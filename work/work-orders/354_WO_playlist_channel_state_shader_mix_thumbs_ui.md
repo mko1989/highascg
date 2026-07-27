@@ -40,6 +40,15 @@ renderable predicate too.
   `.scenes-toolbar__global-take--right` margin-left auto → 0; the transition group owns the
   right edge since WO-350.
 
+## Follow-up (same day)
+
+- Compact playlist transport: ⏮/▶/⏭ render as white-on-BLUE emoji squares in Noto Color Emoji —
+  swapped to the always-monochrome geometric glyphs ◄◄ / ► / ►► (U+25C4/25BA have no emoji
+  presentation) and the play button joined `btn--secondary` (no primary-blue fill).
+- Shader deck thumbs: restoring cg-only eligibility (item 3) routed shader looks through the
+  contain-fit drawer → checkerboard bars again. Shader layers now STRETCH their content-cropped
+  PNG into the layer rect (they render full-rect on air), other CG keeps contain-fit.
+
 ## Verification
 
 test:ci 1532/0 (wo224 repointed), lint 0, 500-line gate 0, client built, service restarted,

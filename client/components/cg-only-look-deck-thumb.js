@@ -174,7 +174,13 @@ export function drawCgOnlyLookDeckThumb(ctx, W, H, scene, opts = {}) {
 				ctx.beginPath()
 				ctx.rect(px, py, pw, ph)
 				ctx.clip()
-				drawCgThumbContained(ctx, entry.img, px, py, pw, ph, singleLayerFill ? 0.04 : 0.06)
+				/* todos27: shaders render full-rect on air, so their (content-cropped) thumb
+				 * STRETCHES into the layer rect — contain-fit left checkerboard bars. */
+				if (/(^|\/)shaders\//i.test(String(req.sourceValue || ''))) {
+					ctx.drawImage(entry.img, px, py, pw, ph)
+				} else {
+					drawCgThumbContained(ctx, entry.img, px, py, pw, ph, singleLayerFill ? 0.04 : 0.06)
+				}
 				ctx.restore()
 				return
 			}

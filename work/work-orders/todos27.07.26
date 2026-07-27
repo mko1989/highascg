@@ -43,4 +43,5 @@ when i click back to gui, the browser hides under the casparcg screen, but after
 
 
  in the compact playlist the next prev buttons have blue bg under icons, i dont want it.
+ the shaders thumbs are back to not filling the screen even though the layer they are on is set to screen's dimmensions.
  

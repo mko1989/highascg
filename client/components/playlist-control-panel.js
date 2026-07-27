@@ -36,9 +36,9 @@ export function initPlaylistControlPanel(mountEl) {
 					<button type="button" class="btn btn--secondary" id="plp-timeless-apply" title="Set the duration of every image/template/shader item in this playlist">Set all</button>
 				</div>
 				<div class="playlist-control-panel__row playlist-control-panel__transport">
-					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item">⏮</button>
-					<button type="button" class="btn" id="plp-play" title="Restage the selected item">▶</button>
-					<button type="button" class="btn btn--secondary" id="plp-next" title="Next item">⏭</button>
+					<button type="button" class="btn btn--secondary" id="plp-prev" title="Previous item">◄◄</button>
+					<button type="button" class="btn btn--secondary" id="plp-play" title="Restage the selected item">►</button>
+					<button type="button" class="btn btn--secondary" id="plp-next" title="Next item">►►</button>
 				</div>
 			</div>
 		</div>`
