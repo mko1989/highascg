@@ -175,3 +175,10 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       ▶ in the editor bar takes PRV→PGM with the deck's transition. ↺ per-param reset
       visibly snaps the row back now.
       >
+
+- [ ] **35. Shader names + no more file fights** (Syncthing fix)
+      Rename a shader in the edit modal → the templates browser shows the NEW name (may take
+      one refresh, 15s cache). Files in template/shaders stop being "touched" constantly and
+      deleted shaders STAY deleted. NOTE: add the same two .stignore lines
+      (/template/shaders, /data/shaders) on the MacBook's copy — stignore doesn't sync itself.
+      >
