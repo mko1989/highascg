@@ -65,7 +65,7 @@ function getHelperCoordinator(ctx) {
 		resolveWindowContext: async (id, info) => {
 			const action = info?.action || id
 			const env = xds.displaySessionEnv()
-			const ids = await xds.findGuiWindowIds(action, { excludeTitle: OPERATOR_TITLE_MARKER })
+			const ids = await xds.findGuiWindowIds(action, { excludeTitle: OPERATOR_TITLE_MARKER, includeHidden: true })
 			const rectInfo = (() => {
 				try {
 					return xds.resolveHelperWindowRect(ctx.config)
@@ -100,7 +100,7 @@ function getHelperCoordinator(ctx) {
 					if (!h) return
 					if (h.state !== 'launching') return
 					try {
-						const ids = await xds.findGuiWindowIds(action, { excludeTitle: OPERATOR_TITLE_MARKER })
+						const ids = await xds.findGuiWindowIds(action, { excludeTitle: OPERATOR_TITLE_MARKER, includeHidden: true })
 						if (Array.isArray(ids) && ids.length) {
 							_singleton.onHelperMapped(id, ids[0])
 							return
@@ -131,7 +131,9 @@ async function reconcileHelperWindows(ctx) {
 	for (const h of coord.taskbar()) {
 		if (h.state !== 'open') continue
 		try {
-			const ids = await xds.findGuiWindowIds(h.info?.action || h.id, { excludeTitle: OPERATOR_TITLE_MARKER })
+			/* includeHidden: a minimized helper is still running — keep its chip (raising it
+			 * de-iconifies via _NET_ACTIVE_WINDOW). */
+			const ids = await xds.findGuiWindowIds(h.info?.action || h.id, { excludeTitle: OPERATOR_TITLE_MARKER, includeHidden: true })
 			if (!Array.isArray(ids) || ids.length === 0) coord.onHelperGone(h.id)
 		} catch {
 			/* transient X error — do not reap on noise */

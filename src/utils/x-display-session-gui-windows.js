@@ -59,7 +59,10 @@ async function findGuiWindowIds(action, opts = {}) {
 	for (const winClass of winClasses) {
 		for (const flag of ['--class', '--classname']) {
 			try {
-				const { stdout } = await execFileAsync('xdotool', ['search', '--onlyvisible', flag, winClass], {
+				/* Owner 27.07: '--onlyvisible' excludes ICONIFIED windows — a minimized helper
+				 * vanished from the taskbar and got reaped. includeHidden keeps it listed. */
+				const searchArgs = opts.includeHidden === true ? ['search', flag, winClass] : ['search', '--onlyvisible', flag, winClass]
+				const { stdout } = await execFileAsync('xdotool', searchArgs, {
 					env,
 					timeout: 3000,
 				})

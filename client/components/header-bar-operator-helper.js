@@ -140,6 +140,23 @@ export function initHeaderBarOperatorHelper(container) {
 		if (!wrap.contains(/** @type {Node} */ (e.target))) closeMenu()
 	})
 
+	/* Owner 27.07: clicking the GUI while a helper is raised = "I want the GUI" — auto-park
+	 * every raised helper (a raised window covers the video holes; the operator should never
+	 * have to find the chip first). Clicks on this control's own chrome are exempt. */
+	let _lastHelpers = []
+	document.addEventListener(
+		'pointerdown',
+		(e) => {
+			if (!_taskbarOn) return
+			if (wrap.contains(/** @type {Node} */ (e.target))) return
+			const raised = _lastHelpers.filter((h) => h.state === 'open' && h.parked !== true)
+			for (const h of raised) {
+				void operatorHelperTaskbarAction(h.id, h.info?.action || h.id).then(() => refresh())
+			}
+		},
+		{ capture: true },
+	)
+
 	// WO-317: taskbar strip of running helpers, shown ONLY when the server reports the multi-helper
 	// feature enabled. When off, this stays empty and the WO-283 single button above is the whole UI.
 	const taskbar = document.createElement('div')
@@ -190,6 +207,7 @@ export function initHeaderBarOperatorHelper(container) {
 		// Poll the taskbar too; cheap, and it is the only signal that a helper crashed/closed.
 		const tb = await getOperatorHelperTaskbar()
 		_taskbarOn = tb.enabled
+		_lastHelpers = Array.isArray(tb.helpers) ? tb.helpers : []
 		if (tb.enabled) {
 			// With the taskbar active, launching is per-helper (multiple can run) — the menu items
 			// route through the taskbar action instead of the single-helper open.
