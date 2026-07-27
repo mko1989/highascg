@@ -153,14 +153,24 @@ export function initHeaderBarOperatorHelper(container) {
 			if (h.state !== 'open' && h.state !== 'launching') continue
 			const chip = document.createElement('button')
 			chip.type = 'button'
-			// Owner styling (WO-317 note 2026-07-26): same look as the rec/stream indicator pills —
-			// `.active` (red) = helper currently raised over the GUI, idle gray = parked/hidden.
-			chip.className = `header-stream-indicator header-operator-taskbar__chip${h.parked || h.state === 'launching' ? '' : ' active'}`
-			const label = labelFor(h.info?.action || h.id)
+			// Owner (todos27.07.26): circular chips with the app's SYSTEM icon inside — red ring =
+			// raised over the GUI, gray ring = parked/hidden, pulsing = still launching.
+			chip.className = `header-operator-taskbar__chip${h.parked || h.state === 'launching' ? '' : ' active'}${h.state === 'launching' ? ' launching' : ''}`
+			const action = h.info?.action || h.id
+			const label = labelFor(action)
+			const img = document.createElement('img')
+			img.className = 'header-operator-taskbar__icon'
+			img.alt = label
+			img.src = `/api/system/operator-helper-icon?action=${encodeURIComponent(action)}`
+			// 404 (no system icon) → first letter in the circle instead.
+			img.addEventListener('error', () => {
+				img.remove()
+				chip.textContent = label.slice(0, 1).toUpperCase()
+			})
+			chip.appendChild(img)
 			// A parked helper is behind the video; a raised one is on top. The chip shows which and
 			// clicking toggles it — click a parked chip to bring it forward, a raised one to send it back.
-			chip.textContent = h.state === 'launching' ? `${label}…` : label
-			chip.title = h.parked ? `Bring ${label} to front` : `Send ${label} behind the GUI`
+			chip.title = h.state === 'launching' ? `${label} launching…` : h.parked ? `Bring ${label} to front` : `Send ${label} behind the GUI`
 			chip.disabled = h.state === 'launching'
 			chip.addEventListener('click', async (e) => {
 				e.preventDefault()

@@ -314,7 +314,7 @@ def stacking_gap(root, caspar_top_id, firefox_top_id):
         return None
 
 
-def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
+def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id, helper_open=False):
     """Keep the operator_gui Caspar consumer DIRECTLY under Firefox, permanently:
       - EWMH: strip BELOW, add ABOVE — the consumer rides the kiosk's layer so no normal-layer
         window can ever sit between them (owner request 2026-07-26);
@@ -342,7 +342,11 @@ def enforce_caspar_under(root, monitor, channel, firefox_pair, prev_caspar_id):
     set_input_empty(pair)
     if is_new:
         log(f"caspar consumer window {client.id} (ch {channel}): pinned under kiosk (ABOVE layer) + input-dead")
-    if firefox_pair is not None:
+    # todos27.07.26: while a helper window is deliberately RAISED over the kiosk (helper_open),
+    # the adjacency heal must stand down — raising the consumer+kiosk pair here is exactly what
+    # shoved the operator's browser back under the video ~2s after every raise. EWMH pinning and
+    # the input-dead shape above stay in force; only the restack watchdog pauses.
+    if firefox_pair is not None and not helper_open:
         gap = stacking_gap(root, top.id, firefox_pair[0].id)
         if gap == 'inverted':
             log("stacking inverted (caspar above firefox) — re-activating firefox")

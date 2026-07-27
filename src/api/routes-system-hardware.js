@@ -26,7 +26,7 @@ const {
 /**
  * @param {string} p
  */
-async function hardwareHandleGet(p, ctx) {
+async function hardwareHandleGet(p, ctx, query) {
 	if (p === '/api/system/gpu-nvidia') return gpuNvidiaGet()
 	if (p === '/api/system/gpu-layout') return handleGpuLayoutGet()
 	if (p === '/api/system/decklink') return decklinkGet()
@@ -42,6 +42,10 @@ async function hardwareHandleGet(p, ctx) {
 	if (p === '/api/system/operator-helper-taskbar') {
 		const { handleOperatorHelperTaskbarGet } = require('./system-hardware-gui')
 		return handleOperatorHelperTaskbarGet(ctx)
+	}
+	if (p === '/api/system/operator-helper-icon') {
+		const { handleOperatorHelperIconGet } = require('./system-hardware-gui')
+		return handleOperatorHelperIconGet(query)
 	}
 	return null
 }

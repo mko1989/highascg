@@ -145,6 +145,7 @@ def main() -> int:
                 caspar_pair = enforce_caspar_under(
                     root, state_monitor, state_channel, win,
                     caspar_pair[1].id if caspar_pair else None,
+                    helper_open=state_helper_open,
                 )
 
             r, _, _ = select.select([stdin_fd], [], [], STDIN_SELECT_TIMEOUT_SEC)

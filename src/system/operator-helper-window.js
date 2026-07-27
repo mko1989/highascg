@@ -208,6 +208,14 @@ async function restoreNow(reason, ctx) {
 	const done = nextHelperState(session.state, 'restore_done')
 	say(ctx.log, 'info', `restored — state=${done.state}`)
 	resetSession()
+	/* todos27.07.26: the kiosk is now re-asserted over everything — if the WO-317 taskbar
+	 * coordinator is active, its raised helpers are effectively parked; tell it so the next
+	 * chip click raises instead of double-parking. */
+	try {
+		require('./operator-helper-live').noteKioskRestored()
+	} catch {
+		/* taskbar feature absent — single-helper boxes */
+	}
 }
 
 /**

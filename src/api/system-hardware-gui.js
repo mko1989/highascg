@@ -234,12 +234,66 @@ async function handleOperatorHelperWindowPost(body, ctx) {
  * WO-317 — GET /api/system/operator-helper-taskbar. Returns the multi-helper taskbar model when the
  * feature is enabled, else `{ enabled: false }` so the client renders the WO-283 single button.
  */
-function handleOperatorHelperTaskbarGet(ctx) {
-	const { getHelperCoordinator, isMultiHelperTaskbarEnabled } = require('../system/operator-helper-live')
+/* todos27.07.26: taskbar chips show the real app icons. Fixed candidate lists — these are the
+ * exact paths the installed packages ship on this box (hicolor theme + pixmaps); first hit wins,
+ * 404 lets the client fall back to a letter. Never globs, never follows user input into fs. */
+const HELPER_ICON_CANDIDATES = {
+	firefox: [
+		'/usr/share/icons/hicolor/64x64/apps/firefox-esr.png',
+		'/usr/share/icons/hicolor/128x128/apps/firefox-esr.png',
+		'/usr/share/icons/hicolor/64x64/apps/firefox.png',
+	],
+	'file-manager': [
+		'/usr/share/icons/hicolor/128x128/apps/org.xfce.thunar.png',
+		'/usr/share/icons/hicolor/48x48/apps/org.xfce.thunar.png',
+	],
+	desktopvideo_setup: [
+		'/usr/share/icons/hicolor/128x128/apps/BlackmagicDesktopVideoSetup.png',
+		'/usr/share/icons/hicolor/48x48/apps/BlackmagicDesktopVideoSetup.png',
+	],
+	desktop_video_updater: [
+		'/usr/share/icons/hicolor/128x128/apps/DesktopVideoUpdater.png',
+		'/usr/share/icons/hicolor/48x48/apps/DesktopVideoUpdater.png',
+	],
+	'nvidia-settings': [
+		'/usr/share/icons/hicolor/64x64/apps/nvidia-settings.png',
+		'/usr/share/pixmaps/nvidia-settings.png',
+	],
+}
+
+/** GET /api/system/operator-helper-icon?action=<helper action> → the app's system icon (PNG). */
+function handleOperatorHelperIconGet(query) {
+	const action = String(query?.action || '')
+	const candidates = HELPER_ICON_CANDIDATES[action]
+	if (!candidates) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'unknown action' }) }
+	for (const f of candidates) {
+		try {
+			const buf = fs.readFileSync(f)
+			return {
+				status: 200,
+				headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
+				body: buf,
+			}
+		} catch {
+			/* try next candidate */
+		}
+	}
+	return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'icon not found' }) }
+}
+
+async function handleOperatorHelperTaskbarGet(ctx) {
+	const { getHelperCoordinator, isMultiHelperTaskbarEnabled, reconcileHelperWindows } = require('../system/operator-helper-live')
 	if (!isMultiHelperTaskbarEnabled(ctx?.config)) {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, helpers: [] }) }
 	}
 	const coord = getHelperCoordinator(ctx)
+	/* todos27.07.26: the 1.5s client poll is the only signal a helper's window was closed by the
+	 * operator — reconcile registry vs live windows here so chips never show ghosts. */
+	try {
+		await reconcileHelperWindows(ctx)
+	} catch {
+		/* reconcile is best-effort — never fail the poll */
+	}
 	const { HELPER_ACTIONS } = require('../system/operator-helper-window')
 	return {
 		status: 200,
@@ -364,6 +418,7 @@ module.exports = {
 	handleOperatorHelperWindowPost,
 	handleOperatorHelperWindowGet,
 	handleOperatorHelperTaskbarGet,
+	handleOperatorHelperIconGet,
 	handleOperatorHelperTaskbarPost,
 	handlePointerConfinePost,
 }

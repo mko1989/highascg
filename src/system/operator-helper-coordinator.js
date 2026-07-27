@@ -115,6 +115,15 @@ function createHelperCoordinator(deps) {
 		taskbar() {
 			return listHelpers(reg)
 		},
+		/** todos27.07.26: the WO-283 "Back to GUI" restore re-asserts the kiosk over EVERYTHING —
+		 * reflect that here or the next chip click toggles the wrong way ('park' on an already
+		 * hidden helper). Marks every unparked open helper parked and recomputes the flag. */
+		parkAllOpen() {
+			for (const h of Object.values(reg.helpers)) {
+				if (h.state === 'open' && !h.parked) h.parked = true
+			}
+			syncShapeFlag()
+		},
 		/** Test/inspection hooks. */
 		_registry: reg,
 		_shapeFlag: () => lastFlag,

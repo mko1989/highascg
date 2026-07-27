@@ -54,6 +54,9 @@ describe('shape helper: consumer input-dead + BELOW, firefox CLIENT above, watch
 		assert.match(pySrc, /_NET_ACTIVE_WINDOW/, 'reactivation atom interned')
 		assert.match(pySrc, /def activate_window/, 'reactivation fn exists')
 		assert.match(pySrc, /stacking_gap\(root, top\.id, firefox_pair\[0\]\.id\)/, 'watchdog compares toplevels (what the X server stacks)')
+		/* todos27.07.26: while a helper is deliberately raised (helper_open), the heal must stand
+		 * down — it was shoving the operator's browser back under the video every poll tick. */
+		assert.match(pySrc, /firefox_pair is not None and not helper_open/, 'adjacency heal suspended while a helper window is raised')
 	})
 	it('enforce_caspar_under runs on EVERY poll tick (a restarted consumer must be re-neutralized <=2s) and input is restored on exit', () => {
 		assert.match(pySrc, /caspar_pair = enforce_caspar_under\(/, 'poll loop re-asserts the lock')
