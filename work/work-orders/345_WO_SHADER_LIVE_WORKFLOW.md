@@ -5,7 +5,7 @@ the logo with glasses, that should change the looks list/editor into shaders edi
 shows parameters for the live shader ... each shader should have it's many different parameters
 available as sliders, color pickers etc."
 
-**Status: OPEN → implementing now.**
+**Status: IMPLEMENTED 2026-07-27 (hot-recompile live-verified: running page dark spectrum → solid green via CG UPDATE, no restart). Owner validates the workflow on the display; NOTE: retake shader looks once so producers pick up the new player.js contract.**
 
 ## Design
 
