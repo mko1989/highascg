@@ -370,3 +370,50 @@ test('T224.1: 2-item auto playlist with playlistLoop=true wraps correctly', asyn
 	assert.strictEqual(amcpCalls[0].clip, 'resolved:item0.mov', 'should wrap to item0 again')
 	assert.strictEqual(self.playlistActiveIndices[pKey], 1, 'activeIndex should be 1 again')
 })
+
+/* Owner 27.07: a PNG dropped between two movies must get its timer and advance. */
+test('image between videos: OSC promotion arms the duration timer and it advances', async () => {
+	delete require.cache[require.resolve('../../src/state/live-scene-state')]
+	require.cache[require.resolve('../../src/state/live-scene-state')] = {
+		exports: { getChannel: (ch) => (ch === 1 ? { scene: { id: 'sc-img', layers: [] } } : null), getAll: () => ({}) },
+	}
+	delete require.cache[require.resolve('../../src/engine/scene-take-lbg-playlist')]
+	const eng = require('../../src/engine/scene-take-lbg-playlist')
+	const calls = []
+	const scene = { id: 'sc-img', layers: [] }
+	const layer = {
+		layerNumber: 10,
+		sourceMode: 'list',
+		playlistAdvance: 'auto',
+		playlistLoop: true,
+		playlist: [
+			{ value: 'v1.mov', type: 'media' },
+			{ value: 'pic.png', type: 'image', duration: 0.02 },
+			{ value: 'v2.mov', type: 'media' },
+		],
+	}
+	scene.layers.push(layer)
+	require.cache[require.resolve('../../src/state/live-scene-state')].exports.getChannel = () => ({ scene })
+	const self = {
+		config: {},
+		playlistActiveIndices: { '1:sc-img-10': 1 },
+		playlistImageTimers: {},
+		playlistOscPrevPlayingPath: {},
+		amcp: {
+			loadbg: async (...a) => calls.push(['loadbg', ...a]),
+			play: async (...a) => calls.push(['play', ...a]),
+			cgAdd: async (...a) => calls.push(['cgAdd', ...a]),
+		},
+		log: () => {},
+	}
+	// The png just got AUTO-promoted (OSC path) — arm branch requires timer absent + timeless.
+	eng.__test_schedulePlaylistImageTimer?.(self, 1, 10, scene, layer, 1)
+	if (!eng.__test_schedulePlaylistImageTimer) {
+		// no test export — reach it via the public trigger (stages item 1 then arms its timer)
+		eng.triggerPlaylistAdvance(self, 1, 10, scene, layer, 1)
+	}
+	await new Promise((r) => setTimeout(r, 120))
+	const played = calls.filter((c) => c[0] === 'loadbg' || c[0] === 'play')
+	assert.ok(self.playlistActiveIndices['1:sc-img-10'] === 2 || played.some((c) => String(c[3] ?? c[2]).includes('v2')),
+		`png timer must advance to v2 (calls: ${JSON.stringify(calls)})`)
+})

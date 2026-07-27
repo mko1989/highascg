@@ -82,8 +82,11 @@ export function initPlaylistControlPanel(mountEl) {
 		itemSel.innerHTML = (p?.items || [])
 			.map((it, i) => {
 				const active = i === cur ? (p.live ? '● ' : '▸ ') : ''
-				const dur = it.duration != null ? ` (${it.duration}s)` : ''
-				return `<option value="${i}"${i === cur ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${it.label}${dur}`)}</option>`
+				/* Owner 27.07: timed media carries its own length — the (Ns) tag is only true
+				 * for timeless items; labels show the file name, not the path. */
+				const dur = isTimelessItem(it) && it.duration != null ? ` (${it.duration}s)` : ''
+				const base = String(it.label || '').replace(/\\/g, '/').split('/').filter(Boolean).pop() || it.label
+				return `<option value="${i}"${i === cur ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${base}${dur}`)}</option>`
 			})
 			.join('')
 		for (const id of ['plp-prev', 'plp-play', 'plp-next']) {

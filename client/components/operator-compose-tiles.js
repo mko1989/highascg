@@ -112,11 +112,6 @@ export function initOperatorComposeTiles(container, options) {
 
 	const root = document.createElement('div')
 	root.className = 'operator-compose-tiles'
-	const resetBtn = document.createElement('button')
-	resetBtn.type = 'button'
-	resetBtn.className = 'operator-compose-tiles__reset-btn'
-	resetBtn.textContent = 'Reset layout'
-	root.appendChild(resetBtn)
 	container.appendChild(root)
 
 	// 2026-07-19 bug: switching looks list <-> looks editor shifts the whole canvas vertically at
@@ -255,7 +250,6 @@ export function initOperatorComposeTiles(container, options) {
 		persist()
 		layoutAll()
 	}
-	resetBtn.addEventListener('click', (e) => { e.stopPropagation(); resetLayout() })
 
 	// WO-323 — accept Sources-panel Live-tab drags (same payload the multiview editor consumes).
 	// The drop must land on real DOM (canvas background / tile chrome) — hole bodies are input-dead

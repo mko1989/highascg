@@ -83,6 +83,15 @@ export function mixinSceneStateLayerOps(SceneStateClass) {
 		},
 
 		patchLayer(sceneId, layerIndex, patch) {
+			/* Owner 27.07: playlist edits while the look is LIVE must reach the running engine —
+			 * central hook so every mutation path (inspector rows, panel Set-all, drops) pushes.
+			 * Server no-ops when the scene isn't live anywhere. */
+			if (patch && Array.isArray(patch.playlist)) {
+				const ln = this.getScene(sceneId)?.layers?.[layerIndex]?.layerNumber
+				if (ln != null) {
+					import('./playlist-live-sync.js').then((m) => m.pushLivePlaylistUpdate(sceneId, ln, patch.playlist)).catch(() => {})
+				}
+			}
 			const L = this.getScene(sceneId)?.layers?.[layerIndex]
 			if (L) {
 				LayerLogic.patchLayer(L, patch)

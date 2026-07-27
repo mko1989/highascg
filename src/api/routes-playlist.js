@@ -79,6 +79,31 @@ async function handleControlPost(body, ctx) {
 	const channel = parseInt(b.channel, 10)
 	const layerNumber = parseInt(b.layerNumber, 10)
 	const action = String(b.action || 'next')
+	/* Owner 27.07 ("dropped a png mid-play, it never played"): playlist EDITS while the look is
+	 * LIVE must reach the running engine — the OSC advance loop reads liveSceneState every tick,
+	 * so patching the live layer's playlist there makes the new list the truth for the next hop.
+	 * Timers for this layer are re-armed against the new list when the current item advances. */
+	if (action === 'update_live') {
+		const sceneId = String(b.sceneId || '').trim()
+		const items = Array.isArray(b.playlist) ? b.playlist : null
+		if (!sceneId || !Number.isFinite(layerNumber) || !items) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'sceneId, layerNumber, playlist required' }) }
+		}
+		let patched = 0
+		for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
+			const scene = entry?.scene
+			if (!scene || String(scene.id) !== sceneId || !Array.isArray(scene.layers)) continue
+			const idx = scene.layers.findIndex((l) => Number(l?.layerNumber) === layerNumber)
+			if (idx < 0) continue
+			const next = JSON.parse(JSON.stringify(scene))
+			next.layers[idx] = { ...next.layers[idx], playlist: items }
+			await liveSceneState.setChannel(parseInt(chKey, 10), { sceneId: entry.sceneId, scene: next })
+			patched++
+		}
+		if (patched > 0) liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, patched }) }
+	}
+
 	/* WO-347: pre-playout start item for a NOT-live playlist — keyed by sceneId, consumed by
 	 * setupLayerPlaylists at the next take of that look. Sticky until changed. */
 	if (action === 'set_start') {
