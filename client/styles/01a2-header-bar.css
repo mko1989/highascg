@@ -428,6 +428,15 @@
 }
 
 
+.header-wall-clock {
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+	white-space: nowrap;
+	margin-right: 10px;
+	align-self: center;
+}
+
 /* todos27.07.26 — WO-317 taskbar: circular chips with the app's system icon inside.
  * Red ring = raised over the GUI, gray ring = parked, pulse = launching. */
 .header-operator-taskbar__chip {

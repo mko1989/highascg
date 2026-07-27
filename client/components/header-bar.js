@@ -280,6 +280,18 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		apply()
 	}
 
+	/* Owner (todos27, final spot): system clock with seconds immediately LEFT of the
+	 * connection eyes. statusEl is a vertical column (P1 / eyes / filename), so the clock is a
+	 * HORIZONTAL sibling before it in rightWrap — not a child of the column. */
+	const wallClock = document.createElement('span')
+	wallClock.id = 'header-wall-clock'
+	wallClock.className = 'header-wall-clock'
+	const tickWallClock = () => {
+		wallClock.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false })
+	}
+	tickWallClock()
+	setInterval(tickWallClock, 1000)
+
 	// Layout: [title] [project · save · load · new · sync] [server · settings] … [headphones · eyes]
 	const autosaveIndicator = document.createElement('span')
 	autosaveIndicator.className = 'header-autosave-indicator'
@@ -320,7 +332,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 
 	const rightWrap = document.createElement('div')
 	rightWrap.className = 'header-right'
-	rightWrap.append(audioGroup, statusEl)
+	rightWrap.append(audioGroup, wallClock, statusEl)
 
 	titleEl.insertAdjacentElement('afterend', leftWrap)
 	leftWrap.insertAdjacentElement('afterend', midWrap)

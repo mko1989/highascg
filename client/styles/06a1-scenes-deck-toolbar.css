@@ -163,12 +163,3 @@
 	align-items: center;
 	gap: 6px;
 }
-
-/* System clock in the deck top bar, next to the screen-pill eyes. */
-.scenes-toolbar .scenes-wall-clock {
-	font-size: 12px;
-	font-variant-numeric: tabular-nums;
-	color: var(--text-muted);
-	white-space: nowrap;
-	align-self: center;
-}
