@@ -34,65 +34,70 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       (the "stopped displaying" case).
       >
 
-- [ ] **6. Deck cards**
+- [x] **6. Deck cards**
       Shaders: **red** border on PGM (not violet), thumbs fill the square.
       Footer buttons small + centered; ✕ top-right red, copy below it; names start from the edge;
       angled 45° panel labels with tight underline.
       >
 
-- [ ] **7. Two-client drill** (WO-329)
+- [x] **7. Two-client drill** (WO-329)
       Laptop browser + kiosk side by side — takes, preview recalls, look edits from each.
       Both converge, nothing blocked, no sync-error toasts.
       >
 
 - [ ] **8. Taskbar** (WO-317)
       Open via the small indicator-style button, launch two helpers, toggle chips.
-      >
+      >doesnt realy work automaticaly as it should, just clicking on the gui should push the window under the caspar consumer.
+      minimaizing firefox forinstance makes it disappear from the "task bar"
 
-- [ ] **9. Live-audio host channel** (WO-336)
+
+- [x] **9. Live-audio host channel** (WO-336)
       Device-view host-channel inspector: device swap + FFT source toggle.
       Shader reacts on the Caspar program with music from the DM3.
       >
 
-- [ ] **10. Shader on look band + compose source tiles** (WO-322/323)
+- [x] **10. Shader on look band + compose source tiles** (WO-322/323)
       Bank crossfade with a shader on the look band looks right.
       Compose live-source tiles survive drop / remove / restart.
       >
 
 ## B. Needs privileges / hardware / a decision
 
-- [ ] **11. Power button root install** (WO-332) — needs a sudo run.
-      >
+- [x] **11. Power button root install** (WO-332) — needs a sudo run.
+      >casparcg@highascg7579:~/highascg$ sudo install -m 755 /home/casparcg/highascg/tools/runtime/highascg-power-button-listen.sh \
+  /usr/local/lib/highascg/highascg-power-button-listen.sh
+sudo systemctl restart highascg-power-button.service
+[sudo] password for casparcg: 
 
-- [ ] **12. Companion deploy** (WO-330) — run the one deploy command in the WO, then desk QA.
-      >
+- [x] **12. Companion deploy** (WO-330) — run the one deploy command in the WO, then desk QA.
+      >although the module needs work later. it should also work in dev mode which would be easier to work on.
 
 - [ ] **13. Headless-GUI flag** (WO-325 Part A) — regenerate Caspar config + restart to take effect.
       >
 
-- [ ] **14. nodm on canvas growth** (WO-315) — on the next real canvas-growth apply, confirm the
+- [x] **14. nodm on canvas growth** (WO-315) — on the next real canvas-growth apply, confirm the
       restart decision fires correctly (test suite now green + hermetic).
-      >
+      >worked, the last i checked.
 
 - [ ] **15. Brightness decay trigger pattern** (3d-meters worst)
       Next time it dims, note: **gradual while idle** or **step per take**? That answer unblocks
       the investigation.
-      >
+      >when i do some tweaks so it looks how i want it stops dimming.
 
 - [ ] **16. Uncommitted runtime diffs** — `config/*.json` + `template/shaders/`
       (modified sh-audio/balatro/…, deleted sh-ext + sh-ios, 7 new untracked shaders).
       Decide: commit as-is, or restore the deletions if unintended.
-      >
+      >not sure
 
 ## C. GitHub (passive)
 
-- [ ] **17. No more failure emails** — CI + Pages both green since this morning (WO-349);
+- [x] **17. No more failure emails** — CI + Pages both green since this morning (WO-349);
       the Pages site serves the project map again. Just notice the absence of mail.
       >
 
 ## D. Added mid-day 27.07 (WO-350 / WO-351)
 
-- [ ] **18. Bar heights** (WO-350)
+- [x] **18. Bar heights** (WO-350)
       Compose preview top bar is ~half its old height; the progress bar above it sits tight;
       the looks-list column head is lower; the mix/duration/tween group is small and
       right-adjusted in the deck toolbar (no more full-width stretch).
@@ -102,24 +107,24 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       The footer Playlists panel has a "Timeless (s)" input + **Set all**. After applying,
       the input keeps showing the value you set (not 20) — both here and in the layer
       inspector's "Timeless items (s)".
-      >
+      >it still displays 5s for media clips with time.
 
 - [ ] **20. Monitor picker** (WO-351 — needs a fresh-boot pick to see)
       Prompt is black with white centered text and a subtle gray frame.
       After clicking a monitor, the devices tab shows the Operator GUI destination cabled
       to that GPU port (any old cable on that jack replaced).
-      >
+      >not yet checked.
 
-- [ ] **21. Taskbar** (WO-352 — live-verified by automation, worth an eyeball)
+- [x] **21. Taskbar** (WO-352 — live-verified by automation, worth an eyeball)
       Chips are circles with the real app icons (red ring = raised, gray = parked, pulsing =
       launching). Open the browser, park it, raise it again — it must come back and STAY
       (the old ~2s steal is fixed). "Back to GUI" then one chip click brings it forward.
-      >
+      >other issues detailed above.
 
 - [ ] **22. Playlist rows + ✕** (WO-353)
       Playlist items: tiny drag dots, name gets the space, small seconds box, ✕ delete.
       Trashcans are ✕ everywhere (layer list, preset delete, sources folder too).
-      >
+      >the space between the two columns of dots is unnecesserily wide.
 
 - [ ] **23. Playlist edit → preview** (WO-354)
       Edit a playlist, take the look to PGM (new list plays), recall it to preview —
@@ -130,36 +135,36 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
 - [ ] **24. Shader playlist mixing** (WO-354)
       Shaders in a playlist with a MIX transition crossfade again. Editing one of those
       shaders in Shader Live restarts it once (at the first slider move), then edits land live.
-      >
+      >all shaders doesnt mix well now, even from look to look.
 
-- [ ] **25. Shader thumbs on ALL looks** (WO-354)
+- [x] **25. Shader thumbs on ALL looks** (WO-354)
       Every pure-shader look renders a real thumbnail on its deck card, not just one.
-      >
+      >mostly true.
 
-- [ ] **26. Compose footer font + take buttons** (WO-354)
+- [x] **26. Compose footer font + take buttons** (WO-354)
       Current-item name under each screen window is readable (12px); ▶/CUT sit on the LEFT
       of the deck toolbar next to the screen pills.
       >
 
-- [ ] **27. Playlists are PGM-only + stop on take-out** (WO-355)
+- [x] **27. Playlists are PGM-only + stop on take-out** (WO-355)
       Recall a playlist look to preview: it shows one item and sits still. Take a different
       look to PGM: the old look's playlist stops hopping immediately.
       >
 
-- [ ] **28. Shader Live editor** (WO-355)
+- [x] **28. Shader Live editor** (WO-355)
       Dropdown no longer blinks; params fully visible in both columns (color pickers included);
       ✎ next to any param names it (persists across reload; tooltip shows the raw code context).
       >
 
 - [ ] **29. Wall clock** (WO-355)
       Small HH:MM:SS ticking at the right end of the progress-bar row.
-      >
+      >no, it needs to be between the eyes and progress bar.
 
-- [ ] **30. Shader params decoded + categorized** (WO-355 follow-up)
+- [x] **30. Shader params decoded + categorized** (WO-355 follow-up)
       Deep params show human names ("speed", "uv scale", "mix amount", "iterations"…) grouped
       under Colors / Speed & time / Scale & shape / Intensity / Detail — no more code snippets
       as names (those now live in the hover tooltip). ✎ still renames anything.
-      >
+      >needs further work but later.
 
 - [ ] **31. Shader Live v3** (WO-356)
       Categories in bordered boxes, compact rows; mouse wheel over any slider steps it;
@@ -195,4 +200,11 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       override with their own rects). "Enable secondary color" reveals the second color +
       transition-time slider; the glow breathes between the two. Pulse speed and min-opacity
       sliders reach 0 (speed 0 = pulse off).
+      >
+
+- [ ] **38. Route looks rock solid** (WO-359)
+      Take a look with a source layer + routes of it (Look 12), CUT-retake it several times and
+      MIX between it and its copy — the source and BOTH routes must survive every take (the bug
+      was cut retakes sweeping the unchanged source layer away). Automated 6-cycle drill passed;
+      confirm by eye on the glass.
       >

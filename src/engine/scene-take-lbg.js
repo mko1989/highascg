@@ -168,6 +168,15 @@ async function runSceneTakeLbg(amcp, opts) {
 	const shouldClearOrphans = (!shouldRunBankCrossfade && takeJobs.length > 0) || (opts.pgmOnly && takeJobs.length > 0)
 	if (shouldClearOrphans) {
 		const incomingPhys = takeJobs.map((j) => j.pLayer)
+		/* Owner 27.07 ("routes not consistent — must be rock solid"): visually-equal skipped
+		 * layers are NOT takeJobs, but their producer stays on air — on the current bank now
+		 * and on the target bank after the WO-218 SWAP. The sweep was clearing them on CUT
+		 * takes (crossfade takes skip the sweep — hence "inconsistent"), killing the unchanged
+		 * layer and every route:// of it. Keep BOTH endpoints. */
+		for (const sk of skippedVisuallyEqualLayers) {
+			incomingPhys.push(sk.physicalLayerNow)
+			incomingPhys.push(phys(sk.layerNumber, inactiveBank))
+		}
 		const stalePhys = collectOrphanLookPhysicalLayers(self, channel, incomingPhys)
 		if (stalePhys.length > 0) {
 			try {
