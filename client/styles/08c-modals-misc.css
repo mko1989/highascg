@@ -273,8 +273,11 @@
 	gap: 10px;
 }
 
-.scenes-rundown-row .scenes-rundown-playback {
-	flex: 1;
+/* The playback-timer mount OVERWRITES the slot's className, so target by position — the
+ * class selector silently stopped matching and the clock hugged the label (owner: "i still
+ * dont see the time"). */
+.scenes-rundown-row > :first-child {
+	flex: 1 1 auto;
 	min-width: 0;
 }
 

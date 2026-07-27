@@ -248,6 +248,15 @@ export function pickTopLayerStateForPlayback(channelState, opts) {
  * @param {(layerState: object) => boolean} predicate
  * @returns {{ layerNum: number | null, layerState: object | null }}
  */
+/* Owner 27.07: route layers are wiring, not content — never surface them in the progress
+ * bars or as the top active layer (idle label OR running playback). */
+function isRouteOscLayer(ly) {
+	if (!ly || typeof ly !== 'object') return false
+	if (String(ly.type || '').trim().toLowerCase() === 'route') return true
+	const f = ly.file && (ly.file.name || ly.file.path)
+	return typeof f === 'string' && /^route:\/\//i.test(f.trim())
+}
+
 function pickTopLayerStateBy(channelState, opts, predicate) {
 	const layers = channelState?.layers
 	if (!layers) return { layerNum: null, layerState: null }
@@ -261,6 +270,7 @@ function pickTopLayerStateBy(channelState, opts, predicate) {
 		if (isExcludedPlaybackLayerNum(n)) continue
 		if (n < lo || n > hi) continue
 		const ly = layers[key]
+		if (isRouteOscLayer(ly)) continue
 		if (isStaleOscPlaybackLayer(ly, nowTs)) continue
 		if (n > bestN && predicate(ly)) {
 			bestN = n
