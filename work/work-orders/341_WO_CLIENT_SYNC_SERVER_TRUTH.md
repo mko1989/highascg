@@ -4,7 +4,28 @@
 and fixed. both of them are controling same server, both should display live state of the server,
 every new call from wherever becomes the truth. but only actual user interaction."
 
-**Status: surveyed (two deep scans, 2026-07-26) + top defects fixed same night; structural work open.**
+**Status: kill list IMPLEMENTED 2026-07-27 (items 1–7); item 8 = observe-then-decide.**
+
+## Kill-list implementation (2026-07-27)
+
+1. `_persist(meta)` tracks whether any contribution in the 1s window was LOCAL; an all-remote
+   window emits `persisted {remote:true}` and the deck-sync/autosave listener skips it.
+2. Resync/reconnect no longer schedules a deck sync — only SEEDING a fresh server (no project)
+   pushes (`serverWasFresh` gate in server-project-sync.js).
+3. The ws import dispatches `project-loaded {detail:{remote:true}}`; the app listener skips it.
+4. Heartbeat + rects nudge KEPT, classified in-code as server-initiated reads of per-client
+   layout (no shared state, no echo path) — see operator-gui-mode-report.js header.
+5. Editor `softChange` handler now render-only for remote-tagged events (a remote import
+   mid-edit-session used to trigger a preview push).
+6. `sceneState.ingestRemoteDeckScenes` — the `scene.deck` broadcast upserts into the client deck
+   as REMOTE data (remote-tagged 'imported', skips the locally-edited look, deletions still via
+   project_sync), then re-applies the last scene.live; deck convergence no longer waits for a
+   project save.
+7. Server stamps `scene.live` change broadcasts with a monotonic `seq`; clients detect a gap
+   (dropped frame on a backed-up socket) and re-pull via refreshSceneLiveFromServer.
+8. OPEN — observe: with 1–5 dead, idle-session autosave cadence should drop to zero (acceptance
+   drill below); only if stale_rev noise persists, implement the server-side base-rev acceptance.
+
 
 ## The principle (owner's, verbatim intent)
 

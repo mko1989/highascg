@@ -101,6 +101,7 @@ export async function bootstrapFromServer(deps) {
 	} = deps
 
 	let state = null
+	let serverWasFresh = false
 	try {
 		state = await api.get('/api/state')
 	} catch (e) {
@@ -135,13 +136,17 @@ export async function bootstrapFromServer(deps) {
 		} else if (!project || (typeof project === 'object' && !Object.keys(project).length)) {
 			// Fresh server with no saved project yet — allow outbound sync.
 			markServerProjectSynced()
+			serverWasFresh = true
 		} else {
 			console.warn('[HighAsCG] Server project missing version — blocking push until reload')
 		}
 	} catch (e) {
 		console.warn('[HighAsCG] Server project load failed:', e?.message || e)
 	} finally {
-		if (isServerProjectSynced()) {
+		/* WO-341 kill #2: a resync/reconnect is NOT user interaction — adopt server state,
+		 * never push back. The one legitimate push here is SEEDING a fresh server that has
+		 * no project at all. */
+		if (serverWasFresh && isServerProjectSynced()) {
 			appLogic.scheduleSceneDeckSync?.()
 		}
 	}

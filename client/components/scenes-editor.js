@@ -3,7 +3,7 @@
  */
 import { settingsState } from '../lib/settings-state.js'
 import { sceneState } from '../lib/scene-state.js'
-import { api, getApiBase } from '../lib/api-client.js'
+import { api } from '../lib/api-client.js'
 import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
 import { clearTemplateThumbCache } from '../lib/template-thumb.js'
 import { initPreviewPanel, drawSceneComposeStack } from './preview-canvas.js'
@@ -352,8 +352,14 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 
 	// Including `scene.live`: take-to-PGM updates `sceneState` silently and applies `scene.live` only — deck PRV/PGM borders read live IDs from sceneState.
 	stateStore.on('*', path => { if (['channelMap', 'scene.live', '*'].includes(path)) scheduleRender() })
-	sceneState.on('softChange', () => {
+	sceneState.on('softChange', (meta) => {
 		previewPanel.scheduleDraw()
+		/* WO-341 kill #5: a REMOTE-tagged soft change (ws import/live broadcast) must never
+		 * trigger preview/border pushes — even mid-edit-session. Render only. */
+		if (meta?.remote === true) {
+			scheduleRender()
+			return
+		}
 		if (sceneState.borderChanged) {
 			sceneState.borderChanged = false
 			previewRuntime.pushBorderOnly()

@@ -9,7 +9,7 @@ Method: every WO 306–344 read; unclear ones verified against code/commits by t
       (WO-339 v2 design; three candidate mechanisms in the WO — pointer-capture test decides)
 - [ ] **WO-344** — shader look-deck thumbnails: content-aware crop + synthetic audio + fill
       compositing (currently borders + alpha void)
-- [ ] **WO-342** — click empty deck-header space clears that screen's PRV (small)
+- [x] **WO-342** — already implemented (scene-list-column.js head click; audit entry was stale)
 - [ ] **WO-320 Part A** — pixel-precise countdown-timer position (Part B eye-fade landed b168f25)
 - [ ] **WO-326 rest** — contentZoom / scale-% control for look layers (the W/H bug part landed
       0299b2d + follow-ups; the feature itself was never built)
@@ -29,8 +29,8 @@ Method: every WO 306–344 read; unclear ones verified against code/commits by t
 - [ ] **WO-317** taskbar: enabled 2026-07-26 + chips restyled — open two helpers, toggle chips
 - [ ] **WO-336** live-audio host-channel controls: check device swap + FFT toggle on display
 - [ ] **WO-329** two-client save/load: after tonight's sync fixes re-run the two-browser drill
-- [ ] **WO-330** Companion: run the one deploy command in the WO, then desk QA
-- [ ] **WO-332** power button: root install still pending (needs sudo run)
+- [x] **WO-330** Companion: deployed + connected (verified 27.07); desk QA with owner
+- [x] **WO-332** power button: installed, service active (verified 27.07)
 - [ ] **WO-325 Part A** headless GUI flag: needs a Caspar config regenerate+restart to take
 - [ ] **WO-315** nodm-on-canvas-growth: verify on the next real canvas-growth apply
 
@@ -49,6 +49,4 @@ WO-335/336/339 v1/340 v1 (today's work, statuses refreshed)
 
 ## E. OPEN INVESTIGATIONS (not WOs yet)
 
-- [ ] Shader brightness decay over time (worst: 3d-meters) — all infrastructure measured clean
-      (FFT feed, stored opacity, mixer opacity, 3-min render). Need owner's trigger pattern:
-      gradual-while-idle vs step-per-take.
+- [x] Shader brightness decay — CLOSED by owner 27.07 ("doesnt matter"); infra measured clean.

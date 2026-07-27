@@ -347,6 +347,9 @@ function resendMergedNow() {
  *      Caspar reconnect; the WS client re-emits broadcast type `'change'` verbatim, so this listens
  *      for that path directly rather than a dedicated message type.
  *  (c) 60s heartbeat while mode is active — belt-and-suspenders for any nudge/reconnect miss.
+ * WO-341 #4 classification (2026-07-27): these are SERVER-INITIATED READS of this client's own
+ * window layout — per-client, never shared state, no client↔client echo possible — and stay
+ * exempt from the "only user interaction writes" rule by design.
  * Call once at startup (client/app.js) with the shared `WsClient` instance.
  * @param {{ on: (event: string, fn: (data: unknown) => void) => (() => void) }} ws
  * @returns {(() => void)|null} unsubscribe-all, or null when operator-GUI mode is inactive / ws is unusable

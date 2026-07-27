@@ -40,8 +40,6 @@ import { projectState } from './lib/project-state.js'
 import { timelineState } from './lib/timeline-state.js'
 import { initOptionalModules } from './lib/optional-modules.js'
 import { initCgStudioTab } from './components/cg-studio-tab.js'
-import { initDeviceView, onDeviceViewTabActivated } from './components/device-view.js'
-import { initAudioMixerView } from './components/audio-mixer-view.js'
 import { placeholderState } from './lib/placeholder-state.js'
 import {
 	bootstrapFromServer,
@@ -279,7 +277,9 @@ async function init() {
 		if (id == null) void flushAutosave()
 	})
 	document.addEventListener('highascg-global-border-config-save', () => void flushAutosave())
-	sceneState.on('persisted', () => {
+	sceneState.on('persisted', (meta) => {
+		/* WO-341 kill #1: an all-remote persist window is server data landing, not a user edit. */
+		if (meta?.remote === true) return
 		if (!canPushProjectToServer()) return
 		appLogic.scheduleSceneDeckSync()
 		void flushAutosave()
@@ -294,7 +294,9 @@ async function init() {
 	})
 	window.addEventListener('pagehide', () => void flushAutosaveIfPending())
 
-	window.addEventListener('project-loaded', () => {
+	window.addEventListener('project-loaded', (e) => {
+		/* WO-341 kill #3: remote ws imports fire this too — only user-initiated loads push. */
+		if (e?.detail?.remote === true) return
 		if (canPushProjectToServer()) appLogic.scheduleSceneDeckSync()
 	})
 

@@ -147,13 +147,20 @@ export class SceneState {
 		this.armedScreenIndices = [this.activeScreenIndex]
 	}
 
-	_persist() {
+	_persist(meta) {
+		/* WO-341 kill #1: the 1s timer used to ERASE the remote origin — a ws import would
+		 * emit a bare 'persisted' a second later and the deck-sync/autosave listeners wrote
+		 * server data back. Track whether ANY contribution in this debounce window was local;
+		 * an all-remote window emits { remote: true } and the write listeners skip it. */
+		if (meta?.remote !== true) this._persistHasLocal = true
 		if (this._persistTimer) clearTimeout(this._persistTimer)
 		this._persistTimer = setTimeout(() => {
 			this._persistTimer = null
+			const remoteOnly = !this._persistHasLocal
+			this._persistHasLocal = false
 			try {
 				localStorage.setItem(Persistence.STORAGE_KEY, Persistence.getPersistPayload(this))
-				this._emit('persisted')
+				this._emit('persisted', remoteOnly ? { remote: true } : {})
 			} catch {}
 		}, 1000)
 	}
@@ -184,9 +191,41 @@ export class SceneState {
 		this._emit('change')
 	}
 
+	/* WO-341 kill #6: ingest the server's scene.deck broadcast as REMOTE data — a look created
+	 * on the other client appears here immediately, without waiting for the debounced project
+	 * save. Upsert-only (deletions still flow via project_sync), never touches the look being
+	 * edited locally, and the 'imported' emit is remote-tagged so no write-back fires. */
+	ingestRemoteDeckScenes(snapshots) {
+		if (!Array.isArray(snapshots) || !snapshots.length) return false
+		let changed = false
+		for (const snap of snapshots) {
+			const id = snap?.id != null ? String(snap.id) : ''
+			if (!id || id === this.editingSceneId) continue
+			let scene
+			try {
+				scene = migrateScene(JSON.parse(JSON.stringify(snap)))
+			} catch {
+				continue
+			}
+			const idx = this.scenes.findIndex((sc) => sc && String(sc.id) === id)
+			if (idx >= 0) {
+				if (JSON.stringify(this.scenes[idx]) === JSON.stringify(scene)) continue
+				this.scenes[idx] = scene
+			} else {
+				this.scenes.push(scene)
+			}
+			changed = true
+		}
+		if (changed) {
+			this._persist({ remote: true })
+			this._emit('imported', { remote: true })
+		}
+		return changed
+	}
+
 	_softSave(meta) {
 		// Debounce persistence for high-frequency updates (drag/resize)
-		this._persist()
+		this._persist(meta)
 		this._emit('softChange', meta)
 	}
 

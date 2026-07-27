@@ -159,6 +159,9 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 	const pendingStateChanges = new Map()
 	/** @type {ReturnType<typeof setTimeout> | null} */
 	let stateChangeTimer = null
+	/* WO-341 #7: 'change' frames drop for backed-up clients (SKIP_WHEN_BUFFERED) with no
+	 * periodic full-state — seq lets clients detect the gap and re-pull. */
+	let sceneLiveSeq = 0
 
 	function flushPendingStateChanges() {
 		if (stateChangeTimer) {
@@ -167,7 +170,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 		}
 		if (pendingStateChanges.size === 0) return
 		for (const [path, value] of pendingStateChanges) {
-			broadcast('change', { path, value })
+			if (path === 'scene.live') broadcast('change', { path, value, seq: ++sceneLiveSeq })
+			else broadcast('change', { path, value })
 		}
 		pendingStateChanges.clear()
 	}

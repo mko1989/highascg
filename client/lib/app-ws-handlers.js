@@ -100,6 +100,10 @@ function applyWsStateSideEffects(data, { sceneState, programOutputState, appLogi
 }
 
 export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore, appLogic }) {
+	/** WO-341 kill #7: last seen scene.live seq — a gap means the ws dropped a frame for this
+	 * backed-up client (SKIP_WHEN_BUFFERED); re-pull the authoritative state instead of living
+	 * with a permanently stale live map. */
+	let _sceneLiveSeq = null
 	/** Last server scene.live payload — re-applied after deck/project catches up (see below). */
 	let _lastSceneLive = null
 
@@ -136,6 +140,13 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		stateStore.applyChange(data.path, data.value)
 		ingestStreamingChannelChange(data.path, data.value)
 		if (data.path === 'scene.live' && data.value) {
+			if (Number.isFinite(data.seq)) {
+				if (_sceneLiveSeq != null && data.seq > _sceneLiveSeq + 1) {
+					console.warn(`[HighAsCG] scene.live seq gap (${_sceneLiveSeq} → ${data.seq}) — re-pulling state`)
+					void refreshSceneLiveFromServer(sceneState, stateStore)
+				}
+				_sceneLiveSeq = data.seq
+			}
 			maybeInvalidatePreviewOnLiveChange(data.value, stateStore.getState()?.channelMap)
 			// Owner principle 2026-07-26 (server state IS the truth): applyServerLiveChannels
 			// drops ids its local deck doesn't know yet (take broadcast racing the deck sync) —
@@ -144,6 +155,13 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 			// next take ("web uis are lagging behind, sometimes doesn't show up").
 			_lastSceneLive = data.value
 			sceneState.applyServerLiveChannels(data.value, stateStore.getState()?.channelMap)
+		}
+		if (data.path === 'scene.deck' && data.value && Array.isArray(data.value.sceneSnapshots)) {
+			/* WO-341 kill #6: deck convergence no longer waits for a project save. After the
+			 * ingest, re-apply the last scene.live so a take that raced this deck data lands. */
+			if (sceneState.ingestRemoteDeckScenes(data.value.sceneSnapshots) && _lastSceneLive) {
+				sceneState.applyServerLiveChannels(_lastSceneLive, stateStore.getState()?.channelMap)
+			}
 		}
 		if (data.path === 'scene.globalBorders' && Array.isArray(data.value)) {
 			ingestArtnetGlobalBordersArray(sceneState, data.value)
@@ -199,7 +217,8 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		if (!project || project.error || !project.version || consumeSkipRemoteProjectSync()) return
 		try {
 			projectState.importProject(project, sceneState, timelineState, multiviewState, programOutputState, { silent: true })
-			window.dispatchEvent(new Event('project-loaded'))
+			/* WO-341 kill #3: this load came FROM the server — listeners must not write back. */
+			window.dispatchEvent(new CustomEvent('project-loaded', { detail: { remote: true } }))
 			// Owner principle 2026-07-26: the deck just caught up — re-apply the last server
 			// scene.live so a preview/live announcement that raced ahead of this project data
 			// (and was dropped by the unknown-id guard) converges now instead of never.
