@@ -1,5 +1,7 @@
 # WO-306 — Media-layer audio routing: unroute from own channel, route to another channel
 
+**Status: DEPRECATED (2026-07-27) — REJECTED by owner 2026-07-21 ("the current way is how caspar works and is fine"). Do not build this; kept only as a record of the decision.**
+
 **Status: NOT WANTED — closed 2026-07-21.** Owner: "the current way is how caspar works and is
 fine." Do not build. Kept below for context only.
 

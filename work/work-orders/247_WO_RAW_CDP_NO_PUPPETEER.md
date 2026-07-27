@@ -1,5 +1,7 @@
 # WO-247 — Replace puppeteer with a raw CDP client for CEF interactive input
 
+**Status: DEPRECATED (2026-07-27) — MOOT: the CEF interactive input bridge this targeted was removed outright by WO-257. The raw-CDP client itself lives on for thumbnails (WO-248). Do not treat the input plan as source of truth.**
+
 **Status:** OPEN
 **Priority:** HIGH (owner-picked option 1 for the CEF-GUI workflow; de-risks Option B of the transparent-previews plan)
 **Owner check:** A247.1

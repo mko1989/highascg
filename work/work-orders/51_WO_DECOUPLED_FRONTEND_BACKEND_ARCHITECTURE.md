@@ -1,5 +1,7 @@
 # Work Order 51: Decoupling Frontend & Backend Architecture
 
+**Status: DEPRECATED (2026-07-27) — the headless split model was superseded by WO-52 (API + dist-web/ served from the playout box on :4200). Do not treat as source of truth.**
+
 > **AGENT COLLABORATION PROTOCOL**  
 > Every agent that works on this document MUST:  
 > 1. Add a dated entry to the **Work Log** section at the bottom.  

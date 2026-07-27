@@ -1,5 +1,7 @@
 # WO-324 — Operator GUI "stuck together" with the Caspar screen consumer (triage first)
 
+**Status: DEPRECATED (2026-07-27) — triage only; the observed behaviour was answered by WO-325 and then INVERTED into the owner-requested kiosk/consumer adjacency contract (commit 809a809, enforced by tools/runtime/operator_shape_overlay_lib.py). The four hypotheses below are historical. Do not treat as source of truth.**
+
 **Source:** todos22.07.26 — "operatort gui in kiosk sticked togheter with caspar screen consumer."
 
 ## Why this is a triage WO

@@ -59,3 +59,12 @@ there needs to be an easy way to browse and load into preview shaders and their 
 this only should happen when in the shaders mode.
 
  current time with seconds small between eyes on the right and the small progress bar.
+
+there is still no play button in the shaders editor. 
+id also like to use empty space on the right of parameters to be able to stack shaders on layers. 
+it shows pgm stack top layer 10 shows playing shader. under layers 11-20 empty. when editing a shader on prv and im happy with the look, i either click layer 10 to exchange (transition mix) this with what was on pgm or click layer 11-20 and it transitions to that layer. remeber minimalizm.
+
+global border needs to be displayed inside its set width height (also for slices) add to the glow secondary color and time slider for how long the transition from first to second should be, hide it under enable secondary color. the pulse values needs to be able to go all the way to 0.
+
+routes should be omitted for display in the prgress bars and as top active layer.
+i still dont see the time in the operator gui.

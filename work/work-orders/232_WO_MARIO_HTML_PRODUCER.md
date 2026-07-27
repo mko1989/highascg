@@ -1,5 +1,7 @@
 # WO-232 — Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF interactive bridge)
 
+**Status: PARTIALLY DEPRECATED (2026-07-27) — the interactive input path (T232.3/T232.6, CEF bridge) was removed by WO-257 after production instability; mario vendoring/transparency (T232.1-2) and the template picker (T232.7) still stand. Do not treat the input path as source of truth.**
+
 **Status:** Planned | **Date:** 2026-07-15
 
 **STATUS ADDENDUM (2026-07-16, WO-257):** The CEF interactive bridge this WO's input path (T232.3)

@@ -1,5 +1,7 @@
 # WO-243 — Operator GUI channel: CEF web-UI layer over routed preview channels, own screen consumer
 
+**Status: PARTIALLY DEPRECATED (2026-07-27) — the CEF-in-Caspar DISPLAY approach was retired and superseded by WO-255 (fullscreen Firefox + shaped Caspar overlay); the operator-gui CHANNEL machinery (route layers, layout API, src/system/operator-gui-channel.js) from this WO is still current. Trust WO-255 for the display architecture.**
+
 **Status:** Implemented (T243.1-T243.4 done; A243.1 is an owner action, unchecked) | **Priority:** HIGH (owner-picked architecture)
 **Owner check:** A243.1
 
