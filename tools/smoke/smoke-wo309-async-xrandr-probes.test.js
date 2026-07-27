@@ -38,11 +38,18 @@ test('the async xrandr-query probe does not block the event loop', { skip: !hasX
 	try {
 		let ticks = 0
 		const timer = setInterval(() => ticks++, 4)
+		const t0 = Date.now()
 		await mod.getDisplaysXrandrDetailedAsync()
+		const elapsedMs = Date.now() - t0
 		clearInterval(timer)
-		// A 5ms-interval timer ticking at least once during the call proves the loop was free —
-		// execSync would have made this impossible (proven separately: 0 ticks over ~170ms).
-		assert.ok(ticks >= 1, `expected at least one event-loop tick during the async call, got ${ticks}`)
+		// A 4ms-interval timer ticking at least once during the call proves the loop was free —
+		// execSync would have made this impossible (proven separately: 0 ticks over ~170ms on
+		// the box). On a fast virtual X (CI xvfb-run) xrandr answers in <4ms, faster than one
+		// timer period — such a call cannot prove blocking either way, so only assert when the
+		// call was long enough for the timer to have possibly fired.
+		if (elapsedMs >= 8) {
+			assert.ok(ticks >= 1, `expected at least one event-loop tick during the ${elapsedMs}ms async call, got ${ticks}`)
+		}
 	} finally {
 		if (prevTtl === undefined) delete process.env.HIGHASCG_XRANDR_CACHE_TTL_MS
 		else process.env.HIGHASCG_XRANDR_CACHE_TTL_MS = prevTtl
