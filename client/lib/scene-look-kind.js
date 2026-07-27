@@ -52,6 +52,11 @@ export function isCgTemplateLayer(layer) {
 	const src = layer.source
 	const clipId = src?.value ? String(src.value) : ''
 
+	/* Owner 2026-07-27 (+WO-322 philosophy): SHADER templates are visual MEDIA, not CG graphics —
+	 * they composite on the look band, fill the frame, and their deck cards must get the normal
+	 * media treatment (red PGM border, real thumb) instead of the cg-only violet styling. */
+	if (/(^|\/)shaders\//i.test(clipId)) return false
+
 	if (src && typeof src === 'object') {
 		const t = String(src.type || '').toLowerCase()
 		if (NON_CG_SOURCE_TYPES.has(t)) return false

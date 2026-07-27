@@ -298,6 +298,20 @@
 .scenes-card__footer .scenes-btn {
 	flex: 1;
 	min-width: 0;
+	/* Owner 2026-07-27 (minimalism): smaller footer buttons with the label truly centered —
+	 * "CUT" used to overflow its box. Beats .scenes-btn / --sm / --icon paddings. */
+	padding: 2px 2px;
+	font-size: 0.66rem;
+	line-height: 1.3;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+}
+
+.scenes-card__footer {
+	gap: 3px;
+	padding: 3px 4px;
 }
 
 .scenes-card__title {

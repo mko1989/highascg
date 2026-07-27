@@ -141,8 +141,12 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					ctx.clip()
 					const cf = layer.contentFit || 'native'
 					/* WO-326d: an UNLOCKED layer stretches to its rect on air (WO-326b) — the editor must
-					 * draw the same, not contain-fit with black bars. */
-					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
+					 * draw the same, not contain-fit with black bars. Owner 2026-07-27: SHADER templates
+					 * render full-rect on air (fullscreen canvas), so their (possibly content-cropped)
+					 * thumbs must fill the layer box too — contain-fit left empty space. */
+					const isShaderTpl = /(^|\/)shaders\//i.test(String(layer.source?.value || ''))
+					const forceStretch =
+						isShaderTpl || cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
 					if (forceStretch) {
 						ctx.drawImage(img, px, py, pw, ph)
 					} else if (cf === 'horizontal' || cf === 'vertical') {
@@ -168,8 +172,12 @@ export function drawSceneComposeStack(ctx, W, H, opts) {
 					ctx.clip()
 					const cf = layer.contentFit || 'native'
 					/* WO-326d: an UNLOCKED layer stretches to its rect on air (WO-326b) — the editor must
-					 * draw the same, not contain-fit with black bars. */
-					const forceStretch = cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
+					 * draw the same, not contain-fit with black bars. Owner 2026-07-27: SHADER templates
+					 * render full-rect on air (fullscreen canvas), so their (possibly content-cropped)
+					 * thumbs must fill the layer box too — contain-fit left empty space. */
+					const isShaderTpl = /(^|\/)shaders\//i.test(String(layer.source?.value || ''))
+					const forceStretch =
+						isShaderTpl || cf === 'stretch' || layer.fillNativeAspect === false || layer.aspectLocked === false
 					if (forceStretch) {
 						ctx.drawImage(thumbImg, px, py, pw, ph)
 					} else if (cf === 'horizontal' || cf === 'vertical') {
