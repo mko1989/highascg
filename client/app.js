@@ -20,6 +20,7 @@ import { markLocalProjectSaved } from './lib/project-remote-sync.js'
 import { initAudioMixerPanel } from './components/audio-mixer-panel.js'
 import { initTimerControlPanel, getScreenTimersSnapshot } from './components/timer-control-panel.js'
 import { initPlaylistControlPanel } from './components/playlist-control-panel.js'
+import { initShaderLiveEditor } from './components/shader-live-editor.js'
 import { refreshLiveAudioConfigured } from './lib/live-audio-state.js'
 import { programOutputState } from './lib/program-output-state.js'
 import { applySettingsFromServer, settingsState } from './lib/settings-state.js'
@@ -322,6 +323,7 @@ async function init() {
 	initAudioMixerPanel(stateStore, document.getElementById('panel-inspector-audio-mount'))
 	initTimerControlPanel(stateStore, document.getElementById('panel-inspector-timer-mount'), { getChannelMap: () => stateStore.getState()?.channelMap || {} })
 	initPlaylistControlPanel(document.getElementById('panel-inspector-playlists-mount'))
+	initShaderLiveEditor(stateStore)
 	// WO-210 T210.8: Register timers snapshot function for look-save integration.
 	// Derive the look's target screens from mainScope so the flat {timerId: boolean}
 	// snapshot only reflects timers on screens this look actually drives.

@@ -202,3 +202,63 @@
 	border-radius: 3px;
 	background: transparent;
 }
+
+/* WO-345 — Shader Live overlay (shades-bunny toggle) */
+.shader-live {
+	position: fixed;
+	top: var(--header-h, 48px);
+	left: 0;
+	right: 0;
+	bottom: 0;
+	z-index: 60; /* over the workspace, under .modal-overlay */
+	background: var(--bg-dark, #0d1117);
+	display: flex;
+	flex-direction: column;
+	padding: 10px 14px;
+	gap: 10px;
+}
+
+.shader-live__bar {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 8px;
+}
+
+.shader-live__title {
+	font-weight: 700;
+	letter-spacing: 0.04em;
+}
+
+.shader-live__dirty {
+	color: var(--accent, #58a6ff);
+	font-size: 0.75rem;
+	margin-left: auto;
+}
+
+.shader-live__params {
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-width: 720px;
+}
+
+.shader-live__param {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.shader-live__pname {
+	flex: 0 0 160px;
+	font-family: var(--mono-font, monospace);
+	font-size: 0.82rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.shader-live__param input[type='range'] { flex: 1 1 auto; }
+.shader-live__param input[type='number'] { flex: 0 0 84px; width: 84px; }
+.shader-live__param input[type='color'] { flex: 0 0 52px; width: 52px; height: 28px; padding: 0; }

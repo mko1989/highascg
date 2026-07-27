@@ -47,12 +47,18 @@
 	}
 	window.next = () => {}
 	window.update = (raw) => {
-		// v1: config is baked into the exported template; update() accepts { paused } only.
+		/* { paused } — pause/resume. WO-345: { common?, passes?: { <key>: { source } } } — live
+		 * source replacement: patch the baked config and re-run the pass setters, which RECOMPILES
+		 * in place on the running producer (same canvas + audio texture, iTime keeps counting; no
+		 * restart, no black frame). Channels never change here — they stay as exported. */
 		try {
 			const data = typeof raw === 'string' ? JSON.parse(raw) : raw || {}
 			if (!toyRef) return
 			if (data.paused === true) toyRef.pause()
 			else if (data.paused === false) toyRef.play()
+			if (data.common != null || (data.passes && typeof data.passes === 'object')) {
+				applyLiveSourceUpdate(data)
+			}
 		} catch {
 			/* malformed update payloads are ignored */
 		}
@@ -297,6 +303,26 @@
 		if (p.image) toy.setImage(passConfig(p.image))
 		toy.setOnDraw(updateAudio)
 		toy.play()
+	}
+
+	/* WO-345 — live source replacement (see window.update above). A compile error inside a
+	 * setter must not kill the running visual: ShaderToyLite logs the failure and keeps the
+	 * previous program for keys it could not rebuild. */
+	function applyLiveSourceUpdate(data) {
+		if (data.common != null) {
+			config.common = String(data.common)
+			toy.setCommon(config.common)
+		}
+		const incoming = data.passes && typeof data.passes === 'object' ? data.passes : {}
+		const setters = { image: 'setImage', bufferA: 'setBufferA', bufferB: 'setBufferB', bufferC: 'setBufferC', bufferD: 'setBufferD' }
+		for (const key of Object.keys(setters)) {
+			const src = incoming[key] && typeof incoming[key].source === 'string' ? incoming[key].source : null
+			if (src == null) continue
+			if (!config.passes) config.passes = {}
+			if (!config.passes[key]) config.passes[key] = { source: src, channels: [] }
+			else config.passes[key].source = src
+			toy[setters[key]](passConfig(config.passes[key]))
+		}
 	}
 
 	toyRef = toy
