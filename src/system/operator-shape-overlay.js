@@ -36,6 +36,8 @@ const OPERATOR_TITLE_MARKER = 'HIGHASCG-OPERATOR-GUI'
 
 /** @type {import('child_process').ChildProcess | null} */
 let proc = null
+/** WO-338: in-flight spawn guard — set when spawn starts, cleared when complete or child exits. */
+let spawnInFlight = null
 /** Last-known {monitor, rects} sent — re-sent verbatim by {@link reapplyOperatorShapeOverlay} on
  * Caspar reconnect (a fresh consumer window has no custom shape yet) and after a lazy respawn. */
 let lastMonitor = null
@@ -74,11 +76,13 @@ function isTestContext() {
 function ensureSpawned(log) {
 	if (proc) return proc
 	if (isTestContext()) return null
+	if (spawnInFlight) return null
 	const fs = require('fs')
 	if (!fs.existsSync(SHAPE_SCRIPT)) {
 		log?.('warn', `[Shape overlay] missing ${SHAPE_SCRIPT}`)
 		return null
 	}
+	spawnInFlight = true
 	const env = displaySessionEnv()
 	const child = spawn('python3', ['-u', SHAPE_SCRIPT], { env, stdio: ['pipe', 'pipe', 'pipe'] })
 	helperSpawnAt = Date.now()
@@ -98,6 +102,7 @@ function ensureSpawned(log) {
 	child.on('exit', (code, sig) => {
 		log?.('warn', `[Shape overlay] exited code=${code} sig=${sig}`)
 		if (proc === child) proc = null
+		spawnInFlight = null
 	})
 	proc = child
 	log?.('info', '[Shape overlay] started')
@@ -191,6 +196,7 @@ function stopOperatorShapeOverlay() {
 		}
 		proc = null
 	}
+	spawnInFlight = null
 	lastMonitor = null
 	lastRects = null
 	_lastWrittenPayload = null

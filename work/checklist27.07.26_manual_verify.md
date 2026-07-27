@@ -5,26 +5,27 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
 
 ## A. Operator kiosk GUI
 
-- [ ] **1. Compose top bar — Reset button** (WO-346)
+- [x] **1. Compose top bar — Reset button** (WO-346)
       PRT PGM is gone; **Reset** is there. Click it → all compose tiles snap back to the default layout.
-      >
+      >but still reset layout button inside the compose prv.
 
-- [ ] **2. Tile PRT buttons** (WO-346 + todos27 follow-up, deployed ~10:00 today)
+- [x] **2. Tile PRT buttons** (WO-346 + todos27 follow-up, deployed ~10:00 today)
       Non-PGM tiles (PRV, mv cells, live sources) have a **PRT** styled like the other tile buttons.
       **PGM tiles show CAPTURE only** — no duplicate PRT.
       Click PRT on a live-source tile → toast + PNG lands in the Caspar media folder.
       >
 
-- [ ] **3. Playlists panel, bottom right** (WO-347)
+- [x] **3. Playlists panel, bottom right** (WO-347)
       Shows **every** playlist defined in the project's looks, not just live ones.
       Non-live entries say "not live"; live ones have 🔴 + channel.
       Select an item on a *non-live* playlist → take that look to PGM → playout starts at that item.
       Transport ⏮ ▶ ⏭ works on the live one.
-      >
+      >in the list it seems like movie files have 5s set as their time. also the grab and drop dots have a space between them not needed just taking up space. i have media now from inside some folders and most of the label in the list is path to the file instead of the filename, inside this playlist editor we just need file name, its full path doesn't matter unless its missing.
+      here we enter something that hasent been done yet properly, which is status check and message to the user if anything is missing or input hasent started properly and failed bring alive pass. 
 
-- [ ] **4. Playlist auto-advance of timeless items**
+- [x] **4. Playlist auto-advance of timeless items**
       Two shaders in a playlist at 20 s: they hop, repeatedly, and after a manual jump the timer re-arms.
-      >
+      >although when i just dropped the png inbetween two movie files it did not play its seemingly default 5s. again after loop the set 5s on a png fails to play.
 
 - [ ] **5. Shader Live editor** (WO-339/340/348 — glasses-bunny click)
       Compose preview stays in place; params in **two columns** below.

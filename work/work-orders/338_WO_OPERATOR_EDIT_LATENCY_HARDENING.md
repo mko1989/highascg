@@ -2,7 +2,7 @@
 
 **Source:** owner request 2026-07-26 — "making sure the edits between web ui, casparcg and whatever does the punchholes are as quick as possible."
 
-**Status: chain fully mapped and measured by code reading 2026-07-26; targeted reductions open.** Related: WO-198 (compose-preview settle latency), WO-318 (hole geometry at 2160p50).
+**Status: CLOSED 2026-07-27.** Items 1+2 shipped 13462b1; item 3 (pre-debounce hole feed) evaluated and SKIPPED — with the server debounce already at 50 ms the residual gain is ~one debounce window, not worth a second plan computation on every POST in the hottest operator path; item 4 skipped earlier (per-line route-liveness cache); item 5 shipped 2026-07-27 as a double-spawn guard in operator-shape-overlay.ensureSpawned (in-flight flag, cleared on exit/stop). Related: WO-198 (compose-preview settle latency), WO-318 (hole geometry at 2160p50).
 
 ## The two edit paths and their current floors
 

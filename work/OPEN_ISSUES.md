@@ -123,7 +123,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | WO-340 | Shader modal: auto-detect tweakable GLSL variables (#define floats, const vec3 colors, @slider/@color annotations) → color pickers + sliders that rewrite the source literals; v1 zero runtime changes, v2 (follow-up) true live uniforms via CG UPDATE | [WO-340](./work-orders/340_WO_SHADER_PARAMS_UI.md) | 🟡 Implemented v1 (3256730 — owner: open shader modal, tweak) |
 
-| WO-341 | Client sync redesign: server state is the single truth, clients converge (never drop), ONLY user interaction writes — echo-loop kill list, scene.deck ingestion, seq-gap detection, autosave rev-race | [WO-341](./work-orders/341_WO_CLIENT_SYNC_SERVER_TRUTH.md) | 🟡 Top defects fixed 2026-07-26 (stale-by-one broadcasts, echo loops #1-3, converge-on-import); structural items open |
+| WO-341 | Client sync redesign: server state is the single truth, clients converge (never drop), ONLY user interaction writes — echo-loop kill list, scene.deck ingestion, seq-gap detection, autosave rev-race | [WO-341](./work-orders/341_WO_CLIENT_SYNC_SERVER_TRUTH.md) | 🟡 Kill list 1-7 done 27.07; item 8 = two-client observation drill (owner QA) |
 
 | WO-342 | Deck header empty-space click clears that screen PRV | [WO-342](./work-orders/342_WO_DECK_HEADER_CLICK_CLEARS_PRV.md) | 🔴 Open |
 | WO-343 | Look editor shows REAL PRV video on the screen consumer while editing (WO-339 v2; X SHAPE input contract applies) | [WO-343](./work-orders/343_WO_LOOK_EDITOR_REAL_PRV_VIDEO.md) | 🔴 Open |
