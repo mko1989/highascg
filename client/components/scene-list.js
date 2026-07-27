@@ -30,6 +30,17 @@ import { screenLabel } from '../lib/screen-label.js'
  * @param {() => void} ctx.globalTakeFromPreview
  * @param {() => void} ctx.globalCutFromPreview
  */
+let _wallClockTimer = null
+function ensureToolbarClock() {
+	if (_wallClockTimer) return
+	const tick = () => {
+		const el = document.getElementById('scenes-toolbar-clock')
+		if (el) el.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false })
+	}
+	_wallClockTimer = setInterval(tick, 1000)
+	tick()
+}
+
 export function renderSceneDeck(ctx) {
 	const {
 		mainHost,
@@ -106,6 +117,10 @@ export function renderSceneDeck(ctx) {
 		pillsParts.push('</div>')
 
 	}
+	/* Owner (todos27, 3rd ask): the system clock lives IN THE TOP BAR, right next to the
+	 * screen-pill eyes — not in the progress row. Ticked by the module interval below
+	 * (the toolbar re-renders, so the interval re-finds it by id). */
+	pillsParts.push('<span class="scenes-wall-clock" id="scenes-toolbar-clock"></span>')
 	pillsParts.push(
 		'<div class="scenes-toolbar__global-take scenes-toolbar__global-take--right">' +
 			'<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-global-take" title="Take preview to program (LOADBG + transition + PLAY)" aria-label="Take preview to program">▶</button>' +
@@ -115,6 +130,7 @@ export function renderSceneDeck(ctx) {
 	)
 	toolbar.innerHTML = pillsParts.join('')
 	deckWrap.appendChild(toolbar)
+	ensureToolbarClock()
 
 	const transMount = toolbar.querySelector('#scenes-deck-transition-mount')
 	const anyPgmOnlyMain = (() => {

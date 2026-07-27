@@ -67,18 +67,7 @@ export function appendScenesEditorShell(root) {
 	previewHost.style.flex = `0 0 ${splitPx.current}px`
 	previewHost.style.minHeight = '0'
 
-	/* todos27: small wall clock (with seconds) riding the rundown/progress row, right side. */
-	const rundownRow = document.createElement('div')
-	rundownRow.className = 'scenes-rundown-row'
-	const wallClock = document.createElement('span')
-	wallClock.className = 'scenes-wall-clock'
-	const tickClock = () => {
-		wallClock.textContent = new Date().toLocaleTimeString('en-GB', { hour12: false })
-	}
-	tickClock()
-	setInterval(tickClock, 1000)
-	rundownRow.append(rundownPlaybackSlot, wallClock)
-	root.appendChild(rundownRow)
+	root.appendChild(rundownPlaybackSlot)
 	root.appendChild(scenesSplit)
 	scenesSplit.appendChild(previewHost)
 	scenesSplit.appendChild(splitHandle)
