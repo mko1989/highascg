@@ -280,9 +280,9 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		apply()
 	}
 
-	/* Owner (todos27, final spot): system clock with seconds immediately LEFT of the
-	 * connection eyes. statusEl is a vertical column (P1 / eyes / filename), so the clock is a
-	 * HORIZONTAL sibling before it in rightWrap — not a child of the column. */
+	/* Owner (todos27, placement 4): statusEl is a flex ROW — [PGM timer block] [eyes]; the
+	 * clock goes BETWEEN them (the timer slot self-inserts at firstChild at runtime, so
+	 * inserting before the eye container yields timer → clock → eyes). */
 	const wallClock = document.createElement('span')
 	wallClock.id = 'header-wall-clock'
 	wallClock.className = 'header-wall-clock'
@@ -332,7 +332,10 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 
 	const rightWrap = document.createElement('div')
 	rightWrap.className = 'header-right'
-	rightWrap.append(audioGroup, wallClock, statusEl)
+	const eyeContainerEl = document.getElementById('connection-eye-container')
+	if (eyeContainerEl && eyeContainerEl.parentNode === statusEl) statusEl.insertBefore(wallClock, eyeContainerEl)
+	else statusEl.appendChild(wallClock)
+	rightWrap.append(audioGroup, statusEl)
 
 	titleEl.insertAdjacentElement('afterend', leftWrap)
 	leftWrap.insertAdjacentElement('afterend', midWrap)
