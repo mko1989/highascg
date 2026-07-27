@@ -270,7 +270,10 @@ export function initShaderLiveEditor(stateStore) {
 			passKey === 'common'
 				? { common: shaderCfg.common }
 				: { passes: { [passKey]: { source: shaderCfg.passes[passKey].source } } }
-		const json = JSON.stringify(payload).replace(/"/g, '\\"')
+		/* AMCP quoted-string escaping: BACKSLASHES FIRST, then quotes — multi-line GLSL serializes
+		 * with \n escapes, and without doubling them Caspar unescapes \n to a REAL newline inside a
+		 * JSON string literal = invalid JSON = silent no-op (the owner's 'live edits do not work').*/
+		const json = JSON.stringify(payload).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 		const targets = instances().filter((i) => i.shaderId === inst.shaderId)
 		for (const t of targets) {
 			try {

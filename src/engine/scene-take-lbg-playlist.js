@@ -332,9 +332,17 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 
 	void (async () => {
 		try {
-			const clip = resolveSceneClipForAmcp(nextItem.value, self)
-			await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
-			await self.amcp.play(channel, pLayer)
+			/* Owner 2026-07-27: SHADER items must stay CG-hosted — LOADBG/PLAY of the html file
+			 * creates a plain html producer and Shader Live's CG UPDATE rides then 403. CG ADD
+			 * (playOnLoad) keeps the template host alive across playlist hops. Trade-off: no MIX
+			 * transition on shader hops (CG has no bg-transition path). */
+			if (/(^|\/)shaders\//i.test(String(nextItem.value || ''))) {
+				await self.amcp.cgAdd(channel, pLayer, 0, String(nextItem.value).trim().toLowerCase(), 1, '{}')
+			} else {
+				const clip = resolveSceneClipForAmcp(nextItem.value, self)
+				await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
+				await self.amcp.play(channel, pLayer)
+			}
 
 			// Update index state immediately so that it triggers correctly on next update
 			const pKey = `${scene.id}-${layer.layerNumber}`
