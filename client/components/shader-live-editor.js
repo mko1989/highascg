@@ -15,7 +15,7 @@ import { escapeHtml } from '../lib/dom-escape.js'
 import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
 import { sceneState } from '../lib/scene-state.js'
 import { liveShaderInstances } from '../lib/shader-live-instances.js'
-import { DEEP_CATEGORY_ORDER } from '../lib/shader-param-naming.js'
+import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function initShaderLiveEditor(stateStore) {
 	let overlay = null
@@ -119,9 +119,7 @@ export function initShaderLiveEditor(stateStore) {
 		/* WO-348: pristine copy for per-param revert + Reset all (recovery from broken values). */
 		pristine = {
 			common: shaderCfg?.common || '',
-			passes: Object.fromEntries(
-				Object.entries(shaderCfg?.passes || {}).map(([k, v]) => [k, v ? { source: v.source } : null]),
-			),
+			passes: Object.fromEntries(Object.entries(shaderCfg?.passes || {}).map(([k, v]) => [k, v ? { source: v.source } : null])),
 		}
 		pristineParams = null
 		syncDirty()
@@ -187,12 +185,20 @@ export function initShaderLiveEditor(stateStore) {
 			if (!p.deep) return
 			const cat = p.category || 'Other values'
 			if (!byCat.has(cat)) byCat.set(cat, [])
-			byCat.get(cat).push(row(p, i))
+			byCat.get(cat).push({ p, i })
 		})
+		/* todos27: cluster same-base params ("freq", "freq #2") adjacently inside a category. */
+		for (const items of byCat.values()) {
+			items.sort((a, b) => {
+				const ba = baseLabelOf(a.p.name)
+				const bb = baseLabelOf(b.p.name)
+				return ba < bb ? -1 : ba > bb ? 1 : a.i - b.i
+			})
+		}
 		const order = [...DEEP_CATEGORY_ORDER, ...[...byCat.keys()].filter((c) => !DEEP_CATEGORY_ORDER.includes(c))]
 		const deepHtml = order
 			.filter((c) => byCat.has(c))
-			.map((c) => groupHtml(c, byCat.get(c).join('')))
+			.map((c) => groupHtml(c, byCat.get(c).map(({ p, i }) => row(p, i)).join('')))
 			.join('')
 		host.innerHTML =
 			groupHtml('Layer (Caspar mixer)', mixerRowsHtml()) +
@@ -214,13 +220,15 @@ export function initShaderLiveEditor(stateStore) {
 
 	function paramRowHtml(p, idx) {
 		const cls = p.deep ? 'shader-live__param shader-live__param--deep' : 'shader-live__param'
+		/* todos27: the calculation the value lives in — tiny, so the user can guess the effect. */
+		const exprHtml = p.deep && p.expr ? `<div class="shader-live__expr" title="${escapeHtml(p.expr)}">${escapeHtml(p.expr)}</div>` : ''
 		const custom = shaderCfg?.paramLabels?.[labelKeyOf(p)]
 		/* Tooltip = the decode: pass + auto name + the raw ◆ code context. */
 		const tip = `${p.passKey} — ${p.name}${p.context ? `\n${p.context}` : ''}`
 		const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
 		if (p.kind === 'color') {
 			const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
-			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}</div>`
+			return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}${exprHtml}</div>`
 		}
 		const sliders = p.values
 			.map(
@@ -228,7 +236,7 @@ export function initShaderLiveEditor(stateStore) {
 				<input type="number" data-p="${idx}" data-c="${ci}" data-num min="${p.min}" max="${p.max}" step="${p.step}" value="${v}">`,
 			)
 			.join('')
-		return `<div class="${cls}">${name}${sliders}</div>`
+		return `<div class="${cls}">${name}${sliders}${exprHtml}</div>`
 	}
 
 	function sourceOf(passKey) {

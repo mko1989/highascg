@@ -147,3 +147,29 @@ export function dedupeLabels(params) {
 	}
 	return params
 }
+
+/**
+ * todos27: the CALCULATION a literal lives in, for display under its row — the statement
+ * around the span, whitespace-collapsed, the tweakable literal replaced by ◆, trimmed to
+ * ~maxLen around the marker so the interesting part stays visible.
+ * @param {string} src UNmasked source (display text; offsets match — masking preserves length)
+ */
+export function exprAround(src, start, end, maxLen = 64) {
+	let a = start
+	while (a > 0 && !';{}\n'.includes(src[a - 1])) a--
+	let b = end
+	while (b < src.length && !';{}\n'.includes(src[b])) b++
+	const pre = src.slice(a, start).replace(/\s+/g, ' ').trimStart()
+	const post = src.slice(end, b).replace(/\s+/g, ' ').trimEnd()
+	const room = Math.max(16, maxLen - 1)
+	const lp = Math.min(pre.length, Math.ceil(room * 0.55))
+	const rp = Math.min(post.length, room - lp)
+	const left = pre.length > lp ? '…' + pre.slice(-lp) : pre
+	const right = post.length > rp ? post.slice(0, rp) + '…' : post
+	return `${left}◆${right}`
+}
+
+/** Base label for clustering ("freq #2" → "freq"). */
+export function baseLabelOf(name) {
+	return String(name || '').replace(/ #\d+$/, '')
+}

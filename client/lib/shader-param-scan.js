@@ -301,7 +301,7 @@ function deepRange(v) {
 	return { min: v < 0 ? -span : 0, max: v < 0 ? span / 4 : span, step }
 }
 
-import { nameDeepParam, dedupeLabels } from './shader-param-naming.js'
+import { nameDeepParam, dedupeLabels, exprAround } from './shader-param-naming.js'
 
 function contextLabel(source, start, end, idx) {
 	const pre = source.slice(Math.max(0, start - 14), start).replace(/\s+/g, ' ')
@@ -355,6 +355,7 @@ export function scanShaderDeepParams(source) {
 			name: named.label,
 			category: named.category,
 			context: contextLabel(src, vm.index, closeIdx + 1, out.length),
+			expr: exprAround(src, vm.index, closeIdx + 1),
 			kind: 'color',
 			values: three.map((l) => l.value),
 			spans: three.map((l) => ({ start: l.start, end: l.end })),
@@ -375,6 +376,7 @@ export function scanShaderDeepParams(source) {
 			name: named.label,
 			category: named.category,
 			context: contextLabel(src, l.start, l.end, out.length),
+			expr: exprAround(src, l.start, l.end),
 			kind: 'slider',
 			values: [l.value],
 			spans: [{ start: l.start, end: l.end }],
