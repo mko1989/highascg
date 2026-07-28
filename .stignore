@@ -61,3 +61,8 @@ Thumbs.db
 
 // Optional: UI build output (Mac rebuilds from highascg-client; playout ships dist-web/)
 // dist-web
+// Owner bug 27.07.26: peers kept pushing stale shader files back (renames reverted, deleted
+// templates resurrected, constant mtime churn). The BOX's shader-store owns these — peers
+// must neither overwrite nor receive them.
+/template/shaders
+/data/shaders
