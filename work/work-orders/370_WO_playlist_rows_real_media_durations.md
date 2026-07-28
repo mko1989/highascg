@@ -1,6 +1,6 @@
 # WO-370 — Playlist rows show the timeless default on media clips instead of each clip's real length
 
-**Status: OPEN — root cause found 28.07.26 (one un-gated render site + an unused data field). Not fixed.**
+**Status: DONE (28.07.26 — implemented + offline-proven against the live 133-entry media list; owner eyeball on the glass owed).**
 
 Source: `work/checklist27.07.26_manual_verify.md` item 39, owner note added 28.07 14:26:
 
@@ -103,13 +103,58 @@ other, so the tie-break must be explicit.
 - New smoke over the duration lookup, including the duplicate-entry tie-break, added to the
   curated FILES list in `tools/ci/run-offline-tests.js`.
 
-## 4. What was VERIFIED (investigation only)
+## 4. What was DONE
 
-- Both render sites read at `dc8b2c4`; the gate present at `playlist-control-panel.js:88` and
-  absent at `inspector-layer-playlist.js:168`.
-- `durationMs` confirmed present on the live box: `GET /api/media` → 133 entries, values quoted
-  above are real output.
-- The duplicate-entry duration contradiction is real live data, not hypothetical.
-- Deploy state confirmed current (14:02 build + kiosk restart vs 14:26 note), so this is a code
-  defect and not a stale bundle.
-- Nothing changed; no build run.
+**New — `client/lib/media-duration.js`** (123 lines). Index over `state.media`, same
+normalisation shape as `media-exists.js` (case-insensitive, extension-stripped, basename
+fallback), initialised from `client/app.js` next to `initMediaExistsIndex`. The §1d trap is
+handled by an explicit three-step tie-break, applied per key at index build:
+
+1. drop implausible candidates — no positive `durationMs`, or an fps **below 1** (the
+   CINF frame-count/timebase miscalculation's tell, `fps: 0.04`);
+2. prefer probed rows (those carrying `codec`/`resolution`) over CINF-only rows;
+3. if the survivors still disagree by more than 10x, return `null`.
+
+`mediaDurationMs()` returns `null` for anything untrustworthy and callers render **nothing** —
+the hard rule from §2.2. `formatClipDuration()` gives `0:53` / `1:24:06` (§2.3).
+
+**Changed — `client/components/inspector-layer-playlist.js`:**
+
+- Row render gates on `isTimelessItem(item)`: timeless items keep an editable seconds input,
+  now defaulting to `timelessSecsOf(playlist)` instead of the hardcoded `5` (it agrees with the
+  "Timeless items (s)" field instead of contradicting it); timed media renders a static
+  `.playlist-item-length` cell with the clip's real length, blank when unknown.
+- The two item-creation sites (mode switch to `list`, drag-and-drop) no longer stamp
+  `duration: 5` on movies — a duration is written **only** for timeless items. This was the
+  source of the stray 5s in saved scenes, not just in the render.
+- The `parseInt(...) || 5` fallback in the change handler follows the same default.
+- Removed a dead `isImg` local (unused since the thumb rewrite; one fewer lint warning).
+
+Justification for making timed rows non-editable: the server arms a wall-clock timer from
+`item.duration` **only** for timeless items — `scene-take-lbg-playlist.js:339`
+(`schedulePlaylistImageTimer`) is called exclusively under `isTimelessPlaylistItem` guards
+(:102, :204). On a movie the box was both a lie and dead code; the input's old tooltip claim
+"or to limit video playback" was never implemented.
+
+## 5. What was VERIFIED
+
+- **Live data, real lookup:** the full 133-entry `GET /api/media` payload fed through the new
+  index — 0 implausible results (nothing over 3 h), the 8.4-hour CINF row resolves to `0:53`
+  under **both** id spellings, and all **33** timed-extension entries carry a `durationMs`, so
+  every movie in a playlist gets a real length rather than a blank. The 96 nulls are entries
+  with no `durationMs` at all (stills/graphics — timeless, so they render the input anyway) and
+  2 sub-1-fps CINF rows with no probed sibling, correctly refused.
+- **New smoke** `tools/smoke/smoke-wo370-playlist-media-durations.test.js` (9 tests), added to
+  the curated FILES list in `tools/ci/run-offline-tests.js`: the duplicate-entry tie-break on
+  real box fixtures, path/case/extension tolerance, null-not-a-number for unknowns, the >10x
+  disagreement refusal, formatting, plus source pins that the hardcoded `5` is gone, the input
+  is gated, and the index is actually wired at app init (WO-367's dead-code lesson).
+- **Full offline suite: 1570 tests, 1568 pass / 0 fail / 2 skip.** Lint clean on all touched
+  files (the 2 remaining warnings in the inspector are pre-existing WO-103 innerHTML notices on
+  untouched blocks). `check-max-file-lines` 0 over.
+- `npm run build:client` OK.
+- §2.4 checked: the MV playlist labels (`multiview_master.js:253-279`) build `current -> next`
+  from item **values** only — no `duration ?? 5` anywhere in the templates. Nothing to fix there.
+- The panel dropdown (`playlist-control-panel.js:88`, already correct) was not touched.
+
+**Owner QA owed:** open a playlist of movies in the layer inspector — real lengths, no `5`.

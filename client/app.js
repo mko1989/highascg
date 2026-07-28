@@ -61,6 +61,7 @@ import { applyOperatorGuiHtmlClass, initOperatorGuiRectReporting } from './lib/o
 import { initOperatorGuiInteractionSuppress } from './lib/operator-gui-interaction-suppress.js'
 import { initDecklinkInputToasts, initLiveInputFailureToasts } from './lib/decklink-input-toast.js'
 import { initMediaExistsIndex } from './lib/media-exists.js'
+import { initMediaDurationIndex } from './lib/media-duration.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
 // WO-243/255: hard-gated on ?operatorGui / legacy ?cefOperator in the query string — no-op
@@ -72,6 +73,7 @@ export const stateStore = new StateStore()
 initDecklinkInputToasts(stateStore)
 /* WO-360 (re-wired 28.07 — the lint census caught these calls lost in a batch edit). */
 initMediaExistsIndex(stateStore)
+initMediaDurationIndex(stateStore) // WO-370: real clip lengths for playlist rows
 initLiveInputFailureToasts(stateStore)
 export const ws = new WsClient()
 window.placeholderState = placeholderState

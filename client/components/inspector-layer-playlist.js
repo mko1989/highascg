@@ -1,6 +1,7 @@
 import { sceneState } from '../lib/scene-state.js'
 import { isTimelessItem, timelessSecsOf } from '../lib/playlist-timeless.js'
 import { clipMissing } from '../lib/media-exists.js'
+import { mediaDurationMs, formatClipDuration } from '../lib/media-duration.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
@@ -34,13 +35,16 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 		const nextMode = modeSel.value
 		const patch = { sourceMode: nextMode }
 		if (nextMode === 'list' && (!layer.playlist || layer.playlist.length === 0) && layer.source) {
-			patch.playlist = [{
+			const seeded = {
 				id: `pl_${Date.now()}`,
 				type: layer.source.type || 'media',
 				value: layer.source.value,
 				label: layer.source.label || layer.source.value,
-				duration: 5
-			}]
+			}
+			/* WO-370: duration belongs to timeless items only — stamping 5 on a movie is what put
+			 * the bogus "5" in the rows in the first place. */
+			if (isTimelessItem(seeded)) seeded.duration = timelessSecsOf(layer.playlist)
+			patch.playlist = [seeded]
 		}
 		if (nextMode === 'single' && layer.playlist && layer.playlist.length > 0) {
 			const item = layer.playlist[0]
@@ -108,8 +112,9 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 					type: isImg ? 'image' : (data.type || 'media'),
 					value: data.value,
 					label: data.label || data.value,
-					duration: 5,
 				}
+				// WO-370: only timeless items carry a duration, pre-filled from this playlist's setting.
+				if (isTimelessItem(newItem)) newItem.duration = timelessSecsOf(layer.playlist)
 				const nextList = [...(layer.playlist || []), newItem]
 				const patch = { playlist: nextList }
 				if (nextList.length === 1) {
@@ -145,7 +150,8 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			itemRow.style.padding = '2px 4px'
 			itemRow.style.transition = 'all 0.15s ease'
 			
-			const isImg = item.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(item.value)
+			/* (the old local isImg here was dead since the thumb rewrite; isTimelessItem below
+			 * classifies the row now — WO-370) */
 			const thumbUrl =
 				(item.type === 'media' || item.type === 'file' || !item.type) && item.value
 					? getThumbnailUrl(item.value, 80, 2)
@@ -161,11 +167,22 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			/* Owner 27.07: the row shows the FILE NAME; the full path only matters when missing
 			 * (tooltip keeps it). */
 			const itemLabel = String(rawLabel).replace(/\\/g, '/').split('/').filter(Boolean).pop() || rawLabel
+			/* WO-370 (owner, 3rd report): only TIMELESS items have an operator-settable duration —
+			 * the server arms its wall-clock timer from item.duration for those and for nothing else
+			 * (scene-take-lbg-playlist.js:339, guarded by isTimelessPlaylistItem). A movie's box was
+			 * therefore both a lie and dead: it read the hardcoded 5 and changed nothing. Timed media
+			 * now shows its REAL length as static text; unknown length shows nothing, never a number. */
+			const timeless = isTimelessItem(item)
+			const clipMs = timeless ? null : mediaDurationMs(item.value)
+			const clipLen = formatClipDuration(clipMs)
+			const durCellHtml = timeless
+				? `<input type="number" class="playlist-item-duration" title="Seconds this timeless item stays on air before the playlist advances" value="${item.duration ?? timelessSecsOf(playlist)}" min="1" max="3600" style="width: 34px; flex: none; margin: 0 4px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.7rem; text-align: center; padding: 1px 0;"/>`
+				: `<span class="playlist-item-length" title="${escapeAttr(clipLen ? `Clip length ${clipLen}` : 'Clip length unknown')}" style="flex: none; margin: 0 4px; min-width: 34px; text-align: center; font-size: 0.7rem; color: var(--text-muted); font-variant-numeric: tabular-nums;">${escapeHtml(clipLen)}</span>`
 			itemRow.innerHTML = `
 				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 4px; font-size: 0.6rem; line-height: 1; letter-spacing: -2px; user-select: none; flex: none;">⋮⋮</span>
 				${thumbHtml}
 				<span class="playlist-item-name" title="${escapeAttr(missing ? `MISSING in Caspar media: ${item.value}` : rawLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;${missing ? ' color: #f85149;' : ''}">${missing ? '⚠ ' : ''}${escapeHtml(itemLabel)}</span>
-				<input type="number" class="playlist-item-duration" title="Duration in seconds (static images / timeless items, or to limit video playback)" value="${item.duration ?? 5}" min="1" max="3600" style="width: 34px; flex: none; margin: 0 4px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.7rem; text-align: center; padding: 1px 0;"/>
+				${durCellHtml}
 				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" title="Remove item" style="padding: 0 4px; font-size: 0.75rem; line-height: 1.3; flex: none;">✕</button>
 			`
 
@@ -218,7 +235,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			const durInp = itemRow.querySelector('.playlist-item-duration')
 			if (durInp) {
 				durInp.addEventListener('change', () => {
-					const nextDur = Math.max(1, parseInt(durInp.value, 10) || 5)
+					const nextDur = Math.max(1, parseInt(durInp.value, 10) || timelessSecsOf(playlist))
 					const list = playlist.map(x => x.id === item.id ? { ...x, duration: nextDur } : x)
 					sceneState.patchLayer(sceneId, layerIndex, { playlist: list })
 					document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
