@@ -1,5 +1,7 @@
 'use strict'
 
+const { resolveOutputSourceToChannel } = require('../config/output-source-name')
+
 const path = require('path')
 const { getChannelMap } = require('../config/routing')
 const { buildAudioDownmixFilterChain } = require('../streaming/streaming-channel-ffmpeg')
@@ -15,7 +17,9 @@ function isRemoveNotFoundError(err) {
 }
 
 function joinCasparMediaFile(dir, file) {
-	const d = String(dir || '').trim().replace(/[/\\]+$/, '')
+	const d = String(dir || '')
+		.trim()
+		.replace(/[/\\]+$/, '')
 	if (!d) return file
 	if (/^[A-Za-z]:[\\/]/.test(d)) return path.win32.join(d, file)
 	return path.posix.join(d.replace(/\\/g, '/'), file.replace(/\\/g, '/'))
@@ -87,7 +91,10 @@ async function resolveCasparMediaDir(ctx) {
 function recordFfmpegArgs(opts = {}) {
 	const crf = Number.isFinite(Number(opts.crf)) ? Math.min(51, Math.max(18, Math.round(Number(opts.crf)))) : 26
 	const codec = String(opts.videoCodec || 'h264').toLowerCase() === 'hevc' ? 'libx265' : 'libx264'
-	const preset = String(opts.encoderPreset || 'veryfast').trim().toLowerCase() || 'veryfast'
+	const preset =
+		String(opts.encoderPreset || 'veryfast')
+			.trim()
+			.toLowerCase() || 'veryfast'
 	const vbrRaw = parseInt(String(opts.videoBitrateKbps ?? ''), 10)
 	const useVbr = Number.isFinite(vbrRaw) && vbrRaw >= 200
 	const video = [
@@ -244,22 +251,12 @@ function resolveRecordSourceChannel(ctx, outputId) {
 	const map = getChannelMap(config, ctx.switcherOutputBusByChannel)
 	const outputs = Array.isArray(config?.recordOutputs) ? config.recordOutputs : []
 	const picked = outputs.find((x) => String(x?.id || '') === String(outputId || '')) || outputs[0] || {}
-	const source = String(picked?.source || 'program_1').toLowerCase()
-	if (source === 'multiview' && map.multiviewCh != null) return map.multiviewCh
-	const pm = source.match(/^program[_-]?(\d+)$/)
-	if (pm) {
-		const i = parseInt(pm[1], 10)
-		if (i >= 1 && i <= map.screenCount) return map.programCh(i)
-	}
-	const pr = source.match(/^preview[_-]?(\d+)$/)
-	if (pr) {
-		const i = parseInt(pr[1], 10)
-		if (i >= 1 && i <= map.screenCount) {
-			const ch = map.previewCh(i)
-			if (ch != null) return ch
-		}
-	}
-	return map.programCh(1)
+	/* WO-378: shared vocabulary — `channel_<N>` (any Caspar channel, so a cabled HOST channel can
+	 * feed a record output), `program_<N>`/`preview_<N>` (screen buses), `multiview`. The three
+	 * copies of these regexes are gone; only the per-caller fallback differs, and this one keeps
+	 * recording SOMETHING rather than refusing. */
+	const resolved = resolveOutputSourceToChannel(map, picked?.source || 'program_1')
+	return resolved != null ? resolved : map.programCh(1)
 }
 
 module.exports = {

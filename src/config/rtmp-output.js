@@ -1,5 +1,7 @@
 'use strict'
 
+const { resolveOutputSourceToChannel } = require('./output-source-name')
+
 const defaults = require('./defaults')
 const { getChannelMap } = require('./routing')
 const { escapeXml } = require('./config-generator-builders')
@@ -12,20 +14,10 @@ const { buildStreamingRtmpFfmpegArgs } = require('../streaming/streaming-channel
  * @returns {number | null}
  */
 function resolveInputTargetToChannel(config, target) {
-	const map = getChannelMap(config)
-	const t = String(target || 'program_1').toLowerCase()
-	if (t === 'multiview') return map.multiviewCh != null ? map.multiviewCh : null
-	const pm = t.match(/^program[_-]?(\d)$/)
-	if (pm) {
-		const i = parseInt(pm[1], 10)
-		if (i >= 1 && i <= map.screenCount) return map.programCh(i)
-	}
-	const pr = t.match(/^preview[_-]?(\d)$/)
-	if (pr) {
-		const i = parseInt(pr[1], 10)
-		if (i >= 1 && i <= map.screenCount) return map.previewCh(i)
-	}
-	return null
+	/* WO-378: one vocabulary — `channel_<N>` (any Caspar channel, incl. host channels),
+	 * `program_<N>`/`preview_<N>` (screen buses), `multiview`. This used to carry its own copy of
+	 * the program/preview regexes and did not know `channel_<N>` at all. */
+	return resolveOutputSourceToChannel(getChannelMap(config), target || 'program_1')
 }
 
 /**
@@ -99,10 +91,7 @@ function normalizeRtmpConfig(rtmpIn) {
 			rtmpUrl: getEffectiveRtmpDestinationUrl({ rtmpServerUrl: serverUrl, streamKey, rtmpUrl: legacyUrl }),
 			inputTarget: String(a.inputTarget ?? t.inputTarget ?? 'program_1').trim() || 'program_1',
 			videoCodec: String(a.videoCodec ?? 'h264').toLowerCase(),
-			videoBitrateKbps: Math.max(
-				100,
-				parseInt(String(a.videoBitrateKbps ?? t.videoBitrateKbps ?? 2500), 10) || 2500
-			),
+			videoBitrateKbps: Math.max(100, parseInt(String(a.videoBitrateKbps ?? t.videoBitrateKbps ?? 2500), 10) || 2500),
 			encoderPreset: String(a.encoderPreset ?? t.encoderPreset ?? 'veryfast').trim() || 'veryfast',
 			audioSource: String(a.audioSource ?? 'muxed').toLowerCase(),
 			audioBitrateKbps: Math.max(32, parseInt(String(a.audioBitrateKbps ?? 128), 10) || 128),

@@ -62,7 +62,9 @@ test('WO-377 a host-channel cable is no longer invisible to the output mapping',
 	const edges = collectDestinationOutputEdges(config()).filter((e) => e.sink.kind === 'v4l2_out')
 	assert.equal(edges.length, 1, 'the edge must survive the screenDestinations lookup miss')
 	assert.equal(edges[0].hostChannel, 4, 'the channel comes off the connector, not the destination list')
-	assert.equal(edges[0].videoSource, null, 'a host channel has no program_N/preview_N name')
+	// WO-378 superseded WO-377's interim `videoSource: null`: a host channel is now NAMED
+	// `channel_<N>`, which is what lets it feed record/stream outputs and not just the vcam.
+	assert.equal(edges[0].videoSource, 'channel_4')
 	assert.equal(edges[0].mode, 'host_channel')
 })
 
@@ -84,15 +86,21 @@ test('WO-377 a normal screen destination still resolves through the named source
 	assert.equal(edges[0].videoSource, 'program_1')
 })
 
-test('WO-377 an unnameable source never blanks a record/stream source string', () => {
+test('WO-377 → WO-378: a host-channel cable now feeds a record output too', () => {
+	/* This assertion INVERTED on purpose. WO-377 could only give the virtual camera (which takes a
+	 * channel NUMBER) its host channel; a record output stores a source STRING and there was no
+	 * name for a host channel, so the rule was "leave it alone rather than blank it".
+	 * WO-378 gave it a name — `channel_<N>` — per the owner's "host channels must be able to feed
+	 * any and all outputs", so the correct result is now that the record source FOLLOWS the cable.
+	 * The no-blanking guard it used to test is still in place for any future unnameable source. */
 	const cfg = config({
 		recordOutputs: [{ id: 'record_1', label: 'Rec1', enabled: true, source: 'program_1' }],
 	})
-	// Same host-channel cable, this time landing on a RECORD sink, whose config field is a STRING.
 	cfg.deviceGraph.edges = [{ id: 'e1', sourceId: 'dst_in_host_decklink_input_4', sinkId: 'record_1' }]
 
 	applyStreamRecordMappingsFromGraph(cfg)
-	assert.equal(cfg.recordOutputs[0].source, 'program_1', 'must be left alone, not set to null/undefined')
+	assert.equal(cfg.recordOutputs[0].source, 'channel_4')
+	assert.ok(cfg.recordOutputs[0].source, 'and it is never blanked')
 })
 
 test('WO-377 a host connector with no usable channel is still ignored', () => {

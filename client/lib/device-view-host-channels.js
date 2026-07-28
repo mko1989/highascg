@@ -156,16 +156,18 @@ export function listHostLiveSourceDestinations(payload) {
 	const cm = channelMapForHostChannels(payload)
 	if (!cm || typeof cm !== 'object') return []
 	const hostEntries = (Array.isArray(cm.inputChannels) ? cm.inputChannels : []).filter(
-		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host' || e?.kind === 'browser_display',
+		(e) => e?.kind === 'webpage_host' || e?.kind === 'ndi_host' || e?.kind === 'browser_display'
 	)
 	const out = []
 	for (const entry of hostEntries) {
-		const role = entry.kind === 'webpage_host' ? 'webpage_host' : entry.kind === 'ndi_host' ? 'ndi_host' : 'browser_display'
+		const role =
+			entry.kind === 'webpage_host' ? 'webpage_host' : entry.kind === 'ndi_host' ? 'ndi_host' : 'browser_display'
 		const dest = normalizeHostChannelDestination({
 			hostRole: role,
 			casparChannel: entry.channel,
 			sourceId: entry.sourceId,
-			label: entry.label || defaultHostChannelLabel({ role, ch: entry.channel, label: entry.label, sourceId: entry.sourceId }),
+			label:
+				entry.label || defaultHostChannelLabel({ role, ch: entry.channel, label: entry.label, sourceId: entry.sourceId }),
 			id: hostChannelDestinationId(role, entry.channel, entry.sourceId),
 		})
 		if (dest) out.push(dest)
@@ -204,7 +206,7 @@ export function listHostChannelDestinations(payload) {
 	const fromHostLive = listHostLiveSourceDestinations(payload)
 	const cm = channelMapForHostChannels(payload)
 	return mergeHostDestinations([fromInputs, fromHostLive, fromOrder, fromIntent]).map((dest) =>
-		reconcileHostChannelDestination(dest, cm),
+		reconcileHostChannelDestination(dest, cm)
 	)
 }
 
@@ -263,7 +265,6 @@ export {
 	liveAudioSlotFromHostDestination,
 	v4l2SlotFromHostDestination,
 	findExtraLiveSourceForHostDestination,
-	hostChannelVideoSourceToken,
 } from './device-view-host-channels-destination-utils.js'
 
 /**

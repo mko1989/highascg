@@ -3,6 +3,7 @@
 const { normalizeDeviceGraph, isCasparOutputConnector } = require('./device-graph')
 const { normalizeVirtualCameraConfig } = require('../virtual-output/v4l2-bridge-config')
 const { resolveInputTargetToChannel } = require('./rtmp-output')
+const { channelSourceName } = require('./output-source-name')
 const { normalizeScreenDestinations } = require('./screen-destinations')
 
 /**
@@ -71,9 +72,10 @@ function collectDestinationOutputEdges(config) {
 				 * the cable existed in the graph and meant nothing downstream. The connector itself
 				 * carries the answer (`caspar.hostChannel`), so resolve from it instead.
 				 *
-				 * Such an edge has no `program_N`/`preview_N` name — `videoSource` stays null and
-				 * consumers that write a source STRING must skip it (only the ones that take a
-				 * channel NUMBER, i.e. the virtual camera, can honour it today). */
+				 * WO-378 (owner: "host channels must be able to feed any and all outputs"): the edge
+				 * is named `channel_<N>` — the canonical vocabulary for a bare Caspar channel — so
+				 * it flows into `recordOutputs[].source` / `streamingChannel.videoSource` like any
+				 * other source, instead of being a special case only the virtual camera could read. */
 				const hostChannel = Math.max(0, parseInt(String(source?.caspar?.hostChannel ?? 0), 10) || 0)
 				if (!hostChannel) return null
 				return {
@@ -84,7 +86,7 @@ function collectDestinationOutputEdges(config) {
 					mode: 'host_channel',
 					mainIndex: 0,
 					layer: readEdgeOutputLayer(e),
-					videoSource: null,
+					videoSource: channelSourceName(hostChannel),
 					hostChannel,
 				}
 			}
@@ -182,9 +184,8 @@ function applyStreamRecordMappingsFromGraph(config) {
 	for (const [streamSinkId, list] of groupedStreams.entries()) {
 		const winner = pickOutputEdgeWinner(list, streamSinkId)
 		if (!winner) continue
-		// todos28.07.26: host-channel sources have no program_N/preview_N name — `videoSource` is
-		// the string this writes into config, so an unnameable source must be left alone rather
-		// than blanking a working one.
+		// WO-378: every source now has a name (`channel_<N>` for host channels), so this only
+		// guards against a future unnameable source blanking a working one.
 		if (!winner.videoSource) continue
 		if (!config.streamingChannel || typeof config.streamingChannel !== 'object') {
 			config.streamingChannel = {}
@@ -210,7 +211,7 @@ function applyStreamRecordMappingsFromGraph(config) {
 		for (const [recordId, list] of groupedRecords.entries()) {
 			const winner = pickOutputEdgeWinner(list, recordId)
 			if (!winner) continue
-			if (!winner.videoSource) continue // see the stream guard above
+			if (!winner.videoSource) continue // WO-378: see the stream guard above
 			const idx = next.findIndex((x) => String(x?.id || '') === recordId)
 			if (idx >= 0) {
 				if (String(next[idx].source || '') !== winner.videoSource) {

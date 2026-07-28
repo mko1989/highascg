@@ -63,22 +63,15 @@ export function findExtraLiveSourceForHostDestination(dest, role, ch, extraLive)
 	if (ch != null) {
 		return (
 			list.find(
-				(x) =>
-					Number(x?.hostChannel ?? x?.inputsChannel) === Number(ch) &&
-					(x?.routeType === role || x?.hostRole === role),
+				(x) => Number(x?.hostChannel ?? x?.inputsChannel) === Number(ch) && (x?.routeType === role || x?.hostRole === role)
 			) || null
 		)
 	}
 	return null
 }
 
-/**
- * Token stored on recordOutputs[].source / streamingChannel.videoSource when cabled from a host destination.
- * @param {object} dest
- * @returns {string}
- */
-export function hostChannelVideoSourceToken(dest) {
-	const ch = parseInt(String(dest?.casparChannel ?? dest?.pgmChannel ?? ''), 10)
-	if (Number.isFinite(ch) && ch >= 1) return `channel_${ch}`
-	return 'program_1'
-}
+/* WO-378: `hostChannelVideoSourceToken()` lived here and was never called by anything (it was
+ * re-exported once and that was all) — the `channel_<N>` token it invented is now produced
+ * SERVER-side from the graph edge itself (src/config/device-graph-output-mapping.js), which is the
+ * only place that knows which cable won. Removed rather than left as a second, drifting source of
+ * the same string. */
