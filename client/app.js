@@ -70,6 +70,9 @@ initOperatorGuiInteractionSuppress()
 
 export const stateStore = new StateStore()
 initDecklinkInputToasts(stateStore)
+/* WO-360 (re-wired 28.07 — the lint census caught these calls lost in a batch edit). */
+initMediaExistsIndex(stateStore)
+initLiveInputFailureToasts(stateStore)
 export const ws = new WsClient()
 window.placeholderState = placeholderState
 settingsState.subscribe(() => applyEditorDefaultsToRuntime(sceneState))
