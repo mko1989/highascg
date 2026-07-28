@@ -428,12 +428,20 @@
 }
 
 
+/* WO-369 (checklist27 item 29, owner: "needs to have bigger font and be closer to the eyes,
+ * minimum padding"). Placement from 1d1dca0 is signed off — only the type changes here.
+ * The 28px-tall eye row is the size ceiling; 17px reads from the operator position and still
+ * clears it. The -2px trims the .header__status flex `gap: 0.5rem` down to the 6px density
+ * a6ac9f1 established for the eyes cluster (8px row gap - 2px = 6px), without touching a gap
+ * every other status child shares. */
 .header-wall-clock {
-	font-size: 12px;
+	font-size: 17px;
+	font-weight: 600;
+	line-height: 1;
 	font-variant-numeric: tabular-nums;
-	color: var(--text-muted);
+	color: var(--text);
 	white-space: nowrap;
-	margin-right: 10px;
+	margin-right: -2px;
 	align-self: center;
 }
 

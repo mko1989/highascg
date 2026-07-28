@@ -79,7 +79,12 @@ export function initHeaderBarOperatorHelper(container) {
 		openBtn.textContent = busy
 			? `${labelFor(action)}${state === 'opening' ? ' opening…' : ' is open'}`
 			: 'Open window ▾'
-		backBtn.style.display = busy ? '' : 'none'
+		/* WO-369 (checklist27 item 8, owner: "doesnt need the back to gui button"): with the
+		 * taskbar on, 98c80e3's pointerdown auto-park already puts the GUI back on any click, so
+		 * the button is dead chrome. It survives ONLY for the flag-off WO-283 single-helper
+		 * configuration, where auto-park is inert (`if (!_taskbarOn) return` below) and this is
+		 * the only way back. */
+		backBtn.style.display = busy && !_taskbarOn ? '' : 'none'
 		if (busy) closeMenu()
 	}
 
@@ -203,11 +208,13 @@ export function initHeaderBarOperatorHelper(container) {
 
 	async function refresh() {
 		const s = await getOperatorHelperWindowState()
-		render(s.state, s.action)
 		// Poll the taskbar too; cheap, and it is the only signal that a helper crashed/closed.
 		const tb = await getOperatorHelperTaskbar()
 		_taskbarOn = tb.enabled
 		_lastHelpers = Array.isArray(tb.helpers) ? tb.helpers : []
+		// WO-369: taskbar state is read BEFORE render — the Back-to-GUI gate depends on it, and
+		// rendering first would decide the first pass against a stale `_taskbarOn`.
+		render(s.state, s.action)
 		if (tb.enabled) {
 			// With the taskbar active, launching is per-helper (multiple can run) — the menu items
 			// route through the taskbar action instead of the single-helper open.

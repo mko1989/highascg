@@ -1,6 +1,6 @@
 # WO-369 — Checklist27 UI notes: drop the "Back to GUI" button, retune the wall clock
 
-**Status: OPEN — written 28.07.26 from the owner's checklist27 notes. Investigation + plan only; nothing implemented.**
+**Status: DONE (28.07.26 — both items shipped, built and reloaded on the kiosk; clock verified in a screenshot of the running GUI, owner sign-off on legibility owed).**
 
 Source: `work/checklist27.07.26_manual_verify.md`, notes added by the owner on the 28th (file
 saved 14:26, after the 14:02 client rebuild + kiosk reload — so both notes describe the
@@ -81,10 +81,51 @@ Related precedent for the spacing target: `a6ac9f1` closed the connection-eyes g
 Client-only, both items: `npm run build:client` then `DISPLAY=:0 xdotool key F5` (kiosk reload,
 XTEST — `XSendEvent` F5 is dropped by Firefox).
 
-## 4. What was VERIFIED (investigation only)
+## 4. What was DONE
 
-- Both notes are post-deploy: `dist-web/` rebuilt 28.07 14:02, kiosk Firefox restarted 14:02:17,
-  checklist saved 14:26. The owner is describing the shipped UI.
-- `98c80e3`'s auto-park is the behaviour that makes the button redundant — confirmed from the
-  commit message's live-verification record.
-- Nothing changed; no build run.
+### Item 8 — Back to GUI
+
+The plan's "check before deleting" found a condition the note could not have known about: the
+auto-park handler that makes the button redundant is **gated on the multi-helper taskbar flag** —
+`header-bar-operator-helper.js` starts its `pointerdown` handler with `if (!_taskbarOn) return`,
+and `_taskbarOn` mirrors `operatorTools.multiHelperTaskbar` (`operator-helper-live.js:33`). That
+flag is `true` in this box's `config/general.json` and the live API reports
+`{"enabled":true}` — but with it off (the WO-283 single-helper configuration other boxes ship
+with) auto-park never runs and the button is the only way back.
+
+So the button is **gated, not deleted**: `backBtn.style.display = busy && !_taskbarOn ? '' : 'none'`.
+On this box it can never appear again; the flag-off fallback keeps its escape hatch. `refresh()`
+was reordered to read taskbar state *before* `render()`, otherwise the first pass after load
+would decide the gate on a stale `_taskbarOn`.
+
+Nothing else calls the action: the only other `parkAllOpen()` callers are server-side
+(`operator-helper-coordinator.js:121`, `operator-helper-live.js:150`) and stay reachable. The
+auto-park path is untouched.
+
+### Item 29 — wall clock
+
+`client/styles/01a2-header-bar.css` `.header-wall-clock`: `12px` → **17px**, weight 600,
+`line-height: 1`, colour `--text-muted` → `--text` (the note asks for legible at a glance; muted
+grey at 12px was the "sized to disappear" the WO describes). `margin-right: 10px` → **-2px**,
+which nets to a **6px** gap against `.header__status`'s `gap: 0.5rem` — the density `a6ac9f1`
+established for the eyes cluster, reached without touching a row gap every other status child
+shares. The 28px eye row is the height ceiling and 17px clears it. Placement untouched.
+
+## 5. What was VERIFIED
+
+- **On the glass.** Client rebuilt, kiosk reloaded (`DISPLAY=:0 xdotool key F5`, XTEST), and a
+  screenshot of the running operator GUI shows the clock ticking at the new size, sitting tight
+  against the connection eyes, still between the PGM progress block and the eyes
+  (`… P1 | BRIDGE/291780 0:09 / 0:16 | 14:58:00 | 👀`).
+- **New smoke** `tools/smoke/smoke-wo369-header-clock-and-back-button.test.js` (4 tests) in the
+  curated FILES list: the button gate + the refresh ordering it depends on; the auto-park path
+  that replaces it (capture-phase listener, own-chrome exemption, raised-only filter, server
+  `parkAllOpen` still reachable); clock font ≥16px, effective gap ≤ the row rhythm and > 0,
+  tabular numerals; and that the clock is still inserted before the eye container.
+  **Note for the record:** the WO assumed "the smoke coverage that `98c80e3` added for auto-park
+  must still pass" — `98c80e3` added no tests (3 files, all production). This is the first test
+  of that behaviour.
+- **Full offline suite: 1590 tests, 1588 pass / 0 fail / 2 skip.** Lint clean. Build OK.
+
+**Owner QA owed:** confirm the clock is legible from the operating position, and that clicking a
+chip still raises and *keeps* a helper raised (the old ~2 s steal must not be back).
