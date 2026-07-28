@@ -35,12 +35,30 @@ import {
 	resolveCableSourceResolution,
 } from '../lib/device-view-gpu-source-inherit.js'
 import { cableSinkAffectsCasparRestart, isStreamingDedicatedOutputChannel } from '../lib/caspar-restart-dirty-policy.js'
+import { edgeHalfOf, edgeOutputLayer, isDestinationConnectorId } from '../lib/device-view-output-layer.js'
 import * as Actions from './device-view-actions.js'
 import { registerDeviceViewCableOutputs } from './device-view-cable-outputs.js'
 
 export function registerDeviceViewCable(ctx) {
 	const { refs, state } = ctx
 	const { wrap, clearCableBtn, messinessSlider, simpleWiringCk, cableOverlay, rearPanel, statusEl } = refs
+
+	/**
+	 * WO-365: which half of a pgm_prv pair the live gesture hangs off, so the ghost cable leaves
+	 * the right dot. A fresh cable knows from the arm (`cableSourceHalf`); a re-grab has to read
+	 * it off the held edge, because the anchor there is an existing edge end, not a click.
+	 * @returns {'pgm' | 'prv' | null}
+	 */
+	const cableAnchorHalf = () => {
+		const grab = state.cableRegrab
+		if (grab) {
+			// Halves live on the SOURCE side only — an anchored sink has none.
+			if (grab.end !== 'sink') return null
+			const edge = (state.lastPayload?.graph?.edges || []).find((e) => String(e?.id) === String(grab.edgeId))
+			return edge && isDestinationConnectorId(edge.sourceId) ? edgeHalfOf(edge) : null
+		}
+		return state.cableSourceHalf === 'prv' ? 'prv' : null
+	}
 
 	ctx.getCOCtx = () => ({
 		cableOverlay,
@@ -52,6 +70,7 @@ export function registerDeviceViewCable(ctx) {
 		selectedConnectorId: state.selectedConnectorId,
 		selectEdgeById: ctx.selectEdgeById,
 		cableSourceId: state.cableSourceId,
+		cableSourceHalf: cableAnchorHalf(),
 		cablePointer: state.cablePointer,
 		messiness: messinessSlider.value,
 		simpleWiring: simpleWiringCk.checked,
@@ -221,6 +240,20 @@ export function registerDeviceViewCable(ctx) {
 		}
 
 		const rollback = planRegrabRollback(grab)
+		/* WO-365: a re-grab is remove-then-add, and `addCable` writes a bare edge — so moving a
+		 * PRV cable used to drop its {outputLayer:2} note and silently demote the cable to a
+		 * SECOND PGM feed (same failure mode as the ghost matrix row). Carry the note across the
+		 * move, and across the rollback if the new target is rejected. */
+		const heldEdge = (state.lastPayload?.graph?.edges || []).find((e) => String(e?.id) === String(plan.removeEdgeId))
+		const heldLayer = heldEdge ? edgeOutputLayer(heldEdge) : 1
+		const restoreLayer = async (sourceId, sinkId) => {
+			if (heldLayer < 2 || !isDestinationConnectorId(sourceId)) return
+			if (typeof ctx.updateDestinationOutputLayer !== 'function') return
+			const moved = (state.lastPayload.graph?.edges || []).find(
+				(e) => String(e?.sourceId) === String(sourceId) && String(e?.sinkId) === String(sinkId),
+			)
+			if (moved?.id) await ctx.updateDestinationOutputLayer(moved.id, heldLayer)
+		}
 		ctx.clearCableGesture()
 		try {
 			ctx.pushUndo()
@@ -237,6 +270,7 @@ export function registerDeviceViewCable(ctx) {
 					try {
 						const back = await Actions.addCable(rollback.sourceId, rollback.sinkId)
 						if (back?.graph) state.lastPayload.graph = back.graph
+						await restoreLayer(rollback.sourceId, rollback.sinkId)
 					} catch {
 						/* surfaced below; the forced reload shows the operator the real graph */
 					}
@@ -244,6 +278,7 @@ export function registerDeviceViewCable(ctx) {
 				throw addErr
 			}
 			if (res?.graph) state.lastPayload.graph = res.graph
+			await restoreLayer(plan.sourceId, plan.sinkId)
 			if (state.selectedEdgeId === plan.removeEdgeId) state.selectedEdgeId = null
 			const sinkConn = connectorById(state.lastPayload, plan.sinkId)
 			if (

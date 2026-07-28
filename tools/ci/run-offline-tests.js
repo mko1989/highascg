@@ -196,6 +196,7 @@ const FILES = [
 	'tools/smoke/smoke-wo319-remote-operator-view.test.js',
 	'tools/smoke/smoke-wo364-prv-output-routing.test.js',
 	'tools/smoke/smoke-wo370-playlist-media-durations.test.js',
+	'tools/smoke/smoke-wo365-matrix-rows-and-cable-anchors.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

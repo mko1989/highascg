@@ -1,6 +1,6 @@
 # WO-365 — Matrix view lists the PGM/PRV destination a third time; standard-view cables all anchor on the PGM dot (todos28.07.26 §3)
 
-**Status: OPEN — investigated 28.07.26, both defects reproduced from live device-view data + source; NOT fixed (investigation only, per owner instruction).**
+**Status: DONE (28.07.26 — both defects fixed; ghost row proven gone against the live payload, anchor resolution unit-proven; owner eyeball on the cable dots owed).**
 
 Regression follow-up to [WO-364](./364_WO_prv_physical_output_gpu.md) (PRV bus as a first-class
 routable output, commit `71aa5a1`, 28.07 11:46).
@@ -145,10 +145,71 @@ WO-364 did teach the *gesture* path about halves (`device-view-cable.js:358` spe
   row counts for a cabled `pgm_prv` destination (the fallback path is pure and testable).
 - Offline suite stays green; `npm run build:client` + kiosk reload to deploy (client-only).
 
-## 4. What was VERIFIED (investigation only)
+## 4. What was DONE
 
-- Both defects traced to specific lines, quoted above, in the tree at `637965c`.
-- The duplicate-row path was confirmed reachable with the **live** `/api/device-view` payload:
-  the destination connector `dst_in_dst_mrzeocxh_1` exists, has two outgoing edges, and is not
-  present in `addedIds` under its bare id after the WO-364 split.
-- No fix applied; no client rebuild; nothing deployed. Owner asked for investigation only.
+### 4a. Matrix fallback dedupe
+
+`addPort` now records the **bare** id in a second set, `consumedIds`, alongside the `id#half`
+dedupe key, and section 4's fallback tests that set
+([device-view-matrix-ports.js](../../client/lib/device-view-matrix-ports.js)). One line added,
+no behaviour change for unsplit ports — the plan's preferred option.
+
+`extractMatrixPorts` moved out of `device-view-matrix.js` into
+`client/lib/device-view-matrix-ports.js`. It is pure, and the render module cannot be imported
+by a test without dragging in modals and the settings store (which fires a `/api/settings`
+fetch at import). The component now imports it; it also lost the component from 265 → 190 lines.
+
+### 4b. Cable anchors by half
+
+- New `client/lib/device-view-output-layer.js` — **one** `edgeOutputLayer` parser (there were
+  two; the renderer needed a third) plus `edgeHalfOf`, `isDestinationConnectorId`,
+  `anchorKeyFor(id, half)` and `edgeSourceAnchorKey(edge)`.
+  `device-view-destinations-inspector-modes.js` re-exports it so the existing
+  inspector/destination import chain is untouched; `device-view-matrix.js` dropped its private copy.
+- `device-view-destinations-ui.js` stamps `data-connector-anchor="dst_in_<id>#pgm|#prv"` on the
+  two pair dots. `data-connector-id` stays on both for hit-testing — exactly the plan's
+  preferred split.
+- `connectorCenter(surfaceEl, connId, half)` tries the half-qualified anchor first and falls
+  back to today's `data-connector-id` / `data-real-ids` path when a destination has no pair dots
+  (pgm_only, pixelmap, multiview, operator_gui — all unaffected).
+- `buildConnectorPositionMap` is now keyed by **anchor key** rather than bare connector id;
+  `drawCable` looks up `edgeSourceAnchorKey(e)`, so a PRV edge leaves the PRV dot and a PGM edge
+  the PGM dot. Sinks and non-destination connectors keep their plain id.
+
+### 4c. Ghost + re-grab (plan step 3) — and a defect the plan did not know about
+
+- The ghost cable takes `cableSourceHalf` from a new `cableAnchorHalf()` in
+  `device-view-cable.js`: a freshly armed cable knows its half from the click
+  (`state.cableSourceHalf`), while a **re-grab** has to read it off the held edge, because there
+  the anchor is an existing edge end, not a click.
+- Found while checking the re-grab path: `commitCableRegrab` is remove-then-add via
+  `Actions.addCable(sourceId, sinkId)`, which writes a **bare** edge — so moving a PRV cable to
+  another port silently dropped its `{outputLayer:2}` note and demoted the cable to a **second
+  PGM feed**. Same failure mode as the ghost matrix row, and not cosmetic. The held edge's layer
+  is now captured before removal and re-applied to the moved edge — and to the rolled-back edge
+  if the server rejects the new target.
+
+## 5. What was VERIFIED
+
+- **The ghost row, on live data.** The real `GET /api/device-view` payload run through
+  `extractMatrixPorts`: pre-fix (same code with `consumedIds` reverted to `addedIds`) →
+  `[{id: dst_in_dst_mrzeocxh_1, label: 'PGM/PRV 1', group: 'Other Sources', half: null}]`;
+  post-fix → `[]`, with exactly two rows (`— PGM`, `— PRV`) for that destination. The Operator
+  GUI destination the WO flagged is `operator_gui`, not `pgm_prv`, so it keeps its single bare
+  row — also asserted.
+- **Anchor resolution, at the level the bug lived.** A stubbed surface with both pair dots
+  sharing one `data-connector-id` and PGM first in document order: `connectorCenter(…, 'prv')`
+  returns the PRV dot's centre (x 305) where the old code returned PGM's (x 105); no-half calls
+  keep the legacy first-match result; a half with no anchored dot falls back rather than
+  returning null (which would have made cables vanish on non-pair destinations).
+- **New smoke** `tools/smoke/smoke-wo365-matrix-rows-and-cable-anchors.test.js` (16 tests) in the
+  curated FILES list: matrix row counts, the anchor/output-layer lib, the DOM resolution above,
+  renderer + gesture wiring pins, and a guard that the outputLayer parser exists in exactly one
+  place.
+- **Full offline suite: 1586 tests, 1584 pass / 0 fail / 2 skip.** Lint clean on every touched
+  file (one pre-existing WO-103 innerHTML warning on an untouched block). `npm run build:client` OK.
+
+**Owner QA owed** (acceptance §3, on the glass): matrix shows two rows for `PGM/PRV 1` and no
+"Other Sources" row; in standard view the PGM cable leaves the PGM dot and the PRV cable the PRV
+dot; dragging/re-grabbing either keeps its own anchor **and its bus** (a moved PRV cable must
+still read `outputLayer 2` in the edge inspector).

@@ -1,4 +1,5 @@
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
+import { edgeOutputLayer } from '../lib/device-view-output-layer.js'
 
 export const STANDARD_VIDEO_MODES = [
 	'PAL', 'NTSC', '576p2500', '720p2398', '720p2400', '720p2500', '720p2997', '720p3000', '720p5000', '720p5994', '720p6000',
@@ -263,18 +264,7 @@ export function resolveGpuInspectorVideoMode(opts) {
 	return { modeId: projectMode }
 }
 
-export function edgeOutputLayer(edge) {
-	const raw = edge?.note
-	if (raw == null || raw === '') return 1
-	if (typeof raw === 'number' && Number.isFinite(raw)) return Math.max(1, Math.round(raw))
-	const s = String(raw || '').trim()
-	if (!s) return 1
-	try {
-		const j = JSON.parse(s)
-		const n = Number(j?.outputLayer)
-		return Number.isFinite(n) ? Math.max(1, Math.round(n)) : 1
-	} catch {
-		const m = s.match(/outputLayer\s*[:=]\s*(\d+)/i)
-		return m ? Math.max(1, parseInt(m[1], 10) || 1) : 1
-	}
-}
+/* WO-365: the parser moved to client/lib/device-view-output-layer.js (the cable renderer needed
+ * it too and a third copy was one copy too many). Re-exported here so the existing
+ * inspector/destination import chain is unchanged. */
+export { edgeOutputLayer }

@@ -3,6 +3,7 @@
  */
 import { destinationRectLabel } from './device-view-ui-utils.js'
 import { edgeOutputLayer } from './device-view-destinations-inspector.js'
+import { anchorKeyFor } from '../lib/device-view-output-layer.js'
 import { friendlyConnectorLabel } from './device-view-helpers.js'
 import { listAllScreenDestinationsForDeviceView } from '../lib/device-view-host-channels.js'
 import { hostChannelsPendingApplyForPayload } from '../lib/planned-channel-map.js'
@@ -229,6 +230,11 @@ export function renderDestinations(ctx) {
 				/* WO-364: which half the gesture started on ('pgm'|'prv') — the PRV bus is a real
 				 * routable output, so the cable must know its half to note outputLayer 2. */
 				const half = nd.dataset.pairNode === 'prv-out' ? 'prv' : 'pgm'
+				/* WO-365: both halves share one connector id, so the cable renderer's
+				 * `[data-connector-id=…]` query returned BOTH dots and .find() took the first in
+				 * document order — the PGM one — for every cable, PRV included. This is the
+				 * half-qualified anchor it resolves first; data-connector-id stays for hit-testing. */
+				if (sinkConnectorId) nd.dataset.connectorAnchor = anchorKeyFor(sinkConnectorId, half)
 				nd.addEventListener('click', (ev) => {
 					ev.preventDefault()
 					ev.stopPropagation()

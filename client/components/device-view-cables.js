@@ -3,6 +3,12 @@
  */
 import { collectDecklinkKeyFillVirtualEdges } from '../lib/device-view-decklink-keyfill.js'
 import { getCableColor, getOrBuild } from './device-view-cables-physics.js'
+import {
+	anchorKeyFor,
+	edgeHalfOf,
+	edgeSourceAnchorKey,
+	isDestinationConnectorId,
+} from '../lib/device-view-output-layer.js'
 
 const DECKLINK_KEY_LINK_COLOR = '#58a6ff'
 const DECKLINK_KEY_LINK_GAP = 26
@@ -73,9 +79,18 @@ function appendDecklinkKeyFillLabel(group, link) {
 	group.append(g)
 }
 
-export function connectorCenter(surfaceEl, connId) {
+/**
+ * @param {Element} surfaceEl
+ * @param {string} connId
+ * @param {'pgm'|'prv'|null} [half] WO-365: a pgm_prv destination's two dots share one connector
+ *        id, so the half-qualified `data-connector-anchor` is tried FIRST. Everything else (and
+ *        any destination rendered without pair dots) falls through to the plain id lookup.
+ */
+export function connectorCenter(surfaceEl, connId, half) {
 	if (!connId || !surfaceEl) return null
-	const matches = [
+	const anchorKey = half ? anchorKeyFor(connId, half) : ''
+	const anchored = anchorKey ? [...surfaceEl.querySelectorAll(`[data-connector-anchor="${anchorKey}"]`)] : []
+	const matches = anchored.length ? anchored : [
 		...surfaceEl.querySelectorAll(`[data-connector-id="${connId}"]`),
 		...surfaceEl.querySelectorAll(`[data-real-ids*="${connId}"]`)
 	]
@@ -96,39 +111,46 @@ export function connectorCenter(surfaceEl, connId) {
 }
 
 /**
- * T202.4: Build a Map of connector-id → center position for all connectors in a render pass.
+ * T202.4: Build a Map of anchor-key → center position for all connectors in a render pass.
  * This avoids repeated querySelectorAll calls per edge and improves overlay render performance.
+ *
+ * WO-365: the key is the ANCHOR key, not the bare connector id — a destination source is keyed
+ * `dst_in_x#pgm` / `dst_in_x#prv` so the two halves of a pair get their own positions. Sinks and
+ * every non-destination connector keep their plain id.
+ *
  * @param {Element} surface
  * @param {Array} edges
  * @param {Array} keyFillEdges
  * @param {string} cableSourceId
+ * @param {'pgm'|'prv'|null} [cableSourceHalf]
  * @returns {Map<string, {x: number, y: number}>}
  */
-function buildConnectorPositionMap(_surface, edges, keyFillEdges, cableSourceId) {
+function buildConnectorPositionMap(_surface, edges, keyFillEdges, cableSourceId, cableSourceHalf) {
 	const map = new Map()
 
 	if (!_surface) return map
 
-	// Collect all unique connector IDs from edges + ghost cable (if any)
-	const connectorIds = new Set()
-	for (const e of edges) {
-		if (e?.sourceId) connectorIds.add(e.sourceId)
-		if (e?.sinkId) connectorIds.add(e.sinkId)
+	// Collect every anchor the pass needs: edge ends + ghost cable (if any)
+	/** @type {Map<string, {id: string, half: 'pgm'|'prv'|null}>} */
+	const wanted = new Map()
+	const want = (id, half) => {
+		if (!id) return
+		wanted.set(anchorKeyFor(id, half), { id, half: half || null })
 	}
-	for (const e of keyFillEdges) {
-		if (e?.sourceId) connectorIds.add(e.sourceId)
-		if (e?.sinkId) connectorIds.add(e.sinkId)
+	for (const list of [edges, keyFillEdges]) {
+		for (const e of list) {
+			if (e?.sourceId) want(e.sourceId, isDestinationConnectorId(e.sourceId) ? edgeHalfOf(e) : null)
+			if (e?.sinkId) want(e.sinkId, null)
+		}
 	}
 	if (cableSourceId) {
-		connectorIds.add(cableSourceId)
+		want(cableSourceId, isDestinationConnectorId(cableSourceId) ? (cableSourceHalf || 'pgm') : null)
 	}
 
-	// Query all connectors at once per ID and cache the result
-	for (const connId of connectorIds) {
-		const pos = connectorCenter(_surface, connId)
-		if (pos) {
-			map.set(connId, pos)
-		}
+	// Query all connectors at once per anchor and cache the result
+	for (const [key, { id, half }] of wanted) {
+		const pos = connectorCenter(_surface, id, half)
+		if (pos) map.set(key, pos)
 	}
 
 	return map
@@ -202,6 +224,7 @@ export function renderCableOverlay(ctx) {
 		selectedConnectorId,
 		selectEdgeById,
 		cableSourceId,
+		cableSourceHalf,
 		cablePointer,
 		messiness,
 		simpleWiring,
@@ -236,11 +259,12 @@ export function renderCableOverlay(ctx) {
 	const simpleWiringMap = simpleWiring ? buildSmoothSimpleMap(edges, surface) : null
 
 	// T202.4: Build connector position map once per render pass
-	const connectorPositionMap = buildConnectorPositionMap(surface, edges, keyFillEdges, cableSourceId)
+	const connectorPositionMap = buildConnectorPositionMap(surface, edges, keyFillEdges, cableSourceId, cableSourceHalf)
 
 	const drawCable = (e, { decklinkKeyFill = false } = {}) => {
 		if (!e || !e.sourceId || !e.sinkId) return
-		const a = connectorPositionMap.get(e.sourceId)
+		// WO-365: a PRV edge leaves the PRV dot, a PGM edge the PGM dot — same connector id.
+		const a = connectorPositionMap.get(edgeSourceAnchorKey(e))
 		const b = connectorPositionMap.get(e.sinkId)
 		if (!a || !b) return
 
@@ -285,7 +309,10 @@ export function renderCableOverlay(ctx) {
 	for (const e of edges) drawCable(e)
 	for (const e of keyFillEdges) drawCable(e, { decklinkKeyFill: true })
 	if (cableSourceId && cablePointer && Number.isFinite(cablePointer.x) && Number.isFinite(cablePointer.y)) {
-		const a = connectorPositionMap.get(cableSourceId)
+		// WO-365: the ghost leaves the half the gesture was armed on (or the grabbed edge's half).
+		const a = connectorPositionMap.get(
+			isDestinationConnectorId(cableSourceId) ? anchorKeyFor(cableSourceId, cableSourceHalf || 'pgm') : cableSourceId,
+		)
 		if (a) {
 			const b = { x: cablePointer.x, y: cablePointer.y }
 			// Ghost cable while dragging: lightweight path only (no physics sim per pointermove).
