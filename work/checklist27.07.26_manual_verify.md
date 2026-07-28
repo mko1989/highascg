@@ -45,11 +45,11 @@ Tick, and drop notes under any item (that's what the `>` lines are for).
       Both converge, nothing blocked, no sync-error toasts.
       >
 
-- [ ] **8. Taskbar** (WO-317)
+- [x] **8. Taskbar** (WO-317)
       Open via the small indicator-style button, launch two helpers, toggle chips.
       >doesnt realy work automaticaly as it should, just clicking on the gui should push the window under the caspar consumer.
       minimaizing firefox forinstance makes it disappear from the "task bar"
-
+seems to work. doesnt need the back to gui button.
 
 - [x] **9. Live-audio host channel** (WO-336)
       Device-view host-channel inspector: device swap + FFT source toggle.
@@ -79,7 +79,7 @@ sudo systemctl restart highascg-power-button.service
       restart decision fires correctly (test suite now green + hermetic).
       >worked, the last i checked.
 
-- [ ] **15. Brightness decay trigger pattern** (3d-meters worst)
+- [x] **15. Brightness decay trigger pattern** (3d-meters worst)
       Next time it dims, note: **gradual while idle** or **step per take**? That answer unblocks
       the investigation.
       >when i do some tweaks so it looks how i want it stops dimming.
@@ -121,7 +121,7 @@ sudo systemctl restart highascg-power-button.service
       (the old ~2s steal is fixed). "Back to GUI" then one chip click brings it forward.
       >other issues detailed above.
 
-- [ ] **22. Playlist rows + ✕** (WO-353)
+- [x] **22. Playlist rows + ✕** (WO-353)
       Playlist items: tiny drag dots, name gets the space, small seconds box, ✕ delete.
       Trashcans are ✕ everywhere (layer list, preset delete, sources folder too).
       >the space between the two columns of dots is unnecesserily wide.
@@ -130,13 +130,13 @@ sudo systemctl restart highascg-power-button.service
       Edit a playlist, take the look to PGM (new list plays), recall it to preview —
       preview must play the NEW list too (the old-version replay is fixed at the root:
       playlist timers were shared between PGM and PRV).
-      >
+      >no, i prv the playlist stops after first item.
 
-- [ ] **24. Shader playlist mixing** (WO-354)
+- [x] **24. Shader playlist mixing** (WO-354)
       Shaders in a playlist with a MIX transition crossfade again. Editing one of those
       shaders in Shader Live restarts it once (at the first slider move), then edits land live.
       >all shaders doesnt mix well now, even from look to look.
-
+seems fine
 - [x] **25. Shader thumbs on ALL looks** (WO-354)
       Every pure-shader look renders a real thumbnail on its deck card, not just one.
       >mostly true.
@@ -156,9 +156,9 @@ sudo systemctl restart highascg-power-button.service
       ✎ next to any param names it (persists across reload; tooltip shows the raw code context).
       >
 
-- [ ] **29. Wall clock** (WO-355)
+- [x] **29. Wall clock** (WO-355)
       Small HH:MM:SS ticking at the right end of the progress-bar row.
-      >no, it needs to be between the eyes and progress bar.
+      >needs to have bigger font and be closer to the eyes, minimum padding.
 
 - [x] **30. Shader params decoded + categorized** (WO-355 follow-up)
       Deep params show human names ("speed", "uv scale", "mix amount", "iterations"…) grouped
@@ -166,7 +166,7 @@ sudo systemctl restart highascg-power-button.service
       as names (those now live in the hover tooltip). ✎ still renames anything.
       >needs further work but later.
 
-- [ ] **31. Shader Live v3** (WO-356)
+- [x] **31. Shader Live v3** (WO-356)
       Categories in bordered boxes, compact rows; mouse wheel over any slider steps it;
       "col"-named values sit in the Colors box (broadcast vec3(1.8) reads "… level").
       Save to library → creates "<shader>-c2" child (source shader untouched); the child shows
@@ -174,35 +174,35 @@ sudo systemctl restart highascg-power-button.service
       preview and into the dropdown; outside shaders mode the click does nothing.
       >
 
-- [ ] **32. Shader params: decode + wiggle + take** (WO-356 follow-ups)
+- [x] **32. Shader params: decode + wiggle + take** (WO-356 follow-ups)
       Each auto param shows a plain-language line ("size/radius of the shape", "wave speed"…).
       ≋ wiggles the value on PREVIEW only (~1.2s) then restores — PGM never moves.
       ▶ in the editor bar takes PRV→PGM with the deck's transition. ↺ per-param reset
       visibly snaps the row back now.
       >
 
-- [ ] **35. Shader names + no more file fights** (Syncthing fix)
+- [x] **35. Shader names + no more file fights** (Syncthing fix)
       Rename a shader in the edit modal → the templates browser shows the NEW name (may take
       one refresh, 15s cache). Files in template/shaders stop being "touched" constantly and
       deleted shaders STAY deleted. NOTE: add the same two .stignore lines
       (/template/shaders, /data/shaders) on the MacBook's copy — stignore doesn't sync itself.
       >
 
-- [ ] **36. Shader Live ▶ + PGM stack** (WO-357)
+- [x] **36. Shader Live ▶ + PGM stack** (WO-357)
       ▶ next to the instance dropdown takes PRV→PGM (deck transition). Right column lists PGM
       layers 10–20: with a PRV shader selected, clicking L10 exchanges it with what's on air
       (MIX), clicking an empty 11–20 fades the shader onto that layer — stacking works, the
       row lights up, and editing the landed shader restarts it once then rides live.
       >
 
-- [ ] **37. Global border: area / secondary color / pulse 0** (WO-358)
+- [x] **37. Global border: area / secondary color / pulse 0** (WO-358)
       Effect inspector has "Area %" X/Y/W/H — border draws inside that rect (slices still
       override with their own rects). "Enable secondary color" reveals the second color +
       transition-time slider; the glow breathes between the two. Pulse speed and min-opacity
       sliders reach 0 (speed 0 = pulse off).
       >
 
-- [ ] **38. Route looks rock solid** (WO-359)
+- [x] **38. Route looks rock solid** (WO-359)
       Take a look with a source layer + routes of it (Look 12), CUT-retake it several times and
       MIX between it and its copy — the source and BOTH routes must survive every take (the bug
       was cut retakes sweeping the unchanged source layer away). Automated 6-cycle drill passed;
@@ -213,9 +213,10 @@ sudo systemctl restart highascg-power-button.service
       Misspell a clip in a playlist: the row and the Playlists panel show ⚠ red with the full
       path in the tooltip; taking the look toasts "Missing in Caspar media: <name>". Unplug /
       break a live input: a red toast names the slot and reason; recovery toasts green.
-      >
+      >it displays correctly. the issue is with in the list it displays the timeless value even on media clips that have their own values which should be displayed.
 
 - [ ] **40. Companion dev mode** (WO-361)
       Run tools/eggs/companion/dev-mode.sh once, then: edit module src → npm run package:dev →
       sudo systemctl restart companion. README in the module repo has the loop (commit it there).
-      >
+      >no, there is no dev to choose meaning companion doest run with correct flags. where is it defined?
+

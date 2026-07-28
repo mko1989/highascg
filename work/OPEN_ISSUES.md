@@ -125,12 +125,12 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | WO-341 | Client sync redesign: server state is the single truth, clients converge (never drop), ONLY user interaction writes — echo-loop kill list, scene.deck ingestion, seq-gap detection, autosave rev-race | [WO-341](./work-orders/341_WO_CLIENT_SYNC_SERVER_TRUTH.md) | 🟡 Kill list 1-7 done 27.07; item 8 = two-client observation drill (owner QA) |
 
-| WO-342 | Deck header empty-space click clears that screen PRV | [WO-342](./work-orders/342_WO_DECK_HEADER_CLICK_CLEARS_PRV.md) | 🔴 Open |
+| WO-342 | Deck header empty-space click clears that screen PRV | [WO-342](./work-orders/342_WO_DECK_HEADER_CLICK_CLEARS_PRV.md) | ✅ Implemented (status was stale; handler live at scene-list-column.js:64, dead duplicate removed 9d2f6dd — owner eyeball owed) |
 | WO-343 | Look editor shows REAL PRV video on the screen consumer while editing (WO-339 v2; X SHAPE input contract applies) | [WO-343](./work-orders/343_WO_LOOK_EDITOR_REAL_PRV_VIDEO.md) | 🔴 Open |
 | WO-344 | Shader look thumbnails: content-aware crop, synthetic audio, fill compositing | [WO-344](./work-orders/344_WO_SHADER_LOOK_THUMBNAILS.md) | 🔴 Open |
 | WO-AUDIT | Last-week WO audit + compiled todo list | [todos26.07.26_wo_audit.md](./todos26.07.26_wo_audit.md) | ✅ 2026-07-26 |
 
-| WO-345 | Shader Live workflow: shades-bunny toggles live-shader editor; params ride the RUNNING producer via CG UPDATE hot-recompile | [WO-345](./work-orders/345_WO_SHADER_LIVE_WORKFLOW.md) | 🔴 Open (implementing) |
+| WO-345 | Shader Live workflow: shades-bunny toggles live-shader editor; params ride the RUNNING producer via CG UPDATE hot-recompile | [WO-345](./work-orders/345_WO_SHADER_LIVE_WORKFLOW.md) | ✅ Implemented 27.07 (status was stale; WO's own line: hot-recompile live-verified. Built out by WO-348/355/356/357, all owner-signed 28.07) |
 
 | WO-346 | Compose toolbar: Reset replaces PRT PGM; per-tile PRT capture | [WO-346](./work-orders/346_WO_COMPOSE_TOOLBAR_RESET_AND_TILE_PRT.md) | ✅ Done 27.07 |
 | WO-347 | Playlists panel: all project playlists + set start item pre-playout | [WO-347](./work-orders/347_WO_PLAYLISTS_PANEL_PROJECT_WIDE.md) | ✅ Done 27.07 |
@@ -155,7 +155,12 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-366 | todos21.07.26 top block never triaged — 7 owner items with zero WO/commit coverage (record bus records wrong channel; live-audio channel resolution; numlock; timeline drops/inspector/latency; timeline compose label bar) | [WO-366](./work-orders/366_WO_todos21_untriaged_backlog.md) | 🔴 Open (triage; needs owner "does this still happen?") |
 | WO-367 | CI does not cap eslint warnings and has no unwired-export check — 3 "written but never called" bugs found by hand on 28.07, one of which shipped WO-360 dead | [WO-367](./work-orders/367_WO_lint_ratchet_and_unwired_code_gate.md) | 🔴 Open |
 | WO-368 | template/shaders is box-owned in .stignore but still git-tracked: permanent dirty tree, deleted shaders resurrectable by any checkout, 9 untracked shaders exist on one machine only (checklist27 item 16) | [WO-368](./work-orders/368_WO_shader_store_git_ownership.md) | 🔴 Open (owner decision: A/B/C in §2) |
+| WO-369 | Checklist27 UI notes: remove the now-redundant "Back to GUI" button (item 8); wall clock bigger font + minimum padding to the eyes (item 29) | [WO-369](./work-orders/369_WO_checklist27_ui_notes_batch.md) | 🔴 Open (small, client-only) |
+| WO-370 | Playlist rows show the timeless default on media clips — layer-inspector row never gates on isTimelessItem and hardcodes 5; real durationMs already in state.media | [WO-370](./work-orders/370_WO_playlist_rows_real_media_durations.md) | 🔴 Open (root cause found; checklist27 item 39) |
+| WO-371 | "In PRV the playlist stops after the first item" — checklist item 23 contradicts item 27; WO-355 made playlists PGM-only after WO-354's acceptance was written | [WO-371](./work-orders/371_WO_prv_playlist_preview_playback.md) | 🔴 BLOCKED on owner decision (A/B/C in §3; C recommended) |
+| WO-372 | Companion shows no dev module to choose: dev symlink and installed store both declare highpass-highascg@1.0.4, so there is no second version to offer (flag + symlink are correct) | [WO-372](./work-orders/372_WO_companion_dev_module_not_selectable.md) | 🔴 Open (checklist27 item 40; WO-361 status needs correcting) |
+| WO-373 | Record bus records the wrong channel: two same-layer destination edges on one record sink tie-break on edge insertion order, so the older cable wins forever | [WO-373](./work-orders/373_WO_record_bus_wrong_source_channel.md) | 🔴 Open (promoted from WO-366; owner repro in §3 owed) |
 
-Last updated: 2026-07-28 — completeness audit of todos 14.07→28.07 (see `work/checklist28.07.26_manual_verify.md`); WO-365..368 opened, none implemented. Suite 1559 pass / 0 fail / 2 skip at 637965c.
+Last updated: 2026-07-28 — completeness audit of todos 14.07→28.07 (see `work/checklist28.07.26_manual_verify.md`) + checklist27 note sweep; WO-365..373 opened, none implemented. Stale statuses corrected: WO-342, WO-345. Suite 1559 pass / 0 fail / 2 skip at 637965c.
 
 Previously: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)
