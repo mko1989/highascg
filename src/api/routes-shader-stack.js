@@ -5,6 +5,12 @@
  * PRV shader onto a chosen PGM look-band layer (10–20) with the deck transition.
  *
  *   POST /api/shader-stack { mainIndex, layerNumber, value, transition?: { type, duration } }
+ *   POST /api/shader-stack { mainIndex, layerNumber, clear: true, transition?: { type, duration } }
+ *
+ * WO-379 (owner, todos28.07.26: "there is no way to remove a shader from a pgm stack in shaders
+ * editor") — the stack could only ever be ADDED to. `clear` fades the layer out with the same
+ * transition vocabulary and drops it from the live scene, so a stacked shader can be taken off
+ * without clearing the whole look.
  *
  * LOADBG + PLAY with the transition covers both cases in one path: an occupied layer crossfades
  * old→new (exchange), an empty layer fades the shader in from transparent. The producer lands
@@ -26,17 +32,25 @@ async function handlePost(body, ctx) {
 	const mainIdx = Math.max(0, parseInt(b.mainIndex, 10) || 0)
 	const layerNumber = parseInt(b.layerNumber, 10)
 	const value = String(b.value || '').trim()
-	if (!value || !Number.isFinite(layerNumber) || layerNumber < STACK_LAYER_MIN || layerNumber > STACK_LAYER_MAX) {
+	const clear = b.clear === true || b.clear === 'true'
+	if (!Number.isFinite(layerNumber) || layerNumber < STACK_LAYER_MIN || layerNumber > STACK_LAYER_MAX) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
-			body: jsonBody({ ok: false, error: `value and layerNumber ${STACK_LAYER_MIN}-${STACK_LAYER_MAX} required` }),
+			body: jsonBody({ ok: false, error: `layerNumber ${STACK_LAYER_MIN}-${STACK_LAYER_MAX} required` }),
 		}
+	}
+	if (!clear && !value) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'value required (or clear: true)' }) }
 	}
 	const routeMap = getRouteMap(ctx)
 	const channel = routeMap.programChannels?.[mainIdx]
 	if (!Number.isFinite(channel)) {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: `no program channel for main ${mainIdx}` }) }
+		return {
+			status: 400,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: false, error: `no program channel for main ${mainIdx}` }),
+		}
 	}
 	const bank = (ctx.programLayerBankByChannel || {})[String(channel)] === 'b' ? 'b' : 'a'
 	const pLayer = physicalProgramLayer(layerNumber, bank)
@@ -50,8 +64,21 @@ async function handlePost(body, ctx) {
 	}
 
 	const run = async () => {
-		await ctx.amcp.loadbg(channel, pLayer, value.toLowerCase(), loadOpts)
-		await ctx.amcp.play(channel, pLayer)
+		if (clear) {
+			/* WO-379: fade the layer out, then clear it. A CUT clears immediately; a MIX needs the
+			 * fade to finish before CLEAR, or the layer disappears without the transition the
+			 * operator asked for. Mirrors the FTB fade-then-clear shape (WO-175). */
+			const fadeFrames = loadOpts.duration || 0
+			if (fadeFrames > 0) {
+				await ctx.amcp.send(`MIXER ${channel}-${pLayer} OPACITY 0 ${fadeFrames}`)
+				const fps = Number(ctx.config?.project?.fps) || 50
+				await new Promise((r) => setTimeout(r, Math.min(4000, Math.round((fadeFrames / fps) * 1000) + 60)))
+			}
+			await ctx.amcp.send(`CLEAR ${channel}-${pLayer}`)
+		} else {
+			await ctx.amcp.loadbg(channel, pLayer, value.toLowerCase(), loadOpts)
+			await ctx.amcp.play(channel, pLayer)
+		}
 
 		/* An exchanged layer may have been a running playlist — kill its channel-scoped runtime
 		 * so a stale timer cannot hop the fresh shader away. */
@@ -71,15 +98,20 @@ async function handlePost(body, ctx) {
 			/* playlist engine absent in some test contexts */
 		}
 		const idx = (scene.layers || []).findIndex((l) => Number(l?.layerNumber) === layerNumber)
-		const newSource = { type: 'template', value }
-		if (idx >= 0) {
-			scene.layers[idx] = { ...scene.layers[idx], source: newSource, sourceMode: 'single', playlist: undefined }
+		if (clear) {
+			// WO-379: drop the layer entirely — an empty stack row must read as empty everywhere.
+			if (idx >= 0) scene.layers.splice(idx, 1)
 		} else {
-			scene.layers.push({ layerNumber, source: newSource, opacity: 1, fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } })
+			const newSource = { type: 'template', value }
+			if (idx >= 0) {
+				scene.layers[idx] = { ...scene.layers[idx], source: newSource, sourceMode: 'single', playlist: undefined }
+			} else {
+				scene.layers.push({ layerNumber, source: newSource, opacity: 1, fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } })
+			}
 		}
 		await liveSceneState.setChannel(channel, { sceneId: scene.id, scene: stripEphemeralTakeFields(scene) })
 		liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
-		return { ok: true, channel, pLayer, layerNumber, transition: loadOpts.transition || 'CUT' }
+		return { ok: true, channel, pLayer, layerNumber, cleared: clear, transition: loadOpts.transition || 'CUT' }
 	}
 
 	try {

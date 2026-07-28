@@ -58,6 +58,25 @@ export function createShaderLiveStack(deps) {
 		}
 	}
 
+	/* WO-379 (owner, todos28.07.26: "there is no way to remove a shader from a pgm stack in shaders
+	 * editor"). The stack could only be added to — an occupied row exchanged, never emptied. */
+	async function clearLayer(layerNumber) {
+		const { mIdx } = pgmScene()
+		const t = sceneState.getResolvedGlobalDefaultTransition?.() || { type: 'MIX', duration: 12 }
+		try {
+			const r = await api.post('/api/shader-stack', {
+				mainIndex: mIdx,
+				layerNumber,
+				clear: true,
+				transition: { type: t.type || 'MIX', duration: t.duration ?? 12 },
+			})
+			if (r?.error || r?.ok === false) throw new Error(r?.error || 'failed')
+			window.showToast?.(`PGM L${layerNumber} cleared`, 'success')
+		} catch (e) {
+			window.showToast?.(`Clear failed: ${e?.message || e}`, 'error')
+		}
+	}
+
 	function render() {
 		if (!host) return
 		const { ch, scene } = pgmScene()
@@ -68,7 +87,12 @@ export function createShaderLiveStack(deps) {
 			const title = occ
 				? `Exchange PGM L${n} (${occ}) with the PRV shader — deck transition`
 				: `Land the PRV shader on PGM L${n} — fades in`
-			return `<button type="button" class="${cls}" data-stack="${n}" title="${escapeHtml(title)}"><span class="shader-live__stack-n">${n}</span><span class="shader-live__stack-name">${escapeHtml(occ || '—')}</span></button>`
+			/* ✕ only on OCCUPIED rows — matches the playlist rows' remove affordance (WO-353:
+			 * "all trashcans → ✕"). Empty rows keep the single land-target hit area. */
+			const clearBtn = occ
+				? `<span class="shader-live__stack-clear" data-stack-clear="${n}" role="button" tabindex="0" title="${escapeHtml(`Take PGM L${n} (${occ}) off air — fades out`)}">✕</span>`
+				: ''
+			return `<button type="button" class="${cls}" data-stack="${n}" title="${escapeHtml(title)}"><span class="shader-live__stack-n">${n}</span><span class="shader-live__stack-name">${escapeHtml(occ || '—')}</span>${clearBtn}</button>`
 		}).join('')
 		const html =
 			`<div class="shader-live__group-title">PGM stack${ch != null ? ` ch${ch}` : ''}</div>` + rows
@@ -81,7 +105,16 @@ export function createShaderLiveStack(deps) {
 	function mount(el) {
 		host = el
 		host.addEventListener('click', (e) => {
-			const btn = e.target instanceof HTMLElement ? e.target.closest('[data-stack]') : null
+			const el = e.target instanceof HTMLElement ? e.target : null
+			// WO-379: the ✕ sits INSIDE the row button — it must not also land a shader.
+			const clearEl = el?.closest('[data-stack-clear]')
+			if (clearEl) {
+				e.preventDefault()
+				e.stopPropagation()
+				void clearLayer(Number(clearEl.dataset.stackClear))
+				return
+			}
+			const btn = el?.closest('[data-stack]')
 			if (btn) void land(Number(btn.dataset.stack))
 		})
 		render()

@@ -116,9 +116,10 @@ function normalizeShaderConfig(input) {
 
 	/* todos27.07.26: child shaders — every Shader Live save is a NEW config pointing at the
 	 * shader it was derived from. One level: children attach to the root parent. */
-	const parentId = payload.parentId && isValidShaderId(String(payload.parentId)) && String(payload.parentId) !== id
-		? String(payload.parentId)
-		: null
+	const parentId =
+		payload.parentId && isValidShaderId(String(payload.parentId)) && String(payload.parentId) !== id
+			? String(payload.parentId)
+			: null
 
 	return {
 		id,
@@ -142,8 +143,84 @@ function templatePath(id) {
 	return path.join(SHADERS_TEMPLATE_DIR, `${id}.html`)
 }
 
+/**
+ * WO-379 — reconcile the shader store's two halves.
+ *
+ * A shader lives in TWO files: `data/shaders/<id>.json` (the config, what the library lists) and
+ * `template/shaders/<id>.html` (the exported Caspar template, what actually plays). `saveShader`
+ * writes both and `deleteShader` unlinks both — but anything that touches only one side (a git
+ * checkout, a Syncthing revert, a half-finished copy) leaves an orphan, and each direction fails
+ * differently and silently:
+ *
+ *   JSON without HTML  → the shader IS in the library, and playing/previewing it 404s.
+ *   HTML without JSON  → Caspar's template catalog lists it, and `/api/shaders/<id>` 404s.
+ *                        (Owner, todos28.07.26: "sh-mirrors shader fails to load with 404.")
+ *
+ * Measured on this box 28.07: 7 of the first kind, 2 of the second. WO-368's git/Syncthing
+ * ownership question is the root cause; this is the repair that stops the symptom regardless of
+ * which way the owner settles that.
+ *
+ * Both directions are recovered, never deleted — this library is single-copy right now (WO-368),
+ * so the only safe move is to rebuild the missing half:
+ *   - missing HTML → re-export it from the JSON (the exporter is pure and deterministic);
+ *   - missing JSON → recover it from the config the exporter EMBEDS in the HTML
+ *                    (`window.__SHADERFX_CONFIG__`), then normalise and write it.
+ *
+ * @returns {Promise<{ exported: string[], recovered: string[] }>}
+ */
+async function reconcileShaderStore() {
+	const exported = []
+	const recovered = []
+	const listDir = async (dir, suffix) => {
+		try {
+			return (await fsp.readdir(dir)).filter((n) => n.endsWith(suffix))
+		} catch {
+			return []
+		}
+	}
+
+	const dataIds = (await listDir(SHADERS_DATA_DIR, '.json')).map((n) => n.slice(0, -5))
+	const tplIds = (await listDir(SHADERS_TEMPLATE_DIR, '.html')).map((n) => n.slice(0, -5))
+	const tplSet = new Set(tplIds)
+	const dataSet = new Set(dataIds)
+
+	for (const id of dataIds) {
+		if (!isValidShaderId(id) || tplSet.has(id)) continue
+		try {
+			const raw = JSON.parse(await fsp.readFile(dataPath(id), 'utf8'))
+			await atomicWriteFile(templatePath(id), buildShaderTemplateHtml(normalizeShaderConfig(raw)))
+			exported.push(id)
+		} catch {
+			/* unreadable/invalid config — leave it alone rather than write a broken template */
+		}
+	}
+
+	for (const id of tplIds) {
+		if (!isValidShaderId(id) || dataSet.has(id)) continue
+		try {
+			const html = await fsp.readFile(templatePath(id), 'utf8')
+			const m = /window\.__SHADERFX_CONFIG__ = (\{[\s\S]*?\})<\/script>/.exec(html)
+			if (!m) continue
+			// The exporter escapes `</` as `<\/` so shader source can never close the script tag.
+			const cfg = JSON.parse(m[1].replace(/<\\\//g, '</'))
+			await atomicWriteFile(dataPath(id), JSON.stringify(normalizeShaderConfig(cfg), null, '\t') + '\n')
+			recovered.push(id)
+		} catch {
+			/* not a recoverable template — a 404 is better than a fabricated config */
+		}
+	}
+
+	return { exported, recovered }
+}
+
 /** @returns {Promise<Array<{ id: string, name: string, audio: boolean, alpha: boolean, casparPath: string, updatedAt: string|null }>>} */
 async function listShaders() {
+	// WO-379: the library read is where a divergence becomes visible, so heal it here.
+	try {
+		await reconcileShaderStore()
+	} catch {
+		/* reconciliation is best-effort — never fail the list because of it */
+	}
 	let names
 	try {
 		names = await fsp.readdir(SHADERS_DATA_DIR)
@@ -222,6 +299,7 @@ module.exports = {
 	isValidShaderId,
 	slugFromName,
 	normalizeShaderConfig,
+	reconcileShaderStore,
 	listShaders,
 	getShader,
 	saveShader,

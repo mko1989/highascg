@@ -70,8 +70,7 @@ function inferGraphMainUsage(config) {
 
 function resolveMainScreenCount(config) {
 	const cs = config?.casparServer && typeof config.casparServer === 'object' ? config.casparServer : null
-	const a = parseInt(String(config?.screen_count ?? ''), 10)
-	const b = parseInt(String(cs?.screen_count ?? ''), 10)
+	const a = parseInt(String(config?.screen_count ?? ''), 10); const b = parseInt(String(cs?.screen_count ?? ''), 10)
 	const nA = Number.isFinite(a) && a >= 1 ? a : 1
 	const nB = Number.isFinite(b) && b >= 1 ? b : 1
 	const graphMainUsage = inferGraphMainUsage(config)
@@ -119,12 +118,12 @@ function resolvePreviewEnabledByMain(config, screenCount) {
 	}
 	const out = Array.from({ length: screenCount }, () => true)
 	for (let idx = 0; idx < screenCount; idx++) {
-		const perMain = withMode.filter((d) => (parseInt(String(d.mainScreenIndex ?? 0), 10) || 0) === idx)
+		const perMain = withMode.filter(d => (parseInt(String(d.mainScreenIndex ?? 0), 10) || 0) === idx)
 		if (!perMain.length) {
 			if (graphMainUsage.pgmOnlyMainIndices.has(idx)) out[idx] = false
 			continue
 		}
-		const picked = perMain.find((d) => String(d.mode || 'pgm_prv') === 'pgm_prv') || perMain[0]
+		const picked = perMain.find(d => String(d.mode || 'pgm_prv') === 'pgm_prv') || perMain[0]
 		// WO-242: pixelmap screens are PGM-only (native <artnet> consumer channel), same as pgm_only —
 		// no PRV bus is allocated (routing-map.js previewChannels[idx] stays null for them).
 		const pickedMode = String(picked.mode || 'pgm_prv')
@@ -136,12 +135,11 @@ function resolvePreviewEnabledByMain(config, screenCount) {
 function resolveDecklinkInputDeviceIndex(cfg, i) {
 	const raw = readCasparSetting(cfg, `decklink_input_${i}_device`)
 	if (raw === undefined || raw === null || raw === '' || raw === 0 || raw === '0') return i
-	const n = parseInt(String(raw), 10)
-	return Number.isFinite(n) && n > 0 ? n : i
+	const n = parseInt(String(raw), 10); return Number.isFinite(n) && n > 0 ? n : i
 }
 
 function getRouteString(channel, layer) {
-	return layer !== undefined && layer !== null ? `route://${channel}-${layer}` : `route://${channel}`
+	return (layer !== undefined && layer !== null) ? `route://${channel}-${layer}` : `route://${channel}`
 }
 
 /**
@@ -179,48 +177,26 @@ function resolveStreamOutputCasparChannel(config, map, sc) {
 
 function getChannelMap(config, activeBuses = null) {
 	const cs = config?.casparServer && typeof config.casparServer === 'object' ? config.casparServer : {}
-	const virtualMainChannels = Array.isArray(config?.virtual_main_channels)
-		? config.virtual_main_channels
-		: Array.isArray(cs?.virtual_main_channels)
-			? cs.virtual_main_channels
-			: []
+	const virtualMainChannels = Array.isArray(config?.virtual_main_channels) ? config.virtual_main_channels : (Array.isArray(cs?.virtual_main_channels) ? cs.virtual_main_channels : [])
 	const useVirtual = virtualMainChannels.length > 0
 	const screenCount = useVirtual ? Math.max(1, virtualMainChannels.length) : resolveMainScreenCount(config)
-	const previewEnabledByMain = useVirtual
-		? Array.from({ length: screenCount }, (_, i) => {
-				const v = virtualMainChannels[i] || {}
-				return !(v.prv == null || String(v.prv).trim() === '')
-			})
+	const previewEnabledByMain = useVirtual ? Array.from({ length: screenCount }, (_, i) => { const v = virtualMainChannels[i] || {}; return !(v.prv == null || String(v.prv).trim() === '') })
 		: resolvePreviewEnabledByMain(config, screenCount) || Array.from({ length: screenCount }, () => true)
 
-	const decklinkCount = Math.min(
-		8,
-		Math.max(0, parseInt(String(config?.decklink_input_count ?? cs.decklink_input_count ?? 0), 10) || 0)
-	)
+	const decklinkCount = Math.min(8, Math.max(0, parseInt(String(config?.decklink_input_count ?? cs.decklink_input_count ?? 0), 10) || 0))
 	const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
 	const decklinkInputSlots = resolveDecklinkInputSlots(config)
-	const liveAudioCount = Math.min(
-		8,
-		Math.max(0, parseInt(String(config?.live_audio_input_count ?? cs.live_audio_input_count ?? 0), 10) || 0)
-	)
-	const v4l2InputCount = Math.min(
-		8,
-		Math.max(0, parseInt(String(config?.v4l2_input_count ?? cs.v4l2_input_count ?? 0), 10) || 0)
-	)
+	const liveAudioCount = Math.min(8, Math.max(0, parseInt(String(config?.live_audio_input_count ?? cs.live_audio_input_count ?? 0), 10) || 0))
+	const v4l2InputCount = Math.min(8, Math.max(0, parseInt(String(config?.v4l2_input_count ?? cs.v4l2_input_count ?? 0), 10) || 0))
 	const inputsHostChannelEnabled =
 		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === true ||
 		readCasparSetting(config, 'decklink_inputs_host_channel_enabled') === 'true' ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === true ||
 		readCasparSetting(config, 'live_audio_inputs_host_channel_enabled') === 'true'
-	const inputsEnabled =
-		decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled
-	const extraAudioCount = Math.min(
-		4,
-		Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0)
-	)
+	const inputsEnabled = decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled
+	const extraAudioCount = Math.min(4, Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0))
 
-	const programChannels = []
-	const previewChannels = []
+	const programChannels = []; const previewChannels = []
 	const switcherBus1Channels = []
 	const switcherBusChannels = []
 	// Switcher-bus (3-channel per destination) is retired.
@@ -243,8 +219,7 @@ function getChannelMap(config, activeBuses = null) {
 		const seen = new Set()
 		for (const ch of allAssigned) {
 			if (seen.has(ch)) {
-				if (typeof console !== 'undefined')
-					console.warn(`[routing-map] Warning: duplicate channel number ${ch} in virtual main channel assignments`)
+				if (typeof console !== 'undefined') console.warn(`[routing-map] Warning: duplicate channel number ${ch} in virtual main channel assignments`)
 			}
 			seen.add(ch)
 		}
@@ -277,18 +252,10 @@ function getChannelMap(config, activeBuses = null) {
 		}
 	}
 
-	let nextCh =
-		Math.max(
-			0,
-			...programChannels,
-			...previewChannels.filter((c) => c != null),
-			...switcherBusChannels.filter((c) => c != null)
-		) + 1
-
-	const mvDests = (routingDestinationsFromConfig(config) ?? []).filter(
-		(d) => d && String(d.mode || '').toLowerCase() === 'multiview'
-	)
-
+	let nextCh = Math.max(0, ...programChannels, ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
+	
+	const mvDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'multiview')
+	
 	const multiviewChannels = []
 	if (mvDests.length > 0) {
 		mvDests.forEach(() => multiviewChannels.push(nextCh++))
@@ -298,17 +265,13 @@ function getChannelMap(config, activeBuses = null) {
 	// WO-243: operator_gui is a dedicated utility channel (CEF web-UI over routed preview holes),
 	// allocated the same way as multiview — never a programChannels[] slot. At most one is expected
 	// (validated in device-view-crud.js), but this mirrors multiview's array shape defensively.
-	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter(
-		(d) => d && String(d.mode || '').toLowerCase() === 'operator_gui'
-	)
+	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
 	const operatorGuiChannels = []
 	if (ogDests.length > 0) {
 		ogDests.forEach(() => operatorGuiChannels.push(nextCh++))
 	}
 	const operatorGuiCh = operatorGuiChannels[0] || null
-	const decklinkInputsHost = String(
-		readCasparSetting(config, 'decklink_inputs_host') ?? 'multiview_if_match'
-	).toLowerCase()
+	const decklinkInputsHost = String(readCasparSetting(config, 'decklink_inputs_host') ?? 'multiview_if_match').toLowerCase()
 
 	// WO-53: each live input gets its own Caspar channel so its audio meter is isolated (channel-level
 	// OSC meter == one input). DeckLink inputs get a full-quality channel (inputs_channel_mode); the
@@ -318,9 +281,7 @@ function getChannelMap(config, activeBuses = null) {
 	const decklinkInputModeRaw = String(readCasparSetting(config, 'inputs_channel_mode') ?? '1080p5000').trim()
 	const decklinkInputMode = _modes.STANDARD_VIDEO_MODES[decklinkInputModeRaw] ? decklinkInputModeRaw : '1080p5000'
 	const v4l2InputModeRaw = String(
-		readCasparSetting(config, 'v4l2_input_channel_mode') ||
-			readCasparSetting(config, 'inputs_channel_mode') ||
-			'1080p5000'
+		readCasparSetting(config, 'v4l2_input_channel_mode') || readCasparSetting(config, 'inputs_channel_mode') || '1080p5000',
 	).trim()
 	const v4l2InputMode = _modes.STANDARD_VIDEO_MODES[v4l2InputModeRaw] ? v4l2InputModeRaw : decklinkInputMode
 	const liveAudioInputMode = _modes.resolveLiveAudioInputChannelMode(config)
@@ -374,19 +335,15 @@ function getChannelMap(config, activeBuses = null) {
 	}
 	// Legacy: explicit empty inputs-host toggle with no real inputs configured.
 	let legacyHostCh = null
-	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0 && v4l2InputCount === 0)
-		legacyHostCh = nextCh++
+	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0 && v4l2InputCount === 0) legacyHostCh = nextCh++
 	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? v4l2InputChannels[0] ?? legacyHostCh ?? null
 
-	const audioOnlyChannels = []
-	for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
+	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
 
 	/** @deprecated Always empty — pixel-map DeckLink routing is merged onto the program channel in generated Caspar XML. */
 	const mappingChannels = []
 
-	const monitorChannelEnabled =
-		readCasparSetting(config, 'monitor_channel_enabled') === true ||
-		readCasparSetting(config, 'monitor_channel_enabled') === 'true'
+	const monitorChannelEnabled = readCasparSetting(config, 'monitor_channel_enabled') === true || readCasparSetting(config, 'monitor_channel_enabled') === 'true'
 	const monitorCh = monitorChannelEnabled ? nextCh++ : null
 
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
@@ -451,8 +408,7 @@ function getChannelMap(config, activeBuses = null) {
 		operatorGuiEnabled: operatorGuiChannels.length > 0,
 		operatorGuiCh,
 		operatorGuiChannels,
-		inputsEnabled:
-			effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,
+		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,
 		inputsOnMvr,
 		decklinkInputsHost,
 		decklinkCount: effectiveDecklinkInputCount,
@@ -471,13 +427,9 @@ function getChannelMap(config, activeBuses = null) {
 			}
 			return null
 		},
-		programChannels,
-		previewChannels,
+		programChannels, previewChannels, 
 		playbackChannels: switcherBusMode ? switcherBus1Channels : programChannels,
-		previewEnabledByMain,
-		multiviewCh,
-		inputsCh,
-		audioOnlyChannels,
+		previewEnabledByMain, multiviewCh, inputsCh, audioOnlyChannels,
 		mappingChannels,
 		monitorCh,
 		switcherBus1Channels,
@@ -510,28 +462,17 @@ function getChannelMap(config, activeBuses = null) {
 }
 
 function resolveStreamingChannelRouteForRole(config, role = 'video') {
-	const map = getChannelMap(config)
-	if (map.streamingCh == null) return null
+	const map = getChannelMap(config); if (map.streamingCh == null) return null
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
 	const rawVideo = String(sc.videoSource || 'program_1').toLowerCase()
 	let src = rawVideo
 	if (role === 'audio') {
-		const rawAudio = String(sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : sc.audioSource)
-			.trim()
-			.toLowerCase()
-		src = rawAudio === 'follow_video' || rawAudio === 'follow' ? rawVideo : rawAudio
+		const rawAudio = String(sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : sc.audioSource).trim().toLowerCase()
+		src = (rawAudio === 'follow_video' || rawAudio === 'follow') ? rawVideo : rawAudio
 	}
 	if (src === 'multiview' && map.multiviewCh != null) return getRouteString(map.multiviewCh)
-	const pm = src.match(/^program[_-]?(\d+)$/)
-	if (pm) {
-		const i = parseInt(pm[1], 10)
-		if (i >= 1 && i <= map.screenCount) return getRouteString(map.programCh(i))
-	}
-	const pr = src.match(/^preview[_-]?(\d+)$/)
-	if (pr) {
-		const i = parseInt(pr[1], 10)
-		if (i >= 1 && i <= map.screenCount) return getRouteString(map.previewCh(i))
-	}
+	const pm = src.match(/^program[_-]?(\d+)$/); if (pm) { const i = parseInt(pm[1], 10); if (i >= 1 && i <= map.screenCount) return getRouteString(map.programCh(i)) }
+	const pr = src.match(/^preview[_-]?(\d+)$/); if (pr) { const i = parseInt(pr[1], 10); if (i >= 1 && i <= map.screenCount) return getRouteString(map.previewCh(i)) }
 	return getRouteString(map.programCh(1))
 }
 

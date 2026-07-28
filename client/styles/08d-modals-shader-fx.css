@@ -462,4 +462,27 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	min-width: 0;
+	flex: 1;
+}
+
+/* WO-379: take a stacked shader off air. Only rendered on occupied rows, and kept faint until the
+ * row is hovered so the stack stays as quiet as WO-353 asked the playlist rows to be. */
+.shader-live__stack-clear {
+	flex: none;
+	margin-left: auto;
+	padding: 0 2px;
+	color: var(--text-muted);
+	opacity: 0;
+	transition: opacity 0.12s ease, color 0.12s ease;
+	cursor: pointer;
+	line-height: 1;
+}
+
+.shader-live__stack-row:hover .shader-live__stack-clear,
+.shader-live__stack-clear:focus-visible {
+	opacity: 1;
+}
+
+.shader-live__stack-clear:hover {
+	color: #f85149;
 }
