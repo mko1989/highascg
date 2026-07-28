@@ -17,6 +17,30 @@ function getCgThumbCacheDir(config) {
 }
 
 /**
+ * WO-344 — the template FILE's fingerprint, so re-saving a shader busts its thumb.
+ *
+ * The hash below is built from the request alone (id, cgData, size). Editing a shader in Shader
+ * Live rewrites `template/shaders/sh-*.html` without changing any of those, so the request hashed
+ * identically and the deck kept serving the OLD picture — the acceptance criterion "thumb refresh
+ * on shader re-save" could never hold. Best-effort: any resolution failure just leaves the hash as
+ * it was (an un-fingerprinted template behaves exactly like before).
+ * @param {object} req
+ * @returns {string}
+ */
+function templateFileFingerprint(req) {
+	try {
+		// Lazy: the resolver lives in the render module, which must not depend on this one.
+		const { resolveCgTemplateHtmlPath } = require('./cg-look-thumb-render')
+		const p = resolveCgTemplateHtmlPath(req)
+		if (!p) return ''
+		const st = fs.statSync(p)
+		return `${Math.floor(st.mtimeMs)}:${st.size}`
+	} catch {
+		return ''
+	}
+}
+
+/**
  * @param {object} req
  * @returns {string}
  */
@@ -28,6 +52,7 @@ function hashCgThumbRequest(req) {
 		cgData: req?.cgData ?? null,
 		width: Number(req?.width) || 640,
 		height: Number(req?.height) || 360,
+		file: templateFileFingerprint(req),
 	}
 	return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex').slice(0, 32)
 }

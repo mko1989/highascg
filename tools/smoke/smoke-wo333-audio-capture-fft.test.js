@@ -155,7 +155,14 @@ describe('WO-333 (d): wiring', () => {
 		// WO-335: fresh WS frames outrank the analyser per frame in updateAudio (CEF file://
 		// getUserMedia auto-grant must not shadow the WS feed); both tiers always init.
 		assert.match(player, /if \(Date\.now\(\) - lastFftAt < FFT_FRESH_MS\) \{/)
-		assert.match(player, /initTierB\(\)\s*\n\s*void initTierA\(\)/)
+		/* WO-344 repointed this line: tier A is now skipped in `?shaderThumb=1` thumbnail renders
+		 * (headless Chrome has no capture device). The assertion is unchanged in force — both
+		 * tiers must still init together on every NORMAL playout load. */
+		assert.match(player, /initTierB\(\)\s*\n(?:\s*\/\/[^\n]*\n)*\s*if \(!THUMB_MODE\) void initTierA\(\)/)
+		assert.ok(
+			!/if \([^)]*\) void initTierB\(\)/.test(player),
+			'tier B (the WS feed) must never become conditional — it is the primary source',
+		)
 		// The WO-266 OSC fallback must survive as the stale path.
 		assert.ok(player.includes("type !== 'osc'"), 'OSC level fallback stays intact')
 	})

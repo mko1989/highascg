@@ -11,6 +11,10 @@ const REPO_TEMPLATE = path.join(__dirname, '..', '..', 'template')
 
 const VIEWPORT_W = 1920
 const VIEWPORT_H = 1080
+/* WO-344: see renderCgLookThumbPng — shader pages render through SwiftShader. */
+const SHADER_VIEWPORT_W = 960
+const SHADER_VIEWPORT_H = 540
+const SHADER_CDP_TIMEOUT_MS = 25000
 
 /**
  * @param {string} dir
@@ -163,14 +167,7 @@ async function markCgThumbCaptureTarget(page) {
 			return true
 		}
 
-		const selectors = [
-			'main .graphic',
-			'.graphic',
-			'main',
-			'[class*="lt-"]',
-			'body > main',
-			'body > div:first-of-type',
-		]
+		const selectors = ['main .graphic', '.graphic', 'main', '[class*="lt-"]', 'body > main', 'body > div:first-of-type']
 		let target = null
 		let targetArea = 0
 		for (const sel of selectors) {
@@ -218,10 +215,7 @@ async function markCgThumbCaptureTarget(page) {
 				width: Math.max(1, x1 - x0),
 				height: Math.max(1, y1 - y0),
 			}
-			document.body.setAttribute(
-				'data-cg-thumb-clip',
-				JSON.stringify(clip),
-			)
+			document.body.setAttribute('data-cg-thumb-clip', JSON.stringify(clip))
 			return 'clip'
 		}
 
@@ -281,7 +275,9 @@ async function contentCropPng(png) {
 	const { execFile } = require('child_process')
 	const run = (args) =>
 		new Promise((resolve, reject) =>
-			execFile('ffmpeg', args, { timeout: 15000 }, (e, so, se) => (e ? reject(new Error(se || e.message)) : resolve(se || so))),
+			execFile('ffmpeg', args, { timeout: 15000 }, (e, so, se) =>
+				e ? reject(new Error(se || e.message)) : resolve(se || so)
+			)
 		)
 	const dir = fsn.mkdtempSync(pathn.join(os.tmpdir(), 'cgthumb-'))
 	const inP = pathn.join(dir, 'in.png')
@@ -289,7 +285,20 @@ async function contentCropPng(png) {
 	try {
 		fsn.writeFileSync(inP, png)
 		// -loop + 3 frames: cropdetect emits nothing on a single still frame.
-		const det = await run(['-hide_banner', '-loop', '1', '-i', inP, '-vf', 'cropdetect=limit=24:round=2:reset=0', '-frames:v', '3', '-f', 'null', '-'])
+		const det = await run([
+			'-hide_banner',
+			'-loop',
+			'1',
+			'-i',
+			inP,
+			'-vf',
+			'cropdetect=limit=24:round=2:reset=0',
+			'-frames:v',
+			'3',
+			'-f',
+			'null',
+			'-',
+		])
 		const m = [...det.matchAll(/crop=(\d+):(\d+):(\d+):(\d+)/g)].pop()
 		const dm = det.match(/, (\d+)x(\d+)[, ]/)
 		if (!m || !dm) return png
@@ -336,15 +345,31 @@ async function renderCgLookThumbPng(req) {
 	}
 
 	const chrome = await getChrome()
-	const page = await openPage(chrome.httpPort, { width: VIEWPORT_W, height: VIEWPORT_H, deviceScaleFactor: 1 })
+	const shaderReq = isShaderThumbReq(req)
+	/* WO-344: shaders render on the CPU here (SwiftShader — headless has no GPU), and a fullscreen
+	 * raymarcher at 1080p could not be screenshotted inside the CDP client's 5 s default at all:
+	 * `sh-audio` failed every time with "CDP command timeout: Page.captureScreenshot". A 16:9 half
+	 * viewport is 4× fewer pixels (still far above the 640×360 deck button) and the budget is
+	 * raised for the commands that actually do the rendering work. */
+	const page = await openPage(chrome.httpPort, {
+		width: shaderReq ? SHADER_VIEWPORT_W : VIEWPORT_W,
+		height: shaderReq ? SHADER_VIEWPORT_H : VIEWPORT_H,
+		deviceScaleFactor: 1,
+		commandTimeoutMs: shaderReq ? SHADER_CDP_TIMEOUT_MS : undefined,
+	})
 	try {
 		/* WO-344: shader templates render via the SERVER url — the file:// route produced black
 		 * frames in this pipeline while the http route captures reliably (proven path); it also
 		 * gives the page same-origin access to the live audio_fft WS feed, so audio-reactive
-		 * shaders thumb with real content. */
-		const shaderReq = isShaderThumbReq(req)
+		 * shaders thumb with real content. `shaderThumb=1` additionally guarantees a plausible
+		 * spectrum when no real audio is flowing (nothing on air ⇒ flat meters ⇒ the "lots of
+		 * empty space" the owner reported), and skips getUserMedia, which has no device here. */
+		const shaderSlug = String(req?.sourceValue || req?.templateId || '')
+			.replace(/^.*shaders\//i, '')
+			.replace(/\.html?$/i, '')
+			.toLowerCase()
 		const navUrl = shaderReq
-			? `http://127.0.0.1:4200/templates/shaders/${String(req?.sourceValue || req?.templateId || '').replace(/^.*shaders\//i, '').replace(/\.html?$/i, '').toLowerCase()}.html`
+			? `http://127.0.0.1:4200/templates/shaders/${shaderSlug}.html?shaderThumb=1`
 			: `file://${htmlPath}`
 		await page.navigate(navUrl, { timeoutMs: 30000 })
 
@@ -368,7 +393,7 @@ async function renderCgLookThumbPng(req) {
 			// WO-344: full-viewport capture with default background (the omit-background +
 			// DOM-target path is meaningless for a single fullscreen canvas), then
 			// pixel-content crop (borders + alpha void otherwise).
-			const png = await page.screenshot({})
+			const png = await page.screenshot({ timeoutMs: SHADER_CDP_TIMEOUT_MS })
 			return contentCropPng(png)
 		}
 		return await captureCgThumbPng(page)

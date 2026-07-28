@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 697,
+	"count": 695,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -460,7 +460,6 @@
 		"src/media/cg-look-thumb-cache.js: getCgThumbCacheDir",
 		"src/media/cg-look-thumb-render.js: captureCgThumbPng",
 		"src/media/cg-look-thumb-render.js: deriveLtTemplateId",
-		"src/media/cg-look-thumb-render.js: resolveCgTemplateHtmlPath",
 		"src/media/cg-look-thumb-render.js: waitForCgThumbSettle",
 		"src/media/live-thumbnail-input-capture.js: INPUT_CAPTURE_BACKOFF_BASE_MS",
 		"src/media/live-thumbnail-input-capture.js: INPUT_CAPTURE_BACKOFF_MAX_MS",
@@ -602,7 +601,6 @@
 		"src/streaming/stream-config.js: STREAMING_DEFAULTS",
 		"src/system/browser-source-session.js: PROFILE_ROOT",
 		"src/system/browser-source-session.js: stopBrowserSource",
-		"src/system/cef-cdp-client.js: CDP_COMMAND_TIMEOUT_MS",
 		"src/system/cef-cdp-client.js: VK_CODE",
 		"src/system/cef-cdp-client.js: vkCodeForKey",
 		"src/system/device-identity.js: DEVICE_IDENTITY_PATH",

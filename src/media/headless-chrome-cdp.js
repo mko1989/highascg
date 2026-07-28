@@ -108,7 +108,7 @@ function resolveChromeBinary(opts = {}) {
 	throw new Error(
 		'No Chrome binary found. Set HIGHASCG_CHROME_BIN, install a Chrome-for-Testing build under ' +
 			'~/.cache/puppeteer/chrome/linux-<version>/chrome-linux64/chrome, or install chromium, ' +
-			'chromium-browser, or google-chrome on PATH.',
+			'chromium-browser, or google-chrome on PATH.'
 	)
 }
 
@@ -235,12 +235,16 @@ async function waitForLoad(session, timeoutMs) {
  * `/json/new` HTTP endpoint) and wrap it with the small subset of the
  * puppeteer `Page` API the thumbnail renderers and DOM smokes use.
  * @param {number} httpPort from `launchHeadlessChrome()`
- * @param {{ width?: number, height?: number, deviceScaleFactor?: number }} [opts]
+ * @param {{ width?: number, height?: number, deviceScaleFactor?: number, commandTimeoutMs?: number }} [opts]
  */
 async function openPage(httpPort, opts = {}) {
 	const width = opts.width || 1920
 	const height = opts.height || 1080
 	const deviceScaleFactor = opts.deviceScaleFactor || 1
+	/* WO-344: pages that render slowly (a fullscreen raymarching shader through SwiftShader —
+	 * there is no GPU in headless) blow the CDP client's 5 s per-command default and the whole
+	 * thumbnail fails with "CDP command timeout: Page.captureScreenshot". Undefined keeps it. */
+	const commandTimeoutMs = Number(opts.commandTimeoutMs) > 0 ? Number(opts.commandTimeoutMs) : undefined
 
 	const res = await fetch(`http://127.0.0.1:${httpPort}/json/new?about:blank`, { method: 'PUT' })
 	if (!res.ok) throw new Error(`CDP /json/new HTTP ${res.status}`)
@@ -274,11 +278,15 @@ async function openPage(httpPort, opts = {}) {
 			const body = typeof fn === 'function' ? fn.toString() : String(fn)
 			const argList = args.map((a) => JSON.stringify(a)).join(',')
 			const expression = `(${body})(${argList})`
-			const result = await session.send('Runtime.evaluate', {
-				expression,
-				returnByValue: true,
-				awaitPromise: true,
-			})
+			const result = await session.send(
+				'Runtime.evaluate',
+				{
+					expression,
+					returnByValue: true,
+					awaitPromise: true,
+				},
+				{ timeoutMs: commandTimeoutMs }
+			)
 			if (result?.exceptionDetails) {
 				const desc =
 					result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate exception'
@@ -308,7 +316,9 @@ async function openPage(httpPort, opts = {}) {
 			await session.send('Emulation.setDefaultBackgroundColorOverride', omit ? { color: { r: 0, g: 0, b: 0, a: 0 } } : {})
 		},
 		/**
-		 * @param {{ clip?: {x:number,y:number,width:number,height:number}, omitBackground?: boolean }} [shotOpts]
+		 * @param {{ clip?: {x:number,y:number,width:number,height:number}, omitBackground?: boolean,
+		 *   timeoutMs?: number }} [shotOpts] WO-344: timeoutMs for pages that render slowly
+		 *   (fullscreen shaders through SwiftShader) — default stays the CDP client's 5 s.
 		 * @returns {Promise<Buffer>}
 		 */
 		async screenshot(shotOpts = {}) {
@@ -323,7 +333,9 @@ async function openPage(httpPort, opts = {}) {
 					scale: 1,
 				}
 			}
-			const { data } = await session.send('Page.captureScreenshot', params)
+			const { data } = await session.send('Page.captureScreenshot', params, {
+				timeoutMs: shotOpts.timeoutMs || commandTimeoutMs,
+			})
 			return Buffer.from(data, 'base64')
 		},
 		/**
@@ -385,7 +397,7 @@ async function openPage(httpPort, opts = {}) {
 					el.dispatchEvent(new Event('change', { bubbles: true }))
 				},
 				selector,
-				text,
+				text
 			)
 			/* eslint-enable no-undef */
 		},

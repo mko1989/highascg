@@ -200,6 +200,7 @@ const FILES = [
 	'tools/smoke/smoke-wo369-header-clock-and-back-button.test.js',
 	'tools/smoke/smoke-wo367-wiring-gates.test.js',
 	'tools/smoke/smoke-wo373-record-source-tiebreak.test.js',
+	'tools/smoke/smoke-wo344-shader-thumbs.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

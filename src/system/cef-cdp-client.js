@@ -110,18 +110,25 @@ function connectCdp(wsUrl, connectTimeoutMs = 5000) {
 			/**
 			 * @param {string} method
 			 * @param {object} [params]
+			 * @param {{ timeoutMs?: number }} [sendOpts] WO-344: per-command timeout override
 			 * @returns {Promise<any>}
 			 */
-			send(method, params = {}) {
+			send(method, params = {}, sendOpts = {}) {
 				if (closed || ws.readyState !== WebSocket.OPEN) {
 					return Promise.reject(new Error(`CDP session not open (${method})`))
 				}
 				const id = nextId++
+				/* WO-344: 5 s is right for input/DOM commands but not for rendering ones — a
+				 * fullscreen raymarching shader screenshots through SwiftShader (no GPU in headless)
+				 * in far more than that, and the whole thumbnail failed with
+				 * "CDP command timeout: Page.captureScreenshot". Callers that know they are asking
+				 * for work can raise it; everything else keeps the 5 s default. */
+				const timeoutMs = Number(sendOpts?.timeoutMs) > 0 ? Number(sendOpts.timeoutMs) : CDP_COMMAND_TIMEOUT_MS
 				return new Promise((res, rej) => {
 					const timer = setTimeout(() => {
 						pending.delete(id)
-						rej(new Error(`CDP command timeout: ${method}`))
-					}, CDP_COMMAND_TIMEOUT_MS)
+						rej(new Error(`CDP command timeout: ${method} (${timeoutMs}ms)`))
+					}, timeoutMs)
 					pending.set(id, { resolve: res, reject: rej, timer })
 					try {
 						ws.send(JSON.stringify({ id, method, params }))
@@ -233,8 +240,7 @@ async function createCefPage({ targetInfo, wsUrl }) {
 		 * @returns {Promise<any>}
 		 */
 		async evaluate(expressionOrFn) {
-			const expression =
-				typeof expressionOrFn === 'function' ? `(${expressionOrFn.toString()})()` : String(expressionOrFn)
+			const expression = typeof expressionOrFn === 'function' ? `(${expressionOrFn.toString()})()` : String(expressionOrFn)
 			const result = await session.send('Runtime.evaluate', {
 				expression,
 				returnByValue: true,
@@ -242,9 +248,7 @@ async function createCefPage({ targetInfo, wsUrl }) {
 			})
 			if (result?.exceptionDetails) {
 				const desc =
-					result.exceptionDetails.exception?.description ||
-					result.exceptionDetails.text ||
-					'Runtime.evaluate exception'
+					result.exceptionDetails.exception?.description || result.exceptionDetails.text || 'Runtime.evaluate exception'
 				throw new Error(desc)
 			}
 			return result?.result?.value

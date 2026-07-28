@@ -246,6 +246,26 @@
 		}
 	}
 
+	/* WO-344 — thumbnail mode (`?shaderThumb=1`). The look-deck thumb is rendered headless with
+	 * nothing on air, so every real audio tier is silent and an audio-reactive shader thumbs as
+	 * flat meters and empty space — the owner's complaint. This synthesizes ONE plausible static
+	 * spectrum (no animation: the capture is a single frame) so bars/meters have content, and it
+	 * suppresses getUserMedia, which has no device in headless Chrome and only costs time. It is
+	 * opt-in by query param: playout never passes it. */
+	const THUMB_MODE = query.get('shaderThumb') === '1'
+
+	function sampleThumbSpectrum() {
+		for (let i = 0; i < AUDIO_W; i++) {
+			const t = i / AUDIO_W
+			// Music-like falling spectrum with a few peaks, deterministic so thumbs are stable.
+			const base = Math.pow(1 - t, 1.7)
+			const peaks = 0.22 * Math.sin(t * 37) * Math.sin(t * 11) + 0.12 * Math.sin(t * 83)
+			const v = Math.max(0, Math.min(1, base * 0.92 + peaks * base))
+			freqBytes[i] = Math.round(255 * v)
+			waveBytes[i] = Math.round(128 + 110 * Math.sin(t * Math.PI * 6) * (0.35 + 0.65 * base))
+		}
+	}
+
 	function sampleTierB() {
 		// Synthesize a plausible falling spectrum + a level-scaled sine waveform from one RMS
 		// value. Coarse by design — real FFT comes from fresh audio_fft frames or tier A.
@@ -259,6 +279,12 @@
 	}
 
 	function updateAudio() {
+		if (THUMB_MODE && Date.now() - lastFftAt >= FFT_FRESH_MS) {
+			// WO-344: real frames still win if something IS on air while the thumb renders.
+			sampleThumbSpectrum()
+			uploadAudioTexture()
+			return
+		}
 		if (Date.now() - lastFftAt < FFT_FRESH_MS) {
 			// freqBytes/waveBytes already hold the latest WS audio_fft frame — use verbatim.
 		} else if (analyser) {
@@ -292,7 +318,8 @@
 			// WS tier is always on and outranks the analyser while frames are fresh; tier A
 			// runs in the background as the fallback (don't block first paint on getUserMedia).
 			initTierB()
-			void initTierA()
+			// WO-344: no capture device in headless Chrome — asking only delays first paint.
+			if (!THUMB_MODE) void initTierA()
 		}
 		if (config.common) toy.setCommon(config.common)
 		const p = config.passes || {}
