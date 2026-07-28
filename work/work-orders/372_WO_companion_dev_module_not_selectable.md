@@ -1,6 +1,6 @@
 # WO-372 — Companion offers no "dev" module to choose: the dev build and the installed build declare the same id AND the same version
 
-**Status: OPEN — root cause found on the box 28.07.26. WO-361's claim was right about the flag and wrong about the outcome. Not fixed.**
+**Status: IN PROGRESS — the collision is fixed and the dev build is now self-identifying (`1.0.5-dev.d20260728t1511` vs installed `1.0.4`). Plan steps 1, 4 and 5 done; steps 2 and 3 need a Companion restart, which is an owner call on a live show-control service — NOT declared done until the picker is observed.**
 
 Source: `work/checklist27.07.26_manual_verify.md` item 40, owner note 28.07 14:26:
 
@@ -92,11 +92,85 @@ collides with the installed one.
   WO-361, see [WO-368](./368_WO_shader_store_git_ownership.md) §3, where the same untracked-README
   residue is recorded.
 
-## 4. What was VERIFIED
+## 4. What was DONE (steps 1, 4, 5)
 
+### 4a. The dev build stamps its own version (step 1)
+
+The plan's caveat was answered **before** choosing a form: `validateManifest` from
+`@companion-module/base/manifest` — the same validator `companion-module-build` runs — was fed
+three candidates against the real manifest. All three are accepted:
+`1.0.4-dev.d20260728t1512`, `1.0.5-dev.0`, `1.0.4+dev.1`. So a suffix cannot make the module
+vanish at validation.
+
+The build tool already supports what was needed and it was simply never used:
+`companion-module-build --prerelease` sets `isPrerelease` in the manifest
+(`tools/dist/scripts/lib/build-util.js:113`), and the version is copied verbatim from
+`package.json:version` (`:108`) — which is exactly why every dev build collided.
+
+In the module repo (`~/companion-module-dev/companion-module-highpass-highascg`):
+
+- **new `scripts/stamp-dev-manifest.js`** — rewrites the **packaged** manifest only
+  (`pkg/<id>/companion/manifest.json`): version → `<next patch>-dev.d<UTC yyyymmdd>t<hhmm>`,
+  `isPrerelease: true`, then re-validates before writing. Source `package.json` and
+  `companion/manifest.json` are never touched, so nothing dev-only can be committed by accident.
+- **`package:dev`** → `companion-module-build --dev --prerelease && node scripts/stamp-dev-manifest.js`.
+
+Form choices, both deliberate: a leading-letter timestamp identifier (`d2026…`) because semver
+forbids leading zeros in *numeric* prerelease identifiers and an 09xx time would be invalid; and
+**next**-patch rather than same-patch, because `1.0.4-dev.x` sorts BELOW `1.0.4` and would read as
+older than the release it is testing.
+
+### 4b. `dev-mode.sh` refuses to hide the failure (step 4)
+
+`tools/eggs/companion/dev-mode.sh` was also **stale**: it looked for the build in `dist/` and put
+the symlink in `/home/casparcg/companion/modules/`, while the working setup (per §1b) uses
+`pkg/<id>` and `<extra-module-path>/<id>`. Repointed, and:
+
+- it now reads both manifests and **exits 1 with the explanation** when the dev and installed
+  versions match — the exact state that produced "there is no dev to choose";
+- the header says what the script does *not* do (it does not make the module selectable on its
+  own), and the printed workflow names the version to pick and warns that the pin lives in
+  Companion's `db.sqlite`, so an existing connection keeps its pinned version until changed.
+
+### 4c. WO-361 status corrected (step 5)
+
+[WO-361](./361_WO_companion_module_dev_mode.md) now reads CORRECTED, not DONE, naming why
+(verifying the flag is not verifying the loop) and pointing here.
+
+## 5. What was VERIFIED
+
+- **The collision is gone, measured:** dev manifest `highpass-highascg@1.0.5-dev.d20260728t1511`
+  `isPrerelease: true` vs installed `highpass-highascg@1.0.4` `isPrerelease: false`, both read
+  back from disk after a real `npm run package:dev`.
+- **Version forms accepted** by Companion's own manifest validator (above) — the plan's step-1
+  caveat, answered with a run rather than an assumption.
+- **The guard fires and passes:** a fixture tree with two `1.0.4` manifests → `dev-mode.sh` exits
+  **1** with the WO-372 explanation; changing the dev manifest to the stamped version → passes and
+  creates the symlink. Also re-run against the real box layout: "dev 1.0.5-dev.d20260728t1511 vs
+  installed 1.0.4 ✓ distinguishable", symlink already correct.
 - Every fact in §1b was read off the live box on 28.07: `systemctl cat companion`, `ps`,
   `readlink -f`, `journalctl -u companion --since 14:15`.
 - Both manifests parsed directly; the id/version collision in §1c is measured, not inferred.
-- Not verified, and deliberately so: how Companion 5.0.2's picker behaves once two versions exist.
-  That needs the change made first — it is step 2 of the plan, not an assumption behind it.
-- Nothing changed on the box: no manifest edited, no service restarted, no module repackaged.
+### Still NOT verified — and this WO stays open until it is
+
+- **Step 2 — what the picker actually does** with two versions present. Companion has not been
+  restarted: it is live show-control on a production box, and a restart is the owner's call, not a
+  side effect of a repo change. Until someone runs
+  `sudo systemctl restart companion` and looks at Connections → HighAsCG → version dropdown, the
+  acceptance criteria are unproven. Two specific things to watch:
+  1. whether the connection, pinned to `1.0.4` in `db.sqlite`, keeps loading the installed copy
+     (expected — the pin must be changed, cf. WO-330);
+  2. whether Companion 5.0.2 **hides** prerelease versions from the dropdown by default. If the
+     dev entry does not appear at all, the fallback is to drop `--prerelease` from `package:dev`
+     and keep only the version suffix — the stamping is what creates the second entry;
+     `isPrerelease` is only the label on it.
+- **Step 3 — make the loaded copy observable** (log the path the running module came from). Not
+  attempted; it needs the same restart to test.
+- **The module repo README is still uncommitted** there (untracked `README.md`), as WO-361 noted
+  and [WO-368](./368_WO_shader_store_git_ownership.md) §3 records. `scripts/stamp-dev-manifest.js`
+  and the `package:dev` change are likewise **uncommitted in the module repo** — that repo is not
+  this one, and committing in it was not in scope here.
+- What changed on the box: the module's **dev package** was rebuilt (`pkg/`, which is what the dev
+  symlink points at) and now declares the dev version. The **installed** copy under
+  `~/.config/companion/modules/` was not touched, and Companion was not restarted, so nothing
+  running changed.
