@@ -62,15 +62,19 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 		placeholder: 'label',
 		value: String(saved.label || conn?.label || 'Virtual cam'),
 	})
-	const chIn = Object.assign(document.createElement('input'), {
-		className: 'device-view__destinations-type',
-		type: 'number',
-		min: '1',
-		step: '1',
-		placeholder: 'channel',
-		value: String(saved.channel ?? caspar.channel ?? 1),
-	})
-	attachMathInput(chIn, { decimals: 0 })
+	/* todos28.07.26 (owner): "there shouldnt even be an input box in the inspector of the virtual
+	 * camera output. it should only accept connections to channels."
+	 *
+	 * The channel is DERIVED from the cable now (WO-377/378 resolve it from the graph edge), so an
+	 * editable box could only ever disagree with the cabling — and when it did, the operator had no
+	 * way to tell which one the bridge was actually using. It is a read-out, and the save patch no
+	 * longer sends `channel` at all: the graph is the single source of truth. */
+	const chOut = Object.assign(document.createElement('div'), { className: 'device-view__note' })
+	const paintChannel = () => {
+		const ch = live?.channel ?? saved.channel ?? caspar.channel ?? null
+		chOut.textContent = ch ? `Source: channel ${ch} (from the cable)` : 'Source: not cabled — connect it in Device View'
+		chOut.title = 'Cable a destination or host channel to this output in Device View to choose the source'
+	}
 	const devIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
 		type: 'text',
@@ -122,6 +126,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 
 	let live = getVirtualCameraStatus()
 	const paint = () => {
+		paintChannel()
 		statusPre.textContent = renderStatusBlock(live)
 		startBtn.disabled = !!live?.running
 		stopBtn.disabled = !live?.running
@@ -144,7 +149,6 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 		const height = Math.max(240, parseInt(res[1], 10) || 1080)
 		return {
 			label: String(labelIn.value || conn?.label || 'Virtual cam').trim(),
-			channel: Math.max(1, parseInt(String(chIn.value || '1'), 10) || 1),
 			device: String(devIn.value || '/dev/video10').trim(),
 			fps: Math.max(1, parseInt(String(fpsIn.value || '50'), 10) || 50),
 			width,
@@ -205,7 +209,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 
 	wrap.append(
 		labelIn,
-		chIn,
+		chOut,
 		devIn,
 		fpsIn,
 		resIn,

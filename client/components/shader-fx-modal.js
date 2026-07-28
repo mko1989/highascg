@@ -73,6 +73,11 @@ export function showShaderFxModal(opts = {}) {
 					<p class="settings-note">Saved shaders export to <code>template/shaders/</code> and appear in the Templates tab after a Caspar template refresh.</p>
 				</aside>
 				<section class="shaderfx-editor">
+					<!-- WO-380 (owner): paste a Shadertoy share link and have it fill in the code layers. -->
+					<div class="shaderfx-row shaderfx-row--import">
+						<label style="flex:1">Import <input type="text" id="shaderfx-import-url" placeholder="https://www.shadertoy.com/view/lldcR8"></label>
+						<button type="button" class="btn btn--secondary" id="shaderfx-import-go">Fetch</button>
+					</div>
 					<div class="shaderfx-row">
 						<label>Name <input type="text" id="shaderfx-name" placeholder="My audio shader"></label>
 						<label class="shaderfx-flag"><input type="checkbox" id="shaderfx-audio" checked> audio reactive</label>
@@ -158,6 +163,36 @@ export function showShaderFxModal(opts = {}) {
 		}
 	}
 
+	/* WO-380: fetch → fill the form, but do NOT save. The operator reviews the layers and presses
+	 * save themselves, so a paste can never silently overwrite the shader they had open. */
+	async function importFromShadertoy() {
+		const url = el('shaderfx-import-url').value.trim()
+		if (!url) return
+		const btn = el('shaderfx-import-go')
+		btn.disabled = true
+		setStatus('Fetching from Shadertoy…')
+		try {
+			const r = await api.post('/api/shaders/import', { url })
+			if (!r?.ok || !r.config) throw new Error(r?.error || 'import failed')
+			const cfg = r.config
+			// A fresh id: an import is a NEW shader, never an overwrite of the open one.
+			currentId = null
+			el('shaderfx-name').value = cfg.name || ''
+			el('shaderfx-audio').checked = cfg.audio?.enabled === true
+			el('shaderfx-alpha').checked = cfg.opts?.alpha === true
+			el('shaderfx-common').value = cfg.common || ''
+			renderPasses(cfg)
+			el('shaderfx-delete').disabled = true
+			el('shaderfx-preview').src = 'about:blank'
+			const skipped = Array.isArray(cfg.skipped) && cfg.skipped.length ? ` — not imported: ${cfg.skipped.join(', ')}` : ''
+			setStatus(`Imported "${cfg.name}" — review and save${skipped}`, skipped ? 'warn' : 'ok')
+		} catch (e) {
+			setStatus(`Import failed: ${e?.message || e}`, 'err')
+		} finally {
+			btn.disabled = false
+		}
+	}
+
 	async function openShader(id) {
 		try {
 			fillForm(await api.get(`/api/shaders/${encodeURIComponent(id)}`))
@@ -206,6 +241,14 @@ export function showShaderFxModal(opts = {}) {
 		if (e.target === modal) modal.remove()
 	})
 	el('shaderfx-new').addEventListener('click', () => fillForm(null))
+	// WO-380: Fetch button + Enter in the field (a pasted link is usually followed by Enter).
+	el('shaderfx-import-go').addEventListener('click', () => void importFromShadertoy())
+	el('shaderfx-import-url').addEventListener('keydown', (e) => {
+		if (e.key === 'Enter') {
+			e.preventDefault()
+			void importFromShadertoy()
+		}
+	})
 	el('shaderfx-save').addEventListener('click', () => void doSave())
 	el('shaderfx-delete').addEventListener('click', async () => {
 		if (!currentId) return

@@ -385,6 +385,7 @@ const casparStateGet = ({ path, ctx, query }) => routesState.handleGet(path, ctx
 routes.get('/api/shaders', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
 routes.get('/api/shaders/*', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
 routes.post('/api/shaders', ({ path, body, ctx }) => routesShaders.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/shaders/import', ({ path, body, ctx }) => routesShaders.handlePost(path, body, ctx), { requireCaspar: false })
 routes.delete('/api/shaders/*', ({ path }) => routesShaders.handleDelete(path), { requireCaspar: false })
 
 routes.get('/api/state', casparStateGet, { requireCaspar: true })

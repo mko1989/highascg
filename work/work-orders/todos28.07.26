@@ -12,5 +12,11 @@ some shaders allow camera input. make it possible to route the virtual cam outpu
 i connected decklink input 4 host channel to a virtual camera output and on the output there is channel 1 output instead of decklink.
 if i change the id to 4 it starts with the correct channel but it defaults to 1 instead of using the connection to determine the channel.
 
+!!!This still defaults to using channel 1 as source of virtual cabcam even though ch4 is connected.
+
 there is no way to remove a shader from a pgm stack in shaders editor.
 sh-mirrors shader fails to load with 404
+
+i noticed there is a share link on shader toy. it should be easy to be able to paste that link and it will fill in all the code layers.
+example link
+https://www.shadertoy.com/view/lldcR8
