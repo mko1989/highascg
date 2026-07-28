@@ -1,6 +1,6 @@
 # WO-364 — PRV of a pgm_prv destination cannot be cabled to a GPU connector (todos28 follow-up, owner 28.07)
 
-**Status: OPEN (investigated 28.07.26 — root cause is a missing feature, not a wiring bug)**
+**Status: DONE (28.07.26 — built + verified offline and against the live server; owner presses Apply for the Caspar/X restart)**
 
 Owner: "i tried connecting the prv of screen dest 1 to a gpu connector and it grabs the cable
 from pgm always." / "in matrix view its not even split."
@@ -43,3 +43,41 @@ port dot is cosmetic today:
 
 Cost note: a PRV screen consumer is another GL output window on the single GPU — needs a
 Caspar restart and a quick perf sanity check alongside the operator-GUI channel.
+
+## 3. Build decisions (28.07)
+
+- Source of truth for "this cable is PRV": the graph edge's note `{outputLayer: 2}` — the
+  same convention the DeckLink destination edges already use for their "PRV:" labels. No new
+  outputBinding type for identity; bindings stay derived.
+- "Outside routing" landed first: `destinationToVideoSource()` now maps a pgm_prv destination
+  edge with outputLayer ≥ 2 to `preview_<N>` (stream/record/RTMP/v4l2 all already resolve
+  `preview_N` via `resolveInputTargetToChannel`). pgm_only/pixelmap stay program-only.
+- Physical head: the box currently has DP-6 = PGM (2560x896), DP-0 = operator GUI, and DP-2
+  connected but unconfigured — the owner's plugged PRV cable; live verification target.
+
+## 4. What was built (28.07, commit 71aa5a1)
+
+Server: edge note `{outputLayer:2}` identifies the PRV half everywhere. `destinationToVideoSource`
+maps layer-2 pgm_prv edges to `preview_<N>` (stream/record/RTMP/v4l2 "outside routing").
+Layout pipeline grew a PRV head class mirroring multiview: assign (binding `screen_prv` or
+layer-2 edge) → place (same raster as the pair, packed after screens+mv) → mapping-GPU
+merge/offset → xrandr apply + layout verify (canvas-expansion check included) + settings-os
+`screen_N_prv_os_*` keys. `applyLayoutPositionsToMerged` writes `screen_N_prv_screen_consumer`
++ `_prv_x/_prv_y`; `buildScreenPairChannels` emits a `<screen>` consumer on the PRV channel
+(own device number); PGM consumer gating uses a PGM-only reachability map so a PRV-only cable
+never enables screen_N. Client: pair-dot half → cable arm/drop → edge note + `screen_prv`
+binding; PRV cables skip PGM settings seeding; matrix view splits pgm_prv into PGM/PRV rows
+(cell toggle reads/writes the note).
+
+## 5. Verified
+
+- Suite 1559/1559 incl. new `smoke-wo364-prv-output-routing.test.js` (videoSource mapping,
+  edge threading, preview channel resolution).
+- Dry-run against the box's real config + synthetic PRV edge: PRV head lands on DP-2
+  2560x896@4480,0 (PGM DP-6 and operator DP-0 untouched), PRV channel XML gains the screen
+  consumer at device 2, PGM channel unchanged.
+- Live: staged the real cable via API (edge `dst_in_dst_mrzeocxh_1 → gpu_p1` note
+  outputLayer 2 + `screen_prv` binding); the RUNNING server's
+  `/api/caspar-config/generate` now emits the PRV head channel.
+- NOT yet applied: Apply Caspar + OS layout (Caspar restart; DP-2 head extends the X canvas
+  to 7040px → expect a session restart prompt). Left to the owner — box in active use.

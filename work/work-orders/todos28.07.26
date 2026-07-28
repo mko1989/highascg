@@ -1,0 +1,4 @@
+looks with routes pointing to layer 10 are failing to play correctly on most trys.
+
+when factory reseting on the webui the default preview compose becomes jpeg stream. should be the simple thumbnails.
+
