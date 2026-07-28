@@ -36,9 +36,17 @@ let _modalObserver = null
 let _pointerDown = false
 let _modalOpen = false
 let _htmlDrag = false
+/* WO-343 design 2 (2026-07-28): once a drag is established, the hole can RE-OPEN — the press
+ * landed on Firefox pixels, so the X implicit pointer grab (button held) keeps delivering
+ * motion/release to Firefox even when the pointer crosses the hole. The operator then sees
+ * REAL video through the drag instead of a blanked hole. Press-time blank stays (the first
+ * beat shows the drag chrome and guarantees the press itself never races an open hole). */
+const DRAG_REOPEN_MS = 150
+let _dragReopened = false
+let _dragReopenTimer = null
 
 function recompute() {
-	setInteractionSuppressed(_modalOpen || _pointerDown || _htmlDrag)
+	setInteractionSuppressed(_modalOpen || (_pointerDown && !_dragReopened) || _htmlDrag)
 }
 
 function onPointerDown(e) {
@@ -46,12 +54,22 @@ function onPointerDown(e) {
 	if (!e.target || typeof e.target.closest !== 'function') return
 	if (!e.target.closest(PREVIEW_SURFACE_SELECTOR)) return
 	_pointerDown = true
+	_dragReopened = false
 	recompute()
+	clearTimeout(_dragReopenTimer)
+	_dragReopenTimer = setTimeout(() => {
+		if (_pointerDown) {
+			_dragReopened = true
+			recompute()
+		}
+	}, DRAG_REOPEN_MS)
 }
 
 function onPointerUp() {
 	if (!_pointerDown) return
 	_pointerDown = false
+	_dragReopened = false
+	clearTimeout(_dragReopenTimer)
 	recompute()
 }
 
@@ -134,4 +152,6 @@ export function stopOperatorGuiInteractionSuppress() {
 	_pointerDown = false
 	_modalOpen = false
 	_htmlDrag = false
+	_dragReopened = false
+	clearTimeout(_dragReopenTimer)
 }

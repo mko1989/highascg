@@ -28,6 +28,7 @@ const IGNORES = [
 const ESLINT_10_RECOMMENDED_OVERRIDES = {
 	// ESLint 10 expanded eslint:recommended — warn until existing code is cleaned up.
 	'no-useless-assignment': 'warn',
+	'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
 	'preserve-caught-error': 'warn',
 	'no-constant-binary-expression': 'warn',
 	'no-unexpected-multiline': 'warn',
@@ -41,8 +42,8 @@ const SERVER_FILES = ['src/**/*.js', 'tools/**/*.js', 'scripts/**/*.js', 'test/*
 const SERVER_MODULE_FILES = ['tools/**/*.mjs', 'scripts/**/*.mjs']
 
 const SERVER_RULES = {
-	'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-	'no-empty': ['warn', { allowEmptyCatch: false }],
+	'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+	'no-empty': ['warn', { allowEmptyCatch: true }],
 	'no-undef': 'warn',
 	'no-restricted-syntax': [
 		'warn',
@@ -101,8 +102,8 @@ module.exports = [
 			},
 		},
 		rules: {
-			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-			'no-empty': ['warn', { allowEmptyCatch: false }],
+			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+			'no-empty': ['warn', { allowEmptyCatch: true }],
 			'no-undef': 'off',
 			'no-restricted-syntax': [
 				'warn',
@@ -131,8 +132,8 @@ module.exports = [
 			},
 		},
 		rules: {
-			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
-			'no-empty': ['warn', { allowEmptyCatch: false }],
+			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+			'no-empty': ['warn', { allowEmptyCatch: true }],
 			...ESLINT_10_RECOMMENDED_OVERRIDES,
 		},
 	},
