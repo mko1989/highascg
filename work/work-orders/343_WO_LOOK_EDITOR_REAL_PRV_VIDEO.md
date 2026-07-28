@@ -38,6 +38,29 @@ input∩bounding, so every click inside an open hole falls through to the input-
 WO-339's on-channel edit chrome (edit_chrome layer 990, already implemented) pairs with any of
 these: the operator sees real video + outlines while input stays reliable.
 
+## Test coverage (added 28.07.26)
+
+This shipped, was reverted once (`9cc305a`), shipped again in `9f0e2d8` + `ba8970f` — and had **no
+test at all**. `tools/smoke/smoke-wo343-prv-watch-suppression.test.js` (9 tests, curated list) now
+pins the suppression state machine BEHAVIOURALLY against a stub DOM, not by source text:
+
+- press on a preview surface blanks the holes **immediately** (the press must never race an open
+  hole — the X SHAPE input∩bounding contract that killed v1);
+- still held past `DRAG_REOPEN_MS` → holes re-open, so the operator sees real video through the drag;
+- release returns to idle and the reopen latch does **not** survive into the next press;
+- a short click never leaves the holes reopened (the timer must not fire after release);
+- presses outside a preview surface are ignored, so GUI chrome stays live;
+- a modal blanks regardless and is never uncovered by the reopen timer;
+- an HTML5 drag suppresses for its whole duration (drop targets under holes).
+
+Timing note for whoever touches this next: two timers gate the observable state — the detector's
+`DRAG_REOPEN_MS` (150) and the report layer's `RESTORE_DEBOUNCE_MS` (300, `operator-gui-mode-report.js`).
+Blanking is immediate; **un**-blanking is debounced. A test that waits only past the reopen latch
+will see the old state and look like a failure of the feature.
+
 ## Acceptance
 While editing a look on the operator GUI, real Caspar PRV video is visible (with WO-339 chrome);
 every click/drag still registers; exiting edit restores normal compose-preview behavior.
+
+**Still owner QA on the real display** (that is what this WO waits on — the code is in and now
+tested): drag layers with the PRV watch toggle on; the revert knob is `DRAG_REOPEN_MS`.
