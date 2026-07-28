@@ -149,5 +149,6 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-360 | Playout status surfacing: missing media / failed inputs visibly reported | [WO-360](./work-orders/360_WO_playout_status_surfacing.md) | ✅ Done 28.07 (probe-verified; route-to-empty deferred) |
 | WO-361 | Companion module dev-mode workflow | [WO-361](./work-orders/361_WO_companion_module_dev_mode.md) | ✅ Done 28.07 (dev-mode.sh; --extra-module-path was already configured) |
 | WO-362 | Routed looks (route://1-10) reliability + shader CG ADD pre-fade reorder | [WO-362](./work-orders/362_WO_route_layer10_look_reliability.md) | ✅ Done 28.07 (12/12 pixel-probed ROUTES-ALIVE; owner on-glass confirm pending) |
+| WO-363 | Factory reset defaulted compose preview to JPEG stream | [WO-363](./work-orders/363_WO_factory_reset_compose_preview_default.md) | ✅ Done 28.07 (default → canvas; live reset left to owner) |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

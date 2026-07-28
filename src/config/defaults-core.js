@@ -103,7 +103,9 @@ function coreDefaults() {
 			legacyJsPixelmap: false,
 		},
 		composePreview: {
-			mode: 'ffmpeg_jpeg',
+			// Factory default is the simple canvas thumbnails (todos28.07.26 §2, owner) — the
+			// ffmpeg JPEG stream is an explicit opt-in, not what a fresh/reset box should run.
+			mode: 'canvas',
 			fps: 25,
 			resolutionScale: 'half',
 			jpegQuality: 10,
