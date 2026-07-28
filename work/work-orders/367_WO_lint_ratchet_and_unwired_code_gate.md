@@ -1,6 +1,6 @@
 # WO-367 — CI does not gate lint warnings, and "written but never called" code keeps shipping
 
-**Status: OPEN — investigated 28.07.26 (evidence: three separate lost-wiring bugs found by hand on 28.07 alone). No change made.**
+**Status: DONE (28.07.26 — all three gates landed and each proven to fail on the regression it exists for).**
 
 ## 1. Investigation
 
@@ -74,12 +74,72 @@ Both are worth covering; the first is one line of config, the second needs a che
   starting value so a later session can tell drift from an intentional raise.
 - CI stays green on the current tree at the moment the gate lands.
 
-## 4. What was VERIFIED
+## 4. What was DONE
 
-- `.github/workflows/ci.yml` and `package.json` read at `637965c`: no `--max-warnings`, no
-  unwired-export or init-call check anywhere in `tools/ci/`.
-- The three lost-wiring commits and their messages quoted verbatim from `git log`.
-- Baseline at time of writing: offline suite 1559 pass / 0 fail / 2 skip;
-  `node tools/ci/check-max-file-lines.js` → "Files over 500 lines: 0".
-- Nothing changed. The 225-warning figure is quoted from `185d200`'s message, **not**
-  independently re-measured — do that before pinning it.
+### 4a. Warning cap (plan step 1)
+
+`"lint": "npx eslint . --max-warnings 224"`.
+
+The plan's caveat was honoured: the figure was **re-measured**, not taken from `185d200`'s
+message. `npx eslint .` reports **224**, not 225 — the extra one was a dead `isImg` local in
+`inspector-layer-playlist.js`, removed while implementing WO-370 earlier the same day. The count
+depends only on tracked sources (flat-config ignores cover `node_modules`, `dist-web`, `vendor`,
+`work`, `template`), so a clean `npm ci` on the runner sees the same files and the same number.
+
+### 4b. Unwired-export gate (plan step 2)
+
+`tools/ci/check-unwired-exports.js`, in the `tools/ci/` style, wired as a CI step next to the
+500-line gate. It flags a named export in `client/components`, `client/lib` or `src` whose name
+appears **nowhere** outside its own file, scanning `client/ src/ tools/ template/ scripts/` for
+references.
+
+Deliberately conservative: any occurrence counts — static import, re-export, namespace member
+access (`Actions.addCable`), a dynamic `import()` result, even a smoke's source-text assertion.
+It never resolves module paths, so it cannot argue with the bundler; it only catches the total
+orphan, which is the observed failure shape. False negatives (two modules sharing a name) are
+accepted; false positives would get the gate switched off.
+
+**It is a ratchet, not a cleanup order.** The first run found **697 real orphans** — spot-checked
+and confirmed: `syncFaderUIFromGain`, `resolveV4l2Device`, `VIRTUAL_CAMERA_DEFAULTS` and
+`XRANDR_MODE_RE` are each referenced only inside their own file. Far too many to fix in the
+change that introduces the gate, so they are recorded in `tools/ci/unwired-exports-baseline.json`
+and only a NEW orphan fails. Entries that become wired are *reported, not failed* (deleting a
+file must never turn CI red) with the `--update` command to shrink the list. The plan's
+allowlist-with-reasons idea was dropped in favour of the baseline: 697 hand-written reasons would
+be fiction, and a baseline file makes the debt countable and shrinkable.
+
+### 4c. Init-call assertion (plan step 3)
+
+`tools/smoke/smoke-wo367-wiring-gates.test.js`, in the curated FILES list. Every `init*` symbol
+the client bootstrap **imports** must also appear as a **call** in `client/app.js`, plus named
+assertions for the exact `6e53abe` casualties (`initMediaExistsIndex`,
+`initLiveInputFailureToasts`) and today's `initMediaDurationIndex`.
+
+## 5. What was VERIFIED
+
+Each gate was proven against the regression it exists for, not just observed to be present:
+
+- **Warning cap fires.** Adding one unused module-level const → `npm run lint` exits **1**
+  (225 > 224); removing it → exits **0**. (First probe was named `__wo367…` and was correctly
+  ignored — the config exempts `^_` by design; re-run with a normal name.)
+- **Unwired-export gate fires.** Adding `export function __wo367ProbeNothingCallsThis()` to
+  `client/lib/media-duration.js` → exit **1** naming that export; reverted → exit **0** with
+  "no NEW orphan exports (697 in baseline)".
+- **Detection logic unit-tested** (not just the CLI): export-form parsing across all five shapes
+  this repo uses (`export function/const/class`, `export { x as y }`, `module.exports = {}`,
+  `exports.x =`), an orphan flagged in a temp fixture tree while its wired sibling is not, and a
+  namespace member access correctly counting as a reference (the obvious false-positive trap).
+- **Init-call rule** passes on the current bootstrap and would fail if a call were dropped while
+  the import stayed — the shape of `6e53abe`.
+- **Full offline suite: 1599 tests, 1597 pass / 0 fail / 2 skip.** `npm run lint` 0,
+  `npm run format:check` clean, `check-script-paths` clean, CI stays green on the tree the gate
+  lands on (acceptance §3).
+
+**Recorded starting values** (so a later session can tell drift from an intentional raise):
+warning cap **224**, orphan baseline **697**. Both may only go down; the smoke asserts the cap is
+never raised above 224.
+
+**Unrelated local finding:** `npm run verify:repo-integrity` fails on this box — 11 Syncthing
+`*.sync-conflict-*` files under `projects/`. `projects/` is gitignored (WO-261), so CI never sees
+them and this is not a CI problem; they are owner project data and were left untouched. Worth a
+cleanup decision by the owner.

@@ -39,6 +39,11 @@ jobs:
       - name: File size limit (500 lines)
         run: node tools/ci/check-max-file-lines.js
 
+      # WO-367: code written, reviewed and marked DONE but never wired to a caller has shipped
+      # three times (6e53abe, 9d2f6dd, 185d200). Fails only on NEW orphan exports.
+      - name: Unwired exports
+        run: node tools/ci/check-unwired-exports.js
+
       - name: Boot check (no-http)
         run: node index.js --no-http
 
