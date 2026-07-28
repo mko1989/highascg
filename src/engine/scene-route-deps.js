@@ -318,9 +318,14 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 		// atomically — every layer of the look (media AND routes) lands on the same output frame.
 		// Leading/trailing `MIXER <ch> COMMIT` stay outside (forbidden inside BEGIN…COMMIT).
 		const routeLines = orderedRoutes.flatMap((job) => linesForJob(job) || [])
+		/* todos28: the suffix (crossfade fades for non-route layers — CG-hosted shaders, outgoing
+		 * fade-outs, border/timeline tweens) must ride the batch even when the look has NO media
+		 * source PLAYs (shader + routes look: playPlan is null on template jobs, so sourceLines is
+		 * empty). Dropping it left the incoming shader at the deferred OPACITY 0 forever and the
+		 * outgoing look hard-cutting instead of mixing. */
 		const block = [
 			...sourceLines,
-			...(sourceLines.length > 0 ? suffixAfterSources : []),
+			...(sourceLines.length > 0 || routeLines.length > 0 ? suffixAfterSources : []),
 			...routeLines,
 		]
 		if (block.length === 0) {
@@ -329,7 +334,11 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 			}
 			return
 		}
-		if (leadingCommit && sourceLines.length > 0) await amcp.mixerCommit(ch)
+		/* todos28: flush the Phase-A deferred prep (incoming bank pre-hidden at OPACITY 0, FILLs)
+		 * BEFORE the fade batch whenever anything is sent — gating this on sourceLines meant a
+		 * routes-without-media look left the zeros queued, and the TRAILING commit below applied
+		 * them AFTER the fade-in tweens, re-hiding the entire incoming bank. */
+		if (leadingCommit) await amcp.mixerCommit(ch)
 		await amcp.batchSendChunked(block, { skipMixerPreCommit: true, forceBatch: true })
 		if (commitAfterSources || (routeLines.length > 0 && commitAfterRoutes)) {
 			await amcp.mixerCommit(ch)

@@ -1,6 +1,6 @@
 # WO-362 — Looks with routes to layer 10 "failing to play on most trys" (todos28.07.26 §1)
 
-**Status: DONE (28.07.26, pixel-probed live on the box — see §3; owner on-glass confirm outstanding)**
+**Status: DONE (28.07.26 second pass — real root cause found and fixed after owner rejected first conclusion; visual pixel evidence in §3b)**
 
 Follow-up to [WO-359](./359_WO_route_take_consistency.md) (orphan-sweep keep-set fix) and
 [WO-322](./322_WO_shader_look_band_routing.md) (shader on the look band).
@@ -51,3 +51,33 @@ created before its source exists — one move fixes both.
   and the reordered pipeline.
 - Remains owner QA: reproduce the original failure on the glass; if it still occurs, capture
   which flow (playlist take? edit-on-PGM? Shader Live stack?) — every flow probed here passes.
+
+## 4. Second pass (owner: "the nested looks still dont play as they should")
+
+The §3 "ROUTES-ALIVE" YAVG metric was INVALID: PRINT frames are RGBA and the look's border
+glow alone produces YAVG 29–47 — the probe could not distinguish a live route from a fully
+transparent look. Lesson: calibrate a probe against a known-bad frame before trusting it.
+
+Real root cause (visual drill + full AMCP trace, `scene-route-deps.js`
+`sendStaggeredTakePlays` twoPhaseBatch branch): for a look whose only non-route content is
+CG-hosted (shader templates have `playPlan: null`), `sourceLines` is empty, and the branch
+(a) DROPPED `suffixAfterSources` — the crossfade batch carrying the shader layer's fade-in,
+the outgoing look's fade-outs, and border/timeline tweens — and (b) SKIPPED the leading
+`MIXER <ch> COMMIT`, so the Phase-A deferred `OPACITY 0` pre-hide of the incoming bank was
+applied by the TRAILING commit AFTER the route fade-ins, re-hiding the whole incoming bank.
+Net effect: every bank-B take of a shader+routes look landed fully transparent (bank-A takes
+survived only because teardown `MIXER CLEAR` resets that bank's opacity to 1) — "fails on
+most trys". The same suffix drop also explains WO-354's "shaders don't mix well" (outgoing
+fade-outs were lost → hard cut).
+
+Fix: include the suffix whenever the batch sends anything (sources OR routes), and fire the
+leading commit unconditionally when `leadingCommit` is set.
+
+### 3b. Verified (second pass)
+- AMCP trace showed `MIXER 1-110/111/112 OPACITY 0 0 (+DEFER)` with fade-ins only for
+  111/112, then trailing `MIXER 1 COMMIT`; mixer state after take: all three layers at 0.
+- Manual `OPACITY 1` restore rendered all three panes perfectly → opacity was the entire
+  failure; producers and routes were healthy the whole time.
+- Post-fix visual drill: 4 alternating MIX takes, every frame alpha=255 (fully opaque) and
+  visually correct (center + both route panes live, border glow intact) — including both
+  bank-B takes that previously failed. Suite 1553/1553.
