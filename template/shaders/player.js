@@ -298,8 +298,65 @@
 	}
 
 	// --- wire passes -------------------------------------------------------------------------
-	function passConfig(p) {
+
+	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
+	 * image iCh0". Ticking the box only sets audio.enabled; the audio TEXTURE is created below
+	 * only when a pass actually BINDS 'audio' to a channel, so tick-and-forget produced a shader
+	 * that was silently not reactive while still wearing the ♪ badge in the library. The store
+	 * binds it on save (src/shaderfx/shader-store.js), and this does the same at load time so
+	 * ALREADY-EXPORTED templates start working without being re-exported — player.js is shared
+	 * and loaded fresh by every sh-*.html. Never displaces an existing binding. */
+	function ensureAudioChannelBinding() {
+		if (!config.audio || !config.audio.enabled) return
+		const passes = config.passes || {}
+		const bound = Object.keys(passes).some((k) => passes[k] && (passes[k].channels || []).includes('audio'))
+		if (bound) return
+		const img = passes.image
+		if (!img) return
+		if (!Array.isArray(img.channels)) img.channels = [null, null, null, null]
+		const free = img.channels.findIndex((c) => !c)
+		if (free >= 0) img.channels[free] = 'audio'
+	}
+
+	/* todos28.07.26 (owner): "alpha doesnt work on shaders."
+	 *
+	 * The transparent PAGE and the alpha-claimed WebGL2 context were both already correct — what
+	 * is opaque is the shader itself. Shadertoy shaders are written for an opaque canvas and end
+	 * with `fragColor = vec4(col, 1.0)`; every alpha-enabled shader in this library does exactly
+	 * that (sh-matrix, sh-bubles, sh-mirrors), so there is nothing for the transparency to show
+	 * through. Alpha could never have worked without touching the shader source.
+	 *
+	 * So when the Alpha flag is on, the image pass is wrapped: the author's mainImage is renamed
+	 * and called by ours, which keys near-black to transparent and PREMULTIPLIES (the context is
+	 * claimed premultipliedAlpha:true). A shader that DOES author real alpha keeps it — the key
+	 * only applies where the author wrote a fully opaque pixel.
+	 *
+	 * Fail-safe: if the source does not contain exactly one `void mainImage(` the wrap is skipped
+	 * and behaviour is exactly as before. Turning the Alpha flag off also restores it. */
+	const ALPHA_KEY_SOFT = 0.06
+	function alphaKeyImageSource(src) {
+		const decls = String(src).match(/\bvoid\s+mainImage\s*\(/g) || []
+		if (decls.length !== 1) return null
+		const renamed = String(src).replace(/\bvoid\s+mainImage\s*\(/, 'void mainImageAuthor(')
+		return (
+			renamed +
+			'\n\n// injected by player.js — Alpha flag (todos28.07.26)\n' +
+			'void mainImage(out vec4 fragColor, in vec2 fragCoord) {\n' +
+			'  vec4 c;\n' +
+			'  mainImageAuthor(c, fragCoord);\n' +
+			'  float key = max(c.r, max(c.g, c.b));\n' +
+			'  float a = c.a < 1.0 ? c.a : smoothstep(0.0, ' + ALPHA_KEY_SOFT.toFixed(3) + ', key);\n' +
+			'  fragColor = vec4(c.rgb * a, a);\n' +
+			'}\n'
+		)
+	}
+
+	function passConfig(p, key) {
 		const cfg = { source: p.source }
+		if (key === 'image' && config.opts && config.opts.alpha) {
+			const keyed = alphaKeyImageSource(p.source)
+			if (keyed) cfg.source = keyed
+		}
 		for (let i = 0; i < 4; i++) {
 			if (p.channels && p.channels[i]) cfg['iChannel' + i] = p.channels[i]
 		}
@@ -312,6 +369,7 @@
 	}
 
 	async function start() {
+		ensureAudioChannelBinding()
 		if (config.audio && config.audio.enabled && usesAudioChannel()) {
 			audioTexture = createAudioTexture()
 			toy.addTexture(audioTexture, 'audio', AUDIO_W, 2)
@@ -327,7 +385,7 @@
 		if (p.bufferB) toy.setBufferB(passConfig(p.bufferB))
 		if (p.bufferC) toy.setBufferC(passConfig(p.bufferC))
 		if (p.bufferD) toy.setBufferD(passConfig(p.bufferD))
-		if (p.image) toy.setImage(passConfig(p.image))
+		if (p.image) toy.setImage(passConfig(p.image, 'image'))
 		toy.setOnDraw(updateAudio)
 		toy.play()
 	}
@@ -348,7 +406,8 @@
 			if (!config.passes) config.passes = {}
 			if (!config.passes[key]) config.passes[key] = { source: src, channels: [] }
 			else config.passes[key].source = src
-			toy[setters[key]](passConfig(config.passes[key]))
+			// WO-345 hot-recompile must keep the Alpha keying (todos28.07.26) — pass the key through.
+			toy[setters[key]](passConfig(config.passes[key], key))
 		}
 	}
 

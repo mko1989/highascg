@@ -80,6 +80,26 @@ function normalizeShaderConfig(input) {
 	}
 	if (!passes.image) throw new Error('image pass source is required')
 
+	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
+	 * image iCh0". Ticking the box only set `audio.enabled`; the audio TEXTURE is created by
+	 * player.js's `usesAudioChannel()`, which asks whether any pass actually binds 'audio' to a
+	 * channel. Tick the box, forget the select, and the shader is silently not reactive at all —
+	 * while the library still shows it a ♪ badge. Measured on this box: sh-balatro, sh-console,
+	 * sh-test and sh-wavy were all in that state.
+	 *
+	 * So the flag now MEANS something: if audio is on and nothing binds it, bind it — first free
+	 * image channel, iChannel0 first. Deliberately never displaces an existing binding (a buffer
+	 * wired to iChannel0 stays), and when every image channel is occupied the config is left
+	 * untouched rather than silently rewired. */
+	const audioEnabled = payload.audio?.enabled !== false
+	if (audioEnabled) {
+		const boundSomewhere = Object.values(passes).some((p) => p && p.channels.includes('audio'))
+		if (!boundSomewhere) {
+			const free = passes.image.channels.findIndex((c) => c == null)
+			if (free >= 0) passes.image.channels[free] = 'audio'
+		}
+	}
+
 	/* todos27.07.26: operator-given display names for Shader Live parameters ("decode what each
 	 * parameter does"). Keyed by the editor's stable param key; bounded so a hostile payload
 	 * cannot bloat the config file. */

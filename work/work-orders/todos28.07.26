@@ -2,3 +2,11 @@ looks with routes pointing to layer 10 are failing to play correctly on most try
 
 when factory reseting on the webui the default preview compose becomes jpeg stream. should be the simple thumbnails.
 
+in matrix view the prv is listed twice now. and in standard view the cable comes out of pgm node dot instead of the prv one.
+
+
+alpha doesnt work on shaders.
+when audio reactive is ticked on a shader audio must be chosen in image iCh0.
+some shaders allow camera input. make it possible to route the virtual cam output to the shaders.
+
+i connected decklink input 4 host channel to a virtual camera output and on the output there is channel 1 output instead of decklink.

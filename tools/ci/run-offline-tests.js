@@ -202,6 +202,7 @@ const FILES = [
 	'tools/smoke/smoke-wo373-record-source-tiebreak.test.js',
 	'tools/smoke/smoke-wo344-shader-thumbs.test.js',
 	'tools/smoke/smoke-wo343-prv-watch-suppression.test.js',
+	'tools/smoke/smoke-shader-alpha-and-audio-binding.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)
