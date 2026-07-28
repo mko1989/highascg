@@ -121,7 +121,7 @@ async function emitCgClear(ctx, routing) {
  * @param {object} ctx
  * @param {object} [query]
  */
-function handleGet(p, ctx, query = {}) {
+function handleGet(p, ctx, _query = {}) {
 	if (p !== '/api/countdown/list') return null
 
 	// WO-196 T196.3: enumerate all project countdown layers + mark on-air from live state.

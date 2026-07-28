@@ -52,7 +52,7 @@ function resolveOperatorMonitorPort(config, opts = {}) {
 				const raw = getGpuConnectorInventory() || []
 				connectors = raw.filter((c) => !isPseudoGpuConnectorName(c?.shortName || c?.name))
 			}
-		} catch (e) {
+		} catch {
 			// Detection threw; fall back to flag-only
 			fallbackMode = true
 			displays = []
@@ -81,7 +81,7 @@ function resolveOperatorMonitorPort(config, opts = {}) {
 			displays,
 			connectors,
 		})
-	} catch (e) {
+	} catch {
 		// Map build failed; fall back to flag-only
 		const flagPort = resolveFlagPort(config)
 		return {

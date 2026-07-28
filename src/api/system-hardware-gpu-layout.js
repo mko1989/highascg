@@ -26,7 +26,7 @@ async function getInstalledGpuName() {
 		)
 		const lines = String(stdout || '').trim().split(/\r?\n/)
 		if (lines.length > 0) return lines[0].trim()
-	} catch (err) {
+	} catch {
 		// Suppress or log error if no nvidia GPU is found.
 		return null
 	}
@@ -79,7 +79,7 @@ async function handleGpuLayoutGet() {
 		if (fs.existsSync(DB_PATH)) {
 			db = JSON.parse(fs.readFileSync(DB_PATH, 'utf8'))
 		}
-	} catch (err) {
+	} catch {
 		return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'Failed to load GPU database' }) }
 	}
 

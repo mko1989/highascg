@@ -76,10 +76,6 @@ function jsonStable(v) {
 	}
 }
 
-function pipOverlaysStable(layer) {
-	return jsonStable(pipOverlaysFromLayer(layer))
-}
-
 function fadeOnEndEqual(a, b) {
 	const x = a && typeof a === 'object' ? a : { enabled: false, frames: 12 }
 	const y = b && typeof b === 'object' ? b : { enabled: false, frames: 12 }

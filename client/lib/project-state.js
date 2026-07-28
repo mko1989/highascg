@@ -9,7 +9,7 @@ const PROJECT_VERSION = 2
 const SERVER_STORE_NAME = 'casparcg_web_project'
 
 export class ProjectState {
-	constructor(options = {}) {
+	constructor(_options = {}) {
 		this.projectName = ''
 		this.projectSlug = ''
 		/** WO-329: server-issued monotonic revision this client's state is based on. The server

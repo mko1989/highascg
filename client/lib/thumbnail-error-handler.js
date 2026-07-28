@@ -58,7 +58,7 @@ export function handleThumbnailError(img, fallbackHtml = '<i>🎬</i>') {
 
 			// Start loading
 			newImg.src = retriedSrc
-		} catch (e) {
+		} catch {
 			// URL parsing failed, just show fallback
 			if (img.parentElement) img.parentElement.innerHTML = fallbackHtml
 		}

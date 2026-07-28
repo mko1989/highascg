@@ -40,9 +40,6 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	const wrapCtl = Object.assign(document.createElement('div'), { className: 'device-view__inspector-links' })
 	const audioOutputsList = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : []
 	const existing = audioOutputsList.find((x) => String(x?.id || '') === String(conn.id || ''))
-	const audioRouting = currentSettings?.audioRouting && typeof currentSettings.audioRouting === 'object'
-		? currentSettings.audioRouting
-		: {}
 
 	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'Output label', value: String(existing?.label || conn?.label || '') })
 

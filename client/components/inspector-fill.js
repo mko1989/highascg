@@ -91,7 +91,7 @@ export function appendLayerAlignButtons(parent, onAlign) {
  * @param {import('../lib/scene-state.js').SceneState} opts.sceneState
  */
 export function appendSceneLayerFillGroup(root, opts) {
-	const { res, pxRect, patchFillPx, patchFillAlign, layer, sceneId, layerIndex, sceneState, stateStore } = opts
+	const { pxRect, patchFillPx, patchFillAlign, layer, sceneId, layerIndex, sceneState, stateStore } = opts
 
 	let contentFitApplySeq = 0
 	/** @type {ReturnType<typeof createDragInput> | null} */

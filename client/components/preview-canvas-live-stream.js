@@ -19,7 +19,6 @@
 import {
 	acquireGuiStream,
 	releaseGuiStream,
-	guiStreamChannel,
 	guiStreamFrame,
 	guiStreamSupported,
 	guiStreamStats,

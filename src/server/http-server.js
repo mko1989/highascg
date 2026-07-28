@@ -182,7 +182,7 @@ async function serveWebApp(requestPath, dirs) {
  * @param {string} body
  * @param {import('http').IncomingMessage} _req
  */
-async function defaultRouteApi(method, reqPath, body, _req) {
+async function defaultRouteApi(method, reqPath, _body, _req) {
 	return {
 		status: 503,
 		headers: { 'Content-Type': 'application/json; charset=utf-8' },

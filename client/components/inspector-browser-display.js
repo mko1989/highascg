@@ -38,7 +38,7 @@ function applyBrowserDisplayApiResult(r) {
  * @param {HTMLElement} container
  * @param {{ source: object, onApplied?: (r: object) => void, hostOperatorFullscreen?: object }} opts
  */
-export function mountBrowserDisplayControls(container, { source, onApplied, hostOperatorFullscreen }) {
+export function mountBrowserDisplayControls(container, { source, onApplied, _hostOperatorFullscreen }) {
 	if (!source) return
 
 	const section = document.createElement('div')

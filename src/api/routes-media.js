@@ -125,7 +125,7 @@ async function handleThumbnail(path, query, ctx) {
 					return { status: 200, headers: { 'Content-Type': 'image/png' }, body: localBuf }
 				}
 			}
-		} catch (e) {
+		} catch {
 			// Cache key generation failed; fall through to normal flow
 			const localBuf = await tryLocalThumbnailPng(ctx.config || {}, filename, maxW, seekSec)
 			if (localBuf && localBuf.length) {

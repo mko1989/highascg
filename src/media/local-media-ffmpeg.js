@@ -245,7 +245,7 @@ function writeThumbnailCacheFile(cacheDir, key, data) {
 		const tmpPath = `${targetPath}.tmp`
 		fs.writeFileSync(tmpPath, data)
 		fs.renameSync(tmpPath, targetPath)
-	} catch (e) {
+	} catch {
 		/* non-fatal: cache write failure is OK */
 		// Clean up tmp file if it exists
 		try {

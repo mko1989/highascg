@@ -9,7 +9,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
-const { normalizeProgramLayerBank, physicalProgramLayer } = require('../engine/scene-transition')
+const { physicalProgramLayer } = require('../engine/scene-transition')
 const { triggerPlaylistAdvance, playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
 
 /**

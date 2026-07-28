@@ -166,7 +166,7 @@ function scanProjectsDir(projectsDir, source) {
 		let project
 		try {
 			project = JSON.parse(fs.readFileSync(p, 'utf8'))
-		} catch (e) {
+		} catch {
 			projectStoreLazy().quarantineCorruptFile(p)
 			out.push({
 				slug: baseSlug || slug,

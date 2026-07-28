@@ -81,7 +81,7 @@ class RouteRegistry {
 					} else {
 						try {
 							params[key] = decodeURIComponent(match[index + 1])
-						} catch (e) {
+						} catch {
 							params[key] = match[index + 1]
 						}
 					}

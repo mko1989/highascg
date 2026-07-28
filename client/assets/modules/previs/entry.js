@@ -39,7 +39,7 @@ function requestPrvPctOverride(value) {
 /**
  * @param {{ stateStore: any, ws: any, api: any, sceneState: any, settingsState: any, streamState: any }} ctx
  */
-export default async function initPrevisModule(ctx) {
+export default async function initPrevisModule(_ctx) {
 	console.info('[previs] module loaded')
 
 	registerOptionalSettingsTab({

@@ -20,11 +20,6 @@ function createPlaybackCell(position = 0) {
 	return { position, playing: false, loop: false, _t0: t, _p0: position }
 }
 
-function cellNowMs(cell) {
-	if (!cell?.playing) return cell?.position ?? 0
-	return cell._p0 + (Date.now() - cell._t0)
-}
-
 function setCellPosition(cell, pos) {
 	cell.position = pos
 	cell._p0 = pos

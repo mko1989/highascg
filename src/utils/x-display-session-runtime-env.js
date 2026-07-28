@@ -106,7 +106,7 @@ function resolveConfineBarriersScript() {
 }
 
 /** @returns {Promise<string|null>} */
-async function resolveXdotoolBin(env) {
+async function resolveXdotoolBin(_env) {
 	const candidates = ['/usr/bin/xdotool', '/usr/local/bin/xdotool']
 	for (const p of candidates) {
 		try {

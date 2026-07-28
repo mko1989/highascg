@@ -105,9 +105,9 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 			const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }]
 			await Actions.saveSettingsPatch({ streamOutputs: next })
 			loadCallback()
-		} catch(e) {}
+		} catch {}
 	}
-	
+
 	const addRecordBtn = document.createElement('button')
 	addRecordBtn.className = 'header-btn'
 	addRecordBtn.textContent = '+ Record'
@@ -118,7 +118,7 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 			const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, type: 'h264', name: `Rec${idx}`, quality: 'medium' }]
 			await Actions.saveSettingsPatch({ recordOutputs: next })
 			loadCallback()
-		} catch(e) {}
+		} catch {}
 	}
 	
 	const addMapBtn = document.createElement('button')

@@ -54,7 +54,7 @@ export function cursorForResizeHandle(h) {
 	return map[h] || 'default'
 }
 
-export function getResizeHandle(cell, canvasX, canvasY, scale, cm = {}) {
+export function getResizeHandle(cell, canvasX, canvasY, scale, _cm = {}) {
 	const tol = HANDLE_SIZE / scale
 	const { x, y, w, h } = getCellOuterRect(cell)
 	const insideX = canvasX > x + tol && canvasX < x + w - tol

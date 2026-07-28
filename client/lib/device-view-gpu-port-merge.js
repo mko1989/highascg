@@ -32,7 +32,7 @@ export function resolveGpuSlotIdFromSavedLayout(pairs, _prefs = null, savedTopol
  * @param {{ byId?: Map<string, object>, orderIds?: string[] }} [prefs]
  * @param {{ defaultHideDisconnected?: boolean, connectedDisplays?: object[], connectors?: object[], topology?: object[] }} [opts]
  */
-export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisconnected = false, connectedDisplays = [], connectors = [], topology = null } = {}) {
+export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisconnected = false, connectedDisplays = [], _connectors = [], topology = null } = {}) {
 	const connectedNames = new Set(
 		(connectedDisplays || [])
 			.filter((d) => d?.connected)

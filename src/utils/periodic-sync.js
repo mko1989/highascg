@@ -424,6 +424,16 @@ async function runPeriodicSync(self) {
 	self._periodicSyncInFlight = true
 	try {
 		await runPeriodicChannelInfoSync(self)
+		/* Lost wiring found 2026-07-28 (lint census): this refresher existed since its doc was
+		 * written but was never called — INFO CONFIG (decklink/config-compare, consumer
+		 * summaries) went stale for the whole session. Rare changes → every 10th tick.
+		 * Caveat: the periodic poll is OFF while OSC is active (see startPeriodicSync), so
+		 * mid-session config refresh still only happens on Caspar reconnect in OSC mode. */
+		self._infoConfigTick = (self._infoConfigTick || 0) + 1
+		if (self._infoConfigTick >= 10) {
+			self._infoConfigTick = 0
+			await runPeriodicInfoConfigRefresh(self)
+		}
 
 		try {
 			if (typeof self.updateDynamicVariables === 'function') self.updateDynamicVariables(self)

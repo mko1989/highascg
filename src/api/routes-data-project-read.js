@@ -2,7 +2,7 @@
 
 const { JSON_HEADERS, jsonBody } = require('./response')
 const persistence = require('../utils/persistence')
-const { loadFullProject, loadProjectForSlug } = require('../engine/project-scenes')
+const { loadFullProject } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
 const { maskProjectStreamCredentials } = require('../engine/project-stream-credentials')
 const { getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')

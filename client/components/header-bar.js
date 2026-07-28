@@ -231,7 +231,7 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		startFreshProject()
 	})
 
-	function updateSyncVisibility(cfg) {
+	function updateSyncVisibility(_cfg) {
 		// Buttons removed as requested (redundant with save/load)
 	}
 	settingsState.subscribe(updateSyncVisibility)

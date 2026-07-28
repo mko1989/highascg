@@ -166,7 +166,7 @@ function spawnOverlay(display, durationMs, colourIndex) {
  * @param {string} body
  * @param {*} ctx
  */
-async function handleIdentifyDisplaysPost(body, ctx) {
+async function handleIdentifyDisplaysPost(body, _ctx) {
 	// Kill any running overlays first
 	killActiveOverlays()
 

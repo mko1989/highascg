@@ -9,7 +9,6 @@ import {
 	STORAGE_KEY,
 	DEFAULT_SEND_TO,
 	normalizeSendTo,
-	ensureTimelineSendTo,
 	defaultClip,
 	defaultLayer,
 	defaultTimeline,

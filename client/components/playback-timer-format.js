@@ -76,7 +76,7 @@ export function ensureStyle() {
  * @param {object} displayFile
  * @param {number|null} layerNum
  */
-export function paintPlaybackDisplay(ctx, displayFile, layerNum) {
+export function paintPlaybackDisplay(ctx, displayFile, _layerNum) {
 	const { row, fill, bar, container, format, fpsFallback, labelPrefix = '', title } = ctx
 	const f = displayFile
 	const elapsed = f.elapsed

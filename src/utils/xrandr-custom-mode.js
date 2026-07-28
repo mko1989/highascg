@@ -209,7 +209,7 @@ function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger
 	}
 	try {
 		execFileSync('xrandr', ['--display', ':0', '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
-	} catch (e) {
+	} catch {
 		try {
 			execFileSync('xrandr', ['--display', ':0', '--delmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
 			execFileSync('xrandr', ['--display', ':0', '--addmode', output, modeName], { env, encoding: 'utf8', maxBuffer: 65536 })

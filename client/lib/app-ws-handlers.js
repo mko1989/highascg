@@ -99,7 +99,7 @@ function applyWsStateSideEffects(data, { sceneState, programOutputState, appLogi
 	appLogic.refreshEye()
 }
 
-export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore, appLogic }) {
+export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, _variableStore, appLogic }) {
 	/** WO-341 kill #7: last seen scene.live seq — a gap means the ws dropped a frame for this
 	 * backed-up client (SKIP_WHEN_BUFFERED); re-pull the authoritative state instead of living
 	 * with a permanently stale live map. */

@@ -27,7 +27,7 @@ function isInputKind(kind, connectorId, lastPayload) {
 	return kind === 'audio_in' || kind === 'v4l2_in'
 }
 
-function statusSubtitle(it, live, lastPayload) {
+function statusSubtitle(it, live, _lastPayload) {
 	if (it.kind === 'gpu_out') {
 		if (it.connected) {
 			const parts = []

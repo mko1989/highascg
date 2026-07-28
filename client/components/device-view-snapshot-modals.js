@@ -70,7 +70,7 @@ export async function openSaveDeviceSnapshotModal(opts) {
 	const body = document.createElement('div')
 	body.append(nameInput, filePreview, capNote, hint)
 
-	const { backdrop, close } = modalShell('Save device snapshot', body, actions)
+	const { close } = modalShell('Save device snapshot', body, actions)
 
 	cancel.onclick = close
 	ok.onclick = async () => {

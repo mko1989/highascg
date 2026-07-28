@@ -6,7 +6,7 @@ import { api } from '../lib/api-client.js'
 import { mappingState } from '../lib/mapping-state.js'
 import { createPixelMapCanvasController } from './pixel-map-editor-canvas.js'
 
-export function initPixelMapEditor(root, stateStore) {
+export function initPixelMapEditor(root, _stateStore) {
 	let wrap = null
 	let hostContainer = null
 	let lastCanvasWidth = 0

@@ -77,7 +77,7 @@ function readSysfsEdidEntries() {
 	return out
 }
 
-function guessDrmCardFromSysfs(xrandrName, sysfsEntries, byEdidKey) {
+function guessDrmCardFromSysfs(xrandrName, sysfsEntries, _byEdidKey) {
 	for (const row of sysfsEntries) {
 		if (normalizePortName(row.shortName) === normalizePortName(xrandrName)) return row.drmCard
 	}

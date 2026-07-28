@@ -48,7 +48,6 @@ function loadChannelsEnabled() {
  * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean>, channelsEnabled: Record<string, boolean>, pattern: string, charCount: number }}
  */
 export function getLedTestSettings(stateStore) {
-	const st = typeof stateStore?.getState === 'function' ? stateStore.getState() : {}
 	return {
 		cols: Math.max(1, parseInt(localStorage.getItem(LS.cols) || '20', 10) || 20),
 		rows: Math.max(1, parseInt(localStorage.getItem(LS.rows) || '10', 10) || 10),

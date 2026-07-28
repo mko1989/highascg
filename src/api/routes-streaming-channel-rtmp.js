@@ -201,7 +201,7 @@ async function handlePostRtmp(body, ctx) {
 		let res
 		try {
 			res = await ctx.amcp.raw(`REMOVE ${ch}-${idx} STREAM ${param(url)}`)
-		} catch (e1) {
+		} catch {
 			res = await ctx.amcp.raw(`REMOVE ${ch} STREAM ${param(url)}`)
 		}
 		ctx.streamingChannelRtmp = { active: false, url: null, consumerIndex: idx, lastError: null }

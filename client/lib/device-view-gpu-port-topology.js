@@ -30,7 +30,7 @@ export function detectRtx2030QuadFromLive(live) {
 }
 
 /** @deprecated Use server physicalMap.effectiveTopology. */
-export function reconcileTopologyWithLiveDisplays(topology, live) {
+export function reconcileTopologyWithLiveDisplays(topology, _live) {
 	return Array.isArray(topology) ? topology : []
 }
 

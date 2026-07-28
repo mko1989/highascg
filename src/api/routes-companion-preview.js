@@ -1,6 +1,5 @@
 'use strict'
 
-const fs = require('fs')
 const path = require('path')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')

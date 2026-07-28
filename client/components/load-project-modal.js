@@ -265,7 +265,7 @@ export function showLoadProjectModal(opts = {}) {
 		}
 	}
 
-	function importDeps(entry) {
+	function importDeps(_entry) {
 		return {
 			projectState,
 			sceneState,

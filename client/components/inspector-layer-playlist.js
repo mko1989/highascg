@@ -133,7 +133,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 		let playlistDragFromId = null
 
 		const playlist = layer.playlist || []
-		playlist.forEach((item, idx) => {
+		playlist.forEach((item, _idx) => {
 			const itemRow = document.createElement('div')
 			itemRow.className = 'playlist-item-row'
 			itemRow.draggable = true

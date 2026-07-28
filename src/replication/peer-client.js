@@ -1,7 +1,6 @@
 'use strict'
 
 const http = require('http')
-const os = require('os')
 const { getReplicationConfig } = require('../config/replication-config')
 const { updateClockOffsetFromPing } = require('./sync-clock')
 const { computeBackoffMs } = require('./reconnect-backoff')

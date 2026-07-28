@@ -93,7 +93,7 @@ export function triggerBlobDownload(blob, filename = 'highascg-support.zip') {
  * @param {string} apiBase
  * @param {{ onError?: (err: unknown) => void }} [opts]
  */
-export async function downloadSupportBundleFromApi(apiBase, opts = {}) {
+export async function downloadSupportBundleFromApi(apiBase, _opts = {}) {
 	const { blob, filename } = await fetchSupportBundle(apiBase)
 	triggerBlobDownload(blob, filename)
 }
