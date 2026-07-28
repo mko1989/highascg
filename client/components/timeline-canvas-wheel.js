@@ -84,7 +84,7 @@ export function attachTimelineWheelAndDrop(canvas, api) {
 		const rect = canvas.getBoundingClientRect()
 		const cx = e.clientX - rect.left
 		const cy = e.clientY - rect.top
-		let source = null
+		let source
 		try {
 			source = JSON.parse(e.dataTransfer.getData('application/json'))
 		} catch {

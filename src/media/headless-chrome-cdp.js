@@ -291,12 +291,15 @@ async function openPage(httpPort, opts = {}) {
 		 * @returns {Promise<{x:number,y:number,width:number,height:number}|null>}
 		 */
 		elementClip(selector) {
+			/* eslint-disable no-undef */
+			// runs in the headless Chrome page, not node
 			return page.evaluate((sel) => {
 				const el = document.querySelector(sel)
 				if (!el) return null
 				const r = el.getBoundingClientRect()
 				return { x: r.x, y: r.y, width: r.width, height: r.height }
 			}, selector)
+			/* eslint-enable no-undef */
 		},
 		/**
 		 * @param {boolean} omit
@@ -330,7 +333,10 @@ async function openPage(httpPort, opts = {}) {
 		async waitForSelector(selector, waitOpts = {}) {
 			const deadline = Date.now() + (waitOpts.timeoutMs || DEFAULT_NAV_TIMEOUT_MS)
 			while (Date.now() < deadline) {
+				/* eslint-disable no-undef */
+				// runs in the headless Chrome page, not node
 				const found = await page.evaluate((sel) => !!document.querySelector(sel), selector)
+				/* eslint-enable no-undef */
 				if (found) return
 				await sleep(50)
 			}
@@ -353,17 +359,22 @@ async function openPage(httpPort, opts = {}) {
 		 * @param {string} selector
 		 */
 		async click(selector) {
+			/* eslint-disable no-undef */
+			// runs in the headless Chrome page, not node
 			await page.evaluate((sel) => {
 				const el = document.querySelector(sel)
 				if (!el) throw new Error(`click: no element for ${sel}`)
 				el.click()
 			}, selector)
+			/* eslint-enable no-undef */
 		},
 		/**
 		 * @param {string} selector
 		 * @param {string} text
 		 */
 		async type(selector, text) {
+			/* eslint-disable no-undef */
+			// runs in the headless Chrome page, not node
 			await page.evaluate(
 				(sel, value) => {
 					const el = document.querySelector(sel)
@@ -376,6 +387,7 @@ async function openPage(httpPort, opts = {}) {
 				selector,
 				text,
 			)
+			/* eslint-enable no-undef */
 		},
 		async close() {
 			session.close()

@@ -44,7 +44,7 @@ async function repairLiveInputMetersIfStale(ctx, opts = {}) {
 	const now = Date.now()
 	const snap = ctx.oscState?.getSnapshot?.()
 	const channels = snap?.channels || {}
-	let repaired = []
+	let repaired
 
 	if (isMeterNullConsumerEnabled(ctx?.config)) {
 		for (const slot of slots) {

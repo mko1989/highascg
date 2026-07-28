@@ -20,7 +20,7 @@ function normalizeAmcpCommandLines(cmds) {
  * @param {object} [ctx]
  */
 function applyClearCoalescing(lines, ctx) {
-	let targeted = lines
+	let targeted
 	let targetedChannels = new Set()
 	try {
 		const { targetTeardownLines } = require('../caspar/amcp-teardown-targeting')

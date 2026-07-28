@@ -124,7 +124,7 @@ function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, s
 	let skipped = 0
 	/** @type {string[]} */
 	const errors = []
-	let exSt = null
+	let exSt
 	try {
 		exSt = fs.statSync(exfatAbs)
 	} catch {
@@ -139,7 +139,7 @@ function syncPairBootPreferExfat(exfatAbs, projectAbs, dryRun, pairId, exPred, s
 	for (const rel of walkRelativeFiles(exfatAbs, exPred)) {
 		const a = path.join(exfatAbs, rel)
 		const b = path.join(projectAbs, rel)
-		let stA = null
+		let stA
 		try {
 			stA = fs.statSync(a)
 		} catch {

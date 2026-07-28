@@ -30,7 +30,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 	const results = { screens: {}, multiview: {} }
 	let cumulativeX = 0
 	for (const p of placements) {
-		let data = null
+		let data
 		if (p.kind === 'screen') {
 			data = allGpuAssignments.get(p.n)
 		} else {
@@ -60,7 +60,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 		// xrandr-recognizable token (WxH, optionally `_rate` suffixed) may be used as-is.
 		const looksLikeXrandrModeToken = /^\d+x\d+/i.test(rawOsMode || '')
 
-		let modeForXrandr = ''
+		let modeForXrandr
 		let usedCasparOverStaleOsPixel = false
 		if (osModeSource === 'edid' && rawOsMode && looksLikeXrandrModeToken) {
 			modeForXrandr = rawOsMode
@@ -154,7 +154,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 		const posX = data.manualX !== null ? data.manualX : cumulativeX
 		const posY = data.manualY !== null ? data.manualY : 0
 
-		let effectiveRate = data.osRate
+		let effectiveRate
 		if (forceOsRes) {
 			const customFps = readScreenSetting(config, `screen_${p.n}_custom_fps`)
 			const fpsNum = parseFloat(String(customFps ?? ''))

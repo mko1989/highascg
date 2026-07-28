@@ -189,7 +189,7 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 			if (!isVisible) el.style.display = 'none'
 			el.dataset.sourceValue = id
 
-			let thumbHtml = ''
+			let thumbHtml
 			let thumbKind = kind // Store for later error handler (WO-184)
 			if (kind === 'video' || kind === 'still') {
 				const thumbUrl = getThumbnailUrl(id, 80, 2)

@@ -36,7 +36,7 @@ async function handlePost(path, body, ctx) {
 		return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
 	}
 
-	let payload = {}
+	let payload
 	try {
 		payload = parseBody(body)
 	} catch {

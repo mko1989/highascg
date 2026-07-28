@@ -176,7 +176,7 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 	}
 
 	/** Live resolutions for PGM/PRV contain-fill (ultrawide / custom canvas, e.g. 15360×1728). */
-	let cmForMv = null
+	let cmForMv
 	try {
 		cmForMv = require('../config/channel-map-from-ctx').buildChannelMap(ctx)
 	} catch (_) {

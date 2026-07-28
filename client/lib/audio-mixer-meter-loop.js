@@ -56,7 +56,7 @@ export function createAudioMeterLoop(ctx) {
 			}
 			const oscClient = getAppOsc()
 			for (const [key, fill] of meterFills) {
-				let level = -99
+				let level
 				/** WO-284 — 'no-data' / 'silent' / 'signal', dedicated input strips only. */
 				let inputState = null
 				if (key.includes(':layer:')) {

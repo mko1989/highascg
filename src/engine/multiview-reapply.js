@@ -22,7 +22,7 @@ function collectPersistedMultiviewLayouts(ctx) {
 	const layouts = {}
 	const hasLayout = (v) => v && Array.isArray(v.layout) && v.layout.length > 0
 
-	let all = {}
+	let all
 	try {
 		const persistence = ctx?.persistence || require('../utils/persistence')
 		all = persistence.getAll() || {}

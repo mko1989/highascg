@@ -66,7 +66,7 @@ function buildDecklinkSummary(ctx, decklinkHardware) {
 		)
 	)
 	const strongestHint = Math.max(runtimeRequested, highestConfiguredDeviceSlot)
-	let n = 0
+	let n
 	// Deterministic behavior:
 	// - show real ports when detected by probe/log parser
 	// - otherwise do NOT fabricate DeckLink ports on pure config hints

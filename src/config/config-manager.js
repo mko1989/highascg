@@ -96,7 +96,7 @@ class ConfigManager extends EventEmitter {
 		}
 
 		/** T161.6: version of the config as found on disk (0 = pre-versioning). */
-		let loadedVersion = 0
+		let loadedVersion
 		try {
 			if (fs.existsSync(this.configPath)) {
 				const stats = fs.statSync(this.configPath)

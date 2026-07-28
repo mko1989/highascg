@@ -137,4 +137,36 @@ module.exports = [
 			...ESLINT_10_RECOMMENDED_OVERRIDES,
 		},
 	},
+	{
+		// DOM smoke test files that run browser code via headless Chrome + CDP. These files
+		// execute page.evaluate() callbacks in the browser context, so they need browser globals.
+		files: ['tools/smoke/smoke-logs-modal-toggles.mjs', 'tools/smoke/smoke-settings-nuclear-password-dom.mjs'],
+		languageOptions: {
+			ecmaVersion: 2022,
+			sourceType: 'module',
+			globals: {
+				...globals.node,
+				...globals.browser,
+			},
+		},
+		rules: SERVER_RULES,
+	},
+	{
+		// Mocha test files that use describe/it globals (not imported).
+		files: ['test/**/*.js', 'test/**/*.test.js'],
+		languageOptions: {
+			ecmaVersion: 2022,
+			sourceType: 'commonjs',
+			globals: {
+				...globals.node,
+				describe: 'readonly',
+				it: 'readonly',
+				before: 'readonly',
+				after: 'readonly',
+				beforeEach: 'readonly',
+				afterEach: 'readonly',
+			},
+		},
+		rules: SERVER_RULES,
+	},
 ]

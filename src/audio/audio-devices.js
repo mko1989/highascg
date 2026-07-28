@@ -155,7 +155,7 @@ function listAudioDevices(opts = {}) {
 		return { ...cache.payload, cached: true }
 	}
 
-	let alsa = []
+	let alsa
 	try {
 		const text = execAplay('-l')
 		alsa = parseAplayList(text || '')
@@ -163,7 +163,7 @@ function listAudioDevices(opts = {}) {
 		alsa = []
 	}
 
-	let alsaL = []
+	let alsaL
 	try {
 		const text = execAplay('-L')
 		alsaL = parseAplayLongList(text || '')
@@ -171,7 +171,7 @@ function listAudioDevices(opts = {}) {
 		alsaL = []
 	}
 
-	let pipewire = []
+	let pipewire
 	try {
 		const text = execPwCliListNodes()
 		pipewire = parsePwCliNodes(text || '')

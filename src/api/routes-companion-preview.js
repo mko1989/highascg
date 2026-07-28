@@ -100,7 +100,7 @@ async function handlePost(path, body, ctx) {
 	const client = getSatellitePreviewClient()
 
 	if (path === '/api/companion/page-preview/subscribe') {
-		let payload = {}
+		let payload
 		try {
 			payload = parseBody(body) || {}
 		} catch {
@@ -127,7 +127,7 @@ async function handlePost(path, body, ctx) {
 	}
 
 	if (path === '/api/companion/page-preview/unsubscribe') {
-		let payload = {}
+		let payload
 		try {
 			payload = parseBody(body) || {}
 		} catch {
@@ -142,7 +142,7 @@ async function handlePost(path, body, ctx) {
 	}
 
 	if (path === '/api/companion/button-preview/test-press') {
-		let payload = {}
+		let payload
 		try {
 			payload = parseBody(body) || {}
 		} catch {

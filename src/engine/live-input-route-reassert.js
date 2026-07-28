@@ -64,7 +64,7 @@ function isPgmAudioOnly(config) {
  *   channel: number, layer: number, audioOnly: boolean, policy: string}>}
  */
 function buildLiveInputRouteReassertPlan(config) {
-	let inputChannels = []
+	let inputChannels
 	try {
 		inputChannels = getChannelMap(config || {})?.inputChannels || []
 	} catch {

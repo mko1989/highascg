@@ -7,6 +7,8 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const filePersistence = require('../utils/persistence')
+const { resolveSafe } = require('../media/local-media-paths')
+const { probeMedia } = require('../media/local-media-ffmpeg')
 
 /** @type {string} */
 const VARIABLE_CUSTOM_LABELS_KEY = 'variableCustomLabels'

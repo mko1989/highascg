@@ -27,7 +27,7 @@ async function buildGpuDisplaySnapshot(ctx) {
 	const layout = calculateLayoutPositions(config)
 	const xrandrCheck = checkXrandrLayout(config)
 
-	let physicalMap = null
+	let physicalMap
 	try {
 		physicalMap = buildGpuPhysicalMap({
 			config,
@@ -43,7 +43,7 @@ async function buildGpuDisplaySnapshot(ctx) {
 		? { deprecated: true, note: 'Use physicalMap; GET /api/system/gpu-layout is deprecated', physicalMap }
 		: null
 
-	let bootXrandr = null
+	let bootXrandr
 	try {
 		const { readBootXrandrSnapshot, resolveBootXrandrQueryPath } = require('../utils/boot-xrandr-snapshot')
 		const snap = readBootXrandrSnapshot()
@@ -54,7 +54,7 @@ async function buildGpuDisplaySnapshot(ctx) {
 		bootXrandr = { error: e instanceof Error ? e.message : String(e) }
 	}
 
-	let plannedCustomModes = null
+	let plannedCustomModes
 	try {
 		const { REPO_ROOT } = require('../repo-paths')
 		const fs = require('fs')

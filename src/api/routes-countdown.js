@@ -130,7 +130,7 @@ function handleGet(p, ctx, query = {}) {
 
 	// Load all project scenes
 	// Called via the module object so tests can stub it (destructured binding defeats stubs).
-	let project = null
+	let project
 	try {
 		project = projectScenesLoad.loadFullProject()
 	} catch {

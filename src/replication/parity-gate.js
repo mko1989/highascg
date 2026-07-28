@@ -41,7 +41,7 @@ async function validateReplicationParity(ctx, opts = {}) {
 	const { validateCasparParityForPair } = require('./caspar-parity')
 	const caspar = await validateCasparParityForPair(ctx)
 
-	let channelMap = { ok: true, mismatches: [], peerAvailable: false }
+	let channelMap
 	try {
 		const { buildChannelMapSummary, compareChannelParity } = require('./channel-parity')
 		const local = buildChannelMapSummary(ctx.config)

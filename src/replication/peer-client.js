@@ -57,7 +57,7 @@ function peerHttpRequest(peer, path, opts = {}) {
 					data += c
 				})
 				res.on('end', () => {
-					let json = null
+					let json
 					try {
 						json = data ? JSON.parse(data) : null
 					} catch {

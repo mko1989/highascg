@@ -165,7 +165,7 @@ async function handleProject(path, body, ctx) {
 					: ''
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = reqSlug || projectStore.getActiveSlug(persistence)
-		let project = null
+		let project
 		let recoveredFromAutosave = false
 		if (reqSlug) {
 			const fromFile = loadProjectForSlug(reqSlug, { mergeAutosave: false })

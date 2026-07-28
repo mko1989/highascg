@@ -14,7 +14,7 @@ async function handleGet(path, ctx) {
 
 async function handlePost(path, body, ctx) {
 	if (path !== '/api/system/exfat-sync/run') return null
-	let payload = {}
+	let payload
 	try {
 		payload = typeof body === 'string' ? parseBody(body) : body || {}
 	} catch {

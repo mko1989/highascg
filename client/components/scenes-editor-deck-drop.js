@@ -47,7 +47,7 @@ export function createDeckMediaDropHandler(ctx) {
 
 	return async function onDeckMediaDrop(mainCol, e) {
 		const dt = e.dataTransfer
-		let payloads = []
+		let payloads
 		if (dt?.files?.length) {
 			payloads = (await ingestDeckDroppedFiles(dt.files)) || []
 		} else {

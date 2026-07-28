@@ -84,7 +84,7 @@ export function mountShaderParamsPanel(modal, deps) {
 
 	function rescan() {
 		const { passes, common } = collectSources()
-		let next = []
+		let next
 		try {
 			next = scanAllPassSources(passes, common)
 		} catch (e) {

@@ -33,7 +33,7 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 
 	const dest = cachePngPath(cfg, ch)
 
-	let stat = null
+	let stat
 	try {
 		stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : null
 	} catch {

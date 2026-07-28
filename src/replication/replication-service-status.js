@@ -38,7 +38,7 @@ function buildPeerBox(runtime, peerPing, repl) {
  */
 function buildLocalBox(ctx, runtime, repl) {
 	const { buildChannelMapSummary } = require('./channel-parity')
-	let channelMap = null
+	let channelMap
 	try {
 		channelMap = buildChannelMapSummary(ctx.config)
 	} catch {
@@ -196,7 +196,7 @@ async function buildReplicationStatus(ctx) {
 			}
 		: null
 
-	let companion = null
+	let companion
 	try {
 		const { buildCompanionControlStatus } = require('../api/companion-control-status')
 		companion = buildCompanionControlStatus(ctx)
@@ -204,7 +204,7 @@ async function buildReplicationStatus(ctx) {
 		companion = null
 	}
 
-	let projectHotBackup = null
+	let projectHotBackup
 	try {
 		const { loadFullProject } = require('../engine/project-scenes')
 		const { hotBackupPeerLabel } = require('./project-hot-backup')

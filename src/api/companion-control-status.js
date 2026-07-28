@@ -147,7 +147,7 @@ function buildCompanionControlStatus(ctx) {
 		channelParityOk = true
 	}
 
-	let amcpFanoutActive = false
+	let amcpFanoutActive
 	try {
 		amcpFanoutActive = require('../replication/amcp-fanout').isAmcpFanoutMirrorActive(ctx.config)
 	} catch {

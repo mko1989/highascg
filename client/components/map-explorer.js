@@ -48,7 +48,7 @@ class SearchIndex {
         for (const entry of this.entries) {
             const allMatch = terms.every(t => entry.searchText.includes(t));
             if (allMatch) {
-                let score = 0;
+                let score;
                 const labelLower = entry.node.label.toLowerCase();
                 if (labelLower === q) score = 100;
                 else if (labelLower.startsWith(q)) score = 80;
@@ -362,7 +362,6 @@ class DependencyGraph {
                 let edgeType = 'internal';
                 
                 if (imp.builtin || imp.external) {
-                    edgeType = 'external';
                     // We don't render external for now unless requested
                     continue;
                 }
@@ -565,7 +564,7 @@ class MapExplorer {
             } else if (e.key === ' ' && document.activeElement.classList.contains('map-card')) {
                 e.preventDefault();
                 const id = document.activeElement.getAttribute('data-node-id');
-                let node = null;
+                let node;
                 const searchNode = (n) => {
                     if (n.id === id) return n;
                     if (n.children) {

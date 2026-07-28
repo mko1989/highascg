@@ -124,7 +124,7 @@ export function renderLiveTab(listEl, {
 		}
 		
 		const ch = getLiveThumbnailChannelForSource(s)
-		let thumbHtml = ''
+		let thumbHtml
 		let thumbControls = ''
 		if (ch > 0) {
 			// TTL-window bust (not Date.now()): the panel re-renders on every state tick, and a

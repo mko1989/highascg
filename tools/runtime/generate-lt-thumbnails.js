@@ -36,6 +36,8 @@ async function generateThumbnails() {
             await page.navigate(fileUrl, { timeoutMs: 30000 });
 
             // Evaluate code in the context of the page to load data and play
+            /* eslint-disable no-undef */
+            // runs in the headless Chrome page, not node
             await page.evaluate(() => {
                 window.update({
                     data: { title: "Alex Rivera", subtitle: "Lead Designer" },
@@ -47,6 +49,7 @@ async function generateThumbnails() {
                 });
                 window.play();
             });
+            /* eslint-enable no-undef */
 
             // Wait a short moment for the super-fast animation to finish
             await new Promise(r => setTimeout(r, 200));

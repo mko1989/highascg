@@ -90,7 +90,7 @@ function handleNetworkApplyPost(body, ctx) {
 				(network.static.dns && network.static.dns[0]) || '',
 			]
 
-	let log = ''
+	let log
 	try {
 		log = execFileSync('sudo', ['-n', script, ...args], { encoding: 'utf8', timeout: 30000 })
 	} catch (e) {
@@ -150,7 +150,7 @@ function handleNetworkResetPost(body, ctx) {
 	}
 
 	const args = iface ? [iface] : []
-	let log = ''
+	let log
 	try {
 		log = execFileSync('sudo', ['-n', script, ...args], { encoding: 'utf8', timeout: 45000 })
 	} catch (e) {

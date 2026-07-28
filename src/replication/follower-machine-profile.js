@@ -175,7 +175,7 @@ async function regenerateFollowerCasparFromDeviceView(ctx) {
 	if (!isFollowerRole(ctx)) return { ok: false, skipped: true }
 	const { applyCasparConfigToDiskAndRestart } = require('../api/routes-caspar-config')
 	const res = await applyCasparConfigToDiskAndRestart(ctx)
-	let body = {}
+	let body
 	try {
 		body = JSON.parse(String(res.body || '{}'))
 	} catch {

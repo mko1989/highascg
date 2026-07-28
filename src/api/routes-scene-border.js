@@ -85,7 +85,7 @@ async function handleBorderLines(body, ctx) {
 	const border = _normalizeGlobalBorder(rawBorder)
 
 	const overlay = border ? borderPayloadToOverlay(border) : null
-	let lines = []
+	let lines
 	if (overlay && border.enabled) {
 		writeGlobalBorderLiveFile(channel, overlay)
 		_cancelPendingBorderClear(channel, layer)

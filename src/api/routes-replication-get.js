@@ -21,7 +21,7 @@ async function handleGet(path, ctx, req) {
 		const repl = getReplicationConfig(ctx.config)
 		const rt = getReplicationRuntime(ctx)
 		const casparEp = getCasparEndpointForPeer(ctx.config)
-		let syncthingDeviceId = ''
+		let syncthingDeviceId
 		try {
 			syncthingDeviceId = (await getLocalSyncthingDeviceId()) || ''
 		} catch {
@@ -37,14 +37,14 @@ async function handleGet(path, ctx, req) {
 		} catch {
 			programFramerates = {}
 		}
-		let channelMap = null
+		let channelMap
 		try {
 			const { buildChannelMapSummary } = require('../replication/channel-parity')
 			channelMap = buildChannelMapSummary(ctx.config)
 		} catch {
 			channelMap = null
 		}
-		let projectMedia = null
+		let projectMedia
 		try {
 			const { getProjectMediaPingSummary } = require('../replication/project-media-parity')
 			projectMedia = await getProjectMediaPingSummary(ctx)

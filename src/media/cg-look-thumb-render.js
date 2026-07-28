@@ -126,6 +126,8 @@ async function waitForCgThumbSettle(page, speed) {
 	const pace = Number.isFinite(speed) && speed > 0 ? speed : 1
 	const minAnimMs = Math.min(4500, Math.max(200, Math.round(2400 / pace)))
 	await new Promise((r) => setTimeout(r, minAnimMs))
+	/* eslint-disable no-undef */
+	// runs in the headless Chrome page, not node
 	await page.evaluate(async () => {
 		const deadline = Date.now() + 1500
 		while (Date.now() < deadline) {
@@ -134,6 +136,7 @@ async function waitForCgThumbSettle(page, speed) {
 			await new Promise((r) => setTimeout(r, 40))
 		}
 	})
+	/* eslint-enable no-undef */
 	await new Promise((r) => setTimeout(r, 80))
 }
 
@@ -143,6 +146,8 @@ async function waitForCgThumbSettle(page, speed) {
  * @returns {Promise<'element'|'clip'|'viewport'>}
  */
 async function markCgThumbCaptureTarget(page) {
+	/* eslint-disable no-undef */
+	// runs in the headless Chrome page, not node
 	return page.evaluate(() => {
 		document.querySelectorAll('[data-cg-thumb-target]').forEach((el) => el.removeAttribute('data-cg-thumb-target'))
 		const vw = window.innerWidth
@@ -223,6 +228,7 @@ async function markCgThumbCaptureTarget(page) {
 		document.body.setAttribute('data-cg-thumb-target', 'viewport')
 		return 'viewport'
 	})
+	/* eslint-enable no-undef */
 }
 
 /**
@@ -239,7 +245,10 @@ async function captureCgThumbPng(page) {
 	}
 
 	if (mode === 'clip') {
+		/* eslint-disable no-undef */
+		// runs in the headless Chrome page, not node
 		const clipRaw = await page.evaluate(() => document.body.getAttribute('data-cg-thumb-clip'))
+		/* eslint-enable no-undef */
 		if (clipRaw) {
 			try {
 				const clip = JSON.parse(clipRaw)
@@ -339,6 +348,8 @@ async function renderCgLookThumbPng(req) {
 			: `file://${htmlPath}`
 		await page.navigate(navUrl, { timeoutMs: 30000 })
 
+		/* eslint-disable no-undef */
+		// runs in the headless Chrome page, not node
 		await page.evaluate((payload) => {
 			if (typeof window.update === 'function') {
 				window.update(payload)
@@ -347,6 +358,7 @@ async function renderCgLookThumbPng(req) {
 				window.play()
 			}
 		}, cgPayload)
+		/* eslint-enable no-undef */
 
 		const speedRaw = cgPayload?.style?.speed
 		const speed = Number.isFinite(Number(speedRaw)) && Number(speedRaw) > 0 ? Number(speedRaw) : 1

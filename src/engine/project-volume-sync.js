@@ -143,7 +143,7 @@ function scanProjectsDir(projectsDir, source) {
 		const { slug, baseSlug, isSyncConflict, isCorrupt } = parsed
 		if (!slug || slug === AUTOSAVE_SUBDIR) continue
 		const p = path.join(projectsDir, ent)
-		let sizeBytes = null
+		let sizeBytes
 		try {
 			sizeBytes = fs.statSync(p).size
 		} catch {
@@ -286,7 +286,7 @@ function copyIfSrcNewer(src, dst) {
 	} catch {
 		return false
 	}
-	let stDst = null
+	let stDst
 	try {
 		stDst = fs.statSync(dst)
 	} catch {

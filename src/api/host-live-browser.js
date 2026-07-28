@@ -88,7 +88,7 @@ async function updateBrowserDisplaySource(ctx, payload) {
 		return { ok: false, status: 503, error: 'Failed to save config' }
 	}
 	ctx.config.extraLiveSources = list
-	let playResult = null
+	let playResult
 	try {
 		playResult = await playHostLiveSourceNow(ctx, updated)
 	} catch (e) {
@@ -115,7 +115,7 @@ async function reloadBrowserDisplaySource(ctx, payload) {
 	const hit = findBrowserHostEntry(ctx, payload)
 	if (!hit) return { ok: false, status: 404, error: 'Browser source not found' }
 	const source = hit.source
-	let playResult = null
+	let playResult
 	try {
 		playResult = await playHostLiveSourceNow(ctx, source)
 	} catch (e) {

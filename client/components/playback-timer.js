@@ -378,7 +378,7 @@ export function mountPgmTopLayerPlaybackTimer(container, opts) {
 			paintedIdleKey = null
 			bar.style.display = ''
 		}
-		let infoLayer = null
+		let infoLayer
 		try {
 			const st = typeof getState === 'function' ? getState() : null
 			const chEntry = Array.isArray(st?.channels) ? st.channels.find((c) => c && c.id === resolvedChNum) : null

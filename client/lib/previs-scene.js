@@ -167,7 +167,7 @@ function createPrevisScene(container, THREE, deps, options) {
 	 */
 	function getCameraState() {
 		const pos = camera.position
-		let tx = 0, ty = 0, tz = 0
+		let tx, ty, tz
 		if (controls && controls.target) {
 			tx = controls.target.x
 			ty = controls.target.y

@@ -67,7 +67,7 @@ class TcpClient extends EventEmitter {
 		socket.on('data', (chunk) => {
 			this._receiveBuffer += chunk.toString('utf8')
 			let offset = 0
-			let i = 0
+			let i
 			while ((i = this._receiveBuffer.indexOf('\r\n', offset)) !== -1) {
 				const line = this._receiveBuffer.slice(offset, i)
 				offset = i + 2

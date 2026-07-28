@@ -14,7 +14,7 @@ function computeActiveShowRevision(project) {
 		return { revision: null, savedAt: null, slug: null }
 	}
 	const stripped = stripDeviceLocalFromProject(project)
-	let revision = null
+	let revision
 	try {
 		revision = crypto.createHash('sha256').update(JSON.stringify(stripped)).digest('hex').slice(0, 12)
 	} catch {

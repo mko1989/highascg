@@ -220,7 +220,7 @@ function buildGlobalPortAudioInnerXml(config) {
 	const device = consumer ? String(consumer.deviceName || '').trim() : String(config.screen_1_portaudio_device_name || '').trim()
 	const hostApi = consumer ? String(consumer.hostApi || 'auto').trim() : String(config.caspar_portaudio_host_api ?? 'auto').trim() || 'auto'
 	
-	let ch = 2
+	let ch
 	if (consumer) {
 		ch = parseInt(String(consumer.outputChannels || 2), 10) || 2
 	} else {

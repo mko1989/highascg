@@ -60,7 +60,7 @@ function resolveLiveInputForSource(config, source) {
 	if (!m) return null
 	const ch = parseInt(m[1], 10)
 	const layer = m[2] != null ? parseInt(m[2], 10) : null
-	let inputChannels = []
+	let inputChannels
 	try {
 		const { getChannelMap } = require('../config/routing')
 		inputChannels = getChannelMap(config || {})?.inputChannels || []

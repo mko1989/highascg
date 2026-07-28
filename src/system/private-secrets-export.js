@@ -58,8 +58,8 @@ function buildReplicationPairingManifest(ctx) {
  * @returns {{ connected: boolean, ipv4: string|null, statusLine: string|null }}
  */
 function readTailscaleStatus() {
-	let ipv4 = null
-	let statusLine = null
+	let ipv4
+	let statusLine
 	try {
 		ipv4 = execFileSync('tailscale', ['ip', '-4'], { encoding: 'utf8', timeout: 4000 }).trim() || null
 	} catch {

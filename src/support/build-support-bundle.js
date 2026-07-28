@@ -84,7 +84,7 @@ async function buildSupportBundleFiles(ctx, opts = {}) {
 		projectSummary = { active: false, error: e instanceof Error ? e.message : String(e) }
 	}
 
-	let casparXml = ''
+	let casparXml
 	try {
 		const screenCount = typeof ctx.getChannelCount === 'function' ? ctx.getChannelCount() : 1
 		casparXml = buildConfigXml(mergeAudioRoutingIntoConfig(config), screenCount)
@@ -101,7 +101,7 @@ async function buildSupportBundleFiles(ctx, opts = {}) {
 		hostStats = null
 	}
 
-	let inventory = null
+	let inventory
 	try {
 		inventory = readSystemInventoryFile()
 	} catch {
@@ -111,7 +111,7 @@ async function buildSupportBundleFiles(ctx, opts = {}) {
 	const networkCfg = normalizeNetworkSettings(config.network, config.network)
 	const network = buildNetworkStatus(networkCfg)
 
-	let gpuDisplay = null
+	let gpuDisplay
 	try {
 		gpuDisplay = await buildGpuDisplaySnapshot(ctx)
 	} catch (e) {

@@ -90,7 +90,7 @@ async function applyMultiviewOverlay(ctx, ch, overlayLayer, params) {
 			const ovTypeCell = overlayType(c, programChannels, previewChannels, inputsCh, decklinkInputChannels)
 			const pgmM = c.id?.match(/^pgm(?:_(\d+))?$/)
 			const prvM = c.id?.match(/^prv(?:_(\d+))?$/)
-			let n = 1
+			let n
 			if (pgmM || ovTypeCell === 'pgm') {
 				if (pgmM?.[1] != null) n = parseInt(pgmM[1], 10) + 1
 				else if (c.source && String(c.source).startsWith('route://')) {

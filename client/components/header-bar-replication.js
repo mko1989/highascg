@@ -34,9 +34,9 @@ export function initReplicationBadge(container) {
 		const leaderAvail = !!status.leaderAvailable
 		const peerOk = !!(status.peerLinkReady ?? status.peerReachable)
 
-		let letter = ''
-		let mode = 'hidden'
-		let title = 'Hot backup'
+		let letter
+		let mode
+		let title
 
 		if (enabled && role === 'follower') {
 			letter = 'F'

@@ -127,7 +127,7 @@ function findCrossChannelRouteCycles(scene, destChannel, getSceneForChannel) {
 		const parsed = parseRouteClip(layer?.source?.value)
 		if (!parsed || parsed.channel === dest || seen.has(parsed.channel)) continue
 		seen.add(parsed.channel)
-		let other = null
+		let other
 		try {
 			other = getSceneForChannel(parsed.channel)
 		} catch {

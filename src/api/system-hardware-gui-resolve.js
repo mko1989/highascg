@@ -138,7 +138,7 @@ function resolveDesktopvideoSetup() {
 function resolveBmdUpdater() {
 	const candidates = []
 	for (const pkg of ['desktopvideo-gui', 'desktopvideo']) {
-		let out = ''
+		let out
 		try {
 			out = execFileSync('dpkg', ['-L', pkg], { encoding: 'utf8', timeout: 5000, maxBuffer: 2 * 1024 * 1024 })
 		} catch {

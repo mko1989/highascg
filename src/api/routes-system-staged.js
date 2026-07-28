@@ -25,7 +25,7 @@ function handle(method, p) {
 	const armPath = getArmPath()
 
 	if (method === 'GET') {
-		let armed = false
+		let armed
 		try {
 			armed = fs.existsSync(armPath)
 		} catch {

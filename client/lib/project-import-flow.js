@@ -93,7 +93,7 @@ export async function importProjectWithHardwareReconcile(project, deps) {
 		return 'looks_only'
 	}
 
-	let liveCtx = null
+	let liveCtx
 	try {
 		liveCtx = await fetchLiveHardwareContext()
 	} catch {

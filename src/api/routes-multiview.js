@@ -30,7 +30,7 @@ async function handleMultiviewApply(body, ctx) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Multiviewer ${n} not enabled` }) }
 	}
 
-	let infoXml = null
+	let infoXml
 	try {
 		const info = await fetchMultiviewInfoXml(b, ctx)
 		infoXml = info.infoXml

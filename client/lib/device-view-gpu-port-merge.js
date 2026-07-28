@@ -49,7 +49,7 @@ export function mergeGpuLayoutEntriesWithPrefs(entries, prefs, { defaultHideDisc
 	const merged = entries.map((entry) => {
 		const id = String(entry.connectorId || entry.layoutSlotId || '').trim()
 		const saved = byIdRaw.get(id)
-		let hiddenReason = 'visible (default)'
+		let hiddenReason
 		let hidden
 		if (saved != null) {
 			hidden = !!saved.hidden

@@ -116,7 +116,7 @@ async function updateWebpageHostSource(ctx, payload) {
 		return { ok: false, status: 503, error: 'Failed to save config' }
 	}
 	ctx.config.extraLiveSources = list
-	let playResult = null
+	let playResult
 	try {
 		playResult = await playWebpageHostNow(ctx, updated)
 	} catch (e) {
@@ -145,7 +145,7 @@ async function reloadWebpageHostSource(ctx, payload) {
 	const hit = findWebpageHostEntry(ctx, payload)
 	if (!hit || hit.idx < 0) return { ok: false, status: 404, error: 'Webpage host source not found' }
 	const source = hit.source
-	let playResult = null
+	let playResult
 	try {
 		playResult = await playWebpageHostNow(ctx, source)
 	} catch (e) {

@@ -22,7 +22,7 @@ const {
 } = require('./routes-replication-shared')
 
 async function handlePost(path, body, ctx, req) {
-	let payload = {}
+	let payload
 	try {
 		payload = typeof body === 'string' && body ? parseBody(body) : body && typeof body === 'object' ? body : {}
 	} catch {

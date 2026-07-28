@@ -47,7 +47,7 @@ function formatResolution(w, h) {
  * @returns {{ fill?: object, contentResolution?: { w: number, h: number } } | null}
  */
 function findPublisherLayerFromProject(ctx, channel, layer) {
-	let project = null
+	let project
 	try {
 		project = loadFullProject()
 	} catch {

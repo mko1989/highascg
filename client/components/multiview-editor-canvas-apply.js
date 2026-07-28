@@ -77,7 +77,7 @@ export async function applyMultiviewLayout(getChannelMap, opts = {}) {
 	} catch (e) {
 		const msg = String(e?.message ?? e ?? '')
 		if (msg.includes('HTTP 404')) {
-			let fallback404 = false
+			let fallback404
 			try {
 				await api.post('/api/multiview', {
 					layout,

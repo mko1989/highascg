@@ -52,7 +52,7 @@ export async function applyLedTestPattern(stateStore, enabled, options = {}) {
 		const uniqueChannels = [...new Set([...activeChs, ...gridChs])].filter((n) => Number.isFinite(n) && n > 0)
 
 		const channelScoped = Array.isArray(options.channels) && options.channels.length > 0
-		let targets = []
+		let targets
 		if (channelScoped) {
 			targets = [...new Set(options.channels.map((n) => parseInt(String(n), 10)).filter((n) => Number.isFinite(n) && n > 0))]
 		} else if (enabled) {

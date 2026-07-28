@@ -84,7 +84,7 @@ function mergeDecklinks(primary, clog) {
 }
 
 async function decklinkGet() {
-	let ff = null
+	let ff
 	try {
 		ff = await probeDecklinkHardware({ timeoutMs: 2600 })
 	} catch {

@@ -26,7 +26,7 @@ function resolveOperatorGuiPort(config, dest) {
 		? Number(dest.physicalPort)
 		: null
 	if (explicitPort != null) return explicitPort
-	let resolvedPort = null
+	let resolvedPort
 	try {
 		resolvedPort = resolveOperatorMonitorPort(config).port
 	} catch (_) {

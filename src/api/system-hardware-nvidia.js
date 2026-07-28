@@ -100,7 +100,7 @@ async function gpuNvidiaGet() {
 	}
 
 	/** @type {string|null} */
-	let loadedModuleVersion = null
+	let loadedModuleVersion
 	try {
 		loadedModuleVersion =
 			execFileSync('modinfo', ['-F', 'version', 'nvidia'], { encoding: 'utf8', timeout: 4000 }).trim() || null
@@ -109,7 +109,7 @@ async function gpuNvidiaGet() {
 	}
 
 	/** @type {string|null} */
-	let dpkgDriverLine = null
+	let dpkgDriverLine
 	try {
 		const { stdout } = await execFileAsync(
 			'dpkg-query',

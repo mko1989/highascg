@@ -103,7 +103,10 @@ test('WO-232: vendored Mario page renders with a transparent background', async 
 		const unexpectedErrors = consoleErrors.filter((e) => !/NotAllowedError/.test(e))
 		assert.deepEqual(unexpectedErrors, [], `page threw unexpected errors: ${unexpectedErrors.join(' | ')}`)
 
+		/* eslint-disable no-undef */
+		// runs in the puppeteer browser page, not node
 		const hasCanvas = await page.evaluate(() => !!document.querySelector('canvas'))
+		/* eslint-enable no-undef */
 		assert.ok(hasCanvas, 'game should have created a <canvas>')
 
 		// Screenshot the whole page with omitBackground so any opaque body/html/canvas fill would
