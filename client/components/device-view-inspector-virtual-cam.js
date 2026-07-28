@@ -24,6 +24,7 @@ function savedVirtualCamera(currentSettings, conn) {
 		width: caspar.width ?? 1920,
 		height: caspar.height ?? 1080,
 		audioEnabled: caspar.audioEnabled !== false,
+		shaderCamera: caspar.shaderCamera === true,
 		alsaLoopbackCardId: caspar.alsaLoopbackCardId || 'HighAsCG_VCam',
 	}
 }
@@ -96,6 +97,16 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 	const audioLbl = Object.assign(document.createElement('label'), { className: 'device-view__note' })
 	audioLbl.append(audioCb, document.createTextNode(' Include audio (ALSA loopback virtual mic)'))
 
+	/* WO-376 (owner): "maybe a tick in the virtual camera output inspector to send to shaders as
+	 * camera". Opt-in — a shader's `camera` channel stays black until this is on, so nothing
+	 * silently opens a capture device. What the shader sees is whatever is CABLED to this output
+	 * in Device View (WO-377), not necessarily PGM. */
+	const shaderCamCb = Object.assign(document.createElement('input'), { type: 'checkbox' })
+	shaderCamCb.checked = saved.shaderCamera === true
+	const shaderCamLbl = Object.assign(document.createElement('label'), { className: 'device-view__note' })
+	shaderCamLbl.title = "Shader FX channels set to 'camera' sample this output live"
+	shaderCamLbl.append(shaderCamCb, document.createTextNode(' Send to shaders as camera'))
+
 	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save settings' })
 	const startBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Start virtual cam' })
 	const stopBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Stop virtual cam' })
@@ -139,6 +150,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 			width,
 			height,
 			audioEnabled: !!audioCb.checked,
+			shaderCamera: !!shaderCamCb.checked,
 			showInDeviceView: true,
 		}
 	}
@@ -198,6 +210,7 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 		fpsIn,
 		resIn,
 		audioLbl,
+		shaderCamLbl,
 		saveBtn,
 		startBtn,
 		stopBtn,

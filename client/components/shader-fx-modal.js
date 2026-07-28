@@ -20,7 +20,7 @@ const PASSES = [
 	{ key: 'bufferC', label: 'Buffer C' },
 	{ key: 'bufferD', label: 'Buffer D' },
 ]
-const CHANNEL_OPTIONS = ['', 'A', 'B', 'C', 'D', 'audio']
+const CHANNEL_OPTIONS = ['', 'A', 'B', 'C', 'D', 'audio', 'camera'] // WO-376: camera = the virtual cam
 
 function channelSelects(passKey, channels) {
 	return [0, 1, 2, 3]

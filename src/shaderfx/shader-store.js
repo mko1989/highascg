@@ -10,7 +10,7 @@
  *   { id: 'sh-<slug>', name, common,
  *     passes: { image: { source, channels: [ch,ch,ch,ch] }, bufferA..bufferD: same | null },
  *     audio: { enabled }, opts: { alpha } }
- * where each channels[i] maps iChannel<i> to 'A'|'B'|'C'|'D'|'audio'|null.
+ * where each channels[i] maps iChannel<i> to 'A'|'B'|'C'|'D'|'audio'|'camera'|null.
  */
 
 'use strict'
@@ -26,7 +26,9 @@ const SHADERS_DATA_DIR = path.join(REPO_ROOT, 'data', 'shaders')
 const SHADERS_TEMPLATE_DIR = path.join(REPO_ROOT, 'template', 'shaders')
 
 const PASS_KEYS = ['image', 'bufferA', 'bufferB', 'bufferC', 'bufferD']
-const CHANNEL_VALUES = ['A', 'B', 'C', 'D', 'audio']
+/* WO-376: `camera` joins `audio` as a runtime-fed channel — the virtual camera, offered to
+ * shaders only when its inspector tick is on. */
+const CHANNEL_VALUES = ['A', 'B', 'C', 'D', 'audio', 'camera']
 const MAX_SOURCE_LEN = 256 * 1024
 
 /** @param {string} name */

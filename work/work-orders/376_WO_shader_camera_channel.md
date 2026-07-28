@@ -1,6 +1,6 @@
 # WO-376 — route the virtual camera into shader channels (Shadertoy's webcam input)
 
-**Status: OPEN — investigated 28.07.26 (feasibility established on this box, no blocker found). Not implemented: this is a feature with a routing decision the owner should make, and it cannot be proven without watching real video land in a shader.**
+**Status: IMPLEMENTED 28.07.26 — owner chose option A with an explicit opt-in. Server + client + runtime done and fail-soft proven headless; the LIVE camera image is not yet verified (needs the restart, the tick on, and a browser that can open the device) — §7.**
 
 Source: `work/work-orders/todos28.07.26`, owner line added 28.07:
 
@@ -87,6 +87,17 @@ as a device *option* without changing the stored vocabulary. Then decide the fee
 explicitly — a warning in the modal when the shader's own look plays on the bridged channel is
 probably enough.
 
+### DECIDED 28.07.26 — owner
+
+> i need to be able to choose camera from a drop down in shader channels the same way audio is now
+> implemented. maybe a tick in the virtual camera output inspector to send to shaders as camera
+
+Option **A**, plus an explicit opt-in the WO had not proposed: the virtual camera decides whether
+shaders may see it at all. The feedback question answered itself — after
+[WO-377](./377_WO_host_channel_cable_ignored_by_output_mapping.md) the bridge shows *whatever is
+cabled to it in Device View* (currently DeckLink input 4, not PGM), so the operator steers it with
+a cable and no hard guard was added.
+
 ## 3. Implementation plan (once the decision is made)
 
 1. Add `'camera'` to the three vocabularies in §1b.
@@ -111,7 +122,65 @@ probably enough.
   — including in the look-deck thumbnail renderer.
 - The self-route/feedback case is either blocked or deliberately allowed, and says which.
 
-## 5. What was VERIFIED (investigation only)
+## 6. What was BUILT
+
+| piece | file |
+|---|---|
+| `camera` accepted + persisted | `src/shaderfx/shader-store.js` — added to `CHANNEL_VALUES` |
+| offered in the dropdown, next to `audio` | `client/components/shader-fx-modal.js` — `CHANNEL_OPTIONS` |
+| the owner's tick | `src/virtual-output/v4l2-bridge-config.js` (`shaderCamera`, default **false**) + `client/components/device-view-inspector-virtual-cam.js` ("Send to shaders as camera") |
+| the live texture | `template/shaders/player-camera.js` (new), lazily loaded by `player.js` |
+
+**Two gates before any device opens**, both required:
+1. a pass actually binds `camera` — otherwise the companion script is never even fetched;
+2. `virtualCamera.shaderCamera` is ON — read live from `/api/virtual-camera`.
+
+Read strictly (`=== true`): an opt-in that opens a capture device should not be satisfied by a
+truthy string.
+
+**Fail-soft everywhere** (WO-268's rule that nothing may break the Caspar template contract): the
+companion registers a **black 1×1** texture immediately so the pass compiles and samples something
+from frame 1, then fills it only if the device arrives. No device, denied permission, headless
+thumbnail (WO-344's `?shaderThumb=1`), or a missing companion file → the camera contribution is
+black and the shader still renders.
+
+`iChannelResolution` is kept truthful: the texture is re-registered with the real video dimensions
+on the first frame, so shaders that correct aspect from `iChannelResolution[i].xy` are not fed a
+1×1 lie.
+
+**Why a separate file:** `player.js` hit the repo's 500-line limit. The companion is loaded
+lazily *and relatively*, which has a second benefit — already-exported `sh-*.html` reference only
+`player.js`, and they pick this up with no re-export; if the file is somehow absent, the channel
+just stays black.
+
+## 7. What was VERIFIED
+
+- **The value survives the round trip:** `normalizeShaderConfig` keeps `['camera', …]` (the running
+  server still strips it — that is the pending restart, not the code), and the exported template
+  embeds `"channels":["camera"…]`.
+- **Rendered headless with the tick OFF**, which is the case that must not break: a shader doing
+  `texture(iChannel0, uv)` plus a blue tint on the right half measured
+  **left `[0,0,0]` / right `[0,64,128]`** — i.e. the pass compiled, the camera channel bound, the
+  camera contribution was black, and everything else drew exactly right. The Caspar contract
+  (`play`/`stop`/`update`) was intact on the page. Re-run after the file split with identical
+  numbers.
+- **`camera` and `audio` coexist**: WO-375's auto-bind takes the first FREE channel and does not
+  evict a camera on iChannel0.
+- **The tick normalises correctly** (off by default, strict true) and the inspector saves it.
+- New smoke `tools/smoke/smoke-wo376-shader-camera-channel.test.js` (7 tests, curated list),
+  including that the companion never references `player.js` scope — it carried a stale
+  `usesCameraChannel()` reading `config` during the split, which would have been a ReferenceError
+  the moment a camera shader loaded.
+- **Full suite: 1659 tests, 1657 pass / 0 fail / 2 skip.** Lint 0, 500-line gate 0, unwired-export
+  gate clean, `npm run build:client` OK. A test shader created for the render probe was deleted
+  again — the shader store is exactly as it was.
+
+**NOT verified:** an actual camera image inside a shader. That needs the highascg restart (so the
+API stops stripping `camera`), the tick ON, and a browser that can open the device. On the Caspar
+CEF path video permission is still unproven (§1d) — the browser_display route is the supported one
+until someone checks.
+
+## 8. What was VERIFIED (original investigation)
 
 - `/dev/video10` exists and is the v4l2loopback "Virtual cam"; `GET /api/virtual-camera` reports
   it enabled, bridging channel 1 at 1920×1080@50.

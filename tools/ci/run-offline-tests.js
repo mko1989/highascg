@@ -206,6 +206,7 @@ const FILES = [
 	'tools/smoke/smoke-wo377-host-channel-virtual-camera.test.js',
 	'tools/smoke/smoke-wo378-channel-source-vocabulary.test.js',
 	'tools/smoke/smoke-wo379-shader-store-and-stack-clear.test.js',
+	'tools/smoke/smoke-wo376-shader-camera-channel.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

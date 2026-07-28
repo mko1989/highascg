@@ -297,6 +297,35 @@
 		uploadAudioTexture()
 	}
 
+	/* WO-376 — the `camera` channel (the virtual camera as a live texture) lives in the lazily
+	 * loaded companion `player-camera.js`: it is only needed when a pass binds `camera`, and
+	 * player.js is at the repo's 500-line limit. If the file is missing (an old export served from
+	 * elsewhere) the channel simply stays black — the same fail-soft contract as a denied device. */
+	let cameraFeed = null
+
+	function usesCameraChannel() {
+		const passes = config.passes || {}
+		return Object.keys(passes).some((k) => passes[k] && (passes[k].channels || []).includes('camera'))
+	}
+
+	function loadCameraCompanion() {
+		return new Promise((resolve) => {
+			if (window.__SHADERFX_CAMERA__) return resolve(window.__SHADERFX_CAMERA__)
+			const el = document.createElement('script')
+			// Relative to the template, i.e. next to player.js — works from file:// and http://.
+			el.src = 'player-camera.js'
+			el.onload = () => resolve(window.__SHADERFX_CAMERA__ || null)
+			el.onerror = () => resolve(null)
+			document.head.appendChild(el)
+		})
+	}
+
+	async function initCameraChannel() {
+		const mod = await loadCameraCompanion()
+		if (!mod) return
+		cameraFeed = mod.create({ gl, toy, apiBase, query, thumbMode: THUMB_MODE })
+	}
+
 	// --- wire passes -------------------------------------------------------------------------
 
 	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
@@ -379,6 +408,11 @@
 			// WO-344: no capture device in headless Chrome — asking only delays first paint.
 			if (!THUMB_MODE) void initTierA()
 		}
+		if (usesCameraChannel()) {
+			// The companion registers a black 1×1 immediately so the pass compiles and samples
+			// something from frame 1, then fills it if the device opens.
+			await initCameraChannel()
+		}
 		if (config.common) toy.setCommon(config.common)
 		const p = config.passes || {}
 		if (p.bufferA) toy.setBufferA(passConfig(p.bufferA))
@@ -386,7 +420,10 @@
 		if (p.bufferC) toy.setBufferC(passConfig(p.bufferC))
 		if (p.bufferD) toy.setBufferD(passConfig(p.bufferD))
 		if (p.image) toy.setImage(passConfig(p.image, 'image'))
-		toy.setOnDraw(updateAudio)
+		toy.setOnDraw(() => {
+			updateAudio()
+			if (cameraFeed) cameraFeed.update()
+		})
 		toy.play()
 	}
 

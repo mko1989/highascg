@@ -25,6 +25,10 @@ const VIRTUAL_CAMERA_DEFAULTS = Object.freeze({
 	resolutionScale: 'full',
 	jpegQuality: 10,
 	audioEnabled: true,
+	/* WO-376 (owner): "maybe a tick in the virtual camera output inspector to send to shaders as
+	 * camera". Opt-in: shader templates only bind their `camera` channel when this is on, so a
+	 * shader never silently opens a capture device the operator did not offer it. */
+	shaderCamera: false,
 	alsaLoopbackCardId: 'HighAsCG_VCam',
 	alsaLoopbackIndex: 20,
 	alsaLoopbackPcm: 2,
@@ -51,6 +55,7 @@ function normalizeVirtualCameraConfig(raw) {
 	vc.resolutionScale = normalizeResolutionScale(vc.resolutionScale)
 	vc.jpegQuality = clampJpegQuality(vc.jpegQuality, 10)
 	vc.audioEnabled = vc.audioEnabled !== false
+	vc.shaderCamera = vc.shaderCamera === true
 	vc.alsaLoopbackCardId = String(vc.alsaLoopbackCardId || VIRTUAL_CAMERA_DEFAULTS.alsaLoopbackCardId).trim() || VIRTUAL_CAMERA_DEFAULTS.alsaLoopbackCardId
 	vc.alsaLoopbackIndex = Math.max(0, parseInt(String(vc.alsaLoopbackIndex ?? 20), 10) || 20)
 	vc.alsaLoopbackPcm = Math.max(2, parseInt(String(vc.alsaLoopbackPcm ?? 2), 10) || 2)
@@ -80,6 +85,7 @@ function patchVirtualCameraConfig(config, patch) {
 	if (p.resolutionScale != null) next.resolutionScale = String(p.resolutionScale)
 	if (p.jpegQuality != null) next.jpegQuality = parseInt(String(p.jpegQuality), 10)
 	if (p.audioEnabled != null) next.audioEnabled = !!p.audioEnabled
+	if (p.shaderCamera != null) next.shaderCamera = !!p.shaderCamera
 	if (p.alsaLoopbackCardId != null) next.alsaLoopbackCardId = String(p.alsaLoopbackCardId).trim()
 	if (p.alsaLoopbackIndex != null) next.alsaLoopbackIndex = parseInt(String(p.alsaLoopbackIndex), 10)
 	if (p.alsaLoopbackPcm != null) next.alsaLoopbackPcm = parseInt(String(p.alsaLoopbackPcm), 10)
