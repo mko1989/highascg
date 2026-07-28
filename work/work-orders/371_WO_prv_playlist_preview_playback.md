@@ -1,6 +1,16 @@
 # WO-371 — "In PRV the playlist stops after the first item": the owner ticked the design and then reported it as a bug
 
-**Status: OPEN — BLOCKED ON AN OWNER DECISION. Written 28.07.26; the conflict is between two of the owner's own sign-offs, so no implementation is correct until it is resolved.**
+**Status: DECIDED 28.07.26 — OPTION B. Unblocked, not yet implemented.**
+
+Owner's answer, written into `work/DECISIONS_PENDING_2026-07-28.md` beside the question
+("Today: you can't. Preview shows item 1 frozen."):
+
+> yes and it should continue playing as expected so each item and looping.
+
+So preview PLAYS: every item, and it loops. That is **option B** below, with the loop behaviour
+called out explicitly — the preview timer must honour `playlistLoop`, not stop at the last item.
+WO-355's "stop on take-out" (checklist item 27's second half) still has to hold, and item 27's
+first half ("shows one item and sits still") is now WRONG and must be reworded, not preserved.
 
 ## 1. The conflict
 
