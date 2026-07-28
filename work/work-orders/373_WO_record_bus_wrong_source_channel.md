@@ -1,6 +1,6 @@
 # WO-373 — "I connected PGM2 to the rec output and PGM1 got recorded": same-layer record edges tie-break on edge order, not on the cable you just dropped
 
-**Status: OPEN — strong code evidence for a specific mechanism, but the owner's 21.07 cable state is gone, so the repro is owed. Not fixed.**
+**Status: DONE (28.07.26 — the §1c model question is settled from code, the mechanism is fixed at both ends, and the reported symptom is reproduced and closed in an offline test. Owner repro no longer blocking; SERVER change, needs a highascg restart.)**
 
 Source: `work/work-orders/todos21.07.26` line 3 — one of the seven items [WO-366](./366_WO_todos21_untriaged_backlog.md)
 found had never been triaged:
@@ -105,10 +105,68 @@ writing the fix; it decides between "fix the tie-break" and "fix the drop handle
 - A smoke covering two same-layer edges on one record sink, asserting the documented winner (not
   whatever `sort` happens to produce), added to the curated FILES list.
 
-## 5. What was VERIFIED
+## 5. RESOLUTION (28.07.26)
 
-- The tie-break code, the `layer` semantics, and the record route's source resolution were read at
-  `dc8b2c4`; line references above are exact.
-- Confirmed the current box has no two-edge record state, so this cannot be reproduced here without
-  deliberately creating it — hence the owner repro in §3 rather than a claimed fix.
-- Nothing changed; no cabling touched on the live box.
+### 5a. §1c answered — the model is SINGLE-cable, and there was a hole
+
+The WO could not decide from the code whether a record sink may hold more than one cable. It can
+not: `addEdgeToGraph` rejects a second edge to any Caspar output — `record_out` is in
+`isCasparOutputConnector` — with `sink_already_connected`
+([device-graph-edges.js](../../src/config/device-graph-edges.js)). Proven in the new smoke.
+
+So the tie-break resolves a state the API forbids… which is nonetheless reachable, because
+**`validateDeviceGraph` does not enforce single-input** (it checks referential integrity,
+self-loops and exact duplicates only) and **whole-graph writes skip `addEdgeToGraph` entirely**.
+The matrix view did exactly that: a crosspoint click deep-copied the graph, `push`ed a new edge and
+wrote the lot through `saveSettingsPatch({ deviceGraph })`
+([device-view-matrix.js](../../client/components/device-view-matrix.js)). Cabling PGM2 onto an
+already-cabled record output **in matrix view** produced two layer-1 edges — precisely the state
+§1b describes. Standard view would have refused it. That is the missing half of the diagnosis, and
+it means the answer to §1c's "fix the tie-break or fix the drop handler" is **both**.
+
+### 5b. What was changed
+
+1. **`pickOutputEdgeWinner()`** in `src/config/device-graph-output-mapping.js` replaces the three
+   copies of `sort((a, b) => a.layer - b.layer)[0]` (streams, records, **and** virtual camera —
+   the WO only spotted two). Rule, now documented in the code: layer 1 (PGM) beats layer 2 (PRV);
+   among **same-layer** edges the **last in graph order wins** — the most recently cabled, which is
+   what the operator means — and it emits a warning naming every candidate and the winner, because
+   an output fed by two cables is a data error, not a preference.
+2. **The matrix stops creating the state.** A crosspoint click on a single-input sink now removes
+   the existing edge on that sink before adding its own (router semantics — one crosspoint per
+   output column). `isSingleInputSinkId()` in `client/lib/device-view-matrix-ports.js` mirrors the
+   server's connector-kind list; pixel-map inputs are deliberately excluded, they take several feeds.
+3. **The resolved bus is visible before recording** (plan step 3): record and stream ports carry
+   `resolvedSource` — the persisted value the server resolves at start time — into the rear-panel
+   marker tooltip: `Rec1 — Record · id record_1 · source program_2`.
+4. Streams got the same treatment (plan step 4) via the shared helper.
+
+### 5c. What was VERIFIED
+
+- **The reported symptom, reproduced and closed.** On the identical two-edge list:
+  old rule → `program_1` (the bug: "pgm1 got recorded"), new rule → `program_2`. End-to-end,
+  `applyStreamRecordMappingsFromGraph` on a config with PGM1 cabled first and PGM2 second now
+  writes `recordOutputs[0].source = 'program_2'`; it wrote `program_1` before.
+- **The conflict is announced**: one warning naming `record_1`, both candidates and the winner.
+  No warning when the layers legitimately differ.
+- **PGM still beats PRV** in both edge orders, and a PRV-only cable still resolves to `preview_1`.
+- **The server API refuses the illegal state** (`sink_already_connected`), asserted rather than
+  assumed.
+- **`isSingleInputSinkId` matches the server's kind list**, and does not claim pixel-map inputs.
+- New smoke `tools/smoke/smoke-wo373-record-source-tiebreak.test.js` (11 tests) in the curated
+  FILES list. **Full suite: 1610 tests, 1608 pass / 0 fail / 2 skip.** Lint 0, prettier clean,
+  unwired-export gate clean, 500-line gate clean. `npm run build:client` OK, kiosk reloaded.
+- Read at `dc8b2c4`/`e81dbdf`; no cabling touched on the live box, no graph rewritten.
+
+### 5d. What is still owed
+
+- **The server half needs a highascg restart** (`kill -TERM $(systemctl show -p MainPID --value highascg)`);
+  the client half is built and reloaded already.
+- The §3 repro is no longer needed to *confirm* the diagnosis, but it is still the honest way to
+  close the loop on hardware: cable a second destination onto a cabled record output **in matrix
+  view**, check `recordOutputs[].source` follows it, and read
+  `Record start requested on ch<N> (source=…)`.
+- Not done: a config-import/hand-edit path can still persist two edges on one sink. The mapping now
+  survives it loudly instead of silently, which was the WO's requirement, but enforcing single-input
+  inside `validateDeviceGraph` would close it at the source. Left out deliberately — it would make
+  every existing graph with that shape fail to load, which is a migration decision, not a bug fix.

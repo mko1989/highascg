@@ -77,6 +77,20 @@ export function renderCasparBand(ctx) {
 	const slots = []
 	const resolveStatusClass = createCasparRearMarkerStatusResolver({ live, lastPayload })
 
+	/* WO-373: what this output will ACTUALLY record/stream — the persisted value the server
+	 * resolves at start time (`recordOutputs[].source` / `streamingChannel.videoSource`, see
+	 * resolveRecordSourceChannel). Surfaced on the port so a mis-sourced output is visible BEFORE
+	 * pressing record, not after the show. */
+	const resolvedOutputSource = (kind, connectorId) => {
+		const settings = ctx.currentSettings || lastPayload?.settings
+		if (kind === 'record_out') {
+			const list = Array.isArray(settings?.recordOutputs) ? settings.recordOutputs : []
+			return String(list.find((r) => String(r?.id || '') === String(connectorId))?.source || '')
+		}
+		if (kind === 'stream_out') return String(settings?.streamingChannel?.videoSource || '')
+		return ''
+	}
+
 	const connectedDisplays = live?.gpu?.displays || []
 
 	const graphGpuOuts = graphConnectors.filter((c) => c?.kind === 'gpu_out' || c?.kind === 'gpu_output')
@@ -142,7 +156,13 @@ export function renderCasparBand(ctx) {
 	}
 	slots.push({
 		title: 'Stream',
-		items: streamOut.map((c) => ({ id: c.id, icon: '/assets/ethernet-port-icon.svg', label: c.label || c.id, kind: 'stream_out' })),
+		items: streamOut.map((c) => ({
+			id: c.id,
+			icon: '/assets/ethernet-port-icon.svg',
+			label: c.label || c.id,
+			kind: 'stream_out',
+			resolvedSource: resolvedOutputSource('stream_out', c.id),
+		})),
 	})
 	slots.push({
 		title: 'Virtual cam',
@@ -155,7 +175,13 @@ export function renderCasparBand(ctx) {
 	})
 	slots.push({
 		title: 'Record',
-		items: recordOut.map((c) => ({ id: c.id, icon: '/assets/record-port-icon.svg', label: c.label || c.id, kind: 'record_out' })),
+		items: recordOut.map((c) => ({
+			id: c.id,
+			icon: '/assets/record-port-icon.svg',
+			label: c.label || c.id,
+			kind: 'record_out',
+			resolvedSource: resolvedOutputSource('record_out', c.id),
+		})),
 	})
 	const audioOutputsList = Array.isArray(ctx.lastPayload?.audioOutputs || ctx.currentSettings?.audioOutputs) ? (ctx.lastPayload?.audioOutputs || ctx.currentSettings?.audioOutputs) : []
 	const audioItems = audioOutputsList.map((ao) => {

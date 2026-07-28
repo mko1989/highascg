@@ -68,6 +68,8 @@ export function buildCasparRearMarkerLayoutItems(slots, casparConnectors) {
 					topologySlot: it.topologySlot,
 					pairs: it.pairs,
 					hidden: it.hidden,
+					resolvedSource: it.resolvedSource, // WO-373: bus this output will capture
+
 					container: isDisconnectedGpu ? slot.disconnectedContainer : slot.container,
 				})
 			})
@@ -142,9 +144,11 @@ export function appendCasparRearPanelMarkers({
 			? ` · ${it.connected ? 'connected' : 'disconnected'}${it.monitor ? ` · ${it.monitor}` : ''}${it.edidSerial ? ` · serial ${it.edidSerial}` : ''}${it.edidPreferredMode ? ` · native ${it.edidPreferredMode}` : ''}${it.resolution ? ` · ${it.resolution}` : ''}${Number.isFinite(it.refreshHz) ? ` @ ${it.refreshHz}Hz` : ''}`
 			: ''
 		const unmappedGpu = it.kind === 'gpu_out' && it.isVirtual
+		// WO-373: a record/stream output states the bus it will actually capture.
+		const sourcePart = it.resolvedSource ? ` · source ${it.resolvedSource}` : ''
 		marker.title = unmappedGpu
 			? `${it.label} (Physical port — not in Device View graph)${monitorPart}`
-			: `${it.label} — ${casparRearKindTitle(kind)} · id ${it.connectorId}${monitorPart}`
+			: `${it.label} — ${casparRearKindTitle(kind)} · id ${it.connectorId}${monitorPart}${sourcePart}`
 
 		if ((it.kind === 'decklink_out' || it.kind === 'decklink_io') && live?.decklink?.outputs) {
 			const dlOut = live.decklink.outputs.find((o) => String(o?.connectorId || '') === String(it.connectorId || ''))

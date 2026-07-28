@@ -1,6 +1,6 @@
 import * as Actions from './device-view-actions.js'
 import { edgeOutputLayer } from '../lib/device-view-output-layer.js'
-import { extractMatrixPorts } from '../lib/device-view-matrix-ports.js'
+import { extractMatrixPorts, isSingleInputSinkId } from '../lib/device-view-matrix-ports.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { getAppStateStore } from '../lib/app-runtime.js'
 import { showLiveInputModal } from './live-input-modal.js'
@@ -163,6 +163,14 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 						e => !(e.sourceId === src.id && e.sinkId === sink.id && (!src.half || edgeOutputLayer(e) === rowLayer)),
 					)
 				} else {
+					/* WO-373: a Caspar output takes ONE feed — the server's addEdgeToGraph rejects a
+					 * second edge to such a sink, but the matrix writes the WHOLE graph through
+					 * settings and skipped that rule. That is how "i connected pgm2 to rec output and
+					 * pgm1 got recorded" happens: the old edge stayed, and the mapping's same-layer
+					 * tie-break kept the older one. A crosspoint click now REPLACES, like a router. */
+					if (isSingleInputSinkId(payload, sink.id)) {
+						newGraph.edges = newGraph.edges.filter((e) => String(e?.sinkId || '') !== String(sink.id))
+					}
 					// Connect (add edge; a PRV row notes outputLayer 2 — WO-364)
 					const id = `edge_${Date.now()}_${Math.floor(Math.random() * 1000)}`
 					const edge = { id, sourceId: src.id, sinkId: sink.id }

@@ -8,6 +8,20 @@
 import { connectorById } from '../components/device-view-helpers.js'
 import { listAllScreenDestinationsForDeviceView, listHostChannelDestinations } from './device-view-host-channels.js'
 
+/**
+ * Caspar output connectors take exactly ONE destination feed. Mirror of `isCasparOutputConnector`
+ * in src/config/device-graph-edges.js, whose `addEdgeToGraph` rejects a second edge to such a sink
+ * with `sink_already_connected` — a rule the matrix used to skip entirely, because it writes the
+ * whole graph through settings instead of going through addEdge (WO-373).
+ * @param {object} payload @param {string} sinkId
+ */
+export function isSingleInputSinkId(payload, sinkId) {
+	const kind = String(connectorById(payload, String(sinkId || ''))?.kind || '')
+	return ['gpu_out', 'decklink_out', 'decklink_io', 'caspar_mv_out', 'stream_out', 'record_out', 'audio_out', 'v4l2_out'].includes(
+		kind,
+	)
+}
+
 export function extractMatrixPorts(payload) {
 	const sources = []
 	const sinks = []

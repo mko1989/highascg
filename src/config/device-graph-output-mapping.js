@@ -78,6 +78,53 @@ function collectDestinationOutputEdges(config) {
 }
 
 /**
+ * WO-373 — which cable feeds an output when several land on the same sink.
+ *
+ * Owner, todos21.07.26: *"i connected pgm2 to rec output and pgm1 got recorded."* The old rule was
+ * `list.sort((a, b) => a.layer - b.layer)[0]` — layer 1 (PGM) before layer 2 (PRV), which is right,
+ * but two edges at the SAME layer compare equal and V8's sort is stable, so the winner was
+ * whichever edge sat earliest in the graph: the cable cabled FIRST won, permanently. Cabling a
+ * second destination to the same record output changed the UI and nothing else.
+ *
+ * A caspar output takes exactly one feed — `addEdgeToGraph` rejects a second edge to any
+ * `record_out`/`stream_out`/`gpu_out`… with `sink_already_connected`
+ * (src/config/device-graph-edges.js). Two same-layer edges on one sink is therefore a DATA ERROR,
+ * reachable only through a whole-graph write that skips that rule (matrix view did exactly this
+ * until WO-373; also config import and hand edits). So: pick deterministically by what the
+ * operator means — the most recently cabled edge, i.e. the LAST in graph order — and say so in the
+ * log rather than resolving it silently.
+ *
+ * @param {Array<object>} list edges landing on one sink (from collectDestinationOutputEdges)
+ * @param {string} sinkId for the warning
+ * @param {(msg: string) => void} [warn]
+ * @returns {object | null}
+ */
+function pickOutputEdgeWinner(list, sinkId, warn) {
+	const arr = (Array.isArray(list) ? list : []).filter(Boolean)
+	if (arr.length <= 1) return arr[0] || null
+
+	const layerOf = (e) => Math.max(1, Number(e?.layer) || 1)
+	const minLayer = Math.min(...arr.map(layerOf))
+	const sameLayer = arr.filter((e) => layerOf(e) === minLayer)
+	const winner = sameLayer[sameLayer.length - 1]
+
+	if (sameLayer.length > 1) {
+		const say =
+			typeof warn === 'function'
+				? warn
+				: (m) => {
+						if (typeof console !== 'undefined') console.warn(m)
+					}
+		say(
+			`[device-graph] ${sameLayer.length} cables feed ${sinkId || 'one output'} at the same layer ` +
+				`(${sameLayer.map((e) => `${e.destinationId}→${e.videoSource}`).join(', ')}). An output takes ONE feed — ` +
+				`using the most recently cabled (${winner.destinationId}→${winner.videoSource}). Remove the stale cable(s) in Device View.`
+		)
+	}
+	return winner
+}
+
+/**
  * Sync `streamingChannel.videoSource` and `recordOutputs[].source` from graph cabling.
  * Graph edges win over stale `program_1` defaults in persisted JSON.
  * @param {object} config - mutated in place
@@ -104,8 +151,8 @@ function applyStreamRecordMappingsFromGraph(config) {
 
 	let changed = false
 
-	for (const [, list] of groupedStreams.entries()) {
-		const winner = list.slice().sort((a, b) => a.layer - b.layer)[0]
+	for (const [streamSinkId, list] of groupedStreams.entries()) {
+		const winner = pickOutputEdgeWinner(list, streamSinkId)
 		if (!winner) continue
 		if (!config.streamingChannel || typeof config.streamingChannel !== 'object') {
 			config.streamingChannel = {}
@@ -131,7 +178,7 @@ function applyStreamRecordMappingsFromGraph(config) {
 			? config.recordOutputs.map((x) => ({ ...x }))
 			: []
 		for (const [recordId, list] of groupedRecords.entries()) {
-			const winner = list.slice().sort((a, b) => a.layer - b.layer)[0]
+			const winner = pickOutputEdgeWinner(list, recordId)
 			if (!winner) continue
 			const idx = next.findIndex((x) => String(x?.id || '') === recordId)
 			if (idx >= 0) {
@@ -172,7 +219,7 @@ function applyVirtualCameraMappingsFromGraph(config) {
 	const edges = collectDestinationOutputEdges(config).filter((e) => e.sink.kind === 'v4l2_out')
 	if (!edges.length) return { changed: false }
 
-	const winner = edges.slice().sort((a, b) => a.layer - b.layer)[0]
+	const winner = pickOutputEdgeWinner(edges, edges[0]?.sink?.id || 'v4l2_out')
 	if (!winner) return { changed: false }
 
 	const ch = resolveInputTargetToChannel(config, winner.videoSource)
@@ -187,6 +234,7 @@ function applyVirtualCameraMappingsFromGraph(config) {
 
 module.exports = {
 	readEdgeOutputLayer,
+	pickOutputEdgeWinner,
 	destinationToVideoSource,
 	collectDestinationOutputEdges,
 	applyStreamRecordMappingsFromGraph,
