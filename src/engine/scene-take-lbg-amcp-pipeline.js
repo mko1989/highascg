@@ -250,6 +250,22 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		 * preroll ramped a BLANK layer up and the shader popped in mid-fade. Give shader-bearing
 		 * takes a real warm-up before the crossfade starts. */
 		const hasShaderJob = takeJobs.some((j) => j.templateCg && isShaderCgName(j.templateCg.cgName))
+		/* todos28: shaders staged HERE — before the warm-up sleep and the PLAY/route batch —
+		 * so (a) the WO-354 warm-up actually warms the CEF page before the fade ramps it and
+		 * (b) route:// producers created in the play batch always find the layer occupied.
+		 * (WO-322 semantics unchanged: CG ADD on the bank-mapped phys layer, opacity owned by
+		 * the crossfade batch, no continuity/tracking for look-band shaders.) */
+		for (const job of takeJobs) {
+			if (!job.templateCg || !isShaderCgName(job.templateCg.cgName)) continue
+			const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg, {})
+			if (lines.length > 0) {
+				self.log?.(
+					'info',
+					`[scene-take-lbg] shader layer ${job.layer.layerNumber} → ${job.templateCg.cgName} on look-band layer ${job.pLayer} (WO-322, pre-fade)`,
+				)
+				await sendPipOverlayLinesSerial(amcp, lines)
+			}
+		}
 		const shaderWarmupMs = Math.max(0, Math.min(3000, parseInt(process.env.HIGHASCG_SHADER_WARMUP_MS || '600', 10) || 600))
 		const prebufferMs = hasShaderJob
 			? Math.max(needsIncomingFadePreroll ? 180 : 80, shaderWarmupMs)
@@ -344,17 +360,8 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				// shader per channel, exactly like media), no cgFade (the job's own mixerLines
 				// OPACITY in the crossfade batch owns the fade — a CG-level ramp would double it),
 				// and no tracked-host record (buildSceneTemplateCgAmcpLines guards that to 700+).
-				if (isShaderCgName(job.templateCg.cgName)) {
-					const lines = buildSceneTemplateCgAmcpLines(channel, job.pLayer, job.templateCg, {})
-					if (lines.length > 0) {
-						self.log?.(
-							'info',
-							`[scene-take-lbg] shader layer ${job.layer.layerNumber} → ${job.templateCg.cgName} on look-band layer ${job.pLayer} (WO-322)`,
-						)
-						await sendPipOverlayLinesSerial(amcp, lines)
-					}
-					continue
-				}
+				// Shaders were staged pre-fade above (todos28) — nothing left to do here.
+				if (isShaderCgName(job.templateCg.cgName)) continue
 
 				// WO-196 T196.2: detect continuity — same template on same host layer preserves timer state.
 				// Check if the current scene already has this template on the same layer.
