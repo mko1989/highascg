@@ -194,6 +194,8 @@ export function createTakeSceneToProgram(deps) {
 						? normalizeTransitionForPgmOnly(transitionOverride)
 						: { ...transitionOverride }
 				}
+				/* WO-360: name what will be black BEFORE it is. */
+				import('../lib/media-exists.js').then((m) => m.warnMissingMediaOnTake(incomingSceneForTake)).catch(() => {})
 				jobs.push({
 					scene,
 					sceneId: scene.id,

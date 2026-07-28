@@ -208,3 +208,14 @@ sudo systemctl restart highascg-power-button.service
       was cut retakes sweeping the unchanged source layer away). Automated 6-cycle drill passed;
       confirm by eye on the glass.
       >
+
+- [ ] **39. Status surfacing v1** (WO-360)
+      Misspell a clip in a playlist: the row and the Playlists panel show ⚠ red with the full
+      path in the tooltip; taking the look toasts "Missing in Caspar media: <name>". Unplug /
+      break a live input: a red toast names the slot and reason; recovery toasts green.
+      >
+
+- [ ] **40. Companion dev mode** (WO-361)
+      Run tools/eggs/companion/dev-mode.sh once, then: edit module src → npm run package:dev →
+      sudo systemctl restart companion. README in the module repo has the loop (commit it there).
+      >

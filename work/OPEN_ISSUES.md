@@ -146,7 +146,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 | WO-357 | Shader Live: ▶ take fixed + PGM layer stack (exchange L10 / stack 11-20, MIX) | [WO-357](./work-orders/357_WO_shader_live_take_and_pgm_stack.md) | ✅ Done 27.07 |
 | WO-358 | Global border: area rect + glow secondary color cycle + pulse to 0 | [WO-358](./work-orders/358_WO_global_border_area_color2_pulse0.md) | ✅ Done 27.07 |
 | WO-359 | Route takes rock solid — cut-take sweep cleared visually-equal sources | [WO-359](./work-orders/359_WO_route_take_consistency.md) | ✅ Done 27.07 (6-cycle live drill) |
-| WO-360 | Playout status surfacing: missing media / failed inputs visibly reported | [WO-360](./work-orders/360_WO_playout_status_surfacing.md) | 🔴 Open |
-| WO-361 | Companion module dev-mode workflow | [WO-361](./work-orders/361_WO_companion_module_dev_mode.md) | 🔴 Open |
+| WO-360 | Playout status surfacing: missing media / failed inputs visibly reported | [WO-360](./work-orders/360_WO_playout_status_surfacing.md) | 🟡 v1 shipped 28.07 (marks+toasts); deck badge + AMCP plumbing open |
+| WO-361 | Companion module dev-mode workflow | [WO-361](./work-orders/361_WO_companion_module_dev_mode.md) | ✅ Done 28.07 (dev-mode.sh; --extra-module-path was already configured) |
 
 Last updated: 2026-07-15 evening (WO-242 committed 74990aa: gate 320/318/0-fail re-verified, vite build OK; config/*.json left dirty pending CONFIG-APPLY-CLOBBER decision; **highascg restart still pending for WO-239 frozen-variables fix**; reload browsers; local commits await `git push origin main` by owner)

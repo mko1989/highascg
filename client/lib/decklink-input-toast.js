@@ -52,3 +52,44 @@ export function initDecklinkInputToasts(stateStore) {
 		}
 	}
 }
+
+/* WO-360: same transition-toast contract for live-audio (ALSA) and V4L2 input bring-alive
+ * failures — the statuses already ride getState (`liveAudioInputsStatus`/`v4l2InputsStatus`);
+ * nothing surfaced them. Keyed per slot; failures toast once, recoveries toast success. */
+const knownBySource = { audio: new Set(), v4l2: new Set() }
+let livePrimed = false
+
+export function initLiveInputFailureToasts(stateStore) {
+	stateStore.on('*', checkLive)
+	stateStore.on('liveAudioInputsStatus', checkLive)
+	stateStore.on('v4l2InputsStatus', checkLive)
+
+	function checkOne(kind, st, label) {
+		if (!st || st.enabled === false) return
+		const failed = Array.isArray(st.failed) ? st.failed : []
+		const now = new Set(failed.map((f) => String(f.slot ?? f.device ?? f.channel)))
+		const known = knownBySource[kind]
+		for (const f of failed) {
+			const key = String(f.slot ?? f.device ?? f.channel)
+			if (!known.has(key)) {
+				known.add(key)
+				/* Failures toast even on the priming pass — an input that is ALREADY dead when
+				 * the page opens is exactly what the operator must hear about. */
+				showAppToast(`⚠ ${label} ${key} failed to start: ${f.message || 'unknown'} (${f.clip || ''})`, 'error', 10000)
+			}
+		}
+		for (const key of [...known]) {
+			if (!now.has(key)) {
+				known.delete(key)
+				if (livePrimed) showAppToast(`${label} ${key} recovered`, 'success', 5000)
+			}
+		}
+	}
+
+	function checkLive() {
+		const st = stateStore.getState?.() || {}
+		checkOne('audio', st.liveAudioInputsStatus, 'Live audio input')
+		checkOne('v4l2', st.v4l2InputsStatus, 'V4L2 input')
+		livePrimed = true
+	}
+}

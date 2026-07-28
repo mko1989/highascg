@@ -219,6 +219,8 @@ export function createScenesPreviewRuntime(opts) {
 				transitionTake: false,
 				pgmOnly: false,
 			})
+			/* WO-360: name what will be black BEFORE it is (preview recall included). */
+			import('../lib/media-exists.js').then((m) => m.warnMissingMediaOnTake(incomingScene)).catch(() => {})
 			await api.post('/api/scene/take', {
 				channel: programCh,
 				sceneId,

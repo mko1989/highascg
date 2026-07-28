@@ -59,7 +59,8 @@ import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
 import { applyOperatorGuiHtmlClass, initOperatorGuiRectReporting } from './lib/operator-gui-mode.js'
 import { initOperatorGuiInteractionSuppress } from './lib/operator-gui-interaction-suppress.js'
-import { initDecklinkInputToasts } from './lib/decklink-input-toast.js'
+import { initDecklinkInputToasts, initLiveInputFailureToasts } from './lib/decklink-input-toast.js'
+import { initMediaExistsIndex } from './lib/media-exists.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
 // WO-243/255: hard-gated on ?operatorGui / legacy ?cefOperator in the query string — no-op

@@ -10,6 +10,7 @@ import { api } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { sceneState } from '../lib/scene-state.js'
 import { isTimelessItem, timelessSecsOf } from '../lib/playlist-timeless.js'
+import { clipMissing } from '../lib/media-exists.js'
 
 const LS_COLLAPSED = 'highascg_playlist_panel_collapsed'
 const POLL_MS = 2000
@@ -85,8 +86,9 @@ export function initPlaylistControlPanel(mountEl) {
 				/* Owner 27.07: timed media carries its own length — the (Ns) tag is only true
 				 * for timeless items; labels show the file name, not the path. */
 				const dur = isTimelessItem(it) && it.duration != null ? ` (${it.duration}s)` : ''
+				const warn = clipMissing(it.value) === true ? '⚠ ' : ''
 				const base = String(it.label || '').replace(/\\/g, '/').split('/').filter(Boolean).pop() || it.label
-				return `<option value="${i}"${i === cur ? ' selected' : ''}>${escapeHtml(`${active}${i + 1}. ${base}${dur}`)}</option>`
+				return `<option value="${i}"${i === cur ? ' selected' : ''}>${escapeHtml(`${active}${warn}${i + 1}. ${base}${dur}`)}</option>`
 			})
 			.join('')
 		for (const id of ['plp-prev', 'plp-play', 'plp-next']) {

@@ -1,5 +1,6 @@
 import { sceneState } from '../lib/scene-state.js'
 import { isTimelessItem, timelessSecsOf } from '../lib/playlist-timeless.js'
+import { clipMissing } from '../lib/media-exists.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
@@ -155,6 +156,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			const thumbHtml = thumbUrl
 				? `<img src="${escapeAttr(thumbUrl)}" onerror="this.remove()" style="width: 24px; height: 14px; object-fit: cover; border-radius: 2px; margin-right: 4px; flex: none;"/>`
 				: ''
+			const missing = clipMissing(item.value) === true
 			const rawLabel = item.label || item.value || ''
 			/* Owner 27.07: the row shows the FILE NAME; the full path only matters when missing
 			 * (tooltip keeps it). */
@@ -162,7 +164,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			itemRow.innerHTML = `
 				<span class="playlist-item-drag-handle" style="cursor: grab; color: var(--text-muted); margin-right: 4px; font-size: 0.6rem; line-height: 1; letter-spacing: -2px; user-select: none; flex: none;">⋮⋮</span>
 				${thumbHtml}
-				<span class="playlist-item-name" title="${escapeAttr(rawLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;">${escapeHtml(itemLabel)}</span>
+				<span class="playlist-item-name" title="${escapeAttr(missing ? `MISSING in Caspar media: ${item.value}` : rawLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;${missing ? ' color: #f85149;' : ''}">${missing ? '⚠ ' : ''}${escapeHtml(itemLabel)}</span>
 				<input type="number" class="playlist-item-duration" title="Duration in seconds (static images / timeless items, or to limit video playback)" value="${item.duration ?? 5}" min="1" max="3600" style="width: 34px; flex: none; margin: 0 4px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); border-radius: 3px; font-size: 0.7rem; text-align: center; padding: 1px 0;"/>
 				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" title="Remove item" style="padding: 0 4px; font-size: 0.75rem; line-height: 1.3; flex: none;">✕</button>
 			`
