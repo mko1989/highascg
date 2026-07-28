@@ -92,7 +92,7 @@ function deriveHardwareIdentity(networkCfg) {
 		try {
 			machineId = fs.readFileSync('/etc/machine-id', 'utf8').trim()
 		} catch {
-			machineId = ''
+			/* /etc/machine-id unreadable — stays '' */
 		}
 		hardwareId = deriveHardwareIdFromMachineId(machineId || os.hostname() || 'highascg')
 		source = machineId ? 'machine-id' : 'hostname-fallback'

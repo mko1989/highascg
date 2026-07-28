@@ -88,7 +88,7 @@ function main() {
 	for (const rel of files.sort()) {
 		const rule = ruleFor(rel)
 		const abs = path.join(DOCS_ROOT, rel)
-		let md = ''
+		let md
 		try {
 			md = fs.readFileSync(abs, 'utf8')
 		} catch {

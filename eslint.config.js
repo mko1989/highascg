@@ -37,6 +37,17 @@ const ESLINT_10_RECOMMENDED_OVERRIDES = {
 	'no-useless-escape': 'warn',
 }
 
+/* Previs is a PARKED future module (owner 2026-07-28): registry-gated, three.js not installed,
+ * nothing in core may call it. Its internal dead code is expected until the module is picked up. */
+const PREVIS_PARKED = {
+	files: ['client/components/previs-*.js', 'client/lib/previs-*.js', 'src/previs/**/*.js'],
+	rules: {
+		'no-unreachable': 'off',
+		'no-unused-vars': 'off',
+		'no-useless-assignment': 'off',
+	},
+}
+
 const SERVER_FILES = ['src/**/*.js', 'tools/**/*.js', 'scripts/**/*.js', 'test/**/*.js', 'client/**/*.cjs', 'index.js']
 
 const SERVER_MODULE_FILES = ['tools/**/*.mjs', 'scripts/**/*.mjs']
@@ -169,4 +180,5 @@ module.exports = [
 		},
 		rules: SERVER_RULES,
 	},
+	PREVIS_PARKED,
 ]

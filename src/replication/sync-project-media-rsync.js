@@ -248,7 +248,7 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 		const localManifest = await getLocalProjectMediaManifest(ctx)
 		localSignature = localManifest.signature || ''
 	} catch {
-		localSignature = ''
+		/* manifest unavailable — stays '' */
 	}
 
 	if (!plan.relPaths.length) {

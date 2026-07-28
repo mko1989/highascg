@@ -74,7 +74,7 @@ function resolveOperatorMonitorPort(config, opts = {}) {
 	}
 
 	// Build the physical map to find connected ports
-	let physicalMap = null
+	let physicalMap
 	try {
 		physicalMap = buildGpuPhysicalMap({
 			config: config || {},

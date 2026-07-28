@@ -32,7 +32,7 @@ function parseTlsLines(data) {
 			.trim()
 		if (!line || /^TLS\b/i.test(line) || /^\d{3}\s/.test(line)) continue
 		const match = line.match(/\"(.*?)\" +(.*)/)
-		let file = null
+		let file
 		if (match === null) file = line
 		else file = match[1]
 		if (file !== null) {

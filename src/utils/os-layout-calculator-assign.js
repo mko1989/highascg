@@ -133,7 +133,7 @@ function collectGpuLayoutAssignments(config) {
 		const isScreenBinding = binding?.type === 'screen'
 		const isLegacyMainIndexOnly = !binding && mainIndex != null
 		if ((isScreenBinding || isLegacyMainIndexOnly) && !fedByPixelMap) {
-			const n = Math.min(16, Math.max(1, parseInt(String(binding?.index ?? (Number(mainIndex) + 1) ?? 1), 10) || 1))
+			const n = Math.min(16, Math.max(1, parseInt(String(binding?.index ?? (Number(mainIndex) + 1)), 10) || 1))
 			const mappedEdge = edgeKind === 'pixel_map_out' || edgeKind === 'destination_in'
 			if (isLegacyMainIndexOnly && !mappedEdge && allGpuAssignments.has(n)) return
 			if (isLegacyMainIndexOnly && graphHasDestinationGpuBinding && graphHasPixelMapToGpu) return

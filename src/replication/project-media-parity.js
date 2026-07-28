@@ -64,7 +64,7 @@ async function getLocalProjectMediaManifest(ctx) {
 	try {
 		project = await loadFullProject()
 	} catch {
-		project = null
+		/* project store unavailable — stays null */
 	}
 	const config = ctx?.config || {}
 	const store = ctx?.persistence

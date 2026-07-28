@@ -54,7 +54,7 @@ async function applyX11Layout(config, opts = {}) {
 	const customModeRegistry = new CustomXrandrModeRegistry()
 	/** @type {Array<{ output: string, x: number, y: number, mode: string, rate?: number|null }>} */
 	const xrandrHeads = []
-	let xrandrQueryOut = ''
+	let xrandrQueryOut
 	/** @type {Map<string, Set<string>>} */
 	const availableModesByOutput = new Map()
 

@@ -156,7 +156,7 @@ function computeModelineForWxH({ width, height, refreshHz, env, timingKind, logg
 	const hz = Number.isFinite(r) && r > 0 && r < 240 ? r : 60
 	const kindRaw = String(timingKind || 'cvt').toLowerCase().replace(/-/g, '_')
 	const kind = kindRaw === 'gtf' ? 'gtf' : kindRaw === 'cvt_r' ? 'cvt_r' : 'cvt'
-	let genText = ''
+	let genText
 	try {
 		genText = runTimingGenerator(kind, W, H, hz, env)
 	} catch (e) {

@@ -237,18 +237,15 @@ test('applyMultiviewLayout: failed apply does not poison chain for next apply (T
 
 test('applyMultiviewLayout: timerScale and highlightTopTimer passthrough (WO-203.7)', async () => {
 	// WO-203: Verify timerScale clamping (50-300) and highlightTopTimer passthrough
-	// Note: This test verifies the clamping logic is in place; the actual overlayData
-	// structure is tested implicitly by the existing smoke tests that call the full flow.
-	const timerScale1 = Math.max(50, Math.min(300, 500))
-	const timerScale2 = Math.max(50, Math.min(300, 10))
-	const timerScale3 = Math.max(50, Math.min(300, 100 || 100))
-
-	assert.equal(timerScale1, 300, 'timerScale 500 clamps to 300')
-	assert.equal(timerScale2, 50, 'timerScale 10 clamps to 50')
-	assert.equal(timerScale3, 100, 'timerScale 100 is within range')
-
-	const highlightDefault = true !== false
-	assert.equal(highlightDefault, true, 'highlightTopTimer defaults to true')
+	/* 2026-07-28: these previously asserted literal constants (always-true — the lint census
+	 * flagged them); they now exercise the REAL exported helpers. */
+	const { clampMultiviewTimerScale, resolveHighlightTopTimer } = require('../../src/engine/multiview-apply')
+	assert.equal(clampMultiviewTimerScale(500), 300, 'timerScale 500 clamps to 300')
+	assert.equal(clampMultiviewTimerScale(10), 50, 'timerScale 10 clamps to 50')
+	assert.equal(clampMultiviewTimerScale(100), 100, 'timerScale 100 is within range')
+	assert.equal(clampMultiviewTimerScale(undefined), 100, 'missing timerScale defaults to 100')
+	assert.equal(resolveHighlightTopTimer(undefined), true, 'highlightTopTimer defaults to true')
+	assert.equal(resolveHighlightTopTimer(false), false, 'explicit false disables highlight')
 
 	console.log('✓ timerScale clamping and highlightTopTimer defaults verified')
 })

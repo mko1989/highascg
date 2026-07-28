@@ -86,7 +86,7 @@ async function pushProjectConfigToExfat(opts) {
 		const projectPath = String(p.project || '').trim()
 		const exfatAbs = path.join(exfatRoot, exfatRel)
 		const projectAbs = path.resolve(projectPath)
-		let prSt = null
+		let prSt
 		try {
 			assertUnderExfat(exfatRoot, exfatAbs)
 			assertSafeProjectPath(projectAbs)

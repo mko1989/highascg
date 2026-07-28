@@ -220,7 +220,7 @@ function getPlayheadSyncStatus(runtime, ctx) {
 		const { getPlayheadCorrectionConfig } = require('./playhead-correction')
 		correctionCfg = ctx ? getPlayheadCorrectionConfig(ctx.config) : null
 	} catch {
-		correctionCfg = null
+		/* correction module optional — stays null */
 	}
 	return {
 		driftMs: runtime?.playheadDriftMs ?? st?.lastDriftMs ?? 0,

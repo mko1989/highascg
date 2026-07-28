@@ -29,7 +29,7 @@ export async function applyProjectHardware(hardwareConfig) {
 		if (applied) steps.push('Device graph, destinations, and routing applied')
 		else warnings.push('No device snapshot payload in project hardware')
 	} catch (e) {
-		throw new Error(e?.message || 'Project hardware apply failed')
+		throw new Error(e?.message || 'Project hardware apply failed', { cause: e })
 	}
 
 	const osPatch = osDisplayKeysFromHardware(hardwareConfig)

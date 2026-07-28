@@ -77,13 +77,13 @@ function attachLiveDeckAccessors(ctx, liveDeck) {
 	ctx.liveDeck = liveDeck
 	Object.defineProperty(ctx, 'programLayerBankByChannel', {
 		get: () => liveDeck.programLayerBankByChannel,
-		set: (v) => liveDeck.replaceProgramLayerBanks(v),
+		set: (v) => { liveDeck.replaceProgramLayerBanks(v) },
 		enumerable: true,
 		configurable: true,
 	})
 	Object.defineProperty(ctx, 'sceneDeck', {
 		get: () => liveDeck.sceneDeck,
-		set: (v) => liveDeck.setSceneDeck(v),
+		set: (v) => { liveDeck.setSceneDeck(v) },
 		enumerable: true,
 		configurable: true,
 	})

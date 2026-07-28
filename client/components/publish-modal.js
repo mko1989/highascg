@@ -166,7 +166,7 @@ async function runPublishWorkflow(targetUrl, modal) {
 		// Basic check: we want them to be somewhat compatible. 
 		// If remote doesn't even have /api/settings, it's too old or not HighAsCG.
 	} catch (e) {
-		throw new Error('Target server is not responding or not a compatible HighAsCG instance.')
+		throw new Error('Target server is not responding or not a compatible HighAsCG instance.', { cause: e })
 	}
 
 	updateStep('bundle', 'done')

@@ -243,7 +243,6 @@ function buildEnvelopeFromCtx(ctx) {
 
 function safeReadPackageVersion() {
 	try {
-		// eslint-disable-next-line global-require
 		return require('../../package.json').version || '0.0.0'
 	} catch {
 		return '0.0.0'

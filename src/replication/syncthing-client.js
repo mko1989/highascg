@@ -44,7 +44,7 @@ function syncthingRequest(method, apiPath, body = null) {
 					try {
 						json = data ? JSON.parse(data) : null
 					} catch {
-						json = null
+						/* non-JSON body — stays null */
 					}
 					const ok = res.statusCode != null && res.statusCode >= 200 && res.statusCode < 300
 					resolve({ ok, status: res.statusCode || 0, json, error: ok ? undefined : `HTTP ${res.statusCode}` })

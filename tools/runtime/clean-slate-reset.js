@@ -305,7 +305,7 @@ async function run(opts) {
 	const { starterSlug } = resetProjects(projectsDir, opts.dryRun)
 	resetCasparConfig(opts.dryRun)
 
-	let mediaSummary = { ok: true, mediaDeleted: 0, mediaSkipped: 0 }
+	let mediaSummary
 	try {
 		mediaSummary = runMediaScript(opts.dryRun, opts.yes)
 	} catch (e) {

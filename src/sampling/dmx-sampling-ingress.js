@@ -211,7 +211,7 @@ const ingressMethods = {
 			this.log('error', `[DMX] mkfifo failed for ${fifoPath}: ${e.message}`)
 			// If mkfifo fails (e.g. on Windows or permission issue), we might still try to use it if it exists
 			if (!fs.existsSync(fifoPath)) {
-				throw new Error(`Critical: Could not create FIFO pipe at ${fifoPath}`)
+				throw new Error(`Critical: Could not create FIFO pipe at ${fifoPath}`, { cause: e })
 			}
 		}
 	},

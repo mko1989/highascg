@@ -47,7 +47,7 @@ function startMockCdpWs(opts = {}) {
 				if (neverReply.has(method)) return
 				if (method === 'Runtime.evaluate') {
 					try {
-						// eslint-disable-next-line no-eval
+						// Deliberate eval: this MOCK CDP endpoint mimics Chrome's Runtime.evaluate.
 						const value = (0, eval)(params.expression)
 						sock.send(JSON.stringify({ id, result: { result: { value } } }))
 					} catch (e) {

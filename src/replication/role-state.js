@@ -40,7 +40,7 @@ class RoleState extends EventEmitter {
 
 	_recompute() {
 		const prev = this._effectiveRole
-		let next /** @type {ReplicationRole} */ = 'standalone'
+		let next /** @type {ReplicationRole} */
 
 		if (!this._replicationEnabled) {
 			next = 'standalone'

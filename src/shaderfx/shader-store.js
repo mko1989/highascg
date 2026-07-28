@@ -124,7 +124,7 @@ function templatePath(id) {
 
 /** @returns {Promise<Array<{ id: string, name: string, audio: boolean, alpha: boolean, casparPath: string, updatedAt: string|null }>>} */
 async function listShaders() {
-	let names = []
+	let names
 	try {
 		names = await fsp.readdir(SHADERS_DATA_DIR)
 	} catch {

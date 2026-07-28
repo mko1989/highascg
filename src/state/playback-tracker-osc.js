@@ -133,7 +133,6 @@ function buildMatrixFromOsc(ctx) {
 				if (durationMs == null && durationSec == null && Number.isFinite(elapsedSec) && progress > 0.001) {
 					const tot = elapsedSec / progress
 					if (Number.isFinite(tot) && tot > 0) {
-						durationSec = tot
 						durationMs = Math.round(tot * 1000)
 					}
 				}

@@ -44,7 +44,8 @@ function calculateLayoutPositions(config) {
 	const assignments = collectGpuLayoutAssignments(config)
 	const results = computePlacedLayoutResults(config, assignments)
 
-	let { mappingGpuOutputs, mappingGpuBBox } = buildMappingGpuLayoutArtifacts(config)
+	let { mappingGpuOutputs } = buildMappingGpuLayoutArtifacts(config)
+	let mappingGpuBBox
 	;({ mappingGpuOutputs, mappingGpuBBox } = mergeMappingGpuOutputsWithScreens(config, results, mappingGpuOutputs))
 
 	applyMappingGpuPlacementOffsets(

@@ -134,14 +134,24 @@ async function applyMultiviewLayout(body, ctx, opts = {}) {
  * @param {{ infoXml?: string|null }} opts
  * @returns {Promise<{ ok: true, channel: number, debug?: object }>}
  */
+/** PURE, exported for the smoke: timer overlay scale % clamps to 50–300, default 100. */
+function clampMultiviewTimerScale(v) {
+	return Math.max(50, Math.min(300, Number(v) || 100))
+}
+
+/** PURE: highlight defaults ON; only an explicit false disables. */
+function resolveHighlightTopTimer(v) {
+	return v !== false
+}
+
 async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 	const layout = b.layout
 
 	const showOverlay = !!b.showOverlay
 	const bgColor = typeof b.bgColor === 'string' && b.bgColor.trim() ? b.bgColor.trim() : '#000000'
 	const showTimersUnderLabels = !!b.showTimersUnderLabels
-	const timerScale = Math.max(50, Math.min(300, Number(b.timerScale) || 100))
-	const highlightTopTimer = b.highlightTopTimer !== false
+	const timerScale = clampMultiviewTimerScale(b.timerScale)
+	const highlightTopTimer = resolveHighlightTopTimer(b.highlightTopTimer)
 	const inputsCh = map.inputsCh
 	const decklinkInputChannels = Array.isArray(map.decklinkInputChannels) ? map.decklinkInputChannels : []
 	const previewChannels = Array.isArray(map.previewChannels)
@@ -339,7 +349,7 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 		const hint = (base.includes('404') || base.includes('401') || base.includes('INVALID'))
 			? ` Channel ${ch} may not exist on CasparCG. Check module Settings → Screens: enable "Multiview channel", then use "Apply server config and restart" to create channels.`
 			: ''
-		throw new Error(base + hint)
+		throw new Error(base + hint, { cause: e })
 	}
 	if (failed.length > 0) {
 		ctx.log('warn', `Multiview: ${failed.length} cell(s) failed: ${failed.map((f) => `L${f.layer} ${f.route} (${f.err})`).join('; ')}`)
@@ -389,6 +399,8 @@ function getLastAppliedDebug() {
 }
 
 module.exports = {
+	clampMultiviewTimerScale,
+	resolveHighlightTopTimer,
 	MAX_MV_LAYERS,
 	MV_BG_LAYER,
 	MV_CELL_LAYER_START,

@@ -122,7 +122,7 @@ function resolveNetworkConfigSource(networkCfg) {
 	try {
 		exfatConfPresent = fs.existsSync(EXFAT_NETWORK_CONF)
 	} catch {
-		exfatConfPresent = false
+		/* fs probe failed — stays false */
 	}
 
 	let source = 'default'
