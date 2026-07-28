@@ -6,6 +6,7 @@
 
 'use strict'
 
+import { escapeAttr } from '../lib/dom-escape.js'
 import { api } from '../lib/api-client.js'
 import { getApiOrigin } from '../lib/api-origin.js'
 import { postFormDataWithProgress } from '../lib/form-upload.js'
@@ -35,7 +36,7 @@ export async function showPublishModal() {
 					<p class="publish-intro">Intelligent differential sync: only missing or modified media files will be uploaded.</p>
 					<div class="settings-group">
 						<label>Target Server Address (IP or Hostname)</label>
-						<input type="text" id="publish-target" placeholder="e.g., 192.168.1.50:8080" value="${savedTarget}">
+						<input type="text" id="publish-target" placeholder="e.g., 192.168.1.50:8080" value="${escapeAttr(savedTarget)}">
 						<p class="settings-note">Ensure the production HighAsCG server is running and reachable.</p>
 					</div>
 					<div class="publish-warning">

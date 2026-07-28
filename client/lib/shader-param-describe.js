@@ -63,8 +63,8 @@ export function describeParam(masked, start, end, kind) {
 	if (inner === 'clamp') return 'limit on the value range'
 	if (inner === 'mod' || inner === 'fract') return 'repetition — pattern tiling/wrap'
 
-	const mulTime = (TIME_RE.test(pre) && /[*\/]\s*$/.test(pre)) || (/^\s*[*\/]/.test(post) && TIME_RE.test(post))
-	const mulCoord = (COORD_RE.test(pre) && /[*\/]\s*$/.test(pre)) || (/^\s*[*\/]/.test(post) && COORD_RE.test(post))
+	const mulTime = (TIME_RE.test(pre) && /[*/]\s*$/.test(pre)) || (/^\s*[*/]/.test(post) && TIME_RE.test(post))
+	const mulCoord = (COORD_RE.test(pre) && /[*/]\s*$/.test(pre)) || (/^\s*[*/]/.test(post) && COORD_RE.test(post))
 	if (inner === 'sin' || inner === 'cos') {
 		if (mulTime || TIME_RE.test(around)) return 'wave speed — how fast it oscillates'
 		if (mulCoord) return 'wave frequency — more = tighter ripples'
@@ -73,7 +73,7 @@ export function describeParam(masked, start, end, kind) {
 	if (mulTime) return 'animation speed'
 	if (mulCoord) return 'pattern scale/zoom — higher = more repeats'
 	if (/[-+]\s*$/.test(pre) && COORD_RE.test(pre)) return 'position offset'
-	if (/[*\/]\s*$/.test(pre) || /^\s*[*\/]/.test(post)) return 'strength multiplier on the value next to it'
+	if (/[*/]\s*$/.test(pre) || /^\s*[*/]/.test(post)) return 'strength multiplier on the value next to it'
 	if (/[-+]\s*$/.test(pre) || /^\s*[-+]/.test(post)) return 'offset added into the calculation'
 	return ''
 }

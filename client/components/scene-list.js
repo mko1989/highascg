@@ -187,21 +187,6 @@ export function renderSceneDeck(ctx) {
 		sceneState.switchScreen(col)
 	}
 
-	function bindDeckBlankClearPrv(colEl, col) {
-		if (typeof clearPreviewBusForMain !== 'function' || !isPreviewBusAvailable(cm, col)) return
-
-		colEl.addEventListener('click', (e) => {
-			if (e.defaultPrevented) return
-			if (!isScenesDeckColBlankClick(e.target, colEl)) return
-			const sceneLive = getSceneLive() || {}
-			const sceneExists = (id) => !!sceneState.getScene(id)
-			if (!hasPreviewLookForMain(col, sceneLive, cm, sceneExists, sceneState)) return
-			e.preventDefault()
-			ensureMainForColumn(col)
-			void clearPreviewBusForMain(col, { full: true })
-		})
-	}
-
 	const appendColumn = (col, scenes, mount) =>
 		appendSceneDeckColumn(
 			{

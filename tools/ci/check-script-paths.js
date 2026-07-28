@@ -24,7 +24,7 @@ const PATTERNS = [
 	// systemd ExecStart paths
 	/ExecStart=\s*([^\s]+\.sh)/g,
 	// Direct paths like tools/runtime/xxx.sh or scripts/setup/xxx.sh
-	/(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g,
+	/(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g,
 ]
 
 function findScriptReferences() {
@@ -41,7 +41,7 @@ function findScriptReferences() {
 				output
 					.split(REPO_ROOT + '/')
 					.join('')
-					.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || []
+					.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
 			scripts.forEach((s) => {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('src/')
@@ -59,7 +59,7 @@ function findScriptReferences() {
 				.readFileSync(runsh, 'utf8')
 				.split(REPO_ROOT + '/')
 				.join('')
-			const scripts = content.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || []
+			const scripts = content.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
 			scripts.forEach((s) => {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('run.sh')
@@ -75,7 +75,7 @@ function findScriptReferences() {
 				.readFileSync(pkgjson, 'utf8')
 				.split(REPO_ROOT + '/')
 				.join('')
-			const scripts = content.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || []
+			const scripts = content.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
 			scripts.forEach((s) => {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('package.json')
@@ -95,7 +95,7 @@ function findScriptReferences() {
 				output
 					.split(REPO_ROOT + '/')
 					.join('')
-					.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || []
+					.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
 			scripts.forEach((s) => {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('scripts/systemd/')
@@ -115,7 +115,7 @@ function findScriptReferences() {
 				output
 					.split(REPO_ROOT + '/')
 					.join('')
-					.match(/(?<![A-Za-z0-9_\/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_\/-]+\.(?:sh|py|js)/g) || []
+					.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work|bin)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
 			scripts.forEach((s) => {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('scripts/exfat/')

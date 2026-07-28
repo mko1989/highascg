@@ -160,7 +160,7 @@ function probeDecklinkFromOs() {
 			.split(/\r?\n/)
 			.find((l) => /blackmagic|decklink/i.test(l))
 		if (line) {
-			const bm = line.match(/Blackmagic Design DeckLink[^\[]*|DeckLink [^\[]+/i)
+			const bm = line.match(/Blackmagic Design DeckLink[^[]*|DeckLink [^[]+/i)
 			pciModel = bm?.[0]?.trim() || ''
 			if (!pciModel) {
 				const afterColon = line.split(':').slice(2).join(':').trim()
@@ -384,7 +384,7 @@ function parseInfoConfigForDecklinks(xmlStr, cb) {
 					}
 				})
 			}
-		} catch (e) {
+		} catch {
 			// ignore parse errors
 		}
 		if (typeof cb === 'function') cb(decklink)

@@ -181,4 +181,13 @@ module.exports = [
 		rules: SERVER_RULES,
 	},
 	PREVIS_PARKED,
+	{
+		/* Smoke-test stubs: unused ARGS are the mocked API's shape (documentation, not dead
+		 * code) — e.g. `loadbg: (channel, pLayer, clip, opts) =>` reading only some. Unused
+		 * VARS still warn (a forgotten assertion is a real smell). Owner-approved 2026-07-28. */
+		files: ['tools/smoke/**/*.js', 'tools/smoke/**/*.mjs'],
+		rules: {
+			'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+		},
+	},
 ]

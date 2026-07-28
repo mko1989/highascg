@@ -1,3 +1,4 @@
+import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 import { DECKLINK_REAR_ORDER_KEY } from '../lib/device-view-decklink-order.js'
 import { GPU_CUSTOM_LAYOUT_KEY, gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
 import { gpuLayoutLog, isGpuLayoutDebugEnabled } from '../lib/device-view-gpu-layout-debug.js'
@@ -163,8 +164,8 @@ export function appendCasparRearPanelMarkers({
 
 		marker.innerHTML = `
 			<div class="device-view__panel-status-glow"></div>
-			<img src="${iconPath}" class="device-view__panel-connector-img" alt="${kind}" width="36" height="36" />
-			<span class="device-view__panel-marker-label ${labelDirClass}">${it.labelHtml || it.label}</span>
+			<img src="${iconPath}" class="device-view__panel-connector-img" alt="${escapeAttr(kind)}" width="36" height="36" />
+			<span class="device-view__panel-marker-label ${labelDirClass}">${it.labelHtml || escapeHtml(it.label)}</span>
 		`
 
 		const cableId = it.connectorId

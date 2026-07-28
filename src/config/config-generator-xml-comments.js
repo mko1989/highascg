@@ -7,7 +7,7 @@
  */
 function channelXmlComment(description) {
 	const t = String(description || 'channel')
-		.replace(/\-\-/g, '\u2014')
+		.replace(/--/g, '\u2014')
 		.replace(/\]\]>/g, '] ]>')
 		.trim()
 	return `        <!-- HighAsCG: ${t} -->\n`
