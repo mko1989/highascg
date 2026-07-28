@@ -226,10 +226,13 @@ export function renderDestinations(ctx) {
 			b.appendChild(pair)
 			for (const nd of pair.querySelectorAll('[data-pair-node$="-out"]')) {
 				if (sinkConnectorId) nd.dataset.connectorId = sinkConnectorId
+				/* WO-364: which half the gesture started on ('pgm'|'prv') — the PRV bus is a real
+				 * routable output, so the cable must know its half to note outputLayer 2. */
+				const half = nd.dataset.pairNode === 'prv-out' ? 'prv' : 'pgm'
 				nd.addEventListener('click', (ev) => {
 					ev.preventDefault()
 					ev.stopPropagation()
-					if (onDestinationPortClick) onDestinationPortClick(sinkConnectorId)
+					if (onDestinationPortClick) onDestinationPortClick(sinkConnectorId, half)
 				})
 				nd.title = 'Drop DeckLink connector to assign destination output'
 				nd.addEventListener('dragover', (ev) => {
@@ -244,7 +247,7 @@ export function renderDestinations(ctx) {
 					const parsed = parseDecklinkDrop(ev)
 					if (!parsed) return
 					ev.preventDefault()
-					if (onDecklinkDropToDestinationOutput) onDecklinkDropToDestinationOutput(parsed.connectorId, d, intent)
+					if (onDecklinkDropToDestinationOutput) onDecklinkDropToDestinationOutput(parsed.connectorId, d, intent, half)
 				})
 			}
 		}

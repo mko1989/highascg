@@ -67,6 +67,7 @@ export function registerDeviceViewCable(ctx) {
 	/** Leave cable/re-grab mode. Client-side only: no intermediate state was ever persisted. */
 	ctx.clearCableGesture = () => {
 		state.cableSourceId = null
+		state.cableSourceHalf = null
 		state.cablePointer = null
 		state.cableRegrab = null
 		snapshotPrewarm.stop()
@@ -184,6 +185,8 @@ export function registerDeviceViewCable(ctx) {
 		}
 		ctx.selectKey(k, { ...d, connectorId: c })
 		state.cableSourceId = c
+		/* WO-364: remember which pgm_prv half armed the cable — a PRV cable notes outputLayer 2. */
+		state.cableSourceHalf = d?.half === 'prv' ? 'prv' : null
 		state.suppressDocCableClickUntil = Date.now() + 100
 		// WO-278 (A): warm the server snapshot while the operator picks a target.
 		snapshotPrewarm.start()
@@ -349,6 +352,17 @@ export function registerDeviceViewCable(ctx) {
 				return
 			}
 			if (res?.graph) state.lastPayload.graph = res.graph
+			/* WO-364: a cable armed on the PRV half notes outputLayer 2 on the new edge — the
+			 * server maps such edges to preview_<N> (video source + PRV head placement). */
+			const cableHalf = state.cableSourceHalf
+			if (cableHalf === 'prv' && String(resolved.sourceId || '').startsWith('dst_in_')) {
+				const newEdge = (state.lastPayload.graph?.edges || []).find(
+					(e) => String(e?.sourceId) === String(resolved.sourceId) && String(e?.sinkId) === String(resolved.sinkId),
+				)
+				if (newEdge?.id && typeof ctx.updateDestinationOutputLayer === 'function') {
+					await ctx.updateDestinationOutputLayer(newEdge.id, 2)
+				}
+			}
 			const sinkConn = connectorById(state.lastPayload, resolved.sinkId)
 			if (sinkConn?.kind === 'gpu_out' && state.currentSettings) {
 				const cs =
@@ -358,16 +372,19 @@ export function registerDeviceViewCable(ctx) {
 				const screenN = resolveGpuScreenNumber(sinkConn, state.lastPayload)
 				const portN = resolveGpuPhysicalScreenIndex(sinkConn, state.lastPayload)
 				const source = resolveCableSourceResolution(state.lastPayload, resolved.sourceId)
-				const outputBinding = gpuOutputBindingFromCableSource(state.lastPayload, resolved.sourceId)
+				const outputBinding = gpuOutputBindingFromCableSource(state.lastPayload, resolved.sourceId, cableHalf)
 				const isMultiviewOutput = outputBinding?.type === 'multiview'
+				const isPrvOutput = outputBinding?.type === 'screen_prv'
 				const settingsPatches = []
-				if (shouldSeedScreenConsumerDefaults(cs, portN)) {
+				/* WO-364: PRV head must not seed/overwrite the PGM screen_N settings — its dims
+				 * follow the pair's channel; only the connector binding identifies it. */
+				if (!isPrvOutput && shouldSeedScreenConsumerDefaults(cs, portN)) {
 					settingsPatches.push(screenConsumerSeedSettingsPatch(cs, portN))
 				}
 				if (isMultiviewOutput && shouldSeedMultiviewAlwaysOnTopDefault(cs)) {
 					settingsPatches.push(multiviewConsumerDefaultsSettingsPatch())
 				}
-				if (source) {
+				if (source && !isPrvOutput) {
 					settingsPatches.push(gpuScreenInheritedSettingsPatch(screenN, source))
 				}
 				if (settingsPatches.length) {

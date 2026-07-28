@@ -191,9 +191,28 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const prvChNum = routeMap.previewCh(n)
 	const composePrvXml = buildComposePreviewFfmpegConsumerXml(config, prvChNum)
 	const rtmpPrvXml = buildRtmpFfmpegConsumersForChannel(config, prvChNum)
-	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)`)}        <channel>
+	/* WO-364: the PRV bus is a real output — a GPU jack cabled to the destination's PRV half
+	 * (layout-sync sets screen_N_prv_screen_consumer + _prv_x/_prv_y from the placed PRV head)
+	 * gets a full <screen> consumer on the preview channel, same raster as the pair. */
+	const prvScreenEnabled =
+		config[`screen_${n}_prv_screen_consumer`] === true || config[`screen_${n}_prv_screen_consumer`] === 'true'
+	const prvDeviceNum = ctx.nextDevice + ((decklinkReplaceScreen || !screenConsumerEnabled) ? 0 : 1)
+	const prvScreenXml = !prvScreenEnabled
+		? ''
+		: `
+                <screen>
+                    <device>${prvDeviceNum}</device>
+                    <x>${parseOptionalPixel(config[`screen_${n}_prv_x`], 0)}</x><y>${parseOptionalPixel(config[`screen_${n}_prv_y`], 0)}</y>
+                    <width>${dims.width}</width><height>${dims.height}</height>
+                    <stretch>${stretch}</stretch>
+                    <windowed>${windowed}</windowed>
+                    <vsync>${vsync}</vsync>
+                    <always-on-top>${alwaysOnTop}</always-on-top>
+                    <borderless>${borderless}</borderless>
+                </screen>`
+	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)${prvScreenEnabled ? ' — physical PRV head (WO-364)' : ''}`)}        <channel>
             <video-mode>${dims.modeId}</video-mode>
-            <consumers>${composePrvXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
+            <consumers>${prvScreenXml}${composePrvXml}${prvSystemAudioXml}${rtmpPrvXml}</consumers>
             <mixer>
                 <audio-osc>true</audio-osc>
             </mixer>
@@ -215,6 +234,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		prvXml,
 		bus2Xml,
 		hasScreenConsumer: !decklinkReplaceScreen && screenConsumerEnabled,
+		hasPrvScreenConsumer: prvScreenEnabled,
 	}
 }
 

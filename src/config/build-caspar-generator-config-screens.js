@@ -161,7 +161,8 @@ function applyScreenConsumerOverridesFromCabling(merged, appConfig) {
 		const idx = Math.max(0, parseInt(String(dest?.mainScreenIndex ?? 0), 10) || 0)
 		const n = idx + 1
 		const srcCandidates = destinationSourceIds(dest, idx, ctx)
-		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src, ctx))
+		/* WO-364: only PGM-half cables count — a PRV-only GPU cable must not enable screen_N. */
+		merged[`screen_${n}_screen_consumer`] = srcCandidates.some((src) => reachesGpuFromSource(src, ctx, { pgmOnly: true }))
 	}
 }
 

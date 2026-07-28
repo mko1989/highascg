@@ -6,15 +6,31 @@ import { getAppStateStore } from '../lib/app-runtime.js'
 import { showLiveInputModal } from './live-input-modal.js'
 import { saveVirtualCameraConfig } from '../lib/virtual-camera-state.js'
 
+/** WO-364: edge note {outputLayer} reader — 1 = PGM (default), 2 = PRV. */
+function matrixEdgeOutputLayer(edge) {
+	const raw = edge?.note
+	if (raw == null || raw === '') return 1
+	try {
+		const n = Number(JSON.parse(String(raw))?.outputLayer)
+		return Number.isFinite(n) ? Math.max(1, Math.round(n)) : 1
+	} catch {
+		const m = String(raw).match(/outputLayer\s*[:=]\s*(\d+)/i)
+		return m ? Math.max(1, parseInt(m[1], 10) || 1) : 1
+	}
+}
+
 function extractMatrixPorts(payload) {
 	const sources = []
 	const sinks = []
 	
 	const addedIds = new Set()
-	const addPort = (id, label, isSource, group) => {
-		if (!id || addedIds.has(id)) return
-		addedIds.add(id)
-		const port = { id, label, group }
+	const addPort = (id, label, isSource, group, half) => {
+		/* WO-364: a pgm_prv destination contributes TWO rows sharing one graph id — dedupe on
+		 * id+half so the PRV row survives the id check. */
+		const dedupeKey = half ? `${id}#${half}` : id
+		if (!id || addedIds.has(dedupeKey)) return
+		addedIds.add(dedupeKey)
+		const port = { id, label, group, half: half || null }
 		if (isSource) sources.push(port)
 		else sinks.push(port)
 	}
@@ -26,7 +42,13 @@ function extractMatrixPorts(payload) {
 		const isHost = String(d?.mode || '') === 'host_channel' || d?.virtual === true
 		const group = isHost ? 'Host channels' : 'Destinations'
 		seenDestIds.add(String(d?.id || ''))
-		addPort(`dst_in_${d.id}`, d.label || d.id, true, group)
+		if (String(d?.mode || 'pgm_prv') === 'pgm_prv' && !isHost) {
+			/* WO-364: PRV is a real routable bus — split the pair into two matrix rows. */
+			addPort(`dst_in_${d.id}`, `${d.label || d.id} — PGM`, true, group, 'pgm')
+			addPort(`dst_in_${d.id}`, `${d.label || d.id} — PRV`, true, group, 'prv')
+		} else {
+			addPort(`dst_in_${d.id}`, d.label || d.id, true, group)
+		}
 	}
 	for (const h of listHostChannelDestinations(payload)) {
 		if (!h?.id || seenDestIds.has(String(h.id))) continue
@@ -217,7 +239,10 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 			const td = document.createElement('td')
 			td.className = 'device-view-matrix__cell'
 			
-			const edgeIndex = edges.findIndex(e => e.sourceId === src.id && e.sinkId === sink.id)
+			const rowLayer = src.half === 'prv' ? 2 : 1
+			const edgeIndex = edges.findIndex(
+				e => e.sourceId === src.id && e.sinkId === sink.id && (!src.half || matrixEdgeOutputLayer(e) === rowLayer),
+			)
 			const isActive = edgeIndex !== -1
 			
 			if (isActive) {
@@ -232,12 +257,16 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 				const newGraph = JSON.parse(JSON.stringify(payload.graph || { edges: [], connectors: [] }))
 				
 				if (isActive) {
-					// Disconnect
-					newGraph.edges = newGraph.edges.filter(e => !(e.sourceId === src.id && e.sinkId === sink.id))
+					// Disconnect (only this half's edge — WO-364)
+					newGraph.edges = newGraph.edges.filter(
+						e => !(e.sourceId === src.id && e.sinkId === sink.id && (!src.half || matrixEdgeOutputLayer(e) === rowLayer)),
+					)
 				} else {
-					// Connect (add edge)
+					// Connect (add edge; a PRV row notes outputLayer 2 — WO-364)
 					const id = `edge_${Date.now()}_${Math.floor(Math.random() * 1000)}`
-					newGraph.edges.push({ id, sourceId: src.id, sinkId: sink.id })
+					const edge = { id, sourceId: src.id, sinkId: sink.id }
+					if (src.half === 'prv') edge.note = JSON.stringify({ outputLayer: 2 })
+					newGraph.edges.push(edge)
 				}
 				
 				try {

@@ -2,7 +2,7 @@
 
 const { normalizeDeviceGraph } = require('./device-graph')
 const { destinationsFromConfig } = require('./screen-destinations')
-const { collectDestinationOutputEdges } = require('./device-graph-output-mapping')
+const { collectDestinationOutputEdges, readEdgeOutputLayer } = require('./device-graph-output-mapping')
 
 /**
  * @param {object} appConfig
@@ -12,16 +12,24 @@ function createDestinationWiringContext(appConfig) {
 	const byId = new Map((g.connectors || []).map((c) => [String(c?.id || ''), c]))
 	/** @type {Map<string, string[]>} */
 	const outgoing = new Map()
+	/** WO-364: same map minus PRV edges (note outputLayer >= 2) — used when deciding the PGM
+	 * screen consumer, so a PRV-only GPU cable never force-enables screen_N's consumer. */
+	const outgoingPgm = new Map()
 	for (const e of g.edges || []) {
 		const src = String(e?.sourceId || '')
 		if (!src) continue
 		if (!outgoing.has(src)) outgoing.set(src, [])
 		outgoing.get(src).push(String(e?.sinkId || ''))
+		if (readEdgeOutputLayer(e) < 2) {
+			if (!outgoingPgm.has(src)) outgoingPgm.set(src, [])
+			outgoingPgm.get(src).push(String(e?.sinkId || ''))
+		}
 	}
 	return {
 		g,
 		byId,
 		outgoing,
+		outgoingPgm,
 		destinations: destinationsFromConfig(appConfig || {}),
 	}
 }
@@ -51,14 +59,15 @@ function destinationSourceIds(dest, destIndex, ctx) {
  * @param {string} sourceId
  * @param {ReturnType<typeof createDestinationWiringContext>} ctx
  */
-function reachesGpuFromSource(sourceId, ctx) {
+function reachesGpuFromSource(sourceId, ctx, opts = {}) {
 	const queue = [String(sourceId || '')]
 	const seen = new Set()
+	const edgeMap = opts.pgmOnly && ctx.outgoingPgm ? ctx.outgoingPgm : ctx.outgoing
 	while (queue.length) {
 		const cur = queue.shift()
 		if (!cur || seen.has(cur)) continue
 		seen.add(cur)
-		const next = ctx.outgoing.get(cur) || []
+		const next = edgeMap.get(cur) || []
 		for (const sinkId of next) {
 			const sink = ctx.byId.get(String(sinkId || ''))
 			if (!sink) continue

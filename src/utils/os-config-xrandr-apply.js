@@ -253,6 +253,7 @@ async function applyX11Layout(config, opts = {}) {
 	const mapGpu = Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []
 	Object.values(layout.screens).forEach(processHeadDeduped)
 	Object.values(layout.multiview).forEach(processHeadDeduped)
+	Object.values(layout.prv || {}).forEach(processHeadDeduped) /* WO-364 PRV heads */
 	mapGpu.forEach(processHeadDeduped)
 
 	const env = { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }

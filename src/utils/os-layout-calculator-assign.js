@@ -15,6 +15,9 @@ function collectGpuLayoutAssignments(config) {
 
 	const allGpuAssignments = new Map()
 	const mvAssignments = []
+	/* WO-364: PRV heads — a GPU jack cabled from the PRV half of a pgm_prv destination.
+	 * Separate collection like mvAssignments: PRV never feeds effectiveScreenCount. */
+	const prvAssignments = []
 	const explicitScreenAssignments = new Map()
 	/** Operator Apply OS / Device View screen_N_* — must survive graph rebuild. */
 	const operatorScreenAssignments = new Map()
@@ -74,6 +77,7 @@ function collectGpuLayoutAssignments(config) {
 	if (graphHasDestinationGpuBinding) {
 		allGpuAssignments.clear()
 		mvAssignments.length = 0
+		prvAssignments.length = 0
 	}
 
 	graphGpuConnectors.forEach(c => {
@@ -96,6 +100,12 @@ function collectGpuLayoutAssignments(config) {
 				boundDest = dests.find(d => d.id === dstId) || null
 			}
 		}
+		let edgeOutputLayer = 1
+		if (inEdge) {
+			try {
+				edgeOutputLayer = require('../config/device-graph-output-mapping').readEdgeOutputLayer(inEdge)
+			} catch { edgeOutputLayer = 1 }
+		}
 		if (boundDest) {
 			const dMode = String(boundDest.mode || 'pgm_prv').toLowerCase()
 			// WO-243 follow-up: an operator_gui-bound jack is the operator-area monitor — it claims
@@ -105,6 +115,11 @@ function collectGpuLayoutAssignments(config) {
 			// landed on the operator monitor and the real program output lost its head.
 			if (dMode === 'multiview' || dMode === 'operator_gui') {
 				edgeDerivedMode = 'multiview'
+			} else if (dMode === 'pgm_prv' && edgeOutputLayer >= 2) {
+				/* WO-364: cable from the destination's PRV half (edge note outputLayer 2) — a
+				 * PRV head, not a claim on screen_<N>'s jack. */
+				edgeDerivedMode = 'prv'
+				edgeDerivedMainIndex = Math.max(0, parseInt(String(boundDest.mainScreenIndex ?? 0), 10) || 0)
 			} else if (dMode !== 'stream') {
 				edgeDerivedMode = 'screen'
 				edgeDerivedMainIndex = Math.max(0, parseInt(String(boundDest.mainScreenIndex ?? 0), 10) || 0)
@@ -114,6 +129,10 @@ function collectGpuLayoutAssignments(config) {
 		if (edgeDerivedMode === 'screen') {
 			mainIndex = edgeDerivedMainIndex
 			binding = { type: 'screen', index: edgeDerivedMainIndex + 1 }
+			inferredFromEdge = true
+		} else if (edgeDerivedMode === 'prv') {
+			binding = { type: 'screen_prv', index: edgeDerivedMainIndex + 1 }
+			mainIndex = null
 			inferredFromEdge = true
 		} else if (edgeDerivedMode === 'multiview') {
 			binding = { type: 'multiview', index: 1 }
@@ -200,6 +219,26 @@ function collectGpuLayoutAssignments(config) {
 				}
 			}
 
+			if (binding?.type === 'screen_prv') {
+				const n = Math.min(16, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
+				if (prvAssignments.some(a => a.sysId === sysId)) return
+				const prvVideoMode = boundDest ? String(boundDest.videoMode || '').trim() : ''
+				const prvFps =
+					boundDest && Number.isFinite(Number(boundDest.fps)) && Number(boundDest.fps) > 0
+						? Number(boundDest.fps)
+						: null
+				prvAssignments.push({
+					sysId,
+					n,
+					osMode: config[`screen_${n}_prv_os_mode`] || prvVideoMode || c.caspar?.mode,
+					osBackend: String(config[`screen_${n}_prv_os_backend`] || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
+					osRate: prvFps ?? config[`screen_${n}_prv_os_rate`] ?? c.caspar?.refreshHz,
+					casparMode: prvVideoMode || readScreenSetting(config, `screen_${n}_mode`) || c.caspar?.mode,
+					manualX: Number.isFinite(config[`screen_${n}_prv_os_x`]) ? config[`screen_${n}_prv_os_x`] : null,
+					manualY: Number.isFinite(config[`screen_${n}_prv_os_y`]) ? config[`screen_${n}_prv_os_y`] : null,
+				})
+				return
+			}
 			if (mvIndex != null) {
 				const n = mvIndex
 				if (mvAssignments.some(a => a.sysId === sysId)) return
@@ -269,6 +308,7 @@ function collectGpuLayoutAssignments(config) {
 	return {
 		allGpuAssignments,
 		mvAssignments,
+		prvAssignments,
 		operatorScreenAssignments,
 		graphHasDestinationGpuBinding,
 		effectiveScreenCount,

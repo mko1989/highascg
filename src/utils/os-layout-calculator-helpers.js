@@ -148,6 +148,13 @@ function mergeMappingGpuOutputsWithScreens(config, results, mappingGpuOutputs) {
 			delete results.multiview[idx]
 		}
 	}
+	/* WO-364: pixel-map rows evict colliding PRV heads too (no force flag for PRV — the
+	 * pixel map always wins its jack). */
+	for (const [idx, info] of Object.entries(results.prv || {})) {
+		const id = resolveSysIdToXrandrOutput(String(info?.sysId || ''), { config })
+		if (!id || !mappingBySysId.has(id)) continue
+		delete results.prv[idx]
+	}
 	const kept = [...mappingBySysId.values()]
 	return {
 		mappingGpuOutputs: kept,

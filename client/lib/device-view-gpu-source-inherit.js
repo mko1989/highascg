@@ -127,7 +127,7 @@ export function resolveCableSourceResolution(lastPayload, sourceId) {
  * @param {object | null | undefined} lastPayload
  * @param {string} sourceId
  */
-export function gpuOutputBindingFromCableSource(lastPayload, sourceId) {
+export function gpuOutputBindingFromCableSource(lastPayload, sourceId, half) {
 	const sid = String(sourceId || '').trim()
 	if (!sid.startsWith('dst_in_')) return null
 	const dstId = sid.slice('dst_in_'.length).trim()
@@ -140,6 +140,8 @@ export function gpuOutputBindingFromCableSource(lastPayload, sourceId) {
 	const mode = String(d.mode || 'pgm_prv').toLowerCase()
 	if (mode === 'multiview') return { type: 'multiview' }
 	const mainIdx = Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)
+	/* WO-364: a cable armed on the PRV half binds the jack as a PRV head, never as screen_N. */
+	if (half === 'prv' && mode === 'pgm_prv') return { type: 'screen_prv', index: Math.max(1, mainIdx + 1) }
 	return { type: 'screen', index: Math.max(1, mainIdx + 1) }
 }
 

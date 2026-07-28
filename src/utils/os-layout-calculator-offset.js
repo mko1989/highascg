@@ -60,6 +60,12 @@ function applyMappingGpuPlacementOffsets(
 					if (manualOsY != null) continue
 					info.y += offY
 				}
+				for (const [key, info] of Object.entries(results.prv || {})) {
+					const n = parseInt(key, 10)
+					if (!Number.isFinite(n) || n < 1 || !info) continue
+					if (Number.isFinite(config[`screen_${n}_prv_os_y`])) continue
+					info.y += offY
+				}
 			}
 		} else if (offX > 0) {
 			for (const [key, info] of Object.entries(results.screens)) {
@@ -83,6 +89,12 @@ function applyMappingGpuPlacementOffsets(
 					Number.isFinite(config[`multiview_${n}_os_x`]) ? config[`multiview_${n}_os_x`] :
 					Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null
 				if (manualOsX != null) continue
+				info.x = Math.max(Number(info.x) || 0, offX)
+			}
+			for (const [key, info] of Object.entries(results.prv || {})) {
+				const n = parseInt(key, 10)
+				if (!Number.isFinite(n) || n < 1 || !info) continue
+				if (Number.isFinite(config[`screen_${n}_prv_os_x`])) continue
 				info.x = Math.max(Number(info.x) || 0, offX)
 			}
 		}

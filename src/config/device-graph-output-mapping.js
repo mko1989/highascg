@@ -27,10 +27,14 @@ function readEdgeOutputLayer(edge) {
 /**
  * @param {object} destination
  */
-function destinationToVideoSource(destination) {
+function destinationToVideoSource(destination, outputLayer) {
 	const mode = String(destination?.mode || 'pgm_prv')
 	const mainIndex = Math.max(0, parseInt(String(destination?.mainScreenIndex ?? 0), 10) || 0)
 	if (mode === 'multiview') return 'multiview'
+	/* WO-364: the PRV bus is a real Caspar channel — an edge cabled from the destination's PRV
+	 * half (outputLayer 2, same note convention as the DeckLink "PRV:" labels) feeds preview_N.
+	 * Only pgm_prv has a preview bus; pgm_only/pixelmap stay program-only. */
+	if (mode === 'pgm_prv' && Number(outputLayer) >= 2) return `preview_${mainIndex + 1}`
 	// WO-242: pixelmap is a PGM-only program bus too (dedicated channel), same source-id shape as pgm_only.
 	if (mode === 'pgm_only' || mode === 'pgm_prv' || mode === 'pixelmap') return `program_${mainIndex + 1}`
 	return 'program_1'
@@ -58,6 +62,7 @@ function collectDestinationOutputEdges(config) {
 			const destination = byDestId.get(destinationId)
 			if (!destination) return null
 			const mainIndex = Math.max(0, parseInt(String(destination.mainScreenIndex ?? 0), 10) || 0)
+			const layer = readEdgeOutputLayer(e)
 			return {
 				edge: e,
 				sink,
@@ -65,8 +70,8 @@ function collectDestinationOutputEdges(config) {
 				destination,
 				mode: String(destination.mode || 'pgm_prv'),
 				mainIndex,
-				layer: readEdgeOutputLayer(e),
-				videoSource: destinationToVideoSource(destination),
+				layer,
+				videoSource: destinationToVideoSource(destination, layer),
 			}
 		})
 		.filter(Boolean)

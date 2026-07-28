@@ -13,6 +13,10 @@ function copyLegacyScreenAndMultiviewSettings(merged, appConfig) {
 		if (appConfig[prefix + 'os_rate']) merged[prefix + 'os_rate'] = appConfig[prefix + 'os_rate']
 		if (appConfig[prefix + 'os_x'] !== undefined) merged[prefix + 'os_x'] = appConfig[prefix + 'os_x']
 		if (appConfig[prefix + 'os_y'] !== undefined) merged[prefix + 'os_y'] = appConfig[prefix + 'os_y']
+		/* WO-364: PRV head OS overrides ride the same copy. */
+		for (const k of ['prv_os_mode', 'prv_os_rate', 'prv_os_x', 'prv_os_y', 'prv_os_backend']) {
+			if (appConfig[prefix + k] !== undefined) merged[prefix + k] = appConfig[prefix + k]
+		}
 	}
 	if (appConfig.multiview_system_id) merged.multiview_system_id = appConfig.multiview_system_id
 	if (appConfig.multiview_os_mode) merged.multiview_os_mode = appConfig.multiview_os_mode
@@ -58,6 +62,15 @@ function applyLayoutPositionsToMerged(merged) {
 			const head = layout?.screens?.[n]
 			if (head && Number.isFinite(head.x)) merged[`screen_${n}_x`] = head.x
 			if (head && Number.isFinite(head.y)) merged[`screen_${n}_y`] = head.y
+			/* WO-364: a placed PRV head enables + positions the PRV channel's screen consumer. */
+			const prvHead = layout?.prv?.[n]
+			if (prvHead && Number.isFinite(prvHead.x) && Number.isFinite(prvHead.y)) {
+				merged[`screen_${n}_prv_screen_consumer`] = true
+				merged[`screen_${n}_prv_x`] = prvHead.x
+				merged[`screen_${n}_prv_y`] = prvHead.y
+			} else if (merged[`screen_${n}_prv_screen_consumer`] === true) {
+				merged[`screen_${n}_prv_screen_consumer`] = false
+			}
 			const tiles = merged[`screen_${n}_decklink_tiles`]
 			const wantsScreen =
 				merged[`screen_${n}_screen_consumer`] !== false && merged[`screen_${n}_screen_consumer`] !== 'false'

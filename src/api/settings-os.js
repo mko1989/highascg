@@ -26,6 +26,11 @@ const SYSTEM_DISPLAY_KEYS = [
 	'multiview_os_timing_source',
 	'multiview_os_x', 'multiview_os_y',
 	'screen_1_force_os_resolution', 'screen_2_force_os_resolution', 'screen_3_force_os_resolution', 'screen_4_force_os_resolution',
+	/* WO-364: PRV head OS overrides */
+	'screen_1_prv_os_mode', 'screen_2_prv_os_mode', 'screen_3_prv_os_mode', 'screen_4_prv_os_mode',
+	'screen_1_prv_os_rate', 'screen_2_prv_os_rate', 'screen_3_prv_os_rate', 'screen_4_prv_os_rate',
+	'screen_1_prv_os_x', 'screen_2_prv_os_x', 'screen_3_prv_os_x', 'screen_4_prv_os_x',
+	'screen_1_prv_os_y', 'screen_2_prv_os_y', 'screen_3_prv_os_y', 'screen_4_prv_os_y',
 	'os_xrandr_create_missing_modes',
 ]
 
@@ -51,6 +56,11 @@ function mergeSystemDisplaySettings(ctx, s) {
 		ctx.config.os_xrandr_create_missing_modes = v === true || v === 'true' || v === 1 || v === '1'
 	}
 	for (let n = 1; n <= 4; n++) {
+		/* WO-364: PRV head OS overrides */
+		const pm = `screen_${n}_prv_os_mode`; if (s[pm] !== undefined) ctx.config[pm] = String(s[pm] || '').trim()
+		const pr = `screen_${n}_prv_os_rate`; if (s[pr] !== undefined) { const r = parseFloat(s[pr]); if (Number.isFinite(r) && r > 0) ctx.config[pr] = r; else delete ctx.config[pr] }
+		const px = `screen_${n}_prv_os_x`; if (s[px] !== undefined) { const x = parseInt(s[px], 10); if (Number.isFinite(x)) ctx.config[px] = x; else delete ctx.config[px] }
+		const py = `screen_${n}_prv_os_y`; if (s[py] !== undefined) { const y = parseInt(s[py], 10); if (Number.isFinite(y)) ctx.config[py] = y; else delete ctx.config[py] }
 		const sid = `screen_${n}_system_id`; if (s[sid] !== undefined) ctx.config[sid] = String(s[sid] || '').trim()
 		const om = `screen_${n}_os_mode`; if (s[om] !== undefined) ctx.config[om] = String(s[om] || '').trim()
 		const ob = `screen_${n}_os_backend`
@@ -131,6 +141,7 @@ async function handleOsPost(path, body, ctx) {
 			const headList = [
 				...Object.values(layout.screens || {}),
 				...Object.values(layout.multiview || {}),
+				...Object.values(layout.prv || {}) /* WO-364 PRV heads */,
 				...(Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 			]
 			const seenHead = new Set()

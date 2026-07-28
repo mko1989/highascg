@@ -30,6 +30,11 @@ function logLayoutPlan(results) {
 					`[OS-Config] Layout multiview_${idx}: id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`,
 				)
 			}
+			for (const [idx, info] of Object.entries(results.prv || {})) {
+				logger.info(
+					`[OS-Config] Layout prv_${idx} (WO-364): id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`,
+				)
+			}
 			if (results.mappingGpuBBox) {
 				const b = results.mappingGpuBBox
 				logger.info(

@@ -18,6 +18,7 @@ function plannedHeadsFromLayout(layout, opts = {}) {
 	const list = [
 		...Object.values(layout?.screens || {}),
 		...Object.values(layout?.multiview || {}),
+		...Object.values(layout?.prv || {}) /* WO-364 PRV heads */,
 		...(Array.isArray(layout?.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 	]
 	const seen = new Set()

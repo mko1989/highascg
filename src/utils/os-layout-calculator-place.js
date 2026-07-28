@@ -21,13 +21,15 @@ const { resolveEffectiveOsModeSource } = require('./os-mode-source')
  *   swap: boolean,
  * }} assignments
  */
-function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, effectiveScreenCount, swap }) {
+function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, prvAssignments, effectiveScreenCount, swap }) {
 	const placements = []
 	const screens = getHorizontalLayoutOrder(effectiveScreenCount, swap)
 	for (const n of screens) placements.push({ kind: 'screen', n })
 	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
+	/* WO-364: PRV heads placed after screens+multiview; keyed by their main's n. */
+	;(prvAssignments || []).forEach((pa) => placements.push({ kind: 'prv', n: pa.n, data: pa }))
 
-	const results = { screens: {}, multiview: {} }
+	const results = { screens: {}, multiview: {}, prv: {} }
 	let cumulativeX = 0
 	for (const p of placements) {
 		let data
@@ -127,6 +129,27 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 				}
 				if (Number.isFinite(dims?.height) && dims.height > 0) h = dims.height
 			}
+		} else if (p.kind === 'prv') {
+			/* WO-364: the PRV bus is the same raster as its main's pair. */
+			const topoDims = resolveScreenDimsFromTopology(config, p.n)
+			if (topoDims && topoDims.width > 0 && topoDims.height > 0) {
+				w = topoDims.width
+				h = topoDims.height
+				hasCasparDims = true
+				const allowTopoReplaceMode = !explicitPixelOsMode && !forceOsRes
+				if (allowTopoReplaceMode) {
+					const mappedOk = /^\d+x\d+$/i.test(modeForXrandr)
+					const cmLower = String(cm || '').toLowerCase()
+					if (!mappedOk || cmLower === 'custom') modeForXrandr = `${w}x${h}`
+				}
+			} else {
+				const dims = getModeDimensions(String(data.casparMode || ''), config, p.n)
+				if (Number.isFinite(dims?.width) && dims.width > 0) {
+					w = dims.width
+					hasCasparDims = true
+				}
+				if (Number.isFinite(dims?.height) && dims.height > 0) h = dims.height
+			}
 		} else if (p.kind === 'multiview') {
 			const topoDims = resolveMultiviewDimsFromTopology(config, p.n)
 			if (topoDims && topoDims.width > 0 && topoDims.height > 0) {
@@ -146,7 +169,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 			if (!hasCasparDims) {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
-			} else if (p.kind === 'screen' || p.kind === 'multiview') {
+			} else if (p.kind === 'screen' || p.kind === 'multiview' || p.kind === 'prv') {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
 			}
@@ -189,6 +212,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 		}
 
 		if (p.kind === 'screen') results.screens[p.n] = info
+		else if (p.kind === 'prv') results.prv[p.n] = info
 		else results.multiview[p.n] = info
 
 		if (data.manualX === null) cumulativeX += w

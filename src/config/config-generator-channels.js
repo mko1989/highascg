@@ -112,6 +112,11 @@ function buildChannelsSection(config, routeMap) {
 			cumulativeX += s.dims.width
 			nextDevice++
 		}
+		/* WO-364: the PRV head's <screen> window claims its own device number. */
+		if (pair.hasPrvScreenConsumer && previewOn) {
+			cumulativeX += s.dims.width
+			nextDevice++
+		}
 		if (s.dims.isCustom) pushCustomMode(customVideoModes, customModeIds, s.dims)
 	}
 

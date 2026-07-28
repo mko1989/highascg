@@ -127,6 +127,11 @@ function findLayoutRectBySysId(layout, sysId) {
 			return { ...mv, kind: 'multiview', index: parseInt(idx, 10) || 1 }
 		}
 	}
+	for (const [idx, pv] of Object.entries(layout.prv || {})) {
+		if (String(pv?.sysId || '') === id && pv.width > 0 && pv.height > 0) {
+			return { ...pv, kind: 'prv', index: parseInt(idx, 10) || 1 }
+		}
+	}
 	return null
 }
 

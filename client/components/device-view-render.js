@@ -154,9 +154,9 @@ export function registerDeviceViewRender(ctx) {
 				}),
 			resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(state.lastPayload, d),
 			cableSourceId: state.cableSourceId,
-			onDestinationPortClick: (connectorId) => ctx.beginOrCompleteCable('dest:' + connectorId, connectorId, {}),
-			onDecklinkDropToDestinationOutput: (connectorId, d, intent) =>
-				ctx.setDecklinkAsDestinationOutput(connectorId, d, intent),
+			onDestinationPortClick: (connectorId, half) => ctx.beginOrCompleteCable('dest:' + connectorId, connectorId, { half }),
+			onDecklinkDropToDestinationOutput: (connectorId, d, intent, half) =>
+				ctx.setDecklinkAsDestinationOutput(connectorId, d, intent, half),
 			updateDestinationOutputLayer: ctx.updateDestinationOutputLayer,
 			requestCableOverlayRender: () => renderCableOverlay(ctx.getCOCtx()),
 		})
