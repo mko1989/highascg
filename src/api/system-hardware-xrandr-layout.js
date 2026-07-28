@@ -25,8 +25,8 @@ function handleXrandrLayoutGet(ctx) {
 /**
  * @param {*} ctx
  */
-function handleXrandrLayoutApplyPost(ctx) {
-	const res = applyX11Layout(ctx.config)
+async function handleXrandrLayoutApplyPost(ctx) {
+	const res = await applyX11Layout(ctx.config)
 	return {
 		status: 200,
 		headers: JSON_HEADERS,

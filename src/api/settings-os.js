@@ -163,7 +163,7 @@ async function handleOsPost(path, body, ctx) {
 			ctx.log('warn', `[settings-os] failed to build xrandr plan preview: ${e?.message || e}`)
 		}
 	}
-	const layoutRes = applyX11Layout(ctx.config) || { applied: false, persisted: false, xrandrCommand: null }
+	const layoutRes = (await applyX11Layout(ctx.config)) || { applied: false, persisted: false, xrandrCommand: null }
 	if (typeof ctx.log === 'function') {
 		ctx.log('info', `[settings-os] layout result applied=${!!layoutRes.applied} persisted=${!!layoutRes.persisted}`)
 	}

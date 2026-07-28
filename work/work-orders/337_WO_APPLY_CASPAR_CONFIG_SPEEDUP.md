@@ -2,7 +2,7 @@
 
 **Source:** owner report 2026-07-26 — "i need a good look at apply caspar config button. the whole process seems to take longer than it should."
 
-**Status: CLOSED 2026-07-27 — top-5 implemented 2026-07-26; residue resolved: template copy already per-file-mtime-gated (bd89484), TLS-before-CINF reorder REFUSED (CINF callbacks populate mediaDetails that the TLS callback consumes — reordering would pass empty data), remaining display/sleep items intentionally deferred (each requires live apply-cycle testing that restarts Caspar; do during a maintenance window, not from the desk).** Top-5: (commits e70fc01, 387149f, e51c7ed, 83f01b1):
+**Status: CLOSED 2026-07-27 — top-5 implemented 2026-07-26; residue resolved: template copy already per-file-mtime-gated (bd89484), TLS-before-CINF reorder REFUSED (CINF callbacks populate mediaDetails that the TLS callback consumes — reordering would pass empty data), final deferred item landed 2026-07-28 (owner authorized restarts): applyX11Layout is fully ASYNC (promisified xrandr execs + async retry sleeps — the sync execs froze the whole API/WS server during applies), all 6 callers await, watchdog tick rejection-guarded. NVIDIA fire-and-forget and the 1.5s stable-wait were already in. Live-verified: xrandr apply 0.3s HTTP with verify OK; unchanged-config full apply short-circuits in 0.12s via the skip gate.** Top-5: (commits e70fc01, 387149f, e51c7ed, 83f01b1):
 (1) toolbar button busy state + `[Full apply] Step N` streaming; (2) duplicate
 `applyOperatorDisplaySession` eliminated via `skipOperatorSession` (~5s); (3) operator-restart
 marker `/tmp/caspar-operator-restart` skips run.sh's 5s + 2×2s damping (activates at the next

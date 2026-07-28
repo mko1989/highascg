@@ -138,7 +138,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		}
 	}
 
-	const layoutRes = applyX11Layout(ctx.config, { live: false, persist: true })
+	const layoutRes = await applyX11Layout(ctx.config, { live: false, persist: true })
 	out.layout.persisted = !!layoutRes.persisted
 	out.layout.preXrandrCommand = layoutRes.xrandrCommand || null
 
@@ -174,7 +174,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			log('warn', `[Full apply] Display did not stabilize (${stable.reason || 'unknown'}) — applying xrandr anyway`)
 		}
 
-		const postLayout = applyX11Layout(ctx.config, { live: true, persist: false, skipOperatorSession: true })
+		const postLayout = await applyX11Layout(ctx.config, { live: true, persist: false, skipOperatorSession: true })
 		out.layout.postApplied = !!postLayout.applied
 		out.layout.postXrandrCommand = postLayout.xrandrCommand || null
 		out.displayRestart.postLayoutApplied = !!postLayout.applied
@@ -189,7 +189,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		await waitForAmcpDisconnect(ctx, 5_000)
 	} else {
 		log('info', '[Full apply] Step 3 — applying live xrandr layout')
-		const liveLayout = applyX11Layout(ctx.config, { live: true, persist: false, skipOperatorSession: true })
+		const liveLayout = await applyX11Layout(ctx.config, { live: true, persist: false, skipOperatorSession: true })
 		out.layout.preApplied = !!liveLayout.applied
 		out.layout.postApplied = !!liveLayout.applied
 		out.layout.postXrandrCommand = liveLayout.xrandrCommand || null

@@ -1,6 +1,8 @@
 'use strict'
 
-const { execFileSync } = require('child_process')
+const { execFile } = require('child_process')
+const { promisify } = require('util')
+const execFileAsync = promisify(execFile)
 const logger = require('./buffered-logger').osDisplay
 const { getGpuConnectorInventory, getXAuthority } = require('./hardware-info')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
@@ -18,14 +20,9 @@ const {
 } = require('./xrandr-safety')
 const { persistLayoutScript } = require('./os-config-persist')
 
-/** Synchronous sleep between xrandr retries (this function runs in a sync execSync context). */
-function sleepSyncMs(ms) {
-	if (!(ms > 0)) return
-	try {
-		execFileSync('sleep', [String(Math.max(0.05, ms / 1000))], { stdio: 'ignore' })
-	} catch (_) {
-		/* best effort */
-	}
+/** WO-337: async now — the sync sleep + sync xrandr execs froze the whole API/WS server. */
+function sleepMs(ms) {
+	return new Promise((r) => setTimeout(r, Math.max(0, ms)))
 }
 
 /** Number of xrandr apply attempts (NVIDIA BadMatch often clears on identical retry). Env: HIGHASCG_XRANDR_APPLY_ATTEMPTS */
@@ -47,7 +44,7 @@ function readXrandrApplyRetryDelayMs(config) {
 /**
  * Applies X11 screen positioning using xrandr or nvidia-settings.
  */
-function applyX11Layout(config, opts = {}) {
+async function applyX11Layout(config, opts = {}) {
 	const live = opts.live !== false
 	const persist = opts.persist !== false
 	logger.info(`[OS-Config] applyX11Layout start live=${live} persist=${persist}`)
@@ -236,11 +233,12 @@ function applyX11Layout(config, opts = {}) {
 	}
 
 	try {
-		xrandrQueryOut = execFileSync(
+		const q = await execFileAsync(
 			'xrandr',
 			['--display', ':0', '--query'],
 			{ env: { ...process.env, DISPLAY: ':0', XAUTHORITY: getXAuthority() }, encoding: 'utf8' },
-		).toString()
+		)
+		xrandrQueryOut = String(q.stdout || '')
 		const parsed = parseOutputModes(xrandrQueryOut)
 		for (const [out, modes] of parsed.entries()) availableModesByOutput.set(out, modes)
 	} catch (e) { logger.warn(`[OS-Config] Failed to query connected outputs: ${e.message}`) }
@@ -288,7 +286,7 @@ function applyX11Layout(config, opts = {}) {
 		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 			try {
 				logger.info(`[OS-Config] Applying (xrandr) attempt ${attempt}/${maxAttempts}: ${xrandrLog}`)
-				const out = execFileSync('xrandr', xrandrArgv, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
+				const { stdout: out } = await execFileAsync('xrandr', xrandrArgv, { env, encoding: 'utf8', maxBuffer: 1024 * 1024 })
 				const trimmed = String(out || '').trim()
 				if (trimmed) {
 					const cap = 8000
@@ -307,7 +305,7 @@ function applyX11Layout(config, opts = {}) {
 				logger.warn(`[OS-Config] xrandr apply attempt ${attempt}/${maxAttempts} failed: ${e.message}`)
 				if (stderr) logger.warn(`[OS-Config] xrandr stderr: ${stderr}`)
 				if (e.stdout) logger.warn(`[OS-Config] xrandr stdout (on error): ${String(e.stdout).trim().slice(0, 8000)}`)
-				if (attempt < maxAttempts && retryDelayMs > 0) sleepSyncMs(retryDelayMs)
+				if (attempt < maxAttempts && retryDelayMs > 0) await sleepMs(retryDelayMs)
 			}
 		}
 		if (applied) {

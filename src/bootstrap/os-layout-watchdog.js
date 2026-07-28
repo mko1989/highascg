@@ -36,7 +36,7 @@ function startOsLayoutWatchdog(ctx) {
 	/** @type {ReturnType<typeof setInterval> | null} */
 	let timer = null
 
-	const tick = () => {
+	const tick = async () => {
 		if (done) return
 		attempts += 1
 		const xr = getDisplaysXrandrDetailed()
@@ -72,7 +72,7 @@ function startOsLayoutWatchdog(ctx) {
 		}
 
 		log('info', '[OS-Watchdog] Re-applying xrandr layout')
-		const res = applyX11Layout(ctx.config)
+		const res = await applyX11Layout(ctx.config)
 		if (res?.verify?.ok) {
 			done = true
 			if (timer) clearInterval(timer)
@@ -90,8 +90,10 @@ function startOsLayoutWatchdog(ctx) {
 		}
 	}
 
-	timer = setInterval(tick, pollMs)
-	tick()
+	/* tick is async now (applyX11Layout awaited) — never let a rejection escape the interval. */
+	const safeTick = () => void tick().catch((e) => log('warn', `[OS-Watchdog] tick failed: ${e?.message || e}`))
+	timer = setInterval(safeTick, pollMs)
+	safeTick()
 	return () => {
 		done = true
 		if (timer) clearInterval(timer)
