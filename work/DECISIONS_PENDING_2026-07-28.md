@@ -6,11 +6,15 @@ evening batch is implemented (WO-365, WO-367, WO-369, WO-370, WO-373; WO-372 par
 Nothing below has been implemented — deliberately. Each section says what to answer, what it
 costs, and what happens once you answer.
 
-**Quickest path:** WO-366 is seven yes/no ticks (§1). WO-371 and WO-368 are one letter each.
+**Quickest path:** WO-366 is seven yes/no ticks. WO-368 and WO-376 are one letter each. (WO-371: answered — option B.)
 
 ---
 
-## WO-371 — "In PRV the playlist stops after the first item"
+## WO-371 — "In PRV the playlist stops after the first item"  ✅ ANSWERED
+
+**You answered: B** — "yes and it should continue playing as expected so each item and looping."
+Recorded in the WO and the queue; unblocked, not yet implemented. The rest of this section is kept
+for context.
 
 **Answer with: A, B or C.** → [WO-371](./work-orders/371_WO_prv_playlist_preview_playback.md)
 
@@ -28,7 +32,7 @@ is.** But the question WO-354 was answering is still unanswered:
 
 > After editing a playlist, how do you confirm the new list is right without putting it on air?
 
-Today: you can't. Preview shows item 1 frozen.
+Today: you can't. Preview shows item 1 frozen. 
 
 ### Options
 
@@ -40,6 +44,7 @@ Today: you can't. Preview shows item 1 frozen.
 
 **Recommended: C** — it answers the real need (verify the edited list) without rebuilding the
 dual-timer surface WO-354 had to untangle. **A** is right if you are happy verifying on air.
+actually it makes sense that it pauses.
 
 ### After you answer
 
@@ -82,13 +87,41 @@ Three consequences, worst first:
 
 **Recommended: C** long-term; **A** is the correct stop-gap if you want it settled today. Neither
 should land before answering *"what backs up my shaders?"* — right now nothing does.
-
+the shaders that are in the folder rigth now can be added to the repo. 
 ### Same class, one commit, no decision needed
 
 `README.md` in `/home/casparcg/companion-module-dev/companion-module-highpass-highascg` is still
 untracked (`??`), so the dev-mode loop WO-361 documents exists only on this box. WO-372 added
 `scripts/stamp-dev-manifest.js` and a `package:dev` change **in that same repo, also uncommitted**.
 One commit there closes all three. Say the word and I'll do it.
+
+---
+
+## WO-376 — which source should a shader's "camera" channel mean?
+
+**Answer with: A, B or C.** → [WO-376](./work-orders/376_WO_shader_camera_channel.md)
+
+From your todos28 line *"some shaders allow camera input. make it possible to route the virtual cam
+output to the shaders."* Feasibility is settled — `/dev/video10` is live and bridging PGM at
+1920×1080@50, and the audio-texture path in `player.js` is the exact template a camera texture
+copies. What is not settled is what "camera" points at, and that changes the stored vocabulary:
+
+| | What "camera" means | Cost |
+|---|---|---|
+| **A** ⭐ | The virtual camera only (`/dev/video10` = PGM). | One well-known device, no new config. Carries the feedback hazard below. |
+| **B** | Any V4L2 device — virtual cam plus the USB cameras Device View already enumerates, picked per shader. | More UI, and a shader config becomes machine-specific (moved to another box, the device may not exist). |
+| **C** | A Caspar channel chosen per shader, delivered by re-pointing the virtual-camera bridge. | Most native, but the bridge is a single global sink today — one shader would dictate it for everyone, or a second bridge instance is needed. |
+
+**Recommended: A**, with the value named `camera` (not `vcam`) so B can be added later as a device
+*option* without changing what is stored.
+
+**Second question, either way:** the virtual cam carries **PGM**. A camera shader playing out *on*
+PGM is a feedback loop (the class WO-156's self-route guard exists for). Block it, or allow it as a
+deliberate video-feedback effect? Some Shadertoy shaders want exactly that.
+
+Also worth knowing before you pick: this will work on the browser_display path (real getUserMedia),
+**needs proving on the Caspar CEF path** (video permission there is not established — audio is), and
+must be skipped entirely in look-deck thumbnails (no capture device headless).
 
 ---
 
