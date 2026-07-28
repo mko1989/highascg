@@ -1,6 +1,6 @@
 # WO-360 — Playout status surfacing: missing media / failed inputs must TELL the operator
 
-**Status: v1 SHIPPED 2026-07-28 — missing-media marks + take toasts + live-input failure toasts; deck-card badge and per-command AMCP-failure plumbing remain.** · Source: owner checklist note 27.07 (item 3): "here we enter something that
+**Status: DONE 2026-07-28 (live-verified) — missing-media marks (rows/panel/deck-card ⚠), pre-take missing toasts, live-input failure toasts, AND per-take AMCP failure plumbing (batch failures → take response → toast; probe-verified: a bogus clip returned both 404 LOADBGs). Route-to-empty detection deferred (needs post-take INFO probing; low value now that WO-359 made routes reliable).** · Source: owner checklist note 27.07 (item 3): "here we enter something that
 hasent been done yet properly, which is status check and message to the user if anything is
 missing or input hasent started properly and failed bring alive pass."
 
@@ -41,11 +41,17 @@ status layer across the playout surfaces:
   the decklink toast's transition semantics — failures once (including already-dead at page
   load), recoveries as success.
 
-## Remaining
+## Completed in v2 (same day)
 
-- Deck-card ⚠ badge for looks containing missing media.
-- Per-command AMCP failure plumbing (batch `failures[]` → take response → client toast) for
-  failures the static index can't predict.
+- Deck-card ⚠ badge (corner, tooltip lists missing paths; `.scenes-card--missing-media`).
+- AMCP failure plumbing: the take route arms `connection._batchFailureSink`; amcp-batch pushes
+  inner BEGIN…COMMIT failures into it; the 200 response carries `amcpFailures[]`; deck takes
+  and preview recalls toast the first failed command + count. Live-probed with a bogus clip:
+  response carried both 404 LOADBGs (PGM + preview exchange). Note: the sink is per-connection —
+  overlapping takes on other channels may co-mingle entries (still informative).
+
+## Deferred
+
 - Route-to-empty detection post-take.
 
 ## Acceptance

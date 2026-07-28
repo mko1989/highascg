@@ -82,3 +82,16 @@ export function warnMissingMediaOnTake(scene) {
 	window.showToast?.(`⚠ Missing in Caspar media: ${names}`, 'error')
 	console.warn('[media-exists] take with missing media:', missing)
 }
+
+/** WO-360: toast inner AMCP failures a take response reports (server-collected per take). */
+export function toastTakeAmcpFailures(res) {
+	const fails = Array.isArray(res?.amcpFailures) ? res.amcpFailures : []
+	if (!fails.length) return
+	const first = fails[0]
+	const cmd = String(first.command || '').split(' ').slice(0, 3).join(' ')
+	window.showToast?.(
+		`⚠ ${fails.length} command(s) failed during take — first: ${cmd} → ${first.line || first.code}`,
+		'error',
+	)
+	console.warn('[take] AMCP failures:', fails)
+}

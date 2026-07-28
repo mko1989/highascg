@@ -221,7 +221,7 @@ export function createScenesPreviewRuntime(opts) {
 			})
 			/* WO-360: name what will be black BEFORE it is (preview recall included). */
 			import('../lib/media-exists.js').then((m) => m.warnMissingMediaOnTake(incomingScene)).catch(() => {})
-			await api.post('/api/scene/take', {
+			const takeRes = await api.post('/api/scene/take', {
 				channel: programCh,
 				sceneId,
 				target: 'preview',
@@ -233,6 +233,7 @@ export function createScenesPreviewRuntime(opts) {
 					globalBorder: sceneState.getGlobalBorderForScreen(mIdx),
 				},
 			})
+			import('../lib/media-exists.js').then((m) => m.toastTakeAmcpFailures(takeRes)).catch(() => {})
 			sceneState.setPreviewSceneId(sceneId, mIdx)
 			if (Number.isFinite(prvCh) && prvCh > 0) previewState.lastPreviewChannel = prvCh
 		}

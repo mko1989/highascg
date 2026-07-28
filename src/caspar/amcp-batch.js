@@ -215,6 +215,11 @@ function runBeginCommitBatch(client, lines, options) {
 					if (connection._amcpBatchDrain === drain) connection._amcpBatchDrain = null
 					const rawLines = this.lines.slice()
 					const { failures, benign } = extractBatchFailures(rawLines, lines)
+					/* WO-360: a take (or other flow) can arm a sink to COLLECT inner failures —
+					 * the log lines below were the only trace, invisible to the operator. */
+					if (Array.isArray(connection._batchFailureSink) && failures.length > 0) {
+						connection._batchFailureSink.push(...failures)
+					}
 					if (typeof connection.log === 'function') {
 						// One line per failure, carrying the offending command and Caspar's own status line.
 						// Before WO-281 §4.1 these were invisible: the drain short-circuits amcp-protocol's

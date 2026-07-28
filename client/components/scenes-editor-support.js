@@ -231,6 +231,8 @@ export function createTakeSceneToProgram(deps) {
 					continue
 				}
 				const takeRes = res.value
+				/* WO-360: the server reports inner AMCP failures per take — say them out loud. */
+				import('../lib/media-exists.js').then((m) => m.toastTakeAmcpFailures(takeRes)).catch(() => {})
 				touched.push({ mainIdx: job.mainIdx, channel: job.channel })
 				sceneState.setLiveSceneId(job.sceneId, job.mainIdx, { silent: true })
 				if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {

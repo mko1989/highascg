@@ -357,6 +357,12 @@ async function handleSceneTake(body, ctx) {
 	ctx._sceneTakeChainByChannel[chKey] = takePromise.catch(() => {})
 
 	let takeTimeoutTimer = null
+	/* WO-360: collect inner BEGIN…COMMIT failures during THIS take so the operator hears about
+	 * a 404'd layer instead of watching black (previously log-only). Shared connection: an
+	 * overlapping take on another channel may co-mingle entries — still informative. */
+	const amcpConn = ctx.amcp?._context
+	const takeFailures = []
+	if (amcpConn) amcpConn._batchFailureSink = takeFailures
 	try {
 		await Promise.race([
 			takePromise,
@@ -381,6 +387,7 @@ async function handleSceneTake(body, ctx) {
 	} finally {
 		// Do not leak a 2-minute timer per take (kept the event loop alive; WO-156 cleanup).
 		if (takeTimeoutTimer) clearTimeout(takeTimeoutTimer)
+		if (amcpConn && amcpConn._batchFailureSink === takeFailures) amcpConn._batchFailureSink = null
 	}
 
 	const matrix = playbackTracker.getMatrixForState(ctx)
@@ -391,6 +398,9 @@ async function handleSceneTake(body, ctx) {
 			ok: true,
 			sceneLive: liveSceneState.getAll(),
 			playbackMatrix: matrix,
+			...(takeFailures.length
+				? { amcpFailures: takeFailures.map((f) => ({ code: f.code, command: f.command, line: f.line })) }
+				: {}),
 		}),
 	}
 }

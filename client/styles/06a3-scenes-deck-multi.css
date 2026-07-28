@@ -205,3 +205,16 @@
 	padding: 1rem 0.5rem;
 }
 
+
+/* WO-360 — look card carrying media Caspar doesn't know */
+.scenes-card__missing-badge {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	z-index: 3;
+	font-size: 12px;
+	color: #f85149;
+	text-shadow: 0 0 3px #000;
+	pointer-events: auto;
+	cursor: help;
+}

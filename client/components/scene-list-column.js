@@ -4,6 +4,7 @@
 
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
+import { missingMediaInScene } from '../lib/media-exists.js'
 import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
 import { api } from '../lib/api-client.js'
 import { uiIcon } from './ui-icons.js'
@@ -213,6 +214,8 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			const onPreview = !onPgm && (prvLookId === sc.id || armedPrvId === sc.id)
 			const isGlobal = sc.mainScope === 'all'
 			const cgOnly = isCgOnlyLook(sc)
+			/* WO-360: looks carrying media Caspar doesn't know get a corner ⚠. */
+			const missingMedia = missingMediaInScene(sc)
 			// Scoped looks: live/preview styling only on the main they belong to (already filtered by getScenesForMain).
 			const card = document.createElement('div')
 			card.className =
@@ -220,8 +223,16 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				(onPgm ? ' scenes-card--live' : '') +
 				(onPreview ? ' scenes-card--preview' : '') +
 				(isGlobal ? ' scenes-card--global' : '') +
-				(cgOnly ? ' scenes-card--cg-only' : '')
+				(cgOnly ? ' scenes-card--cg-only' : '') +
+				(missingMedia.length ? ' scenes-card--missing-media' : '')
 			card.dataset.sceneId = String(sc.id)
+			if (missingMedia.length) {
+				const warn = document.createElement('span')
+				warn.className = 'scenes-card__missing-badge'
+				warn.textContent = '⚠'
+				warn.title = `Missing in Caspar media:\n${missingMedia.join('\n')}`
+				card.appendChild(warn)
+			}
 			const header = document.createElement('div')
 			header.className = 'scenes-card__header'
 			const nameInput = document.createElement('input')
