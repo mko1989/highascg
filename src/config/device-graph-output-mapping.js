@@ -48,7 +48,7 @@ function collectDestinationOutputEdges(config) {
 	const graph = normalizeDeviceGraph(config?.deviceGraph)
 	const byConn = new Map((graph.connectors || []).map((c) => [String(c.id), c]))
 	const byDestId = new Map(
-		(normalizeScreenDestinations(config?.screenDestinations).destinations || []).map((d) => [String(d?.id || ''), d]),
+		(normalizeScreenDestinations(config?.screenDestinations).destinations || []).map((d) => [String(d?.id || ''), d])
 	)
 	return (Array.isArray(graph.edges) ? graph.edges : [])
 		.map((e) => {
@@ -60,7 +60,34 @@ function collectDestinationOutputEdges(config) {
 			const destinationId = String(source.externalRef || '').trim()
 			if (!destinationId) return null
 			const destination = byDestId.get(destinationId)
-			if (!destination) return null
+			if (!destination) {
+				/* todos28.07.26 (owner): "i connected decklink input 4 host channel to a virtual
+				 * camera output and on the output there is channel 1 ... it defaults to 1 instead of
+				 * using the connection to determine the channel."
+				 *
+				 * HOST-CHANNEL destinations (decklink/live-audio input buses) are VIRTUAL — they are
+				 * built for Device View from the channel map, never persisted into
+				 * `screenDestinations`. So this lookup missed and the edge was dropped on the floor:
+				 * the cable existed in the graph and meant nothing downstream. The connector itself
+				 * carries the answer (`caspar.hostChannel`), so resolve from it instead.
+				 *
+				 * Such an edge has no `program_N`/`preview_N` name — `videoSource` stays null and
+				 * consumers that write a source STRING must skip it (only the ones that take a
+				 * channel NUMBER, i.e. the virtual camera, can honour it today). */
+				const hostChannel = Math.max(0, parseInt(String(source?.caspar?.hostChannel ?? 0), 10) || 0)
+				if (!hostChannel) return null
+				return {
+					edge: e,
+					sink,
+					destinationId,
+					destination: null,
+					mode: 'host_channel',
+					mainIndex: 0,
+					layer: readEdgeOutputLayer(e),
+					videoSource: null,
+					hostChannel,
+				}
+			}
 			const mainIndex = Math.max(0, parseInt(String(destination.mainScreenIndex ?? 0), 10) || 0)
 			const layer = readEdgeOutputLayer(e)
 			return {
@@ -72,6 +99,7 @@ function collectDestinationOutputEdges(config) {
 				mainIndex,
 				layer,
 				videoSource: destinationToVideoSource(destination, layer),
+				hostChannel: null,
 			}
 		})
 		.filter(Boolean)
@@ -154,6 +182,10 @@ function applyStreamRecordMappingsFromGraph(config) {
 	for (const [streamSinkId, list] of groupedStreams.entries()) {
 		const winner = pickOutputEdgeWinner(list, streamSinkId)
 		if (!winner) continue
+		// todos28.07.26: host-channel sources have no program_N/preview_N name — `videoSource` is
+		// the string this writes into config, so an unnameable source must be left alone rather
+		// than blanking a working one.
+		if (!winner.videoSource) continue
 		if (!config.streamingChannel || typeof config.streamingChannel !== 'object') {
 			config.streamingChannel = {}
 		}
@@ -174,12 +206,11 @@ function applyStreamRecordMappingsFromGraph(config) {
 	}
 
 	if (groupedRecords.size) {
-		const next = Array.isArray(config.recordOutputs)
-			? config.recordOutputs.map((x) => ({ ...x }))
-			: []
+		const next = Array.isArray(config.recordOutputs) ? config.recordOutputs.map((x) => ({ ...x })) : []
 		for (const [recordId, list] of groupedRecords.entries()) {
 			const winner = pickOutputEdgeWinner(list, recordId)
 			if (!winner) continue
+			if (!winner.videoSource) continue // see the stream guard above
 			const idx = next.findIndex((x) => String(x?.id || '') === recordId)
 			if (idx >= 0) {
 				if (String(next[idx].source || '') !== winner.videoSource) {
@@ -222,7 +253,9 @@ function applyVirtualCameraMappingsFromGraph(config) {
 	const winner = pickOutputEdgeWinner(edges, edges[0]?.sink?.id || 'v4l2_out')
 	if (!winner) return { changed: false }
 
-	const ch = resolveInputTargetToChannel(config, winner.videoSource)
+	/* todos28.07.26: a host-channel source (decklink/live-audio input bus) knows its Caspar
+	 * channel outright — it has no program_N name to resolve. */
+	const ch = winner.hostChannel || resolveInputTargetToChannel(config, winner.videoSource)
 	if (ch == null || !Number.isFinite(ch) || ch < 1) return { changed: false }
 
 	const cur = normalizeVirtualCameraConfig(config.virtualCamera)
