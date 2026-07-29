@@ -166,7 +166,9 @@ describe('WO-381 compact timers dock', () => {
 		const css = read('client/styles/07b2-timer-control-panel.css')
 		const rule = css.slice(css.indexOf('.timer-control-panel__timer-input {'))
 		const block = rule.slice(0, rule.indexOf('}'))
-		assert.match(block, /width: 8ch/)
+		// box-sizing is border-box globally, so the width must include padding + border or the
+		// text is clipped (owner: "too wide", then "too small to fit the time now").
+		assert.match(block, /width: calc\(8ch \+ 20px\)/)
 		assert.doesNotMatch(block, /flex: 1/)
 	})
 

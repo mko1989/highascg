@@ -240,11 +240,13 @@
 	flex: 0 0 auto;
 }
 
-/* WO-381 (owner: "the input box for the time is too wide"): sized to its content — `hh:mm:ss`
- * in the monospace face — instead of stretching across the row. */
+/* WO-381 (owner: "the input box for the time is too wide"): sized to its content instead of
+ * stretching across the row. `box-sizing: border-box` is global (01a1-base-theme-tokens.css), so
+ * the width must carry the padding (2×4px) and border (2×1px) on top of the 8 glyphs of
+ * `hh:mm:ss` — a bare `8ch` clipped the text. */
 .timer-control-panel__timer-input {
 	flex: 0 0 auto;
-	width: 8ch;
+	width: calc(8ch + 20px);
 	padding: 2px 4px;
 	background: var(--bg-input, var(--bg-2, #161b22));
 	border: 1px solid rgba(255, 255, 255, 0.08);
