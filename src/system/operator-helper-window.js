@@ -89,6 +89,27 @@ const HELPER_ACTIONS = /** @type {const} */ ([
 	'file-manager',
 ])
 
+/**
+ * WO-387. Is this an action the operator may open? The five above keep their bespoke launch paths
+ * (isolated Firefox profile, media-path file manager, NVIDIA display policy), and ANY app installed
+ * on the box is additionally addressable as `app:<desktop-id>`.
+ *
+ * The catalog is re-read here rather than trusted from the request: this is the gate that keeps the
+ * vocabulary "installed applications" and not "any command". An ID that no longer resolves to a
+ * launchable .desktop entry — package removed between the menu render and the click — is refused
+ * exactly like a made-up one.
+ * @param {string} action
+ * @returns {boolean}
+ */
+function isHelperAction(action) {
+	if (HELPER_ACTIONS.includes(/** @type {any} */ (action))) return true
+	try {
+		return require('../utils/desktop-app-catalog').isAppAction(action)
+	} catch {
+		return false
+	}
+}
+
 /* ------------------------------------------------------------------------------------------- *
  * RUNTIME
  * ------------------------------------------------------------------------------------------- */
@@ -120,6 +141,36 @@ function say(log, level, msg) {
 /** @returns {{ state: string, action: string|null, since: number|null }} */
 function getOperatorHelperState() {
 	return { state: session.state, action: session.action, since: session.startedAt }
+}
+
+/**
+ * WO-387 — hand this single session over to a NEW helper.
+ *
+ * The session above tracks exactly one helper, and `open_requested` refuses while it is busy ("two
+ * helpers would race the same restore"). That refusal is correct for the WO-283 single-helper
+ * configuration and WRONG once the WO-317 taskbar is on: the coordinator is then the multi-helper
+ * authority, and delegating launches through here capped the whole box at ONE open window — owner,
+ * 29.07: *"when i have zoom open the open window button just shows zoom app is open and i cant open
+ * anything else"*.
+ *
+ * Yielding is not "forget the helper": the previous helper stays in the coordinator's registry, its
+ * chip stays live, and its window is reaped by `reconcileHelperWindows` on the taskbar poll instead
+ * of by this watchdog. Only the single session — the thing that can track one helper at a time —
+ * moves to the newcomer. Called ONLY from the coordinator's launch path, so the WO-283 refusal is
+ * untouched when the taskbar is off.
+ *
+ * @param {string} reason
+ * @param {Function} [log]
+ * @returns {boolean} whether a session was actually handed over
+ */
+function yieldOperatorHelperSession(reason, log) {
+	if (session.state === STATE.IDLE) return false
+	say(log, 'info', `session yielded (was ${session.action} in ${session.state}) — ${reason}`)
+	// Deliberately NOT a restore: the kiosk top-assert stays suspended because the incoming helper
+	// suspends it again immediately, and the coordinator's refcount is the authority while the
+	// taskbar is on. resetSession clears the old watchdog so it cannot restore under the newcomer.
+	resetSession()
+	return true
 }
 
 function clearWatchdog() {
@@ -247,8 +298,7 @@ async function findHelperWindows(action, deps = {}) {
 async function openOperatorHelperWindow(action, config, opts = {}) {
 	const log = opts.log
 	const deps = opts.deps || {}
-	if (!HELPER_ACTIONS.includes(/** @type {any} */ (action)))
-		return { ok: false, reason: `unknown_action_${action}`, state: session.state }
+	if (!isHelperAction(action)) return { ok: false, reason: `unknown_action_${action}`, state: session.state }
 
 	const t = nextHelperState(session.state, 'open_requested')
 	if (!t.ok) {
@@ -389,6 +439,7 @@ module.exports = {
 	classifyHelperWindows,
 	STATE,
 	HELPER_ACTIONS,
+	isHelperAction,
 	WATCHDOG_APPEAR_TICKS,
 	WATCHDOG_INTERVAL_MS,
 	WATCHDOG_EARLY_EXIT_GRACE_TICKS,
@@ -396,4 +447,5 @@ module.exports = {
 	openOperatorHelperWindow,
 	closeOperatorHelperWindow,
 	getOperatorHelperState,
+	yieldOperatorHelperSession,
 }

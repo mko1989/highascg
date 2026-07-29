@@ -50,8 +50,7 @@ async function parkPointerOnOperatorDisplay(config, opts = {}) {
  *   (the caller needs titles to tell a real helper window from a "Close Firefox" profile-lock modal)
  */
 async function findGuiWindowIds(action, opts = {}) {
-	const winClassRaw = GUI_WINDOW_CLASS[action]
-	const winClasses = Array.isArray(winClassRaw) ? winClassRaw : winClassRaw ? [winClassRaw] : []
+	const winClasses = windowClassesFor(action)
 	if (!winClasses.length || !(await commandExists('xdotool'))) return []
 	const env = displaySessionEnv()
 	/** @type {Set<string>} */
@@ -253,8 +252,7 @@ function resolveWindowAbovePromoter() {
 async function raiseOperatorGuiWindows(action, config, opts = {}) {
 	const log = typeof opts.log === 'function' ? opts.log : () => {}
 	const rect = resolveOperatorDisplayRect(config)
-	const winClassRaw = GUI_WINDOW_CLASS[action]
-	const winClasses = Array.isArray(winClassRaw) ? winClassRaw : winClassRaw ? [winClassRaw] : []
+	const winClasses = windowClassesFor(action)
 	if (!winClasses.length || !(await commandExists('xdotool'))) return false
 	const env = displaySessionEnv()
 	const x = rect ? rect.x + Math.max(0, Math.floor(rect.width * 0.05)) : 0
@@ -287,6 +285,26 @@ async function raiseOperatorGuiWindows(action, config, opts = {}) {
 		return true
 	}
 	return false
+}
+
+/**
+ * WO-387. The window-class candidates for an action. The five WO-283 tools keep their curated
+ * entries below — hand-checked res_name/res_class values that no .desktop file states (Firefox's
+ * `Navigator`, the DeckLink tools' shared `DesktopVideo`) — while an `app:<id>` action gets its
+ * classes from the installed .desktop entry's `StartupWMClass`. Same contract either way: whatever
+ * comes back is what the helper watchdog will find, promote, park and reap.
+ * @param {string} action
+ * @returns {string[]}
+ */
+function windowClassesFor(action) {
+	const raw = GUI_WINDOW_CLASS[action]
+	if (raw) return Array.isArray(raw) ? raw : [raw]
+	if (!String(action || '').startsWith('app:')) return []
+	try {
+		return require('./desktop-app-catalog').resolveAppWindowClasses(action)
+	} catch {
+		return [] // catalog unavailable — behave as an unknown action rather than throwing into X code
+	}
 }
 
 /** @type {Record<string, string | string[]>} */
@@ -333,6 +351,7 @@ function scheduleGuiWindowPosition(action, config, opts = {}) {
 
 module.exports = {
 	parkPointerOnOperatorDisplay,
+	windowClassesFor,
 	findGuiWindowIds,
 	raiseOperatorGuiWindows,
 	resolveWindowAbovePromoter,

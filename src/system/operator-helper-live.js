@@ -84,8 +84,15 @@ function getHelperCoordinator(ctx) {
 		},
 		launchHelper: async (id, info) => {
 			// Delegate the actual spawn to the existing, live-proven path (positional signature).
-			const { openOperatorHelperWindow } = require('./operator-helper-window')
+			const { openOperatorHelperWindow, yieldOperatorHelperSession } = require('./operator-helper-window')
 			const action = info?.action || id
+			/* WO-387: that path owns ONE session and refuses `open_requested` while it is busy, which
+			 * with the taskbar on meant the second window could never open (owner: "when i have zoom
+			 * open ... i cant open anything else"). THIS coordinator is the multi-helper authority —
+			 * its registry keeps the previous helper and the taskbar poll reaps it — so hand the
+			 * single session to the newcomer instead of inheriting a refusal meant for a
+			 * configuration where only one helper may exist. */
+			yieldOperatorHelperSession(`taskbar launching ${action}`, log)
 			const res = await openOperatorHelperWindow(action, ctx.config, { log })
 			if (res && res.ok === false) throw new Error(res.reason || 'launch_refused')
 			/* todos27.07.26: nothing ever called onHelperMapped, so taskbar helpers wedged in

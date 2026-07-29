@@ -168,6 +168,7 @@ const FILES = [
 	'tools/smoke/smoke-wo313-cable-resize-raf.test.js',
 	'tools/smoke/smoke-wo315-nodm-canvas-decision.test.js',
 	'tools/smoke/smoke-wo316-decklink-already-open.test.js',
+	'tools/smoke/smoke-wo387-desktop-app-catalog.test.js',
 	'tools/smoke/smoke-wo317-helper-registry.test.js',
 	'tools/smoke/smoke-wo317-helper-registry-raise-and-stress.test.js',
 	'tools/smoke/smoke-wo317-helper-window-plan.test.js',

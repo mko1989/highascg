@@ -116,6 +116,22 @@ export async function operatorHelperTaskbarAction(id, action) {
 }
 
 /**
+ * WO-387 — the installed-application catalog behind the "Open window" menu. Every launchable
+ * .desktop entry on the box; `action` is what gets posted back to open one, `pinnedAction` (when
+ * set) says this app IS one of the five curated tools and should be opened through that path
+ * instead (the operator Firefox uses an isolated profile, the file browser opens the media path).
+ * @returns {Promise<Array<{ action: string, id: string, name: string, comment: string, categories: string[], pinnedAction: string|null }>>}
+ */
+export async function getOperatorApps() {
+	try {
+		const res = await api.get('/api/system/apps')
+		return Array.isArray(res?.apps) ? res.apps : []
+	} catch {
+		return []
+	}
+}
+
+/**
  * @param {boolean} enabled
  */
 export async function setOperatorPointerConfine(enabled) {

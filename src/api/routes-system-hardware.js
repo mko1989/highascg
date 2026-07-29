@@ -47,6 +47,10 @@ async function hardwareHandleGet(p, ctx, query) {
 		const { handleOperatorHelperIconGet } = require('./system-hardware-gui')
 		return handleOperatorHelperIconGet(query)
 	}
+	if (p === '/api/system/apps') {
+		const { handleSystemAppsGet } = require('./system-hardware-gui')
+		return handleSystemAppsGet()
+	}
 	return null
 }
 

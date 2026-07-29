@@ -6,11 +6,17 @@ evening batch is implemented (WO-365, WO-367, WO-369, WO-370, WO-373; WO-372 par
 Nothing below has been implemented — deliberately. Each section says what to answer, what it
 costs, and what happens once you answer.
 
-**Quickest path:** WO-366 is seven yes/no ticks. WO-368 and WO-376 are one letter each. (WO-371: answered — option B.)
+**Quickest path:** WO-366 is seven yes/no ticks — **the only thing still open**.
+
+> **29.07 — answers recorded.** WO-371 → **C** (your "actually it makes sense that it pauses", asked
+> back as A-or-C). WO-368 → **B** (your "the shaders that are in the folder rigth now can be added to
+> the repo"). WO-376 → **A**, already implemented on 29.07 (see the queue row — camera value named
+> `camera`, opt-in tick per shader). All three are recorded in their work orders; **WO-371 and WO-368
+> are unblocked but NOT implemented**. WO-366's seven ticks below are still blank.
 
 ---
 
-## WO-371 — "In PRV the playlist stops after the first item"  ✅ ANSWERED
+## WO-371 — "In PRV the playlist stops after the first item"  ✅ ANSWERED (29.07: **C**, superseding B)
 
 **You answered: B** — "yes and it should continue playing as expected so each item and looping."
 Recorded in the WO and the queue; unblocked, not yet implemented. The rest of this section is kept
@@ -53,7 +59,7 @@ implementing WO states which of WO-354's and WO-355's behaviours it preserves.
 
 ---
 
-## WO-368 — the shader library is currently single-copy
+## WO-368 — the shader library is currently single-copy  ✅ ANSWERED (29.07: **B**)
 
 **Answer with: A, B or C.** → [WO-368](./work-orders/368_WO_shader_store_git_ownership.md)
 
@@ -97,7 +103,7 @@ One commit there closes all three. Say the word and I'll do it.
 
 ---
 
-## WO-376 — which source should a shader's "camera" channel mean?
+## WO-376 — which source should a shader's "camera" channel mean?  ✅ ANSWERED (**A**) — IMPLEMENTED 29.07
 
 **Answer with: A, B or C.** → [WO-376](./work-orders/376_WO_shader_camera_channel.md)
 
@@ -114,18 +120,18 @@ copies. What is not settled is what "camera" points at, and that changes the sto
 
 **Recommended: A**, with the value named `camera` (not `vcam`) so B can be added later as a device
 *option* without changing what is stored.
-
+ok option a change the name.
 **Second question, either way:** the virtual cam carries **PGM**. A camera shader playing out *on*
 PGM is a feedback loop (the class WO-156's self-route guard exists for). Block it, or allow it as a
 deliberate video-feedback effect? Some Shadertoy shaders want exactly that.
-
+the virtual cam carries what is coonected to it. it maybe pgm it maybe decklink, ndi, whatever.
 Also worth knowing before you pick: this will work on the browser_display path (real getUserMedia),
 **needs proving on the Caspar CEF path** (video permission there is not established — audio is), and
 must be skipped entirely in look-deck thumbnails (no capture device headless).
 
 ---
 
-## WO-366 — seven of your 21.07 lines were never triaged
+## WO-366 — seven of your 21.07 lines were never triaged  ⬅ STILL OPEN
 
 **Answer with: does it still happen? — seven times.** → [WO-366](./work-orders/366_WO_todos21_untriaged_backlog.md)
 
@@ -144,13 +150,16 @@ closing them on "probably fixed by a refactor" — which the WO's own acceptance
 
 | # | Your line (21.07) | Still happens? | Note |
 |---|---|---|---|
-| 1 | live audio channel should be created at PAL/NTSC resolution so it's cheapest | ☐ yes ☐ no | Cheap generator change, measurable win — the channel is created at full video resolution today for a bus carrying no video. |
+| 1 | live audio channel should be created at PAL/NTSC resolution so it's cheapest | ☐ yes ☐ no | Cheap generator change, measurable win — the channel is created at full video resolution today for a bus carrying no video. | needs to be done!
 | 2 | ~~i connected pgm2 to rec output and pgm1 got recorded~~ | **— done —** | Promoted to WO-373 and **fixed 28.07**. Needs a highascg restart. |
-| 3 | keyboard unlocks numlock between highascg/casparcg restarts | ☐ yes ☐ no | Zero hits for `numlock` anywhere in the repo. |
-| 4 | some drag-and-drops from media browser to timeline don't "land" | ☐ yes ☐ no | |
+| 3 | keyboard unlocks numlock between highascg/casparcg restarts | ☐ yes ☐ no | Zero hits for `numlock` anywhere in the repo. | still happening
+| 4 | some drag-and-drops from media browser to timeline don't "land" | ☐ yes ☐ no |needs checking. |
 | 5 | timeline clips missing almost all settings in the inspector | ☐ yes ☐ no | `f65c7c4` fixed a *crash* there; no WO says what that inspector should expose. |
-| 6 | timeline editing should be quicker on the CasparCG output, like looks editing | ☐ yes ☐ no | Biggest piece. Probably extends the WO-338 nudge path to the timeline rather than new machinery. |
-| 7 | in the timeline editor's compose preview, the label bar fills width instead of staying under the PRV window | ☐ yes ☐ no | WO-350 fixed this in the *deck* compose preview only. |
+inspector for timeline clips video/graphics should have all the options that layers in looks have. plus the timeline specific keyframes.
+also in a timeline clip, there should be an option to change it to a playlits clip.
+so even when the timeline is paused and the playlist clip has a play always (i think it must always have play always (the label should be changed from loop always) enabled when its a playlist) it can still play and loop.
+| 6 | timeline editing should be quicker on the CasparCG output, like looks editing | ☐ yes ☐ no | Biggest piece. Probably extends the WO-338 nudge path to the timeline rather than new machinery. | yes, extend the nudge path to timeline.
+| 7 | in the timeline editor's compose preview, the label bar fills width instead of staying under the PRV window | ☐ yes ☐ no | WO-350 fixed this in the *deck* compose preview only. |check it for timeline compoes too.
 
 Two neighbouring lines are already covered and are why the block looks triaged at a glance: the
 live-input-in-compose-preview request (WO-323, `f8cc0ce`) and "react faster to tab changes and

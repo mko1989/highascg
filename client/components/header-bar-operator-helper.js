@@ -23,8 +23,12 @@ import {
 	operatorHelperTaskbarAction,
 } from '../lib/operator-gui-launch.js'
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { createOperatorAppSection, appLabelFor, loadOperatorApps } from './header-bar-operator-app-menu.js'
 
-/** Same vocabulary as HELPER_ACTIONS in src/system/operator-helper-window.js. @readonly */
+/** The five CURATED tools, pinned above the installed-app list (WO-387). Each one launches through
+ * a bespoke server path — see header-bar-operator-app-menu.js's header for why that matters —
+ * so they stay hard-coded here on purpose. Same vocabulary as HELPER_ACTIONS in
+ * src/system/operator-helper-window.js. @readonly */
 const HELPER_ITEMS = [
 	['firefox', 'Web browser'],
 	['file-manager', 'File browser'],
@@ -74,7 +78,13 @@ export function initHeaderBarOperatorHelper(container) {
 
 	/** @param {string} state @param {string|null} action */
 	function render(state, action) {
-		const busy = state !== 'idle'
+		/* WO-387 (owner 29.07: "when i have zoom open the open window button just shows zoom app is
+		 * open and i cant open anything else"): `state` is the WO-283 SINGLE-helper session, which
+		 * knows about one window at a time. With the taskbar on, many helpers may be open — the
+		 * server no longer refuses the second one — so the menu must stay open for business and the
+		 * button must keep its name. Only the flag-off single-helper configuration is mutually
+		 * exclusive, and there the button still reports what is up. */
+		const busy = state !== 'idle' && !_taskbarOn
 		openBtn.disabled = busy
 		openBtn.textContent = busy
 			? `${labelFor(action)}${state === 'opening' ? ' opening…' : ' is open'}`
@@ -90,7 +100,33 @@ export function initHeaderBarOperatorHelper(container) {
 
 	/** @param {string|null} action */
 	function labelFor(action) {
-		return HELPER_ITEMS.find(([id]) => id === action)?.[1] || 'Window'
+		return HELPER_ITEMS.find(([id]) => id === action)?.[1] || appLabelFor(action) || 'Window'
+	}
+
+	/**
+	 * Open one helper — pinned tool or installed app, the paths are identical from here down.
+	 * @param {string} action @param {string} label
+	 */
+	async function openHelper(action, label) {
+		closeMenu()
+		// WO-317: with the taskbar active, launch through the per-helper action so more than one
+		// window can run at once; otherwise the WO-283 single-helper open (mutually exclusive).
+		if (_taskbarOn) {
+			const r = await operatorHelperTaskbarAction(action, action)
+			if (r.error) window.showToast?.(r.error, 'error')
+			else window.showToast?.(`${label} opening — use the taskbar to send it behind the GUI.`, 'info')
+			void refresh()
+			return
+		}
+		render('opening', action)
+		const r = await openOperatorHelperWindow(action)
+		if (r.error) {
+			window.showToast?.(r.error, 'error')
+			render('idle', null)
+			return
+		}
+		window.showToast?.(`${label} opening — the operator GUI returns when you close it.`, 'info')
+		void refresh()
 	}
 
 	for (const [action, label] of HELPER_ITEMS) {
@@ -99,34 +135,24 @@ export function initHeaderBarOperatorHelper(container) {
 		item.className = 'header-btn'
 		item.textContent = label
 		item.style.cssText = 'text-align: left; border: none; background: transparent;'
-		item.addEventListener('click', async (e) => {
+		item.addEventListener('click', (e) => {
 			e.preventDefault()
-			closeMenu()
-			// WO-317: with the taskbar active, launch through the per-helper action so more than one
-			// window can run at once; otherwise the WO-283 single-helper open (mutually exclusive).
-			if (_taskbarOn) {
-				const r = await operatorHelperTaskbarAction(action, action)
-				if (r.error) window.showToast?.(r.error, 'error')
-				else window.showToast?.(`${label} opening — use the taskbar to send it behind the GUI.`, 'info')
-				void refresh()
-				return
-			}
-			render('opening', action)
-			const r = await openOperatorHelperWindow(action)
-			if (r.error) {
-				window.showToast?.(r.error, 'error')
-				render('idle', null)
-				return
-			}
-			window.showToast?.(`${label} opening — the operator GUI returns when you close it.`, 'info')
-			void refresh()
+			void openHelper(action, label)
 		})
 		menu.appendChild(item)
 	}
 
+	// WO-387: everything else installed on the box, below a divider.
+	const appSection = createOperatorAppSection((action, label) => void openHelper(action, label))
+	menu.appendChild(appSection.element)
+
 	openBtn.addEventListener('click', (e) => {
 		e.preventDefault()
-		menu.style.display = menu.style.display === 'none' ? 'flex' : 'none'
+		const opening = menu.style.display === 'none'
+		menu.style.display = opening ? 'flex' : 'none'
+		// The app list stays collapsed until "Show all apps" is clicked, and re-collapses on every
+		// menu open so the five pinned tools are always what the operator sees first.
+		if (opening) appSection.collapse()
 	})
 
 	backBtn.addEventListener('click', async (e) => {
@@ -228,6 +254,9 @@ export function initHeaderBarOperatorHelper(container) {
 	container.appendChild(wrap)
 
 	if (_pollTimer) clearInterval(_pollTimer)
+	// One catalog fetch at init so a chip for an app helper that survived a GUI reload can still be
+	// named (labelFor falls back to appLabelFor). The menu itself refreshes on open.
+	void loadOperatorApps()
 	void refresh()
 	_pollTimer = setInterval(() => void refresh(), POLL_MS)
 

@@ -14,6 +14,7 @@ const { getXAuthority } = require('../utils/hardware-info')
 const { resolveAlsamixer } = require('../audio/alsa-mixer')
 const { applyNvidiaDisplayPolicy } = require('../utils/nvidia-display-policy')
 const { getMediaIngestBasePath } = require('../media/local-media')
+const { resolveHelperIcon } = require('./operator-helper-icon')
 const {
 	resolveOperatorFirefoxLauncher,
 	resolveFirefox,
@@ -31,7 +32,18 @@ function spawnGuiDetached(action, opts = {}) {
 	let bin = null
 	/** @type {string[]} */
 	let args = []
-	if (action === 'nvidia-settings') bin = resolveNvidiaSettings()
+	/* WO-387: an `app:<desktop-id>` action is any application installed on this box. The command
+	 * comes from the on-disk .desktop entry, never from the request — see
+	 * src/utils/desktop-app-catalog-parse.js for the security model. Console tools (Terminal=true)
+	 * come back already wrapped in the box's terminal emulator. */
+	if (String(action || '').startsWith('app:')) {
+		const { resolveAppLaunch, invalidateAppCatalog } = require('../utils/desktop-app-catalog')
+		invalidateAppCatalog()
+		const launch = resolveAppLaunch(action)
+		if (!launch) throw new Error(`Not an installed application: ${action}`)
+		bin = launch.bin
+		args = launch.args
+	} else if (action === 'nvidia-settings') bin = resolveNvidiaSettings()
 	else if (action === 'desktopvideo_setup') bin = resolveDesktopvideoSetup()
 	else if (action === 'desktop_video_updater') bin = resolveBmdUpdater()
 	else if (action === 'alsamixer') {
@@ -204,6 +216,7 @@ async function handleOperatorHelperWindowPost(body, ctx) {
 		closeOperatorHelperWindow,
 		getOperatorHelperState,
 		HELPER_ACTIONS,
+		isHelperAction,
 	} = require('../system/operator-helper-window')
 
 	if (mode === 'close') {
@@ -215,11 +228,13 @@ async function handleOperatorHelperWindowPost(body, ctx) {
 	}
 
 	const action = String(b?.action ?? '').trim()
-	if (!HELPER_ACTIONS.includes(action)) {
+	if (!isHelperAction(action)) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
-			body: jsonBody({ error: `Unknown action: ${action} (expected one of ${HELPER_ACTIONS.join(', ')})` }),
+			body: jsonBody({
+				error: `Unknown action: ${action} (expected one of ${HELPER_ACTIONS.join(', ')}, or app:<id> for an installed application)`,
+			}),
 		}
 	}
 	const r = await openOperatorHelperWindow(action, ctx.config || {}, { log, url: b?.url })
@@ -234,51 +249,40 @@ async function handleOperatorHelperWindowPost(body, ctx) {
  * WO-317 — GET /api/system/operator-helper-taskbar. Returns the multi-helper taskbar model when the
  * feature is enabled, else `{ enabled: false }` so the client renders the WO-283 single button.
  */
-/* todos27.07.26: taskbar chips show the real app icons. Fixed candidate lists — these are the
- * exact paths the installed packages ship on this box (hicolor theme + pixmaps); first hit wins,
- * 404 lets the client fall back to a letter. Never globs, never follows user input into fs. */
-const HELPER_ICON_CANDIDATES = {
-	firefox: [
-		'/usr/share/icons/hicolor/64x64/apps/firefox-esr.png',
-		'/usr/share/icons/hicolor/128x128/apps/firefox-esr.png',
-		'/usr/share/icons/hicolor/64x64/apps/firefox.png',
-	],
-	'file-manager': [
-		'/usr/share/icons/hicolor/128x128/apps/org.xfce.thunar.png',
-		'/usr/share/icons/hicolor/48x48/apps/org.xfce.thunar.png',
-	],
-	desktopvideo_setup: [
-		'/usr/share/icons/hicolor/128x128/apps/BlackmagicDesktopVideoSetup.png',
-		'/usr/share/icons/hicolor/48x48/apps/BlackmagicDesktopVideoSetup.png',
-	],
-	desktop_video_updater: [
-		'/usr/share/icons/hicolor/128x128/apps/DesktopVideoUpdater.png',
-		'/usr/share/icons/hicolor/48x48/apps/DesktopVideoUpdater.png',
-	],
-	'nvidia-settings': [
-		'/usr/share/icons/hicolor/64x64/apps/nvidia-settings.png',
-		'/usr/share/pixmaps/nvidia-settings.png',
-	],
-}
+/* todos27.07.26: taskbar chips show the real app icons; WO-387 extends that to every installed
+ * app by resolving the .desktop `Icon=` through the standard icon directories. The five pinned
+ * tools keep their exact hard-coded paths. Path safety and the candidate order live in
+ * ./operator-helper-icon.js. */
 
-/** GET /api/system/operator-helper-icon?action=<helper action> → the app's system icon (PNG). */
+/** GET /api/system/operator-helper-icon?action=<helper action> → the app's system icon. */
 function handleOperatorHelperIconGet(query) {
 	const action = String(query?.action || '')
-	const candidates = HELPER_ICON_CANDIDATES[action]
-	if (!candidates) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'unknown action' }) }
-	for (const f of candidates) {
-		try {
-			const buf = fs.readFileSync(f)
-			return {
-				status: 200,
-				headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' },
-				body: buf,
-			}
-		} catch {
-			/* try next candidate */
+	const icon = resolveHelperIcon(action)
+	if (!icon) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'icon not found' }) }
+	try {
+		return {
+			status: 200,
+			headers: { 'Content-Type': icon.contentType, 'Cache-Control': 'public, max-age=86400' },
+			body: fs.readFileSync(icon.file),
 		}
+	} catch {
+		return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'icon not readable' }) }
 	}
-	return { status: 404, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'icon not found' }) }
+}
+
+/**
+ * WO-387 — GET /api/system/apps. The installed-application catalog behind the operator's "Open
+ * window" menu: every launchable .desktop entry on the box, name + action only. Read-only and
+ * unauthenticated like the other operator GET routes (the launch POST keeps the nuclear-password
+ * gate); it discloses nothing an `ls /usr/share/applications` would not.
+ */
+function handleSystemAppsGet() {
+	try {
+		const { listAppsForMenu } = require('../utils/desktop-app-catalog')
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, apps: listAppsForMenu() }) }
+	} catch (e) {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: false, apps: [], error: e?.message || String(e) }) }
+	}
 }
 
 async function handleOperatorHelperTaskbarGet(ctx) {
@@ -322,6 +326,14 @@ async function handleOperatorHelperTaskbarPost(body, ctx) {
 	const id = String(b?.id ?? '').trim()
 	if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
 	const action = b?.action ? String(b.action).trim() : id
+	/* WO-387: refuse an unknown action HERE rather than letting the coordinator register a helper
+	 * that can never launch — a chip for a non-existent app would sit in 'launching' until the
+	 * 20s poll gives up. Validation is the same gate the WO-283 path uses (pinned five + any
+	 * installed app), so both routes share one vocabulary. */
+	const { isHelperAction } = require('../system/operator-helper-window')
+	if (!isHelperAction(action)) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown action: ${action}` }) }
+	}
 	const r = await coord.handleAction(id, { action })
 	return {
 		status: r.ok ? 200 : 409,
@@ -419,6 +431,7 @@ module.exports = {
 	handleOperatorHelperWindowGet,
 	handleOperatorHelperTaskbarGet,
 	handleOperatorHelperIconGet,
+	handleSystemAppsGet,
 	handleOperatorHelperTaskbarPost,
 	handlePointerConfinePost,
 }

@@ -1,6 +1,14 @@
 # WO-368 — `template/shaders` is box-owned for Syncthing but still tracked by git: permanent dirty tree, deleted shaders one `git checkout` from resurrection
 
-**Status: OPEN — investigated 28.07.26. This is the unresolved half of checklist27 item 16 ("Uncommitted runtime diffs — decide"; owner note: "not sure"). No change made.**
+**Status: DECIDED 29.07.26 — OPTION B. Unblocked, not yet implemented.**
+
+> Owner, 29.07: *"the shaders that are in the folder rigth now can be added to the repo."* — git owns
+> the shader library; commit the 16 files currently on disk (9 untracked, 1 edited) as truth, and the
+> 2 tracked-but-deleted files stay deleted. Note what B costs, unchanged from the analysis below:
+> every Shader Live save dirties the tree again, so this is a snapshot, not an end to the dirty-tree
+> problem — it DOES answer "what backs up my shaders?", which nothing did before.
+
+**Previously: OPEN — investigated 28.07.26. This is the unresolved half of checklist27 item 16 ("Uncommitted runtime diffs — decide"; owner note: "not sure"). No change made.**
 
 ## 1. Investigation
 

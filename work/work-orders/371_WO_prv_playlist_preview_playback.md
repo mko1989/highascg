@@ -1,6 +1,12 @@
 # WO-371 — "In PRV the playlist stops after the first item": the owner ticked the design and then reported it as a bug
 
-**Status: DECIDED 28.07.26 — OPTION B. Unblocked, not yet implemented.**
+**Status: DECIDED 29.07.26 — OPTION C (supersedes the 28.07 option-B answer). Unblocked, not yet implemented.**
+
+> Owner, 29.07, on re-reading the options: *"actually it makes sense that it pauses."* — asked which
+> of A/C that meant, they chose **C**: preview stays frozen (WO-355 item 27 stays true), and the
+> Playlists panel's existing ⏮/⏭ step the PRV render through the list so an edited playlist can be
+> verified without going on air. The 28.07 option-B answer (PRV runs its own timer) is withdrawn —
+> do NOT rebuild the second PRV timer WO-354 untangled.
 
 Owner's answer, written into `work/DECISIONS_PENDING_2026-07-28.md` beside the question
 ("Today: you can't. Preview shows item 1 frozen."):
