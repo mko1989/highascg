@@ -11,7 +11,7 @@ import { pickV4l2SlotForDevice } from '../lib/v4l2-add-input.js'
 import { alsaCaptureDeviceOptions, readLiveAudioCasparSettings } from '../lib/live-audio-inputs.js'
 import { readV4l2CasparSettings, v4l2AlsaDeviceOptions, v4l2CaptureDeviceOptions } from '../lib/v4l2-inputs.js'
 import { settingsState } from '../lib/settings-state.js'
-import { effectiveChannelMap, casparHostChannelsPendingApply } from '../lib/planned-channel-map.js'
+import { effectiveChannelMap, hostChannelPendingApply } from '../lib/planned-channel-map.js'
 import { createNdiAttributionElement } from '../lib/ndi-attribution.js'
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
 import { createLiveInputModalShell } from './live-input-modal-shell.js'
@@ -66,10 +66,10 @@ export function showLiveInputModal(stateStore, options = {}) {
 		const slot = selectedDecklinkSlot()
 		const cm = decklinkChannelMap()
 		const entry = decklinkInputForSlot(cm, slot)
-		const pending = casparHostChannelsPendingApply(
-			settingsState.getSettings()?.channelMap,
-			stateStore.getState()?.channelMap,
-		)
+		// WO-381: "planned" means the running Caspar has no such channel yet — see
+		// hostChannelPendingApply. The old settings-vs-state comparison compared two builds of the
+		// same saved config and stuck on "planned" whenever the state store held no channel map.
+		const pending = hostChannelPendingApply(entry?.channel, stateStore.getState()?.configComparison)
 		if (chFixedVal) {
 			chFixedVal.textContent = entry?.channel != null ? String(entry.channel) : '—'
 		}

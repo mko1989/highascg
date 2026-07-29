@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 695,
+	"count": 693,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -166,7 +166,6 @@
 		"client/lib/mixer-fill.js: isFullScaleWithNonZeroOrigin",
 		"client/lib/mixer-fill.js: isMixerFillReasonable",
 		"client/lib/ndi-attribution.js: NDI_TRADEMARK_NOTICE",
-		"client/lib/operator-gui-interaction-suppress.js: stopOperatorGuiInteractionSuppress",
 		"client/lib/operator-gui-launch.js: launchOperatorGui",
 		"client/lib/operator-gui-launch.js: setOperatorPointerConfine",
 		"client/lib/optional-modules-registry.js: getOptionalModuleDef",
@@ -390,7 +389,6 @@
 		"src/config/live-source-route-heal.js: knownRouteChannels",
 		"src/config/program-audio-layouts.js: resolveCabledLayoutsByMain",
 		"src/config/routing-map.js: resolvePreviewEnabledByMain",
-		"src/config/routing-map.js: resolveStreamOutputCasparChannel",
 		"src/config/routing-setup.js: setupMappingChannels",
 		"src/config/routing.js: routeToLayer",
 		"src/config/screen-consumer-port-resolve.js: OPERATOR_GUI_PORT_FLAGS",

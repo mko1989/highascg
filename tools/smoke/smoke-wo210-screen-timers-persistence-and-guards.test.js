@@ -313,14 +313,18 @@ test('CSS: new timer panel classes exist in stylesheet', () => {
 	const cssContent = fs.readFileSync(cssPath, 'utf-8')
 
 	// Check for presence of new CSS classes
+	// WO-381: the dock lost its create button and screen-assignment dropdown (owner: "the adding
+	// of the timers shouldnt be there at all"), so `timer-control-panel__new-timer-btn` and
+	// `timer-control-panel__screen-select` went with them; the editable readout
+	// (`__timer-display--editable` + `__timer-input`) is the control that replaced them here.
 	const requiredClasses = [
 		'timer-control-panel__timer-row',
 		'timer-control-panel__timer-display',
+		'timer-control-panel__timer-display--editable',
+		'timer-control-panel__timer-input',
 		'timer-control-panel__screen-chip',
 		'timer-control-panel__chip-toggle',
 		'timer-control-panel__chip-unassign',
-		'timer-control-panel__screen-select',
-		'timer-control-panel__new-timer-btn',
 		'timer-control-panel__list',
 		'timer-control-panel__settings',
 	]

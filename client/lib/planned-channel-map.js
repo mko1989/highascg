@@ -62,11 +62,39 @@ export function effectiveChannelMap({ payload, settings, liveChannelMap } = {}) 
 	return live || planned
 }
 
-/** @param {object | null | undefined} payload @param {object | null | undefined} [liveChannelMap] */
-export function hostChannelsPendingApplyForPayload(payload, liveChannelMap) {
-	const planned = plannedChannelMapFromPayload(payload)
-	const live = liveChannelMap ?? null
-	return casparHostChannelsPendingApply(planned, live)
+/**
+ * Channel indices the RUNNING Caspar reports (INFO CONFIG → `configComparison.serverChannels`,
+ * broadcast on the `configComparison` state path). This is the only live evidence the client has:
+ * every `channelMap` it holds — settings, /api/state, device-view `live.caspar` — is built by the
+ * same `buildChannelMap(ctx)` from the SAVED config, so comparing two of them says nothing about
+ * what Caspar is actually running.
+ * @param {object | null | undefined} configComparison
+ * @returns {Set<number> | null} — null when Caspar has not reported (no evidence)
+ */
+export function liveCasparChannelSet(configComparison) {
+	const rows = Array.isArray(configComparison?.serverChannels) ? configComparison.serverChannels : []
+	const set = new Set()
+	for (const row of rows) {
+		const n = parseInt(String(row?.index ?? ''), 10)
+		if (Number.isFinite(n) && n >= 1) set.add(n)
+	}
+	return set.size ? set : null
+}
+
+/**
+ * WO-381: a host channel is "planned" only when the running Caspar has no such channel — it then
+ * clears by itself on the next INFO CONFIG after Apply + restart. With no evidence (Caspar down,
+ * nothing reported yet) nothing is claimed: the old config-vs-config test defaulted to `true` and
+ * left every host channel labelled "(planned)" with no way to clear it.
+ * @param {number | string | null | undefined} channel
+ * @param {object | null | undefined} configComparison
+ */
+export function hostChannelPendingApply(channel, configComparison) {
+	const live = liveCasparChannelSet(configComparison)
+	if (!live) return false
+	const ch = parseInt(String(channel ?? ''), 10)
+	if (!Number.isFinite(ch) || ch < 1) return false
+	return !live.has(ch)
 }
 
 /**

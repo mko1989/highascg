@@ -6,7 +6,7 @@ import { edgeOutputLayer } from './device-view-destinations-inspector.js'
 import { anchorKeyFor } from '../lib/device-view-output-layer.js'
 import { friendlyConnectorLabel } from './device-view-helpers.js'
 import { listAllScreenDestinationsForDeviceView } from '../lib/device-view-host-channels.js'
-import { hostChannelsPendingApplyForPayload } from '../lib/planned-channel-map.js'
+import { hostChannelPendingApply } from '../lib/planned-channel-map.js'
 import { getAppStateStore } from '../lib/app-runtime.js'
 
 function getDestinationConnectionLabel(edge, lastPayload, connectorById) {
@@ -110,10 +110,9 @@ export function renderDestinations(ctx) {
 	}
 
 	const destinationsRaw = listAllScreenDestinationsForDeviceView(lastPayload)
-	const hostChannelsPending = hostChannelsPendingApplyForPayload(
-		lastPayload,
-		getAppStateStore()?.getState?.()?.channelMap,
-	)
+	// WO-381: per-channel, and against the running Caspar (INFO CONFIG) — not a config-vs-config
+	// comparison that could never clear.
+	const configComparison = getAppStateStore()?.getState?.()?.configComparison
 	const screenDestCount = destinationsRaw.filter((d) => String(d?.mode || '') !== 'host_channel' && d?.virtual !== true).length
 	const hostDestCount = destinationsRaw.filter((d) => String(d?.mode || '') === 'host_channel' || d?.virtual === true).length
 	const seenDestinationIds = new Set()
@@ -160,8 +159,9 @@ export function renderDestinations(ctx) {
 		const title = document.createElement('strong')
 		title.textContent = String(d?.label || d?.id || 'Destination')
 		const subtitle = document.createElement('small')
+		const hostCh = d?.casparChannel ?? intent?.pgmChannel ?? null
 		subtitle.textContent = isHost
-			? `HOST · ch ${d?.casparChannel ?? intent?.pgmChannel ?? '?'}${hostChannelsPending ? ' (planned)' : ''}`
+			? `HOST · ch ${hostCh ?? '?'}${hostChannelPendingApply(hostCh, configComparison) ? ' (planned)' : ''}`
 			: destinationRectLabel(d)
 		
 		const ports = document.createElement('div')

@@ -6,27 +6,30 @@
  * - List of all screen timers from /api/timers/list (polled ~1s while open)
  * - Per-timer row: name, remaining-time display (computed client-side from lastCmd/cmdAt/config),
  *   start/pause/reset buttons, and per-screen chips with visible toggles
- * - "Add to screen" dropdown per timer (assign to screen slot)
  * - Unassign button (×) per chip with confirmation
- * - "New timer" button (creates timer instance with default config, assigns to screen)
- * - Live time display that MIRRORS timer state (ticks 4×/s locally)
+ * - Live time display that MIRRORS timer state (ticks 4×/s locally) and is click-to-edit
+ *   (timer-control-panel-inline-time.js)
+ *
+ * WO-381 (owner 2026-07-29: "the adding of the timers shouldnt be there at all"): this dock is a
+ * LIVE CONTROLLER only. Creating timers and assigning them to screens live in the screen-timer
+ * Inspector (⏱ in the looks deck → inspector-screen-timer.js); the create button and the per-timer
+ * screen-assignment dropdown were removed from here.
  *
  * WO-210 T210.6:
  * - Source of truth: GET /api/timers/list (poll ~1s while open)
  * - Per-timer display computed from {lastCmd, cmdAt, config} using computeDisplayTime
  * - Transport buttons: POST /api/timers/cmd {timerId, cmd: start|pause|reset}
  * - Per-screen chips with visible toggle: POST /api/timers/visible {timerId, screenIdx, visible}
- * - "Add to screen" control: POST /api/timers/assign {timerId, name?, config?, screenIdx}
  * - Unassign chip affordance (×) with confirm(): POST /api/timers/unassign {timerId, screenIdx}
- * - "New timer" creates instance (via crypto.randomUUID() or similar) with default config
+ * - Setting the time: POST /api/timers/assign {timerId, screenIdx, config} per assigned screen
  * - getScreenTimersSnapshot() exported for T210.8 (look-save integration)
  */
 
 import { api } from '../lib/api-client.js'
 import { escapeAttr } from '../lib/dom-escape.js'
 import { screenLabel } from '../lib/screen-label.js'
-import { DEFAULT_TIMER_CONFIG, computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
-import { createTimerForScreen } from '../lib/screen-timer-create.js'
+import { computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
+import { attachInlineTimeEditor } from './timer-control-panel-inline-time.js'
 import { buildTimerSettings } from './timer-control-panel-settings-form.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
@@ -91,7 +94,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 		</button>
 		<div class="timer-control-panel__content" hidden>
 			<div class="timer-control-panel__list" id="timer-list"></div>
-			<button type="button" class="timer-control-panel__new-timer-btn" id="new-timer-btn" title="Create and assign a new timer">+ New Timer</button>
 		</div>
 	`
 	mountEl.appendChild(root)
@@ -100,7 +102,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 	const chevron = root.querySelector('.timer-control-panel__chevron')
 	const content = root.querySelector('.timer-control-panel__content')
 	const listContainer = root.querySelector('#timer-list')
-	const newTimerBtn = root.querySelector('#new-timer-btn')
 
 	let isCollapsed = true
 	let tickTimer = null
@@ -195,6 +196,8 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 			displayEl.textContent = formatDisplayTime(remaining)
 			displayEl.dataset.timerId = timer.timerId
 			headerEl.appendChild(displayEl)
+			// WO-381: the readout IS the time control — click it, type, Enter.
+			attachInlineTimeEditor(displayEl, timer, { onSaved: () => setTimeout(() => refreshTimerList(), 100) })
 
 			// Settings button
 			const settingsBtn = document.createElement('button')
@@ -274,48 +277,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 				timerEl.appendChild(chipsEl)
 			}
 
-			// "Add to screen" dropdown
-			const addEl = document.createElement('div')
-			addEl.style.cssText = 'display:flex;gap:4px;font-size:0.85em'
-
-			const addLabelEl = document.createElement('span')
-			addLabelEl.textContent = 'Add to screen:'
-			addLabelEl.style.cssText = 'display:flex;align-items:center'
-			addEl.appendChild(addLabelEl)
-
-			const selectEl = document.createElement('select')
-			selectEl.className = 'timer-control-panel__screen-select'
-			selectEl.style.cssText = 'padding:2px 4px;border-radius:2px'
-			selectEl.dataset.timerId = timer.timerId
-			selectEl.addEventListener('change', (e) => {
-				const screenIdx = parseInt(e.target.value, 10)
-				if (Number.isFinite(screenIdx)) {
-					onAssignToScreen(timer.timerId, screenIdx)
-					e.target.value = ''
-				}
-			})
-
-			const defaultOpt = document.createElement('option')
-			defaultOpt.value = ''
-			defaultOpt.textContent = 'Select screen...'
-			selectEl.appendChild(defaultOpt)
-
-			// Build screen list from channelMap
-			const getScreens = typeof getChannelMap === 'function' ? getChannelMap() : {}
-			const screenCount = getScreens.programChannels ? getScreens.programChannels.length : 4
-			const assignedScreens = new Set(Object.keys(timer.screens || {}).map(s => parseInt(s, 10)))
-
-			for (let i = 0; i < screenCount; i++) {
-				if (assignedScreens.has(i)) continue // Skip already assigned
-				const opt = document.createElement('option')
-				opt.value = String(i)
-				opt.textContent = screenLabel(getScreens, i)
-				selectEl.appendChild(opt)
-			}
-
-			addEl.appendChild(selectEl)
-			timerEl.appendChild(addEl)
-
 			// Settings section (hidden by default, toggled by button)
 			const settingsEl = document.createElement('div')
 			settingsEl.className = 'timer-control-panel__settings'
@@ -363,52 +324,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 		}
 	}
 
-	async function onAssignToScreen(timerId, screenIdx) {
-		try {
-			await api.post('/api/timers/assign', { timerId, screenIdx })
-			// Refresh to update UI
-			setTimeout(() => refreshTimerList(), 100)
-		} catch (err) {
-			console.warn('[timer-panel] assign failed:', err?.message || err)
-		}
-	}
-
-	newTimerBtn.addEventListener('click', async () => {
-		const name = prompt('Timer name (default: Timer N):', '')?.trim() || `Timer ${lastTimersList.length + 1}`
-
-		// Show HMS input for duration
-		const defaultDuration = 300 // 5 minutes
-		const h = Math.floor(defaultDuration / 3600)
-		const m = Math.floor((defaultDuration % 3600) / 60)
-		const s = defaultDuration % 60
-		const durationStr = prompt('Duration (HH:MM:SS)', `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`)?.trim()
-
-		let durationSec = defaultDuration
-		if (durationStr) {
-			const parts = durationStr.split(':').map(x => parseInt(x, 10) || 0)
-			durationSec = (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0)
-		}
-
-		const config = {
-			...DEFAULT_TIMER_CONFIG,
-			durationSec,
-		}
-
-		// Get first available screen (or prompt user)
-		const getScreens = typeof getChannelMap === 'function' ? getChannelMap() : {}
-		const screenCount = getScreens.programChannels ? getScreens.programChannels.length : 1
-		const screenIdx = 0 // Assign to first screen by default
-
-		try {
-			// notify:false — this panel refreshes via its own list reload below, not the
-			// 'screen-timers-changed' event (matches the pre-helper behavior).
-			await createTimerForScreen({ name, config, screenIdx, notify: false })
-			// Refresh to show new timer
-			setTimeout(() => refreshTimerList(), 100)
-		} catch (err) {
-			console.warn('[timer-panel] new timer failed:', err?.message || err)
-		}
-	})
 
 	function startTick() {
 		if (tickTimer) return
@@ -421,7 +336,9 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 				if (timer) {
 					const remaining = computeDisplayTime(timer)
 					const displayEl = el.querySelector('.timer-control-panel__timer-display')
-					if (displayEl) {
+					// WO-381: never type over the owner — the inline editor marks the readout
+					// data-editing="1" while it is open.
+					if (displayEl && displayEl.dataset.editing !== '1') {
 						displayEl.textContent = formatDisplayTime(remaining)
 					}
 				}

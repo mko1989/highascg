@@ -207,6 +207,12 @@ function buildGeneratedChannelOrder(ctx) {
 	(map.multiviewChannels || []).forEach((ch, i) => {
 		out.push({ ch, role: 'multiview', mainIndex: i })
 	})
+	// WO-381: operator_gui owns a real Caspar channel (routing-map.js allocates it next to
+	// multiview). Leaving it out left a hole in this order — Device View showed nothing on the
+	// channel and every "next free channel" reader treated it as available.
+	;(map.operatorGuiChannels || []).forEach((ch, i) => {
+		out.push({ ch, role: 'operator_gui', mainIndex: i })
+	})
 	for (const entry of Array.isArray(map.inputChannels) ? map.inputChannels : []) {
 		const role =
 			entry.kind === 'live_audio'

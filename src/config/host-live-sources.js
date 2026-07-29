@@ -94,6 +94,11 @@ function usedCasparChannels(config) {
 	;(map.switcherBusChannels || []).forEach(push)
 	push(map.multiviewCh)
 	;(map.multiviewChannels || []).forEach(push)
+	// WO-381: the operator_gui utility channel is allocated by routing-map.js exactly like
+	// multiview, but was never counted here — so suggestNextHostChannel handed a new host live
+	// source the Operator GUI's own channel (ch 4 on the live box) and the two collided.
+	push(map.operatorGuiCh)
+	;(map.operatorGuiChannels || []).forEach(push)
 	push(map.inputsCh)
 	push(map.streamingCh)
 	push(map.monitorCh)
