@@ -159,6 +159,11 @@ export function renderDestinations(ctx) {
 		const title = document.createElement('strong')
 		title.textContent = String(d?.label || d?.id || 'Destination')
 		const subtitle = document.createElement('small')
+		// `intent` must be resolved BEFORE this line: `??` only short-circuits past it when
+		// `d.casparChannel` is set, which host channels have and screen destinations do not — so
+		// reading it from its old position (declared further down) threw a TDZ error on the first
+		// PGM/PRV card and took the whole destinations render with it.
+		const intent = intentItems.find((x) => String(x?.id || '') === String(d?.id || '')) || null
 		const hostCh = d?.casparChannel ?? intent?.pgmChannel ?? null
 		subtitle.textContent = isHost
 			? `HOST · ch ${hostCh ?? '?'}${hostChannelPendingApply(hostCh, configComparison) ? ' (planned)' : ''}`
@@ -182,9 +187,7 @@ export function renderDestinations(ctx) {
 			ev.stopPropagation()
 			if (onDestinationPortClick) onDestinationPortClick(sinkConnectorId)
 		})
-		
-		const intent = intentItems.find((x) => String(x?.id || '') === String(d?.id || '')) || null
-		
+
 		if (mode !== 'stream') {
 			outputDot.addEventListener('dragover', (ev) => {
 				const parsed = parseDecklinkDrop(ev)

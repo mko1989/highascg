@@ -364,8 +364,12 @@ export function renderComposeScene(scene, opts) {
 						if (items[i]?.value) await addLayerFromMedia(items[i])
 					}
 					const updated = sceneState.getScene(scene.id)
-					const layer = updated?.layers?.[realIdx]
-					if (layer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
+					// WO-383: named apart from the row's `layer` (declared in the enclosing loop).
+					// Shadowing it here put the two reads above — routeLayerDropAllowed and
+					// isLayerSourceExchange — in this block's temporal dead zone, so dropping MORE
+					// THAN ONE source onto a layer threw instead of dropping.
+					const updatedLayer = updated?.layers?.[realIdx]
+					if (updatedLayer) dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer: updatedLayer })
 					schedulePreviewPush()
 					if (first && typeof onSourceDropped === 'function') {
 						try { await onSourceDropped(first) } catch {}
