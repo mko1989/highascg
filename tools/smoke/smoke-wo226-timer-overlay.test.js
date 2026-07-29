@@ -173,13 +173,18 @@ test('2026-07-17: /api/timers/visible accepts fractional opacity, engine persist
 	assert(engineSrc.includes('screenEntry.opacity'), 'engine should store per-screen opacity')
 })
 
-test('T226.5: audio-mixer-panel mounts a compact per-active-screen timer transport cluster', () => {
+test('T226.5 RETIRED by WO-381: the audio-mixer compact timer cluster is gone', () => {
+	// Owner 2026-07-29: "there is an additional timer in the most bottom right. not needed." The
+	// cluster sat directly below the Timers dock and duplicated its transport, so it was removed
+	// rather than kept in sync. The dock (timer-control-panel.js) is the one live controller; the
+	// screen-timer Inspector owns creation/assignment. This assertion now guards the removal.
 	const src = read('client/components/audio-mixer-panel.js')
-	assert(src.includes('audio-mixer__timers-compact'), 'should mount the compact cluster in the root render')
-	assert(src.includes('sceneState.activeScreenIndex'), 'cluster should scope to the ACTIVE screen')
-	assert(src.includes('/api/timers/cmd'), 'transport buttons should post cmd')
-	assert(src.includes('/api/timers/visible'), 'eye toggle should post visible')
-	assert(src.includes("screen-timers-changed"), 'successful posts should dispatch the refresh event')
+	assert(!src.includes('audio-mixer__timers-compact'), 'compact cluster must not be re-mounted here')
+	assert(!src.includes('/api/timers/'), 'the audio mixer panel must not drive timers')
+
+	const dockSrc = read('client/components/timer-control-panel.js')
+	assert(dockSrc.includes('/api/timers/cmd'), 'the dock owns the transport buttons')
+	assert(dockSrc.includes('/api/timers/visible'), 'the dock owns the eye toggle')
 })
 
 test('CSS: WO-226 classes exist in their stylesheets', () => {
@@ -192,8 +197,9 @@ test('CSS: WO-226 classes exist in their stylesheets', () => {
 	assert(inspectorCss.includes('.inspector-screen-timer'), 'screen-timer inspector layout class')
 	assert(inspectorCss.includes('.inspector-screen-timer__opacity'), 'opacity slider row class')
 
-	// Read both files concatenated (split for line-count reduction)
-	const audioCss = read('client/styles/07b-audio-mixer-modal-shell.css') + read('client/styles/07b3-audio-mixer-modal-shell-controls.css')
-	assert(audioCss.includes('.audio-mixer__timers-compact'), 'compact transport cluster class')
-	assert(audioCss.includes('.audio-mixer__timer-compact-btn'), 'compact transport button class')
+	// WO-381 retired the audio-mixer compact cluster (see the T226.5 test above); its transport
+	// now lives only in the Timers dock, so the guard moved to that stylesheet.
+	const timerCss = read('client/styles/07b2-timer-control-panel.css')
+	assert(timerCss.includes('.timer-control-panel__timer-row'), 'dock timer row class')
+	assert(timerCss.includes('.timer-control-panel__timer-input'), 'dock time input class')
 })

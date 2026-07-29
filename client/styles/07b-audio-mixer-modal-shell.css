@@ -44,57 +44,9 @@
 	min-width: 0;
 }
 
-/* WO-226 T226.5: compact timer transport, active screen only. Feeds WO-221 Phase C split-out.
- * Name reuses .audio-mixer__layer-label (below) for its ellipsis/truncation styling. */
-.audio-mixer__timers-compact {
-	display: flex;
-	flex-direction: column;
-	gap: 4px;
-	padding: 6px 16px;
-	border-top: 1px solid var(--border);
-	background: var(--bg-elevated);
-}
-.audio-mixer__timer-compact-row {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-}
-.audio-mixer__timer-compact-btn {
-	background: none;
-	border: 1px solid var(--border);
-	border-radius: 3px;
-	color: var(--text);
-	cursor: pointer;
-	padding: 1px 5px;
-}
-.audio-mixer__timer-compact-btn:hover {
-	background: var(--accent);
-	color: var(--bg);
-}
-
-/* Live countdown readout — tabular numerals so the ticking digits don't wobble the row. */
-.audio-mixer__timer-compact-time {
-	font-variant-numeric: tabular-nums;
-	font-size: 0.8rem;
-	color: var(--text);
-	margin-left: auto;
-	padding-right: 4px;
-}
-.audio-mixer__timer-compact-time--amber {
-	color: #ffb300;
-}
-.audio-mixer__timer-compact-time--red {
-	color: #ff3b30;
-}
-
-/* Per-screen add affordance shown when the active screen has no timer yet. */
-.audio-mixer__timer-compact-add {
-	align-self: flex-start;
-	opacity: 0.7;
-}
-.audio-mixer__timer-compact-add:hover {
-	opacity: 1;
-}
+/* WO-381: the compact timer transport (WO-226 T226.5) was removed from this panel — owner
+ * 2026-07-29: "there is an additional timer in the most bottom right. not needed." Its rules
+ * went with it; the Timers dock (07b2-timer-control-panel.css) is the only timer surface. */
 
 .audio-mixer--inspector .audio-mixer__panel {
 	margin-top: 0;

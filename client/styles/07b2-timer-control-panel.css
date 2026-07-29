@@ -226,28 +226,46 @@
 	color: var(--text);
 }
 
-/* WO-381: the readout is the time control — click to type a new duration / target time. */
-.timer-control-panel__timer-display--editable {
-	cursor: text;
-	border-bottom: 1px dotted rgba(255, 255, 255, 0.25);
+/* WO-381: standing time input per timer row (duration, or target time in clock mode). */
+.timer-control-panel__time-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+	font-size: 0.85em;
+	color: var(--text-muted);
 }
 
-.timer-control-panel__timer-display--editable:hover {
-	border-bottom-color: var(--accent);
+.timer-control-panel__time-label {
+	flex: 0 0 auto;
 }
 
 .timer-control-panel__timer-input {
-	width: 84px;
-	padding: 0 2px;
+	flex: 1;
+	min-width: 0;
+	padding: 2px 4px;
 	background: var(--bg-input, var(--bg-2, #161b22));
-	border: 1px solid var(--accent);
+	border: 1px solid rgba(255, 255, 255, 0.08);
 	border-radius: 2px;
 	color: var(--text);
 	font-family: 'Courier New', monospace;
-	font-size: 1.1em;
-	font-weight: 600;
+	font-size: 1em;
 	text-align: right;
 	outline: none;
+	transition: border-color 0.15s ease;
+}
+
+.timer-control-panel__timer-input:hover:not(:disabled) {
+	border-color: rgba(255, 255, 255, 0.15);
+}
+
+.timer-control-panel__timer-input:focus {
+	border-color: var(--accent);
+}
+
+.timer-control-panel__timer-input:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 /* Screen chip (small inline pill) */
@@ -283,30 +301,9 @@
 	color: var(--text);
 }
 
-/* Chip unassign button (small × button) */
-.timer-control-panel__chip-unassign {
-	background: none;
-	border: none;
-	cursor: pointer;
-	padding: 0;
-	width: 16px;
-	height: 16px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	opacity: 0.6;
-	color: var(--text-muted);
-	font-size: 0.9em;
-	transition: opacity 0.15s ease, color 0.15s ease;
-}
-
-.timer-control-panel__chip-unassign:hover {
-	opacity: 1;
-	color: var(--text);
-}
-
-/* WO-381: the "+ New Timer" button and the "Add to screen" dropdown were removed from this dock —
- * creation and screen assignment live in the screen-timer Inspector. Their rules went with them. */
+/* WO-381: the "+ New Timer" button, the "Add to screen" dropdown and the per-chip remove (×) were
+ * removed from this dock — creation, assignment and unassignment live in the screen-timer
+ * Inspector. Their rules went with them. */
 
 /* Settings editor section */
 .timer-control-panel__settings {

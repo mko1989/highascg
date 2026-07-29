@@ -55,7 +55,7 @@ describe('WO-381 planned badge reflects the running Caspar', () => {
 
 describe('WO-381 compact timers dock', () => {
 	it('parses entered times and maps them onto the timer mode', async () => {
-		const { parseTimeText, secondsToClockText, timeConfigPatch } = await import(
+		const { parseTimeText, secondsToClockText, timeConfigPatch, timeInputValue } = await import(
 			'../../client/components/timer-control-panel-inline-time.js'
 		)
 
@@ -71,6 +71,10 @@ describe('WO-381 compact timers dock', () => {
 
 		assert.deepEqual(timeConfigPatch({ config: { mode: 'duration' } }, 300), { durationSec: 300 })
 		assert.deepEqual(timeConfigPatch({ config: { mode: 'clock' } }, 64800), { targetTime: '18:00:00' })
+
+		// The input shows the timer's own stored value, per mode.
+		assert.equal(timeInputValue({ config: { mode: 'duration', durationSec: 90 } }), '00:01:30')
+		assert.equal(timeInputValue({ config: { mode: 'clock', targetTime: '18:00:00' } }), '18:00:00')
 	})
 
 	it('writes the new time to every screen the timer is on', async () => {
@@ -102,21 +106,46 @@ describe('WO-381 compact timers dock', () => {
 		}
 	})
 
-	it('has no timer creation or screen assignment left in the dock', () => {
+	it('has no timer creation, screen assignment or unassign left in the dock', () => {
 		const src = read('client/components/timer-control-panel.js')
 		assert.doesNotMatch(src, /new-timer-btn/)
 		assert.doesNotMatch(src, /'Add to screen:'/)
 		assert.doesNotMatch(src, /timer-control-panel__screen-select/)
 		assert.doesNotMatch(src, /createTimerForScreen/)
 		assert.doesNotMatch(src, /prompt\(/)
-		// still a live controller: transport, visibility chips, and the editable readout
-		assert.match(src, /attachInlineTimeEditor\(displayEl, timer/)
+		// owner: "there is remove button in the compact timer, not needed"
+		assert.doesNotMatch(src, /timers\/unassign/)
+		assert.doesNotMatch(src, /chip-unassign/)
+		// still a live controller: transport, visibility chips, standing time input
+		assert.match(src, /createTimerTimeInput\(timer/)
 		assert.match(src, /\/api\/timers\/cmd/)
 		assert.match(src, /\/api\/timers\/visible/)
-		// the tick must not overwrite the field while it is being edited
-		assert.match(src, /displayEl\.dataset\.editing !== '1'/)
+		// the poll must not rebuild rows out from under a field being typed into
+		assert.match(src, /if \(!isEditingInPanel\(\)\) updateTimerRows\(\)/)
 
-		// creation still exists where it belongs
-		assert.match(read('client/components/inspector-screen-timer.js'), /createTimerForScreen/)
+		// creation and screen assignment still exist where they belong
+		const inspector = read('client/components/inspector-screen-timer.js')
+		assert.match(inspector, /createTimerForScreen/)
+		assert.match(inspector, /timers\/unassign/)
+	})
+
+	it('the eye fades instead of cutting', () => {
+		const src = read('client/components/timer-control-panel.js')
+		assert.match(src, /const FADE_FRAMES = 25/)
+		assert.match(src, /'\/api\/timers\/visible', \{ timerId, screenIdx, visible, fadeFrames: FADE_FRAMES \}/)
+		// the server ramps MIXER OPACITY over fadeFrames rather than cutting
+		assert.match(read('src/api/routes-screen-timers.js'), /fadeFrames/)
+		assert.match(read('src/engine/screen-timers.js'), /fadeFrames/)
+	})
+
+	it('the duplicate timer strip is gone from the audio mixer panel', () => {
+		const src = read('client/components/audio-mixer-panel.js')
+		assert.doesNotMatch(src, /timers-compact/)
+		assert.doesNotMatch(src, /timer-compact/)
+		assert.doesNotMatch(src, /\/api\/timers\//)
+		assert.doesNotMatch(src, /createTimerForScreen/)
+		// and the panel still does its own job
+		assert.match(src, /audio-mixer__masters/)
+		assert.match(src, /renderInspectorMasterBuses/)
 	})
 })

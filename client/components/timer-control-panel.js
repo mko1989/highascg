@@ -5,22 +5,22 @@
  * - Collapsible header (persists collapsed state in localStorage)
  * - List of all screen timers from /api/timers/list (polled ~1s while open)
  * - Per-timer row: name, remaining-time display (computed client-side from lastCmd/cmdAt/config),
- *   start/pause/reset buttons, and per-screen chips with visible toggles
- * - Unassign button (×) per chip with confirmation
- * - Live time display that MIRRORS timer state (ticks 4×/s locally) and is click-to-edit
- *   (timer-control-panel-inline-time.js)
+ *   start/pause/reset buttons, a time input, and per-screen chips with fade in/out toggles
+ * - Live time display that MIRRORS timer state (ticks 4×/s locally)
  *
- * WO-381 (owner 2026-07-29: "the adding of the timers shouldnt be there at all"): this dock is a
- * LIVE CONTROLLER only. Creating timers and assigning them to screens live in the screen-timer
- * Inspector (⏱ in the looks deck → inspector-screen-timer.js); the create button and the per-timer
- * screen-assignment dropdown were removed from here.
+ * WO-381 — owner 2026-07-29, this dock is a LIVE CONTROLLER ONLY. Removed: the create button
+ * ("the adding of the timers shouldnt be there at all"), the per-timer screen-assignment
+ * dropdown, and the per-chip remove/× ("there is remove button in the compact timer, not
+ * needed"). All three live in the screen-timer Inspector (⏱ in the looks deck →
+ * inspector-screen-timer.js). The eye fades rather than cuts, and each row carries a time input
+ * (timer-control-panel-inline-time.js). The duplicate compact strip that used to sit below this
+ * dock, in the audio mixer panel, is gone too.
  *
  * WO-210 T210.6:
  * - Source of truth: GET /api/timers/list (poll ~1s while open)
  * - Per-timer display computed from {lastCmd, cmdAt, config} using computeDisplayTime
  * - Transport buttons: POST /api/timers/cmd {timerId, cmd: start|pause|reset}
- * - Per-screen chips with visible toggle: POST /api/timers/visible {timerId, screenIdx, visible}
- * - Unassign chip affordance (×) with confirm(): POST /api/timers/unassign {timerId, screenIdx}
+ * - Per-screen chips, fade in/out: POST /api/timers/visible {timerId, screenIdx, visible, fadeFrames}
  * - Setting the time: POST /api/timers/assign {timerId, screenIdx, config} per assigned screen
  * - getScreenTimersSnapshot() exported for T210.8 (look-save integration)
  */
@@ -29,12 +29,16 @@ import { api } from '../lib/api-client.js'
 import { escapeAttr } from '../lib/dom-escape.js'
 import { screenLabel } from '../lib/screen-label.js'
 import { computeDisplayTime, formatDisplayTime } from './timer-control-panel-display.js'
-import { attachInlineTimeEditor } from './timer-control-panel-inline-time.js'
+import { createTimerTimeInput } from './timer-control-panel-inline-time.js'
 import { buildTimerSettings } from './timer-control-panel-settings-form.js'
 
 const LS_COLLAPSED = 'highascg_timer_panel_collapsed'
 const POLL_INTERVAL_MS = 1000 // ~1s (was 5s for old countdown polling)
 const TICK_INTERVAL_MS = 250 // 4×/s
+/** WO-381: eye = fade, not cut. 25 frames matches inspector-screen-timer.js's FADE_FRAMES. */
+const FADE_FRAMES = 25
+/** Re-read the list once the 25-frame ramp (~0.5s at 50p) has landed. */
+const FADE_REFRESH_MS = 700
 
 /**
  * Module-level reference to the last fetched timers list and their visibility state.
@@ -143,6 +147,14 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 
 	toggle.addEventListener('click', () => applyCollapsed(!isCollapsed))
 
+	/** True while a field inside the timer list holds focus (typing a time, editing settings). */
+	function isEditingInPanel() {
+		const el = document.activeElement
+		if (!el || !listContainer.contains(el)) return false
+		const tag = String(el.tagName || '').toLowerCase()
+		return tag === 'input' || tag === 'select' || tag === 'textarea'
+	}
+
 	async function refreshTimerList() {
 		try {
 			const res = await api.get('/api/timers/list')
@@ -158,7 +170,10 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 						}
 					}
 				}
-				updateTimerRows()
+				// WO-381: the 1s poll rebuilds every row — that would wipe a time (or settings)
+				// field mid-typing. Hold the rebuild while the owner is in a field down here; the
+				// live readouts keep ticking off `lastTimersList` regardless (startTick).
+				if (!isEditingInPanel()) updateTimerRows()
 				root.style.display = lastTimersList.length > 0 ? '' : 'none'
 			}
 		} catch (err) {
@@ -196,8 +211,6 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 			displayEl.textContent = formatDisplayTime(remaining)
 			displayEl.dataset.timerId = timer.timerId
 			headerEl.appendChild(displayEl)
-			// WO-381: the readout IS the time control — click it, type, Enter.
-			attachInlineTimeEditor(displayEl, timer, { onSaved: () => setTimeout(() => refreshTimerList(), 100) })
 
 			// Settings button
 			const settingsBtn = document.createElement('button')
@@ -231,6 +244,12 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 
 			timerEl.appendChild(controlsEl)
 
+			// WO-381: standing time input per timer (owner: "there should be time inputs for the
+			// timer in the compact timers menu").
+			timerEl.appendChild(
+				createTimerTimeInput(timer, { onSaved: () => setTimeout(() => refreshTimerList(), 100) }),
+			)
+
 			// Per-screen chips
 			if (timer.screens && Object.keys(timer.screens).length > 0) {
 				const chipsEl = document.createElement('div')
@@ -252,25 +271,15 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 					toggleEl.type = 'button'
 					toggleEl.className = 'timer-control-panel__chip-toggle'
 					toggleEl.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;width:20px;height:20px;display:flex;align-items:center;justify-content:center'
-					toggleEl.title = screenEntry.visible ? 'Hide' : 'Show'
+					toggleEl.title = screenEntry.visible ? `Fade out on ${screenLabel(cm, screenIdx)}` : `Fade in on ${screenLabel(cm, screenIdx)}`
 					toggleEl.textContent = screenEntry.visible ? '👁' : '⊘'
 					toggleEl.dataset.timerId = timer.timerId
 					toggleEl.dataset.screenIdx = screenIdx
 					toggleEl.addEventListener('click', () => onToggleVisible(timer.timerId, screenIdx, !screenEntry.visible))
 					chipEl.appendChild(toggleEl)
 
-					// Unassign button
-					const unassignEl = document.createElement('button')
-					unassignEl.type = 'button'
-					unassignEl.className = 'timer-control-panel__chip-unassign'
-					unassignEl.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;width:16px;height:16px;display:flex;align-items:center;justify-content:center;opacity:0.6;font-size:0.9em'
-					unassignEl.title = 'Remove from screen'
-					unassignEl.textContent = '×'
-					unassignEl.dataset.timerId = timer.timerId
-					unassignEl.dataset.screenIdx = screenIdx
-					unassignEl.addEventListener('click', () => onUnassign(timer.timerId, screenIdx))
-					chipEl.appendChild(unassignEl)
-
+					// WO-381: no unassign (×) here — owner: "there is remove button in the compact
+					// timer, not needed". Screen assignment is the Inspector's job.
 					chipsEl.appendChild(chipEl)
 				}
 
@@ -305,22 +314,14 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 
 	async function onToggleVisible(timerId, screenIdx, visible) {
 		try {
-			await api.post('/api/timers/visible', { timerId, screenIdx, visible })
-			// Refresh to update UI
-			setTimeout(() => refreshTimerList(), 100)
+			// WO-381 (owner: "the eye button should perform fade in and fade out of the timer"):
+			// the server ramps MIXER OPACITY over fadeFrames, and a fade-in targets the timer's
+			// stored on-air opacity. FADE_FRAMES matches the screen-timer Inspector's ramp.
+			await api.post('/api/timers/visible', { timerId, screenIdx, visible, fadeFrames: FADE_FRAMES })
+			// Refresh to update UI — after the ramp, so the eye flips on the settled state.
+			setTimeout(() => refreshTimerList(), FADE_REFRESH_MS)
 		} catch (err) {
 			console.warn('[timer-panel] visible toggle failed:', err?.message || err)
-		}
-	}
-
-	async function onUnassign(timerId, screenIdx) {
-		if (!confirm(`Remove timer from Screen ${screenIdx + 1}?`)) return
-		try {
-			await api.post('/api/timers/unassign', { timerId, screenIdx })
-			// Refresh to update UI
-			setTimeout(() => refreshTimerList(), 100)
-		} catch (err) {
-			console.warn('[timer-panel] unassign failed:', err?.message || err)
 		}
 	}
 
@@ -336,9 +337,7 @@ export function initTimerControlPanel(stateStore, mountEl, opts = {}) {
 				if (timer) {
 					const remaining = computeDisplayTime(timer)
 					const displayEl = el.querySelector('.timer-control-panel__timer-display')
-					// WO-381: never type over the owner — the inline editor marks the readout
-					// data-editing="1" while it is open.
-					if (displayEl && displayEl.dataset.editing !== '1') {
+					if (displayEl) {
 						displayEl.textContent = formatDisplayTime(remaining)
 					}
 				}

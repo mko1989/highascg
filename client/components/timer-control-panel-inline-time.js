@@ -1,10 +1,10 @@
 /**
- * Timer control panel — click-to-set time on the compact dock's live display (WO-381).
+ * Timer control panel — the time input in each compact dock row (WO-381).
  *
- * Owner 2026-07-29: "in the small compact timers at the bottom right there should be a way to set
- * time". The dock is a live controller, so the time itself is the control: click the readout, type
- * a duration (`90`, `5:00`, `01:30:00`), Enter to commit. In clock mode the same box edits the
- * target wall-clock time instead of a duration.
+ * Owner 2026-07-29: "there should be time inputs for the timer in the compact timers menu" — a
+ * standing input box per timer, not a click-to-reveal editor. Type `90`, `5:00` or `01:30:00`;
+ * Enter or blur commits, Escape restores. In clock mode the box sets the target wall-clock time
+ * instead of a duration. The live readout beside it keeps ticking and is never typed into.
  *
  * Saving goes through POST /api/timers/assign (screen-timers.js merges `config` and emits the CG
  * UPDATE) once per assigned screen — every screen showing the timer needs its own UPDATE, and the
@@ -61,59 +61,59 @@ export async function saveTimerConfigPatch(timer, patch) {
 	}
 }
 
+/** The value a timer's input shows: its configured duration, or its target time in clock mode. */
+export function timeInputValue(timer) {
+	const config = timer?.config || {}
+	if ((config.mode || 'duration') === 'clock') return config.targetTime || '00:00:00'
+	return secondsToClockText(config.durationSec || 0)
+}
+
 /**
- * Make a timer readout click-to-edit in place. The tick loop skips elements marked
- * `data-editing="1"`, so a running timer does not overwrite what is being typed.
- * @param {HTMLElement} displayEl — the monospace readout
- * @param {object} timer
+ * Build the labelled time input for one timer row. Unassigned timers get a disabled box (the
+ * assign API needs a screen), so the control is always present and never lies about being usable.
+ * @param {object} timer — /api/timers/list record
  * @param {{ onSaved?: () => void }} [deps]
- * @returns {HTMLInputElement} the (hidden) editor input, already inserted after `displayEl`
+ * @returns {HTMLElement} the row to append (label + input)
  */
-export function attachInlineTimeEditor(displayEl, timer, deps = {}) {
+export function createTimerTimeInput(timer, deps = {}) {
 	const { onSaved } = deps
-	const assigned = Object.keys(timer?.screens || {}).length > 0
 	const isClock = (timer?.config?.mode || 'duration') === 'clock'
+	const assigned = Object.keys(timer?.screens || {}).length > 0
+
+	const wrap = document.createElement('label')
+	wrap.className = 'timer-control-panel__time-row'
+
+	const labelEl = document.createElement('span')
+	labelEl.className = 'timer-control-panel__time-label'
+	labelEl.textContent = isClock ? 'Target' : 'Time'
+	wrap.appendChild(labelEl)
 
 	const input = document.createElement('input')
 	input.type = 'text'
 	input.className = 'timer-control-panel__timer-input'
 	input.inputMode = 'numeric'
-	input.hidden = true
+	input.placeholder = 'HH:MM:SS'
+	input.value = timeInputValue(timer)
+	input.dataset.timerId = timer.timerId
 	input.setAttribute('aria-label', isClock ? 'Target time (HH:MM:SS)' : 'Duration (HH:MM:SS)')
-	displayEl.insertAdjacentElement('afterend', input)
-
+	input.title = isClock ? 'Target time — HH:MM:SS' : 'Duration — MM:SS or HH:MM:SS'
 	if (!assigned) {
-		displayEl.title = 'Assign this timer to a screen to set its time'
-		return input
+		input.disabled = true
+		input.title = 'Assign this timer to a screen to set its time'
 	}
-
-	displayEl.classList.add('timer-control-panel__timer-display--editable')
-	displayEl.title = isClock ? 'Click to set the target time (HH:MM:SS)' : 'Click to set the duration (MM:SS or HH:MM:SS)'
-
-	function stopEditing() {
-		input.hidden = true
-		displayEl.hidden = false
-		delete displayEl.dataset.editing
-	}
-
-	displayEl.addEventListener('click', () => {
-		displayEl.dataset.editing = '1'
-		input.value = isClock ? timer.config?.targetTime || displayEl.textContent : displayEl.textContent
-		displayEl.hidden = true
-		input.hidden = false
-		input.focus()
-		input.select()
-	})
+	wrap.appendChild(input)
 
 	async function commit() {
 		const seconds = parseTimeText(input.value)
 		if (seconds == null) {
-			stopEditing()
+			input.value = timeInputValue(timer) // unparseable — put the stored value back
 			return
 		}
-		stopEditing()
+		const patch = timeConfigPatch(timer, seconds)
+		input.value = isClock ? patch.targetTime : secondsToClockText(patch.durationSec)
+		if (input.value === timeInputValue(timer)) return // nothing changed — no CG UPDATE
 		try {
-			await saveTimerConfigPatch(timer, timeConfigPatch(timer, seconds))
+			await saveTimerConfigPatch(timer, patch)
 			onSaved?.()
 		} catch (err) {
 			console.warn('[timer-panel] set time failed:', err?.message || err)
@@ -123,15 +123,14 @@ export function attachInlineTimeEditor(displayEl, timer, deps = {}) {
 	input.addEventListener('keydown', (e) => {
 		if (e.key === 'Enter') {
 			e.preventDefault()
-			void commit()
+			input.blur() // blur commits
 		} else if (e.key === 'Escape') {
 			e.preventDefault()
-			stopEditing()
+			input.value = timeInputValue(timer)
+			input.blur()
 		}
 	})
-	input.addEventListener('blur', () => {
-		if (!input.hidden) void commit()
-	})
+	input.addEventListener('blur', () => void commit())
 
-	return input
+	return wrap
 }
