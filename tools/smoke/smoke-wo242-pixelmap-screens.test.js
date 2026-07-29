@@ -294,12 +294,27 @@ describe('WO-242 T242.4: routing/channel-map registers pixelmap as a PGM-only sc
 	})
 
 	it('screenLabels (WO-222 helper) flow through unchanged for a pixelmap main', async () => {
+		// WO-385: a screen's name IS its destination's name — "name and label should be one thing".
+		// The legacy `config.screenLabels` array stayed as the fallback for indices no destination
+		// owns, so this now checks BOTH halves of that rule on a pixelmap main.
 		const { screenLabel } = await import('../../client/lib/screen-label.js')
 		const app = twoScreenConfig()
 		app.screenLabels = ['LED Wall']
 		const cm = getChannelMap(app)
-		assert.equal(screenLabel(cm, 0), 'LED Wall', 'custom screenLabels override applies identically to pixelmap mains')
+		// This destination has no label of its own (normalizeDestination falls back to its id, a
+		// generated string) — so the stored array still wins.
+		assert.equal(screenLabel(cm, 0), 'LED Wall', 'a stored label outranks an auto-generated id')
 		assert.equal(screenLabel(cm, 1), 'S2', 'fallback label unaffected')
+
+		// A destination the operator actually NAMED is what the screen is called.
+		const named = twoScreenConfig()
+		named.screenLabels = ['LED Wall']
+		named.screenDestinations.destinations[0].label = 'Stage wall'
+		assert.equal(
+			screenLabel(getChannelMap(named), 0),
+			'Stage wall',
+			'the destination name is the screen name (WO-385)',
+		)
 	})
 
 	it("takes' channel classification (isPreviewBusAvailable) reports the pixelmap main as pgm-only", async () => {

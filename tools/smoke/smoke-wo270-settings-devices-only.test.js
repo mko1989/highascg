@@ -36,11 +36,20 @@ describe('WO-270: settings modal cleanup', () => {
 })
 
 describe('WO-270: Devices tab replacements', () => {
-	it('destination inspector edits the screen label via /api/screens/label', () => {
+	it('destination inspector names a screen with ONE field', () => {
+		// WO-385 (owner: "name and label should be one thing"): the second "Screen label" input is
+		// gone. The destination's own name is the screen's name everywhere, derived by
+		// screenLabelsFromConfig — so this guards the removal and the single remaining field.
 		const form = src('client/components/device-view-destinations-inspector-form.js')
-		assert.match(form, /screenLabels\[screenIdxForLabel\]/)
-		assert.match(form, /post\('\/api\/screens\/label', \{ screenIdx: screenIdxForLabel/)
-		assert.match(form, /mode === 'pgm_prv' \|\| mode === 'pgm_only'\) edits\.append\(screenLabelIn\)/)
+		assert.doesNotMatch(form, /screenLabelIn/, 'the separate screen-label input must stay gone')
+		assert.doesNotMatch(form, /api\/screens\/label/, 'the inspector no longer posts a second label')
+		assert.match(form, /patchDestination\(d\.id, \{ label:/, 'the name field patches the destination')
+		assert.match(form, /Name of this screen/, 'and says that it names the screen')
+
+		const sd = src('src/config/screen-destinations.js')
+		assert.match(sd, /function screenLabelsFromConfig/, 'the derivation is the single source of truth')
+		const routing = src('src/config/routing-map.js')
+		assert.match(routing, /screenLabels: screenLabelsFromConfig\(config, screenCount\)/)
 	})
 
 	it('server inspector carries the WO-268 CEF GPU checkbox', () => {

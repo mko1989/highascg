@@ -175,6 +175,37 @@ function isMainBusDestinationMode(mode) {
  * keep their index untouched: for them it is a monitor-placement hint, not a slot claim.
  * @param {Array<object>} list normalized destinations (mutated)
  */
+/**
+ * WO-385 — the screen's NAME is the name of the destination that owns it.
+ *
+ * "name and label should be one thing" (owner 2026-07-29). A screen used to carry a second,
+ * separate `config.screenLabels[i]` string edited in its own inspector field; a box could name a
+ * destination "ekran" and still show "S1" everywhere else. The destination label now wins, and the
+ * stored array is only a fallback for boxes that set one before this change.
+ *
+ * @param {object} cfg app config
+ * @param {number} screenCount
+ * @returns {string[]} label per screen index ('' where nothing is set — callers fall back to S<n>)
+ */
+function screenLabelsFromConfig(cfg, screenCount) {
+	const stored = Array.isArray(cfg?.screenLabels) ? cfg.screenLabels : []
+	const dests = routingDestinationsFromConfig(cfg) ?? []
+	const out = []
+	for (let i = 0; i < Math.max(0, screenCount); i++) {
+		const owner = dests.find(
+			(d) => d && isMainBusDestinationMode(d.mode) && (parseInt(String(d.mainScreenIndex ?? 0), 10) || 0) === i,
+		)
+		// `normalizeDestination` falls a missing label back to the id, which is a generated string
+		// (`dst_ms5xojur_1`), not a name anyone chose — that must not outrank a stored label.
+		const rawLabel = String(owner?.label ?? '').trim()
+		const named = rawLabel && rawLabel !== String(owner?.id ?? '').trim() ? rawLabel : ''
+		// Nothing named and nothing stored → '', and every reader falls back to S<n>. Never the
+		// generated id.
+		out.push(named || String(stored[i] ?? '').trim())
+	}
+	return out
+}
+
 function compactMainScreenIndices(list) {
 	const mains = list.filter((d) => d && isMainBusDestinationMode(d.mode))
 	const distinct = [...new Set(mains.map((d) => Math.max(0, parseInt(String(d.mainScreenIndex ?? 0), 10) || 0)))].sort(
@@ -260,6 +291,7 @@ function destinationAudioLayoutsByMain(cfg) {
 
 module.exports = {
 	isMainBusDestinationMode,
+	screenLabelsFromConfig,
 	normalizeDestination,
 	normalizeScreenDestinations,
 	finalizeScreenDestinationsConfig,

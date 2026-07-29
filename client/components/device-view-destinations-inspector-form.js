@@ -144,7 +144,13 @@ export function renderDestinationInspector(args) {
 	nameIn.type = 'text'
 	nameIn.className = 'device-view__destinations-type'
 	nameIn.value = String(d?.label || d?.id || '')
-	nameIn.placeholder = 'Destination label'
+	nameIn.placeholder = 'Name'
+	// WO-385: for a screen destination this name IS the screen's name everywhere (looks selector,
+	// multiview, panels, Companion) — there is no second "screen label" to keep in step.
+	nameIn.title =
+		mode === 'pgm_prv' || mode === 'pgm_only'
+			? 'Name of this screen — shown in the looks selector, multiview, panels and Companion'
+			: 'Name of this destination'
 	nameIn.addEventListener('change', () => patchDestination(d.id, { label: String(nameIn.value || '').trim() || String(d?.label || d?.id || 'Destination') }))
 
 	const mainIn = document.createElement('input')
@@ -157,22 +163,11 @@ export function renderDestinationInspector(args) {
 	mainIn.addEventListener('change', () => patchDestination(d.id, { mainScreenIndex: Math.max(0, parseInt(String(mainIn.value || 0), 10) || 0) }))
 	attachMathInput(mainIn, { decimals: 0 })
 
-	// WO-222 label editing moved here from the settings modal (owner request 2026-07-18): the
-	// screen label (S1/S2 default, shown in looks selector / multiview / panels) is per SCREEN
-	// (mainScreenIndex), distinct from the destination's own label above.
-	const screenIdxForLabel = Math.max(0, parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0)
-	const screenLabels = Array.isArray(currentSettings?.channelMap?.screenLabels) ? currentSettings.channelMap.screenLabels : []
-	const screenLabelIn = document.createElement('input')
-	screenLabelIn.type = 'text'
-	screenLabelIn.className = 'device-view__destinations-type'
-	screenLabelIn.value = String(screenLabels[screenIdxForLabel] || '')
-	screenLabelIn.placeholder = `Screen label (S${screenIdxForLabel + 1})`
-	screenLabelIn.title = 'Custom label for this screen output — used in looks selector, multiview and panels; empty = default'
-	screenLabelIn.addEventListener('change', () => {
-		void api
-			.post('/api/screens/label', { screenIdx: screenIdxForLabel, label: String(screenLabelIn.value || '').trim() })
-			.catch((e) => console.warn('screen label save failed:', e?.message || e))
-	})
+	// WO-385: the separate "Screen label" field is gone (owner: "name and label should be one
+	// thing"). The destination's own name above IS the screen name everywhere — looks selector,
+	// multiview, panels, Companion — derived by screenLabelsFromConfig (src/config/screen-destinations.js).
+	// It also never worked: its POST body was read as an object while routes receive a raw string,
+	// so every save bailed out and answered an empty 200 that looked like success.
 
 	const modeSel = document.createElement('select')
 	modeSel.className = 'device-view__destinations-type'
@@ -448,7 +443,6 @@ export function renderDestinationInspector(args) {
 	const operatorGuiFields = mode === 'operator_gui' ? buildOperatorGuiFields({ d, patchDestination }) : []
 
 	edits.append(nameIn, mainIn, modeSel)
-	if (mode === 'pgm_prv' || mode === 'pgm_only') edits.append(screenLabelIn)
 	if (mode !== 'multiview' && mode !== 'stream' && mode !== 'operator_gui') {
 		const audioOutputsWrap = Object.assign(document.createElement('div'), {
 			style: 'display:flex; flex-direction:column; gap:4px; width:100%',

@@ -5,7 +5,7 @@
 
 const { resolveOutputSourceToChannel } = require('./output-source-name')
 
-const { routingDestinationsFromConfig } = require('./screen-destinations')
+const { routingDestinationsFromConfig, screenLabelsFromConfig } = require('./screen-destinations')
 
 function readCasparSetting(cfg, key) {
 	if (!cfg || typeof cfg !== 'object') return undefined
@@ -400,8 +400,8 @@ function getChannelMap(config, activeBuses = null) {
 
 	const result = {
 		screenCount,
-		/** Custom screen labels persisted in config. */
-		screenLabels: Array.isArray(config?.screenLabels) ? config.screenLabels.slice(0, screenCount) : [],
+		/** WO-385: the owning destination's label IS the screen name (stored array only as fallback). */
+		screenLabels: screenLabelsFromConfig(config, screenCount),
 		/** True only when at least one multiview Caspar channel is allocated (topology includes a multiview destination). */
 		multiviewEnabled: multiviewChannels.length > 0,
 		/** WO-243: true only when an operator_gui destination is allocated a Caspar channel. */

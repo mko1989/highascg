@@ -65,38 +65,59 @@ async function testRouterRegistration() {
  * Test 3: Server store roundtrip with stubbed persistence
  */
 async function testServerStoreRoundtrip() {
-	// Simulate the routes-screens handler logic
-	const mockConfig = {
-		screenLabels: [],
+	// WO-385: the handler takes the RAW request body (a string) exactly as router-dispatch.js
+	// hands it over, and answers with the { status, headers, body } shape the route registry
+	// sends. This test used to pass a parsed object and read a bare `.ok`, which is why it stayed
+	// green while every real HTTP save silently did nothing.
+	const routesScreens = require('../../src/api/routes-screens')
+	const post = (payload, ctx) => {
+		const res = routesScreens.handlePost('/api/screens/label', JSON.stringify(payload), ctx)
+		assert(res && typeof res.status === 'number', 'handler must return a { status, headers, body } response')
+		return { status: res.status, json: JSON.parse(res.body) }
 	}
 
-	const mockConfigManager = {
-		get: () => mockConfig,
-		save: (newCfg) => {
-			Object.assign(mockConfig, newCfg)
+	// 1. No destination owns the index → the legacy screenLabels array is the fallback store.
+	const bareConfig = { screenLabels: [] }
+	const bareCtx = {
+		config: bareConfig,
+		configManager: { get: () => bareConfig, save: (n) => Object.assign(bareConfig, n) },
+	}
+	const r1 = post({ screenIdx: 0, label: 'Main' }, bareCtx)
+	assert.strictEqual(r1.status, 200, 'POST should succeed')
+	assert.strictEqual(r1.json.ok, true)
+	assert.strictEqual(bareConfig.screenLabels[0], 'Main', 'config should persist label')
+
+	const r2 = post({ screenIdx: 2, label: 'Aux' }, bareCtx)
+	assert.strictEqual(r2.status, 200)
+	assert.strictEqual(bareConfig.screenLabels[2], 'Aux', 'config should persist second label')
+	assert.strictEqual(bareConfig.screenLabels.length, 3, 'screenLabels array should expand to fit index 2')
+	assert.strictEqual(bareConfig.screenLabels[1], '', 'missing indices should be empty strings')
+
+	// 2. A destination owns the index → THAT is renamed, because the screen and its destination
+	//    are one thing now (owner: "name and label should be one thing").
+	const destConfig = {
+		screenLabels: [],
+		screenDestinations: {
+			version: 1,
+			destinations: [{ id: 'dst_a', label: 'PGM/PRV 1', mode: 'pgm_prv', mainScreenIndex: 0 }],
 		},
 	}
-
-	const mockCtx = {
-		config: mockConfig,
-		configManager: mockConfigManager,
+	const destCtx = {
+		config: destConfig,
+		configManager: { get: () => destConfig, save: (n) => Object.assign(destConfig, n) },
 	}
+	const r3 = post({ screenIdx: 0, label: 'ekran' }, destCtx)
+	assert.strictEqual(r3.status, 200)
+	assert.strictEqual(r3.json.renamedDestination, 'dst_a', 'the owning destination is what gets named')
+	assert.strictEqual(destConfig.screenDestinations.destinations[0].label, 'ekran')
+	assert.deepStrictEqual(r3.json.screenLabels, ['ekran'], 'the channel map reports the new name')
+	assert.deepStrictEqual(destConfig.screenLabels, [], 'the legacy array is left alone when a destination owns it')
 
-	// Test setting a label
-	const routesScreens = require('../../src/api/routes-screens')
-	const result1 = routesScreens.handlePost('/api/screens/label', { screenIdx: 0, label: 'Main' }, mockCtx)
-	assert(result1.ok === true, 'POST should return ok: true')
-	assert.deepStrictEqual(result1.screenLabels, ['Main'], 'screenLabels should be updated')
-	assert.strictEqual(mockConfig.screenLabels[0], 'Main', 'config should persist label')
-
-	// Test setting another label
-	const result2 = routesScreens.handlePost('/api/screens/label', { screenIdx: 2, label: 'Aux' }, mockCtx)
-	assert(result2.ok === true, 'Second POST should return ok: true')
-	assert.strictEqual(mockConfig.screenLabels[2], 'Aux', 'config should persist second label')
-
-	// Verify array has correct length (sparse array filled with empty strings)
-	assert.strictEqual(mockConfig.screenLabels.length, 3, 'screenLabels array should expand to fit index 2')
-	assert.strictEqual(mockConfig.screenLabels[1], '', 'missing indices should be empty strings')
+	// 3. Malformed input is refused, not silently dropped.
+	assert.strictEqual(post({ label: 'no index' }, bareCtx).status, 400)
+	const badJson = routesScreens.handlePost('/api/screens/label', '{not json', bareCtx)
+	assert.strictEqual(badJson.status, 400, 'a broken body must be a 400, not a success-looking empty 200')
+	assert.strictEqual(routesScreens.handlePost('/api/other', '{}', bareCtx), null, 'other paths are not ours')
 
 	console.log('✓ Server store roundtrip test passed')
 }
