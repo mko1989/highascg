@@ -1,6 +1,6 @@
 # WO-381 — Host channels stuck on "planned", ch 4 collision with the Operator GUI, timers dock
 
-**Status: 🟡 Implemented 29.07.26 (server + client live on the box; suite 1678/0/2) — owner eyeball on the dock**
+**Status: 🟡 Implemented 29.07.26 in three rounds (server + client live on the box; suite 1684/0/2) — owner eyeball on the dock; Companion needs a module reinstall + restart**
 
 Owner, 2026-07-29:
 > "i have a setup right now and all the host channels are stuck on planned. when i was adding a host
@@ -77,7 +77,32 @@ inspector column (`client/index.html:109`). Setting a time existed only behind t
 save wrote to `Object.keys(timer.screens)[0]` — the FIRST assigned screen only, silently returning
 when the timer had no screen. Creation lived here too: "+ New Timer" with two `prompt()` dialogs.
 
-### 1e. Second round (owner, same day, after seeing the first cut)
+### 1e. Third round: position, input width, Companion (owner, same day)
+
+> "the input box for the time is too wide."
+> "positioning of the timer doesnt work. inputing anything in x or y doesnt do anything"
+> "now i need full timer control and display as variable in companion."
+
+**Position: every link in the chain was verified WORKING, one at a time.**
+
+1. The form sends it. `buildTimerSettings` driven headlessly from `client/` source with `fetch`
+   captured: Save posted `{"posX":300,"posY":150,…}`.
+2. The server stores and emits it. `assignTimerToScreen` on the box's own registry produced
+   `CG 3-980 UPDATE 0 {…,\"posX\":120,\"posY\":64}`.
+3. The template honours it — including on the RUNNING Caspar. `CG 3-980 INVOKE` (set + read +
+   restore inside one synchronous JS turn, so the compositor never sees the intermediate state)
+   reported:
+   `B[countdown-root countdown-pos-bottom-left~none] M[countdown-root countdown-pos-top-left~150px 0px 0px 300px] A[…bottom-left~none]`.
+4. End to end through the live API: posting the config moved the on-air template and the registry
+   kept `posX 300 / posY 150`, then restored.
+
+So nothing in the pipeline was broken. What could lose the entry is the dock's **1s poll rebuilding
+the whole row while the ⚙ form is open** — `updateTimerRows()` re-creates the form (and hides it)
+every second, discarding whatever was typed. That is the bug fixed in the second round
+(`isEditingInPanel()`), and it fits the symptom exactly. To remove the failure mode entirely rather
+than rely on a focus guard, position now applies on `change` with no Save round-trip.
+
+### 1e-bis. Second round (owner, same day, after seeing the first cut)
 
 > "there is an additional timer in the most bottom right. not needed."
 > "there is remove button in the compact timer, not needed."
@@ -143,6 +168,44 @@ render while an edit is unapplied) "prefer the planned map" is the right default
   loses `__new-timer-btn`, `__screen-select`, `__chip-unassign`; `07b-audio-mixer-modal-shell.css`
   loses the whole `__timer-compact-*` block.
 
+**Third round**
+
+- `timer-control-panel-settings-form.js` — X, Y and the position preset apply on `change`
+  (`applyPositionNow`), no Save round-trip, so nothing can eat the entry between typing and saving.
+  Save itself now goes through `saveTimerConfigPatch`, i.e. every assigned screen instead of the
+  first. A note under the fields states that X+Y override the preset.
+- The time input is `width: 8ch` instead of `flex: 1` (owner: "the input box for the time is too
+  wide") — sized to `hh:mm:ss` in the monospace face.
+
+**Companion module** (`~/companion-module-dev/companion-module-highpass-highascg`) — screen timers
+were entirely absent from it; the old `countdown_*` actions drive the unrelated WO-169
+channel/layer templates.
+
+- `src/screen-timers.js` (new) — the model: deterministic ordering (screen, then CG layer, then id)
+  so `highascg_timer_1_*` keeps meaning the same timer; the same local countdown math the web UI
+  uses, so a running timer ticks on a button without polling 4×/s; time parsing; the variable set.
+- `src/bridge/screen-timer-poller.js` (new) — polls `/api/timers/list` every 2s, recomputes the
+  variables every 250ms, publishes only on change, and rebuilds the action dropdowns only when the
+  set of timers changes.
+- `src/actions/screen-timer-actions.js` (new) — Start, Pause, Reset, Start/Pause toggle, Set time
+  (`90` / `5:00` / `01:30:00`, `targetTime` in clock mode), Add/subtract time, Show/Hide with a fade
+  (0 frames = cut) per screen or all screens. Timer choice is a live dropdown whose empty value
+  means "first timer", so buttons survive a show being rebuilt with new ids.
+- Variables: `highascg_timer_count` + 8 slots × `_name _time _time_short _seconds _state _visible
+  _mode _duration _screens _id`.
+- `src/bridge/api-client.js` — `getScreenTimers`, `screenTimerCmd`, `screenTimerVisible`,
+  `screenTimerAssign`.
+
+**Companion look presets** (owner: "the preset buttons for looks dont use variables in names …
+when a look gets a diferent title it still stays look 1") — a preset's style is COPIED onto the
+button when it is dragged out, so a name baked in at build time is frozen there forever.
+
+- `src/presets.js` — look buttons now read `$(<connection>:highascg_look_label_<id>)`; slot buttons
+  read a new `$(<connection>:highascg_look_slot_<n>_label)`, which follows both a rename and the
+  look moving to another slot.
+- `src/look-vars.js` — `lookSlotLabelVariableId` / definitions / `syncLookSlotLabelVariables`, kept
+  in step from `syncLookSlots()` and the look-list refresh.
+
 ---
 
 ## 3. What was VERIFIED
@@ -164,7 +227,20 @@ render while an edit is unapplied) "prefer the planned map" is the right default
 - **Tests**: `tools/smoke/smoke-wo381-operator-gui-channel-reserved.test.js` (3) and
   `tools/smoke/smoke-wo381-planned-badge-and-timer-dock.test.js` (7), both in the curated CI list.
   The first was proven to fail against the pre-fix modules (4, and the hole in the order).
-- **Suite**: `node tools/ci/run-offline-tests.js` → **1678 pass / 0 fail / 2 skip** (1680 tests).
+- **Position, third round**: the change handler was captured producing
+  `{…,"posX":420,"posY":260}` with no Save click, and that exact body replayed against the live
+  server stored 420/260 and restored cleanly. (The headless page's own POST was blocked by CORS —
+  a harness artefact, not the app; the captured body is the app's output.)
+- **Companion**: `npm test` → **18/18** in a new `test/screen-timers.test.js` (the module had a
+  test script but no tests). Covers ordering, the countdown math incl. paused/past-zero, formats,
+  parsing, the full variable block filled and empty, clock mode, and every action against a stubbed
+  API — including that 0 fade frames sends no `fadeFrames` (a cut, not `fadeFrames: 0`), that an
+  unparseable time is refused rather than sent as 0, and that adjust refuses clock timers. Against
+  the LIVE box: the API client read `Timer S2` and produced
+  `count=1 name=Timer S2 time=00:10:00 state=ready visible=true screens=2`, and a no-op
+  `Set time` through the real action reached the server and left the config intact. Lint/format
+  clean (prettier + eslint on the touched files).
+- **Suite**: `node tools/ci/run-offline-tests.js` → **1684 pass / 0 fail / 2 skip** (1686 tests).
   `check-max-file-lines` 0 over; `check-unwired-exports` no new orphans (baseline shrunk 695→693).
   **Two existing guards were repointed, not weakened**: WO-210's CSS list swapped the removed
   `__new-timer-btn` / `__screen-select` / `__chip-unassign` for the successor `__time-row` /
@@ -179,7 +255,10 @@ render while an edit is unapplied) "prefer the planned map" is the right default
 - **Not verified / owner QA**: the dock on glass — typing a time on a real timer (duration and clock
   mode, single- and multi-screen), the eye's fade as seen on the screen, and that no host channel
   still reads "(planned)" in the owner's browser after a reload. The on-air timer (`Timer S2`,
-  screen 2, visible) was deliberately **not** toggled to test the fade. `npm run lint` could not run
+  screen 2, visible) was deliberately **not** toggled to test the fade. **Companion**: the module
+  changes are on disk in `companion-module-dev` and unpackaged — the owner must rebuild/point
+  Companion at the dev module and restart it (WO-372's dev-mode flow) before the new actions,
+  variables and preset labels appear. Nothing was installed into the running Companion from here. `npm run lint` could not run
   here (`eslint` is not in this box's partial `node_modules`) — CI covers it.
 
 ## 4. Not done (deliberately)

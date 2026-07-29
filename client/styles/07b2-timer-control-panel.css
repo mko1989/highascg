@@ -240,9 +240,11 @@
 	flex: 0 0 auto;
 }
 
+/* WO-381 (owner: "the input box for the time is too wide"): sized to its content — `hh:mm:ss`
+ * in the monospace face — instead of stretching across the row. */
 .timer-control-panel__timer-input {
-	flex: 1;
-	min-width: 0;
+	flex: 0 0 auto;
+	width: 8ch;
 	padding: 2px 4px;
 	background: var(--bg-input, var(--bg-2, #161b22));
 	border: 1px solid rgba(255, 255, 255, 0.08);
@@ -324,6 +326,15 @@
 	color: var(--text-muted);
 	letter-spacing: 0.05em;
 	margin-bottom: 2px;
+}
+
+/* WO-381: how the pixel override relates to the preset, said once, next to the fields. */
+.timer-control-panel__settings-note {
+	margin-top: 3px;
+	font-size: 0.65rem;
+	line-height: 1.35;
+	color: var(--text-muted);
+	opacity: 0.85;
 }
 
 .timer-control-panel__settings-row {

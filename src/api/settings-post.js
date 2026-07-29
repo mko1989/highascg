@@ -203,6 +203,13 @@ async function handlePost(path, body, ctx) {
 		if (settings.operatorTools.cefEnableGpu !== undefined) {
 			cfg.operatorTools.cefEnableGpu = settings.operatorTools.cefEnableGpu === true
 		}
+		if (settings.operatorTools.multiHelperTaskbar !== undefined) {
+			// WO-382: WO-317's taskbar flag was writable ONLY by hand-editing config/general.json —
+			// no UI, no API. It is also absent from `defaults.operatorTools`, so anything that
+			// rebuilds that block from defaults (factory reset) drops it with no way back short of
+			// an editor. Accepting it here makes the feature recoverable through the normal path.
+			cfg.operatorTools.multiHelperTaskbar = settings.operatorTools.multiHelperTaskbar === true
+		}
 	}
 	if (settings.projectScopedMedia) {
 		const { normalizeProjectMediaLocation } = require('../media/project-media-location')

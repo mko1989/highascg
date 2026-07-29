@@ -138,6 +138,38 @@ describe('WO-381 compact timers dock', () => {
 		assert.match(read('src/engine/screen-timers.js'), /fadeFrames/)
 	})
 
+	it('position applies on change and fans out to every screen', () => {
+		const src = read('client/components/timer-control-panel-settings-form.js')
+		// owner: "inputing anything in x or y doesnt do anything" — no Save round-trip required
+		assert.match(src, /for \(const el of \[posXInput, posYInput\]\)/)
+		assert.match(src, /applyPositionNow\(\{ posX: readPx\(posXInput\), posY: readPx\(posYInput\) \}\)/)
+		assert.match(src, /positionSelect\.addEventListener\('change'/)
+		// Save no longer writes only the first assigned screen
+		assert.match(src, /saveTimerConfigPatch\(timer, newConfig\)/)
+		assert.doesNotMatch(src, /api\.post\('\/api\/timers\/assign'/)
+		// and the px override's relationship to the preset is stated in the UI
+		assert.match(src, /X and Y together override the preset/)
+	})
+
+	it('the countdown template still anchors on a numeric posX+posY pair', () => {
+		// Verified live on the running Caspar (CG INVOKE reported padding "150px 0px 0px 300px"
+		// for posX 300 / posY 150, then back to the preset) — this guards the branch that does it.
+		const engine = read('template/countdown/countdown-engine.js')
+		assert.match(engine, /const px = Number\(config\.posX\)/)
+		assert.match(engine, /Number\.isFinite\(px\) && Number\.isFinite\(py\)/)
+		assert.match(engine, /dom\.root\.style\.padding = py \+ 'px 0 0 ' \+ px \+ 'px'/)
+		// and the empty-string case must still fall back to the preset class
+		assert.match(engine, /String\(config\.posX\) !== '' && String\(config\.posY\) !== ''/)
+	})
+
+	it('the time input is sized to its content, not the row', () => {
+		const css = read('client/styles/07b2-timer-control-panel.css')
+		const rule = css.slice(css.indexOf('.timer-control-panel__timer-input {'))
+		const block = rule.slice(0, rule.indexOf('}'))
+		assert.match(block, /width: 8ch/)
+		assert.doesNotMatch(block, /flex: 1/)
+	})
+
 	it('the duplicate timer strip is gone from the audio mixer panel', () => {
 		const src = read('client/components/audio-mixer-panel.js')
 		assert.doesNotMatch(src, /timers-compact/)

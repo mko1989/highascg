@@ -210,6 +210,7 @@ const FILES = [
 	'tools/smoke/smoke-wo380-shadertoy-import.test.js',
 	'tools/smoke/smoke-wo381-operator-gui-channel-reserved.test.js',
 	'tools/smoke/smoke-wo381-planned-badge-and-timer-dock.test.js',
+	'tools/smoke/smoke-wo382-operator-tools-flag-settable.test.js',
 ]
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)

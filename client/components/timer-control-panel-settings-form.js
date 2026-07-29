@@ -1,11 +1,18 @@
 /**
  * Timer control panel — per-timer settings form (duration/mode/target-time/position + save/cancel).
  * Extracted from timer-control-panel.js (WO-221 Phase A mechanical split).
+ *
+ * WO-381 (owner 2026-07-29: "positioning of the timer doesnt work. inputing anything in x or y
+ * doesnt do anything"): position — preset and the X/Y pixel override — now applies the moment you
+ * leave the field, instead of waiting for Save. The whole pipeline underneath was verified sound
+ * (config → CG UPDATE → template padding, probed on the running Caspar); what could lose the entry
+ * was this form being re-created by the panel's 1s poll while it was being typed into.
+ * Save also fans out to every assigned screen now — it used to write only the first.
  */
 
-import { api } from '../lib/api-client.js'
 import { createHmsInput, hmsToSeconds } from '../lib/duration-hms-input.js'
 import { DEFAULT_TIMER_CONFIG } from './timer-control-panel-display.js'
+import { saveTimerConfigPatch } from './timer-control-panel-inline-time.js'
 
 /**
  * Build settings section for a timer.
@@ -127,6 +134,28 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	pxRow.append(posXInput, posYInput)
 	containerEl.appendChild(pxRow)
 
+	const pxNote = document.createElement('div')
+	pxNote.className = 'timer-control-panel__settings-note'
+	pxNote.textContent = 'X and Y together override the preset — clear both to go back to it.'
+	containerEl.appendChild(pxNote)
+
+	// WO-381: position applies on change, so it lands whether or not Save is pressed. Both px
+	// fields go together — the template only anchors when BOTH are numbers.
+	const readPx = (el) => (String(el.value).trim() === '' ? '' : Math.round(Number(el.value)))
+	async function applyPositionNow(patch) {
+		try {
+			await saveTimerConfigPatch(timer, patch)
+			Object.assign(config, patch)
+			refreshTimerList?.()
+		} catch (err) {
+			console.warn('[timer-panel] position apply failed:', err?.message || err)
+		}
+	}
+	for (const el of [posXInput, posYInput]) {
+		el.addEventListener('change', () => void applyPositionNow({ posX: readPx(posXInput), posY: readPx(posYInput) }))
+	}
+	positionSelect.addEventListener('change', () => void applyPositionNow({ position: positionSelect.value }))
+
 	// Mode change handler to show/hide targetTime
 	modeSelect.addEventListener('change', () => {
 		const isClock = modeSelect.value === 'clock'
@@ -148,7 +177,6 @@ export function buildTimerSettings(containerEl, timer, deps) {
 			return
 		}
 
-		const screenIdx = parseInt(assignedScreenIdxStr, 10)
 		const newDurationSec = hmsControl.wrap.querySelector('[id="hms-hours"]')
 			? hmsToSeconds(
 				parseInt(hmsControl.wrap.querySelector('[id="hms-hours"]').value, 10) || 0,
@@ -169,11 +197,9 @@ export function buildTimerSettings(containerEl, timer, deps) {
 		}
 
 		try {
-			await api.post('/api/timers/assign', {
-				timerId: timer.timerId,
-				screenIdx,
-				config: newConfig,
-			})
+			// WO-381: every assigned screen, not just the first — each one needs its own CG UPDATE.
+			await saveTimerConfigPatch(timer, newConfig)
+			Object.assign(config, newConfig)
 			// Refresh to update UI
 			setTimeout(() => refreshTimerList(), 100)
 		} catch (err) {
