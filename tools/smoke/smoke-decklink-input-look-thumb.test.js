@@ -5,7 +5,7 @@
  *
  * A look layer whose source is a DeckLink input has no media file, so the deck card used to
  * render nothing. It now resolves to the input channel's live (PRINT) thumbnail, captured
- * lazily server-side under the live-thumbnail TTL and a capped backoff.
+ * lazily server-side ONCE per cache lifetime (WO-392) under a capped backoff.
  *
  * Pure logic + stubs: no Caspar, no ffmpeg, no network, no disk writes.
  */
@@ -54,23 +54,16 @@ describe('input capture channel classification', () => {
 })
 
 describe('decideInputThumbnailCapture', () => {
-	const base = { isInputChannel: true, hasCache: false, stale: true, gateAllows: true, amcpReady: true }
+	const base = { isInputChannel: true, hasCache: false, gateAllows: true, amcpReady: true }
 
 	it('captures when an input channel has no cache', () => {
 		assert.deepEqual(decideInputThumbnailCapture(base), { attempt: true, reason: 'no_cache' })
 	})
 
-	it('captures when the cached frame is older than the TTL', () => {
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, hasCache: true, stale: true }), {
-			attempt: true,
-			reason: 'stale_cache',
-		})
-	})
-
-	it('serves a fresh cache without printing (no capture per render)', () => {
-		assert.deepEqual(decideInputThumbnailCapture({ ...base, hasCache: true, stale: false }), {
+	it('never captures while ANY cached frame exists — capture-once (WO-392)', () => {
+		assert.deepEqual(decideInputThumbnailCapture({ ...base, hasCache: true }), {
 			attempt: false,
-			reason: 'fresh_cache',
+			reason: 'has_cache',
 		})
 	})
 
@@ -101,7 +94,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const r = await ensureInputLiveThumbnail(CTX, 7, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			capture: async () => {
 				calls += 1
 				return { ok: true, path: '/tmp/ch-7.png' }
@@ -117,7 +109,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const r = await ensureInputLiveThumbnail(CTX, 1, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			capture: async () => {
 				calls += 1
 				return { ok: true }
@@ -140,7 +131,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const first = await ensureInputLiveThumbnail(CTX, 7, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			now: t0,
 			capture: failing,
 		})
@@ -154,7 +144,6 @@ describe('ensureInputLiveThumbnail', () => {
 			const again = await ensureInputLiveThumbnail(CTX, 7, {
 				channelMap: CHANNEL_MAP,
 				hasCache: false,
-				stale: true,
 				now: t0 + dt,
 				capture: failing,
 			})
@@ -166,7 +155,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const retry = await ensureInputLiveThumbnail(CTX, 7, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			now: t0 + 3000,
 			capture: failing,
 		})
@@ -179,7 +167,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const ok = await ensureInputLiveThumbnail(CTX, 7, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			now: t0 + 9000,
 			capture: async () => ({ ok: true, path: '/tmp/ch-7.png' }),
 		})
@@ -192,7 +179,6 @@ describe('ensureInputLiveThumbnail', () => {
 		const r = await ensureInputLiveThumbnail(CTX, 4, {
 			channelMap: CHANNEL_MAP,
 			hasCache: false,
-			stale: true,
 			timeoutMs: 300,
 			capture: () => new Promise(() => {}),
 		})
@@ -210,7 +196,6 @@ describe('ensureInputLiveThumbnail', () => {
 			{
 				channelMap: CHANNEL_MAP,
 				hasCache: false,
-				stale: true,
 				capture: async () => {
 					calls += 1
 					return { ok: true }
@@ -286,18 +271,5 @@ describe('deck thumbnail URL resolution for DeckLink-input layers', () => {
 	})
 })
 
-describe('liveThumbnailCacheBustWindow', () => {
-	it('is constant inside one TTL window and changes across windows', async () => {
-		const { liveThumbnailCacheBustWindow, LIVE_THUMBNAIL_TTL_MS } = await import(
-			'../../client/lib/thumbnail-url.js'
-		)
-		assert.equal(LIVE_THUMBNAIL_TTL_MS, 30000)
-		// Aligned to a window start so the +29 999 / +30 000 edges are exact.
-		const t = Math.floor(1_700_000_000_000 / LIVE_THUMBNAIL_TTL_MS) * LIVE_THUMBNAIL_TTL_MS
-		const w = liveThumbnailCacheBustWindow(LIVE_THUMBNAIL_TTL_MS, t)
-		// Every repaint inside the window reuses one URL → one request, not one per render.
-		assert.equal(liveThumbnailCacheBustWindow(LIVE_THUMBNAIL_TTL_MS, t + 1), w)
-		assert.equal(liveThumbnailCacheBustWindow(LIVE_THUMBNAIL_TTL_MS, t + 29_999), w)
-		assert.equal(liveThumbnailCacheBustWindow(LIVE_THUMBNAIL_TTL_MS, t + 30_000), w + 1)
-	})
-})
+// WO-392 deleted `liveThumbnailCacheBustWindow` — live thumbs use stable URLs now; the
+// no-periodic-refresh invariant is guarded in smoke-wo331-live-thumb-url-stability.test.js.

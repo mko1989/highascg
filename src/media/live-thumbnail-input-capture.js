@@ -63,22 +63,25 @@ function isInputCaptureChannel(channelMap, channel) {
 /**
  * Pure decision: should this GET run a PRINT capture right now?
  *
+ * WO-392: any existing cached PNG refuses capture — live-input thumbs are capture-once. The
+ * cached frame only changes via explicit capture/upload (force paths) or bus-activity
+ * invalidation, which deletes the PNG and makes the next GET land in `no_cache` here.
+ *
  * @param {object} args
  * @param {boolean} args.isInputChannel
  * @param {boolean} args.hasCache — a non-empty cached PNG exists on disk
- * @param {boolean} args.stale — cached meta is older than the live-thumbnail TTL
  * @param {boolean} args.gateAllows — backoff window has elapsed (or the channel is healthy)
  * @param {boolean} [args.amcpReady] — Caspar connected
  * @returns {{ attempt: boolean, reason: string }}
  */
 function decideInputThumbnailCapture(args) {
-	const { isInputChannel, hasCache, stale, gateAllows, amcpReady = true } = args || {}
+	const { isInputChannel, hasCache, gateAllows, amcpReady = true } = args || {}
 	if (!isInputChannel) return { attempt: false, reason: 'not_input_channel' }
 	if (!amcpReady) return { attempt: false, reason: 'amcp_disconnected' }
-	if (hasCache && !stale) return { attempt: false, reason: 'fresh_cache' }
-	// Backoff loses to nothing: a dead input serves its stale frame (or 404s) until the window opens.
+	if (hasCache) return { attempt: false, reason: 'has_cache' }
+	// Backoff loses to nothing: a dead input serves its 404 placeholder until the window opens.
 	if (!gateAllows) return { attempt: false, reason: 'backoff' }
-	return { attempt: true, reason: hasCache ? 'stale_cache' : 'no_cache' }
+	return { attempt: true, reason: 'no_cache' }
 }
 
 /**
@@ -99,12 +102,12 @@ function withTimeout(p, ms, onTimeout) {
 }
 
 /**
- * Capture the live thumbnail for a dedicated input channel, respecting TTL + backoff.
- * Never throws and never blocks longer than `INPUT_CAPTURE_TIMEOUT_MS`.
+ * Capture the live thumbnail for a dedicated input channel when none is cached, respecting
+ * backoff. Never throws and never blocks longer than `INPUT_CAPTURE_TIMEOUT_MS`.
  *
  * @param {object} ctx — app context ({ config, amcp, log? })
  * @param {number} channel
- * @param {{ hasCache?: boolean, stale?: boolean, now?: number, capture?: Function, channelMap?: object, timeoutMs?: number }} [opts]
+ * @param {{ hasCache?: boolean, now?: number, capture?: Function, channelMap?: object, timeoutMs?: number }} [opts]
  * @returns {Promise<{ captured: boolean, reason: string, error?: string }>}
  */
 async function ensureInputLiveThumbnail(ctx, channel, opts = {}) {
@@ -123,7 +126,6 @@ async function ensureInputLiveThumbnail(ctx, channel, opts = {}) {
 	const decision = decideInputThumbnailCapture({
 		isInputChannel: isInputCaptureChannel(channelMap, ch),
 		hasCache: opts.hasCache === true,
-		stale: opts.stale === true,
 		gateAllows: _gate.canAttempt(ch, now),
 		amcpReady: !!ctx?.amcp,
 	})

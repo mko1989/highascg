@@ -12,8 +12,6 @@ const {
 	cachePngPath,
 	cacheMetaPath,
 	readMeta,
-	resolveLiveThumbnailTtlMs,
-	isLiveThumbnailMetaStale,
 } = require('./live-thumbnail-cache-store')
 const { captureLiveThumbnailToCache } = require('./live-thumbnail-cache-capture')
 const { ensureInputLiveThumbnail } = require('./live-thumbnail-input-capture')
@@ -41,17 +39,14 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 	}
 
 	// Dedicated capture inputs (DeckLink / V4L2) have no media file behind them, so a look card's
-	// only possible thumbnail is a PRINT of the input channel. Refresh it lazily here — TTL-gated
-	// and backoff-gated, so a powered-off camera degrades to the 404 placeholder below instead of
-	// retrying per render. PGM/PRV buses are excluded and keep their cache-or-404 behaviour.
+	// only possible thumbnail is a PRINT of the input channel. Capture lazily here ONLY when no
+	// cached PNG exists (WO-392: capture-once — bus invalidation deletes the PNG, explicit
+	// capture uses the force paths); backoff-gated, so a powered-off camera degrades to the 404
+	// placeholder below instead of retrying per render. PGM/PRV buses are excluded and keep
+	// their cache-or-404 behaviour.
 	if (!force) {
-		const meta0 = readMeta(cfg, ch)
-		const ttl0 = resolveLiveThumbnailTtlMs(cfg)
 		const hasCache = !!stat && stat.size > 32
-		const r = await ensureInputLiveThumbnail(ctx, ch, {
-			hasCache,
-			stale: !hasCache || isLiveThumbnailMetaStale(meta0, ttl0),
-		})
+		const r = await ensureInputLiveThumbnail(ctx, ch, { hasCache })
 		if (r.captured) {
 			try {
 				stat = fs.existsSync(dest) ? await fs.promises.stat(dest) : stat
@@ -65,18 +60,22 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 		stat && stat.size > 32 ? `W/"${Math.floor(stat.mtimeMs)}-${stat.size}"` : null
 
 	if (stat && stat.size > 32 && !force) {
-		const meta = readMeta(cfg, ch)
-		const ttlMs = resolveLiveThumbnailTtlMs(cfg)
-		const stale = isLiveThumbnailMetaStale(meta, ttlMs)
+		// WO-392: clients use STABLE (un-busted) URLs now, so the browser must revalidate on
+		// each use — `no-cache` + ETag/304 keeps that cheap and picks up recaptures immediately.
+		const inm = String(query?.ifNoneMatch || '').trim()
+		if (etag && inm && inm === etag) {
+			return {
+				status: 304,
+				headers: { 'Cache-Control': 'private, no-cache', ETag: etag },
+				body: '',
+			}
+		}
 		const buf = await fs.promises.readFile(dest)
 		return {
 			status: 200,
 			headers: {
 				'Content-Type': 'image/png',
-				'Cache-Control': stale
-					? 'private, max-age=0, must-revalidate'
-					: 'private, max-age=86400, stale-while-revalidate=604800',
-				...(stale ? { 'X-Live-Thumb-Stale': '1' } : {}),
+				'Cache-Control': 'private, no-cache',
 				...(etag ? { ETag: etag } : {}),
 			},
 			body: buf,
@@ -111,7 +110,7 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
 			status: 200,
 			headers: {
 				'Content-Type': 'image/png',
-				'Cache-Control': 'private, max-age=86400, stale-while-revalidate=604800',
+				'Cache-Control': 'private, no-cache',
 				ETag: etag2,
 			},
 			body: buf,

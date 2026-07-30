@@ -2,27 +2,6 @@ import { getApiBase } from './api-client.js'
 import { isDecklinkInputChannel } from './input-channels.js'
 
 /**
- * Client mirror of the server `live_thumbnail_ttl_ms` default
- * (`src/config/defaults-core.js` / `config/general.json`). The deck reuses one URL for the
- * whole window so a repaint storm costs zero extra requests.
- */
-export const LIVE_THUMBNAIL_TTL_MS = 30000
-
-/**
- * Cache-bust token quantised to the live-thumbnail TTL: constant inside a window, so the
- * browser (and the canvas thumb cache) reuse one image per channel per TTL instead of
- * refetching on every render.
- * @param {number} [ttlMs]
- * @param {number} [nowMs]
- * @returns {number}
- */
-export function liveThumbnailCacheBustWindow(ttlMs = LIVE_THUMBNAIL_TTL_MS, nowMs = Date.now()) {
-	const ttl = Math.max(1000, Number(ttlMs) || LIVE_THUMBNAIL_TTL_MS)
-	const now = Number.isFinite(Number(nowMs)) ? Number(nowMs) : Date.now()
-	return Math.floor(now / ttl)
-}
-
-/**
  * @param {unknown} x
  * @returns {number | null}
  */

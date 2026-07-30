@@ -8,12 +8,7 @@ import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { drawComposeSnapshotCell, isSnapshotComposePreview } from './preview-canvas-compose-snapshot.js'
 import { resolveComposeChannelForEditingScene, resolveComposeChannelForCell } from '../lib/compose-preview-url.js'
 import { resolveLookAirComposeChannel } from '../lib/look-air-compose-channel.js'
-import {
-	resolveSourceThumbnailUrl,
-	liveThumbnailCacheBustWindow,
-	LIVE_THUMBNAIL_TTL_MS,
-} from '../lib/thumbnail-url.js'
-import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
+import { resolveSourceThumbnailUrl } from '../lib/thumbnail-url.js'
 import * as Logic from './scenes-editor-logic.js'
 import { SCENE_CARD_THUMB_W, SCENE_THUMB_MAX_W } from './scenes-editor-support.js'
 
@@ -29,11 +24,6 @@ export function createDeckThumbPainter(ctx) {
 		previewPanel,
 		mainHost,
 	} = ctx
-
-	/** @type {ReturnType<typeof setTimeout> | null} */
-	let liveRefreshTimer = null
-	/** @type {number | null} */
-	let liveRefreshWindow = null
 
 	function paintDeckThumb(c) {
 		const id = c.dataset.sceneId
@@ -94,22 +84,17 @@ export function createDeckThumbPainter(ctx) {
 			return
 		}
 
-		// DeckLink-input layers resolve to `/api/thumbnail/live/<inputCh>` (the server captures via
-		// PRINT). The bust token is quantised to the live-thumbnail TTL, so every repaint inside a
-		// window reuses one cached image and the frame refreshes at most once per TTL.
-		const liveBust = liveThumbnailCacheBustWindow(LIVE_THUMBNAIL_TTL_MS)
-		let usedLiveInputThumb = false
-		const getDeckThumbUrl = (s) => {
-			const url = resolveSourceThumbnailUrl(s, {
+		// DeckLink-input layers resolve to `/api/thumbnail/live/<inputCh>` (the server captures
+		// once, lazily, via PRINT). STABLE URL, no bust (WO-392): the cached frame only changes
+		// on explicit capture/upload or bus invalidation — both invalidate the canvas image
+		// cache by URL substring, which now matches this un-busted URL exactly.
+		const getDeckThumbUrl = (s) =>
+			resolveSourceThumbnailUrl(s, {
 				maxWidth: SCENE_THUMB_MAX_W,
 				seekSec: 0,
 				deckIdleMode: true,
 				channelMap: cm,
-				cacheBust: liveBust,
 			})
-			if (url && url.includes('/api/thumbnail/live/')) usedLiveInputThumb = true
-			return url
-		}
 
 		drawSceneComposeStack(canvasCtx, cw, ch, {
 			scene,
@@ -125,28 +110,6 @@ export function createDeckThumbPainter(ctx) {
 			},
 			deckThumbnailMode: true,
 		})
-
-		if (usedLiveInputThumb) armLiveInputRefresh(liveBust)
-	}
-
-	/**
-	 * One shared timer for the whole deck: when the TTL window rolls over, drop the per-URL canvas
-	 * image cache for live thumbs (also bounds that Map) and repaint once. Re-armed only while a
-	 * DeckLink-input layer is actually on screen, so an idle deck runs no timers at all.
-	 * @param {number} bustWindow
-	 */
-	function armLiveInputRefresh(bustWindow) {
-		if (typeof window === 'undefined') return
-		if (liveRefreshTimer != null && liveRefreshWindow === bustWindow) return
-		if (liveRefreshTimer != null) clearTimeout(liveRefreshTimer)
-		liveRefreshWindow = bustWindow
-		const dueAt = (bustWindow + 1) * LIVE_THUMBNAIL_TTL_MS
-		liveRefreshTimer = setTimeout(() => {
-			liveRefreshTimer = null
-			liveRefreshWindow = null
-			invalidateThumbnailCache('/api/thumbnail/live/')
-			repaintDeckThumbs()
-		}, Math.max(250, dueAt - Date.now()))
 	}
 
 	function repaintDeckThumbs() {

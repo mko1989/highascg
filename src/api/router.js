@@ -336,7 +336,8 @@ routes.get('/api/cg-thumb', ({ path, query, ctx }) => routesCgThumb.handleGet(pa
 routes.get('/api/compose-preview/*', ({ path, query, ctx }) => routesComposePreview.handleGet(path, query, ctx), { requireCaspar: false })
 routes.get('/api/compose-preview', ({ path, query, ctx }) => routesComposePreview.handleGet(path, query, ctx), { requireCaspar: false })
 
-routes.get('/api/thumbnail/*', ({ path, query, ctx }) => routesMedia.handleThumbnail(path, query, ctx), { requireCaspar: false })
+// WO-392: live thumbs use stable URLs + ETag revalidation — thread If-None-Match through query.
+routes.get('/api/thumbnail/*', ({ path, query, ctx, req }) => routesMedia.handleThumbnail(path, { ...(query || {}), ifNoneMatch: req?.headers?.['if-none-match'] || query?.ifNoneMatch }, ctx), { requireCaspar: false })
 routes.get('/api/local-media/*', ({ path, query, ctx }) => routesMedia.handleLocalMedia(path, query, ctx), { requireCaspar: false })
 
 // Streaming Channel

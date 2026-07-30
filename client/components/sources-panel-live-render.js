@@ -10,7 +10,7 @@ import {
 } from './sources-panel-helpers.js'
 import { migrateLegacyInputRoute } from '../lib/input-channels.js'
 import { reconcileExtraLiveSourceChannel } from '../lib/device-view-host-channels.js'
-import { getLiveThumbnailChannelForSource, getLiveThumbnailUrl, liveThumbnailCacheBustWindow } from '../lib/thumbnail-url.js'
+import { getLiveThumbnailChannelForSource, getLiveThumbnailUrl } from '../lib/thumbnail-url.js'
 import { invalidateThumbnailCache } from './preview-canvas-draw-base.js'
 import { attachLiveSourceActionButtons } from './sources-panel-live-render-actions.js'
 
@@ -127,10 +127,11 @@ export function renderLiveTab(listEl, {
 		let thumbHtml
 		let thumbControls = ''
 		if (ch > 0) {
-			// TTL-window bust (not Date.now()): the panel re-renders on every state tick, and a
-			// per-render bust forced a refetch + visible flicker each time (WO-331). Explicit
-			// capture/upload below keep Date.now() — those are deliberate refreshes.
-			const thumbUrl = getLiveThumbnailUrl(ch, liveThumbnailCacheBustWindow())
+			// STABLE URL, no bust (WO-392): the panel re-renders on every state tick; any
+			// time-varying bust forced periodic refetches + server PRINTs. The server serves
+			// no-cache + ETag, so revalidation picks up recaptures. Explicit capture/upload
+			// below keep Date.now() — those are deliberate refreshes.
+			const thumbUrl = getLiveThumbnailUrl(ch)
 			thumbHtml = `<div class="source-item__thumbnail source-item__thumbnail--live" style="position: relative; width: 32px; height: 32px; flex-shrink: 0; background: #151520; border: 1px solid #333; border-radius: 3px; display: flex; align-items: center; justify-content: center; overflow: hidden;" title="Custom thumbnail / manual capture">
 				<img class="source-item__live-img" src="${thumbUrl}" onerror="this.style.display='none'; if(!this.parentElement.querySelector('svg')){this.parentElement.insertAdjacentHTML('afterbegin', '<svg class=\\'source-item__live-svg-fallback\\' width=\\'14\\' height=\\'14\\' viewBox=\\'0 0 24 24\\' fill=\\'none\\' stroke=\\'#666\\' stroke-width=\\'2\\' stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\'><rect x=\\'2\\' y=\\'3\\' width=\\'20\\' height=\\'14\\' rx=\\'2\\' ry=\\'2\\'></rect><line x1=\\'8\\' y1=\\'21\\' x2=\\'16\\' y2=\\'21\\'></line><line x1=\\'12\\' y1=\\'17\\' x2=\\'12\\' y2=\\'21\\'></line></svg>')}" style="width: 100%; height: 100%; object-fit: cover;" />
 			</div>`
