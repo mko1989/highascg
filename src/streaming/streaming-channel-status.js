@@ -47,10 +47,26 @@ function buildStreamingChannelStatusPayload(ctx, opts = {}) {
 		ctx.config?.streamingChannel && typeof ctx.config.streamingChannel === 'object'
 			? ctx.config.streamingChannel
 			: {}
+	// WO-395: configured-output catalog for remote surfaces (Companion dropdowns/presets).
+	// Safe summaries ONLY — never URLs, stream keys, or passphrases (WO-244/261 rules).
+	const outputs = {
+		stream: (Array.isArray(ctx.config?.streamOutputs) ? ctx.config.streamOutputs : []).map((o) => ({
+			id: String(o?.id || ''),
+			label: String(o?.label || o?.name || o?.id || ''),
+			enabled: o?.enabled !== false,
+			type: String(o?.type || 'rtmp').toLowerCase(),
+		})),
+		record: (Array.isArray(ctx.config?.recordOutputs) ? ctx.config.recordOutputs : []).map((o) => ({
+			id: String(o?.id || ''),
+			label: String(o?.label || o?.name || o?.id || ''),
+			enabled: o?.enabled !== false,
+		})),
+	}
 	return {
 		enabled: map.streamingCh != null,
 		channel: map.streamingCh,
 		contentLayer: map.streamingContentLayer,
+		outputs,
 		videoSource: sc.videoSource ?? 'program_1',
 		audioSource: sc.audioSource == null || sc.audioSource === '' ? 'follow_video' : String(sc.audioSource),
 		route: vRoute,

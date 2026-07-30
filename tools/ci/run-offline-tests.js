@@ -37,6 +37,7 @@ const FILES = [
 	'tools/smoke/smoke-wo325-headless-operator-gui.test.js',
 	'tools/smoke/smoke-wo331-live-thumb-url-stability.test.js',
 	'tools/smoke/smoke-wo393-zero-outputs.test.js',
+	'tools/smoke/smoke-wo395-streaming-status-outputs.test.js',
 	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',
 	'tools/smoke/smoke-wo326-inspector-fill-live-apply.test.js',
 	'tools/smoke/smoke-wo329-project-rev.test.js',
