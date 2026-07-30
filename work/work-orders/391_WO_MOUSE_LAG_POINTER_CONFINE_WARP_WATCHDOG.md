@@ -244,6 +244,11 @@ correct.
 
 ### 7. Still open: the original intermittent-lag report
 
+> **RESOLVED 2026-07-30 by [WO-397](./397_WO_MOUSE_LAG_8S_XRANDR_FREEZE.md):** none of the
+> candidates below was it. The lag is the **8 s barrier watchdog added by this very WO (§9.2)**
+> — each tick recomputes the full layout → uncached `xrandr --verbose`/`--query` → two ~180 ms
+> X freezes every 8.000 s, causally reproduced. The §9.3 cache never engages: TTL 3 s < 8 s tick.
+
 The poll loop is gone, but it was never proven to be what the owner felt. Measured clean at the time:
 swap 0 B; CPU 28 cores / load ~7 / PSI `full=0.00`; IO pressure 0; GPU 30–37% with no throttling; and
 the pointer sampled *inside* the fence, where even the old loop did not warp. Remaining candidates if
