@@ -1,0 +1,155 @@
+# WO-401 — Machine performance research pass (todos30.07.26)
+
+**Status:** OPEN — research complete 2026-07-30, no fixes applied yet (show day; owner to pick targets)
+**Priority:** High (owner: "things that can be done better to get better performance of the machine")
+**Date:** 2026-07-30
+**Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
+**Related:** WO-392 (live-thumb URL bust — half of item 6), WO-396 (Devices-tab load — already fixed 30.07, see below), WO-399 (v4l2 jpg-branch 50 fps burn — sibling of F5), successor WOs to be opened per fix.
+
+## 1. Investigation
+
+All numbers measured live on the box 2026-07-30 (~17:00, node PID 2188853; casparcg PID 2182627).
+Findings 1–5 spot-verified in source by a second pass; the rest carry the researcher's file:line evidence.
+
+### Live baseline
+
+| Metric | Value |
+|---|---|
+| casparcg CPU | **431 %** (~20 threads at 10–20 % each), GPU 33 % / 42 W |
+| OSC messages handled by node | **18,656 msg/s** (1,677 datagrams/s, ~11 msg/bundle) |
+| WS traffic per client | **335 KB/s**, of which `osc` = 323 KB/s (21.9 msg/s × 15,064 B full snapshots) |
+| node service | 7.9 % of one core sustained, 400 MB RSS (flat — no leak) |
+| `GET /api/state` | 43–49 ms, fully synchronous (event-loop stall) |
+| v4l2 relay ffmpeg | 22 % of one core, 24/7 |
+| Firefox kiosk | ~5 % total; Xorg ~13 % |
+| Load / memory | ~7 on 28 cores; 14 / 64 GB used |
+
+### Ranked findings
+
+**F1 — HIGH. OSC debug sample list burns ~15 % of the node process.** `src/osc/osc-listener.js:26-35`
+(called from `:66`/`:79`): `sampleAddresses.includes(addr)` linear-scans a 40-string ring on every
+one of 18,656 msg/s; Caspar emits hundreds of distinct addresses so it's a near-permanent miss
+(40 string compares + push/shift per message). Benchmarked 0.63 µs/msg ≈ **1.18 % of a core** for a
+field only read by `/api/osc/diagnostics`. Fix: `Set` (stop mutating once saturated) or gate behind
+a debug flag. *(Verified in source.)*
+
+**F2 — HIGH. Four full deep clones + two full stringifies of OSC state per 50 ms tick.**
+`src/osc/osc-state.js:190,210` (`getSnapshot` = `JSON.parse(JSON.stringify(channels))`, called by
+`_buildChangePayload` from `_flushEmit:172-181`), `src/bootstrap/osc-lifecycle.js:50` (second
+`getSnapshot` same tick), `src/state/state-manager.js:349,359,371,373` (clone again into `_state`),
+then `osc-lifecycle.js:64` (`_wsBroadcast('osc')`) **and** `state-manager.js:385` (`_emit('osc')`)
+each ship the same 15 KB. `_decayStaleAudio`/`_pruneStaleLayers` run 4× per tick. ≈0.7 % of a core
+in pure serialization plus the GC churn behind 400 MB RSS. Fix: compute the snapshot once per tick
+and pass it through; drop the duplicate `_emit('osc')`. *(Verified in source.)*
+
+**F3 — HIGH. 323 KB/s of full OSC state to every WS client; the delta path exists but is OFF.**
+`src/server/ws-server.js:134-152`, `src/osc/osc-config.js:21-39`. `wsDeltaBroadcast` defaults false
+and neither `highascg.config.json` (only `emitIntervalMs: 50` at `:184`) nor `.env` enables it —
+yet `osc-state.js:187-202` implements per-dirty-channel deltas and the client merge path
+(`client/lib/osc-client.js:3-31`) is written and tested. Kiosk throttles to 4 Hz client-side but
+still `JSON.parse`s all 20 Hz (`client/lib/ws-client.js:131`, plus a 15 KB `text.trim()` copy).
+Fix: set `osc.wsDeltaBroadcast: true`, consider `emitIntervalMs: 100`. *(Verified in source.)*
+
+**F4 — HIGH (take latency). Synchronous disk write before EVERY AMCP send.**
+`src/caspar/amcp-client-history.js:6-20` does `mkdirSync` + `writeFileSync` of
+`data/amcp-last50.txt`, called at `src/caspar/amcp-client-transport.js:81` and `:224` directly
+before `socket.send`. A scene take issues dozens–hundreds of AMCP lines → that many blocking disk
+round-trips inside take latency. Fix: keep ring in memory, flush debounced/async or on error only.
+*(Verified in source.)*
+
+**F5 — HIGH. v4l2 relay ffmpeg runs a redundant software scale/format filter 24/7.**
+`src/virtual-output/v4l2-bridge-relay.js:50-61` adds `-vf format=yuv420p,scale=1920:1080`
+unconditionally; source is already 1920×1080 and `-pix_fmt yuv420p` already covers format. 22 % of
+a core around the clock (stream/udp mode — the jpg branch's separate 50 fps burn is WO-399). Fix:
+omit `-vf` when configured size matches source. Bigger question for a follow-up: should the whole
+bridge idle when nothing consumes /dev/video10? *(Verified in source.)*
+
+**F6 — MED-HIGH. `GET /api/state` re-reads the project JSON 4× and blocks ~45 ms.**
+`src/api/get-state.js:86,90` each call `loadProjectScenes()`; each does `readProjectFile` +
+`readAutosaveFile` (+ legacy) — `src/engine/project-scenes-load.js:44,47,62`,
+`src/engine/project-store.js:178,243,256` — 4 × `readFileSync` + `JSON.parse` of a 38.5 KB file per
+request, plus the whole-state clone (`state-manager.js:407-420`). Measured 43–49 ms synchronous;
+OSC/AMCP starve meanwhile. Likely a big slice of the Devices-tab 1–2 s load (todos item 8).
+Fix: memoize `loadFullProject()` on mtime; pass the loaded envelope into the `globalBorders` branch.
+
+**F7 — MED. ~4,480 `setVariable` calls/s from OSC audio/layer mirroring.**
+`src/osc/osc-variables.js:59-160` (from `osc-lifecycle.js:54`): per 50 ms tick, 8 channels × (16
+`_audio_cN_dBFS` + L/R) + 4 vars/layer ≈ 224 calls, each with `String()` + template-key allocation
+before the dedupe check (`state-manager.js:105`); changed keys each emit a separate WS `change`
+frame via the 500-entry `_changes` shift-array (`:75-76,116`). Fix: precompute keys, skip channels
+whose `audio._lastUpdateAt` didn't advance.
+
+**F8 — MED. `projects/_trash`: 620 tombstone dirs / 19 MB replicated to 3 Syncthing peers.**
+`src/engine/project-store.js:118,144` retires into `projects/_trash/<slug>-<ts>/`; nothing prunes;
+`projects/` is not in `.stignore`. Pure background IO/index cost on 4 machines. Fix: add
+`/projects/_trash` to `.stignore` (mirror on the Mac per CLAUDE.md) + age/count cap in
+`retireProjectSlug`.
+
+**F9 — MED. 57 KB pretty-printed synchronous state write on every on-air key.**
+`src/utils/persistence.js:24-27` (PRETTY defaults true), `:35-43` (IMMEDIATE_KEYS incl.
+`liveScenesByProgramChannel`, `scene_deck`, bank/timers), `:59-68,124-128`: immediate keys bypass
+the 200 ms debounce → full-blob `JSON.stringify(_, null, 2)` + `writeFileSync` + `renameSync` on
+the main thread per set; several per scene take. Fix: `HIGHASCG_PERSISTENCE_PRETTY=0` + ~20 ms
+coalescing window for immediate keys.
+
+**F10 — MED. Every OSC message fully decoded before filtering.** `src/osc/osc-listener.js:63-87` →
+`src/osc/osc-state.js:91-112`: full decode (≈1.17 % core) + 2–3 regexes per message
+(`osc-state.js:105,133,150`) + repeated `tail.slice()` allocs (`osc-state-layer.js:81,84,154,155`);
+`…/has_signal` and `…/file/format` fall through every branch with no handler. Fix: rejected-suffix
+`Set` right after the channel regex; hoist regexes to module scope.
+
+**F11 — MED-LOW. O(C²) channel lookup + unconditional per-channel emits per tick.**
+`src/state/state-manager.js:365` (`channels.find` inside channel loop, 1,280 cmp/s) and `:374`
+emits `channels.<id>` with freshly cloned `oscLayers` for every channel every tick;
+`_dirtyChannels` (`osc-state.js:110`) is discarded at `:177` when delta mode is off. Fix: `Map`
+index; emit only dirty channels.
+
+**F12 — MED-LOW (client). Audio-meter rAF loop never idles.**
+`client/lib/audio-mixer-meter-loop.js:47-131`: unconditional 60 fps rAF (only `document.hidden`
+parks it, `:53`); per-strip `key.split(':')` alloc; `parseBusMeterFillKey` called twice for bus
+keys (`:78-80`) — against OSC data refreshing at 4 Hz. Kiosk content process measured 2.9 %.
+Fix: drive from OSC ingest or ~20 Hz timer; hoist the double parse.
+
+**F13 — LOW. USB hotplug watcher forks `lsblk` every 2 s forever.** `src/media/usb-drives.js:99,110`
+(started unconditionally `index.js:314`). Fix: udev/netlink watch, or 10 s + only while ingest UI open.
+
+**F14 — LOW (feature currently off). Compose-preview mtime watch: 2 async `stat`/channel at 25 Hz**
+with `require('fs')` resolved inside the loop — `src/preview/compose-preview-ffmpeg-jpeg.js:148-152,206-255`
+(`:214` and redundant re-stat `:246`). Only bites when `composePreview.ffmpeg_jpeg` is enabled.
+
+**F15 — LOW. Live-audio bridge encodes synthetic 320×240 x264 with GOP=1 and resamples twice.**
+`src/audio/live-audio-bridge.js:130-133,148-165` (every frame IDR) and `:182-185` (FFT tee re-runs
+the identical `aresample`/`aformat` chain from `:138-139`). Fix: `asplit`, and mpeg2video / lower
+`-r` for the dummy video.
+
+### Owner todos item 6 — live-input thumbnails refreshing periodically
+
+WO-392 made the thumb URL stable (`client/components/sources-panel-live-render.js:130-134`), but the
+panel still rebuilds each row with `el.innerHTML = …` (`:162`) on every state tick — the `<img>`
+node is recreated, so the browser re-requests (304 revalidation) and can visibly flash. The refresh
+the owner sees is DOM-recreation, not URL busting. Fix direction: only rewrite a row's innerHTML
+when its data actually changed (or patch text/status nodes in place and leave the `<img>` alone).
+
+### Owner todos item 8 — Devices tab 1–2 s load
+
+**Already fixed earlier today by WO-396** (cold `GET /api/device-view` DeckLink re-probe: multi-day
+log collector, log-first fallback, 10 min cache — cold 2.47 s → 0.455 s, warm 54 ms). F6 remains an
+independent, additional `/api/state` cost worth fixing on its own merits.
+
+### Checked and CLEAN (don't re-investigate)
+No node memory leak (RSS flat); log ring buffers bounded (`log-buffer.js:38-39`,
+`amcp-client-history.js:11-13`); `ws-server.js` stringifies once per broadcast with sane
+backpressure (`:118-136`); `periodic-sync.js` correctly parks AMCP polling while OSC is live
+(`:253,454-459`); `state-manager.js:168-170` skips xml2js on unchanged INFO; `.stignore` already
+covers `.highascg-state.json`, `data/`, `log/`, `media/`, `node_modules/`.
+
+## 2. What was done
+
+Research only — no code changes under this WO (2026-07-30 is a show day). Suggested first wave when
+owner green-lights, cheapest-risk first: F3 (config flag — delta path already tested), F1, F4, F9
+(env var + coalesce), F5, F8 (.stignore, mirror on Mac), F2.
+
+## 3. What was VERIFIED
+
+Measurements taken live (see table). F1–F5 independently re-read in source at the cited lines by
+the main session before this WO was written; F6–F15 carry researcher evidence, re-verify at fix time.
