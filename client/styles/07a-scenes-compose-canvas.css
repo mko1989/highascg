@@ -264,13 +264,6 @@
 	opacity: 0.8;
 }
 
-.scenes-layer__handles {
-	position: absolute;
-	inset: 0;
-	pointer-events: none;
-	z-index: 3;
-}
-
 /* Border grab bands (todos19.07.26: the ONLY resize affordance — the rotate/scale dots are
  * gone). Invisible zones straddling the layer border: edges reach 7px outside + 7px inside,
  * corners 8px + 8px (corners come last in the DOM so they win where they overlap the sides).
@@ -357,38 +350,12 @@
 
 /* todos19.07.26: rotate/scale dots removed — the only remaining handle button is the WO-158
  * crop toggle. Resize = border grab bands above; rotation = inspector ("Rotation °"). */
-.scenes-layer__handle {
-	position: absolute;
-	pointer-events: auto;
-	width: 14px;
-	height: 14px;
-	padding: 0;
-	border: 2px solid var(--accent);
-	border-radius: 50%;
-	background: var(--bg-dark);
-	cursor: pointer;
-}
-
-/* WO-158 T158.3: crop-mode toggle. Square + amber to read as a distinct affordance from the
-   blue border grab bands and the amber crop drag handles. */
-.scenes-layer__handle--crop {
-	bottom: -8px;
-	left: -8px;
-	border-radius: 3px;
-	border-color: var(--warn);
-	cursor: crosshair;
-}
-
-.scenes-layer__handle--crop[aria-pressed='true'] {
-	background: var(--warn);
-}
-
 /*
  * WO-158 T158.3: visual crop handles — bracket-style corner marks + short edge ticks, positioned
  * on the cropped-content outline (a sub-rect of the layer box, set inline via left/top/right/bottom
  * %). Amber (--warn) throughout so operators can tell "crop" apart from the blue scale/rotate
  * handles and the plain edge-resize zones at a glance. Hidden unless the layer already has a crop
- * effect or the operator opened crop mode via the toggle button.
+ * effect (added via the inspector — the todos30.07.26 pass removed the canvas toggle button).
  */
 .scenes-layer__crop-handles {
 	position: absolute;

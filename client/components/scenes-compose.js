@@ -240,14 +240,8 @@ export function renderComposeScene(scene, opts) {
 
 		/* todos19.07.26: rotate/scale dots removed — resize happens by grabbing the border
 		 * (edge zones below); rotation lives in the inspector ("Rotation °", inspector-mixer.js).
-		 * Only the WO-158 crop toggle remains in the handle bar. */
-		const handles = document.createElement('div')
-		handles.className = 'scenes-layer__handles'
-		handles.innerHTML = `
-				<button type="button" class="scenes-layer__handle scenes-layer__handle--crop" title="Toggle crop handles" aria-pressed="false"></button>
-			`
-		inner.appendChild(handles)
-
+		 * todos30.07.26: the WO-158 crop-toggle button is gone too — crop handles appear when the
+		 * layer has a crop effect (added via the inspector), so the canvas needs no toggle. */
 		const edges = document.createElement('div')
 		edges.className = 'scenes-layer__edges'
 		edges.setAttribute('aria-hidden', 'true')
@@ -265,9 +259,9 @@ export function renderComposeScene(scene, opts) {
 		/*
 		 * WO-158 T158.3: 8 bracket-style crop drag zones, positioned on the cropped-content
 		 * outline (a sub-rect of this layer's own box, expressed in % like the edge zones
-		 * above). Auto-visible when the layer already has a crop effect (any params, so a
-		 * freshly-toggled identity crop stays visible after the render that follows the first
-		 * drag); otherwise hidden until the operator clicks the crop toggle button.
+		 * above). Visible exactly when the layer has a crop effect (any params) — a layer
+		 * gains one via the inspector effects panel; the canvas toggle button is gone
+		 * (todos30.07.26).
 		 */
 		const cropEffectEntry = Array.isArray(layer.effects) ? layer.effects.find((fx) => fx?.type === 'crop') : null
 		const cropForHandles = cropEffectEntry ? normalizeCrop(cropEffectEntry.params) : { left: 0, top: 0, right: 1, bottom: 1 }
@@ -316,7 +310,6 @@ export function renderComposeScene(scene, opts) {
 		})
 
 		el.addEventListener('pointerdown', (e) => {
-			if (e.target.closest('.scenes-layer__handle')) return
 			if (e.target.closest('.scenes-layer__edge')) return
 			if (e.target.closest('.scenes-layer__crop-handle')) return
 			e.preventDefault()
@@ -324,14 +317,6 @@ export function renderComposeScene(scene, opts) {
 			startDrag(e, realIdx, scene, aspect, el)
 		})
 
-		const cropToggleBtn = handles.querySelector('.scenes-layer__handle--crop')
-		cropToggleBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
-		cropToggleBtn.addEventListener('click', (e) => {
-			e.stopPropagation()
-			dispatchLayerSelect({ sceneId: scene.id, layerIndex: realIdx, layer })
-			const nowActive = cropHandles.classList.toggle('scenes-layer__crop-handles--active')
-			cropToggleBtn.setAttribute('aria-pressed', String(nowActive))
-		})
 		el.addEventListener('dragover', (e) => {
 			e.preventDefault()
 			e.stopPropagation()
