@@ -37,84 +37,15 @@ function collectNetwork() {
 	return out
 }
 
-function resolveCasparLogPath() {
-	const env = String(process.env.CASPAR_LOG_PATH || '').trim()
-	if (env) return env
-	const d = new Date()
-	const y = d.getFullYear()
-	const m = String(d.getMonth() + 1).padStart(2, '0')
-	const day = String(d.getDate()).padStart(2, '0')
-	return `/home/casparcg/highascg/log/caspar_${y}-${m}-${day}.log`
-}
-
-/**
- * @param {string} filePath
- * @param {number} maxBytes
- * @returns {string}
- */
-function readFileTailText(filePath, maxBytes) {
-	if (!fs.existsSync(filePath)) return ''
-	const stat = fs.statSync(filePath)
-	const size = stat.size
-	if (size <= 0) return ''
-	const fd = fs.openSync(filePath, 'r')
-	try {
-		const readLen = Math.min(size, maxBytes)
-		const start = size - readLen
-		const buf = Buffer.alloc(readLen)
-		fs.readSync(fd, buf, 0, readLen, start)
-		return buf.toString('utf8')
-	} finally {
-		fs.closeSync(fd)
-	}
-}
-
-/**
- * Parse Caspar startup log block:
- *   Decklink devices found:
- *    - DeckLink 8K Pro [1] (2254678464)
- *
- * @param {string} text
- * @returns {Array<{ index: number, label: string, rawId?: string }>}
- */
-function parseDecklinkDevicesFromCasparLog(text) {
-	const lines = String(text || '').split(/\r?\n/)
-	const out = []
-	const seen = new Set()
-	let inBlock = false
-	for (const line of lines) {
-		if (/Decklink devices found:/i.test(line)) {
-			inBlock = true
-			continue
-		}
-		if (!inBlock) continue
-		// Require "- DeckLink … [N] (persistentId)" — loose "- … [N]" also matches ffmpeg h264 ([27]…)
-		// and log timestamps like "07-04 …".
-		const m = line.match(/-\s*(DeckLink[^[]*?)\s*\[(\d+)\]\s*\((\d+)\)/i)
-		if (m) {
-			const label = String(m[1] || '').trim()
-			const index = parseInt(String(m[2] || ''), 10)
-			if (!label || !Number.isFinite(index) || index < 1) continue
-			if (seen.has(index)) continue
-			seen.add(index)
-			const item = { index, label }
-			const rawId = String(m[3] || '').trim()
-			if (rawId) item.rawId = rawId
-			out.push(item)
-			continue
-		}
-		if (/Initialized decklink module/i.test(line)) break
-	}
-	return out.sort((a, b) => a.index - b.index)
-}
-
 function collectDecklinkFromCasparLog() {
+	// WO-396: delegate to the multi-day log scanner. Caspar writes its "Decklink devices
+	// found:" block at its LAST START, which is usually NOT today's log file — the old
+	// single-day parser here returned [] whenever Caspar had been up across midnight,
+	// which defeated the inventory short-circuit and made every cold GET /api/device-view
+	// re-probe hardware (~1.7 s).
 	try {
-		const p = resolveCasparLogPath()
-		const tail = readFileTailText(p, 2 * 1024 * 1024)
-		if (!tail) return { source: 'caspar_log', connectors: [], logPath: p, warning: 'empty_or_missing_log' }
-		const connectors = parseDecklinkDevicesFromCasparLog(tail)
-		return { source: 'caspar_log', connectors, logPath: p }
+		const { probeDecklinkFromCasparLog } = require('../utils/decklink-enum')
+		return probeDecklinkFromCasparLog({ maxBytes: 4 * 1024 * 1024 })
 	} catch (e) {
 		return { source: 'caspar_log', connectors: [], warning: e?.message || String(e) }
 	}

@@ -243,6 +243,44 @@ function buildGeneratedChannelOrder(ctx) {
 	return out.sort((a, b) => a.ch - b.ch)
 }
 
+/**
+ * WO-396: DeckLink hardware never changes at runtime, but the fallback resolution used to
+ * run on EVERY cold GET /api/device-view — worst-case ~1.7 s, because the live ffmpeg probe
+ * (which ALWAYS fails while Caspar holds the single-open cards) ran before the log parse
+ * that succeeds. Order is now log-parse → live probe, and the resolved summary is cached
+ * for 10 min (`fresh=1`/`freshGpu=1` on the route clears it).
+ */
+const DECKLINK_HW_CACHE_TTL_MS = 10 * 60 * 1000
+let _decklinkHwCache = { at: 0, value: null }
+
+function invalidateDecklinkHwCache() {
+	_decklinkHwCache = { at: 0, value: null }
+}
+
+/** @param {string[]} warnings */
+async function resolveDecklinkHwCached(warnings) {
+	if (_decklinkHwCache.value && Date.now() - _decklinkHwCache.at < DECKLINK_HW_CACHE_TTL_MS) {
+		return _decklinkHwCache.value
+	}
+	let resolved = null
+	const fromCasparLog = probeDecklinkFromCasparLog({ maxBytes: 4 * 1024 * 1024 })
+	if (Array.isArray(fromCasparLog?.connectors) && fromCasparLog.connectors.length > 0) {
+		resolved = fromCasparLog
+	} else {
+		if (fromCasparLog?.warning) warnings.push(`decklink_log_parse: ${fromCasparLog.warning}`)
+		try {
+			resolved = await probeDecklinkHardware({ timeoutMs: 1200 })
+			if (resolved?.warning) warnings.push(`decklink_enum: ${resolved.warning}`)
+		} catch (e) {
+			warnings.push(`decklink_enum: ${e.message}`)
+			resolved = { source: 'none', connectors: [] }
+		}
+	}
+	// Negative results are cached too: a DeckLink-less box must not repay the probe per tab-open.
+	_decklinkHwCache = { at: Date.now(), value: resolved }
+	return resolved
+}
+
 async function buildLiveSnapshot(ctx) {
 	const warnings = []; const inv = readSystemInventoryFile(); let displays = []
 	try { displays = (await getDisplayDetailsAsync()) || [] } catch (e) { warnings.push(`gpu_enum: ${e.message}`) }
@@ -254,20 +292,7 @@ async function buildLiveSnapshot(ctx) {
 			}
 			: { source: 'none', connectors: [] }
 	if (!decklinkHw.connectors.length) {
-		try {
-			decklinkHw = await probeDecklinkHardware({ timeoutMs: 1200 })
-			if (decklinkHw?.warning) warnings.push(`decklink_enum: ${decklinkHw.warning}`)
-		} catch (e) {
-			warnings.push(`decklink_enum: ${e.message}`)
-		}
-	}
-	if (!Array.isArray(decklinkHw?.connectors) || decklinkHw.connectors.length === 0) {
-		const fromCasparLog = probeDecklinkFromCasparLog({ maxBytes: 4 * 1024 * 1024 })
-		if (Array.isArray(fromCasparLog?.connectors) && fromCasparLog.connectors.length > 0) {
-			decklinkHw = fromCasparLog
-		} else if (fromCasparLog?.warning) {
-			warnings.push(`decklink_log_parse: ${fromCasparLog.warning}`)
-		}
+		decklinkHw = await resolveDecklinkHwCached(warnings)
 	}
 	decklinkHw = {
 		...decklinkHw,
@@ -376,4 +401,4 @@ async function buildLiveSnapshot(ctx) {
 	}
 }
 
-module.exports = { buildLiveSnapshot, buildDecklinkSummary, buildDestinationCasparIntent, buildGeneratedChannelOrder }
+module.exports = { buildLiveSnapshot, buildDecklinkSummary, buildDestinationCasparIntent, buildGeneratedChannelOrder, invalidateDecklinkHwCache }

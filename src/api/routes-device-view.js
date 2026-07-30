@@ -67,6 +67,11 @@ async function handleGet(path, ctx, query, req) {
 		} catch {
 			/* optional */
 		}
+		try {
+			Snapshot.invalidateDecklinkHwCache() // WO-396
+		} catch {
+			/* optional */
+		}
 	}
 	const live = await Snapshot.buildLiveSnapshot(ctx)
 	if (path === '/api/device-view/snapshot') {
