@@ -1,6 +1,6 @@
 # WO-398 — run.sh hang-detector forks ss+grep+sleep every second, forever
 
-**Status: OPEN (found during WO-397's fork capture; hygiene, NOT the mouse lag — no X contact)**
+**Status: DONE (2026-07-30, executed as part of WO-400's supervisor cleanup, owner: "do this now" — healthy-state poll is 10 s seconds-accounted; live fork capture: 5 run.sh forks/32 s, was ~96; hang budget preserved, `ss -tln`)**
 **Source:** WO-397 §1.6 background findings (owner 30.07: "make work orders for fixing the other 2 issues").
 
 ---
@@ -40,4 +40,8 @@ file is on the box's live playout path. Change + verify in a quiet window.
 
 ## 3. What was VERIFIED
 
-- (nothing yet — fix not applied)
+See WO-400 §5 — implemented together (same files, one deploy): `_poll` 10 s when AMCP is
+listening, 1 s while a stall (or boot) is being counted, `_stuck` accumulates the interval
+actually slept so `CASPAR_HANG_SEC` detection latency is ≤ budget + one 10 s window. Live after
+`systemctl restart casparcg-server`: **5 run.sh forks in 32 s** (previously ~96), Caspar back
+with 8 channels, AMCP reconnected.

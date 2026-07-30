@@ -122,16 +122,9 @@ caspar_crash_loop_backoff() {
 	return 0
 }
 
-caspar_prepare_restart_after_exit() {
-	_ec="$1"
-	caspar_ensure_fully_stopped
-	if caspar_crash_is_hard_fail_code "$_ec"; then
-		caspar_clear_cef_cache
-	fi
-}
-
 caspar_amcp_listening() {
-	ss -tlnp 2>/dev/null | grep -qE ":${CASPAR_AMCP_PORT}\\b"
+	# WO-400: -p (process info) dropped — the grep never used it and it walks the process table.
+	ss -tln 2>/dev/null | grep -qE ":${CASPAR_AMCP_PORT}\\b"
 }
 
 caspar_cmdline() {
@@ -164,15 +157,6 @@ caspar_list_main_pids() {
 		caspar_is_main_process "$_cmd" || continue
 		printf '%s\n' "$_pid"
 	done | sort -u
-}
-
-caspar_kill_main_processes() {
-	_sig="${1:-TERM}"
-	_killed=0
-	for _pid in $(caspar_list_main_pids); do
-		kill -"$_sig" "$_pid" 2>/dev/null && _killed=1
-	done
-	return "$([ "$_killed" -eq 1 ] && echo 0 || echo 1)"
 }
 
 # All casparcg PIDs for this install (main + CEF children).
@@ -252,23 +236,7 @@ caspar_wait_amcp_port_free() {
 		fi
 		sleep 1
 	done
-	_grace="${CASPAR_RESTART_GRACE_SEC:-2}"
-	# WO-337 #3: operator fast-relaunch (marker consumed in run.sh) skips this grace too;
-	# the flag itself is cleared at run.sh's own grace site so the skip is strictly one-shot.
-	if [ "${CASPAR_SKIP_GRACE_ONCE:-}" = "1" ]; then
-		_grace=0
-	fi
-	if [ -n "$_grace" ] && [ "$_grace" != "0" ]; then
-		sleep "$_grace"
-	fi
-}
-
-caspar_supervisor_running() {
-	# Openbox autostart runs ./run.sh — cmdline often has no absolute path.
-	for _pid in $(pgrep -f 'run\.sh' 2>/dev/null); do
-		_cwd="$(readlink -f "/proc/${_pid}/cwd" 2>/dev/null || true)"
-		[ "$_cwd" = "$CASPAR_ROOT" ] && return 0
-	done
-	pgrep -f "${CASPAR_ROOT}/run\\.sh" >/dev/null 2>&1 \
-		|| pgrep -f "tools/runtime/casparcg-run\\.sh" >/dev/null 2>&1
+	# WO-400: the restart grace used to be slept HERE as well as in run.sh's loop (two sleeps
+	# per relaunch, with the WO-337 one-shot skip flag coordinated across both files). run.sh
+	# owns the grace now — this helper only guarantees the port is free.
 }

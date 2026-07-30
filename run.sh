@@ -8,7 +8,8 @@
 #   CASPAR_RESTART_EXIT_CODES   default: 5 139 1 134 0 (systemd); +137 143 130 without CASPAR_SYSTEMD_SERVICE=1
 #   CASPAR_RESPAWN=1            relaunch after any exit (debug)
 #   CASPAR_RESTART_GRACE_SEC    pause before start (default 2)
-#   CASPAR_RESTART_SLEEP        pause after crash/restart (default 5)
+#   CASPAR_RESTART_SLEEP        crash-backoff base sleep (default 5; doubles per streak, cap CASPAR_RESTART_SLEEP_MAX 120)
+#   CASPAR_CRASH_LOOP_WINDOW_SEC / _MAX / _GIVEUP   crash-streak window 120 / warn 6 / inhibit+stop 18
 #   CASPAR_HANG_SEC             kill if AMCP drops after it was up (default 90)
 #   CASPAR_BOOT_HANG_SEC        kill if AMCP never comes up (default 180)
 #   CASPAR_PORT_FREE_WAIT_SEC   wait for :5250 before start (default 30)
@@ -70,26 +71,25 @@ should_relaunch() {
 	is_restart_code "$_ec"
 }
 
-stop_caspar_if_running() {
-	if caspar_amcp_listening || caspar_any_process_running; then
-		caspar_kill_all_processes TERM
-		sleep 2
-		caspar_kill_all_processes KILL
-		caspar_wait_amcp_port_free
-	fi
-}
-
 run_caspar() {
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
 	_saw_amcp=0
 	_stuck=0
+	# WO-398: the hang detector used to fork ss+grep+sleep EVERY second forever (~260k
+	# forks/day) for a 90 s reaction budget. Healthy steady state now checks every 10 s;
+	# while a stall is being counted (and during boot) it stays at 1 s. `_stuck` counts
+	# SECONDS (the interval just slept), so detection latency stays within CASPAR_HANG_SEC
+	# (+ at most one healthy 10 s window).
+	_poll=1
 	while kill -0 "$_child" 2>/dev/null; do
 		if caspar_amcp_listening; then
 			_saw_amcp=1
 			_stuck=0
+			_poll=10
 		else
-			_stuck=$((_stuck + 1))
+			_stuck=$((_stuck + _poll))
+			_poll=1
 			if [ "$_saw_amcp" -eq 1 ]; then
 				_limit="${CASPAR_HANG_SEC:-90}"
 			else
@@ -104,14 +104,11 @@ run_caspar() {
 				return 5
 			fi
 		fi
-		sleep 1
+		sleep "$_poll"
 	done
 	wait "$_child" 2>/dev/null
 	return $?
 }
-
-_restarts=0
-_window_start=0
 
 while :; do
 	if [ -f "$_inhibit" ]; then
@@ -121,6 +118,7 @@ while :; do
 
 	caspar_wait_amcp_port_free
 
+	# Single grace site (WO-400 — the lib no longer sleeps its own copy of this grace).
 	_grace="${CASPAR_RESTART_GRACE_SEC:-2}"
 	# WO-337 #3: consume the one-shot operator fast-relaunch flag (set at the marker check below).
 	if [ "${CASPAR_SKIP_GRACE_ONCE:-}" = "1" ]; then
@@ -138,40 +136,32 @@ while :; do
 		exit "$ec"
 	fi
 
-	stop_caspar_if_running
+	caspar_ensure_fully_stopped
 
-	case "$ec" in
-	134 | 139) caspar_clear_cef_cache ;;
-	esac
-
-	_now="$(date +%s)"
-	if [ "$_window_start" -eq 0 ] || [ $((_now - _window_start)) -gt 120 ]; then
-		_restarts=0
-		_window_start="$_now"
+	# Hard-fail list lives in ONE place now (WO-400) — the old inline `case 134|139` had
+	# drifted from the lib's 134/139/136/11.
+	if caspar_crash_is_hard_fail_code "$ec"; then
+		caspar_clear_cef_cache
 	fi
-	_restarts=$((_restarts + 1))
 
-	_sleep="${CASPAR_RESTART_SLEEP:-5}"
 	# WO-337 #3: an operator-initiated apply (node writes the marker just before its kill/RESTART)
-	# gets a fast relaunch — the 5s sleep + the two 2s graces exist for crash-loop damping, which
-	# caspar_crash_loop_backoff still provides for real crashes. Stale markers (>120s) are ignored.
+	# gets a fast relaunch and skips crash damping — it is not a crash. Stale markers (>120s) ignored.
 	_marker="/tmp/caspar-operator-restart"
 	CASPAR_SKIP_GRACE_ONCE=""
 	if [ -f "$_marker" ] && [ $(($(date +%s) - $(stat -c %Y "$_marker" 2>/dev/null || echo 0))) -le 120 ]; then
 		rm -f "$_marker"
-		_sleep=1
 		CASPAR_SKIP_GRACE_ONCE=1
-		caspar_supervisor_log "[run.sh] operator restart marker — fast relaunch (sleep ${_sleep}s, grace skipped)"
-	fi
-	if [ "$_restarts" -ge 6 ]; then
-		_sleep=$((_sleep * 2))
-		[ "$_sleep" -gt 60 ] && _sleep=60
-	fi
-	if [ "$_restarts" -ge 18 ]; then
-		caspar_supervisor_log "[run.sh] too many rapid failures (last ec=${ec}) — exit"
-		exit "$ec"
+		caspar_supervisor_log "[run.sh] operator restart marker — fast relaunch (sleep 1s, grace skipped)"
+		sleep 1
+		continue
 	fi
 
-	caspar_supervisor_log "[run.sh] exited ${ec} — relaunch in ${_sleep}s"
-	sleep "$_sleep"
+	# ONE damping engine (WO-400): caspar_crash_loop_backoff logs, sleeps with exponential
+	# backoff, and at give-up WRITES THE INHIBIT FILE and returns non-zero — so a permanently
+	# crashing Caspar actually STOPS autostarting. The old inline `_restarts` counter exited
+	# instead, which systemd Restart=on-failure relaunched 10s later with a fresh counter —
+	# the give-up never held.
+	if ! caspar_crash_loop_backoff "$ec"; then
+		exit "$ec"
+	fi
 done

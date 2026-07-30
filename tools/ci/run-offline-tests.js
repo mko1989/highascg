@@ -40,6 +40,7 @@ const FILES = [
 	'tools/smoke/smoke-wo395-streaming-status-outputs.test.js',
 	'tools/smoke/smoke-wo396-decklink-cold-path.test.js',
 	'tools/smoke/smoke-wo397-confine-tick-x-free.test.js',
+	'tools/smoke/smoke-wo400-supervisor-cleanup.test.js',
 	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',
 	'tools/smoke/smoke-wo326-inspector-fill-live-apply.test.js',
 	'tools/smoke/smoke-wo329-project-rev.test.js',

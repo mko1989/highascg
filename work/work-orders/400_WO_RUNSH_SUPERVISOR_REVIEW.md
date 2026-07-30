@@ -1,6 +1,6 @@
 # WO-400 — run.sh / supervisor-lib review: ~40 % of the lib is dead, the give-up path never fires
 
-**Status: OPEN — review complete (the owner's ask); cleanup plan below staged for a quiet window together with WO-398**
+**Status: DONE (2026-07-30 — owner: "do this now". Cleanup applied per §3, sandbox crash-loop rehearsal proved backoff + inhibit give-up, deployed via `systemctl restart casparcg-server`, Caspar recovered with 8 channels; details §5)**
 **Source:** owner 30.07.26: "do a good review of the run.sh i fear there maybe a lot of unneeded code."
 **Files:** `run.sh` (177 lines), `tools/runtime/casparcg-supervisor-lib.sh` (274 lines), `/etc/systemd/system/casparcg-server.service`, `tools/runtime/caspar-systemd-{control,cleanup}.sh`, `tools/runtime/caspar-kill-main.sh`.
 **Related:** WO-398 (the 1 Hz `ss|grep` hang-detector poll — folds into this cleanup), WO-337 (operator fast-relaunch marker).
@@ -86,7 +86,32 @@ and is unused by the grep — `ss -tln` suffices.
 Expected shrink: lib 274 → ~170 lines, run.sh 177 → ~150, minus three env knobs and one unit
 line — and a crash loop that actually terminates in the designed inhibit state.
 
-## 4. What was VERIFIED
+## 4. What was VERIFIED (review phase)
 
 - Review findings verified live (callers grepped across run.sh/tools/src; unit + launcher
-  confirmed via systemd; PPID 1 → `casparcg-server.service` ExecStart). No changes applied yet.
+  confirmed via systemd; PPID 1 → `casparcg-server.service` ExecStart).
+
+## 5. Execution (same day, owner: "do this now")
+
+Applied exactly §3 with one deviation: `caspar_crash_loop_backoff` / `caspar_crash_is_hard_fail_code`
+/ `caspar_crash_state_file` were NOT deleted — they became **live** (run.sh now calls them), so
+the unit's `CASPAR_CRASH_STATE` env and `caspar-systemd-control.sh`'s reset are meaningful again.
+Deleted outright: `caspar_prepare_restart_after_exit`, `caspar_kill_main_processes`,
+`caspar_supervisor_running`, run.sh's `stop_caspar_if_running` (→ `caspar_ensure_fully_stopped`)
+and the whole inline `_restarts` damping block. One grace site (lib sleep removed). Inline
+hard-fail `case 134|139` → `caspar_crash_is_hard_fail_code` (single list, incl. 136/11). WO-398's
+10 s healthy poll + `ss -tln`. run.sh 177→167 lines, lib 274→242.
+
+Verified:
+- `sh -n` clean on both files; suite **1757 pass / 0 fail / 2 skip** incl. new
+  `smoke-wo400-supervisor-cleanup.test.js` (one damping engine, inhibit-at-give-up, 10 s poll
+  seconds-accounting, dead symbols stay dead, single grace site).
+- **Sandbox crash-loop rehearsal** (temp CASPAR_ROOT, `CASPAR_BIN=/bin/false`, fast knobs):
+  backoff sleeps grew 1→2→4 s, give-up at the configured streak **wrote the inhibit file**
+  (`caspar crash loop give-up ec=1 streak=5`) and run.sh exited — the designed terminal state
+  now reachable. (Next systemd relaunch sees the inhibit file → clean exit 0 → autostart stops.)
+- **Deployed live:** `sudo systemctl restart casparcg-server` — Caspar back, AMCP listening,
+  HighAsCG reconnected, 8 channels; the restart itself exercised the unified stop path
+  ("casparcg still running without AMCP — killing process tree" handled mid-teardown state).
+  Fork capture: **5 run.sh forks/32 s** (was ~96). Vcam stream relay re-attached on its own
+  (udp relay running, 25 fps on /dev/video10).
