@@ -43,6 +43,12 @@ function runWatchdog() {
 	return JSON.parse(lastLine)
 }
 
+/** Mode 2 of the harness: drives the real get_monitor_geometry dispatcher with stubs. */
+function runDispatcherProbe() {
+	const out = execFileSync('python3', [HARNESS, SCRIPT, 'dispatcher'], { encoding: 'utf8', timeout: 20000 })
+	return JSON.parse(out.trim().split('\n').pop())
+}
+
 test('the fence follows the monitor when the layout moves', () => {
 	const events = runWatchdog()
 
@@ -104,6 +110,55 @@ test('a vanished output releases instead of holding a stale fence', () => {
 		events.filter((e) => e[0] === 'warp').length,
 		0,
 		'releasing must not involve moving the pointer anywhere',
+	)
+})
+
+test('WO-391b: geometry comes from the RandR API, not an xrandr fork', () => {
+	const r = runDispatcherProbe()
+	assert.deepEqual(r.api_result, [1920, 1080, 1920, 0], 'the API answer is used verbatim')
+	assert.equal(
+		r.subprocess_calls_when_api_answered,
+		0,
+		'`xrandr --query` must NOT be forked when XRRGetMonitors answers — that fork ran every 2s ' +
+			'for the life of the box before WO-391b',
+	)
+	assert.equal(r.nodpy_used_subprocess, true, 'with no display open it must still fall back to the parser')
+	assert.equal(r.degraded_used_subprocess, true, 'RandR < 1.5 (API answers nothing) must fall back too')
+})
+
+test('WO-391b: the layout watch is event-driven, with polling only as a logged degradation', () => {
+	const src = fs.readFileSync(SCRIPT, 'utf8')
+
+	assert.match(src, /XRRSelectInput/, 'must select RandR change events')
+	assert.match(src, /RR_CRTC_CHANGE_NOTIFY_MASK/, 'CrtcChange is required: moving a CRTC inside an unchanged screen size emits only that')
+	/* It blocks on the X connection. The timeout is a BACKSTOP, not the mechanism (event delivery is
+	 * unproven on this hardware — see GEOMETRY_BACKSTOP_SEC). Pin that it stays a backstop: long
+	 * enough that it cannot quietly regress into the 2 s poll this WO removed. */
+	assert.match(src, /select\.select\(\[xfd\], \[\], \[\], GEOMETRY_BACKSTOP_SEC\)/, 'must block on the X fd, waking early only for events')
+	const backstop = src.match(/GEOMETRY_BACKSTOP_SEC = ([\d.]+)/)
+	assert.ok(backstop, 'the backstop interval must be a named, reviewable constant')
+	assert.ok(
+		parseFloat(backstop[1]) >= 15,
+		`backstop is ${backstop[1]}s — it must stay well above the old 2s cadence, or the poll is back`,
+	)
+	assert.match(src, /XRRUpdateConfiguration/, 'ScreenChangeNotify must refresh Xlib\'s cached screen config')
+
+	/* The maintenance loop must take its pacing from the injected waiter. A bare `time.sleep` in the
+	 * loop body is the regression: it would reintroduce a periodic wake. */
+	const loop = src.slice(src.indexOf('def barrier_maintenance_loop'))
+	const loopBody = loop.slice(0, loop.indexOf('\ndef ') === -1 ? loop.length : loop.indexOf('\ndef '))
+	assert.ok(
+		!/^\s+time\.sleep\(/m.test(loopBody),
+		'barrier_maintenance_loop must not sleep — it blocks in wait_for_change (see make_change_waiter)',
+	)
+	assert.match(loopBody, /wait_for_change\(\)/, 'the loop blocks on the injected waiter')
+
+	/* Both degradations must announce themselves — silent polling is what WO-391 exists to stop. */
+	const waiter = src.slice(src.indexOf('def make_change_waiter'), src.indexOf('def barrier_maintenance_loop'))
+	assert.equal(
+		(waiter.match(/DEGRADED/g) || []).length >= 3,
+		true,
+		'every fallback to polling must log DEGRADED (no libXrandr, QueryExtension fail, setup throw)',
 	)
 })
 

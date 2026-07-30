@@ -19,10 +19,15 @@ const fs = require('fs')
 const path = require('path')
 
 const SRC = path.join(__dirname, '..', '..', 'src', 'utils', 'hardware-info.js')
+/* WO-391c split the xrandr probes + their cache out of hardware-info.js (it hit the 500-line gate).
+ * The guards below follow the code: `getGpuModel`'s execSync stayed put, both xrandr probes and both
+ * async siblings moved here. Scanning only one file would silently stop checking the probes this
+ * whole test exists for. */
+const XR_SRC = path.join(__dirname, '..', '..', 'src', 'utils', 'hardware-info-xrandr.js')
 const SNAPSHOT_SRC = path.join(__dirname, '..', '..', 'src', 'api', 'device-view-snapshot.js')
 
-test('every execSync in hardware-info.js passes a timeout', () => {
-	const src = fs.readFileSync(SRC, 'utf8')
+test('every execSync in hardware-info.js + hardware-info-xrandr.js passes a timeout', () => {
+	const src = fs.readFileSync(SRC, 'utf8') + '\n' + fs.readFileSync(XR_SRC, 'utf8')
 
 	/* Slice each execSync( ... ) options object by brace matching rather than regex, so this cannot
 	 * be fooled by a `timeout:` that belongs to a neighbouring call. */
@@ -54,14 +59,16 @@ test('every execSync in hardware-info.js passes a timeout', () => {
 })
 
 test('the xrandr timeout leaves headroom over the measured healthy cost', () => {
-	const { XRANDR_TIMEOUT_MS } = require('../../src/utils/hardware-info')
-	if (XRANDR_TIMEOUT_MS === undefined) return // not exported; the source check above is the guard
+	/* WO-391c: now genuinely exported (from the xrandr module), so this guard actually runs — it used
+	 * to early-return because hardware-info.js never exported the constant. */
+	const { XRANDR_TIMEOUT_MS } = require('../../src/utils/hardware-info-xrandr')
+	assert.equal(typeof XRANDR_TIMEOUT_MS, 'number', 'XRANDR_TIMEOUT_MS must be exported to be checkable')
 	assert.ok(XRANDR_TIMEOUT_MS >= 1000, 'too tight: healthy xrandr measured ~90ms, slow boxes are worse')
 	assert.ok(XRANDR_TIMEOUT_MS <= 10000, 'too loose to bound a wedged X server usefully')
 })
 
 test('the async xrandr probes also carry the timeout (execFileAsync, same options)', () => {
-	const src = fs.readFileSync(SRC, 'utf8')
+	const src = fs.readFileSync(XR_SRC, 'utf8')
 	for (const fn of ['getDisplaysXrandrVerboseRawAsync', 'getDisplaysXrandrDetailedAsync']) {
 		const start = src.indexOf(`async function ${fn}`)
 		assert.notEqual(start, -1, `${fn} must exist`)

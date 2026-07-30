@@ -1,11 +1,15 @@
 /**
  * Keep mouse pointer inside the operator monitor when enabled.
  *
- * Primary: XFixes pointer barriers (confine-pointer-barriers.py) — hard edge stop,
- * no XGrabPointer, no overlay windows; Caspar multiview/interactive keep working.
+ * The ONLY backend: XFixes pointer barriers (confine-pointer-barriers.py) — a hard edge stop
+ * enforced by the X server, no XGrabPointer, no overlay windows; Caspar multiview/interactive keep
+ * working. That daemon is event-driven and never touches the cursor (WO-391/391b).
  *
- * Fallback: xdotool warp polling (if xdotool is installed).
- * HIGHASCG_POINTER_CONFINE_XGRAB=1 opts into legacy XGrabPointer (breaks interactive).
+ * There is deliberately NO fallback. The old xdotool warp poll (80 ms setInterval → two subprocess
+ * spawns per tick) was removed in WO-391b — see the block comment below `tryBarrierConfine`. If
+ * barriers cannot start, the pointer is left unconfined and the 8 s watchdog retries.
+ *
+ * HIGHASCG_POINTER_CONFINE_XGRAB=1 still opts into legacy XGrabPointer (breaks interactive).
  */
 'use strict'
 
@@ -17,11 +21,8 @@ const {
 	resolveOperatorMonitorRect,
 	isOperatorPointerConfineDesired,
 	evaluateOperatorPointerConfineDesire,
-	pointerInConfineAllowance,
-	parkPointerOnOperatorDisplay,
 	resolveConfineBarriersScript,
 	resolveConfineCursorScript,
-	resolveXdotoolBin,
 	displaySessionEnv,
 } = require('../utils/x-display-session')
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
@@ -36,8 +37,8 @@ const BARRIER_PID_PATH = path.join(process.env.HOME || '/home/casparcg', '.higha
 
 /** @type {import('child_process').ChildProcess | null} */
 let confineProc = null
-/** @type {NodeJS.Timeout | null} */
-let confineTimer = null
+/* WO-391b: `confineTimer` is gone with the xdotool warp interval — the barrier daemon is the only
+ * backend now, so liveness is a question about `confineProc`, not about a local setInterval. */
 /** @type {NodeJS.Timeout | null} */
 let barrierWatchdog = null
 /** @type {string | null} */
@@ -50,10 +51,6 @@ let watchOpts = null
 function envTruthy(name) {
 	const v = String(process.env[name] || '').trim().toLowerCase()
 	return v === '1' || v === 'true' || v === 'yes'
-}
-
-function clamp(n, min, max) {
-	return Math.max(min, Math.min(max, n))
 }
 
 function confineKey(rect) {
@@ -159,11 +156,6 @@ async function ensureUnclutterRunning(env, log) {
 	}
 }
 
-function stopXdotoolConfine() {
-	if (confineTimer) clearInterval(confineTimer)
-	confineTimer = null
-}
-
 function stopBarrierProc(env) {
 	if (confineProc) {
 		try {
@@ -181,13 +173,11 @@ function stopPointerConfine() {
 	const env = displaySessionEnv()
 	activeConfineKey = null
 	stopBarrierWatchdog()
-	stopXdotoolConfine()
 	stopBarrierProc(env)
 	void ensureUnclutterRunning(env)
 }
 
 function isPointerConfineActive() {
-	if (confineTimer) return true
 	if (confineProc && confineProc.exitCode == null && !confineProc.killed) return true
 	return false
 }
@@ -231,56 +221,26 @@ async function tryBarrierConfine(rect, env, log) {
 	return null
 }
 
-/**
- * @param {object} config
- * @param {{ log?: Function, layout?: object }} [opts]
+/* WO-391b: `tickXdotoolConfine` / `startXdotoolConfine` are DELETED.
+ *
+ * They were the fallback when XFixes barriers could not be started: a `setInterval(…, 80)` that
+ * shelled out to `xdotool getmouselocation` and then `xdotool mousemove` — **12.5 process spawns a
+ * second, indefinitely**. Two reasons it is gone rather than tuned:
+ *
+ *   1. It polls and warps the CURSOR, the mechanism the owner rejected outright ("i dont like that
+ *      mouse cursor poll loop at all … i dont see the need for that at all") and which WO-391 already
+ *      removed from the barrier daemon. Keeping a second copy behind a failure branch defeats that.
+ *   2. It fired for the wrong reason. Journal 30.07: `barrier daemon failed to start` at 12:40:46 →
+ *      xdotool fallback → barriers succeeded anyway at 12:40:52. The "failure" was a transient race
+ *      in tryBarrierConfine's 1.6 s start window (it pkills the old daemon then waits for the new
+ *      pid file), so the box spent 6 s spawning processes at 12.5/s to solve nothing.
+ *
+ * What replaces it: nothing. If barriers cannot start we log and leave the pointer UNCONFINED, and
+ * the 8 s `startBarrierWatchdog` keeps retrying barriers — which is how the 12:40 case recovered on
+ * its own. That is the principle this component already applies to a vanished output ("releasing
+ * instead of holding a stale fence"): not confining is recoverable and cheap, confining wrongly (or
+ * expensively) is neither.
  */
-async function tickXdotoolConfine(config, opts = {}) {
-	const layout = opts.layout || calculateLayoutPositions(config)
-	const rect = resolveOperatorMonitorRect(config, layout)
-	if (!rect || rect.width <= 0 || rect.height <= 0) return
-	const env = displaySessionEnv()
-	const xdotool = await resolveXdotoolBin(env)
-	if (!xdotool) return
-	const minX = rect.x
-	const minY = rect.y
-	const maxX = rect.x + rect.width - 1
-	const maxY = rect.y + rect.height - 1
-	try {
-		const { stdout } = await execFileAsync(xdotool, ['getmouselocation', '--shell'], { env, timeout: 2000 })
-		let x = 0
-		let y = 0
-		for (const line of String(stdout || '').split('\n')) {
-			if (line.startsWith('X=')) x = parseInt(line.slice(2), 10)
-			if (line.startsWith('Y=')) y = parseInt(line.slice(2), 10)
-		}
-		if (!Number.isFinite(x) || !Number.isFinite(y)) return
-		if (pointerInConfineAllowance(config, layout, x, y)) return
-		const nx = clamp(x, minX, maxX)
-		const ny = clamp(y, minY, maxY)
-		if (nx !== x || ny !== y) {
-			await execFileAsync(xdotool, ['mousemove', '--sync', String(nx), String(ny)], { env, timeout: 2000 })
-			opts.log?.('debug', `[Pointer confine] Warped ${x},${y} → ${nx},${ny}`)
-		}
-	} catch (e) {
-		opts.log?.('warn', `[Pointer confine] tick failed: ${e?.message || e}`)
-	}
-}
-
-function startXdotoolConfine(config, rect, opts = {}) {
-	const layout = opts.layout || calculateLayoutPositions(config)
-	stopXdotoolConfine()
-	confineTimer = setInterval(() => {
-		void tickXdotoolConfine(config, { ...opts, layout })
-	}, 80)
-	void parkPointerOnOperatorDisplay(config, { ...opts, layout })
-	opts.log?.(
-		'info',
-		`[Pointer confine] xdotool fallback on ${rect.sysId} @ ${rect.x},${rect.y} ${rect.width}x${rect.height}`,
-	)
-	activeConfineKey = confineKey(rect)
-	return { ok: true, rect, mode: 'xdotool' }
-}
 
 async function pythonXlibAvailable(env) {
 	try {
@@ -353,13 +313,17 @@ async function startPointerConfine(config, opts = {}) {
 		return barriers
 	}
 
-	const xdotool = await resolveXdotoolBin(env)
-	if (xdotool) {
-		return startXdotoolConfine(config, rect, opts)
-	}
-
-	log?.('warn', '[Pointer confine] barriers failed and xdotool not installed — confine inactive')
-	return { ok: false, reason: 'no_backend', rect }
+	/* WO-391b: no cursor-polling fallback any more (see the block comment above tryBarrierConfine's
+	 * former xdotool sibling). Leave the pointer free and let the 8 s watchdog keep retrying
+	 * barriers — a transient start race then heals itself, and a persistent failure stays visible
+	 * in the log instead of being masked by 12.5 subprocess spawns a second. */
+	startBarrierWatchdog(config, opts)
+	log?.(
+		'warn',
+		`[Pointer confine] XFixes barriers could not be started on ${rect.sysId} — pointer left UNCONFINED; ` +
+			'the 8s watchdog will keep retrying (WO-391b: the xdotool warp fallback was removed)',
+	)
+	return { ok: false, reason: 'barriers_unavailable', rect }
 }
 
 /**

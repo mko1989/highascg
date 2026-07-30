@@ -295,3 +295,90 @@ was **not** changed unilaterally. Options:
 
 Recommendation: `'off'` while the box is used for development, back to `'auto'` for shows — or the
 third option if the fence is wanted permanently.
+
+---
+
+## 9. WO-391b / WO-391c — the three follow-ups, done (2026-07-30, owner: "i want these 3 fixed. i need that xrandr rewrite")
+
+### 9.1 The xrandr rewrite (§6a) — event-driven, no fork
+
+`tools/runtime/confine-pointer-barriers.py`:
+
+- Geometry now comes from **`XRRGetMonitors`** (RandR 1.5) via ctypes. Verified against the old
+  parser on the live display: both return `('DP-1', (1920, 1080, 1920, 0))` — byte-identical.
+- **RandR change events** (`RRScreenChangeNotify | RRCrtcChangeNotify | RROutputChangeNotify`)
+  selected on the root window; the process blocks in `select()` on the X connection.
+  `XRRUpdateConfiguration` is called for ScreenChangeNotify so Xlib's cached config cannot go stale.
+- `main()` reordered to open the display **before** the first geometry read, so even process startup
+  no longer forks `xrandr`.
+- The `xrandr --query` parser survives only for RandR < 1.5; the 2 s loop only if RandR cannot be set
+  up. Both log `DEGRADED` when they engage.
+
+**Measured on the deployed build** (the point of the whole exercise):
+
+| | old | new |
+|---|---|---|
+| idle CPU ticks / 12 s | — | **0** |
+| context switches / 35 s | ~17 forks + ~700 `XQueryPointer` | **2** |
+| child processes | 1 `xrandr` per 2 s | **0** |
+
+**What is NOT proven, and why the code says so.** Event *delivery* could not be verified. The probe
+used — `xrandr --setmonitor` / `--delmonitor` — turned out to emit no RandR notify at all; that was
+established by running **`xev -root -event randr` as a reference client**, which saw nothing either,
+so it was a bad probe rather than evidence about our client. (`--brightness` was also tried and is a
+gamma-ramp op via `XRRSetCrtcGamma`, which emits nothing.) Proving it needs a real mode/framebuffer
+change, refused on a show day.
+
+So correctness does not depend on it: `select()` keeps a **`GEOMETRY_BACKSTOP_SEC` = 30 s** timeout
+as a safety net, and the loop logs `RandR change event RECEIVED` the first time an event actually
+wakes it. That line appearing after the next real layout apply is the signal that the backstop can be
+dropped for a pure block. This is deliberately the same instrument-then-decide pattern that disproved
+the warp loop's premise in §6 — the alternative was assuming events work and silently fossilising the
+fence, which is the exact bug §6a set out to avoid.
+
+### 9.2 The xdotool fallback (§6b) — deleted
+
+`src/system/pointer-confine.js`: `tickXdotoolConfine` / `startXdotoolConfine` / `stopXdotoolConfine`
+and `confineTimer` are gone, with the reasoning kept as a block comment where they were. Barrier
+failure now logs `pointer left UNCONFINED` and leans on the existing 8 s watchdog to retry — which is
+how the observed 12:40:46 transient healed itself anyway. Dead imports (`pointerInConfineAllowance`,
+`parkPointerOnOperatorDisplay`, `resolveXdotoolBin`, local `clamp`) removed; the unwired-exports
+ratchet stays green because `pointerInConfineAllowance` is still referenced by its own smoke test.
+
+### 9.3 The spawnSync xrandr storm (§7 item 2) — cached + failure backoff
+
+`XRANDR_TIMEOUT_MS` and `XRANDR_CACHE_TTL_MS` were **both 3000**, so a wedged X server gave "block
+3 s → time out → cache 3 s → block 3 s": the node event loop gone ~half the time, re-hammering an X
+server already in trouble. And `getDisplaysXrandrVerboseRaw` had **no cache at all** — measured **195
+ms per call** on this box, reading EDID from every output.
+
+- New `XRANDR_FAILURE_BACKOFF_MS` (30 s, `Math.max(TTL, …)` so it can never be shorter than the
+  success TTL). Successes keep the 3 s TTL so an applied layout stays visible.
+- `--verbose` cached, shared by its sync and async siblings, cleared by `invalidateXrandrCache()`.
+- Both `--query` paths mark boot-snapshot fallback as `failed`, since the live probe did not answer.
+
+**File split (500-line gate):** the additions took `hardware-info.js` 491 → 554. Extracted
+`src/utils/hardware-info-xrandr.js` (probes + parser + cache, 337 lines) leaving `hardware-info.js`
+at 255; every previously-public name is re-exported, verified by asserting all 15 exports still
+resolve. `parseXrandrQueryRaw` is intentionally NOT exported — the WO-367 ratchet correctly flagged it
+as an unreferenced surface.
+
+**Test repointing, not weakening** (the CLAUDE.md rule): `smoke-hardware-info-xrandr-timeout.test.js`
+greps source text, so its execSync scan now reads **both** files concatenated (`getGpuModel`'s call
+stayed behind, the two probes moved — scanning one file would have silently stopped checking the
+probes the test exists for), and the async-timeout check follows the functions. Its
+`XRANDR_TIMEOUT_MS` guard was also *strengthened*: it used to early-return because the constant was
+never exported from `hardware-info.js`, and now asserts against the module that does export it.
+
+### 9.4 Verified
+
+- Full gate **1736 tests, 1734 pass, 0 fail, 2 skip**; 500-line gate 0 over; unwired-exports ratchet
+  green; `py_compile` OK.
+- New/updated tests: `smoke-wo391c-xrandr-cache-backoff.test.js` (6, registered in the curated list —
+  stubs `child_process` via `require.cache` so it needs no X and counts execs exactly),
+  `smoke-pointer-confine-geometry-follow.test.js` now 7 (adds: geometry comes from the API and forks
+  no subprocess; the watch is event-driven with polling only as a logged degradation; the backstop
+  must stay ≥ 15 s so it cannot regress into the old 2 s poll).
+- Deployed: highascg restarted (`kill -TERM`, pid 2007538 → healthy, `/api/state` 200, both services
+  active), confine daemon respawned by its own watchdog with `corners sealed` + `no cursor polling, no
+  xrandr fork; 30s backstop`, and the idle-cost measurement above taken on the running process.
