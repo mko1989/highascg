@@ -201,6 +201,47 @@ symbols cannot reappear in executable code, plus a guard that all four corners o
 **pid 1982228 at 12:52:45**, log reads `4 edges, corners sealed — cursor is not polled`, and **0 warp
 lines since** (both existing lines predate it).
 
+### 6a. Precision: cursor polling is gone, but the geometry re-read is STILL a poll
+
+Stated plainly because it would be easy to read §6 as "all polling removed". It is not.
+`barrier_maintenance_loop` calls `get_monitor_geometry` every `GEOMETRY_POLL_SEC` (2 s), and that
+function is:
+
+```python
+out = subprocess.check_output(["xrandr", "--query"], env=env).decode()
+```
+
+— a **process spawn plus an X round-trip, every 2 seconds, for the life of the box**. It is not
+cursor polling and it earns its keep (it is what stops the fence fossilising around a dead rect), but
+by the owner's own principle the right mechanism is **push, not poll**: select
+`RRScreenChangeNotifyMask` via XRandR and block on the event, exactly as `XFixesSelectBarrierInput`
+is the right answer for barriers. Both would collapse this script to a single blocking
+`XNextEvent` loop with zero periodic work.
+
+Not done today: it means adding XRandR ctypes bindings and changing the process from
+"loop with sleeps" to "event-driven", on a show day, in the component that holds the operator's
+cursor. Worth doing deliberately.
+
+### 6b. The xdotool fallback is NOT merely latent — it engaged today
+
+§1a called it latent. The journal proves otherwise:
+
+```
+12:40:46 [warn] [Pointer confine] barrier daemon failed to start
+12:40:46 [info] [Pointer confine] xdotool fallback on DP-1 @ 1920,0 1920x1080
+12:40:52 [info] [Pointer confine] XFixes barriers on DP-1 @ 1920,0 1920x1080
+```
+
+So barrier creation *does* fail sometimes (here during a highascg service restart, racing the
+previous process's helper), and when it does the box runs the **80 ms `xdotool getmouselocation`
+subprocess loop — 12.5 process spawns per second**. It lasted ~6 s before barriers took over. If
+barrier creation ever fails persistently, that loop runs indefinitely, and it is by far the best
+match for "the mouse lags at times, like something is happening in the background".
+
+**This is now the top suspect for §7 and the next thing to fix** — either make the fallback a
+persistent Xlib client instead of spawning `xdotool`, or drop it entirely now that barriers are
+correct.
+
 ### 7. Still open: the original intermittent-lag report
 
 The poll loop is gone, but it was never proven to be what the owner felt. Measured clean at the time:
@@ -208,9 +249,18 @@ swap 0 B; CPU 28 cores / load ~7 / PSI `full=0.00`; IO pressure 0; GPU 30–37% 
 the pointer sampled *inside* the fence, where even the old loop did not warp. Remaining candidates if
 it recurs, in order:
 
-1. **§1a's xdotool fallback** — 12.5 subprocess spawns/second, latching on whenever barrier creation
-   fails. Still unfixed; the single strongest match for the symptom.
-2. The X cursor path under the SHAPE/restack watchdogs (`operator-shape-overlay.py` re-asserts
+1. **The xdotool fallback (§6b)** — 12.5 subprocess spawns/second, and it is *confirmed* to engage,
+   not merely latent. Strongest match for the symptom. Still unfixed.
+2. **`spawnSync` xrandr storms blocking the node event loop.** Seen today 12:53:37–12:54:04, ten
+   `[Hardware-Info] getDisplaysXrandrVerboseRaw/Detailed failed: spawnSync /bin/sh ETIMEDOUT` lines
+   about 3 s apart. `spawnSync` blocks Node's event loop for its whole duration, and ETIMEDOUT means
+   each call burned the full timeout. **Caveat — this burst correlates with the helper restarts this
+   session performed at 12:52:37 / 12:52:46 / 12:54:06**, so it may well be self-inflicted rather
+   than spontaneous; `display-stable-wait.js` polls `getDisplaysXrandrDetailed` in a loop and a
+   confine RUN can trigger it. Do not treat it as an independent finding without seeing it recur
+   unprompted. What it *does* prove is that xrandr can time out on this box under X contention —
+   which is also an argument for §6a's event-driven rewrite.
+3. The X cursor path under the SHAPE/restack watchdogs (`operator-shape-overlay.py` re-asserts
    stacking on a 2 s watchdog).
 
 Next time it happens, note **what was on screen and what the box was doing** — that is the missing
