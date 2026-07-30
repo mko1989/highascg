@@ -83,7 +83,9 @@ async function handleGet(path, ctx) {
 				return [...collectHostLiveConfigWarnings(cfg), ...mig.warnings]
 			})(),
 			streamCredentials,
-			streamOutputs: (Array.isArray(cfg.streamOutputs) && cfg.streamOutputs.length ? cfg.streamOutputs : [{
+			/* WO-393: seed only when the key is ABSENT (legacy/fresh config). An empty array is a
+			 * deliberate operator choice (all outputs removed) and must NOT resurrect a phantom. */
+			streamOutputs: (Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : [{
 				id: 'str_1',
 				label: 'Str1',
 				enabled: true,
@@ -106,7 +108,7 @@ async function handleGet(path, ctx) {
 				const st = streamCredentials[id] || {}
 				return { ...o, rtmpServerUrl: st.rtmpServerUrl || String(o?.rtmpServerUrl || ''), streamKey: '', hasStreamKey: !!st.hasStreamKey }
 			}),
-			recordOutputs: Array.isArray(cfg.recordOutputs) && cfg.recordOutputs.length ? cfg.recordOutputs : [{
+			recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : [{
 				id: 'rec_1',
 				label: 'Rec1',
 				enabled: true,

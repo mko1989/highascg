@@ -210,7 +210,8 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			externalRef: String(live?.caspar?.multiviewChannel ?? mvItem?.ch ?? ''),
 		})
 	}
-	const streamOutputsRaw = appConfig && Array.isArray(appConfig.streamOutputs) && appConfig.streamOutputs.length ? appConfig.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true }]
+	// WO-393: seed only when the key is absent — an empty array means the operator removed all outputs.
+	const streamOutputsRaw = appConfig && Array.isArray(appConfig.streamOutputs) ? appConfig.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true }]
 	for (let i = 0; i < streamOutputsRaw.length; i++) {
 		const so = streamOutputsRaw[i] || {}
 		const id = String(so.id || `str_${i + 1}`).trim() || `str_${i + 1}`
@@ -262,7 +263,7 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			},
 		})
 	}
-	const recordOutputsRaw = appConfig && Array.isArray(appConfig.recordOutputs) && appConfig.recordOutputs.length
+	const recordOutputsRaw = appConfig && Array.isArray(appConfig.recordOutputs)
 		? appConfig.recordOutputs
 		: [{ id: 'rec_1', label: 'Rec1', enabled: true, name: 'Rec1', source: 'program_1', crf: 26 }]
 	for (let i = 0; i < recordOutputsRaw.length; i++) {
