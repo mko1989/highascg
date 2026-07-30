@@ -1,6 +1,7 @@
 # WO-158 — Looks editor crop: visual handles, pixel values, editor visibility, crop-aware PIP borders
 
 **Status:** Implemented (owner/hardware acceptance pending)
+**Amendment 2026-07-30 (todos30.07.26, commit 23fcaca):** the T158.3 canvas toggle button (`.scenes-layer__handle--crop`, the amber square outside each layer's bottom-left corner) is REMOVED at the owner's request ("weird yellow square … has no purpose"). Crop-handle visibility is now purely auto-derived: visible iff the layer has a `crop` effect entry (added via the inspector effects panel). Everything else in this WO (bracket drag handles, `cropDeltaToParams`, px inspector inputs, crop-aware borders) stands.
 **Priority:** High (operator cannot crop visually; borders wrong on air with cropped content)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)
