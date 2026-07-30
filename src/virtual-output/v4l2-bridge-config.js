@@ -15,13 +15,17 @@ const VIRTUAL_CAMERA_DEFAULTS = Object.freeze({
 	channel: 1,
 	device: '/dev/video10',
 	basenamePrefix: 'highascg_vcam',
-	/** 'jpeg' = Caspar FILE → overwriting JPEG → relay (WO-137). 'stream' = Caspar STREAM → udp → relay (WO-145). */
-	mode: 'jpeg',
+	/** 'stream' = Caspar STREAM → udp → relay (WO-145; default since WO-399, owner decision).
+	 * 'jpeg' = legacy Caspar FILE → overwriting JPEG → relay flipbook (WO-137), explicit opt-in only. */
+	mode: 'stream',
 	/** Loopback UDP port for mode 'stream' (Caspar sends from streamPort+10000 via ?localport=). */
 	streamPort: 5555,
 	width: 1920,
 	height: 1080,
-	fps: 50,
+	/** WO-399: 25 fps — the fps is the dominant CPU knob on both the Caspar mjpeg encode and the
+	 * relay decode (bench: 1080p50 → 44/34 %, 1080p25 → 24/17 % sender/receiver). A virtual
+	 * camera consumer does not need 50. */
+	fps: 25,
 	resolutionScale: 'full',
 	jpegQuality: 10,
 	audioEnabled: true,
@@ -51,7 +55,7 @@ function normalizeVirtualCameraConfig(raw) {
 	vc.streamPort = clampV4l2BridgeStreamPort(vc.streamPort)
 	vc.width = Math.max(320, parseInt(String(vc.width ?? 1920), 10) || 1920)
 	vc.height = Math.max(240, parseInt(String(vc.height ?? 1080), 10) || 1080)
-	vc.fps = clampV4l2BridgeFps(vc.fps, 50)
+	vc.fps = clampV4l2BridgeFps(vc.fps, 25)
 	vc.resolutionScale = normalizeResolutionScale(vc.resolutionScale)
 	vc.jpegQuality = clampJpegQuality(vc.jpegQuality, 10)
 	vc.audioEnabled = vc.audioEnabled !== false

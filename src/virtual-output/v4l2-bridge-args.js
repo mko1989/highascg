@@ -9,14 +9,18 @@ const V4L2_BRIDGE_MODES = Object.freeze(['jpeg', 'stream'])
 const V4L2_BRIDGE_STREAM_PORT_DEFAULT = 5555
 
 /**
+ * WO-399 (owner): 'stream' is the DEFAULT — "package the virtual cam output to a simple
+ * lowest performance hungry stream and an ffmpeg subprocess that receives the stream and
+ * pipes it into v4l2". The jpg flipbook (WO-137) survives only as an explicit legacy opt-in;
+ * it re-decoded one JPEG 50×/s for ~39 % of a core.
  * @param {unknown} mode
  * @returns {'jpeg' | 'stream'}
  */
 function normalizeV4l2BridgeMode(mode) {
-	const m = String(mode ?? 'jpeg')
+	const m = String(mode ?? 'stream')
 		.trim()
 		.toLowerCase()
-	return m === 'stream' ? 'stream' : 'jpeg'
+	return m === 'jpeg' ? 'jpeg' : 'stream'
 }
 
 /**

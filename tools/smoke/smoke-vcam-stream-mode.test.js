@@ -48,6 +48,14 @@ function mockCtx(virtualCamera) {
 describe('vcam stream mode (WO-145)', () => {
 	beforeEach(() => resetV4l2BridgeConsumerState())
 
+	it('stream is the DEFAULT mode; jpeg is explicit legacy opt-in (WO-399)', async () => {
+		const { normalizeV4l2BridgeMode } = await import('../../src/virtual-output/v4l2-bridge-args.js')
+		assert.equal(normalizeV4l2BridgeMode(undefined), 'stream')
+		assert.equal(normalizeV4l2BridgeMode(''), 'stream')
+		assert.equal(normalizeV4l2BridgeMode('garbage'), 'stream')
+		assert.equal(normalizeV4l2BridgeMode('jpeg'), 'jpeg', 'legacy flipbook stays reachable explicitly')
+	})
+
 	it('jpeg mode attaches a FILE consumer on slot 710', async () => {
 		const ctx = mockCtx({ enabled: true, channel: 1, mode: 'jpeg' })
 		await attachV4l2BridgeConsumer(ctx, 1)
@@ -94,14 +102,15 @@ describe('vcam stream mode (WO-145)', () => {
 		assert.notDeepEqual(stream.args, jpeg.args)
 	})
 
-	it('rejects invalid mode, defaults to jpeg', () => {
+	it('rejects invalid mode, defaults to stream (WO-399)', () => {
 		const bad = validateVirtualCameraConfig({ mode: 'rtmp' })
 		assert.equal(bad.ok, false)
 		assert.ok(bad.errors.some((e) => e.includes('mode')))
 
-		assert.equal(normalizeVirtualCameraConfig({}).mode, 'jpeg')
+		assert.equal(normalizeVirtualCameraConfig({}).mode, 'stream')
 		assert.equal(normalizeVirtualCameraConfig({ mode: 'STREAM' }).mode, 'stream')
-		assert.equal(normalizeVirtualCameraConfig({ mode: 'bogus' }).mode, 'jpeg')
+		assert.equal(normalizeVirtualCameraConfig({ mode: 'bogus' }).mode, 'stream')
+		assert.equal(normalizeVirtualCameraConfig({ mode: 'jpeg' }).mode, 'jpeg', 'legacy opt-in stays')
 		assert.equal(validateVirtualCameraConfig({ mode: 'stream' }).ok, true)
 		assert.equal(validateVirtualCameraConfig({ mode: 'stream', streamPort: 80 }).ok, false)
 	})

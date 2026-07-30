@@ -1,7 +1,8 @@
-# WO-399 — Virtual-camera JPEG relay burns ~39 % CPU re-decoding one JPEG at 50 fps
+# WO-399 — Virtual camera: stream mode is the design now (owner) — jpg flipbook retired to legacy opt-in
 
-**Status: OPEN (found during WO-397's process recon; steady load, NOT the periodic mouse lag)**
-**Source:** WO-397 §1.6 background findings (owner 30.07: "make work orders for fixing the other 2 issues").
+**Status: DONE (2026-07-30 — stream/25 fps live on the box, 25 fps verified on /dev/video10, suite 1750/0/2; honest cost accounting in §3 — total CPU is a wash vs jpg mode, the WIN is real motion + flat cost + knobs)**
+**Source:** WO-397 §1.6 background findings; owner 30.07: "the virtual cam the way its done is not good. we need to package the virtual cam output to a simple lowest performance hungry stream and an ffmpeg subprocess that recives the stream and pipes it into v4l2."
+**Related:** WO-137 (jpg flipbook origin), WO-145 (stream-mode spike — mjpeg/NUT chosen, shipped opt-in; its benchmark is why the default stayed jpeg until now).
 
 ---
 
@@ -28,21 +29,42 @@ Related memory/context: shader-audio routing runs DM3 via slot 1 with a tee to u
 the v4l2 bridge is part of that virtual-input plumbing; whatever consumes /dev/video10
 (Caspar v4l2 producer or external apps) must keep getting frames.
 
-## 2. Proposed fix
+## 2. What was done (owner architecture decision superseded the original fps-only proposal)
 
-Lower the jpg-mode publish rate: default `fps` for the **jpg branch only** from 50 to ~10
-(stream mode untouched). v4l2loopback readers receive frames as written — a static/slowly
-refreshing image at 10 fps is visually identical and cuts the decode work ~80 %. Config
-override stays for boxes that need more.
+The owner's target architecture — Caspar → cheap stream → ffmpeg subprocess → v4l2 — already
+existed as WO-145's opt-in `mode: 'stream'` (Caspar STREAM consumer → mjpeg-over-NUT on
+loopback UDP :5555 → node-managed ffmpeg → /dev/video10). This WO makes it the design:
 
-Verify on the box: CPU of the relay process before/after (`pidstat`), and the /dev/video10
-consumer still shows the preview (Caspar v4l2 producer keeps rendering; check for reader
-timeout logic anywhere in the pipeline before shipping). If 10 fps upsets a consumer,
-fall back to 25.
+- **Codec benchmark first** (offline, testsrc2 sender `-re`, jiffies-delta over 8 s):
+  | variant | sender (≈Caspar encode) | receiver (relay) |
+  |---|---|---|
+  | mjpeg 1080p50 q10 | 44 % | 34 % |
+  | **mjpeg 1080p25 q10** | **24 %** | **17 %** |
+  | mjpeg 720p25 | 12 % | 15 % |
+  | rawvideo 1080p50 | 50 % | 40 % |
+  Rawvideo is NOT cheaper (155 MB/s memcpy + UDP packet churn); **fps is the dominant knob**;
+  mjpeg stays (intra-only robustness + ~1 s attach, per WO-145).
+- `v4l2-bridge-args.js`: `normalizeV4l2BridgeMode` defaults to **'stream'**; `'jpeg'` is an
+  explicit legacy opt-in only.
+- `v4l2-bridge-config.js`: defaults `mode: 'stream'`, `fps: 25` (was 50).
+- Box config flipped via `POST /api/virtual-camera/config {mode:'stream', fps:25}` + stop/start
+  cycle (config POST alone does NOT restart the relay — the old jpg relay kept running until
+  the explicit cycle; noted for the inspector UX).
+- `smoke-vcam-stream-mode.test.js` repointed: default-mode assertions now expect 'stream'.
 
-Stretch (optional): skip re-encode entirely when the JPEG mtime is unchanged (a tiny rawvideo
-writer that repeats the last frame), but only if the fps cut alone proves insufficient.
+## 3. What was VERIFIED (live box, 2026-07-30 ~16:00 UTC)
 
-## 3. What was VERIFIED
-
-- (nothing yet — fix not applied)
+- Relay process now `ffmpeg -i udp://127.0.0.1:5555 … /dev/video10`; **21 jiffies/s (~21 % of a
+  core, flat)** vs the jpg relay's ~39 % with real content.
+- `/dev/video10` delivers **exactly 25 fps** (ffmpeg read 125 frames in 5 s) at 1920×1080.
+- CasparCG cost isolated by stop/measure/start: no vcam 297 j/s → stream 389 j/s (**+92 %/core**
+  for the mjpeg 1080p25 encode; WO-145 measured ~+190 % at 50 fps — the fps knob halved it).
+  Legacy jpg mode measured the same way: **+76 %/core** Caspar-side.
+- **Honest accounting:** total (Caspar + relay) is ~115 % either way — stream at 25 fps is NOT
+  cheaper overall than the flipbook, because Caspar's STREAM encode costs more than its FILE
+  consumer. What the owner gains: real motion instead of a still flipbook, a flat relay cost
+  (the jpg relay's cost swung 0–39 % with content), no 50 Hz JPEG rewrites on disk, and cheap
+  knobs to go lower (`fps: 15` or `resolutionScale: '75'|'half'` — 720p25 benches at
+  ~12/15 %). If "lowest hungry" should beat the old total, drop fps/scale in the inspector.
+- Suite **1750 pass / 0 fail / 2 skip**. Owner QA: point a /dev/video10 consumer (Zoom /
+  getUserMedia — A145.4) at the camera and confirm motion.
