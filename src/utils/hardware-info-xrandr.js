@@ -178,13 +178,19 @@ function parseXrandrQueryRaw(stdout) {
 
 /**
  * `xrandr --query` hits the live X server (the one Caspar's screen consumers render on);
- * uncached calls several times per second visibly stutter playout. Short TTL keeps hot
- * paths (AMCP notify hooks, layout lookups) off X; call {@link invalidateXrandrCache}
+ * uncached calls several times per second visibly stutter playout — and EVERY spawn freezes
+ * the X input pipeline ~180 ms (WO-397, probe-measured). Call {@link invalidateXrandrCache}
  * after applying a new layout.
+ *
+ * WO-397: the TTL must exceed the SLOWEST periodic caller, or that caller misses on every
+ * tick. The old 3 s TTL vs the 8 s confine watchdog + ~30 s OS-Config layout watchdog meant
+ * two guaranteed X freezes every 8 s — the owner's "small lags of mouse". 60 s makes the
+ * periodic checkers ride the cache; layout applies invalidate explicitly, so a real change
+ * is never served stale.
  */
 const XRANDR_CACHE_TTL_MS = Math.max(
 	0,
-	parseInt(process.env.HIGHASCG_XRANDR_CACHE_TTL_MS || '3000', 10) || 3000,
+	parseInt(process.env.HIGHASCG_XRANDR_CACHE_TTL_MS || '60000', 10) || 60000,
 )
 
 /**
@@ -198,8 +204,8 @@ const XRANDR_CACHE_TTL_MS = Math.max(
  * was unavailable roughly half the time, and each retry re-hammered an X server that was already
  * struggling — with `--verbose`, which reads EDID from every output.
  *
- * A wedged or absent X server does not recover inside one TTL, so a failure is worth a much longer
- * pause than a success. Successes keep the short TTL (layout changes must still be seen quickly);
+ * A wedged or absent X server does not recover inside one TTL, so a failure is worth a longer
+ * pause than a success. Successes keep the normal TTL;
  * `invalidateXrandrCache()` clears the backoff, so an explicit layout apply is never delayed by it.
  */
 const XRANDR_FAILURE_BACKOFF_MS = Math.max(

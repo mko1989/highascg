@@ -43,6 +43,9 @@ let confineProc = null
 let barrierWatchdog = null
 /** @type {string | null} */
 let activeConfineKey = null
+/** WO-397: rect of the ACTIVE confine, kept so the 8 s watchdog tick never recomputes layout. */
+/** @type {{ sysId?: string, x?: number, y?: number, width?: number, height?: number } | null} */
+let activeConfineRect = null
 /** @type {object | null} */
 let watchConfig = null
 /** @type {{ log?: Function } | null} */
@@ -127,7 +130,7 @@ function startBarrierWatchdog(config, opts) {
 			stopBarrierWatchdog()
 			return
 		}
-		void startPointerConfine(watchConfig, watchOpts || {})
+		void startPointerConfine(watchConfig, { ...(watchOpts || {}), steadyTick: true })
 	}, 8000)
 }
 
@@ -172,6 +175,7 @@ function stopBarrierProc(env) {
 function stopPointerConfine() {
 	const env = displaySessionEnv()
 	activeConfineKey = null
+	activeConfineRect = null
 	stopBarrierWatchdog()
 	stopBarrierProc(env)
 	void ensureUnclutterRunning(env)
@@ -192,6 +196,7 @@ async function tryBarrierConfine(rect, env, log) {
 	if (await isBarrierDaemonRunning(rect.sysId, env)) {
 		log?.('info', `[Pointer confine] XFixes barriers already running on ${rect.sysId}`)
 		activeConfineKey = confineKey(rect)
+		activeConfineRect = rect
 		return { ok: true, rect, mode: 'barriers' }
 	}
 	stopBarrierProc(env)
@@ -212,6 +217,7 @@ async function tryBarrierConfine(rect, env, log) {
 				`[Pointer confine] XFixes barriers on ${rect.sysId} @ ${rect.x},${rect.y} ${rect.width}x${rect.height}`,
 			)
 			activeConfineKey = confineKey(rect)
+			activeConfineRect = rect
 			startBarrierWatchdog(watchConfig, watchOpts)
 			return { ok: true, rect, mode: 'barriers' }
 		}
@@ -261,6 +267,7 @@ async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {
 	if (confineProc.exitCode == null && !confineProc.killed) {
 		log?.('warn', `[Pointer confine] XGrabPointer on ${rect.sysId} — may break Caspar interactive`)
 		activeConfineKey = confineKey(rect)
+		activeConfineRect = rect
 		return { ok: true, rect, mode: 'xgrab' }
 	}
 	stopBarrierProc(env)
@@ -269,7 +276,8 @@ async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {
 
 /**
  * @param {object} config
- * @param {{ log?: Function, layout?: object }} [opts]
+ * @param {{ log?: Function, layout?: object, steadyTick?: boolean }} [opts] — steadyTick marks the
+ *   8 s watchdog recheck (WO-397: takes the X-free fast path; never set by transition callers)
  */
 async function startPointerConfine(config, opts = {}) {
 	const verdict = evaluateOperatorPointerConfineDesire(config)
@@ -277,6 +285,16 @@ async function startPointerConfine(config, opts = {}) {
 		opts.log?.('info', `[Pointer confine] SKIP — ${verdict.reason}`)
 		stopPointerConfine()
 		return { ok: true, enabled: false, reason: verdict.reason }
+	}
+	/* WO-397: the 8 s watchdog tick must be X-FREE. calculateLayoutPositions() below shells out
+	 * to `xrandr --verbose` + `xrandr --query`, each freezing the X input pipeline ~180 ms —
+	 * recomputing the layout every tick was the owner's "small lags of mouse" (two freezes every
+	 * 8.000 s, probe-proven). In steady state the barrier daemon self-tracks geometry via RandR
+	 * events, so a tick only needs "still desired?" (pure, checked above) + "daemon alive?"
+	 * (pid-file/pgrep). Every non-tick caller (boot, config change, OS-Config apply) — and a tick
+	 * that finds the daemon DEAD — still pays the full recomputation below. */
+	if (opts.steadyTick && activeConfineRect?.sysId && (await isBarrierDaemonRunning(activeConfineRect.sysId, displaySessionEnv()))) {
+		return { ok: true, rect: activeConfineRect, mode: 'unchanged' }
 	}
 	const layout = opts.layout || calculateLayoutPositions(config)
 	const rect = resolveOperatorMonitorRect(config, layout)

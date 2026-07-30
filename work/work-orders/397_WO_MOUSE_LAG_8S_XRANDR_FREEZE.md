@@ -1,6 +1,6 @@
 # WO-397 — Mouse lag ROOT-CAUSED: the 8 s pointer-confine watchdog freezes X ~370 ms per tick via uncached xrandr
 
-**Status: OPEN — diagnosis complete and causally proven; fix proposed below, awaiting owner go-ahead**
+**Status: DONE (2026-07-30 — fix deployed and probe-verified: 3-min spike count 47 → 6, p99 2.56 ms → 0.34 ms; details §3. Owner: feel-check the mouse)**
 **Source:** owner 30.07.26: "i still these small lags of mouse. it definitly feels like there is something firing in the background that makes the pc lag. i want you to do a thorough reserch into that."
 **Related:** WO-391 (prior investigation — poll loop disproven, §7 left the lag "still unexplained"; §7's candidates 1–2 were already fixed and were NOT it), WO-391c (the xrandr cache whose TTL makes it useless here).
 
@@ -85,26 +85,36 @@ out unnecessary; the lag is unconditional, every 8 s, idle or not.
   constant load, not periodic; candidate for `-framerate 5` someday.
 - Xorg baseline 13.5 % CPU; no swap, no PSI pressure (unchanged from WO-391).
 
-## 2. Proposed fix (not yet applied — owner asked for research)
+## 2. What was done (owner go-ahead 30.07: "do the 397")
 
-Ranked, smallest-first; 1+2 together are the real fix:
-
-1. **Make the steady-state watchdog tick X-free** (`pointer-confine.js`): move the
-   layout/rect computation BELOW the "still running + still desired" check. Tick =
-   `evaluateOperatorPointerConfineDesire` (pure) + `isBarrierDaemonRunning` (pgrep). Recompute
-   layout only on transition (daemon dead / desire flipped) — and on layout *apply*, which
-   already calls `startPointerConfine` with a fresh `opts.layout`.
-2. **Raise `XRANDR_CACHE_TTL_MS` above the slowest periodic consumer** (e.g. 60 s; env override
-   already exists). Layout applies already call `invalidateXrandrCache()`, and the confine
-   helper gets geometry from RandR events — nothing needs 3 s freshness. This also silences the
-   ~30 s OS-Config watchdog's misses.
-3. Optional hygiene: cache `nvidia-smi gpu_name` (it cannot change at runtime) and audit
-   `modetest -c` on the same path.
-
-Expected result: X freeze events drop from every 8 s to only on real layout transitions; the
-probe (§1.1) re-run should show p99 < 3 ms and zero periodic spikes.
+1. **X-free steady-state watchdog tick** (`src/system/pointer-confine.js`): the 8 s tick now
+   passes `steadyTick: true`; `startPointerConfine` short-circuits on the new
+   `activeConfineRect` (cached at every `activeConfineKey` assignment, cleared on stop) +
+   `isBarrierDaemonRunning` (pid-file/pgrep) BEFORE any layout computation. Geometry drift in
+   steady state is the barrier daemon's own job (RandR events, WO-391b). Every non-tick caller
+   — and a tick that finds the daemon dead — still pays the full recomputation, so operator-
+   monitor changes and retries behave exactly as before.
+2. **`XRANDR_CACHE_TTL_MS` default 3000 → 60000** (`src/utils/hardware-info-xrandr.js`) — the
+   TTL now outlives the periodic consumers; layout applies still `invalidateXrandrCache()`
+   explicitly, so a real change is never served stale. Env override unchanged.
+3. **`getGpuModel()` memoized forever** (`src/utils/hardware-info.js`) — nvidia-smi ran 3× per
+   layout computation for a value that cannot change at runtime; nulls memoized too.
+4. Guards: `tools/smoke/smoke-wo397-confine-tick-x-free.test.js` (steadyTick marker, fast path
+   ordered before `calculateLayoutPositions`, rect cleared on stop, TTL default, memo) in the
+   curated CI list.
 
 ## 3. What was VERIFIED
 
-- Diagnosis verified as in §1 (probe + fork capture + manual causality reproduction, all on the
-  live box, 2026-07-30 15:19–15:26 UTC). No fix applied yet.
+- Diagnosis as in §1 (probe + fork capture + manual causality reproduction, live box,
+  2026-07-30 15:19–15:26 UTC).
+- Suite **1750 pass / 0 fail / 2 skip** (incl. the new smoke); unwired-exports gate clean.
+- Live after service restart (same 3-minute probe, 15:38–15:41):
+  - **spikes >15 ms: 47 → 6** (three ~180 ms pairs at 15:38:46 / 15:39:52 / 15:40:56 — ~65 s
+    apart), `p99 2.56 ms → 0.34 ms`, p50/p95 unchanged-good.
+  - Fork capture over 25 s: **zero** 8 s xrandr spawns; exactly one `--verbose`+`--query` pair
+    (the ~60 s TTL expiry consumed by the OS-Config layout watchdog) — matches the probe.
+- Residual: one ~370 ms freeze pair per ~65 s (was one per 8 s — ~87 % less frozen time, and no
+  longer at a felt-every-few-seconds cadence). If the owner still feels it, the next lever is
+  one env var (`HIGHASCG_XRANDR_CACHE_TTL_MS=600000` → one pair per 10 min) or making the
+  OS-Config layout watchdog event-driven — record as WO-397b if wanted.
+- Owner QA: use the mouse normally for a few minutes — the every-8-seconds hitch should be gone.

@@ -220,20 +220,26 @@ function getConnectedDisplayNames() {
 		.map((c) => c.xrandrName || c.shortName)
 }
 
+/** WO-397: the GPU model cannot change at runtime, but this ran 3× per layout computation
+ * (a blocking ~50-100 ms execSync each). Memoize forever; a null (nvidia-smi missing/failed)
+ * is memoized too — a box without the tool must not re-fork on every layout pass. */
+let _gpuModelMemo
 /**
  * Detect GPU model using nvidia-smi.
  * @returns {string|null}
  */
 function getGpuModel() {
+	if (_gpuModelMemo !== undefined) return _gpuModelMemo
 	try {
 		const stdout = execSync('nvidia-smi --query-gpu=gpu_name --format=csv,noheader', {
 			stdio: ['ignore', 'pipe', 'ignore'],
 			timeout: 2000,
 		}).toString()
-		return stdout.trim() || null
+		_gpuModelMemo = stdout.trim() || null
 	} catch {
-		return null
+		_gpuModelMemo = null
 	}
+	return _gpuModelMemo
 }
 
 module.exports = {
