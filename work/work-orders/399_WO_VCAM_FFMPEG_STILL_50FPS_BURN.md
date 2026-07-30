@@ -68,3 +68,12 @@ loopback UDP :5555 → node-managed ffmpeg → /dev/video10). This WO makes it t
   ~12/15 %). If "lowest hungry" should beat the old total, drop fps/scale in the inspector.
 - Suite **1750 pass / 0 fail / 2 skip**. Owner QA: point a /dev/video10 consumer (Zoom /
   getUserMedia — A145.4) at the camera and confirm motion.
+
+## 4. Follow-up (same day, owner: "it still says in the ui its jpeg buffer")
+
+`device-view-inspector-virtual-cam.js` hardcoded "Caspar channel → JPEG buffer → v4l2loopback"
+in its note and never showed the mode. Now: the note is mode-aware (stream wording by default,
+LEGACY wording only when explicitly opted into jpeg), the status block gains a live
+`Pipeline: mjpeg stream → ffmpeg (udp://…)` line fed by `/api/virtual-camera/status`
+`video.relay.mode/source`, and the display fps fallback matches the new 25 default. Client
+rebuilt + kiosk reloaded; suite 1757/0/2.

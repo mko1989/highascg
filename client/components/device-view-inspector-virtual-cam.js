@@ -20,7 +20,7 @@ function savedVirtualCamera(currentSettings, conn) {
 		label: conn?.label || 'Virtual cam',
 		channel: caspar.channel ?? 1,
 		device: conn?.externalRef || '/dev/video10',
-		fps: caspar.fps ?? 50,
+		fps: caspar.fps ?? 25,
 		width: caspar.width ?? 1920,
 		height: caspar.height ?? 1080,
 		audioEnabled: caspar.audioEnabled !== false,
@@ -32,6 +32,14 @@ function savedVirtualCamera(currentSettings, conn) {
 function renderStatusBlock(live) {
 	const lines = []
 	lines.push(`Running: ${live?.running ? 'yes' : 'no'}`)
+	// WO-399: show which pipeline actually feeds v4l2 — stream (default) or the legacy buffer.
+	if (live?.video?.relay?.mode) {
+		lines.push(
+			live.video.relay.mode === 'stream'
+				? `Pipeline: mjpeg stream → ffmpeg (${live.video.relay.source || 'udp'})`
+				: 'Pipeline: LEGACY JPEG buffer loop',
+		)
+	}
 	if (live?.video?.relay?.device) lines.push(`Video: ${live.video.relay.device}`)
 	if (live?.video?.relay?.pid) lines.push(`Relay PID: ${live.video.relay.pid}`)
 	if (live?.audio?.attached != null) {
@@ -47,11 +55,16 @@ export function renderVirtualCamOutControls(h, conn, { currentSettings, statusEl
 	const saved = savedVirtualCamera(currentSettings, conn)
 	const caspar = conn?.caspar && typeof conn.caspar === 'object' ? conn.caspar : {}
 
+	// WO-399 (owner): stream mode is the design — the note must not describe the retired
+	// JPEG flipbook unless the box is explicitly opted into it.
+	const pipelineNote =
+		String(saved.mode || 'stream') === 'jpeg'
+			? 'Virtual webcam for Zoom/OBS (LEGACY jpeg mode): Caspar channel → JPEG buffer → v4l2loopback. Audio via ALSA loopback capture device. Cable a destination to this port and Apply to set the source channel.'
+			: 'Virtual webcam for Zoom/OBS: Caspar channel → mjpeg stream (loopback UDP) → ffmpeg → v4l2loopback. Audio via ALSA loopback capture device. Cable a destination to this port and Apply to set the source channel.'
 	h.append(
 		Object.assign(document.createElement('p'), {
 			className: 'device-view__note',
-			textContent:
-				'Virtual webcam for Zoom/OBS: Caspar channel → JPEG buffer → v4l2loopback. Audio via ALSA loopback capture device. Cable a destination to this port and Apply to set the source channel.',
+			textContent: pipelineNote,
 		}),
 	)
 
