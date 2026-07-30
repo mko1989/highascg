@@ -2,11 +2,18 @@
 """
 confine-pointer-barriers.py — confine cursor to one monitor (Caspar-safe).
 
-1. XFixes pointer barriers on all four edges (hard stop at boundaries).
-2. Warp watchdog polls every 50ms and pulls the pointer back if it escapes
-   (NVIDIA multi-head sometimes lets the pointer slip past barriers).
+XFixes pointer barriers on all four edges — a hard stop enforced by the X server. The four segments
+OVERLAP at the corners (see create_edge_barriers); barriers that merely touch leak a pixel at a time
+through their shared endpoints on a diagonal move.
 
-Must stay running — barriers are destroyed when this process exits.
+The cursor is NEVER polled or warped. A `warp_watchdog` used to do that at 20 Hz to cover an alleged
+"NVIDIA multi-head lets the pointer slip past barriers" quirk; when finally instrumented (WO-391) the
+only escape it ever caught was the corner-endpoint gap above, which is now fixed at the source. Do
+not reintroduce pointer polling — if the fence ever leaks again, the answer is
+XFixesSelectBarrierInput (barrier HIT EVENTS, which the server pushes to us) not a poll loop.
+
+Must stay running — barriers are destroyed when this process exits. The loop it runs re-reads the
+monitor geometry so the fence follows the layout instead of fossilising around a stale rect.
 
 Usage: confine-pointer-barriers.py [OUTPUT_NAME]
 """
@@ -31,15 +38,10 @@ BARRIER_NEGATIVE_Y = 8
 layout, hotplug, mode change) and a stale rect means the watchdog drags the pointer off-screen."""
 GEOMETRY_POLL_SEC = 2.0
 
-"""WO-391: idle poll of the warp fallback. Was 0.05 (20 Hz) — on a driver that honours XFixes
-barriers that loop never corrects anything, so it was 20 pointless XQueryPointer round-trips a
-second forever. 0.25 still pulls a genuinely escaped pointer back within a quarter second (the
-operator cannot lose the cursor), at a fifth of the X traffic. See warp_watchdog's docstring for
-the plan to drop polling altogether once the log proves whether barriers hold here."""
-WARP_POLL_SEC = 0.25
-
-"""Minimum gap between 'warp' log lines, so a leaking driver cannot flood the log."""
-WARP_LOG_MIN_INTERVAL_SEC = 10.0
+"""How far each barrier extends past the perpendicular edges, to seal the corners — see
+create_edge_barriers. Must be > the largest single-motion-event jump across a corner; 16 px is far
+more than a pointer moves between motion events at any sane speed."""
+CORNER_OVERLAP_PX = 16
 
 libX11 = ctypes.CDLL(ctypes.util.find_library("X11"), use_errno=True)
 libXfixes = ctypes.CDLL(ctypes.util.find_library("Xfixes"), use_errno=True)
@@ -49,29 +51,8 @@ libX11.XCloseDisplay.argtypes = [ctypes.c_void_p]
 libX11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
 libX11.XDefaultRootWindow.restype = ctypes.c_ulong
 libX11.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
-libX11.XQueryPointer.argtypes = [
-    ctypes.c_void_p,
-    ctypes.c_ulong,
-    ctypes.POINTER(ctypes.c_ulong),
-    ctypes.POINTER(ctypes.c_ulong),
-    ctypes.POINTER(ctypes.c_int),
-    ctypes.POINTER(ctypes.c_int),
-    ctypes.POINTER(ctypes.c_int),
-    ctypes.POINTER(ctypes.c_int),
-    ctypes.POINTER(ctypes.c_ulong),
-]
-libX11.XQueryPointer.restype = ctypes.c_int
-libX11.XWarpPointer.argtypes = [
-    ctypes.c_void_p,
-    ctypes.c_ulong,
-    ctypes.c_ulong,
-    ctypes.c_int,
-    ctypes.c_int,
-    ctypes.c_uint,
-    ctypes.c_uint,
-    ctypes.c_int,
-    ctypes.c_int,
-]
+# WO-391: the XQueryPointer / XWarpPointer bindings that used to live here are gone with the poll
+# loop. Nothing in this script reads or moves the cursor any more — see the module docstring.
 
 libXfixes.XFixesQueryExtension.argtypes = [
     ctypes.c_void_p,
@@ -141,12 +122,29 @@ def get_monitor_geometry(output_name=None):
 
 
 def create_edge_barriers(dpy, root, x, y, w, h):
+    """Four directional barriers around the rect, OVERLAPPING at the corners.
+
+    WO-391: the four segments used to merely *touch* at each corner (left ran y..y+h, top ran
+    x..x+w, both starting exactly at the corner). A diagonal move that crosses the corner passes
+    through the barriers' shared endpoint, and X's barrier test misses it — the pointer leaks out
+    one pixel at a time. Measured live on this box at 12:44:06: the pointer escaped to (1919,0),
+    i.e. one px left of the fence at exactly y=0, the top-left corner. It was NOT a driver bug, and
+    the warp-poll loop that used to paper over it has been deleted.
+
+    Extending every segment past both perpendicular edges by CORNER_OVERLAP_PX seals the corners:
+    a crossing at the corner now lands in the middle of a barrier, not on its endpoint.
+
+    The overlap sticks out into coordinates just outside the monitor. That is harmless here (the
+    pointer is being confined INTO this rect, so it has no business out there) but note it would
+    also block motion in a monitor stacked directly above/below this one.
+    """
+    m = CORNER_OVERLAP_PX
     barriers = []
     specs = [
-        ("left", x, y, x, y + h, BARRIER_NEGATIVE_X),
-        ("right", x + w, y, x + w, y + h, BARRIER_POSITIVE_X),
-        ("top", x, y, x + w, y, BARRIER_NEGATIVE_Y),
-        ("bottom", x, y + h, x + w, y + h, BARRIER_POSITIVE_Y),
+        ("left", x, y - m, x, y + h + m, BARRIER_NEGATIVE_X),
+        ("right", x + w, y - m, x + w, y + h + m, BARRIER_POSITIVE_X),
+        ("top", x - m, y, x + w + m, y, BARRIER_NEGATIVE_Y),
+        ("bottom", x - m, y + h, x + w + m, y + h, BARRIER_POSITIVE_Y),
     ]
     for edge, x1, y1, x2, y2, directions in specs:
         bid = libXfixes.XFixesCreatePointerBarrier(
@@ -159,34 +157,6 @@ def create_edge_barriers(dpy, root, x, y, w, h):
     return barriers
 
 
-def query_pointer(dpy, root):
-    win = ctypes.c_ulong()
-    child = ctypes.c_ulong()
-    root_x = ctypes.c_int()
-    root_y = ctypes.c_int()
-    win_x = ctypes.c_int()
-    win_y = ctypes.c_int()
-    mask = ctypes.c_ulong()
-    ok = libX11.XQueryPointer(
-        dpy,
-        root,
-        ctypes.byref(win),
-        ctypes.byref(child),
-        ctypes.byref(root_x),
-        ctypes.byref(root_y),
-        ctypes.byref(win_x),
-        ctypes.byref(win_y),
-        ctypes.byref(mask),
-    )
-    if not ok:
-        return None
-    return root_x.value, root_y.value
-
-
-def clamp(n, lo, hi):
-    return max(lo, min(hi, n))
-
-
 def destroy_barriers(dpy, barriers):
     for edge, bid in barriers:
         try:
@@ -195,75 +165,48 @@ def destroy_barriers(dpy, barriers):
             log(f"destroy {edge} warning: {e}")
 
 
-def warp_watchdog(dpy, root, output_name, geom, barriers):
-    """Pull pointer back inside the monitor if barriers fail on this driver.
+def barrier_maintenance_loop(dpy, root, output_name, geom, barriers):
+    """Keep the barriers alive and matched to the monitor. NEVER touches the pointer.
 
-    The geometry is RE-READ periodically. It used to be captured once at startup, and this loop
-    warps the pointer every 50ms, so when the layout moved under us the watchdog spent 20 times a
-    second dragging the pointer into coordinates where no monitor existed any more. Observed live:
-    barriers built for DP-5 at 1920x1080+3072+0, xrandr later reporting DP-5 at +0+0, and the mouse
-    unusable — it reads as a frozen cursor, not as a fence.
+    WO-391. This replaces `warp_watchdog`, which polled XQueryPointer (20 Hz, later 4 Hz) and
+    XWarpPointer'd the cursor back whenever it found it outside the rect. Owner 30.07: "i dont like
+    that mouse cursor poll loop at all … it worked but in a false situation. i dont see the need for
+    that at all." Both halves of that are right:
 
-    If the output disappears entirely we RELEASE. Clamping to a rect that is definitely wrong is
-    strictly worse than not confining at all: the operator loses the pointer with no way back.
+      * XFixes barriers are enforced BY THE X SERVER. Polling the cursor to re-enforce them is
+        re-implementing the kernel of the feature in userspace.
+      * The one escape the instrumented build ever caught was (1919,0) — one pixel out, at exactly
+        y=0, the top-left corner. That was the barrier segments only TOUCHING at their endpoints,
+        not the NVIDIA slip-past quirk the loop was written for. Fixed properly in
+        create_edge_barriers by overlapping the corners, so there is nothing left to poll for.
 
-    WO-391 (owner 30.07: "something is wrong with the confinement if it needs to poll the mouse
-    pointer all the time. seems like it should be clear boundries that are respected"): correct —
-    XFixes barriers ARE enforced by the X server, so on a driver that honours them this loop never
-    warps and is pure overhead. It exists only for the NVIDIA multi-head slip-past quirk named in
-    the module docstring, and we had NO evidence whether this box actually suffers it.
+    What still needs a loop: this process must stay alive (barriers die with it), and the layout can
+    move under a running confine (apply layout, hotplug, mode change), so the geometry is re-read
+    every GEOMETRY_POLL_SEC and the barriers rebuilt if it moved. That is a cheap xrandr read, not
+    pointer polling, and it is what stops the fence from fossilising around a rect that no longer
+    exists.
 
-    So: the warp is now INSTRUMENTED (every correction is logged, rate-limited) and the idle poll
-    dropped from 20 Hz to WARP_POLL_SEC. The goal is to delete this loop entirely and block on
-    XFixes barrier events instead — but that must wait for evidence, because guessing wrong loses
-    the operator's pointer mid-show. Read the log:
-      * no "warp" lines after real use (including shoving the mouse at all four edges) →
-        barriers hold here, delete the loop / make it opt-in.
-      * "warp" lines appear → this driver does leak, the fallback earns its place, and going
-        event-driven means XFixesSelectBarrierInput + XFixesBarrierReleasePointer, not polling.
+    If the output disappears entirely we RELEASE and return. Holding barriers around a rect that is
+    definitely wrong is strictly worse than not confining at all: the operator loses the pointer
+    with no way back.
     """
     w, h, x, y = geom
-    last_geom_check = time.monotonic()
-    warps = 0
-    last_warp_log = 0.0
     while True:
-        now = time.monotonic()
-        if now - last_geom_check >= GEOMETRY_POLL_SEC:
-            last_geom_check = now
-            try:
-                _, fresh = get_monitor_geometry(output_name)
-            except Exception as e:
-                log(f"geometry re-read failed ({e}) — keeping current rect")
-                fresh = (w, h, x, y)
-            if fresh is None:
-                log(f"output {output_name!r} is no longer connected — releasing instead of clamping to a stale rect")
-                return
-            if fresh != (w, h, x, y):
-                w, h, x, y = fresh
-                log(f"geometry changed → {w}x{h}+{x}+{y} — rebuilding barriers")
-                destroy_barriers(dpy, barriers)
-                barriers[:] = create_edge_barriers(dpy, root, x, y, w, h)
-                libX11.XSync(dpy, 0)
-
-        min_x, min_y = x, y
-        max_x, max_y = x + w - 1, y + h - 1
-        pt = query_pointer(dpy, root)
-        if pt:
-            px, py = pt
-            nx = clamp(px, min_x, max_x)
-            ny = clamp(py, min_y, max_y)
-            if nx != px or ny != py:
-                libX11.XWarpPointer(dpy, 0, root, 0, 0, 0, 0, nx, ny)
-                libX11.XSync(dpy, 0)
-                warps += 1
-                # Rate-limited: a leaking driver would otherwise write a line per poll.
-                if now - last_warp_log >= WARP_LOG_MIN_INTERVAL_SEC:
-                    last_warp_log = now
-                    log(
-                        f"warp: pointer escaped to ({px},{py}) — pulled back to ({nx},{ny}); "
-                        f"barriers did NOT hold on this driver (total warps this run: {warps})"
-                    )
-        time.sleep(WARP_POLL_SEC)
+        time.sleep(GEOMETRY_POLL_SEC)
+        try:
+            _, fresh = get_monitor_geometry(output_name)
+        except Exception as e:
+            log(f"geometry re-read failed ({e}) — keeping current rect")
+            continue
+        if fresh is None:
+            log(f"output {output_name!r} is no longer connected — releasing instead of holding a stale fence")
+            return
+        if fresh != (w, h, x, y):
+            w, h, x, y = fresh
+            log(f"geometry changed → {w}x{h}+{x}+{y} — rebuilding barriers")
+            destroy_barriers(dpy, barriers)
+            barriers[:] = create_edge_barriers(dpy, root, x, y, w, h)
+            libX11.XSync(dpy, 0)
 
 
 def main():
@@ -298,8 +241,8 @@ def main():
     try:
         barriers = create_edge_barriers(dpy, root, x, y, w, h)
         libX11.XSync(dpy, 0)
-        log(f"Pointer barriers active ({len(barriers)} edges) + warp watchdog")
-        warp_watchdog(dpy, root, name, (w, h, x, y), barriers)
+        log(f"Pointer barriers active ({len(barriers)} edges, corners sealed) — cursor is not polled")
+        barrier_maintenance_loop(dpy, root, name, (w, h, x, y), barriers)
     except KeyboardInterrupt:
         pass
     finally:

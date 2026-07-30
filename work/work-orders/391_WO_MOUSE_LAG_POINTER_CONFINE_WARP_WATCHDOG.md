@@ -1,6 +1,6 @@
 # WO-391 — Intermittent mouse lag on the box
 
-**Status: OPEN (2026-07-30) — root cause NOT proven. Polling reduced 20 Hz → 4 Hz and instrumented so the next occurrence produces evidence. Two latent hazards found and one orphan reaped.**
+**Status: DONE for the poll loop (2026-07-30) — the "barriers leak on NVIDIA" premise was FALSE; it was a barrier corner-endpoint gap. Corners sealed, cursor polling DELETED. The original intermittent-lag report is split out as still-unexplained (§7).**
 
 > **Correction to the first pass of this WO (kept deliberately).** It originally asserted the
 > pointer-confine warp watchdog *was* the lag. That is **not supported**: sampling the pointer for 5 s
@@ -150,7 +150,73 @@ Verified: `python3 -m py_compile` OK; `smoke-wo308-pointer-confine-split` +
 app's 8 s watchdog respawned it as **pid 1842120 at 12:01:12**, all four barriers rebuilt, and
 `grep -c "warp:"` on the log is **0**.
 
-### 6. How to finish this WO
+### 6. RESOLVED — the instrumentation paid off in 12 minutes, and it disproved the premise
+
+Owner ran the grep and came back with: *"i dont like that mouse cursor poll loop at all. it worked
+but in a false situation. i dont see the need for that at all."* The log had two lines, both from the
+instrumented build (pid 1976122):
+
+```
+12:44:06  warp: pointer escaped to (1919,0) — pulled back to (1920,0)
+12:47:12  warp: pointer escaped to (1851,0) — pulled back to (1920,0)
+```
+
+**Both escapes are at exactly `y=0`.** That is not a driver leaking at random — it is the barrier
+**corner/endpoint gap**. The segments were built to merely *touch*:
+
+```python
+("left",   x,   y,     x,   y+h, BARRIER_NEGATIVE_X)   # starts AT y
+("top",    x,   y,     x+w, y,   BARRIER_NEGATIVE_Y)   # starts AT x
+```
+
+so at the top-left corner both barriers share an endpoint, and a leftward move along the `y=0` row
+crosses the left barrier exactly at that endpoint, where X's barrier intersection test does not stop
+it. (The 69 px excursion in the second line is just how far the pointer got before the then-4 Hz poll
+noticed — the 20 Hz original hid the size of the leak, which is part of why this was never diagnosed.)
+
+So the premise the loop was built on — "NVIDIA multi-head sometimes lets the pointer slip past
+barriers", never measured — was **false**. The owner's instinct was right on both counts: barriers
+*should* be respected, and the loop *was* covering for a bug elsewhere.
+
+**Fixed at the source and the poll deleted:**
+
+- `CORNER_OVERLAP_PX = 16` — every segment now extends past both perpendicular edges, so a corner
+  crossing lands mid-barrier instead of on an endpoint. Live geometry confirms it:
+  `left (1920,-16)-(1920,1096)`, `top (1904,0)-(3856,0)`, etc. Documented tradeoff: the overlap
+  protrudes just outside the monitor, which is harmless here but would also fence a monitor stacked
+  directly above/below.
+- `warp_watchdog` → **`barrier_maintenance_loop`**. It re-reads the geometry every
+  `GEOMETRY_POLL_SEC` and rebuilds the barriers when the layout moves (that must stay — it is what
+  stops the fence fossilising around a dead rect, the WO-176-era bug) and **never touches the
+  cursor**. `query_pointer`, `clamp`, and the `XQueryPointer`/`XWarpPointer` ctypes bindings are
+  deleted outright.
+- Module docstring now says do not reintroduce polling, and names the right answer if the fence ever
+  does leak: `XFixesSelectBarrierInput` — barrier **hit events**, which the server pushes to us.
+
+**Verified:** `py_compile` OK; the two confine smokes **14/14** (was 12 — the pointer-clamping
+assertions were replaced by their inverse, not dropped: the harness now records any `query_pointer` /
+`XWarpPointer` attempt and the test fails if either happens, plus a source guard that the banned
+symbols cannot reappear in executable code, plus a guard that all four corners overlap). Full gate
+**1728 tests, 1726 pass, 0 fail, 2 skip**. Deployed: helper respawned by its own 8 s watchdog as
+**pid 1982228 at 12:52:45**, log reads `4 edges, corners sealed — cursor is not polled`, and **0 warp
+lines since** (both existing lines predate it).
+
+### 7. Still open: the original intermittent-lag report
+
+The poll loop is gone, but it was never proven to be what the owner felt. Measured clean at the time:
+swap 0 B; CPU 28 cores / load ~7 / PSI `full=0.00`; IO pressure 0; GPU 30–37% with no throttling; and
+the pointer sampled *inside* the fence, where even the old loop did not warp. Remaining candidates if
+it recurs, in order:
+
+1. **§1a's xdotool fallback** — 12.5 subprocess spawns/second, latching on whenever barrier creation
+   fails. Still unfixed; the single strongest match for the symptom.
+2. The X cursor path under the SHAPE/restack watchdogs (`operator-shape-overlay.py` re-asserts
+   stacking on a 2 s watchdog).
+
+Next time it happens, note **what was on screen and what the box was doing** — that is the missing
+input, not more system metrics.
+
+### 8. Superseded: how this WO used to say to finish itself
 
 Use the mouse normally, and deliberately shove it at all four edges of DP-1, then:
 
