@@ -123,6 +123,62 @@ export function cropAdjustedFillForLayer(fill, layer) {
 }
 
 /**
+ * Align a layer's fill so its **visible (cropped) rect** lands on the canvas edge/center —
+ * WO-388, correcting WO-238's inverted reading of todos15 "adjust to doesn't count the crop
+ * values in". The owner's rule: a cropped layer's effective width/height IS the cropped
+ * width/height, so "align left" puts the visible left edge at x=0, not the layer's uncropped
+ * origin (which would leave the cropped-away strip as a gap).
+ *
+ * Math: the visible rect in fill space is `cropAdjustedFill` — origin `f.x + left*scaleX`,
+ * extent `(right-left)*scaleX`. We align THAT rect, then convert back to the layer origin the
+ * MIXER FILL needs by subtracting the same `left*scaleX` offset.
+ *
+ * Identity / absent crop reduces exactly to the old full-rect math (`left=0, right=1` →
+ * offset 0, extent `scaleX`), so uncropped layers are byte-identical.
+ *
+ * @param {{ x?: number, y?: number, scaleX?: number, scaleY?: number }} fill
+ * @param {{ left: number, top: number, right: number, bottom: number } | null | undefined} crop
+ * @param {'left'|'right'|'top'|'bottom'|'center-h'|'center-v'|'center'} mode
+ * @returns {{ x: number, y: number, scaleX: number, scaleY: number }} fill with x/y aligned
+ */
+export function alignFillForCrop(fill, crop, mode) {
+	const c = crop && !isIdentityCrop(crop) ? normalizeCrop(crop) : { left: 0, top: 0, right: 1, bottom: 1 }
+	const sx = fill?.scaleX ?? 0
+	const sy = fill?.scaleY ?? 0
+	const offX = c.left * sx
+	const offY = c.top * sy
+	/* Visible extent — the cropped width/height the owner wants alignment to respect. */
+	const visW = (c.right - c.left) * sx
+	const visH = (c.bottom - c.top) * sy
+	/* Current visible-rect origin, so untouched axes keep their exact position. */
+	let visX = (fill?.x ?? 0) + offX
+	let visY = (fill?.y ?? 0) + offY
+
+	if (mode === 'left') visX = 0
+	else if (mode === 'right') visX = 1 - visW
+	else if (mode === 'top') visY = 0
+	else if (mode === 'bottom') visY = 1 - visH
+	else if (mode === 'center-h') visX = (1 - visW) / 2
+	else if (mode === 'center-v') visY = (1 - visH) / 2
+	else if (mode === 'center') {
+		visX = (1 - visW) / 2
+		visY = (1 - visH) / 2
+	}
+
+	return { x: visX - offX, y: visY - offY, scaleX: sx, scaleY: sy }
+}
+
+/**
+ * Convenience: crop-aware align driven by the layer's own crop effect.
+ * @param {{ x?: number, y?: number, scaleX?: number, scaleY?: number }} fill
+ * @param {{ effects?: Array<{ type: string, params?: object }> } | null | undefined} layer
+ * @param {'left'|'right'|'top'|'bottom'|'center-h'|'center-v'|'center'} mode
+ */
+export function alignFillForLayer(fill, layer, mode) {
+	return alignFillForCrop(fill, cropFromLayer(layer), mode)
+}
+
+/**
  * One crop fraction → pixels of the layer's content resolution dimension.
  * `right`/`bottom` stay measured from the left/top edge (right = width px means uncropped).
  * @param {number} frac 0–1

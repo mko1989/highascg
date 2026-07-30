@@ -90,6 +90,37 @@ function cropAdjustedFillForLayer(fill, layer) {
 	return cropAdjustedFill(fill, cropFromLayer(layer))
 }
 
+/** @see client/lib/layer-crop.js alignFillForCrop — align the VISIBLE (cropped) rect (WO-388) */
+function alignFillForCrop(fill, crop, mode) {
+	const c = crop && !isIdentityCrop(crop) ? normalizeCrop(crop) : { left: 0, top: 0, right: 1, bottom: 1 }
+	const sx = fill?.scaleX ?? 0
+	const sy = fill?.scaleY ?? 0
+	const offX = c.left * sx
+	const offY = c.top * sy
+	const visW = (c.right - c.left) * sx
+	const visH = (c.bottom - c.top) * sy
+	let visX = (fill?.x ?? 0) + offX
+	let visY = (fill?.y ?? 0) + offY
+
+	if (mode === 'left') visX = 0
+	else if (mode === 'right') visX = 1 - visW
+	else if (mode === 'top') visY = 0
+	else if (mode === 'bottom') visY = 1 - visH
+	else if (mode === 'center-h') visX = (1 - visW) / 2
+	else if (mode === 'center-v') visY = (1 - visH) / 2
+	else if (mode === 'center') {
+		visX = (1 - visW) / 2
+		visY = (1 - visH) / 2
+	}
+
+	return { x: visX - offX, y: visY - offY, scaleX: sx, scaleY: sy }
+}
+
+/** @see client/lib/layer-crop.js alignFillForLayer */
+function alignFillForLayer(fill, layer, mode) {
+	return alignFillForCrop(fill, cropFromLayer(layer), mode)
+}
+
 module.exports = {
 	normalizeCrop,
 	isIdentityCrop,
@@ -97,4 +128,6 @@ module.exports = {
 	cropAdjustedRect,
 	cropAdjustedFill,
 	cropAdjustedFillForLayer,
+	alignFillForCrop,
+	alignFillForLayer,
 }

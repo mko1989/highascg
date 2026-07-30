@@ -36,6 +36,19 @@ let _modalObserver = null
 let _pointerDown = false
 let _modalOpen = false
 let _htmlDrag = false
+/**
+ * WO-389 — floating chrome that is NOT a `.modal-overlay` and therefore invisible to the
+ * MutationObserver above. Owner 30.07: "the open window drop down hides under the compose preview
+ * windows". A header dropdown is drawn by Firefox, but the compose tiles are X SHAPE HOLES cut out
+ * of the Firefox window (WO-263) — anything the browser paints over a hole simply is not there, so
+ * `z-index: 9000` can never win. Such panels must withdraw the holes while open.
+ *
+ * Why a registry and not more DOM watching: these menus toggle `style.display` on a node that
+ * never leaves the DOM, and the observer runs `childList` only. Widening it to attribute/style
+ * mutations would fire on every render across the whole app for one dropdown's benefit.
+ * @type {Set<string>}
+ */
+const _occluders = new Set()
 /* WO-343 design 2 (2026-07-28): once a drag is established, the hole can RE-OPEN — the press
  * landed on Firefox pixels, so the X implicit pointer grab (button held) keeps delivering
  * motion/release to Firefox even when the pointer crosses the hole. The operator then sees
@@ -46,7 +59,30 @@ let _dragReopened = false
 let _dragReopenTimer = null
 
 function recompute() {
-	setInteractionSuppressed(_modalOpen || (_pointerDown && !_dragReopened) || _htmlDrag)
+	setInteractionSuppressed(
+		_modalOpen || _occluders.size > 0 || (_pointerDown && !_dragReopened) || _htmlDrag,
+	)
+}
+
+/**
+ * WO-389: declare a non-modal floating panel open/closed so the video holes withdraw while it is
+ * on screen (see {@link _occluders}). Keyed so several panels can overlap without one's close
+ * re-opening the holes under another. Callers MUST pair every `true` with a `false` — the safest
+ * place is the same function that hides the element.
+ * @param {string} key stable id for the panel (e.g. 'operator-app-menu')
+ * @param {boolean} open
+ */
+export function setOccluderOpen(key, open) {
+	if (!key) return
+	const had = _occluders.has(key)
+	if (open) {
+		if (had) return
+		_occluders.add(key)
+	} else {
+		if (!had) return
+		_occluders.delete(key)
+	}
+	recompute()
 }
 
 function onPointerDown(e) {
@@ -153,5 +189,6 @@ export function stopOperatorGuiInteractionSuppress() {
 	_modalOpen = false
 	_htmlDrag = false
 	_dragReopened = false
+	_occluders.clear()
 	clearTimeout(_dragReopenTimer)
 }

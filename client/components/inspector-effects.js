@@ -160,7 +160,7 @@ export function renderEffectEditor(container, effect, onChange, onRemove, liveAp
 	header.className = 'inspector-effect-card__header'
 	const title = document.createElement('span')
 	title.className = 'inspector-effect-card__title'
-	title.textContent = `${def.icon} ${def.label}`
+	title.textContent = def.label
 	header.appendChild(title)
 
 	const removeBtn = document.createElement('button')
@@ -264,13 +264,13 @@ export function renderEffectsGroup(root, { effects, onUpdate, liveApplyContext =
 
 	const defOpt = document.createElement('option')
 	defOpt.value = ''
-	defOpt.textContent = '⊕ Choose effect to add...'
+	defOpt.textContent = 'Choose effect to add...'
 	sel.appendChild(defOpt)
 
 	for (const fx of MIXER_EFFECTS) {
 		const o = document.createElement('option')
 		o.value = fx.type
-		o.textContent = `${fx.icon} ${fx.label}`
+		o.textContent = fx.label
 		sel.appendChild(o)
 	}
 

@@ -23,6 +23,7 @@ import {
 	operatorHelperTaskbarAction,
 } from '../lib/operator-gui-launch.js'
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
+import { setOccluderOpen } from '../lib/operator-gui-interaction-suppress.js'
 import { createOperatorAppSection, appLabelFor, loadOperatorApps } from './header-bar-operator-app-menu.js'
 
 /** The five CURATED tools, pinned above the installed-app list (WO-387). Each one launches through
@@ -72,8 +73,14 @@ export function initHeaderBarOperatorHelper(container) {
 	menu.style.cssText =
 		'position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 9000; display: none; flex-direction: column; min-width: 180px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; box-shadow: 0 6px 18px rgba(0,0,0,0.45);'
 
+	/* WO-389: the menu overhangs the compose tiles, which are X SHAPE HOLES in this window — pixels
+	 * Firefox paints over a hole do not exist, so the dropdown "hid under" the video no matter its
+	 * z-index. Declaring it an occluder withdraws the holes for as long as it is open. */
+	const MENU_OCCLUDER_KEY = 'operator-app-menu'
+
 	function closeMenu() {
 		menu.style.display = 'none'
+		setOccluderOpen(MENU_OCCLUDER_KEY, false)
 	}
 
 	/** @param {string} state @param {string|null} action */
@@ -150,6 +157,7 @@ export function initHeaderBarOperatorHelper(container) {
 		e.preventDefault()
 		const opening = menu.style.display === 'none'
 		menu.style.display = opening ? 'flex' : 'none'
+		setOccluderOpen(MENU_OCCLUDER_KEY, opening)
 		// The app list stays collapsed until "Show all apps" is clicked, and re-collapses on every
 		// menu open so the five pinned tools are always what the operator sees first.
 		if (opening) appSection.collapse()

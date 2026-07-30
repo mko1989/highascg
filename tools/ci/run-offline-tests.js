@@ -182,6 +182,7 @@ const FILES = [
 	'tools/smoke/smoke-wo317-helper-coordinator.test.js',
 	'test/companion-control-status.test.js',
 	'test/wo-238-adjust-fill-ignores-crop.test.js',
+	'tools/smoke/smoke-wo388-crop-aware-align.test.js',
 	'tools/smoke/smoke-wo280-compose-preview-backpressure.test.js',
 	'tools/smoke/smoke-decklink-input-look-thumb.test.js',
 	'tools/smoke/smoke-eggs-exclude-lists.test.js',

@@ -3,6 +3,7 @@ import { sceneState, LOOK_LAYER_FIRST, LOOK_LAYER_MAX } from '../lib/scene-state
 import { fillToPixelRect, pixelRectToFill, fullFill } from '../lib/fill-math.js'
 import { applyFillPxPatch, displayPositionFromStoredPx } from '../lib/coordinate-origin.js'
 import { getContentResolution } from '../lib/mixer-fill.js'
+import { alignFillForLayer } from '../lib/layer-crop.js'
 import { appendSceneLayerFillGroup } from './inspector-fill.js'
 import { appendSceneLayerMixerGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
@@ -165,21 +166,11 @@ export function renderSceneLayerInspector(deps, sel) {
 		const L = sc?.layers?.[layerIndex]
 		if (!L) return
 		const f = L.fill || fullFill()
-		const sx = f.scaleX ?? 0
-		const sy = f.scaleY ?? 0
-		let nx = f.x ?? 0
-		let ny = f.y ?? 0
-		if (mode === 'left') nx = 0
-		else if (mode === 'right') nx = 1 - sx
-		else if (mode === 'top') ny = 0
-		else if (mode === 'bottom') ny = 1 - sy
-		else if (mode === 'center-h') nx = (1 - sx) / 2
-		else if (mode === 'center-v') ny = (1 - sy) / 2
-		else if (mode === 'center') {
-			nx = (1 - sx) / 2
-			ny = (1 - sy) / 2
-		}
-		sceneState.patchLayer(sceneId, layerIndex, { fill: { ...f, x: nx, y: ny } })
+		/* WO-388: a cropped layer's effective size IS its cropped size — align the VISIBLE rect
+		 * so "align left" seats the cropped edge at x=0 instead of leaving the cut-away strip
+		 * as a gap. Identity/no crop reduces to the previous full-rect math. */
+		const aligned = alignFillForLayer(f, L, mode)
+		sceneState.patchLayer(sceneId, layerIndex, { fill: { ...f, x: aligned.x, y: aligned.y } })
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 	}
 

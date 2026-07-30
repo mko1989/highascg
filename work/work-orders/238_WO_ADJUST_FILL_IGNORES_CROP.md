@@ -1,6 +1,19 @@
 # WO-238 — "Adjust to screen" fill must not count crop values in
 
-**Status:** Verified — Code Correct | **Date:** 2026-07-15
+**Status: DEPRECATED (2026-07-30) — the requirement was read INVERTED. Successor: [WO-388](./388_WO_CROP_COUNTS_INTO_LAYER_SIZE_FOR_ALIGN.md).**
+
+> todos15.07.26:39 "sdjust to doesnt count the crop values in." was interpreted below as "adjust
+> must EXCLUDE crop". The owner clarified on 30.07.26 that it meant the opposite — crop was
+> *missing* from the layer's effective size and must be counted IN, so "align left" seats the
+> **visible (cropped)** edge on the canvas edge. This WO's §Analysis then verified and locked in the
+> wrong behavior; `test/wo-238-adjust-fill-ignores-crop.test.js` also cannot fail (its with-crop and
+> without-crop cases pass identical arguments to the same function and assert equality).
+>
+> Still true and carried forward by WO-388: the **contentFit** modes (Native / Fit canvas / Fill
+> width / Fill height / Stretch) legitimately compute from the uncropped *source* resolution.
+> Everything this WO says about **align/adjust** is superseded. Trust WO-388.
+
+**Historical status:** Verified — Code Correct | **Date:** 2026-07-15
 **Source:** owner (todos15): "sdjust to doesnt count the crop values in." — interpreted as: the adjust/fit-to-screen action must compute the fill WITHOUT factoring the layer's crop values (OWNER: correct this WO if the interpretation is wrong).
 
 **FINDING:** Code review + unit tests confirm the current implementation is CORRECT. The adjust/fit fill computation already uses UNCROPPED source geometry. No fix required.
