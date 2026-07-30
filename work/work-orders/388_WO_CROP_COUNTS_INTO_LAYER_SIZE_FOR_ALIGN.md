@@ -91,11 +91,30 @@ the pre-change formula as an oracle.
 - **The compose editor's selection rect / resize handles** still use the full uncropped rect — the
   crop-drag handles (`smoke-scenes-compose-crop-drag.test.js`) need the uncropped box to drag the
   crop edges against. Making that box visible-only would break crop editing.
-- **The inspector W/H number inputs** still report the uncropped layer size. Changing those changes
-  what the operator types into, and the resize/aspect-lock path would need a matching inverse —
-  **open question for the owner** (§5).
+- ~~**The inspector W/H number inputs**~~ — **owner said yes (30.07), done as §2.2b below.**
 - **The timeline-clip align path** (`inspector-panel-timeline-clip.js` → `alignStoredPxRect`) is
   untouched: timeline clips expose no crop effect in that inspector.
+
+### 2.2b WO-388B — the X/Y/W/H boxes now report and accept VISIBLE geometry
+
+Owner answered §5 with **yes, show cropped W/H**. Implemented as the pixel-space inverse of the same
+rule:
+
+- **client/lib/layer-crop.js** (+ CJS mirror) — `layerRectFromVisibleRect(visible, crop)`, the exact
+  inverse of `cropAdjustedRect`, plus `visibleRectForLayer` / `layerRectFromVisibleRectForLayer`
+  conveniences. A collapsed crop (zero visible extent) is floored at `1e-6` instead of dividing by
+  zero — a degenerate crop must not put `NaN` geometry on air.
+- **client/components/inspector-scene-layer.js** — `pxRect` (what the boxes display) is now the
+  visible rect; `patchFillPx` patches in visible space and inverts before writing `fill`.
+  Consequence, and the reason it is done in this order: **aspect lock now locks the ratio the
+  operator can see**, not the uncropped ratio.
+- **client/components/inspector-fill.js** — `syncGeometryInputsFromLayer` and `applyScale` given the
+  same treatment. Both had their own `fillToPixelRect` call; leaving either would make the boxes
+  disagree with themselves after a content-fit reapply or a scale-%.
+
+`reapplyLayerFrameForContentFit` deliberately still writes the **layer** rect from
+`sceneLayerPixelRectForContentFit` — content fit sets the layer frame; the boxes then re-derive the
+visible rect from it.
 
 ## 3. What was VERIFIED
 
@@ -112,10 +131,17 @@ the pre-change formula as an oracle.
   2 skipped** (the 2 skips are the pre-existing `CI=1` server-spawn tests).
 - **Client build:** `npm run build:client` clean (only the pre-existing chunk-size / dynamic-import
   warnings).
-- **NOT verified on the box:** the kiosk was not reloaded — 30.07 is a show day (AskBio European
-  Investigator Summit, the slide is live on PGM). `dist-web/` is built and ready; the running page
-  keeps its old code until an F5. Owner QA: add a crop to a look layer, hit align-left, confirm the
-  visible edge lands on the canvas edge.
+- **WO-388B adds 5 more tests** (12 total in the file): visible→layer round-trip across 3 rects × 4
+  crops, uncropped identity in both directions, the owner's real crop (typing 350 into a 700-wide
+  visible box halves the layer to 600 and re-derives to exactly 350 with the visible x preserved —
+  i.e. the content does not jump), collapsed-crop finiteness, and ESM/CJS parity of the inverse.
+- **Re-run after WO-388B:** full gate **1726 tests, 1724 pass, 0 fail, 2 skip**; 500-line gate 0
+  files over; `npm run build:client` clean.
+- **Deployed on the box:** owner approved the reload — `DISPLAY=:0 xdotool key F5` sent via XTEST to
+  the focused kiosk window (`HIGHASCG-OPERATOR-GUI`, id 23068717); served bundle hash confirmed equal
+  to the built one (`main-7oR1ucRA.js`) and the kiosk window verified still present afterwards.
+- **Owner QA still owed** (behaviour, not wiring): add a crop to a look layer, check the W/H boxes
+  read the cropped size, hit align-left and confirm the visible edge lands on the canvas edge.
 
 ## 4. Unrelated pre-existing failure found while running the suite
 
@@ -125,9 +151,7 @@ the pre-change formula as an oracle.
 (no rotation code changed) — but it suggests **rotation via `/api/mixer/effect` rotates about the
 corner instead of the centre**, because the ANCHOR pivot line is dropped. Worth its own WO.
 
-## 5. Open question for the owner
+## 5. Answered
 
-Should the inspector's **W / H boxes** also report the *cropped* size? Today they show the full
-layer size. If yes, typing a width would have to mean "visible width" and be divided back out
-through the crop — a bigger change to the resize/aspect-lock path, so it is deliberately not
-guessed here.
+*Should the W/H boxes report the cropped size?* — **Owner: yes (30.07).** Implemented as §2.2b
+(WO-388B). Note the knock-on recorded there: aspect lock now locks the **visible** ratio.

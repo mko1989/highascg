@@ -1,6 +1,15 @@
 # WO-391 — Intermittent mouse lag on the box
 
-**Status: DIAGNOSED (2026-07-30) — cause identified, awaiting owner decision on the setting**
+**Status: OPEN (2026-07-30) — root cause NOT proven. Polling reduced 20 Hz → 4 Hz and instrumented so the next occurrence produces evidence. Two latent hazards found and one orphan reaped.**
+
+> **Correction to the first pass of this WO (kept deliberately).** It originally asserted the
+> pointer-confine warp watchdog *was* the lag. That is **not supported**: sampling the pointer for 5 s
+> found it parked at `X=3341 Y=25`, i.e. **inside** the DP-1 fence — and the watchdog only warps when
+> the pointer is *outside*. Inside the fence it is a bare `XQueryPointer` every 50 ms, which is far
+> too cheap to feel. The per-hour "5–12 restarts" figure was also wrong: it pooled several days AND
+> counted `DISPLAY=:87` spawns from the offline test suite (i.e. from this session's own test run).
+> **Today shows 2 real restarts.** What survives is the owner's design objection (§1), which is
+> correct on its own terms and acted on in §5.
 **Source:** owner 30.07.26 — "mouse on the machine is lagging at times. like something is happening in
 the background. maybe there is some leftover process that gets the mouse position or something."
 
@@ -61,9 +70,29 @@ Each restart tears down and rebuilds the 4 barriers. Not the main symptom, but i
 with no fence and repeated barrier churn. Worth a follow-up: find why `pointer-confine.js`'s watchdog
 keeps deciding to respawn.
 
+## 1a. Latent hazard: the xdotool fallback spawns a process every 80 ms
+
+`startXdotoolConfine` (`src/system/pointer-confine.js:270`) is the backend used when barriers fail:
+
+```js
+confineTimer = setInterval(() => { void tickXdotoolConfine(...) }, 80)
+```
+
+and each tick shells out to `/usr/bin/xdotool getmouselocation --shell` — **12.5 process spawns per
+second, forever**. If that path ever latches on (barriers failing, xrandr hiccup), it would produce
+exactly the reported symptom and would be very easy to mistake for "the machine is just busy".
+
+Right now it is **inactive** — barriers succeed, and the journal has **one** `tick failed` line in
+24 h (`11:38:58`, during a transition), not a stream. Flagged rather than fixed: converting it to a
+persistent Xlib client instead of a subprocess-per-tick is its own change, and barriers are holding.
+
 ## 2. Ruled out
 
 - **Not memory pressure.** 62 GiB total, 16 GiB used, 39 GiB free, **swap 0 B used**, `si/so = 0`.
+- **Not CPU starvation.** **28 cores**, load 6.2–7.2 (≈25%). PSI `/proc/pressure/cpu`:
+  `some avg10≈6.6`, **`full avg10=0.00`** — nothing is fully stalled. `/proc/pressure/io` all zero.
+- **Not the GPU.** RTX PRO 4000 Blackwell at **30–37%** util, 3% memory-bandwidth, 6.3/24.5 GiB VRAM,
+  66 °C, `clocks_event_reasons.active = 0x0` (no throttling). Sampled 10× at 1 s — no spikes.
 - **Not the system-wide context-switch rate.** `vmstat` shows ~116k cs/s, but per-thread attribution
   (summing `/proc/*/task/*/status`) puts **~104k/s (≈90%) in `casparcg` itself** — inherent to 8
   channels at 50 fps, not a stray poller. Next largest are the vcam ffmpeg (1.3k), the DeckLink
@@ -86,7 +115,58 @@ Session `3508d865-…` is not the current session. ~826 MB RSS and ~4.5% CPU for
 work spawned it (WO-247 / WO-344 raw-CDP thumbnails) is not cleaning up on exit. Worth a follow-up so
 these do not accumulate; `/tmp/claude-1000` already holds 10 session dirs / 124 MB.
 
-## 4. Owner decision required
+## 3a. DONE — orphan reaped
+
+`kill 376402` — the 19.5 h headless Firefox and its content child are gone (verified by `ps`: both
+PIDs absent). ~870 MiB returned. A scan of the other 9 scratchpad session dirs found **no** further
+live processes from dead sessions.
+
+## 4. Owner's answer, and what was done
+
+Owner 30.07: *"something is wrong with the confiment if it needs to poll the mouse pointer all the
+time. seems like it should be clear boundries that are respected. which seemed to work fine
+earlier."*
+
+**Correct, and worth stating plainly:** XFixes barriers are enforced **by the X server**. On a driver
+that honours them the warp loop never fires, so it is pure overhead — 20 pointless round-trips a
+second for the life of the box. The loop exists solely for the NVIDIA multi-head slip-past quirk
+named in the script's docstring, and **nobody had ever measured whether this box suffers it.**
+
+What was NOT done, and why: deleting the loop outright today. If barriers *do* leak here, the
+operator loses the pointer off-screen mid-show, and 30.07 is a show day. Guessing in that direction
+is the one unrecoverable option.
+
+### 5. What was changed (`tools/runtime/confine-pointer-barriers.py`)
+
+- `WARP_POLL_SEC = 0.25` — idle poll **20 Hz → 4 Hz**. A genuinely escaped pointer is still recovered
+  within a quarter second, at a fifth of the X traffic.
+- **Every warp is now logged** (rate-limited to one line / 10 s by `WARP_LOG_MIN_INTERVAL_SEC`), with
+  the escape coordinates and a running count, explicitly saying the barriers did not hold.
+- `warp_watchdog`'s docstring now records the decision procedure and the event-driven endgame
+  (`XFixesSelectBarrierInput` + `XFixesBarrierReleasePointer`, not polling).
+
+Verified: `python3 -m py_compile` OK; `smoke-wo308-pointer-confine-split` +
+`smoke-pointer-confine-geometry-follow` → **12/12 pass**. Deployed live — old helper killed, the
+app's 8 s watchdog respawned it as **pid 1842120 at 12:01:12**, all four barriers rebuilt, and
+`grep -c "warp:"` on the log is **0**.
+
+### 6. How to finish this WO
+
+Use the mouse normally, and deliberately shove it at all four edges of DP-1, then:
+
+```
+grep "warp:" ~/.highascg/log/confine-pointer-barriers.log
+```
+
+- **No lines** → barriers hold on this driver. Delete the warp loop (or make it opt-in via env) and
+  the last pointer poller on the box is gone — exactly what the owner asked for.
+- **Lines present** → the driver really does leak; keep a fallback but make it event-driven, and the
+  logged coordinates tell us which edge fails.
+
+And if the lag recurs, note **what was on screen and what the box was doing** — with CPU, GPU, IO,
+memory and the pointer poller all now measured clean, the next most likely candidates are the X
+cursor path under the SHAPE/restack watchdogs (`operator-shape-overlay.py` re-asserts stacking on a
+2 s watchdog) or the §1a xdotool fallback latching on.
 
 Confinement is deliberate show-time behaviour (an operator cannot drag the mouse off the GUI), so it
 was **not** changed unilaterally. Options:

@@ -122,6 +122,48 @@ export function cropAdjustedFillForLayer(fill, layer) {
 	return cropAdjustedFill(fill, cropFromLayer(layer))
 }
 
+/** Smallest visible fraction we will divide by, so a fully-collapsed crop cannot produce Infinity. */
+const MIN_VISIBLE_FRACTION = 1e-6
+
+/**
+ * Inverse of {@link cropAdjustedRect}: given the **visible (cropped)** pixel rect the operator sees
+ * and edits, return the FULL layer rect that produces it. WO-388B — the inspector's X/Y/W/H boxes
+ * report and accept visible geometry ("when its cropped the layer width and/or height is cropped
+ * too"), but MIXER FILL still needs the uncropped rect.
+ *
+ * visible.w = (right-left) * layer.w  →  layer.w = visible.w / (right-left)
+ * visible.x = layer.x + left*layer.w  →  layer.x = visible.x - left*layer.w
+ *
+ * Identity / null crop returns a copy of the input, so uncropped layers round-trip unchanged.
+ * A degenerate crop (zero visible extent) is floored at {@link MIN_VISIBLE_FRACTION} rather than
+ * dividing by zero — the operator gets a very large layer rect, not NaN geometry on air.
+ *
+ * @param {{ x: number, y: number, w: number, h: number }} visible
+ * @param {{ left: number, top: number, right: number, bottom: number } | null | undefined} crop
+ * @returns {{ x: number, y: number, w: number, h: number }} the full layer rect
+ */
+export function layerRectFromVisibleRect(visible, crop) {
+	if (!crop || isIdentityCrop(crop)) {
+		return { x: visible.x, y: visible.y, w: visible.w, h: visible.h }
+	}
+	const c = normalizeCrop(crop)
+	const fw = Math.max(MIN_VISIBLE_FRACTION, c.right - c.left)
+	const fh = Math.max(MIN_VISIBLE_FRACTION, c.bottom - c.top)
+	const w = visible.w / fw
+	const h = visible.h / fh
+	return { x: visible.x - c.left * w, y: visible.y - c.top * h, w, h }
+}
+
+/** Convenience: {@link layerRectFromVisibleRect} driven by the layer's own crop effect. */
+export function layerRectFromVisibleRectForLayer(visible, layer) {
+	return layerRectFromVisibleRect(visible, cropFromLayer(layer))
+}
+
+/** Convenience: visible pixel rect for a layer, from its own crop effect. */
+export function visibleRectForLayer(rect, layer) {
+	return cropAdjustedRect(rect, cropFromLayer(layer))
+}
+
 /**
  * Align a layer's fill so its **visible (cropped) rect** lands on the canvas edge/center —
  * WO-388, correcting WO-238's inverted reading of todos15 "adjust to doesn't count the crop

@@ -3,7 +3,7 @@ import { sceneState, LOOK_LAYER_FIRST, LOOK_LAYER_MAX } from '../lib/scene-state
 import { fillToPixelRect, pixelRectToFill, fullFill } from '../lib/fill-math.js'
 import { applyFillPxPatch, displayPositionFromStoredPx } from '../lib/coordinate-origin.js'
 import { getContentResolution } from '../lib/mixer-fill.js'
-import { alignFillForLayer } from '../lib/layer-crop.js'
+import { alignFillForLayer, visibleRectForLayer, layerRectFromVisibleRectForLayer } from '../lib/layer-crop.js'
 import { appendSceneLayerFillGroup } from './inspector-fill.js'
 import { appendSceneLayerMixerGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
@@ -41,7 +41,10 @@ export function renderSceneLayerInspector(deps, sel) {
 	const res = getResolutionForScreen(stateStore)
 	const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 	const fill = layer.fill || fullFill()
-	const pxRectStored = fillToPixelRect(fill, canvas)
+	/* WO-388B: X/Y/W/H report the VISIBLE (cropped) rect — a cropped layer's effective size IS its
+	 * cropped size. Uncropped layers pass through `visibleRectForLayer` unchanged. patchFillPx()
+	 * inverts this before writing the fill. */
+	const pxRectStored = visibleRectForLayer(fillToPixelRect(fill, canvas), layer)
 	const pxRect = displayPositionFromStoredPx(pxRectStored, canvas)
 
 	root.innerHTML = ''
@@ -128,7 +131,11 @@ export function renderSceneLayerInspector(deps, sel) {
 		const L = sc?.layers?.[layerIndex]
 		if (!L) return
 		const f = L.fill || fullFill()
-		const r = fillToPixelRect(f, canvas)
+		/* WO-388B: the boxes hold VISIBLE geometry, so patch in visible space and invert at the end
+		 * — otherwise typing a width into a cropped layer would be read as a layer width and the
+		 * content would jump by the cropped-away amount. Aspect lock below therefore also locks the
+		 * ratio the operator actually sees. */
+		const r = visibleRectForLayer(fillToPixelRect(f, canvas), L)
 		let next = applyFillPxPatch({ x: r.x, y: r.y, w: r.w, h: r.h }, partial, canvas)
 		if (L.aspectLocked !== false) {
 			const cr = L.source ? getContentResolution(L.source, stateStore, sceneState.activeScreenIndex) : null
@@ -154,7 +161,8 @@ export function renderSceneLayerInspector(deps, sel) {
 				next.w = Math.max(1, Math.round(next.h * ar))
 			}
 		}
-		sceneState.patchLayer(sceneId, layerIndex, { fill: pixelRectToFill(next, canvas) })
+		const layerRect = layerRectFromVisibleRectForLayer(next, L)
+		sceneState.patchLayer(sceneId, layerIndex, { fill: pixelRectToFill(layerRect, canvas) })
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 	}
 

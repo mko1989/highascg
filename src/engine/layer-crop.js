@@ -90,6 +90,32 @@ function cropAdjustedFillForLayer(fill, layer) {
 	return cropAdjustedFill(fill, cropFromLayer(layer))
 }
 
+/** @see client/lib/layer-crop.js MIN_VISIBLE_FRACTION */
+const MIN_VISIBLE_FRACTION = 1e-6
+
+/** @see client/lib/layer-crop.js layerRectFromVisibleRect — inverse of cropAdjustedRect (WO-388B) */
+function layerRectFromVisibleRect(visible, crop) {
+	if (!crop || isIdentityCrop(crop)) {
+		return { x: visible.x, y: visible.y, w: visible.w, h: visible.h }
+	}
+	const c = normalizeCrop(crop)
+	const fw = Math.max(MIN_VISIBLE_FRACTION, c.right - c.left)
+	const fh = Math.max(MIN_VISIBLE_FRACTION, c.bottom - c.top)
+	const w = visible.w / fw
+	const h = visible.h / fh
+	return { x: visible.x - c.left * w, y: visible.y - c.top * h, w, h }
+}
+
+/** @see client/lib/layer-crop.js layerRectFromVisibleRectForLayer */
+function layerRectFromVisibleRectForLayer(visible, layer) {
+	return layerRectFromVisibleRect(visible, cropFromLayer(layer))
+}
+
+/** @see client/lib/layer-crop.js visibleRectForLayer */
+function visibleRectForLayer(rect, layer) {
+	return cropAdjustedRect(rect, cropFromLayer(layer))
+}
+
 /** @see client/lib/layer-crop.js alignFillForCrop — align the VISIBLE (cropped) rect (WO-388) */
 function alignFillForCrop(fill, crop, mode) {
 	const c = crop && !isIdentityCrop(crop) ? normalizeCrop(crop) : { left: 0, top: 0, right: 1, bottom: 1 }
@@ -130,4 +156,7 @@ module.exports = {
 	cropAdjustedFillForLayer,
 	alignFillForCrop,
 	alignFillForLayer,
+	layerRectFromVisibleRect,
+	layerRectFromVisibleRectForLayer,
+	visibleRectForLayer,
 }

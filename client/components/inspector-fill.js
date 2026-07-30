@@ -4,6 +4,7 @@
 
 import { fillToPixelRect, pixelRectToFill, fullFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
+import { visibleRectForLayer } from '../lib/layer-crop.js'
 import { api } from '../lib/api-client.js'
 import { multiviewState } from '../lib/multiview-state.js'
 import { createMathInput } from '../lib/math-input.js'
@@ -109,7 +110,9 @@ export function appendSceneLayerFillGroup(root, opts) {
 		if (!L || !xInpRef || !yInpRef || !wInpRef || !hInpRef) return
 		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 		const fill = L.fill || fullFill()
-		const pxRectStored = fillToPixelRect(fill, canvas)
+		/* WO-388B: must match rerenderSceneLayer's pxRect — both report the VISIBLE (cropped) rect,
+		 * or the boxes would disagree with themselves after a content-fit reapply. */
+		const pxRectStored = visibleRectForLayer(fillToPixelRect(fill, canvas), L)
 		const disp = displayPositionFromStoredPx(pxRectStored, canvas)
 		xInpRef.setValue(Math.round(disp.x), false)
 		yInpRef.setValue(Math.round(disp.y), false)
@@ -223,7 +226,8 @@ export function appendSceneLayerFillGroup(root, opts) {
 		if (!L) return
 		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
 		const fill = L.fill || fullFill()
-		const pxRectStored = fillToPixelRect(fill, canvas)
+		/* WO-388B: scale % works on the VISIBLE rect and feeds patchFillPx, which is visible-space. */
+		const pxRectStored = visibleRectForLayer(fillToPixelRect(fill, canvas), L)
 		const disp = displayPositionFromStoredPx(pxRectStored, canvas)
 		const newW = disp.w * (pct / 100)
 		const newH = disp.h * (pct / 100)

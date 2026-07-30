@@ -31,6 +31,16 @@ BARRIER_NEGATIVE_Y = 8
 layout, hotplug, mode change) and a stale rect means the watchdog drags the pointer off-screen."""
 GEOMETRY_POLL_SEC = 2.0
 
+"""WO-391: idle poll of the warp fallback. Was 0.05 (20 Hz) — on a driver that honours XFixes
+barriers that loop never corrects anything, so it was 20 pointless XQueryPointer round-trips a
+second forever. 0.25 still pulls a genuinely escaped pointer back within a quarter second (the
+operator cannot lose the cursor), at a fifth of the X traffic. See warp_watchdog's docstring for
+the plan to drop polling altogether once the log proves whether barriers hold here."""
+WARP_POLL_SEC = 0.25
+
+"""Minimum gap between 'warp' log lines, so a leaking driver cannot flood the log."""
+WARP_LOG_MIN_INTERVAL_SEC = 10.0
+
 libX11 = ctypes.CDLL(ctypes.util.find_library("X11"), use_errno=True)
 libXfixes = ctypes.CDLL(ctypes.util.find_library("Xfixes"), use_errno=True)
 
@@ -196,9 +206,26 @@ def warp_watchdog(dpy, root, output_name, geom, barriers):
 
     If the output disappears entirely we RELEASE. Clamping to a rect that is definitely wrong is
     strictly worse than not confining at all: the operator loses the pointer with no way back.
+
+    WO-391 (owner 30.07: "something is wrong with the confinement if it needs to poll the mouse
+    pointer all the time. seems like it should be clear boundries that are respected"): correct —
+    XFixes barriers ARE enforced by the X server, so on a driver that honours them this loop never
+    warps and is pure overhead. It exists only for the NVIDIA multi-head slip-past quirk named in
+    the module docstring, and we had NO evidence whether this box actually suffers it.
+
+    So: the warp is now INSTRUMENTED (every correction is logged, rate-limited) and the idle poll
+    dropped from 20 Hz to WARP_POLL_SEC. The goal is to delete this loop entirely and block on
+    XFixes barrier events instead — but that must wait for evidence, because guessing wrong loses
+    the operator's pointer mid-show. Read the log:
+      * no "warp" lines after real use (including shoving the mouse at all four edges) →
+        barriers hold here, delete the loop / make it opt-in.
+      * "warp" lines appear → this driver does leak, the fallback earns its place, and going
+        event-driven means XFixesSelectBarrierInput + XFixesBarrierReleasePointer, not polling.
     """
     w, h, x, y = geom
     last_geom_check = time.monotonic()
+    warps = 0
+    last_warp_log = 0.0
     while True:
         now = time.monotonic()
         if now - last_geom_check >= GEOMETRY_POLL_SEC:
@@ -228,7 +255,15 @@ def warp_watchdog(dpy, root, output_name, geom, barriers):
             if nx != px or ny != py:
                 libX11.XWarpPointer(dpy, 0, root, 0, 0, 0, 0, nx, ny)
                 libX11.XSync(dpy, 0)
-        time.sleep(0.05)
+                warps += 1
+                # Rate-limited: a leaking driver would otherwise write a line per poll.
+                if now - last_warp_log >= WARP_LOG_MIN_INTERVAL_SEC:
+                    last_warp_log = now
+                    log(
+                        f"warp: pointer escaped to ({px},{py}) — pulled back to ({nx},{ny}); "
+                        f"barriers did NOT hold on this driver (total warps this run: {warps})"
+                    )
+        time.sleep(WARP_POLL_SEC)
 
 
 def main():

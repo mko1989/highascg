@@ -154,6 +154,96 @@ test('WO-388: crop params are clamped/normalized before aligning (inverted + out
 	}
 })
 
+// ---------------------------------------------------------------------------
+// WO-388B — the inspector's X/Y/W/H boxes report and accept VISIBLE geometry.
+// ---------------------------------------------------------------------------
+
+test('WO-388B: visible → layer rect round-trips for any crop', async () => {
+	const esm = await esmPromise
+	const rects = [
+		{ x: 0, y: 0, w: 1920, h: 1080 },
+		{ x: -163, y: 285, w: 906, h: 510 },
+		{ x: 400, y: 100, w: 1280, h: 720 },
+	]
+	const crops = [
+		null,
+		{ left: 0, top: 0, right: 1, bottom: 1 },
+		{ left: 0.20833333333333334, top: 0, right: 0.7916666666666666, bottom: 1 },
+		{ left: 0.1, top: 0.2, right: 0.6, bottom: 0.9 },
+	]
+	for (const layerRect of rects) {
+		for (const crop of crops) {
+			const vis = esm.cropAdjustedRect(layerRect, crop)
+			const back = esm.layerRectFromVisibleRect(vis, crop)
+			for (const k of ['x', 'y', 'w', 'h']) {
+				assert.ok(
+					Math.abs(back[k] - layerRect[k]) < 1e-9,
+					`round-trip ${k}: ${back[k]} vs ${layerRect[k]} (crop ${JSON.stringify(crop)})`,
+				)
+			}
+		}
+	}
+})
+
+test('WO-388B: uncropped layers pass through both directions untouched', async () => {
+	const esm = await esmPromise
+	const rect = { x: 12, y: 34, w: 560, h: 315 }
+	for (const layer of [null, {}, { effects: [] }, { effects: [{ type: 'crop', params: { left: 0, top: 0, right: 1, bottom: 1 } }] }]) {
+		assert.deepEqual(esm.visibleRectForLayer(rect, layer), rect, 'visible == full rect')
+		assert.deepEqual(esm.layerRectFromVisibleRectForLayer(rect, layer), rect, 'inverse is identity')
+	}
+})
+
+test('WO-388B: the owner\'s crop — typing a visible width scales the layer rect up', async () => {
+	const esm = await esmPromise
+	// crop keeps the middle 58.33% horizontally
+	const layer = { effects: [{ type: 'crop', params: { left: 0.20833333333333334, top: 0, right: 0.7916666666666666, bottom: 1 } }] }
+	const full = { x: 0, y: 0, w: 1200, h: 675 }
+	const vis = esm.visibleRectForLayer(full, layer)
+	assert.ok(Math.abs(vis.w - 700) < 1e-9, `visible width is the cropped width (got ${vis.w})`)
+	assert.ok(Math.abs(vis.x - 250) < 1e-9, `visible x is offset by the left crop (got ${vis.x})`)
+
+	// Operator types "350" into W — half the visible width. The LAYER must halve too.
+	const back = esm.layerRectFromVisibleRectForLayer({ ...vis, w: 350 }, layer)
+	assert.ok(Math.abs(back.w - 600) < 1e-9, `layer width halves to 600 (got ${back.w})`)
+	// and the visible rect really does become 350 wide again
+	const again = esm.visibleRectForLayer(back, layer)
+	assert.ok(Math.abs(again.w - 350) < 1e-9, `re-deriving visible width gives 350 (got ${again.w})`)
+	assert.ok(Math.abs(again.x - vis.x) < 1e-9, 'visible x is preserved — content does not jump')
+})
+
+test('WO-388B: a fully collapsed crop cannot produce NaN/Infinity geometry', async () => {
+	const esm = await esmPromise
+	const vis = { x: 10, y: 10, w: 100, h: 100 }
+	for (const crop of [
+		{ left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 },
+		{ left: 0.8, top: 0.8, right: 0.2, bottom: 0.2 }, // inverted → normalizes to collapsed
+	]) {
+		const back = esm.layerRectFromVisibleRect(vis, crop)
+		for (const k of ['x', 'y', 'w', 'h']) {
+			assert.ok(Number.isFinite(back[k]), `${k} stays finite for a collapsed crop (got ${back[k]})`)
+		}
+	}
+})
+
+test('WO-388B: ESM and CJS inverse mirrors agree', async () => {
+	const esm = await esmPromise
+	const vis = { x: -20, y: 40, w: 800, h: 450 }
+	const layers = [
+		null,
+		{ effects: [{ type: 'crop', params: { left: 0.1, top: 0.2, right: 0.8, bottom: 0.9 } }] },
+		{ effects: [{ type: 'crop', params: { left: 0.5, top: 0.5, right: 0.5, bottom: 0.5 } }] },
+		{ effects: [{ type: 'crop', params: {} }] },
+	]
+	for (const layer of layers) {
+		assert.deepEqual(esm.visibleRectForLayer(vis, layer), cjs.visibleRectForLayer(vis, layer))
+		assert.deepEqual(
+			esm.layerRectFromVisibleRectForLayer(vis, layer),
+			cjs.layerRectFromVisibleRectForLayer(vis, layer),
+		)
+	}
+})
+
 test('WO-388: ESM and CJS mirrors agree (must not drift)', async () => {
 	const esm = await esmPromise
 	const fills = [
