@@ -83,8 +83,8 @@ describe('WO-401 F4: AMCP history stays off the send path', () => {
 	})
 })
 
-describe('WO-401 F3 void finding: dirty tracking is per-message, not per-change', () => {
-	it('delta payload contains a channel whose values did not change (identical message twice)', () => {
+describe('WO-401 F3-revised: dirty tracking is VALUE-aware (delta mode pays)', () => {
+	it('unchanged repeats stay clean; value changes dirty; frame counters never dirty', () => {
 		const osc = new OscState(() => {}, { ...OSC_CFG, wsDeltaBroadcast: true })
 		// First message past the emit interval flushes synchronously (_scheduleEmit fast path).
 		const emitted = []
@@ -94,16 +94,39 @@ describe('WO-401 F3 void finding: dirty tracking is per-message, not per-change'
 		assert.equal(emitted[0].delta, true)
 		assert.ok(emitted[0].channels['3'])
 
-		// Same message, same value, within the interval → channel is dirty again. This is WHY WS
-		// delta mode saves nothing on a box receiving Caspar's full OSC copy (WO-401 F3).
-		// Value-aware marking would flip this.
+		// Identical repeat within the interval → channel stays CLEAN. This is the F3-revised
+		// contract that makes WS delta mode worthwhile on a box receiving Caspar's full OSC copy.
 		osc.handleOscMessage({ address: '/channel/3/mixer/audio/nb_channels', args: [2] })
-		const p = osc._buildChangePayload()
-		assert.equal(p.delta, true)
-		assert.ok(p.channels['3'], 'channel 3 no longer dirty — dirty-marking became value-aware; revisit WO-401 F3')
-
-		// Drained: no traffic → null payload.
 		assert.equal(osc._buildChangePayload(), null)
+
+		// A real value change dirties…
+		osc.handleOscMessage({ address: '/channel/3/mixer/audio/1/dBFS', args: [-12] })
+		let p = osc._buildChangePayload()
+		assert.equal(p.delta, true)
+		assert.ok(p.channels['3'])
+		// …and the same value repeated does not.
+		osc.handleOscMessage({ address: '/channel/3/mixer/audio/1/dBFS', args: [-12] })
+		assert.equal(osc._buildChangePayload(), null)
+
+		// Output frame counters increment forever on every channel — stored, but never dirty.
+		osc.handleOscMessage({ address: '/channel/3/output/port/1/frame', args: [100, 200] })
+		osc.handleOscMessage({ address: '/channel/3/output/port/1/frame', args: [101, 200] })
+		assert.equal(osc._buildChangePayload(), null)
+		assert.equal(osc.getSnapshot().channels['3'].outputs['1'].frames, 101)
+
+		// Playing layer: elapsed moves → dirty; a paused layer repeating the same time stays clean.
+		osc.handleOscMessage({ address: '/channel/3/stage/layer/10/foreground/file/time', args: [1.0, 10.0] })
+		p = osc._buildChangePayload()
+		assert.ok(p && p.channels['3'])
+		osc.handleOscMessage({ address: '/channel/3/stage/layer/10/foreground/file/time', args: [1.0, 10.0] })
+		assert.equal(osc._buildChangePayload(), null)
+
+		// Channel profiler floats are noise (only `healthy` is consumed) — stored, dirty on flip only.
+		osc.handleOscMessage({ address: '/channel/3/profiler/time', args: [10, 20] })
+		p = osc._buildChangePayload()
+		assert.ok(p && p.channels['3'], 'first profiler message sets healthy=false→…: flip counts')
+		osc.handleOscMessage({ address: '/channel/3/profiler/time', args: [11, 20] })
+		assert.equal(osc._buildChangePayload(), null, 'jittering actual/expected must not dirty')
 		osc.destroy()
 	})
 })

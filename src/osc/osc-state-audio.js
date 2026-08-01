@@ -31,17 +31,23 @@ function intMeterSampleToDbfs(raw) {
 }
 
 const audioMethods = {
+	/**
+	 * @returns {boolean} true when a CONSUMED value (nbChannels, dBFS, peak) changed — WO-401
+	 * F3-revised delta dirty-marking. Timestamps (`_lastUpdateAt`, `peakAge`) never count: on a
+	 * silent channel the same dBFS repeats every tick and must not keep the channel dirty.
+	 */
 	_routeMixerAudio(ch, sub, vals) {
 		const c = this._ensureChannel(ch)
 		if (sub === 'nb_channels') {
 			const n = Math.max(0, parseInt(String(vals[0]), 10) || 0)
+			const changed = c.audio.nbChannels !== n || c.audio.levels.length !== n
 			c.audio.nbChannels = n
 			c.audio._nbChannelsFromOsc = true
 			while (c.audio.levels.length < n) {
 				c.audio.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
 			}
 			if (c.audio.levels.length > n) c.audio.levels.length = n
-			return
+			return changed
 		}
 		// Forks may emit bundled int meters (e.g. 16× int32) instead of per-index …/M/dBFS messages.
 		if (sub === 'volume' && vals.length > 0) {
@@ -49,22 +55,29 @@ const audioMethods = {
 			// Do not inflate channel count from padded volume bundles — trust nb_channels when set.
 			const cap = a._nbChannelsFromOsc && a.nbChannels > 0 ? a.nbChannels : vals.length
 			const n = Math.min(vals.length, cap)
-			if (!a._nbChannelsFromOsc) a.nbChannels = n
+			let changed = false
+			if (!a._nbChannelsFromOsc && a.nbChannels !== n) {
+				a.nbChannels = n
+				changed = true
+			}
 			const now = Date.now()
 			a._lastUpdateAt = now
 			for (let i = 0; i < n; i++) {
 				const db = intMeterSampleToDbfs(vals[i])
 				while (a.levels.length <= i) {
 					a.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
+					changed = true
 				}
 				const slot = a.levels[i]
+				if (slot.dBFS !== db) changed = true
 				slot.dBFS = db
 				if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
+					if (slot.peak !== db) changed = true
 					slot.peak = db
 					slot.peakAge = now
 				}
 			}
-			return
+			return changed
 		}
 		const dm = sub.match(/^(\d+)\/dBFS$/)
 		if (dm) {
@@ -75,21 +88,27 @@ const audioMethods = {
 				a._meterIndexBase = rawIdx === 0 ? 0 : 1
 			}
 			const idx = a._meterIndexBase === 1 ? rawIdx - 1 : rawIdx
-			if (idx < 0 || !Number.isFinite(idx)) return
+			if (idx < 0 || !Number.isFinite(idx)) return false
 			const rawDb = Number(vals[0])
+			let changed = false
 			while (a.levels.length <= idx) {
 				a.levels.push({ dBFS: -120, peak: -120, peakAge: 0 })
+				changed = true
 			}
 			const slot = a.levels[idx]
 			const now = Date.now()
 			const db = Number.isFinite(rawDb) ? rawDb : slot.dBFS
+			if (slot.dBFS !== db) changed = true
 			slot.dBFS = db
 			a._lastUpdateAt = now
 			if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
+				if (slot.peak !== db) changed = true
 				slot.peak = db
 				slot.peakAge = now
 			}
+			return changed
 		}
+		return false
 	},
 
 	/** Reset mixer levels when Caspar stops sending fresh OSC (avoids frozen VU after CLEAR / lost consumer). */

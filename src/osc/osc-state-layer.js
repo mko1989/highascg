@@ -71,6 +71,9 @@ const layerMethods = {
 
 	/**
 	 * @param {'foreground' | 'background'} [fileTarget] - where `file/*` OSC goes (Caspar 2.3+ nests under foreground/background)
+	 * @returns {boolean} true when a consumed value changed (WO-401 F3-revised dirty-marking).
+	 * `_lastOscAt` (keep-alive for pruning) and layer profiler floats (measurement noise, no
+	 * consumer) deliberately never count as changes.
 	 */
 	_routeLayer(ch, layerId, tail, vals, fileTarget = 'foreground') {
 		const layer = this._ensureLayer(ch, layerId)
@@ -84,22 +87,43 @@ const layerMethods = {
 			return this._routeLayer(ch, layerId, tail.slice('background/'.length), vals, 'background')
 		}
 
-		if (tail === 'time') layer.time = vals[0] != null ? Number(vals[0]) : null
-		else if (tail === 'frame') layer.frame = vals[0] != null ? parseInt(String(vals[0]), 10) : null
-		else if (tail === 'type') {
+		if (tail === 'time') {
+			const next = vals[0] != null ? Number(vals[0]) : null
+			const changed = layer.time !== next
+			layer.time = next
+			return changed
+		} else if (tail === 'frame') {
+			const next = vals[0] != null ? parseInt(String(vals[0]), 10) : null
+			const changed = layer.frame !== next
+			layer.frame = next
+			return changed
+		} else if (tail === 'type') {
 			const t = vals[0] != null ? String(vals[0]) : 'empty'
+			let changed = layer.type !== t
 			layer.type = t
 			if (t === 'empty') {
+				// Reset unconditionally (repeat empties must re-clear INFO-supplemented timing);
+				// it only counts as a change when there was something to clear.
+				if (Object.keys(layer.file || {}).length || Object.keys(layer.backgroundFile || {}).length || layer.template?.path) changed = true
 				layer.file = {}
 				layer.backgroundFile = {}
 				layer.template = { path: null, width: 0, height: 0, fps: 0 }
 			}
-		} else if (tail === 'background/type') layer.backgroundType = vals[0] != null ? String(vals[0]) : null
-		else if (tail === 'profiler/time' && vals.length >= 2) {
+			return changed
+		} else if (tail === 'background/type') {
+			const next = vals[0] != null ? String(vals[0]) : null
+			const changed = layer.backgroundType !== next
+			layer.backgroundType = next
+			return changed
+		} else if (tail === 'profiler/time' && vals.length >= 2) {
 			layer.profiler = { actual: Number(vals[0]), expected: Number(vals[1]) }
+			return false
 		} else if (tail === 'paused') {
 			const v = vals[0]
-			layer.paused = v === true || v === 1 || v === 'true'
+			const next = v === true || v === 1 || v === 'true'
+			const changed = layer.paused !== next
+			layer.paused = next
+			return changed
 		} else if (tail === 'loop') {
 			// WO-239 T239.2: Caspar 2.6-dev av_producer.cpp:766/991 `state_["loop"] = loop;` is a
 			// TOP-LEVEL key on the producer's own state map, not nested under "file/" — confirmed both
@@ -114,10 +138,14 @@ const layerMethods = {
 			// correctness/robustness of the layer.file.loop field other consumers may read.
 			const v = vals[0]
 			const f = fileTarget === 'background' ? layer.backgroundFile || (layer.backgroundFile = {}) : layer.file || (layer.file = {})
-			f.loop = v === true || v === 1 || v === 'true'
+			const next = v === true || v === 1 || v === 'true'
+			const changed = f.loop !== next
+			f.loop = next
+			return changed
 		} else if (tail === 'producer') {
 			const sig = producerSignatureFromVals(vals)
 			const sigKey = fileTarget === 'background' ? '_lastBgProducerSig' : '_lastProducerSig'
+			let changed = false
 			if (sig !== layer[sigKey]) {
 				layer[sigKey] = sig
 				const f =
@@ -125,6 +153,7 @@ const layerMethods = {
 						? layer.backgroundFile || (layer.backgroundFile = {})
 						: layer.file || (layer.file = {})
 				clearOscFileTiming(f)
+				changed = true
 			}
 			// WO-235 T235.2/T235.3: Caspar 2.6-dev (r253c16c) core/producer/layer.cpp:132-141 never
 			// emits an explicit `.../type` leaf — it only sets `state_["foreground"]["producer"]` /
@@ -140,9 +169,11 @@ const layerMethods = {
 			const producerName = vals[0] != null ? String(vals[0]) : null
 			if (producerName != null) {
 				if (fileTarget === 'background') {
+					if (layer.backgroundType !== producerName) changed = true
 					layer.backgroundType = producerName
 					if (producerName === 'empty') layer.backgroundFile = {}
 				} else {
+					if (layer.type !== producerName) changed = true
 					layer.type = producerName
 					if (producerName === 'empty') {
 						layer.file = {}
@@ -151,27 +182,38 @@ const layerMethods = {
 					}
 				}
 			}
-		} else if (tail.startsWith('file/')) this._routeLayerFile(layer, tail.slice('file/'.length), vals, fileTarget)
-		else if (tail.startsWith('host/')) this._routeLayerHost(layer, tail.slice('host/'.length), vals)
+			return changed
+		} else if (tail.startsWith('file/')) return this._routeLayerFile(layer, tail.slice('file/'.length), vals, fileTarget)
+		else if (tail.startsWith('host/')) return this._routeLayerHost(layer, tail.slice('host/'.length), vals)
+		return false
 	},
 
 	/**
 	 * @param {'foreground' | 'background'} fileTarget
+	 * @returns {boolean} true when a consumed file field changed (WO-401 F3-revised)
 	 */
 	_routeLayerFile(layer, sub, vals, fileTarget = 'foreground') {
 		const key = fileTarget === 'background' ? 'backgroundFile' : 'file'
 		const f = layer[key] || (layer[key] = {})
 		if (sub === 'name') {
 			const nv = vals[0] != null ? String(vals[0]) : null
+			const changed = f.name !== nv
 			if (f._lastOscFileName !== undefined && f._lastOscFileName !== nv) clearOscFileTiming(f)
 			f._lastOscFileName = nv
 			f.name = nv
+			return changed
 		} else if (sub === 'path') {
 			const pv = vals[0] != null ? String(vals[0]) : null
+			const changed = f.path !== pv
 			if (f._lastOscFilePath !== undefined && f._lastOscFilePath !== pv) clearOscFileTiming(f)
 			f._lastOscFilePath = pv
 			f.path = pv
+			return changed
 		} else if (sub === 'time' && vals.length >= 1) {
+			const prevElapsed = f.elapsed
+			const prevDuration = f.duration
+			const prevRemaining = f.remaining
+			const prevProgress = f.progress
 			// `.../file/time` carries [elapsed_sec, duration_sec] on both lineages: old and new
 			// (2.6-dev av_producer.cpp:990 `state_["file/time"] = {time()/format_desc_.fps,
 			// file_duration().value_or(0)/format_desc_.fps}`) compute seconds by dividing CHANNEL
@@ -222,32 +264,66 @@ const layerMethods = {
 			}
 			f.remaining = remaining
 			f.progress = progress
+			return (
+				f.elapsed !== prevElapsed || f.duration !== prevDuration || f.remaining !== prevRemaining || f.progress !== prevProgress
+			)
 		} else if (sub === 'frame' && vals.length >= 2) {
-			f.frameElapsed = parseInt(String(vals[0]), 10)
-			f.frameTotal = parseInt(String(vals[1]), 10)
-		} else if (sub === 'fps' || sub.endsWith('/fps')) f.fps = Number(vals[0])
-		else if (sub === 'loop') f.loop = vals[0] === 1 || vals[0] === true
-		else if (sub.startsWith('video/')) {
+			const fe = parseInt(String(vals[0]), 10)
+			const ft = parseInt(String(vals[1]), 10)
+			const changed = f.frameElapsed !== fe || f.frameTotal !== ft
+			f.frameElapsed = fe
+			f.frameTotal = ft
+			return changed
+		} else if (sub === 'fps' || sub.endsWith('/fps')) {
+			const next = Number(vals[0])
+			const changed = f.fps !== next
+			f.fps = next
+			return changed
+		} else if (sub === 'loop') {
+			const next = vals[0] === 1 || vals[0] === true
+			const changed = f.loop !== next
+			f.loop = next
+			return changed
+		} else if (sub.startsWith('video/')) {
 			if (!f.video) f.video = {}
 			const k = sub.slice('video/'.length)
-			if (k === 'width') f.video.width = parseInt(String(vals[0]), 10)
-			else if (k === 'height') f.video.height = parseInt(String(vals[0]), 10)
-			else if (k === 'field' || k === 'codec') f.video[k] = vals[0] != null ? String(vals[0]) : null
+			let next
+			if (k === 'width' || k === 'height') next = parseInt(String(vals[0]), 10)
+			else if (k === 'field' || k === 'codec') next = vals[0] != null ? String(vals[0]) : null
+			else return false
+			const prop = k === 'width' ? 'width' : k === 'height' ? 'height' : k
+			const changed = f.video[prop] !== next
+			f.video[prop] = next
+			return changed
 		} else if (sub.startsWith('audio/')) {
 			if (!f.audio) f.audio = {}
 			const k = sub.slice('audio/'.length)
-			if (k === 'sample-rate') f.audio.sampleRate = parseInt(String(vals[0]), 10)
-			else if (k === 'channels') f.audio.channels = parseInt(String(vals[0]), 10)
-			else if (k === 'format' || k === 'codec') f.audio[k] = vals[0] != null ? String(vals[0]) : null
+			let prop
+			let next
+			if (k === 'sample-rate') { prop = 'sampleRate'; next = parseInt(String(vals[0]), 10) }
+			else if (k === 'channels') { prop = 'channels'; next = parseInt(String(vals[0]), 10) }
+			else if (k === 'format' || k === 'codec') { prop = k; next = vals[0] != null ? String(vals[0]) : null }
+			else return false
+			const changed = f.audio[prop] !== next
+			f.audio[prop] = next
+			return changed
 		}
+		return false
 	},
 
+	/** @returns {boolean} true when a template field changed (WO-401 F3-revised) */
 	_routeLayerHost(layer, sub, vals) {
 		const t = layer.template || (layer.template = { path: null, width: 0, height: 0, fps: 0 })
-		if (sub === 'path') t.path = vals[0] != null ? String(vals[0]) : null
-		else if (sub === 'width') t.width = parseInt(String(vals[0]), 10) || 0
-		else if (sub === 'height') t.height = parseInt(String(vals[0]), 10) || 0
-		else if (sub === 'fps') t.fps = Number(vals[0]) || 0
+		let prop
+		let next
+		if (sub === 'path') { prop = 'path'; next = vals[0] != null ? String(vals[0]) : null }
+		else if (sub === 'width') { prop = 'width'; next = parseInt(String(vals[0]), 10) || 0 }
+		else if (sub === 'height') { prop = 'height'; next = parseInt(String(vals[0]), 10) || 0 }
+		else if (sub === 'fps') { prop = 'fps'; next = Number(vals[0]) || 0 }
+		else return false
+		const changed = t[prop] !== next
+		t[prop] = next
+		return changed
 	},
 }
 
