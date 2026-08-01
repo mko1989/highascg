@@ -239,8 +239,22 @@ Deliberately NOT taken (reasoning recorded so nobody re-litigates blind):
   would have to be kept in sync with every other `_state.channels` writer in the file — risk
   outweighs <0.1 % of a core. The unhandled-suffix early-reject remains valid but is bundled
   into F3-revised (value-aware dirty marking touches the same routing layer).
-- **F12 + todos item 6 (client)** — implemented later would need `npm run build:client` + kiosk
-  reload; parked until post-show.
+- ~~F12 + todos item 6 (client) — parked~~ **Implemented later the same evening** (fourth
+  tranche), source-only — **`npm run build:client` deliberately NOT run** so an accidental
+  mid-show GUI reload cannot pick up unproven client code; build + kiosk reload happens with the
+  post-show restart:
+  - **F12** — `client/lib/audio-mixer-meter-loop.js`: 60 fps free-running rAF → 50 ms
+    `setInterval` (20 Hz = the fastest data rate feeding it), with `SMOOTH_FALL` re-derived
+    (0.18@60fps → 0.45@20Hz, same per-second decay curve) and the double `parseBusMeterFillKey`
+    call collapsed. WO-284's guards (`_lastBg`/`_lastMeterState`/`document.hidden`/no layout
+    reads) preserved — its smoke passes untouched.
+  - **todos item 6 root cause fixed** — `sources-panel-live-render.js`: the tab's render key
+    hashed the WHOLE decklink/liveAudio/v4l2 status objects, which carry `updatedAt: Date.now()`
+    re-stamped by routing retries — so the tab periodically rebuilt every row, recreating each
+    `<img>` (refetch + the visible thumbnail flash the owner reported), with nothing visible
+    changed. The key now hashes exactly what rows display: the derived per-source slot-message
+    strings (`slotMsgForSource`, also deduplicating the render-path branches). WO-392's stable
+    thumb URL untouched.
 - **F13** — lsblk cadence is an owner-visible USB-detection-latency tradeoff (~0.5 forks/s is
   tiny); owner call.
 - **F14** — feature currently disabled on the box (no `ffmpeg_jpeg` compose-preview mode); fix
@@ -266,9 +280,18 @@ Deliberately NOT taken (reasoning recorded so nobody re-litigates blind):
   it caught a real `lk` TDZ collision mid-implementation (loop variable shadowing), fixed by
   renaming to `lkeys`. Final full offline suite **1764 pass / 0 fail / 2 skip**;
   `check-max-file-lines` 0 over.
+- Fourth tranche: smoke extended to 7 tests — source-text guards pin F12 (no
+  `requestAnimationFrame`, interval-paced, re-derived smoothing, WO-284 guards intact) and the
+  item-6 fix (render key excludes raw status objects, keyed on `slotMsgForSource`).
+  `smoke-wo284-audio-mixer-inputs-vu-routing` + `smoke-wo331-live-thumb-url-stability`
+  re-verified green. Final suite **1766 pass / 0 fail / 2 skip**; ws-server.js kept at ≤500
+  lines (F6 fallback compacted). **dist-web NOT rebuilt** — served bundle is still pre-tranche-4.
+- Post-show deploy sequence: (1) `npm run build:client`, (2) service restart
+  (`kill -TERM $(systemctl show -p MainPID --value highascg)`), (3) kiosk F5.
 - NOT yet verified live (post-restart owner QA): `/api/state` latency re-measure (expect well
   under 10 ms), `/api/variables` meters still tick, companion variables live, WS state hydrate
-  intact on a GUI reload.
+  intact on a GUI reload, audio-mixer meters feel unchanged at 20 Hz, live-input thumbnails no
+  longer flash periodically.
 - NOT yet verified live: the changed code paths run only after the post-show restart. Owner QA
   after restart: `/api/osc/diagnostics` still returns addresses; `data/amcp-last50.txt` updates
   within ~1 s of AMCP traffic; take feel unchanged/better.
