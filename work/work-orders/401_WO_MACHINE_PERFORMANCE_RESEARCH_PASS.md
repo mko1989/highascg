@@ -1,6 +1,6 @@
 # WO-401 — Machine performance research pass (todos30.07.26)
 
-**Status:** IN PROGRESS — research complete 2026-07-30; first wave (F1, F4, F8) implemented same day, owner-approved ("you can start working on those"), **awaiting service restart after the show** to take effect. F3 found VOID as proposed — see §2.
+**Status:** IN PROGRESS — research complete 2026-07-30; F1, F2, F4, F8, F9 implemented same day (owner-approved), **awaiting service restart after the show** to take effect. F3 and F5 found VOID as proposed — see §2. Remaining: F6, F7-remainder, F10–F15, F3-revised (value-aware dirty marking).
 **Priority:** High (owner: "things that can be done better to get better performance of the machine")
 **Date:** 2026-07-30
 **Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
@@ -176,16 +176,54 @@ was restarted or reloaded.
   owner accepts 10 Hz meters: `emitIntervalMs` 50 → 100 halves tick work + WS bytes — feel-visible,
   owner's call, not taken unilaterally.
 
-Not touched this wave: F2 (single-snapshot-per-tick refactor), F5 (v4l2 `-vf`), F6, F7, F9–F15.
+Second tranche, same evening (owner: "ok, continue"):
+
+- **F2** — one snapshot per tick, zero clones in the mirror:
+  - `osc-state.js`: `_buildChangePayload` (full mode) uses new `_snapshotNow()` — skips the
+    duplicate decay/prune that `_flushEmit` already ran this tick.
+  - `osc-lifecycle.js`: the `change` handler reuses the emitted full snapshot for
+    `updateFromOscSnapshot` + variables instead of re-deriving `getSnapshot()` (delta payloads
+    still re-derive). Consumer chain verified read-only before sharing.
+  - `state-manager.js updateFromOscSnapshot`: takes the snapshot **by reference** (each tick
+    replaces it wholesale; nothing mutates in place) — the full-mirror deep clone plus per-channel
+    audio/layers/outputs clones (20×/s) are gone. Per-tick `_emit('osc'/'audio'/'channels.N')`
+    removed after proving all three have no consumers: `getDelta()` (the `_changes` ring's only
+    reader) has **zero callers**; no client code reads stateStore paths `osc`/`audio`/
+    `channels.N` (client OSC rides the dedicated `'osc'` WS broadcast + `'state'` hydrate);
+    the Companion module's bridge consumes only `scene.live`/`scene.deck` change paths
+    (`companion-module-highpass-highascg/src/bridge/ws-client.js:101-110`); `oscLayers`/
+    `oscProfiler`/`oscOutputs` fields have no readers outside state-manager (kept updated for
+    `/api/state` HTTP consumers, reference-shared). INFO-driven `channels.N` emits still fire
+    via `_queueInfoChannelWsEmit`. Net: kills clones #1–#4, one WS `change` frame stream, and
+    most `_changes` ring churn (part of F7's cost) per tick.
+- **F9** — `persistence.js`: IMMEDIATE_KEYS now coalesce through a 25 ms ref'd timer
+  (`HIGHASCG_PERSISTENCE_IMMEDIATE_COALESCE_MS`, 0 = old strict write-through) so a take's burst
+  of immediate sets does one synchronous write instead of several; any full write clears the
+  pending timer; `flush`/`flushSync` semantics unchanged. Plus `HIGHASCG_PERSISTENCE_PRETTY=0`
+  in `.env` (machine-read file, ~35 % fewer bytes/write; `python3 -m json.tool` to inspect).
+- **F5 — VOID as proposed, not changed.** The relay's `-vf format=yuv420p,scale=W:H` is not
+  redundant work the way the research read it: ffmpeg fuses adjacent format/scale into one
+  negotiated swscale pass, a conversion is needed regardless (Caspar's mjpeg decodes to
+  full-range yuvj), and the `scale` is the guarantee that frame size matches the `-video_size`
+  the v4l2 device was set to (dropping it breaks non-1080p channels loudly). The measured 22 %
+  is the 1080p50 mjpeg **decode** itself. Real levers, both owner-visible tradeoffs, not taken
+  unilaterally: `virtualCamera.fps` 50 → 25/30 (halves Caspar-side encode + relay decode) and/or
+  an on-demand lifecycle (run the bridge only while something holds /dev/video10 open).
+
+Not touched: F6, F7 (remainder), F10–F15.
 
 ## 3. What was VERIFIED
 
 - Research: measurements taken live (see table); F1–F5 re-read in source at the cited lines by the
   main session before the WO was written; F6–F15 carry researcher evidence, re-verify at fix time.
-- First wave: new `tools/smoke/smoke-wo401-perf-first-wave.test.js` (3 tests — F1 saturation +
-  Set hot path; F4 no-sync-write + 50-cap + async flush content; F3 void-finding pin: identical
-  message twice still dirties the channel, guards the revisit). Added to the curated FILES list.
-  Full offline suite **1762 pass / 0 fail / 2 skip**; `check-max-file-lines` 0 over.
+- First wave: new `tools/smoke/smoke-wo401-perf-first-wave.test.js` (F1 saturation + Set hot
+  path; F4 no-sync-write + 50-cap + async flush content; F3 void-finding pin: identical message
+  twice still dirties the channel, guards the revisit). Added to the curated FILES list.
+- Second tranche: same smoke extended to 5 tests — F2 (mirror stores snapshot/audio/oscLayers by
+  reference, `_changes` length unchanged across a tick = no dead emits) and F9 (immediate key
+  does NOT write synchronously, coalesced write lands compact within the window, `flushSync`
+  still synchronous). Full offline suite **1764 pass / 0 fail / 2 skip**; `check-max-file-lines`
+  0 over. `smoke-wo251-playlist-osc-wiring` (stubs the lifecycle wiring) re-verified green.
 - NOT yet verified live: the changed code paths run only after the post-show restart. Owner QA
   after restart: `/api/osc/diagnostics` still returns addresses; `data/amcp-last50.txt` updates
   within ~1 s of AMCP traffic; take feel unchanged/better.
