@@ -156,6 +156,27 @@ describe('WO-401 client tranche: paced meter loop, stable live-source rows', () 
 	})
 })
 
+describe('WO-401 F5-revised: virtual-camera fps derives from the source rate', () => {
+	const { resolveV4l2BridgeFps } = require('../../src/virtual-output/v4l2-bridge-args')
+
+	it('halves the source rate only while the result stays ≥ 25', () => {
+		assert.equal(resolveV4l2BridgeFps({ machineProfile: { defaultProjectFps: 50 } }), 25)
+		assert.equal(resolveV4l2BridgeFps({ machineProfile: { defaultProjectFps: 60 } }), 30)
+		// Owner 30.07.26: "if the input is 25 it shouldn't half to 12,5".
+		assert.equal(resolveV4l2BridgeFps({ machineProfile: { defaultProjectFps: 25 } }), 25)
+		assert.equal(resolveV4l2BridgeFps({ machineProfile: { defaultProjectFps: 30 } }), 30)
+		// No config at all → canonical 50 source → 25 out.
+		assert.equal(resolveV4l2BridgeFps({}), 25)
+	})
+
+	it('explicit virtualCamera.fps wins un-halved; native = full source rate', () => {
+		const src50 = { machineProfile: { defaultProjectFps: 50 } }
+		assert.equal(resolveV4l2BridgeFps({ ...src50, virtualCamera: { fps: 50 } }), 50)
+		assert.equal(resolveV4l2BridgeFps({ ...src50, virtualCamera: { fps: 'native' } }), 50)
+		assert.equal(resolveV4l2BridgeFps({ ...src50, virtualCamera: { fps: 10 } }), 10)
+	})
+})
+
 describe('WO-401 F9: immediate persistence keys coalesce into one write', () => {
 	it('does not write synchronously, lands compact JSON within the window', async () => {
 		const stateFile = path.join(os.tmpdir(), `highascg-state-test-${process.pid}.json`)

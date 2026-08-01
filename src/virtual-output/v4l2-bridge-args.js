@@ -97,15 +97,39 @@ function buildScaleFilter(resolutionScale) {
 }
 
 /**
- * Resolve output fps from config (defaults to project/machine 50).
+ * Source (Caspar channel) rate feeding the virtual camera — the canonical project fps, with the
+ * legacy machineProfile fallback.
+ * @param {object} config
+ * @returns {number}
+ */
+function resolveV4l2BridgeSourceFps(config) {
+	try {
+		const { resolveProjectFps } = require('../config/project-fps')
+		const f = resolveProjectFps(config)
+		if (Number.isFinite(f) && f > 0) return Math.round(f)
+	} catch {
+		/* fall through to the legacy field */
+	}
+	const machineFps = parseInt(String(config?.machineProfile?.defaultProjectFps ?? ''), 10)
+	return Number.isFinite(machineFps) && machineFps > 0 ? machineFps : 50
+}
+
+/**
+ * Resolve virtual-camera output fps.
+ * WO-401 F5-revised (owner 30.07.26: "half the fps … not hard coded to 25 but variable depending
+ * on input. also if the input is 25 it shouldn't half to 12,5"): with no explicit
+ * `virtualCamera.fps`, derive from the source channel rate and HALVE it — but only while the
+ * halved rate stays ≥ 25 (50 → 25, 60 → 30; 25/30 sources stay as they are). An explicit
+ * `virtualCamera.fps` always wins un-halved; `'native'` = full source rate.
  * @param {object} config
  * @returns {number}
  */
 function resolveV4l2BridgeFps(config) {
 	const vc = config?.virtualCamera || {}
-	const machineFps = parseInt(String(config?.machineProfile?.defaultProjectFps ?? ''), 10)
-	const fallback = Number.isFinite(machineFps) && machineFps > 0 ? machineFps : 50
-	return clampV4l2BridgeFps(vc.fps, fallback)
+	const src = resolveV4l2BridgeSourceFps(config)
+	if (String(vc.fps ?? '').trim() !== '') return clampV4l2BridgeFps(vc.fps, src)
+	const half = Math.round(src / 2)
+	return clampV4l2BridgeFps(half >= 25 ? half : src, src)
 }
 
 /**

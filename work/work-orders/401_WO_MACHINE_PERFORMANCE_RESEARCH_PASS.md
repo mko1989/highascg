@@ -209,6 +209,17 @@ Second tranche, same evening (owner: "ok, continue"):
   is the 1080p50 mjpeg **decode** itself. Real levers, both owner-visible tradeoffs, not taken
   unilaterally: `virtualCamera.fps` 50 → 25/30 (halves Caspar-side encode + relay decode) and/or
   an on-demand lifecycle (run the bridge only while something holds /dev/video10 open).
+  - **F5-revised — DONE (owner decision 30.07 eve: "half the fps is fine but needs to be not
+    hard coded to 25 but be variable depending on input. also if the input is 25 it shouldnt
+    half to 12,5").** `v4l2-bridge-args.js resolveV4l2BridgeFps`: with no explicit
+    `virtualCamera.fps`, the output rate now derives from the SOURCE channel rate (new
+    `resolveV4l2BridgeSourceFps` → canonical `resolveProjectFps`, legacy machineProfile
+    fallback) and is halved only while the result stays ≥ 25: 50 → 25, 60 → 30, 25 → 25,
+    30 → 30. Explicit `virtualCamera.fps` wins un-halved; `'native'` = full source rate.
+    Feeds both the Caspar STREAM/FILE consumer params and the jpeg-branch `-framerate` (shared
+    resolver). Verified against the LIVE config offline: box resolves source 50 (via
+    `screen_1_mode: 1080p5000`; `machineProfile.defaultProjectFps` unset) → virtual camera runs
+    25 fps after the post-show restart. The on-demand-lifecycle idea stays open.
 
 Third tranche, same evening:
 
