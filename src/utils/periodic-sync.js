@@ -27,7 +27,10 @@ let oscChannelsBlobCtx = null
 function fireOscChannelsBlob(ctx) {
 	if (!ctx || typeof ctx._wsBroadcast !== 'function' || typeof ctx.state?.getState !== 'function') return
 	try {
-		ctx._wsBroadcast('change', { path: 'channels', value: ctx.state.getState().channels })
+		// WO-401 F6: broadcast stringifies immediately — shared references beat a full-state clone.
+		const st =
+			typeof ctx.state.getStateShared === 'function' ? ctx.state.getStateShared() : ctx.state.getState()
+		ctx._wsBroadcast('change', { path: 'channels', value: st.channels })
 	} catch {
 		/* ignore */
 	}

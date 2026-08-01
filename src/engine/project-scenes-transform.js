@@ -111,8 +111,9 @@ function enrichDeckScenesWithProject(deckScenes, projectEnvelope) {
  * Live WS-synced deck (ctx.sceneDeck) wins over on-disk project for look names.
  * @param {object} ctx
  */
-function buildSceneDeckForApi(ctx) {
-	const projectEnv = loadProjectScenes()
+/** @param {object} ctx @param {object|null} [sharedProjectEnv] — pass a pre-loaded envelope to skip the disk re-read (WO-401 F6) */
+function buildSceneDeckForApi(ctx, sharedProjectEnv) {
+	const projectEnv = sharedProjectEnv !== undefined ? sharedProjectEnv : loadProjectScenes()
 	const fromProject = extractSceneDeckFromProjectScenes(projectEnv)
 	const rawDeck =
 		ctx?.sceneDeck && typeof ctx.sceneDeck === 'object' && Array.isArray(ctx.sceneDeck.looks)

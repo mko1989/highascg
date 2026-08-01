@@ -29,7 +29,11 @@ function getState(ctx, opts = {}) {
 	const channelMap = buildChannelMap(ctx)
 
 	let base
-	if (ctx.state && typeof ctx.state.getState === 'function') {
+	if (ctx.state && typeof ctx.state.getStateShared === 'function') {
+		// WO-401 F6: this DTO only reads/serializes `base` (media enrichment maps to new objects,
+		// both branches re-spread before assigning) — skip getState()'s deep clones.
+		base = ctx.state.getStateShared()
+	} else if (ctx.state && typeof ctx.state.getState === 'function') {
 		base = ctx.state.getState()
 	} else {
 		base = {
@@ -82,16 +86,18 @@ function getState(ctx, opts = {}) {
 	const timelinePlayback =
 		timelineEngine && typeof timelineEngine.getPlayback === 'function' ? timelineEngine.getPlayback() : null
 
-	/** Looks + snapshots from saved project; live `previewSceneId` from WS when UI is connected. */
-	const sceneDeck = buildSceneDeckForApi(ctx)
-
-	let globalBorders = null
+	/** Looks + snapshots from saved project; live `previewSceneId` from WS when UI is connected.
+	 * WO-401 F6: load the project envelope ONCE per request and share it with the deck builder —
+	 * each loadProjectScenes() is 2 readFileSync + JSON.parse of the full project file. */
+	let projectEnv = null
 	try {
-		const scenes = loadProjectScenes()
-		if (Array.isArray(scenes?.globalBorders)) globalBorders = scenes.globalBorders
+		projectEnv = loadProjectScenes()
 	} catch (_) {
 		// Ignore project-scene load failures and fall back to the current state snapshot.
 	}
+	const sceneDeck = buildSceneDeckForApi(ctx, projectEnv)
+
+	const globalBorders = Array.isArray(projectEnv?.globalBorders) ? projectEnv.globalBorders : null
 
 	const hostLiveMig = migrateExtraLiveSourcesList(Array.isArray(cfg.extraLiveSources) ? cfg.extraLiveSources : [], {
 		config: cfg,

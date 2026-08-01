@@ -405,7 +405,22 @@ class StateManager extends EventEmitter {
 	}
 
 	/**
-	 * Full state snapshot.
+	 * WO-401 F6: full state for SERIALIZE-ONLY consumers (HTTP /api/state, WS bootstrap/broadcast).
+	 * Top-level object is fresh; nested values are LIVE references — callers must not mutate them
+	 * (measured: getState()'s deep clones of media/templates/channels/osc dominated the 43–49 ms
+	 * synchronous /api/state stall, and the WS slim-bootstrap path threw the cloned catalog away).
+	 * @returns {object}
+	 */
+	getStateShared() {
+		return {
+			...this._state,
+			serverInfo: { ...this._state.serverInfo },
+			variables: { ...this.variables },
+		}
+	}
+
+	/**
+	 * Full state snapshot (deep-cloned — safe to mutate).
 	 * @returns {object}
 	 */
 	getState() {
