@@ -101,9 +101,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 			}
 		}
 		if (typeof ctx.getState === 'function') return ctx.getState()
-		// WO-401 F6: serialize-only path — shared references, no deep clone.
-		if (ctx.state && typeof ctx.state.getStateShared === 'function') return ctx.state.getStateShared()
-		if (ctx.state && typeof ctx.state.getState === 'function') return ctx.state.getState()
+		if (ctx.state) { const f = ctx.state.getStateShared || ctx.state.getState; if (typeof f === 'function') return f.call(ctx.state) } /* WO-401 F6: shared refs, serialize-only */
 		return {
 			channels: [],
 			media: [],

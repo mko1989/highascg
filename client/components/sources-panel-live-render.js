@@ -42,6 +42,20 @@ export function renderLiveTab(listEl, {
 		: []
 	const sources = [...extras, ...base]
 
+	/* todos30.07.26 (WO-401): the owner saw live-input thumbnails "refreshing periodically" —
+	 * the status objects carry volatile fields (`updatedAt: Date.now()` re-stamped by routing
+	 * retries), and keying the render on the WHOLE objects rebuilt every row (recreating each
+	 * <img> → refetch + visible flash) with nothing visible changed. Key on what the rows
+	 * actually display: the derived per-source slot message strings. */
+	const slotMsgForSource = (s) => {
+		if (s.routeType === 'decklink' && s.decklinkSlot != null)
+			return decklinkSlotStatusMessage(decklinkInputsStatus, s.decklinkSlot)
+		if (s.routeType === 'live_audio' && s.liveAudioSlot != null)
+			return liveAudioSlotStatusMessage(liveAudioInputsStatus, s.liveAudioSlot)
+		if (s.routeType === 'v4l2' && s.v4l2Slot != null) return v4l2SlotStatusMessage(v4l2InputsStatus, s.v4l2Slot)
+		return ''
+	}
+
 	const renderKey = JSON.stringify({
 		channelMap: {
 			program: channelMap?.programChannels || [],
@@ -57,11 +71,9 @@ export function renderLiveTab(listEl, {
 			res: s.resolution,
 			type: s.type,
 			routeType: s.routeType,
+			slotMsg: slotMsgForSource(s),
 		})),
 		connectors: connectors.map((c) => c?.id).filter(Boolean),
-		status: decklinkInputsStatus,
-		liveAudioStatus: liveAudioInputsStatus,
-		v4l2Status: v4l2InputsStatus,
 		operatorFs: hostOperatorFullscreen?.sourceId || null,
 	})
 	if (listEl._lastRenderKey === renderKey) return
@@ -114,14 +126,7 @@ export function renderLiveTab(listEl, {
 		}
 		const meta = metaItems.filter(Boolean).join(' · ')
 		
-		let slotMsg = ''
-		if (s.routeType === 'decklink' && s.decklinkSlot != null) {
-			slotMsg = decklinkSlotStatusMessage(decklinkInputsStatus, s.decklinkSlot)
-		} else if (s.routeType === 'live_audio' && s.liveAudioSlot != null) {
-			slotMsg = liveAudioSlotStatusMessage(liveAudioInputsStatus, s.liveAudioSlot)
-		} else if (s.routeType === 'v4l2' && s.v4l2Slot != null) {
-			slotMsg = v4l2SlotStatusMessage(v4l2InputsStatus, s.v4l2Slot)
-		}
+		const slotMsg = slotMsgForSource(s)
 		
 		const ch = getLiveThumbnailChannelForSource(s)
 		let thumbHtml

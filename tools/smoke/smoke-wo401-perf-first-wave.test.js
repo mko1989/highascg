@@ -136,6 +136,26 @@ describe('WO-401 F2: OSC mirror takes the snapshot by reference, no dead emits',
 	})
 })
 
+describe('WO-401 client tranche: paced meter loop, stable live-source rows', () => {
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../../', p), 'utf8')
+
+	it('F12: audio meter loop is interval-paced, not free-running rAF', () => {
+		const loop = read('client/lib/audio-mixer-meter-loop.js')
+		assert.ok(!loop.includes('requestAnimationFrame'), 'meter loop must not free-run at display rate')
+		assert.ok(loop.includes('setInterval(tick, TICK_MS)'), 'meter loop paced by interval')
+		assert.ok(loop.includes('SMOOTH_FALL = 0.45'), 'fall smoothing re-derived for 20 Hz')
+		// WO-284 guards must survive the rewrite.
+		assert.ok(loop.includes('_lastBg') && loop.includes('_lastMeterState') && loop.includes('document.hidden'))
+	})
+
+	it('todos30.07.26 item 6: live-tab render key excludes volatile status objects', () => {
+		const rendr = read('client/components/sources-panel-live-render.js')
+		assert.ok(!rendr.includes('status: decklinkInputsStatus'), 'raw status object (updatedAt churn) must not key the render')
+		assert.ok(!rendr.includes('liveAudioStatus: liveAudioInputsStatus'), 'raw status object must not key the render')
+		assert.ok(rendr.includes('slotMsg: slotMsgForSource(s)'), 'render keyed on the displayed slot message instead')
+	})
+})
+
 describe('WO-401 F9: immediate persistence keys coalesce into one write', () => {
 	it('does not write synchronously, lands compact JSON within the window', async () => {
 		const stateFile = path.join(os.tmpdir(), `highascg-state-test-${process.pid}.json`)
