@@ -66,3 +66,8 @@ Thumbs.db
 // must neither overwrite nor receive them.
 /template/shaders
 /data/shaders
+
+// WO-401 F8 (30.07.26): retired-project tombstones (620 dirs / 19 MB, nothing prunes them) —
+// pure rescan+index cost on 4 machines, no peer needs them. MIRROR THIS ON THE MAC before
+// deleting anything under it, or peers will push the dirs right back.
+/projects/_trash
