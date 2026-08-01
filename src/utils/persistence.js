@@ -42,8 +42,21 @@ const IMMEDIATE_KEYS = new Set([
 	'screenTimers',
 ])
 
+/**
+ * WO-401 F9: immediate keys used to `_writeToDisk()` inline per `set` — a scene take sets
+ * several of them back-to-back, each paying a full synchronous 57 KB stringify+write+rename on
+ * the main thread. A tiny coalescing window turns that burst into one write while keeping the
+ * WO-101 intent (state survives a crash moments after a take). 0 restores strict write-through.
+ */
+const IMMEDIATE_COALESCE_MS = Math.max(
+	0,
+	Math.min(1000, parseInt(process.env.HIGHASCG_PERSISTENCE_IMMEDIATE_COALESCE_MS || '25', 10) || 0),
+)
+
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _saveTimer = null
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _immediateTimer = null
 
 function _load() {
 	if (_cache !== null) return _cache
@@ -57,6 +70,10 @@ function _load() {
 }
 
 function _writeToDisk() {
+	if (_immediateTimer) {
+		clearTimeout(_immediateTimer)
+		_immediateTimer = null
+	}
 	if (_cache === null) return
 	try {
 		const json = PRETTY ? JSON.stringify(_cache, null, 2) : JSON.stringify(_cache)
@@ -122,7 +139,16 @@ function set(key, value) {
 		_cache[key] = value
 	}
 	if (IMMEDIATE_KEYS.has(key)) {
-		_writeToDisk()
+		if (IMMEDIATE_COALESCE_MS <= 0) {
+			_writeToDisk()
+		} else if (!_immediateTimer) {
+			// Deliberately ref'd (no unref): an armed on-air write must land even if the
+			// process is winding down without reaching flushSync.
+			_immediateTimer = setTimeout(() => {
+				_immediateTimer = null
+				_writeToDisk()
+			}, IMMEDIATE_COALESCE_MS)
+		}
 	} else {
 		_scheduleSave()
 	}

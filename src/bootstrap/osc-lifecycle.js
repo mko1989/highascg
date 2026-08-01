@@ -46,12 +46,19 @@ function createOscLifecycle({
 		oscListener = new OscListener(config.osc, appCtx.log, oscState)
 		oscListener.start()
 
-		const pushOscToState = () => {
-			const snap = appCtx.oscState.getSnapshot()
+		/**
+		 * WO-401 F2: one snapshot per tick. In full-snapshot mode the emitted `change` payload IS a
+		 * fresh snapshot — reuse it instead of re-deriving (and re-cloning) the same data; only
+		 * delta-mode payloads (partial) force a fresh `getSnapshot()`. The consumer chain
+		 * (updateFromOscSnapshot mirror, variables, WS stringify, playlist handler) is read-only,
+		 * so sharing the one object is safe.
+		 */
+		const pushOscToState = (snap) => {
+			const snapshot = snap && !snap.delta ? snap : appCtx.oscState.getSnapshot()
 			if (typeof appCtx.state.updateFromOscSnapshot === 'function') {
-				appCtx.state.updateFromOscSnapshot(snap)
+				appCtx.state.updateFromOscSnapshot(snapshot)
 			}
-			applyOscSnapshotToVariables(appCtx, snap)
+			applyOscSnapshotToVariables(appCtx, snapshot)
 		}
 		pushOscToState()
 		// Full snapshot so browsers never rely only on delta WS + first `state` (which may have had osc: null before OSC started).
@@ -59,7 +66,7 @@ function createOscLifecycle({
 			appCtx._wsBroadcast('osc', appCtx.oscState.getSnapshot())
 		}
 		appCtx.oscState.on('change', (snapshot) => {
-			pushOscToState()
+			pushOscToState(snapshot)
 			if (typeof appCtx._wsBroadcast === 'function') {
 				appCtx._wsBroadcast('osc', snapshot)
 			}

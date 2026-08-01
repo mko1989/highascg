@@ -13,6 +13,10 @@
  *     WO-401 F3 flag decision must be revisited (that's intentional).
  */
 
+// F9 env knobs must be set BEFORE persistence.js is required (read at module load).
+process.env.HIGHASCG_PERSISTENCE_PRETTY = '0'
+process.env.HIGHASCG_PERSISTENCE_IMMEDIATE_COALESCE_MS = '25'
+
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
@@ -21,6 +25,8 @@ const path = require('path')
 const { OscListener } = require('../../src/osc/osc-listener')
 const { OscState } = require('../../src/osc/osc-state')
 const { recordAmcpHistory, flushAmcpHistory } = require('../../src/caspar/amcp-client-history')
+const { StateManager } = require('../../src/state/state-manager')
+const persistence = require('../../src/utils/persistence')
 
 const OSC_CFG = {
 	enabled: true,
@@ -99,5 +105,55 @@ describe('WO-401 F3 void finding: dirty tracking is per-message, not per-change'
 		// Drained: no traffic → null payload.
 		assert.equal(osc._buildChangePayload(), null)
 		osc.destroy()
+	})
+})
+
+describe('WO-401 F2: OSC mirror takes the snapshot by reference, no dead emits', () => {
+	it('stores snapshot/audio/oscLayers without cloning and emits no per-tick change paths', () => {
+		const sm = new StateManager()
+		const snap = {
+			updatedAt: Date.now(),
+			channels: {
+				1: {
+					format: '1080p5000',
+					audio: { nbChannels: 2, levels: [{ dBFS: -12, peak: -6, peakAge: 0 }] },
+					layers: { 10: { file: { name: 'clip' } } },
+					outputs: {},
+					profiler: { actual: 1, expected: 2, healthy: true },
+				},
+			},
+		}
+		const changesBefore = sm._changes.length
+		sm.updateFromOscSnapshot(snap)
+		// By reference — the per-tick JSON round-trips are gone.
+		assert.equal(sm._state.osc, snap)
+		assert.equal(sm._state.audio['1'].levels, snap.channels[1].audio.levels)
+		const entry = sm._state.channels.find((c) => c.id === 1)
+		assert.equal(entry.oscLayers, snap.channels[1].layers)
+		// No osc/audio/channels.N change entries queued (getDelta() is caller-less; WS clients
+		// never read those paths — client OSC rides the dedicated 'osc' broadcast).
+		assert.equal(sm._changes.length, changesBefore)
+	})
+})
+
+describe('WO-401 F9: immediate persistence keys coalesce into one write', () => {
+	it('does not write synchronously, lands compact JSON within the window', async () => {
+		const stateFile = path.join(os.tmpdir(), `highascg-state-test-${process.pid}.json`)
+		fs.rmSync(stateFile, { force: true })
+		persistence.set('scene_deck', { a: 1 })
+		persistence.set('screenTimers', { b: 2 })
+		assert.ok(!fs.existsSync(stateFile), 'immediate key wrote synchronously despite coalesce window')
+		await new Promise((r) => setTimeout(r, 80))
+		assert.ok(fs.existsSync(stateFile), 'coalesced write never landed')
+		const raw = fs.readFileSync(stateFile, 'utf8')
+		assert.ok(!raw.includes('\n'), 'HIGHASCG_PERSISTENCE_PRETTY=0 should produce compact JSON')
+		const parsed = JSON.parse(raw)
+		assert.equal(parsed.scene_deck.a, 1)
+		assert.equal(parsed.screenTimers.b, 2)
+		// flushSync stays synchronous for shutdown paths.
+		persistence.set('scene_deck', { a: 3 })
+		persistence.flushSync()
+		assert.equal(JSON.parse(fs.readFileSync(stateFile, 'utf8')).scene_deck.a, 3)
+		fs.rmSync(stateFile, { force: true })
 	})
 })

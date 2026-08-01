@@ -187,7 +187,8 @@ class OscState extends EventEmitter {
 	_buildChangePayload() {
 		const ts = Date.now()
 		if (!this._config.wsDeltaBroadcast) {
-			return this.getSnapshot()
+			// _flushEmit already ran decay/prune this tick — skip getSnapshot()'s repeat (WO-401 F2).
+			return this._snapshotNow(ts)
 		}
 		if (this._dirtyChannels.size === 0) {
 			return null
@@ -206,6 +207,11 @@ class OscState extends EventEmitter {
 		const now = Date.now()
 		this._decayStaleAudio(now)
 		this._pruneStaleLayers(now)
+		return this._snapshotNow(now)
+	}
+
+	/** Snapshot without the decay/prune housekeeping — for callers that already ran it this tick. */
+	_snapshotNow(now) {
 		return {
 			channels: JSON.parse(JSON.stringify(this._channels)),
 			updatedAt: now,

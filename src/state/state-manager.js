@@ -346,7 +346,14 @@ class StateManager extends EventEmitter {
 			this._emit('osc', null)
 			return
 		}
-		this._state.osc = JSON.parse(JSON.stringify(snapshot))
+		/* WO-401 F2: `snapshot` is a fresh per-tick object (OscState.getSnapshot() output) that this
+		 * mirror takes ownership of by reference — every tick replaces it wholesale and no consumer
+		 * mutates it in place, so the former JSON round-trips here (a full deep clone plus per-channel
+		 * audio/layers/outputs clones, 20×/s) bought nothing. The per-tick _emit('osc'/'audio'/
+		 * 'channels.N') calls are gone too: getDelta() has no callers, no WS client reads those change
+		 * paths (client OSC rides the dedicated 'osc' broadcast; Companion only consumes scene.*), and
+		 * INFO-driven channel emits still fire via _queueInfoChannelWsEmit. */
+		this._state.osc = snapshot
 		const chans = snapshot.channels || {}
 		const audio = {}
 		const seenIds = new Set()
@@ -356,7 +363,7 @@ class StateManager extends EventEmitter {
 			if (ch.audio) {
 				audio[k] = {
 					nbChannels: ch.audio.nbChannels,
-					levels: JSON.parse(JSON.stringify(ch.audio.levels || [])),
+					levels: ch.audio.levels || [],
 				}
 			}
 			const id = parseInt(k, 10)
@@ -368,10 +375,9 @@ class StateManager extends EventEmitter {
 				this._state.channels.push(entry)
 			}
 			entry.oscFormat = ch.format != null ? String(ch.format) : null
-			entry.oscLayers = ch.layers ? JSON.parse(JSON.stringify(ch.layers)) : {}
-			entry.oscProfiler = ch.profiler ? { ...ch.profiler } : undefined
-			entry.oscOutputs = ch.outputs ? JSON.parse(JSON.stringify(ch.outputs)) : {}
-			this._emit(`channels.${id}`, entry)
+			entry.oscLayers = ch.layers || {}
+			entry.oscProfiler = ch.profiler || undefined
+			entry.oscOutputs = ch.outputs || {}
 		}
 		for (const entry of this._state.channels) {
 			if (!seenIds.has(entry.id)) {
@@ -382,8 +388,6 @@ class StateManager extends EventEmitter {
 			}
 		}
 		this._state.audio = audio
-		this._emit('osc', this._state.osc)
-		this._emit('audio', this._state.audio)
 	}
 
 	_stripOscFieldsFromChannels() {
