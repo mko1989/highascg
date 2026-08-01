@@ -14,7 +14,7 @@ import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
 import { sceneState } from '../lib/scene-state.js'
-import { liveShaderInstances } from '../lib/shader-live-instances.js'
+import { liveShaderInstances, createPlaylistNowTracker } from '../lib/shader-live-instances.js'
 import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
 import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml } from './shader-live-rows.js'
 import { createShaderLiveStack } from './shader-live-stack.js'
@@ -94,7 +94,11 @@ export function initShaderLiveEditor(stateStore) {
 		return overlay
 	}
 
-	const instances = () => liveShaderInstances(stateStore)
+	/* issues 01.08: playlist layers hop server-side without touching scene.live — resolve them to
+	 * the item actually ON AIR, else edits (and the 403→CG ADD re-host) land on the stale first
+	 * shader and visibly replay it. Polls only while the overlay is open. */
+	const _plNow = createPlaylistNowTracker(api, () => onLiveChanged())
+	const instances = () => liveShaderInstances(stateStore, _plNow.now())
 	const keyOf = (i) => `${i.shaderId}@${i.channel}-${i.pLayer}`
 	const selected = () => instances().find((i) => keyOf(i) === selectedKey) || null
 
@@ -107,7 +111,13 @@ export function initShaderLiveEditor(stateStore) {
 				'<p class="settings-note">No shader live — take a shader look to PGM or PRV.</p>'
 			return false
 		}
-		if (!list.some((i) => keyOf(i) === selectedKey)) selectedKey = keyOf(list[0])
+		if (!list.some((i) => keyOf(i) === selectedKey)) {
+			/* issues 01.08: a playlist hop replaces this channel-layer's instance — FOLLOW the layer
+			 * (load the shader now on air there) instead of snapping back to the first in the list. */
+			const tail = String(selectedKey || '').split('@')[1]
+			const follow = tail ? list.find((i) => keyOf(i).endsWith(`@${tail}`)) : null
+			selectedKey = keyOf(follow || list[0])
+		}
 		const html = list
 			.map((i) => {
 				const k = keyOf(i)
@@ -431,8 +441,11 @@ export function initShaderLiveEditor(stateStore) {
 			unsub = null
 		}
 		if (open) {
+			_plNow.start()
 			if (renderInstanceList()) void loadSelected()
 			unsub = stateStore.on?.('*', () => onLiveChanged()) || null
+		} else {
+			_plNow.stop()
 		}
 	}
 
