@@ -1,6 +1,6 @@
 # WO-401 — Machine performance research pass (todos30.07.26)
 
-**Status:** OPEN — research complete 2026-07-30, no fixes applied yet (show day; owner to pick targets)
+**Status:** IN PROGRESS — research complete 2026-07-30; first wave (F1, F4, F8) implemented same day, owner-approved ("you can start working on those"), **awaiting service restart after the show** to take effect. F3 found VOID as proposed — see §2.
 **Priority:** High (owner: "things that can be done better to get better performance of the machine")
 **Date:** 2026-07-30
 **Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
@@ -145,11 +145,47 @@ covers `.highascg-state.json`, `data/`, `log/`, `media/`, `node_modules/`.
 
 ## 2. What was done
 
-Research only — no code changes under this WO (2026-07-30 is a show day). Suggested first wave when
-owner green-lights, cheapest-risk first: F3 (config flag — delta path already tested), F1, F4, F9
-(env var + coalesce), F5, F8 (.stignore, mirror on Mac), F2.
+First wave implemented 2026-07-30 evening (owner: "you can start working on those. the machine is
+on show now. so no restarts") — all server-side, **inert until the next service restart**; nothing
+was restarted or reloaded.
+
+- **F1** — `src/osc/osc-listener.js`: `sampleAddresses` array ring → `Set`, frozen at 40 distinct
+  addresses (hot path after saturation = two integer ops). Semantics change: first-40-seen instead
+  of last-40-seen; `/api/osc/diagnostics` response shape unchanged.
+- **F4** — `src/caspar/amcp-client-history.js`: the inline `mkdirSync` + `writeFileSync` before
+  every `socket.send` is gone. Ring stays in memory; `data/amcp-last50.txt` is now a debounced
+  (1 s, unref'd timer) async fire-and-forget artifact. `flushAmcpHistory` exported;
+  `ctx._amcpHistoryFile` overrides the path for tests. Crash loses ≤1 s of tail — acceptable,
+  nothing reads the file back.
+- **F8** — `.stignore`: added `/projects/_trash` (WARNING in-file: **mirror on the Mac** — the
+  entry is git-tracked so it arrives via pull, but Syncthing does not sync `.stignore` itself —
+  before deleting any tombstones, or peers push them back, cf. the WO-354 shader fight). No
+  tombstones deleted yet; the age/count cap in `retireProjectSlug` remains a follow-up.
+- **F3 — VOID as proposed, flag NOT enabled.** Found while wiring it: `osc-state.js:110` does
+  `_dirtyChannels.add(ch)` on **every handled message**, with no value comparison — and Caspar
+  full-copies every channel's state every tick, so all 8 channels are dirty every 50 ms emit and
+  the "delta" payload contains all channels at full size. Net effect of the flag on this box:
+  identical bytes, plus the playlist handler (`scene-take-lbg-playlist.js:162`) and every WS
+  consumer switch payload shape — risk without reward. (Checked before deciding: the playlist
+  handler DOES tolerate delta payloads — channels absent from `snapshot.channels` just no-op —
+  and `osc-lifecycle.js:50` keeps the StateManager mirror full regardless. So the flag is *safe*,
+  merely useless.) A comment in `.env` records why it is deliberately unset. **F3-revised
+  (follow-up):** make dirty-marking value-aware in the leaf writers (`_routeLayer`,
+  `_routeMixerAudio`, …); only then does the flag pay. The new smoke deliberately pins today's
+  per-message semantics so that change forces a revisit here. Alternative cheap lever if the
+  owner accepts 10 Hz meters: `emitIntervalMs` 50 → 100 halves tick work + WS bytes — feel-visible,
+  owner's call, not taken unilaterally.
+
+Not touched this wave: F2 (single-snapshot-per-tick refactor), F5 (v4l2 `-vf`), F6, F7, F9–F15.
 
 ## 3. What was VERIFIED
 
-Measurements taken live (see table). F1–F5 independently re-read in source at the cited lines by
-the main session before this WO was written; F6–F15 carry researcher evidence, re-verify at fix time.
+- Research: measurements taken live (see table); F1–F5 re-read in source at the cited lines by the
+  main session before the WO was written; F6–F15 carry researcher evidence, re-verify at fix time.
+- First wave: new `tools/smoke/smoke-wo401-perf-first-wave.test.js` (3 tests — F1 saturation +
+  Set hot path; F4 no-sync-write + 50-cap + async flush content; F3 void-finding pin: identical
+  message twice still dirties the channel, guards the revisit). Added to the curated FILES list.
+  Full offline suite **1762 pass / 0 fail / 2 skip**; `check-max-file-lines` 0 over.
+- NOT yet verified live: the changed code paths run only after the post-show restart. Owner QA
+  after restart: `/api/osc/diagnostics` still returns addresses; `data/amcp-last50.txt` updates
+  within ~1 s of AMCP traffic; take feel unchanged/better.
