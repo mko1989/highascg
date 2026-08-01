@@ -1,6 +1,6 @@
 # WO-401 — Machine performance research pass (todos30.07.26)
 
-**Status:** IN PROGRESS — research complete 2026-07-30; **F1, F2, F4, F6, F7, F8, F9 implemented same day** (owner-approved), **awaiting service restart after the show** to take effect. F3 and F5 found VOID as proposed; F10–F15 deliberately deferred with reasons — see §2. Follow-ups: F3-revised (value-aware dirty marking), client tranche (F12 + todos item 6) post-show.
+**Status:** IN PROGRESS — research complete 2026-07-30; **F1, F2, F3-revised (+delta flag ON), F4, F5-revised (fps derives from source), F6, F7, F8, F9, F12 and todos item 6 all implemented same day** (owner-approved), **awaiting the post-show deploy** (build:client → service restart → kiosk F5) to take effect. F3/F5 as ORIGINALLY proposed were void — superseded by the -revised versions. Deferred with reasons: F10/F11 (marginal), F13 (owner call), F14 (feature off), F15 (quiet day, DM3 path). Remaining follow-up: v4l2 on-demand lifecycle idea.
 **Priority:** High (owner: "things that can be done better to get better performance of the machine")
 **Date:** 2026-07-30
 **Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
@@ -244,12 +244,32 @@ Third tranche, same evening:
   an OSC subsystem restart repopulates from scratch. WO-239 clearing semantics unchanged —
   its dedicated smoke passes untouched.
 
+Fifth tranche, same evening — **F3-revised DONE, delta flag ENABLED**:
+
+- Dirty-marking is now VALUE-aware end to end: `_routePath`/`_routeLayer`/`_routeLayerFile`/
+  `_routeLayerHost`/`_routeMixerAudio` return whether a consumed value changed, and
+  `handleOscMessage` dirties the channel only then. Deliberate exclusions (stored but never
+  dirty, all previously proven consumer-less): output port frame counters (increment every frame
+  on every channel — would have defeated delta mode single-handedly), channel/layer profiler
+  `actual`/`expected` jitter (only the channel `healthy` FLIP dirties), and the keep-alive
+  timestamps (`_lastOscAt`, `_lastUpdateAt`, `peakAge`). Housekeeping already marked its own
+  dirty channels (`_decayStaleAudio` — meters must decay to −120 for clients in delta mode;
+  `_pruneStaleLayers` — dead layers must disappear, cf. WO-151; `applyInfoTimingSupplement` too).
+  The `type==='empty'` reset stays unconditional (repeat empties re-clear INFO-supplemented
+  timing) but only counts as a change when something was cleared.
+- `HIGHASCG_OSC_WS_DELTA=1` set in `.env` (rollback = delete the line; the served client bundle
+  already contains the delta merge path — verified `.delta` handling in dist-web main chunk).
+  Net effect after restart: idle/silent channels drop out of the 20 Hz WS stream entirely;
+  active channels ship only while their meters/timers actually move. The old F3 void-pin smoke
+  was REPLACED by the F3-revised contract test (unchanged repeats clean, value change dirty,
+  frame counters never dirty, profiler jitter never dirty, paused-layer time repeats clean).
+
 Deliberately NOT taken (reasoning recorded so nobody re-litigates blind):
 - **F10/F11** — marginal after F1/F2: JS regex literals are compiled once by V8 (the "re-parsed
   regexes" premise was wrong); the `channels.find` is 64 integer compares/tick and a Map index
   would have to be kept in sync with every other `_state.channels` writer in the file — risk
-  outweighs <0.1 % of a core. The unhandled-suffix early-reject remains valid but is bundled
-  into F3-revised (value-aware dirty marking touches the same routing layer).
+  outweighs <0.1 % of a core. The unhandled-suffix concern is now half-covered by F3-revised:
+  unmatched tails return `false` and no longer dirty anything.
 - ~~F12 + todos item 6 (client) — parked~~ **Implemented later the same evening** (fourth
   tranche), source-only — **`npm run build:client` deliberately NOT run** so an accidental
   mid-show GUI reload cannot pick up unproven client code; build + kiosk reload happens with the
@@ -299,10 +319,17 @@ Deliberately NOT taken (reasoning recorded so nobody re-litigates blind):
   lines (F6 fallback compacted). **dist-web NOT rebuilt** — served bundle is still pre-tranche-4.
 - Post-show deploy sequence: (1) `npm run build:client`, (2) service restart
   (`kill -TERM $(systemctl show -p MainPID --value highascg)`), (3) kiosk F5.
+- Fifth tranche: final suite **1768 pass / 0 fail / 2 skip** — this includes the full
+  WO-235/239/250/251/252 OSC-compat matrix (both Caspar lineages, exact field values) running
+  against the value-aware rewrite, plus the rewritten F3-revised contract test and the
+  F5-revised fps-derivation tests (live config verified offline: source resolves 50 → vcam 25).
 - NOT yet verified live (post-restart owner QA): `/api/state` latency re-measure (expect well
   under 10 ms), `/api/variables` meters still tick, companion variables live, WS state hydrate
-  intact on a GUI reload, audio-mixer meters feel unchanged at 20 Hz, live-input thumbnails no
-  longer flash periodically.
+  intact on a GUI reload, audio-mixer meters feel unchanged at 20 Hz AND decay to silence within
+  ~5 s of stopping audio (delta-mode decay path), live-input thumbnails no longer flash, virtual
+  camera consumers happy at 25 fps, WS `osc` traffic re-measure (was 323 KB/s/client — expect a
+  large drop with idle channels out). Delta rollback: remove `HIGHASCG_OSC_WS_DELTA=1` from
+  `.env` + restart.
 - NOT yet verified live: the changed code paths run only after the post-show restart. Owner QA
   after restart: `/api/osc/diagnostics` still returns addresses; `data/amcp-last50.txt` updates
   within ~1 s of AMCP traffic; take feel unchanged/better.
