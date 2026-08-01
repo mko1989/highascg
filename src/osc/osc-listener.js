@@ -19,19 +19,22 @@ class OscListener {
 		this._oscState = oscState
 		/** @type {import('osc').UDPPort | null} */
 		this._port = null
-		/** @type {{ received: number, lastAt: number | null, sampleAddresses: string[] }} */
-		this._stats = { received: 0, lastAt: null, sampleAddresses: [] }
+		/** @type {{ received: number, lastAt: number | null }} */
+		this._stats = { received: 0, lastAt: null }
+		/**
+		 * First 40 distinct addresses seen, then frozen (WO-401 F1: the old last-40 ring did a
+		 * 40-string `includes` scan per message — ~1.2 % of a core at the measured 18.6k msg/s,
+		 * for a diagnostics-only field). Once saturated the hot path is two integer ops.
+		 * @type {Set<string>}
+		 */
+		this._sampleAddresses = new Set()
 	}
 
 	_record(addr) {
 		this._stats.received++
 		this._stats.lastAt = Date.now()
 		if (!addr) return
-		const s = this._stats.sampleAddresses
-		if (!s.includes(addr)) {
-			s.push(addr)
-			if (s.length > 40) s.shift()
-		}
+		if (this._sampleAddresses.size < 40) this._sampleAddresses.add(addr)
 	}
 
 	/** @returns {{ received: number, lastAt: number | null, sampleAddresses: string[], floatByteOrder: string }} */
@@ -39,7 +42,7 @@ class OscListener {
 		return {
 			received: this._stats.received,
 			lastAt: this._stats.lastAt,
-			sampleAddresses: [...this._stats.sampleAddresses],
+			sampleAddresses: [...this._sampleAddresses],
 			floatByteOrder: this._endian ? this._endian.getMode() : 'auto',
 		}
 	}
