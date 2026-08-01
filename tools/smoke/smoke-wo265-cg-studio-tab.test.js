@@ -143,7 +143,11 @@ describe('WO-265 T265.3/T265.4: workspace tab + video latch (source asserts)', (
 		assert.match(src, /export function setForegroundTabBlocksVideo/)
 		assert.match(src, /export function registerVideoBlockingTab/)
 		assert.match(src, /_videoBlockingTabs\.has\(tab\)/, 'central listener computes the latch from the registered set')
-		assert.match(src, /_suppressed \|\| _tabBlocked \? \[\] : mergedCells\(\)/)
+		/* issues 01.08: interaction suppression no longer empties the set (that DELETEd the layout
+		 * and STOPped the compose routes — "preview loses signal" on every drag/modal). The tab
+		 * latch still empties; _suppressed rides the WO-319 suppressHoles flag instead. */
+		assert.match(src, /_tabBlocked \? \[\] : mergedCells\(\)/)
+		assert.match(src, /_composeHolesSuppressed \|\| _suppressed/, 'interaction suppression closes holes via the WO-319 flag, not by emptying the layout')
 		assert.ok(!/sendLayout\(mergedCells\(\)\)/.test(src), 'no send path bypasses effectiveCells()')
 		assert.match(src, /_suppressed = false\s*\n\s*_tabBlocked = false/, 'test reset clears the latch')
 	})

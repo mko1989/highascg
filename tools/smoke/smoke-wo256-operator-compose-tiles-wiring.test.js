@@ -194,6 +194,9 @@ describe('2026-07-19 fix: recovery re-sends never assert an EMPTY layout (boot D
 	it('genuine withdrawals still go through their own immediate paths (not via resendMergedNow)', () => {
 		const src = read('client/lib/operator-gui-mode.js') + read('client/lib/operator-gui-mode-report.js')
 		assert.match(src, /function reportSurfaceCells\([\s\S]{0,300}_bySurface\.delete\(surface\)[\s\S]{0,80}scheduleReport\(\)/)
-		assert.match(src, /_suppressed = true[\s\S]{0,200}void sendLayout\(\[\]\)/, 'popup suppression still sends empty immediately')
+		/* issues 01.08: suppression no longer sends EMPTY (a DELETE stopped the compose routes —
+		 * "preview loses signal" per drag/modal). It still sends IMMEDIATELY, now with the cells
+		 * held and holes closed via the WO-319 suppressHoles flag (see effectiveCells()). */
+		assert.match(src, /_suppressed = true[\s\S]{0,400}void sendLayout\(effectiveCells\(\)\)/, 'popup suppression still sends immediately (holes closed via suppressHoles)')
 	})
 })

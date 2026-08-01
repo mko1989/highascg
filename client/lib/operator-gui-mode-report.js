@@ -53,10 +53,15 @@ function mergedCells() {
 	return out
 }
 
-/** The set that should actually be on the wire right now — empty while a popup suppression OR
- * the foreground-tab latch (WO-265) is active, else the merged surface cells. */
+/** The set that should actually be on the wire right now — empty while the foreground-tab latch
+ * (WO-265) is active, else the merged surface cells. Interaction suppression no longer empties
+ * the set (issues 01.08): an empty POST DELETEs the layout, which STOPs every compose route
+ * producer — so each drag/modal cost a full route re-acquire on restore ("preview loses signal").
+ * Instead the cells stay on the wire and `_suppressed` rides the WO-319 suppressHoles flag: the
+ * shape holes close immediately but the routes keep playing behind the solid window, and restore
+ * is only a shape-rect re-add — the picture is back the instant the hole is. */
 function effectiveCells() {
-	return _suppressed || _tabBlocked ? [] : mergedCells()
+	return _tabBlocked ? [] : mergedCells()
 }
 
 /* WO-338: throttle, not trailing-edge debounce — the old pure debounce meant a continuous tile
@@ -195,7 +200,9 @@ async function sendLayout(cells, { force = false } = {}) {
 	// WO-319: hole-suppression is HOST-only — a remote client editing the shared layout must not send
 	// suppressHoles (that would blank the operator's physical-monitor holes based on the REMOTE's live
 	// preview state). The shared cell layout still posts; only the host's own hole toggle rides along.
-	const suppress = isRemoteOperatorView() ? false : _composeHolesSuppressed
+	// Interaction suppression (modals/drags) rides the same flag — see effectiveCells(). On a remote
+	// it therefore dedupes into silence instead of DELETE-ing the shared layout out from under the host.
+	const suppress = isRemoteOperatorView() ? false : _composeHolesSuppressed || _suppressed
 	// Fold the hole-suppress flag into the dedupe key so toggling live preview re-sends even when
 	// the cell rects are identical (the flag is the only thing that changed).
 	const json = JSON.stringify({ cells, s: suppress })
@@ -232,7 +239,7 @@ export function setOperatorComposeHolesSuppressed(suppressed) {
  * modal/dropdown/context-menu is open, or a pointer-drag is happening on a preview surface (layer
  * dragging in the looks editor), the video overlay sitting above the GUI would otherwise hide
  * popups and drag chrome. Suppress fires immediately (cancels any pending debounced report and
- * POSTs empty right away); restore is debounced {@link RESTORE_DEBOUNCE_MS} after the LAST
+ * re-POSTs the cells with suppressHoles right away); restore is debounced {@link RESTORE_DEBOUNCE_MS} after the LAST
  * `setInteractionSuppressed(false)` call, re-sending whatever the surfaces currently hold.
  * @param {boolean} suppressed
  */
@@ -249,7 +256,9 @@ export function setInteractionSuppressed(suppressed) {
 			clearTimeout(_debounceTimer)
 			_debounceTimer = null
 		}
-		void sendLayout([])
+		/* issues 01.08: cells stay up, suppressHoles closes the holes — routes never stop, so the
+		 * restore below shows live video the instant the shape rects come back (no re-PLAY). */
+		void sendLayout(effectiveCells())
 		return
 	}
 	if (!_suppressed) return
@@ -323,8 +332,8 @@ function resendMergedNow() {
 	// an empty layout and wipe the layout the server just re-applied from `operatorGuiLayout`
 	// persistence. Genuine withdrawals never come through this path — they go through
 	// reportSurfaceCells / setInteractionSuppressed / setForegroundTabBlocksVideo, which all send
-	// immediately on their own. (Suppression with live surfaces still re-asserts empty: _bySurface
-	// is non-empty then, only `effectiveCells()` is empty.)
+	// immediately on their own. (Suppression with live surfaces re-asserts the cells with
+	// suppressHoles=true — the layout survives a mid-modal reconnect, holes stay closed.)
 	if (!_bySurface.size) return
 	if (_debounceTimer) {
 		clearTimeout(_debounceTimer)
