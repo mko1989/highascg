@@ -1,6 +1,6 @@
 # WO-401 — Machine performance research pass (todos30.07.26)
 
-**Status:** IN PROGRESS — research complete 2026-07-30; F1, F2, F4, F8, F9 implemented same day (owner-approved), **awaiting service restart after the show** to take effect. F3 and F5 found VOID as proposed — see §2. Remaining: F6, F7-remainder, F10–F15, F3-revised (value-aware dirty marking).
+**Status:** IN PROGRESS — research complete 2026-07-30; **F1, F2, F4, F6, F7, F8, F9 implemented same day** (owner-approved), **awaiting service restart after the show** to take effect. F3 and F5 found VOID as proposed; F10–F15 deliberately deferred with reasons — see §2. Follow-ups: F3-revised (value-aware dirty marking), client tranche (F12 + todos item 6) post-show.
 **Priority:** High (owner: "things that can be done better to get better performance of the machine")
 **Date:** 2026-07-30
 **Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
@@ -210,7 +210,43 @@ Second tranche, same evening (owner: "ok, continue"):
   unilaterally: `virtualCamera.fps` 50 → 25/30 (halves Caspar-side encode + relay decode) and/or
   an on-demand lifecycle (run the bridge only while something holds /dev/video10 open).
 
-Not touched: F6, F7 (remainder), F10–F15.
+Third tranche, same evening:
+
+- **F6** — `/api/state` cost split into two fixes after re-attribution (the 4 project-file
+  read+parses are ~2 ms of the 43–49 ms; the **whole-state deep clone** in `getState()` — media/
+  templates/channels/osc — is the bulk, and the WS slim-bootstrap path even threw the cloned
+  catalog away):
+  - `state-manager.js`: new `getStateShared()` — fresh top-level object, nested LIVE references,
+    documented serialize-only. Field set verified identical to `getState()` (`_state` spread +
+    `variables`). `getState()` (deep clone) kept for mutating callers (`scene-native-fill.js`).
+  - `get-state.js`: DTO uses `getStateShared()` (verified read-only: media enrichment maps to new
+    objects, both branches re-spread `base` before assigning); project envelope loaded ONCE per
+    request and passed to `buildSceneDeckForApi(ctx, sharedProjectEnv)` (new optional param,
+    `project-scenes-transform.js`) — halves the per-request project reads.
+  - `ws-server.js` fallback and `periodic-sync.js fireOscChannelsBlob` → `getStateShared()`
+    (both stringify immediately; serialization is synchronous so no torn reads possible).
+- **F7** — `osc-variables.js`: per-channel/per-layer variable KEY strings now cached on ctx
+  (`_channelVarKeys`/`_layerVarKeys` — keys are derived-only, so caching changes no values), and
+  the 16-slot "clear unused meters" sweeps run only when `nb` changes instead of every tick
+  (`_oscVarsAudioClearedNb` tracker; setVariable dedupe made the old sweeps no-ops that still
+  paid key allocation — ~2.5k wasted string allocs/s). `clearOscVariables` resets both caches so
+  an OSC subsystem restart repopulates from scratch. WO-239 clearing semantics unchanged —
+  its dedicated smoke passes untouched.
+
+Deliberately NOT taken (reasoning recorded so nobody re-litigates blind):
+- **F10/F11** — marginal after F1/F2: JS regex literals are compiled once by V8 (the "re-parsed
+  regexes" premise was wrong); the `channels.find` is 64 integer compares/tick and a Map index
+  would have to be kept in sync with every other `_state.channels` writer in the file — risk
+  outweighs <0.1 % of a core. The unhandled-suffix early-reject remains valid but is bundled
+  into F3-revised (value-aware dirty marking touches the same routing layer).
+- **F12 + todos item 6 (client)** — implemented later would need `npm run build:client` + kiosk
+  reload; parked until post-show.
+- **F13** — lsblk cadence is an owner-visible USB-detection-latency tradeoff (~0.5 forks/s is
+  tiny); owner call.
+- **F14** — feature currently disabled on the box (no `ffmpeg_jpeg` compose-preview mode); fix
+  it when/if that mode returns.
+- **F15** — touches the live-audio/FFT arg builder (DM3 path, hard-won per WO-354-era history)
+  on show night; quiet-day work with owner QA.
 
 ## 3. What was VERIFIED
 
@@ -222,8 +258,17 @@ Not touched: F6, F7 (remainder), F10–F15.
 - Second tranche: same smoke extended to 5 tests — F2 (mirror stores snapshot/audio/oscLayers by
   reference, `_changes` length unchanged across a tick = no dead emits) and F9 (immediate key
   does NOT write synchronously, coalesced write lands compact within the window, `flushSync`
-  still synchronous). Full offline suite **1764 pass / 0 fail / 2 skip**; `check-max-file-lines`
-  0 over. `smoke-wo251-playlist-osc-wiring` (stubs the lifecycle wiring) re-verified green.
+  still synchronous). `smoke-wo251-playlist-osc-wiring` (stubs the lifecycle wiring) re-verified
+  green.
+- Third tranche: F6/F7 covered by the EXISTING guards — `smoke-wo239-osc-variables.test.js`
+  (9 tests: per-layer derivation both OSC lineages, pruned-layer clearing, `type===empty`
+  immediate clear, restart tracking reset) passes against the F7 key-cache/clear-tracker rewrite;
+  it caught a real `lk` TDZ collision mid-implementation (loop variable shadowing), fixed by
+  renaming to `lkeys`. Final full offline suite **1764 pass / 0 fail / 2 skip**;
+  `check-max-file-lines` 0 over.
+- NOT yet verified live (post-restart owner QA): `/api/state` latency re-measure (expect well
+  under 10 ms), `/api/variables` meters still tick, companion variables live, WS state hydrate
+  intact on a GUI reload.
 - NOT yet verified live: the changed code paths run only after the post-show restart. Owner QA
   after restart: `/api/osc/diagnostics` still returns addresses; `data/amcp-last50.txt` updates
   within ~1 s of AMCP traffic; take feel unchanged/better.
