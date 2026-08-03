@@ -40,3 +40,19 @@
   (test-pattern invocations are always fresh adds).
 - Owner QA: open the LED test pattern — resolution once (top line only), characters bounce
   at their visible edges.
+
+## 4. Round 2 (03.08 later): character size relative to the screen (todos03.08 addition)
+
+Owner: *"the bouncing character needs to have relative size to the size of the screen,
+right now on smaller screen its too big."* The box was a fixed `bounceSize = 250` px in both
+copies (`template/led_grid_test-render.js:61`, `template/led-grid-test-patterns.js:61`).
+
+**Done:** `bounceSize = max(40, round(min(width, height) × 0.26))` — 26% of the shorter
+screen dimension reproduces the original look on the 1728×960 main screen exactly
+(0.26 × 960 ≈ 250) and scales down on smaller outputs (720×576 → 150 px). `baseSpeed` now
+equals `bounceSize` (was independently 250) so travel speed stays proportional to size.
+Both template copies updated in sync (the WO-411 rule).
+
+**Verified:** `node --check` both files; scaling table sanity-run (1728×960→250,
+1920×1080→281, 720×576→150, min-clamp 40). Templates load fresh on every CG ADD — no build
+or restart needed. Owner QA: pop the test pattern on a small output.

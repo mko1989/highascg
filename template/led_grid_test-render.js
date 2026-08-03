@@ -58,8 +58,12 @@ function renderBouncingCharacter(layer, count) {
 		images.push(img)
 	}
 	
-	var bounceSize = 250
-	var baseSpeed = 250
+	// todos03.08 round 2: size is RELATIVE to the screen — a fixed 250px box dwarfed
+	// smaller outputs. 26% of the shorter dimension reproduces the original look on the
+	// 1728x960 main screen (0.26 × 960 ≈ 250); speed scales with size so travel feels
+	// the same at any resolution.
+	var bounceSize = Math.max(40, Math.round(Math.min(width, height) * 0.26))
+	var baseSpeed = bounceSize
 	
 	var characters = []
 	for (var i = 0; i < n; i++) {
