@@ -109,9 +109,9 @@ async function handlePost(path, body, ctx) {
 		if (b.connectorLabel != null && String(b.connectorLabel).trim()) {
 			connectorLabel = String(b.connectorLabel).trim()
 		}
-		const modeText = String(videoMode || '').trim()
+		// todos03.08: no videoMode suffix here — the mode id IS the resolution on custom
+		// modes, and the meta block's top line already shows it ("once at the top is enough").
 		if (outputRole) connectorLabel += ` · ${outputRole}`
-		if (modeText) connectorLabel += ` · ${modeText}`
 
 		const payload = showLedGrid
 			? {

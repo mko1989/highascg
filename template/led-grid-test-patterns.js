@@ -98,52 +98,56 @@ function renderBouncingCharacter(layer, count) {
 			ctx.fillStyle = '#000000'
 			ctx.fillRect(0, 0, width, height)
 			
-			var maxW = width - bounceSize
-			var maxH = height - bounceSize
-			
 			for (var j = 0; j < characters.length; j++) {
 				var ch = characters[j]
 				ch.x += ch.vx * dt
 				ch.y += ch.vy * dt
-				
-				var bounced = false
-				
-				if (ch.x < 0) {
-					ch.x = 0
-					ch.vx = -ch.vx
-					bounced = true
-				} else if (ch.x > maxW) {
-					ch.x = maxW
-					ch.vx = -ch.vx
-					bounced = true
-				}
-				
-				if (ch.y < 0) {
-					ch.y = 0
-					ch.vy = -ch.vy
-					bounced = true
-				} else if (ch.y > maxH) {
-					ch.y = maxH
-					ch.vy = -ch.vy
-					bounced = true
-				}
-				
-				if (bounced) {
-					ch.imgIndex = Math.floor(Math.random() * images.length)
-				}
-				
+
+				// todos03.08: collide on the DRAWN glyph rect, not the bounceSize square —
+				// narrow characters aspect-fit inside the box and used to bounce off the
+				// left/right walls offsetX px before actually touching them.
 				var imgEl = images[ch.imgIndex]
-				if (imgEl && imgEl.complete && imgEl.naturalWidth > 0) {
-					var drawW = bounceSize
-					var drawH = bounceSize
+				var drawW = bounceSize
+				var drawH = bounceSize
+				var hasImg = imgEl && imgEl.complete && imgEl.naturalWidth > 0
+				if (hasImg) {
 					var ratio = imgEl.naturalWidth / imgEl.naturalHeight
 					if (ratio > 1) {
 						drawH = bounceSize / ratio
 					} else {
 						drawW = bounceSize * ratio
 					}
-					var offsetX = (bounceSize - drawW) / 2
-					var offsetY = (bounceSize - drawH) / 2
+				}
+				var offsetX = (bounceSize - drawW) / 2
+				var offsetY = (bounceSize - drawH) / 2
+
+				var bounced = false
+
+				if (ch.x + offsetX < 0) {
+					ch.x = -offsetX
+					ch.vx = -ch.vx
+					bounced = true
+				} else if (ch.x + offsetX + drawW > width) {
+					ch.x = width - drawW - offsetX
+					ch.vx = -ch.vx
+					bounced = true
+				}
+
+				if (ch.y + offsetY < 0) {
+					ch.y = -offsetY
+					ch.vy = -ch.vy
+					bounced = true
+				} else if (ch.y + offsetY + drawH > height) {
+					ch.y = height - drawH - offsetY
+					ch.vy = -ch.vy
+					bounced = true
+				}
+
+				if (bounced) {
+					ch.imgIndex = Math.floor(Math.random() * images.length)
+				}
+
+				if (hasImg) {
 					ctx.drawImage(imgEl, ch.x + offsetX, ch.y + offsetY, drawW, drawH)
 				} else {
 					ctx.fillStyle = '#00ff00'

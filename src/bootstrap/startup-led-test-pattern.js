@@ -309,9 +309,7 @@ function buildStartupLedTestUpdateCommands(withTarget, ipLines, config) {
 			screenHeight: ch.screenHeight,
 			videoMode: ch.videoMode,
 			gpuConnectorId: gpu.gpuConnectorId,
-			connectorLabel:
-				gpu.connectorLabel ||
-				`PGM ch ${ch.index}${ch.videoMode ? ` · ${ch.videoMode}` : ''}`,
+			connectorLabel: gpu.connectorLabel || `PGM ch ${ch.index}`,
 			ipLines,
 		})
 		const json = JSON.stringify(payload)
@@ -386,9 +384,7 @@ function buildStartupLedTestFlatCommands(withTarget, ipLines, config) {
 			screenHeight: ch.screenHeight,
 			videoMode: ch.videoMode,
 			gpuConnectorId: gpu.gpuConnectorId,
-			connectorLabel:
-				gpu.connectorLabel ||
-				`PGM ch ${ch.index}${ch.videoMode ? ` · ${ch.videoMode}` : ''}`,
+			connectorLabel: gpu.connectorLabel || `PGM ch ${ch.index}`,
 			ipLines,
 		})
 		const json = JSON.stringify(payload)

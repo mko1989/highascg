@@ -2,6 +2,13 @@
 
 Normative setup for **smooth, tear-free** output on CasparCG **screen** consumers when the playout GPU is **NVIDIA**.
 
+> **Multi-head box? This recipe is necessary but NOT sufficient.** With more than one
+> display on the X screen, GL vsync gates on ONE head (the primary by default) and every
+> other display beats against it — irregular micro-stutter on the on-air output while the
+> operator monitor stays smooth. See
+> [multi-head-gl-vblank-sync.md](./multi-head-gl-vblank-sync.md) (WO-407):
+> `__GL_SYNC_DISPLAY_DEVICE=<PGM connector>` via `~/.config/highascg/caspar-env`.
+
 ## Required combination
 
 | Layer | Setting | Value |
