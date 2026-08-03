@@ -39,27 +39,34 @@ then "screen consumer" per se isn't broken; the difference is per-output.)
   this driver setup, or display bring-up at boot is racing the consumers (WO-80/WO-314
   territory). Must re-probe while the owner confirms pictures are on the glass.
 
-### Hypotheses, ranked
+### Update 03.08 later (box back in show state, displays driven)
 
-1. **Refresh mismatch** — PGM display at 60 Hz vs 50 fps channel with vsync (needs live
-   xrandr showing the `*` mode; if 60: force 50 Hz via WO-80 mechanism, or vsync off on that
-   consumer and let the 50 fps pace itself).
+`xrandr` with real modes: **DP-0 = 1728x960@50.00\* and DP-4 = 1920x1080@50.00\*** — both
+displays run exactly 50 Hz, matching the 50 fps channels. **Hypothesis 1 (refresh mismatch)
+is RULED OUT.** The earlier 8×8/no-mode report resolved itself after the owner's restart —
+likely a boot-order window, worth remembering but not the stutter. Show-day caspar logs
+(01–02.08) contain zero late/dropped lines (the binary doesn't log frame pacing at info
+level), so diagnosis is by eye + single-variable tests below.
+
+### Hypotheses, ranked (updated)
+
+1. ~~Refresh mismatch~~ — RULED OUT 03.08 (both displays measured 50.00 Hz, see update).
 2. **Dual-vsync contention** — two blocking swap chains on one X screen; test by setting
    `vsync false` on the ch 3 (operator GUI) consumer only, since Firefox composites above it
-   anyway, and see if PGM smooths out.
+   anyway, and see if PGM smooths out. NOTE: ch 3's vsync is HARD-CODED true in
+   `config-generator-operator-gui.js:88` — the test is a hand-edit of the generated
+   `config/casparcg.config` + caspar restart (next Apply regenerates it back).
 3. **Load-induced** — caspar at 431 % CPU (WO-401 baseline) missing frame deadlines;
-   would show as irregular (not cadenced) drops; `DIAG` / graph overlay or frame-time OSC
-   would distinguish. Ties into WO-405 round-2 measurements.
+   would show as irregular (not cadenced) drops. Ties into WO-405 round-2 measurements.
+4. **Windowed swap path** — both consumers are `windowed` borderless; without a compositor
+   X blits instead of page-flipping. If 2. fails, try fullscreen/windowed toggle on ch 1.
 
-## 2. Diagnosis plan (needs the box in its normal on-glass state)
+## 2. Diagnosis plan (box IS in show state as of 03.08 midday — ready when the owner is)
 
-1. Owner confirms which output shows the stutter (LED wall on DP-0? projector?).
-2. `xrandr` with displays live → actual refresh of the PGM display (and re-check the 8×8
-   anomaly).
-3. Watch cadence: is the stutter periodic (≈10 Hz hiccup ⇒ 50-on-60 duplication) or
-   irregular (⇒ load)?
-4. Single-variable tests, one restart each, in order: force PGM display to 50 Hz →
-   ch 3 vsync off → PGM vsync off.
+1. Owner looks at the PGM output now: is the micro-stutter visible at the shop, and is it
+   periodic (metronome-like hiccup) or irregular? Which output is it (DP-0 1728×960?).
+2. Single-variable tests, one caspar restart each, in order: ch 3 vsync off (hand-edit) →
+   ch 1 PGM vsync off → windowed/fullscreen. Judge each by eye on moving content.
 
 ## 3. What was done / verified
 
