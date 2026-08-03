@@ -138,6 +138,8 @@ untouched), exactly so system audio can be used as a regular output elsewhere.
 - The stored NDI extra live source pins `hostChannel: 5` while the map no longer allocates
   a channel for it — **collision confirmed live 03.08**: on caspar restart the live-source
   bootstrap fired `PLAY 5-1 ndi://macbook…` onto the monitor's solo layer (silent while the
-  macbook is away; the next solo/default play replaces it). FOLLOW-UP: the host-live-source
-  replay must resolve its channel through the map (or skip when the stored channel ==
-  monitorCh), same planned-vs-stored family as WO-377/381.
+  macbook is away; the next solo/default play replaces it). **Guard shipped 03.08
+  (`host-live-sources-setup.js`): replay onto monitorCh is skipped with a warning —
+  verified live on the next reconnect.** Renumbering the stored hostChannel itself stays
+  with the WO-377/381 planned-vs-stored family (owner: re-create the NDI source when the
+  macbook returns).
