@@ -41,12 +41,12 @@ export function renderConsoleMasterStrips(mastersListEl, { mastersList, settings
 			<span class="audio-mixer-view__fader-val">${formatVolumeDb(r.v)}</span>
 			<div class="audio-mixer-view__strip-actions">
 				<div class="audio-mixer-view__master-badge">${r.isPreview ? 'PRV' : 'PGM'}</div>
-				${r.isPreview ? `<button type="button" class="audio-mixer-view__solo-btn${audioMixerState.isSoloed(r.key) ? ' audio-mixer-view__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this PRV bus to the monitor output (Ctrl+Click for multi)">SOLO</button>` : ''}
+				<button type="button" class="audio-mixer-view__solo-btn${audioMixerState.isSoloed(r.key) ? ' audio-mixer-view__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this ${r.isPreview ? 'PRV' : 'PGM'} bus to the monitor output (Ctrl+Click for multi)">SOLO</button>
 			</div>
 		`
 		mastersListEl.appendChild(strip)
-		// todos03.08: PRV strips solo the whole preview channel onto the monitor bus —
-		// same solo store/endpoint as the layer strips (layer-less target = full channel).
+		// todos03.08: PRV and PGM master strips solo their whole channel onto the monitor
+		// bus — same solo store/endpoint as the layer strips (layer-less target = full channel).
 		strip.querySelector('.audio-mixer-view__solo-btn')?.addEventListener('click', async (e) => {
 			audioMixerState.toggleSolo(r.key, e.metaKey || e.ctrlKey)
 			syncAllSolosUI()

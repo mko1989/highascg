@@ -254,12 +254,19 @@ function getChannelMap(config, activeBuses = null) {
 	}
 
 	let nextCh = Math.max(0, ...programChannels, ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
-	
+	// WO-414: stored host-live sources PIN their channel (pins never move, WO-377/381), so
+	// dynamic allocation flows AROUND them — the monitor bus landing on the NDI host's pinned
+	// ch5 gave two owners one channel (generator clobbered the NDI block; the mixer metered
+	// monitor-bus audio as "macbook NDI input"). Lazy require: circular with this module.
+	const hostLive = require('./host-live-sources')
+	const pinnedHostChannels = new Set(hostLive.listHostLiveChannelEntries(config).map((e) => e.channel))
+	const allocCh = () => { while (pinnedHostChannels.has(nextCh)) nextCh++; return nextCh++ }
+
 	const mvDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'multiview')
 	
 	const multiviewChannels = []
 	if (mvDests.length > 0) {
-		mvDests.forEach(() => multiviewChannels.push(nextCh++))
+		mvDests.forEach(() => multiviewChannels.push(allocCh()))
 	}
 	const multiviewCh = multiviewChannels[0] || null
 
@@ -269,7 +276,7 @@ function getChannelMap(config, activeBuses = null) {
 	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
 	const operatorGuiChannels = []
 	if (ogDests.length > 0) {
-		ogDests.forEach(() => operatorGuiChannels.push(nextCh++))
+		ogDests.forEach(() => operatorGuiChannels.push(allocCh()))
 	}
 	const operatorGuiCh = operatorGuiChannels[0] || null
 	const decklinkInputsHost = String(readCasparSetting(config, 'decklink_inputs_host') ?? 'multiview_if_match').toLowerCase()
@@ -293,7 +300,7 @@ function getChannelMap(config, activeBuses = null) {
 	const inputChannels = []
 	const decklinkInputChannels = []
 	for (const i of decklinkInputSlots) {
-		const channel = nextCh++
+		const channel = allocCh()
 		decklinkInputChannels.push(channel)
 		inputChannels.push({
 			kind: 'decklink',
@@ -308,7 +315,7 @@ function getChannelMap(config, activeBuses = null) {
 	const effectiveDecklinkInputCount = decklinkInputChannels.length
 	const liveAudioInputChannels = []
 	for (let i = 1; i <= liveAudioCount; i++) {
-		const channel = nextCh++
+		const channel = allocCh()
 		liveAudioInputChannels.push(channel)
 		inputChannels.push({
 			kind: 'live_audio',
@@ -322,7 +329,7 @@ function getChannelMap(config, activeBuses = null) {
 	}
 	const v4l2InputChannels = []
 	for (let i = 1; i <= v4l2InputCount; i++) {
-		const channel = nextCh++
+		const channel = allocCh()
 		v4l2InputChannels.push(channel)
 		inputChannels.push({
 			kind: 'v4l2',
@@ -336,15 +343,15 @@ function getChannelMap(config, activeBuses = null) {
 	}
 	// Legacy: explicit empty inputs-host toggle with no real inputs configured.
 	let legacyHostCh = null
-	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0 && v4l2InputCount === 0) legacyHostCh = nextCh++
+	if (inputsHostChannelEnabled && decklinkCount === 0 && liveAudioCount === 0 && v4l2InputCount === 0) legacyHostCh = allocCh()
 	const inputsCh = decklinkInputChannels[0] ?? liveAudioInputChannels[0] ?? v4l2InputChannels[0] ?? legacyHostCh ?? null
 
-	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(nextCh++)
+	const audioOnlyChannels = []; for (let i = 0; i < extraAudioCount; i++) audioOnlyChannels.push(allocCh())
 
 	/** @deprecated Always empty — pixel-map DeckLink routing is merged onto the program channel in generated Caspar XML. */
 	const mappingChannels = []
 
-	const monitorCh = resolveMonitorBus(config).enabled ? nextCh++ : null
+	const monitorCh = resolveMonitorBus(config).enabled ? allocCh() : null
 
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
 	const mapSoFar = {
@@ -374,7 +381,7 @@ function getChannelMap(config, activeBuses = null) {
 	if (sc.enabled === true || sc.enabled === 'true') {
 		const out = resolveStreamOutputCasparChannel(config, mapSoFar, sc)
 		if (out.kind === 'dedicated') {
-			streamingCh = nextCh++
+			streamingCh = allocCh()
 			streamingDedicatedChannelSlot = true
 		} else {
 			streamingCh = out.ch
@@ -382,8 +389,7 @@ function getChannelMap(config, activeBuses = null) {
 		}
 	}
 
-	const { mergeHostLiveChannelsIntoRouting } = require('./host-live-sources')
-	const hostMerge = mergeHostLiveChannelsIntoRouting(config, nextCh)
+	const hostMerge = hostLive.mergeHostLiveChannelsIntoRouting(config, nextCh)
 	for (const entry of hostMerge.entries) {
 		inputChannels.push({
 			kind: entry.kind,

@@ -142,7 +142,8 @@ untouched), exactly so system audio can be used as a regular output elsewhere.
   (`host-live-sources-setup.js`): replay onto monitorCh is skipped with a warning —
   verified live on the next reconnect.** Renumbering the stored hostChannel itself stays
   with the WO-377/381 planned-vs-stored family (owner: re-create the NDI source when the
-  macbook returns).
+  macbook returns). **Resolved differently by WO-414 (03.08): dynamic allocation now flows
+  around stored pins — monitorCh moved to 6, the NDI source keeps its pinned ch5 unchanged.**
 
 ## 6. Second round (03.08 later): "stuttery noise" + "you added it as portaudio" (todos03.08 additions)
 

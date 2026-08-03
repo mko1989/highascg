@@ -123,5 +123,7 @@ test('WO-406: client inspector saves the role; solo API keeps the monitorCh fall
 	assert.match(settingsPost, /if \(String\(x\.role \|\| ''\)\.toLowerCase\(\) === 'monitor'\) out\.role = 'monitor'/, 'sanitizer keeps the monitor role')
 
 	const routingMap = read('src/config/routing-map.js')
-	assert.match(routingMap, /resolveMonitorBus\(config\)\.enabled \? nextCh\+\+ : null/, 'channel map allocates from the shared resolver')
+	// WO-414: allocation goes through allocCh() so the monitor bus flows around
+	// stored host-live channel pins — still gated on the shared resolver.
+	assert.match(routingMap, /resolveMonitorBus\(config\)\.enabled \? allocCh\(\) : null/, 'channel map allocates from the shared resolver')
 })
