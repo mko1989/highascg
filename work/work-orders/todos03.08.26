@@ -22,3 +22,949 @@ the bouncing character needs to have relative size to the size of the screen, ri
 
 usb drives auto mount doesnt work. its neccesery so operators can plug a drive in and import media without going into terminal to mount it. it needs to support multiple drives/mounts.
 
+i need you to look over the gui and remove stupid notes. like under the audio mixer console, "full tcatile..."
+and others. most of the stuff is selfexplanatory no need for notes.
+
+then i need a full code base review
+
+in a couple places there is a subtitle of highascg as broadcast playout graphics. or direct playout.
+i want all of them to say media server. the titile of the browser tab also says it.
+
+tried running eggs produce and flash to drive, then i ran it on a different machine and ran the calamares installer (also the above in the installer) and the installer failed to install with failed to install boot loader.
+
+
+Apply now (optional): sudo systemctl start highascg-hardware-hostname.service
+Log: /var/log/highascg-hardware-hostname.log
+==> Kernel headers + DKMS tools (DeckLink / NVIDIA on installed playout)
+==> DKMS build deps for ISO squashfs (kernel 6.8.0-117-generic)
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+linux-headers-6.8.0-117-generic is already the newest version (6.8.0-117.117).
+build-essential is already the newest version (12.10ubuntu1).
+dkms is already the newest version (1:3.4.1-1ubuntu1).
+gcc is already the newest version (4:13.2.0-7ubuntu1).
+make is already the newest version (4.3-4.1build2).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+linux-headers-6.8.0-117-generic was already set on hold.
+linux-headers-6.8.0-117 was already set on hold.
+OK: linux-headers-6.8.0-117-generic + build-essential + dkms ready for eggs produce
+==> playout mount stubs under /home/casparcg/highascg
+OK: operator layout under /home/casparcg/exfat (drop-update, drop-config, media, …)
+==> WO-47 systemd units (mount + bind + boot sync)
+installed /etc/udev/rules.d/99-highascg-exfat-arrive.rules
+installed /etc/udev/rules.d/99-highascg-bridge-arrive.rules
+installed /etc/highascg/bootstrap-rsync-excludes.txt
+installed /etc/highascg/server-update-rsync-excludes.txt
+OK: bridge layout under /home/casparcg/bridge (media/, configs/, drop-config/)
+OK: operator layout under /home/casparcg/exfat (drop-update, drop-config, media, …)
+OK: no /home/casparcg/exfat/sim (nothing to remove)
+Installed:
+  /usr/local/lib/highascg/highascg-exfat-arrive.sh
+  /etc/udev/rules.d/99-highascg-exfat-arrive.rules (hotplug + late USB → highascg-exfat-arrive.service)
+  /etc/udev/rules.d/99-highascg-bridge-arrive.rules (late NVMe → highascg-bridge-arrive.service)
+  /usr/local/lib/highascg/highascg-bridge-arrive.sh
+  /usr/local/lib/highascg/highascg-exfat-server-update.sh
+  /usr/local/lib/highascg/highascg-apply-server-drop.sh
+  /usr/local/lib/highascg/highascg-webui-server-update.sh
+  /etc/highascg/disable-exfat-bootstrap (legacy sim/highascg seed off)
+  /etc/highascg/bootstrap-rsync-excludes.txt (legacy bootstrap excludes — unused when disabled)
+  /etc/highascg/server-update-rsync-excludes.txt (server drop — skips client/, dist-web/, runtime)
+  /usr/share/doc/highascg-wo47/ (offline Documentation= targets)
+  /etc/systemd/system/home-casparcg-bridge.mount (LABEL=HIGHASCGDAT)
+  /etc/systemd/system/highascg-bridge-media-prep.service
+  /etc/systemd/system/home-casparcg-highascg-media-bridge.mount (bridge library → ~/highascg/media/bridge)
+  /etc/systemd/system/highascg-bridge-boot.service
+  /usr/local/lib/highascg/highascg-bridge-boot.sh
+  legacy USB media bind: disabled — WO-52
+  /etc/systemd/system/home-casparcg-exfat.mount
+  /etc/systemd/system/highascg-exfat-media-prep.service
+  /etc/systemd/system/home-casparcg-highascg-media-exfat.mount
+  /etc/systemd/system/highascg-exfat-server-update.service (drop-update/ or legacy update/server/)
+  /etc/systemd/system/highascg-fix-config-permissions.service
+  /usr/local/lib/highascg/highascg-fix-config-permissions.sh
+  /etc/systemd/system/highascg-exfat-sync.service
+  /etc/systemd/system/highascg-exfat-boot.service
+  /usr/local/lib/highascg/highascg-exfat-boot.sh
+  /etc/systemd/system/highascg-exfat-network-apply.service
+  /usr/local/lib/highascg/highascg-exfat-network-apply.sh
+  /etc/systemd/system/highascg-decklink-install.service
+  /usr/local/lib/highascg/decklink-install-from-exfat.sh
+  /usr/local/lib/highascg/decklink-install-lib.sh
+  /usr/local/lib/highascg/highascg-set-system-time.sh
+  /etc/systemd/system/highascg-exfat-arrive.service
+installed /etc/sudoers.d/highascg-decklink-install
+installed /etc/sudoers.d/highascg-system-time
+Re-run: sudo bash /home/casparcg/highascg/scripts/write-highascg-systemd-unit.sh casparcg
+  installed /etc/highascg/server-update-retain-drop (live USB — keep drop-update/ across boots)
+==> HighAsCG service unit ordering (depends on WO-47 when present)
+Removed /etc/systemd/system/highascg.service.d/10-headless.conf if present (WO-52: serve dist-web/ on :4200).
+Wrote /etc/systemd/system/highascg.service (WO-47 deps if units present).
+==> nginx :80 → :4200 (operator UI without port in browser URL)
+Synchronizing state of nginx.service with SysV service script with /usr/lib/systemd/systemd-sysv-install.
+Executing: /usr/lib/systemd/systemd-sysv-install enable nginx
+OK: nginx proxies :80 → 127.0.0.1:4200 (/etc/nginx/sites-available/highascg-web-proxy.conf)
+==> power button (short=network reset, hold 3s=shutdown)
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+evtest is already the newest version (1:1.35-1).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+OK: power button handler enabled
+     short press → /usr/local/lib/highascg/highascg-network-reset.sh, then splash IP refresh after 5s
+     hold >=3s  → systemctl poweroff (release after shutdown starts is OK)
+     status: systemctl status highascg-power-button.service
+  installed 20-live-boot.conf (faster AMCP settle + startup testcard)
+==> merge HighAsCG eggs excludes (embed server on ISO — standalone boot)
+Removed prior HighAsCG exclude blocks from: /etc/penguins-eggs.d/exclude.list
+Appended HighAsCG excludes to: /etc/penguins-eggs.d/exclude.list
+Next: sudo eggs produce --clone --excludes static --basename "…"
+==> merge DeckLink excludes (WO-92 — mask BMD on build host, omit from ISO)
+Appended 30 missing HighAsCG exclude line(s) to: /etc/penguins-eggs.d/exclude.list
+==> clone host audit (swap inactive, no nvidia-pool, exclude.list)
+==> HighAsCG eggs clone host audit (strict=1)
+OK: no eggs liveroot bind mounts (safe to run eggs produce — never rm /home/eggs/liveroot)
+WARN: swap is active: /swap.img — excluded from squashfs (OK for produce); optional: strip-host-swap-for-live-iso.sh prepare (swapoff + drop fstab swap lines for live boot)
+OK: /swap.img on disk (8.1G) — listed in exclude.list (will not be in squashfs)
+OK: swap not active: /swapfile
+WARN: /home/casparcg/highascg/media/bridge is mounted (exfat /dev/nvme1n1p3[/media]) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/highascg/media/exfat is mounted (exfat /dev/sda3[/media]) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/exfat is mounted (exfat /dev/sda3) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/bridge is mounted (exfat /dev/nvme1n1p3) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+OK: no /opt/nvidia-pool on host
+WARN: nvidia-smi present but cuda-drivers not installed — run scripts/setup/03-nvidia-open-595.sh before eggs produce
+OK: alsa-utils present
+OK: exclude.list present (320 lines)
+OK: exclude.list contains: home/casparcg/.antigravity-ide-server
+OK: exclude.list contains: opt/nvidia-pool
+OK: exclude.list contains: swapfile
+OK: exclude.list contains: tmp/\*
+WARN: 357M /home/casparcg/.antigravity-ide-server on host — must stay out of squashfs via exclude.list
+WARN: 2.1G /home/casparcg/.cursor-server on host — must stay out of squashfs via exclude.list
+OK: node_modules present (17M) — embed-server ISO will include production deps
+OK: Companion headless present (909M)
+OK: highpass-highascg module packaged under .config/companion/modules
+OK: companion.service unit installed
+OK: Calamares present (installed)
+OK: eggs calamares CLI available
+OK: GRUB splash.png ready in highascg-eggs-theme
+OK: Plymouth default: highascg
+OK: licenses/manifest.json present
+OK: manifest includes NDI SDK entry
+OK: DeckLink exclude.list present (WO-92 — BMD omitted from squashfs)
+OK: desktopvideo on build host — stays installed locally, masked from ISO by exclude.list
+
+Audit passed (8 warning(s)).
+==> Caspar supervisor wiring (systemd owns run.sh; Openbox trimmed)
+==> Caspar supervisor wiring (systemd owns playout; refresh Openbox autostart)
+==> CasparCG systemd units (scanner + server via run.sh)
+  ok: enabled casparcg-scanner.service
+  ok: enabled casparcg-server.service
+==> NVIDIA GL env + per-session nvidia-settings
+  ok: xorg ForceCompositionPipeline default installed
+  ok: nvidia-x-apply + confine-pointer-barriers installed
+  ok: boot xrandr capture installed
+==> highascg-display-mode helper
+==> Openbox autostart for casparcg
+  ok: skipped nodm restart (OPENBOX_SKIP_NODM_RESTART=1)
+
+  ok: autostart → /home/casparcg/.config/openbox/autostart
+Logs: /tmp/caspar.log
+DeckLink GUI mode: sudo highascg-display-mode x11-only
+
+Next: sudo bash /home/casparcg/highascg/scripts/setup/12-passwordless-sudo.sh casparcg
+Start: sudo systemctl start casparcg-scanner.service casparcg-server.service
+==> NVIDIA GL env + per-session nvidia-settings
+  ok: xorg ForceCompositionPipeline default installed
+  ok: nvidia-x-apply + confine-pointer-barriers installed
+  ok: boot xrandr capture installed
+==> highascg-display-mode helper
+==> Openbox autostart for casparcg
+  ok: skipped nodm restart (OPENBOX_SKIP_NODM_RESTART=1)
+
+  ok: autostart → /home/casparcg/.config/openbox/autostart
+Logs: /tmp/caspar.log
+DeckLink GUI mode: sudo highascg-display-mode x11-only
+  ok: Caspar wiring synced — use: bash /home/casparcg/highascg/tools/runtime/diagnose-caspar-supervisors.sh
+On a running laptop with duplicates: sudo systemctl restart casparcg-scanner casparcg-server
+==> passwordless sudo (Nuclear Install to disk + Calamares on :0)
+OK: /etc/sudoers.d/highascg
+     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home, hardware-hostname
+
+Verify as casparcg:
+  sudo -u casparcg sudo -n /usr/local/bin/caspar-systemd-control.sh status
+==> Tailscale apt daemon (mask snap unit from build host clone)
+OK: tailscale deb + tailscaled enabled; snap.tailscale.tailscaled masked
+==> fast boot (cap network wait-online; mask networkd-wait-online)
+==> Mask systemd-networkd-wait-online (often ~120s on laptops with down NICs)
+==> Cap NetworkManager wait-online at 15s (HighAsCG uses network.target, not network-online)
+==> NetworkManager-wait-online stays enabled (15s cap via /etc/NetworkManager/conf.d/99-highascg-fast-boot.conf)
+OK: fast-boot network (reboot and run: systemd-analyze blame | head -15)
+==> post-boot QA scripts (tools/startup → squashfs; tools/eggs is excluded)
+==> tools/startup on clone host (must be in squashfs after produce)
+OK: /home/casparcg/highascg/tools/startup/run-health-checks.sh
+OK: /home/casparcg/highascg/tools/startup/verify-live-stick.sh
+OK: /home/casparcg/highascg/tools/startup/verify-passwordless-sudo.sh
+OK: /home/casparcg/highascg/tools/startup/stick-boot-test/run-stick-boot-tests.sh
+tools/startup host verify passed.
+
+==> Ready for clone snapshot:
+    sudo eggs produce --nointeractive --clone --max --excludes static --basename "yourname"
+    Or: sudo bash /home/casparcg/highascg/tools/eggs/live-usb/build-highascg-egg.sh
+
+==> Pinned kernel 6.8.0-117-generic — eggs.yaml + purge non-pinned images (no linux-image-generic)
+==> Using pinned kernel from /etc/highascg/pinned-kernel: 6.8.0-117-generic
+==> eggs.yaml → latest kernel 6.8.0-117-generic (running: 6.8.0-117-generic)
+initrd_img: /boot/initrd.img-6.8.0-117-generic
+vmlinuz: /boot/vmlinuz-6.8.0-117-generic
+==> Pinned kernel — keep linux-image-6.8.0-117-generic only
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+==> Skip host initramfs here (will run once before eggs produce)
+OK: eggs produce will use 6.8.0-117-generic (only this image package should remain)
+==> Install network + firmware essentials for live image
+Hit:1 http://pl.archive.ubuntu.com/ubuntu noble InRelease
+Hit:2 https://deb.nodesource.com/node_24.x nodistro InRelease                                          
+Hit:3 http://security.ubuntu.com/ubuntu noble-security InRelease                                       
+Hit:4 http://pl.archive.ubuntu.com/ubuntu noble-updates InRelease                                      
+Get:5 https://pkgs.tailscale.com/stable/ubuntu noble InRelease                                         
+Hit:6 http://pl.archive.ubuntu.com/ubuntu noble-backports InRelease                                    
+Hit:7 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64  InRelease
+Hit:8 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu noble InRelease
+Hit:9 https://penguins-eggs.net/repos/deb stable InRelease
+Fetched 6649 B in 0s (16.5 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+network-manager is already the newest version (1.46.0-1ubuntu2.7).
+wpasupplicant is already the newest version (2:2.10-21ubuntu0.4).
+isc-dhcp-client is already the newest version (4.4.3-P1-4ubuntu2).
+iproute2 is already the newest version (6.1.0-1ubuntu6.4).
+ethtool is already the newest version (1:6.7-1build1).
+pciutils is already the newest version (1:3.10.0-2build1).
+usbutils is already the newest version (1:017-3build1).
+rfkill is already the newest version (2.39.3-9ubuntu6.5).
+wireless-regdb is already the newest version (2025.10.07-0ubuntu1~24.04.1).
+linux-firmware is already the newest version (20240318.git3b128b60-0ubuntu2.27).
+netplan.io is already the newest version (1.1.2-8ubuntu1~24.04.2).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+==> Live auto-network without NM (systemd-networkd + netplan)
+Unit /etc/systemd/system/systemd-networkd-wait-online.service is masked, ignoring.
+==> Hostname for ISO naming (highascg-nvidia-595)
+==> Factory operator config (not eggs build-host JSON / .env)
+==> Modular config from src/config/defaults.js (not build-host JSON)
+[Config] Saved modular config to /home/casparcg/highascg/config
+OK: factory modular config → /home/casparcg/highascg/config
+OK: starter project → /home/casparcg/highascg/projects/new_project_1.json
+OK: factory scanner config → /home/casparcg/highascg/casparcg.config
+[exfat-sync] push to volume(s) copied=66 skipped=4
+[exfat-sync] bridge-state-module: neither side exists yet — skip
+[exfat-sync] usb-state-module: neither side exists yet — skip
+[exfat-sync] done boot=false dryRun=false copied=820 skipped=45 errors=0
+==> Caspar XML: /home/casparcg/highascg/config/casparcg.config (from casparcg.config.iso)
+==> /home/casparcg/highascg/.env from .env.example (build-host .env not baked)
+==> Clear /home/casparcg/exfat/configs (avoid exfat-sync pulling build-host settings on first boot)
+==> Reset projects/ to starter show (New project 1 + PGM-only destination)
+OK: ISO will ship factory defaults + clean starter project, not eggs build-host operator data
+==> Clone host audit (swap, nvidia-pool, excludes, branding)
+==> HighAsCG eggs clone host audit (strict=1)
+OK: no eggs liveroot bind mounts (safe to run eggs produce — never rm /home/eggs/liveroot)
+WARN: swap is active: /swap.img — excluded from squashfs (OK for produce); optional: strip-host-swap-for-live-iso.sh prepare (swapoff + drop fstab swap lines for live boot)
+OK: /swap.img on disk (8.1G) — listed in exclude.list (will not be in squashfs)
+OK: swap not active: /swapfile
+WARN: /home/casparcg/highascg/media/bridge is mounted (exfat /dev/nvme1n1p3[/media]) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/highascg/media/exfat is mounted (exfat /dev/sda3[/media]) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/exfat is mounted (exfat /dev/sda3) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+WARN: /home/casparcg/bridge is mounted (exfat /dev/nvme1n1p3) — umount before produce (stop-and-unmount-wo47-for-eggs-produce.sh)
+OK: no /opt/nvidia-pool on host
+WARN: nvidia-smi present but cuda-drivers not installed — run scripts/setup/03-nvidia-open-595.sh before eggs produce
+OK: alsa-utils present
+OK: exclude.list present (320 lines)
+OK: exclude.list contains: home/casparcg/.antigravity-ide-server
+OK: exclude.list contains: opt/nvidia-pool
+OK: exclude.list contains: swapfile
+OK: exclude.list contains: tmp/\*
+WARN: 357M /home/casparcg/.antigravity-ide-server on host — must stay out of squashfs via exclude.list
+WARN: 2.1G /home/casparcg/.cursor-server on host — must stay out of squashfs via exclude.list
+OK: node_modules present (17M) — embed-server ISO will include production deps
+OK: Companion headless present (909M)
+OK: highpass-highascg module packaged under .config/companion/modules
+OK: companion.service unit installed
+OK: Calamares present (installed)
+OK: eggs calamares CLI available
+OK: GRUB splash.png ready in highascg-eggs-theme
+OK: Plymouth default: highascg
+OK: licenses/manifest.json present
+OK: manifest includes NDI SDK entry
+OK: DeckLink exclude.list present (WO-92 — BMD omitted from squashfs)
+OK: desktopvideo on build host — stays installed locally, masked from ISO by exclude.list
+
+Audit passed (8 warning(s)).
+==> Third-party license bundle (NVIDIA / NDI / DeckLink notices)
+[collect-licenses] copied nvidia-driver-595-open copyright → third-party/nvidia-driver.NOTICE
+[collect-licenses] copied desktopvideo copyright → third-party/blackmagic-desktopvideo.NOTICE
+[collect-licenses] copied desktopvideo-gui copyright → third-party/blackmagic-desktopvideo-gui.NOTICE
+[collect-licenses] wrote third-party/blackmagic-desktopvideo-EULA.txt
+[collect-licenses] copied ffmpeg copyright → third-party/ffmpeg.NOTICE
+[collect-licenses] copied syncthing copyright → third-party/syncthing.NOTICE
+[collect-licenses] copied nodejs copyright → third-party/nodejs.NOTICE
+[collect-licenses] copied calamares copyright → third-party/calamares.NOTICE
+Wrote /home/casparcg/highascg/licenses/manifest.json (6 components)
+Wrote /home/casparcg/highascg/licenses/INDEX.md
+[collect-licenses] done — see /home/casparcg/highascg/licenses/INDEX.md and /home/casparcg/highascg/licenses/COMPLIANCE-ISO.md
+==> Install licenses → /usr/share/doc/highascg/licenses
+==> Symlink /home/casparcg/highascg/licenses → /usr/share/doc/highascg/licenses
+  ok: licenses installed at /usr/share/doc/highascg/licenses
+==> Pre-produce preflight (no deletes under /home/eggs)
+==> Stop playout + WO-47/WO-52 services
+==> Mask runtime automount/arrive (prevent re-mount during produce)
+==> Umount WO-47 paths (empty stubs only in squashfs)
+  skip /home/casparcg/highascg/media/exfat (directory on root fs — not a mount point)
+  skip /home/casparcg/highascg/media/bridge (directory on root fs — not a mount point)
+  skip /home/casparcg/exfat (directory on root fs — not a mount point)
+  skip /home/casparcg/bridge (directory on root fs — not a mount point)
+OK: /home/casparcg/highascg/media/exfat is not mounted (root-fs stub OK for squashfs)
+OK: /home/casparcg/highascg/media/bridge is not mounted (root-fs stub OK for squashfs)
+OK: /home/casparcg/exfat is not mounted (root-fs stub OK for squashfs)
+OK: /home/casparcg/bridge is not mounted (root-fs stub OK for squashfs)
+OK: WO-47 volumes stopped/unmounted for eggs produce
+==> strip host swap for live ISO (swapoff + drop fstab lines — right before produce)
+==> Prepare host for live ISO (swap file stays on disk; omitted via exclude.list; tmpfs mounts are never cloned)
+  fstab: removed file-swap entries until restore (backup: /var/lib/highascg/iso-swap-fstab-strip/fstab.bak)
+==> Calamares shellprocess fixes (last chance before squashfs clone — avoids install exit 127)
+     note: eggs produce regenerates /etc/calamares; patch-iso-squashfs-calamares.sh runs after produce
+==> Calamares shellprocess fix target: live system (/)
+==> Calamares shellprocess: full paths for chroot (mkinitramfs, dpkg-reconfigure)
+==> installed /usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe)
+==> installed /usr/libexec/calamares/calamares-nomodeset.sh (/usr/sbin/update-grub)
+==> installed /usr/libexec/calamares/calamares-logs-helper.sh (offline-safe install logs)
+OK: Calamares shellprocess fixes applied
+     /etc/calamares/modules/shellprocess@mkinitramfs.conf
+     /etc/calamares/modules/shellprocess@boot_reconfigure.conf
+     /etc/calamares/modules/shellprocess@boot_deploy.conf
+     /etc/calamares/modules/before_bootloader_context.conf
+     /etc/calamares/modules/bootloader.conf (full paths)
+     /usr/libexec/calamares/calamares-logs-helper.sh (offline-safe)
+OK: binary /usr/bin/calamares (installed)
+OK: dpkg calamares
+OK: /etc/calamares
+OK: branding /etc/calamares/branding/highascg-eggs-theme/branding.desc
+OK: branding image highascg-eggs-theme-logo.png
+OK: branding image highascg-eggs-theme-logo.png
+OK: installer slideshow is HighAsCG-branded (show.qml)
+OK: polkit policy (com.github.calamares.calamares.policy)
+OK: eggs calamares CLI
+OK: launcher /usr/local/bin/launch-calamares.sh
+OK: passwordless sudo for launch-calamares (casparcg)
+OK: /usr/sbin/cleanup.sh (Calamares cleanup job)
+OK: shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs
+OK: Calamares l10n helper patched (offline-safe)
+OK: Calamares logs helper patched (avoids end-of-install exit 1)
+Calamares verify passed.
+    liveroot: /home/eggs/liveroot — left untouched
+OK: preflight complete — safe to run eggs produce
+==> Finalize GRUB splash + Plymouth initramfs (must run immediately before eggs produce)
+==> linux-modules-extra for 6.8.0-117-generic (VMD and other out-of-tree-ish block drivers)
+Hit:1 http://pl.archive.ubuntu.com/ubuntu noble InRelease
+Hit:2 http://pl.archive.ubuntu.com/ubuntu noble-updates InRelease                                      
+Hit:3 http://pl.archive.ubuntu.com/ubuntu noble-backports InRelease                                    
+Hit:4 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64  InRelease            
+Get:5 https://pkgs.tailscale.com/stable/ubuntu noble InRelease                                         
+Hit:6 https://deb.nodesource.com/node_24.x nodistro InRelease                                          
+Hit:7 https://penguins-eggs.net/repos/deb stable InRelease                                
+Hit:8 https://ppa.launchpadcontent.net/mozillateam/ppa/ubuntu noble InRelease
+Hit:9 http://security.ubuntu.com/ubuntu noble-security InRelease
+Fetched 6649 B in 0s (18.1 kB/s)
+Reading package lists... Done
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+linux-modules-extra-6.8.0-117-generic is already the newest version (6.8.0-117.117).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+OK: module nvme_core present (/lib/modules/6.8.0-117-generic/kernel/drivers/nvme/host/nvme-core.ko.zst)
+OK: module nvme present (/lib/modules/6.8.0-117-generic/kernel/drivers/nvme/host/nvme.ko.zst)
+OK: module vmd present (/lib/modules/6.8.0-117-generic/kernel/drivers/pci/controller/vmd.ko.zst)
+OK: storage drivers configured for ISO
+     /etc/initramfs-tools/modules.d/highascg-storage-block.conf
+     /etc/initramfs-tools/hooks/highascg-storage
+     /usr/local/lib/highascg/probe-internal-storage.sh
+     /etc/systemd/system/highascg-storage-probe.service (enabled)
+==> Using pinned kernel from /etc/highascg/pinned-kernel: 6.8.0-117-generic
+==> GRUB theme + Plymouth files (single host initramfs rebuild after this)
+==> GRUB theme.cfg (HighAsCG colours)
+==> Prepare boot-ready splash + Plymouth frames (RGB PNG for GRUB)
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+==> Plymouth animation-boot → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/animation-boot (30 frames, RGB for script theme)
+     30 animation frame(s); sample: PNG image data, 134 x 178, 8-bit/color RGB, non-interlaced
+OK: boot-ready branding assets prepared
+==> GRUB/isolinux splash from branding/splash.boot.png
+==> Plymouth boot splash (replaces Ubuntu purple screen)
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+plymouth is already the newest version (24.004.60-1ubuntu7.2).
+plymouth-theme-spinner is already the newest version (24.004.60-1ubuntu7.2).
+plymouth-label is already the newest version (24.004.60-1ubuntu7.2).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+OK: /etc/initramfs-tools/conf.d/highascg-live-iso-build.conf (suppresses fsck hook root probe warning during mkinitramfs)
+OK: initramfs will embed nvidia{,_modeset,_uvm,_drm} for Plymouth
+     /etc/initramfs-tools/modules.d/highascg-nvidia-plymouth.conf
+     /etc/initramfs-tools/modules (module names)
+     /etc/initramfs-tools/hooks/highascg-nvidia (copies .ko / .ko.zst from modinfo)
+     /etc/modprobe.d/highascg-nvidia-plymouth.conf
+     GRUB/isolinux must include: nvidia-drm.modeset=1 nvidia-drm.fbdev=1
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+==> Plymouth animation-boot → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/animation-boot (30 frames, RGB for script theme)
+     30 animation frame(s); sample: PNG image data, 134 x 178, 8-bit/color RGB, non-interlaced
+OK: boot-ready branding assets prepared
+==> Plymouth theme → /usr/share/plymouth/themes/highascg (mode=throbber-script)
+  throbber-boot (top-right): 4 frames → throbber-0001 … throbber-0004
+  Plymouth module: script (4 throbber frames, status log left + spinner top-right)
+==> initramfs hook (always embed highascg theme in ISO /live/initrd)
+==> Register default.plymouth alternative
+==> Using pinned kernel from /etc/highascg/pinned-kernel: 6.8.0-117-generic
+==> Skip host initramfs rebuild (install-highascg-plymouth-theme.sh)
+OK: Plymouth default = highascg (throbber-script, 4 frames, initrd 6.8.0-117-generic)
+OK: eggs theme → /home/casparcg/highascg/tools/eggs/live-usb/highascg-eggs-theme
+     GRUB: default Live entry (exFAT-only; no union persistence on kernel line)
+     Plymouth: highascg throbber-script (4 frames top-right + status log left) (see branding/README.md)
+theme: /home/casparcg/highascg/tools/eggs/live-usb/highascg-eggs-theme
+
+IMPORTANT: eggs produce ignores eggs.yaml theme: unless you pass --theme.
+  build-highascg-egg.sh passes: eggs produce ... --theme /home/casparcg/highascg/tools/eggs/live-usb/highascg-eggs-theme
+  Manual: sudo eggs produce --nointeractive --clone --max --basename highascg --theme /home/casparcg/highascg/tools/eggs/live-usb/highascg-eggs-theme
+==> Framebuffer corner throbber (default Live nosplash + corner animation)
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+==> Plymouth animation-boot → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/animation-boot (30 frames, RGB for script theme)
+     30 animation frame(s); sample: PNG image data, 134 x 178, 8-bit/color RGB, non-interlaced
+OK: boot-ready branding assets prepared
+==> Compile /usr/local/bin/highascg-fb-corner-throbber
+==> Convert throbber-boot PNGs → raw RGB (/usr/share/highascg/boot-throbber)
+==> Install systemd units (frame 60x80, count=4)
+
+OK: framebuffer corner throbber installed
+     binary: /usr/local/bin/highascg-fb-corner-throbber
+     frames: /usr/share/highascg/boot-throbber/throbber-0001.rgb … (4 @ 60x80)
+     service: highascg-fb-corner-throbber.service (enabled)
+     stops before nodm via /etc/systemd/system/nodm.service.d/stop-fb-throbber.conf
+
+Reboot to verify: GRUB wallpaper → scrolling dmesg + corner animation.
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, n
+
+ E G G S: the reproductive system of penguins
+
+ penguins-eggs            Perri's brewery edition           v26.6.2-x86_64 
+command: produce --nointeractive,--clone,--max,--excludes,static,--basename,highascg-nvidia-595,--theme,/home/casparcg/highascg/tools/eggs/live-usb/highascg-eggs-theme
+
+eggs >>> Produce an egg...
+eggs >>> using preesixent yolk
+eggs >>> creating live structure on /home/eggs/
+eggs >>> eggs will SAVE users and users' data on CLEAR on the live (ISO)/live/filesystem.squashfs
+eggs >>> creating calamares configuration files on /etc/calamares
+eggs >>> cleanup calamares configuration files
+eggs >>> copying vmlinuz-6.8.0-117-generic on (ISO)/live
+eggs >>> creating /boot/initrd.img-6.8.0-117-generic using mkinitramfs on (ISO)/live
+eggs >>> creating filesystem.squashfs on (ISO)/live
+mksquashfs /home/eggs/liveroot /home/eggs/mnt/iso/live/filesystem.squashfs -comp xz -Xbcj x86 -b 1M -no-duplicates -no-recovery -always-use-fragments -wildcards -ef /etc/penguins-eggs.d/exclude.list -e 'boot/efi/EFI' 'boot/loader/entries/' 'etc/fstab' 'var/lib/containers/' 'var/lib/docker/' 'etc/mtab' 'etc/udev/rules.d/70-persistent-cd.rules' 'etc/udev/rules.d/70-persistent-net.rules' 'etc/rc0.dK01cryptdisks' 'etc/rc0.dK01cryptdisks-early' 'etc/rc6.dK01cryptdisks' 'etc/rc6.dK01cryptdisks-early' 'etc/rcS.dS01cryptdisks' 'etc/rcS.dS01cryptdisks-early' 'home/eggs/' 
+Parallel mksquashfs: Using 28 processors
+Creating 4.0 filesystem on /home/eggs/mnt/iso/live/filesystem.squashfs, block size 1048576.
+[==================================================================================- ] 87121/87155  99%
+Unrecognised xattr prefix system.posix_acl_access
+Unrecognised xattr prefix system.posix_acl_default
+[===================================================================================\] 87155/87155 100%
+
+Exportable Squashfs 4.0 filesystem, xz compressed, data block size 1048576
+        compressed data, compressed metadata, compressed fragments,
+        compressed xattrs, compressed ids
+        duplicates are not removed
+Filesystem size 3440658.26 Kbytes (3360.02 Mbytes)
+        38.63% of uncompressed filesystem size (8907207.11 Kbytes)
+Inode table size 834928 bytes (815.36 Kbytes)
+        22.06% of uncompressed inode table size (3784762 bytes)
+Directory table size 936558 bytes (914.61 Kbytes)
+        33.55% of uncompressed directory table size (2791179 bytes)
+Xattr table size 109 bytes (0.11 Kbytes)
+        100.00% of uncompressed xattr table size (109 bytes)
+No duplicate files removed
+Number of inodes 108776
+Number of files 80667
+Number of fragments 2237
+Number of symbolic links 14762
+Number of device nodes 0
+Number of fifo nodes 0
+Number of socket nodes 1
+Number of directories 13346
+Number of hard-links 17
+Number of ids (unique uids + gids) 17
+Number of uids 7
+        root (0)
+        _apt (42)
+        casparcg (1000)
+        nx (108)
+        uuidd (107)
+        www-data (33)
+        systemd-timesync (997)
+Number of gids 16
+        root (0)
+        shadow (42)
+        polkitd (991)
+        casparcg (1000)
+        _ssh (103)
+        messagebus (102)
+        tty (5)
+        utmp (43)
+        staff (50)
+        nx (1001)
+        uuidd (107)
+        www-data (33)
+        systemd-timesync (997)
+        adm (4)
+        systemd-journal (999)
+        mail (8)
+eggs >>> Your live system Ubuntu/x64 can boot with Secure Boot enabled
+eggs >>> UUID used for boot search: 648270a5-8b24-4670-837d-0a6ab1e57fb4
+eggs >>> creating grub.cfg seeker USB on (efi.img)/boot/grub
+eggs >>> creating grub.cfg bridge to main. (ISO)/boot/grub/x86_64-efi
+eggs >>> creating grub.cfg seeker ISO/DVD on (ISO)/EFI/ubuntu
+eggs >>> copyng (efi.img) on (ISO)/boot/grub
+eggs >>> creating grub.cfg main on (ISO)/boot/grub
+xorriso -as mkisofs -J -joliet-long -r -l -iso-level 3 -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin -partition_offset 16 -V highascg-nvidia-595 -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -eltorito-alt-boot -e boot/grub/efi.img -isohybrid-gpt-basdat -no-emul-boot -o /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso /home/eggs/mnt/iso/
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  636g free
+xorriso : WARNING : -volid text is too long for Joliet (19 > 16)
+xorriso : WARNING : -volid text does not comply to ISO 9660 / ECMA 119 rules
+Added to ISO image: directory '/'='/home/eggs/mnt/iso'
+xorriso : UPDATE :      38 files added in 1 seconds
+xorriso : UPDATE :      38 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 432 bytes from file '/usr/lib/ISOLINUX/isohdpfx.bin'
+libisofs: NOTE : Automatically adjusted MBR geometry to 1021/224/32
+libisofs: NOTE : Aligned image size to cylinder size by 545 blocks
+xorriso : UPDATE :  7.12% done
+xorriso : UPDATE :  53.00% done
+ISO image produced: 1829632 sectors
+Written to medium : 1829632 sectors at LBA 0
+Writing to 'stdio:/home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso' completed successfully.
+
+eggs is finished!
+
+You can find the file: highascg-nvidia-595_amd64_2026-08-03_1259.iso
+in the nest: /home/eggs/.
+
+Remember, on liveCD user = live/evolution
+                    root = root/evolution
+==> Patch Calamares in squashfs (eggs produce regenerates /etc/calamares after preflight)
+==> Patch Calamares shellprocess inside ISO squashfs (eggs produce clobbers preflight fix)
+     squashfs: /home/eggs/mnt/iso/live/filesystem.squashfs (3361 MiB)
+     work dir: /home/eggs/mnt/squashfs-calamares-patch-root
+==> unsquashfs full tree (one-time per build; ~5–15 min for 4 GiB)
+Parallel unsquashfs: Using 28 processors
+95447 inodes (87155 blocks) to write
+
+[=================================================================================|] 182602/182602 100%
+
+created 80667 files
+created 13346 directories
+created 14762 symlinks
+created 0 devices
+created 0 fifos
+created 1 socket
+created 17 hardlinks
+==> Calamares shellprocess fix target: /home/eggs/mnt/squashfs-calamares-patch-root (squashfs unpack / liveroot)
+==> Calamares shellprocess: full paths for chroot (mkinitramfs, dpkg-reconfigure)
+==> patched /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/bootloader.conf (full paths to grub-install)
+==> installed /home/eggs/mnt/squashfs-calamares-patch-root/usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe)
+==> installed /home/eggs/mnt/squashfs-calamares-patch-root/usr/libexec/calamares/calamares-nomodeset.sh (/usr/sbin/update-grub)
+==> installed /home/eggs/mnt/squashfs-calamares-patch-root/usr/libexec/calamares/calamares-logs-helper.sh (offline-safe install logs)
+OK: Calamares shellprocess fixes applied
+     /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/shellprocess@mkinitramfs.conf
+     /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/shellprocess@boot_reconfigure.conf
+     /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/shellprocess@boot_deploy.conf
+     /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/before_bootloader_context.conf
+     /home/eggs/mnt/squashfs-calamares-patch-root/etc/calamares/modules/bootloader.conf (full paths)
+     /home/eggs/mnt/squashfs-calamares-patch-root/usr/libexec/calamares/calamares-logs-helper.sh (offline-safe)
+==> mksquashfs (xz, same family as eggs produce)
+Parallel mksquashfs: Using 28 processors
+Creating 4.0 filesystem on /home/eggs/mnt/iso/live/filesystem.squashfs.calamares-patched.307441, block size 1048576.
+[===================================================================================\] 87155/87155 100%
+
+Exportable Squashfs 4.0 filesystem, xz compressed, data block size 1048576
+        compressed data, compressed metadata, compressed fragments,
+        compressed xattrs, compressed ids
+        duplicates are not removed
+Filesystem size 3440658.51 Kbytes (3360.02 Mbytes)
+        38.63% of uncompressed filesystem size (8907207.51 Kbytes)
+Inode table size 834940 bytes (815.37 Kbytes)
+        22.06% of uncompressed inode table size (3784762 bytes)
+Directory table size 936590 bytes (914.64 Kbytes)
+        33.56% of uncompressed directory table size (2791179 bytes)
+Xattr table size 109 bytes (0.11 Kbytes)
+        100.00% of uncompressed xattr table size (109 bytes)
+No duplicate files removed
+Number of inodes 108776
+Number of files 80667
+Number of fragments 2237
+Number of symbolic links 14762
+Number of device nodes 0
+Number of fifo nodes 0
+Number of socket nodes 1
+Number of directories 13346
+Number of hard-links 17
+Number of ids (unique uids + gids) 17
+Number of uids 7
+        root (0)
+        _apt (42)
+        casparcg (1000)
+        nx (108)
+        uuidd (107)
+        www-data (33)
+        systemd-timesync (997)
+Number of gids 16
+        root (0)
+        shadow (42)
+        polkitd (991)
+        casparcg (1000)
+        _ssh (103)
+        messagebus (102)
+        tty (5)
+        utmp (43)
+        staff (50)
+        nx (1001)
+        uuidd (107)
+        www-data (33)
+        systemd-timesync (997)
+        adm (4)
+        systemd-journal (999)
+        mail (8)
+OK: patched squashfs → /home/eggs/mnt/iso/live/filesystem.squashfs
+==> Calamares shellprocess fix target: live system (/)
+==> Calamares shellprocess: full paths for chroot (mkinitramfs, dpkg-reconfigure)
+==> patched /etc/calamares/modules/bootloader.conf (full paths to grub-install)
+==> installed /usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe)
+==> installed /usr/libexec/calamares/calamares-nomodeset.sh (/usr/sbin/update-grub)
+==> installed /usr/libexec/calamares/calamares-logs-helper.sh (offline-safe install logs)
+OK: Calamares shellprocess fixes applied
+     /etc/calamares/modules/shellprocess@mkinitramfs.conf
+     /etc/calamares/modules/shellprocess@boot_reconfigure.conf
+     /etc/calamares/modules/shellprocess@boot_deploy.conf
+     /etc/calamares/modules/before_bootloader_context.conf
+     /etc/calamares/modules/bootloader.conf (full paths)
+     /usr/libexec/calamares/calamares-logs-helper.sh (offline-safe)
+OK: squashfs shellprocess@mkinitramfs patched
+==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)
+==> Prepare boot-ready splash + Plymouth frames
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+==> Plymouth animation-boot → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/animation-boot (30 frames, RGB for script theme)
+     30 animation frame(s); sample: PNG image data, 134 x 178, 8-bit/color RGB, non-interlaced
+OK: boot-ready branding assets prepared
+==> Refresh Plymouth theme files (skip host initramfs — rebuild ISO /live/initrd only)
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+plymouth is already the newest version (24.004.60-1ubuntu7.2).
+plymouth-theme-spinner is already the newest version (24.004.60-1ubuntu7.2).
+plymouth-label is already the newest version (24.004.60-1ubuntu7.2).
+0 upgraded, 0 newly installed, 0 to remove and 80 not upgraded.
+OK: /etc/initramfs-tools/conf.d/highascg-live-iso-build.conf (suppresses fsck hook root probe warning during mkinitramfs)
+OK: initramfs will embed nvidia{,_modeset,_uvm,_drm} for Plymouth
+     /etc/initramfs-tools/modules.d/highascg-nvidia-plymouth.conf
+     /etc/initramfs-tools/modules (module names)
+     /etc/initramfs-tools/hooks/highascg-nvidia (copies .ko / .ko.zst from modinfo)
+     /etc/modprobe.d/highascg-nvidia-plymouth.conf
+     GRUB/isolinux must include: nvidia-drm.modeset=1 nvidia-drm.fbdev=1
+==> GRUB/isolinux splash (1920×1080, RGB PNG — GRUB cannot use subsampled JPEG)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.png (PNG image data, 1920 x 1080, 8-bit/color RGB, non-interlaced)
+     /home/casparcg/highascg/tools/eggs/live-usb/branding/splash.boot.jpg (optional 4:4:4 JPEG)
+==> Plymouth throbber → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/throbber-boot (frames 1 2 29 30, max 80px)
+     4 throbber frame(s) from animation/{1 2 29 30}; sample: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+==> Plymouth animation-boot → /home/casparcg/highascg/tools/eggs/live-usb/branding/plymouth/animation-boot (30 frames, RGB for script theme)
+     30 animation frame(s); sample: PNG image data, 134 x 178, 8-bit/color RGB, non-interlaced
+OK: boot-ready branding assets prepared
+==> Plymouth theme → /usr/share/plymouth/themes/highascg (mode=throbber-script)
+  throbber-boot (top-right): 4 frames → throbber-0001 … throbber-0004
+  Plymouth module: script (4 throbber frames, status log left + spinner top-right)
+==> initramfs hook (always embed highascg theme in ISO /live/initrd)
+==> Register default.plymouth alternative
+==> Using pinned kernel from /etc/highascg/pinned-kernel: 6.8.0-117-generic
+==> Skip host initramfs rebuild (install-highascg-plymouth-theme.sh)
+OK: Plymouth default = highascg (throbber-script, 4 frames, initrd 6.8.0-117-generic)
+==> Skip squashfs refresh (default — Plymouth in initrd; OS root unchanged)
+==> GRUB/isolinux splash + theme.cfg → ISO tree
+==> GRUB font.pf2 (theme text invisible without matching Unifont on ISO)
+OK: copied /boot/grub/font.pf2 → boot/grub/font.pf2
+==> GRUB gfx preamble + theme fonts (Unifont — avoids generic text menu)
+OK: grub.cfg already has gfxterm (gfx theme enabled)
+==> GRUB menu timeout + gfx fallbacks on ISO grub.cfg
+==> GRUB kernel cmdline (console + splash + nvidia-drm.fbdev=1)
+  patched /home/eggs/mnt/iso/boot/grub/grub.cfg
+  patched /home/eggs/mnt/iso/EFI/ubuntu/grub.cfg
+  patched /home/eggs/mnt/iso/isolinux/isolinux.cfg
+OK: ISO kernel cmdline (default Live = full dmesg nosplash; Plymouth splash is alternate menuentry)
+OK: /etc/initramfs-tools/conf.d/highascg-live-iso-build.conf (suppresses fsck hook root probe warning during mkinitramfs)
+OK: initramfs will embed nvidia{,_modeset,_uvm,_drm} for Plymouth
+     /etc/initramfs-tools/modules.d/highascg-nvidia-plymouth.conf
+     /etc/initramfs-tools/modules (module names)
+     /etc/initramfs-tools/hooks/highascg-nvidia (copies .ko / .ko.zst from modinfo)
+     /etc/modprobe.d/highascg-nvidia-plymouth.conf
+     GRUB/isolinux must include: nvidia-drm.modeset=1 nvidia-drm.fbdev=1
+==> Rebuild live initrd (6.8.0-117-generic) → /home/eggs/mnt/iso/live/initrd.img-6.8.0-117-generic (2–8 min — ISO only, not a loop)
+live-boot: core filesystems dm-verity devices utils udev blockdev iscsi dns.
+==> Re-pack ISO (xorriso, ISO 9660 volume id HIGHASCG)
+xorriso 1.5.6 : RockRidge filesystem manipulator, libburnia project.
+
+Drive current: -outdev 'stdio:/home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso'
+Media current: stdio file, overwriteable
+Media status : is blank
+Media summary: 0 sessions, 0 data blocks, 0 data,  627g free
+Added to ISO image: directory '/'='/home/eggs/mnt/iso'
+xorriso : UPDATE :      44 files added in 1 seconds
+xorriso : UPDATE :      44 files added in 1 seconds
+xorriso : NOTE : Copying to System Area: 432 bytes from file '/usr/lib/ISOLINUX/isohdpfx.bin'
+libisofs: NOTE : Automatically adjusted MBR geometry to 1021/224/32
+libisofs: NOTE : Aligned image size to cylinder size by 1622 blocks
+xorriso : UPDATE :  7.75% done
+xorriso : UPDATE :  58.72% done
+xorriso : UPDATE : Thank you for being patient. Working since 2 seconds.
+ISO image produced: 1829632 sectors
+Written to medium : 1829632 sectors at LBA 0
+Writing to 'stdio:/home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso' completed successfully.
+
+OK: /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso
+==> Verify squashfs excludes (no swap file, nvidia-pool, dev trees)
+==> verify squashfs excludes: /home/eggs/mnt/iso/live/filesystem.squashfs
+OK: no root /swapfile or /swap.img in squashfs
+OK: no /opt/zoom in squashfs
+OK: no /opt/nvidia-pool in squashfs
+OK: no home/casparcg/highascg/.private in squashfs
+OK: no home/casparcg/highascg/projects/_trash in squashfs
+OK: no config/*.bak* or *copy*.config in squashfs
+OK: absent: home/casparcg/highascg/.git
+OK: absent: usr/lib/penguins-eggs
+OK: absent: usr/src/linux-headers-6.8.0-117
+OK: absent: home/casparcg/.antigravity-ide-server
+OK: present: home/casparcg/highascg/index.js
+OK: present: home/casparcg/highascg/node_modules (embed-server ISO)
+OK: present: home/casparcg/highascg/dist-web/index.html (operator UI on :4200)
+OK: present: home/casparcg/highascg/src/config/factory-starter.js (highascg new-project boot)
+OK: present: home/casparcg/highascg/src/config/default-empty-project.json (highascg new-project boot)
+OK: new-project.js uses src/config/factory-starter (not tools/eggs/)
+OK: absent: home/casparcg/highascg/tools/eggs (runtime uses src/config/)
+OK: present: home/casparcg/companion/companion_headless.sh
+OK: present: home/casparcg/.config/companion/modules/highpass-highascg/main.js
+OK: present: etc/systemd/system/companion.service
+OK: present: /usr/bin/calamares (install-to-disk)
+OK: present: /usr/local/bin/launch-calamares.sh
+OK: present: /etc/sudoers.d/highascg (Nuclear + Calamares NOPASSWD)
+OK: present: /usr/local/lib/highascg/highascg-tailscale-up.sh (Tailscale login)
+OK: present: /etc/calamares/branding/highascg-eggs-theme/branding.desc
+OK: present: /etc/calamares/branding/highascg-eggs-theme/highascg-eggs-theme-logo.png
+OK: present: /usr/local/lib/highascg/fix-calamares-branding.sh
+OK: present: shellprocess@mkinitramfs uses /usr/sbin/mkinitramfs (avoids exit 127)
+OK: present: /usr/sbin/cleanup.sh (Calamares cleanup job)
+OK: present: /usr/libexec/calamares/calamares-l10n-helper.sh (offline-safe l10n)
+OK: present: /usr/libexec/calamares/calamares-logs-helper.sh (avoids end-of-install exit 1)
+OK: present: shellprocess@boot_reconfigure uses /usr/sbin/dpkg-reconfigure
+OK: present: /usr/local/lib/highascg/probe-internal-storage.sh (NVMe/VMD for Calamares)
+OK: present: grub-pc in squashfs (Legacy BIOS Calamares bootloader)
+OK: present: linux-headers-6.8.0-117-generic in squashfs (DeckLink/NVIDIA DKMS)
+OK: present: before_bootloader_context installs grub-pc on BIOS firmware
+OK: present: /usr/local/bin/caspar-systemd-cleanup.sh (orphan caspar cleanup)
+OK: present: home/casparcg/highascg/tools/startup/run-health-checks.sh (post-boot QA on stick)
+OK: present: home/casparcg/highascg/tools/startup/verify-live-stick.sh (post-boot QA on stick)
+OK: present: home/casparcg/highascg/tools/startup/verify-passwordless-sudo.sh (post-boot QA on stick)
+OK: present: home/casparcg/highascg/tools/startup/verify-decklink.sh (post-boot QA on stick)
+OK: present: home/casparcg/highascg/tools/startup/stick-boot-test/run-stick-boot-tests.sh (post-boot QA on stick)
+OK: absent (DeckLink): usr/lib/blackmagic
+OK: absent (DeckLink): var/lib/dkms/blackmagic
+OK: absent (DeckLink): lib/udev/rules.d/55-blackmagic.rules
+OK: Plymouth animation in squashfs: PNG image data, 60 x 80, 8-bit/color RGB, non-interlaced
+OK: squashfs size 3361 MiB
+Squashfs exclude verification passed.
+==> Verify ISO boot branding (set HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1 or FAST=1 to shorten)
+==> ISO: /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso
+OK: default grub linux line is plain Live (no union persistence) (grub.cfg)
+OK: grub.cfg default linux line has nosplash (full early dmesg)
+OK: grub.cfg default linux line has systemd.show_status=true (RPi-style status log)
+OK: grub.cfg has nvidia-drm.fbdev=1 (Plymouth framebuffer on NVIDIA)
+OK: grub.cfg has alternate Live (Plymouth splash) menuentry
+OK: grub.cfg has custom Live menuentry (highascg-eggs-theme)
+OK: grub.cfg loads gfxterm (themed menu + splash.png)
+OK: grub.cfg sets gfxmode=1920x1080 (matches splash.boot.png)
+OK: default Live menuentry uses gfxpayload=text (clean kernel handoff)
+OK: theme.cfg fonts match GNU Unifont (font.pf2)
+OK: theme.cfg sets boot_menu menu_bg_color (visible labels on dark splash)
+OK: boot/grub/font.pf2 present on ISO
+OK: grub.cfg timeout=5
+OK: GRUB splash matches branding/splash.boot.png
+OK: isolinux splash present
+OK: live initrd contains plymouth theme highascg
+OK: live initrd contains plymouth binary
+OK: live initrd contains highascg.script (status log + corner throbber)
+OK: live initrd has 4 throbber frames (animation 1,2,29,30)
+OK: live initrd contains nvidia_drm module (Plymouth can use GPU fbdev)
+OK: Calamares slideshow in squashfs is HighAsCG-branded (show.qml)
+All boot branding checks passed.
+==> Restore build-host fstab / swap after ISO produce
+  restored /etc/fstab
+  re-enabled /swap.img
+==> Remount bridge/USB + config sync (eggs produce umounts volumes for squashfs)
+==> Bridge boot (HIGHASCGDAT)
+==> USB / exFAT boot (HIGHASCGEXF)
+==> Wait for exfat-sync (boot pull + push seed)
+● highascg-exfat-sync.service - HighAsCG bridge/USB mtime sync (WO-47 + WO-52)
+     Loaded: loaded (/etc/systemd/system/highascg-exfat-sync.service; enabled; preset: enabled)
+     Active: active (exited) since Mon 2026-08-03 13:04:02 UTC; 17ms ago
+       Docs: file:/usr/share/doc/highascg-wo47/EXFAT_DATA_ZERO_TOUCH.md
+    Process: 431186 ExecStart=/usr/bin/node /home/casparcg/highascg/tools/runtime/exfat-sync-cli.js --boot (code=exited, status=0/SUCCESS)
+   Main PID: 431186 (code=exited, status=0/SUCCESS)
+        CPU: 338ms
+
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:         "mounted": true,
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:         "copied": 5,
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:         "skipped": 0,
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:         "volumePath": "/home/casparcg/exfat/.private/highascg7579"
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:       }
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:     ],
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:     "errors": []
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]:   }
+Aug 03 13:04:02 highascg-nvidia-595 node[431186]: }
+Aug 03 13:04:02 highascg-nvidia-595 systemd[1]: Finished highascg-exfat-sync.service - HighAsCG bridge/USB mtime sync (WO-47 + WO-52).
+
+
+Config counts:
+  /home/casparcg/highascg/config: 43 files
+  /home/casparcg/bridge/configs: 45 files
+  /home/casparcg/exfat/configs: 41 files
+
+Dashboard: curl -s http://127.0.0.1:4200/api/system/exfat-sync | jq .volumes 2>/dev/null || true
+Start server if needed: sudo systemctl start highascg.service
+
+Done. ISO: /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso (nvidia-595, no nvidia-pool)
+
+Full build + flash /dev/sda:
+  sudo HIGHASCG_NVIDIA_DRIVER=595 bash /home/casparcg/highascg/tools/eggs/live-usb/build-produce-flash-stick.sh -y
+
+Flash only (this ISO):
+  sudo bash /home/casparcg/highascg/tools/eggs/live-usb/create-operator-stick-from-dd.sh /dev/sda --iso /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso
+  (see tools/eggs/live-usb/FLASH_AND_PERSIST.md)
+
+==> Phase 2/2: flash + partition stick
+     DEVICE: /dev/sda
+     ISO:    /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEVICE: /dev/sda  (29.3G ProductCode)
+ISO:    /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso  (3.5GiB)
+This ERASES all data on /dev/sda.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+(-y) Skipping interactive confirmation.
+==> 1/5 Unmount and flash ISO (dd)
+OK: no mounts on partitions under /dev/sda
+Note: exFAT units masked for this session; finish-operator-stick.sh unmasks when done.
+Syncing filesystem buffers before write (can take a minute)…
+Writing ISO to /dev/sda (~5–15 min, progress every 2s)…
+Writing /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso → /dev/sda (bs=4M) …
+13:04:09  written: 1.1MiB
+ / 3.5GiB
+
+Flushing to stick…
+ISO write complete.
+==> Reread partition table on /dev/sda (USB-safe)…
+NAME   FSTYPE  FSVER            LABEL               UUID                                 FSAVAIL FSUSE% MOUNTPOINTS
+sda    iso9660 Joliet Extension highascg-nvidia-595 2026-08-03-13-03-28-00                              
+├─sda2 vfat    FAT16                                0B31-AE32                                           
+└─sda3 exfat   1.0              HIGHASCGEXF         EFFE-EECC                              24.6G     0% /home/casparcg/highascg/media/exfat
+                                                                                                        /home/casparcg/exfat
+                                                                                                        /media/casparcg/HIGHASCGEXF
+==> 2/5 exFAT + operator layout (finish-operator-stick, no persistence)
+OK: /etc/highascg/exfat-sync.json already matches repo.
+OK: /etc/highascg/exfat-sync.json already matches repo.
+OK: no mounts on partitions under /dev/sda
+Note: exFAT units masked for this session; finish-operator-stick.sh unmasks when done.
+==> Before prune-hybrid-data-partitions:
+Model: VendorCo ProductCode (scsi)
+Disk /dev/sda: 30000MiB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start    End      Size     Type     File system  Flags
+ 2      0.18MiB  16.2MiB  16.0MiB  primary  fat16        esp
+
+Keep partition 2 (ESP)
+==> After prune-hybrid-data-partitions:
+Model: VendorCo ProductCode (scsi)
+Disk /dev/sda: 30000MiB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start    End      Size     Type     File system  Flags
+ 2      0.18MiB  16.2MiB  16.0MiB  primary  fat16        esp
+
+OK: no mounts on partitions under /dev/sda
+Note: exFAT units masked for this session; finish-operator-stick.sh unmasks when done.
+==> ISO path for partition placement: /home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso
+==> exFAT-only stick (no union persistence partition)
+==> Remove stale operator slices (persistence + exFAT) before recreating HIGHASCGEXF
+OK: no mounts on partitions under /dev/sda
+Note: exFAT units masked for this session; finish-operator-stick.sh unmasks when done.
+==> Partition table before prune:
+Model: VendorCo ProductCode (scsi)
+Disk /dev/sda: 30000MiB
+Sector size (logical/physical): 512B/512B
+Partition Table: msdos
+Disk Flags: 
+
+Number  Start    End      Size     Type     File system  Flags
+ 2      0.18MiB  16.2MiB  16.0MiB  primary  fat16        esp
+
+Prune candidate: /dev/sda3 → parted rm 3 (LABEL=HIGHASCGEXF TYPE=exfat)
+parted rm 3
+Error: Partition doesn't exist.
+Error: Partition(s) 3 on /dev/sda have been written, but we have been unable to inform the kernel of the change, probably because it/they are in use.  As a result, the old partition(s) will remain in use.  You should reboot now before making further changes.
+casparcg@highascg7579:~/highascg$ lsblk
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0         7:0    0     4K  1 loop /snap/bare/5
+loop1         7:1    0  66.8M  1 loop /snap/core24/1643
+loop2         7:2    0  50.1M  1 loop /snap/snapd/27591
+loop3         7:3    0  50.1M  1 loop /snap/snapd/27406
+loop4         7:4    0  29.1M  1 loop /snap/tailscale/154
+sda           8:0    1  29.3G  0 disk 
+├─sda2        8:2    1    16M  0 part 
+└─sda3        8:3    1  24.6G  0 part /media/casparcg/HIGHASCGEXF
+zram0       251:0    0     8G  0 disk [SWAP]
+nvme0n1     259:0    0 953.9G  0 disk 
+├─nvme0n1p1 259:1    0   300M  0 part /boot/efi
+└─nvme0n1p2 259:2    0 953.6G  0 part /
+nvme1n1     259:3    0   1.9T  0 disk 
+├─nvme1n1p1 259:4    0    16M  0 part 
+├─nvme1n1p2 259:5    0   1.4T  0 part 
+└─nvme1n1p3 259:6    0 488.3G  0 part /home/casparcg/highascg/media/bridge
+                                      /home/casparcg/bridge
