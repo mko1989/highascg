@@ -303,6 +303,12 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing caspar-systemd-cleanup.sh — re-run sync-caspar-supervisor-wiring.sh"
 	fi
+	if squash_has_path 'etc/systemd/system/multi-user.target.wants/calamares-session-log-rescue.service' \
+		&& squash_has_path 'usr/libexec/calamares/calamares-session-log-rescue.sh'; then
+		ok "present: calamares-session-log-rescue enabled (WO-417 — failed installs leave session.log on HIGHASCGEXF)"
+	else
+		bad "missing calamares-session-log-rescue — run fix-calamares-shellprocess.sh / patch-iso-squashfs-calamares.sh"
+	fi
 else
 	ok "HIGHASCG_ISO_EMBED_CALAMARES=0 — skip Calamares squashfs checks"
 fi

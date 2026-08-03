@@ -114,6 +114,8 @@ fi
 L10N_SRC="${HERE}/calamares-l10n-helper.sh"
 NOMODESET_SRC="${HERE}/calamares-nomodeset-helper.sh"
 LOGS_SRC="${HERE}/calamares-logs-helper.sh"
+RESCUE_SRC="${HERE}/calamares-session-log-rescue.sh"
+RESCUE_UNIT_SRC="${HERE}/systemd/calamares-session-log-rescue.service"
 if [[ -f "$L10N_SRC" ]]; then
 	install -m 0755 "$L10N_SRC" "${LIB}/calamares-l10n-helper.sh"
 	echo "==> installed ${LIB}/calamares-l10n-helper.sh (offline-safe)"
@@ -125,6 +127,18 @@ fi
 if [[ -f "$LOGS_SRC" ]]; then
 	install -m 0755 "$LOGS_SRC" "${LIB}/calamares-logs-helper.sh"
 	echo "==> installed ${LIB}/calamares-logs-helper.sh (offline-safe install logs)"
+fi
+
+# WO-417: an exec-phase failure (bootloader) aborts BEFORE shellprocess@logs, losing
+# session.log with the live tmpfs. Live-only unit mirrors it to HIGHASCGEXF instead.
+if [[ -f "$RESCUE_SRC" && -f "$RESCUE_UNIT_SRC" ]]; then
+	SYSD="${ROOT}/etc/systemd/system"
+	mkdir -p "$SYSD" "${SYSD}/multi-user.target.wants"
+	install -m 0755 "$RESCUE_SRC" "${LIB}/calamares-session-log-rescue.sh"
+	install -m 0644 "$RESCUE_UNIT_SRC" "${SYSD}/calamares-session-log-rescue.service"
+	ln -sf ../calamares-session-log-rescue.service \
+		"${SYSD}/multi-user.target.wants/calamares-session-log-rescue.service"
+	echo "==> installed + enabled calamares-session-log-rescue (live sessions only)"
 fi
 
 if [[ ! -x "${SBIN}/cleanup.sh" ]]; then
@@ -142,3 +156,4 @@ echo "     ${MOD}/shellprocess@boot_deploy.conf"
 echo "     ${MOD}/before_bootloader_context.conf"
 echo "     ${MOD}/bootloader.conf (full paths)"
 echo "     ${LIB}/calamares-logs-helper.sh (offline-safe)"
+echo "     ${LIB}/calamares-session-log-rescue.sh (+ live-only systemd unit)"

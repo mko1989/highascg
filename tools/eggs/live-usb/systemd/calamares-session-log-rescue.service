@@ -1,0 +1,16 @@
+# HighAsCG WO-417 — live-session only: keep a copy of the Calamares session log
+# on the operator exFAT so an aborted install (e.g. bootloader failure) stays
+# diagnosable after reboot. Installed + enabled into the ISO squashfs by
+# fix-calamares-shellprocess.sh; inert on installed systems (no /run/live/medium).
+[Unit]
+Description=Copy Calamares session.log to HIGHASCGEXF during live install
+ConditionPathExists=/run/live/medium
+
+[Service]
+Type=simple
+ExecStart=/usr/libexec/calamares/calamares-session-log-rescue.sh
+Restart=no
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
