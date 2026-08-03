@@ -146,10 +146,7 @@ function shouldIgnoreBootShrink(ch, cells, log) {
 	const n = Array.isArray(cells) ? cells.length : 0
 	if (n === 0 || n >= g.cells) return false
 	bootShrinkGuard = null // one-shot: the next report wins whatever it says
-	log?.(
-		'warn',
-		`operator-gui: ignoring boot-window report of ${n} cell(s) that would shrink the restored ${g.cells}-cell layout (one-shot guard)`,
-	)
+	log?.('warn', `operator-gui: ignoring boot-window report of ${n} cell(s) that would shrink the restored ${g.cells}-cell layout (one-shot guard)`)
 	return true
 }
 
@@ -393,11 +390,8 @@ async function ensureOperatorGuiChannel(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return { skipped: true }
 	const { ch, guiUrl } = resolved
-	// Caspar just (re)connected: this may be a FRESH caspar whose stage is empty — the
-	// skip-unchanged route cache describes the previous instance. Forget it so the re-apply
-	// below re-PLAYs every route. (todos03.08 regression: the config-apply flow's re-plays
-	// landed on the dying instance, then this re-apply skipped all PLAYs as "unchanged" —
-	// MIXER fills went out, holes stayed empty.)
+	// WO-410: a (re)connect may face a FRESH caspar with an empty stage — the skip-unchanged
+	// cache describes the previous instance, so forget it or the re-apply skips every PLAY.
 	lastAppliedRouteByChannel.delete(ch)
 	lastMaxLayerByChannel.delete(ch)
 	// WO-255 migration hygiene: the retired CEF web-UI layer (100) may still be PLAYing from a
@@ -443,10 +437,7 @@ async function ensureOperatorGuiChannel(ctx) {
 			// returning to Looks restores it via the client's own report.
 			const decision = shouldReapplyPersistedLayout(ch, saved.cells)
 			if (!decision.reapply) {
-				ctx.log?.(
-					'info',
-					`Operator GUI re-apply skipped (ch ${ch}): ${decision.reason} — ${saved.cells.length} cell(s) stay saved`,
-				)
+				ctx.log?.('info', `Operator GUI re-apply skipped (ch ${ch}): ${decision.reason} — ${saved.cells.length} cell(s) stay saved`)
 			} else {
 				// Arm the one-shot shrink guard for the boot window (see {@link shouldIgnoreBootShrink}).
 				bootShrinkGuard = saved.cells.length > 1 ? { ch, until: Date.now() + BOOT_GUARD_MS, cells: saved.cells.length } : null

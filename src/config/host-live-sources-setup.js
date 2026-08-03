@@ -25,7 +25,21 @@ async function setupHostLiveSources(self) {
 
 	const played = []
 	const failed = []
+	// WO-406/WO-410 (03.08, live-proven): a stored hostChannel can point at a channel the map
+	// has since reassigned — the NDI source pinned ch 5 and its replay clobbered the monitor
+	// bus's solo layer on every reconnect. Never replay onto the monitor channel; the real
+	// renumbering fix is the WO-377/381 planned-vs-stored family.
+	const { getChannelMap } = require('./routing-map')
+	const monitorCh = getChannelMap(self.config).monitorCh
 	for (const entry of entries) {
+		if (monitorCh != null && Number(entry.channel) === Number(monitorCh)) {
+			self.log?.(
+				'warn',
+				`Host live sources: "${entry.sourceId}" stored hostChannel ${entry.channel} is the MONITOR channel — replay skipped (re-create the source to renumber it)`,
+			)
+			failed.push({ sourceId: entry.sourceId, channel: entry.channel, cmd: '(skipped)', message: 'monitor_channel_collision' })
+			continue
+		}
 		if (isBrowserDisplayCandidate(entry.item)) {
 			const ready = await ensureBrowserDisplaySourceReady(self, entry.item)
 			if (!ready.ok) {
