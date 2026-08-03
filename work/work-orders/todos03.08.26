@@ -8,6 +8,9 @@ live inputs need to have a blue label bar (not red) under them in compose previe
 the pgm has capture button and others have prt should be unified.
 
 the test pattern displays the resolution twice at the top.
+now it displays it once ate the top and then the second time after screen consumer. once at the top is enough.
+the boucing character has too big "bump box", meaning on the left and right it bounces of the wall too early, not when the character actually touches the border.
+
 
 the prv channels need to appear in audio mixer, so operators can monitor the audio of video before taking it to pgm.
 

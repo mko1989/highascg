@@ -1,6 +1,6 @@
 # WO-407 — Screen-consumer micro-stutter while the same channel is smooth in the operator GUI (todos03.08.26 item 3)
 
-**Status: OPEN (triaged 2026-08-03 — config-level suspects identified; needs live repro with displays actually driven)**
+**Status: DONE (2026-08-03 — T2 confirmed by owner on the glass: "seems to be smooth now". Root cause: GL swaps synced to the PRIMARY head (DP-4 operator monitor) while PGM lives on DP-0 — cross-panel vblank beat. Fix: `__GL_SYNC_DISPLAY_DEVICE=DP-0` via run.sh's box-local caspar-env hook)**
 **Priority:** High (on-air output quality)
 **Source:** `work/work-orders/todos03.08.26` item 3 — "micro stutters on screen consumer. the same channel in the operator gui is smooth, yet on the actual output it stutters a little"
 **Related:** WO-80 (xrandr forced custom modes), WO-314 (NVIDIA prime service env), WO-391 (mouse-lag/pointer watchdog on the same X server), WO-243/263 (operator-GUI CEF channel — the "smooth" comparison path), WO-401/405 (caspar at 431 % CPU — load-induced frame misses are a competing hypothesis)
@@ -78,7 +78,7 @@ level), so diagnosis is by eye + single-variable tests below.
   box-local `~/.config/highascg/caspar-env` (NOT in the repo — Syncthing peers
   unaffected); this box sets `CASPAR_GL_SYNC_DISPLAY=DP-0` →
   `__GL_SYNC_DISPLAY_DEVICE=DP-0`, verified in the running caspar's environment
-  (service cycled via exit-137 → systemd on-failure restart). **Awaiting owner verdict.**
+  (service cycled via exit-137 → systemd on-failure restart). **Owner verdict: SMOOTH — this was the fix.** Note: the owner asked if a stray caspar instance was the cause — no; that was a pgrep-self-match false alarm in the session (only one caspar ever ran). CAVEAT: T1's ch3 vsync=false hand-edit was still in place during the verdict; the next Apply regenerates vsync=true on ch3 — re-check PGM smoothness once after that Apply (if stutter returns, the combination matters and ch3 vsync needs a real setting).
 - If T2 fails: **T3** — ForceCompositionPipeline OFF on DP-0 only (live
   `nvidia-settings --assign`, no restart — but contradicts the normative doc; test-only,
   re-asserted by `highascg-nvidia-x-apply.sh` on next layout apply). Then T4: PGM vsync
