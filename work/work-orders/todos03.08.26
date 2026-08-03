@@ -1,0 +1,5 @@
+need you to do a thorough review of the code base. looking for anything that might be benefecial to get the most performace out of the machine.
+
+i need a good way to get audio monitoring on a second audio output (system audio) so i can monitor each channel or input by soloing it in the audio mixer.
+
+i also see some micro stuters on screen consumer. the weird thing is that the same channel in the operator gui is smooth, yet on the actual output it stutters a little.

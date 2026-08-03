@@ -1,6 +1,6 @@
 # WO-401 — Machine performance research pass (todos30.07.26)
 
-**Status:** IN PROGRESS — research complete 2026-07-30; **F1, F2, F3-revised (+delta flag ON), F4, F5-revised (fps derives from source), F6, F7, F8, F9, F12 and todos item 6 all implemented same day** (owner-approved), **awaiting the post-show deploy** (build:client → service restart → kiosk F5) to take effect. F3/F5 as ORIGINALLY proposed were void — superseded by the -revised versions. Deferred with reasons: F10/F11 (marginal), F13 (owner call), F14 (feature off), F15 (quiet day, DM3 path). Remaining follow-up: v4l2 on-demand lifecycle idea.
+**Status:** IN PROGRESS — research complete 2026-07-30; **F1, F2, F3-revised (+delta flag ON), F4, F5-revised (fps derives from source), F6, F7, F8, F9, F12 and todos item 6 all implemented same day** (owner-approved), **post-show deploy DONE 2026-08-03** (service+caspar restart 09:55, `build:client` 10:13, kiosk XTEST F5 — recorded in WO-405 §2; owner QA of the client items still owed). F3/F5 as ORIGINALLY proposed were void — superseded by the -revised versions. Deferred with reasons: F10/F11 (marginal), F13 (owner call), F14 (feature off), F15 (quiet day, DM3 path). Remaining follow-up: v4l2 on-demand lifecycle idea.
 **Priority:** High (owner: "things that can be done better to get better performance of the machine")
 **Date:** 2026-07-30
 **Source:** owner conversation + `work/work-orders/todos30.07.26` items 6 (thumbnail refresh) and 8 (devices tab load)
