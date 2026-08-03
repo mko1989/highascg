@@ -9,7 +9,7 @@ const { createLogger } = require('./src/utils/logger'); const logBuffer = requir
 const { config: configLogger } = require('./src/utils/buffered-logger')
 const { StateManager } = require('./src/state/state-manager')
 const { startHttpServer, stopHttpServer } = require('./src/server/http-server'); const { attachWebSocketServer } = require('./src/server/ws-server')
-const { startUsbHotplugWatcher } = require('./src/media/usb-drives'); const { routeRequest, getState } = require('./src/api/router')
+const { startUsbHotplugWatcher } = require('./src/media/usb-drives'); const { startUsbAutoMount } = require('./src/media/usb-automount'); const { routeRequest, getState } = require('./src/api/router')
 const persistence = require('./src/utils/persistence'); const { TimelineEngine } = require('./src/engine/timeline-engine')
 const { ClipEndFadeWatcher } = require('./src/engine/clip-end-fade'); const { ConnectionManager } = require('./src/caspar/connection-manager')
 const { normalizeOscConfig } = require('./src/osc/osc-config'); const { OscState } = require('./src/osc/osc-state')
@@ -312,6 +312,7 @@ function main() {
 		})
 		appCtx._stopReplicationService = () => stopReplicationService(appCtx)
 		appCtx._stopUsbHotplugWatcher = startUsbHotplugWatcher(appCtx)
+		appCtx._stopUsbAutoMount = startUsbAutoMount(appCtx, { log: (m) => logger.info(m), logError: (m) => logger.error(m) })
 
 		logBuffer.setOnNewLine((record) => {
 			try {

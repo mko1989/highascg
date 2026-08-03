@@ -32,6 +32,7 @@ function coreDefaults() {
 		casparServer: casparServerDefaults(),
 		usbIngest: {
 			enabled: true,
+			autoMount: true,
 			defaultSubfolder: '',
 			overwritePolicy: 'rename',
 			verifyHash: false,

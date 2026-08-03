@@ -47,6 +47,7 @@ const FILES = [
 	'tools/smoke/smoke-wo406-monitor-bus.test.js',
 	'tools/smoke/smoke-wo407-gl-sync-env.test.js',
 	'tools/smoke/smoke-wo412-opgui-cable-implies-monitor.test.js',
+	'tools/smoke/smoke-wo413-usb-automount.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',
 	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',

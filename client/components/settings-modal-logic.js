@@ -124,6 +124,8 @@ export function buildSettingsPayload(modal) {
 		rtmp: JSON.parse(JSON.stringify(prevAll.rtmp || {})),
 		usbIngest: {
 			enabled: !!(modal.querySelector('#set-usb-enabled') || {}).checked,
+			// WO-413: no modal control — preserve the stored value or a save re-enables it.
+			autoMount: (prevAll.usbIngest || {}).autoMount !== false,
 			defaultSubfolder: (modal.querySelector('#set-usb-subfolder') || {}).value?.trim() ?? '',
 			overwritePolicy: (modal.querySelector('#set-usb-policy') || {}).value ?? 'rename',
 			verifyHash: !!(modal.querySelector('#set-usb-verify') || {}).checked,

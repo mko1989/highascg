@@ -182,7 +182,7 @@ async function handlePost(path, body, ctx) {
 			.sort((a, b) => a.slotOrder - b.slotOrder)
 		cfg.gpuPhysicalTopologyOperatorSaved = true
 	}
-	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
+	if (settings.usbIngest) { const u = settings.usbIngest; const p = String(u.overwritePolicy || 'rename'); cfg.usbIngest = { enabled: u.enabled !== false, autoMount: u.autoMount !== false, defaultSubfolder: String(u.defaultSubfolder ?? '').trim(), overwritePolicy: ['skip', 'overwrite', 'rename'].includes(p) ? p : 'rename', verifyHash: !!u.verifyHash } }
 	if (settings.operatorTools) {
 		// WO-268: preserve already-saved keys and only apply the keys present in the patch —
 		// this used to rebuild from defaults + pointerConfineMultiview only, silently wiping
