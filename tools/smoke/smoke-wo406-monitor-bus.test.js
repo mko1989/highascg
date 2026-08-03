@@ -86,6 +86,14 @@ test('WO-406: generator derives flat keys and emits the monitor channel XML', ()
 	assert.match(xml, /<system-audio>[\s\S]*Sennheiser SC60: USB Audio \(hw:2,0\)[\s\S]*<\/system-audio>/)
 	assert.doesNotMatch(xml, /<portaudio>/)
 
+	// Mode MUST match the screens' fps: route_producer's bounded queue drops every other
+	// frame's audio when the monitor channel runs at half the source rate — the owner heard
+	// this as "weird stuttery noise" on a 50 fps PRV routed into the old fixed 576p2500
+	// (25 fps) channel. Cheapest progressive mode AT the source rate, 576p2500 fallback.
+	assert.match(buildMonitorChannelXml(merged, 9, 50), /<video-mode>720p5000<\/video-mode>/)
+	assert.match(buildMonitorChannelXml(merged, 9, 25), /<video-mode>576p2500<\/video-mode>/)
+	assert.match(xml, /<video-mode>576p2500<\/video-mode>/) // no fps given → historical default
+
 	// No monitor entry → nothing derived, nothing emitted.
 	const clean = { caspar_build_profile: 'custom_live', screen_count: 1 }
 	applyAudioOutputOverridesToScreens(clean, { audioOutputs: [] })
@@ -97,6 +105,14 @@ test('WO-406: client inspector saves the role; solo API keeps the monitorCh fall
 	const inspector = read('client/components/device-view-inspector-audio.js')
 	assert.match(inspector, /role: monitorChk\.checked \? 'monitor' : ''/, 'save writes the role')
 	assert.match(inspector, /Monitor \/ headphone bus \(mixer SOLO output\)/, 'checkbox is labelled')
+	// Owner 03.08: "usb headphones as a second portaudio output … is not possible" — correct
+	// (WO-406 §4b). Checking Monitor forces the System Audio type; a monitor save can never
+	// persist type portaudio again.
+	assert.match(inspector, /type: monitorChk\.checked \? 'system-audio' : typeSel\.value/, 'monitor save forces system-audio type')
+
+	// The generator call site passes the screens' fps so the monitor mode rate-matches the route sources.
+	const channels = read('src/config/config-generator-channels.js')
+	assert.match(channels, /buildMonitorChannelXml\(config, routeMap\.monitorCh, plan\.screens\?\.\[0\]\?\.dims\?\.fps\)/, 'monitor mode derives from screen fps')
 
 	const routes = read('src/api/routes-audio.js')
 	assert.match(routes, /const monitorCh = previewCh \?\? map\.monitorCh/, 'solo resolves to the monitor channel when audioPreview is off')

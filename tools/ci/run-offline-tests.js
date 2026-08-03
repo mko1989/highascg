@@ -43,6 +43,7 @@ const FILES = [
 	'tools/smoke/smoke-wo400-supervisor-cleanup.test.js',
 	'tools/smoke/smoke-wo401-perf-first-wave.test.js',
 	'tools/smoke/smoke-wo403-shader-live-playlist-follow.test.js',
+	'tools/smoke/smoke-wo237-monitor-channel-cheapest-mode.test.js',
 	'tools/smoke/smoke-wo406-monitor-bus.test.js',
 	'tools/smoke/smoke-wo407-gl-sync-env.test.js',
 	'tools/smoke/smoke-wo412-opgui-cable-implies-monitor.test.js',

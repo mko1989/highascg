@@ -182,7 +182,7 @@ function buildChannelsSection(config, routeMap) {
 
 	if (plan.streamingChannelDedicatedSlot) setChannelXml(routeMap.streamingCh, buildStreamingChannel(config, routeMap.streamingCh))
 
-	const monitorXml = buildMonitorChannelXml(config, routeMap.monitorCh)
+	const monitorXml = buildMonitorChannelXml(config, routeMap.monitorCh, plan.screens?.[0]?.dims?.fps)
 	if (monitorXml) setChannelXml(routeMap.monitorCh, monitorXml)
 
 	const usedNums = [...channelXmlByNumber.keys()]

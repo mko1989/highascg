@@ -1,7 +1,7 @@
 'use strict'
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
-const { layoutChannelCount } = require('./config-modes')
+const { layoutChannelCount, getLowestStandardVideoModeIdForFps } = require('./config-modes')
 const { casparChannelLayoutId, DISCRETE_8CH_LAYOUT_ID } = require('./audio-channel-layouts')
 const { escapeXml, isCustomLiveProfile } = require('./config-generator-utils')
 const {
@@ -407,9 +407,11 @@ function buildPortAudioConsumerXml(config, screenIdx1) {
 /**
  * @param {Record<string, unknown>} config
  * @param {number|null|undefined} casparChannelNum - Caspar channel index for XML comment
+ * @param {number} [sourceFps] - fps of the screen (PGM/PRV) channels the solo bus routes from;
+ *   the monitor mode must match it or route_producer drops every other frame's audio
  * @returns {string}
  */
-function buildMonitorChannelXml(config, casparChannelNum) {
+function buildMonitorChannelXml(config, casparChannelNum, sourceFps) {
 	if (!isCustomLiveProfile(config)) return ''
 	const enabled = config.monitor_channel_enabled === true || config.monitor_channel_enabled === 'true'
 	if (!enabled) return ''
@@ -426,8 +428,9 @@ function buildMonitorChannelXml(config, casparChannelNum) {
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const head = channelXmlComment(`Caspar channel ${ch}: Monitor / headphone mix (system-audio consumer)`)
+	const mode = getLowestStandardVideoModeIdForFps(sourceFps)
 	return `${head}        <channel>
-            <video-mode>576p2500</video-mode>
+            <video-mode>${mode}</video-mode>
             <consumers>
                 <system-audio>${inner}
                 </system-audio>

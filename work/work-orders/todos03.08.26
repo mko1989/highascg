@@ -15,3 +15,10 @@ the boucing character has too big "bump box", meaning on the left and right it b
 the prv channels need to appear in audio mixer, so operators can monitor the audio of video before taking it to pgm.
 
 
+you added the usb headphones as a second portaudio output, which i dont think is possible. thats why i explicitly said to use system audio for this.
+tried listenting to a prv channel and its just weird stuttery noise.
+
+the bouncing character needs to have relative size to the size of the screen, right now on smaller screen its too big.
+
+usb drives auto mount doesnt work. its neccesery so operators can plug a drive in and import media without going into terminal to mount it. it needs to support multiple drives/mounts.
+

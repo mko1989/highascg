@@ -1,109 +1,115 @@
 'use strict'
 
+/**
+ * WO-237 (updated for the WO-406 follow-up, 03.08.26): the monitor channel uses the
+ * CHEAPEST PROGRESSIVE video mode AT THE SCREENS' FRAME RATE — not a fixed 576p2500.
+ * A rate-mismatched monitor channel makes route_producer's bounded queue drop every
+ * other source frame (and its audio): the owner heard a 50 fps PRV routed into the old
+ * 25 fps monitor channel as "weird stuttery noise". Consumer is system-audio (OpenAL),
+ * never portaudio (WO-406 §4b: this build's portaudio consumer ignores per-channel params).
+ */
+
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('path')
 const { ConfigManager } = require('../../src/config/config-manager')
 const { buildCasparGeneratorFlatConfig } = require('../../src/config/build-caspar-generator-config')
 const { buildConfigXml } = require('../../src/config/config-generator')
+const { getLowestStandardVideoModeIdForFps, STANDARD_VIDEO_MODES } = require('../../src/config/config-modes')
+const { inferProjectFpsFromConfig } = require('../../src/config/project-fps')
 
-describe('WO-237: monitor channel uses cheapest video mode (576p2500)', () => {
-	it('monitor channel block includes 576p2500 when enabled', () => {
-		const cm = new ConfigManager(path.join(__dirname, '../../config'), {
-			info() {},
-			warn() {},
-			error() {},
-		})
-		cm.load()
-		const cfg = cm.get()
+function loadBoxConfig() {
+	const cm = new ConfigManager(path.join(__dirname, '../../config'), {
+		info() {},
+		warn() {},
+		error() {},
+	})
+	cm.load()
+	return cm.get()
+}
 
-		// Enable monitor channel (settings are in casparServer)
+describe('WO-237/406: monitor channel mode + consumer', () => {
+	it('cheapest-mode helper: progressive, rate-matched, 576p2500 fallback', () => {
+		assert.equal(getLowestStandardVideoModeIdForFps(50), '720p5000')
+		assert.equal(getLowestStandardVideoModeIdForFps(25), '576p2500')
+		assert.equal(getLowestStandardVideoModeIdForFps(undefined), '576p2500')
+		assert.equal(getLowestStandardVideoModeIdForFps(0), '576p2500')
+		// Never an interlaced id (field cadence pops the route queue at half rate again).
+		for (const fps of [25, 29.97, 30, 50, 59.94, 60]) {
+			assert.doesNotMatch(getLowestStandardVideoModeIdForFps(fps), /\di\d/)
+		}
+	})
+
+	it('monitor channel block uses the cheapest mode at the screens fps (box config)', () => {
+		const cfg = loadBoxConfig()
 		cfg.casparServer.monitor_channel_enabled = true
 		cfg.casparServer.caspar_build_profile = 'custom_live'
-		cfg.casparServer.monitor_portaudio_device = 'hw:0,0'
+		cfg.casparServer.monitor_portaudio_device = 'sc60mon'
 
 		const flat = buildCasparGeneratorFlatConfig(cfg)
-
-		// Debug: check the flat config
-		assert.equal(flat.monitor_channel_enabled, true, 'flat config should have monitor_channel_enabled=true')
-		assert.equal(flat.caspar_build_profile, 'custom_live', 'flat config should have caspar_build_profile=custom_live')
-
 		const xml = buildConfigXml(flat)
 
-		// Debug: check if monitor is being found
-		const hasMonitor = xml.includes('Monitor / headphone')
-		assert.ok(hasMonitor, 'XML should contain monitor channel block')
-
-		// Check that monitor channel block contains 576p2500
-		assert.match(xml, /Monitor \/ headphone mix.*?<video-mode>576p2500<\/video-mode>/s,
-			'monitor channel should use 576p2500 mode')
-
-		// Verify it contains only PortAudio consumer (no video consumers)
-		const monitorBlockMatch = xml.match(
-			/<!-- HighAsCG: Caspar channel \d+: Monitor[\s\S]*?<\/channel>/
-		)
+		const monitorBlockMatch = xml.match(/<!-- HighAsCG: Caspar channel \d+: Monitor[\s\S]*?<\/channel>/)
 		assert.ok(monitorBlockMatch, 'should find monitor channel block')
 		const monitorBlock = monitorBlockMatch[0]
-		assert.match(monitorBlock, /<portaudio>/, 'should have portaudio consumer')
+
+		const fps = inferProjectFpsFromConfig(cfg)
+		const expectedMode = getLowestStandardVideoModeIdForFps(fps)
+		assert.match(
+			monitorBlock,
+			new RegExp(`<video-mode>${expectedMode}</video-mode>`),
+			`monitor channel should use ${expectedMode} for ${fps} fps screens`
+		)
+		const modeFps = STANDARD_VIDEO_MODES[expectedMode]?.fps
+		assert.ok(Math.abs(modeFps - fps) < 0.06, 'monitor mode fps matches the screens fps')
+
+		// system-audio consumer only — no portaudio, no video consumers.
+		assert.match(monitorBlock, /<system-audio>/, 'should have system-audio consumer')
+		assert.doesNotMatch(monitorBlock, /<portaudio>/, 'must not use portaudio (WO-406 §4b)')
 		assert.doesNotMatch(monitorBlock, /<screen>/, 'should not have screen consumer')
 		assert.doesNotMatch(monitorBlock, /<decklink>/, 'should not have decklink consumer')
 		assert.doesNotMatch(monitorBlock, /<ndi>/, 'should not have ndi consumer')
 	})
 
-	it('monitor channel is not emitted when disabled', () => {
-		const cm = new ConfigManager(path.join(__dirname, '../../config'), {
-			info() {},
-			warn() {},
-			error() {},
-		})
-		cm.load()
-		const cfg = cm.get()
-
-		// Disable monitor channel (default)
+	it('monitor channel is not emitted when fully disabled', () => {
+		const cfg = loadBoxConfig()
 		cfg.casparServer.monitor_channel_enabled = false
 		cfg.casparServer.caspar_build_profile = 'custom_live'
+		// The resolver also enables the bus from a role:'monitor' audioOutputs entry
+		// (that is the normal enablement path on this box) — strip those too.
+		cfg.audioOutputs = (Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : []).filter(
+			(o) => String(o?.role || '').toLowerCase() !== 'monitor'
+		)
 
 		const flat = buildCasparGeneratorFlatConfig(cfg)
 		const xml = buildConfigXml(flat)
-
-		// Check that monitor channel is not in the output
-		assert.doesNotMatch(xml, /Monitor \/ headphone mix/,
-			'monitor channel should not be present when disabled')
+		assert.doesNotMatch(xml, /Monitor \/ headphone mix/, 'monitor channel should not be present when disabled')
 	})
 
 	it('other channels unchanged when monitor channel enabled', () => {
-		const cm = new ConfigManager(path.join(__dirname, '../../config'), {
-			info() {},
-			warn() {},
-			error() {},
-		})
-		cm.load()
-		const cfg = cm.get()
-
-		// Build config without monitor channel
-		cfg.casparServer.monitor_channel_enabled = false
+		const cfg = loadBoxConfig()
 		cfg.casparServer.caspar_build_profile = 'custom_live'
-		cfg.casparServer.monitor_portaudio_device = 'hw:0,0'
-		const flat1 = buildCasparGeneratorFlatConfig(cfg)
-		const xml1 = buildConfigXml(flat1)
+		cfg.casparServer.monitor_portaudio_device = 'sc60mon'
+		cfg.audioOutputs = (Array.isArray(cfg.audioOutputs) ? cfg.audioOutputs : []).filter(
+			(o) => String(o?.role || '').toLowerCase() !== 'monitor'
+		)
 
-		// Build config with monitor channel
+		cfg.casparServer.monitor_channel_enabled = false
+		const xml1 = buildConfigXml(buildCasparGeneratorFlatConfig(cfg))
+
 		cfg.casparServer.monitor_channel_enabled = true
-		const flat2 = buildCasparGeneratorFlatConfig(cfg)
-		const xml2 = buildConfigXml(flat2)
+		const xml2 = buildConfigXml(buildCasparGeneratorFlatConfig(cfg))
 
-		// Extract the program and preview channels from both (they should be identical)
-		// Remove the monitor channel block from xml2 and compare
-		const xml2WithoutMonitor = xml2.replace(
-			/<!-- Caspar channel \d+: Monitor \/ headphone mix[\s\S]*?<\/channel>\n/,
-			''
-		)
-
-		// The remaining channels should be identical
-		assert.equal(
-			xml1.length > 0 && xml2WithoutMonitor.includes('<channels>'),
-			true,
-			'both should have channel blocks'
-		)
+		// NOTE: full byte-equality is impossible here — enabling the monitor bus reallocates
+		// the channel index a stored NDI host source had pinned (known WO-406 §5 / WO-377/381
+		// renumbering family). The screen channels themselves must be untouched.
+		const block = (xml, role) => {
+			const m = xml.match(new RegExp(`<!-- HighAsCG: Caspar channel \\d+: ${role}[\\s\\S]*?</channel>`))
+			assert.ok(m, `${role} block present`)
+			return m[0]
+		}
+		for (const role of ['Screen 1 program output', 'Screen 1 preview output']) {
+			assert.equal(block(xml2, role), block(xml1, role), `${role} unchanged by monitor enable`)
+		}
 	})
 })

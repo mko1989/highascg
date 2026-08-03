@@ -142,6 +142,16 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	})
 	monitorLab.append(monitorChk, document.createTextNode('Monitor / headphone bus (mixer SOLO output)'))
 
+	// WO-406 §4b: this build's PortAudio consumer ignores per-channel device params, so a
+	// PortAudio monitor bus is impossible — checking Monitor forces the System Audio type.
+	monitorChk.addEventListener('change', () => {
+		if (monitorChk.checked && typeSel.value !== 'system-audio') {
+			typeSel.value = 'system-audio'
+			refreshDevices()
+		}
+	})
+	if (monitorChk.checked && typeSel.value !== 'system-audio') typeSel.value = 'system-audio'
+
 	const hostApiSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	hostApiSel.innerHTML = '<option value="auto">Auto Host API</option><option value="ASIO">ASIO</option><option value="ALSA">ALSA</option><option value="CoreAudio">CoreAudio</option><option value="WASAPI">WASAPI</option>'
 	hostApiSel.value = String(existing?.hostApi || 'auto')
@@ -166,7 +176,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 			...next[idx],
 			id: String(conn.id),
 			label,
-			type: typeSel.value,
+			type: monitorChk.checked ? 'system-audio' : typeSel.value,
 			role: monitorChk.checked ? 'monitor' : '',
 			deviceName,
 			channelLayout,

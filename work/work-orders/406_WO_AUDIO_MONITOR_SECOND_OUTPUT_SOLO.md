@@ -1,6 +1,6 @@
 # WO-406 — Audio monitoring on a second output + mixer solo, end to end (todos03.08.26 item 2)
 
-**Status: IN PROGRESS (2026-08-03 — LIVE on the box: monitor channel 5 up as a system-audio/OpenAL consumer on the SC60, default PRV-1 feed playing; owner QA = listen + press SOLO)**
+**Status: IN PROGRESS (2026-08-03 second round — stutter root-caused §6 (25 fps monitor channel chopped the 50 fps route audio) and fixed live: ch5 now 720p5000, `oal[5|720p5000] Initialized.`, route://2 playing; stored output entry flipped to type system-audio. Owner QA = listen + SOLO)**
 **Priority:** High (owner: "a good way to get audio monitoring on a second audio output (system audio) so I can monitor each channel or input by soloing it in the audio mixer")
 **Source:** `work/work-orders/todos03.08.26` item 2
 **Related:** WO-44 (the original spec for exactly this — requirements doc, never carried a status line and was never implemented as a whole), WO-115 (mixer split), WO-157 (screen-then-pair routing), WO-249 (source-pair reporting), WO-16/WO-354-era (DM3 — **hardware is single-open**, so the monitor output must be a different physical device than the DM3 main out)
@@ -143,3 +143,60 @@ untouched), exactly so system audio can be used as a regular output elsewhere.
   verified live on the next reconnect.** Renumbering the stored hostChannel itself stays
   with the WO-377/381 planned-vs-stored family (owner: re-create the NDI source when the
   macbook returns).
+
+## 6. Second round (03.08 later): "stuttery noise" + "you added it as portaudio" (todos03.08 additions)
+
+### Investigation
+
+Owner: *"you added the usb headphones as a second portaudio output, which i dont think is
+possible … tried listening to a prv channel and its just weird stuttery noise."*
+
+1. **"portaudio output" — owner is right about the label.** The stored entry
+   (`config/audio_outputs.json`, `audio_monitor_usb`) carried `"type": "portaudio"` from the
+   first save, so the Device View showed the headphones as a PortAudio output even though the
+   GENERATED channel 5 XML was already `<system-audio>` (§4b). Cosmetic-but-misleading, and a
+   portaudio-typed monitor is exactly the impossible thing §4b proved.
+2. **The stutter is NOT the OpenAL/ALSA path — it's a frame-rate mismatch on the route.**
+   The monitor channel was hard-coded `576p2500` (25 fps, the WO-237 "cheapest mode") while
+   PGM/PRV run the 1728x960 custom mode at 50 fps. The solo bus plays `route://<ch>`:
+   `route_producer.cpp:204` (build tree on this box) pushes into a **bounded queue
+   (capacity 2)** at the SOURCE rate and the monitor channel pops at 25 fps → `try_push`
+   fails for every other frame → that frame *and its 20 ms of audio* are dropped
+   ("dropped-frame" diag tag). 20 ms on / 20 ms gone at 25 Hz = the owner's "weird stuttery
+   noise". The file's own comment concedes the class of bug: "this doesn't fix the audio if
+   going 50i -> 25p". Verified device-side that audio otherwise flowed fine:
+   `/proc/asound/card2/pcm0p/sub0/hw_params` showed caspar holding sc60mon at 48 kHz S16
+   RUNNING with no xruns.
+
+### What was done
+
+- `src/config/config-modes.js` — `getLowestStandardVideoModeIdForFps(fps)`: smallest-area
+  PROGRESSIVE standard mode at the given rate (interlaced excluded — field cadence halves the
+  pop rate again); no/invalid fps → `576p2500` (the historical default).
+- `src/config/config-generator-audio-xml.js` — `buildMonitorChannelXml(config, ch, sourceFps)`
+  emits that mode instead of the fixed `576p2500`.
+- `src/config/config-generator-channels.js` — call site passes `plan.screens[0].dims.fps`
+  (the PGM/PRV rate the solo bus routes from). On this box: 50 → `720p5000`.
+- `client/components/device-view-inspector-audio.js` — checking "Monitor / headphone bus"
+  forces the System Audio type (change listener + save writes
+  `type: monitorChk.checked ? 'system-audio' : typeSel.value`), so a monitor entry can never
+  be saved as portaudio again.
+- Stored entry flipped live: POST `/api/settings` → `audio_monitor_usb` now
+  `type: "system-audio"` (persisted in `config/audio_outputs.json`).
+- Box-local `~/.alsoftrc`: added `frequency = 48000` so OpenAL mixes at caspar's rate instead
+  of a 44.1 kHz default that the sc60mon plug would resample back up (mirror on rebuild).
+- Smokes: `smoke-wo406-monitor-bus.test.js` extended (mode-by-fps + client type-forcing +
+  call-site pins); `smoke-wo237-monitor-channel-cheapest-mode.test.js` was STALE (not in the
+  CI list, failing: still asserted `<portaudio>` and pre-resolver disable semantics) —
+  rewritten to the current contract ("cheapest progressive mode AT the screens' fps") and
+  added to the curated CI FILES list.
+
+### What was VERIFIED to work
+
+- Offline suite **1792 pass / 0 fail / 2 skip** (1794 tests) including both updated smokes.
+- Live: node restarted, `/api/caspar-config/generate` emits ch5 `720p5000` + `<system-audio>`;
+  Apply → caspar restart → `oal[5|720p5000] Initialized.` (log 12:13:30); solo-clear replayed
+  the default feed: `POST /api/audio/solo {solos:[]}` → `route://2` playing on 5-1, SC60 open
+  at 48 kHz S16. Client rebuilt + kiosk reloaded.
+- Owner QA still owed: actually LISTEN (smooth PRV audio, no chop), SOLO a strip,
+  Ctrl+click multi-solo.

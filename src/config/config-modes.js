@@ -237,6 +237,35 @@ function getLowestStandardVideoModeId() {
 }
 
 /**
+ * Smallest-area PROGRESSIVE standard mode at the given frame rate (±0.06 fps).
+ * WO-406 follow-up: the monitor bus plays `route://` frames from the PGM/PRV
+ * channels — route_producer's bounded queue drops every other frame (and its
+ * audio) when the destination runs at half the source rate, which the owner
+ * heard as 25 Hz-chopped "stuttery noise". The monitor channel therefore MUST
+ * match the screens' fps; cheapness comes from the smallest area at that rate.
+ * Interlaced ids are excluded (field-cadence pops at half rate again).
+ * No fps / no match → '576p2500' (the historical WO-237 choice).
+ * @param {number} [fps]
+ * @returns {string}
+ */
+function getLowestStandardVideoModeIdForFps(fps) {
+	const want = Number(fps)
+	if (!Number.isFinite(want) || want <= 0) return '576p2500'
+	let bestId = ''
+	let bestArea = Infinity
+	for (const [id, m] of Object.entries(STANDARD_VIDEO_MODES)) {
+		if (!m || Math.abs(m.fps - want) >= 0.06) continue
+		if (!/^(dci)?\d+p\d+$/.test(id)) continue
+		const area = m.width * m.height
+		if (area < bestArea) {
+			bestArea = area
+			bestId = id
+		}
+	}
+	return bestId || '576p2500'
+}
+
+/**
  * Video mode for dedicated ALSA input channels (WO-53).
  * Accepts both setting keys: `live_audio_inputs_channel_mode` (UI/settings) and
  * `live_audio_input_channel_mode` (legacy). Empty → cheapest integer-fps standard mode (PAL).
@@ -281,6 +310,7 @@ module.exports = {
 	getExtraAudioModeDimensions,
 	getStandardModeChoices,
 	getLowestStandardVideoModeId,
+	getLowestStandardVideoModeIdForFps,
 	resolveLiveAudioInputChannelMode,
 	// WO-242: pre-existing latent bug fix — project-fps.js requires this but it was never exported,
 	// so inferProjectFpsFromConfig() threw "readScreenConfigValue is not a function" for any config
