@@ -29,15 +29,37 @@ function resolveGlSyncDisplay(config) {
 	const lower = raw.toLowerCase()
 	if (lower === 'off' || lower === 'none') return null
 	if (raw && lower !== 'auto') return raw
-	try {
-		const { calculateLayoutPositions } = require('./os-layout-calculator')
-		const plan = calculateLayoutPositions(config)
-		const s1 = plan?.screens?.[1] ?? plan?.screens?.['1']
-		const sysId = String(s1?.sysId || '').trim()
-		if (sysId) return sysId
-	} catch {
-		/* layout plan unavailable (headless/test) — fall through */
+
+	let plan
+	const planSysId = (idx) => {
+		try {
+			if (plan === undefined) {
+				const { calculateLayoutPositions } = require('./os-layout-calculator')
+				plan = calculateLayoutPositions(config)
+			}
+		} catch {
+			plan = null /* layout plan unavailable (headless/test) */
+		}
+		const s = plan?.screens?.[idx] ?? plan?.screens?.[String(idx)]
+		return String(s?.sysId || '').trim()
 	}
+
+	// 1. The Device-View "NVIDIA sync to display" tick — ONE tick drives the NVIDIA policy
+	//    script (HIGHASCG_NVIDIA_SYNC_OUTPUT) AND caspar's GL swap gating (owner 03.08).
+	try {
+		const { nvidiaSyncToDisplayPortIndex } = require('./x-display-session-layout-resolve')
+		const port = nvidiaSyncToDisplayPortIndex(config)
+		if (port) {
+			const sid = String(cs[`screen_${port}_system_id`] || '').trim() || planSysId(port)
+			if (sid) return sid
+		}
+	} catch {
+		/* resolver unavailable — fall through to auto */
+	}
+
+	// 2. Auto: screen 1 (the PGM output) from the layout plan, then the stored connector.
+	const s1 = planSysId(1)
+	if (s1) return s1
 	const sid = String(cs.screen_1_system_id || '').trim()
 	return sid || null
 }

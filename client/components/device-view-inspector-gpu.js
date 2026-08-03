@@ -158,7 +158,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const { ck: nvidiaSyncCk, inp: nvidiaSyncIn } = mkCk(
 		'NVIDIA sync to display',
 		nvidiaSyncOn,
-		'NVIDIA OpenGL/XVideo sync-to-display target (often PGM, not the operator monitor)',
+		'Sync to this display: NVIDIA OpenGL/XVideo target AND Caspar GL swap vblank (WO-407) — often PGM, not the operator monitor',
 	)
 	// WO-308: "operator monitor" and "confine pointer to it" used to be ONE setting — checking this
 	// box also silently switched on the pointer barriers, which caused a real mouse lockout

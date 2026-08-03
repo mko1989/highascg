@@ -38,6 +38,31 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		throw new Error('writeCasparConfig hook required')
 	}
 
+	// WO-412: cabling the operator GUI to a port IS the "Operator monitor" choice — persist
+	// the implied flags into the APP config so the runtime display session (primary head,
+	// kiosk placement, pointer confine) and the Device-View tick agree with the cable, not
+	// just the generated XML (applyPhysicalPortConsumerFlagsToScreens covers that side).
+	try {
+		const { deriveOperatorGuiAppConfigPortFlags } = require('../config/screen-consumer-port-resolve')
+		const { patch, guiPort } = deriveOperatorGuiAppConfigPortFlags(ctx.config)
+		if (guiPort) {
+			const cs = ctx.config.casparServer || (ctx.config.casparServer = {})
+			let changed = false
+			for (const [k, v] of Object.entries(patch)) {
+				if (cs[k] !== v) {
+					cs[k] = v
+					changed = true
+				}
+			}
+			if (changed) {
+				log('info', `[Full apply] operator-GUI cable → port ${guiPort}: operator_monitor + stacking flags persisted (WO-412)`)
+				if (ctx.configManager) ctx.configManager.save({ ...ctx.configManager.get(), casparServer: cs })
+			}
+		}
+	} catch (e) {
+		log('warn', `[Full apply] operator-GUI implied port flags: ${e?.message || e}`)
+	}
+
 	const out = {
 		ok: true,
 		step: 'done',

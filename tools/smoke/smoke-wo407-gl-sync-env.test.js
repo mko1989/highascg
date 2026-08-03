@@ -33,6 +33,28 @@ test('WO-407: resolver precedence — off kills it, explicit wins, fallback to s
 	)
 })
 
+test('WO-407: the Device-View "NVIDIA sync to display" tick drives caspar GL sync too', () => {
+	// One tick, both consumers of it: the nvidia policy script AND __GL_SYNC_DISPLAY_DEVICE.
+	assert.equal(
+		resolveGlSyncDisplay({
+			casparServer: {
+				screen_2_nvidia_sync_to_display: true,
+				screen_2_system_id: 'DP-4',
+				screen_1_system_id: 'DP-0',
+			},
+		}),
+		'DP-4',
+		'ticked port outranks the screen-1 auto fallback',
+	)
+	// Explicit override still outranks the tick (emergency escape hatch).
+	assert.equal(
+		resolveGlSyncDisplay({
+			casparServer: { caspar_gl_sync_display: 'off', screen_2_nvidia_sync_to_display: true, screen_2_system_id: 'DP-4' },
+		}),
+		null,
+	)
+})
+
 test('WO-407: apply flow rewrites the env file; run.sh sources and exports it', () => {
 	const apply = read('src/utils/full-config-apply.js')
 	assert.match(apply, /writeCasparGlSyncEnvFile\(\{ config: ctx\.config, log \}\)/, 'caspar-env refreshed on every Apply')

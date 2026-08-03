@@ -63,11 +63,15 @@ display must get every frame on its own beat.
   file `~/.config/highascg/caspar-env` (box-local — not in the repo, so Syncthing peers
   with different connector layouts are unaffected). Do not hand-edit it; the next Apply
   overwrites it.
-- **Auto resolution**: screen 1's connector from `calculateLayoutPositions()` — the SAME
-  layout plan that generates the `xrandr --output DP-0 --pos 0x0 …` line, so the sync
-  display tracks the PGM output through replugs and layout changes with zero manual steps.
-  Fallback: `casparServer.screen_1_system_id`; if nothing resolves, the var is simply not
-  written (never a stale connector).
+- **Resolution order**:
+  1. The Device-View port tick **"NVIDIA sync to display"** (`screen_N_nvidia_sync_to_display`)
+     — ONE tick drives both the NVIDIA policy script and caspar's GL swap gating
+     ("sync to this display", owner 03.08).
+  2. Auto: screen 1's connector from `calculateLayoutPositions()` — the SAME layout plan
+     that generates the `xrandr --output DP-0 --pos 0x0 …` line, so the sync display tracks
+     the PGM output through replugs and layout changes with zero manual steps.
+  3. Fallback: `casparServer.screen_1_system_id`; if nothing resolves, the var is simply
+     not written (never a stale connector).
 - `run.sh` sources the file and exports `__GL_SYNC_DISPLAY_DEVICE` before launching caspar.
 - **Override** (config key, no GUI yet): `casparServer.caspar_gl_sync_display` =
   `auto` (default) | `off` (never set) | a connector name verbatim (e.g. `DP-4`).

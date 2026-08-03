@@ -186,6 +186,33 @@ function applyPhysicalPortConsumerFlagsToScreens(merged, appConfig) {
 	}
 }
 
+/**
+ * WO-412 (owner 03.08): cabling the operator GUI to an output IS the "Operator monitor"
+ * choice. `applyPhysicalPortConsumerFlagsToScreens` above stamps the implied flags on the
+ * MERGED generator config only — the app config (what the runtime display session, kiosk
+ * placement and the Device-View tick read) never got them, so the tick stayed manual.
+ * This derives the app-config patch: single-select operator_monitor on the cabled port
+ * (mirroring the inspector's own 1..4 loop) + the WO-263 stacking flags on that port.
+ * @param {object} appConfig
+ * @returns {{ patch: Record<string, boolean>, guiPort: number | null }}
+ */
+function deriveOperatorGuiAppConfigPortFlags(appConfig) {
+	const ctx = createDestinationWiringContext(appConfig || {})
+	let guiPort = null
+	for (let i = 0; i < ctx.destinations.length; i++) {
+		const dest = ctx.destinations[i]
+		if (String(dest?.mode || '').toLowerCase() !== 'operator_gui') continue
+		guiPort = resolvePhysicalPortIndexForDestination(dest, i, ctx)
+		if (guiPort) break
+	}
+	if (!guiPort) return { patch: {}, guiPort: null }
+	const patch = {}
+	for (let p = 1; p <= 4; p++) patch[`screen_${p}_operator_monitor`] = p === guiPort
+	patch[`screen_${guiPort}_always_on_top`] = false
+	patch[`screen_${guiPort}_interactive`] = true
+	return { patch, guiPort }
+}
+
 module.exports = {
 	PHYSICAL_PORT_CONSUMER_FIELDS,
 	WINDOW_CHROME_FIELDS,
@@ -195,4 +222,5 @@ module.exports = {
 	resolveGpuOutConnectorFromSource,
 	resolvePhysicalPortIndexForDestination,
 	applyPhysicalPortConsumerFlagsToScreens,
+	deriveOperatorGuiAppConfigPortFlags,
 }
