@@ -1,6 +1,6 @@
 # WO-407 — Screen-consumer micro-stutter while the same channel is smooth in the operator GUI (todos03.08.26 item 3)
 
-**Status: DONE (2026-08-03 — T2 confirmed by owner on the glass: "seems to be smooth now". Root cause: GL swaps synced to the PRIMARY head (DP-4 operator monitor) while PGM lives on DP-0 — cross-panel vblank beat. Fix: `__GL_SYNC_DISPLAY_DEVICE=DP-0` via run.sh's box-local caspar-env hook)**
+**Status: DONE (2026-08-03 — T2 confirmed by owner on the glass: "seems to be smooth now". Root cause: GL swaps synced to the PRIMARY head (DP-4 operator monitor) while PGM lives on DP-0 — cross-panel vblank beat. Fix: `__GL_SYNC_DISPLAY_DEVICE` — AUTO since owner follow-up: caspar-env is machine-generated on every Apply from the layout plan's screen-1 connector; override key `caspar_gl_sync_display` = auto|off|<connector>. Explainer: docs/reference/multi-head-gl-vblank-sync.md)**
 **Priority:** High (on-air output quality)
 **Source:** `work/work-orders/todos03.08.26` item 3 — "micro stutters on screen consumer. the same channel in the operator gui is smooth, yet on the actual output it stutters a little"
 **Related:** WO-80 (xrandr forced custom modes), WO-314 (NVIDIA prime service env), WO-391 (mouse-lag/pointer watchdog on the same X server), WO-243/263 (operator-GUI CEF channel — the "smooth" comparison path), WO-401/405 (caspar at 431 % CPU — load-induced frame misses are a competing hypothesis)

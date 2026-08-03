@@ -199,6 +199,15 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
 	}
 
+	// WO-407: refresh the machine-owned caspar-env (GL swaps gate on the PGM display's
+	// vblank) so the value tracks layout changes — run.sh sources it at every launch.
+	try {
+		const { writeCasparGlSyncEnvFile } = require('./caspar-gl-sync-env')
+		writeCasparGlSyncEnvFile({ config: ctx.config, log })
+	} catch (e) {
+		log('warn', `[Full apply] caspar-env GL sync write failed: ${e?.message || e}`)
+	}
+
 	if (opts.skipCasparRestart) {
 		log('info', '[Full apply] skipCasparRestart=true — config and layout script saved only')
 		out.message = needsNodm

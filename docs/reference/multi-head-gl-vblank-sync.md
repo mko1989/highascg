@@ -57,28 +57,29 @@ Priority rule: **the on-air output wins**. The operator monitor showing an occas
 frame is invisible in practice (Firefox composites at its own rhythm anyway); the PGM
 display must get every frame on its own beat.
 
-### How it's wired on this box (survives restarts, not synced to peers)
+### How it's wired — AUTOMATIC (owner rule: no hand-edited env files)
 
-- `run.sh` (repo) sources an optional **box-local** env file:
-  `~/.config/highascg/caspar-env` — not in the repo, so Syncthing peers with different
-  connector layouts are unaffected.
-- That file sets `CASPAR_GL_SYNC_DISPLAY=DP-0`; `run.sh` exports it as
-  `__GL_SYNC_DISPLAY_DEVICE` before launching caspar.
-- Valid names: `DISPLAY=:0 nvidia-settings -q dpys` (this box: `DP-0`, `DP-4`).
+- On **every config Apply**, `src/utils/caspar-gl-sync-env.js` rewrites the machine-owned
+  file `~/.config/highascg/caspar-env` (box-local — not in the repo, so Syncthing peers
+  with different connector layouts are unaffected). Do not hand-edit it; the next Apply
+  overwrites it.
+- **Auto resolution**: screen 1's connector from `calculateLayoutPositions()` — the SAME
+  layout plan that generates the `xrandr --output DP-0 --pos 0x0 …` line, so the sync
+  display tracks the PGM output through replugs and layout changes with zero manual steps.
+  Fallback: `casparServer.screen_1_system_id`; if nothing resolves, the var is simply not
+  written (never a stale connector).
+- `run.sh` sources the file and exports `__GL_SYNC_DISPLAY_DEVICE` before launching caspar.
+- **Override** (config key, no GUI yet): `casparServer.caspar_gl_sync_display` =
+  `auto` (default) | `off` (never set) | a connector name verbatim (e.g. `DP-4`).
 
-To change/disable: edit `~/.config/highascg/caspar-env`, then restart caspar
-(`casparcg-server` service). Verify it took:
+Verify on the running caspar:
 
 ```bash
 tr '\0' '\n' < /proc/$(pgrep -x casparcg | head -1)/environ | grep SYNC_DISPLAY
 ```
 
-## If the PGM display ever moves to a different connector
-
-The env file pins **DP-0** by name. If the LED processor gets replugged to another port (or
-this doc is read on a different box), update `CASPAR_GL_SYNC_DISPLAY` to the connector that
-carries the on-air output — `xrandr` shows which connected output holds the PGM geometry.
-Symptom of getting it wrong: this exact bug again (smooth operator monitor, irregular
+If the PGM display moves to a different connector, just run Apply — the plan re-resolves.
+Symptom of a wrong sync display: this exact bug (smooth operator monitor, irregular
 micro-stutter on air).
 
 ## Diagnosis recipe for next time
