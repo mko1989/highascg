@@ -43,6 +43,7 @@ const FILES = [
 	'tools/smoke/smoke-wo400-supervisor-cleanup.test.js',
 	'tools/smoke/smoke-wo401-perf-first-wave.test.js',
 	'tools/smoke/smoke-wo403-shader-live-playlist-follow.test.js',
+	'tools/smoke/smoke-wo406-monitor-bus.test.js',
 	'tools/smoke/smoke-wo327-dest-overlay-dims.test.js',
 	'tools/smoke/smoke-wo326-inspector-fill-live-apply.test.js',
 	'tools/smoke/smoke-wo329-project-rev.test.js',

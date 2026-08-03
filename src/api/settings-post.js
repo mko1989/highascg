@@ -351,6 +351,8 @@ async function handlePost(path, body, ctx) {
 					deviceName: String(x.deviceName || '').trim(),
 					channelLayout: type === 'system-audio' ? 'stereo' : channelLayout,
 				}
+				// WO-406: 'monitor' marks the headphone/solo bus (monitor-bus.js resolver).
+				if (String(x.role || '').toLowerCase() === 'monitor') out.role = 'monitor'
 				if (type === 'portaudio') {
 					out.hostApi = String(x.hostApi || 'auto').trim() || 'auto'
 					const buf = parseInt(String(x.bufferFrames ?? 128), 10)

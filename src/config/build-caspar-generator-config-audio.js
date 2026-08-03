@@ -2,6 +2,7 @@
 
 const { channelCountFromLayout, normalizeProgramLayout, maxProgramLayout } = require('./audio-channel-layouts')
 const { destinationsFromConfig, destinationAudioLayoutsByMain } = require('./screen-destinations')
+const { resolveMonitorBus } = require('./monitor-bus')
 
 /**
  * Device View destination `audioLayout` → `screen_N_audio_layout` for Caspar PGM bus width.
@@ -99,6 +100,28 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 
 	reconcileCustomLivePortAudioVsOpenAl(merged)
 	assignStereoBusPatchesOnScreens(merged)
+	applyMonitorBusToMerged(merged, appConfig)
+}
+
+/**
+ * A Device-View audio output with `role: 'monitor'` needs no cable — it becomes the
+ * dedicated monitor channel (`buildMonitorChannelXml`) that the mixer SOLO bus plays into.
+ * Runs after the cable loop so an explicit `monitor_channel_enabled` casparServer key wins
+ * inside `resolveMonitorBus` and the derived flat keys are what `getChannelMap(merged)` sees.
+ * @param {Record<string, unknown>} merged
+ * @param {Record<string, unknown>} appConfig
+ */
+function applyMonitorBusToMerged(merged, appConfig) {
+	const mon = resolveMonitorBus(appConfig || {})
+	if (!mon.enabled || !mon.deviceName) return
+	merged.monitor_channel_enabled = true
+	merged.monitor_portaudio_device = mon.deviceName
+	merged.monitor_portaudio_buffer_frames = mon.bufferFrames
+	merged.monitor_portaudio_latency_ms = mon.latencyMs
+	merged.monitor_portaudio_fifo_ms = mon.fifoMs
+	if (merged.caspar_build_profile === 'stock' || !merged.caspar_build_profile) {
+		merged.caspar_build_profile = 'custom_live'
+	}
 }
 
 /**

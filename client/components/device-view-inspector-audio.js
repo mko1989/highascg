@@ -133,6 +133,15 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	const manualDevIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'or type device name manually', value: deviceSel.value ? '' : String(existing?.deviceName || '') })
 	deviceSel.addEventListener('change', () => { manualDevIn.value = '' })
 
+	const monitorChk = Object.assign(document.createElement('input'), { type: 'checkbox' })
+	monitorChk.checked = String(existing?.role || '') === 'monitor'
+	const monitorLab = Object.assign(document.createElement('label'), {
+		className: 'device-view__inspector-label',
+		title: 'Dedicated stereo Caspar channel for headphones — mixer SOLO (and solo-clear default) plays here. No cable needed.',
+		style: 'display:flex;align-items:center;gap:6px;font-size:11px',
+	})
+	monitorLab.append(monitorChk, document.createTextNode('Monitor / headphone bus (mixer SOLO output)'))
+
 	const hostApiSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	hostApiSel.innerHTML = '<option value="auto">Auto Host API</option><option value="ASIO">ASIO</option><option value="ALSA">ALSA</option><option value="CoreAudio">CoreAudio</option><option value="WASAPI">WASAPI</option>'
 	hostApiSel.value = String(existing?.hostApi || 'auto')
@@ -158,6 +167,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 			id: String(conn.id),
 			label,
 			type: typeSel.value,
+			role: monitorChk.checked ? 'monitor' : '',
 			deviceName,
 			channelLayout,
 			hostApi: hostApiSel.value,
@@ -169,7 +179,9 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 		const patch = { audioOutputs: next }
 		await Actions.saveSettingsPatch(patch)
 		setCasparRestartDirty(true)
-		setStatus(statusEl, `Audio output "${label}" saved (${channelLayout} PortAudio). Set program bus width on the cabled destination.`, true)
+		setStatus(statusEl, monitorChk.checked
+			? `Monitor bus "${label}" saved — mixer SOLO plays here after Apply + Caspar restart.`
+			: `Audio output "${label}" saved (${channelLayout} PortAudio). Set program bus width on the cabled destination.`, true)
 		await load()
 	}
 
@@ -211,6 +223,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 		typeSel,
 		deviceSel,
 		manualDevIn,
+		monitorLab,
 		busNote,
 		layoutLab,
 		layoutSel,

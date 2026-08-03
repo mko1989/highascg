@@ -1,6 +1,6 @@
 # WO-406 — Audio monitoring on a second output + mixer solo, end to end (todos03.08.26 item 2)
 
-**Status: OPEN (triaged 2026-08-03 — most parts already exist in code; the enablement path is the missing piece)**
+**Status: IN PROGRESS (implemented + staged 2026-08-03; owner QA = Apply config → Caspar restart → SOLO with the USB headset)**
 **Priority:** High (owner: "a good way to get audio monitoring on a second audio output (system audio) so I can monitor each channel or input by soloing it in the audio mixer")
 **Source:** `work/work-orders/todos03.08.26` item 2
 **Related:** WO-44 (the original spec for exactly this — requirements doc, never carried a status line and was never implemented as a whole), WO-115 (mixer split), WO-157 (screen-then-pair routing), WO-249 (source-pair reporting), WO-16/WO-354-era (DM3 — **hardware is single-open**, so the monitor output must be a different physical device than the DM3 main out)
@@ -62,7 +62,50 @@
 4. Smoke: config generator emits the monitor channel XML when enabled (extend the existing
    audio-xml smoke).
 
-## 3. What was done / verified
+## 3. What was done (2026-08-03, same session as the triage)
 
-Nothing yet — triage only (this session verified the above file:line facts and the absence
-of the enablement keys in the live config).
+Owner answered A406.1: user-selectable device, testing on a just-plugged **USB headset**
+(`aplay -l`: card 2 Sennheiser SC60 → PortAudio id `hw:2,0`).
+
+- **`src/config/monitor-bus.js` (new)** — `resolveMonitorBus(config)`: ONE resolver for the
+  bus. Explicit `monitor_channel_enabled`/`monitor_portaudio_device` casparServer keys win;
+  otherwise an enabled `audioOutputs` entry with `role: 'monitor'` **and a device name**
+  supplies device + buffer/latency/fifo. No device → not enabled (a defaulted PortAudio
+  device could double-open the main out). Reads both app config and merged flat config.
+- **`src/config/routing-map.js`** — `monitorCh` allocation now goes through the resolver
+  (net −1 line; file was at 490/500), so the runtime channel map (= what
+  `/api/audio/solo` resolves) agrees with the generator.
+- **`src/config/build-caspar-generator-config-audio.js`** — `applyMonitorBusToMerged()`:
+  derives the flat `monitor_*` keys from the role entry after the cable loop, so
+  `getChannelMap(merged)` and `buildMonitorChannelXml` see them.
+- **`src/api/settings-post.js`** — the audioOutputs sanitizer whitelists fields and **ate
+  `role` on the first live save** (found by the staging round-trip); now passes
+  `role: 'monitor'` through.
+- **`client/components/device-view-inspector-audio.js`** — "Monitor / headphone bus (mixer
+  SOLO output)" checkbox in the audio-output inspector; save writes the role and the status
+  line says Apply + Caspar restart are needed.
+- **`tools/smoke/smoke-wo406-monitor-bus.test.js` (new, in the CI FILES list)** — 4 tests:
+  resolver precedence/refusals, channel-map allocation, generator derivation + emitted XML,
+  and source-pins on the client save, solo fallback, sanitizer passthrough.
+- **Staged for the owner's test**: `audioOutputs` now carries
+  `{id: audio_monitor_usb, role: monitor, deviceName: hw:2,0}` (posted via
+  `/api/settings` after the service restart; `config/audio_outputs.json` has it).
+
+## 4. What was VERIFIED to work
+
+- Offline suite **1773 pass / 0 fail / 2 skip** including the new smoke.
+- Node service restarted (deploy loop) and the live `/api/caspar-config/generate` output
+  now contains `Caspar channel 5: Monitor / headphone mix` with `hw:2,0`, stereo, matching
+  buffer settings — planned-vs-running diff is **exactly** that one channel block.
+- NOT yet verified (owner QA): Apply config → Caspar restart → mixer SOLO plays the strip
+  into the headset, Ctrl+click sums, clear returns the default (PRV 1) feed.
+
+## 5. Caveats recorded
+
+- **Do not press SOLO before Apply + Caspar restart**: the map already resolves monitorCh=5,
+  but in the RUNNING caspar channel 5 is the (dormant) NDI host channel — solo would play
+  routes onto it. Owner: NDI "is not live now, doesn't matter." Follow-up idea: guard the
+  solo route with the WO-381 configComparison ("monitor channel not in running Caspar").
+- The stored NDI extra live source pins `hostChannel: 5` while the map no longer allocates
+  a channel for it — if that NDI source is ever re-enabled it will collide with the monitor
+  channel. Same planned-vs-stored family as WO-377/381; fix belongs there, noted here.

@@ -4,6 +4,7 @@
 'use strict'
 
 const { resolveOutputSourceToChannel } = require('./output-source-name')
+const { resolveMonitorBus } = require('./monitor-bus')
 
 const { routingDestinationsFromConfig, screenLabelsFromConfig } = require('./screen-destinations')
 
@@ -343,8 +344,7 @@ function getChannelMap(config, activeBuses = null) {
 	/** @deprecated Always empty — pixel-map DeckLink routing is merged onto the program channel in generated Caspar XML. */
 	const mappingChannels = []
 
-	const monitorChannelEnabled = readCasparSetting(config, 'monitor_channel_enabled') === true || readCasparSetting(config, 'monitor_channel_enabled') === 'true'
-	const monitorCh = monitorChannelEnabled ? nextCh++ : null
+	const monitorCh = resolveMonitorBus(config).enabled ? nextCh++ : null
 
 	const sc = config?.streamingChannel && typeof config.streamingChannel === 'object' ? config.streamingChannel : {}
 	const mapSoFar = {
