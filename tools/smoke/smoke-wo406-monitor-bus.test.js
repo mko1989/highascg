@@ -81,8 +81,10 @@ test('WO-406: generator derives flat keys and emits the monitor channel XML', ()
 
 	const xml = buildMonitorChannelXml(merged, 9)
 	assert.match(xml, /Monitor \/ headphone mix/)
-	assert.match(xml, /Sennheiser SC60: USB Audio \(hw:2,0\)/)
-	assert.match(xml, /<output-channels>2<\/output-channels>/)
+	// system-audio (OpenAL), NOT portaudio: this build's portaudio consumer ignores
+	// per-channel params and reuses the busy main-out device (live-proven 03.08).
+	assert.match(xml, /<system-audio>[\s\S]*Sennheiser SC60: USB Audio \(hw:2,0\)[\s\S]*<\/system-audio>/)
+	assert.doesNotMatch(xml, /<portaudio>/)
 
 	// No monitor entry → nothing derived, nothing emitted.
 	const clean = { caspar_build_profile: 'custom_live', screen_count: 1 }

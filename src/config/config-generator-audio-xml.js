@@ -413,30 +413,24 @@ function buildMonitorChannelXml(config, casparChannelNum) {
 	if (!isCustomLiveProfile(config)) return ''
 	const enabled = config.monitor_channel_enabled === true || config.monitor_channel_enabled === 'true'
 	if (!enabled) return ''
-	
+
+	// WO-406: the custom build's PortAudio consumer reads ONLY the global
+	// configuration.portaudio.* — a per-channel <portaudio> silently reuses the main
+	// output device (busy → "sample rate mismatch" throw, proven live 03.08). The OpenAL
+	// system-audio consumer is the one that honors per-channel <device-name>
+	// (oal_consumer.cpp create_preconfigured_consumer), so the monitor channel uses it.
+	// OpenAL device names differ from ALSA ids; an unmatched name falls back to OpenAL's
+	// default device (steerable per box via ~/.alsoftrc → e.g. an ~/.asoundrc plug PCM).
 	const device = String(config.monitor_portaudio_device || '').trim()
-	const hostApi = String(config.caspar_portaudio_host_api ?? 'auto').trim() || 'auto'
-	const buf = Number.parseInt(String(config.monitor_portaudio_buffer_frames ?? 128), 10) || 128
-	const lat = Number.parseInt(String(config.monitor_portaudio_latency_ms ?? 40), 10) || 40
-	const fifo = Number.parseInt(String(config.monitor_portaudio_fifo_ms ?? 50), 10) || 50
-	const autoTune = config.monitor_portaudio_auto_tune_latency !== false && config.monitor_portaudio_auto_tune_latency !== 'false'
-	
-	let inner = ''
-	if (device) inner += `\n                    <device-name>${escapeXml(device)}</device-name>`
-	inner += `\n                    <host-api>${escapeXml(hostApi)}</host-api>`
-	inner += `\n                    <output-channels>2</output-channels>`
-	inner += `\n                    <buffer-size-frames>${buf}</buffer-size-frames>`
-	inner += `\n                    <latency-compensation-ms>${lat}</latency-compensation-ms>`
-	inner += `\n                    <fifo-ms>${fifo}</fifo-ms>`
-	inner += `\n                    <auto-tune-latency>${autoTune ? 'true' : 'false'}</auto-tune-latency>`
+	const inner = device ? `\n                    <device-name>${escapeXml(device)}</device-name>` : ''
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
-	const head = channelXmlComment(`Caspar channel ${ch}: Monitor / headphone mix (PortAudio consumer)`)
+	const head = channelXmlComment(`Caspar channel ${ch}: Monitor / headphone mix (system-audio consumer)`)
 	return `${head}        <channel>
             <video-mode>576p2500</video-mode>
             <consumers>
-                <portaudio>${inner}
-                </portaudio>
+                <system-audio>${inner}
+                </system-audio>
             </consumers>
             <mixer>
                 <audio-osc>true</audio-osc>

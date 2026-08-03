@@ -1,6 +1,6 @@
 # WO-406 — Audio monitoring on a second output + mixer solo, end to end (todos03.08.26 item 2)
 
-**Status: IN PROGRESS (implemented + staged 2026-08-03; owner QA = Apply config → Caspar restart → SOLO with the USB headset)**
+**Status: IN PROGRESS (2026-08-03 — LIVE on the box: monitor channel 5 up as a system-audio/OpenAL consumer on the SC60, default PRV-1 feed playing; owner QA = listen + press SOLO)**
 **Priority:** High (owner: "a good way to get audio monitoring on a second audio output (system audio) so I can monitor each channel or input by soloing it in the audio mixer")
 **Source:** `work/work-orders/todos03.08.26` item 2
 **Related:** WO-44 (the original spec for exactly this — requirements doc, never carried a status line and was never implemented as a whole), WO-115 (mixer split), WO-157 (screen-then-pair routing), WO-249 (source-pair reporting), WO-16/WO-354-era (DM3 — **hardware is single-open**, so the monitor output must be a different physical device than the DM3 main out)
@@ -100,6 +100,35 @@ Owner answered A406.1: user-selectable device, testing on a just-plugged **USB h
 - NOT yet verified (owner QA): Apply config → Caspar restart → mixer SOLO plays the strip
   into the headset, Ctrl+click sums, clear returns the default (PRV 1) feed.
 
+## 4b. The PortAudio dead end and the OpenAL fix (same day, live)
+
+First apply crashed the ch5 consumer: `portaudio_consumer.cpp:845` threw **"Audio device
+sample rate mismatch"** — NON-fatal (the instance kept running, channel 5 just had no audio
+consumer). Root cause chain, proven in the build source on this box:
+
+1. The custom build's PortAudio consumer reads **only the global
+   `configuration.portaudio.*`** (`portaudio_consumer.cpp:631-642`); both factory functions
+   ignore per-channel params entirely. The monitor channel's `<portaudio><device-name>` was
+   silently discarded — the consumer targeted the busy main-out device (`hw:0,0`, already
+   exclusively held by ch 1) and the failed format probe surfaced as a rate mismatch.
+2. The **OpenAL system-audio consumer IS per-channel configurable**
+   (`oal_consumer.cpp:349-355` reads `device-name` from the ptree) — this is the consumer
+   WO-44 intended for monitoring all along. `buildMonitorChannelXml` now emits
+   `<system-audio>` (smoke updated: asserts no `<portaudio>` in the monitor channel).
+3. OpenAL on this box enumerates ONE device ("ALSA Default" → the ALSA `default` PCM =
+   dmix on card 0 — would collide with the held main out). Two **box-local** files steer it
+   (mirror if the box is ever rebuilt; NOT in the repo):
+   - `~/.asoundrc` — `pcm.sc60mon`: 48 kHz `plug` wrap of the SC60 (`hw:2,0`), because the
+     headset's native default is narrowband and raw hw rejects float32@48k.
+   - `~/.alsoftrc` — `[alsa] device = sc60mon`, so OpenAL's default lands on the headset.
+4. Applied + caspar restarted: `oal[5|576p2500] Initialized.` (name fell back to OpenAL
+   default as designed), no exception, and `POST /api/audio/solo {solos: []}` played
+   `route://2` — PRV 1 audio feeds the headset.
+
+**Owner design note (03.08):** the monitor bus is opt-in by the `role: 'monitor'` checkbox
+ONLY — the `system-audio` TYPE stays a normal per-destination output (screen cabling path
+untouched), exactly so system audio can be used as a regular output elsewhere.
+
 ## 5. Caveats recorded
 
 - **Do not press SOLO before Apply + Caspar restart**: the map already resolves monitorCh=5,
@@ -107,5 +136,8 @@ Owner answered A406.1: user-selectable device, testing on a just-plugged **USB h
   routes onto it. Owner: NDI "is not live now, doesn't matter." Follow-up idea: guard the
   solo route with the WO-381 configComparison ("monitor channel not in running Caspar").
 - The stored NDI extra live source pins `hostChannel: 5` while the map no longer allocates
-  a channel for it — if that NDI source is ever re-enabled it will collide with the monitor
-  channel. Same planned-vs-stored family as WO-377/381; fix belongs there, noted here.
+  a channel for it — **collision confirmed live 03.08**: on caspar restart the live-source
+  bootstrap fired `PLAY 5-1 ndi://macbook…` onto the monitor's solo layer (silent while the
+  macbook is away; the next solo/default play replaces it). FOLLOW-UP: the host-live-source
+  replay must resolve its channel through the map (or skip when the stored channel ==
+  monitorCh), same planned-vs-stored family as WO-377/381.
