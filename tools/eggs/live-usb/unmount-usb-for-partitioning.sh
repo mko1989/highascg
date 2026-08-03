@@ -19,13 +19,25 @@ DEV="${1:?pass whole disk e.g. /dev/sda}"
 }
 
 usb_quiesce_stick_for_partitioning "$DEV"
-sleep 1
+
+# WO-416: the highascg USB auto-mount poller ticks every 3 s and only sees the
+# inhibit file on its next tick — and a udisksctl mount may already be in flight.
+# Verify over a window longer than one tick; re-unmount anything that reappears.
+for attempt in 1 2 3; do
+	sleep 4
+	if ! findmnt -rn -S "$DEV" &>/dev/null; then
+		break
+	fi
+	echo "Mount reappeared on $DEV (attempt ${attempt}/3) — unmounting again…" >&2
+	usb_umount_disk_partitions "$DEV"
+done
 
 if findmnt -rn -S "$DEV" &>/dev/null; then
-	echo "Still mounted:" >&2
+	echo "Still mounted after quiesce + 3 re-unmount attempts:" >&2
 	findmnt -S "$DEV" >&2
+	echo "Something keeps re-mounting $DEV — check 'journalctl -u udisks2 -n 20' before re-running." >&2
 	exit 1
 fi
 
-echo "OK: no mounts on partitions under $DEV"
-echo "Note: exFAT units masked for this session; finish-operator-stick.sh unmasks when done."
+echo "OK: no mounts on partitions under $DEV (held through a ${SECONDS}s settle window)"
+echo "Note: exFAT units masked + auto-mount poller inhibited; finish-operator-stick.sh unmasks when done."

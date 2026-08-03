@@ -19,11 +19,20 @@
  *
  * Config gate: `usbIngest.enabled` and `usbIngest.autoMount` (both default true),
  * re-read every tick so a settings change needs no restart.
+ *
+ * Inhibit file (WO-416): the flash pipeline repartitions sticks and must not race
+ * this poller. `usb_mask_exfat_automount` (tools/eggs/live-usb/flash-stick-common.sh)
+ * touches /run/highascg/usb-automount-inhibit; while it exists no mount is attempted.
+ * unmask-exfat-systemd.sh removes it; /run is tmpfs so a crashed flash run can leave
+ * it at worst until reboot.
  */
 'use strict'
 
+const fs = require('fs')
+
 const usbDrives = require('./usb-drives')
 
+const INHIBIT_FILE = '/run/highascg/usb-automount-inhibit'
 const POLL_MS = 3000
 const RETRY_BASE_MS = 30 * 1000
 const RETRY_MAX_MS = 5 * 60 * 1000
@@ -35,7 +44,7 @@ const POLKIT_RETRY_MS = 10 * 60 * 1000
  *   listCandidates?: () => Promise<Array<{ blockDevice: string, label?: string, fsType?: string }>>,
  *   listMounted?: () => Promise<Array<{ device?: string }>>,
  *   mount?: (dev: string) => Promise<{ ok: boolean, mountpoint?: string|null, message?: string, needsPolkit?: boolean }>,
- *   force?: boolean }} [options] non-default fields exist for offline tests
+ *   inhibitFile?: string, force?: boolean }} [options] non-default fields exist for offline tests
  * @returns {() => void} stop function
  */
 function startUsbAutoMount(ctx, options = {}) {
@@ -47,12 +56,28 @@ function startUsbAutoMount(ctx, options = {}) {
 	const log = options.log || (() => {})
 	const logError = options.logError || log
 
+	const inhibitFile = options.inhibitFile ?? INHIBIT_FILE
+
 	/** @type {Map<string, { done: boolean, attempts: number, nextRetryAt: number }>} */
 	const state = new Map()
 	let ticking = false
 	let stopped = false
+	let inhibited = false
 
 	const enabled = () => {
+		let inhibitNow = false
+		try {
+			inhibitNow = fs.existsSync(inhibitFile)
+		} catch {
+			inhibitNow = false
+		}
+		if (inhibitNow !== inhibited) {
+			inhibited = inhibitNow
+			log(inhibited
+				? `USB auto-mount inhibited (${inhibitFile} present — flash pipeline owns the stick)`
+				: 'USB auto-mount resumed (inhibit file gone)')
+		}
+		if (inhibitNow) return false
 		const u = ctx?.config?.usbIngest
 		if (!u || typeof u !== 'object') return true
 		return u.enabled !== false && u.autoMount !== false

@@ -1,6 +1,6 @@
 # WO-416 — `build-produce-flash-stick.sh` fails at exFAT partitioning: WO-413 USB auto-mount re-mounts the stick mid-flash
 
-**Status: OPEN (2026-08-03 — root-caused from owner's pasted run log + journal; no fix applied)**
+**Status: DONE (2026-08-03 — fix options 1+3 implemented; offline suite 1801/2, the 2 reds are the pre-existing WO-415 monitor smokes; live flash re-run remains owner QA)**
 
 ## Symptom (owner run log, pasted into `work/work-orders/todos03.08.26`)
 
@@ -133,10 +133,44 @@ Because the kernel was left with a stale in-use `sda3` after the failed run, a *
 physical unplug/replug of the stick) is needed before re-running, exactly as `parted` advised —
 otherwise the table/kernel mismatch persists.
 
+## What was done (03.08, options 1 + 3 as recommended above)
+
+Inhibit-file handshake between the flash pipeline and the WO-413 poller, path
+`/run/highascg/usb-automount-inhibit` (same convention as `inhibit-caspar-autostart`; `/run` is
+tmpfs so a crashed run leaves it at worst until reboot):
+
+- `src/media/usb-automount.js` — `enabled()` returns false while the inhibit file exists
+  (checked every tick alongside the config gate; logs once on inhibit/resume transitions).
+  `options.inhibitFile` injectable for tests.
+- `tools/eggs/live-usb/flash-stick-common.sh` — new `usb_inhibit_highascg_automount_poller()`
+  (mkdir+touch), called first inside `usb_mask_exfat_automount()` so EVERY existing quiesce
+  call site (unmount-usb-for-partitioning, usb_prepare_partition_for_mkfs, prune scripts)
+  now also stops the poller.
+- `tools/eggs/live-usb/unmask-exfat-systemd.sh` — removes the inhibit file (both the
+  finish-operator-stick EXIT trap and the manual path go through here).
+- `tools/eggs/live-usb/unmount-usb-for-partitioning.sh` — TOCTOU guard (option 3): after
+  quiesce, verifies across 3 × 4 s windows (each > the 3 s POLL_MS tick, so an in-flight
+  mount or a pre-inhibit tick is caught), re-unmounting anything that reappears; hard-fails
+  with a `journalctl -u udisks2` pointer only if a mount survives all three.
+- `tools/eggs/live-usb/create-operator-stick-from-dd.sh` — holds the inhibit for the WHOLE
+  flash: asserts it before dd, re-asserts after `finish-operator-stick.sh` (whose unmask
+  clears it — otherwise the poller could grab HIGHASCGEXF during seed phases 3–5, exactly
+  the 14:53 journal mounts above), and releases it via EXIT trap on success or failure.
+
 ## What was VERIFIED
 
-Diagnosis only — read-only. Verified: the quoted run-log failure; `flash-stick-common.sh:243-250`
-masks systemd units only; `usb-automount.js:27,58` poll interval and config gate;
-`config/usb_ingest.json` has `enabled/autoMount: true`; the udisks unmount→remount pairs above;
-no desktop automounter process on the box; current `sda` state (`sda1`+`sda2` mounted under
-`/media/casparcg/`, no exFAT slice). **No fix applied, no flash re-run, no service restarted.**
+- Round 1 (read-only diagnosis): the quoted run-log failure; masks covered systemd units only;
+  `usb-automount.js` poll interval and config gate; `config/usb_ingest.json` enabled/autoMount
+  true; the udisks unmount→remount pairs; no desktop automounter; `sda` half-flashed state.
+- Round 2 (fix): `bash -n` on all four edited scripts; smoke
+  `tools/smoke/smoke-wo413-usb-automount.test.js` extended with a live inhibit-file test
+  (blocks while present, resumes on removal, via injected temp path) and a source-pin test
+  locking the shared path + both sides of the handshake + the settle loop + the EXIT trap —
+  8/8 pass; curated offline suite 1801 pass / 2 fail (the 2 are the pre-existing WO-415
+  monitor-channel reds, unrelated).
+- **Owner QA:** re-run `sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh --flash-only
+  --usb /dev/sdX -y` after a replug/reboot (kernel still holds the stale in-use `sda3` from the
+  failed run). No service restart needed for the poller change to matter on the next flash —
+  but the running server predates this commit, so **restart highascg before flashing**
+  (`kill -TERM $(systemctl show -p MainPID --value highascg)`) or the live poller won't know
+  the inhibit file.

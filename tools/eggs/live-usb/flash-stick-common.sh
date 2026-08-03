@@ -239,8 +239,21 @@ usb_mount_label_safe() {
 	return 1
 }
 
-# Block WO-47 automount while repartitioning / mkfs on the operator USB stick.
+# Block automount while repartitioning / mkfs on the operator USB stick.
+# Two re-mounters exist: WO-47 systemd units, and the WO-413 udisks poller inside
+# highascg.service (a node timer — systemctl can't mask it). The poller checks
+# /run/highascg/usb-automount-inhibit every tick (WO-416); touch it here, removed
+# by unmask-exfat-systemd.sh.
+USB_AUTOMOUNT_INHIBIT=/run/highascg/usb-automount-inhibit
+
+usb_inhibit_highascg_automount_poller() {
+	mkdir -p /run/highascg 2>/dev/null || true
+	touch "$USB_AUTOMOUNT_INHIBIT" 2>/dev/null || true
+	chmod 0644 "$USB_AUTOMOUNT_INHIBIT" 2>/dev/null || true
+}
+
 usb_mask_exfat_automount() {
+	usb_inhibit_highascg_automount_poller
 	systemctl mask --runtime highascg-exfat-arrive.service 2>/dev/null || true
 	systemctl mask --runtime home-casparcg-exfat.mount 2>/dev/null || true
 	systemctl mask --runtime home-casparcg-highascg-media-exfat.mount 2>/dev/null || true

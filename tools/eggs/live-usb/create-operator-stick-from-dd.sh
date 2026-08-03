@@ -97,6 +97,12 @@ else
 	echo "(-y) Skipping interactive confirmation."
 fi
 
+# WO-416: hold the auto-mount poller inhibit for the WHOLE flash (dd + partition +
+# seed) — finish-operator-stick's unmask clears it, so it is re-asserted after.
+# On exit (success or failure) the poller resumes.
+trap 'rm -f "$USB_AUTOMOUNT_INHIBIT" 2>/dev/null || true' EXIT
+usb_inhibit_highascg_automount_poller
+
 echo "==> 1/5 Unmount and flash ISO (dd)"
 bash "${HERE}/unmount-usb-for-partitioning.sh" "$DEV" 2>/dev/null || true
 umount "${DEV}"?* 2>/dev/null || true
@@ -131,6 +137,8 @@ export HIGHASCG_EXFAT_ONLY=1
 export EXFAT_FILL_DISK=1
 bash "${HERE}/install-exfat-sync-map.sh"
 bash "${HERE}/finish-operator-stick.sh" "$DEV" --iso "$ISO" --prune-stale
+# finish-operator-stick's unmask removed the inhibit — re-assert for seed phases 3-5.
+usb_inhibit_highascg_automount_poller
 
 echo "==> 3/5 Factory starter configs on HIGHASCGEXF (not build-host GPU layout)"
 if [[ "${HIGHASCG_SEED_STICK_CONFIG:-0}" == "1" ]]; then
