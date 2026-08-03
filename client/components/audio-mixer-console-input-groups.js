@@ -203,10 +203,7 @@ export function renderConsoleInputGroups(
 				audioMixerState.toggleSolo(r.key, e.metaKey || e.ctrlKey)
 				syncAllSolosUI()
 				try {
-					const solos = audioMixerState.getSoloedLayers().map((k) => {
-						const parts = k.split(':')
-						return { channel: parseInt(parts[1], 10), layer: parseInt(parts[3], 10) }
-					})
+					const solos = audioMixerState.getSoloedLayers().map(audioMixerState.soloKeyToTarget)
 					await api.post('/api/audio/solo', { solos })
 				} catch {
 					console.warn('Solo API not supported on this playout server. Solo state will remain client-side only.')

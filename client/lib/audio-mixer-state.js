@@ -107,6 +107,20 @@ export function getSoloedLayers() {
 	return [...load().soloedLayers]
 }
 
+/**
+ * Map a solo key to its /api/audio/solo target. Layer keys ('pgm:1:layer:10')
+ * solo one layer; whole-channel keys ('prv:2', todos03.08 PRV strips) omit
+ * `layer` and the server routes the full channel.
+ * @param {string} key
+ * @returns {{ channel: number, layer?: number }}
+ */
+export function soloKeyToTarget(key) {
+	const parts = String(key).split(':')
+	const channel = parseInt(parts[1], 10)
+	const layer = parts.length >= 4 ? parseInt(parts[3], 10) : NaN
+	return Number.isFinite(layer) ? { channel, layer } : { channel }
+}
+
 export function clearSolos() {
 	const d = load()
 	d.soloedLayers = []

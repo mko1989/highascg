@@ -54,7 +54,12 @@ function parseServerChannels(xmlStr) {
 						screenWidth = px.width
 						screenHeight = px.height
 					}
-					const resolutionLabel = `${screenWidth}×${screenHeight} · ${vm || '—'}`
+					// todos03.08: custom modes are NAMED by their resolution ("1728x960") — appending
+					// the mode id would print the resolution twice on the test pattern.
+					const vmIsResolution = String(vm || '').toLowerCase() === `${screenWidth}x${screenHeight}`
+					const resolutionLabel = vm && !vmIsResolution
+						? `${screenWidth}×${screenHeight} · ${vm}`
+						: `${screenWidth}×${screenHeight}`
 					return {
 						index: i + 1,
 						videoMode: vm,

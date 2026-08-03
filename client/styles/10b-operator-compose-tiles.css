@@ -85,6 +85,8 @@
 	background: #c92a2a;
 }
 .operator-tile[data-role='prv'] .operator-tile__labelrow { background: #0d9488; }
+/* todos03.08: dropped live-source tiles are inputs, not PGM — blue, never the red default */
+.operator-tile[data-live-source='1'] .operator-tile__labelrow { background: #2563eb; }
 .operator-tile__label {
 	box-sizing: border-box;
 	flex: 1 1 auto;

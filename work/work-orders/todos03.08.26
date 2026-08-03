@@ -3,3 +3,12 @@ need you to do a thorough review of the code base. looking for anything that mig
 i need a good way to get audio monitoring on a second audio output (system audio) so i can monitor each channel or input by soloing it in the audio mixer.
 
 i also see some micro stuters on screen consumer. the weird thing is that the same channel in the operator gui is smooth, yet on the actual output it stutters a little.
+
+live inputs need to have a blue label bar (not red) under them in compose preview.
+the pgm has capture button and others have prt should be unified.
+
+the test pattern displays the resolution twice at the top.
+
+the prv channels need to appear in audio mixer, so operators can monitor the audio of video before taking it to pgm.
+
+

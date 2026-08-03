@@ -65,6 +65,7 @@ export function initAudioMixerPanel(stateStore, mountEl) {
 
 		const { programChannels, mastersList, inputsList } = collectProgramAudioRows(stateStore, {
 			masterLabel: (ch, i) => `PGM ${i + 1} (ch ${ch})`,
+			previewLabel: (ch, i) => `PRV ${i + 1} (ch ${ch})`,
 		})
 		const channelMap = stateStore.getState()?.channelMap || {}
 		const settings = settingsState.getSettings()

@@ -23,7 +23,7 @@ export function busMeterFillKey(masterKey, channelIndex) {
  * @returns {{ casparChannel: number, channelIndex: number } | null}
  */
 export function parseBusMeterFillKey(key) {
-	const m = String(key).match(/^pgm:(\d+):bus:(\d+)$/)
+	const m = String(key).match(/^(?:pgm|prv):(\d+):bus:(\d+)$/)
 	if (!m) return null
 	return { casparChannel: parseInt(m[1], 10), channelIndex: parseInt(m[2], 10) }
 }

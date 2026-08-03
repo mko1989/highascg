@@ -322,7 +322,9 @@ async function handlePost(path, body, ctx) {
 			}
 			for (let i = 0; i < solos.length; i++) {
 				const s = solos[i]
-				await ctx.amcp.play(monitorCh, layer0 + i, `route://${s.channel}-${s.layer}`)
+				// Layer-less solo (todos03.08 PRV strips) routes the whole channel.
+				const src = s.layer != null ? `route://${s.channel}-${s.layer}` : `route://${s.channel}`
+				await ctx.amcp.play(monitorCh, layer0 + i, src)
 			}
 			for (let l = layer0 + solos.length; l <= maxLayers; l++) {
 				try {

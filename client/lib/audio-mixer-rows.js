@@ -95,7 +95,7 @@ function getActiveTimelineForChannel(stateStore, channel) {
  * @param {import('./state-store.js').StateStore} stateStore
  * @param {{ masterLabel: (ch: number, index: number) => string, labelMax?: number, labelTailChars?: number }} options
  */
-export function collectProgramAudioRows(stateStore, { masterLabel, labelMax = 22, labelTailChars = 3 }) {
+export function collectProgramAudioRows(stateStore, { masterLabel, previewLabel, labelMax = 22, labelTailChars = 3 }) {
 	const cm = stateStore.getState()?.channelMap || {}
 	const programChannels =
 		Array.isArray(cm.programChannels) && cm.programChannels.length > 0 ? cm.programChannels : [1]
@@ -105,6 +105,21 @@ export function collectProgramAudioRows(stateStore, { masterLabel, labelMax = 22
 		const key = `pgm:${ch}`
 		const v = audioMixerState.getMasterVolume(key)
 		rows.push({ key, ch, label: masterLabel(ch, i), v, isMaster: true })
+
+		// todos03.08: PRV bus strip per screen — meters + SOLO so the operator can hear
+		// a preview before taking it to PGM (solo plays route://<prvCh> on the monitor bus).
+		const prvCh = Number(cm.previewChannels?.[i])
+		if (Number.isFinite(prvCh) && prvCh > 0) {
+			const pKey = `prv:${prvCh}`
+			rows.push({
+				key: pKey,
+				ch: prvCh,
+				label: typeof previewLabel === 'function' ? previewLabel(prvCh, i) : `PRV ${i + 1}`,
+				v: audioMixerState.getMasterVolume(pKey),
+				isMaster: true,
+				isPreview: true,
+			})
+		}
 
 		// T183.3: Check if a timeline is active on this channel
 		const activeTimeline = getActiveTimelineForChannel(stateStore, ch)

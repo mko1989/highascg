@@ -41,6 +41,7 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 
 		const { programChannels, mastersList, inputsList } = collectProgramAudioRows(stateStore, {
 			masterLabel: (_ch, i) => `PGM ${i + 1} Master`,
+			previewLabel: (_ch, i) => `PRV ${i + 1} Master`,
 			labelMax: 14,
 			labelTailChars: 0,
 		})

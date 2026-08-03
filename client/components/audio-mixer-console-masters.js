@@ -1,4 +1,5 @@
 import * as audioMixerState from '../lib/audio-mixer-state.js'
+import { api } from '../lib/api-client.js'
 import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
@@ -7,7 +8,7 @@ import {
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
 import { bindFaderResetGestures, UNITY_LINEAR_GAIN } from '../lib/audio-mixer-fader-bind.js'
-import { syncFaderUI } from './audio-mixer-panel-sync.js'
+import { syncFaderUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
 import {
 	programBusChannelCount,
 	renderBusMeterBankHtml,
@@ -39,10 +40,23 @@ export function renderConsoleMasterStrips(mastersListEl, { mastersList, settings
 			</div>
 			<span class="audio-mixer-view__fader-val">${formatVolumeDb(r.v)}</span>
 			<div class="audio-mixer-view__strip-actions">
-				<div class="audio-mixer-view__master-badge">PGM</div>
+				<div class="audio-mixer-view__master-badge">${r.isPreview ? 'PRV' : 'PGM'}</div>
+				${r.isPreview ? `<button type="button" class="audio-mixer-view__solo-btn${audioMixerState.isSoloed(r.key) ? ' audio-mixer-view__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this PRV bus to the monitor output (Ctrl+Click for multi)">SOLO</button>` : ''}
 			</div>
 		`
 		mastersListEl.appendChild(strip)
+		// todos03.08: PRV strips solo the whole preview channel onto the monitor bus —
+		// same solo store/endpoint as the layer strips (layer-less target = full channel).
+		strip.querySelector('.audio-mixer-view__solo-btn')?.addEventListener('click', async (e) => {
+			audioMixerState.toggleSolo(r.key, e.metaKey || e.ctrlKey)
+			syncAllSolosUI()
+			try {
+				const solos = audioMixerState.getSoloedLayers().map(audioMixerState.soloKeyToTarget)
+				await api.post('/api/audio/solo', { solos })
+			} catch {
+				console.warn('Solo API not supported on this playout server. Solo state will remain client-side only.')
+			}
+		})
 		registerBusMeterFills(r.key, strip, meterFills, busChCount, 'audio-mixer-view')
 		const fader = strip.querySelector('.audio-mixer-view__fader')
 		const valEl = strip.querySelector('.audio-mixer-view__fader-val')

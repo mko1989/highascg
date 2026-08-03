@@ -312,6 +312,7 @@ export function createOperatorComposeTileController(env) {
 		el.className = 'operator-tile'
 		el.dataset.role = def.role
 		el.dataset.tileId = def.id
+		if (def.sourceTile) el.dataset.liveSource = '1' // todos03.08: blue label bar, not PGM red
 
 		const bodyEl = document.createElement('div')
 		bodyEl.className = 'operator-tile__body'
@@ -337,14 +338,14 @@ export function createOperatorComposeTileController(env) {
 		labelEl.textContent = tileLabelText(def, getCm())
 		labelRowEl.appendChild(labelEl)
 		if (def.role === 'pgm') labelRowEl.appendChild(buildPgmTileActions(def.mainIndex))
-		// WO-346 (+todos27 follow-up): PRT capture per tile via AMCP PRINT — same chrome class as
-		// the WO-272 action buttons, and NOT on PGM tiles (those already carry CAPTURE).
+		// WO-346 (+todos27 follow-up): capture per tile via AMCP PRINT — same chrome class as the
+		// WO-272 buttons, NOT on PGM tiles (those carry CAPTURE); todos03.08: label unified on CAPTURE.
 		if (def.role !== 'pgm') {
 			const prtBtn = document.createElement('button')
 			prtBtn.type = 'button'
-			prtBtn.className = 'operator-tile__btn operator-tile__btn--prt'
-			prtBtn.textContent = 'PRT'
-			prtBtn.title = 'Capture this channel (Caspar PRINT)'
+			prtBtn.className = 'operator-tile__btn operator-tile__btn--capture'
+			prtBtn.textContent = 'CAPTURE'
+			prtBtn.title = 'Snapshot this channel (Caspar PRINT → PNG in the media folder)'
 			prtBtn.addEventListener('pointerdown', (e) => e.stopPropagation())
 			prtBtn.addEventListener('click', async (e) => {
 				e.stopPropagation()
