@@ -37,7 +37,7 @@ export function renderRecordOutControls(h, conn, { currentSettings, streamingSta
 		Object.assign(document.createElement('p'), {
 			className: 'device-view__note',
 			textContent:
-				'Configure file recording here. Saved settings apply on next Start record. Cable from a destination to set the source channel.',
+				'Saved settings apply on next Start record. Cable from a destination to set the source channel.',
 		}),
 	)
 

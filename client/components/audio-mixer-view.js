@@ -21,7 +21,6 @@ export function initAudioMixerView(root, stateStore) {
 						<h2 class="audio-mixer-view__title">Audio Mixer Console</h2>
 						<button type="button" class="audio-mixer-view__add-input-btn" title="Configure Live Audio Inputs">+</button>
 					</div>
-					<p class="audio-mixer-view__subtitle">Full tactile control over program masters, active inputs, and channel routing destinations.</p>
 				</div>
 				<div class="audio-mixer-view__status-badge">
 					<span class="audio-mixer-view__status-dot"></span> OSC Active

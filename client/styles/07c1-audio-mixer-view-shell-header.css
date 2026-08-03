@@ -88,12 +88,6 @@
 	transform: scale(0.95);
 }
 
-.audio-mixer-view__subtitle {
-	margin: 0;
-	font-size: 0.82rem;
-	color: var(--text-muted);
-}
-
 .audio-mixer-view__status-badge {
 	display: flex;
 	align-items: center;

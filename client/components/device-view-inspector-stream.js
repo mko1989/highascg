@@ -29,7 +29,7 @@ export function renderStreamOutControls(h, conn, { currentSettings, streamingSta
 		Object.assign(document.createElement('p'), {
 			className: 'device-view__note',
 			textContent:
-				'Configure RTMP/SRT/NDI/UDP here. Saved settings apply on next Start stream. Cable from a destination to set the source channel.',
+				'Saved settings apply on next Start stream. Cable from a destination to set the source channel.',
 		}),
 	)
 

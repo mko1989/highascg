@@ -33,11 +33,9 @@ export async function showPublishModal() {
 			</div>
 			<div class="modal-body">
 				<div id="publish-setup">
-					<p class="publish-intro">Intelligent differential sync: only missing or modified media files will be uploaded.</p>
 					<div class="settings-group">
 						<label>Target Server Address (IP or Hostname)</label>
 						<input type="text" id="publish-target" placeholder="e.g., 192.168.1.50:8080" value="${escapeAttr(savedTarget)}">
-						<p class="settings-note">Ensure the production HighAsCG server is running and reachable.</p>
 					</div>
 					<div class="publish-warning">
 						<p><strong>Note:</strong> This will overwrite the configuration, scenes, and media on the production server to match your local draft. The remote servers will restart automatically.</p>
