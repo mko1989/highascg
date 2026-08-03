@@ -42,10 +42,11 @@
 
 ### Owner input needed before building
 
-- **A406.1**: Which physical output should be the headphone/monitor out? (Motherboard
-  analog out, HDMI/DP audio on the operator monitor, USB dongle…) `aplay -l` on the box
-  will list candidates; the choice lands in `monitor_portaudio_device` / system-audio
-  device-name.
+- **A406.1**: Which physical output should be the headphone/monitor out? `aplay -l`
+  (03.08): the main portaudio out `hw:0,0` is **card 0 ALC1220 Analog** (motherboard —
+  already taken as main), so the candidates are **card 1 NVidia HDMI 0–3** (audio out
+  through a monitor's speakers/headphone jack) or a USB audio dongle (none plugged in
+  today). The choice lands in `monitor_portaudio_device` / system-audio device-name.
 
 ## 2. Work plan
 
