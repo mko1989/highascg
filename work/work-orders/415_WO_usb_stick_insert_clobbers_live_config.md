@@ -1,6 +1,44 @@
-# WO-415 — Inserting a flashed live-USB stick clobbered the live box config (exfat-sync `usb-modular-config` one-way pull)
+# WO-415 — Live box config wiped to defaults during the 12:54 stick-insert stack restart
 
-**Status: OPEN (2026-08-03 — diagnosed, recovery pending owner go-ahead)**
+**Status: OPEN (2026-08-03 — trigger chain verified; SOURCE VOLUME MISATTRIBUTED IN ROUND 1, corrected below)**
+
+## CORRECTION (same day, before any fix)
+
+Round 1 blamed the exfat-sync pair `usb-modular-config` (stick → live config). **That is wrong.**
+Verified afterwards:
+
+- `/home/casparcg/exfat` is **not a mount point at all** (plain empty dir), and
+  `/home/casparcg/exfat/configs/` is **empty** (mtime Jun 7). The USB volume therefore supplied
+  no config content; the `usb-*` pairs cannot have been the source.
+- The stick auto-mounted at `/media/casparcg/highascg-nvidia-595` + `/media/casparcg/0B31-AE32`,
+  not at the sync path.
+- The stick itself is a **raw hybrid-ISO dd only**: `sda1` 3.5 G iso9660 + `sda2` 16 M vfat, with
+  ~25.8 GB unallocated and **no `HIGHASCGEXF` exFAT partition** — so it has no `configs/` to push.
+- `/home/casparcg/bridge/configs/device_graph.json` (internal NVMe partition `HIGHASCGDAT`,
+  pair `bridge-modular-config`, `direction: both`, `bootPrefer: exfat`, `pushOnSave: true`) is
+  **byte-identical to the clobbered live file** (181 bytes; git HEAD has 4420) with the same
+  preserved mtime 12:55:03.21.
+
+**Most probable mechanism, given the evidence** — not the stick's content, but the
+config-load-failure amplifier documented as finding #1 in
+`work/reviews/2026-08-03-config-system-bootstrap.md`: the stick insert triggered
+`highascg-exfat-server-update.service`, which **stopped the playout stack mid-flight**; on
+restart the server came up with a default device graph (journal 12:54:44:
+`[device-graph] boot hardware sync saved (0→4 gpu_out ports from live probe)`,
+`Layout plan: no assigned outputs`), the next `save()` persisted those defaults over the real
+`config/*.json`, and `pushProjectConfigToExfat` then propagated the defaults to the bridge disk
+(`[exfat-sync] push to volume(s) copied=96 skipped=2`). Direction bridge→project vs
+project→bridge is not provable from the surviving artifacts (both sides are identical and
+mtimes are preserved by the copy), but the empty USB volume rules the stick out either way.
+
+**Operational consequence of the correction:** plugging a stick is not itself a config-overwrite
+event. What IS verified is that **stick insertion stops and restarts the whole playout stack**
+(companion, highascg, casparcg-server) via `highascg-exfat-server-update.service` — that alone
+is disruptive on a live box, and it is what exposed the defaults-wipe.
+
+---
+
+## Round 1 investigation (trigger chain — still valid; source attribution superseded above)
 
 ## Investigation FIRST
 
