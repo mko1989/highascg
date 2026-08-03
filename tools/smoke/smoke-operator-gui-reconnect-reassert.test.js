@@ -281,3 +281,17 @@ describe('2026-07-20: the client withdrawal path stays wired through the API bou
 		assert.equal(shouldReapplyPersistedLayout(ch, THREE_CELLS).reapply, true, 'the reconnect may repaint what the client just asked for')
 	})
 })
+
+describe('WO-410 (todos03.08): reconnect must forget the skip-unchanged route cache', () => {
+	it('ensureOperatorGuiChannel clears the per-channel route cache before re-applying', () => {
+		// A fresh caspar has an empty stage; a cache describing the PREVIOUS instance made
+		// the reconnect re-apply skip every PLAY (MIXER fills went out, holes stayed empty).
+		const fs = require('node:fs')
+		const path = require('node:path')
+		const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src/system/operator-gui-channel.js'), 'utf8')
+		const fnStart = src.indexOf('async function ensureOperatorGuiChannel')
+		const head = src.slice(fnStart, fnStart + 900)
+		assert.match(head, /lastAppliedRouteByChannel\.delete\(ch\)/, 'route cache forgotten on (re)connect')
+		assert.match(head, /lastMaxLayerByChannel\.delete\(ch\)/, 'max-layer hygiene cache forgotten too')
+	})
+})

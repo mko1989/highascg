@@ -393,6 +393,13 @@ async function ensureOperatorGuiChannel(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return { skipped: true }
 	const { ch, guiUrl } = resolved
+	// Caspar just (re)connected: this may be a FRESH caspar whose stage is empty — the
+	// skip-unchanged route cache describes the previous instance. Forget it so the re-apply
+	// below re-PLAYs every route. (todos03.08 regression: the config-apply flow's re-plays
+	// landed on the dying instance, then this re-apply skipped all PLAYs as "unchanged" —
+	// MIXER fills went out, holes stayed empty.)
+	lastAppliedRouteByChannel.delete(ch)
+	lastMaxLayerByChannel.delete(ch)
 	// WO-255 migration hygiene: the retired CEF web-UI layer (100) may still be PLAYing from a
 	// pre-pivot server run — a Caspar restart clears it, but don't rely on one. Harmless when empty.
 	try {
