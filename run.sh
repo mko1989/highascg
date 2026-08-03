@@ -23,6 +23,12 @@ unset LD_PRELOAD
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-/home/casparcg/.Xauthority}"
 
+# WO-407: optional BOX-LOCAL caspar env (not in the repo — Syncthing peers unaffected).
+# e.g. CASPAR_GL_SYNC_DISPLAY=DP-0 gates GL swaps on the PGM display's vblank instead of
+# the driver-default head (multi-head X screen: the other head beats → micro-stutter).
+[ -r "${HOME:-/home/casparcg}/.config/highascg/caspar-env" ] && . "${HOME:-/home/casparcg}/.config/highascg/caspar-env"
+[ -n "${CASPAR_GL_SYNC_DISPLAY:-}" ] && export __GL_SYNC_DISPLAY_DEVICE="$CASPAR_GL_SYNC_DISPLAY"
+
 CONFIG_PATH="${CASPAR_CONFIG:-${CASPAR_CONFIG_PATH:-$CASPAR_ROOT/config/casparcg.config}}"
 CASPAR_BIN="${CASPAR_BIN:-$CASPAR_ROOT/bin/casparcg}"
 

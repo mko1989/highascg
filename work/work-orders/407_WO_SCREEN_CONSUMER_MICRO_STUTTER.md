@@ -61,6 +61,29 @@ level), so diagnosis is by eye + single-variable tests below.
 4. **Windowed swap path** — both consumers are `windowed` borderless; without a compositor
    X blits instead of page-flipping. If 2. fails, try fullscreen/windowed toggle on ch 1.
 
+### Test log (03.08, owner watching)
+
+- **T1 — ch 3 vsync off** (hand-edit of generated config + caspar restart 11:17): owner
+  verdict **"its the same"** — dual-vsync contention alone is not it (or not all of it).
+  Left off for now; next Apply regenerates it back to true.
+- Owner hunch: "may be something with composition pipeline in nvidia settings" — live
+  driver state read: **ForceCompositionPipeline=On on both displays** (this box's own
+  documented normative policy, `docs/reference/screen-consumer-vsync-nvidia.md` +
+  `/etc/X11/xorg.conf.d/99-highascg-force-composition.conf`), SyncToVBlank=0,
+  `__GL_SYNC_TO_VBLANK=0`. So the doc'd recipe is in force and still stutters.
+- **T2 — pin GL swap vblank to the PGM display** (running): the doc never covers WHICH
+  head GL syncs to; on a multi-head X screen the driver defaults to one (primary DP-4 =
+  operator monitor = the smooth one) and DP-0 beats against it — matches "irregular" +
+  the channel pipeline measuring a perfect 50.00 fps. `run.sh` now sources an optional
+  box-local `~/.config/highascg/caspar-env` (NOT in the repo — Syncthing peers
+  unaffected); this box sets `CASPAR_GL_SYNC_DISPLAY=DP-0` →
+  `__GL_SYNC_DISPLAY_DEVICE=DP-0`, verified in the running caspar's environment
+  (service cycled via exit-137 → systemd on-failure restart). **Awaiting owner verdict.**
+- If T2 fails: **T3** — ForceCompositionPipeline OFF on DP-0 only (live
+  `nvidia-settings --assign`, no restart — but contradicts the normative doc; test-only,
+  re-asserted by `highascg-nvidia-x-apply.sh` on next layout apply). Then T4: PGM vsync
+  off / fullscreen.
+
 ## 2. Diagnosis plan (box IS in show state as of 03.08 midday — ready when the owner is)
 
 1. Owner looks at the PGM output now: is the micro-stutter visible at the shop, and is it
