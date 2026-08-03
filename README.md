@@ -1,6 +1,6 @@
 <div align="center">
   <h1>HighAsCG</h1>
-  <p><strong>CasparCG playout control — unified client + server on one Ubuntu host.</strong></p>
+  <p><strong>Media server — unified client + server on one Ubuntu host.</strong></p>
   
   <p>
     <a href="docs/STICK_QUICK_START.md"><strong>🔌 Stick quick start</strong></a> ·
