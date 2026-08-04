@@ -1,6 +1,6 @@
 # WO-371 — "In PRV the playlist stops after the first item": the owner ticked the design and then reported it as a bug
 
-**Status: DECIDED 29.07.26 — OPTION C (supersedes the 28.07 option-B answer). Unblocked, not yet implemented.**
+**Status: DONE (2026-08-04 — option C implemented, §6–7: ⏮/⏭ step the PRV render via a schedule-free stage path; smoke 3/3, suite 1818/0/2, deployed both halves. Owner QA: step a playlist look recalled to PRV)**
 
 > Owner, 29.07, on re-reading the options: *"actually it makes sense that it pauses."* — asked which
 > of A/C that meant, they chose **C**: preview stays frozen (WO-355 item 27 stays true), and the
@@ -110,3 +110,35 @@ WO-355's behaviours it preserves.
   files; the ordering (355 after 354) confirmed from `git log`.
 - No code inspected beyond establishing the two WOs' intent — deliberately, because the question
   is which behaviour is *wanted*, not what the code does. Nothing changed.
+
+## 6. Implementation (2026-08-04 — option C)
+
+- `src/engine/scene-take-lbg-playlist.js` — `triggerPlaylistAdvance` split: new exported
+  `stagePlaylistItem()` does the AMCP staging (shader CG/warmup path preserved verbatim) and
+  the channel-scoped index update, resolving true/false; `triggerPlaylistAdvance` wraps it and
+  arms the timer/preload chain only after a successful stage (public contract unchanged —
+  WO-224/211/251 smokes pass unmodified, 14/14).
+- `src/api/routes-playlist.js` — new `action:'step_preview'` `{sceneId, layerNumber,
+  direction}`: moves the sticky start index (the same `playlistStartIndices` key `set_start`
+  writes, wrapping both directions), then re-stages that item via `stagePlaylistItem` on every
+  PREVIEW channel (`isPreviewCasparChannel`) where the look is currently recalled. No timer
+  ever arms; program channels are structurally unreachable from this path.
+- `client/components/playlist-control-panel.js` — ⏮/⏭ enabled for NOT-live playlists (they
+  call step_preview; live playlists keep the existing transport), ▶ restage stays live-only.
+  The ▸ start-item marker follows each step via the poll refresh.
+- Checklist items 23 and 27 reworded (04.08) so they can no longer contradict: 27's "never
+  advances on its own" is the contract; 23 now describes verification via stepping. WO-355's
+  stop-on-take-out is preserved untouched; WO-354's single-timer world is preserved (no PRV
+  timer was rebuilt — the 28.07 option-B answer stayed withdrawn).
+
+## 7. What was VERIFIED (04.08)
+
+- New smoke `smoke-wo371-preview-playlist-step.test.js` 3/3 (curated): index wrap both
+  directions, staging ONLY on the mocked preview channel with zero timers armed, zero AMCP
+  when the look is staged nowhere, 400 on unknown look, source pins for the schedule-free
+  path and the panel enable-condition.
+- Full suite 1818 / 0 fail / 2 skip; playlist neighbor smokes (WO-224/211/251) 14/14
+  unmodified. Client rebuilt + kiosk reloaded; server restarted; live probe of the new action
+  answers correctly (400 "No playlist on that look/layer" on the playlist-less default
+  project). Owner QA: recall a playlist look to PRV, step with ⏮/⏭, confirm the render steps
+  and PGM is untouched.

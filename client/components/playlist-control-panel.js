@@ -93,7 +93,10 @@ export function initPlaylistControlPanel(mountEl) {
 			.join('')
 		for (const id of ['plp-prev', 'plp-play', 'plp-next']) {
 			const b = el(id)
-			if (b) b.disabled = !p?.live
+			/* WO-371 option C: ⏮/⏭ also step a NOT-live playlist — they move the sticky start
+			 * item and re-stage the preview render (no timers; PRV keeps sitting still).
+			 * ▶ restage only makes sense while the playlist is live. */
+			if (b) b.disabled = id === 'plp-play' ? !p?.live : !p
 		}
 		/* todos27: show the duration ALREADY set on the playlist's timeless items, not a
 		 * hard default — and never clobber the field while the operator is typing in it.
@@ -174,8 +177,31 @@ export function initPlaylistControlPanel(mountEl) {
 		appliedSecs.set(keyOf(p), secs)
 		void refresh()
 	})
-	el('plp-prev').addEventListener('click', () => void control('prev'))
-	el('plp-next').addEventListener('click', () => void control('next'))
+	async function stepPreview(direction) {
+		const p = selected()
+		if (!p) return
+		try {
+			await api.post('/api/playlist/control', {
+				action: 'step_preview',
+				sceneId: p.sceneId,
+				layerNumber: p.layerNumber,
+				direction,
+			})
+		} catch (e) {
+			console.warn('[playlist panel] step_preview failed:', e?.message || e)
+		}
+		void refresh()
+	}
+	el('plp-prev').addEventListener('click', () => {
+		const p = selected()
+		if (!p) return
+		void (p.live ? control('prev') : stepPreview('prev'))
+	})
+	el('plp-next').addEventListener('click', () => {
+		const p = selected()
+		if (!p) return
+		void (p.live ? control('next') : stepPreview('next'))
+	})
 	el('plp-play').addEventListener('click', () => {
 		const idx = parseInt(itemSel.value, 10)
 		void control('goto', Number.isFinite(idx) ? idx : selected()?.activeIndex ?? 0)

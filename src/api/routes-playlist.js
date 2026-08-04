@@ -10,7 +10,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { physicalProgramLayer } = require('../engine/scene-transition')
-const { triggerPlaylistAdvance, playlistRuntimeKey } = require('../engine/scene-take-lbg-playlist')
+const { triggerPlaylistAdvance, playlistRuntimeKey, stagePlaylistItem } = require('../engine/scene-take-lbg-playlist')
 
 /**
  * Owner request 2026-07-26 — Playlists footer panel: enumerate every playlist layer currently
@@ -115,6 +115,53 @@ async function handleControlPost(body, ctx) {
 		ctx.playlistStartIndices = ctx.playlistStartIndices || {}
 		ctx.playlistStartIndices[`${sceneId}-${layerNumber}`] = idx
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: idx }) }
+	}
+
+	/* WO-371 option C (owner 29.07: "actually it makes sense that it pauses"): ⏮/⏭ for a
+	 * NOT-live playlist. Moves the sticky start index (the same key set_start writes) and, when
+	 * the look is currently recalled on a PREVIEW channel, re-stages that item there via the
+	 * schedule-free stagePlaylistItem — no timers arm, so WO-355 item 27 ("sits still") stays
+	 * true, and nothing is ever emitted to a program channel. */
+	if (action === 'step_preview') {
+		const sceneId = String(b.sceneId || '').trim()
+		const dir = String(b.direction || 'next') === 'prev' ? -1 : 1
+		if (!sceneId || !Number.isFinite(layerNumber)) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'sceneId and layerNumber required' }) }
+		}
+		let layerDef = null
+		try {
+			const envelope = require('../engine/project-scenes-load').loadProjectScenes()
+			for (const scene of envelope?.scenes || []) {
+				if (String(scene?.id) !== sceneId) continue
+				layerDef = (scene.layers || []).find((l) => Number(l?.layerNumber) === layerNumber) || null
+			}
+		} catch { /* fall through to 400 */ }
+		if (!layerDef || layerDef.sourceMode !== 'list' || !Array.isArray(layerDef.playlist) || layerDef.playlist.length === 0) {
+			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'No playlist on that look/layer' }) }
+		}
+		const len = layerDef.playlist.length
+		const pKey = `${sceneId}-${layerNumber}`
+		ctx.playlistStartIndices = ctx.playlistStartIndices || {}
+		const cur = Number.isFinite(ctx.playlistStartIndices[pKey]) ? ctx.playlistStartIndices[pKey] : 0
+		const nextIdx = ((cur + dir) % len + len) % len
+		ctx.playlistStartIndices[pKey] = nextIdx
+		const previewChannels = []
+		try {
+			const { isPreviewCasparChannel } = require('../engine/caspar-channel-clear')
+			for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
+				const ch = parseInt(chKey, 10)
+				const scene = entry?.scene
+				if (!scene || String(scene.id) !== sceneId) continue
+				if (!isPreviewCasparChannel(ctx.config, ch)) continue
+				const liveLayer = (scene.layers || []).find((l) => Number(l?.layerNumber) === layerNumber)
+				if (!liveLayer || liveLayer.sourceMode !== 'list' || !Array.isArray(liveLayer.playlist) || nextIdx >= liveLayer.playlist.length) continue
+				const bank = (ctx?.programLayerBankByChannel && ctx.programLayerBankByChannel[String(ch)]) || 'a'
+				const pLayer = physicalProgramLayer(layerNumber, bank === 'b' ? 'b' : 'a')
+				await stagePlaylistItem(ctx, ch, pLayer, scene, liveLayer, nextIdx)
+				previewChannels.push(ch)
+			}
+		} catch { /* preview restage is advisory; the start index moved regardless */ }
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: nextIdx, previewChannels }) }
 	}
 	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layerNumber)) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'channel and layerNumber required' }) }

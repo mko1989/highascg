@@ -374,7 +374,11 @@ function clearPlaylistImageTimer(self, pKey) {
 	}
 }
 
-function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
+/* WO-371 option C: stage ONE playlist item on a channel/layer with NO follow-up scheduling —
+ * the preview ⏮/⏭ step path (item 27's "sits still" must stay true on PRV). PGM advancing is
+ * triggerPlaylistAdvance below, which stages via this and then arms the timer/preload chain.
+ * Resolves true when the item was staged, false on AMCP failure. */
+function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 	const nextItem = layer.playlist[nextIdx]
 	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
 
@@ -390,7 +394,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 		self.log('info', `[Playlist] Advancing from image to item ${nextIdx} (${nextItem.value}) on ${channel}-${pLayer}`)
 	}
 
-	void (async () => {
+	return (async () => {
 		try {
 			/* Owner 2026-07-27 (two rounds): shader hops must MIX like any media (CG has no
 			 * bg-transition path, so a non-CUT transition goes LOADBG/PLAY on the html file);
@@ -417,27 +421,35 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 			const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			self.playlistActiveIndices[pKey] = nextIdx
-
-			// Setup next advancement
-			if (isTimelessPlaylistItem(nextItem)) {
-				schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
-			} else {
-				let nextNextIdx = nextIdx + 1
-				if (layer.playlistLoop !== false) {
-					nextNextIdx = nextNextIdx % layer.playlist.length
-				} else if (nextNextIdx >= layer.playlist.length) {
-					nextNextIdx = -1
-				}
-				if (nextNextIdx >= 0) {
-					queueNextPlaylistItem(self, channel, pLayer, layer, nextNextIdx)
-				}
-			}
+			return true
 		} catch (err) {
 			if (typeof self.log === 'function') {
 				self.log('warn', `[Playlist] Advance trigger failed on ${channel}-${pLayer}: ${err?.message || err}`)
 			}
+			return false
 		}
 	})()
+}
+
+function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
+	void stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx).then((staged) => {
+		if (!staged) return
+		// Setup next advancement
+		const nextItem = layer.playlist[nextIdx]
+		if (isTimelessPlaylistItem(nextItem)) {
+			schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
+		} else {
+			let nextNextIdx = nextIdx + 1
+			if (layer.playlistLoop !== false) {
+				nextNextIdx = nextNextIdx % layer.playlist.length
+			} else if (nextNextIdx >= layer.playlist.length) {
+				nextNextIdx = -1
+			}
+			if (nextNextIdx >= 0) {
+				queueNextPlaylistItem(self, channel, pLayer, layer, nextNextIdx)
+			}
+		}
+	})
 }
 
 function sameFileName(a, b) {
@@ -469,4 +481,4 @@ function shouldForceAdvance(state) {
 
 module.exports = {
 	playlistRuntimeKey,
-	clearChannelPlaylistState, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance }
+	clearChannelPlaylistState, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance, stagePlaylistItem }

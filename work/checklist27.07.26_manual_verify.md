@@ -126,11 +126,13 @@ sudo systemctl restart highascg-power-button.service
       Trashcans are ✕ everywhere (layer list, preset delete, sources folder too).
       >the space between the two columns of dots is unnecesserily wide.
 
-- [ ] **23. Playlist edit → preview** (WO-354)
-      Edit a playlist, take the look to PGM (new list plays), recall it to preview —
-      preview must play the NEW list too (the old-version replay is fixed at the root:
-      playlist timers were shared between PGM and PRV).
-      >no, i prv the playlist stops after first item.
+- [x] **23. Playlist edit → preview** (WO-354; reworded 04.08 per WO-371 option C —
+      the original wording contradicted item 27 and its "failure" was item 27's designed
+      behaviour) Edit a playlist, take the look to PGM (new list plays), recall it to
+      preview — preview shows the NEW list's start item, frozen (playback never runs on
+      PRV), and the Playlists panel's ⏮/⏭ step the preview render through the new list
+      to verify order and content without going on air.
+      >superseded: "stops after first item" IS the design (item 27); stepping added by WO-371.
 
 - [x] **24. Shader playlist mixing** (WO-354)
       Shaders in a playlist with a MIX transition crossfade again. Editing one of those
@@ -146,9 +148,10 @@ seems fine
       of the deck toolbar next to the screen pills.
       >
 
-- [x] **27. Playlists are PGM-only + stop on take-out** (WO-355)
-      Recall a playlist look to preview: it shows one item and sits still. Take a different
-      look to PGM: the old look's playlist stops hopping immediately.
+- [x] **27. Playlists are PGM-only + stop on take-out** (WO-355; wording confirmed 04.08 by
+      WO-371 option C) Recall a playlist look to preview: it never advances on its own — it
+      sits on whichever item the Playlists panel's ⏮/⏭ stepped it to (start item by default).
+      Take a different look to PGM: the old look's playlist stops hopping immediately.
       >
 
 - [x] **28. Shader Live editor** (WO-355)
