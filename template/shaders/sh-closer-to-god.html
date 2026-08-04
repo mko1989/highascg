@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Closer to God — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-closer-to-god","name":"Closer to God","common":"","passes":{"image":{"source":"// --- Compiled Custom Parameters for Shadertoy ---\n#define uSpeed 1.0000\n#define uExpansion 0.5000\n#define uBrightness 1.0000\n#define uBeatSensitivity 1.0000\n// -------------------------------------------------\n\nprecision highp float;mat2 rot(float a){float s=sin(a),c=cos(a);return mat2(c,-s,s,c);}void mainImage(out vec4 fragColor,in vec2 fragCoord){vec2 uv=(fragCoord-.5*iResolution.xy)/iResolution.y;float t=iTime*uSpeed;float audio=texture(iChannel0,vec2(0.05,0.25)).r*uBeatSensitivity;float d=length(uv);vec3 col=vec3(0.0);vec2 p=uv;for(float i=0.0;i<6.0;i++){p=abs(p)-(0.15+audio*0.2)*uExpansion;p*=rot(0.5+t*0.2+i*0.3);float s=length(p)-0.02;col+=mix(vec3(0.1,0.3,0.9),vec3(1.0,0.5,0.2),sin(t*0.5+i))*0.03/(abs(s)+0.015);}float pulse=sin(d*10.0-t*3.0)*0.5+0.5;col+=vec3(0.5,0.7,1.0)*0.01/(d+0.1)*uBrightness;col+=vec3(0.8,0.2,0.9)*pulse*audio*uBrightness;float ring=smoothstep(0.02,0.0,abs(d-(0.3+audio*0.1)));col+=ring*vec3(1.0,0.8,0.5)*uBrightness;col*=exp(-d*2.0);col=pow(col,vec3(0.9));fragColor=vec4(col,1.0);}","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

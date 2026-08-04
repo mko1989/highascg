@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Revision Qualification 2018-Cupe — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-revision-qualification-2018-cupe","name":"Revision Qualification 2018-Cupe","common":"","passes":{"image":{"source":"void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    vec2 uv = vec2(gl_FragCoord.x / iResolution.x, gl_FragCoord.y / iResolution.y); \n  \tuv -= .5;\n  \tuv /= vec2(iResolution.y / iResolution.x, 1.);\n\n  \tvec3 col = vec3(0);\n  \tfloat t = iTime*2. + texture(iChannel1, vec2(0.02)).x*1.5 - texture(iChannel3, vec2(0.04)).x*3.;\n\n  \tfor (float j = 0.; j < 140.; j++) {\n    \tvec3 pointCol = vec3(10,2,0.3);\n    \tfloat i = j;\n\n    \tfloat star = 1.;\n    \tfloat starPos = 0.;\n    \tif (i > 70.) {\n      \t\tpointCol = vec3(0.2,4,8);\n      \t\ti += 234.;\n      \t\tstar *= texture(iChannel0, vec2(0.05)).x;\n      \t\tstarPos = texture(iChannel2, vec2(0.03)).x*10. - texture(iChannel3, vec2(0.04)).x*20.;\n    \t} else {\n      \t\tstar *= texture(iChannel0, vec2(0.08)).x*1.4;\n      \t\tstarPos = texture(iChannel2, vec2(0.035)).x*15. - texture(iChannel1, vec2(0.025)).x*10.;\n    \t}\n\n    \tvec2 p = vec2(sin(i*0.1423 + t*0.1) + cos(i*0.17 + t*0.21), sin(i*0.0731 + t*-0.14) + cos(i*.17 + t*0.221)) * 0.4;\n\n    \tvec2 diff = p - uv;\n\n    \tfloat a = atan(diff.y,diff.x);\n\n    \tfloat highlight = 1000.*pow(0.5+0.5*sin(i*0.1 - iTime*0.5 + starPos*0.4), 300.);\n\n    \tfloat pointB = 1. + highlight * (0.1 + pow(0.5+0.5*sin(a*12.), 10.)) * star * 10.;\n   \n    \tfloat dist = length(diff);\n\n    \tfloat brightness = pow(0.1/(0.0001 + dist), 2.) * pointB;\n\n    \tfor (float f = 0.; f < 3.; f++) {\n      \t\tvec2 p2 = -p * (0.4 + f * 0.3);\n      \t\tfloat diff2 = distance(uv,p2) * 1.5;\n      \t\tfloat flare = smoothstep(0.14,0.13,diff2) * (smoothstep(0.1,0.11,diff2) * 0.1+0.1);\n      \t\tcol += pointCol * flare * pointCol * 0.00001 * highlight;\n    \t}\n    \tcol += pointCol * brightness * 0.0001;\n    \n  \t}\n\n  \tcol /= (vec3(1)+col);\n  \n  \tfragColor.rgb = pow(col, 1./vec3(2.2));\n}","channels":["audio",null,null,null]},"bufferA":{"source":"void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    fragColor = texture(iChannel0, vec2(0.02));\n    \n    float delta = texture(iChannel1, vec2(0.0)).x;\n    \n    fragColor += vec4(pow(delta/1.,4.)/10.);\n}","channels":["A","audio",null,null]},"bufferB":{"source":"void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    fragColor = texture(iChannel0, vec2(0.03));\n    \n    float delta = texture(iChannel1, vec2(0.0)).x;\n    \n    fragColor += vec4(pow(delta/1.,4.)/10.);\n}","channels":["B","audio",null,null]},"bufferC":{"source":"void mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n    fragColor = texture(iChannel0, vec2(0.04));\n    \n    float delta = texture(iChannel1, vec2(0.0)).x;\n    \n    fragColor += vec4(pow(delta/1.,4.)/10.);\n}","channels":["C","audio",null,null]},"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

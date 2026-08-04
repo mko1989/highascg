@@ -4,13 +4,13 @@
 	<meta charset="utf-8">
 	<title>fft test — HighAsCG Shader FX</title>
 	<style>
-		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
 		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
 	</style>
 </head>
 <body>
 	<canvas id="shaderfx-canvas"></canvas>
-	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-fft-test","name":"fft test","common":"","passes":{"image":{"source":"void mainImage(out vec4 o, in vec2 fragCoord){\n  vec2 uv = fragCoord/iResolution.xy;\n  // row 0 (y~0.25) = FFT spectrum, row 1 (y~0.75) = waveform, x = 0..1 across 512 bins\n  float fft  = texture(iChannel0, vec2(uv.x, 0.25)).x;\n  float wave = texture(iChannel0, vec2(uv.x, 0.75)).x;\n  vec3 col = vec3(0.02);\n  // spectrum bars\n  if (uv.y < fft) col = mix(vec3(0.1,0.9,0.3), vec3(1.0,0.15,0.1), uv.x);\n  // waveform trace\n  col += smoothstep(0.015, 0.0, abs(uv.y - wave)) * vec3(0.9);\n  // bass flash in the corner so reactivity is obvious from across the room\n  float bass = texture(iChannel0, vec2(0.05, 0.25)).x;\n  col += bass * bass * vec3(0.6,0.2,0.8) * smoothstep(0.5, 0.0, length(uv - vec2(0.08, 0.85)));\n  o = vec4(col, 1.0);\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-fft-test","name":"fft test","common":"","passes":{"image":{"source":"void mainImage(out vec4 o, in vec2 fragCoord){\n  vec2 uv = fragCoord/iResolution.xy;\n  // row 0 (y~0.25) = FFT spectrum, row 1 (y~0.75) = waveform, x = 0..1 across 512 bins\n  float fft  = texture(iChannel0, vec2(uv.x, 0.59)).x;\n  float wave = texture(iChannel0, vec2(uv.x, 0.75)).x;\n  vec3 col = vec3(0.02);\n  // spectrum bars\n  if (uv.y < fft) col = mix(vec3(0.6039,0.6,0.5882), vec3(0.102,0.3725,0.7059), uv.x);\n  // waveform trace\n  col += smoothstep(0.015, 0.0, abs(uv.y - wave)) * vec3(0.9);\n  // bass flash in the corner so reactivity is obvious from across the room\n  float bass = texture(iChannel0, vec2(0.05, 0.25)).x;\n  col += bass * bass * vec3(0.7765,0.2745,0.0) * smoothstep(0.5, 0.0, length(uv - vec2(0.08, 0.85)));\n  o = vec4(col, 1.0);\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":true}}</script>
 	<script src="ShaderToyLite.js"></script>
 	<script src="player.js"></script>
 </body>

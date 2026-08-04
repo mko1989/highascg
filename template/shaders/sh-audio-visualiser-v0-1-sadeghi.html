@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Audio Visualiser v0.1 Sadeghi — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-audio-visualiser-v0-1-sadeghi","name":"Audio Visualiser v0.1 Sadeghi","common":"","passes":{"image":{"source":"// Audio Visualiser v0.1 by Sadeghi \n// All rights reserved - Sadeghi-Alavi\n// Please allow microphone permission in your browser in order to use Audio Visualiser\n\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) \n{\n    \n    vec2 uv = (fragCoord - 0.5*iResolution.xy)/iResolution.y;\n    \n    \n    float bass = texture(iChannel0, vec2(0.01, 0.25)).x;\n    float mid = texture(iChannel0, vec2(0.5, 0.25)).x;\n    float treble = texture(iChannel0, vec2(0.99, 0.25)).x;\n    \n    \n    float pulse = 0.5 + 0.5*sin(iTime*1.5) * smoothstep(0.1, 0.5, bass*2.0);\n    \n    \n    float radius = 0.2 + 0.01*pulse + 0.05*mid;\n    \n    \n    float dist = length(uv) - radius + 0.05*treble*sin(20.0*length(uv)-iTime*5.0);\n    \n    \n    float glow = 1.0+ (0.02 + 0.05*bass) / abs(dist);\n    \n    \n    vec3 col = 0.15 + 0.1*cos(iTime + uv.xyx + vec3(0.0, 2.0 + 5.0*mid, 4.0 + 3.0*treble));\n    \n    \n    col *= glow * (0.15 + pulse*0.5 + bass);\n    \n    \n    \n    \n    \n   \n    float particleIntensity = treble * 0.8;\n    if (particleIntensity > 0.01) {\n       \n        float particleSpeed = iTime * 2.0 + treble * 10.0;\n        vec2 particleUV = uv * 2.0; \n        \n      \n        float noise = fract(sin(dot(particleUV + vec2(particleSpeed, 0.0), vec2(12.9898, 78.233))) * 43758.5453);\n        noise = fract(noise * (1.0 + treble * 50.0));\n        \n       \n        float mask = smoothstep(radius - 0.1, radius + 0.1, length(uv));\n        \n       \n        vec3 particleColor = vec3(0.8, 0.9, 1.0) * noise * particleIntensity * mask;\n        col += particleColor * (0.5 + 0.5*sin(iTime*3.0));\n    }\n    \n    fragColor = vec4(col, 1.0);\n}\n    \n \n\n  \n  \n\n \n    \n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

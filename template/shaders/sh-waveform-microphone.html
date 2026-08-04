@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Waveform Microphone — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-waveform-microphone","name":"Waveform Microphone","common":"","passes":{"image":{"source":"/*\n    \"Waveform\" by @XorDev\n    \n    I wish Soundcloud worked on ShaderToy again\n*/\nvoid mainImage(out vec4 O, vec2 I)\n{\n    //Raymarch iterator, step distance, depth and reflection\n    float i, d, z, r;\n    //Clear fragcolor and raymarch 90 steps\n    for(O*= i; i++<9e1;\n    //Pick color and attenuate\n    O += (cos(z*.5+iTime*0.6+vec4(0,2,4,3))+1.3)/d/z)\n    {\n        //Raymarch sample point\n        vec3 R = iResolution.xyy,\n         p = z * normalize(vec3(I+I,0)*1. - R*1.1);\n        //Shift camera and get reflection coordinates\n        r = max(-++p, 0.).y*1.;\n        //Mirror and music\n        p.y += r+r-4.*texture(iChannel0, vec2((p.x+6.5)/15.,(-p.z-3.)*5e1/R.y)).r;\n        //Step forward (reflections are softer)\n        z += d = .1*(.1*r+abs(p.y)/(1.+r+r+r*r) + max(d=p.z+3.,-d*.1));\n    }\n    //Tanh tonemapping\n    O = tanh(O/9e2);\n}","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>
