@@ -1,0 +1,4 @@
+when i go into shader editor while a playlist with shaders is playing, it only shows the first from the list. when another one is playing and i will make adjustments it will transition to the first shader.
+
+when dragging a shader from the sources browser to drop it on a list the compose preview "looses signal" goes black for a second and then comes back.
+

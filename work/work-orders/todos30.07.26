@@ -1,0 +1,10 @@
+companion module. 
+the straight amcp commands can be removed. just leave the custom raw amcp send action. this should be treated as a highascg module, not as highascg and caspracg module. so remove the the mentions of + casparcg (its already implide) remove the amcp port and bridge enab;e from config.
+i need simple actions to start and stop (as well as idicate status with feedbacks) recordings and stream. all the actually set ones, no placeholders. with preset buttons
+on that note in highascg it does not allow to have 0 stream or record outputs, which should be possible.
+
+i can see the gui is refreshing thumbnails of live inputs periodicaly which shouldnt happen really.
+
+i need to work on the performance of the devices view tab. it loads between a 1s-2s. thats too long. there needs to be something we can do to increase the performance of this.
+
+what would be the downsides to runnning xcompmgr and trasseting parts of the the firefix gui on the operator monitor instead of the hole punchnig?

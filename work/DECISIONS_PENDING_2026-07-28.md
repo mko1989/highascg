@@ -185,3 +185,6 @@ are yes: **#1** (cheap, measurable), then **#7** (small, client-only), then **#6
 - **Nothing is pushed** — 8 commits sit on the local branch awaiting `git push origin main`.
 - `npm run verify:repo-integrity` fails locally on 11 Syncthing `*.sync-conflict-*` files under the
   gitignored `projects/`. Your data, invisible to CI, untouched by me — worth a cleanup.
+
+
+On your decisions — recorded in the WOs and the queue: WO-371 → C (supersedes the earlier B; PRV stays paused, ⏮/⏭ step it), WO-368 → B (commit the shaders now in the folder). Neither is implemented yet. WO-376 turned out to be already implemented on 29.07. WO-366's seven yes/no ticks are still blank — that's the only thing left open in that file.
