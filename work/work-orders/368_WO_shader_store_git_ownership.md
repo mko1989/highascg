@@ -1,6 +1,6 @@
 # WO-368 — `template/shaders` is box-owned for Syncthing but still tracked by git: permanent dirty tree, deleted shaders one `git checkout` from resurrection
 
-**Status: DECIDED 29.07.26 — OPTION B. Unblocked, not yet implemented.**
+**Status: DONE (2026-08-04 — option B implemented at today's disk state, which had grown well past the 28.07 snapshot: 36 shaders added, 4 box edits recorded, sh-ext/sh-ios deletions committed (git resurrection now impossible), commit `0f2bf14`. Same session: post-produce `config/*.json` committed as the accepted baseline (`0abc720`, owner's WO-415 reframe) and owner work files committed (`6c2bf0f`) — `git status` on the box is CLEAN, 0 entries, restoring the "is the tree clean?" signal. The §3 companion-README residue was already absorbed by that repo's WO-394/395 commit `501763d`. Acceptance: library now on box + GitHub (two places); recorded cost stands — every Shader Live save dirties the tree until the next shader-store commit.)**
 
 > Owner, 29.07: *"the shaders that are in the folder rigth now can be added to the repo."* — git owns
 > the shader library; commit the 16 files currently on disk (9 untracked, 1 edited) as truth, and the
