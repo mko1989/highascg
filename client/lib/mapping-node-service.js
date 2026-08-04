@@ -72,6 +72,13 @@ export function videoModeToResolution(mode) {
 	const custom = parseCustomVideoMode(mode)
 	if (custom) return { w: custom.width, h: custom.height, fps: custom.fps }
 	const m = String(mode || '').toLowerCase()
+	/* WO-426: the rate lives in the mode id ("1080p6000" = 60 fps) — the old prefix match
+	 * returned 50 for EVERY 1080/2160/720 mode, so 60 Hz projects got 50 fps canvases. */
+	const std = /^(720|1080|2160)[pi](\d{4})$/.exec(m)
+	if (std) {
+		const dims = { 720: { w: 1280, h: 720 }, 1080: { w: 1920, h: 1080 }, 2160: { w: 3840, h: 2160 } }[std[1]]
+		return { ...dims, fps: parseInt(std[2], 10) / 100 }
+	}
 	if (m.startsWith('1080')) return { w: 1920, h: 1080, fps: 50 }
 	if (m.startsWith('2160')) return { w: 3840, h: 2160, fps: 50 }
 	if (m.startsWith('720')) return { w: 1280, h: 720, fps: 50 }

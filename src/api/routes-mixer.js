@@ -177,7 +177,10 @@ async function handleMixer(path, body, ctx) {
 	try {
 		const dur = parseInt(String(b?.duration ?? ''), 10)
 		if (Number.isFinite(dur) && dur > 0) {
-			const fps = 50
+			/* WO-426: duration is in FRAMES — convert at the project's real rate (60 Hz projects
+			 * settled too late on the old hardcoded 50). */
+			const { inferProjectFpsFromConfig } = require('../config/project-fps')
+			const fps = inferProjectFpsFromConfig(ctx?.config) || 50
 			require('../preview/compose-preview-activity').scheduleSettle(
 				channel,
 				Math.ceil((dur / fps) * 1000) + 100,

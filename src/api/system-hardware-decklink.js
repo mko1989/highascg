@@ -32,6 +32,9 @@ function isBetterDecklinkLabel(candidate, existing) {
  */
 function checkDecklinkVendorAvailable() {
 	const vendorDirs = [
+		// WO-427: GUI-uploaded packages land here (no stick required) — keep in sync with
+		// decklink_vendor_search_dirs in scripts/lib/decklink-install-lib.sh.
+		'/home/casparcg/highascg/vendor/decklink',
 		'/home/casparcg/exfat/decklink',
 		'/home/casparcg/bridge/decklink',
 	]

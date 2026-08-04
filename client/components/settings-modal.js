@@ -107,6 +107,10 @@ export function showSettingsModal(initialTab) {
 	}
 
 	modal.querySelector('#decklink-refresh-btn')?.addEventListener('click', () => void MountHw.refreshDecklinkPanel(modal))
+	/* WO-427: these two were exported but never called — the WO-188 install button was dead
+	 * (and absent from the template until now). */
+	MountHw.wireDecklinkInstallListener(modal)
+	MountHw.wireDecklinkUploadListener(modal)
 	modal.querySelector('#system-hw-refresh-btn')?.addEventListener('click', () => void MountHw.refreshSystemHardwarePanel(modal))
 
 	modal.querySelector('.settings-tabs')?.addEventListener('click', e => {

@@ -143,6 +143,8 @@ routes.get('/api/v4l2-inputs/status', ({ path, query, ctx }) => routesV4l2Input.
 
 routes.post('/api/system/time', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/decklink/install', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
+// WO-427: multipart — needs the raw req stream (http-server skips body consumption on multipart)
+routes.post('/api/system/decklink/upload', ({ req }) => routesSystemHardware.handleDecklinkUploadPost(req), { requireCaspar: false })
 routes.post('/api/system/gpu-nvidia/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gui-launch', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/pointer-confine', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })

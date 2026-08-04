@@ -13,7 +13,7 @@
   },
   {
     "id": "audio_monitor_usb",
-    "label": "USB headphones",
+    "label": "Audio 2",
     "enabled": true,
     "type": "system-audio",
     "deviceName": "sc60mon",

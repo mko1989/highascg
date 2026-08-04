@@ -45,9 +45,13 @@ decklink_both_packages_installed_at_least() {
 	fi
 }
 
-# Prints mounted …/decklink directories (USB exFAT then bridge), one per line.
+# Prints vendor …/decklink directories, one per line: GUI-uploaded local dir first (WO-427 —
+# the Settings upload saves there, no stick required), then mounted USB exFAT, then bridge.
 decklink_vendor_search_dirs() {
 	local mp
+	if [[ -d /home/casparcg/highascg/vendor/decklink ]]; then
+		printf '%s\n' /home/casparcg/highascg/vendor/decklink
+	fi
 	for mp in /home/casparcg/exfat /home/casparcg/bridge; do
 		if mountpoint -q "$mp" 2>/dev/null && [[ -d "${mp}/decklink" ]]; then
 			printf '%s\n' "${mp}/decklink"

@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 691,
+	"count": 690,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -58,7 +58,6 @@
 		"client/components/scenes-shared.js: playSeekFramesForSceneLayerFromTimeline",
 		"client/components/scenes-shared.js: playSeekFramesFromClip",
 		"client/components/settings-modal-companion.js: refreshCompanionConnectionStatus",
-		"client/components/settings-modal-mount-hardware.js: wireDecklinkInstallListener",
 		"client/components/sources-panel-helpers.js: formatFileSize",
 		"client/components/sources-panel-helpers.js: iconFor",
 		"client/components/sources-panel-shell.js: SOURCES_PANEL_HTML",

@@ -244,6 +244,14 @@ export function getMainModalHtml() {
 							<button type="button" class="btn btn--secondary" id="decklink-dv-updater">Desktop Video Updater</button>
 						</div>
 						<p class="settings-note" id="decklink-status-line" style="margin-top:0.35rem"></p>
+						<h3 class="settings-category" style="margin-top:0.75rem">Driver install / update</h3>
+						<p class="settings-note">Blackmagic's license does not allow shipping the DeckLink driver with HighAsCG — you supply it once: download <strong>"Desktop Video" for Linux</strong> from <code>blackmagicdesign.com/support</code> (free, any computer), then upload the <code>Blackmagic_Desktop_Video_Linux_*.tar.gz</code> here — or copy it to a USB stick's <code>decklink/</code> folder and plug the stick in.</p>
+						<div class="settings-group" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center">
+							<input type="file" id="decklink-upload-input" accept=".gz,.deb" style="max-width:16rem" />
+							<button type="button" class="btn btn--secondary" id="decklink-upload-btn">Upload driver package</button>
+							<button type="button" class="btn btn--primary" id="decklink-install-btn" disabled>Install driver</button>
+						</div>
+						<p class="settings-note" id="decklink-install-result" style="margin-top:0.35rem"></p>
 					</div>
 					<div class="settings-pane" id="settings-pane-diagnostics">
 						<h3 class="settings-category">Diagnostics &amp; support</h3>

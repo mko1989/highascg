@@ -8,7 +8,7 @@
 const { gpuNvidiaGet, handleGpuNvidiaApply } = require('./system-hardware-nvidia')
 const { handleGpuLayoutGet } = require('./system-hardware-gpu-layout')
 const { decklinkGet } = require('./system-hardware-decklink')
-const { handleDecklinkInstallPost } = require('./system-hardware-decklink-install')
+const { handleDecklinkInstallPost, handleDecklinkUploadPost } = require('./system-hardware-decklink-install')
 const { handleGuiLaunchPost } = require('./system-hardware-gui')
 const { handleGpuPortsReset } = require('./system-hardware-gpu-ports')
 const { handleXrandrLayoutGet, handleXrandrLayoutApplyPost } = require('./system-hardware-xrandr-layout')
@@ -89,4 +89,5 @@ async function hardwareHandlePost(p, body, ctx) {
 module.exports = {
 	hardwareHandleGet,
 	hardwareHandlePost,
+	handleDecklinkUploadPost,
 }

@@ -129,3 +129,6 @@ config/*.tmp
 
 # WO-319: self-signed TLS proxy cert/key — never commit
 config/certs/
+
+# WO-427: GUI-uploaded DeckLink driver packages (250MB+, user-supplied, never committed)
+/vendor/

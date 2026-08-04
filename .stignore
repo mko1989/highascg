@@ -71,3 +71,6 @@ Thumbs.db
 // pure rescan+index cost on 4 machines, no peer needs them. MIRROR THIS ON THE MAC before
 // deleting anything under it, or peers will push the dirs right back.
 /projects/_trash
+
+// WO-427: GUI-uploaded DeckLink driver packages — box-local, peers must not sync them
+/vendor

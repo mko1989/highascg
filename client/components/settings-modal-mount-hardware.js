@@ -358,3 +358,38 @@ export function wireSystemTimeListeners(modal) {
 		}
 	})
 }
+
+/** WO-427: browser upload of the Blackmagic Desktop Video package into the local vendor dir
+ * (`vendor/decklink/` under the repo) — the install script scans it first, so no USB stick is
+ * needed. Upload only stages; installing stays behind the password-gated Install button. */
+export function wireDecklinkUploadListener(modal) {
+	const btn = modal.querySelector('#decklink-upload-btn')
+	const input = modal.querySelector('#decklink-upload-input')
+	const resultLine = modal.querySelector('#decklink-install-result')
+	if (!btn || !input) return
+	btn.addEventListener('click', async () => {
+		const file = input.files && input.files[0]
+		if (!file) {
+			if (resultLine) resultLine.textContent = 'Choose the Blackmagic_Desktop_Video_Linux_*.tar.gz first.'
+			return
+		}
+		btn.disabled = true
+		if (resultLine) resultLine.textContent = `Uploading ${file.name} (${Math.round(file.size / 1e6)} MB)…`
+		try {
+			const fd = new FormData()
+			fd.append('file', file, file.name)
+			const res = await fetch(resolveApiUrl('/api/system/decklink/upload'), { method: 'POST', body: fd })
+			const data = await res.json().catch(() => ({}))
+			if (res.ok && data?.ok) {
+				if (resultLine) resultLine.textContent = `Uploaded ${data.savedAs} — now press Install driver.`
+			} else {
+				if (resultLine) resultLine.textContent = `Upload failed: ${data?.error || `HTTP ${res.status}`}`
+			}
+		} catch (e) {
+			if (resultLine) resultLine.textContent = `Upload failed: ${e?.message || e}`
+		} finally {
+			btn.disabled = false
+			await refreshDecklinkPanel(modal)
+		}
+	})
+}

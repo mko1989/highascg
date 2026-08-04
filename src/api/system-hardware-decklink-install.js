@@ -77,6 +77,89 @@ async function handleDecklinkInstallPost(body, ctx) {
 	}
 }
 
+/* WO-427: Blackmagic's EULA does not allow redistributing Desktop Video, so the driver can
+ * never ship inside the ISO — the user must supply the package themselves. This upload makes
+ * that a browser action: Settings → DeckLink → choose the tar.gz downloaded from
+ * blackmagicdesign.com/support → it lands in the local vendor dir the install script scans
+ * first (no USB stick required). Upload only STAGES the file; installing stays behind the
+ * nuclear-password Install button. */
+const DECKLINK_LOCAL_VENDOR_DIR = '/home/casparcg/highascg/vendor/decklink'
+const DECKLINK_VENDOR_NAME_RE = /^(Blackmagic_Desktop_Video_Linux_[\w.-]+\.tar\.gz|desktopvideo[\w.-]*\.deb)$/i
+
+/**
+ * POST /api/system/decklink/upload — multipart, single file.
+ * @param {import('http').IncomingMessage} req
+ */
+function handleDecklinkUploadPost(req) {
+	const busboy = require('busboy')
+	const fs = require('fs')
+	const path = require('path')
+	return new Promise((resolve) => {
+		let bb
+		try {
+			bb = busboy({ headers: req.headers, limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 } })
+		} catch (e) {
+			resolve({ status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Bad upload request: ${e?.message || e}` }) })
+			return
+		}
+		let done = false
+		let pendingWrite = null
+		let savedAs = null
+		let failure = null
+		const finish = () => {
+			if (done) return
+			done = true
+			if (failure) resolve({ status: 400, headers: JSON_HEADERS, body: jsonBody({ error: failure }) })
+			else if (!savedAs) resolve({ status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'No file received' }) })
+			else resolve({ status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, savedAs, dir: DECKLINK_LOCAL_VENDOR_DIR }) })
+		}
+		bb.on('file', (_name, file, info) => {
+			const filename = path.basename(String(info?.filename || ''))
+			if (!DECKLINK_VENDOR_NAME_RE.test(filename)) {
+				failure = `Not a Desktop Video package: "${filename}" — expected Blackmagic_Desktop_Video_Linux_*.tar.gz (or a desktopvideo_*.deb)`
+				file.resume()
+				return
+			}
+			let dest
+			try {
+				fs.mkdirSync(DECKLINK_LOCAL_VENDOR_DIR, { recursive: true })
+				dest = path.join(DECKLINK_LOCAL_VENDOR_DIR, filename)
+			} catch (e) {
+				failure = `Cannot create vendor dir: ${e?.message || e}`
+				file.resume()
+				return
+			}
+			const ws = fs.createWriteStream(dest)
+			pendingWrite = new Promise((wDone) => {
+				const failWrite = (e) => {
+					failure = failure || `Write failed: ${e?.message || e}`
+					try { fs.unlinkSync(dest) } catch { /* partial gone or never created */ }
+					file.resume()
+					wDone()
+				}
+				ws.on('error', failWrite)
+				file.on('error', failWrite)
+				file.on('limit', () => failWrite(new Error('File exceeds the 2 GB upload limit')))
+				ws.on('finish', () => {
+					savedAs = filename
+					wDone()
+				})
+			})
+			file.pipe(ws)
+		})
+		bb.on('error', (e) => {
+			failure = failure || `Upload stream error: ${e?.message || e}`
+			finish()
+		})
+		bb.on('close', () => {
+			if (pendingWrite) pendingWrite.then(finish)
+			else finish()
+		})
+		req.pipe(bb)
+	})
+}
+
 module.exports = {
 	handleDecklinkInstallPost,
+	handleDecklinkUploadPost,
 }

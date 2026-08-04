@@ -37,7 +37,7 @@
       "id": "audio_monitor_usb",
       "deviceId": "caspar_host",
       "kind": "audio_out",
-      "label": "USB headphones",
+      "label": "Audio 2",
       "externalRef": "sc60mon"
     },
     {
