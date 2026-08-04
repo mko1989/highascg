@@ -43,6 +43,7 @@ the stick — the installer's log is now saved onto the stick itself
 (`HIGHASCGEXF:/logs/session.log`), and that log is the missing piece for finding
 the real cause.
 
+i already did reflash and install and it worked
 ---
 
 ## 3. Seven old complaints — tell me which still happen
@@ -55,15 +56,15 @@ changed a lot since, so some may be gone already. For each one, just tell me
    channel still a concern?
 2. "I connected PGM2 to the record output and PGM1 got recorded" — the record
    bus got a big fix on 28.07 (WO-373), so this one is PROBABLY fixed. Does it
-   still record the wrong channel?
+   still record the wrong channel? no
 3. NumLock turns itself off when highascg or caspar restarts — still happening?
 4. Drag & drop from the media browser to the timeline sometimes doesn't "land" —
-   still happening?
-5. Clips on the timeline show almost no settings in the inspector — still true?
+   still happening? no
+5. Clips on the timeline show almost no settings in the inspector — still true? no
 6. Timeline editing feels slow on the caspar output (looks editing got fast,
-   timeline didn't) — still true?
+   timeline didn't) — still true? 
 7. In the timeline editor's compose preview, the label bar stretches full width
-   instead of staying under the PRV window — still true?
+   instead of staying under the PRV window — still true? no
 
 Anything you mark "still happens" gets its own work order and gets fixed.
 

@@ -1,5 +1,7 @@
 # WO-416 — `build-produce-flash-stick.sh` fails at exFAT partitioning: WO-413 USB auto-mount re-mounts the stick mid-flash
 
+**OWNER QA PASSED 04.08 — "i already did reflash and install and it worked": the full 5-phase flash completed with the WO-416 inhibit in place. CLOSED.**
+
 **Status: DONE (2026-08-03 — fix options 1+3 implemented; offline suite 1801/2, the 2 reds are the pre-existing WO-415 monitor smokes; live flash re-run remains owner QA)**
 
 ## Symptom (owner run log, pasted into `work/work-orders/todos03.08.26`)

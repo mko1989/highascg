@@ -1,5 +1,7 @@
 # WO-417 — Calamares "failed to install boot loader" on target machine (03.08 ISO); session log unrecoverable → log-rescue baked into ISO
 
+**RESOLVED 04.08 — owner: reflash + install on the target machine WORKED ("i already did reflash and install and it worked"). The bootloader failure did not reproduce with the 03.08+ fixes baked in; the session-log rescue stays in the ISO as permanent evidence plumbing. CLOSED.**
+
 **Status: IN PROGRESS (2026-08-03 — ISO payload audited clean, root cause NOT determinable without the target's session log; log-rescue implemented so the next failure is diagnosable. Needs next produce + owner retry)**
 
 Owner report (`todos03.08.26` line 33): ran `eggs produce` + flash, took the stick to a

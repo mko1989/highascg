@@ -1,6 +1,6 @@
 # WO-366 — todos21.07.26 top block was never triaged: seven owner items with no work order
 
-**Status: OPEN — gap found by the 14.07→28.07 completeness audit (28.07.26). Triage only; no code written.**
+**Status: PARTIALLY CLOSED (2026-08-04 — owner answered 4 of 7 in `work/checklist04.08.26_owner_actions.md`: #2 record-bus "no" (WO-373 fixed it), #4 drag-drop "no", #5 clip inspector "no", #7 label bar "no" — all closed as no-longer-reproducing. STILL OPEN, unanswered: #1 live-audio channel cheapest resolution, #3 NumLock resets on restart, #6 timeline editing speed on the caspar output.)**
 
 ## 1. Investigation
 
