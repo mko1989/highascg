@@ -109,6 +109,23 @@ else
 	ok "no home/casparcg/highascg/${PRIVATE_IDENTITY_DIR} in squashfs"
 fi
 
+# WO-429 — credentials + user-supplied driver packages MUST NOT ship.
+if squash_has_path 'home/casparcg/.config/gh/hosts.yml'; then
+	bad "home/casparcg/.config/gh/hosts.yml is in squashfs — the GitHub OAuth token leaked (WO-429); check exclude fragment merge, then ROTATE the token (gh auth logout && gh auth login) on any box cloned from a prior ISO"
+else
+	ok "no gh auth token in squashfs"
+fi
+if squash_has_path 'home/casparcg/.bash_history'; then
+	bad "home/casparcg/.bash_history is in squashfs — shell history leaked (WO-429); check exclude fragment merge"
+else
+	ok "no shell history in squashfs"
+fi
+if squash_has_tree 'home/casparcg/highascg/vendor'; then
+	bad "home/casparcg/highascg/vendor is in squashfs — user-supplied Blackmagic packages leaked (WO-429: 2 GB + EULA-bound, never redistributable); check exclude fragment merge"
+else
+	ok "no vendor driver packages in squashfs"
+fi
+
 # WO-168 T168.4/T168.6 — deleted-project tombstones; reset also purges these.
 if squash_has_tree "home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR}"; then
 	bad "home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR} is in squashfs — deleted-project tombstones leaked (WO-168 T168.4); check exclude fragment merge and factory reset"

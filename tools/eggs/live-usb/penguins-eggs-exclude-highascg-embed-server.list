@@ -241,3 +241,19 @@ home/casparcg/highascg/src/previs
 home/casparcg/highascg/src/previs/*
 home/casparcg/highascg/client/assets/modules/previs
 home/casparcg/highascg/client/assets/modules/previs/*
+
+# WO-429 (owner 04.08): credentials and user-supplied driver packages must never ship in an
+# ISO. The gh token below is what pushes this repo to GitHub — it was shipping until today.
+home/casparcg/.config/gh
+home/casparcg/.config/gh/*
+home/casparcg/.gitconfig
+home/casparcg/.git-credentials
+home/casparcg/.netrc
+home/casparcg/.npmrc
+home/casparcg/.bash_history
+home/casparcg/.zsh_history
+home/casparcg/.local/share/keyrings
+home/casparcg/.local/share/keyrings/*
+# GUI-uploaded Blackmagic packages (WO-427) — 2 GB and EULA-bound, never redistributable.
+home/casparcg/highascg/vendor
+home/casparcg/highascg/vendor/*

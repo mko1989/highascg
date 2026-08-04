@@ -97,3 +97,11 @@ staged 2 GB archive: `decklink_needs_install_from_vendor` → "install or upgrad
 main deb resolved. Smoke 5/5. Owner: run
 `sudo bash scripts/exfat/install-exfat-systemd-units.sh` ONE more time (the fixed lib must
 reach /usr/local/lib), then Install.
+
+## Follow-up 3 — OWNER QA PASSED (04.08 evening)
+
+Owner: "the decklink driver install seems to succeded" — the full chain works end-to-end:
+browser upload of the real 2 GB tar.gz → staged → installer refresh → Install button →
+Desktop Video 16.0.1 → 16.2 installed through the GUI. The flow shipped in WO-188 never
+worked once; it now has three fixes (stderr parsing, nested-archive layout, pipefail
+SIGPIPE) each proven against the real package. CLOSED.
