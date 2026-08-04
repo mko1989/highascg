@@ -197,9 +197,6 @@ async function handleImport(ctx, body) {
 	}
 
 	ctx._usbImportCancel = { cancelled: false }
-	const cancelFn = () => {
-		ctx._usbImportCancel.cancelled = true
-	}
 
 	setUsbImportState(ctx, {
 		active: true,

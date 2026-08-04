@@ -1,7 +1,6 @@
 'use strict'
 
 const { spawn } = require('child_process')
-const { readCasparSetting } = require('../config/routing-map')
 const {
 	resolveV4l2InputDevice,
 	resolveV4l2InputFormat,

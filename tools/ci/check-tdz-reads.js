@@ -111,7 +111,8 @@ function scanFile(file) {
 		if (parent.type === 'MemberExpression' && parent.property === node && !parent.computed) return false
 		if (parent.type === 'ImportSpecifier' || parent.type === 'ImportDefaultSpecifier') return false
 		if (parent.type === 'ExportSpecifier') return false
-		if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement' || parent.type === 'ContinueStatement') return false
+		if (parent.type === 'LabeledStatement' || parent.type === 'BreakStatement' || parent.type === 'ContinueStatement')
+			return false
 		return true
 	}
 

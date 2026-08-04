@@ -1,5 +1,4 @@
 import { buildInspectorTable } from './device-view-ui-utils.js'
-import { api } from '../lib/api-client.js'
 import { PROGRAM_LAYOUT_OPTIONS } from '../lib/audio-channel-layouts.js'
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from '../lib/project-fps.js'
 import { renderHostChannelDestinationInspector } from './device-view-destinations-inspector-host-channel.js'

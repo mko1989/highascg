@@ -80,8 +80,8 @@ function copyClientStaticTreesPlugin() {
 	}
 }
 
-/** @param {string} apiOrigin */
-function vendorImportMapEntries(apiOrigin) {
+/** @param {string} _apiOrigin */
+function vendorImportMapEntries(_apiOrigin) {
 	// Always use relative paths for vendor imports so they go through the same-origin proxy (Web UI port / companion)
 	// which avoids all CORS issues and works under any custom LAN IP configuration.
 	return {
