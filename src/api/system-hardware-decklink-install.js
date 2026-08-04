@@ -5,7 +5,6 @@
 
 'use strict'
 
-const { execFileSync } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { checkNuclearPassword } = require('./routes-system-setup')
 
@@ -29,52 +28,49 @@ async function handleDecklinkInstallPost(body, ctx) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON' }) }
 	}
 
-	// Invoke the install script via sudo -n (requires sudoers entry)
-	try {
-		const output = execFileSync('sudo', ['-n', DECKLINK_INSTALL_SCRIPT], {
-			encoding: 'utf8',
-			timeout: 300000, // 5 minutes
-			stdio: ['pipe', 'pipe', 'pipe'],
-		})
+	// Invoke the install script via sudo -n (requires sudoers entry).
+	// WO-428 follow-up: the script LOGS TO STDERR — the old execFileSync read stdout only, so
+	// every result showed as "skipped: unknown". Read both streams and scan ALL lines for the
+	// last ok:/skip: marker instead of trusting a fixed line position.
+	const { spawnSync } = require('child_process')
+	const run = spawnSync('sudo', ['-n', DECKLINK_INSTALL_SCRIPT], {
+		encoding: 'utf8',
+		timeout: 300000, // 5 minutes
+	})
+	const output = [run.stdout, run.stderr].filter(Boolean).join('\n').trim()
 
-		// Parse output to extract the action and reason
-		const lines = String(output).split('\n')
-		const lastLine = lines[lines.length - 2] || ''
+	if (run.error || run.status !== 0) {
+		const msg = output || run.error?.message || `Install script exited ${run.status}`
+		return { status: 409, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
+	}
 
-		// Script outputs "skip: <reason>" or "ok: <reason>"
-		let action = 'skipped'
-		let reason = 'unknown'
-
-		if (lastLine.includes('skip:')) {
+	let action = 'skipped'
+	let reason = output || 'no output from install script'
+	for (const line of output.split('\n')) {
+		if (line.includes('skip:')) {
 			action = 'skipped'
-			reason = lastLine.replace(/.*skip:\s*/, '').trim()
-		} else if (lastLine.includes('ok:')) {
+			reason = line.replace(/.*skip:\s*/, '').trim()
+		} else if (line.includes('ok:')) {
 			action = 'installed'
-			reason = lastLine.replace(/.*ok:\s*/, '').trim()
-		}
-
-		return {
-			status: 200,
-			headers: JSON_HEADERS,
-			body: jsonBody({
-				ok: true,
-				action,
-				reason,
-			}),
-		}
-	} catch (e) {
-		const stderr = e.stderr ? String(e.stderr).trim() : ''
-		const stdout = e.stdout ? String(e.stdout).trim() : ''
-		const msg = stderr || stdout || e.message || 'Install script failed'
-
-		return {
-			status: 409,
-			headers: JSON_HEADERS,
-			body: jsonBody({
-				error: msg,
-			}),
+			reason = line.replace(/.*ok:\s*/, '').trim()
 		}
 	}
+
+	// A package IS staged locally but the INSTALLED script only searched exfat/bridge — the
+	// root-owned copies predate the GUI upload (WO-427/428) and the owner never re-ran the
+	// installer. Say exactly that instead of a bare "no vendor debs".
+	try {
+		const fs = require('fs')
+		const staged =
+			fs.existsSync(DECKLINK_LOCAL_VENDOR_DIR) && fs.readdirSync(DECKLINK_LOCAL_VENDOR_DIR).length > 0
+		if (action === 'skipped' && staged && !output.includes('vendor/decklink')) {
+			reason += ' — a driver package IS staged from the GUI upload, but the installed system scripts predate it. Run once: sudo bash scripts/exfat/install-exfat-systemd-units.sh — then retry Install.'
+		}
+	} catch {
+		/* hint is best-effort */
+	}
+
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, reason }) }
 }
 
 /* WO-427: Blackmagic's EULA does not allow redistributing Desktop Video, so the driver can

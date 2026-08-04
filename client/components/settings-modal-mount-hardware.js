@@ -3,6 +3,7 @@
  */
 import { api } from '../lib/api-client.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
+import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { renderHardwareSummary } from './settings-modal-mount-hardware-summary.js'
 
@@ -139,8 +140,19 @@ export function wireDecklinkInstallListener(modal) {
 	if (!installBtn) return
 
 	installBtn.addEventListener('click', async () => {
-		const password = prompt('Enter nuclear password to confirm DeckLink install:')
-		if (password === null) return // User cancelled
+		/* WO-428 follow-up: only ask for the nuclear password when the gate is actually ON —
+		 * the server's checkNuclearPassword passes without one when nuclearRequirePassword is
+		 * false, so prompting an owner who never set a password was pure confusion (WO-193
+		 * established the same rule for system-time). */
+		const ui = settingsState.getSettings()?.ui || {}
+		const gateOn = ui.nuclearRequirePassword === true || ui.nuclearRequirePassword === 'true'
+		let password = ''
+		if (gateOn) {
+			password = prompt('Enter nuclear password to confirm DeckLink install:')
+			if (password === null) return // User cancelled
+		} else if (!window.confirm('Install/update the DeckLink driver now? Capture may restart.')) {
+			return
+		}
 
 		installBtn.disabled = true
 		if (resultLine) resultLine.textContent = 'Installing…'

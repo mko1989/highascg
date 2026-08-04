@@ -62,3 +62,15 @@ test('WO-428: tar.gz installer accepts the real nested Blackmagic archive layout
 	// Verified live 04.08 against the real Blackmagic_Desktop_Video_Linux_16.2.tar.gz:
 	// version 16.2a1, main+gui debs found under the top-level folder.
 })
+
+test('WO-428 follow-up: Install reports the real reason and only prompts when the gate is on', () => {
+	const install = read('src/api/system-hardware-decklink-install.js')
+	assert.match(install, /spawnSync\('sudo'/, 'reads both streams (the script logs to STDERR — execFileSync saw nothing → "skipped: unknown")')
+	assert.match(install, /\[run\.stdout, run\.stderr\]/, 'stdout+stderr combined')
+	assert.ok(!install.includes('lines[lines.length - 2]'), 'no fixed-line-position parsing')
+	assert.match(install, /installed system scripts predate it/, 'stale-scripts hint when a package is staged but unseen')
+
+	const panel = read('client/components/settings-modal-mount-hardware.js')
+	assert.match(panel, /nuclearRequirePassword === true/, 'password prompt gated on the nuclear setting')
+	assert.match(panel, /window\.confirm\('Install\/update the DeckLink driver now\?/, 'gate off → plain confirm instead of a password ask')
+})

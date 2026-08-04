@@ -5,7 +5,7 @@
   "caspar_global_portaudio": true,
   "caspar_portaudio_host_api": "auto",
   "transitionModel": "switcher_bus",
-  "screen_count": 1,
+  "screen_count": 0,
   "screen_1_mode": "1080p5000",
   "screen_1_stretch": "none",
   "screen_1_windowed": true,
@@ -236,5 +236,6 @@
   "configPath": "/home/casparcg/highascg/config/casparcg.config",
   "casparConfigOverride": "",
   "default_alsa_card": "",
-  "default_alsa_device": ""
+  "default_alsa_device": "",
+  "screen_3_operator_monitor": true
 }

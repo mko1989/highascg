@@ -61,3 +61,22 @@ Plus the real driver at `~/Downloads/Blackmagic_Desktop_Video_Linux_16.2.tar.gz`
    stack, so expect a Caspar restart and possibly a reboot for the DKMS module.
 3. The second machine: after updating it (git pull or drop-update), its phantom card
    disappears on the next Devices-tab load; real ports appear once a card + driver exist.
+
+## Follow-up (same day, owner pressed Install)
+
+Two more defects surfaced live:
+1. **Password prompt with no password set** — `wireDecklinkInstallListener` prompted
+   unconditionally; the server's `checkNuclearPassword` passes without one when
+   `nuclearRequirePassword` is off. Now: gate ON → password prompt; gate OFF → a plain
+   confirm (WO-193's system-time rule applied here).
+2. **"skipped: unknown"** — the install script logs to STDERR; the handler's `execFileSync`
+   read stdout only (empty), and parsed a fixed line position. Now `spawnSync` reads both
+   streams and scans all lines for the last `ok:`/`skip:` marker. Bonus: when a package IS
+   staged from the GUI upload but the (stale, root-owned) installed scripts didn't look
+   there, the reason now says exactly that and names the one-time fix command.
+
+Live-verified after restart: `POST /api/system/decklink/install {}` →
+`skipped: no vendor debs in ~/exfat/decklink or ~/bridge/decklink — a driver package IS
+staged from the GUI upload, but the installed system scripts predate it. Run once:
+sudo bash scripts/exfat/install-exfat-systemd-units.sh — then retry Install.`
+Smoke extended to 4/4; suite 1830/0/2; client rebuilt + kiosk reloaded.
