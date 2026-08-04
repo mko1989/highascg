@@ -310,7 +310,12 @@ function runBeginCommitBatch(client, lines, options) {
 					)
 				}
 				connection._amcpSendQueue = Promise.resolve()
-				if (rejectP) rejectP(new Error(`AMCP batch COMMIT ack timeout (${lines.length} cmds)`))
+				const err = new Error(`AMCP batch COMMIT ack timeout (${lines.length} cmds)`)
+				/* Review 03.08 engine §3: the payload had already hit the socket when this timer
+				 * armed — Caspar very likely executed the transaction and only the ack was lost/
+				 * late (exactly the 2026-07-19 ack-drift incident). Callers must NOT replay. */
+				err.amcpPayloadSent = true
+				if (rejectP) rejectP(err)
 			}, batchTimeoutMs)
 			connection.socket.send(payload)
 			try {
@@ -384,6 +389,17 @@ class AmcpBatch {
 		}
 
 		return runBeginCommitBatch(client, clean, options).catch((e) => {
+			/* Review 03.08 engine §3: a COMMIT-ack timeout fires AFTER the payload was written —
+			 * the commands very likely ran inside Caspar, and replaying them sequentially
+			 * double-executes on air (every PLAY restarts its clip from frame 0 mid-transition,
+			 * without transaction atomicity). Only failures raised BEFORE the socket write
+			 * (not connected, validation) are safe to retry sequentially. */
+			if (e && e.amcpPayloadSent === true) {
+				if (typeof connection.log === 'function') {
+					connection.log('warn', 'AMCP batch: ' + (e?.message || e) + ' — NOT resending (payload already sent; a replay would double-execute)')
+				}
+				return Promise.reject(e)
+			}
 			if (typeof connection.log === 'function') {
 				connection.log('debug', 'AMCP batch: ' + (e?.message || e) + ' — falling back to sequential')
 			}
