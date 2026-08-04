@@ -1,6 +1,6 @@
 # WO-405 — Performance round 2 (todos03.08.26 item 1)
 
-**Status: IN PROGRESS (2026-08-03 — WO-401 deploy leg completed and verified; round-2 research not yet run)**
+**Status: IN PROGRESS (2026-08-04 — deploy leg done 03.08; idle baseline captured 04.08 (§4, casparcg 8 %, node 1 % on the post-produce config); caspar-internal pass awaits a real show config)**
 **Priority:** High (owner: "thorough review of the code base… anything beneficial to get the most performance out of the machine")
 **Source:** `work/work-orders/todos03.08.26` item 1
 **Related:** WO-401 (round 1, 2026-07-30 — 15 ranked findings, F1–F9/F12 implemented), WO-398 (run.sh fork loop), WO-399 (v4l2 jpg branch), WO-407 (screen-consumer stutter — the on-glass symptom is tracked there, but candidate causes overlap with caspar-process load)
@@ -58,3 +58,27 @@ The owed WO-401/403/404 **post-show deploy**:
   WO-401 client items (thumbnail refresh), WO-403 (Shader Live follows playlist), WO-404
   (drag no longer blanks compose preview) — the QA lists live in those WOs.
 - Round-2 research (§1 steps 1–4) NOT started — that is the remaining body of this WO.
+
+## 4. Post-deploy idle baseline (2026-08-04, WO-421 session)
+
+Owner 04.08 dissolved the config gate ("config restore does not matter at all") — measured on
+the accepted current config: post-produce defaults + one operator-GUI destination (channels:
+1 Operator GUI 1080p50, 2 Monitor). All WO-401 fixes AND today's WO-418/419/421 server code
+live (restarts 10:28 and 11:48). Box idle, no show content, kiosk connected.
+
+60 s `/proc/<pid>/stat` window + `nvidia-smi` + `/api/host-stats`:
+
+| metric | round 1 (30.07, show config) | now (04.08, idle default config) |
+|---|---|---|
+| casparcg CPU | 431 % | **8 %** |
+| node (highascg) CPU | (18,656 OSC msg/s era) | **1 %** |
+| GPU util / enc / dec | — | 12 % / 0 % / 0 % (224 MiB VRAM) |
+| load1 / mem used | — | 0.25 / 7.2 GB of 64 |
+
+**Caveat, recorded deliberately: these columns are not comparable.** Round 1 measured a full
+show config (screens, inputs, MV); this is the idle floor of a 2-channel default config. Its
+value is as the reference floor: anything the next show config adds can be attributed to that
+config, not to the daemon baseline. The remaining round-2 body (caspar-internal per-channel
+pass, delta-WS verify under real OSC load, deferred F10/F11/F13/F15 revisit) is only
+meaningful once real destinations/inputs are configured again — measure then against this
+floor. Status stays IN PROGRESS for that remainder.
