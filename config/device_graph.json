@@ -5,60 +5,9 @@
       "id": "caspar_host",
       "role": "caspar_host",
       "label": "Caspar / HighAsCG host"
-    },
-    {
-      "id": "destinations",
-      "role": "destinations",
-      "label": "Screen destinations"
     }
   ],
   "connectors": [
-    {
-      "id": "str_1",
-      "deviceId": "caspar_host",
-      "kind": "stream_out",
-      "index": 0,
-      "label": "Str1",
-      "caspar": {
-        "type": "rtmp",
-        "name": "Str1",
-        "quality": "medium",
-        "rtmpServerUrl": "",
-        "streamKey": "",
-        "hasStreamKey": false,
-        "srtUrl": "",
-        "udpUrl": "",
-        "videoCodec": "h264",
-        "videoBitrateKbps": 6500,
-        "encoderPreset": "veryfast",
-        "audioCodec": "aac",
-        "audioBitrateKbps": 128
-      },
-      "externalRef": "stream_1"
-    },
-    {
-      "id": "str_2",
-      "deviceId": "caspar_host",
-      "kind": "stream_out",
-      "index": 1,
-      "label": "Str2",
-      "caspar": {
-        "type": "ndi",
-        "name": "Str2",
-        "quality": "medium",
-        "rtmpServerUrl": "",
-        "streamKey": "",
-        "hasStreamKey": false,
-        "srtUrl": "",
-        "udpUrl": "",
-        "videoCodec": "h264",
-        "videoBitrateKbps": 4500,
-        "encoderPreset": "veryfast",
-        "audioCodec": "aac",
-        "audioBitrateKbps": 128
-      },
-      "externalRef": "stream_2"
-    },
     {
       "id": "rec_1",
       "deviceId": "caspar_host",
@@ -85,62 +34,11 @@
       "externalRef": "hw:0,0"
     },
     {
-      "id": "dst_in_dst_mrzemj1s_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "Operator GUI",
-      "externalRef": "dst_mrzemj1s_1"
-    },
-    {
-      "id": "dlsdi_1",
+      "id": "audio_monitor_usb",
       "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 0,
-      "label": "DeckLink 1",
-      "caspar": {
-        "ioDirection": "unassigned"
-      },
-      "externalRef": "1"
-    },
-    {
-      "id": "dlsdi_2",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 1,
-      "label": "DeckLink 2",
-      "caspar": {
-        "ioDirection": "unassigned"
-      },
-      "externalRef": "2"
-    },
-    {
-      "id": "dlsdi_3",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 2,
-      "label": "DeckLink 3",
-      "caspar": {
-        "ioDirection": "unassigned"
-      },
-      "externalRef": "3"
-    },
-    {
-      "id": "dlsdi_4",
-      "deviceId": "caspar_host",
-      "kind": "decklink_io",
-      "index": 3,
-      "label": "DeckLink 4",
-      "caspar": {
-        "ioDirection": "unassigned"
-      },
-      "externalRef": "4"
-    },
-    {
-      "id": "dst_in_dst_mrzeocxh_1",
-      "deviceId": "destinations",
-      "kind": "destination_in",
-      "label": "PGM/PRV 1",
-      "externalRef": "dst_mrzeocxh_1"
+      "kind": "audio_out",
+      "label": "USB headphones",
+      "externalRef": "sc60mon"
     },
     {
       "id": "gpu_p0",
@@ -149,7 +47,7 @@
       "label": "P0",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 1
+        "mainIndex": 0
       },
       "externalRef": "DP-0"
     },
@@ -171,9 +69,9 @@
       "label": "P2",
       "caspar": {
         "bus": "pgm",
-        "mainIndex": 0
+        "mainIndex": 1
       },
-      "externalRef": "DP-4/DP-5"
+      "externalRef": "DP-4"
     },
     {
       "id": "gpu_p3",
@@ -184,19 +82,8 @@
         "bus": "pgm",
         "mainIndex": 0
       },
-      "externalRef": "DP-6"
+      "externalRef": "DP-6/DP-7"
     }
   ],
-  "edges": [
-    {
-      "id": "e_dst_in_dst_mrzemj1s_1_gpu_p0",
-      "sourceId": "dst_in_dst_mrzemj1s_1",
-      "sinkId": "gpu_p0"
-    },
-    {
-      "id": "e_dst_in_dst_mrzeocxh_1_gpu_p3",
-      "sourceId": "dst_in_dst_mrzeocxh_1",
-      "sinkId": "gpu_p3"
-    }
-  ]
+  "edges": []
 }

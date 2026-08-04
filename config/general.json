@@ -19,9 +19,7 @@
     "pointerConfine": "auto",
     "cefInteractiveBridge": true,
     "cefInteractiveLayer": 999,
-    "cefRemoteDebuggingPort": 9222,
-    "cefEnableGpu": true,
-    "multiHelperTaskbar": true
+    "cefRemoteDebuggingPort": 9222
   },
   "local_template_path": "",
   "composePreview": {
@@ -45,6 +43,7 @@
   "x11_horizontal_swap": false,
   "multiview_system_id": "",
   "multiview_os_mode": "",
+  "multiview_os_rate": "",
   "cgStudio": {
     "httpPort": 4300,
     "bindAddress": "127.0.0.1"
@@ -98,43 +97,5 @@
     }
   },
   "screen_count": 1,
-  "configVersion": 1,
-  "streaming": {
-    "enabled": false,
-    "protocol": "UDP",
-    "captureMode": "udp",
-    "localCaptureDevice": "auto",
-    "x11Display": ":0",
-    "ndiNamingMode": "auto",
-    "ndiSourcePattern": "CasparCG Channel {ch}",
-    "ndiChannelNames": {},
-    "quality": "medium",
-    "basePort": 40000,
-    "hardwareAccel": true,
-    "maxBitrate": 2000,
-    "resolution": "half",
-    "fps": 25,
-    "drmDevice": "/dev/dri/card0",
-    "autoRelocateBasePort": true
-  },
-  "periodic_sync_interval_sec": null,
-  "periodic_sync_interval_sec_osc": null,
-  "screen_3_system_id": "DP-4",
-  "screen_3_os_mode": "1280x768",
-  "screen_3_os_backend": "xrandr",
-  "screen_3_os_rate": 50,
-  "screen_3_os_timing_source": "cvt",
-  "screen_3_os_mode_source": "edid",
-  "extraLiveSources": [],
-  "screen_1_system_id": "",
-  "screen_2_system_id": "",
-  "screen_4_system_id": "",
-  "screen_1_os_mode": "",
-  "screen_2_os_mode": "",
-  "screen_4_os_mode": "",
-  "screen_1_os_backend": "xrandr",
-  "screen_2_os_backend": "xrandr",
-  "screen_4_os_backend": "xrandr",
-  "multiview_os_backend": "xrandr",
-  "gpuPhysicalTopologyOperatorSaved": false
+  "configVersion": 1
 }

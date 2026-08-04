@@ -2,7 +2,7 @@
   "version": 1,
   "destinations": [
     {
-      "id": "dst_mrzemj1s_1",
+      "id": "dst_operator_gui",
       "label": "Operator GUI",
       "mainScreenIndex": 0,
       "mode": "operator_gui",
@@ -26,29 +26,6 @@
       "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
       "autoLaunch": true,
       "headless": false
-    },
-    {
-      "id": "dst_mrzeocxh_1",
-      "label": "PGM/PRV 1",
-      "mainScreenIndex": 0,
-      "mode": "pgm_prv",
-      "audioLayout": "stereo",
-      "videoMode": "custom",
-      "width": 2560,
-      "height": 896,
-      "fps": 50,
-      "caspar": {
-        "bus": "pgm"
-      },
-      "edidLabel": "",
-      "inheritsProjectFps": false,
-      "stream": {
-        "type": "rtmp",
-        "source": "program_1",
-        "url": "",
-        "key": "",
-        "quality": "medium"
-      }
     }
   ],
   "edidNotes": ""
