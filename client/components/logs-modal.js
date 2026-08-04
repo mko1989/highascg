@@ -20,46 +20,13 @@ import {
 import {
 	applyLogsPaneVisibility,
 	downloadSupportBundleFromApi,
+	parseMarkdownBasic,
 	setLogsToggleStyles,
 } from '../lib/logs-modal-shared.js'
 import shortcutsMd from '../../shortcuts.md?raw'
 
 /** @type {string} Module-level storage for last active tab (per session) */
 let lastActiveTab = 'logs'
-
-function parseMarkdownBasic(md) {
-	let html = md
-		.replace(/</g, '&lt;').replace(/>/g, '&gt;')
-		.replace(/^### (.*$)/gim, '<h3>$1</h3>')
-		.replace(/^## (.*$)/gim, '<h2>$1</h2>')
-		.replace(/^# (.*$)/gim, '<h1>$1</h1>')
-		.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>')
-		.replace(/`(.*?)`/gim, '<code>$1</code>')
-		.replace(/\*(.*?)\*/gim, '<em>$1</em>')
-	
-	let inList = false;
-	const lines = html.split('\n');
-	for(let i=0; i<lines.length; i++) {
-		if(lines[i].match(/^- /)) {
-			if(!inList) {
-				lines[i] = '<ul>\n' + lines[i].replace(/^- (.*)$/, '<li>$1</li>');
-				inList = true;
-			} else {
-				lines[i] = lines[i].replace(/^- (.*)$/, '<li>$1</li>');
-			}
-		} else {
-			if(inList) {
-				lines[i-1] += '\n</ul>';
-				inList = false;
-			}
-			if (lines[i].trim() && !lines[i].match(/^<h/) && !lines[i].match(/^<ul>/) && !lines[i].match(/^<\/ul>/)) {
-				lines[i] = '<p>' + lines[i] + '</p>';
-			}
-		}
-	}
-	if (inList) lines[lines.length-1] += '\n</ul>';
-	return lines.join('\n');
-}
 
 const POLL_MS = 2000
 
@@ -72,13 +39,19 @@ function setToggleStyles(modal, highOn, casparOn) {
 	setLogsToggleStyles(modal, highOn, casparOn)
 }
 
+/** Close function of the currently open modal — the toggle-close path must run the SAME
+ * teardown as the ✕ button; a bare `existing.remove()` here leaked the 2 s poll interval,
+ * the `log_line` WS subscription and the filter cleanup on every eye-click close. */
+let activeModalClose = null
+
 /**
  * Toggle: open on first click, close if already open.
  */
 export function showLogsModal() {
 	const existing = document.getElementById('logs-modal')
 	if (existing) {
-		existing.remove()
+		if (activeModalClose) activeModalClose()
+		else existing.remove()
 		return
 	}
 
@@ -467,7 +440,9 @@ export function showLogsModal() {
 		if (filterReloadTimer) clearTimeout(filterReloadTimer)
 		if (categoryFilterCleanup) categoryFilterCleanup()
 		modal.remove()
+		activeModalClose = null
 	}
+	activeModalClose = close
 
 	modal.querySelector('#logs-modal-close')?.addEventListener('click', close)
 

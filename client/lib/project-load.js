@@ -28,6 +28,12 @@ export async function fetchProjectFromServer() {
 		const getRes = await api.get('/api/project')
 		const fromGet = normalizeProjectPayload(getRes)
 		if (fromGet) return fromGet
+		if (getRes && typeof getRes === 'object' && !getRes.error && !Object.keys(getRes).length) {
+			// Fresh server: GET /api/project answers 200 {} when nothing is stored yet.
+			// Return it as-is so bootstrap can take its seeding branch — falling through to
+			// POST /api/project/load would 404 ("No project stored") and throw instead.
+			return getRes
+		}
 	} catch {
 		/* try POST load next */
 	}

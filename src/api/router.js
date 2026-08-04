@@ -287,11 +287,9 @@ routes.post('/api/ingest/download', ({ body, ctx }) => routesIngest.handleDownlo
 routes.get('/api/ingest/download-status', ({ ctx }) => routesIngest.handleGetDownloadStatus(ctx), { requireCaspar: false })
 routes.get('/api/ingest/preview', ({ query, ctx }) => routesIngest.handleIngestPreview(query, ctx), { requireCaspar: false })
 
-// USB Ingest
-routes.get('/api/usb-ingest/*', ({ method, path, body, ctx, req }) => routesUsbIngest.handle(method, path, path, body, ctx, req), { requireCaspar: false })
-routes.get('/api/usb-ingest', ({ method, path, body, ctx, req }) => routesUsbIngest.handle(method, path, path, body, ctx, req), { requireCaspar: false })
-routes.post('/api/usb-ingest/*', ({ method, path, body, ctx, req }) => routesUsbIngest.handle(method, path, path, body, ctx, req), { requireCaspar: false })
-routes.post('/api/usb-ingest', ({ method, path, body, ctx, req }) => routesUsbIngest.handle(method, path, path, body, ctx, req), { requireCaspar: false })
+// USB Ingest — prefix must be /api/usb/* to match both the handler's route table and the client
+routes.get('/api/usb/*', ({ method, path, query, body, ctx, req }) => routesUsbIngest.handle(method, path, query, body, ctx, req), { requireCaspar: false })
+routes.post('/api/usb/*', ({ method, path, query, body, ctx, req }) => routesUsbIngest.handle(method, path, query, body, ctx, req), { requireCaspar: false })
 
 // Project
 routes.post('/api/project/save', ({ path, body, ctx }) => routesData.handleProject(path, body, ctx), { requireCaspar: false })

@@ -14,6 +14,7 @@ let offlineMode = false
 let projectGone = false
 let resyncPromise = null
 let lastSyncedAt = 0
+let bootstrapInFlight = false
 
 export function setOfflineBootstrapMode(enabled) {
 	offlineMode = !!enabled
@@ -32,8 +33,8 @@ export function canPushProjectToServer() {
  * WO-311: the server refused an autosave because this project was deleted there (410
  * `project_gone`). Latch outbound pushes OFF — retrying would be an attempt to resurrect a
  * project someone deliberately trashed, which is exactly the bug. The operator must act:
- * Save As keeps their in-memory copy under a new slug, or a reload adopts the server's truth
- * (a fresh page re-imports this module, so the latch does not outlive the session).
+ * Save / Save As keeps their in-memory copy, Load/New adopts or creates a real project — any
+ * of those reaches markServerProjectSynced(), which is the single exit from this latch.
  */
 export function markProjectGoneOnServer() {
 	projectGone = true
@@ -43,14 +44,15 @@ export function isProjectGoneOnServer() {
 	return projectGone
 }
 
-/** Explicit operator action produced a real project again (Save As / Load). */
-export function clearProjectGoneOnServer() {
-	projectGone = false
-}
-
 export function markServerProjectSynced() {
 	synced = true
 	lastSyncedAt = Date.now()
+	/* Every caller of this is either an operator action that produced a real server project
+	 * again (Save / Save As / Load / New project / file import) or an adoption of server truth
+	 * (bootstrap / resync) — each is a legitimate exit from the WO-311 `project_gone` latch.
+	 * Before this line the latch was permanent: an exported clear function existed but nothing
+	 * called it, so one 410 killed autosave + deck sync for the rest of the kiosk session. */
+	projectGone = false
 }
 
 export function resetServerProjectSync() {
@@ -102,6 +104,7 @@ export async function bootstrapFromServer(deps) {
 
 	let state = null
 	let serverWasFresh = false
+	bootstrapInFlight = true
 	try {
 		state = await api.get('/api/state')
 	} catch (e) {
@@ -143,6 +146,7 @@ export async function bootstrapFromServer(deps) {
 	} catch (e) {
 		console.warn('[HighAsCG] Server project load failed:', e?.message || e)
 	} finally {
+		bootstrapInFlight = false
 		/* WO-341 kill #2: a resync/reconnect is NOT user interaction — adopt server state,
 		 * never push back. The one legitimate push here is SEEDING a fresh server that has
 		 * no project at all. */
@@ -172,7 +176,15 @@ export async function resyncFromServer(deps) {
 	return resyncPromise
 }
 
-/** Skip immediate reconnect resync when bootstrap just finished. */
+/**
+ * Resync on WS connect unless a bootstrap just finished (or is running right now).
+ * The old gate was `synced && age > 2500` — inverted for the failure case: a client whose
+ * bootstrap/resync FAILED (synced=false) never resynced again, leaving autosave + deck sync
+ * silently off for the whole kiosk session (kiosk F5 during the node restart window hit this
+ * every deploy). NOT-synced is exactly when a reconnect must retry.
+ */
 export function shouldResyncOnWsConnect() {
-	return isServerProjectSynced() && Date.now() - lastSyncedAt > 2500
+	if (offlineMode || bootstrapInFlight) return false
+	if (!synced) return true
+	return Date.now() - lastSyncedAt > 2500
 }

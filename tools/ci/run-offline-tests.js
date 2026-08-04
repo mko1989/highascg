@@ -50,6 +50,7 @@ const FILES = [
 	'tools/smoke/smoke-wo413-usb-automount.test.js',
 	'tools/smoke/smoke-wo417-calamares-log-rescue.test.js',
 	'tools/smoke/smoke-wo418-review-fixes.test.js',
+	'tools/smoke/smoke-wo419-review-rows-6-7-10.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',

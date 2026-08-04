@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 693,
+	"count": 691,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -235,7 +235,6 @@
 		"client/lib/scenes-preview-look-stack.js: layersToClearBeforePgmTake",
 		"client/lib/screen-consumer-defaults.js: MULTIVIEW_CONSUMER_DEFAULTS",
 		"client/lib/screen-consumer-defaults.js: legacyBorderedWindowConsumer",
-		"client/lib/server-project-sync.js: clearProjectGoneOnServer",
 		"client/lib/server-project-sync.js: isProjectGoneOnServer",
 		"client/lib/server-project-sync.js: isServerProjectSynced",
 		"client/lib/shader-cg-update.js: cgUpdateJson",
@@ -418,7 +417,6 @@
 		"src/engine/project-hardware-config.js: HARDWARE_CONFIG_VERSION",
 		"src/engine/project-hardware-config.js: ROUTING_EXTRA_KEYS",
 		"src/engine/project-hardware-config.js: hardwareConfigToSnapshotPayload",
-		"src/engine/project-store.js: ACTIVE_SLUG_KEY",
 		"src/engine/project-store.js: LEGACY_AUTOSAVE_PATH",
 		"src/engine/project-store.js: PROJECTS_DIR",
 		"src/engine/project-store.js: TRASH_SUBDIR",

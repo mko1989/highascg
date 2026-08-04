@@ -6,7 +6,7 @@
 
 const path = require('path')
 const defaults = require('../config/defaults')
-const { JSON_HEADERS, jsonBody, parseBody, parseQueryString } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const usbDrives = require('../media/usb-drives')
 const { getDefaultIngestSubdir } = require('../media/project-media-root')
 const persistence = require('../utils/persistence')
@@ -337,15 +337,13 @@ async function handleEject(ctx, body) {
 /**
  * @param {string} method
  * @param {string} p path without query
- * @param {string} pathWithQuery
+ * @param {Record<string, string>} query parsed query params (the dispatcher strips the
+ *   query string from `p` before route matching, so it must be passed separately)
  * @param {string} body
  * @param {object} ctx
  * @param {import('http').IncomingMessage} req
  */
-async function handle(method, p, pathWithQuery, body, ctx, req) {
-	const qIdx = pathWithQuery.indexOf('?')
-	const query = parseQueryString(qIdx >= 0 ? pathWithQuery.slice(qIdx + 1) : '')
-
+async function handle(method, p, query, body, ctx, req) {
 	if (method === 'GET' && p === '/api/usb/drives') return handleGetDrives(ctx)
 	if (method === 'GET' && p === '/api/usb/browse') return handleBrowse(ctx, query, req)
 	if (method === 'GET' && p === '/api/usb/import-status') return handleImportStatus(ctx)
