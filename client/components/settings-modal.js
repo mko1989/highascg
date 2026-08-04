@@ -181,7 +181,9 @@ export function showSettingsModal(initialTab) {
 		await postNuclear('/api/system/setup/reboot')
 	})
 	installDiskBtn?.addEventListener('click', async () => {
-		if (!window.confirm('Open Calamares disk installer on the local display (:0)?')) return
+		/* WO-423 (owner): the launcher stops CasparCG AND this GUI so only the installer is on
+		 * the glass; both come back automatically when the installer closes. */
+		if (!window.confirm('Open Calamares disk installer on the local display (:0)?\n\nCasparCG and the HighAsCG GUI will CLOSE so only the installer is on screen. They restart when the installer exits.')) return
 		await postNuclearJson('/api/system/setup/install')
 	})
 	modal.querySelector('#set-nuclear-caspar-stop')?.addEventListener('click', async () => {

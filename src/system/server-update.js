@@ -174,9 +174,27 @@ async function checkForUpdate(opts = {}) {
 	}
 
 	try {
-		const rel = await fetchJson(`https://api.github.com/repos/${repo}/releases/latest`)
-		const assets = Array.isArray(rel?.assets) ? rel.assets : []
-		const serverAsset = assets.find((a) => /^highascg-server_.+\.tar\.gz$/i.test(String(a?.name || '')))
+		/* WO-424: server builds are published as PRERELEASES (make-github-release-server.sh),
+		 * and GitHub's /releases/latest endpoint only ever returns the newest FULL release —
+		 * so the shipped check could never see a server drop and the whole GUI update flow sat
+		 * dead. Scan the release list instead and pick the newest release (prerelease or not,
+		 * drafts excluded) that actually carries a highascg-server_*.tar.gz asset. */
+		const releases = await fetchJson(`https://api.github.com/repos/${repo}/releases?per_page=15`)
+		let rel = null
+		let serverAsset = null
+		for (const cand of Array.isArray(releases) ? releases : []) {
+			if (cand?.draft) continue
+			const asset = (Array.isArray(cand?.assets) ? cand.assets : []).find((a) =>
+				/^highascg-server_.+\.tar\.gz$/i.test(String(a?.name || '')),
+			)
+			if (!asset) continue
+			const stamp = parseServerReleaseAssetStamp(asset.name)
+			const best = serverAsset ? parseServerReleaseAssetStamp(serverAsset.name) : null
+			if (!serverAsset || (stamp && best && compareBuildStamps(stamp, best) > 0)) {
+				rel = cand
+				serverAsset = asset
+			}
+		}
 		const latest = serverAsset ? parseServerReleaseAssetStamp(serverAsset.name) : null
 		base.latest = latest
 		base.publishedAt = rel?.published_at || null
@@ -207,25 +225,54 @@ async function downloadFile(url, destPath) {
 		throw new Error('Download URL must be a GitHub releases asset')
 	}
 	fs.mkdirSync(path.dirname(destPath), { recursive: true })
+	/* WO-424 (review 03.08 config §5): every failure path must settle the promise and clean the
+	 * partial file — an unhandled 'error' on the write stream was a process.exit(1) via the
+	 * uncaughtException guard, and a stalled body left the apply job wedged forever. The write
+	 * stream is also created only for the final 200 (it used to be shared across redirects). */
 	await new Promise((resolve, reject) => {
-		const file = fs.createWriteStream(destPath)
-		const go = (fetchUrl) => {
-			https
-				.get(fetchUrl, { timeout: 120000 }, (res) => {
-					if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-						go(res.headers.location)
-						return
-					}
-					if ((res.statusCode || 0) !== 200) {
-						reject(new Error(`Download HTTP ${res.statusCode || '?'}`))
-						return
-					}
-					res.pipe(file)
-					file.on('finish', () => file.close(resolve))
-				})
-				.on('error', reject)
+		let settled = false
+		const fail = (err) => {
+			if (settled) return
+			settled = true
+			try { fs.unlinkSync(destPath) } catch { /* nothing written yet */ }
+			reject(err instanceof Error ? err : new Error(String(err)))
 		}
-		go(url)
+		const go = (fetchUrl, redirects) => {
+			if (redirects > 5) return fail(new Error('Download: too many redirects'))
+			const req = https.get(fetchUrl, { timeout: 120000 }, (res) => {
+				if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+					res.resume()
+					go(res.headers.location, redirects + 1)
+					return
+				}
+				if ((res.statusCode || 0) !== 200) {
+					res.resume()
+					fail(new Error(`Download HTTP ${res.statusCode || '?'}`))
+					return
+				}
+				const file = fs.createWriteStream(destPath)
+				res.pipe(file)
+				res.on('error', (e) => {
+					file.destroy()
+					fail(e)
+				})
+				file.on('error', (e) => {
+					res.destroy()
+					fail(e)
+				})
+				file.on('finish', () =>
+					file.close(() => {
+						if (!settled) {
+							settled = true
+							resolve(undefined)
+						}
+					}),
+				)
+			})
+			req.on('error', fail)
+			req.on('timeout', () => req.destroy(new Error('Download stalled (no activity for 120 s)')))
+		}
+		go(url, 0)
 	})
 }
 

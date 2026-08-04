@@ -57,6 +57,17 @@ if [[ "$(id -u)" -ne 0 ]]; then
 	exit 1
 fi
 
+# WO-423: the Web UI spawns this via sudo from INSIDE highascg.service's cgroup — the
+# owner-requested `systemctl stop highascg` below would kill this script mid-run with it.
+# Re-exec into a transient systemd unit first so the stop cannot take us down.
+if [[ -z "${HIGHASCG_CAL_SCOPED:-}" ]] && command -v systemd-run >/dev/null 2>&1; then
+	exec systemd-run --quiet --collect --unit="highascg-calamares-launch-$$" \
+		--setenv=HIGHASCG_CAL_SCOPED=1 \
+		--setenv=DISPLAY="${DISPLAY:-:0}" \
+		--setenv=XAUTHORITY="${XAUTHORITY:-${HOME_CASPAR}/.Xauthority}" \
+		"$(readlink -f "$0")"
+fi
+
 if ! command -v "${CALAMARES_BIN}" >/dev/null 2>&1; then
 	echo "Calamares not installed (eggs calamares --install or apt install calamares)" >&2
 	exit 1
@@ -88,4 +99,20 @@ if [[ -x /usr/local/lib/highascg/probe-internal-storage.sh ]]; then
 	}
 fi
 
-exec "${CALAMARES_BIN}" -d
+# WO-423 (owner 04.08): only the installer on the glass — stop playout AND the control GUI.
+# Done last, right before the launch, to keep the dead window short; safe because we run in
+# our own transient unit (re-exec above).
+for unit in casparcg-server.service casparcg-scanner.service highascg.service; do
+	systemctl stop "${unit}" 2>/dev/null || true
+done
+
+status=0
+"${CALAMARES_BIN}" -d || status=$?
+
+# Installer closed (finished or cancelled) — bring the box back. After a real install the
+# user reboots into the new system anyway; restarting first costs nothing and un-bricks a
+# cancelled attempt.
+for unit in highascg.service casparcg-server.service casparcg-scanner.service; do
+	systemctl start "${unit}" 2>/dev/null || true
+done
+exit "${status}"
