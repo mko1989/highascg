@@ -104,8 +104,17 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			connectors.push({ id: `caspar_pgm_${i + 1}`, deviceId: DEFAULT_DEVICE_ID, kind: 'gpu_out', label: `Program ${i + 1} (virtual)`, caspar: { bus: 'pgm', mainIndex: i }, externalRef: `program_${i + 1}` })
 		}
 	}
+	/* WO-428: only build DeckLink ports when hardware was actually DETECTED. The snapshot's
+	 * `decklink.detected` merges the ffmpeg enumeration with the OS probe, and the OS half
+	 * reports the PCI card (by its real lspci model name) even when the driver is missing —
+	 * so a physically present card always counts. A machine with neither must not render a
+	 * phantom card: fresh installs can carry cloned decklink_* config keys from the build
+	 * host, and the config fallback below exists for "Caspar offline on a box that HAS the
+	 * card", not for boxes without one. Fails OPEN when the snapshot carries no probe data. */
+	const decklinkDetected = !live?.decklink || live.decklink.detected !== false
 	const seenDecklinkIndices = new Set()
 	const addDecklinkPort = (slot, device, kind, label, extra = {}) => {
+		if (!decklinkDetected) return
 		const devIdx = parseInt(String(device), 10)
 		if (isNaN(devIdx) || devIdx <= 0) return
 		const id = `dlsdi_${slot}`

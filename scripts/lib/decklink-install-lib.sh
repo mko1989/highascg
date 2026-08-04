@@ -66,19 +66,27 @@ decklink_extract_tar_gz_debs() {
 	local temp_dir
 	[[ -f "$tar_gz" ]] || return 1
 	temp_dir="$(mktemp -d)" || return 1
-	DECKLINK_EXTRACT_TMPDIR="$temp_dir"
-	# List deb/x86_64/*.deb entries; if found, extract them to temp dir
-	if tar -tzf "$tar_gz" 2>/dev/null | grep -q '^deb/x86_64/.*\.deb$'; then
-		tar -xzf "$tar_gz" -C "$temp_dir" deb/x86_64/*.deb 2>/dev/null || {
+	DECKLINK_EXTRACT_TMPDIR=""
+	# WO-428: the REAL Blackmagic archive nests everything under a top-level
+	# Blackmagic_Desktop_Video_Linux_<ver>/ directory — the old `^deb/x86_64/` anchor
+	# matched nothing and the whole tar.gz path silently skipped. Accept both layouts.
+	if tar -tzf "$tar_gz" 2>/dev/null | grep -Eq '(^|/)deb/x86_64/[^/]+\.deb$'; then
+		tar -xzf "$tar_gz" -C "$temp_dir" --wildcards '*deb/x86_64/*.deb' 2>/dev/null || {
 			rm -rf "$temp_dir"
-			DECKLINK_EXTRACT_TMPDIR=""
 			return 1
 		}
+		DECKLINK_EXTRACT_TMPDIR="$temp_dir"
 		return 0
 	fi
 	rm -rf "$temp_dir"
-	DECKLINK_EXTRACT_TMPDIR=""
 	return 1
+}
+
+# Prints the extracted deb/x86_64 directory (root-level or nested), empty if none.
+decklink_extracted_deb_dir() {
+	local root="${1:-}"
+	[[ -d "$root" ]] || return 0
+	find "$root" -type d -path '*deb/x86_64' 2>/dev/null | head -1
 }
 
 # Sets DECKLINK_VENDOR_MAIN_DEB, DECKLINK_VENDOR_GUI_DEB, DECKLINK_VENDOR_VERSION, DECKLINK_VENDOR_DIR.
@@ -121,14 +129,16 @@ decklink_find_newest_vendor_pair() {
 			for tar_gz in "$search_dir"/Blackmagic_Desktop_Video_Linux_*.tar.gz; do
 				[[ -f "$tar_gz" ]] || continue
 				if decklink_extract_tar_gz_debs "$tar_gz"; then
-					# Look for debs in extracted temp dir (deb/x86_64/ structure)
-					for f in "${DECKLINK_EXTRACT_TMPDIR}"/deb/x86_64/desktopvideo_*.deb; do
+					# WO-428: the extracted deb dir may sit under the archive's top-level folder.
+					local extract_deb_dir
+					extract_deb_dir="$(decklink_extracted_deb_dir "${DECKLINK_EXTRACT_TMPDIR}")"
+					for f in "${extract_deb_dir:-/nonexistent}"/desktopvideo_*.deb; do
 						[[ -f "$f" ]] || continue
 						base="$(basename "$f")"
 						[[ "$base" == desktopvideo-gui_* ]] && continue
 						ver="$(decklink_deb_version_from_basename "$base")"
 						[[ -n "$ver" ]] || continue
-						gui_deb="${DECKLINK_EXTRACT_TMPDIR}/deb/x86_64/desktopvideo-gui_${ver}_amd64.deb"
+						gui_deb="${extract_deb_dir}/desktopvideo-gui_${ver}_amd64.deb"
 						if [[ ! -f "$gui_deb" ]]; then
 							gui_deb=""
 						fi
@@ -136,7 +146,7 @@ decklink_find_newest_vendor_pair() {
 							best_ver="$ver"
 							best_main="$f"
 							best_gui="$gui_deb"
-							best_dir="${DECKLINK_EXTRACT_TMPDIR}/deb/x86_64"
+							best_dir="${extract_deb_dir}"
 						fi
 					done
 					# Keep the temp dir for later cleanup after install
