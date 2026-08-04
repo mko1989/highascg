@@ -128,7 +128,11 @@ class OscState extends EventEmitter {
 			const c = this._ensureChannel(ch)
 			const actual = Number(vals[0])
 			const expected = Number(vals[1])
-			const healthy = !(Number.isFinite(actual) && Number.isFinite(expected) && expected > 0 && actual <= expected * 1.05)
+			// profiler/time is [actual, expected] frame time: keeping up means actual <= expected
+			// (5 % headroom). Unmeasurable values count as healthy. The negation used to wrap the
+			// GOOD condition, reporting healthy exactly when frames dropped (review engine §4).
+			const measurable = Number.isFinite(actual) && Number.isFinite(expected) && expected > 0
+			const healthy = !measurable || actual <= expected * 1.05
 			/* actual/expected are per-tick measurement noise with no consumer (only `healthy` is
 			 * read) — store them, but only a healthy FLIP dirties the channel. */
 			const changed = c.profiler?.healthy !== healthy

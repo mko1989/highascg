@@ -156,6 +156,11 @@ function createGuiStreamIngest(opts) {
 		proc.stderr.on('data', (d) => {
 			errTail = (errTail + d.toString()).slice(-2000)
 		})
+		proc.on('error', (err) => {
+			if (state.proc === proc) state.proc = null
+			state.lastError = `remux spawn failed: ${err?.message || err}`
+			log('warn', `[GUI stream] ${state.lastError}`)
+		})
 		proc.on('exit', (code, signal) => {
 			if (state.proc !== proc) return
 			state.proc = null

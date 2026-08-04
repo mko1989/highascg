@@ -225,6 +225,10 @@ function startLiveAudioBridge(ctx, slot, opts = {}) {
 	 * stop above cleared it, and without this the remembered value is consumed once and every
 	 * later start re-probes the device we already know is broken. */
 	if (device !== configured) _workingDeviceBySlot.set(n, device)
+	proc.on('error', (err) => {
+		entry.lastError = err?.message || String(err)
+		ctx?.log?.('warn', `[live-audio-bridge] slot ${n} spawn failed: ${entry.lastError}`)
+	})
 	proc.stderr?.on('data', (buf) => {
 		const s = buf.toString().trim()
 		if (!s) return

@@ -335,7 +335,17 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			} else {
 				await sendPhasedTakePlays(amcp, channel, takeJobs, self, { twoPhaseBatch })
 			}
-		} catch (_) {}
+		} catch (e) {
+			// Phase B failing means the incoming look may never have reached air, and with
+			// fadeClockRef.start unset the teardown STOPs the outgoing look immediately —
+			// black program output. This was silent (review 2026-08-03 engine §2); the log
+			// is the only diagnostic for a wedged COMMIT ack / dropped connection mid-take.
+			self.log?.(
+				'error',
+				`[scene-take-lbg] take Phase B (PLAY/crossfade/COMMIT) failed on ch${channel}: ${e?.message || e} — ` +
+					`jobs=${takeJobs.length} crossfadeLines=${crossfadeLines.length} fadeClockStarted=${fadeClockRef.start != null}`,
+			)
+		}
 
 		try {
 			for (const job of takeJobs) {

@@ -122,11 +122,18 @@ describe('WO-401 F3-revised: dirty tracking is VALUE-aware (delta mode pays)', (
 		assert.equal(osc._buildChangePayload(), null)
 
 		// Channel profiler floats are noise (only `healthy` is consumed) — stored, dirty on flip only.
+		// Channels default to healthy=true; [10, 20] = actual within budget keeps healthy=true,
+		// so no flip and no dirty. (Pre-review-fix the flag was inverted and this message flipped.)
 		osc.handleOscMessage({ address: '/channel/3/profiler/time', args: [10, 20] })
-		p = osc._buildChangePayload()
-		assert.ok(p && p.channels['3'], 'first profiler message sets healthy=false→…: flip counts')
+		assert.equal(osc._buildChangePayload(), null, 'in-budget message keeps default healthy=true — no flip')
+		assert.equal(osc.getSnapshot().channels['3'].profiler.healthy, true, 'meeting frame budget is healthy')
 		osc.handleOscMessage({ address: '/channel/3/profiler/time', args: [11, 20] })
 		assert.equal(osc._buildChangePayload(), null, 'jittering actual/expected must not dirty')
+		// Overrunning the frame budget (dropping frames) flips healthy → false and dirties.
+		osc.handleOscMessage({ address: '/channel/3/profiler/time', args: [25, 20] })
+		p = osc._buildChangePayload()
+		assert.ok(p && p.channels['3'], 'budget overrun flips healthy → dirty')
+		assert.equal(osc.getSnapshot().channels['3'].profiler.healthy, false, 'dropping frames is unhealthy')
 		osc.destroy()
 	})
 })

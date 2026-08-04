@@ -155,6 +155,10 @@ function startV4l2InputBridge(ctx, slot) {
 	const proc = spawn(ffmpegBinary(cfg), args, { stdio: ['ignore', 'ignore', 'pipe'] })
 	const entry = { proc, port, device, startedAt: Date.now(), lastError: undefined }
 	_bridges.set(n, entry)
+	proc.on('error', (err) => {
+		entry.lastError = err?.message || String(err)
+		ctx?.log?.('warn', `[v4l2-input-bridge] slot ${n} spawn failed: ${entry.lastError}`)
+	})
 	proc.stderr?.on('data', (buf) => {
 		const s = buf.toString().trim()
 		if (!s) return

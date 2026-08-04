@@ -91,10 +91,10 @@ async function resolveCasparMediaDir(ctx) {
 function recordFfmpegArgs(opts = {}) {
 	const crf = Number.isFinite(Number(opts.crf)) ? Math.min(51, Math.max(18, Math.round(Number(opts.crf)))) : 26
 	const codec = String(opts.videoCodec || 'h264').toLowerCase() === 'hevc' ? 'libx265' : 'libx264'
-	const preset =
-		String(opts.encoderPreset || 'veryfast')
-			.trim()
-			.toLowerCase() || 'veryfast'
+	// Single-token whitelist: this string lands verbatim inside a line-delimited AMCP
+	// ADD command (request body reaches here unvalidated — review 2026-08-03 src-api §2).
+	const presetRaw = String(opts.encoderPreset || 'veryfast').trim().toLowerCase()
+	const preset = /^[a-z0-9_-]{1,32}$/.test(presetRaw) ? presetRaw : 'veryfast'
 	const vbrRaw = parseInt(String(opts.videoBitrateKbps ?? ''), 10)
 	const useVbr = Number.isFinite(vbrRaw) && vbrRaw >= 200
 	const video = [

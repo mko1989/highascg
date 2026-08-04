@@ -36,7 +36,27 @@ function projectsDir() {
 	return PROJECTS_DIR
 }
 
+/**
+ * Slug containment (review 2026-08-03 src-api §1): slugs reach path.join from URL
+ * parts and request bodies; `..%2f` traversal read config/general.json live and
+ * would let the autosave loop overwrite config/*.json. Legit slugs come from
+ * projectSlugFromName ([a-z0-9_]) plus Syncthing conflict copies (dots, dashes,
+ * uppercase) — so allow those, refuse separators/dotfiles outright, and belt-and-
+ * braces resolve-check the joined path.
+ * @param {string} slug
+ */
+function isSafeProjectSlug(slug) {
+	const s = String(slug || '')
+	if (!s || s.length > 160) return false
+	if (/[/\\\0]/.test(s) || s.startsWith('.') || s.includes('..')) return false
+	const resolved = path.resolve(PROJECTS_DIR, `${s}.json`)
+	return resolved.startsWith(PROJECTS_DIR + path.sep)
+}
+
 function projectFilePath(slug) {
+	if (!isSafeProjectSlug(slug)) {
+		throw new Error(`invalid project slug: ${JSON.stringify(String(slug || '')).slice(0, 80)}`)
+	}
 	return path.join(PROJECTS_DIR, `${slug}.json`)
 }
 
@@ -59,7 +79,13 @@ function getActiveSlug(persistence) {
  * @param {string} slug
  */
 function setActiveSlug(persistence, slug) {
-	persistence.set(ACTIVE_SLUG_KEY, String(slug || '').trim() || 'untitled')
+	const s = String(slug || '').trim() || 'untitled'
+	// Never persist a traversal slug — the autosave loop would write through it forever.
+	if (!isSafeProjectSlug(s)) {
+		console.warn(`[project-store] refused to activate unsafe slug: ${JSON.stringify(s).slice(0, 80)}`)
+		return
+	}
+	persistence.set(ACTIVE_SLUG_KEY, s)
 }
 
 /**
@@ -120,7 +146,7 @@ function quarantineCorruptFile(filePath) {
  */
 function retireProjectSlug(slug) {
 	const s = String(slug || '').trim()
-	if (!s) return false
+	if (!s || !isSafeProjectSlug(s)) return false
 	ensureProjectsDir()
 	const trashDir = path.join(PROJECTS_DIR, TRASH_SUBDIR, `${s}-${Date.now()}`)
 	fs.mkdirSync(trashDir, { recursive: true })
@@ -152,7 +178,7 @@ function retireProjectSlug(slug) {
  */
 function wasProjectSlugRetired(slug) {
 	const s = String(slug || '').trim()
-	if (!s) return false
+	if (!s || !isSafeProjectSlug(s)) return false
 	const trashRoot = path.join(PROJECTS_DIR, TRASH_SUBDIR)
 	try {
 		if (!fs.existsSync(trashRoot)) return false
@@ -168,7 +194,7 @@ function wasProjectSlugRetired(slug) {
  * @returns {object | null}
  */
 function readProjectFile(slug) {
-	if (!slug) return null
+	if (!slug || !isSafeProjectSlug(slug)) return null
 	try {
 		pullProjectSlugFromUsbIfNewer(slug)
 	} catch (_) {}
@@ -189,6 +215,9 @@ function readProjectFile(slug) {
  * @param {object} project
  */
 function autosaveFilePath(slug) {
+	if (!isSafeProjectSlug(slug)) {
+		throw new Error(`invalid project slug: ${JSON.stringify(String(slug || '')).slice(0, 80)}`)
+	}
 	ensureProjectsDir()
 	const dir = path.join(PROJECTS_DIR, AUTOSAVE_SUBDIR)
 	if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
@@ -220,7 +249,7 @@ function writeProjectFile(slug, project) {
  * @param {object} project
  */
 function writeAutosaveFile(slug, project) {
-	if (!slug) return
+	if (!slug || !isSafeProjectSlug(slug)) return
 	const payload = withProjectSlug(project, slug)
 	const p = autosaveFilePath(slug)
 	const tmp = p + '.tmp'
@@ -233,7 +262,7 @@ function writeAutosaveFile(slug, project) {
  * @returns {object | null}
  */
 function readAutosaveFile(slug) {
-	if (!slug) return null
+	if (!slug || !isSafeProjectSlug(slug)) return null
 	try {
 		pullAutosaveSlugFromVolumesIfNewer(slug)
 	} catch (_) {}
@@ -293,6 +322,7 @@ module.exports = {
 	ACTIVE_SLUG_KEY,
 	LEGACY_AUTOSAVE_PATH,
 	projectSlugFromName,
+	isSafeProjectSlug,
 	parseProjectListFilename,
 	quarantineCorruptFile,
 	retireProjectSlug,

@@ -76,8 +76,9 @@ function buildStreamingRtmpFfmpegArgs(quality, opts = {}) {
 		preset = 'ultrafast'
 		vbr = 2500
 	}
+	// Single-token whitelist — lands verbatim in the AMCP ADD line (src-api §2).
 	const customPreset = String(opts.encoderPreset || '').trim().toLowerCase()
-	if (customPreset) preset = customPreset
+	if (/^[a-z0-9_-]{1,32}$/.test(customPreset)) preset = customPreset
 	const customBitrate = parseInt(String(opts.videoBitrateKbps ?? ''), 10)
 	if (Number.isFinite(customBitrate) && customBitrate >= 200) vbr = customBitrate
 

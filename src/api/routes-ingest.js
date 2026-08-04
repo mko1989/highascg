@@ -136,6 +136,8 @@ async function handleUpload(req, res, ctx) {
 		})
 		let fileCount = 0
 		let targetSubdir = ''
+		/** @type {string[]} files whose write stream died (disk-full, aborted upload) */
+		const uploadErrors = []
 
 		bb.on('field', (name, val) => {
 			if (name === 'path') targetSubdir = val
@@ -163,6 +165,20 @@ async function handleUpload(req, res, ctx) {
 			const writeStream = fs.createWriteStream(savePath)
 			file.pipe(writeStream)
 
+			// pipe() does not forward errors; an unhandled 'error' here is process.exit(1)
+			// via the uncaughtException guard (review 2026-08-03 src-api §3). Disk-full or
+			// an aborted upload must drop the partial file and keep draining the request.
+			const onStreamError = (err) => {
+				console.error(`[Ingest] Upload failed for ${filename}: ${err?.message || err}`)
+				uploadErrors.push(`${filename}: ${err?.message || err}`)
+				file.unpipe(writeStream)
+				writeStream.destroy()
+				fs.unlink(savePath, () => {})
+				file.resume()
+			}
+			writeStream.on('error', onStreamError)
+			file.on('error', onStreamError)
+
 			writeStream.on('finish', () => {
 				if (path.extname(savePath).toLowerCase() === '.zip') {
 					console.log(`[Ingest] Unzipping ${filename}...`)
@@ -183,6 +199,14 @@ async function handleUpload(req, res, ctx) {
 		})
 
 		bb.on('finish', () => {
+			if (uploadErrors.length > 0) {
+				resolve({
+					status: 500,
+					headers: JSON_HEADERS,
+					body: jsonBody({ error: `Upload failed: ${uploadErrors.join('; ')}`, count: fileCount - uploadErrors.length }),
+				})
+				return
+			}
 			resolve({ status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, count: fileCount }) })
 		})
 

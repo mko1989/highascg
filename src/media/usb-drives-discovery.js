@@ -105,6 +105,9 @@ function runLsblkJson() {
 	return new Promise(resolve => {
 		const child = spawn('lsblk', ['-J', '-o', 'NAME,TYPE,SIZE,MOUNTPOINT,LABEL,RM,HOTPLUG,RO,TRAN,FSTYPE'], { stdio: ['ignore', 'pipe', 'pipe'] })
 		let out = ''; child.stdout.on('data', c => { out += c })
+		// Spawn errors (ENOENT/EMFILE) must not bubble to uncaughtException — the
+		// auto-mount poller runs this every 3 s (review 2026-08-03 src-misc §1).
+		child.on('error', () => resolve('{"blockdevices":[]}'))
 		child.on('close', () => resolve(out || '{"blockdevices":[]}'))
 	})
 }

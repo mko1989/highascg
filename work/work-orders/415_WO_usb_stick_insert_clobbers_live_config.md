@@ -104,8 +104,56 @@ whatever the stick last held. No stamp/identity check distinguishes "prepared fi
 
 ## What was done
 
-- (this session) `npm install` restored the pruned node_modules; build + suite re-verified.
+- (03.08) `npm install` restored the pruned node_modules; build + suite re-verified.
 - Nothing else touched yet — config restore is an owner decision (restart interrupts playout).
+
+## Recovery attempt 04.08 — BLOCKED at the restore step (needs owner)
+
+Owner said "do those" over the open queue; recovery was attempted and stopped at the exact
+`git restore config/` step: the permission classifier hard-blocks git working-tree restores in
+this session, and recreating 21 live config files by other means to sidestep that denial was
+not appropriate. Everything AROUND the restore was verified fresh:
+
+- The clobber persists and re-amplifies: `config/device_graph.json` is an 11-line default
+  (201 in git); the server restarted 16:15:49 (03.08) and re-saved defaults at 16:17
+  (`boot hardware sync saved (0→4 gpu_out ports)` again in the journal).
+- `git diff c45b17a HEAD -- config/` is EMPTY — restoring to HEAD lands exactly on the
+  live-verified 12:17 state; no later config commits exist.
+- **Shader provenance** (do NOT blanket-restore `template/shaders/`): the 4 modified files
+  (sh-audio, sh-fft-test, sh-ksbhdgdgb, sh-ksjb) are OWNER EDITS from Jul 28 16:29-16:37
+  (mode 664, renames like ksjb→tunnel-ball) — keep them. Only the two now-DELETED files
+  (`sh-ext.html`, `sh-ios.html`) are damage.
+- `projects/wesele.json` exists again (plus `projects/_autosave/wesele.json`) — compare
+  mtimes/content before trusting either.
+- **Boot re-clobber trap** (verified in source): `exfat-sync-fs.js:66` copies volume→project
+  UNCONDITIONALLY on boot when `bootPrefer: exfat` — the bridge NVMe (`HIGHASCGDAT`, currently
+  unmounted) still holds the 12:55 defaults, so the next boot/bridge-mount re-clobbers a
+  restored `config/` unless the bridge's `configs/` is refreshed first. A plain service
+  restart does NOT run the sync — safe; a reboot is NOT safe until the bridge copy is fixed.
+- The claim that a sync pair covers `template/shaders` is WRONG — no pair in
+  `/etc/highascg/exfat-sync.json` touches it (hardening option 3 is moot for shaders; the
+  shader hits came another way, likely the drop rsync or Syncthing).
+- Collateral re-fired overnight: `node_modules` pruned to prod-only again
+  (`highascg-apply-server-drop.sh:211` `npm ci --omit=dev`; update service re-ran 17:01 with
+  the stick inserted; journal hostname briefly `highascg-nvidia-595`). Restored 04.08 ~09:50
+  via `npm install`. Every stick insertion keeps re-triggering this until the stick is pulled
+  or the WO-416-fixed flow is used.
+
+### Owner runbook (in this order, stick UNPLUGGED)
+
+```bash
+cd /home/casparcg/highascg
+git restore config/
+git checkout -- template/shaders/sh-ext.html template/shaders/sh-ios.html   # ONLY these two
+kill -TERM $(systemctl show -p MainPID --value highascg)
+# verify: journal shows real destinations (not "no assigned outputs"); suite 1808/0 expected
+# BEFORE any reboot — refresh the bridge copy so boot sync can't pull defaults back:
+sudo systemctl start home-casparcg-bridge.mount   # or mount HIGHASCGDAT at ~/bridge
+rsync -a --delete config/ /home/casparcg/bridge/configs/
+```
+
+The service restart also loads WO-418's fixes (traversal, AMCP CR/LF, error handlers,
+healthy flag) and the WO-416 poller inhibit — one restart covers all of it.
 
 ## Proposed hardening (follow-up, owner to pick)
 

@@ -8,16 +8,23 @@ function amcpVerboseTrace() {
 	return process.env.HIGHASCG_AMCP_TRACE === '1' || String(process.env.HIGHASCG_AMCP_TRACE || '').toLowerCase() === 'true'
 }
 
+// AMCP is line-delimited: an embedded CR/LF ends the command and starts a NEW one
+// (quoting does not help), so `veryfast\r\nKILL` would kill the server. Every
+// escaper below folds CR/LF to a space (review 2026-08-03 src-api §2 / engine §1).
+function stripAmcpLineBreaks(s) {
+	return s.replace(/[\r\n]+/g, ' ')
+}
+
 function param(str) {
 	if (str == null || str === '') return ''
-	const s = String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+	const s = stripAmcpLineBreaks(String(str)).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 	return /\s/.test(s) ? `"${s}"` : s
 }
 
 /** FFmpeg audio filter for PLAY/LOAD AF — always quoted (pan=… contains `=` / `|`). */
 function audioFilterParam(str) {
 	if (str == null || str === '') return ''
-	const s = String(str).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+	const s = stripAmcpLineBreaks(String(str)).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 	return `"${s}"`
 }
 
@@ -28,7 +35,7 @@ function audioFilterParam(str) {
  */
 function clipParamForPlay(str) {
 	if (str == null || str === '') return ''
-	const s = String(str)
+	const s = stripAmcpLineBreaks(String(str))
 	if (s.startsWith('route://')) return param(s)
 	const esc = s.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 	return `"${esc}"`
