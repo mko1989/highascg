@@ -80,3 +80,20 @@ Live-verified after restart: `POST /api/system/decklink/install {}` →
 staged from the GUI upload, but the installed system scripts predate it. Run once:
 sudo bash scripts/exfat/install-exfat-systemd-units.sh — then retry Install.`
 Smoke extended to 4/4; suite 1830/0/2; client rebuilt + kiosk reloaded.
+
+## Follow-up 2 (owner re-ran the installer, STILL "no vendor debs")
+
+The installed lib WAS refreshed (16:10, byte-identical to the repo) — the remaining bug was
+a `set -o pipefail` trap that user-context testing missed: `tar -tzf | grep -Eq` — grep
+quits at the first match and closes the pipe, tar dies with SIGPIPE (exit 141), and under
+the front script's pipefail the pipeline counts as FAILED despite the successful match. The
+ORIGINAL WO-188 code had the same trap, so the tar.gz path was doubly dead. Fixed by
+capturing the listing with `|| true` (no early-quit grep on the tar pipeline); same
+treatment for the `find | head -1` in `decklink_extracted_deb_dir`; skip message now names
+all three search locations including the GUI upload dir.
+
+Verified under the front script's exact options (`set -euo pipefail`) against the real
+staged 2 GB archive: `decklink_needs_install_from_vendor` → "install or upgrade to 16.2a1",
+main deb resolved. Smoke 5/5. Owner: run
+`sudo bash scripts/exfat/install-exfat-systemd-units.sh` ONE more time (the fixed lib must
+reach /usr/local/lib), then Install.

@@ -74,3 +74,11 @@ test('WO-428 follow-up: Install reports the real reason and only prompts when th
 	assert.match(panel, /nuclearRequirePassword === true/, 'password prompt gated on the nuclear setting')
 	assert.match(panel, /window\.confirm\('Install\/update the DeckLink driver now\?/, 'gate off → plain confirm instead of a password ask')
 })
+
+test('WO-428 pipefail: tar listing must not use grep -q (SIGPIPE kills the match)', () => {
+	const lib = read('scripts/lib/decklink-install-lib.sh')
+	assert.ok(!/tar -tzf[^\n]*\| *grep -Eq/.test(lib), 'grep -q on the tar pipeline dies on pipefail — capture with || true instead')
+	assert.match(lib, /deb_listing="\$\(tar -tzf[^\n]*\|\| true\)"/, 'listing captured pipefail-safe')
+	assert.match(lib, /head -1 \|\| true/, 'find|head capture pipefail-safe too')
+	assert.match(lib, /GUI upload/, 'skip reason names the upload dir')
+})

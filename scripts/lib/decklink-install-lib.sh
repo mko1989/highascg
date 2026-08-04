@@ -70,7 +70,11 @@ decklink_extract_tar_gz_debs() {
 	# WO-428: the REAL Blackmagic archive nests everything under a top-level
 	# Blackmagic_Desktop_Video_Linux_<ver>/ directory — the old `^deb/x86_64/` anchor
 	# matched nothing and the whole tar.gz path silently skipped. Accept both layouts.
-	if tar -tzf "$tar_gz" 2>/dev/null | grep -Eq '(^|/)deb/x86_64/[^/]+\.deb$'; then
+	# NO `grep -q` on the tar pipeline: -q quits at the first match, tar dies on SIGPIPE
+	# (141), and the caller's `set -o pipefail` turns a successful match into a failure.
+	local deb_listing
+	deb_listing="$(tar -tzf "$tar_gz" 2>/dev/null | grep -E '(^|/)deb/x86_64/[^/]+\.deb$' || true)"
+	if [[ -n "$deb_listing" ]]; then
 		tar -xzf "$tar_gz" -C "$temp_dir" --wildcards '*deb/x86_64/*.deb' 2>/dev/null || {
 			rm -rf "$temp_dir"
 			return 1
@@ -86,7 +90,8 @@ decklink_extract_tar_gz_debs() {
 decklink_extracted_deb_dir() {
 	local root="${1:-}"
 	[[ -d "$root" ]] || return 0
-	find "$root" -type d -path '*deb/x86_64' 2>/dev/null | head -1
+	# head closing early can SIGPIPE find under pipefail — same trap as the tar listing.
+	find "$root" -type d -path '*deb/x86_64' 2>/dev/null | head -1 || true
 }
 
 # Sets DECKLINK_VENDOR_MAIN_DEB, DECKLINK_VENDOR_GUI_DEB, DECKLINK_VENDOR_VERSION, DECKLINK_VENDOR_DIR.
@@ -168,7 +173,7 @@ decklink_find_newest_vendor_pair() {
 decklink_needs_install_from_vendor() {
 	local reason_var="${1:-}"
 	decklink_find_newest_vendor_pair || {
-		[[ -n "$reason_var" ]] && printf -v "$reason_var" "no vendor debs in ~/exfat/decklink or ~/bridge/decklink"
+		[[ -n "$reason_var" ]] && printf -v "$reason_var" "no vendor debs or Desktop Video tar.gz in ~/highascg/vendor/decklink (GUI upload), ~/exfat/decklink or ~/bridge/decklink"
 		return 1
 	}
 	if decklink_both_packages_installed_at_least "$DECKLINK_VENDOR_VERSION"; then
