@@ -1,6 +1,6 @@
 # WO-415 — Live box config wiped to defaults during the 12:54 stick-insert stack restart
 
-**Status: OPEN (2026-08-03 — trigger chain verified; SOURCE VOLUME MISATTRIBUTED IN ROUND 1, corrected below)**
+**Status: CLOSED — NOT AN INCIDENT (2026-08-04, owner: "normal operation that happens when I run eggs produce. It sets all configs to defaults so the produced ISO is clean and not full of old test projects." No restore wanted; the clobbered config is the accepted current state. Hardening options 1–2 DROPPED — they would fight the intended stick-wins produce flow; the flow-independent durability parts (atomic copies, corrupt-file quarantine) done as [WO-421](./421_WO_config_durability_and_monitor_fps_fallback.md). The diagnosis chain below stays as reference for what produce does to a live box.)**
 
 ## CORRECTION (same day, before any fix)
 

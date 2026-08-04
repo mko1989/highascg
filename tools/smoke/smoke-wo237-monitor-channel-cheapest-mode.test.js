@@ -103,12 +103,20 @@ describe('WO-237/406: monitor channel mode + consumer', () => {
 		// NOTE: full byte-equality is impossible here — enabling the monitor bus reallocates
 		// the channel index a stored NDI host source had pinned (known WO-406 §5 / WO-377/381
 		// renumbering family). The screen channels themselves must be untouched.
+		const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 		const block = (xml, role) => {
-			const m = xml.match(new RegExp(`<!-- HighAsCG: Caspar channel \\d+: ${role}[\\s\\S]*?</channel>`))
+			const m = xml.match(new RegExp(`<!-- HighAsCG: Caspar channel \\d+: ${esc(role)}[\\s\\S]*?</channel>`))
 			assert.ok(m, `${role} block present`)
 			return m[0]
 		}
-		for (const role of ['Screen 1 program output', 'Screen 1 preview output']) {
+		// Repointed 04.08 (WO-421): the fixed ['Screen 1 program output', 'Screen 1 preview
+		// output'] list assumed plain screen mains. A post-produce default config (owner:
+		// eggs produce resets config deliberately) has ONLY an operator-GUI main, so the old
+		// list made the suite permanently red. Same invariant, asserted on whichever main
+		// channel blocks actually exist in the no-monitor XML.
+		const mains = [...xml1.matchAll(/<!-- HighAsCG: Caspar channel \d+: ((?:Screen \d+ (?:program|preview) output|Operator GUI)[^\n]*?) -->/g)].map((m) => m[1])
+		assert.ok(mains.length > 0, 'at least one main (screen or operator-GUI) channel block present')
+		for (const role of mains) {
 			assert.equal(block(xml2, role), block(xml1, role), `${role} unchanged by monitor enable`)
 		}
 	})

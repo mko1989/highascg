@@ -182,7 +182,11 @@ function buildChannelsSection(config, routeMap) {
 
 	if (plan.streamingChannelDedicatedSlot) setChannelXml(routeMap.streamingCh, buildStreamingChannel(config, routeMap.streamingCh))
 
-	const monitorXml = buildMonitorChannelXml(config, routeMap.monitorCh, plan.screens?.[0]?.dims?.fps)
+	// The solo bus routes from whatever main channels exist — plain screens OR operator-GUI
+	// channels (an operator-gui-only box has plan.screens empty; falling back to 576p2500
+	// against a 50 fps GUI channel re-creates the WO-237 every-other-frame audio chop).
+	const monitorSourceFps = plan.screens?.[0]?.dims?.fps ?? plan.operatorGuis?.[0]?.dims?.fps
+	const monitorXml = buildMonitorChannelXml(config, routeMap.monitorCh, monitorSourceFps)
 	if (monitorXml) setChannelXml(routeMap.monitorCh, monitorXml)
 
 	const usedNums = [...channelXmlByNumber.keys()]

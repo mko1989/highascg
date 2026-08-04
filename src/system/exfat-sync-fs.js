@@ -39,9 +39,19 @@ function walkRelativeFiles(dir, excludePred) {
 
 function copyFilePreserveTimes(src, dst) {
 	fs.mkdirSync(path.dirname(dst), { recursive: true })
-	fs.copyFileSync(src, dst)
-	const st = fs.statSync(src)
-	fs.utimesSync(dst, st.atime, st.mtime)
+	// Tmp+rename, never truncate-in-place (WO-161 discipline, review 03.08 §3): this is the
+	// only writer of live config/*.json outside ConfigManager, and a crash or stick yank
+	// mid-copy must not leave a torn file on either side.
+	const tmp = `${dst}.tmp-${process.pid}`
+	try {
+		fs.copyFileSync(src, tmp)
+		const st = fs.statSync(src)
+		fs.utimesSync(tmp, st.atime, st.mtime)
+		fs.renameSync(tmp, dst)
+	} catch (e) {
+		try { fs.unlinkSync(tmp) } catch {}
+		throw e
+	}
 }
 
 function syncOneFilePair(pathExfat, pathProject, direction, dryRun, pairId, rel, syncOpts) {

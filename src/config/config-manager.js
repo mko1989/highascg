@@ -169,8 +169,34 @@ class ConfigManager extends EventEmitter {
 			return this.config
 		} catch (e) {
 			this.logger.error(`[Config] Failed to load ${this.configPath}: ${e.message}`)
+			// Monolithic file present but unloadable: move it aside before defaults take over —
+			// the next save() would otherwise write defaults straight over a torn-but-recoverable
+			// file (review 03.08 config §1, the corruption amplifier).
+			try {
+				if (fs.existsSync(this.configPath) && fs.statSync(this.configPath).isFile()) {
+					this._quarantineCorruptFile(this.configPath)
+				}
+			} catch {}
 			this.config = finalizeScreenDestinationsConfig({ ...defaults })
 			return this.config
+		}
+	}
+
+	/**
+	 * A config file that EXISTS but failed to parse is moved to `<name>.corrupt-<stamp>`,
+	 * never left in place: save() writes every key unconditionally, so an unquarantined torn
+	 * file is silently replaced by defaults on the next settings change (review 03.08 §1).
+	 * Restore by hand: fix the JSON and rename it back.
+	 * @param {string} file
+	 */
+	_quarantineCorruptFile(file) {
+		try {
+			const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+			const dst = `${file}.corrupt-${stamp}`
+			fs.renameSync(file, dst)
+			this.logger.error(`[Config] Quarantined unparsable config to ${dst} — fix and rename back to recover`)
+		} catch (qe) {
+			this.logger.error(`[Config] Quarantine failed for ${file}: ${qe?.message || qe}`)
 		}
 	}
 
@@ -284,6 +310,7 @@ class ConfigManager extends EventEmitter {
 					}
 				} catch (e) {
 					this.logger.error(`[Config] Failed to load ${filename}: ${e.message}`)
+					this._quarantineCorruptFile(path.join(dir, filename))
 				}
 			}
 		}
@@ -294,6 +321,7 @@ class ConfigManager extends EventEmitter {
 				result.tandemTopology = JSON.parse(raw)
 			} catch (e) {
 				this.logger.error(`[Config] Failed to load tandem_topology.json: ${e.message}`)
+				this._quarantineCorruptFile(path.join(dir, 'tandem_topology.json'))
 			}
 		}
 

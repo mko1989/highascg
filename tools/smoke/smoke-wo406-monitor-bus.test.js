@@ -110,9 +110,12 @@ test('WO-406: client inspector saves the role; solo API keeps the monitorCh fall
 	// persist type portaudio again.
 	assert.match(inspector, /type: monitorChk\.checked \? 'system-audio' : typeSel\.value/, 'monitor save forces system-audio type')
 
-	// The generator call site passes the screens' fps so the monitor mode rate-matches the route sources.
+	// The generator call site passes the mains' fps so the monitor mode rate-matches the route
+	// sources. Repointed 04.08 (WO-421): the fps now falls back to the operator-GUI channel when
+	// there are no plain screens (post-produce default config) — same contract, wider source.
 	const channels = read('src/config/config-generator-channels.js')
-	assert.match(channels, /buildMonitorChannelXml\(config, routeMap\.monitorCh, plan\.screens\?\.\[0\]\?\.dims\?\.fps\)/, 'monitor mode derives from screen fps')
+	assert.match(channels, /plan\.screens\?\.\[0\]\?\.dims\?\.fps \?\? plan\.operatorGuis\?\.\[0\]\?\.dims\?\.fps/, 'monitor mode derives from the mains fps')
+	assert.match(channels, /buildMonitorChannelXml\(config, routeMap\.monitorCh, monitorSourceFps\)/, 'call site uses the resolved fps')
 
 	const routes = read('src/api/routes-audio.js')
 	assert.match(routes, /const monitorCh = previewCh \?\? map\.monitorCh/, 'solo resolves to the monitor channel when audioPreview is off')
