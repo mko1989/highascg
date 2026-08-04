@@ -1,6 +1,6 @@
 # WO-418 — Review 2026-08-03 "fix first" rows 1–5: traversal, AMCP injection, crash-on-error, silent take failure, inverted health flag
 
-**Status: DONE (2026-08-04 — all five implemented; smoke 3/3 + repointed WO-401 smoke; suite 1806/2, the 2 reds are the WO-415 config drift. Server restart required to take effect — pending owner (or next Apply/deploy restart))**
+**Status: DONE (2026-08-04 — all five implemented; smoke 3/3 + repointed WO-401 smoke; suite 1806/2, the 2 reds are the WO-415 config drift. Server restarted 04.08 ~10:30 and the live probe passed: `GET /api/project/file/..%2fconfig%2fgeneral` → 404, was serving the file before the fix)**
 
 Owner: "anything still open? if yes do those" → the review wave's own recommendation
 (`work/reviews/2026-08-03-SUMMARY.md`): "one WO per numbered row, fixing 1–5 before the next
@@ -70,7 +70,7 @@ corrected healthy expression.
 - Suite 1806 pass / 2 fail — the 2 are `smoke-wo237-monitor-channel-cheapest-mode` reading the
   box's still-clobbered `config/` (WO-415, recovery pending owner); they were red before this WO.
 - New smoke 3/3; repointed WO-401 smoke green; 500-line check clean.
-- **NOT verified live** (needs server restart to load the new code): the traversal 404 probe
+- ~~NOT verified live~~ VERIFIED live 04.08 after the restart — traversal probe returned 404. Original note: the traversal 404 probe
   (`GET /api/project/file/..%2fconfig%2fgeneral` should now return not-found) and a
   record-start with a hostile preset. Both are safe read-only/no-op probes to run post-restart.
 - Rows 6–10 of the review summary remain OPEN (autosave latches, dead USB import API,

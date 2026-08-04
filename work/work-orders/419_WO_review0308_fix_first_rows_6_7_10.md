@@ -1,6 +1,6 @@
 # WO-419 — Review 2026-08-03 "fix first" rows 6, 7, 10: autosave latches, dead USB-import API, logs-modal leak
 
-**Status: DONE (2026-08-04 — all three implemented; new smoke 3/3; suite 1809 pass / 2 fail, the 2 reds are the WO-415 config drift, red before this WO. Client rebuilt (`dist-web`) + kiosk reload; server half (row 7) needs the restart already pending from WO-418)**
+**Status: DONE (2026-08-04 — all three implemented; new smoke 3/3; suite 1809/2, reds are the WO-415 config drift. Client rebuilt + kiosk reloaded; server restarted 04.08 and row 7 VERIFIED live: `GET /api/usb/drives` → 200 `{ok:true,...}`, was 404)**
 
 Owner handed back the open-items list from the WO-418 session ("still open after this…"), which
 included "rows 6, 7, and 10" as the batch offered for this session. Rows 8–9 (exFAT
@@ -80,8 +80,7 @@ three latch exits, and the toggle-close path.
 - 500-line gate clean (logs-modal split), unwired-exports baseline shrunk with `--update`
   (693→691: the deleted latch exit + `ACTIVE_SLUG_KEY`, wired by WO-418's smoke).
 - Client rebuilt to `dist-web` and kiosk reloaded (F5) — rows 6/10 are live on the box.
-- **NOT verified live** (row 7 needs the server restart already pending from WO-418):
-  `GET /api/usb/drives` should answer 200 post-restart (was 404). Safe read-only probe.
+- Row 7 VERIFIED live 04.08 post-restart: `GET /api/usb/drives` → 200 `{ok:true,drives:[],unmounted:[]}` (was 404).
 - Rows 8–9 (exFAT staleness/atomicity + config-load defaults amplifier — WO-415 hardening
   options), the auth-off exposure note, and engine §3 (batch double-execution) remain open on
   owner decisions.
