@@ -149,7 +149,17 @@ else
 fi
 
 echo "==> 4/5 Seed drop-update/ (dist-web + server for live UI on stick boot)"
-bash "${HERE}/seed-stick-drop-update-from-host.sh" "$DEV"
+# WO-434: an embed-server ISO already carries the identical tree in the squashfs — a
+# seeded same-version drop adds nothing to a fresh stick but becomes a downgrade
+# grenade once the stick ages (insert applies its old drop over any box, incl. the
+# build host mid-produce, WO-433 addendum). Seed only when the squashfs has no server
+# (WO-47 exFAT-only) or when explicitly making a sneakernet update stick.
+if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "0" || "${HIGHASCG_SEED_DROP_UPDATE:-0}" == "1" ]]; then
+	bash "${HERE}/seed-stick-drop-update-from-host.sh" "$DEV"
+else
+	echo "    skip: embed-server ISO already contains the server (WO-434)."
+	echo "    Set HIGHASCG_SEED_DROP_UPDATE=1 to seed anyway (sneakernet update stick)."
+fi
 
 echo "==> 5/5 Verify boot layout"
 bash "${HERE}/usb-restore-esp-flags.sh" "$DEV"

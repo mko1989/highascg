@@ -2,7 +2,13 @@
 # test-04-drop-update.sh — validate drop-update/ shape (no apply)
 st_section "04 drop-update/ (read-only validate)"
 if [[ ! -d "$DROP" ]]; then
-	st_fail "missing ${DROP}/"
+	# WO-434: embed-server sticks ship no drop on purpose — the squashfs carries the
+	# server. Only fail when the playout tree is ALSO missing (nothing would run).
+	if [[ -f "${PLAYOUT}/index.js" ]]; then
+		st_ok "no drop-update/ (embed-server stick, WO-434) — server present in squashfs"
+		return 0 2>/dev/null || exit 0
+	fi
+	st_fail "missing ${DROP}/ and no embedded server at ${PLAYOUT}/index.js"
 else
 	st_ok "drop-update/ directory exists"
 fi

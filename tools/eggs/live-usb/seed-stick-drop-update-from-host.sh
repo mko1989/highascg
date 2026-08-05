@@ -59,6 +59,23 @@ ensure_dist_web() {
 rsync_drop_members() {
 	local dest="$1"
 	mkdir -p "$dest"
+	local on_exfat=0
+	findmnt -T "$dest" -no FSTYPE 2>/dev/null | grep -qxF exfat && on_exfat=1
+	# exFAT stores no Unix ownership/perms/symlinks — -a's chown/chmod aborts rsync
+	# (code 23); --modify-window covers exFAT's coarse mtime granularity.
+	local rs=(rsync -a)
+	[[ "$on_exfat" -eq 1 ]] && rs=(rsync -rLt --modify-window=2)
+	# Machine-local config must not ride a stick onto another box (set mirrors
+	# MACHINE_LOCAL_JSON in tools/ci/write-repo-default-config.js);
+	# --delete-excluded scrubs copies left behind by earlier seeds.
+	local config_filter=(
+		--exclude=exfat-sync.json
+		--exclude=hardware-identity.json
+		--exclude=replication-local-identity.json
+		--exclude=tailscale.json
+		--exclude=.highascg-state.json
+		--delete-excluded
+	)
 	local members=(index.js package.json package-lock.json src config template scripts tools/runtime dist-web)
 	local m src parent
 	for m in "${members[@]}"; do
@@ -67,14 +84,18 @@ rsync_drop_members() {
 		if [[ -d "$src" ]]; then
 			parent="$(dirname "$m")"
 			[[ "$parent" != "." ]] && mkdir -p "${dest}/${parent}"
-			rsync -a --delete "${src%/}/" "${dest}/${m}/"
+			if [[ "$m" == config ]]; then
+				"${rs[@]}" --delete "${config_filter[@]}" "${src%/}/" "${dest}/${m}/"
+			else
+				"${rs[@]}" --delete "${src%/}/" "${dest}/${m}/"
+			fi
 		else
-			rsync -a "$src" "${dest}/"
+			"${rs[@]}" "$src" "${dest}/"
 		fi
 	done
 	if [[ -f "${REPO_ROOT}/BUILD_STAMP" ]]; then
 		# exFAT cannot store Unix ownership — skip -o/-g on that filesystem.
-		if findmnt -T "$dest" -no FSTYPE 2>/dev/null | grep -qxF exfat; then
+		if [[ "$on_exfat" -eq 1 ]]; then
 			install -m 0644 "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
 		else
 			install -m 0644 -o root -g root "${REPO_ROOT}/BUILD_STAMP" "${dest}/BUILD_STAMP"
