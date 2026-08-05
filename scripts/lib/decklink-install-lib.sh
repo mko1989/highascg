@@ -56,12 +56,16 @@ decklink_both_packages_installed_at_least() {
 }
 
 # Prints vendor …/decklink directories, one per line: GUI-uploaded local dir first (WO-427 —
-# the Settings upload saves there, no stick required), then mounted USB exFAT, then bridge.
+# the Settings upload saves there, no stick required), then the operator's Downloads
+# (WO-433 — the package is usually downloaded ON the box; no upload round-trip needed;
+# ~/Downloads never ships in ISOs, WO-429), then mounted USB exFAT, then bridge.
 decklink_vendor_search_dirs() {
 	local mp
-	if [[ -d /home/casparcg/highascg/vendor/decklink ]]; then
-		printf '%s\n' /home/casparcg/highascg/vendor/decklink
-	fi
+	for mp in /home/casparcg/highascg/vendor/decklink /home/casparcg/Downloads; do
+		if [[ -d "$mp" ]]; then
+			printf '%s\n' "$mp"
+		fi
+	done
 	for mp in /home/casparcg/exfat /home/casparcg/bridge; do
 		if mountpoint -q "$mp" 2>/dev/null && [[ -d "${mp}/decklink" ]]; then
 			printf '%s\n' "${mp}/decklink"
@@ -253,7 +257,15 @@ decklink_ensure_dkms_prereqs() {
 			return 1
 		}
 	if ! decklink_kernel_headers_ready "$krel"; then
-		echo "ERROR: ${hdr_pkg} installed but /lib/modules/${krel}/build still missing" >&2
+		# WO-433: eggs clones ship a dpkg status that CLAIMS the headers are installed
+		# while usr/src was excluded from the squashfs — plain install is a no-op
+		# ("already the newest version") and the build tree stays missing. --reinstall
+		# restores the files; the base (non-generic) package holds most of the tree.
+		local hdr_base="${hdr_pkg%-generic}"
+		apt-get install --reinstall -y --no-install-recommends "${hdr_base}" "${hdr_pkg}" || true
+	fi
+	if ! decklink_kernel_headers_ready "$krel"; then
+		echo "ERROR: ${hdr_pkg} present in dpkg but /lib/modules/${krel}/build still missing — phantom install from an eggs clone; reinstall needs working apt network" >&2
 		return 1
 	fi
 	return 0

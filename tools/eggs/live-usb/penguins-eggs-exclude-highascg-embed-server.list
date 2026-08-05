@@ -9,9 +9,13 @@ swapfile
 usr/lib/penguins-eggs
 usr/lib/penguins-eggs/*
 
-# Kernel/NVIDIA headers — build host only
-usr/src
-usr/src/*
+# Driver source trees — rebuilt from their packages, never read at playout runtime.
+# usr/src is otherwise SHIPPED (WO-433): the linux-headers trees live here and the
+# DeckLink desktopvideo postinst runs a DKMS build at GUI-install time — a blanket
+# usr/src exclude left clones with dpkg CLAIMING headers while /lib/modules/*/build
+# dangled, and apt "already the newest version" could not heal it offline.
+usr/src/nvidia-*
+usr/src/blackmagic-*
 
 opt/nvidia-pool
 opt/nvidia-pool/*
@@ -118,7 +122,7 @@ home/casparcg/caspar-build
 home/casparcg/caspar-build/*
 
 # Boost headers — CasparCG *compile-time* only (183M measured in shipped tree).
-# Kernel headers for DKMS live in usr/src (already excluded above); usr/include
+# (Kernel headers in usr/src DO ship — WO-433, DeckLink DKMS.) usr/include/boost
 # is C/C++ dev headers and is not read by anything at playout runtime.
 usr/include/boost
 usr/include/boost/*

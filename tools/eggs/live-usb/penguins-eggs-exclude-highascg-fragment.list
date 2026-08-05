@@ -10,8 +10,10 @@ usr/lib/penguins-eggs
 usr/lib/penguins-eggs/*
 
 # Kernel/NVIDIA headers — build host only
-usr/src
-usr/src/*
+# WO-433: usr/src ships (linux-headers for DeckLink DKMS at GUI-install time);
+# only driver source trees are masked — see the embed-server fragment note.
+usr/src/nvidia-*
+usr/src/blackmagic-*
 
 # Multi-branch NVIDIA deb cache (removed — one driver baked per ISO)
 opt/nvidia-pool

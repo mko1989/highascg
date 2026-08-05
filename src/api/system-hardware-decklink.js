@@ -35,6 +35,8 @@ function checkDecklinkVendorAvailable() {
 		// WO-427: GUI-uploaded packages land here (no stick required) — keep in sync with
 		// decklink_vendor_search_dirs in scripts/lib/decklink-install-lib.sh.
 		'/home/casparcg/highascg/vendor/decklink',
+		// WO-433: the package is usually downloaded ON the box — no upload round-trip.
+		'/home/casparcg/Downloads',
 		'/home/casparcg/exfat/decklink',
 		'/home/casparcg/bridge/decklink',
 	]

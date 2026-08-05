@@ -126,7 +126,9 @@ export async function refreshDecklinkPanel(modal) {
 		const installBtn = modal.querySelector('#decklink-install-btn')
 		if (installBtn) {
 			installBtn.disabled = !r?.vendorAvailable
-			installBtn.title = r?.vendorAvailable ? 'Install DeckLink from USB' : 'No vendor files available'
+			installBtn.title = r?.vendorAvailable
+				? 'Install the staged Desktop Video package'
+				: 'No Desktop Video package found — put the Blackmagic tar.gz in Downloads on this machine, or upload it here'
 		}
 	} catch (e) {
 		summary.textContent = e?.message || String(e)

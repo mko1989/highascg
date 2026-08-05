@@ -309,6 +309,15 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing linux-headers-${kver} in squashfs — run install-kernel-headers-for-dkms-iso.sh before produce"
 	fi
+	# WO-433: the dpkg-status grep above is phantom-blind — clones shipped a status
+	# CLAIMING headers while a blanket usr/src exclude stripped the actual tree and the
+	# DeckLink GUI install died on "/lib/modules/<kver>/build still missing". Check the
+	# real files too.
+	if squash_has_path "usr/src/linux-headers-${kver}/Makefile"; then
+		ok "present: usr/src/linux-headers-${kver} FILES in squashfs (not just dpkg status)"
+	else
+		bad "linux-headers-${kver} files missing from squashfs (dpkg status may still claim them, WO-433) — remove any usr/src exclude and re-run install-kernel-headers-for-dkms-iso.sh"
+	fi
 	if unsquashfs -cat "$SQ" etc/calamares/modules/before_bootloader_context.conf 2>/dev/null \
 		| grep -q 'grub-pc'; then
 		ok "present: before_bootloader_context installs grub-pc on BIOS firmware"
