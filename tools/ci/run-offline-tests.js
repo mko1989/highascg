@@ -58,6 +58,7 @@ const FILES = [
 	'tools/smoke/smoke-wo425-427-audio-fps-decklink.test.js',
 	'tools/smoke/smoke-wo428-decklink-detect-gated.test.js',
 	'tools/smoke/smoke-wo429-iso-secrets-excluded.test.js',
+	'tools/smoke/smoke-wo430-decklink-kernel-module-excluded.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',

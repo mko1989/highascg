@@ -34,3 +34,12 @@ lib/modules/*/updates/dkms/blackmagic.ko*
 lib/modules/*/updates/dkms/blackmagic-io.ko*
 lib/modules/*/updates/dkms/snd_blackmagic-io.ko*
 usr/src/blackmagic-*
+
+# WO-430: merged-usr — /lib and /lib/udev are symlinks to usr/lib; mksquashfs stores
+# the real files ONLY under usr/lib/..., so the anchored lib/... lines above never
+# match them. Without these, the DKMS kernel modules ship and autoload on install
+# (PCI modalias), creating /dev/blackmagic/io* on "driver-free" ISOs.
+usr/lib/modules/*/updates/dkms/blackmagic.ko*
+usr/lib/modules/*/updates/dkms/blackmagic-io.ko*
+usr/lib/modules/*/updates/dkms/snd_blackmagic-io.ko*
+usr/lib/udev/rules.d/55-blackmagic.rules

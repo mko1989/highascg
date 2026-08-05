@@ -351,13 +351,22 @@ if [[ "${HIGHASCG_ISO_FORBID_DECKLINK:-1}" == "1" ]]; then
 	for needle in \
 		'usr/lib/blackmagic' \
 		'var/lib/dkms/blackmagic' \
-		'lib/udev/rules.d/55-blackmagic.rules'; do
+		'lib/udev/rules.d/55-blackmagic.rules' \
+		'usr/lib/udev/rules.d/55-blackmagic.rules'; do
 		if squash_has_tree "$needle"; then
 			bad "DeckLink path in squashfs (WO-92): ${needle} — merge penguins-eggs-exclude-decklink.list and rebuild"
 		else
 			ok "absent (DeckLink): ${needle}"
 		fi
 	done
+	# WO-430: merged-usr real path of the DKMS modules — lib/modules/* excludes never
+	# matched (lib is a symlink), so the kernel driver shipped and autoloaded on
+	# "driver-free" ISOs (found live on a fresh install: 16.2a1 loading, /dev/blackmagic/io0-3).
+	if squash_grep_list '^squashfs-root/usr/lib/modules/[^/]+/updates/dkms/(snd_)?blackmagic' 'usr/lib/modules'; then
+		bad "DeckLink DKMS kernel module in squashfs (WO-430): usr/lib/modules/*/updates/dkms/blackmagic* — merged-usr paths missing from penguins-eggs-exclude-decklink.list"
+	else
+		ok "absent (DeckLink): usr/lib/modules/*/updates/dkms/blackmagic*"
+	fi
 else
 	ok "HIGHASCG_ISO_FORBID_DECKLINK=0 — skip DeckLink squashfs absence checks"
 fi
