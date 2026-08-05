@@ -41,6 +41,16 @@ test('WO-433: ISO verifier checks the real header FILES, not just dpkg status', 
 		v.includes('usr/src/linux-headers-${kver}/Makefile'),
 		'verifier asserts the header tree files exist in the squashfs'
 	)
+	// The 13:46 produce on 05.08 failed on a leftover absence entry for the base
+	// header tree — headers ship on purpose now; only driver source trees stay out.
+	assert.ok(
+		!v.includes("'usr/src/linux-headers-6.8.0-117'"),
+		'verifier must not list the header tree as an unexpected path'
+	)
+	assert.ok(
+		v.includes('usr/src/(nvidia|blackmagic)'),
+		'verifier still forbids driver source trees under usr/src'
+	)
 })
 
 test('WO-433: installer self-heals phantom header packages with apt --reinstall', () => {

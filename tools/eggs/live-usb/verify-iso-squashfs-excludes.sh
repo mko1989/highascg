@@ -140,10 +140,12 @@ else
 	ok "no config/*.bak* or *copy*.config in squashfs"
 fi
 
+# NOTE: usr/src/linux-headers-* is NOT in this list — headers ship on purpose since
+# WO-433 (DeckLink DKMS at GUI-install time); only driver SOURCE trees stay masked,
+# checked separately below.
 for needle in \
 	'home/casparcg/highascg/.git' \
 	'usr/lib/penguins-eggs' \
-	'usr/src/linux-headers-6.8.0-117' \
 	'home/casparcg/.antigravity-ide-server'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"
@@ -151,6 +153,13 @@ for needle in \
 		ok "absent: ${needle}"
 	fi
 done
+
+# WO-433: headers ship, but driver SOURCE trees must not (fragments mask them).
+if squash_grep_list '^squashfs-root/usr/src/(nvidia|blackmagic)'; then
+	bad "driver source tree in squashfs (WO-433): usr/src/nvidia-*|blackmagic-* — check fragment merge"
+else
+	ok "absent: usr/src/{nvidia,blackmagic}-* source trees"
+fi
 
 # WO-47 exFAT-only server omits node_modules; embed-server ISO keeps production deps.
 if [[ "${HIGHASCG_ISO_EMBED_SERVER:-1}" == "0" ]]; then
