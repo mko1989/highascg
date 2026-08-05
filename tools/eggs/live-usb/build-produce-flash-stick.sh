@@ -67,11 +67,30 @@ done
 	exit 1
 }
 
+REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
+
 BUILD_START_EPOCH=0
 if "$DO_BUILD"; then
 	BUILD_START_EPOCH=$(date +%s)
+	# WO-432: stamp the produce so Updates shows the ISO build date. Without this,
+	# clones report the ancient package.json-era .highascg-build-stamp (2026.05.20) —
+	# only the GitHub-release flow ever wrote BUILD_STAMP, never eggs produce.
+	# BUILD_STAMP outranks the legacy file (src/system/build-stamp.js) and is
+	# deliberately NOT in the eggs exclude fragments, so it rides into the squashfs.
+	PRODUCE_STAMP="$(date -u +%Y-%m-%d_%H%M%S)"
+	echo "$PRODUCE_STAMP" >"${REPO_ROOT}/BUILD_STAMP"
+	chown --reference="$REPO_ROOT" "${REPO_ROOT}/BUILD_STAMP" 2>/dev/null || true
+	echo "==> BUILD_STAMP=${PRODUCE_STAMP}"
 	echo "==> Phase 1/2: eggs produce (BASENAME=${BASENAME})"
 	bash "$BUILD_SCRIPT"
+	echo
+	# WO-432 (owner 05.08): install-iso-defaults.sh prunes the LIVE repo's node_modules
+	# to production for the squashfs — restore the dev tree immediately (not after the
+	# flash phase, so --build-only and a failed flash still leave the box usable).
+	echo "==> npm install (restore dev+optional node_modules after produce prune)"
+	repo_user="$(stat -c %U "$REPO_ROOT")"
+	runuser -u "$repo_user" -- bash -c "cd '$REPO_ROOT' && npm install --include=optional --no-audit --no-fund" \
+		|| echo "WARN: node_modules restore failed — run 'npm install --include=optional' in $REPO_ROOT as $repo_user" >&2
 	echo
 fi
 

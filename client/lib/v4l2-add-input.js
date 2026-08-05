@@ -23,7 +23,7 @@ export function pickV4l2SlotForDevice(ui, device) {
 		if (!String(ui.slots[i - 1] || '').trim()) return { slot: i, count: ui.count, slots: [...ui.slots] }
 	}
 	if (ui.count >= V4L2_MAX_SLOTS) {
-		throw new Error(`Maximum ${V4L2_MAX_SLOTS} USB video inputs — remove one in Settings → USB video`)
+		throw new Error(`Maximum ${V4L2_MAX_SLOTS} USB video inputs — remove one from its input tile in the device view`)
 	}
 	const count = ui.count + 1
 	const slots = [...ui.slots]
