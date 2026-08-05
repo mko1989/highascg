@@ -28,12 +28,22 @@ decklink_pkg_installed_version() {
 	printf '%s' "$v"
 }
 
+# WO-431: eggs clones ship the build host's dpkg STATUS entry (a single record cannot
+# be excluded from var/lib/dpkg/status) while the WO-92/430 fragment masks every payload
+# file — so on a fresh install dpkg-query reports desktopvideo as installed when nothing
+# is on disk (phantom install, GUI Install button answered "already installed"). Trust
+# dpkg only when the helper binary the fragment masks actually exists.
+decklink_payload_present() {
+	[[ -e /usr/lib/blackmagic/DesktopVideo/DesktopVideoHelper ]]
+}
+
 decklink_both_packages_installed_at_least() {
 	local target_ver="${1:-}"
 	local v_main v_gui
 	[[ -n "$target_ver" ]] || return 1
 	v_main="$(decklink_pkg_installed_version desktopvideo || true)"
 	[[ -n "$v_main" ]] || return 1
+	decklink_payload_present || return 1
 	if ! decklink_version_gte "$v_main" "$target_ver"; then
 		return 1
 	fi

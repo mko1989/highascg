@@ -86,6 +86,7 @@ test('decklink_needs_install_from_vendor skips when dpkg reports installed versi
 				*) return 1 ;;
 			esac
 		}
+		decklink_payload_present() { return 0; }
 		reason=""
 		if decklink_needs_install_from_vendor reason; then
 			echo "NEEDS_INSTALL:$reason"
@@ -94,6 +95,35 @@ test('decklink_needs_install_from_vendor skips when dpkg reports installed versi
 		fi
 	`)
 	assert.match(out.trim(), /^SKIP:already installed/)
+})
+
+// WO-431: eggs clones carry the build host's dpkg status entry while the fragment masks
+// the payload — a dpkg version alone must NOT count as installed.
+test('decklink_needs_install_from_vendor installs on a phantom dpkg entry (payload missing)', () => {
+	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'decklink-phantom-'))
+	const deck = path.join(tmp, 'decklink')
+	fs.mkdirSync(deck)
+	fs.writeFileSync(path.join(deck, 'desktopvideo_16.0.1a2_amd64.deb'), '')
+	fs.writeFileSync(path.join(deck, 'desktopvideo-gui_16.0.1a2_amd64.deb'), '')
+
+	const out = bashEval(`
+		source "${LIB}"
+		decklink_vendor_search_dirs() { echo "${deck}"; }
+		decklink_pkg_installed_version() {
+			case "$1" in
+				desktopvideo|desktopvideo-gui) echo "16.0.1a2" ;;
+				*) return 1 ;;
+			esac
+		}
+		decklink_payload_present() { return 1; }
+		reason=""
+		if decklink_needs_install_from_vendor reason; then
+			echo "NEEDS_INSTALL:$reason"
+		else
+			echo "SKIP:$reason"
+		fi
+	`)
+	assert.match(out.trim(), /^NEEDS_INSTALL:install or upgrade/)
 })
 
 test('decklink_needs_install_from_vendor wants install when vendor is newer', () => {

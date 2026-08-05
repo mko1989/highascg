@@ -1,6 +1,6 @@
 # WO-430 — "Driver-free" ISOs ship the DeckLink kernel module (merged-usr exclude miss)
 
-**Status: DONE (2026-08-05 — fragment + verifier + smoke fixed and green; squashfs-level proof lands at the next produce, see Owner QA)**
+**Status: DONE (2026-08-05 — fragment + verifier + smoke green; squashfs-PROVEN same day: the 10:32 produce (`highascg-nvidia-595_amd64_2026-08-05_1032.iso`) passed the full verifier incl. `absent (DeckLink): usr/lib/modules/*/updates/dkms/blackmagic*`)**
 
 Owner 05.08: "on the second machine that i installed the iso just now, again the decklink
 card displays in the devices tab even though the drivers are not installed" (box 192.168.0.34).
@@ -73,8 +73,10 @@ on 192.168.0.34 (owner's call, see QA).
 
 ## Owner QA / actions
 
-- [ ] Next produce: run `verify-iso-squashfs-excludes.sh` — expect
-      `ok "absent (DeckLink): usr/lib/modules/*/updates/dkms/blackmagic*"`.
+- [x] Next produce: verified 05.08 — the owner's 10:32 produce passed the full verifier
+      (`absent (DeckLink): usr/lib/modules/*/updates/dkms/blackmagic*`, gh token / history /
+      vendor also clean). NOTE: that ISO predates the WO-431 lib fix, so fresh installs
+      from it still need the WO-431 one-liner before GUI driver install.
 - [ ] Every ISO produced to date ships the kernel module (16.2a1 on the latest). If
       EULA-cleanliness of already-burned sticks matters, re-produce after this fix.
 - [ ] The second box (192.168.0.34) currently runs the leaked module. Options: leave it
