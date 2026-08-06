@@ -41,3 +41,13 @@ use the layout editor to review."*
 - Owner QA: drag a socket one slot — it must land there on the first try; the "Detected GPU
   wiring differs" banner must clear after reload (service restart pending in batch tail)
   and stay gone for reorders of the same jacks.
+
+## 4. Round 2 (06.08 later): "in the inspector it needs rearranging a second time"
+
+Owner follow-up (todos06.08 line 28): rear panel reordered on first drag, the editor list
+did not. The drop handler mutated `customGpuItems` and saved, but never called
+`renderList()` — and `load()` refreshes the rear panel while the inspector DOM stays
+(`restoreInspector` defaults false), so the list kept its pre-drag order until a second
+rearrange forced a re-render. `renderList()` now runs synchronously after the splice (and
+after `triggerChange` pair edits, which had the same stale-label symptom).
+

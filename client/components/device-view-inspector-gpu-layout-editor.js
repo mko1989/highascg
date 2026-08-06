@@ -214,6 +214,11 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 				if (insertAt === dragIdx) return
 				const draggedItem = customGpuItems.splice(dragIdx, 1)[0]
 				customGpuItems.splice(insertAt, 0, draggedItem)
+				/* Re-render THIS list immediately: load() refreshes the rear panel but the
+				 * inspector DOM stays (restoreInspector defaults false), so without this the
+				 * editor kept showing the pre-drag order until a second rearrange forced it
+				 * (todos06.08 line 28). */
+				renderList()
 				saveAndRefresh()
 			})
 
@@ -258,6 +263,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 						? 'edp'
 						: 'dp'
 				item.hidden = hideIn.checked
+				renderList()
 				saveAndRefresh()
 			}
 

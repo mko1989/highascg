@@ -52,3 +52,19 @@ CAPS SUBSCRIPTIONS=0 NONSQUARE=1 BITMAP_FORMATS="rgb,png,webp"
   `reason:"subscriptions_disabled"` + actionable hint — matches the netcat ground truth.
 - Owner QA after enabling Button Subscriptions API in Companion: settings shows previews
   available; picker fills with button images. Until then: blank-but-clickable grid.
+
+## 4. Round 2 (06.08 later): "the companion button chooser modal does not open at all now"
+
+Owner follow-up (todos06.08 lines 29-31). Two compounding finds:
+1. `inspector-panel-timeline-flag.js` DISABLED the "Choose button…" button whenever
+   `/api/companion/button-preview/status` said `subscriptions_disabled` — and round 1 made
+   that status truthful (the preview client now lingers connected with the real CAPS bit),
+   so the disable started firing. Button no longer disables; tooltip explains previews.
+2. The round-1 "blind grid" branch was UNREACHABLE in production: the subscribe route
+   answers **503** and `api.post` THROWS on non-2xx, so `!sub.ok` never ran — the catch
+   branch showed the old dead-end. The catch now renders the blind grid too (reason-aware
+   message via `err.reason`).
+
+Verified: eslint clean, suite green, built + deployed. Owner QA: "Choose button…" in the
+companion_press flag inspector opens a clickable 8×8 grid with the warning line.
+

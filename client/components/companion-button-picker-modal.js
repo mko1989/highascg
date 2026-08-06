@@ -205,14 +205,19 @@ export function openCompanionButtonPickerModal(opts = {}) {
 			const st = await waitForPagePreviews(page)
 			renderGrid(st.cells || [])
 		} catch (e) {
+			/* The subscribe route answers 503 (with reason/hint in the body) when previews are
+			 * unavailable, and api.post THROWS on non-2xx — so the !sub.ok branch above never
+			 * sees it. Same story here: render the blind grid, picking needs no previews. */
+			renderGrid([])
 			statusEl.classList.add('companion-picker-status--warn')
 			const msg = e?.message || String(e)
 			const friendly =
 				/crypto\.randomUUID|secure context/i.test(msg)
 					? 'Browser blocked session id on HTTP — rebuild client (server assigns session id now).'
-					: msg
-			statusEl.textContent = `Preview unavailable: ${friendly} Check HighAsCG server is running and Companion Satellite is enabled.`
-			gridEl.innerHTML = ''
+					: e?.reason === 'subscriptions_disabled'
+						? 'Enable Button Subscriptions API in Companion Settings (not only the Satellite server).'
+						: msg
+			statusEl.textContent = `Previews unavailable: ${friendly} You can still click a cell to bind it.`
 		}
 	}
 

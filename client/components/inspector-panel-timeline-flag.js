@@ -324,9 +324,12 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 		previewStatus.textContent =
 			st?.hint ||
 			'Companion button preview unavailable. Enable Satellite + Button Subscriptions API in Companion Settings.'
+		/* WO-450/452: do NOT disable the picker — a binding is just page/row/column and the
+		 * modal now renders a clickable blind grid without previews. Disabling here is what
+		 * read as "the chooser does not open at all" once the status started truthfully
+		 * reporting subscriptions_disabled (todos06.08 line 29). */
 		if (st?.reason === 'subscriptions_disabled') {
-			pickBtn.disabled = true
-			pickBtn.title = 'Enable Button Subscriptions API in Companion Settings'
+			pickBtn.title = 'Previews need Button Subscriptions API in Companion Settings — picking works without them'
 		}
 	}).catch(() => {
 		if (previewStatus.isConnected) {
