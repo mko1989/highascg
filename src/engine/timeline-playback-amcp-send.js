@@ -132,7 +132,19 @@ module.exports = {
 					const atEntry = transportStale && !force
 					const transportOpts = { atEntry, channel: ch, physicalLayer: caspLayer }
 					const meta = clipTransportMeta(clip, ms, tl, self, transportOpts)
-					const needsFullTransport = transportStale || (force && playing)
+					/* Extending a clip past its media length mid-air flips implicitLoop (same for a
+					 * clip.loop toggle), but none of the timelineClipTransportStale fields change —
+					 * Caspar was started without LOOP and blanks at file end while the engine still
+					 * thinks the clip is active (todos06.08). Re-send the transport when the loop
+					 * requirement changes on a playing timeline. */
+					const loopStale =
+						playing &&
+						!!prev &&
+						!transportStale &&
+						prev.clipId === clip.id &&
+						((prev.implicitLoop ?? false) !== !!meta.implicitLoop ||
+							(prev.loopClip ?? false) !== !!meta.loopClip)
+					const needsFullTransport = transportStale || loopStale || (force && playing)
 					const needsScrubSeek =
 						force &&
 						prev?.clipId === clip.id &&
@@ -198,6 +210,8 @@ module.exports = {
 							audioRoute: clipAudioRoute(clip),
 							loopAlways: !!clip.loopAlways,
 							isRoute: meta.isRoute,
+							implicitLoop: !!meta.implicitLoop,
+							loopClip: !!meta.loopClip,
 							frame: transportSent ? meta.frame : (prev?.frame ?? meta.frame),
 						})
 					} else if (playing && !force && prev?.clipId === clip.id) {
