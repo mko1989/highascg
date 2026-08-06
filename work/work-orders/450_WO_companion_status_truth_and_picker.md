@@ -68,3 +68,24 @@ Owner follow-up (todos06.08 lines 29-31). Two compounding finds:
 Verified: eslint clean, suite green, built + deployed. Owner QA: "Choose button…" in the
 companion_press flag inspector opens a clickable 8×8 grid with the warning line.
 
+## 5. Round 3 (06.08 later): "still Cannot reach Companion Satellite … even though it is always on"
+
+Owner enabled Button Subscriptions (live handshake now `CAPS SUBSCRIPTIONS=1`) but the flag
+inspector still showed "Cannot reach Companion Satellite at 127.0.0.1:16622". Two defects:
+
+1. **One-shot reconnect chain**: `_onClose` arms exactly one retry; toggling the setting
+   restarted Companion's satellite listener, the single retry landed while it was still
+   down, and the client stayed disconnected FOREVER while holding 61 subscription refs
+   (observed live: `satelliteConnected:false, subscriptions:61`). `_ensureConnected` now
+   re-arms the retry while refs are held.
+2. **`/api/companion/button-preview/status` echoed the passive client** (the same lie class
+   as round 1's other endpoint): it now live-probes the handshake when the passive client
+   claims not-connected, reports the probe's truth, and nudges a real reconnect
+   (`ensureReconnected`).
+
+Verified LIVE end-to-end after restart: status `satelliteConnected:true,
+subscriptionsSupported:true`; page-1 subscribe → `ok:true, 64 cells`; **64/64 previews
+ready**, button jpg served (1180 B); `previewAvailable:true, subs:64`. Smoke extended (r3
+stuck-refs reconnect test), 5/5. Note for the record (owner): button PRESSES never needed
+the Subscriptions API — only previews do; the picker also works blind without it.
+

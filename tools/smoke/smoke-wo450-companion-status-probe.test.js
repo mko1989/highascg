@@ -59,6 +59,27 @@ test('WO-450: silent server (no CAPS) still reports connected with unknown capab
 	assert.equal(r.subscriptionsSupported, null)
 })
 
+test('WO-450 r3: ensureReconnected revives a client stuck with refs but no socket', async () => {
+	const { server, port } = await mockSatellite((s) => {
+		s.write(BEGIN)
+		s.write('CAPS SUBSCRIPTIONS=1\n')
+	})
+	const client = new SatellitePreviewClient()
+	client.configure({ companion: { satelliteEnabled: true, satelliteHost: '127.0.0.1', satellitePort: port } })
+	/* Simulate the todos06.08 stuck state: subscriptions held, connection long dead,
+	 * reconnect chain expired. */
+	client._refs.set('1/0/0', { count: 1, page: 1, row: 0, column: 0 })
+	assert.equal(client.getStatus().satelliteConnected, false, 'starts disconnected')
+	try {
+		const ok = await client.ensureReconnected()
+		assert.equal(ok, true, 'nudge must reconnect while the satellite is reachable')
+		assert.equal(client.getStatus().satelliteConnected, true)
+	} finally {
+		client.shutdown()
+		server.close()
+	}
+})
+
 test('WO-450: ensureSubscribed survives CAPS arriving after BEGIN (the picker race)', async () => {
 	const received = []
 	const { server, port } = await mockSatellite((s) => {

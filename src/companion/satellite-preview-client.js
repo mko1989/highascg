@@ -233,7 +233,24 @@ class SatellitePreviewClient extends EventEmitter {
 		})
 		this._connecting = false
 		if (!this._connected) await this._waitReady(3000)
+		/* WO-450 round 3: _onClose arms exactly ONE retry — if that attempt lands while
+		 * Companion's satellite listener is itself restarting (e.g. right after toggling
+		 * Button Subscriptions), the chain died and the held subscriptions stayed
+		 * disconnected forever. Re-arm while anyone still holds refs. */
+		if (!this._connected && !this._intentionalClose && this._refs.size > 0 && !this._reconnectTimer) {
+			this._reconnectTimer = setTimeout(() => {
+				this._reconnectTimer = null
+				void this._ensureConnected()
+			}, RECONNECT_MS)
+		}
 		return this._connected
+	}
+
+	/** Public reconnect nudge (status route): connect now when enabled and down. */
+	ensureReconnected() {
+		if (!this._config?.satelliteEnabled) return Promise.resolve(false)
+		if (this._connected) return Promise.resolve(true)
+		return this._ensureConnected()
 	}
 
 	_waitCaps(ms) {

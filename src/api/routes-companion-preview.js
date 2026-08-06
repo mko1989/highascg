@@ -37,10 +37,36 @@ async function handleGet(path, ctx) {
 	if (path === '/api/companion/button-preview/status') {
 		const client = getSatellitePreviewClient()
 		client.configure(ctx.config)
+		let st = client.getStatus()
+		/* WO-450 round 3: the passive client is disconnected whenever idle (or when its one
+		 * reconnect attempt raced a Companion restart), so its "cannot reach" hint lied while
+		 * the satellite was UP (todos06.08 lines 33-38). When it claims not-connected, verify
+		 * with a live handshake probe and report THAT truth; also nudge a real reconnect when
+		 * subscriptions are being held. */
+		if (st.ok && !st.satelliteConnected) {
+			const { probeCompanionTcp } = require('./companion-connection-status')
+			const probe = await probeCompanionTcp(st.satelliteHost, st.satellitePort, 2000)
+			if (probe.connected) {
+				void client.ensureReconnected()
+				st = {
+					...st,
+					satelliteConnected: true,
+					subscriptionsSupported: probe.subscriptionsSupported === true,
+					previewAvailable: false,
+					reason: probe.subscriptionsSupported === false ? 'subscriptions_disabled' : 'satellite_reconnecting',
+					hint:
+						probe.subscriptionsSupported === false
+							? st.hint && /Subscriptions/i.test(st.hint)
+								? st.hint
+								: 'In Companion Settings, enable Button Subscriptions API for previews.'
+							: 'Companion Satellite reachable — reconnecting; previews resume on the next picker open.',
+				}
+			}
+		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,
-			body: jsonBody(client.getStatus()),
+			body: jsonBody(st),
 		}
 	}
 
