@@ -22,6 +22,22 @@ const ROUTING_EXTRA_KEYS = [
 ]
 
 /**
+ * WO-443: monitor-role audio outputs are BOX-LOCAL hardware (this box's headphone/monitor
+ * device — cf. WO-425: the label/device is never a code default), so they must not ride in a
+ * project: saving stamped them into every project, and loading imposed one box's monitor
+ * device on another (or resurrected a stale copy over the live one).
+ * @param {unknown} list
+ * @returns {{ monitor: object[], portable: object[] }}
+ */
+function splitMonitorAudioOutputs(list) {
+	const arr = Array.isArray(list) ? list : []
+	return {
+		monitor: arr.filter((o) => String(o?.role || '') === 'monitor'),
+		portable: arr.filter((o) => String(o?.role || '') !== 'monitor'),
+	}
+}
+
+/**
  * Stable machine identifiers for the project fingerprint. Best-effort: hardware-identity pulls in
  * network inventory, so a failure here must never block a project save.
  * @returns {{ hardwareId?: string, mac?: string }}
@@ -73,6 +89,9 @@ function buildHardwareConfigFromConfig(cfg, persistence) {
 
 	for (const k of ROUTING_EXTRA_KEYS) {
 		if (cfg[k] !== undefined) hardwareConfig[k] = cfg[k]
+	}
+	if (hardwareConfig.audioOutputs !== undefined) {
+		hardwareConfig.audioOutputs = splitMonitorAudioOutputs(hardwareConfig.audioOutputs).portable
 	}
 
 	return hardwareConfig
@@ -137,6 +156,14 @@ function applyHardwareConfigToCtx(ctx, hc) {
 
 		for (const k of ROUTING_EXTRA_KEYS) {
 			if (hc[k] !== undefined) next[k] = hc[k]
+		}
+		if (hc.audioOutputs !== undefined) {
+			/* WO-443: the box keeps ITS monitor outputs; the project's copy (legacy projects carry
+			 * one) is dropped — it describes whatever box it was saved on. */
+			next.audioOutputs = [
+				...splitMonitorAudioOutputs(hc.audioOutputs).portable,
+				...splitMonitorAudioOutputs(cm.get().audioOutputs).monitor,
+			]
 		}
 
 		cm.save(next)
@@ -277,6 +304,7 @@ function applyHardwareConfigFromProject(ctx, project) {
 module.exports = {
 	HARDWARE_CONFIG_VERSION,
 	ROUTING_EXTRA_KEYS,
+	splitMonitorAudioOutputs,
 	buildHardwareConfigFromConfig,
 	buildHardwareConfigFromCtx,
 	hardwareConfigToSnapshotPayload,
