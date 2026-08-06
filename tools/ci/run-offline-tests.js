@@ -67,6 +67,7 @@ const FILES = [
 	'tools/smoke/smoke-wo440-441-apply-force-inspector-fit.test.js',
 	'tools/smoke/smoke-wo442-custom-dims-fossils.test.js',
 	'tools/smoke/smoke-wo443-monitor-audio-not-in-project.test.js',
+	'tools/smoke/smoke-wo444-caspar-env-per-launch.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',

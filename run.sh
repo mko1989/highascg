@@ -23,11 +23,23 @@ unset LD_PRELOAD
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-/home/casparcg/.Xauthority}"
 
-# WO-407: optional BOX-LOCAL caspar env (not in the repo — Syncthing peers unaffected).
+# WO-407/WO-444: optional BOX-LOCAL caspar env (not in the repo — Syncthing peers unaffected).
 # e.g. CASPAR_GL_SYNC_DISPLAY=DP-0 gates GL swaps on the PGM display's vblank instead of
 # the driver-default head (multi-head X screen: the other head beats → micro-stutter).
-[ -r "${HOME:-/home/casparcg}/.config/highascg/caspar-env" ] && . "${HOME:-/home/casparcg}/.config/highascg/caspar-env"
-[ -n "${CASPAR_GL_SYNC_DISPLAY:-}" ] && export __GL_SYNC_DISPLAY_DEVICE="$CASPAR_GL_SYNC_DISPLAY"
+# The file is rewritten on every config Apply, so it is sourced PER CASPAR LAUNCH inside
+# run_caspar() — sourcing only here at supervisor start meant an Apply-time change never
+# reached the relaunched binary until the whole service restarted (WO-444).
+source_caspar_env() {
+	# Clear first so a line REMOVED from the file also clears the exported var.
+	unset CASPAR_GL_SYNC_DISPLAY
+	[ -r "${HOME:-/home/casparcg}/.config/highascg/caspar-env" ] && . "${HOME:-/home/casparcg}/.config/highascg/caspar-env"
+	if [ -n "${CASPAR_GL_SYNC_DISPLAY:-}" ]; then
+		export __GL_SYNC_DISPLAY_DEVICE="$CASPAR_GL_SYNC_DISPLAY"
+	else
+		unset __GL_SYNC_DISPLAY_DEVICE
+	fi
+}
+source_caspar_env
 
 CONFIG_PATH="${CASPAR_CONFIG:-${CASPAR_CONFIG_PATH:-$CASPAR_ROOT/config/casparcg.config}}"
 CASPAR_BIN="${CASPAR_BIN:-$CASPAR_ROOT/bin/casparcg}"
@@ -78,6 +90,7 @@ should_relaunch() {
 }
 
 run_caspar() {
+	source_caspar_env
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
 	_saw_amcp=0
