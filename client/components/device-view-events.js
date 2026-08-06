@@ -3,7 +3,6 @@ import { getAppWs } from '../lib/app-runtime.js'
 import { renderCableOverlay } from './device-view-cables.js'
 import { CASPAR_HOST } from './device-view-helpers.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
-import { openSaveDeviceSnapshotModal, openLoadDeviceSnapshotModal } from './device-view-snapshot-modals.js'
 import { resolveProjectFpsFromSettings, defaultVideoModeForProjectFps } from '../lib/project-fps.js'
 import { listHostChannelDestinations } from '../lib/device-view-host-channels.js'
 import {
@@ -17,12 +16,9 @@ import * as Actions from './device-view-actions.js'
 export function attachDeviceViewEvents(ctx) {
 	const { refs, state, wrap } = ctx
 	const {
-		refreshBtn,
 		resetBtn,
 		applyCasparBtn,
 		editCasparBtn,
-		saveSnapBtn,
-		loadSnapBtn,
 		clearCableBtn,
 		messinessSlider,
 		messinessVal,
@@ -43,19 +39,6 @@ export function attachDeviceViewEvents(ctx) {
 		}
 	})
 
-	saveSnapBtn.onclick = () =>
-		openSaveDeviceSnapshotModal({
-			getRearPanelEl: () => wrap.querySelector('.device-view__backpanel--caspar'),
-			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
-		})
-	loadSnapBtn.onclick = () =>
-		openLoadDeviceSnapshotModal({
-			onApplied: () => {
-				void ctx.load({ forceRefresh: true })
-			},
-			onStatus: (msg, ok) => setStatus(statusEl, msg, !!ok),
-		})
-	refreshBtn.onclick = () => ctx.load({ forceRefresh: true })
 	resetBtn.onclick = () => ctx.resetCabling()
 	// WO-337: the apply takes ~10-20s — the button must show busy state and stream the server's
 	// `[Full apply] Step N` progress (already broadcast as log_line) instead of sitting inert.

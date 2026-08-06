@@ -13,9 +13,6 @@ export function buildDeviceViewShell(root) {
 	header.className = 'device-view__header'
 	const actions = document.createElement('div')
 	actions.className = 'device-view__actions'
-	const refreshBtn = document.createElement('button')
-	refreshBtn.className = 'header-btn'
-	refreshBtn.textContent = 'Refresh'
 	const resetBtn = document.createElement('button')
 	resetBtn.className = 'header-btn'
 	resetBtn.textContent = 'Reset all cabling'
@@ -28,13 +25,7 @@ export function buildDeviceViewShell(root) {
 	editCasparBtn.innerHTML = `<svg class="device-view__edit-config-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="12" height="13" rx="1.5"/><line x1="7" y1="12" x2="13" y2="12"/><line x1="7" y1="15" x2="13" y2="15"/><line x1="7" y1="18" x2="10" y2="18"/><line x1="12" y1="3" x2="20" y2="11"/><line x1="19" y1="10" x2="21" y2="12"/><line x1="10" y1="5" x2="12" y2="3"/></svg>`
 	editCasparBtn.title = 'View or edit generated Caspar config (advanced)'
 	editCasparBtn.setAttribute('aria-label', 'Caspar config editor')
-	const saveSnapBtn = document.createElement('button')
-	saveSnapBtn.className = 'header-btn'
-	saveSnapBtn.textContent = 'Save snapshot'
-	const loadSnapBtn = document.createElement('button')
-	loadSnapBtn.className = 'header-btn'
-	loadSnapBtn.textContent = 'Load snapshot'
-	actions.append(refreshBtn, saveSnapBtn, loadSnapBtn, resetBtn, applyCasparBtn, editCasparBtn)
+	actions.append(resetBtn, applyCasparBtn, editCasparBtn)
 	header.append(
 		Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }),
 		actions,
@@ -147,12 +138,9 @@ export function buildDeviceViewShell(root) {
 	return {
 		wrap,
 		layout,
-		refreshBtn,
 		resetBtn,
 		applyCasparBtn,
 		editCasparBtn,
-		saveSnapBtn,
-		loadSnapBtn,
 		clearCableBtn,
 		messinessSlider,
 		messinessVal,
