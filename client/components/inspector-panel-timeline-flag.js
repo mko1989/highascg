@@ -156,8 +156,19 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	previewImg.width = 72
 	previewImg.height = 72
 	previewImg.src = companionButtonPreviewUrl(coords.page, coords.row, coords.column)
+	/* One delayed retry: the jpg route subscribes on demand and the first frame can miss its
+	 * 1.5 s window right after a rebind. */
+	let previewRetryTimer = null
 	previewImg.onerror = () => {
 		previewWrap.classList.add('companion-inspector-preview--missing')
+		if (previewRetryTimer) return
+		previewRetryTimer = setTimeout(() => {
+			previewRetryTimer = null
+			if (previewImg.isConnected) previewImg.src = `${previewImg.src.split('?')[0]}?t=${Date.now()}`
+		}, 1200)
+	}
+	previewImg.onload = () => {
+		previewWrap.classList.remove('companion-inspector-preview--missing')
 	}
 	previewWrap.appendChild(previewImg)
 	companionWrap.appendChild(previewWrap)
@@ -167,11 +178,16 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	previewStatus.textContent = 'Checking Companion preview…'
 	companionWrap.appendChild(previewStatus)
 
-	const refreshPreviewImg = () => {
-		const tl = timelineState.getActive()
-		const f = tl?.flags?.find((x) => x.id === flagId) || flag
-		const c = flagCompanionCoords(f)
-		previewImg.src = companionButtonPreviewUrl(c.page, c.row, c.column, Date.now())
+	/* WO-450 round 4 (todos06.08: "the displayed companion button does not update once set"):
+	 * this used to re-derive coords from timelineState.getActive() with a fallback to the
+	 * STALE closure flag — editing a non-active timeline (or an immutable flag update) showed
+	 * the OLD button forever. The caller knows the new coords; use them directly. */
+	const refreshPreviewImg = (page, row, column) => {
+		if (previewRetryTimer) {
+			clearTimeout(previewRetryTimer)
+			previewRetryTimer = null
+		}
+		previewImg.src = companionButtonPreviewUrl(page, row, column, Date.now())
 	}
 
 	const applyCoords = (page, row, column) => {
@@ -181,7 +197,7 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 			companionColumn: column,
 		})
 		syncTimelineToServer()
-		refreshPreviewImg()
+		refreshPreviewImg(page, row, column)
 	}
 
 	const locWrap = document.createElement('div')

@@ -89,3 +89,13 @@ ready**, button jpg served (1180 B); `previewAvailable:true, subs:64`. Smoke ext
 stuck-refs reconnect test), 5/5. Note for the record (owner): button PRESSES never needed
 the Subscriptions API — only previews do; the picker also works blind without it.
 
+## 6. Round 4 (06.08 later): "the displayed companion button does not update once set"
+
+The flag inspector's bound-button preview: `refreshPreviewImg` re-derived coords from
+`timelineState.getActive()` + a fallback to the STALE closure flag (wrong timeline → old
+coords → old image), the `--missing` dim class was added on error but never removed on a
+successful load (no onload), and a 404 (first frame missing its 1.5 s window right after a
+rebind) had no retry. Now: applyCoords passes the new coords straight through, onload clears
+the dim class, and a single 1.2 s retry re-requests after a miss. Built + deployed.
+Owner QA: choose a different button → the 72px preview swaps within ~a second.
+
