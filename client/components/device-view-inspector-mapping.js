@@ -57,7 +57,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 				// Fast path: update local state directly
 				window.dispatchEvent(new CustomEvent('highascg-device-view-update-payload', { detail: { graph: r.graph } }))
 			}
-			load() 
+			load({ forceRefresh: true }) 
 		}
 		else if (statusEl) statusEl.textContent = r.error
 	})
@@ -103,7 +103,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 				.join(' · ')
 			statusEl.textContent = summary ? `Proposed ${summary}` : 'Outputs updated from input'
 		}
-		load()
+		load({ forceRefresh: true })
 	}
 	host.appendChild(proposeBtn)
 
@@ -133,7 +133,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 				setCasparRestartDirty(true)
 				if (r.graph) window.dispatchEvent(new CustomEvent('highascg-device-view-update-payload', { detail: { graph: r.graph } }))
 				window.dispatchEvent(new CustomEvent('highascg-mapping-inspector-updated', { detail: { nodeId: node.id } }))
-				load()
+				load({ forceRefresh: true })
 			} else {
 				alert(`Failed to remove output: ${r.error || 'Unknown error'}`)
 			}
@@ -158,7 +158,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 			if (r.ok) {
 				setCasparRestartDirty(true)
 				window.dispatchEvent(new CustomEvent('highascg-mapping-inspector-updated', { detail: { nodeId: node.id } }))
-				load()
+				load({ forceRefresh: true })
 			}
 		}
 		inpRow('Label', oLabel)
@@ -198,7 +198,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 					window.dispatchEvent(new CustomEvent('highascg-device-view-update-payload', { detail: { graph: r.graph } }))
 				}
 				window.dispatchEvent(new CustomEvent('highascg-mapping-inspector-updated', { detail: { nodeId: node.id } }))
-				load()
+				load({ forceRefresh: true })
 			}
 		}
 		vMode.onchange = () => {
@@ -260,7 +260,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 			setCasparRestartDirty(true)
 			// Notify mapping preview canvas if open
 			window.dispatchEvent(new CustomEvent('highascg-mapping-inspector-updated', { detail: { nodeId: node.id } }))
-			load()
+			load({ forceRefresh: true })
 		}
 
 		posBox.append(fX, fY, fW, fH)
@@ -280,7 +280,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 			setCasparRestartDirty(true)
 			if (r.graph) window.dispatchEvent(new CustomEvent('highascg-device-view-update-payload', { detail: { graph: r.graph } }))
 			window.dispatchEvent(new CustomEvent('highascg-mapping-inspector-updated', { detail: { nodeId: node.id } }))
-			load()
+			load({ forceRefresh: true })
 		}
 	}
 	host.appendChild(addBtn)
@@ -303,7 +303,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 	dupeBtn.textContent = 'Duplicate Node'
 	dupeBtn.onclick = async () => {
 		const r = await MappingNode.duplicateMappingNode(node.id)
-		if (r.ok) load()
+		if (r.ok) load({ forceRefresh: true })
 	}
 
 	const delNodeBtn = document.createElement('button')
@@ -313,7 +313,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 	delNodeBtn.onclick = async () => {
 		if (!confirm(`Delete mapping node "${node.label || node.id}" and all its cables?`)) return
 		const r = await MappingNode.deleteMappingNode(node.id)
-		if (r.ok) { setCasparRestartDirty(true); load() }
+		if (r.ok) { setCasparRestartDirty(true); load({ forceRefresh: true }) }
 	}
 
 	actions.append(editorBtn, dupeBtn, delNodeBtn)

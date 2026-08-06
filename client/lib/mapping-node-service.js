@@ -133,7 +133,11 @@ export function proposeMappingOutputLayout(inputWidth, inputHeight, fps, numOutp
 }
 
 export async function fetchDeviceView() {
-	return api.get('/api/device-view')
+	/* WO-436: every caller is a read-modify-write (fetch graph → mutate → save whole graph).
+	 * The route is browser-cacheable (Cache-Control: max-age=3), so a plain GET within 3s of
+	 * the previous fetch is answered by the HTTP cache with a PRE-EDIT graph — saving that
+	 * back silently reverts the edit that just landed. Same bust as loadDeviceView's bustCache. */
+	return api.get(`/api/device-view?_ts=${Date.now()}`)
 }
 
 export async function saveDeviceGraph(graph) {
