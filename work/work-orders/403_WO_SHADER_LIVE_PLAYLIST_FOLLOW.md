@@ -1,6 +1,6 @@
 # WO-403 — Shader Live editor vs shader playlists: lists only the first item, edits replay it on air
 
-**Status: IN PROGRESS (implemented + suite green 01.08; NOT built/deployed — on show. Post-show: `npm run build:client` + kiosk F5, then owner QA)**
+**Status: DONE (06.08.26 — deploy leg complete: the code landed 01.08 and today's WO-445..451 batch rebuilt the client, F5'd the kiosk and restarted the service, so it is live. Owner QA on `work/checklist06.08.26_close_all_wos.md`.)**
 
 Owner report (`issues_01.08.26` item 1): "when i go into shader editor while a playlist with
 shaders is playing, it only shows the first from the list. when another one is playing and i

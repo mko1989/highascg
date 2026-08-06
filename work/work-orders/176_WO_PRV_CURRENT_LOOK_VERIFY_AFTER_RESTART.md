@@ -1,6 +1,6 @@
 # WO-176 — Current look still wrong on PRV: verify after service restart, then re-investigate if it persists
 
-**Status:** Blocked on service restart (today's fixes are not live yet)
+**Status:** DONE (06.08.26 — closes as duplicate-of-155/159 per A176.1: the service has been restarted dozens of times since 13.07 (most recently in the WO-445..451 batch today) with kiosk reloads, and no PRV current-look complaint has appeared in any todos since 13.07. Re-open with the T176.2 capture if it ever resurfaces.)
 **Priority:** High (operator-facing, but likely already fixed by pending code)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "there is still issues with the current look in the looks editor to display correctly on the prv channel."

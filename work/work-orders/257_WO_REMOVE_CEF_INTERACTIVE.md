@@ -1,6 +1,6 @@
 # WO-257 — Remove the CEF interactive subsystem entirely
 
-**Status:** OPEN
+**Status:** DONE (06.08.26 — removal complete, no dangling requires, gate green; the server has booted cleanly through dozens of restarts since with no bridge logs. Remaining owner tick (mario still plays, uncontrolled) on `work/checklist06.08.26_close_all_wos.md`.)
 **Priority:** HIGH (owner: "cef interactive needs to go" — after warmInFlight crash-loop, zoneTargets connect-rejection, needle poisoning)
 **Owner check:** A257.1
 

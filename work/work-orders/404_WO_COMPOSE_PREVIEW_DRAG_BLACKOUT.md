@@ -1,6 +1,6 @@
 # WO-404 — Compose preview "loses signal" during any sources-panel drag (goes black ~1 s)
 
-**Status: IN PROGRESS (implemented + suite green 01.08; NOT built/deployed — on show. Post-show: `npm run build:client` + kiosk F5, then owner QA)**
+**Status: DONE (06.08.26 — deploy leg complete: live since today's batch build+F5+restart. Owner QA on `work/checklist06.08.26_close_all_wos.md`.)**
 
 Owner report (`issues_01.08.26` item 2): "when dragging a shader from the sources browser to
 drop it on a list the compose preview 'looses signal' goes black for a second and then comes

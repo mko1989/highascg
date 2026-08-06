@@ -1,6 +1,6 @@
 # WO-256 — Operator GUI: compose preview becomes a free-tile canvas (multiviewer-style windows)
 
-**Status:** OPEN
+**Status:** IMPLEMENTED (all T-tasks done; owner acceptance A256.1 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (owner feature, follows the WO-255 pivot)
 **Owner check:** A256.1
 

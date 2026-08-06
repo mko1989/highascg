@@ -1,6 +1,6 @@
 # WO-262 — Operator GUI: shape helper spawns but never shapes (consumer opaque under Firefox, no holes, no video)
 
-**Status:** OPEN — LIVE broken (operator GUI shows no video; Caspar consumer sits opaque under Firefox)
+**Status:** DONE (06.08.26 — superseded by the WO-263 pivot (shape Firefox, not the consumer) which shipped with WO-264/269; the operator GUI with shaped holes has been in daily use since. Trust WO-263 onward, not this WO's pre-pivot architecture.)
 **Priority:** URGENT
 **Owner check:** A262.1
 

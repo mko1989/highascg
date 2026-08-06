@@ -1,6 +1,6 @@
 # WO-259 — Two-phase batched take: kill the per-command AMCP stagger in transitions
 
-**Status:** OPEN
+**Status:** IMPLEMENTED (T259.2 intentionally skipped — dead code per WO-160b, recorded in the work log; owner acceptance A259.1 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (owner-reported on-air artifact) — LIVE-CRITICAL CODE, escape hatch mandatory
 **Owner check:** A259.1
 

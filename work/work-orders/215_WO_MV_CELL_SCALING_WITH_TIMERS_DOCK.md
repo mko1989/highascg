@@ -1,6 +1,6 @@
 # WO-215 — Multiview cell video scaling wrong when timers dock is enabled (borders look wrong on MV, correct on output)
 
-**Status:** Awaiting owner repro (evidence does not confirm H1 or H2)
+**Status: CLOSED — NOT REPRODUCED (06.08.26: owner repro never arrived and no recurrence appears in any todos since; the evidence gathered did not confirm H1 or H2. Re-open with a fresh capture on next sighting.)**
 **Priority:** Medium
 **Date:** 2026-07-14
 **Source:** owner: "scaling on the multiviewer is wrong probably due to it taking the timers into acount. it makes the borders appear incorectly on the multiviewer. this is very weird because it looks correct on the output."

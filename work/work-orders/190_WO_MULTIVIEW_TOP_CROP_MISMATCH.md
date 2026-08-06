@@ -1,6 +1,6 @@
 # WO-190 — Multiview shows cropped layer without its top crop (main output correct) — diagnostic-first
 
-**Status:** Planned (needs a live repro capture; theory work exhausted remotely)
+**Status: CLOSED — NOT REPRODUCED (06.08.26: no recurrence reported since 15.07 across all todos; theory work was exhausted remotely. Re-open with the live capture described below on next sighting.)**
 **Priority:** Medium-High (multiview truthfulness)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner).

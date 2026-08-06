@@ -1,6 +1,6 @@
 # WO-221 — Split all code files exceeding the 500-line limit into smaller modules
 
-**Status:** Planned
+**Status:** DONE (06.08.26 — superseded piecemeal: every census file was split by WO-114/118/122/140-era work, and the rule is CI-enforced by `tools/ci/check-max-file-lines.js` (WO-445). Census re-run today: 0 files over 500.)
 **Priority:** Medium (hygiene; owner rule: 500 LOC max across ALL code files incl. frontend CSS and templates)
 **Date:** 2026-07-15
 **Source:** owner loop directive 2026-07-15 ("check all highascg code files including frontend css and templates... write wo to split... spawn sonnet for it").

@@ -1,6 +1,6 @@
 # WO-205 — Timer panel: true mirroring of the running timer (any initiator) + real persistence of panel-set durations
 
-**Status:** Planned
+**Status:** IMPLEMENTED (all T-tasks done, countdown suites 24/24; owner acceptance A205.1-2 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** High (the panel still doesn't show the actual timer; durations still snap back)
 **Date:** 2026-07-14
 **Source:** owner re-report after WO-192 (bundle + running service both verified to include the WO-192/169 code — this is NOT restart-gated): "the timer in the corner still doesn't show the actual timer. it also still defaults to 5m after using a couple times."

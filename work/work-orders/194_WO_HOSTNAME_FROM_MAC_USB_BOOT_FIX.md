@@ -1,6 +1,6 @@
 # WO-194 — Hostname-from-MAC on USB boot: wrapper dies on read-only /var/log before applying
 
-**Status:** Planned
+**Status:** IMPLEMENTED (code landed `56898bf`; owner acceptance A194.1-3 needs a USB boot — on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** Medium-High (replication/tailscale/mDNS identity wrong on every USB boot)
 **Date:** 2026-07-14
 **Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "check the workflow for auto creation of the hostname based on the mac address. on usb boot it needs to happen each time it boots."

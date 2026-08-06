@@ -1,6 +1,6 @@
 # WO-390 — "Crop didn't apply on the actual Caspar output"
 
-**Status: OPEN — Caspar and the take-path AMCP both PROVEN correct; needs one live capture to close**
+**Status: DONE (06.08.26 — evidence window expired; §4 defect fixed; §3.1 class mitigated. Re-open with the §5 capture on next sighting.)**
 **Source:** owner 30.07.26 — "i had a look made with one of the layers with the crop effect. the crop
 didnt apply on the actual caspar output."
 
@@ -98,3 +98,16 @@ PGM/PRV were deliberately left alone. When a channel can be spared:
 
 `data/amcp-last50.txt` being a 50-line ring that a 60 s heartbeat floods is itself the reason no
 after-the-fact evidence existed for this report. Consider a larger/filtered ring.
+
+## 6. Closure (06.08.26, owner "close all open WOs" sweep)
+
+- The §5 capture is no longer obtainable: the active project has changed (6 plain looks, no
+  crop effects anywhere, `liveScenesByProgramChannel` empty) and both Caspar and the service
+  have restarted many times since 30.07 — nothing of the 30.07 mixer state survives.
+- §3.1 (live snapshot survives a Caspar restart) is mitigated in the current tree:
+  `live-scene-reconcile` clears persisted scene.live on INFO/content mismatch, so a restart
+  produces a cold re-take that re-asserts all MIXER lines including CROP.
+- §4 defect FIXED: `buildNudgeLinesForLayer` now defers the crop line like every other nudge
+  line (`routes-preview-nudge.js`, via `deferMixerAmcpLine`); `smoke-preview-mixer-nudge` 9/9.
+- No crop complaint has recurred since 30.07. If it resurfaces: run the §5 getter capture
+  IMMEDIATELY (the amcp-last50 ring floods in ~2 min).

@@ -1,0 +1,26 @@
+in the gpu port inspector there is native mode display which always displays the Hz with the z in the second line. make sure its always displayed in the same line.
+then lower there is: Video Mode
+Caspar screen 1 — shared with gpu_p1, gpu_p3
+Output 1: 3840×2160 @ 50 Hz
+and under it are input boxes with default 1920 1080 where the second box doesnt fit the screen.
+
+the apply and restart button should ALWAYS restart caspar. right now id like to force it to restart so the gl sync takes, but it just says no changes so no restart.
+
+it seems the monitor audio output is part of default project, which it shouldnt be.
+
+i need a full project search, looking for files that are exceeding 500 lines of code limit, as well as search for dead/duplicate code.
+
+grabbing a clips edge in timeline and extending it does not have an effect on the actual playout, it only plays the first segment and then blanks.
+
+the companion connection gives false connected flag in the settings and doesnt actually let me pick a button after i started companion.
+
+the timeline defaults to be already linked to pgm, meaing when i do edits and jump the playhead it starts displaying over the already playing look. it should be routed to prv (or not routed at all for pgm only screens) unless the timeline is taken to screen by pressing the take button in timeline or playing it from a look.
+
+remove the vsync on as default for screen consumers. with the gl sync and vsync off the playback is perfect.
+
+this: Look take (playback)
+
+Relative: on take, seek to the same position in the file as the timeline playhead on this layer (in-point + elapsed).
+doesnt make sense to have in the inspector of a clip in timeline.
+
+i edited layout of gpu ports so it reflects my actual ports on the card, first of all rearenging the ports doesnt take with first try, second i get an error: Detected GPU wiring differs from saved layout — open a GPU port in the inspector and use the layout editor to review.

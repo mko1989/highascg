@@ -33,6 +33,7 @@ const {
 	sceneLayerRotationMixerLines,
 } = require('../engine/scene-layer-rotation-amcp')
 const { buildEffectAmcpLines } = require('../engine/scene-take-lbg-helpers')
+const { deferMixerAmcpLine } = require('../caspar/amcp-utils')
 const { LOOK_LAYER_MIN, LOOK_LAYER_MAX, PGM_BANK_B_OFFSET } = require('../engine/look-layer-ranges')
 const { normalizeProgramLayerBank } = require('../engine/program-layer-bank')
 const {
@@ -69,12 +70,14 @@ function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null) {
 	if (layer.opacity != null && Number.isFinite(Number(layer.opacity))) {
 		lines.push(`MIXER ${cl} OPACITY ${Number(layer.opacity)} 0 DEFER`)
 	}
-	/* Crop drags ride the nudge too — same line the take pipeline emits for the crop effect. */
+	/* Crop drags ride the nudge too — same line the take pipeline emits for the crop effect.
+	 * WO-390 §4: buildEffectAmcpLines returns a bare (non-DEFER) line; every other nudge line
+	 * defers into the single COMMIT, so the bare crop landed one frame early during drags. */
 	if (Array.isArray(layer.effects)) {
 		for (const fx of layer.effects) {
 			if (!fx || fx.type !== 'crop') continue
 			const fxLines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
-			if (fxLines) lines.push(...fxLines)
+			if (fxLines) lines.push(...fxLines.map((l) => deferMixerAmcpLine(l)))
 		}
 	}
 	return lines
