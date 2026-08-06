@@ -1,6 +1,13 @@
 # Screen consumer vsync (NVIDIA)
 
-Normative setup for **smooth, tear-free** output on CasparCG **screen** consumers when the playout GPU is **NVIDIA**.
+> **SUPERSEDED for the consumer-vsync row (06.08.26, todos06.08 / WO-447):** with
+> `CASPAR_GL_SYNC_DISPLAY=<PGM connector>` active (WO-407→444), the owner verified **GL sync +
+> consumer vsync OFF is perfect** — consumer vsync on top only adds a competing wait. The
+> HighAsCG default for `screen_N_vsync` is now **false** (`defaults-caspar-server.js`,
+> `screen-consumer-defaults.js`, generator fallback). The NVIDIA driver rows below (Sync to
+> VBlank **off**, Force Composition Pipeline **on**) still stand.
+
+Historical setup for **smooth, tear-free** output on CasparCG **screen** consumers when the playout GPU is **NVIDIA** (pre-GL-sync era).
 
 > **Multi-head box? This recipe is necessary but NOT sufficient.** With more than one
 > display on the X screen, GL vsync gates on ONE head (the primary by default) and every

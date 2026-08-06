@@ -76,7 +76,8 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		? String(config[`screen_${n}_stretch`])
 		: 'none'
 	const windowed = casparBoolEnabled(config[`screen_${n}_windowed`], true)
-	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], true)
+	/* Unset must agree with casparScreenDefaults(): vsync OFF (GL sync paces frames, WO-407/444). */
+	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], false)
 	// PGM default is on: an unset key must agree with casparScreenDefaults() and with the
 	// Device View checkbox, which also renders unset as on.
 	const alwaysOnTop = casparBoolEnabled(config[`screen_${n}_always_on_top`], true)

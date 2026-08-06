@@ -1,12 +1,13 @@
 /**
  * Default CasparCG screen-consumer flags when settings keys are unset.
- * Windowed + borderless, V-sync on when keys are unset.
+ * Windowed + borderless, V-sync OFF when keys are unset (todos06.08.26: GL sync via
+ * CASPAR_GL_SYNC_DISPLAY paces the frames; consumer vsync on top adds competing waits).
  */
 import { defaultVideoModeForProjectFps, resolveProjectFpsFromSettings } from './project-fps.js'
 export const SCREEN_CONSUMER_DEFAULTS = {
 	windowed: true,
 	borderless: true,
-	vsync: true,
+	vsync: false,
 }
 
 /** Multiview screen consumer: not always-on-top unless explicitly enabled. */

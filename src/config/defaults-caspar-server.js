@@ -7,8 +7,10 @@ function casparScreenDefaults(n, ndiName) {
 		[`${p}mode`]: '1080p5000',
 		[`${p}stretch`]: 'none',
 		[`${p}windowed`]: true,
-		/** NVIDIA: keep true; driver Sync to VBlank must be off — docs/reference/screen-consumer-vsync-nvidia.md */
-		[`${p}vsync`]: true,
+		/** Off by default since todos06.08.26: with CASPAR_GL_SYNC_DISPLAY (WO-407/444) doing the
+		 * frame pacing, consumer vsync only adds competing waits — owner verified GL sync +
+		 * vsync off is perfect. History: docs/reference/screen-consumer-vsync-nvidia.md */
+		[`${p}vsync`]: false,
 		[`${p}borderless`]: true,
 		/** PGM screen consumers stack above desktop chrome by default (owner default, todos19.07.26). */
 		[`${p}always_on_top`]: true,
