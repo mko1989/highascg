@@ -9,7 +9,7 @@ const {
 const { buildGpuPhysicalMap } = require('../../src/utils/gpu-physical-map')
 const { handleGpuPortsReset } = require('../../src/api/system-hardware-gpu-ports')
 const {
-	topologyDiffers,
+	topologyPairSetDiffers,
 	reconcileTopologyWithLiveDisplays,
 } = require('../../src/utils/gpu-topology-reconcile')
 const { physicalPortIndexFromGpuConnector } = require('../../src/config/screen-consumer-port-resolve')
@@ -108,17 +108,24 @@ describe('gpu topology SSOT (WO-108)', () => {
 		}
 	})
 
-	it('topologyDiffers detects pair changes between clients', () => {
+	/* Repointed for WO-451 (todos06.08): an operator REORDERING the same jacks is not a wiring
+	 * change and must not raise the mismatch banner — only a different jack SET is. */
+	it('topologyPairSetDiffers ignores socket order, detects real jack changes', () => {
 		const a = [
 			{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1' },
 			{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'DP-2', dpB: 'DP-3' },
 		]
-		const b = [
+		const reordered = [
 			{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-2', dpB: 'DP-3' },
 			{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'DP-0', dpB: 'DP-1' },
 		]
-		assert.equal(topologyDiffers(a, b), true)
-		assert.equal(topologyDiffers(a, a), false)
+		const rewired = [
+			{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1' },
+			{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: '' },
+		]
+		assert.equal(topologyPairSetDiffers(a, reordered), false, 'same jacks, new order → no banner')
+		assert.equal(topologyPairSetDiffers(a, rewired), true, 'different jack set → banner')
+		assert.equal(topologyPairSetDiffers(a, a), false)
 	})
 
 	it('screen_N consumer index follows gpu_p socket order', () => {

@@ -109,17 +109,27 @@ function reconcileTopologyWithLiveDisplays(topology, displays, discoveredRows = 
 }
 
 /**
+ * Order-insensitive WIRING compare: only the set of physical jacks (dpA/dpB pair keys)
+ * matters. The operator deliberately reordering sockets to match their card is NOT a wiring
+ * change — the old row-by-row compare (incl. slotOrder) kept the "Detected GPU wiring
+ * differs" banner up forever after any manual layout edit (todos06.08). The banner should
+ * fire only when discovery sees different jacks than the saved layout references.
  * @param {object[]} saved
  * @param {object[]} discovered
  */
-function topologyDiffers(saved, discovered) {
-	return !topologyRowsEqual(normalizeTopologyRows(saved), normalizeTopologyRows(discovered))
+function topologyPairSetDiffers(saved, discovered) {
+	const pairKeys = (rows) =>
+		normalizeTopologyRows(rows)
+			.map((r) => topologyPairKey(r.dpA, r.dpB))
+			.filter(Boolean)
+			.sort()
+	return JSON.stringify(pairKeys(saved)) !== JSON.stringify(pairKeys(discovered))
 }
 
 module.exports = {
 	normalizeTopologyRows,
 	connectedLiveRandrNames,
 	reconcileTopologyWithLiveDisplays,
-	topologyDiffers,
+	topologyPairSetDiffers,
 	topologyRowsEqual,
 }

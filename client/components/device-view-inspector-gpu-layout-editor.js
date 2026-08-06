@@ -185,24 +185,36 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 			row.addEventListener('dragend', () => {
 				row.style.opacity = '1'
 			})
+			/* Insert-before vs insert-after by pointer half. The old top-border-only variant made
+			 * "drag one slot down" a no-op (remove + insert-at-index-1 lands the row back where it
+			 * was) — the todos06.08 "rearranging doesnt take with first try". */
+			const dropAfter = (ev) => ev.offsetY > row.offsetHeight / 2
+			const clearDropIndicator = () => {
+				row.style.borderTop = '1px solid #444'
+				row.style.borderBottom = ''
+			}
 			row.addEventListener('dragover', (ev) => {
 				ev.preventDefault()
-				row.style.borderTop = '2px solid #007bff'
+				if (dropAfter(ev)) {
+					row.style.borderTop = '1px solid #444'
+					row.style.borderBottom = '2px solid #007bff'
+				} else {
+					row.style.borderBottom = ''
+					row.style.borderTop = '2px solid #007bff'
+				}
 			})
-			row.addEventListener('dragleave', () => {
-				row.style.borderTop = '1px solid #444'
-			})
+			row.addEventListener('dragleave', clearDropIndicator)
 			row.addEventListener('drop', (ev) => {
 				ev.preventDefault()
-				row.style.borderTop = '1px solid #444'
+				clearDropIndicator()
 				const dragIdx = parseInt(ev.dataTransfer.getData('application/x-highascg-inspector-gpu-slot'), 10)
-				if (!Number.isNaN(dragIdx) && dragIdx !== index) {
-					const draggedItem = customGpuItems.splice(dragIdx, 1)[0]
-					let insertAt = index
-					if (dragIdx < index) insertAt = index - 1
-					customGpuItems.splice(insertAt, 0, draggedItem)
-					saveAndRefresh()
-				}
+				if (Number.isNaN(dragIdx) || dragIdx === index) return
+				let insertAt = index + (dropAfter(ev) ? 1 : 0)
+				if (dragIdx < insertAt) insertAt -= 1
+				if (insertAt === dragIdx) return
+				const draggedItem = customGpuItems.splice(dragIdx, 1)[0]
+				customGpuItems.splice(insertAt, 0, draggedItem)
+				saveAndRefresh()
 			})
 
 			const portRow = Object.assign(document.createElement('div'), { style: 'display:flex; gap:4px;' })

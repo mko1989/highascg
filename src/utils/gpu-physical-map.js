@@ -9,7 +9,7 @@ const { discoverGpuPhysicalTopology, cardFromDrmName } = require('./gpu-topology
 const {
 	normalizeTopologyRows,
 	reconcileTopologyWithLiveDisplays,
-	topologyDiffers,
+	topologyPairSetDiffers,
 } = require('./gpu-topology-reconcile')
 const { resolveDisplayByDrmHeuristic } = require('./gpu-display-alias')
 
@@ -262,7 +262,7 @@ function buildGpuPhysicalMap({ config, displays, connectors }) {
 		savedConfig.length &&
 		discoveredRows?.length &&
 		config?.gpuPhysicalTopologyOperatorSaved &&
-		topologyDiffers(savedConfig, discoveredRows)
+		topologyPairSetDiffers(savedConfig, discoveredRows)
 	) {
 		suggestedTopology = normalizeTopologyRows(discoveredRows)
 	}
