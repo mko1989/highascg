@@ -14,6 +14,7 @@ import {
 	resolveGpuInspectorVideoMode,
 } from './device-view-destinations-inspector.js'
 import { resolveDefaultVideoMode } from '../lib/project-fps.js'
+import { videoModeToResolution } from '../lib/mapping-node-service.js'
 import {
 	readPortOsValue,
 	buildPerPortOsSettingsPatch,
@@ -212,7 +213,23 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		customWidthIn.disabled = !isCustom
 		customHeightIn.disabled = !isCustom
 		customFpsIn.disabled = !isCustom
+		/* WO-442: a standard mode fully determines the raster — showing the (disabled) custom
+		 * boxes next to it displays whatever screen_N_custom_* keys happen to hold (the owner
+		 * found seeded 1920/1080 fossils beside a 2160p mode: "it doesnt make sense at all").
+		 * The row only exists when Custom is selected. Parent is assembled by the caller, so
+		 * resolve it at call time. */
+		const row = customWidthIn.parentElement
+		if (row) row.style.display = isCustom ? 'flex' : 'none'
+		/* Switching TO custom starts from the mode that was just active, not from stale keys. */
+		if (isCustom && modeSel.dataset.prevStandardMode) {
+			const res = videoModeToResolution(modeSel.dataset.prevStandardMode)
+			customWidthIn.value = String(res.w)
+			customHeightIn.value = String(res.h)
+			customFpsIn.value = String(res.fps ?? 50)
+		}
+		if (!isCustom) modeSel.dataset.prevStandardMode = modeSel.value
 	}
+	if (modeSel.value !== 'custom') modeSel.dataset.prevStandardMode = modeSel.value
 	syncCustomInputsState()
 
 	const modeFromRes = String(detectedDisplay?.resolution || '').match(/^(\d+)x(\d+)$/)

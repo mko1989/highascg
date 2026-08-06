@@ -400,7 +400,13 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		...(cableFeedNote ? [cableFeedNote] : []),
 		modeSel,
 		(() => {
-			const d = Object.assign(document.createElement('div'), { style: 'display:flex; gap:4px; margin-top:4px; min-width:0' })
+			// WO-442: the row exists only in Custom mode (a standard mode determines the raster;
+			// disabled boxes just parroted whatever stale screen_N_custom_* keys held). The modeline's
+			// syncCustomInputsState keeps this in sync on mode changes; it runs before assembly, so
+			// the initial state is applied here.
+			const d = Object.assign(document.createElement('div'), {
+				style: `display:${modeSel.value === 'custom' ? 'flex' : 'none'}; gap:4px; margin-top:4px; min-width:0`,
+			})
 			// WO-441: number inputs keep their natural width (~150px) unless told otherwise — three
 			// of them overflowed the sidebar and the Height box was cut off. Share the row equally.
 			for (const inp of [customWidthIn, customHeightIn, customFpsIn]) {
