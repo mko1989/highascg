@@ -3,6 +3,7 @@ import { getAppWs } from '../lib/app-runtime.js'
 import { renderCableOverlay } from './device-view-cables.js'
 import { CASPAR_HOST } from './device-view-helpers.js'
 import { showCasparConfigModal } from './caspar-config-modal.js'
+import { openSaveDeviceSnapshotModal } from './device-view-snapshot-modals.js'
 import { resolveProjectFpsFromSettings, defaultVideoModeForProjectFps } from '../lib/project-fps.js'
 import { listHostChannelDestinations } from '../lib/device-view-host-channels.js'
 import {
@@ -18,6 +19,7 @@ export function attachDeviceViewEvents(ctx) {
 	const {
 		resetBtn,
 		applyCasparBtn,
+		saveSnapshotBtn,
 		editCasparBtn,
 		clearCableBtn,
 		messinessSlider,
@@ -78,6 +80,12 @@ export function attachDeviceViewEvents(ctx) {
 			.catch((e) => setStatus(statusEl, e?.message || String(e), false))
 			.finally(done)
 	}
+	// WO-49 save half — load half lives in project-hardware-reconcile-modal.js.
+	saveSnapshotBtn.onclick = () =>
+		void openSaveDeviceSnapshotModal({
+			getRearPanelEl: () => refs.rearPanel || null,
+			onStatus: (msg, ok) => setStatus(statusEl, msg, ok),
+		})
 	editCasparBtn.onclick = () =>
 		showCasparConfigModal({
 			onApplied: () => {

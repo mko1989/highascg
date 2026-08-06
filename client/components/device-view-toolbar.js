@@ -25,7 +25,31 @@ export function buildDeviceViewShell(root) {
 	editCasparBtn.innerHTML = `<svg class="device-view__edit-config-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="8" width="12" height="13" rx="1.5"/><line x1="7" y1="12" x2="13" y2="12"/><line x1="7" y1="15" x2="13" y2="15"/><line x1="7" y1="18" x2="10" y2="18"/><line x1="12" y1="3" x2="20" y2="11"/><line x1="19" y1="10" x2="21" y2="12"/><line x1="10" y1="5" x2="12" y2="3"/></svg>`
 	editCasparBtn.title = 'View or edit generated Caspar config (advanced)'
 	editCasparBtn.setAttribute('aria-label', 'Caspar config editor')
-	actions.append(resetBtn, applyCasparBtn, editCasparBtn)
+	const saveSnapshotBtn = document.createElement('button')
+	saveSnapshotBtn.type = 'button'
+	saveSnapshotBtn.className = 'header-btn device-view__save-snapshot-btn'
+	const snapshotIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+	const snapshotIconAttrs = {
+		viewBox: '0 0 24 24',
+		width: '18',
+		height: '18',
+		fill: 'none',
+		stroke: 'currentColor',
+		'stroke-width': '1.75',
+		'stroke-linecap': 'round',
+		'stroke-linejoin': 'round',
+		'aria-hidden': 'true',
+	}
+	for (const [k, v] of Object.entries(snapshotIconAttrs)) snapshotIcon.setAttribute(k, v)
+	for (const d of ['M12 3v10', 'M8 9l4 4 4-4', 'M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17']) {
+		const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+		p.setAttribute('d', d)
+		snapshotIcon.appendChild(p)
+	}
+	saveSnapshotBtn.appendChild(snapshotIcon)
+	saveSnapshotBtn.title = 'Save device snapshot (cabling + GPU/DeckLink profile as JSON)'
+	saveSnapshotBtn.setAttribute('aria-label', 'Save device snapshot')
+	actions.append(resetBtn, applyCasparBtn, saveSnapshotBtn, editCasparBtn)
 	header.append(
 		Object.assign(document.createElement('h2'), { className: 'device-view__title', textContent: 'Devices' }),
 		actions,
@@ -140,6 +164,7 @@ export function buildDeviceViewShell(root) {
 		layout,
 		resetBtn,
 		applyCasparBtn,
+		saveSnapshotBtn,
 		editCasparBtn,
 		clearCableBtn,
 		messinessSlider,
