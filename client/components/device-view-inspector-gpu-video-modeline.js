@@ -3,7 +3,7 @@
  *
  * Extracted concerns (WO-140):
  * - Settings/patch helpers: ./device-view-inspector-gpu-video-modeline-os-settings.js
- * - Timing preview UI + mode-selection readers: ./device-view-inspector-gpu-video-modeline-preview.js
+ * - Timing preview UI + mode-selection readers + input event wiring: ./device-view-inspector-gpu-video-modeline-preview.js
  */
 import { resolveCableSourceResolution } from '../lib/device-view-gpu-source-inherit.js'
 import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
@@ -27,6 +27,7 @@ import {
 import {
 	createModeSelectionReaders,
 	createModelineTimingPreview,
+	wireModelineInputEvents,
 } from './device-view-inspector-gpu-video-modeline-preview.js'
 import { attachMathInput } from '../lib/math-input.js'
 
@@ -386,56 +387,23 @@ export function populateGpuVideoModelineSection(wrapCtl, ctx) {
 		scheduleModelinePreview()
 	}
 
-	timingSel.addEventListener('change', () => {
-		runOsSave()
-		scheduleModelinePreview()
-	})
-	overrideResIn.addEventListener('change', () => {
-		runOsSave()
-		syncTimingRowVisibility()
-	})
-	syncTimingRowVisibility()
-
-	displayModeSelect.addEventListener('change', () => {
-		syncOsCustomRowVisibility()
-		syncTimingRowVisibility()
-		scheduleModelinePreview()
-		runOsSave()
-	})
-	osCustomWidthIn.addEventListener('change', () => {
-		runOsSave()
-		scheduleModelinePreview()
-	})
-	osCustomHeightIn.addEventListener('change', () => {
-		runOsSave()
-		scheduleModelinePreview()
-	})
-	osCustomFpsIn.addEventListener('change', () => {
-		runOsSave()
-		scheduleModelinePreview()
-	})
-	osCustomWidthIn.addEventListener('input', () => scheduleModelinePreview())
-	osCustomHeightIn.addEventListener('input', () => scheduleModelinePreview())
-	osCustomFpsIn.addEventListener('input', () => scheduleModelinePreview())
-	customWidthIn.addEventListener('change', () => {
-		runSave()
-		scheduleModelinePreview()
-	})
-	customHeightIn.addEventListener('change', () => {
-		runSave()
-		scheduleModelinePreview()
-	})
-	customFpsIn.addEventListener('change', () => {
-		runSave()
-		scheduleModelinePreview()
-	})
-	customWidthIn.addEventListener('input', () => scheduleModelinePreview())
-	customHeightIn.addEventListener('input', () => scheduleModelinePreview())
-	customFpsIn.addEventListener('input', () => scheduleModelinePreview())
-	modeSel.addEventListener('change', () => {
-		syncCustomInputsState()
-		scheduleModelinePreview()
-		runSave()
+	wireModelineInputEvents({
+		timingSel,
+		overrideResIn,
+		displayModeSelect,
+		osCustomWidthIn,
+		osCustomHeightIn,
+		osCustomFpsIn,
+		customWidthIn,
+		customHeightIn,
+		customFpsIn,
+		modeSel,
+		runSave,
+		runOsSave,
+		scheduleModelinePreview,
+		syncTimingRowVisibility,
+		syncOsCustomRowVisibility,
+		syncCustomInputsState,
 	})
 
 	const buildOutputPatchFromSelection = () => {

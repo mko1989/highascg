@@ -171,3 +171,65 @@ export function createModelineTimingPreview({ cs, currentSettings, osScreenN, re
 
 	return { timingRow, timingLbl, timingSel, scheduleModelinePreview }
 }
+
+/**
+ * Wires save + preview-refresh to every mode-selection control. The initial
+ * syncTimingRowVisibility() call must run after the override checkbox is wired
+ * (same order as the inline block in populateGpuVideoModelineSection this replaced).
+ */
+export function wireModelineInputEvents(refs) {
+	const {
+		timingSel,
+		overrideResIn,
+		displayModeSelect,
+		osCustomWidthIn,
+		osCustomHeightIn,
+		osCustomFpsIn,
+		customWidthIn,
+		customHeightIn,
+		customFpsIn,
+		modeSel,
+		runSave,
+		runOsSave,
+		scheduleModelinePreview,
+		syncTimingRowVisibility,
+		syncOsCustomRowVisibility,
+		syncCustomInputsState,
+	} = refs
+
+	timingSel.addEventListener('change', () => {
+		runOsSave()
+		scheduleModelinePreview()
+	})
+	overrideResIn.addEventListener('change', () => {
+		runOsSave()
+		syncTimingRowVisibility()
+	})
+	syncTimingRowVisibility()
+
+	displayModeSelect.addEventListener('change', () => {
+		syncOsCustomRowVisibility()
+		syncTimingRowVisibility()
+		scheduleModelinePreview()
+		runOsSave()
+	})
+	for (const el of [osCustomWidthIn, osCustomHeightIn, osCustomFpsIn]) {
+		el.addEventListener('change', () => {
+			runOsSave()
+			scheduleModelinePreview()
+		})
+		el.addEventListener('input', () => scheduleModelinePreview())
+	}
+	for (const el of [customWidthIn, customHeightIn, customFpsIn]) {
+		el.addEventListener('change', () => {
+			runSave()
+			scheduleModelinePreview()
+		})
+		el.addEventListener('input', () => scheduleModelinePreview())
+	}
+	modeSel.addEventListener('change', () => {
+		syncCustomInputsState()
+		scheduleModelinePreview()
+		runSave()
+	})
+}
