@@ -7,7 +7,7 @@ import {
 	parseCompanionCoordField,
 	flagCompanionCoords,
 } from '../lib/companion-location-parse.js'
-import { companionButtonPreviewUrl } from '../lib/companion-button-preview-url.js'
+import { companionButtonPreviewUrl, invalidateCompanionFlagThumbs } from '../lib/companion-button-preview-url.js'
 import { openCompanionButtonPickerModal } from './companion-button-picker-modal.js'
 import { appendTimelineInspectorPosition, syncTimelineToServer } from './inspector-panel-timeline-shared.js'
 
@@ -182,13 +182,29 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	 * this used to re-derive coords from timelineState.getActive() with a fallback to the
 	 * STALE closure flag — editing a non-active timeline (or an immutable flag update) showed
 	 * the OLD button forever. The caller knows the new coords; use them directly. */
+	let boundCoords = { page: coords.page, row: coords.row, column: coords.column }
 	const refreshPreviewImg = (page, row, column) => {
 		if (previewRetryTimer) {
 			clearTimeout(previewRetryTimer)
 			previewRetryTimer = null
 		}
+		boundCoords = { page, row, column }
 		previewImg.src = companionButtonPreviewUrl(page, row, column, Date.now())
 	}
+
+	/* WO-450 round 5 (todos06.08: "I need it to update live"): follow the same WS preview
+	 * events the picker uses, so a Companion-side change redraws the bound preview without a
+	 * page reload. Self-removes once this inspector render is gone from the DOM. */
+	const onPreviewWs = (e) => {
+		if (!previewImg.isConnected) {
+			window.removeEventListener('companion-button-preview', onPreviewWs)
+			return
+		}
+		const d = e.detail
+		if (!d || d.page !== boundCoords.page || d.row !== boundCoords.row || d.column !== boundCoords.column) return
+		previewImg.src = companionButtonPreviewUrl(d.page, d.row, d.column, d.mtimeMs || Date.now())
+	}
+	window.addEventListener('companion-button-preview', onPreviewWs)
 
 	const applyCoords = (page, row, column) => {
 		timelineState.updateFlag(timelineId, flagId, {
@@ -198,6 +214,9 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 		})
 		syncTimelineToServer()
 		refreshPreviewImg(page, row, column)
+		/* Rebind must also repaint the flag's thumb on the timeline canvas — the canvas only
+		 * redraws on its own events, so without this the OLD button stayed until reload. */
+		invalidateCompanionFlagThumbs()
 	}
 
 	const locWrap = document.createElement('div')

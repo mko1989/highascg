@@ -23,7 +23,7 @@ import {
 } from '../components/preview-canvas-compose-snapshot.js'
 import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-url.js'
 import { applySharedLayoutBroadcast } from './operator-gui-mode.js'
-import { invalidateCompanionFlagThumbs } from './companion-button-preview-url.js'
+import { invalidateCompanionFlagThumbs, noteCompanionButtonPreviewUpdate } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
 import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
 
@@ -197,6 +197,11 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('operatorGuiLayout', (data) => applySharedLayoutBroadcast(data?.cells, { source: data?.source }))
 
 	ws.on('companion.buttonPreview', (data) => {
+		/* Record the fresh mtime BEFORE invalidating so the re-fetch is cache-busted past the
+		 * browser HTTP cache (live updates without a page reload, todos06.08). */
+		if (data && data.page != null) {
+			noteCompanionButtonPreviewUpdate(data.page, data.row, data.column, data.mtimeMs)
+		}
 		invalidateCompanionFlagThumbs()
 		try {
 			window.dispatchEvent(new CustomEvent('companion-button-preview', { detail: data }))

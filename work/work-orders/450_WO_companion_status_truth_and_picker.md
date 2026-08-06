@@ -99,3 +99,20 @@ rebind) had no retry. Now: applyCoords passes the new coords straight through, o
 the dim class, and a single 1.2 s retry re-requests after a miss. Built + deployed.
 Owner QA: choose a different button → the 72px preview swaps within ~a second.
 
+## 7. Round 5 (06.08 later): "the companion button on the timeline and in the inspector only updates after a web UI page refresh. I need it to update live."
+
+Three gaps, one existing pipeline: the server already broadcasts `companion.buttonPreview`
+over WS on every SUB-STATE (and the picker modal already listened) — but:
+1. The **inspector's bound preview** listened to nothing. It now follows the same WS event
+   (matching bound coords, mtime cache-buster, self-removing listener).
+2. The **canvas thumb cache** re-fetched the SAME URL after invalidation, so the browser
+   HTTP cache (max-age=2) could serve the stale jpg. The WS handler now records each
+   button's latest mtime (`noteCompanionButtonPreviewUpdate`) and the thumb loader uses it
+   as cache-buster.
+3. **Rebinding** never repainted the canvas — `applyCoords` now calls
+   `invalidateCompanionFlagThumbs()` (which schedules a canvas redraw via the registered
+   hook).
+
+Built + deployed; suite 1882/0/2. Owner QA: change a button's look in Companion — the flag
+thumb on the timeline and the inspector preview follow within ~a second, no reload.
+
