@@ -31,7 +31,7 @@ function resolveGlSyncDisplay(config) {
 	if (raw && lower !== 'auto') return raw
 
 	let plan
-	const planSysId = (idx) => {
+	const ensurePlan = () => {
 		try {
 			if (plan === undefined) {
 				const { calculateLayoutPositions } = require('./os-layout-calculator')
@@ -40,8 +40,28 @@ function resolveGlSyncDisplay(config) {
 		} catch {
 			plan = null /* layout plan unavailable (headless/test) */
 		}
-		const s = plan?.screens?.[idx] ?? plan?.screens?.[String(idx)]
+		return plan
+	}
+	const planSysId = (idx) => {
+		const p = ensurePlan()
+		const s = p?.screens?.[idx] ?? p?.screens?.[String(idx)]
 		return String(s?.sysId || '').trim()
+	}
+	/* WO-437: a mapping-node-only rig (pixel_map_out → gpu_out cables, no screen destinations
+	 * assigned to screens) has an empty plan.screens, so the WO-407 auto never resolved and
+	 * caspar ran without __GL_SYNC_DISPLAY_DEVICE — the cross-panel vblank beat could return.
+	 * The PGM head is then the wall's origin: the mapping-driven output placed leftmost. */
+	const planMappingSysId = () => {
+		const p = ensurePlan()
+		const rows = Array.isArray(p?.mappingGpuOutputs) ? p.mappingGpuOutputs.filter((r) => r?.sysId) : []
+		if (!rows.length) return ''
+		const leftmost = rows.reduce((a, b) => {
+			const ax = Number(a.x) || 0
+			const bx = Number(b.x) || 0
+			if (ax !== bx) return ax <= bx ? a : b
+			return (Number(a.y) || 0) <= (Number(b.y) || 0) ? a : b
+		})
+		return String(leftmost.sysId || '').trim()
 	}
 
 	// 1. The Device-View "NVIDIA sync to display" tick — ONE tick drives the NVIDIA policy
@@ -61,7 +81,9 @@ function resolveGlSyncDisplay(config) {
 	const s1 = planSysId(1)
 	if (s1) return s1
 	const sid = String(cs.screen_1_system_id || '').trim()
-	return sid || null
+	if (sid) return sid
+	// 3. Mapping-only rig: the leftmost mapping-driven GPU head (WO-437).
+	return planMappingSysId() || null
 }
 
 /**

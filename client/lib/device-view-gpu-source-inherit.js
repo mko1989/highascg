@@ -4,7 +4,7 @@
 import {
 	CASPAR_VIDEO_MODE_SPECS,
 } from '../components/device-view-destinations-inspector.js'
-import { videoModeToResolution } from './mapping-node-service.js'
+import { videoModeToResolution, resolveMappingOutputResolution } from './mapping-node-service.js'
 import { resolveDefaultVideoMode } from './project-fps.js'
 
 /**
@@ -98,16 +98,18 @@ function resolveMappingOutputFeedSource(lastPayload, sourceId) {
 		outputs.find((o) => String(o?.id || '') === outKey) ||
 		outputs[Number.isFinite(Number(conn.index)) ? Number(conn.index) : -1] ||
 		null
-	const resolved = output ? videoModeToResolution(output.mode) : null
-	const mode = String(output?.mode || '1080p5000').trim() || '1080p5000'
+	/* WO-437: resolveMappingOutputResolution owns the mode-vs-stored-dims precedence (a standard
+	 * mode outranks stale stored width/height) — inlining `output.width ?? mode dims` here made
+	 * GPU ports report the pre-mode-change size as the incoming signal. */
+	const res = resolveMappingOutputResolution(output)
 
 	return normalizeFeedSource({
 		id: sid,
 		label: output?.label || conn.label,
-		videoMode: mode,
-		width: output?.width ?? resolved?.w,
-		height: output?.height ?? resolved?.h,
-		fps: output?.fps ?? resolved?.fps,
+		videoMode: res.mode,
+		width: res.width,
+		height: res.height,
+		fps: res.fps,
 	}, lastPayload?._settings)
 }
 

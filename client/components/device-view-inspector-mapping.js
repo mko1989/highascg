@@ -184,13 +184,15 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 		customBox.style.display = isCustomMode ? 'grid' : 'none'
 
 		const saveCustom = async () => {
-			const width = Math.max(1, parseInt(cW.value, 10) || 1)
-			const height = Math.max(1, parseInt(cH.value, 10) || 1)
-			const fps = Math.max(1, parseFloat(cF.value) || 50)
-			const mode =
-				vMode.value === 'custom'
-					? MappingNode.formatCustomVideoMode(width, height, fps)
-					: vMode.value
+			/* WO-437: picking a STANDARD mode used to save the hidden custom inputs' stale numbers
+			 * alongside it ({mode:'2160p5000', width:1920, height:1080}) — and stored dims outrank
+			 * the mode everywhere the feed is resolved, so GPU ports kept reporting the old size. */
+			const isCustom = vMode.value === 'custom'
+			const std = isCustom ? null : MappingNode.videoModeToResolution(vMode.value)
+			const width = isCustom ? Math.max(1, parseInt(cW.value, 10) || 1) : std.w
+			const height = isCustom ? Math.max(1, parseInt(cH.value, 10) || 1) : std.h
+			const fps = isCustom ? Math.max(1, parseFloat(cF.value) || 50) : (std.fps ?? 50)
+			const mode = isCustom ? MappingNode.formatCustomVideoMode(width, height, fps) : vMode.value
 			const r = await MappingNode.updateMappingOutputFields(node.id, out.id, { mode, width, height, fps })
 			if (r.ok) {
 				setCasparRestartDirty(true)

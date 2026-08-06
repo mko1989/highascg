@@ -55,6 +55,14 @@ export function resolveMappingOutputResolution(output) {
 			isCustom: true,
 		}
 	}
+	/* WO-437: a STANDARD mode id is authoritative over stored width/height. Outputs saved by the
+	 * pre-437 inspector carry stale custom dims next to a standard mode (mode 2160p5000 with
+	 * width 1920) — the dropdown is what the operator set; letting the stale numbers outrank it
+	 * made GPU ports report the old resolution as the incoming signal. */
+	if (/^(720|1080|2160)[pi]\d{4}$/i.test(mode) || /^(pal|ntsc)$/i.test(mode)) {
+		const res = videoModeToResolution(mode)
+		return { mode, width: res.w, height: res.h, fps: res.fps ?? 50, isCustom: false }
+	}
 	if (Number.isFinite(Number(output?.width)) && Number.isFinite(Number(output?.height))) {
 		return {
 			mode,

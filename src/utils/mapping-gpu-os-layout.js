@@ -7,6 +7,11 @@ const { pickGpuOutLayoutSysId, resolveSysIdToXrandrOutput } = require('./xrandr-
 
 function resolveOutputPixelSize(outDef) {
 	const modeId = String(outDef?.mode || '1080p5000').trim()
+	// WO-437: a STANDARD mode id is authoritative over stored width/height — pre-437 inspector
+	// saves left stale custom dims next to a standard mode (2160p5000 with width 1920), and
+	// preferring the numbers here fed the old size into the OS layout / consumer fallbacks.
+	const stdSpec = STANDARD_VIDEO_MODES[modeId]
+	if (stdSpec) return { width: stdSpec.width, height: stdSpec.height, fps: stdSpec.fps }
 	const wNum = parseInt(String(outDef?.width ?? ''), 10)
 	const hNum = parseInt(String(outDef?.height ?? ''), 10)
 	if (wNum > 0 && hNum > 0) {
