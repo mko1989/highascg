@@ -34,12 +34,16 @@ export function previewBusAvailableForSendTo(cm, sendTo) {
 	return isPreviewBusAvailable(cm, Math.max(0, s))
 }
 
-/** PGM-only outputs: route timeline to program; hide/disable PRV dest. */
+/**
+ * PGM-only outputs (no PRV bus): drop the impossible PRV routing but leave `program` alone —
+ * unticked stays UNROUTED. Coercing to program:true here is what made every timeline born
+ * live on PGM-only rigs, so playhead scrubs painted over the playing look (todos06.08); PGM
+ * engages only via the explicit tick, the timeline Take, or a look playing the timeline.
+ */
 export function coerceTimelineSendTo(cm, sendTo) {
 	if (!sendTo || typeof sendTo !== 'object') return sendTo
 	if (!previewBusAvailableForSendTo(cm, sendTo)) {
 		sendTo.preview = false
-		sendTo.program = true
 	}
 	return sendTo
 }

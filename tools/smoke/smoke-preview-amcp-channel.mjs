@@ -99,12 +99,20 @@ ok(
 	previewBusAvailableForSendTo(pgmOnlyMap, prvDefault) === false,
 	'timeline dest has no PRV bus on pgm_only',
 )
+/* Repointed for WO-448 (todos06.08): pgm_only used to coerce to program:true, which made every
+ * timeline born live on PGM — scrubbing painted over the playing look. Now it coerces to
+ * UNROUTED; PGM engages only via the explicit tick, timeline Take, or look playback. */
 const coerced = coerceTimelineSendTo(pgmOnlyMap, { ...prvDefault })
-ok(coerced.preview === false && coerced.program === true, 'timeline sendTo coerces to PGM on pgm_only')
+ok(coerced.preview === false && coerced.program === false, 'timeline sendTo coerces to UNROUTED on pgm_only')
 const coercedDefault = defaultTimelineSendTo(pgmOnlyMap)
 ok(
-	coercedDefault.preview === false && coercedDefault.program === true,
-	'timeline default sendTo is PGM on pgm_only',
+	coercedDefault.preview === false && coercedDefault.program === false,
+	'timeline default sendTo is unrouted on pgm_only (never silently PGM)',
+)
+const explicitPgm = coerceTimelineSendTo(pgmOnlyMap, { preview: true, program: true, screenIdx: 0 })
+ok(
+	explicitPgm.preview === false && explicitPgm.program === true,
+	'an explicit PGM tick survives pgm_only coercion',
 )
 const kept = coerceTimelineSendTo(pgmPrvMap, { ...prvDefault })
 ok(kept.preview === true && kept.program === false, 'timeline sendTo stays PRV on pgm_prv')

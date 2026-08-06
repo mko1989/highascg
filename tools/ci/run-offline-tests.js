@@ -70,6 +70,7 @@ const FILES = [
 	'tools/smoke/smoke-wo444-caspar-env-per-launch.test.js',
 	'tools/smoke/smoke-wo446-lighting-protocol-dispatch.test.js',
 	'tools/smoke/smoke-wo447-vsync-default-off.test.js',
+	'tools/smoke/smoke-wo448-timeline-unrouted-default.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',

@@ -221,7 +221,7 @@ export function createTimelineTransport(deps) {
 					<span class="tl-tb-label">Dest:</span>
 					${screenSel}
 					${prvChk}
-					<label class="tl-chk"><input type="checkbox" id="tl-s-pgm" ${view.sendTo.program ? 'checked' : ''}${prvAvailable ? '' : ' checked disabled'}> PGM</label>
+					<label class="tl-chk"><input type="checkbox" id="tl-s-pgm" ${view.sendTo.program ? 'checked' : ''}> PGM</label>
 				</div>
 				<div class="tl-tb-group tl-tb-take">
 					<select class="tl-select tl-select-sm" id="tl-take-trans" title="Take transition">

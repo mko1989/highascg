@@ -361,6 +361,8 @@ module.exports = {
 		const st = normalizeTimelineSendTo(sendTo)
 		const previewOn = st.preview
 		const programOn = st.program
+		/* Unrouted timeline (todos06.08): edits/scrub apply nowhere until Take or a look routes it. */
+		if (!previewOn && !programOn) return []
 		let map = null
 		try {
 			map = this.self?.config ? getChannelMap(this.self.config) : null
@@ -378,8 +380,15 @@ module.exports = {
 		if (screenIdx !== null) addScreen(screenIdx)
 		else for (let i = 0; i < screenCount; i++) addScreen(i)
 		if (ch.length === 0) {
-			const fallback = programOn ? (map?.programCh?.(1) ?? 1) : (map?.previewCh?.(1) ?? map?.programCh?.(1) ?? 1)
-			ch.push(fallback)
+			/* PRV requested but the screen has no PRV bus (pgm_only/pixelmap): route NOWHERE.
+			 * The old fallback crossed to programCh(1) here, which is exactly how scrubbing a
+			 * "preview-only" timeline painted over the live look on PGM-only rigs (todos06.08).
+			 * Only an explicit program request may fall back to a program channel. */
+			if (programOn) ch.push(map?.programCh?.(1) ?? 1)
+			else {
+				const prv1 = map?.previewCh?.(1)
+				if (prv1 != null) ch.push(prv1)
+			}
 		}
 		return ch
 	},
