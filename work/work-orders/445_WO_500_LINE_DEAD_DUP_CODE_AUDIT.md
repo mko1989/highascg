@@ -1,6 +1,6 @@
 # WO-445 — Full-project audit: 500-line violations, dead code, duplicate code
 
-**Status: OPEN (investigation complete 06.08.26; no code changed)**
+**Status: DONE (06.08.26 — CI un-red fixes + dead-file deletions implemented and verified; duplicate consolidations remain open as follow-ups, see §2b)**
 
 Owner todo (todos06.08.26 line 11): *"i need a full project search, looking for files that are
 exceeding 500 lines of code limit, as well as search for dead/duplicate code."*
@@ -103,14 +103,61 @@ stripped) over `client/components`, `client/lib`, `src`, `tools`, `scripts`, `te
 - Smoke-test internal repetition (`smoke-wo224-playlist-wrap` 62, `smoke-wo244` 43+31, …) —
   copy-paste fixture setup inside single test files; low value, low risk, lowest priority.
 
-## 2. What was done
+## 2. What was done (owner "go", same day)
 
-Investigation only. This WO written; row added to `work/OPEN_ISSUES.md`. No production code
-touched. Suggested fix order: §1.0 items 1→3 (un-reds CI, smallest possible diffs), then the
-dead-file deletions (§1.2, trivial, shrink the baseline), then the duplicate consolidations
-(each its own WO, config generators last).
+Correction to §1.3 discovered while fixing: `device-view-inspector-gpu-modeline-apply.js`
+and `-os.js` — the other half of the top three duplicate groups — were themselves DEAD
+(imported by nothing / only by each other; an abandoned parallel split of the WO-140
+family). So the biggest "dedupe" was a deletion, not an extraction.
 
-## 3. What was VERIFIED
+1. **500-line gate** — moved the input event-wiring block (old lines 389-439) out of
+   `device-view-inspector-gpu-video-modeline.js` into a new `wireModelineInputEvents`
+   export in the live `-preview.js` sibling: 507 → 475 lines. Behavior-preserving: same
+   listener order, including the initial `syncTimingRowVisibility()` call position. The
+   WO-441/442/edid smokes pin only regions that stayed put.
+2. **WO-367 gate / WO-49** — wired `openSaveDeviceSnapshotModal`: new icon button
+   (down-arrow-into-tray, DOM-built to avoid the WO-103 innerHTML lint) in the Devices
+   header next to the config-editor icon; handler in `attachDeviceViewEvents` passes
+   `refs.rearPanel` for the PNG capture and `setStatus` for feedback. This was WO-49's
+   designated primary entry point; the load half was already live in
+   `project-hardware-reconcile-modal.js`.
+3. **ESLint** — the NBSP inside the WO-441 smoke's regex literal is now ` `
+   (matches the identical character; `no-irregular-whitespace` skips strings but not
+   regexes, which is why the production line never errored).
+4. **Dead files deleted** (1,034 lines): `template/led-grid-test-{core,patterns}.js`,
+   `client/components/device-view-gpu-source-inherit.js`,
+   `client/components/device-view-inspector-gpu-modeline-{apply,os}.js`.
+   Baseline `--update`: 690 → 688. Note: `screenConsumerCasparPatch` ENTERED the baseline
+   in the same rewrite — the deleted stale gpu-source-inherit copy (with its broken
+   `./screen-consumer-defaults.js` import) was its only external mention; the function is
+   used inside its own module, i.e. the same module-local class the baseline exists for.
+
+### 2b. Still open (each needs its own WO before touching)
+
+- Caspar config generators dedupe (~220 lines, load-bearing XML — verify with before/after
+  XML diff), audio mixer console↔panel (~100), artnet↔sacn (~63), `which.js` reimpl (~47),
+  template pairs (multiview ~84, lower-thirds ~44 — CEF, no bundler).
+- Lint pass 6 for `no-unused-vars` headroom (216 warnings vs 218 cap).
+- 11 Syncthing `*.sync-conflict-*` files under `projects/` (June 24-28) fail
+  `verify:repo-integrity` LOCALLY (untracked, so CI never sees them). Owner call:
+  delete the conflict copies after checking none holds wanted edits.
+
+## 3. What was VERIFIED (post-fix)
+
+- All CI-order gates green locally at the final commit: max-file-lines 0 violations;
+  unwired-exports no new orphans (688 baseline); eslint 0 errors / 216 warnings (cap 218);
+  prettier CI-scope clean; offline suite **1867 tests: 1865 pass / 0 fail / 2 skip**
+  (same counts as WO-444's green run). Repo-integrity fails locally ONLY on the
+  pre-existing untracked sync-conflict files above. Boot check left to CI (a second
+  `node index.js` on the live box could steal UDP/OSC binds).
+- `npm run build:client` OK; `device-view__save-snapshot-btn` present in the built
+  device-view chunk; `gpu-modeline-apply` absent from `dist-web/`. Kiosk reloaded
+  (XTEST F5). Owner QA: the new ⭳ button in Devices header → "Save device snapshot"
+  modal downloads the JSON.
+- Vite build doubles as an import-graph check: none of the five deleted files was
+  reachable (build succeeded with them gone).
+
+## 3-orig. What was VERIFIED (audit phase)
 
 - Gate outputs reproduced locally at HEAD `9d7e2b6` (= origin/main, nothing unpushed):
   `check-max-file-lines` exit 1 (1 violation, 507), `check-unwired-exports` exit 1 (1 new
