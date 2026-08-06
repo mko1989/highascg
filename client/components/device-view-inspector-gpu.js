@@ -29,11 +29,13 @@ export function buildGpuInspectorSummaryRows(conn, { lastPayload } = {}) {
 	const edid = display?.monitor || display?.edid?.parsed || rt.monitor || null
 	const monitorName = edidMonitorLabel(edid)
 	const serial = String(edid?.serial || '').trim()
-	const nativeMode =
+	const nativeModeRaw =
 		String(edid?.preferredMode || '').trim() ||
 		(display?.resolution && Number.isFinite(display?.refreshHz)
 			? `${display.resolution} @ ${display.refreshHz} Hz`
 			: display?.resolution || '')
+	// WO-441: non-breaking spaces keep the mode on ONE line ("… @ 50 Hz" was wrapping).
+	const nativeMode = nativeModeRaw.replace(/ /g, ' ')
 	const osOutput = String(rt.xrandrName || rt.activePort || display?.name || '').trim() || '—'
 	const status = display?.connected || rt.connected ? 'Connected' : 'Disconnected'
 	const warnings = (Array.isArray(lastPayload?.live?.warnings) ? lastPayload.live.warnings : [])
@@ -398,7 +400,14 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		...(cableFeedNote ? [cableFeedNote] : []),
 		modeSel,
 		(() => {
-			const d = Object.assign(document.createElement('div'), { style: 'display:flex; gap:4px; margin-top:4px' })
+			const d = Object.assign(document.createElement('div'), { style: 'display:flex; gap:4px; margin-top:4px; min-width:0' })
+			// WO-441: number inputs keep their natural width (~150px) unless told otherwise — three
+			// of them overflowed the sidebar and the Height box was cut off. Share the row equally.
+			for (const inp of [customWidthIn, customHeightIn, customFpsIn]) {
+				inp.style.flex = '1 1 0'
+				inp.style.minWidth = '0'
+				inp.style.width = 'auto'
+			}
 			d.append(customWidthIn, customHeightIn, customFpsIn)
 			return d
 		})(),

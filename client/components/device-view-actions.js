@@ -115,7 +115,12 @@ export async function addDestination(typeOrOptions) {
 }
 
 export async function applyCasparConfig(opts = {}) {
-	const body = {}
+	/* WO-440 (owner): the Apply button ALWAYS restarts Caspar. The WO-337 unchanged-gate
+	 * ("no changes — Caspar left running") also missed caspar-env drift (WO-407 GL sync lives
+	 * there, outside the XML), so an operator could not force the restart that makes an env
+	 * change take. The gate still serves background appliers (project-hardware-apply posts
+	 * directly without force). */
+	const body = { force: true }
 	if (typeof opts.xml === 'string' && opts.xml.trim()) body.xml = opts.xml.trim()
 	return await api.post('/api/caspar-config/apply', body)
 }

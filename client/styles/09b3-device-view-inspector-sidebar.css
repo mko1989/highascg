@@ -117,7 +117,10 @@
 .device-view__kv-val {
 	font-size: 12px;
 	color: #fff;
-	word-break: break-all;
+	/* WO-441: break-all split mid-word ("3840x2160 @ 50 Hz" wrapped inside "Hz"); wrap at
+	 * word boundaries, break only tokens that cannot fit (long EDID serials). */
+	word-break: normal;
+	overflow-wrap: anywhere;
 	min-width: 0;
 }
 .device-view__links {
