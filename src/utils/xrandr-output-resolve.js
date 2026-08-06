@@ -186,6 +186,30 @@ function pickGpuOutLayoutSysId(config, connector, screenIndex1) {
 }
 
 /**
+ * WO-439: xrandr output name for a 1-based physical GPU port index (graph connector
+ * `gpu_p{N-1}`), straight from the device graph. The Device-View "NVIDIA sync to display"
+ * tick stores only the port index (`screen_N_nvidia_sync_to_display`); resolving the NAME
+ * via `screen_N_system_id` / layout-plan screens fails on a mapping-node-only rig (no screen
+ * assignments exist), which silently dropped the owner's tick for BOTH tick consumers.
+ * @param {object} config
+ * @param {number} portIndex1 1-based physical GPU port index
+ * @returns {string} xrandr output name, or ''
+ */
+function resolveGpuPortIndexToXrandrOutput(config, portIndex1) {
+	const n = parseInt(String(portIndex1), 10)
+	if (!Number.isFinite(n) || n < 1) return ''
+	const dg = config?.deviceGraph
+	const connector = (Array.isArray(dg?.connectors) ? dg.connectors : []).find(
+		(c) => String(c?.id || '') === `gpu_p${n - 1}` && (c?.kind === 'gpu_out' || c?.kind === 'gpu_output'),
+	)
+	if (!connector) return ''
+	// screenIndex null: the screen_N_system_id path is the caller's step 1 — here the graph decides.
+	const sysId = pickGpuOutLayoutSysId(config, connector, null)
+	if (!sysId) return ''
+	return resolveSysIdToXrandrOutput(sysId, { config }) || sysId
+}
+
+/**
  * Resolve a Device View / config sysId (DRM or xrandr) to a live xrandr output name.
  * @param {string} sysId
  * @param {{ inventory?: ReturnType<typeof getGpuConnectorInventory>, config?: object, displays?: object[] }} [opts]
@@ -244,6 +268,7 @@ module.exports = {
 	pickGpuOutLayoutSysId,
 	findTopologyPairForName,
 	resolveViaPortPair,
+	resolveGpuPortIndexToXrandrOutput,
 	resolveSysIdToXrandrOutput,
 	resolveLayoutHeadSysId,
 	normalizePortName,

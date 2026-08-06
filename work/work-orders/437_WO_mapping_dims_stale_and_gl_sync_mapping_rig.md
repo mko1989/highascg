@@ -2,6 +2,15 @@
 
 **Status: DONE (2026-08-06 — suite 1849/0/2, built + kiosk F5 + highascg restart; live graph healed via API. Caspar picks up the GL-sync var on the owner's next Apply + caspar restart)**
 
+> **CORRECTION (same day, owner escalation → WO-439):** this WO's GL-sync diagnosis was
+> incomplete. The owner's "NVIDIA sync to display" tick WAS set (`screen_1_nvidia_sync_to_display: true`)
+> and WAS being read — it was dropped one step later, at the port→name lookup, which only knew
+> `screen_N_system_id` / plan.screens (both empty on this rig). This session's offline repro
+> missed it by loading the config without the caspar_server.json slice. The mapping-outputs
+> fallback added here is still correct as the LAST resort, but the tick fix is
+> [WO-439](./439_WO_nvidia_sync_tick_dropped_on_mapping_rig.md); precedence is now
+> tick → screen assignment → mapping wall origin.
+
 Owner (todos06.08.26 items 2+3): "even though the mapping node outputs are set to 2160p the
 gpu ports display 1080p as the incoming/connected signal" and "is the caspar gl sync set
 right now?"

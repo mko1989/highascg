@@ -66,11 +66,18 @@ function resolveGlSyncDisplay(config) {
 
 	// 1. The Device-View "NVIDIA sync to display" tick — ONE tick drives the NVIDIA policy
 	//    script (HIGHASCG_NVIDIA_SYNC_OUTPUT) AND caspar's GL swap gating (owner 03.08).
+	//    WO-439: the ticked PORT resolves to a name via the device graph's gpu_p{N-1} connector
+	//    when screen_N_system_id / layout-plan screens don't exist (mapping-node-only rig) —
+	//    the tick was being read and then silently dropped at exactly this lookup.
 	try {
 		const { nvidiaSyncToDisplayPortIndex } = require('./x-display-session-layout-resolve')
 		const port = nvidiaSyncToDisplayPortIndex(config)
 		if (port) {
-			const sid = String(cs[`screen_${port}_system_id`] || '').trim() || planSysId(port)
+			const { resolveGpuPortIndexToXrandrOutput } = require('./xrandr-output-resolve')
+			const sid =
+				String(cs[`screen_${port}_system_id`] || '').trim() ||
+				planSysId(port) ||
+				resolveGpuPortIndexToXrandrOutput(config, port)
 			if (sid) return sid
 		}
 	} catch {

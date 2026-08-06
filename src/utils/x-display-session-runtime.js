@@ -3,6 +3,7 @@
 const { execFile } = require('child_process')
 const { promisify } = require('util')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
+const { resolveGpuPortIndexToXrandrOutput } = require('./xrandr-output-resolve')
 const {
 	resolveNvidiaXApplyScript,
 	buildNvidiaDisplayPolicyShellLines,
@@ -73,7 +74,12 @@ function buildConfineCursorShellLines(config, layout) {
 function resolveNvidiaSyncToDisplayOutput(config) {
 	const port = nvidiaSyncToDisplayPortIndex(config)
 	if (!port) return null
-	const sysId = String(readCasparSetting(config, `screen_${port}_system_id`) || '').trim()
+	// WO-439: screen_N_system_id only exists when screens are assigned; on a mapping-node-only
+	// rig the ticked port must resolve through the device graph's gpu_p{N-1} connector or the
+	// tick exports nothing and the NVIDIA policy script never learns the sync head.
+	const sysId =
+		String(readCasparSetting(config, `screen_${port}_system_id`) || '').trim() ||
+		resolveGpuPortIndexToXrandrOutput(config, port)
 	if (!sysId || !/^[A-Za-z0-9._-]+$/.test(sysId)) return null
 	return sysId
 }

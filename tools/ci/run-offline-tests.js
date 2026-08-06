@@ -63,6 +63,7 @@ const FILES = [
 	'tools/smoke/smoke-wo434-no-drop-seed-embed-server.test.js',
 	'tools/smoke/smoke-wo436-mapping-inspector-cache-revert.test.js',
 	'tools/smoke/smoke-wo437-mapping-dims-gl-sync.test.js',
+	'tools/smoke/smoke-wo439-nvidia-sync-tick-mapping-rig.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',
