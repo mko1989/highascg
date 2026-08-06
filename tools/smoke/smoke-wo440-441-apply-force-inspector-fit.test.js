@@ -64,7 +64,7 @@ test('WO-441: inspector summary values wrap at word boundaries, not mid-word', (
 
 test('WO-441: Native mode string is non-breaking; custom W/H/FPS inputs share the row', () => {
 	const src = code(read('client/components/device-view-inspector-gpu.js'))
-	assert.match(src, /nativeModeRaw\.replace\(\/ \/g, ' '\)/, 'NBSP join keeps the mode on one line')
+	assert.match(src, /nativeModeRaw\.replace\(\/ \/g, '\u00a0'\)/, 'NBSP join keeps the mode on one line')
 	assert.match(src, /flex = '1 1 0'/, 'number inputs must not keep natural width in the sidebar row')
 	assert.match(src, /minWidth = '0'/, 'flex children need min-width:0 to actually shrink')
 })
