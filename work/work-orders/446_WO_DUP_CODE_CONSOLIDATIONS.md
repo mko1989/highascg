@@ -27,6 +27,31 @@ Verified: `smoke-command-lookup.test.js` 3/3 (includes the no-/usr/bin/command s
 `smoke-os-layout-w40.js` 9/9, eslint clean, exports probed by hand
 (`commandExists('sh') → true`, `FALLBACK_PATH` intact).
 
+### 2.2 Art-Net ↔ sACN receivers (~250 shared lines) — DONE, and it wired a lost feature
+
+The two classes were line-for-line copies apart from the transport. Extracted
+`src/artnet/dmx-border-receiver-base.js` (shared state, stats, slot/patch resolution,
+handleData, WS/Caspar flush scheduling, stop); `artnet-receiver.js` (357→52) and
+`sacn-receiver.js` (397→97) keep only transport + protocol hooks. Fixes two latent sACN
+bugs the duplication had hidden: `applyPatch` calls `receiver._artnetScreenIndex()` which
+SacnReceiver never defined (TypeError on any patch without screenIndex), and
+`getInputStatus` reads `_socket`/`_artnetListenEnabled` by name (sACN stored its transport
+in `_sacnReceiver` → status permanently "not listening").
+
+**Bigger find: `SacnReceiver` was never instantiated anywhere.** WO-179 T179.4 shipped the
+class, the UI protocol select, and `slotLightingProtocol()` — but index.js constructed
+ArtnetReceiver unconditionally. Choosing sACN in the inspector did nothing (fifth WO-367
+lost-wiring find; pre-gate, baselined). New `src/artnet/lighting-input-receiver.js` facade
+owns whichever receiver the slot asks for and swaps on reconfigure; it exposes the exact
+surface all call sites already use, so `appCtx.artnetReceiver` keeps its name and only
+index.js changed (2 lines). Fresh-instance init honors the DMX master switch the same way
+boot does.
+
+Verified: new `smoke-wo446-lighting-protocol-dispatch.test.js` 4/4 (dispatch follows the
+slot, no instance churn on same protocol, sACN field contract, shared handleData) —
+registered in FILES; WO-179 smokes 9+5 still green; eslint clean; no new orphan exports.
+Server restart pending at batch end (src change).
+
 ## 3. What was VERIFIED
 
 Per-item, recorded inline above. Suite + gates re-run at the end of the batch.

@@ -31,7 +31,7 @@ const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
 const { runConnectionQueryCycle, runMediaLibraryQueryCycle, bindAppCtxAmcpTransport } = require('./src/utils/query-cycle')
 const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
-const { ArtnetReceiver } = require('./src/artnet/artnet-receiver')
+const { LightingInputReceiver } = require('./src/artnet/lighting-input-receiver')
 const { createAppContext } = require('./src/app-context')
 const { setSceneLiveBroadcastHooks } = require('./src/state/live-scene-state')
 const { onSceneLiveBroadcast } = require('./src/companion-bridge/look-air-frames')
@@ -209,7 +209,7 @@ function main() {
 		appCtx._composePreviewLifecycle = createComposePreviewLifecycle({ appCtx })
 		appCtx._v4l2BridgeLifecycle = createV4l2BridgeLifecycle({ appCtx })
 		appCtx._loopRestartWatchdog = require('./src/engine/loop-restart-watchdog').startLoopRestartWatchdog(appCtx)
-		appCtx.artnetReceiver = new ArtnetReceiver(appCtx)
+		appCtx.artnetReceiver = new LightingInputReceiver(appCtx)
 		if (config.dmx?.artnetInputEnabled !== false) {
 			appCtx.artnetReceiver.init()
 		}
