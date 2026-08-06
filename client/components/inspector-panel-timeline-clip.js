@@ -381,40 +381,9 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 	trimGrp.appendChild(inHint)
 	root.appendChild(trimGrp)
 
-	const takeGrp = document.createElement('div')
-	takeGrp.className = 'inspector-group'
-	takeGrp.innerHTML = '<div class="inspector-group__title">Look take (playback)</div>'
-	const startWrap = document.createElement('div')
-	startWrap.className = 'inspector-field'
-	const startLab = document.createElement('label')
-	startLab.className = 'inspector-field__label'
-	startLab.textContent = 'Start behaviour'
-	const startSel = document.createElement('select')
-	startSel.className = 'inspector-field__select'
-	startSel.setAttribute('aria-label', 'Media start when taking this look to program')
-	startSel.innerHTML =
-		'<option value="beginning">Start from beginning (trim)</option>' +
-		'<option value="relativeToPrevious">Relative to timeline (layer)</option>'
-	const sbClip = freshClip().startBehaviour || 'beginning'
-	startSel.value = sbClip === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
-	startSel.addEventListener('change', () => {
-		timelineState.updateClip(timelineId, layerIdx, clipId, {
-			startBehaviour: startSel.value === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
-		})
-		syncTimelineToServer()
-		redrawClipInspector()
-	})
-	startLab.appendChild(startSel)
-	startWrap.appendChild(startLab)
-	const startHint = document.createElement('p')
-	startHint.className = 'inspector-field inspector-field--hint'
-	startHint.style.fontSize = '0.78rem'
-	startHint.style.color = 'var(--text-muted)'
-	startHint.textContent =
-		'Relative: on take, seek to the same position in the file as the timeline playhead on this layer (in-point + elapsed).'
-	startWrap.appendChild(startHint)
-	takeGrp.appendChild(startWrap)
-	root.appendChild(takeGrp)
+	/* "Look take (playback)" (startBehaviour) is a LOOK-take concept — its UI lives in the
+	 * scene-layer inspector. Owner removed it from the timeline clip inspector (todos06.08
+	 * lines 21-24); existing clip.startBehaviour values keep working in the engine. */
 
 	appendTimelineClipKeyframes(root, {
 		timelineId, layerIdx, clipId, clip,

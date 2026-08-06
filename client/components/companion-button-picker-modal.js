@@ -185,12 +185,17 @@ export function openCompanionButtonPickerModal(opts = {}) {
 			}
 			const sub = await api.post('/api/companion/page-preview/subscribe', { page })
 			if (!sub?.ok) {
+				/* No previews ≠ no picking: a binding is just page/row/column, so render the grid
+				 * blind and keep the warning visible (todos06.08: "doesnt actually let me pick a
+				 * button"). renderGrid resets the status line, so set the warning after it. */
+				renderGrid([])
 				statusEl.classList.add('companion-picker-status--warn')
 				statusEl.textContent =
-					sub?.hint ||
-					(sub?.reason === 'subscriptions_disabled'
-						? 'Enable Button Subscriptions API in Companion Settings (not only the Satellite server).'
-						: 'Companion Satellite preview unavailable.')
+					(sub?.hint ||
+						(sub?.reason === 'subscriptions_disabled'
+							? 'Enable Button Subscriptions API in Companion Settings (not only the Satellite server).'
+							: 'Companion Satellite preview unavailable.')) +
+					' You can still click a cell to bind it — previews will appear once enabled.'
 				return
 			}
 			sessionId = sub.sessionId

@@ -94,6 +94,9 @@ class SatellitePreviewClient extends EventEmitter {
 		} else {
 			this._refs.set(key, { count: 1, page, row, column })
 			const ok = await this._ensureConnected()
+			/* BEGIN (which resolves the connect wait) and CAPS arrive as separate lines — judging
+			 * subscriptionsSupported right after BEGIN can read a stale false. Give CAPS a moment. */
+			if (ok && !this._subscriptionsSupported) await this._waitCaps(1200)
 			if (!ok || !this._subscriptionsSupported) {
 				this._refs.delete(key)
 				const cfgNow = this._config || cfg
@@ -233,6 +236,21 @@ class SatellitePreviewClient extends EventEmitter {
 		return this._connected
 	}
 
+	_waitCaps(ms) {
+		if (this._subscriptionsSupported) return Promise.resolve(true)
+		return new Promise((resolve) => {
+			const timer = setTimeout(() => {
+				this.off('caps', onCaps)
+				resolve(false)
+			}, ms)
+			const onCaps = () => {
+				clearTimeout(timer)
+				resolve(true)
+			}
+			this.once('caps', onCaps)
+		})
+	}
+
 	_waitReady(ms) {
 		if (this._connected) return Promise.resolve(true)
 		return new Promise((resolve) => {
@@ -272,6 +290,7 @@ class SatellitePreviewClient extends EventEmitter {
 		}
 		if (command === 'CAPS') {
 			this._subscriptionsSupported = args.SUBSCRIPTIONS === '1' || args.SUBSCRIPTIONS === 'true'
+			this.emit('caps')
 			this._resubscribeAll()
 			return
 		}

@@ -38,6 +38,11 @@ async function probeCompanionHttp(host, port, timeoutMs = 2500) {
 }
 
 /**
+ * Connect AND read the Satellite handshake: Companion answers
+ * `BEGIN CompanionVersion=…` then `CAPS SUBSCRIPTIONS=0|1 …`. Reporting the CAPS bit from a
+ * live probe is what makes the settings status truthful — the passive preview client is
+ * disconnected whenever no picker is open, so its `subscriptionsSupported=false` said
+ * "Button Subscriptions API is not enabled" even when it was (todos06.08 false-flag report).
  * @param {string} host
  * @param {number} port
  * @param {number} [timeoutMs]
@@ -45,16 +50,44 @@ async function probeCompanionHttp(host, port, timeoutMs = 2500) {
 function probeCompanionTcp(host, port, timeoutMs = 2500) {
 	return new Promise((resolve) => {
 		const socket = net.connect({ host, port })
+		socket.setEncoding('utf8')
+		let buf = ''
+		let connected = false
+		let companionVersion = null
+		/** @type {boolean | null} */
+		let subscriptionsSupported = null
 		const done = (result) => {
 			clearTimeout(timer)
+			clearTimeout(capsTimer)
 			try {
 				socket.destroy()
 			} catch {}
 			resolve(result)
 		}
-		const timer = setTimeout(() => done({ connected: false, error: 'timeout' }), timeoutMs)
-		socket.once('connect', () => done({ connected: true }))
-		socket.once('error', (err) => done({ connected: false, error: err?.message || String(err) }))
+		const finishConnected = () => done({ connected: true, subscriptionsSupported, companionVersion })
+		const timer = setTimeout(() => {
+			if (connected) finishConnected()
+			else done({ connected: false, subscriptionsSupported: null, error: 'timeout' })
+		}, timeoutMs)
+		/* Give the handshake a short window after connect; a bare TCP open already means "up". */
+		let capsTimer = null
+		socket.once('connect', () => {
+			connected = true
+			capsTimer = setTimeout(finishConnected, 1200)
+		})
+		socket.on('data', (chunk) => {
+			buf += chunk
+			const mVer = buf.match(/\bCompanionVersion="([^"]*)"/)
+			if (mVer) companionVersion = mVer[1]
+			const mCaps = buf.match(/^CAPS\b[^\n]*\bSUBSCRIPTIONS=("?)(0|1|true|false)\1/m)
+			if (mCaps) {
+				subscriptionsSupported = mCaps[2] === '1' || mCaps[2] === 'true'
+				finishConnected()
+			}
+		})
+		socket.once('error', (err) =>
+			done({ connected: false, subscriptionsSupported: null, error: err?.message || String(err) }),
+		)
 	})
 }
 
@@ -79,14 +112,19 @@ async function buildCompanionConnectionStatus(ctx, query) {
 			: Promise.resolve({ connected: false, skipped: true }),
 	])
 
-	let satelliteSubscriptions = null
+	/* Live probe first; passive client only as a fallback when the probe saw no CAPS line. */
+	let satelliteSubscriptions = satelliteTcp.subscriptionsSupported ?? null
 	let satelliteReason = null
 	let satelliteHint = null
-	if (usingSaved && cfg.satelliteEnabled) {
+	if (cfg.satelliteEnabled && satelliteSubscriptions === false) {
+		satelliteReason = 'subscriptions_disabled'
+		satelliteHint =
+			'In Companion Settings, enable **Button Subscriptions API** (Satellite server alone is not enough). HighAsCG uses ADD-SUB for button previews — same API as the Elgato app.'
+	} else if (usingSaved && cfg.satelliteEnabled && satelliteSubscriptions === null) {
 		const client = getSatellitePreviewClient()
 		client.configure(ctx.config)
 		const st = client.getStatus()
-		satelliteSubscriptions = !!st.subscriptionsSupported
+		if (st.satelliteConnected) satelliteSubscriptions = !!st.subscriptionsSupported
 		satelliteReason = st.reason
 		satelliteHint = st.hint
 	}
