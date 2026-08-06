@@ -1,6 +1,6 @@
 # WO-446 — Duplicate-code consolidations (WO-445 §2b follow-ups)
 
-**Status: IN PROGRESS (06.08.26)**
+**Status: DONE for items 2.1–2.2 (06.08.26, suite green, service restarted); §2.9 items deferred — owner todos (WO-447..451) took priority mid-session**
 
 Owner "continue" on WO-445. Each item lands as its own commit, verified before the next.
 Ordering: safest → riskiest; the Caspar config generators go last (load-bearing XML) and
@@ -51,6 +51,17 @@ Verified: new `smoke-wo446-lighting-protocol-dispatch.test.js` 4/4 (dispatch fol
 slot, no instance churn on same protocol, sACN field contract, shared handleData) —
 registered in FILES; WO-179 smokes 9+5 still green; eslint clean; no new orphan exports.
 Server restart pending at batch end (src change).
+
+### 2.9 Deferred (each needs its own WO before touching)
+
+Owner todos landed mid-session (vsync WO-447, timeline WO-448/449, companion WO-450, GPU
+layout WO-451) and took priority. Still open from WO-445 §2b:
+- Audio mixer console ↔ panel shared helpers (~100 lines, both UIs live).
+- Template pairs: multiview_master ↔ multiview_overlay (~84), lower-thirds engine ↔ styles
+  (~44) — CEF standalone, sharing needs <script> includes, judge per template.
+- Caspar config generators (~220 lines) — riskiest; requires before/after XML diff harness.
+- Lint pass 6 (216 warnings vs 218 cap).
+- `projects/*.sync-conflict-*` cleanup — owner call.
 
 ## 3. What was VERIFIED
 
