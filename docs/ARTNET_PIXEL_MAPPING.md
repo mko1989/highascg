@@ -1,7 +1,7 @@
 # Art-Net & pixel mapping — capability landscape (WO-241, updated WO-242)
 
 **Status:** Canonical reference (2026-07) | **Binary:** `bin/casparcg` highascg-build-v1, deployed 2026-07-15 — see [CASPARCG_BUILD_PROVENANCE.md](CASPARCG_BUILD_PROVENANCE.md)
-**Walkthroughs:** [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines, primary flow) · [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md) (live JS pipeline, [DEPRECATED — legacyJsPixelmap flag])
+**Walkthroughs:** [WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md](WALKTHROUGH_PIXELMAP_DESTINATION_TEST.md) (Pixel Map destination: real-world hookup + hardware-free testing, WO-438) · [WALKTHROUGH_ARTNET_LED_WALL.md](WALKTHROUGH_ARTNET_LED_WALL.md) (native engines, primary flow) · [WALKTHROUGH_PIXELMAP_FIXTURES.md](WALKTHROUGH_PIXELMAP_FIXTURES.md) (live JS pipeline, [DEPRECATED — legacyJsPixelmap flag])
 
 This rig has **three independent engines** that turn live video into DMX-over-network (Art-Net / sACN). They coexist; pick per production. Everything below is read from the code actually deployed — source cites are `file:line` into the built Caspar tree (`/home/casparcg/caspar-build/src-tree/`) and this repo.
 
