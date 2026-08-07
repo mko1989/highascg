@@ -27,12 +27,16 @@ HighAsCG operator exFAT layout (volume label must be HIGHASCGEXF)
 Copy the contents of this zip onto the exFAT partition (not inside an extra folder).
 
 Folders:
-  drop-update/     Server hotfix drops (extract highascg-server_*.tar.gz here)
+  drop-update/     Server drops (extract highascg-server_*.tar.gz here; applied/ = history)
   drop-config/     Optional monolithic highascg.config.json overlay
   configs/         Modular settings + .highascg-state.json (starter show included)
   media/           Playout media library
   templates/       Caspar HTML/templates
+  projects/        Show files (*.json, _autosave/ kept by the app)
+  network/         network.conf — DHCP/static IP, editable from any PC (see its README)
+  decklink/        Operator-supplied Blackmagic Desktop Video .debs (see its README)
   snapshots/rear-panels/  Rear-panel snapshots
+  .private/        Per-machine sync/VPN identities — created at sync time, leave in place
 
 Boot order on the playout machine:
   mount HIGHASCGEXF → apply drop-update/ → sync configs/ → start highascg.service

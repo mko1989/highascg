@@ -13,6 +13,8 @@ mkdir -p \
 	"${ROOT}/projects" \
 	"${ROOT}/projects/_autosave" \
 	"${ROOT}/drop-config" \
+	"${ROOT}/drop-update" \
+	"${ROOT}/drop-update/applied" \
 	"${ROOT}/decklink" \
 	"${ROOT}/.private"
 
@@ -25,6 +27,8 @@ HighAsCG bridge partition (LABEL=HIGHASCGDAT)
   configs/   Modular settings + .highascg-state.json (synced with ~/highascg/config)
   projects/  Show files (*.json) synced with ~/highascg/projects (bidirectional)
   drop-config/  Optional monolithic highascg.config.json overlay
+  drop-update/  Server drops (extract highascg-server_*.tar.gz here; updates also stage back)
+  decklink/     Operator-supplied Blackmagic Desktop Video .debs (see decklink/README.txt)
   .private/     Per-machine Tailscale/Syncthing/replication secrets (not in configs/)
 
 Format: mkfs.exfat -L HIGHASCGDAT /dev/sdXN

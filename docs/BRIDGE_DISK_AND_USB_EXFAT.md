@@ -42,7 +42,7 @@ sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /home/casparcg/brid
 | **Server drops** | `drop-update/` (unchanged) |
 | **Private (per machine)** | `.private/<machine-id>/` on USB and bridge — Tailscale/Syncthing/replication pairing; **not** in `configs/` sync |
 
-Use [`HIGHASCGEXF-starter-layout.zip`](guides/stick/HIGHASCGEXF-starter-layout.zip) for USB folder stubs (refresh via `npm run exfat:starter-zip` → `dist/`).
+Use [`HIGHASCGEXF-starter-layout.zip`](guides/stick/HIGHASCGEXF-starter-layout.zip) for USB folder stubs and [`HIGHASCGDAT-starter-layout.zip`](guides/stick/HIGHASCGDAT-starter-layout.zip) for the bridge partition (refresh via `npm run exfat:starter-zip` / `npm run bridge:starter-zip` → `dist/`).
 
 ## Boot order
 

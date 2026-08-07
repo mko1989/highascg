@@ -166,12 +166,12 @@ HIGHASCGEXF/
   drop-update/          ← put highascg-server_*.tar.gz here later
   drop-update/applied/
   media/
-  network/              ← operator IP file network.conf (WO-95; create if your zip predates it)
+  network/              ← operator IP file network.conf (WO-95; in the zip since 2026-08-07)
   projects/
   snapshots/rear-panels/
   templates/
   .private/             ← per-machine pairing data (hidden folder)
-  decklink/             ← optional DeckLink vendor debs — NOT in the zip, create manually (see below)
+  decklink/             ← optional DeckLink vendor debs (folder + README in the zip since 2026-08-07)
   README.txt
 ```
 
@@ -195,7 +195,7 @@ Safely eject the stick when copying finishes.
 
 ### DeckLink drivers (optional — operator-supplied)
 
-The public ISO does **not** ship Blackmagic Desktop Video. If the playout machine has a DeckLink card, copy vendor packages into **`decklink/`** on the stick (create the folder if your starter zip predates it):
+The public ISO does **not** ship Blackmagic Desktop Video. If the playout machine has a DeckLink card, copy vendor packages into **`decklink/`** on the stick (in the starter zip since 2026-08-07; create it if yours predates that):
 
 ```
 HIGHASCGEXF/decklink/
