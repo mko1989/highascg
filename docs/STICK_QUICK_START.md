@@ -2,7 +2,7 @@
 
 Prepare a **bootable HighAsCG USB stick** on **Windows** or **macOS**: flash the live ISO, add the operator **exFAT** partition, copy the starter folder layout, then boot the playout machine from the stick.
 
-**Time:** ~20 minutes · **USB size:** 32 GiB recommended (minimum: ISO size + ~2 GiB free for exFAT)
+**Time:** ~20 minutes · **USB size:** 32 GiB recommended (the exFAT partition starts at a fixed **6 GiB** offset, so 16 GiB is the practical minimum)
 
 ---
 
@@ -75,17 +75,32 @@ Click **Flash!** → approve the admin prompt → wait for verification (**Flash
 
 Use **only the unallocated space at the end** of the USB disk. Never delete or reformat the small boot partitions Etcher created.
 
-**`diskpart` (run as Administrator)** — replace `2` with your USB disk number from Disk Management:
+The partition **must start at the 6 GiB mark** — the flashed boot image is invisible to Windows, and anything placed earlier overwrites it and breaks boot. This is why Disk Management cannot be used (it has no offset option) and why the offset below is not optional.
+
+### Windows — Command Prompt (run as Administrator)
+
+**1. Create the partition with `diskpart`** — replace `2` with your USB disk number from `list disk` (check the size column — picking the wrong disk destroys it):
 
 ```text
 diskpart
 list disk
 select disk 2
 create partition primary offset=6291456
-format fs=exfat label=HIGHASCGEXF quick
-assign
+assign letter=E
 exit
 ```
+
+`offset` is in KB: **6291456 KB = 6 GiB** — always use this value. If `E:` is taken, pick any free letter and use it below.
+
+**2. Format from the normal prompt, NOT inside diskpart** — diskpart's own `format` fails on freshly flashed sticks with *"DiskPart has encountered an error: The system cannot find the file specified"* (the volume isn't attached yet). Plain `format` works:
+
+```text
+format E: /FS:exFAT /V:HIGHASCGEXF /Q
+```
+
+Answer `Y` to the warning prompt.
+
+**If diskpart itself reported "the system cannot find the file specified":** the partition was usually still created. Cancel any *"You need to format the disk"* popups, unplug and re-insert the stick, run `diskpart` again → `select disk 2` → `list partition`. If a partition starting at 6144 MB is listed, just `select partition <its number>` → `assign letter=E` → `exit`, then format as in step 2.
 
 ### macOS — Terminal
 
@@ -121,7 +136,7 @@ In `fdisk`, type one line at a time (do not paste the whole block):
 2. `edit 4` — use your free slot number
 3. `07` — exFAT/NTFS family type
 4. Choose **sector offsets** when asked (not CHS)
-5. Start sector: **`12582912`** (6 GiB offset — safe for current ~5 GiB ISO builds). **Rule:** the start sector must leave at least **ISO size + 1.5 GiB** before the exFAT partition (512-byte sectors: `(ISO_GiB + 1.5) × 2097152`). If your ISO grows past ~4.5 GiB, increase the offset accordingly.
+5. Start sector: **`12582912`** — the fixed **6 GiB offset** (512-byte sectors), same rule as Windows. Always use this value; it only needs revisiting if a future ISO build grows past ~5.5 GiB.
 6. End sector: total sectors from `diskutil info disk2` **minus 1**
 7. `print` — confirm the boot ISO slice is unchanged
 8. `write` → confirm → `exit`
@@ -242,6 +257,7 @@ After boot:
 | Problem | Fix |
 |---------|-----|
 | No unallocated space after Etcher | Use a **larger** USB (32 GiB recommended) |
+| `diskpart`: *"The system cannot find the file specified"* | The partition is usually created anyway — replug the stick, `assign letter` in diskpart, then plain `format E: /FS:exFAT /V:HIGHASCGEXF /Q` **outside** diskpart (step 3) |
 | Windows only shows a tiny partition | Do not format the ISO slice — partition only the **trailing free space** |
 | macOS **Partition** greyed out | Use the Terminal / `fdisk` steps above |
 | Stick boots but no exFAT sync | Volume label must be exactly **`HIGHASCGEXF`** |
