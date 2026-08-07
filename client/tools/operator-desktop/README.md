@@ -18,7 +18,7 @@ Double-click (from repo root layout):
 | **Linux / macOS** | `tools/operator-desktop/HighAsCG-Launcher.command` |
 | **Windows** | `tools/operator-desktop/HighAsCG-Launcher.cmd` |
 
-The Electron launcher displays **Flashing Guides**, **Partitioning & exFAT** guides, **Simulation Center**, and an **embedded control UI** (`dist-web/`) that talks to the headless API on the playout host (or local sim). Run `npm run launcher:prepare` once before first use.
+The Electron launcher displays **Flashing Guides**, **Partitioning & exFAT** guides, **Simulation Center**, and an **embedded control UI** (`dist-web/`) that talks to the headless API on the playout host (or local sim). Run `npm run build:client` + `bash client/tools/electron-launcher/sync-dist-web.sh` once before first use.
 
 - **macOS / Windows:** runs **`highascg-operator.js prepare-stick`** (sudo / Administrator).
 

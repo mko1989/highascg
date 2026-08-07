@@ -179,16 +179,17 @@ fi
 
 if [[ -z "${VOL:-}" || ! -d "$VOL" ]]; then
 	echo "exFAT created but not mounted under /Volumes — open Disk Utility to mount, then create folders manually:" >&2
-	echo "  sim/highascg  drop-config  media  templates  configs  snapshots/rear-panels" >&2
+	echo "  sim/highascg  drop-update/applied  drop-config  media  templates  configs  snapshots/rear-panels" >&2
 	exit 0
 fi
 
 echo "==> Seeding operator layout under $VOL"
-mkdir -p "$VOL/sim/highascg" "$VOL/update/server" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
+mkdir -p "$VOL/sim/highascg" "$VOL/drop-update" "$VOL/drop-update/applied" "$VOL/drop-config" "$VOL/media" "$VOL/templates" "$VOL/configs" "$VOL/snapshots/rear-panels"
 cat >"$VOL/README-HIGHASCG-EXFAT.txt" <<EOF
 HighAsCG operator data (exFAT volume label: $EXFAT_LABEL)
 
 sim/highascg — Extract release tarball or sync sources here (Linux WO-47 mtime sync → ~/highascg).
+drop-update — Playout update payloads (drop-update/applied = consumed markers).
 drop-config — Optional monolithic highascg.config.json.
 media — Carry media; binds to ~/highascg/media/exfat on tuned Linux images.
 templates — Extra templates.

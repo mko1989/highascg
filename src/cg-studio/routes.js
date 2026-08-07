@@ -31,11 +31,6 @@ function resolveStudioPort() {
 	return DEFAULT_PORT
 }
 
-function buildStudioUrl(port, bindAddress) {
-	const host = !bindAddress || bindAddress === '0.0.0.0' ? '127.0.0.1' : bindAddress
-	return `http://${host}:${port}/`
-}
-
 /**
  * @param {string} method
  * @param {string} p
@@ -158,9 +153,10 @@ async function handleStudioRequest(req) {
 	return serveStatic(p)
 }
 
+// buildStudioUrl left with the deleted electron-launcher studio host (WO-453) —
+// the launcher now builds the server URL itself from its connection settings.
 module.exports = {
 	resolveStudioPort,
-	buildStudioUrl,
 	handleStudioApi,
 	handleStudioRequest,
 }

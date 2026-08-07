@@ -49,7 +49,6 @@ function getPublicDir() {
 
 module.exports = {
 	configure,
-	getPackageDir,
 	getTemplateRoot,
 	getLtDir,
 	getStudioDir,

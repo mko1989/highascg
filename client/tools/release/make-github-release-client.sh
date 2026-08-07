@@ -104,13 +104,13 @@ Vite production bundle (\`dist-web/\`) for the **Electron launcher** or legacy e
 
 | Asset | Use |
 |-------|-----|
-| \`${ARCHIVE_BASENAME}.tar.gz\` | **Recommended:** \`npm run launcher:prepare\` uses this tree; or extract beside launcher |
+| \`${ARCHIVE_BASENAME}.tar.gz\` | Extract beside the launcher (or sync into it via \`sync-dist-web.sh\`) |
 
 Production playout runs **API only** (\`HIGHASCG_HEADLESS=true\`). Open UI with \`npm run launcher\` and set playout API host/port.
 
-Requires matching **server** tarball on \`update/server/\` or embedded on ISO.
+Requires matching **server** tarball on \`drop-update/\` or embedded on ISO.
 
-[\`client/tools/electron-launcher/README.md\`](client/tools/electron-launcher/README.md) · server/API sources: [\`not-needed/\`](../not-needed/)
+[\`client/tools/electron-launcher/README.md\`](client/tools/electron-launcher/README.md) · server/API sources: unified repo root
 EOF
 
 if [[ "$DRY_RUN" -eq 1 ]]; then

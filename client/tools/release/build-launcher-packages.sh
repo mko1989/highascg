@@ -16,8 +16,10 @@ release_lib_need_cmd node
 release_lib_need_cmd npx
 
 if [[ "$SKIP_PREPARE" -eq 0 ]]; then
-	echo "==> launcher:prepare (Vite + dist-web + bundle + sim-server)"
-	(cd "$REPO_ROOT" && npm run launcher:prepare)
+	echo "==> prepare launcher bundle (Vite + dist-web + lib/portable-sim)"
+	(cd "$REPO_ROOT" && npm run build:client)
+	bash "${LAUNCHER_DIR}/sync-dist-web.sh"
+	bash "${LAUNCHER_DIR}/sync-launcher-bundle.sh"
 fi
 
 REQUIRED=(
@@ -26,25 +28,28 @@ REQUIRED=(
 	"${LAUNCHER_DIR}/lib/webui-port.json"
 	"${LAUNCHER_DIR}/portable-sim/launch-sim-from-exfat.cjs"
 	"${LAUNCHER_DIR}/portable-sim/sim-app-root.cjs"
-	"${LAUNCHER_DIR}/sim-server/index.js"
-	"${LAUNCHER_DIR}/sim-server/package.json"
 )
 for f in "${REQUIRED[@]}"; do
 	if [[ ! -f "$f" ]]; then
 		echo "Missing packaged launcher file: $f" >&2
-		echo "Run: npm run launcher:prepare (needs not-needed/index.js for sim-server)" >&2
+		echo "Run: npm run build:client, then sync-dist-web.sh + sync-launcher-bundle.sh in ${LAUNCHER_DIR}" >&2
 		exit 1
 	fi
 done
 
-if [[ "$INSTALL_SIM_DEPS" -eq 1 ]]; then
-	echo "==> npm install in sim-server (bundled for offline sim; uses Electron as Node at runtime)"
-	(cd "$REPO_ROOT" && npm run launcher:sim-install)
-fi
-
-if [[ ! -d "${LAUNCHER_DIR}/sim-server/node_modules" ]]; then
-	echo "Missing ${LAUNCHER_DIR}/sim-server/node_modules — simulation will not work in the zip." >&2
-	exit 1
+# Optional bundled sim-server/ (server checkout placed next to the launcher for offline sim
+# in the packaged zip). Without it, the packaged app needs HIGHASCG_SIM_APP_ROOT at runtime.
+if [[ -f "${LAUNCHER_DIR}/sim-server/index.js" ]]; then
+	if [[ "$INSTALL_SIM_DEPS" -eq 1 && ! -d "${LAUNCHER_DIR}/sim-server/node_modules" ]]; then
+		echo "==> npm install in sim-server (bundled for offline sim; uses Electron as Node at runtime)"
+		(cd "${LAUNCHER_DIR}/sim-server" && npm install --omit=dev)
+	fi
+	if [[ ! -d "${LAUNCHER_DIR}/sim-server/node_modules" ]]; then
+		echo "Missing ${LAUNCHER_DIR}/sim-server/node_modules — simulation will not work in the zip." >&2
+		exit 1
+	fi
+else
+	echo "==> no bundled sim-server/ — packaged app will need a server tree (HIGHASCG_SIM_APP_ROOT) for simulation"
 fi
 
 ELECTRON_VER="$(node -e "console.log(require('${REPO_ROOT}/node_modules/electron/package.json').version)")"

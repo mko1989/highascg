@@ -108,7 +108,6 @@ function getTemplateDetail(id, category) {
 }
 
 module.exports = {
-	BUILTIN_NAMES,
 	scanAllTemplates,
 	resolveTemplateFile,
 	getTemplateDetail,

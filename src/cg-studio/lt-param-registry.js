@@ -177,7 +177,6 @@ function parseInitSelectors(html) {
 module.exports = {
 	DEFAULT_DATA,
 	DEFAULT_STYLE,
-	DATA_FIELDS,
 	COLOR_FIELDS,
 	TYPOGRAPHY_FIELDS,
 	LAYOUT_FIELDS,

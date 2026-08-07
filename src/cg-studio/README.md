@@ -26,9 +26,9 @@ Open `http://127.0.0.1:4300/`. Optional: `HIGHASCG_CG_STUDIO_PORT=4301`.
 ## Run from Electron launcher
 
 1. Build/install [**highascg-client**](https://github.com/mko1989/highascg-client) (packaging extract from this repo).
-2. Modules tab → enable **CG Overlay Studio**.
-3. `npm run launcher:prepare` (syncs `src/cg-studio/` from this repo into the launcher bundle).
-4. Click **CG Studio** in the launcher.
+2. Click **CG Studio** in the launcher — it opens the studio SERVED BY the connected
+   (or simulated) server at `http://<server>:<port>/cg-studio/index.html` (WO-453;
+   the launcher no longer hosts its own mirror on :4300).
 
 Set `HIGHASCG_SERVER_ROOT` to this repo path if the launcher cannot find templates.
 

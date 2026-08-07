@@ -283,7 +283,7 @@ class StickStudioUi:
 					if not readme.is_file():
 						readme.write_text(
 							"sim/highascg — HighAsCG payload (ZIP or git sync).\n"
-							"See tools/live-usb/MANUAL_STICK_WINDOWS_MACOS.md · WO‑47.\n",
+							"See tools/eggs/live-usb/MANUAL_STICK_WINDOWS_MACOS.md · WO‑47.\n",
 							encoding="utf-8",
 						)
 				except OSError as e:

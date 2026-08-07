@@ -97,7 +97,7 @@ if [[ "$INCLUDE_CLIENT_TARBALL" -eq 1 ]]; then
 		release_lib_need_cmd tar
 		DIST_WEB="${REPO_ROOT}/dist-web"
 		[[ -f "${DIST_WEB}/index.html" ]] || {
-			echo "Missing dist-web — build runs via launcher:prepare" >&2
+			echo "Missing dist-web — run npm run build:client + sync-dist-web.sh" >&2
 			exit 1
 		}
 		tar -C "$REPO_ROOT" -czf "$ARCHIVE_PATH" dist-web

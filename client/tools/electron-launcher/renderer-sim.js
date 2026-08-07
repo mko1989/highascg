@@ -208,12 +208,12 @@ module.exports = function initRendererSim(ctx) {
     try {
       const rt = await ipcRenderer.invoke('check-sim-runtime')
       if (rt.ready) {
-        const nm = rt.hasNodeModules ? 'ready' : 'run npm run launcher:sim-install from repo root'
+        const nm = rt.hasNodeModules ? 'ready' : `run npm install in ${rt.appRoot}`
         simRuntimeHint.textContent = `Sim runtime: ${rt.source} — ${nm}`
         simRuntimeHint.classList.remove('sim-runtime-warn')
       } else {
         simRuntimeHint.textContent =
-          'Sim runtime not ready — from repo root: npm run launcher:prepare, then npm run launcher:sim-install'
+          'Sim runtime not ready — no HighAsCG server tree found (repo checkout with npm install, or HIGHASCG_SIM_APP_ROOT)'
         simRuntimeHint.classList.add('sim-runtime-warn')
       }
     } catch (e) {

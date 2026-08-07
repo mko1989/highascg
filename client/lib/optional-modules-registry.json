@@ -3,9 +3,8 @@
 		{
 			"id": "cg-studio",
 			"label": "CG Overlay Studio",
-			"description": "Lower-thirds template editor on this machine (:4300). Exports to the linked HighAsCG template/ tree.",
-			"launcherOpensWindow": true,
-			"defaultEnabled": false
+			"description": "Lower-thirds template editor served by the HighAsCG server (/cg-studio/, enabled there by default). The launcher button opens the connected server's studio page.",
+			"defaultEnabled": true
 		},
 		{
 			"id": "tracking",

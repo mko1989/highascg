@@ -147,7 +147,5 @@ function exportTemplate(opts) {
 module.exports = {
 	exportTemplate,
 	bakeDefaults,
-	fixStudioAssetPaths,
 	validateExportedHtml,
-	EXPORT_ID_RE,
 }

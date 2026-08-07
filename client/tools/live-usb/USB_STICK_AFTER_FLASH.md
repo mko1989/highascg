@@ -38,7 +38,7 @@ This repository (**highascg-client**) is **UI + launcher only**. It does **not**
 | `HighAsCG-Launcher-<platform>_*.zip` | **Recommended** — prep kit + embedded UI (port **4350**) |
 | `highascg-client_*.tar.gz` | `dist-web/` only — dev/extract; bundled inside launcher zips |
 
-Build from source: `npm run launcher:prepare` then `npm run launcher`, or `npm run release:github-launcher` to publish platform zips.
+Build from source: `npm run build:client` + `bash client/tools/electron-launcher/sync-dist-web.sh`, then `npm run launcher`, or `npm run release:github-launcher` to publish platform zips.
 
 ---
 
@@ -86,7 +86,7 @@ From a machine with **Node.js ≥ 20** (repo checkout or unpacked launcher zip):
 ```bash
 cd /path/to/highascg-client
 npm install
-npm run launcher:prepare    # once — builds dist-web into launcher
+npm run build:client && bash client/tools/electron-launcher/sync-dist-web.sh   # once — builds dist-web into launcher
 npm run launcher            # GUI: flash guides, partition guide, sim, API host
 ```
 

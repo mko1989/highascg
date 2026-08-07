@@ -101,7 +101,8 @@ function simPathOnVolume(volRoot) {
 
 /**
  * Resolve the Node **server** tree used for local simulation (--no-caspar).
- * Standalone client / Electron launcher: bundled `sim-server/` next to the app, then dev `not-needed/`.
+ * Dev checkout: the unified repo root itself (this file lives in it). Packaged
+ * Electron launcher: bundled `sim-server/` next to the app.
  * USB exFAT is opt-in only (`allowExfatStick` or `HIGHASCG_SIM_ALLOW_EXFAT=1`).
  *
  * @param {{
@@ -136,14 +137,14 @@ function resolveSimAppRoot(opts = {}) {
 		}
 	}
 
+	/* Repo checkout wins over a (possibly stale) bundled sim-server/ tree. */
+	if (isServerAppRoot(repoRoot)) {
+		return { appRoot: repoRoot, source: 'repo root (unified checkout)' }
+	}
+
 	const bundled = bundledSimServerDir(launcherDir)
 	if (bundled && isServerAppRoot(bundled)) {
 		return { appRoot: bundled, source: `${SIM_SERVER_DIRNAME}/ (launcher bundle)` }
-	}
-
-	const nn = path.join(repoRoot, 'not-needed')
-	if (isServerAppRoot(nn)) {
-		return { appRoot: nn, source: 'not-needed/ (dev server tree)' }
 	}
 
 	const forceCwd =
@@ -183,18 +184,14 @@ function formatSimRootHelp(opts = {}) {
 	const lines = [
 		'Could not find a HighAsCG server tree for simulation (need index.js + node_modules).',
 		'',
-		'Simulation runs from the standalone client app — not from the USB stick.',
+		'Simulation runs from the unified repo checkout — not from the USB stick.',
 		'',
-		`  • Run: npm run launcher:prepare  (copies server into launcher/${SIM_SERVER_DIRNAME}/)`,
-		`  • Then once: npm run launcher:sim-install`,
-		`  • Start GUI from repo root: npm run launcher  (not from ${SIM_SERVER_DIRNAME}/)`,
+		`  • Dev checkout: npm install at the repo root, then npm run portable:sim (or npm run launcher)`,
+		`  • Expected repo root: ${repoRoot}`,
 		'  • Or set HIGHASCG_SIM_APP_ROOT=/path/to/server/tree',
 	]
 	if (bundled) {
-		lines.push('', `  Expected bundle path: ${bundled}`)
-	}
-	if (fs.existsSync(path.join(repoRoot, 'not-needed', 'index.js'))) {
-		lines.push('', `  Dev checkout: not-needed/ is present — run npm ci there or use launcher:prepare.`)
+		lines.push('', `  Packaged app bundle path: ${bundled}`)
 	}
 	return lines.join('\n')
 }

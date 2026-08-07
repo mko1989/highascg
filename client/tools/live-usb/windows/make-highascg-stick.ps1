@@ -46,6 +46,8 @@ $ExfatLabel = 'HIGHASCGEXF'  # 11 chars max — fixed for HighAsCG WO-47 systemd
 
 $SeedDirs = @(
     'sim\highascg',
+    'drop-update',
+    'drop-update\applied',
     'drop-config',
     'media',
     'templates',

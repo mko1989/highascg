@@ -7,14 +7,15 @@
  * so `npm run portable:sim` works from a normal repo clone without the stick plugged in.
  *
  * Usage:
- *   node tools/portable-desktop/launch-sim-from-exfat.cjs [extra args … passed to index.js]
+ *   node client/tools/portable-desktop/launch-sim-from-exfat.cjs [extra args … passed to index.js]
+ *   npm run portable:sim
  *   HIGHASCG_EXFAT_ROOT=E:\  node ...
  *   SIM_USE_CWD=1 node ...        # force cwd as app root
  *   --use-cwd                      # same, as flag
  *   HIGHASCG_LAUNCH_PORT_FALLBACK=N  # try next ports if busy; injects --port
  *   HIGHASCG_LAUNCH_NO_OFFLINE_DEFAULT=1  # do not default HIGHASCG_OFFLINE_MODE=1
  *
- * @see tools/portable-desktop/README.md
+ * @see client/tools/portable-desktop/README.md
  * @see work/work-orders/50_WO_WINDOWS_MAC_EXFAT_SIMULATION_LAUNCHERS.md
  */
 'use strict'
@@ -193,7 +194,7 @@ async function main() {
 
 	const nm = path.join(appRoot, 'node_modules')
 	if (!fs.existsSync(nm)) {
-		console.error(`[HighAsCG sim] Missing node_modules — from repo root: npm run launcher:sim-install`)
+		console.error(`[HighAsCG sim] Missing node_modules — run npm install in ${appRoot}`)
 		process.exit(1)
 	}
 	const indexJs = path.join(appRoot, 'index.js')

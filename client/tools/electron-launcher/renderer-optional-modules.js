@@ -57,18 +57,9 @@ module.exports = function initRendererOptionalModules(ctx) {
       enabled.push(input.getAttribute('data-module-id'))
     })
     try {
-      const result = await ipcRenderer.invoke('set-optional-modules', enabled)
+      await ipcRenderer.invoke('set-optional-modules', enabled)
       localStorage.setItem(LS_OPTIONAL_MODULES, JSON.stringify(enabled))
       await updateCgStudioButtons()
-      if (result && result.cgStudio) {
-        if (result.cgStudio.running && result.cgStudio.url) {
-          ctx.appendLog(`[Launcher] CG Studio server running at ${result.cgStudio.url}\n`)
-        } else if (result.cgStudio.error) {
-          ctx.appendLog(`[Launcher] CG Studio: ${result.cgStudio.error}\n`)
-        } else if (!enabled.includes('cg-studio')) {
-          ctx.appendLog('[Launcher] CG Studio stopped\n')
-        }
-      }
     } catch (e) {
       console.error('Save optional modules failed:', e)
     }
@@ -88,12 +79,21 @@ module.exports = function initRendererOptionalModules(ctx) {
     }
   }
 
+  function getCgStudioUrl() {
+    // Same server target as the Simulation tab header inputs (LS_SERVER_IP / LS_SERVER_PORT).
+    const ipInput = document.getElementById('header-server-ip')
+    const portInput = document.getElementById('header-server-port')
+    const ip = ((ipInput && ipInput.value) || '127.0.0.1').trim()
+    const port = parseInt(portInput && portInput.value, 10) || 4200
+    return `http://${ip}:${port}/cg-studio/index.html`
+  }
+
   async function openCgStudio() {
     for (const btn of [headerBtnOpenCgStudio, btnOpenCgStudio]) {
       if (btn) btn.disabled = true
     }
     try {
-      const result = await ipcRenderer.invoke('open-cg-studio')
+      const result = await ipcRenderer.invoke('open-cg-studio', { url: getCgStudioUrl() })
       if (!result.ok) {
         ctx.appendLog(`[Launcher] CG Studio: ${result.error}\n`)
         window.alert(result.error)

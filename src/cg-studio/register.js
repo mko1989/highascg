@@ -18,9 +18,10 @@ const context = require('./cg-studio-context')
 const { handleStudioApi } = require('./routes')
 
 /**
- * This file is synced verbatim into client/tools/electron-launcher/cg-studio/
- * (sync-cg-studio.sh), where `require('../repo-paths')` does not resolve —
- * walk up to the repo root (dir containing template/ + package.json) instead.
+ * Historically synced verbatim into the electron launcher (mirror removed in
+ * WO-453 — the launcher now opens the server-hosted studio), so this file still
+ * avoids `require('../repo-paths')` and walks up to the repo root (dir containing
+ * template/ + package.json) itself. Keeps `npm run cg-studio` standalone-safe.
  */
 function findRepoRoot(start) {
 	const fs = require('fs')

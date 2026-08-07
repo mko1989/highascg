@@ -128,7 +128,7 @@
                 <span class="field-hint">The port the server will bind to locally</span>
               </div>
 
-              <p class="field-hint" id="sim-runtime-hint">Local sim uses the launcher bundle (sim-server/), not the USB stick. From repo root: <code>npm run launcher:prepare</code>, then <code>npm run launcher:sim-install</code>, then <code>npm run launcher</code>.</p>
+              <p class="field-hint" id="sim-runtime-hint">Local sim runs the repo checkout (<code>node index.js --no-caspar</code>), not the USB stick. From repo root: <code>npm install</code> once, then <code>npm run launcher</code>.</p>
 
               <div class="sim-actions-grid">
                 <button class="btn btn-success btn-large" id="btn-start-sim">
@@ -150,7 +150,7 @@
                 <button class="btn btn-secondary btn-large hidden" id="btn-open-cg-studio" type="button">
                   Open CG Studio
                 </button>
-                <p class="quicklink-hint">Web UI uses the embedded launcher port. CG Studio runs locally on this machine (default :4300).</p>
+                <p class="quicklink-hint">Web UI uses the embedded launcher port. CG Studio opens the studio served by the connected/simulated server (/cg-studio/).</p>
               </div>
             </div>
           </div>
@@ -186,7 +186,8 @@
             <h2>Web UI optional modules</h2>
             <p class="field-hint modules-tab-intro">
               Choose which optional modules are active for this launcher session.
-              <strong>CG Overlay Studio</strong> opens in a separate window on the playout server (port 4300).
+              <strong>CG Overlay Studio</strong> is served by the HighAsCG server itself — the button opens
+              the connected server's studio page in a separate window.
               Other modules load inside the Web UI when enabled.
             </p>
             <div class="optional-modules-list" id="optional-modules-list" aria-live="polite">

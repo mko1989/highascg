@@ -2,7 +2,7 @@
 
 HighAsCG ships with a small set of optional feature modules that can be enabled or deleted independently of the base server. The packaging rules below are the ones enforced by [WO-30](../work/30_WO_PREVIS_TRACKING_MODULE.md); everything in the Previs / Tracking / Stage Auto-follow WOs (17 / 19 / 31) is built on top of them.
 
-**CG Studio** (WO-32) is also an optional module but runs a **separate HTTP server** on port 4300 — see [src/cg-studio/README.md](../src/cg-studio/README.md).
+**CG Studio** (WO-32) is served **in-process by the playout server** through the module registry — UI at `/cg-studio/`, API under `/api/cg-studio`, enabled by default — see [src/cg-studio/README.md](../src/cg-studio/README.md) and the section below.
 
 Acceptance test for the "lean build": delete the module directories listed below and the base server must still boot normally.
 
@@ -165,12 +165,14 @@ npm uninstall three onnxruntime-node
 
 Then boot. `GET /api/modules` returns `{ enabled: [] }`, the web client logs `loaded: [—]`, and the base app runs untouched.
 
-## CG Studio (launcher-hosted module)
+## CG Studio (server-hosted module)
 
-CG Studio does **not** run on the playout server in normal production. Source is `src/cg-studio/` in **this repo**. The optional Electron launcher ([highascg-client](https://github.com/mko1989/highascg-client)) — packaged from `client/tools/electron-launcher/` — starts it locally on port **4300** when enabled in the Modules tab.
+CG Studio runs **in-process on the playout server**. `src/cg-studio/register.js` mounts it through the module registry: static UI at `/cg-studio/index.html` (+ `/studio-assets/`), API under `/api/cg-studio`, and a workspace tab in the operator UI. It is **enabled by default** (WO-265); opt out with `features.cgStudio: false` in config or `HIGHASCG_CG_STUDIO=0` in the environment. The simulator (`node index.js --no-caspar`) serves the same module, so launcher-driven simulation gets CG Studio for free.
 
-**Local dev:** `npm run cg-studio` from this repo checkout.
+**Standalone dev mode** for module development still exists: `npm run cg-studio` (`scripts/cg-studio-run.js`) runs the studio on its own HTTP server, port **4300** (`cgStudio.httpPort`).
 
-The **operator UI** (dashboard, scenes, device view) is always **`client/`** in this repo → `dist-web/` on playout `:4200`. Do not develop that UI in highascg-client.
+The Electron launcher (`client/tools/electron-launcher/`) no longer hosts its own copy — its **CG Studio** button opens `http://<server>:<port>/cg-studio/index.html` on the connected (or simulated) server.
 
-Exported templates land in `template/studio/` on the linked HighAsCG checkout and appear in `GET /api/lower-thirds/templates` after playout picks up the files.
+The **operator UI** (dashboard, scenes, device view) is always **`client/`** in this repo → `dist-web/` on playout `:4200`.
+
+Exported templates land in `template/studio/` on the server and appear in `GET /api/lower-thirds/templates` after playout picks up the files.
