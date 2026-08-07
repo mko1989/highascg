@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # WO-452: a GitHub incident left a push run as an un-rerunnable zombie; manual
+  # dispatch is the only way to get CI on a commit whose push run is wedged.
+  workflow_dispatch:
 
 # A force-push or rapid follow-up commit obsoletes the older run — kill it.
 concurrency:
