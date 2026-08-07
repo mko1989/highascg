@@ -13,6 +13,30 @@ const execFileAsync = promisify(execFile)
 
 const DEFAULT_GITHUB_REPO = 'mko1989/highascg'
 const CACHE_ROOT = '/var/cache/highascg/updates'
+/** Second source root the sudo apply helper accepts (validate_source_path) — see WO-455. */
+const FALLBACK_CACHE = '/tmp/highascg-updates'
+
+/**
+ * WO-455: installed systems ship WITHOUT /var/cache/highascg (eggs excludes `var/cache/*`),
+ * and the node process (user casparcg) cannot mkdir under root-owned /var/cache — the GUI
+ * update died with EACCES before downloading anything. /tmp/highascg-updates is already
+ * whitelisted by the deployed sudo helper, so it works on existing installs unmodified.
+ * @param {(line: string) => void} [logLine]
+ */
+function resolveUpdateCacheDir(logLine) {
+	const preferred = process.env.HIGHASCG_UPDATE_CACHE || CACHE_ROOT
+	try {
+		fs.mkdirSync(preferred, { recursive: true })
+		return preferred
+	} catch (e) {
+		if (!['EACCES', 'EPERM', 'EROFS'].includes(e?.code)) throw e
+		fs.mkdirSync(FALLBACK_CACHE, { recursive: true })
+		if (typeof logLine === 'function') {
+			logLine(`Cache ${preferred} not writable (${e.code}) — using ${FALLBACK_CACHE}`)
+		}
+		return FALLBACK_CACHE
+	}
+}
 const APPLY_DROP_SH = '/usr/local/lib/highascg/highascg-apply-server-drop.sh'
 const CHECK_CACHE_MS = 15 * 60 * 1000
 
@@ -328,8 +352,7 @@ async function startApplyJob(opts = {}) {
 
 	void (async () => {
 		try {
-			const cacheDir = process.env.HIGHASCG_UPDATE_CACHE || CACHE_ROOT
-			fs.mkdirSync(cacheDir, { recursive: true })
+			const cacheDir = resolveUpdateCacheDir(appendJobLog)
 			const tarPath = path.join(cacheDir, assetName || `highascg-server_${stamp}.tar.gz`)
 			const extractDir = path.join(cacheDir, `extract-${stamp}`)
 

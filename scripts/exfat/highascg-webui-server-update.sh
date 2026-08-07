@@ -14,6 +14,14 @@ EXCLUDES="/etc/highascg/server-update-rsync-excludes.txt"
 SERVICE=highascg.service
 CACHE_ROOT="/var/cache/highascg/updates"
 
+# WO-455: installed systems ship without /var/cache/highascg (eggs excludes var/cache/*).
+# We run as root — create the real cache tree so future updates need no /tmp fallback.
+ensure_cache_dirs() {
+	install -d -m 0755 /var/cache/highascg /var/cache/highascg/update-staging
+	install -d -m 0755 -o "$USER_NAME" -g "$(id -gn "$USER_NAME")" "$CACHE_ROOT" 2>/dev/null \
+		|| install -d -m 0755 "$CACHE_ROOT"
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APPLY_SH="${HIGHASCG_APPLY_SERVER_DROP_SH:-/usr/local/lib/highascg/highascg-apply-server-drop.sh}"
 [[ -f "$APPLY_SH" ]] || APPLY_SH="${SCRIPT_DIR}/highascg-apply-server-drop.sh"
@@ -105,6 +113,7 @@ main() {
 		log "--source required"
 		exit 2
 	}
+	ensure_cache_dirs
 	validate_source_path "$src" || {
 		log "refusing source outside cache: $src"
 		exit 1

@@ -80,6 +80,9 @@ DOC_MATRIX="${REPO_ROOT}/docs/WO47_ISO_VS_EXFAT.md"
 
 mkdir -p /usr/local/lib/highascg /etc/highascg /var/cache/highascg/update-staging /var/cache/highascg/updates "$DOC_PKG"
 install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/dev/null || install -d -m 0755 /var/cache/highascg/updates
+# WO-455: tmpfiles entry recreates the cache tree every boot — and, once present in /etc,
+# rides every eggs ISO (var/cache/* itself is excluded from the image).
+[[ -f "${REPO_ROOT}/scripts/tmpfiles.d/highascg.conf" ]] && install -m 0644 -o root -g root "${REPO_ROOT}/scripts/tmpfiles.d/highascg.conf" /etc/tmpfiles.d/highascg.conf
 [[ -f "$ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$ARRIVE_SH_SRC" "$ARRIVE_SH_DST"
 [[ -f "$BRIDGE_ARRIVE_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_ARRIVE_SH_SRC" "$BRIDGE_ARRIVE_SH_DST"
 [[ -f "$FIX_CFG_SRC" ]] && install -m 0755 -o root -g root "$FIX_CFG_SRC" "$FIX_CFG_DST"

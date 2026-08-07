@@ -74,6 +74,7 @@ const FILES = [
 	'tools/smoke/smoke-wo449-clip-extend-loop.test.js',
 	'tools/smoke/smoke-wo450-companion-status-probe.test.js',
 	'tools/smoke/smoke-wo453-sim-parity.test.js',
+	'tools/smoke/smoke-wo455-update-cache-fallback.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',
