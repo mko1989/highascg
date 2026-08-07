@@ -529,14 +529,16 @@ ls -lh $WORK/highascg-server-live.iso
 # Identify your USB device (BE CAREFUL — wrong device = data loss!)
 lsblk
 
-# Write (replace /dev/sdX with your USB device — NOT a partition like /dev/sdX1)
-sudo dd if=/path/to/highascg-server-*.iso of=/dev/sdX bs=4M status=progress oflag=sync
+# Resolve the ISO first (name pattern: highascg_amd64_YYYY-MM-DD_HHMM.iso)
+ISO=/path/to/highascg_amd64_YYYY-MM-DD_HHMM.iso
 
-# Or use a safer alternative:
-sudo cp /path/to/highascg-server-*.iso /dev/sdX
+# Write (replace /dev/sdX with your USB device — NOT a partition like /dev/sdX1)
+sudo dd if="$ISO" of=/dev/sdX bs=4M status=progress oflag=sync
 sync
 sudo partprobe /dev/sdX
 ```
+
+(`cp iso-file /dev/sdX` also works but gives no progress and is no safer than `dd` — the target device is what matters.)
 
 **HighAsCG — after `dd`, add the exFAT data partition** (label **`HIGHASCGEXF`**) for configs, media, and server drops — see **`docs/WO47_ISO_VS_EXFAT.md`**, **`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`**. Boot plain **Live** (no union **`/ union`** persistence partition).
 
@@ -550,7 +552,8 @@ diskutil list
 diskutil unmountDisk /dev/diskN
 
 # Write (use rdiskN for faster raw writes)
-sudo dd if=/path/to/highascg-server-*.iso of=/dev/rdiskN bs=4m status=progress
+ISO=/path/to/highascg_amd64_YYYY-MM-DD_HHMM.iso
+sudo dd if="$ISO" of=/dev/rdiskN bs=4m status=progress
 
 # Eject
 diskutil eject /dev/diskN
@@ -560,6 +563,8 @@ diskutil eject /dev/diskN
 
 Use **[balenaEtcher](https://etcher.balena.io/)** or **Rufus** (select "DD Image
 mode" in Rufus).
+
+**After the ISO write on macOS or Windows** you still need the **`HIGHASCGEXF`** exFAT data partition — this section stops at the ISO. See **[STICK_QUICK_START.md §3](STICK_QUICK_START.md#3-create-the-exfat-partition-highascgexf)** for creating it on macOS (`fdisk` + `newfs_exfat`) and Windows (Disk Management / `diskpart`).
 
 ---
 
@@ -984,4 +989,4 @@ sudo dd if=/home/eggs/highascg-server-amd64.iso of=/dev/sdX bs=4M status=progres
 
 ---
 
-*Document created: 2026-04-22 | Related: [MANUAL_INSTALL.md](./MANUAL_INSTALL.md), [WO-12](../12_WO_PRODUCTION_INSTALLER.md), [openbox_autostart.md](../openbox_autostart.md)*
+*Document created: 2026-04-22 | Related: [MANUAL_INSTALL.md](./MANUAL_INSTALL.md), [WO-12](../work/work-orders/12_WO_PRODUCTION_INSTALLER.md), [openbox_autostart.md](./openbox_autostart.md)*

@@ -41,7 +41,7 @@ $release = Invoke-RestMethod https://highascg.dpdns.org/release.json
 Invoke-WebRequest -Uri $release.download_url -OutFile highascg-latest.iso
 ```
 
-Example filename at time of writing: `highascg-nvidia-595_amd64_2026-06-08_0812.iso` (~2.7 GiB). Yours may differ — trust **`release.json`**, not a fixed name.
+Example filename at time of writing: `highascg-nvidia-595_amd64_2026-06-08_0812.iso`. Current builds are **~5 GiB** (older docs mentioning ~2.7 GiB are stale). Yours may differ — trust **`release.json`**, not a fixed name.
 
 ---
 
@@ -129,7 +129,7 @@ In `fdisk`, type one line at a time (do not paste the whole block):
 2. `edit 4` — use your free slot number
 3. `07` — exFAT/NTFS family type
 4. Choose **sector offsets** when asked (not CHS)
-5. Start sector: **`12582912`** (6 GiB offset — safe for current ~5 GiB ISO builds)
+5. Start sector: **`12582912`** (6 GiB offset — safe for current ~5 GiB ISO builds). **Rule:** the start sector must leave at least **ISO size + 1.5 GiB** before the exFAT partition (512-byte sectors: `(ISO_GiB + 1.5) × 2097152`). If your ISO grows past ~4.5 GiB, increase the offset accordingly.
 6. End sector: total sectors from `diskutil info disk2` **minus 1**
 7. `print` — confirm the boot ISO slice is unchanged
 8. `write` → confirm → `exit`
@@ -153,6 +153,8 @@ diskutil rename "HIGHASCGEXF 1" HIGHASCGEXF
 
 Download **[HIGHASCGEXF-starter-layout.zip](guides/stick/HIGHASCGEXF-starter-layout.zip)** from this repo (or build it with `npm run exfat:starter-zip`).
 
+> **Note:** `npm run exfat:starter-zip` writes a fresh zip to **`dist/HIGHASCGEXF-starter-layout.zip`**; the checked-in copy at `docs/guides/stick/HIGHASCGEXF-starter-layout.zip` is a **snapshot** and can lag behind. To refresh it: `npm run exfat:starter-zip`, then copy `dist/HIGHASCGEXF-starter-layout.zip` over the docs copy.
+
 Unzip **directly onto the exFAT volume root** — not inside an extra folder.
 
 **Expected top-level folders after unzip:**
@@ -164,10 +166,12 @@ HIGHASCGEXF/
   drop-update/          ← put highascg-server_*.tar.gz here later
   drop-update/applied/
   media/
+  network/              ← operator IP file network.conf (WO-95; create if your zip predates it)
   projects/
   snapshots/rear-panels/
   templates/
-  decklink/               ← optional DeckLink vendor debs (see below)
+  .private/             ← per-machine pairing data (hidden folder)
+  decklink/             ← optional DeckLink vendor debs — NOT in the zip, create manually (see below)
   README.txt
 ```
 
@@ -182,6 +186,8 @@ Expand-Archive -Path HIGHASCGEXF-starter-layout.zip -DestinationPath E:\ -Force
 ```bash
 unzip -o HIGHASCGEXF-starter-layout.zip -d /Volumes/HIGHASCGEXF
 ```
+
+> **Copying from Linux? Never `rsync -a` onto exFAT** — exFAT has no ownership, so `chown` fails with `EPERM` and rsync exits **23** (killing scripts mid-copy). Use `rsync -rLt --modify-window=2` or plain `cp`.
 
 Safely eject the stick when copying finishes.
 

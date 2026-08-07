@@ -24,3 +24,17 @@ Relative: on take, seek to the same position in the file as the timeline playhea
 doesnt make sense to have in the inspector of a clip in timeline.
 
 i edited layout of gpu ports so it reflects my actual ports on the card, first of all rearenging the ports doesnt take with first try, second i get an error: Detected GPU wiring differs from saved layout — open a GPU port in the inspector and use the layout editor to review.
+
+the GPU port rearranging changes the  ports in the rear panel on first try but in the inspector it needs rearranging a second time.
+
+the companion button chooser modal does not open at all now.
+it's in the inspector of companion button push flag in the timeline.
+
+I've enabled the button subscription API (which by the way is NOT needed for full functionality) and I still get 
+Cannot reach Companion Satellite at 127.0.0.1:16622 (TCP). Check Companion → Settings → Satellite is enabled.
+even though the satellite API is always on . there is no toggle in companion for it.
+this used to worked fully before.
+Satellite TCP Listen Port	16622
+Satellite Websocket Listen Port	16623
+
+the companion button on the timeline and in the inspector only updates after a web UI page refresh. I need it to update live. 

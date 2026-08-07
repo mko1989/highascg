@@ -1,0 +1,7 @@
+make a github realese of highascg
+
+
+check and fix the stand alone client/simulator, it wasnt updated for a long time, so it needs to be updated so the simulator works in the same way as actual server.
+also check the flashing/partitioning guides for mac and windows.
+cg studio was implemented as a module in simulator but since its added to the the main highascg it should also be the same for the simulator.
+

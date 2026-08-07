@@ -1,6 +1,6 @@
 # HighAsCG live USB — build and flash
 
-**What is inside the ISO?** Stack from Ubuntu → nodm/Openbox → NVIDIA → DeckLink → CasparCG → HighAsCG (and WO‑47 exFAT split): **[`docs/ISO_CONTENTS.md`](../../docs/ISO_CONTENTS.md)**.
+**What is inside the ISO?** Stack from Ubuntu → nodm/Openbox → NVIDIA → DeckLink → CasparCG → HighAsCG (and WO‑47 exFAT split): **[`docs/ISO_CONTENTS.md`](../../../docs/ISO_CONTENTS.md)**.
 
 **All-in-one (eggs produce → `dd` → persistence + exFAT on `/dev/sda`):**
 
@@ -15,24 +15,21 @@ Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt
 
 **Alternate** (legacy interactive flash): `sudo bash tools/eggs/live-usb/legacy-persistence/build-flash-and-persist.sh --help`
 
-### Operator stick — one command (`build-operator-stick`)
+### Operator stick — one command (`build-operator-stick`) — **deprecated**
 
-```bash
-cd /path/to/highascg
-sudo bash tools/live-usb/build-operator-stick.sh
-```
+> **Deprecated.** The script now lives at **`work/deprecated/tools/build-operator-stick.sh`** and builds the old exFAT **+ union persistence** layout. For current sticks use **`tools/eggs/live-usb/finish-operator-stick.sh`** (exFAT-only) after `dd`, or the all-in-one `build-produce-flash-stick.sh` above.
 
-Runs **`build-highascg-egg.sh`** (WO‑47 **`/etc`** prep, Eggs **`--clone --max --excludes static`**, NVIDIA offline cache), confirms the **USB whole-disk** interactively (`dd`), adds **exFAT `HIGHASCGEXF`** with start **≥ hybrid ISO tail** and **≥ ceil(ISO MiB)+`EXFAT_AFTER_ISO_MARGIN_MIB`** (**1152** MiB default — adjust if your ISO grows), then **union persistence**. Warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
+The finish/partition scripts place **exFAT `HIGHASCGEXF`** with start **≥ hybrid ISO tail** and **≥ ceil(ISO MiB)+`EXFAT_AFTER_ISO_MARGIN_MIB`** (**1536** MiB default — adjust if your ISO grows). The build warns if Blackmagic **`desktopvideo*`** packages are missing from the clone source; **`--decklink-required`** exits non‑zero unless they’re installed (*`sudo bash scripts/install.sh`* with Desktop Video tarball). The string **`highascg-data`** cannot be the literal exFAT volume label (**11 characters max**); operators still call it “data”; **`HIGHASCGEXF`** is what systemd mounts.
 
-### Desktop helper — Stick Studio (`tools/stick-tools`)
+### Desktop helper — Stick Studio (`client/tools/stick-tools`)
 
-On a workstation with a display (and **`python3-tk`**): flash ISO + optional exFAT + seed operator dirs + optional copy to `sim/highascg`, plus **Start simulation** — `npm run stick-studio` from the repo root. Destructive steps use **pkexec**. Details: **`tools/stick-tools/README.md`**. See **[`docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md`](../../docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md)** for how a **Caspar-only** squashfs coexists with **HighAsCG synced from exFAT**.
+On a workstation with a display (and **`python3-tk`**): flash ISO + optional exFAT + seed operator dirs + optional copy to `sim/highascg`, plus **Start simulation** — `python3 client/tools/stick-tools/stick_studio.py` from the repo root (no npm wrapper). Destructive steps use **pkexec**. Details: **`client/tools/stick-tools/README.md`**. See **[`docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md`](../../../docs/CASPAR_IMAGE_VS_HIGHASCG_OVERLAY.md)** for how a **Caspar-only** squashfs coexists with **HighAsCG synced from exFAT**.
 
 ### Automated dev prerelease on GitHub (ISO + ZIP)
 
 To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.tar.gz`** (full tree, **`node_modules` included by default**) as GitHub prerelease assets from a machine already set up as a build/run host:
 
-[`docs/DEV_RELEASE_GITHUB.md`](../../docs/DEV_RELEASE_GITHUB.md) · `npm run release:dev-github` (`release:dev-github:dry` preview).
+[`docs/DEV_RELEASE_GITHUB.md`](../../../docs/DEV_RELEASE_GITHUB.md) · `npm run release:github-server` (`release:github-server:dry` preview); full-ISO publishing is a manual/deprecated flow (see that doc).
 
 ## Build host (Ubuntu Noble recommended)
 
@@ -43,15 +40,15 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
    ```bash
    cd /path/to/highascg
-   sudo bash tools/live-usb/build-highascg-egg.sh
+   sudo bash tools/eggs/live-usb/build-highascg-egg.sh   # or: npm run eggs:build
    ```
 
-   The build script runs **`prepare-eggs-clone-with-exfat.sh`** first (mount + bind + boot sync units, **`highascg.service`** ordering, empty **`~/exfat`** / **`~/highascg/media/*`** stubs, merge of **`penguins-eggs-exclude-highascg-fragment.list`**). If **`/etc/penguins-eggs.d/exclude.list`** does not exist yet, run Eggs config or a preliminary **`eggs produce`** once; then rerun the build script or **`sudo bash tools/live-usb/prepare-eggs-clone-with-exfat.sh`**. Stick + exFAT workflow: [**`EXFAT_DATA_ZERO_TOUCH.md`**](EXFAT_DATA_ZERO_TOUCH.md).
+   The build script runs **`prepare-eggs-clone-with-exfat.sh`** first (mount + bind + boot sync units, **`highascg.service`** ordering, empty **`~/exfat`** / **`~/highascg/media/*`** stubs, merge of **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**). If **`/etc/penguins-eggs.d/exclude.list`** does not exist yet, run Eggs config or a preliminary **`eggs produce`** once; then rerun the build script or **`sudo bash tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh`** (also: `npm run eggs:prepare`). Stick + exFAT workflow: [**`EXFAT_DATA_ZERO_TOUCH.md`**](EXFAT_DATA_ZERO_TOUCH.md).
 
    Optional:
 
    ```bash
-   sudo NVIDIA_BRANCHES="535 580 595" BASENAME=highascg bash tools/live-usb/build-highascg-egg.sh
+   sudo NVIDIA_BRANCHES="535 580 595" BASENAME=highascg bash tools/eggs/live-usb/build-highascg-egg.sh
    ```
 
 3. **Kernel (one version)** — `build-highascg-egg.sh` runs `sync-eggs-kernel-and-purge-stale.sh` with **`HIGHASCG_ENSURE_LATEST_KERNEL=1`**: installs **`linux-image-generic`**, points **`eggs.yaml`** at the **newest** `linux-image-*-generic`, purges older images. The ISO matches that kernel, not necessarily the kernel you booted before the build. If the script warns that running ≠ latest, **reboot** after the build (or before a long `eggs produce`) so DKMS (NVIDIA, DeckLink) matches.
@@ -69,8 +66,8 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 
 7. **Tailscale / tailnet identity**: A cloned ISO is **not** automatically “logged out.” If `tailscaled` state existed on the build host when `eggs produce` ran, that **machine key** is copied into the squashfs unless every storage path is excluded. The laptop then joins the tailnet **as the same node** as the builder (same key → same identity; it effectively replaces that machine until you fix it).  
    - `.deb` installs often use **`/var/lib/tailscale/`**, but **snap** layouts use **`/var/snap/tailscale/…`** — so “no `/var/lib/tailscale`” does **not** prove there is no shipped identity.  
-   - Custom locations: check **`systemctl cat tailscaled`** and **`/etc/default/tailscaled`** for `--statedir=` / `--state=`. Add matching paths to **`tools/live-usb/penguins-eggs-exclude-highascg-fragment.list`**, run **`merge-penguins-eggs-exclude-highascg.sh`**, rebuild.  
-   - **Persistence** (`FLASH_AND_PERSIST.md`, `/ union`) saves overlays too — once state exists on the stick, it keeps coming back until you delete or reflash.  
+   - Custom locations: check **`systemctl cat tailscaled`** and **`/etc/default/tailscaled`** for `--statedir=` / `--state=`. Add matching paths to **`tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list`**, run **`merge-penguins-eggs-exclude-highascg.sh`**, rebuild.  
+   - **Legacy persistence** ([`legacy-persistence/FLASH_AND_PERSIST.md`](./legacy-persistence/FLASH_AND_PERSIST.md), `/ union`) saves overlays too — once state exists on the stick, it keeps coming back until you delete or reflash.  
    - Sanity-check the ISO/squashfs: mount or `unsquashfs -ll` and search for **`tailscaled.state`** (and anything under **`var/snap/tailscale/`**).
 
 ---
@@ -92,19 +89,18 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
 3. **Write ISO** (replace `ISO` and `USB`):
 
    ```bash
-   ISO=/home/eggs/mnt/highascg_amd64_2026-05-09_1311.iso
+   shopt -s globstar
+   ISO="$(ls -t /home/eggs/**/*.iso | head -1)"   # or set the full filename explicitly
    USB=/dev/sdc
 
-   sudo dd if=$(ls -t /home/eggs/mnt/highascg_amd64_2026-05-09_1311.iso | head -1) of=$USB bs=4M status=progress oflag=sync conv=fsync
+   sudo dd if="$ISO" of="$USB" bs=4M status=progress oflag=sync conv=fsync
    sudo sync
    sudo partprobe "$USB"
    ```
 
-   Do **not** quote the glob in `dd if=…` — use `ls -t … | head -1` or the full filename.
+4. **Required for production sticks — exFAT data partition** (persistence is **legacy opt-in**, not production)
 
-4. **Required for production sticks — exFAT + persistence** (not optional)
-
-   After `dd` + `sync` + `partprobe`, add **both** partitions (exFAT **first**, persistence **second**). Do **not** use partition **2** for operator data if it is a tiny leftover slice — remove stale partitions 2+ from a previous attempt, then run the finish script.
+   After `dd` + `sync` + `partprobe`, add the **exFAT `HIGHASCGEXF`** partition. Do **not** use partition **2** for operator data if it is a tiny leftover slice — remove stale partitions 2+ from a previous attempt, then run the finish script.
 
    ```bash
    USB=/dev/sdX
@@ -113,9 +109,9 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    sudo bash tools/eggs/live-usb/finish-operator-stick.sh "$USB" --iso "$ISO" --prune-stale
    ```
 
-   Or manually: **`add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=4096`** ) → **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. On a **32 GiB** stick: ~5 GiB ISO · ~4 GiB persistence · ~22 GiB exFAT.
+   Or manually: **`EXFAT_FILL_DISK=1 add-exfat-data-partition.sh`** → **`seed-exfat-operator-layout.sh`**. Legacy union persistence (opt-in **`HIGHASCG_LEGACY_UNION_PERSIST=1`** only, not for production): **`legacy-persistence/add-union-persistence-partition.sh`** ( **`PERSIST_SIZE_MIB=4096`** ) before the exFAT step. On a **32 GiB** stick: ~5 GiB ISO · ~4 GiB persistence · ~22 GiB exFAT.
 
-   GRUB default entry includes **`persistence`** when the ISO was built after **`install-eggs-live-grub-theme.sh`**. Full reference: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
+   Legacy persistence reference: **[legacy-persistence/FLASH_AND_PERSIST.md](./legacy-persistence/FLASH_AND_PERSIST.md)** · Etcher / macOS / Windows: **[MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md)**.
 
    **Narrow alternative (not production playout):** persist only **`~/highascg`** on a separate ext4 — **[HIGHASCG_FOLDER_USB_PARTITION.md](./HIGHASCG_FOLDER_USB_PARTITION.md)**. Skips NVIDIA/Tailscale/system-wide persistence.
 
@@ -157,9 +153,9 @@ sudo eggs krill
 
 That installs to disk without Calamares in the ISO.
 
-### Option C — No install — **full USB persistence (default / recommended)**
+### Option C — No install — **full USB persistence (legacy opt-in, not production)**
 
-Use **`/ union`** persistence so the stick **remembers** NVIDIA drivers, DeckLink-related OS state, Tailscale, **`/etc`**, **`/var`**, **`/home`**, and HighAsCG. After `dd`, run **`add-union-persistence-partition.sh`** and always boot **Live with persistence**: **[FLASH_AND_PERSIST.md](./FLASH_AND_PERSIST.md)**, [flash step 4](#flash-to-usb).
+Production sticks are **exFAT-only, no union persistence** — durable data lives on `HIGHASCGEXF`. If you deliberately need the legacy layout (`HIGHASCG_LEGACY_UNION_PERSIST=1`), **`/ union`** persistence makes the stick remember NVIDIA drivers, DeckLink-related OS state, Tailscale, **`/etc`**, **`/var`**, **`/home`**, and HighAsCG. After `dd`, run **`legacy-persistence/add-union-persistence-partition.sh`** and boot **Live with persistence**: **[legacy-persistence/FLASH_AND_PERSIST.md](./legacy-persistence/FLASH_AND_PERSIST.md)**, [flash step 4](#flash-to-usb).
 
 ### Option D — No install — **only `~/highascg` on a data partition (advanced / narrow)**
 
@@ -167,20 +163,18 @@ When you **deliberately** do **not** want full-root persistence: **[HIGHASCG_FOL
 
 ---
 
-## Windows / macOS — write ISO + exFAT + persistence
+## Windows / macOS — write ISO + exFAT
 
-**Etcher + extra partitions (macOS / Windows):** [MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md).
-
-**Manual Etcher + system partitioning (legacy detail):** [`MANUAL_STICK_WINDOWS_MACOS.md`](MANUAL_STICK_WINDOWS_MACOS.md).
+**Etcher + system partitioning (macOS / Windows):** [MANUAL_STICK_WINDOWS_MACOS.md](./MANUAL_STICK_WINDOWS_MACOS.md).
 
 If you already have a **`*.iso`** built elsewhere:
 
 | OS | Script |
 |----|--------|
-| **Windows** (Admin PowerShell) | [`windows/make-highascg-stick.ps1`](windows/make-highascg-stick.ps1) |
-| **macOS** (sudo in Terminal) | [`macos/make-highascg-stick.sh`](macos/make-highascg-stick.sh) |
+| **Windows** (Admin PowerShell) | [`make-highascg-stick.ps1`](../../../client/tools/live-usb/windows/make-highascg-stick.ps1) |
+| **macOS** (sudo in Terminal) | [`make-highascg-stick.sh`](../../../client/tools/live-usb/macos/make-highascg-stick.sh) |
 
-Both: **visible menu** of removable targets, **explicit confirmations**, raw **ISO** write, then **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) and seeded folders: **`drop-update`**, **`drop-config`**, **`media`**, **`templates`**, **`configs`**, **`snapshots/rear-panels`**. Hybrid ISO + free-space detection varies by OS; macOS may require **Disk Utility** or **Linux `add-exfat-data-partition.sh`** fallback if `diskutil addPartition` fails.
+Both: **visible menu** of removable targets, **explicit confirmations**, raw **ISO** write, then **exFAT** labelled **`HIGHASCGEXF`** (WO‑47) and seeded folders (**`drop-config`**, **`media`**, **`templates`**, **`configs`**, **`snapshots/rear-panels`**, plus a `sim/highascg` simulation tree). Note on server-drop folders: the **canonical layout is `drop-update/`** (+ `drop-update/applied/`); today the macOS script still seeds legacy **`update/server/`** and the Windows script seeds neither — create `drop-update/` yourself until the scripts are aligned. Hybrid ISO + free-space detection varies by OS; macOS may require **Disk Utility** or **Linux `add-exfat-data-partition.sh`** fallback if `diskutil addPartition` fails.
 
 ---
 

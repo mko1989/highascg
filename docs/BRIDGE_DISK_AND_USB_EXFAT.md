@@ -12,17 +12,16 @@ WO-52 splits operator storage into two volumes.
 | **Configs** | `bridge/configs/` ↔ `~/highascg/config/` + state JSON (bidirectional, boot prefers bridge) |
 | **Projects** | `bridge/projects/*.json` ↔ `~/highascg/projects/` (bidirectional mtime sync) |
 
-Create on Windows (Disk Management) or Linux:
+Create on Windows (Disk Management — same partitioning steps as the stick guide, see [STICK_QUICK_START.md §3, “Windows — Disk Management”](STICK_QUICK_START.md#windows--disk-management), but label the volume **`HIGHASCGDAT`**) or on Linux:
 
 ```bash
 sudo mkfs.exfat -L HIGHASCGDAT /dev/nvme0n1p3
+```
 
 After the partition exists with that label, install units and sync map on the playout host:
 
 ```bash
 cd ~/highascg && sudo bash scripts/apply-bridge-label-highascgdat.sh
-```
-sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /mount/point
 ```
 
 Seed layout only:
@@ -43,7 +42,7 @@ sudo bash tools/eggs/live-usb/seed-bridge-operator-layout.sh /home/casparcg/brid
 | **Server drops** | `drop-update/` (unchanged) |
 | **Private (per machine)** | `.private/<machine-id>/` on USB and bridge — Tailscale/Syncthing/replication pairing; **not** in `configs/` sync |
 
-Use [`HIGHASCGEXF-starter-layout.zip`](../dist/HIGHASCGEXF-starter-layout.zip) for USB folder stubs.
+Use [`HIGHASCGEXF-starter-layout.zip`](guides/stick/HIGHASCGEXF-starter-layout.zip) for USB folder stubs (refresh via `npm run exfat:starter-zip` → `dist/`).
 
 ## Boot order
 
@@ -59,7 +58,7 @@ Installed from `config/exfat-sync.json` → `/etc/highascg/exfat-sync.json`.
 Legacy **USB `media/exfat` bind** is disabled by default. Enable only for old sticks:
 
 ```bash
-sudo HIGHASCG_LEGACY_USB_MEDIA_BIND=1 bash scripts/install-exfat-systemd-units.sh
+sudo HIGHASCG_LEGACY_USB_MEDIA_BIND=1 bash scripts/exfat/install-exfat-systemd-units.sh
 ```
 
 ## Missing-volume behavior (graceful)
