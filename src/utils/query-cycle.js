@@ -109,7 +109,10 @@ function attachEnqueueQueue(ctx) {
 	}
 
 	ctx.runCommandQueue = function runCommandQueue() {
-		if (!ctx.socket || !ctx.socket.isConnected || ctx.commandQueue.length === 0) return
+		// WO-453: offline_mode has no connected socket — requestData routes through
+		// amcp._send which answers from AmcpSimulated, so the cycle must still run.
+		const reachable = (ctx.socket && ctx.socket.isConnected) || ctx.amcp?.isOffline
+		if (!reachable || ctx.commandQueue.length === 0) return
 		const item = ctx.commandQueue.shift()
 		ctx.requestData(
 			item.command,
@@ -123,7 +126,7 @@ function attachEnqueueQueue(ctx) {
 	}
 
 	ctx.requestData = function requestData(command, params, callback, responseKey) {
-		if (ctx.socket && ctx.socket.isConnected) {
+		if ((ctx.socket && ctx.socket.isConnected) || ctx.amcp?.isOffline) {
 			const fullCommand = (command + (params != null && params !== '' ? ' ' + params : '')).trim().toUpperCase()
 			const key =
 				responseKey !== undefined ? String(responseKey).toUpperCase() : fullCommand.split(/\s+/)[0]

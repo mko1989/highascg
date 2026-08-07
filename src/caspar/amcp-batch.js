@@ -173,6 +173,9 @@ const {
  * @param {{ skipMixerPreCommit?: boolean }} [options]
  */
 function runBeginCommitBatch(client, lines, options) {
+	// WO-453: offline/sim has no socket transaction — send the lines straight through the
+	// simulated transport instead of burning a guaranteed 'Not connected' rejection first.
+	if (client.isOffline) return sequentialRaw([...lines], client)
 	const skipMixerPreCommit = options?.skipMixerPreCommit === true
 	const connection = client._context
 	const ch = inferProgramChannelFromAmcpLines(lines)

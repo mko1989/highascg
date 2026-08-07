@@ -54,6 +54,11 @@ const { installProcessGuards } = require('./src/bootstrap/process-guards')
 function main() {
 	installProcessGuards({ logger, persistence })
 	const cli = Args.parseArgs(process.argv); if (cli.help) { Args.printHelp(); process.exit(0) }
+	// WO-453: --no-caspar IS simulation mode. Forcing offline_mode through the existing env
+	// override (survives config rebuilds) routes every AMCP send to AmcpSimulated instead of
+	// leaving appCtx.amcp null — null meant takes silently no-oped and the whole post-connect
+	// bootstrap (INFO CONFIG, CLS/TLS, routing) never ran in the simulator.
+	if (cli.noCaspar) process.env.HIGHASCG_OFFLINE_MODE = '1'
 	let configPath = process.env.HIGHASCG_CONFIG_PATH ? path.resolve(process.env.HIGHASCG_CONFIG_PATH) : path.join(REPO_ROOT, 'highascg.config.json')
 	const modularDir = path.join(REPO_ROOT, 'config')
 	if (!process.env.HIGHASCG_CONFIG_PATH && fs.existsSync(modularDir) && fs.statSync(modularDir).isDirectory()) {
@@ -267,14 +272,14 @@ function main() {
 			}
 		})
 
-		let casparConn = null; if (!cli.noCaspar) {
-			const hMs = parseInt(process.env.HIGHASCG_AMCP_HEALTH_MS || '0', 10) || 0; const sMs = parseInt(process.env.HIGHASCG_AMCP_CONNECT_SETTLE_MS || '600', 10) || 600
-			casparConn = new ConnectionManager({ host: config.caspar.host, port: config.caspar.port, config, log: appCtx.log, healthIntervalMs: hMs, healthConnectDelayMs: sMs })
-			appCtx.amcp = casparConn.amcp; appCtx.casparConnection = casparConn
-			bindAppCtxAmcpTransport(appCtx, casparConn)
-			casparConn.context.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
-			casparConn.context.gatheredInfo = appCtx.gatheredInfo
-		}
+		// WO-453: constructed even under --no-caspar — offline_mode (forced above) routes all
+		// sends to AmcpSimulated and start() below is skipped, so no TCP is ever opened.
+		const hMs = parseInt(process.env.HIGHASCG_AMCP_HEALTH_MS || '0', 10) || 0; const sMs = parseInt(process.env.HIGHASCG_AMCP_CONNECT_SETTLE_MS || '600', 10) || 600
+		const casparConn = new ConnectionManager({ host: config.caspar.host, port: config.caspar.port, config, log: appCtx.log, healthIntervalMs: hMs, healthConnectDelayMs: sMs })
+		appCtx.amcp = casparConn.amcp; appCtx.casparConnection = casparConn
+		bindAppCtxAmcpTransport(appCtx, casparConn)
+		casparConn.context.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks
+		casparConn.context.gatheredInfo = appCtx.gatheredInfo
 
 		if (!isHeadlessMode()) {
 			logger.info(
@@ -384,14 +389,26 @@ function main() {
 				}
 				if (config.offline_mode) appCtx.state.setVariable('caspar_connected', 'true')
 			}); casparConn.on('error', err => appCtx.log('warn', 'Caspar TCP: ' + (err.message || err)))
-			
+
 			if (!config.offline_mode) {
 				casparConn.start()
+			} else {
+				// WO-453: no TCP in offline/sim — fire the connected status once so the whole
+				// post-connect bootstrap above (INFO CONFIG, CLS/TLS query cycle, periodic hooks,
+				// caspar_connected=true for the connection eye) runs against AmcpSimulated.
+				setImmediate(() => casparConn.emit('status', { connected: true, at: Date.now(), host: config.caspar.host, port: config.caspar.port, version: '2.4.0 (Simulated)' }))
 			}
 		}
 
 		const { startOscSubsystem, stopOscSubsystem, restartOscSubsystem, getOscReceiverStats } = createOscLifecycle({ appCtx, config, cli, logger, normalizeOscConfig, OscState, OscListener, applyOscSnapshotToVariables, clearOscVariables, startOscPlaybackInfoSupplement })
 		startOscSubsystem(); appCtx.restartOscSubsystem = restartOscSubsystem; appCtx.getOscReceiverStats = getOscReceiverStats
+
+		if (config.offline_mode && appCtx.oscState) {
+			// WO-453: nothing sends OSC UDP in simulation — feed sim playback state through the
+			// real OscState pipeline (timers, playlist advance, clip-end fade all read it).
+			const { startSimOscFeeder } = require('./src/caspar/sim-osc-feeder')
+			appCtx._stopSimOscFeeder = startSimOscFeeder(appCtx)
+		}
 
 		// WO-333: line-in/USB capture → FFT frames on WS for shader audio reactivity (opt-in).
 		const { createAudioCaptureLifecycle } = require('./src/bootstrap/audio-capture-lifecycle')
