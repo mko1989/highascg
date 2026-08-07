@@ -1,6 +1,6 @@
 # WO-455 — GUI update on installed systems: EACCES mkdir /var/cache/highascg/updates
 
-**Status: DONE in repo (2026-08-07, suite 1891/0; fix reaches installed boxes with the NEXT release/drop — the owner's second machine needs either the one-time dir command below or this code via stick, see Remains).**
+**Status: DONE (2026-08-07, suite 1891/0, CI run 31169663041 green; shipped in release 2026-08-07_122111 — machine 2 needs the one-time dir command below OR this release via stick, see Remains).**
 
 Owner (todos07.08.26 addendum): update on an installed system (second machine) fails —
 `phase: error EACCES permission denied mkdir /var/cache/highascg/updates`.
@@ -49,7 +49,7 @@ Owner (todos07.08.26 addendum): update on an installed system (second machine) f
 - **Second machine, pick ONE:**
   a. One-time unblock of the CURRENT code (fastest):
      `sudo mkdir -p /var/cache/highascg/updates && sudo chown -R casparcg:casparcg /var/cache/highascg/updates`
-     — then Settings → System Updates works immediately (release 2026-08-07_120130 is newer
+     — then Settings → System Updates works immediately (release 2026-08-07_122111 is newer
      than what it runs).
   b. Or get THIS code onto it via a stick drop-update; afterwards GUI updates need no manual
      step ever (the /tmp fallback covers the missing dir).
