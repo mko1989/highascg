@@ -1,6 +1,6 @@
 # WO-452 — Aug 6 Actions red burst (GitHub incident) + commits attributed to a stranger
 
-**Status: IN PROGRESS (2026-08-07 — fixes landed, CI green on this push pending)**
+**Status: DONE (2026-08-07 — CI run 31161076708 green in 1m18s + Pages 31161076377 green in 1m42s on push 70b96b0; GitHub API confirms author login mko1989. That CI run is also the first gate verification of WO-450 rounds 3–5.)**
 
 ## Investigation FIRST
 
