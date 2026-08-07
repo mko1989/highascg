@@ -75,21 +75,13 @@ Click **Flash!** → approve the admin prompt → wait for verification (**Flash
 
 Use **only the unallocated space at the end** of the USB disk. Never delete or reformat the small boot partitions Etcher created.
 
-### Windows — Disk Management
-
-1. `Win + X` → **Disk Management**
-2. In the **lower** pane, select your **Removable** USB disk (verify size — **not** internal Disk 0)
-3. Right-click the **black unallocated** bar at the **right end** → **New Simple Volume…**
-4. Use all available space → file system **exFAT** → volume label **`HIGHASCGEXF`** (exact spelling, no spaces)
-5. Finish and note the drive letter (e.g. `E:`)
-
-**Optional — `diskpart` (run as Administrator)** — replace `2` with your USB disk number from Disk Management:
+**`diskpart` (run as Administrator)** — replace `2` with your USB disk number from Disk Management:
 
 ```text
 diskpart
 list disk
 select disk 2
-create partition primary
+create partition primary offset=6291456
 format fs=exfat label=HIGHASCGEXF quick
 assign
 exit
