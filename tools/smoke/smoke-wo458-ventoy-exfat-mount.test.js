@@ -112,10 +112,15 @@ describe('WO-458 Ventoy exFAT mount', () => {
 	for (const file of [CANON, RUNTIME]) {
 		it(`${file}: mount fallback is reachable and dm-aware`, () => {
 			const src = read(file)
+			// The start stays --no-block (blocking here delays highascg.service, which is why the
+			// original code used it). What must never come back is gating the fallback on the
+			// systemctl exit code: --no-block always exits 0, so that made the fallback dead code.
+			assert.match(src, /systemctl start --no-block home-casparcg-exfat\.mount/, 'start must stay asynchronous')
 			assert.ok(
-				!/systemctl start --no-block home-casparcg-exfat\.mount/.test(src),
-				'--no-block always exits 0, which made the direct-mount fallback dead code'
+				!/if ! systemctl start[^\n]*home-casparcg-exfat\.mount[^\n]*; then/.test(src),
+				'the fallback must not hang off the systemctl exit code'
 			)
+			assert.match(src, /if ! mountpoint -q "\$MP"; then/, 'the fallback must be gated on the actual mount state')
 			assert.match(src, /resolve_usb_dev\(\) \{/, 'must carry the Ventoy device resolver')
 			assert.match(src, /MOUNT_DEV="\$\(resolve_usb_dev\)"/)
 			assert.match(src, /mount -t exfat -o "defaults,uid=\$\{uid\},gid=\$\{gid\},umask=002" "\$MOUNT_DEV"/)

@@ -78,15 +78,27 @@ else
 	mkdir -p "$MP"
 
 	# home-casparcg-exfat.mount hardcodes What=/dev/disk/by-label/… so it can only work when the
-	# raw partition is mountable. Start it blocking (device/mount timeouts are 5s) — `--no-block`
-	# always exits 0, which made every fallback below unreachable.
+	# raw partition is mountable.
+	#
+	# The start MUST stay --no-block. This service is Before=highascg.service with
+	# TimeoutStartSec=300, and a blocking systemctl start here has previously delayed the whole
+	# stack — that is why the original code used --no-block. WO-458 briefly made it blocking to
+	# reach the fallback below; that was the wrong lever. The real defect was that the fallback
+	# hung off the systemctl exit code (--no-block always exits 0, so it was dead code). The
+	# fallback now hangs off `mountpoint`, which is the actual question, so the start can stay
+	# asynchronous. Poll briefly: the unit carries device-timeout=5 / mount-timeout=5.
 	if [[ "$MOUNT_DEV" == "${DEV_MAPPER}"/* ]]; then
-		log "Raw partition held by device-mapper (Ventoy stick) — mounting ${MOUNT_DEV}"
+		log "Raw partition held by device-mapper (Ventoy stick) — mounting ${MOUNT_DEV} directly"
 	else
-		systemctl start home-casparcg-exfat.mount 2>>"$LOG" || log "WARN: home-casparcg-exfat.mount failed — falling back to direct mount"
+		systemctl start --no-block home-casparcg-exfat.mount 2>>"$LOG" || true
+		for ((i = 0; i < 10; i++)); do
+			mountpoint -q "$MP" && break
+			sleep 1
+		done
 	fi
 
 	if ! mountpoint -q "$MP"; then
+		log "Unit did not mount $MP — direct mount of ${MOUNT_DEV}"
 		systemctl reset-failed home-casparcg-exfat.mount 2>>"$LOG" || true
 		mount -t exfat -o "defaults,uid=${uid},gid=${gid},umask=002" "$MOUNT_DEV" "$MP" 2>>"$LOG" \
 			|| mount -o "defaults,uid=${uid},gid=${gid},umask=002" "$MOUNT_DEV" "$MP" 2>>"$LOG" \
