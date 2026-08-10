@@ -30,6 +30,20 @@ assert.strictEqual(cfg.screenDestinations.destinations[0].videoMode, '1080p2500'
 
 assert.strictEqual(isAllowedEthernetIface('eth0'), true)
 assert.strictEqual(isAllowedEthernetIface('wlan0'), false)
+/* Every box shipped before highascg7579 had an `enoN` NIC, so a digits-only suffix passed unnoticed.
+ * That box's `enp3s0` was filtered out entirely — /api/system/network returned interfaces:[] and the
+ * GUI showed "(no Ethernet found)" with no way to configure the network. Cover each systemd
+ * predictable-name scheme, and keep the non-Ethernet classes excluded. */
+for (const ok of ['eno1', 'eno2', 'enp3s0', 'enp4s0', 'enp0s31f6', 'ens33', 'eno1np0', 'enx047c1615c6e4']) {
+	assert.strictEqual(isAllowedEthernetIface(ok), true, `expected ${ok} to be an allowed Ethernet iface`)
+}
+for (const no of ['wlo1', 'wlp0s20f3', 'lo', 'tailscale0', 'docker0', 'br-abc123', 'veth1a2b', 'en', '']) {
+	assert.strictEqual(isAllowedEthernetIface(no), false, `expected ${no} to be rejected`)
+}
+assert.strictEqual(
+	normalizeNetworkSettings({ mode: 'dhcp', primaryInterface: 'enp3s0' }, {}).primaryInterface,
+	'enp3s0',
+)
 assert.strictEqual(isValidIpv4('192.168.1.10'), true)
 assert.strictEqual(isValidIpv4('999.1.1.1'), false)
 const net = normalizeNetworkSettings({ mode: 'static', primaryInterface: 'eth0', static: { address: '10.0.0.2' } }, {})

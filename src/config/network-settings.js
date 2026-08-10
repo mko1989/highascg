@@ -2,7 +2,13 @@
 
 const defaults = require('./defaults')
 
-const IFACE_RE = /^(eth|enp|eno)[0-9]+$/i
+/* systemd predictable names are `en` + a scheme suffix that is NOT digits-only: onboard `eno1`,
+ * hotplug slot `ens33`, PCI `enp3s0` / `enp0s31f6`, MAC `enx047c1615c6e4`, plus optional
+ * f/d/n/v parts (`eno1np0`). The old `^(eth|enp|eno)[0-9]+$` only matched digits after the
+ * prefix, so every box shipped so far (all `enoN`) passed while a PCI-named NIC — `enp3s0` on
+ * highascg7579 — was filtered out, leaving interfaces:[] and "(no Ethernet found)" in the GUI.
+ * Wireless (`wl*`), bridges, veth, tun and lo do not start with `eth`/`en` and stay excluded. */
+const IFACE_RE = /^(eth[0-9]+|en[a-z0-9]+)$/i
 
 /**
  * @param {unknown} name

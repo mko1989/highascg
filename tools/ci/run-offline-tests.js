@@ -12,6 +12,8 @@ const path = require('path')
 const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const FILES = [
+	'tools/smoke/smoke-os-layout-offset-overlap.test.js',
+	'tools/smoke/smoke-project-fps-network.test.js',
 	'tools/smoke/smoke-edid-parse.test.js',
 	'tools/smoke/smoke-edid-preferred-mode.test.js',
 	'tools/smoke/smoke-operator-gui-4k-scale.test.js',

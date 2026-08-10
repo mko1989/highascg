@@ -3,7 +3,20 @@
 const { resolvePixelMapFeedToProgramScreen } = require('../config/pixel-mapping-config')
 
 /**
- * WO-40a: place destination-driven heads to the right of mapping-fed bbox.
+ * WO-40a: place destination-driven heads outside the mapping-fed bbox — to its right when the
+ * mapping spans wider than tall, below it otherwise.
+ *
+ * Every head arrives here already carrying a relative offset from computePlacedLayoutResults'
+ * running cumulativeX, so the move must be a SHIFT. Screens shifted, but multiview/prv heads were
+ * clamped (`x = max(x, offX)`), which threw that offset away and parked them exactly on the bbox
+ * edge — where the first shifted screen also lands. On highascg7579 an operator_gui head at
+ * cumulative 1920 became max(1920, 6144) = 6144, the same origin as screen_2 at 0 + 6144: two
+ * xrandr outputs scanning identical pixels, so the operator GUI showed on the PGM2 monitor too.
+ *
+ * The horizontal and vertical placements are mutually exclusive. They used to be split across two
+ * blocks, the second running unconditionally, so a vertically-stacked layout moved multiview/prv
+ * heads down AND right; the clamp hid it by usually being a no-op on that path.
+ *
  * @param {object} config
  * @param {object} results
  * @param {object | null} mappingGpuBBox
@@ -20,15 +33,17 @@ function applyMappingGpuPlacementOffsets(
 	graphHasDestinationGpuBinding,
 ) {
 	const skipWo40aAutoOffset = !graphHasDestinationGpuBinding && operatorScreenAssignments.size > 0
+	if (skipWo40aAutoOffset || !mappingGpuBBox || mappingGpuOutputs.length === 0) return
 
-	if (
-		!skipWo40aAutoOffset &&
-		mappingGpuBBox &&
-		mappingGpuOutputs.length > 0 &&
-		Object.keys(results.screens).length > 0
-	) {
+	const screens = Object.entries(results.screens || {})
+	const multiview = Object.entries(results.multiview || {})
+	const prv = Object.entries(results.prv || {})
+
+	/* A screen the pixel mapping already feeds is positioned by its mapping outputs — shifting it
+	 * again would move it off its own raster. */
+	const mappingFeedScreens = new Set()
+	if (screens.length > 0) {
 		const devices = Array.isArray(config?.deviceGraph?.devices) ? config.deviceGraph.devices : []
-		const mappingFeedScreens = new Set()
 		for (const d of devices) {
 			if (!d || d.role !== 'pixel_mapping') continue
 			const feed = resolvePixelMapFeedToProgramScreen(config, String(d.id))
@@ -36,68 +51,40 @@ function applyMappingGpuPlacementOffsets(
 				mappingFeedScreens.add(feed.screenIndex)
 			}
 		}
-		const offX = Math.max(0, mappingGpuBBox.maxX)
-		const spanX = mappingGpuBBox.maxX - mappingGpuBBox.minX
-		const spanY = mappingGpuBBox.maxY - mappingGpuBBox.minY
-		const verticalStack = spanY > spanX
-		if (verticalStack) {
-			const offY = Math.max(0, mappingGpuBBox.maxY)
-			if (offY > 0) {
-				for (const [key, info] of Object.entries(results.screens)) {
-					const n = parseInt(key, 10)
-					if (!Number.isFinite(n) || n < 1 || !info) continue
-					if (mappingFeedScreens.size > 0 && mappingFeedScreens.has(n)) continue
-					const manualOsY = Number.isFinite(config[`screen_${n}_os_y`]) ? config[`screen_${n}_os_y`] : null
-					if (manualOsY != null) continue
-					info.y += offY
-				}
-				for (const [key, info] of Object.entries(results.multiview)) {
-					const n = parseInt(key, 10)
-					if (!Number.isFinite(n) || n < 1 || !info) continue
-					const manualOsY =
-						Number.isFinite(config[`multiview_${n}_os_y`]) ? config[`multiview_${n}_os_y`] :
-						Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null
-					if (manualOsY != null) continue
-					info.y += offY
-				}
-				for (const [key, info] of Object.entries(results.prv || {})) {
-					const n = parseInt(key, 10)
-					if (!Number.isFinite(n) || n < 1 || !info) continue
-					if (Number.isFinite(config[`screen_${n}_prv_os_y`])) continue
-					info.y += offY
-				}
-			}
-		} else if (offX > 0) {
-			for (const [key, info] of Object.entries(results.screens)) {
-				const n = parseInt(key, 10)
-				if (!Number.isFinite(n) || n < 1 || !info) continue
-				if (mappingFeedScreens.size > 0 && mappingFeedScreens.has(n)) continue
-				const manualOsX = Number.isFinite(config[`screen_${n}_os_x`]) ? config[`screen_${n}_os_x`] : null
-				if (manualOsX != null) continue
-				info.x += offX
-			}
-		}
 	}
 
-	if (!skipWo40aAutoOffset && mappingGpuBBox && mappingGpuOutputs.length > 0) {
-		const offX = Math.max(0, mappingGpuBBox.maxX)
-		if (offX > 0) {
-			for (const [key, info] of Object.entries(results.multiview)) {
-				const n = parseInt(key, 10)
-				if (!Number.isFinite(n) || n < 1 || !info) continue
-				const manualOsX =
-					Number.isFinite(config[`multiview_${n}_os_x`]) ? config[`multiview_${n}_os_x`] :
-					Number.isFinite(config.multiview_os_x) ? config.multiview_os_x : null
-				if (manualOsX != null) continue
-				info.x = Math.max(Number(info.x) || 0, offX)
-			}
-			for (const [key, info] of Object.entries(results.prv || {})) {
-				const n = parseInt(key, 10)
-				if (!Number.isFinite(n) || n < 1 || !info) continue
-				if (Number.isFinite(config[`screen_${n}_prv_os_x`])) continue
-				info.x = Math.max(Number(info.x) || 0, offX)
-			}
+	const spanX = mappingGpuBBox.maxX - mappingGpuBBox.minX
+	const spanY = mappingGpuBBox.maxY - mappingGpuBBox.minY
+	const verticalStack = spanY > spanX
+	const axis = verticalStack ? 'y' : 'x'
+	const off = Math.max(0, verticalStack ? mappingGpuBBox.maxY : mappingGpuBBox.maxX)
+	if (off <= 0) return
+
+	const manual = (...keys) => {
+		for (const k of keys) {
+			if (Number.isFinite(config[k])) return config[k]
 		}
+		return null
+	}
+
+	for (const [key, info] of screens) {
+		const n = parseInt(key, 10)
+		if (!Number.isFinite(n) || n < 1 || !info) continue
+		if (mappingFeedScreens.size > 0 && mappingFeedScreens.has(n)) continue
+		if (manual(`screen_${n}_os_${axis}`) != null) continue
+		info[axis] = (Number(info[axis]) || 0) + off
+	}
+	for (const [key, info] of multiview) {
+		const n = parseInt(key, 10)
+		if (!Number.isFinite(n) || n < 1 || !info) continue
+		if (manual(`multiview_${n}_os_${axis}`, `multiview_os_${axis}`) != null) continue
+		info[axis] = (Number(info[axis]) || 0) + off
+	}
+	for (const [key, info] of prv) {
+		const n = parseInt(key, 10)
+		if (!Number.isFinite(n) || n < 1 || !info) continue
+		if (manual(`screen_${n}_prv_os_${axis}`) != null) continue
+		info[axis] = (Number(info[axis]) || 0) + off
 	}
 }
 
