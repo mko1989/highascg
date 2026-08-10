@@ -11,6 +11,8 @@ if [[ -d /run/live ]]; then
 else
 	WAIT_SEC="${HIGHASCG_EXFAT_BOOT_WAIT_SEC:-12}"
 fi
+# WO-471: how long to keep looking when udev reports no USB disk at all (see the settle check below).
+STICKLESS_GRACE_SEC="${HIGHASCG_EXFAT_STICKLESS_GRACE_SEC:-5}"
 LOG=/var/log/highascg-exfat-boot.log
 
 log() {
@@ -58,9 +60,25 @@ resolve_usb_dev() {
 if findmnt -n "$MP" &>/dev/null; then
 	log "Already mounted: $MP ($(findmnt -n -o SOURCE,FSTYPE "$MP")) — continue pipeline"
 else
-	log "Waiting up to ${WAIT_SEC}s for USB exFAT label ${USB_LABEL}"
+	# WO-471: casparcg-server.service is ordered behind this unit (scripts/setup/13-caspar-systemd-units.sh
+	# adds highascg-decklink-install.service to its After= list, and that chains back to here), so every
+	# second spent here delays playout coming up. Measured on an installed box booting WITHOUT a stick:
+	# highascg-exfat-boot.service +30.111s, casparcg-server.service @31.489s — the entire delay was this
+	# loop polling once a second for a stick that was never going to appear.
+	#
+	# udev creates /dev/disk/by-label/* as part of processing the block device, so once its queue has
+	# drained, "no USB disk at all" is a reliable answer rather than a guess. When that is the case, fall
+	# back to a short grace instead of the full wait — a stick that enumerates on a slow controller is
+	# still caught, but a box with no stick no longer pays ~30s. A present stick takes the unchanged path.
+	udevadm settle --timeout=5 &>/dev/null || true
+	wait_for="$WAIT_SEC"
+	if [[ ! -e "$USB_DEV" ]] && ! lsblk -dno NAME,TRAN 2>/dev/null | awk '$2 == "usb" { found = 1 } END { exit !found }'; then
+		wait_for="$STICKLESS_GRACE_SEC"
+		log "No USB disk present after udev settle — grace ${wait_for}s instead of ${WAIT_SEC}s"
+	fi
+	log "Waiting up to ${wait_for}s for USB exFAT label ${USB_LABEL}"
 	found=0
-	for ((i = 0; i < WAIT_SEC; i++)); do
+	for ((i = 0; i < wait_for; i++)); do
 		if [[ -e "$USB_DEV" ]]; then
 			found=1
 			break
@@ -135,15 +153,18 @@ if systemctl cat highascg-decklink-install.service &>/dev/null; then
 		log "Skip highascg-decklink-install.service (already active this boot)"
 	elif [[ "$dl_st" == "activating" ]]; then
 		log "Skip highascg-decklink-install.service (still running from earlier start)"
-	elif dpkg-query -W -f='${Status}' desktopvideo 2>/dev/null | grep -qE 'install ok installed'; then
-		if lspci 2>/dev/null | grep -qi blackmagic && ! lsmod 2>/dev/null | grep -q blackmagic; then
-			log "Queueing highascg-decklink-install.service (desktopvideo installed but module missing)"
-			systemctl start --no-block highascg-decklink-install.service 2>>"$LOG" || log "WARN: queue decklink-install failed"
-		else
-			log "Skip queue highascg-decklink-install.service (desktopvideo OK — manual run to upgrade)"
-		fi
+	# WO-471: decide on OBSERVABLE driver state, never on dpkg alone. The old `else` branch queued a
+	# DKMS build whenever `dpkg-query` did not report desktopvideo installed — and WO-431 established
+	# that /var/lib/dpkg/status ships whole in a clone, so its record of a masked package is not
+	# evidence either way. A box whose module is loaded and working could therefore rebuild the driver
+	# on EVERY boot, and casparcg-server.service is ordered behind this unit, so that delay lands
+	# squarely on time-to-playout. A loaded module means there is nothing to install, whatever dpkg says.
+	elif lsmod 2>/dev/null | grep -q blackmagic; then
+		log "Skip queue highascg-decklink-install.service (blackmagic module already loaded)"
+	elif ! lspci 2>/dev/null | grep -qi blackmagic; then
+		log "Skip queue highascg-decklink-install.service (no Blackmagic card on this host)"
 	else
-		log "Queueing highascg-decklink-install.service (--no-block; DKMS may take several minutes)"
+		log "Queueing highascg-decklink-install.service (card present, module missing; DKMS may take several minutes)"
 		systemctl start --no-block highascg-decklink-install.service 2>>"$LOG" || log "WARN: queue decklink-install failed"
 	fi
 fi

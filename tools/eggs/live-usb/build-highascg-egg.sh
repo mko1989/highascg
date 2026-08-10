@@ -137,6 +137,21 @@ THEME_ABS="$(cd "${HERE}/highascg-eggs-theme" && pwd)"
 echo "==> Stop highascg + companion during squashfs (avoid state changing mid-pack; free RAM)"
 systemctl stop highascg.service companion.service 2>/dev/null || true
 
+# WO-471: stamp EVERY produce, not just the flash wrapper. WO-432 put this write in
+# build-produce-flash-stick.sh, but a bare `npm run eggs:build` (this script) is the main
+# workflow and never stamped — so clones fell through src/system/build-stamp.js's precedence
+# (BUILD_STAMP -> .highascg-build-stamp -> package.json.version) to the frozen legacy value and
+# Settings -> Updates reported 2026.05.20 on a same-day ISO. Worse, compareBuildStamps() then
+# weighed that against real release stamps, so the update check answered on a bogus version.
+#
+# This must land BEFORE `eggs produce` clones the filesystem, and BUILD_STAMP is deliberately
+# absent from the eggs exclude fragments so it rides into the squashfs. The wrapper exports
+# HIGHASCG_BUILD_STAMP so both phases report one identical stamp; standalone runs generate it.
+PRODUCE_STAMP="${HIGHASCG_BUILD_STAMP:-$(date -u +%Y-%m-%d_%H%M%S)}"
+echo "$PRODUCE_STAMP" >"${REPO_ROOT}/BUILD_STAMP"
+chown --reference="$REPO_ROOT" "${REPO_ROOT}/BUILD_STAMP" 2>/dev/null || true
+echo "==> BUILD_STAMP=${PRODUCE_STAMP}"
+
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
 eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
 

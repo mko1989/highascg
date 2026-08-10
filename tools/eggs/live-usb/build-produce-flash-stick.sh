@@ -72,15 +72,13 @@ REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 BUILD_START_EPOCH=0
 if "$DO_BUILD"; then
 	BUILD_START_EPOCH=$(date +%s)
-	# WO-432: stamp the produce so Updates shows the ISO build date. Without this,
-	# clones report the ancient package.json-era .highascg-build-stamp (2026.05.20) —
-	# only the GitHub-release flow ever wrote BUILD_STAMP, never eggs produce.
-	# BUILD_STAMP outranks the legacy file (src/system/build-stamp.js) and is
-	# deliberately NOT in the eggs exclude fragments, so it rides into the squashfs.
+	# WO-432 stamped the produce so Updates shows the ISO build date. WO-471 moved the actual
+	# write into build-highascg-egg.sh, because a bare `npm run eggs:build` — the main workflow —
+	# bypasses this wrapper entirely and so never got stamped. Export it here only so both phases
+	# print one identical stamp; the egg script is the single writer.
 	PRODUCE_STAMP="$(date -u +%Y-%m-%d_%H%M%S)"
-	echo "$PRODUCE_STAMP" >"${REPO_ROOT}/BUILD_STAMP"
-	chown --reference="$REPO_ROOT" "${REPO_ROOT}/BUILD_STAMP" 2>/dev/null || true
-	echo "==> BUILD_STAMP=${PRODUCE_STAMP}"
+	export HIGHASCG_BUILD_STAMP="$PRODUCE_STAMP"
+	echo "==> BUILD_STAMP=${PRODUCE_STAMP} (written by build-highascg-egg.sh)"
 	echo "==> Phase 1/2: eggs produce (BASENAME=${BASENAME})"
 	bash "$BUILD_SCRIPT"
 	echo

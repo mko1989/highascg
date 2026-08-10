@@ -12,6 +12,8 @@ const path = require('path')
 const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const FILES = [
+	'tools/smoke/smoke-eggs-produce-build-stamp.test.js',
+	'tools/smoke/smoke-exfat-boot-wait-and-decklink-gate.test.js',
 	'tools/smoke/smoke-os-layout-offset-overlap.test.js',
 	'tools/smoke/smoke-media-dedupe-folder-scope.test.js',
 	'tools/smoke/smoke-config-defaults-no-machine-audio.test.js',
