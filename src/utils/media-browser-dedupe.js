@@ -38,6 +38,33 @@ function canonicalMediaBasenameKey(id) {
 }
 
 /**
+ * Dedupe key for browser rows: the canonical basename SCOPED TO ITS DIRECTORY.
+ *
+ * `canonicalMediaBasenameKey` deliberately drops the directory — caspar-cls-id.js and
+ * playback-tracker-media.js match a bare clip name that carries no path, so they need that
+ * looseness. Dedupe must NOT: two files with the same name in different folders are two different
+ * media. Keying browser rows on the bare basename merged `exfat/TALK2.mp4` into `bridge/TALK2.mp4`
+ * (both key `talk2`), and the localeCompare tie-break puts `bridge/` first — so after media was
+ * copied from the stick to the bridge, every file in the exfat folder disappeared from the GUI
+ * while the folder itself remained, looking empty.
+ *
+ * The directory is compared case-insensitively so the intended merges still happen within a folder:
+ * Caspar CLS's `BRIDGE/CONFERENCE ACKNOWLEDGEMENTS 3.16.2026 REV3` still collapses onto the disk
+ * scan's `bridge/Conference Acknowledgements 3.16.2026 rev3.mp4`.
+ * @param {string} id
+ */
+function canonicalMediaRowKey(id) {
+	const norm = String(id || '')
+		.toLowerCase()
+		.replace(/\\/g, '/')
+		.replace(/\/+/g, '/')
+	const cut = norm.lastIndexOf('/')
+	const dir = cut >= 0 ? norm.slice(0, cut + 1) : ''
+	const base = canonicalMediaBasenameKey(id)
+	return base ? `${dir}${base}` : ''
+}
+
+/**
  * Prefer rows with resolution/ffprobe metadata and ids that include a file extension.
  * @param {{ id?: string, resolution?: string, codec?: string, durationMs?: number, fps?: number, type?: string, fileSize?: number, cinf?: string, label?: string }} m
  */
@@ -96,7 +123,7 @@ function dedupeMediaList(media) {
 	if (!Array.isArray(media) || media.length < 2) return media || []
 	const byKey = new Map()
 	for (const m of media) {
-		const key = canonicalMediaBasenameKey(m.id)
+		const key = canonicalMediaRowKey(m.id)
 		if (!key) continue
 		const list = byKey.get(key) || []
 		list.push(m)
@@ -110,4 +137,4 @@ function dedupeMediaList(media) {
 	return out.sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base' }))
 }
 
-module.exports = { dedupeMediaList, canonicalMediaBasenameKey }
+module.exports = { dedupeMediaList, canonicalMediaBasenameKey, canonicalMediaRowKey }
