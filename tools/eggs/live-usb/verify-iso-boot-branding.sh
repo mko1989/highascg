@@ -283,8 +283,13 @@ else
 		bad "squashfs missing ${SHOW_QML_PATH} (Calamares slideshow) — run install-eggs-calamares.sh on host, then full produce"
 	elif grep -q 'penguins-eggs' <<<"$show_qml"; then
 		bad "Calamares slideshow in squashfs is stock penguins-eggs (show.qml) — run install-eggs-calamares.sh, then full produce"
+	elif grep -qiE 'broadcast|playout' <<<"$show_qml"; then
+		# Owner (todos03.08 §30, todos10.08 §1): the product is a MEDIA SERVER. No "broadcast"
+		# or "playout" wording anywhere operator-facing, and this slideshow is the one surface
+		# that only shows up mid-install, so nobody catches it by looking at the running box.
+		bad "Calamares slideshow says 'broadcast'/'playout' — must read 'media server' ($(grep -inE 'broadcast|playout' <<<"$show_qml" | head -3 | tr '\n' ' '))"
 	elif grep -q 'HighAsCG' <<<"$show_qml"; then
-		ok "Calamares slideshow in squashfs is HighAsCG-branded (show.qml)"
+		ok "Calamares slideshow in squashfs is HighAsCG-branded, no broadcast/playout wording (show.qml)"
 	else
 		bad "Calamares show.qml in squashfs has no HighAsCG branding"
 	fi

@@ -73,7 +73,7 @@ Presentation
                 horizontalAlignment: Text.AlignHCenter
                 width: parent.width
                 wrapMode: Text.WordWrap
-                text: qsTr("Broadcast graphics playout — installing to this machine")
+                text: qsTr("Media server — installing to this machine")
             }
         }
     }
@@ -89,7 +89,7 @@ Presentation
                 font.family: textFont; font.pixelSize: 40; font.bold: true
                 color: accentColor
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: qsTr("One-box playout")
+                text: qsTr("One-box media server")
             }
             Text {
                 font.family: textFont; font.pixelSize: 22
