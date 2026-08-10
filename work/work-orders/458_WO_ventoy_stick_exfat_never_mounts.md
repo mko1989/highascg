@@ -99,12 +99,20 @@ Why writing to the Ventoy partition is acceptable: the `ventoy` map is read-only
 relocates the clusters of an existing file, so the ISO's extents cannot move under it. The one
 rule is that the sync pipeline must never touch the ISO itself, which it does not.
 
-**Layout decision — SETTLED, owner 2026-08-10:** *"i dont see a point in creating an additional
-partition on the stick when ventoy already does it."* A reserved-space third partition
-(Ventoy2Disk → Option → Partition Configuration → "Preserve some space at the end of the disk")
-was considered and **rejected**: one Ventoy exFAT partition carries both the ISOs and the operator
-data, and the dm-map mount above is what makes that work. Do not re-propose the extra partition.
-WO-457's fixed 6 GiB offset simply retires with the Etcher flow — there is no offset under Ventoy.
+**Layout decision — REVERSED later the same day (2026-08-10). Read this, not the paragraph below.**
+The owner's first ruling was *"i dont see a point in creating an additional partition on the stick
+when ventoy already does it"*, recorded here as settled. It did not survive contact: the sticks
+built afterwards use **Ventoy's reserved-space layout** (p1 `Ventoy` ISOs, p2 `VTOYEFI`,
+p3 `HIGHASCGEXF` operator data — confirmed on the owner's 57.3 GB stick as 37.3 G / 32 M / 20 G),
+and the final instruction was to document exactly that: *"change quickstart guide and any place
+that references the iso flash to the new way using ventoy and additional exf partition at the end
+of the stick."* **WO-466 is the successor** and `docs/STICK_QUICK_START.md` is the procedure.
+
+The `/dev/mapper` resolution in this WO is **not** obsoleted by that. It is what stops a
+single-partition Ventoy stick from failing silently, and it is inert on the three-partition
+layout — the data partition has no dm holders, so `resolve_usb_dev()` returns it unchanged.
+
+WO-457's fixed 6 GiB offset retires either way: Ventoy reserves the space itself, at the end.
 
 **Corroboration (owner, same day):** *"the same stick mounted correctly on this machine."* Exactly
 what the diagnosis predicts — plugged into a machine that did **not** boot from it, Ventoy creates

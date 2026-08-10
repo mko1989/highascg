@@ -11,7 +11,7 @@ Operator and integrator docs live at the **top level** of this folder. Deeper ma
 | [PLAN_SERVER_CLIENT_SPLIT.md](PLAN_SERVER_CLIENT_SPLIT.md) | Historical WO-51 headless plan (superseded by WO-52) |
 | [../from_client/AGENT_SERVER_CLIENT_MERGE.md](../from_client/AGENT_SERVER_CLIENT_MERGE.md) | **WO-52** deploy checklist — API + UI on playout |
 | [MANUAL_INSTALL.md](MANUAL_INSTALL.md) | Production install on Ubuntu (`scripts/install.sh`) |
-| [STICK_QUICK_START.md](STICK_QUICK_START.md) | **Operator stick prep** — download ISO, Etcher, exFAT, starter zip, BIOS |
+| [STICK_QUICK_START.md](STICK_QUICK_START.md) | **Operator stick prep** — download ISO, Ventoy (reserve space at the end), `HIGHASCGEXF` exFAT partition, starter zip, BIOS |
 | [LIVE_USB_IMAGE.md](LIVE_USB_IMAGE.md) | Build / flash / boot a live USB from a running host |
 | [CALAMARES_INSTALL_TO_DISK.md](CALAMARES_INSTALL_TO_DISK.md) | **Install to internal disk** — **disable CSM**, Calamares, UEFI ESP, **`bios_grub`** + `/`, troubleshooting |
 | [ISO_CONTENTS.md](ISO_CONTENTS.md) | What is inside the Eggs live ISO (OS → Caspar → HighAsCG) |

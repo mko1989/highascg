@@ -2,16 +2,38 @@
 
 **What is inside the ISO?** Stack from Ubuntu → nodm/Openbox → NVIDIA → DeckLink → CasparCG → HighAsCG (and WO‑47 exFAT split): **[`docs/ISO_CONTENTS.md`](../../../docs/ISO_CONTENTS.md)**.
 
-**All-in-one (eggs produce → `dd` → persistence + exFAT on `/dev/sda`):**
+> ## Sticks are made with Ventoy now
+>
+> The `dd`/Etcher flow below is **pre-Ventoy**. It writes the ISO over the whole device, which
+> destroys a Ventoy stick's layout **and the `HIGHASCGEXF` operator data partition with it**.
+>
+> Current procedure: **[`docs/STICK_QUICK_START.md`](../../../docs/STICK_QUICK_START.md)** —
+> install Ventoy reserving space at the end of the disk, create `HIGHASCGEXF` in that space, then
+> copy each new ISO onto the Ventoy partition. No reflash per build, and the previous ISO stays
+> as a fallback.
+>
+> The `dd` sections below are kept for recovery and non-Ventoy media, not for operator sticks.
+
+**Build the ISO only (what you want with Ventoy):**
 
 ```bash
 cd ~/highascg
-sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
-# non-interactive dd confirm: add -y
-# npm run eggs:build-flash
+sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh
+# npm run eggs:build
 ```
 
-Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt/` (e.g. `highascg_amd64_2026-05-25_2108.iso`), then runs **`create-operator-stick-from-dd.sh`** (4 GiB persistence, exFAT remainder, seed layout).
+Wait for **`Done. ISO:`** — the file appears minutes earlier and is still being re-packed; the
+`<iso>.sha256` sidecar is written last and is the ready signal. Then copy to the stick's Ventoy
+partition, `sync`, and verify with `verify-stick-iso.sh`.
+
+**All-in-one build + `dd` (legacy — destroys a Ventoy stick):**
+
+```bash
+sudo bash tools/eggs/live-usb/build-produce-flash-stick.sh
+# non-interactive dd confirm: add -y
+```
+
+Picks the **newest ISO from this build** under `/home/eggs/` and `/home/eggs/mnt/`, then runs **`create-operator-stick-from-dd.sh`** (4 GiB persistence, exFAT remainder, seed layout).
 
 **Alternate** (legacy interactive flash): `sudo bash tools/eggs/live-usb/legacy-persistence/build-flash-and-persist.sh --help`
 
