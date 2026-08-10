@@ -178,6 +178,16 @@ bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null 
 	echo "WARN: remount/sync skipped — run: sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" >&2
 }
 
+# WO-465: install-iso-defaults.sh runs `npm prune --omit=dev --omit=optional` so the squashfs
+# carries production deps only. That prune outlives the build, and the repo's own gates then die
+# with `Cannot find module 'acorn'`. Safe to restore here: eggs produce has already cloned the
+# tree into the squashfs, so nothing added now reaches the ISO.
+# As casparcg, never root — npm as root leaves root-owned node_modules and ~/.npm entries that
+# EACCES the operator's next npm/test run.
+echo "==> Restore dev dependencies on the build host (post-produce; does not affect the ISO)"
+sudo -u "${USER_CASPAR:-casparcg}" -H bash -lc "cd '${REPO_ROOT}' && npm install --include=optional" \
+	|| echo "WARN: npm install --include=optional failed — run it manually before the offline suite" >&2
+
 # shellcheck source=flash-stick-common.sh
 source "${HERE}/flash-stick-common.sh" 2>/dev/null || true
 BUILT_ISO=""
