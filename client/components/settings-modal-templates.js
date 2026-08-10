@@ -315,6 +315,7 @@ export function getMainModalHtml() {
 						<div class="settings-group">
 							<button type="button" class="btn btn--secondary" id="set-nuclear-restart-wm">Restart window manager (nodm)</button>
 							<button type="button" class="btn btn--primary" id="set-nuclear-reboot">Reboot host</button>
+							<button type="button" class="btn btn--primary" id="set-nuclear-shutdown">Shut down host</button>
 						</div>
 						<h4 class="settings-subhead">Install to disk</h4>
 						<p class="settings-note">Launch the Calamares graphical installer on <code>:0</code> (needs a connected screen). Use after booting the live USB to copy HighAsCG onto internal storage.</p>

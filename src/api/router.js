@@ -167,6 +167,7 @@ routes.post('/api/network/tailscale/logout', ({ path, body, ctx }) => routesNetw
 
 routes.post('/api/system/setup/restart-window-manager', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/setup/reboot', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/system/setup/shutdown', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/setup/restart-app', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/setup/install', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/setup/caspar/stop', ({ path, body, ctx }) => routesSystemSetup.handlePost(path, body, ctx), { requireCaspar: false })

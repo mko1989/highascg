@@ -47,6 +47,10 @@ These appear in **`sudo -n`** call sites. If the Nuclear / setup actions fail wi
 | **`/usr/sbin/reboot`** | *(none)* | Same |
 | **`/bin/systemctl`** | `reboot` | Same |
 | **`/usr/bin/systemctl`** | `reboot` | Same |
+| **`/sbin/poweroff`** | *(none)* | `src/api/routes-system-setup.js` — WO-460 **Shut down host** |
+| **`/usr/sbin/poweroff`** | *(none)* | Same |
+| **`/bin/systemctl`** | `poweroff` | Same |
+| **`/usr/bin/systemctl`** | `poweroff` | Same |
 | **`/usr/local/lib/highascg/highascg-webui-server-update.sh`** | `--source <extract-dir>` | Web UI server update (WO-66) |
 | **`/usr/bin/eggs`** | `calamares` | `src/api/routes-system-setup.js` (DISPLAY often `:0`) |
 | **`/usr/local/lib/highascg/highascg-network-apply.sh`** | fixed `dhcp` / `static` + allow-listed iface args | WO-59 **Apply network** (`POST /api/system/network/apply`) |

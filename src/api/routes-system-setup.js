@@ -329,6 +329,7 @@ async function handlePost(path, body, ctx) {
 	const nuclearPaths = new Set([
 		'/api/system/setup/restart-window-manager',
 		'/api/system/setup/reboot',
+		'/api/system/setup/shutdown',
 		'/api/system/setup/restart-app',
 		'/api/system/setup/install',
 		'/api/system/setup/caspar/stop',
@@ -433,6 +434,27 @@ async function handlePost(path, body, ctx) {
 				note: 'Restart sent. CasparCG may take up to 2 minutes to stop before coming back.',
 			}),
 		}
+	}
+
+	// WO-460: must be its own branch — reboot is the fallthrough at the bottom of this function,
+	// so anything not matched above would silently reboot the box instead of powering it off.
+	if (path === '/api/system/setup/shutdown') {
+		const s = runSudoNoPrompt([
+			{ bin: '/sbin/poweroff', args: [] },
+			{ bin: '/usr/sbin/poweroff', args: [] },
+			{ bin: '/bin/systemctl', args: ['poweroff'] },
+			{ bin: '/usr/bin/systemctl', args: ['poweroff'] },
+		])
+		if (!s.ok) {
+			return {
+				status: 502,
+				headers: JSON_HEADERS,
+				body: jsonBody({
+					error: `Shutdown failed: ${s.error}. Run: sudo bash scripts/setup/12-passwordless-sudo.sh (adds poweroff to the sudoers allowlist).`,
+				}),
+			}
+		}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action: 'shutdown' }) }
 	}
 
 	const r = runSudoNoPrompt([

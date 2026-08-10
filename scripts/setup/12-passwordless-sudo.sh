@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install NOPASSWD sudoers for HighAsCG Web UI (nodm restart, reboot, Calamares, Caspar systemd).
+# Install NOPASSWD sudoers for HighAsCG Web UI (nodm restart, reboot, poweroff, Calamares, Caspar systemd).
 #
 #   sudo bash scripts/setup/12-passwordless-sudo.sh [casparcg]
 #
@@ -36,6 +36,8 @@ cat >"$TMP" <<EOF
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl restart nodm, /usr/bin/systemctl restart nodm
 ${USER_CASPAR} ALL=(root) NOPASSWD: /sbin/reboot, /usr/sbin/reboot
 ${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl reboot, /usr/bin/systemctl reboot
+${USER_CASPAR} ALL=(root) NOPASSWD: /sbin/poweroff, /usr/sbin/poweroff
+${USER_CASPAR} ALL=(root) NOPASSWD: /bin/systemctl poweroff, /usr/bin/systemctl poweroff
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/bin/launch-calamares.sh
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/local/bin/launch-calamares.sh --check
 ${USER_CASPAR} ALL=(root) NOPASSWD: /usr/bin/calamares -d
@@ -67,7 +69,7 @@ visudo -cf "$TMP" >/dev/null
 install -m 0440 -o root -g root "$TMP" "$DEST"
 
 echo "OK: $DEST"
-echo "     nodm restart, reboot, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home, hardware-hostname"
+echo "     nodm restart, reboot, poweroff, launch-calamares, caspar-systemd-control, tailscale-up helper, operator-snap-home, hardware-hostname"
 echo
 echo "Verify as ${USER_CASPAR}:"
 echo "  sudo -u ${USER_CASPAR} sudo -n /usr/local/bin/caspar-systemd-control.sh status"

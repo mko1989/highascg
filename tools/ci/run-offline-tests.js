@@ -77,6 +77,7 @@ const FILES = [
 	'tools/smoke/smoke-wo455-update-cache-fallback.test.js',
 	'tools/smoke/smoke-wo458-ventoy-exfat-mount.test.js',
 	'tools/smoke/smoke-wo459-installer-slideshow-media-server.test.js',
+	'tools/smoke/smoke-wo460-shutdown-host-button.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',

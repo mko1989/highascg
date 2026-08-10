@@ -173,6 +173,10 @@ export function showSettingsModal(initialTab) {
 		if (!window.confirm('Reboot host now? This will interrupt all outputs.')) return
 		await postNuclear('/api/system/setup/reboot')
 	})
+	modal.querySelector('#set-nuclear-shutdown')?.addEventListener('click', async () => {
+		if (!window.confirm('Shut down host now? Outputs stop and the machine powers off — it cannot be restarted from this UI.')) return
+		await postNuclear('/api/system/setup/shutdown')
+	})
 	installDiskBtn?.addEventListener('click', async () => {
 		/* WO-423 (owner): the launcher stops CasparCG AND this GUI so only the installer is on
 		 * the glass; both come back automatically when the installer closes. */
