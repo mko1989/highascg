@@ -62,8 +62,12 @@ function parseRemovableCandidates(jsonText) {
 			const mp = n.mountpoint || null
 			const type = String(n.type || '')
 			const fsType = String(n.fstype || n.fsType || '')
-			const isMountCandidate =
-				type === 'part' || (type === 'disk' && !hasChildren && !!fsType)
+			// WO-463: a partition with children is already claimed by device-mapper (Ventoy's ISO
+			// extent map, LVM, LUKS…), which holds it O_EXCL — udisks then fails EBUSY on every
+			// poll forever. On a Ventoy stick that is the boot partition itself, so the operator
+			// box logged "already mounted or mount point busy" for /dev/sdX1 on a loop. The
+			// mountable thing in those setups is the mapper device, never the raw partition.
+			const isMountCandidate = !hasChildren && (type === 'part' || (type === 'disk' && !!fsType))
 			if (isMountCandidate && !mp && removable) {
 				const blockDevice = name.startsWith('/') ? name : `/dev/${name}`
 				out.push({
