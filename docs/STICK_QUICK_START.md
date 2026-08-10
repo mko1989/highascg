@@ -1,10 +1,12 @@
-# HighAsCG playout stick — quick start
+# HighAsCG playout stick — quick start (Windows)
 
-Prepare a **bootable HighAsCG USB stick** with **Ventoy**: install Ventoy while reserving space at the end of the disk, create the operator **exFAT** partition in that space, copy the ISO onto the Ventoy volume, copy the starter folder layout, then boot the playout machine from the stick.
+Prepare a **bootable HighAsCG USB stick** on **Windows**: install Ventoy while reserving space at the end of the disk, create the operator **exFAT** partition in that space with Disk Management, copy the ISO onto the Ventoy volume, copy the starter folder layout, then boot the playout machine from the stick.
 
-**Time:** ~25 minutes · **USB size:** **64 GiB recommended** (Ventoy holds the ISOs, the reserved tail holds operator data; 32 GiB is the practical minimum)
+**Time:** ~25 minutes · **USB size:** **32 GiB is enough** — Ventoy holds the ISOs, the reserved tail holds operator data
 
-> **Why Ventoy and not Etcher?** Ventoy keeps the ISO as a *file*, so updating the machine later means dropping a new ISO next to the old one instead of reflashing the whole stick — and you can keep the previous build to fall back to. The old Etcher flow and its fixed **6 GiB offset** rule are retired; ignore any guide that still mentions them.
+**You need:** Windows 10 version 1703 or newer (earlier Windows only exposes the *first* partition of a removable drive, which hides the operator volume).
+
+> **Why Ventoy and not Etcher?** Ventoy keeps the ISO as a *file*, so updating a machine later means dropping a new ISO next to the old one instead of reflashing the whole stick — and the previous build stays as a fallback. The old Etcher flow and its fixed **6 GiB offset** rule are retired; ignore any guide that still mentions them.
 
 ---
 
@@ -20,7 +22,7 @@ Three partitions. Ventoy creates the first two; **you create the third.**
 
 On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`, applies any server drop in `drop-update/`, syncs `configs/`, and starts the operator UI at **`http://<playout-ip>/`** (nginx proxies port 80 → `:4200`; **`http://<playout-ip>:4200/`** also works).
 
-> **Do not put operator data on the Ventoy partition.** While the machine is booted from a stick, Ventoy holds that partition open for the ISO it is streaming, and Linux cannot mount it — the operator data has to be its own partition. That is the whole reason for reserving space in step 2.
+> **Do not put operator data on the Ventoy partition.** While the machine is booted from a stick, Ventoy holds that partition open for the ISO it is streaming, and Linux cannot mount it. Operator data has to be its own partition — that is the whole reason for reserving space in step 2.
 
 ---
 
@@ -28,19 +30,12 @@ On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`,
 
 Always use the **current** build — filenames change with each release.
 
-| Method | Link / command |
-|--------|----------------|
+| Method | Link |
+|--------|------|
 | **Browser (recommended)** | [https://highascg.dpdns.org/](https://highascg.dpdns.org/) — click **DOWNLOAD BOOTABLE ISO** |
 | **Direct URL (auto-latest)** | Read `download_url` from [release.json](https://highascg.dpdns.org/release.json) |
 
-**Resume a large download (Linux / macOS Terminal):**
-
-```bash
-ISO_URL=$(python3 -c "import json,urllib.request; print(json.load(urllib.request.urlopen('https://highascg.dpdns.org/release.json'))['download_url'])")
-wget -c "$ISO_URL" -O highascg-latest.iso
-```
-
-**Windows PowerShell:**
+**PowerShell:**
 
 ```powershell
 $release = Invoke-RestMethod https://highascg.dpdns.org/release.json
@@ -49,123 +44,83 @@ Invoke-WebRequest -Uri $release.download_url -OutFile highascg-latest.iso
 
 Current builds are **~3.7 GiB**. Trust **`release.json`**, not a fixed filename.
 
-> **Building in house?** Wait for `build-highascg-egg.sh` to print **`Done. ISO:`** before you copy anything. The ISO file appears minutes earlier — its name carries the *produce* time, not the finish time — and the build keeps re-packing it after that. Copying during that window produces a stick that boots to the GRUB menu and then dies with *"invalid magic number / you need to load the kernel first"*. The build writes `<iso>.sha256` as its very last action, so **the sidecar existing is the signal that the ISO is finished.**
+> **Copying an ISO you built in house?** Wait for `build-highascg-egg.sh` to print **`Done. ISO:`** before copying it anywhere. The file appears minutes earlier — its name carries the *produce* time, not the finish time — and the build keeps re-packing it afterwards. Copying inside that window produces a stick that reaches the GRUB menu and then dies with *"invalid magic number / you need to load the kernel first"*. The build writes `<iso>.sha256` last, so **the sidecar existing is the signal the ISO is finished.**
+
+<!-- SCREENSHOT: download page with DOWNLOAD BOOTABLE ISO highlighted -->
 
 ---
 
 ## 2. Install Ventoy, reserving space for operator data
 
-Download Ventoy from [https://www.ventoy.net/](https://www.ventoy.net/). It ships installers for **Windows** and **Linux**.
-
-> **macOS:** Ventoy has no official macOS installer. Prepare the stick once on a Windows or Linux machine; afterwards a Mac can copy ISOs and operator files onto it normally.
+Download Ventoy from [https://www.ventoy.net/](https://www.ventoy.net/) and unzip it. No installation needed — run the executable from the folder.
 
 **Installing Ventoy erases the entire stick.** Check the device size and model before you click.
 
-1. Run **`Ventoy2Disk.exe`** (Windows) or **`Ventoy2Disk.sh` / `VentoyGUI`** (Linux).
+1. Run **`Ventoy2Disk.exe`**.
 2. Open the **Option** menu → **Partition Configuration**.
-3. Set **"Preserve some space at the end of the disk"** to the size you want for operator data, **in MB**. On a 64 GiB stick, **20000** (≈20 GiB) leaves plenty for several ISOs. Do not skip this — the space cannot be reserved after installation without redoing the stick.
+3. Set **"Preserve some space at the end of the disk"** to the size you want for operator data, **in MB**. On a 32 GiB stick, **10000** (≈10 GiB) is a good split — it still leaves room for four or five ISOs at ~3.7 GiB each. **Do not skip this** — the space cannot be reserved afterwards without redoing the stick from scratch.
 4. Leave **Secure Boot support** off. The HighAsCG image ships unsigned NVIDIA and DeckLink drivers, so Secure Boot has to be disabled in the machine's BIOS regardless.
-5. Select your USB device and click **Install**.
+5. Select your USB device, click **Install**, and confirm the two warnings.
 
-When it finishes you have the `Ventoy` partition, the 32 MiB `VTOYEFI` partition, and **unallocated space at the end** — that last part is what step 3 fills.
+<!-- SCREENSHOT: Ventoy2Disk main window with the correct USB device selected -->
+<!-- SCREENSHOT: Option → Partition Configuration with "Preserve some space at the end of the disk" set to 10000 MB -->
+
+When it finishes, Explorer shows a **`Ventoy`** drive, and Disk Management will show the 32 MiB `VTOYEFI` partition plus **unallocated space at the end** — that last part is what step 3 fills.
 
 ---
 
 ## 3. Create the exFAT partition (`HIGHASCGEXF`)
 
-Use **only the unallocated space at the end** of the disk. Never resize or reformat the two partitions Ventoy created.
+Use **Disk Management** — the standard Windows disk utility. Press **Win + X** → **Disk Management** (or run `diskmgmt.msc`).
 
-### Windows — Command Prompt (run as Administrator)
+> Disk Management is safe here, and this is a change from older HighAsCG guides. Those forbade it because a raw-flashed ISO left free space Windows misread, so a new partition landed *inside* the boot image. Ventoy reserves the space itself, at the end of the disk, so the unallocated block you see is the **only** free region and there is no offset to get right.
 
-Replace `2` with your USB disk number from `list disk` — check the size column, picking the wrong disk destroys it.
+1. Find your USB stick in the lower pane — identify it by **size**, and by the `Ventoy` and 32 MB partitions next to the unallocated block. **Getting the wrong disk destroys it.**
+2. Right-click the **Unallocated** block at the end → **New Simple Volume…**
+3. **Size:** accept the default (the whole unallocated block).
+4. **Drive letter:** accept the default, or pick any free letter.
+5. **Format this volume with the following settings:**
+   - **File system:** **exFAT**
+   - **Allocation unit size:** Default
+   - **Volume label:** **`HIGHASCGEXF`** — exactly this, all capitals, no spaces
+   - **Perform a quick format:** ticked
+6. **Finish.** The new volume appears in Explorer with gigabytes free.
 
-```text
-diskpart
-list disk
-select disk 2
-create partition primary
-assign letter=E
-exit
-```
+<!-- SCREENSHOT: Disk Management showing Ventoy + VTOYEFI + the Unallocated block, right-click menu open -->
+<!-- SCREENSHOT: New Simple Volume wizard format page — exFAT, label HIGHASCGEXF, quick format ticked -->
 
-With Ventoy's reserved space there is exactly one free region, at the end, so **`create partition primary` with no offset now does the right thing** — the old `offset=6291456` rule existed only because a flashed ISO left free space Windows misread, and it no longer applies.
-
-Then format **outside** diskpart — diskpart's own `format` often fails on a freshly partitioned stick with *"The system cannot find the file specified"*:
-
-```text
-format E: /FS:exFAT /V:HIGHASCGEXF /Q
-```
-
-### Linux
-
-Replace `/dev/sdX` with your stick — confirm with `lsblk` first.
-
-```bash
-lsblk -o NAME,SIZE,LABEL,MODEL            # identify the stick — check size and model
-sudo parted /dev/sdX unit MiB print free  # find the trailing "Free Space" row
-```
-
-Take the **Start** and **End** of that trailing free region and create the partition inside it, then format:
-
-```bash
-sudo parted /dev/sdX --script mkpart primary <START>MiB <END>MiB
-sudo mkfs.exfat -L HIGHASCGEXF /dev/sdX3
-```
-
-> `mkfs.exfat` on Ubuntu 24.04 comes from **exfatprogs** and takes **`-L`** for the label. The `-n` flag belongs to the older `exfat-utils` and fails here.
-
-### macOS
-
-Ventoy cannot install from macOS, but a Mac can add the third partition to an already-Ventoy'd stick. Replace `disk2` with your USB id from `diskutil list external physical` — **never `disk0` or `disk1`**.
-
-```bash
-diskutil list external physical
-diskutil unmountDisk disk2
-sudo fdisk -e /dev/rdisk2
-```
-
-In `fdisk`, one line at a time: `print` (note the free slot and where the Ventoy partitions end), `edit <free slot>`, type `07`, choose **sector** offsets, start at the first free sector after `VTOYEFI`, end at total sectors minus 1, then `print` to confirm the Ventoy slices are unchanged, `write`, `exit`. Then:
-
-```bash
-sudo newfs_exfat -v HIGHASCGEXF /dev/rdisk2s3
-```
+> **The label is not cosmetic.** The playout machine looks for a volume labelled exactly `HIGHASCGEXF` (exFAT allows at most 11 characters). Anything else and the stick boots but no operator data is applied. If you mistype it, right-click the volume in Explorer → **Rename**.
 
 ---
 
 ## 4. Copy the ISO onto the Ventoy partition
 
-Copy the `.iso` to the **root of the `Ventoy` volume** (partition 1). Ventoy lists every ISO it finds there, so you can keep the previous build alongside the new one and pick at boot.
+Copy the `.iso` to the **root of the `Ventoy` drive** — not into a subfolder, and not onto `HIGHASCGEXF`. Ventoy lists every ISO it finds there, so you can keep the previous build alongside the new one and choose at boot.
 
-Then **flush and verify** — this is not optional, and it is where sticks most often go wrong:
+**Then eject properly.** Use **Safely Remove Hardware** (or right-click the drive → **Eject**) and wait for the confirmation. A copy that looks finished in Explorer can still be sitting in RAM; pulling the stick early leaves a file of exactly the right size full of stale bytes, and the machine boots to GRUB and then fails on the kernel.
 
-```bash
-cp highascg-latest.iso /media/<you>/Ventoy/ && sync
-```
-
-**Always eject/unmount properly.** A copy that looks complete in the file manager can still be sitting in RAM; pulling the stick leaves a file of the correct size full of stale bytes, and the machine boots to GRUB and then fails on the kernel.
-
-Verify before you trust it — same size proves nothing, only the hash does:
-
-```bash
-# Linux, in the repo:
-bash tools/eggs/live-usb/verify-stick-iso.sh /media/<you>/Ventoy/highascg-latest.iso
-```
+**Verify before you trust it** — matching size proves nothing, only the hash does:
 
 ```powershell
-# Windows: compare the two hashes by eye
 Get-FileHash .\highascg-latest.iso -Algorithm SHA256
-Get-FileHash E:\highascg-latest.iso -Algorithm SHA256
+Get-FileHash E:\highascg-latest.iso -Algorithm SHA256    # E: = the Ventoy drive
 ```
+
+The two hashes must be identical. If they differ, delete the copy on the stick, copy again, eject properly, and re-check.
+
+<!-- SCREENSHOT: Explorer showing the ISO at the root of the Ventoy drive -->
 
 ---
 
 ## 5. Copy the starter folder layout onto `HIGHASCGEXF`
 
-Download **[HIGHASCGEXF-starter-layout.zip](guides/stick/HIGHASCGEXF-starter-layout.zip)** from this repo (or build it with `npm run exfat:starter-zip`).
+Download **[HIGHASCGEXF-starter-layout.zip](guides/stick/HIGHASCGEXF-starter-layout.zip)** from this repo.
 
-> **Note:** `npm run exfat:starter-zip` writes a fresh zip to **`dist/HIGHASCGEXF-starter-layout.zip`**; the checked-in copy under `docs/guides/stick/` is a **snapshot** and can lag behind.
+Unzip **directly onto the `HIGHASCGEXF` volume root** — not inside an extra folder, and not onto the Ventoy drive. Adjust `F:` to the `HIGHASCGEXF` drive letter:
 
-Unzip **directly onto the `HIGHASCGEXF` volume root** — not inside an extra folder, and **not** onto the Ventoy partition.
+```powershell
+Expand-Archive -Path HIGHASCGEXF-starter-layout.zip -DestinationPath F:\ -Force
+```
 
 **Expected top-level folders after unzip:**
 
@@ -185,21 +140,9 @@ HIGHASCGEXF/
   README.txt
 ```
 
-**Windows (PowerShell)** — adjust `E:` to the `HIGHASCGEXF` drive letter:
-
-```powershell
-Expand-Archive -Path HIGHASCGEXF-starter-layout.zip -DestinationPath E:\ -Force
-```
-
-**macOS / Linux:**
-
-```bash
-unzip -o HIGHASCGEXF-starter-layout.zip -d /Volumes/HIGHASCGEXF
-```
-
-> **Copying from Linux? Never `rsync -a` onto exFAT** — exFAT has no ownership, so `chown` fails with `EPERM` and rsync exits **23**, killing scripts mid-copy. Use `rsync -rLt --modify-window=2` or plain `cp`.
-
 Eject the stick safely when copying finishes.
+
+<!-- SCREENSHOT: Explorer showing the unzipped folder layout at the root of HIGHASCGEXF -->
 
 > **Optional later:** extract a [GitHub server release](https://github.com/mko1989/highascg/releases) (`highascg-server_*.tar.gz`) into `drop-update/` so `drop-update/package.json` exists. The starter zip alone is enough for a first boot test with the embedded ISO server tree.
 
@@ -229,7 +172,10 @@ Download [Desktop Video for Linux](https://www.blackmagicdesign.com/support/fami
 After boot:
 
 - Operator UI: **`http://127.0.0.1/`** on the machine, or **`http://<playout-ip>/`** from the LAN
-- Confirm the data partition mounted: `findmnt /home/casparcg/exfat` should show your **third** partition, or check Settings → exFAT sync
+- Confirm the data partition mounted: Settings → exFAT sync, or on the machine run `findmnt /home/casparcg/exfat` — it should show the **third** partition
+
+<!-- SCREENSHOT: Ventoy boot menu listing the HighAsCG ISO -->
+<!-- SCREENSHOT: HighAsCG GRUB menu with the Live entry selected -->
 
 ---
 
@@ -237,10 +183,10 @@ After boot:
 
 | Step | Done when |
 |------|-----------|
-| ISO downloaded / built | Size matches [release.json](https://highascg.dpdns.org/release.json); in-house builds have printed `Done. ISO:` |
-| Ventoy installed | Stick shows `Ventoy` + `VTOYEFI` **and** unallocated space at the end |
-| exFAT created | Explorer/Finder shows **`HIGHASCGEXF`** with **gigabytes** free |
-| ISO copied | Hash on the stick matches the source, after `sync` / safe eject |
+| ISO downloaded | Size matches [release.json](https://highascg.dpdns.org/release.json) |
+| Ventoy installed | Explorer shows a `Ventoy` drive; Disk Management shows unallocated space at the end |
+| exFAT created | Explorer shows **`HIGHASCGEXF`** with **gigabytes** free |
+| ISO copied | `Get-FileHash` matches on both sides, after a safe eject |
 | Starter zip copied | `configs/`, `drop-update/`, `media/`, … at the `HIGHASCGEXF` root |
 | BIOS | Secure Boot **off**, USB boot **on** |
 | Live boot | Ventoy menu → GRUB → playout starts; `:4200` responds |
@@ -251,11 +197,13 @@ After boot:
 
 | Problem | Fix |
 |---------|-----|
-| **"invalid magic number / you need to load the kernel first"** after the GRUB menu | The ISO on the stick is corrupt — almost always copied while the build was still writing it, or pulled before the copy flushed. Re-copy, `sync`, and verify the hash (step 4) |
-| No unallocated space after installing Ventoy | You skipped **Preserve some space at the end of the disk**. Re-run the Ventoy installer with it set — this erases the stick |
-| Ventoy menu appears but no HighAsCG entry | The ISO is not at the **root** of the `Ventoy` partition, or the copy never finished |
+| **"invalid magic number / you need to load the kernel first"** after the GRUB menu | The ISO on the stick is corrupt — almost always copied while the build was still writing it, or the stick was pulled before the copy flushed. Re-copy, eject safely, and compare `Get-FileHash` (step 4) |
+| No unallocated space in Disk Management | You skipped **Preserve some space at the end of the disk**. Re-run the Ventoy installer with it set — this erases the stick |
+| Ventoy drive nearly full | Delete the oldest ISO from the `Ventoy` drive — each build is ~3.7 GiB |
+| Explorer only shows one USB drive | Windows older than 10 version 1703 exposes only the first partition of a removable drive. Update Windows, or use a newer machine to prepare the stick |
+| Ventoy menu appears but no HighAsCG entry | The ISO is not at the **root** of the `Ventoy` drive, or the copy never finished |
 | Stick boots but no exFAT sync | The label must be exactly **`HIGHASCGEXF`**, and it must be the **third** partition — not the Ventoy one |
-| `diskpart`: *"The system cannot find the file specified"* | The partition is usually created anyway — replug, `assign letter` in diskpart, then `format E: /FS:exFAT /V:HIGHASCGEXF /Q` **outside** diskpart |
+| **New Simple Volume…** greyed out | You right-clicked an existing partition instead of the **Unallocated** block, or you picked the wrong disk |
 | Secure Boot error / no NVIDIA | Disable Secure Boot in BIOS |
 | Updating to a new build | Copy the new ISO next to the old one and pick it in the Ventoy menu — no reflash, and the previous build stays as a fallback |
 
@@ -265,6 +213,7 @@ After boot:
 
 | Topic | Document |
 |-------|----------|
+| Stick contents / server drops | [../tools/eggs/live-usb/MANUAL_STICK_WINDOWS_MACOS.md](../tools/eggs/live-usb/MANUAL_STICK_WINDOWS_MACOS.md) |
 | exFAT vs ISO contents | [WO47_ISO_VS_EXFAT.md](WO47_ISO_VS_EXFAT.md) |
 | Bridge disk + USB roles | [BRIDGE_DISK_AND_USB_EXFAT.md](BRIDGE_DISK_AND_USB_EXFAT.md) |
 | Server drops on the stick | [EXFAT_SERVER_UPDATE.md](EXFAT_SERVER_UPDATE.md) |

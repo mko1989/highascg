@@ -48,11 +48,28 @@ updating all three in parallel.
 
 - **`docs/STICK_QUICK_START.md` — rewritten** as the single procedure: download → install Ventoy
   with **Option → Partition Configuration → "Preserve some space at the end of the disk"** →
-  create `HIGHASCGEXF` in the reserved tail (Windows/Linux/macOS) → **copy the ISO to the Ventoy
-  partition, `sync`, verify the hash** → starter zip onto `HIGHASCGEXF` → boot (Ventoy menu, then
-  the HighAsCG GRUB menu). The three-partition table replaces the old two-layer one; the checklist
-  and troubleshooting are rewritten around the failures actually hit this week, with *"invalid
-  magic number"* first. Etcher screenshots dropped rather than left showing a retired tool.
+  create `HIGHASCGEXF` in the reserved tail → **copy the ISO to the Ventoy partition, eject
+  safely, verify the hash** → starter zip onto `HIGHASCGEXF` → boot (Ventoy menu, then the
+  HighAsCG GRUB menu). The three-partition table replaces the old two-layer one; the checklist and
+  troubleshooting are rewritten around the failures actually hit this week, with *"invalid magic
+  number"* first.
+- **Windows-only, Disk Management, 32 GiB** (owner, second pass). The Linux and macOS partitioning
+  sections were removed rather than kept as alternatives — the owner creates sticks on Windows, and
+  a guide with three OS paths is a guide with two untested ones. Partitioning is now the **standard
+  Disk Management** wizard (`Win + X` → Disk Management → right-click Unallocated → New Simple
+  Volume → exFAT, label `HIGHASCGEXF`), not `diskpart`.
+
+  **This reverses WO-457 specifically.** That WO removed Disk Management from the guide because it
+  has no offset option, so an offset-less partition landed *inside* the flashed boot image. Under
+  Ventoy the reserved space is the only free region and sits at the end of the disk, so the
+  objection is gone — the guide says so in place, since an operator who remembers the old rule
+  needs to know why it no longer applies. Sizing: **32 GiB stick, reserve 10000 MB**, which still
+  leaves room for four or five ~3.7 GiB ISOs.
+- **Nine `<!-- SCREENSHOT: … -->` placeholders** left at the points that need them (Ventoy device
+  selection, the Partition Configuration dialog, Disk Management with the unallocated block, the
+  format page, the ISO on the Ventoy root, the unzipped layout, the Ventoy and GRUB menus). The
+  owner is adding the images. The old Etcher screenshots are dropped rather than left showing a
+  retired tool.
 - **`MANUAL_STICK_WINDOWS_MACOS.md` — narrowed** from a duplicate procedure to what was unique in
   it: the folder-by-folder layout of `HIGHASCGEXF`, server-drop mechanics, and the copy hazards.
   Stick-making now points at the quickstart.
@@ -65,17 +82,19 @@ updating all three in parallel.
   legacy, for recovery and non-Ventoy media.
 - **`docs/README.md`** — index row updated.
 
-Two facts were checked rather than assumed while writing:
+Two errors were caught in the first draft's Linux section. That section was then removed by the
+Windows-only pass, so neither is in the shipped guide — recorded here because the facts stay true
+for anyone partitioning a stick from Linux:
 
 - **`mkfs.exfat -L`, not `-n`.** Ubuntu 24.04 ships `mkfs.exfat` from **exfatprogs**, whose label
-  flag is `-L`; `-n` is the older `exfat-utils` spelling and fails here. Confirmed against
-  `mkfs.exfat --help` and `dpkg -S` on the build host. The first draft of the guide had `-n`.
-- **`parted` needs explicit bounds.** The draft had a `mkpart primary` with no start/end, which
-  cannot work. The guide now tells the operator to read the trailing free region from
-  `parted … unit MiB print free` and pass its Start/End.
+  flag is `-L`; `-n` is the older `exfat-utils` spelling and fails. Confirmed against
+  `mkfs.exfat --help` and `dpkg -S` on the build host rather than assumed.
+- **`parted` needs explicit bounds.** The draft had `mkpart primary` with no start/end, which
+  cannot work; the free region has to be read from `parted … unit MiB print free` first.
 
-Ventoy has no official macOS installer, so the guide says so plainly and gives macOS users the
-workable path: prepare the stick once on Windows or Linux, then maintain it from macOS.
+Also noted and then dropped with the same pass: Ventoy has **no official macOS installer**. It is
+no longer in the guide because the guide is Windows-only, but it is the reason a macOS path could
+never have been a peer alternative — a Mac can only maintain a stick someone else prepared.
 
 ## 3. What was VERIFIED to work
 
@@ -89,7 +108,9 @@ workable path: prepare the stick once on Windows or Linux, then maintain it from
 - `node tools/ci/check-max-file-lines.js` → 0 over 500. Full offline suite: **1929 pass / 0 fail /
   2 skip** (no test reads these docs; run to confirm nothing was coupled to them).
 
-**Remains (owner QA):** walk the guide once on a fresh stick. The step most worth confirming is
-the Windows one — with Ventoy's reserved space there is a single free region at the end, so
-`create partition primary` with **no** offset is now correct, and that is the opposite of what
-WO-457 hammered into the previous guide.
+**Remains (owner):**
+
+1. Walk the guide once on a fresh 32 GiB stick. The step most worth confirming is **step 3** —
+   Disk Management on the unallocated block — because WO-457 explicitly banned that tool and an
+   operator who remembers the ban needs to see it work.
+2. Add the images at the nine `<!-- SCREENSHOT: … -->` markers.
