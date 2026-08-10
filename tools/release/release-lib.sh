@@ -60,12 +60,16 @@ release_lib_ensure_release_tag() {
 	fi
 }
 
+# WO-467: RELEASE_LIB_LATEST=1 publishes a full release marked Latest instead of a prerelease.
+# Default stays --prerelease so existing callers are unchanged.
 release_lib_create_prerelease() {
 	local repo_root="$1" tag="$2" title="$3" notes_file="$4"
 	shift 4
+	local -a kind=(--prerelease)
+	[[ "${RELEASE_LIB_LATEST:-0}" == "1" ]] && kind=(--latest)
 	(cd "$repo_root" &&
 		gh release create "$tag" \
-			--prerelease \
+			"${kind[@]}" \
 			--title "$title" \
 			--notes-file "$notes_file" \
 			"$@")

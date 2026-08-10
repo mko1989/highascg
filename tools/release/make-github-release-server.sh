@@ -5,6 +5,11 @@
 #   npm run release:github-server
 #   npm run release:github-server:dry
 #   ./tools/release/make-github-release-server.sh [--dry-run] [--replace] [--tag NAME] [--no-bump-package]
+#                                                  [--latest] [--no-starter-zips]
+#
+# --latest            publish as a full release marked Latest (default: prerelease)
+# --no-starter-zips   skip the HIGHASCGEXF / HIGHASCGDAT starter layout zips (default: attach both,
+#                     rebuilt from the repo so the release never ships a stale snapshot)
 #
 set -euo pipefail
 
@@ -19,6 +24,7 @@ REPLACE_RELEASE=0
 OUT_DIR=""
 ZIP_EXCLUDE_NODE_MODULES=0
 BUMP_PACKAGE=1
+STARTER_ZIPS=1
 BUILD_STAMP_FILE=""
 NOTES=""
 
@@ -48,6 +54,8 @@ while [[ $# -gt 0 ]]; do
 		;;
 	--zip-exclude-node-modules) ZIP_EXCLUDE_NODE_MODULES=1 ;;
 	--no-bump-package) BUMP_PACKAGE=0 ;;
+	--latest) export RELEASE_LIB_LATEST=1 ;;
+	--no-starter-zips) STARTER_ZIPS=0 ;;
 	*)
 		echo "Unknown option: $1" >&2
 		usage 1
@@ -133,9 +141,13 @@ cat >"$NOTES" <<EOF
 
 Unified playout stack for sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`): API + operator UI (\`dist-web/\` built from in-repo \`client/\`).
 
-| Asset | Extract |
-|-------|---------|
+| Asset | Where it goes |
+|-------|---------------|
 | \`${ARCHIVE_BASENAME}.tar.gz\` | \`mkdir -p <mount>/drop-update && tar -xzf … -C <mount>/drop-update\` |
+| \`HIGHASCGEXF-starter-layout.zip\` | Unzip at the **root of the \`HIGHASCGEXF\`** partition (operator stick) |
+| \`HIGHASCGDAT-starter-layout.zip\` | Unzip at the **root of the \`HIGHASCGDAT\`** bridge volume |
+
+Stick prep (Ventoy + a reserved exFAT partition at the end): [\`docs/STICK_QUICK_START.md\`](docs/STICK_QUICK_START.md)
 
 ${NM_NOTE}
 
@@ -156,6 +168,26 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
 fi
 
 release_lib_check_asset_size "server tarball" "$ARCHIVE_PATH"
+
+# WO-467: operators need the stick layout zips from the same place as the server drop. Rebuilt
+# here rather than copied from docs/guides/stick/ — that checked-in pair is a snapshot and lags.
+ASSETS=("$ARCHIVE_PATH")
+if [[ "$STARTER_ZIPS" -eq 1 ]]; then
+	echo "==> Starter layout zips (rebuilt from the repo)"
+	bash "${REPO_ROOT}/tools/eggs/live-usb/pack-exfat-starter-zip.sh" >/dev/null
+	bash "${REPO_ROOT}/tools/eggs/live-usb/pack-bridge-starter-zip.sh" >/dev/null
+	for z in HIGHASCGEXF-starter-layout.zip HIGHASCGDAT-starter-layout.zip; do
+		if [[ -f "${REPO_ROOT}/dist/${z}" ]]; then
+			release_lib_check_asset_size "$z" "${REPO_ROOT}/dist/${z}"
+			ASSETS+=("${REPO_ROOT}/dist/${z}")
+			echo "    ${z} ($(du -h "${REPO_ROOT}/dist/${z}" | cut -f1))"
+		else
+			echo "ERROR: ${z} missing after pack — refusing to publish a release without it" >&2
+			exit 1
+		fi
+	done
+fi
+
 release_lib_ensure_release_tag "$REPO_ROOT" "$TAG" "$REPLACE_RELEASE"
-release_lib_create_prerelease "$REPO_ROOT" "$TAG" "Server ${STAMP}" "$NOTES" "$ARCHIVE_PATH"
+release_lib_create_prerelease "$REPO_ROOT" "$TAG" "Server ${STAMP}" "$NOTES" "${ASSETS[@]}"
 echo "Local tarball: $ARCHIVE_PATH"
