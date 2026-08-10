@@ -26,6 +26,35 @@ log() {
 mkdir -p "$(dirname "$LOG")"
 touch "$LOG"
 
+# Ventoy sticks: the data partition is also the boot medium. Ventoy maps the booted ISO's extents
+# out of it with device-mapper, and dm holds the raw partition open O_EXCL — mount(2) on
+# /dev/sdX1 then returns EBUSY forever. Ventoy also exposes a 1:1 linear map of the whole
+# partition under /dev/mapper/<part>, which is mountable. Pick that when it exists; the smaller
+# ISO-extent map (named "ventoy") is skipped by the size check.
+SYSFS_BLOCK="${HIGHASCG_SYSFS_BLOCK:-/sys/class/block}"
+DEV_MAPPER="${HIGHASCG_DEV_MAPPER:-/dev/mapper}"
+
+resolve_usb_dev() {
+	local raw base holder name
+	raw="$(readlink -f "$USB_DEV" 2>/dev/null || echo "$USB_DEV")"
+	base="${raw#/dev/}"
+	[[ -d "${SYSFS_BLOCK}/${base}/holders" ]] || {
+		printf '%s' "$raw"
+		return 0
+	}
+	for holder in "${SYSFS_BLOCK}/${base}/holders/"dm-*; do
+		[[ -e "${holder}/dm/name" ]] || continue
+		[[ "$(cat "${holder}/size" 2>/dev/null || echo 0)" == "$(cat "${SYSFS_BLOCK}/${base}/size" 2>/dev/null || echo -1)" ]] || continue
+		name="$(cat "${holder}/dm/name" 2>/dev/null || true)"
+		[[ -n "$name" && -e "${DEV_MAPPER}/${name}" ]] || continue
+		if [[ "$(blkid -p -s TYPE -o value "${DEV_MAPPER}/${name}" 2>/dev/null || true)" == "exfat" ]]; then
+			printf '%s/%s' "$DEV_MAPPER" "$name"
+			return 0
+		fi
+	done
+	printf '%s' "$raw"
+}
+
 if findmnt -n "$MP" &>/dev/null; then
 	log "Already mounted: $MP ($(findmnt -n -o SOURCE,FSTYPE "$MP")) — continue pipeline"
 else
@@ -44,19 +73,25 @@ else
 	fi
 	log "Device present: $(readlink -f "$USB_DEV" 2>/dev/null || echo "$USB_DEV")"
 
-	if ! systemctl start --no-block home-casparcg-exfat.mount 2>>"$LOG"; then
-		uid="$(id -u casparcg 2>/dev/null || echo 1000)"
-		gid="$(id -g casparcg 2>/dev/null || echo 1000)"
-		mkdir -p "$MP"
-		if ! mountpoint -q "$MP"; then
-			mount -t exfat -o "defaults,uid=${uid},gid=${gid},umask=002" "$USB_DEV" "$MP" \
-				|| mount -o "defaults,uid=${uid},gid=${gid},umask=002" "$USB_DEV" "$MP" \
-				|| {
-					log "WARN: direct mount failed — trying home-casparcg-exfat.mount"
-					systemctl reset-failed home-casparcg-exfat.mount 2>>"$LOG" || true
-					systemctl start home-casparcg-exfat.mount 2>>"$LOG" || true
-				}
-		fi
+	uid="$(id -u casparcg 2>/dev/null || echo 1000)"
+	gid="$(id -g casparcg 2>/dev/null || echo 1000)"
+	MOUNT_DEV="$(resolve_usb_dev)"
+	mkdir -p "$MP"
+
+	# home-casparcg-exfat.mount hardcodes What=/dev/disk/by-label/… so it can only work when the
+	# raw partition is mountable. Start it blocking (device/mount timeouts are 5s) — `--no-block`
+	# always exits 0, which made every fallback below unreachable.
+	if [[ "$MOUNT_DEV" == "${DEV_MAPPER}"/* ]]; then
+		log "Raw partition held by device-mapper (Ventoy stick) — mounting ${MOUNT_DEV}"
+	else
+		systemctl start home-casparcg-exfat.mount 2>>"$LOG" || log "WARN: home-casparcg-exfat.mount failed — falling back to direct mount"
+	fi
+
+	if ! mountpoint -q "$MP"; then
+		systemctl reset-failed home-casparcg-exfat.mount 2>>"$LOG" || true
+		mount -t exfat -o "defaults,uid=${uid},gid=${gid},umask=002" "$MOUNT_DEV" "$MP" 2>>"$LOG" \
+			|| mount -o "defaults,uid=${uid},gid=${gid},umask=002" "$MOUNT_DEV" "$MP" 2>>"$LOG" \
+			|| log "WARN: direct mount of ${MOUNT_DEV} failed"
 	fi
 
 	for ((i = 0; i < 45; i++)); do
