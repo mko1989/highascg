@@ -99,13 +99,17 @@ Why writing to the Ventoy partition is acceptable: the `ventoy` map is read-only
 relocates the clusters of an existing file, so the ISO's extents cannot move under it. The one
 rule is that the sync pipeline must never touch the ISO itself, which it does not.
 
-**Alternative considered and still recommended for stick production:** Ventoy2Disk →
-Option → Partition Configuration → *"Preserve some space at the end of the disk"*, then create a
-third partition there formatted exFAT `HIGHASCGEXF`. That restores WO-47's clean two-volume model
-(medium separate from data), needs no dm trickery, and the udev rule already matches `sd*[0-9]`.
-This WO's code fix is what makes a **plain** Ventoy stick work at all; it is not an argument
-against the reserved-space layout. WO-457's fixed 6 GiB offset does not carry over — under Ventoy
-the data partition lands at the end, sized by the preserve setting.
+**Layout decision — SETTLED, owner 2026-08-10:** *"i dont see a point in creating an additional
+partition on the stick when ventoy already does it."* A reserved-space third partition
+(Ventoy2Disk → Option → Partition Configuration → "Preserve some space at the end of the disk")
+was considered and **rejected**: one Ventoy exFAT partition carries both the ISOs and the operator
+data, and the dm-map mount above is what makes that work. Do not re-propose the extra partition.
+WO-457's fixed 6 GiB offset simply retires with the Etcher flow — there is no offset under Ventoy.
+
+**Corroboration (owner, same day):** *"the same stick mounted correctly on this machine."* Exactly
+what the diagnosis predicts — plugged into a machine that did **not** boot from it, Ventoy creates
+no dm mapping, nothing holds the partition, and `/dev/sdb1` mounts normally. The EBUSY is specific
+to the box that is running off the stick, which is also the only box where it matters.
 
 ## 3. What was VERIFIED to work
 

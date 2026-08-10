@@ -72,11 +72,16 @@ touching it forces a client rebuild. Flagged for the owner — one word, say so 
   contains "broadcast". Remaining hits are WebSocket identifiers, code comments, and
   `console.warn` developer text.
 
-**Remains (owner — needs root on the eggs host, then a produce):**
+**Remains (owner):**
 
-1. `sudo bash ~/highascg/tools/eggs/live-usb/install-eggs-calamares.sh` — resyncs the corrected
-   slideshow into `/etc/calamares/branding/highascg-eggs-theme/`. Until this runs, the stale
-   wording is what the next produce bakes in.
-2. Full `eggs produce`, then `verify-iso-boot-branding.sh` on the new ISO — it now asserts the
-   wording, so a green verify is the proof.
-3. Optional: decide on `client/map.html`'s "playout stack" meta description (above).
+1. Build a new ISO — `sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh`.
+   **No separate branding step is needed:** that script → `prepare-eggs-clone-with-exfat.sh:86` →
+   `install-eggs-calamares.sh`, whose slideshow sync (lines 104-118) is unconditional and
+   overwrites the stale `/etc/calamares/branding/highascg-eggs-theme/show.qml` before produce
+   clones the host. (An earlier note in this WO told the owner to run `install-eggs-calamares.sh`
+   by hand — harmless but redundant; corrected here.)
+2. The build's own `verify-iso-boot-branding.sh` step now asserts the wording and aborts the build
+   on a hit, so a completed build IS the proof.
+
+**Closed:** `client/map.html`'s "playout stack" meta description — owner 10.08: *"the map doesnt
+matter at all."* No change, no follow-up.
