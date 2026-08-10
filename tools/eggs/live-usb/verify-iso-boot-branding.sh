@@ -156,8 +156,25 @@ if [[ -n "$GRUB_CFG" ]]; then
 		elif grep -q 'GNU Unifont' "$THEME_CFG"; then
 			ok "theme.cfg fonts match GNU Unifont (font.pf2)"
 		fi
-		if grep -q 'menu_bg_color' "$THEME_CFG"; then
-			ok "theme.cfg sets boot_menu menu_bg_color (visible labels on dark splash)"
+		# WO-461: GRUB's boot_menu has no background COLOUR properties — menu_bg_color and
+		# selected_item_bg_color are silently ignored (only *_pixmap_style paints a background).
+		# The old check rewarded menu_bg_color and so passed an ISO whose selected entry was
+		# drawn in desktop-color, i.e. invisible. Selection is text colour only — assert contrast.
+		_desk="$(sed -n 's/^desktop-color:[[:space:]]*"\([^"]*\)".*/\1/p' "$THEME_CFG" | head -1)"
+		_sel="$(sed -n 's/^[[:space:]]*selected_item_color[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$THEME_CFG" | head -1)"
+		_item="$(sed -n 's/^[[:space:]]*item_color[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$THEME_CFG" | head -1)"
+		if [[ -z "$_sel" ]]; then
+			bad "theme.cfg has no selected_item_color — the highlighted menu entry has no colour of its own"
+		elif [[ "${_sel,,}" == "${_desk,,}" ]]; then
+			bad "theme.cfg selected_item_color (${_sel}) equals desktop-color — highlighted entry is INVISIBLE"
+		elif [[ "${_sel,,}" == "${_item,,}" ]]; then
+			bad "theme.cfg selected_item_color equals item_color (${_sel}) — selection is indistinguishable"
+		else
+			ok "theme.cfg selected_item_color ${_sel} contrasts desktop ${_desk} and items ${_item}"
+		fi
+		# Assignments only — the theme carries a comment naming these properties to warn people off.
+		if grep -qE '^[[:space:]]*(menu_bg_color|selected_item_bg_color)[[:space:]]*=' "$THEME_CFG"; then
+			bad "theme.cfg sets menu_bg_color/selected_item_bg_color — GRUB ignores both; they hide missing contrast"
 		fi
 	fi
 	if [[ -f "${MNT}/boot/grub/font.pf2" ]]; then
