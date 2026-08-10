@@ -169,9 +169,26 @@ if declare -F find_latest_iso >/dev/null 2>&1; then
 	BUILT_ISO="$(find_latest_iso 2>/dev/null || true)"
 fi
 
+# WO-462: the ISO file appears at `eggs produce` time and keeps CHANGING for minutes afterwards —
+# patch-iso-squashfs-calamares.sh rewrites filesystem.squashfs and inject-iso-boot-branding.sh
+# re-packs the whole image. A stick copy started inside that window gets a torn image: correct
+# final size, mixed content, and GRUB dies with "invalid magic number" loading the kernel. The
+# name's timestamp is the produce time, NOT the finish time, so it cannot be used as a signal.
+# This sidecar is written LAST — its existence is the only reliable "safe to copy" marker.
+if [[ -n "$BUILT_ISO" && -f "$BUILT_ISO" ]]; then
+	echo "==> Completion sidecar (safe-to-copy marker + checksum) — this is written last"
+	(cd "$(dirname "$BUILT_ISO")" && sha256sum "$(basename "$BUILT_ISO")" >"$(basename "$BUILT_ISO").sha256") \
+		|| echo "WARN: could not write ${BUILT_ISO}.sha256" >&2
+fi
+
 echo
 if [[ -n "$BUILT_ISO" ]]; then
 	echo "Done. ISO: ${BUILT_ISO} (nvidia-${BR}, no nvidia-pool)"
+	echo
+	echo "DO NOT copy the ISO to a stick before this point — it was still being re-packed."
+	echo "Copy, then flush and verify:"
+	echo "  cp ${BUILT_ISO} /path/to/ventoy/ && sync"
+	echo "  bash ${HERE}/verify-stick-iso.sh /path/to/ventoy/$(basename "$BUILT_ISO")"
 else
 	echo "Done. ISO is under /home/eggs/ (name starts with ${BASENAME}_, nvidia-${BR})"
 fi

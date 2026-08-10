@@ -36,6 +36,13 @@ verify_one() {
 		return
 	fi
 
+	# WO-462: the build writes <iso>.sha256 as its LAST action. No sidecar means the build either
+	# never finished or predates that change — and an ISO copied mid-build is the exact failure
+	# this script exists to catch, so say so rather than silently comparing against a moving file.
+	if [[ ! -f "${src_iso}.sha256" ]]; then
+		note "WARN: no ${src_iso}.sha256 — cannot confirm the build had finished when this was copied"
+	fi
+
 	local s_size k_size
 	s_size="$(stat -Lc %s "$src_iso")"
 	k_size="$(stat -Lc %s "$stick_iso")"
@@ -46,7 +53,11 @@ verify_one() {
 
 	note "hashing $(basename "$stick_iso") ($((s_size / 1024 / 1024)) MiB) — slow over USB, be patient"
 	local s_hash k_hash
-	s_hash="$(sha256sum "$src_iso" | cut -d' ' -f1)"
+	if [[ -f "${src_iso}.sha256" ]]; then
+		s_hash="$(cut -d' ' -f1 <"${src_iso}.sha256")"
+	else
+		s_hash="$(sha256sum "$src_iso" | cut -d' ' -f1)"
+	fi
 	k_hash="$(sha256sum "$stick_iso" | cut -d' ' -f1)"
 	if [[ "$s_hash" == "$k_hash" ]]; then
 		ok "$(basename "$stick_iso") matches source ($s_hash)"
