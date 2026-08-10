@@ -26,6 +26,22 @@ REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 export HIGHASCG_NVIDIA_DRIVER="$BR"
 BASENAME="${BASENAME:-highascg-nvidia-${BR}}"
 
+# WO-464: a previous `eggs produce` leaves its liveroot bind mounts behind, and the audit that
+# catches them only runs at line ~92 — after prepare has already done apt, `npm ci`, a vite build
+# and the Companion packaging (~5 min) and mutated the host tree. The condition is knowable before
+# any of that, so check it here. Effectively: one produce per boot.
+# shellcheck source=eggs-liveroot-safety.sh
+source "${HERE}/eggs-liveroot-safety.sh"
+_LIVEROOT="$(eggs_liveroot_default)"
+if eggs_liveroot_has_host_bind_mounts "$_LIVEROOT"; then
+	echo "ERROR: a previous eggs produce left LIVE system bind mounts under ${_LIVEROOT}." >&2
+	echo "       Reboot, then re-run this script. Nothing has been changed on this host yet." >&2
+	echo "       Do NOT run 'umount -R ${_LIVEROOT}' or 'rm -rf ${_LIVEROOT}' — that path has" >&2
+	echo "       erased /usr on this project before (see RECOVER_DESTROYED_USR.md)." >&2
+	eggs_liveroot_print_host_bind_mounts "$_LIVEROOT"
+	exit 1
+fi
+
 mkdir -p /etc/highascg
 echo "$BR" > /etc/highascg/nvidia-iso-driver
 chmod 0644 /etc/highascg/nvidia-iso-driver

@@ -81,6 +81,7 @@ const FILES = [
 	'tools/smoke/smoke-wo461-grub-selected-entry-contrast.test.js',
 	'tools/smoke/smoke-wo462-iso-copy-race-guard.test.js',
 	'tools/smoke/smoke-wo463-automount-skips-dm-held-partitions.test.js',
+	'tools/smoke/smoke-wo464-liveroot-guard-runs-first.test.js',
 	'tools/smoke/smoke-wo414-pinned-host-channel-collision.test.js',
 	'tools/smoke/smoke-wo408-compose-ui-batch.test.js',
 	'tools/smoke/smoke-wo409-prv-mixer-strips.test.js',
