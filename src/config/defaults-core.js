@@ -255,6 +255,11 @@ function coreDefaults() {
 		 * outputs are not configured yet. Every `Array.isArray(x) ? x : [rec_1]` fallback that
 		 * used to re-materialise it was changed to `[]` in the same pass. */
 		recordOutputs: [],
+		/* WO-474: the same rule for every output family — a fresh box and a New project open a
+		 * CLEAN device view. Shipping the keys as empty arrays (rather than omitting them) is what
+		 * makes it stick: every "key absent → seed one default" fallback keyed off `undefined`. */
+		audioOutputs: [],
+		streamOutputs: [],
 		screenDestinations: {
 			version: 1,
 			edidNotes: '',

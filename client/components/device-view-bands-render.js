@@ -329,7 +329,8 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 		setCasparRestartDirty,
 		onAddStreamOutput: async () => {
 			try {
-				const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true, type: 'rtmp', name: 'Str1', quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
+				/* WO-474: no phantom str_1 — with zero outputs the first Add must create Str1, not Str2. */
+				const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : [];
 				const idx = cur.length + 1;
 				const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
 				await Actions.saveSettingsPatch({ streamOutputs: next });

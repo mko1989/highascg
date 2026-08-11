@@ -219,8 +219,9 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			externalRef: String(live?.caspar?.multiviewChannel ?? mvItem?.ch ?? ''),
 		})
 	}
-	// WO-393: seed only when the key is absent — an empty array means the operator removed all outputs.
-	const streamOutputsRaw = appConfig && Array.isArray(appConfig.streamOutputs) ? appConfig.streamOutputs : [{ id: 'str_1', label: 'Str1', enabled: true }]
+	/* WO-393: an empty array means the operator removed all outputs. WO-474: an ABSENT key means
+	 * the same — a fresh box has no stream output, so no phantom str_1 band in device view. */
+	const streamOutputsRaw = appConfig && Array.isArray(appConfig.streamOutputs) ? appConfig.streamOutputs : []
 	for (let i = 0; i < streamOutputsRaw.length; i++) {
 		const so = streamOutputsRaw[i] || {}
 		const id = String(so.id || `str_${i + 1}`).trim() || `str_${i + 1}`

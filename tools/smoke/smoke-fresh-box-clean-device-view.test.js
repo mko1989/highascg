@@ -1,10 +1,13 @@
 'use strict'
 
-/* WO-473. A fresh box and a "New project" must start with ZERO record outputs, the same rule
- * WO-468/470 set for audio outputs. `defaults-core.js` shipped a `rec_1` bound to `program_1`, and
- * four separate `Array.isArray(x) ? x : [rec_1]` fallbacks re-materialised it even when the config
+/* WO-473 + WO-474. A fresh box and a "New project" must open a CLEAN device view: zero audio,
+ * stream, record and virtual-cam outputs. WO-468/470 set that rule for audio alone.
+ *
+ * `defaults-core.js` shipped a `rec_1` bound to `program_1`, and every output family had
+ * `Array.isArray(x) ? x : [phantom]` fallbacks that re-materialised a band even when the config
  * said none — including the client's initial settings state, which drew a "Rec1" row before the
- * server had answered.
+ * server had answered, and the Add buttons, whose first click would then have created Rec2/Str2.
+ * The arrays now ship present-and-empty so "absent" and "empty" cannot diverge again.
  *
  * Also pins the leak vector WO-470 left as manual owner action: this box's `audio_outputs.json`
  * (portaudio `hw:0,0` + the `sc60mon` monitor) rode the operator stick and bridge into a fresh
@@ -29,14 +32,37 @@ const { readCommittedConfigSlice } = require('./lib/committed-config-slice')
 
 /* 1. The factory shape — what a produced stick, an ISO install and "New project" all start from. */
 const factory = buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, normalizeScreenDestinations)
-assert.ok(Array.isArray(factory.recordOutputs), 'factory config must define recordOutputs as an array')
-assert.strictEqual(factory.recordOutputs.length, 0, 'buildFactoryModularConfig must not emit a record output')
+for (const key of ['recordOutputs', 'streamOutputs', 'audioOutputs']) {
+	/* Present-and-empty, not absent: every phantom-seeding fallback keyed off `undefined`, so an
+	 * omitted key is what used to resurrect str_1 / rec_1 in device view. */
+	assert.ok(Array.isArray(factory[key]), `factory config must define ${key} as an array`)
+	assert.strictEqual(factory[key].length, 0, `buildFactoryModularConfig must not emit a ${key} entry`)
+}
+assert.ok(!factory.virtualCamera, 'factory config must not define a virtual camera')
 
 const starter = buildStarterHardwareConfig(require(path.join(REPO_ROOT, 'src/utils/persistence')))
-assert.strictEqual(
-	(starter.hardwareConfig.recordOutputs || []).length,
-	0,
-	'a New project must not stamp a record output into its hardwareConfig',
+for (const key of ['recordOutputs', 'streamOutputs', 'audioOutputs']) {
+	assert.strictEqual(
+		(starter.hardwareConfig[key] || []).length,
+		0,
+		`a New project must not stamp ${key} into its hardwareConfig`,
+	)
+}
+
+/* 1b. createNewProject clears the LIVE config too. The hardwareConfig above carries empty arrays,
+ * but applyHardwareConfigToCtx re-adds the box's monitor-role audio outputs (WO-443, which guards
+ * against a project saved on another box) and never touches virtualCamera — so the reset has to
+ * zero all four explicitly. Source-text guard: this runs without a server or a config on disk. */
+const newProjectSrc = fs.readFileSync(path.join(REPO_ROOT, 'src/engine/new-project.js'), 'utf8')
+for (const key of ['extraLiveSources', 'audioOutputs', 'streamOutputs', 'recordOutputs']) {
+	assert.ok(
+		new RegExp(`${key}:\\s*\\[\\]`).test(newProjectSrc),
+		`createNewProject must reset ${key} to [] — a New project opens a clean device view`,
+	)
+}
+assert.ok(
+	/delete next\.virtualCamera/.test(newProjectSrc),
+	'createNewProject must drop virtualCamera — a New project has no virtual cam output',
 )
 
 /* 2. The COMMITTED slice must match the factory. Judged at HEAD, not in the working tree: this
@@ -74,19 +100,21 @@ if (committedGraph.available) {
 	)
 }
 
-/* 3. No fallback may resurrect a rec_1 the operator never created. These four sites each did. */
-const NO_REC1_FALLBACK = [
+/* 3. No fallback may resurrect a rec_1 or str_1 the operator never created. */
+const NO_PHANTOM_FALLBACK = [
 	'src/api/settings-get.js',
 	'src/config/device-graph-suggest.js',
 	'client/lib/settings-state.js',
 	'client/components/device-view-bands-render.js',
 ]
-for (const rel of NO_REC1_FALLBACK) {
+for (const rel of NO_PHANTOM_FALLBACK) {
 	const src = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8')
-	assert.ok(
-		!/\[\s*\{\s*(\/\*[^]*?\*\/\s*)?id:\s*'rec_1'/.test(src),
-		`${rel} must not default recordOutputs to a literal rec_1 — use [] and let the operator add one`,
-	)
+	for (const phantom of ['rec_1', 'str_1']) {
+		assert.ok(
+			!new RegExp(`\\[\\s*\\{\\s*(/\\*[^]*?\\*/\\s*)?id:\\s*'${phantom}'`).test(src),
+			`${rel} must not default an output array to a literal ${phantom} — use [] and let the operator add one`,
+		)
+	}
 }
 
 /* 4. audio_outputs.json must not ride the stick/bridge configs sync in either direction. WO-470
@@ -105,4 +133,4 @@ if (fs.existsSync(syncPath)) {
 	}
 }
 
-console.log('smoke-fresh-box-no-record-output: ok')
+console.log('smoke-fresh-box-clean-device-view: ok')

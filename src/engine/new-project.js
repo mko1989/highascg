@@ -68,9 +68,24 @@ function createNewProject(ctx) {
 
 	const cm = ctx.configManager
 	if (cm) {
-		const next = { ...cm.get(), extraLiveSources: [] }
+		/* WO-474: a New project opens a CLEAN device view — no audio, stream, record or virtual-cam
+		 * output. The factory hardwareConfig above carries empty arrays, but applyHardwareConfigToCtx
+		 * deliberately re-adds the box's monitor-role audio outputs (WO-443, which protects a box
+		 * from a project SAVED ELSEWHERE) and never touches virtualCamera, which is not project
+		 * state. A New project is the explicit reset to factory, so it clears all four here. */
+		const next = {
+			...cm.get(),
+			extraLiveSources: [],
+			audioOutputs: [],
+			streamOutputs: [],
+			recordOutputs: [],
+		}
+		delete next.virtualCamera
 		cm.save(next)
-		if (ctx.config) Object.assign(ctx.config, cm.get())
+		if (ctx.config) {
+			Object.assign(ctx.config, cm.get())
+			delete ctx.config.virtualCamera
+		}
 	}
 
 	const project = buildNewUntitledProject(hardwareConfig)

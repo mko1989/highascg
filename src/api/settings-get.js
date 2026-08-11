@@ -83,25 +83,9 @@ async function handleGet(path, ctx) {
 				return [...collectHostLiveConfigWarnings(cfg), ...mig.warnings]
 			})(),
 			streamCredentials,
-			/* WO-393: seed only when the key is ABSENT (legacy/fresh config). An empty array is a
-			 * deliberate operator choice (all outputs removed) and must NOT resurrect a phantom. */
-			streamOutputs: (Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : [{
-				id: 'str_1',
-				label: 'Str1',
-				enabled: true,
-				type: 'rtmp',
-				name: 'Str1',
-				quality: 'medium',
-				rtmpServerUrl: '',
-				streamKey: '',
-				srtUrl: '',
-				udpUrl: '',
-				videoCodec: 'h264',
-				videoBitrateKbps: 4500,
-				encoderPreset: 'veryfast',
-				audioCodec: 'aac',
-				audioBitrateKbps: 128,
-			}]).map((o) => {
+			/* WO-393: an empty array is a deliberate operator choice (all outputs removed) and must
+			 * NOT resurrect a phantom. WO-474: neither must an absent key — a fresh box ships none. */
+			streamOutputs: (Array.isArray(cfg.streamOutputs) ? cfg.streamOutputs : []).map((o) => {
 				// WO-261: never emit the raw per-output key; expose the resolved (project-first) URL and a
 				// hasStreamKey boolean for the inspector placeholder.
 				const id = String(o?.id || '')

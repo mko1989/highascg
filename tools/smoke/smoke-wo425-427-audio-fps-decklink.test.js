@@ -47,7 +47,10 @@ test('WO-425: no "USB headphones" anywhere; monitor entry is Audio 2 + role; fac
 	const { finalizeScreenDestinationsConfig, normalizeScreenDestinations } = require('../../src/config/screen-destinations')
 	const { buildFactoryModularConfig } = require('../../src/config/factory-starter')
 	const cfg = buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, normalizeScreenDestinations)
-	assert.ok(!('audioOutputs' in cfg), 'factory config ships zero audio outputs')
+	/* WO-474: the key is now present-and-empty rather than absent — every phantom-seeding fallback
+	 * keyed off `undefined`, so shipping `[]` is what makes "no outputs" survive. Either shape
+	 * satisfies WO-425; what must never hold is a non-empty list. */
+	assert.deepEqual(cfg.audioOutputs ?? [], [], 'factory config ships zero audio outputs')
 	assert.ok(!JSON.stringify(cfg).includes('USB headphones'), 'factory config never mentions headphones')
 })
 
