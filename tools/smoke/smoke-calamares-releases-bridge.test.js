@@ -18,10 +18,15 @@ const ROOT = path.join(__dirname, '..', '..')
 const SRC = fs.readFileSync(path.join(ROOT, 'tools/runtime/launch-calamares.sh'), 'utf8')
 
 test('WO-475: the launcher releases the bridge before Calamares and restores it after', () => {
-	const iRelease = SRC.indexOf('release_bridge\n')
+	/* WO-481 added a `--release-bridge` early-exit mode (Calamares' own shellprocess step calls it),
+	 * whose body is also a bare `release_bridge` call — and it sits ABOVE the launch path by
+	 * design. Anchor on the launch-path call, the one guarded by the restore trap. */
+	const iTrap = SRC.indexOf('trap restore_bridge EXIT')
+	const iRelease = SRC.indexOf('release_bridge\n', iTrap)
 	const iCalamares = SRC.indexOf('"${CALAMARES_BIN}" -d')
 	const iStopServices = SRC.indexOf('for unit in casparcg-server.service casparcg-scanner.service highascg.service')
 
+	assert.ok(iTrap > 0, 'the restore trap is armed before the release')
 	assert.ok(iStopServices > 0, 'launcher still stops playout before the install (WO-423)')
 	assert.ok(iRelease > 0, 'launcher calls release_bridge')
 	assert.ok(iCalamares > 0, 'launcher invokes Calamares')
@@ -38,6 +43,20 @@ test('WO-475: the launcher releases the bridge before Calamares and restores it 
 		SRC,
 		/trap restore_bridge EXIT/,
 		'a cancelled or crashed installer must not leave the box without its media disk',
+	)
+})
+
+test('WO-481: the release is callable on its own for Calamares\' own shellprocess step', () => {
+	assert.match(
+		SRC,
+		/if \[\[ "\$\{1:-\}" == "--release-bridge" \]\]; then\n\trelease_bridge\n\texit 0/,
+		'a --release-bridge mode must exist so the logic is never duplicated elsewhere (WO-471)',
+	)
+	/* It must come before the transient-unit re-exec: a one-shot unmount needs no scope, and
+	 * systemd-run would detach it from the caller that is waiting on the exit status. */
+	assert.ok(
+		SRC.indexOf('"--release-bridge"') < SRC.indexOf('exec systemd-run'),
+		'the standalone release must not be re-exec\'d into a transient unit',
 	)
 })
 

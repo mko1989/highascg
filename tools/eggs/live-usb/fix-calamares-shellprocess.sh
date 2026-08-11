@@ -53,6 +53,21 @@ script:
   - /bin/bash -c 'INITRD=No /usr/sbin/dpkg-reconfigure -fnoninteractive linux-image-$(uname -r)'
 EOF
 
+cat >"${MOD}/shellprocess@release_bridge.conf" <<'EOF'
+# HighAsCG WO-481 — free the bridge partition (LABEL=HIGHASCGDAT) before partitioning.
+# KPMcore asks the kernel to re-read the TARGET DISK's partition table and the kernel refuses
+# while ANY partition on that disk is mounted, so an install onto the internal disk fails even
+# when the operator leaves the bridge untouched. launch-calamares.sh already does this (WO-475),
+# but only when the installer was started through it — this step also covers a terminal
+# `calamares`, a desktop entry, and a live ISO whose launcher predates that fix.
+---
+message: Releasing the bridge data partition...
+dontChroot: true
+timeout: 60
+script:
+  - /bin/bash -c '[ -x /usr/local/bin/launch-calamares.sh ] && /usr/local/bin/launch-calamares.sh --release-bridge || true'
+EOF
+
 cat >"${MOD}/shellprocess@boot_deploy.conf" <<'EOF'
 # HighAsCG — live medium vmlinuz copy (eggs boot_deploy)
 ---
@@ -76,6 +91,36 @@ firmwareType:
     - command: apt install -y --no-upgrade -o Acquire::gpgv::Options::=--ignore-time-conflict grub-pc grub-pc-bin
       timeout: 300
 EOF
+
+# WO-481 — schedule the release as the FIRST exec step, i.e. after the operator has chosen a
+# layout and before Calamares commits anything. Pure awk so the edit is idempotent and needs no
+# interpreter beyond what the live ISO already has.
+SETTINGS="${ROOT}/etc/calamares/settings.conf"
+[[ -n "$ROOT" ]] || SETTINGS=/etc/calamares/settings.conf
+if [[ ! -f "$SETTINGS" ]]; then
+	echo "WARN: ${SETTINGS} not found — cannot schedule shellprocess@release_bridge" >&2
+elif grep -q 'shellprocess@release_bridge' "$SETTINGS"; then
+	echo "==> settings.conf already runs shellprocess@release_bridge"
+else
+	awk '
+		/^[[:space:]]*-[[:space:]]*exec:[[:space:]]*$/ { in_exec = 1 }
+		{
+			if (in_exec && !done && $0 ~ /^[[:space:]]*-[[:space:]]*partition[[:space:]]*$/) {
+				indent = $0
+				sub(/-.*/, "", indent)
+				print indent "- shellprocess@release_bridge"
+				done = 1
+			}
+			print
+		}
+	' "$SETTINGS" >"${SETTINGS}.tmp" && mv "${SETTINGS}.tmp" "$SETTINGS"
+	if grep -q 'shellprocess@release_bridge' "$SETTINGS"; then
+		echo "==> settings.conf: shellprocess@release_bridge inserted before partition"
+	else
+		echo "WARN: no 'exec:' / '- partition' anchor in ${SETTINGS} — release step NOT scheduled" >&2
+	fi
+fi
+
 
 if [[ -f "${MOD}/bootloader.conf" ]]; then
 	# Full paths — Calamares chroot PATH may omit /usr/sbin (grub-install exit 1 / 127).

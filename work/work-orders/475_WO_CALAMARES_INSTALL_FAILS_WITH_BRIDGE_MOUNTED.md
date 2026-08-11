@@ -101,3 +101,52 @@ the same two edits on its next insert.
 exercised for real only on the next reinstall. Owner QA: partitioning should now pass with
 HIGHASCGDAT present, and `~/bridge` + `~/highascg/media/bridge` must be mounted again after the
 installer closes (or after cancelling it).
+
+---
+
+## WO-481 — the WO-475 fix did not reach the machine the owner installed from
+
+**Status: DONE (11.08.2026) — owner QA: next install attempt**
+
+Owner 11.08, after WO-475 shipped: *"running the calamares setup did not unmount the bridge
+partition making the install impossible."*
+
+**WO-475 patched the repo copy; the running system uses an installed copy.**
+`scripts/setup/13-caspar-systemd-units.sh` does `install -m 0755 tools/runtime/launch-calamares.sh
+/usr/local/bin/launch-calamares.sh`, and the sudoers rule points at `/usr/local/bin`. Editing
+`tools/runtime/` therefore changes nothing on a box until that installer re-runs — and on a **live
+USB the launcher is baked into `filesystem.squashfs`**, so an ISO produced before WO-475 can never
+have it. WO-475's own note ("no second deployment step to forget") was right about future ISOs and
+wrong about every machine already built. That is the WO-471 two-copies trap again, one level up.
+
+Evidence on this box: `/usr/local/bin/launch-calamares.sh` and the repo copy are byte-identical
+*now* (mtime 12:39, after the owner deployed), and `journalctl` records `home-casparcg-bridge.mount`
+being unmounted at 12:38:56 — so the mechanism works where it is installed. No
+`highascg-calamares-launch-*` transient unit appears in this box's journal at all, i.e. the failing
+install was started elsewhere, from an older copy.
+
+**Fix — make it independent of how Calamares was started.**
+
+- `launch-calamares.sh` gained a `--release-bridge` mode: the WO-475 `release_bridge()` and its
+  arrays moved above the transient-unit re-exec, and the flag runs it and exits. One implementation,
+  two entry points; the logic is never duplicated.
+- `fix-calamares-shellprocess.sh` now writes `shellprocess@release_bridge.conf`
+  (`dontChroot: true`, calls the launcher with that flag, tolerates its absence) **and inserts it as
+  the first step of the `exec:` sequence in `settings.conf`** — after the operator has chosen a
+  layout, before Calamares commits anything. Pure awk, idempotent, skips the `- partition` entry
+  under `show:`. That covers a terminal `calamares`, a desktop entry, and our launcher alike.
+
+**Still true and unavoidable:** a live stick produced before this carries the old squashfs. Until an
+ISO is produced, the operator must either run the installed launcher (`sudo -n
+/usr/local/bin/launch-calamares.sh`, once refreshed) or unmount by hand first:
+
+```bash
+sudo systemctl stop home-casparcg-highascg-media-bridge.mount home-casparcg-bridge.mount
+```
+
+Verified: `bash -n` clean; the awk insertion dry-run against this box's real
+`/etc/calamares/settings.conf` put `- shellprocess@release_bridge` above `- partition` under
+`exec:` and left the `show:` copy alone; smoke extended (4/4) to pin the `--release-bridge` mode and
+that it exits before the re-exec; WO-423's ordering guard repointed to the playout stop loop, since
+`release_bridge()`'s definition now legitimately precedes the re-exec. Offline suite **1958 tests,
+1956 pass, 0 fail, 2 skip**.

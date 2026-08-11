@@ -28,8 +28,16 @@ test('WO-423: launcher stops the stack, restarts it after, and survives its own 
 	const src = read(rel)
 	// Re-exec guard must come BEFORE any systemctl stop — else the stop kills the script.
 	const reexecAt = src.indexOf('exec systemd-run')
-	const stopAt = src.indexOf('systemctl stop "')
-	assert.ok(reexecAt > 0 && stopAt > 0 && reexecAt < stopAt, 'transient-unit re-exec precedes the stop')
+	/* WO-481 moved release_bridge()'s DEFINITION above the re-exec so `--release-bridge` can exit
+	 * early for Calamares' own shellprocess step; its body contains the first `systemctl stop "` in
+	 * the file. The invariant is about the PLAYOUT stop — that is what would kill this script with
+	 * highascg.service — so anchor on that loop, not on the first stop-like string. */
+	const stopAt = src.indexOf('for unit in casparcg-server.service casparcg-scanner.service highascg.service')
+	assert.ok(reexecAt > 0 && stopAt > 0 && reexecAt < stopAt, 'transient-unit re-exec precedes the playout stop')
+	assert.ok(
+		src.indexOf('"--release-bridge"') < reexecAt,
+		'the standalone release exits before the re-exec — it must not become a transient unit',
+	)
 	assert.match(src, /HIGHASCG_CAL_SCOPED/, 're-exec is guarded against recursion')
 	for (const unit of ['casparcg-server.service', 'highascg.service']) {
 		assert.ok(src.includes(unit), `${unit} in the stop/start lists`)
