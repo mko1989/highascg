@@ -1,7 +1,7 @@
 'use strict'
 
 const defaults = require('./defaults')
-const { STANDARD_VIDEO_MODES } = require('./config-modes')
+const { findStandardModeId, STANDARD_VIDEO_MODES } = require('./config-modes')
 const { normalizeProgramLayout } = require('./audio-channel-layouts')
 
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/
@@ -87,10 +87,20 @@ function normalizeDestination(d) {
 	// WO-242/WO-243: pixelmap and operator_gui channels are raster-exact by default (custom WxH),
 	// not a standard broadcast mode — pixelmap sizes to the fixture wall, operator_gui sizes to the
 	// operator monitor's real resolution.
-	const isCustomByDefaultMode = mode === 'pixelmap' || mode === 'operator_gui'
-	const videoMode = String(
+	/* WO-486: only a pixelmap wall is raster-exact by default — its size comes from the fixtures.
+	 * An operator GUI is an ordinary monitor and defaults to a real mode; `custom` there put the
+	 * word "custom" in the mode dropdown where 1080p50 belongs, and (before WO-484) registered a
+	 * duplicate <video-mode>. WO-243's original reasoning stands for pixelmap and is untouched. */
+	const isCustomByDefaultMode = mode === 'pixelmap'
+	const videoModeRaw = String(
 		d.videoMode != null && d.videoMode !== '' ? d.videoMode : isCustomByDefaultMode ? 'custom' : '1080p5000',
 	).trim() || (isCustomByDefaultMode ? 'custom' : '1080p5000')
+	/* An explicit `custom` whose dimensions ARE a shipped mode is just that mode — but only judge
+	 * that when the caller actually supplied dimensions; a bare normalizeDestination({mode}) is
+	 * "size unknown yet", not "1920x1080". */
+	const dimsGiven = d.width != null && d.height != null
+	const stdFromDims = videoModeRaw === 'custom' && dimsGiven ? findStandardModeId(width, height, fps) : ''
+	const videoMode = stdFromDims || videoModeRaw
 	const std = videoMode !== 'custom' ? STANDARD_VIDEO_MODES[videoMode] : null
 	const hostRole = String(d.hostRole || '').trim()
 	const casparChannel = parseInt(String(d.casparChannel ?? ''), 10)

@@ -50,12 +50,24 @@ function baseAppConfig() {
 }
 
 describe('WO-243/255 T243.1: operator_gui destination model (screen-destinations.js)', () => {
-	it('normalizeDestination fills operator_gui defaults (guiUrl, custom videoMode)', () => {
+	it('normalizeDestination fills operator_gui defaults (guiUrl, a real video mode)', () => {
 		const d = normalizeDestination({ id: 'og1', label: 'Operator GUI', mode: 'operator_gui' })
 		assert.equal(d.mode, 'operator_gui')
-		assert.equal(d.videoMode, 'custom', 'operator_gui defaults to a raster-exact custom mode')
+		/* WO-486 supersedes WO-243 here: an operator GUI is an ordinary monitor, so it defaults to a
+		 * mode from the dropdown rather than the word "custom". Only a pixelmap wall — whose raster
+		 * comes from its fixtures — is custom by default. An operator monitor no shipped mode
+		 * describes (2560x1080) still resolves to custom, covered below. */
+		assert.equal(d.videoMode, '1080p5000', 'operator_gui defaults to a standard mode')
 		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1', 'WO-255: default guiUrl switched from ?cefOperator to ?operatorGui')
 		assert.equal(d.physicalPort, undefined, 'no physicalPort by default -> falls back to resolveOperatorMonitorPort() at runtime')
+	})
+
+	it('an operator monitor no shipped mode describes still resolves to custom (WO-486)', () => {
+		const d = normalizeDestination({ id: 'ogw', mode: 'operator_gui', videoMode: 'custom', width: 2560, height: 1080, fps: 50 })
+		assert.equal(d.videoMode, 'custom', 'ultrawide has no shipped mode — custom is correct there')
+		assert.equal(d.width, 2560)
+		const std = normalizeDestination({ id: 'ogs', mode: 'operator_gui', videoMode: 'custom', width: 1920, height: 1080, fps: 50 })
+		assert.equal(std.videoMode, '1080p5000', 'an explicit custom that IS a shipped mode resolves to it')
 	})
 
 	it('accepts an explicit guiUrl and a valid physicalPort (1-4)', () => {
