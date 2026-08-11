@@ -89,6 +89,13 @@ fi
 USER_CASPAR="${HIGHASCG_SERVICE_USER:-casparcg}"
 if [[ -x /usr/local/bin/launch-calamares.sh ]]; then
 	ok "launcher /usr/local/bin/launch-calamares.sh"
+	# WO-475: an ISO built before the bridge release still carries the old launcher, and the
+	# install then dies on "partition table could not be re-read" with HIGHASCGDAT mounted.
+	if grep -q 'release_bridge' /usr/local/bin/launch-calamares.sh; then
+		ok "launcher releases the bridge partition before Calamares (WO-475)"
+	else
+		fail "installed launcher predates WO-475 (no bridge release) — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"
+	fi
 else
 	fail "missing /usr/local/bin/launch-calamares.sh — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"
 fi

@@ -106,12 +106,79 @@ for unit in casparcg-server.service casparcg-scanner.service highascg.service; d
 	systemctl stop "${unit}" 2>/dev/null || true
 done
 
+# WO-475 (owner 11.08): the install failed with the bridge partition still mounted, even though
+# the operator left that partition untouched — Calamares/KPMcore re-reads the TARGET DISK's
+# partition table, and the kernel refuses while any partition on it is mounted. The bridge
+# (LABEL=HIGHASCGDAT) lives on the internal disk being installed to, so it must be released.
+# Must run AFTER the services above: highascg.service holds the media root and the projects sync.
+# The exFAT operator stick is deliberately left alone — it is the live boot medium, not a target.
+BRIDGE_UNITS=(
+	home-casparcg-highascg-media-bridge.mount
+	home-casparcg-bridge.mount
+	highascg-bridge-arrive.service
+	highascg-bridge-boot.service
+	highascg-bridge-media-prep.service
+	highascg-exfat-sync.service
+)
+# Deepest first: the media bind sits inside ~/bridge.
+BRIDGE_PATHS=(
+	/home/casparcg/highascg/media/bridge
+	/home/casparcg/bridge
+)
+BRIDGE_RELEASED=0
+
+release_bridge() {
+	local unit mp
+	for unit in "${BRIDGE_UNITS[@]}"; do
+		systemctl stop "${unit}" 2>/dev/null || true
+		# Runtime mask only — udev's arrive unit would otherwise remount mid-install, and a
+		# runtime mask evaporates on the reboot into the freshly installed system.
+		systemctl mask --runtime "${unit}" 2>/dev/null || true
+	done
+	for mp in "${BRIDGE_PATHS[@]}"; do
+		findmnt -n "${mp}" >/dev/null 2>&1 || continue
+		umount "${mp}" 2>/dev/null && continue
+		echo "WARN: ${mp} busy — processes holding it:" >&2
+		fuser -mv "${mp}" 2>&1 | head -20 >&2 || true
+		umount -l "${mp}" 2>/dev/null || true
+	done
+	BRIDGE_RELEASED=1
+	local still=0
+	for mp in "${BRIDGE_PATHS[@]}"; do
+		if findmnt -n "${mp}" >/dev/null 2>&1; then
+			echo "WARN: ${mp} is STILL mounted — Calamares may fail to re-read the partition table" >&2
+			still=1
+		fi
+	done
+	[[ "${still}" -eq 0 ]] && echo "OK: bridge volumes released for the installer"
+	return 0
+}
+
+restore_bridge() {
+	[[ "${BRIDGE_RELEASED}" -eq 1 ]] || return 0
+	local unit
+	for unit in "${BRIDGE_UNITS[@]}"; do
+		systemctl unmask --runtime "${unit}" 2>/dev/null || true
+	done
+	# Mount units only — the boot/arrive services re-run their own sync on the next boot.
+	for unit in home-casparcg-bridge.mount home-casparcg-highascg-media-bridge.mount; do
+		systemctl start "${unit}" 2>/dev/null || true
+	done
+	BRIDGE_RELEASED=0
+}
+
+# A cancelled or crashed installer must not leave the box without its media disk.
+trap restore_bridge EXIT INT TERM
+
+release_bridge
+
 status=0
 "${CALAMARES_BIN}" -d || status=$?
 
 # Installer closed (finished or cancelled) — bring the box back. After a real install the
 # user reboots into the new system anyway; restarting first costs nothing and un-bricks a
 # cancelled attempt.
+restore_bridge
 for unit in highascg.service casparcg-server.service casparcg-scanner.service; do
 	systemctl start "${unit}" 2>/dev/null || true
 done

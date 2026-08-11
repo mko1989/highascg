@@ -1,0 +1,103 @@
+# WO-475 — Calamares install fails while the bridge partition is mounted
+
+**Status: DONE (11.08.2026, verified: offline suite green with a new positional-order gate,
+`bash -n` clean) — owner QA: the next reinstall must get past partitioning with HIGHASCGDAT
+present, and `~/bridge` must be back after the installer closes**
+
+## 1. Investigation
+
+Owner 11.08: *"i just had an issue while reinstalling thru calamares, the bridge partition was still
+mounted which made the install fail even when i left this partition untouched. so running calamares
+install needs to unmount the bridge partition."*
+
+**Why "untouched" does not help.** Calamares' partition module (KPMcore) commits the layout and then
+asks the kernel to re-read the target disk's partition table (`BLKRRPART`). The kernel refuses with
+`EBUSY` while **any** partition on that disk is mounted — not just the ones being edited. On a
+playout box the bridge is `nvme0n1p3` (`LABEL=HIGHASCGDAT`, exFAT), i.e. a partition of the very
+disk the OS is installed onto:
+
+```
+/dev/nvme0n1p3 on /home/casparcg/bridge type exfat (rw,relatime,uid=1000,gid=1000,…)
+/dev/nvme0n1p3 on /home/casparcg/highascg/media/bridge type exfat (…)   ← bind of its media/ dir
+```
+
+Two mounts of the same device, and the second is a bind **inside** the first, so the parent cannot
+be released until the bind is.
+
+**Nothing was releasing them.** `tools/runtime/launch-calamares.sh` stops
+`casparcg-server` / `casparcg-scanner` / `highascg` (WO-423 — only the installer on the glass) and
+then launches Calamares. It never touched the WO-47/52 volumes. The mounts are also actively
+defended: `highascg-bridge-arrive.service` remounts on the udev event, so a hand `umount` during the
+install can be undone under the installer's feet.
+
+Prior art exists for the produce path only —
+`tools/eggs/live-usb/stop-and-unmount-wo47-for-eggs-produce.sh` does exactly this dance so stick and
+bridge content is not baked into `filesystem.squashfs`. The install path had no equivalent.
+
+## 2. What was done
+
+Inlined the release into `tools/runtime/launch-calamares.sh` rather than adding a new script.
+That is deliberate: the launcher is already installed to `/usr/local/bin` by
+`scripts/setup/13-caspar-systemd-units.sh` and already covered by the sudoers rule, so it reaches
+every ISO with no second deployment step to forget (cf. WO-471, where a boot script existed twice
+and patching only one copy would have been a no-op).
+
+- `release_bridge()` stops **and runtime-masks** `home-casparcg-bridge.mount`,
+  `home-casparcg-highascg-media-bridge.mount`, `highascg-bridge-arrive.service`,
+  `highascg-bridge-boot.service`, `highascg-bridge-media-prep.service` and
+  `highascg-exfat-sync.service`, then unmounts the media bind first and `~/bridge` second. The mask
+  is what stops udev remounting mid-install; `--runtime` means it evaporates on the reboot into the
+  freshly installed system, so nothing can be left masked permanently.
+- A busy mount is reported with `fuser -mv` before falling back to `umount -l`, and a still-mounted
+  path warns loudly rather than aborting — a warning still lets the operator try, and Calamares'
+  own error is the better teacher if it fails anyway.
+- Ordering: the release runs **after** the WO-423 service stops. `highascg.service` holds the media
+  root and the projects sync open, so releasing first would just hit EBUSY.
+- `restore_bridge()` unmasks and remounts, and is wired to `trap … EXIT INT TERM` so a cancelled or
+  crashed installer cannot leave the box without its media disk. Starting the media bind pulls the
+  prep service and the parent mount back in via its own `Requires=`.
+- The **exFAT operator stick is deliberately left mounted**: it is the live boot medium, not an
+  install target, and pulling it out from under the running installer would be its own bug. Asserted
+  in the gate so nobody "helpfully" adds it later.
+
+`tools/eggs/live-usb/verify-calamares-installed.sh` now also greps the **installed**
+`/usr/local/bin/launch-calamares.sh` for `release_bridge`, so an ISO built from an older copy is
+caught by the verifier instead of by a failed install.
+
+`docs/CALAMARES_INSTALL_TO_DISK.md` gained a troubleshooting row naming the symptom, plus the manual
+`systemctl stop` for anyone who starts Calamares by hand instead of through Settings → Install to
+disk.
+
+### Side finding — the boot sync reverted a live config edit mid-session
+
+WO-473's exclude was written to `config/exfat-sync.json` at 10:33 and was gone by the time the
+suite ran. The journal names the culprit: a stick insert at **11:04** fired the arrive chain, and
+`highascg-exfat-sync` ran `boot bridge-modular-config (bridge): volume → project only (copied=46)`
+— `bootPrefer: exfat` means the BRIDGE's `configs/` overwrites `config/` wholesale, with mtimes
+preserved (both files came back stamped 2026-07-02). This is intended behaviour (WO-415: config
+reset on stick insert is how a clean ISO stays clean), so the lesson is not "add a guard" but
+**where a config change has to land**: the committed repo copy (for fresh installs) AND the
+volumes' `configs/` copies (for this box). Both were re-applied, and the bridge's
+`audio_outputs.json` re-blanked. The stick was not mounted at the time of writing and still owes
+the same two edits on its next insert.
+
+## 3. What was verified
+
+- New gate `tools/smoke/smoke-calamares-releases-bridge.test.js` (registered in the curated `FILES`
+  list) asserts the fix **positionally**, since the ordering is the fix: stop services → release →
+  calamares → restore, plus the EXIT trap, both mount points in deepest-first order, the arrive unit
+  being stopped, runtime-only masking, and that the stick is untouched. 3/3 pass.
+- `bash -n tools/runtime/launch-calamares.sh` clean; full offline suite **1950 tests, 1948 pass,
+  0 fail, 2 skip**.
+- WO-423's ordering guard repointed: it searched for the first `systemctl start` anywhere, which is
+  now inside `restore_bridge()` (defined above the launch). It asserts on the playout restart loop
+  specifically — same intent, unambiguous anchor.
+- Unit names confirmed against this box's `systemctl list-unit-files`, and the media bind's
+  `Requires=${bridge_prep_svc} home-casparcg-bridge.mount` confirmed in
+  `scripts/exfat/install-exfat-units-bridge.sh` — that is what makes the restore a single
+  `systemctl start`.
+
+**Not verified live:** no install was run — that would wipe this box. The release/restore path is
+exercised for real only on the next reinstall. Owner QA: partitioning should now pass with
+HIGHASCGDAT present, and `~/bridge` + `~/highascg/media/bridge` must be mounted again after the
+installer closes (or after cancelling it).

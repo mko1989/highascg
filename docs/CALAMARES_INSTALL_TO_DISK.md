@@ -217,6 +217,7 @@ lsblk -o NAME,SIZE,FSTYPE,PARTTYPE,PARTFLAGS,MOUNTPOINT,MODEL,TRAN
 | **Legacy BIOS**, log shows `grub-install --target i386-pc` failed | ISO may lack **`grub-pc`** (older sticks). **Preferred:** disable **CSM**, boot USB in **UEFI**, **Erase disk**. **Permanent:** rebuild ISO after `install-grub-for-calamares-iso.sh` + `fix-calamares-shellprocess.sh`. |
 | **UEFI** boot | Need **fat32 ESP** mounted **`/boot/efi`** (flags **boot**, **esp**). Do **not** use `bios_grub` only. |
 | Bootloader installed to **USB stick** | Wrong disk — pick **Kingston / internal** in Calamares; `TRAN` must not be `usb`. |
+| Install fails and the **bridge partition** (`HIGHASCGDAT`) is on the target disk | The kernel refuses to re-read a partition table while any partition on that disk is mounted — even one you left untouched. `launch-calamares.sh` unmounts `~/bridge` and its media bind before starting the installer and remounts them after (**WO-475**). If you started Calamares by hand instead, release it first: `sudo systemctl stop home-casparcg-highascg-media-bridge.mount home-casparcg-bridge.mount`. |
 | Files copied but bootloader step failed | See **manual GRUB recovery** below. |
 
 On the live stick, apply Calamares patches (includes BIOS `grub-pc` install step):

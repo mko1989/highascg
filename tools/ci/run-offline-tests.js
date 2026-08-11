@@ -19,6 +19,7 @@ const FILES = [
 	'tools/smoke/smoke-media-browser-merge-folder-scope.test.js',
 	'tools/smoke/smoke-config-defaults-no-machine-audio.test.js',
 	'tools/smoke/smoke-fresh-box-clean-device-view.test.js',
+	'tools/smoke/smoke-calamares-releases-bridge.test.js',
 	'tools/smoke/smoke-project-fps-network.test.js',
 	'tools/smoke/smoke-edid-parse.test.js',
 	'tools/smoke/smoke-edid-preferred-mode.test.js',

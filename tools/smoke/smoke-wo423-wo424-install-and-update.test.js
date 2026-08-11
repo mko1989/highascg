@@ -38,7 +38,11 @@ test('WO-423: launcher stops the stack, restarts it after, and survives its own 
 	assert.ok(stopBlock.indexOf('CALAMARES_BIN') > 0, 'stop happens before the installer launches')
 	assert.match(src, /systemctl start/, 'stack restarts when the installer exits')
 	const launchAt = src.indexOf('"${CALAMARES_BIN}" -d')
-	const startAt = src.indexOf('systemctl start')
+	/* The PLAYOUT restart loop specifically. A bare `systemctl start` search would now hit
+	 * WO-475's restore_bridge() body, which is defined above the launch — the mounts it brings
+	 * back are a different concern from the stack coming up. */
+	const startAt = src.indexOf('for unit in highascg.service casparcg-server.service casparcg-scanner.service')
+	assert.ok(startAt > 0, 'the playout restart loop is still there')
 	assert.ok(launchAt > 0 && startAt > launchAt, 'restart comes after the installer run')
 
 	const modal = read('client/components/settings-modal.js')
