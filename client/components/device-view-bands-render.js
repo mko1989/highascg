@@ -339,7 +339,8 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 		},
 		onAddRecordOutput: async () => {
 			try {
-				const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : [{ id: 'rec_1', label: 'Rec1', enabled: true, name: 'Rec1', source: 'program_1', crf: 26 }];
+				/* WO-473: no phantom rec_1 — with zero outputs the first Add must create Rec1, not Rec2. */
+				const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : [];
 				const idx = cur.length + 1;
 				const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, name: `Rec${idx}`, source: 'program_1', crf: 26 }];
 				await Actions.saveSettingsPatch({ recordOutputs: next });

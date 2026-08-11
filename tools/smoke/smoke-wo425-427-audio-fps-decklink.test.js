@@ -18,17 +18,26 @@ const path = require('node:path')
 
 const ROOT = path.join(__dirname, '..', '..')
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8')
+const { readCommittedConfigSlice } = require('./lib/committed-config-slice')
+
+/* WO-473: config slices are judged AS STAGED, not as they sit in the working tree — this repo is
+ * checked out on live boxes whose own audio devices legitimately live in config/. Falls back to
+ * the file on a non-git install, where nothing can be committed anyway. */
+const readShipped = (rel) => {
+	const staged = readCommittedConfigSlice(ROOT, rel)
+	return staged.available ? staged.text : read(rel)
+}
 
 test('WO-425: no "USB headphones" anywhere; monitor entry is Audio 2 + role; factory ships none', () => {
 	for (const rel of ['config/audio_outputs.json', 'config/device_graph.json']) {
-		assert.ok(!read(rel).includes('USB headphones'), `${rel} carries no special headphone label`)
+		assert.ok(!readShipped(rel).includes('USB headphones'), `${rel} carries no special headphone label`)
 	}
 	/* WO-468 supersedes WO-425 here. WO-425 renamed the label but deliberately kept this box's
 	 * `sc60mon` monitor entry in the committed config; it then rode a stick to highascg7579, whose
 	 * Caspar threw "Failed to initialize audio device" for an alias that machine does not expose.
 	 * The committed slices now ship NO audio outputs — the operator adds "Audio N" and ticks
 	 * Monitor. See smoke-config-defaults-no-machine-audio.test.js for the standing gate. */
-	const outs = JSON.parse(read('config/audio_outputs.json'))
+	const outs = JSON.parse(readShipped('config/audio_outputs.json'))
 	assert.equal(outs.length, 0, 'committed config ships no audio outputs (WO-468)')
 	for (const o of outs) {
 		assert.match(String(o.label), /^Audio \d+$/, 'any shipped audio output keeps a generic Audio N label')

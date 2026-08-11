@@ -18,6 +18,7 @@ const fs = require('fs')
 const path = require('path')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
+const { readCommittedConfigSlice } = require('./lib/committed-config-slice')
 const CONFIG_DIR = path.join(REPO_ROOT, 'config')
 
 const { buildFactoryModularConfig } = require(path.join(REPO_ROOT, 'src/config/factory-starter'))
@@ -34,14 +35,17 @@ assert.ok(
 	'buildFactoryModularConfig must not emit any audio outputs',
 )
 
-const audioOutputsPath = path.join(CONFIG_DIR, 'audio_outputs.json')
-if (fs.existsSync(audioOutputsPath)) {
-	const parsed = JSON.parse(fs.readFileSync(audioOutputsPath, 'utf8'))
+/* WO-473: judged AS COMMITTED. config/ is simultaneously the factory default and the live config
+ * of the box this repo is checked out on, so reading the working tree failed forever on any box
+ * that had added its own outputs — a permanently red gate teaches everyone to ignore it. */
+const committedAudio = readCommittedConfigSlice(REPO_ROOT, 'config/audio_outputs.json')
+if (committedAudio.available) {
+	const parsed = JSON.parse(committedAudio.text)
 	assert.ok(Array.isArray(parsed), 'config/audio_outputs.json must be an array')
 	assert.strictEqual(
 		parsed.length,
 		0,
-		`config/audio_outputs.json must ship empty — found ${parsed.length} entr(y|ies): ` +
+		`config/audio_outputs.json must ship empty — HEAD carries ${parsed.length} entr(y|ies): ` +
 			`${parsed.map((e) => `${e && e.id}→${e && e.deviceName}`).join(', ')}. ` +
 			'Run `npm run config:write-defaults` before committing, or move the entry to machine-local config.',
 	)
@@ -53,13 +57,10 @@ if (fs.existsSync(audioOutputsPath)) {
 const offenders = []
 for (const ent of fs.readdirSync(CONFIG_DIR)) {
 	if (!ent.endsWith('.json')) continue
-	const full = path.join(CONFIG_DIR, ent)
-	let raw
-	try {
-		raw = fs.readFileSync(full, 'utf8')
-	} catch {
-		continue
-	}
+	/* Committed content again — a box may legitimately bind its own monitor device locally. */
+	const slice = readCommittedConfigSlice(REPO_ROOT, `config/${ent}`)
+	if (!slice.available) continue
+	const raw = slice.text
 	if (/"role"\s*:\s*"monitor"/.test(raw)) offenders.push(`${ent} (ships a role:"monitor" audio output)`)
 	/* Named ALSA/PortAudio aliases are per-machine by construction. sc60mon is the one that actually
 	 * shipped; the check names it so a re-commit fails loudly rather than silently reaching a box. */

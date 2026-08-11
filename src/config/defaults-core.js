@@ -249,21 +249,12 @@ function coreDefaults() {
 			httpPort: 4300,
 			bindAddress: '127.0.0.1',
 		},
-		recordOutputs: [
-			{
-				id: 'rec_1',
-				label: 'Rec1',
-				enabled: true,
-				name: 'Rec1',
-				source: 'program_1',
-				crf: 26,
-				videoCodec: 'h264',
-				videoBitrateKbps: 4500,
-				encoderPreset: 'veryfast',
-				audioCodec: 'aac',
-				audioBitrateKbps: 128,
-			},
-		],
+		/* WO-473: a fresh box and a New project start with NO record output, the same rule
+		 * WO-468/470 established for audio outputs — the operator adds "Rec N" in device view.
+		 * A shipped rec_1 is a recorder nobody asked for, pinned to program_1 on a box whose
+		 * outputs are not configured yet. Every `Array.isArray(x) ? x : [rec_1]` fallback that
+		 * used to re-materialise it was changed to `[]` in the same pass. */
+		recordOutputs: [],
 		screenDestinations: {
 			version: 1,
 			edidNotes: '',

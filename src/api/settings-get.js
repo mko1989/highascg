@@ -108,19 +108,8 @@ async function handleGet(path, ctx) {
 				const st = streamCredentials[id] || {}
 				return { ...o, rtmpServerUrl: st.rtmpServerUrl || String(o?.rtmpServerUrl || ''), streamKey: '', hasStreamKey: !!st.hasStreamKey }
 			}),
-			recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : [{
-				id: 'rec_1',
-				label: 'Rec1',
-				enabled: true,
-				name: 'Rec1',
-				source: 'program_1',
-				crf: 26,
-				videoCodec: 'h264',
-				videoBitrateKbps: 4500,
-				encoderPreset: 'veryfast',
-				audioCodec: 'aac',
-				audioBitrateKbps: 128,
-			}],
+			/* WO-473: no implicit rec_1 — a fresh box ships zero record outputs (defaults-core). */
+			recordOutputs: Array.isArray(cfg.recordOutputs) ? cfg.recordOutputs : [],
 			audioOutputs: Array.isArray(cfg.audioOutputs) && cfg.audioOutputs.length ? cfg.audioOutputs : [],
 			machineProfile: {
 				defaultProjectFps: resolveProjectFps(cfg),

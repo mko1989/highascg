@@ -272,9 +272,11 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 			},
 		})
 	}
+	/* WO-473: suggest a record_out connector only for record outputs that actually exist — a fresh
+	 * box has none, and the old fallback drew a rec_1 band in device view before one was added. */
 	const recordOutputsRaw = appConfig && Array.isArray(appConfig.recordOutputs)
 		? appConfig.recordOutputs
-		: [{ id: 'rec_1', label: 'Rec1', enabled: true, name: 'Rec1', source: 'program_1', crf: 26 }]
+		: []
 	for (let i = 0; i < recordOutputsRaw.length; i++) {
 		const ro = recordOutputsRaw[i] || {}
 		const id = String(ro.id || `rec_${i + 1}`).trim() || `rec_${i + 1}`

@@ -31,10 +31,13 @@ describe('device-graph suggester honours empty output arrays (WO-393)', () => {
 		assert.deepEqual(connectors.filter((c) => c.kind === 'record_out'), [])
 	})
 
-	it('still seeds one default of each when the keys are absent (fresh/legacy config)', () => {
+	/* WO-473 narrows WO-393's "key absent → seed one default": that still holds for stream outputs,
+	 * but NOT for record outputs. A fresh box now ships `recordOutputs: []` and must show no Rec
+	 * band until the operator adds one — the phantom rec_1 was reaching fresh installs. */
+	it('seeds a default stream output when the key is absent, but never a record output', () => {
 		const { connectors } = suggestConnectorsAndDevicesFromLive(LIVE, {})
 		assert.equal(connectors.filter((c) => c.kind === 'stream_out').length, 1)
-		assert.equal(connectors.filter((c) => c.kind === 'record_out').length, 1)
+		assert.equal(connectors.filter((c) => c.kind === 'record_out').length, 0)
 	})
 })
 
@@ -43,7 +46,8 @@ describe('settings GET does not resurrect phantom outputs (WO-393)', () => {
 
 	it('stream/record output arrays are passed through without a length re-seed', () => {
 		assert.match(src, /streamOutputs: \(Array\.isArray\(cfg\.streamOutputs\) \? cfg\.streamOutputs : \[\{/)
-		assert.match(src, /recordOutputs: Array\.isArray\(cfg\.recordOutputs\) \? cfg\.recordOutputs : \[\{/)
+		/* WO-473: the record fallback is now `[]`, not a literal rec_1 — see the note above. */
+		assert.match(src, /recordOutputs: Array\.isArray\(cfg\.recordOutputs\) \? cfg\.recordOutputs : \[\]/)
 		assert.doesNotMatch(
 			src,
 			/(streamOutputs|recordOutputs)\.length \?/,

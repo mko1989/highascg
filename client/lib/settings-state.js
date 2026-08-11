@@ -80,19 +80,9 @@ export const settingsState = {
 			previewSystemAudioEnabled: [false, false, false, false],
 			previewSystemAudioDevices: ['', '', '', ''],
 		},
-		recordOutputs: [{
-			id: 'rec_1',
-			label: 'Rec1',
-			enabled: true,
-			name: 'Rec1',
-			source: 'program_1',
-			crf: 26,
-			videoCodec: 'h264',
-			videoBitrateKbps: 4500,
-			encoderPreset: 'veryfast',
-			audioCodec: 'aac',
-			audioBitrateKbps: 128,
-		}],
+		/* WO-473: the GUI must not invent a record output before the server answers — a fresh box
+		 * has none, and this seed rendered a "Rec1" row the operator never created. */
+		recordOutputs: [],
 	},
 	listeners: new Set(),
 
