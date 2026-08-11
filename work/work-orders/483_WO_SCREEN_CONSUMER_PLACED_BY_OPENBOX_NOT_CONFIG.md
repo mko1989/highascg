@@ -1,7 +1,7 @@
 # WO-483 — PGM2's screen consumer is placed by Openbox, not by its config
 
-**Status: OPEN (11.08.2026 — root cause proven on the box; the fix branches on one measurement the
-owner still has to take)**
+**Status: DONE (11.08.2026 — measurement taken on the dev box: the move STICKS, so the fix is the
+placement pass; implemented, wired to caspar-connect, and verified live on a real misplaced window)**
 
 ## 1. Investigation
 
@@ -73,3 +73,36 @@ settles it in one run.
 
 **Immediate workaround** (survives until the next Caspar restart):
 `DISPLAY=:0 xdotool windowmove $(xdotool search --name 'Screen consumer \[3\|' | head -1) 6144 0`
+
+
+## 4. Measurement and fix (11.08, dev box)
+
+The rig moved to the dev machine and reproduced immediately — same arithmetic, different monitors:
+
+```
+canvas 9984x1536   DP-0 +0+0  DP-2 +3072+0  DP-4 +6144+0  DP-6 +8064+0
+ch1 6144x1536  want 0,0     at 0,0        OK (Smart cannot centre it — falls back to top-left)
+ch3 1080p5000  want 6144,0  at 4032,228   MISPLACED = ((9984-1920)/2, (1536-1080)/2)
+ch4 1080p5000  want 8064,0  at 8064,0     OK (highascg places the operator GUI itself, WO-279)
+```
+
+`xdotool windowmove 0x120000e 6144 0` → the window **stayed**. So Openbox interferes at placement
+time only; no `rc.xml` rule is needed and no fight with the WM either.
+
+`src/system/screen-consumer-placement.js` reads the per-channel `<x>/<y>` out of the generated
+`casparcg.config` — that file IS what Caspar was told, so the pass cannot drift from the generator —
+finds each window by its title, and moves only the ones that are wrong.
+`caspar-info-ready.js` runs it on every Caspar connect, after a settle and once more at 4s, because
+the windows appear a moment after AMCP does.
+
+Verified live, not just in tests: ch3 was pushed back to 4032,228 by hand and the pass corrected it
+while leaving ch1 and ch4 untouched —
+
+```
+[Screen placement] ch 3: 4032,228 → 6144,0 (WM placed it elsewhere)
+[Screen placement] moved=1 already-correct=2 no-window=0
+```
+
+Smoke `smoke-screen-consumer-placement.test.js` (6/6) covers the parser, the escaped title pattern
+(an unescaped `|` matches every window — a diagnostic earlier in this session hit exactly that), the
+move-only-the-wrong-one behaviour, the not-yet-mapped and missing-config cases, and the wiring.

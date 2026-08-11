@@ -44,6 +44,27 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 					appCtx.log('warn', 'Look thumb warm: ' + (e?.message || e))
 				})
 			})
+		/* WO-483: a Caspar restart spawns brand-new consumer windows, and Openbox places them by its
+		 * own policy — a PGM consumer that should sit at 6144,0 was parked centre-canvas while its
+		 * monitor stayed blank. Put each one where the generated config says. Delayed and retried
+		 * once because the windows appear a moment after AMCP does; a plain windowmove sticks
+		 * (measured), so no fight with the WM is needed. */
+		void (async () => {
+			try {
+				const { placeScreenConsumers } = require('../system/screen-consumer-placement')
+				for (const waitMs of [1500, 4000]) {
+					await new Promise((r) => setTimeout(r, waitMs))
+					const res = await placeScreenConsumers({
+						config: appCtx.config,
+						log: (level, msg) => appCtx.log(level, msg),
+					})
+					if (res.missing === 0) break
+				}
+			} catch (e) {
+				appCtx.log('debug', `[Screen placement] ${e?.message || e}`)
+			}
+		})()
+
 		// WO-207 T207.3: startup/reconnect sweep for orphaned template CG hosts (band 700-789)
 		// WO-210 T210.4: restore screen timers (band 980-989)
 		void (async () => {
