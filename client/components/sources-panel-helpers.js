@@ -271,10 +271,24 @@ function preferMergedMediaId(prev, next, prevIsDir, nextIsDir) {
 	return b.length >= a.length ? b : a
 }
 
+/**
+ * Merge key for one catalog row — the client-side mirror of `canonicalMediaRowKey`
+ * (src/utils/media-browser-dedupe.js). Files key on the canonical basename SCOPED TO THEIR FOLDER.
+ *
+ * `normalizeMediaIdForMatch` deliberately drops the directory (findMediaRow resolves a layer value
+ * that carries a bare clip name), so keying files on it alone merged `exfat/TALK2.mp4` into
+ * `bridge/TALK2.mp4` — and preferMergedMediaId's length tie-break keeps the longer `bridge/` id,
+ * every time, because `bridge/` is one character longer than `exfat/`. WO-469 fixed the same bug
+ * server-side; this overlay ran after it and swallowed the exfat rows again, so the folder stayed
+ * on screen and looked empty. The directory is lowercased so the intended merge still happens
+ * inside a folder: WS `BRIDGE/TALK2` (CLS: uppercase, no extension) folds onto `bridge/TALK2.mp4`.
+ */
 function mediaCatalogMergeKey(item) {
-	const raw = String(item.id ?? item).replace(/\\/g, '/')
+	const raw = String(item.id ?? item).replace(/\\/g, '/').replace(/\/+/g, '/')
 	if (item.isDir) return `dir:${normalizeMediaPathKey(raw)}`
-	return `file:${normalizeMediaIdForMatch(raw)}`
+	const cut = raw.lastIndexOf('/')
+	const dir = cut >= 0 ? raw.slice(0, cut + 1).toLowerCase() : ''
+	return `file:${dir}${normalizeMediaIdForMatch(raw)}`
 }
 
 /**
