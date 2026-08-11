@@ -21,6 +21,7 @@ const FILES = [
 	'tools/smoke/smoke-fresh-box-clean-device-view.test.js',
 	'tools/smoke/smoke-calamares-releases-bridge.test.js',
 	'tools/smoke/smoke-osc-info-supplement-gate.test.js',
+	'tools/smoke/smoke-cg-orphan-sweep-occupied-only.test.js',
 	'tools/smoke/smoke-project-fps-network.test.js',
 	'tools/smoke/smoke-edid-parse.test.js',
 	'tools/smoke/smoke-edid-preferred-mode.test.js',

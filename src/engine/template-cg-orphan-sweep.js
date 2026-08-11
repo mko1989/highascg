@@ -42,12 +42,42 @@ async function sweepTemplateCgOrphansOnCasparConnected(opts) {
 		}
 	}
 
-	// Clear hosts 700-789 not declared by the restored live look
+	/* WO-482: clear only hosts that are actually OCCUPIED and undeclared.
+	 *
+	 * The band is 90 hosts per program channel, so the blanket form emitted ~186 `CG n-m CLEAR`
+	 * lines on every startup and every Caspar reconnect — on a box with nothing on those layers,
+	 * 186 commands to clear 186 empty layers. Batched (below), so it is 3 round-trips rather than
+	 * 186, but Caspar logs each line and the owner rightly asked what all of it was for.
+	 *
+	 * The connect gather has already run INFO on each channel, and
+	 * `parseLayerFgProducerTypesFromChannelXml` turns that into layer → producer type — the same
+	 * source WO-268 uses to decide whether a quarantined host survived. A host with an empty (or
+	 * absent) producer needs no CLEAR. On a clean channel that is zero commands.
+	 *
+	 * Fallback is deliberate: with no XML for a channel (INFO not gathered yet, parse failure) the
+	 * old blanket sweep runs for that channel. An orphan left on air is worse than a redundant
+	 * clear, so uncertainty must fail toward sweeping. */
+	const { parseLayerFgProducerTypesFromChannelXml } = require('../state/live-scene-reconcile')
+	const channelXml = opts?.channelXml || {}
+	let sweptBlind = 0
 	for (const ch of channels) {
+		let types = null
+		const xml = channelXml[String(ch)]
+		if (xml && String(xml).trim()) {
+			try {
+				types = await parseLayerFgProducerTypesFromChannelXml(xml)
+			} catch {
+				types = null
+			}
+		}
+		if (!types) sweptBlind++
 		for (let host = 700; host <= 789; host++) {
 			const key = `${ch}-${host}`
 			if (declaredHosts.has(key)) continue
-			// This host is not declared — clear it
+			if (types) {
+				const t = String(types[String(host)] || '')
+				if (!t || t === 'empty') continue
+			}
 			clearLines.push(`CG ${ch}-${host} CLEAR`)
 		}
 	}
@@ -74,7 +104,8 @@ async function sweepTemplateCgOrphansOnCasparConnected(opts) {
 	if (typeof log === 'function') {
 		log(
 			'info',
-			`[template-cg-orphan-sweep] ch=${channels.join(',')} cleared=${clearedCount} declared=${declaredHosts.size}`,
+			`[template-cg-orphan-sweep] ch=${channels.join(',')} cleared=${clearedCount} declared=${declaredHosts.size}` +
+				(sweptBlind ? ` (no INFO xml for ${sweptBlind} channel(s) — full band swept there)` : ''),
 		)
 	}
 

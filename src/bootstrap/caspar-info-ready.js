@@ -58,6 +58,8 @@ function createOnAfterInfoConfigReady({ appCtx, config, getChannelMap, handleCas
 				await sweepTemplateCgOrphansOnCasparConnected({
 					amcp: appCtx.amcp,
 					liveState: liveSceneState.getAll(),
+					/* WO-482: the connect gather's INFO XML — lets the sweep clear only occupied hosts. */
+					channelXml: appCtx.gatheredInfo?.channelXml || {},
 					channels: programChannels,
 					log: (level, msg) => appCtx.log(level, msg),
 				})
