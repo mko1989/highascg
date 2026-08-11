@@ -16,6 +16,9 @@ const path = require('node:path')
 
 const ROOT = path.join(__dirname, '..', '..')
 const SRC = fs.readFileSync(path.join(ROOT, 'tools/runtime/launch-calamares.sh'), 'utf8')
+const PREFLIGHT = fs.readFileSync(path.join(ROOT, 'tools/eggs/live-usb/pre-produce-preflight.sh'), 'utf8')
+const SHELLPROC = fs.readFileSync(path.join(ROOT, 'tools/eggs/live-usb/fix-calamares-shellprocess.sh'), 'utf8')
+const VERIFY = fs.readFileSync(path.join(ROOT, 'tools/eggs/live-usb/verify-calamares-installed.sh'), 'utf8')
 
 test('WO-475: the launcher releases the bridge before Calamares and restores it after', () => {
 	/* WO-481 added a `--release-bridge` early-exit mode (Calamares' own shellprocess step calls it),
@@ -86,4 +89,39 @@ test('WO-475: the exFAT operator stick is left mounted — it is the live boot m
 		!/home-casparcg-exfat\.mount|\/home\/casparcg\/exfat/.test(release),
 		'unmounting the live stick would pull the installer\'s own medium out from under it',
 	)
+})
+
+test('WO-481: a produce cannot bake a stale launcher into the squashfs', () => {
+	/* The image clones the LIVE filesystem, so /usr/local/bin is what ships — editing the repo
+	 * alone is how WO-475 reached nobody. The preflight refreshes the installed copy at the last
+	 * point before the clone. */
+	assert.match(
+		PREFLIGHT,
+		/install -m 0755 "\$REPO_LAUNCHER" \/usr\/local\/bin\/launch-calamares\.sh/,
+		'preflight must refresh /usr/local/bin/launch-calamares.sh from the repo',
+	)
+	assert.ok(
+		PREFLIGHT.indexOf('REPO_LAUNCHER') < PREFLIGHT.indexOf('verify-calamares-installed.sh'),
+		'the refresh must happen before the verifier that checks it',
+	)
+	assert.match(
+		VERIFY,
+		/grep -q -- '--release-bridge'/,
+		'the verifier must check the FLAG — a WO-475-era launcher has the function but not the mode',
+	)
+})
+
+test('WO-481: the Calamares step never triggers a full launch from inside Calamares', () => {
+	const step = SHELLPROC.slice(SHELLPROC.indexOf('shellprocess@release_bridge.conf'))
+	assert.match(
+		step,
+		/grep -q -- "--release-bridge" \/usr\/local\/bin\/launch-calamares\.sh/,
+		'the step must confirm the launcher understands the flag before calling it',
+	)
+	assert.match(
+		SHELLPROC,
+		/shellprocess@release_bridge/,
+		'the module is scheduled into the exec sequence',
+	)
+	assert.match(SHELLPROC, /dontChroot: true/, 'the release runs on the live system, not in the chroot')
 })

@@ -150,3 +150,25 @@ Verified: `bash -n` clean; the awk insertion dry-run against this box's real
 that it exits before the re-exec; WO-423's ordering guard repointed to the playout stop loop, since
 `release_bridge()`'s definition now legitimately precedes the re-exec. Offline suite **1958 tests,
 1956 pass, 0 fail, 2 skip**.
+
+### WO-481 addendum — closing the produce hole (owner: *"do i need to run anything else before producing new eggs?"*)
+
+Checking what a produce actually runs turned up two more traps:
+
+1. **`eggs produce` images the LIVE filesystem**, so `/usr/local/bin/launch-calamares.sh` is what
+   ships — never the repo copy. Nothing in `build-highascg-egg.sh` refreshed it, which is precisely
+   how WO-475 shipped an ISO with the old launcher. `pre-produce-preflight.sh` (already called by
+   the build) now installs the repo copy over it, immediately before `fix-calamares-shellprocess.sh`
+   and the verifier, i.e. the last point before the squashfs clone.
+2. **A launcher predating WO-481 does not recognise `--release-bridge`** — it would fall past the
+   flag check into the FULL launch path: stop playout, wait for X, start a second Calamares from
+   inside the first one's shellprocess step. The module's command now greps the launcher for the
+   flag before calling it, and `verify-calamares-installed.sh` checks for the flag rather than the
+   function name (a WO-475-era launcher has the function but not the mode, so the old check passed
+   on exactly the file that would misbehave).
+
+Everything else a produce needs was already automatic: `pre-produce-preflight.sh` runs
+`stop-and-unmount-wo47-for-eggs-produce.sh` (bridge + stick stopped, runtime-masked and unmounted —
+a hand `umount` does not survive, the arrive unit remounts) and `fix-calamares-shellprocess.sh`
+(which now also writes `shellprocess@release_bridge.conf` and schedules it), then
+`verify-calamares-installed.sh` gates the lot.

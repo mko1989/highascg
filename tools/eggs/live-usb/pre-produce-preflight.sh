@@ -40,6 +40,23 @@ if [[ "${SKIP_STRIP_HOST_SWAP:-0}" != "1" ]]; then
 	bash "${HERE}/strip-host-swap-for-live-iso.sh" prepare
 fi
 
+# WO-481: the squashfs clones the LIVE filesystem, so what ships is /usr/local/bin, never the repo.
+# WO-475 shipped an ISO whose launcher still had no bridge release for exactly this reason: the
+# repo copy was fixed and the installed copy — the one the sudoers rule and the GUI button call —
+# was months old. Refresh it here, the last place before the clone, so a produce cannot bake a
+# stale launcher again.
+REPO_LAUNCHER="$(cd "${HERE}/../../.." && pwd)/tools/runtime/launch-calamares.sh"
+if [[ -f "$REPO_LAUNCHER" ]]; then
+	if cmp -s "$REPO_LAUNCHER" /usr/local/bin/launch-calamares.sh; then
+		echo "==> /usr/local/bin/launch-calamares.sh already matches the repo"
+	else
+		install -m 0755 "$REPO_LAUNCHER" /usr/local/bin/launch-calamares.sh
+		echo "==> refreshed /usr/local/bin/launch-calamares.sh from the repo (WO-481)"
+	fi
+else
+	echo "WARN: ${REPO_LAUNCHER} missing — cannot refresh the installed launcher" >&2
+fi
+
 echo "==> Calamares shellprocess fixes (last chance before squashfs clone — avoids install exit 127)"
 echo "     note: eggs produce regenerates /etc/calamares; patch-iso-squashfs-calamares.sh runs after produce"
 bash "${HERE}/fix-calamares-shellprocess.sh"

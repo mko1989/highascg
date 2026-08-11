@@ -91,10 +91,12 @@ if [[ -x /usr/local/bin/launch-calamares.sh ]]; then
 	ok "launcher /usr/local/bin/launch-calamares.sh"
 	# WO-475: an ISO built before the bridge release still carries the old launcher, and the
 	# install then dies on "partition table could not be re-read" with HIGHASCGDAT mounted.
-	if grep -q 'release_bridge' /usr/local/bin/launch-calamares.sh; then
-		ok "launcher releases the bridge partition before Calamares (WO-475)"
+	# WO-481: check the FLAG, not the function name — Calamares' shellprocess@release_bridge step
+	# invokes `--release-bridge`, and a WO-475-era launcher has the function but not the mode.
+	if grep -q -- '--release-bridge' /usr/local/bin/launch-calamares.sh; then
+		ok "launcher releases the bridge partition, standalone mode included (WO-475/481)"
 	else
-		fail "installed launcher predates WO-475 (no bridge release) — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"
+		fail "installed launcher predates WO-481 (no --release-bridge) — sudo install -m 0755 ${REPO_ROOT}/tools/runtime/launch-calamares.sh /usr/local/bin/launch-calamares.sh"
 	fi
 else
 	fail "missing /usr/local/bin/launch-calamares.sh — sudo bash ${REPO_ROOT}/scripts/setup/13-caspar-systemd-units.sh"

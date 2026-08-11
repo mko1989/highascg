@@ -65,7 +65,10 @@ message: Releasing the bridge data partition...
 dontChroot: true
 timeout: 60
 script:
-  - /bin/bash -c '[ -x /usr/local/bin/launch-calamares.sh ] && /usr/local/bin/launch-calamares.sh --release-bridge || true'
+  # The flag check is not decoration: a launcher predating WO-481 does not recognise
+  # --release-bridge and would fall through to its FULL launch path — stopping playout and
+  # starting a second Calamares from inside this one. Only call it when it understands us.
+  - /bin/bash -c 'grep -q -- "--release-bridge" /usr/local/bin/launch-calamares.sh 2>/dev/null && /usr/local/bin/launch-calamares.sh --release-bridge || true'
 EOF
 
 cat >"${MOD}/shellprocess@boot_deploy.conf" <<'EOF'
