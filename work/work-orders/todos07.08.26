@@ -5,3 +5,5 @@ check and fix the stand alone client/simulator, it wasnt updated for a long time
 also check the flashing/partitioning guides for mac and windows.
 cg studio was implemented as a module in simulator but since its added to the the main highascg it should also be the same for the simulator.
 
+when trying to run an update on an installed system (second machine from this one) i got phase: error eacces permision denied mkdir /var/cache/highascg/updates
+error: eacces permision denied mkdir /var/cache/highascg/updates

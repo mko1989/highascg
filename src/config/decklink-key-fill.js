@@ -37,13 +37,36 @@ function decklinkRequiresYuvPixelFormat(videoMode) {
 }
 
 /**
- * 1080p and below: Caspar default (RGBA). 2160p/UHD: required YUV on many DeckLink devices.
- * @param {string} [videoMode]
+ * WO-487: whether to WRITE a `<pixel-format>` at all.
+ *
+ * Caspar already picks correctly on its own — `config.cpp:124`:
+ * `default_pixel_format = is_8bit ? L"rgba" : L"yuv"`. The choice belongs to the CHANNEL'S BIT
+ * DEPTH, not to the resolution: on an ordinary 8-bit channel the native path is rgba (Caspar's
+ * frames are already RGBA), and forcing yuv buys a per-frame RGBA→YUV conversion on every card.
+ * At 2160p50 x2 that is a large, permanent cost on the consumer that owns the channel's
+ * synchronization clock.
+ *
+ * The old rule fired on resolution alone, so it only ever applied to UHD rigs — every proven
+ * 1080p50 setup (see `config/casparcg copy.config`) has no `<pixel-format>` element at all, which
+ * is why this cost went unnoticed. Emit it only when the operator asks for it explicitly.
+ * @param {Record<string, unknown>|null|undefined} consumerSettings
+ * @returns {'yuv'|'rgba'|''} '' = omit the element and let Caspar choose
+ */
+function resolveDecklinkPixelFormatOverride(consumerSettings) {
+	const raw = String(consumerSettings?.pixelFormat ?? '').trim().toLowerCase()
+	return raw === 'yuv' || raw === 'rgba' ? raw : ''
+}
+
+/**
+ * The `<pixel-format>` element, or '' to let Caspar apply its own bit-depth default (WO-487).
+ * @param {string} [videoMode] - kept for callers; the decision is the operator's override only
+ * @param {Record<string, unknown>} [consumerSettings]
  * @returns {string}
  */
-function decklinkPixelFormatXml(videoMode) {
-	if (!decklinkRequiresYuvPixelFormat(videoMode)) return ''
-	return `\n                    <pixel-format>yuv</pixel-format>`
+function decklinkPixelFormatXml(videoMode, consumerSettings) {
+	const override = resolveDecklinkPixelFormatOverride(consumerSettings)
+	if (!override) return ''
+	return `\n                    <pixel-format>${override}</pixel-format>`
 }
 
 /**
@@ -314,6 +337,7 @@ module.exports = {
 	resolveDecklinkConsumerKeyer,
 	decklinkPixelFormatXml,
 	decklinkRequiresYuvPixelFormat,
+	resolveDecklinkPixelFormatOverride,
 	FILL_ONLY_KEYER,
 	DEFAULT_DECKLINK_CONSUMER_SETTINGS,
 	DECKLINK_BUFFER_DEPTH_MIN,

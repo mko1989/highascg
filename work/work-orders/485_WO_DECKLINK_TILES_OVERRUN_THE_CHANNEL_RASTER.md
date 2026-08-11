@@ -1,7 +1,7 @@
 # WO-485/486 — DeckLink subregions were cut from the SDI mode, not the channel raster
 
-**Status: DONE (11.08.2026, verified: new smoke 5/5 reproducing the box's exact geometry, suite
-1977/1975 pass/0 fail/2 skip) — owner QA: re-apply the config on .28 and re-measure PGM1**
+**Status: DEPRECATED (11.08.2026 — the diagnosis was WRONG and the change is reverted; see §4.
+The operator-GUI half survives as WO-486. Successor lead: WO-487, the forced YUV pixel format.)**
 
 ## 1. Investigation
 
@@ -87,3 +87,37 @@ change only on Apply), then play the timer clip on PGM1. Expected `<subregion>` 
 **Still open on this thread:** whether 2160p5000 is even the right per-card mode once each card is
 fed a 3072x1536 region — a mode nearer the region size would avoid the conversion the log reports
 (`Device supports video-format with conversion: 1080p50`). That is a rig decision, not a code one.
+
+
+## 4. Why this was wrong — reverted
+
+Owner: *"decklink sdi can only use standard video modes. thats a standard way of mapping to have
+larger sdi output and just put the actual video frames where they appear, leaving the rest blank.
+the blank parts are moot … search the repo for a doc with correct decklink subregions config."*
+
+That doc is `config/casparcg copy.config`, a rig the owner built and tested. It settles it:
+
+```
+channel raster 5120x1024, four cards @ 1080p5000
+  region src-x    0  w 1920  -> ends 1920
+  region src-x 1920  w 1920  -> ends 3840
+  region src-x 3840  w 1920  -> ends 5760   <-- 640px PAST the 5120 raster
+```
+
+**The proven config overruns the raster too, and runs at full speed.** The pattern is deliberate:
+each region is the size of the card's standard SDI frame, packed by that width; the video lands
+where it lands and the remainder of the frame is blank. `.28` follows exactly the same pattern
+(3840-wide regions from a 6144 canvas at 2160p50) — it is not malformed.
+
+So the overrun is not the fault, and WO-485's change was worse than useless: sizing tiles from the
+raster would have fed non-standard dimensions into `resolveDecklinkTileVideoMode`, and a DeckLink
+SDI output can only take a **standard** mode. Reverted in full (`pixel-mapping-config.js` restored,
+smoke deleted).
+
+**What I should have done:** read the reference config first. The owner said from the start that
+this class of setup was built and tested; the repo held the proof, and I reasoned from arithmetic
+instead of looking. The geometry "looked wrong" only because I had no baseline for what right
+looks like.
+
+**Surviving from this WO:** the operator-GUI default (now WO-486) — unrelated to the DeckLink path
+and still correct.
