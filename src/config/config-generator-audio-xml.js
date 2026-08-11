@@ -323,8 +323,13 @@ function buildCustomLiveRootXml(config) {
         <device-name/>
     </system-audio>`)
 	}
+	/* WO-488: `<= 1` also caught ZERO. A box with no audio outputs configured still got a root
+	 * `<portaudio>` block, so Caspar opened a PortAudio device nobody asked for — on a machine whose
+	 * audio outputs are all removed that is a device open (and its failure paths) for nothing.
+	 * The root block exists to hold the settings of THE single global consumer, so it needs that
+	 * consumer to exist: exactly 1, not "at most 1". */
 	const globalPa = config.caspar_global_portaudio === true || config.caspar_global_portaudio === 'true'
-	if (globalPa && countPortAudioConsumers(config) <= 1) {
+	if (globalPa && countPortAudioConsumers(config) === 1) {
 		const inner = buildGlobalPortAudioInnerXml(config)
 		parts.push(`    <portaudio>${inner}\n    </portaudio>`)
 	}
