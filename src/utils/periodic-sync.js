@@ -14,6 +14,7 @@ const { responseToStr, updateChannelVariablesFromXml } = require('./query-cycle'
 const handlers = require('./handlers')
 const { ensureLocalThumbnailCacheForMediaIds } = require('../media/local-media-ffmpeg')
 const { broadcastTemplateCatalog, broadcastMediaCatalogCounts } = require('./media-catalog-broadcast')
+const { shouldSendOscInfoSupplement, resetOscInfoSupplementGate } = require('./periodic-sync-osc-info-gate')
 
 const CHANNELS_BLOB_DEBOUNCE_MS = Math.max(
 	0,
@@ -135,6 +136,7 @@ function clearPeriodicSyncTimer(self) {
  * The new binary needs this for clip durations to appear in multiview/timer bars (WO-252).
  */
 function clearOscPlaybackInfoSupplement() {
+	resetOscInfoSupplementGate()
 	if (oscPlaybackInfoTimer) {
 		clearInterval(oscPlaybackInfoTimer)
 		oscPlaybackInfoTimer = null
@@ -177,7 +179,11 @@ async function runOscPlaybackInfoSupplementOnce(self) {
 	if (!playbackTracker.isOscPlaybackActive(self)) return
 	if (_infoSupplementInFlight) return
 	if (Date.now() < _infoSupplementBackoffUntil) return
-	const channels = pickInfoChannelsThisTick(self, getProgramChannelsForOscInfo(self))
+	/* WO-477: only channels whose clip actually CHANGED — the duration this supplement exists to
+	 * fetch belongs to the clip, so a fixed heartbeat re-asked the same question forever. */
+	const channels = pickInfoChannelsThisTick(self, getProgramChannelsForOscInfo(self)).filter((ch) =>
+		shouldSendOscInfoSupplement(self, ch),
+	)
 	if (channels.length === 0) return
 	_infoSupplementInFlight = true
 	try {

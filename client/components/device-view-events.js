@@ -93,7 +93,20 @@ export function attachDeviceViewEvents(ctx) {
 				return ctx.load({ forceRefresh: true })
 			},
 		})
-	window.onresize = rafThrottle(() => renderCableOverlay(ctx.getCOCtx()))
+	/* WO-478: `window.onresize` misses every layout change that moves connectors without changing
+	 * the window — dragging the inspector splitter, collapsing a panel, bands reflowing. The cable
+	 * ends then stay where they were last drawn while their ports have moved away. Observe the
+	 * surface and the external inspector host so geometry changes redraw the ropes too. Same
+	 * rafThrottle: a resize drag must not re-run the Verlet simulation per pointer event (WO-313). */
+	const relayoutCables = rafThrottle(() => renderCableOverlay(ctx.getCOCtx()))
+	window.onresize = relayoutCables
+	if (typeof ResizeObserver === 'function') {
+		const cableResizeObserver = new ResizeObserver(relayoutCables)
+		for (const el of [wrap, ctx.gHost]) {
+			if (el) cableResizeObserver.observe(el)
+		}
+		ctx.cableResizeObserver = cableResizeObserver
+	}
 	clearCableBtn.onclick = () => {
 		const wasRegrab = !!state.cableRegrab
 		ctx.clearCableGesture()

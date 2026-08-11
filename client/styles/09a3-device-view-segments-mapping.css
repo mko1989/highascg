@@ -18,6 +18,12 @@
 	font-family: monospace !important;
 }
 .device-view__destinations-type {
+	/* WO-479: a dropdown must fill its field, not size itself to the longest option — the DeckLink
+	 * inspector's single-column fields otherwise left selects at intrinsic width and clipped
+	 * values like `3072x1536p50`. */
+	width: 100%;
+	max-width: 100%;
+	box-sizing: border-box;
 	min-height: 30px;
 	padding: 4px 8px;
 	border-radius: 6px;

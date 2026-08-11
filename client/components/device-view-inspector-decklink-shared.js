@@ -64,3 +64,22 @@ export function decklinkMergedConnectors(lastPayload) {
 	const deckOut = sug.filter((c) => c && c.deviceId === CASPAR_HOST && c.kind === 'decklink_out')
 	return [...deckIo, ...deckOut].filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
 }
+
+/**
+ * Cables landing on this connector, either end.
+ *
+ * WO-479: the "Unassigned SDI port" note keyed on `caspar.ioDirection`, which nothing sets when you
+ * draw a cable — the suggester derives it from the APPLIED config (`screen_N_decklink_device`,
+ * `decklink_input_N_direction`). So a port with a mapping-node output patched into it still read
+ * "Unassigned SDI port. Cable a screen destination here…" while the cable was on screen.
+ * Counting edges tells the operator what they can see: this port is wired.
+ * @param {object|null|undefined} lastPayload
+ * @param {string} connectorId
+ * @returns {number}
+ */
+export function connectorCableCount(lastPayload, connectorId) {
+	const id = String(connectorId || '')
+	if (!id) return 0
+	const edges = Array.isArray(lastPayload?.graph?.edges) ? lastPayload.graph.edges : []
+	return edges.filter((e) => String(e?.sinkId || '') === id || String(e?.sourceId || '') === id).length
+}

@@ -6,13 +6,14 @@ import { renderDecklinkInputSection } from './device-view-inspector-decklink-inp
 import {
 	appendDecklinkSectionHeading,
 	appendDecklinkSectionNote,
+	connectorCableCount,
 } from './device-view-inspector-decklink-shared.js'
 import {
 	renderDecklinkConsumerSettingsControls,
 	renderDecklinkKeyFillControls,
 	renderDecklinkOutputInheritControls,
-	renderDecklinkRearOrderEditor,
 } from './device-view-inspector-decklink-output.js'
+import { renderDecklinkRearOrderEditor } from './device-view-inspector-decklink-rear-order.js'
 
 export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload, statusEl, load, setCasparRestartDirty }) {
 	renderDecklinkRearOrderEditor(h, { lastPayload, load })
@@ -25,6 +26,7 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 	}
 
 	const ioDir = normalizeDecklinkIoDirection(conn?.caspar)
+	const cableCount = connectorCableCount(lastPayload, conn?.id)
 
 	const ioWrap = Object.assign(document.createElement('div'), { className: 'device-view__inspector-links' })
 
@@ -51,10 +53,19 @@ export function renderDeckLinkIoControls(h, conn, { currentSettings, lastPayload
 		)
 	} else {
 		if (ioDir === DECKLINK_IO_UNASSIGNED) {
-			appendDecklinkSectionNote(
-				outputSection,
-				'Unassigned SDI port. Cable a screen destination here to use as program output, or configure fill+key below.'
-			)
+			/* WO-479: a drawn cable is not reflected in `ioDirection` until Apply writes the config,
+			 * so a patched port used to keep telling the operator to patch it. */
+			if (cableCount > 0) {
+				appendDecklinkSectionNote(
+					outputSection,
+					`Cabled (${cableCount} connection${cableCount === 1 ? '' : 's'}) — becomes a program output on Apply. Fill+key below.`
+				)
+			} else {
+				appendDecklinkSectionNote(
+					outputSection,
+					'Unassigned SDI port. Cable a screen destination here to use as program output, or configure fill+key below.'
+				)
+			}
 		} else {
 			appendDecklinkSectionNote(outputSection, 'Program output, fill+key pairs, and destination mapping.')
 		}

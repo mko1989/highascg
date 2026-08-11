@@ -102,10 +102,24 @@ test('rafThrottle: defaults to the real requestAnimationFrame when none is injec
 test('wiring: device-view-events.js routes the resize handler through rafThrottle', () => {
 	const src = fs.readFileSync(repoFile('client/components/device-view-events.js'), 'utf8')
 	assert.match(src, /import \{ rafThrottle \} from '\.\.\/lib\/raf-throttle\.js'/)
+	/* WO-478 gave the throttled redraw a name so a ResizeObserver could share it — the inspector
+	 * splitter moves connectors without ever firing a window resize. Both entry points must go
+	 * through the SAME rafThrottle wrapper: a resize drag re-runs the Verlet rope simulation on
+	 * every event otherwise, which is the WO-313 regression. */
 	assert.match(
 		src,
-		/window\.onresize\s*=\s*rafThrottle\(/,
-		'the resize handler must be throttled, not call renderCableOverlay directly',
+		/const relayoutCables = rafThrottle\(/,
+		'the redraw must be wrapped in rafThrottle',
+	)
+	assert.match(
+		src,
+		/window\.onresize = relayoutCables/,
+		'the resize handler must be the throttled function, not a direct renderCableOverlay call',
+	)
+	assert.match(
+		src,
+		/new ResizeObserver\(relayoutCables\)/,
+		'the layout observer must share the throttle, not schedule its own renders',
 	)
 	assert.doesNotMatch(
 		src,

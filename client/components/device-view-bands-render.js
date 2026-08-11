@@ -335,7 +335,10 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
 				await Actions.saveSettingsPatch({ streamOutputs: next });
 				setStatus(statusEl, `Added stream output Str${idx}`, true);
-				await load()
+				/* WO-480: ctx.load() serves a 5s cache and skips the fetch entirely on a hit — right
+				 * after a save that is always a hit, so the new band did not appear until the cache
+				 * aged out. Every mutation here re-reads for real. */
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onAddRecordOutput: async () => {
@@ -346,7 +349,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, name: `Rec${idx}`, source: 'program_1', crf: 26 }];
 				await Actions.saveSettingsPatch({ recordOutputs: next });
 				setStatus(statusEl, `Added record output Rec${idx}`, true);
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onRemoveStreamOutput: async (id) => {
@@ -355,7 +358,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = cur.filter(s => String(s.id) !== String(id))
 				await Actions.saveSettingsPatch({ streamOutputs: next })
 				setStatus(statusEl, 'Stream output removed', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onRemoveRecordOutput: async (id) => {
@@ -364,7 +367,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = cur.filter(s => String(s.id) !== String(id))
 				await Actions.saveSettingsPatch({ recordOutputs: next })
 				setStatus(statusEl, 'Record output removed', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onAddAudioOutput: async () => {
@@ -374,7 +377,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = [...cur, { id: `audio_${idx}`, label: `Audio ${idx}`, enabled: true, deviceName: '', channelLayout: 'stereo' }];
 				await Actions.saveSettingsPatch({ audioOutputs: next });
 				setStatus(statusEl, `Added audio output Audio ${idx}`, true);
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onRemoveAudioOutput: async (id) => {
@@ -383,7 +386,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				const next = cur.filter(s => String(s.id) !== String(id))
 				await Actions.saveSettingsPatch({ audioOutputs: next })
 				setStatus(statusEl, 'Audio output removed', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		onAddVirtualCamOutput: async () => {
@@ -402,7 +405,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 					{ persist: true },
 				)
 				setStatus(statusEl, 'Virtual camera output added', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) {
 				setStatus(statusEl, e.message, false)
 			}
@@ -425,7 +428,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 					await Actions.saveDeviceGraph(g)
 				}
 				setStatus(statusEl, 'Virtual camera output removed', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) {
 				setStatus(statusEl, e.message, false)
 			}
@@ -435,7 +438,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				await Actions.addMappingNode()
 				setCasparRestartDirty?.(true)
 				setStatus(statusEl, 'Added pixel mapping node', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e.message, false) }
 		},
 		mappingPersist: async (work) => {
@@ -447,7 +450,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				}
 				setCasparRestartDirty?.(true)
 				setStatus(statusEl, 'Mapping updated', true)
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) {
 				setStatus(statusEl, e?.message || String(e), false)
 			}
@@ -476,7 +479,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 				} else {
 					throw new Error(res?.error || 'Apply failed')
 				}
-				await load()
+				await load({ forceRefresh: true })
 			} catch (e) { setStatus(statusEl, e?.message || String(e), false) }
 		}
 	}
