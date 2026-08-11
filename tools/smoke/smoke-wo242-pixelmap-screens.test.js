@@ -165,15 +165,17 @@ describe('WO-242 T242.3: config generator emits the channel + native <artnet> co
 		const flat = buildCasparGeneratorFlatConfig(app)
 		const xml = buildConfigXml(flat)
 
-		// Custom video-mode registered via the existing custom-modes mechanism (bare WxH id; FPS
-		// carries into <time-scale>/<cadence>, not the id — config-modes.js:95-110).
-		assert.match(xml, /<id>1920x1080<\/id>/, 'custom mode id is registered in <video-modes>')
+		/* WO-484: the destination says `custom`, but 1920x1080@50 IS 1080p5000 — a shipped mode.
+		 * Registering a duplicate under the id `1920x1080` also made the channel
+		 * `video_format::custom`, which stops a DeckLink consumer matching it to a BMDDisplayMode by
+		 * identity. Only genuinely non-standard sizes get a <video-mode> block now. */
+		assert.doesNotMatch(xml, /<id>1920x1080<\/id>/, '1920x1080@50 is 1080p5000 — no duplicate mode')
 
 		const chBlock = xml.match(/<!-- HighAsCG: Caspar channel \d+: Pixel-map screen[\s\S]*?<\/channel>/)
 		assert.ok(chBlock, 'pixelmap channel block present')
 		const block = chBlock[0]
 
-		assert.match(block, /<video-mode>1920x1080<\/video-mode>/)
+		assert.match(block, /<video-mode>1080p5000<\/video-mode>/, 'channel references the shipped mode')
 		assert.match(block, /<refresh-rate>30<\/refresh-rate>/)
 		assert.match(block, /<type>RGB<\/type>/)
 		assert.match(block, /<start-address>1<\/start-address>/)

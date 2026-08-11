@@ -1,6 +1,6 @@
 'use strict'
 
-const { getModeDimensions, getExtraAudioModeDimensions, STANDARD_VIDEO_MODES } = require('./config-modes')
+const { findStandardModeId, getModeDimensions, getExtraAudioModeDimensions, STANDARD_VIDEO_MODES } = require('./config-modes')
 const { screenModeString } = require('./config-generator-mode-helpers')
 const { readCasparSetting } = require('./routing-map')
 const { destinationsFromConfig } = require('./screen-destinations')
@@ -20,6 +20,13 @@ function operatorGuiModeDimensions(dest) {
 	const width = Math.max(64, parseInt(String(dest?.width ?? 1920), 10) || 1920)
 	const height = Math.max(64, parseInt(String(dest?.height ?? 1080), 10) || 1080)
 	const fps = Math.max(1, parseFloat(String(dest?.fps ?? 50)) || 50)
+	/* WO-484: a destination saved as `custom` still describes a shipped mode more often than not —
+	 * the operator GUI at 1920x1080@50 is 1080p5000. Resolve to the standard id so no duplicate
+	 * <video-mode> is registered. Both halves matter: the emitter refuses duplicates, so a resolver
+	 * that kept minting `1920x1080` here would leave the channel referencing a mode that was never
+	 * registered, and Caspar refuses to start on an unknown video-mode id. */
+	const stdId = findStandardModeId(width, height, fps)
+	if (stdId) return { ...STANDARD_VIDEO_MODES[stdId], modeId: stdId, isCustom: false }
 	return { width, height, fps, modeId: `${width}x${height}`, isCustom: true }
 }
 

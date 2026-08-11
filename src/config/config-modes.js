@@ -132,6 +132,35 @@ function readScreenConfigValue(config, screenIdx, suffix) {
 	return undefined
 }
 
+
+/**
+ * The standard mode id that exactly matches these dimensions, or '' when none does.
+ *
+ * WO-484: a screen set to `custom` minted a custom `<video-mode>` from its width/height/fps even
+ * when that triple already IS a shipped mode — an operator-GUI screen at 1920x1080@50 produced a
+ * `<video-mode><id>1920x1080</id>…50000/1000/960</video-mode>` block that is `1080p5000` spelled
+ * differently. Beyond the redundancy it makes the channel `video_format::custom`, so a DeckLink
+ * consumer cannot match it to a BMDDisplayMode by identity and falls back to conversion
+ * ("Device supports video-format with conversion: 1080p50" in the box's log).
+ *
+ * fps is compared with a tolerance because the fractional families are stored as 23.98 / 29.97 /
+ * 59.94 rather than exact ratios.
+ * @param {number} width
+ * @param {number} height
+ * @param {number} fps
+ * @returns {string}
+ */
+function findStandardModeId(width, height, fps) {
+	const w = Number(width)
+	const h = Number(height)
+	const f = Number(fps)
+	if (!(w > 0) || !(h > 0) || !(f > 0)) return ''
+	for (const [id, spec] of Object.entries(STANDARD_VIDEO_MODES)) {
+		if (spec.width === w && spec.height === h && Math.abs(spec.fps - f) < 0.01) return id
+	}
+	return ''
+}
+
 /**
  * @param {string} modeId
  * @param {Record<string, unknown>} config
@@ -143,6 +172,10 @@ function getModeDimensions(modeId, config, screenIdx) {
 		const w = parseInt(String(readScreenConfigValue(config, screenIdx, 'custom_width') || '1920'), 10) || 1920
 		const h = parseInt(String(readScreenConfigValue(config, screenIdx, 'custom_height') || '1080'), 10) || 1080
 		const fps = parseFloat(String(readScreenConfigValue(config, screenIdx, 'custom_fps') || '50')) || 50
+		/* WO-484: "custom" describes how the operator picked it, not whether Caspar needs a new
+		 * mode. 1920x1080@50 is 1080p5000 — ship the standard id and emit no <video-mode> block. */
+		const stdId = findStandardModeId(w, h, fps)
+		if (stdId) return { ...STANDARD_VIDEO_MODES[stdId], modeId: stdId, isCustom: false }
 		return { width: w, height: h, fps, modeId: `${w}x${h}`, isCustom: true }
 	}
 	// Normalize aliases like '1080p50' to '1080p5000'
@@ -153,8 +186,11 @@ function getModeDimensions(modeId, config, screenIdx) {
 	if (px) {
 		const w = parseInt(px[1], 10) || 1920
 		const h = parseInt(px[2], 10) || 1080
-		const fps = px[3] ? parseFloat(px[3]) : 50
-		return { width: w, height: h, fps: Number.isFinite(fps) && fps > 0 ? fps : 50, modeId: `${w}x${h}`, isCustom: true }
+		const fpsRaw = px[3] ? parseFloat(px[3]) : 50
+		const fps = Number.isFinite(fpsRaw) && fpsRaw > 0 ? fpsRaw : 50
+		const stdId = findStandardModeId(w, h, fps)
+		if (stdId) return { ...STANDARD_VIDEO_MODES[stdId], modeId: stdId, isCustom: false }
+		return { width: w, height: h, fps, modeId: `${w}x${h}`, isCustom: true }
 	}
 	return { width: 1920, height: 1080, fps: 50, modeId: normalized || '1080p5000', isCustom: false }
 }
@@ -301,6 +337,7 @@ function getStandardModeChoices() {
 
 module.exports = {
 	STANDARD_VIDEO_MODES,
+	findStandardModeId,
 	calculateCadence,
 	getModeDimensions,
 	pixelSizeForVideoMode,

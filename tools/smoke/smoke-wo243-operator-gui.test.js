@@ -148,13 +148,15 @@ describe('WO-243 T243.2: config generator emits the operator_gui channel', () =>
 		const flat = buildCasparGeneratorFlatConfig(app)
 		const xml = buildConfigXml(flat)
 
-		assert.match(xml, /<id>1280x720<\/id>/, 'custom operator_gui mode id registered in <video-modes>')
+		/* WO-484: 1280x720@30 IS 720p3000. `videoMode: 'custom'` records how the operator chose it,
+		 * not that Caspar needs a new mode registered. */
+		assert.doesNotMatch(xml, /<id>1280x720<\/id>/, '1280x720@30 is 720p3000 — no duplicate mode')
 
 		const chBlock = xml.match(/<!-- HighAsCG: Caspar channel \d+: Operator GUI channel[\s\S]*?<\/channel>/)
 		assert.ok(chBlock, 'operator_gui channel block present')
 		const block = chBlock[0]
 
-		assert.match(block, /<video-mode>1280x720<\/video-mode>/)
+		assert.match(block, /<video-mode>720p3000<\/video-mode>/, 'channel references the shipped mode')
 		assert.match(block, /<screen>/, 'operator_gui channel drives a physical monitor via a screen consumer')
 		assert.match(block, /<windowed>true<\/windowed>/)
 		assert.match(block, /<borderless>true<\/borderless>/)
@@ -168,6 +170,25 @@ describe('WO-243 T243.2: config generator emits the operator_gui channel', () =>
 		// operator_gui must not be registered as a takeable PGM screen (no "Screen N program output"
 		// comment referencing its mainScreenIndex 5 -> screen "6").
 		assert.doesNotMatch(xml, /Screen 6 program output/)
+	})
+
+	it('an operator_gui monitor with a genuinely non-standard size still registers its mode (WO-484)', () => {
+		const app = baseAppConfig()
+		app.screenDestinations = {
+			version: 1,
+			destinations: [
+				{ id: 'scr1', label: 'Main', mainScreenIndex: 0, mode: 'pgm_prv', videoMode: '1080p5000', width: 1920, height: 1080, fps: 50 },
+				/* An ultrawide operator monitor — no shipped mode covers 2560x1080, so Caspar does
+				 * need a <video-mode> for it. This is the half WO-484 must NOT break. */
+				{ id: 'og1', label: 'Operator GUI', mainScreenIndex: 5, mode: 'operator_gui', videoMode: 'custom', width: 2560, height: 1080, fps: 50, guiUrl: 'http://127.0.0.1:4200/?operatorGui=1' },
+			],
+		}
+		const xml = buildConfigXml(buildCasparGeneratorFlatConfig(app))
+		assert.match(xml, /<id>2560x1080<\/id>/, 'a non-standard size is still registered')
+		assert.match(xml, /<time-scale>50000<\/time-scale>/)
+		assert.match(xml, /<cadence>960<\/cadence>/, '48000 / 50 fps')
+		const block = xml.match(/<!-- HighAsCG: Caspar channel \d+: Operator GUI channel[\s\S]*?<\/channel>/)[0]
+		assert.match(block, /<video-mode>2560x1080<\/video-mode>/)
 	})
 })
 
