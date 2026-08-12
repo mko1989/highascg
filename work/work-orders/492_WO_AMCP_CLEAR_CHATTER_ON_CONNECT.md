@@ -25,17 +25,27 @@ CLEAR-family tally for 12.08, one day, box mostly idle:
  9 CG 2-999 CLEAR      9 MIXER 2-999 CLEAR    0 CG n-7xx CLEAR   ← band sweep silent
 ```
 
-Orphan-sweep journal, last 4 days (`journalctl -u highascg.service`):
+Orphan-sweep journal, full retained history (`journalctl -u highascg.service`). The before/after is
+unambiguous — every pre-WO-482 connect swept the whole band, every post-fix connect with INFO XML
+sweeps nothing:
 
 ```
+Aug 06 15:56:46  [template-cg-orphan-sweep] ch=1   cleared=90 declared=0   ← pre-WO-482, ×6 that day
+Aug 06 16:11:14  [template-cg-orphan-sweep] ch=1   cleared=90 declared=0
+   … (every connect that day: cleared=90) …
+Aug 10 13:40:14  [template-cg-orphan-sweep] ch=    cleared=0  declared=0
+Aug 11 15:49:02  [template-cg-orphan-sweep] ch=    cleared=0  declared=0
 Aug 11 15:50:00  [template-cg-orphan-sweep] ch=1,3 cleared=0 declared=0
 Aug 11 15:53:42  [template-cg-orphan-sweep] ch=1,3 cleared=0 declared=0
 Aug 11 15:54:13  [warn] [template-cg-orphan-sweep] clear batch failed: Not connected
 Aug 11 15:54:13  [template-cg-orphan-sweep] ch=1,3 cleared=0   declared=0 (no INFO xml for 2 channel(s) — full band swept there)
 Aug 11 15:54:41  [template-cg-orphan-sweep] ch=1,3 cleared=180 declared=0 (no INFO xml for 2 channel(s) — full band swept there)
 Aug 11 15:55:30  [template-cg-orphan-sweep] ch=1,3 cleared=0 declared=0
-Aug 12 10:31:04 / 10:35:06 / 11:26:05 / 11:29:27   all cleared=0
+Aug 12 10:31:04 / 10:35:06 / 11:26:05 / 11:29:27 / 11:37:10   all cleared=0
 ```
+
+Two blind runs in the entire retained history, both inside one 30-second reconnect window on 11.08 —
+so the residual in §2 is rare, but it is reachable and it is loud when it fires (180 clears).
 
 So: WO-482's occupancy gate works (`cleared=0` everywhere it has data), and the two blind runs are
 the exception — including one that tried to send **while AMCP was down**, and one that emitted
