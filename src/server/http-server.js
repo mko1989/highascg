@@ -13,6 +13,7 @@ const { mergeCors } = require('./cors')
 const { mergeSecurityHeaders } = require('./security-headers')
 const { isHeadlessMode } = require('./headless-mode')
 const { readRequestBody } = require('./http-body')
+const zlib = require('zlib')
 
 const MIME = {
 	'.html': 'text/html',
@@ -192,6 +193,50 @@ async function serveWebApp(requestPath, dirs) {
  * @param {string} body
  * @param {import('http').IncomingMessage} _req
  */
+
+/** Text payloads worth compressing. Images/fonts are already compressed — re-gzipping only burns CPU. */
+const COMPRESSIBLE_CT = /^(?:text\/|application\/(?:javascript|json|xml)|image\/svg\+xml)/i
+/** Below this, the gzip header costs more than it saves and adds a needless CPU hop. */
+const GZIP_MIN_BYTES = 1024
+
+/**
+ * WO-498: gzip text responses in-process.
+ *
+ * The nginx :80 proxy was removed at the owner's request (an `<ip>:4200` URL is fine), which also
+ * removed the only place that could have compressed anything. In practice it never did — every
+ * `gzip_types` line in `/etc/nginx/nginx.conf` ships commented out and nginx's default covers
+ * `text/html` only, so the ~1.69 MB eager UI bundle went over the wire raw either way (WO-497).
+ * Compressing here is a straight win: measured ~3.8x on this repo's bundles.
+ *
+ * Skipped when the client did not offer gzip, for already-compressed types, for tiny bodies, and
+ * for streamed responses (which have no buffered body to compress).
+ * @param {import('http').IncomingMessage} req
+ * @param {Record<string, string>} headers - mutated with Content-Encoding/Vary when compressing
+ * @param {string | Buffer} body
+ * @returns {string | Buffer}
+ */
+function maybeGzip(req, headers, body) {
+	if (body == null || body === '') return body
+	const accepts = String(req.headers?.['accept-encoding'] || '')
+	if (!/\bgzip\b/i.test(accepts)) return body
+	if (headers['Content-Encoding']) return body
+	if (!COMPRESSIBLE_CT.test(String(headers['Content-Type'] || ''))) return body
+	const raw = Buffer.isBuffer(body) ? body : Buffer.from(String(body), 'utf8')
+	if (raw.length < GZIP_MIN_BYTES) return body
+	let gz
+	try {
+		gz = zlib.gzipSync(raw, { level: 6 })
+	} catch {
+		return body
+	}
+	if (gz.length >= raw.length) return body
+	headers['Content-Encoding'] = 'gzip'
+	// Caches must not serve a gzipped body to a client that did not ask for one.
+	headers['Vary'] = headers['Vary'] ? `${headers['Vary']}, Accept-Encoding` : 'Accept-Encoding'
+	headers['Content-Length'] = String(gz.length)
+	return gz
+}
+
 /**
  * WO-497: a Vite content-hashed build artefact — `.../assets/<name>-<HASH>.<ext>`.
  *
@@ -298,6 +343,8 @@ function startHttpServer(options) {
 				result = await serveWebApp(reqPath, { webDir, templatesDir, vendorDirs })
 			}
 			const headers = mergeCors(result.headers, req)
+			// Streamed responses have no buffered body — nothing to compress here.
+			const outBody = result.stream ? result.body : maybeGzip(req, headers, result.body)
 			res.writeHead(result.status ?? 200, headers)
 			if (result.stream && typeof result.stream.pipe === 'function') {
 				result.stream.on('error', (err) => {
@@ -310,7 +357,7 @@ function startHttpServer(options) {
 				result.stream.pipe(res)
 				return
 			}
-			res.end(result.body ?? '')
+			res.end(outBody ?? '')
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e)
 			res.writeHead(502, mergeCors({ 'Content-Type': 'application/json; charset=utf-8' }, req))

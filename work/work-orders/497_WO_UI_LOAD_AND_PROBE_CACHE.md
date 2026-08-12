@@ -62,25 +62,13 @@ retained); only genuinely new files are probed later.
 
 Full offline gate → **2027 tests, 2025 pass / 0 fail / 2 skip**. eslint 0 errors; 0 files over 500.
 
-## 5. Owner-owned, root config — two commands
+## 5. SUPERSEDED by [WO-498](./498_WO_REMOVE_NGINX_AND_GZIP_IN_NODE.md)
 
-These are the other half of §1 and cannot be done from the repo. They also take the 1.7 MB per load
-**off the playout event loop** entirely, which is the mechanism coupling "slow web UI" to "the whole
-program is sluggish" — `/etc/nginx/sites-enabled/highascg-web-proxy.conf` currently has a single
-`location / { proxy_pass … }` with no `root`, so nginx serves nothing itself and every byte is read
-and buffered by the Node process that also drives AMCP and the OSC tick.
-
-1. In `/etc/nginx/nginx.conf`, uncomment `gzip_vary`, `gzip_comp_level` and `gzip_types`.
-2. In `/etc/nginx/sites-enabled/highascg-web-proxy.conf`, add above `location /`:
-   ```
-   location /assets/ {
-       alias /home/casparcg/highascg/dist-web/assets/;
-       gzip_static on;
-       expires 1y;
-       add_header Cache-Control "public, immutable";
-   }
-   ```
-   then `sudo nginx -t && sudo systemctl reload nginx`.
+This section originally asked the owner to uncomment `gzip_types` in `/etc/nginx/nginx.conf` and add
+an `/assets/` alias block. The owner instead chose to **remove nginx entirely** (12.08: *"i see nginx
+is giving some problems so id like it removed completly. ip with a port number is totaly fine"*), so
+neither command applies. Compression moved into the Node server; see WO-498. Nothing was lost by
+removing the proxy — it had never compressed anything, for the reason measured in §1.
 
 ## 6. Ruled OUT by measurement — do not re-investigate
 

@@ -222,7 +222,7 @@ These are installed by `fix-calamares-shellprocess.sh` into the live-USB squashf
 **NOTE:** `patch-wo47-exfat-boot-scripts.sh`, `wo47-*.sh` remain in tools/runtime/ (referenced by exFAT systemd units and eggs/live-usb/).
 
 #### `scripts/runtime/` (naming trap — these are **INSTALLERS**, not runtime)
-- `install-highascg-web-proxy.sh` — nginx proxy setup (provisioning, not runtime)
+- `remove-highascg-web-proxy.sh` — remove the old nginx :80 proxy (WO-498; UI is served directly on :4200)
 - `install-network-apply.sh` — network-apply script installer
 - `decklink-install-from-exfat.sh` — DeckLink driver installer
 

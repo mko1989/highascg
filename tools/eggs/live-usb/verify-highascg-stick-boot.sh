@@ -66,8 +66,7 @@ fi
 [[ -f "${HIGHASCG_ROOT}/dist-web/index.html" ]] && ok "dist-web built for stick seed" \
 	|| fail "missing dist-web — sudo bash ${HERE}/ensure-dist-web-for-stick-seed.sh"
 
-[[ -f /etc/nginx/sites-enabled/highascg-web-proxy.conf ]] && ok "nginx :80 → :4200 proxy" \
-	|| fail "nginx proxy not installed — sudo bash ${REPO_ROOT}/scripts/runtime/install-highascg-web-proxy.sh"
+# WO-498: nginx removed — the operator UI is served directly on :4200.
 
 if systemctl cat highascg-exfat-server-update.service 2>/dev/null | grep -q 'TimeoutStartSec=300'; then
 	ok "server-update TimeoutStartSec=300"

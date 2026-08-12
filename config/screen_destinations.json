@@ -7,7 +7,7 @@
       "mainScreenIndex": 0,
       "mode": "operator_gui",
       "audioLayout": "stereo",
-      "videoMode": "custom",
+      "videoMode": "1080p5000",
       "width": 1920,
       "height": 1080,
       "fps": 50,

@@ -79,11 +79,7 @@ need_pkg exfatprogs "sudo apt install exfatprogs (or run prepare-eggs-clone-with
 need_pkg parted "sudo apt install parted"
 need_pkg python3 "sudo apt install python3"
 need_pkg rsync "sudo apt install rsync"
-if dpkg-query -W -f='${Status}' nginx 2>/dev/null | grep -qE '(install|hold) ok installed'; then
-	ok "package nginx (port 80 proxy)"
-else
-	fail "missing package nginx — sudo bash ${HERE}/prepare-eggs-clone-with-exfat.sh"
-fi
+# WO-498: nginx removed — no port-80 proxy package to verify.
 
 bash "${HERE}/verify-highascg-stick-boot.sh"
 

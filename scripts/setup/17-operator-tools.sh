@@ -47,5 +47,5 @@ echo "OK: Operator tools installed"
 echo
 echo "Optional next steps:"
 echo "  - GitHub: gh auth login (configure credentials for release uploads)"
-echo "  - Web proxy: sudo bash scripts/runtime/install-highascg-web-proxy.sh (nginx for web UI)"
+echo "  - Operator UI: http://<playout-ip>:4200/ (no proxy; WO-498 removed nginx)"
 echo

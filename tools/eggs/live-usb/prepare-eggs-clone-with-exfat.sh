@@ -60,7 +60,7 @@ if [[ "$SKIP_APT" != "1" ]]; then
 	# shellcheck source=apt-with-stale-eggs-repo-fallback.sh
 	source "${HERE}/apt-with-stale-eggs-repo-fallback.sh"
 	highascg_apt_update
-	highascg_apt_install exfatprogs parted python3 rsync nginx v4l-utils
+	highascg_apt_install exfatprogs parted python3 rsync v4l-utils
 fi
 
 echo "==> ISO defaults (Caspar config + optional embedded server)"
@@ -123,8 +123,12 @@ echo "  installed /etc/highascg/server-update-retain-drop (live USB — keep dro
 echo "==> HighAsCG service unit ordering (depends on WO-47 when present)"
 bash "${REPO_ROOT}/scripts/write-highascg-systemd-unit.sh" "$USER_CASPAR"
 
-echo "==> nginx :80 → :4200 (operator UI without port in browser URL)"
-bash "${REPO_ROOT}/scripts/runtime/install-highascg-web-proxy.sh"
+# WO-498: the nginx :80 proxy was removed — the operator UI is served directly on :4200, and a
+# stale proxy would only shadow it. Clear it on clones that were prepared before that change.
+if [[ -x "${REPO_ROOT}/scripts/runtime/remove-highascg-web-proxy.sh" ]]; then
+	echo "==> operator UI on :4200 (removing any old nginx port-80 proxy)"
+	bash "${REPO_ROOT}/scripts/runtime/remove-highascg-web-proxy.sh" || true
+fi
 
 if [[ "${SKIP_HIGHASCG_POWER_BUTTON:-0}" != "1" ]]; then
 	echo "==> power button (short=network reset, hold 3s=shutdown)"

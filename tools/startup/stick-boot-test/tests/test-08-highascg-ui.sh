@@ -6,7 +6,7 @@ if systemctl is-active --quiet highascg.service 2>/dev/null; then
 else
 	st_fail "highascg.service not active"
 fi
-for url in http://127.0.0.1/ http://127.0.0.1:4200/; do
+for url in http://127.0.0.1:4200/; do
 	if command -v curl >/dev/null 2>&1; then
 		code="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 3 "$url" 2>/dev/null || echo 000)"
 		case "$code" in
@@ -31,6 +31,6 @@ if command -v curl >/dev/null 2>&1; then
 	elif [[ -n "$api" ]]; then
 		st_warn "/api/system/status body present but unexpected shape"
 	else
-		st_warn "/api/system/status empty (nginx proxy or Node not on :4200)"
+		st_warn "/api/system/status empty (Node not on :4200)"
 	fi
 fi

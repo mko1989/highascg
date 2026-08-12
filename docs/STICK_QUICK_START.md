@@ -20,7 +20,7 @@ Three partitions. Ventoy creates the first two; **you create the third.**
 | 2 | `VTOYEFI` | 32 MiB | Ventoy's boot partition — never touch it |
 | 3 | **`HIGHASCGEXF`** | the space you reserved | exFAT — configs, media, server updates. Must be **exactly** this label (11 characters) |
 
-On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`, applies any server drop in `drop-update/`, syncs `configs/`, and starts the operator UI at **`http://<playout-ip>/`** (nginx proxies port 80 → `:4200`; **`http://<playout-ip>:4200/`** also works).
+On boot, the playout machine mounts **`HIGHASCGEXF`** at `/home/casparcg/exfat`, applies any server drop in `drop-update/`, syncs `configs/`, and starts the operator UI at **`http://<playout-ip>:4200/`** (WO-498: the nginx port-80 proxy was removed — connect with the port).
 
 > **Do not put operator data on the Ventoy partition.** While the machine is booted from a stick, Ventoy holds that partition open for the ISO it is streaming, and Linux cannot mount it. Operator data has to be its own partition — that is the whole reason for reserving space in step 2.
 

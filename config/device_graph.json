@@ -7,6 +7,51 @@
       "label": "Caspar / HighAsCG host"
     }
   ],
-  "connectors": [],
+  "connectors": [
+    {
+      "id": "gpu_p0",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P0",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-0/DP-1"
+    },
+    {
+      "id": "gpu_p1",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P1",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-2/DP-3"
+    },
+    {
+      "id": "gpu_p2",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P2",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-4/DP-5"
+    },
+    {
+      "id": "gpu_p3",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P3",
+      "caspar": {
+        "bus": "pgm",
+        "mainIndex": 0
+      },
+      "externalRef": "DP-6/DP-7"
+    }
+  ],
   "edges": []
 }
