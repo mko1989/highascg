@@ -30,8 +30,11 @@ log() {
 	echo "[highascg-webui-server-update] $*" >&2
 }
 
+SERVICE_WAS_ACTIVE=0
+
 stop_service() {
 	if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+		SERVICE_WAS_ACTIVE=1
 		log "stopping $SERVICE"
 		systemctl stop "$SERVICE"
 	fi
@@ -41,8 +44,27 @@ start_service() {
 	if [[ -f "${DST}/package.json" ]]; then
 		log "starting $SERVICE"
 		systemctl start "$SERVICE" 2>/dev/null || true
+	else
+		log "NOT starting $SERVICE — ${DST}/package.json is missing (the install is incomplete)"
 	fi
 }
+
+# WO-499: this script runs `set -e` and stops the service BEFORE applying. Any non-zero exit after
+# that — a failed rsync, a full disk, an exFAT chown refusal while staging to a stick — skipped
+# `start_service` and left the playout box DOWN with no operator UI to fix it from. Restarting is
+# now unconditional on exit: the box comes back even when the update itself failed, which is always
+# better than a dark box, and the non-zero exit still reaches the Web UI job log.
+restore_service_on_exit() {
+	local rc=$?
+	if [[ "$SERVICE_WAS_ACTIVE" == "1" ]] && ! systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
+		if [[ $rc -ne 0 ]]; then
+			log "update FAILED (exit ${rc}) — restarting $SERVICE so the box does not stay down"
+		fi
+		start_service
+	fi
+	exit "$rc"
+}
+trap restore_service_on_exit EXIT
 
 validate_source_path() {
 	local src="$1"
@@ -64,7 +86,14 @@ stage_drop_to_volume() {
 	log "staging drop → ${drop}/ (retain)"
 	local xtra=()
 	[[ -f "$EXCLUDES" ]] && xtra+=(--exclude-from="$EXCLUDES")
-	rsync "${xtra[@]}" -rlptgoD --delete "${src%/}/" "${drop%/}/"
+	# WO-499: exFAT has no owner/group, so `-go` makes rsync attempt a chown it cannot do and exit
+	# 23 — which under `set -e` used to abort the whole update after the service was already
+	# stopped. Drop -goD and widen the timestamp tolerance (exFAT stores 2 s granularity). This is
+	# a best-effort convenience copy to a removable volume: it must never fail the update.
+	if ! rsync "${xtra[@]}" -rlpt --modify-window=2 --delete "${src%/}/" "${drop%/}/"; then
+		log "staging to ${drop} failed (continuing — the server itself is already updated)"
+		return 0
+	fi
 	local grp
 	grp="$(id -gn "$USER_NAME")"
 	chown -R "${USER_NAME}:${grp}" "$drop" 2>/dev/null || true
@@ -133,9 +162,10 @@ main() {
 		--excludes "$EXCLUDES" \
 		--auto-retain
 
-	stage_drop_to_volume "$EXFAT_ROOT" "$src"
-	stage_drop_to_volume "$BRIDGE_ROOT" "$src"
-	push_drop_config
+	# Best-effort from here on — the server is already updated; nothing below is worth failing for.
+	stage_drop_to_volume "$EXFAT_ROOT" "$src" || log "stage ${EXFAT_ROOT} failed (continuing)"
+	stage_drop_to_volume "$BRIDGE_ROOT" "$src" || log "stage ${BRIDGE_ROOT} failed (continuing)"
+	push_drop_config || log "config push failed (continuing)"
 	start_service
 	log "web UI update complete"
 }

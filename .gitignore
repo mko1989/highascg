@@ -132,3 +132,7 @@ config/certs/
 
 # WO-427: GUI-uploaded DeckLink driver packages (250MB+, user-supplied, never committed)
 /vendor/
+
+# WO-498: the nginx :80 proxy was removed. config/ is restored from the stick/bridge by
+# exfat-sync, which resurrects this file on disk — ignoring it stops that stray being re-committed.
+config/nginx/

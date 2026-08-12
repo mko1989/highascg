@@ -17,6 +17,7 @@ const assert = require('node:assert/strict')
 const fs = require('fs')
 const path = require('path')
 const zlib = require('zlib')
+const { execFileSync } = require('child_process')
 
 const REPO = path.resolve(__dirname, '../..')
 const read = (rel) => fs.readFileSync(path.join(REPO, rel), 'utf8')
@@ -84,8 +85,17 @@ test('WO-498: streamed responses are never gzipped (no buffered body)', () => {
 })
 
 test('WO-498: the nginx proxy is gone from the repo', () => {
-	assert.equal(exists('config/nginx/highascg-web-proxy.conf'), false, 'proxy conf must be deleted')
-	assert.equal(exists('scripts/runtime/install-highascg-web-proxy.sh'), false, 'installer must be deleted')
+	/* Asserted on what git TRACKS, not on what is on disk. `config/` is restored from the stick and
+	 * bridge by exfat-sync, which resurrects `config/nginx/highascg-web-proxy.conf` as an untracked
+	 * stray — it did exactly that mid-session, and a filesystem check failed on a repo that was in
+	 * fact correct. What matters is that the repo no longer SHIPS or installs the proxy. */
+	const tracked = execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8' }).split('\n')
+	assert.equal(tracked.includes('config/nginx/highascg-web-proxy.conf'), false, 'proxy conf must not be tracked')
+	assert.equal(
+		tracked.includes('scripts/runtime/install-highascg-web-proxy.sh'),
+		false,
+		'installer must not be tracked',
+	)
 	assert.equal(exists('scripts/runtime/remove-highascg-web-proxy.sh'), true, 'a remover must be provided')
 })
 
