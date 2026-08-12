@@ -13,6 +13,8 @@ const DEFAULT_DECKLINK_CONSUMER_SETTINGS = {
 	latency: 'normal',
 	bufferDepth: 3,
 	colorSpace: 'bt709',
+	/** WO-493: '' = auto — omit <pixel-format> and let Caspar choose by channel bit depth. */
+	pixelFormat: '',
 }
 
 /** Caspar DeckLink consumer buffer-depth valid range on this stack. */
@@ -53,8 +55,23 @@ function decklinkRequiresYuvPixelFormat(videoMode) {
  * @returns {'yuv'|'rgba'|''} '' = omit the element and let Caspar choose
  */
 function resolveDecklinkPixelFormatOverride(consumerSettings) {
-	const raw = String(consumerSettings?.pixelFormat ?? '').trim().toLowerCase()
-	return raw === 'yuv' || raw === 'rgba' ? raw : ''
+	return normalizeDecklinkPixelFormat(consumerSettings?.pixelFormat)
+}
+
+/**
+ * WO-493: '' = auto (omit the element, Caspar picks by channel bit depth — the WO-487 default).
+ *
+ * `yuv` is NOT cosmetic on this box: on a 2160p SDI output, omitting it makes the DeckLink consumer
+ * fail to produce picture AND wedge the channel, so nothing renders on ANY consumer of that channel
+ * (owner, 12.08). WO-487 was right that forcing yuv on every 1080p rig costs a needless per-frame
+ * RGBA→YUV conversion — but the override it left as the escape hatch was never reachable, so UHD
+ * rigs had no way back. Hence: default auto, operator-selectable per output.
+ * @param {unknown} raw
+ * @returns {'yuv'|'rgba'|''}
+ */
+function normalizeDecklinkPixelFormat(raw) {
+	const s = String(raw ?? '').trim().toLowerCase()
+	return s === 'yuv' || s === 'rgba' ? s : ''
 }
 
 /**
@@ -202,6 +219,7 @@ function readDecklinkConsumerSettings(cs, prefix) {
 		latency: normalizeDecklinkLatency(cs?.[`${prefix}decklink_latency`]),
 		bufferDepth: normalizeDecklinkBufferDepth(cs?.[`${prefix}decklink_buffer_depth`]),
 		colorSpace: normalizeDecklinkColorSpace(cs?.[`${prefix}decklink_color_space`]),
+		pixelFormat: normalizeDecklinkPixelFormat(cs?.[`${prefix}decklink_pixel_format`]),
 		lowLatency: parseDecklinkLowLatency(cs?.[`${prefix}decklink_low_latency`]),
 	}
 }
@@ -227,6 +245,7 @@ function readDecklinkConsumerSettingsFromConnectorCaspar(caspar) {
 		latency: normalizeDecklinkLatency(caspar.decklinkLatency),
 		bufferDepth: normalizeDecklinkBufferDepth(caspar.decklinkBufferDepth),
 		colorSpace: normalizeDecklinkColorSpace(caspar.decklinkColorSpace),
+		pixelFormat: normalizeDecklinkPixelFormat(caspar.decklinkPixelFormat),
 		lowLatency: parseDecklinkLowLatency(caspar.decklinkLowLatency),
 	}
 }
@@ -243,6 +262,7 @@ function applyDecklinkConsumerSettingsFromConnector(merged, prefix, connector) {
 	merged[`${prefix}decklink_latency`] = s.latency
 	merged[`${prefix}decklink_buffer_depth`] = s.bufferDepth
 	merged[`${prefix}decklink_color_space`] = s.colorSpace
+	merged[`${prefix}decklink_pixel_format`] = s.pixelFormat
 	merged[`${prefix}decklink_low_latency`] = s.lowLatency
 	const outputMode = String(connector?.caspar?.decklinkOutputVideoMode || '').trim()
 	if (outputMode) merged[`${prefix}decklink_output_video_mode`] = outputMode
@@ -307,7 +327,7 @@ function buildDecklinkKeyFillConsumersXml(opts) {
 	const keyDevice = parseDecklinkDeviceIndex(opts?.keyDevice)
 	const videoModeRaw = String(opts?.videoMode || '').trim()
 	const videoModeXml = videoModeRaw ? `\n                    <video-mode>${escapeXml(videoModeRaw)}</video-mode>` : ''
-	const pixelFormatXml = decklinkPixelFormatXml(videoModeRaw)
+	const pixelFormatXml = decklinkPixelFormatXml(videoModeRaw, opts?.consumerSettings)
 	const consumerXml = buildDecklinkConsumerOptionsXml(opts?.consumerSettings || {})
 	const subregionXml = buildDecklinkSubregionXml(opts?.passthroughSubregion)
 	const lowLatencyXml = opts?.lowLatency ? '\n                    <latency>low</latency>' : ''
@@ -340,6 +360,7 @@ module.exports = {
 	resolveDecklinkPixelFormatOverride,
 	FILL_ONLY_KEYER,
 	DEFAULT_DECKLINK_CONSUMER_SETTINGS,
+	normalizeDecklinkPixelFormat,
 	DECKLINK_BUFFER_DEPTH_MIN,
 	DECKLINK_BUFFER_DEPTH_MAX,
 	DECKLINK_LATENCY_VALUES,

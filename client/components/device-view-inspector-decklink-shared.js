@@ -5,6 +5,23 @@ import { CASPAR_HOST } from './device-view-helpers.js'
 
 export const DECKLINK_LATENCY_OPTIONS = ['normal', 'low', 'default']
 export const DECKLINK_COLOR_SPACE_OPTIONS = ['bt709', 'bt601', 'bt2020']
+/**
+ * WO-493. '' = Auto: omit `<pixel-format>` so Caspar picks by channel bit depth (the WO-487
+ * default, and correct for 1080p rigs — forcing yuv there costs a per-frame RGBA→YUV convert).
+ * On a 2160p SDI output the omission makes the consumer produce no picture AND wedge the channel,
+ * so UHD outputs need `yuv` selected explicitly.
+ */
+export const DECKLINK_PIXEL_FORMAT_OPTIONS = [
+	{ id: '', label: 'Auto (Caspar decides)' },
+	{ id: 'yuv', label: 'YUV — required for 2160p' },
+	{ id: 'rgba', label: 'RGBA' },
+]
+
+/** WO-493: UHD SDI modes where Auto is known to fail on this stack. */
+export function decklinkModeNeedsYuv(videoMode) {
+	const m = String(videoMode || '').trim().toLowerCase()
+	return /^(dci)?2160p/.test(m) || /^(dci)?4320p/.test(m)
+}
 export const DECKLINK_CHANNEL_LAYOUT_OPTIONS = [
 	{ id: 'stereo', label: 'Stereo' },
 	{ id: 'mono', label: 'Mono' },
@@ -55,6 +72,7 @@ export function readDecklinkConsumerCaspar(conn) {
 		latency: String(c.decklinkLatency || 'normal').toLowerCase(),
 		bufferDepth: Math.min(3, Math.max(1, parseInt(String(c.decklinkBufferDepth ?? 3), 10) || 3)),
 		colorSpace: String(c.decklinkColorSpace || 'bt709').toLowerCase(),
+		pixelFormat: String(c.decklinkPixelFormat || '').trim().toLowerCase(),
 	}
 }
 

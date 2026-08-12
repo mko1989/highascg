@@ -32,12 +32,12 @@ const {
  * (first tile on `<decklink>`) + synced `<ports>` for additional tiles.
  * Caspar cannot use the channel custom mode (e.g. 5120×1024) for DeckLink format — parent video-mode is required.
  * @param {{ device: number, srcX: number, srcY: number, destX: number, destY: number, width: number, height: number, videoMode: string }[]} tiles
- * @param {{ videoMode?: string, keyer?: string, lowLatency?: boolean }} [opts]
+ * @param {{ videoMode?: string, keyer?: string, lowLatency?: boolean, consumerSettings?: object }} [opts]
  */
 function buildDecklinkTiledConsumersXml(tiles, opts = {}) {
 	if (!Array.isArray(tiles) || tiles.length === 0) return ''
 	const globalVideoMode = escapeXml(String(opts.videoMode || tiles[0]?.videoMode || '1080p5000'))
-	const pixelFormatXml = decklinkPixelFormatXml(String(opts.videoMode || tiles[0]?.videoMode || ''))
+	const pixelFormatXml = decklinkPixelFormatXml(String(opts.videoMode || tiles[0]?.videoMode || ''), opts.consumerSettings)
 	const lowLatencyXml = opts.lowLatency ? '\n                     <latency>low</latency>' : ''
 	const keyerXml = `\n                     <keyer>${escapeXml(
 		resolveDecklinkConsumerKeyer({
@@ -120,6 +120,9 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 			keyDevice: keyFill.keyDevice,
 			keyFillEnabled: keyFill.keyFillEnabled,
 			lowLatency: consumerSettings.lowLatency,
+			// WO-493: without this the operator's pixel-format choice never reaches a tiled (LED-wall)
+			// SDI output — the exact shape a 2160p wall uses.
+			consumerSettings,
 		})
 	} else if (decklinkDevice > 0) {
 		const keyFill = readDecklinkKeyFillSettings(config, `screen_${n}_`)

@@ -14,6 +14,8 @@ import { DECKLINK_IO_UNASSIGNED } from '../lib/decklink-io-direction.js'
 import {
 	DECKLINK_LATENCY_OPTIONS,
 	DECKLINK_COLOR_SPACE_OPTIONS,
+	DECKLINK_PIXEL_FORMAT_OPTIONS,
+	decklinkModeNeedsYuv,
 	DECKLINK_CHANNEL_LAYOUT_OPTIONS,
 	decklinkOutputStatusForConnector,
 	formatInheritedDecklinkMode,
@@ -182,6 +184,37 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 	colorField.wrap.append(colorSel)
 	grid.append(colorField.wrap)
 
+	/* WO-493: Auto omits <pixel-format> and lets Caspar choose by channel bit depth — right for
+	 * 1080p, but on a 2160p SDI output it yields no picture AND wedges the channel, so every
+	 * consumer on it goes dark. The warning below fires on exactly those modes. */
+	const pixField = mkField('Pixel format')
+	const pixSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
+	for (const o of DECKLINK_PIXEL_FORMAT_OPTIONS) {
+		const el = document.createElement('option')
+		el.value = o.id
+		el.textContent = o.label
+		pixSel.append(el)
+	}
+	pixSel.value = DECKLINK_PIXEL_FORMAT_OPTIONS.some((o) => o.id === cur.pixelFormat) ? cur.pixelFormat : ''
+	pixField.wrap.append(pixSel)
+	const pixWarn = Object.assign(document.createElement('div'), {
+		className: 'device-view__hint',
+		style: 'grid-column:1 / -1;color:#d29922',
+	})
+	const syncPixWarn = () => {
+		const needsYuv = decklinkModeNeedsYuv(modeSel?.value || cur.outputVideoMode)
+		pixWarn.textContent =
+			needsYuv && pixSel.value !== 'yuv'
+				? 'This is a 2160p output — set Pixel format to YUV, or the SDI shows nothing and the whole channel stops rendering on every consumer.'
+				: ''
+	}
+	pixSel.addEventListener('change', syncPixWarn)
+	// The warning depends on the SDI format too, so re-evaluate when that changes.
+	modeSel.addEventListener('change', syncPixWarn)
+	syncPixWarn()
+	pixField.wrap.append(pixWarn)
+	grid.append(pixField.wrap)
+
 	const audioRow = Object.assign(document.createElement('label'), {
 		className: 'device-view__field',
 		style: 'grid-column:1 / -1;display:flex;align-items:center;gap:6px;margin-top:4px',
@@ -220,6 +253,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 			decklinkLatency: String(latencySel.value || 'normal'),
 			decklinkBufferDepth: Math.min(3, Math.max(1, parseInt(String(depthIn.value || '3'), 10) || 3)),
 			decklinkColorSpace: String(colorSel.value || 'bt709'),
+			decklinkPixelFormat: String(pixSel.value || ''),
 			decklinkLowLatency: lowLatencyCheck.checked,
 		}
 		if (conn?.caspar?.outputBinding) casparPatch.outputBinding = conn.caspar.outputBinding
@@ -238,7 +272,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 		}
 	}
 
-	for (const el of [modeSel, layoutSel, latencySel, colorSel, depthIn, audioCheck, lowLatencyCheck]) {
+	for (const el of [modeSel, layoutSel, latencySel, colorSel, pixSel, depthIn, audioCheck, lowLatencyCheck]) {
 		el.addEventListener('change', () => void persist())
 	}
 }
