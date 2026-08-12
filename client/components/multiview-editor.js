@@ -10,7 +10,7 @@ import { showAppToast } from '../lib/app-toast.js'
 import { parseRouteValue } from './scenes-shared.js'
 import { resolveMvCellSourceChannel } from '../lib/input-channels.js'
 import { attachMathInput } from '../lib/math-input.js'
-import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
+import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType, getContainedVideoRect } from './multiview-editor-canvas.js'
 import { reportMultiviewEditRect, reportMultiviewEditCellRects, isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 import { holeRectFromOuter } from '../lib/hole-rect.js'
 
@@ -69,8 +69,14 @@ export function initMultiviewEditor(root, stateStore) {
 	//  - FULL OUTPUT (toggle): the old single whole-dock hole showing the real composited
 	//    multiview channel (incl. its own labels/timers/bg) — click-dead, view-only.
 	let mvOperatorFullOutput = false
-	/** Viewport-px insets keeping editor chrome outside the per-cell holes ({@link holeRectFromOuter}). */
-	const MV_BLEND_INSETS = { top: 20, right: 6, bottom: 6, left: 6 }
+	/**
+	 * Viewport-px insets keeping editor chrome outside the per-cell holes ({@link holeRectFromOuter}).
+	 * Applied to the cell's **drawn video rect**, not the cell box — the label strip lives below that
+	 * rect, so it stays outside every hole and therefore stays painted AND clickable (holes are both
+	 * click-dead and paint-dead). That strip is the drag handle for moving a cell; a symmetric inset
+	 * is all the border stroke (3 canvas px, centred) needs.
+	 */
+	const MV_BLEND_INSETS = { top: 6, right: 6, bottom: 6, left: 6 }
 	const getCM = () => stateStore.getState()?.channelMap || {}
 	const isEnabled = () => getCM().multiviewEnabled !== false && getCM().multiviewCh != null
 	const applyDebounce = createDebounce(() => applyMultiviewLayout(getCM, { silent: true }), 800)
@@ -145,9 +151,13 @@ export function initMultiviewEditor(root, stateStore) {
 		const mvChs = getMvChannels()
 		const cells = []
 		for (const c of multiviewState.getCells()) {
-			// Same client-px mapping as the mouse handlers (toCanvas is its inverse).
+			// Same client-px mapping as the mouse handlers (toCanvas is its inverse). The hole tracks
+			// the aspect-fitted picture rect the server MIXER FILLs this source into, so the live
+			// video lands exactly where the editor draws its frame instead of being offset and
+			// stretched across the whole cell box.
+			const v = getContainedVideoRect(c, cm)
 			const rect = holeRectFromOuter(
-				{ left: canvasRect.left + offsetX + c.x * scale, top: canvasRect.top + offsetY + c.y * scale, width: c.w * scale, height: c.h * scale },
+				{ left: canvasRect.left + offsetX + v.x * scale, top: canvasRect.top + offsetY + v.y * scale, width: v.w * scale, height: v.h * scale },
 				MV_BLEND_INSETS
 			)
 			if (rect.width < 24 || rect.height < 24) continue
