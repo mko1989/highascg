@@ -179,7 +179,7 @@ export function wireReplicationInspector(ui, ctx) {
 			showAppToast('Leader available for followers', 'success')
 			refreshReplicationStatusSoon()
 			await refreshStatus()
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(ctx.statusEl, e?.message || String(e), false)
 			showAppToast(e?.message || String(e), 'error')
@@ -232,7 +232,7 @@ export function wireReplicationInspector(ui, ctx) {
 			)
 			refreshReplicationStatusSoon()
 			await refreshStatus()
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(ctx.statusEl, e?.message || String(e), false)
 			showAppToast(e?.message || String(e), 'error')
@@ -287,7 +287,7 @@ export function wireReplicationInspector(ui, ctx) {
 			setStatus(ctx.statusEl, msg, ok && out.pingOk !== false)
 			showAppToast(msg, ok ? (out.pingOk ? 'success' : 'warn') : 'error')
 			refreshReplicationStatusSoon()
-			if (ok && typeof ctx.load === 'function') await ctx.load()
+			if (ok && typeof ctx.load === 'function') await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(ctx.statusEl, e?.message || String(e), false)
 			showAppToast(e?.message || String(e), 'error')
@@ -312,7 +312,7 @@ export function wireReplicationInspector(ui, ctx) {
 			showAppToast(msg, ok ? 'success' : 'warn')
 			refreshReplicationStatusSoon()
 			await refreshStatus()
-			if (typeof ctx.load === 'function') await ctx.load()
+			if (typeof ctx.load === 'function') await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(ctx.statusEl, e?.message || String(e), false)
 			showAppToast(e?.message || String(e), 'error')

@@ -116,7 +116,7 @@ export function registerDeviceViewCable(ctx) {
 		try {
 			await Actions.saveSettingsPatch({ deviceGraph: graph, screenDestinations })
 			ctx.setCasparRestartDirty(true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 			setStatus(statusEl, 'Undo successful', true)
 		} catch (e) {
 			setStatus(statusEl, e.message, false)

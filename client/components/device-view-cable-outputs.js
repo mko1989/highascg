@@ -47,7 +47,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 		try {
 			await Actions.saveDeviceGraph(g)
 			ctx.setCasparRestartDirty(true)
-			ctx.load()
+			ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, `Output mapping update failed: ${e.message}`, false)
 		}
@@ -65,7 +65,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 			await Actions.updateConnector(connectorId, { caspar: { ioDirection: 'out', outputBinding } })
 			setStatus(statusEl, `DeckLink ${connectorId} mapped to destination output`, true)
 			ctx.setCasparRestartDirty(true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}
@@ -98,7 +98,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 			// attach mode's next Start already resolves from fresh config.
 			if (isStreamingDedicatedOutputChannel(state.currentSettings)) ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Stream output removed', true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}
@@ -115,7 +115,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 			// (resolveRecordSourceChannel always resolves live from fresh config at record-start), so
 			// removing a record output connector never needs the restart flag.
 			setStatus(statusEl, 'Record output removed', true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}
@@ -130,7 +130,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 			await pruneConnectorFromGraph(cid)
 			ctx.setCasparRestartDirty(true)
 			setStatus(statusEl, 'Audio output removed', true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}
@@ -147,7 +147,7 @@ export function registerDeviceViewCableOutputs(ctx) {
 			await saveVirtualCameraConfig({ showInDeviceView: false, enabled: false }, { persist: true })
 			await pruneConnectorFromGraph(cid)
 			setStatus(statusEl, 'Virtual camera output removed', true)
-			await ctx.load()
+			await ctx.load({ forceRefresh: true })
 		} catch (e) {
 			setStatus(statusEl, e.message, false)
 		}

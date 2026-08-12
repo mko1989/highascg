@@ -201,11 +201,12 @@ export function registerDeviceViewSelection(ctx) {
 						ctx.setCasparRestartDirty(true)
 						return ctx.load({ forceRefresh: true })
 					}),
+				// WO-490: the removal is a mutation too — same reason as patchDestination above.
 				removeDestination: (did) =>
 					Actions.removeDestination(did).then(() => {
 						state.selectedDestinationId = null
 						ctx.setCasparRestartDirty(true)
-						return ctx.load()
+						return ctx.load({ forceRefresh: true })
 					}),
 				currentSettings: state.currentSettings,
 				updateDestinationOutputLayer: ctx.updateDestinationOutputLayer,

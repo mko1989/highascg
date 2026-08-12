@@ -136,21 +136,26 @@ export function registerDeviceViewRender(ctx) {
 			clearChipHighlights: () => {},
 			renderIntoInspector: ctx.rIntoInsp,
 			selectDestinationById: ctx.selectDestinationById,
+			/* WO-490: every reload below answers a mutation the server has already committed, so it
+			 * MUST refetch. A plain ctx.load() is served from the 5 s payload cache and skips the
+			 * fetch entirely, re-rendering the pre-mutation snapshot — a removed destination stays
+			 * on screen until some later forced load (classically: until a new one is added, which
+			 * does force). Same class as WO-276 / WO-480. */
 			patchDestination: (id, p) =>
 				Actions.patchDestination(id, p).then(() => {
 					ctx.setCasparRestartDirty(true)
-					return ctx.load()
+					return ctx.load({ forceRefresh: true })
 				}),
 			removeDestination: (id) =>
 				Actions.removeDestination(id).then(() => {
 					state.selectedDestinationId = null
 					ctx.setCasparRestartDirty(true)
-					return ctx.load()
+					return ctx.load({ forceRefresh: true })
 				}),
 			applyPlan: () =>
 				Actions.applyDeviceViewPlan({ applyCaspar: true }).then(() => {
 					ctx.setCasparRestartDirty(false)
-					return ctx.load()
+					return ctx.load({ forceRefresh: true })
 				}),
 			resolveDestinationSinkConnectorId: (d) => resolveDestinationSinkConnectorId(state.lastPayload, d),
 			cableSourceId: state.cableSourceId,
@@ -310,7 +315,13 @@ export function registerDeviceViewRender(ctx) {
 			let payload, settings, stream
 			try {
 				;[payload, settings, stream] = await Promise.all([
-					Actions.loadDeviceView({ freshGpu }),
+					/* WO-490: this is the only path a forceRefresh reaches, and it was the one not
+					 * passing bustCache — so forceRefresh bypassed our 5 s payload cache but the
+					 * response could still come from the browser's own `Cache-Control: max-age=3`
+					 * copy, i.e. still pre-mutation. (The `bustCache: forceRefresh` on the stale-
+					 * cache background fetch above is always false by construction and harmless:
+					 * that branch only runs once >5 s have passed, so the 3 s HTTP cache is dead.) */
+					Actions.loadDeviceView({ freshGpu, bustCache: forceRefresh }),
 					Actions.loadSettings(),
 					cachedStream ? Promise.resolve(cachedStream) : Actions.getStreamingChannelStatus().catch(() => null),
 				])
