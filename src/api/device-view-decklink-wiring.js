@@ -251,7 +251,56 @@ function releaseDecklinkOutputsForDestination(ctx, graph, destinationId) {
 	const { destinationInputConnectorIds } = require('../config/device-graph-edges')
 	const g = normalizeDeviceGraph(graph)
 	const srcIds = destinationInputConnectorIds(g, destinationId)
-	if (!srcIds.size) return { graph: g, casparServerChanged: false }
+	return releaseDecklinkSinksOfSources(ctx, g, srcIds)
+}
+
+/**
+ * WO-494: same release, for a pixel-mapping node's DeckLinks.
+ *
+ * Deleting a mapping node had NO server handler — the client rewrote the graph and POSTed the whole
+ * thing, so nothing ever released these bindings. It stayed invisible because `screen_N_decklink_tiles`
+ * is generate-time only (`pixel-mapping-config.js` writes it into `merged` and `delete`s
+ * `screen_N_decklink_device` on the same pass) and the DeckLink projection refuses to touch a tiled
+ * screen — so while the node exists, the stale flat key is MASKED. Remove the node and the mask goes.
+ *
+ * A node's outputs are subregions of ONE program channel, so every port it feeds carries the same
+ * `outputBinding {type:'screen', index}` and they collide on a single `screen_N_decklink_device`
+ * slot — which is why the owner saw the LAST card (DeckLink 2) survive rather than the first.
+ *
+ * Must run BEFORE the node's connectors/edges are pruned.
+ * @param {object} ctx
+ * @param {object} graph - graph still containing the node's edges
+ * @param {string} nodeId
+ * @returns {{ graph: object, casparServerChanged: boolean }}
+ */
+function releaseDecklinkOutputsForMappingNode(ctx, graph, nodeId) {
+	const g = normalizeDeviceGraph(graph)
+	const id = String(nodeId || '').trim()
+	if (!id) return { graph: g, casparServerChanged: false }
+	const srcIds = new Set(
+		(g.connectors || [])
+			.filter((c) => String(c?.deviceId || '') === id && c?.kind === 'pixel_map_out')
+			.map((c) => String(c.id || '')),
+	)
+	return releaseDecklinkSinksOfSources(ctx, g, srcIds)
+}
+
+/**
+ * Shared body for WO-491 / WO-494: release every DeckLink port fed by `srcIds`.
+ *
+ * Clears the port's positional `caspar.outputBinding` (plus `bus`/`mainIndex`) — the generator's
+ * legacy `!incomingEdge` fallback re-asserts the screen binding from it, so clearing the flat key
+ * alone does nothing — and clears `screen_N_*` / multiview keys ONLY where they still name that
+ * same device, so a target another destination legitimately owns is never stomped. Tiled LED-wall
+ * screens are skipped: they own their device through `screen_N_decklink_tiles`, the same carve-out
+ * `releaseDecklinkDeviceFromOtherTargets` makes. The physical port survives as an output.
+ * @param {object} ctx
+ * @param {object} g - normalized graph, edges still intact
+ * @param {Set<string>} srcIds - source connector ids whose DeckLink sinks are being released
+ * @returns {{ graph: object, casparServerChanged: boolean }}
+ */
+function releaseDecklinkSinksOfSources(ctx, g, srcIds) {
+	if (!srcIds || !srcIds.size) return { graph: g, casparServerChanged: false }
 
 	const byId = new Map((g.connectors || []).map((c) => [String(c?.id || ''), c]))
 	const releaseIds = new Set()
@@ -284,7 +333,7 @@ function releaseDecklinkOutputsForDestination(ctx, graph, destinationId) {
 				casparServerChanged = true
 			}
 		}
-		// The physical port survives (and stays an output); only the destination binding goes.
+		// The physical port survives (and stays an output); only the binding goes.
 		const caspar = { ...(c.caspar || {}) }
 		delete caspar.outputBinding
 		delete caspar.bus
@@ -300,6 +349,7 @@ module.exports = {
 	applyDecklinkOutputOnDestinationEdge,
 	clearDecklinkInputSlot,
 	releaseDecklinkOutputsForDestination,
+	releaseDecklinkOutputsForMappingNode,
 	scheduleDeviceViewCasparSync,
 	syncDeviceViewToCaspar,
 }

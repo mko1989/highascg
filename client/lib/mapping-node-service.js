@@ -289,24 +289,13 @@ export async function duplicateMappingNode(nodeId) {
 
 export async function deleteMappingNode(nodeId) {
 	try {
-		const payload = await fetchDeviceView()
-		const graph = payload?.graph
-		if (!graph) return { ok: false, error: 'No graph' }
-		const removeConnectorIds = new Set(
-			(graph.connectors || [])
-				.filter((c) => String(c?.deviceId || '') === nodeId)
-				.map((c) => String(c.id || ''))
-		)
-		const next = {
-			...graph,
-			devices: (graph.devices || []).filter((d) => String(d?.id || '') !== nodeId),
-			connectors: (graph.connectors || []).filter((c) => !removeConnectorIds.has(String(c?.id || ''))),
-			edges: (graph.edges || []).filter(
-				(e) => !removeConnectorIds.has(String(e?.sourceId || '')) && !removeConnectorIds.has(String(e?.sinkId || ''))
-			),
-		}
-		await saveDeviceGraph(next)
-		return { ok: true, graph: next }
+		/* WO-494: ask the server to remove the node instead of POSTing a rewritten graph. A whole-graph
+		 * save lands in the generic `deviceGraph` branch, which only persists — so the DeckLinks this
+		 * node fed kept their positional `outputBinding` and `screen_N_decklink_device`, and the
+		 * generator re-asserted them the moment the pixel-map tiles stopped masking the stale key. */
+		const res = await api.post('/api/device-view', { removeMappingNode: { id: nodeId } })
+		if (res?.error) return { ok: false, error: res.error }
+		return { ok: true, graph: res?.graph, casparRestartNeeded: res?.casparRestartNeeded === true }
 	} catch (e) {
 		return { ok: false, error: e?.message || String(e) }
 	}

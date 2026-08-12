@@ -113,6 +113,7 @@ const FILES = [
 	'tools/smoke/smoke-wo491-remove-destination-releases-decklink.test.js',
 	'tools/smoke/smoke-wo492-amcp-clear-chatter.test.js',
 	'tools/smoke/smoke-wo493-decklink-pixel-format-option.test.js',
+	'tools/smoke/smoke-wo494-remove-mapping-node-releases-decklink.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
 	'tools/smoke/smoke-api-auth.test.js',
 	'tools/smoke/smoke-settings-nuclear-password.test.js',
