@@ -15,28 +15,9 @@ const {
 	writeDecklinkKeyFillToCasparServer,
 } = require('../config/decklink-key-fill')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
-const {
-	clearDecklinkInputSlot,
-	releaseDecklinkOutputsForDestination,
-	releaseDecklinkOutputsForMappingNode,
-} = require('./device-view-decklink-wiring')
+const { clearDecklinkInputSlot, releaseDecklinkOutputsForDestination } = require('./device-view-decklink-wiring')
 
-function saveConfig(ctx, patch) {
-	if (!ctx.configManager) {
-		if (typeof ctx.log === 'function') ctx.log('warn', '[device-view] configManager missing; graph/destination changes are not persisted to disk')
-		Object.assign(ctx.config, patch)
-	} else {
-		ctx.configManager.save({ ...ctx.configManager.get(), ...patch })
-		if (ctx.config) Object.assign(ctx.config, ctx.configManager.get())
-	}
-	try {
-		const { onDeviceConfigSaved } = require('../replication/follower-machine-profile')
-		onDeviceConfigSaved(ctx, patch)
-	} catch {
-		/* optional */
-	}
-	return true
-}
+const { saveConfig } = require('./device-view-crud-save')
 
 function scheduleDeviceViewCasparSyncIfNeeded(ctx) {
 	try {
@@ -337,7 +318,22 @@ function handleUpdateConnector(j, ctx, liveSnapshot) {
 					}
 				}
 				if (ioDirection === 'out' && outBind && typeof outBind === 'object') {
-					c1.caspar = { ...(c1.caspar || {}), outputBinding: outBind }
+					/* WO-496: record HOW this binding came to exist, so Apply can tell a real
+					 * connection from a fossil. `manual` = the operator supplied it (dropping a
+					 * DeckLink on a destination's output dot) — no cable by design, always honoured.
+					 * `auto` = synthesized just below from bus/mainIndex because the port was saved
+					 * as an output with no binding at all; that invents a screen_1 binding out of an
+					 * unrelated settings save (e.g. picking a pixel format), so it only counts while
+					 * a cable backs it. Provenance is preserved once set: re-saving settings on a
+					 * cabled port must not downgrade its `cable` origin. */
+					const priorSource = String(c0?.caspar?.bindingSource || '').toLowerCase()
+					const bindingSource =
+						priorSource === 'cable'
+							? 'cable'
+							: outBindPatch && typeof outBindPatch === 'object'
+								? 'manual'
+								: priorSource || 'auto'
+					c1.caspar = { ...(c1.caspar || {}), outputBinding: outBind, bindingSource }
 					const keyFill = readDecklinkKeyFillFromConnectorCaspar({ ...(c1.caspar || {}), ...(patch.caspar || {}) })
 					if (patch?.caspar?.decklinkKeyFill === false || patch?.caspar?.decklinkKeyFill === 'false') {
 						c1.caspar.decklinkKeyFill = false
@@ -409,81 +405,5 @@ function handleRemoveAllEdges(j, ctx) {
 	return { ok: true, graph: next }
 }
 
-function handleAddMappingNode(j, ctx) {
-	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
-	const now = Date.now().toString(36)
-	let seq = 1; while (g0.devices.some(d => d.id === `mapping_${now}_${seq}`)) seq++
-	const id = `mapping_${now}_${seq}`
-	const label = `Pixel Mapping ${seq}`
-	
-	const newDevice = {
-		id,
-		role: 'pixel_mapping',
-		label,
-		settings: {
-			numOutputs: 2,
-			outputs: [
-				{ id: 'out_1', mode: '1080p5000', label: 'Output 1' },
-				{ id: 'out_2', mode: '1080p5000', label: 'Output 2' }
-			],
-			mappings: []
-		}
-	}
-	
-	const newConnectors = [
-		{ id: `${id}_in`, deviceId: id, kind: 'pixel_map_in', label: 'Input Feed' },
-		{ id: `${id}_out_1`, deviceId: id, kind: 'pixel_map_out', index: 0, label: 'Output 1' },
-		{ id: `${id}_out_2`, deviceId: id, kind: 'pixel_map_out', index: 1, label: 'Output 2' }
-	]
-	
-	const next = {
-		...g0,
-		devices: [...g0.devices, newDevice],
-		connectors: [...g0.connectors, ...newConnectors]
-	}
-	
-	const norm = normalizeDeviceGraph(next)
-	ctx.config.deviceGraph = norm
-	saveConfig(ctx, { deviceGraph: norm })
-	return { ok: true, graph: norm, addedId: id }
-}
 
-/**
- * WO-494: removing a pixel-mapping node.
- *
- * This used to have no handler at all — the client rewrote the graph and POSTed the whole thing,
- * landing in the generic `j.deviceGraph` branch which only persists. A whole-graph POST can never be
- * made safe: the server cannot tell a deletion from any other edit, so it cannot know a DeckLink
- * just lost its feed. Hence a dedicated handler, same shape as `handleRemoveDestination`.
- * @param {object} j
- * @param {object} ctx
- */
-function handleRemoveMappingNode(j, ctx) {
-	const id = String(j.removeMappingNode?.id || '').trim()
-	if (!id) return { error: 'Missing id' }
-	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
-	if (!(g0.devices || []).some((d) => String(d?.id || '') === id)) return { error: 'Not found', id }
-
-	// Before pruning — it reads the edges the prune is about to drop.
-	const released = releaseDecklinkOutputsForMappingNode(ctx, g0, id)
-	const g = released.graph
-	const dropIds = new Set(
-		(g.connectors || []).filter((c) => String(c?.deviceId || '') === id).map((c) => String(c.id || '')),
-	)
-	const graph = normalizeDeviceGraph({
-		...g,
-		devices: (g.devices || []).filter((d) => String(d?.id || '') !== id),
-		connectors: (g.connectors || []).filter((c) => !dropIds.has(String(c?.id || ''))),
-		edges: (g.edges || []).filter(
-			(e) => !dropIds.has(String(e?.sourceId || '')) && !dropIds.has(String(e?.sinkId || '')),
-		),
-	})
-	ctx.config.deviceGraph = graph
-	saveConfig(ctx, {
-		deviceGraph: graph,
-		...(released.casparServerChanged ? { casparServer: ctx.config.casparServer } : {}),
-	})
-	return { ok: true, graph, removedId: id, casparRestartNeeded: released.casparServerChanged }
-}
-
-module.exports = { handleAddDestination, handleUpdateDestination, handleRemoveDestination, handleAddEdge, handleRemoveEdge, handleUpdateConnector, handleRemoveAllEdges, handleAddMappingNode, handleRemoveMappingNode }
+module.exports = { handleAddDestination, handleUpdateDestination, handleRemoveDestination, handleAddEdge, handleRemoveEdge, handleUpdateConnector, handleRemoveAllEdges }

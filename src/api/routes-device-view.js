@@ -11,6 +11,7 @@ const { normalizeScreenDestinations } = require('../config/screen-destinations')
 const Snapshot = require('./device-view-snapshot')
 const Apply = require('./device-view-apply')
 const CRUD = require('./device-view-crud')
+const CRUD_MAPPING = require('./device-view-crud-mapping')
 const { enrichExtraLiveSource, enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 
 /**
@@ -142,10 +143,10 @@ async function handlePost(body, ctx) {
 	const j = parseBody(body) || {}; let res = null
 	if (j.applyPlan) res = await Apply.executeApplyPlan(ctx, typeof j.applyPlan === 'object' ? j.applyPlan : {})
 	else if (j.addDestination) res = CRUD.handleAddDestination(j, ctx)
-	else if (j.addMappingNode) res = CRUD.handleAddMappingNode(j, ctx)
+	else if (j.addMappingNode) res = CRUD_MAPPING.handleAddMappingNode(j, ctx)
 	// WO-494: dedicated handler so the DeckLinks the node fed are released. It must sit ABOVE the
 	// generic `j.deviceGraph` branch, which only persists and cannot tell a deletion from any edit.
-	else if (j.removeMappingNode) res = CRUD.handleRemoveMappingNode(j, ctx)
+	else if (j.removeMappingNode) res = CRUD_MAPPING.handleRemoveMappingNode(j, ctx)
 	else if (j.updateDestination) res = CRUD.handleUpdateDestination(j, ctx)
 	else if (j.removeDestination) res = CRUD.handleRemoveDestination(j, ctx)
 	else if (j.addEdge) res = CRUD.handleAddEdge(j, ctx, await Snapshot.buildLiveSnapshot(ctx))

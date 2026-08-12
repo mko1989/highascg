@@ -72,6 +72,8 @@ function applyDecklinkOutputOnDestinationEdge(ctx, graph, sourceId, sinkId) {
 				...(c.caspar || {}),
 				ioDirection: 'out',
 				outputBinding,
+				// WO-496: a cable made this binding, so it is only real while the cable is there.
+				bindingSource: 'cable',
 				bus: mode === 'multiview' ? 'multiview' : 'pgm',
 				mainIndex: mode === 'multiview' ? 0 : mainIdx,
 			},
@@ -336,6 +338,7 @@ function releaseDecklinkSinksOfSources(ctx, g, srcIds) {
 		// The physical port survives (and stays an output); only the binding goes.
 		const caspar = { ...(c.caspar || {}) }
 		delete caspar.outputBinding
+		delete caspar.bindingSource
 		delete caspar.bus
 		delete caspar.mainIndex
 		return { ...c, caspar }

@@ -25,7 +25,8 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 
 const defaults = require('../../src/config/defaults')
-const CRUD = require('../../src/api/device-view-crud')
+// WO-496 split the mapping-node handlers into their own CRUD module (500-line limit).
+const CRUD = require('../../src/api/device-view-crud-mapping')
 const { buildConfigXml } = require('../../src/config/config-generator')
 const { buildCasparGeneratorFlatConfig } = require('../../src/config/build-caspar-generator-config')
 

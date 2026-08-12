@@ -118,6 +118,25 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 		if (!incomingEdge) {
 			// Fallback to legacy binding if no cable exists
 			if (c.kind === 'decklink_io' && !isDecklinkIoOut(c)) return
+			/* WO-496 (owner: "cabling can change dynamically, but when hitting apply caspar config it
+			 * needs to read what is actually connected"). A binding that a CABLE created, or that
+			 * `handleUpdateConnector` SYNTHESIZED when an SDI port was merely saved as an output,
+			 * describes a connection that no longer exists once the cable is gone — emitting a
+			 * consumer from it is the config disagreeing with the graph. Pull the cable and Apply:
+			 * no consumer. Plug it back and Apply: it returns. Bindings the operator made explicitly
+			 * (dropping a DeckLink on a destination's output dot => `manual`) have no cable by
+			 * design and are honoured, as are pre-WO-496 bindings with no recorded provenance —
+			 * unknown must never silently blank a live SDI output. */
+			const src = String(c.caspar?.bindingSource || '').toLowerCase()
+			if (src === 'cable' || src === 'auto') {
+				/* Skipping the connector is only half of it: `merged` is seeded from the persisted
+				 * casparServer, so the `screen_N_decklink_device` this binding wrote is already in
+				 * there and `config-generator-consumer-attach-screen` would emit from it regardless.
+				 * Release the device from every target — nothing is cabled to it this pass. Tiled
+				 * LED-wall screens are skipped inside, as always. */
+				releaseDecklinkDeviceFromOtherTargets(devNum, null)
+				return
+			}
 			const binding = c.caspar?.outputBinding
 			if (binding?.type === 'screen') {
 				const n = Math.min(8, Math.max(1, parseInt(String(binding.index ?? 1), 10) || 1))
