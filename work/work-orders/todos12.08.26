@@ -1,0 +1,21 @@
+the captured frame from a live input like decklink gets overwritten with a black frame when played.
+
+when opening a web ui on another machine the looks that are already created doesnt load.
+
+there are definitly some performance issues that are responisible for the slower playback. it also affects usage of the whole program. the whole thing feels slugish as hell.
+it makes playing a look not reliable.
+ive came back to a second machine for tests. its 192.168.0.37
+even loading the webui is slow. something is definitly wrong.
+
+
+yes, cabling can change dynamically, but when hitting apply caspar config it needs to read what is actually connected.
+
+do the hygine pass
+"Two things I did not do
+Three sibling paths have the identical hole and I've left them for you to decide: removeMappingOutput (deleting one output strands that output's DeckLink — closest to this bug), handleRemoveEdge (pulling just a cable), and handleRemoveAllEdges (releases nothing at all). I held off on edge removal specifically because you may pull and re-plug a cable routinely, and releasing on every unplug is a behaviour change that should be a decision, not something inherited from this fix.
+
+A trap worth flagging: src/config/build-caspar-config-decklink.js and build-caspar-config-routing.js have no requires anywhere in src/. They're dead twins of the real generator pipeline, carrying their own stale copies of assignDecklinkToScreen. I nearly read the wrong one. Worth deleting under a hygiene pass.
+
+Suite is 2010 tests, 2008 pass, 0 fail. Client built and kiosk reloaded, so the new endpoint is live.
+
+Both of today's DeckLink fixes still need a Caspar restart to take effect in the generated config, and neither live delete has been exercised — that's the QA I owe you."
