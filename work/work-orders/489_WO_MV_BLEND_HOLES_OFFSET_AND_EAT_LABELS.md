@@ -1,6 +1,6 @@
 # WO-489 — Multiview editor blend holes sit 18 px low and eat the label strips
 
-**Status: DONE (12.08, measured on the box before/after from a screen capture; smokes 99/99 + hole-rect 5/5, eslint 0 errors)**
+**Status: DONE (12.08, measured on the box before/after from a screen capture; smokes 99/99 + hole-rect 5/5, suite 1982/1980/0, eslint 0 errors)**
 
 Owner 12.08: *"the rects in multiview layout editor are all too low and overlap the labels of the
 multiview windows. it seems the space to move them is making the gap. the moving should be done by
@@ -108,6 +108,8 @@ the mid-drag hole suppression.
   `holeRectFromOuter`; it does not pin the editor's inset values, so it is unaffected by design.
 - `npx eslint client/components/multiview-editor.js` → 0 errors (2 pre-existing warnings on
   lines 105/111, untouched).
+- Full offline gate `node tools/ci/run-offline-tests.js` → **1982 tests, 1980 pass / 0 fail /
+  2 skip** (the two live-server skips), i.e. the WO-483 baseline unchanged.
 
 **Owner QA owed:** confirm dragging a cell by its label strip feels right in the shaped operator GUI
 (the measurement proves the strip is painted and outside the hole; the drag ergonomics are a feel
