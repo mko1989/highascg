@@ -15,7 +15,7 @@ const {
 	writeDecklinkKeyFillToCasparServer,
 } = require('../config/decklink-key-fill')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('../config/decklink-io-direction')
-const { clearDecklinkInputSlot } = require('./device-view-decklink-wiring')
+const { clearDecklinkInputSlot, releaseDecklinkOutputsForDestination } = require('./device-view-decklink-wiring')
 
 function saveConfig(ctx, patch) {
 	if (!ctx.configManager) {
@@ -229,10 +229,18 @@ function handleRemoveDestination(j, ctx) {
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
 	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
-	const graph = pruneDestinationFromGraph(g0, id)
+	// WO-491: release any DeckLink cabled to this destination BEFORE pruning drops those edges.
+	// `next` has already compacted mainScreenIndex, so a surviving destination now sits on the
+	// screen index this one vacated — leaving the binding would hand it a DeckLink it never had.
+	const released = releaseDecklinkOutputsForDestination(ctx, g0, id)
+	const graph = pruneDestinationFromGraph(released.graph, id)
 	ctx.config.deviceGraph = graph
-	saveConfig(ctx, { screenDestinations: next, deviceGraph: graph })
-	return { ok: true, screenDestinations: next, removedId: id, graph }
+	saveConfig(ctx, {
+		screenDestinations: next,
+		deviceGraph: graph,
+		...(released.casparServerChanged ? { casparServer: ctx.config.casparServer } : {}),
+	})
+	return { ok: true, screenDestinations: next, removedId: id, graph, casparRestartNeeded: released.casparServerChanged }
 }
 
 function handleAddEdge(j, ctx, liveSnapshot) {

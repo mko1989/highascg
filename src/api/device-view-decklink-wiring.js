@@ -227,9 +227,79 @@ async function syncDeviceViewToCaspar(ctx, opts = {}) {
 	return { casparServerChanged: true, restarted: true, restartDeferred: false }
 }
 
+/**
+ * WO-491: {@link applyDecklinkOutputOnDestinationEdge} writes POSITIONAL state in two places —
+ * `connector.caspar.outputBinding = { type: 'screen', index: mainScreenIndex + 1 }` and
+ * `casparServer.screen_N_decklink_device`. Deleting the destination prunes only the graph EDGE, so
+ * both survived; and because `normalizeScreenDestinations` COMPACTS `mainScreenIndex`, the next
+ * destination to slide into that index inherited a DeckLink output it was never cabled to. Clearing
+ * the flat key alone is not enough — the generator's legacy fallback re-asserts it from the
+ * connector binding whenever the port has no incoming edge — so both have to go.
+ *
+ * This is the deletion half of WO-275, which only released a device when some OTHER target claimed
+ * it; nothing claims a deleted destination's DeckLink. Flat keys are cleared only where they still
+ * name this same device, and tiled (LED-wall) screens are skipped — they own their device through
+ * `screen_N_decklink_tiles`, exactly as `releaseDecklinkDeviceFromOtherTargets` treats them.
+ *
+ * Must run BEFORE `pruneDestinationFromGraph`: it reads the edges that pruning is about to drop.
+ * @param {object} ctx
+ * @param {object} graph - graph still containing the destination's edges
+ * @param {string} destinationId
+ * @returns {{ graph: object, casparServerChanged: boolean }}
+ */
+function releaseDecklinkOutputsForDestination(ctx, graph, destinationId) {
+	const { destinationInputConnectorIds } = require('../config/device-graph-edges')
+	const g = normalizeDeviceGraph(graph)
+	const srcIds = destinationInputConnectorIds(g, destinationId)
+	if (!srcIds.size) return { graph: g, casparServerChanged: false }
+
+	const byId = new Map((g.connectors || []).map((c) => [String(c?.id || ''), c]))
+	const releaseIds = new Set()
+	for (const e of g.edges || []) {
+		if (!srcIds.has(String(e?.sourceId || ''))) continue
+		const sink = byId.get(String(e?.sinkId || ''))
+		if (sink && (sink.kind === 'decklink_out' || sink.kind === 'decklink_io')) releaseIds.add(String(sink.id))
+	}
+	if (!releaseIds.size) return { graph: g, casparServerChanged: false }
+
+	const cs = { ...((ctx.config && ctx.config.casparServer) || {}) }
+	let casparServerChanged = false
+
+	const connectors = (g.connectors || []).map((c) => {
+		if (!releaseIds.has(String(c?.id || ''))) return c
+		const devNum = parseDecklinkDeviceIndex(c?.externalRef)
+		if (devNum > 0) {
+			for (let n = 1; n <= 16; n++) {
+				const tiles = cs[`screen_${n}_decklink_tiles`]
+				if (Array.isArray(tiles) && tiles.length > 0) continue
+				if ((parseInt(String(cs[`screen_${n}_decklink_device`] || '0'), 10) || 0) !== devNum) continue
+				cs[`screen_${n}_decklink_device`] = 0
+				cs[`screen_${n}_decklink_key_device`] = 0
+				cs[`screen_${n}_decklink_replace_screen`] = false
+				casparServerChanged = true
+			}
+			if ((parseInt(String(cs.multiview_decklink_device || '0'), 10) || 0) === devNum) {
+				cs.multiview_decklink_device = 0
+				cs.multiview_decklink_key_device = 0
+				casparServerChanged = true
+			}
+		}
+		// The physical port survives (and stays an output); only the destination binding goes.
+		const caspar = { ...(c.caspar || {}) }
+		delete caspar.outputBinding
+		delete caspar.bus
+		delete caspar.mainIndex
+		return { ...c, caspar }
+	})
+
+	if (casparServerChanged) ctx.config.casparServer = cs
+	return { graph: normalizeDeviceGraph({ ...g, connectors }), casparServerChanged }
+}
+
 module.exports = {
 	applyDecklinkOutputOnDestinationEdge,
 	clearDecklinkInputSlot,
+	releaseDecklinkOutputsForDestination,
 	scheduleDeviceViewCasparSync,
 	syncDeviceViewToCaspar,
 }

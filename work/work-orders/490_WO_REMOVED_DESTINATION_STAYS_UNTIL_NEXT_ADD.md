@@ -119,12 +119,9 @@ by code + bundle inspection; **owner QA: delete a screen destination and confirm
 immediately** (do it within 5 s of another Device View interaction — that is the window that used to
 reproduce it).
 
-## 4. Not done — owner decision
+## 4. Follow-up — §1.4 is now [WO-491](./491_WO_REMOVE_DESTINATION_LEAVES_DECKLINK_BOUND.md)
 
-§1.4's DeckLink binding leak is real and demonstrable but changes generated Caspar output on a live
-playout box. Recommended fix when the owner wants it: before writing winners in
-`applyDestinationOutputEdgesToCasparConfig`, zero `screen_N_decklink_device` / `_key_device` /
-`_replace_screen` for every `screen_N` with no owning destination edge (or clear the removed
-destination's `screen_N_*` keys in `handleRemoveDestination`). Extending
-`releaseDecklinkDeviceFromOtherTargets` to drop unowned bindings would also cover the
-compaction-inheritance case.
+§1.4's DeckLink binding leak was split out, reproduced end-to-end and fixed under WO-491. The
+diagnosis there is sharper than the sketch above: clearing the flat `screen_N_*` keys alone is NOT
+sufficient, because cabling also writes a positional `connector.caspar.outputBinding` that the
+generator's legacy fallback re-asserts once the edge is pruned. Both had to be released.
