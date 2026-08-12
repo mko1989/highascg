@@ -25,6 +25,15 @@ async function sweepTemplateCgOrphansOnCasparConnected(opts) {
 	if (!amcp || typeof amcp.batchSendChunked !== 'function') {
 		return { clearedCount: 0, declaredCount: 0 }
 	}
+	/* WO-492 A: a sweep against a dead socket cannot clear an orphan — it can only log
+	 * `clear batch failed: Not connected` and, on the blind path below, burn 90 lines per channel
+	 * building a batch nothing will receive (observed 11.08 15:54:13). The reconnect that follows
+	 * re-runs this sweep with INFO XML in hand, which is the run that actually does the work.
+	 * `=== false` on purpose: test doubles omit the getter, and they must still sweep. */
+	if (amcp.isConnected === false) {
+		log?.('debug', '[template-cg-orphan-sweep] skipped — AMCP not connected (the reconnect sweep will run it)')
+		return { clearedCount: 0, declaredCount: 0 }
+	}
 
 	const declaredHosts = new Set()
 	const clearLines = []

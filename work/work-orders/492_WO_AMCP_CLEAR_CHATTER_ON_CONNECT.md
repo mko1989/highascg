@@ -1,6 +1,6 @@
 # WO-492 — AMCP CLEAR chatter on connect/start: what still fires and why
 
-**Status: OPEN 12.08 — investigation complete and evidence-backed; three findings, NO code changed (two of them would reverse a documented deliberate tradeoff or touch live multiview clearing — owner call)**
+**Status: DONE (12.08 — investigation, then all three findings fixed on owner go-ahead; 9 new smokes, suite 1995/1993/0, eslint 0 errors) — NOT deployed: needs a `highascg` restart, owner's call on an on-air box**
 
 Owner 12.08: *"investigate amcp chatter. the thing that most stands out to me is a cg clears on
 multiple layers on connection or start. this shouldnt happen."*
@@ -73,7 +73,8 @@ empty when the connect gather has not populated yet — i.e. exactly on a fast r
 (`template-cg-orphan-sweep.js:57-59`): *"Fallback is deliberate: with no XML for a channel (INFO not
 gathered yet, parse failure) the old blanket sweep runs for that channel. An orphan left on air is
 worse than a redundant clear, so uncertainty must fail toward sweeping."* That is a sound on-air
-safety argument and **must not be silently reversed** — hence no code change here.
+safety argument and **must not be silently reversed** — so the policy is untouched; only the
+parts with no safety argument behind them were changed (see §7.1).
 
 What is *not* covered by that argument, and is plainly wrong:
 
@@ -83,10 +84,9 @@ What is *not* covered by that argument, and is plainly wrong:
   rather than re-gathering INFO and sweeping accurately a moment later, is the noisy branch of a
   choice that has a quiet branch.
 
-**Recommended (owner call):** bail when `amcp` is not connected; and when a channel has no XML,
-re-gather INFO once with a short backoff before falling back to the blind sweep. Both preserve
-"uncertainty fails toward sweeping" — they just stop it firing when the uncertainty is about to
-resolve itself.
+**Done (§7.1):** bail when `amcp` is not connected. The re-gather-INFO-before-falling-back idea was
+NOT taken — it changes when the deliberate blind sweep runs, and the disconnected guard already
+removes the observed noise.
 
 ## 3. Finding B — `CG n-999 CLEAR` on EVERY multiview apply (undocumented)
 
@@ -113,7 +113,7 @@ on multiple layers on connection or start" looks like in the log.
 **Recommended:** apply WO-482's own technique — gate on occupancy via
 `parseLayerFgProducerTypesFromChannelXml` (WO-482's live check literally observed `999=html`), or
 latch a per-channel "card was painted here" flag and clear once on the active→inactive edge instead
-of on every apply. Not done here because it changes clearing behaviour on the live multiview path.
+of on every apply. **Done (§7.2)** — occupancy gate plus a per-channel cache.
 
 ## 4. Finding C — the multiview "surgical CLEAR" is dead code
 
@@ -136,7 +136,7 @@ if (layersToClear.length > 0) {
 Not destructive — the multiview channel (ch 4 here) is entirely app-owned — but the debug line
 **misreports what went on the wire**, which is how this kind of thing stays hidden.
 
-**Recommended:** either emit per-layer clears for `layersToClear` in the `occupiedList != null`
+**Done (§7.3):** emit per-layer clears for `layersToClear` in the `occupiedList != null`
 branch (batched, as `scene-exit-layers.js:167-173` already does), keeping `clearCasparChannel` for
 the no-XML fallback — or, at minimum, stop the log claiming "surgical".
 
@@ -157,3 +157,80 @@ the no-XML fallback — or, at minimum, stop the log claiming "surgical".
 Findings A, B and C were each re-read in the live source by hand, and the journal and
 `log/caspar_2026-08-12.log` tallies above were re-run directly rather than taken on trust.
 No files were changed.
+
+---
+
+# 7. What was done (owner: "do those", 12.08)
+
+All three findings fixed. The one thing deliberately **not** touched is WO-482's blind-fallback
+*policy* (§2): with a live connection and no INFO XML it still sweeps the full band, because
+"uncertainty fails toward sweeping" remains the right on-air call. Only the parts with no safety
+argument behind them were changed.
+
+## 7.1 Finding A — `src/engine/template-cg-orphan-sweep.js`
+
+Early return when `amcp.isConnected === false`, before any line is built:
+
+```js
+if (amcp.isConnected === false) {
+    log?.('debug', '[template-cg-orphan-sweep] skipped — AMCP not connected (the reconnect sweep will run it)')
+    return { clearedCount: 0, declaredCount: 0 }
+}
+```
+
+`=== false`, not falsy: the existing test doubles omit the getter entirely and must keep sweeping.
+A sweep against a dead socket cannot clear an orphan — the reconnect that follows re-runs it with
+INFO in hand, which is the run that does the work (proven by the 11.08 15:54:13 → 15:55:30 pair).
+
+## 7.2 Finding B — new `src/bootstrap/led-test-layer-999.js`
+
+`clearLedTestLayerOnChannelsIfPresent(ctx, amcp, channels, log)` probes layer 999 and skips channels
+that are provably empty, caching the result per channel so the probe runs **once**, not once per
+apply; `markLedTestLayerPainted(ctx)` drops the cache whenever the card is (re)painted (both the
+initial paint and the CEF replay). `multiview-apply.js` now calls this instead of the unconditional
+`clearLedTestLayerOnChannels`.
+
+The probe uses `listOccupiedStageLayersInRange`, **not** `foregroundProducerOnLayer` — the latter
+returns `null` for *both* "layer is empty" and "XML is unparseable" (its own doc warns against
+reading that as absent), and that is exactly the distinction this gate turns on. `null` (unknown)
+still falls through to clearing, so uncertainty fails toward clearing, same as WO-482.
+
+Split into its own module because the additions pushed `startup-led-test-pattern.js` to 514 lines,
+over the CI limit. `STARTUP_LED_TEST_LAYER` now lives in the new module and the old one imports it,
+so the two cannot become circular.
+
+## 7.3 Finding C — `src/engine/multiview-apply.js`
+
+The `occupiedList != null` branch now actually emits what it computed —
+`CG ch-L CLEAR` / `STOP ch-L` / `MIXER ch-L CLEAR` per stale layer via `batchSend` + one commit,
+the same shape `scene-exit-layers.js:167-173` uses — and records a `playbackTracker.recordStop` per
+cleared layer, because the whole-channel path used to drop the channel from the playback matrix and
+per-layer clears would otherwise leave ghosts. `clearCasparChannel` is now only what it always
+should have been: the fallback for when INFO could not be read (and a catch-fallback if the batch
+throws). The "surgical CLEAR" debug line is finally true.
+
+## 7.4 Verified
+
+- `tools/smoke/smoke-wo492-amcp-clear-chatter.test.js` — **9 tests, all passing**, registered in the
+  curated CI list:
+  - **A** disconnected AMCP queues nothing; connected AMCP still emits all 90 lines (the guard is
+    not a kill-switch); a double without the getter is unaffected.
+  - **B** an empty 999 is probed once and never cleared, and stays silent over repeated applies
+    (cache); an occupied 999 *is* cleared; a repaint re-probes; an unreadable INFO clears.
+  - **C** with INFO only layers 30/31 get `CG`/`STOP`/`MIXER` clears and **no** whole-channel CLEAR
+    fires, and a layer this apply needs (11) is not cleared; without INFO the whole-channel CLEAR
+    still fires.
+- Two real bugs in the first draft were caught by these tests before commit: the probe used
+  `foregroundProducerOnLayer` (which cannot distinguish empty from unparseable, so every channel
+  fell through to clearing), and the first test mock returned `{ text }` where
+  `infoResponseToXml` reads `res.data`.
+- Full offline gate → **1995 tests, 1993 pass / 0 fail / 2 skip** (was 1986/1984 — the 9 new tests,
+  nothing regressed; `smoke-multiview-apply-lock` / `smoke-multiview-reapply` exercise the changed
+  clear path and still pass). `check-max-file-lines` → 0 over 500. eslint → 0 errors (2 pre-existing
+  unused-import warnings in `multiview-apply.js:19-20`, present in HEAD before this change).
+
+**NOT deployed.** These are `src/**` changes, so they need
+`kill -TERM $(systemctl show -p MainPID --value highascg)`. That drops AMCP and re-runs startup — an
+owner call on a live box. The restart is also the natural QA for A: the reconnect is the exact path
+that used to sweep blind, and `journalctl -u highascg.service | grep orphan-sweep` should keep
+reading `cleared=0`, with no `CG n-999 CLEAR` triple following the multiview apply.

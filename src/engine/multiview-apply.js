@@ -180,8 +180,12 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 			if (programChannels.includes(routeCh) || previewChannels.includes(routeCh)) routed.add(routeCh)
 		}
 		if (routed.size > 0) {
-			const { clearLedTestLayerOnChannels } = require('../bootstrap/startup-led-test-pattern')
-			await clearLedTestLayerOnChannels(ctx.amcp, [...routed], ctx.log?.bind(ctx))
+			/* WO-492 B: probe layer 999 before clearing it. This runs on EVERY apply (boot, every
+			 * reconnect, every layout edit) and the unconditional form cleared three empty layers
+			 * per apply forever. `…IfPresent` caches "provably empty" per channel, so the steady
+			 * state is silent. */
+			const { clearLedTestLayerOnChannelsIfPresent } = require('../bootstrap/startup-led-test-pattern')
+			await clearLedTestLayerOnChannelsIfPresent(ctx, ctx.amcp, [...routed], ctx.log?.bind(ctx))
 		}
 	}
 
@@ -216,9 +220,34 @@ async function _doApplyMultiviewLayout(b, ctx, ch, map, opts = {}) {
 		layersToClear.push(OVERLAY_LAYER)
 		ctx.log('debug', `Multiview: broad CLEAR on ch ${ch} (INFO XML missing or unparseable)`)
 	}
+	/* WO-492 C: this used to compute `layersToClear`, log it as "surgical", then throw it away and
+	 * send a whole-channel `CLEAR <ch>` down BOTH branches — the debug line described a per-layer
+	 * clear that never went on the wire. When INFO told us exactly which slots are occupied, clear
+	 * those slots; the whole-channel hammer is now only what it always should have been: the
+	 * fallback for when we could not see the channel. */
 	if (layersToClear.length > 0) {
-		ctx.log('debug', `Multiview: CLEAR ${ch} (was ${layersToClear.length} per-layer slot(s) in 10–60)`)
-		await clearCasparChannel(ctx.amcp, ch, ctx)
+		if (occupiedList != null) {
+			const lines = []
+			for (const L of layersToClear) lines.push(`CG ${ch}-${L} CLEAR`, `STOP ${ch}-${L}`, `MIXER ${ch}-${L} CLEAR`)
+			try {
+				await ctx.amcp.batchSend(lines)
+				await ctx.amcp.mixerCommit(ch)
+				// The whole-channel path dropped the channel from the playback matrix; per-layer
+				// clears have to drop exactly the layers they cleared, or the matrix keeps ghosts.
+				const playbackTracker = require('../state/playback-tracker')
+				for (const L of layersToClear) {
+					try {
+						playbackTracker.recordStop(ctx, ch, L)
+					} catch (_) {}
+				}
+			} catch (e) {
+				ctx.log('debug', `Multiview: per-layer CLEAR on ch ${ch} failed (${e?.message || e}) — falling back to whole-channel CLEAR`)
+				await clearCasparChannel(ctx.amcp, ch, ctx)
+			}
+		} else {
+			ctx.log('debug', `Multiview: whole-channel CLEAR ${ch} (no INFO XML — ${layersToClear.length} slot(s) assumed in 10–60)`)
+			await clearCasparChannel(ctx.amcp, ch, ctx)
+		}
 	}
 
 	try {

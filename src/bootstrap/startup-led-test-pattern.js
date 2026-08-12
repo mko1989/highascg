@@ -7,8 +7,14 @@ const { parseServerChannels } = require('../config/config-compare')
 const { responseToStr } = require('../utils/query-cycle')
 const persistence = require('../utils/persistence')
 
-/** Same layer as manual LED test card (`routes-led-test-card.js`). */
-const STARTUP_LED_TEST_LAYER = 999
+/* WO-492 B: layer-999 clearing + the "is the card even there?" probe live in their own module
+ * (500-line limit); the layer constant is defined there so the two cannot require each other. */
+const {
+	STARTUP_LED_TEST_LAYER,
+	clearLedTestLayerOnChannels,
+	clearLedTestLayerOnChannelsIfPresent,
+	markLedTestLayerPainted,
+} = require('./led-test-layer-999')
 const TEMPLATE_NAME = 'led_grid_test'
 
 const DONE_KEY = 'ledTestStartupDoneBootId'
@@ -207,6 +213,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	appCtx._startupLedTestChannelIndices = withTarget.map((c) => c.index)
 	appCtx._startupLedTestChannels = withTarget
 	appCtx._ledTestPatternActive = true
+	markLedTestLayerPainted(appCtx)
 	if (typeof appCtx._wsBroadcast === 'function' && typeof appCtx.getState === 'function') {
 		try {
 			appCtx._wsBroadcast('change', { path: 'ledTestPatternActive', value: true })
@@ -243,35 +250,6 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 			}, ms)
 			if (t.unref) t.unref()
 			cefReplayTimeouts.push(t)
-		}
-	}
-}
-
-/**
- * Remove only the startup LED template + mixer on layer 999 (not whole-channel CLEAR).
- * @param {import('../caspar/amcp-client').AmcpClient} amcp
- * @param {number[]} channelIndices
- * @param {(s: string, ...a: unknown[]) => void} [log]
- */
-async function clearLedTestLayerOnChannels(amcp, channelIndices, log) {
-	if (!amcp?.cg?.cgClear || !channelIndices?.length) return
-	for (const ch of channelIndices) {
-		if (!Number.isFinite(ch) || ch < 1) continue
-		const cl = `${ch}-${STARTUP_LED_TEST_LAYER}`
-		try {
-			await amcp.cg.cgClear(ch, STARTUP_LED_TEST_LAYER)
-		} catch (e) {
-			log?.('debug', `[Startup LED test] CG CLEAR ${cl}: ${e?.message || e}`)
-		}
-		try {
-			if (amcp.mixerClear) await amcp.mixerClear(ch, STARTUP_LED_TEST_LAYER)
-		} catch (e) {
-			log?.('debug', `[Startup LED test] MIXER CLEAR ${cl}: ${e?.message || e}`)
-		}
-		try {
-			await amcp.mixerCommit(ch)
-		} catch (e) {
-			log?.('debug', `[Startup LED test] COMMIT ch${ch}: ${e?.message || e}`)
 		}
 	}
 }
@@ -416,6 +394,7 @@ async function replayStartupLedTestFullBatch(appCtx, withTarget, ipLines, config
 				await amcp.mixerCommit(ch.index)
 			} catch (_) {}
 		}
+		markLedTestLayerPainted(appCtx)
 		appCtx.log?.('debug', '[Startup LED test] Full CG replay (CEF catch-up)')
 	} catch (e) {
 		appCtx.log?.('warn', '[Startup LED test] replay: ' + (e?.message || e))
@@ -439,5 +418,7 @@ module.exports = {
 	buildStartupLedTestUpdateCommands,
 	notifyWebSocketClientConnected,
 	clearLedTestLayerOnChannels,
+	clearLedTestLayerOnChannelsIfPresent,
+	markLedTestLayerPainted,
 	tryClearStartupLedTestForWebUi,
 }
