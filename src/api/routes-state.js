@@ -42,20 +42,30 @@ async function handleGet(path, ctx, query = {}) {
 				if (media.length > 0) {
 					ctx._mediaProbePopulating = true
 					ctx._mediaProbeCache = ctx._mediaProbeCache || {}
-					const toProbe = media
-						.filter((c) => {
-							const existing = ctx._mediaProbeCache[c.id]
-							return !existing?.resolution || (existing?.fps == null && existing?.fps !== 0)
-						})
-						.slice(0, 120)
+					/* WO-497: select on "have we probed this yet", not on what the probe returned.
+					 *
+					 * The old filter re-selected anything without a `resolution`, and the write-back
+					 * only cached a NON-EMPTY result. `probeMedia` resolves `{}` on spawn error or a
+					 * non-zero exit, so an unprobeable file was never cached and re-spawned ffprobe on
+					 * every single /api/state — forever. An audio-only file was worse: it probes
+					 * SUCCESSFULLY into `{hasAudio, durationMs, fileSize}` with no resolution, so it
+					 * got cached and still matched the filter, re-spawning every call. Measured here:
+					 * 97 media files, 11 audio-only — a guaranteed floor of 11 ffprobe spawns per
+					 * call, on an endpoint the UI hits on load, project sync, new project and the
+					 * sources panel, in the process that also drives playout. */
+					const toProbe = media.filter((c) => !(c.id in ctx._mediaProbeCache)).slice(0, 120)
 					Promise.all(
 						toProbe.map(async (c) => {
 							const fp = resolveSafe(basePath, c.id)
 							if (fp) {
 								try {
 									const p = await probeMedia(fp)
-									if (p && Object.keys(p).length) ctx._mediaProbeCache[c.id] = p
-								} catch {}
+									// Cache the result even when empty — "we tried and got nothing" is
+									// itself the answer, and re-asking cannot change it.
+									ctx._mediaProbeCache[c.id] = p && Object.keys(p).length ? p : {}
+								} catch {
+									ctx._mediaProbeCache[c.id] = {}
+								}
 							}
 						}),
 					).finally(() => {

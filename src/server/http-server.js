@@ -145,9 +145,19 @@ async function serveWebApp(requestPath, dirs) {
 		const body = await fs.promises.readFile(fullPath, 'utf8')
 		const headers = withUiSecurityHeaders({ 'Content-Type': contentType }, ext)
 		if (ext === '.html' || ext === '.js' || ext === '.css' || ext === '.mjs') {
-			headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-			headers['Pragma'] = 'no-cache'
-			headers['Expires'] = '0'
+			/* WO-497: `assets/*` are Vite CONTENT-HASHED builds (`main-Uwb3-Ep9.js`) — the filename
+			 * changes whenever the bytes do, so they are immutable by construction and `no-store`
+			 * only forces every client to re-download the whole eager bundle (~1.7 MB here) on every
+			 * single load and reload, through the same Node process that drives playout. index.html
+			 * is NOT hashed and stays no-store, so a new build is still picked up immediately — it
+			 * is what points at the new hashes. */
+			if (isContentHashedAsset(fullPath)) {
+				headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+			} else {
+				headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+				headers['Pragma'] = 'no-cache'
+				headers['Expires'] = '0'
+			}
 		}
 		return { status: 200, headers, body }
 	} catch (e) {
@@ -182,6 +192,21 @@ async function serveWebApp(requestPath, dirs) {
  * @param {string} body
  * @param {import('http').IncomingMessage} _req
  */
+/**
+ * WO-497: a Vite content-hashed build artefact — `.../assets/<name>-<HASH>.<ext>`.
+ *
+ * The hash is derived from the bytes, so the URL changes whenever the content does. That makes the
+ * file safe to cache forever, and makes `no-store` pure waste. Deliberately anchored on the `assets`
+ * directory AND an 8+ char base62 hash segment, so hand-written files (`index.html`, vendor drops,
+ * templates) never match and keep their revalidate-every-time behaviour.
+ * @param {string} filePath - resolved filesystem path being served
+ * @returns {boolean}
+ */
+function isContentHashedAsset(filePath) {
+	const p = String(filePath || '').replace(/\\/g, '/')
+	return /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/.test(p)
+}
+
 async function defaultRouteApi(method, reqPath, _body, _req) {
 	return {
 		status: 503,
