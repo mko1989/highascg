@@ -118,6 +118,57 @@ visible loss. **Unverified — Caspar pairs may require matching rasters for rou
 **D. Fewer destinations, or a lower project fps.** Effective and unattractive; listed for
 completeness.
 
+## 5b. RESOLVED by Option B — owner tested `<gpu-texture>true</gpu-texture>` 13.08
+
+Owner hand-edited it into the generated `casparcg.config` and re-measured. It works, and the tick
+rates are the proof — **every channel is back at 50 fps**:
+
+| | ch2 (6144×1536) | ch6 | ch7 | ch1 media rate | GPU |
+|---|---|---|---|---|---|
+| host_strategy (default) | 46.35 | 47.00 | 47.35 | 91.7–93.6 % | 100 % |
+| **`gpu-texture` on** | **51.19** | **49.96** | **50.00** | **100.3–100.6 %** | **75 %** |
+
+All seven channels retained. The GL-thread ceiling in §3 is real but was being hit by *avoidable*
+work: `host_strategy` was round-tripping every screen consumer's full raster through host memory and
+re-uploading it, on that same single thread. Binding the mixer's existing texture removes it.
+
+**Made a real setting** — the owner's edit was to the *generated* file and the next Apply would have
+erased it:
+
+- `src/config/config-generator-screen-xml.js` — `screen_N_gpu_texture` → `<gpu-texture>`, emitted
+  explicitly, **default false** (upstream calls it a 2.5 feature and it needs the consumer's GL
+  context to share with the device, so it stays opt-in per screen).
+- `src/config/defaults-caspar-server.js` — seeded false, agreeing with the generator.
+- 4 smokes: default off, `true`/`'true'` honoured, per-screen isolation (screen 2 must not inherit
+  screen 1), and the seed agreeing with the generator.
+
+**Owner action:** set `screen_1_gpu_texture: true` (and any other screen you want it on) via the
+settings API or Device View, then Apply — otherwise the next Apply reverts to `host_strategy` and
+the box drops back to ~93 %.
+
+Options A, C and D are consequently **not needed** and were never applied. Option A's measurement
+(+7.5 points from dropping two channels) stands as evidence for the serialization mechanism, not as
+a recommendation.
+
+## 5c. On "the jitter is still present"
+
+The owner asked how accurate the tool is, given a 100.3 % median alongside a wide per-sample spread.
+The scepticism was correct and the tool was fixed (`tools/dev/measure-playback-rate.js`):
+
+- The headline is now a **least-squares fit** over all samples, not a sum of pairwise ratios — a
+  single slow `/api/state` no longer distorts it.
+- The per-sample column is relabelled **spread**, and the tool now measures its own poll-interval
+  standard deviation and says outright when that dominates. Measured here: **±0.056 s of poll
+  wobble**, which moves a ~1 s ratio far more than playback does. The 0.687–1.339 spread was almost
+  entirely this tool, not the box.
+- **Channel tick rate** (exact monotonic frame counters, immune to poll latency) is now printed with
+  every run. It is the honest instrument, and it is what confirmed the fix above.
+
+**Rate is solved.** If jitter is still visible on the glass at ~100 % rate and 50 fps tick, it is a
+frame-*pacing* problem — presentation timing, not speed — which is [WO-407](./407_WO_SCREEN_CONSUMER_MICRO_STUTTER.md)'s
+territory (GL vblank sync, `docs/reference/multi-head-gl-vblank-sync.md`), and needs judging by eye
+on moving content rather than by this tool.
+
 ## 6. What was NOT done
 
 - **No change was made.** Both ablations were reverted within seconds; the box is as it was.

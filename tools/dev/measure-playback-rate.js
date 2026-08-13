@@ -157,6 +157,47 @@ async function snapshotHost(host) {
 	}
 }
 
+/**
+ * Least-squares slope of elapsed vs wall clock.
+ *
+ * The headline number. Pairwise ratios divide by a ~1 s interval that carries this tool's own HTTP
+ * latency, so a single slow `/api/state` throws that sample far off while barely moving the fit.
+ * Regression uses every sample's absolute position, so poll-latency noise cancels instead of
+ * accumulating.
+ * @param {{at:number, elapsed:number}[]} pts wrap-corrected, monotonic
+ */
+function regressionRate(pts) {
+	const n = pts.length
+	if (n < 3) return null
+	const mx = pts.reduce((s, p) => s + p.at, 0) / n
+	const my = pts.reduce((s, p) => s + p.elapsed, 0) / n
+	let num = 0
+	let den = 0
+	for (const p of pts) {
+		num += (p.at - mx) * (p.elapsed - my)
+		den += (p.at - mx) ** 2
+	}
+	return den > 0 ? num / den : null
+}
+
+/** Per-channel tick rate from each meter consumer's monotonic frame counter (WO-502). */
+async function readConsumerFrames(host) {
+	const out = {}
+	for (let ch = 1; ch <= 16; ch++) {
+		let data
+		try {
+			data = (await amcp(host, `INFO ${ch}`))?.data
+		} catch {
+			break
+		}
+		if (typeof data !== 'string') break
+		const block = /<port_720>[\s\S]*?<\/port_720>/.exec(data)
+		const f = block && /<frame>(\d+)<\/frame>/.exec(block[0])
+		if (f) out[ch] = parseInt(f[1], 10)
+	}
+	return { at: Date.now() / 1000, frames: out }
+}
+
 function summarise(samples, duration) {
 	let advanced = 0
 	let wall = 0
@@ -181,18 +222,40 @@ function summarise(samples, duration) {
 	}
 	const rate = wall > 0 ? advanced / wall : 0
 	ratios.sort((x, y) => x - y)
+
+	// Wrap-corrected monotonic series for the regression fit.
+	const pts = []
+	let offset = 0
+	for (let i = 0; i < samples.length; i++) {
+		if (i > 0 && duration && samples[i].elapsed - samples[i - 1].elapsed < -1) offset += duration
+		pts.push({ at: samples[i].at, elapsed: samples[i].elapsed + offset })
+	}
+	const fit = regressionRate(pts)
+
+	// How much of the per-sample spread is OUR polling, not playback. dt should be ~constant.
+	const dts = []
+	for (let i = 1; i < samples.length; i++) dts.push(samples[i].at - samples[i - 1].at)
+	const mdt = dts.length ? dts.reduce((a, b) => a + b, 0) / dts.length : 0
+	const sdt = dts.length ? Math.sqrt(dts.reduce((s, d) => s + (d - mdt) ** 2, 0) / dts.length) : 0
+
+	const fitPct = fit != null ? +(fit * 100).toFixed(1) : null
+	const headline = fitPct != null ? fit : rate
 	return {
 		samples: samples.length,
 		mediaAdvancedSec: +advanced.toFixed(3),
 		wallSec: +wall.toFixed(3),
-		ratePct: +(rate * 100).toFixed(1),
+		ratePct: fitPct != null ? fitPct : +(rate * 100).toFixed(1),
+		ratePctPairwise: +(rate * 100).toFixed(1),
 		minRatio: ratios.length ? +ratios[0].toFixed(3) : null,
 		medianRatio: ratios.length ? +ratios[Math.floor(ratios.length / 2)].toFixed(3) : null,
 		maxRatio: ratios.length ? +ratios[ratios.length - 1].toFixed(3) : null,
+		pollIntervalSd: +sdt.toFixed(3),
+		/** Per-sample ratios are untrustworthy once our own poll interval wobbles this much. */
+		pollNoiseDominates: sdt > 0.05,
 		backwardSteps: backward,
 		loopWraps: wraps,
 		/** Client re-anchors once its 1.0x extrapolation drifts past SNAP_TOL_SEC (0.5 s). */
-		predictedBarSnapSec: rate > 0 && rate < 1 ? +(0.5 / (1 - rate)).toFixed(2) : null,
+		predictedBarSnapSec: headline > 0 && headline < 1 ? +(0.5 / (1 - headline)).toFixed(2) : null,
 	}
 }
 
@@ -220,6 +283,7 @@ async function main() {
 	console.log(`window     ${opt.seconds} s @ ${opt.interval} s\n`)
 
 	const before = await snapshotHost(opt.host)
+	const ticksBefore = await readConsumerFrames(opt.host)
 	const samples = []
 	const t0 = Date.now()
 	while ((Date.now() - t0) / 1000 < opt.seconds) {
@@ -257,15 +321,41 @@ async function main() {
 		await sleep(Math.max(0, opt.interval * 1000 - (Date.now() - tb)))
 	}
 
+	const ticksAfter = await readConsumerFrames(opt.host)
 	const after = await snapshotHost(opt.host)
 	const consumers = await snapshotConsumers(opt.host)
 	const sum = summarise(samples, duration)
 
+	// Channel tick rate: an exact monotonic counter over a long window. Immune to poll latency, and
+	// the only honest way to tell a slow CHANNEL from a slow clip (WO-502).
+	const tickWindow = ticksAfter.at - ticksBefore.at
+	const ticks = []
+	for (const ch of Object.keys(ticksAfter.frames)) {
+		const a = ticksBefore.frames[ch]
+		const b = ticksAfter.frames[ch]
+		if (a == null || b == null || b <= a || tickWindow <= 0) continue
+		ticks.push({ channel: Number(ch), fps: +((b - a) / tickWindow).toFixed(2) })
+	}
+
 	console.log(`\n${'='.repeat(58)}`)
 	console.log(`RATE       ${sum.ratePct} % of realtime` + (opt.label ? `   [${opt.label}]` : ''))
-	console.log(`           ${sum.mediaAdvancedSec} s media over ${sum.wallSec} s wall, ${sum.samples} samples`)
-	console.log(`jitter     min ${sum.minRatio}  median ${sum.medianRatio}  max ${sum.maxRatio}`)
+	console.log(`           least-squares fit over ${sum.samples} samples (pairwise: ${sum.ratePctPairwise} %)`)
+	console.log(`spread     min ${sum.minRatio}  median ${sum.medianRatio}  max ${sum.maxRatio}`)
+	if (sum.pollNoiseDominates) {
+		console.log(
+			`           ^ MOSTLY THIS TOOL: poll interval varied +/-${sum.pollIntervalSd}s, which moves\n` +
+				`             each per-sample ratio far more than playback does. Trust RATE, not the spread.\n` +
+				`             This is NOT on-glass jitter — at ~100 % rate, visible stutter is a frame-pacing\n` +
+				`             problem (vsync / GL sync, WO-407), not a speed problem.`,
+		)
+	}
 	console.log(`backward   ${sum.backwardSteps} source-side regressions, ${sum.loopWraps} loop wraps`)
+	if (ticks.length) {
+		console.log(
+			`tick rate  ${ticks.map((t) => `ch${t.channel} ${t.fps}`).join('  ')}   ` +
+				`(exact frame counters over ${tickWindow.toFixed(0)} s — a slow CHANNEL shows here)`,
+		)
+	}
 	if (sum.predictedBarSnapSec) {
 		console.log(`bar snap   expect the GUI progress bar to jump back every ~${sum.predictedBarSnapSec} s`)
 	}
@@ -290,6 +380,7 @@ async function main() {
 			layer,
 			clip: { name: found.file.name ?? null, fps: found.file.fps ?? null, duration },
 			...sum,
+			ticks,
 			hostBefore: before,
 			hostAfter: after,
 			consumers,

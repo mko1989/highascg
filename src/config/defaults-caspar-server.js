@@ -34,6 +34,9 @@ function casparScreenDefaults(n, ndiName) {
 		[`${p}sbs_key`]: false,
 		[`${p}colour_space`]: 'RGB',
 		[`${p}force_linear_filter`]: false,
+		/* WO-502: opt-in. Skips host_strategy's per-frame full-raster memcpy + re-upload on the
+		 * single shared GL thread. Off by default — upstream calls it a 2.5 feature. */
+		[`${p}gpu_texture`]: false,
 		[`${p}force_os_resolution`]: false,
 	}
 }

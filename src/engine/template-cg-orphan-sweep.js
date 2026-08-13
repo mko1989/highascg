@@ -79,6 +79,21 @@ async function sweepTemplateCgOrphansOnCasparConnected(opts) {
 				types = null
 			}
 		}
+		/* WO-503: `gatheredInfo.channelXml` is a SNAPSHOT taken when this sweep is scheduled, and on
+		 * the connect path `periodic-sync` has not filled it yet — so the blind branch below fired on
+		 * every reconnect and put 90 `CG n-7xx CLEAR` lines per program channel into Caspar's log,
+		 * which is what made the log unreadable. Ask for the XML instead of guessing: ONE `INFO <ch>`
+		 * replaces 90 CLEARs and is strictly more accurate than sweeping blind. Only a genuine INFO
+		 * failure now reaches the fallback, which keeps WO-482's deliberate fail-toward-sweeping. */
+		if (!types && amcp?.isConnected) {
+			try {
+				const info = await amcp.info(ch)
+				const xmlNow = typeof info?.data === 'string' ? info.data : Array.isArray(info?.data) ? info.data.join('\n') : ''
+				if (xmlNow.trim()) types = await parseLayerFgProducerTypesFromChannelXml(xmlNow)
+			} catch {
+				types = null
+			}
+		}
 		if (!types) sweptBlind++
 		for (let host = 700; host <= 789; host++) {
 			const key = `${ch}-${host}`
