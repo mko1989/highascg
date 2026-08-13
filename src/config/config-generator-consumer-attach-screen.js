@@ -14,6 +14,8 @@ const {
 } = require('./config-generator-builders')
 const { casparBoolEnabled } = require('./config-generator-utils')
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
+/* WO-507: which DeckLink slots are bound as INPUTS — never emit an output consumer on one. */
+const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
 const {
 	buildDecklinkKeyFillConsumersXml,
 	readDecklinkKeyFillSettings,
@@ -103,8 +105,34 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const portAudioXml = buildPortAudioConsumerXml(config, n)
 
 	const tilesRaw = config[`screen_${n}_decklink_tiles`]
-	const tiles = Array.isArray(tilesRaw) ? tilesRaw : []
-	const decklinkDevice = parseInt(String(config[`screen_${n}_decklink_device`] || '0'), 10)
+	/* WO-507: a DeckLink card cannot be an input and an output at once. Asking Caspar to open an
+	 * output consumer on a device already bound to an input producer fails at card-open, and because
+	 * that failure happens during channel construction the server dies and systemd restarts it — a
+	 * restart LOOP, with no picture at all. Owner hit exactly this: outputs on DeckLink 1 & 2 also
+	 * emitted a 2160p50 consumer on device 3, which the config declares as an input.
+	 *
+	 * Fossil bindings are the usual source (`screen_N_decklink_tiles` is generate-time-only state,
+	 * WO-494; `screen_N_decklink_device` survives re-mapping, WO-442/491/496). Rather than chase every
+	 * path that can leave one behind, refuse to emit here: this is the single point every screen's
+	 * DeckLink output passes through, and an output we drop costs one dark SDI port, while one we
+	 * wrongly emit costs the whole server. */
+	const reservedInputSlots = new Set(resolveDecklinkInputSlots(config) || [])
+	const tilesAll = Array.isArray(tilesRaw) ? tilesRaw : []
+	const tiles = tilesAll.filter((t) => !reservedInputSlots.has(parseInt(String(t?.device), 10)))
+	if (tiles.length !== tilesAll.length && typeof config.__generatorWarn === 'function') {
+		const dropped = tilesAll.filter((t) => reservedInputSlots.has(parseInt(String(t?.device), 10)))
+		config.__generatorWarn(
+			`[WO-507] screen ${n}: dropped DeckLink output tile(s) on input-reserved device(s) ` +
+				`${[...new Set(dropped.map((t) => t.device))].join(', ')}`,
+		)
+	}
+	const decklinkDeviceRaw = parseInt(String(config[`screen_${n}_decklink_device`] || '0'), 10)
+	const decklinkDevice = reservedInputSlots.has(decklinkDeviceRaw) ? 0 : decklinkDeviceRaw
+	if (decklinkDeviceRaw > 0 && decklinkDevice === 0 && typeof config.__generatorWarn === 'function') {
+		config.__generatorWarn(
+			`[WO-507] screen ${n}: DeckLink ${decklinkDeviceRaw} is configured as an INPUT — output consumer not emitted`,
+		)
+	}
 	const decklinkReplaceScreen =
 		(config[`screen_${n}_decklink_replace_screen`] === true || config[`screen_${n}_decklink_replace_screen`] === 'true') &&
 		(decklinkDevice > 0 || tiles.length > 0) &&

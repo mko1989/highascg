@@ -91,6 +91,42 @@ should_relaunch() {
 
 run_caspar() {
 	source_caspar_env
+	# WO-508: the flock at the top guards against a second run.sh, NOT against a second casparcg.
+	# A binary started outside the supervisor — by hand, or a survivor of a previous boot — was never
+	# noticed, and this launched a second MAIN alongside it. Two mains cannot coexist: they fight for
+	# AMCP :5250, the DeckLink cards and the screen consumers, and the loser exiting non-zero puts the
+	# unit into a restart loop.
+	#
+	# caspar_list_main_pids() already excludes CEF children (they carry --type=), so this counts real
+	# mains only — the pgrep-self-match false alarm from WO-407 is handled there, not re-invented here.
+	#
+	# Wait briefly first: on a supervisor relaunch the pid we see is usually our own just-exited child
+	# still being reaped, and refusing on that would break every legitimate restart.
+	_wait=0
+	while [ "$_wait" -lt 50 ]; do
+		[ -z "$(caspar_list_main_pids)" ] && break
+		_wait=$((_wait + 1))
+		sleep 0.1
+	done
+	# Confirm each candidate by /proc/<pid>/exe before acting on it. caspar_list_main_pids() matches on
+	# the COMMAND LINE, so any process that merely mentions both the binary and the config path — a
+	# shell running a caspar command, an editor, this script's own tooling — is reported as a main.
+	# That is the WO-407 self-match false alarm, and it is measurable: a shell with both paths in its
+	# argv lands in that list. Pattern-matching is fine for a kill sweep; it is NOT good enough to
+	# refuse a launch on, because a false positive here leaves the box dark.
+	_stray=''
+	for _p in $(caspar_list_main_pids); do
+		[ "$_p" = "$$" ] && continue
+		_exe="$(readlink -f "/proc/$_p/exe" 2>/dev/null || true)"
+		[ "$_exe" = "$(readlink -f "$CASPAR_BIN" 2>/dev/null || echo "$CASPAR_BIN")" ] || continue
+		_stray="$_stray$_p "
+	done
+	if [ -n "${_stray% }" ]; then
+		# Deliberately refuse rather than kill: that other process may be the one currently ON AIR.
+		# Exiting non-zero lets systemd back off (RestartSec) and puts the reason in the journal.
+		caspar_supervisor_log "[run.sh] REFUSING to launch — a casparcg main process is already running (pid(s): ${_stray% }). Only one instance may run; stop it first (systemctl stop casparcg-server) or kill it by hand."
+		exit 3
+	fi
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
 	_saw_amcp=0

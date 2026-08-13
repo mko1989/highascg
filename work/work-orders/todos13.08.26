@@ -4,3 +4,9 @@ operators will want to work mostly on their custom labels and not generic screen
 after reboot the operator ch starts with a test card on. then needs me to enable and disable the tick for that screen in test card setup for it to disapper. shouldnt happen at all.
 
 in pixel mapping node, when in an output a resolution is chosen from a drop down, it should fill width and height with that resolutions w/h.
+
+just now wanted to test output of ch1 to two decklinks 1&2, somehow it also tried to open a cosumer on decklink 3 at 2160p50 even though its used as an input in the config. 
+this makes the casparcg go into restart loop. 
+also i want you to double and triple check if there is only one instance of caspar running and there are appropriete safeguards for ensuring only one runs at a time (counting subprocesses of course). 
+
+the yuv setting in decklink output doesnt land in the generated caspar config.

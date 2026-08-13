@@ -1,7 +1,6 @@
 # WO-506 — Operator-editable labels for ANY live source, on every label bar
 
-**Status: OPEN — investigated 13.08.2026, NOT implemented.** Design and the full render-site
-inventory are below; the build is a decision, see §5.
+**Status: OPEN — investigated 13.08.2026, NOT implemented. Owner DECIDED the open questions same day (§4a) — the design is now unblocked and ready to build.**
 **Priority:** Medium (operator ergonomics, no on-air risk)
 **Source:** owner `todos13.08.26`: *"labels for any live source (pgm, prv, decklink, ndi etc) that
 can be displayed on the label bar that appears in compose prv, multiview, looks, timelines (for
@@ -109,6 +108,28 @@ Renaming those is a separate decision.
 - **Empty string must mean "use the fallback"**, not "blank label".
 - Labels are operator free text rendered into HTML templates and SVG — they must go through the
   existing escaping used for template payloads (WO-103 hardening).
+
+## 4a. Owner decisions (13.08) — questions in §4 are ANSWERED
+
+> *"the screen labels need to be over anything. if operator changes the label then this is the only
+> thing that shows everywhere."*
+
+**`screenLabels` is authoritative, unconditionally.** The §4 collision is resolved in its favour:
+`screenDestinations[].label` must never win, and where a surface shows a destination name it renders
+the screen label instead. One operator edit, one visible result, everywhere. Empty still means
+"fall back to the generated name" — that is absence, not an override.
+
+> *"for the small pils in the top bar right side, to choose which screens progress bar to show, it
+> should be a 3 later shorthand of the label, just first 3 letters, nothing else."*
+
+**Top-bar screen pills = `label.slice(0, 3)`.** Literally the first three characters of the resolved
+label — no smart initials, no vowel-stripping, no uppercasing beyond what the operator typed. "Main"
+→ "Mai", "Stage Left" → "Sta". Shorter labels render as-is. This is a display-only transform at the
+pill render site; it must NOT be stored, and every other surface keeps the full label.
+
+Still open from §4 and NOT decided: whether the audio-mixer and header-bar sites keep their channel
+numbers. Treated as **keep** until the owner says otherwise, since those numbers are a diagnostic —
+they are outside the surfaces the owner named and will not be swept.
 
 ## 5. Not done, and why
 
