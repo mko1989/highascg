@@ -12,3 +12,23 @@ also i want you to double and triple check if there is only one instance of casp
 the yuv setting in decklink output doesnt land in the generated caspar config.
 the config generator doesnt register that a connection has been changed and tries to run two channels on the same decklink outputs.
 do a thorough investigation into config generator as i see it has regressed.
+
+
+
+*****NEW******
+add the guard.
+
+check the long restart issue.
+
+the labels of screens is not finished. cant add labels to decklink inputs.
+
+the dev machine plays the same setup with even more media easily on both screen consumer and decklink conusumers. at under 50% gpu load.
+
+
+transitions between looks and timelines doesnt work correctly, either some of the layers play or nothing at all. this already happend so there should be a wo about that.
+
+going between looks and timelines screwes up the compose preview. also there is a weird dotted blue line around the compose preview, why???
+
+changing clips position/size (on the screen) in timelines takes a while to show up on the preview screen, looks like amcp gets overrun.
+
+when copying a clip in timelines to another layer then dropping a different media on to it, i want it to preserve all the settings (resolution should be similar when ratios doest match). also when the clip was "extended"(dragged by the clips edge to make take up more space in the timeline) it should preserve that too.

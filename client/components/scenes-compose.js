@@ -17,6 +17,7 @@ import { cropFromLayer, normalizeCrop } from '../lib/layer-crop.js'
 import { isLayerSourceExchange } from '../lib/scene-state-layer-logic.js'
 import { createComposeDragHandlers } from './scenes-compose-handlers.js'
 import { buildComposeLayerContent } from './scenes-compose-layer-thumb.js'
+import { installDragHighlightCleanup } from '../lib/drag-highlight-cleanup.js'
 export { createComposeDragHandlers } from './scenes-compose-handlers.js'
 
 /**
@@ -323,6 +324,10 @@ export function renderComposeScene(scene, opts) {
 			e.dataTransfer.dropEffect = 'copy'
 			el.classList.add('scenes-layer--drag-over')
 		})
+		/* WO-518: `dragleave` alone leaks the highlight — it does not fire on an Esc-cancelled drag, a
+		 * drop on another element, or a mid-drag re-render, which is how a blue dashed outline ended up
+		 * outliving the gesture and following the operator between looks and timelines. */
+		installDragHighlightCleanup()
 		el.addEventListener('dragleave', () => el.classList.remove('scenes-layer--drag-over'))
 		el.addEventListener('drop', (e) => {
 			e.preventDefault()
