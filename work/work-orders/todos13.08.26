@@ -1,0 +1,6 @@
+labels for any live source (pgm, prv, decklink, ndi etc) that can be displayed on the label bar that appears in compose prv, multiview, looks, timelines (for pgm/prv), test card (settings and display).
+operators will want to work mostly on their custom labels and not generic screen 1 etc. 
+
+after reboot the operator ch starts with a test card on. then needs me to enable and disable the tick for that screen in test card setup for it to disapper. shouldnt happen at all.
+
+in pixel mapping node, when in an output a resolution is chosen from a drop down, it should fill width and height with that resolutions w/h.

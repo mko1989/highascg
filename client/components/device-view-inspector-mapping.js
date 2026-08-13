@@ -181,7 +181,7 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 		attachMathInput(cW, { min: 1, decimals: 0 })
 		attachMathInput(cH, { min: 1, decimals: 0 })
 		attachMathInput(cF, { min: 1, decimals: 2 })
-		customBox.style.display = isCustomMode ? 'grid' : 'none'
+		/* Visibility/disabled state is owned by syncModeFields() below (WO-505). */
 
 		const saveCustom = async () => {
 			/* WO-437: picking a STANDARD mode used to save the hidden custom inputs' stale numbers
@@ -203,8 +203,24 @@ export function renderMappingNodeInspector(host, deviceId, live, { lastPayload, 
 				load({ forceRefresh: true })
 			}
 		}
+		/* WO-505: picking a standard mode computed the right w/h for the SAVE (WO-437) but left the
+		 * visible inputs showing the previous resolution — so the panel contradicted what was stored,
+		 * and switching back to Custom started from stale numbers. Mirror the mode into the fields and
+		 * keep them on screen, disabled, so the chosen resolution is readable instead of hidden. */
+		const syncModeFields = () => {
+			const isCustom = vMode.value === 'custom'
+			customBox.style.display = 'grid'
+			for (const el of [cW, cH, cF]) el.disabled = !isCustom
+			if (isCustom) return
+			const std = MappingNode.videoModeToResolution(vMode.value)
+			if (!std) return
+			cW.value = String(std.w)
+			cH.value = String(std.h)
+			if (Number.isFinite(std.fps)) cF.value = String(std.fps)
+		}
+		syncModeFields()
 		vMode.onchange = () => {
-			customBox.style.display = vMode.value === 'custom' ? 'grid' : 'none'
+			syncModeFields()
 			if (vMode.value !== 'custom') saveCustom()
 		}
 		cW.onchange = cH.onchange = cF.onchange = saveCustom

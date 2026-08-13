@@ -111,8 +111,36 @@ function scheduleRetry(appCtx, delayMs) {
 	if (retryTimer.unref) retryTimer.unref()
 }
 
-function channelsForLedTestOutput(channels) {
-	return channels.filter((c) => c.hasScreen || c.hasDecklinkOutput)
+/**
+ * Which channels get the boot identification card.
+ *
+ * WO-504: the operator-GUI channel is excluded. It has a screen consumer, so it used to match
+ * `hasScreen` and got the card painted on layer 999 like any program output — but it is not an
+ * output that needs identifying, it is the surface the operator UI itself is displayed through
+ * (CEF over routed preview holes, WO-243). The card is only auto-cleared by an explicit operator
+ * toggle (`tryClearStartupLedTestForWebUi` is a deliberate no-op — the card must survive on real
+ * outputs until dismissed), so on the operator channel it sat on top of the UI after every reboot
+ * until the owner ticked and un-ticked that screen in test-card setup.
+ *
+ * @param {Array<{index:number, hasScreen?:boolean, hasDecklinkOutput?:boolean}>} channels
+ * @param {Record<string, unknown>} [config] omit only where no config is available; the operator
+ *   channel is then not excluded, which is the pre-WO-504 behaviour.
+ */
+function channelsForLedTestOutput(channels, config) {
+	const skip = new Set()
+	if (config) {
+		try {
+			const { getChannelMap } = require('../config/routing-map')
+			const map = getChannelMap(config)
+			for (const ch of map?.operatorGuiChannels || []) {
+				const n = parseInt(String(ch), 10)
+				if (Number.isFinite(n)) skip.add(n)
+			}
+		} catch (_) {
+			/* No map: fall through and paint everything, as before. */
+		}
+	}
+	return channels.filter((c) => (c.hasScreen || c.hasDecklinkOutput) && !skip.has(c.index))
 }
 
 /**
@@ -179,7 +207,7 @@ async function runStartupLedTestPatternIfNeeded(appCtx) {
 	}
 
 	const channels = await parseServerChannels(xml || '')
-	const withTarget = channelsForLedTestOutput(channels)
+	const withTarget = channelsForLedTestOutput(channels, appCtx.config)
 
 	if (withTarget.length === 0) {
 		appCtx.log('info', '[Startup LED test] No screen or DeckLink output in INFO CONFIG — skip')

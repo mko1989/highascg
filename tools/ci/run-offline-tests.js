@@ -119,6 +119,8 @@ const FILES = [
 	'tools/smoke/smoke-wo500-meter-null-skips-consumed-channels.test.js',
 	'tools/smoke/smoke-wo501-update-detaches-from-service-cgroup.test.js',
 	'tools/smoke/smoke-wo502-wo503-gpu-texture-and-blind-sweep.test.js',
+	'tools/smoke/smoke-wo504-no-boot-card-on-operator-channel.test.js',
+	'tools/smoke/smoke-wo505-mapping-mode-fills-dimensions.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
