@@ -1,6 +1,6 @@
 # WO-506 — Operator-editable labels for ANY live source, on every label bar
 
-**Status: OPEN — investigated 13.08.2026, NOT implemented. Owner DECIDED the open questions same day (§4a) — the design is now unblocked and ready to build.**
+**Status: FOUNDATION DONE in repo (13.08.2026 — 12 smokes, suite 2098/2096/0, eslint 0, prettier clean, client rebuilt). NOT deployed. The store, resolver, route, client helpers and the pill transform are in; the per-surface UI sweep and the inspector edit control are NOT — see §5.**
 **Priority:** Medium (operator ergonomics, no on-air risk)
 **Source:** owner `todos13.08.26`: *"labels for any live source (pgm, prv, decklink, ndi etc) that
 can be displayed on the label bar that appears in compose prv, multiview, looks, timelines (for
@@ -131,23 +131,53 @@ Still open from §4 and NOT decided: whether the audio-mixer and header-bar site
 numbers. Treated as **keep** until the owner says otherwise, since those numbers are a diagnostic —
 they are outside the surfaces the owner named and will not be swept.
 
-## 5. Not done, and why
+## 4b. A §4 risk that turned out to be already solved
 
-Implementation is not started. This is a cross-cutting feature touching a new server store, a new
-route, a client helper, five owner-named surfaces plus template payloads, and it needs the §4
-decision on which of the two existing label schemes wins. Building half of it would leave some
-surfaces renamed and others not — indistinguishable, from the operator's seat, from the bug being
-reported.
+§4 warned that `screenLabels` and `screenDestinations[].label` could disagree. Reading the code:
+**WO-385 already unified them.** `screenLabelsFromConfig` (`src/config/screen-destinations.js:200`)
+resolves *owning destination's label → stored `screenLabels[i]` → ''* and every reader falls back to
+`S<n>`; `/api/screens/label` renames the destination. So the owner's rule — screen labels outrank
+everything — is already the implemented behaviour, and no change was needed. Recorded so nobody
+"fixes" a collision that no longer exists.
 
-The durable value delivered here is §1–§4: the inventory, the collision risk, and the
-"which sites deliberately keep channel numbers" carve-out.
+## 5. What was built
 
-**Owner decision needed:** confirm `screenLabels` is authoritative over
-`screenDestinations[].label`, and confirm the audio-mixer / header-bar sites keep their channel
-numbers.
+- **`src/config/source-labels.js`** — the store and resolver for NON-screen sources. Key prefers
+  `connectorId` (`dlsdi_3`), which survives re-cabling and re-mapping, falling back to `value`
+  (`route://6-3`), which does not; nothing stable → no key, so nothing can be mislabelled. Empty
+  means **absence**, never a blank name. Labels are capped at 64 chars because they are operator free
+  text that ends up in HTML/SVG template payloads.
+- **Applied at the single choke point.** `enrichExtraLiveSources` is the one function every live
+  source passes through before `/api/state`, so overriding `label` there gives **every surface that
+  already renders `extraLiveSources[].label` the custom name for free** — sources panel, multiview
+  tiles, looks, compose — with no per-site edit. The generated name is preserved on `generatedLabel`
+  and `labelIsCustom` flags human-named sources.
+- **`POST /api/sources/label`** (`src/api/routes-sources.js`), **registered in `router.js`** — WO-222
+  recorded registration as the recurring failure. It parses a RAW STRING body and returns the
+  `{status, headers, body}` shape, the two defects `routes-screens.js` shipped twice; the tests pass
+  real strings so they cannot repeat the WO-222 test's mistake of pre-parsing.
+- **`sourceLabels` exposed in `/api/state`** so an inspector can show which sources are custom.
+- **`client/lib/source-label.js`** — `sourceLabel()`, `sourceLabelIsCustom()`, and `shortLabelPill()`.
+- **The pill transform** (§4a) implemented in both server and client, with a test asserting the two
+  agree so they cannot drift.
 
-## 6. Work log
+## 6. NOT done — and one thing I could not find
 
-- 2026-08-13 — Opened. Inventoried existing label infrastructure (WO-222 screens, generated
-  `extraLiveSources.label`, `screenDestinations[].label`), enumerated render sites by grep, recorded
-  the two-scheme collision risk.
+- **The top-bar screen pills are not wired.** I could not locate the component that renders them.
+  `header-bar-streaming.js:62` renders *streaming* indicators (a different row), `timeline-transport.js`
+  uses a `<select>`, and nothing else in `client/components/header-bar*.js` renders a per-screen
+  progress-bar chooser. Rather than guess and change the wrong control, the transform is implemented
+  and tested and the wiring is left. **Owner: which component/class is that pill row?**
+- **No inspector edit control yet.** The API works; the device-view host-channel inspector still needs
+  the text input (and it belongs there, not in the Sources tab, which has no inspector).
+- **Surfaces that build their own label** are untouched and still show generated text:
+  `preview-canvas-compose-snapshot.js:456`, `timeline-editor.js:259`, and the test-card payloads in
+  `routes-led-test-card.js` / `startup-led-test-pattern.js`.
+- **Template payloads.** A rename reaches the client immediately but multiview/test-card CEF surfaces
+  need a `CG UPDATE` to repaint; nothing triggers that yet.
+- The audio-mixer and header-bar sites keep their channel numbers, per §4a.
+
+## 7. Work log
+
+- 2026-08-13 — Investigated (§1–4), owner decided (§4a), foundation built and tested (§5). §4's
+  two-scheme collision found to be already solved by WO-385.

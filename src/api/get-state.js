@@ -134,6 +134,9 @@ function getState(ctx, opts = {}) {
 		configComparison: ctx._configComparison || null,
 		ui: cfg.ui || {},
 		extraLiveSources: enrichExtraLiveSources(hostLiveMig.list, ctx),
+		/* WO-506: the raw override map, so the inspector can show which sources carry a custom name
+		 * and offer a revert. The applied label already rides on each extraLiveSources entry. */
+		sourceLabels: require('../config/source-labels').sourceLabelsFromConfig(cfg),
 		hostLiveMigrationWarnings: [...collectHostLiveConfigWarnings(cfg), ...hostLiveMig.warnings],
 		...getHostOperatorFullscreenSnapshot(ctx),
 		osc:

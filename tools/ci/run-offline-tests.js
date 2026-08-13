@@ -123,6 +123,7 @@ const FILES = [
 	'tools/smoke/smoke-wo505-mapping-mode-fills-dimensions.test.js',
 	'tools/smoke/smoke-wo507-wo508-decklink-io-collision-and-single-instance.test.js',
 	'tools/smoke/smoke-wo509-tiled-screen-releases-and-applies.test.js',
+	'tools/smoke/smoke-wo506-source-labels.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

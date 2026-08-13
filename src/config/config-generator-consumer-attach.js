@@ -203,9 +203,17 @@ function buildStreamingChannel(config, casparChannelNum) {
 	const mvStd = !!STANDARD_VIDEO_MODES[rawMode]
 	let profXml = ''
 	if (deckN > 0 && mvStd) {
+		/* WO-509 §5 / WO-510: this third emit path passed neither `consumerSettings` nor `videoMode`,
+		 * so a DeckLink on the streaming bus got no pixel-format, embedded-audio, latency, buffer-depth
+		 * or colour-space — the same class of gap WO-493 fixed on the screen and tiled paths, just on a
+		 * route no config had reached yet. Settings come from the streaming config's own prefix so the
+		 * bus keeps its own choices rather than inheriting screen 1's. */
+		const consumerSettings = readDecklinkConsumerSettings(config, 'streaming_')
 		profXml = buildDecklinkKeyFillConsumersXml({
 			fillDevice: deckN,
 			keyDevice: parseDecklinkDeviceIndex(sc.decklinkKeyDevice),
+			videoMode: modeId,
+			consumerSettings,
 			lowLatency: sc.decklinkLowLatency === true || sc.decklinkLowLatency === 'true',
 		})
 	}

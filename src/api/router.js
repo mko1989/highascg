@@ -59,6 +59,7 @@ const routesCountdown = require('./routes-countdown')
 const routesPlaylist = require('./routes-playlist')
 const routesScreenTimers = require('./routes-screen-timers')
 const routesScreens = require('./routes-screens')
+const routesSources = require('./routes-sources')
 const routesCgThumb = require('./routes-cg-thumb')
 const routesShaders = require('./routes-shaders')
 const routesReplication = require('./routes-replication')
@@ -369,6 +370,9 @@ routes.post('/api/timers/cmd', ({ path, body, ctx }) => routesScreenTimers.handl
 
 // Screen labels (WO-222) — custom screen names, propagated to all render sites
 routes.post('/api/screens/label', ({ path, body, ctx }) => routesScreens.handlePost(path, body, ctx), { requireCaspar: false })
+/* WO-506: non-screen live sources. Registering the route is the step WO-222 recorded as the
+ * recurring failure — the handler is useless without this line. */
+routes.post('/api/sources/label', ({ path, body, ctx }) => routesSources.handlePost(path, body, ctx), { requireCaspar: false })
 
 // --- CASPAR REQUIRED ROUTES (requireCaspar: true) ---
 

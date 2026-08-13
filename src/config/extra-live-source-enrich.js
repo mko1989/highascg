@@ -172,7 +172,14 @@ function enrichExtraLiveSource(item, ctx) {
  */
 function enrichExtraLiveSources(list, ctx) {
 	if (!Array.isArray(list)) return []
-	return list.map((item) => enrichExtraLiveSource(item, ctx))
+	/* WO-506: the single choke point every live source passes through before `/api/state`. Applying
+	 * the operator's label HERE means every surface that already renders `extraLiveSources[].label`
+	 * — sources panel, multiview tiles, looks, compose — inherits it with no per-site change. */
+	const { applySourceLabels } = require('./source-labels')
+	return applySourceLabels(
+		list.map((item) => enrichExtraLiveSource(item, ctx)),
+		ctx?.config,
+	)
 }
 
 /**
