@@ -265,7 +265,45 @@ function buildApplyDryRunPlan(ctx) {
 			actions: dActions,
 		})
 	}
+	/* WO-515: sanity checks the operator can actually see. Apply used to succeed silently on a layout
+	 * that could not physically work — a 6144x1536 always-on-top PGM window on a 5760x1080 desktop
+	 * covered every other output including the operator GUI, with no message anywhere. Warnings, not
+	 * blockers: overlapping windows are a legitimate setup (operator GUI under a PGM hole, WO-243) and
+	 * a wrong geometry probe must not strand a box. */
+	try {
+		const { collectScreenLayoutWarnings, collectDecklinkBindingWarnings } = require('../config/screen-layout-guard')
+		const flat = (ctx.config && ctx.config.casparServer) || {}
+		warnings.push(...collectScreenLayoutWarnings(flat, { desktop: resolveDesktopExtent(ctx) }))
+		warnings.push(...collectDecklinkBindingWarnings(flat, ctx.config))
+	} catch (e) {
+		/* A guard that throws must never block an Apply that would otherwise work. */
+		if (typeof ctx.log === 'function') ctx.log('debug', `[apply-guard] ${e?.message || e}`)
+	}
 	return { canApply: blockers.length === 0, blockers, warnings, actions, byDestination }
+}
+
+/**
+ * Physical desktop extent for the layout guard, or null when unknown.
+ * Derived from the saved GPU layout plan rather than probing here — Apply is on the request path
+ * (WO-401 F6) and an xrandr fork per Apply is not worth a warning string.
+ * @param {object} ctx
+ * @returns {{ width: number, height: number } | null}
+ */
+function resolveDesktopExtent(ctx) {
+	const outputs = ctx?.config?.osLayout?.outputs || ctx?.config?.gpuLayout?.outputs
+	if (!Array.isArray(outputs) || !outputs.length) return null
+	let width = 0
+	let height = 0
+	for (const o of outputs) {
+		const x = parseInt(String(o?.x ?? 0), 10) || 0
+		const y = parseInt(String(o?.y ?? 0), 10) || 0
+		const w = parseInt(String(o?.width ?? o?.w ?? 0), 10) || 0
+		const h = parseInt(String(o?.height ?? o?.h ?? 0), 10) || 0
+		if (w <= 0 || h <= 0) continue
+		width = Math.max(width, x + w)
+		height = Math.max(height, y + h)
+	}
+	return width > 0 && height > 0 ? { width, height } : null
 }
 
 async function executeApplyPlan(ctx, opts = {}) {

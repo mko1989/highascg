@@ -125,6 +125,7 @@ const FILES = [
 	'tools/smoke/smoke-wo509-tiled-screen-releases-and-applies.test.js',
 	'tools/smoke/smoke-wo506-source-labels.test.js',
 	'tools/smoke/smoke-wo512-rsync-excludes-anchored.test.js',
+	'tools/smoke/smoke-wo515-apply-layout-guard.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

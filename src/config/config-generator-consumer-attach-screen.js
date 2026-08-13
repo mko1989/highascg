@@ -119,20 +119,8 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 	const reservedInputSlots = new Set(resolveDecklinkInputSlots(config) || [])
 	const tilesAll = Array.isArray(tilesRaw) ? tilesRaw : []
 	const tiles = tilesAll.filter((t) => !reservedInputSlots.has(parseInt(String(t?.device), 10)))
-	if (tiles.length !== tilesAll.length && typeof config.__generatorWarn === 'function') {
-		const dropped = tilesAll.filter((t) => reservedInputSlots.has(parseInt(String(t?.device), 10)))
-		config.__generatorWarn(
-			`[WO-507] screen ${n}: dropped DeckLink output tile(s) on input-reserved device(s) ` +
-				`${[...new Set(dropped.map((t) => t.device))].join(', ')}`,
-		)
-	}
 	const decklinkDeviceRaw = parseInt(String(config[`screen_${n}_decklink_device`] || '0'), 10)
 	const decklinkDevice = reservedInputSlots.has(decklinkDeviceRaw) ? 0 : decklinkDeviceRaw
-	if (decklinkDeviceRaw > 0 && decklinkDevice === 0 && typeof config.__generatorWarn === 'function') {
-		config.__generatorWarn(
-			`[WO-507] screen ${n}: DeckLink ${decklinkDeviceRaw} is configured as an INPUT — output consumer not emitted`,
-		)
-	}
 	const decklinkReplaceScreen =
 		(config[`screen_${n}_decklink_replace_screen`] === true || config[`screen_${n}_decklink_replace_screen`] === 'true') &&
 		(decklinkDevice > 0 || tiles.length > 0) &&
