@@ -32,18 +32,51 @@ handler and would otherwise swallow it. The per-element `dragleave` is **kept**:
 backstop for abandoned gestures, not a replacement for immediate feedback when the pointer moves off
 a layer mid-drag.
 
-## 3. AMCP flood on clip position/size drag — CAUSE FOUND, not fixed
+## 3. Timeline clip position/size is slow to appear — CAUSE FOUND, and it is NOT an AMCP flood
 
-**There is no throttle, debounce or coalescing anywhere on that path** — verified by grep across
-`client/lib/mixer-fill.js`, the inspector components, `src/api/routes-mixer.js` and
-`amcp-client-transport.js`. Every drag frame becomes a POST, and every POST becomes an AMCP line
-serialised on `_amcpSendQueue`. The owner's read — *"looks like amcp gets overrun"* — is correct.
+Owner: *"changing clips position/size (on the screen) in timelines takes a while to show up on the
+preview screen, looks like amcp gets overrun."*
 
-The fix is a **trailing-edge coalescer keyed on (channel, layer, command)**: keep only the newest
-transform per layer in flight, drop superseded ones, and always send the final position on
-pointer-up so the last frame is never lost. That is a behaviour change on a live-control path
-(a dropped intermediate frame is fine, a dropped FINAL frame is a visibly wrong layer), so it wants
-its own WO and its own acceptance test rather than being tacked onto a batch.
+**It is the opposite of a flood: the change is not sent at all until 3 seconds after you stop.**
+
+`timelineState.updateClip()` (`client/lib/timeline-state-clips.js:36`) writes the clip and calls
+`_save()`, which does exactly two things (`timeline-state.js:227`): `localStorage.setItem` and
+`_emit('change')`. **No API call and no AMCP.** The only subscriber that reaches the server is
+`client/app.js:293`:
+
+```js
+timelineState.on('change', scheduleAutosave)   // scheduleAutosave(delayMs = 3000)
+```
+
+and that debounce **resets on every change**:
+
+```js
+if (autosaveTimeout) clearTimeout(autosaveTimeout)
+autosaveTimeout = setTimeout(() => void triggerAutosave(), delayMs)
+```
+
+So while the operator is dragging, the timer is continuously pushed forward; the edit reaches the
+server 3 s after the last movement, carried by a **full project autosave**. That is the "takes a
+while", and it explains why it feels worse the longer you keep adjusting.
+
+**Two corrections to what I said earlier in this session, both wrong:**
+
+1. I reported *"there is no throttle, debounce or coalescing anywhere on that path"*. Wrong for the
+   scenes/compose editor, which has both: `schedulePreviewPush` debounces with a max-wait ceiling,
+   and `scheduleMixerNudge` (`scenes-preview-runtime-mixer-nudge.js:74`) throttles on a single timer
+   with an in-flight `nudgeQueued` flag — that is already trailing-edge coalescing.
+2. I proposed a coalescer as the fix. It would have made this **worse**: coalescing reduces traffic
+   on a path that is currently sending nothing.
+
+**The real gap: the timeline editor has no live fast-path at all.** The compose editor pushes
+geometry edits straight to the mixer through the throttled nudge; the timeline editor relies on
+project autosave. The fix is to give timeline geometry edits the same treatment the compose editor
+already has — a throttled, coalescing mixer nudge for geometry/opacity-only changes on the
+live/preview timeline — not to throttle something that is not firing.
+
+Deliberately not implemented here. It is a new live-control path on the take/playout side, it wants
+the same care `scenes-preview-runtime-mixer-nudge.js` got (content changes must NOT be short-cut —
+only geometry/opacity/crop), and it needs on-box verification the owner can watch. Its own WO.
 
 ## 4. Looks↔timeline transitions — NOT investigated
 
