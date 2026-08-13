@@ -1,6 +1,6 @@
 # WO-139 — Looks → timeline Take smoothness (flash race, atomic crossfade, teardown)
 
-**Status:** Code complete (2026-07-07) — pending operator QA on real PGM output (A139.2)
+**Status: REOPENED 13.08.2026 — A139.2 was never done, and the owner is now reporting the exact failure the un-QA'd path can produce. One fail-dark bug found and fixed (§5, WO-519); the rest of A139.2 still owed.**
 **Priority:** High (operator-facing on-air quality)
 **Date:** 2026-07-07
 **Depends on:** WO-138 (tree must be stable and gates green first).
@@ -43,6 +43,51 @@ Confirmed hazards in `src/engine/timeline-take.js`:
 - [ ] A139.3 No regression in look→look takes (spot-check MIX + CUT between two looks).
 
 - [x] A139.3 No regression in look→look takes: full `test:ci` green including `smoke-scene-take-pgm-only` (code path untouched; `fadePhysicalLayersIn/Out` kept intact for `scene-take.js`). Operator spot-check still advised alongside A139.2.
+
+## 5. WO-519 — reopened: the take could leave layers playing invisibly
+
+Owner 13.08: *"transitions between looks and timelines doesnt work correctly, either some of the
+layers play or nothing at all. this already happend so there should be a wo about that."* This WO.
+
+**T139.1 presets every timeline layer to opacity 0 on a MIX take**, and something must then bring it
+up: either the layer-level fade, or the clip's own keyframe tween for layers that
+`collectClipOpacityFadeLayers` deliberately excludes (T139.2, so the two do not both write MIXER
+OPACITY and fight).
+
+That exclusion tested only keyframe **times**, never their **values**:
+
+```js
+if (times.length >= 2 && pos - clip.startTime < times[times.length - 1]) set.add(...)
+```
+
+So any clip with ≥2 opacity keyframes was excluded — including one whose track never reaches a
+visible value from the take position onward. The layer-level fade skipped it, the clip's tween drove
+it to 0 or held it there, and the preset 0 stood. **The layer plays and is invisible.** Some clips
+keyframed gives *"some of the layers play"*; all of them keyframed gives *"nothing at all"* — the
+owner's two symptoms, exactly.
+
+This is the same class T139.1 already patched once on the CUT path (*"a stale 0 from an earlier
+fade-out can no longer make a CUT take invisible"*), reappearing on the MIX path through a different
+door.
+
+**Fix:** exclude only when the clip's opacity track actually reaches a visible value at or after the
+take position. Deliberately **fail bright** — re-including a layer that also tweens its own opacity
+risks the double-write T139.2 fixed, which is cosmetic; leaving it out costs a missing layer on air.
+Those are not comparable, so uncertainty resolves toward visible.
+
+Verified: `tools/smoke/smoke-wo519-take-fails-bright.test.js`, 8 tests. A fade-in still owns its
+opacity (T139.2 preserved); a fade-OUT taken at its **start** is still owned by the clip (it opens
+visible — rescuing it would fight the intended fade); a fade-OUT taken **past** its last visible
+keyframe is rescued; an all-zero track is rescued; only keyframes at/after the take position count;
+single/no-keyframe clips are unchanged. Suite 2141/2139/0.
+
+**Two of those expectations were wrong on my first pass** and the tests caught it: I had asserted a
+fade-out should always be rescued, which would have fought a legitimate fade. Corrected — the
+distinction is whether anything *ahead of the take position* is visible.
+
+**Still owed: A139.2 (a)–(e) on real PGM output.** This fixes one specific fail-dark path found by
+reading; it does not discharge the operator QA that was never done, and the owner's report may have
+more than one cause.
 
 ## 4. Work log
 

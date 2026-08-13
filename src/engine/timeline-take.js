@@ -89,12 +89,28 @@ function collectClipOpacityFadeLayers(eng, tl, pos) {
 	for (let i = 0; i < tl.layers.length; i++) {
 		const clip = typeof eng?._clipAt === 'function' ? eng._clipAt(tl.layers[i], pos) : null
 		if (!clip) continue
-		const times = (clip.keyframes || [])
+		const kfs = (clip.keyframes || [])
 			.filter((k) => k.property === 'opacity')
-			.map((k) => k.time)
-			.sort((a, b) => a - b)
+			.sort((a, b) => a.time - b.time)
+		const times = kfs.map((k) => k.time)
 		if (times.length >= 2 && pos - clip.startTime < times[times.length - 1]) {
-			set.add(timelineCasparLayer(i))
+			/* WO-519: excluding a layer here hands its opacity entirely to the clip's own keyframe
+			 * tween — and a MIX take has already preset the layer to 0 (T139.1). If that tween never
+			 * reaches a visible value, the layer stays at 0 and PLAYS INVISIBLY: content running,
+			 * nothing on screen. Owner: *"either some of the layers play or nothing at all"* — some
+			 * clips keyframed gives "some", all keyframed gives "nothing".
+			 *
+			 * The original test looked only at keyframe TIMES, never their values, so a fade-OUT clip
+			 * (1 → 0) or any track that is 0 from the take position onward was excluded exactly like a
+			 * proper fade-in. Only step aside when the clip will actually light the layer up.
+			 *
+			 * Deliberately fail BRIGHT. Re-including a layer that also tweens its own opacity risks
+			 * the double-write WO-139 T139.2 fixed (both writing MIXER OPACITY, last writer wins) —
+			 * a cosmetic glitch. Leaving it out costs a missing layer on air. Those are not
+			 * comparable, so uncertainty resolves toward visible. */
+			const rel = pos - clip.startTime
+			const reachesVisible = kfs.some((k) => k.time >= rel && Number(k.value) > 0)
+			if (reachesVisible) set.add(timelineCasparLayer(i))
 		}
 	}
 	return set
