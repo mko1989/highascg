@@ -80,10 +80,25 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			if (keep === n) continue
 			const cur = parseInt(String(merged[`screen_${n}_decklink_device`] || '0'), 10) || 0
 			if (cur !== devNum) continue
-			// Tiled (LED-wall) screens own the device through `screen_N_decklink_tiles`, not this key —
-			// assignDecklinkToScreen refuses to touch them, so releasing them here would be inconsistent.
+			/* WO-509: a tiled (LED-wall) screen owns the device through `screen_N_decklink_tiles`, not
+			 * through this key — and skipping it entirely meant it NEVER released. Move a cable to
+			 * another screen and the tiled screen kept its claim while the new target added its own:
+			 * two channels, one card. Measured on the box — ch1 (6144x1536, tiled) and ch3 both emitted
+			 * `<device>1</device>`, which Caspar cannot open twice.
+			 * Release only the tiles bound to THIS device, so a multi-card wall keeps its other tiles. */
 			const tiles = merged[`screen_${n}_decklink_tiles`]
-			if (Array.isArray(tiles) && tiles.length > 0) continue
+			if (Array.isArray(tiles) && tiles.length > 0) {
+				const kept = tiles.filter((t) => (parseInt(String(t?.device), 10) || 0) !== devNum)
+				if (kept.length !== tiles.length) {
+					merged[`screen_${n}_decklink_tiles`] = kept
+					if (kept.length === 0) {
+						merged[`screen_${n}_decklink_device`] = 0
+						merged[`screen_${n}_decklink_key_device`] = 0
+						merged[`screen_${n}_decklink_replace_screen`] = false
+					}
+				}
+				continue
+			}
 			merged[`screen_${n}_decklink_device`] = 0
 			merged[`screen_${n}_decklink_key_device`] = 0
 			merged[`screen_${n}_decklink_replace_screen`] = false
@@ -99,7 +114,16 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 
 	function assignDecklinkToScreen(n, devNum, connector) {
 		const existingTiles = merged[`screen_${n}_decklink_tiles`]
-		if (Array.isArray(existingTiles) && existingTiles.length > 0) return
+		if (Array.isArray(existingTiles) && existingTiles.length > 0) {
+			/* WO-509: a tiled screen owns the device through its tiles, so the device KEY must not be
+			 * set here — but the consumer settings (pixel format, output mode, latency…) still belong
+			 * to it. Returning early skipped those too, which is why the operator's YUV choice never
+			 * reached the generated config on a tiled output: `screen_N_decklink_pixel_format` was
+			 * never written, so `readDecklinkConsumerSettings` had nothing to emit. */
+			applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, connector)
+			applyDecklinkConsumerSettingsFromConnector(merged, `screen_${n}_`, connector)
+			return
+		}
 		releaseDecklinkDeviceFromOtherTargets(devNum, n)
 		merged[`screen_${n}_decklink_device`] = devNum
 		if (merged[`screen_${n}_decklink_replace_screen`] === undefined) {

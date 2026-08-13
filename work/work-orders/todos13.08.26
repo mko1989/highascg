@@ -10,3 +10,5 @@ this makes the casparcg go into restart loop.
 also i want you to double and triple check if there is only one instance of caspar running and there are appropriete safeguards for ensuring only one runs at a time (counting subprocesses of course). 
 
 the yuv setting in decklink output doesnt land in the generated caspar config.
+the config generator doesnt register that a connection has been changed and tries to run two channels on the same decklink outputs.
+do a thorough investigation into config generator as i see it has regressed.
