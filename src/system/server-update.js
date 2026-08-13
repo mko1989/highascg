@@ -328,6 +328,34 @@ async function runApplyHelper(extractDir) {
 		? '/usr/local/lib/highascg/highascg-webui-server-update.sh'
 		: path.join(REPO_ROOT, 'scripts/exfat/highascg-webui-server-update.sh')
 	if (!fs.existsSync(helper)) throw new Error(`Missing apply helper: ${helper}`)
+
+	/* WO-511: `/usr/local/lib/highascg/` is root-owned and is refreshed only by
+	 * install-exfat-systemd-units.sh, which an update never runs — so the Node side can ship a new
+	 * flag while the installed helper still rejects it. That is exactly what happened when WO-501's
+	 * `--detach` went out: every update died on `unknown option: --detach`.
+	 *
+	 * Check before invoking, and fail with the command that fixes it. Falling back to ATTACHED mode
+	 * would be worse than failing: an old helper stops the service from inside the service's own
+	 * cgroup, gets killed mid-apply, and leaves the box down AND un-updated (WO-501 §1). A clean
+	 * refusal leaves it up and running the old build. */
+	let helperSupportsDetach = true
+	try {
+		helperSupportsDetach = fs.readFileSync(helper, 'utf8').includes('--detach')
+	} catch (_) {
+		/* unreadable (root-only mode) — assume support and let the call surface any real error */
+	}
+	if (!helperSupportsDetach) {
+		throw new Error(
+			`The installed update helper is out of date and cannot run this update safely.\n` +
+				`It lives at ${helper} and is root-owned, so the updater cannot replace it itself.\n` +
+				`Run this once, then retry the update:\n\n` +
+				`  sudo install -m 0755 -o root -g root \\\n` +
+				`    ${path.join(REPO_ROOT, 'scripts/exfat/highascg-webui-server-update.sh')} \\\n` +
+				`    ${helper}\n\n` +
+				`(After that it refreshes itself on every future update — WO-511.)`,
+		)
+	}
+
 	const { stdout, stderr } = await execFileAsync('sudo', ['-n', helper, '--detach', '--source', extractDir], {
 		encoding: 'utf8',
 		timeout: 120000,

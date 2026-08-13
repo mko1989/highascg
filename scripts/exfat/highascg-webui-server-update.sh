@@ -211,6 +211,31 @@ main() {
 		--excludes "$EXCLUDES" \
 		--auto-retain
 
+	# WO-511: refresh the ROOT-OWNED helper copies from the repo we just applied.
+	#
+	# `/usr/local/lib/highascg/*` is only written by install-exfat-systemd-units.sh, which the update
+	# never runs — so a change to THIS script reached ~/highascg but never the copy that actually
+	# executes. That is how WO-501's `--detach` shipped on the Node side while the installed helper
+	# still rejected it, breaking the updater outright. Refreshing here means one manual bootstrap is
+	# the last one ever needed.
+	#
+	# Safe: we run as root, the source is the tree the apply just verified, and it is the same content
+	# install-exfat-systemd-units.sh would place. Best-effort — the server is already updated and a
+	# failure here must not fail the update.
+	refresh_installed_helpers() {
+		_libdir=/usr/local/lib/highascg
+		[ -d "$_libdir" ] || return 0
+		for _h in highascg-webui-server-update.sh highascg-apply-server-drop.sh highascg-exfat-server-update.sh; do
+			_src="${DST}/scripts/exfat/${_h}"
+			[ -f "$_src" ] || continue
+			if ! cmp -s "$_src" "${_libdir}/${_h}"; then
+				install -m 0755 -o root -g root "$_src" "${_libdir}/${_h}" \
+					&& log "refreshed ${_libdir}/${_h}"
+			fi
+		done
+	}
+	refresh_installed_helpers || log "helper refresh failed (continuing)"
+
 	# Best-effort from here on — the server is already updated; nothing below is worth failing for.
 	stage_drop_to_volume "$EXFAT_ROOT" "$src" || log "stage ${EXFAT_ROOT} failed (continuing)"
 	stage_drop_to_volume "$BRIDGE_ROOT" "$src" || log "stage ${BRIDGE_ROOT} failed (continuing)"

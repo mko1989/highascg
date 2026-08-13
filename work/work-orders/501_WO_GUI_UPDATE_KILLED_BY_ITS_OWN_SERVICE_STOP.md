@@ -127,7 +127,37 @@ journalctl -u 'highascg-update-*' -f      # or: tail -f /var/log/highascg/update
 **Chicken-and-egg, stated plainly:** this fix cannot deploy itself through the broken updater. The
 command above is the manual bootstrap; every update after it is detached.
 
+## 5b. WO-511 — the bootstrap bit me, exactly where §5 said it would
+
+Owner deployed and the update failed:
+
+```
+Command failed: sudo -n /usr/local/lib/highascg/highascg-webui-server-update.sh --detach --source …
+[highascg-webui-server-update] unknown option: --detach
+```
+
+§5 predicted this and the prediction was not enough. The Node half shipped through the normal update
+while the root-owned helper did not, so the new flag met the old script. Two things were wrong:
+
+**1. The failure was useless.** `runApplyHelper` fired `--detach` blind and surfaced a raw
+`unknown option`. It now reads the installed helper, checks for `--detach`, and if absent fails with
+the exact `sudo install …` command that fixes it. **It deliberately does NOT fall back to attached
+mode** — an old helper stops the service from inside the service's own cgroup, gets killed mid-apply,
+and leaves the box down *and* un-updated (§1). Refusing leaves it up on the old build, which is
+strictly better.
+
+**2. It could never self-heal.** `/usr/local/lib/highascg/*` is written only by
+`install-exfat-systemd-units.sh`, which an update never runs — so *every* future helper change would
+have needed a manual root install, forever. The helper now refreshes those copies from the applied
+tree at the end of a successful update (`refresh_installed_helpers`, itself included), so **one
+manual bootstrap is the last one ever needed**. It runs after the apply (refreshing first would copy
+the old tree), only when the file actually differs, and is best-effort so it cannot fail an update
+that already succeeded.
+
+Owner: run the §5 command once; from then on this is automatic.
+
 ## 6. Work log
 
+- 2026-08-13 (later) — WO-511: deployed and hit the predicted bootstrap failure; made the refusal actionable and the helper self-refreshing. 3 more smokes, suite 2101/2099/0.
 - 2026-08-13 — Opened, root-caused to cgroup membership, `--detach` implemented via `systemd-run`,
   7 smokes, full gate green. Awaiting the §5 root refresh and a real end-to-end update.

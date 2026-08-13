@@ -155,3 +155,40 @@ test('WO-501: the Node side asks for --detach and parses the handoff', () => {
 	assert.match(src, /HIGHASCG_UPDATE_DETACHED/, 'and parse the handoff line')
 	assert.match(src, /phase = 'detached'/, 'and report a distinct phase, not a false "done"')
 })
+
+/**
+ * WO-511 — the root-owned helper must not be able to go stale forever.
+ *
+ * Owner 13.08, after WO-501 deployed: the update died on
+ * `[highascg-webui-server-update] unknown option: --detach`. `/usr/local/lib/highascg/` is refreshed
+ * only by install-exfat-systemd-units.sh, which an update never runs, so the Node side shipped the
+ * new flag while the installed helper still rejected it.
+ */
+
+test('WO-511: Node refuses with the fix command when the helper is too old', () => {
+	const src = code(read('src/system/server-update.js'))
+	assert.match(src, /helperSupportsDetach/, 'it must probe before invoking')
+	assert.match(src, /includes\('--detach'\)/, 'by looking for the flag in the installed helper')
+	assert.match(src, /sudo install -m 0755/, 'and name the exact command that fixes it')
+	// Falling back to attached mode would stop the service from inside its own cgroup, get killed,
+	// and leave the box DOWN and un-updated — strictly worse than refusing.
+	assert.doesNotMatch(src, /helperSupportsDetach\s*\?\s*\[[^\]]*'--detach'/, 'must not silently run attached')
+})
+
+test('WO-511: a successful update refreshes the root-owned helper copies', () => {
+	const sh = read('scripts/exfat/highascg-webui-server-update.sh')
+	assert.match(sh, /refresh_installed_helpers/, 'the helper must re-install itself after applying')
+	const fn = /refresh_installed_helpers\(\) \{([\s\S]*?)\n\t\}/.exec(sh)
+	assert.ok(fn, 'function body must be parseable')
+	assert.match(fn[1], /highascg-webui-server-update\.sh/, 'including itself — that is the whole point')
+	assert.match(fn[1], /install -m 0755 -o root -g root/, 'installed with root ownership')
+	assert.match(fn[1], /cmp -s/, 'only when it actually differs')
+})
+
+test('WO-511: the refresh runs AFTER the apply and cannot fail the update', () => {
+	const sh = read('scripts/exfat/highascg-webui-server-update.sh')
+	const applyIdx = sh.indexOf('"$APPLY_SH"')
+	const refreshIdx = sh.indexOf('refresh_installed_helpers ||')
+	assert.ok(applyIdx > 0 && refreshIdx > applyIdx, 'refreshing before the apply would copy the OLD tree')
+	assert.match(sh, /refresh_installed_helpers \|\| log/, 'best-effort: the server is already updated')
+})
