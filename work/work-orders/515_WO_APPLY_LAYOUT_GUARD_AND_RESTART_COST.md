@@ -1,6 +1,6 @@
 # WO-515 — Apply now warns on impossible layouts; and where the long restart actually goes
 
-**Status: GUARD DONE in repo (13.08.2026 — 11 smokes, suite 2123/2121/0, eslint 0, prettier clean). RESTART: investigated and measured, NOT changed — §3.**
+**Status: DONE in repo (13.08.2026 — guard + restart cadence, suite 2127/2125/0, eslint 0, prettier clean, client rebuilt). NOT deployed.**
 **Priority:** High (a silent Apply produced a black operator screen)
 **Source:** owner 13.08: *"add the guard."* and *"check the long restart issue."*
 **Related:** [WO-507](./507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md) (whose warnings were dead — §2), [WO-483](./483_WO_SCREEN_CONSUMER_PLACED_BY_OPENBOX_NOT_CONFIG.md), [WO-243](./243_WO_OPERATOR_GUI_CHANNEL.md)
@@ -59,7 +59,9 @@ Measured from source, not guessed:
 So a Caspar restart costs **~5 s of deliberate nothing before the first reconnect attempt**, plus up
 to **5.5 s** of placement sleeps, before any of the post-connect work starts.
 
-**Not changed, deliberately.** The obvious win — attempt immediately, then back off to 5 s — lives in
+**Changed (WO-516) — see §3b. What follows was the reasoning before that.**
+
+**Originally left alone:** The obvious win — attempt immediately, then back off to 5 s — lives in
 `node_modules`, so it needs either a `ConnectionManager`-level early nudge or a vendor patch, and the
 placement sleeps exist to let X settle (WO-483's territory) so shortening them blind risks
 mis-placed windows. Both want a measurement of the real end-to-end restart on the box first, which
@@ -69,6 +71,29 @@ needs the owner's hardware and a stopwatch, not more source reading.
 attempt when the AMCP port is observed listening, instead of waiting out the library's 5 s timer —
 the watchdog already knows how to detect exactly that (`isAmcpPortListening`), it just does not act
 until 15 s.
+
+## 3b. WO-516 — what was actually changed
+
+Owner: *"do the fixes."* Two cadence defaults, no vendor patch:
+
+- **`clientNudgeMs` 15 000 → 1 000.** 15 s was a backstop from when this only caught a *hung* Caspar.
+  It was also the floor on recovering from an **ordinary** restart — which happens on every Apply — so
+  the operator waited 15 s+ for the UI to return after a routine config change. Once the AMCP port is
+  listening again, waiting buys nothing.
+- **Adaptive poll: 5 s healthy, 500 ms while down** (`HIGHASCG_AMCP_WATCHDOG_DOWN_POLL_MS`). The loop
+  is now self-scheduling rather than `setInterval`, choosing its next delay from the tick result. A
+  fixed 5 s interval meant a restart cost up to a full poll before we even *looked*, on top of the
+  library's own 5 s timer.
+
+WO-398's fork-loop lesson is respected: `isAmcpPortListening` forks `ss`, so a permanent 500 ms poll
+would be ~170k forks/day. The fast cadence exists **only** while disconnected; healthy steady state is
+unchanged at 5 s.
+
+The library's hardcoded 5 s reconnect timer is still there and still untouched — the nudge now
+overtakes it rather than waiting for it. That is the whole win, and it needs no vendor patch.
+
+**Still not done:** shortening the 1500+4000 ms screen-placement sleeps. They exist to let X settle
+(WO-483) and shortening them blind risks mis-placed windows; that one wants an on-box measurement.
 
 ## 4. What was VERIFIED
 

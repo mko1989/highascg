@@ -168,14 +168,32 @@ function startCasparAmcpWatchdog(ctx) {
 	const warnMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_WARN_MS', 30_000)
 	const recoverMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_RECOVER_MS', 120_000)
 	const recoveryCooldownMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_RECOVERY_COOLDOWN_MS', 90_000)
-	const clientNudgeMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_CLIENT_NUDGE_MS', 15_000)
+	/* WO-516: 15 s was a backstop default from when this only ever caught a hung Caspar. It is also the
+	 * floor on how fast we recover from an ORDINARY restart, which happens on every Apply — so the
+	 * operator waited 15 s+ for the UI to come back from a routine config change. Once the AMCP port is
+	 * listening again, waiting buys nothing. */
+	const clientNudgeMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_CLIENT_NUDGE_MS', 1000)
+	/* Poll fast only while DOWN. WO-398's fork-loop lesson applies: `isAmcpPortListening` forks `ss`,
+	 * so a permanent 500 ms poll would be ~170k forks/day. Healthy steady state stays at pollMs and the
+	 * fast cadence exists solely for the seconds around a restart. */
+	const downPollMs = parsePositiveInt('HIGHASCG_AMCP_WATCHDOG_DOWN_POLL_MS', 500)
 	const log = typeof ctx?.log === 'function' ? ctx.log : () => {}
 
 	const state = createAmcpWatchdogState()
 	let busy = false
 
-	const tick = () => {
-		if (busy) return
+	/* Self-scheduling instead of setInterval so the cadence can follow the state: 5 s when healthy,
+	 * `downPollMs` while the client is disconnected. A fixed 5 s interval meant a Caspar restart cost
+	 * up to a full poll before we even looked, on top of the library's own 5 s reconnect timer. */
+	let timer = null
+	let stopped = false
+	const schedule = (ms) => {
+		if (stopped) return
+		timer = setTimeout(run, ms)
+		if (timer.unref) timer.unref()
+	}
+	const run = () => {
+		if (busy || stopped) return
 		busy = true
 		void evaluateAmcpWatchdogTick(ctx, state, Date.now(), {
 			pollMs,
@@ -185,22 +203,27 @@ function startCasparAmcpWatchdog(ctx) {
 			clientNudgeMs,
 			log,
 		})
-			.catch((e) => log('warn', `[AMCP-Watchdog] tick failed: ${e?.message || e}`))
+			.then((res) => {
+				const healthy = res?.action === 'ok' || res?.action === 'skip'
+				schedule(healthy ? pollMs : downPollMs)
+			})
+			.catch((e) => {
+				log('warn', `[AMCP-Watchdog] tick failed: ${e?.message || e}`)
+				schedule(pollMs)
+			})
 			.finally(() => {
 				busy = false
 			})
 	}
-
-	const timer = setInterval(tick, pollMs)
-	if (timer.unref) timer.unref()
-	tick()
+	run()
 	log(
 		'info',
-		`[AMCP-Watchdog] Started (poll=${pollMs}ms warn=${warnMs}ms recover=${recoverMs}ms)`
+		`[AMCP-Watchdog] Started (poll=${pollMs}ms down-poll=${downPollMs}ms nudge=${clientNudgeMs}ms warn=${warnMs}ms recover=${recoverMs}ms)`
 	)
 
 	return () => {
-		clearInterval(timer)
+		stopped = true
+		if (timer) clearTimeout(timer)
 	}
 }
 

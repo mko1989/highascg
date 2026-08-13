@@ -139,3 +139,41 @@ test('WO-510: the streaming-bus DeckLink now gets consumer settings too', () => 
 	assert.match(block[1], /consumerSettings/, 'WO-509 §5: it passed none, so pixel-format et al were dropped')
 	assert.match(block[1], /videoMode: modeId/, 'and no video mode either')
 })
+
+/**
+ * WO-517 — the edit control the owner said was missing.
+ *
+ * Owner 13.08: *"the labels of screens is not finished. cant add labels to decklink inputs."*
+ * WO-506 shipped the store, resolver, route and helpers, but nothing in the UI could SET a label.
+ */
+
+test('WO-517: the DeckLink input inspector mounts a label control', () => {
+	const src = read('client/components/device-view-inspector-decklink-input.js')
+	assert.match(src, /function mountSourceLabelControl\(/, 'the control must exist')
+	assert.match(src, /mountSourceLabelControl\(inputSection, conn, ctx\)/, 'and actually be mounted')
+})
+
+test('WO-517: it keys on the connector id, which survives re-cabling', () => {
+	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
+		read('client/components/device-view-inspector-decklink-input.js'),
+	)[0]
+	assert.match(body, /String\(conn\?\.id \|\| ''\)/, 'connectorId is the stable key (WO-506)')
+	assert.match(body, /sourceId: key/, 'and it is what the API is given')
+	assert.match(body, /'\/api\/sources\/label'/, 'posting to the registered route')
+})
+
+test('WO-517: the placeholder shows the generated fallback, so empty reads as "revert"', () => {
+	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
+		read('client/components/device-view-inspector-decklink-input.js'),
+	)[0]
+	assert.match(body, /placeholder: generated/, 'the operator must see what clearing falls back to')
+	assert.match(body, /generatedLabel/, 'which the server preserves on each source')
+})
+
+test('WO-517: renaming must NOT mark Caspar restart-dirty', () => {
+	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
+		read('client/components/device-view-inspector-decklink-input.js'),
+	)[0]
+	// A label changes no Caspar config; demanding a playout restart to rename a camera is absurd.
+	assert.doesNotMatch(body, /setCasparRestartDirty|markCasparRestartDirty/)
+})
