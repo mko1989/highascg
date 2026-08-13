@@ -92,8 +92,20 @@ shared cause. Found while reading, **not** investigated or fixed:
   no `videoMode`**. Any DeckLink attached to the streaming bus therefore gets no pixel-format,
   embedded-audio, latency or colour-space. Not reachable in the owner's current config, so it did not
   cause this report, but it is the same bug waiting.
-- **`dlsdi_99`**, a connector with `ioDirection:'out'`, `bus:'multiview'` and no real card, sits in
-  the live device graph. Smells like the WO-428 phantom-card family. Harmless-looking; unexamined.
+- **`dlsdi_99` / "SDI (MVR)" — ANSWERED 13.08** (owner: *"there is an additional sdi port on the
+  decklink called sdi (mvr) wtf is it doing there??"*). Not a phantom card and not the WO-428 family:
+  `src/config/device-graph-suggest.js:156,177` synthesises it —
+  `addDecklinkPort(99, mvd, 'decklink_io', 'SDI (MVR)', {caspar:{ioDirection:'out',bus:'multiview'}})`
+  — whenever a multiview DeckLink device is configured (`live.decklink.multiviewDevice`, else
+  `casparServer.multiview_decklink_device`). **Slot 99 is a sentinel, not a physical port**; the real
+  card is the second argument, stored as `externalRef`. `addDecklinkPort` dedupes by DEVICE index, so
+  it cannot double-claim a card already listed.
+  Two things are still wrong with it and remain unfixed: (1) `decklinkSlotFromConnector()` returns
+  **99** for it rather than the real device, so every slot-based rule — including WO-507's
+  input-reservation guard — reasons about a port that does not exist; (2) the suggester only ADDS, so
+  once `multiview_decklink_device` is cleared the connector **stays in the saved graph as a fossil**,
+  which is what .37 is showing. Fixing it means deriving the slot from the device and pruning on
+  absence — a device-graph change, deliberately not stacked onto today's in-flight work.
 - Fossil cleanup on write (WO-496 provenance work) — WO-507 and this WO both stop bad state reaching
   Caspar without removing it from the saved config.
 

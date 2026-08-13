@@ -1,26 +1,37 @@
 # rsync excludes: exfat/drop-update/ → ~/highascg (server-only drop)
 # Never overwrite or remove ISO/install artifacts (see apply script: merge-only, no --delete on dest).
-client/
-audio_testing/
-for_client/
-From_client/
+#
+# WO-512: EVERY directory pattern here MUST be anchored with a leading '/'.
+# An rsync pattern without a leading slash matches at ANY depth, so a bare `media/` also excluded
+# `src/media/` (production code) and a bare `lib/` also excluded `scripts/lib/` — both shipped, both
+# silently missing from every update for as long as this file has existed. The same mistake in the
+# manual procedure (`--exclude 'config/'`, which also matched `src/config/`) took the box down: a new
+# `src/api/` file landed while the `src/config/` module it required did not.
+#
+# Two deliberate exceptions below keep their any-depth behaviour: `node_modules/` and `.git/`.
+/client/
+/audio_testing/
+/for_client/
+/From_client/
+# any-depth ON PURPOSE — never sync a dependency tree, wherever it sits
 node_modules/
+# any-depth ON PURPOSE — never sync a git dir
 .git/
-bin/
-lib/
-media/
-cef-cache/
-log/
-data/
-projects/
-work/
-run.sh
+/bin/
+/lib/
+/media/
+/cef-cache/
+/log/
+/data/
+/projects/
+/work/
+/run.sh
 tools/eggs/
 tools/release/
 tools/smoke/
-.private/
+/.private/
 config/casparcg.config
-.highascg-state.json
-.module-state.json
-.highascg-build-stamp
-BUILD_STAMP
+/.highascg-state.json
+/.module-state.json
+/.highascg-build-stamp
+/BUILD_STAMP
