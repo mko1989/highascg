@@ -55,7 +55,9 @@ async function repairLiveInputMetersIfStale(ctx, opts = {}) {
 			const oscStale = !lastAt || now - lastAt > staleMs
 			if (!opts.force && !oscStale) continue
 			try {
-				await ensureMeterNullConsumer(ctx.amcp, ch)
+				// force: measured-stale OSC is proof this channel is not ticking, whatever consumers
+				// it reports — override WO-500's "already has a consumer" skip.
+				await ensureMeterNullConsumer(ctx.amcp, ch, { force: true })
 			} catch (e) {
 				if (typeof ctx.log === 'function') {
 					ctx.log('warn', `[meter] repair null consumer ch ${ch}: ${e?.message || e}`)
