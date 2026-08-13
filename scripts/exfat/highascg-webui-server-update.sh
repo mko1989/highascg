@@ -23,14 +23,56 @@ ensure_cache_dirs() {
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 APPLY_SH="${HIGHASCG_APPLY_SERVER_DROP_SH:-/usr/local/lib/highascg/highascg-apply-server-drop.sh}"
 [[ -f "$APPLY_SH" ]] || APPLY_SH="${SCRIPT_DIR}/highascg-apply-server-drop.sh"
+LOG_DIR="${HIGHASCG_UPDATE_LOG_DIR:-/var/log/highascg}"
 
 log() {
 	echo "[highascg-webui-server-update] $*" >&2
 }
 
 SERVICE_WAS_ACTIVE=0
+
+# WO-501: the Web-UI update is launched by Node, which lives INSIDE highascg.service. A sudo child
+# inherits that cgroup, so the moment this script runs `systemctl stop highascg.service` it kills
+# ITSELF — before the apply, and before WO-499's EXIT trap can restart anything. The box is left
+# stopped and un-updated, which is exactly what the owner saw.
+#
+# `--detach` re-launches this same script inside a TRANSIENT SYSTEMD UNIT. systemd-run places it
+# under system.slice, outside highascg.service's cgroup, so stopping the service cannot touch it.
+# The detached run does the whole update and restarts the service itself (start_service + the
+# WO-499 trap), and it survives even if the caller dies mid-flight.
+#
+# Output goes to a file rather than the caller's pipe, because the caller WILL disappear: the Web UI
+# reads it back after the service returns.
+detach_and_exit() {
+	local src="$1"
+	command -v systemd-run >/dev/null 2>&1 || {
+		log "systemd-run unavailable — cannot detach; re-run without --detach from a shell"
+		exit 1
+	}
+	local stamp unit logfile
+	stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+	unit="highascg-update-${stamp}"
+	install -d -m 0755 "$LOG_DIR"
+	logfile="${LOG_DIR}/update-${stamp}.log"
+	: >"$logfile"
+	chmod 0644 "$logfile"
+	log "detaching into ${unit}; log: ${logfile}"
+	# --collect: reap the unit once it exits. No --wait: return immediately so the caller can answer
+	# the HTTP request and then be killed in peace.
+	systemd-run \
+		--unit="$unit" \
+		--collect \
+		--description="HighAsCG server update ${stamp}" \
+		--property=StandardOutput="append:${logfile}" \
+		--property=StandardError="append:${logfile}" \
+		"$SELF" --source "$src"
+	# Machine-readable last line: the Node side parses this to tell the UI where to look.
+	echo "HIGHASCG_UPDATE_DETACHED unit=${unit} log=${logfile}"
+	exit 0
+}
 
 stop_service() {
 	if systemctl is-active --quiet "$SERVICE" 2>/dev/null; then
@@ -125,11 +167,16 @@ main() {
 	}
 
 	local src=""
+	local detach=0
 	while [[ $# -gt 0 ]]; do
 		case "$1" in
 		--source)
 			src="${2:?}"
 			shift 2
+			;;
+		--detach)
+			detach=1
+			shift
 			;;
 		*)
 			log "unknown option: $1"
@@ -147,6 +194,8 @@ main() {
 		log "refusing source outside cache: $src"
 		exit 1
 	}
+	# Validate BEFORE detaching, so a bad request still fails synchronously with a useful message.
+	[[ $detach -eq 1 ]] && detach_and_exit "$src"
 	[[ -x "$APPLY_SH" ]] || {
 		log "missing ${APPLY_SH}"
 		exit 1

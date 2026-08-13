@@ -117,6 +117,7 @@ const FILES = [
 	'tools/smoke/smoke-wo496-apply-reads-actual-cabling.test.js',
 	'tools/smoke/smoke-wo497-ui-load-and-probe-cache.test.js',
 	'tools/smoke/smoke-wo500-meter-null-skips-consumed-channels.test.js',
+	'tools/smoke/smoke-wo501-update-detaches-from-service-cgroup.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

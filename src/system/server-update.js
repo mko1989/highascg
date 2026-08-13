@@ -311,18 +311,38 @@ async function extractTarball(tarPath, destDir) {
 	await execFileAsync('tar', ['-xzf', tarPath, '-C', destDir], { timeout: 600000 })
 }
 
+/**
+ * Run the privileged apply helper.
+ *
+ * WO-501: `--detach` is not optional politeness. This process lives inside `highascg.service`, and
+ * a `sudo` child inherits that cgroup — so when the helper stops the service to swap files, systemd
+ * kills the helper too, mid-update. `--detach` makes the helper hand the work to a transient
+ * systemd unit outside our cgroup; that unit finishes the update and restarts the service on its
+ * own. This call therefore returns in ~a second, long before the update is done, and THIS PROCESS
+ * IS EXPECTED TO DIE shortly afterwards.
+ *
+ * @returns {Promise<{detached: boolean, unit: string|null, logFile: string|null}>}
+ */
 async function runApplyHelper(extractDir) {
 	const helper = fs.existsSync('/usr/local/lib/highascg/highascg-webui-server-update.sh')
 		? '/usr/local/lib/highascg/highascg-webui-server-update.sh'
 		: path.join(REPO_ROOT, 'scripts/exfat/highascg-webui-server-update.sh')
 	if (!fs.existsSync(helper)) throw new Error(`Missing apply helper: ${helper}`)
-	const { stdout, stderr } = await execFileAsync('sudo', ['-n', helper, '--source', extractDir], {
+	const { stdout, stderr } = await execFileAsync('sudo', ['-n', helper, '--detach', '--source', extractDir], {
 		encoding: 'utf8',
-		timeout: 900000,
+		timeout: 120000,
 		maxBuffer: 4 * 1024 * 1024,
 	})
 	const out = [stdout, stderr].filter(Boolean).join('\n').trim()
 	if (out) out.split('\n').forEach((l) => appendJobLog(l))
+	const m = /HIGHASCG_UPDATE_DETACHED unit=(\S+) log=(\S+)/.exec(out)
+	if (!m) {
+		// An older installed helper has no --detach and would have exited 2 on the unknown option;
+		// reaching here means it ran attached and we got lucky. Say so rather than claim success.
+		appendJobLog('WARNING: helper did not report a detached unit — it may be the pre-WO-501 copy')
+		return { detached: false, unit: null, logFile: null }
+	}
+	return { detached: true, unit: m[1], logFile: m[2] }
 }
 
 /**
@@ -367,11 +387,20 @@ async function startApplyJob(opts = {}) {
 
 			applyJob.phase = 'apply'
 			appendJobLog('Applying server drop (privileged)')
-			await runApplyHelper(extractDir)
+			const handoff = await runApplyHelper(extractDir)
 
-			applyJob.phase = 'done'
-			applyJob.ok = true
-			appendJobLog('Update applied successfully')
+			if (handoff.detached) {
+				applyJob.phase = 'detached'
+				applyJob.ok = true
+				applyJob.detachedUnit = handoff.unit
+				applyJob.detachedLog = handoff.logFile
+				appendJobLog(`Update running in ${handoff.unit} — this server will stop and restart itself.`)
+				appendJobLog(`Progress: journalctl -u ${handoff.unit} -f  (or tail ${handoff.logFile})`)
+			} else {
+				applyJob.phase = 'done'
+				applyJob.ok = true
+				appendJobLog('Update applied successfully')
+			}
 		} catch (e) {
 			applyJob.phase = 'error'
 			applyJob.error = e instanceof Error ? e.message : String(e)
