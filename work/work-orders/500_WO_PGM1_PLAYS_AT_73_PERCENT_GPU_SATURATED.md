@@ -331,6 +331,62 @@ primary video` on the current config, SDI frame drops, card enumeration faults �
 comes, test 16.1 first: it is the version with production hours behind it, whereas 16.3 is new on
 both counts.
 
+## 11b. Post-deploy: 92.6 %, and the remaining deficit is a STALE config
+
+Owner deployed 13.08 and re-measured with the new tool (`--seconds 60`):
+
+| | before | after §9 + §9b |
+|---|---|---|
+| ch1 rate | 72.8 % | **92.6 %** |
+| casparcg CPU | 639.6 % | 361.8 % |
+| GPU | 100 % | **100 %** |
+
+**Both halves of the fix are confirmed live**, not assumed: the consumer list shows meter consumers
+on ch2/ch6/ch7 (no other consumer) and *absent* from ch1/ch3/ch4/ch5 (already consumed) — exactly
+what §9's skip produces — and `INFO` on all three remaining ones shows **no `<fps>` element**, which
+is §9b's proof that the video stream is gone.
+
+The residual ~7 % is **GPU saturation** (still pegged at 100 %), and the cause looks like config
+drift rather than genuine load. The live generated `casparcg.config` disagrees with the saved
+settings on four independent keys for ch1's screen consumer:
+
+| key | live `casparcg.config` | `/api/settings` |
+|---|---|---|
+| `enable-mipmaps` | **true** | `screen_1_enable_mipmaps = false` |
+| `high-bitdepth` | **true** | `screen_1_high_bitdepth` absent → false |
+| `always-on-top` | true | `screen_1_always_on_top = false` |
+| `interactive` | false | `screen_1_interactive = true` |
+
+(`vsync`, `borderless`, `windowed`, `stretch`, `colour-space` all agree.)
+
+**Verified by running the real generator against `.37`'s live settings**, not by reading it:
+`buildScreenConsumerExtrasXml(cfg, 1)` returns `""` and `buildProgramScreenConsumerInnerXml(cfg, 1, …)`
+emits `<high-bitdepth>false</high-bitdepth>`. `buildScreenPairChannels` threads a single `ctx.n`
+through every key, so an index mismatch is ruled out — the config on disk is simply **older than the
+settings**, and a service restart does not regenerate it. Note the two true values happen to match
+`screen_3_*`/`screen_4_*` (both true); those are DeckLink outputs where the flags are inert, so it
+is a coincidence of values, not a cross-wire.
+
+Why it plausibly matters: ch1 is **6144×1536 = 9.4 Mpixel**. `high-bitdepth` renders that at 16-bit
+(double the framebuffer/texture bandwidth of the largest surface on the box) and `enable-mipmaps`
+regenerates a mipmap chain over it every frame. No other screen consumer on the box carries either.
+
+**Next action — one Apply** (WO-440: Apply always restarts Caspar), then re-measure:
+
+```bash
+# after Apply, confirm the flags actually went away
+curl -s http://<box>:4200/api/state | python3 -c "import sys,json,re; \
+  print(re.findall(r'<(?:enable-mipmaps|high-bitdepth)>[^<]*<', json.load(sys.stdin)['serverInfo']['config']))"
+node tools/dev/measure-playback-rate.js --host <box>:4200 --seconds 60 --label "mipmaps+16bit off" --json ~/rates.jsonl
+```
+
+Prediction: `<enable-mipmaps>` gone, `<high-bitdepth>false</high-bitdepth>`, GPU below 100 %, rate
+above 92.6 %. **If GPU stays at 100 % the drift was not the cost** and the next candidates are the
+6144×1536 PRV channel (ch2 — owner-confirmed necessary, feeds `ch4:15` and `ch5:10`) and the CEF
+templates on ch4 with `<html><enable-gpu>false</enable-gpu>`.
+
+Related drift precedent: WO-442 (fossil keys), WO-421 (config durability).
+
 ## 12. What was NOT done
 
 - **The agent changed nothing on the live box.** The consumer removal was run by the owner; every
