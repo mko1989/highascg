@@ -110,3 +110,43 @@ test('WO-508: the guard counts MAINS only — CEF children must not trip it', ()
 	assert.ok(listMain, 'caspar_list_main_pids must exist')
 	assert.match(listMain[1], /caspar_is_main_process/, 'and filter through the main-process predicate')
 })
+
+/**
+ * WO-513 — "SDI (MVR)" is a synthesized port, and slot 99 is a sentinel.
+ *
+ * Owner 13.08: *"there is an additional sdi port on the decklink called sdi (mvr) wtf is it doing
+ * there??"* `device-graph-suggest.js:156,177` invents it to represent "the multiview bus goes out on
+ * DeckLink device N". 99 is a made-up index chosen to clear real ports 1..8; the real card is in
+ * `externalRef`. Anything reading the slot out of the id therefore reasoned about a port that does
+ * not exist — including WO-507's guard, which compares output devices against input slots.
+ */
+
+const { decklinkSlotFromConnector, DECKLINK_MVR_SENTINEL_SLOT } = require('../../src/config/decklink-input-slots.js')
+
+test('WO-513: the MVR sentinel resolves to the device it actually drives', () => {
+	assert.equal(DECKLINK_MVR_SENTINEL_SLOT, 99)
+	assert.equal(
+		decklinkSlotFromConnector({ id: 'dlsdi_99', externalRef: '2' }),
+		2,
+		'THE BUG: slot 99 is not a port — the real card is in externalRef',
+	)
+})
+
+test('WO-513: real ports are unaffected', () => {
+	assert.equal(decklinkSlotFromConnector({ id: 'dlsdi_3', externalRef: '3' }), 3)
+	assert.equal(decklinkSlotFromConnector({ id: 'dlsdi_1', externalRef: '7' }), 1, 'a real id still wins over externalRef')
+})
+
+test('WO-513: a sentinel with no device never reports 99', () => {
+	// Better to report "unknown" than a port number that cannot exist.
+	assert.notEqual(decklinkSlotFromConnector({ id: 'dlsdi_99' }), 99)
+})
+
+test('WO-513: the MVR port is only suggested when a multiview device is configured', () => {
+	const src = code(read('src/config/device-graph-suggest.js'))
+	const hits = [...src.matchAll(/addDecklinkPort\(99, (\w+),/g)].map((m) => m[1])
+	assert.ok(hits.length > 0, 'the synthesized port must still exist — it represents a real output')
+	for (const v of hits) {
+		assert.match(src, new RegExp(`${v}\\s*>\\s*0`), `${v} must be gated on a configured device`)
+	}
+})

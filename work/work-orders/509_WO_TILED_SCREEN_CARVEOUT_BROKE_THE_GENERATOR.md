@@ -109,6 +109,34 @@ shared cause. Found while reading, **not** investigated or fixed:
 - Fossil cleanup on write (WO-496 provenance work) — WO-507 and this WO both stop bad state reaching
   Caspar without removing it from the saved config.
 
+## 5b. Third symptom of the same bug, reported 13.08 after the fix was written
+
+Owner: *"i added the decklink consumers to the ch1 and the jitter is high again"* (ch1 down to
+**68.3 %**) and *"ch3 pgm2 is for no reason set to 2160p50 instead of 1080p50."*
+
+Both are this WO, still unfixed **on the box** — the fix never landed there because WO-512's
+unanchored `--exclude 'config/'` skipped all of `src/config/`.
+
+Live evidence: `dlsdi_1` carries `outputBinding {type:'screen', index:2}` **and**
+`decklinkOutputVideoMode: '2160p5000'`, while also being part of ch1's tiled wall. Screen index 2 is
+PGM2 → ch3. Because the tiled screen never released the device (§2a), one connector holds two
+bindings at once, so:
+
+- `<device>1</device>` is emitted on **both ch1 and ch3** — confirmed in the generated XML;
+- ch3 inherits the wall's **2160p5000** output mode, which is why a 1080p destination came up UHD;
+- ch1's DeckLink consumer owns that channel's clock
+  (`decklink_consumer.cpp:1266` true vs `screen_consumer.cpp:1020` false), so ch1 alone drags to
+  68 % while ch2/ch5/ch6 hold **49.89 / 49.98 / 49.99 fps** — the tick rates prove the GL thread and
+  the rest of the box are fine, which rules out WO-502's ceiling as the cause this time.
+
+**Ruled out — do not re-investigate.** The subregion overrun (two 3840×2160 tiles from a 6144×1536
+canvas) *looks* wrong and is **correct and proven**: [WO-485 §4](./485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md)
+records the owner's tested rig (`config/casparcg copy.config`, 1920-wide regions from a 5120 canvas)
+doing the same thing at full speed. Each region is the size of the card's standard SDI frame; the
+video lands where it lands and the remainder is blank. WO-485 already burned a session on this and
+was reverted in full. The remaining untested difference from the proven rig is **2160p50 vs
+1080p50** per card — worth measuring only after the duplicate binding is gone.
+
 ## 6. Work log
 
 - 2026-08-13 — Opened. Read the live generated config and connectors off the box, ruled out a

@@ -11,6 +11,17 @@ function readCasparSetting(cfg, key) {
 }
 
 /**
+ * Sentinel slot for the synthesized "SDI (MVR)" multiview port.
+ *
+ * WO-513: `device-graph-suggest.js` invents `dlsdi_99` to represent "the multiview bus goes out on
+ * DeckLink device N" — 99 is a made-up index chosen to sit clear of real ports 1..8, and the REAL
+ * card is in `externalRef`. Every slot-based rule that read the id therefore reasoned about a port
+ * that does not exist, including WO-507's input-reservation guard, which compared output devices
+ * against input slots and would have compared 99.
+ */
+const DECKLINK_MVR_SENTINEL_SLOT = 99
+
+/**
  * @param {object | null | undefined} connector
  * @returns {number}
  */
@@ -19,7 +30,15 @@ function decklinkSlotFromConnector(connector) {
 	const m = id.match(/^dlsdi_(\d+)$/)
 	if (m) {
 		const n = parseInt(m[1], 10)
-		if (Number.isFinite(n) && n > 0) return n
+		/* The MVR port's id encodes a sentinel, not a port — fall through to externalRef, which holds
+		 * the device it actually drives. Its id is left alone deliberately: saved graphs key settings
+		 * off `dlsdi_99`, and renaming it would orphan them. */
+		if (n === DECKLINK_MVR_SENTINEL_SLOT) {
+			const dev = parseInt(String(connector?.externalRef ?? 0), 10) || 0
+			if (dev > 0) return dev
+		} else if (Number.isFinite(n) && n > 0) {
+			return n
+		}
 	}
 	const idx = parseInt(String(connector?.index ?? ''), 10)
 	if (Number.isFinite(idx) && idx >= 0) return idx + 1
@@ -128,6 +147,7 @@ function decklinkInputsConfiguredInSettings(cfg) {
 
 module.exports = {
 	readCasparSetting,
+	DECKLINK_MVR_SENTINEL_SLOT,
 	decklinkSlotFromConnector,
 	decklinkInputSlotsFromDeviceGraph,
 	isLegacyImplicitDecklinkInputSlot,
