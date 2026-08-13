@@ -119,7 +119,22 @@ function applyDecklinkOverridesToScreens(merged, appConfig) {
 			 * set here — but the consumer settings (pixel format, output mode, latency…) still belong
 			 * to it. Returning early skipped those too, which is why the operator's YUV choice never
 			 * reached the generated config on a tiled output: `screen_N_decklink_pixel_format` was
-			 * never written, so `readDecklinkConsumerSettings` had nothing to emit. */
+			 * never written, so `readDecklinkConsumerSettings` had nothing to emit.
+			 *
+			 * WO-514: it must ALSO release the device from every other target. A tiled screen is still
+			 * this device's legitimate owner, so any `screen_M_decklink_device` still pointing at it is
+			 * a fossil — and returning before the release left it standing. Owner, third report:
+			 * *"ch3 still sets itself to 2160p and has a decklink consumer even nothing like that exists
+			 * in devices view"* — a consumer emitted from a stale flat key, plus that key's UHD output
+			 * mode dragged onto a 1080p destination.
+			 *
+			 * Note this is the same call the non-tiled path already makes below; only the tiled branch
+			 * was missing it. A broader "rebuild every binding from the graph" sweep was tried first and
+			 * REVERTED: it broke WO-275's and WO-491's acceptance tests, because the connector loop does
+			 * not re-establish every binding it would have cleared (a cabled connector whose edge path
+			 * resolves no screen relies on the existing key), and WO-496's rule stands — a device the
+			 * graph does not know about must never be silently blanked. */
+			releaseDecklinkDeviceFromOtherTargets(devNum, n)
 			applyDecklinkKeyFillFromConnector(merged, `screen_${n}_`, connector)
 			applyDecklinkConsumerSettingsFromConnector(merged, `screen_${n}_`, connector)
 			return

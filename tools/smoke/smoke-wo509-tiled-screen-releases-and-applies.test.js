@@ -91,3 +91,55 @@ test('WO-509: the flat pixel-format key still reaches the generated XML (end to 
 	}
 	assert.match(JSON.stringify(buildScreenPairChannels(cfg, RM, { ...CTX })), /pixel-format>yuv</)
 })
+
+/**
+ * WO-514 — a tiled screen must also RELEASE the device from other targets.
+ *
+ * Owner 13.08, third report: *"ch3 still sets itself to 2160p and has a decklink consumer even
+ * nothing like that exists in devices view."* WO-509 made the tiled branch apply consumer settings,
+ * but it still returned before `releaseDecklinkDeviceFromOtherTargets`. So when a tiled wall
+ * legitimately owns a device, a stale `screen_M_decklink_device` pointing at the same card survived
+ * — emitting a second consumer AND dragging the wall's UHD output mode onto a 1080p destination.
+ */
+
+test('WO-514: the tiled branch releases the device from other targets', () => {
+	const tiled = /if \(Array\.isArray\(existingTiles\) && existingTiles\.length > 0\) \{([\s\S]*?)\n\t\t\}/.exec(
+		/function assignDecklinkToScreen\([\s\S]*?\n\t\}/.exec(SRC)[0],
+	)[1]
+	assert.match(
+		tiled,
+		/releaseDecklinkDeviceFromOtherTargets\(devNum, n\)/,
+		'THE BUG: returning without releasing left a second channel claiming the same card',
+	)
+})
+
+test('WO-514: end to end — a tiled wall clears another screen stale claim on the same card', () => {
+	const { applyDecklinkOverridesToScreens } = require('../../src/config/build-caspar-generator-config-decklink.js')
+	const merged = {
+		// The wall owns DeckLink 1 through its tiles…
+		screen_1_decklink_tiles: [{ device: 1, videoMode: '2160p5000', width: 3840, height: 2160 }],
+		// …while a fossil still points screen 2 at the same card, with the wall's UHD mode.
+		screen_2_decklink_device: 1,
+		screen_2_decklink_replace_screen: true,
+	}
+	applyDecklinkOverridesToScreens(merged, {
+		deviceGraph: {
+			connectors: [
+				{
+					id: 'dlsdi_1',
+					kind: 'decklink_io',
+					externalRef: '1',
+					caspar: { ioDirection: 'out', outputBinding: { type: 'screen', index: 1 }, bindingSource: 'manual' },
+				},
+			],
+			edges: [],
+		},
+	})
+	assert.equal(
+		parseInt(String(merged.screen_2_decklink_device || '0'), 10) || 0,
+		0,
+		'the fossil claim on screen 2 must be gone — one card, one channel',
+	)
+	assert.deepEqual(merged.screen_1_decklink_tiles, [{ device: 1, videoMode: '2160p5000', width: 3840, height: 2160 }],
+		'the wall that legitimately owns the card keeps its tiles')
+})
