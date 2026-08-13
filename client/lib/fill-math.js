@@ -119,6 +119,42 @@ export function sceneLayerPixelRectForContentFit(cw, ch, mediaW, mediaH, content
 }
 
 /**
+ * Fit new content INSIDE an existing layer rect, keeping the content's aspect ratio (WO-520).
+ *
+ * Owner 13.08, on dropping different media onto a clip that already has a transform: *"I want the
+ * new media to be confined to the same max size the layer had before keeping the new clips ratio.
+ * no crops."*
+ *
+ * So the previous rect is a MAX BOUNDING BOX, not a target: scale down to fit, never up past it,
+ * never crop. The result keeps the old rect's CENTRE, so a layer positioned deliberately on the
+ * canvas stays where the operator put it instead of jumping to a corner or to the middle of the
+ * screen.
+ *
+ * This differs from `sceneLayerPixelRectForContentFit`, which fits content to the whole CANVAS for
+ * an empty layer. Here the box is the layer's own previous rect.
+ *
+ * @param {{ x: number, y: number, w: number, h: number }} prevRect the layer's current pixel rect
+ * @param {number} contentW natural width of the new media
+ * @param {number} contentH natural height
+ * @returns {{ x: number, y: number, w: number, h: number }} unchanged rect when content size is unknown
+ */
+export function containRectPreservingAspect(prevRect, contentW, contentH) {
+	const boxW = Math.max(1, Math.round(prevRect?.w ?? 0))
+	const boxH = Math.max(1, Math.round(prevRect?.h ?? 0))
+	// Unknown media size must not resize anything — a guess here silently moves a live layer.
+	if (!(contentW > 0 && contentH > 0) || !(prevRect?.w > 0 && prevRect?.h > 0)) {
+		return { x: prevRect?.x ?? 0, y: prevRect?.y ?? 0, w: boxW, h: boxH }
+	}
+	const s = Math.min(boxW / contentW, boxH / contentH)
+	const w = Math.max(1, Math.round(contentW * s))
+	const h = Math.max(1, Math.round(contentH * s))
+	// Keep the centre, so only the size changes.
+	const cx = (prevRect.x ?? 0) + boxW / 2
+	const cy = (prevRect.y ?? 0) + boxH / 2
+	return { x: Math.round(cx - w / 2), y: Math.round(cy - h / 2), w, h }
+}
+
+/**
  * @param {number} val - pixel value
  * @param {number} total - canvas dimension
  */

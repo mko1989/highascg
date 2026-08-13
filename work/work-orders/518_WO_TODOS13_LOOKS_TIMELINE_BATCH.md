@@ -1,6 +1,6 @@
 # WO-518 — todos13 batch: drag highlight, looks↔timeline transitions, AMCP drag flood, clip copy
 
-**Status: PARTIAL (13.08.2026). §2 the blue dashed outline — DONE, 6 smokes, suite 2133/2131/0, client rebuilt. §3–§5 — INVESTIGATED, not fixed; each says exactly how far I got.**
+**Status: PARTIAL (13.08.2026). §2 blue dashed outline — DONE. §4 looks↔timeline transitions — prior WO found, one fail-dark bug fixed (WO-519, in WO-139 §5). §5 clip exchange fit — DONE (WO-520); the 'extended duration' half is NOT done. §3 AMCP drag flood — cause found, deferred. Suite 2150/2148/0, client rebuilt.**
 **Source:** owner `todos13.08.26` (new block)
 **Related:** [WO-404](./404_WO_COMPOSE_PREVIEW_DRAG_BLACKOUT.md) (compose preview during drags), [WO-448](./448_WO_timeline_unrouted_until_take.md), [WO-401](./401_WO_MACHINE_PERFORMANCE_RESEARCH_PASS.md) F4 (AMCP send cost)
 
@@ -55,9 +55,34 @@ of the layers play or nothing at all"*. Either it was never written up, or it is
 I did not guess. Worth the owner naming the WO if they remember it, otherwise this needs a fresh
 diagnosis with a reproduction.
 
-## 5. Copy clip + drop new media should preserve settings — NOT started
+## 5. Copy clip + drop new media — HALF DONE (WO-520)
 
-A feature, not a fault. Two requirements, and the second is the harder one:
+**The fit half is done.** Owner decided the rule: *"I want the new media to be confined to the same
+max size the layer had before keeping the new clips ratio. no crops."*
+
+`containRectPreservingAspect(prevRect, contentW, contentH)` in `client/lib/fill-math.js` treats the
+layer's existing rect as a **max bounding box**: scale the new clip to fit inside at its own aspect
+ratio, centred on the old rect, never cropped, never grown past it. Wired into both drop branches in
+`scenes-compose.js` via `createApplyExchangeFitForSource`, replacing the old
+`isExchange ? Promise.resolve()` — which preserved the transform verbatim and therefore stretched
+anything whose ratio differed. An **empty** layer still content-fits to the canvas
+(`applyNativeFillForSource`), unchanged.
+
+Deliberate: unknown media resolution patches nothing at all. Guessing would silently move a live
+layer, and "leave it exactly as it was" is the only safe answer when the size is not known.
+
+Verified by `smoke-wo520-exchange-contain-fit.test.js`, 9 tests, including a no-crop sweep over five
+aspect ratios asserting all four edges stay inside the old bounds. One assertion was too strict on
+the first run — an odd fitted width cannot sit exactly centred in an even box at integer
+coordinates — and now allows a half-pixel.
+
+**Still NOT done: preserving an "extended" clip duration.** That is timeline-model state (the clip's
+own length after an edge-drag), not layer transform, and nothing in the exchange path touches it.
+It needs the timeline clip-drop path rather than the compose canvas, and is a separate change.
+
+### Original scoping, kept for context
+
+Two requirements, and the second is the harder one:
 
 - preserve transform/settings when the media under a copied clip changes — there is precedent in
   `scenes-compose.js`'s `isLayerSourceExchange`, which already keeps an existing layer's transform on

@@ -7,7 +7,12 @@
  */
 
 
-import { pixelRectToFill, sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
+import {
+	pixelRectToFill,
+	fillToPixelRect,
+	sceneLayerPixelRectForContentFit,
+	containRectPreservingAspect,
+} from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api } from '../lib/api-client.js'
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
@@ -67,6 +72,47 @@ export function createApplyNativeFillForSource(opts) {
 }
 
 
+/**
+ * Re-fit a layer when its media is EXCHANGED (WO-520).
+ *
+ * Owner 13.08: *"I want the new media to be confined to the same max size the layer had before
+ * keeping the new clips ratio. no crops."*
+ *
+ * So the layer's existing rect becomes a max bounding box: the new clip is scaled to fit inside it
+ * at its own aspect ratio, centred on the old rect, never cropped and never grown past it.
+ *
+ * Previously an exchange preserved the transform VERBATIM (todos19.07.26), which stretched or
+ * squashed anything whose ratio differed from the outgoing clip. An empty layer still content-fits
+ * to the canvas via `applyNativeFillForSource` — that path is unchanged.
+ *
+ * @param {{ sceneState: object, getResolution?: () => object, stateStore: object }} opts
+ */
+export function createApplyExchangeFitForSource(opts) {
+	const { sceneState, getResolution, stateStore } = opts
+	return async function applyExchangeFitForSource(layerIndex, data) {
+		const scene = sceneState.getScene(sceneState.editingSceneId)
+		const layer = scene?.layers?.[layerIndex]
+		if (!layer || !data?.value) return
+		const res = typeof getResolution === 'function' ? getResolution() : null
+		const canvas = {
+			width: res?.w > 0 ? res.w : stateStore?.getState?.()?.channelMap?.programResolutions?.[0]?.w || 1920,
+			height: res?.h > 0 ? res.h : stateStore?.getState?.()?.channelMap?.programResolutions?.[0]?.h || 1080,
+		}
+		const prevRect = fillToPixelRect(layer.fill, canvas)
+		if (!(prevRect?.w > 0 && prevRect?.h > 0)) return
+		const contentRes = await fetchMediaContentResolution(
+			sourcePayloadForFill(data),
+			stateStore,
+			sceneState.activeScreenIndex,
+			() => api.get('/api/media'),
+		)
+		// Unknown media size leaves the layer exactly as it was — guessing would move a live layer.
+		if (!(contentRes?.w > 0 && contentRes?.h > 0)) return
+		const rect = containRectPreservingAspect(prevRect, contentRes.w, contentRes.h)
+		sceneState.patchLayer(scene.id, layerIndex, { fill: pixelRectToFill(rect, canvas) })
+	}
+}
+
 /** @param {object} scene @param {Record<string, unknown>} opts */
 export function renderComposeScene(scene, opts) {
 	const {
@@ -84,6 +130,12 @@ export function renderComposeScene(scene, opts) {
 		getThumbUrlForLayerSource,
 		getPreviewChannelForLiveThumb,
 	} = opts
+
+	/* WO-520: built locally from the same opts rather than threaded through every caller — the
+	 * WO-158 precedent immediately below does the same for the crop handlers. An exchange re-fits the
+	 * new clip inside the layer's existing rect (owner: same max size, new clip's ratio, no crops);
+	 * an EMPTY layer still content-fits to the canvas via applyNativeFillForSource. */
+	const applyExchangeFitForSource = createApplyExchangeFitForSource({ sceneState, getResolution, stateStore })
 
 	/*
 	 * WO-158 T158.3: `startCropResize` is not threaded through scenes-editor.js's opts wiring
@@ -348,7 +400,9 @@ export function renderComposeScene(scene, opts) {
 							value: first.value,
 							label: first.label || first.value,
 						})
-						if (!isExchange) await applyNativeFillForSource(realIdx, sourcePayloadForFill(first))
+						await (isExchange
+							? applyExchangeFitForSource(realIdx, sourcePayloadForFill(first))
+							: applyNativeFillForSource(realIdx, sourcePayloadForFill(first)))
 					}
 					for (let i = 1; i < items.length; i++) {
 						if (items[i]?.value) await addLayerFromMedia(items[i])
@@ -378,7 +432,7 @@ export function renderComposeScene(scene, opts) {
 					label: data.label || data.value,
 				})
 				void (isExchange
-					? Promise.resolve()
+					? applyExchangeFitForSource(realIdx, sourcePayloadForFill(data))
 					: applyNativeFillForSource(realIdx, sourcePayloadForFill(data))
 				).then(() => {
 					const updated = sceneState.getScene(scene.id)
