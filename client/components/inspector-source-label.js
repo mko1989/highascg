@@ -40,6 +40,37 @@ export function readSourceLabelState(sources, connectorId, fallbackLabel = '') {
 }
 
 /**
+ * WO-534 — fold a just-saved name into the enriched snapshot the inspectors re-render from.
+ *
+ * `POST /api/sources/label` echoes the authoritative post-save value, and the array handed to this
+ * control IS `lastPayload.extraLiveSources` (by reference), so applying the echo here makes the
+ * caller's own snapshot correct without it having to re-fetch anything. Without this the field
+ * reverted to the previous name on the next re-render, even though the rename had really persisted
+ * — owner 14.08: *"it somehow applyed on the compose preview but went back to the previous label in
+ * host ch and sdi port inspectors."*
+ *
+ * Mirrors the server's resolution in `src/config/source-labels.js`: a blank label CLEARS the
+ * override (absence, not a blank name), so the entry falls back to its generated name.
+ *
+ * @param {Array<object>|null|undefined} list
+ * @param {string} connectorId
+ * @param {string} label the label as echoed by the server
+ */
+export function applySavedSourceLabel(list, connectorId, label) {
+	const key = String(connectorId || '').trim()
+	const mine = (Array.isArray(list) ? list : []).find((s) => String(s?.connectorId || '') === key)
+	if (!mine) return
+	const custom = String(label ?? '').trim()
+	if (custom) {
+		mine.label = custom
+		mine.labelIsCustom = true
+		return
+	}
+	mine.label = String(mine.generatedLabel || '').trim() || mine.label
+	mine.labelIsCustom = false
+}
+
+/**
  * @param {HTMLElement} parent
  * @param {object} opts
  * @param {string} opts.connectorId stable key that survives re-cabling, e.g. `dlsdi_3`
@@ -82,7 +113,10 @@ export function mountSourceLabelControl(parent, { connectorId, sources, fallback
 		if (saving) return
 		saving = true
 		try {
-			await api.post('/api/sources/label', { sourceId: key, label: input.value })
+			const res = await api.post('/api/sources/label', { sourceId: key, label: input.value })
+			// WO-534: the caller's snapshot is a reference, not a copy — patch it before onSaved so
+			// any re-render (including one that serves a cached payload) shows the new name.
+			applySavedSourceLabel(sources, key, res?.label)
 			// A rename changes no Caspar config — it must NOT mark the restart hint dirty. Demanding a
 			// playout restart to rename a camera would be absurd.
 			if (typeof onSaved === 'function') await onSaved()

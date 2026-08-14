@@ -225,6 +225,9 @@ describe('todos19.07.26 (resize fix): canvas resize preserves tile pixel sizes (
 
 	it('resetLayout clears px/pxDesired so they are re-derived from fresh fractions', () => {
 		const src = readOperatorComposeTiles()
-		assert.match(src, /function resetLayout\(\)[\s\S]{0,400}t\.px = null[\s\S]{0,100}t\.pxDesired = null/, 'reset clears px and pxDesired')
+		/* WO-533 widened 400 -> 900: `resetLayout` gained a degenerate-canvas guard (a hidden pane
+		 * measures 1x1 and used to persist full-height slivers into the other editor) whose comment
+		 * carries the reasoning. Measured distance is 771; the assertion itself is unchanged. */
+		assert.match(src, /function resetLayout\(\)[\s\S]{0,900}t\.px = null[\s\S]{0,100}t\.pxDesired = null/, 'reset clears px and pxDesired')
 	})
 })

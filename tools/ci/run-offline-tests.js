@@ -138,6 +138,8 @@ const FILES = [
 	'tools/smoke/smoke-wo530-compose-labels-and-surfaces.test.js',
 	'tools/smoke/smoke-wo531-authoring-canvas-follows-target.test.js',
 	'tools/smoke/smoke-wo532-look-geometry-follows-its-screen.test.js',
+	'tools/smoke/smoke-wo533-reset-layout-is-per-surface.test.js',
+	'tools/smoke/smoke-wo534-source-label-survives-save.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

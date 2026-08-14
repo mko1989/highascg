@@ -37,7 +37,11 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 			connectorId: conn.id,
 			sources: lastPayload?.extraLiveSources,
 			fallbackLabel: `DeckLink ${slot}`,
-			onSaved: () => load?.(),
+			/* WO-534: a bare `load()` is served straight from the 5s payload cache
+			 * (device-view-render.js `shouldUseCache`) — i.e. the pre-rename snapshot, re-rendered
+			 * over the field the operator just edited. WO-436 forced the other nine inspector
+			 * reloads; this WO-525-era one was added afterwards and missed it. */
+			onSaved: () => load?.({ forceRefresh: true }),
 		})
 		const removeBtn = Object.assign(document.createElement('button'), {
 			className: 'header-btn',

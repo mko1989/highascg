@@ -382,7 +382,8 @@ export function initPreviewPanel(host, options) {
 	}
 
 	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); if (c && typeof onComposeCellRects === 'function') onComposeCellRects([]); updateLive() }
-	btn.onclick = () => setColl(!collapsed); grabBtnEl.onclick = () => { window.dispatchEvent(new CustomEvent('operator-tiles-reset-request')) }
+	btn.onclick = () => setColl(!collapsed); /* WO-533: name the surface — both editors stay mounted, so an unaddressed reset hit both. */
+	grabBtnEl.onclick = () => { window.dispatchEvent(new CustomEvent('operator-tiles-reset-request', { detail: { surface } })) }
 	if (composePrvPgmLayoutToggle && !operatorTilesActive) {
 		// WO-256: the Stack/Side toggle only affects the legacy canvas-pair's flex direction — the
 		// free-tile canvas has no such single-axis layout, so the control would otherwise be dead.

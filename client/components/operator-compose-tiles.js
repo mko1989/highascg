@@ -241,7 +241,12 @@ export function initOperatorComposeTiles(container, options) {
 		saveTileLayout(storage, storageKey, {})
 		const defs = currentDefs()
 		const { w: cw, h: ch } = canvasSize()
-		const fresh = computeDefaultTileLayout(defs, cw, ch)
+		/* WO-533: a hidden pane measures 1x1 (canvasSize()'s floor), and packing tiles into 1x1
+		 * yields full-height slivers that persist() would then make permanent. With no real box to
+		 * pack against, fall back to the argument-free default — the same 1920x1080 reference
+		 * `defaultTileLayout` uses — and let the next real layout pass re-fit it. */
+		const real = cw > 1 && ch > 1
+		const fresh = real ? computeDefaultTileLayout(defs, cw, ch) : computeDefaultTileLayout(defs)
 		for (const [id, t] of tiles) {
 			if (fresh[id]) {
 				t.frac = fresh[id]
@@ -318,7 +323,18 @@ export function initOperatorComposeTiles(container, options) {
 	// Workspace tab switches reflow the whole page — re-layout + re-report deterministically
 	// (belt-and-suspenders next to posWatch; also covers environments without IntersectionObserver).
 	const onTabActivated = () => layoutAll()
-	const onResetRequest = () => resetLayout()
+	/* WO-533 — "Reset layout" is per canvas. The looks editor and the timeline editor are BOTH
+	 * mounted at all times (workspace tabs only toggle an `active` class), so an unaddressed window
+	 * event reset both of them. The hidden one reset against a `display:none` pane, where
+	 * `canvasSize()` floors at 1x1 and `computeDefaultTileLayout` degenerates into full-height
+	 * slivers — and `resetLayout` persists that. Hence the owner's "it blanks the compose preview in
+	 * the other editor". An event with no surface still resets everything (nothing else dispatches
+	 * one today, but a bare reset is the honest reading of a bare event). */
+	const onResetRequest = (ev) => {
+		const want = ev?.detail?.surface
+		if (want != null && String(want) !== String(surface)) return
+		resetLayout()
+	}
 	window.addEventListener('resize', onWinResize)
 	window.addEventListener('scroll', onWinScroll, true)
 	window.addEventListener('highascg-workspace-tab-activated', onTabActivated)
