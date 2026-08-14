@@ -1,12 +1,13 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { interpClipProp } from '../lib/timeline-clip-interp.js'
 import { applyTimelineClipLayoutFromMedia } from '../lib/timeline-clip-layout.js'
-import { findMediaRow } from '../lib/mixer-fill.js'
+import { findMediaRow, fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { api, getApiBase } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { createEffectInstance } from '../lib/effect-registry.js'
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
 import { isLikelyAudioOnlySource } from '../lib/media-audio-kind.js'
+import { containRectPreservingAspect } from '../lib/fill-math.js'
 export { attachTimelineEditorInput } from './timeline-editor-inputs.js'
 
 export function showTimelineToast(msg, type = 'info') {
@@ -25,6 +26,35 @@ export function showTimelineToast(msg, type = 'info') {
 	toast.textContent = msg
 	container.appendChild(toast)
 	setTimeout(() => toast.remove(), type === 'error' ? 6000 : 4000)
+}
+
+/**
+ * Re-fit an exchanged clip's media inside the rect the clip already had (WO-523, rule from WO-520).
+ *
+ * Owner: *"the new media to be confined to the same max size the layer had before keeping the new
+ * clips ratio. no crops."* The previous rect is a max bounding box, not a target.
+ *
+ * Best-effort and deliberately silent on failure: the media swap has already happened and is the
+ * thing the operator asked for. An unknown resolution leaves the rect exactly as it was rather than
+ * guessing — the same rule the compose path uses.
+ *
+ * @param {string} timelineId
+ * @param {number} layerIdx
+ * @param {object} clip the clip AFTER the source swap
+ */
+async function refitExchangedClipToOldRect(timelineId, layerIdx, clip, stateStore) {
+	try {
+		const prev = clip?.fillPx
+		if (!(prev?.w > 0 && prev?.h > 0)) return
+		const res = await fetchMediaContentResolution(clip.source, stateStore, 0, () => api.get('/api/media'))
+		if (!(res?.w > 0 && res?.h > 0)) return
+		const next = containRectPreservingAspect(prev, res.w, res.h)
+		if (next.x === prev.x && next.y === prev.y && next.w === prev.w && next.h === prev.h) return
+		timelineState.updateClip(timelineId, layerIdx, clip.id, { fillPx: next })
+		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
+	} catch {
+		/* the swap already succeeded; a failed refit must not surface as an error */
+	}
 }
 
 /**
@@ -198,6 +228,11 @@ export function createTimelineCanvasHandlers(deps) {
 						duration,
 					)
 					if (!clip) return
+					/* WO-523/WO-520: the clip keeps its rect, but the NEW media must fit inside it at its
+					 * own ratio rather than being stretched into the outgoing clip's shape — the same
+					 * rule the compose canvas got. Async (needs the media's resolution), so it patches
+					 * after the swap and re-syncs; the swap itself is not held up by a probe. */
+					void refitExchangedClipToOldRect(tl.id, layerIdx, clip, stateStore)
 					const sel = { timelineId: tl.id, layerIdx, clipId: clip.id, clip }
 					setSelectedClip(sel)
 					window.dispatchEvent(new CustomEvent('timeline-clip-select', { detail: sel }))

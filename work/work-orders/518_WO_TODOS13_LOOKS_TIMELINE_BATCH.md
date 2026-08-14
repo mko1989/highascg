@@ -113,9 +113,29 @@ aspect ratios asserting all four edges stay inside the old bounds. One assertion
 the first run — an odd fitted width cannot sit exactly centred in an even box at integer
 coordinates — and now allows a half-pixel.
 
-**Still NOT done: preserving an "extended" clip duration.** That is timeline-model state (the clip's
-own length after an edge-drag), not layer transform, and nothing in the exchange path touches it.
-It needs the timeline clip-drop path rather than the compose canvas, and is a separate change.
+### The "extended" half — DONE (WO-523)
+
+`replaceClipSource` overwrote `clip.duration` with the incoming media's length unconditionally, so
+any edge-drag was discarded on a media swap. Nothing recorded the media's own length either, so
+"extended" could not be told from "happens to match its media" after the fact.
+
+`clip.naturalDuration` now records the media's own length (seeded in `addClip`, refreshed on every
+swap). On a swap: **any clip whose duration differs from its natural length was resized by the
+operator and keeps its length**; a clip that simply matched its media adopts the new one's. Legacy
+clips with no `naturalDuration` are **preserved** — silently shrinking a clip the operator had
+stretched is the worse error, so unknown provenance resolves toward keeping it. Shortened clips
+count as resized too; the rule is "the operator touched it", not "it got longer".
+
+Keyframes are clamped to the **preserved** duration, not the incoming one — clamping a 12 s clip's
+keyframes to a 3 s incoming file would destroy them. Trim points still reset (they index into the
+outgoing media and mean nothing for a different file), and `fillPx` is untouched.
+
+The timeline drop path also got the WO-520 aspect rule: `refitExchangedClipToOldRect` contains the
+new media inside the clip's existing rect, reusing `containRectPreservingAspect` rather than a second
+copy. Best-effort and silent — the swap has already succeeded, and an unknown resolution leaves the
+rect exactly as it was.
+
+Verified by `smoke-wo523-clip-exchange-preserves.test.js`, 9 tests driving the real store methods.
 
 ### Original scoping, kept for context
 
