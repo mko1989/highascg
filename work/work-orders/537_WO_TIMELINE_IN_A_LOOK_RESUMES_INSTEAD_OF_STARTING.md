@@ -1,6 +1,6 @@
 # WO-537 — A timeline inside a look resumed where it was left; and returning to a look still cuts
 
-**Status: PART 1 FIXED. PART 2 — one real defect found and fixed (§4b); the reported symptom itself still UNCONFIRMED (§4c). 9 smokes, suite 2266 / 2264 pass / 0 fail / 2 skip.**
+**Status: PART 1 FIXED. PART 2 — CLOSED, root cause is [WO-540](./540_WO_CH1_HALF_RATE_TEARS_DOWN_EVERY_FADE_AT_50_PERCENT.md) (channel 1 drifts to half rate, so the teardown STOPs the outgoing content at ~60 % of every fade). §4b's collision guard remains a real, separate defect and stays fixed. 9 smokes, suite 2266 / 2264 pass / 0 fail / 2 skip.**
 **Priority:** High (on-air; the look plays the wrong part of the timeline)
 **Source:** `work/work-orders/todos14.08.26`
 - line 1: *"hitting take from timeline editor now works correctly, but playing the same timeline from a look (i can drop a timeline from sources browser into looks) down not work properly."*
@@ -162,7 +162,23 @@ duration, forceCut): the guard is reachable in exactly **2** states, and in both
 in by the bank crossfade. The enumeration is in the test, with an assertion on the count of 2 so a
 future change to the surrounding conditions cannot silently widen it.
 
-### 4c. What this does NOT yet explain
+### 4d. ANSWERED — see WO-540
+
+The owner answered probe step 0 with *"pgm1 channel 1 screen"* and freed the box, which turned this
+from source-reading into measurement. The take was reproduced on the wire and the live mixer sampled
+through it: the fade IS issued and the teardown DOES wait — but **channel 1 was ticking at 24.9 fps
+while declaring 50**, so a 25-frame fade needed 1000 ms and the teardown, computing `fadeMs` from the
+declared rate, STOPped the outgoing timeline at ~623 ms — about 62 % through the dissolve. The
+producers die mid-fade while the mixer numbers keep counting down, which is why the log looks clean.
+
+Channel 2, on the identical 6144×1536 mode, measured 48.4 fps at the same moment — so it is not the
+resolution or the GPU. Full measurements, the `REMOVE 1 DECKLINK 1` intervention that doubled the
+rate, and the restart that showed it is a **runtime drift rather than a config mismatch**, are in
+WO-540.
+
+Everything §4 and §4b ruled out stays ruled out; they were just not where the fault was.
+
+### 4c. What §4b does NOT explain (superseded by §4d)
 
 This fires only when a timeline layer is in **both** lists — i.e. the incoming look carries the
 timeline that is currently live. The owner's report is *going back to a **look***, which in the plain
@@ -177,7 +193,8 @@ point. That is a one-word answer and it halves the search.
 
 ### The next probe (cheap, and the owner can do it while working)
 
-0. **Which screen?** Screen 0 (ch1, has a PRV bus → banked path) or screen 1 (ch3, PGM-only path)?
+0. ~~**Which screen?**~~ **ANSWERED: screen 0 / ch1** — and that answer led to WO-540. The steps
+   below were never needed; kept only as a record of what would have been tried.
 
 
 Take a look while a timeline is live on PGM, then read `log/caspar_<date>.log` for that moment:
