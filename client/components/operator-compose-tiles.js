@@ -102,12 +102,13 @@ export {
  *   getComposeCellDefs: () => Array<{ id: string, role: 'pgm'|'prv', mainIndex: number }>,
  *   stateStore: { getState: () => any, on?: (path: string, fn: Function) => (() => void) },
  *   storageKeyPrefix?: string,
+ *   surface?: string,
  *   getOscClient?: (() => any) | null,
  *   onCellRects?: ((cellRects: Array<{ id: string, role: string, mainIndex: number, rect: { left: number, top: number, width: number, height: number } }>) => void) | null,
  * }} options
  */
 export function initOperatorComposeTiles(container, options) {
-	const { getComposeCellDefs, stateStore, storageKeyPrefix = 'casparcg_preview', getOscClient = null, onCellRects = null } = options || {}
+	const { getComposeCellDefs, stateStore, storageKeyPrefix = 'casparcg_preview', getOscClient = null, onCellRects = null, surface = 'compose' } = options || {}
 	const storage = typeof localStorage !== 'undefined' ? localStorage : null
 
 	const root = document.createElement('div')
@@ -191,6 +192,8 @@ export function initOperatorComposeTiles(container, options) {
 	const tileController = createOperatorComposeTileController({
 		root, storage, tiles, getOscClient, stateStore, onCellRects, getCm, posWatch,
 		getStorageKey: () => storageKey,
+		// WO-529: which surface's cells in the shared layout belong to THIS canvas.
+		getSurface: () => surface,
 		getStateReady: () => stateReady,
 		onPersist: persist,
 		onRemoveSourceTile: removeSourceTile,
@@ -321,6 +324,9 @@ export function initOperatorComposeTiles(container, options) {
 	window.addEventListener('highascg-workspace-tab-activated', onTabActivated)
 	window.addEventListener('operator-tiles-reset-request', onResetRequest)
 	const unsubCm = stateStore?.on?.('channelMap', () => rebuild())
+	// WO-529: a rename broadcasts `change { path: 'sourceLabels' }` and nothing else, so without this
+	// the label bar keeps the name a source had when it was dropped here until the next full reload.
+	const unsubLabels = stateStore?.on?.('sourceLabels', () => { for (const t of tiles.values()) relabel(t) })
 	// The WS full-`state` message goes through StateStore.setState(), which emits ONLY '*' — it
 	// never emits 'channelMap' (client/lib/state-store.js) — so the subscription above alone can
 	// leave this canvas parked on its provisional defs until some later incremental change (in
@@ -406,6 +412,7 @@ export function initOperatorComposeTiles(container, options) {
 			window.removeEventListener('highascg-workspace-tab-activated', onTabActivated)
 			window.removeEventListener('operator-tiles-reset-request', onResetRequest)
 			unsubCm?.()
+			unsubLabels?.()
 			unsubAnyState?.()
 			unsubLiveFrame?.()
 			unsubShared?.()

@@ -79,6 +79,11 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 				slot,
 				lastPayload,
 				currentSettings,
+				// This inspector already mounted the shared label control above — it has to appear even
+				// when the input has no host channel yet, which is why it is not left to this call.
+				// Letting the host controls mount a second one put TWO Label boxes on the same connector
+				// id (owner 14.08: "in decklink ports inspector there are 2 input boxes for labels").
+				includeLabel: false,
 				onApplied: async (r) => {
 					setStatus(statusEl, r?.message || `DeckLink updated on ch ${inputEntry.channel}.`, true)
 					await load?.()

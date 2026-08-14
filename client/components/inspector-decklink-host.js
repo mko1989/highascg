@@ -45,9 +45,12 @@ function buildDeviceOptions(lastPayload, slot, activeDevice) {
 
 /**
  * @param {HTMLElement} container
- * @param {{ source: object, slot: number, lastPayload?: object, currentSettings?: object, onApplied?: (r: object) => void }} opts
+ * @param {{ source: object, slot: number, lastPayload?: object, currentSettings?: object,
+ *   includeLabel?: boolean, onApplied?: (r: object) => void }} opts
+ * `includeLabel: false` for callers that already mounted the shared label themselves — the DeckLink
+ * ports inspector does, because its label must show even before the input has a host channel.
  */
-export function mountDecklinkHostSourceControls(container, { source, slot, lastPayload, currentSettings, onApplied }) {
+export function mountDecklinkHostSourceControls(container, { source, slot, lastPayload, currentSettings, includeLabel = true, onApplied }) {
 	// Owner request 2026-07-26: dedicated DeckLink input slots have NO extraLiveSources entry, so
 	// `source` is null for them — the device switcher must still mount (the server's slot-only
 	// update path stops the host channel and PLAYs the new DECKLINK device).
@@ -65,7 +68,7 @@ export function mountDecklinkHostSourceControls(container, { source, slot, lastP
 	/* WO-525: the SAME control the DeckLink ports inspector mounts, on the same key — owner asked for
 	 * "shared label in host channel and in decklink ports inspector". Rendered before the title so it
 	 * reads as the thing this section is about, and only when the source has a stable connector id. */
-	mountSourceLabelControl(container, {
+	if (includeLabel) mountSourceLabelControl(container, {
 		connectorId: source?.connectorId,
 		sources: lastPayload?.extraLiveSources,
 		fallbackLabel: `DeckLink ${slot}`,

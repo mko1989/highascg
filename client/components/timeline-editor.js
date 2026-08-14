@@ -227,6 +227,9 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 	previewPanel = initPreviewPanel(previewHost, {
 		title: 'Timeline output',
 		storageKeyPrefix: 'casparcg_preview_timeline',
+		// WO-529: matches reportTimelineCellRects' tag, so this canvas seeds only from its own cells
+		// and never adopts the looks editor's arrangement (their seed keys are identical).
+		surface: 'timeline',
 		fillParentHeight: true,
 		hideInnerResize: true,
 		onCollapsedChange: (isCollapsed) => {

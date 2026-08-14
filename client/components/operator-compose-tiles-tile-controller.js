@@ -3,6 +3,7 @@
  * crop sync for operator-compose-tiles.js's initOperatorComposeTiles.
  */
 import { screenLabel } from '../lib/screen-label.js'
+import { liveSourceLabelForValue } from '../lib/source-label.js'
 import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
@@ -13,7 +14,7 @@ import {
 	isOperatorLiveCanvasEnabled,
 } from './preview-canvas-live-stream.js'
 import { TILE_CHROME, minOuterSize, tileHoleRectFromOuter, snapToGrid, clampTileRect } from './operator-compose-tiles-geometry.js'
-import { resolveTileAspect, resolveTileChannel, loadTileLayout, tileSeedKey } from './operator-compose-tiles-state.js'
+import { resolveTileAspect, resolveTileChannel, loadTileLayout, tileSeedKey, cellsForSurface } from './operator-compose-tiles-state.js'
 import { buildPgmTileActions } from './operator-compose-tiles-actions.js'
 
 /**
@@ -23,14 +24,14 @@ import { buildPgmTileActions } from './operator-compose-tiles-actions.js'
  *   stateStore: { getState: () => any },
  *   onCellRects: ((cellRects: Array<object>, viewport?: object) => void) | null,
  *   getCm: () => object,  posWatch: { update: () => void },  getStorageKey: () => string,
- *   getStateReady: () => boolean,  onPersist: () => void,
+ *   getStateReady: () => boolean,  onPersist: () => void,  getSurface: () => string,
  *   onRemoveSourceTile: (id: string) => void,  isClient: boolean,
  * }} env
  */
 export function createOperatorComposeTileController(env) {
 	const {
 		root, storage, tiles, getOscClient, stateStore, onCellRects, getCm, posWatch,
-		getStorageKey, getStateReady, onPersist, onRemoveSourceTile, isClient,
+		getStorageKey, getStateReady, onPersist, onRemoveSourceTile, isClient, getSurface,
 	} = env
 
 	let rafReport = null
@@ -154,7 +155,8 @@ export function createOperatorComposeTileController(env) {
 		if (!isClient) return
 		// WO-323: source tiles all carry mainIndex 0 — key them by their routed channel instead
 		// (tileSeedKey), so two source tiles never collide with each other or with PGM/PRV cells.
-		const byKey = new Map((Array.isArray(cells) ? cells : []).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		// WO-529: this canvas' OWN surface only — the other editor's cells share our seed keys.
+		const byKey = new Map(cellsForSurface(cells, getSurface?.()).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
 		if (!byKey.size) return
 		// (1) Crop source — always.
 		for (const t of tiles.values()) {
@@ -197,7 +199,10 @@ export function createOperatorComposeTileController(env) {
 		// persisted — seeding from cells below ~3% of the canvas would shrink every tile to
 		// "smallest possible". Such cells are noise, never an intentional layout.
 		const byKey = new Map(
-			(Array.isArray(cells) ? cells : [])
+			// WO-529: this canvas' OWN surface only. Without this the looks and timeline editors seed
+			// from each other (same role:mainIndex keys) and persist the result, so one arrangement
+			// permanently replaced the other.
+			cellsForSurface(cells, getSurface?.())
 				.map((c) => [tileSeedKey(c), c.rect])
 				.filter(([, r]) => r && r.w > 0.03 && r.h > 0.03),
 		)
@@ -366,7 +371,10 @@ export function createOperatorComposeTileController(env) {
 	function tileLabelText(def, cm) {
 		if (def.role === 'mvcell') {
 			const ch = resolveTileChannel(def, cm)
-			return ch != null ? `LIVE ch${ch} / ${def.label}` : `LIVE (source unavailable) / ${def.label}`
+			// The operator's current name, not the one captured when the source was dropped here.
+			const st = stateStore?.getState?.()
+			const name = liveSourceLabelForValue(st?.extraLiveSources, def.sourceTile?.value, def.label, st?.sourceLabels)
+			return ch != null ? `LIVE ch${ch} / ${name}` : `LIVE (source unavailable) / ${name}`
 		}
 		return `${def.role.toUpperCase()} ${def.mainIndex + 1} / ${screenLabel(cm, def.mainIndex)}`
 	}

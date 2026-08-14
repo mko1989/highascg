@@ -194,6 +194,30 @@ export function resolveSourceTileChannel(tile, cm) {
 	return resolveMvCellSourceChannel({ id: tile.id, type: tile.type, label: tile.label }, parsed, cm)
 }
 
+/**
+ * WO-529 (owner 14.08: *"the compose preview just 'remembers' either the settings of looks eidotr
+ * or timeline, never both at the same time"*).
+ *
+ * The looks editor and the timeline editor each own a tile canvas, and both report into ONE shared
+ * server layout, tagged `surface` ('compose' / 'timeline'). But {@link tileSeedKey} is
+ * `role:mainIndex` — the surface is NOT part of it — so the two editors' `pgm_1` cells collide.
+ * Seeding either canvas from the whole layout therefore applied whichever surface was written
+ * last, to BOTH, and `seedHostLayoutFromCells` persists what it seeds — so one editor's
+ * arrangement permanently overwrote the other's.
+ *
+ * A canvas must only ever seed from its own surface's cells. Untagged cells are treated as
+ * 'compose': that was the only surface when the layout format was introduced, so old persisted
+ * records keep restoring into the looks editor rather than silently becoming unseedable.
+ *
+ * @param {Array<object>|null|undefined} cells
+ * @param {string} surface
+ * @returns {Array<object>}
+ */
+export function cellsForSurface(cells, surface) {
+	const want = String(surface || 'compose')
+	return (Array.isArray(cells) ? cells : []).filter((c) => String(c?.surface || 'compose') === want)
+}
+
 /** seedFromCells identity: source tiles are keyed by their routed channel, never mainIndex (all 0). */
 export function tileSeedKey(c) {
 	return c.role === 'mvcell' ? `mvcell:${c.srcCh}` : `${c.role}:${c.mainIndex}`

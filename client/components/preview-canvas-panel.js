@@ -14,7 +14,7 @@ import { subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './pre
 const G = 6; const BORDER_FADE = 400
 
 export function initPreviewPanel(host, options) {
-	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null, getOscClient = null } = options
+	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null, getOscClient = null, surface = 'compose' } = options
 	const kC = `${storageKeyPrefix}_collapsed`; const kH = `${storageKeyPrefix}_height`; const kL = `${storageKeyPrefix}_compose_prv_pgm_layout`; const kS = `${storageKeyPrefix}_compose_prv_pgm_split`; const kW = `${storageKeyPrefix}_compose_cell_weights`
 	// WO-256: operator-GUI mode replaces the compose canvas-pair with a free-tile canvas
 	// (client/components/operator-compose-tiles.js) — hard-gated, zero effect otherwise.
@@ -412,7 +412,7 @@ export function initPreviewPanel(host, options) {
 	// WO-319: tiles handle — built now on the host operator kiosk, lazily on the first Live-preview-on
 	// for any other client (setComposeTilesMode). Held in a ref because it is created dynamically.
 	const tilesRef = { h: operatorTilesActive
-		? initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
+		? initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects, surface })
 		: null }
 	const unsubCm = stateStore?.on('channelMap', () => {
 		if (tilesRef.h) tilesRef.h.refreshDefs()
@@ -430,7 +430,7 @@ export function initPreviewPanel(host, options) {
 		composeTilesMode = on
 		if (on && !tilesRef.h && tilesMountEl) {
 			tilesMountEl.style.position = 'relative'
-			tilesRef.h = initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects })
+			tilesRef.h = initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects, surface })
 		}
 		if (tilesMountEl) tilesMountEl.style.display = on ? '' : 'none'
 		if (wrap) wrap.style.display = on ? 'none' : ''
