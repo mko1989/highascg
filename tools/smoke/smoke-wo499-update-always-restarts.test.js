@@ -77,6 +77,9 @@ function runHelper(opts) {
 			PATH: `${bin}:${process.env.PATH}`,
 			HIGHASCG_APPLY_SERVER_DROP_SH: apply,
 			HIGHASCG_SERVICE_USER: 'casparcg',
+			// WO-538: without this the helper's DST fell back to the REAL install, so these
+			// assertions passed on the box and failed on any clean machine.
+			HIGHASCG_UPDATE_DEST: dst,
 		},
 	})
 	const code = r.status ?? 1

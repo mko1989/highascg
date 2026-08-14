@@ -82,6 +82,9 @@ function runHelper(opts) {
 			HIGHASCG_APPLY_SERVER_DROP_SH: apply,
 			HIGHASCG_SERVICE_USER: 'casparcg',
 			HIGHASCG_UPDATE_LOG_DIR: logDir,
+			// WO-538: without this the helper's DST fell back to the REAL install, so these
+			// assertions passed on the box and failed on any clean machine.
+			HIGHASCG_UPDATE_DEST: dst,
 		},
 	})
 	const out = {

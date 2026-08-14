@@ -7,7 +7,12 @@
 set -euo pipefail
 
 USER_NAME="${HIGHASCG_SERVICE_USER:-casparcg}"
-DST="/home/casparcg/highascg"
+# WO-538: overridable like USER_NAME / APPLY_SH / LOG_DIR below. `start_service` gates on
+# `${DST}/package.json`, so with DST hard-coded the WO-499/WO-501 smokes silently read the REAL
+# install: green on this box, red on any clean machine (which is how CI failed once the unwired-
+# exports gate stopped masking the offline-test step). Production is unaffected — sudo's default
+# env_reset drops HIGHASCG_* on the way in, so only a direct invocation can set this.
+DST="${HIGHASCG_UPDATE_DEST:-/home/casparcg/highascg}"
 EXFAT_ROOT="/home/casparcg/exfat"
 BRIDGE_ROOT="/home/casparcg/bridge"
 EXCLUDES="/etc/highascg/server-update-rsync-excludes.txt"

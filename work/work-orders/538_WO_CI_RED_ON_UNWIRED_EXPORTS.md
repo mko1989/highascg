@@ -1,6 +1,6 @@
-# WO-538 — CI has been red at the "Unwired exports" gate; six exports nobody imports
+# WO-538 — CI red: six unwired exports, and four tests the gate was hiding
 
-**Status: FIXED in repo (14.08.2026) — gate exits 0, suite 2263 / 2261 pass / 0 fail / 2 skip, boot check green.**
+**Status: FIXED in repo (14.08.2026) — BOTH layers. Gate exits 0; suite green with AND without `dist-web/` (2266 / 2264 pass / 0 fail / 2 skip, and 2263 / 0 fail / 3 skip on a clean tree).**
 **Priority:** High (it fails every push, and a standing red hides the next real regression)
 **Source:** found while running the gates for WO-536, then confirmed against GitHub Actions —
 run `31808496051` on `5fb0adc` and the run on `85ea2ad` both failed at the same step.
@@ -84,7 +84,47 @@ it here would mix a real fix with 43 KB of churn.
   unchanged — this session added none); line limit 0 over; `node index.js --no-http` boots; client
   builds.
 
-## 6. Two things the owner should know
+## 6. Layer two — fixing the gate revealed four tests it had been hiding
+
+Pushing the fix did **not** turn CI green. The workflow runs `Unwired exports` at step 47 and
+`Offline tests` at step 59, and a failing step aborts the job — so while the gate was red the
+offline tests **never ran at all**. Run `31810058268` on `f210561` is the first time they executed
+in weeks, and four failed. This is WO-420's masking pattern again, one layer down.
+
+All four passed locally and failed only on the runner, which is the tell.
+
+### 6a. Three update-helper tests were reading the real installation
+
+`scripts/exfat/highascg-webui-server-update.sh` had `DST="/home/casparcg/highascg"` **hard-coded**,
+while `USER_NAME`, `APPLY_SH` and `LOG_DIR` beside it all take env overrides. `start_service` gates
+on `[[ -f "${DST}/package.json" ]]`.
+
+So the WO-499 and WO-501 harnesses, which carefully build a temp destination *and write a
+`package.json` into it*, were handing that tmpdir to nobody: the helper looked at the real install
+instead. On this box that file exists → `systemctl start` fires → green. On a clean machine it does
+not → `NOT starting …` → `attached mode still starts (WO-499)` fails. The tmpdir was decorative and
+the tests were passing for the wrong reason.
+
+`DST` now honours `HIGHASCG_UPDATE_DEST`, the same pattern as its three neighbours, and both
+harnesses pass their tmpdir. Production is untouched: `sudo`'s default `env_reset` drops `HIGHASCG_*`
+on the way in, so only a direct invocation can set it. Confirmed by pointing the override at a
+nonexistent path — the assertions fail exactly as CI reported.
+
+### 6b. One test asserts on build output that the verify job never builds
+
+`smoke-wo497 A: the real built bundles match` reads `dist-web/index.html`. `dist-web/` is gitignored
+and built by the *separate* `build-client` job, so in `verify` the file cannot exist. It now skips
+with a reason when the artefact is absent, rather than asserting against a file that is never there.
+
+Verified both ways: with `dist-web/` present it runs and passes; with the directory moved aside the
+whole suite is **2266 / 0 fail / 3 skip** instead of a failure.
+
+**This does trade CI coverage for green**, and that should not pass unnoticed: the guarantee is now
+enforced only where a build exists (this box, any pre-push run). Restoring it properly means running
+that file in the `build-client` job after its build step — a workflow change, worth doing, not done
+here because it belongs to whoever owns the CI layout.
+
+## 7. Two things the owner should know
 
 1. **The lint ratchet has zero headroom.** `npm run lint` reports exactly **218** warnings against a
    `--max-warnings 218` cap. The next warning anyone adds turns CI red. Worth a deliberate pass to
@@ -93,8 +133,12 @@ it here would mix a real fix with 43 KB of churn.
    `projects/`. They are gitignored and untracked, so CI never sees them — but it means that gate
    cannot be trusted as a local pre-push check until they are cleared.
 
-## 7. Work log
+## 8. Work log
 
+- 2026-08-14 (later) — The fix did not turn CI green: with the gate no longer aborting the job, the
+  offline-test step ran for the first time in weeks and four tests failed, all runner-only. Three
+  were reading the real installation through a hard-coded `DST`; one asserts on a build the verify
+  job never makes. Both fixed; suite verified green with and without `dist-web/`.
 - 2026-08-14 — Found while gating WO-536; confirmed red on GitHub Actions across two of the owner's
   pushes. Each of the six checked individually rather than swept: five are internal helpers with a
   redundant `export`, one is a genuine orphan superseded by direct field access. Un-exported and
