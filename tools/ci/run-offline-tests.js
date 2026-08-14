@@ -131,6 +131,7 @@ const FILES = [
 	'tools/smoke/smoke-wo520-exchange-contain-fit.test.js',
 	'tools/smoke/smoke-wo522-timeline-geometry-throttle.test.js',
 	'tools/smoke/smoke-wo523-clip-exchange-preserves.test.js',
+	'tools/smoke/smoke-wo525-shared-source-label.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

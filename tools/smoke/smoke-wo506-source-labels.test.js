@@ -141,41 +141,31 @@ test('WO-510: the streaming-bus DeckLink now gets consumer settings too', () => 
 })
 
 /**
- * WO-517 — the edit control the owner said was missing.
+ * WO-517 — the edit control the owner said was missing, now the SHARED one (WO-525).
  *
- * Owner 13.08: *"the labels of screens is not finished. cant add labels to decklink inputs."*
- * WO-506 shipped the store, resolver, route and helpers, but nothing in the UI could SET a label.
+ * WO-517 first added a control local to this inspector. WO-525 replaced it with
+ * `inspector-source-label.js`, mounted identically here and in the host-channel inspector, after the
+ * owner reported the label "does not apply" and asked for one shared field. The behavioural
+ * assertions (keying, placeholder, no restart-dirty) moved with it to
+ * `smoke-wo525-shared-source-label.test.js`; what belongs here is that this inspector still offers
+ * the control at all.
  */
 
-test('WO-517: the DeckLink input inspector mounts a label control', () => {
+test('WO-517: the DeckLink input inspector offers a label control', () => {
 	const src = read('client/components/device-view-inspector-decklink-input.js')
-	assert.match(src, /function mountSourceLabelControl\(/, 'the control must exist')
-	assert.match(src, /mountSourceLabelControl\(inputSection, conn, ctx\)/, 'and actually be mounted')
+	assert.match(src, /import \{ mountSourceLabelControl \}/, 'must use the shared control')
+	assert.match(src, /mountSourceLabelControl\(inputSection, \{/, 'and mount it in the input section')
 })
 
 test('WO-517: it keys on the connector id, which survives re-cabling', () => {
-	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
-		read('client/components/device-view-inspector-decklink-input.js'),
-	)[0]
-	assert.match(body, /String\(conn\?\.id \|\| ''\)/, 'connectorId is the stable key (WO-506)')
-	assert.match(body, /sourceId: key/, 'and it is what the API is given')
-	assert.match(body, /'\/api\/sources\/label'/, 'posting to the registered route')
+	const src = read('client/components/device-view-inspector-decklink-input.js')
+	assert.match(src, /connectorId: conn\.id/, 'connectorId is the stable key (WO-506)')
 })
 
-test('WO-517: the placeholder shows the generated fallback, so empty reads as "revert"', () => {
-	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
-		read('client/components/device-view-inspector-decklink-input.js'),
-	)[0]
-	assert.match(body, /placeholder: generated/, 'the operator must see what clearing falls back to')
-	assert.match(body, /generatedLabel/, 'which the server preserves on each source')
-})
-
-test('WO-517: renaming must NOT mark Caspar restart-dirty', () => {
-	const body = /function mountSourceLabelControl\([\s\S]*?\n\}/.exec(
-		read('client/components/device-view-inspector-decklink-input.js'),
-	)[0]
-	// A label changes no Caspar config; demanding a playout restart to rename a camera is absurd.
-	assert.doesNotMatch(body, /setCasparRestartDirty|markCasparRestartDirty/)
+test('WO-517: the control is fed the payload this inspector actually holds', () => {
+	// The original bug: it read a key that only exists in /api/state, off the device-view snapshot.
+	const src = read('client/components/device-view-inspector-decklink-input.js')
+	assert.match(src, /sources: lastPayload\?\.extraLiveSources/)
 })
 
 /**

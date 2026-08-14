@@ -4,6 +4,7 @@
 import { changeDecklinkInputDevice, reloadDecklinkInputDevice } from '../lib/decklink-add-input.js'
 import { decklinkSlotFromConnector } from '../lib/input-channels.js'
 import { showAppToast } from '../lib/app-toast.js'
+import { mountSourceLabelControl } from './inspector-source-label.js'
 
 function listDecklinkIoConnectors(lastPayload) {
 	return [
@@ -60,6 +61,16 @@ export function mountDecklinkHostSourceControls(container, { source, slot, lastP
 	const section = document.createElement('div')
 	section.className = 'inspector-section inspector-decklink-host-controls'
 	section.style.marginTop = '10px'
+
+	/* WO-525: the SAME control the DeckLink ports inspector mounts, on the same key — owner asked for
+	 * "shared label in host channel and in decklink ports inspector". Rendered before the title so it
+	 * reads as the thing this section is about, and only when the source has a stable connector id. */
+	mountSourceLabelControl(container, {
+		connectorId: source?.connectorId,
+		sources: lastPayload?.extraLiveSources,
+		fallbackLabel: `DeckLink ${slot}`,
+		onSaved: () => onApplied?.({ message: 'Label saved.' }),
+	})
 
 	const title = document.createElement('div')
 	title.className = 'inspector-section__title'

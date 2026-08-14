@@ -180,8 +180,13 @@ everything — is already the implemented behaviour, and no change was needed. R
   The chips already re-render on `path === 'channelMap'`; they just never heard. The rename now
   broadcasts the rebuilt map, guarded so a broadcast failure cannot fail the save. Without this the
   owner's rule — a renamed screen shows everywhere — was not actually true.
-- **No inspector edit control yet.** The API works; the device-view host-channel inspector still needs
-  the text input (and it belongs there, not in the Sources tab, which has no inspector).
+- ~~**No inspector edit control yet.**~~ **DONE (WO-517, corrected by WO-525).** The first control
+  read `sourceLabels` off `ctx.lastPayload` — the **device-view snapshot**, which does not carry that
+  key; only `/api/state` does. So it always rendered blank and the owner reported the label "does not
+  apply", even though the value had saved correctly (confirmed live: `sourceLabels.dlsdi_4 = 'Cam2'`).
+  Now `client/components/inspector-source-label.js` resolves from `extraLiveSources`, which both
+  payloads carry, and is mounted in **both** the DeckLink ports inspector and the host-channel
+  inspector on the same key — one component, not two copies.
 - **Surfaces that build their own label** are untouched and still show generated text:
   `preview-canvas-compose-snapshot.js:456`, `timeline-editor.js:259`, and the test-card payloads in
   `routes-led-test-card.js` / `startup-led-test-pattern.js`.

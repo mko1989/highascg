@@ -6,6 +6,7 @@ import { decklinkInputForSlot, decklinkSlotFromConnector, routeForDecklinkSlot }
 import { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } from '../lib/decklink-io-direction.js'
 import { appendDecklinkSectionHeading, appendDecklinkSectionNote } from './device-view-inspector-decklink-shared.js'
 import { mountDecklinkHostSourceControls } from './inspector-decklink-host.js'
+import { mountSourceLabelControl } from './inspector-source-label.js'
 import {
 	addDecklinkInputSlot,
 	removeDecklinkInputSlot,
@@ -29,7 +30,15 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 	appendDecklinkSectionHeading(inputSection, 'Input')
 
 	if (isCurrentlyInput) {
-		mountSourceLabelControl(inputSection, conn, ctx)
+		/* WO-525: the shared control — same key and same field as the host-channel inspector. The
+		 * previous local copy read `ctx.lastPayload`, which is the device-view snapshot and never carries
+		 * `sourceLabels`, so the field opened blank and the saved name looked lost. */
+		mountSourceLabelControl(inputSection, {
+			connectorId: conn.id,
+			sources: lastPayload?.extraLiveSources,
+			fallbackLabel: `DeckLink ${slot}`,
+			onSaved: () => load?.(),
+		})
 		const removeBtn = Object.assign(document.createElement('button'), {
 			className: 'header-btn',
 			textContent: 'Stop input',
@@ -127,72 +136,4 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 	}
 
 	return { ioDir, isCurrentlyInput }
-}
-
-/**
- * Operator-editable name for this input (WO-506).
- *
- * The store, resolver and `POST /api/sources/label` landed with WO-506, but nothing could SET a
- * label — owner: *"the labels of screens is not finished. cant add labels to decklink inputs."*
- * This is the missing control. It lives in the device-view host-channel inspector, not the Sources
- * tab: a Sources selection is not a place to hang settings, and per-input controls belong here.
- *
- * The key is the CONNECTOR id (`dlsdi_3`), which survives re-cabling and re-mapping, so a renamed
- * camera keeps its name when it is re-patched. Clearing the field removes the override rather than
- * storing a blank, and the placeholder shows the generated name it will fall back to.
- *
- * @param {HTMLElement} parent
- * @param {object} conn device-graph connector
- * @param {object} ctx inspector context
- */
-function mountSourceLabelControl(parent, conn, ctx) {
-	const key = String(conn?.id || '').trim()
-	if (!key) return
-	const state = ctx?.lastPayload || {}
-	const sources = Array.isArray(state.extraLiveSources) ? state.extraLiveSources : []
-	const mine = sources.find((s) => String(s?.connectorId || '') === key) || null
-	const generated = String(mine?.generatedLabel || mine?.label || '').trim()
-	const custom = String((state.sourceLabels || {})[key] || '').trim()
-
-	const row = document.createElement('div')
-	row.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:8px'
-	row.appendChild(
-		Object.assign(document.createElement('span'), {
-			textContent: 'Label',
-			style: 'font-size:10px;opacity:0.6',
-		}),
-	)
-	const input = Object.assign(document.createElement('input'), {
-		type: 'text',
-		className: 'device-view__inspector-input',
-		value: custom,
-		placeholder: generated || `DeckLink ${decklinkSlotFromConnector(conn)}`,
-		maxLength: 64,
-	})
-	input.title = 'Shown wherever this source appears. Leave empty to use the generated name.'
-
-	let saving = false
-	const save = async () => {
-		if (saving) return
-		saving = true
-		try {
-			const res = await fetch('/api/sources/label', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sourceId: key, label: input.value }),
-			})
-			if (!res.ok) throw new Error(`HTTP ${res.status}`)
-			// A rename changes no Caspar config, so this must NOT set the restart-dirty flag —
-			// making the operator restart playout to rename a camera would be absurd.
-			if (typeof ctx.load === 'function') ctx.load({ forceRefresh: true })
-		} catch (e) {
-			if (ctx?.statusEl) ctx.statusEl.textContent = `Label save failed: ${e?.message || e}`
-		} finally {
-			saving = false
-		}
-	}
-	input.addEventListener('change', save)
-	input.addEventListener('blur', save)
-	row.appendChild(input)
-	parent.appendChild(row)
 }
