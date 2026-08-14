@@ -85,6 +85,18 @@ function handleScreenLabel(body, ctx) {
 		ctx.configManager.save(nextConfig)
 		Object.assign(ctx.config, ctx.configManager.get())
 		const { getChannelMap } = require('../config/routing')
+		/* WO-506: broadcast the rebuilt map. A rename saved fine but told nobody, so every surface
+		 * reading `channelMap.screenLabels` — the header timer chips, multiview cells, the looks
+		 * selector — kept the old name until some unrelated state push happened to refresh it. The
+		 * owner's rule is that a renamed screen shows everywhere; that only holds if the rename is
+		 * announced. */
+		if (typeof ctx._wsBroadcast === 'function') {
+			try {
+				ctx._wsBroadcast('change', { path: 'channelMap', value: getChannelMap(ctx.config) })
+			} catch (_) {
+				/* a broadcast failure must not fail the rename itself */
+			}
+		}
 		return {
 			status: 200,
 			headers: JSON_HEADERS,

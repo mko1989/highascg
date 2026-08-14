@@ -177,3 +177,44 @@ test('WO-517: renaming must NOT mark Caspar restart-dirty', () => {
 	// A label changes no Caspar config; demanding a playout restart to rename a camera is absurd.
 	assert.doesNotMatch(body, /setCasparRestartDirty|markCasparRestartDirty/)
 })
+
+/**
+ * WO-524 — the top-bar playback-timer chips show the operator's screen name.
+ *
+ * Owner pointed at the component (`button class header pgm timer chip`) after I failed to find it:
+ * `client/lib/app-pgm-header-timer.js`, which hardcoded `P1`/`P2`. Owner's rule for these:
+ * *"a 3 later shorthand of the label, just first 3 letters, nothing else."*
+ */
+
+test('WO-524: the chip renders the screen label shorthand, not a hardcoded P<n>', () => {
+	const src = read('client/lib/app-pgm-header-timer.js')
+	assert.match(src, /shortLabelPill\(full\)/, 'must use the shared 3-letter transform')
+	assert.match(src, /screenLabel\(cm, idx\)/, 'resolved from the screen label, per WO-222/WO-385')
+	assert.doesNotMatch(src, /b\.textContent = `P\$\{idx \+ 1\}`/, 'the hardcoded label must be gone')
+})
+
+test('WO-524: the full name stays reachable in the tooltip', () => {
+	// The chip is three characters wide; the operator still needs to know which screen it is.
+	const src = read('client/lib/app-pgm-header-timer.js')
+	assert.match(src, /b\.title = `Show playback timer for \$\{full\} \(channel \$\{ch\}\)`/)
+})
+
+test('WO-524: a chip is never blank', () => {
+	// screenLabel falls back to S<n>, and there is a P<n> backstop after that.
+	const src = read('client/lib/app-pgm-header-timer.js')
+	assert.match(src, /shortLabelPill\(full\) \|\| `P\$\{idx \+ 1\}`/)
+})
+
+test('WO-524: renaming a screen BROADCASTS, or no surface would update', () => {
+	const src = read('src/api/routes-screens.js')
+	assert.match(src, /_wsBroadcast\('change', \{ path: 'channelMap'/, 'the rename must announce itself')
+	// The chips re-render on exactly this path.
+	const chips = read('client/lib/app-pgm-header-timer.js')
+	assert.match(chips, /if \(path === 'channelMap'\) renderPlaybackChannelChips\(\)/)
+})
+
+test('WO-524: a failed broadcast must not fail the rename', () => {
+	const body = /if \(typeof ctx\._wsBroadcast === 'function'\) \{[\s\S]*?\n\t\t\}/.exec(read('src/api/routes-screens.js'))
+	assert.ok(body, 'the broadcast must be guarded')
+	assert.match(body[0], /catch/, 'the save already succeeded')
+})

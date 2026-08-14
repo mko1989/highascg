@@ -2,6 +2,8 @@
  * Header PGM channel playback-timer chips + timer host mount.
  */
 import { mountPgmTopLayerPlaybackTimer } from '../components/playback-timer.js'
+import { screenLabel } from './screen-label.js'
+import { shortLabelPill } from './source-label.js'
 
 export function initPgmHeaderTimer({ stateStore, sceneState, statusEl, getOscClient }) {
 	let pgmHeaderTimerDestroy = null
@@ -38,8 +40,14 @@ export function initPgmHeaderTimer({ stateStore, sceneState, statusEl, getOscCli
 			const b = document.createElement('button')
 			b.type = 'button'
 			b.className = 'header-pgm-timer-chip' + (ch === selectedPlaybackChannel ? ' header-pgm-timer-chip--active' : '')
-			b.textContent = `P${idx + 1}`
-			b.title = `Show playback timer for channel ${ch}`
+			/* WO-506: the operator's own screen name, not a generic `P1`. Owner: *"it should be a 3
+			 * later shorthand of the label, just first 3 letters, nothing else."* The chip is tiny, so
+			 * only the shorthand is rendered — the tooltip carries the full name and the channel.
+			 * `screenLabel` already falls back to `S<n>` when nothing is named, so this is never blank. */
+			const cm = stateStore.getState()?.channelMap || {}
+			const full = screenLabel(cm, idx)
+			b.textContent = shortLabelPill(full) || `P${idx + 1}`
+			b.title = `Show playback timer for ${full} (channel ${ch})`
 			b.addEventListener('click', () => {
 				selectedPlaybackChannel = ch
 				persistSelectedPlaybackChannel()

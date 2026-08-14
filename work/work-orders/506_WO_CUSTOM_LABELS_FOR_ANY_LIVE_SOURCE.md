@@ -163,11 +163,23 @@ everything — is already the implemented behaviour, and no change was needed. R
 
 ## 6. NOT done — and one thing I could not find
 
-- **The top-bar screen pills are not wired.** I could not locate the component that renders them.
-  `header-bar-streaming.js:62` renders *streaming* indicators (a different row), `timeline-transport.js`
-  uses a `<select>`, and nothing else in `client/components/header-bar*.js` renders a per-screen
-  progress-bar chooser. Rather than guess and change the wrong control, the transform is implemented
-  and tested and the wiring is left. **Owner: which component/class is that pill row?**
+- ~~**The top-bar screen pills are not wired.**~~ **DONE (WO-524).** Owner supplied the pointer after
+  I failed to find it: *"top bar pills show playback timers for the chosen channel. button class
+  header pgm timer chip"* → `client/lib/app-pgm-header-timer.js`, which hardcoded ``b.textContent =
+  `P${idx + 1}` ``. My search had been over `client/components/header-bar*.js`; the chips live in
+  `client/lib/` and are a *playback-timer channel chooser*, which is why "progress bar" and "pills"
+  both missed them.
+
+  Now `shortLabelPill(screenLabel(cm, idx))` — the shared 3-letter transform over the screen label,
+  with the full name in the `title` (the chip is three characters wide) and a `P<n>` backstop after
+  `screenLabel`'s own `S<n>` fallback, so a chip is never blank.
+
+  **A second gap surfaced while wiring it:** `/api/screens/label` saved the rename and told nobody —
+  no `_wsBroadcast` — so `stateStore.channelMap` never changed and *every* surface reading
+  `channelMap.screenLabels` kept the old name until an unrelated state push happened to refresh it.
+  The chips already re-render on `path === 'channelMap'`; they just never heard. The rename now
+  broadcasts the rebuilt map, guarded so a broadcast failure cannot fail the save. Without this the
+  owner's rule — a renamed screen shows everywhere — was not actually true.
 - **No inspector edit control yet.** The API works; the device-view host-channel inspector still needs
   the text input (and it belongs there, not in the Sources tab, which has no inspector).
 - **Surfaces that build their own label** are untouched and still show generated text:
