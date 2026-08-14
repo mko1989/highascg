@@ -142,11 +142,17 @@ test('WO-513: a sentinel with no device never reports 99', () => {
 	assert.notEqual(decklinkSlotFromConnector({ id: 'dlsdi_99' }), 99)
 })
 
-test('WO-513: the MVR port is only suggested when a multiview device is configured', () => {
+test('WO-513/527: the MVR pseudo-port is gone entirely — superseded by the owner', () => {
+	// WO-513 kept the synthesized port and merely stopped slot 99 poisoning slot-based rules. The
+	// owner then ruled it out completely: "the mvr sdi should not ever appear. user can send mvr
+	// channel to sdi port but it still stays an sdi port # not mvr sdi." See WO-527.
 	const src = code(read('src/config/device-graph-suggest.js'))
-	const hits = [...src.matchAll(/addDecklinkPort\(99, (\w+),/g)].map((m) => m[1])
-	assert.ok(hits.length > 0, 'the synthesized port must still exist — it represents a real output')
-	for (const v of hits) {
-		assert.match(src, new RegExp(`${v}\\s*>\\s*0`), `${v} must be gated on a configured device`)
-	}
+	assert.doesNotMatch(src, /addDecklinkPort\(99,/, 'no pseudo-slot may be synthesized')
+	assert.doesNotMatch(src, /SDI \(MVR\)/, 'and no MVR label')
+})
+
+test('WO-513: the sentinel resolver stays as a safety net for un-normalized graphs', () => {
+	// normalizeDeviceGraph strips dlsdi_99 on load, but a caller holding a raw graph must still not
+	// be told that slot 99 exists.
+	assert.equal(decklinkSlotFromConnector({ id: 'dlsdi_99', externalRef: '2' }), 2)
 })

@@ -153,7 +153,13 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 
 	const mvd = parseInt(live?.decklink?.multiviewDevice, 10)
 	if (mvd > 0) {
-		addDecklinkPort(99, mvd, 'decklink_io', 'SDI (MVR)', { caspar: { ioDirection: 'out', bus: 'multiview' } })
+		/* WO-527: a multiview output is an ordinary SDI port, labelled by its port number. Owner:
+		 * *"the mvr sdi should not ever appear. user can send mvr channel to sdi port but it still
+		 * stays an sdi port # not mvr sdi."* This used to invent `dlsdi_99` / "SDI (MVR)" — a slot that
+		 * does not exist, which then poisoned every slot-based rule and, because the suggester only
+		 * ever adds, outlived the setting that created it. `addDecklinkPort` dedupes by DEVICE, so if
+		 * the card is already listed as a real port this is a no-op and that port keeps its own label. */
+		addDecklinkPort(mvd, mvd, 'decklink_io', `SDI ${mvd}`, { caspar: { ioDirection: 'out', bus: 'multiview' } })
 	}
 
 	// Fallback: discover from config if Caspar is offline or misconfigured
@@ -174,7 +180,10 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 	}
 	const cfgMvd = parseInt(String(cs.multiview_decklink_device), 10)
 	if (Number.isFinite(cfgMvd) && cfgMvd > 0) {
-		addDecklinkPort(99, cfgMvd, 'decklink_io', 'SDI (MVR)', { caspar: { ioDirection: 'out', bus: 'multiview' } })
+		// WO-527: same as above on the config-fallback path — a real port number, never a pseudo-slot.
+		addDecklinkPort(cfgMvd, cfgMvd, 'decklink_io', `SDI ${cfgMvd}`, {
+			caspar: { ioDirection: 'out', bus: 'multiview' },
+		})
 	}
 
 	const v4l2Count = Math.max(0, parseInt(String(cs.v4l2_input_count || 0), 10))

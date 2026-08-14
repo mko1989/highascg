@@ -22,6 +22,9 @@ function buildGpuLegacyToPhysicalMap() {
 	return out
 }
 
+/** WO-527: the retired "SDI (MVR)" pseudo-port. Never emitted, and stripped from saved graphs. */
+const MVR_PSEUDO_CONNECTOR_ID = 'dlsdi_99'
+
 function normalizeDeviceGraph(raw) {
 	const base = defaults.deviceGraph && typeof defaults.deviceGraph === 'object' ? defaults.deviceGraph : {}
 	const x = raw && typeof raw === 'object' ? raw : {}
@@ -52,6 +55,14 @@ function normalizeDeviceGraph(raw) {
 			if (!c || typeof c !== 'object') return null
 			const id = String(c.id || '').trim()
 			if (!id) return null
+			/* WO-527: drop the synthetic "SDI (MVR)" port. Owner: *"the mvr sdi should not ever appear.
+			 * user can send mvr channel to sdi port but it still stays an sdi port # not mvr sdi."*
+			 * `dlsdi_99` was invented by device-graph-suggest to represent "the multiview bus goes out
+			 * on DeckLink N" — but 99 is not a port, the card is in `externalRef`, and the suggester
+			 * only ever ADDED, so once the multiview device was cleared the entry stayed in the saved
+			 * graph forever. A multiview output now shows on its REAL port, like any other output.
+			 * Pruned on normalize so existing graphs are cleaned on load, not just new ones. */
+			if (id === MVR_PSEUDO_CONNECTOR_ID) return null
 			const deviceId = String(c.deviceId || outDev[0].id).trim() || outDev[0].id
 			let nextId = id
 			if (String(c.kind || '').trim() === 'gpu_out') {
@@ -149,4 +160,5 @@ function validateDeviceGraph(graph) {
 	return { ok: errors.length === 0, errors }
 }
 
-module.exports = { normalizeDeviceGraph, validateDeviceGraph }
+module.exports = {
+	MVR_PSEUDO_CONNECTOR_ID, normalizeDeviceGraph, validateDeviceGraph }
