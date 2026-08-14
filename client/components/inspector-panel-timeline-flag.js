@@ -7,9 +7,28 @@ import {
 	parseCompanionCoordField,
 	flagCompanionCoords,
 } from '../lib/companion-location-parse.js'
-import { companionButtonPreviewUrl, invalidateCompanionFlagThumbs } from '../lib/companion-button-preview-url.js'
+import { companionButtonPreviewUrl, invalidateCompanionFlagThumbs, latestCompanionButtonPreviewMtime } from '../lib/companion-button-preview-url.js'
 import { openCompanionButtonPickerModal } from './companion-button-picker-modal.js'
 import { appendTimelineInspectorPosition, syncTimelineToServer } from './inspector-panel-timeline-shared.js'
+
+/**
+ * WO-535: what is actually missing, per the status endpoint's `reason`. The Satellite TCP server
+ * and the Button Subscriptions API are two different Companion settings, and the old single
+ * sentence blamed both — including when Satellite was demonstrably connected.
+ * @param {string | null | undefined} reason
+ */
+function companionPreviewUnavailableText(reason) {
+	switch (String(reason || '')) {
+		case 'satellite_disabled':
+			return 'Companion Satellite is switched off in HighAsCG\u2019s own Companion settings.'
+		case 'subscriptions_disabled':
+			return 'Satellite is connected. Previews additionally need Button Subscriptions API in Companion Settings \u2014 picking and pressing work without it.'
+		case 'satellite_reconnecting':
+			return 'Companion Satellite reachable \u2014 reconnecting; the preview appears shortly.'
+		default:
+			return 'Companion button preview unavailable \u2014 no answer from Companion Satellite. Pressing still works over the HTTP API.'
+	}
+}
 
 /**
  * @param {{
@@ -155,7 +174,15 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	previewImg.alt = 'Companion button preview'
 	previewImg.width = 72
 	previewImg.height = 72
-	previewImg.src = companionButtonPreviewUrl(coords.page, coords.row, coords.column)
+	/* WO-535: bust on the same live SUB-STATE mtime the timeline flag thumb uses. Without a buster
+	 * the browser served its cached jpg of this button, so the inspector showed the button as it
+	 * looked at some earlier state while the flag beside it was current. */
+	previewImg.src = companionButtonPreviewUrl(
+		coords.page,
+		coords.row,
+		coords.column,
+		latestCompanionButtonPreviewMtime(coords.page, coords.row, coords.column),
+	)
 	/* One delayed retry: the jpg route subscribes on demand and the first frame can miss its
 	 * 1.5 s window right after a rebind. */
 	let previewRetryTimer = null
@@ -356,9 +383,13 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 			return
 		}
 		previewStatus.classList.add('companion-inspector-preview-status--warn')
-		previewStatus.textContent =
-			st?.hint ||
-			'Companion button preview unavailable. Enable Satellite + Button Subscriptions API in Companion Settings.'
+		/* WO-535 — never tell the operator to enable something the status says is already on. Owner
+		 * 14.08: *"it displays cannot reach companion satelite, and to check companion settings if
+		 * its enabled. That is very wrong because the companion sattelite setting CANNOT be turned
+		 * off."* The old blanket fallback conflated the Satellite TCP server with the separate
+		 * Button Subscriptions API, and fired even for a transient reconnect. The status endpoint
+		 * already distinguishes them (`reason`); say which one is actually missing. */
+		previewStatus.textContent = st?.hint || companionPreviewUnavailableText(st?.reason)
 		/* WO-450/452: do NOT disable the picker — a binding is just page/row/column and the
 		 * modal now renders a clickable blind grid without previews. Disabling here is what
 		 * read as "the chooser does not open at all" once the status started truthfully

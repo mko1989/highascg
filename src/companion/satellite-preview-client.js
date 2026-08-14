@@ -131,18 +131,27 @@ class SatellitePreviewClient extends EventEmitter {
 
 	/**
 	 * Emulate a button press via the Satellite API.
+	 *
+	 * WO-535: **the return value is load-bearing.** This returns silently when the socket is not
+	 * connected, and the only caller (`_fireCompanionPress`) read that silence as success — so a
+	 * playhead flag never fell back to the HTTP press API, which is the path the settings modal's
+	 * Test press proves works. Owner 14.08: *"the test press goes thru but the playhead does not
+	 * trigger a press."* Callers MUST branch on this.
+	 *
 	 * @param {number} page
 	 * @param {number} row
 	 * @param {number} column
+	 * @returns {boolean} true only when the KEY-STATE line actually went out
 	 */
 	pressButton(page, row, column) {
-		if (!this._connected) return
+		if (!this._connected) return false
 		this._send(formatSatelliteLine('KEY-STATE', { LOCATION: `${page}/${row}/${column}`, PRESSED: '1' }))
 		setTimeout(() => {
 			if (this._connected) {
 				this._send(formatSatelliteLine('KEY-STATE', { LOCATION: `${page}/${row}/${column}`, PRESSED: '0' }))
 			}
 		}, 20)
+		return true
 	}
 
 	/**

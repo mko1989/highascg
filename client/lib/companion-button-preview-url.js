@@ -19,6 +19,19 @@ function latestMtimeFor(page, row, column) {
 	return _latestMtime.get(`${page}/${row}/${column}`)
 }
 
+/**
+ * WO-535: the timeline flag thumb has always cache-busted with this mtime; the flag INSPECTOR built
+ * its first `<img>` src with no buster at all, so the browser's cached copy of that jpg — from
+ * whenever the button last looked different — was what the operator saw. Owner 14.08: *"the flag
+ * correctly displays the current display of the button, but inside the inspector it shows a stale
+ * button display."* Exported so both surfaces bust on the same value.
+ * @param {number} page @param {number} row @param {number} column
+ * @returns {number | undefined}
+ */
+export function latestCompanionButtonPreviewMtime(page, row, column) {
+	return latestMtimeFor(page, row, column)
+}
+
 /** @type {(() => void) | null} */
 let _invalidateDraw = null
 

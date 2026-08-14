@@ -194,21 +194,26 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			const row = flag.companionRow ?? 0
 			const col = flag.companionColumn ?? 0
 
-			// Try Satellite API first (primary)
+			/* Try Satellite first (primary). WO-535: `pressButton` RETURNS whether the line went out —
+			 * it exits silently when the socket is not connected, and the old code set `satelliteOk`
+			 * unconditionally because only a synchronous throw could reach the catch. The press was
+			 * then dropped with no fallback and no log, while the settings modal's Test press (pure
+			 * HTTP, routes-companion-preview.js:179) kept working. That asymmetry IS the owner's
+			 * report. The catch stays for a require/construct failure. */
 			let satelliteOk = false
 			try {
 				const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
-				getSatellitePreviewClient().pressButton(page, row, col)
-				satelliteOk = true
+				satelliteOk = getSatellitePreviewClient().pressButton(page, row, col) === true
 			} catch (_err) {
-				// Satellite unavailable, will fall back to HTTP
+				/* require/construct failure only — `satelliteOk` is already false. */
 			}
 
 			// Fall back to HTTP API if satellite failed
 			if (!satelliteOk) {
-				const comp = this.self?.config?.companion || {}
-				const host = comp.host || '127.0.0.1'
-				const port = comp.port || 8000
+				// WO-535: one resolver, so the fallback cannot drift from the port the status probe
+				// and the Test press use.
+				const { resolveCompanionConfig } = require('../companion/companion-config')
+				const { host, port } = resolveCompanionConfig(this.self?.config)
 				const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
 
 				fetch(url, {
