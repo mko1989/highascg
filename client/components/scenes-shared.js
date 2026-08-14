@@ -375,7 +375,16 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 		if (frames != null) layers[i] = { ...layers[i], playSeekFrames: frames }
 	}
 
-	const cv = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+	/* WO-531 — the authoring canvas must be the canvas of the screen this payload is FOR, not the
+	 * one the operator happens to have selected in the editor. `activeScreenIndex` made a take's
+	 * geometry depend on the current tab: with a 1920x1080 screen selected, a look taken to the
+	 * 6144x1536 screen was mapped 1920x1080 -> 6144x1536 by the server's
+	 * mapProgramPixelRectToTargetOutput and every layer shrank by pw*k/ow = 4/9. That exact 0.4444
+	 * factor is on the wire in log/caspar_2026-08-14.log, on all three layers of Look 1 at once.
+	 * Every take/stage caller already passes the target `mainIdx`; the fallback keeps the old
+	 * behaviour for the one caller that has no target (a local state apply, not a wire payload). */
+	const canvasIdx = Number.isInteger(seekOpts?.mainIdx) && seekOpts.mainIdx >= 0 ? seekOpts.mainIdx : sceneState.activeScreenIndex
+	const cv = sceneState.getCanvasForScreen(canvasIdx)
 	const pgmOnly = seekOpts?.pgmOnly === true
 	let payload = {
 		id: scene.id,

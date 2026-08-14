@@ -136,6 +136,7 @@ const FILES = [
 	'tools/smoke/smoke-wo528-take-opacity-not-slammed.test.js',
 	'tools/smoke/smoke-wo529-operator-surface-handoff.test.js',
 	'tools/smoke/smoke-wo530-compose-labels-and-surfaces.test.js',
+	'tools/smoke/smoke-wo531-authoring-canvas-follows-target.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

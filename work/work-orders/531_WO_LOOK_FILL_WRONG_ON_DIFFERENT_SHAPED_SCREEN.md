@@ -1,112 +1,133 @@
-# WO-531 — A look taken to a differently-shaped screen applies the wrong layer position and size
+# WO-531 — A take sized its layers with the LOOKS EDITOR's selected screen, not the target screen
 
-**Status: DIAGNOSED, NOT FIXED (14.08.2026). The mechanism is proven from the live project and live channel map (§2); the FIX is a design choice the owner must make (§4).**
-**Priority:** High (on-air geometry; the owner hits it on the main play button)
+**Status: FIXED in repo (14.08.2026) — 5 smokes, suite 2214 / 2212 pass / 0 fail / 2 skip. Owner QA owed (§6).**
+**Priority:** High (on-air geometry, every main-play take)
 **Source:** `work/work-orders/todos14.08.26` — *"when hitting the main play button to transition all selected screen destitionations, the transition not always correctly apply position and size of layers set in looks, like it gets it from somewhere else."* Restated 14.08: *"the main play button still applies wrong sizing on layers at least on ch1."*
-**Related:** WO-238 (adjust fill ignores crop), WO-388 (crop counts into layer size), WO-327 (compose preview dest borders at custom res)
+**Related:** WO-327 (compose preview dest borders at custom res), WO-238, WO-388
 
 ---
 
-## 1. The two screens are not the same shape
+## 0. Correction — my first diagnosis was wrong
 
-From the running box (`GET /api/state`):
-
-```
-screenCount        2
-programChannels    [1, 3]
-programResolutions [ {w: 6144, h: 1536, fps: 50},    ← screen 0, ch1 — 4:1 mapped LED
-                     {w: 1920, h: 1080, fps: 50} ]   ← screen 1, ch3 — 16:9
-```
-
-Not just different sizes — **different aspect ratios**, 4:1 against 16:9.
-
-## 2. One look is live on both, and nothing records which canvas it was built for
-
-`projects/test420.json`:
+The first pass of this WO claimed *"Look 3 is live on main 0 AND main 1"*. That was a misread of
 
 ```
-liveSceneIdByMain  ['63668cee…', '9c93ed10…', None, None]
+liveSceneIdByMain    ['63668cee…', '9c93ed10…', None, None]
 previewSceneIdByMain ['1215909c…', '9c93ed10…', None, None]
 ```
 
-**Look 3 (`9c93ed10`) is live on main 0 AND main 1** — the 6144×1536 screen and the 1920×1080 one.
+Index 1 in **both** lists is screen 1 — Look 3 is live and preview on *the same* screen, not on two.
+The owner corrected it: *"look 3 is pgm2 look only."* The composeCanvas-is-null theory built on top of
+that reading is withdrawn; §2 replaces it, and it is arithmetically exact against the wire.
 
-Layer geometry is stored NORMALIZED, with no record of what it was normalized against. A real layer
-from Look 1:
+Actual assignment: main 0 live = Look 4, preview = Look 1. Main 1 live = preview = Look 3.
 
-```json
-"contentFit": "native",
-"fill": { "x": 0.25, "y": -0.0625, "scaleX": 0.5, "scaleY": 1.125 }
+## 1. The two screens
+
+```
+programChannels    [1, 3]
+programResolutions [ {w: 6144, h: 1536},    ← screen 0 (ch1 PGM / ch2 PRV) — 4:1 mapped LED
+                     {w: 1920, h: 1080} ]   ← screen 1 (ch3 PGM / ch4 PRV) — 16:9
 ```
 
-`scaleY > 1` with a negative `y` is the signature of something fitted on the **4:1** canvas. Applied
-verbatim to 1920×1080 it becomes 960 px wide and 1215 px tall — taller than the screen.
+## 2. Root cause — `composeCanvas` came from the editor's selected screen
 
-The field that exists to prevent this is `composeCanvas`, consumed by
-`getProgramAuthoringResolution` (`src/engine/scene-native-fill.js:154`):
+`client/components/scenes-shared.js`, `buildIncomingScenePayload`:
 
 ```js
-const cc = incomingScene && incomingScene.composeCanvas
-if (cc && cc.w > 0 && cc.h > 0) return { w: cc.w, h: cc.h }
+const cv = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)   // ← the EDITOR's screen
 …
-const pr = cm?.programResolutions?.[screenIdx]          // ← falls back to the TARGET screen
-if (pr?.w > 0 && pr?.h > 0) return { w: pr.w, h: pr.h }
+composeCanvas: { w: cv.width, h: cv.height },
 ```
 
-and by `mapProgramPixelRectToTargetOutput` (`:131`), which contain-fits authoring → target and is
-an explicit no-op when the two match.
+`getCanvasForScreen` returns that screen's real program canvas. The server takes `composeCanvas` as
+the **authoring** resolution (`getProgramAuthoringResolution`, `scene-native-fill.js:154`) and, when
+it differs from the target channel, remaps every layer through `mapProgramPixelRectToTargetOutput`.
 
-**Every look in the live project has `composeCanvas: null`** (checked all 5). So the authoring
-resolution always resolves to the *destination* screen, the two always "match", the mapping never
-runs, and the stored fill is reinterpreted against whatever canvas it lands on.
+So with **screen 1 selected in the looks editor**, a look taken to **screen 0** was mapped
+`1920×1080 → 6144×1536`. Both dimensions shrink by
 
-That is the owner's sentence exactly:
-- *"not always"* — correct on the screen the look was built on, wrong on the other.
-- *"like it gets it from somewhere else"* — it takes the canvas from the destination, not the look.
-- *"at least on ch1"* — ch1 is the 4:1 screen, the one furthest from any 16:9 authoring.
+```
+pw·k / ow = 1920 · min(6144/1920, 1536/1080) / 6144 = 1920 · 1.4222 / 6144 = 4/9 = 0.4444
+```
+
+**That is the owner's sentence exactly.** *"gets it from somewhere else"* — the canvas of whichever
+screen the editor is on. *"not always"* — only when the selected screen differs from the take target
+**and** the two screens differ. *"at least on ch1"* — screen 0 is the one furthest from 16:9.
+
+### The wire proves it
+
+`log/caspar_2026-08-14.log`, 12:04:20 — Look 1 staged to ch2 (PRV of screen 0), all three layers
+shrunk by the same 4/9, in one batch:
+
+| layer | stored fill | on the wire |
+|---|---|---|
+| 10 | `0.25  -0.0625  0.5  1.125` | `0.38888888888888884  -0.0625  0.22222222222222224  0.5` |
+| 11 | `0.018726  0.21488  0.204172  0.544459` | `0.286100372279496  0.21488402061855671  0.09074312714776633  0.24198167239404356` |
+| 12 | `0.773880  0.22519  0.180332  0.480885` | `0.6217246563573883  0.22519329896907223  0.08014747995418098  0.21372661321114927` |
+
+And at 11:50:44 the *same* look on the *same* channel went out with its stored values verbatim —
+the correct case. Same look, same channel, two different results: the only variable is which screen
+was selected in the editor.
+
+Feeding `resolveSceneLayerFill` an authoring canvas of 1920×1080 and a target of 6144×1536
+reproduces those numbers **exactly** (`0.38888888888888884`, `0.22222222222222224`, `0.5`). Pinned
+in the test.
 
 ## 3. What is NOT the cause
 
-Worth recording so the next session does not re-derive it:
+Recorded so this is not re-derived:
 
-- Not the transition code. `scene-take-lbg-*` applies whatever fill it is handed; the wrong number
-  is produced upstream in `scene-native-fill.js`.
-- Not `contentFit: "native"` itself. Native fit legitimately recomputes per channel from the media
-  resolution; the operator's manual `fill` on top is what carries no canvas reference.
-- Not the multi-screen fan-out. Taking the SAME look to one screen is equally wrong if that screen
-  is not the one it was authored on — the fan-out just makes it visible in one action.
+- **Not the server's fill math.** `mapProgramPixelRectToTargetOutput` did precisely the right thing
+  with the inputs it was given. The dishonest input was the client's.
+- **Not the transition/take code.** `scene-take-lbg-*` applies whatever fill it is handed.
+- **Not `contentFit: 'native'`**, and not a missing media probe.
+- **Not `composeCanvas: null` in the saved project.** The persisted value is irrelevant — the client
+  stamps a fresh one onto every take payload.
+- **Not the multi-screen fan-out.** One screen is enough; the fan-out only makes it obvious.
 
-## 4. Why this is not fixed here — the owner has to choose
+## 4. The fix
 
-The mechanism is settled. The intended behaviour is not, and the two readings produce visibly
-different output on air:
+```js
+const canvasIdx = Number.isInteger(seekOpts?.mainIdx) && seekOpts.mainIdx >= 0 ? seekOpts.mainIdx : sceneState.activeScreenIndex
+const cv = sceneState.getCanvasForScreen(canvasIdx)
+```
 
-- **(A) Preserve the composition.** Stamp `composeCanvas` on save and let
-  `mapProgramPixelRectToTargetOutput` contain-fit the whole arrangement into the target screen. A
-  look built on 4:1 appears letterboxed on the 16:9 screen, with the layers' relationship to each
-  other intact.
-- **(B) Re-fit per screen.** Treat the stored fill as relative to whatever screen it plays on — the
-  current behaviour — and accept that a cross-shape look needs per-screen adjustment. This is
-  correct if the owner *wants* a look to fill each screen.
+The authoring canvas is now the canvas of the screen the payload is **for**. `mapProgramPixelRect…`
+becomes a no-op, and the stored fill lands verbatim — which is what the editor showed for that
+screen.
 
-There is also a migration question either way: **existing looks carry no `composeCanvas`**, so a
-stamp-on-save fix does nothing for the 5 looks already in the project until they are re-saved.
-Options are to backfill from the screen a look is currently assigned to, to leave old looks on
-today's behaviour, or to stamp on first load.
+**All three take/stage callers already pass the target `mainIdx`** (`scenes-preview-runtime.js:212`
+and `:274`, `scenes-editor-support.js:180`), so nothing had to be threaded. The `activeScreenIndex`
+fallback survives for the single caller with no target
+(`scenes-editor-support.js:251`) — a local `applySceneFromTakePayload`, not a wire payload. A test
+asserts every payload built with `seekOpts` names a `mainIdx`, so the fallback cannot quietly become
+load-bearing.
 
-Guessing here would change what goes to air on a live box, so it is the owner's call. Once chosen,
-the change is small — §2 names both functions.
+## 5. What was VERIFIED
 
-## 5. What the owner can confirm cheaply
+- `tools/smoke/smoke-wo531-authoring-canvas-follows-target.test.js` (5 tests, curated CI list):
+  the real `resolveSceneLayerFill` reproduces the reported 4/9 shrink on all three of Look 1's
+  layers and the exact wire numbers; authoring == target is a no-op; the same look on screen 1 is
+  unaffected (which is *why* it was intermittent); and the client now keys off `mainIdx`.
+- Suite **2214 / 2212 pass / 0 fail / 2 skip**. Lint 0 errors. Line limit clean. Client builds.
 
-1. Take Look 3 to **screen 1 only** (1920×1080) and then to **screen 0 only** (6144×1536). If it is
-   right on one and wrong on the other, §2 is confirmed end to end.
-2. Re-save the look while the *wrong* screen is the active editor screen, then take it again. If
-   the error moves to the other screen, the geometry is following the editor's canvas — which is
-   the same finding from the other direction.
+## 6. Owner QA
 
-## 6. Work log
+Client-side change — rebuild + kiosk reload only, no server restart.
 
-- 2026-08-14 — Diagnosed from the live channel map and the live project: two screens of different
-  aspect (4:1 / 16:9), one look assigned to both, and `composeCanvas` null on every look so the
-  authoring-canvas mapping never runs. Not fixed — the correct behaviour is an owner decision (§4).
+1. Select **screen 1** in the looks editor, then hit the main play button for **all** destinations.
+   Screen 0's look must land at the size it shows in its own editor — no shrink.
+2. Repeat with screen 0 selected. Both directions must now be identical.
+3. Worth knowing either way: a look has **no home screen** of its own (`mainIndex` is null on all 5
+   in the project). It is now normalized to whatever screen it plays on, so a look built while one
+   screen was selected and then played on a differently-shaped screen will re-fit rather than
+   preserve its framing. If you want a look to keep its composition across screens instead, that is
+   a separate change — a per-look home canvas — and worth its own WO.
+
+## 7. Work log
+
+- 2026-08-14 (later) — First diagnosis withdrawn after the owner corrected the assignment reading
+  (§0). Re-derived from the AMCP wire: `composeCanvas` was stamped from the editor's selected
+  screen, so a cross-screen take remapped every layer by 4/9. Fixed, 5 smokes.
+- 2026-08-14 — Initial (incorrect) diagnosis based on a misread of `liveSceneIdByMain`.
