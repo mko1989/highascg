@@ -275,7 +275,20 @@ async function runSceneTakeLbg(amcp, opts) {
 			let tail = `0 ${fadeDur}`
 			if (fadeTw) tail += ` ${param(fadeTw)}`
 			for (let li = 0; li < tl.layers.length; li++) {
-				const cl = `${channel}-${TIMELINE_LAYER_BASE + li}`
+				const pOut = TIMELINE_LAYER_BASE + li
+				/* WO-537: a layer can be BOTH exiting (the live timeline) and entering (the incoming
+				 * look carries the same timeline) — the fade-in owns it then. `scene-take-pgm-only.js`
+				 * has always had this guard; the banked path did not, so both ramps were queued for
+				 * one layer and the outcome came down to insertion order in Caspar's per-channel
+				 * deferred list.
+				 *
+				 * That is not a coin flip, and not what WO-537 §4 first assumed: a non-deferred MIXER
+				 * applies immediately, deferred ones accumulate and are applied by `MIXER <ch> COMMIT`
+				 * — i.e. LAST (`AMCPCommandsImpl.cpp:895` `transforms_applier::apply`). This fade-OUT
+				 * is deferred and is inserted before the crossfade's fade-IN, so on commit the layer
+				 * the take just faded up was ramped straight back down. */
+				if (timelineFadeInPhys.includes(pOut)) continue
+				const cl = `${channel}-${pOut}`
 				mergeMixerExtras.push(deferMixerAmcpLine(`MIXER ${cl} OPACITY ${tail}`))
 			}
 		}

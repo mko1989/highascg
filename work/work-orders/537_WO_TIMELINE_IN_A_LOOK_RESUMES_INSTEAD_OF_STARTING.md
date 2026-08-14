@@ -1,6 +1,6 @@
 # WO-537 — A timeline inside a look resumed where it was left; and returning to a look still cuts
 
-**Status: PART 1 FIXED (14.08.2026, 6 smokes, suite 2251 / 2249 pass / 0 fail / 2 skip). PART 2 OPEN — narrowed, not reproduced (§4).**
+**Status: PART 1 FIXED. PART 2 — one real defect found and fixed (§4b); the reported symptom itself still UNCONFIRMED (§4c). 9 smokes, suite 2266 / 2264 pass / 0 fail / 2 skip.**
 **Priority:** High (on-air; the look plays the wrong part of the timeline)
 **Source:** `work/work-orders/todos14.08.26`
 - line 1: *"hitting take from timeline editor now works correctly, but playing the same timeline from a look (i can drop a timeline from sources browser into looks) down not work properly."*
@@ -125,12 +125,60 @@ MIXER 1-212 OPACITY 1 25 linear
 MIXER 1 COMMIT                              ← flushes both; the last value wins
 ```
 
-Both ramps target the same three layers and are applied by one `MIXER 1 COMMIT`, so the layers go to
-1 and the fade-out never happens. If a look take can ever put a layer in both
-`timelineFadeInPhys` and `timelineFadeLines`, that is a cut with a fade-out on the wire — which
-would explain a report that looks impossible from the source.
+### 4b. Correction, and a real defect — CORRECTED 14.08
+
+The sentence that stood here (*"the layers go to 1 and the fade-out never happens"*) was **wrong**,
+and wrong in the direction that matters. Caspar's actual ordering, from `transforms_applier::apply`
+in `protocol/amcp/AMCPCommandsImpl.cpp` (the source the running binary was built from — provenance in
+WO-536 §5):
+
+```cpp
+void apply() {
+    if (defer_) { deferred_transforms_[channel_index].insert(…, transforms_); }   // queued
+    else        { ctx_.channel.stage->apply_transforms(transforms_); }            // NOW
+}
+```
+
+A non-deferred MIXER applies **immediately**; deferred ones accumulate per channel and are applied by
+`MIXER <ch> COMMIT` — i.e. **last**. So in that trace the deferred fade-OUT wins, and the layer the
+take just faded up is ramped straight back down. Not "the fade-out never happens": the fade-IN never
+happens.
+
+**And the banked path had no guard against it.** `scene-take-pgm-only.js` has always had one:
+
+```js
+// A layer can be both exiting (old timeline) and entering (new timeline) —
+// the incoming fade-in owns it then; don't schedule a competing fade-out.
+if (timelineFadeInPhys.includes(pOut)) continue
+```
+
+`scene-take-lbg.js` did not, so taking a look that *contains* the live timeline queued both ramps on
+one layer and let insertion order decide. Fixed by giving the banked path the same guard — the
+sibling implementation already knew the answer.
+
+**Verified it cannot fail dark**, because skipping a fade-out on a layer preset to opacity 0 is
+precisely the WO-519 trap. Enumerated over every combination of (merge, currentMap, activeTimeline,
+duration, forceCut): the guard is reachable in exactly **2** states, and in both the layer is faded
+in by the bank crossfade. The enumeration is in the test, with an assertion on the count of 2 so a
+future change to the surrounding conditions cannot silently widen it.
+
+### 4c. What this does NOT yet explain
+
+This fires only when a timeline layer is in **both** lists — i.e. the incoming look carries the
+timeline that is currently live. The owner's report is *going back to a **look***, which in the plain
+case puts nothing in `timelineFadeInPhys`, so the guard changes nothing there. Part 2 stays open.
+
+One narrowing worth having before the log read: **which screen was it on?** This box has
+`previewChannels = [2, null]` — screen 1 has **no preview bus**, so its takes do not go through
+`scene-take-lbg.js` at all; they go through `scene-take-pgm-only.js`, a separate implementation with
+no bank crossfade, whose transitions are additionally rewritten by `normalizeTransitionForPgmOnly`.
+If the cut is only ever on screen 1, everything read so far about the banked path is beside the
+point. That is a one-word answer and it halves the search.
 
 ### The next probe (cheap, and the owner can do it while working)
+
+0. **Which screen?** Screen 0 (ch1, has a PRV bus → banked path) or screen 1 (ch3, PGM-only path)?
+
 
 Take a look while a timeline is live on PGM, then read `log/caspar_<date>.log` for that moment:
 
@@ -145,4 +193,10 @@ Take a look while a timeline is live on PGM, then read `log/caspar_<date>.log` f
 - 2026-08-14 — todos line 1 traced to `play()`'s resume shortcut discarding the take's requested
   start position, measured 12003 vs 30 ms against the real engine, and fixed with an opt-in
   `restart` (not `playForTake`, which would fail-dark on the CUT branch). 6 smokes. Line 2 read end
-  to end, not reproduced; the ruled-out paths and the three-way log probe are in §4.
+  to end, not reproduced; the ruled-out paths and the log probe are in §4.
+- 2026-08-14 (later) — §4's DEFER-ordering claim CORRECTED from the Caspar source: deferred
+  transforms apply at COMMIT, i.e. after immediate ones, so the collision kills the fade-IN, not the
+  fade-out. Found that `scene-take-lbg.js` lacks the both-lists guard `scene-take-pgm-only.js` has;
+  added it, with an exhaustive fail-dark check. Does not explain the reported symptom on its own
+  (§4c) — added "which screen?" as probe step 0, since screen 1 is PGM-only and uses the other
+  implementation entirely.

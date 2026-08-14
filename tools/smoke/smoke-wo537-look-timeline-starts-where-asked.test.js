@@ -102,3 +102,55 @@ describe('WO-537: the look path asks for it', () => {
 		}
 	})
 })
+
+describe('WO-537: a timeline layer is never given two competing ramps', () => {
+	const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
+
+	/* Caspar's ordering, from the source the running binary was built from
+	 * (`transforms_applier::apply`, AMCPCommandsImpl.cpp): a non-deferred MIXER applies
+	 * IMMEDIATELY, deferred ones accumulate per channel and are applied by `MIXER <ch> COMMIT` —
+	 * i.e. last. So when a layer is both exiting (deferred fade-out) and entering (crossfade
+	 * fade-in), whichever was inserted later into the deferred list decides, and the fade-out was
+	 * inserted first. WO-537 §4's original note had this backwards. */
+
+	it('both take implementations skip the fade-out for a layer that is also fading in', () => {
+		for (const rel of ['src/engine/scene-take-lbg.js', 'src/engine/scene-take-pgm-only.js']) {
+			assert.match(
+				read(rel),
+				/if \(timelineFadeInPhys\.includes\(pOut\)\) continue/,
+				`${rel}: the fade-in owns a layer that is in both lists`,
+			)
+		}
+	})
+
+	it('the banked path builds its fade-out per physical layer, so the guard has something to test', () => {
+		const src = read('src/engine/scene-take-lbg.js')
+		assert.match(src, /const pOut = TIMELINE_LAYER_BASE \+ li/)
+		assert.match(src, /mergeMixerExtras\.push\(deferMixerAmcpLine\(`MIXER \$\{cl\} OPACITY \$\{tail\}`\)\)/)
+	})
+
+	/* Skipping a fade-out must never strand a layer at the opacity-0 preset — the WO-519 class of
+	 * failure. Enumerated over every combination of (merge, currentMap, activeTimeline, duration,
+	 * forceCut): the guard is reachable in exactly 2 states, and both fade the layer in elsewhere. */
+	it('the guard cannot fail dark — every state that reaches it also fades the layer in', () => {
+		let reachable = 0
+		for (const merge of [false, true])
+			for (const curMap of [0, 1])
+				for (const activeTl of [false, true])
+					for (const dur of [0, 25])
+						for (const forceCut of [false, true]) {
+							const fadeDur = forceCut || dur <= 0 ? 0 : dur
+							// scene-take-lbg-jobs.js: the fadeDur handed to startSceneTimelineLayer,
+							// which is what presets the layer to 0 and populates timelineFadeInPhys.
+							const jobFade = forceCut || merge || !(dur > 0) ? 0 : dur
+							const fadeInPhys = jobFade > 0
+							const bankXf = fadeDur > 0 && (curMap > 0 || activeTl) && !merge
+							const guardRuns = activeTl && fadeDur > 0 && !forceCut
+							if (!guardRuns || !fadeInPhys) continue
+							reachable++
+							const fadesIn = bankXf || (!bankXf && !merge && fadeDur > 0)
+							assert.ok(fadesIn, `no fade-in for merge=${merge} curMap=${curMap} dur=${dur}`)
+						}
+		assert.equal(reachable, 2, 'if this count moves, re-derive the fail-dark argument')
+	})
+})
