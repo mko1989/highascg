@@ -113,7 +113,15 @@ test('WO-528: both take paths declare takeFade, and CUT is excluded', () => {
 	// Take button: MIX suppresses, CUT does not.
 	assert.match(takeSrc, /playForTake\(tlId, pos, \{ takeFade: !forceCut \}\)/, 'the Take path passes it, CUT excluded')
 	// Timeline as a layer inside a look — reached only on the fade branch, which presets to 0.
-	assert.match(takeSrc, /eng\.play\(tlId, startPos, \{ takeFade: true \}\)/, 'the look path passes it too')
-	// The cut branch of startSceneTimelineLayer must stay a plain play (no preset, so no suppression).
-	assert.match(takeSrc, /if \(!\(opts\.fadeDur > 0\)\) \{\n\t\teng\.play\(tlId, startPos\)/, 'the cut branch is untouched')
+	/* WO-537 added `restart` alongside it on this same call (the look path must start at 0, not
+	 * resume). Repointed to keep pinning `takeFade: true` on the fade branch; the guarantee is
+	 * unchanged. */
+	assert.match(takeSrc, /eng\.play\(tlId, startPos, \{ takeFade: true, restart \}\)/, 'the look path passes it too')
+	/* The cut branch of startSceneTimelineLayer must carry NO takeFade — it does not preset to 0, so
+	 * there is nothing to suppress and suppressing would be WO-139 T139.1's invisible CUT. WO-537
+	 * added `restart` here (start at 0 rather than resume), which is orthogonal; the assertion is
+	 * narrowed to the guarantee this WO owns rather than to the exact argument list. */
+	const cutBranch = takeSrc.match(/if \(!\(opts\.fadeDur > 0\)\) \{\n\t\teng\.play\(tlId, startPos([^\n]*)\)/)
+	assert.ok(cutBranch, 'the cut branch still plays directly')
+	assert.doesNotMatch(cutBranch[1], /takeFade/, 'the cut branch must not suppress the engine opacity')
 })

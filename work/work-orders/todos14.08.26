@@ -1,1 +1,15 @@
-when hitting the main play button to transition all selected screen destitionations, the transition not always correctly apply position and size of layers set in looks, like it gets it from somewhere else.
+hitting take from timeline editor now works correctly, but playing the same timeline from a look (i can drop a timeline from sources browser into looks) down not work properly.
+going back to a look from timeline does a cut instead of mix
+
+the problem with the compose preview is that when i hit reset in looks editor to get a standard compose preview it blanks the compose preview in timeline editor and vice verse.
+
+when pausing a timeline, jumping the playhead somewhere else and hitting play again results in a black frame before it starts playing. it probably sends another seek, even though the seek was already applied when moving the playhead.
+
+the companion connection is not working correctly, it seems slow, gives many different errors. main use case is to use companion button presses inside the timeline.
+it displays cannot reach companion satelite, and to check companion settings if its enabled. That is very wrong because the companion sattelite setting CANNOT be turned off.
+the test press goes thru but the playhead does not trigger a press. also the flag correctly displays the current display of the button, but inside the inspector it shows a stale button display.
+
+i just changed a clip on timeline that was extended to make it loop multiple times and it doesnt start in correct place in regard to timelines playhead.
+
+the decklink labels are still not applying correctly, i just changed a label on decklink4 in host channel, it somehow applyed on the compose preview but went back to the previous label in host ch and sdi port inspectors.
+

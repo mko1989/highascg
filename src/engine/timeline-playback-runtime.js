@@ -18,10 +18,17 @@ module.exports = {
 	/**
 	 * @param {string} id
 	 * @param {number} [fromMs]
-	 * @param {{ takeFade?: boolean }} [opts] takeFade (WO-528): the CALLER presets these layers to
-	 *   opacity 0 and will fade them in itself — used by `startSceneTimelineLayer` when a timeline
-	 *   runs as a layer inside a look. Suppresses the engine's own instant OPACITY, which would
-	 *   otherwise land the layer at full between the preset and the fade.
+	 * @param {{ takeFade?: boolean, restart?: boolean }} [opts] takeFade (WO-528): the CALLER presets
+	 *   these layers to opacity 0 and will fade them in itself — used by `startSceneTimelineLayer`
+	 *   when a timeline runs as a layer inside a look. Suppresses the engine's own instant OPACITY,
+	 *   which would otherwise land the layer at full between the preset and the fade.
+	 *
+	 *   restart (WO-537): the caller is demanding `fromMs`, not offering it. Without this the
+	 *   paused-resume shortcut wins and `fromMs` is DISCARDED — deliberate for an operator pressing
+	 *   Play (WO: "resume must ignore stale client fromMs"), wrong for a take, which must start
+	 *   where it says. `playForTake` never resumes at all; this is the same guarantee for the look
+	 *   path, which cannot use `playForTake` because its CUT branch has no orchestrator commit to
+	 *   receive the DEFER lead tweens `take: true` would produce (the WO-519 fail-dark class).
 	 */
 	play(id, fromMs, opts) {
 		const tl = this.timelines.get(id)
@@ -33,7 +40,7 @@ module.exports = {
 		}
 		const cell = this._pbFor(id)
 		const prevAir = this._airTimelineId
-		const wasPausedResume = prevAir === id && this._canResumePlayback(id)
+		const wasPausedResume = prevAir === id && opts?.restart !== true && this._canResumePlayback(id)
 
 		if (this._ticker) clearInterval(this._ticker)
 

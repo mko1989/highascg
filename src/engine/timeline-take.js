@@ -259,8 +259,15 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	eng.setLoop(tlId, !!layer.loop)
 	const pb = opts.startAtCurrentPosition ? eng.getPlayback?.(tlId) : null
 	const startPos = pb?.position ?? 0
+	/* WO-537: both callers ask for `startAtCurrentPosition: false`, i.e. start at 0 — and until now
+	 * `play()` silently ignored that whenever the timeline happened to be paused, because its
+	 * resume shortcut discards `fromMs` by design. Any operator who had scrubbed the timeline in its
+	 * own editor therefore got the look's timeline layer resuming from wherever they left it. That
+	 * is the "playing the same timeline from a look does not work properly" half of the report; the
+	 * Take button was unaffected because `playForTake` never resumes. */
+	const restart = !opts.startAtCurrentPosition
 	if (!(opts.fadeDur > 0)) {
-		eng.play(tlId, startPos)
+		eng.play(tlId, startPos, { restart })
 		return []
 	}
 	const tl = eng.get(tlId)
@@ -276,7 +283,7 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	// WO-528: the caller fades these in, so the engine must not write an instant full-opacity value
 	// between the preset above and that fade — same fault as the Take path, and the reason a timeline
 	// inside a look "flashes ... and gets back to the look".
-	eng.play(tlId, startPos, { takeFade: true })
+	eng.play(tlId, startPos, { takeFade: true, restart })
 	const kfLayers = collectClipOpacityFadeLayers(eng, tl, startPos)
 	return physLayers.filter((L) => !kfLayers.has(L))
 }
