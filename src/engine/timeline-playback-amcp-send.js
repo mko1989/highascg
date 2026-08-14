@@ -88,7 +88,7 @@ module.exports = {
 	 * @param {boolean} force scrub / explicit seek — sends PLAY|LOAD|SEEK for active clips
 	 */
 	_applyAt(id, ms, force, opts) {
-		this._syncAmcpLayers(id, ms, { force: !!force, take: !!opts?.take })
+		this._syncAmcpLayers(id, ms, { force: !!force, take: !!opts?.take, takeFade: !!opts?.takeFade })
 	},
 
 	/**
@@ -113,6 +113,7 @@ module.exports = {
 		if (!tl || !self?.amcp) return
 		const force = !!opts.force
 		const take = !!opts.take
+		const takeFade = !!opts.takeFade
 		const channels = this._channels()
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()
@@ -228,6 +229,7 @@ module.exports = {
 							playing,
 							fps: Math.max(1, tl.fps || 25),
 							scheduleLeadTween: take,
+							takeFade,
 							collectLines: lines,
 						})
 					) {

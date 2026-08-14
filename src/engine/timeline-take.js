@@ -178,7 +178,12 @@ async function runTimelineDirectTake(ctx, eng, tlId, body) {
 	}
 
 	// Timeline on PGM first; clip lead-opacity tweens are batched DEFERred (not committed yet).
-	await eng.playForTake(tlId, pos)
+	// `takeFade` (WO-528): on the MIX path the layer fade below owns opacity, so the engine's own
+	// per-clip instant OPACITY must be suppressed — otherwise it lands the layer at full between
+	// the preset-to-0 above and the fade, and the fade then ramps 1 -> 1, which is a CUT. On the
+	// CUT path there IS no fade, the preset is 1, and the engine's instant value is what gives a
+	// clip its own base opacity — so it must still be sent (WO-139 T139.1's invisible-CUT trap).
+	await eng.playForTake(tlId, pos, { takeFade: !forceCut })
 
 	const fadeWaits = []
 	for (const sIdx of targetIdxs) {
@@ -268,7 +273,10 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 			)
 			.catch(() => {})
 	}
-	eng.play(tlId, startPos)
+	// WO-528: the caller fades these in, so the engine must not write an instant full-opacity value
+	// between the preset above and that fade — same fault as the Take path, and the reason a timeline
+	// inside a look "flashes ... and gets back to the look".
+	eng.play(tlId, startPos, { takeFade: true })
 	const kfLayers = collectClipOpacityFadeLayers(eng, tl, startPos)
 	return physLayers.filter((L) => !kfLayers.has(L))
 }

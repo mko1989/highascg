@@ -1,6 +1,6 @@
 # WO-528 — A timeline inside a look cuts instead of mixing, and destabilises later look plays
 
-**Status: ROOT CAUSE FOUND on the wire (14.08.2026 — §7). NOT fixed: it is a one-line-shaped change on the live take path, and WO-139's history says do not guess here. §2's merge/animate theory is RULED OUT by the owner.**
+**Status: FIXED in repo (14.08.2026 — §8), after the owner reported "nothing is fixed with playing timelines". 6 smokes, suite 2209/2207/0. Owner QA on PGM still owed. §2's merge/animate theory is RULED OUT by the owner.**
 **Priority:** High (on-air transition quality; owner is hitting it live)
 **Source:** owner 14.08: *"transition between timeline and looks is a cut instead of mix. when a timeline is used inside a look, it just transition seemingly randomly and screwes up subsequent looks plays."*
 **Parent:** [WO-139](./139_WO_TIMELINE_TAKE_SMOOTHNESS.md) — same subject, whose **A139.2 operator QA on real PGM was never run**. This report *is* that QA, arriving 5 weeks late.
@@ -144,8 +144,49 @@ preference:
 Not done here: it is the live take path, this is the third fault found in it, and the owner can
 watch PGM while it is verified — which is worth more than my guessing at option 1 tonight.
 
+## 8. The fix (14.08, later)
+
+`takeFade` is threaded from the take orchestrator to the generic property emitter, and the instant
+`OPACITY` write is skipped while it is set.
+
+| file | change |
+|---|---|
+| `src/engine/timeline-take.js` | `playForTake(tlId, pos, { takeFade: !forceCut })`; the look path's fade branch gets `eng.play(tlId, startPos, { takeFade: true })` |
+| `src/engine/timeline-playback-runtime.js` | `play` and `playForTake` accept `opts.takeFade` and pass it into `_applyAt` |
+| `src/engine/timeline-playback-amcp-send.js` | `_syncAmcpLayers` reads it and forwards it to `_applyClipMixer` |
+| `src/engine/timeline-playback-amcp-schedule.js` | the instant branch returns early: `if (extra.takeFade && !extra.isVolume) return false` |
+
+**Both entry points are fixed, not just the Take button.** `startSceneTimelineLayer`'s fade branch
+presets to 0 exactly like the Take path and then hands the layers to the caller to fade, so it had
+the identical hole — that is the *"flashes the timeline and gets back to the look"* half of the
+report. Its CUT branch (`fadeDur <= 0`) is left as a plain `play()`: no preset, so nothing to guard.
+
+Three decisions worth recording, because each is a way to get this wrong:
+
+1. **The value is still recorded** in `_lastKfValues` even though nothing is sent. The fade ends at
+   full, so that is genuinely where the layer lands, and recording it keeps `valueChanged` false on
+   the following ticks. Skipping the record instead would re-emit an instant full-opacity write on
+   the very next tick and clobber the fade mid-ramp.
+2. **CUT takes are NOT suppressed** (`takeFade: !forceCut`). There is no fade on that path, the
+   preset is `1`, and this write is what gives a clip its own base opacity. Suppressing it there is
+   exactly the invisible-CUT regression WO-139 T139.1 had to patch. Pinned by a named regression test.
+3. **VOLUME is untouched** — only opacity belongs to the orchestrator.
+
+### Verified
+
+`tools/smoke/smoke-wo528-take-opacity-not-slammed.test.js` (6 tests, curated CI list) drives the
+REAL `_applyKeyedMixerProp` with a recording AMCP double — no stubbing of the decision under test.
+**Confirmed the test fails without the fix**: reverting the one-line guard turns 2 of the 6 red
+(the MIX suppression and the record-without-send), and the CUT guard stays green. Suite
+2209 / 2207 pass / 0 fail / 2 skip.
+
+Still owner-side: watch PGM through a look → timeline MIX take, and a timeline layer inside a look.
+The wire order is now preset → PLAY → fade, with no instant full in between, but only the monitor
+can confirm it reads as a mix.
+
 ## 6. Work log
 
+- 2026-08-14 (later still) — Owner: *"nothing is fixed with playing timelines"*. Implemented §7's option 1 on BOTH entry points (§8), with the CUT path explicitly excluded and pinned. 6 smokes, verified to fail without the fix.
 - 2026-08-14 (later) — Owner ruled out §2 (all plain MIX) and reported the Take path cutting too. Read the AMCP wire: the engine's generic per-clip property write emits `OPACITY <base> 0` between the take's preset-to-0 and its fade-in, so the fade ramps 1→1. §7.
 - 2026-08-14 — Owner report triaged. Two causes located: the merge/animate carve-out forcing a cut
   (deliberate, guarding against fail-dark) and the un-batched preset/play/fade sequence racing the

@@ -15,7 +15,15 @@ function setCellPosition(cell, pos) {
 }
 
 module.exports = {
-	play(id, fromMs) {
+	/**
+	 * @param {string} id
+	 * @param {number} [fromMs]
+	 * @param {{ takeFade?: boolean }} [opts] takeFade (WO-528): the CALLER presets these layers to
+	 *   opacity 0 and will fade them in itself — used by `startSceneTimelineLayer` when a timeline
+	 *   runs as a layer inside a look. Suppresses the engine's own instant OPACITY, which would
+	 *   otherwise land the layer at full between the preset and the fade.
+	 */
+	play(id, fromMs, opts) {
 		const tl = this.timelines.get(id)
 		if (!tl) {
 			const msg = `[Timeline] play(${id}): timeline not on server`
@@ -64,7 +72,7 @@ module.exports = {
 				this._lastKfValues.clear()
 				this._lastKfSegment.clear()
 			}
-			this._applyAt(id, pos, true)
+			this._applyAt(id, pos, true, { takeFade: opts?.takeFade === true })
 		}
 
 		this._lastTickPositionMs = undefined
@@ -76,8 +84,10 @@ module.exports = {
 	 * Program take: always full transport + awaited mixer (clip fade-in keyframes). Never resume shortcut.
 	 * @param {string} id
 	 * @param {number} [fromMs]
+	 * @param {{ takeFade?: boolean }} [opts] takeFade: the take orchestrator will fade these layers
+	 *   in itself (MIX), so the per-clip instant OPACITY must be suppressed — see WO-528.
 	 */
-	async playForTake(id, fromMs) {
+	async playForTake(id, fromMs, opts) {
 		const tl = this.timelines.get(id)
 		if (!tl) {
 			const msg = `[Timeline] playForTake(${id}): timeline not on server`
@@ -112,7 +122,7 @@ module.exports = {
 		// take: clip lead-opacity segments are batched as DEFER tweens and NOT committed here —
 		// the take orchestrator (runTimelineDirectTake) issues one MIXER COMMIT per channel so
 		// clip fade-ins fire frame-locked with the look crossfade (WO-139).
-		this._applyAt(id, pos, true, { take: true })
+		this._applyAt(id, pos, true, { take: true, takeFade: opts?.takeFade === true })
 
 		this._lastTickPositionMs = undefined
 		this._ticker = setInterval(() => this._tick(), TICK_MS)

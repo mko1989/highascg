@@ -163,6 +163,7 @@ module.exports = {
 		sent =
 			this._applyKeyedMixerProp(ch, layer, clip, 'opacity', localMs, opDef, playing, force, fps, {
 				scheduleLeadTween: !!opts.scheduleLeadTween,
+				takeFade: !!opts.takeFade,
 				collectLines: collectLines,
 			}) || sent
 		const volDef = clip.volume != null ? clip.volume : 1
@@ -200,7 +201,10 @@ module.exports = {
 	/**
 	 * Opacity/volume keyframes: one tweened MIXER per segment while playing.
 	 * T173.4: collect MIXER lines into array instead of sending immediately.
-	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean, collectLines?: Array }} extra — scheduleLeadTween:
+	 * @param {{ isVolume?: boolean, scheduleLeadTween?: boolean, takeFade?: boolean, collectLines?: Array }} extra —
+	 *   takeFade (WO-528): a MIX take is about to fade these layers in, so the instant OPACITY write
+	 *   below is suppressed — it would land the layer at full before the fade even starts.
+	 *   scheduleLeadTween:
 	 *   take entry (WO-139): batch the current opacity segment as instant-start + DEFER tween so
 	 *   the clip fade-in fires on the take orchestrator's single MIXER COMMIT (frame-locked with
 	 *   the look crossfade) instead of an instant value that ticks animate later.
@@ -294,6 +298,22 @@ module.exports = {
 			this._lastKfValues.set(kVal, val)
 			if (playing && inSpan) this._lastKfSegment.set(kSeg, segIdx)
 			else if (!playing) this._lastKfSegment.delete(kSeg)
+			/* WO-528 — during a MIX take the orchestrator owns this layer's opacity. It presets every
+			 * timeline layer to `OPACITY 0 0`, PLAYs, then fades in over the transition duration. This
+			 * instant write lands BETWEEN those two, at the clip's full base value, so the fade then
+			 * ramps 1 -> 1: invisible, i.e. the take cuts with the right content on screen. Proven on
+			 * the wire in log/caspar_2026-08-14.log. WO-139 T139.2 only carved out the KEYFRAME case
+			 * (scheduleLeadTween above); a plain clip has no opacity keyframes and fell through here.
+			 *
+			 * The value is still RECORDED, deliberately: the fade ends at full, so this is where the
+			 * layer genuinely lands, and recording it keeps `valueChanged` false on the following ticks.
+			 * Skipping the record instead would re-emit an instant full-opacity write on the very next
+			 * tick and clobber the fade mid-ramp.
+			 *
+			 * CUT takes are NOT suppressed (`takeFade` is false for them): there is no fade, the preset
+			 * is 1, and this write is what gives a clip its own base opacity. Suppressing it there is
+			 * exactly the invisible-CUT regression WO-139 T139.1 had to patch. */
+			if (extra.takeFade && !extra.isVolume) return false
 			const cl = `${ch}-${layer}`
 			const keyword = extra.isVolume ? 'VOLUME' : 'OPACITY'
 			// T173.4: instant (non-segment) values still sent immediately, not collected
