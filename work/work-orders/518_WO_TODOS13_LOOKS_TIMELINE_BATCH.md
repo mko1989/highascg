@@ -32,51 +32,55 @@ handler and would otherwise swallow it. The per-element `dragleave` is **kept**:
 backstop for abandoned gestures, not a replacement for immediate feedback when the pointer moves off
 a layer mid-drag.
 
-## 3. Timeline clip position/size is slow to appear — CAUSE FOUND, and it is NOT an AMCP flood
+## 3. Timeline clip position/size flooding the server — FIXED (WO-522)
 
 Owner: *"changing clips position/size (on the screen) in timelines takes a while to show up on the
-preview screen, looks like amcp gets overrun."*
+preview screen, looks like amcp gets overrun."* **The owner's diagnosis was right.**
 
-**It is the opposite of a flood: the change is not sent at all until 3 seconds after you stop.**
+### Two wrong answers from me first, both recorded
 
-`timelineState.updateClip()` (`client/lib/timeline-state-clips.js:36`) writes the clip and calls
-`_save()`, which does exactly two things (`timeline-state.js:227`): `localStorage.setItem` and
-`_emit('change')`. **No API call and no AMCP.** The only subscriber that reaches the server is
-`client/app.js:293`:
+1. *"There is no throttle, debounce or coalescing anywhere on that path."* Wrong — the
+   **scenes/compose** editor has both `schedulePreviewPush` (debounce + max-wait) and
+   `scheduleMixerNudge` (single timer, in-flight guard, `nudgeQueued`, i.e. trailing coalescing).
+   I generalised from the wrong editor.
+2. *"Nothing is sent until a 3 s autosave debounce."* Also wrong. I traced
+   `updateClip → _save() → localStorage + emit('change')` and stopped there, concluding the only
+   server path was `app.js`'s autosave. I never found the second path.
+
+### What is actually happening
+
+`inspector-panel-timeline-clip.js`'s `applyFillPx` — the X/Y/W/H **drag inputs** — calls
+`refreshTimelineClipGeometryOnServer()` on every change, and that is **two** round-trips:
 
 ```js
-timelineState.on('change', scheduleAutosave)   // scheduleAutosave(delayMs = 3000)
+await syncTimelineToServer()                          // PUT the ENTIRE timeline
+await api.post(`/api/timelines/${id}/seek`, { ms })   // engine re-applies every layer → AMCP burst
 ```
 
-and that debounce **resets on every change**:
+Fired as `void`, so a drag put two full requests per pointer move on the wire, with no coalescing
+and **no ordering guarantee** — a slower earlier response could land after a newer one. Four drag
+handlers did this: position, size, opacity and in-point.
 
-```js
-if (autosaveTimeout) clearTimeout(autosaveTimeout)
-autosaveTimeout = setTimeout(() => void triggerAutosave(), delayMs)
-```
+### Fix
 
-So while the operator is dragging, the timer is continuously pushed forward; the edit reaches the
-server 3 s after the last movement, carried by a **full project autosave**. That is the "takes a
-while", and it explains why it feels worse the longer you keep adjusting.
+`client/lib/trailing-throttle.js` — `createTrailingThrottle(fn, ms)`: one pending timer, an
+in-flight guard, and a queued flag so the **last** call always runs. Extracted rather than
+reinvented: it is the same shape `scenes-preview-runtime-mixer-nudge.js` already uses for compose,
+and a second subtly-different implementation would drift.
 
-**Two corrections to what I said earlier in this session, both wrong:**
+The property that matters: **the value the operator settles on always reaches the server.** Dropping
+intermediate frames is the point; dropping the final one leaves a layer visibly wrong — which is why
+a leading-edge throttle would be wrong here. All four drag handlers now go through it at 80 ms;
+discrete one-shot actions still `await` the un-throttled function directly.
 
-1. I reported *"there is no throttle, debounce or coalescing anywhere on that path"*. Wrong for the
-   scenes/compose editor, which has both: `schedulePreviewPush` debounces with a max-wait ceiling,
-   and `scheduleMixerNudge` (`scenes-preview-runtime-mixer-nudge.js:74`) throttles on a single timer
-   with an in-flight `nudgeQueued` flag — that is already trailing-edge coalescing.
-2. I proposed a coalescer as the fix. It would have made this **worse**: coalescing reduces traffic
-   on a path that is currently sending nothing.
+Verified by `smoke-wo522-timeline-geometry-throttle.test.js`, 9 tests: a 50-frame burst collapses to
+under 10 runs; the last value always arrives; work never runs concurrently (the out-of-order
+hazard); a change made *during* an in-flight request is still sent; a throwing call does not wedge
+the throttle; every drag handler is wired and no `void refresh…` remains; `flush()` beats the window
+and never races an in-flight call.
 
-**The real gap: the timeline editor has no live fast-path at all.** The compose editor pushes
-geometry edits straight to the mixer through the throttled nudge; the timeline editor relies on
-project autosave. The fix is to give timeline geometry edits the same treatment the compose editor
-already has — a throttled, coalescing mixer nudge for geometry/opacity-only changes on the
-live/preview timeline — not to throttle something that is not firing.
-
-Deliberately not implemented here. It is a new live-control path on the take/playout side, it wants
-the same care `scenes-preview-runtime-mixer-nudge.js` got (content changes must NOT be short-cut —
-only geometry/opacity/crop), and it needs on-box verification the owner can watch. Its own WO.
+**NOT verified on the box.** The measurable claim is that a drag now issues far fewer PUT+seek pairs
+and the preview settles sooner — owner QA.
 
 ## 4. Looks↔timeline transitions — NOT investigated
 

@@ -10,6 +10,7 @@ import { getClipBasePixelRect } from '../lib/timeline-clip-interp.js'
 import { sceneLayerPixelRectForContentFit } from '../lib/fill-math.js'
 import { getContentResolution, fetchMediaContentResolution } from '../lib/mixer-fill.js'
 import { getTimelineProgramCanvas } from '../lib/timeline-program-canvas.js'
+import { createTrailingThrottle } from '../lib/trailing-throttle.js'
 import { settingsState } from '../lib/settings-state.js'
 import { appendAudioInspectorGroup } from './inspector-mixer.js'
 import { renderEffectsGroup } from './inspector-effects.js'
@@ -155,6 +156,17 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 	const canvas = getTimelineProgramCanvas(timelineId, sceneState, stateStore)
 	const programScreenIdx = canvas.screenIdx ?? 0
 
+	/* WO-522: the geometry refresh below is TWO round-trips — a PUT of the whole timeline plus a
+	 * seek that makes the engine re-apply every layer at that position. `applyFillPx` fires it on
+	 * every drag-input change, fired-and-forgotten, so a drag put two full requests per pointer move
+	 * on the wire with no coalescing and no ordering guarantee. Owner: *"changing clips
+	 * position/size in timelines takes a while to show up on the preview screen, looks like amcp gets
+	 * overrun."*
+	 *
+	 * Throttled with a trailing call so intermediate frames drop but the value the operator settles
+	 * on always reaches the server — the same pattern the compose editor's mixer nudge already uses.
+	 * Discrete one-shot actions still await the un-throttled function directly; only the drag path
+	 * goes through the throttle. */
 	async function refreshTimelineClipGeometryOnServer() {
 		await syncTimelineToServer()
 		const pb = stateStore.getState()?.timeline?.playback
@@ -171,6 +183,8 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 				.catch(() => {})
 		}
 	}
+
+	const scheduleGeometrySync = createTrailingThrottle(() => refreshTimelineClipGeometryOnServer(), 80)
 
 	function clearClipTransformKeyframes() {
 		for (const prop of ['fill_x', 'fill_y', 'scale_x', 'scale_y']) {
@@ -203,7 +217,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		timelineState.updateClip(timelineId, layerIdx, clipId, {
 			fillPx: { x: next.x, y: next.y, w: next.w, h: next.h },
 		})
-		void refreshTimelineClipGeometryOnServer()
+		scheduleGeometrySync()
 		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 		redrawClipInspector()
 	}
@@ -211,7 +225,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		const next = alignStoredPxRect(pxRectForClip(), canvas, mode)
 		clearClipTransformKeyframes()
 		timelineState.updateClip(timelineId, layerIdx, clipId, { fillPx: next })
-		void refreshTimelineClipGeometryOnServer()
+		scheduleGeometrySync()
 		window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 		redrawClipInspector()
 	}
@@ -340,7 +354,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		decimals: 0,
 		onChange: (v) => {
 			timelineState.updateClip(timelineId, layerIdx, clipId, { opacity: Math.max(0, Math.min(1, v / 100)) })
-			void refreshTimelineClipGeometryOnServer()
+			scheduleGeometrySync()
 			window.dispatchEvent(new CustomEvent('timeline-redraw-request'))
 		},
 	})
@@ -369,7 +383,7 @@ export function renderTimelineClipInspector(deps, timelineId, layerIdx, clipId, 
 		decimals: 0,
 		onChange: (v) => {
 			timelineState.updateClip(timelineId, layerIdx, clipId, { inPoint: Math.max(0, Math.round(v)) })
-			void refreshTimelineClipGeometryOnServer()
+			scheduleGeometrySync()
 		},
 	})
 	trimGrp.appendChild(inInp.wrap)
