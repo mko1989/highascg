@@ -1,6 +1,6 @@
 # WO-536 — A clip with **Loop** ticked restarts from frame 0 instead of resuming at the playhead
 
-**Status: OPEN — root cause proved offline against the real engine (§2). Fix designed (§4), NOT implemented: it is the live transport path and one CasparCG behaviour needs the box (§5).**
+**Status: FIXED in repo (14.08.2026) — 12 smokes (4 of them verified to fail without the fix), suite 2263 / 2261 pass / 0 fail / 2 skip. Owner QA owed (§8).**
 **Priority:** High (black frame on air every resume; the clip plays from the wrong point)
 **Source:** `work/work-orders/todos14.08.26`, two reports that turn out to be one bug:
 - line 6: *"when pausing a timeline, jumping the playhead somewhere else and hitting play again results in a black frame before it starts playing. it probably sends another seek, even though the seek was already applied when moving the playhead."*
@@ -110,18 +110,88 @@ producer's **in-point**, so `PLAY file LOOP SEEK 100` would loop 100→end rathe
 would silently change what a looping clip *is*. A separate `CALL SEEK` moves the playhead and leaves
 the loop range alone.
 
-## 5. Why it is not implemented here
+## 5. The open question, answered from the source that built this binary — not from the box
 
-One thing genuinely needs the box: **does `CALL <ch>-<layer> SEEK <frame>` behave on a LOOPing
-ffmpeg producer in this Caspar build** — does it seek cleanly, and does the loop still wrap at the
-file end afterwards? Everything else above is proved, but that answer is not in the source, and this
-is the live take/transport path where WO-139 → WO-519 → WO-528 each shipped a fix that needed
-another one. The owner can settle it in one minute with a looping clip and a PGM monitor.
+The blocker was: *does `CALL <ch>-<layer> SEEK <frame>` behave on a LOOPing ffmpeg producer in this
+build?* That did not need an on-air experiment. The CasparCG source tree that produced the running
+binary is on the box, and it is provably the right one:
 
-Once that is known, both changes are small and the offline harness in §2 verifies them before
-anything reaches air.
+```
+~/caspar-build/src-tree            git b96e58d60
+md5  ~/caspar-build/build/shell/casparcg  == 9b323f16…
+md5  ~/highascg/bin/casparcg               == 9b323f16…      ← identical
+```
 
-## 6. What is NOT the cause
+Reading it settles all three sub-questions, and better than a single observation would:
+
+1. **`CALL … SEEK n` is orthogonal to looping.** `ffmpeg_producer.cpp:180` routes it to
+   `AVProducer::seek`, which (`av_producer.cpp:1075`) sets `seek_` and drops the buffer. It touches
+   neither `loop_` nor `start_`.
+2. **Looping still wraps afterwards.** `av_producer.cpp:881`: at EOF,
+   `if (loop_ && frame_count_ > 2) seek_internal(start)` — back to `start_`, i.e. the IN point, not
+   to wherever the last seek went.
+3. **`PLAY … LOOP SEEK n` really would have been the wrong instrument** — `ffmpeg_producer.cpp:302`,
+   `auto in = get_param(L"IN", params, seek)`, aliases SEEK onto IN, moving the loop's start point.
+   §4's warning was right and is now source-backed rather than recalled.
+
+### The hazard the source also revealed
+
+`seek_internal` resets `frame_count_ = 0`, and the wrap is guarded by `frame_count_ > 2`. So a
+producer seeked to within ~2 frames of the end hits EOF *before* it qualifies to loop and takes the
+`sleep_for(10ms); continue` branch instead — holding the last frame permanently, because nothing
+further is decoded to grow the count. That window is refused by `loopSeekIsSafe`, which is the one
+part of this fix that would not have been found by trying it once and watching PGM.
+
+## 6. What was implemented
+
+| file | change |
+|---|---|
+| `timeline-playback-helpers.js` | new `loopSeekIsSafe(meta)` — the predicate, carrying the source citations above. Frame 0 **is** legal (a scrub back to the loop start must be sent); the end-of-media window and routes are refused. |
+| `timeline-playback-amcp-send.js` | `needsScrubSeek` no longer excludes `loopAlways` outright — `(!meta.loopAlways || loopSeekIsSafe(meta))`. |
+| `timeline-playback-amcp-send.js` | the exclusive `if (meta.loopAlways)` dispatch branch gained `else if (needsScrubSeek) → CALL … SEEK`. **This was the real structural gate**: even with the condition relaxed, a looping clip never reached the scrub cases, because that branch returns without falling through. |
+| `timeline-playback-amcp-send.js` | `_sendClipTransport`'s loopAlways branch follows its `PLAY … LOOP` with `CALL … SEEK meta.frame` when `meta.frame > 0 && loopSeekIsSafe(meta)`. |
+| `timeline-playback-transport-bulk.js` (new, 78 lines) | the added lines pushed the sender to 511, over the CI limit. `_pauseAll` / `_resumeAll` / `_stopAll` extracted whole — a coherent unit (walk the layers, one command each, no per-clip reasoning) rather than a shaving of the fix. Mixed into the engine prototype next to the sender; no smoke reads the sender by path, so nothing needed repointing. |
+
+Playing and paused take the same command in the scrub branch: a looping producer repositions
+identically either way, and — worth knowing — `_pauseAll` **skips** `loopAlways` layers, so such a
+clip is never PAUSEd in Caspar at all. `_resumeAll` skips them symmetrically. That is why the
+corrected trace below shows *nothing* on the resume rather than a `RESUME`: there is nothing to
+resume, and that is correct, not a missing command.
+
+### Before / after, same script as §2
+
+```
+### Loop ticked (loopAlways)                    BEFORE                     AFTER
+  play@4000ms      STOP | PLAY … LOOP                    STOP | PLAY … LOOP | CALL SEEK 100
+  seek -> 20000ms  (NOTHING SENT)                        CALL SEEK 500
+  canResume        false                                 true
+  play             STOP | PLAY … LOOP   ← black frame    (nothing — never paused)
+```
+
+## 7. What was VERIFIED
+
+- `tools/smoke/smoke-wo536-looping-clip-seeks-instead-of-restarting.test.js` — 12 tests, curated CI
+  list, driving the **real `TimelineEngine`** with a recording AMCP double: the scrub reaches the
+  wire and the resume stays available; the following play emits no STOP and no PLAY; a mid-timeline
+  start seeks to the playhead; the seek is never folded into the PLAY; the stretched case wraps with
+  the loop modulo; **the plain and `implicitLoop` paths are asserted unchanged**; and
+  `loopSeekIsSafe`'s boundaries are pinned frame by frame (247 ok, 248 refused, in-point offsets it).
+- **Confirmed the tests fail without the fix**: reverting the two conditions turns 4 of the 12 red;
+  restoring them turns all 12 green.
+- Suite **2263 / 2261 pass / 0 fail / 2 skip**. Lint 0 errors. Line limit 0 over. `node index.js --no-http` boots (the mixin split is load-bearing at startup, so the boot gate is the check that matters here).
+
+## 8. Owner QA
+
+Server-side — needs `kill -TERM $(systemctl show -p MainPID --value highascg)`.
+
+1. A clip with **Loop** ticked, playing. Pause, drag the playhead somewhere else, press Play:
+   **no black frame**, and it continues from where the playhead is.
+2. Take a timeline whose first clip is a looping one, from a mid-timeline position: it must start at
+   the playhead's point in the media, not at the clip's beginning.
+3. Let a looping clip run past its media end at least once — it must still wrap. (This is the one
+   thing the source says is safe but only the monitor can confirm end to end.)
+
+## 9. What is NOT the cause
 
 - **Not a double seek.** The scrub sends one `CALL SEEK`; for a looping clip it sends **none**.
 - **Not `implicitLoop` / WO-449.** Measured correct in §2.
@@ -130,9 +200,12 @@ anything reaches air.
 - **Not the client.** `seek` then `play` is the right call sequence; the engine's response to it is
   the fault.
 
-## 7. Work log
+## 10. Work log
 
 - 2026-08-14 — todos lines 6 and 12 triaged to one cause and reproduced offline against the real
   `TimelineEngine`: `loopAlways` clips are excluded from the paused scrub seek, which staleness the
   resume check then trips over, which forces the STOP + `PLAY … LOOP` restart that both reports
-  describe. Fix designed; held for one on-box question about `CALL SEEK` under `LOOP`.
+  describe. Held briefly for an on-box question about `CALL SEEK` under `LOOP` — then answered
+  instead from the CasparCG tree that built the running binary (§5), which also turned up the
+  `frame_count_ > 2` end-of-media stall that an on-air trial would have missed. Implemented, 12
+  smokes, 4 verified to fail without it.

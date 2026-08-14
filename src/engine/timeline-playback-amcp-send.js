@@ -5,6 +5,7 @@ const {
 	clipAudioRoute,
 	playAfSuffix,
 	timelineClipTransportStale,
+	loopSeekIsSafe,
 	TIMELINE_LAYER_BASE,
 	timelineCasparLayer,
 	normalizeTimelineSendTo,
@@ -146,13 +147,21 @@ module.exports = {
 						((prev.implicitLoop ?? false) !== !!meta.implicitLoop ||
 							(prev.loopClip ?? false) !== !!meta.loopClip)
 					const needsFullTransport = transportStale || loopStale || (force && playing)
+					/* WO-536: `!meta.loopAlways` used to be one of these conditions, so scrubbing a
+					 * paused looping clip sent NOTHING — the picture never moved, `transportSent`
+					 * stayed false, and the `_prevKey` write below kept the pre-scrub frame. That
+					 * staleness then failed `_validateClipStateForResume`, so the next play() took
+					 * the full-transport path and restarted the producer: the owner's black frame
+					 * (todos14.08 line 6) and its wrong start position (line 12). A looping producer
+					 * seeks exactly like any other — see `loopSeekIsSafe` for the source proof and
+					 * for the one end-of-media window that must still be refused. */
 					const needsScrubSeek =
 						force &&
 						prev?.clipId === clip.id &&
 						!transportStale &&
 						prev.frame !== meta.frame &&
 						!meta.isRoute &&
-						!meta.loopAlways
+						(!meta.loopAlways || loopSeekIsSafe(meta))
 					const needsPausedSeek = needsScrubSeek && !playing
 					const needsPlayingScrub = needsScrubSeek && playing
 					let transportSent = false
@@ -166,6 +175,18 @@ module.exports = {
 								mixerDirty.add(ch)
 								hasDeferredLines = true // T173.2
 							}
+						} else if (needsScrubSeek) {
+							/* WO-536: this branch is exclusive — a looping clip never reached the
+							 * scrub cases below, so a scrub sent nothing and `_prevKey.frame` went
+							 * stale, which is what made `_canResumePlayback` decline and forced the
+							 * STOP + PLAY restart on the next play (the black frame). Playing and
+							 * paused are the same command here: a looping producer repositions like
+							 * any other, and `loopSeekIsSafe` (already folded into needsScrubSeek)
+							 * keeps us out of the end-of-media window. */
+							self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+								this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP scrub) failed: ${_err.message}`)
+							})
+							transportSent = true
 						}
 					} else if (needsFullTransport) {
 						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
@@ -294,6 +315,18 @@ module.exports = {
 			self.amcp.raw(cmd).catch(_err => {
 				this._logDebug(`PLAY ${cl} LOOP failed: ${_err.message}`)
 			})
+			/* WO-536: this PLAY carried no start position at all, so a looping clip always began at
+			 * its IN point no matter where the timeline playhead was — owner: *"it doesnt start in
+			 * correct place in regard to timelines playhead"*. It must be a SEPARATE `CALL … SEEK`:
+			 * folding it into the PLAY as `LOOP SEEK n` would set the loop's IN point instead of the
+			 * playhead (`ffmpeg_producer.cpp:302` aliases SEEK onto IN). `loopSeekIsSafe` carries the
+			 * source proof and refuses the last ~2 frames, where the producer would hold rather than
+			 * wrap. */
+			if (meta.frame > 0 && loopSeekIsSafe(meta)) {
+				self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+					this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP) failed: ${_err.message}`)
+				})
+			}
 			return { hasDeferredLines: false }
 		}
 		if (!startTransport) return { hasDeferredLines: false }
@@ -418,61 +451,4 @@ module.exports = {
 		return li >= 0 ? li : -1
 	},
 
-	_pauseAll() {
-		const self = this.self
-		if (!self?.amcp) return
-		const airId = this._airTimelineId
-		const tl = airId ? this.timelines.get(airId) : null
-		if (!tl) return
-		const ms = this._nowMs(airId)
-		for (const key of this._prevKey.keys()) {
-			const [ch, caspLayer] = key.split('-').map(Number)
-			if (isNaN(ch) || isNaN(caspLayer)) continue
-			const li = this._timelineLayerIndex(caspLayer)
-			if (li >= 0 && li < tl.layers.length) {
-				const clip = this._clipAt(tl.layers[li], ms)
-				if (clip?.loopAlways) continue
-			}
-			self.amcp.pause(ch, caspLayer).catch(_err => {
-				this._logDebug(`PAUSE ${ch}-${caspLayer} failed: ${_err.message}`)
-			})
-		}
-	},
-
-	_resumeAll() {
-		const self = this.self
-		if (!self?.amcp) return
-		const airId = this._airTimelineId
-		const tl = airId ? this.timelines.get(airId) : null
-		if (!tl) return
-		const ms = this._nowMs(airId)
-		for (const key of this._prevKey.keys()) {
-			const [ch, caspLayer] = key.split('-').map(Number)
-			if (isNaN(ch) || isNaN(caspLayer)) continue
-			const li = this._timelineLayerIndex(caspLayer)
-			if (li >= 0 && li < tl.layers.length) {
-				const clip = this._clipAt(tl.layers[li], ms)
-				if (clip?.loopAlways) continue
-			}
-			self.amcp.resume(ch, caspLayer).catch(_err => {
-				this._logDebug(`RESUME ${ch}-${caspLayer} failed: ${_err.message}`)
-			})
-		}
-	},
-
-	_stopAll(tl, channelsOverride) {
-		const self = this.self
-		if (!self?.amcp) return
-		const channels = channelsOverride ?? this._channels()
-		for (let li = 0; li < tl.layers.length; li++) {
-			for (const ch of channels) {
-				const caspLayer = this._caspLayer(ch, li)
-				self.amcp.stop(ch, caspLayer).catch(_err => {
-					this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
-				})
-			}
-		}
-		this._lastKfValues.clear()
-		this._lastKfSegment.clear()
-	},
 }

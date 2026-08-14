@@ -91,6 +91,44 @@ function timelineClipTransportStale(prev, clip) {
 	return false
 }
 
+/**
+ * WO-536 — may a looping clip be repositioned with `CALL <ch>-<layer> SEEK <frame>`?
+ *
+ * Yes, and it is the ONLY safe way. Verified by reading the CasparCG source the running binary was
+ * built from — provenance and hashes in WO-536 §5, which is also where to look before trusting these
+ * line numbers against a different Caspar build:
+ *
+ *  - `CALL … SEEK n` reaches `AVProducer::seek` (`ffmpeg_producer.cpp:180`), which only sets `seek_`
+ *    and drops the buffer (`av_producer.cpp:1075`). It touches neither `loop_` nor `start_`, so the
+ *    loop keeps wrapping to the IN point afterwards (`av_producer.cpp:881` — at EOF,
+ *    `if (loop_ && frame_count_ > 2) seek_internal(start)`).
+ *  - `PLAY file LOOP SEEK n` is NOT equivalent and must never be used for this:
+ *    `auto in = get_param(L"IN", params, seek)` (`ffmpeg_producer.cpp:302`) aliases SEEK onto IN, so
+ *    it moves the loop's start point rather than the playhead.
+ *
+ * The one hazard is that same `frame_count_ > 2` guard: `seek_internal` resets `frame_count_` to 0,
+ * so a producer seeked to within ~2 frames of the end reaches EOF before it qualifies to wrap and
+ * takes the `sleep(10ms); continue` branch instead — holding the last frame forever, since nothing
+ * further is decoded to grow the count. Refuse the seek in that window; the clip then starts at its
+ * IN point, which is merely the pre-WO-536 behaviour rather than a stall.
+ *
+ * @param {{ frame?: number, inFrames?: number, loopSpanFrames?: number, isRoute?: boolean }} meta
+ * @returns {boolean}
+ */
+function loopSeekIsSafe(meta) {
+	if (!meta || meta.isRoute) return false
+	const frame = Number(meta.frame)
+	/* Frame 0 IS a legal target — a scrub back to the loop's start must still be sent. Skipping a
+	 * pointless SEEK 0 straight after a `PLAY … LOOP` (which already starts there) is the PLAY
+	 * site's business, not this predicate's. */
+	if (!Number.isFinite(frame) || frame < 0) return false
+	const span = Number(meta.loopSpanFrames)
+	// No known span (media duration unresolved) — nothing to be near the end OF, so allow it.
+	if (!Number.isFinite(span) || span <= 0) return true
+	const lastSafe = (Number(meta.inFrames) || 0) + span - 3
+	return frame <= lastSafe
+}
+
 /** @param {string|undefined} s */
 function parseResolutionAspect(s) {
 	if (!s || typeof s !== 'string') return null
@@ -173,6 +211,7 @@ module.exports = {
 	clipAudioRoute,
 	playAfSuffix,
 	timelineClipTransportStale,
+	loopSeekIsSafe,
 	parseResolutionAspect,
 	TIMELINE_LAYER_BASE,
 	TIMELINE_LAYER_MAX_COUNT,

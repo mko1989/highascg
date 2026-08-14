@@ -12,6 +12,7 @@ const {
 	normalizeTimelineSendTo,
 } = require('./timeline-playback-helpers')
 const timelinePlaybackAmcpSend = require('./timeline-playback-amcp-send')
+const timelinePlaybackTransportBulk = require('./timeline-playback-transport-bulk')
 const timelinePlaybackAmcpSchedule = require('./timeline-playback-amcp-schedule')
 const timelinePlaybackRuntime = require('./timeline-playback-runtime')
 
@@ -31,6 +32,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 	Object.assign(TimelineEngineClass.prototype, {
 		...timelinePlaybackAmcpSchedule,
 		...timelinePlaybackAmcpSend,
+		...timelinePlaybackTransportBulk,
 		...timelinePlaybackRuntime,
 
 		_pbFor(id) {
