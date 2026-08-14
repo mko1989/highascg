@@ -85,7 +85,23 @@ async function handlePost(path, body, ctx) {
 		const videoMode = b.videoMode != null ? String(b.videoMode) : ''
 		const mainIdx = Array.isArray(programChannels) ? programChannels.indexOf(channel) : -1
 		let outputRole = ''
-		let connectorLabel = mainIdx >= 0 ? `Screen ${mainIdx + 1} (PGM ch ${channel})` : `PGM ch ${channel}`
+		/* WO-506: the operator's own screen name, not a generic `Screen N`. Owner: *"operators will want
+		 * to work mostly on their custom labels and not generic screen 1 etc"*, and named the test card
+		 * (settings and display) as one of the surfaces. Resolved from the same authority as everywhere
+		 * else — `channelMap.screenLabels` (WO-222 → WO-385: owning destination's name, then the stored
+		 * array, then `S<n>`), so a rename shows here too. */
+		let screenName = ''
+		if (mainIdx >= 0) {
+			try {
+				const { getChannelMap } = require('../config/routing')
+				const labels = getChannelMap(ctx?.config || {})?.screenLabels
+				screenName = Array.isArray(labels) ? String(labels[mainIdx] || '').trim() : ''
+			} catch (_) {
+				/* a label lookup must never stop a test card going up */
+			}
+		}
+		if (!screenName && mainIdx >= 0) screenName = `Screen ${mainIdx + 1}`
+		let connectorLabel = mainIdx >= 0 ? `${screenName} (PGM ch ${channel})` : `PGM ch ${channel}`
 		const gpu = resolveGpuConnectorLabelForChannel(ctx?.config || {}, channel)
 		let gpuConnectorId = gpu.gpuConnectorId || ''
 		if (gpu.connectorLabel) connectorLabel = gpu.connectorLabel

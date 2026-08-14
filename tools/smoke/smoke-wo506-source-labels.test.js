@@ -208,3 +208,32 @@ test('WO-524: a failed broadcast must not fail the rename', () => {
 	assert.ok(body, 'the broadcast must be guarded')
 	assert.match(body[0], /catch/, 'the save already succeeded')
 })
+
+/**
+ * WO-526 — the test card shows the operator's screen name.
+ *
+ * Owner named "test card (settings and display)" as one of the label-bar surfaces, and
+ * `routes-led-test-card.js` hardcoded `Screen ${mainIdx + 1}`.
+ */
+
+test('WO-526: the test card resolves the screen name from channelMap.screenLabels', () => {
+	const src = read('src/api/routes-led-test-card.js')
+	assert.match(src, /getChannelMap\(ctx\?\.config \|\| \{\}\)\?\.screenLabels/, 'same authority as every other surface')
+	assert.match(src, /\$\{screenName\} \(PGM ch \$\{channel\}\)/, 'the name must reach the payload')
+})
+
+test('WO-526: it still falls back to Screen <n>, and a lookup failure cannot block a test card', () => {
+	const src = read('src/api/routes-led-test-card.js')
+	assert.match(src, /if \(!screenName && mainIdx >= 0\) screenName = `Screen \$\{mainIdx \+ 1\}`/, 'never blank')
+	const block = /let screenName = ''[\s\S]*?\n\t\t\}/.exec(src)
+	assert.ok(block, 'the lookup must be parseable')
+	assert.match(block[0], /catch \(_\) \{/, 'a label lookup must never stop a test card going up')
+})
+
+test('WO-526: the surfaces the owner named all resolve from the screen label', () => {
+	// compose prv / looks / timelines / multiview all go through screenLabel or the enriched
+	// extraLiveSources[].label; this pins the two client ones that resolve it directly.
+	assert.match(read('client/components/scene-list.js'), /screenLabel\(cm, i\)/, 'looks selector')
+	assert.match(read('client/lib/multiview-state-layout.js'), /screenLabel\(channelMap, s\)/, 'multiview cells')
+	assert.match(read('client/components/timeline-editor.js'), /screenLabel\(cm, s\)/, 'timeline pgm/prv')
+})

@@ -187,11 +187,37 @@ everything — is already the implemented behaviour, and no change was needed. R
   Now `client/components/inspector-source-label.js` resolves from `extraLiveSources`, which both
   payloads carry, and is mounted in **both** the DeckLink ports inspector and the host-channel
   inspector on the same key — one component, not two copies.
-- **Surfaces that build their own label** are untouched and still show generated text:
-  `preview-canvas-compose-snapshot.js:456`, `timeline-editor.js:259`, and the test-card payloads in
-  `routes-led-test-card.js` / `startup-led-test-pattern.js`.
-- **Template payloads.** A rename reaches the client immediately but multiview/test-card CEF surfaces
-  need a `CG UPDATE` to repaint; nothing triggers that yet.
+- ~~**Surfaces that build their own label.**~~ Re-checked one by one, and the inventory in §3 was
+  partly wrong:
+  - `timeline-editor.js:259` — **already correct**. `labelBase = … || screenLabel(cm, s)`; it only
+    decorates with `PGM ·` and the channel number. Listing it as a violation was my error.
+  - `client/components/scene-list.js` (looks) and `client/lib/multiview-state-layout.js` (multiview
+    cells) — **already correct**, both resolve through `screenLabel`.
+  - Compose PRV tiles and every other surface rendering `extraLiveSources[].label` — correct for free
+    via the enrich choke point (§5).
+  - `routes-led-test-card.js:88` — **was** hardcoding `Screen ${mainIdx + 1}`. **Fixed (WO-526):**
+    resolves from `getChannelMap(config).screenLabels`, same authority as everything else, still
+    falling back to `Screen <n>`, and the lookup is wrapped — a label lookup must never stop a test
+    card going up.
+  - `preview-canvas-compose-snapshot.js:456` — deliberately left. It is a transient *status* string
+    (`no frame yet — ch N` / `PGM ch N…`) shown while a frame is being fetched, not a label bar.
+    Naming a channel there would be cosmetic at best and misleading while the tile is empty.
+
+## 8. Still open — rename PROPAGATION, not surface coverage
+
+Every surface the owner named now resolves the operator's label. What is *not* solved is pushing a
+rename into things already painted:
+
+- **Multiview cell labels are persisted in the saved layout**, generated from `screenLabel` at layout
+  time. A later rename does not rewrite them. This cannot be a blind overwrite: WO-222 was explicit
+  that a cell label the operator has overridden must survive, and nothing currently distinguishes
+  "auto-generated from the screen name" from "typed by the operator" — the same `labelIsCustom`
+  problem WO-506 solved for sources, unsolved for cells.
+- **CEF template surfaces** (multiview, test card) only repaint on a `CG UPDATE`. A rename updates
+  the client instantly but the on-glass template keeps the old text until its payload is re-sent.
+
+Both want a decision before code: should a rename rewrite existing multiview cell labels, and if so
+how is an operator-typed cell label protected? Recorded rather than guessed at.
 - The audio-mixer and header-bar sites keep their channel numbers, per §4a.
 
 ## 7. Work log
