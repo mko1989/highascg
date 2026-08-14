@@ -119,11 +119,11 @@ Client-side change — rebuild + kiosk reload only, no server restart.
 1. Select **screen 1** in the looks editor, then hit the main play button for **all** destinations.
    Screen 0's look must land at the size it shows in its own editor — no shrink.
 2. Repeat with screen 0 selected. Both directions must now be identical.
-3. Worth knowing either way: a look has **no home screen** of its own (`mainIndex` is null on all 5
-   in the project). It is now normalized to whatever screen it plays on, so a look built while one
-   screen was selected and then played on a differently-shaped screen will re-fit rather than
-   preserve its framing. If you want a look to keep its composition across screens instead, that is
-   a separate change — a per-look home canvas — and worth its own WO.
+3. ~~Worth knowing either way: a look has **no home screen** of its own.~~ **WRONG — superseded by
+   [WO-532](./532_WO_LOOK_GEOMETRY_IS_PER_SCREEN.md) §0.** I checked `scene.mainIndex`, which does
+   not exist; the field is `scene.mainScope` and every look in the project has a concrete one. The
+   owner: *"looks are per screen always so they should act as this."* WO-532 makes geometry follow
+   `mainScope` in the editor too, which is where the same fault was rewriting stored fills.
 
 ## 7. Work log
 

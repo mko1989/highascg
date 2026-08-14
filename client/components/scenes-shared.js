@@ -13,6 +13,7 @@ import {
 } from '../lib/layer-playhead-resolve.js'
 import { isLowerThirdSource, resolveLayerLowerThirdCgData, resolveLayerLowerThirdConfig, buildLowerThirdCasparCgData } from '../lib/lower-third-cg-data.js'
 import { parseRouteValue } from '../lib/input-channels.js'
+import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 
 export function amcpParam(str) {
 	if (str == null || str === '') return ''
@@ -384,7 +385,11 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 	 * Every take/stage caller already passes the target `mainIdx`; the fallback keeps the old
 	 * behaviour for the one caller that has no target (a local state apply, not a wire payload). */
 	const canvasIdx = Number.isInteger(seekOpts?.mainIdx) && seekOpts.mainIdx >= 0 ? seekOpts.mainIdx : sceneState.activeScreenIndex
-	const cv = sceneState.getCanvasForScreen(canvasIdx)
+	/* WO-532 — a look is per screen (owner: *"looks are per screen always so they should act as
+	 * this"*). Its geometry was authored against its OWN screen's canvas, so that canvas is the
+	 * authoring canvas even if some caller aims the payload elsewhere. Only a `mainScope: 'all'`
+	 * look has no home, and then WO-531's rule stands: the target screen, else the selection. */
+	const cv = sceneState.getCanvasForScreen(resolveMainIndexForScene(scene, sceneState, canvasIdx))
 	const pgmOnly = seekOpts?.pgmOnly === true
 	let payload = {
 		id: scene.id,

@@ -87,7 +87,14 @@ describe('WO-531: the payload stamps the TARGET screen’s canvas', () => {
 			/const canvasIdx = Number\.isInteger\(seekOpts\?\.mainIdx\) && seekOpts\.mainIdx >= 0 \? seekOpts\.mainIdx : sceneState\.activeScreenIndex/,
 			'the target screen wins when the caller knows it',
 		)
-		assert.match(src, /const cv = sceneState\.getCanvasForScreen\(canvasIdx\)/, 'and the canvas is read for it')
+		/* WO-532 refined this: `canvasIdx` is now the OVERRIDE handed to `resolveMainIndexForScene`,
+		 * which prefers the look's own `mainScope`. Same guarantee for this WO's case (a scoped look
+		 * is only ever taken to its own screen, so override == scope), strictly stronger otherwise. */
+		assert.match(
+			src,
+			/const cv = sceneState\.getCanvasForScreen\(resolveMainIndexForScene\(scene, sceneState, canvasIdx\)\)/,
+			'and the canvas is read for the screen the look belongs to',
+		)
 		assert.doesNotMatch(
 			src,
 			/getCanvasForScreen\(sceneState\.activeScreenIndex\)/,

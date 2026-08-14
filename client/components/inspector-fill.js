@@ -13,6 +13,7 @@ import { fillInspectorPositionMeta, displayPositionFromStoredPx } from '../lib/c
 import { getCellOverlayType, resolveSourceAspectRatio, solveCellDimensions } from './multiview-editor-canvas.js'
 
 import { SCENE_CONTENT_FIT_OPTIONS } from '../lib/scene-content-fit.js'
+import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 
 export { SCENE_CONTENT_FIT_OPTIONS }
 
@@ -108,7 +109,8 @@ export function appendSceneLayerFillGroup(root, opts) {
 		const sc = sceneState.getScene(sceneId)
 		const L = sc?.layers?.[layerIndex]
 		if (!L || !xInpRef || !yInpRef || !wInpRef || !hInpRef) return
-		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		/* WO-532: the look's own screen (`mainScope`), not the one selected in the editor. */
+		const canvas = sceneState.getCanvasForScreen(resolveMainIndexForScene(sc, sceneState))
 		const fill = L.fill || fullFill()
 		/* WO-388B: must match rerenderSceneLayer's pxRect — both report the VISIBLE (cropped) rect,
 		 * or the boxes would disagree with themselves after a content-fit reapply. */
@@ -125,11 +127,13 @@ export function appendSceneLayerFillGroup(root, opts) {
 		const sc = sceneState.getScene(sceneId)
 		const L = sc?.layers?.[layerIndex]
 		if (!L?.source?.value) return
-		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		/* WO-532: content-fit refits against the look's own screen. */
+		const mainIdx = resolveMainIndexForScene(sc, sceneState)
+		const canvas = sceneState.getCanvasForScreen(mainIdx)
 		const cr = await fetchMediaContentResolution(
 			L.source,
 			stateStore,
-			sceneState.activeScreenIndex,
+			mainIdx,
 			() => api.get('/api/media'),
 		)
 		if (seq !== contentFitApplySeq) return
@@ -224,7 +228,7 @@ export function appendSceneLayerFillGroup(root, opts) {
 		const sc = sceneState.getScene(sceneId)
 		const L = sc?.layers?.[layerIndex]
 		if (!L) return
-		const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+		const canvas = sceneState.getCanvasForScreen(resolveMainIndexForScene(sc, sceneState)) // WO-532
 		const fill = L.fill || fullFill()
 		/* WO-388B: scale % works on the VISIBLE rect and feeds patchFillPx, which is visible-space. */
 		const pxRectStored = visibleRectForLayer(fillToPixelRect(fill, canvas), L)

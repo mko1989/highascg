@@ -38,8 +38,12 @@ export function renderSceneLayerInspector(deps, sel) {
 		renderEmpty()
 		return
 	}
-	const res = getResolutionForScreen(stateStore)
-	const canvas = sceneState.getCanvasForScreen(sceneState.activeScreenIndex)
+	/* WO-532: a look is per screen — every geometry read here is against ITS screen (`mainScope`),
+	 * never the one selected in the editor. Otherwise the same look reports different X/Y/W/H
+	 * depending on which tab is open, and writing a box back rewrites the stored fill. */
+	const sceneMain = resolveMainIndexForScene(scene, sceneState)
+	const res = getResolutionForScreen(stateStore, sceneMain)
+	const canvas = sceneState.getCanvasForScreen(sceneMain)
 	const fill = layer.fill || fullFill()
 	/* WO-388B: X/Y/W/H report the VISIBLE (cropped) rect — a cropped layer's effective size IS its
 	 * cropped size. Uncropped layers pass through `visibleRectForLayer` unchanged. patchFillPx()
@@ -138,7 +142,7 @@ export function renderSceneLayerInspector(deps, sel) {
 		const r = visibleRectForLayer(fillToPixelRect(f, canvas), L)
 		let next = applyFillPxPatch({ x: r.x, y: r.y, w: r.w, h: r.h }, partial, canvas)
 		if (L.aspectLocked !== false) {
-			const cr = L.source ? getContentResolution(L.source, stateStore, sceneState.activeScreenIndex) : null
+			const cr = L.source ? getContentResolution(L.source, stateStore, sceneMain) : null
 			let ar = cr && cr.w > 0 && cr.h > 0 ? cr.w / cr.h : null
 			
 			if (!ar) {
@@ -203,7 +207,7 @@ export function renderSceneLayerInspector(deps, sel) {
 
 	/* Crop is edited in pixels of the layer's content resolution (fallback: channel) — WO-158 T158.4. */
 	const effectContentRes =
-		(layer.source ? getContentResolution(layer.source, stateStore, sceneState.activeScreenIndex) : null) || res
+		(layer.source ? getContentResolution(layer.source, stateStore, sceneMain) : null) || res
 
 	renderEffectsGroup(root, {
 		effects: layer.effects || [],
