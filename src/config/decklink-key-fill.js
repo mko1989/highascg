@@ -357,7 +357,6 @@ module.exports = {
 	resolveDecklinkConsumerKeyer,
 	decklinkPixelFormatXml,
 	decklinkRequiresYuvPixelFormat,
-	resolveDecklinkPixelFormatOverride,
 	FILL_ONLY_KEYER,
 	DEFAULT_DECKLINK_CONSUMER_SETTINGS,
 	normalizeDecklinkPixelFormat,

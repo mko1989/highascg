@@ -125,7 +125,6 @@ module.exports = {
 	MAX_SOURCE_LABEL,
 	sourceLabelKey,
 	sourceLabelsFromConfig,
-	applySourceLabel,
 	applySourceLabels,
 	setSourceLabelInConfig,
 	shortSourcePill,

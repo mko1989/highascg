@@ -18,7 +18,9 @@
  */
 
 /** Every class that paints a drag-hover affordance. Add new ones here, not to a second sweeper. */
-export const DRAG_HIGHLIGHT_CLASSES = [
+/* WO-538: module-private. `installDragHighlightCleanup` is this file's whole public
+ * surface; exporting the parts invited a second sweeper, which the comment above forbids. */
+const DRAG_HIGHLIGHT_CLASSES = [
 	'scenes-layer--drag-over',
 	'scenes-layer-row--drop-target',
 	'scenes-layer-row--dragging',
@@ -30,7 +32,7 @@ export const DRAG_HIGHLIGHT_CLASSES = [
  * Remove every drag-hover class currently in the document.
  * @param {Document | HTMLElement} [root]
  */
-export function clearDragHighlights(root = document) {
+function clearDragHighlights(root = document) {
 	for (const cls of DRAG_HIGHLIGHT_CLASSES) {
 		for (const el of root.querySelectorAll(`.${cls}`)) el.classList.remove(cls)
 	}

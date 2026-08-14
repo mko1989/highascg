@@ -24,11 +24,6 @@ export function sourceLabel(source, fallback = '') {
 	return fallback
 }
 
-/** @returns {boolean} true when an operator named this source, rather than us generating it. */
-export function sourceLabelIsCustom(source) {
-	return source?.labelIsCustom === true
-}
-
 /**
  * Current label for a source identified by its ROUTE VALUE (`route://5-3`), for surfaces that
  * stored a drag payload rather than a connector id — the operator-GUI compose tiles do exactly

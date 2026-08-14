@@ -103,7 +103,6 @@ async function clearLedTestLayerOnChannels(amcp, channelIndices, log) {
 
 module.exports = {
 	STARTUP_LED_TEST_LAYER,
-	isLedTestLayerOccupied,
 	clearLedTestLayerOnChannels,
 	clearLedTestLayerOnChannelsIfPresent,
 	markLedTestLayerPainted,
