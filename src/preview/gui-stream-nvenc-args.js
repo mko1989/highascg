@@ -95,7 +95,15 @@ function guiStreamUdpUri(port) {
  */
 function buildGuiStreamNvencArgs(opts = {}) {
 	const bitrate = clampInt(opts.bitrateKbps, MIN_BITRATE_KBPS, MAX_BITRATE_KBPS, DEFAULT_BITRATE_KBPS)
-	const fps = clampInt(opts.fps, 1, 120, DEFAULT_FPS)
+	/* WO-539: accepted, documented, clamped — and never emitted. There is no `-r:v` below, so the
+	 * nvenc consumer takes the channel's own rate and this option does nothing. Kept (as `_fps`,
+	 * so the linter stays quiet) rather than deleted, because the caller really does thread a
+	 * value here — `gui-stream-ingest.js:141` — and `gui-stream-ws-relay.js:119` announces that
+	 * same fps to the browser in the `gui_stream_config` handshake. Today every channel on this
+	 * box is 50 and DEFAULT_FPS is 50, so nothing is visibly wrong; the day they differ, the
+	 * client decodes against a rate the encoder was never told about. Deciding between emitting
+	 * `-r:v` and dropping the option is a behaviour change on a live consumer — see WO-539. */
+	const _fps = clampInt(opts.fps, 1, 120, DEFAULT_FPS)
 	const gop = clampInt(opts.gop, 1, 600, DEFAULT_GOP)
 	const preset = String(opts.preset || DEFAULT_PRESET).trim() || DEFAULT_PRESET
 	const tune = String(opts.tune || DEFAULT_TUNE).trim() || DEFAULT_TUNE

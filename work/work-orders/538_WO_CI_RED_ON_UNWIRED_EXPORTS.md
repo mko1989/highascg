@@ -73,9 +73,11 @@ orphan set, which would have "fixed" CI by recording all six as acceptable. The 
 header forbids it: *"The baseline is allowed to go down, never up: adding to it by hand is how this
 gate would rot."* Baselining a gate to make it green is how it stops finding anything.
 
-The gate still reports **9 baseline entries no longer orphaned** and invites a shrink. Left alone:
-shrinking the baseline is a separate, purely-good change, but it is not this WO's subject and doing
-it here would mix a real fix with 43 KB of churn.
+The gate also reported **9 baseline entries no longer orphaned** and invited a shrink. That IS
+purely good — the ratchet tightening in the allowed direction — and was done separately once the
+red was cleared: `--update` took the baseline 688 → 679, a 10-line diff, no entries added. (Running
+`--update` while the six orphans were still present would have been the forbidden move; running it
+after they were fixed is the intended one.)
 
 ## 5. What was VERIFIED
 
@@ -127,8 +129,29 @@ here because it belongs to whoever owns the CI layout.
 ## 7. Two things the owner should know
 
 1. **The lint ratchet has zero headroom.** `npm run lint` reports exactly **218** warnings against a
-   `--max-warnings 218` cap. The next warning anyone adds turns CI red. Worth a deliberate pass to
-   burn some down, or the cap becomes a tripwire rather than a ratchet.
+   `--max-warnings 218` cap, so the next warning anyone adds turns CI red. The breakdown:
+
+   | count | rule |
+   |---|---|
+   | 132 | `no-unused-vars` (110 "assigned but never used", 10 unused catch bindings, 12 args/vars) |
+   | 80 | `no-restricted-syntax` (the WO-103 `innerHTML` escaping guard) |
+   | 6 | `no-useless-assignment` |
+
+   **A bulk burn-down would be a mistake**, and it is worth saying why rather than just doing it: the
+   110 "assigned but never used" are spread over 103 files, and at least some are the *only* trace of
+   an unimplemented feature. I audited the 61 with a call on the right-hand side and found one real
+   fault that way — [WO-539](./539_WO_GUI_STREAM_FPS_OPTION_DOES_NOTHING.md), an operator-GUI stream
+   option that is accepted, announced to the browser, and never encoded. Deleting the variable would
+   have deleted the evidence.
+
+   The genuinely signal-free subset is the unused `require`/import destructures. Clearing those buys
+   real headroom at zero risk, and is the pass to do if headroom is wanted.
+
+   Ruled out while auditing, so nobody re-checks them: the AMCP transport's unused `p`
+   (`_sendAfter` — `execute` returns `p` on every path, so the destructure is merely redundant), the
+   two `labelY` cases in `preview-canvas-draw-base.js` (dead setup under commented-out `fillText`),
+   `publish-modal`'s discarded `await fetch` (a deliberate reachability probe whose value is not
+   wanted), and `decklink-install`'s `payload` (assigned for `parseBody`'s throwing side effect).
 2. **`npm run verify:repo-integrity` fails locally** on 11 Syncthing `sync-conflict` files under
    `projects/`. They are gitignored and untracked, so CI never sees them — but it means that gate
    cannot be trusted as a local pre-push check until they are cleared.
