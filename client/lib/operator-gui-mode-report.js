@@ -70,22 +70,49 @@ function effectiveCells() {
  * REPORT_DEBOUNCE_MS, with a trailing send so the final rect always lands. The `_lastSentJson`
  * dedupe in sendLayout keeps redundant emissions off the wire. */
 let _lastReportAt = 0
+/** WO-529: a pending timer that exists ONLY because the merged set was empty when it was
+ * scheduled. A non-empty report arriving before it fires is the other half of a surface handoff
+ * and may cancel it — see {@link scheduleReport}. */
+let _debounceIsWithdrawalOnly = false
+
+function fireScheduledReport() {
+	_debounceTimer = null
+	_debounceIsWithdrawalOnly = false
+	_lastReportAt = Date.now()
+	void sendLayout(effectiveCells())
+}
+
 function scheduleReport() {
 	const now = Date.now()
+	/* WO-529 — NEVER put a withdrawal on the leading edge. A workspace tab switch (looks editor <->
+	 * timeline editor) hands one operator surface off to another as TWO calls in the same frame:
+	 * the outgoing surface reports zero-size rects (its pane is display:none, so every
+	 * getBoundingClientRect is 0 and cellRectsToLayoutCells filters them all out) and withdraws,
+	 * then the incoming surface reports its own. Sending that intermediate empty set immediately
+	 * makes it real on the wire — and an empty POST is a DELETE, which STOPs every route layer and
+	 * empties the shape rects (clearOperatorGuiLayout -> _doApplyOperatorGuiLayout(ctx, ch, [])).
+	 * The whole mosaic then has to be re-acquired from nothing when the handoff completes, which
+	 * is the owner's "nothing inside of it". Deferring costs nothing: a genuinely final empty set
+	 * still goes out one interval later. */
+	if (!effectiveCells().length) {
+		if (_debounceTimer) return
+		_debounceIsWithdrawalOnly = true
+		_debounceTimer = setTimeout(fireScheduledReport, REPORT_DEBOUNCE_MS)
+		return
+	}
+	// We have cells, so a deferred withdrawal is stale — this call IS the rest of the handoff.
+	if (_debounceTimer && _debounceIsWithdrawalOnly) {
+		clearTimeout(_debounceTimer)
+		_debounceTimer = null
+		_debounceIsWithdrawalOnly = false
+	}
 	if (now - _lastReportAt >= REPORT_DEBOUNCE_MS && !_debounceTimer) {
 		_lastReportAt = now
 		void sendLayout(effectiveCells())
 		return
 	}
 	if (_debounceTimer) return
-	_debounceTimer = setTimeout(
-		() => {
-			_debounceTimer = null
-			_lastReportAt = Date.now()
-			void sendLayout(effectiveCells())
-		},
-		Math.max(16, REPORT_DEBOUNCE_MS - (now - _lastReportAt)),
-	)
+	_debounceTimer = setTimeout(fireScheduledReport, Math.max(16, REPORT_DEBOUNCE_MS - (now - _lastReportAt)))
 }
 
 /**
@@ -255,6 +282,7 @@ export function setInteractionSuppressed(suppressed) {
 		if (_debounceTimer) {
 			clearTimeout(_debounceTimer)
 			_debounceTimer = null
+			_debounceIsWithdrawalOnly = false
 		}
 		/* issues 01.08: cells stay up, suppressHoles closes the holes — routes never stop, so the
 		 * restore below shows live video the instant the shape rects come back (no re-PLAY). */
@@ -286,6 +314,7 @@ export function setForegroundTabBlocksVideo(blocked) {
 	if (_debounceTimer) {
 		clearTimeout(_debounceTimer)
 		_debounceTimer = null
+		_debounceIsWithdrawalOnly = false
 	}
 	void sendLayout(effectiveCells())
 }
@@ -338,6 +367,7 @@ function resendMergedNow() {
 	if (_debounceTimer) {
 		clearTimeout(_debounceTimer)
 		_debounceTimer = null
+		_debounceIsWithdrawalOnly = false
 	}
 	void sendLayout(effectiveCells(), { force: true })
 }
@@ -386,6 +416,7 @@ export function initOperatorGuiRectReporting(ws) {
 export function resetOperatorGuiModeStateForTests() {
 	if (_debounceTimer) clearTimeout(_debounceTimer)
 	_debounceTimer = null
+	_debounceIsWithdrawalOnly = false
 	if (_restoreTimer) clearTimeout(_restoreTimer)
 	_restoreTimer = null
 	_bySurface = new Map()

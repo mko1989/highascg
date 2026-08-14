@@ -215,7 +215,11 @@ describe('todos19.07.26 (resize fix): canvas resize preserves tile pixel sizes (
 	it('ResizeObserver calls onCanvasResize which preserves px and updates fractions', () => {
 		const src = readOperatorComposeTiles()
 		assert.match(src, /const ro = typeof ResizeObserver[\s\S]{0,50}new ResizeObserver\(onCanvasResize\)/, 'ResizeObserver uses onCanvasResize')
-		assert.match(src, /function onCanvasResize\(\)[\s\S]{0,500}clampTileRect\(t\.pxDesired/, 'onCanvasResize preserves pxDesired, clamps to new size')
+		// WO-529 repoint: the window was 500 chars, which the body already very nearly filled — the
+		// degenerate-observation guard added there overflowed it. Widened, not weakened: the claim is
+		// still "onCanvasResize is the function that restores pxDesired through clampTileRect", and
+		// the guard's own behaviour is pinned in smoke-wo529-operator-surface-handoff.test.js.
+		assert.match(src, /function onCanvasResize\(\)[\s\S]{0,1200}clampTileRect\(t\.pxDesired/, 'onCanvasResize preserves pxDesired, clamps to new size')
 		assert.match(src, /newSize\.w.*newSize\.h.*minOuter\.width/, 'onCanvasResize receives new canvas size and clamps with minimum')
 	})
 
