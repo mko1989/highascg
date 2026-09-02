@@ -143,6 +143,8 @@ const FILES = [
 	'tools/smoke/smoke-wo535-companion-press-and-preview.test.js',
 	'tools/smoke/smoke-wo536-looping-clip-seeks-instead-of-restarting.test.js',
 	'tools/smoke/smoke-wo537-look-timeline-starts-where-asked.test.js',
+	'tools/smoke/smoke-wo540-teardown-opacity-verify.test.js',
+	'tools/smoke/smoke-wo541-timeline-only-look-crossfade.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

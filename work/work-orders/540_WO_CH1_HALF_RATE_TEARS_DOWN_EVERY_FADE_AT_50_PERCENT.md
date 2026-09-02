@@ -1,6 +1,10 @@
 # WO-540 — Channel 1 drifts to half rate at runtime, so every transition on it is torn down mid-fade
 
-**Status: ROOT CAUSE PROVEN by measurement and intervention (§2–§4). The software consequence is fixable here (§6); the hardware trigger is the owner's call (§5).**
+**Status: ROOT CAUSE PROVEN by measurement and intervention (§2–§4). §6 option B (verify the real
+opacity before tearing down, instead of trusting the declared framerate) IMPLEMENTED 02.09.2026 —
+see §9. The hardware trigger itself is still the owner's call (§5); live-measured healthy again
+02.09 (ch1 at ~48.8fps, 1024ms/50 frames) after that day's Caspar restart, so §5's watch-and-report
+stays open but nothing was actively wrong to reproduce against.**
 **Priority:** High — it is the answer to *"going back to a look from timeline does a cut instead of mix"*, and a channel at half rate is a playout-quality fault in its own right
 **Source:** owner 14.08, answering [WO-537](./537_WO_TIMELINE_IN_A_LOOK_RESUMES_INSTEAD_OF_STARTING.md) §4's probe step 0: *"pgm1 channel 1 screen"*, plus *"the box is not on air now, you can do what you want"* — which is what made the measurements below possible.
 **Related:** [WO-537](./537_WO_TIMELINE_IN_A_LOOK_RESUMES_INSTEAD_OF_STARTING.md) (part 2 — this closes it),
@@ -158,6 +162,54 @@ and the wait really does happen. What it could not see from source is that the w
 a framerate the channel was not honouring. §4b's collision guard (a look carrying the live timeline
 queuing two ramps on one layer) stays a real, separate defect and remains fixed.
 
+## 9. §6 option B — implemented 02.09.2026
+
+Chose option B (poll the real value) over A (widen the margin — papers over a 2x error) and C
+(measure/cache the channel's effective rate — more machinery, needs a freshness story) exactly as
+§6 recommended.
+
+New `src/engine/scene-take-teardown-opacity-wait.js`: `waitForOpacitySettled(amcp, channel, layer,
+target, maxWaitMs)` polls `MIXER <ch>-<layer> OPACITY` (bare query — confirmed against
+`amcp-protocol.js`'s SINGLE_LINE response state that the callback receives ONLY the value line, not
+the `201 MIXER OK` status line, so no parsing surprises between simulated and real sockets) every
+40ms until the value is within 0.02 of `target` or `maxWaitMs` elapses. Fails open on any query
+error (timeout, disconnect, malformed reply) — returns immediately rather than risk hanging a take.
+
+Wired into `scene-take-lbg-teardown.js`, after the existing computed `teardownWait`: budgeted
+against wall-clock time since `fadeClockStart` so the total wait (original + verification) never
+exceeds `2 * fadeMs` from when the fade started, matching §6's own spec, however this point was
+reached — including when `teardownWait` had already hit 0 by the time other AMCP work finished
+(the case most likely to have under-waited, since the original code would have proceeded straight
+to STOP with zero margin). The reference layer to poll is derived cheaply and unambiguously: the
+timeline band base (`TIMELINE_LAYER_BASE`) when a live timeline is fading out, else the first
+exiting layer's physical number. **Scoped to non-merge transitions only** — a merge/Animate take's
+teardown timing model is a different mechanism and was not the reported fault; touching it would
+be scope creep on a path this WO did not measure.
+
+Deliberately NOT touched: `scene-take-pgm-only.js`'s equivalent wait (`fadeMs`-only, no
+verification). §1's reproduction log (`MIXER 1-210 OPACITY … DEFER` / `MIXER 1 COMMIT` /
+`MIXER 1-110 OPACITY …`) matches `scene-take-lbg.js`'s bank-crossfade shape, not the pgm-only
+implementation, so this fix is scoped to the path that was actually measured. Extending the same
+treatment there is a candidate for its own WO if a pgm-only channel is ever confirmed to show the
+same drift.
+
+### Verified
+
+`tools/smoke/smoke-wo540-teardown-opacity-verify.test.js` — 12 tests: the isolated poll helper
+(instant-settle, settles-partway-through-the-bound, never-settles-bounded, query-error-fails-open,
+`maxWaitMs<=0` sends no query) and its wiring into `runSceneTakeLbgTeardown` (queries the right
+reference layer for a plain exit and for a live-timeline exit, skips entirely on a merge
+transition, and actually waits — bounded — when the channel is slow to settle). Reverting the
+teardown wiring and rerunning fails 2 of the 4 wiring tests cleanly, confirming the smoke catches
+the regression rather than passing vacuously. Full suite 2282/2280/0/2 (2 pre-existing CI-gated
+skips). Lint 0 errors/warnings.
+
+**Not done:** live PGM verification against an actually-degraded channel — the box was healthy at
+measurement time (02.09), so this is proven by unit test against a simulated slow channel, not
+against the real hardware fault reproducing again. Owner: if ch1 (or any channel) drifts again,
+this should now hold the outgoing layer up instead of cutting it — worth confirming on the wire
+when it next happens, per §5's watch-for-the-drift guidance (still open).
+
 ## 8. Work log
 
 - 2026-08-14 — Owner answered probe step 0 (*"pgm1 channel 1 screen"*) and freed the box. Reproduced
@@ -167,3 +219,7 @@ queuing two ramps on one layer) stays a real, separate defect and remains fixed.
   static-config theory to a runtime drift and puts "Reference signal: not detected" at the top of the
   suspect list. Box restored and verified: 6 channels PLAYING, both DeckLink inputs up, Caspar
   connected.
+- 2026-09-02 — Owner reported a timeline-in-a-look symptom again ("nothing appeared at all").
+  Live-measured ch1: healthy (~48.8fps) — the hardware fault was not currently active; the report
+  turned out to be a different, new bug (WO-541). While investigating, implemented §6 option B
+  (deferred on 08-14 pending hardware findings) since the owner asked for it regardless — see §9.

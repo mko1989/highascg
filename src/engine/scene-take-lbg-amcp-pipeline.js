@@ -170,7 +170,16 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		}
 	}
 
-	if (takeJobs.length > 0 || mergeMixerExtras.length > 0) {
+	/* WO-541: a look whose ONLY content is a timeline layer never produces a takeJob — timeline
+	 * layers `continue` past the takeJobs loop in buildTakeJobs and are tracked separately via
+	 * timelineFadeInPhys. On a plain MIX (non-merge), mergeMixerExtras is also always [] (gated
+	 * on isMergeTransition). So this whole block — the ONLY place that builds crossfadeLines,
+	 * including the timeline's own fade-in at L239 — was skipped entirely, leaving the layers
+	 * `startSceneTimelineLayer` already preset to OPACITY 0 with no write ever following: the
+	 * timeline stays invisible forever. The `takeJobs.length === 0` branch below (L278, "Timeline-
+	 * only / exit-only crossfade") was already written to handle exactly this case — it just could
+	 * never be reached. */
+	if (takeJobs.length > 0 || mergeMixerExtras.length > 0 || (shouldRunBankCrossfade && timelineFadeInPhys.length > 0)) {
 		await sendTakeJobsLoadAndMixerBatch(amcp, {
 			self,
 			channel,

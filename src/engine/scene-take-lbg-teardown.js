@@ -21,6 +21,7 @@ const {
 	untrackTemplateHosts,
 } = require('./scene-template-cg')
 const { isShaderCgName } = require('./cg-routing')
+const { waitForOpacitySettled } = require('./scene-take-teardown-opacity-wait')
 /**
  * @param {object} ctx
  * @param {object} ctx.amcp
@@ -98,6 +99,34 @@ async function runSceneTakeLbgTeardown(ctx) {
 
 	if (teardownWait > 0) {
 		await new Promise((r) => setTimeout(r, Math.ceil(teardownWait) + 5))
+	}
+
+	/* WO-540 §6 option B: `teardownWait` trusts the channel's DECLARED framerate. If the channel is
+	 * actually running slower (measured live: ch1 at half rate while declaring full), the fade is
+	 * not really done by the time `teardownWait` runs out — STOPping now yanks the producer mid-
+	 * dissolve, a silent cut. Verify against ONE representative outgoing physical layer's real
+	 * MIXER OPACITY before proceeding, failing open on any query error (see
+	 * scene-take-teardown-opacity-wait.js). Runs even when `teardownWait` was already 0 (other AMCP
+	 * work before this point ate the whole computed window) — that is exactly the case most likely
+	 * to have under-waited. Budgeted against the wall clock since `fadeClockStart` so total wait
+	 * never exceeds ~2x fadeMs, per the WO's own spec, however this call was reached. Scoped to the
+	 * two cases with an unambiguous single reference layer; a merge transition's teardown timing
+	 * model is untouched (its bank-swap semantics differ and it isn't the reported fault). */
+	if (!isMergeTransition && fadeDur > 0 && fadeMs > 0 && fadeClockStart != null) {
+		const verifyBudgetMs = Math.max(0, 2 * fadeMs - (Date.now() - fadeClockStart))
+		if (verifyBudgetMs > 0) {
+			let refLayer = null
+			if (ctx.activeTimelineIdToFadeOut) {
+				const { TIMELINE_LAYER_BASE } = require('./timeline-playback-helpers')
+				refLayer = TIMELINE_LAYER_BASE
+			} else if (exitMedia.length > 0) {
+				const ln = Number(exitMedia[0].layerNumber)
+				if (Number.isFinite(ln)) refLayer = phys(ln, activeBank)
+			}
+			if (refLayer != null) {
+				await waitForOpacitySettled(amcp, channel, refLayer, 0, verifyBudgetMs)
+			}
+		}
 	}
 
 	const takeJobLogicalNums = new Set(takeJobs.map((j) => Number(j.layer.layerNumber)).filter(Number.isFinite))
