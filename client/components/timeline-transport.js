@@ -150,7 +150,9 @@ export function createTimelineTransport(deps) {
 		canvas.setPlayheadPosition(0)
 		buildTransport()
 		redrawTimelineView()
-		await api.post(`/api/timelines/${tl.id}/stop`).catch(() => {})
+		// WO-552: the server refuses to stop a timeline currently live on program unless asked to —
+		// this IS the operator's explicit Stop button, a deliberate action, so it opts in.
+		await api.post(`/api/timelines/${tl.id}/stop`, { force: true }).catch(() => {})
 	}
 
 	function projectFps() {

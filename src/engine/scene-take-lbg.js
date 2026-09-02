@@ -102,9 +102,8 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	let activeTimelineIdToFadeOut = null
 	if (self.timelineEngine) {
-		const pbNowForFadeOut = self.timelineEngine.getPlayback()
 		activeTimelineIdToFadeOut = resolveActiveTimelineIdToFadeOut(
-			pbNowForFadeOut,
+			self.timelineEngine.getPlayback(),
 			diff.exit,
 			incoming.layers,
 			channel,
@@ -113,12 +112,6 @@ async function runSceneTakeLbg(amcp, opts) {
 			layerHasContent,
 			!!opts.restrictTimelineToPreview,
 		)
-		// WO-551 diagnostic (temporary): pin the exact decision on the next PRV-recall reproduction.
-		if (pbNowForFadeOut?.timelineId && typeof self.log === 'function') {
-			self.log('debug', `[scene-take-lbg] tl-fade-out: tl=${pbNowForFadeOut.timelineId} ch=${channel} ` +
-				`restrict=${!!opts.restrictTimelineToPreview} protected=${opts.protectedTimelineId ?? 'null'} ` +
-				`sendTo=${JSON.stringify(pbNowForFadeOut.sendTo)} result=${activeTimelineIdToFadeOut ?? 'null'}`)
-		}
 	}
 
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration

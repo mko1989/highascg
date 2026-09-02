@@ -1,6 +1,12 @@
-# WO-551 — Sending a look to PRV still appears to affect PGM despite WO-550 — OPEN, diagnostic only
+# WO-551 — Sending a look to PRV still appears to affect PGM despite WO-550 — DEPRECATED
 
-**Status: OPEN. Diagnostic logging deployed 02.09.2026; root cause not yet found. No fix applied.**
+**Status: DEPRECATED — superseded by [WO-552](./552_WO_TIMELINE_STOP_ROUTE_NEVER_AFFECTS_PROGRAM.md).
+The stack-trace diagnostic this WO added named the real caller on the very next reproduction: not
+the take-orchestration guard this WO (and WO-546/548/549/550) had been chasing at all, but a
+client-side `stopActiveTimelineOnServer()` call that runs on every look preview/take by design. Both
+diagnostic additions (this WO's) were removed once WO-552's actual fix landed. Kept for the
+investigation trail — the "everywhere else was checked and came up empty" reasoning here is what
+justified adding the diagnostic that found it.**
 **Priority:** Critical (owner: "very very wrong")
 **Source:** owner 02.09, after WO-550: *"sending a look to prv when the timeline look is on pgm
 results in sending the look to pgm, which is very very wrong. the reltionship between prv pgm and

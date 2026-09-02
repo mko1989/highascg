@@ -153,6 +153,7 @@ const FILES = [
 	'tools/smoke/smoke-wo548-retake-same-timeline-look.test.js',
 	'tools/smoke/smoke-wo549-preview-only-timeline-routing.test.js',
 	'tools/smoke/smoke-wo550-preview-only-call-never-kills-program.test.js',
+	'tools/smoke/smoke-wo552-timeline-stop-never-affects-program.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

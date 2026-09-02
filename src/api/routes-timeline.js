@@ -98,9 +98,37 @@ async function handleTimelineRoutes(method, path, body, ctx) {
 			case 'pause':
 				eng.pause(id)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
-			case 'stop':
+			case 'stop': {
+				/* WO-552: this generic endpoint had two callers — the Timeline Editor's own explicit
+				 * Stop button (a deliberate operator action, always allowed) and
+				 * scenes-editor-preview-actions.js's incidental cleanup of "whatever timeline is
+				 * open in the editor" on every look preview/take, REGARDLESS of whether that
+				 * timeline happened to be the one actually live on program. The client has no way to
+				 * know the server's routing state at the moment it fires — the server does, so the
+				 * guarantee belongs here: stopping a timeline that is currently live on PROGRAM
+				 * requires the caller to say so explicitly (`force: true`). Every incidental/ambient
+				 * caller (previewing or taking an unrelated look) does not, and is now safely
+				 * refused instead of silently taking PGM off air — the owner's own words, "PRV can't
+				 * have an effect on PGM," is the acceptance test. */
+				/* getPlayback() with NO id reflects the engine's actual current air timeline (and its
+				 * live sendTo) — calling it WITH id would instead read that timeline's own stored
+				 * sendTo even if it is no longer air, which could be stale and wrongly refuse a stop
+				 * that is now perfectly safe. */
+				const pbNow = typeof eng.getPlayback === 'function' ? eng.getPlayback() : null
+				const isOnProgram = pbNow?.timelineId === id && !!pbNow?.sendTo?.program
+				if (isOnProgram && b?.force !== true) {
+					return {
+						status: 409,
+						headers: JSON_HEADERS,
+						body: jsonBody({
+							error: 'Timeline is live on program — refusing to stop without force:true',
+							onProgram: true,
+						}),
+					}
+				}
 				eng.stop(id)
 				return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true }) }
+			}
 			case 'seek': {
 				const ms = b.ms != null ? Number(b.ms) : NaN
 				if (Number.isNaN(ms) || ms < 0) {
