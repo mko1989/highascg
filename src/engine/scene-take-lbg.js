@@ -165,6 +165,10 @@ async function runSceneTakeLbg(amcp, opts) {
 		framerate,
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
 		restrictTimelineToPreview: !!opts.restrictTimelineToPreview,
+		/* WO-553: buildTakeJobs's `incomingIsAboveOutgoing` carve-out for this flag was dead — its
+		 * only caller (here) never passed it, so a bank-B incoming layer always fought the real
+		 * exiting timeline's own fade-out with its own simultaneous fade-in (double-ramp → cut). */
+		outgoingTopIsTimeline: !!activeTimelineIdToFadeOut,
 	})
 
 	if (extraExitCandidates && extraExitCandidates.length > 0) {

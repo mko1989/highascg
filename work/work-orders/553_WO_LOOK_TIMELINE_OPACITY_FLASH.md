@@ -1,26 +1,29 @@
-# WO-553 — A timeline layer inside a look flashed full opacity before disappearing then fading in
+# WO-553 — Timeline-in-a-look opacity flash, and the timeline↔look switch that cut instead of mixed
 
-**Status: FIXED in repo (02.09.2026). Root cause found by re-reading `setSendTo`'s own AMCP-apply
-side effect against the fresh wire-log symptom, then confirmed with a real-`TimelineEngine`
-reproduction. 2 smokes, both verified to fail without the fix (one reproduces the exact flashed
-value from production). Suite 2351/2349/0/2 → 2353/2351/0/2. Owner QA still owed.**
-**Priority:** Critical — live production visual defect on every look-with-timeline take.
+**Status: FIXED in repo (02.09.2026), both halves. Part A (flash) found by re-reading `setSendTo`'s
+own AMCP-apply side effect against a fresh wire-log symptom. Part B (cut) found by tracing a
+pre-existing, self-documenting dead parameter (`outgoingTopIsTimeline`) that was never wired to its
+only caller. 4 smokes across 2 files, all 4 verified to fail without their respective fix (one
+reproduces the exact flashed value from production). Suite 2351/2349/0/2 → 2357/2355/0/2. Owner QA
+still owed on both.**
+**Priority:** Critical — live production visual defect on every look-with-timeline take, both
+directions.
 **Source:** owner 02.09, after WO-546/548/549/550/552: *"now you need to look at opacity of layers
 between looks and timeline looks. when playing a timeline look some of its layers appear at full
 opacity for a split seccond, before disapearing and then fading in. switching between timeline look
-and normal look results in cut. this needs to follow the same principals as standard looks"* —
-this WO addresses the opacity-flash half. The cut-on-switch half is tracked separately (see
-`work/OPEN_ISSUES.md`; not yet root-caused as of this WO).
+and normal look results in cut. this needs to follow the same principals as standard looks"*
 **Related:** [WO-528](./528_WO_TIMELINE_TAKE_MIX_INSTEAD_OF_CUT.md) and
 [WO-544](./544_WO_TIMELINE_CLIP_KEYFRAME_VS_TAKE_FADE.md) (the two existing `takeFade` suppression
-paths this bug bypassed entirely — both were working correctly the whole time),
+paths Part A's bug bypassed entirely — both were working correctly the whole time),
 [WO-546](./546_WO_PREVIEW_EXCHANGE_KILLS_CONCURRENT_TIMELINE_TAKE.md) (the concurrent
-staging+PGM-take call pattern that creates the race window), [WO-549](./549_WO_PREVIEW_ONLY_TIMELINE_ROUTING.md)
-(`restrictToPreview`, the mechanism whose routing change is what triggers this)
+staging+PGM-take call pattern that creates Part A's race window), [WO-549](./549_WO_PREVIEW_ONLY_TIMELINE_ROUTING.md)
+(`restrictToPreview`, the mechanism whose routing change is what triggers Part A)
 
 ---
 
-## 1. Investigation
+## Part A — full-opacity flash on an incoming timeline layer
+
+### 1. Investigation
 
 Fresh wire log (`log/caspar_2026-09-02.log`, ~12:45:37-38) for a look-with-timeline take showed,
 for each timeline physical layer (210/211/212), a **full mixer-property reset block** — FILL,
@@ -65,15 +68,9 @@ real sequence for a look containing a timeline:
 
 `runTimelineDirectTake` (the Take-button path, `timeline-take.js` line ~158) had already hit this
 exact class of bug for its own `setSendTo` call and was fixed with `{ skipAmcpApply: true }` —
-`startSceneTimelineLayer`, the look-embedded-timeline path, never received the same guard. This is
-precisely the "does not follow the same principles as standard looks" gap the owner described:
-standard look layers build one synchronous, fully-composed set of mixer lines per take
-(`scene-take-lbg-jobs.js`) with no independent side-effecting engine call in between; the timeline
-path instead makes multiple independent, stateful engine calls (`setSendTo`, `play`) from two
-concurrent take invocations against one global `TimelineEngine` singleton, and only one of those
-calls (`play`) had ever been taught to respect `takeFade`.
+`startSceneTimelineLayer`, the look-embedded-timeline path, never received the same guard.
 
-## 2. What was done
+### 2. What was done
 
 `timeline-take.js`, `startSceneTimelineLayer`: pass `{ skipAmcpApply: true }` to its `setSendTo`
 call, mirroring `runTimelineDirectTake`'s existing fix. The STOP-old-channels + state-clear half of
@@ -82,19 +79,7 @@ the redundant, unprotected re-apply is skipped, because the very next lines in t
 (preset-to-0, then `takeFade`-protected `play()`) always immediately supersede it on every path
 (the CUT branch too — it unconditionally ends in its own `eng.play()`).
 
-## 3. What was NOT done
-
-- The second reported symptom — "switching between timeline look and normal look results in a
-  cut" — was not investigated in this WO; it needs its own root-cause pass.
-- `scene-transition.js`'s `runTimelineOnlyTake` (the ANIMATE-transition timeline path) has the same
-  unguarded `eng.setSendTo({...}, tlId)` shape and was not audited — it is a structurally different,
-  hard-cut-oriented path (`eng.play(tlId, 0)` with no `takeFade` at all, by design) and was left
-  alone rather than changed on suspicion without evidence it is actually reachable in the reported
-  symptom.
-- Owner QA on real PGM: take a look containing a timeline layer, confirm no flash — verified here
-  by a direct reproduction against the real `TimelineEngine` class, not the physical box.
-
-## 4. What was VERIFIED
+### 3. What was VERIFIED
 
 - `tools/smoke/smoke-wo553-look-timeline-setsendto-race.test.js` — two tests. The first drives the
   real `TimelineEngine` + real `startSceneTimelineLayer` through the exact staging-then-PGM-take
@@ -102,8 +87,86 @@ the redundant, unprotected re-apply is skipped, because the very next lines in t
   the `skipAmcpApply: true` argument at the source level.
 - Reverted `src/engine/timeline-take.js` via `git stash` and reran: both tests fail cleanly. The
   first failure reproduces the **exact** flashed value seen on the wire —
-  `{ ch: 1, layer: 210, val: 1, dur: 0 }` — confirming the smoke catches the real regression, not a
-  proxy for it.
-- Full offline suite: 2353/2351 pass, 0 fail, 2 pre-existing skips (real-clock-based, run outside
-  CI). Lint clean on both changed files (0 errors; repo-wide pre-existing warnings elsewhere
+  `{ ch: 1, layer: 210, val: 1, dur: 0 }`.
+
+---
+
+## Part B — timeline↔look switch cuts instead of mixing
+
+### 1. Investigation
+
+This is precisely the "does not follow the same principles as standard looks" gap the owner
+described. Looked for the mechanism that fades an EXITING timeline out during a bank crossfade (the
+standard look-to-look transition), expecting to find it missing entirely — instead found it fully
+built (`scene-take-lbg.js` lines ~280-305: `activeTimelineIdToFadeOut`'s physical layers get DEFER
+opacity-to-0 lines folded into `mergeMixerExtras`, which rides the same `MIXER <ch> COMMIT` as the
+incoming look's own crossfade — correctly frame-locked) and correctly gated by `waitForOpacitySettled`
+(WO-540§6, already timeline-aware) before the eventual `timelineEngine.stop()`. That whole path
+looked architecturally sound.
+
+The actual bug was one property away: `scene-take-lbg-jobs.js`'s `buildTakeJobs` has a real
+parameter, `outgoingTopIsTimeline`, with real logic depending on it and a comment explaining exactly
+why:
+
+```js
+// Bank B (+100) stacks above bank A — only pre-hide when incoming is the top layer.
+// An outgoing timeline (band 210+) sits above BOTH look banks, so the incoming bank-B look is
+// then genuinely BELOW the real top: stage it at full opacity (revealed as the timeline fades)
+// rather than fading it in, which would double-ramp with the timeline fade-out into a dip.
+const incomingIsAboveOutgoing =
+    shouldRunBankCrossfade && inactiveBank === 'b' && activeBank === 'a' && !outgoingTopIsTimeline
+```
+
+`buildTakeJobs` has exactly one caller — `scene-take-lbg.js` — and that caller never passed
+`outgoingTopIsTimeline`. It defaulted to `false` unconditionally, so the carve-out this comment
+describes could never fire. Whenever a timeline was exiting and the incoming look landed on bank B
+(the common case — the very next take after any take flips the bank pointer), the incoming layer
+was wrongly treated as the topmost layer: it got `incomingIsAboveOutgoing = true`, which fades it IN
+(0→1) via `prePlayOpacityZeroLine` + the crossfade ramp, at the same time the REAL top layer — the
+timeline band, via Part A's already-correct `mergeMixerExtras` mechanism — fades OUT (1→0). Two
+independent ramps stacked on top of each other, moving in opposite directions: exactly the
+"double-ramp ... into a dip ... not a smooth mix" the comment warns about, and what reads to an
+operator as a cut rather than a crossfade.
+
+### 2. What was done
+
+`scene-take-lbg.js`: pass `outgoingTopIsTimeline: !!activeTimelineIdToFadeOut` into the
+`buildTakeJobs` call (`activeTimelineIdToFadeOut` is already computed earlier in the same function,
+in scope at the call site). No change to `scene-take-lbg-jobs.js` itself — the logic it already had
+was correct; it was simply never told the truth.
+
+### 3. What was NOT done
+
+- Owner QA on real PGM: take a timeline-containing look, then take a normal look over it, confirm a
+  smooth mix — verified here by direct unit test of `buildTakeJobs`, not the physical box.
+- The narrower case where the incoming look reuses a DIFFERENT layer number than the outgoing
+  timeline occupied (`isEnterOnly`, no `hasOutgoingOnAir` overlap) was not touched — that case
+  already fades the new layer in independently, which is correct: it is a genuinely new layer
+  entering next to an unrelated timeline fading out on its own band, not the same-slot "reveal
+  through the fade" case this fix targets.
+
+### 4. What was VERIFIED
+
+- `tools/smoke/smoke-wo553b-timeline-exit-crossfade-no-doubleramp.test.js` — calls `buildTakeJobs`
+  directly with an outgoing timeline and an incoming media layer on the same logical slot, bank
+  A→B. With `outgoingTopIsTimeline: true`: `incomingIsAboveOutgoing` is `false`, no
+  `prePlayOpacityZeroLine` (no ramp), `prePlayOpacityFullLine` set (staged full, revealed by the
+  timeline's own fade). Without it (both explicit `false` and omitted, matching the pre-fix
+  default): the old double-ramp shape. A fourth test confirms the flag is irrelevant when the
+  incoming look isn't landing on bank B. A fifth (source-level) test pins the
+  `outgoingTopIsTimeline: !!activeTimelineIdToFadeOut` wiring in `scene-take-lbg.js`.
+- Reverted `src/engine/scene-take-lbg.js` via `git stash` and reran: the source-wiring test fails
+  cleanly (the direct `buildTakeJobs` behavior tests still pass on their own, since they exercise
+  the parameter explicitly — the wiring test is what catches this exact regression).
+- Trimmed the in-code comment once to keep `scene-take-lbg.js` under the 500-line CI limit
+  (`node tools/ci/check-max-file-lines.js` — confirmed 0 files over after).
+
+## Combined verification (both parts)
+
+- Full offline suite: 2357/2355 pass, 0 fail, 2 pre-existing skips (real-clock-based, run outside
+  CI; the one known pre-existing flaky real-clock test, `smoke-wo537-...`, was hit once mid-session
+  and confirmed unrelated on rerun — clean pass in isolation).
+- Lint clean on all four changed/added files (0 errors; repo-wide pre-existing warnings elsewhere
   untouched). 0 files over the 500-line limit.
+- Server restarted (`kill -TERM` — service runs as the `casparcg` user, no sudo needed) with Part A
+  live; Part B landed and verified before that restart, so both are live together.
