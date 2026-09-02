@@ -43,6 +43,7 @@ describe('WO-546: resolveActiveTimelineIdToFadeOut', () => {
 		const result = resolveActiveTimelineIdToFadeOut(
 			pbNow,
 			[], // nothing in diff.exit names it either — the "isPlayingOnThisChannel" path is what would trigger
+			[], // this call's own incoming scene doesn't mention it either (that's reason 2, WO-548, tested separately)
 			2, // the preview-exchange call's own channel (bus1)
 			'tl-1', // protected: this is the concurrent PGM take's own incoming timeline
 			() => [1, 2], // channelsFor: both channels, matching startSceneTimelineLayer's real behavior
@@ -53,25 +54,25 @@ describe('WO-546: resolveActiveTimelineIdToFadeOut', () => {
 
 	it('without protection, the identical inputs DO flag it (pins the pre-fix bug for real)', () => {
 		const pbNow = { timelineId: 'tl-1', sendTo: { preview: true, program: true, screenIdx: 0 } }
-		const result = resolveActiveTimelineIdToFadeOut(pbNow, [], 2, null, () => [1, 2], hasContent)
+		const result = resolveActiveTimelineIdToFadeOut(pbNow, [], [], 2, null, () => [1, 2], hasContent)
 		assert.equal(result, 'tl-1', 'without the guard, isPlayingOnThisChannel alone marks it exiting')
 	})
 
 	it('protection only shields the NAMED id — a genuinely different exiting timeline still fades', () => {
 		const pbNow = { timelineId: 'tl-OTHER', sendTo: { preview: true, program: true, screenIdx: 0 } }
-		const result = resolveActiveTimelineIdToFadeOut(pbNow, [], 2, 'tl-1', () => [1, 2], hasContent)
+		const result = resolveActiveTimelineIdToFadeOut(pbNow, [], [], 2, 'tl-1', () => [1, 2], hasContent)
 		assert.equal(result, 'tl-OTHER', 'protecting tl-1 does not shield an unrelated exiting timeline')
 	})
 
 	it('no timeline currently air: always null, protection or not', () => {
-		assert.equal(resolveActiveTimelineIdToFadeOut(null, [], 2, 'tl-1', () => [1, 2], hasContent), null)
-		assert.equal(resolveActiveTimelineIdToFadeOut({ timelineId: null }, [], 2, 'tl-1', () => [1, 2], hasContent), null)
+		assert.equal(resolveActiveTimelineIdToFadeOut(null, [], [], 2, 'tl-1', () => [1, 2], hasContent), null)
+		assert.equal(resolveActiveTimelineIdToFadeOut({ timelineId: null }, [], [], 2, 'tl-1', () => [1, 2], hasContent), null)
 	})
 
 	it('a timeline named in diff.exit but on a DIFFERENT channel still exits normally when unprotected', () => {
 		const pbNow = { timelineId: 'tl-2', sendTo: { preview: true, program: true, screenIdx: 5 } }
 		const diffExit = [{ source: { type: 'timeline', value: 'tl-2' } }]
-		const result = resolveActiveTimelineIdToFadeOut(pbNow, diffExit, 2, null, () => [9, 10], hasContent)
+		const result = resolveActiveTimelineIdToFadeOut(pbNow, diffExit, [], 2, null, () => [9, 10], hasContent)
 		assert.equal(result, 'tl-2', 'named in this channel’s own exit diff — exits regardless of isPlayingOnThisChannel')
 	})
 })

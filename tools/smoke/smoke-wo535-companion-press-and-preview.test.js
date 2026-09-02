@@ -48,16 +48,31 @@ describe('WO-535: pressButton reports whether the press left the box', () => {
 	})
 })
 
-describe('WO-535: the caller branches on it', () => {
+describe('WO-535/WO-547: the caller no longer touches Satellite at all', () => {
 	const src = read('src/engine/timeline-playback.js')
 
-	it('satelliteOk comes from the return value, never from "we called it"', () => {
-		assert.match(
-			src,
-			/satelliteOk = getSatellitePreviewClient\(\)\.pressButton\(page, row, col\) === true/,
-			'an unconditional true is what swallowed every playhead press',
-		)
-		assert.doesNotMatch(src, /pressButton\(page, row, col\)\s*\n\s*satelliteOk = true/)
+	/* WO-547 (same day, 02.09): trying Satellite before HTTP was itself the bug, not just the
+	 * unconditional-true reporting fixed here. Satellite's KEY-STATE is not a real Companion
+	 * trigger command — this project's own architecture reference
+	 * (docs/reference/companion-satellite-api.md) says pressing stays HTTP-only, and WO-75
+	 * explicitly rejected Satellite for triggering ("adds connection state; HTTP is the
+	 * established show trigger"). The write succeeded silently and nothing was ever pressed —
+	 * confirmed live via journalctl ("sent via Satellite", no error, no press). `_fireCompanionPress`
+	 * is HTTP-only again, matching WO-24's original design; `pressButton()` itself is untouched
+	 * and still correctly reports its own connection state (tests above), it's just never called
+	 * from the timeline press path any more. */
+	it('never references pressButton / satelliteOk / getSatellitePreviewClient', () => {
+		assert.doesNotMatch(src, /pressButton\(page, row, col\)/)
+		assert.doesNotMatch(src, /satelliteOk/)
+		assert.doesNotMatch(src, /getSatellitePreviewClient/)
+	})
+
+	it('_fireCompanionPress goes straight to fetch(...) with no Satellite branch first', () => {
+		const start = src.indexOf('_fireCompanionPress(flag)')
+		assert.ok(start > 0, 'found _fireCompanionPress')
+		const body = src.slice(start, src.indexOf('_processTimelineFlags', start))
+		assert.match(body, /fetch\(url, \{/)
+		assert.doesNotMatch(body, /require\('\.\.\/companion\/satellite-preview-client'\)/)
 	})
 
 	it('the HTTP fallback resolves its host/port the same way everything else does', () => {

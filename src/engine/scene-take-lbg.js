@@ -105,6 +105,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		activeTimelineIdToFadeOut = resolveActiveTimelineIdToFadeOut(
 			self.timelineEngine.getPlayback(),
 			diff.exit,
+			incoming.layers,
 			channel,
 			opts.protectedTimelineId,
 			(sendTo) => self.timelineEngine._channelsFor(sendTo),

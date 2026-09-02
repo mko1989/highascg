@@ -202,38 +202,30 @@ function applyPlaybackMixin(TimelineEngineClass) {
 				else console.log(msg)
 			}
 
-			/* Try Satellite first (primary). WO-535: `pressButton` RETURNS whether the line went out —
-			 * it exits silently when the socket is not connected, and the old code set `satelliteOk`
-			 * unconditionally because only a synchronous throw could reach the catch. The press was
-			 * then dropped with no fallback and no log, while the settings modal's Test press (pure
-			 * HTTP, routes-companion-preview.js:179) kept working. That asymmetry IS the owner's
-			 * report. The catch stays for a require/construct failure. */
-			let satelliteOk = false
-			try {
-				const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
-				satelliteOk = getSatellitePreviewClient().pressButton(page, row, col) === true
-			} catch (_err) {
-				/* require/construct failure only — `satelliteOk` is already false. */
-			}
-
-			if (satelliteOk) {
-				log('debug', `[Timeline] Companion press ${loc} sent via Satellite`)
-				return
-			}
-
-			// Fall back to HTTP API if satellite failed
-			// WO-535: one resolver, so the fallback cannot drift from the port the status probe
-			// and the Test press use.
+			/* WO-547: this is HTTP-only, deliberately — matching WO-24's original design AND the
+			 * project's own architecture reference (docs/reference/companion-satellite-api.md):
+			 * "Timeline press/trigger stays on the HTTP Remote Control API. Satellite is for button
+			 * preview bitmaps only." WO-75's own investigation went further: "Satellite SUB-PRESS
+			 * exists but adds connection state; HTTP is the established show trigger" — Satellite
+			 * pressing was considered and explicitly rejected, not merely unimplemented.
+			 *
+			 * WO-535 (08-14) added a Satellite-first attempt via `pressButton()` — sending a
+			 * `KEY-STATE` line, which is not a real trigger command in Companion's Satellite API
+			 * (the documented one is `SUB-PRESS`, and that was the one rejected above) and is not
+			 * part of this project's own documented Satellite feature set (`ADD-SUB`/`SUB-STATE`/
+			 * `REMOVE-SUB`, preview-only). It "works" in the sense that the TCP write succeeds and
+			 * Companion sends back nothing — no error, nothing pressed. Since Satellite is normally
+			 * connected (previews use it), `pressButton()` reports success and the HTTP fallback
+			 * below never ran: the playhead press silently no-opped while the settings modal's Test
+			 * press (always pure HTTP) kept working — exactly the owner's report, confirmed live
+			 * (`journalctl`: "sent via Satellite", no error, nothing pressed). Restored to WO-24's
+			 * original direct-HTTP design; `pressButton()` itself is left in place
+			 * (satellite-preview-client.js) since nothing about the preview/subscription path is
+			 * wrong, only this caller. */
 			const { resolveCompanionConfig } = require('../companion/companion-config')
 			const { host, port } = resolveCompanionConfig(this.self?.config)
 			const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
 
-			/* WO-543: the Test-press route (routes-companion-preview.js) checks `r.ok`/`r.status` and
-			 * reports it back to the operator; this fallback used to fire-and-forget with only a
-			 * `.catch` for network-level failures — `fetch` does NOT reject on a non-2xx response, so
-			 * an actual Companion-side error (wrong location, Companion busy, auth) landed here as a
-			 * silent success with zero log trace. Same URL construction as the working Test-press path
-			 * (confirmed identical), so this closes the one place they could still disagree. */
 			fetch(url, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -241,13 +233,13 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			})
 				.then((res) => {
 					if (res.ok) {
-						log('debug', `[Timeline] Companion press ${loc} sent via HTTP fallback (status ${res.status})`)
+						log('debug', `[Timeline] Companion press ${loc} sent via HTTP (status ${res.status})`)
 					} else {
-						log('warn', `[Timeline] Companion press ${loc} HTTP fallback got status ${res.status} — Companion did not confirm the press`)
+						log('warn', `[Timeline] Companion press ${loc} HTTP got status ${res.status} — Companion did not confirm the press`)
 					}
 				})
 				.catch((err) => {
-					log('warn', `[Timeline] Companion press ${loc} HTTP fallback failed: ${err.message}`)
+					log('warn', `[Timeline] Companion press ${loc} HTTP failed: ${err.message}`)
 				})
 		},
 

@@ -22,6 +22,12 @@
  * Both paths now log, so the NEXT time this is reproduced, `journalctl -u highascg` will show
  * exactly which stage failed instead of nothing at all. This file locks in the crossing-detection
  * behavior that was verified correct, and the new response-status / staleness logging.
+ *
+ * **Follow-up, same day (WO-547):** the logging this WO added is exactly what caught the real
+ * cause — `journalctl` showed "sent via Satellite" with no error, yet nothing pressed. Satellite's
+ * `KEY-STATE` was never a real Companion trigger command, and the project's own architecture
+ * reference explicitly says pressing stays HTTP-only. `_fireCompanionPress` is HTTP-only again
+ * now, matching WO-24's original design — see the "WO-547" describe block below.
  */
 
 const { describe, it, after } = require('node:test')
@@ -169,82 +175,73 @@ describe('WO-543: crossing detection dispatches to _fireCompanionPress', () => {
 	})
 })
 
-describe('WO-543: _fireCompanionPress response handling', () => {
-	function withMockedSatellite(pressReturn, fn) {
+describe('WO-547: _fireCompanionPress is HTTP-only (Satellite press attempt removed)', () => {
+	// WO-535 (08-14) added a Satellite-first attempt here, which this session's owner report and
+	// docs/reference/companion-satellite-api.md ("Timeline press/trigger stays on the HTTP Remote
+	// Control API") both say was wrong: Satellite's KEY-STATE is not a real Companion trigger
+	// command (the documented one, SUB-PRESS, was itself explicitly rejected for triggering back
+	// in WO-75 — "adds connection state; HTTP is the established show trigger"), so the write
+	// succeeded silently and nothing was ever pressed. Restored to WO-24's original direct-HTTP
+	// design; these tests pin that satellite-preview-client is never touched by this function.
+
+	it('never requires the satellite module — calling it does not even attempt to load satellite-preview-client', async () => {
 		const modPath = require.resolve('../../src/companion/satellite-preview-client')
-		const original = require.cache[modPath]
-		require.cache[modPath] = {
-			id: modPath,
-			filename: modPath,
-			loaded: true,
-			exports: { getSatellitePreviewClient: () => ({ pressButton: () => pressReturn }) },
-		}
-		try {
-			return fn()
-		} finally {
-			if (original) require.cache[modPath] = original
-			else delete require.cache[modPath]
-		}
-	}
+		const wasCached = !!require.cache[modPath]
+		if (wasCached) delete require.cache[modPath]
 
-	it('satellite success: no HTTP fallback, logs at debug', async () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng)
-		let fetchCalled = false
-		global.fetch = async () => {
-			fetchCalled = true
-			return { ok: true, status: 200 }
-		}
-		withMockedSatellite(true, () => {
-			eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
-		})
-		assert.equal(fetchCalled, false, 'HTTP fallback must not fire when satellite succeeded')
-		assert.ok(log.some((l) => /sent via Satellite/.test(l.msg)))
-	})
-
-	it('satellite unavailable, HTTP succeeds: logs the confirmed status', async () => {
-		const log = []
-		const eng = makeEngine(log)
-		makeFlagTimeline(eng)
-		let capturedUrl = null
-		global.fetch = async (url) => {
-			capturedUrl = url
-			return { ok: true, status: 200 }
-		}
-		withMockedSatellite(false, () => {
-			eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
-		})
+		global.fetch = async () => ({ ok: true, status: 200 })
+		eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
 		await new Promise((r) => setImmediate(r))
-		assert.equal(capturedUrl, 'http://127.0.0.1:8001/api/location/1/0/2/press')
-		assert.ok(log.some((l) => l.level === 'debug' && /HTTP fallback \(status 200\)/.test(l.msg)))
+
+		assert.equal(
+			!!require.cache[modPath],
+			wasCached,
+			'satellite-preview-client must not get pulled into the module cache by a press',
+		)
 	})
 
-	it('satellite unavailable, HTTP responds with an error status: WARNS instead of silently succeeding (the fixed gap)', async () => {
+	it('HTTP succeeds: logs the confirmed status, hits the documented URL/method/headers', async () => {
+		const log = []
+		const eng = makeEngine(log)
+		makeFlagTimeline(eng)
+		let captured = null
+		global.fetch = async (url, opts) => {
+			captured = { url, opts }
+			return { ok: true, status: 200 }
+		}
+		eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
+		await new Promise((r) => setImmediate(r))
+
+		assert.equal(captured.url, 'http://127.0.0.1:8001/api/location/1/0/2/press')
+		assert.equal(captured.opts.method, 'POST')
+		assert.equal(captured.opts.headers['Content-Type'], 'application/json')
+		assert.ok(log.some((l) => l.level === 'debug' && /HTTP \(status 200\)/.test(l.msg)))
+	})
+
+	it('HTTP responds with an error status: warns instead of silently succeeding (the WO-543 gap, still fixed)', async () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng)
 		global.fetch = async () => ({ ok: false, status: 404 })
-		withMockedSatellite(false, () => {
-			eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
-		})
+		eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
 		await new Promise((r) => setImmediate(r))
 		assert.ok(
 			log.some((l) => l.level === 'warn' && /status 404/.test(l.msg) && /did not confirm/.test(l.msg)),
-			`a non-ok response is now surfaced, not swallowed: ${JSON.stringify(log)}`,
+			`a non-ok response is surfaced, not swallowed: ${JSON.stringify(log)}`,
 		)
 	})
 
-	it('satellite unavailable, HTTP throws (network failure): still logs a warning', async () => {
+	it('HTTP throws (network failure): logs a warning', async () => {
 		const log = []
 		const eng = makeEngine(log)
 		makeFlagTimeline(eng)
 		global.fetch = async () => {
 			throw new Error('ECONNREFUSED')
 		}
-		withMockedSatellite(false, () => {
-			eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
-		})
+		eng._fireCompanionPress({ id: 'f1', companionPage: 1, companionRow: 0, companionColumn: 2 })
 		await new Promise((r) => setImmediate(r))
 		assert.ok(log.some((l) => l.level === 'warn' && /ECONNREFUSED/.test(l.msg)))
 	})
