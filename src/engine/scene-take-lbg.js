@@ -31,6 +31,7 @@ const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline'
 const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
 const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
+const { resolveActiveTimelineIdToFadeOut } = require('./scene-take-lbg-timeline-guard')
 
 /**
  * @param {object} amcp
@@ -101,16 +102,14 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	let activeTimelineIdToFadeOut = null
 	if (self.timelineEngine) {
-		const pbNow = self.timelineEngine.getPlayback()
-		if (pbNow?.timelineId) {
-			const isPlayingOnThisChannel = self.timelineEngine._channelsFor(pbNow.sendTo).includes(channel)
-			const exitingTimeline = diff.exit.find(
-				(l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId
-			)
-			if (exitingTimeline || isPlayingOnThisChannel) {
-				activeTimelineIdToFadeOut = pbNow.timelineId
-			}
-		}
+		activeTimelineIdToFadeOut = resolveActiveTimelineIdToFadeOut(
+			self.timelineEngine.getPlayback(),
+			diff.exit,
+			channel,
+			opts.protectedTimelineId,
+			(sendTo) => self.timelineEngine._channelsFor(sendTo),
+			layerHasContent,
+		)
 	}
 
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration
@@ -485,4 +484,4 @@ async function runSceneTakeLbg(amcp, opts) {
 	}
 }
 
-module.exports = { runSceneTakeLbg }
+module.exports = { runSceneTakeLbg, resolveActiveTimelineIdToFadeOut }

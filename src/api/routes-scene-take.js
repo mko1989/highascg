@@ -47,6 +47,19 @@ function liveEntryFromTake(inc, takeUpdatedAt) {
 }
 
 /**
+ * WO-546: id of the timeline this scene wants live, if any — used to shield it from the
+ * concurrent preview-exchange take below (see that call site for why).
+ * @param {object|null} scene
+ * @returns {string|null}
+ */
+function incomingTimelineId(scene) {
+	const layers = scene?.layers
+	if (!Array.isArray(layers)) return null
+	const tl = layers.find((l) => layerHasContent(l) && l.source?.type === 'timeline' && l.source.value)
+	return tl ? String(tl.source.value) : null
+}
+
+/**
  * @param {string} body
  * @param {object} ctx — app context (`self` in companion)
  */
@@ -286,6 +299,20 @@ async function handleSceneTake(body, ctx) {
 						/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
 						if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {}
 						ctx.programLayerBankByChannel[String(bus1)] = 'a'
+						/* WO-546: this call and `pgmTakePromise` above run CONCURRENTLY by design (the
+						 * comment at the pgmTakePromise call site explains why they can't be
+						 * serialized — that would reintroduce WO-150 B150.1). `startSceneTimelineLayer`
+						 * always claims BOTH the program AND preview channel of the screen it's given
+						 * (by design, for the normal case of a single PGM/PRV pair) — so the staging
+						 * call above and `pgmTakePromise` below both legitimately make `inc`'s timeline
+						 * the engine's one global `_airTimelineId`, routed to channel+bus1 together.
+						 * From THIS call's own point of view (channel=bus1, incomingScene=the OLD
+						 * look, which has no timeline), that same timeline looks like it is exiting —
+						 * so `activeTimelineIdToFadeOut` gets set and `timelineEngine.stop()` kills it,
+						 * even though it is simultaneously the legitimate incoming PGM content
+						 * `pgmTakePromise` just started. Measured on the wire: PLAY, then a duplicate
+						 * PLAY (the two concurrent callers each restarting it), then a bare STOP with
+						 * no replay — "goes up in opacity then down". Shield it explicitly. */
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,
@@ -295,6 +322,7 @@ async function handleSceneTake(body, ctx) {
 							self: ctx,
 							skipLayerVisualEquality: true,
 							banklessTake: true,
+							protectedTimelineId: incomingTimelineId(inc),
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						await liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })
