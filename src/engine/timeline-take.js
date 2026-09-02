@@ -264,7 +264,22 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * one." The real PGM take (a separate, concurrent call — see WO-546) is unaffected: it never
 	 * sets this flag, so a timeline that IS the real incoming content still gets the normal
 	 * preview+program routing every other caller relies on. */
-	eng.setSendTo({ preview: true, program: !opts.restrictToPreview, screenIdx: opts.screenIdx }, tlId)
+	/* WO-553: if this timeline is already `_airTimelineId` (the concurrent staging call, WO-546,
+	 * just made it air with a different `sendTo` — e.g. preview-only), `setSendTo` itself detects
+	 * `routingChanged` and fires its own full `_applyAt(force:true)` — with NO `takeFade`, because
+	 * `setSendTo` has no idea a preset+fade sequence is about to run. That unprotected apply writes
+	 * the clip's raw instant OPACITY (and FILL/VOLUME/effects-neutral lines) straight to the program
+	 * channel, BEFORE the preset-to-0 below and the real `takeFade`-protected `play()` — the exact
+	 * "full opacity for a split second, then disappears, then fades in" flash. `skipAmcpApply` is
+	 * the same fix `runTimelineDirectTake` already uses for its own `setSendTo` call above (line
+	 * 158) — this function's preset + `play({takeFade:true})` below make that extra apply redundant
+	 * on every path (CUT included: it always ends in its own unconditional `eng.play()`), so
+	 * skipping it costs nothing and closes the race. */
+	eng.setSendTo(
+		{ preview: true, program: !opts.restrictToPreview, screenIdx: opts.screenIdx },
+		tlId,
+		{ skipAmcpApply: true },
+	)
 	eng.setLoop(tlId, !!layer.loop)
 	const pb = opts.startAtCurrentPosition ? eng.getPlayback?.(tlId) : null
 	const startPos = pb?.position ?? 0
