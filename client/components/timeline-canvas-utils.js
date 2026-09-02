@@ -26,6 +26,51 @@ export function fmtSmpte(ms, fps) {
 	return `${p(h)}:${p(m)}:${p(s)}:${p(fr)}`
 }
 
+/** Timecode for display where a frame count is meaningless (flag jump targets, WO-542): HH:MM:SS:mmm. */
+export function fmtHms(ms) {
+	const total = Math.max(0, Math.round(Number(ms) || 0))
+	const h = Math.floor(total / 3600000)
+	const m = Math.floor((total % 3600000) / 60000)
+	const s = Math.floor((total % 60000) / 1000)
+	const msec = total % 1000
+	return `${p(h)}:${p(m)}:${p(s)}:${String(msec).padStart(3, '0')}`
+}
+
+/**
+ * Parse HH:MM:SS:mmm (or shorter M:SS:mmm / SS:mmm), ++500/--500 offsets, or plain ms — the
+ * millisecond counterpart to {@link parseTcInput} for contexts with no frame rate of their own
+ * (a flag's jump target isn't "at" a clip's fps).
+ * @returns {number|null} ms or null if invalid
+ */
+export function parseHmsInput(str, currentMs, totalMs) {
+	if (typeof str !== 'string') return null
+	const s = str.trim()
+	if (!s) return null
+	const offsetMatch = s.match(/^([+-]{2})\s*(\d+)(?:ms)?$/)
+	if (offsetMatch) {
+		const sign = offsetMatch[1] === '++' ? 1 : -1
+		const ms = parseInt(offsetMatch[2], 10) || 0
+		return Math.max(0, Math.min(totalMs ?? 999999999, (currentMs ?? 0) + sign * ms))
+	}
+	const parts = s.split(':').map((x) => parseInt(x, 10))
+	if (!parts.every((n) => !isNaN(n))) return null
+	let ms = null
+	if (parts.length === 4) {
+		const [h, m, sec, msec] = parts
+		ms = (h * 3600 + m * 60 + sec) * 1000 + msec
+	} else if (parts.length === 3) {
+		const [m, sec, msec] = parts
+		ms = (m * 60 + sec) * 1000 + msec
+	} else if (parts.length === 2) {
+		const [sec, msec] = parts
+		ms = sec * 1000 + msec
+	} else if (parts.length === 1 && parts[0] >= 0) {
+		ms = parts[0]
+	}
+	if (ms == null) return null
+	return Math.max(0, Math.min(totalMs ?? 999999999, ms))
+}
+
 /**
  * Parse timecode input: SMPTE (HH:MM:SS:FF), ++500/--500 offsets, or plain ms.
  * @returns {number|null} ms or null if invalid

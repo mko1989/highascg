@@ -1,6 +1,6 @@
 import { timelineState } from '../lib/timeline-state.js'
 import { api } from '../lib/api-client.js'
-import { parseNumberInput } from '../lib/math-input.js'
+import { fmtHms, parseHmsInput } from './timeline-canvas.js'
 import {
 	parseCompanionLocationInput,
 	formatCompanionLocation,
@@ -111,16 +111,29 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	if (!showJump) jumpWrap.style.display = 'none'
 	const jumpLab = document.createElement('label')
 	jumpLab.className = 'inspector-field__label'
-	jumpLab.textContent = 'Jump to time (ms)'
+	jumpLab.textContent = 'Jump to time (hh:mm:ss:ms)'
 	const jumpInp = document.createElement('input')
 	jumpInp.type = 'text'
 	jumpInp.className = 'inspector-field__input inspector-math-input'
-	jumpInp.value = flag.jumpTimeMs != null && Number.isFinite(flag.jumpTimeMs) ? String(flag.jumpTimeMs) : ''
+	jumpInp.spellcheck = false
+	jumpInp.title = 'HH:MM:SS:mmm, ++500 / --500 offset, or plain ms'
+	jumpInp.value = flag.jumpTimeMs != null && Number.isFinite(flag.jumpTimeMs) ? fmtHms(flag.jumpTimeMs) : ''
 	jumpInp.placeholder = 'optional'
 	jumpInp.addEventListener('change', () => {
 		const raw = jumpInp.value.trim()
-		const v = raw === '' ? undefined : parseNumberInput(raw, 0)
-		timelineState.updateFlag(timelineId, flagId, { jumpTimeMs: v })
+		if (raw === '') {
+			timelineState.updateFlag(timelineId, flagId, { jumpTimeMs: undefined })
+			syncTimelineToServer()
+			return
+		}
+		const dur = tl?.duration ?? 999999999
+		const parsed = parseHmsInput(raw, flag.jumpTimeMs ?? 0, dur)
+		if (parsed == null) {
+			jumpInp.value = flag.jumpTimeMs != null ? fmtHms(flag.jumpTimeMs) : ''
+			return
+		}
+		jumpInp.value = fmtHms(parsed)
+		timelineState.updateFlag(timelineId, flagId, { jumpTimeMs: parsed })
 		syncTimelineToServer()
 	})
 	jumpLab.appendChild(jumpInp)
@@ -138,7 +151,7 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 	const other = (tl.flags || []).filter((f) => f.id !== flagId)
 	refSel.innerHTML =
 		'<option value="">—</option>' +
-		other.map((f) => `<option value="${f.id}">${(f.label || f.type || 'flag') + ' @ ' + Math.round(f.timeMs) + 'ms'}</option>`).join('')
+		other.map((f) => `<option value="${f.id}">${(f.label || f.type || 'flag') + ' - ' + fmtHms(f.timeMs)}</option>`).join('')
 	refSel.value = flag.jumpFlagId || ''
 	refSel.addEventListener('change', () => {
 		timelineState.updateFlag(timelineId, flagId, { jumpFlagId: refSel.value || undefined })
@@ -150,7 +163,7 @@ export function renderTimelineFlagInspector(deps, timelineId, flagId) {
 
 	const hint = document.createElement('p')
 	hint.className = 'inspector-field inspector-field--hint'
-	hint.textContent = 'For “Jump to”, set a time (ms) or pick another flag; time wins if both are set.'
+	hint.textContent = 'For “Jump to”, set a time (hh:mm:ss:ms) or pick another flag; time wins if both are set.'
 	if (!showJump) hint.style.display = 'none'
 	grp.appendChild(hint)
 

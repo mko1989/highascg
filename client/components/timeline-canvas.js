@@ -27,7 +27,7 @@ import {
 	attachTimelineWheelAndDrop,
 } from './timeline-canvas-wheel.js'
 
-export { fmtSmpte, parseTcInput } from './timeline-canvas-utils.js'
+export { fmtSmpte, parseTcInput, fmtHms, parseHmsInput } from './timeline-canvas-utils.js'
 
 export function initTimelineCanvas(container, opts) {
 	const {
