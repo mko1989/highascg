@@ -171,6 +171,14 @@ module.exports = {
 
 	stop(id, opts) {
 		if (!id) return
+		// WO-551 diagnostic (temporary): the take-level guard (WO-546/548/549/550) never sees this
+		// call reach it (its own decision consistently logs result=null), so the timeline is being
+		// stopped some other way. Log every real stop (skipAmcp:true stops, e.g. FTB pre-clearing,
+		// are a different intentional path) with a stack trace to find the actual caller.
+		if (this._airTimelineId === id && !opts?.skipAmcp && typeof this.self?.log === 'function') {
+			const stack = new Error().stack?.split('\n').slice(1, 6).join(' | ') ?? 'no stack'
+			this.self.log('debug', `[Timeline] stop(${id}) called — was air, will clear. via: ${stack}`)
+		}
 		const cell = this._pbFor(id)
 		if (this._opacityExitHoldId === id) this._opacityExitHoldId = null
 		if (this._airTimelineId === id) {
