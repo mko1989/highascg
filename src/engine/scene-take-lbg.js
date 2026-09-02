@@ -163,6 +163,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		globalT,
 		framerate,
 		skipLayerVisualEquality: !!opts.skipLayerVisualEquality,
+		restrictTimelineToPreview: !!opts.restrictTimelineToPreview,
 	})
 
 	if (extraExitCandidates && extraExitCandidates.length > 0) {

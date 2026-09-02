@@ -255,7 +255,16 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	const eng = self?.timelineEngine
 	const tlId = layer?.source?.value
 	if (!eng || !tlId) return []
-	eng.setSendTo({ preview: true, program: true, screenIdx: opts.screenIdx }, tlId)
+	/* WO-549: `restrictToPreview` exists for routes-scene-take.js's pgm/prv preview-exchange call —
+	 * its whole job is putting the PREVIOUS look on the preview bus for operator reference, and it
+	 * must never touch program. Without this, a timeline in that previous look claimed BOTH the
+	 * program and preview channel of its screen (the normal, correct behavior for an actual take),
+	 * so re-displaying the OLD look's timeline on preview also silently re-took it onto program —
+	 * "going back to another look results in retaking the timeline look instead of playing the new
+	 * one." The real PGM take (a separate, concurrent call — see WO-546) is unaffected: it never
+	 * sets this flag, so a timeline that IS the real incoming content still gets the normal
+	 * preview+program routing every other caller relies on. */
+	eng.setSendTo({ preview: true, program: !opts.restrictToPreview, screenIdx: opts.screenIdx }, tlId)
 	eng.setLoop(tlId, !!layer.loop)
 	const pb = opts.startAtCurrentPosition ? eng.getPlayback?.(tlId) : null
 	const startPos = pb?.position ?? 0

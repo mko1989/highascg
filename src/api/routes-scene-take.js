@@ -195,6 +195,7 @@ async function handleSceneTake(body, ctx) {
 				self: ctx,
 				skipLayerVisualEquality: true,
 				banklessTake: true,
+				restrictTimelineToPreview: true, // WO-549: a preview-only take must never claim program
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
 				/* WO-341: MUST be awaited — setChannel serializes its write into a later microtask;
@@ -246,6 +247,12 @@ async function handleSceneTake(body, ctx) {
 				/* WO-199: PRV is bank-less — force bank 'a' so preview uses logical layer targets */
 				if (!ctx.programLayerBankByChannel) ctx.programLayerBankByChannel = {}
 				ctx.programLayerBankByChannel[String(bus1)] = 'a'
+				/* WO-549: this call only ever wants the preview bus (`pgmTakePromise` below is the
+				 * one actually claiming program, moments later) — without restricting it, a timeline
+				 * in `inc` got routed to program early by THIS call and then re-routed again by
+				 * `pgmTakePromise`, the redundant restart measured on the wire in WO-546 §1b as a
+				 * "duplicate PLAY". Restricting here does not change what ends up live: the real take
+				 * still runs unrestricted and its own routing is what the engine keeps. */
 				await runSceneTakeLbg(ctx.amcp, {
 					...takeOpts,
 					channel: bus1,
@@ -255,6 +262,7 @@ async function handleSceneTake(body, ctx) {
 					self: ctx,
 					skipLayerVisualEquality: true,
 					banklessTake: true,
+					restrictTimelineToPreview: true,
 				})
 				if (inc && typeof inc === 'object' && inc.id) {
 					await liveSceneState.setChannel(bus1, {
@@ -313,6 +321,13 @@ async function handleSceneTake(body, ctx) {
 						 * `pgmTakePromise` just started. Measured on the wire: PLAY, then a duplicate
 						 * PLAY (the two concurrent callers each restarting it), then a bare STOP with
 						 * no replay — "goes up in opacity then down". Shield it explicitly. */
+						/* WO-549: the OTHER direction of the same claiming-both-channels behavior —
+						 * when `previousPgmScene` (what this call is putting on the PREVIEW bus)
+						 * itself contains a DIFFERENT timeline than `inc`, `startSceneTimelineLayer`
+						 * would route it to program too, silently overriding the real PGM take
+						 * `pgmTakePromise` is concurrently trying to put there: "going back to another
+						 * look results in retaking the timeline look instead of playing the new one."
+						 * This call only ever wants the preview bus. */
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,
@@ -323,6 +338,7 @@ async function handleSceneTake(body, ctx) {
 							skipLayerVisualEquality: true,
 							banklessTake: true,
 							protectedTimelineId: incomingTimelineId(inc),
+							restrictTimelineToPreview: true,
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						await liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })

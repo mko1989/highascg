@@ -42,6 +42,7 @@ async function buildTakeJobs(opts) {
 		framerate,
 		skipLayerVisualEquality = false,
 		outgoingTopIsTimeline = false,
+		restrictTimelineToPreview = false,
 	} = opts
 
 	const takeJobs = []
@@ -64,6 +65,7 @@ async function buildTakeJobs(opts) {
 					fadeDur,
 					screenIdx,
 					startAtCurrentPosition: false,
+					restrictToPreview: restrictTimelineToPreview,
 				})
 				timelineFadeInPhys.push(...fadeIn)
 			}

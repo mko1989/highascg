@@ -151,6 +151,7 @@ const FILES = [
 	'tools/smoke/smoke-wo545-opacity-exit-hold.test.js',
 	'tools/smoke/smoke-wo546-preview-exchange-timeline-guard.test.js',
 	'tools/smoke/smoke-wo548-retake-same-timeline-look.test.js',
+	'tools/smoke/smoke-wo549-preview-only-timeline-routing.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
