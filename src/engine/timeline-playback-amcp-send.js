@@ -114,7 +114,12 @@ module.exports = {
 		if (!tl || !self?.amcp) return
 		const force = !!opts.force
 		const take = !!opts.take
-		const takeFade = !!opts.takeFade
+		/* WO-545: a take orchestrator's exit fade owns this timeline's opacity for the whole
+		 * teardown wait, not just the entry apply that already passed `takeFade` — fold the hold
+		 * in for every regular tick too (`_syncAmcpOnTimelineTick` never passes takeFade itself).
+		 * `_applyKeyedMixerProp` (WO-528/WO-544) already suppresses both write paths under
+		 * `takeFade`; this just widens WHEN that suppression applies for this one timeline. */
+		const takeFade = !!opts.takeFade || this._opacityExitHoldId === id
 		const channels = this._channels()
 		const playing = this._airTimelineId === id && (this._pbFor(id).playing ?? false)
 		const mixerDirty = new Set()

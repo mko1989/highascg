@@ -136,6 +136,19 @@ module.exports = {
 		this._emitPb(id)
 	},
 
+	/**
+	 * WO-545: mark `id` as having its opacity externally owned by a take orchestrator's own exit
+	 * fade — `_syncAmcpLayers` folds this into `takeFade` for every regular tick while it's set, so
+	 * the timeline's own per-tick opacity writes (steady-state or keyframe-segment) stop fighting
+	 * the take's DEFERred fade-out for the whole teardown wait window instead of just its first
+	 * apply. Pass `null` to release. `stop()` also clears it automatically so a hold can never
+	 * outlive the timeline it was set for.
+	 * @param {string|null} id
+	 */
+	setOpacityExitHold(id) {
+		this._opacityExitHoldId = id || null
+	},
+
 	pause(id) {
 		const cell = this._pbFor(id)
 		if (!cell.playing && this._airTimelineId !== id) return
@@ -159,6 +172,7 @@ module.exports = {
 	stop(id, opts) {
 		if (!id) return
 		const cell = this._pbFor(id)
+		if (this._opacityExitHoldId === id) this._opacityExitHoldId = null
 		if (this._airTimelineId === id) {
 			if (this._ticker) {
 				clearInterval(this._ticker)

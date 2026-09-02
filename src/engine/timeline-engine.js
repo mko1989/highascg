@@ -27,6 +27,13 @@ class TimelineEngine extends EventEmitter {
 		this._lastKfValues = new Map()
 		/** @type {Map<string, number>} Active keyframe segment index per ch-layer-prop (playback tween scheduling). */
 		this._lastKfSegment = new Map()
+		/* WO-545: id of a timeline whose opacity a take orchestrator is actively fading OUT (the
+		 * DEFER-committed exit ramp built in scene-take-lbg.js / scene-take-pgm-only.js) — the
+		 * timeline itself is still "air" and still ticking until `stop()` runs after the wait, so
+		 * without this its own per-tick opacity writes (steady-state OR keyframe-segment, for a
+		 * clip with its own opacity animation) would keep firing every ~40ms and fight the take's
+		 * fade the whole window. See `setOpacityExitHold` / `_syncAmcpLayers`. */
+		this._opacityExitHoldId = null
 	}
 
 	create(opts) {

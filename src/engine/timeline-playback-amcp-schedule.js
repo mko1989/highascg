@@ -252,6 +252,30 @@ module.exports = {
 		const segChanged = inSpan && prevSeg !== segIdx
 
 		if (segChanged) {
+			/* WO-544: `takeFade` means an external orchestrator (a MIX take's own crossfade batch,
+			 * or `startSceneTimelineLayer`'s look-path caller) owns this layer's opacity for THIS
+			 * call only — it is passed on the initial play() apply and never again on later ticks
+			 * (`_syncAmcpOnTimelineTick` never sets it). Writing here races the orchestrator's own
+			 * fade against an unrelated, uncoordinated ramp driven by the clip's OWN keyframe curve —
+			 * same class of bug the steady-state branch below was already guarded against (WO-528),
+			 * just reached via the segment-tween path instead, because `scheduleLeadTween` (the
+			 * mechanism that WOULD fold this into the orchestrator's own batch) requires `take:
+			 * true`, which the look path deliberately never sets (WO-537: its CUT branch has no
+			 * commit to receive an uncommitted DEFER lead tween). Symptom before this fix: the
+			 * layer's opacity visibly ramped through the clip's own keyframe curve independently of
+			 * — and immediately fighting — the take's crossfade ("goes up then down"), then stuck at
+			 * whatever value that curve last wrote until an unrelated MIXER CLEAR (e.g. from a later
+			 * take) reset it to 1 and made the still-playing content suddenly visible.
+			 *
+			 * Deliberately does NOT record `_lastKfSegment`/`_lastKfValues` here: leaving `prevSeg`
+			 * unset means the very next tick (~40ms later, `takeFade` no longer set) re-evaluates
+			 * fresh and issues this exact tween properly, a beat after the take's own fade has
+			 * started — instead of never issuing it at all (which was the fail-dark alternative;
+			 * see the collectClipOpacityFadeLayers comment in timeline-take.js — its exclusion of
+			 * these layers from the caller's OWN fade-in assumes this tween runs, just not on the
+			 * very first tick). */
+			if (extra.takeFade && !extra.isVolume) return false
+
 			const t0 = times[segIdx]
 			const t1 = times[segIdx + 1]
 			const startVal = this._interpProp(clip, prop, localMs > t0 + 2 ? localMs : t0, holdValue)

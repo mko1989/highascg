@@ -147,6 +147,8 @@ const FILES = [
 	'tools/smoke/smoke-wo541-timeline-only-look-crossfade.test.js',
 	'tools/smoke/smoke-wo542-flag-timecode-and-jump-label.test.js',
 	'tools/smoke/smoke-wo543-companion-flag-fire-and-log.test.js',
+	'tools/smoke/smoke-wo544-timeline-clip-keyframe-vs-take-fade.test.js',
+	'tools/smoke/smoke-wo545-opacity-exit-hold.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

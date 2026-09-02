@@ -176,6 +176,11 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			}
 		}
 	}
+	// WO-545: same reasoning as scene-take-lbg.js — the exiting timeline keeps ticking through the
+	// teardown wait below, so its own per-tick opacity writes must not fight this fade-out DEFER.
+	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut) {
+		self.timelineEngine.setOpacityExitHold(activeTimelineIdToFadeOut)
+	}
 
 	const takeJobs = []
 	/** Timeline physical layers preset to 0 by startSceneTimelineLayer — faded in via flatMixer (WO-152 B152.1). */

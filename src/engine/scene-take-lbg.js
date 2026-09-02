@@ -117,6 +117,14 @@ async function runSceneTakeLbg(amcp, opts) {
 	const fadeTw = globalT.tween
 	const fadeMs = fadeDur > 0 ? (fadeDur / framerate) * 1000 : 0
 	const isMergeTransition = isLayerAnimateTakeTransition(globalT.type)
+	/* WO-545: the exiting timeline keeps ticking (still "air") for the whole teardown wait below,
+	 * right up until `timelineEngine.stop()` finally runs — without this, its own per-tick opacity
+	 * writes would fight the fade-out DEFER this same condition gates (§ "activeTimelineIdToFadeOut
+	 * && fadeDur > 0 && !forceCut" below and in sendExitAndTimelineFadeLines). `stop()` clears the
+	 * hold automatically, so there is no cleanup to forget. */
+	if (activeTimelineIdToFadeOut && fadeDur > 0 && !forceCut && self.timelineEngine) {
+		self.timelineEngine.setOpacityExitHold(activeTimelineIdToFadeOut)
+	}
 	const shouldRunBankCrossfade = fadeDur > 0 && (currentMap.size > 0 || activeTimelineIdToFadeOut) && !isMergeTransition
 	let fadeClockStart = null
 	let transitionStartedNotified = false
