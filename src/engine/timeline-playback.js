@@ -195,6 +195,12 @@ function applyPlaybackMixin(TimelineEngineClass) {
 			const page = flag.companionPage ?? 1
 			const row = flag.companionRow ?? 0
 			const col = flag.companionColumn ?? 0
+			const loc = `${page}/${row}/${col}`
+			const log = (level, msg) => {
+				if (typeof this.self?.log === 'function') this.self.log(level, msg)
+				else if (level === 'warn') console.warn(msg)
+				else console.log(msg)
+			}
 
 			/* Try Satellite first (primary). WO-535: `pressButton` RETURNS whether the line went out —
 			 * it exits silently when the socket is not connected, and the old code set `satelliteOk`
@@ -210,26 +216,39 @@ function applyPlaybackMixin(TimelineEngineClass) {
 				/* require/construct failure only — `satelliteOk` is already false. */
 			}
 
-			// Fall back to HTTP API if satellite failed
-			if (!satelliteOk) {
-				// WO-535: one resolver, so the fallback cannot drift from the port the status probe
-				// and the Test press use.
-				const { resolveCompanionConfig } = require('../companion/companion-config')
-				const { host, port } = resolveCompanionConfig(this.self?.config)
-				const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
+			if (satelliteOk) {
+				log('debug', `[Timeline] Companion press ${loc} sent via Satellite`)
+				return
+			}
 
-				fetch(url, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: '{}',
-				}).catch((err) => {
-					if (typeof this.self?.log === 'function') {
-						this.self.log('warn', `[Timeline] Companion press HTTP fallback failed: ${err.message}`)
+			// Fall back to HTTP API if satellite failed
+			// WO-535: one resolver, so the fallback cannot drift from the port the status probe
+			// and the Test press use.
+			const { resolveCompanionConfig } = require('../companion/companion-config')
+			const { host, port } = resolveCompanionConfig(this.self?.config)
+			const url = `http://${host}:${port}/api/location/${page}/${row}/${col}/press`
+
+			/* WO-543: the Test-press route (routes-companion-preview.js) checks `r.ok`/`r.status` and
+			 * reports it back to the operator; this fallback used to fire-and-forget with only a
+			 * `.catch` for network-level failures — `fetch` does NOT reject on a non-2xx response, so
+			 * an actual Companion-side error (wrong location, Companion busy, auth) landed here as a
+			 * silent success with zero log trace. Same URL construction as the working Test-press path
+			 * (confirmed identical), so this closes the one place they could still disagree. */
+			fetch(url, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: '{}',
+			})
+				.then((res) => {
+					if (res.ok) {
+						log('debug', `[Timeline] Companion press ${loc} sent via HTTP fallback (status ${res.status})`)
 					} else {
-						console.warn('[Timeline] Companion press HTTP fallback failed:', err.message)
+						log('warn', `[Timeline] Companion press ${loc} HTTP fallback got status ${res.status} — Companion did not confirm the press`)
 					}
 				})
-			}
+				.catch((err) => {
+					log('warn', `[Timeline] Companion press ${loc} HTTP fallback failed: ${err.message}`)
+				})
 		},
 
 		/**
@@ -260,8 +279,18 @@ function applyPlaybackMixin(TimelineEngineClass) {
 					if (t === 'companion_press') {
 						// Dispatch off-tick to prevent blocking playback sync; guard against stale execution
 						const capturedId = tlId
+						if (typeof this.self?.log === 'function') {
+							this.self.log('debug', `[Timeline] playhead crossed companion_press flag "${f.label || f.id}" at ${f.timeMs}ms (tl=${tlId})`)
+						}
 						setImmediate(() => {
-							if (this._airTimelineId === capturedId) this._fireCompanionPress(f)
+							if (this._airTimelineId === capturedId) {
+								this._fireCompanionPress(f)
+							} else if (typeof this.self?.log === 'function') {
+								this.self.log(
+									'warn',
+									`[Timeline] companion_press flag "${f.label || f.id}" crossed but a different timeline (${this._airTimelineId}) took over before it fired — press dropped`,
+								)
+							}
 						})
 					}
 					return false
