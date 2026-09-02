@@ -110,6 +110,7 @@ async function runSceneTakeLbg(amcp, opts) {
 			opts.protectedTimelineId,
 			(sendTo) => self.timelineEngine._channelsFor(sendTo),
 			layerHasContent,
+			!!opts.restrictTimelineToPreview,
 		)
 	}
 

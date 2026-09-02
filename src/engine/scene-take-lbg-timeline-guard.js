@@ -1,5 +1,5 @@
 /**
- * WO-546/WO-548: which timeline (if any) counts as exiting a take, given the engine's global
+ * WO-546/548/550: which timeline (if any) counts as exiting a take, given the engine's global
  * playback state and this channel's own scene diff — split out of scene-take-lbg.js to stay under
  * the 500-line CI limit and so this guard can be tested directly, without standing up the rest of
  * `runSceneTakeLbg`.
@@ -8,7 +8,7 @@
 'use strict'
 
 /**
- * Two independent reasons a timeline that LOOKS like it is exiting actually is not:
+ * Three independent reasons a timeline that LOOKS like it is exiting actually is not:
  *
  * 1. **It is still wanted** (WO-548): if THIS call's own incoming scene still contains the exact
  *    same timeline, it is continuing, not exiting — regardless of `isPlayingOnThisChannel`, which
@@ -29,6 +29,19 @@
  *    incoming layers. `protectedTimelineId` is how a caller with outside knowledge (the orchestrator
  *    in routes-scene-take.js, which knows about the sibling concurrent call) shields it.
  *
+ * 3. **This call has no business touching program at all** (WO-550): every PRV-only call site in
+ *    routes-scene-take.js (staging, preview-exchange, and the standalone "preview-only path" used
+ *    when an operator previews a DIFFERENT look on PRV while a timeline is live on PGM) now passes
+ *    `restrictTimelineToPreview` (WO-549, originally added only to stop those calls from ROUTING a
+ *    timeline onto program). The same flag closes a second, independent hole: if the currently-air
+ *    timeline is ALSO currently routed to program, a preview-scoped call must never be the one that
+ *    tears it down — `timelineEngine.stop()` kills a timeline everywhere at once (there is no
+ *    "remove from preview only" primitive), so a PRV-only call correctly concluding "not part of my
+ *    own incoming content" and calling stop() anyway would take PROGRAM off the air over an action
+ *    that was only ever supposed to affect preview. Measured on the wire (WO-550): previewing an
+ *    unrelated look on PRV while a timeline was live on PGM produced `STOP 1-210/211/212` AND
+ *    `STOP 2-210/211/212` together, with no replay on either channel.
+ *
  * @param {{ timelineId?: string, sendTo?: object } | null | undefined} pbNow
  * @param {object[] | undefined} diffExit
  * @param {object[] | undefined} incomingLayers — the layers of THIS call's own incoming scene
@@ -36,6 +49,8 @@
  * @param {string | null | undefined} protectedTimelineId
  * @param {(sendTo: object) => number[]} channelsFor
  * @param {(layer: object) => boolean} hasContent
+ * @param {boolean} [previewOnlyCall] — WO-550: this call is restricted to the preview bus
+ *   (routes-scene-take.js's `restrictTimelineToPreview`) and must never tear down program
  * @returns {string | null}
  */
 function resolveActiveTimelineIdToFadeOut(
@@ -46,6 +61,7 @@ function resolveActiveTimelineIdToFadeOut(
 	protectedTimelineId,
 	channelsFor,
 	hasContent,
+	previewOnlyCall,
 ) {
 	if (!pbNow?.timelineId) return null
 	if (protectedTimelineId && pbNow.timelineId === protectedTimelineId) return null
@@ -53,6 +69,7 @@ function resolveActiveTimelineIdToFadeOut(
 		(l) => hasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId,
 	)
 	if (stillWantedByThisIncomingScene) return null
+	if (previewOnlyCall && pbNow.sendTo?.program) return null
 	const isPlayingOnThisChannel = channelsFor(pbNow.sendTo).includes(channel)
 	const exitingTimeline = (diffExit || []).find(
 		(l) => hasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId,
