@@ -280,6 +280,18 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 		tlId,
 		{ skipAmcpApply: true },
 	)
+	/* WO-554: `deferPlay` exists for routes-scene-take.js's pgm/prv "stage on preview" call, which
+	 * runs BEFORE the real, unrestricted `pgmTakePromise` for the SAME `incomingScene` (both reach
+	 * this function for the identical tlId — see the WO-549/553 comments below on `restrictToPreview`
+	 * for why the routing itself has to be duplicated). Without this flag each call independently
+	 * called `eng.play()` with `restart:true`, so a timeline inside a look got two genuine PLAY
+	 * restarts on the wire, milliseconds apart, for the one take — "it looks on pgm as it is played
+	 * 2 times one after another" (todos02.09.26). The staging call's job is only to get PRV's routing
+	 * right for the brief window before the real take supersedes it — `setSendTo` above already did
+	 * that (routing-only, `skipAmcpApply`); the actual `play()` belongs to whichever call is NOT
+	 * deferred, which always runs moments later for the same tlId (buildTakeJobs processes every
+	 * timeline layer unconditionally, never skips it as "unchanged"), so playback is never lost. */
+	if (opts.deferPlay) return []
 	eng.setLoop(tlId, !!layer.loop)
 	const pb = opts.startAtCurrentPosition ? eng.getPlayback?.(tlId) : null
 	const startPos = pb?.position ?? 0

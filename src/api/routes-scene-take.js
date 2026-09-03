@@ -251,8 +251,13 @@ async function handleSceneTake(body, ctx) {
 				 * one actually claiming program, moments later) — without restricting it, a timeline
 				 * in `inc` got routed to program early by THIS call and then re-routed again by
 				 * `pgmTakePromise`, the redundant restart measured on the wire in WO-546 §1b as a
-				 * "duplicate PLAY". Restricting here does not change what ends up live: the real take
-				 * still runs unrestricted and its own routing is what the engine keeps. */
+				 * "duplicate PLAY".
+				 * WO-554: `restrictTimelineToPreview` alone only fixed the ROUTING of that duplicate
+				 * restart, not the restart itself — this call and `pgmTakePromise` below both still
+				 * called `eng.play()` for the identical timeline, so program genuinely played it twice
+				 * ("it looks on pgm as it is played 2 times one after another"). `deferTimelinePlay`
+				 * skips the actual play()/restart here; `pgmTakePromise`'s own unrestricted call is
+				 * what ends up live, same as the routing already worked. */
 				await runSceneTakeLbg(ctx.amcp, {
 					...takeOpts,
 					channel: bus1,
@@ -263,6 +268,7 @@ async function handleSceneTake(body, ctx) {
 					skipLayerVisualEquality: true,
 					banklessTake: true,
 					restrictTimelineToPreview: true,
+					deferTimelinePlay: true,
 				})
 				if (inc && typeof inc === 'object' && inc.id) {
 					await liveSceneState.setChannel(bus1, {
