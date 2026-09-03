@@ -284,9 +284,22 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * dropped (now just program, since WO-555's engine-side fix stopped it from also nuking
 	 * preview's persisting layers) — a preview action taking program off the air: "i click it to
 	 * prv it, it changes to another random look on pgm". Preserve whatever program claim already
-	 * exists instead of overwriting it; an unrestricted call (real take) still always claims it. */
+	 * exists instead of overwriting it; an unrestricted call (real take) still always claims it.
+	 *
+	 * WO-559: symmetric fix on the OTHER axis. A restricted call still always wants preview — that
+	 * is its entire purpose. But an UNRESTRICTED call (the real take) no longer forces preview too:
+	 * a normal look's own content never automatically claims preview — only the separate pgm/prv
+	 * flip-flop (`previewExchangePromise`, routing the OUTGOING look there) does — and a timeline
+	 * look must follow the identical rule, or it permanently squats on preview (the timeline band
+	 * sits ABOVE both look banks, WO-553) and visually blocks the outgoing look the flip-flop just
+	 * placed underneath: "after transitioning to a timeline look, the outgoing look needs to be
+	 * called into preview — now the timeline ends up both on pgm and prv" (todos03.09.26). This
+	 * mirrors `runTimelineDirectTake`'s own `setSendTo` call above (line ~158), which already only
+	 * ever claims `{ preview: false, program: true }` for exactly this reason — this function was
+	 * the one path still forcing both. */
 	const program = opts.restrictToPreview ? !!eng._sendToFor(tlId)?.program : true
-	eng.setSendTo({ preview: true, program, screenIdx: opts.screenIdx }, tlId, { skipAmcpApply: true })
+	const preview = !!opts.restrictToPreview
+	eng.setSendTo({ preview, program, screenIdx: opts.screenIdx }, tlId, { skipAmcpApply: true })
 	/* WO-554: `deferPlay` exists for routes-scene-take.js's pgm/prv "stage on preview" call, which
 	 * runs BEFORE the real, unrestricted `pgmTakePromise` for the SAME `incomingScene` (both reach
 	 * this function for the identical tlId — see the WO-549/553 comments below on `restrictToPreview`

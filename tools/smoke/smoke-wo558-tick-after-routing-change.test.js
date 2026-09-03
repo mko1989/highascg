@@ -83,13 +83,15 @@ function programLines(sentLines) {
 describe('WO-558: a regular tick after a routing change must not touch a persisting channel', () => {
 	it('release-from-preview (WO-556 shape) + the NEXT tick: program is untouched', async () => {
 		const { self, eng, sentLines } = makeEngine()
-		// Timeline live on both channels (an earlier real take) — channel 1 = program, 2 = preview
-		// (default map fallback: programCh(1)=1, previewCh(1)=2).
+		// Timeline live on both channels — channel 1 = program, 2 = preview (default map fallback:
+		// programCh(1)=1, previewCh(1)=2). WO-559: an unrestricted take alone only claims program now,
+		// so the both-buses precondition is established explicitly here.
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0
 		// The exact WO-556 release call shape: drop preview, keep program, skipAmcpApply:true.
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
@@ -107,6 +109,9 @@ describe('WO-558: a regular tick after a routing change must not touch a persist
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		// WO-559: an unrestricted take alone no longer claims preview too — establish the both-buses
+		// precondition this release scenario actually exercises explicitly.
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		// Reproduce the PRE-WO-558 behavior directly: wholesale-clear the caches, exactly as the old
@@ -126,6 +131,9 @@ describe('WO-558: a regular tick after a routing change must not touch a persist
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		// WO-559: an unrestricted take alone no longer claims preview too — establish the both-buses
+		// precondition this release scenario actually exercises explicitly.
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		const preview2Lines = sentLines.filter((l) => /^STOP\s+2-/.test(String(l)))

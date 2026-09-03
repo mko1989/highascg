@@ -76,12 +76,15 @@ function makeEngine() {
 describe('WO-556 Bug A: releasing a preview claim must not flash program', () => {
 	it('setSendTo({preview:false, program:true}, {skipAmcpApply:true}) sends no unprotected reapply lines', async () => {
 		const { self, eng, sentLines } = makeEngine()
-		// Establish: timeline live on both buses (an earlier real take).
+		// Establish: timeline live on both buses (an earlier real take, plus whatever separately put
+		// it on preview too — WO-559 means a real take alone no longer does this, but the release
+		// path this test exercises must stay correct regardless of how a both-buses state arose).
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0 // only care about what the release call itself sends
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		// No PLAY/LOAD/MIXER OPACITY line should be freshly written to program as a side effect.
@@ -95,6 +98,7 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // no opts — the pre-fix call shape
 		assert.ok(sentLines.length > 0, 'documents the pre-WO-556 unprotected flash reapply')
@@ -112,6 +116,7 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 			screenIdx: 0,
 			startAtCurrentPosition: false,
 		})
+		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		stopped.length = 0
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		assert.ok(stopped.some((s) => s.startsWith('2-')), `preview channel (dropped) should still be stopped, got: ${JSON.stringify(stopped)}`)
@@ -122,7 +127,7 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 describe('WO-556 Bug B: the outgoing look\'s timeline must never be restarted by the preview-exchange call', () => {
 	it('deferPlay:true + restrictToPreview:true (already on program): routes correctly, sends no PLAY', async () => {
 		const { self, eng, sentLines } = makeEngine()
-		// The timeline is already live on both buses (the earlier real take).
+		// The timeline is already live on program (the earlier real take — WO-559: program only).
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
 			screenIdx: 0,

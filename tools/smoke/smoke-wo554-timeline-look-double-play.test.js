@@ -113,7 +113,7 @@ describe('WO-554: startSceneTimelineLayer deferPlay', () => {
 		assert.equal(playLinesByChannel(sentLines).size, 0, 'deferPlay must not send any PLAY line')
 	})
 
-	it('staging (deferPlay) + real take (no deferPlay): every channel gets exactly ONE PLAY line', async () => {
+	it('staging (deferPlay) + real take (no deferPlay): program gets exactly ONE PLAY line, preview gets none (WO-559)', async () => {
 		const { self, eng, sentLines } = makeEngine()
 		// Staging call — WO-549's restrictToPreview + WO-554's deferTimelinePlay, as routes-scene-take.js sends it.
 		await startSceneTimelineLayer(self, self.amcp, 2, { source: { value: 'tl1' } }, {
@@ -130,15 +130,27 @@ describe('WO-554: startSceneTimelineLayer deferPlay', () => {
 			startAtCurrentPosition: false,
 		})
 		assert.equal(eng._airTimelineId, 'tl1')
-		assert.deepEqual(eng._sendToFor('tl1'), { preview: true, program: true, screenIdx: 0 })
+		/* WO-559: the real take no longer also claims preview — a timeline look must leave preview
+		 * free for the pgm/prv flip-flop to put the OUTGOING look there, exactly like a normal look's
+		 * own content never auto-claims preview. So only program ends up routed, and only program
+		 * gets a PLAY line — there is nothing left for the timeline to play on preview at all. */
+		assert.deepEqual(eng._sendToFor('tl1'), { preview: false, program: true, screenIdx: 0 })
 		const byChannel = playLinesByChannel(sentLines)
-		assert.equal(byChannel.size, 2, 'both preview and program channels get a PLAY line')
+		assert.equal(byChannel.size, 1, 'only program gets a PLAY line; preview is left for the flip-flop')
 		for (const [ch, count] of byChannel) {
 			assert.equal(count, 1, `channel ${ch} must receive exactly one PLAY line, got ${count}`)
 		}
 	})
 
-	it('regression check: WITHOUT deferPlay, the PREVIEW channel gets a duplicate PLAY (the bug)', async () => {
+	it('regression check: WITHOUT deferPlay, the staging call still flashes preview needlessly (WO-554, revised by WO-559)', async () => {
+		/* WO-559 changed what the real take claims (program only, never preview — see
+		 * timeline-take.js), which structurally closes the ORIGINAL WO-554 mechanism this test
+		 * documented (the real take could no longer duplicate a PLAY onto preview even without
+		 * deferPlay, since it never routes there at all anymore). deferPlay still earns its keep:
+		 * without it, the staging call plays the timeline onto preview once — the real take's own
+		 * `preview:false` transition immediately STOPs it again a moment later (WO-555's differential
+		 * stop) — a pointless flash-then-clear that deferPlay skips entirely by never playing there
+		 * in the first place. */
 		const { self, eng, sentLines } = makeEngine()
 		await startSceneTimelineLayer(self, self.amcp, 2, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
@@ -154,10 +166,10 @@ describe('WO-554: startSceneTimelineLayer deferPlay', () => {
 		})
 		const byChannel = playLinesByChannel(sentLines)
 		const counts = [...byChannel.values()].sort((a, b) => a - b)
-		assert.deepEqual(counts, [1, 2], 'documents the pre-WO-554 mechanism: preview channel restarted twice, program once')
+		assert.deepEqual(counts, [1, 1], 'preview gets one pointless PLAY (from staging) alongside program\'s real one')
 	})
 
-	it('deferPlay absent/false: unchanged single-call behavior (still plays both channels once)', async () => {
+	it('deferPlay absent/false: unchanged single-call behavior (program only, WO-559)', async () => {
 		for (const opts of [{}, { deferPlay: false }]) {
 			const { self, eng, sentLines } = makeEngine()
 			await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
@@ -168,7 +180,9 @@ describe('WO-554: startSceneTimelineLayer deferPlay', () => {
 			})
 			assert.equal(eng._airTimelineId, 'tl1')
 			const byChannel = playLinesByChannel(sentLines)
-			assert.equal(byChannel.size, 2)
+			// WO-559: a single unrestricted call now only ever claims and plays program — preview is
+			// left for the pgm/prv flip-flop to route the outgoing look there instead.
+			assert.equal(byChannel.size, 1)
 			for (const count of byChannel.values()) assert.equal(count, 1)
 			eng.stop('tl1', { skipAmcp: true })
 		}

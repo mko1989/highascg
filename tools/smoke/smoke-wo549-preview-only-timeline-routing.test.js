@@ -67,7 +67,10 @@ describe('WO-549: startSceneTimelineLayer routing', () => {
 		eng.stop('tl1', { skipAmcp: true })
 	})
 
-	it('without restrictToPreview (absent, undefined, or false): unchanged, both channels claimed', async () => {
+	it('without restrictToPreview (absent, undefined, or false): program only (WO-559)', async () => {
+		/* WO-559 revised this: an unrestricted (real take) call used to always claim BOTH channels
+		 * ("both channels claimed", the original assertion here) — now it only claims program,
+		 * matching how a normal look's own content never auto-claims preview. See timeline-take.js. */
 		for (const opts of [{}, { restrictToPreview: false }]) {
 			const { self, eng } = makeEngine()
 			await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
@@ -78,8 +81,8 @@ describe('WO-549: startSceneTimelineLayer routing', () => {
 			})
 			assert.deepEqual(
 				eng._sendToFor('tl1'),
-				{ preview: true, program: true, screenIdx: 0 },
-				`opts=${JSON.stringify(opts)} must keep the normal both-channel routing`,
+				{ preview: false, program: true, screenIdx: 0 },
+				`opts=${JSON.stringify(opts)} must claim program only, leaving preview to the flip-flop`,
 			)
 			eng.stop('tl1', { skipAmcp: true })
 		}

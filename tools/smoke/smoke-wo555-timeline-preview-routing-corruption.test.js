@@ -98,7 +98,7 @@ describe('WO-555 Bug A: TimelineEngine.setSendTo only stops REMOVED channels', (
 			fadeDur: 0,
 			screenIdx: 0,
 			startAtCurrentPosition: false,
-			// unrestricted: claims both — channels resolve to programCh(1)=1 (default map fallback) and previewCh(1)=2
+			// unrestricted: claims program only (WO-559) — programCh(1)=1 (default map fallback)
 		})
 		stopped.length = 0 // only care about what happens on the NEXT routing change
 		eng.setSendTo({ preview: true, program: false, screenIdx: 0 }, 'tl1')
