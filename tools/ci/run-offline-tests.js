@@ -162,6 +162,7 @@ const FILES = [
 	'tools/smoke/smoke-wo558-tick-after-routing-change.test.js',
 	'tools/smoke/smoke-wo559-timeline-take-leaves-preview-for-flipflop.test.js',
 	'tools/smoke/smoke-wo560-timeline-layer-not-missing-media.test.js',
+	'tools/smoke/smoke-wo561-timeline-replaces-normal-layer-exit.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

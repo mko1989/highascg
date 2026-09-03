@@ -71,6 +71,22 @@ async function buildTakeJobs(opts) {
 				})
 				timelineFadeInPhys.push(...fadeIn)
 			}
+			/* WO-561: `diffScenes` (scene-transition.js) compares purely by `layerNumber` — a normal
+			 * layer previously occupying this SAME slot, now replaced by an incoming timeline layer,
+			 * is classified as an "update" (same slot, different source), never an "exit", because
+			 * diffScenes has no concept of the timeline/bank split. The normal (non-timeline) path
+			 * below already re-derives a genuine exit candidate for exactly this "update but actually
+			 * being replaced" situation (`extraExitCandidates.push(cur)`, a few lines down) — this
+			 * branch `continue`s before ever reaching that check, so a timeline replacing a normal
+			 * layer left the old layer's physical content playing, unstopped, merely hidden underneath
+			 * the timeline's own (higher, WO-553) physical band — until a LATER take removed the
+			 * timeline and revealed it again: "there is still the previous look playing under it which
+			 * then surfaces with another take" (todos03.09.26). Same fix, same exclusion (a timeline
+			 * continuing at this slot — WO-548's retake case — must not be treated as exiting). */
+			const curAtSlot = currentMap.get(layer.layerNumber)
+			if (layerHasContent(curAtSlot) && String(curAtSlot?.source?.type || '') !== 'timeline') {
+				extraExitCandidates.push(curAtSlot)
+			}
 			continue
 		}
 		let clipRaw = clipPath(layer)
