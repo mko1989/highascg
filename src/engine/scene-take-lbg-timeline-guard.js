@@ -77,4 +77,34 @@ function resolveActiveTimelineIdToFadeOut(
 	return exitingTimeline || isPlayingOnThisChannel ? pbNow.timelineId : null
 }
 
-module.exports = { resolveActiveTimelineIdToFadeOut }
+/**
+ * WO-555: `resolveActiveTimelineIdToFadeOut`'s reason 3 correctly protects program by doing
+ * NOTHING when a preview-scoped call's own incoming content has left a program-routed timeline
+ * behind — but "nothing" also means the timeline's PREVIEW claim is never released either, since
+ * routing revocation only happens inside `startSceneTimelineLayer`, which only runs for a timeline
+ * that IS part of the incoming scene. A look with no timeline layer at all never reaches it, so an
+ * old timeline that is legitimately still live on program keeps rendering on preview forever after
+ * the operator previews something else — "pgm and prv show the same thing until i clear the prv".
+ *
+ * This resolves the complementary, SAFE action: release just the preview claim (never program) for
+ * a timeline this preview-scoped call's own content does not want, when it is currently on BOTH
+ * buses. Safe only because `TimelineEngine.setSendTo`'s routing-change STOP now only clears
+ * channels being REMOVED (WO-555, timeline-playback-runtime.js) — dropping preview here can no
+ * longer reach program's physical layers.
+ *
+ * @param {{ timelineId?: string, sendTo?: object } | null | undefined} pbNow
+ * @param {object[] | undefined} incomingLayers
+ * @param {(layer: object) => boolean} hasContent
+ * @param {boolean} previewOnlyCall
+ * @returns {string | null}
+ */
+function resolveTimelineIdToReleaseFromPreview(pbNow, incomingLayers, hasContent, previewOnlyCall) {
+	if (!previewOnlyCall || !pbNow?.timelineId) return null
+	if (!pbNow.sendTo?.program || !pbNow.sendTo?.preview) return null
+	const stillWantedByThisIncomingScene = (incomingLayers || []).some(
+		(l) => hasContent(l) && l.source?.type === 'timeline' && l.source.value === pbNow.timelineId,
+	)
+	return stillWantedByThisIncomingScene ? null : pbNow.timelineId
+}
+
+module.exports = { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview }

@@ -31,7 +31,7 @@ const { runSceneTakeLbgAmcpPipeline } = require('./scene-take-lbg-amcp-pipeline'
 const { sendExitAndTimelineFadeLines } = require('./scene-take-lbg-exit-fade')
 const { collectOrphanLookLogicalLayers, collectOrphanLookPhysicalLayers, clearPhysicalLookLayers } = require('./scene-exit-layers')
 const { remapIntraLookRoutesForTakeChannel, assertSceneHasNoSelfRoutes } = require('./scene-route-deps')
-const { resolveActiveTimelineIdToFadeOut } = require('./scene-take-lbg-timeline-guard')
+const { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview } = require('./scene-take-lbg-timeline-guard')
 
 /**
  * @param {object} amcp
@@ -102,8 +102,9 @@ async function runSceneTakeLbg(amcp, opts) {
 
 	let activeTimelineIdToFadeOut = null
 	if (self.timelineEngine) {
+		const pbNow = self.timelineEngine.getPlayback()
 		activeTimelineIdToFadeOut = resolveActiveTimelineIdToFadeOut(
-			self.timelineEngine.getPlayback(),
+			pbNow,
 			diff.exit,
 			incoming.layers,
 			channel,
@@ -112,6 +113,20 @@ async function runSceneTakeLbg(amcp, opts) {
 			layerHasContent,
 			!!opts.restrictTimelineToPreview,
 		)
+		/* WO-555: the above legitimately declined to fade THIS timeline out (still on program) —
+		 * that must not also mean it silently keeps claiming preview forever. See the function's
+		 * own header for why this is safe. */
+		if (!activeTimelineIdToFadeOut) {
+			const releaseId = resolveTimelineIdToReleaseFromPreview(
+				pbNow,
+				incoming.layers,
+				layerHasContent,
+				!!opts.restrictTimelineToPreview,
+			)
+			if (releaseId) {
+				self.timelineEngine.setSendTo({ preview: false, program: true, screenIdx: pbNow.sendTo?.screenIdx }, releaseId)
+			}
+		}
 	}
 
 	const fadeDur = forceCut || globalT.duration <= 0 ? 0 : globalT.duration

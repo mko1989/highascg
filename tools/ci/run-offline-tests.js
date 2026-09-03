@@ -157,6 +157,7 @@ const FILES = [
 	'tools/smoke/smoke-wo553-look-timeline-setsendto-race.test.js',
 	'tools/smoke/smoke-wo553b-timeline-exit-crossfade-no-doubleramp.test.js',
 	'tools/smoke/smoke-wo554-timeline-look-double-play.test.js',
+	'tools/smoke/smoke-wo555-timeline-preview-routing-corruption.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

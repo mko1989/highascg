@@ -275,11 +275,18 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * 158) — this function's preset + `play({takeFade:true})` below make that extra apply redundant
 	 * on every path (CUT included: it always ends in its own unconditional `eng.play()`), so
 	 * skipping it costs nothing and closes the race. */
-	eng.setSendTo(
-		{ preview: true, program: !opts.restrictToPreview, screenIdx: opts.screenIdx },
-		tlId,
-		{ skipAmcpApply: true },
-	)
+	/* WO-555: a preview-restricted call has authority to ADD a preview claim, never to REMOVE an
+	 * existing program one. Forcing `program: false` unconditionally whenever `restrictToPreview`
+	 * is set was correct for WO-549's original targets (a timeline that is NOT this call's own
+	 * incoming content yet), but this same function also runs for the operator directly previewing
+	 * the look that is ALREADY live with this exact timeline on program — there, `routingChanged`
+	 * (program true → false) makes `setSendTo` stop every physical layer on the channels being
+	 * dropped (now just program, since WO-555's engine-side fix stopped it from also nuking
+	 * preview's persisting layers) — a preview action taking program off the air: "i click it to
+	 * prv it, it changes to another random look on pgm". Preserve whatever program claim already
+	 * exists instead of overwriting it; an unrestricted call (real take) still always claims it. */
+	const program = opts.restrictToPreview ? !!eng._sendToFor(tlId)?.program : true
+	eng.setSendTo({ preview: true, program, screenIdx: opts.screenIdx }, tlId, { skipAmcpApply: true })
 	/* WO-554: `deferPlay` exists for routes-scene-take.js's pgm/prv "stage on preview" call, which
 	 * runs BEFORE the real, unrestricted `pgmTakePromise` for the SAME `incomingScene` (both reach
 	 * this function for the identical tlId — see the WO-549/553 comments below on `restrictToPreview`

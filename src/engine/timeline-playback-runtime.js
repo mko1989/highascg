@@ -268,9 +268,22 @@ module.exports = {
 		if (this._airTimelineId === tid) {
 			const self = this.self
 			if (routingChanged) {
-				if (tl && self?.amcp) {
+				/* WO-555: a channel that is wanted by BOTH the old and the new routing (e.g. preview
+				 * staying on while only program is added/removed) must never be stopped — it was
+				 * unconditionally included in the old wholesale STOP-everything-then-reapply below,
+				 * which is only harmless for a caller that also re-applies (the `!opts?.skipAmcpApply`
+				 * branch a few lines down) to immediately re-establish it. `startSceneTimelineLayer`
+				 * (timeline-take.js) always passes `skipAmcpApply: true`, so a routing change that only
+				 * drops preview (or only drops program) left the channel that was SUPPOSED to keep
+				 * playing freshly STOPped with nothing to restart it — a preview-scoped action (e.g.
+				 * "preview a look whose own timeline is already live on program") stopping PROGRAM's
+				 * physical layers as a side effect: "clicking a playing timeline look to send it to prv
+				 * changes pgm to another random look" (todos02.09.26). Only channels being REMOVED
+				 * (present in the old set, absent from the new one) get stopped. */
+				const removedCh = oldCh.filter((c) => !newCh.includes(c))
+				if (tl && self?.amcp && removedCh.length) {
 					for (let li = 0; li < tl.layers.length; li++) {
-						for (const ch of oldCh) {
+						for (const ch of removedCh) {
 							const caspLayer = this._caspLayer(ch, li)
 							self.amcp.stop(ch, caspLayer).catch((_err) => {
 								if (typeof this.self?.log === 'function') {
