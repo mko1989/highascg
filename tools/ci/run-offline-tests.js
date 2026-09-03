@@ -159,6 +159,7 @@ const FILES = [
 	'tools/smoke/smoke-wo554-timeline-look-double-play.test.js',
 	'tools/smoke/smoke-wo555-timeline-preview-routing-corruption.test.js',
 	'tools/smoke/smoke-wo556-preview-flash-and-exit-restart.test.js',
+	'tools/smoke/smoke-wo558-tick-after-routing-change.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',

@@ -293,9 +293,32 @@ module.exports = {
 						}
 					}
 				}
-				this._prevKey = new Map()
-				this._lastKfValues.clear()
-				this._lastKfSegment.clear()
+				/* WO-558: the three transport/mixer caches below are keyed `${ch}-${caspLayer}[...]` —
+				 * NOT per-channel maps — so wiping them entirely on ANY routing change (as this used
+				 * to do) also drops the valid, still-accurate cached state for a channel that was
+				 * NOT removed (e.g. program, when only preview's claim is being released). The next
+				 * regular tick (`_tick()`, an unrelated ~40ms `setInterval`, not this call) then finds
+				 * no `prev` entry for THAT channel's layers either, reads it as "transport never
+				 * started", and force-restarts it — STOP+PLAY plus a full mixer reset — on a channel
+				 * nothing was ever supposed to touch. Measured on the wire: previewing a plain,
+				 * timeline-free look while a timeline played on program produced a full STOP/PLAY/MIXER
+				 * block on program's own timeline layers ~20ms after the (correctly `skipAmcpApply`d)
+				 * preview-release call — not from that call's own reapply, from the NEXT tick reading
+				 * the now-empty cache (todos03.09.26: "sending looks on preview has effect on pgm
+				 * channel"). Only drop cache entries for channels actually being REMOVED; a channel
+				 * present in both `oldCh` and `newCh` keeps its cache, so the next tick still sees it
+				 * as unchanged and leaves it alone. */
+				if (removedCh.length) {
+					for (const key of [...this._prevKey.keys()]) {
+						if (removedCh.includes(Number(key.split('-')[0]))) this._prevKey.delete(key)
+					}
+					for (const key of [...this._lastKfValues.keys()]) {
+						if (removedCh.includes(Number(key.split('-')[0]))) this._lastKfValues.delete(key)
+					}
+					for (const key of [...this._lastKfSegment.keys()]) {
+						if (removedCh.includes(Number(key.split('-')[0]))) this._lastKfSegment.delete(key)
+					}
+				}
 			}
 			if (routingChanged && tl && !opts?.skipAmcpApply) {
 				const cell = this._pbFor(tid)
