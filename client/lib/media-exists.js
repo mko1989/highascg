@@ -17,6 +17,14 @@ let _ready = false
 const NON_MEDIA_RE = /^(route:\/\/|\[html\]|https?:\/\/|decklink|live|color|#)/i
 const TEMPLATE_PATH_RE = /(^|\/)(shaders|lower-thirds|lower_thirds|studio|countdown|loop-io|html)\//i
 
+/* WO-560: layer types whose `source.value` is never a Caspar media clip path — a timeline's value
+ * is the TIMELINE's own id (e.g. "tmsro89fsecg"), a template's is a template name, etc. None of
+ * these match `NON_MEDIA_RE`/`TEMPLATE_PATH_RE` (those pattern-match the VALUE string; an id or
+ * name looks exactly like a plausible-but-missing clip name), so a layer of one of these types
+ * was flagged as "missing media" for content that was never media at all — reported as a
+ * permanent (falsely) ⚠ badge stuck to the one look in the project that has a timeline layer. */
+const NON_PLAIN_MEDIA_LAYER_TYPES = new Set(['timeline', 'template', 'live_audio', 'placeholder', 'effect', 'browser', 'route'])
+
 function norm(v) {
 	return String(v || '')
 		.trim()
@@ -66,6 +74,7 @@ export function clipMissing(value) {
 export function missingMediaInScene(scene) {
 	const out = []
 	for (const layer of scene?.layers || []) {
+		if (NON_PLAIN_MEDIA_LAYER_TYPES.has(layer?.source?.type)) continue
 		const vals = []
 		if (layer?.source?.value) vals.push(layer.source.value)
 		if (Array.isArray(layer?.playlist)) for (const it of layer.playlist) if (it?.value) vals.push(it.value)
