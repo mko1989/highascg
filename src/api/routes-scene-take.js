@@ -333,7 +333,21 @@ async function handleSceneTake(body, ctx) {
 						 * would route it to program too, silently overriding the real PGM take
 						 * `pgmTakePromise` is concurrently trying to put there: "going back to another
 						 * look results in retaking the timeline look instead of playing the new one."
-						 * This call only ever wants the preview bus. */
+						 * This call only ever wants the preview bus.
+						 *
+						 * WO-556: `previousPgmScene` is the look that WAS on program — when it itself
+						 * contains a timeline (exactly the "switch away from a timeline look" case),
+						 * that timeline is either still legitimately airing (mid exit-fade, run by the
+						 * concurrent `pgmTakePromise`/`activeTimelineIdToFadeOut` above) or already
+						 * stopped — never something that needs STARTING here. Its preview routing is
+						 * already correct (nothing has touched it since the earlier take put it on
+						 * both buses) — `startSceneTimelineLayer`'s unconditional `eng.play(...,
+						 * {restart:true})` was the only consequential thing this call did to it: an
+						 * unwanted position-0 restart stomping the smooth crossfade-out mid-transition
+						 * ("the timeline restarts during the transition" — todos, 03.09). Deferred: this
+						 * call's timeline handling becomes routing-only (a no-op when nothing changed),
+						 * same mechanism WO-554 uses for the staging call, different reason (there: a
+						 * redundant real take follows; here: nothing should ever (re)play it). */
 						await runSceneTakeLbg(ctx.amcp, {
 							...takeOpts,
 							channel: bus1,
@@ -345,6 +359,7 @@ async function handleSceneTake(body, ctx) {
 							banklessTake: true,
 							protectedTimelineId: incomingTimelineId(inc),
 							restrictTimelineToPreview: true,
+							deferTimelinePlay: true,
 						})
 						const prevId = String(previousPgmScene.id || `preview_${Date.now()}`)
 						await liveSceneState.setChannel(bus1, { sceneId: prevId, scene: stripEphemeralTakeFields(previousPgmScene) })

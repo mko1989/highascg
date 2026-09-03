@@ -199,6 +199,6 @@ describe('WO-555: wired end-to-end', () => {
 	it('scene-take-lbg.js calls resolveTimelineIdToReleaseFromPreview and releases via setSendTo', () => {
 		const src = fs.readFileSync(path.join(__dirname, '../../src/engine/scene-take-lbg.js'), 'utf8')
 		assert.match(src, /resolveTimelineIdToReleaseFromPreview/)
-		assert.match(src, /setSendTo\(\{ preview: false, program: true, screenIdx: pbNow\.sendTo\?\.screenIdx \}, releaseId\)/)
+		assert.match(src, /preview: false, program: true, screenIdx: pbNow\.sendTo\?\.screenIdx \}[\s\S]{0,40}releaseId/)
 	})
 })

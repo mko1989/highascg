@@ -124,7 +124,19 @@ async function runSceneTakeLbg(amcp, opts) {
 				!!opts.restrictTimelineToPreview,
 			)
 			if (releaseId) {
-				self.timelineEngine.setSendTo({ preview: false, program: true, screenIdx: pbNow.sendTo?.screenIdx }, releaseId)
+				/* WO-556: without `skipAmcpApply`, `setSendTo`'s routing-change reapply fires an
+				 * unprotected `_applyAt(force:true)` for this timeline against its NEW channel set
+				 * (now program-only) — the exact WO-553 flash class, writing raw instant OPACITY/FILL
+				 * to program's timeline layers as a side effect of a PREVIEW action. The STOP of the
+				 * dropped (preview) channel above is not gated by this flag, so clearing PRV's stale
+				 * layers still happens; only the redundant, unprotected program-side reapply is
+				 * skipped — nothing needs it, since the timeline's regular tick already keeps program
+				 * in sync while it stays on air. */
+				self.timelineEngine.setSendTo(
+					{ preview: false, program: true, screenIdx: pbNow.sendTo?.screenIdx },
+					releaseId,
+					{ skipAmcpApply: true },
+				)
 			}
 		}
 	}
