@@ -273,6 +273,14 @@ const CountdownEngine = (function () {
 			doReset();
 			return;
 		}
+		if (!cmd && config.mode === 'duration' && Object.prototype.hasOwnProperty.call(rest, 'durationSec')) {
+			// A duration edit (panel/Companion "set time") with no cmd must reset the anchor
+			// immediately — otherwise a running (or already-overrun) timer keeps ticking from
+			// its stale endEpochMs and the new value never visibly takes effect until a
+			// Reset/Start, which is not how an operator expects "set time" to behave.
+			remainingSec = Math.max(0, Number(config.durationSec) || 0);
+			if (state === 'running') endEpochMs = Date.now() + remainingSec * 1000;
+		}
 		applyPositionClass();
 		if (cmd === 'start') doStart(resumeRemainingSec);
 		else if (cmd === 'pause') doPause();

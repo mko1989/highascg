@@ -124,6 +124,17 @@ function assignTimerToScreen(opts) {
 				record.config = { ...record.config, ...config }
 			}
 
+			// A duration change must land on the LIVE countdown now, not just seed the next
+			// Start, or a running/overrun timer keeps ticking from its stale anchor.
+			const changingDuration =
+				config && Object.prototype.hasOwnProperty.call(config, 'durationSec') && (record.config.mode || 'duration') === 'duration'
+			if (changingDuration && record.lastCmd === 'start') {
+				record.cmdAt = Date.now()
+				record.remainingSec = null
+			} else if (changingDuration && record.lastCmd === 'pause') {
+				record.remainingSec = Number(record.config.durationSec) || 0
+			}
+
 			const lines = []
 			const cgPayload = {
 				...record.config,
