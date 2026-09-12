@@ -16,12 +16,21 @@
  * on bank B to 300, colliding with the PIP overlay band (260–979). Staying off that machinery
  * entirely avoids the collision without needing to special-case it. Preview shows item 0 only,
  * with no advance timer — the same "staged, static" convention normal look playlists use on PRV.
+ *
+ * Every PLAY on the fixed layer (initial take, playlist advance, or one audio-only look replacing
+ * another on the same screen) carries a MIX transition — same {type:'MIX', duration:12} default
+ * normal look playlists fall back to (scene-take-lbg-playlist.js) — so switching background audio
+ * never hard-cuts, whether that's the first item starting from silence or one track replacing
+ * another mid-show.
  */
 
 'use strict'
 
 const { AUDIO_ONLY_LOOK_LAYER } = require('./look-layer-ranges')
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
+
+/** Default crossfade for every audio-only PLAY — mirrors the normal playlist engine's default. */
+const AUDIO_ONLY_TRANSITION = { transition: 'MIX', duration: 12 }
 
 /** @param {object} scene @returns {boolean} */
 function isAudioOnlyLook(scene) {
@@ -65,7 +74,7 @@ async function takeAudioOnlyLook({ amcp, channel, scene, self, preview = false }
 			return
 		}
 		const clip = resolveSceneClipForAmcp(raw, self)
-		await amcp.play(ch, AUDIO_ONLY_LOOK_LAYER, clip, { loop: !!layer.loop })
+		await amcp.play(ch, AUDIO_ONLY_LOOK_LAYER, clip, { ...AUDIO_ONLY_TRANSITION, loop: !!layer.loop })
 		return
 	}
 
@@ -74,7 +83,7 @@ async function takeAudioOnlyLook({ amcp, channel, scene, self, preview = false }
 		const raw = item?.value
 		if (!raw) return
 		const clip = resolveSceneClipForAmcp(raw, self)
-		await amcp.play(ch, AUDIO_ONLY_LOOK_LAYER, clip, {})
+		await amcp.play(ch, AUDIO_ONLY_LOOK_LAYER, clip, { ...AUDIO_ONLY_TRANSITION })
 		if (preview) return
 		const rawDuration = Number(item.duration)
 		const durationMs = (Number.isFinite(rawDuration) && rawDuration > 0 ? rawDuration : 5) * 1000
@@ -102,6 +111,7 @@ async function stopAudioOnlyLook({ amcp, channel }) {
 
 module.exports = {
 	AUDIO_ONLY_LOOK_LAYER,
+	AUDIO_ONLY_TRANSITION,
 	isAudioOnlyLook,
 	resolveAudioOnlyLookLayer,
 	takeAudioOnlyLook,

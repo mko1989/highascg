@@ -1,7 +1,7 @@
-**Status: IMPLEMENTED (2026-09-12) — Parts A, B, and C all landed. Offline suite 2431/2434 (the
-1 failing test is a pre-existing, unrelated timing flake in smoke-wo537 — see §"Verification"),
-client build clean. Not yet kiosk-reloaded/service-restarted on the box (live show, owner-QA
-owed for all three parts).**
+**Status: IMPLEMENTED (2026-09-12) — Parts A, B, C landed, plus a same-day follow-up ("fill the
+gaps") closing 3 of the 4 known v1 gaps Part C shipped with. Offline suite 2434/2436 (2 legitimate
+skips — local-server-spawn tests that always skip under CI=1), client build clean. Not yet
+kiosk-reloaded/service-restarted on the box (live show, owner-QA owed for everything below).**
 
 **Source:** `work/work-orders/todos12.09.26` (owner, verbatim):
 > i need you to do a review and fixing of the audio implementation and settings in highascg.
@@ -113,15 +113,13 @@ asserted.
   leaves it occupying layer 200 (blocking a different audio-only look from taking over) instead of
   actually clearing it.
 
-**Known limitations (v1, honestly scoped rather than silently gapped):**
+**Known limitations at first ship (v1):**
 - Only a look's **first** layer plays; additional layers on an "audio only" look are silently
   ignored. Not validated against in the editor — the 🔊 toggle doesn't restrict adding more layers.
 - The deck's live/preview ring (`scenes-card--live`/`--preview`) is **not** wired for audio-only
   looks — it reads `resolveBusLookIdsForMain` against `scene.live` only, which an audio-only look
   never enters. An audio-only look's card gives no on-deck indication that it's currently playing;
-  the compact mixer's new row (and its 🔊 label) is the only live indicator today. Wiring the deck
-  ring needs a second parallel live/preview-id map client-side (`sceneState` currently hard-assumes
-  one live scene per channel) — real work, scoped out of this pass.
+  the compact mixer's new row (and its 🔊 label) is the only live indicator today.
 - No crossfade between playlist items (hard cut via `PLAY`), and no crossfade when one audio-only
   look replaces another on the same screen.
 - Not wired into the companion-bridge / look-air-frames broadcast that `live-scene-state.js` calls
@@ -131,6 +129,57 @@ Note for whoever extends this: WO-306 (media-layer cross-channel audio routing �
 per-layer routing feature) was explicitly **rejected by the owner** ("the current way is how
 caspar works and is fine"). This feature is not that — it's a dedicated look type, not a routing
 toggle on ordinary look layers — worth naming that distinction if it ever comes up.
+
+## Part C follow-up ("fill the gaps") — same day
+
+Closed 3 of the 4 limitations above:
+
+1. **Deck live/preview indicator — done, but deliberately NOT the video ring.** New
+   `resolveAudioOnlyLookIdsForMain()` ([client/lib/scene-live-main-sync.js](../../client/lib/scene-live-main-sync.js))
+   mirrors `resolveBusLookIdsForMain` but reads `scene.liveAudioOnly` instead of `scene.live`, with
+   no client-only "armed preview" fallback (an audio-only preview always requires a real PRV
+   channel — `handleAudioOnlyLookTake` 400s otherwise, so there's never an armed-only state to fall
+   back to). Card logic extracted to a new
+   [client/components/scene-list-card-audio-only.js](../../client/components/scene-list-card-audio-only.js)
+   (kept `scene-list-column.js` under the 500-line cap) — new classes `scenes-card--audio-live` /
+   `--audio-preview` give a **cyan/violet** ring + glowing 🔊 badge, distinct from the video look's
+   red/green ring, because an audio-only look can be live at the same time as an unrelated video
+   look on the same screen — reusing the video ring would read as "this replaced the screen",
+   which it never does.
+2. **Crossfade — done.** Every `amcp.play()` call in `audio-only-look.js` (initial take, playlist
+   advance, one audio-only look replacing another) now carries `{transition:'MIX', duration:12}` —
+   the same default the normal look-playlist engine falls back to. No more hard cuts on any
+   audio-only transition.
+3. **First-layer-only confusion — turned into an active guard, not just a doc note.**
+   `sceneState.setSceneAudioOnly()` now **trims** any layers beyond the first when the 🔊 toggle is
+   switched on (with a toast telling the operator how many were removed), and the editor's `+ Add
+   Layer` button is disabled once an audio-only look already has its one layer — so the editor can
+   no longer show layers that could never play.
+4. **Companion bridge — investigated, partially closed, rest is out of this repo's reach.** The
+   companion-module plugin code itself isn't in this checkout (it's a separate repo — see the
+   `@see companion-module-casparcg-server/src/live-scene-state.js` cross-reference already in that
+   file), so button-feedback logic there can't be touched from here. What WAS a real, verifiable
+   gap in this repo: `src/api/get-state.js`'s full bootstrap snapshot builds `scene: {live: ...}`
+   by hand (not generically) and never included `liveAudioOnly` — so any FRESH client connecting
+   (a browser reload, or Companion connecting/reconnecting) would never see audio-only look state
+   at all, even though already-connected clients got it fine via the incremental WS broadcast.
+   Fixed: `scene.liveAudioOnly` now ships in the bootstrap snapshot too. Whether Companion's own
+   button feedback acts on it is that other repo's work, not this one's.
+
+## Verification (follow-up)
+
+- New/updated tests in `tools/smoke/smoke-wo572-audio-only-look.test.js` (now 12): every
+  `amcp.play()` call asserts `opts.transition === 'MIX'` / `opts.duration === 12`;
+  `getState()` is asserted to carry `scene.liveAudioOnly`; `resolveAudioOnlyLookIdsForMain` gets
+  its own table-driven test (live, preview, no entry, a stale/deleted sceneId, PGM-only main).
+- Full offline suite: 2434/2436 (2 legitimate CI=1 skips, 0 failures).
+- `npm run build:client`: clean.
+- `node tools/ci/check-max-file-lines.js`: only the pre-existing, unrelated
+  `src/engine/scene-take-lbg.js` (522 lines, untouched by this WO) is over the cap.
+- **Owner-QA owed (nothing live-verified):** confirm the cyan/violet ring shows correctly when an
+  audio-only look is live/preview alongside an unrelated video look; confirm playlist items and
+  look-to-look switches actually crossfade instead of cutting; confirm toggling 🔊 on a multi-layer
+  look trims it down (with the toast) and the `+` button then disables.
 
 ## Verification (Parts A & B)
 
@@ -184,5 +233,16 @@ toggle on ordinary look layers — worth naming that distinction if it ever come
 - `client/styles/06a1-scenes-deck-toolbar.css` (`.scenes-btn--active`)
 - `client/components/audio-mixer-panel-input-layers.js` (Stop button)
 - `client/styles/07b-audio-mixer-modal-shell.css` (`.audio-mixer__stop-btn`)
-- `tools/smoke/smoke-wo572-audio-only-look.test.js` (new, 10 tests)
+- `tools/smoke/smoke-wo572-audio-only-look.test.js` (new, grew to 12 tests in the follow-up)
 - `tools/ci/run-offline-tests.js` (added the new test file to the curated list)
+
+**Follow-up-only files:**
+- `src/engine/audio-only-look.js` (MIX transition on every PLAY)
+- `client/lib/scene-live-main-sync.js` (new `resolveAudioOnlyLookIdsForMain`)
+- `client/components/scene-list-card-audio-only.js` (new — extracted to stay under 500 lines)
+- `client/components/scenes-editor.js` (threads `getLiveAudioOnly` down to the deck)
+- `client/components/scene-list.js` (threads `getLiveAudioOnly` through to the column)
+- `src/api/get-state.js` (bootstrap snapshot now includes `scene.liveAudioOnly`)
+- `client/lib/scene-state.js` (`setSceneAudioOnly` now trims extra layers)
+- `client/components/scenes-editor-edit.js` (trim toast; `+ Add Layer` disabled once audio-only has its layer)
+- `client/styles/06a3-scenes-deck-multi.css` (audio-live/preview ring + badge glow)

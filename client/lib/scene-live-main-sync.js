@@ -98,6 +98,39 @@ export function resolveBusLookIdsForMain(mainIdx, sceneLive, channelMap, sceneEx
 }
 
 /**
+ * WO-572 Part C follow-up: read PGM/PRV audio-only look ids for one main directly from
+ * scene.liveAudioOnly. No client-only "armed preview" fallback here (unlike
+ * resolveBusLookIdsForMain above) — an audio-only preview take always requires a real, separate
+ * PRV channel (handleAudioOnlyLookTake 400s otherwise), so there is never a client-only-armed
+ * state to fall back to.
+ * @param {number} mainIdx
+ * @param {Record<string, { sceneId?: string }>} liveAudioOnly
+ * @param {{ programChannels?: number[], previewChannels?: number[] }} channelMap
+ * @param {(id: string) => boolean} sceneExists
+ * @returns {{ pgmLookId: string | null, prvLookId: string | null }}
+ */
+export function resolveAudioOnlyLookIdsForMain(mainIdx, liveAudioOnly, channelMap, sceneExists) {
+	const idx = Math.max(0, parseInt(String(mainIdx), 10) || 0)
+	const programs = Array.isArray(channelMap?.programChannels) ? channelMap.programChannels : []
+	const previews = Array.isArray(channelMap?.previewChannels) ? channelMap.previewChannels : []
+	const pgmCh = programs[idx]
+	const prvCh = previews[idx]
+	const hasSeparatePrv = prvCh != null && Number(prvCh) > 0 && Number(prvCh) !== Number(pgmCh)
+
+	const live = liveAudioOnly && typeof liveAudioOnly === 'object' ? liveAudioOnly : {}
+	const pgmSidRaw = pgmCh != null ? String(live[String(pgmCh)]?.sceneId || '').trim() : ''
+	const pgmLookId = pgmSidRaw && sceneExists(pgmSidRaw) ? pgmSidRaw : null
+
+	let prvLookId = null
+	if (hasSeparatePrv) {
+		const prvSidRaw = String(live[String(prvCh)]?.sceneId || '').trim()
+		prvLookId = prvSidRaw && sceneExists(prvSidRaw) ? prvSidRaw : null
+	}
+	if (prvLookId && pgmLookId && prvLookId === pgmLookId) prvLookId = null
+	return { pgmLookId, prvLookId }
+}
+
+/**
  * Whether this main has a look staged on PRV (server scene.live or client preview slot).
  * Uses the PRV channel entry directly so a look on PGM+PRV still counts as clearable preview.
  * @param {number} mainIdx

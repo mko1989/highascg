@@ -5,6 +5,7 @@
 'use strict'
 
 const liveSceneState = require('../state/live-scene-state')
+const liveAudioOnlyLookState = require('../state/live-audio-only-look-state')
 const playbackTracker = require('../state/playback-tracker')
 const { parseCinfMedia } = require('../media/cinf-parse')
 const { buildChannelMap } = require('../config/channel-map-from-ctx')
@@ -117,6 +118,7 @@ function getState(ctx, opts = {}) {
 		channelMap,
 		scene: {
 			live: liveSceneState.getAll(),
+			liveAudioOnly: liveAudioOnlyLookState.getAll(),
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
 			deck: sceneDeck,
 			...(globalBorders ? { globalBorders } : {}),

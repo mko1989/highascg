@@ -59,7 +59,7 @@ export function renderEdit(ctx) {
 		<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-take-live">▶</button>
 		<button type="button" class="scenes-btn scenes-btn--sm" id="scenes-take-cut" title="Hard cut" aria-label="Hard cut">CUT</button>
 		<button type="button" class="scenes-btn scenes-btn--icon${scene.audioOnlyLook ? ' scenes-btn--active' : ''}" id="scenes-audio-only-toggle" title="Audio-only look — plays its first layer's audio without touching this screen's video layers">🔊</button>
-		<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-layer">＋</button>
+		<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-layer"${scene.audioOnlyLook && scene.layers?.length ? ' disabled title="Audio-only looks play a single layer only"' : ''}>＋</button>
 	`
 	// WO-272 edit-on-PGM: unmissable red LIVE indication — every edit in this session hits AIR
 	// (geometry via the PGM mixer nudge, content changes via a forceCut server take).
@@ -84,7 +84,13 @@ export function renderEdit(ctx) {
 		void takeSceneToProgram(scene.id, true, { targetMains: [mainIdx] })
 	})
 	bar.querySelector('#scenes-audio-only-toggle').addEventListener('click', () => {
-		sceneState.setSceneAudioOnly(scene.id, !scene.audioOnlyLook)
+		const { trimmedCount } = sceneState.setSceneAudioOnly(scene.id, !scene.audioOnlyLook)
+		if (trimmedCount > 0) {
+			showScenesToast?.(
+				`Audio-only look plays only its first layer — removed ${trimmedCount} other layer${trimmedCount === 1 ? '' : 's'}.`,
+				'info',
+			)
+		}
 		renderEdit(ctx)
 	})
 	bar.querySelector('#scenes-back').addEventListener('click', () => {

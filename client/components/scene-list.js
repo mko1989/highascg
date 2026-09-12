@@ -16,6 +16,7 @@ import { screenLabel } from '../lib/screen-label.js'
  * @param {() => number} ctx.getScreenCount
  * @param {() => object} [ctx.getChannelMap]
  * @param {() => Record<string, { sceneId?: string }>} [ctx.getSceneLive]
+ * @param {() => Record<string, { sceneId?: string }>} [ctx.getLiveAudioOnly]
  * @param {number} [ctx.outputAspect] - program width/height for look card thumb framing
  * @param {(canvas: HTMLCanvasElement) => void} ctx.paintDeckThumb
  * @param {(sceneId: string, forceCut: boolean) => Promise<void>} ctx.takeSceneToProgram
@@ -37,6 +38,7 @@ export function renderSceneDeck(ctx) {
 		getScreenCount,
 		getChannelMap = () => ({}),
 		getSceneLive = () => ({}),
+		getLiveAudioOnly = () => ({}),
 		outputAspect,
 		paintDeckThumb,
 		takeSceneToProgram,
@@ -193,6 +195,7 @@ export function renderSceneDeck(ctx) {
 				sceneState,
 				getChannelMap,
 				getSceneLive,
+				getLiveAudioOnly,
 				paintDeckThumb,
 				takeSceneToProgram,
 				showToast,

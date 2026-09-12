@@ -4,15 +4,19 @@
  * WO-572 Part C — audio-only looks: a look flagged `audioOnlyLook: true` plays on a fixed layer
  * (AUDIO_ONLY_LOOK_LAYER = 200) that the normal look take/diff/exit machinery never touches.
  *
- * Four independently-testable pieces:
+ * Five independently-testable pieces:
  *  1. look-layer-ranges.js: layer 200 is excluded from isLookPhysicalLayer (so the normal
  *     look-clear sweep already leaves it alone by construction).
  *  2. audio-only-look.js: single-clip take, playlist advance (duration timer, not OSC), preview
- *     shows item 0 statically with no advance, and stop cancels a pending advance + clears Caspar.
+ *     shows item 0 statically with no advance, stop cancels a pending advance + clears Caspar, and
+ *     every PLAY carries a MIX transition (follow-up: no hard cuts between tracks/looks).
  *  3. routes-scene-take-audio-only.js: take/stop update a SEPARATE live map (liveAudioOnlyLooksByChannel)
  *     and broadcast on 'scene.liveAudioOnly' — never liveSceneState / 'scene.live'.
  *  4. routes-scene-take.js: handleSceneTake branches to the audio-only path BEFORE the normal
  *     10-99 layer-numbering validation, so an audio-only scene's layer numbering is never rejected.
+ *  5. get-state.js / scene-live-main-sync.js (follow-up): the full state snapshot carries
+ *     scene.liveAudioOnly, and resolveAudioOnlyLookIdsForMain reads live/preview ids from it the
+ *     same way resolveBusLookIdsForMain reads scene.live for a normal look's deck ring.
  */
 
 const test = require('node:test')
@@ -24,6 +28,7 @@ const {
 	takeAudioOnlyLook,
 	stopAudioOnlyLook,
 } = require('../../src/engine/audio-only-look')
+const { resolveAudioOnlyLookIdsForMain } = require('../../client/lib/scene-live-main-sync.js')
 
 function mockAmcp() {
 	const log = []
@@ -68,6 +73,8 @@ test('takeAudioOnlyLook: single clip plays once on the fixed layer with its loop
 		[{ cmd: 'PLAY', ch: 5, layer: 200 }],
 	)
 	assert.equal(amcp.log[0].opts.loop, true)
+	assert.equal(amcp.log[0].opts.transition, 'MIX', 'every audio-only PLAY crossfades, never hard-cuts')
+	assert.equal(amcp.log[0].opts.duration, 12)
 	// resolveSceneClipForAmcp resolves through Caspar's CLS-id lookup (uppercased, extension
 	// stripped) — same as every other engine caller (scene-take-lbg-jobs.js etc.), not a bug here.
 	assert.match(amcp.log[0].clip, /bed/i)
@@ -200,4 +207,39 @@ test('handleSceneTake branches to the audio-only path BEFORE the 10-99 layer-num
 	assert.equal(liveAudioOnlyLookState.getChannel(1)?.sceneId, 'audio-look-3')
 	await require('../../src/engine/audio-only-look').stopAudioOnlyLook({ amcp, channel: 1 })
 	await liveAudioOnlyLookState.clearChannel(1)
+})
+
+test('getState() carries scene.liveAudioOnly (bootstrap snapshot, not just the incremental WS broadcast)', () => {
+	const { getState } = require('../../src/api/get-state')
+	const state = getState({ config: { screen_count: 1, screen_1_mode: '1920x1080p25' }, programLayerBankByChannel: {} })
+	assert.ok('liveAudioOnly' in state.scene, 'a fresh client (or Companion) bootstrapping state must see this field')
+})
+
+test('resolveAudioOnlyLookIdsForMain: reads live/preview ids from scene.liveAudioOnly like resolveBusLookIdsForMain reads scene.live', () => {
+	const channelMap = { programChannels: [1], previewChannels: [2] }
+	const sceneExists = (id) => id === 'a1' || id === 'a2'
+
+	assert.deepEqual(
+		resolveAudioOnlyLookIdsForMain(0, { 1: { sceneId: 'a1' } }, channelMap, sceneExists),
+		{ pgmLookId: 'a1', prvLookId: null },
+	)
+	assert.deepEqual(
+		resolveAudioOnlyLookIdsForMain(0, { 2: { sceneId: 'a2' } }, channelMap, sceneExists),
+		{ pgmLookId: null, prvLookId: 'a2' },
+	)
+	assert.deepEqual(
+		resolveAudioOnlyLookIdsForMain(0, {}, channelMap, sceneExists),
+		{ pgmLookId: null, prvLookId: null },
+		'no live audio-only entry for this main -> both null',
+	)
+	assert.deepEqual(
+		resolveAudioOnlyLookIdsForMain(0, { 1: { sceneId: 'deleted-look' } }, channelMap, sceneExists),
+		{ pgmLookId: null, prvLookId: null },
+		'a sceneId the deck no longer has must not be reported as live',
+	)
+	// PGM-only main (no separate PRV channel): a live PGM audio-only look is not also reported as preview.
+	assert.deepEqual(
+		resolveAudioOnlyLookIdsForMain(0, { 1: { sceneId: 'a1' } }, { programChannels: [1], previewChannels: [] }, sceneExists),
+		{ pgmLookId: 'a1', prvLookId: null },
+	)
 })

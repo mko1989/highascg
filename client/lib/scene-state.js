@@ -349,17 +349,26 @@ export class SceneState {
 	/**
 	 * WO-572 Part C: flag a look as audio-only — taken/previewed on a fixed layer outside the
 	 * normal look band, never touching whatever video look is live on the same screen. Only the
-	 * look's first layer plays; see src/engine/audio-only-look.js for the take-side behavior.
+	 * look's first layer ever plays (see src/engine/audio-only-look.js), so turning this ON trims
+	 * any extra layers rather than leaving a look whose editor shows layers that can never play —
+	 * that mismatch was gap #1 from the first pass at this feature.
 	 * @param {string} id
 	 * @param {boolean} audioOnly
+	 * @returns {{ trimmedCount: number }}
 	 */
 	setSceneAudioOnly(id, audioOnly) {
 		const s = this.getScene(id)
-		if (!s) return
+		if (!s) return { trimmedCount: 0 }
 		const next = !!audioOnly
-		if (!!s.audioOnlyLook === next) return
+		let trimmedCount = 0
+		if (next && Array.isArray(s.layers) && s.layers.length > 1) {
+			trimmedCount = s.layers.length - 1
+			s.layers.length = 1
+		}
+		if (!!s.audioOnlyLook === next && trimmedCount === 0) return { trimmedCount: 0 }
 		s.audioOnlyLook = next
 		this._save()
+		return { trimmedCount }
 	}
 
 	setLiveSceneId(id, mainIdx, opts = {}) {

@@ -228,4 +228,24 @@
 	font-size: 11px;
 	text-shadow: 0 0 3px #000;
 	pointer-events: none;
+	transition: filter 0.15s ease;
+}
+
+/* WO-572 follow-up: distinct cyan ring for "this audio-only look is actually playing/staged" —
+ * deliberately NOT the video look's red/green (--live/--preview) ring: an audio-only look can be
+ * live at the same time as an unrelated video look on the same screen, and reusing that ring would
+ * read as "this replaced the screen", which it never does. */
+.scenes-card--audio-live .scenes-card__audio-only-badge {
+	filter: drop-shadow(0 0 4px #22d3ee);
+}
+.scenes-card--audio-preview:not(.scenes-card--audio-live) .scenes-card__audio-only-badge {
+	filter: drop-shadow(0 0 4px #a78bfa);
+}
+.scenes-card--audio-live:not(.scenes-card--live):not(.scenes-card--preview) {
+	border-color: rgba(34, 211, 238, 0.6);
+	box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.35);
+}
+.scenes-card--audio-preview:not(.scenes-card--audio-live):not(.scenes-card--live):not(.scenes-card--preview) {
+	border-color: rgba(167, 139, 250, 0.6);
+	box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.35);
 }
