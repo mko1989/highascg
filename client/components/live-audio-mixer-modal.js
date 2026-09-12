@@ -117,7 +117,9 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 					targets.push({ channel: ch, layer: destLayer })
 				}
 			}
-			routeTargets.push(targets.length ? targets : getMultiPlayTargets(i))
+			// Always the scanned DOM state, even empty — "none checked" must persist as "route to
+			// nothing", not silently fall back to a stale localStorage selection (WO-571).
+			routeTargets.push(targets)
 		}
 
 		return {
@@ -198,7 +200,9 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 		const labels = []
 		const routeTargets = []
 		for (let i = 1; i <= LIVE_AUDIO_MAX_SLOTS; i++) {
-			routeTargets.push(getMultiPlayTargets(i))
+			// Persisted server selection is authoritative once the slot has been saved through
+			// these buttons; only a slot that's never been touched falls back to localStorage.
+			routeTargets.push(ui.routeTargets?.[i - 1] ?? getMultiPlayTargets(i))
 			labels.push('')
 		}
 		container.innerHTML = `

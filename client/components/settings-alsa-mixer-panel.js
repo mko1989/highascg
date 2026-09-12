@@ -47,6 +47,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 
 	let currentCard = 0
 	let lastPayload = null
+	let userPickedCard = false
 
 	const setStatus = (msg, ok = true) => {
 		if (!statusEl) return
@@ -82,6 +83,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			const muted = !!(ctrl.muted ?? ctrl.mute)
 			const dB = ctrl.dB != null ? `${Number(ctrl.dB).toFixed(1)} dB` : ''
 			const channels = Array.isArray(ctrl.channels) ? ctrl.channels.join(', ') : ''
+			const idxAttr = ctrl.index != null && Number.isFinite(parseInt(String(ctrl.index), 10)) ? ` data-index="${ctrl.index}"` : ''
 
 			if (ty === 'enum' || ty === 'enumerated') {
 				const items = Array.isArray(ctrl.items) ? ctrl.items : []
@@ -89,7 +91,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 				html += `
 					<div class="alsa-mixer-panel__row" data-name="${escapeHtml(name)}">
 						<div class="alsa-mixer-panel__label" title="${escapeHtml(channels)}">${escapeHtml(name)}</div>
-						<select class="alsa-mixer-panel__enum" data-name="${escapeHtml(name)}">
+						<select class="alsa-mixer-panel__enum" data-name="${escapeHtml(name)}"${idxAttr}>
 							${items
 								.map((it) => {
 									const v = String(typeof it === 'object' ? it.value ?? it.name : it)
@@ -108,7 +110,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 					<div class="alsa-mixer-panel__row" data-name="${escapeHtml(name)}">
 						<div class="alsa-mixer-panel__label">${escapeHtml(name)}</div>
 						<label class="alsa-mixer-panel__bool">
-							<input type="checkbox" class="alsa-mixer-panel__switch" data-name="${escapeHtml(name)}" ${on ? 'checked' : ''} />
+							<input type="checkbox" class="alsa-mixer-panel__switch" data-name="${escapeHtml(name)}"${idxAttr} ${on ? 'checked' : ''} />
 							<span>${on ? 'On' : 'Off'}</span>
 						</label>
 					</div>`
@@ -119,8 +121,8 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			html += `
 				<div class="alsa-mixer-panel__row alsa-mixer-panel__row--volume" data-name="${escapeHtml(name)}">
 					<div class="alsa-mixer-panel__label" title="${escapeHtml(channels)}">${escapeHtml(name)}</div>
-					<button type="button" class="alsa-mixer-panel__mute${muted ? ' alsa-mixer-panel__mute--active' : ''}" data-name="${escapeHtml(name)}" title="Mute">${muted ? 'M' : '—'}</button>
-					<input type="range" class="alsa-mixer-panel__slider" min="0" max="100" value="${pct}" data-name="${escapeHtml(name)}" aria-label="${escapeHtml(name)} volume" />
+					<button type="button" class="alsa-mixer-panel__mute${muted ? ' alsa-mixer-panel__mute--active' : ''}" data-name="${escapeHtml(name)}"${idxAttr} title="Mute">${muted ? 'M' : '—'}</button>
+					<input type="range" class="alsa-mixer-panel__slider" min="0" max="100" value="${pct}" data-name="${escapeHtml(name)}"${idxAttr} aria-label="${escapeHtml(name)} volume" />
 					<span class="alsa-mixer-panel__val">${pct}%${dB ? ` · ${escapeHtml(dB)}` : ''}</span>
 				</div>`
 		}
@@ -128,13 +130,21 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 		bindControlHandlers()
 	}
 
+	function controlIndex(el) {
+		const raw = el.dataset.index
+		if (raw == null || raw === '') return undefined
+		const idx = parseInt(raw, 10)
+		return Number.isFinite(idx) ? idx : undefined
+	}
+
 	function bindControlHandlers() {
 		controlsEl.querySelectorAll('.alsa-mixer-panel__slider').forEach((slider) => {
 			const name = slider.dataset.name || ''
+			const index = controlIndex(slider)
 			const valEl = slider.closest('.alsa-mixer-panel__row')?.querySelector('.alsa-mixer-panel__val')
 			const post = debounceAlsaSet(async () => {
 				try {
-					await setAlsaMixerControl({ card: currentCard, name, percent: parseInt(String(slider.value), 10) || 0 })
+					await setAlsaMixerControl({ card: currentCard, name, index, percent: parseInt(String(slider.value), 10) || 0 })
 				} catch (e) {
 					setStatus(e?.message || String(e), false)
 				}
@@ -145,7 +155,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			})
 			slider.addEventListener('change', async () => {
 				try {
-					await setAlsaMixerControl({ card: currentCard, name, percent: parseInt(String(slider.value), 10) || 0 })
+					await setAlsaMixerControl({ card: currentCard, name, index, percent: parseInt(String(slider.value), 10) || 0 })
 				} catch (e) {
 					setStatus(e?.message || String(e), false)
 				}
@@ -155,11 +165,12 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 		controlsEl.querySelectorAll('.alsa-mixer-panel__mute').forEach((btn) => {
 			btn.addEventListener('click', async () => {
 				const name = btn.dataset.name || ''
+				const index = controlIndex(btn)
 				const next = !btn.classList.contains('alsa-mixer-panel__mute--active')
 				btn.classList.toggle('alsa-mixer-panel__mute--active', next)
 				btn.textContent = next ? 'M' : '—'
 				try {
-					await setAlsaMixerControl({ card: currentCard, name, mute: next })
+					await setAlsaMixerControl({ card: currentCard, name, index, mute: next })
 				} catch (e) {
 					setStatus(e?.message || String(e), false)
 					btn.classList.toggle('alsa-mixer-panel__mute--active', !next)
@@ -171,8 +182,9 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 		controlsEl.querySelectorAll('.alsa-mixer-panel__enum').forEach((sel) => {
 			sel.addEventListener('change', async () => {
 				const name = sel.dataset.name || ''
+				const index = controlIndex(sel)
 				try {
-					await setAlsaMixerControl({ card: currentCard, name, item: sel.value })
+					await setAlsaMixerControl({ card: currentCard, name, index, item: sel.value })
 				} catch (e) {
 					setStatus(e?.message || String(e), false)
 				}
@@ -182,10 +194,11 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 		controlsEl.querySelectorAll('.alsa-mixer-panel__switch').forEach((chk) => {
 			chk.addEventListener('change', async () => {
 				const name = chk.dataset.name || ''
+				const index = controlIndex(chk)
 				const label = chk.closest('label')?.querySelector('span')
 				if (label) label.textContent = chk.checked ? 'On' : 'Off'
 				try {
-					await setAlsaMixerControl({ card: currentCard, name, value: chk.checked ? 1 : 0 })
+					await setAlsaMixerControl({ card: currentCard, name, index, value: chk.checked ? 1 : 0 })
 				} catch (e) {
 					setStatus(e?.message || String(e), false)
 					chk.checked = !chk.checked
@@ -202,6 +215,10 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 			lastPayload = raw
 			const norm = normalizeAlsaMixerPayload(raw)
 			currentCard = norm.card
+			if (!userPickedCard && norm.suggestedCard != null && norm.suggestedCard !== currentCard) {
+				currentCard = norm.suggestedCard
+				return load(refresh)
+			}
 			populateCardSelect(norm.cards, currentCard)
 			renderControls()
 			setStatus(`${norm.controls.length} control(s) on card ${currentCard}.`, true)
@@ -220,6 +237,7 @@ export async function mountAlsaMixerPanel(container, opts = {}) {
 	}
 
 	cardSel?.addEventListener('change', () => {
+		userPickedCard = true
 		currentCard = parseInt(String(cardSel.value || '0'), 10) || 0
 		void load(false)
 	})

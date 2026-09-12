@@ -27,7 +27,7 @@ export async function setAlsaMixerControl(body) {
 
 /**
  * @param {unknown} payload
- * @returns {{ card: number, cards: { card: number, name?: string }[], controls: object[] }}
+ * @returns {{ card: number, cards: { card: number, name?: string }[], controls: object[], suggestedCard: number|null }}
  */
 export function normalizeAlsaMixerPayload(payload) {
 	const p = payload && typeof payload === 'object' ? payload : {}
@@ -48,7 +48,8 @@ export function normalizeAlsaMixerPayload(payload) {
 	else if (p.playback || p.capture) {
 		controls = [...(Array.isArray(p.playback) ? p.playback : []), ...(Array.isArray(p.capture) ? p.capture : [])]
 	}
-	return { card, cards, controls: controls.filter((c) => c && typeof c === 'object') }
+	const suggestedCard = Number.isFinite(parseInt(String(p.suggestedCard), 10)) && p.suggestedCard != null ? parseInt(String(p.suggestedCard), 10) : null
+	return { card, cards, controls: controls.filter((c) => c && typeof c === 'object'), suggestedCard }
 }
 
 /**

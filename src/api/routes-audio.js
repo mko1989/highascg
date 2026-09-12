@@ -410,6 +410,17 @@ async function handlePost(path, body, ctx) {
 		for (let i = 1; i <= 8; i++) {
 			const key = `live_audio_input_${i}_device`
 			if (b[key] != null) cs[key] = normalizeAlsaCaptureUri(String(b[key]))
+			// WO-571: per-slot "Route to program" selection. Written (even as '') whenever the
+			// Live Audio Mixer saves that slot's route buttons — once present it overrides the
+			// legacy blanket live_audio_pgm_always_on routing for that slot.
+			const pgmKey = `live_audio_input_${i}_pgm_channels`
+			if (b[pgmKey] != null) {
+				const list = Array.isArray(b[pgmKey]) ? b[pgmKey] : String(b[pgmKey]).split(/[,;\s]+/)
+				cs[pgmKey] = list
+					.map((n) => parseInt(String(n), 10))
+					.filter((n) => Number.isFinite(n) && n >= 1)
+					.join(',')
+			}
 		}
 		if (b.live_audio_pgm_always_on != null) cs.live_audio_pgm_always_on = b.live_audio_pgm_always_on
 		// WO-333b: which slot feeds the shader-FFT tee (0/'' = none). Single-select by design.

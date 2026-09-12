@@ -1,11 +1,7 @@
 'use strict'
 
 const routingMap = require('./routing-map')
-const {
-	listConfiguredLiveAudioSlots,
-	resolveLiveAudioRouteString,
-	resolveLiveAudioPgmTargetScreens,
-} = require('./live-audio-input')
+const { listConfiguredLiveAudioSlots, resolveLiveAudioRouteString } = require('./live-audio-input')
 const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
 const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
 const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
@@ -96,7 +92,6 @@ async function setupV4l2Inputs(self) {
 }
 
 async function setupLiveAudioPgmRoutes(self) {
-	const map = routingMap.getChannelMap(self.config)
 	if (!self.amcp) return
 	const alwaysOn =
 		routingMap.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== false &&
@@ -105,7 +100,6 @@ async function setupLiveAudioPgmRoutes(self) {
 	const { slots } = listConfiguredLiveAudioSlots(self.config)
 	if (!slots.length) return
 
-	const screens = resolveLiveAudioPgmTargetScreens(self.config)
 	const baseLayer = Math.min(
 		9,
 		Math.max(1, parseInt(String(routingMap.readCasparSetting(self.config, 'live_audio_pgm_layer') ?? 2), 10) || 2),
@@ -115,19 +109,20 @@ async function setupLiveAudioPgmRoutes(self) {
 		routingMap.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === 'true'
 	const routes = []
 
-	for (const screen of screens) {
-		const pgmCh = map.programCh(screen)
-		if (!Number.isFinite(pgmCh) || pgmCh < 1) continue
-		for (let i = 0; i < slots.length; i++) {
-			const slot = slots[i]
-			const route =
-				slot.route || resolveLiveAudioRouteString(self.config, slot.slot)
-			if (!route) continue
-			const layer = baseLayer + i
-			if (layer > 9) {
-				self.log('warn', `Live audio PGM route skipped slot ${slot.slot} screen ${screen}: layer ${layer} exceeds audio track range 1–9`)
-				continue
-			}
+	// WO-571: each slot routes only to its own persisted `pgmChannels` selection (the Live Audio
+	// Mixer's per-slot "Route to program" buttons) — never blanket-routed to every PGM screen
+	// regardless of what's selected. A slot with none selected stays off PGM entirely.
+	for (let i = 0; i < slots.length; i++) {
+		const slot = slots[i]
+		if (!slot.pgmChannels.length) continue
+		const route = slot.route || resolveLiveAudioRouteString(self.config, slot.slot)
+		if (!route) continue
+		const layer = baseLayer + i
+		if (layer > 9) {
+			self.log('warn', `Live audio PGM route skipped slot ${slot.slot}: layer ${layer} exceeds audio track range 1–9`)
+			continue
+		}
+		for (const pgmCh of slot.pgmChannels) {
 			const cl = `${pgmCh}-${layer}`
 			try {
 				await self.amcp.raw(`PLAY ${cl} ${route}`)
@@ -137,7 +132,7 @@ async function setupLiveAudioPgmRoutes(self) {
 						await self.amcp.raw(`MIXER ${cl} VOLUME 1`)
 					} catch (_) {}
 				}
-				routes.push({ screen, channel: pgmCh, layer, route, audioOnly })
+				routes.push({ channel: pgmCh, layer, route, audioOnly })
 			} catch (e) {
 				self.log('warn', `Live audio PGM route ${cl} ${route}: ${e?.message || e}`)
 			}

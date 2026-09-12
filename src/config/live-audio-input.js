@@ -255,7 +255,7 @@ function resolveLiveAudioPlayClip(cfg, slot) {
 
 /**
  * @param {object} cfg
- * @returns {{ count: number, slots: Array<{ slot: number, layer: number, device: string, clip: string, route: string|null }> }}
+ * @returns {{ count: number, slots: Array<{ slot: number, layer: number, device: string, clip: string, route: string|null, pgmChannels: number[] }> }}
  */
 function listConfiguredLiveAudioSlots(cfg) {
 	const count = Math.min(8, Math.max(0, parseInt(String(readCasparSetting(cfg, 'live_audio_input_count') ?? 0), 10) || 0))
@@ -270,9 +270,34 @@ function listConfiguredLiveAudioSlots(cfg) {
 			device: readCasparSetting(cfg, `live_audio_input_${i}_device`),
 			clip,
 			route: resolveLiveAudioRouteString(cfg, i),
+			pgmChannels: resolveLiveAudioSlotPgmChannels(cfg, i),
 		})
 	}
 	return { count, slots }
+}
+
+/**
+ * Effective PGM channel numbers for one live-audio slot. `live_audio_input_N_pgm_channels` is
+ * written whenever the Live Audio Mixer's per-slot "Route to program" buttons are saved — even
+ * when saved with none checked — so once present it is authoritative (an empty list there means
+ * "route to nothing", not "fall back to auto-routing"). A slot never touched through that UI has
+ * no such key at all, and falls back to the legacy blanket `live_audio_pgm_always_on` +
+ * resolveLiveAudioPgmTargetScreens behavior so existing setups don't lose routing on upgrade.
+ * @param {object} cfg
+ * @param {number} slot
+ * @returns {number[]}
+ */
+function resolveLiveAudioSlotPgmChannels(cfg, slot) {
+	const raw = readCasparSetting(cfg, `live_audio_input_${slot}_pgm_channels`)
+	if (raw !== undefined) {
+		const list = Array.isArray(raw) ? raw : String(raw).split(/[,;\s]+/)
+		return list.map((n) => parseInt(String(n), 10)).filter((n) => Number.isFinite(n) && n >= 1)
+	}
+	const { getChannelMap } = require('./routing-map')
+	const map = getChannelMap(cfg)
+	return resolveLiveAudioPgmTargetScreens(cfg)
+		.map((screen) => map.programCh(screen))
+		.filter((n) => Number.isFinite(n) && n >= 1)
 }
 
 /**
@@ -328,16 +353,12 @@ function listLiveAudioPgmProtectedLayers(cfg) {
 		PGM_AUDIO_TRACK_LAYER_MAX,
 		Math.max(1, parseInt(String(readCasparSetting(cfg, 'live_audio_pgm_layer') ?? 2), 10) || 2),
 	)
-	const { getChannelMap } = require('./routing-map')
-	const map = getChannelMap(cfg)
 	const out = []
-	for (const screen of resolveLiveAudioPgmTargetScreens(cfg)) {
-		const pgmCh = map.programCh(screen)
-		if (!Number.isFinite(pgmCh) || pgmCh < 1) continue
-		for (let i = 0; i < slots.length; i++) {
-			const layer = baseLayer + i
-			if (layer < 1 || layer > PGM_AUDIO_TRACK_LAYER_MAX) continue
-			out.push({ channel: pgmCh, layer, slot: slots[i].slot, screen })
+	for (let i = 0; i < slots.length; i++) {
+		const layer = baseLayer + i
+		if (layer < 1 || layer > PGM_AUDIO_TRACK_LAYER_MAX) continue
+		for (const pgmCh of slots[i].pgmChannels) {
+			out.push({ channel: pgmCh, layer, slot: slots[i].slot })
 		}
 	}
 	return out
@@ -374,5 +395,6 @@ module.exports = {
 	resolveLiveAudioPlayClip,
 	listConfiguredLiveAudioSlots,
 	resolveLiveAudioPgmTargetScreens,
+	resolveLiveAudioSlotPgmChannels,
 	listLiveAudioPgmProtectedLayers,
 }

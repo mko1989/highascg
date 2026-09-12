@@ -149,12 +149,31 @@ export function readLiveAudioCasparSettings(cs) {
 	}
 	const ar = c.audioRouting && typeof c.audioRouting === 'object' ? c.audioRouting : {}
 	const ap = ar.audioPreview && typeof ar.audioPreview === 'object' ? ar.audioPreview : {}
+	const pgmLayerBase = parseInt(String(c.live_audio_pgm_layer ?? '2'), 10) || 2
+	/** Persisted per-slot "Route to program" selection — null when the slot has never been
+	 * saved through the Live Audio Mixer's route buttons (fall back to legacy behavior then),
+	 * an array (possibly empty) once it has (an explicit "route to nothing" is authoritative). */
+	const routeTargets = []
+	for (let i = 1; i <= LIVE_AUDIO_MAX_SLOTS; i++) {
+		const raw = c[`live_audio_input_${i}_pgm_channels`]
+		if (raw == null) {
+			routeTargets.push(null)
+			continue
+		}
+		const layer = Math.max(1, pgmLayerBase) + (i - 1)
+		const channels = String(raw)
+			.split(/[,;\s]+/)
+			.map((n) => parseInt(n, 10))
+			.filter((n) => Number.isFinite(n) && n >= 1)
+		routeTargets.push(channels.map((channel) => ({ channel, layer })))
+	}
 	return {
 		count,
 		slots,
+		routeTargets,
 		pgmAlwaysOn: c.live_audio_pgm_always_on !== false && c.live_audio_pgm_always_on !== 'false',
 		pgmScreen: parseInt(String(c.live_audio_pgm_screen ?? '1'), 10) || 1,
-		pgmLayer: parseInt(String(c.live_audio_pgm_layer ?? '2'), 10) || 2,
+		pgmLayer: pgmLayerBase,
 		pgmAudioOnly: c.live_audio_pgm_audio_only !== false && c.live_audio_pgm_audio_only !== 'false',
 		hostChannelEnabled:
 			c.live_audio_inputs_host_channel_enabled === true || c.live_audio_inputs_host_channel_enabled === 'true',
@@ -192,6 +211,10 @@ export function buildLiveAudioConfigBody(ui) {
 	}
 	for (let i = 1; i <= LIVE_AUDIO_MAX_SLOTS; i++) {
 		body[`live_audio_input_${i}_device`] = ui.slots[i - 1] || ''
+		const targets = ui.routeTargets?.[i - 1]
+		if (Array.isArray(targets)) {
+			body[`live_audio_input_${i}_pgm_channels`] = targets.map((t) => t.channel).join(',')
+		}
 	}
 	return body
 }
