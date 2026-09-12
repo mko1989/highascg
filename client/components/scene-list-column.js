@@ -15,6 +15,7 @@ import {
 	isTimersCacheLoaded,
 	refreshAllTimerButtons,
 } from './scene-list-column-timers.js'
+import { attachLookDeckReorder } from './scene-list-column-reorder.js'
 
 function isScenesDeckColBlankClick(target, colRoot) {
 	const t = /** @type {HTMLElement | null} */ (target)
@@ -183,6 +184,7 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 		if (isPreviewBusAvailable(cm, col)) {
 			grid.title = 'Click empty space to clear preview for this screen'
 		}
+		const reorder = attachLookDeckReorder(grid, sceneState)
 		if (scenes.length === 0) {
 			const empty = document.createElement('div')
 			empty.className = 'scenes-deck__empty scenes-deck__empty--tight scenes-deck__empty--clear-prv'
@@ -214,6 +216,7 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			const onPreview = !onPgm && (prvLookId === sc.id || armedPrvId === sc.id)
 			const isGlobal = sc.mainScope === 'all'
 			const cgOnly = isCgOnlyLook(sc)
+			const audioOnly = !!sc.audioOnlyLook
 			/* WO-360: looks carrying media Caspar doesn't know get a corner ⚠. */
 			const missingMedia = missingMediaInScene(sc)
 			// Scoped looks: live/preview styling only on the main they belong to (already filtered by getScenesForMain).
@@ -224,6 +227,7 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				(onPreview ? ' scenes-card--preview' : '') +
 				(isGlobal ? ' scenes-card--global' : '') +
 				(cgOnly ? ' scenes-card--cg-only' : '') +
+				(audioOnly ? ' scenes-card--audio-only' : '') +
 				(missingMedia.length ? ' scenes-card--missing-media' : '')
 			card.dataset.sceneId = String(sc.id)
 			if (missingMedia.length) {
@@ -232,6 +236,13 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				warn.textContent = '⚠'
 				warn.title = `Missing in Caspar media:\n${missingMedia.join('\n')}`
 				card.appendChild(warn)
+			}
+			if (audioOnly) {
+				const badge = document.createElement('span')
+				badge.className = 'scenes-card__audio-only-badge'
+				badge.textContent = '🔊'
+				badge.title = 'Audio-only look — plays without touching this screen\'s video layers'
+				card.appendChild(badge)
 			}
 			const header = document.createElement('div')
 			header.className = 'scenes-card__header'
@@ -275,6 +286,7 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			const thumbCanvas = document.createElement('canvas')
 			thumbCanvas.className = 'scenes-card__thumb-canvas'
 			thumbBtn.appendChild(thumbCanvas)
+			reorder.makeCardDraggable(card, thumbBtn, String(sc.id))
 			const footer = document.createElement('div')
 			footer.className = 'scenes-card__footer'
 			const takeBtn = document.createElement('button')

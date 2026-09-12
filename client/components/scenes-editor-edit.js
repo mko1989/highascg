@@ -58,6 +58,7 @@ export function renderEdit(ctx) {
 		<input type="text" class="scenes-edit-name" id="scenes-name" value="${escapeHtml(scene.name)}" placeholder="Look name" />
 		<button type="button" class="scenes-btn scenes-btn--take scenes-btn--icon" id="scenes-take-live">▶</button>
 		<button type="button" class="scenes-btn scenes-btn--sm" id="scenes-take-cut" title="Hard cut" aria-label="Hard cut">CUT</button>
+		<button type="button" class="scenes-btn scenes-btn--icon${scene.audioOnlyLook ? ' scenes-btn--active' : ''}" id="scenes-audio-only-toggle" title="Audio-only look — plays its first layer's audio without touching this screen's video layers">🔊</button>
 		<button type="button" class="scenes-btn scenes-btn--primary scenes-btn--icon" id="scenes-add-layer">＋</button>
 	`
 	// WO-272 edit-on-PGM: unmissable red LIVE indication — every edit in this session hits AIR
@@ -81,6 +82,10 @@ export function renderEdit(ctx) {
 		// WO-185 T185.2: Pass targetMains to take the edited scene to its configured main
 		const mainIdx = resolveMainIndexForScene(scene, sceneState)
 		void takeSceneToProgram(scene.id, true, { targetMains: [mainIdx] })
+	})
+	bar.querySelector('#scenes-audio-only-toggle').addEventListener('click', () => {
+		sceneState.setSceneAudioOnly(scene.id, !scene.audioOnlyLook)
+		renderEdit(ctx)
 	})
 	bar.querySelector('#scenes-back').addEventListener('click', () => {
 		void (async () => {

@@ -9,6 +9,8 @@ const playbackTracker = require('../state/playback-tracker')
 const liveSceneState = require('../state/live-scene-state')
 const { layerHasContent } = require('../engine/scene-transition')
 const { LOOK_LAYER_MIN, LOOK_LAYER_MAX } = require('../engine/look-layer-ranges')
+const { isAudioOnlyLook } = require('../engine/audio-only-look')
+const { handleAudioOnlyLookTake } = require('./routes-scene-take-audio-only')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
@@ -102,6 +104,14 @@ async function handleSceneTake(body, ctx) {
 			}),
 		}
 	}
+
+	// WO-572: an audio-only look plays on a fixed layer outside the normal look bands (see
+	// audio-only-look.js) — never enters buildTakeJobs/diffScenes, so it must branch off before
+	// the layer-numbering validation below (its layers aren't expected to sit in 10-99 at all).
+	if (isAudioOnlyLook(b.incomingScene)) {
+		return handleAudioOnlyLookTake(b, ctx, channel, b.incomingScene)
+	}
+
 	// WO-160 T160.3: logical look layers live in 10–99 (bank A physical = logical, bank B = +100).
 	// A stale client (old unbounded +10 numbering) must never write into the audio (1–9/101–109),
 	// bank B (110–199), timeline (210+) or PIP overlay (260+) bands.

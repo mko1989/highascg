@@ -323,12 +323,42 @@ export class SceneState {
 		this._save()
 	}
 
+	/** Move look `id` to sit right before look `beforeId` (or to the end when `beforeId` is falsy).
+	 * `scenes` is one flat array shared by every main — splicing at the target's own index keeps
+	 * every other look's relative order untouched, in this main's filtered view and every other's. */
+	reorderScene(id, beforeId) {
+		if (!id || id === beforeId) return
+		const from = this.scenes.findIndex((s) => s.id === id)
+		if (from < 0) return
+		const [scene] = this.scenes.splice(from, 1)
+		const to = beforeId ? this.scenes.findIndex((s) => s.id === beforeId) : -1
+		if (to < 0) this.scenes.push(scene)
+		else this.scenes.splice(to, 0, scene)
+		this._save()
+	}
+
 	setSceneName(id, name) {
 		const s = this.getScene(id)
 		if (!s) return
 		const next = (name || '').trim() || 'Untitled look'
 		if (s.name === next) return
 		s.name = next
+		this._save()
+	}
+
+	/**
+	 * WO-572 Part C: flag a look as audio-only — taken/previewed on a fixed layer outside the
+	 * normal look band, never touching whatever video look is live on the same screen. Only the
+	 * look's first layer plays; see src/engine/audio-only-look.js for the take-side behavior.
+	 * @param {string} id
+	 * @param {boolean} audioOnly
+	 */
+	setSceneAudioOnly(id, audioOnly) {
+		const s = this.getScene(id)
+		if (!s) return
+		const next = !!audioOnly
+		if (!!s.audioOnlyLook === next) return
+		s.audioOnlyLook = next
 		this._save()
 	}
 

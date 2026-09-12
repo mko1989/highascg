@@ -1,7 +1,7 @@
-**Status: IN PROGRESS (2026-09-12) — Part A (mixer button width) and Part B (still-image false
-positive) implemented, offline suite green, client build clean; not yet kiosk-reloaded/restarted
-on the box (live show, owner-QA owed). Part C (audio-only looks) not started — needs an owner
-decision, see §3.**
+**Status: IMPLEMENTED (2026-09-12) — Parts A, B, and C all landed. Offline suite 2431/2434 (the
+1 failing test is a pre-existing, unrelated timing flake in smoke-wo537 — see §"Verification"),
+client build clean. Not yet kiosk-reloaded/service-restarted on the box (live show, owner-QA
+owed for all three parts).**
 
 **Source:** `work/work-orders/todos12.09.26` (owner, verbatim):
 > i need you to do a review and fixing of the audio implementation and settings in highascg.
@@ -57,6 +57,81 @@ care that file already documents at length for duration — real work, not neede
 reported, and higher risk to make correctness-critical on a live box today. If a genuinely silent
 video file turns out to also need excluding, that's a follow-up with its own WO.
 
+## Part C — audio-only looks (single or playlist) that don't touch video layers
+
+Owner picked **per-screen, additive** over the channel-decoupled `route://`-style shape (asked
+live via AskUserQuestion — the two shapes have very different blast radius): a look flagged
+`audioOnlyLook: true` plays its first layer's audio (single clip or playlist) on a screen's own
+program channel, on a **fixed physical layer reserved outside every existing band**
+(`AUDIO_ONLY_LOOK_LAYER = 200`, new entry in the table in
+[look-layer-ranges.js](../../src/engine/look-layer-ranges.js), the 200-209 gap between the look
+bank-B ceiling (199) and `TIMELINE_LAYER_BASE` (210)). Because it never enters
+`buildTakeJobs`/`diffScenes`, and `isLookPhysicalLayer(200)` is already `false` by construction,
+neither taking nor clearing an audio-only look can ever touch the 10-99/110-199 look band a
+screen's real video look occupies — verified as a regression guard in the new smoke test, not just
+asserted.
+
+**New modules:**
+- [`src/engine/audio-only-look.js`](../../src/engine/audio-only-look.js) — `isAudioOnlyLook`,
+  `takeAudioOnlyLook`, `stopAudioOnlyLook`. Single clip: one `PLAY` with the layer's `loop` flag.
+  Playlist: `PLAY` item 0 immediately, then a **self-contained duration timer**
+  (`item.duration` seconds, default 5 — same field/convention as normal look playlists) schedules
+  the next item, looping forever until stopped. Deliberately NOT the OSC-driven advance engine
+  normal look playlists use (`scene-take-lbg-playlist.js`) — that engine's `physicalProgramLayer`
+  bank-offset formula would map layer 200 on bank B to 300, colliding with the PIP overlay band
+  (260-979). Staying off that machinery entirely sidesteps the collision without special-casing it,
+  at the cost of no LOADBG-AUTO preload / no crossfade between playlist items (acceptable v1
+  tradeoff — a Caspar-level hard cut between items, not a broadcast-grade concern for a background
+  audio bed). Preview plays item 0 once with no advance timer, matching the existing convention
+  that a previewed look's playlist is "staged, static" (todos27.07.26).
+- [`src/state/live-audio-only-look-state.js`](../../src/state/live-audio-only-look-state.js) — a
+  **separate** persisted map + WS broadcast path (`scene.liveAudioOnly`, key
+  `liveAudioOnlyLooksByChannel`, added to `persistence.js`'s `IMMEDIATE_KEYS`), deliberately not
+  reusing `live-scene-state.js`'s single-slot-per-channel `scene.live` map — a channel can have one
+  live video look AND one live audio-only look simultaneously, and `live-scene-state.js`'s
+  `all[ch] = {...}` overwrite would clobber whichever kind took second.
+- [`src/api/routes-scene-take-audio-only.js`](../../src/api/routes-scene-take-audio-only.js) —
+  `handleAudioOnlyLookTake`/`handleAudioOnlyLookStop`, split into its own file purely because
+  `routes-scene-take.js` was already at 485/500 lines. `handleSceneTake` branches here via
+  `isAudioOnlyLook(b.incomingScene)` **before** the existing "layer number must be 10-99" 400
+  guard (an audio-only scene's stored layer numbering is irrelevant — only `layers[0]` is read,
+  and only ever mapped to the fixed layer 200). New route: `POST /api/scene/audio-only/stop`.
+
+**Client wiring** (deliberately minimal — this is a v1 cut, see Known limitations below):
+- `client/lib/scene-state.js`: `setSceneAudioOnly(id, bool)`, mirrors `setSceneName`.
+- `client/components/scenes-editor-edit.js`: a 🔊 toggle button in the look editor's edit bar.
+- `client/components/scene-list-column.js` /
+  `client/styles/06a3-scenes-deck-multi.css`: a small 🔊 corner badge on audio-only look cards
+  (same pattern as the existing WO-360 ⚠ missing-media badge, opposite corner).
+- `client/lib/audio-mixer-rows.js`: a mixer row per live audio-only look (reads the new
+  `scene.liveAudioOnly` WS slice — no extra client wiring needed, `stateStore.applyChange` already
+  handles arbitrary paths generically), with `sceneId: null` so it doesn't try to render the
+  look cross-screen routing matrix.
+- `client/components/audio-mixer-panel-input-layers.js` /
+  `client/styles/07b-audio-mixer-modal-shell.css`: a ■ **Stop** button on that row
+  (`POST /api/scene/audio-only/stop`) — mute alone isn't enough, since muting an audio-only look
+  leaves it occupying layer 200 (blocking a different audio-only look from taking over) instead of
+  actually clearing it.
+
+**Known limitations (v1, honestly scoped rather than silently gapped):**
+- Only a look's **first** layer plays; additional layers on an "audio only" look are silently
+  ignored. Not validated against in the editor — the 🔊 toggle doesn't restrict adding more layers.
+- The deck's live/preview ring (`scenes-card--live`/`--preview`) is **not** wired for audio-only
+  looks — it reads `resolveBusLookIdsForMain` against `scene.live` only, which an audio-only look
+  never enters. An audio-only look's card gives no on-deck indication that it's currently playing;
+  the compact mixer's new row (and its 🔊 label) is the only live indicator today. Wiring the deck
+  ring needs a second parallel live/preview-id map client-side (`sceneState` currently hard-assumes
+  one live scene per channel) — real work, scoped out of this pass.
+- No crossfade between playlist items (hard cut via `PLAY`), and no crossfade when one audio-only
+  look replaces another on the same screen.
+- Not wired into the companion-bridge / look-air-frames broadcast that `live-scene-state.js` calls
+  on every `scene.live` change — Companion won't see audio-only look state.
+
+Note for whoever extends this: WO-306 (media-layer cross-channel audio routing — a *different*
+per-layer routing feature) was explicitly **rejected by the owner** ("the current way is how
+caspar works and is fine"). This feature is not that — it's a dedicated look type, not a routing
+toggle on ordinary look layers — worth naming that distinction if it ever comes up.
+
 ## Verification (Parts A & B)
 
 - `node tools/ci/run-offline-tests.js`: 2421/2424 pass, 2 skipped (pre-existing, both
@@ -68,34 +143,46 @@ video file turns out to also need excluding, that's a follow-up with its own WO.
 - **Owner-QA owed:** kiosk reload to see the buttons at their new size and confirm the two jpg
   layers drop out of the mixer live, on this show.
 
-## Part C — audio-only looks (single or playlist) that don't touch video layers
+## Verification (Part C)
 
-**Not started — needs an owner decision before writing any code**, flagged live in this session
-via AskUserQuestion rather than guessed at, because the two shapes have very different blast
-radius and neither is obviously "smaller":
+- New smoke test `tools/smoke/smoke-wo572-audio-only-look.test.js` (10 tests, added to the curated
+  list in `tools/ci/run-offline-tests.js`): layer-200 exclusion from `isLookPhysicalLayer`, single
+  clip take, playlist advance timing, preview-does-not-advance, stop-cancels-pending-timer,
+  take/stop touch `liveAudioOnlyLookState`/`scene.liveAudioOnly` and never `liveSceneState`/
+  `scene.live`, preview-with-no-preview-bus rejects with 400 and sends no AMCP, and
+  `handleSceneTake` branches to the audio-only path before the normal 10-99 layer-numbering guard.
+- Caught and fixed a real bug during test-writing: the playlist-advance duration calc had an
+  incorrect `Math.max(1, seconds)` floor that silently forced every item to a 1-second minimum
+  regardless of its configured duration — found because the test's 60ms wait assertion failed,
+  which (before a `try/finally` was added around it) left the infinite playlist-advance timer
+  chain running forever in the background and hung the whole `node --test` process. Both the
+  production bug and the test-hygiene gap are fixed.
+- Full offline suite after adding this file: 2431/2434 (same pre-existing smoke-wo537 timing flake
+  as Parts A/B, unrelated).
+- `npm run build:client`: clean.
+- **Owner-QA owed (nothing live-verified — no kiosk reload / service restart performed, per "on
+  show, don't do anything destructive"):** create an audio-only look via the 🔊 toggle, Take it to
+  a screen already showing video, confirm the video is untouched and the audio plays; confirm the
+  new mixer row appears with a working fader/mute/Stop; confirm a playlist advances and loops;
+  confirm Stop actually silences it (not just mutes).
 
-1. **Per-screen, additive:** the audio-only look plays into a small number of layer slots
-   reserved outside the normal look band (mirroring the existing reserved 1-9 / 101-109 band that
-   always-on live-audio buses already use — see
-   [look-layer-ranges.js](../../src/engine/look-layer-ranges.js)), on a chosen screen's own
-   program channel. Taking/clearing it must never enter the normal look diff/exit path for that
-   channel's 10-99/110-199 band, so it can start, change, or stop without touching whatever video
-   look is live. Playlists reuse the existing per-layer `sourceMode: 'list'` mechanism
-   ([scene-take-lbg-jobs.js](../../src/engine/scene-take-lbg-jobs.js)).
-2. **Channel-decoupled:** mirror `route://` live-audio-inputs
-   ([live-audio-input.js](../../src/config/live-audio-input.js)) — its own dedicated Caspar
-   channel, not bound to any screen, mixed into PGM(s) via `route://<ch>`. Plays regardless of
-   which look is live on any screen, at the cost of a new channel + routing-map allocation
-   (`extra_audio_channel_count` / `audioOnlyChannels[]` already exists as a building block in
-   `routing-map.js`, per investigation, currently unused).
-
-Note for whoever picks this up: WO-306 (media-layer cross-channel audio routing — a *different*
-per-layer routing feature) was explicitly **rejected by the owner** ("the current way is how
-caspar works and is fine"). Neither shape above proposes that; both are scoped to a dedicated new
-look type, not a routing toggle on ordinary look layers. Worth naming that distinction to the
-owner up front so the rejection doesn't get assumed to cover this too.
-
-## Files touched (Parts A & B)
+## Files touched (Part A, B, C)
 
 - `client/styles/07c4-audio-mixer-view-matrix-empty-modal.css`
 - `client/lib/audio-mixer-rows.js`
+- `src/engine/look-layer-ranges.js` (new `AUDIO_ONLY_LOOK_LAYER` constant)
+- `src/engine/audio-only-look.js` (new)
+- `src/state/live-audio-only-look-state.js` (new)
+- `src/api/routes-scene-take-audio-only.js` (new)
+- `src/api/routes-scene-take.js` (early branch to the audio-only path)
+- `src/api/routes-scene.js` (new `POST /api/scene/audio-only/stop` route)
+- `src/utils/persistence.js` (`liveAudioOnlyLooksByChannel` added to `IMMEDIATE_KEYS`)
+- `client/lib/scene-state.js` (`setSceneAudioOnly`)
+- `client/components/scenes-editor-edit.js` (🔊 toggle button)
+- `client/components/scene-list-column.js` (deck card badge)
+- `client/styles/06a3-scenes-deck-multi.css` (badge CSS)
+- `client/styles/06a1-scenes-deck-toolbar.css` (`.scenes-btn--active`)
+- `client/components/audio-mixer-panel-input-layers.js` (Stop button)
+- `client/styles/07b-audio-mixer-modal-shell.css` (`.audio-mixer__stop-btn`)
+- `tools/smoke/smoke-wo572-audio-only-look.test.js` (new, 10 tests)
+- `tools/ci/run-offline-tests.js` (added the new test file to the curated list)

@@ -158,6 +158,13 @@
 	line-height: 1;
 }
 
+/* WO-572: generic toggled-on state for an icon button (e.g. the "Audio only" look toggle). */
+.scenes-btn--active {
+	background: #166534;
+	border-color: #22c55e;
+	color: #fff;
+}
+
 .scenes-toolbar__global-take {
 	display: flex;
 	align-items: center;

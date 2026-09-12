@@ -9,6 +9,7 @@
  * | Look layers, bank A           | 10–99     | logical = physical (consecutive from 10, step 1)
  * | Audio / route buses, bank B   | 101–109   |
  * | Look layers, bank B           | 110–199   | logical + 100
+ * | Audio-only looks (WO-572)     | 200–209   | single fixed layer per channel today (200); reserved range for future slots
  * | Timelines                     | 210–259   |
  * | PIP overlays                  | 260–979   | 4 slots per content layer, both banks
  * | Editing chrome (WO-339)       | 980–995   | PRV-only, non-persisted; single CG layer 990 today
@@ -27,6 +28,12 @@ const PGM_AUDIO_TRACK_LAYER_MAX = 9
 
 /** Bank B physical offset (logical N → N + offset on bank b). */
 const PGM_BANK_B_OFFSET = 100
+
+/** WO-572 — audio-only looks (additive: play without touching a screen's video look layers).
+ * Fixed physical layer, both banks share it since it never participates in bank-swap crossfades —
+ * a new audio-only take just PLAYs over whatever was there. Sits in the 200–209 gap between the
+ * look bank B ceiling (199) and TIMELINE_LAYER_BASE (210); only 200 is used today. */
+const AUDIO_ONLY_LOOK_LAYER = 200
 
 /** Timeline clips play on TIMELINE_LAYER_BASE + layerIndex (WO-160: 200 → 210, clear of look overflow). */
 const TIMELINE_LAYER_BASE = 210
@@ -161,6 +168,7 @@ module.exports = {
 	LOOK_LAYER_MAX,
 	PGM_AUDIO_TRACK_LAYER_MAX,
 	PGM_BANK_B_OFFSET,
+	AUDIO_ONLY_LOOK_LAYER,
 	TIMELINE_LAYER_BASE,
 	TIMELINE_LAYER_MAX_COUNT,
 	PIP_OVERLAY_BAND_BASE,

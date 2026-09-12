@@ -34,6 +34,7 @@ const FLUSH_DEBOUNCE_MS = Math.max(
 /** Keys flushed immediately (on-air / operator-critical). */
 const IMMEDIATE_KEYS = new Set([
 	'liveScenesByProgramChannel',
+	'liveAudioOnlyLooksByChannel',
 	'scene_deck',
 	'multiviewLayout',
 	'web_project',

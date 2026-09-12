@@ -218,3 +218,14 @@
 	pointer-events: auto;
 	cursor: help;
 }
+
+/* WO-572 — audio-only look: plays its first layer's audio without touching this screen's video. */
+.scenes-card__audio-only-badge {
+	position: absolute;
+	top: 2px;
+	right: 2px;
+	z-index: 3;
+	font-size: 11px;
+	text-shadow: 0 0 3px #000;
+	pointer-events: none;
+}

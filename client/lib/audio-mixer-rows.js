@@ -223,6 +223,36 @@ export function collectProgramAudioRows(stateStore, { masterLabel, previewLabel,
 		})
 	}
 
+	// WO-572 Part C: audio-only looks live on a fixed layer (200) outside the normal look band,
+	// tracked in a separate WS-pushed slice (scene.liveAudioOnly) so they never clobber — or get
+	// clobbered by — that channel's normal video look in scene.live. sceneId stays null (like the
+	// live-audio-slot rows above) so this doesn't try to render the look cross-screen matrix.
+	const AUDIO_ONLY_LOOK_LAYER = 200
+	const liveAudioOnly = stateStore.getState()?.scene?.liveAudioOnly || {}
+	for (const ch of programChannels) {
+		const entry = liveAudioOnly[ch] ?? liveAudioOnly[String(ch)]
+		const scene = entry?.scene
+		if (!scene) continue
+		const lKey = `pgm:${ch}:layer:${AUDIO_ONLY_LOOK_LAYER}`
+		if (rowKeys.has(lKey)) continue
+		rowKeys.add(lKey)
+		const fullName = String(scene.name || 'Audio only').trim()
+		const shortName = shortenMediaName(fullName, { max: labelMax, tailChars: labelTailChars })
+		rows.push({
+			key: lKey,
+			ch,
+			layer: AUDIO_ONLY_LOOK_LAYER,
+			label: `🔊 ${shortName}`,
+			labelTitle: `${fullName} (Audio-only look · Ch ${ch} L${AUDIO_ONLY_LOOK_LAYER})`,
+			v: audioMixerState.getMasterVolume(lKey),
+			muted: audioMixerState.getMuted(lKey),
+			isMaster: false,
+			audioRoute: '1+2',
+			sceneId: null,
+			isAudioOnlyLook: true,
+		})
+	}
+
 	return {
 		programChannels,
 		rows,

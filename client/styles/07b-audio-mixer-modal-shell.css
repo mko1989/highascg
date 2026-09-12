@@ -256,7 +256,7 @@ input[type="range"].audio-mixer__fader-vertical {
 	color: #dcfce7;
 }
 
-.audio-mixer__solo-btn, .audio-mixer__mute-btn, .audio-mixer__start-btn {
+.audio-mixer__solo-btn, .audio-mixer__mute-btn, .audio-mixer__start-btn, .audio-mixer__stop-btn {
 	width: 18px;
 	height: 18px;
 	padding: 0;
@@ -273,7 +273,7 @@ input[type="range"].audio-mixer__fader-vertical {
 	transition: all 0.15s ease;
 }
 
-.audio-mixer__solo-btn:hover, .audio-mixer__mute-btn:hover {
+.audio-mixer__solo-btn:hover, .audio-mixer__mute-btn:hover, .audio-mixer__stop-btn:hover {
 	background: rgba(255, 255, 255, 0.12);
 	color: var(--text);
 }

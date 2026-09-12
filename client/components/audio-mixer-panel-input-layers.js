@@ -105,6 +105,9 @@ export function renderInspectorProgramInputLayers(
 			const soloHtml = `<button type="button" class="audio-mixer__solo-btn${isSolo ? ' audio-mixer__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this layer to monitor">S</button>`
 			const isMuted = !!r.muted
 			const muteHtml = `<button type="button" class="audio-mixer__mute-btn${isMuted ? ' audio-mixer__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute this layer">M</button>`
+			const stopHtml = r.isAudioOnlyLook
+				? `<button type="button" class="audio-mixer__stop-btn" data-key="${escapeAttr(r.key)}" title="Stop this audio-only look">■</button>`
+				: ''
 			const labelTitle = r.labelTitle || r.label
 			const sourceAudioLabel = r.sourceAudioPair ? ` (src ${r.sourceAudioPair})` : ''
 			row.innerHTML = `
@@ -114,6 +117,7 @@ export function renderInspectorProgramInputLayers(
 					<div class="audio-mixer__layer-actions">
 						${soloHtml}
 						${muteHtml}
+						${stopHtml}
 						${routeHtml}
 					</div>
 				</div>
@@ -191,6 +195,17 @@ export function renderInspectorProgramInputLayers(
 						})
 					} catch (e) {
 						console.warn('MUTE playout update failed:', e?.message || e)
+					}
+				}
+			}
+
+			const stopBtn = row.querySelector('.audio-mixer__stop-btn')
+			if (stopBtn) {
+				stopBtn.onclick = async () => {
+					try {
+						await api.post('/api/scene/audio-only/stop', { channel: r.ch })
+					} catch (e) {
+						showScenesToast?.(`Stop audio-only look failed: ${e?.message || e}`, 'error')
 					}
 				}
 			}
