@@ -6,12 +6,17 @@ import { settingsState } from './settings-state.js'
 import { enumerateLiveAudioMixerSlots, readLiveAudioCasparSettings } from './live-audio-inputs.js'
 import { listAudioInputChannels, LIVE_AUDIO_INPUT_LAYER, liveAudioInputForSlot } from './input-channels.js'
 import { timelineState } from './timeline-state.js'
+import { classifyMediaKind } from './media-ext.js'
 
-/** Layers that expose a per-strip fader in the program mixer. */
+/**
+ * Layers that expose a per-strip fader in the program mixer. Still images (jpg/png/...) never
+ * carry audio — filename-only check, same classifier the loop/thumb UI already trusts — so they
+ * no longer get a mixer strip identical to a real audio-bearing clip's.
+ */
 export function layerHasMixerAudio(layer) {
 	const src = layer?.source
 	if (!src) return false
-	if (isMediaOrFileSource(src)) return true
+	if (isMediaOrFileSource(src)) return classifyMediaKind(src.value) !== 'still'
 	return String(src.type || '').toLowerCase() === 'live_audio' && !!src.value
 }
 
