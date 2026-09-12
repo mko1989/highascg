@@ -155,16 +155,25 @@ Closed 3 of the 4 limitations above:
    switched on (with a toast telling the operator how many were removed), and the editor's `+ Add
    Layer` button is disabled once an audio-only look already has its one layer — so the editor can
    no longer show layers that could never play.
-4. **Companion bridge — investigated, partially closed, rest is out of this repo's reach.** The
-   companion-module plugin code itself isn't in this checkout (it's a separate repo — see the
-   `@see companion-module-casparcg-server/src/live-scene-state.js` cross-reference already in that
-   file), so button-feedback logic there can't be touched from here. What WAS a real, verifiable
-   gap in this repo: `src/api/get-state.js`'s full bootstrap snapshot builds `scene: {live: ...}`
-   by hand (not generically) and never included `liveAudioOnly` — so any FRESH client connecting
-   (a browser reload, or Companion connecting/reconnecting) would never see audio-only look state
-   at all, even though already-connected clients got it fine via the incremental WS broadcast.
-   Fixed: `scene.liveAudioOnly` now ships in the bootstrap snapshot too. Whether Companion's own
-   button feedback acts on it is that other repo's work, not this one's.
+4. **Companion bridge — closed, in both repos.** Corrected after the owner pointed out the actual
+   module location: `~/companion-module-dev/companion-module-highpass-highascg` (a sibling repo,
+   not the `companion-module-casparcg-server` name the cross-reference comment implied). This
+   repo's half: `src/api/get-state.js`'s full bootstrap snapshot builds `scene: {live: ...}` by
+   hand (not generically) and never included `liveAudioOnly` — so any fresh client connecting (a
+   browser reload, or Companion reconnecting) would never see audio-only look state at all, even
+   though already-connected clients got it fine via the incremental WS broadcast. Fixed:
+   `scene.liveAudioOnly` now ships in the bootstrap snapshot too.
+
+   The Companion module's own half (separate commit, that repo): its WS client only forwarded the
+   `"scene.live"` change path — a `"scene.liveAudioOnly"` event matched no branch and was silently
+   dropped; its `_deepMergeScene` hand-picks surviving `scene.*` sub-keys (only `live`/`deck`) and
+   would have dropped it a second time even with the WS fix; and no feedback ever read the field
+   once it existed. Fixed all three, and added the missing control-side counterpart: two new
+   feedbacks (`look_audio_only_is_live` / `look_audio_only_is_preview`, cyan/violet to match this
+   repo's own deck ring for the same state) and a `look_audio_only_stop` action mirroring the web
+   UI's mixer Stop button. Audio-only looks needed no changes to appear in the existing look
+   dropdown or to be taken/cued via the existing take action — both already flow through
+   generically, no look-kind filtering anywhere in that path. 7 new tests there, full suite 48/48.
 
 ## Verification (follow-up)
 
