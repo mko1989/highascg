@@ -1,6 +1,6 @@
 # Work Order 574: Multi-screen take (preset ▶ / global take) starts the screens at different times
 
-**Status: IN PROGRESS — implemented + offline-tested (2451 tests, 0 fail); owner-QA on the real two-screen rig owed (not measured on air)**
+**Status: IN PROGRESS — implemented + offline-tested (2454 tests, 0 fail); owner-QA on the real two-screen rig owed (not measured on air)**
 
 **Parent / context:** WO-150 B150.6 (concurrent per-channel take POSTs), WO-259 (two-phase BEGIN…COMMIT take batching)
 
@@ -38,16 +38,33 @@ Rendezvous barrier just before Phase B; everything before it (staging, LOADBG, P
   the group wait out the timeout).
 - Alternative rejected: a barrier at the route level before the PGM `runSceneTakeLbg` — leaves Phase A + warm-up skew
   in front of the PLAY, which is the part that varies most.
-- Residual skew: Phase B of each channel still goes out over the one shared AMCP connection back-to-back (a BEGIN…COMMIT
-  each), i.e. wire time of one batch (single-digit ms) — not addressed.
-- Unrelated to this WO: `scene-take-lbg.js` was already 522 lines at HEAD (over the 500-line CI limit); this adds 1 line.
-  Needs a split under WO-221's approach.
+- **Round 2 (owner 21.09: "the per-screen amcp plays should be batched together as the last amcp sent")**: the barrier
+  alone still left each channel sending its OWN Phase B (BEGIN…COMMIT) back-to-back over the shared AMCP connection.
+  Now a take hands its Phase B over as a *plan* `{amcp, channel, leadingCommit, block, trailingCommit}`
+  (`playSync.arrive(plan)` from `sendStaggeredTakePlays`' two-phase path) and the group sends ALL screens' plans as one
+  merged sequence on release: every leading `MIXER n COMMIT` (parallel) → ONE `BEGIN…COMMIT` with all screens' PLAY/fade
+  lines (forceBatch, the last batch sent) → trailing `MIXER n COMMIT`s (parallel; these fire the deferred tweens —
+  they cannot live inside a batch). A send failure rejects every waiting take (each logs its own Phase B failure).
+  Branches with no plan (timeline-only, shader-only, rollback `take_two_phase_batch:false`) call `playSync.arrive()`
+  as a plain gate and send their own lines. `playSync` replaces the earlier `awaitPlayBarrier` option.
+  Caveat: `batchSendChunked` splits at `amcp_max_batch_commands` (default 64) — a merged block over that limit is sent as
+  two consecutive batches (screen 1's lines first), still back-to-back but no longer one atomic batch. Two screens'
+  looks normally stay well under it; raise `HIGHASCG_AMCP_MAX_BATCH` if a very large preset needs it.
+  Physical limit: the channels' own frame clocks — a batch applied "at once" still lands on each channel's next frame.
+- Split (owner asked): `scene-take-lbg.js` was 522 lines at HEAD (over the CI limit). Post-teardown bank bookkeeping
+  (skipped-layer SWAP, pointer flip, vacated-layer CLEAR, orphan sweep, timersVisibility) moved verbatim into
+  `scene-take-lbg-bank-finalize.js` (`finalizeTakeBankState`) → 448 + 129 lines; `check-max-file-lines` now 0 over.
 
 ## 3. VERIFIED
 
 - `tools/smoke/smoke-wo574-multi-screen-take-sync-barrier.test.js` (6 tests, in the curated list): released together only
   when the last peer arrives (Δ<25 ms), leave/throw releases the slot, timeout caps a missing peer + straggler passes,
   and source pins for client tagging / server wiring / barrier position between warm-up and Phase B.
-- `npm run test:ci`: 2451 tests, 2449 pass, 0 fail, 2 skipped.
+- Round 2 tests (fake AMCP recording wire order): nothing sent until the last screen is ready; ONE batch containing both
+  screens' lines, leading commits before it, trailing commit only where requested, after it; failure rejects all
+  screens; a straggler after timeout sends its own plan.
+- The split is covered by the existing behavioural smokes that drive `runSceneTakeLbg` (wo209 bankless, wo218 bank-drift,
+  wo259 two-phase) + the source-text pins, all green.
+- `npm run test:ci`: 2454 tests, 2452 pass, 0 fail, 2 skipped.
 - NOT verified: real-rig timing. Owner-QA: recall a 2-screen preset with ▶ and compare the two screens' transition starts;
   server log has no barrier line yet — if skew persists, add a timestamp log at `awaitPlayBarrier` release.

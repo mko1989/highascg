@@ -84,7 +84,61 @@ test('withTakeGroup releases the slot even when the take throws', async () => {
 	assert.ok(Date.now() - t0 < 500)
 })
 
-test('wiring: client tags batched POSTs, server passes the barrier into the PGM take, pipeline awaits it before Phase B', () => {
+/** Fake AMCP client recording the exact wire order. */
+function fakeAmcp(log) {
+	return {
+		mixerCommit: async (ch) => void log.push(`COMMIT ${ch}`),
+		batchSendChunked: async (lines, opts) => void log.push({ batch: lines, opts }),
+	}
+}
+
+test('Phase B of every screen goes out as ONE merged batch, the last batch sent, with commits around it', async () => {
+	const g = { id: 'wo574-merge', size: 2 }
+	const log = []
+	const amcp = fakeAmcp(log)
+	const a = joinTakeGroup(g)
+	const b = joinTakeGroup(g)
+	const pa = a.arrive({ amcp, channel: 1, leadingCommit: true, block: ['PLAY 1-10', 'MIXER 1-110 OPACITY 1 25'], trailingCommit: true })
+	await tick(40)
+	assert.deepEqual(log, [], 'nothing is sent until the last screen is ready')
+	const pb = b.arrive({ amcp, channel: 2, leadingCommit: true, block: ['PLAY 2-10'], trailingCommit: false })
+	await Promise.all([pa, pb])
+	const batches = log.filter((x) => typeof x === 'object')
+	assert.equal(batches.length, 1, 'one BEGIN…COMMIT for both screens')
+	assert.deepEqual(batches[0].batch, ['PLAY 1-10', 'MIXER 1-110 OPACITY 1 25', 'PLAY 2-10'])
+	assert.deepEqual(batches[0].opts, { skipMixerPreCommit: true, forceBatch: true })
+	const at = log.indexOf(batches[0])
+	assert.deepEqual(log.slice(0, at).sort(), ['COMMIT 1', 'COMMIT 2'], 'leading commits of both screens first')
+	assert.deepEqual(log.slice(at + 1), ['COMMIT 1'], 'trailing commit only where requested, after the batch')
+})
+
+test('a send failure rejects every screen of the merged send (each take logs its own Phase B failure)', async () => {
+	const g = { id: 'wo574-fail', size: 2 }
+	const amcp = { mixerCommit: async () => {}, batchSendChunked: async () => Promise.reject(new Error('amcp down')) }
+	const plan = (channel) => ({ amcp, channel, leadingCommit: false, block: [`PLAY ${channel}-10`], trailingCommit: false })
+	const a = joinTakeGroup(g)
+	const b = joinTakeGroup(g)
+	const res = await Promise.allSettled([a.arrive(plan(1)), b.arrive(plan(2))])
+	assert.deepEqual(res.map((r) => r.status), ['rejected', 'rejected'])
+})
+
+test('a straggler after a timeout release sends its own plan immediately', async () => {
+	process.env.HIGHASCG_TAKE_SYNC_TIMEOUT_MS = '60'
+	try {
+		const g = { id: 'wo574-straggler', size: 2 }
+		const log = []
+		const amcp = fakeAmcp(log)
+		const a = joinTakeGroup(g)
+		await a.arrive({ amcp, channel: 1, leadingCommit: false, block: ['PLAY 1-10'], trailingCommit: false })
+		const late = joinTakeGroup(g)
+		await late.arrive({ amcp, channel: 2, leadingCommit: false, block: ['PLAY 2-10'], trailingCommit: false })
+		assert.deepEqual(log.filter((x) => typeof x === 'object').map((x) => x.batch), [['PLAY 1-10'], ['PLAY 2-10']])
+	} finally {
+		delete process.env.HIGHASCG_TAKE_SYNC_TIMEOUT_MS
+	}
+})
+
+test('wiring: client tags batched POSTs, server hands the group to the PGM take, Phase B submits its plan to it', () => {
 	const client = read('client/components/scenes-editor-support.js')
 	assert.match(client, /jobs\.length > 1/)
 	assert.match(client, /size: jobs\.length/)
@@ -92,14 +146,14 @@ test('wiring: client tags batched POSTs, server passes the barrier into the PGM 
 
 	const route = read('src/api/routes-scene-take.js')
 	assert.match(route, /withTakeGroup\(parseBody\(body\)\?\.takeGroup/)
-	assert.equal((route.match(/awaitPlayBarrier: sync\?\.arrive/g) || []).length, 2, 'PGM take + direct-program take')
+	assert.equal((route.match(/playSync: sync/g) || []).length, 2, 'PGM take + direct-program take only (never PRV staging)')
 
-	const lbg = read('src/engine/scene-take-lbg.js')
-	assert.match(lbg, /awaitPlayBarrier: typeof opts\.awaitPlayBarrier === 'function'/)
+	assert.match(read('src/engine/scene-take-lbg.js'), /playSync: opts\.playSync \|\| null/)
 
 	const pipe = read('src/engine/scene-take-lbg-amcp-pipeline.js')
-	const barrierAt = pipe.indexOf('await awaitPlayBarrier()')
-	const sleepAt = pipe.indexOf('await new Promise((r) => setTimeout(r, prebufferMs))')
-	const phaseBAt = pipe.indexOf('Timeline-only / exit-only crossfade')
-	assert.ok(sleepAt > 0 && barrierAt > sleepAt && phaseBAt > barrierAt, 'barrier sits between warm-up and Phase B')
+	assert.equal((pipe.match(/\bplaySync,\n/g) || []).length >= 3, true, 'crossfade / merge / phased branches pass playSync on')
+	assert.ok(pipe.indexOf('setTimeout(r, prebufferMs)') < pipe.indexOf('Timeline-only / exit-only crossfade'))
+
+	const deps = read('src/engine/scene-route-deps.js')
+	assert.match(deps, /opts\.playSync\.arrive\(\{ amcp, channel: ch, leadingCommit, block, trailingCommit \}\)/)
 })

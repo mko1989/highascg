@@ -42,7 +42,7 @@ const { scheduleFadeOnEndForTakeJobs } = require('./scene-take-lbg-amcp-pipeline
  * @param {number} channel
  * @param {object[]} takeJobs
  * @param {*} self
- * @param {{ trailingCommit?: boolean, twoPhaseBatch?: boolean }} [opts]
+ * @param {{ trailingCommit?: boolean, twoPhaseBatch?: boolean, playSync?: object|null }} [opts]
  */
 async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 	await sendStaggeredTakePlays(
@@ -59,6 +59,7 @@ async function sendPhasedTakePlays(amcp, channel, takeJobs, self, opts = {}) {
 			commitAfterSources: true,
 			commitAfterRoutes: opts.trailingCommit !== false,
 			twoPhaseBatch: opts.twoPhaseBatch === true,
+			playSync: opts.playSync,
 		},
 	)
 }
@@ -122,7 +123,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		framerate,
 		fadeWatcher,
 		notifyProgramTransitionStarted,
-		awaitPlayBarrier,
+		playSync,
 		incoming,
 		timelineFadeInPhys = [],
 	} = ctx
@@ -284,18 +285,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				: 80
 		await new Promise((r) => setTimeout(r, prebufferMs))
 
-		// Multi-screen take: everything above is prep (LOADBG, Phase A, warm-up). Hold here until
-		// every screen of the group is ready so Phase B (PLAY + crossfade) starts on all together.
-		if (awaitPlayBarrier) {
-			try {
-				await awaitPlayBarrier()
-			} catch (_) {}
-		}
-
+		// Multi-screen take (WO-574): everything above is prep (LOADBG, Phase A, warm-up). Phase B
+		// below hands its lines to `playSync`, which holds until every screen is ready and then sends
+		// all screens' PLAY/fade lines as ONE merged batch — the last AMCP sent before the transition.
 		try {
 			if (crossfadeLines.length > 0 && takeJobs.length === 0) {
 				// Timeline-only / exit-only crossfade: sendStaggeredTakePlays drops suffix
 				// lines when there are no source PLAY lines to ride on — send directly.
+				await playSync?.arrive()
 				await amcp.batchSendChunked(crossfadeLines, { skipMixerPreCommit: true })
 				await amcp.mixerCommit(channel)
 				fadeClockRef.start = Date.now()
@@ -308,6 +305,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				// parity and the outgoing media hard-cut at teardown instead of mixing. Leading
 				// COMMIT first (flushes the deferred pre-hide, exactly like the staggered path's
 				// leadingCommit before its PLAY batch), then the crossfade ramps.
+				await playSync?.arrive()
 				await amcp.mixerCommit(channel)
 				await amcp.batchSendChunked(crossfadeLines, { skipMixerPreCommit: true })
 				await amcp.mixerCommit(channel)
@@ -327,6 +325,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						commitAfterRoutes: true,
 						suffixAfterSources,
 						twoPhaseBatch,
+						playSync,
 					},
 				)
 				fadeClockRef.start = Date.now()
@@ -346,12 +345,13 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 						commitAfterSources: true,
 						commitAfterRoutes: true,
 						twoPhaseBatch,
+						playSync,
 					},
 				)
 				fadeClockRef.start = Date.now()
 				notifyProgramTransitionStarted()
 			} else {
-				await sendPhasedTakePlays(amcp, channel, takeJobs, self, { twoPhaseBatch })
+				await sendPhasedTakePlays(amcp, channel, takeJobs, self, { twoPhaseBatch, playSync })
 			}
 		} catch (e) {
 			// Phase B failing means the incoming look may never have reached air, and with

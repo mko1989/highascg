@@ -286,7 +286,10 @@ function orderRouteJobsByDependency(routeJobs, allJobs) {
  * @param {number} channel
  * @param {object[]} takeJobs
  * @param {(job: object) => string[]} linesForJob
- * @param {{ leadingCommit?: boolean, commitAfterSources?: boolean, commitAfterRoutes?: boolean, suffixAfterSources?: string[], twoPhaseBatch?: boolean }} [opts]
+ * @param {{ leadingCommit?: boolean, commitAfterSources?: boolean, commitAfterRoutes?: boolean, suffixAfterSources?: string[], twoPhaseBatch?: boolean, playSync?: object|null }} [opts]
+ *   `playSync` (WO-574): multi-screen take group ({@link import('./take-sync-barrier.js')}). The two-phase
+ *   Phase B is handed over as a plan and sent by the group, merged with the other screens' plans; the
+ *   rollback (non-two-phase) path only waits at the gate, then sends as before.
  *   `twoPhaseBatch` (WO-259): send the source PLAY + suffix lines as one BEGIN…COMMIT batch instead of
  *   one-command-at-a-time; the leading/trailing `MIXER <ch> COMMIT` still go outside the batch (Caspar
  *   forbids `MIXER n COMMIT` inside BEGIN…COMMIT). Same-channel route:// PLAYs are folded into the SAME
@@ -329,6 +332,7 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 			...routeLines,
 		]
 		if (block.length === 0) {
+			await opts.playSync?.arrive()
 			if (orderedRoutes.length === 0 && (leadingCommit || commitAfterRoutes)) {
 				await amcp.mixerCommit(ch)
 			}
@@ -338,14 +342,18 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 		 * BEFORE the fade batch whenever anything is sent — gating this on sourceLines meant a
 		 * routes-without-media look left the zeros queued, and the TRAILING commit below applied
 		 * them AFTER the fade-in tweens, re-hiding the entire incoming bank. */
+		const trailingCommit = commitAfterSources || (routeLines.length > 0 && commitAfterRoutes)
+		if (opts.playSync) {
+			await opts.playSync.arrive({ amcp, channel: ch, leadingCommit, block, trailingCommit })
+			return
+		}
 		if (leadingCommit) await amcp.mixerCommit(ch)
 		await amcp.batchSendChunked(block, { skipMixerPreCommit: true, forceBatch: true })
-		if (commitAfterSources || (routeLines.length > 0 && commitAfterRoutes)) {
-			await amcp.mixerCommit(ch)
-		}
+		if (trailingCommit) await amcp.mixerCommit(ch)
 		return
 	}
 
+	await opts.playSync?.arrive()
 	if (sourceLines.length > 0) {
 		/** @type {string[]} */
 		const block = []

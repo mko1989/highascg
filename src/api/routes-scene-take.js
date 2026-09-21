@@ -400,7 +400,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				forceCut: !!b.forceCut,
 				self: ctx,
 				skipLayerVisualEquality: true,
-				awaitPlayBarrier: sync?.arrive,
+				playSync: sync,
 			})
 			// Flip-flop the preview WHILE the program transition runs (different Caspar
 			// channel, independent AMCP). Sequenced after the awaited PGM take, PRV kept
@@ -427,7 +427,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 			)
 		}
 		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, awaitPlayBarrier: sync?.arrive })
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, playSync: sync })
 		if (inc && typeof inc === 'object' && inc.id) {
 			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}
