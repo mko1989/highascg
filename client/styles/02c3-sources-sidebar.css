@@ -453,3 +453,43 @@
 	margin-top: 20px;
 }
 
+/* WO-575 — Encode to HAP modal */
+.media-hap-encode {
+	max-width: 420px;
+	width: 92vw;
+}
+
+.media-hap-encode__hint {
+	margin: 0 0 8px;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+}
+
+.media-hap-encode__files {
+	margin: 0 0 12px;
+	padding-left: 18px;
+	max-height: 130px;
+	overflow: auto;
+	font-size: 0.82rem;
+}
+
+.media-hap-encode__toggle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+	font-size: 0.9rem;
+	cursor: pointer;
+}
+
+.media-hap-encode__format {
+	margin: 8px 0 0;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+
+.media-hap-encode__warning {
+	margin: 6px 0 0;
+	font-size: 0.8rem;
+	color: #f0b955;
+}

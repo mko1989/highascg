@@ -97,3 +97,25 @@ export function formatMediaOpResult(result, verb) {
 	if (result.failed === 0) return `${verb} ${result.ok} file${result.ok === 1 ? '' : 's'}`
 	return `${verb} ${result.ok} of ${total} — ${result.failed} failed`
 }
+
+/**
+ * WO-575 — HAP encoder (server: src/api/routes-media-hap.js).
+ * @param {string[]} ids
+ * @param {{ alpha?: boolean, hq?: boolean }} opts
+ */
+export function startHapEncode(ids, opts = {}) {
+	return api.post('/api/media/hap-encode', { ids, alpha: opts.alpha === true, hq: opts.hq === true })
+}
+
+/** Per-file "would this encode / has alpha" pre-check for the modal (no side effects). */
+export function probeMediaForHap(ids) {
+	return api.post('/api/media/hap-encode/probe', { ids })
+}
+
+export function cancelHapEncode(jobId) {
+	return api.post('/api/media/hap-encode/cancel', { jobId })
+}
+
+export function fetchHapEncodeJobs() {
+	return api.get('/api/media/hap-encode')
+}

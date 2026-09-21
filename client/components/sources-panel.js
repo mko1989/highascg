@@ -13,6 +13,7 @@ import { bindSourcesPanelIngestUi } from './sources-panel-ingest-ui.js'
 import { createSourcesPanelRender } from './sources-panel-render.js'
 import { createProjectMediaGather } from './sources-panel-project-gather.js'
 import { createMediaSelection } from './sources-panel-media-selection.js'
+import { createHapEncode } from './sources-panel-hap-encode.js'
 import { attachDecklinkDropHandlers } from './sources-panel-decklink-drop.js'
 
 export function initSourcesPanel(root, stateStore, opts = {}) {
@@ -45,6 +46,8 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		replMediaBtn,
 		copyBtn,
 		moveBtn,
+		hapBtn,
+		hapCancelBtn,
 		deleteBtn,
 		clearSelBtn,
 		liveFooter,
@@ -201,6 +204,16 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		render: () => hooks.render(),
 	})
 
+	const hapEncode = createHapEncode({
+		stateStore,
+		wsClient,
+		selectedMedia,
+		setStatus: ingest.setStatus,
+		refreshMedia,
+		cancelBtn: hapCancelBtn,
+	})
+	hapEncode.attach()
+
 	let panelRender
 	panelRender = createSourcesPanelRender({
 		root,
@@ -285,6 +298,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	if (refreshBtn) refreshBtn.onclick = rescanMediaFromCaspar
 	if (copyBtn) copyBtn.onclick = () => void mediaSelection.runMediaTransfer('copy')
 	if (moveBtn) moveBtn.onclick = () => void mediaSelection.runMediaTransfer('move')
+	if (hapBtn) hapBtn.onclick = () => void hapEncode.run()
 	if (deleteBtn) deleteBtn.onclick = () => void mediaSelection.runMediaDelete()
 	if (clearSelBtn) {
 		clearSelBtn.onclick = () => {
