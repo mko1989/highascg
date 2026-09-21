@@ -122,6 +122,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		framerate,
 		fadeWatcher,
 		notifyProgramTransitionStarted,
+		awaitPlayBarrier,
 		incoming,
 		timelineFadeInPhys = [],
 	} = ctx
@@ -282,6 +283,14 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				? 180
 				: 80
 		await new Promise((r) => setTimeout(r, prebufferMs))
+
+		// Multi-screen take: everything above is prep (LOADBG, Phase A, warm-up). Hold here until
+		// every screen of the group is ready so Phase B (PLAY + crossfade) starts on all together.
+		if (awaitPlayBarrier) {
+			try {
+				await awaitPlayBarrier()
+			} catch (_) {}
+		}
 
 		try {
 			if (crossfadeLines.length > 0 && takeJobs.length === 0) {

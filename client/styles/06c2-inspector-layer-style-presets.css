@@ -55,6 +55,9 @@
 	gap: 10px;
 }
 .look-preset-card {
+	display: flex;
+	align-items: stretch;
+	gap: 8px;
 	padding: 8px 10px;
 	background: var(--bg-elevated, #21262d);
 	border: 1px solid var(--border, #30363d);
@@ -69,6 +72,16 @@
 	border-color: #a78bfa;
 	background: rgba(139, 92, 246, 0.1);
 	box-shadow: 0 0 4px rgba(139, 92, 246, 0.3);
+}
+.look-preset-card__body {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+.look-preset-card__play {
+	flex: 0 0 auto;
+	align-self: center;
+	min-width: 36px;
+	min-height: 36px;
 }
 .look-preset-card__row {
 	display: flex;

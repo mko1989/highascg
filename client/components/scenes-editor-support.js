@@ -202,8 +202,8 @@ export function createTakeSceneToProgram(deps) {
 					mainIdx,
 					channel: Number(programCh),
 					incomingSceneForTake,
-					// Dispatch NOW — all channels' takes run server-side concurrently.
-					promise: deps.api.post('/api/scene/take', {
+					promise: null,
+					body: {
 						channel: Number(programCh),
 						sceneId: scene.id,
 						framerate: fps,
@@ -213,8 +213,20 @@ export function createTakeSceneToProgram(deps) {
 							...incomingSceneForTake,
 							globalBorder: sceneState.getGlobalBorderForScreen(mainIdx),
 						},
-					}),
+					},
 				})
+			}
+
+			// Dispatch NOW — all channels' takes run server-side concurrently. With >1 take, tag
+			// every POST with a group (size = POSTs actually sent) so the server holds each take's
+			// PLAY/crossfade until all screens are prepped, then starts them together
+			// (take-sync-barrier.js).
+			const takeGroup =
+				jobs.length > 1
+					? { id: `tg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`, size: jobs.length }
+					: null
+			for (const j of jobs) {
+				j.promise = deps.api.post('/api/scene/take', takeGroup ? { ...j.body, takeGroup } : j.body)
 			}
 
 			const results = await Promise.allSettled(jobs.map((j) => j.promise))

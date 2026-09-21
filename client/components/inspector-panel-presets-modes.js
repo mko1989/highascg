@@ -264,6 +264,10 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 			renderLookPresetsMode(root, { onSceneRefresh })
 		})
 
+		const body = document.createElement('div')
+		body.className = 'look-preset-card__body'
+		card.appendChild(body)
+
 		const line1 = document.createElement('div')
 		line1.className = 'look-preset-card__row'
 		const mainHint =
@@ -281,23 +285,33 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 			const src = sourceKindLabel(p.sourceKind)
 			metaEl.textContent = sc ? `${src} ${mainHint}` : `${src} ${mainHint} · look missing`
 		}
-		card.appendChild(line1)
+		body.appendChild(line1)
 		if (sc) {
 			const sub = document.createElement('div')
 			sub.className = 'look-preset-card__sub'
 			sub.textContent = `→ “${sc.name}”`
-			card.appendChild(sub)
+			body.appendChild(sub)
 		}
 		const row2 = document.createElement('div')
 		row2.className = 'look-preset-card__actions'
 		row2.innerHTML = `
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-prv>Preview</button>
-			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-take title="Take to PGM with each look's own transition">Take</button>
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-auto title="Take to PGM with the deck's default transition (like a normal take)">Auto</button>
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-r-cut>Cut</button>
 			<button type="button" class="scenes-btn scenes-btn--sm" data-lp-ovw>Overwrite</button>
 			<button type="button" class="scenes-btn scenes-btn--sm scenes-btn--danger" data-lp-rm>Remove</button>
 		`
+		body.appendChild(row2)
+
+		const playBtn = document.createElement('button')
+		playBtn.type = 'button'
+		playBtn.className = 'scenes-btn scenes-btn--take scenes-btn--icon look-preset-card__play'
+		playBtn.textContent = '▶'
+		playBtn.title = "Play: take to PGM with each look's own transition"
+		playBtn.setAttribute('aria-label', `Play look preset ${p.name}`)
+		playBtn.disabled = !sc
+		card.appendChild(playBtn)
+
 		if (!sc) {
 			for (const b of row2.querySelectorAll('button')) {
 				if (b.hasAttribute('data-lp-rm')) continue
@@ -309,7 +323,7 @@ export function renderLookPresetsMode(root, { onSceneRefresh } = {}) {
 					new CustomEvent(LOOK_PRESET_RECALL_PRV, { detail: { sceneId: p.sceneId, lookPreset: p } }),
 				)
 			})
-			row2.querySelector('[data-lp-r-take]')?.addEventListener('click', () => {
+			playBtn.addEventListener('click', () => {
 				document.dispatchEvent(
 					new CustomEvent(LOOK_PRESET_RECALL_PGM, {
 						detail: { sceneId: p.sceneId, lookPreset: p, forceCut: false },

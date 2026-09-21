@@ -364,6 +364,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		framerate,
 		fadeWatcher,
 		notifyProgramTransitionStarted,
+		awaitPlayBarrier: typeof opts.awaitPlayBarrier === 'function' ? opts.awaitPlayBarrier : null,
 	})
 	fadeClockStart = fadeClockRef.start
 

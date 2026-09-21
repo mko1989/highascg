@@ -12,6 +12,7 @@ const { LOOK_LAYER_MIN, LOOK_LAYER_MAX } = require('../engine/look-layer-ranges'
 const { isAudioOnlyLook } = require('../engine/audio-only-look')
 const { handleAudioOnlyLookTake } = require('./routes-scene-take-audio-only')
 const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
+const { withTakeGroup } = require('../engine/take-sync-barrier')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
@@ -62,10 +63,17 @@ function incomingTimelineId(scene) {
 }
 
 /**
+ * Multi-screen takes carry `takeGroup: { id, size }`: each take preps independently, then all
+ * fire PLAY/crossfade together (see take-sync-barrier.js). The slot is always released, so an
+ * early 400 / failure here never makes the sibling screens wait.
  * @param {string} body
  * @param {object} ctx — app context (`self` in companion)
  */
-async function handleSceneTake(body, ctx) {
+function handleSceneTake(body, ctx) {
+	return withTakeGroup(parseBody(body)?.takeGroup, (sync) => handleSceneTakeInner(body, ctx, sync))
+}
+
+async function handleSceneTakeInner(body, ctx, sync) {
 	const b = parseBody(body)
 	const channel = parseInt(b.channel, 10)
 	if (!channel || channel < 1) {
@@ -392,6 +400,7 @@ async function handleSceneTake(body, ctx) {
 				forceCut: !!b.forceCut,
 				self: ctx,
 				skipLayerVisualEquality: true,
+				awaitPlayBarrier: sync?.arrive,
 			})
 			// Flip-flop the preview WHILE the program transition runs (different Caspar
 			// channel, independent AMCP). Sequenced after the awaited PGM take, PRV kept
@@ -418,7 +427,7 @@ async function handleSceneTake(body, ctx) {
 			)
 		}
 		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly })
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, awaitPlayBarrier: sync?.arrive })
 		if (inc && typeof inc === 'object' && inc.id) {
 			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}

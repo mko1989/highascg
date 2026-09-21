@@ -165,6 +165,7 @@ const FILES = [
 	'tools/smoke/smoke-wo561-timeline-replaces-normal-layer-exit.test.js',
 	'tools/smoke/smoke-wo570-look-media-transport.test.js',
 	'tools/smoke/smoke-wo572-audio-only-look.test.js',
+	'tools/smoke/smoke-wo574-multi-screen-take-sync-barrier.test.js',
 	'tools/smoke/smoke-wo498-no-nginx-gzip.test.js',
 	'tools/smoke/smoke-wo499-update-always-restarts.test.js',
 	'tools/smoke/smoke-streaming-channel-status.test.js',
