@@ -12,13 +12,14 @@
 import { api } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { escapeHtml } from '../lib/dom-escape.js'
-import { scanShaderParams, scanShaderDeepParams, rewriteParamValues } from '../lib/shader-param-scan.js'
-import { sceneState } from '../lib/scene-state.js'
+import { rewriteParamValues } from '../lib/shader-param-scan.js'
+import { scanShaderCfg } from '../lib/shader-controls.js'
 import { liveShaderInstances, createPlaylistNowTracker } from '../lib/shader-live-instances.js'
 import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
-import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml } from './shader-live-rows.js'
+import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml, advancedHtml } from './shader-live-rows.js'
+import { createShaderControlsPanel } from './shader-controls-panel.js'
+import { installShaderAudition } from './shader-live-audition.js'
 import { createShaderLiveStack } from './shader-live-stack.js'
-import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function initShaderLiveEditor(stateStore) {
 	let overlay = null
@@ -28,6 +29,9 @@ export function initShaderLiveEditor(stateStore) {
 	let params = []
 	let pristine = null
 	let pristineParams = null
+	let pristineByKey = new Map() // param key → library values (macro base, presets, reset)
+	let advOpen = false
+	let panel = null
 	let unsub = null
 	let _stack = null
 
@@ -70,6 +74,29 @@ export function initShaderLiveEditor(stateStore) {
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
 		_stack = createShaderLiveStack({ stateStore, getSelected: selected })
 		_stack.mount(overlay.querySelector('#shl-stack'))
+		panel = createShaderControlsPanel({
+			getParams: () => params,
+			getManifest: () => shaderCfg?.controls || null,
+			setManifest: (m) => {
+				if (shaderCfg) shaderCfg.controls = m
+				return persistCfg()
+			},
+			pristine: () => pristineByKey,
+			applyBatch,
+			labelOf: (p) => shaderCfg?.paramLabels?.[labelKeyOf(p)],
+			rerender: () => renderParams(),
+		})
+		panel.attach(overlay.querySelector('#shl-params'))
+		/* `toggle` does not bubble — capture it; the Advanced list is built lazily (up to 48 rows). */
+		overlay.querySelector('#shl-params').addEventListener(
+			'toggle',
+			(e) => {
+				if (e.target?.id !== 'shl-adv') return
+				advOpen = e.target.open
+				if (advOpen) fillAdvanced()
+			},
+			true,
+		)
 		overlay.querySelector('#shl-params').addEventListener('click', onParamReset)
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamWiggle(e))
 		overlay.querySelector('#shl-params').addEventListener('click', (e) => void onParamRename(e))
@@ -150,66 +177,29 @@ export function initShaderLiveEditor(stateStore) {
 			passes: Object.fromEntries(Object.entries(shaderCfg?.passes || {}).map(([k, v]) => [k, v ? { source: v.source } : null])),
 		}
 		pristineParams = null
+		pristineByKey = new Map(scanShaderCfg(shaderCfg).map((p) => [p.key, [...p.values]]))
 		syncDirty()
 		renderParams()
 		pristineParams = params.map((p) => ({ values: [...p.values] }))
 	}
 
-	function scanCfg() {
-		const out = []
-		const push = (passKey, source) => {
-			const named = scanShaderParams(source || '')
-			for (const p of named) out.push({ ...p, passKey })
-			// Owner 2026-07-27: auto-extracted body literals — no code interaction needed. Drop
-			// any that overlap a named param's spans (const literals appear in both scans).
-			const taken = named.flatMap((p) => p.spans)
-			for (const d of scanShaderDeepParams(source || '')) {
-				const hits = d.spans.some((ds) => taken.some((ts) => ds.start < ts.end && ts.start < ds.end))
-				if (!hits) out.push({ ...d, passKey })
-			}
-		}
-		push('common', shaderCfg?.common)
-		for (const key of ['image', 'bufferA', 'bufferB', 'bufferC', 'bufferD']) {
-			if (shaderCfg?.passes?.[key]?.source) push(key, shaderCfg.passes[key].source)
-		}
-		return out
+	const labelOfParam = (p) => shaderCfg?.paramLabels?.[labelKeyOf(p)]
+
+	function fillAdvanced() {
+		const host = overlay.querySelector('#shl-adv-body')
+		if (host) host.innerHTML = advancedHtml(params, (p, i) => paramRowHtml(p, i, labelOfParam(p)))
 	}
 
-
+	/* Main panel = the synthesized key controls (shader-controls-panel); everything else the
+	 * scanner found sits in the collapsed Advanced list, one ★ away from the main panel. */
 	function renderParams() {
-		params = scanCfg()
+		params = scanShaderCfg(shaderCfg)
 		const host = overlay.querySelector('#shl-params')
-		const row = (p, idx) => paramRowHtml(p, idx, shaderCfg?.paramLabels?.[labelKeyOf(p)])
-		const namedHtml = params.map((p, i) => (p.deep ? '' : row(p, i))).join('')
-		/* todos27: deep params render as human-named rows grouped into CATEGORIES (Colors,
-		 * Speed & time, …) instead of one bucket of code snippets. */
-		const byCat = new Map()
-		params.forEach((p, i) => {
-			if (!p.deep) return
-			const cat = p.category || 'Other values'
-			if (!byCat.has(cat)) byCat.set(cat, [])
-			byCat.get(cat).push({ p, i })
-		})
-		/* todos27: cluster same-base params ("freq", "freq #2") adjacently inside a category. */
-		for (const items of byCat.values()) {
-			items.sort((a, b) => {
-				const ba = baseLabelOf(a.p.name)
-				const bb = baseLabelOf(b.p.name)
-				return ba < bb ? -1 : ba > bb ? 1 : a.i - b.i
-			})
-		}
-		const order = [...DEEP_CATEGORY_ORDER, ...[...byCat.keys()].filter((c) => !DEEP_CATEGORY_ORDER.includes(c))]
-		const deepHtml = order
-			.filter((c) => byCat.has(c))
-			.map((c) => groupHtml(c, byCat.get(c).map(({ p, i }) => row(p, i)).join('')))
-			.join('')
 		host.innerHTML =
+			panel.html() +
 			groupHtml('Layer (Caspar mixer)', mixerRowsHtml()) +
-			groupHtml('Shader parameters', namedHtml) +
-			deepHtml +
-			(!namedHtml && !deepHtml
-				? '<p class="settings-note">Nothing tweakable found in this shader source.</p>'
-				: '')
+			`<details class="shader-live__adv" id="shl-adv"${advOpen ? ' open' : ''}><summary>Advanced — all ${params.length} detected values</summary><div id="shl-adv-body"></div></details>`
+		if (advOpen) fillAdvanced()
 	}
 
 	/* todos27: stable identity for operator-given labels (survives reloads; deep keys embed the
@@ -330,11 +320,7 @@ export function initShaderLiveEditor(stateStore) {
 		shaderCfg.paramLabels = shaderCfg.paramLabels || {}
 		if (String(next).trim()) shaderCfg.paramLabels[key] = String(next).trim()
 		else delete shaderCfg.paramLabels[key]
-		try {
-			await api.post('/api/shaders', shaderCfg)
-		} catch (err) {
-			console.warn('[shader-live] label save failed:', err?.message || err)
-		}
+		await persistCfg()
 		const keep = params.map((x) => ({ values: [...x.values] }))
 		renderParams()
 		params.forEach((x, i) => {
@@ -355,6 +341,44 @@ export function initShaderLiveEditor(stateStore) {
 		renderParams()
 	}
 
+	/* Persist the operator's curation (labels/controls/presets) WITHOUT baking in live edits —
+	 * the library shader keeps its pristine source; edits only ever land as a child (Save). */
+	async function persistCfg() {
+		if (!shaderCfg || !pristine) return
+		const passes = Object.fromEntries(
+			Object.entries(shaderCfg.passes || {}).map(([k, v]) => [k, v && pristine.passes[k] ? { ...v, source: pristine.passes[k].source } : v]),
+		)
+		try {
+			await api.post('/api/shaders', { ...shaderCfg, common: pristine.common, passes })
+		} catch (e) {
+			console.warn('[shader-live] save of controls failed:', e?.message || e)
+		}
+	}
+
+	/** Several params at once (macro / preset / randomize): one source rewrite + one CG UPDATE per pass. */
+	function applyBatch(items) {
+		const byPass = new Map()
+		for (const it of items) {
+			if (!byPass.has(it.p.passKey)) byPass.set(it.p.passKey, [])
+			byPass.get(it.p.passKey).push(it)
+		}
+		for (const [passKey, list] of byPass) {
+			list.sort((a, b) => b.p.spans[0].start - a.p.spans[0].start) // right-to-left keeps earlier spans valid
+			try {
+				let src = sourceOf(passKey)
+				for (const { p, next } of list) src = rewriteParamValues(src, p, next, { preserveInt: !!p.intLiteral })
+				setSource(passKey, src)
+			} catch {
+				renderParams()
+				return
+			}
+		}
+		params = scanShaderCfg(shaderCfg)
+		dirty = true
+		syncDirty()
+		for (const passKey of byPass.keys()) void pushLive(passKey)
+	}
+
 	function applyParamValues(p, next) {
 		let rewritten
 		try {
@@ -365,7 +389,7 @@ export function initShaderLiveEditor(stateStore) {
 		}
 		setSource(p.passKey, rewritten)
 		p.values = next
-		params = scanCfg()
+		params = scanShaderCfg(shaderCfg)
 		dirty = true
 		syncDirty()
 		void pushLive(p.passKey)
@@ -449,38 +473,7 @@ export function initShaderLiveEditor(stateStore) {
 		}
 	}
 
-	/* todos27: templates-browser shader rows dispatch this on click. Only ACT while shaders
-	 * mode is open — outside it the event fizzles and the browser behaves as before. Stages an
-	 * ephemeral one-layer look on the active main's preview bus via the normal take pipeline,
-	 * so scene.live updates and the instance dropdown picks it up. */
-	document.addEventListener('shader-audition-request', (e) => {
-		if (!overlay || overlay.hidden) return
-		const id = String(e?.detail?.id || '')
-		const label = String(e?.detail?.label || id)
-		if (!id) return
-		void (async () => {
-			try {
-				const cm = stateStore.getState()?.channelMap || {}
-				const mIdx = Math.max(0, Number(sceneState.activeScreenIndex) || 0)
-				const programCh = cm.programChannels?.[mIdx]
-				if (!programCh) throw new Error('no program channel for the active main')
-				const incomingScene = {
-					id: `shader-audition-${mIdx}`,
-					name: `Audition ${label}`,
-					layers: [
-						{ layerNumber: 10, source: { type: 'template', value: id }, opacity: 1, fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } },
-					],
-				}
-				await api.post('/api/scene/take', { channel: programCh, target: 'preview', forceCut: true, useServerLive: true, incomingScene })
-				const sid = (id.toLowerCase().match(/sh-[a-z0-9-]+$/) || [])[0]
-				const prvCh = cm.previewChannels?.[mIdx]
-				if (sid && prvCh) selectedKey = `${sid}@${prvCh}-10`
-				window.showToast?.(`${label} → preview`, 'info')
-			} catch (err) {
-				window.showToast?.(`Audition failed: ${err?.message || err}`, 'error')
-			}
-		})()
-	})
+	installShaderAudition({ stateStore, isOpen: () => !!overlay && !overlay.hidden, select: (key) => (selectedKey = key) })
 
 	// Trigger: the mascot — only while it wears the shades (GPU CEF on).
 	const logo = document.querySelector('img.header__logo')

@@ -279,6 +279,7 @@ const FILES = [
 	'tools/smoke/smoke-wo268-shader-cef-continuity.test.js',
 	'tools/smoke/smoke-wo322-shader-look-band-routing.test.js',
 	'tools/smoke/smoke-wo340-shader-param-scan.test.js',
+	'tools/smoke/smoke-wo577-shader-controls.test.js',
 	'tools/smoke/smoke-wo333-audio-capture-fft.test.js',
 	'tools/smoke/smoke-wo269-shape-log-dedupe.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',

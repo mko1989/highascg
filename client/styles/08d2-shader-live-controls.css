@@ -1,0 +1,232 @@
+/* Shader Live — curated key controls (client/components/shader-controls-panel.js).
+ * Minimal by design: label + readout on one line, full-width slider under it; the ↺ ≋ ✎ ✕ tools
+ * only show on hover; colours are a swatch palette. Advanced (raw literals) is a collapsed fold. */
+
+.slp {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+.slp__btn,
+.slp__chip {
+	display: inline-flex;
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	background: var(--bg-elevated);
+	color: var(--text);
+	font-size: 0.72rem;
+	padding: 0;
+	overflow: hidden;
+}
+
+.slp__btn {
+	padding: 3px 10px;
+	cursor: pointer;
+}
+
+.slp__chip button {
+	background: none;
+	border: 0;
+	color: inherit;
+	font: inherit;
+	padding: 3px 9px;
+	cursor: pointer;
+}
+
+.slp__chip button + button {
+	padding-left: 2px;
+	color: var(--text-muted);
+}
+
+.slp__btn:hover,
+.slp__chip:hover {
+	border-color: var(--accent);
+}
+
+.slp__link {
+	background: none;
+	border: 0;
+	padding: 0;
+	color: var(--accent);
+	font: inherit;
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.slc-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+	gap: 10px 18px;
+}
+
+.slc-grid--palette {
+	grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+.slc {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-width: 0;
+}
+
+.slc__head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.slc__label {
+	flex: 1 1 auto;
+	font-size: 0.8rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.slc__val {
+	font-size: 0.72rem;
+	font-variant-numeric: tabular-nums;
+	color: var(--text-muted);
+}
+
+.slc__row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.slc__row input[type='range'],
+.slc--macro input[type='range'] {
+	flex: 1 1 auto;
+	width: 100%;
+	min-width: 0;
+}
+
+.slc__axis {
+	font-size: 0.68rem;
+	color: var(--text-muted);
+	text-transform: uppercase;
+}
+
+.slc__tools {
+	display: inline-flex;
+	gap: 2px;
+	opacity: 0;
+	transition: opacity 0.12s;
+}
+
+.slc:hover .slc__tools,
+.slc:focus-within .slc__tools {
+	opacity: 1;
+}
+
+.slc__hide {
+	background: none;
+	border: 0;
+	color: var(--text-muted);
+	cursor: pointer;
+	padding: 0 3px;
+}
+
+.slc__hide:hover {
+	color: var(--text);
+}
+
+/* Colour swatch tile */
+.slc--swatch,
+.slc--toggle {
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
+}
+
+.slc--swatch input[type='color'] {
+	flex: 0 0 34px;
+	width: 34px;
+	height: 34px;
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	background: none;
+	cursor: pointer;
+}
+
+/* Toggle switch */
+.slc__switch {
+	position: relative;
+	display: inline-block;
+	width: 32px;
+	height: 18px;
+	flex: 0 0 32px;
+}
+
+.slc__switch input {
+	position: absolute;
+	inset: 0;
+	opacity: 0;
+	margin: 0;
+	cursor: pointer;
+	z-index: 1;
+}
+
+.slc__switch span {
+	position: absolute;
+	inset: 0;
+	border-radius: 999px;
+	background: var(--border);
+	transition: background 0.12s;
+}
+
+.slc__switch span::after {
+	content: '';
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--text);
+	transition: transform 0.12s;
+}
+
+.slc__switch input:checked + span {
+	background: var(--accent);
+}
+
+.slc__switch input:checked + span::after {
+	transform: translateX(14px);
+}
+
+.slc-summary {
+	font-size: 0.7rem;
+	color: var(--text-muted);
+}
+
+/* Advanced fold-away */
+.shader-live__adv > summary {
+	cursor: pointer;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	padding: 4px 2px;
+}
+
+.shader-live__adv[open] > summary {
+	margin-bottom: 6px;
+}
+
+.shader-live__pin {
+	flex: 0 0 auto;
+	background: none;
+	border: 0;
+	padding: 0 2px;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 0.72rem;
+}
+
+.shader-live__pin:hover {
+	color: var(--accent);
+}

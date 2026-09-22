@@ -116,6 +116,8 @@ function normalizeShaderConfig(input) {
 		if (Object.keys(paramLabels).length >= 96) break
 	}
 
+	const controls = normalizeControlsManifest(payload.controls)
+
 	/* todos27.07.26: child shaders — every Shader Live save is a NEW config pointing at the
 	 * shader it was derived from. One level: children attach to the root parent. */
 	const parentId =
@@ -131,8 +133,59 @@ function normalizeShaderConfig(input) {
 		audio: { enabled: payload.audio?.enabled !== false },
 		opts: { alpha: payload.opts?.alpha === true },
 		...(Object.keys(paramLabels).length ? { paramLabels } : {}),
+		...(controls ? { controls } : {}),
 		...(parentId ? { parentId } : {}),
 	}
+}
+
+const CONTROL_SECTIONS = ['Motion', 'Shape', 'Look', 'Colour', 'Audio']
+
+/**
+ * Shader Live "controls manifest" — the operator's curation layer on top of the auto-synthesized
+ * controls (client/lib/shader-controls.js): `pinned` params forced into the main panel with a
+ * label/section, `hidden` params kept out of it, and named value `presets`. Everything is keyed
+ * by the client's stable param keys; bounded so a hostile payload cannot bloat the config file.
+ * @returns {{ pinned: Array<{key:string,label?:string,section?:string}>, hidden: string[], presets: Array<{name:string,v:Record<string,number[]>}> } | null}
+ */
+function normalizeControlsManifest(raw) {
+	if (!raw || typeof raw !== 'object') return null
+	const key = (k) =>
+		String(k || '')
+			.trim()
+			.slice(0, 200)
+	const pinned = []
+	for (const it of Array.isArray(raw.pinned) ? raw.pinned : []) {
+		const k = key(it?.key)
+		if (!k || pinned.some((x) => x.key === k)) continue
+		const label = String(it.label || '')
+			.trim()
+			.slice(0, 60)
+		pinned.push({
+			key: k,
+			...(label ? { label } : {}),
+			...(CONTROL_SECTIONS.includes(it.section) ? { section: it.section } : {}),
+		})
+		if (pinned.length >= 48) break
+	}
+	const hidden = [...new Set((Array.isArray(raw.hidden) ? raw.hidden : []).map(key).filter(Boolean))].slice(0, 96)
+	const presets = []
+	for (const it of Array.isArray(raw.presets) ? raw.presets : []) {
+		const name = String(it?.name || '')
+			.trim()
+			.slice(0, 40)
+		if (!name || !it.v || typeof it.v !== 'object') continue
+		const v = {}
+		for (const [k, vals] of Object.entries(it.v)) {
+			const kk = key(k)
+			const nums = Array.isArray(vals) ? vals.map(Number).filter(Number.isFinite).slice(0, 4) : []
+			if (kk && nums.length) v[kk] = nums
+			if (Object.keys(v).length >= 160) break
+		}
+		presets.push({ name, v })
+		if (presets.length >= 16) break
+	}
+	if (!pinned.length && !hidden.length && !presets.length) return null
+	return { pinned, hidden, presets }
 }
 
 /** @param {string} id */

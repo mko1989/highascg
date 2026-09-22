@@ -4,6 +4,7 @@
  */
 
 import { escapeHtml } from '../lib/dom-escape.js'
+import { DEEP_CATEGORY_ORDER, baseLabelOf } from '../lib/shader-param-naming.js'
 
 export function toHex(v) {
 	const c = (x) => Math.max(0, Math.min(255, Math.round((Number(x) || 0) * 255))).toString(16).padStart(2, '0')
@@ -41,7 +42,7 @@ export function paramRowHtml(p, idx, custom) {
 	const exprHtml = p.deep && line ? `<div class="shader-live__expr" title="${escapeHtml(p.expr || '')}">${escapeHtml(line)}</div>` : ''
 	/* Tooltip = the decode: pass + auto name + the raw ◆ code context. */
 	const tip = `${p.passKey} — ${p.name}${p.context ? `\n${p.context}` : ''}`
-	const name = `<button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><button type="button" class="shader-live__wiggle" data-wiggle="${idx}" title="SHOW me: briefly wiggles this value on the preview output, then restores">≋</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
+	const name = `<button type="button" class="shader-live__pin" data-pin="${idx}" title="Add to the main controls">★</button><button type="button" class="shader-live__reset" data-reset="${idx}" title="Revert to the library value">↺</button><button type="button" class="shader-live__rename" data-rename="${idx}" title="Name this parameter (saved to the shader library)">✎</button><button type="button" class="shader-live__wiggle" data-wiggle="${idx}" title="SHOW me: briefly wiggles this value on the preview output, then restores">≋</button><span class="shader-live__pname${custom ? ' shader-live__pname--custom' : ''}" title="${escapeHtml(tip)}">${escapeHtml(custom || p.name)}</span>`
 	if (p.kind === 'color') {
 		const alpha = p.vec === 4 ? `<input type="range" data-p="${idx}" data-c="3" min="0" max="1" step="0.01" value="${p.values[3]}">` : ''
 		return `<div class="${cls}">${name}<input type="color" data-p="${idx}" data-color value="${toHex(p.values)}">${alpha}${exprHtml}</div>`
@@ -53,4 +54,33 @@ export function paramRowHtml(p, idx, custom) {
 		)
 		.join('')
 	return `<div class="${cls}">${name}${sliders}${exprHtml}</div>`
+}
+
+/**
+ * The Advanced fold-away: every detected value, named params first, then the auto-extracted
+ * literals grouped by category (Colors, Speed & time, …) with same-base names clustered.
+ * @param {Array<object>} params @param {(p: object, idx: number) => string} row
+ */
+export function advancedHtml(params, row) {
+	const named = params.map((p, i) => (p.deep ? '' : row(p, i))).join('')
+	const byCat = new Map()
+	params.forEach((p, i) => {
+		if (!p.deep) return
+		const cat = p.category || 'Other values'
+		if (!byCat.has(cat)) byCat.set(cat, [])
+		byCat.get(cat).push({ p, i })
+	})
+	for (const items of byCat.values()) {
+		items.sort((a, b) => {
+			const ba = baseLabelOf(a.p.name)
+			const bb = baseLabelOf(b.p.name)
+			return ba < bb ? -1 : ba > bb ? 1 : a.i - b.i
+		})
+	}
+	const order = [...DEEP_CATEGORY_ORDER, ...[...byCat.keys()].filter((c) => !DEEP_CATEGORY_ORDER.includes(c))]
+	const deep = order
+		.filter((c) => byCat.has(c))
+		.map((c) => groupHtml(c, byCat.get(c).map(({ p, i }) => row(p, i)).join('')))
+		.join('')
+	return groupHtml('Shader parameters', named) + deep
 }

@@ -185,10 +185,11 @@ function calculateStep(values, floatTexts, source) {
  * @param {string} source
  * @param {Param} param
  * @param {number[]} newValues
+ * @param {{ preserveInt?: boolean }} [opts]
  * @returns {string}
  * @throws if newValues.length doesn't match spans.length or source has drifted
  */
-export function rewriteParamValues(source, param, newValues) {
+export function rewriteParamValues(source, param, newValues, opts = {}) {
 	if (newValues.length !== param.spans.length) {
 		throw new Error(
 			`rewriteParamValues: length mismatch (param.spans=${param.spans.length}, newValues=${newValues.length})`,
@@ -211,7 +212,11 @@ export function rewriteParamValues(source, param, newValues) {
 
 	let result = source
 	for (const edit of edits) {
-		const formatted = formatFloat(edit.value)
+		/* opts.preserveInt: a literal written without a '.' is an int (`#define FLAG 1` feeds `#if`,
+		 * where `1.0` is a preprocessor error) — keep it an int when the new value is whole.
+		 * Opt-in: the default keeps WO-340's "always a decimal point" contract. */
+		const wasInt = !source.slice(edit.span.start, edit.span.end).includes('.')
+		const formatted = opts.preserveInt && wasInt && Number.isInteger(edit.value) ? String(edit.value) : formatFloat(edit.value)
 		result = result.slice(0, edit.span.start) + formatted + result.slice(edit.span.end)
 	}
 
