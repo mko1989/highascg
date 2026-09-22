@@ -105,9 +105,11 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 
 	typeSel.addEventListener('change', () => {
 		refreshDevices()
+		void save()
 	})
 	deviceSel.addEventListener('change', () => {
 		refreshLayoutOptions()
+		void save()
 	})
 
 	layoutSel.value = String(existing?.channelLayout || 'stereo')
@@ -132,6 +134,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 
 	const manualDevIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'or type device name manually', value: deviceSel.value ? '' : String(existing?.deviceName || '') })
 	deviceSel.addEventListener('change', () => { manualDevIn.value = '' })
+	manualDevIn.addEventListener('change', () => void save())
 
 	const monitorChk = Object.assign(document.createElement('input'), { type: 'checkbox' })
 	monitorChk.checked = String(existing?.role || '') === 'monitor'
@@ -149,22 +152,31 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 			typeSel.value = 'system-audio'
 			refreshDevices()
 		}
+		void save()
 	})
 	if (monitorChk.checked && typeSel.value !== 'system-audio') typeSel.value = 'system-audio'
 
 	const hostApiSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
 	hostApiSel.innerHTML = '<option value="auto">Auto Host API</option><option value="ASIO">ASIO</option><option value="ALSA">ALSA</option><option value="CoreAudio">CoreAudio</option><option value="WASAPI">WASAPI</option>'
 	hostApiSel.value = String(existing?.hostApi || 'auto')
+	hostApiSel.addEventListener('change', () => void save())
 
 	const bufferIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'Buffer frames (e.g. 128)', value: String(existing?.bufferFrames ?? 128) })
 	attachMathInput(bufferIn, { decimals: 0 })
+	bufferIn.addEventListener('change', () => void save())
 	const latencyIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'Latency ms (e.g. 40)', value: String(existing?.latencyMs ?? 40) })
 	attachMathInput(latencyIn, { decimals: 0 })
+	latencyIn.addEventListener('change', () => void save())
 	const fifoIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'FIFO ms (e.g. 50)', value: String(existing?.fifoMs ?? 50) })
 	attachMathInput(fifoIn, { decimals: 0 })
+	fifoIn.addEventListener('change', () => void save())
+	layoutSel.addEventListener('change', () => void save())
+	nameIn.addEventListener('change', () => void save())
 
-	const saveBtn = Object.assign(document.createElement('button'), { className: 'header-btn', textContent: 'Save audio settings' })
-	saveBtn.onclick = async () => {
+	/* Auto-save, like the rest of Device View (WO-578: a manual button here meant the load()
+	 * that followed a click landed inside the 5s payload cache and re-rendered the PRE-save
+	 * state, so the picked device visibly reverted; forceRefresh here is the actual fix). */
+	async function save() {
 		const cur = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : []
 		const idx = cur.findIndex((x) => String(x?.id || '') === String(conn.id || ''))
 		if (idx < 0) { setStatus(statusEl, 'Audio output not found', false); return }
@@ -192,7 +204,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 		setStatus(statusEl, monitorChk.checked
 			? `Monitor bus "${label}" saved — mixer SOLO plays here after Apply + Caspar restart.`
 			: `Audio output "${label}" saved (${channelLayout} PortAudio). Set program bus width on the cabled destination.`, true)
-		await load()
+		await load({ forceRefresh: true })
 	}
 
 	const removeBtn = Object.assign(document.createElement('button'), {
@@ -245,7 +257,6 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 		latencyIn,
 		fifoLab,
 		fifoIn,
-		saveBtn,
 		removeBtn,
 	)
 	h.append(wrapCtl)
