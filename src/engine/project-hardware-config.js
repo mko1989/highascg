@@ -124,9 +124,9 @@ function hardwareConfigToSnapshotPayload(hc) {
 		settingsPatches: {},
 	}
 
-	if (Array.isArray(hc.gpuPhysicalTopology) && hc.gpuPhysicalTopology.length) {
-		payload.gpuPhysicalTopology = hc.gpuPhysicalTopology
-	}
+	/* WO-579: hc.gpuPhysicalTopology is deliberately NOT applied. The GPU bracket map is this
+	 * machine's card, set once by the operator in Device View — a project (saved on another box, or
+	 * an Untitled one stamped with the generic factory rows) must never rewrite it on load. */
 
 	if (hc.osDisplay && typeof hc.osDisplay === 'object') {
 		Object.assign(payload.settingsPatches, hc.osDisplay)

@@ -1,4 +1,4 @@
-**Status: IMPLEMENTED (2026-09-24, new smoke fails without the fix / passes with it, smoke-new-project 4/4 + smoke-fresh-box-clean-device-view green) — needs `highascg` restart + owner on-hardware confirmation**
+**Status: IMPLEMENTED (2026-09-24, New project + project load both keep the map; new smokes fail without the fix / passes with it, smoke-new-project 4/4 + smoke-fresh-box-clean-device-view green) — needs `highascg` restart + owner on-hardware confirmation**
 
 ## Investigation
 
@@ -41,9 +41,20 @@ machine and once operator sets the layout hed like it to be constant."*
 - `smoke-new-project` 4/4, `smoke-fresh-box-clean-device-view` green.
 - Owner QA: set a GPU port layout in Device View → New project → layout and port names unchanged.
 
-## Not changed (note)
+## Follow-up: project load never applies the layout (2026-09-24)
 
-Loading a project whose `hardwareConfig` carries a `gpuPhysicalTopology` still applies it. Untitled
-projects created by New Project before this fix carry the generic rows, so loading one of those can
-re-impose them. If the layout should be machine-constant on load too, strip the key in
-`applyHardwareConfigToCtx` — left for the owner to decide.
+Owner: *"the layout should not be touched by projects loading."*
+
+- `src/engine/project-hardware-config.js` `hardwareConfigToSnapshotPayload` no longer forwards
+  `hc.gpuPhysicalTopology`, so `applyHardwareConfigToCtx` leaves the machine map alone on every path
+  that uses it: server-side project load (`applyHardwareConfigFromProject`), `/api/project/apply-hardware`,
+  and New project. Projects still RECORD the map on save (harmless, used for nothing on load).
+- `client/lib/project-hardware-mismatch.js`: dropped the "GPU topology differs" mismatch item (it
+  warned about something a load can no longer change) and the key from
+  `buildDeviceSnapshotFromHardwareConfig` / `hasProjectHardwareConfig`.
+- Device View's own snapshot import (`/api/device-snapshot/apply`) is untouched: that is the operator
+  explicitly applying a device snapshot, not a project load.
+- Verified: new smoke in `smoke-project-hardware-config.test.js` fails on HEAD, passes with the fix.
+  Offline suite in the working tree 2508 pass / 1 fail / 2 skip; the failure (WO-537 `play(fromMs)`)
+  passes on HEAD + only this change, so it comes from other uncommitted working-tree edits. Lint and
+  500-line check clean; client rebuilt (`npm run build:client`).

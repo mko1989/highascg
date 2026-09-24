@@ -174,3 +174,34 @@ test('apply-hardware route applies routing extras from hardwareConfig', async ()
 	assert.equal(cfg.audioRouting.channels[0].id, 'saved')
 	assert.equal(cfg.deviceGraph.connectors.length, 1)
 })
+
+/* WO-579: owner — "the layout should not be touched by projects loading." The GPU bracket map is
+ * machine state; a project's copy (another box's, or the generic rows an old New project stamped)
+ * must never replace it or clear the operator-saved flag. */
+test('applyHardwareConfigToCtx never touches the machine GPU port layout (WO-579)', () => {
+	const cfg = cloneCfg()
+	const machine = [
+		{ physicalPortId: 'gpu_p1', slotOrder: 0, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 0, location: 0 },
+		{ physicalPortId: 'gpu_p0', slotOrder: 1, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 1, location: 1 },
+	]
+	cfg.gpuPhysicalTopology = JSON.parse(JSON.stringify(machine))
+	cfg.gpuPhysicalTopologyOperatorSaved = true
+	const hc = phc.buildHardwareConfigFromConfig(cfg, fakePersistence)
+	hc.gpuPhysicalTopology = [
+		{ physicalPortId: 'gpu_p0', slotOrder: 0, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 0, location: 0 },
+		{ physicalPortId: 'gpu_p1', slotOrder: 1, dpA: 'HDMI-0', dpB: 'HDMI-1', connectorNumber: 1, location: 1 },
+	]
+
+	const ctx = {
+		config: cfg,
+		configManager: {
+			get: () => cfg,
+			save: (next) => Object.assign(cfg, next),
+		},
+		persistence: fakePersistence,
+	}
+
+	assert.equal(phc.applyHardwareConfigToCtx(ctx, hc), true)
+	assert.deepEqual(cfg.gpuPhysicalTopology, machine)
+	assert.equal(cfg.gpuPhysicalTopologyOperatorSaved, true)
+})

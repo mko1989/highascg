@@ -21,7 +21,6 @@ export function hasProjectHardwareConfig(hw) {
 		h.deviceGraph ||
 		h.screenDestinations ||
 		h.casparServer ||
-		h.gpuPhysicalTopology ||
 		h.osDisplay
 	)
 }
@@ -405,23 +404,7 @@ export function detectHardwareMismatch(hardwareConfig, liveCtx) {
 			liveCtx?.settings?.casparServer || liveCtx?.deviceSnapBuild?.payload?.casparServer,
 		),
 	)
-	const savedTopo = hardwareConfig?.gpuPhysicalTopology
-	const liveTopo =
-		liveCtx?.settings?.gpuPhysicalTopology ||
-		liveCtx?.deviceSnapBuild?.payload?.gpuPhysicalTopology
-	if (savedTopo && liveTopo && JSON.stringify(savedTopo) !== JSON.stringify(liveTopo)) {
-		items.push({
-			section: 'GPU topology',
-			message: 'Physical GPU port map in the project differs from this machine.',
-			severity: 'soft',
-		})
-	} else if (savedTopo && !liveTopo) {
-		items.push({
-			section: 'GPU topology',
-			message: 'Project includes GPU port map; live topology was not reported.',
-			severity: 'soft',
-		})
-	}
+	// WO-579: no GPU topology diff — a project load never applies the machine's GPU port map.
 
 	let severity = /** @type {MismatchSeverity} */ ('none')
 	for (const it of items) {
@@ -447,7 +430,6 @@ export function buildDeviceSnapshotFromHardwareConfig(hardwareConfig) {
 		'deviceGraph',
 		'screenDestinations',
 		'casparServer',
-		'gpuPhysicalTopology',
 		'osDisplay',
 		'audioRouting',
 		'streamingChannel',
