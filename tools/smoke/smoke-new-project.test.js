@@ -115,3 +115,29 @@ test('createNewProject resets routing and persists empty Untitled project', () =
 		fs.rmSync(mediaRoot, { recursive: true, force: true })
 	}
 })
+
+/* Owner report: New project replaced the Device View GPU ports with the generic `__generic__` rows
+ * (HDMI-0/1 on a DP-only RTX PRO 4000) and discarded the operator's port layout. The bracket map
+ * is machine state — a New project must leave it, and its operator-saved flag, exactly as it was. */
+test('createNewProject keeps the machine GPU port layout (gpuPhysicalTopology)', () => {
+	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-gpu-'))
+	try {
+		const ctx = makeCtx(mediaRoot)
+		const operatorLayout = [
+			{ physicalPortId: 'gpu_p1', slotOrder: 0, dpA: 'DP-2', dpB: 'DP-3', connectorNumber: 0, location: 0 },
+			{ physicalPortId: 'gpu_p2', slotOrder: 1, dpA: 'DP-4', dpB: 'DP-5', connectorNumber: 1, location: 1 },
+			{ physicalPortId: 'gpu_p3', slotOrder: 2, dpA: 'DP-6', dpB: 'DP-7', connectorNumber: 2, location: 2 },
+			{ physicalPortId: 'gpu_p0', slotOrder: 3, dpA: 'DP-0', dpB: 'DP-1', connectorNumber: 3, location: 3 },
+		]
+		ctx.config.gpuPhysicalTopology = JSON.parse(JSON.stringify(operatorLayout))
+		ctx.config.gpuPhysicalTopologyOperatorSaved = true
+		assert.notDeepEqual(defaults.gpuPhysicalTopology, operatorLayout, 'fixture must differ from the factory rows')
+
+		const { project } = createNewProject(ctx)
+		assert.deepEqual(ctx.config.gpuPhysicalTopology, operatorLayout)
+		assert.equal(ctx.config.gpuPhysicalTopologyOperatorSaved, true)
+		assert.deepEqual(project.hardwareConfig.gpuPhysicalTopology, operatorLayout, 'Untitled project carries the real map, not the generic one')
+	} finally {
+		fs.rmSync(mediaRoot, { recursive: true, force: true })
+	}
+})

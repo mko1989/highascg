@@ -51,6 +51,15 @@ function buildStarterHardwareConfig(persistence) {
 }
 
 /**
+ * @param {object} cfg
+ * @returns {object[] | null} deep copy of the live GPU physical port map, or null when unset
+ */
+function copyLiveGpuTopology(cfg) {
+	const rows = cfg?.gpuPhysicalTopology
+	return Array.isArray(rows) && rows.length ? JSON.parse(JSON.stringify(rows)) : null
+}
+
+/**
  * Apply starter routing and persist empty Untitled project.
  * @param {object} ctx
  * @returns {{ project: object, slug: string }}
@@ -61,6 +70,16 @@ function createNewProject(ctx) {
 	}
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const { hardwareConfig } = buildStarterHardwareConfig(persistence)
+
+	/* The GPU bracket map (gpuPhysicalTopology) is a property of THIS machine's card, not of a show:
+	 * the factory config carries the generic `__generic__` rows (defaults-core.js resolves them with
+	 * no GPU model — HDMI-0/1 on a DP-only card), and applying them here replaced the operator's
+	 * Device View port layout with ports the card does not have. Keep the live map (and its
+	 * operator-saved flag, which the snapshot apply never touches) so a New project resets the
+	 * show, never the rig's port layout. */
+	const liveTopology = copyLiveGpuTopology(ctx.configManager.get())
+	if (liveTopology) hardwareConfig.gpuPhysicalTopology = liveTopology
+	else delete hardwareConfig.gpuPhysicalTopology
 
 	if (!applyHardwareConfigToCtx(ctx, hardwareConfig)) {
 		throw new Error('Failed to apply starter hardware configuration')
