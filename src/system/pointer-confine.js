@@ -29,7 +29,11 @@ const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
 
 const execFileAsync = promisify(execFile)
 
-/** Idle seconds before unclutter hides the cursor (operator monitor + desktop). */
+/**
+ * Idle seconds before unclutter hides the cursor on the desktop (no operator monitor set).
+ * WO-568: the operator monitor itself is exempted — unclutter is killed there instead, so the
+ * cursor stays visible while the operator is working the GUI.
+ */
 const UNCLUTTER_IDLE_SEC = 2
 
 const BARRIER_LOG_PATH = path.join(process.env.HOME || '/home/casparcg', '.highascg/log/confine-pointer-barriers.log')
@@ -159,6 +163,16 @@ async function ensureUnclutterRunning(env, log) {
 	}
 }
 
+/** WO-568: kill unclutter so the cursor stays visible on the operator monitor. */
+async function ensureUnclutterStopped(env, log) {
+	try {
+		await execFileAsync('pkill', ['-x', 'unclutter'], { env, timeout: 2000 })
+		log?.('info', '[Pointer confine] unclutter stopped — operator monitor cursor stays visible')
+	} catch {
+		/* nothing running to kill — not an error */
+	}
+}
+
 function stopBarrierProc(env) {
 	if (confineProc) {
 		try {
@@ -172,13 +186,18 @@ function stopBarrierProc(env) {
 	void execFileAsync('pkill', ['-f', 'confine-cursor.py'], { env, timeout: 3000 }).catch(() => {})
 }
 
-function stopPointerConfine() {
+/**
+ * @param {{ manageUnclutter?: boolean }} [opts] — manageUnclutter:false skips the
+ *   ensureUnclutterRunning restore (WO-568: the caller is about to immediately stop unclutter
+ *   itself, and starting it here first would race that stop).
+ */
+function stopPointerConfine(opts = {}) {
 	const env = displaySessionEnv()
 	activeConfineKey = null
 	activeConfineRect = null
 	stopBarrierWatchdog()
 	stopBarrierProc(env)
-	void ensureUnclutterRunning(env)
+	if (opts.manageUnclutter !== false) void ensureUnclutterRunning(env)
 }
 
 function isPointerConfineActive() {
@@ -314,11 +333,12 @@ async function startPointerConfine(config, opts = {}) {
 	// Reached only on a genuine transition into confine (first start, or restart after the rect/key
 	// changed) — never on the steady-state watchdog recheck above, so this logs once per transition.
 	opts.log?.('info', `[Pointer confine] RUN — ${verdict.reason}`)
-	stopPointerConfine()
+	stopPointerConfine({ manageUnclutter: false })
 	const log = opts.log
 	watchConfig = config
 	watchOpts = opts
-	await ensureUnclutterRunning(env, log)
+	// WO-568: operator monitor is set — leave the cursor visible, don't auto-hide it.
+	await ensureUnclutterStopped(env, log)
 
 	if (envTruthy('HIGHASCG_POINTER_CONFINE_XGRAB')) {
 		const xgrab = await tryPythonXgrabConfine(config, rect, env, log, opts, layout)

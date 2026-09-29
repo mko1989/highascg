@@ -61,9 +61,8 @@ function buildConfineCursorShellLines(config, layout) {
 					'fi',
 				]
 			: []),
-		'if command -v unclutter >/dev/null 2>&1; then',
-		'  pgrep -x unclutter >/dev/null 2>&1 || unclutter -idle 2 -root &',
-		'fi',
+		'# WO-568: operator monitor is set — kill unclutter so the cursor stays visible',
+		'pkill -x unclutter 2>/dev/null || true',
 	]
 }
 
@@ -128,8 +127,10 @@ async function applyOperatorDisplaySession(config, opts = {}) {
 	const confineDesired = isOperatorPointerConfineDesired(config)
 	const rect = confineDesired ? resolveOperatorMonitorRect(config, layout) : null
 	if (!confineDesired) {
-		const env = displaySessionEnv()
-		await execFileAsync('pkill', ['-f', 'confine-cursor.py'], { env, timeout: 3000 }).catch(() => {})
+		// WO-568: also restores unclutter (auto-hide) — the operator monitor exemption only
+		// applies while an operator monitor is actually set.
+		const { stopPointerConfine } = require('../system/pointer-confine')
+		stopPointerConfine()
 		log('info', '[X-Display] No operator monitor — skip primary/confine session')
 	} else if (!rect) {
 		log('info', '[X-Display] Operator monitor configured but no layout rect — skip primary/mouse session')

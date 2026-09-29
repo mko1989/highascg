@@ -135,3 +135,25 @@ describe('pointer-confine.js logs one line per decision', () => {
 		assert.ok(runIdx > unchangedIdx, 'RUN must be logged AFTER the unchanged early-return, not before it')
 	})
 })
+
+describe('WO-568 — cursor auto-hide is off while an operator monitor is set', () => {
+	const fs = require('fs')
+	const path = require('path')
+	const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'system', 'pointer-confine.js'), 'utf8')
+
+	it('the RUN transition stops unclutter instead of (re)starting it', () => {
+		const runIdx = src.indexOf('[Pointer confine] RUN')
+		const skipIdx = src.indexOf('[Pointer confine] SKIP')
+		assert.ok(runIdx > skipIdx, 'RUN branch must come after SKIP in source order for this slice to be correct')
+		const runBranch = src.slice(runIdx)
+		assert.match(runBranch, /stopPointerConfine\(\{ manageUnclutter: false \}\)/, 'must not let stopPointerConfine restart unclutter here — races the stop below')
+		assert.match(runBranch, /await ensureUnclutterStopped\(env, log\)/)
+	})
+
+	it('the SKIP (no operator monitor) path still restores unclutter via the default stopPointerConfine()', () => {
+		const skipIdx = src.indexOf('[Pointer confine] SKIP')
+		const runIdx = src.indexOf('[Pointer confine] RUN')
+		const skipBranch = src.slice(skipIdx, runIdx)
+		assert.match(skipBranch, /stopPointerConfine\(\)\n/, 'default call (manageUnclutter left true) restores auto-hide when no operator monitor is set')
+	})
+})

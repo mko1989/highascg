@@ -150,7 +150,9 @@ describe('interactive operator display', () => {
 		assert.ok(lines.some((l) => l.includes('xrandr --output DP-1 --primary')))
 		const confine = buildConfineCursorShellLines(config, layout)
 		assert.ok(confine.some((l) => l.includes('confine-pointer-barriers.py')))
-		assert.ok(confine.some((l) => l.includes('unclutter -idle 2')))
+		// WO-568: operator monitor set — cursor stays visible, unclutter is killed not started.
+		assert.ok(confine.some((l) => l.includes('pkill -x unclutter')))
+		assert.ok(!confine.some((l) => l.includes('unclutter -idle')))
 	})
 
 	it('physical port interactive=false does not clobber multiview_interactive', () => {
