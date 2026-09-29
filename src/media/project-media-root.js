@@ -135,8 +135,15 @@ function ensureProjectMediaDir(config, slug, store) {
 function normalizeMediaIdForProject(storedId, slug, config) {
 	const id = normalizeMediaIdKey(storedId).trim()
 	if (!id || !slug) return id
+	// Case-insensitive: some stored refs are already a resolved Caspar CLS id (round-tripped
+	// through toCasparClsMediaId, e.g. "PROJECTS/NOC_FOTO/RYNEK/…" — all-uppercase, no
+	// extension), sitting alongside others still stored as the original lowercase disk-relative
+	// form ("rynek/…"). A case-sensitive startsWith missed the uppercase form entirely, leaving
+	// its already-present project prefix un-stripped — the caller then prefixed it AGAIN
+	// (PROJECTS/NOC_FOTO/PROJECTS/NOC_FOTO/…), 404ing every clip stored in its resolved form.
+	const idLower = id.toLowerCase()
 	for (const prefix of projectMediaIdPrefixesForSlug(slug, config)) {
-		if (id.startsWith(prefix)) return id.slice(prefix.length)
+		if (idLower.startsWith(prefix.toLowerCase())) return id.slice(prefix.length)
 	}
 	return id
 }

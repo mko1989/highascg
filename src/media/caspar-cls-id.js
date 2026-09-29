@@ -7,6 +7,7 @@ const { resolveSafe } = require('./local-media-paths')
 const {
 	expandMediaIdToMediaRoot,
 	getActiveProjectSlug,
+	getProjectMediaRelId,
 	getProjectMediaRoot,
 	isProjectScopedMediaEnabled,
 	normalizeMediaIdForProject,
@@ -211,12 +212,19 @@ function resolveClipForAmcpLoad(id, ctx) {
 	// CLS catalog basename matches (e.g. BRIDGE/…) must not override project-scoped refs.
 	if (ctx?.config && isProjectScopedMediaEnabled(ctx.config)) {
 		const slug = getActiveProjectSlug(ctx.persistence)
-		if (slug) {
-			const expanded = expandMediaIdToMediaRoot(raw, slug, ctx.config)
-			const clsId = toCasparClsMediaId(expanded)
-			if (clsId.includes('/') && clipFileExistsUnderProjectRoot(raw, slug, ctx)) {
-				return clsId
-			}
+		if (slug && clipFileExistsUnderProjectRoot(raw, slug, ctx)) {
+			// The disk check just above already confirmed this clip lives under
+			// media/projects/<slug>/ — build the CLS id from THAT verified location directly,
+			// rather than re-deriving it via expandMediaIdToMediaRoot(). That helper treats any id
+			// containing a "/" as "already resolved from the media root" (a short-circuit meant to
+			// avoid double-prefixing a genuinely root-level ref), but a project whose own clips are
+			// organized into subfolders (e.g. stored as "rynek/clip.mov", relative to the PROJECT
+			// root, not the media root) hits that same short-circuit and comes back unprefixed —
+			// LOADBG then 404s because "RYNEK/CLIP" doesn't exist at the media root, only
+			// "PROJECTS/<SLUG>/RYNEK/CLIP" does. Trust the disk check instead of the heuristic.
+			const relUnderProject = normalizeMediaIdForProject(raw, slug, ctx.config)
+			const projectScopedId = `${getProjectMediaRelId(slug, ctx.config)}/${relUnderProject}`
+			return toCasparClsMediaId(projectScopedId)
 		}
 	}
 

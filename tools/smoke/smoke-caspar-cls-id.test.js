@@ -81,6 +81,31 @@ test('resolveClipForAmcpLoad: active project folder wins over CLS basename match
 	)
 })
 
+test('resolveClipForAmcpLoad: project clip stored in a subfolder still gets the project prefix (regression, 2026-09-07 live-show incident: LOADBG 404s on every clip organized into a subfolder within its project — the id already contains a "/" so expandMediaIdToMediaRoot short-circuited it as "already resolved", losing PROJECTS/<slug>/)', () => {
+	const ctx = {
+		config: {
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'noc_foto' : null) },
+	}
+	assert.equal(resolveClipForAmcpLoad('rynek/06_AGA_3.mov', ctx), 'PROJECTS/NOC_FOTO/RYNEK/06_AGA_3')
+})
+
+test('resolveClipForAmcpLoad: a stored ref already in resolved CLS form (uppercase, project prefix already present, no extension) is NOT prefixed again (regression, 2026-09-07 follow-up: normalizeMediaIdForProject stripped the project prefix with a case-sensitive startsWith, missing the all-caps form and doubling it to PROJECTS/<slug>/PROJECTS/<slug>/…)', () => {
+	const ctx = {
+		config: {
+			projectScopedMedia: { enabled: true },
+			local_media_path: require('path').join(__dirname, '../../media'),
+		},
+		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'noc_foto' : null) },
+	}
+	assert.equal(
+		resolveClipForAmcpLoad('PROJECTS/NOC_FOTO/RYNEK/06_AGA_3', ctx),
+		'PROJECTS/NOC_FOTO/RYNEK/06_AGA_3',
+	)
+})
+
 test('resolveClipForAmcpLoad: project basename without extension expands to CLS id', () => {
 	const ctx = {
 		config: {

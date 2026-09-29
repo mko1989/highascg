@@ -15,8 +15,12 @@ function parseCinfMedia(cinf) {
 		const fm = (parts[i] || '').match(/^(\d+)\/(\d+)$/)
 		if (fm && i > 0) {
 			const frames = parseInt(parts[i - 1], 10) || 0
-			const den = parseInt(fm[2], 10) || 1
-			const fps = den > 0 ? parseInt(fm[1], 10) / den : 0
+			const num = parseInt(fm[1], 10) || 0
+			const den = parseInt(fm[2], 10) || 0
+			/* Caspar reports the time base (1/25, 1001/30000), not the rate — same as the CLS parser.
+			 * A fraction above 1 (25/1) is already a rate. */
+			const ratio = num > 0 && den > 0 ? num / den : 0
+			const fps = ratio > 1 ? ratio : ratio > 0 ? 1 / ratio : 0
 			if (frames > 0 && fps > 0) out.durationMs = Math.round((frames / fps) * 1000)
 			if (fps > 0) out.fps = Math.round(fps * 100) / 100
 			break
