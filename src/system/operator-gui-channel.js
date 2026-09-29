@@ -230,9 +230,11 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 		if (list.length > 0) {
 			const persistence = ctx.persistence || require('../utils/persistence')
 			persistence.set('operatorGuiLayout', { cells: list, savedAt: Date.now() })
-			// Owner request 2026-07-26: the compose placement is part of the SHOW — mirror it into
-			// the active project (debounced) so loading the project restores the arrangement.
-			scheduleComposeLayoutProjectPersist(ctx, list)
+			// Owner request 2026-07-26: mirror the compose placement into the active project so
+			// loading it restores the arrangement — debounced, and gated to real reports only: a
+			// project_load reapply's cells came FROM the project, so echoing them back shared this
+			// debounce with a live report and could revert it (2026-09-23 bug).
+			if (opts.source !== 'project_load') scheduleComposeLayoutProjectPersist(ctx, list)
 		}
 	} catch (_) {
 		/* persistence optional (tests/headless) */

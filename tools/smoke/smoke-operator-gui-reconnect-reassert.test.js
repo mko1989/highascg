@@ -295,3 +295,48 @@ describe('WO-410 (todos03.08): reconnect must forget the skip-unchanged route ca
 		assert.match(head, /lastMaxLayerByChannel\.delete\(ch\)/, 'max-layer hygiene cache forgotten too')
 	})
 })
+
+describe('2026-09-23: a stale boot/reconnect reapply must not clobber a fresh client report in the project file', () => {
+	// Owner bug: hit Reset in the compose preview, got the new layout on screen, then Caspar
+	// reconnected (or the service restarted) minutes later and the compose preview reverted to
+	// the OLD, pre-Reset arrangement. `applyProjectComposeLayout` re-applies whatever is already
+	// saved in the project (source: 'project_load') on every boot/reconnect — see
+	// `ensureOperatorGuiChannel` below. That reapply used to unconditionally call
+	// `scheduleComposeLayoutProjectPersist` too, and that function shares ONE module-level debounce
+	// timer across every caller: a reconnect's stale echo landing after a live report just
+	// cancelled the live report's pending 2s write and replaced it with the stale one, so the
+	// live report's data never reached disk. Persisting cells that were only just READ from the
+	// project is a pure no-op anyway — only a genuine live client report may schedule a write.
+	const fs = require('node:fs')
+	const path = require('node:path')
+	const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src/system/operator-gui-channel.js'), 'utf8')
+
+	it('the project-file persist is gated on source, never firing for a project_load reapply', () => {
+		const anchor = src.indexOf("persistence.set('operatorGuiLayout'")
+		assert.notEqual(anchor, -1, 'the persistence block this guard lives in must still exist')
+		const body = src.slice(anchor, anchor + 800)
+		assert.match(
+			body,
+			/if \(opts\.source !== 'project_load'\) scheduleComposeLayoutProjectPersist\(ctx, list\)/,
+			'a project_load reapply (its own cells already came FROM the project) must not schedule a write',
+		)
+	})
+
+	it('applyProjectComposeLayout still tags its cells project_load (the other half of the gate)', () => {
+		const fnStart = src.indexOf('function applyProjectComposeLayout')
+		assert.notEqual(fnStart, -1)
+		const body = src.slice(fnStart, fnStart + 400)
+		assert.match(body, /source: 'project_load'/, 'the gate above only recognizes this exact tag')
+	})
+
+	it('ensureOperatorGuiChannel boot/reconnect reapply still runs through the same source tag', () => {
+		const fnStart = src.indexOf('async function ensureOperatorGuiChannel')
+		assert.notEqual(fnStart, -1)
+		const body = src.slice(fnStart, src.indexOf('\nasync function', fnStart + 10) - 1)
+		assert.match(
+			body,
+			/applyOperatorGuiLayout\(ctx, saved\.cells, \{ source: savedSource \}\)/,
+			'boot/reconnect must keep routing through the gated apply, not a bespoke persist path',
+		)
+	})
+})
