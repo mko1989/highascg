@@ -150,6 +150,44 @@ test('forced be mode never swaps even when canaries look LE', () => {
 	assert.strictEqual(norm.getMode(), 'be')
 })
 
+function fileClipMessage(elapsed, duration) {
+	return {
+		address: '/channel/1/stage/layer/110/foreground/file/clip',
+		args: [
+			{ type: 'f', value: elapsed },
+			{ type: 'f', value: duration },
+		],
+	}
+}
+
+/** streams/0/fps as an int pair — the newer build's replacement for the float `/fps` canary. */
+function intFpsMessage(num, den) {
+	return {
+		address: '/channel/1/stage/layer/110/foreground/file/streams/0/fps',
+		args: [
+			{ type: 'i', value: num },
+			{ type: 'i', value: den },
+		],
+	}
+}
+
+test('2026-09-03 regression: no /fps float canary (fps is an int pair) — file/time duration still latches le', () => {
+	const norm = createFloatEndianNormalizer('auto', null)
+	// int fps traffic must never cast a vote — only floats do.
+	for (let i = 0; i < 5; i++) norm.normalize(Buffer.from(osc.writePacket(intFpsMessage(24, 1))))
+	assert.strictEqual(norm.getMode(), 'auto')
+
+	// 3 file/time canaries (duration=60, matching the live-captured regression) latch 'le'.
+	for (let i = 0; i < 3; i++) norm.normalize(writePacketWithLeFloats(fileTimeMessage(41.7 + i * 0.02, 60)))
+	assert.strictEqual(norm.getMode(), 'le')
+
+	const buf = writePacketWithLeFloats(fileClipMessage(41.8, 60))
+	norm.normalize(buf)
+	const [msg] = readVals(buf)
+	assert.ok(Math.abs(msg.vals[0] - 41.8) < 1e-3, `elapsed decoded ${msg.vals[0]}`)
+	assert.ok(Math.abs(msg.vals[1] - 60) < 1e-3, `duration decoded ${msg.vals[1]}`)
+})
+
 test('ambiguous canaries do not latch; malformed packets do not throw', () => {
 	const norm = createFloatEndianNormalizer('auto', null)
 	// 0.0 decodes 0.0 both ways -> no vote either direction.

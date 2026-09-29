@@ -1,5 +1,7 @@
 'use strict'
 
+const { isSaneTimingValue } = require('./osc-state-timing')
+
 /**
  * osc-float-endian.js — normalize float byte order in raw CasparCG OSC datagrams.
  *
@@ -26,6 +28,16 @@
  * latches for the process lifetime. Until latched, packets pass through unmodified (= BE
  * behavior, correct for a spec-compliant binary). Override with config `osc.floatByteOrder`
  * ('be' | 'le') or env OSC_FLOAT_BYTE_ORDER when a stream has no fps traffic to vote on.
+ *
+ * 2026-09-03: a newer 2.6-dev build stopped sending the single-float `.../fps` canary — fps now
+ * rides as an INT pair on `.../file/streams/0/fps` (correct BE either way, since only floats are
+ * mis-endian). With no `/fps` float left to vote on, auto-detect never latched and `file/time` /
+ * `file/clip` (still `,ff` floats: elapsed, duration) stayed raw-LE garbage forever — live capture
+ * confirmed BE decode gave e.g. -4.5e-11 while LE gave a smooth 41.70, 41.72, 41.74… against a
+ * constant 60.0 duration matching the actual clip length. Added a second canary on those two
+ * addresses' duration arg (second float) using the same sanity bounds `osc-state-timing.js`
+ * already applies to elapsed/duration, so auto-detect latches from real playback traffic even when
+ * the fps canary is gone.
  */
 
 const MODE_LATCH_VOTES = 3
@@ -52,8 +64,10 @@ function skipPaddedString(buf, off, end) {
  * @param {boolean} swap - reverse 'f'/'d' payload bytes
  * @param {(fpsBE: number, fpsLE: number) => void} [onFpsCanary] - called with both decodes of a
  *   single-float `.../file/fps` message so the caller can vote on endianness
+ * @param {(durBE: number, durLE: number) => void} [onDurationCanary] - called with both decodes
+ *   of the second (duration) float of a `.../file/time` or `.../file/clip` message
  */
-function walkMessage(buf, off, end, swap, onFpsCanary) {
+function walkMessage(buf, off, end, swap, onFpsCanary, onDurationCanary) {
 	const addrEnd = skipPaddedString(buf, off, end)
 	if (addrEnd < 0) return
 	if (buf[addrEnd] !== 0x2c /* ',' */) return
@@ -61,6 +75,7 @@ function walkMessage(buf, off, end, swap, onFpsCanary) {
 	if (tagsEnd < 0) return
 	let p = tagsEnd
 	let firstFloatAt = -1
+	let secondFloat4At = -1
 	let floatCount = 0
 	let tagCount = 0
 	for (let t = addrEnd + 1; t < end && buf[t] !== 0; t++) {
@@ -70,6 +85,7 @@ function walkMessage(buf, off, end, swap, onFpsCanary) {
 			const size = tag === 'f' ? 4 : 8
 			if (p + size > end) return
 			if (floatCount === 0) firstFloatAt = p
+			else if (floatCount === 1 && size === 4) secondFloat4At = p
 			floatCount++
 			if (swap) {
 				for (let a = p, b = p + size - 1; a < b; a++, b--) {
@@ -96,16 +112,31 @@ function walkMessage(buf, off, end, swap, onFpsCanary) {
 		}
 		if (p > end) return
 	}
-	// Canary: a lone-float fps message (address .../fps) — decode both ways for the voter.
-	// Only meaningful pre-latch, when swap=false and the bytes are still in wire order. The
-	// address string is only materialized here, on the pre-latch path, never in steady state.
-	if (!swap && onFpsCanary && floatCount === 1 && tagCount === 1 && firstFloatAt >= 0) {
+	// Canaries: decode a known-shape float both ways and let the caller vote on endianness. Only
+	// meaningful pre-latch, when swap=false and the bytes are still in wire order — the address
+	// string is only materialized here, on the pre-latch path, never in steady state.
+	if (!swap && (onFpsCanary || onDurationCanary) && floatCount >= 1) {
 		let z = off
 		while (z < end && buf[z] !== 0) z++
 		const address = Buffer.from(buf.buffer, buf.byteOffset + off, z - off).toString('ascii')
-		if (address.endsWith('/fps')) {
+		// A lone-float fps message (address .../fps): a real fps is 1..1000, its byte-swap is
+		// subnormal or astronomically large.
+		if (onFpsCanary && floatCount === 1 && tagCount === 1 && firstFloatAt >= 0 && address.endsWith('/fps')) {
 			const view = Buffer.from(buf.buffer, buf.byteOffset + firstFloatAt, 4)
 			onFpsCanary(view.readFloatBE(0), view.readFloatLE(0))
+		}
+		// `.../file/time` / `.../file/clip` carry [elapsed, duration] as two floats — some builds
+		// no longer send a `/fps` canary at all (fps moved to an int-typed address), so this is the
+		// only float traffic left to vote on. Duration is the more reliable of the two args (a
+		// live/looping clip can legitimately have elapsed near 0, but a byte-swapped duration is
+		// reliably insane by isSaneTimingValue's bounds).
+		if (
+			onDurationCanary &&
+			secondFloat4At >= 0 &&
+			(address.endsWith('/file/time') || address.endsWith('/file/clip'))
+		) {
+			const view = Buffer.from(buf.buffer, buf.byteOffset + secondFloat4At, 4)
+			onDurationCanary(view.readFloatBE(0), view.readFloatLE(0))
 		}
 	}
 }
@@ -117,8 +148,9 @@ function walkMessage(buf, off, end, swap, onFpsCanary) {
  * @param {number} end
  * @param {boolean} swap
  * @param {(fpsBE: number, fpsLE: number) => void} [onFpsCanary]
+ * @param {(durBE: number, durLE: number) => void} [onDurationCanary]
  */
-function walkPacket(buf, off, end, swap, onFpsCanary) {
+function walkPacket(buf, off, end, swap, onFpsCanary, onDurationCanary) {
 	if (end - off < 4) return
 	// '#bundle\0'
 	if (
@@ -137,12 +169,12 @@ function walkPacket(buf, off, end, swap, onFpsCanary) {
 			const size = (buf[p] << 24) | (buf[p + 1] << 16) | (buf[p + 2] << 8) | buf[p + 3]
 			p += 4
 			if (size <= 0 || p + size > end) return
-			walkPacket(buf, p, p + size, swap, onFpsCanary)
+			walkPacket(buf, p, p + size, swap, onFpsCanary, onDurationCanary)
 			p += size
 		}
 		return
 	}
-	walkMessage(buf, off, end, swap, onFpsCanary)
+	walkMessage(buf, off, end, swap, onFpsCanary, onDurationCanary)
 }
 
 /**
@@ -157,15 +189,14 @@ function createFloatEndianNormalizer(mode, log) {
 	let leVotes = 0
 	let beVotes = 0
 
-	function onFpsCanary(fpsBE, fpsLE) {
-		const beSane = fpsBE >= FPS_SANE_MIN && fpsBE <= FPS_SANE_MAX
-		const leSane = fpsLE >= FPS_SANE_MIN && fpsLE <= FPS_SANE_MAX
+	/** @param {boolean} beSane @param {boolean} leSane @param {string} reason */
+	function castVote(beSane, leSane, reason) {
 		if (beSane === leSane) return // ambiguous — no vote
 		if (leSane) {
 			beVotes = 0
 			if (++leVotes >= MODE_LATCH_VOTES) {
 				latched = 'le'
-				log?.('warn', `[OSC] float args are LITTLE-ENDIAN on the wire (non-spec binary) — byte-swapping all floats from here on (canary fps LE=${fpsLE})`)
+				log?.('warn', `[OSC] float args are LITTLE-ENDIAN on the wire (non-spec binary) — byte-swapping all floats from here on (${reason})`)
 			}
 		} else {
 			leVotes = 0
@@ -176,10 +207,25 @@ function createFloatEndianNormalizer(mode, log) {
 		}
 	}
 
+	function onFpsCanary(fpsBE, fpsLE) {
+		castVote(
+			fpsBE >= FPS_SANE_MIN && fpsBE <= FPS_SANE_MAX,
+			fpsLE >= FPS_SANE_MIN && fpsLE <= FPS_SANE_MAX,
+			`canary fps LE=${fpsLE}`,
+		)
+	}
+
+	// Fallback canary for builds that no longer send a `/fps` float (fps moved to an int-typed
+	// address) — vote on the duration arg of `file/time` / `file/clip` instead.
+	function onDurationCanary(durBE, durLE) {
+		castVote(isSaneTimingValue(durBE), isSaneTimingValue(durLE), `canary file duration LE=${durLE}`)
+	}
+
 	return {
 		normalize(data) {
 			try {
-				walkPacket(data, 0, data.length, latched === 'le', latched === null ? onFpsCanary : undefined)
+				const voting = latched === null
+				walkPacket(data, 0, data.length, latched === 'le', voting ? onFpsCanary : undefined, voting ? onDurationCanary : undefined)
 			} catch (_) {
 				/* malformed packet — leave it for the parser's own error path */
 			}
