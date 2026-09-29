@@ -106,9 +106,11 @@ function computeBorderFromDmx(data, start, channelMap, runtimeParams) {
 	}
 
 	if (map[7]) {
-		const spd = 0.1 + (readByte(data, start + 7) / 255) * 9.9
-		params.speed = spd
-		params.pulseSpeed = spd
+		const byte7 = readByte(data, start + 7)
+		/* edge_strip speed is px/s (WO: per-slice speed must match regardless of slice perimeter);
+		 * pulseSpeed (glow) stays a 0.1-10s duration — same DMX byte, two different unit scales. */
+		params.speed = 10 + (byte7 / 255) * 2990
+		params.pulseSpeed = 0.1 + (byte7 / 255) * 9.9
 	}
 
 	if (map[8]) {
@@ -127,7 +129,8 @@ function computeBorderFromDmx(data, start, channelMap, runtimeParams) {
 
 	if (map[12]) params.radius = (readByte(data, start + 12) / 255) * 50
 	if (map[13]) params.count = Math.floor((readByte(data, start + 13) / 255) * 12) + 1
-	if (map[14]) params.length = 5 + (readByte(data, start + 14) / 255) * 95
+	/* edge_strip length is px (WO-566 unit change, same as speed) */
+	if (map[14]) params.length = 10 + (readByte(data, start + 14) / 255) * 1990
 
 	if (map[15] || map[16] || map[17]) {
 		let segmentMode = prev.segmentMode === 'uniform' || prev.segmentationMode === 'uniform' ? 'uniform' : 'full'

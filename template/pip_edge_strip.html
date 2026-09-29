@@ -50,8 +50,8 @@
 		count: 1,
 		thickness: 3,
 		color: '#e63946',
-		speed: 2,
-		length: 28,
+		speed: 400,
+		length: 300,
 		glow: true,
 		glowColor: '#ff6b6b',
 		glowWidth: 5,
@@ -116,10 +116,9 @@
 
 		var NS = 'http://www.w3.org/2000/svg'
 		var cw = state.direction !== 'ccw'
-		var dur = Math.max(0.1, state.speed)
+		var speedPxPerSec = Math.max(1, state.speed)
 		var n = Math.max(1, Math.min(12, Math.round(Number(state.count))))
-		var L = Math.max(2, Math.min(98, state.length))
-		var gap = 100 - L
+		var lengthPx = Math.max(1, state.length)
 		var th = state.thickness || 3
 		var side = normalizeSide(state.side)
 
@@ -158,6 +157,11 @@
 				rw = wPx + th
 				rh = hPx + th
 			}
+
+			var perimPx = 2 * (rw + rh)
+			var dur = Math.max(0.05, perimPx / speedPxPerSec)
+			var L = Math.max(2, Math.min(98, (lengthPx / Math.max(1, perimPx)) * 100))
+			var gap = 100 - L
 
 			var viewBox = '0 0 ' + wPx + ' ' + hPx
 
