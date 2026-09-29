@@ -1,6 +1,6 @@
 # WO-382 — Operator taskbar gone + operator-GUI stacking changed: the WO-317 flag was lost and unrecoverable
 
-**Status: 🟡 Implemented 29.07.26 (flag restored live — `enabled: true`; suite 1684/0/2) — owner: confirm the strip and the window behaviour on the glass**
+**Status: 🟡 Implemented — recurred 10.09.26 (WO-569), re-enabled live + default flipped ON in code so it survives a factory reset this time (offline suite 2406/0/2) — owner: confirm helper-window stacking on the glass. See §5.**
 
 Owner, 2026-07-29:
 > "there is also a regression with how the operator gui behaves in relation to other windows as
@@ -81,3 +81,48 @@ preserved a `true` value through a reset anyway — only made the key present an
 
 No UI exposes this flag. A checkbox next to the existing GPU one in the Devices tab would make it
 visible and self-service; the API half now exists for it.
+
+## 5. Update 2026-09-10 (WO-569): the flag was lost AGAIN — decision reversed, now defaults ON
+
+Owner report (`work/work-orders/todos10.09.26`): "i ran a web browser window and after a while
+clicked back to gui. the browser window was visible thru the shape cut outs and it should land
+under the operator screen consumer" — the exact WO-317/382 symptom, reproduced live:
+`GET /api/system/operator-helper-taskbar` → `{"ok":true,"enabled":false,"helpers":[]}`, byte-
+identical to this WO's own "before" evidence in §1.
+
+Traced why §2's fix didn't stick: `multiHelperTaskbar` was deliberately kept OUT of
+`defaults.operatorTools` (`src/config/defaults-core.js`) so a factory reset couldn't silently flip
+window-stacking authority. But both the actual loss mechanism this WO diagnosed (`ConfigManager
+.factoryReset()`, `src/config/config-manager.js:450` — `{...defaults, ...}` directly) AND the
+"New Project" starter (`src/config/factory-starter.js` — deep-copies the same `defaults` module,
+no `operatorTools` override of its own) bottom out at that SAME shared defaults object. There is no
+seed point that fixes the recurring loss without touching it — confirmed with the owner before
+acting (a global default change is a bigger commitment than the "just this box" framing first
+suggested).
+
+Owner decision, informed of that trade-off: flip the global default ON. Re-verified the specific
+worry from §2 — WO-317's whole safety argument is that exactly one of {WO-283 single-helper path,
+coordinator} is ever live, never both — still holds: `isMultiHelperTaskbarEnabled` is the single
+gate both the coordinator (`operator-helper-live.js`) and the taskbar routes read, so flipping its
+default doesn't create a state where both paths can be live at once; it only changes which one a
+fresh box starts on.
+
+**What was done:**
+- Live: `POST /api/settings {"operatorTools":{"multiHelperTaskbar":true}}` (same recovery this WO
+  used in July) — re-enabled it on the box immediately, confirmed via
+  `GET /api/system/operator-helper-taskbar` → `enabled:true`.
+- `src/config/defaults-core.js` — `operatorTools.multiHelperTaskbar` added, `true`, with a comment
+  recording why (this WO + WO-317 + WO-569) so the next person doesn't reflexively "fix" it back to
+  matching WO-283's single-helper default.
+- `tools/smoke/smoke-wo382-operator-tools-flag-settable.test.js` — the "starts off" transition test
+  now sets `multiHelperTaskbar: false` explicitly in its own fixture instead of inheriting whatever
+  the shared default says, since the test is specifically about the off→on→off transition, not
+  about what a fresh box starts on.
+
+**What was verified:** offline suite 2406/0/2 (unchanged pass count vs. pre-change, this file's own
+3 tests still pass); `node --check` on both touched files; `check-max-file-lines.js` clean (only
+the pre-existing unrelated `scene-take-lbg.js` over the cap). Live: confirmed via the API before
+and after the settings POST. Not yet verified: owner on-hardware confirmation that a helper window
+now correctly parks under the operator screen consumer on refocus (needs `highascg` service
+restart for the new default to reach a config rebuilt from scratch — the live box already has the
+flag set via the settings POST above, independent of the code default).

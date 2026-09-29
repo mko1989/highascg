@@ -16,6 +16,10 @@ const fakePersistence = {
 	set(k, v) {
 		this._store[k] = v
 	},
+	remove(k) {
+		// Mirrors src/utils/persistence.js's real remove(): set(key, null), not a delete.
+		this.set(k, null)
+	},
 }
 
 function makeCtx(mediaRoot) {
@@ -111,6 +115,58 @@ test('createNewProject resets routing and persists empty Untitled project', () =
 		assert.equal((ctx.config.deviceGraph.edges || []).length, 0)
 		assert.equal(fakePersistence._store.multiviewLayout, null)
 		assert.deepEqual(ctx.config.extraLiveSources, [])
+	} finally {
+		fs.rmSync(mediaRoot, { recursive: true, force: true })
+	}
+})
+
+/* WO-569: owner report — a New Project taken while the operator GUI's Looks tab was foreground
+ * left the previous setup's video holes open, and a later tab switch never closed them either.
+ * Root cause: routing-map.js allocates the operator_gui channel dynamically AFTER
+ * programChannels/multiview, so resetting destinations to factory (one operator_gui dest, zero
+ * PGM) renumbers it — any clear/withdraw issued AFTER the reset targets the NEW channel, leaving
+ * the OLD channel's routes/shape holes with nothing left that will ever stop them. */
+test('createNewProject clears the OLD operator-GUI channel before the destinations reset can renumber it (WO-569)', () => {
+	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-og-'))
+	try {
+		const ctx = makeCtx(mediaRoot)
+		ctx.config.screenDestinations = {
+			version: 1,
+			destinations: [
+				{ id: 'dst_pgm_1', label: 'PGM 1', mainScreenIndex: 0, mode: 'pgm_only', caspar: { bus: 'pgm' } },
+				{ id: 'dst_pgm_2', label: 'PGM 2', mainScreenIndex: 1, mode: 'pgm_only', caspar: { bus: 'pgm' } },
+				{ id: 'dst_operator_gui', label: 'Operator GUI', mainScreenIndex: 0, mode: 'operator_gui', caspar: {}, guiUrl: '' },
+			],
+			edidNotes: '',
+		}
+		ctx.config.casparServer = { ...(ctx.config.casparServer || {}), screen_count: 2 }
+		ctx.config.screen_count = 2
+
+		const { resolveOperatorGuiChannel } = require('../../src/system/operator-gui-channel-geometry')
+		const oldResolved = resolveOperatorGuiChannel(JSON.parse(JSON.stringify(ctx.config)))
+		assert.ok(oldResolved, 'fixture must actually resolve an operator-gui channel before the reset')
+		const oldCh = oldResolved.ch
+
+		fakePersistence._store.operatorGuiLayout = {
+			cells: [{ role: 'pgm', mainIndex: 0, rect: { x: 0, y: 0, w: 1, h: 1 } }],
+			savedAt: 1,
+		}
+
+		createNewProject(ctx)
+
+		const newResolved = resolveOperatorGuiChannel(ctx.config)
+		assert.ok(newResolved, 'fresh project still seeds one operator-gui destination')
+		assert.notEqual(newResolved.ch, oldCh, 'fixture must exercise an actual channel renumber, or this test proves nothing')
+
+		assert.equal(
+			fakePersistence._store.operatorGuiLayout,
+			null,
+			'stale compose layout must not survive to leak onto the new channel on a later Caspar reconnect',
+		)
+
+		const { shouldReapplyPersistedLayout } = require('../../src/system/operator-gui-channel')
+		const verdict = shouldReapplyPersistedLayout(oldCh, [{ role: 'pgm', mainIndex: 0, rect: { x: 0, y: 0, w: 1, h: 1 } }])
+		assert.equal(verdict.reapply, false, 'the OLD channel must be vetoed so a reconnect can never re-light the old holes')
 	} finally {
 		fs.rmSync(mediaRoot, { recursive: true, force: true })
 	}

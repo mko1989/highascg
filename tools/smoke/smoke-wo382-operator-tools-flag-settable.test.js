@@ -62,6 +62,10 @@ test('POST /api/settings turns the flag on and leaves the rest of operatorTools 
 		...config.operatorTools,
 		pointerConfine: 'on',
 		cefEnableGpu: true,
+		// WO-569 flipped the shared default to true (recurring loss of a hand-set flag was worse
+		// than committing to it) — this test is specifically about the off->on->off transition, so
+		// it fixes its OWN starting point rather than inheriting whatever the default says today.
+		multiHelperTaskbar: false,
 	}
 	let saved = null
 	const ctx = {

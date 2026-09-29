@@ -68,7 +68,34 @@ function createNewProject(ctx) {
 	if (!ctx?.configManager) {
 		throw new Error('Server context missing configManager')
 	}
+	/* WO-569: stop the operator-GUI compose routes/shape holes on the CURRENT (about-to-be-stale)
+	 * channel before the destinations reset below can renumber which Caspar channel "operator_gui"
+	 * is (routing-map.js allocates it dynamically after programChannels/multiview — resetting to
+	 * "one PGM" shifts that count). resolveOperatorGuiChannel() resolves synchronously against
+	 * ctx.config at call time, so calling this BEFORE applyHardwareConfigToCtx mutates ctx.config
+	 * in place captures the OLD channel number; the actual STOP/MIXER CLEAR happen async after,
+	 * unaffected by the later mutation. Without this, a New Project taken from the operator GUI's
+	 * Looks tab left the previous setup's video holes open with no channel left that will ever
+	 * clear them again (a later withdrawal resolves the NEW channel instead). */
 	const persistence = ctx.persistence || require('../utils/persistence')
+	try {
+		const { clearOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
+		// Mirrors the DELETE /api/operator-gui/layout handler's own pair (routes-operator-gui.js):
+		// noteClientLayoutReport([]) vetoes a stale reconnect re-apply of the old project's persisted
+		// cells onto whatever channel resolves next, same as an operator's own explicit withdrawal.
+		noteClientLayoutReport(ctx, [])
+		void clearOperatorGuiLayout(ctx).catch((e) => {
+			if (typeof ctx.log === 'function') ctx.log('warn', `[project] operator-gui layout clear: ${e?.message || e}`)
+		})
+		// clearOperatorGuiLayout() deliberately never persists an EMPTY cell set (a live reconnect
+		// blip must not wipe the saved arrangement) — but a New Project IS the case that should wipe
+		// it, same as clearPersistedMultiviewLayout below, so a later Caspar reconnect can't reapply
+		// the old project's compose layout onto whatever channel "operator_gui" resolves to next.
+		persistence.remove('operatorGuiLayout')
+	} catch {
+		/* optional */
+	}
+
 	const { hardwareConfig } = buildStarterHardwareConfig(persistence)
 
 	/* The GPU bracket map (gpuPhysicalTopology) is a property of THIS machine's card, not of a show:

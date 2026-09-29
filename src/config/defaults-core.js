@@ -50,6 +50,18 @@ function coreDefaults() {
 			cefInteractiveBridge: true,
 			cefInteractiveLayer: 999,
 			cefRemoteDebuggingPort: 9222,
+			// WO-317/382/569: gates the multi-helper taskbar + its window-stacking coordinator
+			// (src/system/operator-helper-live.js's isMultiHelperTaskbarEnabled) vs. the WO-283
+			// single-helper path — exactly one of the two is ever live, never both. WO-382 first
+			// shipped this ON via a hand-set config/general.json key with NO default here on purpose
+			// (a factory reset must not silently flip window-stacking authority); every factory
+			// reset/stick-insert since has silently dropped that hand-set key back to the
+			// single-helper path, reproducing the exact bug the taskbar was built to fix (WO-569:
+			// a helper browser window left stacked above the operator screen consumer, showing
+			// through the shaped video holes, because nothing parks it on refocus without this on).
+			// Owner decision 2026-09-10: default ON — the taskbar path is the box's actual steady
+			// state, and losing it silently on every reset was strictly worse than committing to it.
+			multiHelperTaskbar: true,
 		},
 		projectScopedMedia: {
 			enabled: true,
