@@ -148,6 +148,15 @@ export function computeDefaultTileLayout(defs, canvasW = 1920, canvasH = 1080) {
 	const cols = Math.ceil(n / bestRows)
 	const cellW = 1 / cols
 	const cellH = 1 / bestRows
+	/* 2026-09-23: a row's cells stay at the FULL 1/rows share on purpose — this function has no
+	 * per-tile aspect data (it assumes DEFAULT_TILE_ASPECT for every tile, see the area-maximizing
+	 * loop above), so shrinking the outer box here would starve any screen whose REAL aspect needs
+	 * more height than 16:9 guesses, even when the panel has the room (owner regression: "prv1 and
+	 * pgm1 do not fill the height even though they could"). The "labels fill the height" complaint
+	 * this used to chase is fixed downstream instead, where the real per-tile aspect is known: see
+	 * operator-compose-tiles-tile-controller.js `layoutTileDom`, which now hugs the footer to the
+	 * bottom of the actual aspect-locked hole instead of the bottom of this (possibly much taller)
+	 * outer box. */
 
 	// Sort defs: by mainIndex first, then role (PRV before PGM) to maintain reading order convention.
 	const sorted = defs.slice().sort((a, b) => {

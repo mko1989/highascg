@@ -70,6 +70,14 @@ export function createOperatorComposeTileController(env) {
 		t.bodyEl.style.width = `${hole.width}px`
 		t.bodyEl.style.height = `${hole.height}px`
 		t.footerEl.style.height = `${TILE_CHROME.footerH}px`
+		/* Owner 2026-09-23: a cell taller than its aspect-locked hole needs (the row-grid default
+		 * always allots a whole row's share, see operator-compose-tiles-geometry.js) used to leave
+		 * the footer pinned to the TILE's own bottom edge (CSS `bottom:0`) -- stranded far below the
+		 * video with a big dead gap ("the labels fill the compose preview height"). Hug it to the
+		 * hole's own bottom instead, so the label always sits right under the video regardless of
+		 * how much extra letterbox room the outer tile has. */
+		t.footerEl.style.top = `${hole.top + hole.height}px`
+		t.footerEl.style.bottom = 'auto'
 	}
 
 	function reportRectsNow() {
