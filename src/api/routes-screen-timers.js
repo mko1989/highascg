@@ -68,10 +68,14 @@ function handleGet(p, ctx) {
 	if (p !== '/api/timers/list') return null
 
 	const timers = screenTimers.listScreenTimers()
+	// A remote client (Companion, possibly on a different machine with a skewed clock) must
+	// never subtract ITS OWN Date.now() from a `cmdAt` written by THIS server's clock — that
+	// bakes clock drift straight into the displayed countdown. `serverNowMs` lets a client
+	// measure the offset between the two clocks at poll time and correct for it instead.
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, timers }),
+		body: jsonBody({ ok: true, timers, serverNowMs: Date.now() }),
 	}
 }
 
