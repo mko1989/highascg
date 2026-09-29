@@ -201,6 +201,9 @@ export function createScenesPreviewRuntime(opts) {
 					: [...allow].filter((i) => Number.isFinite(i) && i >= 0 && i < (cm.screenCount || 1))
 		}
 		for (const mIdx of targetIdxs) {
+			/* WO-572: audio-only looks are never the screen's armed/preview VIDEO look — the server
+			 * tracks them in scene.liveAudioOnly, so skip every setPreviewSceneId below. */
+			if (scene.audioOnlyLook && !isPreviewBusAvailable(cm, mIdx)) continue
 			if (!isPreviewBusAvailable(cm, mIdx)) {
 				sceneState.setPreviewSceneId(sceneId, mIdx)
 				continue
@@ -234,10 +237,14 @@ export function createScenesPreviewRuntime(opts) {
 				},
 			})
 			import('../lib/media-exists.js').then((m) => m.toastTakeAmcpFailures(takeRes)).catch(() => {})
+			if (scene.audioOnlyLook) {
+				if (takeRes?.audioOnlyLive) stateStore.applyChange('scene.liveAudioOnly', takeRes.audioOnlyLive)
+				continue
+			}
 			sceneState.setPreviewSceneId(sceneId, mIdx)
 			if (Number.isFinite(prvCh) && prvCh > 0) previewState.lastPreviewChannel = prvCh
 		}
-		primePreviewSnapshotFromScene(sceneId)
+		if (!scene.audioOnlyLook) primePreviewSnapshotFromScene(sceneId)
 	}
 
 	/**

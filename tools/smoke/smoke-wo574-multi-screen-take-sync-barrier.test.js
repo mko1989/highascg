@@ -157,3 +157,34 @@ test('wiring: client tags batched POSTs, server hands the group to the PGM take,
 	const deps = read('src/engine/scene-route-deps.js')
 	assert.match(deps, /opts\.playSync\.arrive\(\{ amcp, channel: ch, leadingCommit, block, trailingCommit \}\)/)
 })
+
+test('merge/Animate take: transition rides the LOADBG and PLAY is BARE (a clip PLAY re-opens the file and drops the pre-roll)', async () => {
+	const { runSceneTakeLbg } = require('../../src/engine/scene-take-lbg')
+	const sent = []
+	const amcp = {
+		_context: { config: {}, log() {} },
+		batchSendChunked: async (ls) => void sent.push(...ls),
+		batchSend: async (ls) => void sent.push(...ls),
+		mixerCommit: async () => {},
+		mixerClear: async () => {},
+		stop: async () => {},
+		loadbg: async (ch, l, clip) => void sent.push(`LOADBG ${ch}-${l} ${clip}`),
+		_send: async (l) => void sent.push(l),
+	}
+	const self = { config: { screen_count: 1 }, log() {}, programLayerBankByChannel: { 3: 'a' }, _playbackMatrix: {} }
+	await runSceneTakeLbg(amcp, {
+		self,
+		channel: 3,
+		currentScene: null,
+		forceCut: false,
+		pgmOnly: true,
+		incomingScene: {
+			id: 'x',
+			defaultTransition: { type: 'MIX + ANIMATE', duration: 25, tween: 'linear' },
+			layers: [{ layerNumber: 10, source: { type: 'media', value: 'A/intro.mov' } }],
+		},
+	})
+	assert.ok(sent.some((l) => /^LOADBG 3-10 \S+ MIX 25 linear/.test(l)), 'LOADBG carries the MIX: ' + sent.join(' | '))
+	const plays = sent.filter((l) => /^PLAY /.test(l))
+	assert.deepEqual(plays, ['PLAY 3-10'], 'PLAY is bare — no clip, no MIX')
+})

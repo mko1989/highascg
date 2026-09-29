@@ -71,6 +71,69 @@ function recordStop(ctx, channel, layer, opts = {}) {
 	if (!opts.silent) emitMatrix(ctx)
 }
 
+/**
+ * WO-570: PAUSE freezes the tracked position — without this, `getLivePlayheadFrames`'s
+ * `Date.now() - startedAt` math keeps advancing while the actual Caspar layer is frozen, so a
+ * scrub bar built on this matrix would drift away from the real (paused) position.
+ * @param {{ _playbackMatrix?: object, state?: import('events').EventEmitter }} ctx
+ * @param {number|string} channel
+ * @param {number|string} layer
+ */
+function recordPause(ctx, channel, layer) {
+	const ch = parseInt(channel, 10)
+	const ln = parseInt(layer, 10)
+	if (!Number.isFinite(ch) || !Number.isFinite(ln)) return
+	const cell = ctx._playbackMatrix?.[`${ch}-${ln}`]
+	if (!cell || !cell.playing) return
+	const elapsedMs = Math.max(0, Date.now() - (cell.startedAt || Date.now()))
+	cell.pausedElapsedMs = cell.durationMs != null && cell.durationMs > 0 && !cell.loop ? Math.min(elapsedMs, cell.durationMs) : elapsedMs
+	cell.playing = false
+	emitMatrix(ctx)
+}
+
+/**
+ * RESUME rebases `startedAt` so the frozen position is exactly where playback picks back up —
+ * mirrors PAUSE's freeze in reverse.
+ * @param {{ _playbackMatrix?: object, state?: import('events').EventEmitter }} ctx
+ * @param {number|string} channel
+ * @param {number|string} layer
+ */
+function recordResume(ctx, channel, layer) {
+	const ch = parseInt(channel, 10)
+	const ln = parseInt(layer, 10)
+	if (!Number.isFinite(ch) || !Number.isFinite(ln)) return
+	const cell = ctx._playbackMatrix?.[`${ch}-${ln}`]
+	if (!cell || cell.playing) return
+	cell.startedAt = Date.now() - (cell.pausedElapsedMs || 0)
+	cell.playing = true
+	delete cell.pausedElapsedMs
+	emitMatrix(ctx)
+}
+
+/**
+ * An operator-driven SEEK (scrub bar) jumps the tracked position to `positionMs` without
+ * changing play/pause state — same rebase idea as RESUME, but for an arbitrary target instead of
+ * the frozen pause point.
+ * @param {{ _playbackMatrix?: object, state?: import('events').EventEmitter }} ctx
+ * @param {number|string} channel
+ * @param {number|string} layer
+ * @param {number} positionMs
+ */
+function recordSeek(ctx, channel, layer, positionMs) {
+	const ch = parseInt(channel, 10)
+	const ln = parseInt(layer, 10)
+	const pos = Math.max(0, Number(positionMs) || 0)
+	if (!Number.isFinite(ch) || !Number.isFinite(ln)) return
+	const cell = ctx._playbackMatrix?.[`${ch}-${ln}`]
+	if (!cell) return
+	if (cell.playing) {
+		cell.startedAt = Date.now() - pos
+	} else {
+		cell.pausedElapsedMs = pos
+	}
+	emitMatrix(ctx)
+}
+
 function emitMatrix(ctx) {
 	const snapshot = getMatrixSnapshot(ctx)
 	if (ctx.state && typeof ctx.state.emit === 'function') {
@@ -406,6 +469,9 @@ function recordAmcpLines(ctx, lines) {
 module.exports = {
 	recordPlay,
 	recordStop,
+	recordPause,
+	recordResume,
+	recordSeek,
 	recordAmcpLines,
 	recordMixerDirty,
 	clearMixerDirty,

@@ -21,7 +21,7 @@ function handleStateGet(ctx) {
 	const all = liveSceneState.getAll()
 	const playlists = []
 	const seen = new Set()
-	const pushEntry = (scene, layer, channel) => {
+	const pushEntry = (scene, layer, channel, previewChannel = null) => {
 		const pKey = `${scene.id}-${layer.layerNumber}`
 		if (seen.has(pKey)) return
 		seen.add(pKey)
@@ -30,6 +30,7 @@ function handleStateGet(ctx) {
 		playlists.push({
 			live: channel != null,
 			channel: channel != null ? channel : null,
+			previewChannel,
 			sceneId: scene.id,
 			sceneName: scene.name || scene.id,
 			layerNumber: Number(layer.layerNumber),
@@ -42,15 +43,29 @@ function handleStateGet(ctx) {
 				value: it.value,
 				duration: it.duration ?? null,
 				type: it.type || 'media',
+				loop: it.loop === true,
 			})),
 		})
 	}
-	for (const chKey of Object.keys(all || {})) {
-		const scene = all[chKey]?.scene
+	/* WO-581: a look recalled on PREVIEW is not live — playlists run on program only (WO-355).
+	 * Listing it live:true with the PRV channel sent the panel's item pick as a `goto` onto the
+	 * PRV bus, so the start item was never recorded and the take to PGM began at item 0.
+	 * Program channels list first (live wins); PRV recalls list as not-live + previewChannel. */
+	const isPrv = (ch) => {
+		try {
+			return require('../engine/caspar-channel-clear').isPreviewCasparChannel(ctx.config, ch)
+		} catch {
+			return false
+		}
+	}
+	const chans = Object.keys(all || {}).map((k) => parseInt(k, 10))
+	for (const ch of [...chans.filter((c) => !isPrv(c)), ...chans.filter(isPrv)]) {
+		const scene = all[ch]?.scene
 		if (!scene || !Array.isArray(scene.layers)) continue
 		for (const layer of scene.layers) {
 			if (layer.sourceMode !== 'list' || !Array.isArray(layer.playlist) || layer.playlist.length === 0) continue
-			pushEntry(scene, layer, parseInt(chKey, 10))
+			if (isPrv(ch)) pushEntry(scene, layer, null, ch)
+			else pushEntry(scene, layer, ch)
 		}
 	}
 	/* WO-347: also every playlist DEFINED in the project's looks (not live yet) — the operator
@@ -67,6 +82,28 @@ function handleStateGet(ctx) {
 		/* project store unavailable — live-only listing */
 	}
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, playlists }) }
+}
+
+/* WO-371 option C / WO-581: re-stage item `idx` on every PREVIEW channel where the look is
+ * recalled, via the schedule-free stagePlaylistItem — no timers, never a program channel. */
+async function restagePreviewChannels(ctx, sceneId, layerNumber, idx) {
+	const previewChannels = []
+	try {
+		const { isPreviewCasparChannel } = require('../engine/caspar-channel-clear')
+		for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
+			const ch = parseInt(chKey, 10)
+			const scene = entry?.scene
+			if (!scene || String(scene.id) !== sceneId) continue
+			if (!isPreviewCasparChannel(ctx.config, ch)) continue
+			const liveLayer = (scene.layers || []).find((l) => Number(l?.layerNumber) === layerNumber)
+			if (!liveLayer || liveLayer.sourceMode !== 'list' || !Array.isArray(liveLayer.playlist) || idx >= liveLayer.playlist.length) continue
+			const bank = (ctx?.programLayerBankByChannel && ctx.programLayerBankByChannel[String(ch)]) || 'a'
+			const pLayer = physicalProgramLayer(layerNumber, bank === 'b' ? 'b' : 'a')
+			await stagePlaylistItem(ctx, ch, pLayer, scene, liveLayer, idx)
+			previewChannels.push(ch)
+		}
+	} catch { /* preview restage is advisory; the start index moved regardless */ }
+	return previewChannels
 }
 
 /**
@@ -114,7 +151,9 @@ async function handleControlPost(body, ctx) {
 		}
 		ctx.playlistStartIndices = ctx.playlistStartIndices || {}
 		ctx.playlistStartIndices[`${sceneId}-${layerNumber}`] = idx
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: idx }) }
+		/* WO-581: the pick is what PRV shows and what the take to PGM starts on. */
+		const previewChannels = await restagePreviewChannels(ctx, sceneId, layerNumber, idx)
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: idx, previewChannels }) }
 	}
 
 	/* WO-371 option C (owner 29.07: "actually it makes sense that it pauses"): ⏮/⏭ for a
@@ -145,22 +184,7 @@ async function handleControlPost(body, ctx) {
 		const cur = Number.isFinite(ctx.playlistStartIndices[pKey]) ? ctx.playlistStartIndices[pKey] : 0
 		const nextIdx = ((cur + dir) % len + len) % len
 		ctx.playlistStartIndices[pKey] = nextIdx
-		const previewChannels = []
-		try {
-			const { isPreviewCasparChannel } = require('../engine/caspar-channel-clear')
-			for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
-				const ch = parseInt(chKey, 10)
-				const scene = entry?.scene
-				if (!scene || String(scene.id) !== sceneId) continue
-				if (!isPreviewCasparChannel(ctx.config, ch)) continue
-				const liveLayer = (scene.layers || []).find((l) => Number(l?.layerNumber) === layerNumber)
-				if (!liveLayer || liveLayer.sourceMode !== 'list' || !Array.isArray(liveLayer.playlist) || nextIdx >= liveLayer.playlist.length) continue
-				const bank = (ctx?.programLayerBankByChannel && ctx.programLayerBankByChannel[String(ch)]) || 'a'
-				const pLayer = physicalProgramLayer(layerNumber, bank === 'b' ? 'b' : 'a')
-				await stagePlaylistItem(ctx, ch, pLayer, scene, liveLayer, nextIdx)
-				previewChannels.push(ch)
-			}
-		} catch { /* preview restage is advisory; the start index moved regardless */ }
+		const previewChannels = await restagePreviewChannels(ctx, sceneId, layerNumber, nextIdx)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, sceneId, layerNumber, startIndex: nextIdx, previewChannels }) }
 	}
 	if (!Number.isFinite(channel) || channel < 1 || !Number.isFinite(layerNumber)) {
@@ -260,19 +284,20 @@ async function handlePost(p, body, ctx) {
 		}
 	}
 
-	if (layer.playlistAdvance !== 'manual') {
+	// Get the current active index
+	const pKey = playlistRuntimeKey(channel, scene.id, layerNumber)
+	const self = ctx  // The handler context may have state if needed
+	self.playlistActiveIndices = self.playlistActiveIndices || {}
+	const currentIdx = self.playlistActiveIndices[pKey] ?? 0
+
+	/* An auto playlist parked on a per-item-looped entry is waiting for exactly this Next. */
+	if (layer.playlistAdvance !== 'manual' && layer.playlist[currentIdx]?.loop !== true) {
 		return {
 			status: 400,
 			headers: JSON_HEADERS,
 			body: jsonBody({ ok: false, error: 'Playlist is not in manual advance mode' }),
 		}
 	}
-
-	// Get the current active index
-	const pKey = playlistRuntimeKey(channel, scene.id, layerNumber)
-	const self = ctx  // The handler context may have state if needed
-	self.playlistActiveIndices = self.playlistActiveIndices || {}
-	const currentIdx = self.playlistActiveIndices[pKey] ?? 0
 
 	// Calculate next index
 	let nextIdx = currentIdx + 1

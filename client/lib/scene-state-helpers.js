@@ -82,6 +82,8 @@ export function defaultLayerConfig(layerNumber) {
 		contentFit: 'native',
 		/** When true (default), changing W or H in the inspector keeps content aspect (from media resolution when known). */
 		aspectLocked: true,
+		/** Clip start point on take: 'beginning' | 'relativeToPrevious' (continue the clip already playing on this layer). */
+		startBehaviour: 'beginning',
 		fill: defaultFill(),
 		opacity: 1,
 		rotation: 0,
@@ -155,6 +157,7 @@ export function migrateScene(s) {
 						base.contentFit = l.fillNativeAspect === false ? 'stretch' : 'native'
 					}
 					if (base.aspectLocked == null) base.aspectLocked = true
+					if (base.startBehaviour !== 'relativeToPrevious') base.startBehaviour = 'beginning'
 					if (!base.fadeOnEnd || typeof base.fadeOnEnd !== 'object') {
 						base.fadeOnEnd = { enabled: false, frames: 12 }
 					}
@@ -187,6 +190,8 @@ export function migrateScene(s) {
 		name: s.name || 'Untitled look',
 		layers,
 		mainScope: normalizeMainScopeFromImport(s),
+		// WO-572: this return is a whitelist — without it the audio-only flag is lost on every load.
+		...(s.audioOnlyLook ? { audioOnlyLook: true } : {}),
 		defaultTransition: { ...defaultTransition(), ...(s.defaultTransition || {}) },
 		globalBorder: s.globalBorder ? {
 			...s.globalBorder,

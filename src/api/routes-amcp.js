@@ -205,16 +205,32 @@ async function handlePost(path, body, ctx) {
 		}
 		case '/api/pause': {
 			const r = await amcp.pause(channel, layer)
+			playbackTracker.recordPause(ctx, channel, layer)
 			try {
 				require('../preview/compose-preview-activity').onPlaybackPaused(ctx, channel)
 			} catch {
 				/* WO-57 optional */
 			}
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
+			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
 		}
 		case '/api/resume': {
 			const r = await amcp.resume(channel, layer)
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
+			playbackTracker.recordResume(ctx, channel, layer)
+			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
+		}
+		case '/api/seek': {
+			// WO-570: scrub-bar seek — CALL {ch-l} SEEK {frame} is the AMCP verb for jumping a
+			// playing/paused clip's position without a fresh LOAD/PLAY. `positionMs` (the same unit
+			// the client's scrub bar already works in) rebases the playback-matrix tracker so a
+			// ticking progress bar doesn't jump back to the pre-seek position on its next tick.
+			const { frame, positionMs } = b
+			const f = parseInt(frame, 10)
+			if (!Number.isFinite(f) || f < 0) {
+				return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'frame: non-negative integer required' }) }
+			}
+			const r = await amcp.call(channel, layer, 'SEEK', String(f))
+			playbackTracker.recordSeek(ctx, channel, layer, positionMs)
+			return { status: 200, headers: JSON_HEADERS, body: jsonPlaybackBody(ctx, r) }
 		}
 		case '/api/stop': {
 			const r = await amcp.stop(channel, layer)

@@ -111,9 +111,15 @@ test('WO-371: source pins — schedule-free stage path and the client enable-con
 	const routes = read('src/api/routes-playlist.js')
 	const stepBlock = routes.slice(routes.indexOf("action === 'step_preview'"))
 	const block = stepBlock.slice(0, stepBlock.indexOf('\n\t}'))
-	assert.match(block, /stagePlaylistItem\(/, 'step_preview stages via the schedule-free helper')
+	/* WO-581: the PRV restage moved into restagePreviewChannels (shared with set_start) —
+	 * step_preview must call it, and the helper carries the original pins. */
+	assert.match(block, /restagePreviewChannels\(/, 'step_preview restages via the shared PRV helper')
 	assert.doesNotMatch(block, /triggerPlaylistAdvance\(/, 'step_preview must never arm the advance chain')
-	assert.match(block, /isPreviewCasparChannel/, 'only preview channels are restaged')
+	const helperFn = routes.slice(routes.indexOf('async function restagePreviewChannels'))
+	const helper = helperFn.slice(0, helperFn.indexOf('\n}'))
+	assert.match(helper, /stagePlaylistItem\(/, 'PRV restage stages via the schedule-free helper')
+	assert.doesNotMatch(helper, /triggerPlaylistAdvance\(/, 'PRV restage must never arm the advance chain')
+	assert.match(helper, /isPreviewCasparChannel/, 'only preview channels are restaged')
 
 	const engine = read('src/engine/scene-take-lbg-playlist.js')
 	const stageFn = engine.slice(engine.indexOf('function stagePlaylistItem'), engine.indexOf('function triggerPlaylistAdvance'))

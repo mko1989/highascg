@@ -246,6 +246,14 @@ export function createTakeSceneToProgram(deps) {
 				/* WO-360: the server reports inner AMCP failures per take — say them out loud. */
 				import('../lib/media-exists.js').then((m) => m.toastTakeAmcpFailures(takeRes)).catch(() => {})
 				touched.push({ mainIdx: job.mainIdx, channel: job.channel })
+				/* WO-572: an audio-only look is NOT the screen's live video look. It lives in
+				 * scene.liveAudioOnly (server-owned, cyan ring); writing it into scene.live /
+				 * setLiveSceneId gave it the red PGM ring AND overwrote the channel's real video
+				 * look entry. */
+				if (job.scene.audioOnlyLook) {
+					if (takeRes?.audioOnlyLive) deps.stateStore.applyChange('scene.liveAudioOnly', takeRes.audioOnlyLive)
+					continue
+				}
 				sceneState.setLiveSceneId(job.sceneId, job.mainIdx, { silent: true })
 				if (takeRes?.sceneLive && typeof takeRes.sceneLive === 'object') {
 					for (const [k, v] of Object.entries(takeRes.sceneLive)) {
@@ -269,7 +277,7 @@ export function createTakeSceneToProgram(deps) {
 			}
 			deps.stateStore.applyChange('scene.live', mergedLive)
 			sceneState.applyServerLiveChannels(mergedLive, cm)
-			for (const sceneId of new Set(jobs.map((j) => j.sceneId))) {
+			for (const sceneId of new Set(jobs.filter((j) => !j.scene.audioOnlyLook).map((j) => j.sceneId))) {
 				deps.primePreviewSnapshotFromScene(sceneId)
 			}
 			if (touched.length === 0 && failed.length === 0) {

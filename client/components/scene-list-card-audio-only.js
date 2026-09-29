@@ -1,9 +1,10 @@
 /**
- * WO-572 Part C follow-up — deck card state/badge for audio-only looks, split out of
+ * WO-572 Part C follow-up — deck card state and stop control for audio-only looks, split out of
  * scene-list-column.js purely to stay under the repo's 500-line file cap.
  */
 
 import { resolveAudioOnlyLookIdsForMain } from '../lib/scene-live-main-sync.js'
+import { api } from '../lib/api-client.js'
 
 /**
  * @param {object} sc — the look/scene this card renders
@@ -35,18 +36,35 @@ export function audioOnlyCardClasses({ audioOnly, audioOnlyLive, audioOnlyPrevie
 }
 
 /**
- * @param {HTMLElement} card
+ * WO-572: audio-only cards get a ■ Stop in place of CUT (a cut means nothing for audio). Without
+ * it there was no deck control to stop a playing audio-only look at all — taking one only ever
+ * started it, and the sole Stop lived in the compact mixer row.
+ * @param {HTMLElement} footer
  * @param {{ audioOnly: boolean, audioOnlyLive: boolean, audioOnlyPreview: boolean }} state
+ * @returns {boolean} true when the CUT button should be dropped for this card
  */
-export function appendAudioOnlyBadge(card, { audioOnly, audioOnlyLive, audioOnlyPreview }) {
-	if (!audioOnly) return
-	const badge = document.createElement('span')
-	badge.className = 'scenes-card__audio-only-badge'
-	badge.textContent = '🔊'
-	badge.title = audioOnlyLive
-		? 'Audio-only look — playing now'
-		: audioOnlyPreview
-			? 'Audio-only look — staged on preview'
-			: "Audio-only look — plays without touching this screen's video layers"
-	card.appendChild(badge)
+export function appendAudioOnlyStopButton(footer, { audioOnly, audioOnlyLive, audioOnlyPreview }) {
+	if (!audioOnly) return false
+	const btn = document.createElement('button')
+	btn.type = 'button'
+	btn.className = 'scenes-btn scenes-btn--sm scenes-btn--icon'
+	btn.dataset.action = 'audio-stop'
+	btn.textContent = '■'
+	btn.title = 'Stop this audio-only look'
+	btn.setAttribute('aria-label', 'Stop audio-only look')
+	btn.disabled = !audioOnlyLive && !audioOnlyPreview
+	footer.appendChild(btn)
+	return true
+}
+
+/**
+ * Stop the audio-only look on this main's PGM (live) or PRV (staged) channel.
+ * @param {{ audioOnlyLive: boolean }} state
+ * @param {number} col
+ * @param {{ programChannels?: number[], previewChannels?: number[] }} cm
+ */
+export async function stopAudioOnlyForCard(state, col, cm) {
+	const ch = Number((state.audioOnlyLive ? cm?.programChannels : cm?.previewChannels)?.[col])
+	if (!Number.isFinite(ch) || ch < 1) return
+	await api.post('/api/scene/audio-only/stop', { channel: ch })
 }

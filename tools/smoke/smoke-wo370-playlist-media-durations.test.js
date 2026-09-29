@@ -22,9 +22,30 @@ const repoRoot = path.join(__dirname, '..', '..')
 /* Real rows from GET /api/media on this box (28.07.26), trimmed to the fields the index reads. */
 const LIVE_MEDIA = [
 	{ id: '0.0_VB1_OPENING TREEFILM MASTER', type: 'MOVIE', fps: 0.04, durationMs: 30257742, cinf: '... 1262 1001/24000' },
-	{ id: '0.0_VB1_Opening Treefilm Master.mp4', durationMs: 52636, hasAudio: true, resolution: '1920×1080', codec: 'h264', fps: 23.98 },
-	{ id: '0.1_VB2_Summer Rally intro video_short video SR 2026.mp4', durationMs: 17584, resolution: '1920×1080', codec: 'h264', fps: 29.97 },
-	{ id: '01_Grzegorz Zytka.mov', durationMs: 10000, fps: 30, type: 'MOVIE', cinf: '... 300 1/30', resolution: '1920×1080', codec: 'hap' },
+	{
+		id: '0.0_VB1_Opening Treefilm Master.mp4',
+		durationMs: 52636,
+		hasAudio: true,
+		resolution: '1920×1080',
+		codec: 'h264',
+		fps: 23.98,
+	},
+	{
+		id: '0.1_VB2_Summer Rally intro video_short video SR 2026.mp4',
+		durationMs: 17584,
+		resolution: '1920×1080',
+		codec: 'h264',
+		fps: 29.97,
+	},
+	{
+		id: '01_Grzegorz Zytka.mov',
+		durationMs: 10000,
+		fps: 30,
+		type: 'MOVIE',
+		cinf: '... 300 1/30',
+		resolution: '1920×1080',
+		codec: 'hap',
+	},
 	{ id: 'no-duration.mp4', resolution: '1920×1080', codec: 'h264', fps: 25 },
 ]
 
@@ -77,6 +98,45 @@ test('WO-370 media duration index', async (t) => {
 	})
 })
 
+test('WO-570 follow-up: a probed GET /api/media overlay rescues a file state.media alone cannot resolve', async () => {
+	const mod = await import('../../client/lib/media-duration.js')
+	// Reproduces the live bug exactly: WS `state.media` carries ONLY the broken CINF row (fps<1,
+	// rejected by candidateOf) for this file — no probed counterpart in state.media at all, unlike
+	// LIVE_MEDIA above where both rows already live in the same array. Before this fix,
+	// mediaDurationMs() read state.media exclusively and returned null FOREVER for such a file,
+	// even though `GET /api/media` (fetched only by the Sources panel, for its own rendering) had
+	// the correct probed row the whole time.
+	const stateMediaOnly = [{ id: 'projects/x/Spoty MichaÅ.mp4', type: 'MOVIE', fps: 0.04, durationMs: 30257742 }]
+	const probedOverlay = [
+		{
+			id: 'projects/x/Spoty MichaÅ.mp4',
+			durationMs: 379300,
+			hasAudio: true,
+			resolution: '1920×1080',
+			codec: 'h264',
+			fps: 30,
+		},
+	]
+
+	mod._setMediaForTest(stateMediaOnly) // no probe overlay — the pre-fix, permanently-broken case
+	assert.equal(mod.mediaDurationMs('Spoty MichaÅ.mp4'), null, 'sanity: state.media alone cannot resolve this file')
+
+	mod._setMediaForTest(stateMediaOnly, probedOverlay)
+	assert.equal(mod.mediaDurationMs('Spoty MichaÅ.mp4'), 379300, 'the probed overlay rescues it')
+
+	mod._setMediaForTest(LIVE_MEDIA) // restore baseline for subsequent tests in this file
+})
+
+test('WO-570 follow-up: initMediaDurationIndex fetches GET /api/media and merges it in', () => {
+	const src = fs.readFileSync(path.join(repoRoot, 'client/lib/media-duration.js'), 'utf8')
+	assert.match(
+		src,
+		/api\s*\.\s*get\(\s*['"]\/api\/media['"]\s*\)/,
+		'must fetch the probed catalog, not rely on WS state.media alone'
+	)
+	assert.match(src, /_probed\s*=\s*Array\.isArray\(probe\)/, 'fetched probe list must be captured for rebuild()')
+})
+
 test('WO-370 inspector rows are gated on isTimelessItem', () => {
 	const src = fs.readFileSync(path.join(repoRoot, 'client/components/inspector-layer-playlist.js'), 'utf8')
 
@@ -88,12 +148,12 @@ test('WO-370 inspector rows are gated on isTimelessItem', () => {
 	assert.ok(/const timeless = isTimelessItem\(item\)/.test(src), 'row render must classify the item')
 	assert.ok(
 		/playlist-item-duration[\s\S]{0,400}item\.duration \?\? timelessSecsOf\(playlist\)/.test(src),
-		'the timeless input must default to the playlist timeless setting',
+		'the timeless input must default to the playlist timeless setting'
 	)
 	assert.ok(/playlist-item-length/.test(src), 'timed media must render a static length cell')
 	assert.ok(
 		/mediaDurationMs|formatClipDuration/.test(src),
-		'row render must read real lengths from the media-duration index',
+		'row render must read real lengths from the media-duration index'
 	)
 })
 

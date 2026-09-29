@@ -29,7 +29,7 @@ function sameClip(a, b) {
  * Snapshot shape (minimal):
  * {
  *   channel, layer,
- *   nextUp: { clip, loop?, seek?, length?, filter?, audioFilter?, transition? },
+ *   nextUp: { clip, loop?, in?, seek?, length?, filter?, audioFilter?, transition? },
  *   playing: boolean
  * }
  */
@@ -47,6 +47,7 @@ function diffCasparLayerPlan(prev, next, opts = {}) {
 		out.push(
 			buildClipCommandPlan('LOADBG', channel, layer, nextNext.clip, {
 				loop: !!nextNext.loop,
+				in: nextNext.in,
 				seek: nextNext.seek,
 				length: nextNext.length,
 				filter: nextNext.filter,

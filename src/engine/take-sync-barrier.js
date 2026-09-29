@@ -41,12 +41,16 @@ async function sendMergedPlans(plans) {
 	const channelsOf = (key) => [...new Set(plans.filter((p) => p[key]).map((p) => p.channel))]
 	const leading = channelsOf('leadingCommit')
 	const trailing = channelsOf('trailingCommit')
+	const log = amcp._context?.log
+	const t0 = Date.now()
+	if (typeof log === 'function') log('info', `[take-sync] Phase B go: ch ${plans.map((p) => p.channel).join('+')} (${plans.length} screen(s), ${plans.reduce((n, p) => n + p.block.length, 0)} lines)`)
 	if (leading.length) await Promise.all(leading.map((ch) => amcp.mixerCommit(ch)))
 	await amcp.batchSendChunked(
 		plans.flatMap((p) => p.block),
 		{ skipMixerPreCommit: true, forceBatch: true }
 	)
 	if (trailing.length) await Promise.all(trailing.map((ch) => amcp.mixerCommit(ch)))
+	if (typeof log === 'function') log('info', `[take-sync] Phase B sent in ${Date.now() - t0}ms`)
 }
 
 /** @type {Map<string, { expected: number, settled: number, released: boolean, waiters: Array<{ resolve: () => void, reject: (e: unknown) => void, plan: PhaseBPlan|null }>, timer: NodeJS.Timeout|null }>} */

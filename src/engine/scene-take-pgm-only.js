@@ -16,7 +16,7 @@ const playbackTracker = require('../state/playback-tracker')
 const { param } = require('../caspar/amcp-utils')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('./audio-route')
-const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const { resolvePlaySeekFramesForSceneLayer, resolvePlayInFramesForSceneLayer } = require('./scene-play-seek')
 const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
 const {
 	buildPipOverlayAmcpLinesAll,
@@ -237,7 +237,11 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			activeBank: 'a',
 			incoming,
 		})
-		if (seekFrames != null && seekFrames > 0) loadOpts.seek = seekFrames
+		if (seekFrames != null && seekFrames > 0) {
+			// Explicit IN: Caspar defaults IN to SEEK, which would move a looping clip's loop point.
+			loadOpts.in = resolvePlayInFramesForSceneLayer(layer, framerate)
+			loadOpts.seek = seekFrames
+		}
 
 		takeJobs.push({
 			layer,

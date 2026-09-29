@@ -307,6 +307,17 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 			playlistTransition: l.playlistTransition ? { ...l.playlistTransition } : { type: 'MIX', duration: 12, tween: 'linear' },
 			playlistLoop: l.playlistLoop !== false,
 			playlistAdvance: l.playlistAdvance || 'auto',
+			// WO-570: this whitelist row is what the server's take engine actually sees — a field
+			// missing here is invisible server-side no matter what's stored on the client's own
+			// scene-state layer object. trimInMs/trimOutMs were being set locally (patchLayer) and
+			// silently dropped right here on every take/stage.
+			// Same trap: startBehaviour missing here was stripped from the deck look by
+			// applySceneFromTakePayload on every take, so the inspector snapped back to its default.
+			...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious'
+				? { startBehaviour: l.startBehaviour }
+				: {}),
+			...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),
+			...(l.trimOutMs != null ? { trimOutMs: l.trimOutMs } : {}),
 		}
 		if (Array.isArray(l.effects) && l.effects.length > 0) {
 			row.effects = JSON.parse(JSON.stringify(l.effects))
@@ -401,6 +412,9 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 		composeCanvas: { w: cv.width, h: cv.height },
 		globalBorder: scene.globalBorder ? JSON.parse(JSON.stringify(scene.globalBorder)) : undefined,
 		layers,
+		// WO-572: the server's take route branches on this flag (isAudioOnlyLook) — dropped here, an
+		// audio-only look silently took the normal video path instead.
+		...(scene.audioOnlyLook ? { audioOnlyLook: true } : {}),
 	}
 	if (pgmOnly) {
 		payload = {

@@ -7,6 +7,7 @@
 const { pathsMatch, normPath } = require('../state/live-scene-reconcile')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-transition')
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
+const { resolvePlaylistStartIndex } = require('./scene-take-playlist-start')
 
 /* Owner request 2026-07-26: templates/shaders/graphics in a playlist never advanced — advance was
  * OSC file/time-driven (media only) with a wall-clock timer for IMAGES only. "Timeless" now means
@@ -20,6 +21,12 @@ function isTimelessPlaylistItem(item) {
 	const v = String(item.value || '')
 	if (/\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(v)) return true
 	return !TIMED_MEDIA_EXT_RE.test(v)
+}
+
+/* Per-item loop tick: a looped item plays with LOOP and HOLDS the playlist there — no timer, no
+ * AUTO preload of the next item — until the operator advances (Next / Playlists panel). */
+function isLoopedPlaylistItem(item) {
+	return !!item && item.loop === true
 }
 
 /* todos27.07.26 ROOT CAUSE of "preview played the old version": every piece of playlist runtime
@@ -74,23 +81,13 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
 			const pKey = playlistRuntimeKey(channel, incoming.id, layer.layerNumber)
 			
-			// Initialize the active index to 0 for auto advance
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
-			
-			/* WO-347: operator pre-selected a start item (Playlists panel, action:set_start) —
-			 * stage it right after the take lands. Sticky until changed in the panel. */
-			const startIdx = (self.playlistStartIndices || {})[`${incoming.id}-${layer.layerNumber}`]
-			if (Number.isFinite(startIdx) && startIdx > 0 && Array.isArray(layer.playlist) && startIdx < layer.playlist.length) {
-				setTimeout(() => {
-					try {
-						triggerPlaylistAdvance(self, channel, job.pLayer, incoming, layer, startIdx)
-					} catch {
-						/* advisory */
-					}
-				}, 400)
-			}
+			/* WO-581: buildTakeJobs already staged the operator's start item (WO-347 set_start /
+			 * WO-371 PRV step) — arm the chain from THAT item. Replaces the old 400 ms post-take
+			 * hop, which put item 0 on air first with item 0's timer/preload already armed. */
+			const startIdx = resolvePlaylistStartIndex(self, incoming.id, layer)
+			self.playlistActiveIndices[pKey] = startIdx
 			if (layer.playlistAdvance === 'auto') {
-				self.playlistActiveIndices[pKey] = 0
 				self.playlistOscPrevPlayingPath = self.playlistOscPrevPlayingPath || {}
 				delete self.playlistOscPrevPlayingPath[pKey]
 
@@ -98,12 +95,16 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 				clearPlaylistImageTimer(self, pKey)
 				
 				if (layer.playlist.length > 1) {
-					const firstItem = layer.playlist[0]
-					if (isTimelessPlaylistItem(firstItem)) {
-						schedulePlaylistImageTimer(self, channel, job.pLayer, incoming, layer, 0)
+					const firstItem = layer.playlist[startIdx]
+					if (isLoopedPlaylistItem(firstItem)) {
+						/* held on air — nothing to arm */
+					} else if (isTimelessPlaylistItem(firstItem)) {
+						schedulePlaylistImageTimer(self, channel, job.pLayer, incoming, layer, startIdx)
 					} else {
-						// Video: preload the second item as LOADBG AUTO
-						queueNextPlaylistItem(self, channel, job.pLayer, layer, 1)
+						// Video: preload the following item as LOADBG AUTO
+						let nextIdx = startIdx + 1
+						if (layer.playlistLoop !== false) nextIdx %= layer.playlist.length
+						if (nextIdx < layer.playlist.length) queueNextPlaylistItem(self, channel, job.pLayer, layer, nextIdx)
 					}
 				}
 			}
@@ -202,6 +203,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 								const pTimerKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 								if (
 									isTimelessPlaylistItem(layer.playlist[itemIdx]) &&
+									!isLoopedPlaylistItem(layer.playlist[itemIdx]) &&
 									layer.playlist.length > 1 &&
 									!(self.playlistImageTimers && self.playlistImageTimers[pTimerKey])
 								) {
@@ -221,7 +223,9 @@ function handlePlaylistOscUpdate(self, snapshot) {
 									clearPlaylistImageTimer(self, pKey)
 
 									const currentItem = layer.playlist[itemIdx]
-									if (isTimelessPlaylistItem(currentItem)) {
+									if (isLoopedPlaylistItem(currentItem)) {
+										/* looped item: hold here until Next */
+									} else if (isTimelessPlaylistItem(currentItem)) {
 										schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx)
 									} else {
 										// Video: preload the next item (with loop wrapping)
@@ -241,7 +245,7 @@ function handlePlaylistOscUpdate(self, snapshot) {
 
 							// T211.5: Stall watchdog for imperfect media (video stream ends before container duration).
 							// Track elapsed time progress; if near-end and frozen >2s, force-promote next item.
-							if (layer.playlist.length > 1 && typeof elapsed === 'number' && typeof duration === 'number' && duration > 0) {
+							if (layer.playlist.length > 1 && !isLoopedPlaylistItem(layer.playlist[itemIdx]) && typeof elapsed === 'number' && typeof duration === 'number' && duration > 0) {
 								self.playlistElapsedTracking = self.playlistElapsedTracking || {}
 								self.playlistWatchdogFiredFor = self.playlistWatchdogFiredFor || {}
 
@@ -314,7 +318,7 @@ function queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx) {
 	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
 	const loadOpts = {
 		auto: true,
-		loop: false
+		loop: isLoopedPlaylistItem(nextItem)
 	}
 	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
 		loadOpts.transition = transition.type
@@ -336,6 +340,7 @@ function schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx
 	clearPlaylistImageTimer(self, pKey)
 
 	const item = layer.playlist[itemIdx]
+	if (isLoopedPlaylistItem(item)) return
 	const durationMs = (item.duration ?? 5) * 1000
 
 	if (typeof self.log === 'function') {
@@ -383,7 +388,7 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
 
 	const loadOpts = {
-		loop: layer.playlistAdvance === 'manual' ? true : false
+		loop: layer.playlistAdvance === 'manual' || isLoopedPlaylistItem(nextItem)
 	}
 	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
 		loadOpts.transition = transition.type
@@ -436,6 +441,7 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 		if (!staged) return
 		// Setup next advancement
 		const nextItem = layer.playlist[nextIdx]
+		if (isLoopedPlaylistItem(nextItem)) return
 		if (isTimelessPlaylistItem(nextItem)) {
 			schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
 		} else {

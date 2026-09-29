@@ -5,6 +5,22 @@
 	gap: 12px;
 	padding: 8px;
 	align-items: stretch;
+	position: relative;
+}
+
+/* Reorder drag (scene-list-column-reorder.js): vertical line between looks showing the drop spot. */
+.scenes-deck__drop-indicator {
+	display: none;
+	position: absolute;
+	width: 3px;
+	background: var(--accent, #58a6ff);
+	border-radius: 2px;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.scenes-card--dragging {
+	opacity: 0.4;
 }
 
 .scenes-deck--media-drop-target {

@@ -297,7 +297,7 @@ export class SceneState {
 	duplicateScene(id) {
 		const s = this.getScene(id)
 		if (!s) return null
-		const dupe = migrateScene({ id: newId(), name: LookLogic.uniqueLookNameForDuplicate(this.scenes, s.name), layers: JSON.parse(JSON.stringify(s.layers || [])), mainScope: s.mainScope, defaultTransition: s.defaultTransition })
+		const dupe = migrateScene({ id: newId(), name: LookLogic.uniqueLookNameForDuplicate(this.scenes, s.name), layers: JSON.parse(JSON.stringify(s.layers || [])), mainScope: s.mainScope, audioOnlyLook: s.audioOnlyLook, defaultTransition: s.defaultTransition })
 		this.scenes.push(dupe); this._save(); return dupe.id
 	}
 

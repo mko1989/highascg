@@ -243,3 +243,48 @@ test('resolveAudioOnlyLookIdsForMain: reads live/preview ids from scene.liveAudi
 		{ pgmLookId: 'a1', prvLookId: null },
 	)
 })
+
+test('buildIncomingScenePayload forwards audioOnlyLook — the server take route branches on it (source assertion)', () => {
+	// The payload is a hand-picked field list; a flag missing from it is invisible to the server
+	// and the look silently takes the normal video path (the "audio only looks don't work" bug).
+	const fs = require('node:fs')
+	const path = require('node:path')
+	const src = fs.readFileSync(path.join(__dirname, '../../client/components/scenes-shared.js'), 'utf8')
+	const fn = src.slice(src.indexOf('export function buildIncomingScenePayload'))
+	assert.match(fn, /scene\.audioOnlyLook\s*\?\s*\{\s*audioOnlyLook:\s*true\s*\}/)
+	assert.ok(fn.indexOf('audioOnlyLook') < fn.indexOf('if (pgmOnly)'), 'flag must be set on the base payload, before the pgmOnly spread')
+})
+
+test('migrateScene keeps audioOnlyLook across a load/save round trip (its return is a field whitelist)', async () => {
+	const { migrateScene } = await import('../../client/lib/scene-state-helpers.js')
+	const layers = [{ layerNumber: 10, source: { type: 'media', value: 'bed.wav' } }]
+	assert.equal(migrateScene({ id: 'a', layers, audioOnlyLook: true }).audioOnlyLook, true)
+	assert.equal('audioOnlyLook' in migrateScene({ id: 'b', layers }), false, 'ordinary looks are unchanged')
+})
+
+test('deck: audio-only cards have a ■ Stop wired to the stop route, and the deck re-renders on scene.liveAudioOnly (source assertion)', () => {
+	const fs = require('node:fs')
+	const path = require('node:path')
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+	const col = read('client/components/scene-list-column.js')
+	assert.match(col, /appendAudioOnlyStopButton\(footer, audioOnlyState\)/)
+	assert.match(col, /\[data-action="audio-stop"\]/)
+	const card = read('client/components/scene-list-card-audio-only.js')
+	assert.match(card, /api\.post\('\/api\/scene\/audio-only\/stop'/)
+	// Without this the ring/badge/stop-enabled state stays stale after take and stop.
+	assert.match(read('client/components/scenes-editor.js'), /'scene\.liveAudioOnly'/)
+})
+
+test('client take/preview paths never write an audio-only look into scene.live or the video PGM/PRV slots (red/green ring bug; source assertion)', () => {
+	const fs = require('node:fs')
+	const path = require('node:path')
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+	const take = read('client/components/scenes-editor-support.js')
+	const guard = take.indexOf('if (job.scene.audioOnlyLook)')
+	assert.ok(guard > 0)
+	assert.ok(guard < take.indexOf('sceneState.setLiveSceneId(job.sceneId'), 'audio-only guard must precede setLiveSceneId')
+	assert.ok(guard < take.indexOf('mergedLive[String(job.channel)]'), 'audio-only guard must precede the scene.live merge')
+	const prv = read('client/components/scenes-preview-runtime.js')
+	assert.match(prv, /if \(scene\.audioOnlyLook\) \{[^}]*continue/s)
+	assert.match(read('client/components/scene-list-column.js'), /const onPgm = !sc\.audioOnlyLook &&/)
+})

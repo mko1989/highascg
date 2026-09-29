@@ -351,7 +351,7 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 	})
 
 	// Including `scene.live`: take-to-PGM updates `sceneState` silently and applies `scene.live` only — deck PRV/PGM borders read live IDs from sceneState.
-	stateStore.on('*', path => { if (['channelMap', 'scene.live', '*'].includes(path)) scheduleRender() })
+	stateStore.on('*', path => { if (['channelMap', 'scene.live', 'scene.liveAudioOnly', '*'].includes(path)) scheduleRender() })
 	sceneState.on('softChange', (meta) => {
 		previewPanel.scheduleDraw()
 		/* WO-341 kill #5: a REMOTE-tagged soft change (ws import/live broadcast) must never

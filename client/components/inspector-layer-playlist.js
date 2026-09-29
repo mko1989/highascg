@@ -183,6 +183,9 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 				${thumbHtml}
 				<span class="playlist-item-name" title="${escapeAttr(missing ? `MISSING in Caspar media: ${item.value}` : rawLabel)}" style="font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;${missing ? ' color: #f85149;' : ''}">${missing ? '⚠ ' : ''}${escapeHtml(itemLabel)}</span>
 				${durCellHtml}
+				<label class="playlist-item-loop" title="Loop this item — the playlist holds here until Next" style="flex: none; display: flex; align-items: center; gap: 2px; margin-right: 4px; font-size: 0.7rem; color: var(--text-muted); cursor: pointer;">
+					<input type="checkbox" class="playlist-item-loop-cb" ${item.loop === true ? 'checked' : ''} style="margin: 0;"/>⟲
+				</label>
 				<button class="scenes-btn scenes-btn--sm scenes-btn--danger playlist-item-delete" title="Remove item" style="padding: 0 4px; font-size: 0.75rem; line-height: 1.3; flex: none;">✕</button>
 			`
 
@@ -243,6 +246,15 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 				attachMathInput(durInp, { decimals: 0 })
 			}
 
+			// Per-item loop: this item repeats and holds the playlist until Next
+			const loopItemCb = itemRow.querySelector('.playlist-item-loop-cb')
+			loopItemCb.addEventListener('change', () => {
+				const list = playlist.map(x => x.id === item.id ? { ...x, loop: loopItemCb.checked } : x)
+				sceneState.patchLayer(sceneId, layerIndex, { playlist: list })
+				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
+				rerenderSceneLayer(sel)  // Rerender to show/hide the Next button
+			})
+
 			// Handle delete
 			const delBtn = itemRow.querySelector('.playlist-item-delete')
 			delBtn.addEventListener('click', (e) => {
@@ -286,7 +298,7 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 						Loop List
 					</label>
 				</div>
-				${layer.playlistAdvance === 'manual' ? `<button type="button" class="inspector-btn inspector-btn-sm" id="playlist-next-btn" style="margin-top: 18px;">Next ▶</button>` : ''}
+				${layer.playlistAdvance === 'manual' || playlist.some((x) => x.loop === true) ? `<button type="button" class="inspector-btn inspector-btn-sm" id="playlist-next-btn" style="margin-top: 18px;">Next ▶</button>` : ''}
 			</div>
 
 			<div class="inspector-row">

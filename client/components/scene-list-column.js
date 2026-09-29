@@ -6,7 +6,12 @@ import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
 import { isCgOnlyLook } from '../lib/scene-look-kind.js'
 import { missingMediaInScene } from '../lib/media-exists.js'
 import { resolveBusLookIdsForMain, hasPreviewLookForMain } from '../lib/scene-live-main-sync.js'
-import { resolveAudioOnlyCardState, audioOnlyCardClasses, appendAudioOnlyBadge } from './scene-list-card-audio-only.js'
+import {
+	resolveAudioOnlyCardState,
+	audioOnlyCardClasses,
+	appendAudioOnlyStopButton,
+	stopAudioOnlyForCard,
+} from './scene-list-card-audio-only.js'
 import { api } from '../lib/api-client.js'
 import { uiIcon } from './ui-icons.js'
 import {
@@ -211,11 +216,12 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				sceneExists,
 				sceneState,
 			)
-			const onPgm = pgmLookId === sc.id
+			// WO-572: an audio-only look never gets the red PGM / green PRV ring — only its own cyan/violet one.
+			const onPgm = !sc.audioOnlyLook && pgmLookId === sc.id
 			// B150.3: PGM-only mains have no PRV channel in scene.live — the armed
 			// look lives only in client state (setPreviewSceneId), so read it there.
 			const armedPrvId = !isPreviewBusAvailable(cm, col) ? sceneState.getPreviewSceneIdForMain(col) : null
-			const onPreview = !onPgm && (prvLookId === sc.id || armedPrvId === sc.id)
+			const onPreview = !sc.audioOnlyLook && !onPgm && (prvLookId === sc.id || armedPrvId === sc.id)
 			const isGlobal = sc.mainScope === 'all'
 			const cgOnly = isCgOnlyLook(sc)
 			const audioOnlyState = resolveAudioOnlyCardState(sc, col, cm, getLiveAudioOnly, sceneExists)
@@ -239,7 +245,6 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				warn.title = `Missing in Caspar media:\n${missingMedia.join('\n')}`
 				card.appendChild(warn)
 			}
-			appendAudioOnlyBadge(card, audioOnlyState)
 			const header = document.createElement('div')
 			header.className = 'scenes-card__header'
 			const nameInput = document.createElement('input')
@@ -307,7 +312,7 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 			editBtn.setAttribute('aria-label', 'Edit look')
 			editBtn.textContent = '⚙'
 			footer.appendChild(takeBtn)
-			footer.appendChild(cutBtn)
+			if (!appendAudioOnlyStopButton(footer, audioOnlyState)) footer.appendChild(cutBtn)
 			footer.appendChild(editBtn)
 			card.appendChild(header)
 			card.appendChild(thumbBtn)
@@ -363,6 +368,14 @@ export function appendSceneDeckColumn(deckCtx, col, scenes, mount, local) {
 				e.stopPropagation()
 				ensureMainForColumn(col)
 				void takeSceneToProgram(sc.id, true, { targetMains: [col] })
+			})
+			card.querySelector('[data-action="audio-stop"]')?.addEventListener('click', async (e) => {
+				e.stopPropagation()
+				try {
+					await stopAudioOnlyForCard(audioOnlyState, col, getChannelMap())
+				} catch (err) {
+					showToast(`Stop audio-only look failed: ${err?.message || err}`, 'error')
+				}
 			})
 			card.querySelector('[data-action="edit"]')?.addEventListener('click', async (e) => {
 				e.stopPropagation()

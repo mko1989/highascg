@@ -415,3 +415,34 @@
 	color: var(--text-muted);
 	margin: 0;
 }
+
+/* WO-570: media transport (play/pause, scrub bar, trim in/out) — scene layer inspector */
+.inspector-media-transport__row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.inspector-media-transport__scrub {
+	flex: 1;
+}
+.inspector-media-transport__time {
+	font-variant-numeric: tabular-nums;
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+.inspector-media-transport__trim-row {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+.inspector-media-transport__trim-row .inspector-field {
+	flex: 1 1 auto;
+	min-width: 110px;
+}
+.inspector-media-transport__trim-buttons {
+	display: flex;
+	gap: 6px;
+	margin-top: 4px;
+	flex-wrap: wrap;
+}

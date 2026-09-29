@@ -51,6 +51,9 @@ function serializeClipCommandPlan(plan) {
 			if (opts.direction) cmd += ` ${opts.direction}`
 		}
 	}
+	/* IN must travel WITH SEEK: this Caspar build defaults IN to SEEK (`ffmpeg_producer.cpp:302`,
+	 * `get_param(L"IN", params, seek)`), so a bare `LOOP SEEK n` also moves the loop point to n. */
+	if (withClipFields && opts.in != null) cmd += ` IN ${opts.in}`
 	if (withClipFields && opts.seek != null) cmd += ` SEEK ${opts.seek}`
 	if (withClipFields && opts.length != null) cmd += ` LENGTH ${opts.length}`
 	if (opts.filter) cmd += ` FILTER ${param(opts.filter)}`
@@ -71,6 +74,7 @@ function getEffectiveClipCommandOpts(plan) {
 		delete opts.duration
 		delete opts.tween
 		delete opts.direction
+		delete opts.in
 		delete opts.seek
 		delete opts.length
 	}
@@ -91,6 +95,7 @@ function describeClipCommandPlan(plan) {
 		duration: opts.duration,
 		tween: opts.tween,
 		direction: opts.direction,
+		in: opts.in,
 		seek: opts.seek,
 		length: opts.length,
 	}

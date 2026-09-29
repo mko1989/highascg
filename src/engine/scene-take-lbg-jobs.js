@@ -3,7 +3,6 @@
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel, routeSourceChannelsToAudioFilter } = require('./audio-route')
 const { deferMixerAmcpLine, param } = require('../caspar/amcp-utils')
-const { buildClipCommandPlan } = require('../caspar/amcp-command-plan')
 const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
@@ -21,7 +20,7 @@ const {
 	isLayerAnimateTakeTransition,
 	baseTypeStripAnimateSuffix,
 } = require('./scene-transition')
-const { resolvePlaySeekFramesForSceneLayer } = require('./scene-play-seek')
+const { resolvePlaySeekFramesForSceneLayer, resolvePlayInFramesForSceneLayer } = require('./scene-play-seek')
 const { resolveTakeVolumeForSceneLayer } = require('./live-input-audio-policy')
 
 async function buildTakeJobs(opts) {
@@ -100,14 +99,17 @@ async function buildTakeJobs(opts) {
 		}
 		/** Manual list only: advance index after we know this layer will get a take job (no-op takes must not consume a step). */
 		let pendingManualPlaylistAdvance = null
+		let playlistStartIdx = 0
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 0) {
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			/* todos27: runtime playlist state is channel-scoped (PGM + PRV of one look must not share). */
 			const { playlistRuntimeKey } = require('./scene-take-lbg-playlist')
 			const pKey = playlistRuntimeKey(channel, incoming.id, layer.layerNumber)
+			/* WO-581: a take goes out ON the operator's start item (Playlists panel / PRV step),
+			 * never item 0 followed by a hop. */
+			playlistStartIdx = require('./scene-take-playlist-start').resolvePlaylistStartIndex(self, incoming.id, layer)
 			if (layer.playlistAdvance === 'manual') {
-				let idx = self.playlistActiveIndices[pKey] || 0
-				if (idx < 0 || idx >= layer.playlist.length) idx = 0
+				const idx = playlistStartIdx
 				clipRaw = layer.playlist[idx].value
 				pendingManualPlaylistAdvance = {
 					pKey,
@@ -116,9 +118,8 @@ async function buildTakeJobs(opts) {
 					loop: layer.playlistLoop !== false,
 				}
 			} else {
-				// auto advance starts at index 0 on fresh take (unchanged vs old order)
-				self.playlistActiveIndices[pKey] = 0
-				clipRaw = layer.playlist[0].value
+				self.playlistActiveIndices[pKey] = playlistStartIdx
+				clipRaw = layer.playlist[playlistStartIdx].value
 			}
 		}
 		let clip = clipRaw
@@ -208,6 +209,10 @@ async function buildTakeJobs(opts) {
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist.length > 1) {
 			isLoop = false
 		}
+		// Per-item loop tick on the item this take starts on: a looped item holds the list until Next.
+		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist[playlistStartIdx]?.loop === true) {
+			isLoop = true
+		}
 		// WO-224 T224.6: Manual-advance playlists loop each item until operator advances
 		if (layer.sourceMode === 'list' && layer.playlistAdvance === 'manual') {
 			isLoop = true
@@ -224,17 +229,37 @@ async function buildTakeJobs(opts) {
 			activeBank,
 			incoming,
 		})
-		if (seekFrames != null) loadOpts.seek = seekFrames
+		// Explicit IN with every SEEK: Caspar defaults IN to SEEK, so a "relativeToPrevious" take's
+		// bare `LOOP SEEK n` made frame n the loop point — each same-clip look switch shaved more off
+		// the loop. IN stays at the trim-in (or 0); SEEK only places the playhead.
+		const inFrames = resolvePlayInFramesForSceneLayer(layer, framerate)
+		if (seekFrames != null) {
+			loadOpts.in = inFrames
+			loadOpts.seek = seekFrames
+		}
+		// WO-570: a persisted trim-out point reaches Caspar as LENGTH, which Caspar measures from IN
+		// (out = in + LENGTH). A trim-out at or before the resolved start point is nonsensical — skip
+		// LENGTH entirely rather than send one that ends before playback even starts.
+		if (layer.trimOutMs != null && Number.isFinite(Number(layer.trimOutMs))) {
+			const outFrames = Math.max(0, Math.round((Number(layer.trimOutMs) * framerate) / 1000))
+			const startFrames = seekFrames != null ? seekFrames : 0
+			const lengthFrames = outFrames - (seekFrames != null ? inFrames : 0)
+			if (outFrames > startFrames && lengthFrames > 0) loadOpts.length = lengthFrames
+		}
 		const baseType = isMerge ? baseTypeStripAnimateSuffix(globalT.type) : globalT.type
 
-		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. +Animate: transition on PLAY only.
+		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. Everything else (plain MIX/WIPE
+		// cut-path AND +Animate) carries the transition on the LOADBG and plays with a BARE `PLAY ch-layer`
+		// (WO-574): a `PLAY <clip> MIX …` re-loads the clip — Caspar discards the pre-rolled LOADBG producer
+		// and cold-opens the file at PLAY, so first-frame latency differed per file (measured 340 vs 560 ms
+		// on two screens) and no two screens could start together. The transition producer picks up the
+		// outgoing layer content at PLAY time either way, so the dissolve is unchanged.
 		if (
 			!shouldRunBankCrossfade &&
-			!isMerge &&
 			!forceCut &&
 			globalT.duration > 0 &&
-			globalT.type &&
-			String(globalT.type).toUpperCase() !== 'CUT'
+			baseType &&
+			String(baseType).toUpperCase() !== 'CUT'
 		) {
 			loadOpts.transition = baseType
 			loadOpts.duration = globalT.duration
@@ -335,6 +360,7 @@ async function buildTakeJobs(opts) {
 				nextUp: {
 					clip,
 					loop: !!loadOpts.loop,
+					in: loadOpts.in,
 					seek: loadOpts.seek,
 					length: loadOpts.length,
 					filter: loadOpts.filter,
@@ -359,21 +385,7 @@ async function buildTakeJobs(opts) {
 			{ fps: framerate }
 		)
 		const useLoadAuto = false
-		let playPlan = templateCg ? null : useLoadAuto ? null : playPlans.find((p) => p.commandName === 'PLAY') || null
-		if (
-			!templateCg &&
-			isMerge &&
-			globalT.duration > 0 &&
-			baseType &&
-			String(baseType).toUpperCase() !== 'CUT'
-		) {
-			playPlan = buildClipCommandPlan('PLAY', channel, pLayer, clip, {
-				loop: !!loadOpts.loop,
-				transition: baseType,
-				duration: globalT.duration,
-				tween: globalT.tween,
-			})
-		}
+		const playPlan = templateCg ? null : useLoadAuto ? null : playPlans.find((p) => p.commandName === 'PLAY') || null
 
 		takeJobs.push({
 			layer,

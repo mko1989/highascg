@@ -26,7 +26,7 @@ export function getLayerStyleDataFromLayer(l) {
 		straightAlpha: l.straightAlpha,
 		contentFit: l.contentFit,
 		aspectLocked: l.aspectLocked,
-		startBehaviour: l.startBehaviour ?? 'inherit',
+		startBehaviour: l.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
 		effects: Array.isArray(l.effects) ? JSON.parse(JSON.stringify(l.effects)) : [],
 		transition: l.transition ? { ...l.transition } : null,
 		fadeOnEnd: l.fadeOnEnd ? { ...l.fadeOnEnd } : { enabled: false, frames: 12 },
@@ -47,10 +47,7 @@ export function applyLayerStyleData(L, c) {
 	if (c.contentFit != null) L.contentFit = c.contentFit
 	if (c.aspectLocked != null) L.aspectLocked = c.aspectLocked
 	if (Array.isArray(c.effects)) L.effects = JSON.parse(JSON.stringify(c.effects))
-	if ('startBehaviour' in c) {
-		if (c.startBehaviour === null || c.startBehaviour === 'inherit') delete L.startBehaviour
-		else L.startBehaviour = c.startBehaviour
-	}
+	if ('startBehaviour' in c) L.startBehaviour = c.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
 	L.transition = c.transition
 	if (c.fadeOnEnd) L.fadeOnEnd = { ...c.fadeOnEnd }
 	if (c.pipOverlays !== undefined) {
@@ -149,10 +146,7 @@ export function patchLayer(L, patch) {
 	if (patch.fadeOnEnd) L.fadeOnEnd = { ...(L.fadeOnEnd || { enabled: false, frames: 12 }), ...patch.fadeOnEnd }
 	const { startBehaviour, ...rest } = patch
 	Object.assign(L, rest)
-	if ('startBehaviour' in patch) {
-		if (startBehaviour === null || startBehaviour === 'inherit') delete L.startBehaviour
-		else L.startBehaviour = startBehaviour
-	}
+	if ('startBehaviour' in patch) L.startBehaviour = startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
 	// WO-177: record local edit timestamp to prevent mixer_update echo from stomping recent changes
 	layerLocalEditTimes.set(L, Date.now())
 }

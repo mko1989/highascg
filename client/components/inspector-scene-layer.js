@@ -14,8 +14,10 @@ import { appendCountdownGroup } from './inspector-countdown.js'
 import { getPipOverlaysFromLayer } from '../lib/pip-overlay-registry.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { getResolutionForScreen } from './inspector-channel-resolution.js'
+import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { renderLayerPlaylistGroup } from './inspector-layer-playlist.js'
 import { appendLiveAudioSourceGroup } from './inspector-live-audio-source.js'
+import { appendMediaTransportGroup } from './inspector-media-transport.js'
 import { createStepperInput } from './inspector-common.js'
 
 let activeInteractionAr = null
@@ -128,6 +130,7 @@ export function renderSceneLayerInspector(deps, sel) {
 	root.appendChild(styleGrp)
 
 	renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore })
+	appendMediaTransportGroup(root, { sceneId, layerIndex, layer, scene, sceneState, stateStore })
 	appendLiveAudioSourceGroup(root, { sceneId, layerIndex, layer, stateStore, rerenderSceneLayer, sel })
 
 	function patchFillPx(partial) {
@@ -255,25 +258,17 @@ export function renderSceneLayerInspector(deps, sel) {
 	startWrap.className = 'inspector-field'
 	const startLab = document.createElement('label')
 	startLab.className = 'inspector-field__label'
-	startLab.textContent = 'Start behaviour override'
+	startLab.textContent = 'Clip start point'
 	const startSel = document.createElement('select')
 	startSel.className = 'inspector-field__select'
-	startSel.setAttribute('aria-label', 'Override timeline clip start behaviour for this layer')
+	startSel.setAttribute('aria-label', 'Where this layer\u2019s clip starts when the look is taken')
 	startSel.innerHTML =
-		'<option value="inherit">Same as timeline clip</option>' +
-		'<option value="beginning">Start from beginning (trim)</option>' +
-		'<option value="relativeToPrevious">Relative to timeline (layer)</option>'
-	const rawSb = layer.startBehaviour
-	startSel.value =
-		rawSb === 'relativeToPrevious'
-			? 'relativeToPrevious'
-			: rawSb === 'beginning'
-				? 'beginning'
-				: 'inherit'
+		'<option value="beginning">Start from beginning</option>' +
+		'<option value="relativeToPrevious">Relative to the clip playing on this layer</option>'
+	startSel.value = layer.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
 	startSel.addEventListener('change', () => {
-		const v = startSel.value
 		sceneState.patchLayer(sceneId, layerIndex, {
-			startBehaviour: v === 'inherit' ? null : v === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
+			startBehaviour: startSel.value === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning',
 		})
 		document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))
 	})
@@ -284,7 +279,7 @@ export function renderSceneLayerInspector(deps, sel) {
 	startHint.style.fontSize = '0.78rem'
 	startHint.style.color = 'var(--text-muted)'
 	startHint.textContent =
-		'Override timeline clip on the same layer index when taking. With no timeline clip, “Start from beginning” / “Relative to timeline” apply from this layer (continue uses last take frame for this file).'
+		'Start from beginning plays the clip from its start (or its trim-in). Relative continues from the frame the clip already playing on this layer has reached.'
 	startWrap.appendChild(startHint)
 	takeGrp.appendChild(startWrap)
 	root.appendChild(takeGrp)

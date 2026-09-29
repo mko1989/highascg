@@ -74,7 +74,9 @@ export function initPlaylistControlPanel(mountEl) {
 			.map((p) => {
 				const k = keyOf(p)
 				/* WO-347: every playlist defined in the looks; live ones carry the channel. */
-				const label = `${p.live ? '🔴 ' : ''}${p.sceneName} · L${p.layerNumber}${p.live ? ` · ch${p.channel}` : ' · not live'}`
+				/* WO-581: a PRV recall is not live — picking an item sets where the take starts. */
+				const where = p.live ? ` · ch${p.channel}` : p.previewChannel != null ? ` · PRV ch${p.previewChannel}` : ' · not live'
+				const label = `${p.live ? '🔴 ' : ''}${p.sceneName} · L${p.layerNumber}${where}`
 				return `<option value="${escapeHtml(k)}"${k === selectedKey ? ' selected' : ''}>${escapeHtml(label)}</option>`
 			})
 			.join('')

@@ -35,6 +35,7 @@ const {
 } = require('./scene-route-deps')
 const { sendTakeJobsLoadAndMixerBatch } = require('./scene-take-lbg-amcp-pipeline-batch')
 const { scheduleFadeOnEndForTakeJobs } = require('./scene-take-lbg-amcp-pipeline-fade')
+const { settleRelativeSeekLead, relativeSeekPlayWaitMs } = require('./scene-relative-seek-lead')
 
 /**
  * PLAY source layers before same-channel intra-look routes so route:// targets are on-air.
@@ -283,7 +284,8 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 			: needsIncomingFadePreroll
 				? 180
 				: 80
-		await new Promise((r) => setTimeout(r, prebufferMs))
+		// WO-582: a relative seek fixed its PLAY moment — hold until then, never shorter than the prebuffer.
+		await new Promise((r) => setTimeout(r, relativeSeekPlayWaitMs(self, channel, prebufferMs)))
 
 		// Multi-screen take (WO-574): everything above is prep (LOADBG, Phase A, warm-up). Phase B
 		// below hands its lines to `playSync`, which holds until every screen is ready and then sends
@@ -364,6 +366,9 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					`jobs=${takeJobs.length} crossfadeLines=${crossfadeLines.length} fadeClockStarted=${fadeClockRef.start != null}`,
 			)
 		}
+		// WO-582: clear the pending relative seek; the resolve→PLAY-ack time is logged for tuning.
+		const leadMs = settleRelativeSeekLead(self, channel)
+		if (leadMs != null) self.log?.('info', `[scene-take-lbg] relative seek lead ch${channel}: ${leadMs}ms`)
 
 		try {
 			for (const job of takeJobs) {

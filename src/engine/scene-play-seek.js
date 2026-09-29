@@ -5,6 +5,7 @@ const { getMatrixForState } = require('../state/playback-tracker')
 const { isOscPlaybackActive } = require('../state/playback-tracker-osc')
 const { resolveClipDurationMs } = require('../state/playback-tracker')
 const { PGM_BANK_B_OFFSET } = require('./scene-transition')
+const { projectRelativeSeekFrames } = require('./scene-relative-seek-lead')
 
 /**
  * @param {number|string} physicalLayer
@@ -181,6 +182,20 @@ function seekFramesFromTimelineClip(clip, positionMs, fps, sb, ctx, channel, onA
 }
 
 /**
+ * Clip in-point (loop point) for a scene take — the persisted trim-in (WO-570), else frame 0.
+ * Sent as an explicit IN next to every SEEK: Caspar defaults IN to SEEK, so a relative start
+ * without it would permanently cut everything before the seek frame out of the loop.
+ * @param {object} layer
+ * @param {number} fps
+ * @returns {number}
+ */
+function resolvePlayInFramesForSceneLayer(layer, fps) {
+	const rate = Math.max(1, fps || 25)
+	const ms = Number(layer?.trimInMs)
+	return layer?.trimInMs != null && Number.isFinite(ms) ? Math.max(0, Math.round((ms * rate) / 1000)) : 0
+}
+
+/**
  * Scene take SEEK resolution (WO-33).
  * @param {object} layer
  * @param {object} ctx
@@ -223,8 +238,21 @@ function resolvePlaySeekFramesForSceneLayer(layer, ctx, opts) {
 	}
 
 	if (sb === 'beginning') {
-		rememberLastPlayFrame(ctx, channel, layerNumber, 0)
-		return 0
+		// WO-570: a persisted trim-in point (inspector-set) starts the clip there instead of frame 0.
+		const trimInFrames = resolvePlayInFramesForSceneLayer(layer, fps)
+		rememberLastPlayFrame(ctx, channel, layerNumber, trimInFrames)
+		return trimInFrames
+	}
+
+	/* WO-582: the server's own OSC read wins over the client's `playSeekFrames` — the client reads
+	 * logical layer N regardless of bank, so leaving a bank-B look it read the empty bank-A layer
+	 * and sent 0 ("works only one way"). It is also projected to when the PLAY will land. */
+	if (!forceCut && isOscPlaybackActive(ctx)) {
+		const projected = projectRelativeSeekFrames(ctx, channel, onAirPhys, fps)
+		if (projected != null) {
+			rememberLastPlayFrame(ctx, channel, layerNumber, projected)
+			return projected
+		}
 	}
 
 	if (layer.playSeekFrames != null && Number.isFinite(Number(layer.playSeekFrames))) {
@@ -330,6 +358,7 @@ module.exports = {
 	getActiveTimelineForTake,
 	elapsedFramesFromPlayback,
 	resolvePlaySeekFramesForSceneLayer,
+	resolvePlayInFramesForSceneLayer,
 	resolveTimelineClipFrame,
 	seekFramesFromTimelineClip,
 }

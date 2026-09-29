@@ -15,13 +15,27 @@
  *   3. if what survives still disagrees by more than an order of magnitude, return null.
  *
  * null means "no trustworthy length" and callers must render NOTHING — never a made-up number.
+ *
+ * WO-570 follow-up: `state.media` (the WS-pushed slice this file used to read exclusively) is the
+ * CINF-only snapshot right after a server flush — for a file whose ONLY CINF row fails the fps<1
+ * sanity check above (the exact trap this file already documents) with no probed counterpart ever
+ * reaching global state, this returned null FOREVER, not just transiently. The probed row exists —
+ * `GET /api/media` (ffprobe + disk merge) has it — but until now only the Sources panel fetched it
+ * (`sources-panel.js` → `mergeMediaProbeOverlay`), privately, for its own rendering only. Every
+ * `mediaDurationMs()` caller — this file's own playlist-row callers AND WO-570's transport
+ * controls — needs the same probed data, so this file now fetches it too, once, and merges it into
+ * the same index (`rebuild()` below) rather than duplicating the Sources panel's own merge.
  */
+
+import { api } from './api-client.js'
 
 /** @type {Map<string, number|null>} */
 let _byId = new Map()
 /** @type {Map<string, number|null>} */
 let _byBase = new Map()
 let _ready = false
+/** @type {Array<object>} last-known GET /api/media result — merged into every rebuild(). */
+let _probed = []
 
 function norm(v) {
 	return String(v || '')
@@ -68,7 +82,7 @@ function push(map, key, cand) {
 function rebuild(media) {
 	const ids = new Map()
 	const bases = new Map()
-	for (const m of media || []) {
+	for (const m of [...(media || []), ..._probed]) {
 		const id = norm(m?.id ?? m?.name)
 		if (!id) continue
 		const cand = candidateOf(m)
@@ -88,10 +102,20 @@ export function initMediaDurationIndex(stateStore) {
 	stateStore.on?.('*', (path) => {
 		if (path === 'media' || path === '*') rebuild(stateStore.getState()?.media)
 	})
+	api
+		.get('/api/media')
+		.then((probe) => {
+			_probed = Array.isArray(probe) ? probe : []
+			rebuild(stateStore.getState()?.media)
+		})
+		.catch(() => {
+			/* offline/boot race — the WS-only CINF baseline still applies */
+		})
 }
 
-/** Test seam — build the index from a plain media array. @param {Array<object>} media */
-export function _setMediaForTest(media) {
+/** Test seam — build the index from a plain media array, optionally with a probed overlay. */
+export function _setMediaForTest(media, probed) {
+	_probed = probed || []
 	rebuild(media)
 }
 
