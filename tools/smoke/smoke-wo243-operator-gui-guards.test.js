@@ -24,19 +24,39 @@ function clone(cfg) {
 }
 
 // WO-243 follow-up (owner: "gui still displays on the first screen"): an operator_gui-bound GPU
-// jack must claim the multiview-style head, never a screen_<mainScreenIndex+1> assignment — the
+// jack must claim its own non-screen head, never a screen_<mainScreenIndex+1> assignment — the
 // screen-branch classification hijacked screen_1's head (program output lost its monitor) and the
 // generator emitted x=0,y=0 (window on the program screen). Grep-level wiring guards.
+//
+// WO-573 follow-up (21.09.2026): operator_gui used to be classified as a MULTIVIEW head
+// specifically (binding.type 'multiview'), sharing `results.multiview[1]` with any genuine
+// multiview destination. A box running both at once (two separate physical GPU outputs) had them
+// silently overwrite each other — whichever connector was visited last in the device-graph loop
+// won, and the other's window landed on the wrong monitor at the wrong size. operator_gui now gets
+// its own binding.type ('operator_gui') and results bucket (`results.operatorGui`), independent of
+// multiview. The guards below were updated to assert the NEW independent classification instead of
+// the old shared one.
 describe('WO-243 follow-up: operator_gui never claims a program-screen layout slot', () => {
 	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
-	it('os-layout-calculator-assign classifies operator_gui as a multiview-style head', () => {
+	it('os-layout-calculator-assign classifies operator_gui as its OWN head, independent of multiview', () => {
 		const src = read('src/utils/os-layout-calculator-assign.js')
-		assert.match(src, /dMode === 'multiview' \|\| dMode === 'operator_gui'/, 'edge classifier maps operator_gui to the multiview head')
+		assert.match(src, /dMode === 'operator_gui'/, 'edge classifier still recognizes operator_gui')
+		assert.doesNotMatch(
+			src,
+			/dMode === 'multiview' \|\| dMode === 'operator_gui'/,
+			'WO-573: operator_gui must not be folded back into the multiview edge classification',
+		)
+		assert.match(src, /binding = \{ type: 'operator_gui', index: 1 \}/, 'operator_gui gets its own binding type')
 		assert.match(src, /dMode !== 'stream' && dMode !== 'multiview' && dMode !== 'operator_gui'/, 'legacy mainIndex fallback excludes operator_gui')
 	})
-	it('resolveLayoutRectForOperatorPort resolves operator_gui-bound ports to the multiview rect', () => {
+	it('resolveLayoutRectForOperatorPort resolves operator_gui-bound ports to their OWN rect, not the multiview one', () => {
 		const src = read('src/utils/x-display-session-layout.js') + read('src/utils/x-display-session-layout-resolve.js')
-		assert.match(src, /mode === 'multiview' \|\| mode === 'operator_gui'/, 'wiring loop treats operator_gui like multiview')
+		assert.doesNotMatch(
+			src,
+			/mode === 'multiview' \|\| mode === 'operator_gui'/,
+			'WO-573: the wiring loop must not alias operator_gui to the multiview rect any more',
+		)
+		assert.match(src, /plan\?\.operatorGui\?\.\[1\]/, 'operator_gui resolves through its own results.operatorGui bucket')
 		assert.match(src, /buildGpuPhysicalMap\(/, 'gpu-map xrandr fallback strategy present')
 	})
 	it('generator pins <device> to the X-screen convention, not the GPU port number', () => {

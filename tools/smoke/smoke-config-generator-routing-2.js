@@ -292,9 +292,16 @@ test('screen consumer x/y sync from graph layout without screen_N_system_id', ()
 	 * (observed 2026-07-20: live config yielded screen_1_x undefined where the committed one
 	 * yields 0). A gate test must not depend on mutable runtime state. */
 	const graph = clone(require('./fixtures/device_graph.sample.json'))
+	/* WO-573 follow-up: this used to point at a nonexistent destination id ('dst_mqtchens_1') on
+	 * gpu_p2 — a dead edge, silently masked because gpu_p2 already has a real edge from the fixture's
+	 * operator_gui destination (`e_dst_in_dst_mrs7zdk8_1_gpu_p2`), which `edges.find()` matches first.
+	 * The "multiview x" this test exercised was therefore actually operator_gui's OS-layout head,
+	 * back when operator_gui and multiview shared the same binding/results bucket. Now that they are
+	 * independent (os-layout-calculator-assign.js), this must cable a GENUINE multiview destination
+	 * (`dst_mrsa11vf_1`) to an unused GPU port (gpu_p3) to still test what its name says. */
 	graph.edges = [
 		...(Array.isArray(graph.edges) ? graph.edges : []),
-		{ id: 'e_mv_gpu', sourceId: 'dst_in_dst_mqtchens_1', sinkId: 'gpu_p2' },
+		{ id: 'e_mv_gpu', sourceId: 'dst_in_dst_mrsa11vf_1', sinkId: 'gpu_p3' },
 	]
 	const app = {
 		screen_count: 2,

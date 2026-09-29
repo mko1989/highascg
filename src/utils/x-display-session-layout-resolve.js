@@ -10,7 +10,7 @@ const {
 const { resolveOperatorMonitorPort } = require('./operator-monitor-resolve')
 
 /**
- * @typedef {{ x: number, y: number, width: number, height: number, sysId: string|null, kind: 'multiview'|'screen', index: number, interactive: boolean }} OperatorDisplayRect
+ * @typedef {{ x: number, y: number, width: number, height: number, sysId: string|null, kind: 'multiview'|'operator_gui'|'screen', index: number, interactive: boolean }} OperatorDisplayRect
  */
 
 function readCasparSetting(config, key) {
@@ -127,6 +127,11 @@ function findLayoutRectBySysId(layout, sysId) {
 			return { ...mv, kind: 'multiview', index: parseInt(idx, 10) || 1 }
 		}
 	}
+	for (const [idx, og] of Object.entries(layout.operatorGui || {})) {
+		if (String(og?.sysId || '') === id && og.width > 0 && og.height > 0) {
+			return { ...og, kind: 'operator_gui', index: parseInt(idx, 10) || 1 }
+		}
+	}
 	for (const [idx, pv] of Object.entries(layout.prv || {})) {
 		if (String(pv?.sysId || '') === id && pv.width > 0 && pv.height > 0) {
 			return { ...pv, kind: 'prv', index: parseInt(idx, 10) || 1 }
@@ -150,7 +155,11 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 			const interactive =
 				hit.kind === 'multiview'
 					? multiviewInteractiveEnabled(config)
-					: screenInteractiveEnabled(config, hit.index)
+					: hit.kind === 'operator_gui'
+						? false /* WO-573 follow-up: operator_gui is a Firefox kiosk page, not an
+						 * AMCP-clickable Caspar screen/multiview consumer — this flag only ever gates
+						 * pointer routing into a Caspar consumer, so it has nothing to opt into here. */
+						: screenInteractiveEnabled(config, hit.index)
 			return {
 				x: hit.x,
 				y: hit.y,
@@ -169,9 +178,25 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
 		const portIdx = resolvePhysicalPortIndexForDestination(dest, destIndex, ctx)
 		if (portIdx !== portN) continue
 		const mode = String(dest?.mode || '').toLowerCase()
-		// operator_gui-bound jacks claim the multiview-style head (os-layout-calculator-assign.js)
-		// — resolve them to the multiview rect, never to screen_<mainScreenIndex+1>.
-		if (mode === 'multiview' || mode === 'operator_gui') {
+		// operator_gui-bound jacks resolve to their OWN non-screen head, never to
+		// screen_<mainScreenIndex+1> (os-layout-calculator-assign.js) — WO-573 follow-up: this used
+		// to alias to the multiview rect, which broke the moment a real multiview destination was
+		// also live, since both would collide on the same plan.multiview[1] entry.
+		if (mode === 'operator_gui') {
+			const og = plan?.operatorGui?.[1]
+			if (!og || og.width <= 0 || og.height <= 0) continue
+			return {
+				x: og.x,
+				y: og.y,
+				width: og.width,
+				height: og.height,
+				sysId: og.sysId ? String(og.sysId) : sysId || null,
+				kind: 'operator_gui',
+				index: 1,
+				interactive: false,
+			}
+		}
+		if (mode === 'multiview') {
 			const mv = plan?.multiview?.[1]
 			if (!mv || mv.width <= 0 || mv.height <= 0) continue
 			return {

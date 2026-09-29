@@ -11,8 +11,9 @@ function logLayoutPlan(results) {
 	try {
 		const screenEntries = Object.entries(results.screens)
 		const mvEntries = Object.entries(results.multiview)
+		const ogEntries = Object.entries(results.operatorGui || {})
 		const mapEntries = Array.isArray(results.mappingGpuOutputs) ? results.mappingGpuOutputs : []
-		if (screenEntries.length === 0 && mvEntries.length === 0 && mapEntries.length === 0) {
+		if (screenEntries.length === 0 && mvEntries.length === 0 && ogEntries.length === 0 && mapEntries.length === 0) {
 			logger.info('[OS-Config] Layout plan: no assigned outputs')
 		} else {
 			for (const info of mapEntries) {
@@ -28,6 +29,11 @@ function logLayoutPlan(results) {
 			for (const [idx, info] of mvEntries) {
 				logger.info(
 					`[OS-Config] Layout multiview_${idx}: id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`,
+				)
+			}
+			for (const [idx, info] of ogEntries) {
+				logger.info(
+					`[OS-Config] Layout operator_gui_${idx}: id=${info.sysId} mode=${info.mode} pos=${info.x},${info.y} size=${info.width}x${info.height} backend=${info.backend}${info.rate != null ? ` rate=${info.rate}` : ''}`,
 				)
 			}
 			for (const [idx, info] of Object.entries(results.prv || {})) {

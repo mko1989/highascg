@@ -62,9 +62,12 @@ test('WO-441: inspector summary values wrap at word boundaries, not mid-word', (
 	assert.match(m[1], /overflow-wrap:\s*anywhere/, 'long unbroken tokens (EDID serials) still break')
 })
 
-test('WO-441: Native mode string is non-breaking; custom W/H/FPS inputs share the row', () => {
+test('WO-441: mode strings are non-breaking; custom W/H/FPS inputs share the row', () => {
 	const src = code(read('client/components/device-view-inspector-gpu.js'))
-	assert.match(src, /nativeModeRaw\.replace\(\/ \/g, '\u00a0'\)/, 'NBSP join keeps the mode on one line')
+	// WO-573 follow-up (21.09.2026): "Native mode" (one fallback-blended value) split into
+	// "Current mode" and "EDID preferred mode" (two honest ones) \u2014 both still need the NBSP join.
+	assert.match(src, /currentModeRaw\.replace\(\/ \/g, '\u00a0'\)/, 'NBSP join keeps the current mode on one line')
+	assert.match(src, /edidPreferredRaw\.replace\(\/ \/g, '\u00a0'\)/, 'NBSP join keeps the EDID preferred mode on one line')
 	assert.match(src, /flex = '1 1 0'/, 'number inputs must not keep natural width in the sidebar row')
 	assert.match(src, /minWidth = '0'/, 'flex children need min-width:0 to actually shrink')
 })

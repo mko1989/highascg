@@ -15,6 +15,9 @@ function collectGpuLayoutAssignments(config) {
 
 	const allGpuAssignments = new Map()
 	const mvAssignments = []
+	/** Independent from mvAssignments (WO-573 follow-up) — operator_gui is a separate physical
+	 * head from a genuine multiview destination and must not share its binding/results bucket. */
+	const operatorGuiAssignments = []
 	/* WO-364: PRV heads — a GPU jack cabled from the PRV half of a pgm_prv destination.
 	 * Separate collection like mvAssignments: PRV never feeds effectiveScreenCount. */
 	const prvAssignments = []
@@ -62,12 +65,6 @@ function collectGpuLayoutAssignments(config) {
 	}
 
 	const graphGpuConnectors = connectors.filter(c => c.kind === 'gpu_out' || c.kind === 'gpu_output')
-	const graphHasPixelMapToGpu = edges.some((e) => {
-		const src = connectorById.get(String(e?.sourceId || ''))
-		if (src?.kind !== 'pixel_map_out') return false
-		const sink = connectorById.get(String(e?.sinkId || ''))
-		return sink?.kind === 'gpu_out' || sink?.kind === 'gpu_output'
-	})
 	const graphHasDestinationGpuBinding = graphGpuConnectors.some((c) => {
 		const inEdge = edges.find((e) => e.sinkId === c.id)
 		if (!inEdge) return false
@@ -109,12 +106,19 @@ function collectGpuLayoutAssignments(config) {
 		if (boundDest) {
 			const dMode = String(boundDest.mode || 'pgm_prv').toLowerCase()
 			// WO-243 follow-up: an operator_gui-bound jack is the operator-area monitor — it claims
-			// the multiview-style head so the OS layout keeps placing that output (mode/position)
-			// exactly as when the multiview owned the jack. Classifying it as a screen (the old
-			// default branch) made it hijack screen_<mainScreenIndex+1>'s assignment: screen_1
-			// landed on the operator monitor and the real program output lost its head.
-			if (dMode === 'multiview' || dMode === 'operator_gui') {
+			// a non-screen head so the OS layout keeps placing that output (mode/position) instead of
+			// hijacking screen_<mainScreenIndex+1>'s assignment (the old default-branch bug: screen_1
+			// landed on the operator monitor and the real program output lost its head).
+			// WO-573 follow-up: this used to fold into the SAME 'multiview' bucket as a genuine
+			// multiview destination (both hardcoded to binding.index 1), so a box running both at once
+			// had them silently overwrite each other in `results.multiview[1]` — whichever connector
+			// this forEach visited last won, and the other's window landed on the wrong monitor with
+			// the wrong size. They are independent physical outputs that can both be live at the same
+			// time, so they now get independent binding types/buckets.
+			if (dMode === 'multiview') {
 				edgeDerivedMode = 'multiview'
+			} else if (dMode === 'operator_gui') {
+				edgeDerivedMode = 'operator_gui'
 			} else if (dMode === 'pgm_prv' && edgeOutputLayer >= 2) {
 				/* WO-364: cable from the destination's PRV half (edge note outputLayer 2) — a
 				 * PRV head, not a claim on screen_<N>'s jack. */
@@ -138,6 +142,10 @@ function collectGpuLayoutAssignments(config) {
 			binding = { type: 'multiview', index: 1 }
 			mainIndex = null
 			inferredFromEdge = true
+		} else if (edgeDerivedMode === 'operator_gui') {
+			binding = { type: 'operator_gui', index: 1 }
+			mainIndex = null
+			inferredFromEdge = true
 		}
 
 		if (!binding && mainIndex == null && boundDest) {
@@ -155,7 +163,18 @@ function collectGpuLayoutAssignments(config) {
 			const n = Math.min(16, Math.max(1, parseInt(String(binding?.index ?? (Number(mainIndex) + 1)), 10) || 1))
 			const mappedEdge = edgeKind === 'pixel_map_out' || edgeKind === 'destination_in'
 			if (isLegacyMainIndexOnly && !mappedEdge && allGpuAssignments.has(n)) return
-			if (isLegacyMainIndexOnly && graphHasDestinationGpuBinding && graphHasPixelMapToGpu) return
+			/* Once the graph is edge-authoritative (ANY gpu_out connector has a real dst_in_ edge
+			 * ANYWHERE — not just this connector), an unwired connector's `caspar.mainIndex` is not a
+			 * real binding: it is device-graph-suggest.js's fallback default (`Number.isFinite(displayIdx)
+			 * ? displayIdx : 0`), stamped on EVERY auto-suggested gpu_out connector that has no currently
+			 * connected display — i.e. 0 on every disconnected port, not "this port serves screen 1".
+			 * Trusting it here fabricated a phantom "screen 1" (with screen_1's leftover custom-mode
+			 * width) on whichever unwired port sorted first, even though nothing routes there — and
+			 * because OS layout places screens before multiview/operator (os-layout-calculator-place.js),
+			 * the real operator/multiview head then landed to the phantom's right instead of at x=0.
+			 * Previously only skipped when a pixel-map edge ALSO existed elsewhere (WO-242-era patch for
+			 * one collision); broadened to the general case here. */
+			if (isLegacyMainIndexOnly && graphHasDestinationGpuBinding) return
 			const fkResN = `screen_${n}_force_os_resolution`
 			const forceOsResForN =
 				readScreenSetting(config, fkResN) === true ||
@@ -203,8 +222,11 @@ function collectGpuLayoutAssignments(config) {
 				}
 			}
 			let mvIndex = null
+			let ogIndex = null
 			if (binding?.type === 'multiview') {
 				mvIndex = parseInt(binding.index, 10) || 1
+			} else if (binding?.type === 'operator_gui') {
+				ogIndex = parseInt(binding.index, 10) || 1
 			} else if (inEdge) {
 				const srcId = String(inEdge.sourceId || '')
 				if (srcId.startsWith('dst_in_')) {
@@ -258,6 +280,28 @@ function collectGpuLayoutAssignments(config) {
 					manualY: Number.isFinite(config[`multiview_${n}_os_y`]) ? config[`multiview_${n}_os_y`] : (Number.isFinite(config.multiview_os_y) ? config.multiview_os_y : null),
 				})
 			}
+			/* WO-573 follow-up: own key namespace (`operator_gui_os_*`, not `multiview_os_*`) — it must
+			 * never cross-talk with a genuine multiview destination's OS settings even though both used
+			 * to share the same binding. */
+			if (ogIndex != null) {
+				const n = ogIndex
+				if (operatorGuiAssignments.some(a => a.sysId === sysId)) return
+				const ogVideoMode = boundDest ? String(boundDest.videoMode || '').trim() : ''
+				const ogFps =
+					boundDest && Number.isFinite(Number(boundDest.fps)) && Number(boundDest.fps) > 0
+						? Number(boundDest.fps)
+						: null
+				operatorGuiAssignments.push({
+					sysId,
+					n,
+					osMode: config[`operator_gui_${n}_os_mode`] || config.operator_gui_os_mode || ogVideoMode || c.caspar?.mode,
+					osBackend: String(config[`operator_gui_${n}_os_backend`] || config.operator_gui_os_backend || c.caspar?.osBackend || 'xrandr').trim().toLowerCase(),
+					osRate: ogFps ?? config[`operator_gui_${n}_os_rate`] ?? config.operator_gui_os_rate ?? c.caspar?.refreshHz,
+					casparMode: ogVideoMode || config[`operator_gui_${n}_mode`] || c.caspar?.mode,
+					manualX: Number.isFinite(config[`operator_gui_${n}_os_x`]) ? config[`operator_gui_${n}_os_x`] : (Number.isFinite(config.operator_gui_os_x) ? config.operator_gui_os_x : null),
+					manualY: Number.isFinite(config[`operator_gui_${n}_os_y`]) ? config[`operator_gui_${n}_os_y`] : (Number.isFinite(config.operator_gui_os_y) ? config.operator_gui_os_y : null),
+				})
+			}
 		}
 	})
 
@@ -291,7 +335,14 @@ function collectGpuLayoutAssignments(config) {
 				continue
 			}
 			if (manualX == null && manualY == null) continue
-			const base = allGpuAssignments.get(n) || assign
+			/* Same class of bug as the isLegacyMainIndexOnly fix above: `assign` here is built purely
+			 * from leftover screen_${n}_os_x/os_y (WO's "Apply OS" flow) and survives independently of
+			 * whether main `n` still has a real destination bound in the graph. Falling back to `assign`
+			 * when there is no live `allGpuAssignments.get(n)` fabricated a phantom screen entry from a
+			 * stale x/y pair alone once the destination was disconnected — only merge onto a screen the
+			 * graph pass actually placed this run; a screen with nothing routed to it gets no entry. */
+			if (!allGpuAssignments.has(n)) continue
+			const base = allGpuAssignments.get(n)
 			allGpuAssignments.set(n, {
 				...base,
 				...(manualX != null ? { manualX } : {}),
@@ -308,6 +359,7 @@ function collectGpuLayoutAssignments(config) {
 	return {
 		allGpuAssignments,
 		mvAssignments,
+		operatorGuiAssignments,
 		prvAssignments,
 		operatorScreenAssignments,
 		graphHasDestinationGpuBinding,

@@ -29,13 +29,23 @@ export function buildGpuInspectorSummaryRows(conn, { lastPayload } = {}) {
 	const edid = display?.monitor || display?.edid?.parsed || rt.monitor || null
 	const monitorName = edidMonitorLabel(edid)
 	const serial = String(edid?.serial || '').trim()
-	const nativeModeRaw =
-		String(edid?.preferredMode || '').trim() ||
-		(display?.resolution && Number.isFinite(display?.refreshHz)
+	/* Owner correction (21.09.2026): a row labelled "Native mode" that only ever showed the EDID's
+	 * declared PREFERRED timing was read as "the one true resolution this device supports" — wrong
+	 * for an LED processor like the PixelHue P80, which can advertise a generic preferred INPUT
+	 * timing (e.g. 1080p60) while also genuinely supporting, and actually running, a completely
+	 * different custom canvas mode (confirmed live: DP-6's own EDID lists 5760x1728 as a real named
+	 * mode alongside its 1080p60 preference — xrandr's `+` only ever means "the EDID's preferred
+	 * pick", never "the only mode" or "what's currently active"). Split into two honest rows instead
+	 * of one fallback-blended one: what the EDID prefers, and what is actually driving the output
+	 * right now — no more silently relabelling the current mode as "native" when EDID gives nothing. */
+	const edidPreferredRaw = String(edid?.preferredMode || '').trim()
+	const edidPreferred = edidPreferredRaw.replace(/ /g, ' ')
+	const currentModeRaw =
+		display?.resolution && Number.isFinite(display?.refreshHz)
 			? `${display.resolution} @ ${display.refreshHz} Hz`
-			: display?.resolution || '')
+			: display?.resolution || ''
 	// WO-441: non-breaking spaces keep the mode on ONE line ("… @ 50 Hz" was wrapping).
-	const nativeMode = nativeModeRaw.replace(/ /g, ' ')
+	const currentMode = currentModeRaw.replace(/ /g, ' ')
 	const osOutput = String(rt.xrandrName || rt.activePort || display?.name || '').trim() || '—'
 	const status = display?.connected || rt.connected ? 'Connected' : 'Disconnected'
 	const warnings = (Array.isArray(lastPayload?.live?.warnings) ? lastPayload.live.warnings : [])
@@ -45,7 +55,8 @@ export function buildGpuInspectorSummaryRows(conn, { lastPayload } = {}) {
 		{ label: 'OS output', value: osOutput },
 		{ label: 'Monitor', value: monitorName || (status === 'Connected' ? 'No EDID received' : '—'), strong: !!monitorName },
 		{ label: 'Serial', value: serial || '—' },
-		{ label: 'Native mode', value: nativeMode || '—' },
+		{ label: 'Current mode', value: currentMode || '—' },
+		{ label: 'EDID preferred mode', value: edidPreferred || '—' },
 		{ label: 'Status', value: status },
 		...(warnings.length ? [{ label: 'GPU warnings', value: warnings.join('; ') }] : []),
 	]

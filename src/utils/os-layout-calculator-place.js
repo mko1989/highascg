@@ -8,6 +8,7 @@ const {
 	mapCasparModeToXrandrRes,
 	readScreenSetting,
 	resolveMultiviewDimsFromTopology,
+	resolveOperatorGuiDimsFromTopology,
 	resolveScreenDimsFromTopology,
 } = require('./os-layout-calculator-helpers')
 const { resolveEffectiveOsModeSource } = require('./os-mode-source')
@@ -21,15 +22,18 @@ const { resolveEffectiveOsModeSource } = require('./os-mode-source')
  *   swap: boolean,
  * }} assignments
  */
-function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, prvAssignments, effectiveScreenCount, swap }) {
+function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, operatorGuiAssignments, prvAssignments, effectiveScreenCount, swap }) {
 	const placements = []
 	const screens = getHorizontalLayoutOrder(effectiveScreenCount, swap)
 	for (const n of screens) placements.push({ kind: 'screen', n })
 	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
+	/* WO-573 follow-up: operator_gui is placed independently of a genuine multiview destination —
+	 * both can be live on separate physical outputs at once, so each gets its own results bucket. */
+	;(operatorGuiAssignments || []).forEach((og, idx) => placements.push({ kind: 'operator_gui', n: idx + 1, data: og }))
 	/* WO-364: PRV heads placed after screens+multiview; keyed by their main's n. */
 	;(prvAssignments || []).forEach((pa) => placements.push({ kind: 'prv', n: pa.n, data: pa }))
 
-	const results = { screens: {}, multiview: {}, prv: {} }
+	const results = { screens: {}, multiview: {}, operatorGui: {}, prv: {} }
 	let cumulativeX = 0
 	for (const p of placements) {
 		let data
@@ -163,13 +167,26 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 					if (!mappedOk || cmLower === 'custom') modeForXrandr = `${w}x${h}`
 				}
 			}
+		} else if (p.kind === 'operator_gui') {
+			const topoDims = resolveOperatorGuiDimsFromTopology(config, p.n)
+			if (topoDims && topoDims.width > 0 && topoDims.height > 0) {
+				w = topoDims.width
+				h = topoDims.height
+				hasCasparDims = true
+				const allowTopoReplaceMode = !explicitPixelOsMode && !forceOsRes
+				if (allowTopoReplaceMode) {
+					const mappedOk = /^\d+x\d+$/i.test(modeForXrandr)
+					const cmLower = String(cm || '').toLowerCase()
+					if (!mappedOk || cmLower === 'custom') modeForXrandr = `${w}x${h}`
+				}
+			}
 		}
 		const resMatch = modeForXrandr.match(/^(\d+)x(\d+)/)
 		if (resMatch) {
 			if (!hasCasparDims) {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
-			} else if (p.kind === 'screen' || p.kind === 'multiview' || p.kind === 'prv') {
+			} else if (p.kind === 'screen' || p.kind === 'multiview' || p.kind === 'operator_gui' || p.kind === 'prv') {
 				w = parseInt(resMatch[1], 10) || w
 				h = parseInt(resMatch[2], 10) || h
 			}
@@ -213,6 +230,7 @@ function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, 
 
 		if (p.kind === 'screen') results.screens[p.n] = info
 		else if (p.kind === 'prv') results.prv[p.n] = info
+		else if (p.kind === 'operator_gui') results.operatorGui[p.n] = info
 		else results.multiview[p.n] = info
 
 		if (data.manualX === null) cumulativeX += w

@@ -1,6 +1,6 @@
 'use strict'
 
-const { destinationsFromConfig } = require('../config/screen-destinations')
+const { destinationsFromConfig, isMainBusDestinationMode } = require('../config/screen-destinations')
 const { STANDARD_VIDEO_MODES } = require('../config/config-modes')
 const { resolveSysIdToXrandrOutput } = require('./xrandr-output-resolve')
 
@@ -16,10 +16,14 @@ function resolveScreenDimsFromTopology(config, screenIdx1) {
 	const list = destinationsFromConfig(config)
 	if (!list.length) return null
 	const idx0 = Math.max(0, (parseInt(String(screenIdx1), 10) || 1) - 1)
-	const routable = list.filter((d) => {
-		const mode = String(d?.mode || 'pgm_prv')
-		return mode !== 'multiview' && mode !== 'stream'
-	})
+	/* WO-573: this used to be an inline `mode !== 'multiview' && mode !== 'stream'` check that did
+	 * NOT exclude `operator_gui`. operator_gui's mainScreenIndex is a placement hint only (see
+	 * isMainBusDestinationMode's doc), but this lookup treated it as a main-bus claim — so an
+	 * operator_gui sitting at the same mainScreenIndex as a real screen won the `find()` below
+	 * whenever it was listed first, silently handing that screen operator_gui's 1080p dims instead
+	 * of its own. The bug was masked twice on the live box by moving operator_gui's index off 0/1
+	 * (a data convention, not a fix); using the canonical helper here closes it for real. */
+	const routable = list.filter((d) => isMainBusDestinationMode(d?.mode))
 	const perMain = routable.filter((d) => (parseInt(String(d?.mainScreenIndex ?? 0), 10) || 0) === idx0)
 	if (!perMain.length) return null
 	const picked = perMain.find((d) => String(d?.mode || 'pgm_prv') === 'pgm_prv') || perMain[0]
@@ -46,6 +50,26 @@ function resolveMultiviewDimsFromTopology(config, multiviewIdx1) {
 	const idx0 = Math.max(0, (parseInt(String(multiviewIdx1), 10) || 1) - 1)
 	const mvDests = list.filter((d) => String(d?.mode || '') === 'multiview')
 	const picked = mvDests[idx0] || mvDests[0]
+	if (!picked) return null
+	const vm = String(picked?.videoMode || '').trim()
+	if (vm && STANDARD_VIDEO_MODES[vm]) {
+		return { width: STANDARD_VIDEO_MODES[vm].width, height: STANDARD_VIDEO_MODES[vm].height }
+	}
+	const w = parseInt(String(picked?.width ?? 0), 10) || 0
+	const h = parseInt(String(picked?.height ?? 0), 10) || 0
+	if (w > 0 && h > 0) return { width: w, height: h }
+	return null
+}
+
+/** WO-573 follow-up: mirrors {@link resolveMultiviewDimsFromTopology} exactly, for `operator_gui`
+ * destinations — kept as its own function (not a shared "non-screen mode" parameter) so the two
+ * stay independent the same way their assignments/results buckets are independent. */
+function resolveOperatorGuiDimsFromTopology(config, operatorGuiIdx1) {
+	const list = destinationsFromConfig(config)
+	if (!list.length) return null
+	const idx0 = Math.max(0, (parseInt(String(operatorGuiIdx1), 10) || 1) - 1)
+	const ogDests = list.filter((d) => String(d?.mode || '') === 'operator_gui')
+	const picked = ogDests[idx0] || ogDests[0]
 	if (!picked) return null
 	const vm = String(picked?.videoMode || '').trim()
 	if (vm && STANDARD_VIDEO_MODES[vm]) {
@@ -148,6 +172,19 @@ function mergeMappingGpuOutputsWithScreens(config, results, mappingGpuOutputs) {
 			delete results.multiview[idx]
 		}
 	}
+	for (const [idx, info] of Object.entries(results.operatorGui || {})) {
+		const id = resolveSysIdToXrandrOutput(String(info?.sysId || ''), { config })
+		if (!id || !mappingBySysId.has(id)) continue
+		const n = parseInt(String(idx), 10)
+		const ogForced =
+			readScreenSetting(config, `operator_gui_${n}_force_os_resolution`) === true ||
+			readScreenSetting(config, 'operator_gui_force_os_resolution') === true
+		if (ogForced) {
+			mappingBySysId.delete(id)
+		} else {
+			delete results.operatorGui[idx]
+		}
+	}
 	/* WO-364: pixel-map rows evict colliding PRV heads too (no force flag for PRV — the
 	 * pixel map always wins its jack). */
 	for (const [idx, info] of Object.entries(results.prv || {})) {
@@ -166,6 +203,7 @@ module.exports = {
 	readScreenSetting,
 	resolveScreenDimsFromTopology,
 	resolveMultiviewDimsFromTopology,
+	resolveOperatorGuiDimsFromTopology,
 	mapCasparModeToXrandrRes,
 	inferRefreshHzFromCasparMode,
 	getHorizontalLayoutOrder,

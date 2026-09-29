@@ -141,6 +141,7 @@ async function handleOsPost(path, body, ctx) {
 			const headList = [
 				...Object.values(layout.screens || {}),
 				...Object.values(layout.multiview || {}),
+				...Object.values(layout.operatorGui || {}) /* WO-573 follow-up */,
 				...Object.values(layout.prv || {}) /* WO-364 PRV heads */,
 				...(Array.isArray(layout.mappingGpuOutputs) ? layout.mappingGpuOutputs : []),
 			]

@@ -37,6 +37,7 @@ function applyMappingGpuPlacementOffsets(
 
 	const screens = Object.entries(results.screens || {})
 	const multiview = Object.entries(results.multiview || {})
+	const operatorGui = Object.entries(results.operatorGui || {})
 	const prv = Object.entries(results.prv || {})
 
 	/* A screen the pixel mapping already feeds is positioned by its mapping outputs — shifting it
@@ -78,6 +79,12 @@ function applyMappingGpuPlacementOffsets(
 		const n = parseInt(key, 10)
 		if (!Number.isFinite(n) || n < 1 || !info) continue
 		if (manual(`multiview_${n}_os_${axis}`, `multiview_os_${axis}`) != null) continue
+		info[axis] = (Number(info[axis]) || 0) + off
+	}
+	for (const [key, info] of operatorGui) {
+		const n = parseInt(key, 10)
+		if (!Number.isFinite(n) || n < 1 || !info) continue
+		if (manual(`operator_gui_${n}_os_${axis}`, `operator_gui_os_${axis}`) != null) continue
 		info[axis] = (Number(info[axis]) || 0) + off
 	}
 	for (const [key, info] of prv) {
