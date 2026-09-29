@@ -74,16 +74,15 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 	if (colourSpace) lines.push(`<colour-space>${escapeXml(colourSpace)}</colour-space>`)
 	lines.push(`<force-linear-filter>${forceLinear ? 'true' : 'false'}</force-linear-filter>`)
 	lines.push(`<high-bitdepth>${highBitdepth ? 'true' : 'false'}</high-bitdepth>`)
-	/* WO-502: bind the mixer's existing GPU texture instead of round-tripping every frame through
-	 * host memory. `screen_consumer.cpp` picks gpu_strategy (:918, `in_frame.texture()->bind(0)`)
-	 * over host_strategy (:875, a full-frame `std::memcpy` + re-upload EVERY frame — 37.7 MB/frame
-	 * on a 6144x1536 channel, all of it on Caspar's SINGLE shared GL thread, which WO-502 measured
-	 * as the box-wide ceiling). Owner measured on the box: 93.6 % -> 100.3 % of realtime and GPU
-	 * 100 % -> 75 %, with all seven channels still running.
-	 * Default OFF: upstream marks it a 2.5 feature and it needs the consumer's GL context to share
-	 * with the device, so it stays opt-in per screen. */
-	const gpuTexture = casparBoolEnabled(config[`screen_${n}_gpu_texture`], false)
-	lines.push(`<gpu-texture>${gpuTexture ? 'true' : 'false'}</gpu-texture>`)
+	/* WO-502: always on, unconditionally — not a per-screen setting. Binds the mixer's existing GPU
+	 * texture instead of round-tripping every frame through host memory: `screen_consumer.cpp`
+	 * picks gpu_strategy (:918, `in_frame.texture()->bind(0)`) over host_strategy (:875, a
+	 * full-frame `std::memcpy` + re-upload EVERY frame — 37.7 MB/frame on a 6144x1536 channel, all
+	 * of it on Caspar's SINGLE shared GL thread, which WO-502 measured as the box-wide ceiling).
+	 * Owner measured on the box: 93.6 % -> 100.3 % of realtime and GPU 100 % -> 75 %, with all seven
+	 * channels still running. Owner decision 21.09.2026: no known downside on this box, so it is
+	 * forced on rather than exposed as a toggle. */
+	lines.push('<gpu-texture>true</gpu-texture>')
 	return lines.join('\n                    ')
 }
 
@@ -154,6 +153,8 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 	if (colourSpace) lines.push(`<colour-space>${escapeXml(colourSpace)}</colour-space>`)
 	lines.push(`<force-linear-filter>${forceLinear ? 'true' : 'false'}</force-linear-filter>`)
 	lines.push(`<high-bitdepth>${highBitdepth ? 'true' : 'false'}</high-bitdepth>`)
+	/* WO-502: same forced-on gpu-texture as the program screen consumer — see that function. */
+	lines.push('<gpu-texture>true</gpu-texture>')
 	return lines.join('\n                    ')
 }
 

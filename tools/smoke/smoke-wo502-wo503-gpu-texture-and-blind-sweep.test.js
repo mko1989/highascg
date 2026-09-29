@@ -1,12 +1,15 @@
 'use strict'
 
 /**
- * WO-502 — `screen_N_gpu_texture` must be a real setting, not a hand-edit.
+ * WO-502 — screen consumers must always emit `<gpu-texture>true</gpu-texture>`, unconditionally.
  * WO-503 — the CG orphan sweep must ask for INFO instead of sweeping a channel blind.
  *
  * WO-502: the owner hand-edited `<gpu-texture>true</gpu-texture>` into the generated
  * `casparcg.config` and measured 93.6 % -> 100.3 % of realtime with GPU 100 % -> 75 %. A hand-edit
- * is erased by the next Apply, so the win has to come from a config key.
+ * is erased by the next Apply. It first landed as an opt-in `screen_N_gpu_texture` key (default
+ * off); owner decision 21.09.2026 was that it has no known downside on this box and should never
+ * have been a toggle — it is now forced on for every screen (program and multiview), with no
+ * config key and nothing exposed in the UI.
  *
  * WO-503: owner 13.08 — *"this still happens … making checking logs imposible"*, pasting hundreds
  * of `CG 1-7xx CLEAR` / `CG 3-7xx CLEAR` lines. `gatheredInfo.channelXml` is a snapshot taken when
@@ -18,7 +21,10 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { buildProgramScreenConsumerInnerXml } = require('../../src/config/config-generator-screen-xml.js')
+const {
+	buildProgramScreenConsumerInnerXml,
+	buildMultiviewScreenConsumerInnerXml,
+} = require('../../src/config/config-generator-screen-xml.js')
 const { sweepTemplateCgOrphansOnCasparConnected } = require('../../src/engine/template-cg-orphan-sweep.js')
 
 /** isCustomLiveProfile gates the extended tag set (config-generator-utils.js:98). */
@@ -35,28 +41,43 @@ const CTX = {
 	borderless: true,
 }
 
-test('WO-502: gpu-texture defaults to false and is emitted explicitly', () => {
-	const xml = buildProgramScreenConsumerInnerXml({ ...BASE }, 1, CTX)
-	assert.match(xml, /<gpu-texture>false<\/gpu-texture>/, 'an unset key must render explicitly off')
+test('WO-502: program screen gpu-texture is always true, with no config key involved', () => {
+	assert.match(buildProgramScreenConsumerInnerXml({ ...BASE }, 1, CTX), /<gpu-texture>true<\/gpu-texture>/)
+	assert.match(buildProgramScreenConsumerInnerXml({ ...BASE }, 2, CTX), /<gpu-texture>true<\/gpu-texture>/)
 })
 
-test('WO-502: screen_N_gpu_texture=true reaches the generated XML', () => {
-	for (const v of [true, 'true']) {
-		const xml = buildProgramScreenConsumerInnerXml({ ...BASE, screen_1_gpu_texture: v }, 1, CTX)
-		assert.match(xml, /<gpu-texture>true<\/gpu-texture>/, `screen_1_gpu_texture=${JSON.stringify(v)} must be honoured`)
-	}
+test('WO-502: an explicit screen_N_gpu_texture=false cannot turn it off — there is no toggle', () => {
+	const cfg = { ...BASE, screen_1_gpu_texture: false, screen_1_gpu_texture_2: 'false' }
+	assert.match(buildProgramScreenConsumerInnerXml(cfg, 1, CTX), /<gpu-texture>true<\/gpu-texture>/)
 })
 
-test('WO-502: the key is per screen — screen 2 must not inherit screen 1', () => {
-	const cfg = { ...BASE, screen_1_gpu_texture: true }
-	assert.match(buildProgramScreenConsumerInnerXml(cfg, 1, CTX), /<gpu-texture>true</)
-	assert.match(buildProgramScreenConsumerInnerXml(cfg, 2, CTX), /<gpu-texture>false</)
+test('WO-502: multiview screen gpu-texture is also always true', () => {
+	const xml = buildMultiviewScreenConsumerInnerXml({ ...BASE }, { ...CTX, n: 1 })
+	assert.match(xml, /<gpu-texture>true<\/gpu-texture>/)
 })
 
-test('WO-502: the default seed carries gpu_texture off', () => {
+test('WO-502: the default seed has no gpu_texture key — it is not a setting any more', () => {
 	const { casparScreenDefaults } = require('../../src/config/defaults-caspar-server.js')
 	const seeded = casparScreenDefaults(1)
-	assert.equal(seeded.screen_1_gpu_texture, false, 'seed must agree with the generator default')
+	assert.equal(seeded.screen_1_gpu_texture, undefined, 'gpu_texture must not exist as a seeded/overridable key')
+})
+
+test('WO-502: operator_gui screen consumer gpu-texture is also always true (owner, 21.09.2026)', () => {
+	/* Owner: "shouldn't the operator gui (or multiview) screen consumer also have gpu texture
+	 * true? i think it should" — operator_gui's <screen> consumer is built inline in
+	 * config-generator-operator-gui.js, not through buildProgramScreenConsumerInnerXml, so it
+	 * needed its own gpu-texture line rather than inheriting the fix above. It is a real CasparCG
+	 * GL window (stacked below the Firefox kiosk, WO-263) on the same single shared GL thread as
+	 * every other screen consumer, so the same WO-502 fix applies. */
+	const { buildOperatorGuiChannel } = require('../../src/config/config-generator-operator-gui')
+	const { normalizeScreenDestinations } = require('../../src/config/screen-destinations')
+	const dest = normalizeScreenDestinations({
+		version: 1,
+		destinations: [{ id: 'og', mode: 'operator_gui', physicalPort: 2, label: 'Operator GUI' }],
+	}).destinations[0]
+	const dims = { width: 1920, height: 1080, fps: 50, modeId: '1080p5000', isCustom: false }
+	const xml = buildOperatorGuiChannel({}, dest, dims, { cumulativeX: 0, nextDevice: 1, layout: null }, 5)
+	assert.match(xml, /<gpu-texture>true<\/gpu-texture>/)
 })
 
 /** Minimal AMCP double recording batched lines and INFO calls. */

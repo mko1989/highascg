@@ -1,7 +1,6 @@
 # WO-502 — Every channel runs at ~93 %: seven channels exceed CasparCG's single OpenGL thread
 
-**Status: ROOT CAUSE PROVEN (13.08.2026 — two live ablation tests + the source the binary was built
-from). No code change yet: the remedies are a product decision, laid out in §5.**
+**Status: DONE (21.09.2026 — owner decision: gpu-texture is forced on, never a toggle. See §5d.)**
 **Priority:** High (on-air playback speed; this is the residual after WO-500)
 **Source:** owner 13.08, after deploying WO-500: *"no real difference between mipmaps high bitdepth
 and force linear on or off. the jitter is still present… i still want the jitter to be gone."*
@@ -149,6 +148,46 @@ the box drops back to ~93 %.
 Options A, C and D are consequently **not needed** and were never applied. Option A's measurement
 (+7.5 points from dropping two channels) stands as evidence for the serialization mechanism, not as
 a recommendation.
+
+## 5d. Owner decision 21.09.2026 — no toggle, forced on for every screen consumer
+
+The opt-in `screen_N_gpu_texture` key (default off, never exposed in any UI) was itself the wrong
+shape: it was never surfaced to the owner and §5b already had a clean live measurement showing no
+downside. Owner: *this setting was never exposed to the user, nor should it be — it should always
+be set to true. ALWAYS.*
+
+**What was done:**
+- `src/config/config-generator-screen-xml.js` — `buildProgramScreenConsumerInnerXml` now emits
+  `<gpu-texture>true</gpu-texture>` unconditionally; the `screen_${n}_gpu_texture` config read is
+  gone. `buildMultiviewScreenConsumerInnerXml` gained the same unconditional tag — it never had one
+  before, and the single-shared-GL-thread cause in §3 applies to it too (it is the ch4 multiview
+  screen consumer, one of the seven channels serialized behind the same thread).
+- `src/config/defaults-caspar-server.js` — `screen_N_gpu_texture` removed from the seed entirely;
+  it is not a setting any more, so there is nothing to default.
+- `tools/smoke/smoke-wo502-wo503-gpu-texture-and-blind-sweep.test.js` — rewritten: asserts
+  gpu-texture is `true` for both program and multiview screen consumers regardless of any
+  `screen_N_gpu_texture` value passed in (proving there is no back door to turn it off), and that
+  the seed no longer carries the key at all.
+
+**Verified:** full offline suite (`node tools/ci/run-offline-tests.js`) — 2434/2436 pass, 2
+pre-existing environment-gated skips unrelated to this change. Live behaviour was already verified
+in §5b (93.6 % → 100.3 % of realtime, GPU 100 % → 75 %, all seven channels retained); this change
+only removes the toggle so every screen gets that result by construction instead of by hand-edit.
+
+## 6. Third consumer closed (21.09.2026) — operator_gui's own `<screen>` consumer
+
+Owner, mid-WO-573-follow-up: *"shouldn't the operator gui (or multiview) screen consumer also have
+gpu texture true? i think it should."* Multiview was already covered by §5's fix
+(`buildMultiviewScreenConsumerInnerXml`), but `dst_operator_gui`'s `<screen>` consumer is built
+inline in `src/config/config-generator-operator-gui.js` (`buildOperatorGuiChannel`), NOT through
+either `buildProgramScreenConsumerInnerXml` or `buildMultiviewScreenConsumerInnerXml` — so it never
+inherited the fix and had no `<gpu-texture>` tag at all. It is a real CasparCG GL window (stacked
+below the Firefox kiosk per WO-263, showing routed preview layers 10-49 through holes punched in
+the kiosk chrome) on the exact same single shared GL thread as every other screen consumer, so the
+same reasoning applies. Added `<gpu-texture>true</gpu-texture>` to its `screenInner` array (the
+headless branch, WO-325, still correctly emits no `<screen>` consumer at all, so nothing to add
+there). Verified: new test in `smoke-wo502-wo503-gpu-texture-and-blind-sweep.test.js`; full offline
+suite 2443/2445 (2 pre-existing environment-gated skips); `npm run build:client` clean.
 
 ## 5c. On "the jitter is still present"
 

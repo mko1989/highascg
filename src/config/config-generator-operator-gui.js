@@ -93,6 +93,10 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 		// above an always-on-top video window). See tools/runtime/operator-shape-overlay.py.
 		`<always-on-top>false</always-on-top>`,
 		`<borderless>true</borderless>`,
+		/* WO-502: same forced-on gpu-texture as every other screen/multiview consumer — this is a
+		 * real CasparCG GL window (stacked below the Firefox kiosk, WO-263) subject to the exact same
+		 * single-shared-GL-thread cost as any other screen consumer. */
+		`<gpu-texture>true</gpu-texture>`,
 	].join('\n                    ')
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
