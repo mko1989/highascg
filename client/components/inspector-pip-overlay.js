@@ -15,6 +15,7 @@ import {
 	PIP_OVERLAY_MAP,
 	PIP_OVERLAY_MAX_STACK,
 	createPipOverlayInstance,
+	pipOverlayFieldVisible,
 } from '../lib/pip-overlay-registry.js'
 
 /** @type {Map<string, ReturnType<typeof setTimeout>>} */
@@ -341,15 +342,29 @@ function renderPipOverlayCard(
 
 	const paramsBlock = document.createElement('div')
 	paramsBlock.className = 'inspector-effect-card__params'
+	/* `visibleWhen` rows toggle in place (no inspector rebuild — that would break a slider drag). */
+	const shownParams = { ...overlay.params }
+	const gatedRows = []
+	const syncGatedRows = () => {
+		for (const { row, schema } of gatedRows) {
+			row.style.display = pipOverlayFieldVisible(schema, shownParams, def.schema) ? '' : 'none'
+		}
+	}
 	for (const schema of def.schema) {
 		const curVal = overlay.params?.[schema.key] ?? schema.default
-		renderParamEditor(paramsBlock, schema, curVal, (newVal) => {
+		const row = document.createElement('div')
+		if (schema.visibleWhen) gatedRows.push({ row, schema })
+		renderParamEditor(row, schema, curVal, (newVal) => {
+			shownParams[schema.key] = newVal
+			syncGatedRows()
 			onChangeOverlay({
 				type: overlay.type,
 				params: { ...overlay.params, [schema.key]: newVal },
 			})
 		})
+		paramsBlock.appendChild(row)
 	}
+	syncGatedRows()
 	card.appendChild(paramsBlock)
 	container.appendChild(card)
 }

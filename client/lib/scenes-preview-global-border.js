@@ -166,11 +166,13 @@ export function createScenesPreviewGlobalBorder(deps) {
 		const prev = lastGlobalBorderPushMeta.get(borderMetaKey(slot.channel, slot.layer))
 		const ty = String(globalBorder.type || '').toLowerCase()
 		const sk = borderSlicesKey(globalBorder)
+		/* edge_strip takes slice changes live (template re-renders from UPDATE, animation phase kept). */
+		const slicesMatch = ty === 'edge_strip' || String(prev?.slicesKey ?? '') === sk
 		return !!(
 			prev &&
 			String(prev.sceneId) === String(sceneId) &&
 			String(prev.borderType || '').toLowerCase() === ty &&
-			String(prev.slicesKey ?? '') === sk
+			slicesMatch
 		)
 	}
 

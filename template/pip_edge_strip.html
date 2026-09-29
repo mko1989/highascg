@@ -56,6 +56,9 @@
 		glowColor: '#ff6b6b',
 		glowWidth: 5,
 		roundedTips: false,
+		altColors: false,
+		altColor: '#457b9d',
+		altGlowColor: '#a8dadc',
 		side: 'outside',
 		opacity: 1,
 		inner: null,
@@ -67,6 +70,33 @@
 
 	var livePollId = null
 	var lastLiveRaw = ''
+
+	/* Motion clock: signed px travelled along the edge (+ = cw). Every render() rebuilds the SVG, so a
+	 * plain CSS animation would restart from 0 on each param change; instead each strip's animation
+	 * gets a negative delay that resumes it at clockDist(). Speed/direction changes fold the distance
+	 * covered so far into `dist` first, so the strips keep their position and only change pace. */
+	var motion = { dist: 0, t0: null, speed: state.speed, sign: 1 }
+
+	function nowMs() {
+		var t = document.timeline && document.timeline.currentTime
+		return typeof t === 'number' && isFinite(t) ? t : performance.now()
+	}
+
+	function clockDist(now) {
+		if (motion.t0 == null) motion.t0 = now
+		return motion.dist + motion.sign * motion.speed * ((now - motion.t0) / 1000)
+	}
+
+	function retimeMotion(now) {
+		motion.dist = clockDist(now)
+		motion.t0 = now
+		motion.speed = Math.max(1, Number(state.speed) || 1)
+		motion.sign = state.direction === 'ccw' ? -1 : 1
+	}
+
+	function frac(x) {
+		return x - Math.floor(x)
+	}
 
 	function clamp01(x) {
 		var n = Number(x)
@@ -128,6 +158,10 @@
 
 		var screenW = window.innerWidth || 1920
 		var screenH = window.innerHeight || 1080
+		var now = nowMs()
+		retimeMotion(now)
+		var distPx = clockDist(now)
+		var alt = !!state.altColors && n > 1
 
 		slices.forEach(function (inn) {
 			var wPx = Math.max(1, inn.w * screenW)
@@ -203,12 +237,19 @@
 			}
 
 			for (var i = 0; i < n; i++) {
-				var delay = (-(i / n) * dur).toFixed(3)
+				/* Loop progress for strip i: cw keyframes run dashoffset 0→-100, ccw 0→+100, so the same
+				 * travelled distance maps to p for cw and 1-p for ccw (continuous across a direction flip). */
+				var pos = distPx / Math.max(1, perimPx) + i / n
+				var prog = cw ? frac(pos) : frac(-pos)
+				var delay = (-prog * dur).toFixed(3)
+				var odd = alt && i % 2 === 1
 				if (state.glow && svgGlow) {
 					var gw = state.glowWidth || 5
-					svgGlow.appendChild(createRect(state.glowColor, th + gw * 1.2, 0.55, delay, rx, ry, rw, rh))
+					svgGlow.appendChild(
+						createRect(odd ? state.altGlowColor : state.glowColor, th + gw * 1.2, 0.55, delay, rx, ry, rw, rh)
+					)
 				}
-				svg.appendChild(createRect(state.color, th, 1, delay, rx, ry, rw, rh))
+				svg.appendChild(createRect(odd ? state.altColor : state.color, th, 1, delay, rx, ry, rw, rh))
 			}
 
 			wrap.appendChild(svg)
@@ -232,6 +273,9 @@
 		if (d.glowColor != null) state.glowColor = String(d.glowColor)
 		if (d.glowWidth != null) state.glowWidth = parseFloat(d.glowWidth)
 		if (d.roundedTips != null) state.roundedTips = !!d.roundedTips
+		if (d.altColors != null) state.altColors = !!d.altColors
+		if (d.altColor != null) state.altColor = String(d.altColor)
+		if (d.altGlowColor != null) state.altGlowColor = String(d.altGlowColor)
 		if (d.side != null) state.side = normalizeSide(d.side)
 		if (d.opacity != null) state.opacity = clamp01(parseFloat(d.opacity))
 		if (d.ringInnerPx != null) state.ringInnerPx = Math.max(0, parseFloat(d.ringInnerPx) || 0)

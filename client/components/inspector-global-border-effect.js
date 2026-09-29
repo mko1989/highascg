@@ -1,5 +1,5 @@
 import { sceneState } from '../lib/scene-state.js'
-import { PIP_OVERLAY_MAP } from '../lib/pip-overlay-registry.js'
+import { PIP_OVERLAY_MAP, pipOverlayFieldVisible } from '../lib/pip-overlay-registry.js'
 import { renderParamEditor } from './inspector-pip-overlay.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { requestGlobalBorderPush } from './inspector-global-border-events.js'
@@ -99,20 +99,34 @@ export function appendGlobalBorderEffectSections(
 	if (def) {
 		const paramsBlock = document.createElement('div')
 		paramsBlock.className = 'inspector-effect-card__params'
+		/* `visibleWhen` rows (edge strip alternate colors) toggle in place — rerender() mid slider drag
+		 * would drop the drag. */
+		const gatedRows = []
+		const syncGatedRows = () => {
+			const params = gbNow()?.params || {}
+			for (const { row, schema } of gatedRows) {
+				row.style.display = pipOverlayFieldVisible(schema, params, def.schema) ? '' : 'none'
+			}
+		}
 		for (const schema of def.schema) {
 			if (schema.key === 'side') continue
 			/* Owner 27.07: secondary color + its transition time hide under the enable toggle. */
 			if ((schema.key === 'color2' || schema.key === 'colorCycleSec') && gb.params?.color2Enabled !== true) continue
 			const curVal = gb.params?.[schema.key] ?? schema.default
-			renderParamEditor(paramsBlock, schema, curVal, (newVal) => {
+			const row = document.createElement('div')
+			if (schema.visibleWhen) gatedRows.push({ row, schema })
+			renderParamEditor(row, schema, curVal, (newVal) => {
 				const cur = gbNow()
 				if (!cur) return
 				patchGlobalBorder({
 					params: { ...cur.params, [schema.key]: newVal, side: 'inside' },
 				})
 				if (schema.key === 'color2Enabled') rerender()
+				syncGatedRows()
 			})
+			paramsBlock.appendChild(row)
 		}
+		syncGatedRows()
 		borderGrp.appendChild(paramsBlock)
 	}
 

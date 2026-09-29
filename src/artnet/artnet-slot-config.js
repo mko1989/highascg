@@ -53,6 +53,10 @@ function runtimeParamsFromSlot(slot) {
 		radius: p.radius != null ? Number(p.radius) : 0,
 		count: p.count != null ? Number(p.count) : 1,
 		length: p.length != null ? Number(p.length) : 300,
+		/* edge_strip alternating palette — not DMX-mapped, carried through so Art-Net frames keep it */
+		altColors: p.altColors === true,
+		altColor: p.altColor != null ? String(p.altColor) : '#457b9d',
+		altGlowColor: p.altGlowColor != null ? String(p.altGlowColor) : '#a8dadc',
 		segmentMode: p.segmentMode || p.segmentationMode || 'full',
 		segmentationMode: p.segmentationMode || p.segmentMode || 'full',
 		segmentsPerEdge: p.segmentsPerEdge != null ? Number(p.segmentsPerEdge) : 1,

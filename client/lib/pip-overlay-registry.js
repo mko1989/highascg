@@ -158,6 +158,9 @@ export const PIP_OVERLAYS = [
 			glowColor: '#ff6b6b',
 			glowWidth: 5,
 			roundedTips: false,
+			altColors: false,
+			altColor: '#457b9d',
+			altGlowColor: '#a8dadc',
 			side: 'outside',
 			opacity: 1,
 		},
@@ -199,6 +202,28 @@ export const PIP_OVERLAYS = [
 			{ key: 'glow', label: 'Glow Trail', type: 'bool', default: true },
 			{ key: 'glowColor', label: 'Glow Color', type: 'color', default: '#ff6b6b' },
 			{ key: 'glowWidth', label: 'Glow Width', type: 'float', min: 1, max: 50, step: 1, decimals: 0, default: 5, slider: true },
+			/* Alternating palette: even strips use color/glowColor, odd strips altColor/altGlowColor. */
+			{
+				key: 'altColors',
+				label: 'Alternate colors between strips',
+				type: 'bool',
+				default: false,
+				visibleWhen: [{ key: 'count', min: 2 }],
+			},
+			{
+				key: 'altColor',
+				label: 'Alternate strip color',
+				type: 'color',
+				default: '#457b9d',
+				visibleWhen: [{ key: 'count', min: 2 }, { key: 'altColors', equals: true }],
+			},
+			{
+				key: 'altGlowColor',
+				label: 'Alternate glow color',
+				type: 'color',
+				default: '#a8dadc',
+				visibleWhen: [{ key: 'count', min: 2 }, { key: 'altColors', equals: true }],
+			},
 			{ key: 'roundedTips', label: 'Rounded Tips', type: 'bool', default: false },
 		],
 	},
@@ -273,6 +298,25 @@ export const PIP_OVERLAY_MAP = new Map(PIP_OVERLAYS.map((o) => [o.type, o]))
 
 /** Template filenames that must exist in Caspar's template folder. */
 export const PIP_OVERLAY_TEMPLATE_FILES = PIP_OVERLAYS.map((o) => o.template + '.html')
+
+/**
+ * Whether a schema field should show for the current params. Fields opt in with
+ * `visibleWhen: [{ key, min?, equals? }]` — every rule must hold (missing values fall back to the
+ * field's own schema default).
+ * @param {{ visibleWhen?: { key: string, min?: number, equals?: unknown }[] }} field
+ * @param {object} params
+ * @param {{ key: string, default?: unknown }[]} [schema]
+ */
+export function pipOverlayFieldVisible(field, params, schema = []) {
+	const rules = Array.isArray(field?.visibleWhen) ? field.visibleWhen : []
+	const p = params && typeof params === 'object' ? params : {}
+	return rules.every((r) => {
+		const v = p[r.key] ?? schema.find((s) => s.key === r.key)?.default
+		if (r.min != null && !(Number(v) >= r.min)) return false
+		if ('equals' in r && v !== r.equals) return false
+		return true
+	})
+}
 
 /**
  * Create a default overlay instance.

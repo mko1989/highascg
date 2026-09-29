@@ -256,7 +256,9 @@ export function sceneStateSetGlobalBorderForScreen(self, screenIdx, border) {
 		const prevJson = JSON.stringify(prev.slices || [])
 		const nextJson = JSON.stringify(nextSlices)
 		if (prevJson !== nextJson) {
-			self.borderJustEnabled[m] = true
+			/* edge_strip re-reads slices from CG UPDATE / live file; a re-ADD would reload the template and
+			 * restart the strip animation on every slice edit. */
+			if (String(merged.type || '') !== 'edge_strip') self.borderJustEnabled[m] = true
 			if (!self._globalBorderSliceEditAt) self._globalBorderSliceEditAt = {}
 			self._globalBorderSliceEditAt[m] = Date.now()
 		}
