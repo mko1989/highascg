@@ -130,8 +130,11 @@ async function handleUpload(req, res, ctx) {
 			}
 		}
 
+		// Browsers send the multipart filename as raw UTF-8; busboy's default latin1 decode turned
+		// Polish names into mojibake on disk ("Tło" → "TÅ\x82o"). NFC folds macOS NFD names ("Z"+U+0307 → "Ż").
 		const bb = busboy({
 			headers: req.headers,
+			defParamCharset: 'utf8',
 			limits: { fileSize: readMaxUploadBytes(), files: 64 },
 		})
 		let fileCount = 0
@@ -144,7 +147,7 @@ async function handleUpload(req, res, ctx) {
 		})
 
 		bb.on('file', (name, file, info) => {
-			const { filename } = info
+			const filename = String(info.filename || '').normalize('NFC')
 			const effectiveBase = getIngestEffectiveBase(config, targetSubdir, persistence)
 			
 			// Ensure target subdir exists (sequential upload means we can do this here)

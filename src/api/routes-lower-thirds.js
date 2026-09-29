@@ -201,7 +201,7 @@ async function handlePost(p, body, ctx, req) {
 		return new Promise((resolve) => {
 			if (!fs.existsSync(FONTS_DIR)) fs.mkdirSync(FONTS_DIR, { recursive: true })
 			try {
-				const bb = busboy({ headers: req.headers })
+				const bb = busboy({ headers: req.headers, defParamCharset: 'utf8' })
 				let savedFile = null
 				bb.on('file', (name, file, info) => {
 					const { filename } = info

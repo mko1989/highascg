@@ -142,7 +142,7 @@ function handleUpload(req, ctx) {
 
 		let bb
 		try {
-			bb = busboy({ headers: req.headers, limits: { fileSize: MAX_BYTES, files: 1 } })
+			bb = busboy({ headers: req.headers, defParamCharset: 'utf8', limits: { fileSize: MAX_BYTES, files: 1 } })
 		} catch (err) {
 			resolve(jsonResp(400, { error: `bad multipart body: ${err.message}` }))
 			return
