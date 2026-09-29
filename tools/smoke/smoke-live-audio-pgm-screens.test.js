@@ -4,6 +4,7 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const {
 	resolveLiveAudioPgmTargetScreens,
+	resolveLiveAudioSlotPgmChannels,
 	listLiveAudioPgmProtectedLayers,
 } = require('../../src/config/live-audio-input')
 const { getChannelMap } = require('../../src/config/routing-map')
@@ -47,5 +48,36 @@ describe('live-audio PGM screen targets', () => {
 			protectedLayers.map((p) => p.channel).sort(),
 			[map.programCh(1), map.programCh(2)].sort(),
 		)
+	})
+
+	// WO-571: a slot never saved through the Live Audio Mixer's per-slot "Route to program"
+	// buttons has no `live_audio_input_N_pgm_channels` key at all, and falls back to the legacy
+	// blanket behavior above. Once that key is written — even as '' — it is authoritative.
+	it('an unconfigured slot falls back to the legacy blanket screens', () => {
+		assert.deepEqual(resolveLiveAudioSlotPgmChannels(dualScreenCfg, 1), [
+			getChannelMap(dualScreenCfg).programCh(1),
+			getChannelMap(dualScreenCfg).programCh(2),
+		])
+	})
+
+	it('an explicit empty selection means routed to nothing, not the blanket fallback', () => {
+		const cfg = {
+			...dualScreenCfg,
+			casparServer: { ...dualScreenCfg.casparServer, live_audio_input_1_pgm_channels: '' },
+		}
+		assert.deepEqual(resolveLiveAudioSlotPgmChannels(cfg, 1), [])
+		assert.deepEqual(listLiveAudioPgmProtectedLayers(cfg), [])
+	})
+
+	it('an explicit selection routes only to the chosen channel(s)', () => {
+		const map = getChannelMap(dualScreenCfg)
+		const cfg = {
+			...dualScreenCfg,
+			casparServer: { ...dualScreenCfg.casparServer, live_audio_input_1_pgm_channels: String(map.programCh(1)) },
+		}
+		assert.deepEqual(resolveLiveAudioSlotPgmChannels(cfg, 1), [map.programCh(1)])
+		const protectedLayers = listLiveAudioPgmProtectedLayers(cfg)
+		assert.equal(protectedLayers.length, 1)
+		assert.equal(protectedLayers[0].channel, map.programCh(1))
 	})
 })
