@@ -82,6 +82,19 @@
 .inspector-effect-card__advanced-summary::-webkit-details-marker {
 	display: none;
 }
+/* Native marker is hidden above (and by list-style in Firefox) — draw our own disclosure arrow. */
+.inspector-effect-card__advanced-summary::before {
+	content: '▸';
+	display: inline-block;
+	width: 1em;
+	transition: transform 0.12s ease;
+}
+.inspector-effect-card__advanced[open] > .inspector-effect-card__advanced-summary::before {
+	transform: rotate(90deg);
+}
+.inspector-effect-card__advanced-summary:hover {
+	color: var(--text, #c9d1d9);
+}
 .inspector-effect-card__advanced-params {
 	display: flex;
 	flex-direction: column;

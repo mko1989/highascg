@@ -23,7 +23,7 @@ function stableBorderFingerprint(slot) {
 		fadeDuration: Number(slot.fadeDuration) || 25,
 		mirrorBorderOnPrv: slot.mirrorBorderOnPrv === true,
 		activePgmLayer: Number(slot.activePgmLayer) === 996 ? 996 : 998,
-		artnetListenEnabled: slot.artnetListenEnabled !== false,
+		artnetListenEnabled: slot.artnetListenEnabled === true,
 		artnetChannelMap: Array.isArray(slot.artnetChannelMap) ? slot.artnetChannelMap : null,
 		params: p,
 		slices: Array.isArray(slot.slices)

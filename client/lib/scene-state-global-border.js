@@ -23,8 +23,8 @@ export function sceneStateDefaultGlobalBorderTemplate() {
 		params: { ...(def?.defaults || {}), side: 'inside' },
 		slices: [],
 		artnetPatch: { startChannel: 1, universe: 0 },
-		/** When false, server should not apply DMX to this screen; client ignores Art-Net WS sync. */
-		artnetListenEnabled: true,
+		/** Opt-in: only `true` lets the server apply DMX to this screen (client ignores Art-Net WS sync otherwise). */
+		artnetListenEnabled: false,
 		/** Per DMX offset (0–17): false = keep UI/local value for that parameter. */
 		artnetChannelMap: defaultArtnetChannelMap(),
 		mirrorBorderOnPrv: false,
@@ -84,7 +84,7 @@ function preserveLocalArtnetConfig(local, remote, sceneState, screenIndex, fromA
 		artnetPatch: patch,
 		artnetListenEnabled:
 			fromArtnet || remote.artnetListenEnabled === undefined
-				? local.artnetListenEnabled !== false
+				? local.artnetListenEnabled === true
 				: !!remote.artnetListenEnabled,
 		artnetChannelMap: fromArtnet
 			? normalizeArtnetChannelMap(local.artnetChannelMap)
@@ -114,7 +114,7 @@ export function applyRemoteGlobalBorderSlot(sceneState, screenIndex, remote, opt
 		}
 		return
 	}
-	if (fromArtnet && local.artnetListenEnabled === false) return
+	if (fromArtnet && local.artnetListenEnabled !== true) return
 
 	const localSlices = copySlices(local.slices)
 	const remoteSlices = copySlices(remote.slices)
@@ -195,7 +195,7 @@ function normalizeStoredBorder(stored) {
 		mirrorBorderOnPrv: stored.mirrorBorderOnPrv === true,
 		activePgmLayer: normActivePgmLayer(stored.activePgmLayer),
 		borderPresets: Array.isArray(stored.borderPresets) ? stored.borderPresets : [],
-		artnetListenEnabled: stored.artnetListenEnabled !== false,
+		artnetListenEnabled: stored.artnetListenEnabled === true,
 		artnetChannelMap: normalizeArtnetChannelMap(stored.artnetChannelMap),
 		pgmAirSnapshot: snap,
 	}

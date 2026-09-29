@@ -7,6 +7,9 @@ import { showScenesToast } from './scenes-editor-support.js'
 import { scheduleGlobalBorderConfigSave } from './inspector-global-border-events.js'
 import { attachMathInput } from '../lib/math-input.js'
 
+/** Patch/mapping disclosure stays as the operator left it across inspector rerenders (closed at load). */
+let dmxDetailsOpen = false
+
 /**
  * @param {HTMLElement} root
  * @param {() => import('../lib/scene-state.js').GlobalBorderConfig | null | undefined} gbNow
@@ -39,11 +42,26 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 	})
 	const listenTxt = document.createElement('span')
 	listenTxt.textContent =
-		'Listen for Art-Net on this screen (uncheck to freeze border from DMX; UI controls still work)'
+		'Listen for Art-Net/sACN on this screen (opt-in — off by default; while off, only UI controls drive the border)'
 	listenLab.appendChild(listenChk)
 	listenLab.appendChild(listenTxt)
 	listenWrap.appendChild(listenLab)
 	patchBlock.appendChild(listenWrap)
+
+	/* Protocol, patch, per-channel mapping and fixture download live in a closed-by-default disclosure. */
+	const dmxDetails = document.createElement('details')
+	dmxDetails.className = 'inspector-effect-card__advanced'
+	dmxDetails.open = dmxDetailsOpen
+	dmxDetails.addEventListener('toggle', () => {
+		dmxDetailsOpen = dmxDetails.open
+	})
+	const dmxSummary = document.createElement('summary')
+	dmxSummary.className = 'inspector-effect-card__advanced-summary'
+	dmxDetails.appendChild(dmxSummary)
+	const dmxBlock = document.createElement('div')
+	dmxBlock.className = 'inspector-effect-card__advanced-params'
+	dmxDetails.appendChild(dmxBlock)
+	patchBlock.appendChild(dmxDetails)
 
 	const protocolWrap = document.createElement('div')
 	protocolWrap.className = 'inspector-field'
@@ -68,9 +86,14 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 	})
 	protocolLab.appendChild(protocolSel)
 	protocolWrap.appendChild(protocolLab)
-	patchBlock.appendChild(protocolWrap)
+	dmxBlock.appendChild(protocolWrap)
 
 	let patchStartCh = Number(gb.artnetPatch?.startChannel) || 1
+	const updateDmxSummary = () => {
+		const uni = Number(gbNow()?.artnetPatch?.universe) || 0
+		dmxSummary.textContent = `DMX patch & channel mapping (universe ${uni}, start ch ${patchStartCh})`
+	}
+	updateDmxSummary()
 
 	const scWrap = document.createElement('div')
 	scWrap.className = 'inspector-field'
@@ -94,11 +117,12 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 		})
 		scheduleGlobalBorderConfigSave()
 		rebuildMappingTable()
+		updateDmxSummary()
 	})
 	attachMathInput(scInp, { decimals: 0 })
 	scLab.appendChild(scInp)
 	scWrap.appendChild(scLab)
-	patchBlock.appendChild(scWrap)
+	dmxBlock.appendChild(scWrap)
 
 	const uniWrap = document.createElement('div')
 	uniWrap.className = 'inspector-field'
@@ -120,18 +144,19 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 			artnetPatch: { ...cur.artnetPatch, universe: isNaN(val) ? 0 : val },
 		})
 		scheduleGlobalBorderConfigSave()
+		updateDmxSummary()
 	})
 	attachMathInput(uniInp, { decimals: 0 })
 	uniLab.appendChild(uniInp)
 	uniWrap.appendChild(uniLab)
-	patchBlock.appendChild(uniWrap)
+	dmxBlock.appendChild(uniWrap)
 
 	const channelMapHint = document.createElement('p')
 	channelMapHint.className = 'inspector-field inspector-field--hint'
 	channelMapHint.style.marginTop = '8px'
 	channelMapHint.textContent =
 		'Uncheck a row to keep that parameter under UI control while Art-Net is on (server must honor artnetChannelMap).'
-	patchBlock.appendChild(channelMapHint)
+	dmxBlock.appendChild(channelMapHint)
 
 	const setChannelMap = (nextMap) => {
 		patchGlobalBorder({ artnetChannelMap: nextMap })
@@ -182,7 +207,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 		<tbody></tbody>
 	`
 	rebuildMappingTable()
-	patchBlock.appendChild(table)
+	dmxBlock.appendChild(table)
 
 	const dlBtn = Object.assign(document.createElement('button'), {
 		type: 'button',
@@ -206,7 +231,7 @@ export function appendGlobalBorderArtnetSection(root, gbNow, patchGlobalBorder) 
 			showScenesToast(`Download failed: ${e?.message || e}`, 'warn')
 		}
 	})
-	patchBlock.appendChild(dlBtn)
+	dmxBlock.appendChild(dlBtn)
 
 	patchGrp.appendChild(patchBlock)
 	root.appendChild(patchGrp)
