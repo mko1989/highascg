@@ -1,0 +1,3 @@
+why does scroll value changes does not register to output in shaders editor. only update after slider click.
+id also like the changes to happen smoothly and not abruptly.
+→ scroll-apply fixed 25.09 (built, kiosk reload by owner). "reload" look on scroll = speed change jumps the animation phase. Real fix (no jump + smooth glide): WO-580, OPEN — after the show.

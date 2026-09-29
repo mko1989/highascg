@@ -1,0 +1,3 @@
+changing audio output device from the drop down, then clicking save audio settings resets the device back to what it was, the procuder needs to be done again to actually change and save the audio settings. 
+id like it to work without pressing the save audio settings button, just like most settings are auto saved.
+

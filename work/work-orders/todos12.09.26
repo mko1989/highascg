@@ -1,0 +1,9 @@
+i need you to do a review and fixing of the audio implementation and settings in highascg.
+
+while youre at it in the compact audio mixer in bottom right the routing buttons are stretched to fill width instead of being pretty small.
+
+highascg needs to be doing better job at determining wheter there is audio present on a layer, right now there are 2 layers on screen with jpg media, so no audio, yet they appear in the mixer.
+
+i also need audio only looks (single or playlist) that can be played without changing the video layers of the screen.
+
+on show so dont do anything destructive.

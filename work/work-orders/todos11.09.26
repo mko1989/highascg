@@ -1,0 +1,3 @@
+i have live audio input set now, its set to NOT be routed to outputs as it is only used as fft source for shaders. yet it is present on pgm outputs...
+
+the other problem i had was with alsa mixer settings to make the audio capture active. it should be possible to set from the app's settings, yet i had errors and had to do it manually thru alsamixer from terminal. 

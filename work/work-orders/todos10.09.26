@@ -1,0 +1,8 @@
+when the operator monitor is set, turn off the cursor auto hide function.
+
+timer font with border around characters
+
+
+had a problem where when i created a new project while being in the looks tab of the operator gui, the cut out shapes of the previous setup just stayed there and did not hide when i changed tabs. an edge case.
+
+i noticed another problem similar, i ran a web browser window and after a while clicked back to gui. the browser window was visible thru the shape cut outs and it should land under the operator screen consumer.
