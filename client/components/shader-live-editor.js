@@ -113,6 +113,9 @@ export function initShaderLiveEditor(stateStore) {
 				const next = Math.min(hi, Math.max(lo, (parseFloat(t.value) || 0) + (e.deltaY < 0 ? step : -step)))
 				t.value = String(next)
 				t.dispatchEvent(new Event('input', { bubbles: true }))
+				/* Apply rides `change` — settle the wheel burst into ONE push (each is a recompile). */
+				clearTimeout(t._wheelApply)
+				t._wheelApply = setTimeout(() => t.dispatchEvent(new Event('change', { bubbles: true })), 150)
 			},
 			{ passive: false },
 		)
