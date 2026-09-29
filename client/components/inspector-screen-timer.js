@@ -186,6 +186,7 @@ export function renderScreenTimerInspector(root, sel) {
 				dispatchTimersChanged()
 				void reload()
 			},
+			extended: true,
 		})
 		section.appendChild(settingsWrap)
 

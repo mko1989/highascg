@@ -48,9 +48,12 @@ const CountdownEngine = (function () {
 		hideTimer: false,        // true → show the middle aux line where the timer would sit
 		timerFontSize: 15,       // vw
 		auxFontSize: 5,          // vw
+		timerFontFamily: '',     // '' = template default (Arial/Helvetica Neue stack)
 		timerColor: '#ffffff',
 		amberColor: '#ffb300',
 		redColor: '#ff3b30',
+		timerBorderWidth: 0,     // px — outline around the timer characters, 0 = off
+		timerBorderColor: '#000000',
 		auxColor: '#ffffff',
 		auxTop: '',
 		auxMiddle: '',
@@ -178,7 +181,10 @@ const CountdownEngine = (function () {
 			dom.timer.textContent = formatTime(totalSec, config.format);
 			dom.timer.style.color = currentColor(totalSec);
 			dom.timer.style.fontSize = (Number(config.timerFontSize) || DEFAULT_CONFIG.timerFontSize) + 'vw';
+			dom.timer.style.fontFamily = config.timerFontFamily || '';
 			dom.timer.style.display = config.hideTimer ? 'none' : '';
+			const borderW = Number(config.timerBorderWidth) || 0;
+			dom.timer.style.webkitTextStroke = borderW > 0 ? borderW + 'px ' + (config.timerBorderColor || DEFAULT_CONFIG.timerBorderColor) : '';
 		}
 		applyAux(dom.auxTop, config.auxTop);
 		applyAux(dom.auxMiddle, config.auxMiddle);

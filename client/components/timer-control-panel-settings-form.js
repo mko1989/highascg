@@ -18,7 +18,9 @@ import { saveTimerConfigPatch } from './timer-control-panel-inline-time.js'
  * Build settings section for a timer.
  * @param {HTMLElement} containerEl
  * @param {object} timer
- * @param {{ refreshTimerList: () => void }} deps
+ * @param {{ refreshTimerList: () => void, extended?: boolean }} deps - `extended: true` adds the
+ *   Font/Color fields (screen-timer Inspector only — the compact dock deliberately omits them,
+ *   per the owner: "only in the 'big' settings, the compact ones should stay as is")
  */
 export function buildTimerSettings(containerEl, timer, deps) {
 	const { refreshTimerList } = deps
@@ -93,6 +95,92 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	sizeInput.style.cssText = 'width:100%;padding:2px 4px'
 	sizeInput.value = String(config.timerFontSize || DEFAULT_TIMER_CONFIG.timerFontSize)
 	containerEl.appendChild(sizeInput)
+
+	// Font + color — WO todos10.09.26: "add font and color settings so the timer can be
+	// customized. only in the 'big' settings, the compact ones should stay as is." Gated on
+	// deps.extended so the corner dock (timer-control-panel.js, the owner's own "compact timer")
+	// keeps its current fields untouched; only the screen-timer Inspector ("full inspector",
+	// WO-226) opts in.
+	let fontSelect = null
+	let timerColorInput = null
+	let amberColorInput = null
+	let redColorInput = null
+	let borderWidthInput = null
+	let borderColorInput = null
+	if (deps?.extended) {
+		const fontLabel = document.createElement('div')
+		fontLabel.className = 'timer-control-panel__settings-label'
+		fontLabel.style.marginTop = '4px'
+		fontLabel.textContent = 'Font'
+		containerEl.appendChild(fontLabel)
+
+		fontSelect = document.createElement('select')
+		fontSelect.className = 'timer-control-panel__settings-select'
+		fontSelect.style.cssText = 'width:100%;padding:2px 4px'
+		const FONT_OPTIONS = [
+			['', 'Default (Arial)'],
+			["'Arial', 'Helvetica Neue', sans-serif", 'Arial'],
+			["'Helvetica Neue', Helvetica, sans-serif", 'Helvetica Neue'],
+			["'Verdana', sans-serif", 'Verdana'],
+			["'Trebuchet MS', sans-serif", 'Trebuchet MS'],
+			["'Georgia', serif", 'Georgia'],
+			["'Times New Roman', serif", 'Times New Roman'],
+			["'Courier New', monospace", 'Courier New'],
+			["'Impact', sans-serif", 'Impact'],
+		]
+		for (const [value, label] of FONT_OPTIONS) {
+			const opt = document.createElement('option')
+			opt.value = value
+			opt.textContent = label
+			fontSelect.appendChild(opt)
+		}
+		fontSelect.value = config.timerFontFamily || ''
+		containerEl.appendChild(fontSelect)
+
+		const colorField = (rowEl, labelText, value) => {
+			const wrap = document.createElement('div')
+			wrap.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px'
+			const lab = document.createElement('span')
+			lab.className = 'timer-control-panel__settings-label'
+			lab.textContent = labelText
+			const inp = document.createElement('input')
+			inp.type = 'color'
+			inp.style.cssText = 'width:100%;padding:0;height:22px'
+			inp.value = value
+			wrap.append(lab, inp)
+			rowEl.appendChild(wrap)
+			return inp
+		}
+
+		const colorRow = document.createElement('div')
+		colorRow.style.cssText = 'display:flex;gap:4px;margin-top:4px'
+		timerColorInput = colorField(colorRow, 'Color', config.timerColor || DEFAULT_TIMER_CONFIG.timerColor)
+		amberColorInput = colorField(colorRow, 'Amber', config.amberColor || DEFAULT_TIMER_CONFIG.amberColor)
+		redColorInput = colorField(colorRow, 'Red', config.redColor || DEFAULT_TIMER_CONFIG.redColor)
+		containerEl.appendChild(colorRow)
+
+		// Border — WO todos10.09.26 follow-up: "timer font with border around characters"
+		// (-webkit-text-stroke; 0 = off, matches the pre-existing look exactly).
+		const borderRow = document.createElement('div')
+		borderRow.style.cssText = 'display:flex;gap:4px;margin-top:4px'
+		const borderWidthWrap = document.createElement('div')
+		borderWidthWrap.style.cssText = 'flex:1;display:flex;flex-direction:column;gap:2px'
+		const borderWidthLab = document.createElement('span')
+		borderWidthLab.className = 'timer-control-panel__settings-label'
+		borderWidthLab.textContent = 'Border (px)'
+		borderWidthInput = document.createElement('input')
+		borderWidthInput.type = 'number'
+		borderWidthInput.min = '0'
+		borderWidthInput.max = '20'
+		borderWidthInput.step = '1'
+		borderWidthInput.className = 'timer-control-panel__settings-input'
+		borderWidthInput.style.cssText = 'width:100%;padding:2px 4px'
+		borderWidthInput.value = String(config.timerBorderWidth ?? DEFAULT_TIMER_CONFIG.timerBorderWidth ?? 0)
+		borderWidthWrap.append(borderWidthLab, borderWidthInput)
+		borderRow.appendChild(borderWidthWrap)
+		borderColorInput = colorField(borderRow, 'Border color', config.timerBorderColor || DEFAULT_TIMER_CONFIG.timerBorderColor)
+		containerEl.appendChild(borderRow)
+	}
 
 	// Position select
 	const positionLabel = document.createElement('div')
@@ -194,6 +282,12 @@ export function buildTimerSettings(containerEl, timer, deps) {
 			posX: posXInput.value.trim() === '' ? '' : Math.round(Number(posXInput.value)),
 			posY: posYInput.value.trim() === '' ? '' : Math.round(Number(posYInput.value)),
 			timerFontSize: Math.max(1, Math.min(100, parseInt(sizeInput.value, 10) || DEFAULT_TIMER_CONFIG.timerFontSize)),
+			...(fontSelect ? { timerFontFamily: fontSelect.value } : null),
+			...(timerColorInput ? { timerColor: timerColorInput.value } : null),
+			...(amberColorInput ? { amberColor: amberColorInput.value } : null),
+			...(redColorInput ? { redColor: redColorInput.value } : null),
+			...(borderWidthInput ? { timerBorderWidth: Math.max(0, Math.min(20, parseInt(borderWidthInput.value, 10) || 0)) } : null),
+			...(borderColorInput ? { timerBorderColor: borderColorInput.value } : null),
 		}
 
 		try {
