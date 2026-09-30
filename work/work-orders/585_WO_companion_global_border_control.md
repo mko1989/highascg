@@ -51,9 +51,9 @@ first web inspector edit does a full re-ADD (a short re-fade) rather than a live
 
 ### 2b. Companion module (`~/companion-module-dev/companion-module-highpass-highascg`)
 Actions (Global border: on/off/toggle, set colour, opacity, width, type, fade, recall preset),
-feedback `global_border_on`, variables `highascg_global_border_<n>_{state,type,color}`, presets
+feedback `global_border_on`, variables `highascg_global_border_<n>_{state,type,color,opacity}`, presets
 "HighAsCG · Global border". Left uncommitted in that repo because it already carries the owner's
-uncommitted playlist/FTB work in the same shared files.
+uncommitted playlist/FTB work in the same shared files (and reuses its `buildScreenDropdown`). Module tests 73/73 (9 new), touched files lint + prettier clean. Companion runs installed bundles from `~/.config/companion/modules/`, so it needs a `yarn package` + import to go live.
 
 ## 3. Verified
 
