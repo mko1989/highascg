@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Frequency Visualization — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-frequency-visualization","name":"Frequency Visualization","common":"","passes":{"image":{"source":"// Frequency Visualization — by rakeshcjadav\n// https://www.shadertoy.com/view/MdVSWG\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/MdVSWG\n// Modified by ArthurTent\n// Created by rakeshcjadav\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\nvec3 B2_spline(vec3 x) { // returns 3 B-spline functions of degree 2\n    vec3 t = 3.0 * x;\n    vec3 b0 = step(0.0, t)     * step(0.0, 1.0-t);\n\tvec3 b1 = step(0.0, t-1.0) * step(0.0, 2.0-t);\n\tvec3 b2 = step(0.0, t-2.0) * step(0.0, 3.0-t);\n\treturn 0.5 * (\n    \tb0 * pow(t, vec3(2.0)) +\n    \tb1 * (-2.0*pow(t, vec3(2.0)) + 6.0*t - 3.0) +\n    \tb2 * pow(3.0-t,vec3(2.0))\n    );\n}\n\nvoid sa_main()\n{\n    // create pixel coordinates\n\t//vec2 uv = fragCoord.xy / iResolution.xy;\n    vec2 uv = vUv;\n\n    float fVBars = 100.;\n    float fHSpacing = 1.00;\n\n    float fHFreq = (uv.x * 3.14);\n\tfloat squarewave = sign(sin(fHFreq*fVBars)+1.0-fHSpacing);\n\n    float x = floor(uv.x * fVBars)/fVBars;\n    float fSample = texture(iChannel0, sa_fft(vec2(abs(2.0 * x - 1.0), 0.25))).x;\n\n\tfloat fft = squarewave * fSample* 0.5;\n\n    float fHBars = 100.0;\n    float fVSpacing = 0.180;\n    float fVFreq = (uv.y * 3.14);\n\tfVFreq = sign(sin(fVFreq * fHBars)+1.0-fVSpacing);\n\n    vec2 centered = vec2(1.0) * uv - vec2(1.0);\n    float t = iTime / 100.0;\n    float polychrome = 1.0;\n    vec3 spline_args = fract(vec3(polychrome*uv.x-t) + vec3(0.0, -1.0/3.0, -2.0/3.0));\n    vec3 spline = B2_spline(spline_args);\n\n    float f = abs(centered.y);\n    vec3 base_color  = vec3(1.0, 1.0, 1.0) - f*spline;\n    vec3 flame_color = pow(base_color, vec3(3.0));\n\n    float tt = 0.3 - uv.y;\n    float df = sign(tt);\n    df = (df + 1.0)/0.5;\n    vec3 col = flame_color * vec3(1.0 - step(fft, abs(0.3-uv.y))) * vec3(fVFreq);\n    col -= col * df * 0.180;\n\n\t// output final color\n\tsa_FragColor = vec4(col,1.0);\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

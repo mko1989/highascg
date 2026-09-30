@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>大龙猫 - Vortex — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-vortex","name":"大龙猫 - Vortex","common":"","passes":{"image":{"source":"// 大龙猫 - Vortex — by totetmatt\n// https://www.shadertoy.com/view/3tdfD2\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/3tdfD2\n// Modified by ArthurTent\n// Created by hunter\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\n#define PI 3.141592\nmat2 rot(float a){\n  float c=cos(a),s=sin(a);\n    return mat2(c,-s,s,c);\n  }\n\n\n\nfloat stargate(vec2 uv,float offset)\n{\n\n  vec2 uuv = uv;\n  uuv*=rot(offset*23.);\n  float c = sin(atan(uuv.x,uuv.y))*.5+.5;\n\tfloat f = texture(iChannel0, sa_fft(vec2(abs(floor(20.*c)/20.)))).r*exp(1.+c)*.10;\n\n  float d = abs(length(uv)-(.4+f*1.5))-.04;\n\n   return d;\n  }\n\n  vec3 pal(float t){\n    return +vec3(.5,.7,.5)+vec3(.5,.7,.5)*cos(2.*PI*(vec3(1.,10.1,1.)*t+vec3(.3,.0,.7)));\n\n    }\n\n    float grid(vec2 uv){\n      return abs(fract(uv.x*10.))<.02 || abs(fract(uv.y*10.))<.02  ? 1.: 0.;\n      }\n\n\n\nvoid sa_main()\n{\n    // Normalized pixel coordinates (from 0 to 1)\n    vec2 fragCoordFromUV = vUv * iResolution.xy;\n    //vec2 uv = (fragCoord-.5*iResolution.xy)/iResolution.y;\n    vec2 uv =  (fragCoordFromUV-.5*iResolution.xy)/iResolution.y;\n\n float tt = texture(iChannel0, sa_fft(vec2(.3,uv.y))).r*.1;\n\n  float d = 1.;\n  float lim = 10.;\n  vec3 col  = vec3(0.);\n  for(float i=0.;i<=lim;++i){\n         float it = i/lim;\n\n          float pit = fract(it+iTime*.1);\n           float qq = tt*25. > pit? tt*50.0:1.;\n          it = mix(50.,.001,pit);\n\n    vec2 coord = (uv-.05*vec2(it*tt*sin(iTime),it*tt *cos(iTime)))*it;\n    float g = pit*grid(uv*it*rot(pit*2.)) * smoothstep(.01,.021,(length(coord)-.55));\n        d = .1/abs(.01+stargate(coord,i/lim));\n        d = (d*3.*g)+d;\n    col += mix(vec3(.1),pal((i/lim)+tt)*pit,d*qq)/lim;\n    }\n\n\n\n\n\n\n    // Output to screen\n    sa_FragColor = vec4(col,1.0);\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

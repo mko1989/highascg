@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Acid blossom visualizer (Sound!) — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-acid-blossom-visualizer-sound","name":"Acid blossom visualizer (Sound!)","common":"","passes":{"image":{"source":"// Acid blossom visualizer (Sound!) — by Forthro\n// https://www.shadertoy.com/view/mlcfW2\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/mlcfW2\n// Modified by ArthurTent\n// Created by Forthro\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\nconst float segmentsNumVariants[] = float[](1.0, 3.0, 7.0, 11.0);\n\nvoid sa_main()\n{\n    vec2 centerCoord =/* iResolution.xy/2.*/iMouse.xy;  /*iMouse.xy*/\n    vec2 uv = vUv;\n    vec2 fragCoordFromUV = uv * iResolution.xy;\n    float normalDist = distance( fragCoordFromUV.xy, centerCoord )\n                     / ( sqrt( 2.0 * iResolution.x * iResolution.x ) * 1.25);\n    float reverseNormalDist = 1.0 - normalDist;\n    vec2 normalCoord =  -1.0 + 2.0 *vUv;\n\n    float sound = texture(iChannel0, sa_fft(vec2( cos( normalDist ), 0.25 ))).r\n                + texture(iChannel0, sa_fft(vec2( sin( normalDist ), 0.25 ))).r;\n\n    float segmentsNum = segmentsNumVariants[ int( floor( sound * 2.0 + normalDist )) ];\n\n    float radialWave = 0.5 + cos( atan( normalCoord.x, normalCoord.y ) * segmentsNum + iTime * 3.0 + cos( sound * 10.0 ) * sound );\n\n    float shiftedTime = iTime - ( normalDist * 7.0 )\n                      + radialWave * sin( pow( reverseNormalDist, reverseNormalDist ) * 50.0 + iTime + sound * sound * 2.0 );\n\n    float waveModulator = 0.35 + sin( normalDist * 20.0 - shiftedTime * 4.0 ) * sound;\n\n    float red = ( 0.25 + cos( shiftedTime + sound * 4.0) / 2.5 ) * waveModulator;\n    float green = 0.75 * waveModulator * ( 0.5 + sin(sound * 7.0 ) / 2.0 );\n    float blue = ( 0.25 + sin( shiftedTime + sound * 4.0 ) / 2.5 ) * waveModulator;\n\n    sa_FragColor = vec4( red, green, blue, 1.0 );\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

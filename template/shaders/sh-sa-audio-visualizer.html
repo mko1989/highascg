@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Audio-Visualizer — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-audio-visualizer","name":"Audio-Visualizer","common":"","passes":{"image":{"source":"// Audio-Visualizer — by CoolerZ\n// https://www.shadertoy.com/view/wd3XzS\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/wd3XzS\n// Modified by ArthurTent\n// Created by CoolerZ\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\nfloat sigmoid(float x)\n{\n    return 1. / (1. + exp(x));\n}\n\nvec3 sigmoid(vec3 xyz)\n{\n    return vec3(sigmoid(xyz.x), sigmoid(xyz.y), sigmoid(xyz.z));\n}\n\nfloat sample_at(float f)\n{\n    return texture(iChannel0, sa_fft(vec2(f / 16.0, 0.))).x;\n}\n\nfloat sample_multiple(float f)\n{\n    float delta = .1;\n    return 0.2 * (sample_at(f - 2. * delta) + sample_at(f - delta) + sample_at(f) + sample_at(f + delta) + sample_at(f + 2. * delta));\n}\n\nvoid sa_main()\n{\n    //vec2 uv = (fragCoord.xy - 0.5) / iResolution.xy;\n    //vec2 uv = vUv - vec2(.5);\n    vec2 uv = -1.0 + 3.0* vUv;\n\n    uv = 2. * uv - 1.;\n    uv.x *= iResolution.x/iResolution.y;\n\n    vec2 center = vec2(0.);// 0.5 * vec2(cos(iTime), sin(iTime));\n    float d = length(uv - center);\n\n    float amplitude = sample_multiple(d * d);\n    d -= amplitude;\n    float weird = sigmoid(abs(uv.x) * abs(uv.y));\n    float speed = 6. * amplitude * sin(iTime * weird * 0.005) * 0.001;\n    float dist_diagonal = abs(abs(uv.x) - abs(uv.y));\n    dist_diagonal += d * amplitude;\n    dist_diagonal *= dist_diagonal;\n    amplitude += .1 / (.1 + smoothstep(1., 0.1, dist_diagonal));\n    float brightness = 3. * amplitude * sigmoid(sin(d * d * 16. - speed * iTime + 2. * speed * amplitude));\n\n    vec3 col = sigmoid(vec3(uv, sin(iTime)));\n\n    sa_FragColor = vec4(col * brightness,1.0);\n}\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

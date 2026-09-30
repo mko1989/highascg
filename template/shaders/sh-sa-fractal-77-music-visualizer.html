@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Fractal 77 Music Visualizer — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-fractal-77-music-visualizer","name":"Fractal 77 Music Visualizer","common":"","passes":{"image":{"source":"// Fractal 77 Music Visualizer — by orblivius\n// https://www.shadertoy.com/view/XXBGzw\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/XXBGzw\n// Modified by ArthurTent\n// Created by orblivius\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\n// Fork of \"Fractal 77_gaz\" by gaz. https://shadertoy.com/view/fdy3WG\n// 2024-02-18 19:18:54\n\n#define R(p,a,r)mix(a*dot(p,a),p,cos(r))+sin(r)*cross(p,a)\n#define H(h)(cos((h)*6.3+vec3(0,23,21))*.5+.5)\nvec3 pow3(vec3 x, int y) {\n    while (y>0) {\n        x*=x;\n        y=y-1;\n    }\n    return x;\n}\nfloat fft(float x) {\n    return texelFetch(iChannel0, sa_fftI(ivec2(128.*x,0)), 0 ).x;\n }\n\nvoid sa_main()\n{\n    sa_FragColor=vec4(0);\n\n    float bass  = texelFetch(iChannel0, sa_fftI(ivec2(1,0)), 0 ).x;\n    bass = clamp((bass-0.5)*2.0,0.0,1.0);\n\n    vec3 p,r=vec3(iResolution.x,iResolution.y,1);\n    vec2 uv = -1. + 2. * vUv;\n    vec3 d = normalize(vec3((bass*2.+uv*r.xy)/r.y,1));\n    for(\n        float i=0.,g=0.,e,s;\n        ++i<99.;\n        sa_FragColor.rgb+=mix(vec3(r/r) ,H(log(s)),.7)*.08*exp(-i*i*e))\n    {\n\n        p=g*d;\n        p.z-=.6;\n        p=R(p,normalize(vec3(1,2,3)),iTime*.3);\n        s=4.;\n        for(int j=0;j++<8;)\n            p=abs(p),p=p.x<p.y?p.zxy:p.zyx,\n            s*=e=1.8/min(dot(p,p),1.3),\n            p=p*e-vec3(12,3,3)+2.*fft((e)/99.);\n        g+=e=length(p.xz)/s;\n\n    }\n    //O=vec4(pow3(O.rgb,2),1.);\n }\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

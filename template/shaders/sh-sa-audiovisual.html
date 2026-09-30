@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>AudioVisual — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-sa-audiovisual","name":"AudioVisual","common":"","passes":{"image":{"source":"// AudioVisual — by Passion\n// https://www.shadertoy.com/view/MsBSzw\n// Ported to ShaderAmp (github.com/ArthurTent/ShaderAmp) by ArthurTent\n// License: Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License — https://creativecommons.org/licenses/by-nc-sa/3.0/\n// Converted for HighAsCG, WO-586 (iAudioData -> audio channel, main -> mainImage wrapper)\n\nvec4 sa_FragColor;\nvec2 sa_fft(vec2 p) { return vec2(p.x, 0.25); } // ShaderAmp FFT is one row\nivec2 sa_fftI(ivec2 p) { return ivec2(p.x, 0); }\n// https://www.shadertoy.com/view/MsBSzw\n// Modified by ArthurTent\n// Created by Passion\n// Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n// https://creativecommons.org/licenses/by-nc-sa/3.0/\nvec2 vUv;\n\nvoid sa_main()\n{\n    //vec2 p = (fragCoord.xy-.5*iResolution.xy)/min(iResolution.x,iResolution.y);\n    //vec2 p =  vUv - .5;\n    vec2 p =  vUv-0.5;\n\n    vec3 c = vec3(0.0);\n    //vec2 uv = fragCoord.xy / iResolution.xy;\n    //vec2 uv = gl_FragCoord.xy / iResolution.xy;\n    //vec2 uv =  -1. + 2.* vUv;\n    vec2 uv =  vUv;\n    float wave = texture(iChannel0, sa_fft(vec2(uv.x,0.75))).x;\n\n    for(int i = 1; i<20; i++)\n    {\n        float time = 2.*3.14*float(i)/20.* (iTime*.9);\n        float x = sin(time)*1.8*smoothstep( 0.0, 0.15, abs(wave - uv.y));\n        float y = sin(.5*time) *smoothstep( 0.0, 0.15, abs(wave - uv.y));\n        y*=.5;\n        vec2 o = .4*vec2(x*cos(iTime*.5),y*sin(iTime*.3));\n        float red = fract(time);\n        float green = 1.-red;\n        c+=0.016/(length(p-o))*vec3(red,green,sin(iTime));\n    }\n    sa_FragColor = vec4(c,1.0);\n}\n//2014 - Passion\n//References  - https://www.shadertoy.com/view/Xds3Rr\n//            - tokyodemofest.jp/2014/7lines/index.html\n\nvoid mainImage(out vec4 fragColor, in vec2 fragCoord) {\n\tvUv = fragCoord / iResolution.xy;\n\tsa_FragColor = vec4(0.0);\n\tsa_main();\n\tfragColor = sa_FragColor;\n}\n","channels":["audio",null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":true},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>
