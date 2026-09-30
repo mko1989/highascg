@@ -4,6 +4,7 @@ const { handleSceneTake } = require('./routes-scene-take')
 const { handleAudioOnlyLookStop } = require('./routes-scene-take-audio-only')
 const { handlePreviewLiveRegister, handlePreviewLiveClear } = require('./routes-scene-preview')
 const { handleBorderLines, handleBorderPresetCrossfade } = require('./routes-scene-border')
+const { handleGlobalBorderControl } = require('./routes-scene-global-border')
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
@@ -25,6 +26,9 @@ async function handlePost(path, body, ctx) {
 	}
 	if (path === '/api/scene/border-preset-crossfade') {
 		return handleBorderPresetCrossfade(body, ctx)
+	}
+	if (path === '/api/scene/global-border') {
+		return handleGlobalBorderControl(body, ctx)
 	}
 	return null
 }

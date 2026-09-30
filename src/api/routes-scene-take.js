@@ -15,6 +15,7 @@ const { runSceneTakeLbg } = require('../engine/scene-take-lbg')
 const { withTakeGroup } = require('../engine/take-sync-barrier')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
+const { withScreenGlobalBorderForChannel } = require('../engine/global-border-control')
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
 const {
 	stripEphemeralTakeFields,
@@ -84,7 +85,8 @@ async function handleSceneTakeInner(body, ctx, sync) {
 	if ((!b.incomingScene || typeof b.incomingScene !== 'object') && sceneIdRaw != null && String(sceneIdRaw).trim()) {
 		const fromProject = resolveSceneById(sceneIdRaw)
 		if (fromProject) {
-			b.incomingScene = fromProject
+			// WO-585: take with the screen's global border slot, like the web UI (not the look's stale copy).
+			b.incomingScene = withScreenGlobalBorderForChannel(fromProject, ctx, channel)
 		}
 	}
 

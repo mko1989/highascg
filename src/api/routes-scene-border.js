@@ -55,19 +55,13 @@ function _normalizeGlobalBorder(border) {
 	}
 }
 
-async function handleBorderLines(body, ctx) {
-	const b = parseBody(body)
-	const channel = parseInt(b.channel, 10)
-	const rawBorder = b.border
-	const isUpdate = !!b.isUpdate
-	const rawLayer = parseInt(b.layer, 10)
-	const layer =
-		Number.isFinite(rawLayer) && rawLayer >= 1 && rawLayer <= 9998 ? rawLayer : GLOBAL_BORDER_LAYER
-
-	if (!channel || channel < 1) {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
-	}
-
+/**
+ * AMCP lines that put `border` on (or fade it off) `channel-layer`, with the live-file write and
+ * post-fade clear side effects. Shared by the web push (`/api/scene/border-lines`, which returns
+ * the lines for the client to run) and server-side control (`routes-scene-global-border.js`).
+ * @returns {string[]}
+ */
+function computeBorderLines(ctx, { channel, layer, border: rawBorder, isUpdate }) {
 	const {
 		buildGlobalBorderAmcpLines,
 		buildGlobalBorderClearLines,
@@ -111,7 +105,20 @@ async function handleBorderLines(body, ctx) {
 			lines = buildGlobalBorderClearLines(channel, layer)
 		}
 	}
+	return lines
+}
 
+async function handleBorderLines(body, ctx) {
+	const b = parseBody(body)
+	const channel = parseInt(b.channel, 10)
+	const rawLayer = parseInt(b.layer, 10)
+	const layer =
+		Number.isFinite(rawLayer) && rawLayer >= 1 && rawLayer <= 9998 ? rawLayer : GLOBAL_BORDER_LAYER
+
+	if (!channel || channel < 1) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel required' }) }
+	}
+	const lines = computeBorderLines(ctx, { channel, layer, border: b.border, isUpdate: !!b.isUpdate })
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ lines }) }
 }
 
@@ -141,6 +148,8 @@ async function handleBorderPresetCrossfade(body, ctx) {
 }
 
 module.exports = {
+	computeBorderLines,
+	cancelPendingBorderClear: _cancelPendingBorderClear,
 	handleBorderLines,
 	handleBorderPresetCrossfade,
 }
