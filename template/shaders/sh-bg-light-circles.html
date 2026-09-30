@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Light Circles — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-light-circles","name":"Light Circles","common":"","passes":{"image":{"source":"// Light Circles — by Deefunct\n// https://www.shadertoy.com/view/MlyGzW\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n\tvec2 uv = 1.5*(2.0*fragCoord.xy - iResolution.xy) / iResolution.y;\n    vec2 mouse = 1.5*(2.0*iMouse.xy - iResolution.xy) / iResolution.y;\n\tvec2 offset = vec2(cos(iTime/2.0)*mouse.x,sin(iTime/2.0)*mouse.y);;\n\n\tvec3 light_color = vec3(0.9, 0.65, 0.5);\n\tfloat light = 0.1 / distance(normalize(uv), uv);\n\t\n\tif(length(uv) < 1.0){\n\t\tlight *= 0.1 / distance(normalize(uv-offset), uv-offset);\n\t}\n\n\tfragColor = vec4(light*light_color, 1.0);\n}\n","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

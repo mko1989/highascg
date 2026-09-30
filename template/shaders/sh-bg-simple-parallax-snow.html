@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Simple parallax snow — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-simple-parallax-snow","name":"Simple parallax snow","common":"","passes":{"image":{"source":"// Simple parallax snow — by fenwick67\n// https://www.shadertoy.com/view/MdXcW8\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\n#define cc vec2(0.5,0.5)\n#define smoothness 1.0\n#define SNOW_COL vec4(1.0,1.0,1.0,1.0)\n#define N_LAYERS 8.0\n#define SNOW_ALPHA 1.0\n#define SPEED 0.3\n#define bg vec4(0.8,0.8,0.9,1.0)\n\nfloat smoothCircle(vec2 position,float relativeSize){\n    float d = distance(cc,position)*2./relativeSize;\n    if (d > 1.0){\n    \treturn 0.0;\n    }\n    else{\n    \treturn clamp(smoothness/d-smoothness,-1.0,1.0);\n    }\n}\n\n// fake random stolen from https://gist.github.com/patriciogonzalezvivo/670c22f3966e662d2f83\nfloat randF(float n){\n    return fract(sin(n) * 43758.5453123);\n}\n\n// used to determine whether to draw a flake in the grid\n// the magic number is just me mashing the keyboard\nbool rand2d(float i, float j, float probability){\n\treturn  (randF(i + j*7.8124861) > probability);\n}\n\n\n// create the grid of circles, with a bunch missing, and fanaggle the sizes a bit\nfloat circleGrid(vec2 position, float spacing, float dotSize){\n    \n    // idx => which dot we are showing in the grid.\n    \n    // check x and y index to see if we should draw it or not.\n    float idx = floor(1./spacing * position.x);\n    float yIdx = floor(1./spacing * position.y);\n\n    // much higher than .06 causes the grid to be obvious\n    if (rand2d(idx,yIdx,0.06)){\n    \treturn 0.0;\n    }\n    \n    // modify the size of the flake a bit\n    float relativeSize = (0.5 + 0.5*randF(yIdx))*dotSize / spacing;\n    \n    return smoothCircle(vec2(\n        fract(1./spacing*position.x),\n        fract(1./spacing*position.y + yIdx)\n    ),relativeSize);\n}\n\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n\tvec2 uv = fragCoord.xy / iResolution.xy;\n    vec2 uvsq = vec2(uv.x* iResolution.x/iResolution.y,uv.y);\n    float amnt = 0.0;\n    \n    float rotX = 0.0;\n    float rotY = 0.0;\n    rotX = -2.0*iMouse.x / iResolution.x;\n    rotY = -2.0*iMouse.y / iResolution.y;\n    \n    \n    for (float i = 0.0; i < N_LAYERS; i ++){\n        float p = 0.5 + ((i+1.) / N_LAYERS)*0.4;\n        // small flakes in bg drawn first with lower speed\n        \n        // the only reason we add \"i\" is so it tweaks the noise called on this position later.\n        vec2 fallPosition = vec2(\n            rotX * (1.0-p) + uvsq.x + i + p*sin(iTime/2.+i)/4.*SPEED,\n            rotY * (1.0-p) + i * 3.0 + uvsq.y + iTime*p/1.*SPEED\n        );\n    \tamnt = amnt + SNOW_ALPHA * circleGrid(fallPosition, 0.06* p, 0.04* p*p); \n    }\n    \n    fragColor = mix(SNOW_COL,bg,1.0-amnt);\n    \n}","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

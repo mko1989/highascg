@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Slowstars 2  ( 197 chars ) — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-slowstars-2-197-chars","name":"Slowstars 2  ( 197 chars )","common":"","passes":{"image":{"source":"// Slowstars 2  ( 197 chars ) — by FabriceNeyret2\n// https://www.shadertoy.com/view/XsVSWG\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\n// inspired from https://www.shadertoy.com/view/MsGXWy\n\n\n/**/     // 197 chars\n\n#define R(r)  fract( 4e4 * sin(2e3 * r) )  // random uniform [0,1[\n\nvoid mainImage( out vec4 O, vec2 U )\n{\n    O -= O;\n    \n    for (float i = 0.; i < 2e2; i ++)\n        O += R(i)/ 1e3         // pos = pos(0)  +  velocity   *  t   ( modulo, to fit screen )\n               / length( fract( R(i+vec2(.1,.2)) + (R(i+vec2(.3,.5))-.5) * iTime/20. ) \n                         - U/iResolution.x );\n    // --- colors\n  //O *= vec4(1,.6,.4,1);\n  //O *= vec4(1,O.x,O.x*O.x,1);\n  //O = sin(40./O); // just for fun\n}\n/**/\n\n\n\n\n/**      // 208 chars\n\n#define R(r)  fract( 4e4 * sin(2e3 * r) )\n\nvoid mainImage(out vec4 O, vec2 U )\n{\n    O -= O;\n    \n    for (float i = 0.; i < 2e2; i ++)\n        O += max( 0., \n                  1.- length( fract( R(i+vec2(.1,.2)) + (R(i+vec2(.3,.5))-.5) * iTime/20. ) \n                              - U/iResolution.x\n                            ) / R(i) * 2e2\n                );\n}\n/**/","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

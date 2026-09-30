@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Electric Sinusoid — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-electric-sinusoid","name":"Electric Sinusoid","common":"","passes":{"image":{"source":"// Electric Sinusoid — by ddoodm\n// https://www.shadertoy.com/view/XdXXzr\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n\tvec2 uv = fragCoord.xy / iResolution.xy;\n\tvec2 mouse = iMouse.xy / iResolution.xy;\n\t\n\tfloat bg = (cos(uv.x*3.14159*2.0) + sin((uv.y)*3.14159)) * 0.15;\n\t\n\tvec2 p = uv*2.0 - 1.0;\n\tp *= 15.0;\n\tvec2 sfunc = vec2(p.x, p.y + 5.0*sin(uv.x*10.0-iTime*2.0 + cos(iTime*7.0) )+2.0*cos(uv.x*25.0+iTime*4.0));\n\tsfunc.y *= uv.x*2.0+0.05;\n\tsfunc.y *= 2.0 - uv.x*2.0+0.05;\n\tsfunc.y /= 0.1; // Thickness fix\n\t\n\tvec3 c = vec3(abs(sfunc.y));\n\tc = pow(c, vec3(-0.5));\n\tc *= vec3(0.3,0.85,1.0);\n\t//c += vec3(bg, bg*0.8, bg*0.4);\n\n\tfragColor = vec4(c,1.0);\n}","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

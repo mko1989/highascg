@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Perlin Water Noise — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-perlin-water-noise","name":"Perlin Water Noise","common":"","passes":{"image":{"source":"// Perlin Water Noise — by jackdavenport\n// https://www.shadertoy.com/view/Mt2SzR\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\nfloat random(float x) {\n \n    return fract(sin(x) * 10000.);\n          \n}\n\nfloat noise(vec2 p) {\n\n    return random(p.x + p.y * 10000.);\n            \n}\n\nvec2 sw(vec2 p) { return vec2(floor(p.x), floor(p.y)); }\nvec2 se(vec2 p) { return vec2(ceil(p.x), floor(p.y)); }\nvec2 nw(vec2 p) { return vec2(floor(p.x), ceil(p.y)); }\nvec2 ne(vec2 p) { return vec2(ceil(p.x), ceil(p.y)); }\n\nfloat smoothNoise(vec2 p) {\n\n    vec2 interp = smoothstep(0., 1., fract(p));\n    float s = mix(noise(sw(p)), noise(se(p)), interp.x);\n    float n = mix(noise(nw(p)), noise(ne(p)), interp.x);\n    return mix(s, n, interp.y);\n        \n}\n\nfloat fractalNoise(vec2 p) {\n\n    float x = 0.;\n    x += smoothNoise(p      );\n    x += smoothNoise(p * 2. ) / 2.;\n    x += smoothNoise(p * 4. ) / 4.;\n    x += smoothNoise(p * 8. ) / 8.;\n    x += smoothNoise(p * 16.) / 16.;\n    x /= 1. + 1./2. + 1./4. + 1./8. + 1./16.;\n    return x;\n            \n}\n\nfloat movingNoise(vec2 p) {\n \n    float x = fractalNoise(p + iTime);\n    float y = fractalNoise(p - iTime);\n    return fractalNoise(p + vec2(x, y));   \n    \n}\n\n// call this for water noise function\nfloat nestedNoise(vec2 p) {\n    \n    float x = movingNoise(p);\n    float y = movingNoise(p + 100.);\n    return movingNoise(p + vec2(x, y));\n    \n}\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n\tvec2 uv = fragCoord.xy / iResolution.xy;\n    float n = nestedNoise(uv * 6.);\n    \n\tfragColor = vec4(mix(vec3(.4, .6, 1.), vec3(.1, .2, 1.), n), 1.);\n}","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

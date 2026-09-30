@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Worley Algorithm (Cell Noise ) — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-worley-algorithm-cell-noise","name":"Worley Algorithm (Cell Noise )","common":"","passes":{"image":{"source":"// Worley Algorithm (Cell Noise ) — by Yeis\n// https://www.shadertoy.com/view/Xl33Wn\n// License: CC-BY-NC-SA-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\nfloat length2(vec2 p){\n    //producto punto entre los 2 vectore vx*vx + vY*vY\n    return dot(p,p);\n}\nfloat noise(vec2 p )\n{\n    //funcion de ruido pseudo-aleatoria basada en la funcio seno \n    return fract(cos(fract(sin(p.x)*(41.13311))+ p.y)*31.0011);\n}\n\nfloat worley(vec2 p) {\n    //ponemos un numero grandote \n float d = 1e30;\n    //checamos todos los puntos vecinos en 9 direcciones \n for (int xo = -1; xo <= 1; ++xo) {\n  for (int yo = -1; yo <= 1; ++yo) {\n   vec2 tp = floor(p) + vec2(xo, yo);\n   d = min(d, length2(p - tp - noise(tp)));\n  }\n }\n    //funcion exponencial mamona 3.0*exp(-4.0*abs(2.0*d - 1.0)).\n  return 3.0*exp(-4.0*abs((2.5*d)-1.0));\n}\n\nfloat fworley(vec2 p)\n{\n    return sqrt(sqrt(sqrt(worley(p * 5.0 + 0.05 * iTime) * \n                          sqrt(worley(p*50.0+ 0.12+ -0.1*iTime)) *\n                         sqrt(sqrt(worley(p*-10.0+00.03*iTime))))));\n}\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n vec2 uv = fragCoord.xy / iResolution.xy;\n    float wolo = fworley(uv*iResolution.xy / 1500.0);\n    //Repeat the grid pattern 5 times by multiplying by uv.\n \twolo *= exp(-length2(abs(0.7*uv-1.0)));\n    fragColor = vec4(wolo * vec3(.1, 0.5*wolo, pow(wolo, 0.50-wolo)), 1.0);\n}\n\n//link http://ibreakdownshaders.blogspot.mx/","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

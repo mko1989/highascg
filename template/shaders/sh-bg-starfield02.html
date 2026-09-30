@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>StarField02 — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-starfield02","name":"StarField02","common":"","passes":{"image":{"source":"// StarField02 — by xaot88\n// https://www.shadertoy.com/view/MdSXRd\n// License: cc-by-nc-sa-3.0 (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\n// License Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.\n\n#define HASHSCALE1 .1031\n\n//From Dave_Hoskins (https://www.shadertoy.com/view/4djSRW)\nfloat hash12(vec2 p)\n{\n\tvec3 p3  = fract(vec3(p.xyx) * HASHSCALE1);\n    p3 += dot(p3, p3.yzx + 19.19);\n    return fract((p3.x + p3.y) * p3.z);\n}\n\n// Convert Noise2d() into a \"star field\" by stomping everthing below fThreshhold to zero.\nfloat NoisyStarField( in vec2 vSamplePos, float fThreshhold )\n{\n    float StarVal = hash12( vSamplePos );\n    if ( StarVal >= fThreshhold )\n        StarVal = pow( (StarVal - fThreshhold)/(1.0 - fThreshhold), 6.0 );\n    else\n        StarVal = 0.0;\n    return StarVal;\n}\n\n// Stabilize NoisyStarField() by only sampling at integer values.\nfloat StableStarField( in vec2 vSamplePos, float fThreshhold )\n{\n    // Linear interpolation between four samples.\n    // Note: This approach has some visual artifacts.\n    // There must be a better way to \"anti alias\" the star field.\n    float fractX = fract( vSamplePos.x );\n    float fractY = fract( vSamplePos.y );\n    vec2 floorSample = floor( vSamplePos );    \n    float v1 = NoisyStarField( floorSample, fThreshhold );\n    float v2 = NoisyStarField( floorSample + vec2( 0.0, 1.0 ), fThreshhold );\n    float v3 = NoisyStarField( floorSample + vec2( 1.0, 0.0 ), fThreshhold );\n    float v4 = NoisyStarField( floorSample + vec2( 1.0, 1.0 ), fThreshhold );\n\n    float StarVal =   v1 * ( 1.0 - fractX ) * ( 1.0 - fractY )\n        \t\t\t+ v2 * ( 1.0 - fractX ) * fractY\n        \t\t\t+ v3 * fractX * ( 1.0 - fractY )\n        \t\t\t+ v4 * fractX * fractY;\n\treturn StarVal;\n}\n\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord )\n{\n\t// Sky Background Color\n\tvec3 vColor = vec3( 0.1, 0.2, 0.4 ) * fragCoord.y / iResolution.y;\n\n    // Note: Choose fThreshhold in the range [0.99, 0.9999].\n    // Higher values (i.e., closer to one) yield a sparser starfield.\n    float StarFieldThreshhold = 0.97;\n\n    // Stars with a slow spin.\n    float fSpinRate = 0.001;\n    vec2 vInputPos = ( 2.0 * fragCoord.xy/iResolution.y ) - vec2( 1.0, 1.0 );\n    float fSampleAngle = fSpinRate * float( iFrame ) + atan( vInputPos.y, vInputPos.x );\n    vec2 vSamplePos = ( 0.5 * length( vInputPos ) * vec2( cos( fSampleAngle ), sin( fSampleAngle ) ) + vec2( 0.5, 0.5 ) ) * iResolution.y;\n    float StarVal = StableStarField( vSamplePos, StarFieldThreshhold );\n    vColor += vec3( StarVal );\n\t\n\tfragColor = vec4(vColor, 1.0);\n}\n\n","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>

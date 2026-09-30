@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Perlin noise fire — HighAsCG Shader FX</title>
+	<style>
+		html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+		#shaderfx-canvas { display: block; width: 100vw; height: 100vh; }
+	</style>
+</head>
+<body>
+	<canvas id="shaderfx-canvas"></canvas>
+	<script>window.__SHADERFX_CONFIG__ = {"id":"sh-bg-perlin-noise-fire","name":"Perlin noise fire","common":"","passes":{"image":{"source":"// Perlin noise fire — by BenWheatley\n// https://www.shadertoy.com/view/MsdyDN\n// License: mit (as detected by the Vipitis/shadertoys-dataset annotator)\n// Imported for HighAsCG as a background, WO-587\n\n/*\n * \"Fire\" by Ben Wheatley - 2018\n * License MIT License\n * Contact: github.com/BenWheatley\n */\n\n// constants\nconst int MAX_OCTAVE = 8;\nconst float PI = 3.14159265359;\n\nfloat cosineInterpolate(float a, float b, float x) {\n\tfloat ft = x * PI;\n\tfloat f = (1.0 - cos(ft)) * 0.5;\n\t\n\treturn a*(1.0-f) + b*f;\n}\n\nfloat seededRandom(float seed) {\n    int x = int(seed);\n    x = x << 13 ^ x;\n    x = (x * (x * x * 15731 + 789221) + 1376312589);\n    x = x & 0x7fffffff;\n    return float(x)/1073741824.0;\n}\n\n// The magic constants are essentially arbitary:\n// they define the scale of the largest component of the Perlin noise\nfloat perlinNoise(float x_arg, float y_arg, float time_arg) {\n    float sum = 0.0;\n    for (int octave=0; octave<MAX_OCTAVE; ++octave) {\n        float sf = pow(2.0, float(octave));\n        float x = x_arg*sf;\n    \tfloat y = (y_arg*sf) + (1.5*time_arg*log2(sf));\n    \tfloat y_scale = 1.0*sf;\n        \n\t\tfloat x_floor = floor(x);\n\t\tfloat y_floor = floor(y);\n\t\tfloat fraction_x = x - x_floor;\n\t\tfloat fraction_y = y - y_floor;\n        \n        float t1 = seededRandom( x_floor\t+\ty_scale *  y_floor      );\n\t\tfloat t2 = seededRandom( x_floor\t+\ty_scale * (y_floor+1.0) );\n        \n        x_floor += 1.0;\n        float t3 = seededRandom( x_floor\t+\ty_scale *  y_floor      );\n\t\tfloat t4 = seededRandom( x_floor\t+\ty_scale * (y_floor+1.0) );\n        \n\t\tfloat i1 = cosineInterpolate(t1, t2, fraction_y);\n\t\tfloat i2 = cosineInterpolate(t3, t4, fraction_y);\n        \n        sum += cosineInterpolate(i1, i2, fraction_x)/sf;\n    }\n    return 2.0*sum;\n}\n\n// main\nvoid mainImage( out vec4 fragColor, in vec2 fragCoord ) {\n    vec2 uv = fragCoord.xy / iResolution.xy;\n    \n    float dx = 0.5 - uv.x;\n    float dy = 0.5 - uv.y;\n    dy *= iResolution.y / iResolution.x;\n    \n    float c = perlinNoise(dx, dy, iTime);\n    // Fiddle with brightness and contrast to push it into a nice range\n    c -= 2.4;\n    c *= cos(dx*PI); // This also makes it central in the image\n    c *= 1.0-((uv.y/iResolution.y)*256.0);\n    \n    float red = c*0.9;\n    float green =  c*(dy+0.25); // This makes it more yellow towards the bottom\n    \n    fragColor = vec4(red, green, 0, 0);\n}","channels":[null,null,null,null]},"bufferA":null,"bufferB":null,"bufferC":null,"bufferD":null},"audio":{"enabled":false},"opts":{"alpha":false}}</script>
+	<script src="ShaderToyLite.js"></script>
+	<script src="player.js"></script>
+</body>
+</html>
