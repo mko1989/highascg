@@ -20,6 +20,7 @@ const LS = {
 	channelsEnabled: 'highascg_led_test_channels_enabled',
 	pattern: 'highascg_led_test_pattern',
 	charCount: 'highascg_led_test_char_count',
+	builderSpeed: 'highascg_led_test_builder_speed',
 }
 
 function loadGridByChannel() {
@@ -45,7 +46,7 @@ function loadChannelsEnabled() {
 }
 
 /**
- * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean>, channelsEnabled: Record<string, boolean>, pattern: string, charCount: number }}
+ * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean>, channelsEnabled: Record<string, boolean>, pattern: string, charCount: number, builderSpeed: number }}
  */
 export function getLedTestSettings(stateStore) {
 	return {
@@ -63,6 +64,7 @@ export function getLedTestSettings(stateStore) {
 		channelsEnabled: loadChannelsEnabled(),
 		pattern: localStorage.getItem(LS.pattern) || 'grid-white',
 		charCount: Math.max(1, Math.min(48, parseInt(localStorage.getItem(LS.charCount) || '3', 10) || 3)),
+		builderSpeed: Math.max(1, Math.min(10, parseInt(localStorage.getItem(LS.builderSpeed) || '3', 10) || 3)),
 	}
 }
 
@@ -88,6 +90,7 @@ export function saveLedTestSettings(s) {
 	}
 	localStorage.setItem(LS.pattern, s.pattern || 'grid-white')
 	localStorage.setItem(LS.charCount, String(Math.max(1, Math.min(48, s.charCount || 1))))
+	localStorage.setItem(LS.builderSpeed, String(Math.max(1, Math.min(10, s.builderSpeed || 3))))
 }
 
 /**
@@ -186,6 +189,9 @@ export function showLedTestModal(onApplied, stateStore) {
 					<div class="led-test-modal__full" id="led-test-char-wrap" hidden>
 						<label><span id="led-test-char-label">Bouncing HighAsCG characters</span> <input type="number" id="led-test-char-count" min="1" max="48" step="1" /></label>
 					</div>
+					<div class="led-test-modal__full" id="led-test-builder-speed-wrap" hidden>
+						<label>Builder speed (1 slow – 10 fast) <input type="number" id="led-test-builder-speed" min="1" max="10" step="1" /></label>
+					</div>
 				</div>
 				<div class="led-test-modal__section">
 					<div class="led-test-modal__section-title">Full LED grid (per channel)</div>
@@ -225,6 +231,8 @@ export function showLedTestModal(onApplied, stateStore) {
 	const charWrap = modal.querySelector('#led-test-char-wrap')
 	const charCountInp = modal.querySelector('#led-test-char-count')
 	const charLabel = modal.querySelector('#led-test-char-label')
+	const builderSpeedWrap = modal.querySelector('#led-test-builder-speed-wrap')
+	const builderSpeedInp = modal.querySelector('#led-test-builder-speed')
 	const builderOpt = patternSel.querySelector('option[value="led-builder"]')
 
 	cols.value = String(s.cols)
@@ -239,10 +247,12 @@ export function showLedTestModal(onApplied, stateStore) {
 	crossCb.checked = s.showCross !== false
 	patternSel.value = s.pattern || 'grid-white'
 	charCountInp.value = String(s.charCount ?? 3)
+	builderSpeedInp.value = String(s.builderSpeed ?? 3)
 
 	function syncBouncingCharUi() {
 		const builder = patternSel.value === 'led-builder'
 		charWrap.hidden = !builder && patternSel.value !== 'bouncing-element'
+		builderSpeedWrap.hidden = !builder
 		charLabel.textContent = builder ? 'Builder bunnies' : 'Bouncing HighAsCG characters'
 	}
 
@@ -311,6 +321,7 @@ export function showLedTestModal(onApplied, stateStore) {
 			channelsEnabled: nextShow,
 			pattern: patternSel.value,
 			charCount: Math.max(1, Math.min(48, parseInt(charCountInp.value, 10) || 1)),
+			builderSpeed: Math.max(1, Math.min(10, parseInt(builderSpeedInp.value, 10) || 3)),
 		}
 	}
 
@@ -339,7 +350,7 @@ export function showLedTestModal(onApplied, stateStore) {
 		labelDebounce = setTimeout(() => persistAndApply(), 300)
 	}
 
-	for (const el of [cols, rows, pw, ph, charCountInp]) {
+	for (const el of [cols, rows, pw, ph, charCountInp, builderSpeedInp]) {
 		el.addEventListener('change', () => persistAndApply())
 		attachMathInput(el, { decimals: 0 })
 	}

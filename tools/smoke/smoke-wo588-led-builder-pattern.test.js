@@ -44,8 +44,18 @@ describe('WO-588 builder helpers', () => {
 		assert.equal(ledBuilderSide(0, 1, 1), 1)
 	})
 
-	it('cycles red → green → blue → white', () => {
-		assert.match(BUILDER, /var BUILDER_COLORS = \['#ff0000', '#00ff00', '#0000ff', '#ffffff'\]/)
+	it('cycles half-level red → green → blue, no white (owner: full colours too bright)', () => {
+		assert.match(BUILDER, /var BUILDER_COLORS = \['#800000', '#008000', '#000080'\]/)
+	})
+
+	it('maps the 1–10 speed setting to a 0.1–1 pace, default 3', () => {
+		const { ledBuilderPace } = loadBuilder()
+		assert.equal(ledBuilderPace(1), 0.1)
+		assert.equal(ledBuilderPace(10), 1)
+		assert.equal(ledBuilderPace(25), 1)
+		assert.equal(ledBuilderPace(undefined), 0.3)
+		assert.equal(ledBuilderPace('x'), 0.3)
+		assert.equal(ledBuilderPace(0), 0.3)
 	})
 })
 
@@ -65,6 +75,14 @@ describe('WO-588 template wiring', () => {
 	})
 })
 
+describe('WO-588 route', () => {
+	it('passes builderSpeed (clamped 1–10, default 3) to the grid payload', () => {
+		const route = read('src/api/routes-led-test-card.js')
+		assert.match(route, /const builderSpeed = Math\.max\(1, Math\.min\(10, parseInt\(b\.builderSpeed, 10\) \|\| 3\)\)/)
+		assert.match(route, /charCount,\s*builderSpeed,\s*\}/)
+	})
+})
+
 describe('WO-588 modal', () => {
 	const modal = read('client/components/led-test-modal.js')
 
@@ -76,5 +94,10 @@ describe('WO-588 modal', () => {
 		assert.match(modal, /builderOpt\.disabled = !anyGrid/)
 		assert.match(modal, /if \(!anyGrid && patternSel\.value === 'led-builder'\) \{\s*patternSel\.value = 'grid-white'/)
 		assert.match(modal, /syncBuilderAvailability\(\)\s*persistAndApply\(\)/)
+	})
+
+	it('has a builder speed field, shown only for the builder', () => {
+		assert.match(modal, /id="led-test-builder-speed" min="1" max="10"/)
+		assert.match(modal, /builderSpeedWrap\.hidden = !builder/)
 	})
 })

@@ -66,6 +66,8 @@ async function handlePost(path, body, ctx) {
 
 		const showLedGrid = b.showLedGrid === true
 		const charCount = Math.max(1, Math.min(48, parseInt(b.charCount, 10) || 1))
+		/* WO-588: bunny-builder pace 1–10 (template maps it to 0.1–1× of the original speed). */
+		const builderSpeed = Math.max(1, Math.min(10, parseInt(b.builderSpeed, 10) || 3))
 		const showCircle = b.showCircle !== false && b.showCircle !== 'false'
 		const showCross = b.showCross !== false && b.showCross !== 'false'
 		let ipLines = b.ipLines
@@ -151,6 +153,7 @@ async function handlePost(path, body, ctx) {
 					ipLines,
 					pattern: b.pattern || 'grid-white',
 					charCount,
+					builderSpeed,
 				}
 			: {
 					showLedGrid: false,

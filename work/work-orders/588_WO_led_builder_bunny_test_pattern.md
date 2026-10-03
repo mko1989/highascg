@@ -1,6 +1,6 @@
 # WO-588 — LED test pattern: "Bunny builds the wall" (full LED grid only)
 
-**Status: IMPLEMENTED 03.10.26 — rendered and colour-cycle probed in headless Chrome through the real template; offline smoke 7/7; client rebuilt + kiosk reloaded. Not yet seen on a real LED wall (§3).**
+**Status: IMPLEMENTED 03.10.26, round 2 same day (§4: speed setting, darker colours, no white). Rendered and probed in headless Chrome through the real template; offline smoke 10/10; client rebuilt, kiosk reloaded, server restarted. Not yet seen on a real LED wall.**
 
 Owner, 03.10: *"create a new test card pattern where the main character from the logo highascg bunny is building the test pattern for the led wall. so it should only be available when full led grid is on. by building i mean the character should come into the canvas from outside carrying a led panel and placing it in its place. lets say it starts with gray panels like right now the test pattern has, and the character replaces the panels into another color (red for instance), when he is done with all panels he changes the color to another one."*
 
@@ -38,3 +38,19 @@ No server change: `routes-led-test-card.js` already passes `pattern`, `cols`, `r
   - On a real LED wall via Caspar's CEF: smoothness at the channel frame rate, and how the bunny reads at small cell sizes. 20×10 on 1080p gives a ~124 px bunny.
   - Whether full-white phases on a big wall are wanted (power/brightness). Dropping white is a one-line edit to `BUILDER_COLORS`.
   - The modal gate in the real UI: untick every Full LED grid box and the option greys out.
+
+## 4. Round 2 (03.10) — speed setting, darker colours, no white
+
+Owner, after the first look: *"its way too quick. needs a speed setting. no need for the full white it would be too bright. the red is also too bright. it shouldnt be full colors but rather darker versions."*
+
+**Done:**
+- **Colours**: `BUILDER_COLORS = ['#800000', '#008000', '#000080']` (half-level primaries). White is removed, so the cycle is gray → red → green → blue → red …. The drop flash went from 70 % to 30 % white for the same reason.
+- **Speed setting** `builderSpeed` 1–10, default **3**. `ledBuilderPace(level) = level / 10`, so 10 is the round-1 pace (the "way too quick" one) and 3 is 0.3×. Walk speed scales by the pace. Placing, the pause between colours and the stagger between bunnies are divided by it. The hop rate scales by √pace so a slow walk doesn't look like slow motion. Blinks stay real-time.
+- **Modal**: *Builder speed (1 slow – 10 fast)* number field, shown only for this pattern and stored in `highascg_led_test_builder_speed`. `led-test-apply.js` already spreads all settings into the POST, so it needed no change.
+- **Route** (`routes-led-test-card.js`): it builds an explicit payload, so `builderSpeed` (clamped 1–10, default 3) is now added to the grid payload. **Server change → service restarted.**
+
+**Verified:**
+- Headless Chrome, 1920×1080, 8×4, 3 bunnies, wall-canvas probe of all 32 cells once a second. Whole wall red at **20.0 s with speed 10** and **66.2 s at the default** (3.3×, as designed). Colours seen across 90 s: only the two gray gradient tones, `128,0,0` and `0,128,0`; no white. Frame at 12 s: dark-red panels, bunnies carrying.
+- Route exercised offline with a stubbed AMCP: `builderSpeed` 7 → 7, missing → 3, 99 → 10, both in the response and in the CG ADD data.
+- Smoke 10/10 (+ pace mapping, route pin, modal field). Full curated suite: 2553 tests, 2550 pass, 1 fail, which is the same unrelated `data/shaders/sh-sa-fluidic-space.json` failure as §3. 0 files over 500 lines; no new lint warnings. Client rebuilt (`led-test-builder-speed` is in the bundle), kiosk reloaded, `highascg` restarted (PID 2621 → 74632, `/api/state` 200). A live test card was not put up from here, because that would go on air.
+- **Owner QA**: pick a speed on the wall, and check that 50 % colours are dark enough. They are a single constant, so 40 % / 30 % is a one-line change.

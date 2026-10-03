@@ -4,19 +4,29 @@
  * The HighAsCG bunny walks in from outside the canvas carrying an LED panel, slides it into its
  * cell, and walks back out for the next one. The wall starts in the default dark-gray panel look;
  * every panel is replaced with the phase colour, and once the whole wall is done the next colour
- * starts (red → green → blue → white → red …). `charCount` = number of bunnies working at once.
+ * starts (red → green → blue → red …). `charCount` = number of bunnies working at once,
+ * `builderSpeed` 1–10 = pace (10 = the original pace, which the owner found way too quick).
  *
  * Two canvases: the panel colours sit in #patternLayer UNDER the #root grid (so R×C labels and
  * seams stay on top, like every other pattern); bunnies + carried panels + drop flashes sit on a
  * transparent canvas ABOVE everything. Loaded between led_grid_test.js and -render.js.
  */
 
-var BUILDER_COLORS = ['#ff0000', '#00ff00', '#0000ff', '#ffffff']
+/* Half-level primaries: full red/white was too bright on the wall (owner, 03.10). */
+var BUILDER_COLORS = ['#800000', '#008000', '#000080']
 var BUILDER_MAX_WORKERS = 12
 var BUILDER_PLACE_S = 0.28
 var BUILDER_FLASH_S = 0.3
 var BUILDER_PHASE_PAUSE_S = 1.2
+var BUILDER_DEFAULT_SPEED = 3
 var builderRaf = null
+
+/** Speed setting 1–10 → pace multiplier 0.1–1 (missing/invalid = the default). */
+function ledBuilderPace(level) {
+	var n = parseInt(level, 10)
+	if (!(n >= 1)) n = BUILDER_DEFAULT_SPEED
+	return Math.min(10, n) / 10
+}
 
 /** Build order: bottom row first (walls go up), left → right. Returns [{ c, r }] (0-based). */
 function ledBuilderOrder(cols, rows) {
@@ -81,7 +91,11 @@ function renderBunnyBuilder(layer, data) {
 	/* Bunny scales with the panel it carries, but never dwarfs (or vanishes from) the screen. */
 	var bunnyH = Math.max(32, Math.min(cellH * 1.15, H * 0.4))
 	var bunnyW = bunnyH * (512 / 666)
-	var speed = Math.max(W * 0.45, cellW * 2.5)
+	var pace = ledBuilderPace(data.builderSpeed)
+	var speed = Math.max(W * 0.45, cellW * 2.5) * pace
+	var placeS = BUILDER_PLACE_S / pace
+	var staggerS = 0.45 / pace
+	var hopRate = 9 * Math.sqrt(pace)
 
 	function cellRect(c, r) {
 		var x0 = Math.round(c * cellW)
@@ -119,7 +133,7 @@ function renderBunnyBuilder(layer, data) {
 	var nWorkers = Math.max(1, Math.min(BUILDER_MAX_WORKERS, order.length, parseInt(data.charCount, 10) || 1))
 	var workers = []
 	for (var i = 0; i < nWorkers; i++) {
-		workers.push({ state: 'idle', wait: i * 0.45, hop: Math.random() * 6, blinkIn: 2 + Math.random() * 5, blinkT: 0 })
+		workers.push({ state: 'idle', wait: i * staggerS, hop: Math.random() * 6, blinkIn: 2 + Math.random() * 5, blinkT: 0 })
 	}
 
 	function phaseColor() {
@@ -145,7 +159,7 @@ function renderBunnyBuilder(layer, data) {
 	}
 
 	function stepWorker(w, dt) {
-		w.hop += dt * 9
+		w.hop += dt * hopRate
 		w.blinkIn -= dt
 		if (w.blinkIn <= 0) {
 			w.blinkT = 0.24
@@ -174,7 +188,7 @@ function renderBunnyBuilder(layer, data) {
 		}
 		if (w.state === 'place') {
 			w.t += dt
-			if (w.t >= BUILDER_PLACE_S) {
+			if (w.t >= placeS) {
 				paintCell(w.cell.c, w.cell.r, w.color)
 				flashes.push({ rect: w.rect, t: 0 })
 				w.bx = bunnyX(w)
@@ -240,13 +254,13 @@ function renderBunnyBuilder(layer, data) {
 		var j, f
 		for (j = flashes.length - 1; j >= 0; j--) {
 			f = flashes[j]
-			act.fillStyle = 'rgba(255, 255, 255, ' + (0.7 * (1 - f.t / BUILDER_FLASH_S)).toFixed(3) + ')'
+			act.fillStyle = 'rgba(255, 255, 255, ' + (0.3 * (1 - f.t / BUILDER_FLASH_S)).toFixed(3) + ')'
 			act.fillRect(f.rect.x, f.rect.y, f.rect.w, f.rect.h)
 		}
 		for (j = 0; j < workers.length; j++) {
 			var w = workers[j]
 			if (w.state !== 'in' && w.state !== 'place') continue
-			var settle = w.state === 'place' ? 1 - Math.min(1, w.t / BUILDER_PLACE_S) : 1
+			var settle = w.state === 'place' ? 1 - Math.min(1, w.t / placeS) : 1
 			var bob = w.state === 'in' ? Math.abs(Math.sin(w.hop)) * bunnyH * 0.06 : 0
 			drawPanel(w.rect, w.px, w.rect.y - bob - settle * cellH * 0.04, w.color, settle)
 		}
@@ -274,10 +288,10 @@ function renderBunnyBuilder(layer, data) {
 		if (allDone) {
 			phase++
 			nextIdx = 0
-			pauseLeft = BUILDER_PHASE_PAUSE_S
+			pauseLeft = BUILDER_PHASE_PAUSE_S / pace
 			for (j = 0; j < workers.length; j++) {
 				workers[j].state = 'idle'
-				workers[j].wait = j * 0.45
+				workers[j].wait = j * staggerS
 			}
 		}
 		draw()
