@@ -20,7 +20,8 @@ const templates = [
     'lt-underline-reveal',
     'lt-tag-badge',
     'lt-gradient-wave',
-    'lt-corner-bracket'
+    'lt-corner-bracket',
+    'lt-confetti-center'
 ];
 
 async function generateThumbnails() {

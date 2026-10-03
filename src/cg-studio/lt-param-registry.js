@@ -158,6 +158,13 @@ function getDefaultPayload(templateId) {
 		payload.style.titleFontSize = 42
 		payload.style.subtitleFontSize = 18
 	}
+	if (templateId === 'lt-confetti-center') {
+		// Always screen-centered; position/margins are ignored by the template itself.
+		payload.style.position = 'center'
+		payload.style.titleFontSize = 76
+		payload.style.subtitleFontSize = 30
+		payload.style.titleFontWeight = '800'
+	}
 	if (templateId === 'lt-classic-box') {
 		payload.style.titleFontSize = 46
 		payload.style.subtitleFontSize = 27

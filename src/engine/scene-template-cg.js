@@ -79,6 +79,7 @@ const DEFAULT_CG_DATA_BY_TEMPLATE = {
 	'lower-thirds/lt-tag-badge': DEFAULT_LT_CG_DATA,
 	'lower-thirds/lt-gradient-wave': DEFAULT_LT_CG_DATA,
 	'lower-thirds/lt-corner-bracket': DEFAULT_LT_CG_DATA,
+	'lower-thirds/lt-confetti-center': DEFAULT_LT_CG_DATA,
 }
 
 /**

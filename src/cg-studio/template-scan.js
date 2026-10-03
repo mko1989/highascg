@@ -20,6 +20,7 @@ const BUILTIN_NAMES = {
 	'lt-tag-badge': 'Tag Badge',
 	'lt-gradient-wave': 'Gradient Wave',
 	'lt-corner-bracket': 'Corner Bracket',
+	'lt-confetti-center': 'Confetti Center',
 }
 
 /**
