@@ -1,6 +1,6 @@
 # WO-589 — Lower-thirds engine template: "Confetti Center" (screen-centered, confetti on title reveal)
 
-**Status: IMPLEMENTED 03.10.26 — rendered in headless Chrome through the real engine (centering, burst, studio hold-in, stop mid-burst, replay all probed); offline suite has one unrelated failure (§3). Server not restarted; owner: look at it on PRV/PGM through Caspar CEF.**
+**Status: IMPLEMENTED 03.10.26, round 2 same day (§4: no box, no underline) — rendered in headless Chrome through the real engine (centering, burst, studio hold-in, stop mid-burst, replay all probed); offline suite has one unrelated failure (§3). Server not restarted; owner: look at it on PRV/PGM through Caspar CEF.**
 
 Owner, 03.10: *"i need a template based on the lower thirds engine that is centered on the screen and has a confeti animation on the title reveal"*
 
@@ -39,3 +39,15 @@ Headless Chrome (`src/media/headless-chrome-cdp`), real template file:
 - Prettier `--check` warns on `routes-lower-thirds.js`, `lt-param-registry.js` and `scene-template-cg.js`, but those three already warn at HEAD (pre-existing). `template-scan.js` stays clean.
 
 **Owner QA:** load it on a channel through Caspar CEF, check confetti smoothness at broadcast frame rate, and decide whether the confetti should sit above the card (current) or behind it.
+
+## 4. Round 2 (03.10): no box, no underline
+
+Owner: *"no box underneath the name and title and also no underline"*.
+
+- Removed the card (background, radius, shadow, padding/min-width) and the `.rule` element plus its tween. Because the dark card no longer sits behind the text, the title and subtitle get a two-layer text shadow (tight 2–4 px + soft 12–18 px) so they stay legible over arbitrary video.
+- The reveal is now: title pops (`back.out`), confetti fires 0.12 s in, subtitle rises at +0.35 s. The card-unfold step is gone (nothing left to unfold), so `animateIn` resolves at ~0.8 s.
+- **Re-verified** in headless Chrome over a blue→gold→white gradient background:
+  - center still (960, 540) with `position: left` + margins passed in;
+  - no errors; text legible on dark and light areas;
+  - confetti px: hold-in 0 / mid-burst ~13 000 / after stop 0 / replay ~12 000.
+- Thumbnail regenerated.

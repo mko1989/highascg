@@ -25,12 +25,8 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
-            min-width: 560px;
-            max-width: 1500px;
-            padding: 34px 80px 30px;
-            background: rgba(12, 12, 24, 0.78);
-            border-radius: 16px;
-            box-shadow: 0 18px 60px rgba(0,0,0,0.45);
+            gap: 10px;
+            max-width: 1700px;
             opacity: 0;
         }
         h1 {
@@ -39,14 +35,7 @@
             color: var(--text, #fff);
             letter-spacing: 0.01em;
             line-height: 1.1;
-            text-shadow: 0 4px 16px rgba(0,0,0,0.5);
-        }
-        .rule {
-            width: 140px;
-            height: 5px;
-            margin: 16px 0 14px;
-            border-radius: 3px;
-            background: var(--primary, #ffc107);
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 4px 18px rgba(0,0,0,0.55);
         }
         p {
             font-size: 30px;
@@ -54,6 +43,7 @@
             color: var(--primary, #ffc107);
             text-transform: uppercase;
             letter-spacing: 0.14em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.6), 0 3px 12px rgba(0,0,0,0.5);
         }
         #confetti {
             position: absolute;
@@ -68,7 +58,6 @@
     <main class="lt-confetti-center">
         <div class="graphic">
             <h1>Name</h1>
-            <div class="rule"></div>
             <p>Title</p>
         </div>
     </main>
@@ -197,19 +186,15 @@
                 return new Promise(function(resolve) {
                     var g = document.querySelector('.lt-confetti-center .graphic');
                     var h1 = g.querySelector('h1');
-                    var rule = g.querySelector('.rule');
                     var p = g.querySelector('p');
                     Confetti.clear();
                     var tl = new gsap.timeline({ onComplete: resolve });
-                    tl.set(g, { opacity: 1, scaleX: 0, scaleY: 1, y: 0 })
+                    tl.set(g, { opacity: 1, scale: 1, y: 0 })
                       .set([h1, p], { opacity: 0 })
-                      .set(rule, { scaleX: 0 })
-                      .to(g, { scaleX: 1, duration: 0.45, ease: 'power3.out' })
-                      .addLabel('reveal', '-=0.05')
+                      .addLabel('reveal')
                       .fromTo(h1, { scale: 0.4, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.6, ease: 'back.out(2.2)' }, 'reveal')
                       .call(function () { Confetti.burst(h1); }, null, 'reveal+=0.12')
-                      .to(rule, { scaleX: 1, duration: 0.45, ease: 'power2.out' }, 'reveal+=0.25')
-                      .fromTo(p, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 'reveal+=0.4');
+                      .fromTo(p, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.45, ease: 'power2.out' }, 'reveal+=0.35');
                 });
             },
             animateOut: function() {
