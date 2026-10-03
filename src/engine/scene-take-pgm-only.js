@@ -356,7 +356,10 @@ async function runSceneTakePgmOnly(amcp, opts) {
 			// WO-322: never for shaders — buildPgmOnlyMixerLines already emits FILL/OPACITY on
 			// job.pLayer (the shader's host now), so a CG-level ramp would double the fade.
 			const cgFade = !isShader && fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
-			const lines = buildSceneTemplateCgAmcpLines(channel, isShader ? job.pLayer : job.layer.layerNumber, job.templateCg, cgFade)
+			// WO-590: the layer's fill goes on the overlay host the template plays on (shaders already
+			// get theirs from buildPgmOnlyMixerLines on job.pLayer).
+			const cgOpts = isShader ? cgFade : { ...cgFade, fill: job.f }
+			const lines = buildSceneTemplateCgAmcpLines(channel, isShader ? job.pLayer : job.layer.layerNumber, job.templateCg, cgOpts)
 			if (lines.length > 0) {
 				self.log?.(
 					'info',

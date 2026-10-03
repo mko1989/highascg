@@ -109,10 +109,30 @@ function extractTemplateCgData(layer, cgName) {
 }
 
 /**
+ * WO-590: the look layer's resolved fill, placed on the template's own CG layer. Template CG plays
+ * on a 700+ overlay host, but the take only ever sent the layer's MIXER FILL to the look-band
+ * physical layer (where nothing plays) — so moving/scaling a template layer never moved it on
+ * PGM, while the PRV push (scenes-preview-push-scene.js) already filled its CG layer. Immediate
+ * (tail 0): it is staged before CG ADD so the template never shows at the stale geometry.
+ * Returns [] without a usable fill so callers that pass none (shader band, standalone LT API)
+ * emit exactly what they did before.
+ * @param {string} cl — `channel-layer`
+ * @param {{ x?: number, y?: number, scaleX?: number, scaleY?: number } | null | undefined} fill
+ * @returns {string[]}
+ */
+function templateHostFillLines(cl, fill) {
+	if (!fill || typeof fill !== 'object') return []
+	const v = [fill.x, fill.y, fill.scaleX, fill.scaleY].map(Number)
+	if (!v.every(Number.isFinite)) return []
+	return [`MIXER ${cl} FILL ${v[0]} ${v[1]} ${v[2]} ${v[3]} 0`]
+}
+
+/**
  * @param {number} channel
  * @param {number} logicalOrHostLayer — scene layerNumber; mapped to 700+ overlay host
  * @param {{ cgName: string, data?: string, playOnLoad?: boolean }} spec
- * @param {{ fadeDurFrames?: number, fadeTween?: string }} [opts] when fadeDurFrames > 0 the template
+ * @param {{ fadeDurFrames?: number, fadeTween?: string, fill?: object }} [opts] `fill` = the look layer's
+ *   resolved fill, applied to the CG host layer (WO-590). When fadeDurFrames > 0 the template
  *   is CROSSFADED in on its own host layer instead of cutting. This mirrors the global-border
  *   pattern (add hidden → tween up, same layer): template CG lands on a fixed 700+ overlay layer
  *   that the bank crossfade never touches, so without an explicit opacity ramp here it always pops
@@ -133,11 +153,13 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec, opts =
 	// template). WO-322: overlay-band (700+) hosts only — a shader's look-band layer must never
 	// pollute the tracked-host set (its cleanup rides the look-layer teardown, not the 700+ sweep).
 	if (hostLayer >= TEMPLATE_CG_OVERLAY_LAYER_BASE) recordTemplateHostAdded(channel, hostLayer)
+	const fillLines = templateHostFillLines(cl, opts?.fill)
 	const fadeDur = Number(opts?.fadeDurFrames)
 	if (Number.isFinite(fadeDur) && fadeDur > 0) {
 		const tw = opts?.fadeTween ? ` ${param(opts.fadeTween)}` : ''
 		return [
 			`CG ${cl} CLEAR`,
+			...fillLines,
 			`MIXER ${cl} OPACITY 0 0`,
 			`CG ${cl} ADD 0 ${tpl} ${playOnLoad} ${param(dataStr)}`,
 			`CG ${cl} PLAY 0`,
@@ -147,6 +169,7 @@ function buildSceneTemplateCgAmcpLines(channel, logicalOrHostLayer, spec, opts =
 	}
 	return [
 		`CG ${cl} CLEAR`,
+		...fillLines,
 		`CG ${cl} ADD 0 ${tpl} ${playOnLoad} ${param(dataStr)}`,
 		`CG ${cl} PLAY 0`,
 		`CG ${cl} UPDATE 0 ${param(dataStr)}`,
@@ -229,15 +252,17 @@ function isSameTemplateSpec(incoming, current) {
  * @param {number} channel
  * @param {number} logicalOrHostLayer
  * @param {{ cgName: string, data?: string }} spec
+ * @param {{ fill?: object }} [opts] WO-590: re-apply the layer's fill, so a moved/resized template
+ *   layer follows on air without restarting the template
  * @returns {string[]}
  */
-function buildSceneTemplateCgUpdateOnlyLines(channel, logicalOrHostLayer, spec) {
+function buildSceneTemplateCgUpdateOnlyLines(channel, logicalOrHostLayer, spec, opts = {}) {
 	const cgName = String(spec?.cgName || '').trim()
 	if (!cgName) return []
 	const hostLayer = resolveTemplateCgHostLayer(logicalOrHostLayer, cgName)
 	const cl = `${channel}-${hostLayer}`
 	const dataStr = typeof spec?.data === 'string' && spec.data.length > 0 ? spec.data : '{}'
-	return [`CG ${cl} UPDATE 0 ${param(dataStr)}`]
+	return [...templateHostFillLines(cl, opts?.fill), `CG ${cl} UPDATE 0 ${param(dataStr)}`]
 }
 
 /**

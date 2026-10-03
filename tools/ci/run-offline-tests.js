@@ -334,6 +334,7 @@ const FILES = [
 	'tools/smoke/smoke-consumer-index-collisions.test.js',
 	'tools/smoke/smoke-scene-template-cg-crossfade.test.js',
 	'tools/smoke/smoke-scene-template-cg-fadeout.test.js',
+	'tools/smoke/smoke-wo590-template-cg-host-fill.test.js',
 	'tools/smoke/smoke-wo319-remote-operator-view.test.js',
 	'tools/smoke/smoke-wo364-prv-output-routing.test.js',
 	'tools/smoke/smoke-wo370-playlist-media-durations.test.js',

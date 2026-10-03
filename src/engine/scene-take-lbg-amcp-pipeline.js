@@ -422,7 +422,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				let lines = []
 				if (isContinuous) {
 					// Same timer on same layer: emit UPDATE only to preserve running state.
-					lines = buildSceneTemplateCgUpdateOnlyLines(channel, job.layer.layerNumber, job.templateCg)
+					lines = buildSceneTemplateCgUpdateOnlyLines(channel, job.layer.layerNumber, job.templateCg, { fill: job.f })
 					if (typeof self.log === 'function') {
 						self.log(
 							'info',
@@ -434,7 +434,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 					// bank crossfade, fade the template in on its host layer so it MIXES with the media
 					// instead of cutting (the CG host layer is outside the bank crossfade math).
 					const cgFade = shouldRunBankCrossfade && fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: fadeTw } : {}
-					lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg, cgFade)
+					lines = buildSceneTemplateCgAmcpLines(channel, job.layer.layerNumber, job.templateCg, { ...cgFade, fill: job.f })
 					if (typeof self.log === 'function') {
 						self.log(
 							'info',

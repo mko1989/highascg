@@ -11,7 +11,9 @@
             background: transparent;
             display: flex;
             font-family: 'Arial', 'Helvetica Neue', sans-serif;
-            height: 1080px; width: 1920px;
+            /* WO-590: the page is the CHANNEL frame (CEF renders at channel resolution, e.g. 3072×1024),
+               not a fixed 1920×1080 — a fixed size put "center" at x=960 on wider channels. */
+            height: 100vh; width: 100vw;
             overflow: hidden;
             position: relative;
         }
@@ -48,7 +50,7 @@
         #confetti {
             position: absolute;
             left: 0; top: 0;
-            width: 1920px; height: 1080px;
+            width: 100vw; height: 100vh;
             pointer-events: none;
             z-index: 10;
         }
@@ -90,6 +92,14 @@
                 var primary = cs.getPropertyValue('--primary').trim() || '#ffc107';
                 var text = cs.getPropertyValue('--text').trim() || '#ffffff';
                 return [primary, primary, text].concat(PALETTE);
+            }
+
+            /** Backing store = the actual frame size (channel resolution), checked per burst. */
+            function fitCanvas() {
+                var w = window.innerWidth || 1920;
+                var h = window.innerHeight || 1080;
+                if (canvas.width !== w) canvas.width = w;
+                if (canvas.height !== h) canvas.height = h;
             }
 
             function spawn(rect) {
@@ -155,6 +165,7 @@
 
             function burst(originEl) {
                 clear();
+                fitCanvas();
                 spawn(originEl.getBoundingClientRect());
                 clock.t = 0;
                 tween = gsap.to(clock, {
