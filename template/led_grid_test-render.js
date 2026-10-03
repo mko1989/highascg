@@ -3,6 +3,7 @@ function resetPatternLayer(layer) {
 		cancelAnimationFrame(animId)
 		animId = null
 	}
+	if (typeof stopBunnyBuilder === 'function') stopBunnyBuilder()
 	layer.style.background = '#0a0a0f'
 	layer.innerHTML = ''
 }
@@ -168,6 +169,8 @@ function renderBouncingCharacter(layer, count) {
 
 function applyPattern(data) {
 	var pat = data.pattern || 'grid-white'
+	/* WO-588: the builder needs panels to build — on a screens-mode channel it falls back to the default look. */
+	var builderOn = pat === 'led-builder' && data.showLedGrid === true && typeof renderBunnyBuilder === 'function'
 	var layer = document.getElementById('patternLayer')
 	resetPatternLayer(layer)
 
@@ -218,14 +221,17 @@ function applyPattern(data) {
 		layer.innerHTML = '<div class="animated-noise"></div>'
 	} else if (pat === 'bouncing-element') {
 		renderBouncingCharacter(layer, data.charCount || 1)
+	} else if (pat === 'led-builder' && builderOn) {
+		renderBunnyBuilder(layer, data)
 	}
 
 	var root = document.getElementById('root')
-	if (pat !== 'grid-white') {
+	if (pat !== 'grid-white' && !(pat === 'led-builder' && !builderOn)) {
 		root.classList.add('root--transparent-panels')
 	} else {
 		root.classList.remove('root--transparent-panels')
 	}
+	root.classList.toggle('root--builder', builderOn)
 }
 
 function build(data) {

@@ -80,6 +80,11 @@
 			background: rgba(0,0,0,0.15) !important;
 			border-color: rgba(255,255,255,0.2) !important;
 		}
+		/* WO-588 builder: panel colours are painted on the canvas below; keep only seams + labels on top. */
+		.root--builder .panel {
+			background: transparent !important;
+			border-color: rgba(0,0,0,0.5) !important;
+		}
 		#screensMode.screens-mode--on { display: block; }
 		/* Grid + overlay: panels below; circle/cross + resolution strip stay visible */
 		#screensMode.screens-mode--grid-overlay {
@@ -331,6 +336,7 @@
 	</div>
 	<div id="spec" style="display: none;"></div>
 	<script src="led_grid_test.js"></script>
+	<script src="led_grid_test-builder.js"></script>
 	<script src="led_grid_test-render.js"></script>
 </body>
 </html>

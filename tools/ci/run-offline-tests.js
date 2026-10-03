@@ -288,6 +288,7 @@ const FILES = [
 	'tools/smoke/smoke-wo340-shader-param-scan.test.js',
 	'tools/smoke/smoke-wo577-shader-controls.test.js',
 	'tools/smoke/smoke-wo585-global-border-control.test.js',
+	'tools/smoke/smoke-wo588-led-builder-pattern.test.js',
 	'tools/smoke/smoke-wo333-audio-capture-fft.test.js',
 	'tools/smoke/smoke-wo269-shape-log-dedupe.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',

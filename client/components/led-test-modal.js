@@ -167,6 +167,7 @@ export function showLedTestModal(onApplied, stateStore) {
 							<option value="gradient-v">Gradient Vertical</option>
 							<option value="checkerboard">Checkerboard</option>
 							<option value="bouncing-element">Bouncing Character</option>
+							<option value="led-builder">Animated: Bunny builds the wall</option>
 							<option value="animated-radar">Animated: Radar Sweep</option>
 							<option value="animated-stripes">Animated: Scrolling Stripes</option>
 							<option value="animated-pulse">Animated: Expanding Pulse</option>
@@ -183,7 +184,7 @@ export function showLedTestModal(onApplied, stateStore) {
 						<label><input type="checkbox" id="led-test-cross" /> Crosshair</label>
 					</div>
 					<div class="led-test-modal__full" id="led-test-char-wrap" hidden>
-						<label>Bouncing HighAsCG characters <input type="number" id="led-test-char-count" min="1" max="48" step="1" /></label>
+						<label><span id="led-test-char-label">Bouncing HighAsCG characters</span> <input type="number" id="led-test-char-count" min="1" max="48" step="1" /></label>
 					</div>
 				</div>
 				<div class="led-test-modal__section">
@@ -223,6 +224,8 @@ export function showLedTestModal(onApplied, stateStore) {
 	const patternSel = modal.querySelector('#led-test-pattern')
 	const charWrap = modal.querySelector('#led-test-char-wrap')
 	const charCountInp = modal.querySelector('#led-test-char-count')
+	const charLabel = modal.querySelector('#led-test-char-label')
+	const builderOpt = patternSel.querySelector('option[value="led-builder"]')
 
 	cols.value = String(s.cols)
 	rows.value = String(s.rows)
@@ -238,11 +241,23 @@ export function showLedTestModal(onApplied, stateStore) {
 	charCountInp.value = String(s.charCount ?? 3)
 
 	function syncBouncingCharUi() {
-		const on = patternSel.value === 'bouncing-element'
-		charWrap.hidden = !on
+		const builder = patternSel.value === 'led-builder'
+		charWrap.hidden = !builder && patternSel.value !== 'bouncing-element'
+		charLabel.textContent = builder ? 'Builder bunnies' : 'Bouncing HighAsCG characters'
 	}
 
-	syncBouncingCharUi()
+	/* WO-588: the builder fills LED panels, so it is only offered while some channel has Full LED grid on. */
+	function syncBuilderAvailability() {
+		const anyGrid = Object.values(collectSettings().gridByChannel).some((v) => v === true)
+		builderOpt.disabled = !anyGrid
+		builderOpt.textContent = anyGrid ? 'Animated: Bunny builds the wall' : 'Animated: Bunny builds the wall (needs Full LED grid)'
+		if (!anyGrid && patternSel.value === 'led-builder') {
+			patternSel.value = 'grid-white'
+			syncBouncingCharUi()
+			saveLedTestSettings(collectSettings())
+		}
+	}
+
 	patternSel.addEventListener('change', () => {
 		syncBouncingCharUi()
 		persistAndApply()
@@ -253,6 +268,8 @@ export function showLedTestModal(onApplied, stateStore) {
 		const ch = inp.getAttribute('data-led-grid-ch')
 		if (ch != null) inp.checked = gridMap[ch] === true
 	})
+	syncBuilderAvailability()
+	syncBouncingCharUi()
 
 	modal.querySelectorAll('[data-led-show-ch]').forEach((inp) => {
 		const ch = inp.getAttribute('data-led-show-ch')
@@ -334,7 +351,10 @@ export function showLedTestModal(onApplied, stateStore) {
 	}
 
 	modal.querySelectorAll('[data-led-grid-ch]').forEach((inp) => {
-		inp.addEventListener('change', () => persistAndApply())
+		inp.addEventListener('change', () => {
+			syncBuilderAvailability()
+			persistAndApply()
+		})
 	})
 
 	modal.querySelectorAll('[data-led-show-ch]').forEach((inp) => {
