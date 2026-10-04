@@ -1,0 +1,93 @@
+/* WO-592 — media-file inspector */
+.media-insp {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 8px 10px;
+	--media-insp-wave: var(--text-muted, #6e7681);
+	--media-insp-wave-played: var(--accent, #58a6ff);
+}
+.media-insp__title {
+	margin: 0;
+	font-size: 0.95rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.media-insp__folder {
+	margin-top: -6px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.media-insp__preview {
+	width: 100%;
+	max-height: 40vh;
+	background: #000;
+	border-radius: 4px;
+	overflow: hidden;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.media-insp__preview img {
+	width: 100%;
+	height: 100%;
+	object-fit: contain;
+}
+.media-insp__wave {
+	position: relative;
+	height: 56px;
+	background: var(--bg-elevated, #21262d);
+	border-radius: 4px;
+}
+.media-insp__wave canvas {
+	width: 100%;
+	height: 100%;
+	display: block;
+	cursor: pointer;
+}
+.media-insp__wave-note {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	pointer-events: none;
+}
+.media-insp__transport {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.media-insp__btn {
+	min-width: 40px;
+	padding: 4px 10px;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 4px;
+	background: var(--bg-elevated, #21262d);
+	color: var(--text);
+	cursor: pointer;
+}
+.media-insp__tc {
+	font-family: ui-monospace, monospace;
+	font-size: 0.8rem;
+	color: var(--text-muted);
+}
+.media-insp__info {
+	display: grid;
+	grid-template-columns: auto 1fr;
+	gap: 2px 10px;
+	margin: 0;
+	font-size: 0.75rem;
+}
+.media-insp__info dt {
+	color: var(--text-muted);
+}
+.media-insp__info dd {
+	margin: 0;
+}

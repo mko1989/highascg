@@ -24,6 +24,7 @@ import { renderPreservingFocus } from './device-view-ui-utils.js'
 import { attachInspectorLiveSourceSelectionEvents } from './inspector-panel-live-source-events.js'
 import { readInspectorPanelMode, writeInspectorPanelMode } from './inspector-panel-mode-storage.js'
 import { inspectorSelectionKey } from './inspector-panel-selection-key.js'
+import { renderMediaFileInspector } from './inspector-media-file.js'
 
 function isPixelMapTabActive() {
 	const t = document.querySelector('.workspace__tabs .tab[data-tab="pixelmap"]')
@@ -175,6 +176,11 @@ export function initInspectorPanel(root, stateStore) {
 			scheduleSelectionSync(stateStore, selection)
 			return
 		}
+		if (data.type === 'mediaFile' && data.id) {
+			renderMediaFileInspector(root, data)
+			scheduleSelectionSync(stateStore, selection)
+			return
+		}
 		if (data.type === 'timelineFlag' && data.timelineId && data.flagId) {
 			renderTimelineFlagInspector(
 				{ root, renderEmpty, onClearSelection: () => update(null) },
@@ -254,6 +260,13 @@ export function initInspectorPanel(root, stateStore) {
 		} else if (!d) {
 			if (selection?.type === 'timelineFlag') update(null)
 		}
+	})
+
+	// WO-592: one file selected in the Media tab → media-file inspector.
+	window.addEventListener('media-file-select', (e) => {
+		const d = e.detail
+		if (d?.id) update({ type: 'mediaFile', id: d.id, item: d.item })
+		else if (selection?.type === 'mediaFile') update(null)
 	})
 
 	window.addEventListener('timeline-clip-select', (e) => {

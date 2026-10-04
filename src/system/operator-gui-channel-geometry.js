@@ -16,6 +16,9 @@ const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session
 
 const ROUTE_LAYER_START = 10
 const ROUTE_LAYER_MAX = 49
+/** WO-592: media-inspector preview — a clip LOADed straight onto the GUI channel (no route), on a
+ * fixed layer above the route range so compose-cell churn never re-numbers (and restarts) it. */
+const MEDIA_PREVIEW_LAYER = 50
 const DEFAULT_GUI_URL = 'http://127.0.0.1:4200/?operatorGui=1'
 
 /**
@@ -254,7 +257,12 @@ function computeOperatorGuiCellPlan(cells, map, config) {
 	const out = []
 	let layer = ROUTE_LAYER_START
 	for (const cell of Array.isArray(cells) ? cells : []) {
-		if (layer > ROUTE_LAYER_MAX) break
+		if (cell?.role === 'media') {
+			const entry = computeMediaPreviewEntry(cell, guiDims)
+			if (entry) out.push(entry)
+			continue
+		}
+		if (layer > ROUTE_LAYER_MAX) continue
 		const srcCh = resolveCellSourceChannel(cell, map)
 		if (srcCh == null) continue
 		const rect = cell?.rect || {}
@@ -285,9 +293,26 @@ function computeOperatorGuiCellPlan(cells, map, config) {
 	return out
 }
 
+/**
+ * WO-592: plan entry for the media-inspector cell (role 'media'). Aspect-fit uses the clip's own
+ * raster (`srcW`/`srcH` from the client's probe data); no route — the layer's content is owned by
+ * src/api/routes-media-preview.js.
+ * @returns {{layer: number, route: null, media: true, x: number, y: number, w: number, h: number}|null}
+ */
+function computeMediaPreviewEntry(cell, guiDims) {
+	const rect = cell?.rect || {}
+	let fitted = { x: clampFraction(rect.x), y: clampFraction(rect.y), w: clampFraction(rect.w), h: clampFraction(rect.h) }
+	if (!(fitted.w > 0) || !(fitted.h > 0)) return null
+	const srcW = Number(cell.srcW)
+	const srcH = Number(cell.srcH)
+	if (guiDims && srcW > 0 && srcH > 0) fitted = computeAspectFitCellRect(fitted, guiDims, { width: srcW, height: srcH })
+	return { layer: MEDIA_PREVIEW_LAYER, route: null, media: true, ...fitted }
+}
+
 module.exports = {
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
+	MEDIA_PREVIEW_LAYER,
 	DEFAULT_GUI_URL,
 	operatorGuiDestination,
 	resolveOperatorGuiChannel,

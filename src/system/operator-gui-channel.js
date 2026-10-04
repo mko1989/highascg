@@ -36,19 +36,17 @@ const {
 	computeAspectFitCellRect,
 	computeOperatorGuiCellPlan,
 } = require('./operator-gui-channel-geometry')
+const { splitMediaPreviewEntries, persistableCells, applyMediaPreviewLayer } = require('./operator-gui-media-layer')
 
-// WO-338: 150 → 50 ms — the per-channel promise chain already serializes overlapping applies,
-// so the long debounce mostly added edit-to-hole latency (client now throttles at 150 ms).
+// WO-338: 150 → 50 ms — the per-channel chain already serializes applies; the client throttles at 150 ms.
 const APPLY_DEBOUNCE_MS = 50
 
-/** Per-channel last-applied route by layer, so unchanged PLAYs are skipped. Module state (mirrors
- * multiview-apply.js's per-channel serialization convention). */
+/** Per-channel: last-applied route by layer (skip unchanged PLAYs); highest layer used (stale-layer hygiene). */
 const lastAppliedRouteByChannel = new Map()
-/** Per-channel highest layer previously used, for STOP+MIXER CLEAR hygiene of stale layers. */
 const lastMaxLayerByChannel = new Map()
 /** Per-channel promise chain — serializes applies the same way multiview-apply.js's mvApplyChains does. */
 const applyChains = new Map()
-/** Per-channel debounce timer handle (150ms server-side coalescing, per T243.2). */
+/** Per-channel debounce timer handle (server-side coalescing, T243.2). */
 const debounceTimers = new Map()
 
 /**
@@ -177,7 +175,8 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	}
 	const priorRoutes = lastAppliedRouteByChannel.get(ch) || new Map()
 	const nextRoutes = new Map()
-	for (const entry of plan) {
+	const { routes: routePlan, media: mediaPlan } = splitMediaPreviewEntries(plan) // WO-592
+	for (const entry of routePlan) {
 		let routeLive = priorRoutes.get(entry.layer) === entry.route
 		if (!routeLive) {
 			try {
@@ -197,7 +196,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 		// the hole on the previous run's stale content until a manual route change.
 		if (routeLive) nextRoutes.set(entry.layer, entry.route)
 	}
-	const newMax = plan.length ? plan[plan.length - 1].layer : ROUTE_LAYER_START - 1
+	const newMax = routePlan.length ? routePlan[routePlan.length - 1].layer : ROUTE_LAYER_START - 1
 	const prevMax = lastMaxLayerByChannel.has(ch) ? lastMaxLayerByChannel.get(ch) : newMax
 	for (let layer = newMax + 1; layer <= Math.min(prevMax, ROUTE_LAYER_MAX); layer++) {
 		try {
@@ -211,6 +210,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 			/* best-effort hygiene */
 		}
 	}
+	await applyMediaPreviewLayer(ctx, ch, mediaPlan)
 	try {
 		await ctx.amcp.mixerCommit(ch)
 	} catch (_) {
@@ -226,7 +226,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	 * later logged "re-apply: 0 cell(s)" and .highascg-state.json held cells: []). The live holes
 	 * still clear, because that is driven by the applied routes above, not by this record. */
 	try {
-		const list = Array.isArray(cells) ? cells : []
+		const list = persistableCells(cells)
 		if (list.length > 0) {
 			const persistence = ctx.persistence || require('../utils/persistence')
 			persistence.set('operatorGuiLayout', { cells: list, savedAt: Date.now() })
@@ -247,7 +247,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 			// boot) — which SHOULD move its tiles — from an ordinary report echo, which must not.
 			ctx._wsBroadcast('operatorGuiLayout', {
 				channel: ch,
-				cells: Array.isArray(cells) ? cells : [],
+				cells: persistableCells(cells),
 				source: opts.source || 'report',
 			})
 		}

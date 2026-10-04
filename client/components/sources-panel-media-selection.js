@@ -52,12 +52,27 @@ export function createMediaSelection(ctx) {
 		render()
 	}
 
+	/** WO-592: exactly one selected file → media inspector; anything else withdraws it. */
+	let announcedId = null
+	function announceInspectorSelection() {
+		const id = selectedMedia.size === 1 ? String(Array.from(selectedMedia)[0]) : null
+		if (id === announcedId) return
+		announcedId = id
+		let item = null
+		if (id) {
+			const list = mergeMediaProbeOverlay(stateStore.getState().media || [], getMediaWithProbe())
+			item = list.find((m) => String(m?.id ?? m) === id) || { id }
+		}
+		window.dispatchEvent(new CustomEvent('media-file-select', { detail: item ? { id, item } : null }))
+	}
+
 	function updateSelectionBar() {
 		const count = selectedMedia.size
 		if (selectionBar) selectionBar.style.display = count > 0 ? 'flex' : 'none'
 		if (selectionCountEl) {
 			selectionCountEl.textContent = `${count} selected`
 		}
+		announceInspectorSelection()
 	}
 
 	async function runMediaTransfer(op, ids) {

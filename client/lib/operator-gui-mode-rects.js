@@ -25,7 +25,15 @@ export function cellRectsToLayoutCells(cellRects, viewport) {
 		const cell = {
 			id: c.id,
 			role:
-				c.role === 'prv' ? 'prv' : c.role === 'multiview' ? 'multiview' : c.role === 'mvcell' ? 'mvcell' : 'pgm',
+				c.role === 'prv'
+					? 'prv'
+					: c.role === 'multiview'
+						? 'multiview'
+						: c.role === 'mvcell'
+							? 'mvcell'
+							: c.role === 'media'
+								? 'media'
+								: 'pgm',
 			mainIndex: Math.max(0, parseInt(String(c.mainIndex ?? 0), 10) || 0),
 			rect: {
 				x: clamp01(Number(r.left) / vw),
@@ -40,6 +48,11 @@ export function cellRectsToLayoutCells(cellRects, viewport) {
 			const srcCh = Number(c.srcCh)
 			if (!Number.isFinite(srcCh) || srcCh <= 0) continue
 			cell.srcCh = Math.floor(srcCh)
+		}
+		// WO-592 'media': media-inspector preview — the clip's raster drives the server's aspect-fit.
+		if (cell.role === 'media') {
+			cell.srcW = Math.max(0, Number(c.srcW) || 0)
+			cell.srcH = Math.max(0, Number(c.srcH) || 0)
 		}
 		out.push(cell)
 	}

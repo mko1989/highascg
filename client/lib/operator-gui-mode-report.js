@@ -185,6 +185,23 @@ export function reportLookEditPrvRect(rect, mainIndex, viewport) {
 	reportSurfaceCells('lookedit', cells)
 }
 
+/**
+ * Surface 5 — media-inspector preview (WO-592): ONE rect, role 'media'. The server LOADs the clip
+ * onto the GUI channel's fixed media layer (POST /api/media/preview) and FILLs it into this hole.
+ * @param {{left:number,top:number,width:number,height:number}|null} rect - null/empty withdraws
+ * @param {{width?: number, height?: number}} [srcDims] - clip raster, for aspect-fit
+ */
+export function reportMediaPreviewRect(rect, srcDims, viewport) {
+	if (!isOperatorGuiModeActive()) return
+	if (!rect || !(Number(rect.width) > 0) || !(Number(rect.height) > 0)) {
+		reportSurfaceCells('mediainspector', [])
+		return
+	}
+	const cell = { id: 'media-preview', role: 'media', srcW: srcDims?.width, srcH: srcDims?.height, rect }
+	const cells = cellRectsToLayoutCells([cell], defaultViewport(viewport)).map((c) => ({ ...c, surface: 'mediainspector' }))
+	reportSurfaceCells('mediainspector', cells)
+}
+
 export function reportMultiviewEditRect(rect, viewport) {
 	if (!isOperatorGuiModeActive()) return
 	if (!rect || !(Number(rect.width) > 0) || !(Number(rect.height) > 0)) {

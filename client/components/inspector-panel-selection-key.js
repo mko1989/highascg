@@ -25,6 +25,8 @@ export function inspectorSelectionKey(data) {
 			return `ndiHost:${data.sourceId || data.value || data.hostChannel || ''}`
 		case 'v4l2Input':
 			return `v4l2Input:${data.slot}`
+		case 'mediaFile':
+			return `mediaFile:${data.id}`
 		default:
 			return String(data.type || '')
 	}
