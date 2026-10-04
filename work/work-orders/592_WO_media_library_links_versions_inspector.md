@@ -1,4 +1,4 @@
-**Status: IN PROGRESS — C (media inspector: preview/waveform/transport/info) DONE + verified live 04.10; A links, trim/mute defaults, D multi-rename, B versions, final delete still OPEN. Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
+**Status: DONE (2026-10-04, offline suite + live on the box) — A links, B versions, C inspector, D multi-rename, trim/mute defaults, final delete, mojibake repair. Owner QA: look layer picks up file trim/mute on drop; remote browser view; .stignore mirror on the Mac.** Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
 
 # WO-592 — Media library: stable links, version control, media inspector, multi-rename
 
@@ -187,3 +187,73 @@ change title, optional renumbering is enough (no pattern field). 2 → **no prox
 - Waveform: a 1-min H.264 with sound → 600 bars, 591 non-silent. The HAP clip's PCM track is
   genuinely silent (all zero) — the flat strip is correct.
 - **Owner QA:** remote browser shows thumbnail + waveform (not exercised from the box).
+
+## Progress — A links, D multi-rename, defaults, B versions, final delete, mojibake repair (04.10)
+
+Owner 04.10 after the show: "no audio at this point. you can fix the files. continue building".
+
+### Investigation (links)
+- References: scene-layer `source`, layer `playlist[]`, timeline clip `source` (the set
+  `normalizeProjectMediaRefs` walks). Values come in 3 shapes: root-relative with extension,
+  **project-relative** (`00. Intro_Bumper_MAIN_HAP.mov` under `projects/dtlodz/` — 252 playlist
+  labels in dtlodz alone), and Caspar CLS (uppercase, no ext). Labels often hold the full path.
+- Active project = `loadFullProject` → `persistProject` → `scheduleProjectSyncBroadcast`; clients
+  `importProject` on `project_sync` (scenes + timelines wholesale) — same path WO-585 uses.
+- Media root has a different device under `bridge/` → registry keys on dev+ino.
+
+### What was done
+- `src/media/media-reference-rewrite.js` (pure): rewrite every ref to a renamed file **in its own
+  shape**; a value WITH an extension must match the exact path (case-insensitive, NFC) — only an
+  ext-less value matches by CLS id, so `clip.mov` never drags `clip.mp4`. Labels follow when they
+  were the path / old value / basename. `findProjectMediaUsage` for "used in".
+- `src/media/media-library-registry.js`: `data/media-library/registry.json` (.stignore'd), one
+  entry per file; `reconcileRegistry` adopts new files, re-links a vanished entry by (dev, ino) else
+  a UNIQUE (size, mtimeMs) match, marks the rest `missingSince`.
+- `src/media/media-links.js`: `renameMediaFiles` (validate all → rename → roll back on failure;
+  extension changes refused), `followMediaMoves` (UI move), `applyRenamesToProjects` (active via
+  persistProject + project_sync; others: project file + autosave on disk), `scheduleMediaReconcile`
+  (debounced, serialized; hooked onto every `runMediaLibraryQueryCycle` + once at boot).
+- Routes (`routes-media-library.js`): `POST /api/media/rename`, `GET /api/media/library/entry`,
+  `GET|POST /api/media/library/defaults`. `/api/media/move` now follows links; `/api/media/delete`
+  forgets the link and removes every stored version (final).
+- Defaults: per-file `trimInMs/trimOutMs/muted` (look-layer field names); `client/lib/media-file-defaults.js`
+  + one hook in `sceneState.patchLayer` — when a layer's media source CHANGES, fields the patch
+  doesn't set are copied from the file. Covers every drop path (compose, editor strip, deck).
+- Multi-rename (`client/lib/media-multi-rename.js` + modal): lead number owns the numbering
+  (`03_LOOP_2x3` keeps "LOOP_2x3" as title), trailing number only with a separator; blank title =
+  keep titles; optional renumber; duplicate/existing-name checks; list order, not click order.
+- Versions (`src/media/media-versions.js`, `routes-media-versions.js`, inspector panel): new version
+  keeps the path; old ones in `data/media-versions/<id>/v<n>` (.stignore'd), listed until purged;
+  Go back = swap. Upload refuses a different extension.
+- Inspector: trim in/out (+ set-from-playhead on kiosk), mute, trim shading on the strip, preview
+  plays In→Out, used-in, rename, final delete, versions; duration falls back to waveform/Caspar.
+
+### Mojibake repair (owner: "you can fix the files")
+10 files in `projects/airport` had double-encoded names from the old busboy latin1 bug
+(`GÅÃ³wne TÅo` = UTF-8 read as Latin-1 and re-encoded). Fixed by `name.encode('latin1').decode('utf8')`
++ NFC through `POST /api/media/rename`: 10 renamed, **5 references in the airport project followed**
+(project + autosave: 0 garbled strings left). Caspar CLS now lists `GŁÓWNE TŁO…`; the 6 "Error: 501
+CINF FAILED" rows in the media list are gone — Caspar could not open those names at all before.
+
+### Verified
+- Offline: wo592 links 13/13 (rewrite shapes, reconcile, all-or-nothing rename on temp dirs,
+  planner, defaults copy, wiring), versions 4/4, preview 6/6. Full suite 2583: 2580 pass / 1 fail
+  (pre-existing wo577 shader-library data test). `smoke-wo537-look-timeline-starts-where-asked`
+  is timing-flaky (1 of 3 standalone runs failed) — unrelated, observed once in a full run.
+- Live: registry built at boot (357 entries = 357 files). Probe file kept its id through an API
+  rename AND a shell `mv` + rescan; final delete removed file + entry. Kiosk UI (xdotool): selected 3
+  numbered probes → Rename… → "Stage Loop" → preview `01_Stage Loop.mov`… → disk renamed, selection
+  followed. Inspector: trim 2/6 s + mute saved to the registry; new version via upload endpoint →
+  same path, new hash, v1 listed; "Go back" from the kiosk restored the original hash with v2 kept;
+  inspector Delete → native confirm → file, versions dir and entry gone. Probes cleaned up.
+- Found live and fixed: version list showed a stale size (stats only refreshed on rescan) and the
+  list thumbnail showed the replaced version (browser image cache, same URL) — stats now refresh at
+  swap; thumbnail URLs carry `&v=<fileSize>`.
+
+### Owner QA / open
+- Drop a clip that has trim/mute defaults onto a look: the layer should open with that trim + mute
+  (unit-tested; not exercised live — it would have modified a show file).
+- Remote browser: thumbnail + waveform + versions/rename/delete.
+- `.stignore` gained `data/media-library` and `data/media-versions`; `.stignore` doesn't sync —
+  mirror both lines on the Mac.
+- Playlist items don't take file defaults (playlist rows have no per-item trim today).
