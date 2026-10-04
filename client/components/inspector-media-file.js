@@ -141,7 +141,7 @@ export function renderMediaFileInspector(root, sel) {
 		const frac = Math.min(1, Math.max(0, (e.clientX - r.left) / Math.max(1, r.width)))
 		state.pos = frac * durationSec
 		showPos()
-		void send({ action: 'seek', frame: Math.floor(state.pos * fps) })
+		void send({ action: 'seek', seconds: state.pos })
 	})
 
 	// Track the hole: re-report on move/resize/visibility; withdraw + stop once unmounted.

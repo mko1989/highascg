@@ -1,4 +1,4 @@
-**Status: OPEN — design proposed 2026-10-04; decisions 1, 3, 4 answered 04.10, decision 2 (proxies) pending. Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
+**Status: IN PROGRESS — C (media inspector: preview/waveform/transport/info) DONE + verified live 04.10; A links, trim/mute defaults, D multi-rename, B versions, final delete still OPEN. Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
 
 # WO-592 — Media library: stable links, version control, media inspector, multi-rename
 
@@ -140,7 +140,7 @@ Select several files → *Rename…* in the selection bar → dialog:
 **Answered 04.10:** 1 → file defaults copied into looks. 3 → keep all versions until purged
 manually; the inspector shows the full list of old versions and the owner can go back to any chosen
 one (Restore = swap, the current file becomes a version, so nothing is lost). 4 → keep numbers,
-change title, optional renumbering is enough (no pattern field). 2 → open (owner asked what it means).
+change title, optional renumbering is enough (no pattern field). 2 → **no proxies** (04.10, after the show): "do the preview only for the kiosk using the operator screen consumer; the remote client should get waveform if possible even for video files". Proxy plan dropped; kiosk previews through Caspar, remote gets thumbnail + waveform.
 
 1. Trim/mute in the media inspector: **file default copied into looks (recommended)**, or edits the
    file itself (destructive trim via re-encode), or preview-only?
@@ -148,3 +148,42 @@ change title, optional renumbering is enough (no pattern field). 2 → open (own
 3. Version retention: keep all until purged manually (recommended), or keep last N?
 4. Multi-rename: is "keep numbers, change title" plus optional renumbering enough, or is a free
    pattern field (`{n:2}_{title}`) wanted?
+
+## Progress — C. Media inspector (04.10)
+
+### What was done (commits 18e1f787 + seek fix)
+- **Kiosk preview through Caspar.** New `POST /api/media/preview` (`src/api/routes-media-preview.js`):
+  `load` → `LOAD` on the operator-GUI channel (ch3 here, 1080p50, screen consumer only → silent)
+  at fixed `MEDIA_PREVIEW_LAYER` 50, outside the route range 10–49 so compose-cell churn never
+  re-numbers and restarts it; `play`/`pause` → RESUME/PAUSE; `seek {seconds}`; `stop` → STOP + MIXER CLEAR.
+- **Hole.** New cell role `media` (`computeMediaPreviewEntry` in operator-gui-channel-geometry.js,
+  aspect-fit from the clip's own `srcW/srcH`). `src/system/operator-gui-media-layer.js`: the apply
+  only FILLs the layer; it STOPs + clears it on the media-cell present→absent transition only (a
+  compose-only report racing a fresh LOAD can't kill it). Media cells are **never persisted**
+  (`operatorGuiLayout`, project) **nor broadcast** as shared compose layout.
+- **Client.** `reportMediaPreviewRect` (surface `mediainspector`); `inspector-media-file.js` +
+  `-wave.js`; Media-tab single selection fires `media-file-select` → inspector panel `mediaFile`.
+  Kiosk + video → hole + ▶/❚❚ + timecode + click-waveform-to-seek, playhead from OSC
+  `onLayerState(ch, 50)`. Remote / stills → thumbnail. Every client gets the waveform (existing
+  cached endpoint; video files with an audio track included). Controls sit below the hole (click-dead).
+
+### Found while verifying
+- The real `AmcpClient` has **no flat `load` alias** (`amcp-client-commands.js`) — first live call
+  failed `ctx.amcp.load is not a function`; now `ctx.amcp.basic.load`, and the smoke fake mirrors
+  the real shape so this can't pass offline again.
+- **SEEK counts CHANNEL frames on this build**: on the 50p GUI channel SEEK 100 / 200 landed at
+  2 s / 4 s of a 30p NotchLC clip. The API takes `seconds` and converts with the GUI channel's fps.
+
+### Verified
+- Offline: `smoke-wo592-media-preview` 6/6; full suite 2566 → 2563 pass / 1 fail / 2 skip. The one
+  failure is `smoke-wo577-shader-controls` "library: main panel stays small", which reads the live
+  `data/shaders` library (a shader exposing a control labelled "Value"); unrelated to this WO.
+  check-max-file-lines clean; eslint 0 errors.
+- Live, API vs AMCP `INFO 3`: NotchLC `S_AKT_1_START_1.mov` LOADs paused at 0; play → 1.98 s
+  after 2 s; pause holds; seek 7.5 s → 7.5 s exactly; stop → layer empty.
+- Live on the kiosk (xdotool + scrot): selecting a HAP clip opens the inspector with Caspar's frame
+  in the hole; ▶ plays (timecode + playhead advance, INFO paused=false); clicking mid-waveform → 31.06 s;
+  ❚❚ pauses; deselecting closes the inspector, layer 50 empties, no leftover hole.
+- Waveform: a 1-min H.264 with sound → 600 bars, 591 non-silent. The HAP clip's PCM track is
+  genuinely silent (all zero) — the flat strip is correct.
+- **Owner QA:** remote browser shows thumbnail + waveform (not exercised from the box).

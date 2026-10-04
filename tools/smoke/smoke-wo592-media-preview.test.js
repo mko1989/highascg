@@ -36,7 +36,8 @@ function guiCtx() {
 	const store = new Map()
 	const amcp = {
 		play: rec('play'),
-		load: rec('load'),
+		// Real AmcpClient has no flat `load` alias (amcp-client-commands.js) — only basic.load.
+		basic: { load: rec('load') },
 		resume: rec('resume'),
 		pause: rec('pause'),
 		call: rec('call'),
@@ -114,7 +115,8 @@ describe('WO-592 POST /api/media/preview', () => {
 		assert.equal(load[1], body.channel)
 		assert.equal(load[2], MEDIA_PREVIEW_LAYER)
 		await handleMediaPreviewPost({ action: 'play' }, ctx)
-		await handleMediaPreviewPost({ action: 'seek', frame: 125.7 }, ctx)
+		// 2.5 s on the 50p operator-GUI channel → SEEK 125 (channel frames, not file frames)
+		await handleMediaPreviewPost({ action: 'seek', seconds: 2.5 }, ctx)
 		assert.ok(calls.some((c) => c[0] === 'resume' && c[2] === MEDIA_PREVIEW_LAYER))
 		assert.ok(calls.some((c) => c[0] === 'call' && c[3] === 'SEEK' && c[4] === '125'))
 	})

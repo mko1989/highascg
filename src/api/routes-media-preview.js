@@ -7,7 +7,8 @@
  *
  *   POST /api/media/preview  { action: 'load', id }            → { ok, channel, layer, clip }
  *                            { action: 'play' | 'pause' | 'stop' }
- *                            { action: 'seek', frame }
+ *                            { action: 'seek', seconds }   — SEEK counts CHANNEL frames on this build
+ *                              (probed 04.10: SEEK 100/200 on the 50p GUI channel → 2 s/4 s of a 30p clip)
  */
 'use strict'
 
@@ -15,6 +16,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { resolveOperatorGuiChannel, MEDIA_PREVIEW_LAYER } = require('../system/operator-gui-channel-geometry')
 const { clearMediaPreviewLayer } = require('../system/operator-gui-media-layer')
 const { resolveSceneClipForAmcp } = require('../engine/scene-take-lbg-helpers')
+const { operatorGuiModeDimensions } = require('../config/config-generator-channel-plan')
 
 const err = (status, error) => ({ status, headers: JSON_HEADERS, body: jsonBody({ error }) })
 
@@ -35,13 +37,14 @@ async function handleMediaPreviewPost(body, ctx) {
 			const id = String(b.id || '').trim()
 			if (!id || id.includes('..')) return err(400, 'id required')
 			const clip = resolveSceneClipForAmcp(id, ctx)
-			await ctx.amcp.load(ch, layer, clip, {})
+			await ctx.amcp.basic.load(ch, layer, clip, {}) // no flat `load` alias on AmcpClient
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel: ch, layer, clip }) }
 		}
 		if (action === 'play') await ctx.amcp.resume(ch, layer)
 		else if (action === 'pause') await ctx.amcp.pause(ch, layer)
 		else if (action === 'seek') {
-			const f = Math.max(0, Math.floor(Number(b.frame) || 0))
+			const chFps = Number(operatorGuiModeDimensions(gui.dest)?.fps) || 50
+			const f = Math.max(0, Math.round((Number(b.seconds) || 0) * chFps))
 			await ctx.amcp.call(ch, layer, 'SEEK', String(f))
 		} else if (action === 'stop') await clearMediaPreviewLayer(ctx, ch)
 		else return err(400, `unknown action: ${action}`)
