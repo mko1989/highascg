@@ -274,12 +274,18 @@ async function handleMediaDelete(body, ctx) {
 	const ids = collectTransferIds(b, 'id', 'ids')
 	if (!ids.length) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id or ids required' }) }
 	if (typeof ctx.log === 'function') ctx.log('info', `[media] delete ids=${JSON.stringify(ids)}`)
+	// WO-592: delete is final — the link is forgotten so nothing can re-link to the path later.
+	const unlinkOne = async (id) => {
+		const r = await unlinkMediaById(ctx.config || {}, id)
+		if (r.status === 200) require('../media/media-library-registry').forgetPaths([String(id)])
+		return r
+	}
 	if (ids.length === 1) {
-		const r = await unlinkMediaById(ctx.config || {}, ids[0])
+		const r = await unlinkOne(ids[0])
 		if (r.status === 200) triggerMediaRescan(ctx)
 		return r
 	}
-	const r = await runBatchMediaOp(ctx, ids, 'deleted', (id) => unlinkMediaById(ctx.config || {}, id))
+	const r = await runBatchMediaOp(ctx, ids, 'deleted', unlinkOne)
 	if (r.status === 200) triggerMediaRescan(ctx)
 	return r
 }
@@ -308,19 +314,27 @@ async function handleMediaMove(body, ctx) {
 	}
 	const cfg = ctx.config || {}
 	const targetId = b.targetId
-	if (sourceIds.length === 1) {
-		const r = await moveMediaFile(cfg, sourceIds[0], targetId)
-		if (r.status === 200) triggerMediaRescan(ctx)
+	// WO-592 links: every look/playlist/timeline reference follows a moved file.
+	const moved = []
+	const moveOne = async (sourceId) => {
+		const r = await moveMediaFile(cfg, sourceId, targetId)
 		if (r.status === 200) {
-			return {
-				status: 200,
-				headers: JSON_HEADERS,
-				body: jsonBody({ ok: true, moved: 1, count: 1 }),
+			try {
+				const j = JSON.parse(r.body)
+				if (j.id && !j.copiedOnly) moved.push({ from: String(sourceId), to: String(j.id) })
+			} catch (_) {
+				/* body is ours — always JSON */
 			}
 		}
 		return r
 	}
-	const r = await runBatchMediaOp(ctx, sourceIds, 'moved', (sourceId) => moveMediaFile(cfg, sourceId, targetId))
+	const r =
+		sourceIds.length === 1
+			? await moveOne(sourceIds[0]).then((one) =>
+					one.status === 200 ? { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, moved: 1, count: 1 }) } : one,
+				)
+			: await runBatchMediaOp(ctx, sourceIds, 'moved', moveOne)
+	if (moved.length) await require('../media/media-links').followMediaMoves(ctx, moved)
 	if (r.status === 200) triggerMediaRescan(ctx)
 	return r
 }

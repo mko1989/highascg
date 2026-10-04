@@ -29,6 +29,7 @@ const { startOsLayoutWatchdog } = require('./src/bootstrap/os-layout-watchdog')
 const { startCasparAmcpWatchdog } = require('./src/bootstrap/caspar-amcp-watchdog')
 const { parseInfoConfigForDecklinks } = require('./src/utils/decklink-enum')
 const { runConnectionQueryCycle, runMediaLibraryQueryCycle, bindAppCtxAmcpTransport } = require('./src/utils/query-cycle')
+const { scheduleMediaReconcile } = require('./src/media/media-links')
 const moduleRegistry = require('./src/module-registry')
 const { applyUiSelectionPayloadToVariables } = require('./src/api/apply-ui-selection-variables')
 const { LightingInputReceiver } = require('./src/artnet/lighting-input-receiver')
@@ -204,7 +205,9 @@ function main() {
 		appCtx.timelineEngine = new TimelineEngine(appCtx); appCtx.clipEndFadeWatcher = new ClipEndFadeWatcher(appCtx)
 		appCtx.getState = () => getState(appCtx)
 		appCtx.getStateWsBootstrap = () => getState(appCtx, { slimCatalog: true })
-		appCtx.runMediaLibraryQueryCycle = () => runMediaLibraryQueryCycle(appCtx)
+		// WO-592 links: every media rescan also reconciles the registry (re-links files moved outside the UI).
+		appCtx.runMediaLibraryQueryCycle = () => { runMediaLibraryQueryCycle(appCtx); scheduleMediaReconcile(appCtx) }
+		scheduleMediaReconcile(appCtx, 10000)
 		appCtx.startPeriodicSync = (self) => startPeriodicSync(self || appCtx)
 		appCtx.refreshConfigComparison = refreshConfigComparison; appCtx.samplingManager = new SamplingManager(appCtx)
 		appCtx.parseInfoConfigForDecklinks = parseInfoConfigForDecklinks

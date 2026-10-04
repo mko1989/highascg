@@ -355,6 +355,7 @@ module.exports = {
 	getIngestEffectiveBase,
 	ensureProjectMediaDir,
 	normalizeMediaIdForProject,
+	projectMediaIdPrefixesForSlug,
 	expandMediaIdToMediaRoot,
 	getProjectMediaResolveCandidates,
 	normalizeProjectMediaRefs,

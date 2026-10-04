@@ -243,6 +243,7 @@ const FILES = [
 	'tools/smoke/smoke-wo243-operator-gui-crud-ui.test.js',
 	'tools/smoke/smoke-wo243-operator-gui-guards.test.js',
 	'tools/smoke/smoke-wo592-media-preview.test.js',
+	'tools/smoke/smoke-wo592-media-links.test.js',
 	'tools/smoke/smoke-operator-gui-reconnect-reassert.test.js',
 	'tools/smoke/smoke-wo255-shaped-overlay.test.js',
 	'tools/smoke/smoke-shape-overlay-input-dead.test.js',

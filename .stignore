@@ -40,6 +40,7 @@ config/*.json
 
 // Waveform / still caches
 data/waveforms
+data/media-library
 data/live-thumbnails
 
 // Live template poll files
