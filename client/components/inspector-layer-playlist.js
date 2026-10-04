@@ -8,6 +8,7 @@ import { attachMathInput } from '../lib/math-input.js'
 import { api } from '../lib/api-client.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { showScenesToast } from './scenes-editor-support.js'
+import { parseDraggableSourcesPayload } from './scenes-shared.js'
 
 export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rerenderSceneLayer, sel, stateStore }) {
 	const grp = document.createElement('div')
@@ -98,27 +99,27 @@ export function renderLayerPlaylistGroup(root, { sceneId, layerIndex, layer, rer
 			dropzone.style.borderColor = 'var(--border, #30363d)'
 			dropzone.style.backgroundColor = 'rgba(255,255,255,0.02)'
 			dropzone.style.color = 'var(--text-muted)'
-			let data
-			try {
-				data = JSON.parse(e.dataTransfer.getData('application/json'))
-			} catch {
-				const val = e.dataTransfer.getData('text/plain')
-				if (val) data = { type: 'media', value: val, label: val }
-			}
-			if (data && data.value) {
-				const isImg = data.kind === 'still' || data.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(data.value)
-				const newItem = {
-					id: `pl_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
-					type: isImg ? 'image' : (data.type || 'media'),
-					value: data.value,
-					label: data.label || data.value,
-				}
-				// WO-370: only timeless items carry a duration, pre-filled from this playlist's setting.
-				if (isTimelessItem(newItem)) newItem.duration = timelessSecsOf(layer.playlist)
-				const nextList = [...(layer.playlist || []), newItem]
+			// Multi-select drags arrive as `{ type: 'multi', items }` — append them all, in list order.
+			const dropped = parseDraggableSourcesPayload(e.dataTransfer)
+			if (dropped.length) {
+				const newItems = dropped.map((data) => {
+					const isImg = data.kind === 'still' || data.type === 'image' || /\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(data.value)
+					const newItem = {
+						id: `pl_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+						type: isImg ? 'image' : (data.type || 'media'),
+						value: data.value,
+						label: data.label || data.value,
+					}
+					// WO-370: only timeless items carry a duration, pre-filled from this playlist's setting.
+					if (isTimelessItem(newItem)) newItem.duration = timelessSecsOf(layer.playlist)
+					return newItem
+				})
+				const prevLen = (layer.playlist || []).length
+				const nextList = [...(layer.playlist || []), ...newItems]
 				const patch = { playlist: nextList }
-				if (nextList.length === 1) {
-					patch.source = { type: newItem.type, value: newItem.value, label: newItem.label }
+				if (prevLen === 0) {
+					const first = newItems[0]
+					patch.source = { type: first.type, value: first.value, label: first.label }
 				}
 				sceneState.patchLayer(sceneId, layerIndex, patch)
 				document.dispatchEvent(new CustomEvent('scenes-refresh-preview'))

@@ -158,8 +158,7 @@ export function bindSourcesPanelIngestUi(ctx) {
 		showUsbImportModal({ wsClient, onImported: refreshMedia })
 	}
 
-	const upload = (fs) =>
-		Ingest.uploadFiles(fs, {
+	const uploadOpts = () => ({
 			setStatus,
 			showProgress: (v) => {
 				iProgWrap.style.display = v ? 'flex' : 'none'
@@ -171,6 +170,7 @@ export function bindSourcesPanelIngestUi(ctx) {
 			refreshCallback: refreshMedia,
 			uploadSubdir: getDefaultUploadSubdir(),
 		})
+	const upload = (fs) => Ingest.uploadFiles(fs, uploadOpts())
 
 	root.ondragenter = (e) => {
 		e.preventDefault()
@@ -184,7 +184,11 @@ export function bindSourcesPanelIngestUi(ctx) {
 		e.preventDefault()
 		dragOverlay.style.display = 'none'
 		if (getCurrentTab() !== 'media') tabs[0].click()
-		upload(e.dataTransfer?.files)
+		// Internal drags (a media row dropped back on the panel) carry no files — ignore them.
+		if (!e.dataTransfer?.types?.includes('Files')) return
+		void Ingest.collectDroppedFiles(e.dataTransfer)
+			.then((entries) => (entries.some((x) => x.dir) ? Ingest.uploadDroppedEntries(entries, uploadOpts()) : upload(entries.map((x) => x.file))))
+			.catch((err) => setStatus(`✗ ${err?.message || 'Could not read dropped folder'}`, 'error'))
 	}
 	plusBtn.onclick = (e) => {
 		e.stopPropagation()
