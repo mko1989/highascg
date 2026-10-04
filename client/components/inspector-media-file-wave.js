@@ -23,8 +23,9 @@ export function formatMediaTimecode(sec, fps) {
  * @param {HTMLCanvasElement} canvas
  * @param {number[] | null} peaks - 0..1
  * @param {number} progress - 0..1
+ * @param {{ in?: number|null, out?: number|null }} [trim] - 0..1 fractions; outside is dimmed
  */
-export function drawMediaWaveform(canvas, peaks, progress) {
+export function drawMediaWaveform(canvas, peaks, progress, trim = {}) {
 	const dpr = window.devicePixelRatio || 1
 	const w = Math.max(1, Math.round(canvas.clientWidth * dpr))
 	const h = Math.max(1, Math.round(canvas.clientHeight * dpr))
@@ -46,6 +47,16 @@ export function drawMediaWaveform(canvas, peaks, progress) {
 			ctx.fillStyle = x / w <= p ? played : base
 			ctx.fillRect(x, mid - bh / 2, 1, bh)
 		}
+	}
+	const tIn = trim.in != null ? Math.round(trim.in * w) : null
+	const tOut = trim.out != null ? Math.round(trim.out * w) : null
+	if (tIn != null || tOut != null) {
+		ctx.fillStyle = 'rgba(0,0,0,0.55)'
+		if (tIn) ctx.fillRect(0, 0, tIn, h)
+		if (tOut != null && tOut < w) ctx.fillRect(tOut, 0, w - tOut, h)
+		ctx.fillStyle = css.getPropertyValue('--media-insp-trim').trim() || '#f0b429'
+		if (tIn != null) ctx.fillRect(tIn, 0, Math.max(1, Math.round(2 * dpr)), h)
+		if (tOut != null) ctx.fillRect(tOut - Math.max(1, Math.round(2 * dpr)), 0, Math.max(1, Math.round(2 * dpr)), h)
 	}
 	if (p > 0) {
 		ctx.fillStyle = played

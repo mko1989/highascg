@@ -153,3 +153,56 @@ describe('WO-592 renameMediaFiles (temp media + projects)', () => {
 		assert.equal((await links.renameMediaFiles(ctx, [{ from: 'testowe/a.mov', to: '../a.mov' }])).status, 400)
 	})
 })
+
+describe('WO-592 D multi-rename planner (client/lib/media-multi-rename.js)', () => {
+	const load = () => import('../../client/lib/media-multi-rename.js')
+
+	it('keeps each file its own number while the title changes; extension + folder stay', async () => {
+		const { buildMultiRenamePlan } = await load()
+		const plan = buildMultiRenamePlan(['a/01_Grzegorz Zytka.mov', 'a/02_Panel I.mov', 'a/Summer Rally 03.mp4'], { title: 'Speaker' })
+		assert.deepEqual(plan.map((r) => r.to), ['a/01_Speaker.mov', 'a/02_Speaker.mov', 'a/Speaker 03.mp4'])
+	})
+
+	it('a lead number owns the numbering: digits inside the title are never split off', async () => {
+		const { parseNumberedName } = await load()
+		assert.equal(parseNumberedName('03_LOOP_2x3.mp4').title, 'LOOP_2x3')
+		assert.equal(parseNumberedName('1. Główne Tło_HAP.mov').lead, '1')
+	})
+
+	it('renumber (start/step/pad) with empty title keeps titles; flags duplicates and existing names', async () => {
+		const { buildMultiRenamePlan } = await load()
+		const r = buildMultiRenamePlan(['x/01_A.mov', 'x/02_B.mov'], { title: '', renumber: { start: 10, step: 10, pad: 3 } })
+		assert.deepEqual(r.map((x) => x.to), ['x/010_A.mov', 'x/020_B.mov'])
+		const d = buildMultiRenamePlan(['x/Clip.mp4', 'x/Other.mp4'], { title: 'Same' })
+		assert.ok(d.every((x) => x.error === 'duplicate name'))
+		const e = buildMultiRenamePlan(['x/Loop 1.mp4'], { title: 'Bg' }, ['x/Bg 1.mp4', 'x/Loop 1.mp4'])
+		assert.equal(e[0].error, 'a file with this name exists')
+	})
+})
+
+describe('WO-592 per-file defaults copy onto a look layer (client/lib/media-file-defaults.js)', () => {
+	it('only on a media SOURCE CHANGE, only fields the patch does not set', async () => {
+		const m = await import('../../client/lib/media-file-defaults.js')
+		m.setLocalMediaFileDefaults('projects/demo/intro.mov', { trimInMs: 1000, trimOutMs: 9000, muted: true })
+		const layer = { source: { type: 'media', value: 'old.mov' } }
+		const out = m.withMediaFileDefaults(layer, { source: { type: 'media', value: 'projects/demo/intro.mov' }, trimOutMs: 5000 })
+		assert.equal(out.trimInMs, 1000)
+		assert.equal(out.trimOutMs, 5000, 'explicit patch value wins')
+		assert.equal(out.muted, true)
+		const same = { source: { type: 'media', value: 'projects/demo/intro.mov' } }
+		assert.equal(m.withMediaFileDefaults({ source: same.source }, same), same, 'unchanged source → untouched')
+		const tpl = { source: { type: 'template', value: 'projects/demo/intro.mov' } }
+		assert.equal(m.withMediaFileDefaults(layer, tpl), tpl)
+	})
+})
+
+describe('WO-592 wiring (source asserts)', () => {
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
+	it('patchLayer applies file defaults; move + delete go through links; reconcile rides every rescan', () => {
+		assert.match(read('client/lib/scene-state-layer-ops.js'), /LayerLogic\.patchLayer\(L, withMediaFileDefaults\(L, patch\)\)/)
+		const rm = read('src/api/routes-media.js')
+		assert.match(rm, /followMediaMoves\(ctx, moved\)/)
+		assert.match(rm, /forgetPaths\(\[String\(id\)\]\)/)
+		assert.match(read('index.js'), /runMediaLibraryQueryCycle\(appCtx\); scheduleMediaReconcile\(appCtx\)/)
+	})
+})

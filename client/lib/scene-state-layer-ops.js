@@ -13,6 +13,7 @@ import {
 import { showAppToast } from './app-toast.js'
 import { applySceneLayerDefaults } from './editor-defaults.js'
 import * as LayerLogic from './scene-state-layer-logic.js'
+import { withMediaFileDefaults } from './media-file-defaults.js'
 
 /** @param {import('./scene-state.js').SceneState} SceneStateClass */
 export function mixinSceneStateLayerOps(SceneStateClass) {
@@ -94,7 +95,8 @@ export function mixinSceneStateLayerOps(SceneStateClass) {
 			}
 			const L = this.getScene(sceneId)?.layers?.[layerIndex]
 			if (L) {
-				LayerLogic.patchLayer(L, patch)
+				// WO-592: a clip landing on this layer brings its per-file trim/mute defaults.
+				LayerLogic.patchLayer(L, withMediaFileDefaults(L, patch))
 				this._softSave()
 			}
 		},

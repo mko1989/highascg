@@ -15,6 +15,7 @@ import { createProjectMediaGather } from './sources-panel-project-gather.js'
 import { createMediaSelection } from './sources-panel-media-selection.js'
 import { createHapEncode } from './sources-panel-hap-encode.js'
 import { attachDecklinkDropHandlers } from './sources-panel-decklink-drop.js'
+import { showMediaMultiRename } from './media-multi-rename-modal.js'
 
 export function initSourcesPanel(root, stateStore, opts = {}) {
 	const liveConnectorsCache = { current: [] }
@@ -44,6 +45,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		selectionCountEl,
 		refreshBtn,
 		replMediaBtn,
+		renameBtn,
 		copyBtn,
 		moveBtn,
 		hapBtn,
@@ -296,6 +298,29 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 		render()
 	})
 	if (refreshBtn) refreshBtn.onclick = rescanMediaFromCaspar
+	// WO-592: links — renames/deletes made anywhere (multi-rename, inspector) keep the selection in
+	// step and rescan; references in looks/timelines were already rewritten server-side.
+	window.addEventListener('media-library-changed', (e) => {
+		const d = e.detail || {}
+		for (const { from, to } of d.renamed || []) {
+			if (selectedMedia.delete(from)) selectedMedia.add(to)
+		}
+		for (const id of d.deleted || []) selectedMedia.delete(id)
+		void refreshMedia()
+	})
+	if (renameBtn) {
+		renameBtn.onclick = async () => {
+			// List order, not click order — renumbering follows what the operator sees.
+			const order = visibleMediaOrder.current.map(String)
+			const ids = Array.from(selectedMedia).map(String).sort((x, y) => order.indexOf(x) - order.indexOf(y))
+			const existingIds = (stateStore.getState().media || []).map((m) => String(m?.id ?? m))
+			const renamed = await showMediaMultiRename({ ids, existingIds })
+			if (renamed) {
+				ingest.setStatus(`✓ Renamed ${renamed.length} file(s) — looks follow`, 'ok')
+				window.dispatchEvent(new CustomEvent('media-library-changed', { detail: { renamed } }))
+			}
+		}
+	}
 	if (copyBtn) copyBtn.onclick = () => void mediaSelection.runMediaTransfer('copy')
 	if (moveBtn) moveBtn.onclick = () => void mediaSelection.runMediaTransfer('move')
 	if (hapBtn) hapBtn.onclick = () => void hapEncode.run()

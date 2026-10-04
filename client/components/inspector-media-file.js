@@ -15,6 +15,7 @@ import { classifyMediaItem } from '../lib/media-ext.js'
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 import { reportMediaPreviewRect } from '../lib/operator-gui-mode-report.js'
 import { drawMediaWaveform, formatMediaTimecode } from './inspector-media-file-wave.js'
+import { mountMediaFileLibrarySection } from './inspector-media-file-library.js'
 
 /** Only the newest mount owns the Caspar preview layer — a disposed older one must not stop it. */
 let currentToken = 0
@@ -68,14 +69,33 @@ export function renderMediaFileInspector(root, sel) {
 			</div>`
 					: ''
 			}
+			<div class="media-insp__library"></div>
 			${info.length ? `<dl class="media-insp__info">${info.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join('')}</dl>` : ''}
 		</div>`
 
 	const waveWrap = root.querySelector('.media-insp__wave')
 	const canvas = waveWrap.querySelector('canvas')
 	const note = waveWrap.querySelector('.media-insp__wave-note')
-	const state = { peaks: null, pos: 0, playing: false, channel: null, layer: null }
-	const redraw = () => drawMediaWaveform(canvas, state.peaks, durationSec > 0 ? state.pos / durationSec : 0)
+	const state = { peaks: null, pos: 0, playing: false, channel: null, layer: null, trim: { inSec: null, outSec: null } }
+	const frac = (sec) => (sec != null && durationSec > 0 ? Math.min(1, Math.max(0, sec / durationSec)) : null)
+	const redraw = () =>
+		drawMediaWaveform(canvas, state.peaks, durationSec > 0 ? state.pos / durationSec : 0, {
+			in: frac(state.trim.inSec),
+			out: frac(state.trim.outSec),
+		})
+
+	mountMediaFileLibrarySection(root.querySelector('.media-insp__library'), {
+		id,
+		fps,
+		durationSec,
+		timed: kind === 'video' || kind === 'audio',
+		getPos: kiosk ? () => state.pos : null,
+		isCurrent: () => token === currentToken,
+		onTrim: (t) => {
+			state.trim = t
+			redraw()
+		},
+	})
 
 	api.get(`/api/local-media/${encodeURIComponent(id)}/waveform?bars=600`)
 		.then((r) => {
@@ -121,6 +141,10 @@ export function renderMediaFileInspector(root, sel) {
 				offOsc = osc.onLayerState(r.channel, r.layer, (ly) => {
 					const el = Number(ly?.file?.elapsed)
 					if (Number.isFinite(el)) state.pos = el
+					if (state.playing && state.pos >= outSec()) {
+						setPlaying(false)
+						void send({ action: 'pause' })
+					}
 					if (typeof ly?.paused === 'boolean' && ly.paused === state.playing) setPlaying(!ly.paused)
 					showPos()
 				})
@@ -130,10 +154,21 @@ export function renderMediaFileInspector(root, sel) {
 			if (token === currentToken) tcEl.textContent = e?.message || 'Preview unavailable'
 		})
 
-	playBtn.addEventListener('click', () => {
+	// Preview honours the trim: play starts at In when outside [In, Out), and pauses at Out.
+	const inSec = () => state.trim.inSec ?? 0
+	const outSec = () => state.trim.outSec ?? Infinity
+	playBtn.addEventListener('click', async () => {
 		const next = !state.playing
 		setPlaying(next)
-		void send({ action: next ? 'play' : 'pause' }).catch(() => setPlaying(!next))
+		try {
+			if (next && (state.pos < inSec() || state.pos >= outSec() - 0.05)) {
+				state.pos = inSec()
+				await send({ action: 'seek', seconds: state.pos })
+			}
+			await send({ action: next ? 'play' : 'pause' })
+		} catch {
+			setPlaying(!next)
+		}
 	})
 	canvas.addEventListener('click', (e) => {
 		if (!(durationSec > 0)) return

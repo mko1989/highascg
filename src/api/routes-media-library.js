@@ -3,7 +3,8 @@
  *
  *   POST /api/media/rename            { renames: [{ from, to }] }  all-or-nothing; references follow
  *   GET  /api/media/library/entry     ?path=<media id>             → { entry, usage }
- *   POST /api/media/library/defaults  { path, trimIn?, trimOut?, muted? }  per-file defaults
+ *   POST /api/media/library/defaults  { path, trimInMs?, trimOutMs?, muted? }  per-file defaults
+ *   GET  /api/media/library/defaults  → { defaults: { [path]: { trimInMs?, trimOutMs?, muted? } } }
  */
 'use strict'
 
@@ -53,18 +54,28 @@ function handleDefaultsPost(body, ctx) {
 	const e = entryFor(ctx, p)
 	if (!e) return reply(404, { error: 'not in media library' })
 	const patch = {}
-	for (const k of ['trimIn', 'trimOut']) {
+	for (const k of ['trimInMs', 'trimOutMs']) {
 		if (!(k in b)) continue
 		const v = num(b[k])
-		if (v === undefined) return reply(400, { error: `${k} must be seconds ≥ 0 or null` })
+		if (v === undefined) return reply(400, { error: `${k} must be ms ≥ 0 or null` })
 		patch[k] = v
 	}
 	if ('muted' in b) patch.muted = b.muted === true
-	if (patch.trimIn != null && patch.trimOut != null && patch.trimOut <= patch.trimIn) {
+	if (patch.trimInMs != null && patch.trimOutMs != null && patch.trimOutMs <= patch.trimInMs) {
 		return reply(400, { error: 'trimOut must be after trimIn' })
 	}
 	const next = registry.setDefaults(e.id, patch)
 	return reply(200, { ok: true, defaults: next?.defaults || {} })
 }
 
-module.exports = { handleRename, handleEntryGet, handleDefaultsPost }
+/** Every file that has defaults — the client applies them when a clip lands on a look layer. */
+function handleDefaultsGet() {
+	const out = {}
+	for (const e of Object.values(registry.load().items)) {
+		const d = e.defaults || {}
+		if (d.trimInMs != null || d.trimOutMs != null || d.muted) out[e.path] = d
+	}
+	return reply(200, { defaults: out })
+}
+
+module.exports = { handleRename, handleEntryGet, handleDefaultsPost, handleDefaultsGet }

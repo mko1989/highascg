@@ -326,6 +326,7 @@ routes.post('/api/media/preview', ({ body, ctx }) => routesMediaPreview.handleMe
 routes.post('/api/media/rename', ({ body, ctx }) => routesMediaLibrary.handleRename(body, ctx), { requireCaspar: false }) // WO-592 links
 routes.get('/api/media/library/entry', ({ query, ctx }) => routesMediaLibrary.handleEntryGet(query, ctx), { requireCaspar: false })
 routes.post('/api/media/library/defaults', ({ body, ctx }) => routesMediaLibrary.handleDefaultsPost(body, ctx), { requireCaspar: false })
+routes.get('/api/media/library/defaults', () => routesMediaLibrary.handleDefaultsGet(), { requireCaspar: false })
 routes.post('/api/media/cinf', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/thumbnail/live/capture', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })
 routes.post('/api/thumbnail/live/upload', ({ path, body, ctx, req, query }) => routesMedia.handlePost(path, body, ctx, req, query), { requireCaspar: false })

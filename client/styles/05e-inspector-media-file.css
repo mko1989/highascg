@@ -91,3 +91,118 @@
 .media-insp__info dd {
 	margin: 0;
 }
+.media-insp__trim {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+.media-insp__trim label {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.media-insp__trim input {
+	width: 78px;
+	font-family: ui-monospace, monospace;
+}
+.media-insp__btn--sm {
+	min-width: 0;
+	padding: 2px 7px;
+}
+.media-insp__btn--danger {
+	color: var(--danger, #f85149);
+	border-color: color-mix(in srgb, var(--danger, #f85149) 50%, transparent);
+}
+.media-insp__mute {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.8rem;
+}
+.media-insp__hint {
+	margin: -2px 0 0;
+	font-size: 0.68rem;
+	color: var(--text-muted);
+}
+.media-insp__usage {
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+.media-insp__usage ul {
+	margin: 2px 0 0;
+	padding-left: 16px;
+	color: var(--text);
+}
+.media-insp__usage i {
+	color: var(--text-muted);
+	font-style: normal;
+}
+.media-insp__actions {
+	display: flex;
+	gap: 8px;
+}
+.media-insp__msg {
+	font-size: 0.75rem;
+	color: var(--danger, #f85149);
+}
+.media-insp__msg:empty {
+	display: none;
+}
+
+/* WO-592 D — multi-rename dialog */
+.media-multi-rename {
+	width: min(640px, 92vw);
+}
+.media-multi-rename__field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	font-size: 0.8rem;
+}
+.media-multi-rename__renumber {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-top: 10px;
+	font-size: 0.8rem;
+}
+.media-multi-rename__renumber input[type='number'] {
+	width: 64px;
+}
+.media-multi-rename__hint {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+.media-multi-rename__preview {
+	max-height: 40vh;
+	overflow: auto;
+	border: 1px solid var(--border, #30363d);
+	border-radius: 4px;
+	font-size: 0.75rem;
+}
+.media-multi-rename__row {
+	display: grid;
+	grid-template-columns: 1fr auto 1fr;
+	gap: 8px;
+	padding: 3px 8px;
+	border-bottom: 1px solid var(--border, #30363d);
+}
+.media-multi-rename__row span {
+	overflow-wrap: anywhere;
+}
+.media-multi-rename__row--same {
+	color: var(--text-muted);
+}
+.media-multi-rename__row--bad em {
+	color: var(--danger, #f85149);
+	font-style: normal;
+}
+.media-multi-rename__error {
+	margin-top: 6px;
+	font-size: 0.75rem;
+	color: var(--danger, #f85149);
+}
