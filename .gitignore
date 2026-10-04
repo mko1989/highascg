@@ -118,11 +118,15 @@ CT-SS-master/
 # Local Caspar config backups / duplicates
 config/casparcg.config.bak.*
 config/*copy.config
+# config-manager quarantines unparseable configs here
+config/*.corrupt-*
 
 # Runtime scratch / local timelines (like projects/)
 .w
 work/logs/
 work/multi-logs/
+# Third-party reference code, local only
+work/references/
 timelines/
 .operator-firefox-profile/
 config/*.tmp
