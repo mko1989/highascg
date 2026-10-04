@@ -223,6 +223,7 @@ const FILES = [
 	'tools/smoke/smoke-wo210-screen-timers-persistence-and-guards.test.js',
 	'tools/smoke/smoke-wo211-playlist-loop.test.js',
 	'tools/smoke/smoke-playlist-item-loop.test.js',
+	'tools/smoke/smoke-playlist-osc-index-match.test.js',
 	'tools/smoke/smoke-wo212-mv-playlist-labels.test.js',
 	'tools/smoke/smoke-wo213-preview-invalidate.test.js',
 	'tools/smoke/smoke-wo214-timeline-mixer-rows.test.js',
