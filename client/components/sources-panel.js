@@ -306,7 +306,8 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 			if (selectedMedia.delete(from)) selectedMedia.add(to)
 		}
 		for (const id of d.deleted || []) selectedMedia.delete(id)
-		void refreshMedia()
+		mediaSelection.forceReannounce()
+		void refreshMedia().then(render)
 	})
 	if (renameBtn) {
 		renameBtn.onclick = async () => {

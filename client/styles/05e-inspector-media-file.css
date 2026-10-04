@@ -206,3 +206,51 @@
 	font-size: 0.75rem;
 	color: var(--danger, #f85149);
 }
+
+/* WO-592 B — versions */
+.media-insp__versions {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding-top: 6px;
+	border-top: 1px solid var(--border, #30363d);
+}
+.media-insp__versions-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 0.75rem;
+	color: var(--text-muted);
+}
+.media-insp__upload {
+	cursor: pointer;
+	font-size: 0.72rem;
+}
+.media-insp__ver {
+	display: grid;
+	grid-template-columns: 30px 1fr auto auto auto;
+	align-items: center;
+	gap: 6px;
+	font-size: 0.72rem;
+	color: var(--text-muted);
+}
+.media-insp__ver b {
+	color: var(--text);
+}
+.media-insp__ver--current b {
+	color: var(--accent, #58a6ff);
+}
+.media-insp__ver--none {
+	display: block;
+}
+.media-insp__versions-progress {
+	height: 4px;
+	background: var(--bg-elevated, #21262d);
+	border-radius: 2px;
+	overflow: hidden;
+}
+.media-insp__versions-progress > div {
+	height: 100%;
+	width: 0;
+	background: var(--accent, #58a6ff);
+}

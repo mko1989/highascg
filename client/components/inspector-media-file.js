@@ -38,7 +38,9 @@ export function renderMediaFileInspector(root, sel) {
 	const folder = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : ''
 	const dims = parseResolution(item.resolution)
 	const fps = Number(item.fps) > 0 ? Number(item.fps) : 25
-	const durationSec = Number(item.durationMs) > 0 ? Number(item.durationMs) / 1000 : 0
+	// Unknown right after a rename/ingest (probe overlay keyed by the old id) — filled in below from
+	// the waveform response, or on the kiosk from Caspar's own `file/time` duration.
+	let durationSec = Number(item.durationMs) > 0 ? Number(item.durationMs) / 1000 : 0
 	const kiosk = isOperatorGuiModeActive() && kind === 'video'
 	const aspect = dims ? `${dims.width} / ${dims.height}` : '16 / 9'
 
@@ -84,6 +86,12 @@ export function renderMediaFileInspector(root, sel) {
 			out: frac(state.trim.outSec),
 		})
 
+	const onDuration = () => {
+		const tc = root.querySelector('.media-insp__tc')
+		if (tc) tc.textContent = `${formatMediaTimecode(state.pos, fps)} / ${formatMediaTimecode(durationSec, fps)}`
+		redraw()
+	}
+
 	mountMediaFileLibrarySection(root.querySelector('.media-insp__library'), {
 		id,
 		fps,
@@ -100,6 +108,10 @@ export function renderMediaFileInspector(root, sel) {
 	api.get(`/api/local-media/${encodeURIComponent(id)}/waveform?bars=600`)
 		.then((r) => {
 			if (token !== currentToken) return
+			if (!(durationSec > 0) && Number(r?.durationMs) > 0) {
+				durationSec = Number(r.durationMs) / 1000
+				onDuration()
+			}
 			if (!r?.hasAudio || !r.peaks?.length) {
 				note.textContent = 'No audio track'
 				return
@@ -140,6 +152,7 @@ export function renderMediaFileInspector(root, sel) {
 			if (osc?.onLayerState) {
 				offOsc = osc.onLayerState(r.channel, r.layer, (ly) => {
 					const el = Number(ly?.file?.elapsed)
+					if (!(durationSec > 0) && Number(ly?.file?.duration) > 0) durationSec = Number(ly.file.duration)
 					if (Number.isFinite(el)) state.pos = el
 					if (state.playing && state.pos >= outSec()) {
 						setPlaying(false)

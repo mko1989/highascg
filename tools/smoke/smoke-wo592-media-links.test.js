@@ -203,6 +203,7 @@ describe('WO-592 wiring (source asserts)', () => {
 		const rm = read('src/api/routes-media.js')
 		assert.match(rm, /followMediaMoves\(ctx, moved\)/)
 		assert.match(rm, /forgetPaths\(\[String\(id\)\]\)/)
+		assert.match(rm, /removeAllVersions\(gone\.map/, 'final delete also removes every stored version')
 		assert.match(read('index.js'), /runMediaLibraryQueryCycle\(appCtx\); scheduleMediaReconcile\(appCtx\)/)
 	})
 })

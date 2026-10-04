@@ -7,6 +7,7 @@ import { api } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { setLocalMediaFileDefaults } from '../lib/media-file-defaults.js'
 import { formatMediaTimecode } from './inspector-media-file-wave.js'
+import { mountMediaFileVersions } from './inspector-media-file-versions.js'
 
 /** "1:02.5" / "62.5" / "1:02:03" → seconds; '' → null; garbage → NaN */
 export function parseTimeInput(text) {
@@ -40,11 +41,13 @@ export function mountMediaFileLibrarySection(host, opts) {
 			: ''
 	}
 		<div class="media-insp__usage">Checking where this file is used…</div>
+		<div class="media-insp__versions"></div>
 		<div class="media-insp__actions">
 			<button type="button" class="media-insp__btn" data-act="rename">Rename…</button>
 			<button type="button" class="media-insp__btn media-insp__btn--danger" data-act="delete">Delete</button>
 		</div>
 		<div class="media-insp__msg"></div>`
+	mountMediaFileVersions(host.querySelector('.media-insp__versions'), { id, isCurrent })
 	const q = (k) => host.querySelector(`[data-k="${k}"]`)
 	const msg = host.querySelector('.media-insp__msg')
 	const usageEl = host.querySelector('.media-insp__usage')

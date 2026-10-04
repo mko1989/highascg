@@ -277,7 +277,10 @@ async function handleMediaDelete(body, ctx) {
 	// WO-592: delete is final — the link is forgotten so nothing can re-link to the path later.
 	const unlinkOne = async (id) => {
 		const r = await unlinkMediaById(ctx.config || {}, id)
-		if (r.status === 200) require('../media/media-library-registry').forgetPaths([String(id)])
+		if (r.status === 200) {
+			const gone = require('../media/media-library-registry').forgetPaths([String(id)])
+			require('../media/media-versions').removeAllVersions(gone.map((e) => e.id))
+		}
 		return r
 	}
 	if (ids.length === 1) {

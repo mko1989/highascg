@@ -110,7 +110,13 @@ export function createMediaSelection(ctx) {
 		refreshMedia()
 	}
 
+	/** Next render re-announces the selection even if unchanged (file content/name changed under it). */
+	function forceReannounce() {
+		announcedId = undefined
+	}
+
 	return {
+		forceReannounce,
 		toggleMediaSelection,
 		updateSelectionBar,
 		runMediaTransfer,

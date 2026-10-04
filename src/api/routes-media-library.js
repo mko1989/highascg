@@ -36,7 +36,7 @@ function handleEntryGet(query, ctx) {
 	const e = entryFor(ctx, p)
 	if (!e) return reply(404, { error: 'not in media library' })
 	return reply(200, {
-		entry: { id: e.id, path: e.path, defaults: e.defaults || {}, versions: e.versions || [], addedAt: e.addedAt },
+		entry: { id: e.id, path: e.path, defaults: e.defaults || {}, versions: e.versions || [], currentV: e.currentV || 1, size: e.size, addedAt: e.addedAt },
 		usage: findMediaUsage(ctx, e.path),
 	})
 }
