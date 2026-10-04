@@ -1,4 +1,4 @@
-**Status: OPEN — design proposed 2026-10-04, awaiting owner decisions (§ Decisions). Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
+**Status: OPEN — design proposed 2026-10-04; decisions 1, 3, 4 answered 04.10, decision 2 (proxies) pending. Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
 
 # WO-592 — Media library: stable links, version control, media inspector, multi-rename
 
@@ -137,6 +137,11 @@ Select several files → *Rename…* in the selection bar → dialog:
 5. Versions + final delete.
 
 ## Decisions (owner)
+**Answered 04.10:** 1 → file defaults copied into looks. 3 → keep all versions until purged
+manually; the inspector shows the full list of old versions and the owner can go back to any chosen
+one (Restore = swap, the current file becomes a version, so nothing is lost). 4 → keep numbers,
+change title, optional renumbering is enough (no pattern field). 2 → open (owner asked what it means).
+
 1. Trim/mute in the media inspector: **file default copied into looks (recommended)**, or edits the
    file itself (destructive trim via re-encode), or preview-only?
 2. Proxies: OK to spend ~1 GB/hour of footage on disk and background CPU off-air? (Recommended yes.)
