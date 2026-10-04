@@ -192,7 +192,7 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 			let thumbHtml
 			let thumbKind = kind // Store for later error handler (WO-184)
 			if (kind === 'video' || kind === 'still') {
-				const thumbUrl = getThumbnailUrl(id, 80, 2)
+				const thumbUrl = getThumbnailUrl(id, 80, 2, item.fileSize)
 				// WO-184: Use placeholder; error handler will be attached after DOM creation
 				thumbHtml = `<div class="source-item__thumbnail"><img src="${thumbUrl}" loading="lazy"/></div>`
 			} else if (kind === 'audio') {

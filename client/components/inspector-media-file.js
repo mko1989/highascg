@@ -55,7 +55,7 @@ export function renderMediaFileInspector(root, sel) {
 	if (kind === 'video' || kind === 'still') {
 		previewHtml = kiosk
 			? `<div class="media-insp__preview media-insp__preview--hole" style="aspect-ratio:${aspect}"></div>`
-			: `<div class="media-insp__preview" style="aspect-ratio:${aspect}"><img src="${escapeHtml(getThumbnailUrl(id, 640, 2))}" alt="" /></div>`
+			: `<div class="media-insp__preview" style="aspect-ratio:${aspect}"><img src="${escapeHtml(getThumbnailUrl(id, 640, 2, item.fileSize))}" alt="" /></div>`
 	}
 	root.innerHTML = `
 		<div class="media-insp">

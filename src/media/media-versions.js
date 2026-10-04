@@ -36,6 +36,16 @@ function moveFile(src, dest) {
 	}
 }
 
+/** Keep the registry's stats true right away (reconcile would only catch up on the next rescan). */
+function refreshStats(e, abs) {
+	try {
+		const st = fs.statSync(abs)
+		Object.assign(e, { dev: st.dev, ino: st.ino, size: st.size, mtimeMs: Math.round(st.mtimeMs) })
+	} catch {
+		/* stats are advisory */
+	}
+}
+
 function nextV(e) {
 	return Math.max(e.currentV || 1, ...(e.versions || []).map((x) => x.v)) + 1
 }
@@ -69,6 +79,7 @@ function installNewVersion(config, mediaPath, incomingAbs) {
 	}
 	e.currentV = v
 	e.currentAddedAt = now
+	refreshStats(e, abs)
 	registry.save()
 	return { ok: true, entry: e }
 }
@@ -90,6 +101,7 @@ function restoreVersion(config, mediaPath, v) {
 	e.versions = e.versions.filter((x) => x.v !== target.v)
 	e.currentV = target.v
 	e.currentAddedAt = target.addedAt
+	refreshStats(e, abs)
 	registry.save()
 	return { ok: true, entry: e }
 }

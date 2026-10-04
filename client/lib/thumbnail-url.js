@@ -42,11 +42,14 @@ export function getLiveThumbnailChannelForSource(source, fallbackChannel = null)
  * Build a thumbnail URL preferring HighAsCG local ffmpeg extraction.
  * `hq=1` hints server-side local extraction before any Caspar fallback path.
  */
-export function getThumbnailUrl(fileId, width = 960, seekSec = 2) {
+export function getThumbnailUrl(fileId, width = 960, seekSec = 2, cacheBust) {
 	if (!fileId) return null
 	const w = Math.max(64, Math.min(1920, Number(width) || 960))
 	const t = Math.max(0, Number(seekSec) || 0)
-	return `${getApiBase()}/api/thumbnail/${encodeURIComponent(String(fileId))}?hq=1&w=${w}&t=${t}`
+	// WO-592: a new file version keeps its path — `cacheBust` (e.g. file size) makes the browser's
+	// image cache miss once the content changed (the server cache is already keyed by stat).
+	const v = cacheBust != null && String(cacheBust) !== '' ? `&v=${encodeURIComponent(String(cacheBust))}` : ''
+	return `${getApiBase()}/api/thumbnail/${encodeURIComponent(String(fileId))}?hq=1&w=${w}&t=${t}${v}`
 }
 
 export function getLiveThumbnailUrl(channel, cacheBust) {
