@@ -39,13 +39,13 @@ function isVolumeMountedSync(mountPath) {
  * @returns {{ usb: string | null, bridge: string | null, local: string }}
  */
 function getProjectRoots() {
-	const { REPO_ROOT } = require('../repo-paths')
-	const loaded = loadExfatSyncMapFromDisk()
+	const { projectsRoot, volumeSyncAllowed } = require('./projects-root')
+	const loaded = volumeSyncAllowed() ? loadExfatSyncMapFromDisk() : { map: null }
 	const vols = loaded.map?.volumes || {}
 	return {
 		usb: vols.usb?.mount ? path.resolve(vols.usb.mount) : null,
 		bridge: vols.bridge?.mount ? path.resolve(vols.bridge.mount) : null,
-		local: path.join(REPO_ROOT, PROJECTS_SUBDIR),
+		local: projectsRoot(),
 	}
 }
 

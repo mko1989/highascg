@@ -9,11 +9,14 @@ const {
 	pullAutosaveSlugFromVolumesIfNewer,
 } = require('./project-volume-sync')
 
-const PROJECTS_DIR = path.join(REPO_ROOT, 'projects')
+const { projectsRoot } = require('./projects-root')
+const PROJECTS_DIR = projectsRoot() // live <repo>/projects; a temp dir under node --test (projects-root.js)
 const AUTOSAVE_SUBDIR = '_autosave'
 const TRASH_SUBDIR = '_trash'
 const ACTIVE_SLUG_KEY = 'web_project_active_slug'
-const LEGACY_AUTOSAVE_PATH = path.join(REPO_ROOT, 'autosave.json')
+const LEGACY_AUTOSAVE_PATH = require('./projects-root').underTestRunner()
+	? path.join(PROJECTS_DIR, '_legacy-autosave.json')
+	: path.join(REPO_ROOT, 'autosave.json')
 const SYNC_CONFLICT_RE = /^(.+)\.sync-conflict-\d{8}-\d{6}-[A-Z0-9]+$/
 
 /**
