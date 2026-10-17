@@ -4,8 +4,12 @@ extends HSplitContainer
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const StageBuilder := preload("res://features/previs/stage_builder.gd")
+const StagePanel := preload("res://features/previs/stage_panel.gd")
 
 var stage: PrevisStage
+var builder: StageBuilder
+var stage_panel: StagePanel
 var _models: ItemList
 var _meshes: VBoxContainer
 var _source: OptionButton
@@ -25,9 +29,19 @@ func _ready() -> void:
 	svc.add_child(sv)
 	stage = PrevisStage.new()
 	sv.add_child(stage)
+	builder = StageBuilder.new()
+	stage.add_child(builder)
 	svc.gui_input.connect(func(e: InputEvent) -> void: stage.handle_input(e))
 	add_child(_build_panel())
 	stage.model_loaded.connect(_on_model_loaded)
+	var framed := [false]
+	stage_panel.stage_loaded.connect(func(n: int) -> void:
+		if n > 0 and not framed[0]:
+			framed[0] = true
+			stage.frame_box.call_deferred(builder.bounds()))
+	stage_panel.bind(builder)
+	if Config.args.has("probe-stage-add"):  # dev: --probe-stage-add=<menu id> (0 LED, 1 TV, 2 projection)
+		get_tree().create_timer(3.0).timeout.connect(func() -> void: stage_panel._on_add(int(Config.args["probe-stage-add"])))
 	_set_source(str(Config.args.get("previs-source", "opgui")))
 	refresh_models()
 
@@ -37,7 +51,7 @@ func refresh_models() -> void:
 	_models.clear()
 	_model_ids.clear()
 	if not res.ok:
-		_status.text = "previs module off on the server (%s)" % res.error
+		_status.text = "no GLB model library (server previs module off) — the stage above works without it"
 		return
 	for m in (res.data as Dictionary).get("models", []):
 		_models.add_item(str(m.get("name", m.get("id"))))
@@ -82,6 +96,9 @@ func _build_panel() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
 	panel.add_child(v)
+	v.add_child(_heading("Stage (WO-614)"))
+	stage_panel = StagePanel.new()
+	v.add_child(stage_panel)
 	v.add_child(_heading("Models"))
 	_models = ItemList.new()
 	_models.custom_minimum_size.y = 120
@@ -96,6 +113,10 @@ func _build_panel() -> Control:
 	v.add_child(_source)
 	v.add_child(_heading("Camera"))
 	var cams := HBoxContainer.new()
+	var fit := Button.new()
+	fit.text = "Fit"
+	fit.pressed.connect(func() -> void: stage.frame_box(builder.bounds()))
+	cams.add_child(fit)
 	for p in ["Front", "Top", "ISO"]:
 		var b := Button.new()
 		b.text = p
