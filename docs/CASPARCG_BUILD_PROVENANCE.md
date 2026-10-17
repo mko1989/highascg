@@ -38,3 +38,16 @@ Every component of the final binary, mapped to its source. Keep current through 
 - Output: `bin/casparcg` (9.3 MB, reports `2.6.0 Dev Revision: 253c16c`), deployed 2026-07-15 (previous binary kept as `bin/casparcg.prev`).
 - Rebuild recipe + full per-commit provenance: `~/Downloads/caspar-build-kit/` (`SOURCES.txt`, `build-baremetal.sh`, `build-docker.sh`, unshallowed git bundle, the exact CEF tarball) and `work/work-orders/234_WO_CASPAR_FINAL_BUILD.md`.
 - Known post-swap integration work: WO-235 (2.6-dev OSC/INFO schema drift vs highascg parsers).
+
+---
+
+## Build record highascg-build-v2 (2026-10-17, built + running on the shop dev box)
+
+- Base **upstream `v2.5.1-stable` (`ec38d94`)** + all v1 carried commits cherry-picked with `-x`
+  (branch `highascg-build-v2`, final HEAD `886998c`). Per-item outcome and the OAL decision: [WO-613](../work/work-orders/613_WO_next_caspar_build_on_v2_5_1.md).
+- Differences from v1 beyond the base: rows 1–10 carried; **row 3/4 keep Enhanced OAL/screen** (upstream #1714 OAL rewrite not taken);
+  **row 7 newtek module = v1's** (master NDI v6 + #1691); **+ row 11 `shm` consumer** (WO-594);
+  **+ `886998c` fix(osc): float/double args big-endian** (regression from carried `7e7c0b2`, the root cause of the "LE OSC floats" defect).
+- Toolchain: system cmake + ninja, gcc, Release, `-j24`, `USE_SYSTEM_CEF=OFF`, CEF from v1's download cache (pinned sha256 `2a03fa6b…`).
+- Output: `bin/casparcg` reports `2.5.1 886998cc1 Stable` (9.2 MB). Rollbacks on the box: `casparcg.253c16c` (v1), `casparcg.v1-shm`, `casparcg.prev`.
+- Source: `~/caspar-build/src-v2` (worktree of `src-tree`), bundle `~/Downloads/caspar-build-kit/highascg-build-v2.bundle`.

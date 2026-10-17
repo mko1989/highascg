@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — module + ABI + writer/reader implemented in `caspar/modules/shm/`; seqlock test PASS and Caspar glue syntax-checked on the dev Mac; NOT yet built into highascg-build-v1 or run in Caspar (no box). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Blocks: WO-595 (M0 spike, step 2+), WO-596, WO-597, WO-607.**
+**Status: IN PROGRESS (2026-10-17) — built INTO Caspar for the first time on the shop dev box (v1+shm, then `highascg-build-v2` = v2.5.1, WO-613) and running there; ADD/REMOVE, probe, reader-stall and restart checks PASS; **CPU target MISSED (+5.2 % of a core at 1080p50 vs < 3 %)**; 1 h soak + on-air ADD/REMOVE still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
 
 # WO-594 — CasparCG `shm` frame consumer (highascg-build-v1): channel frames → POSIX shared memory
 
@@ -252,3 +252,19 @@ frame. A shared futex on `latest` can be added later for event-driven readers.
 - Python bridge ↔ probe with the same ABI: 1080p50 300/300 frames 0 torn; 3072×1728 0 torn (WO-595).
 - **Not verified:** build inside `highascg-build-v1`, behaviour inside Caspar (channel timing, ADD/REMOVE
   on air, CPU) — the WO-594 acceptance table runs on the box.
+
+## What was VERIFIED on the box (2026-10-17, shop dev box, 1 channel 1080p50, RTX PRO 4000)
+
+Built with no source change into v1 (`~/caspar-build/build`, one `add_subdirectory(shm)`) and into
+`highascg-build-v2` (WO-613); gcc, no warnings in `modules/shm`. Note the box has **one channel**, so the
+smoke ran on ch1 (`ADD 5-740` correctly answers 400 here — no ch5).
+
+| Check | Result |
+|-------|--------|
+| `ADD 1-740 SHM NAME opgui` / `REMOVE 1-740` | **PASS** — `/dev/shm/highascg-opgui` 24 899 584 B; log `shm[opgui|1920x1080] publishing … Initialized` / `Uninitialized`, clean |
+| `hshm_probe` (5 s) | **PASS** — 50.2 fps, 0 gaps, 0 lapped, 0 torn, latency p50 1.41 / p95 2.34 ms, writer_dropped 0 |
+| Pixel correctness | **PASS** — `PLAY 1-900 #FFFF8000` arrives orange in Godot (BGRA order right); real clip incl. MIXER blur/grain visible |
+| `kill -STOP` reader 10 s | **PASS** — writer_dropped 0, torn 0 after CONT (gaps = frames missed while stopped) |
+| Caspar restart | **PASS** — reader reopened (`reopens 1`) after each of 3 RESTARTs |
+| Caspar CPU added | **FAIL vs target** — 4 alternating 8 s windows, clip playing: off 63–67 %, on 68–72 % → **+5.2 % of one core** (target < 3 %). Next: profile the worker copy (page faults on the mapping? `MAP_POPULATE`/hugepages; non-temporal copy) |
+| 1 h soak, ADD/REMOVE on an on-air PGM, channel frame-time delta | not run |

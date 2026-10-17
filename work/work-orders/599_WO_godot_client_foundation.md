@@ -147,6 +147,30 @@ the web client (inventory E) → define the Godot palette explicitly, owner-appr
 - Unit tests: **52 passed / 0 failed** on 4.6.3 and on **4.7.2 from a clean checkout** (no `.godot`, no built extension) = the CI condition.
 - Not verified: the GitHub Actions run itself (not pushed), the box (X11/NVIDIA/4.7.x), HiDPI, monitor picker, systemd unit.
 
+## Box run (2026-10-17, shop dev box: X11, RTX PRO 4000, driver 595.71.05, DP-3 1920×1080@50)
+
+**BLOCKER — `godot/client/core/` was never committed.** `.gitignore` `core` (core dumps) and `.stignore`
+`core` also match the directory, so `api.gd, ws.gd, state_store.gd, config.gd, settings_state.gd,
+net_util.gd, project_sync*.gd` exist only on the dev Mac (commit `e010372` + `601a6c6` lack them; no CI
+run exists for `godot`, so nothing caught it). Same class: `.gitignore` `projects/` swallowed the WO-598
+fixture `tools/fixtures/projects/take-payload-coverage.json`. Fixed the rules (`!godot/client/core/`,
+`!tools/fixtures/projects/`, `.stignore` `!/godot/client/core` before `core`) — **owner: on the Mac pull,
+mirror the `.stignore` line, then `git add godot/client/core tools/fixtures/projects` and push.**
+
+- Engine: official 4.7.2 (SHA-512 verified) at `~/.local/opt/godot/godot` (no sudo for `/opt`; `GODOT=` env).
+- hshm GDExtension: `build.sh` built clean (gcc, godot-cpp fetched), installed into client + m0.
+- Headless `run-client.sh --test`: **40 passed / 2 failed** — `test_core`, `test_project_sync` cannot
+  compile (missing `core/`); `test_deck_model`, `test_previs_uv_mapper` pass on 4.7.2. Windowed client
+  cannot boot (6 autoloads in `core/`).
+- Offline JS suite on the `godot` branch: 2593/2599 — 2 fail on the missing WO-598 fixture, 2 also fail
+  on `main` (pointer-confine reason test, shader library "Value" label — box-environment, pre-existing).
+- Server on the `godot` branch: `/api/video-surfaces` answers (all `channel:null` — box has 1 channel).
+- M0 spike (WO-595) native reader, Vulkan Forward+, NVIDIA, synthetic bridge 15 s each: canvas 49.3 fps,
+  frame p95 20.4 ms, latency p50 4.4 ms, 31/721 gaps, 0 lapped; atlas 49.2 fps, 37/715 gaps; previs
+  3072×1728 45.7 fps avg, **130/752 gaps (17 %)**, frame p95 21.5 ms. Real Caspar shm (WO-594, ch1):
+  latency p50 ~18–20 ms (one display frame: Caspar and the 50 Hz scan-out are separate clocks),
+  gaps 6–13 %. Every run: ~145 ms first-frame hitch, `1 RID of type "Texture" was leaked` at exit.
+
 ## Earlier notes
 
 Nothing yet. Engine/godot-cpp versions verified by `git ls-remote`; everything else from research + inventory.

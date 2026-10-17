@@ -25,6 +25,8 @@ dist
 .module-state.json.tmp
 autosave.json
 health.json
+// Godot client source dir — must be un-ignored BEFORE the bare `core` (core dumps) line; first match wins.
+!/godot/client/core
 core
 libndi.so.6
 casparcg.config

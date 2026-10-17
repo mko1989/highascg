@@ -16,6 +16,8 @@ BUILD_STAMP
 .private/
 autosave.json
 projects/
+# WO-598 fixture lives under a projects/ dir — the rule above swallowed it from the godot branch
+!tools/fixtures/projects/
 highascg.config.json
 
 # FFmpeg waveform JSON cache (GET /api/local-media/.../waveform)
@@ -64,6 +66,8 @@ refs/
 
 # User/system local artifacts
 core
+# bare `core` (core dumps) also matched the Godot client's source dir and dropped it from the godot branch
+!godot/client/core/
 health.json
 libndi.so.6
 casparcg.config
