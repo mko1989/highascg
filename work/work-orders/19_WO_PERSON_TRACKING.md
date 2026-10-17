@@ -1,5 +1,8 @@
 # Work Order 19: Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs
 
+> **2026-10-17:** implementation approach superseded by [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (Godot previs + OpenFollow port + server tracking hub; browser TF.js detection dropped with the Godot port). Goals below still hold.
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

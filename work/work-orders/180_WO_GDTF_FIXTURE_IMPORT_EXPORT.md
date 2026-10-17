@@ -1,5 +1,8 @@
 # WO-180 — GDTF fixture import/export for pixel mapping
 
+> **2026-10-17:** real-fixture GDTF import, patch and Art-Net/sACN output → [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md). This WO keeps only pixel-map GDTF export.
+
+
 **Status:** Planned (research-first; implement after WO-179)
 **Priority:** Low-Medium (workflow enhancement)
 **Date:** 2026-07-13

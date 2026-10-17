@@ -89,8 +89,9 @@ UI (Control, same window): toolbar, mesh inspector, camera list, display toggles
 - [ ] T8 — UV/virtual-canvas drag editor (the deferred WO-17 item) — natural in Godot 2D.
 - [ ] **MVR scene import (Capture etc.) → [WO-612](./612_WO_previs_mvr_import.md)** (needs a 3DS loader; MVR
       VideoScreen Sources/Mappings map onto these screen bindings).
-- [ ] Later (own WOs): DMX/Art-Net fixtures lit live from the existing `dmx:colors` WS broadcast;
-      zones/tracking (WO-19, WO-31) on the Godot stage.
+- [ ] **Stage builder (LED walls / TVs / projection from numbers, bound to channels) → [WO-614](./614_WO_previs_stage_builder.md)**
+- [ ] **Fixtures: GDTF, patch, Art-Net/sACN out, beams → [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md)**
+- [ ] **Tracking: OpenFollow port, DeckLink/channel camera, two-camera fusion → [WO-616](./616_WO_previs_tracking_openfollow_cameras.md)**
 
 ## Acceptance
 

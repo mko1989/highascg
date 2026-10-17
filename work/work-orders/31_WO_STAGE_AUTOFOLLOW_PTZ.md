@@ -1,5 +1,8 @@
 # Work Order 31: Stage Auto-Follow — PTZ Cameras & Moving-Heads from Tracking
 
+> **2026-10-17:** tracking source and DMX-fixture follow move to [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) / [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md); Companion variables remain an output of the WO-616 hub.
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done
