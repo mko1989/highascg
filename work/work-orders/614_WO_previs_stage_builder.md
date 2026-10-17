@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — T1 model, T2 persistence (+ server guard), T3 builder, T4 panel/inspector/from-destination DONE and verified on the shop dev box; T5 gizmo/array/templates, T6 refinements, T7 MVR open. Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR import produces the same objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (fixtures hang in the same stage), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (cameras are stage objects too).**
+**Status: DONE (2026-10-17, verified on the shop dev box with a real PGM output on DP-7) — T1–T6 implemented + verified; T7 (MVR round trip) moved to [WO-612](./612_WO_previs_mvr_import.md) where the MVR reader/writer lives. Owner QA: interactive pass on the box. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D views, drag-move).**
 
 # WO-614 — Previs stage builder: standard LED walls, TVs, projection — bound to channels
 
@@ -65,9 +65,9 @@ spacing) for TV rows; templates: "Ground stack centre wall + 2 side walls", "Two
 - [x] T3 `stage_builder.gd` — Node3D generation (cabinet/box + screen quad, curved walls as N panel quads,
       projector frustum), material per object, bound to `VideoSurfaces` roles + rect.
 - [x] T4 Inspector + list + add menu + "from destination" (reads `screenDestinations` + channel map).
-- [ ] T5 Gizmo (move/rotate, snap), duplicate/array, templates.
-- [~] T6 LED shader: seams + pixel grid (shared with WO-607 T4).
-- [ ] T7 MVR round trip: WO-612 import maps `VideoScreen` → these objects; export stage → MVR `VideoScreen`s.
+- [x] T5 Gizmo (move/rotate, snap), duplicate/array, templates.
+- [x] T6 LED shader: seams + pixel grid (shared with WO-607 T4).
+- [→] T7 (moved to WO-612) MVR round trip: WO-612 import maps `VideoScreen` → these objects; export stage → MVR `VideoScreen`s.
 
 ## Acceptance
 
@@ -103,3 +103,19 @@ keeps a client-owned slice the payload omits; wired into `/api/project/save` + `
 - Web-shaped autosave after the guard (rev 345) → all 4 objects still stored. Smoke 5/5 (CI list).
 - Not yet: interactive owner pass (typing in the inspector), from-destination on a multi-screen box,
   gizmo, MVR round trip.
+
+## Finish (2026-10-17, second pass)
+
+Done: templates (`three_walls` carved L|C|R, `imag_lr`, `tv_row`) with crops fitted to the role's real raster
+(`_role_raster`: screen destination behind pgm/prv N, else texture size); Array…/Duplicate along the object's own
+axis; default role = first PGM surface with a channel; from-destination for all three types; 2D plan shift-drag
+rotate; keys (Delete, Ctrl+D, arrows 5/50 cm, Q/E 5/15°, F); 3D click-pick (ray vs object boxes) + selection box;
+GLB picker holds only with loaded screens. `run-client.sh --check` (headless boot, fails on script errors) added to
+CI after a parse error in `stage_2d_view.gd` passed the unit runner.
+
+Verified on the box after the owner added a screen (PGM+PRV destination `dst_mvcvbk52_1` on DP-7 via the
+device-view API → channels 1 PGM / 2 PRV / 3 operator shm): template through the menu path → 3 walls on pgm1,
+crops 0-384 | 384-1536 | 1536-1920 × 576; real XTEST keys moved Side R +0.10 m and turned −20° → −15°
+(persisted); real 3D click selected "Centre LED"; headless 179/0.
+Bug found + fixed during verification: templates assumed a 2560×768 canvas — on a 1920×1080 PGM the right wall's
+crop started past the picture edge.

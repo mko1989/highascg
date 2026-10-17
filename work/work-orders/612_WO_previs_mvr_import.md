@@ -72,7 +72,8 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 - [ ] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
 - [ ] T5 VideoScreen Sources/Mappings → previs screen bindings + UV crops.
 - [ ] T6 Persistence: store the `.mvr` via `/api/previs/models` (allow the extension) + parsed metadata.
-- [ ] Later: MVR-xchange client (live sync), export of our screen mapping back to MVR.
+- [ ] T7 Export the WO-614 stage (LED walls / TVs / projection = `VideoScreen` + generated glb geometry, `Sources`/`Mappings` from each object's role + crop) via `ZIPPacker` (moved here from WO-614 T7).
+- [ ] Later: MVR-xchange client (live sync).
 
 ## What was done / What was VERIFIED
 

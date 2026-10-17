@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — T1–T4 done and measured on the shop dev box (2D default, surfaces refcounted). Open: server-side REMOVE on leaving previs not observable on this 1-channel box (needs a box with PGM channels), remaining 7 % idle client CPU (profile). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md) (the stage it draws), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md) (leases), [WO-594](./594_WO_caspar_shm_frame_consumer.md) (per-surface Caspar cost).**
+**Status: DONE (2026-10-17, measured + server lease cycle verified on the shop dev box) — open follow-up only: profile the remaining ~7 % idle client CPU. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md), [WO-594](./594_WO_caspar_shm_frame_consumer.md).**
 
 # WO-617 — Previs 2D mode (default) + video surfaces only while something shows them
 
@@ -47,7 +47,7 @@ measured render time per viewport) and `nvidia-smi` board power over 12 s window
 - [x] T1 VideoSurfaces refcount + headless tests; Live tab holds `opgui` only while visible.
 - [x] T2 Stage builder + GLB source picker acquire/release through an owner; `set_live(bool)`.
 - [x] T3 2D view (front/plan, select, drag-move, live-pictures toggle) + mode switch + persistence.
-- [~] T4 Measure again: 2D vs 3D vs hidden ✔; leases/REMOVE on the server when leaving previs — needs a multi-channel box.
+- [x] T4 Measure again: 2D vs 3D vs hidden ✔; leases/REMOVE on the server when leaving previs ✔ (second screen, below).
 
 ## Investigation addendum — the offline suite overwrote the live project (found while testing this)
 After a suite run the seeded stage was gone and `projects/untitled.json` was a fresh empty Untitled
@@ -89,4 +89,6 @@ scripts still run every loop iteration; the idle cost needs profiling, not a fla
   pictures show per-object crops (left/right halves); real XTEST drag moved Main LED [0,1,0] → [3,2.5,0],
   autosaved (rev 351), inspector followed the 2D selection.
 - Headless 155/0 (holders 2 tests, 2D geometry 6 checks).
-- Not verified here: server `REMOVE` of a PGM consumer on leaving previs (box has only the operator channel).
+- **Server lease cycle (after the owner added a second screen → real PGM channel 1):** 3D with an LED wall on `pgm1`
+  → journal `[video-surfaces] ADD 1-741 SHM NAME pgm1` (1 lease); real click on "2D front" → lease dropped →
+  `REMOVE 1-741 (pgm1: no leases)` 12 s later (TTL); client `held_roles: []` at exit.
