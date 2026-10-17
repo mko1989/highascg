@@ -1,5 +1,12 @@
 # CasparCG highascg-build-v1 — provenance manifest
 
+> **NEXT BUILD (owner, 17.10.2026): base it on upstream `v2.5.1-stable` (2026-09-16)** — released after
+> this build and carries fixes we want (AMCP BATCH race, DeckLink A/V-sync recovery + keying check,
+> audio multi-device/sync/delay, FFmpeg 8.1.2). Plan, compatibility checks and the carried-patch diff:
+> [WO-613](../work/work-orders/613_WO_next_caspar_build_on_v2_5_1.md). The next build also adds the
+> `shm` frame consumer ([WO-594](../work/work-orders/594_WO_caspar_shm_frame_consumer.md), `caspar/modules/shm/`).
+
+
 Every component of the final binary, mapped to its source. Keep current through assembly/build.
 (Exact commit hashes get filled by the assembly step — see SOURCES.txt in the build kit for the raw list.)
 
