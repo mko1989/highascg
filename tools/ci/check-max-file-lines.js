@@ -6,8 +6,9 @@ const path = require('path')
 
 const repoRoot = path.resolve(__dirname, '../..')
 const MAX = parseInt(process.env.HIGHASCG_MAX_FILE_LINES || '500', 10)
-const ROOTS = ['client', 'src', 'scripts', 'tools', 'template']
-const EXT = new Set(['.js', '.css', '.html', '.sh'])
+const ROOTS = ['client', 'src', 'scripts', 'tools', 'template', 'godot', 'caspar']
+/* WO-599: GDScript + the C++ of the shm consumer / hshm GDExtension follow the same 500-line rule. */
+const EXT = new Set(['.js', '.css', '.html', '.sh', '.gd', '.cpp', '.h'])
 const SKIP_DIRS = new Set([
 	'node_modules',
 	'dist-web',
@@ -17,6 +18,8 @@ const SKIP_DIRS = new Set([
 	'.git',
 	'vendor',
 	'__pycache__',
+	'.godot', // Godot import cache (per machine)
+	'build', // godot/extensions/*/build (godot-cpp checkout + objects)
 ])
 
 /* Legacy grandfather list — files that predate the limit and live outside the operator

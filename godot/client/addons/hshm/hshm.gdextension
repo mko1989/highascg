@@ -1,0 +1,15 @@
+; WO-596 — HighAsCG shared-memory frames (HshmSource). Installed into a project by build.sh as
+; res://addons/hshm/. Binaries are built per machine (godot/extensions/hshm/build.sh) and not committed.
+[configuration]
+
+entry_symbol = "hshm_library_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+
+linux.debug.x86_64 = "res://addons/hshm/bin/libhshm.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/hshm/bin/libhshm.linux.template_release.x86_64.so"
+macos.debug.x86_64 = "res://addons/hshm/bin/libhshm.macos.template_debug.x86_64.dylib"
+macos.release.x86_64 = "res://addons/hshm/bin/libhshm.macos.template_release.x86_64.dylib"
+macos.debug.arm64 = "res://addons/hshm/bin/libhshm.macos.template_debug.arm64.dylib"
+macos.release.arm64 = "res://addons/hshm/bin/libhshm.macos.template_release.arm64.dylib"

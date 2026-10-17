@@ -77,3 +77,10 @@ Thumbs.db
 
 // WO-427: GUI-uploaded DeckLink driver packages — box-local, peers must not sync them
 /vendor
+
+// WO-599: Godot editor/import cache — regenerated per machine; peers must not fight over it.
+// MIRROR THIS LINE ON THE BOX (.stignore does not sync).
+.godot
+
+// WO-596: per-machine GDExtension build trees (binaries already skipped via "bin")
+/godot/extensions/hshm/build

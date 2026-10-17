@@ -62,6 +62,36 @@ jobs:
       - name: npm audit
         run: node tools/ci/npm-audit-ci.js
 
+  # WO-593/594/599 — the Godot operator client + the shm frame transport. No GPU on the runner:
+  # GDScript logic tests run headless; the GPU upload path is verified on the box (WO-595).
+  godot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: shm seqlock test (writer/reader, torn frames, laps, generation)
+        run: |
+          c++ -std=c++17 -O2 -pthread caspar/modules/shm/tests/hshm_seqlock_test.cpp -o /tmp/hshm_test
+          /tmp/hshm_test
+
+      - name: shm bridge → probe round-trip (pixel-level torn check)
+        run: |
+          python3 tools/hshm-bridge/hshm_bridge.py --name ci --duration 6 &
+          sleep 1
+          python3 tools/hshm-bridge/hshm_probe.py --name ci --duration 3 --check-pattern --json
+          wait
+
+      - name: Download pinned Godot (godot/GODOT_VERSION)
+        run: |
+          v="$(cat godot/GODOT_VERSION)"
+          curl -sSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${v}-stable/Godot_v${v}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv "/tmp/godot/Godot_v${v}-stable_linux.x86_64" /tmp/godot/godot
+
+      - name: Godot client unit tests (headless)
+        run: /tmp/godot/godot --headless --path godot/client --script res://tests/run_tests.gd
+
   # dist-web/ is untracked — the served UI only exists if `vite build` succeeds, so a
   # contributor's client/ change must prove it still builds (and that every module the
   # bundle imports actually resolves).

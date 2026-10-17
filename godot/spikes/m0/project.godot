@@ -1,0 +1,21 @@
+; WO-595 M0 spike — HighAsCG operator client trial (Godot 4.6+/4.7 pinned for the box).
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="HighAsCG M0 spike"
+run/main_scene="res://main.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/resizable=true
+window/vsync/vsync_mode=1
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

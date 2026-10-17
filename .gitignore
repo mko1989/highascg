@@ -140,3 +140,12 @@ config/certs/
 # WO-498: the nginx :80 proxy was removed. config/ is restored from the stick/bridge by
 # exfat-sync, which resurrects this file on disk — ignoring it stops that stray being re-committed.
 config/nginx/
+
+# WO-599: Godot import cache + local exports/builds (regenerated per machine)
+.godot/
+godot/**/export/
+godot/**/build/
+# WO-596: hshm GDExtension binaries are built per machine (godot/extensions/hshm/build.sh)
+godot/extensions/*/bin/
+godot/extensions/*/build/
+godot/**/addons/hshm/bin/
