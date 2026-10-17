@@ -91,3 +91,10 @@ with actual patch and way to artnet/sacn output."
 ## What was done / What was VERIFIED
 
 Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godot API presence known from WO-612.
+
+## Addendum (2026-10-17) — Perastage + camera calibration
+- Perastage (GPL-3.0-or-later, see WO-612 addendum) is the natural *authoring* side: GDTF library with GDTF Share
+  download and patch tables there, MVR → HighAsCG for real-time output/previs (Perastage is explicitly not a
+  real-time DMX visualiser). Its `core/gdtf_description_reader` + `tests/gdtfloader_*` (channel modes, geometry
+  roots, primitives) are reference material for T1.
+- Fixture position calibration from the stage camera → WO-616 T13 (OpenFollow has no fixture model).

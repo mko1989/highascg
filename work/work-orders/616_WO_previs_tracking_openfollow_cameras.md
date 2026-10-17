@@ -127,3 +127,36 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 Desk only (2026-10-17): OpenFollow README + architecture docs (detection, zones, outputs, video, feature
 list) and source tree read via `gh api`; licence compatibility checked against our `package.json`/`LICENSE`;
 DeckLink input channel layout and shm path confirmed in code (shm proven live in WO-594).
+
+## Addendum (2026-10-17, `next.md` round 2) — how OpenFollow tracks, fixture calibration, camera ↔ 3D overlay
+
+**How OpenFollow tracks** (`openfollow/scene/solver.py`, `docs/architecture/{detection,input,hud,outputs}.md`):
+1. *Frame:* PSN-absolute metres, X stage-left, Y upstage, Z up.
+2. *Camera calibration:* a floor rectangle of known size (the "grid") — the operator drags its 4 corners onto
+   the picture; `solver.py` computes the 3×3 homography by DLT and decomposes it into pos x/y/z, pitch, yaw,
+   roll, fov. Optional extra calibration points refine the fit; radial lens k1/k2 from the Lens step.
+3. *What is tracked = markers.* An operator drives each marker (gamepad / mouse / keys / MIDI / OSC
+   `/marker/{id} x y z`); a mouse click is un-projected onto the floor plane (grid z offset).
+4. *Optional AI:* YOLO26 ONNX person detection (~15 Hz) → ByteTrack (Kalman); the feet point of a box is
+   un-projected to the floor. `assist` snaps operator markers to a nearby detection, `replace` auto-pins.
+5. *Out:* PSN / OTP / OSC / RTTrPM at 60 Hz; a marker not refreshed for 1 s goes stale on every protocol.
+
+**Does it calibrate fixtures?** **No.** The tree has no fixture, pan/tilt or DMX code (searched 2026-10-17);
+"followspot" means a console (grandMA3, Eos, Hog…) receiving PSN and aiming its own fixtures with its own
+fixture calibration. For HighAsCG (we have fixtures in WO-615) this is new work — and the camera makes it
+easy: **camera-assisted fixture calibration** — point the fixture (narrow beam) at 4+ spots, the solved
+camera finds each beam spot on the floor (brightest blob in a frame diff, un-projected), giving
+(pan, tilt) ↔ world-point pairs; least-squares solve of the fixture's base position + orientation
+(+ pan/tilt offsets) against its GDTF axis chain. Manual fallback: click the spot in the camera view.
+
+**Matching the camera view with the 3D view — yes, directly.** The solve gives exactly a pinhole camera
+(pose + fov) + k1/k2: set the previs `Camera3D` to it, show the live camera surface (DeckLink input
+`inN`, WO-597 role) as the background and the 3D stage on top (wireframe/ghosted LED walls, grid, markers,
+zones, fixture beams); k1/k2 applied as a distortion pass so straight 3D edges bend like the lens.
+OpenFollow's HUD does the same with Cairo. Uses: (a) verification — LED-wall edges must sit on the real
+walls; (b) manual calibration — drag 3D points onto the video; (c) operator view with previs overlay.
+
+### Added tasks
+- [ ] T12 "Camera view" overlay mode in previs: background = camera surface, `Camera3D` = solved camera,
+      ghosted stage + markers/zones, lens-distortion shader; opacity slider.
+- [ ] T13 Camera-assisted fixture calibration (WO-615 fixtures): spot detection + pose solve; manual click fallback.

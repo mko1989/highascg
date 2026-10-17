@@ -79,3 +79,18 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 
 Desk only: spec read (MVR 1.6, GDTF folder layout); Godot API presence checked headless on 4.6.3 and 4.7.2.
 Capture behaviour from a vendor forum thread — unverified on our files.
+
+## Addendum (2026-10-17) — Perastage (github.com/PeramatoG/Perastage), owner pointer from `next.md`
+
+C++/wxWidgets desktop app, **GPL-3.0-or-later** (compatible with our AGPL-3.0-or-later; GPLv3 §13 —
+keep its notices on anything ported), 122★, active. "Practical MVR and GDTF workflows": open/merge/edit/
+export MVR, GDTF library + GDTF Share download, 2D/3D review, patch tables, PDF layouts, experimental OSC +
+MCP. **Not a real-time DMX visualiser** (README) — that is exactly the gap WO-615 fills, so the two complement.
+- **Workflow:** design/patch the rig in Perastage → export MVR → HighAsCG imports it (this WO) → live previs,
+  DMX out, video on screens. Round trip back via our MVR export (T7).
+- **Code to reuse:** `viewer3d/loader3ds.cpp` (529 lines; chunks 0x4D4D/0x3D3D/0x4000/0x4100/0x4110/0x4120/
+  0x4140/0x4160/0xAFFF/0xA000 — the same set this WO designed; wx only for texture images) → port as the
+  T2 `Loader3DS` with attribution. Also `core/gdtf_description_reader`, `core/gdtf_archive_reader`,
+  `mvr/mvr_export_archive_writer` as references (tests in `tests/gdtfloader_*` give fixture cases).
+- No `VideoScreen`/projector specific code found in its tree (2026-10-17) → screens from Perastage arrive as
+  plain scene objects; our importer tags them by name/size until confirmed with a real file.
