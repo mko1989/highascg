@@ -9,6 +9,7 @@ const {
 	enrichProjectScenesFromLiveDeck,
 } = require('../engine/project-scenes')
 const projectStore = require('../engine/project-store')
+const { preserveClientOwnedSlices } = require('../engine/project-client-slices')
 const {
 	withProjectCredential,
 	projectHasStreamKey,
@@ -38,6 +39,7 @@ async function handleProject(path, body, ctx) {
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		preserveClientOwnedSlices(project, existing) // WO-614: web saves never carry project.previs
 		const allowReplace = b.force === true || b.allowReplace === true
 		const check = validateIncomingProject(project, existing, { allowReplace })
 		if (!check.ok) {
@@ -386,6 +388,7 @@ async function handleProject(path, body, ctx) {
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		preserveClientOwnedSlices(project, existing) // WO-614: web autosaves never carry project.previs
 		/* WO-311: a factory reset at 11:47:28 correctly trashed projects/tra.json; three seconds
 		 * later a background autosave from the still-open browser RECREATED it as an empty shell.
 		 * 5d01bca stopped the autosave destroying the hardware slice, but not the resurrection
