@@ -47,7 +47,7 @@ measured render time per viewport) and `nvidia-smi` board power over 12 s window
 - [x] T1 VideoSurfaces refcount + headless tests; Live tab holds `opgui` only while visible.
 - [x] T2 Stage builder + GLB source picker acquire/release through an owner; `set_live(bool)`.
 - [x] T3 2D view (front/plan, select, drag-move, live-pictures toggle) + mode switch + persistence.
-- [x] T4 Measure again: 2D vs 3D vs hidden; leases/REMOVE on the server when leaving previs.
+- [~] T4 Measure again: 2D vs 3D vs hidden ✔; leases/REMOVE on the server when leaving previs — needs a multi-channel box.
 
 ## Investigation addendum — the offline suite overwrote the live project (found while testing this)
 After a suite run the seeded stage was gone and `projects/untitled.json` was a fresh empty Untitled
