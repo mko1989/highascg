@@ -104,6 +104,21 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		assert.equal(d.autoLaunch, false, 'omitted field keeps its stored value')
 		assert.equal(d.headless, true, 'explicit headless:true applied')
 	})
+
+	it('handleUpdateDestination honours videoOutput/shmName (WO-597: switching the operator GUI to shm was dropped)', () => {
+		const ctx = mockCtx({
+			screenDestinations: {
+				version: 1,
+				destinations: [{ id: 'og1', mainScreenIndex: 0, mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?operatorGui=1', videoOutput: 'screen', shmName: 'opgui' }],
+			},
+		})
+		let d = handleUpdateDestination({ updateDestination: { id: 'og1', videoOutput: 'shm' } }, ctx).screenDestinations.destinations[0]
+		assert.equal(d.videoOutput, 'shm', 'explicit videoOutput:shm must stick')
+		assert.equal(d.shmName, 'opgui', 'omitted shmName keeps its stored value')
+		d = handleUpdateDestination({ updateDestination: { id: 'og1', shmName: 'opgui2' } }, ctx).screenDestinations.destinations[0]
+		assert.equal(d.shmName, 'opgui2')
+		assert.equal(d.videoOutput, 'shm', 'omitted videoOutput keeps its stored value')
+	})
 })
 
 describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks', () => {

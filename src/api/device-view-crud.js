@@ -196,6 +196,9 @@ function handleUpdateDestination(j, ctx) {
 					// present key wins (false honoured); an absent key keeps the current value.
 					autoLaunch: 'autoLaunch' in p ? p.autoLaunch !== false : d0.autoLaunch,
 					headless: 'headless' in p ? p.headless === true : d0.headless,
+					// WO-597: native-client mode (Godot reads the channel from shm) — same rule.
+					videoOutput: 'videoOutput' in p ? (p.videoOutput === 'shm' ? 'shm' : 'screen') : d0.videoOutput,
+					shmName: 'shmName' in p ? String(p.shmName || 'opgui') : d0.shmName,
 			}
 			: {}),
 	}
