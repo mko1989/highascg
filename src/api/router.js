@@ -50,6 +50,7 @@ const routesLogs = require('./routes-logs')
 const routesSupportBundle = require('./routes-support-bundle')
 const routesHostStats = require('./routes-host-stats')
 const routesGuiStream = require('./routes-gui-stream')
+const routesVideoSurfaces = require('./routes-video-surfaces')
 const routesPipOverlay = require('./routes-pip-overlay')
 const routesArtnet = require('./routes-artnet')
 const routesModules = require('./routes-modules')
@@ -104,6 +105,8 @@ routes.post('/api/support/bundle', ({ path, body, ctx }) => routesSupportBundle.
 // Host stats
 routes.get('/api/host-stats', ({ ctx }) => routesHostStats.handleGet(ctx), { requireCaspar: false })
 routes.get('/api/gui-stream/status', ({ ctx }) => routesGuiStream.handleGet(ctx), { requireCaspar: false })
+routes.get('/api/video-surfaces', ({ ctx }) => routesVideoSurfaces.handleGet(ctx), { requireCaspar: false }) // WO-597
+routes.post('/api/video-surfaces/lease', ({ body, ctx }) => routesVideoSurfaces.handleLease(body, ctx), { requireCaspar: false })
 
 // Companion
 routes.get('/api/companion/*', ({ path, ctx, query }) => routesCompanion.handleGet(path, ctx, query), { requireCaspar: false })

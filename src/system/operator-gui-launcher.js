@@ -205,6 +205,8 @@ function shouldAutoLaunchOperatorGui(config, opts = {}) {
 	// WO-325: a headless operator GUI exists only to feed the remote NVENC stream — never spawn the
 	// Firefox kiosk on a physical monitor for it (the generator also omits its <screen> consumer).
 	if (dest.headless === true) return { launch: false, reason: 'headless' }
+	// WO-597/609: with shared-memory output the native Godot client owns the operator monitor.
+	if (dest.videoOutput === 'shm') return { launch: false, reason: 'native_client_shm' }
 	if (dest.autoLaunch === false) return { launch: false, reason: 'auto_launch_disabled' }
 	if (Number.isFinite(dest.physicalPort)) return { launch: true, reason: 'explicit_port' }
 	const resolveMonitorPort =

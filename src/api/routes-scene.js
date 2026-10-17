@@ -5,11 +5,17 @@ const { handleAudioOnlyLookStop } = require('./routes-scene-take-audio-only')
 const { handlePreviewLiveRegister, handlePreviewLiveClear } = require('./routes-scene-preview')
 const { handleBorderLines, handleBorderPresetCrossfade } = require('./routes-scene-border')
 const { handleGlobalBorderControl } = require('./routes-scene-global-border')
+const { handleTakeLook } = require('./routes-scene-take-look')
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
 		if (!ctx.amcp) return null
 		return handleSceneTake(body, ctx)
+	}
+	if (path === '/api/scene/take-look') {
+		// WO-598 C1: take / stage a stored look by id — payload built server-side.
+		if (!ctx.amcp) return null
+		return handleTakeLook(body, ctx)
 	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null

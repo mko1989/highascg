@@ -102,6 +102,25 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'
 	const label = escapeXml(String(dest?.label || 'Operator GUI'))
 
+	// WO-597: native client mode — the channel publishes to shared memory (WO-594 consumer) instead
+	// of a screen window; the Godot client draws it inside its own scene (no kiosk, no shape holes).
+	if (dest?.videoOutput === 'shm') {
+		const shmName = escapeXml(String(dest?.shmName || 'opgui'))
+		return `${channelXmlComment(
+			`Caspar channel ${ch}: Operator GUI channel "${label}" — SHARED MEMORY /dev/shm/highascg-${shmName} for the native client (WO-593/594); routed preview layers (10-49) unchanged`,
+		)}        <channel>
+            <video-mode>${dims.modeId}</video-mode>
+            <consumers>
+                <shm>
+                    <name>${shmName}</name>
+                </shm>
+            </consumers>
+            <mixer>
+                <audio-osc>true</audio-osc>
+            </mixer>
+        </channel>`
+	}
+
 	// WO-325: headless / stream-only — emit the channel (raster + audio-osc, which the route layers
 	// 10-49 and the runtime NVENC gui-stream consumer depend on) but NO physical <screen> consumer.
 	// The channel still renders, so the runtime STREAM consumer keeps feeding the remote client; the

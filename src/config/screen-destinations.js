@@ -158,6 +158,12 @@ function normalizeDestination(d) {
 		// port), and the boot launcher does not spawn the Firefox kiosk. Default false = today's
 		// physical-output behaviour.
 		base.headless = d.headless === true
+		// WO-597: how the operator channel reaches the operator surface. 'screen' (default, today) =
+		// Caspar <screen> consumer under the Firefox kiosk; 'shm' = the Caspar shm frame consumer
+		// (WO-594, needs the next Caspar build) read by the native Godot client (WO-593) — no window,
+		// no kiosk. shmName = the segment /dev/shm/highascg-<shmName>.
+		base.videoOutput = d.videoOutput === 'shm' ? 'shm' : 'screen'
+		base.shmName = /^[a-z0-9_-]{1,32}$/i.test(String(d.shmName || '')) ? String(d.shmName) : 'opgui'
 	}
 	return base
 }

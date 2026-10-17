@@ -189,6 +189,12 @@ async function setupAllRouting(self) {
 		const { maybeAutoLaunchOperatorGui } = require('../system/operator-gui-launcher')
 		maybeAutoLaunchOperatorGui(self)
 	}
+	// WO-597: runtime shm consumers (previs PGM/PRV surfaces) die with Caspar — re-ADD every leased role.
+	try {
+		await require('../system/video-surfaces').getVideoSurfaceManager(self).onCasparReady()
+	} catch (e) {
+		self.log('warn', `Video surfaces: ${e?.message || e}`)
+	}
 	// WO-312: the audio route matrix is config, but the route LAYERS carrying the audio are AMCP
 	// state and die with Caspar. Replay them server-side on boot and every reconnect — previously
 	// only a client button press recreated them, so with the kiosk closed a restart left the matrix
