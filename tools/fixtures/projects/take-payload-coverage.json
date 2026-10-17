@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "name": "take-payload-coverage (synthetic, WO-598)",
+  "scenes": {
+    "scenes": [
+      {
+        "id": "cov-media", "name": "Media + fill/trim/effects/playlist", "mainScope": "0",
+        "defaultTransition": { "type": "MIX", "duration": 25, "tween": "linear" },
+        "layers": [
+          { "layerNumber": 10, "source": { "type": "media", "value": "show/clip.mp4" },
+            "loop": true, "fill": { "x": 0.1, "y": 0.2, "scaleX": 0.5, "scaleY": 0.5 }, "opacity": 0.8, "rotation": 15,
+            "transition": { "type": "PUSH", "duration": 12, "tween": "easeinsine" }, "audioRoute": "3+4", "volume": 0.5,
+            "fadeOnEnd": { "enabled": true }, "startBehaviour": "relativeToPrevious", "trimInMs": 1200, "trimOutMs": 9000,
+            "effects": [ { "type": "blur", "params": { "amount": 3 } } ] },
+          { "layerNumber": 20, "source": { "type": "media", "value": "show/a.mov", "isPlaceholder": true },
+            "sourceMode": "playlist", "playlist": [ { "value": "show/a.mov" }, { "value": "show/b.mov" } ],
+            "playlistTransition": { "type": "MIX", "duration": 6, "tween": "linear" }, "playlistLoop": false,
+            "playlistAdvance": "manual", "muted": true, "fillNativeAspect": false, "aspectLocked": false,
+            "startBehaviour": "beginning", "straightAlpha": true }
+        ]
+      },
+      {
+        "id": "cov-cg", "name": "Templates, lower third, PIP, route", "mainScope": "1",
+        "globalBorder": { "enabled": true, "type": "solid", "params": { "width": 6 } },
+        "layers": [
+          { "layerNumber": 10, "source": { "type": "template", "value": "cg/clock", "template": "cg/clock",
+            "data": { "f0": "12:00" }, "parameters": "-- extra" } },
+          { "layerNumber": 11, "source": { "type": "template", "value": "lower-thirds/lt-confetti-center" } },
+          { "layerNumber": 12, "source": { "type": "template", "value": "cg/tpl" }, "templateData": { "title": "Hello" } },
+          { "layerNumber": 13, "source": { "type": "route", "value": "route://6" },
+            "pipOverlays": [ { "type": "border", "params": { "width": 4, "color": "#e63946" } }, { "notype": true } ] },
+          { "layerNumber": 14, "source": { "type": "ndi", "value": "CAM 1" }, "pipOverlay": { "type": "border", "params": {} } },
+          { "layerNumber": 15, "source": null }
+        ]
+      },
+      {
+        "id": "cov-audio", "name": "Audio-only, global scope, no default transition", "mainScope": "all", "audioOnlyLook": true,
+        "layers": [ { "layerNumber": 10, "source": { "type": "media", "value": "music/bed.wav" }, "volume": 0.25 } ]
+      }
+    ],
+    "liveSceneIdByMain": [null, null, null, null], "previewSceneIdByMain": [null, null, null, null]
+  }
+}
