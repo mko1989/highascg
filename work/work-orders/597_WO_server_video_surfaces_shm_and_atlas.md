@@ -153,3 +153,12 @@ an older Caspar does not know `<shm>` in the config. Runtime ADDs just fail and 
 ## What was VERIFIED
 
 Code reading only (refs above, cross-checked with inventory F [`work/godot-port/inventory/runtime-kiosk-tests.md`](../godot-port/inventory/runtime-kiosk-tests.md)).
+
+## Box finding (2026-10-17) — operator shm could not be switched on
+
+`POST /api/device-view {updateDestination:{videoOutput:'shm'}}` answered `ok:true` but kept `screen`:
+`src/api/device-view-crud.js` operator_gui merge only carried guiUrl/physicalPort/autoLaunch/headless.
+Fixed (`110c05d`, same present-key-wins rule; smoke `smoke-wo243-operator-gui-crud-ui` 16/16). Verified
+live: stored `shm`, `/api/caspar-config/apply` generated `<shm><name>opgui</name></shm>`, Godot showed
+the channel and reattached after a Caspar RESTART. The shop dev box now runs the operator GUI in shm mode
+(switch back: same API with `videoOutput:'screen'` + apply).

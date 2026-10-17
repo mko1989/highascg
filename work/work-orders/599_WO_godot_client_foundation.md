@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — foundation implemented in `godot/client/` and verified on the dev Mac against the real server protocol (simulator); box run pending. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
+**Status: IN PROGRESS (2026-10-17) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); open: HiDPI, multi-monitor placement, systemd unit, CI job run. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
 
 # WO-599 — Godot client foundation: project, engine pin, networking, state, theme, windows, CI, dev loop
 
@@ -170,6 +170,16 @@ mirror the `.stignore` line, then `git add godot/client/core tools/fixtures/proj
   3072×1728 45.7 fps avg, **130/752 gaps (17 %)**, frame p95 21.5 ms. Real Caspar shm (WO-594, ch1):
   latency p50 ~18–20 ms (one display frame: Caspar and the 50 Hz scan-out are separate clocks),
   gaps 6–13 %. Every run: ~145 ms first-frame hitch, `1 RID of type "Texture" was leaked` at exit.
+
+## Box acceptance (2026-10-17, after the Mac pushed `core/` = 2118fd2)
+
+- Headless **87/0** (was 40/2 without `core/`); WO-598 parity smoke 3/3.
+- Windowed on DP-3 against the live server + Caspar 2.5.1: boots, eye green, mirrors state (29-30 keys),
+  WS ~2000 msgs; **node restart** at t=15 s → `ws reconnected — resync`; **Caspar RESTART** at t=35 s →
+  config shm consumer re-created 21 s later, client reattached with live picture (screenshot).
+- Operator picture needed `videoOutput: shm` on the operator destination — the device-view update
+  silently dropped that field (fixed under WO-597, `110c05d`); applied via `/api/caspar-config/apply`.
+- Acceptance met on the box except: HiDPI, multi-monitor placement (box has one monitor), systemd unit.
 
 ## Earlier notes
 

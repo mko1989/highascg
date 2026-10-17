@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — investigation + design written; T1 (pure geometry model + tests) started in the Godot client. Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR import produces the same objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (fixtures hang in the same stage), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (cameras are stage objects too).**
+**Status: IN PROGRESS (2026-10-17) — T1 model, T2 persistence (+ server guard), T3 builder, T4 panel/inspector/from-destination DONE and verified on the shop dev box; T5 gizmo/array/templates, T6 refinements, T7 MVR open. Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR import produces the same objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (fixtures hang in the same stage), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (cameras are stage objects too).**
 
 # WO-614 — Previs stage builder: standard LED walls, TVs, projection — bound to channels
 
@@ -58,15 +58,15 @@ spacing) for TV rows; templates: "Ground stack centre wall + 2 side walls", "Two
 
 ## Tasks
 
-- [ ] T1 `features/previs/stage_objects.gd` — pure model: normalize/validate each type, derived values
+- [x] T1 `features/previs/stage_objects.gd` — pure model: normalize/validate each type, derived values
       (size, pitch, px, seams, projector pose), panel presets; headless tests.
-- [ ] T2 Persistence: `project.previs.stage` via ProjectSync autosave (+ server keeps the key; smoke);
+- [x] T2 Persistence: `project.previs.stage` via ProjectSync autosave (+ server keeps the key; smoke);
       web client ignores it (no web UI).
-- [ ] T3 `stage_builder.gd` — Node3D generation (cabinet/box + screen quad, curved walls as N panel quads,
+- [x] T3 `stage_builder.gd` — Node3D generation (cabinet/box + screen quad, curved walls as N panel quads,
       projector frustum), material per object, bound to `VideoSurfaces` roles + rect.
-- [ ] T4 Inspector + list + add menu + "from destination" (reads `screenDestinations` + channel map).
+- [x] T4 Inspector + list + add menu + "from destination" (reads `screenDestinations` + channel map).
 - [ ] T5 Gizmo (move/rotate, snap), duplicate/array, templates.
-- [ ] T6 LED shader: seams + pixel grid (shared with WO-607 T4).
+- [~] T6 LED shader: seams + pixel grid (shared with WO-607 T4).
 - [ ] T7 MVR round trip: WO-612 import maps `VideoScreen` → these objects; export stage → MVR `VideoScreen`s.
 
 ## Acceptance
@@ -76,6 +76,30 @@ spacing) for TV rows; templates: "Ground stack centre wall + 2 side walls", "Two
 - "From destination" for each configured screen destination produces a correctly sized, live object.
 - Two objects sharing one raster show the right halves.
 
-## What was done / What was VERIFIED
+## Investigation addendum — a web autosave erased the stage
+`client/lib/project-state.js:83-100` `exportProject` rebuilds the payload from a fixed key list
+(scenes, programOutput, timelines, multiview, placeholders) → the next web save/autosave dropped
+`project.previs`. Fixed on the server (any stale/remote client is covered): `src/engine/project-client-slices.js`
+keeps a client-owned slice the payload omits; wired into `/api/project/save` + `/autosave`.
 
-(see below as tasks land)
+## What was done (2026-10-17)
+
+| File | What |
+|---|---|
+| `godot/client/features/previs/stage_objects.gd` | pure model: defaults/clamps, pixels, size, pitch (+ non-square flag), curved column edges (chord = panel width), TV from diagonal/aspect/portrait, projector pose (throw, shift, rear), crop UV, presets, `from_destination` (→ `pgm<N>` role, full raster) |
+| `…/led_screen.gdshader` | emissive picture with crop, AA panel seams + LED pixel grid fading with distance (also WO-607 T4) |
+| `…/stage_builder.gd` | per-object nodes: LED strip per panel column (flat/curved) + cabinet back, TV + cabinet, projection screen + projector + frustum; shared VideoSurfaces texture per role, crop re-derived when a raster changes |
+| `…/stage_panel.gd`, `previs_tab.gd`, `previs_stage.gd` | Stage section: Add ▾ (LED/TV/projection/from destination), list, inspector, duplicate/delete; persists via ProjectSync; echo-safe reload (canonical JSON); frames the stage on first load; `--probe-stage-add` dev flag |
+| `src/engine/project-client-slices.js` + handlers | server keeps `previs` when a payload omits it |
+
+## What was VERIFIED
+
+- Headless: `test_stage_objects` 42 + `test_stage_builder` 12 checks → suite **141/0** on 4.7.2.
+- Server keeps `project.previs` through autosave (probe POST/GET/restore, rev 340-341).
+- Box (RTX PRO 4000, Caspar 2.5.1, operator channel → shm): 4 objects seeded into the server project
+  (flown 10×6 P2.6 wall, curved 6×4 P3.9 side wall on the left half, 65" TV on the right half,
+  projection with frustum) load in the client with live video, seams and curve correct (screenshots).
+- UI write path: `--probe-stage-add=1` → autosave rev 343 → object present on the server.
+- Web-shaped autosave after the guard (rev 345) → all 4 objects still stored. Smoke 5/5 (CI list).
+- Not yet: interactive owner pass (typing in the inspector), from-destination on a multi-screen box,
+  gizmo, MVR round trip.
