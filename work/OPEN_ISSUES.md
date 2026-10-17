@@ -14,6 +14,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | ID | Summary | Tracker | Status |
 |----|---------|---------|--------|
+| WO-617 | 17.10 (`next.md`): simple 2D previs to preserve resources — 2D front/plan default, 3D on demand; video surfaces read/leased only while shown (were never released); offline suite no longer overwrites the live project | [WO-617](./work-orders/617_WO_previs_2d_mode_and_surface_refcount.md) | 🟡 Done on the dev box (2D: CPU 7.0 % vs 12.4 %, −4.3 W, 0 surfaces); PGM REMOVE check needs a multi-channel box |
 | WO-616 | 17.10 (`next.md`): previs tracking — OpenFollow logic ported (AGPL-compatible), DeckLink input / Caspar channel as stage camera via shm, calibration from previs geometry, PSN/OSC out, zones, detection sidecar, **two-camera fusion workflow** | [WO-616](./work-orders/616_WO_previs_tracking_openfollow_cameras.md) | 🔴 Open — designed, P1 first |
 | WO-615 | 17.10: previs fixtures — **GDTF import (none today)**, real patch, Art-Net/sACN output via existing senders, live beams, visualiser mode, follow IK | [WO-615](./work-orders/615_WO_previs_fixtures_gdtf_patch_dmx_out.md) | 🔴 Open — designed |
 | WO-614 | 17.10: previs stage builder — LED walls from panel px/mm/quantity, TVs, projection, bound to channel surfaces, server-persisted in the project | [WO-614](./work-orders/614_WO_previs_stage_builder.md) | 🟡 Model + builder + Stage panel + server persistence guard done, verified on the box with live video; gizmo/templates/MVR open |
