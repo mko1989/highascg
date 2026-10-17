@@ -104,3 +104,47 @@ func test_2d_footprint_and_front_rect() -> void:
 	t.ok(_near(S.projector_world_xz(p).y, 6.0), "projector 6 m in front (plan)")
 	var wall := S.normalize({"type": "led_wall", "panels": [6, 2], "curve_deg": 10.0})
 	t.eq(S.footprint(wall).size(), 7, "curved wall footprint = column edges")
+
+
+func test_templates() -> void:
+	var w := S.template("three_walls", [], "pgm1", Vector2i(2560, 768))  # design canvas = identity crops
+	t.eq(w.size(), 3, "three walls")
+	t.eq(w[1].name, "Centre LED", "centre in the middle")
+	t.eq(S.pixels(w[1]), Vector2i(1536, 768), "centre 12×6 × 128 px")
+	t.eq(w[0].source.rect.x, 0, "left wall = canvas 0..512")
+	t.eq(w[1].source.rect.x, 512, "centre = canvas 512..2048")
+	t.eq(w[2].source.rect.x, 2048, "right wall = canvas 2048..2560")
+	t.ok(w[0].id != w[1].id and w[1].id != w[2].id, "unique ids")
+	t.ok(w[0].rotation[1] > 0.0 and w[2].rotation[1] < 0.0, "side walls angled towards the audience")
+	var imag := S.template("imag_lr", w)
+	t.eq(imag.size(), 2, "two IMAG screens")
+	t.ok(imag[0].position[0] < 0.0 and imag[1].position[0] > 0.0, "L and R")
+	var row := S.template("tv_row", w + imag)
+	t.eq(row.size(), 4, "four TVs")
+	var ids := {}
+	for o in w + imag + row:
+		ids[o.id] = true
+	t.eq(ids.size(), 9, "all nine ids unique across templates")
+
+
+func test_array_copies_follow_yaw() -> void:
+	var tv := S.normalize({"id": "tv_1", "type": "tv", "name": "DSM 1", "diagonal_in": 55, "position": [0.0, 1.0, 0.0], "rotation": [0.0, 90.0, 0.0]})
+	var copies := S.array_copies(tv, 2, 0.5, [tv])
+	t.eq(copies.size(), 2, "two copies")
+	t.eq(copies[0].name, "DSM 2", "numbered after the original")
+	var step := S.size_m(tv).x + 0.5
+	t.ok(_near(copies[0].position[0], 0.0, 1e-3) and _near(absf(copies[0].position[2]), step, 1e-3), "yaw 90°: copies run along Z")
+	t.ok(_near(absf(copies[1].position[2]), 2.0 * step, 1e-3), "second copy two steps away")
+	t.ok(copies[0].id != tv.id and copies[0].id != copies[1].id, "unique ids")
+
+
+func test_template_crops_fit_the_raster() -> void:
+	var w := S.template("three_walls", [], "pgm1", Vector2i(1920, 1080))
+	for o in w:
+		var r: Dictionary = o.source.rect
+		t.ok(r.x + r.w <= 1920 and r.y + r.h <= 1080, "%s crop inside a 1920×1080 raster" % o.name)
+	t.eq(w[0].source.rect.x + w[0].source.rect.w, w[1].source.rect.x, "left|centre adjacent")
+	t.eq(w[1].source.rect.x + w[1].source.rect.w, w[2].source.rect.x, "centre|right adjacent")
+	t.eq(w[2].source.rect.x + w[2].source.rect.w, 1920, "canvas spans the full width")
+	var full := S.template("imag_lr", [], "pgm1", Vector2i(3840, 2160))
+	t.eq(full[0].source.rect.w, 3840, "full-raster templates take the raster size")

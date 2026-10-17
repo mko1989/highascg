@@ -9,8 +9,8 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const ROLES := ["opgui", "pgm1", "prv1", "pgm2", "prv2", "pgm3", "prv3", "pgm4", "prv4"]
 
 ## [label, key, index (-1 = scalar), kind ("f" float, "i" int, "b" bool, "s" text), min, max, step]
-const COMMON := [["Name", "name", -1, "s"], ["X m", "position", 0, "f", -500, 500, 0.05], ["Y m (height)", "position", 1, "f", -50, 200, 0.05],
-	["Z m", "position", 2, "f", -500, 500, 0.05], ["Yaw °", "rotation", 1, "f", -360, 360, 1], ["Tilt °", "rotation", 0, "f", -90, 90, 1]]
+const COMMON := [["Name", "name", -1, "s"], ["X m", "position", 0, "f", -500, 500, 0.01], ["Y m (height)", "position", 1, "f", -50, 200, 0.01],
+	["Z m", "position", 2, "f", -500, 500, 0.01], ["Yaw °", "rotation", 1, "f", -360, 360, 1], ["Tilt °", "rotation", 0, "f", -90, 90, 1]]
 const FIELDS := {
 	"led_wall": [["Panel px W", "panel_px", 0, "i", 1, 4096, 1], ["Panel px H", "panel_px", 1, "i", 1, 4096, 1],
 		["Panel mm W", "panel_mm", 0, "f", 10, 4000, 0.5], ["Panel mm H", "panel_mm", 1, "f", 10, 4000, 0.5],
@@ -52,7 +52,7 @@ func _ready() -> void:
 	_add.about_to_popup.connect(_fill_add_menu)
 	_add.get_popup().id_pressed.connect(_on_add)
 	row.add_child(_add)
-	for spec in [["Duplicate", _duplicate], ["Delete", _delete]]:
+	for spec in [["Duplicate", _duplicate], ["Array…", _array_dialog], ["Delete", _delete]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
@@ -77,40 +77,142 @@ func _fill_add_menu() -> void:
 	p.add_item("LED wall", 0)
 	p.add_item("TV", 1)
 	p.add_item("Projection", 2)
-	_dests = (Settings.get_setting("screenDestinations", {}) as Dictionary).get("destinations", []) if Settings.get_setting("screenDestinations", {}) is Dictionary else []
+	p.add_separator("Templates")
+	var names: Array = S.TEMPLATES.keys()
+	for i in names.size():
+		p.add_item(S.TEMPLATES[names[i]], 200 + i)
+	_load_dests()
 	if not _dests.is_empty():
-		p.add_separator("From destination (LED wall)")
+		p.add_separator("Sized from a screen destination")
 		for i in _dests.size():
 			var d: Dictionary = _dests[i]
-			p.add_item("%s  %d×%d" % [d.get("label", "Screen"), int(d.get("width", 0)), int(d.get("height", 0))], 100 + i)
+			for k in 3:
+				p.add_item("%s  %d×%d → %s" % [d.get("label", "Screen"), int(d.get("width", 0)), int(d.get("height", 0)), ["LED wall", "TV", "Projection"][k]], 100 + i * 3 + k)
 
 
-## Menu ids: 0 LED wall, 1 TV, 2 projection, 100+i destination i (also used by the --probe-stage-add dev flag).
+## Menu ids: 0 LED wall, 1 TV, 2 projection, 100 + dest*3 + type (from destination), 200+ templates
+## (ids 0-2 also used by the --probe-stage-add dev flag).
+func _load_dests() -> void:
+	var sd: Variant = Settings.get_setting("screenDestinations", {})
+	_dests = (sd as Dictionary).get("destinations", []) if sd is Dictionary else []
+
+
 func _on_add(id: int) -> void:
+	if id >= 100 and id < 200:
+		_load_dests()
+		if (id - 100) / 3 >= _dests.size():
+			return
+	if id >= 200:
+		var role := _default_role()
+		_add_many(S.template(S.TEMPLATES.keys()[id - 200], builder.objects, role, _role_raster(role)), true)
+		return
 	var o: Dictionary
 	if id >= 100:
-		o = S.from_destination(_dests[id - 100], "led_wall", builder.objects)
+		o = S.from_destination(_dests[(id - 100) / 3], S.TYPES[(id - 100) % 3], builder.objects)
 	else:
 		o = S.new_object(S.TYPES[id], builder.objects)
+		var role := _default_role()
+		var r := _role_raster(role)
+		o["source"] = {"role": role, "rect": {"x": 0, "y": 0, "w": r.x, "h": r.y}}
 	o["position"] = [_free_x(), 0.0, 0.0]
-	o = builder.upsert(o)
+	_add_many([o], false)
+
+
+## Upsert several new objects, persist once, select the last. `shift` moves the group right of the stage.
+func _add_many(list: Array, shift: bool) -> void:
+	var dx := 0.0
+	if shift and not builder.objects.is_empty():
+		var lo := INF
+		for o in list:
+			lo = minf(lo, S.front_rect(o).position.x)
+		dx = _free_x() - lo
+	var last := ""
+	for o in list:
+		var c: Dictionary = o.duplicate(true)
+		c["position"] = [snappedf(float(c.position[0]) + dx, 0.01), c.position[1], c.position[2]]
+		last = builder.upsert(c).id
 	_persist()
 	_refresh_list()
-	_select(o.id)
+	_select(last)
+
+
+## Picture size of a role: the screen destination behind pgm<N>/prv<N>, else the live texture, else 1080p.
+func _role_raster(role: String) -> Vector2i:
+	_load_dests()
+	if role.begins_with("pgm") or role.begins_with("prv"):
+		var n := int(role.substr(3)) - 1
+		for d in _dests:
+			if str(d.get("mode", "")) != "operator_gui" and int(d.get("mainScreenIndex", -1)) == n:
+				return Vector2i(int(d.get("width", 1920)), int(d.get("height", 1080)))
+	var tex := VideoSurfaces.texture(role)
+	if tex != null and tex.get_width() > 0:
+		return Vector2i(tex.get_width(), tex.get_height())
+	return Vector2i(1920, 1080)
+
+
+## Role for new objects: the first PGM surface the server maps to a channel, else the operator surface.
+func _default_role() -> String:
+	for role in ["pgm1", "pgm2", "pgm3", "pgm4"]:
+		var d: Variant = VideoSurfaces.descriptors.get(role)
+		if d is Dictionary and (d as Dictionary).get("channel") != null:
+			return role
+	return "opgui"
 
 
 func _duplicate() -> void:
 	var i := builder.index_of(_selected)
+	if i >= 0:
+		_add_many(S.array_copies(builder.objects[i], 1, 0.5, builder.objects), false)
+
+
+func _array_dialog() -> void:
+	var i := builder.index_of(_selected)
 	if i < 0:
 		return
-	var o: Dictionary = builder.objects[i].duplicate(true)
-	o["id"] = S.new_object(str(o.type), builder.objects).id
-	o["name"] = "%s copy" % o.name
-	o["position"] = [float(o.position[0]) + S.size_m(o).x + 0.5, o.position[1], o.position[2]]
-	o = builder.upsert(o)
-	_persist()
-	_refresh_list()
-	_select(o.id)
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Array copies of %s" % builder.objects[i].name
+	var g := GridContainer.new()
+	g.columns = 2
+	var count := _spin(1, 50, 1, 3)
+	var gap := _spin(0, 20, 0.05, 0.5)
+	for pair in [["Copies", count], ["Gap m", gap]]:
+		var l := Label.new()
+		l.text = pair[0]
+		g.add_child(l)
+		g.add_child(pair[1])
+	dlg.add_child(g)
+	dlg.confirmed.connect(func() -> void:
+		_add_many(S.array_copies(builder.objects[builder.index_of(_selected)], int(count.value), gap.value, builder.objects), false)
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+## Public (keyboard / 2D view): move the selection by a delta in metres, or turn it.
+func nudge(delta: Vector3) -> void:
+	_edit(func(x: Dictionary) -> void:
+		x.position = [snappedf(float(x.position[0]) + delta.x, 0.001), snappedf(float(x.position[1]) + delta.y, 0.001), snappedf(float(x.position[2]) + delta.z, 0.001)])
+	_build_inspector()
+
+
+func turn(yaw_deg: float, absolute := false) -> void:
+	_edit(func(x: Dictionary) -> void:
+		var y := yaw_deg if absolute else float(x.rotation[1]) + yaw_deg
+		x.rotation = [x.rotation[0], wrapf(snappedf(y, 0.5), -180.0, 180.0), x.rotation[2]])
+	_build_inspector()
+
+
+func selected_id() -> String:
+	return _selected
+
+
+func delete_selected() -> void:
+	_delete()
+
+
+func duplicate_selected() -> void:
+	_duplicate()
 
 
 func _delete() -> void:

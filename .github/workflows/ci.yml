@@ -92,6 +92,9 @@ jobs:
       - name: Godot client unit tests (headless)
         run: /tmp/godot/godot --headless --path godot/client --script res://tests/run_tests.gd
 
+      - name: Godot client boot check (every UI script compiles, _ready runs)
+        run: GODOT=/tmp/godot/godot godot/client/run-client.sh --check
+
   # dist-web/ is untracked — the served UI only exists if `vite build` succeeds, so a
   # contributor's client/ change must prove it still builds (and that every module the
   # bundle imports actually resolves).

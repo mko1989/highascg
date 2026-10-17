@@ -50,7 +50,7 @@ func _ready() -> void:
 	builder = StageBuilder.new()
 	builder.live = false
 	stage.add_child(builder)
-	_svc.gui_input.connect(func(e: InputEvent) -> void: stage.handle_input(e))
+	_svc.gui_input.connect(_on_3d_input)
 	view2d = Stage2D.new()
 	view2d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(view2d)
@@ -63,7 +63,12 @@ func _ready() -> void:
 			stage.frame_box.call_deferred(builder.bounds())
 			view2d.fit.call_deferred())
 	stage_panel.stage_changed.connect(func() -> void: view2d.set_objects(builder.objects.duplicate(true)))
-	stage_panel.selection_changed.connect(func(id: String) -> void: view2d.select(id))
+	stage_panel.selection_changed.connect(func(id: String) -> void:
+		view2d.select(id)
+		builder.set_selected(id))
+	view2d.rotated.connect(func(id: String, yaw: float) -> void:
+		stage_panel.select(id)
+		stage_panel.turn(yaw, true))
 	view2d.selected.connect(func(id: String) -> void: stage_panel.select(id))
 	view2d.moved.connect(func(id: String, pos: Array) -> void: stage_panel.move_object(id, pos))
 	stage_panel.bind(builder)
@@ -77,6 +82,57 @@ func _ready() -> void:
 	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "front"))))
 	visibility_changed.connect(_apply_mode)
 	refresh_models()
+
+
+var _press_at := Vector2.INF
+
+
+## 3D: orbit as before; a click without drag selects the object under the mouse.
+func _on_3d_input(e: InputEvent) -> void:
+	stage.handle_input(e)
+	var mb := e as InputEventMouseButton
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
+		if mb.pressed:
+			_press_at = mb.position
+		elif mb.position.distance_to(_press_at) < 4.0:
+			var id := builder.pick(stage.camera(), mb.position)
+			if id != "":
+				stage_panel.select(id)
+
+
+## Keys while the previs is shown (text fields consume their own keys first):
+## Delete remove · Ctrl+D duplicate · arrows nudge 5 cm (shift 50 cm; front: X/height, plan/3D: X/Z)
+## · Q/E turn 5° (shift 15°) · F fit.
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or not is_visible_in_tree():
+		return
+	var step := 0.5 if k.shift_pressed else 0.05
+	var handled := true
+	match k.keycode:
+		KEY_DELETE, KEY_BACKSPACE:
+			stage_panel.delete_selected()
+		KEY_D when k.ctrl_pressed:
+			stage_panel.duplicate_selected()
+		KEY_LEFT:
+			stage_panel.nudge(Vector3(-step, 0, 0))
+		KEY_RIGHT:
+			stage_panel.nudge(Vector3(step, 0, 0))
+		KEY_UP:
+			stage_panel.nudge(Vector3(0, step, 0) if mode == "front" else Vector3(0, 0, -step))
+		KEY_DOWN:
+			stage_panel.nudge(Vector3(0, -step, 0) if mode == "front" else Vector3(0, 0, step))
+		KEY_Q:
+			stage_panel.turn(15.0 if k.shift_pressed else 5.0)
+		KEY_E:
+			stage_panel.turn(-15.0 if k.shift_pressed else -5.0)
+		KEY_F:
+			view2d.fit()
+			stage.frame_box(builder.bounds())
+		_:
+			handled = false
+	if handled:
+		get_viewport().set_input_as_handled()
 
 
 ## "front" | "plan" (2D, no 3D rendering) | "3d". Remembered per client (UI preference, not show data).
@@ -100,7 +156,7 @@ func _apply_mode() -> void:
 	_svc.visible = is3d
 	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
 	builder.set_live(is3d and shown)
-	if is3d and shown:
+	if is3d and shown and not stage.screens.is_empty():  # GLB screens only — no model, no hold
 		VideoSurfaces.acquire(_glb_role, self)
 	else:
 		VideoSurfaces.release(_glb_role, self)
@@ -173,6 +229,7 @@ func _set_source(role: String) -> void:
 
 
 func _on_model_loaded(meshes: Array) -> void:
+	_apply_mode.call_deferred()  # (re)hold the GLB source now that screen meshes exist
 	for c in _meshes.get_children():
 		c.queue_free()
 	for mi in meshes:

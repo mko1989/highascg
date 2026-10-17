@@ -229,3 +229,82 @@ static func projector_world_xz(o: Dictionary) -> Vector2:
 static func _to_world_xz(o: Dictionary, local: Vector3) -> Vector2:
 	var w := local.rotated(Vector3.UP, deg_to_rad(float(o.rotation[1])))
 	return Vector2(float(o.position[0]) + w.x, float(o.position[2]) + w.z)
+
+
+## WO-614 T5 — ready-made layouts. Each returns NEW objects (ids unique against `existing`).
+const TEMPLATES := {
+	"three_walls": "Centre LED + 2 angled side walls (one canvas, carved L|C|R)",
+	"imag_lr": "Two IMAG projection screens L/R",
+	"tv_row": "Row of 4 × 55\" TVs",
+}
+
+
+## `raster` = the role's picture size; crops are fitted into it (canvas layouts keep their proportions).
+static func template(name: String, existing: Array = [], role := "pgm1", raster := Vector2i(1920, 1080)) -> Array:
+	var out: Array = []
+	var all := existing.duplicate()
+	var full := {"x": 0, "y": 0, "w": raster.x, "h": raster.y}
+	match name:
+		"three_walls":
+			# 128 px / 500 mm panels: centre 12×6 = 1536×768 (6×3 m), sides 4×6 = 512×768 (2×3 m) → one 2560×768 canvas
+			var specs := [["Side L", [4, 6], [-4.6, 0.5, 0.9], 20.0, 0], ["Centre LED", [12, 6], [0.0, 0.5, 0.0], 0.0, 512], ["Side R", [4, 6], [4.6, 0.5, 0.9], -20.0, 2048]]
+			for s in specs:
+				var o := new_object("led_wall", all)
+				o["name"] = s[0]
+				o["panel_px"] = [128, 128]
+				o["panels"] = s[1]
+				o["position"] = s[2]
+				o["rotation"] = [0.0, s[3], 0.0]
+				# design canvas 2560×768 scaled into the raster (proportions kept, left-aligned)
+				var k := minf(float(raster.x) / 2560.0, float(raster.y) / 768.0)
+				var x0 := roundi(int(s[4]) * k)
+				var x1 := roundi((int(s[4]) + 128 * int(s[1][0])) * k)
+				o["source"] = {"role": role, "rect": {"x": x0, "y": 0, "w": x1 - x0, "h": roundi(768 * k)}}
+				o = normalize(o)
+				out.append(o)
+				all.append(o)
+		"imag_lr":
+			for side in [-1.0, 1.0]:
+				var o := new_object("projection", all)
+				o["name"] = "IMAG %s" % ("L" if side < 0 else "R")
+				o["screen_m"] = [4.0, 2.25]
+				o["position"] = [side * 7.5, 1.5, 1.0]
+				o["rotation"] = [0.0, -side * 15.0, 0.0]
+				o["throw"] = 1.6
+				o["source"] = {"role": role, "rect": full.duplicate()}
+				o = normalize(o)
+				out.append(o)
+				all.append(o)
+		"tv_row":
+			var first := new_object("tv", all)
+			first["name"] = "TV 1"
+			first["diagonal_in"] = 55.0
+			first["resolution"] = [1920, 1080]
+			first["position"] = [-1.95 * 1.5, 1.2, 3.0]
+			first["source"] = {"role": role, "rect": full.duplicate()}
+			first = normalize(first)
+			out.append(first)
+			all.append(first)
+			out.append_array(array_copies(first, 3, 0.7, all))
+	return out
+
+
+## `count` copies of `o` side by side along its own X axis (yaw respected), `gap_m` apart.
+static func array_copies(o: Dictionary, count: int, gap_m: float, existing: Array = []) -> Array:
+	var out: Array = []
+	var all := existing.duplicate()
+	if not all.has(o):
+		all.append(o)
+	var step := size_m(o).x + gap_m
+	var dir := Vector3.RIGHT.rotated(Vector3.UP, deg_to_rad(float(o.rotation[1])))
+	var base_name := str(o.name).trim_suffix(" 1")
+	for i in range(1, count + 1):
+		var c: Dictionary = o.duplicate(true)
+		c["id"] = new_object(str(o.type), all).id
+		c["name"] = "%s %d" % [base_name, i + 1]
+		var p := Vector3(o.position[0], o.position[1], o.position[2]) + dir * step * i
+		c["position"] = [snappedf(p.x, 0.001), snappedf(p.y, 0.001), snappedf(p.z, 0.001)]
+		c = normalize(c)
+		out.append(c)
+		all.append(c)
+	return out

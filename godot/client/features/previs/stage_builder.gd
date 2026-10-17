@@ -14,6 +14,8 @@ var _tex_provider: Callable      # role -> Texture2D (VideoSurfaces.texture by d
 var _check := 0.0
 var live := true                 # WO-617: false = draw without video, hold no surfaces
 var _held := {}                  # role -> true (surfaces this builder holds)
+var selected_id := ""
+var _sel_box: MeshInstance3D
 
 
 func _init(tex_provider: Callable = Callable()) -> void:
@@ -45,6 +47,8 @@ func upsert(o: Dictionary) -> Dictionary:
 		(_nodes[n.id] as Node).queue_free()
 	_build(n)
 	sync_holds()
+	if n.id == selected_id:
+		_update_highlight.call_deferred()
 	return n
 
 
@@ -80,6 +84,57 @@ func bounds() -> AABB:
 			box = b if first else box.merge(b)
 			first = false
 	return box
+
+
+func set_selected(id: String) -> void:
+	selected_id = id
+	_update_highlight.call_deferred()
+
+
+## Nearest object under a screen point of `cam` (ray against each object's mesh boxes); "" = none.
+func pick(cam: Camera3D, at: Vector2) -> String:
+	var from := cam.project_ray_origin(at)
+	var dir := cam.project_ray_normal(at)
+	var best := ""
+	var best_d := INF
+	for id in _nodes:
+		for mi in (_nodes[id] as Node).find_children("*", "MeshInstance3D", true, false):
+			var box: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+			var hit: Variant = box.grow(0.02).intersects_ray(from, dir)
+			if hit != null and from.distance_to(hit) < best_d:
+				best_d = from.distance_to(hit)
+				best = str(id)
+	return best
+
+
+func _update_highlight() -> void:
+	if _sel_box != null:
+		_sel_box.queue_free()
+		_sel_box = null
+	var n: Node3D = _nodes.get(selected_id)
+	if n == null or not is_inside_tree():
+		return
+	var box := AABB()
+	var first := true
+	for mi in n.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+		box = b if first else box.merge(b)
+		first = false
+	if first:
+		return
+	box = box.grow(0.05)
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINES)
+	for e in [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [2, 6], [3, 7]]:
+		im.surface_add_vertex(box.get_endpoint(e[0]))
+		im.surface_add_vertex(box.get_endpoint(e[1]))
+	im.surface_end()
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color("#58a6ff")
+	_sel_box = _mesh(im, m)
+	_sel_box.top_level = true
+	add_child(_sel_box)
 
 
 func _process(delta: float) -> void:

@@ -148,6 +148,10 @@ func _update_camera() -> void:
 	_cam.look_at(_target, Vector3.UP)
 
 
+func camera() -> Camera3D:
+	return _cam
+
+
 ## Aim the orbit camera at a world box (stage builder objects, WO-614).
 func frame_box(box: AABB) -> void:
 	if box.size == Vector3.ZERO:

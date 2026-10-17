@@ -7,6 +7,7 @@ extends Control
 
 signal selected(id: String)
 signal moved(id: String, position: Array)
+signal rotated(id: String, yaw_deg: float)
 
 const S := preload("res://features/previs/stage_objects.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -114,7 +115,7 @@ func _draw() -> void:
 				draw_line(pj, pts[0], Color(col, 0.4), 1.0)
 				draw_line(pj, pts[pts.size() - 1], Color(col, 0.4), 1.0)
 			draw_string(font, pts[0] + Vector2(0, -8), _label(o), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ThemeBuilder.TEXT if sel else ThemeBuilder.TEXT_MUTED)
-	var hint := "FRONT — drag: move X / height" if view == "front" else "PLAN (audience ↓) — drag: move X / Z"
+	var hint := "FRONT — drag: move X / height" if view == "front" else "PLAN (audience ↓) — drag: move X / Z · shift-drag: rotate"
 	draw_string(font, Vector2(10, size.y - 10), hint + " · wheel: zoom · right-drag: pan", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, ThemeBuilder.TEXT_MUTED)
 
 
@@ -127,11 +128,15 @@ func _gui_input(event: InputEvent) -> void:
 			selected.emit(id)
 			if id != "":
 				var o: Dictionary = objects[_index(id)]
-				_drag = {"id": id, "start": mb.position, "pos": (o.position as Array).duplicate(), "moved": false}
+				_drag = {"id": id, "start": mb.position, "pos": (o.position as Array).duplicate(), "moved": false,
+					"rotate": view == "plan" and mb.shift_pressed, "yaw": float(o.rotation[1])}
 			queue_redraw()
 		elif mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
 			if not _drag.is_empty() and _drag.moved:
-				moved.emit(_drag.id, objects[_index(_drag.id)].position)
+				if _drag.rotate:
+					rotated.emit(_drag.id, float(objects[_index(_drag.id)].rotation[1]))
+				else:
+					moved.emit(_drag.id, objects[_index(_drag.id)].position)
 			_drag = {}
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			_pan = mb.pressed
@@ -144,6 +149,18 @@ func _gui_input(event: InputEvent) -> void:
 	if mm != null:
 		if _pan:
 			_origin += mm.relative
+			queue_redraw()
+		elif not _drag.is_empty() and _drag.rotate:
+			# plan: screen angle grows clockwise (z down); a positive yaw turns the object counter-clockwise
+			var o: Dictionary = objects[_index(_drag.id)]
+			var c := _px(Vector2(float(o.position[0]), float(o.position[2])))
+			var start: Vector2 = _drag.start
+			var a0: float = (start - c).angle()
+			var a1: float = (mm.position - c).angle()
+			var r: Array = (o.rotation as Array).duplicate()
+			r[1] = wrapf(snappedf(float(_drag.yaw) - rad_to_deg(a1 - a0), 5.0), -180.0, 180.0)
+			o.rotation = r
+			_drag.moved = true
 			queue_redraw()
 		elif not _drag.is_empty():
 			var d: Vector2 = (mm.position - _drag.start) / _scale
