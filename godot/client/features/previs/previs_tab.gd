@@ -1,11 +1,15 @@
 extends HSplitContainer
-## WO-607 — Previs tab: 3D stage (SubViewport) + side panel (models from /api/previs/models, live source,
-## screen meshes, camera presets). Source surfaces come from VideoSurfaces (shm; runtime roles leased).
+## WO-607 — Previs tab: stage view + side panel (stage objects, models from /api/previs/models, live source,
+## screen meshes, camera presets). WO-617: view modes 2D front (default) · 2D plan · 3D; the 3D SubViewport
+## renders only in 3D mode, and video surfaces are held only by what is visible (VideoSurfaces refcount).
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
 const StagePanel := preload("res://features/previs/stage_panel.gd")
+const Stage2D := preload("res://features/previs/stage_2d_view.gd")
+const UI_CFG := "user://ui.cfg"
+const MODES := ["front", "plan", "3d"]
 
 var stage: PrevisStage
 var builder: StageBuilder
@@ -15,35 +19,122 @@ var _meshes: VBoxContainer
 var _source: OptionButton
 var _status: Label
 var _model_ids: Array = []
+var view2d: Stage2D
+var mode := "front"
+var _sv: SubViewport
+var _svc: SubViewportContainer
+var _pictures: CheckBox
+var _mode_btns := {}
+var _glb_role := ""
 
 
 func _ready() -> void:
 	split_offset = -320
-	var svc := SubViewportContainer.new()
-	svc.stretch = true
-	svc.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(svc)
-	var sv := SubViewport.new()
-	sv.own_world_3d = true
-	sv.handle_input_locally = false
-	svc.add_child(sv)
+	var left := VBoxContainer.new()
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(left)
+	left.add_child(_build_toolbar())
+	var stack := Control.new()
+	stack.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	left.add_child(stack)
+	_svc = SubViewportContainer.new()
+	_svc.stretch = true
+	_svc.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(_svc)
+	_sv = SubViewport.new()
+	_sv.own_world_3d = true
+	_sv.handle_input_locally = false
+	_svc.add_child(_sv)
 	stage = PrevisStage.new()
-	sv.add_child(stage)
+	_sv.add_child(stage)
 	builder = StageBuilder.new()
+	builder.live = false
 	stage.add_child(builder)
-	svc.gui_input.connect(func(e: InputEvent) -> void: stage.handle_input(e))
+	_svc.gui_input.connect(func(e: InputEvent) -> void: stage.handle_input(e))
+	view2d = Stage2D.new()
+	view2d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(view2d)
 	add_child(_build_panel())
 	stage.model_loaded.connect(_on_model_loaded)
 	var framed := [false]
 	stage_panel.stage_loaded.connect(func(n: int) -> void:
 		if n > 0 and not framed[0]:
 			framed[0] = true
-			stage.frame_box.call_deferred(builder.bounds()))
+			stage.frame_box.call_deferred(builder.bounds())
+			view2d.fit.call_deferred())
+	stage_panel.stage_changed.connect(func() -> void: view2d.set_objects(builder.objects.duplicate(true)))
+	stage_panel.selection_changed.connect(func(id: String) -> void: view2d.select(id))
+	view2d.selected.connect(func(id: String) -> void: stage_panel.select(id))
+	view2d.moved.connect(func(id: String, pos: Array) -> void: stage_panel.move_object(id, pos))
 	stage_panel.bind(builder)
 	if Config.args.has("probe-stage-add"):  # dev: --probe-stage-add=<menu id> (0 LED, 1 TV, 2 projection)
 		get_tree().create_timer(3.0).timeout.connect(func() -> void: stage_panel._on_add(int(Config.args["probe-stage-add"])))
-	_set_source(str(Config.args.get("previs-source", "opgui")))
+	_glb_role = str(Config.args.get("previs-source", "opgui"))
+	stage.set_live_texture(VideoSurfaces.texture(_glb_role))
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	_pictures.button_pressed = cfg.get_value("previs", "live_pictures", false) == true
+	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "front"))))
+	visibility_changed.connect(_apply_mode)
 	refresh_models()
+
+
+## "front" | "plan" (2D, no 3D rendering) | "3d". Remembered per client (UI preference, not show data).
+func set_mode(m: String) -> void:
+	mode = m if MODES.has(m) else "front"
+	for k in _mode_btns:
+		(_mode_btns[k] as Button).set_pressed_no_signal(k == mode)
+	_apply_mode()
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	cfg.set_value("previs", "mode", mode)
+	cfg.set_value("previs", "live_pictures", _pictures.button_pressed)
+	cfg.save(UI_CFG)
+
+
+func _apply_mode() -> void:
+	if _sv == null:
+		return
+	var shown := is_visible_in_tree()
+	var is3d := mode == "3d"
+	_svc.visible = is3d
+	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
+	builder.set_live(is3d and shown)
+	if is3d and shown:
+		VideoSurfaces.acquire(_glb_role, self)
+	else:
+		VideoSurfaces.release(_glb_role, self)
+	view2d.visible = not is3d
+	if not is3d and view2d.view != mode:
+		view2d.set_view(mode)
+	_pictures.disabled = is3d
+	view2d.set_live_pictures(_pictures.button_pressed and not is3d and shown)
+
+
+func _build_toolbar() -> Control:
+	var bar := HBoxContainer.new()
+	var group := ButtonGroup.new()
+	for spec in [["front", "2D front"], ["plan", "2D plan"], ["3d", "3D"]]:
+		var b := Button.new()
+		b.text = spec[1]
+		b.toggle_mode = true
+		b.button_group = group
+		var m: String = spec[0]
+		b.pressed.connect(func() -> void: set_mode(m))
+		bar.add_child(b)
+		_mode_btns[m] = b
+	_pictures = CheckBox.new()
+	_pictures.text = "Live pictures"
+	_pictures.tooltip_text = "2D only. Off = layout only: no video surfaces are read (Caspar and the client do no copying)."
+	_pictures.toggled.connect(func(_on: bool) -> void: set_mode(mode))
+	bar.add_child(_pictures)
+	var fit := Button.new()
+	fit.text = "Fit"
+	fit.pressed.connect(func() -> void:
+		view2d.fit()
+		stage.frame_box(builder.bounds()))
+	bar.add_child(fit)
+	return bar
 
 
 func refresh_models() -> void:
@@ -75,7 +166,10 @@ func load_model(idx: int) -> void:
 
 
 func _set_source(role: String) -> void:
+	VideoSurfaces.release(_glb_role, self)
+	_glb_role = role
 	stage.set_live_texture(VideoSurfaces.texture(role))
+	_apply_mode()
 
 
 func _on_model_loaded(meshes: Array) -> void:
@@ -113,10 +207,6 @@ func _build_panel() -> Control:
 	v.add_child(_source)
 	v.add_child(_heading("Camera"))
 	var cams := HBoxContainer.new()
-	var fit := Button.new()
-	fit.text = "Fit"
-	fit.pressed.connect(func() -> void: stage.frame_box(builder.bounds()))
-	cams.add_child(fit)
 	for p in ["Front", "Top", "ISO"]:
 		var b := Button.new()
 		b.text = p

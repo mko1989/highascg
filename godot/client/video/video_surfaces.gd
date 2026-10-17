@@ -8,6 +8,7 @@ extends Node
 const ShmReader := preload("res://video/shm_reader.gd")
 const ShmNative := preload("res://video/shm_native.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
+const SurfaceHolders := preload("res://video/surface_holders.gd")
 const LEASE_EVERY_S := 5.0
 const RUNTIME_ROLES := ["pgm1", "prv1", "pgm2", "prv2", "pgm3", "prv3", "pgm4", "prv4"]
 
@@ -15,6 +16,7 @@ var client_id := "godot-%d-%d" % [OS.get_process_id(), Time.get_unix_time_from_s
 var descriptors := {}  # role -> server descriptor (path, channel, active, …)
 var leasing := false
 var _surfaces := {}  # role -> { reader, tex, native, path }
+var holders := SurfaceHolders.new()  # WO-617: only held roles are polled, uploaded and leased
 var _timer: Timer
 
 
@@ -31,9 +33,17 @@ func start() -> void:
 	_renew()
 
 
-## Stable Texture2D for a surface (created on first use; stays valid across writer restarts).
+## Stable Texture2D for a surface (created on first use; stays valid across writer restarts and
+## across release/re-acquire). Does NOT hold it: nothing is read or leased until someone acquires.
 func texture(role: String) -> Texture2D:
 	return _ensure(role).tex.texture
+
+
+## WO-617: hold a surface for `owner` (polled, uploaded and leased while ≥ 1 holder). Same texture as texture().
+func acquire(role: String, owner: Object) -> Texture2D:
+	if holders.hold(role, owner) and role in RUNTIME_ROLES and _timer != null and not _timer.is_stopped():
+		_renew()  # lease now, not at the next 5 s tick
+	return texture(role)
 
 
 func reader(role: String) -> Variant:
@@ -44,9 +54,18 @@ func is_native() -> bool:
 	return ShmNative.available()
 
 
-## Stop drawing a role (its lease lapses at the next renewal).
-func release(role: String) -> void:
-	_surfaces.erase(role)
+## Drop `owner`'s hold on a role; with no holders left it stops being read and its lease lapses
+## (server REMOVEs the runtime consumer after the TTL). The texture object is kept for re-acquire.
+func release(role: String, owner: Object) -> void:
+	holders.drop(role, owner)
+
+
+func release_all(owner: Object) -> void:
+	holders.drop_all(owner)
+
+
+func is_held(role: String) -> bool:
+	return holders.is_held(role)
 
 
 func _ensure(role: String) -> Dictionary:
@@ -67,7 +86,7 @@ func path_for(role: String) -> String:
 
 func _renew() -> void:
 	var wanted := []
-	for role in _surfaces.keys():
+	for role in holders.roles():
 		if role in RUNTIME_ROLES:
 			wanted.append(role)
 	var res: Dictionary = await Api.post_json("/api/video-surfaces/lease", {"clientId": client_id, "roles": wanted})
@@ -86,12 +105,15 @@ func _apply_descriptors(list: Variant) -> void:
 	for role in _surfaces.keys():
 		var want := path_for(role)
 		if want != str(_surfaces[role].path):
-			_surfaces.erase(role)
-			_ensure(role)
+			# swap the reader only — the Texture2D object must stay the same for everything bound to it
+			var s: Dictionary = _surfaces[role]
+			s.reader = ShmNative.new(want) if s.native else ShmReader.new(want)
+			s.path = want
 
 
 func _process(_delta: float) -> void:
-	for s in _surfaces.values():
+	for role in holders.roles():
+		var s: Dictionary = _ensure(role)
 		var r: Variant = s.reader
 		if r.poll():
 			if s.native:

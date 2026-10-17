@@ -20,7 +20,9 @@ func _ready() -> void:
 	var stack := Control.new()
 	video_panel.add_child(stack)
 	_video = TextureRect.new()
-	_video.texture = VideoSurfaces.texture(str(Config.args.get("surface", "opgui")))
+	_video.texture = VideoSurfaces.texture(_role())
+	visibility_changed.connect(_hold_surface)  # WO-617: read the operator surface only while shown
+	_hold_surface.call_deferred()
 	_video.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_video.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	var premult := CanvasItemMaterial.new()
@@ -49,8 +51,21 @@ func _ready() -> void:
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))
 
 
+func _role() -> String:
+	return str(Config.args.get("surface", "opgui"))
+
+
+func _hold_surface() -> void:
+	if is_visible_in_tree():
+		VideoSurfaces.acquire(_role(), self)
+	else:
+		VideoSurfaces.release(_role(), self)
+
+
 func _process(_delta: float) -> void:
-	var r: Variant = VideoSurfaces.reader(str(Config.args.get("surface", "opgui")))
+	if not is_visible_in_tree():
+		return
+	var r: Variant = VideoSurfaces.reader(_role())
 	var lost: bool = r.signal_lost
 	_no_signal.visible = lost
 	_video.modulate = Color(0.35, 0.35, 0.35) if lost else Color.WHITE

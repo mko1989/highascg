@@ -88,3 +88,19 @@ func test_new_object_ids_unique() -> void:
 	t.eq(S.PANEL_PRESETS.size(), 5, "presets present")
 	for p in S.PANEL_PRESETS:
 		t.ok(_near(float(p.mm[0]) / p.px[0], float(p.mm[1]) / p.px[1], 1e-6), "%s square pitch" % p.name)
+
+
+func test_2d_footprint_and_front_rect() -> void:
+	var o := S.normalize({"type": "tv", "diagonal_in": 65, "position": [2.0, 1.0, 3.0]})
+	var fp := S.footprint(o)
+	t.ok(_near(fp[0].x, 2.0 - 0.71956, 1e-3) and _near(fp[1].x, 2.0 + 0.71956, 1e-3) and _near(fp[0].y, 3.0), "unrotated TV: centred on x, at z")
+	var r := S.front_rect(o)
+	t.ok(_near(r.position.y, 1.0) and _near(r.size.y, 0.8095, 1e-3) and _near(r.size.x, 1.4391, 1e-3), "front rect = width × height at its height")
+	o["rotation"] = [0.0, 90.0, 0.0]
+	o = S.normalize(o)
+	t.ok(S.front_rect(o).size.x < 0.02, "yaw 90°: edge-on in the front view")
+	t.ok(_near(absf(S.footprint(o)[0].y - S.footprint(o)[1].y), 1.4391, 1e-3), "…and full width along z in the plan")
+	var p := S.normalize({"type": "projection", "screen_m": [4.0, 2.25], "throw": 1.5})
+	t.ok(_near(S.projector_world_xz(p).y, 6.0), "projector 6 m in front (plan)")
+	var wall := S.normalize({"type": "led_wall", "panels": [6, 2], "curve_deg": 10.0})
+	t.eq(S.footprint(wall).size(), 7, "curved wall footprint = column edges")

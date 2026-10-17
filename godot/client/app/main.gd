@@ -39,6 +39,8 @@ func _ready() -> void:
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
+	if Config.args.has("probe-perf"):  # dev: render-time probe (WO-617)
+		add_child(preload("res://app/perf_probe.gd").new())
 	if Config.args.has("quit-after"):
 		get_tree().create_timer(float(Config.args["quit-after"])).timeout.connect(_finish)
 
@@ -134,6 +136,6 @@ func _finish() -> void:
 		"ws_open": Ws.is_open, "ws_messages": Ws.messages_received, "looks": look_count(),
 		"state_keys": Store.state.size(), "settings_loaded": Settings.is_loaded,
 		"video_native": VideoSurfaces.is_native(), "look_names": look_names(),
-		"video_lease_ok": VideoSurfaces.leasing, "saves_ok": ProjectSync.saves_ok, "deck_syncs": ProjectSync.deck_syncs_sent, "project_rev": Store.project.get("rev"), "surfaces_announced": VideoSurfaces.descriptors.size(),
+		"video_lease_ok": VideoSurfaces.leasing, "saves_ok": ProjectSync.saves_ok, "deck_syncs": ProjectSync.deck_syncs_sent, "project_rev": Store.project.get("rev"), "surfaces_announced": VideoSurfaces.descriptors.size(), "held_roles": VideoSurfaces.holders.roles(),
 	}))
 	get_tree().quit()

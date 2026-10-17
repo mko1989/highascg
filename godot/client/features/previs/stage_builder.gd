@@ -12,6 +12,8 @@ var _mats := {}                  # id -> ShaderMaterial
 var _rasters := {}               # role -> Vector2i last seen
 var _tex_provider: Callable      # role -> Texture2D (VideoSurfaces.texture by default; tests inject)
 var _check := 0.0
+var live := true                 # WO-617: false = draw without video, hold no surfaces
+var _held := {}                  # role -> true (surfaces this builder holds)
 
 
 func _init(tex_provider: Callable = Callable()) -> void:
@@ -29,6 +31,7 @@ func set_objects(list: Array) -> void:
 			objects.append(S.normalize(o))
 	for o in objects:
 		_build(o)
+	sync_holds()
 
 
 func upsert(o: Dictionary) -> Dictionary:
@@ -41,6 +44,7 @@ func upsert(o: Dictionary) -> Dictionary:
 	if _nodes.has(n.id):
 		(_nodes[n.id] as Node).queue_free()
 	_build(n)
+	sync_holds()
 	return n
 
 
@@ -52,6 +56,7 @@ func remove(id: String) -> void:
 		(_nodes[id] as Node).queue_free()
 		_nodes.erase(id)
 		_mats.erase(id)
+	sync_holds()
 
 
 func index_of(id: String) -> int:
@@ -79,7 +84,7 @@ func bounds() -> AABB:
 
 func _process(delta: float) -> void:
 	_check += delta
-	if _check < 0.5:
+	if _check < 0.5 or not live:
 		return
 	_check = 0.0
 	for o in objects:
@@ -148,8 +153,36 @@ func _apply_source(o: Dictionary) -> void:
 func _texture(role: String) -> Texture2D:
 	if _tex_provider.is_valid():
 		return _tex_provider.call(role)
+	if not live:
+		return null
 	var vs := get_node_or_null("/root/VideoSurfaces")
 	return vs.texture(role) if vs != null else null
+
+
+## WO-617: 3D mode visible → hold exactly the roles the objects use; otherwise hold nothing.
+func set_live(on: bool) -> void:
+	live = on
+	sync_holds()
+	for o in objects:
+		_apply_source(o)
+
+
+func sync_holds() -> void:
+	var vs := get_node_or_null("/root/VideoSurfaces")
+	if vs == null or _tex_provider.is_valid():
+		return
+	var want := {}
+	if live:
+		for o in objects:
+			want[str(o.source.role)] = true
+	for role in _held.keys():
+		if not want.has(role):
+			vs.release(role, self)
+			_held.erase(role)
+	for role in want.keys():
+		if not _held.has(role):
+			vs.acquire(role, self)
+			_held[role] = true
 
 
 func _raster(role: String) -> Vector2i:

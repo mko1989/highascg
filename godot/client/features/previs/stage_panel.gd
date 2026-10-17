@@ -22,6 +22,8 @@ const FIELDS := {
 		["Res W", "resolution", 0, "i", 1, 16384, 1], ["Res H", "resolution", 1, "i", 1, 16384, 1], ["Brightness", "brightness", -1, "f", 0, 4, 0.05]],
 }
 signal stage_loaded(count: int)
+signal stage_changed            # any edit/reload (WO-617: the 2D view redraws from builder.objects)
+signal selection_changed(id: String)
 
 const RECT := [["Crop X px", "x"], ["Crop Y px", "y"], ["Crop W px", "w"], ["Crop H px", "h"]]
 
@@ -129,8 +131,24 @@ func _free_x() -> float:
 	return b.end.x + 2.5
 
 
+## Public: select from outside (2D view click).
+func select(id: String) -> void:
+	_select(id)
+
+
+## Public: 2D drag-move finished → same path as an inspector edit (rebuild + persist).
+func move_object(id: String, position: Array) -> void:
+	var keep := _selected
+	_selected = id
+	_edit(func(x: Dictionary) -> void: x.position = position)
+	_selected = keep
+	if keep == id:
+		_build_inspector()
+
+
 func _select(id: String) -> void:
 	_selected = id
+	selection_changed.emit(id)
 	var i := builder.index_of(id)
 	if i >= 0:
 		_list.select(i)
@@ -224,6 +242,7 @@ func _maybe_reload() -> void:
 	builder.set_objects(list)
 	_refresh_list()
 	stage_loaded.emit(builder.objects.size())
+	stage_changed.emit()
 	_select(_selected if builder.index_of(_selected) >= 0 else "")
 
 
@@ -233,6 +252,7 @@ func _persist() -> void:
 	Store.project["previs"] = previs
 	_last_json = _canon(builder.objects)
 	ProjectSync.mark_dirty()
+	stage_changed.emit()
 
 
 ## JSON parse turns every number into a float, so compare both sides after one parse round trip.

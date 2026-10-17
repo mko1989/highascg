@@ -194,3 +194,38 @@ static func _ivec2(v: Variant, lo: int, hi: int) -> Array:
 static func _fvec2(v: Variant, lo: float, hi: float) -> Array:
 	var a: Array = v if v is Array and (v as Array).size() == 2 else [lo, lo]
 	return [clampf(float(a[0]), lo, hi), clampf(float(a[1]), lo, hi)]
+
+
+## WO-617 2D views. Footprint = the picture line seen from above, in world XZ (yaw applied, tilt ignored).
+static func footprint(o: Dictionary) -> PackedVector2Array:
+	var local := PackedVector2Array()
+	if str(o.get("type")) == "led_wall":
+		local = column_edges(o)
+	else:
+		var w := size_m(o).x
+		local = PackedVector2Array([Vector2(-w / 2.0, 0.0), Vector2(w / 2.0, 0.0)])
+	var out := PackedVector2Array()
+	for p in local:
+		out.append(_to_world_xz(o, Vector3(p.x, 0.0, p.y)))
+	return out
+
+
+## Front elevation box in world units: x = left edge, y = bottom height, size = (projected width, height).
+static func front_rect(o: Dictionary) -> Rect2:
+	var fp := footprint(o)
+	var lo := INF
+	var hi := -INF
+	for p in fp:
+		lo = minf(lo, p.x)
+		hi = maxf(hi, p.x)
+	return Rect2(lo, float(o.position[1]), maxf(hi - lo, 0.01), size_m(o).y)
+
+
+## Projector position in world XZ (projection objects).
+static func projector_world_xz(o: Dictionary) -> Vector2:
+	return _to_world_xz(o, projector_offset(o))
+
+
+static func _to_world_xz(o: Dictionary, local: Vector3) -> Vector2:
+	var w := local.rotated(Vector3.UP, deg_to_rad(float(o.rotation[1])))
+	return Vector2(float(o.position[0]) + w.x, float(o.position[2]) + w.z)
