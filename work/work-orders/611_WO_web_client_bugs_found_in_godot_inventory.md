@@ -34,6 +34,13 @@
 - Effect: those error toasts are silent.
 - Fix: replace with an `showAppToast` import (or assign `window.showToast = showAppToast` once).
 
+### 4. Compose-frame move snapping only fired when BOTH edges snapped (fixed 2026-10-18, `adfe2540`)
+`client/components/scenes-compose-handlers.js` startDrag compared the left-edge snap with the right edge's no-op result (distance
+0 always wins), so dragging a layer near a border/neighbour never snapped unless the other edge happened to snap too. Found when the
+golden-faithful Godot port failed its own snap tests. Fix: exported pure `snapMoveAxis` (nearest edge that actually snaps, tie →
+start edge; per-edge comparison to avoid the `(v+size)-size` float trap). Smoke `smoke-wo611-compose-move-snap` 2/2 (fails on the
+old code); dist-web rebuilt. Godot `compose_math.gd` uses the same rule.
+
 ### Also noted (not defects, for cleanup)
 
 - Dead: `client/components/inspector-panel-routing.js` (173 LOC), `components/sync-modal.js`,

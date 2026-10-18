@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — step 1 done; step 2 done on the box (PRV/TAKE/FTB/rename, transitions I, PGM timers O) with a real PGM output; step 3 (editing: compose frame, layer stack, sources) waits for WO-598 C2 (PRV push by id) + golden project tests. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
+**Status: IN PROGRESS (2026-10-18) — steps 1–2 done on the box; step 3a (look editor: compose frame over live PRV, move/resize, layer fields, PRV push by id) done on the box. Next: crop handles, layer reorder/add/remove, sources panel + drops (K), effects/PIP/border (J, needs WO-598 C3). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
 
 # WO-600 — Godot port: live operation core (deck, PRV/PGM, compose tiles, look editor, take, sources, live inputs, multiview editor, timers)
 
@@ -99,6 +99,12 @@ FTB 200 (ch1 cleared from `scene.live`), rename persisted (server rev 2 → 3).
   Transition… / Use default transition; timer under each main's header. Not ported: the web's rAF extrapolation
   (`playback-timing-clock.js`) — the server already sends elapsed at ~25 Hz; revisit if sparse-OSC codecs stutter.
 
+**Step 3a — look editor (2026-10-18)** — unblocked by WO-598 C2 (`/api/scene/preview-push`) + B (byte-compatible wire JSON):
+`features/live/look_editor.gd` (compose frame over the live `prv<N>` surface, select/move/8-handle resize with aspect lock + Shift,
+layer list, X/Y/W/H/opacity), `preview_pusher.gd` (web pacing 16 ms / 200 ms, serialized: deck sync → preview-push → autosave),
+`compose_math.gd` (edgeResizeDeltaToFill golden-tested, 64 cases from the JS; move snapping per the WO-611 #4 fix, which this
+port found in the web code and which was fixed there too). Card menu "Edit look…".
+
 ## What was VERIFIED
 
 - Against the simulator's real project (5 looks): column "Main 1 · 2 looks" = Look 1 + Look 3 (`mainScope '0'`),
@@ -110,6 +116,10 @@ FTB 200 (ch1 cleared from `scene.live`), rename persisted (server rev 2 → 3).
   (the look's transition); "Background" set to WIPE 30 through the deck path → server rev 358; PGM timer counted
   0:13 → 0:59 / 1:00 with green → red tier; default row shows the auto sentinel 12 resolved to 25 fr @ 50 fps.
   Headless 266/0; `--check` boot OK.
+
+- **Step 3a on the box (2026-10-18, PRV ch2):** editor on "Background" → PRV nudge, box exactly over the clip in the live
+  PRV picture; real XTEST drag → 8 streamed `MIXER 2-10 FILL` nudges, **no reload**, stored x/y 0.308/0.311 (= 100 px / 30 px on
+  a 480×270 frame); real corner drag → scale 0.6 → 0.5 both axes, top-left anchored, aspect 1.0. Headless 345/0, `--check` OK.
 
 Inventory facts 1, 2, 3 re-checked by hand (refs above). The remaining refs are Haiku-read and
 must be re-grepped when each sub-feature is started.
