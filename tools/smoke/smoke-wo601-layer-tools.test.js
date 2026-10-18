@@ -46,11 +46,14 @@ describe('WO-601 layer-options = the web modules on the /api/settings payload', 
 })
 
 describe('WO-601 GET /api/scene/effect-registry (web effect-registry.js, single source)', () => {
-	it('serves MIXER_EFFECTS + categories', async () => {
+	it('serves MIXER_EFFECTS + categories + PIP_OVERLAYS', async () => {
 		const { handleEffectRegistry } = require('../../src/api/routes-scene-layer-tools')
 		const reg = await import(require('url').pathToFileURL(require('path').join(__dirname, '../../client/lib/effect-registry.js')).href)
 		const r = JSON.parse((await handleEffectRegistry()).body)
 		assert.deepStrictEqual(r.effects, JSON.parse(JSON.stringify(reg.MIXER_EFFECTS)))
 		assert.deepStrictEqual(r.categories, reg.EFFECT_CATEGORIES)
+		const pip = await import(require('url').pathToFileURL(require('path').join(__dirname, '../../client/lib/pip-overlay-registry.js')).href)
+		assert.deepStrictEqual(r.pipOverlays, JSON.parse(JSON.stringify(pip.PIP_OVERLAYS)))
+		assert.equal(r.pipMaxStack, pip.PIP_OVERLAY_MAX_STACK)
 	})
 })

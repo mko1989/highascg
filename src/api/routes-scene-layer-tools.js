@@ -9,8 +9,9 @@
  * GET /api/scene/layer-options?mainIdx= → { programLayout, audioRoutes, sourceChannelSets }
  *   = web inspector-mixer.js route choices: resolveProgramLayoutForMain(settings, channelMap, main) →
  *   audioOutputRoutesForLayout(layout), with `settings` = exactly the GET /api/settings payload.
- * GET /api/scene/effect-registry → { effects, categories } = web effect-registry.js MIXER_EFFECTS (types,
- *   defaults, param schemas) + EFFECT_CATEGORIES — the Godot effects editor renders from these.
+ * GET /api/scene/effect-registry → { effects, categories, pipOverlays, pipMaxStack } = web effect-registry.js
+ *   MIXER_EFFECTS (types, defaults, param schemas) + EFFECT_CATEGORIES, and pip-overlay-registry.js PIP_OVERLAYS +
+ *   PIP_OVERLAY_MAX_STACK — the Godot effects / PIP editors render from these.
  */
 
 const path = require('path')
@@ -59,8 +60,9 @@ async function handleLayerOptions(query, ctx, deps = {}) {
 }
 
 async function handleEffectRegistry() {
-	const reg = await import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', 'effect-registry.js')).href)
-	return out(200, { ok: true, effects: reg.MIXER_EFFECTS, categories: reg.EFFECT_CATEGORIES })
+	const load = (n) => import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', n)).href)
+	const [reg, pip] = await Promise.all([load('effect-registry.js'), load('pip-overlay-registry.js')])
+	return out(200, { ok: true, effects: reg.MIXER_EFFECTS, categories: reg.EFFECT_CATEGORIES, pipOverlays: pip.PIP_OVERLAYS, pipMaxStack: pip.PIP_OVERLAY_MAX_STACK })
 }
 
 module.exports = { handleLayerFit, handleLayerOptions, handleEffectRegistry, SOURCE_CHANNEL_SETS }

@@ -8,6 +8,7 @@ extends VBoxContainer
 signal changed(effects: Array)
 
 const E := preload("res://features/live/effects_model.gd")
+const F := preload("res://features/live/param_field.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var _registry: Array = []
@@ -29,13 +30,13 @@ func _ready() -> void:
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 6)
 	add_child(_list)
-	_load_registry()
+	_fill_add_menu()
+	_rebuild()
 
 
-func _load_registry() -> void:
-	var res: Dictionary = await Api.get_json("/api/scene/effect-registry")
-	if res.ok and res.data is Dictionary and res.data.get("effects") is Array:
-		_registry = res.data.effects
+## GET /api/scene/effect-registry `effects` (the layer inspector fetches it once for every section).
+func set_registry(effects: Array) -> void:
+	_registry = effects
 	_fill_add_menu()
 	_rebuild()
 
@@ -135,76 +136,17 @@ func _grid() -> GridContainer:
 	return g
 
 
-## renderParamEditor: select → OptionButton, bool → CheckBox, float/int → slider + spin (px for crop).
 func _param(g: GridContainer, i: int, fx: Dictionary, s: Dictionary) -> void:
+	var dim := E.px_dim(s, _content)
 	var l := Label.new()
+	l.text = F.label_for(s, dim)
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	g.add_child(l)
 	var key := str(s.key)
-	var v: Variant = E.value_of(fx, s)
-	l.text = str(s.get("label", key))
-	match str(s.get("type", "float")):
-		"select":
-			var o := OptionButton.new()
-			var opts: Array = s.get("options", [])
-			for opt in opts:
-				o.add_item(str(opt))
-			o.select(maxi(0, opts.map(func(x: Variant) -> String: return str(x)).find(str(v))))
-			o.item_selected.connect(func(k: int) -> void: _set_param(i, key, opts[k]))
-			g.add_child(o)
-		"bool":
-			var c := CheckBox.new()
-			c.button_pressed = v == true
-			c.toggled.connect(func(on: bool) -> void: _set_param(i, key, on))
-			g.add_child(c)
-		_:
-			g.add_child(_number(i, key, float(v if v != null else 0.0), s, l))
-
-
-func _number(i: int, key: String, v: float, s: Dictionary, l: Label) -> Control:
-	var dim := E.px_dim(s, _content)
-	var is_int := str(s.get("type", "")) == "int"
-	var row := HBoxContainer.new()
-	var sp := SpinBox.new()
-	sp.custom_minimum_size.x = 90
-	if dim > 0:
-		l.text += " (px)"
-		if s.has("pxHint"):
-			l.tooltip_text = str(s.pxHint)
-		sp.min_value = float(s.get("min", 0.0)) * dim
-		sp.max_value = float(s.get("max", 1.0)) * dim
-		sp.step = 1
-		sp.value = E.to_px(v, dim)
-	else:
-		sp.min_value = float(s.get("min", -100000.0))
-		sp.max_value = float(s.get("max", 100000.0))
-		sp.step = 1.0 if is_int else float(s.get("step", 0.01))
-		sp.value = v
-	var sl: HSlider = null
-	if s.get("slider", false) == true:
-		sl = HSlider.new()
-		sl.custom_minimum_size.x = 110
-		sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		sl.min_value = sp.min_value
-		sl.max_value = sp.max_value
-		sl.step = sp.step
-		sl.value = sp.value
-		sl.value_changed.connect(func(x: float) -> void:
-			if not is_equal_approx(sp.value, x):
-				sp.value = x)
-		row.add_child(sl)
-	sp.value_changed.connect(func(x: float) -> void:
-		if sl != null and not is_equal_approx(sl.value, x):
-			sl.set_value_no_signal(x)
-		var stored: Variant = E.from_px(x, dim, s) if dim > 0 else (int(x) if is_int else x)
-		_set_param(i, key, stored, false))
-	row.add_child(sp)
-	return row
+	g.add_child(F.control(s, E.value_of(fx, s), func(v: Variant) -> void: _set_param(i, key, v), dim))
 
 
 ## A param edit emits without rebuilding the cards (keeps the slider being dragged alive).
-func _set_param(i: int, key: String, v: Variant, rebuild := true) -> void:
+func _set_param(i: int, key: String, v: Variant) -> void:
 	_effects = E.set_param(_effects, i, key, v)
 	changed.emit(_effects.duplicate(true))
-	if rebuild:
-		_rebuild()

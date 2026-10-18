@@ -8,6 +8,8 @@ signal patch(p: Dictionary)
 
 const X := preload("res://features/live/mixer_math.gd")
 const EffectsSection := preload("res://features/live/effects_section.gd")
+const PipSection := preload("res://features/live/pip_section.gd")
+const PipModel := preload("res://features/live/pip_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const STARTS := [["beginning", "Start from beginning"], ["relativeToPrevious", "Relative to the clip playing on this layer"]]
@@ -20,6 +22,7 @@ var _src_sets: Array = []
 var _w := {}
 var _syncing := false
 var _fx: EffectsSection
+var _pip: PipSection
 var _content_key := ""
 var _content := Vector2i.ZERO
 
@@ -61,6 +64,15 @@ func _ready() -> void:
 	_fx = EffectsSection.new()
 	_fx.changed.connect(func(fx: Array) -> void: patch.emit({"effects": fx}))
 	add_child(_fx)
+	add_child(HSeparator.new())
+	_pip = PipSection.new()
+	_pip.changed.connect(func(list: Array) -> void:
+		var p := {"pipOverlays": list}
+		if _layer.get("pipOverlay") != null:
+			p["pipOverlay"] = null  # legacy single overlay is superseded (web scene-state-helpers deletes it)
+		patch.emit(p))
+	add_child(_pip)
+	_load_registry()
 
 
 func show_layer(look_id: String, main_idx: int, layer: Dictionary) -> void:
@@ -74,7 +86,15 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary) -> void:
 	_sync()
 	if not layer.is_empty():
 		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content)
+		_pip.show_overlays(PipModel.from_layer(layer))
 		_refresh_content()
+
+
+func _load_registry() -> void:
+	var res: Dictionary = await Api.get_json("/api/scene/effect-registry")
+	if res.ok and res.data is Dictionary:
+		_fx.set_registry(res.data.get("effects", []) if res.data.get("effects") is Array else [])
+		_pip.set_registry(res.data.get("pipOverlays", []) if res.data.get("pipOverlays") is Array else [], int(res.data.get("pipMaxStack", 4)))
 
 
 ## Crop px editing uses the layer's content resolution (web getContentResolution, fallback channel) —

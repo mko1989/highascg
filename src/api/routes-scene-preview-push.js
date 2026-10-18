@@ -31,14 +31,16 @@ function out(status, payload) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
 }
 
-/** @returns {Promise<'nudge'|'take'>} */
+/** @returns {Promise<'nudge'|'overlay'|'take'>} 'overlay' = nudge + PIP overlay lines (WO-601, routes-scene-preview-pip.js) */
 async function decidePreviewPush(staged, scene, sceneId) {
 	if (!staged || String(staged.sceneId || '') !== String(sceneId) || !staged.scene) return 'take'
 	const sourced = (scene.layers || []).filter((l) => l?.source?.value)
 	if (sourced.length === 0 || sourced.length > NUDGE_MAX_LAYERS) return 'take'
 	const { buildPreviewContentSnapshot, isGeometryOnlyPreview } = await snapshotLib()
 	const prev = buildPreviewContentSnapshot(String(sceneId), staged.scene)
-	return isGeometryOnlyPreview(prev, scene) ? 'nudge' : 'take'
+	if (isGeometryOnlyPreview(prev, scene)) return 'nudge'
+	const { isOverlayOnlyChange } = require('./routes-scene-preview-pip')
+	return isOverlayOnlyChange(isGeometryOnlyPreview, buildPreviewContentSnapshot, sceneId, staged.scene, scene) ? 'overlay' : 'take'
 }
 
 function parseRes(res) {
@@ -77,7 +79,7 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	const mode = await decidePreviewPush(staged, scene, sceneId)
 
 	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))
-	if (mode === 'nudge') {
+	if (mode === 'nudge' || mode === 'overlay') {
 		const nudge = deps.nudge || ((nb) => require('./routes-preview-nudge').handlePreviewMixerNudge(nb, ctx))
 		const res = { w: map.programResolutions?.[mainIdx]?.w, h: map.programResolutions?.[mainIdx]?.h }
 		const nb = {
@@ -90,10 +92,15 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 		}
 		const nr = await nudge(nb)
 		const parsed = parseRes(nr)
-		if (nr?.status === 200 && parsed.ok === true) {
+		let pip = null
+		if (nr?.status === 200 && parsed.ok === true && mode === 'overlay') {
+			const pushPip = deps.pushPip || ((a) => require('./routes-scene-preview-pip').pushPreviewPipOverlays(ctx, a))
+			pip = await pushPip({ sceneId, scene, staged, prvCh, mainIdx, canvas: nb.composeCanvas || null })
+		}
+		if (nr?.status === 200 && parsed.ok === true && (pip == null || pip.ok)) {
 			const register = deps.registerStaged || (async () => registerStagedScene(ctx, scene, map, mainIdx, prvCh))
 			await register()
-			return out(200, { ok: true, mode: 'nudge', mainIdx, previewChannel: prvCh, lines: parsed.lines ?? null })
+			return out(200, { ok: true, mode, mainIdx, previewChannel: prvCh, lines: parsed.lines ?? null, ...(pip ? { pipLines: pip.lines } : {}) })
 		}
 		/* staged look changed between our read and the chain → converge with a full push */
 	}

@@ -85,6 +85,29 @@ func _ready() -> void:
 			ed3._apply_layer({"effects": seed})
 			await get_tree().create_timer(1.2).timeout
 			print("[client] effects restored ", ed3._layers()[ed3._sel].get("effects"))
+		if Config.args.has("probe-pip"):  # dev: --probe-pip=<layer index> → +border, width 9, +shadow, shadow behind, −border, restore (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed4: Node = shell.tabs.get_node("Live").editor
+			ed4._select(int(Config.args["probe-pip"]))
+			var before: Variant = (ed4._layers()[ed4._sel] as Dictionary).get("pipOverlays", [])
+			await get_tree().create_timer(1.0).timeout
+			var pip: Node = ed4._inspector._pip
+			var pt: Array = pip._registry.map(func(d: Dictionary) -> String: return d.type)
+			var step := func(label: String) -> void:
+				await get_tree().create_timer(1.5).timeout
+				print("[client] pip ", label, " ", ed4._layers()[ed4._sel].get("pipOverlays"))
+			pip._add.item_selected.emit(pt.find("border") + 1)
+			await step.call("+border")
+			(pip._cards.get_child(0).find_children("*", "SpinBox", true, false)[0] as SpinBox).value = 9
+			await step.call("width 9")
+			pip._add.item_selected.emit(pt.find("shadow") + 1)
+			await step.call("+shadow")
+			(pip._cards.get_child(1).find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "↑")[0] as Button).pressed.emit()
+			await step.call("shadow behind")
+			(pip._cards.get_child(1).find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "✕")[0] as Button).pressed.emit()
+			await step.call("-border")
+			ed4._apply_layer({"pipOverlays": before})
+			await step.call("restored")
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor
