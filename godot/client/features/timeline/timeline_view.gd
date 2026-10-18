@@ -11,17 +11,23 @@ extends Control
 ## and drags it in time (snapped, never past a same-property neighbour); a double-click on a clip adds an opacity key
 ## at that time with the current value; Delete removes the selected key (its fill / scale partner too) before the clip.
 ## Keyframe gestures emit `keyframes_edited` (the tab syncs and re-seeks).
+## Slice 5: flags (timeline_flag_draw.gd) — pressing one in the ruler selects it (instead of seeking) and drags it in
+## time, unsnapped like the web; Delete removes the selected flag. A flag and a clip are never selected together.
 
 signal seek_requested(ms: float)
 signal clip_selected(li: int, clip_id: String)  # clip_id "" = nothing selected
 signal edited
 signal source_dropped(source: Dictionary, li: int, ms: float)
 signal keyframes_edited
+signal flag_selected(id: String)  # "" = none
+signal flags_edited
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
 const K := preload("res://features/timeline/timeline_keyframes.gd")
 const KD := preload("res://features/timeline/timeline_kf_draw.gd")
+const F := preload("res://features/timeline/timeline_flags.gd")
+const FD := preload("res://features/timeline/timeline_flag_draw.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var tl: Dictionary = {}
@@ -34,6 +40,7 @@ var _scrubbing := false
 var sel_li := -1
 var sel_id := ""
 var sel_kf: Variant = null  # the selected keyframe Dictionary (by identity) of the selected clip
+var sel_flag := ""
 var _drag := {}
 var _seek_at := 0
 
@@ -51,6 +58,8 @@ func set_timeline(t: Dictionary) -> void:
 		TM.ensure_heights(tl)
 	if sel_id != "" and (first or TE.find_clip(tl, sel_li, sel_id).is_empty()):
 		select(-1, "")
+	if sel_flag != "" and (first or F.find(tl, sel_flag).is_empty()):
+		select_flag("")
 	if first:
 		fit()
 	queue_redraw()
@@ -111,6 +120,7 @@ func _draw() -> void:
 	var end_x := _x(dur)
 	if end_x < size.x:
 		draw_rect(Rect2(maxf(end_x, TM.HEADER_W), TM.RULER_H, size.x - maxf(end_x, TM.HEADER_W), size.y - TM.RULER_H), Color(0, 0, 0, 0.35))
+	FD.draw_trails(self, tl, _x, size, sel_flag)
 	# headers
 	draw_rect(Rect2(0, 0, TM.HEADER_W, size.y), Color("#161b22"))
 	for i in layers.size():
@@ -121,13 +131,7 @@ func _draw() -> void:
 		draw_rect(Rect2(0, y + TM.layer_h(tl, i) - 1, TM.HEADER_W, 1), Color("#21262d"))
 	draw_rect(Rect2(TM.HEADER_W - 1, 0, 1, size.y), Color("#30363d"))
 	_draw_ruler(font, dur, fps)
-	for f in tl.get("flags", []):
-		if f is Dictionary:
-			var fx := _x(float(f.get("timeMs", 0)))
-			if fx >= TM.HEADER_W and fx <= size.x:
-				draw_rect(Rect2(fx, 0, 1, size.y), Color(0.95, 0.75, 0.2, 0.6))
-				var fl := str(f.get("label", "")) if str(f.get("label", "")) != "" else str(f.get("type", ""))
-				draw_string(font, Vector2(fx + 3, 10), fl, HORIZONTAL_ALIGNMENT_LEFT, 120, 10, Color("#f0b429"))
+	FD.draw_markers(self, tl, _x, size.x, sel_flag, font)
 	# playhead
 	var px := roundf(_x(playhead_ms)) + 0.5
 	if px >= TM.HEADER_W:
@@ -191,8 +195,12 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
-		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and sel_id != "":
-			if sel_kf != null:
+		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and (sel_id != "" or sel_flag != ""):
+			if sel_flag != "":
+				F.remove(tl, sel_flag)
+				select_flag("")
+				flags_edited.emit()
+			elif sel_kf != null:
 				_remove_kf()
 			else:
 				TE.remove_clip(tl, sel_li, sel_id)
@@ -213,7 +221,12 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
-			if mb.pressed and mb.position.y < TM.RULER_H and mb.position.x > TM.HEADER_W:
+			if mb.pressed and not F.hit(tl, mb.position, _x).is_empty():
+				var f := F.hit(tl, mb.position, _x)
+				select_flag(str(f.id))
+				_drag = {"flag": f, "orig": float(f.get("timeMs", 0))}
+				accept_event()
+			elif mb.pressed and mb.position.y < TM.RULER_H and mb.position.x > TM.HEADER_W:
 				_scrubbing = true
 				_seek_to(mb.position.x)
 				accept_event()
@@ -238,11 +251,23 @@ func _gui_input(event: InputEvent) -> void:
 func select(li: int, clip_id: String) -> void:
 	if li == sel_li and clip_id == sel_id:
 		return
+	if clip_id != "" and sel_flag != "":
+		select_flag("")
 	sel_li = li if clip_id != "" else -1
 	sel_id = clip_id
 	sel_kf = null
 	queue_redraw()
 	clip_selected.emit(sel_li, sel_id)
+
+
+func select_flag(id: String) -> void:
+	if id == sel_flag:
+		return
+	if id != "":
+		select(-1, "")
+	sel_flag = id
+	queue_redraw()
+	flag_selected.emit(id)
 
 
 ## The clip under `pos` → [layer index, clip] or [] (web hitClip over layerAt).
@@ -255,6 +280,9 @@ func _clip_at(pos: Vector2) -> Array:
 
 
 func _hover(pos: Vector2) -> void:
+	if pos.y < TM.RULER_H:
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if not F.hit(tl, pos, _x).is_empty() else Control.CURSOR_HSIZE
+		return
 	var hit := _clip_at(pos) if pos.x > TM.HEADER_W and pos.y >= TM.RULER_H else []
 	var edge := TE.edge_zone(hit[1], TM.ms_at(pos.x, px_per_ms, scroll_x), px_per_ms) if not hit.is_empty() else ""
 	mouse_default_cursor_shape = Control.CURSOR_HSIZE if edge != "" else (Control.CURSOR_MOVE if not hit.is_empty() else Control.CURSOR_ARROW)
@@ -297,6 +325,10 @@ func _press_track(pos: Vector2, double := false) -> void:
 
 func _drag_to(pos: Vector2) -> void:
 	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
+	if _drag.has("flag"):  # web onMoveFlagTime: clamped to the timeline, no snap
+		F.update(tl, _drag.flag, {"timeMs": clampf(ms, 0.0, float(tl.get("duration", 0)))})
+		queue_redraw()
+		return
 	var c := TE.find_clip(tl, _drag.li, _drag.id)
 	if c.is_empty():
 		return
@@ -338,6 +370,10 @@ func _end_drag() -> void:
 		return
 	var d := _drag
 	_drag = {}
+	if d.has("flag"):
+		if float(d.flag.get("timeMs", 0)) != float(d.orig):
+			flags_edited.emit()
+		return
 	var c := TE.find_clip(tl, d.li, d.id)
 	if c.is_empty():
 		return

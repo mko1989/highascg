@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) and slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) DONE, box-verified; flags editing, layer ops open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) and slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) DONE, box-verified; layer ops, effect drops, copy / paste, keyboard navigation open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -105,6 +105,30 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   - `addScaleKeyframe` writes one value (w / W) to both axes, which squashes media that is not the canvas shape.
     It is changed here (below).
 
+### Slice 5 findings (2026-10-18) — flags
+
+- Model (`client/lib/timeline-state.js:117-154`, `timeline-state-model.js:18`): `{id ("f" + base-36 ms + 4
+  random), timeMs, type ∈ pause | play | jump | companion_press, label, jumpTimeMs?, jumpFlagId?, companionPage?,
+  companionRow?, companionColumn?}`. Add, update and duplicate re-sort by time (stable in JS) and grow the
+  duration to the content. An unknown type becomes `pause`. Remove does **not** clear other flags'
+  `jumpFlagId` that point at it. The engine ignores a dangling reference (`timeline-playback.js:184-192`), and a
+  `jumpTimeMs` wins over a `jumpFlagId`.
+- Canvas (`timeline-canvas-render.js:168-260, 372`): ruler stem + triangle in the type colour (pause red, play
+  green, jump purple, Companion orange). A Companion flag shows its button's 28 px thumbnail
+  (`/api/companion/button-preview/P/R/C.jpg`), or "P/R/C" while there is none. Dashed trails run through the
+  tracks; the selected flag is blue with a solid trail. The hit is in the ruler only, ±10 px, first match.
+- Pointer (`timeline-canvas-pointer.js:70-77, 221-223`): a press on a flag selects it instead of seeking. The
+  drag sets `timeMs` to the raw cursor ms clamped to the timeline, with **no snap** and no rounding, and does not
+  move the playhead. Selecting a flag clears the clip selection and the other way round. The "Flag" transport
+  button adds a pause flag at the playhead and selects it. Delete / Backspace removes the selected flag
+  (`timeline-editor-inputs.js:176`).
+- Inspector (`inspector-panel-timeline-flag.js`): Position (SMPTE), Label, Action, then for a jump a time
+  (`parseHmsInput`: hh:mm:ss:mmm, ++/-- offsets, plain ms; empty clears) or another flag. For a Companion press:
+  the live preview (follows `companion.buttonPreview` over WS), the preview status (per `reason`, WO-535),
+  Location "page row column", Page / Row / Column, "Choose button…" (picker modal) and Test press
+  (`POST /api/companion/button-preview/test-press`). Then Remove flag.
+- Ctrl+C / Ctrl+V of flags and Alt+←/→ nudges belong to the copy / paste and navigation slices.
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -204,6 +228,23 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
 - **Deviation:** `s` and the scale row keep each key's own x / y ratio (`scale_y = h / H`), so recording a scale
   key never changes the picture.
 
+### Slice 5 (2026-10-18) — flags
+
+- `timeline_flags.gd` (new, pure): the model mutations (add / update with null = drop the key, the web's
+  `undefined` / remove / duplicate for the later paste), a stable sort (Godot's `sort_custom` is not stable),
+  `hitFlag`, `parseHmsInput`, the Companion location parser and the "jump to flag" option text.
+- `timeline_flag_draw.gd` (new): markers and trails as in the web. Companion thumbnails are cached per location,
+  retried once after 1.2 s (the jpg route subscribes on demand), and dropped when `companion.buttonPreview`
+  names that button. The page's preview shares the same cache.
+- `timeline_flag_inspector.gd` (new): the web flag page in web order. Not ported: "Choose button…", because it
+  is a modal (WO-608 modals); typing the location or Page / Row / Column does the same.
+- `timeline_view.gd`: a ruler press on a flag selects and drags it (web parity: unsnapped, fractional ms, no
+  seek), and `flags_edited` fires only if the time changed. Delete removes the selected flag. `select_flag` and
+  `select` clear each other. The old yellow line + label flag drawing is replaced.
+- `timeline_tab.gd`: the Flag button, the flag page in the global Inspector, and every flag edit through the
+  same `_commit` (autosave + PUT). The media lookups moved to `timeline_media.gd` (unchanged code) to stay well
+  under 500 lines.
+
 ## What was VERIFIED
 
 - Godot unit tests 665/0 (`test_timeline_math.gd` goldens generated from the web modules under node);
@@ -282,3 +323,32 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
   - Volume keys above 1 (drawn at the top, like the web).
   - Whether Delete should remove the keyframe.
   - The parity limitation "set X then P" (above).
+
+### Slice 5 verification (2026-10-18)
+
+- Godot tests 834/0. New `test_timeline_flags.gd`: mutations, stable order, duration growth, null-drops-key,
+  duplicate, hit (±10 px, ruler only, not over the headers), `parseHmsInput` forms and offsets, the location
+  parser. `--check` boot clean. `check-max-file-lines` reports 0 over (tab 466, view 423).
+- On the box, test timeline `tmve1ppeug1t`, each step read back from `GET /api/timelines/tmve1ppeug1t`:
+  - Seek to ~20 s, then Flag gave `{timeMs 20156, type pause, label ""}`, selected (blue), with its page in the
+    Inspector. The playhead draws over the selected trail.
+  - Label "Hold", then Action → Jump to showed the jump rows. `0:05:000` stored `jumpTimeMs 5000` and displays
+    `00:00:05:000`. A second flag at 40194 appeared in "Or jump to flag" as `pause - 00:00:40:194`, and picking
+    it stored `jumpFlagId`.
+  - Dragging the first flag gave `timeMs 10136.947…` (fractional, as in the web). Selecting the 40 s flag and
+    pressing Delete removed it.
+  - Action → Companion button press showed the 1/0/0 button's real thumbnail ("UP") in the ruler and the page,
+    and the status "Preview via Companion Satellite". The status was empty at first when the type was changed
+    in place; fixed by loading it on that change. Location `99 7 7` stored page / row / column, and the thumbnail
+    became Companion's blank render. Test press on that empty button showed "Test press failed: Companion HTTP
+    404" (the endpoint's real answer; it first read "404.0", now formatted as an integer).
+  - Engine: Action → Pause, seek to 8 s, ▶. `GET …/state` then read `{position 10175, playing false}`, paused one
+    tick past the 10137 flag, and the transport showed ▶ at 00:00:10:04.
+  - Position `++1000` gave 11136.9. Remove flag gave `flags: []` (the test timeline's original state).
+  - Selecting the clip afterwards still fills its page (content sizing known), so the `timeline_media.gd` move works.
+- A Test press click "missed" because of a measuring error, not the UI: `ffmpeg` clamps a crop whose x + width
+  passes 3840, so that crop's coordinates were off by 80 px.
+- Owner-QA open:
+  - The thumbnail and live update against a real Companion page change.
+  - A jump flag in playback.
+  - Whether a dangling `jumpFlagId` should be cleared on remove (web keeps it).
