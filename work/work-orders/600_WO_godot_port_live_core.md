@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — steps 1–2 done on the box; step 3a (look editor: compose frame over live PRV, move/resize, layer fields, PRV push by id) done on the box. Next: crop handles, layer reorder/add/remove, sources panel + drops (K), effects/PIP/border (J, needs WO-598 C3). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
+**Status: IN PROGRESS (2026-10-18) — steps 1–2 done on the box; steps 3a–3c (look editor: compose frame over live PRV, move/resize, crop, layer fields; Sources panel + drop to add; remove/reorder) done on the box. Next: layer inspector depth (content fit, loop, audio, transitions per layer → WO-601), effects/PIP/border (J, needs WO-598 C3), route sources (WO-156 rules server-side), multiview editor (M). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
 
 # WO-600 — Godot port: live operation core (deck, PRV/PGM, compose tiles, look editor, take, sources, live inputs, multiview editor, timers)
 
@@ -105,6 +105,12 @@ layer list, X/Y/W/H/opacity), `preview_pusher.gd` (web pacing 16 ms / 200 ms, se
 `compose_math.gd` (edgeResizeDeltaToFill golden-tested, 64 cases from the JS; move snapping per the WO-611 #4 fix, which this
 port found in the web code and which was fixed there too). Card menu "Edit look…".
 
+**Steps 3b/3c (2026-10-18):** `POST /api/scene/new-layer` (server builds the layer a media drop creates with the web's own modules:
+next free number, editor defaults, images never loop, native fill for the content fit via ffprobe resolution; nothing stored),
+`media_panel.gd` (Sources tree from `/api/media`, filter, web drag payload), drop → append + select + PRV push, Remove, ▲/▼
+(reorder = web reorderLayers, renumber from 10), crop mode (crop math golden-tested; effects[{type:'crop'}]), overlay fix
+(boxes paint above the PRV picture).
+
 ## What was VERIFIED
 
 - Against the simulator's real project (5 looks): column "Main 1 · 2 looks" = Look 1 + Look 3 (`mainScope '0'`),
@@ -120,6 +126,10 @@ port found in the web code and which was fixed there too). Card menu "Edit look�
 - **Step 3a on the box (2026-10-18, PRV ch2):** editor on "Background" → PRV nudge, box exactly over the clip in the live
   PRV picture; real XTEST drag → 8 streamed `MIXER 2-10 FILL` nudges, **no reload**, stored x/y 0.308/0.311 (= 100 px / 30 px on
   a 480×270 frame); real corner drag → scale 0.6 → 0.5 both axes, top-left anchored, aspect 1.0. Headless 345/0, `--check` OK.
+
+- **Steps 3b/3c on the box:** real XTEST drag Sources → frame added layer 11, PRV re-taken (`LOADBG 2-11 …`); ▼ Down renumbered
+  10/11; Remove dropped the layer, numbers kept (web); new-layer on a 3840×1344 clip → native fill 2.0×1.244 at x −0.5; real
+  crop drag → `MIXER 2-10 CROP 0 0 0.79 1` nudge, effects stored. Server smoke `smoke-wo600-new-layer` 5/5; Godot 387/0.
 
 Inventory facts 1, 2, 3 re-checked by hand (refs above). The remaining refs are Haiku-read and
 must be re-grepped when each sub-feature is started.
