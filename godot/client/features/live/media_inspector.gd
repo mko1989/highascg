@@ -1,13 +1,14 @@
 extends VBoxContainer
 ## WO-601 / WO-592 — media file inspector (client/components/inspector-media-file*.js): facts, waveform with
 ## trim shading, per-file trim/mute defaults, "used in", rename (extension kept), final delete. Library
-## endpoints key by the LOCAL path; Caspar-only ids get facts + waveform only. Versions: media_versions.gd. Not yet: Caspar preview (WO-601 addendum:
-## needs per-client operator-GUI cells or the WO-597 §D atlas).
+## endpoints key by the LOCAL path; Caspar-only ids get facts + waveform only. Versions: media_versions.gd. Caspar preview
+## of MOVIE files: media_preview.gd (click the waveform to seek).
 
 signal library_changed
 
 const M := preload("res://features/live/media_math.gd")
 const Versions := preload("res://features/live/media_versions.gd")
+const Preview := preload("res://features/live/media_preview.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const WAVE := Color("#6e7681")
 const TRIM := Color("#f0b429")
@@ -29,6 +30,7 @@ var _mute: CheckBox
 var _used: Label
 var _msg: Label
 var _versions: Versions
+var preview: Preview
 
 
 func _ready() -> void:
@@ -36,9 +38,15 @@ func _ready() -> void:
 	_facts = Label.new()
 	_facts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_facts)
+	preview = Preview.new()
+	preview.position_changed.connect(func() -> void: _wave.queue_redraw())
+	add_child(preview)
 	_wave = Control.new()
 	_wave.custom_minimum_size.y = 48
 	_wave.draw.connect(_draw_wave)
+	_wave.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT and _dur > 0 and preview.active():
+			preview.seek(clampf(ev.position.x / maxf(1.0, _wave.size.x), 0.0, 1.0) * _dur))
 	add_child(_wave)
 	_lib = VBoxContainer.new()
 	add_child(_lib)
@@ -90,6 +98,7 @@ func show_media(row: Dictionary) -> void:
 	id = str(row.get("id", ""))
 	visible = id != ""
 	if id == "":
+		preview.stop_preview()
 		return
 	_fps = float(row.get("fps", 25)) if float(row.get("fps", 0)) > 0 else 25.0
 	_dur = float(row.get("durationMs", 0)) / 1000.0
@@ -104,6 +113,8 @@ func show_media(row: Dictionary) -> void:
 		_peaks = wr.data.get("peaks", [])
 		if float(wr.data.get("durationMs", 0)) > 0:
 			_dur = float(wr.data.durationMs) / 1000.0
+	preview.trim = {}
+	preview.start(row, _dur)
 	var er: Dictionary = await Api.get_json("/api/media/library/entry?path=%s" % id.uri_encode())
 	if want != id:
 		return
@@ -114,6 +125,7 @@ func show_media(row: Dictionary) -> void:
 		_usage = er.data.get("usage", []) if er.data.get("usage") is Array else []
 		_show_facts(int(er.data.entry.get("size", -1)))
 		_versions.show_entry(id, er.data.entry)
+		preview.trim = _defaults
 		_sync()
 	else:
 		_defaults = {}
@@ -173,6 +185,7 @@ func _save(patch: Dictionary) -> void:
 	var r: Dictionary = await Api.post_json("/api/media/library/defaults", body)
 	if r.ok and r.data is Dictionary:
 		_defaults = r.data.get("defaults", {}) if r.data.get("defaults") is Dictionary else {}
+		preview.trim = _defaults
 		_msg.text = ""
 	else:
 		_msg.text = "Could not save: %s" % r.error
@@ -200,6 +213,8 @@ func _draw_wave() -> void:
 			var xo := clampf(float(to) / 1000.0 / _dur, 0.0, 1.0) * w
 			_wave.draw_rect(Rect2(xo, 0, w - xo, h), Color(0, 0, 0, 0.55))
 			_wave.draw_rect(Rect2(xo, 0, 2, h), TRIM)
+		if preview.active():
+			_wave.draw_rect(Rect2(clampf(preview.pos / _dur, 0.0, 1.0) * w, 0, 1, h), ThemeBuilder.ERROR)
 
 
 func _rename() -> void:
@@ -220,6 +235,7 @@ func _rename() -> void:
 		if next == "" or next + ext == base:
 			return
 		var to := folder + next + ext
+		await preview.stop_preview()  # Caspar holds the file open while it previews
 		var r: Dictionary = await Api.post_json("/api/media/rename", {"renames": [{"from": id, "to": to}]})
 		if r.ok:
 			id = to
@@ -241,6 +257,7 @@ func _delete() -> void:
 		("\n\nIt is used %d time(s) in %d look(s)/timeline(s) — those will show it as missing." % [n, _usage.size()]) if not _usage.is_empty() else ""]
 	dlg.confirmed.connect(func() -> void:
 		dlg.queue_free()
+		await preview.stop_preview()
 		var r: Dictionary = await Api.post_json("/api/media/delete", {"id": id})
 		if r.ok:
 			visible = false

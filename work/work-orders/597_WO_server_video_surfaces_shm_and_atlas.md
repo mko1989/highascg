@@ -169,3 +169,6 @@ A Godot client cannot do the same today: `POST /api/operator-gui/layout` replace
 wins, `src/api/routes-operator-gui.js:34-52`), so its media cell would wipe the kiosk's cells. §D should therefore
 either keep per-client cell sets merged server-side, or give the media preview its own atlas slot the client crops
 from its `opgui` surface (WO-601 addendum 8).
+**Resolved without §D (2026-10-18, owner):** only one local operator client ever runs (Godot replaces the kiosk; the remote
+browser has thumbnails only and reports no cells), so Godot re-sends the compose cells + its media cell — see WO-601
+"What was done". §D stays open on its own merits (no AMCP on UI moves), not as a blocker for the media preview.

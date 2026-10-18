@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets, media-file versions and the global border (incl. Art-Net/sACN lighting input) ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). Next per plan: media preview (blocked — addendum 8), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets, media-file versions and the global border (incl. Art-Net/sACN lighting input) ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). media-file Caspar preview (addendum 8 resolved: single local client) ported and verified. Next per plan: CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -142,6 +142,10 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
    (`src/api/routes-operator-gui.js:34-52`) REPLACES the whole cell layout — last writer wins, no per-client merge — so a
    Godot report of a media cell would wipe the kiosk's cells (and vice versa). Needs either per-client cell sets merged
    server-side or the WO-597 §D atlas (then the client draws the slot's crop of its `opgui` surface). Decide in WO-597.
+   **Resolved 2026-10-18 (owner):** the kiosk and Godot never run together on one box — Godot replaces the kiosk — and
+   the remote browser client has no Caspar preview (thumbnails only), so it reports no cells. Godot is therefore the only
+   layout writer: it re-sends the current compose cells (`GET /api/operator-gui/layout`) + its role 'media' cell. No
+   server change, no atlas needed for this.
 9. Global border (web, found porting): the border push targets the ARMED / active screens
    (`scenes-preview-global-border.js` pushBorderOnlyNow), not the screen whose inspector is being edited; and slice px
    fields convert with `getResolutionForScreen(stateStore)` — no screen index — so a non-active screen with another raster
@@ -173,6 +177,7 @@ Bugs 1–2, 5 and 9 stay in the web client (Godot no longer uses those paths) �
 | `godot/client/core/stream_upload.gd`, `features/live/media_versions.gd` | media versions: list / New version… / Go back / purge; the upload streams the file in 1 MiB chunks over StreamPeerTCP (HTTPRequest would load a GB file into memory) |
 | `src/engine/global-border-control.js`, `routes-scene-global-border.js`, `godot/…/global_border_panel.gd` | global border: the Godot inspector edits through `POST /api/scene/global-border` (WO-585) only — extended with slices / inner / PRV mirror / preset save+delete / clear under the web's rules; Art-Net section (DMX patch, channel map, listen) still to port |
 | `godot/…/border_artnet_model.gd`, `border_artnet_section.gd`, `global_border_panel.gd` | lighting input: listen / protocol / patch / 18-row map / fixture file via the border endpoint (config-only); `global_border_sync` merged with the web's mergeArtnetBorderRuntime port, re-applied after replies and project_sync |
+| `godot/…/media_preview.gd`, `media_inspector.gd`, `media_panel.gd`, `live_tab.gd` | media-file Caspar preview (web inspector-media-file.js kiosk branch): MOVIE files LOAD on the GUI channel's layer 50 (`POST /api/media/preview`), the layout report = current compose cells + a role 'media' cell (box x .25 y .42 w .5 h .54 — the band under the PRV/PGM tiles; `srcW/srcH` from `resolution` when known), and the view draws the server plan's fitted rect cropped from the `opgui` surface. ▶/❚❚ honours the file's trim (In when outside, pause at Out), position + paused from OSC (`file.elapsed`), waveform click seeks + red playhead. Withdrawn (cell + STOP) on deselect / hidden / exit and before rename/delete (Caspar holds the file); a STOP at startup clears a layer left by a killed run. The inspector sits in a ScrollContainer sharing the Sources column with the tree. |
 | `src/engine/screen-timers.js` | only a changed duration re-anchors a re-assigned timer (addendum 6) |
 | `src/engine/scene-take-payload.js`, `client/components/scenes-shared.js`, `routes-scene-preview-push.js` | `timersConfig` kept in take/stage payloads; `scene.live` broadcast after a nudge that changed a source |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
@@ -237,6 +242,12 @@ Bugs 1–2, 5 and 9 stay in the web client (Godot no longer uses those paths) �
   #e63946 with the desk width; panel shows opacity 0.50 / colour #e63946 / width 7.84 (first runs showed the stored UI values
   after the reply / project_sync — fixed by re-applying the last desk runtime); fixture file saved. Godot 628/0 (golden merge
   4 maps); smokes 6/6 + WO-585 15/15; offline 2668/1.
+- Media preview, box (GUI on the operator monitor, driven by XTest clicks; `USER CONF NOCNE.mp4`, 3840×1344): select →
+  `LOAD 3-50 "PROJECTS/AIRPORT/USER CONF NOCNE"`, `MIXER 3-10/3-11 FILL` (compose cells unchanged), `MIXER 3-50 FILL 0.25
+  0.5344 0.5 0.3111` (aspect-fit), `COMMIT`; the inspector shows that crop. ▶ → `RESUME 3-50`, readout 0:03.00 after 3 s
+  (OSC); ❚❚ → `PAUSE 3-50`; waveform click at 50 % → `CALL 3-50 SEEK 1500` (30 s × 50 fps channel), readout 0:30.00; tab
+  switch → compose cells re-sent + `STOP 3-50` + `MIXER 3-50 CLEAR`; persisted layout never contains the media cell;
+  restart → startup `STOP 3-50` / `MIXER 3-50 CLEAR`. Godot 665/0, `--check` clean. Owner QA: trim In/Out behaviour.
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 

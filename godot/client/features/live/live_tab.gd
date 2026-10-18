@@ -66,6 +66,7 @@ func _ready() -> void:
 	var sources := MediaPanel.new()
 	sources.custom_minimum_size.x = 260
 	split.add_child(sources)
+	sources.inspector.preview.osc_mirror = osc
 	var inner := HSplitContainer.new()
 	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	split.add_child(inner)

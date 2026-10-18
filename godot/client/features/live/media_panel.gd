@@ -36,7 +36,15 @@ func _ready() -> void:
 	_tree.set_drag_forwarding(_drag_data, Callable(), Callable())
 	add_child(_tree)
 	inspector = MediaInspector.new()
-	add_child(inspector)
+	inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()  # the inspector (preview + library) shares the column with the tree, never squeezes it
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_stretch_ratio = 1.6
+	scroll.add_child(inspector)
+	add_child(scroll)
+	inspector.visibility_changed.connect(func() -> void: scroll.visible = inspector.visible)
+	scroll.visible = false
 	inspector.library_changed.connect(load_media)
 	_tree.item_selected.connect(func() -> void:
 		var it := _tree.get_selected()
