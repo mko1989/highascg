@@ -260,6 +260,27 @@ func _ready() -> void:
 		print("[client] timers before remove ", tp._records[0].screens, " readout ", tp._readouts[rec.timerId].text)
 		await tp._post("/api/timers/unassign", {"timerId": rec.timerId, "screenIdx": int(Config.args["probe-timers"])})
 		print("[client] timers after remove ", tp._records.size())
+	if Config.args.has("probe-versions"):  # dev: --probe-versions=<library path>|<new file> → upload, go back, purge (WO-601)
+		var pv := str(Config.args["probe-versions"]).split("|")
+		await get_tree().create_timer(2.5).timeout
+		var mi: Node = shell.tabs.get_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
+		var entry := func() -> Dictionary:
+			var r: Dictionary = await Api.get_json("/api/media/library/entry?path=%s" % pv[0].uri_encode())
+			return r.data.entry if r.ok else {}
+		await mi.show_media({"id": pv[0], "type": "MOVIE", "fps": 25, "durationMs": 2000})
+		var vs: Node = mi._versions
+		print("[client] versions upload ", await vs.upload(pv[1]), " | ", vs._msg.text)
+		if pv.size() > 2:  # stop after the upload (byte check from the shell)
+			return
+		var e1: Dictionary = await entry.call()
+		print("[client] versions after upload current v", e1.get("currentV"), " size ", e1.get("size"), " old ", e1.get("versions"))
+		await vs._restore(1)
+		var e2: Dictionary = await entry.call()
+		print("[client] versions after go-back current v", e2.get("currentV"), " size ", e2.get("size"), " old ", (e2.get("versions", []) as Array).map(func(v: Dictionary) -> int: return int(v.v)))
+		for v in e2.get("versions", []):
+			await vs._purge(int(v.v))
+		var e3: Dictionary = await entry.call()
+		print("[client] versions after purge current v", e3.get("currentV"), " old ", e3.get("versions"), " rows ", vs._list.get_child_count())
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))

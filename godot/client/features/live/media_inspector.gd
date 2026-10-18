@@ -1,11 +1,13 @@
 extends VBoxContainer
 ## WO-601 / WO-592 — media file inspector (client/components/inspector-media-file*.js): facts, waveform with
 ## trim shading, per-file trim/mute defaults, "used in", rename (extension kept), final delete. Library
-## endpoints key by the LOCAL path; Caspar-only ids get facts + waveform only. Not yet: Caspar preview, versions.
+## endpoints key by the LOCAL path; Caspar-only ids get facts + waveform only. Versions: media_versions.gd. Not yet: Caspar preview (WO-601 addendum:
+## needs per-client operator-GUI cells or the WO-597 §D atlas).
 
 signal library_changed
 
 const M := preload("res://features/live/media_math.gd")
+const Versions := preload("res://features/live/media_versions.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const WAVE := Color("#6e7681")
 const TRIM := Color("#f0b429")
@@ -26,6 +28,7 @@ var _out: LineEdit
 var _mute: CheckBox
 var _used: Label
 var _msg: Label
+var _versions: Versions
 
 
 func _ready() -> void:
@@ -71,6 +74,11 @@ func _ready() -> void:
 	del.pressed.connect(_delete)
 	acts.add_child(del)
 	_lib.add_child(acts)
+	_versions = Versions.new()
+	_versions.changed.connect(func() -> void:  # web reselect(): rescan, reload this file's view
+		library_changed.emit()
+		show_media(_row))
+	_lib.add_child(_versions)
 	_msg = Label.new()
 	_msg.add_theme_color_override("font_color", ThemeBuilder.ACCENT_RED)
 	add_child(_msg)
@@ -105,6 +113,7 @@ func show_media(row: Dictionary) -> void:
 		_defaults = er.data.entry.get("defaults", {}) if er.data.entry.get("defaults") is Dictionary else {}
 		_usage = er.data.get("usage", []) if er.data.get("usage") is Array else []
 		_show_facts(int(er.data.entry.get("size", -1)))
+		_versions.show_entry(id, er.data.entry)
 		_sync()
 	else:
 		_defaults = {}
