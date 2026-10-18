@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead) and slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) DONE, box-verified; keyframes, flags editing, transform, layer ops open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) and slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) DONE, box-verified; keyframes, flags editing, layer ops open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -59,6 +59,26 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   `sceneLayerPixelRectForContentFit` on the sendTo screen's program resolution, full canvas when the media size is
   unknown).
 
+### Slice 3 findings (2026-10-18) — clip transform
+
+- Web: `client/components/inspector-panel-timeline-clip.js`. The base rect is `fillPx`, else
+  `getClipBasePixelRect` (the content-fit rect of the media). `applyFillPx` runs `applyFillPxPatch`
+  (`client/lib/coordinate-origin.js:62`), then the aspect lock: a lone W edit sets H = max(1, round(W / ar)) and a
+  lone H edit the reverse. `ar` is the media's own ratio, else the rect's, else 16:9. The lock is on unless
+  `aspectLocked === false`.
+- Every transform edit (`applyFillPx`, `patchFillAlign`, `reapplyClipFrameForContentFit`) first runs
+  `clearClipTransformKeyframes` (fill_x / fill_y / scale_x / scale_y). A whole-clip rect wins over motion keyframes.
+- Geometry reaches the engine through `refreshTimelineClipGeometryOnServer`: a PUT of the timeline plus a seek to
+  the playback position. The seek happens only when this timeline is the one in `state.timeline.playback`, or
+  when no playback timeline is known. Drags go through the WO-522 80 ms trailing throttle.
+- A Content sizing change stores `contentFit`, then refits `fillPx` to `sceneLayerPixelRectForContentFit` when the
+  media size is known. Unknown media keeps the rect.
+- Centre origin: with `editorDefaults.coordinateOrigin = "center"`, X/Y show the layer centre's offset from the
+  canvas centre. Stored data stays top-left (`displayPositionFromStoredPx` / `storedPxFromDisplayPosition`).
+- Align buttons (`client/components/inspector-fill.js:59`): the web artwork mixes plain SVGs and SVGs that embed
+  PNGs, so the Godot buttons draw the same glyphs procedurally in the theme text colour. They also need no import
+  step (WO-596: no editor import).
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -117,8 +137,23 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
 - `timeline_tab.gd` — wiring: selection → `InspectorPanel.present/release`; every commit → `mark_dirty` +
   redraw + page refresh + PUT (POST fallback); volume / opacity / in-point use the web's 80 ms trailing sync; a
   route change re-seeks while playing so the engine re-applies it; the drop pipeline above.
-- Not in this slice (later): transform X/Y/W/H + content sizing on the clip page, keyframes (with eased preview),
+- Not in this slice (later): keyframes (with eased preview),
   flags editing, layer header ops (rename, reorder, heights), effect drops, copy/paste.
+
+### Slice 3 (2026-10-18) — clip transform
+
+- `features/live/px_rect_math.gd` (new, pure, shared with the live layer inspector later). 1:1 ports of
+  `displayPositionFromStoredPx` / `storedPxFromDisplayPosition` / `applyFillPxPatch` / `alignStoredPxRect` (JS
+  `Math.round`), the clip aspect lock as `apply_patch(…, locked, ar)`, and `lock_ratio`.
+- `features/live/align_row.gd` (new): the seven align buttons (`align(mode)` signal), with procedural icons.
+- `timeline_clip_inspector.gd` adds the "Position / size (canvas px)" section in web order. It holds the centre-mode
+  subtitle, the align row, X / Y / Width / Height, Aspect lock (`aspectLocked`), Content sizing (`contentFit`,
+  plus a refit when the media size is known) and the hint. Every rect edit emits `fillPx` together with the
+  keyframes minus the transform properties. Opacity and in-point now use the same "geometry" path.
+- `timeline_tab.gd`: on selection it gives the page the program canvas (`channelMap.programResolutions` of the
+  sendTo screen) and the origin setting, then probes the media size (`_media_res`) and passes it in with
+  `set_content`, which ignores a stale reply. The "geometry" kind uses the 80 ms trailing sync, and that sync also
+  seeks under the web's playback-timeline guard (`_pb_last`).
 
 ## What was VERIFIED
 
@@ -156,3 +191,20 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
     `GET /api/project` autosave matched (4 layers, no clips).
 - Owner-QA open: route change while playing (re-seek path not exercised live); feel of snapping and
   resize scrubbing; a timeline edited here opened in the web editor.
+
+### Slice 3 verification (2026-10-18)
+
+- Godot tests 756/0 (new `test_px_rect_math.gd`: origin round trip, patch and lock, align with JS rounding).
+  `--check` boot clean. `check-max-file-lines` reports 0 files over (tab 432, clip page 282).
+- On the box, with the GUI on DP-3 driven by XTest, every step was read back from `GET /api/timelines/tmve1ppeug1t`
+  and from the server's `[Timeline] MIXER` journal line. The clip was "1. GŁÓWNE TŁO", media 3840×1344, on a
+  1920×1080 program.
+  - Native: `fillPx {-960,-132,3840,1344}`. Content sizing "Fit canvas" gave `contentFit fill-canvas`,
+    `fillPx {0,204,1920,672}`. "Stretch" gave `{0,0,1920,1080}`.
+  - Width 960 with the lock on gave `{0,0,960,336}` (the media's ratio, not the stretched rect's). Align right gave
+    `x 960`, and Align left after a restart gave `x 0`.
+  - After each edit the engine re-applied the layer on preview: `MIXER 2-210 FILL 0 0 0.5 0.3111` and then
+    `0.5 0 0.5 0.3111` (the seek path).
+  - The Content sizing popup works with both mouse and keyboard.
+- Owner-QA open: centre-origin mode (unit-tested only), the align icons' look, and the guarded seek while a
+  *different* timeline plays.

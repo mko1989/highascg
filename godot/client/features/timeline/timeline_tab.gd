@@ -27,6 +27,8 @@ var _pb := {}  # timelineId → {playing, clock {pos, at}}
 var _page: ClipInspector
 var _throttle: Timer
 var _media_rows: Array = []
+var _geo_seek := false  # the pending throttled sync also re-seeks (geometry / mixer / trim edits)
+var _pb_last := ""  # timelineId of the latest timeline.playback (the web's state.timeline.playback)
 
 
 func _ready() -> void:
@@ -169,7 +171,8 @@ func _on_tick(data: Variant) -> void:
 func _on_playback(pb: Variant) -> void:
 	if not (pb is Dictionary) or str(pb.get("timelineId", "")) == "":
 		return
-	var p := _pbk(str(pb.timelineId))
+	_pb_last = str(pb.timelineId)
+	var p := _pbk(_pb_last)
 	p["playing"] = pb.get("playing") == true
 	if pb.get("position") is float or pb.get("position") is int:
 		p["clock"] = {"pos": float(pb.position), "at": _now()}
@@ -271,20 +274,32 @@ func _on_clip_selected(li: int, clip_id: String) -> void:
 		return
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(_page)
+	_page.canvas = _program_res(_main_idx(tl))
+	_page.center = Settings.get_setting("editorDefaults.coordinateOrigin", "") == "center"
+	_page.content = Vector2.ZERO
 	_page.show_clip(tl, li, c, _main_idx(tl))
+	if c.get("source") is Dictionary:
+		var mr := await _media_res(c.source)
+		_page.set_content(c, Vector2(mr))
 
 
-## One committed edit: autosave, redraw, re-read the page, push the timeline to the engine.
+## One committed edit: autosave, redraw, re-read the page, push the timeline to the engine — and when a geometry /
+## mixer / trim edit is part of it, re-seek so the engine re-applies the layers at the playhead (web
+## refreshTimelineClipGeometryOnServer, WO-522).
 func _commit() -> void:
 	var tl := active()
 	if tl.is_empty():
 		return
 	_throttle.stop()
+	var seek := _geo_seek
+	_geo_seek = false
 	ProjectSync.mark_dirty()
 	view.queue_redraw()
 	_page.refresh()
 	if not await _sync_to_server(tl):
 		_status.text = "Timeline sync to the server failed"
+	elif seek and (_pb_last == "" or _pb_last == str(tl.id)):  # web: only the timeline the engine is on re-seeks
+		await Api.post_json("/api/timelines/%s/seek" % str(tl.id).uri_encode(), {"ms": maxf(0.0, roundf(view.playhead_ms))})
 
 
 func _on_patch(changes: Dictionary, kind: String) -> void:
@@ -292,8 +307,9 @@ func _on_patch(changes: Dictionary, kind: String) -> void:
 	if TE.update_clip(tl, view.sel_li, view.sel_id, changes).is_empty():
 		return
 	view.queue_redraw()
-	if kind == "throttle":
+	if kind == "throttle" or kind == "geometry":
 		ProjectSync.mark_dirty()
+		_geo_seek = _geo_seek or kind == "geometry"
 		_throttle.start()
 		return
 	await _commit()

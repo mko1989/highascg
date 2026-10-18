@@ -2,15 +2,22 @@ extends VBoxContainer
 ## WO-602 slice 2 — timeline clip page for the global Inspector (web inspector-panel-timeline-clip.js, same order):
 ## "<label> · Layer N", Position (SMPTE / ++500 / plain ms, inspector-panel-timeline-shared.js), Clip → Loop always,
 ## Audio → route / mute / volume (routes from /api/scene/layer-options for the timeline's screen), Mixer → Opacity %,
-## Trim → In-point (frames). Transform + keyframes come in a later slice. Emits patches; the tab applies and syncs:
-## kind "commit" syncs now, "throttle" is the web's 80 ms trailing geometry sync, "route" syncs then re-seeks so the
-## engine re-applies the route on the playing timeline.
+## Position / size (slice 3: align row, X / Y / W / H in program px — centre offsets when editorDefaults
+## .coordinateOrigin = "center" — aspect lock, content sizing with refit; edits drop the clip's fill_x / fill_y /
+## scale_x / scale_y keyframes like the web), Mixer → Opacity %, Trim → In-point (frames). Keyframes come later.
+## Emits patches; the tab applies and syncs: "commit" syncs now, "throttle" syncs 80 ms trailing, "geometry" is the
+## web's 80 ms trailing PUT + seek (the engine re-applies the layers), "route" syncs then re-seeks while playing.
 
 signal patch(changes: Dictionary, kind: String)
 signal remove_requested
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const X := preload("res://features/live/mixer_math.gd")
+const TE := preload("res://features/timeline/timeline_edit.gd")
+const P := preload("res://features/live/px_rect_math.gd")
+const AlignRow := preload("res://features/live/align_row.gd")
+const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
+const TRANSFORM_PROPS := ["fill_x", "fill_y", "scale_x", "scale_y"]
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var _clip: Dictionary = {}
@@ -29,6 +36,13 @@ var _vol: HSlider
 var _vol_db: Label
 var _op: SpinBox
 var _in: SpinBox
+var canvas := Vector2(1920, 1080)  # the timeline's program resolution (sendTo screen)
+var center := false                # editorDefaults.coordinateOrigin == "center"
+var content := Vector2.ZERO        # the media's resolution once the tab knows it
+var _tf := {}                      # x / y / w / h SpinBoxes
+var _tf_sub: Label
+var _lock: CheckBox
+var _fit: OptionButton
 
 
 func _ready() -> void:
@@ -78,11 +92,12 @@ func _ready() -> void:
 	_vol_db.custom_minimum_size.x = 70
 	vr.add_child(_vol_db)
 	_row(g, "Volume", vr)
+	_build_transform()
 	g = _group("Mixer")
-	_op = _spin(0, 100, func(v: float) -> void: _emit({"opacity": clampf(v / 100.0, 0.0, 1.0)}, "throttle"))
+	_op = _spin(0, 100, func(v: float) -> void: _emit({"opacity": clampf(v / 100.0, 0.0, 1.0)}, "geometry"))
 	_row(g, "Opacity %", _op)
 	g = _group("Trim")
-	_in = _spin(0, 999999, func(v: float) -> void: _emit({"inPoint": maxi(0, roundi(v))}, "throttle"))
+	_in = _spin(0, 999999, func(v: float) -> void: _emit({"inPoint": maxi(0, roundi(v))}, "geometry"))
 	_in.tooltip_text = "Frames skipped from the start of the media on take/seek."
 	_row(g, "In-point (frames)", _in)
 	var del := Button.new()
@@ -130,7 +145,89 @@ func refresh() -> void:
 	_vol_db.text = X.format_db(vol)
 	_op.value = clampf(roundf(float(_clip.get("opacity", 1.0) if _clip.get("opacity") != null else 1.0) * 100.0), 0, 100)
 	_in.value = maxi(0, roundi(float(_clip.get("inPoint", 0) if _clip.get("inPoint") != null else 0)))
+	var d := P.display_from_stored(rect(), canvas, center)
+	for k in ["x", "y", "w", "h"]:
+		(_tf[k] as SpinBox).value = roundf(float(d[k]))
+	_tf_sub.visible = center
+	_lock.button_pressed = _clip.get("aspectLocked") != false
+	_fit.select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(str(_clip.get("contentFit", "native")))))
 	_syncing = false
+
+
+## The media's resolution arrived (the tab probes it after selection) — the base rect and aspect lock use it.
+func set_content(clip: Dictionary, res: Vector2) -> void:
+	if is_same(clip, _clip):
+		content = res
+		refresh()
+
+
+## getClipBasePixelRect: fillPx, else the content-fit rect of the media, else the whole canvas.
+func rect() -> Dictionary:
+	var fp: Variant = _clip.get("fillPx")
+	if fp is Dictionary and float(fp.get("w", 0)) > 0 and float(fp.get("h", 0)) > 0:
+		return {"x": float(fp.get("x", 0)), "y": float(fp.get("y", 0)), "w": float(fp.w), "h": float(fp.h)}
+	return TE.fit_rect(canvas.x, canvas.y, content.x, content.y, str(_clip.get("contentFit", "native")))
+
+
+func _build_transform() -> void:
+	var t := Label.new()
+	t.text = "Position / size (canvas px)"
+	t.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
+	add_child(t)
+	_tf_sub = Label.new()
+	_tf_sub.text = "X/Y: layer center offset from screen center (0,0 = centered)"
+	_tf_sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_tf_sub.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	add_child(_tf_sub)
+	var row := AlignRow.new()
+	row.align.connect(func(mode: String) -> void: _set_rect(P.align(rect(), canvas, mode)))
+	add_child(row)
+	var g := _group("")
+	for k in ["x", "y", "w", "h"]:
+		var sp := _spin(1 if k in ["w", "h"] else -999999, 999999, func(v: float) -> void: _on_tf(k, v))
+		sp.custom_minimum_size.x = 110
+		_tf[k] = sp
+		_row(g, {"x": "X", "y": "Y", "w": "Width", "h": "Height"}[k], sp)
+	_lock = CheckBox.new()
+	_lock.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_lock.toggled.connect(func(on: bool) -> void: _emit({"aspectLocked": on}, "commit"))
+	_row(g, "Aspect lock", _lock)
+	_fit = OptionButton.new()
+	for o in FITS:
+		_fit.add_item(o[1])
+	_fit.item_selected.connect(_on_fit)
+	_row(g, "Content sizing", _fit)
+	var hint := Label.new()
+	hint.text = "Applies to the whole clip (program canvas pixels). Use keyframes only when you need motion over time."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 12)
+	hint.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	add_child(hint)
+
+
+func _on_tf(k: String, v: float) -> void:
+	if _syncing or _clip.is_empty():
+		return
+	var cur := rect()
+	_set_rect(P.apply_patch(cur, {k: v}, canvas, center, _clip.get("aspectLocked") != false, P.lock_ratio(content, cur)))
+
+
+## Content sizing → store it, then refit to the media when its size is known (web reapplyClipFrameForContentFit).
+func _on_fit(i: int) -> void:
+	if _syncing or _clip.is_empty():
+		return
+	var fit: String = FITS[i][0]
+	_emit({"contentFit": fit}, "commit")
+	if content.x > 0 and content.y > 0:
+		_set_rect(TE.fit_rect(canvas.x, canvas.y, content.x, content.y, fit))
+
+
+## A whole-clip rect replaces any position / scale keyframes (web clearClipTransformKeyframes).
+func _set_rect(r: Dictionary) -> void:
+	var kfs: Array = (_clip.get("keyframes", []) as Array).filter(func(k: Variant) -> bool:
+		return not (k is Dictionary and str(k.get("property", "")) in TRANSFORM_PROPS)) if _clip.get("keyframes") is Array else []
+	_emit({"fillPx": {"x": r.x, "y": r.y, "w": r.w, "h": r.h}, "keyframes": kfs}, "geometry")
+	refresh()
 
 
 func _commit_pos() -> void:
