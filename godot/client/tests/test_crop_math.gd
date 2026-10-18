@@ -1,0 +1,28 @@
+extends RefCounted
+## WO-600 F crop — golden values from running layer-crop.js + scenes-compose-handlers.js under node (2026-10-18).
+
+const C := preload("res://features/live/compose_math.gd")
+var t
+
+const CASES := [["e", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.1, "top": 0.05, "right": 0.9500000000000001, "bottom": 1}], ["e", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0.1, "top": 0.05, "right": 0.7, "bottom": 1}], ["e", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.1, "top": 0.05, "right": 1, "bottom": 1}], ["e", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["w", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.15000000000000002, "top": 0.05, "right": 0.9, "bottom": 1}], ["w", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0, "top": 0.05, "right": 0.9, "bottom": 1}], ["w", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.88, "top": 0.05, "right": 0.9, "bottom": 1}], ["w", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["n", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.1, "top": 0.07, "right": 0.9, "bottom": 1}], ["n", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0.1, "top": 0.35, "right": 0.9, "bottom": 1}], ["n", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.1, "top": 0, "right": 0.9, "bottom": 1}], ["n", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["s", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["s", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["s", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 0.09999999999999998}], ["s", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["ne", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.1, "top": 0.07, "right": 0.9500000000000001, "bottom": 1}], ["ne", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0.1, "top": 0.35, "right": 0.7, "bottom": 1}], ["ne", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.1, "top": 0, "right": 1, "bottom": 1}], ["ne", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["nw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.15000000000000002, "top": 0.07, "right": 0.9, "bottom": 1}], ["nw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0, "top": 0.35, "right": 0.9, "bottom": 1}], ["nw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.88, "top": 0, "right": 0.9, "bottom": 1}], ["nw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["se", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.1, "top": 0.05, "right": 0.9500000000000001, "bottom": 1}], ["se", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0.1, "top": 0.05, "right": 0.7, "bottom": 1}], ["se", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.1, "top": 0.05, "right": 1, "bottom": 0.09999999999999998}], ["se", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}], ["sw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.05, 0.02, {"left": 0.15000000000000002, "top": 0.05, "right": 0.9, "bottom": 1}], ["sw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, -0.2, 0.3, {"left": 0, "top": 0.05, "right": 0.9, "bottom": 1}], ["sw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0.95, -0.9, {"left": 0.88, "top": 0.05, "right": 0.9, "bottom": 0.09999999999999998}], ["sw", {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}, 0, 0, {"left": 0.1, "top": 0.05, "right": 0.9, "bottom": 1}]]
+
+func _near(a: Dictionary, b: Dictionary) -> bool:
+	for k in ["left", "top", "right", "bottom"]:
+		if absf(float(a[k]) - float(b[k])) > 1e-12:
+			return false
+	return true
+
+
+func test_crop_delta_golden() -> void:
+	for c in CASES:
+		var got := C.crop_delta(c[0], c[1], c[2], c[3])
+		t.ok(_near(got, c[4]), "%s d=(%s,%s) → %s got %s" % [c[0], c[2], c[3], c[4], got])
+
+
+func test_normalize_crop_golden() -> void:
+	t.eq(C.normalize_crop(null), {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 1.0}, "null → identity")
+	t.eq(C.normalize_crop({}), {"left": 0.0, "top": 0.0, "right": 1.0, "bottom": 1.0}, "{} → identity")
+	t.ok(_near(C.normalize_crop({"left": -1, "top": 2, "right": 0.5, "bottom": "x"}), {"left": 0, "top": 1, "right": 0.5, "bottom": 1}), "normalize {'left': -1, 'top': 2, 'right': 0.5, 'bottom': 'x'}")
+	t.ok(_near(C.normalize_crop({"left": 0.6, "right": 0.4, "top": 0.7, "bottom": 0.2}), {"left": 0.6, "top": 0.7, "right": 0.6, "bottom": 0.7}), "normalize {'left': 0.6, 'right': 0.4, 'top': 0.7, 'bottom': 0.2}")
+	t.ok(C.normalize_crop({"right": null}).right == 0.0, "present null → 0 (JS Number(null))")
+	t.ok(C.is_identity_crop(C.normalize_crop({})) and not C.is_identity_crop({"left": 0.1, "top": 0, "right": 1, "bottom": 1}), "identity check")

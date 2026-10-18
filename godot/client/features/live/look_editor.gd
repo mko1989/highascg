@@ -17,12 +17,16 @@ var pusher: Pusher
 var _title: Label
 var _frame: Control
 var _video: TextureRect
+var _overlay: Control  # boxes/handles — a child AFTER the video, so it paints on top of it
 var _list: ItemList
 var _fields := {}
 var _sel := -1            # selected layer index
 var _drag := {}
 var _role := ""
 var _status: Label
+var _crop_mode := false
+var _crop_btn: Button
+const CROP_COLOR := Color("#e3b341")
 
 
 func _ready() -> void:
@@ -47,13 +51,17 @@ func _ready() -> void:
 	_frame.custom_minimum_size = Vector2(480, 270)
 	_frame.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_frame.clip_contents = true
-	_frame.draw.connect(_draw_frame)
 	_frame.gui_input.connect(_frame_input)
 	_video = TextureRect.new()
 	_video.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_video.stretch_mode = TextureRect.STRETCH_SCALE
 	_video.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frame.add_child(_video)
+	_overlay = Control.new()
+	_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_overlay.draw.connect(_draw_frame)
+	_frame.add_child(_overlay)
 	_frame.set_drag_forwarding(Callable(), _can_drop, _drop)
 	add_child(_frame)
 	var ops := HBoxContainer.new()
@@ -62,6 +70,16 @@ func _ready() -> void:
 		bt.text = spec[0]
 		bt.pressed.connect(spec[1])
 		ops.add_child(bt)
+	_crop_btn = Button.new()
+	_crop_btn.text = "Crop"
+	_crop_btn.toggle_mode = true
+	_crop_btn.tooltip_text = "Crop the selected layer: handles move onto the cropped outline (adds a crop effect)"
+	_crop_btn.toggled.connect(_set_crop_mode)
+	ops.add_child(_crop_btn)
+	var rc := Button.new()
+	rc.text = "Reset crop"
+	rc.pressed.connect(_reset_crop)
+	ops.add_child(rc)
 	add_child(ops)
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 90
@@ -140,12 +158,12 @@ func _process(_d: float) -> void:
 		var b := _box()
 		_video.position = b.position
 		_video.size = b.size
-		_frame.queue_redraw()
+		_overlay.queue_redraw()
 
 
 func _draw_frame() -> void:
 	var b := _box()
-	_frame.draw_rect(b, Color(1, 1, 1, 0.25), false, 1.0)
+	_overlay.draw_rect(b, Color(1, 1, 1, 0.25), false, 1.0)
 	var layers := _layers()
 	for i in layers.size():
 		var l: Dictionary = layers[i]
@@ -153,11 +171,16 @@ func _draw_frame() -> void:
 			continue
 		var r := _fill_rect(l.get("fill", {}) if l.get("fill") is Dictionary else {})
 		var sel := i == _sel
-		_frame.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
-		_frame.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _short(str(l.source.value))], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
+		_overlay.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
+		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _short(str(l.source.value))], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
+		var crop: Variant = _crop_of(l)
+		if crop != null:
+			_overlay.draw_rect(_crop_rect(r, crop), CROP_COLOR, false, 1.5)
 		if sel:
-			for p in _handles(r).values():
-				_frame.draw_rect(Rect2(p - Vector2(HANDLE, HANDLE) / 2.0, Vector2(HANDLE, HANDLE)), ThemeBuilder.ACCENT)
+			var hr := _crop_rect(r, crop if crop != null else C.normalize_crop({})) if _crop_mode else r
+			var hc := CROP_COLOR if _crop_mode else ThemeBuilder.ACCENT
+			for p in _handles(hr).values():
+				_overlay.draw_rect(Rect2(p - Vector2(HANDLE, HANDLE) / 2.0, Vector2(HANDLE, HANDLE)), hc)
 
 
 func _handles(r: Rect2) -> Dictionary:
@@ -178,6 +201,11 @@ func _frame_input(event: InputEvent) -> void:
 		var b := _box()
 		var from: Vector2 = _drag.start
 		var d: Vector2 = (mm.position - from) / b.size
+		if _drag.get("is_crop", false):
+			var lp: Vector2 = _drag.layer_px
+			var cd: Vector2 = (mm.position - from) / Vector2(maxf(1.0, lp.x), maxf(1.0, lp.y))
+			_set_crop(C.crop_delta(_drag.edge, _drag.crop, cd.x, cd.y))
+			return
 		var start: Dictionary = _drag.fill
 		var f: Dictionary
 		if _drag.edge == "":
@@ -196,6 +224,13 @@ func _begin_drag(at: Vector2) -> void:
 	var layers := _layers()
 	if _sel >= 0 and _sel < layers.size():
 		var r := _fill_rect(layers[_sel].get("fill", {}))
+		if _crop_mode:
+			var cr: Variant = _crop_of(layers[_sel])
+			var hs_c := _handles(_crop_rect(r, cr if cr != null else C.normalize_crop({})))
+			for k in hs_c:
+				if (hs_c[k] as Vector2).distance_to(at) <= HANDLE:
+					_drag = {"start": at, "crop": cr if cr != null else C.normalize_crop({}), "layer_px": r.size, "edge": k, "is_crop": true}
+					return
 		var hs := _handles(r)
 		for k in hs:
 			if (hs[k] as Vector2).distance_to(at) <= HANDLE:
@@ -346,3 +381,49 @@ func _move_layer(dir: int) -> void:
 	_refresh_list()
 	_select((next as Array).find(picked))
 	pusher.schedule(scene_id, main)
+
+
+## --- WO-600 F crop: effects[{type:'crop', params}] (web startCropResize / inspector "crop" effect).
+func _crop_of(l: Dictionary) -> Variant:
+	for fx in (l.get("effects", []) if l.get("effects") is Array else []):
+		if fx is Dictionary and str(fx.get("type", "")) == "crop":
+			return C.normalize_crop(fx.get("params"))
+	return null
+
+
+func _crop_rect(r: Rect2, c: Dictionary) -> Rect2:
+	return Rect2(r.position + Vector2(float(c.left), float(c.top)) * r.size, Vector2(float(c.right) - float(c.left), float(c.bottom) - float(c.top)) * r.size)
+
+
+func _set_crop(c: Dictionary) -> void:
+	var layers := _layers()
+	if _sel < 0 or _sel >= layers.size():
+		return
+	var fx: Array = (layers[_sel].get("effects", []) as Array).duplicate() if layers[_sel].get("effects") is Array else []
+	var entry := {"type": "crop", "params": c}
+	var i := -1
+	for k in fx.size():
+		if fx[k] is Dictionary and str(fx[k].get("type", "")) == "crop":
+			i = k
+	if i >= 0:
+		fx[i] = entry
+	else:
+		fx.append(entry)
+	_apply_layer({"effects": fx})
+
+
+func _set_crop_mode(on: bool) -> void:
+	_crop_mode = on
+	var layers := _layers()
+	if on and _sel >= 0 and _sel < layers.size() and _crop_of(layers[_sel]) == null:
+		_set_crop(C.normalize_crop({}))  # web: crop handles exist once the layer has a crop effect
+
+
+func _reset_crop() -> void:
+	var layers := _layers()
+	if _sel < 0 or _sel >= layers.size() or not (layers[_sel].get("effects") is Array):
+		return
+	var fx: Array = (layers[_sel].effects as Array).filter(func(e: Variant) -> bool: return not (e is Dictionary and str(e.get("type", "")) == "crop"))
+	_crop_btn.set_pressed_no_signal(false)
+	_crop_mode = false
+	_apply_layer({"effects": fx})

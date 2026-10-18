@@ -118,3 +118,64 @@ static func edge_resize(edge: String, start_fill: Dictionary, dx: float, dy: flo
 ## JS `v || d` for numbers (0 and missing → default).
 static func _or(v: Variant, d: float) -> float:
 	return float(v) if (v is float or v is int) and float(v) != 0.0 else d
+
+
+## --- WO-600 F crop (client/lib/layer-crop.js normalizeCrop / isIdentityCrop, scenes-compose-handlers.js
+## cropDeltaToParams). Crop = fractions of the layer's own rect, stored as effects[{type:'crop', params}].
+static func _crop_num(params: Variant, key: String) -> float:
+	# JS: Number(undefined) → NaN (default), Number(null) → 0, Number('x') → NaN
+	if not (params is Dictionary) or not (params as Dictionary).has(key):
+		return NAN
+	var v: Variant = params[key]
+	if v == null:
+		return 0.0
+	if v is float or v is int:
+		return clampf(float(v), 0.0, 1.0)
+	var s := str(v).strip_edges()
+	return clampf(float(s), 0.0, 1.0) if s.is_valid_float() else NAN
+
+
+static func normalize_crop(params: Variant) -> Dictionary:
+	var l := _crop_num(params, "left")
+	var t := _crop_num(params, "top")
+	var r := _crop_num(params, "right")
+	var b := _crop_num(params, "bottom")
+	l = 0.0 if is_nan(l) else l
+	t = 0.0 if is_nan(t) else t
+	r = 1.0 if is_nan(r) else r
+	b = 1.0 if is_nan(b) else b
+	return {"left": l, "top": t, "right": maxf(r, l), "bottom": maxf(b, t)}
+
+
+static func is_identity_crop(c: Variant) -> bool:
+	if not (c is Dictionary):
+		return true
+	return absf(float(c.left)) < 1e-6 and absf(float(c.top)) < 1e-6 and absf(float(c.right) - 1.0) < 1e-6 and absf(float(c.bottom) - 1.0) < 1e-6
+
+
+## dx/dy = pointer delta as a fraction of the LAYER's own on-screen rect.
+static func crop_delta(edge: String, start_crop: Variant, dx: float, dy: float, min_frac := 0.02) -> Dictionary:
+	var s := normalize_crop(start_crop)
+	var left: float = s.left
+	var top: float = s.top
+	var right: float = s.right
+	var bottom: float = s.bottom
+	if edge.contains("e"):
+		right = clampf(right + dx, 0.0, 1.0)
+	if edge.contains("w"):
+		left = clampf(left + dx, 0.0, 1.0)
+	if edge.contains("s"):
+		bottom = clampf(bottom + dy, 0.0, 1.0)
+	if edge.contains("n"):
+		top = clampf(top + dy, 0.0, 1.0)
+	if (edge.contains("e") or edge.contains("w")) and right - left < min_frac:
+		if edge.contains("e"):
+			right = minf(1.0, left + min_frac)
+		if edge.contains("w"):
+			left = maxf(0.0, right - min_frac)
+	if (edge.contains("n") or edge.contains("s")) and bottom - top < min_frac:
+		if edge.contains("s"):
+			bottom = minf(1.0, top + min_frac)
+		if edge.contains("n"):
+			top = maxf(0.0, bottom - min_frac)
+	return normalize_crop({"left": left, "top": top, "right": right, "bottom": bottom})
