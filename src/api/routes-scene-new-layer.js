@@ -87,12 +87,21 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
 	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
 	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
-	const contentRes = await (deps.mediaResolution ? deps.mediaResolution(layer.source) : defaultMediaResolution(ctx, layer.source))
-	if (contentRes) {
-		const rect = fill.sceneLayerPixelRectForContentFit(canvas.width, canvas.height, contentRes.w, contentRes.h, layer.contentFit || 'native')
-		layer.fill = fill.pixelRectToFill(rect, canvas)
-	}
-	return out(200, { ok: true, layer, mainIdx, contentResolution: contentRes })
+	const fit = await fitFillForSource(ctx, layer.source, layer.contentFit, canvas, deps.mediaResolution)
+	if (fit.fill) layer.fill = fit.fill
+	return out(200, { ok: true, layer, mainIdx, contentResolution: fit.contentResolution })
 }
 
-module.exports = { handleNewLayer }
+/**
+ * Web reapplyLayerFrameForContentFit / applyNativeFillForSource: fill for `contentFit` from the source's
+ * resolution on `canvas`; `fill: null` when the resolution is unknown (caller keeps the current fill).
+ */
+async function fitFillForSource(ctx, source, contentFit, canvas, mediaResolution = null) {
+	const { fill } = await libs()
+	const contentRes = await (mediaResolution ? mediaResolution(source) : defaultMediaResolution(ctx, source))
+	if (!contentRes) return { fill: null, contentResolution: null }
+	const rect = fill.sceneLayerPixelRectForContentFit(canvas.width, canvas.height, contentRes.w, contentRes.h, contentFit || 'native')
+	return { fill: fill.pixelRectToFill(rect, canvas), contentResolution: contentRes }
+}
+
+module.exports = { handleNewLayer, fitFillForSource, libs }

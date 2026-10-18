@@ -8,6 +8,7 @@ const { handleGlobalBorderControl } = require('./routes-scene-global-border')
 const { handleTakeLook } = require('./routes-scene-take-look')
 const { handlePreviewPush } = require('./routes-scene-preview-push')
 const { handleNewLayer } = require('./routes-scene-new-layer')
+const { handleLayerFit } = require('./routes-scene-layer-tools')
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
@@ -27,6 +28,10 @@ async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/new-layer') {
 		// WO-600 F: build (not store) the layer a media drop creates — same client modules as the web.
 		return handleNewLayer(body, ctx)
+	}
+	if (path === '/api/scene/layer-fit') {
+		// WO-601: refit a layer for its content sizing (web reapplyLayerFrameForContentFit) — computed, not stored.
+		return handleLayerFit(body, ctx)
 	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null
