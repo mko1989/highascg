@@ -137,6 +137,24 @@ export function edgeResizeDeltaToFill(edge, startFill, dx, dy, opts = {}) {
 	return { ...startFill, x, y, scaleX: sx, scaleY: sy }
 }
 
+/**
+ * WO-611 #4: snap a moved layer along one axis by EITHER edge — start (`v`) or end (`v + size`) — to the
+ * nearest candidate within `threshold`; the nearer edge that actually snaps wins (tie → start edge).
+ * The old inline code compared against the non-snapping edge's no-op (distance 0), so a layer only
+ * snapped when both edges did.
+ * @param {number} v @param {number} size @param {number[]} candidates @param {number} threshold
+ */
+export function snapMoveAxis(v, size, candidates, threshold) {
+	const a = snapValue(v, candidates, threshold)
+	const end = v + size
+	const e = snapValue(end, candidates, threshold)
+	/* "snapped" = the edge moved onto a candidate; compare per edge — (v + size) - size is not exactly v */
+	const da = a !== v ? Math.abs(a - v) : Infinity
+	const db = e !== end ? Math.abs(e - end) : Infinity
+	if (da === Infinity && db === Infinity) return v
+	return da <= db ? a : e - size
+}
+
 function snapValue(val, candidates, threshold) {
 	let bestDiff = threshold
 	let bestCandidate = val
@@ -195,26 +213,8 @@ export function createComposeDragHandlers(sceneState, schedulePreviewPush) {
 			const snapThresholdX = 10 / rw
 			const snapThresholdY = 10 / rh
 
-			let nx = nextFill.x
-			let ny = nextFill.y
-			const sxVal = nextFill.scaleX
-			const syVal = nextFill.scaleY
-
-			const snapNx1 = snapValue(nx, xCandidates, snapThresholdX)
-			const snapNx2 = snapValue(nx + sxVal, xCandidates, snapThresholdX) - sxVal
-			if (Math.abs(snapNx1 - nx) <= Math.abs(snapNx2 - nx)) {
-				if (Math.abs(snapNx1 - nx) < snapThresholdX) nx = snapNx1
-			} else {
-				if (Math.abs(snapNx2 - nx) < snapThresholdX) nx = snapNx2
-			}
-
-			const snapNy1 = snapValue(ny, yCandidates, snapThresholdY)
-			const snapNy2 = snapValue(ny + syVal, yCandidates, snapThresholdY) - syVal
-			if (Math.abs(snapNy1 - ny) <= Math.abs(snapNy2 - ny)) {
-				if (Math.abs(snapNy1 - ny) < snapThresholdY) ny = snapNy1
-			} else {
-				if (Math.abs(snapNy2 - ny) < snapThresholdY) ny = snapNy2
-			}
+			const nx = snapMoveAxis(nextFill.x, nextFill.scaleX, xCandidates, snapThresholdX)
+			const ny = snapMoveAxis(nextFill.y, nextFill.scaleY, yCandidates, snapThresholdY)
 
 			const snappedFill = { ...nextFill, x: nx, y: ny }
 
