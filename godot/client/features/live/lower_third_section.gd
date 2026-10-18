@@ -3,12 +3,13 @@ extends VBoxContainer
 ## hold / colours. Every edit patches `source.lowerThirdConfig` + `cgData` at once (lower_third_model.gd, web
 ## persistLocalConfig) and queues one CG UPDATE 450 ms later; ▶ Play flushes it, then animates in — or out when
 ## already playing on this layer; Delete removes the CG. Config resolution + actions: POST /api/scene/lower-third.
-## Roster (web inspector-lower-third-roster.js) is not ported yet.
+## The data sheet (roster) sits under Title/Subtitle like the web (lt_roster_section.gd).
 
 signal patch(p: Dictionary)
 
 const LT := preload("res://features/live/lower_third_model.gd")
 const P := preload("res://features/live/pip_model.gd")
+const RosterSection := preload("res://features/live/lt_roster_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NUMS := [["titleFontSize", "Title px", 8, 200, 1], ["subtitleFontSize", "Sub px", 8, 120, 1],
 	["renderScale", "Scale %", 25, 300, 5], ["displayDurationSec", "Hold s", 0, 3600, 0.5]]
@@ -70,6 +71,7 @@ func _build() -> void:
 	var g := GridContainer.new()
 	g.columns = 2
 	add_child(g)
+	var lines := {}
 	for k in [["title", "Title", "Primary line"], ["subtitle", "Subtitle", "Secondary line"]]:
 		g.add_child(_muted(k[1]))
 		var le := LineEdit.new()
@@ -79,6 +81,21 @@ func _build() -> void:
 		var field: String = k[0]
 		le.text_changed.connect(func(t: String) -> void: _change({field: t}))
 		g.add_child(le)
+		lines[field] = le
+	var roster := RosterSection.new()
+	roster.setup((_layer.source as Dictionary).get("lowerThirdRoster"))
+	roster.roster_changed.connect(func(r: Dictionary) -> void:
+		var src: Dictionary = (_layer.source as Dictionary).duplicate(true)
+		src["lowerThirdRoster"] = r
+		patch.emit({"source": src}))
+	roster.row_picked.connect(func(title: String, subtitle: String) -> void:  # web applyRowToEditor
+		(lines.title as LineEdit).text = title
+		(lines.subtitle as LineEdit).text = subtitle
+		_change({"title": title, "subtitle": subtitle}))
+	add_child(roster)
+	g = GridContainer.new()
+	g.columns = 2
+	add_child(g)
 	var fonts: Array = info.get("fonts", []) if info.get("fonts") is Array else [{"id": "arial", "label": "Arial"}]
 	g.add_child(_muted("Font"))
 	g.add_child(_select(fonts.map(func(f: Dictionary) -> String: return str(f.label)), fonts.map(func(f: Dictionary) -> String: return str(f.id)).find(str(_cfg.fontFamily).to_lower()),

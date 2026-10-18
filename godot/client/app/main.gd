@@ -169,6 +169,27 @@ func _ready() -> void:
 			ProjectSync.mark_dirty()
 			await get_tree().create_timer(4.0).timeout
 			print("[client] cd done, layers ", ed6._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)), " timers ", tl.size())
+		if Config.args.has("probe-roster"):  # dev: --probe-roster=<sheet path> → LT layer, import, pick row 2, Play, Delete, remove (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed8: Node = shell.tabs.get_node("Live").editor
+			await ed8.add_layer_from_source({"type": "template", "value": "lower-thirds/lt-classic-box", "label": "Classic Box"})
+			await get_tree().create_timer(2.0).timeout
+			var lt8: Node = ed8._inspector._lt
+			var rs: Node = lt8.find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("import_file"))[0]
+			print("[client] roster import ", await rs.import_file(str(Config.args["probe-roster"])), " | ", rs._meta.text)
+			await get_tree().create_timer(0.8).timeout
+			print("[client] roster stored ", ed8._layers()[ed8._sel].source.get("lowerThirdRoster", {}).get("mapping"))
+			var items: Array = (rs._table.get_root() as TreeItem).get_children()
+			(items[1] as TreeItem).select(0)
+			await get_tree().create_timer(0.8).timeout
+			print("[client] roster picked → cgData ", ed8._layers()[ed8._sel].cgData.name, " / ", ed8._layers()[ed8._sel].cgData.title)
+			lt8._act("play")
+			await get_tree().create_timer(2.5).timeout
+			lt8._act("clear")
+			await get_tree().create_timer(1.5).timeout
+			ed8._remove_layer()
+			await get_tree().create_timer(1.5).timeout
+			print("[client] roster done, layers ", ed8._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor
