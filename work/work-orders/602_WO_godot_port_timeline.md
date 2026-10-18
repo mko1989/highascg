@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) and slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) DONE, box-verified; layer ops, effect drops, copy / paste, keyboard navigation open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) and slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) DONE, box-verified; effect drops, copy / paste, keyboard navigation open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -129,6 +129,26 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   (`POST /api/companion/button-preview/test-press`). Then Remove flag.
 - Ctrl+C / Ctrl+V of flags and Alt+←/→ nudges belong to the copy / paste and navigation slices.
 
+### Slice 6 findings (2026-10-18) — layers
+
+- Model (`client/lib/timeline-state.js:158-215`): `reorderLayer` moves the layer and its `layerHeights` entry.
+  `insertLayerBelow(li)` inserts a new "Layer N" (next free number) after `li`, or appends one when `li` is out of
+  range, with the default height. `removeLayer` drops the layer, its clips and its height. Heights are
+  index-aligned with `layers`.
+- Divider (`components/timeline-canvas-render.js:391`, `timeline-canvas-pointer.js:89, 189, 207`): a press on the
+  line under a layer trades height with the layer below. Their sum stays the same, and each stays within
+  [MIN_LAYER_H 28, MAX_LAYER_H 120]. With Shift, every layer grows or shrinks by the drag, each clamped. The
+  heights are saved on release, or on mouseleave.
+- Header (`timeline-editor-handlers.js:330-382`): a click selects the layer. This clears the clip and flag
+  selection and shows the layer page. A drag on a header reorders live (`onMoveLayer`), and the result is saved
+  on release. A right-click opens the menu (`createShowLayerContextMenu`, `:418`): Rename layer (browser
+  `prompt()`, empty = no change), Add layer below, Remove layer (`confirm("Remove "X" and all its clips?")`).
+- Double-click (`timeline-canvas-pointer.js:349-372`): on a clip it adds a keyframe (slice 4); elsewhere below the
+  ruler it adds a layer.
+- Layer page (`components/inspector-mixer.js:294-357`): "Timeline Layer N", Layer → Name (on change: trimmed,
+  empty → "Layer N"), Actions → Add layer below / Remove layer (same confirm, then the empty Inspector).
+- Delete never removes a layer. The web header is not drawn as selected.
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -245,6 +265,26 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   same `_commit` (autosave + PUT). The media lookups moved to `timeline_media.gd` (unchanged code) to stay well
   under 500 lines.
 
+### Slice 6 (2026-10-18) — layers
+
+- `timeline_layers.gd` (new, pure): reorder (heights travel), insert below / append, remove, rename (the layer
+  page's trim / empty → "Layer N" rule) and `divider_heights`, a line-for-line port of
+  `applyLayerDividerMouseMove`.
+- `timeline_layer_inspector.gd` (new): the layer page in web order, plus the header's right-click menu. Rename
+  focuses the page's Name field with the text selected, instead of a `prompt()` (Godot has no blocking prompt,
+  and the field is the same edit). Remove asks with a ConfirmationDialog. When the page switches layer while
+  Name has focus, it first releases the focus, so a typed name commits to the layer it was typed for. Without
+  this, the field kept the old text and wrote it into the newly selected layer on blur (found on the box).
+- `timeline_view.gd`: divider press and drag (VSIZE cursor on hover, Shift = all layers), header press = select
+  + live drag-reorder (the selection follows the moved layer), header right-click = select + menu, double-click
+  on a header or empty track = add a layer below (appended past the last) and select it. A press on empty track
+  inside the layer range selects that layer. `select`, `select_flag` and `select_layer` clear each other.
+  Deviation: the selected header is drawn lit (`#1f2a37`) so the operator sees which layer the page edits.
+- `timeline_view_draw.gd` (new): the canvas painting moved out of the view (unchanged code, called as
+  `VD.draw(self)`) to keep the view under 500 lines (it had reached 504).
+- `timeline_tab.gd`: the layer page in the global Inspector, and every layer edit through `_commit` (autosave +
+  PUT) plus the picker's "(N layers)" text.
+
 ## What was VERIFIED
 
 - Godot unit tests 665/0 (`test_timeline_math.gd` goldens generated from the web modules under node);
@@ -352,3 +392,39 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
   - The thumbnail and live update against a real Companion page change.
   - A jump flag in playback.
   - Whether a dangling `jumpFlagId` should be cleared on remove (web keeps it).
+
+### Slice 6 verification (2026-10-18)
+
+- Godot tests 857/0. New `test_timeline_layers.gd`: reorder with heights, same-index and out-of-range moves,
+  insert below / append, remove with height, rename trim / empty, display name, and divider cases (trade, MIN
+  clamp with the sum kept, partner at MAX holds, clamp at MAX, partner at MIN caps the grow, Shift grow, Shift
+  clamp). `--check` boot clean. `check-max-file-lines` reports 0 over (view 414, draw 104, tab 493).
+- On the box, test timeline `tmve1ppeug1t` (4 layers, heights 54), each step read back from
+  `GET /api/timelines/tmve1ppeug1t`:
+  - A click on Layer 2's header lit it, and the Inspector showed "Timeline Layer 2 / Name Layer 2 / Add layer
+    below · Remove layer". Name "Lower thirds" + Enter was stored.
+  - Dragging that header onto Layer 4 gave the order `Layer 1, Layer 3, Layer 4, Lower thirds`. The selection
+    and page followed ("Timeline Layer 4").
+  - Dragging the divider under Layer 1 down 20 px gave heights `[74, 34, 54, 54]`. A Shift-drag up 10 px on the
+    next divider gave `[64, 28, 44, 44]` (Layer 3 clamped at 28).
+  - A double-click on Layer 3's header inserted "Layer 5" below it (`[64, 28, 54, 44, 44]`). A double-click on
+    the empty area below the last layer appended "Layer 6" (height 54) and selected it. The picker read
+    "Timeline (6 layers)".
+  - Right-click on a header first did nothing: the right-button branch was nested inside the left-button one.
+    Fixed. It then selected the layer and opened Rename / Add layer below / Remove layer at the mouse. Rename
+    focused Name with the text selected, and typing "Graphics" + Enter stored it.
+  - Name-field focus bug (see What was done): typed " B" into Name, then right-clicked another layer. Before the
+    fix the field kept "Graphics" for the other layer. After it, " B" was stored on Graphics and the field read
+    "Lower thirds".
+  - Menu → Remove layer showed `Remove "Lower thirds" and all its clips?`. Cancel left all 6 layers. Remove
+    deleted the layer and its height (`[64, 28, 54, 44, 54]`), released the Inspector, and the picker read 5
+    layers. The page's own Remove button opens the same dialog.
+  - A click on empty track in Layer 4 selected it. The page's "Add layer below" inserted "Layer 7" after it.
+    Clicking the clip afterwards swapped the Inspector back to the clip page.
+- The playhead showed 00:00:10:04 after the first sync. That is the engine's real paused position
+  (`GET …/state` → 10175, left by the slice 5 pause-flag test), not a layer side effect.
+- The test timeline was left with the edited layers (`Layer 1, Layer 3, Graphics B, Layer 4, Layer 7, Layer 6`).
+  It is the dev box's scratch timeline in an Untitled project.
+- Owner-QA open:
+  - The lit selected header (deviation).
+  - Rename via the Name field instead of a prompt.

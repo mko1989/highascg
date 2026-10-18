@@ -13,6 +13,10 @@ extends Control
 ## Keyframe gestures emit `keyframes_edited` (the tab syncs and re-seeks).
 ## Slice 5: flags (timeline_flag_draw.gd) — pressing one in the ruler selects it (instead of seeking) and drags it in
 ## time, unsnapped like the web; Delete removes the selected flag. A flag and a clip are never selected together.
+## Slice 6: layers (timeline_layers.gd) — a header press selects the layer and dragging it reorders live; a divider
+## drag trades height with the layer below (Shift: all layers); a double-click on a header or an empty track adds a
+## layer below (below the last: at the end); right-click on a header asks the tab for the layer menu. Selecting a
+## layer clears the clip / flag selection and the other way round; the selected header is lit (the web shows none).
 
 signal seek_requested(ms: float)
 signal clip_selected(li: int, clip_id: String)  # clip_id "" = nothing selected
@@ -21,6 +25,9 @@ signal source_dropped(source: Dictionary, li: int, ms: float)
 signal keyframes_edited
 signal flag_selected(id: String)  # "" = none
 signal flags_edited
+signal layer_selected(li: int)  # -1 = none
+signal layers_edited
+signal layer_menu(li: int)
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
@@ -28,6 +35,8 @@ const K := preload("res://features/timeline/timeline_keyframes.gd")
 const KD := preload("res://features/timeline/timeline_kf_draw.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const FD := preload("res://features/timeline/timeline_flag_draw.gd")
+const L := preload("res://features/timeline/timeline_layers.gd")
+const VD := preload("res://features/timeline/timeline_view_draw.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var tl: Dictionary = {}
@@ -41,6 +50,7 @@ var sel_li := -1
 var sel_id := ""
 var sel_kf: Variant = null  # the selected keyframe Dictionary (by identity) of the selected clip
 var sel_flag := ""
+var sel_layer := -1
 var _drag := {}
 var _seek_at := 0
 
@@ -60,6 +70,8 @@ func set_timeline(t: Dictionary) -> void:
 		select(-1, "")
 	if sel_flag != "" and (first or F.find(tl, sel_flag).is_empty()):
 		select_flag("")
+	if sel_layer >= 0 and (first or sel_layer >= (tl.get("layers", []) as Array).size()):
+		select_layer(-1)
 	if first:
 		fit()
 	queue_redraw()
@@ -98,96 +110,7 @@ func _x(ms: float) -> float:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), ThemeBuilder.BG_DARK)
-	if tl.is_empty():
-		draw_string(get_theme_default_font(), Vector2(TM.HEADER_W + 12, 60), "No timeline", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ThemeBuilder.TEXT_MUTED)
-		return
-	var font := get_theme_default_font()
-	var layers: Array = tl.get("layers", [])
-	var dur := float(tl.get("duration", 30000))
-	var fps := int(tl.get("fps", 25))
-	# tracks
-	for i in layers.size():
-		var y := TM.track_top(tl, i, scroll_y)
-		var h := TM.layer_h(tl, i)
-		if y + h < TM.RULER_H or y > size.y:
-			continue
-		draw_rect(Rect2(TM.HEADER_W, y, size.x - TM.HEADER_W, h), Color("#0d1117") if i % 2 == 0 else Color("#10151c"))
-		draw_rect(Rect2(TM.HEADER_W, y + h - 1, size.x - TM.HEADER_W, 1), Color("#21262d"))
-		for c in layers[i].get("clips", []):
-			_draw_clip(c, i, y, h, font)
-	# past-the-end shade
-	var end_x := _x(dur)
-	if end_x < size.x:
-		draw_rect(Rect2(maxf(end_x, TM.HEADER_W), TM.RULER_H, size.x - maxf(end_x, TM.HEADER_W), size.y - TM.RULER_H), Color(0, 0, 0, 0.35))
-	FD.draw_trails(self, tl, _x, size, sel_flag)
-	# headers
-	draw_rect(Rect2(0, 0, TM.HEADER_W, size.y), Color("#161b22"))
-	for i in layers.size():
-		var y := TM.track_top(tl, i, scroll_y)
-		if y + TM.layer_h(tl, i) < TM.RULER_H or y > size.y:
-			continue
-		draw_string(font, Vector2(8, y + 18), str(layers[i].get("name", "Layer %d" % (i + 1))), HORIZONTAL_ALIGNMENT_LEFT, TM.HEADER_W - 12, 12, ThemeBuilder.TEXT)
-		draw_rect(Rect2(0, y + TM.layer_h(tl, i) - 1, TM.HEADER_W, 1), Color("#21262d"))
-	draw_rect(Rect2(TM.HEADER_W - 1, 0, 1, size.y), Color("#30363d"))
-	_draw_ruler(font, dur, fps)
-	FD.draw_markers(self, tl, _x, size.x, sel_flag, font)
-	# playhead
-	var px := roundf(_x(playhead_ms)) + 0.5
-	if px >= TM.HEADER_W:
-		draw_line(Vector2(px, TM.RULER_H), Vector2(px, size.y), ThemeBuilder.ERROR, 1.0)
-		draw_colored_polygon(PackedVector2Array([Vector2(px - 6, 0), Vector2(px + 6, 0), Vector2(px, 12)]), ThemeBuilder.ERROR)
-
-
-func _draw_ruler(font: Font, dur: float, fps: int) -> void:
-	draw_rect(Rect2(TM.HEADER_W, 0, size.x - TM.HEADER_W, TM.RULER_H), Color("#161b22"))
-	draw_rect(Rect2(TM.HEADER_W, TM.RULER_H - 1, size.x - TM.HEADER_W, 1), Color("#30363d"))
-	var interval := TM.ruler_interval(px_per_ms)
-	var end_ms := scroll_x + (size.x - TM.HEADER_W) / px_per_ms
-	var t := ceilf(scroll_x / interval) * interval
-	while t <= minf(end_ms, dur + interval):
-		var x := _x(t)
-		draw_rect(Rect2(x, 0, 1, TM.RULER_H), Color("#21262d"))
-		draw_rect(Rect2(x, TM.RULER_H - 6, 1, 6), Color("#58a6ff"))
-		draw_string(font, Vector2(x + 3, TM.RULER_H - 9), TM.fmt_timecode(t, fps), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, ThemeBuilder.TEXT_MUTED)
-		t += interval
-	var sub := interval / 5.0
-	if sub * px_per_ms >= 5.0:
-		var s := ceilf(scroll_x / sub) * sub
-		while s <= end_ms:
-			if fmod(s, interval) >= 1.0:
-				draw_rect(Rect2(_x(s), TM.RULER_H - 4, 1, 4), Color("#30363d"))
-			s += sub
-
-
-func _draw_clip(c: Dictionary, li: int, track_y: float, track_h: int, font: Font) -> void:
-	if not (c.get("source") is Dictionary) or str(c.source.get("value", "")) == "":
-		return
-	var x := _x(float(c.get("startTime", 0)))
-	var w := maxf(3.0, float(c.get("duration", 0)) * px_per_ms)
-	var top := maxf(track_y + 4, TM.RULER_H)
-	var bottom := minf(track_y + track_h - 4, size.y)
-	var h := bottom - top
-	if x + w < TM.HEADER_W + 1 or x > size.x or h < 4:
-		return
-	var col := Color(TM.CLIP_PALETTE[li % TM.CLIP_PALETTE.size()])
-	var r := Rect2(x, top, w, h)
-	draw_style_box(_box(col), r)
-	if li == sel_li and str(c.get("id", "")) == sel_id:
-		draw_rect(r.grow(-1), Color.WHITE, false, 2.0)
-	var label := str(c.source.get("label", c.source.value)).get_file()
-	var lx := maxf(x, TM.HEADER_W + 1) + 5
-	var avail := minf(x + w, size.x) - lx - 4
-	if avail > 12 and h >= 14:
-		draw_string(font, Vector2(lx, top + 13), label, HORIZONTAL_ALIGNMENT_LEFT, avail, 11, Color(1, 1, 1, 0.92))
-	KD.draw(self, c, top, h, _x, TM.HEADER_W, size.x, sel_kf, _drag.has("kf"))
-
-
-func _box(col: Color) -> StyleBoxFlat:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = col
-	sb.set_corner_radius_all(3)
-	return sb
+	VD.draw(self)
 
 
 func _gui_input(event: InputEvent) -> void:
@@ -195,7 +118,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	if event is InputEventKey:
 		var k := event as InputEventKey
-		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and (sel_id != "" or sel_flag != ""):
+		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and (sel_id != "" or sel_flag != ""):  # never a layer (web)
 			if sel_flag != "":
 				F.remove(tl, sel_flag)
 				select_flag("")
@@ -230,12 +153,26 @@ func _gui_input(event: InputEvent) -> void:
 				_scrubbing = true
 				_seek_to(mb.position.x)
 				accept_event()
+			elif mb.pressed and mb.position.y >= TM.RULER_H and TM.hit_divider(tl, mb.position.y, scroll_y) >= 0:
+				TM.ensure_heights(tl)
+				_drag = {"div": TM.hit_divider(tl, mb.position.y, scroll_y), "orig": (tl.layerHeights as Array).duplicate(),
+					"y0": mb.position.y, "shift": mb.shift_pressed}
+				accept_event()
 			elif mb.pressed and mb.position.x > TM.HEADER_W:
 				_press_track(mb.position, mb.double_click)
+				accept_event()
+			elif mb.pressed and mb.position.y >= TM.RULER_H:
+				_press_header(mb.position, mb.double_click)
 				accept_event()
 			elif not mb.pressed:
 				_scrubbing = false
 				_end_drag()
+		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and mb.position.x < TM.HEADER_W and mb.position.y >= TM.RULER_H:
+			var li := TM.layer_at_y(tl, mb.position.y, scroll_y)
+			if li >= 0 and li < (tl.layers as Array).size():
+				select_layer(li)
+				layer_menu.emit(li)
+				accept_event()
 	elif event is InputEventMouseMotion:
 		var mm := event as InputEventMouseMotion
 		if _scrubbing:
@@ -253,6 +190,8 @@ func select(li: int, clip_id: String) -> void:
 		return
 	if clip_id != "" and sel_flag != "":
 		select_flag("")
+	if clip_id != "" and sel_layer >= 0:
+		select_layer(-1)
 	sel_li = li if clip_id != "" else -1
 	sel_id = clip_id
 	sel_kf = null
@@ -265,9 +204,33 @@ func select_flag(id: String) -> void:
 		return
 	if id != "":
 		select(-1, "")
+		select_layer(-1)
 	sel_flag = id
 	queue_redraw()
 	flag_selected.emit(id)
+
+
+func select_layer(li: int) -> void:
+	if li == sel_layer:
+		return
+	if li >= 0:
+		select(-1, "")
+		select_flag("")
+	sel_layer = li
+	queue_redraw()
+	layer_selected.emit(li)
+
+
+## web header mousedown: select + start a layer-move; double-click: insertLayerBelow (the last one when below it).
+func _press_header(pos: Vector2, double: bool) -> void:
+	var n := (tl.layers as Array).size()
+	var li := TM.layer_at_y(tl, pos.y, scroll_y)
+	if double:
+		select_layer(L.insert_below(tl, mini(li, n - 1)))
+		layers_edited.emit()
+	elif li >= 0 and li < n:
+		select_layer(li)
+		_drag = {"layer": li, "from": li}
 
 
 ## The clip under `pos` → [layer index, clip] or [] (web hitClip over layerAt).
@@ -280,6 +243,9 @@ func _clip_at(pos: Vector2) -> Array:
 
 
 func _hover(pos: Vector2) -> void:
+	if pos.y >= TM.RULER_H and TM.hit_divider(tl, pos.y, scroll_y) >= 0:
+		mouse_default_cursor_shape = Control.CURSOR_VSIZE
+		return
 	if pos.y < TM.RULER_H:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if not F.hit(tl, pos, _x).is_empty() else Control.CURSOR_HSIZE
 		return
@@ -298,7 +264,16 @@ func _row(li: int) -> Vector2:
 func _press_track(pos: Vector2, double := false) -> void:
 	var hit := _clip_at(pos)
 	if hit.is_empty():
-		select(-1, "")
+		var li := TM.layer_at_y(tl, pos.y, scroll_y)
+		var n := (tl.layers as Array).size()
+		if double:  # web dblclick on an empty track: a layer below it (below the last: at the end)
+			select_layer(L.insert_below(tl, mini(li, n - 1)))
+			layers_edited.emit()
+		elif li >= 0 and li < n:
+			select_layer(li)  # web onLayerClick
+		else:
+			select(-1, "")
+			select_layer(-1)
 		return
 	var c: Dictionary = hit[1]
 	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
@@ -325,6 +300,18 @@ func _press_track(pos: Vector2, double := false) -> void:
 
 func _drag_to(pos: Vector2) -> void:
 	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
+	if _drag.has("div"):
+		tl["layerHeights"] = L.divider_heights(_drag.orig, _drag.div, pos.y - float(_drag.y0), _drag.shift)
+		queue_redraw()
+		return
+	if _drag.has("layer"):  # web layer-move: reorder live as the cursor enters another layer
+		var to := TM.layer_at_y(tl, pos.y, scroll_y)
+		if to >= 0 and to < (tl.layers as Array).size() and to != _drag.layer and L.reorder(tl, _drag.layer, to):
+			_drag["layer"] = to
+			sel_layer = to
+			layer_selected.emit(to)
+			queue_redraw()
+		return
 	if _drag.has("flag"):  # web onMoveFlagTime: clamped to the timeline, no snap
 		F.update(tl, _drag.flag, {"timeMs": clampf(ms, 0.0, float(tl.get("duration", 0)))})
 		queue_redraw()
@@ -373,6 +360,10 @@ func _end_drag() -> void:
 	if d.has("flag"):
 		if float(d.flag.get("timeMs", 0)) != float(d.orig):
 			flags_edited.emit()
+		return
+	if d.has("div") or d.has("layer"):
+		if (d.has("div") and tl.layerHeights != d.orig) or (d.has("layer") and d.layer != d.from):
+			layers_edited.emit()
 		return
 	var c := TE.find_clip(tl, d.li, d.id)
 	if c.is_empty():

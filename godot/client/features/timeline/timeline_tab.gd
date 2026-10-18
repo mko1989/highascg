@@ -8,7 +8,8 @@ extends VBoxContainer
 ## the clip page in the global Inspector; every committed edit autosaves and re-syncs the timeline to the engine.
 ## Slice 3: the clip transform. Slice 4: keyframes (canvas, Inspector groups, the web's i / o / p / s / v / t keys).
 ## Slice 5: flags — the Flag button adds one at the playhead; select / drag / Delete on the canvas, the flag page in
-## the Inspector. Layer ops come in a later slice.
+## the Inspector. Slice 6: layers — header select / drag-reorder / divider resize (Shift: all), double-click adds one,
+## right-click menu, the layer page in the Inspector (rename, add below, remove).
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
@@ -16,6 +17,7 @@ const TE := preload("res://features/timeline/timeline_edit.gd")
 const K := preload("res://features/timeline/timeline_keyframes.gd")
 const ClipInspector := preload("res://features/timeline/timeline_clip_inspector.gd")
 const FlagInspector := preload("res://features/timeline/timeline_flag_inspector.gd")
+const LayerInspector := preload("res://features/timeline/timeline_layer_inspector.gd")
 const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -34,6 +36,7 @@ var _page: ClipInspector
 var _throttle: Timer
 var _media := TimelineMedia.new()
 var _flag_page: FlagInspector
+var _layer_page: LayerInspector
 var _geo_seek := false  # the pending throttled sync also re-seeks (geometry / mixer / trim edits)
 var _pb_last := ""  # timelineId of the latest timeline.playback (the web's state.timeline.playback)
 
@@ -88,6 +91,9 @@ func _ready() -> void:
 	view.keyframes_edited.connect(_kf_commit)
 	view.flag_selected.connect(_on_flag_selected)
 	view.flags_edited.connect(_commit)
+	view.layer_selected.connect(_on_layer_selected)
+	view.layers_edited.connect(_layers_commit)
+	view.layer_menu.connect(func(_li: int) -> void: _layer_page.menu())
 	add_child(view)
 	_page = ClipInspector.new()
 	_page.patch.connect(_on_patch)
@@ -98,6 +104,9 @@ func _ready() -> void:
 		F.remove(active(), view.sel_flag)
 		view.select_flag("")
 		_commit())
+	_layer_page = LayerInspector.new()
+	_layer_page.changed.connect(_layers_commit)
+	_layer_page.selected.connect(func(li: int) -> void: view.select_layer(li))
 	_throttle = Timer.new()
 	_throttle.one_shot = true
 	_throttle.wait_time = 0.08  # the web's 80 ms trailing geometry sync
@@ -272,7 +281,7 @@ func _new_timeline() -> void:
 
 
 func _exit_tree() -> void:
-	for p in [_page, _flag_page]:
+	for p in [_page, _flag_page, _layer_page]:
 		if p != null and not p.is_inside_tree():  # never selected → never adopted by the Inspector
 			p.free()
 
@@ -314,6 +323,22 @@ func _on_flag_selected(id: String) -> void:
 	_flag_page.show_flag(active(), f)
 
 
+func _on_layer_selected(li: int) -> void:
+	if InspectorPanel.current == null:
+		return
+	if li < 0:
+		InspectorPanel.current.release(_layer_page)
+		return
+	InspectorPanel.current.present(_layer_page)
+	_layer_page.show_layer(active(), li)
+
+
+func _layers_commit() -> void:
+	view.queue_redraw()
+	_refresh_picker()
+	_commit()
+
+
 ## web #tl-add-flag: a pause flag at the playhead, selected.
 func _add_flag() -> void:
 	var tl := active()
@@ -338,6 +363,8 @@ func _commit() -> void:
 	view.queue_redraw()
 	_page.refresh()
 	_flag_page.refresh()
+	if view.sel_layer >= 0:
+		_layer_page.show_layer(tl, view.sel_layer)
 	if not await _sync_to_server(tl):
 		_status.text = "Timeline sync to the server failed"
 	elif seek and (_pb_last == "" or _pb_last == str(tl.id)):  # web: only the timeline the engine is on re-seeks
