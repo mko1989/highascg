@@ -18,6 +18,7 @@ const TE := preload("res://features/timeline/timeline_edit.gd")
 const P := preload("res://features/live/px_rect_math.gd")
 const AlignRow := preload("res://features/live/align_row.gd")
 const KfSection := preload("res://features/timeline/timeline_kf_section.gd")
+const EffectsSection := preload("res://features/live/effects_section.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const TRANSFORM_PROPS := ["fill_x", "fill_y", "scale_x", "scale_y"]
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -46,6 +47,9 @@ var _tf_sub: Label
 var _lock: CheckBox
 var _fit: OptionButton
 var kf: KfSection
+var fx: EffectsSection
+var _registry: Array = []  # GET /api/scene/effect-registry effects (loaded once)
+var _registry_loading := false
 
 
 func _ready() -> void:
@@ -107,6 +111,14 @@ func _ready() -> void:
 	kf.host = self
 	kf.changed.connect(func() -> void: _emit({"keyframes": _clip.get("keyframes", [])}, "geometry"))
 	add_child(kf)
+	add_child(HSeparator.new())
+	fx = EffectsSection.new()
+	fx.changed.connect(func(next: Array) -> void: _emit({"effects": next}, "geometry"))
+	add_child(fx)
+	if not _registry.is_empty():
+		fx.set_registry(_registry)  # loaded by a drop before this page was first shown
+	else:
+		load_registry()
 	var del := Button.new()
 	del.text = "Remove clip"
 	del.tooltip_text = "Remove this clip from the timeline (Delete)"
@@ -129,6 +141,20 @@ func show_clip(tl: Dictionary, li: int, clip: Dictionary, main: int) -> void:
 	var src: Dictionary = clip.get("source", {}) if clip.get("source") is Dictionary else {}
 	_title.text = "%s  (Layer %d)" % [str(src.get("label", "")) if str(src.get("label", "")) != "" else str(src.get("value", "Clip")), li + 1]
 	refresh()
+
+
+## The effect registry (types, defaults, schemas — served from the web's effect-registry.js), fetched once.
+func load_registry() -> Array:
+	while _registry_loading:
+		await Engine.get_main_loop().process_frame  # may run before this page is in the tree
+	if _registry.is_empty():
+		_registry_loading = true
+		var res: Dictionary = await Api.get_json("/api/scene/effect-registry")
+		_registry = res.data.get("effects", []) if res.ok and res.data is Dictionary and res.data.get("effects") is Array else []
+		_registry_loading = false
+		if fx != null:
+			fx.set_registry(_registry)
+	return _registry
 
 
 ## Re-read the clip (after a canvas drag) without emitting.
@@ -159,6 +185,8 @@ func refresh() -> void:
 	_lock.button_pressed = _clip.get("aspectLocked") != false
 	_fit.select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(str(_clip.get("contentFit", "native")))))
 	kf.refresh()
+	# crop is edited in px of the clip's content resolution, else the program canvas (web WO-158 T158.4)
+	fx.show_effects(_clip.get("effects", []) if _clip.get("effects") is Array else [], Vector2i(content if content.x > 0 else canvas))
 	_syncing = false
 
 

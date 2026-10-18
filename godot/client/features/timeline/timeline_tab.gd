@@ -12,7 +12,8 @@ extends VBoxContainer
 ## right-click menu, the layer page in the Inspector (rename, add below, remove). Slice 7: the transport bar moved to
 ## timeline_transport.gd (and gained rename, to start / end, loop, the time + duration fields, trim, zoom); the
 ## keyboard (timeline_keys.gd): copy / paste, Space, arrows, Enter. Slice 8: the Dest row (timeline_dest.gd): screen,
-## PRV / PGM posted at once, Take with a transition.
+## PRV / PGM posted at once, Take with a transition. Slice 9: effects — Sources' EFFECTS dropped on a clip, the
+## clip page's Mixer Effects group.
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
@@ -26,6 +27,7 @@ const LayerInspector := preload("res://features/timeline/timeline_layer_inspecto
 const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const EffectsModel := preload("res://features/live/effects_model.gd")
 
 var view: TimelineView
 var transport: TimelineTransport
@@ -254,6 +256,9 @@ func _on_drop(src: Dictionary, li: int, ms: float) -> void:
 	var tl := active()
 	if tl.is_empty():
 		return
+	if src.get("type") == "effect":
+		_add_effect(tl, li, ms, str(src.value))
+		return
 	var dur := await _media.drop_duration(src)
 	if not is_same(tl, active()):
 		return
@@ -281,6 +286,23 @@ func _on_drop(src: Dictionary, li: int, ms: float) -> void:
 	_on_clip_selected(li, str(c.id))
 	transport.refresh_picker()
 	_commit()
+
+
+## web onDropSource, effect branch (WO-22): the effect (one per type, registry defaults) joins the clip under the
+## drop, which is selected so its Effects group shows. Synced and re-seeked like a geometry edit — the engine sends a
+## clip's effects whenever they change, on its next apply.
+func _add_effect(tl: Dictionary, li: int, ms: float, type: String) -> void:
+	var c := TM.hit_clip(tl, li, ms)
+	if c.is_empty():
+		return
+	var cur: Array = c.get("effects", []) if c.get("effects") is Array else []
+	var next := EffectsModel.add(cur, await _page.load_registry(), type)
+	if next.size() == cur.size() or not is_same(tl, active()):
+		return  # already on the clip, or an unknown type
+	c["effects"] = next
+	view.select(li, str(c.id))
+	_on_clip_selected(li, str(c.id))
+	kf_commit()
 
 
 func _program_res(main: int) -> Vector2:

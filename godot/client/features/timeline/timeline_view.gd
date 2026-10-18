@@ -424,8 +424,12 @@ func _remove_kf() -> void:
 	keyframes_edited.emit()
 
 
-func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-	return not tl.is_empty() and data is Dictionary and str(data.get("value", "")) != "" and data.get("type") != "effect"
+func _can_drop_data(at: Vector2, data: Variant) -> bool:
+	if tl.is_empty() or not (data is Dictionary) or str(data.get("value", "")) == "":
+		return false
+	if data.get("type") == "effect":  # web WO-22: an effect lands on the clip under the cursor, nowhere else
+		return not TM.hit_clip(tl, TM.layer_at_y(tl, at.y, scroll_y), TM.ms_at(at.x, px_per_ms, scroll_x)).is_empty()
+	return true
 
 
 ## Web drop: ms under the cursor (≥ 0), layer clamped to [0, n] — n means "a new layer below".

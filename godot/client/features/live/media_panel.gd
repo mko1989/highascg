@@ -1,6 +1,8 @@
 extends VBoxContainer
 ## WO-600 K (first slice) — media sources: folder tree from GET /api/media (ids are "FOLDER/SUB/CLIP"),
 ## filter, drag into the look editor. Drag payload = the web's {type, value, label} (operator-compose-tiles.js).
+## WO-602 slice 9: an EFFECTS group (web sources-panel-effects.js — the registry by category, filtered by label or
+## category) whose items drag {type: "effect"} onto timeline clips.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
@@ -10,6 +12,7 @@ const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 var _filter: LineEdit
 var _tree: Tree
 var _rows: Array = []
+var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
 
 
@@ -53,6 +56,9 @@ func _ready() -> void:
 func load_media() -> void:
 	var res: Dictionary = await Api.get_json("/api/media")
 	_rows = res.data if res.ok and res.data is Array else []
+	if _fx.is_empty():
+		var fr: Dictionary = await Api.get_json("/api/scene/effect-registry")
+		_fx = fr.data if fr.ok and fr.data is Dictionary else {}
 	_build()
 
 
@@ -83,6 +89,32 @@ func _build() -> void:
 		it.set_tooltip_text(0, "%s · %s" % [id, r.get("type", "")])
 		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
 
+	_build_effects(root, f)
+
+
+func _build_effects(root: TreeItem, f: String) -> void:
+	var fx: Array = _fx.get("effects", []) if _fx.get("effects") is Array else []
+	var cats: Array = _fx.get("categories", []) if _fx.get("categories") is Array else []
+	var group: TreeItem = null
+	for cat in cats:
+		var head: TreeItem = null
+		for e in fx:
+			if not (e is Dictionary) or str(e.get("category", "")) != str(cat.get("id", "")):
+				continue
+			var label := str(e.get("label", e.get("type", "")))
+			if f != "" and not label.to_lower().contains(f) and not str(e.get("category", "")).to_lower().contains(f):
+				continue
+			if group == null:
+				group = _tree.create_item(root)
+				group.set_text(0, "EFFECTS")
+				group.collapsed = f == ""
+			if head == null:
+				head = _tree.create_item(group)
+				head.set_text(0, str(cat.get("label", cat.get("id", ""))))
+			var it := _tree.create_item(head)
+			it.set_text(0, label)
+			it.set_tooltip_text(0, "Mixer effect — drop on a timeline clip")
+			it.set_metadata(0, {"type": "effect", "value": str(e.type), "label": label})
 
 func _drag_data(at: Vector2) -> Variant:
 	var it := _tree.get_item_at_position(at)

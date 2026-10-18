@@ -361,7 +361,8 @@ static func _short(s: String) -> String:
 
 ## --- WO-600 K: drop media from the Sources panel → server builds the layer (web rules) → append + push.
 func _can_drop(_at: Vector2, data: Variant) -> bool:
-	return data is Dictionary and str((data as Dictionary).get("value", "")) != "" and scene_id != ""
+	return data is Dictionary and str((data as Dictionary).get("value", "")) != "" and scene_id != "" \
+		and str((data as Dictionary).get("type", "")) != "effect"  # web isDraggableLayerSourcePayload: never a layer
 
 
 func _drop(_at: Vector2, data: Variant) -> void:

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) slice 7 (full transport bar + the timeline keyboard: copy / paste, Space, arrows, Enter) and slice 8 (Dest row: screen select, PRV only with a preview bus, PRV / PGM posted at once, engine routing adopted, Take with a transition) DONE, box-verified; effect drops (slice 9) open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) slice 7 (full transport bar + the timeline keyboard: copy / paste, Space, arrows, Enter) and slice 8 (Dest row: screen select, PRV only with a preview bus, PRV / PGM posted at once, engine routing adopted, Take with a transition) and slice 9 (effects: Sources EFFECTS group, drops on a clip, the clip page's Mixer Effects) DONE, box-verified. The web timeline editor's feature set is ported; open items are owner QA (per-slice lists below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -209,6 +209,27 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   (not the PGM-only list); the server normalises.
 - `projectFps`: the timeline's fps, else `programResolutions[0].fps`, else 50.
 
+### Slice 9 findings (2026-10-18) — effects
+
+- Drag source: the web Sources has an Effects tab (`client/components/sources-panel-effects.js`). It lists the
+  registry by category, filtered by label or category, and each item drags `{type: 'effect', value: type,
+  label}`. Godot's Sources (`media_panel.gd`) listed media only, so nothing could be dragged.
+- Timeline drop (`timeline-editor-handlers.js:192-210`, WO-22):
+  - The effect goes to the clip under the cursor (`start ≤ t < end`), and is refused when no clip is there.
+  - One instance per type (`createEffectInstance`: registry defaults).
+  - The clip is updated (and `expandDurationToContent` runs), synced, and selected.
+- The clip page's Effects group (`inspector-panel-timeline-clip.js:410-431`) comes after the keyframes. Crop is
+  edited in px of the clip's content resolution, else the program canvas. The web also schedules an immediate
+  AMCP apply (`effect-apply-live.js`, `timeline_clip`). The engine already sends a clip's effects whenever their
+  key changes (`timeline-playback-amcp-schedule.js:177-196`: neutral lines, then each effect) on its next apply:
+  a tick while playing, a seek while paused.
+- Godot's look editor accepted any payload. The web refuses effects as a layer source
+  (`scenes-shared.js:35-40 isDraggableLayerSourcePayload`).
+- Out of scope, recorded for WO-600 / 601: the web also takes an effect dropped on a look *layer row*
+  (`scene-layer-row.js:147-156`). Godot has no such drop yet.
+- Web parity worth knowing: every clip update grows the duration to content end + 2 s. A timeline trimmed to its
+  last clip's end therefore grows 2 s on the next clip edit (60000 → 62000 seen on the box).
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -386,6 +407,22 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   `timeline.playback` and a playing `/state` adopt `sendTo`. The picker switch and ＋ (after the timeline is
   pushed) post the routing.
 - `timeline_tab.gd`: `dest` under the transport.
+
+### Slice 9 (2026-10-18) — effects
+
+- `media_panel.gd`: an EFFECTS group after the media folders, with the registry's categories as sub-groups. It is
+  loaded once from `GET /api/scene/effect-registry` (the web's own registry, as in WO-601) and filtered like the
+  web tab. Items drag `{type: "effect", value, label}` and have no media inspector. Deviation: Godot has one
+  Sources tree, not tabs (R1).
+- `look_editor.gd`: `_can_drop` refuses `effect` (web parity).
+- `timeline_view.gd`: an effect is accepted only over a clip, so the cursor shows the refusal anywhere else. The
+  web accepts the drag everywhere and ignores the drop.
+- `timeline_tab.gd` `_add_effect`: `EffectsModel.add` (one per type, registry defaults) on the clip under the
+  drop, then select it and `kf_commit` (sync + re-seek, so a paused preview shows it).
+- `timeline_clip_inspector.gd`: WO-601's `effects_section.gd` after the keyframes. Its edits patch `effects` as a
+  geometry change (throttled sync + re-seek), in place of the web's separate live-apply path. Crop is in px of
+  the clip's content resolution, else the canvas. `load_registry()` is shared with the drop and safe before the
+  page is in the tree; that case was found on the box as a null section on the first drop.
 
 ## What was VERIFIED
 
@@ -615,3 +652,26 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
 - Owner QA open:
   - the second row's layout;
   - the take transition not resetting with the editor defaults.
+
+### Slice 9 verification (2026-10-18)
+
+- Godot tests 895/0 (the effect model is WO-601's, already tested). `--check` boot clean. 0 files over 500 lines
+  (tab 313, clip page 321, view 445, Sources 133).
+- On the box (GUI on DP-3, Sources filter `bright`, timeline `tmve1ppeug1t`, paused at 0, PRV routing):
+  - Sources showed EFFECTS › Color › Brightness.
+  - Dragging it onto the Layer 1 clip gave the clip `effects: [{type: brightness, params: {value: 1}}]`. The
+    clip was selected, and its page showed Mixer Effects with a Brightness card. Caspar:
+    `MIXER 2-210 BRIGHTNESS 1 0` (PRV channel 2, after the re-seek).
+  - Typing 0.5 in the card stored `value: 0.5`. Caspar got `MIXER 2-210 BRIGHTNESS 1 0` (the engine's neutral
+    line) and then `BRIGHTNESS 0.5 0`.
+  - Dropping Brightness again on the clip changed nothing (one per type). Dropping it on empty Layer 3 changed
+    nothing (no clip, no layer created, layer count still 6).
+  - ✕ on the card gave `effects: []`, and Caspar got `MIXER 2-210 BRIGHTNESS 1 0`.
+  - Wheel-scrolling the Inspector over its fields left the keyframes unchanged (read back).
+  - Restored: duration 60000 (Trim, after the 2 s regrowth), one clip, no effects, no flags, PRV-only.
+- Not exercised: an effect dropped on the Live look editor (refused by a one-line guard). Opening a look editor
+  stages a look, and the guard mirrors the web's.
+- Owner QA open:
+  - EFFECTS as a group in the one Sources tree;
+  - the clip page's length, since the Effects group sits below the keyframes as in the web;
+  - the drop cursor refusing outside clips.
