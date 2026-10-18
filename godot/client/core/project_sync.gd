@@ -9,6 +9,7 @@ extends Node
 ## server overlays its live deck mirror onto every autosave (routes-data-project-handlers.js:380
 ## enrichProjectScenesFromLiveDeck), so an autosave alone cannot change looks once a deck exists.
 ## deck_changed() = 100 ms debounce + 2 s echo memo, same as the web.
+const NetUtil := preload("res://core/net_util.gd")
 
 signal saved(rev: int)
 signal save_failed(reason: String)
@@ -56,7 +57,7 @@ func deck_changed() -> void:
 
 func send_deck_sync(force: bool) -> bool:
 	var data := build_deck_payload(Store.project)
-	var json := JSON.stringify(data)
+	var json := NetUtil.to_json(data)
 	var now := Time.get_ticks_msec()
 	if not force and json == _last_deck_json and now - _last_deck_at < DECK_ECHO_WINDOW_MS:
 		return false

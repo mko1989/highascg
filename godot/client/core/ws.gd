@@ -37,7 +37,7 @@ func on(type: String, handler: Callable) -> void:
 func send(obj: Dictionary) -> bool:
 	if not is_open:
 		return false
-	return _peer.send_text(JSON.stringify(obj)) == OK
+	return _peer.send_text(NetUtil.to_json(obj)) == OK
 
 
 func _process(_delta: float) -> void:

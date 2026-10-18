@@ -47,7 +47,7 @@ func request(method: int, path: String, body: Variant) -> Dictionary:
 	var payload := ""
 	if body != null:
 		headers.append("Content-Type: application/json")
-		payload = JSON.stringify(body)
+		payload = NetUtil.to_json(body)
 	var err := r.request(Config.origin + path, headers, method, payload)
 	if err != OK:
 		_release(r)

@@ -40,3 +40,11 @@ static func deep_merge(target: Dictionary, src: Dictionary) -> void:
 			deep_merge(target[k], src[k])
 		else:
 			target[k] = src[k]
+
+
+## WO-598 B — JSON for the wire: source key order kept (the server's projectContentEquals compares
+## JSON.stringify output, so sorted keys made every Godot save look "changed") and full float precision
+## (the default 15 significant digits rewrote web-made values such as 1/3). Godot writes 25 as 25.0,
+## which JSON.parse reads as the same number.
+static func to_json(v: Variant) -> String:
+	return JSON.stringify(v, "", false, true)
