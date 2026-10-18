@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — C1 (take/stage by id, server-built payload) implemented, parity-proven against the real web builder on 312 real show payloads, and exercised end-to-end through the take engine in the simulator; web client + Companion paths deliberately unchanged until owner QA on the box. A/B/C2–C4/D open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward). Pays off for the web client and Companion regardless of the port.**
+**Status: IN PROGRESS (2026-10-18) — C1 (take by id) and C2 (PRV push by id) implemented + verified on real Caspar; B Godot side done (wire JSON byte-compatible, golden round-trip test); two server data-safety bugs found and fixed on the way (stale-disk look resolution, deck-sync write overwriting autosaves). Open: B JS side (web exportProject∘importProject), A contract doc, C3/C4, D, switching the web client to C1/C2 (owner QA). Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
 
 # WO-598 — Client contract: document it, make it testable, move show logic to the server ("thin client")
 
@@ -99,9 +99,9 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 ## Tasks
 
 - [ ] T1 contract docs (A) + CI guard.
-- [ ] T2 project fixtures + JS round-trip golden test (B).
+- [~] T2 golden round trip: Godot side ✔ (`test_project_roundtrip.gd`); JS exportProject∘importProject still open.
 - [ ] T3 take-by-id parity diff test → switch web client (C1).
-- [ ] T4 PRV-push-by-id (C2) with parity diff → switch web client.
+- [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
 - [ ] T5 constants endpoint (C4); web client consumes it.
 - [ ] T6 effects/PIP/border server routes (C3).
 - [ ] T7 client-local storage migration (D).
@@ -150,6 +150,23 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   failed 1/3 standalone runs with no related code change). Boot check OK.
 - NOT verified: real Caspar, transitions/takeGroup barrier with multiple mains, owner QA. Web client + Companion
   still use their existing paths (switching them is T3, after owner QA).
+
+## What was done (2026-10-18) — C2, B (Godot), two server fixes
+
+| Change | Why / evidence |
+|---|---|
+| `src/api/routes-scene-preview-push.js` — `POST /api/scene/preview-push {sceneId, mainIdx?}` | Editing a look staged on PRV: geometry/opacity/rotation/crop only → existing mixer-nudge (same fill math as takes) + staged payload refreshed; anything else → take-look preview + forceCut. Decision = the web's `isGeometryOnlyPreview` (imported) on live-scene-state's staged payload. No new AMCP builder. PGM-only main → `mode:'none'`. |
+| `resolveLiveSceneById` (project-scenes-transform.js), used by take-look + preview-push | They read the look from DISK, written 750 ms after a deck sync → a push right after an edit used the previous version (proven: first live geometry push sent the old FILL). Now the validated in-memory deck first. |
+| `godot/client/core/net_util.gd` `to_json` at every wire call site | Godot's default JSON sorts keys + 15 digits; server `projectContentEquals` compares stringify output → every Godot save of an unchanged show bumped the rev + broadcast, and web floats were rounded. A/B on the box: old encoder rev 358→359 + write; fixed: no change. |
+| `project-scenes.js` deck-sync flush re-reads the stored project | The 750 ms deferred deck-sync write persisted the snapshot from sync time and overwrote an autosave persisted meanwhile (rev regressed, non-deck fields reverted). Proven from mtimes + journal; replay after fix: both files rev 360 with the edit. Affects the web client too. |
+
+## What was VERIFIED (2026-10-18, shop dev box: PGM ch1 DP-7, PRV ch2)
+
+- preview-push after a real `scene_deck_sync`: geometry edit → `mode:nudge`, Caspar `MIXER 2-10 FILL 0.1 0.2 0.6 0.6 0 DEFER`,
+  `OPACITY 0.7`, `MIXER 2 COMMIT` (no reload); clip edit → `mode:take`, `LOADBG 2-10 "PROJECTS/AIRPORT/1. TLO 1 …"` + `PLAY 2-10`.
+- Smokes: `smoke-wo598-preview-push` (decision + routing + live-deck resolution, 13), `smoke-wo598-deck-sync-persist-race` (3,
+  fails on the old code), C1 parity still green; Godot `test_project_roundtrip` (fixtures + synthetic, exact floats + key order).
+- Offline suite 2620/2623 — the shader-library failure also fails on `main`. Godot headless 275/0, `--check` OK.
 
 ## Earlier notes
 
