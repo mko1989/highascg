@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets and media-file versions ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). Next per plan: media preview (blocked — addendum 8), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets, media-file versions and the global border (minus Art-Net) ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). Next per plan: media preview (blocked — addendum 8), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -142,7 +142,11 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
    (`src/api/routes-operator-gui.js:34-52`) REPLACES the whole cell layout — last writer wins, no per-client merge — so a
    Godot report of a media cell would wipe the kiosk's cells (and vice versa). Needs either per-client cell sets merged
    server-side or the WO-597 §D atlas (then the client draws the slot's crop of its `opgui` surface). Decide in WO-597.
-Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
+9. Global border (web, found porting): the border push targets the ARMED / active screens
+   (`scenes-preview-global-border.js` pushBorderOnlyNow), not the screen whose inspector is being edited; and slice px
+   fields convert with `getResolutionForScreen(stateStore)` — no screen index — so a non-active screen with another raster
+   gets wrong px. Godot pushes the edited screen and uses that screen's raster (via the server border control).
+Bugs 1–2, 5 and 9 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
 
 ## What was done (2026-10-18)
 
@@ -163,6 +167,7 @@ Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — c
 | `src/api/routes-lower-third-roster.js`, `godot/…/lt_roster_model.gd`, `lt_roster_section.gd` | lower-third data sheet: server-side Excel/CSV parse with the web's lib (`POST /api/lower-thirds/roster/import`, port fact 4), mapping / search / row picker in Godot, `source.lowerThirdRoster` |
 | `godot/…/layer_style_model.gd`, `layer_style_row.gd` | layer style: Copy / Paste (everything but the source) / Save preset… / Apply preset ▾ — `project.scenes.layerPresets`, golden-tested vs scene-state-layer-logic.js |
 | `godot/client/core/stream_upload.gd`, `features/live/media_versions.gd` | media versions: list / New version… / Go back / purge; the upload streams the file in 1 MiB chunks over StreamPeerTCP (HTTPRequest would load a GB file into memory) |
+| `src/engine/global-border-control.js`, `routes-scene-global-border.js`, `godot/…/global_border_panel.gd` | global border: the Godot inspector edits through `POST /api/scene/global-border` (WO-585) only — extended with slices / inner / PRV mirror / preset save+delete / clear under the web's rules; Art-Net section (DMX patch, channel map, listen) still to port |
 | `src/engine/screen-timers.js` | only a changed duration re-anchors a re-assigned timer (addendum 6) |
 | `src/engine/scene-take-payload.js`, `client/components/scenes-shared.js`, `routes-scene-preview-push.js` | `timersConfig` kept in take/stage payloads; `scene.live` broadcast after a nudge that changed a source |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
@@ -215,6 +220,12 @@ Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — c
   entry): New version → journal `new version v2`, entry current v2 size 4251 = source file; Go back → `restored v1`, size 10774;
   purge → no older versions. Multi-chunk: 3.5 MiB random body uploaded → md5 of the library file equal to the source
   (`6b66f4b7…`). Godot 616/0 (uploader framing/response 3 tests); offline 2662/1.
+- Global border, box (`--probe-border=0`, screen 1 slot null before and after): enable → `CG 1-998 ADD … pip_border` + fade in;
+  width 12 → 0 AMCP (params go to `template/global-border-live-1.json`, polled by the template — by design); glow → re-ADD;
+  slice → re-ADD with the slice; preset 1 saved; recall → `1-996 ADD pip_glow`, `1-998 OPACITY 0 25`, `1-996 OPACITY 1 25`
+  (crossfade); mirror on → `2-997 ADD`; mirror off → 997 faded + cleared, 1-996 updated without an opacity dip (first run
+  re-ADDed with `OPACITY 0 0` — fixed: compare against the PGM snapshot); remove → 998/996 faded + cleared, stored slot null.
+  Smoke `smoke-wo601-global-border-slot-edits` 4/4 + WO-585 15/15; offline 2666/1.
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
