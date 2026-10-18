@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) ported and verified on the box. Next per plan: media file inspector (WO-592 preview/waveform/trim), effects/PIP (needs WO-598 C3), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) and the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) ported and verified on the box. Next per plan: media preview + versions, effects/PIP (needs WO-598 C3), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -87,6 +87,7 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 | `src/api/routes-scene-layer-tools.js` | `POST /api/scene/layer-fit` (= web reapplyLayerFrameForContentFit, shared fit chain with new-layer) and `GET /api/scene/layer-options` (= resolveProgramLayoutForMain → audioOutputRoutesForLayout on the exact /api/settings payload) — computed with the web's modules, nothing stored |
 | `godot/client/features/live/layer_inspector.gd` | content sizing (+ refit), clip start point, loop (only when the source can loop), straight alpha, rotation, audio route / route source channels, mute, volume fader + dB, fade on end |
 | `godot/client/features/live/mixer_math.gd` | audio-volume-scale.js fader curve + dB text, media-ext.js sourceSupportsLoopPlayback — golden-tested against the JS |
+| `godot/client/features/live/media_inspector.gd`, `media_math.gd` | media file inspector: facts, waveform + trim shading, trim/mute defaults, used-in, rename, final delete; parseTimeInput/formatMediaTimecode golden-tested |
 | (WO-600) `compose_math.gd`, `look_editor.gd` | geometry move/resize/crop already ported there |
 
 ## What was VERIFIED
@@ -94,5 +95,7 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 - 2026-10-18 box (PRV ch2): inspector on layer 10 of "Background" → Fit canvas + mute + fader 50 % stored as
   `contentFit: fill-canvas` (refit fill 1.0×0.622), `muted: true`, `volume: 0.2512` (−12 dB); PRV re-taken because these
   are content keys (`LOADBG 2-10 …`, `MIXER 2-10 VOLUME 0`). Server smoke `smoke-wo601-layer-tools` 4/4; Godot 436/0.
+- Media inspector on a library file: In "1.5" / Out "0:40" / Mute → stored {trimInMs 1500, trimOutMs 40000, muted}; usage 2 looks;
+  adding the clip then copied them into the new layer (after the WO-611 #5 fix). Test defaults cleared afterwards. Godot 453/0.
 
 Side findings re-checked by hand (`git grep`, file reads). Everything else is the Haiku inventory.

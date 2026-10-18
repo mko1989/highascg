@@ -41,6 +41,13 @@ golden-faithful Godot port failed its own snap tests. Fix: exported pure `snapMo
 start edge; per-edge comparison to avoid the `(v+size)-size` float trap). Smoke `smoke-wo611-compose-move-snap` 2/2 (fails on the
 old code); dist-web rebuilt. Godot `compose_math.gd` uses the same rule.
 
+### 5. Compose-frame drop skipped the file's trim/mute defaults (fixed 2026-10-18)
+WO-592 decided (04.10) that a file's trim/mute defaults are copied into a look on drop, and its notes say the patchLayer hook
+"covers every drop path (compose, …)". `scenes-compose.js` addLayerFromMedia sets the source with `setLayerSource`, which never
+reaches that hook → a clip dropped on the compose frame came in without its defaults. Fix: `fileDefaultsPatchForNewSource`
+(media-file-defaults.js) applied after setLayerSource; the same helper serves POST /api/scene/new-layer. Smoke
+`smoke-wo611-compose-drop-file-defaults` 2/2; dist-web rebuilt.
+
 ### Also noted (not defects, for cleanup)
 
 - Dead: `client/components/inspector-panel-routing.js` (173 LOC), `components/sync-modal.js`,
