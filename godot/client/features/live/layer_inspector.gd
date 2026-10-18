@@ -7,6 +7,7 @@ extends VBoxContainer
 signal patch(p: Dictionary)
 
 const X := preload("res://features/live/mixer_math.gd")
+const EffectsSection := preload("res://features/live/effects_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const STARTS := [["beginning", "Start from beginning"], ["relativeToPrevious", "Relative to the clip playing on this layer"]]
@@ -18,6 +19,9 @@ var _routes: Array = []        # [{value, label}]
 var _src_sets: Array = []
 var _w := {}
 var _syncing := false
+var _fx: EffectsSection
+var _content_key := ""
+var _content := Vector2i.ZERO
 
 
 func _ready() -> void:
@@ -53,6 +57,10 @@ func _ready() -> void:
 	fade.add_child(_check("fade", func(on: bool) -> void: _emit({"fadeOnEnd": {"enabled": on}})))
 	fade.add_child(_spin("fade_fr", 1, 250, 1, func(v: float) -> void: _emit({"fadeOnEnd": {"frames": int(v)}})))
 	_row(g, "Fade on end (fr)", fade)
+	add_child(HSeparator.new())
+	_fx = EffectsSection.new()
+	_fx.changed.connect(func(fx: Array) -> void: patch.emit({"effects": fx}))
+	add_child(_fx)
 
 
 func show_layer(look_id: String, main_idx: int, layer: Dictionary) -> void:
@@ -64,6 +72,32 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary) -> void:
 	if main_changed:
 		await _load_options()
 	_sync()
+	if not layer.is_empty():
+		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content)
+		_refresh_content()
+
+
+## Crop px editing uses the layer's content resolution (web getContentResolution, fallback channel) —
+## computed by the server's layer-fit (nothing stored), once per look/layer/source.
+func _refresh_content() -> void:
+	var src: Dictionary = _layer.get("source", {}) if _layer.get("source") is Dictionary else {}
+	var key := "%s|%s|%s|%d" % [scene_id, _layer.get("layerNumber", ""), src.get("value", ""), main]
+	if key == _content_key:
+		return
+	_content_key = key
+	var c := Vector2i(1920, 1080)
+	var rl: Variant = (Store.get_value("channelMap", {}) as Dictionary).get("programResolutions", []) if Store.get_value("channelMap") is Dictionary else []
+	if rl is Array and main < (rl as Array).size() and rl[main] is Dictionary:
+		c = Vector2i(int(rl[main].get("w", 1920)), int(rl[main].get("h", 1080)))
+	var res: Dictionary = await Api.post_json("/api/scene/layer-fit", {"sceneId": scene_id, "layerNumber": int(_layer.get("layerNumber", 0)), "contentFit": str(_layer.get("contentFit", "native")), "mainIdx": main})
+	if res.ok and res.data is Dictionary and res.data.get("contentResolution") is Dictionary:
+		var cr: Dictionary = res.data.contentResolution
+		if float(cr.get("w", 0)) > 0 and float(cr.get("h", 0)) > 0:
+			c = Vector2i(int(cr.w), int(cr.h))
+	if key != _content_key:
+		return
+	_content = c
+	_fx.show_effects(_layer.get("effects", []) if _layer.get("effects") is Array else [], _content)
 
 
 func _load_options() -> void:

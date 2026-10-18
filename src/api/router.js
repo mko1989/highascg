@@ -191,6 +191,7 @@ routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { 
 
 // Scene live
 routes.get('/api/scene/layer-options', ({ query, ctx }) => require('./routes-scene-layer-tools').handleLayerOptions(query, ctx), { requireCaspar: false }) // WO-601
+routes.get('/api/scene/effect-registry', () => require('./routes-scene-layer-tools').handleEffectRegistry(), { requireCaspar: false }) // WO-601
 routes.get('/api/scene/live', ({ ctx }) => {
 	return {
 		status: 200,

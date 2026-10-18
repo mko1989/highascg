@@ -24,8 +24,10 @@ fi
 # --check: boot the real app headless for a few seconds (all autoloads + every UI scene script compile and
 # _ready runs); exit 1 on any script/parse error. The unit runner (--test) never loads the UI scripts.
 if [[ "${1:-}" == "--check" ]]; then
-	out="$("$GODOT" --headless --path "$HERE" -- --quit-after=4 --tab=1 2>&1)"
+	# A parse error in the main script means --quit-after never runs → bound the boot, then judge the log.
+	out="$(timeout 45 "$GODOT" --headless --path "$HERE" -- --quit-after=4 --tab=1 2>&1)" && rc=0 || rc=$?
 	errs="$(grep -E 'SCRIPT ERROR|Parse Error|Compile Error' <<<"$out" || true)"
+	if [[ $rc -eq 124 ]]; then errs="${errs:+$errs$'\n'}[check] boot did not quit within 45 s"; fi
 	if [[ -n "$errs" ]]; then echo "$errs" >&2; echo "[check] FAILED" >&2; exit 1; fi
 	echo "[check] boot OK (no script errors)"; exit 0
 fi

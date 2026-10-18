@@ -58,6 +58,33 @@ func _ready() -> void:
 			(ins._w.mute as CheckBox).button_pressed = true
 			(ins._w.vol as HSlider).value = 50
 			print("[client] inspected layer ", ed2._sel)
+		if Config.args.has("probe-effect"):  # dev: --probe-effect=<layer index>[:<seed effects JSON>] (WO-601)
+			# seed (or keep) → +brightness, brightness 1.4, +levels, −brightness → restore the seed
+			await get_tree().create_timer(1.5).timeout
+			var pe := str(Config.args["probe-effect"]).split(":", true, 1)
+			var ed3: Node = shell.tabs.get_node("Live").editor
+			ed3._select(int(pe[0]))
+			var seed: Array = JSON.parse_string(pe[1]) if pe.size() > 1 else (ed3._layers()[ed3._sel].get("effects", []) as Array).duplicate(true)
+			ed3._apply_layer({"effects": seed.duplicate(true)})
+			await get_tree().create_timer(1.0).timeout
+			var fx: Node = ed3._inspector._fx
+			var types: Array = fx._registry.map(func(d: Dictionary) -> String: return d.type)
+			var card := func(t: String) -> Node:  # card order = effects order
+				var k: int = (ed3._layers()[ed3._sel].effects as Array).map(func(e: Dictionary) -> String: return e.type).find(t)
+				return fx._list.get_child(k)
+			fx._add.item_selected.emit(types.find("brightness") + 1)
+			await get_tree().create_timer(0.8).timeout
+			(card.call("brightness").find_children("*", "SpinBox", true, false)[0] as SpinBox).value = 1.4
+			await get_tree().create_timer(0.8).timeout
+			fx._add.item_selected.emit(types.find("levels") + 1)
+			await get_tree().create_timer(0.8).timeout
+			print("[client] effects ", ed3._layers()[ed3._sel].get("effects"))
+			(card.call("brightness").find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "✕")[0] as Button).pressed.emit()
+			await get_tree().create_timer(1.2).timeout
+			print("[client] effects after remove ", ed3._layers()[ed3._sel].get("effects"))
+			ed3._apply_layer({"effects": seed})
+			await get_tree().create_timer(1.2).timeout
+			print("[client] effects restored ", ed3._layers()[ed3._sel].get("effects"))
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor

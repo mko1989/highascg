@@ -57,7 +57,7 @@ const NUDGE_MAX_LAYERS = 12
  *   (logical + 100 on bank B); null/omitted = logical layer IS physical (bank-less PRV).
  * @returns {string[]}
  */
-function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null) {
+function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null, opts = {}) {
 	const ln = physicalLayer != null ? parseInt(physicalLayer, 10) : parseInt(layer.layerNumber, 10)
 	const cl = `${parseInt(previewCh, 10)}-${ln}`
 	const rot = Number(layer.rotation) || 0
@@ -75,12 +75,36 @@ function buildNudgeLinesForLayer(previewCh, layer, f, physicalLayer = null) {
 	 * defers into the single COMMIT, so the bare crop landed one frame early during drags. */
 	if (Array.isArray(layer.effects)) {
 		for (const fx of layer.effects) {
-			if (!fx || fx.type !== 'crop') continue
+			if (!fx || (fx.type !== 'crop' && !opts.allEffects)) continue
 			const fxLines = buildEffectAmcpLines(fx.type, fx.params || {}, cl)
 			if (fxLines) lines.push(...fxLines.map((l) => deferMixerAmcpLine(l)))
 		}
 	}
+	/* WO-601: an effect removed since the staged look → its neutral value (the full push does it with MIXER CLEAR). */
+	for (const type of Array.isArray(opts.resetEffectTypes) ? opts.resetEffectTypes : []) {
+		const neutral = NEUTRAL_EFFECT_PARAMS[type]
+		const fxLines = neutral ? buildEffectAmcpLines(type, neutral, cl) : null
+		if (fxLines) lines.push(...fxLines.map((l) => deferMixerAmcpLine(l)))
+	}
 	return lines
+}
+
+/**
+ * WO-601: identity params per effect type for resetting a removed effect on a nudge. keyer / rotation /
+ * anchor are absent on purpose: every nudge re-emits the layer's own ANCHOR + ROTATION, and the keyer
+ * belongs to the layer's straight-alpha state (take pipeline).
+ */
+const NEUTRAL_EFFECT_PARAMS = {
+	blend_mode: { mode: 'normal' },
+	brightness: { value: 1 },
+	contrast: { value: 1 },
+	saturation: { value: 1 },
+	levels: { minIn: 0, maxIn: 1, gamma: 1, minOut: 0, maxOut: 1 },
+	chroma_key: { key: 'None' },
+	crop: { left: 0, top: 0, right: 1, bottom: 1 },
+	clip_mask: { left: 0, top: 0, width: 1, height: 1 },
+	perspective: {},
+	grid: { resolution: 1 },
 }
 
 /**
@@ -213,7 +237,8 @@ async function handlePreviewMixerNudge(body, ctx) {
 		for (const { layer, f } of resolved) {
 			const ln = parseInt(layer.layerNumber, 10)
 			const physLn = bank === 'b' ? ln + PGM_BANK_B_OFFSET : ln
-			lines.push(...buildNudgeLinesForLayer(targetCh, layer, f, physLn))
+			const fxOpts = { allEffects: b.allEffects === true, resetEffectTypes: b.resetEffects?.[String(ln)] }
+			lines.push(...buildNudgeLinesForLayer(targetCh, layer, f, physLn, fxOpts))
 		}
 		await ctx.amcp.batchSendChunked(lines, { skipMixerPreCommit: true })
 		await ctx.amcp.raw(`MIXER ${targetCh} COMMIT`)
@@ -238,6 +263,7 @@ async function handlePreviewMixerNudge(body, ctx) {
 module.exports = {
 	handlePreviewMixerNudge,
 	buildNudgeLinesForLayer,
+	NEUTRAL_EFFECT_PARAMS,
 	resolveNudgePreviewChannel,
 	resolveNudgePgmChannel,
 	isPgmNudgeTarget,

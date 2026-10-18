@@ -84,6 +84,8 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 			sceneId,
 			mainIndex: mainIdx,
 			layers: (scene.layers || []).filter((l) => l?.source?.value),
+			allEffects: true,
+			resetEffects: removedEffectTypes(staged?.scene, scene),
 			...(Number(res.w) > 0 && Number(res.h) > 0 ? { composeCanvas: { w: Number(res.w), h: Number(res.h) } } : {}),
 		}
 		const nr = await nudge(nb)
@@ -100,6 +102,24 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	return out(tr?.status || 500, { ...parsed, ok: tr?.status === 200 && parsed.ok !== false, mode: 'take', mainIdx, previewChannel: prvCh })
 }
 
+/**
+ * WO-601: effect types a layer had in the staged look but not in the edited one → { [layerNumber]: types[] }.
+ * The web's geometry-only push re-sends present effects only; the server also resets removed ones.
+ */
+function removedEffectTypes(stagedScene, scene) {
+	const types = (l) => new Set((Array.isArray(l?.effects) ? l.effects : []).map((fx) => String(fx?.type || '')).filter(Boolean))
+	const now = new Map((scene?.layers || []).map((l) => [String(Number(l?.layerNumber)), types(l)]))
+	const outMap = {}
+	for (const l of stagedScene?.layers || []) {
+		const key = String(Number(l?.layerNumber))
+		const cur = now.get(key)
+		if (!cur) continue
+		const gone = [...types(l)].filter((t) => !cur.has(t))
+		if (gone.length) outMap[key] = gone
+	}
+	return outMap
+}
+
 /** After a nudge the live map must describe the edited look (geometry included) — like a take would. */
 async function registerStagedScene(ctx, scene, map, mainIdx, prvCh) {
 	const { buildServerIncomingScene } = require('../engine/scene-take-payload')
@@ -109,4 +129,4 @@ async function registerStagedScene(ctx, scene, map, mainIdx, prvCh) {
 	await liveSceneState.setChannel(prvCh, { sceneId: String(scene.id), scene: stripEphemeralTakeFields(incoming) })
 }
 
-module.exports = { handlePreviewPush, decidePreviewPush, NUDGE_MAX_LAYERS }
+module.exports = { handlePreviewPush, decidePreviewPush, removedEffectTypes, NUDGE_MAX_LAYERS }

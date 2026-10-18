@@ -9,6 +9,8 @@
  * GET /api/scene/layer-options?mainIdx= → { programLayout, audioRoutes, sourceChannelSets }
  *   = web inspector-mixer.js route choices: resolveProgramLayoutForMain(settings, channelMap, main) →
  *   audioOutputRoutesForLayout(layout), with `settings` = exactly the GET /api/settings payload.
+ * GET /api/scene/effect-registry → { effects, categories } = web effect-registry.js MIXER_EFFECTS (types,
+ *   defaults, param schemas) + EFFECT_CATEGORIES — the Godot effects editor renders from these.
  */
 
 const path = require('path')
@@ -56,4 +58,9 @@ async function handleLayerOptions(query, ctx, deps = {}) {
 	return out(200, { ok: true, mainIdx, programLayout, audioRoutes: routes.audioOutputRoutesForLayout(programLayout), sourceChannelSets: SOURCE_CHANNEL_SETS })
 }
 
-module.exports = { handleLayerFit, handleLayerOptions, SOURCE_CHANNEL_SETS }
+async function handleEffectRegistry() {
+	const reg = await import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', 'effect-registry.js')).href)
+	return out(200, { ok: true, effects: reg.MIXER_EFFECTS, categories: reg.EFFECT_CATEGORIES })
+}
+
+module.exports = { handleLayerFit, handleLayerOptions, handleEffectRegistry, SOURCE_CHANNEL_SETS }
