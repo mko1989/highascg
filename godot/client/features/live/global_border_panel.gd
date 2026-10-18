@@ -1,14 +1,18 @@
 extends VBoxContainer
-## WO-601 — global border inspector (web inspector-global-border*.js, minus Art-Net — Part B), opened from a deck
+## WO-601 — global border inspector (web inspector-global-border*.js), opened from a deck
 ## column's "Border". Thin client: every edit goes to POST /api/scene/global-border (WO-585 + WO-601 slot edits),
 ## which applies the web's slot rules, puts it on air (PGM 998/996 or the PRV mirror 997) and persists; the reply's
 ## slot replaces `project.scenes.globalBorders[screen]` locally so a later autosave cannot revert it.
 ## Edits coalesce: one request in flight, the newest pending patch 110 ms later (web pushBorderOnly debounce).
+## A lighting desk drives listening screens: `global_border_sync` merges into the slot (border_artnet_model.gd) and
+## the open screen re-renders at most every 150 ms, never while a field has focus (web global-border-artnet-ws.js).
 
 signal closed
 
 const P := preload("res://features/live/pip_model.gd")
 const F := preload("res://features/live/param_field.gd")
+const A := preload("res://features/live/border_artnet_model.gd")
+const ArtnetSection := preload("res://features/live/border_artnet_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const TYPES := ["border", "shadow", "edge_strip", "glow"]
 const DEBOUNCE_S := 0.11
@@ -22,6 +26,8 @@ var _status: Label
 var _pending: Dictionary = {}
 var _busy := false
 var _timer: Timer
+var _sync_timer: Timer
+var _last_sync := {}  # screen → last desk runtime (the server's reply carries the stored UI values, not the desk's)
 
 
 func _ready() -> void:
@@ -52,6 +58,50 @@ func _ready() -> void:
 	_timer.wait_time = DEBOUNCE_S
 	_timer.timeout.connect(_flush)
 	add_child(_timer)
+	_sync_timer = Timer.new()
+	_sync_timer.one_shot = true
+	_sync_timer.wait_time = 0.15
+	_sync_timer.timeout.connect(func() -> void:
+		if visible and get_viewport().gui_get_focus_owner() == null:
+			_render())
+	add_child(_sync_timer)
+	Ws.on("global_border_sync", _on_sync)
+	# a project_sync replaces the slots with the stored (UI) values — put the desk's live runtime back on top
+	Store.project_changed.connect(func(_p: Dictionary) -> void: _reapply_syncs())
+
+
+func _reapply_syncs() -> void:
+	var keep := screen_idx
+	var changed := false
+	for i in _last_sync:
+		screen_idx = i
+		var before: Variant = slot()
+		var after: Variant = A.apply_sync(before, _last_sync[i])
+		if after != before:
+			_adopt(after)
+			changed = changed or i == keep
+	screen_idx = keep
+	if changed and visible and _sync_timer.is_stopped():
+		_sync_timer.start()
+
+
+## DMX-driven runtime from the server's Art-Net/sACN receiver → local slot (not autosaved by itself).
+func _on_sync(data: Variant) -> void:
+	if not (data is Dictionary) or not (data.get("border") is Dictionary):
+		return
+	var i := clampi(int(data.get("screenIndex", -1)), -1, 3)
+	if i < 0:
+		return
+	_last_sync[i] = data.border
+	var keep := screen_idx
+	screen_idx = i
+	var before: Variant = slot()
+	var after: Variant = A.apply_sync(before, data.border)
+	if after != before:
+		_adopt(after)
+	screen_idx = keep
+	if after != before and i == screen_idx and _sync_timer.is_stopped():
+		_sync_timer.start()
 
 
 func open(idx: int, label: String) -> void:
@@ -111,7 +161,8 @@ func _flush() -> void:
 	var res: Dictionary = await Api.post_json("/api/scene/global-border", body)
 	_busy = false
 	if res.ok and res.data is Dictionary:
-		_adopt(res.data.get("border"))
+		var b: Variant = res.data.get("border")
+		_adopt(A.apply_sync(b, _last_sync[screen_idx]) if _last_sync.has(screen_idx) and b is Dictionary else b)
 		_status.text = "%d AMCP line%s" % [(res.data.get("lines", []) as Array).size(), "" if (res.data.get("lines", []) as Array).size() == 1 else "s"]
 		if rebuild:
 			_render()
@@ -159,6 +210,10 @@ func _render() -> void:
 	_area(gb)
 	_slices(gb)
 	_presets(gb)
+	var art := ArtnetSection.new()
+	art.edit.connect(func(p: Dictionary) -> void: send(p, true, p.has("artnetListenEnabled")))  # spins keep focus
+	_body.add_child(art)
+	art.build(gb)
 	_body.add_child(_btn("Remove border from this screen", "Clears this screen's global border slot (PGM border stops)", func() -> void:
 		_confirm("Remove the global border configuration from %s?" % screen_label, func() -> void: send({"clear": true}, true, true))))
 

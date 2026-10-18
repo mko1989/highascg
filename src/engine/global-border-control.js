@@ -137,6 +137,21 @@ function applyControlToSlot(stored, req) {
 			})
 		}
 	}
+	// Lighting input (web inspector-global-border-artnet.js): config only — the Art-Net/sACN receiver reads it.
+	const ARTNET_KEYS = ['artnetListenEnabled', 'lightingProtocol', 'artnetPatch', 'artnetChannelMap']
+	if (typeof req.artnetListenEnabled === 'boolean') next.artnetListenEnabled = req.artnetListenEnabled
+	if (req.lightingProtocol === 'artnet' || req.lightingProtocol === 'sacn') next.lightingProtocol = req.lightingProtocol
+	if (req.artnetPatch && typeof req.artnetPatch === 'object') {
+		const int = (v, lo, hi, d) => (Number.isFinite(parseInt(v, 10)) ? Math.max(lo, Math.min(hi, parseInt(v, 10))) : d)
+		const cur = { startChannel: 1, universe: 0, ...(prev.artnetPatch || {}) }
+		next.artnetPatch = { ...cur, startChannel: int(req.artnetPatch.startChannel ?? cur.startChannel, 1, 512, 1), universe: int(req.artnetPatch.universe ?? cur.universe, 0, 32767, 0) }
+	}
+	if (Array.isArray(req.artnetChannelMap)) next.artnetChannelMap = Array.from({ length: 18 }, (_, i) => req.artnetChannelMap[i] !== false)
+	const airKeys = ['enabled', 'type', 'params', 'fadeDuration', 'slices', 'inner', 'mirrorBorderOnPrv', 'preset']
+	if (ARTNET_KEYS.some((k) => req[k] !== undefined) && !airKeys.some((k) => req[k] !== undefined && req[k] !== null && req[k] !== '')) {
+		return { ok: true, next, wasEnabled, nowEnabled: wasEnabled, typeChanged: false, preset: null, noAir: true }
+	}
+
 	if (req.savePreset && typeof req.savePreset === 'object') {
 		const sn = Math.max(1, Math.floor(Number(req.savePreset.slot)) || 1)
 		const src = prev.pgmAirSnapshot && typeof prev.pgmAirSnapshot === 'object' ? prev.pgmAirSnapshot : next

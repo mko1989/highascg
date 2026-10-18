@@ -144,6 +144,7 @@ async function handleGlobalBorderControl(body, ctx) {
 	}
 	const persisted = await persistProject(ctx, updated, { writeAutosave: true, pushVolumes: false })
 	if (!persisted?.unchanged) scheduleProjectSyncBroadcast(ctx, persisted?.project || updated)
+	reconfigureLightingInput(ctx, persisted?.project || updated)
 	if (pgmCh) {
 		try {
 			await syncLiveSceneBorder(pgmCh, next)
@@ -175,7 +176,31 @@ async function clearScreenSlot(ctx, map, project, borders, screenIdx, persistPro
 	const updated = { ...project, savedAt: new Date().toISOString(), scenes: { ...project.scenes, globalBorders: borders } }
 	const persisted = await persistProject(ctx, updated, { writeAutosave: true, pushVolumes: false })
 	if (!persisted?.unchanged) scheduleProjectSyncBroadcast(ctx, persisted?.project || updated)
+	reconfigureLightingInput(ctx, persisted?.project || updated)
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, screen: screenIdx, enabled: false, border: null, lines: sent }) }
 }
 
-module.exports = { handleGlobalBorderControl }
+/** The Art-Net/sACN receiver caches project.scenes — refresh it like the project save/autosave handlers do. */
+function reconfigureLightingInput(ctx, project) {
+	try {
+		if (ctx.artnetReceiver?.reconfigureFromProject) ctx.artnetReceiver.reconfigureFromProject(project)
+		else if (ctx.artnetReceiver?.reconfigure) ctx.artnetReceiver.reconfigure()
+	} catch (e) {
+		if (typeof ctx.log === 'function') ctx.log('warn', `[global-border] lighting input reconfigure: ${e?.message || e}`)
+	}
+}
+
+/** GET /api/scene/global-border/fixture — the lighting-desk fixture file (web bundles client/fixtures/global-border.txt). */
+function handleGlobalBorderFixture() {
+	const fs = require('fs')
+	const path = require('path')
+	const { REPO_ROOT } = require('../repo-paths')
+	try {
+		const text = fs.readFileSync(path.join(REPO_ROOT, 'client', 'fixtures', 'global-border.txt'), 'utf8')
+		return { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: text }
+	} catch {
+		return bad(404, 'fixture file missing')
+	}
+}
+
+module.exports = { handleGlobalBorderControl, handleGlobalBorderFixture, reconfigureLightingInput }

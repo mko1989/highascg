@@ -46,3 +46,24 @@ describe('WO-601 global border slot edits', () => {
 		assert.equal(d.next.enabled, true, 'on/off untouched')
 	})
 })
+
+describe('WO-601 global border lighting input (Art-Net/sACN config)', () => {
+	it('config-only edits: clamped patch, 18-entry map, protocol — no AMCP', () => {
+		const r = applyControlToSlot(on(), { artnetListenEnabled: true, lightingProtocol: 'sacn', artnetPatch: { startChannel: 999, universe: '3' }, artnetChannelMap: [true, false] })
+		assert.equal(r.noAir, true)
+		assert.equal(r.next.artnetListenEnabled, true)
+		assert.equal(r.next.lightingProtocol, 'sacn')
+		assert.deepStrictEqual(r.next.artnetPatch, { startChannel: 512, universe: 3 })
+		assert.equal(r.next.artnetChannelMap.length, 18)
+		assert.deepStrictEqual(r.next.artnetChannelMap.slice(0, 3), [true, false, true])
+		assert.equal(applyControlToSlot(on(), { lightingProtocol: 'dmx' }).next.lightingProtocol, undefined, 'unknown protocol ignored')
+		assert.equal(applyControlToSlot(on(), { artnetListenEnabled: true, enabled: false }).noAir, undefined, 'mixed with an on-air edit → goes on air')
+	})
+	it('the border endpoint refreshes the Art-Net receiver (it caches project.scenes)', () => {
+		const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/api/routes-scene-global-border.js'), 'utf8')
+		assert.equal((src.match(/reconfigureLightingInput\(ctx, persisted\?\.project \|\| updated\)/g) || []).length, 2, 'after both persists')
+		const fx = require('../../src/api/routes-scene-global-border').handleGlobalBorderFixture()
+		assert.equal(fx.status, 200)
+		assert.ok(String(fx.body).length > 50)
+	})
+})

@@ -305,6 +305,32 @@ func _ready() -> void:
 		await step.call("mirror on", {"mirrorBorderOnPrv": true}, true)
 		await step.call("mirror off", {"mirrorBorderOnPrv": false}, true)
 		await step.call("remove", {"clear": true}, true)
+	if Config.args.has("probe-border-artnet"):  # dev: --probe-border-artnet=<main> → enable + listen, watch desk sync, colour rows off, remove (WO-601)
+		if not Ws.is_open:
+			await Ws.connected
+		await get_tree().create_timer(1.0).timeout
+		var lt10: Node = shell.tabs.get_node("Live")
+		lt10.deck.border_requested.emit(int(Config.args["probe-border-artnet"]), "Main")
+		await get_tree().create_timer(0.8).timeout
+		var bpa: Node = lt10.border
+		var show := func(label: String) -> void:
+			var gb: Variant = bpa.slot()
+			print("[client] artnet %s | %s" % [label, "null" if gb == null else "listen=%s on=%s type=%s opacity=%s color=%s width=%s" % [gb.get("artnetListenEnabled"),
+				gb.get("enabled"), gb.get("type"), gb.params.get("opacity"), gb.params.get("color"), gb.params.get("width")]])
+		await bpa.send({"enabled": true, "params": {"color": "#e63946", "width": 4, "opacity": 1}}, true, true)
+		await bpa.send({"artnetListenEnabled": true, "artnetPatch": {"startChannel": 1, "universe": 0}}, true, true)
+		show.call("ready")
+		await get_tree().create_timer(3.0).timeout
+		show.call("desk on")
+		var m: Array = []
+		for i in 18:
+			m.append(i < 3 or i > 5)
+		await bpa.send({"artnetChannelMap": m, "params": {"color": "#e63946"}}, true, true)
+		await get_tree().create_timer(2.5).timeout
+		show.call("colour rows off")
+		print("[client] artnet fixture saved ", await bpa._body.find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("save_fixture_to"))[0].save_fixture_to("user://gb-fixture.txt"))
+		await bpa.send({"clear": true}, true, true)
+		show.call("removed")
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
