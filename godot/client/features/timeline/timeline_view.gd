@@ -3,10 +3,18 @@ extends Control
 ## nice ticks, layer headers, tracks, clips in the layer palette with their label, flags, the duration end and the
 ## red playhead. Vertical wheel zooms around the cursor, Shift/Alt + wheel pans; click/drag on the ruler seeks.
 ## HiDPI comes from Godot's content scale (the web canvas has no devicePixelRatio handling).
+## Slice 2 (timeline-canvas-pointer.js): click selects a clip (empty track deselects), drag moves it — also onto another
+## layer — or resizes it from a 6 px edge zone, both snapping (timeline_edit.gd); a resize scrubs the playhead to the
+## dragged edge. Sources drop onto tracks (below the last layer = a new one); Delete removes the selected clip. The
+## view mutates the shared timeline Dictionary and emits `edited` once per gesture that changed something.
 
 signal seek_requested(ms: float)
+signal clip_selected(li: int, clip_id: String)  # clip_id "" = nothing selected
+signal edited
+signal source_dropped(source: Dictionary, li: int, ms: float)
 
 const TM := preload("res://features/timeline/timeline_math.gd")
+const TE := preload("res://features/timeline/timeline_edit.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var tl: Dictionary = {}
@@ -16,6 +24,10 @@ var scroll_x := 0.0
 var scroll_y := 0.0
 var follow := true
 var _scrubbing := false
+var sel_li := -1
+var sel_id := ""
+var _drag := {}
+var _seek_at := 0
 
 
 func _ready() -> void:
@@ -29,6 +41,8 @@ func set_timeline(t: Dictionary) -> void:
 	tl = t
 	if not tl.is_empty():
 		TM.ensure_heights(tl)
+	if sel_id != "" and (first or TE.find_clip(tl, sel_li, sel_id).is_empty()):
+		select(-1, "")
 	if first:
 		fit()
 	queue_redraw()
@@ -36,7 +50,11 @@ func set_timeline(t: Dictionary) -> void:
 
 func fit() -> void:
 	var dur := float(tl.get("duration", 30000))
-	if dur > 0 and size.x > TM.HEADER_W + 40:
+	if size.x <= TM.HEADER_W + 40:  # not laid out yet (the tab builds before it is shown) — fit on the first resize
+		if not resized.is_connected(fit):
+			resized.connect(fit, CONNECT_ONE_SHOT)
+		return
+	if dur > 0:
 		px_per_ms = maxf(TM.MIN_PX_MS, (size.x - TM.HEADER_W - 20) / dur)
 		scroll_x = 0.0
 	queue_redraw()
@@ -97,10 +115,11 @@ func _draw() -> void:
 	_draw_ruler(font, dur, fps)
 	for f in tl.get("flags", []):
 		if f is Dictionary:
-			var fx := _x(float(f.get("time", 0)))
+			var fx := _x(float(f.get("timeMs", 0)))
 			if fx >= TM.HEADER_W and fx <= size.x:
 				draw_rect(Rect2(fx, 0, 1, size.y), Color(0.95, 0.75, 0.2, 0.6))
-				draw_string(font, Vector2(fx + 3, 10), str(f.get("name", f.get("type", ""))), HORIZONTAL_ALIGNMENT_LEFT, 120, 10, Color("#f0b429"))
+				var fl := str(f.get("label", "")) if str(f.get("label", "")) != "" else str(f.get("type", ""))
+				draw_string(font, Vector2(fx + 3, 10), fl, HORIZONTAL_ALIGNMENT_LEFT, 120, 10, Color("#f0b429"))
 	# playhead
 	var px := roundf(_x(playhead_ms)) + 0.5
 	if px >= TM.HEADER_W:
@@ -142,6 +161,8 @@ func _draw_clip(c: Dictionary, li: int, track_y: float, track_h: int, font: Font
 	var col := Color(TM.CLIP_PALETTE[li % TM.CLIP_PALETTE.size()])
 	var r := Rect2(x, top, w, h)
 	draw_style_box(_box(col), r)
+	if li == sel_li and str(c.get("id", "")) == sel_id:
+		draw_rect(r.grow(-1), Color.WHITE, false, 2.0)
 	var label := str(c.source.get("label", c.source.value)).get_file()
 	var lx := maxf(x, TM.HEADER_W + 1) + 5
 	var avail := minf(x + w, size.x) - lx - 4
@@ -158,6 +179,14 @@ func _box(col: Color) -> StyleBoxFlat:
 
 func _gui_input(event: InputEvent) -> void:
 	if tl.is_empty():
+		return
+	if event is InputEventKey:
+		var k := event as InputEventKey
+		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and sel_id != "":
+			TE.remove_clip(tl, sel_li, sel_id)
+			select(-1, "")
+			edited.emit()
+			accept_event()
 		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
@@ -176,11 +205,120 @@ func _gui_input(event: InputEvent) -> void:
 				_scrubbing = true
 				_seek_to(mb.position.x)
 				accept_event()
+			elif mb.pressed and mb.position.x > TM.HEADER_W:
+				_press_track(mb.position)
+				accept_event()
 			elif not mb.pressed:
 				_scrubbing = false
-	elif event is InputEventMouseMotion and _scrubbing:
-		_seek_to((event as InputEventMouseMotion).position.x)
-		accept_event()
+				_end_drag()
+	elif event is InputEventMouseMotion:
+		var mm := event as InputEventMouseMotion
+		if _scrubbing:
+			_seek_to(mm.position.x)
+			accept_event()
+		elif not _drag.is_empty():
+			_drag_to(mm.position)
+			accept_event()
+		else:
+			_hover(mm.position)
+
+
+func select(li: int, clip_id: String) -> void:
+	if li == sel_li and clip_id == sel_id:
+		return
+	sel_li = li if clip_id != "" else -1
+	sel_id = clip_id
+	queue_redraw()
+	clip_selected.emit(sel_li, sel_id)
+
+
+## The clip under `pos` → [layer index, clip] or [] (web hitClip over layerAt).
+func _clip_at(pos: Vector2) -> Array:
+	var li := TM.layer_at_y(tl, pos.y, scroll_y)
+	if li >= (tl.layers as Array).size():
+		return []
+	var c := TM.hit_clip(tl, li, TM.ms_at(pos.x, px_per_ms, scroll_x))
+	return [] if c.is_empty() else [li, c]
+
+
+func _hover(pos: Vector2) -> void:
+	var hit := _clip_at(pos) if pos.x > TM.HEADER_W and pos.y >= TM.RULER_H else []
+	var edge := TE.edge_zone(hit[1], TM.ms_at(pos.x, px_per_ms, scroll_x), px_per_ms) if not hit.is_empty() else ""
+	mouse_default_cursor_shape = Control.CURSOR_HSIZE if edge != "" else (Control.CURSOR_MOVE if not hit.is_empty() else Control.CURSOR_ARROW)
+
+
+func _press_track(pos: Vector2) -> void:
+	var hit := _clip_at(pos)
+	if hit.is_empty():
+		select(-1, "")
+		return
+	var c: Dictionary = hit[1]
+	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
+	select(hit[0], str(c.id))
+	_drag = {"edge": TE.edge_zone(c, ms, px_per_ms), "li": hit[0], "from_li": hit[0], "id": str(c.id), "orig_ms": ms,
+		"start": float(c.startTime), "dur": float(c.duration), "now": playhead_ms, "inPoint": int(c.get("inPoint", 0) if c.get("inPoint") != null else 0)}
+
+
+func _drag_to(pos: Vector2) -> void:
+	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
+	var c := TE.find_clip(tl, _drag.li, _drag.id)
+	if c.is_empty():
+		return
+	var thr := TE.SNAP_THRESHOLD_PX / px_per_ms
+	var cands := TE.snap_candidates(tl, _drag.now, _drag.li, _drag.id)  # the playhead at press: a resize moves it
+	if _drag.edge == "":
+		var start := TE.snapped_start(float(_drag.start) + ms - float(_drag.orig_ms), float(c.duration), cands, thr, _drag.now)
+		var to_li := TM.layer_at_y(tl, pos.y, scroll_y)
+		if to_li >= 0 and to_li < (tl.layers as Array).size() and to_li != _drag.li:
+			TE.move_clip_to_layer(tl, _drag.id, _drag.li, to_li)
+			_drag["li"] = to_li
+			sel_li = to_li
+			clip_selected.emit(sel_li, sel_id)
+		TE.update_clip(tl, _drag.li, _drag.id, {"startTime": start})
+	else:
+		var ch := TE.resize_changes(_drag.edge, TE.snapped_edge(ms, cands, thr, _drag.now), _drag, float(tl.get("fps", 25)))
+		if not ch.is_empty():
+			TE.update_clip(tl, _drag.li, _drag.id, ch)
+			_scrub_preview(float(c.startTime) if _drag.edge == "left" else float(c.startTime) + float(c.duration))
+	queue_redraw()
+
+
+## onClipResizePreview: the playhead follows the dragged edge; the engine seeks at most every 100 ms.
+func _scrub_preview(ms: float) -> void:
+	playhead_ms = clampf(ms, 0.0, float(tl.get("duration", 0)))
+	var now := Time.get_ticks_msec()
+	if now - _seek_at >= 100:
+		_seek_at = now
+		seek_requested.emit(playhead_ms)
+
+
+func _end_drag() -> void:
+	if _drag.is_empty():
+		return
+	var d := _drag
+	_drag = {}
+	var c := TE.find_clip(tl, d.li, d.id)
+	if c.is_empty():
+		return
+	if _drag_changed(d, c):
+		if d.edge != "":
+			seek_requested.emit(playhead_ms)  # the trailing seek the throttle may have skipped
+		edited.emit()
+
+
+static func _drag_changed(d: Dictionary, c: Dictionary) -> bool:
+	return d.li != d.from_li or float(c.startTime) != float(d.start) or float(c.duration) != float(d.dur) \
+		or int(c.get("inPoint", 0) if c.get("inPoint") != null else 0) != int(d.inPoint)
+
+
+func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+	return not tl.is_empty() and data is Dictionary and str(data.get("value", "")) != "" and data.get("type") != "effect"
+
+
+## Web drop: ms under the cursor (≥ 0), layer clamped to [0, n] — n means "a new layer below".
+func _drop_data(at: Vector2, data: Variant) -> void:
+	var li := clampi(TM.layer_at_y(tl, at.y, scroll_y), 0, (tl.layers as Array).size())
+	source_dropped.emit(data, li, maxf(0.0, TM.ms_at(at.x, px_per_ms, scroll_x)))
 
 
 func _seek_to(x: float) -> void:
