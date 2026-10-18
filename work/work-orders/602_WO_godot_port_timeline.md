@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) and slice 7 (full transport bar + the timeline keyboard: copy / paste, Space, arrows, Enter) DONE, box-verified; slice 8 (Dest screen select, PRV availability, Take with transition, effect drops) open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) slice 7 (full transport bar + the timeline keyboard: copy / paste, Space, arrows, Enter) and slice 8 (Dest row: screen select, PRV only with a preview bus, PRV / PGM posted at once, engine routing adopted, Take with a transition) DONE, box-verified; effect drops (slice 9) open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -181,6 +181,34 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
 - Web quirks: Space, Shift+arrows and Ctrl+C / V fire even while typing in a text field. Space types nothing,
   Shift+arrow can't extend a selection, and Ctrl+C copies the clip instead of the text.
 
+### Slice 8 findings (2026-10-18) — Dest and Take
+
+- Gap found: the Godot PRV / PGM boxes (slice 1) only saved `tl.sendTo`. The routing reached the engine on the
+  next Play. The web posts every change at once (`updateSendTo`, `timeline-transport.js:68-75`:
+  coerce → `setSendTo` → `POST …/sendto`). The engine re-routes only the timeline on air
+  (`timeline-playback-runtime.js:253`), so ticking PGM on a playing timeline puts it on program at once in the
+  web and did nothing in Godot.
+- Dest list (`:177-187`): with 2+ screens, "All screens" (`screenIdx: null`) comes first. Each screen is labelled
+  `virtualMainChannels[i].name`, else `screenLabel` (custom label, else `S1`…). The Godot Live deck labels
+  `Main 1`; the timeline keeps the web's `S1`.
+- PRV is offered only when the destination has a preview bus (`previewBusAvailableForSendTo`; all screens means any
+  of them). `coerceTimelineSendTo` then drops PRV and never switches PGM on (todos06.08).
+- Adoption: `timeline.playback` carries `sendTo` and the web saves it on that timeline (`timeline-editor.js:399`).
+  `syncPlaybackFromServer` adopts `/state`'s routing only while it is playing (`:192`). The engine's Stop resets a
+  PGM timeline to PRV-only and broadcasts it (`timeline-playback-runtime.js:189-196`). Reaching the end
+  naturally does not reset it (seen on the box).
+- Picker switch and ＋ new timeline post the routing too (`:256-277`).
+- Take (`:337-362`):
+  - push the timeline;
+  - `POST …/take {transition, duration: resolveTransitionDuration(frames, projectFps), tween, screenIdx}`;
+  - save PGM on / PRV off and post it.
+
+  The transition is per session (`view.takeTransition`). It starts at `getDefaultTransitionFromEditor`
+  (`editor-defaults.js:29`): MIX / auto / linear under settings `editorDefaults.transition`, the duration
+  resolved at screen 1's rate. The frames field clamps to 0–120, and 12 still means auto. All types are offered
+  (not the PGM-only list); the server normalises.
+- `projectFps`: the timeline's fps, else `programResolutions[0].fps`, else 50.
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -339,6 +367,25 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   (the paste target; reset on a timeline switch).
 - `timeline_tab.gd`: wires the transport and keys. `root()`, `refresh()`, `commit()`, `kf_commit()`,
   `clip_rect()` and `clip_canvas()` are its public surface for them.
+
+### Slice 8 (2026-10-18) — Dest and Take
+
+- `timeline_send_to.gd` (new, pure): normalize (JS `!!program`, only a literal `false` turns PRV off), prv_available,
+  coerce, default_for, screen_options, project_fps, take_default, take_body.
+- `timeline_dest.gd` (new): the second row. The first row was full (it ends about 40 px short of the Inspector
+  at 1920). It holds Dest, PRV (hidden without a preview bus), PGM, the Take group and the status text (moved from
+  row 1). Each change is saved and posted (`update_send_to`). `adopt()` saves the engine's routing on its
+  timeline, and refreshes when it is the active one.
+  - A channelMap change re-coerces and re-posts. It reacts only to a real change of the map, so a state resync
+    (`*`) with the same map posts nothing. This is narrower than the web, which re-posts on every channelMap
+    event.
+  - The take transition is per session. Unlike the web, it does not reset when the editor defaults or the
+    screen change.
+- `transition_row.gd` (Live's picker, reused): `max_frames` (120 for the timeline Take).
+- `timeline_transport.gd`: PRV / PGM and the status label moved out. Play takes `dest.send_to()`.
+  `timeline.playback` and a playing `/state` adopt `sendTo`. The picker switch and ＋ (after the timeline is
+  pushed) post the routing.
+- `timeline_tab.gd`: `dest` under the transport.
 
 ## What was VERIFIED
 
@@ -530,3 +577,41 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
   - The |◀ / ▶| glyphs.
   - Keys never fire from text fields (deviation from the web).
   - The rename dialog in place of `prompt()`.
+
+### Slice 8 verification (2026-10-18)
+
+- Godot tests 895/0. New `test_timeline_send_to.gd`:
+  - normalize: `!!program`, `"all"`, string index, PRV off only on `false`;
+  - PRV availability: per screen, all screens, `previewEnabledByMain: false`;
+  - coerce leaves PGM off;
+  - the Dest list with "All screens", a label and a virtual-main name;
+  - projectFps fallbacks;
+  - take default (auto at 50 fps gives 25);
+  - take body (clamp to 120, 12 = auto, empty fields fall back to MIX / linear).
+
+  `--check` boot clean. 0 files over 500 lines (transport 352, dest 175).
+- On the box (one screen: PGM ch 1, PRV ch 2, label "Main LED (DP-7)"), with the GUI on DP-3, test timeline
+  `tmve1ppeug1t`, reading `GET …/state`:
+  - The row showed Dest "Main LED (DP-7)", PRV on, PGM off, and MIX · 25 fr · linear (auto at 50 fps).
+  - Ticking PGM gave engine `{preview: true, program: true}` at once. The timeline's `sendTo` was saved the same.
+  - Unticking PRV gave `{preview: false, program: true}`.
+  - Take with 10 fr and easein put the engine on `{preview: false, program: true}` and playing from 20017. Caspar's
+    log shows `MIXER 1-211 … 1-215 OPACITY 1 10 easeinquad DEFER`, the take fade on program channel 1 (layer 210
+    has opacity keyframes and runs its own fade, as the server intends). The row then showed PRV off and PGM on.
+  - While playing, an outside `POST …/sendto {preview: true, program: true}` → the row showed both ticked
+    (`timeline.playback` adopted).
+  - With the GUI closed and the timeline playing, the routing was changed to PGM-only, then the GUI restarted. The
+    row showed PRV off and PGM on, and ❚❚ at 16:01. The project was re-saved at 23:28:33 with that routing
+    (`/state` adopted). The save before had both on.
+  - Stop: the engine reset itself to PRV-only and the row followed (the playback broadcast). A first try "lost"
+    two clicks; they had toggled this already-reset state. That was the test's assumption, not a bug.
+  - Restored afterwards: `{preview: true, program: false, screenIdx: 0}`, stopped at 0.
+- Not tested on the box, because this box has one screen and a preview bus:
+  - "All screens";
+  - PRV hidden on a PGM-only screen;
+  - the channelMap re-post.
+
+  These are covered by the pure tests only. The picker-switch and ＋ posts were not exercised either.
+- Owner QA open:
+  - the second row's layout;
+  - the take transition not resetting with the editor defaults.

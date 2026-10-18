@@ -1,7 +1,7 @@
 extends HBoxContainer
 ## WO-602 — the timeline transport bar (web timeline-transport.js), split out of timeline_tab.gd in slice 7: timeline
 ## picker / rename / new, ⏮ ■ ▶ ⏭ and Loop, the current-time and duration fields (SMPTE, ++500 / --500), Trim, Flag,
-## zoom − Fit +, Follow, PRV / PGM, and the playback state per timeline: `timeline.tick` extrapolated with the web's
+## zoom − Fit +, Follow (Dest / PRV / PGM / Take: timeline_dest.gd, the row below), and the playback state per timeline: `timeline.tick` extrapolated with the web's
 ## 80 / 35 ms rules, `timeline.playback` for play / loop state, and the engine's /state read on a timeline switch
 ## (web syncPlaybackFromServer). Timelines are pushed to the engine before transport (PUT, POST when missing).
 
@@ -19,9 +19,6 @@ var _play: Button
 var _loop: Button
 var _cur: LineEdit
 var _tot: LineEdit
-var _status: Label
-var _prv: CheckBox
-var _pgm: CheckBox
 var _ids: Array = []
 var _pb := {}  # timelineId → {playing, loop, clock {pos, at}}
 var _state_for := ""  # the timeline whose engine state was last read
@@ -35,7 +32,8 @@ func _ready() -> void:
 		if i >= 0 and i < _ids.size():
 			tab.root()["activeId"] = _ids[i]
 			ProjectSync.mark_dirty()
-			tab.refresh())
+			tab.refresh()
+			tab.dest.update_send_to())  # web: the next timeline's routing is posted on a switch
 	add_child(_pick)
 	add_child(_btn("✎", "Rename timeline", _rename))
 	add_child(_btn("＋", "New timeline", _new_timeline))
@@ -68,22 +66,11 @@ func _ready() -> void:
 	fol.button_pressed = true
 	fol.toggled.connect(func(on: bool) -> void: tab.view.follow = on)
 	add_child(fol)
-	add_child(VSeparator.new())
-	_prv = _check("PRV", "Play to the preview bus")
-	_pgm = _check("PGM", "Play to program")
-	add_child(_prv)
-	add_child(_pgm)
-	_status = Label.new()
-	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_status.clip_text = true
-	add_child(_status)
 	Ws.on("timeline.tick", _on_tick)
 	Ws.on("timeline.playback", _on_playback)
 
 
-## The picker, PRV / PGM from the timeline's sendTo, the fields; reads the engine state on a timeline switch.
+## The picker, the Dest row, the fields; reads the engine state on a timeline switch.
 func refresh() -> void:
 	var tl: Dictionary = tab.active()
 	_ids.clear()
@@ -94,9 +81,7 @@ func refresh() -> void:
 			_pick.add_item(_label(t))
 	_pick.select(_ids.find(str(tl.get("id", ""))))
 	_pick.disabled = _ids.is_empty()
-	var st: Dictionary = tl.get("sendTo", {}) if tl.get("sendTo") is Dictionary else {}
-	_prv.set_pressed_no_signal(st.get("preview", true) != false)
-	_pgm.set_pressed_no_signal(st.get("program", false) == true)
+	tab.dest.refresh()
 	status("" if not tl.is_empty() else "No timeline in this project — ＋ creates one.")
 	sync()
 	if not tl.is_empty() and str(tl.id) != _state_for:
@@ -112,8 +97,7 @@ func refresh_picker() -> void:
 
 
 func status(text: String) -> void:
-	_status.text = text
-	_status.tooltip_text = text
+	tab.dest.status(text)
 
 
 ## Play / loop state and the time fields (a focused field is left alone while the operator types).
@@ -181,6 +165,8 @@ func _on_playback(pb: Variant) -> void:
 	if not (pb is Dictionary) or str(pb.get("timelineId", "")) == "":
 		return
 	pb_last = str(pb.timelineId)
+	if pb.get("sendTo") is Dictionary:
+		tab.dest.adopt(pb_last, pb.sendTo)
 	_adopt(pb, false)
 
 
@@ -202,6 +188,8 @@ func _adopt(pb: Dictionary, seek_view: bool) -> void:
 func _read_state(tl: Dictionary) -> void:
 	var r: Dictionary = await Api.get_json("/api/timelines/%s/state" % str(tl.id).uri_encode())
 	if r.ok and r.data is Dictionary and str(r.data.get("timelineId", "")) == str(tl.id):
+		if r.data.get("playing") == true and r.data.get("sendTo") is Dictionary:  # playing: the engine's routing wins
+			tab.dest.adopt(str(tl.id), r.data.sendTo)
 		_adopt(r.data, true)
 	elif not r.ok:
 		await sync_to_server(tl)
@@ -212,12 +200,6 @@ func sync_to_server(tl: Dictionary) -> bool:
 	if not r.ok:
 		r = await Api.post_json("/api/timelines", tl)
 	return r.ok
-
-
-func _send_to() -> Dictionary:
-	var tl: Dictionary = tab.active()
-	var st: Dictionary = tl.get("sendTo", {}) if tl.get("sendTo") is Dictionary else {}
-	return {"preview": _prv.button_pressed, "program": _pgm.button_pressed, "screenIdx": int(st.get("screenIdx", 0))}
 
 
 func toggle_play() -> void:
@@ -233,7 +215,7 @@ func toggle_play() -> void:
 		await Api.post_json("/api/timelines/%s/pause" % id.uri_encode(), {})
 		return
 	var from := maxf(0.0, roundf(tab.view.playhead_ms))
-	tl["sendTo"] = _send_to()
+	tl["sendTo"] = tab.dest.send_to()
 	if not await sync_to_server(tl):
 		status("Timeline sync to the server failed")
 		return
@@ -342,6 +324,7 @@ func _new_timeline() -> void:
 	ProjectSync.mark_dirty()
 	tab.refresh()
 	await sync_to_server(tl)
+	tab.dest.update_send_to()  # web defaultTimelineSendTo: PRV-only, coerced for PGM-only screens
 
 
 func _tc_field(tip: String, commit: Callable) -> LineEdit:
@@ -367,15 +350,3 @@ func _btn(text: String, tip: String, cb: Callable) -> Button:
 		cb.call())
 	return b
 
-
-func _check(text: String, tip: String) -> CheckBox:
-	var c := CheckBox.new()
-	c.text = text
-	c.tooltip_text = tip
-	c.focus_mode = Control.FOCUS_NONE
-	c.toggled.connect(func(_on: bool) -> void:
-		var tl: Dictionary = tab.active()
-		if not tl.is_empty():
-			tl["sendTo"] = _send_to()
-			ProjectSync.mark_dirty())
-	return c

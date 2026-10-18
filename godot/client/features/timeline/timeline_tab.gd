@@ -11,11 +11,13 @@ extends VBoxContainer
 ## the Inspector. Slice 6: layers — header select / drag-reorder / divider resize (Shift: all), double-click adds one,
 ## right-click menu, the layer page in the Inspector (rename, add below, remove). Slice 7: the transport bar moved to
 ## timeline_transport.gd (and gained rename, to start / end, loop, the time + duration fields, trim, zoom); the
-## keyboard (timeline_keys.gd): copy / paste, Space, arrows, Enter.
+## keyboard (timeline_keys.gd): copy / paste, Space, arrows, Enter. Slice 8: the Dest row (timeline_dest.gd): screen,
+## PRV / PGM posted at once, Take with a transition.
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
 const TimelineTransport := preload("res://features/timeline/timeline_transport.gd")
+const TimelineDest := preload("res://features/timeline/timeline_dest.gd")
 const TimelineKeys := preload("res://features/timeline/timeline_keys.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
 const ClipInspector := preload("res://features/timeline/timeline_clip_inspector.gd")
@@ -27,6 +29,7 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var view: TimelineView
 var transport: TimelineTransport
+var dest: TimelineDest
 var _keys := TimelineKeys.new()
 var _page: ClipInspector
 var _throttle: Timer
@@ -40,9 +43,12 @@ func _ready() -> void:
 	add_theme_constant_override("separation", 6)
 	transport = TimelineTransport.new()
 	transport.tab = self
+	dest = TimelineDest.new()
+	dest.tab = self
 	transport.edited.connect(_layers_commit)
 	transport.flag_requested.connect(_add_flag)
 	add_child(transport)
+	add_child(dest)
 	_keys.tab = self
 	view = TimelineView.new()
 	view.size_flags_vertical = Control.SIZE_EXPAND_FILL

@@ -7,6 +7,7 @@ signal changed(t: Dictionary)
 const T := preload("res://features/live/transitions.gd")
 
 var pgm_only := false
+var max_frames := 600  # the timeline Take clamps to 120 (web #tl-take-dur)
 var _type: OptionButton
 var _dur: SpinBox
 var _tween: OptionButton
@@ -38,7 +39,7 @@ func _build() -> void:
 	add_child(_type)
 	_dur = SpinBox.new()
 	_dur.min_value = 0
-	_dur.max_value = 600
+	_dur.max_value = max_frames
 	_dur.step = 1
 	_dur.suffix = "fr"
 	_dur.tooltip_text = "Duration in frames (12 = auto: half the project fps)"
