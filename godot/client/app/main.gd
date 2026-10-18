@@ -48,6 +48,16 @@ func _ready() -> void:
 		if not Ws.is_open:
 			await Ws.connected
 		shell.tabs.get_node("Live").editor.open(str(Config.args["probe-edit"]), 0)
+		if Config.args.has("probe-inspect"):  # dev: --probe-inspect=<layer index> → fit canvas, mute, fader 50 % (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed2: Node = shell.tabs.get_node("Live").editor
+			ed2._select(int(Config.args["probe-inspect"]))
+			await get_tree().create_timer(0.8).timeout
+			var ins: Node = ed2._inspector
+			await ins._on_fit(1)
+			(ins._w.mute as CheckBox).button_pressed = true
+			(ins._w.vol as HSlider).value = 50
+			print("[client] inspected layer ", ed2._sel)
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor

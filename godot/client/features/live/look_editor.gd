@@ -9,6 +9,7 @@ const C := preload("res://features/live/compose_math.gd")
 const Pusher := preload("res://features/live/preview_pusher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const E := preload("res://features/live/look_edits.gd")
+const LayerInspector := preload("res://features/live/layer_inspector.gd")
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -24,6 +25,7 @@ var _sel := -1            # selected layer index
 var _drag := {}
 var _role := ""
 var _status: Label
+var _inspector: LayerInspector
 var _crop_mode := false
 var _crop_btn: Button
 const CROP_COLOR := Color("#e3b341")
@@ -100,6 +102,10 @@ func _ready() -> void:
 		g.add_child(sb)
 		_fields[key] = sb
 	add_child(g)
+	_inspector = LayerInspector.new()
+	_inspector.visible = false
+	_inspector.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
+	add_child(_inspector)
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_status)
@@ -296,6 +302,8 @@ func _select(i: int) -> void:
 func _sync_fields() -> void:
 	var layers := _layers()
 	var has := _sel >= 0 and _sel < layers.size()
+	if _inspector != null and _drag.is_empty():
+		_inspector.show_layer(scene_id, main, layers[_sel] if has else {})
 	for k in _fields:
 		(_fields[k] as SpinBox).editable = has
 	if not has:
