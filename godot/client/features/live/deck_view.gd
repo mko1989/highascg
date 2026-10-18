@@ -9,6 +9,8 @@ const T := preload("res://features/live/transitions.gd")
 const E := preload("res://features/live/look_edits.gd")
 const TimerView := preload("res://features/live/pgm_timer_view.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
+const LookThumb := preload("res://features/live/look_thumb.gd")
+const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
@@ -62,6 +64,7 @@ func rebuild() -> void:
 func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictionary) -> Control:
 	var col := VBoxContainer.new()
 	col.custom_minimum_size.x = 240
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override("separation", 8)
 	var head_row := HBoxContainer.new()
 	var head := Label.new()
@@ -94,8 +97,12 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)
 	col.add_child(timer)
+	var grid := HFlowContainer.new()  # web .scenes-deck: auto-fill grid of thumbnail cards, 12 px gap
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 12)
+	col.add_child(grid)
 	for s in looks:
-		col.add_child(_card(s, bus))
+		grid.add_child(_card(s, bus))
 	return col
 
 
@@ -111,15 +118,21 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	elif str(scene.get("mainScope", "")) == "all":
 		border = ThemeBuilder.ACCENT
 	var card := PanelContainer.new()
+	card.custom_minimum_size.x = CARD_W
 	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, border, 3 if (on_pgm or on_prv) else 1))
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Click: stage on PRV · Double-click: TAKE to PGM · Right-click: rename / transition"
 	card.gui_input.connect(_on_card_input.bind(id, _main_for_card))
 	var v := VBoxContainer.new()
 	card.add_child(v)
+	var thumb := LookThumb.new()  # WO-608 R5: looks show as thumbnails
+	thumb.setup(scene, _res(_main_for_card), _cm())
+	v.add_child(thumb)
 	var name_l := Label.new()
 	name_l.text = str(scene.get("name", "(unnamed)"))
-	name_l.add_theme_font_size_override("font_size", 17)
+	name_l.add_theme_font_size_override("font_size", 15)
+	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	name_l.custom_minimum_size.x = 1  # let a long name ellipsize instead of widening the card
 	v.add_child(name_l)
 	var meta := Label.new()
 	var layers: Array = scene.get("layers", [])
@@ -133,6 +146,9 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 		tags.append("PRV")
 	meta.text = " · ".join(tags)
 	meta.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	meta.add_theme_font_size_override("font_size", 12)
+	meta.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	meta.custom_minimum_size.x = 1
 	v.add_child(meta)
 	return card
 
@@ -289,6 +305,13 @@ func _scenes_root() -> Dictionary:
 
 func _cm() -> Dictionary:
 	return Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+
+
+func _res(main: int) -> Vector2:
+	var res_list: Variant = _cm().get("programResolutions", [])
+	if res_list is Array and main < (res_list as Array).size() and res_list[main] is Dictionary:
+		return Vector2(float(res_list[main].get("w", 1920)), float(res_list[main].get("h", 1080)))
+	return Vector2(1920, 1080)
 
 
 func _fps(main: int) -> float:

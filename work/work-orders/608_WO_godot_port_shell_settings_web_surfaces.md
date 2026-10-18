@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — R1–R4 shell layout DONE (box-verified 18.10, below); R5 look thumbnails, settings/logs/modals open. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
+**Status: IN PROGRESS (2026-10-18) — owner layout rules R1–R5 DONE (box-verified 18.10, below); settings/logs/modals open. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
 
@@ -115,5 +115,26 @@ look… → editor in the workspace; select L10 → geometry + layer style / siz
 the Inspector; Close → "Select an item". Owner-QA: overall look against the web; R3 not audited for per-control
 font overrides yet (none known).
 
-Open: R5 look thumbnails; Inspector modes (Layer presets / Look presets) and the bottom Playlists / Timers /
+### 18.10 — R5 look thumbnails
+
+Done:
+- `features/live/look_thumb_math.gd` (new, pure) — web `resolveSourceThumbnailUrl(deckIdleMode)`: media/file →
+  `/api/thumbnail/<id>?hq=1&w=960&t=0`; DeckLink input routes (routeType or channelMap decklink channels) →
+  `/api/thumbnail/live/<ch>`; buses / templates / NDI → none (WO-63). Placement = web `drawSceneComposeStack`
+  deck mode: FILL rect, clip to the crop window, contentZoom, stretch (shader / `stretch` / unlocked aspect) | cover
+  (`horizontal` / `vertical`) | contain (native / fill-canvas), all as one dst + src-region pair.
+- `features/live/look_thumb.gd` (new) — the card canvas at the screen's aspect (`programResolutions[main]`), layers
+  bottom → top with opacity and rotation; one fetch per URL shared by all cards (the deck rebuilds cards on every
+  change); sources without a static thumbnail get a dim box with their name / "Loading…" / "No preview".
+- `deck_view.gd` — cards (200 px) in an HFlowContainer grid with a 12 px gap (web `.scenes-deck` auto-fill grid),
+  thumbnail on top, name + meta under it (ellipsized).
+
+Verified (box, 18.10): `--test` 688 passed / 0 failed (+23 `test_look_thumb_math.gd`, incl. the box's "Background"
+L11 off-canvas layer); `--check` boot OK. DP-3 screenshot: three cards in one row with thumbnails; "Background"
+shows the same cropped framing as the live PRV tile on the operator channel. Click Waves → PRV border moves to
+Waves; click Background → back (thumbnail doesn't eat the click). Not covered: template/CG thumbnails (web uses a
+cached render — label for now), the web's on-air snapshot mode (`isSnapshotComposePreview`), card reorder drag and
+the "＋" new-look tile.
+
+Open: Inspector modes (Layer presets / Look presets) and the bottom Playlists / Timers /
 Program audio strip; settings / logs / project modals (plan steps 2–4).
