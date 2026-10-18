@@ -3,11 +3,13 @@ extends VBoxContainer
 ## filter, drag into the look editor. Drag payload = the web's {type, value, label} (operator-compose-tiles.js).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const MediaInspector := preload("res://features/live/media_inspector.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
 var _tree: Tree
 var _rows: Array = []
+var inspector: MediaInspector
 
 
 func _ready() -> void:
@@ -33,6 +35,14 @@ func _ready() -> void:
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, Callable(), Callable())
 	add_child(_tree)
+	inspector = MediaInspector.new()
+	add_child(inspector)
+	inspector.library_changed.connect(load_media)
+	_tree.item_selected.connect(func() -> void:
+		var it := _tree.get_selected()
+		var meta: Variant = it.get_metadata(0) if it != null else null
+		if meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
+			inspector.show_media(meta.row))
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
 	load_media()
@@ -69,7 +79,7 @@ func _build() -> void:
 		var it := _tree.create_item(parent)
 		it.set_text(0, parts[parts.size() - 1])
 		it.set_tooltip_text(0, "%s · %s" % [id, r.get("type", "")])
-		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id})
+		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
 
 
 func _drag_data(at: Vector2) -> Variant:
@@ -79,4 +89,6 @@ func _drag_data(at: Vector2) -> Variant:
 	var l := Label.new()
 	l.text = "＋ " + it.get_text(0)
 	set_drag_preview(l)
-	return it.get_metadata(0)
+	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
+	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
+	return data

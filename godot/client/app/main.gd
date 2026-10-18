@@ -62,6 +62,19 @@ func _ready() -> void:
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor
 			print("[client] add layer ", await ed.add_layer_from_source({"type": "media", "value": str(Config.args["probe-add-media"])}))
+	if Config.args.has("probe-media"):  # dev: --probe-media=<local media id> → inspector sets in 1.5 s, out 0:40, mute (WO-601)
+		await get_tree().create_timer(2.5).timeout
+		var ins2: Node = shell.tabs.get_node("Live").find_children("*", "VBoxContainer", true, false).filter(func(n: Node) -> bool: return n.has_method("show_media"))[0]
+		await ins2.show_media({"id": str(Config.args["probe-media"]), "type": "MOVIE", "fps": 50, "durationMs": 60000})
+		ins2._in.text = "1.5"
+		ins2._in.text_submitted.emit("1.5")
+		await get_tree().create_timer(0.6).timeout
+		ins2._out.text = "0:40"
+		ins2._out.text_submitted.emit("0:40")
+		await get_tree().create_timer(0.6).timeout
+		ins2._mute.button_pressed = true
+		await get_tree().create_timer(0.6).timeout
+		print("[client] media defaults ", ins2._defaults, " usage ", ins2._usage.size())
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
