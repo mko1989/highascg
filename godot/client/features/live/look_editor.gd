@@ -303,7 +303,7 @@ func _sync_fields() -> void:
 	var layers := _layers()
 	var has := _sel >= 0 and _sel < layers.size()
 	if _inspector != null and _drag.is_empty():
-		_inspector.show_layer(scene_id, main, layers[_sel] if has else {})
+		_inspector.show_layer(scene_id, main, layers[_sel] if has else {}, _sel)
 	for k in _fields:
 		(_fields[k] as SpinBox).editable = has
 	if not has:

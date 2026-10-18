@@ -143,6 +143,32 @@ func _ready() -> void:
 			ed5._remove_layer()
 			await get_tree().create_timer(1.5).timeout
 			print("[client] cg done, layers ", ed5._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
+		if Config.args.has("probe-countdown"):  # dev: --probe-countdown → add, 1 min, Start/Pause/Reset, re-take PRV, remove layer + timer (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed6: Node = shell.tabs.get_node("Live").editor
+			var cds: Node = ed6._inspector._cd
+			await ed6.add_layer_from_source({"type": "template", "value": "countdown/countdown", "label": "Countdown"})
+			await get_tree().create_timer(2.5).timeout
+			print("[client] cd timer ", cds._timer_id, " bound ", ed6._layers()[ed6._sel].source.get("countdownTimerId"))
+			(cds._w.m as SpinBox).value = 1
+			(cds._w.h as SpinBox).value = 0
+			await get_tree().create_timer(1.2).timeout
+			print("[client] cd durationSec ", ed6._layers()[ed6._sel].get("cgData", {}).get("durationSec"))
+			for b in ["▶ Start", "⏸ Pause", "⟲ Reset"]:
+				(cds.find_children("*", "Button", true, false).filter(func(x: Button) -> bool: return x.text == b)[0] as Button).pressed.emit()
+				await get_tree().create_timer(1.0).timeout
+				print("[client] cd ", b, " | ", cds._status.text)
+			await shell.tabs.get_node("Live").deck.request_take(ed6.scene_id, 0, "preview")
+			await get_tree().create_timer(2.0).timeout
+			var tid: String = cds._timer_id
+			ed6._remove_layer()
+			var tl: Array = (Store.project.scenes as Dictionary).get("timers", [])
+			for i in range(tl.size() - 1, -1, -1):
+				if str(tl[i].get("id", "")) == tid:
+					tl.remove_at(i)
+			ProjectSync.mark_dirty()
+			await get_tree().create_timer(4.0).timeout
+			print("[client] cd done, layers ", ed6._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)), " timers ", tl.size())
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor

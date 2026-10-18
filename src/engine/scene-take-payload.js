@@ -84,7 +84,11 @@ function buildLayerRow(l, h) {
 	if (Array.isArray(l.effects) && l.effects.length > 0) row.effects = clone(l.effects)
 	const pipOverlays = h.pip.getPipOverlaysFromLayer(l)
 	if (pipOverlays.length > 0) row.pipOverlays = clone(pipOverlays)
-	if (ltCfg || h.lt.resolveLayerLowerThirdCgData(l)) {
+	/* WO-601: countdown layers keep their own flat cgData (= countdownConfig). The LT branch below accepts ANY
+	 * object cgData (resolveLayerLowerThirdCgData) and replaced it with lower-third defaults on every take. */
+	if (String(l.source?.value || '').toLowerCase().replace(/\\/g, '/').includes('countdown/countdown')) {
+		if (l.cgData && typeof l.cgData === 'object') row.cgData = clone(l.cgData)
+	} else if (ltCfg || h.lt.resolveLayerLowerThirdCgData(l)) {
 		row.cgData = h.lt.buildLowerThirdCasparCgData(ltCfg || l.source?.lowerThirdConfig || {})
 	} else if (l.templateData && typeof l.templateData === 'object') {
 		row.templateData = clone(l.templateData)

@@ -42,6 +42,10 @@ async function handlePost(path, body, ctx) {
 		// WO-601: Godot lower-third inspector actions (resolve / update / play / clear), web lower-third-cg-data.js.
 		return require('./routes-scene-lower-third').handleSceneLowerThird(body, ctx)
 	}
+	if (path === '/api/scene/countdown') {
+		// WO-601: Godot countdown inspector actions (set / start / pause / reset) with edit-bus routing.
+		return require('./routes-scene-countdown').handleSceneCountdown(body, ctx)
+	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null
 		return handleAudioOnlyLookStop(body, ctx)

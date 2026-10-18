@@ -328,7 +328,11 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 		if (pipOverlays.length > 0) {
 			row.pipOverlays = JSON.parse(JSON.stringify(pipOverlays))
 		}
-		if (ltCfg || resolveLayerLowerThirdCgData(l)) {
+		/* WO-601: countdown layers keep their own flat cgData (= countdownConfig). The LT branch below accepts ANY
+		 * object cgData (resolveLayerLowerThirdCgData) and replaced it with lower-third defaults on every take. */
+		if (String(l.source?.value || '').toLowerCase().replace(/\\/g, '/').includes('countdown/countdown')) {
+			if (l.cgData && typeof l.cgData === 'object') row.cgData = JSON.parse(JSON.stringify(l.cgData))
+		} else if (ltCfg || resolveLayerLowerThirdCgData(l)) {
 			row.cgData = buildLowerThirdCasparCgData(ltCfg || l.source?.lowerThirdConfig || {})
 		} else if (l.templateData && typeof l.templateData === 'object') {
 			row.templateData = JSON.parse(JSON.stringify(l.templateData))
