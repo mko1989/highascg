@@ -52,3 +52,13 @@ stream/record/vcam/audio outputs · Caspar server/hot backup/mapping nodes · sn
 ## What was done / What was VERIFIED
 
 Nothing yet. Orphan-file claim verified by hand.
+
+## Scope moved in from WO-601 (2026-10-18)
+The inspector's "live sources + host channels" sub-feature belongs here, not in a Sources-tab inspector (owner rule
+2026-07-26: per-input controls live in the device-view **host-channel inspector**,
+`client/components/device-view-destinations-inspector-host-channel.js`, mounted per role). Web files to port with the
+host-channel inspector: `inspector-browser-display.js` (URL/size/fps, operator-monitor interact, remove),
+`inspector-webpage-host.js` (URL or template, reload — hard-coded `http://127.0.0.1:4200/template/` → client server
+origin), `inspector-ndi-host.js` (`GET /api/ndi/list`), `inspector-decklink-host.js`, `inspector-v4l2-input.js`,
+`inspector-live-audio-input.js` (device, shader-FFT source single-select, refresh, start/stop, remove),
+`inspector-source-label.js` (`POST /api/sources/label`). Endpoints: see WO-601 inventory "Live sources and host channels".
