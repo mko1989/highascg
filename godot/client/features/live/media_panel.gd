@@ -4,6 +4,7 @@ extends VBoxContainer
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -35,21 +36,14 @@ func _ready() -> void:
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, Callable(), Callable())
 	add_child(_tree)
-	inspector = MediaInspector.new()
-	inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var scroll := ScrollContainer.new()  # the inspector (preview + library) shares the column with the tree, never squeezes it
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.size_flags_stretch_ratio = 1.6
-	scroll.add_child(inspector)
-	add_child(scroll)
-	inspector.visibility_changed.connect(func() -> void: scroll.visible = inspector.visible)
-	scroll.visible = false
+	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
 	inspector.library_changed.connect(load_media)
+	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
 	_tree.item_selected.connect(func() -> void:
 		var it := _tree.get_selected()
 		var meta: Variant = it.get_metadata(0) if it != null else null
 		if meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
+			InspectorPanel.current.present(inspector)
 			inspector.show_media(meta.row))
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
@@ -100,3 +94,8 @@ func _drag_data(at: Vector2) -> Variant:
 	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
 	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
 	return data
+
+
+func _exit_tree() -> void:
+	if inspector != null and not inspector.is_inside_tree():  # never selected → never adopted by the Inspector
+		inspector.free()

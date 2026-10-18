@@ -218,7 +218,10 @@ func _card_menu(scene_id: String, main: int) -> void:
 	pm.id_pressed.connect(_on_card_menu.bind(scene_id, main))
 	pm.popup_hide.connect(pm.queue_free)
 	add_child(pm)
-	pm.popup(Rect2i(Vector2i(get_global_mouse_position()) + get_window().position, Vector2i.ZERO))
+	var at := Vector2i(get_viewport().get_mouse_position())
+	if not get_viewport().gui_embed_subwindows:  # embedded popups are placed in window coordinates (adding the window position pushed it off DP-3's right edge)
+		at += get_window().position
+	pm.popup(Rect2i(at, Vector2i.ZERO))
 
 
 func _on_card_menu(id: int, scene_id: String, main: int) -> void:

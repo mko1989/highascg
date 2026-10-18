@@ -55,7 +55,6 @@ func _ready() -> void:
 		if not is_visible_in_tree():
 			stop_preview())
 	visible = false
-	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
 
 
 ## Start previewing `row` (a MOVIE from /api/media); anything else just stops the preview.

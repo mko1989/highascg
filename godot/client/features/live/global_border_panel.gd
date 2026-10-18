@@ -43,13 +43,9 @@ func _ready() -> void:
 		closed.emit())
 	head.add_child(x)
 	add_child(head)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	_body = VBoxContainer.new()
+	_body = VBoxContainer.new()  # no own scroll: the page lives in the Inspector column, which scrolls (WO-608 R2)
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_body)
-	add_child(scroll)
+	add_child(_body)
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_status)

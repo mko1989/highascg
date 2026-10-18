@@ -11,7 +11,7 @@ const DeckModel := preload("res://features/live/deck_model.gd")
 const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
-const MediaPanel := preload("res://features/live/media_panel.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _video: TextureRect
 var _no_signal: Label
@@ -20,6 +20,7 @@ var editor: LookEditor
 var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
 var _action: Label
+var osc: Node  # the shell's OscMirror (set before _ready)
 
 
 func _ready() -> void:
@@ -53,49 +54,35 @@ func _ready() -> void:
 	_action.text = "Click a look: stage on PRV · double-click: TAKE"
 	_action.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	bottom.add_child(_action)
-	var osc := OscMirror.new()
-	add_child(osc)
+	if osc == null:
+		osc = OscMirror.new()
+		add_child(osc)
 	bottom.add_child(_transition_toolbar())
 	deck = DeckView.new()
 	deck.osc_mirror = osc
 	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	deck.custom_minimum_size.y = 260  # a ScrollContainer has no content minimum — without this it collapses
-	var split := HSplitContainer.new()
-	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	bottom.add_child(split)
-	var sources := MediaPanel.new()
-	sources.custom_minimum_size.x = 260
-	split.add_child(sources)
-	sources.inspector.preview.osc_mirror = osc
 	var inner := HSplitContainer.new()
-	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	split.add_child(inner)
+	inner.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	bottom.add_child(inner)
 	deck.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	inner.add_child(deck)
-	editor = LookEditor.new()
+	editor = LookEditor.new()  # the compose frame + layer list stay in the workspace; the layer page goes to the Inspector
 	editor.custom_minimum_size.x = 560
 	editor.visible = false
 	inner.add_child(editor)
-	timers = ScreenTimerPanel.new()
-	timers.custom_minimum_size.x = 380
+	timers = ScreenTimerPanel.new()  # R2: screen timers / border are Inspector pages, not tab panels
 	timers.visible = false
-	inner.add_child(timers)
+	add_child(timers)
 	border = GlobalBorderPanel.new()
-	border.custom_minimum_size.x = 400
 	border.visible = false
-	inner.add_child(border)
-	var only := func(keep: Control) -> void:  # one right-hand panel at a time
-		for p in [editor, timers, border]:
-			if p != keep:
-				p.visible = false
-	deck.edit_requested.connect(func(id: String, m: int) -> void:
-		only.call(editor)
-		editor.open(id, m))
+	add_child(border)
+	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	deck.timers_requested.connect(func(m: int, label: String) -> void:
-		only.call(timers)
+		InspectorPanel.current.present(timers)
 		timers.open(m, label))
 	deck.border_requested.connect(func(m: int, label: String) -> void:
-		only.call(border)
+		InspectorPanel.current.present(border)
 		border.open(m, label))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text

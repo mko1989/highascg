@@ -10,6 +10,7 @@ const Pusher := preload("res://features/live/preview_pusher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const E := preload("res://features/live/look_edits.gd")
 const LayerInspector := preload("res://features/live/layer_inspector.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -26,6 +27,7 @@ var _drag := {}
 var _role := ""
 var _status: Label
 var _inspector: LayerInspector
+var _page: VBoxContainer  # WO-608 R2: geometry + layer inspector, shown in the global Inspector while a layer is selected
 var _crop_mode := false
 var _crop_btn: Button
 const CROP_COLOR := Color("#e3b341")
@@ -46,6 +48,7 @@ func _ready() -> void:
 	close.pressed.connect(func() -> void:
 		_hold(false)
 		visible = false
+		_release_page()
 		closed.emit())
 	head.add_child(close)
 	add_child(head)
@@ -101,12 +104,14 @@ func _ready() -> void:
 		sb.value_changed.connect(func(v: float) -> void: _set_field(key, v))
 		g.add_child(sb)
 		_fields[key] = sb
-	add_child(g)
+	_page = VBoxContainer.new()
+	_page.visible = false
+	_page.add_child(g)
 	_inspector = LayerInspector.new()
 	_inspector.visible = false
 	_inspector.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
 	_inspector.status.connect(func(t: String) -> void: _status.text = t)
-	add_child(_inspector)
+	_page.add_child(_inspector)
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_status)
@@ -293,11 +298,25 @@ func _apply_layer(patch: Dictionary) -> void:
 	pusher.schedule(scene_id, main)
 
 
-func _select(i: int) -> void:
+func _select(i: int, show := true) -> void:
 	_sel = i
 	if i >= 0 and i < _list.item_count:
 		_list.select(i)
+		if show and InspectorPanel.current != null:
+			InspectorPanel.current.present(_page)
+	else:
+		_release_page()
 	_sync_fields()
+
+
+func _release_page() -> void:
+	if InspectorPanel.current != null:
+		InspectorPanel.current.release(_page)
+
+
+func _exit_tree() -> void:
+	if _page != null and not _page.is_inside_tree():  # never adopted by the Inspector
+		_page.free()
 
 
 func _sync_fields() -> void:
@@ -323,7 +342,7 @@ func _refresh_list() -> void:
 		var src := str((l.get("source", {}) as Dictionary).get("value", "")) if l.get("source") is Dictionary else ""
 		_list.add_item("L%d  %s" % [int(l.get("layerNumber", 0)), _short(src) if src != "" else "(empty)"])
 	if _sel >= 0:
-		_select(_sel)
+		_select(_sel, false)  # a background project update keeps the selection but never takes the Inspector back
 
 
 func _hold(on: bool) -> void:

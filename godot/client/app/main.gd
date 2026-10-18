@@ -13,6 +13,9 @@ var boot_log := PackedStringArray()
 
 func _ready() -> void:
 	theme = ThemeBuilder.build()
+	get_tree().root.theme = theme  # WO-608 R3: popups / tooltips / dialogs too — Rewir is the only font
+	if theme.default_font != null:
+		ThemeDB.fallback_font = theme.default_font
 	var bg := ColorRect.new()
 	bg.color = ThemeBuilder.BG_DARK
 	bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)

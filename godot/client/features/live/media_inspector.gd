@@ -31,6 +31,7 @@ var _used: Label
 var _msg: Label
 var _versions: Versions
 var preview: Preview
+var osc_mirror: Node  # the shell's OscMirror, handed to the preview (built in _ready — the page joins the tree on first select)
 
 
 func _ready() -> void:
@@ -39,6 +40,7 @@ func _ready() -> void:
 	_facts.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_facts)
 	preview = Preview.new()
+	preview.osc_mirror = osc_mirror
 	preview.position_changed.connect(func() -> void: _wave.queue_redraw())
 	add_child(preview)
 	_wave = Control.new()
