@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) and the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) ported and verified on the box. Next per plan: media preview + versions, effects/PIP (needs WO-598 C3), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) and the mixer-effects editor ported and verified on the box. Next per plan: media preview + versions, PIP (needs WO-598 C3), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -80,6 +80,19 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   bullet in the inventory), owner-ticked on the box.
 - Ported pure modules pass their JS-equivalent tests in gdUnit4.
 
+## Investigation addendum (2026-10-18) — effects never reached PRV through the server nudge
+- Effects are not content keys (`client/lib/scenes-preview-snapshot.js:11-23 previewContentCompareKey`), so an
+  effect edit on a staged look is "geometry only" → nudge. The web's own geometry-only push re-sends every
+  effect line (`client/lib/scenes-preview-push-scene.js` `effectToAmcpLines` loop after the mixer part), but the
+  server nudge emitted **crop only** (`src/api/routes-preview-nudge.js` `fx.type !== 'crop'`), so a Godot
+  brightness/levels/chroma edit would have been stored but never shown on PRV.
+- Neither side reset an effect that was *removed* on the nudge path (the full push does `MIXER CLEAR`).
+- Caspar strips a trailing `DEFER` generically for every mixer transform (`caspar-build src-tree
+  src/protocol/amcp/AMCPCommandsImpl.cpp:876`), so every effect line can join the nudge's single COMMIT.
+- Fix: preview-push asks for `allEffects` + `resetEffects` (types per layer present in the staged look, absent
+  now); identity params per type in `NEUTRAL_EFFECT_PARAMS` (keyer/rotation/anchor excluded: the layer's own
+  ANCHOR/ROTATION are re-emitted every nudge and the keyer is straight-alpha state). Web drag nudges unchanged.
+
 ## What was done (2026-10-18)
 
 | Piece | What |
@@ -88,6 +101,9 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 | `godot/client/features/live/layer_inspector.gd` | content sizing (+ refit), clip start point, loop (only when the source can loop), straight alpha, rotation, audio route / route source channels, mute, volume fader + dB, fade on end |
 | `godot/client/features/live/mixer_math.gd` | audio-volume-scale.js fader curve + dB text, media-ext.js sourceSupportsLoopPlayback — golden-tested against the JS |
 | `godot/client/features/live/media_inspector.gd`, `media_math.gd` | media file inspector: facts, waveform + trim shading, trim/mute defaults, used-in, rename, final delete; parseTimeInput/formatMediaTimecode golden-tested |
+| `godot/client/features/live/effects_model.gd`, `effects_section.gd` | mixer effects (inspector-effects.js): add one per type, remove, primary + collapsed advanced params, select/bool/float/int editors, crop in px of the content resolution (from layer-fit's `contentResolution`, fallback the channel). Schemas are NOT re-declared: `GET /api/scene/effect-registry` serves the web's `effect-registry.js` |
+| `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
+| `godot/client/run-client.sh` | `--check` boot bounded at 45 s: a parse error in `app/main.gd` hung the check (the quit timer lives in that script) instead of failing |
 | (WO-600) `compose_math.gd`, `look_editor.gd` | geometry move/resize/crop already ported there |
 
 ## What was VERIFIED
@@ -97,5 +113,15 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   are content keys (`LOADBG 2-10 …`, `MIXER 2-10 VOLUME 0`). Server smoke `smoke-wo601-layer-tools` 4/4; Godot 436/0.
 - Media inspector on a library file: In "1.5" / Out "0:40" / Mute → stored {trimInMs 1500, trimOutMs 40000, muted}; usage 2 looks;
   adding the clip then copied them into the new layer (after the WO-611 #5 fix). Test defaults cleared afterwards. Godot 453/0.
+
+- Effects editor, box (PRV ch2, look "Background" layer 10, real UI controls via `--probe-effect`, seeded with the
+  look's crop and restored after): Caspar log, every step a nudge (no LOADBG/PLAY):
+  `+brightness` → `MIXER 2-10 BRIGHTNESS 1 0 DEFER`; spin 1.4 → `BRIGHTNESS 1.4 0 DEFER`; `+levels` →
+  `LEVELS 0 1 1 0 1 0 DEFER`; ✕ brightness → reset `BRIGHTNESS 1 0 DEFER`; restore → reset `LEVELS …`; each
+  followed by `MIXER 2 COMMIT`. Stored look back to its crop only. Smokes: `smoke-wo601-effects-nudge` 5/5,
+  layer-tools 5/5 (registry = web MIXER_EFFECTS), nudge + WO-598 push 27/0; offline suite 2640/1 (the known
+  shader-library smoke, red on main too); Godot 477/0; `--check` proven to fail on a main.gd parse error.
+- My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
+  (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
 Side findings re-checked by hand (`git grep`, file reads). Everything else is the Haiku inventory.
