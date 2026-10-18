@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config) and the lower-third editor ported and verified on the box. Next per plan: countdown/screen timer, lower-third roster, media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor and the countdown/timer editor ported and verified on the box. Next per plan: screen timer, lower-third roster, media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -120,7 +120,15 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
    stored look (`/api/scene/live/preview`); PGM takes and every server-built push lost it. Also the preview-push nudge
    re-registered PRV without broadcasting `scene.live`. Fixed in both builders (parity smoke still green) + broadcast when a
    layer source changed.
-Bugs 1–2 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
+4. **Every take sent lower-third data to countdown templates** (web `buildIncomingScenePayload` + server twin): the LT
+   branch is `ltCfg || resolveLayerLowerThirdCgData(l)`, and the latter accepts ANY object `layer.cgData` — the countdown
+   inspector writes its config there — so the row got `buildLowerThirdCasparCgData({})`. Box, before: re-take of a
+   60 s countdown → `CG 2-702 UPDATE 0 {name:"",title:"",displayDurationSec:10,…}`; after the countdown branch:
+   `{mode:duration,durationSec:60,…}`. Fixed in both builders (parity smoke green).
+5. **Countdown "Position px" never stored** (`inspector-countdown-controller.js` getCurrentConfig): the config is rebuilt
+   from a fixed key list without `posX`/`posY`, so the WO-320A override is dropped from countdownConfig, cgData and the
+   CG set. Godot keeps the whole config. Also `#cd-duration` no longer exists (HMS input) — harmless, falls back to cfg.
+Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
 
 ## What was done (2026-10-18)
 
@@ -136,6 +144,7 @@ Bugs 1–2 stay in the web client (Godot no longer uses those paths) — candida
 | `godot/client/features/live/lower_third_model.gd`, `lower_third_section.gd` | lower thirds: 1:1 port of `buildLowerThirdCgData` / `buildLowerThirdCasparCgData` (byte-equal JSON golden) so each edit patches `source.lowerThirdConfig` + `cgData` synchronously (a TAKE right after typing never carries stale text); title/subtitle/font/position/sizes/scale/hold/colours, 450 ms debounced CG UPDATE, ▶ Play (flushes first), Delete. Roster not ported yet |
 | `src/api/routes-scene-lower-third.js` | `POST /api/scene/lower-third` resolve / update / play / clear on the web's lower-third-cg-data.js + existing /api/lower-thirds handlers; edit-bus routing; play toggle by logical layer |
 | `godot/client/features/live/template_section.gd`, `routes-scene-layer-tools.js` | HTML template group: Reload page (`POST /api/scene/layer-reload`), playback_timers Timers Config → `source.timersConfig` |
+| `godot/client/features/live/countdown_model.gd`, `countdown_section.gd`, `src/api/routes-scene-countdown.js` | countdown/timer: binds a project timer instance (`project.scenes.timers`, auto-created; autosave carries it), name/mode/duration H:M:S/target/format/thresholds/position + px/hide/sizes/colours/aux, Start/Pause/Reset; edits patch `source.countdownConfig` + `cgData` at once, 450 ms later CG set + propagation to every other bound layer (other looks: deck sync). `POST /api/scene/countdown` = edit-bus routing onto `/api/countdown/*` |
 | `src/engine/scene-take-payload.js`, `client/components/scenes-shared.js`, `routes-scene-preview-push.js` | `timersConfig` kept in take/stage payloads; `scene.live` broadcast after a nudge that changed a source |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
 | `godot/client/run-client.sh` | `--check` boot bounded at 45 s: a parse error in `app/main.gd` hung the check (the quit timer lives in that script) instead of failing |
@@ -168,6 +177,10 @@ Bugs 1–2 stay in the web client (Godot no longer uses those paths) — candida
   → no AMCP (nudge), `GET /api/scene/live` ch2 `timersConfig.compact` None → True 2 s later (after the payload fix); Reload →
   `CALL 2-702 RELOAD`. Smoke `smoke-wo601-lower-third-template` 6/6, WO-598 payload parity green; Godot 523/0 (LT model
   byte-equal JSON for 4 configs incl. legacy/invalid values).
+- Countdown, box (`--probe-countdown` on "Background", layer + timer removed after): timer `sc_<ms>_<7>` created and bound;
+  H:M:S 0:01:00 → `cgData.durationSec 60`, `CG 2-702 UPDATE 0 {mode:duration,durationSec:60,…}`; Start/Pause/Reset →
+  `UPDATE 0 {cmd:start|pause|reset}`; PRV re-take before/after the payload fix as in addendum 4. Smoke
+  `smoke-wo601-countdown` 4/4; Godot 551/0 (countdown model 4 tests); offline 2657/1 (known shader-library smoke).
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
