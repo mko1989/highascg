@@ -4,6 +4,8 @@
  * the same on-air rules as the web push (`scenes-preview-global-border.js` → `/api/scene/border-lines`).
  *
  * Body: `{ screen: 0-based, enabled?: true|false|'toggle', type?, params?: {…}, fadeDuration?, preset?: slot }`
+ *  WO-601 (Godot inspector): also `slices`, `inner`, `mirrorBorderOnPrv`, `savePreset: {slot, name}`, `deletePreset: slot`,
+ *  `clear: true` (remove the screen's slot).
  *  - `preset` recalls a saved border preset (crossfades PGM 998 ↔ 996 when the border is already on).
  *  - Omitting `enabled` keeps the current on/off (a style change while on updates it live).
  * Reply: `{ ok, screen, enabled, border, lines }`.
@@ -21,6 +23,7 @@ const {
 	GLOBAL_BORDER_LAYER_PGM_B,
 	buildGlobalBorderPresetCrossfadeLines,
 } = require('../engine/global-border')
+const GLOBAL_BORDER_LAYER_PRV_MIRROR = 997
 const {
 	normalizeGlobalBordersArray,
 	applyControlToSlot,
@@ -65,9 +68,15 @@ function planLines(ctx, map, screenIdx, res) {
 		return byCh
 	}
 
+	if (res.noAir) return byCh
+	if (res.mirrorChanged && next.mirrorBorderOnPrv !== true) {
+		// mirror off: the PRV mirror layer goes, PGM keeps / gets the restored state (below)
+		const prvCh = Number(map.previewCh(screenIdx + 1)) || null
+		if (prvCh && prvCh !== pgmCh) push(prvCh, computeBorderLines(ctx, { channel: prvCh, layer: GLOBAL_BORDER_LAYER_PRV_MIRROR, border: borderForLines(next, false), isUpdate: false }))
+	}
 	if (nowEnabled) {
 		for (const s of onAir) {
-			const isUpdate = wasEnabled && !res.typeChanged
+			const isUpdate = wasEnabled && !res.forceAdd
 			push(s.channel, computeBorderLines(ctx, { ...s, border: borderForLines(next, true), isUpdate }))
 		}
 	} else if (wasEnabled) {
@@ -112,6 +121,7 @@ async function handleGlobalBorderControl(body, ctx) {
 	if (!project?.scenes || typeof project.scenes !== 'object') return bad(409, 'no project loaded')
 	const borders = normalizeGlobalBordersArray(project.scenes.globalBorders)
 
+	if (b.clear === true) return clearScreenSlot(ctx, map, project, borders, screenIdx, persistProject)
 	const res = applyControlToSlot(borders[screenIdx], b)
 	if (!res.ok) return bad(400, res.error)
 
@@ -149,6 +159,23 @@ async function handleGlobalBorderControl(body, ctx) {
 		headers: JSON_HEADERS,
 		body: jsonBody({ ok: true, screen: screenIdx, enabled: !!next.enabled, border: next, lines: sent }),
 	}
+}
+
+/** `{ clear: true }`: web "Remove border from this screen" — border off on air, slot null in the project. */
+async function clearScreenSlot(ctx, map, project, borders, screenIdx, persistProject) {
+	const cur = borders[screenIdx]
+	let sent = []
+	if (cur?.enabled) {
+		const { clear } = screenBorderCasparSlots(map, screenIdx, cur)
+		const byCh = new Map()
+		for (const s of clear) byCh.set(s.channel, [...(byCh.get(s.channel) || []), ...computeBorderLines(ctx, { ...s, border: borderForLines(cur, false), isUpdate: false })])
+		sent = await runLines(ctx, byCh)
+	}
+	borders[screenIdx] = null
+	const updated = { ...project, savedAt: new Date().toISOString(), scenes: { ...project.scenes, globalBorders: borders } }
+	const persisted = await persistProject(ctx, updated, { writeAutosave: true, pushVolumes: false })
+	if (!persisted?.unchanged) scheduleProjectSyncBroadcast(ctx, persisted?.project || updated)
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, screen: screenIdx, enabled: false, border: null, lines: sent }) }
 }
 
 module.exports = { handleGlobalBorderControl }

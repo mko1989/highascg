@@ -13,6 +13,7 @@ const TransitionRow := preload("res://features/live/transition_row.gd")
 signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
 signal timers_requested(main: int, label: String)  # WO-601: web per-screen ⏱ → screen-timer inspector
+signal border_requested(main: int, label: String)  # WO-601: global border inspector
 
 var _columns: HBoxContainer
 var _dirty := true
@@ -84,6 +85,11 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	tmr.tooltip_text = "Screen timers"
 	tmr.pressed.connect(func() -> void: timers_requested.emit(main, title))
 	head_row.add_child(tmr)
+	var brd := Button.new()
+	brd.text = "Border"
+	brd.tooltip_text = "Global border for this screen"
+	brd.pressed.connect(func() -> void: border_requested.emit(main, title))
+	head_row.add_child(brd)
 	col.add_child(head_row)
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)

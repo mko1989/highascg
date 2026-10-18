@@ -281,6 +281,30 @@ func _ready() -> void:
 			await vs._purge(int(v.v))
 		var e3: Dictionary = await entry.call()
 		print("[client] versions after purge current v", e3.get("currentV"), " old ", e3.get("versions"), " rows ", vs._list.get_child_count())
+	if Config.args.has("probe-border"):  # dev: --probe-border=<main> → enable, width, glow, slice, preset save/recall, mirror on/off, remove (WO-601)
+		if not Ws.is_open:
+			await Ws.connected
+		await get_tree().create_timer(1.5).timeout
+		var lt9: Node = shell.tabs.get_node("Live")
+		lt9.deck.border_requested.emit(int(Config.args["probe-border"]), "Main")
+		await get_tree().create_timer(1.0).timeout
+		var bp: Node = lt9.border
+		var step := func(label: String, patch: Dictionary, now: bool) -> void:
+			await bp.send(patch, now, true)
+			await get_tree().create_timer(0.9).timeout
+			var gb: Variant = bp.slot()
+			print("[client] border %s | %s | %s" % [label, bp._status.text, "null" if gb == null else "%s %s L%s mirror=%s slices=%d presets=%d" % [
+				gb.get("enabled"), gb.get("type"), gb.get("activePgmLayer"), gb.get("mirrorBorderOnPrv"), (gb.get("slices", []) as Array).size(), (gb.get("borderPresets", []) as Array).size()]])
+		await step.call("enable", {"enabled": true}, true)
+		await step.call("width 12", {"params": {"width": 12}}, false)
+		await step.call("glow", {"type": "glow"}, true)
+		await step.call("slice", {"slices": [{"x": 0, "y": 0, "w": 0.5, "h": 1}]}, true)
+		await step.call("save preset 1", {"savePreset": {"slot": 1, "name": "probe"}}, true)
+		await step.call("border", {"type": "border"}, true)
+		await step.call("recall 1", {"preset": 1}, true)
+		await step.call("mirror on", {"mirrorBorderOnPrv": true}, true)
+		await step.call("mirror off", {"mirrorBorderOnPrv": false}, true)
+		await step.call("remove", {"clear": true}, true)
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))

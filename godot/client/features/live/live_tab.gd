@@ -10,6 +10,7 @@ const T := preload("res://features/live/transitions.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
+const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 
 var _video: TextureRect
@@ -17,6 +18,7 @@ var _no_signal: Label
 var deck: DeckView
 var editor: LookEditor
 var timers: ScreenTimerPanel
+var border: GlobalBorderPanel
 var _action: Label
 
 
@@ -77,12 +79,23 @@ func _ready() -> void:
 	timers.custom_minimum_size.x = 380
 	timers.visible = false
 	inner.add_child(timers)
+	border = GlobalBorderPanel.new()
+	border.custom_minimum_size.x = 400
+	border.visible = false
+	inner.add_child(border)
+	var only := func(keep: Control) -> void:  # one right-hand panel at a time
+		for p in [editor, timers, border]:
+			if p != keep:
+				p.visible = false
 	deck.edit_requested.connect(func(id: String, m: int) -> void:
-		timers.visible = false
+		only.call(editor)
 		editor.open(id, m))
 	deck.timers_requested.connect(func(m: int, label: String) -> void:
-		editor.visible = false
+		only.call(timers)
 		timers.open(m, label))
+	deck.border_requested.connect(func(m: int, label: String) -> void:
+		only.call(border)
+		border.open(m, label))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))

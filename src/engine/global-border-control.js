@@ -106,18 +106,77 @@ function applyControlToSlot(stored, req) {
 		next.fadeDuration = Math.min(500, fd)
 	}
 
+	// WO-601 (Godot inspector, thin client): the web inspector's remaining slot edits, same rules as
+	// sceneStateSetGlobalBorderForScreen / …SaveGlobalBorderPresetSlot.
+	let slicesChanged = false
+	if (Array.isArray(req.slices)) {
+		const norm = req.slices.map((sl) => ({ x: Number(sl?.x) || 0, y: Number(sl?.y) || 0, w: Number(sl?.w) || 0, h: Number(sl?.h) || 0 }))
+		slicesChanged = JSON.stringify(norm) !== JSON.stringify(next.slices)
+		next.slices = norm
+	}
+	if (req.inner && typeof req.inner === 'object') {
+		const c = (v, d) => Math.max(0, Math.min(1, Number.isFinite(Number(v)) ? Number(v) : d))
+		next.inner = { l: c(req.inner.l, 0), t: c(req.inner.t, 0), w: c(req.inner.w, 1), h: c(req.inner.h, 1) }
+	}
+	let mirrorChanged = false
+	let restoredPgm = false
+	if (typeof req.mirrorBorderOnPrv === 'boolean' && req.mirrorBorderOnPrv !== (prev.mirrorBorderOnPrv === true)) {
+		mirrorChanged = true
+		next.mirrorBorderOnPrv = req.mirrorBorderOnPrv
+		const snap = prev.pgmAirSnapshot
+		if (!req.mirrorBorderOnPrv && snap && typeof snap === 'object') {
+			restoredPgm = true
+			// Turning the PRV mirror off restores what PGM really shows (web turningPrvOff).
+			Object.assign(next, {
+				enabled: !!snap.enabled,
+				type: snap.type || next.type,
+				params: { ...(snap.params || {}), side: 'inside' },
+				slices: Array.isArray(snap.slices) ? snap.slices : [],
+				fadeDuration: snap.fadeDuration ?? next.fadeDuration,
+				activePgmLayer: normActivePgmLayer(snap.activePgmLayer ?? next.activePgmLayer),
+			})
+		}
+	}
+	if (req.savePreset && typeof req.savePreset === 'object') {
+		const sn = Math.max(1, Math.floor(Number(req.savePreset.slot)) || 1)
+		const src = prev.pgmAirSnapshot && typeof prev.pgmAirSnapshot === 'object' ? prev.pgmAirSnapshot : next
+		const data = {
+			enabled: !!src.enabled,
+			type: src.type,
+			params: { ...(src.params || {}), side: 'inside' },
+			slices: Array.isArray(src.slices) ? src.slices.map((x) => ({ ...x })) : [],
+			fadeDuration: src.fadeDuration ?? 25,
+			artnetPatch: { startChannel: 1, universe: 0, ...(src.artnetPatch || {}) },
+			activePgmLayer: normActivePgmLayer(src.activePgmLayer),
+		}
+		const nm = String(req.savePreset.name || `Preset ${sn}`).trim() || `Preset ${sn}`
+		next.borderPresets = [...next.borderPresets.filter((p) => !p || Number(p.slot) !== sn), { slot: sn, name: nm, data }].sort((a, b) => Number(a.slot) - Number(b.slot))
+		return { ok: true, next, wasEnabled, nowEnabled: wasEnabled, typeChanged: false, preset: null, noAir: true }
+	}
+	if (req.deletePreset != null && req.deletePreset !== '') {
+		const sn = Math.floor(Number(req.deletePreset))
+		next.borderPresets = next.borderPresets.filter((p) => !p || Number(p.slot) !== sn)
+		return { ok: true, next, wasEnabled, nowEnabled: wasEnabled, typeChanged: false, preset: null, noAir: true }
+	}
+
 	const en = parseEnabledRequest(req.enabled)
 	if (en === undefined) return { ok: false, error: 'enabled must be true, false or "toggle"' }
 	if (en === 'toggle') next.enabled = !wasEnabled
 	else if (en !== null) next.enabled = en
 	else if (!preset) next.enabled = wasEnabled
 
+	const typeChanged = String(prev.type || '') !== String(next.type || '')
 	return {
 		ok: true,
 		next,
 		wasEnabled,
 		nowEnabled: !!next.enabled,
-		typeChanged: String(prev.type || '') !== String(next.type || ''),
+		typeChanged,
+		// web borderUsesCgUpdate: a slice change re-ADDs (edge_strip re-reads slices from UPDATE); a new slot ADDs
+		// mirror ON = a new slot (997) → ADD. Mirror OFF with a snapshot restores exactly what PGM shows → UPDATE (no
+		// on-air re-fade; the type may differ from the EDITED slot, not from PGM); without one PGM is unknown → ADD.
+		forceAdd: restoredPgm ? false : typeChanged || mirrorChanged || (slicesChanged && String(next.type) !== 'edge_strip'),
+		mirrorChanged,
 		preset,
 	}
 }
