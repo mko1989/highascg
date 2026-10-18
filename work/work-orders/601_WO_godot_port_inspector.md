@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) and the mixer-effects editor ported and verified on the box. Next per plan: media preview + versions, PIP (needs WO-598 C3), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor and the PIP overlay editor ported and verified on the box. Next per plan: media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -93,6 +93,17 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   now); identity params per type in `NEUTRAL_EFFECT_PARAMS` (keyer/rotation/anchor excluded: the layer's own
   ANCHOR/ROTATION are re-emitted every nudge and the keyer is straight-alpha state). Web drag nudges unchanged.
 
+## Investigation addendum (2026-10-18) — every PIP overlay edit re-took the whole PRV look
+- `pipOverlays` is a content key (`previewContentCompareKey`), so the server's preview-push chose a forceCut
+  re-take: box log for one border-width change = `LOADBG 2-10 … LOOP IN 0 S…`, `LOADBG 2-11 … SEEK 0`, overlay CG
+  lines, `PLAY 2-10`, `PLAY 2-11` — both clips restart on every slider tick.
+- The web's own push does not: an unchanged clip gets mixer lines + `buildPipOverlayAmcpLinesAll` with the previous
+  overlays (`client/lib/scenes-preview-push-scene.js`), and the inspector updates in place when types/sides keep their
+  order (`inspector-pip-overlay.js` struct rule).
+- Fix: preview-push mode `overlay` (`src/api/routes-scene-preview-pip.js`) = the web rule with overlays stripped from
+  both sides → nudge + overlay CG lines on the PRV take chain. Outside-side overlays still re-ADD (server
+  `canUpdateInPlace` excludes them, same as the web) — only the overlay template reloads, never the clips.
+
 ## What was done (2026-10-18)
 
 | Piece | What |
@@ -102,6 +113,8 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 | `godot/client/features/live/mixer_math.gd` | audio-volume-scale.js fader curve + dB text, media-ext.js sourceSupportsLoopPlayback — golden-tested against the JS |
 | `godot/client/features/live/media_inspector.gd`, `media_math.gd` | media file inspector: facts, waveform + trim shading, trim/mute defaults, used-in, rename, final delete; parseTimeInput/formatMediaTimecode golden-tested |
 | `godot/client/features/live/effects_model.gd`, `effects_section.gd` | mixer effects (inspector-effects.js): add one per type, remove, primary + collapsed advanced params, select/bool/float/int editors, crop in px of the content resolution (from layer-fit's `contentResolution`, fallback the channel). Schemas are NOT re-declared: `GET /api/scene/effect-registry` serves the web's `effect-registry.js` |
+| `godot/client/features/live/pip_model.gd`, `pip_section.gd`, `param_field.gd` | PIP overlays (inspector-pip-overlay.js): stack ≤ `pipMaxStack` cards — type, ↑/↓ (index 0 behind), ✕, params with `visibleWhen` rows toggled in place; colours as CSS (`#rrggbb`, translucent → `rgba()`); legacy single `pipOverlay` read and cleared on the first edit. `param_field.gd` = shared schema editors (effects use it too). Registry endpoint also serves `PIP_OVERLAYS` + max stack |
+| `src/api/routes-scene-preview-pip.js` | preview-push `overlay` mode (see addendum) |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
 | `godot/client/run-client.sh` | `--check` boot bounded at 45 s: a parse error in `app/main.gd` hung the check (the quit timer lives in that script) instead of failing |
 | (WO-600) `compose_math.gd`, `look_editor.gd` | geometry move/resize/crop already ported there |
@@ -121,6 +134,12 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   followed by `MIXER 2 COMMIT`. Stored look back to its crop only. Smokes: `smoke-wo601-effects-nudge` 5/5,
   layer-tools 5/5 (registry = web MIXER_EFFECTS), nudge + WO-598 push 27/0; offline suite 2640/1 (the known
   shader-library smoke, red on main too); Godot 477/0; `--check` proven to fail on a main.gd parse error.
+- PIP editor, box (PRV ch2, "Background" layer 11 → CG slots 2-264…267, `--probe-pip`, restored after): +border →
+  `CG 2-264 ADD 0 "pip_border" … width 4`; spin 9 → re-ADD width 9; +shadow → `2-265 pip_shadow`; ↑ → slots swap
+  (shadow 264 behind, border 265); ✕ border → 265 cleared; restore → all four slots cleared. **Before the overlay
+  mode** every step also sent `LOADBG`/`PLAY` for both clips; **after**: zero LOADBG/PLAY/STOP lines in the run.
+  Smoke `smoke-wo601-pip-preview` 7/7 (decision, in-place UPDATE vs re-ADD, reorder/remove clears, handler never
+  re-takes); offline 2647/1 (known shader-library smoke); Godot 509/0 (pip model 4 tests, golden vs node).
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
