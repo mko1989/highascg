@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) and slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) DONE, box-verified; effect drops, copy / paste, keyboard navigation open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) slice 5 (flags: add / select / drag / Delete, flag Inspector page with jump and Companion button) slice 6 (layers: select / drag-reorder / divider resize, double-click add, right-click menu, layer Inspector page) and slice 7 (full transport bar + the timeline keyboard: copy / paste, Space, arrows, Enter) DONE, box-verified; slice 8 (Dest screen select, PRV availability, Take with transition, effect drops) open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -149,6 +149,38 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   empty → "Layer N"), Actions → Add layer below / Remove layer (same confirm, then the empty Inspector).
 - Delete never removes a layer. The web header is not drawn as selected.
 
+### Slice 7 findings (2026-10-18) — transport and keyboard
+
+- The slice 1 bar was a subset of the web's, and the gap was not recorded. The web bar
+  (`client/components/timeline-transport.js:196-232`) has: picker, ✎ rename (`prompt`, empty = no change), + new,
+  to start / play / stop / to end / loop (`POST …/loop {loop}`), the current-time field (`#tl-tc-cur`:
+  `parseTcInput` with ++/-- offsets, commit on change / blur, Enter blurs) and the duration field (`#tl-tc-tot`:
+  accepted only ≥ 1000 ms), Trim (duration = the last clip end, clips only, untouched when 0), Flag, zoom − / Fit /
+  + (`canvas.zoom` ×1.18 around the left edge), Dest screen select, PRV (only when a preview bus exists), PGM, the
+  Take group (transition / frames / tween / Take), Follow. The Dest, PRV and Take items go to slice 8.
+- On opening or switching a timeline, the web reads `GET /api/timelines/:id/state` (`timeline-editor.js:178-224`)
+  and adopts loop, position and playing. A 404 pushes the timeline. `timeline.playback` also carries `loop`
+  (`:406`).
+- Keyboard (`timeline-editor-inputs.js:96-376`) is document-global while the tab is active:
+  - Ctrl/Cmd+C copies the selected clip (deep, with its layer), else the selected flag.
+  - Ctrl+V pastes at the rounded playhead. A clip goes to the selected layer, else the copied layer clamped,
+    else the last layer (`resolvePasteLayerIdx`). The web's selected layer is the last layer *or clip* clicked
+    and is never cleared (`timeline-editor-handlers.js:170-175`). `insertClipClone` gives a new id, appends,
+    grows the duration (start + dur + 2 s, then expandDurationToContent) and selects the copy. A pasted flag
+    is `duplicateFlag` (no `jumpFlagId`).
+  - Delete / Backspace removes the flag, else the clip, when not in a field.
+  - Space plays / pauses.
+  - Shift+←/→ moves the playhead to the previous / next snap point: 0, duration, playhead, flags, clip edges,
+    rounded, > 1 ms away (`buildTimelineSnapCandidates`).
+  - Alt+←/→ moves the selected flag (clamped to the duration) or clip start (clamped to duration − clip
+    length) to the previous / next snap point, excluding itself.
+  - Plain ←/→ moves the selected clip one frame, unless the last canvas click was on the ruler; then it moves
+    the playhead one frame (`canvas.dataset.lastClicked`).
+  - i o p s v t (slice 4).
+  - Enter (`attachTimelineEditorInput`) focuses and selects the current-time field.
+- Web quirks: Space, Shift+arrows and Ctrl+C / V fire even while typing in a text field. Space types nothing,
+  Shift+arrow can't extend a selection, and Ctrl+C copies the clip instead of the text.
+
 ## Port plan
 
 - `TimelineView` (custom `Control`): `_draw()` for ruler/tracks/clips/keyframes/playhead, thumbnail
@@ -284,6 +316,29 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   `VD.draw(self)`) to keep the view under 500 lines (it had reached 504).
 - `timeline_tab.gd`: the layer page in the global Inspector, and every layer edit through `_commit` (autosave +
   PUT) plus the picker's "(N layers)" text.
+
+### Slice 7 (2026-10-18) — transport and keyboard
+
+- `timeline_transport.gd` (new): the bar and all playback state moved out of the tab (tab 493 → 285 lines). It
+  adds ✎ rename (a dialog with the name selected), |◀ / ▶| (Rewir and the fallback font have no ⏮ ⏭), loop (state
+  from `timeline.playback` and `/state`), the current-time and duration fields (LineEdits: Enter releases,
+  release commits, as the web's blur), Trim, − / +. The engine state is read on the first show and on every
+  timeline switch.
+  - Transport buttons never take focus, so Space is always the play key and never a focused button's press.
+  - A click on a transport button first releases the current focus owner, like the web's blur on a button
+    click. This commits a half-typed field. Without it the field kept focus and Ctrl+C went to the text (found
+    on the box).
+- `timeline_keys.gd` (new): the web handler, line for line, with i o p s v t moved here from the tab. Deviation
+  (WO "Behaviours to decide" 1, extended): no key fires while a text field (LineEdit / TextEdit) or a dialog /
+  popup has focus. i o p s v t still fire from the Inspector's SpinBox fields (the web's "set X then P"). Echo
+  repeats only for the arrows.
+- `timeline_nav.gd` (new, pure): snap points, previous / next, frame length, clips end (Trim), paste layer,
+  paste clip.
+- `timeline_view.gd`: `delete_selected()` (Delete is now the tab's global key, so it no longer needs canvas focus),
+  `zoom_step()`, `last_clicked` (ruler / divider / header / track / clip, set on every left press), `last_layer`
+  (the paste target; reset on a timeline switch).
+- `timeline_tab.gd`: wires the transport and keys. `root()`, `refresh()`, `commit()`, `kf_commit()`,
+  `clip_rect()` and `clip_canvas()` are its public surface for them.
 
 ## What was VERIFIED
 
@@ -428,3 +483,50 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
 - Owner-QA open:
   - The lit selected header (deviation).
   - Rename via the Name field instead of a prompt.
+
+### Slice 7 verification (2026-10-18)
+
+- Godot tests 876/0. New `test_timeline_nav.gd`:
+  - snap points: unique, sorted, rounded, exclusions;
+  - previous / next with the 1 ms epsilon;
+  - frame length and a bad fps;
+  - clips end ignores flags;
+  - paste layer: all three fallbacks;
+  - paste clip: new id, deep copy, append, the duration grows, a missing layer.
+
+  `--check` boot clean. `check-max-file-lines` reports 0 over (tab 285, view 441, transport 381).
+- On the box, test timeline `tmve1ppeug1t`, read back from `GET /api/timelines/tmve1ppeug1t` and `…/state`.
+
+  Transport:
+  - Loop gave engine `loop: true`. Current time `00:00:20:00` gave position 20000, and `++500` gave 20500.
+  - ▶| gave 125651 (the duration) and |◀ gave 0.
+  - Duration `00:01:30:00` gave 90000. `500` was rejected (stays 90000). Trim gave 60000 (the clip end), and
+    the end shade moved.
+  - Zoom: Fit at 8.5 px/s, three + to 14.0 px/s, one − to 11.8 px/s (×1.18 steps).
+  - ✎ "Main show" + Enter stored the name, and the picker followed.
+
+  Keyboard:
+  - Clip copy / paste: selected the clip, Ctrl+C, clicked Layer 4's header, time 30 s, Ctrl+V. That gave a new
+    clip on Layer 4 at 30000 with the source's keyframes, selected, with its page shown. The duration became
+    92000.
+  - Frame nudges: → → ← moved it to 30040.
+  - Alt+← snapped it to 30000 (the playhead). Alt+→ aimed at the next point and was clamped to 32000
+    (duration − clip length), as in the web.
+  - Shift+→ → ← moved the playhead 32000 → 60000 → 32000.
+  - After a ruler click at 9989.1, → → → ← moved the playhead (+80). The clip did not move.
+  - Space played (`playing: true`, position advancing). Space again paused.
+  - Enter focused the time field with its text selected. Typing `5:00` + Enter gave 5000.
+  - Space while that field was focused did not play.
+  - Flags: typed 8 s without Enter, then clicked Flag. The blur committed the seek, and the flag was added at
+    8000 and selected. Ctrl+C, time 20 s, Ctrl+V gave a new flag at 20000. Alt+→ moved it to 32000 (the clip
+    start). Delete removed it, without the canvas having focus.
+  - Delete with a clip selected removed the clip.
+  - `t` at 20017 added `opacity 0.603` (the eased value). Selecting that diamond and pressing Delete removed
+    only the keyframe.
+  - Restarting the GUI with the engine at 20000 and loop on showed `00:00:20:00`, the playhead at 20 s and Loop
+    lit (the engine state is read on open).
+- Restored afterwards: name "Timeline", one clip, no flags, loop off, duration 60000.
+- Owner-QA open:
+  - The |◀ / ▶| glyphs.
+  - Keys never fire from text fields (deviation from the web).
+  - The rename dialog in place of `prompt()`.

@@ -51,6 +51,8 @@ var sel_id := ""
 var sel_kf: Variant = null  # the selected keyframe Dictionary (by identity) of the selected clip
 var sel_flag := ""
 var sel_layer := -1
+var last_layer := -1  # the web's selectedLayer: the last layer or clip clicked — the paste target (never cleared)
+var last_clicked := ""  # the web's canvas.dataset.lastClicked: ruler / divider / header / track / clip
 var _drag := {}
 var _seek_at := 0
 
@@ -73,6 +75,8 @@ func set_timeline(t: Dictionary) -> void:
 	if sel_layer >= 0 and (first or sel_layer >= (tl.get("layers", []) as Array).size()):
 		select_layer(-1)
 	if first:
+		last_layer = -1
+		last_clicked = ""
 		fit()
 	queue_redraw()
 
@@ -116,21 +120,6 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if tl.is_empty():
 		return
-	if event is InputEventKey:
-		var k := event as InputEventKey
-		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and (sel_id != "" or sel_flag != ""):  # never a layer (web)
-			if sel_flag != "":
-				F.remove(tl, sel_flag)
-				select_flag("")
-				flags_edited.emit()
-			elif sel_kf != null:
-				_remove_kf()
-			else:
-				TE.remove_clip(tl, sel_li, sel_id)
-				select(-1, "")
-				edited.emit()
-			accept_event()
-		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
@@ -144,6 +133,8 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
+			if mb.pressed:
+				last_clicked = _zone(mb.position)
 			if mb.pressed and not F.hit(tl, mb.position, _x).is_empty():
 				var f := F.hit(tl, mb.position, _x)
 				select_flag(str(f.id))
@@ -185,6 +176,28 @@ func _gui_input(event: InputEvent) -> void:
 			_hover(mm.position)
 
 
+## Delete / Backspace (timeline_keys.gd): the selected flag, else the selected keyframe, else the clip — never a
+## layer (web).
+func delete_selected() -> void:
+	if sel_flag != "":
+		F.remove(tl, sel_flag)
+		select_flag("")
+		flags_edited.emit()
+	elif sel_kf != null:
+		_remove_kf()
+	elif sel_id != "":
+		TE.remove_clip(tl, sel_li, sel_id)
+		select(-1, "")
+		edited.emit()
+
+
+## The web's −/+ buttons (canvas.zoom): one step, the left edge stays.
+func zoom_step(dir: int) -> void:
+	px_per_ms = TM.zoom(px_per_ms, dir)
+	_clamp_scroll(scroll_x)
+	queue_redraw()
+
+
 func select(li: int, clip_id: String) -> void:
 	if li == sel_li and clip_id == sel_id:
 		return
@@ -194,6 +207,8 @@ func select(li: int, clip_id: String) -> void:
 		select_layer(-1)
 	sel_li = li if clip_id != "" else -1
 	sel_id = clip_id
+	if clip_id != "":
+		last_layer = li
 	sel_kf = null
 	queue_redraw()
 	clip_selected.emit(sel_li, sel_id)
@@ -217,6 +232,8 @@ func select_layer(li: int) -> void:
 		select(-1, "")
 		select_flag("")
 	sel_layer = li
+	if li >= 0:
+		last_layer = li
 	queue_redraw()
 	layer_selected.emit(li)
 
@@ -231,6 +248,16 @@ func _press_header(pos: Vector2, double: bool) -> void:
 	elif li >= 0 and li < n:
 		select_layer(li)
 		_drag = {"layer": li, "from": li}
+
+
+func _zone(pos: Vector2) -> String:
+	if pos.y < TM.RULER_H:
+		return "ruler"
+	if TM.hit_divider(tl, pos.y, scroll_y) >= 0:
+		return "divider"
+	if pos.x < TM.HEADER_W:
+		return "header"
+	return "track" if _clip_at(pos).is_empty() else "clip"
 
 
 ## The clip under `pos` → [layer index, clip] or [] (web hitClip over layerAt).
