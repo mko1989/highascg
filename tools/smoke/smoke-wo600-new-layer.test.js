@@ -3,7 +3,7 @@
 /**
  * WO-600 F / WO-598 thin client — POST /api/scene/new-layer builds the layer a media drop creates in the
  * web compose frame (scenes-compose.js addLayerFromMedia): addLayer (next free number ≥ 10, defaultLayerConfig
- * + editor scene defaults) → setLayerSource (images never loop) → native fill for the content fit
+ * + editor scene defaults) → setLayerSource (images never loop) → the file's trim/mute defaults (WO-592) → native fill for the content fit
  * (fill-math sceneLayerPixelRectForContentFit / pixelRectToFill). Built with the SAME client modules,
  * returned, never stored — the client appends it (deck sync + preview-push as any edit).
  */
@@ -35,6 +35,16 @@ describe('WO-600 new-layer — same layer the web drop builds', () => {
 		assert.deepEqual(L.fill, { x: 1 / 6, y: 1 / 6, scaleX: 2 / 3, scaleY: 2 / 3 }, 'native = 1280×720 centred on 1920×1080')
 		assert.equal(L.opacity, 1)
 		assert.deepEqual(L.pipOverlays, [])
+	})
+	it('WO-592 owner decision: the file\'s trim/mute defaults are copied into the new layer', async () => {
+		const d = deps({ fileDefaults: (v) => (v === 'CLIPS/A' ? { trimInMs: 1500, trimOutMs: 9000, muted: true } : null) })
+		const L = parse(await handleNewLayer(body({ type: 'media', value: 'CLIPS/A' }), {}, d)).layer
+		assert.equal(L.trimInMs, 1500)
+		assert.equal(L.trimOutMs, 9000)
+		assert.equal(L.muted, true)
+		const N = parse(await handleNewLayer(body({ type: 'media', value: 'CLIPS/B' }), {}, d)).layer
+		assert.equal('trimInMs' in N, false, 'no defaults → nothing copied')
+		assert.equal(N.muted, false)
 	})
 	it('images never loop (setLayerSource rule)', async () => {
 		const L = parse(await handleNewLayer(body({ type: 'media', value: 'STILLS/logo.png' }), {}, deps())).layer

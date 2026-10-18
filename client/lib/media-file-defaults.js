@@ -56,4 +56,15 @@ export function withMediaFileDefaults(layer, patch) {
 	return out
 }
 
+/**
+ * WO-611 #5: the fields a NEW layer gets from its file (trim in/out, mute) — for drop paths that set the
+ * source directly (setLayerSource) instead of through patchLayer. {} when the file has no defaults.
+ * Used by the web compose drop and server-side by POST /api/scene/new-layer (Godot client).
+ * @param {{ type?: string, value?: string }} source
+ */
+export function fileDefaultsPatchForNewSource(source) {
+	const { source: _s, ...rest } = withMediaFileDefaults({ source: null }, { source })
+	return rest
+}
+
 if (typeof window !== 'undefined') void refreshMediaFileDefaults()

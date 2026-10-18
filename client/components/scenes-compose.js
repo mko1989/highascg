@@ -14,6 +14,7 @@ import {
 	containRectPreservingAspect,
 } from '../lib/fill-math.js'
 import { fetchMediaContentResolution } from '../lib/mixer-fill.js'
+import { fileDefaultsPatchForNewSource } from '../lib/media-file-defaults.js'
 import { api } from '../lib/api-client.js'
 import { parseDraggableSourcesPayload, routeDropRejectionMessage } from './scenes-shared.js'
 import { resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
@@ -202,6 +203,9 @@ export function renderComposeScene(scene, opts) {
 		if (srcType === 'live_audio') {
 			sceneState.patchLayer(scene.id, idx, { opacity: 0 })
 		}
+		/* WO-611 #5 / WO-592: setLayerSource bypasses the patchLayer file-defaults hook — copy them here. */
+		const fileDefaults = fileDefaultsPatchForNewSource({ type: srcType, value: data.value })
+		if (Object.keys(fileDefaults).length) sceneState.patchLayer(scene.id, idx, fileDefaults)
 		await applyNativeFillForSource(idx, sourcePayloadForFill(data))
 		const updated = sceneState.getScene(scene.id)
 		const layer = updated?.layers?.[idx]

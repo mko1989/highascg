@@ -7,8 +7,8 @@
  * addLayerFromMedia): addLayer → next free layer number ≥ 10 (scene-state-helpers nextLayerNumber) +
  * defaultLayerConfig + editor scene defaults (applySceneLayerDefaults) → setLayerSource (images never loop)
  * → native fill for the layer's content fit (fill-math sceneLayerPixelRectForContentFit → pixelRectToFill).
- * The pure client modules are imported (one implementation). Per-file trim/mute defaults are NOT applied:
- * the web drop goes through setLayerSource, not patchLayer. Nothing is stored — the client appends the
+ * The pure client modules are imported (one implementation). The file's trim/mute defaults ARE applied (WO-592
+ * owner decision; the web compose drop skipped them — fixed there as WO-611 #5). Nothing is stored — the client appends the
  * layer and saves it like any edit (deck sync → preview-push → autosave).
  * Route sources (self-route / recursion rules, WO-156) are refused until those rules move server-side.
  */
@@ -80,6 +80,14 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	layer.contentFit = defaults.contentFit
 	layer.source = { ...src, type, value: String(src.value), label: src.label || String(src.value) }
 	if (IMAGE_RE.test(String(src.value))) layer.loop = false
+	/* WO-592 owner decision (04.10): a dropped clip brings its file's trim/mute defaults — via the web's own
+	 * withMediaFileDefaults (the web compose drop missed this until WO-611 #5). */
+	const fileDefaults = deps.fileDefaults ? deps.fileDefaults(String(src.value)) : require('../media/media-library-registry').getEntryByPath(String(src.value))?.defaults
+	if (fileDefaults && typeof fileDefaults === 'object') {
+		const mfd = await import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', 'media-file-defaults.js')).href)
+		mfd.setLocalMediaFileDefaults(String(src.value), fileDefaults)
+		Object.assign(layer, mfd.fileDefaultsPatchForNewSource(layer.source))
+	}
 
 	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
 	const map = getMap()
