@@ -105,6 +105,7 @@ func _ready() -> void:
 	_inspector = LayerInspector.new()
 	_inspector.visible = false
 	_inspector.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
+	_inspector.status.connect(func(t: String) -> void: _status.text = t)
 	add_child(_inspector)
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)

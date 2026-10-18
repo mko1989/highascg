@@ -3,6 +3,7 @@ extends Control
 ## then the WebSocket (handlers attached first). The WS `state` snapshot is authoritative on every
 ## (re)connect; `change`/`project_sync`/`scene.deck` keep the mirror current.
 
+const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Shell := preload("res://app/shell.gd")
 
@@ -190,6 +191,34 @@ func _ready() -> void:
 			ed8._remove_layer()
 			await get_tree().create_timer(1.5).timeout
 			print("[client] roster done, layers ", ed8._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
+		if Config.args.has("probe-style"):  # dev: --probe-style → layer 2 backup copy, preset from layer 1 → applied to 2, backup pasted, preset removed (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed9: Node = shell.tabs.get_node("Live").editor
+			var st: Node = ed9._inspector._style
+			ed9._select(1)
+			await get_tree().create_timer(0.6).timeout
+			var before := NetUtil.to_json(ed9._layers()[1])
+			st._btn_named("Copy").pressed.emit()
+			ed9._select(0)
+			await get_tree().create_timer(0.6).timeout
+			var pid: String = st.save_preset("probe style")
+			ed9._select(1)
+			await get_tree().create_timer(0.6).timeout
+			st._presets.item_selected.emit(st._presets.item_count - 1)
+			await get_tree().create_timer(1.5).timeout
+			print("[client] style applied: L11 fill ", ed9._layers()[1].fill, " effects ", ed9._layers()[1].get("effects"), " | ", ed9._status.text)
+			st._btn_named("Paste").pressed.emit()
+			await get_tree().create_timer(1.5).timeout
+			var list: Array = Store.project.scenes.layerPresets
+			for i in range(list.size() - 1, -1, -1):
+				if str(list[i].id) == pid:
+					list.remove_at(i)
+			ProjectSync.deck_changed()
+			ProjectSync.mark_dirty()
+			await get_tree().create_timer(4.0).timeout
+			print("[client] style restored: L11 fill ", ed9._layers()[1].fill, " effects ", ed9._layers()[1].get("effects"), " presets ", list.size())
+			print("[client] style before ", before)
+			print("[client] style after  ", NetUtil.to_json(ed9._layers()[1]))
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor

@@ -13,6 +13,7 @@ const PipModel := preload("res://features/live/pip_model.gd")
 const TemplateSection := preload("res://features/live/template_section.gd")
 const LowerThirdSection := preload("res://features/live/lower_third_section.gd")
 const CountdownSection := preload("res://features/live/countdown_section.gd")
+const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const STARTS := [["beginning", "Start from beginning"], ["relativeToPrevious", "Relative to the clip playing on this layer"]]
@@ -29,12 +30,18 @@ var _pip: PipSection
 var _tpl: TemplateSection
 var _lt: LowerThirdSection
 var _cd: CountdownSection
+var _style: LayerStyleRow
+signal status(text: String)
 var _content_key := ""
 var _content := Vector2i.ZERO
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 4)
+	_style = LayerStyleRow.new()
+	_style.patch.connect(func(p: Dictionary) -> void: patch.emit(p))
+	_style.status.connect(func(t: String) -> void: status.emit(t))
+	add_child(_style)
 	var g := GridContainer.new()
 	g.columns = 2
 	add_child(g)
@@ -102,6 +109,7 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary, index := -1) 
 	if not layer.is_empty():
 		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content)
 		_pip.show_overlays(PipModel.from_layer(layer))
+		_style.show_layer(layer)
 		_tpl.show_layer(look_id, main_idx, layer)
 		_lt.show_layer(look_id, main_idx, layer)
 		_cd.show_layer(look_id, main_idx, layer, index)
