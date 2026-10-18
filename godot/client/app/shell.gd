@@ -5,6 +5,7 @@ extends VBoxContainer
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LiveTab := preload("res://features/live/live_tab.gd")
 const PrevisTab := preload("res://features/previs/previs_tab.gd")
+const TimelineTab := preload("res://features/timeline/timeline_tab.gd")
 
 var _eye: Label
 var _project: Label
@@ -24,9 +25,12 @@ func _ready() -> void:
 	var previs := PrevisTab.new()
 	previs.name = "Previs"
 	tabs.add_child(previs)
+	var timeline := TimelineTab.new()  # WO-602
+	timeline.name = "Timeline"
+	tabs.add_child(timeline)
 	if Config.args.has("tab"):
 		tabs.current_tab = clampi(int(Config.args["tab"]), 0, tabs.get_tab_count() - 1)
-	for t in [["Inspector", "WO-601"], ["Timeline", "WO-602"], ["Media", "WO-603"], ["Audio", "WO-604"],
+	for t in [["Inspector", "WO-601"], ["Media", "WO-603"], ["Audio", "WO-604"],
 			["Devices", "WO-605"], ["Settings", "WO-608"]]:
 		tabs.add_child(_placeholder(t[0], t[1]))
 	Ws.connected.connect(_refresh_eye)

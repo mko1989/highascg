@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation + port plan written; nothing implemented. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead) DONE, box-verified; editing slices open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -50,7 +50,37 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   (project JSON round-trip diff = ∅).
 - Snap/interp/timecode pure-module tests identical to the JS ones.
 
-## What was done / What was VERIFIED
+## What was done
 
-Nothing yet. Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku inventory's
+### Slice 1 (2026-10-18) — view + transport
+
+- `godot/client/features/timeline/timeline_math.gd` — 1:1 pure ports: `fmtTimecode` / `fmtSmpte` /
+  `fmtHms` / `parseTcInput` (timeline-canvas-utils.js), `ensureLayerHeights` + track geometry
+  (lib/timeline-track-heights.js; note the web maps a below-min height to the DEFAULT 54, not the min
+  28 — kept), ruler nice-interval (≥ 55 px), x↔ms, wheel zoom ×1.18 clamped 0.0001–5 px/ms, the
+  server-tick clock (snap when the server is > 80 ms ahead, ignore when ≤ 35 ms behind), `hitClip`,
+  `uid`, `defaultTimeline`.
+- `timeline_view.gd` — custom `Control._draw`: tracks, clips in the layer palette with labels, flags,
+  past-the-end shade, headers, ruler with sub-ticks, playhead. Wheel zooms around the cursor,
+  Shift/Alt+wheel pans; click/drag on the ruler seeks. Page-follow while playing.
+- `timeline_tab.gd` — picker, ＋ New, ■ / ▶ ❚❚, SMPTE readout, PRV / PGM send-to, Fit, Follow.
+  Timelines live in `Store.project.timelines` (same JSON as the web; autosave carries it). Before play
+  the timeline is pushed to the engine like the web's syncToServer (PUT, POST when missing), then
+  seek → sendto → play {from, sendTo}; Stop is `{force:true}` (WO-552 operator stop).
+  **Deviation from the plan:** no `TimelineState` autoload yet — slice 1 reads/writes the project slice
+  directly; the autoload comes with the editing slice that needs undo/selection.
+- `app/shell.gd` — Timeline tab after Previs (placeholder removed).
+
+## What was VERIFIED
+
+- Godot unit tests 665/0 (`test_timeline_math.gd` goldens generated from the web modules under node);
+  `run-client.sh --check` boot clean.
+- Box, GUI on the operator monitor driven by XTest clicks: ＋ New → `GET /api/timelines` shows the
+  timeline on the engine and `GET /api/project` has `timelines.activeId` = it (autosave). ▶ → engine
+  `{position 3504, playing true}` while the GUI playhead / SMPTE track it; ❚❚ → `playing false`;
+  ruler click at 10 s → engine `position 10254`, GUI `00:00:10:06` (25 fps ✓); ■ → `position 0`.
+- Owner-QA open: everything editing (next slices: clip move/resize, keyframes with eased preview,
+  flags, source drops, clip/flag/layer inspector).
+
+Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku inventory's
 "easing is ignored" holds only for the client preview.
