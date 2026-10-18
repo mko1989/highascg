@@ -10,6 +10,8 @@ const X := preload("res://features/live/mixer_math.gd")
 const EffectsSection := preload("res://features/live/effects_section.gd")
 const PipSection := preload("res://features/live/pip_section.gd")
 const PipModel := preload("res://features/live/pip_model.gd")
+const TemplateSection := preload("res://features/live/template_section.gd")
+const LowerThirdSection := preload("res://features/live/lower_third_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const STARTS := [["beginning", "Start from beginning"], ["relativeToPrevious", "Relative to the clip playing on this layer"]]
@@ -23,6 +25,8 @@ var _w := {}
 var _syncing := false
 var _fx: EffectsSection
 var _pip: PipSection
+var _tpl: TemplateSection
+var _lt: LowerThirdSection
 var _content_key := ""
 var _content := Vector2i.ZERO
 
@@ -60,6 +64,12 @@ func _ready() -> void:
 	fade.add_child(_check("fade", func(on: bool) -> void: _emit({"fadeOnEnd": {"enabled": on}})))
 	fade.add_child(_spin("fade_fr", 1, 250, 1, func(v: float) -> void: _emit({"fadeOnEnd": {"frames": int(v)}})))
 	_row(g, "Fade on end (fr)", fade)
+	_tpl = TemplateSection.new()  # web order: mixer → HTML template → lower third → countdown → effects
+	_tpl.patch.connect(func(p: Dictionary) -> void: patch.emit(p))
+	add_child(_tpl)
+	_lt = LowerThirdSection.new()
+	_lt.patch.connect(func(p: Dictionary) -> void: patch.emit(p))
+	add_child(_lt)
 	add_child(HSeparator.new())
 	_fx = EffectsSection.new()
 	_fx.changed.connect(func(fx: Array) -> void: patch.emit({"effects": fx}))
@@ -87,6 +97,8 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary) -> void:
 	if not layer.is_empty():
 		_fx.show_effects(layer.get("effects", []) if layer.get("effects") is Array else [], _content)
 		_pip.show_overlays(PipModel.from_layer(layer))
+		_tpl.show_layer(look_id, main_idx, layer)
+		_lt.show_layer(look_id, main_idx, layer)
 		_refresh_content()
 
 

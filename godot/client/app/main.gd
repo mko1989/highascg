@@ -108,6 +108,41 @@ func _ready() -> void:
 			await step.call("-border")
 			ed4._apply_layer({"pipOverlays": before})
 			await step.call("restored")
+		if Config.args.has("probe-cg"):  # dev: --probe-cg → LT layer: title, Play, Play (out), Delete; timers layer: compact, Reload; both removed (WO-601)
+			await get_tree().create_timer(1.5).timeout
+			var ed5: Node = shell.tabs.get_node("Live").editor
+			var lts: Node = ed5._inspector._lt
+			var wait := func(s: float, label: String) -> void:
+				await get_tree().create_timer(s).timeout
+				print("[client] cg ", label, " | ", lts._status.text if is_instance_valid(lts._status) else "")
+			await ed5.add_layer_from_source({"type": "template", "value": "lower-thirds/lt-classic-box", "label": "Classic Box"})
+			await wait.call(2.0, "lt added")
+			var le := lts.find_children("*", "LineEdit", true, false)[0] as LineEdit
+			le.text = "Jan Kowalski"
+			le.text_changed.emit(le.text)
+			await wait.call(1.2, "title typed, cgData.name=%s" % ed5._layers()[ed5._sel].get("cgData", {}).get("name"))
+			var btn := func(t: String) -> void: (lts.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == t)[0] as Button).pressed.emit()
+			btn.call("▶ Play")
+			await wait.call(2.5, "play")
+			btn.call("▶ Play")
+			await wait.call(2.5, "play again")
+			btn.call("Delete")
+			await wait.call(1.5, "delete")
+			ed5._remove_layer()
+			await wait.call(1.5, "lt layer removed")
+			await ed5.add_layer_from_source({"type": "template", "value": "playback_timers.html", "label": "Timers"})
+			await get_tree().create_timer(2.0).timeout
+			var tps: Node = ed5._inspector._tpl
+			var compact := tps.find_children("*", "CheckBox", true, false).filter(func(c: CheckBox) -> bool: return c.text == "Compact mode")[0] as CheckBox
+			compact.button_pressed = true
+			await get_tree().create_timer(1.5).timeout
+			print("[client] cg timersConfig ", ed5._layers()[ed5._sel].source.get("timersConfig"))
+			(tps.find_children("*", "Button", true, false).filter(func(b: Button) -> bool: return b.text == "Reload page")[0] as Button).pressed.emit()
+			await get_tree().create_timer(1.5).timeout
+			print("[client] cg reload | ", tps._status.text)
+			ed5._remove_layer()
+			await get_tree().create_timer(1.5).timeout
+			print("[client] cg done, layers ", ed5._layers().map(func(l: Dictionary) -> int: return int(l.layerNumber)))
 		if Config.args.has("probe-add-media"):  # dev: --probe-add-media=<media id> (drop equivalent)
 			await get_tree().create_timer(1.5).timeout
 			var ed: Node = shell.tabs.get_node("Live").editor

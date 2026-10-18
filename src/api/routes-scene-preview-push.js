@@ -133,7 +133,12 @@ async function registerStagedScene(ctx, scene, map, mainIdx, prvCh) {
 	const { stripEphemeralTakeFields } = require('./routes-scene-shared')
 	const liveSceneState = require('../state/live-scene-state')
 	const incoming = await buildServerIncomingScene(scene, { mainIdx, channelMap: map, pgmOnly: false })
+	const sources = (sc) => JSON.stringify((sc?.layers || []).map((l) => l?.source ?? null))
+	const before = sources(liveSceneState.getChannel(prvCh)?.scene)
 	await liveSceneState.setChannel(prvCh, { sceneId: String(scene.id), scene: stripEphemeralTakeFields(incoming) })
+	/* WO-601: templates read scene.live (playback_timers.js timersConfig) — tell listeners when a source changed,
+	 * not on every geometry tick. */
+	if (sources(incoming) !== before) liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
 }
 
 module.exports = { handlePreviewPush, decidePreviewPush, removedEffectTypes, NUDGE_MAX_LAYERS }

@@ -283,6 +283,8 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 						isPlaceholder: !!l.source.isPlaceholder,
 						template: l.source.template,
 						...(l.source.parameters != null ? { parameters: l.source.parameters } : {}),
+						/* WO-601: playback_timers.html reads its config from scene.live (template/playback_timers.js) */
+						...(l.source.timersConfig && typeof l.source.timersConfig === 'object' ? { timersConfig: JSON.parse(JSON.stringify(l.source.timersConfig)) } : {}),
 						...(ltCfg ? { lowerThirdConfig: JSON.parse(JSON.stringify(ltCfg)) } : {}),
 					}
 				: null,

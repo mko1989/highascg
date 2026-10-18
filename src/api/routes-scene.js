@@ -33,6 +33,15 @@ async function handlePost(path, body, ctx) {
 		// WO-601: refit a layer for its content sizing (web reapplyLayerFrameForContentFit) — computed, not stored.
 		return handleLayerFit(body, ctx)
 	}
+	if (path === '/api/scene/layer-reload') {
+		// WO-601: HTML template "Reload page" with server-resolved channels + physical layers.
+		if (!ctx.amcp) return null
+		return require('./routes-scene-layer-tools').handleLayerReload(body, ctx)
+	}
+	if (path === '/api/scene/lower-third') {
+		// WO-601: Godot lower-third inspector actions (resolve / update / play / clear), web lower-third-cg-data.js.
+		return require('./routes-scene-lower-third').handleSceneLowerThird(body, ctx)
+	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null
 		return handleAudioOnlyLookStop(body, ctx)
