@@ -215,6 +215,25 @@ function resolveSceneById(sceneId) {
 	return scenes.find((s) => s && String(s.id) === id) || null
 }
 
+/**
+ * WO-598: the look as the server knows it RIGHT NOW. Edits arrive as `scene_deck_sync` and are applied to
+ * `ctx.sceneDeck.sceneSnapshots` immediately (after validation), while the disk copy is written 750 ms
+ * later (scheduleDeckSyncPersist) — resolving from disk made a take / PRV push right after an edit use the
+ * previous version. Falls back to the stored project.
+ * @param {object | null | undefined} ctx
+ * @param {string} sceneId
+ */
+function resolveLiveSceneById(ctx, sceneId) {
+	if (sceneId == null || !String(sceneId).trim()) return null
+	const id = String(sceneId).trim()
+	const snaps = ctx?.sceneDeck?.sceneSnapshots
+	if (Array.isArray(snaps)) {
+		const hit = snaps.find((s) => s && String(s.id) === id)
+		if (hit) return hit
+	}
+	return resolveSceneById(id)
+}
+
 /** @param {object | null | undefined} project */
 function sceneIdSet(project) {
 	const scenes = project?.scenes?.scenes
@@ -229,6 +248,7 @@ module.exports = {
 	extractSceneDeckFromProjectScenes,
 	buildSceneDeckForApi,
 	resolveSceneById,
+	resolveLiveSceneById,
 	applyLiveSceneDeckToCtx,
 	sceneIdSet,
 }

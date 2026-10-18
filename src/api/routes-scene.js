@@ -6,6 +6,7 @@ const { handlePreviewLiveRegister, handlePreviewLiveClear } = require('./routes-
 const { handleBorderLines, handleBorderPresetCrossfade } = require('./routes-scene-border')
 const { handleGlobalBorderControl } = require('./routes-scene-global-border')
 const { handleTakeLook } = require('./routes-scene-take-look')
+const { handlePreviewPush } = require('./routes-scene-preview-push')
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
@@ -16,6 +17,11 @@ async function handlePost(path, body, ctx) {
 		// WO-598 C1: take / stage a stored look by id — payload built server-side.
 		if (!ctx.amcp) return null
 		return handleTakeLook(body, ctx)
+	}
+	if (path === '/api/scene/preview-push') {
+		// WO-598 C2: re-push an edited look onto PRV by id — nudge (geometry) or re-take (content), server-decided.
+		if (!ctx.amcp) return null
+		return handlePreviewPush(body, ctx)
 	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null

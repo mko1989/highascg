@@ -25,8 +25,8 @@ async function handleTakeLook(body, ctx, deps = {}) {
 	const b = parseBody(body)
 	const sceneId = String(b.sceneId || '').trim()
 	if (!sceneId) return bad(400, 'sceneId required')
-	const resolveScene = deps.resolveSceneById || require('../engine/project-scenes-transform').resolveSceneById
-	const scene = resolveScene(sceneId)
+	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
+	const scene = deps.resolveSceneById ? deps.resolveSceneById(sceneId) : resolveLiveSceneById(ctx, sceneId)
 	if (!scene) return bad(404, `look ${sceneId} not found in the stored project`)
 
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
