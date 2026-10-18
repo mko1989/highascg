@@ -186,6 +186,30 @@ func _ready() -> void:
 		ins2._mute.button_pressed = true
 		await get_tree().create_timer(0.6).timeout
 		print("[client] media defaults ", ins2._defaults, " usage ", ins2._usage.size())
+	if Config.args.has("probe-timers"):  # dev: --probe-timers=<main> → add, start, pause, px, fade in, opacity, fade out, remove (WO-601)
+		if not Ws.is_open:
+			await Ws.connected
+		await get_tree().create_timer(1.5).timeout
+		var lt7: Node = shell.tabs.get_node("Live")
+		lt7.deck.timers_requested.emit(int(Config.args["probe-timers"]), "Main")
+		await get_tree().create_timer(1.5).timeout
+		var tp: Node = lt7.timers
+		await tp._add_timer()
+		var rec: Dictionary = tp._records[0]
+		print("[client] timers added ", rec.timerId, " name ", rec.get("name"), " screens ", rec.get("screens"))
+		await tp._post("/api/timers/cmd", {"timerId": rec.timerId, "cmd": "start"})
+		await get_tree().create_timer(2.2).timeout
+		print("[client] timers running readout ", tp._readouts[rec.timerId].text)
+		await tp._post("/api/timers/cmd", {"timerId": rec.timerId, "cmd": "pause"})
+		await tp._apply(tp._records[0], {"posX": 100, "posY": 50})
+		await tp._visible(rec.timerId, true, 25)
+		await get_tree().create_timer(1.2).timeout
+		await tp._visible(rec.timerId, true, 0, 0.5)
+		await tp._visible(rec.timerId, false, 25)
+		await get_tree().create_timer(1.2).timeout
+		print("[client] timers before remove ", tp._records[0].screens, " readout ", tp._readouts[rec.timerId].text)
+		await tp._post("/api/timers/unassign", {"timerId": rec.timerId, "screenIdx": int(Config.args["probe-timers"])})
+		print("[client] timers after remove ", tp._records.size())
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))

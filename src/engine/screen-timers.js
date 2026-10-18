@@ -120,14 +120,16 @@ function assignTimerToScreen(opts) {
 		if (existing.channel === channel) {
 			// Re-assign to same screen: merge config and emit CG UPDATE
 			if (name !== undefined) record.name = name
+			const prevDurationSec = Number(record.config?.durationSec)
 			if (config !== undefined) {
 				record.config = { ...record.config, ...config }
 			}
 
-			// A duration change must land on the LIVE countdown now, not just seed the next
-			// Start, or a running/overrun timer keeps ticking from its stale anchor.
-			const changingDuration =
-				config && Object.prototype.hasOwnProperty.call(config, 'durationSec') && (record.config.mode || 'duration') === 'duration'
+			// A duration change must land on the LIVE countdown now, not just seed the next Start, or a running/overrun
+			// timer keeps ticking from its stale anchor. WO-601: only a CHANGED one — every settings save re-sends the
+			// whole config (saveTimerConfigPatch), which restarted running timers and reset paused ones.
+			const changingDuration = config && Object.prototype.hasOwnProperty.call(config, 'durationSec') &&
+				Number(config.durationSec) !== prevDurationSec && (record.config.mode || 'duration') === 'duration'
 			if (changingDuration && record.lastCmd === 'start') {
 				record.cmdAt = Date.now()
 				record.remainingSec = null
@@ -136,9 +138,7 @@ function assignTimerToScreen(opts) {
 			}
 
 			const lines = []
-			const cgPayload = {
-				...record.config,
-			}
+			const cgPayload = { ...record.config }
 			// CG UPDATE with new config JSON payload
 			lines.push(`CG ${channel}-${existing.layer} UPDATE ${CG_SUBLAYER} ${param(JSON.stringify(cgPayload))}`)
 
