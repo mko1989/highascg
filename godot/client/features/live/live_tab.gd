@@ -8,10 +8,12 @@ const OscMirror := preload("res://features/live/osc_mirror.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
 const T := preload("res://features/live/transitions.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
+const LookEditor := preload("res://features/live/look_editor.gd")
 
 var _video: TextureRect
 var _no_signal: Label
 var deck: DeckView
+var editor: LookEditor
 var _action: Label
 
 
@@ -53,7 +55,16 @@ func _ready() -> void:
 	deck.osc_mirror = osc
 	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	deck.custom_minimum_size.y = 260  # a ScrollContainer has no content minimum — without this it collapses
-	bottom.add_child(deck)
+	var split := HSplitContainer.new()
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	bottom.add_child(split)
+	deck.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.add_child(deck)
+	editor = LookEditor.new()
+	editor.custom_minimum_size.x = 560
+	editor.visible = false
+	split.add_child(editor)
+	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))

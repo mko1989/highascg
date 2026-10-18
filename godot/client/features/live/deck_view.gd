@@ -11,6 +11,7 @@ const TimerView := preload("res://features/live/pgm_timer_view.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
 
 signal action_result(text: String, ok: bool)
+signal edit_requested(scene_id: String, main: int)
 
 var _columns: HBoxContainer
 var _dirty := true
@@ -200,6 +201,8 @@ func _card_menu(scene_id: String, main: int) -> void:
 	pm.add_item("Rename…", 0)
 	pm.add_item("Transition…", 1)
 	pm.add_item("Use default transition", 2)
+	pm.add_separator()
+	pm.add_item("Edit look…", 3)
 	pm.id_pressed.connect(_on_card_menu.bind(scene_id, main))
 	pm.popup_hide.connect(pm.queue_free)
 	add_child(pm)
@@ -211,6 +214,8 @@ func _on_card_menu(id: int, scene_id: String, main: int) -> void:
 		_prompt_rename(scene_id)
 	elif id == 1:
 		_prompt_transition(scene_id, main)
+	elif id == 3:
+		edit_requested.emit(scene_id, main)
 	elif id == 2:
 		set_look_transition(scene_id, _scenes_root().get("globalDefaultTransition", T.default_transition()))
 

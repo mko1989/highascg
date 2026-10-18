@@ -44,6 +44,10 @@ func _ready() -> void:
 		print("[client] transition ", lt3.deck.set_look_transition(tp[0], {"type": tp[1], "duration": int(tp[2])}))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
+	if Config.args.has("probe-edit"):  # dev: --probe-edit=<sceneId> opens the look editor (WO-600 F)
+		if not Ws.is_open:
+			await Ws.connected
+		shell.tabs.get_node("Live").editor.open(str(Config.args["probe-edit"]), 0)
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
