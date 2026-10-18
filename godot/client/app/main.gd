@@ -36,6 +36,14 @@ func _ready() -> void:
 		print("[client] rename ", lt2.deck.rename_look(kv[0], kv[1]))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
+	if Config.args.has("probe-transition"):  # dev: --probe-transition=<sceneId>:<TYPE>:<frames> (WO-600 I)
+		var tp := str(Config.args["probe-transition"]).split(":")
+		if not Ws.is_open:
+			await Ws.connected
+		var lt3: Node = shell.tabs.get_node("Live")
+		print("[client] transition ", lt3.deck.set_look_transition(tp[0], {"type": tp[1], "duration": int(tp[2])}))
+		await ProjectSync.saved
+		print("[client] saved rev ", Store.project.get("rev"))
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		var lt: Node = shell.tabs.get_node("Live")
 		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))

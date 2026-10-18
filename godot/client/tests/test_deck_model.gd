@@ -71,3 +71,11 @@ func test_prv_never_equals_pgm() -> void:
 func test_screen_label() -> void:
 	t.eq(DeckModel.screen_label({"screenLabels": ["LED", ""]}, 0), "LED")
 	t.eq(DeckModel.screen_label({"screenLabels": ["LED", ""]}, 1), "Main 2")
+
+
+func test_preview_bus_available() -> void:
+	t.ok(DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": [2]}, 0), "pgm 1 + prv 2 → PRV bus")
+	t.ok(not DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": [1]}, 0), "prv == pgm → PGM-only")
+	t.ok(not DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": []}, 0), "no prv → PGM-only")
+	t.ok(not DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": [2], "previewEnabledByMain": [false]}, 0), "preview disabled")
+	t.ok(DeckModel.preview_bus_available({"previewChannels": [3]}, 0), "prv without pgm → available")

@@ -71,3 +71,26 @@ static func screen_label(channel_map: Dictionary, idx: int) -> String:
 	if idx < labels.size() and str(labels[idx]) != "":
 		return str(labels[idx])
 	return "Main %d" % (idx + 1)
+
+
+## web isPreviewBusAvailable (client/lib/scenes-preview-look-stack.js): false → PGM-only main
+## (transitions limited to CUT / "+ ANIMATE" types on take).
+static func preview_bus_available(cm: Dictionary, main_idx: int) -> bool:
+	var pe: Variant = cm.get("previewEnabledByMain")
+	if pe is Array and main_idx < (pe as Array).size() and pe[main_idx] == false:
+		return false
+	var pgm := _num_at(cm.get("programChannels"), main_idx)
+	if is_nan(pgm):
+		pgm = _num_at(cm.get("playbackChannels"), main_idx)
+	var prv := _num_at(cm.get("previewChannels"), main_idx)
+	if is_nan(prv) or prv <= 0.0:
+		return false
+	if is_nan(pgm) or pgm <= 0.0:
+		return true
+	return prv != pgm
+
+
+static func _num_at(arr: Variant, i: int) -> float:
+	if arr is Array and i < (arr as Array).size() and (arr[i] is int or arr[i] is float):
+		return float(arr[i])
+	return NAN

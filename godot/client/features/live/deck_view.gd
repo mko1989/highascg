@@ -5,12 +5,17 @@ extends ScrollContainer
 
 const DeckModel := preload("res://features/live/deck_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const T := preload("res://features/live/transitions.gd")
+const E := preload("res://features/live/look_edits.gd")
+const TimerView := preload("res://features/live/pgm_timer_view.gd")
+const TransitionRow := preload("res://features/live/transition_row.gd")
 
 signal action_result(text: String, ok: bool)
 
 var _columns: HBoxContainer
 var _dirty := true
 var _main_for_card := 0
+var osc_mirror: Node  # WO-600 O: set by the live tab before the first rebuild
 
 
 func _ready() -> void:
@@ -73,6 +78,9 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	ftb.pressed.connect(func() -> void: request_ftb(main, cm))
 	head_row.add_child(ftb)
 	col.add_child(head_row)
+	var timer := TimerView.new()
+	timer.setup(osc_mirror, main)
+	col.add_child(timer)
 	for s in looks:
 		col.add_child(_card(s, bus))
 	return col
@@ -92,7 +100,7 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, border, 3 if (on_pgm or on_prv) else 1))
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
-	card.tooltip_text = "Click: stage on PRV · Double-click: TAKE to PGM · Right-click: rename"
+	card.tooltip_text = "Click: stage on PRV · Double-click: TAKE to PGM · Right-click: rename / transition"
 	card.gui_input.connect(_on_card_input.bind(id, _main_for_card))
 	var v := VBoxContainer.new()
 	card.add_child(v)
@@ -103,6 +111,9 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	var meta := Label.new()
 	var layers: Array = scene.get("layers", [])
 	var tags := PackedStringArray(["%d layers" % layers.size()])
+	var tr := E.short_label(scene.get("defaultTransition"), _fps(_main_for_card))
+	if tr != "":
+		tags.append(tr)
 	if on_pgm:
 		tags.append("PGM")
 	if on_prv:
@@ -118,7 +129,7 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 func _on_card_input(event: InputEvent, scene_id: String, main: int) -> void:
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
-		_prompt_rename(scene_id)
+		_card_menu(scene_id, main)
 		return
 	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
@@ -181,3 +192,87 @@ func _prompt_rename(scene_id: String) -> void:
 	dlg.popup_centered()
 	edit.grab_focus()
 	edit.select_all()
+
+
+## Right-click on a look: Rename… · Transition… · Use default transition.
+func _card_menu(scene_id: String, main: int) -> void:
+	var pm := PopupMenu.new()
+	pm.add_item("Rename…", 0)
+	pm.add_item("Transition…", 1)
+	pm.add_item("Use default transition", 2)
+	pm.id_pressed.connect(_on_card_menu.bind(scene_id, main))
+	pm.popup_hide.connect(pm.queue_free)
+	add_child(pm)
+	pm.popup(Rect2i(Vector2i(get_global_mouse_position()) + get_window().position, Vector2i.ZERO))
+
+
+func _on_card_menu(id: int, scene_id: String, main: int) -> void:
+	if id == 0:
+		_prompt_rename(scene_id)
+	elif id == 1:
+		_prompt_transition(scene_id, main)
+	elif id == 2:
+		set_look_transition(scene_id, _scenes_root().get("globalDefaultTransition", T.default_transition()))
+
+
+func _prompt_transition(scene_id: String, main: int) -> void:
+	var cur: Variant = null
+	for s in _scenes_root().get("scenes", []):
+		if str(s.get("id", "")) == scene_id:
+			cur = s.get("defaultTransition")
+	var dlg := AcceptDialog.new()
+	dlg.title = "Look transition"
+	var row := TransitionRow.new()
+	var pgm_only := not DeckModel.preview_bus_available(_cm(), main)
+	row.setup(cur if cur is Dictionary else T.default_transition(_fps(main)), pgm_only)
+	row.changed.connect(func(tr: Dictionary) -> void: set_look_transition(scene_id, tr))
+	dlg.add_child(row)
+	dlg.confirmed.connect(dlg.queue_free)
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func set_look_transition(scene_id: String, tr: Dictionary) -> bool:
+	if not E.set_look_transition(_scenes_root(), scene_id, tr):
+		return false
+	_commit_looks()
+	action_result.emit("Transition: %s" % E.short_label(tr, 50.0), true)
+	return true
+
+
+func set_global_default(tr: Dictionary) -> void:
+	E.set_global_default(_scenes_root(), tr)
+	Store.project_changed.emit(Store.project)
+	ProjectSync.mark_dirty()
+
+
+func apply_default_to_all() -> int:
+	var n := E.apply_default_to_all(_scenes_root(), DeckModel.screen_count(_cm()))
+	_commit_looks()
+	action_result.emit("Default transition applied to %d look(s)" % n, true)
+	return n
+
+
+## Looks changed: deck sync + autosave (same path as rename).
+func _commit_looks() -> void:
+	Store.project_changed.emit(Store.project)
+	ProjectSync.send_deck_sync(true)
+	ProjectSync.mark_dirty(true)
+
+
+func _scenes_root() -> Dictionary:
+	if not (Store.project.get("scenes") is Dictionary):
+		Store.project["scenes"] = {"scenes": []}
+	return Store.project.scenes
+
+
+func _cm() -> Dictionary:
+	return Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+
+
+func _fps(main: int) -> float:
+	var res_list: Variant = _cm().get("programResolutions", [])
+	if res_list is Array and main < (res_list as Array).size() and res_list[main] is Dictionary:
+		return float((res_list[main] as Dictionary).get("fps", 50))
+	return 50.0
