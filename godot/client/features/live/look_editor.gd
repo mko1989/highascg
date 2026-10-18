@@ -8,6 +8,7 @@ signal closed
 const C := preload("res://features/live/compose_math.gd")
 const Pusher := preload("res://features/live/preview_pusher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const E := preload("res://features/live/look_edits.gd")
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -53,7 +54,15 @@ func _ready() -> void:
 	_video.stretch_mode = TextureRect.STRETCH_SCALE
 	_video.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_frame.add_child(_video)
+	_frame.set_drag_forwarding(Callable(), _can_drop, _drop)
 	add_child(_frame)
+	var ops := HBoxContainer.new()
+	for spec in [["Remove layer", _remove_layer], ["▲ Up", func() -> void: _move_layer(1)], ["▼ Down", func() -> void: _move_layer(-1)]]:
+		var bt := Button.new()
+		bt.text = spec[0]
+		bt.pressed.connect(spec[1])
+		ops.add_child(bt)
+	add_child(ops)
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 90
 	_list.item_selected.connect(func(i: int) -> void: _select(i))
@@ -285,3 +294,55 @@ func _hold(on: bool) -> void:
 static func _short(s: String) -> String:
 	var seg := s.replace("\\", "/").split("/", false)
 	return seg[seg.size() - 1] if not seg.is_empty() else s
+
+
+## --- WO-600 K: drop media from the Sources panel → server builds the layer (web rules) → append + push.
+func _can_drop(_at: Vector2, data: Variant) -> bool:
+	return data is Dictionary and str((data as Dictionary).get("value", "")) != "" and scene_id != ""
+
+
+func _drop(_at: Vector2, data: Variant) -> void:
+	add_layer_from_source(data)
+
+
+func add_layer_from_source(src: Dictionary) -> bool:
+	var res: Dictionary = await Api.post_json("/api/scene/new-layer", {"sceneId": scene_id, "mainIdx": main, "source": src})
+	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("layer") is Dictionary):
+		_status.text = "Add layer refused: %s" % res.error
+		return false
+	var lk := look()
+	if not (lk.get("layers") is Array):
+		lk["layers"] = []
+	(lk.layers as Array).append(res.data.layer)
+	_refresh_list()
+	_select((lk.layers as Array).size() - 1)
+	pusher.schedule(scene_id, main)
+	return true
+
+
+func _remove_layer() -> void:
+	var layers := _layers()
+	if _sel < 0 or _sel >= layers.size():
+		return
+	layers.remove_at(_sel)
+	_sel = -1
+	_refresh_list()
+	pusher.schedule(scene_id, main)
+
+
+## +1 = up the stack (higher layer number), like dragging a row in the web layer strip.
+func _move_layer(dir: int) -> void:
+	var layers := _layers()
+	if _sel < 0 or _sel >= layers.size():
+		return
+	var picked: Dictionary = layers[_sel]
+	var sorted := layers.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("layerNumber", 0)) < float(b.get("layerNumber", 0)))
+	var vi := sorted.find(picked)
+	var next: Variant = E.reorder_layers(layers, vi, vi + dir)
+	if next == null:
+		return
+	look()["layers"] = next
+	_refresh_list()
+	_select((next as Array).find(picked))
+	pusher.schedule(scene_id, main)

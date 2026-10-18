@@ -9,6 +9,7 @@ const TransitionRow := preload("res://features/live/transition_row.gd")
 const T := preload("res://features/live/transitions.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const LookEditor := preload("res://features/live/look_editor.gd")
+const MediaPanel := preload("res://features/live/media_panel.gd")
 
 var _video: TextureRect
 var _no_signal: Label
@@ -58,12 +59,18 @@ func _ready() -> void:
 	var split := HSplitContainer.new()
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bottom.add_child(split)
+	var sources := MediaPanel.new()
+	sources.custom_minimum_size.x = 260
+	split.add_child(sources)
+	var inner := HSplitContainer.new()
+	inner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	split.add_child(inner)
 	deck.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	split.add_child(deck)
+	inner.add_child(deck)
 	editor = LookEditor.new()
 	editor.custom_minimum_size.x = 560
 	editor.visible = false
-	split.add_child(editor)
+	inner.add_child(editor)
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text

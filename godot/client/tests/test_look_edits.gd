@@ -40,3 +40,12 @@ func test_short_label() -> void:
 	t.eq(E.short_label({"type": "WIPE + ANIMATE", "duration": 30}, 50.0), "Wipe + Animate 30 fr", "label")
 	t.eq(E.short_label({"type": "CUT", "duration": 0}, 50.0), "CUT", "cut")
 	t.eq(E.short_label(null, 50.0), "", "none")
+
+
+func test_reorder_layers_like_web() -> void:
+	var ls := [{"layerNumber": 12, "n": "c"}, {"layerNumber": 10, "n": "a"}, {"layerNumber": 11, "n": "b"}]
+	var out: Variant = E.reorder_layers(ls, 0, 2)
+	t.eq((out as Array).map(func(l: Dictionary) -> String: return l.n), ["b", "c", "a"], "a moved to the top of the stack (visual order by layerNumber)")
+	t.eq((out as Array).map(func(l: Dictionary) -> int: return int(l.layerNumber)), [10, 11, 12], "renumbered from 10")
+	t.ok(E.reorder_layers(ls, 1, 1) == null, "same index → null")
+	t.ok(E.reorder_layers(ls, 0, 5) == null, "out of range → null")

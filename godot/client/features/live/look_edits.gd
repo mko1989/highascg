@@ -59,3 +59,20 @@ static func short_label(t: Variant, fps: float) -> String:
 	var d: Variant = (t as Dictionary).get("duration")
 	var dur := ("auto %d fr" % T.resolve_duration(d, fps)) if T.is_auto_duration(d) else ("%d fr" % T.resolve_duration(d, fps))
 	return "%s %s" % [T.LABELS.get(ty, ty), dur]
+
+
+## web scene-state-layer-logic.js reorderLayers: sort by layerNumber, move visual index, renumber from 10 step 1.
+## Returns the new array or null when nothing changes (same contract as the JS).
+static func reorder_layers(layers: Array, from_i: int, to_i: int, first := 10, step := 1) -> Variant:
+	var sorted := layers.duplicate()
+	sorted.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("layerNumber", 0)) < float(b.get("layerNumber", 0)))
+	var n := sorted.size()
+	if from_i < 0 or from_i >= n or to_i < 0 or to_i >= n or from_i == to_i:
+		return null
+	var item: Variant = sorted.pop_at(from_i)
+	sorted.insert(to_i, item)
+	var ln := first
+	for l in sorted:
+		l["layerNumber"] = ln
+		ln += step
+	return sorted
