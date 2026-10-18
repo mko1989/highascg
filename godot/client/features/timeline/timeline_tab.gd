@@ -6,11 +6,13 @@ extends VBoxContainer
 ## pushed to the engine before transport (PUT /api/timelines/:id, POST when missing) like the web's syncToServer.
 ## Slice 2: clip select / move / resize / delete on the canvas, Sources drops (add, or replace the clip under the drop),
 ## the clip page in the global Inspector; every committed edit autosaves and re-syncs the timeline to the engine.
-## Keyframes, flags editing, transform and layer ops come in later slices.
+## Slice 3: the clip transform. Slice 4: keyframes (canvas, Inspector groups, the web's i / o / p / s / v / t keys).
+## Flags editing and layer ops come in later slices.
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
+const K := preload("res://features/timeline/timeline_keyframes.gd")
 const ClipInspector := preload("res://features/timeline/timeline_clip_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -77,6 +79,7 @@ func _ready() -> void:
 	view.clip_selected.connect(_on_clip_selected)
 	view.edited.connect(_commit)
 	view.source_dropped.connect(_on_drop)
+	view.keyframes_edited.connect(_kf_commit)
 	add_child(view)
 	_page = ClipInspector.new()
 	_page.patch.connect(_on_patch)
@@ -274,6 +277,8 @@ func _on_clip_selected(li: int, clip_id: String) -> void:
 		return
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(_page)
+	if _page.kf != null:  # built in the page's _ready, once the Inspector adopted it
+		_page.kf.now = func() -> float: return view.playhead_ms
 	_page.canvas = _program_res(_main_idx(tl))
 	_page.center = Settings.get_setting("editorDefaults.coordinateOrigin", "") == "center"
 	_page.content = Vector2.ZERO
@@ -315,6 +320,35 @@ func _on_patch(changes: Dictionary, kind: String) -> void:
 	await _commit()
 	if kind == "route" and _pbk(str(tl.id)).playing:  # the engine re-applies the route on a seek
 		await Api.post_json("/api/timelines/%s/seek" % str(tl.id).uri_encode(), {"ms": maxf(0.0, roundf(view.playhead_ms))})
+
+
+## Keyframe edits sync and re-seek, so a paused preview shows the change at once (the web re-seeks only after a drag).
+func _kf_commit() -> void:
+	_geo_seek = true
+	_commit()
+
+
+## web CLIP_KEYFRAME_KEYS on the selected clip — from the canvas or the Inspector's number fields (a typed value is
+## committed first, the web's "set X then P"), never while typing in a text field.
+func _input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo or k.ctrl_pressed or k.meta_pressed or k.alt_pressed or view.sel_id == "" \
+			or not is_visible_in_tree():
+		return
+	var key := OS.get_keycode_string(k.keycode).to_lower()
+	if not key in ["i", "o", "p", "s", "v", "t"]:
+		return
+	var fo := get_viewport().gui_get_focus_owner()
+	if fo is TextEdit or (fo is LineEdit and not (fo.get_parent() is SpinBox)):
+		return
+	if fo is LineEdit:
+		fo.release_focus()  # the SpinBox applies its text
+	var c := TE.find_clip(active(), view.sel_li, view.sel_id)
+	if c.is_empty() or not K.shortcut(c, key, view.playhead_ms, _page.rect(), _page.canvas):
+		return
+	get_viewport().set_input_as_handled()
+	view.queue_redraw()
+	_kf_commit()
 
 
 func _remove_selected() -> void:

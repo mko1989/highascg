@@ -7,14 +7,21 @@ extends Control
 ## layer — or resizes it from a 6 px edge zone, both snapping (timeline_edit.gd); a resize scrubs the playhead to the
 ## dragged edge. Sources drop onto tracks (below the last layer = a new one); Delete removes the selected clip. The
 ## view mutates the shared timeline Dictionary and emits `edited` once per gesture that changed something.
+## Slice 4: keyframe diamonds + the eased opacity / volume curve (timeline_kf_draw.gd). Pressing a diamond selects it
+## and drags it in time (snapped, never past a same-property neighbour); a double-click on a clip adds an opacity key
+## at that time with the current value; Delete removes the selected key (its fill / scale partner too) before the clip.
+## Keyframe gestures emit `keyframes_edited` (the tab syncs and re-seeks).
 
 signal seek_requested(ms: float)
 signal clip_selected(li: int, clip_id: String)  # clip_id "" = nothing selected
 signal edited
 signal source_dropped(source: Dictionary, li: int, ms: float)
+signal keyframes_edited
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
+const K := preload("res://features/timeline/timeline_keyframes.gd")
+const KD := preload("res://features/timeline/timeline_kf_draw.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var tl: Dictionary = {}
@@ -26,6 +33,7 @@ var follow := true
 var _scrubbing := false
 var sel_li := -1
 var sel_id := ""
+var sel_kf: Variant = null  # the selected keyframe Dictionary (by identity) of the selected clip
 var _drag := {}
 var _seek_at := 0
 
@@ -168,6 +176,7 @@ func _draw_clip(c: Dictionary, li: int, track_y: float, track_h: int, font: Font
 	var avail := minf(x + w, size.x) - lx - 4
 	if avail > 12 and h >= 14:
 		draw_string(font, Vector2(lx, top + 13), label, HORIZONTAL_ALIGNMENT_LEFT, avail, 11, Color(1, 1, 1, 0.92))
+	KD.draw(self, c, top, h, _x, TM.HEADER_W, size.x, sel_kf, _drag.has("kf"))
 
 
 func _box(col: Color) -> StyleBoxFlat:
@@ -183,9 +192,12 @@ func _gui_input(event: InputEvent) -> void:
 	if event is InputEventKey:
 		var k := event as InputEventKey
 		if k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and sel_id != "":
-			TE.remove_clip(tl, sel_li, sel_id)
-			select(-1, "")
-			edited.emit()
+			if sel_kf != null:
+				_remove_kf()
+			else:
+				TE.remove_clip(tl, sel_li, sel_id)
+				select(-1, "")
+				edited.emit()
 			accept_event()
 		return
 	if event is InputEventMouseButton:
@@ -206,7 +218,7 @@ func _gui_input(event: InputEvent) -> void:
 				_seek_to(mb.position.x)
 				accept_event()
 			elif mb.pressed and mb.position.x > TM.HEADER_W:
-				_press_track(mb.position)
+				_press_track(mb.position, mb.double_click)
 				accept_event()
 			elif not mb.pressed:
 				_scrubbing = false
@@ -228,6 +240,7 @@ func select(li: int, clip_id: String) -> void:
 		return
 	sel_li = li if clip_id != "" else -1
 	sel_id = clip_id
+	sel_kf = null
 	queue_redraw()
 	clip_selected.emit(sel_li, sel_id)
 
@@ -247,7 +260,14 @@ func _hover(pos: Vector2) -> void:
 	mouse_default_cursor_shape = Control.CURSOR_HSIZE if edge != "" else (Control.CURSOR_MOVE if not hit.is_empty() else Control.CURSOR_ARROW)
 
 
-func _press_track(pos: Vector2) -> void:
+## The clip row on screen (web clipRowRect) — keyframes are drawn and hit-tested in it.
+func _row(li: int) -> Vector2:
+	var ty := TM.track_top(tl, li, scroll_y)
+	var top := maxf(ty + 4, TM.RULER_H)
+	return Vector2(top, maxf(0.0, minf(ty + TM.layer_h(tl, li) - 4, size.y) - top))
+
+
+func _press_track(pos: Vector2, double := false) -> void:
 	var hit := _clip_at(pos)
 	if hit.is_empty():
 		select(-1, "")
@@ -255,6 +275,22 @@ func _press_track(pos: Vector2) -> void:
 	var c: Dictionary = hit[1]
 	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
 	select(hit[0], str(c.id))
+	var row := _row(hit[0])
+	var ki := K.hit(c, row.x, row.y, pos, _x)
+	if ki >= 0:
+		sel_kf = c.keyframes[ki]
+		_drag = {"kf": sel_kf, "li": hit[0], "id": str(c.id), "orig_time": float(sel_kf.time), "now": playhead_ms}
+		queue_redraw()
+		return
+	if sel_kf != null:
+		sel_kf = null
+		queue_redraw()
+	if double:  # web onDblClickAddKeyframe: opacity at the current value
+		var t := clampf(roundf(ms - float(c.startTime)), 0.0, float(c.get("duration", 0)))
+		sel_kf = K.add(c, {"time": t, "property": "opacity", "value": K.interp(c, t, "opacity", 1.0), "easing": "linear"})
+		queue_redraw()
+		keyframes_edited.emit()
+		return
 	_drag = {"edge": TE.edge_zone(c, ms, px_per_ms), "li": hit[0], "from_li": hit[0], "id": str(c.id), "orig_ms": ms,
 		"start": float(c.startTime), "dur": float(c.duration), "now": playhead_ms, "inPoint": int(c.get("inPoint", 0) if c.get("inPoint") != null else 0)}
 
@@ -265,6 +301,11 @@ func _drag_to(pos: Vector2) -> void:
 	if c.is_empty():
 		return
 	var thr := TE.SNAP_THRESHOLD_PX / px_per_ms
+	if _drag.has("kf"):
+		var abs_ms := TE.snapped_edge(ms, K.snap_candidates(tl, _drag.now, _drag.kf), thr, _drag.now)
+		if K.move(c, _drag.kf, abs_ms - float(c.startTime)):
+			queue_redraw()
+		return
 	var cands := TE.snap_candidates(tl, _drag.now, _drag.li, _drag.id)  # the playhead at press: a resize moves it
 	if _drag.edge == "":
 		var start := TE.snapped_start(float(_drag.start) + ms - float(_drag.orig_ms), float(c.duration), cands, thr, _drag.now)
@@ -300,6 +341,11 @@ func _end_drag() -> void:
 	var c := TE.find_clip(tl, d.li, d.id)
 	if c.is_empty():
 		return
+	if d.has("kf"):
+		queue_redraw()
+		if float(d.kf.time) != float(d.orig_time):  # web: commit only when the time changed
+			keyframes_edited.emit()
+		return
 	if _drag_changed(d, c):
 		if d.edge != "":
 			seek_requested.emit(playhead_ms)  # the trailing seek the throttle may have skipped
@@ -309,6 +355,19 @@ func _end_drag() -> void:
 static func _drag_changed(d: Dictionary, c: Dictionary) -> bool:
 	return d.li != d.from_li or float(c.startTime) != float(d.start) or float(c.duration) != float(d.dur) \
 		or int(c.get("inPoint", 0) if c.get("inPoint") != null else 0) != int(d.inPoint)
+
+
+func _remove_kf() -> void:
+	var c := TE.find_clip(tl, sel_li, sel_id)
+	var kf: Dictionary = sel_kf
+	sel_kf = null
+	if c.is_empty():
+		return
+	K.remove(c, str(kf.property), float(kf.time))
+	if K.partner(str(kf.property)) != "":
+		K.remove(c, K.partner(str(kf.property)), float(kf.time))
+	queue_redraw()
+	keyframes_edited.emit()
 
 
 func _can_drop_data(_at: Vector2, data: Variant) -> bool:

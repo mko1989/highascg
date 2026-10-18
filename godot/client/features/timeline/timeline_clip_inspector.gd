@@ -4,7 +4,8 @@ extends VBoxContainer
 ## Audio → route / mute / volume (routes from /api/scene/layer-options for the timeline's screen), Mixer → Opacity %,
 ## Position / size (slice 3: align row, X / Y / W / H in program px — centre offsets when editorDefaults
 ## .coordinateOrigin = "center" — aspect lock, content sizing with refit; edits drop the clip's fill_x / fill_y /
-## scale_x / scale_y keyframes like the web), Mixer → Opacity %, Trim → In-point (frames). Keyframes come later.
+## scale_x / scale_y keyframes like the web), Mixer → Opacity %, Trim → In-point (frames), then the keyframe groups
+## + Add keyframe (slice 4, timeline_kf_section.gd).
 ## Emits patches; the tab applies and syncs: "commit" syncs now, "throttle" syncs 80 ms trailing, "geometry" is the
 ## web's 80 ms trailing PUT + seek (the engine re-applies the layers), "route" syncs then re-seeks while playing.
 
@@ -16,6 +17,7 @@ const X := preload("res://features/live/mixer_math.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
 const P := preload("res://features/live/px_rect_math.gd")
 const AlignRow := preload("res://features/live/align_row.gd")
+const KfSection := preload("res://features/timeline/timeline_kf_section.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
 const TRANSFORM_PROPS := ["fill_x", "fill_y", "scale_x", "scale_y"]
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -43,6 +45,7 @@ var _tf := {}                      # x / y / w / h SpinBoxes
 var _tf_sub: Label
 var _lock: CheckBox
 var _fit: OptionButton
+var kf: KfSection
 
 
 func _ready() -> void:
@@ -100,6 +103,10 @@ func _ready() -> void:
 	_in = _spin(0, 999999, func(v: float) -> void: _emit({"inPoint": maxi(0, roundi(v))}, "geometry"))
 	_in.tooltip_text = "Frames skipped from the start of the media on take/seek."
 	_row(g, "In-point (frames)", _in)
+	kf = KfSection.new()
+	kf.host = self
+	kf.changed.connect(func() -> void: _emit({"keyframes": _clip.get("keyframes", [])}, "geometry"))
+	add_child(kf)
 	var del := Button.new()
 	del.text = "Remove clip"
 	del.tooltip_text = "Remove this clip from the timeline (Delete)"
@@ -151,6 +158,7 @@ func refresh() -> void:
 	_tf_sub.visible = center
 	_lock.button_pressed = _clip.get("aspectLocked") != false
 	_fit.select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(str(_clip.get("contentFit", "native")))))
+	kf.refresh()
 	_syncing = false
 
 

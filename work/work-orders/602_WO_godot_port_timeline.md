@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) and slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) DONE, box-verified; keyframes, flags editing, layer ops open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
+**Status: IN PROGRESS (2026-10-18) — slice 1 (canvas read-only + transport + server-synced playhead), slice 2 (clip select / move / resize / delete, Sources drops, clip Inspector page) slice 3 (clip transform: align / X Y W H / aspect lock / content sizing) and slice 4 (keyframes: canvas diamonds + eased curve, drag / double-click / Delete, i o p s v t keys, Inspector keyframe groups) DONE, box-verified; flags editing, layer ops open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (sources drag contract, PRV/PGM), WO-601 (timeline clip/flag/layer inspector sections).**
 
 # WO-602 — Godot port: timeline editor (canvas NLE, keyframes, flags, transport)
 
@@ -27,7 +27,8 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
 1. **Space-to-play is document-global**, not focus-gated (`timeline-editor-inputs.js:187`) — Godot
    port: same when the timeline tab is active, but never while a text field has focus (owner call).
 2. **Keyframe `easing`: the client preview ignores it, the server output honours it** (✔ read by
-   hand). Client `interpClipProp` is plain linear (`client/lib/timeline-clip-interp.js:16-30`), while
+   hand — ⚠ corrected in slice 4: the server *meant* to honour it, but every non-linear name it sent was
+   rejected or ignored by Caspar's tweener until [WO-618](./618_WO_caspar_tween_names.md)). Client `interpClipProp` is plain linear (`client/lib/timeline-clip-interp.js:16-30`), while
    server playback maps easing to Caspar tweens (`src/engine/timeline-playback-amcp-schedule.js:239,284`
    `mapKeyframeTween(easingAtTime(...))`). The editor canvas can therefore disagree with what goes to
    air for non-linear keys. Godot port: implement the eased curve in the canvas preview to match the
@@ -78,6 +79,31 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
 - Align buttons (`client/components/inspector-fill.js:59`): the web artwork mixes plain SVGs and SVGs that embed
   PNGs, so the Godot buttons draw the same glyphs procedurally in the theme text colour. They also need no import
   step (WO-596: no editor import).
+
+### Slice 4 findings (2026-10-18) — keyframes
+
+- Model (`client/lib/timeline-state-keyframes.js`): `{time (clip-local ms), property, value, easing}`.
+  `addKeyframe` replaces the same property at the exact same time and sorts. `removeKeyframe` matches within
+  0.5 ms. A drag (`clampKeyframeDragTime`, WO-152) stops 1 ms short of a same-property neighbour; other
+  properties are no barrier. Fill / scale values are normalized to the program canvas.
+- Canvas (`timeline-canvas-clip.js:318-372`, `timeline-canvas-snap.js:72-150`): diamonds per property colour,
+  opacity / volume at value height (clamped 0–1, so volume > 1 draws at the top), others on the bottom lane. Hit
+  box ±8 px. The drag snaps (`resolveSnappedEdge`) to bounds, playhead, flags, every clip edge and every other
+  keyframe, and commits (PUT + seek to the playhead) only when the time changed. A double-click on a clip adds an
+  opacity key with the current value (`timeline-editor-handlers.js:349`).
+- Keys `i o p s v t` (`timeline-editor-inputs.js:322-357`) work with the clip selected, also while focus is in
+  an inspector field. They do fade in / fade out over 500 ms, and record position / scale / volume / opacity at
+  the playhead. The web has **no** keyframe delete on the canvas: Delete always removes the clip, and the
+  `timeline-keyframe-select` event it dispatches has no listener.
+- Playback: the engine (`timeline-keyframe-mixer.js`) tweens each segment toward the next key with the **end**
+  key's easing. Scrub and pause send the linear `_lerp` value. The non-linear names failed in Caspar
+  (WO-618, fixed first).
+- Web limitations kept for parity, owner to decide:
+  - Any X / Y / W / H edit drops every transform keyframe (`clearClipTransformKeyframes`). The hinted "set X
+    then P" therefore always leaves a single position key. Motion is built from the Position keyframe rows or Add
+    keyframe instead.
+  - `addScaleKeyframe` writes one value (w / W) to both axes, which squashes media that is not the canvas shape.
+    It is changed here (below).
 
 ## Port plan
 
@@ -155,6 +181,29 @@ Scope: **24 JS files, 4,948 LOC + 272 CSS**. Top files: `timeline-editor.js` (47
   `set_content`, which ignores a stale reply. The "geometry" kind uses the 80 ms trailing sync, and that sync also
   seeks under the web's playback-timeline guard (`_pb_last`).
 
+### Slice 4 (2026-10-18) — keyframes
+
+- `timeline_keyframes.gd` (new, pure). It has the web mutations (add / remove / clear range / position and scale
+  pairs / fade in / fade out / the shortcut keys), the drag clamp and an in-place `move` that keeps the dragged
+  key's identity, marker geometry, the hit test and the snap candidates. `interp` matches the engine's `_lerp`.
+  `eased` is the curve Caspar plays: Penner power and sine families, keyed by the end key, through the same name
+  mapping as `toCasparTween`. Elastic, back and bounce preview as linear.
+- `timeline_kf_draw.gd` (new): diamonds in the web colours and sizes, with the selected one outlined. Where the
+  web joins opacity / volume keys with straight dashed lines, this draws the eased curve sampled every 3 px
+  (decision 2 above).
+- `timeline_view.gd`: a press on a diamond selects and drags it, snapped and clamped, and emits
+  `keyframes_edited` only if the time changed. A double-click adds an opacity key. **Deviation:** Delete removes
+  the selected keyframe (with its fill / scale partner), and removes the clip only when no key is selected.
+- `timeline_kf_section.gd` (new): the Inspector groups from `inspector-fill-timeline.js`, in web order (Position
+  in display px with centre-origin support, Scale, Opacity, Volume, then Add keyframe). Pairs are edited in place,
+  so the canvas selection and the easing selectors keep their keys. A rebuild never happens while the operator is
+  typing in a field.
+- `timeline_tab.gd`: `_input` handles `i o p s v t` on the selected clip when the Timeline tab is visible. It
+  skips text fields but not number fields, and commits a typed number first. Every keyframe edit syncs and
+  re-seeks under the playback guard, so a paused preview shows it at once (the web re-seeks only after a drag).
+- **Deviation:** `s` and the scale row keep each key's own x / y ratio (`scale_y = h / H`), so recording a scale
+  key never changes the picture.
+
 ## What was VERIFIED
 
 - Godot unit tests 665/0 (`test_timeline_math.gd` goldens generated from the web modules under node);
@@ -208,3 +257,28 @@ Easing behaviour verified by hand on both sides (refs in item 2) — the Haiku i
   - The Content sizing popup works with both mouse and keyboard.
 - Owner-QA open: centre-origin mode (unit-tested only), the align icons' look, and the guarded seek while a
   *different* timeline plays.
+
+### Slice 4 verification (2026-10-18)
+
+- Godot tests 802/0. New `test_timeline_keyframes.gd` has 46 assertions: mutations, the drag clamp and identity,
+  `_lerp` parity, the eased values (`easeoutquad` 0.75 at u = 0.5, Penner in-out / out-in), the tween-name mapping,
+  marker / hit geometry, snap candidates and the shortcut keys. `--check` boot clean. `check-max-file-lines`
+  reports 0 files over (tab 466, view 387).
+- On the box, on clip "1. GŁÓWNE TŁO" (60 s), every step was read back from `GET /api/timelines/tmve1ppeug1t`:
+  - `i` then `o` gave opacity `0@0, 1@500, 1@59500, 0@60000`. The re-seek primed preview with
+    `MIXER 2-210 OPACITY 0 0` and `… OPACITY 1 13 linear DEFER`.
+  - Two double-clicks added `1@22160` and `1@39841` (the current value). Setting 0.2 and then ease-in-out in the
+    Inspector reached the engine as `{39841, 0.2, ease-in-out}`, and the canvas drew the S-curve.
+  - Dragging the 22160 diamond gave 26756.8 (the web also stores fractional ms). The curve re-eased and the
+    outline showed. Delete then removed that key alone.
+  - With the playhead at 10 s, `p` and `s` gave `fill_x -0.3036 / fill_y 0 / scale_x 1.6073 / scale_y 1` at
+    10019 ms, which is exactly the clip's `fillPx {-583,0,3086,1080}`. The re-seek re-applied preview.
+  - The Inspector shows the Position, Scale and Opacity groups and Add keyframe at the normal Inspector width.
+- A mouse pick in a popup missed once because the Inspector layout had moved between the screenshot and the click.
+  Re-measured, hover and click match exactly.
+- Owner-QA open:
+  - The eased curve against what plays on air.
+  - Centre-origin position rows.
+  - Volume keys above 1 (drawn at the top, like the web).
+  - Whether Delete should remove the keyframe.
+  - The parity limitation "set X then P" (above).
