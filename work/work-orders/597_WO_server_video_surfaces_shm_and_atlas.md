@@ -162,3 +162,10 @@ Fixed (`110c05d`, same present-key-wins rule; smoke `smoke-wo243-operator-gui-cr
 live: stored `shm`, `/api/caspar-config/apply` generated `<shm><name>opgui</name></shm>`, Godot showed
 the channel and reattached after a Caspar RESTART. The shop dev box now runs the operator GUI in shm mode
 (switch back: same API with `videoOutput:'screen'` + apply).
+
+## Requirement from WO-601 (2026-10-18) — Godot media-inspector preview
+The web previews a library file by LOADing it on the GUI channel's MEDIA_PREVIEW_LAYER and reporting a hole rect.
+A Godot client cannot do the same today: `POST /api/operator-gui/layout` replaces the whole cell layout (last writer
+wins, `src/api/routes-operator-gui.js:34-52`), so its media cell would wipe the kiosk's cells. §D should therefore
+either keep per-client cell sets merged server-side, or give the media preview its own atlas slot the client crops
+from its `opgui` surface (WO-601 addendum 8).
