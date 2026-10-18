@@ -7,6 +7,7 @@ const { handleBorderLines, handleBorderPresetCrossfade } = require('./routes-sce
 const { handleGlobalBorderControl } = require('./routes-scene-global-border')
 const { handleTakeLook } = require('./routes-scene-take-look')
 const { handlePreviewPush } = require('./routes-scene-preview-push')
+const { handleNewLayer } = require('./routes-scene-new-layer')
 
 async function handlePost(path, body, ctx) {
 	if (path === '/api/scene/take') {
@@ -22,6 +23,10 @@ async function handlePost(path, body, ctx) {
 		// WO-598 C2: re-push an edited look onto PRV by id — nudge (geometry) or re-take (content), server-decided.
 		if (!ctx.amcp) return null
 		return handlePreviewPush(body, ctx)
+	}
+	if (path === '/api/scene/new-layer') {
+		// WO-600 F: build (not store) the layer a media drop creates — same client modules as the web.
+		return handleNewLayer(body, ctx)
 	}
 	if (path === '/api/scene/audio-only/stop') {
 		if (!ctx.amcp) return null

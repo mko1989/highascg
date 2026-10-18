@@ -1,0 +1,98 @@
+'use strict'
+
+/**
+ * WO-600 F (WO-598 thin client) — POST /api/scene/new-layer { sceneId, source: {type?, value, label?, resolution?}, mainIdx? }
+ *
+ * Returns the layer a media drop creates in the web compose frame (client/components/scenes-compose.js
+ * addLayerFromMedia): addLayer → next free layer number ≥ 10 (scene-state-helpers nextLayerNumber) +
+ * defaultLayerConfig + editor scene defaults (applySceneLayerDefaults) → setLayerSource (images never loop)
+ * → native fill for the layer's content fit (fill-math sceneLayerPixelRectForContentFit → pixelRectToFill).
+ * The pure client modules are imported (one implementation). Per-file trim/mute defaults are NOT applied:
+ * the web drop goes through setLayerSource, not patchLayer. Nothing is stored — the client appends the
+ * layer and saves it like any edit (deck sync → preview-push → autosave).
+ * Route sources (self-route / recursion rules, WO-156) are refused until those rules move server-side.
+ */
+
+const path = require('path')
+const { pathToFileURL } = require('url')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { REPO_ROOT } = require('../repo-paths')
+
+const IMAGE_RE = /\.(jpe?g|png|gif|bmp|webp|tiff?)$/i
+let _libs = null
+
+async function libs() {
+	if (!_libs) {
+		const load = (n) => import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', n)).href)
+		const [helpers, fill, ed] = await Promise.all([load('scene-state-helpers.js'), load('fill-math.js'), load('editor-defaults-constants.js')])
+		_libs = { helpers, fill, ed }
+	}
+	return _libs
+}
+
+function out(status, payload) {
+	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
+}
+
+/** source.resolution → server media details → ffprobe of the file on disk (web fetchMediaContentResolution order). */
+async function defaultMediaResolution(ctx, source) {
+	const { parseResolutionString, getMediaResolutionFromSelf } = require('../engine/scene-native-fill')
+	let r = source.resolution ? parseResolutionString(source.resolution) : null
+	if (!(r?.w > 0)) r = getMediaResolutionFromSelf(ctx, source.value)
+	if (!(r?.w > 0)) {
+		try {
+			const fp = require('../media/local-media').resolveMediaFileOnDisk(ctx?.config || {}, source.value)
+			if (fp) {
+				const p = await require('../media/local-media-ffmpeg').probeMedia(fp)
+				if (p?.resolution) r = parseResolutionString(p.resolution)
+			}
+		} catch {
+			/* not on disk / no ffprobe */
+		}
+	}
+	return r?.w > 0 && r?.h > 0 ? r : null
+}
+
+/**
+ * @param {unknown} body
+ * @param {object} ctx
+ * @param {object} [deps] tests: resolveScene, getChannelMap, editorDefaults, mediaResolution
+ */
+async function handleNewLayer(body, ctx, deps = {}) {
+	const b = parseBody(body)
+	const sceneId = String(b.sceneId || '').trim()
+	const src = b.source && typeof b.source === 'object' ? b.source : null
+	if (!sceneId || !src || !String(src.value || '').trim()) return out(400, { ok: false, error: 'sceneId and source.value required' })
+	const type = String(src.type || 'media')
+	if (type === 'route' || String(src.value).startsWith('route://')) {
+		return out(400, { ok: false, error: 'route sources are not supported here yet (WO-156 rules are client-side)' })
+	}
+	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
+	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
+
+	const { helpers, fill, ed } = await libs()
+	const n = helpers.nextLayerNumber(scene)
+	if (n < 0) return out(409, { ok: false, error: helpers.LOOK_FULL_MESSAGE })
+	const layer = helpers.defaultLayerConfig(n)
+	const defaults = ed.mergeEditorDefaults(deps.editorDefaults ? deps.editorDefaults() : ctx?.config?.editorDefaults).scene
+	layer.loop = !!defaults.loop
+	layer.startBehaviour = defaults.startBehaviour === 'relativeToPrevious' ? 'relativeToPrevious' : 'beginning'
+	layer.contentFit = defaults.contentFit
+	layer.source = { ...src, type, value: String(src.value), label: src.label || String(src.value) }
+	if (IMAGE_RE.test(String(src.value))) layer.loop = false
+
+	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
+	const map = getMap()
+	const scope = parseInt(String(scene.mainScope ?? ''), 10)
+	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
+	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
+	const contentRes = await (deps.mediaResolution ? deps.mediaResolution(layer.source) : defaultMediaResolution(ctx, layer.source))
+	if (contentRes) {
+		const rect = fill.sceneLayerPixelRectForContentFit(canvas.width, canvas.height, contentRes.w, contentRes.h, layer.contentFit || 'native')
+		layer.fill = fill.pixelRectToFill(rect, canvas)
+	}
+	return out(200, { ok: true, layer, mainIdx, contentResolution: contentRes })
+}
+
+module.exports = { handleNewLayer }
