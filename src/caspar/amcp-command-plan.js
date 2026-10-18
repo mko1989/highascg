@@ -1,6 +1,7 @@
 'use strict'
 
 const { chLayer, param, audioFilterParam } = require('./amcp-utils')
+const { toCasparTween } = require('./caspar-tween')
 
 function shouldAppendClipVerbFields(commandName, clip) {
 	return commandName !== 'PLAY' || (clip != null && String(clip).trim() !== '')
@@ -47,7 +48,7 @@ function serializeClipCommandPlan(plan) {
 		if (opts.transition === 'STING') {
 			cmd += ` STING ${param(opts.parameters)}`
 		} else {
-			cmd += ` ${opts.transition} ${opts.duration || 0} ${param(opts.tween || 'linear')}`
+			cmd += ` ${opts.transition} ${opts.duration || 0} ${param(toCasparTween(opts.tween))}`
 			if (opts.direction) cmd += ` ${opts.direction}`
 		}
 	}
@@ -93,7 +94,7 @@ function describeClipCommandPlan(plan) {
 		loop: !!opts.loop,
 		transition: opts.transition || undefined,
 		duration: opts.duration,
-		tween: opts.tween,
+		tween: opts.tween != null ? toCasparTween(opts.tween) : undefined,
 		direction: opts.direction,
 		in: opts.in,
 		seek: opts.seek,

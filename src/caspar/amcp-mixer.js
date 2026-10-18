@@ -1,6 +1,7 @@
 'use strict'
 
 const { param, chLayer } = require('./amcp-utils')
+const { toCasparTween } = require('./caspar-tween')
 
 class AmcpMixer {
 	/**
@@ -34,14 +35,14 @@ class AmcpMixer {
 		const cl = chLayer(channel, layer)
 		let cmd = `MIXER ${cl} ${keyword} ${val}`
 		if (duration != null) cmd += ` ${duration}`
-		if (tween) cmd += ` ${param(tween)}`
+		if (tween) cmd += ` ${param(toCasparTween(tween))}`
 		if (defer) cmd += ' DEFER'
 		const typed = {
 			channel: Number(channel),
 			layer: Number(layer),
 			value: Number(val),
 			...(duration != null ? { duration: Number(duration) } : {}),
-			...(tween ? { tween } : {}),
+			...(tween ? { tween: toCasparTween(tween) } : {}),
 			...(defer ? { defer: true } : {}),
 		}
 		return this._client._invokeTyped(method, typed, cmd, 'MIXER')
@@ -154,7 +155,7 @@ class AmcpMixer {
 		const maxOutput = opts.maxOutput ?? opts.maxOut ?? 1
 		let p = `${minInput} ${maxInput} ${gamma} ${minOutput} ${maxOutput}`
 		if (opts.duration != null) p += ` ${opts.duration}`
-		if (opts.tween) p += ` ${param(opts.tween)}`
+		if (opts.tween) p += ` ${param(toCasparTween(opts.tween))}`
 		if (opts.defer) p += ' DEFER'
 		return this._mixer(channel, layer, `LEVELS ${p}`)
 	}
@@ -163,7 +164,7 @@ class AmcpMixer {
 		if (x === undefined) return this._mixer(channel, layer, 'FILL')
 		let p = `${x} ${y} ${xScale} ${yScale}`
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `FILL ${p}`)
 	}
@@ -172,7 +173,7 @@ class AmcpMixer {
 		if (x === undefined) return this._mixer(channel, layer, 'CLIP')
 		let p = `${x} ${y} ${xScale} ${yScale}`
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `CLIP ${p}`)
 	}
@@ -181,7 +182,7 @@ class AmcpMixer {
 		if (x === undefined) return this._mixer(channel, layer, 'ANCHOR')
 		let p = `${x} ${y}`
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `ANCHOR ${p}`)
 	}
@@ -190,7 +191,7 @@ class AmcpMixer {
 		if (left === undefined) return this._mixer(channel, layer, 'CROP')
 		let p = `${left} ${top} ${right} ${bottom}`
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `CROP ${p}`)
 	}
@@ -199,7 +200,7 @@ class AmcpMixer {
 		if (degrees === undefined) return this._mixer(channel, layer, 'ROTATION')
 		let p = String(degrees)
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `ROTATION ${p}`)
 	}
@@ -208,7 +209,7 @@ class AmcpMixer {
 		if (nwX === undefined) return this._mixer(channel, layer, 'PERSPECTIVE')
 		let p = `${nwX} ${nwY} ${neX} ${neY} ${swX} ${swY} ${seX} ${seY}`
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `PERSPECTIVE ${p}`)
 	}
@@ -232,7 +233,7 @@ class AmcpMixer {
 		if (volume === undefined) return this._mixer(channel, layer, 'VOLUME')
 		let p = String(volume)
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._mixer(channel, layer, `VOLUME ${p}`)
 	}
@@ -241,7 +242,7 @@ class AmcpMixer {
 		if (volume === undefined) return this._send(`MIXER ${parseInt(channel, 10)} MASTERVOLUME`, 'MIXER')
 		let p = String(volume)
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._send(`MIXER ${parseInt(channel, 10)} MASTERVOLUME ${p}`, 'MIXER')
 	}
@@ -255,7 +256,7 @@ class AmcpMixer {
 		const cl = layer != null && layer !== '' ? chLayer(channel, layer) : String(parseInt(channel, 10))
 		let p = String(parseInt(resolution, 10))
 		if (duration != null) p += ` ${duration}`
-		if (tween) p += ` ${param(tween)}`
+		if (tween) p += ` ${param(toCasparTween(tween))}`
 		if (defer) p += ' DEFER'
 		return this._send(`MIXER ${cl} GRID ${p}`, 'MIXER')
 	}

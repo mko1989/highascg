@@ -1,6 +1,7 @@
 'use strict'
 
 const { buildClipCommandPlan } = require('./amcp-command-plan')
+const { toCasparTween } = require('./caspar-tween')
 
 function msToFrames(durationMs, fps) {
 	const rate = Number(fps) > 0 ? Number(fps) : 25
@@ -15,7 +16,7 @@ function normalizeTransitionForAmcp(transition, fps) {
 	if (transition.durationFrames != null) duration = Math.max(0, Number(transition.durationFrames) || 0)
 	else if (transition.duration != null) duration = Math.max(0, Number(transition.duration) || 0)
 	else if (transition.durationMs != null) duration = msToFrames(transition.durationMs, fps)
-	const tween = transition.tween || transition.easing || 'linear'
+	const tween = toCasparTween(transition.tween || transition.easing) // WO-618
 	const direction = transition.direction
 	return { transition: type, duration, tween, direction }
 }

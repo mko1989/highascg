@@ -1,6 +1,7 @@
 'use strict'
 
 const { param } = require('../caspar/amcp-utils')
+const { toCasparTween } = require('../caspar/caspar-tween')
 
 /** Properties that map to a single MIXER FILL command. */
 const FILL_KF_PROPS = ['fill_x', 'fill_y', 'scale_x', 'scale_y']
@@ -61,21 +62,9 @@ function fillTweenForSegmentEnd(clip, endMs) {
 	return easingAtTime(clip, 'fill_x', endMs) || easingAtTime(clip, 'scale_x', endMs) || 'linear'
 }
 
-/** Map UI easing (ease-in, ease-in-out) to Caspar mixer tween names. */
+/** Map UI easing (ease-in, ease-in-out) to Caspar mixer tween names (WO-618: shared, Caspar-valid). */
 function mapKeyframeTween(tw) {
-	const t = String(tw || 'linear')
-		.toLowerCase()
-		.replace(/-/g, '_')
-	const map = {
-		linear: 'linear',
-		easein: 'easein',
-		ease_out: 'easeout',
-		easeout: 'easeout',
-		easeinout: 'easeboth',
-		ease_in_out: 'easeboth',
-		easeboth: 'easeboth',
-	}
-	return map[t] || 'linear'
+	return toCasparTween(tw)
 }
 
 /**

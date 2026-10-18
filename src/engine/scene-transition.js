@@ -4,6 +4,7 @@
  */
 
 const { getChannelMap } = require('../config/routing')
+const { toCasparTween } = require('../caspar/caspar-tween')
 const { normalizeProgramLayerBank } = require('./program-layer-bank')
 const sceneExitLayers = require('./scene-exit-layers')
 const { runExitLayers } = sceneExitLayers
@@ -155,17 +156,7 @@ function diffScenes(current, incoming) {
 }
 
 function mapTween(tw) {
-	const t = String(tw || 'linear').toLowerCase().replace(/-/g, '_')
-	const map = {
-		linear: 'linear',
-		easein: 'easein',
-		ease_out: 'easeout',
-		easeinout: 'easeboth',
-		ease_in_out: 'easeboth',
-		easeout: 'easeout',
-		easeboth: 'easeboth',
-	}
-	return map[t] || map[tw] || 'linear'
+	return toCasparTween(tw) // WO-618
 }
 
 function normalizeTransition(t, forceCut) {

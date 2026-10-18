@@ -51,6 +51,7 @@ const FILES = [
 	'tools/smoke/smoke-timeline-playing-seek.test.js',
 	'tools/smoke/smoke-timeline-pause-resume.test.js',
 	'tools/smoke/smoke-timeline-opacity-fade.test.js',
+	'tools/smoke/smoke-wo618-caspar-tween.test.js',
 	'tools/smoke/smoke-timeline-take.test.js',
 	'tools/smoke/smoke-cg-studio.test.js',
 	'tools/smoke/smoke-wo325-headless-operator-gui.test.js',

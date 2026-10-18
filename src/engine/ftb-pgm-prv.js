@@ -11,11 +11,10 @@ const playbackTracker = require('../state/playback-tracker')
 const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
 const { TIMELINE_LAYER_BASE, TIMELINE_LAYER_MAX_COUNT } = require('./timeline-playback-helpers')
 const { clearCasparChannel } = require('./caspar-channel-clear')
+const { toCasparTween } = require('../caspar/caspar-tween')
 
 function mapTween(tw) {
-	return String(tw || 'linear')
-		.toLowerCase()
-		.replace(/-/g, '_')
+	return toCasparTween(tw) // WO-618
 }
 
 /**
