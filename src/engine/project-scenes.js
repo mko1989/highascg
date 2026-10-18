@@ -43,12 +43,24 @@ function flushDeckSyncPersist() {
 	const pending = _deckSyncPersistPending
 	_deckSyncPersistPending = null
 	if (!pending?.ctx || !pending?.project) return
+	/* WO-598 (2026-10-18): re-read what is stored NOW and apply only the deck. Writing the snapshot taken
+	 * when the sync arrived overwrote any autosave persisted during the debounce (rev regressed, its
+	 * timelines/previs/... reverted — proven on the box). A different show is active now → drop it. */
+	let project = pending.project
+	if (pending.data) {
+		const current = loadFullProject()
+		if (current) {
+			const slugOf = (p) => projectStore.projectSlugFromName(p?.name)
+			if (slugOf(current) !== slugOf(pending.project)) return
+			project = applyDeckSyncToProject(current, pending.data)
+		}
+	}
 	/* WO-329: bumpRev:false — deck-sync merges must not outrun HTTP clients' rev echo. */
-	persistProject(pending.ctx, pending.project, { writeAutosave: true, pushVolumes: false, bumpRev: false })
+	persistProject(pending.ctx, project, { writeAutosave: true, pushVolumes: false, bumpRev: false })
 }
 
-function scheduleDeckSyncPersist(ctx, project) {
-	_deckSyncPersistPending = { ctx, project }
+function scheduleDeckSyncPersist(ctx, project, data = null) {
+	_deckSyncPersistPending = { ctx, project, data }
 	if (SCENE_DECK_SYNC_DEBOUNCE_MS <= 0) {
 		flushDeckSyncPersist()
 		return
@@ -289,13 +301,8 @@ function persistProject(ctx, project, opts = {}) {
  * @param {object} ctx
  * @param {{ looks?: object[], sceneSnapshots?: object[], previewSceneId?: string | null, layerPresets?: object[], lookPresets?: object[] }} data
  */
-function mergeDeckSyncIntoProject(ctx, data) {
-	if (!ctx || !data || typeof data !== 'object') return null
-	const existing = loadFullProject() || {
-		version: 2,
-		name: 'Untitled',
-		scenes: { scenes: [], layerPresets: [], lookPresets: [] },
-	}
+/** The deck part of a scene_deck_sync applied onto `existing` (looks, presets, preview id). Pure. */
+function applyDeckSyncToProject(existing, data) {
 	const envelope =
 		existing.scenes && typeof existing.scenes === 'object'
 			? { ...existing.scenes }
@@ -313,11 +320,17 @@ function mergeDeckSyncIntoProject(ctx, data) {
 	if (prvRaw != null && String(prvRaw).trim()) {
 		envelope.previewSceneId = String(prvRaw).trim()
 	}
-	const project = {
-		...existing,
-		savedAt: new Date().toISOString(),
-		scenes: envelope,
+	return { ...existing, savedAt: new Date().toISOString(), scenes: envelope }
+}
+
+function mergeDeckSyncIntoProject(ctx, data) {
+	if (!ctx || !data || typeof data !== 'object') return null
+	const existing = loadFullProject() || {
+		version: 2,
+		name: 'Untitled',
+		scenes: { scenes: [], layerPresets: [], lookPresets: [] },
 	}
+	const project = applyDeckSyncToProject(existing, data)
 	const check = validateIncomingProject(project, existing)
 	if (!check.ok) {
 		if (typeof ctx.log === 'function') {
@@ -329,7 +342,7 @@ function mergeDeckSyncIntoProject(ctx, data) {
 		return null
 	}
 	applyLiveSceneDeckToCtx(ctx, data)
-	scheduleDeckSyncPersist(ctx, project)
+	scheduleDeckSyncPersist(ctx, project, data)
 	return project
 }
 
