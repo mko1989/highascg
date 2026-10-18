@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor and the PIP overlay editor ported and verified on the box. Next per plan: media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config) and the lower-third editor ported and verified on the box. Next per plan: countdown/screen timer, lower-third roster, media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -104,6 +104,24 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   both sides → nudge + overlay CG lines on the PRV take chain. Outside-side overlays still re-ADD (server
   `canUpdateInPlace` excludes them, same as the web) — only the overlay template reloads, never the clips.
 
+## Investigation addendum (2026-10-18) — CG / lower thirds / timers (web bugs found while porting)
+1. **Lower-third Play never animates out** (`client/components/inspector-lower-third.js` fetchActiveOnLayer): it reads
+   `GET /api/lower-thirds/active` with no channel → `resolveCgRequestChannel` falls back to channel 1's state while the LT
+   runs on the edit bus (PRV), and it compares `st.layer` — rewritten to the 700+ CG host by `applyLtRoutingFields`
+   (`src/api/routes-lower-thirds.js:127`, `src/engine/cg-routing.js:34`) — with the look layer number. Never equal → every
+   Play is load + update + play. Box: Godot's server-side toggle (logical layer on the routed channel) sent `CG 2-702 STOP 1`.
+2. **HTML template "Reload page" hits the wrong layer** (`inspector-html-template.js` reloadHtmlTemplateLayers): `CALL
+   <ch>-<look layer> RELOAD`, but templates run on the CG host (box: `playback_timers.html` ADDed on `2-702`, look layer 12
+   empty) and PGM bank B is +100. Godot uses `POST /api/scene/layer-reload` (server-resolved layers, only channels that stage
+   the look) → `CALL 2-702 RELOAD`.
+3. **timersConfig never reached scene.live from a take payload**: `buildIncomingScenePayload` (web, scenes-shared.js) and
+   its server twin `buildServerIncomingScene` copy a fixed source field list without `timersConfig`, and the template reads
+   its config only from `scene.live` (`template/playback_timers.js:79-95`). The web hid it on PRV by re-registering the full
+   stored look (`/api/scene/live/preview`); PGM takes and every server-built push lost it. Also the preview-push nudge
+   re-registered PRV without broadcasting `scene.live`. Fixed in both builders (parity smoke still green) + broadcast when a
+   layer source changed.
+Bugs 1–2 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
+
 ## What was done (2026-10-18)
 
 | Piece | What |
@@ -115,6 +133,10 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 | `godot/client/features/live/effects_model.gd`, `effects_section.gd` | mixer effects (inspector-effects.js): add one per type, remove, primary + collapsed advanced params, select/bool/float/int editors, crop in px of the content resolution (from layer-fit's `contentResolution`, fallback the channel). Schemas are NOT re-declared: `GET /api/scene/effect-registry` serves the web's `effect-registry.js` |
 | `godot/client/features/live/pip_model.gd`, `pip_section.gd`, `param_field.gd` | PIP overlays (inspector-pip-overlay.js): stack ≤ `pipMaxStack` cards — type, ↑/↓ (index 0 behind), ✕, params with `visibleWhen` rows toggled in place; colours as CSS (`#rrggbb`, translucent → `rgba()`); legacy single `pipOverlay` read and cleared on the first edit. `param_field.gd` = shared schema editors (effects use it too). Registry endpoint also serves `PIP_OVERLAYS` + max stack |
 | `src/api/routes-scene-preview-pip.js` | preview-push `overlay` mode (see addendum) |
+| `godot/client/features/live/lower_third_model.gd`, `lower_third_section.gd` | lower thirds: 1:1 port of `buildLowerThirdCgData` / `buildLowerThirdCasparCgData` (byte-equal JSON golden) so each edit patches `source.lowerThirdConfig` + `cgData` synchronously (a TAKE right after typing never carries stale text); title/subtitle/font/position/sizes/scale/hold/colours, 450 ms debounced CG UPDATE, ▶ Play (flushes first), Delete. Roster not ported yet |
+| `src/api/routes-scene-lower-third.js` | `POST /api/scene/lower-third` resolve / update / play / clear on the web's lower-third-cg-data.js + existing /api/lower-thirds handlers; edit-bus routing; play toggle by logical layer |
+| `godot/client/features/live/template_section.gd`, `routes-scene-layer-tools.js` | HTML template group: Reload page (`POST /api/scene/layer-reload`), playback_timers Timers Config → `source.timersConfig` |
+| `src/engine/scene-take-payload.js`, `client/components/scenes-shared.js`, `routes-scene-preview-push.js` | `timersConfig` kept in take/stage payloads; `scene.live` broadcast after a nudge that changed a source |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
 | `godot/client/run-client.sh` | `--check` boot bounded at 45 s: a parse error in `app/main.gd` hung the check (the quit timer lives in that script) instead of failing |
 | (WO-600) `compose_math.gd`, `look_editor.gd` | geometry move/resize/crop already ported there |
@@ -140,6 +162,12 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
   mode** every step also sent `LOADBG`/`PLAY` for both clips; **after**: zero LOADBG/PLAY/STOP lines in the run.
   Smoke `smoke-wo601-pip-preview` 7/7 (decision, in-place UPDATE vs re-ADD, reorder/remove clears, handler never
   re-takes); offline 2647/1 (known shader-library smoke); Godot 509/0 (pip model 4 tests, golden vs node).
+- CG/LT/timers, box (look "Background" on PRV ch2, `--probe-cg`, layers added and removed again — stored look back to 10, 11):
+  LT layer 12 → title typed → `cgData.name = "Jan Kowalski"` immediately; ▶ Play → `CG 2-702 ADD 1 "lower-thirds/lt-classic-box"
+  … Jan Kowalski`, `UPDATE 1`, `PLAY 1`; ▶ Play again → `CG 2-702 STOP 1`; Delete → `CG 2-702 REMOVE 1`. Timers layer: Compact
+  → no AMCP (nudge), `GET /api/scene/live` ch2 `timersConfig.compact` None → True 2 s later (after the payload fix); Reload →
+  `CALL 2-702 RELOAD`. Smoke `smoke-wo601-lower-third-template` 6/6, WO-598 payload parity green; Godot 523/0 (LT model
+  byte-equal JSON for 4 configs incl. legacy/invalid values).
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
