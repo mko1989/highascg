@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet and the layer-style clipboard/presets ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). Next per plan: media preview + versions, CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets and media-file versions ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). Next per plan: media preview (blocked — addendum 8), CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -137,6 +137,11 @@ timeline clip/flag/layer/keyframes · layer-style and look presets.
 7. (suggestion, not a bug) The roster's column guess has English needles only (`guessRosterMapping`): a Polish sheet
    ("Imię", "Nazwisko", "Stanowisko") maps nothing and the operator picks all three columns by hand. Adding Polish needles
    (imię/imie, nazwisko, stanowisko/funkcja/rola) to the shared lib would fix both clients — owner's call.
+8. **Media preview in Godot is blocked on the operator-GUI layout contract** (not a quick port): the web previews by LOADing
+   the clip on the GUI channel's MEDIA_PREVIEW_LAYER and reporting a hole rect; `POST /api/operator-gui/layout`
+   (`src/api/routes-operator-gui.js:34-52`) REPLACES the whole cell layout — last writer wins, no per-client merge — so a
+   Godot report of a media cell would wipe the kiosk's cells (and vice versa). Needs either per-client cell sets merged
+   server-side or the WO-597 §D atlas (then the client draws the slot's crop of its `opgui` surface). Decide in WO-597.
 Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — candidates for a small web WO.
 
 ## What was done (2026-10-18)
@@ -157,6 +162,7 @@ Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — c
 | `godot/client/features/live/screen_timer_model.gd`, `screen_timer_panel.gd`, `deck_view.gd` ⏱, `live_tab.gd` | screen-timer inspector (inspector-screen-timer.js + settings form): readout on the server clock (`serverNowMs` offset — the web uses the client's own clock), transport, show/hide/fades, opacity, settings (position + px at once, rest on Save to every assigned screen), remove, add; all `/api/timers/*` |
 | `src/api/routes-lower-third-roster.js`, `godot/…/lt_roster_model.gd`, `lt_roster_section.gd` | lower-third data sheet: server-side Excel/CSV parse with the web's lib (`POST /api/lower-thirds/roster/import`, port fact 4), mapping / search / row picker in Godot, `source.lowerThirdRoster` |
 | `godot/…/layer_style_model.gd`, `layer_style_row.gd` | layer style: Copy / Paste (everything but the source) / Save preset… / Apply preset ▾ — `project.scenes.layerPresets`, golden-tested vs scene-state-layer-logic.js |
+| `godot/client/core/stream_upload.gd`, `features/live/media_versions.gd` | media versions: list / New version… / Go back / purge; the upload streams the file in 1 MiB chunks over StreamPeerTCP (HTTPRequest would load a GB file into memory) |
 | `src/engine/screen-timers.js` | only a changed duration re-anchors a re-assigned timer (addendum 6) |
 | `src/engine/scene-take-payload.js`, `client/components/scenes-shared.js`, `routes-scene-preview-push.js` | `timersConfig` kept in take/stage payloads; `scene.live` broadcast after a nudge that changed a source |
 | `src/api/routes-preview-nudge.js`, `routes-scene-preview-push.js` | preview-push nudge carries every effect + identity resets for effects removed since the staged look (see investigation addendum) |
@@ -205,6 +211,10 @@ Bugs 1–2 and 5 stay in the web client (Godot no longer uses those paths) — c
 - Layer style, box (`--probe-style` on "Background"): preset saved from layer 10 and applied to layer 11 → L11 fill
   `0/0.189 1×0.622` + layer 10's crop, PRV re-taken; backup pasted → L11 JSON identical to before except `effects: []`
   (the web's paste writes the same); probe preset removed (stored layerPresets 0 → 0). Godot 605/0.
+- Media versions, box (`--probe-versions` on a generated `media/_probe/vtest.mp4`, removed after with its versions + registry
+  entry): New version → journal `new version v2`, entry current v2 size 4251 = source file; Go back → `restored v1`, size 10774;
+  purge → no older versions. Multi-chunk: 3.5 MiB random body uploaded → md5 of the library file equal to the source
+  (`6b66f4b7…`). Godot 616/0 (uploader framing/response 3 tests); offline 2662/1.
 - My first probe run edited the look's existing crop (wrong card) and removed it; repaired through the seeded probe
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
