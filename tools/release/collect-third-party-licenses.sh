@@ -49,6 +49,7 @@ nvidia_pkg() {
 # --- HighAsCG (AGPL) ---
 cp -f "${REPO_ROOT}/LICENSE" "${TP}/highascg-AGPL-3.0.txt" 2>/dev/null || true
 cp -f "${REPO_ROOT}/COPYRIGHT" "${TP}/highascg-COPYRIGHT.txt" 2>/dev/null || true
+cp -f "${REPO_ROOT}/THIRD_PARTY_NOTICES" "${TP}/highascg-THIRD_PARTY_NOTICES.txt" 2>/dev/null || true
 
 # --- NVIDIA ---
 NV_PKG="$(nvidia_pkg)"
@@ -159,6 +160,20 @@ components = [
         "complianceNotes": "Copyright HighPass Marcin Wardecki. Source: repository root LICENSE.",
     },
 ]
+
+# WO-616: source ported into HighAsCG (not a package) — its notice lives in the repo's THIRD_PARTY_NOTICES.
+if has_file("highascg-THIRD_PARTY_NOTICES.txt"):
+    components.append({
+        "id": "openfollow",
+        "name": "OpenFollow (ported tracking camera maths)",
+        "version": "2f8aa257",
+        "licenseId": "AGPL-3.0-or-later",
+        "category": "application",
+        "isoShipStatus": "allowed",
+        "licenseFile": "third-party/highascg-THIRD_PARTY_NOTICES.txt",
+        "complianceNotes": "Copyright (C) 2026 The OpenFollow Project. Name/logo not licensed; feature is called Tracking.",
+        "attributionUrl": "https://github.com/openfollowapp/openfollow",
+    })
 
 if nv_pkg:
     components.append({

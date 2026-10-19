@@ -316,6 +316,7 @@ const FILES = [
 	'tools/smoke/smoke-wo269-shape-log-dedupe.test.js',
 	'tools/smoke/smoke-wo270-settings-devices-only.test.js',
 	'tools/smoke/smoke-wo619-settings-editor-defaults-persist.test.js',
+	'tools/smoke/smoke-wo616-tracking-camera-model.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
 	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',

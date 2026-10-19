@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation + design written (from `next.md`); nothing implemented. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified) and T2 camera maths (offline, OpenFollow test vectors) done; T3 calibration wizard next. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -99,8 +99,8 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 
 ## Tasks
 
-- [ ] T1 WO-597: surface roles `inN` (DeckLink input channel) and `chN`; lease + config; smoke.
-- [ ] T2 Port camera math (DLT, homography, k1/k2, project/unproject) to GDScript **and** JS (server hub
+- [x] T1 WO-597: surface roles `inN` (DeckLink input channel) and `chN`; lease + config; smoke.
+- [x] T2 Port camera math (DLT, homography, k1/k2, project/unproject) to GDScript **and** JS (server hub
       needs project/unproject for fusion) with OpenFollow's test vectors (bundled gallery calibrations
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
 - [ ] T3 Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
@@ -197,3 +197,71 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
   DeckLink input). `hshm_probe.py --path /dev/shm/highascg-ch1 --duration 2` → 1920×1080 @ 50.49 fps, 101 frames,
   0 gaps, 0 torn, latency p50 2.05 ms. With no renewal, the journal shows `REMOVE 1-801 (ch1: no leases)` after the TTL.
 - Not proven on this box: `inN` against a real DeckLink input (needs a box with capture hardware).
+
+## T2 — camera maths port (2026-10-19) — DONE (offline)
+
+### Investigation
+- Source read at OpenFollow `2f8aa257` (`gh api …/contents`):
+  - `scene/solver.py` (948 lines) holds all the maths:
+    - `project_points` / `unproject_to_plane` (pinhole; the stored fov is horizontal; R = Ry(-yaw)·Rx(pitch)·Rz(roll)
+      in a Y-up frame);
+    - `apply/invert_overlay_distortion` (radial k1/k2 about the centre, r normalised to the half-diagonal, bracketed
+      Newton inverse);
+    - `compute_homography` (normalised DLT, exactly 4 points, SVD null vector);
+    - `decompose_homography` (square pixels, principal point at the centre → focal length by least squares on the
+      two rotation-column constraints, then pose; gimbal case pins yaw);
+    - `solve_camera_dlt` (refuses a solve that misses its own input by > 20 px, which also kills the homography's
+      mirror branch).
+  - `lens_model.py`: the fold rule (`1 + 3k1·s + 5k2·s² > 0` on s ∈ [0,1]) and pull-back.
+  - `lens_fit.py` (k1/k2 fitting from extra points) is **not** ported yet; it belongs to the wizard's lens step (T3).
+- Their Y-up intermediate frame is exactly Godot's: PSN (x, y, z) → (x, z, -y). HighAsCG stage objects face +Z
+  (the audience; `stage_objects.gd:5`), so PSN "upstage" (+Y) is Godot -Z and PSN "stage left" (+X) is Godot +X
+  (the audience's right). The solved camera is therefore a `Camera3D` transform as is, with `fov` = the vertical fov.
+- Precision: Godot `Vector3`/`Basis` are float32 (≈ 1.2e-4 px ulp at x ≈ 1500); the golden pixels are pinned at
+  1e-4, so the port works on plain float64 scalars and Arrays.
+- No SVD in GDScript: with h33 = 1, the 4-point DLT is the 8×8 linear solve. For ≥ 4 points the same system is
+  solved as least squares (normal equations of the Hartley-normalised points). h33 ≠ 0 whenever the camera sees
+  the plane origin in front of it. The SVD "closest rotation" step is a no-op after Gram–Schmidt with r1 = r2 × r0
+  (det = +1 by construction), so it was dropped.
+
+### What was done
+- `godot/client/features/previs/tracking/camera_model.gd` (pure, static):
+  - camera dict (OpenFollow's `CameraConfig` keys);
+  - `project` / `unproject` (null for misses);
+  - `reprojection` (per-point px + RMS: the wizard display and the P1 acceptance figure);
+  - lens fold / validity / pull-back, `apply/invert_distortion`;
+  - `solve_floor` (≥ 4 coplanar points, 20 px gate);
+  - `psn_to_godot` / `godot_transform` for the previs `Camera3D`.
+- `godot/client/features/previs/tracking/homography.gd`: normalised DLT (≥ 4 points), the decomposition, and a
+  small Gaussian elimination.
+- `src/tracking/camera-model.js`: project / unproject / lens / `pixelToFloor` for the server hub (detections →
+  floor, fusion). The calibration solve stays in Godot, where the wizard is.
+- Attribution:
+  - an OpenFollow header (copyright, licence, commit, source files, list of changes) in every ported file;
+  - a new repo-root `THIRD_PARTY_NOTICES` (ported files, commit, copyright, name/logo note).
+    `licenses/` is a tracked symlink to the generated `/usr/share/doc/highascg/licenses`, so nothing hand-written
+    belongs there. `tools/release/collect-third-party-licenses.sh` copies the notice to
+    `third-party/highascg-THIRD_PARTY_NOTICES.txt` and lists an `openfollow` component in the manifest / INDEX.
+  - About-page credit: still open (the About page is WO-608).
+- Tests:
+  - `godot/client/tests/test_tracking_camera.gd`, 67 assertions on OpenFollow's own vectors:
+    - golden pixels for the head-on camera at roll 0 / -12 / 25;
+    - hfov ↔ vfov;
+    - roundtrip, plus the optical-axis reach and bearing;
+    - the six-pose recovery set (FOH, upstage, both box booms, oblique canted);
+    - 8 noisy points;
+    - degenerate / plumb-overhead / mirror-branch refusals;
+    - the lens valid / fold tables, inverse roundtrip under five strong lenses, the Newton-creep case, the fold-ring
+      corner;
+    - the `Camera3D` transform sees the same pixel.
+  - `tools/smoke/smoke-wo616-tracking-camera-model.test.js` (curated CI list): the same golden pixels and lens
+    cases for the JS port.
+
+### What was VERIFIED
+- Godot `--check` OK; `--test` 994 passed, 0 failed. Mutation check: flipping one sign in `rotation()` →
+  13 failures, so the vectors bind the maths. JS smoke 2/2.
+- Offline suite 2678 tests, 2675 pass, 1 fail (the known local-only `smoke-wo577-shader-controls`); 0 files over
+  500 lines.
+- The collector's manifest block, run against a temp `licenses/` holding only the copied notice, emits the
+  `openfollow` component. The full collector was not run (it rewrites the system licence tree from dpkg state).
+- Nothing to prove on the box yet: no camera object consumes this until T3/T4.

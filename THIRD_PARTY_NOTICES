@@ -1,0 +1,22 @@
+HighAsCG — third-party source included in this repository
+(HighAsCG itself: AGPL-3.0-or-later, see LICENSE / COPYRIGHT. Packaged binaries such as NVIDIA, Blackmagic and NDI are
+listed in licenses/INDEX.md, which tools/release/collect-third-party-licenses.sh generates.)
+
+================================================================================
+OpenFollow — https://github.com/openfollowapp/openfollow
+Copyright (C) 2026 The OpenFollow Project – Paul Hermann, Michel Honold, Vinzenz Schultz
+License: GNU Affero General Public License v3.0 or later (the same as HighAsCG; full text in LICENSE).
+
+HighAsCG's previs tracking (WO-616) contains code ported from OpenFollow at commit
+2f8aa257c86b28eafe7e22d7f1a6a2f78cdab211:
+
+  godot/client/features/previs/tracking/camera_model.gd  ← openfollow/scene/solver.py, openfollow/lens_model.py,
+                                                            openfollow/scene/camera.py
+  godot/client/features/previs/tracking/homography.gd    ← openfollow/scene/solver.py
+  src/tracking/camera-model.js                           ← openfollow/scene/solver.py, openfollow/lens_model.py
+  godot/client/tests/test_tracking_camera.gd,
+  tools/smoke/smoke-wo616-tracking-camera-model.test.js  ← test vectors from tests/test_solver.py,
+                                                            tests/test_solver_distortion.py, tests/test_lens_model.py
+
+Each ported file carries this attribution and lists its changes. The OpenFollow name and logo are not
+covered by the licence; HighAsCG calls the feature "Tracking" and credits OpenFollow here and in the files.
