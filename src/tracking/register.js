@@ -15,7 +15,13 @@
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
  * Detection (T9, src/tracking/detect-service.js): GET /api/tracking/detections — sidecar state + latest persons;
  *       WS tracking:detections {enabled, running, cameras:[{id,role,frame,stale,persons:[{tid,box,score,age_s,floor}]}]}
- *       (≤ 15 Hz while persons change, and when a camera goes stale).
+ *       (≤ 15 Hz while persons change, and when a camera goes stale); a person a marker is pinned to carries `marker`.
+ * Pinning (T9b, src/tracking/detect-pin.js) runs every tick: replace / assist write the hub (source 'detect'). In
+ * assist, operator writes (WS / HTTP) become the marker's ANCHOR, not its position; markers broadcasts then carry
+ * `anchor: {x, y, z}` next to the AI-corrected output, so the client keeps steering the anchor. In replace, operator
+ * writes to the pinned marker are dropped while the pin drives it (status 0 = nobody tracked, held in place) and it
+ * carries `driven: true` — the client stops heartbeating it (never inferred from `source`: a dead anchor leaves
+ * source 'detect' on a marker nobody drives, and the operator must be able to take it back).
  */
 
 'use strict'
@@ -24,6 +30,7 @@ const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
+const { DetectPin } = require('./detect-pin')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -46,6 +53,8 @@ let _zones = null
 let _zonesSent = ''
 let _detect = null
 let _detectSent = { json: '', at: 0 }
+const pin = new DetectPin()
+let _pinAt = 0
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
@@ -54,7 +63,17 @@ function apply(data, source) {
 	const list = Array.isArray(data?.markers) ? data.markers : [data]
 	const errors = []
 	let accepted = 0
+	const assist = DetectPin.assistActive(_detect?.config)
 	for (const m of list) {
+		if (assist && (m?.source || source) === 'operator' && pin.setAnchor(m, hub.now())) {
+			accepted++ // the anchor; the pin moves the output (seeded here the first time)
+			if (!hub.markers.has(Number(m.id))) hub.set({ ...m, source: 'operator' })
+			continue
+		}
+		if ((m?.source || source) === 'operator' && pin.drives(Number(m?.id))) {
+			accepted++ // replace: detection owns this marker; the client's heartbeat must not flap its source
+			continue
+		}
 		const r = hub.set({ ...m, source: m?.source || source })
 		if (r.ok) accepted++
 		else errors.push({ id: m?.id ?? null, error: r.error })
@@ -63,15 +82,34 @@ function apply(data, source) {
 	return { accepted, errors }
 }
 
+/** Hub markers + each assisted marker's anchor (the operator's own position) / `driven` while the replace pin owns it. */
+function markersView(now = hub.now()) {
+	return hub.list(now).map((m) => {
+		const a = pin.anchor(m.id)
+		if (a) return { ...m, anchor: { x: a.x, y: a.y, z: a.z } }
+		return pin.drives(m.id) ? { ...m, driven: true } : m
+	})
+}
+
+/** Detection pinning, every tick (dt-corrected, OpenFollow's animate clock). */
+function pinTick() {
+	if (!_detect) return
+	const now = hub.now()
+	const dt = _pinAt ? (now - _pinAt) / 1000 : TICK_MS / 1000
+	_pinAt = now
+	pin.step({ cfg: _detect.config, available: _detect.available, persons: _detect.persons(), hub, planeZ: _detect.planeZ, now, dt })
+}
+
 /** Broadcast when a write landed, the stale set changed, or the heartbeat is due (never for an empty, idle hub). */
 function tick(force = false) {
 	if (!_ctx || typeof _ctx._wsBroadcast !== 'function') return
 	const now = hub.now()
 	const stale = hub.staleKey(now)
 	const due = now - _sent.at >= HEARTBEAT_MS && hub.markers.size > 0
-	if (!force && hub.rev === _sent.rev && stale === _sent.stale && !due) return
-	_sent = { rev: hub.rev, stale, at: now }
-	_ctx._wsBroadcast(WS_EVENT, { markers: hub.list(now), stale_after_ms: MARKER_STALE_AFTER_MS })
+	const rev = `${hub.rev}:${pin.rev}`
+	if (!force && rev === _sent.rev && stale === _sent.stale && !due) return
+	_sent = { rev, stale, at: now }
+	_ctx._wsBroadcast(WS_EVENT, { markers: markersView(now), stale_after_ms: MARKER_STALE_AFTER_MS })
 }
 
 /** Follow aims for the previs beams: ≤ 10 Hz, only when an aim / state changed. */
@@ -96,12 +134,19 @@ function zonesTick() {
 	_ctx._wsBroadcast(ZONES_EVENT, snap)
 }
 
+/** A detections snapshot with `marker` on each person a marker is pinned to (copies — the service's own stay clean). */
+function withPins(snap) {
+	const att = pin.attached()
+	for (const c of snap.cameras) c.persons = c.persons.map((p) => (att[`${c.id}:${p.tid}`] ? { ...p, marker: att[`${c.id}:${p.tid}`] } : p))
+	return snap
+}
+
 /** Detected persons: ≤ 15 Hz, only when something changed (a step with the same boxes sends nothing). */
 function detectTick() {
 	if (!_detect || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
 	const now = hub.now()
 	if (now - _detectSent.at < DETECT_MS) return
-	const snap = _detect.snapshot()
+	const snap = withPins(_detect.snapshot())
 	const json = JSON.stringify(snap)
 	if (json === _detectSent.json) return
 	_detectSent = { json, at: now }
@@ -120,10 +165,10 @@ async function handleApi({ method, path, body }) {
 		return _zones ? reply(200, _zones.status()) : reply(503, { error: 'zone engine not running' })
 	}
 	if (method === 'GET' && path === '/api/tracking/detections') {
-		return _detect ? reply(200, _detect.status()) : reply(503, { error: 'detection service not running' })
+		return _detect ? reply(200, withPins(_detect.status())) : reply(503, { error: 'detection service not running' })
 	}
 	if (path === '/api/tracking/markers') {
-		if (method === 'GET') return reply(200, { markers: hub.list(), stale_after_ms: MARKER_STALE_AFTER_MS })
+		if (method === 'GET') return reply(200, { markers: markersView(), stale_after_ms: MARKER_STALE_AFTER_MS })
 		if (method === 'POST') {
 			let data
 			try {
@@ -169,6 +214,7 @@ module.exports = {
 		if (ctx) ctx.trackingHub = hub
 		if (_timer) clearInterval(_timer)
 		_timer = setInterval(() => {
+			pinTick()
 			tick()
 			followTick()
 			zonesTick()

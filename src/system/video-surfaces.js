@@ -32,6 +32,7 @@ function roleIndex(role) {
 }
 const LEASE_TTL_MS = 15000
 const SWEEP_EVERY_MS = 2000
+const SETTLE_MS = 200 // a REMOVEd shm consumer unlinks its name on the next channel tick (measured: < 20 ms on the box)
 
 /**
  * @param {string} role pgm1..pgm4 | prv1..prv4 | in1..in16 | ch1..ch99
@@ -69,21 +70,55 @@ function segmentFor(role) {
  */
 function createVideoSurfaceManager(deps) {
 	const now = deps.now || Date.now
+	const settleMs = deps.settleMs ?? SETTLE_MS
 	const log = deps.log || (() => {})
 	/** @type {Map<string, Map<string, number>>} role -> clientId -> expiresAt */
 	const leases = new Map()
 	/** @type {Map<string, { channel: number, index: number }>} consumers this manager has ADDed */
 	const active = new Map()
+	/** @type {Map<string, Promise<boolean>>} ADDs on the wire — concurrent leases share one (WO-616 T9b) */
+	const adding = new Map()
+	/**
+	 * Roles whose consumer state on Caspar this manager set itself since the last (re)connect. Any other role may
+	 * still have a consumer on its index (an earlier server process, a connection blip): it is REMOVEd quietly
+	 * before the ADD, because ADD on an occupied index replaces the consumer and the old one's teardown unlinks the
+	 * shm NAME the new one writes (box, 2026-10-19: lease at boot + onCasparReady → two ADDs → /dev/shm/highascg-ch1 gone).
+	 * REMOVE returns before that teardown runs (next channel tick), so when one was there, wait SETTLE_MS first.
+	 */
+	const known = new Set()
+
+	/**
+	 * ADD unless already active or on its way. Two clients leasing the same role inside one AMCP round trip (the
+	 * detection service and the Godot camera view at boot) used to ADD twice: Caspar replaces the consumer on the
+	 * same index and the old one's teardown unlinks the shm NAME the new one writes — mapped readers keep reading,
+	 * every reader opening it afterwards finds nothing.
+	 */
+	function ensure(role) {
+		if (active.has(role)) return Promise.resolve(true)
+		if (!adding.has(role)) adding.set(role, add(role).finally(() => adding.delete(role)))
+		return adding.get(role)
+	}
 
 	async function add(role) {
 		const channel = resolveRoleChannel(role, deps.getChannelMap())
 		const amcp = deps.getAmcp()
 		if (channel == null || !amcp?.basic) return false
 		const index = roleIndex(role)
+		if (!known.has(role)) {
+			let was = false
+			try {
+				const r = await amcp.basic.remove(channel, null, index)
+				was = !(r && r.ok === false)
+			} catch {
+				// 404: nothing there — the usual case
+			}
+			if (was && settleMs > 0) await new Promise((res) => setTimeout(res, settleMs))
+		}
 		try {
 			const res = await amcp.basic.add(channel, 'SHM', `NAME ${role}`, index)
 			if (res && res.ok === false) throw new Error(res.error || 'ADD refused')
 			active.set(role, { channel, index })
+			known.add(role)
 			log('info', `[video-surfaces] ADD ${channel}-${index} SHM NAME ${role}`)
 			return true
 		} catch (e) {
@@ -99,6 +134,7 @@ function createVideoSurfaceManager(deps) {
 		if (!a || !amcp?.basic) return
 		try {
 			await amcp.basic.remove(a.channel, null, a.index)
+			known.add(role)
 			log('info', `[video-surfaces] REMOVE ${a.channel}-${a.index} (${role}: no leases)`)
 		} catch (e) {
 			log('warn', `[video-surfaces] REMOVE ${a.channel}-${a.index} failed: ${e?.message || e}`)
@@ -115,7 +151,7 @@ function createVideoSurfaceManager(deps) {
 		for (const role of wanted) {
 			if (!leases.has(role)) leases.set(role, new Map())
 			leases.get(role).set(id, t + LEASE_TTL_MS)
-			if (!active.has(role)) await add(role)
+			await ensure(role)
 		}
 		await sweep()
 		return list()
@@ -135,7 +171,8 @@ function createVideoSurfaceManager(deps) {
 	/** Caspar (re)connected: runtime consumers died with it — re-ADD every role that still has leases. */
 	async function onCasparReady() {
 		active.clear()
-		for (const role of leases.keys()) await add(role)
+		known.clear()
+		for (const role of leases.keys()) await ensure(role)
 	}
 
 	function list() {

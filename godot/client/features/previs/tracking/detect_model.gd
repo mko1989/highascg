@@ -1,0 +1,87 @@
+extends RefCounted
+## WO-616 T9 — `project.previs.tracking.detection` on the client: defaults + clamps mirrored from the server's
+## src/tracking/detect-model.js normalizeDetection (the server is the authority; this only keeps the Inspector
+## showing what the server will use). Unknown keys survive (`normalize` starts from a deep copy), so masks written
+## by a later client are not dropped by this one.
+
+const DEFAULTS := {
+	"enabled": false, "model": "yolo26n.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
+	"grace_ms": 500, "threads": 4, "pin_mode": "assist", "pin_marker_id": 1, "pin_point": "top",
+	"smoothing": 0.15, "prediction": 8, "assist_radius_m": 1.0, "assist_strength": 0.5,
+}
+const LIMITS := {
+	"confidence": [0.1, 0.95], "interval_ms": [20, 2000], "max_persons": [1, 50], "grace_ms": [0, 10000],
+	"threads": [1, 16], "pin_marker_id": [1, 65535], "smoothing": [0.01, 1], "prediction": [0, 30],
+	"assist_radius_m": [0.1, 10], "assist_strength": [0, 1],
+}
+const INTS := ["interval_ms", "max_persons", "grace_ms", "threads", "pin_marker_id"]
+const PIN_MODES := ["assist", "replace", "off"]
+const PIN_LABELS := {"assist": "Assist — nudge my marker onto the nearest person",
+	"replace": "Replace — the marker follows one detected person", "off": "Off — boxes only"}
+const MODEL_RE := "^[A-Za-z0-9_][A-Za-z0-9_.-]{0,80}\\.onnx$"
+
+
+static func normalize(src: Variant) -> Dictionary:
+	var out: Dictionary = (src as Dictionary).duplicate(true) if src is Dictionary else {}
+	out["enabled"] = out.get("enabled") == true
+	var re := RegEx.create_from_string(MODEL_RE)
+	var model := str(out.get("model", ""))
+	out["model"] = model if re.search(model) != null and not model.contains("..") else DEFAULTS.model
+	for k in LIMITS:
+		var v: Variant = out.get(k)
+		var lim: Array = LIMITS[k]
+		var n: float = clampf(float(v), lim[0], lim[1]) if (v is float or v is int) else float(DEFAULTS[k])
+		out[k] = int(round(n)) if INTS.has(k) else n
+	out["pin_mode"] = out.get("pin_mode") if PIN_MODES.has(out.get("pin_mode")) else DEFAULTS.pin_mode
+	out["pin_point"] = "bottom" if out.get("pin_point") == "bottom" else "top"
+	var cams: Variant = out.get("cameras")
+	out["cameras"] = cams if cams is Dictionary else {}
+	return out
+
+
+## One hub marker (tracking:markers item) → the driver's position: an assisted marker is steered at its `anchor`
+## (the AI-corrected output kept as `out`); one the replace pin owns carries `driven` (the server says so — never
+## inferred from source "detect", which a dead assist anchor leaves behind on a marker nobody drives).
+static func position_of(m: Dictionary) -> Dictionary:
+	var a: Variant = m.get("anchor")
+	var out: Variant = [float(m.get("x", 0.0)), float(m.get("y", 0.0)), float(m.get("z", 0.0))] if a is Dictionary else null
+	var src: Dictionary = a if a is Dictionary else m
+	return {"x": float(src.get("x", 0.0)), "y": float(src.get("y", 0.0)), "z": float(src.get("z", 0.0)),
+		"stale": m.get("stale") == true, "name": str(m.get("name", "")), "out": out,
+		"driven": m.get("driven") == true and out == null, "status": float(m.get("status", 1.0))}
+
+
+## Is detection on for this tracking camera? (no entry = watched, as the server's detectCameras)
+static func camera_on(d: Dictionary, cam_id: String) -> bool:
+	var c: Variant = (d.get("cameras", {}) as Dictionary).get(cam_id)
+	return not (c is Dictionary) or c.get("enabled") != false
+
+
+## d with camera `cam_id` switched on / off (its other fields — masks — kept).
+static func with_camera(d: Dictionary, cam_id: String, on: bool) -> Dictionary:
+	var out := d.duplicate(true)
+	var cams: Dictionary = out.get("cameras", {})
+	var c: Dictionary = (cams.get(cam_id) as Dictionary).duplicate(true) if cams.get(cam_id) is Dictionary else {}
+	c["enabled"] = on
+	cams[cam_id] = c
+	out["cameras"] = cams
+	return out
+
+
+## One status line from a tracking:detections snapshot for the camera on screen.
+static func status_line(snap: Dictionary, cam_id: String) -> String:
+	if snap.is_empty():
+		return "No detection data from the server (tracking module off?)"
+	if snap.get("enabled") != true:
+		return "Detection off"
+	var err := str(snap.get("error", ""))
+	if snap.get("running") != true:
+		return "Starting the detector…" if err.is_empty() else "Detector not running — " + err
+	for c in snap.get("cameras", []):
+		if c is Dictionary and str(c.get("id", "")) == cam_id:
+			if c.get("stale") == true:
+				return "Running — no frames from %s (%s) yet" % [cam_id, str(c.get("role", ""))]
+			var ps: Array = c.get("persons", [])
+			var pinned: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and p.has("marker")).size()
+			return "Running — %d person%s%s" % [ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else ""]
+	return "Running — this camera is not watched (no surface role, or switched off)"

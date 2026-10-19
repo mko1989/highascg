@@ -78,7 +78,9 @@ after(() => services.forEach((s) => s.stop()))
 describe('WO-616 T9 person detection', () => {
 	it('normalizeDetection: defaults, clamps, model names, masks', () => {
 		assert.deepEqual(normalizeDetection(null), {
-			enabled: false, model: 'yolo26n.onnx', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500, threads: 4, cameras: {},
+			enabled: false, model: 'yolo26n.onnx', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500, threads: 4,
+			pin_mode: 'assist', pin_marker_id: 1, pin_point: 'top', smoothing: 0.15, prediction: 8, assist_radius_m: 1, assist_strength: 0.5,
+			cameras: {},
 		})
 		assert.equal(normalizeDetection({ confidence: 5 }).confidence, 0.95)
 		assert.equal(normalizeDetection({ confidence: 0 }).confidence, 0.1)
@@ -94,8 +96,11 @@ describe('WO-616 T9 person detection', () => {
 				c: { enabled: false },
 			},
 		}).cameras
-		assert.deepEqual(cams.a, { enabled: true, masks: [] }, 'two-vertex mask dropped')
-		assert.deepEqual(cams.b, { enabled: true, masks: [{ enabled: false, vertices: [[0, 0.5], [1, 0.5], [0.5, 1]] }] }, 'vertices clamped, enabled false kept')
+		assert.deepEqual(cams.a, { enabled: true, masks_enabled: false, masks: [] }, 'two-vertex mask dropped')
+		assert.deepEqual(cams.b, { enabled: true, masks_enabled: false, masks: [{ enabled: false, vertices: [[0, 0.5], [1, 0.5], [0.5, 1]] }] }, 'vertices clamped, enabled false kept')
+		const pins = normalizeDetection({ pin_mode: 'bogus', pin_point: 'bottom', assist_strength: 2, pin_marker_id: 0 })
+		assert.deepEqual([pins.pin_mode, pins.pin_point, pins.assist_strength, pins.pin_marker_id], ['assist', 'bottom', 1, 1])
+		assert.equal(normalizeDetection({ pin_mode: 'off' }).pin_mode, 'off')
 		assert.equal(cams.c.enabled, false)
 	})
 
@@ -111,6 +116,10 @@ describe('WO-616 T9 person detection', () => {
 		const det = normalizeDetection({ cameras: { c: { enabled: false } } })
 		assert.deepEqual(detectCameras(tracking, det), [{ id: 'a', role: 'ch1', raster: [1280, 720], cam: CAM, masks: [] }])
 		assert.deepEqual(detectCameras({ cameras: [{ id: 'd', role: 'pgm1' }] }, normalizeDetection(null))[0].raster, RASTER)
+		const MASK = { enabled: true, vertices: [[0, 0], [1, 0], [1, 1]] }
+		const sel = (on) => detectCameras({ cameras: [{ id: 'm', role: 'ch1' }] }, normalizeDetection({ cameras: { m: { masks_enabled: on, masks: [MASK] } } }))[0].masks
+		assert.deepEqual(sel(false), [], 'masks inactive until the master switch is on (OpenFollow masks_enabled)')
+		assert.equal(sel(true).length, 1)
 	})
 
 	it('boxToFloor / personsFrom: round trip through the camera model', () => {

@@ -6,10 +6,15 @@
  *
  * Slice (client-owned with the rest of previs.tracking; every field optional):
  *   { enabled: false, model: 'yolo26n.onnx', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500,
- *     threads: 4, cameras: { <camera id>: { enabled: true, masks: [{ enabled, vertices: [[x, y] 0–1, …] }] } } }
- * Defaults are OpenFollow's (detection.py / tracking.py @ 2f8aa257). `model` is a file name inside the models
- * directory (HIGHASCG_TRACKING_MODELS), never a path. A camera without an entry is watched; masks keep a box only
- * when its feet point lies inside an enabled one (no usable mask = whole picture).
+ *     threads: 4, pin_mode: 'assist', pin_marker_id: 1, pin_point: 'top', smoothing: 0.15, prediction: 8,
+ *     assist_radius_m: 1, assist_strength: 0.5,
+ *     cameras: { <camera id>: { enabled: true, masks_enabled: false, masks: [{ enabled, vertices: [[x, y] 0–1, …] }] } } }
+ * Defaults are OpenFollow's (detection.py / tracking.py / configuration.py DetectionConfig @ 2f8aa257). Pinning
+ * (detect-pin.js): `assist` | `replace` as OpenFollow, plus `off` (boxes only); `pin_marker_id` is the replace
+ * target (OpenFollow's −1 "controller-selected marker" has no server-side equivalent here). `model` is a file name inside the models
+ * directory (HIGHASCG_TRACKING_MODELS), never a path. A camera without an entry is watched; with `masks_enabled`
+ * (OpenFollow's master switch, default off) its masks keep a box only when its feet point lies inside an enabled one
+ * (no usable mask = whole picture).
  *
  * Floor point: the box's bottom-centre (feet), scaled from the normalised box to the camera's calibration raster,
  * undistorted and cast onto the plane z = grid.z_offset (camera-model.pixelToFloor) — OpenFollow's
@@ -26,13 +31,26 @@ const DETECTION_DEFAULTS = Object.freeze({
 	max_persons: 10,
 	grace_ms: 500,
 	threads: 4,
+	pin_mode: 'assist',
+	pin_marker_id: 1,
+	pin_point: 'top',
+	smoothing: 0.15,
+	prediction: 8,
+	assist_radius_m: 1,
+	assist_strength: 0.5,
 })
+const PIN_MODES = ['assist', 'replace', 'off']
 const LIMITS = {
 	confidence: [0.1, 0.95],
 	interval_ms: [20, 2000],
 	max_persons: [1, 50],
 	grace_ms: [0, 10000],
 	threads: [1, 16],
+	pin_marker_id: [1, 65535],
+	smoothing: [0.01, 1],
+	prediction: [0, 30],
+	assist_radius_m: [0.1, 10],
+	assist_strength: [0, 1],
 }
 const MODEL_RE = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,80}\.onnx$/
 const ROLE_RE = /^(pgm[1-4]|prv[1-4]|in([1-9]|1[0-6])|ch[1-9][0-9]?)$/
@@ -58,9 +76,14 @@ function normalizeDetection(src) {
 	for (const k of Object.keys(LIMITS)) out[k] = clamp(s[k], LIMITS[k], DETECTION_DEFAULTS[k])
 	out.max_persons = Math.round(out.max_persons)
 	out.threads = Math.round(out.threads)
+	out.pin_marker_id = Math.round(out.pin_marker_id)
+	out.pin_mode = PIN_MODES.includes(s.pin_mode) ? s.pin_mode : DETECTION_DEFAULTS.pin_mode
+	out.pin_point = s.pin_point === 'bottom' ? 'bottom' : 'top'
 	out.cameras = {}
 	const cams = s.cameras && typeof s.cameras === 'object' && !Array.isArray(s.cameras) ? s.cameras : {}
-	for (const [id, c] of Object.entries(cams)) out.cameras[id] = { enabled: c?.enabled !== false, masks: normalizeMasks(c?.masks) }
+	for (const [id, c] of Object.entries(cams)) {
+		out.cameras[id] = { enabled: c?.enabled !== false, masks_enabled: c?.masks_enabled === true, masks: normalizeMasks(c?.masks) }
+	}
 	return out
 }
 
@@ -81,17 +104,26 @@ function detectCameras(tracking, det) {
 		seen.add(id)
 		const r = Array.isArray(c.raster) ? c.raster.map(Number) : []
 		const raster = r.length >= 2 && r[0] > 0 && r[1] > 0 ? [r[0], r[1]] : [1920, 1080]
-		out.push({ id, role, raster, cam: c.cam && typeof c.cam === 'object' ? c.cam : null, masks: dc.masks })
+		out.push({ id, role, raster, cam: c.cam && typeof c.cam === 'object' ? c.cam : null, masks: dc.masks_enabled ? dc.masks : [] })
 	}
 	return out
 }
 
-/** Sidecar box (normalised x1, y1, x2, y2) → [x, y, z] PSN metres on the floor plane, or null. */
-function boxToFloor(box, camEntry, planeZ = 0) {
+/**
+ * Sidecar box (normalised x1, y1, x2, y2) → [x, y, z] PSN metres where the box's bottom-centre (feet, default) or
+ * top-centre (`top`: the head, OpenFollow's pin_point "top" cast onto the marker's own height) meets z = planeZ.
+ */
+function boxPoint(box, camEntry, planeZ = 0, top = false) {
 	if (!camEntry?.cam || !Array.isArray(box) || box.length < 4) return null
 	const [w, h] = camEntry.raster
-	const p = pixelToFloor(camEntry.cam, [((Number(box[0]) + Number(box[2])) / 2) * w, Number(box[3]) * h], w, h, planeZ)
-	return p && p.every(Number.isFinite) ? p.map((v) => Math.round(v * 1000) / 1000) : null
+	const p = pixelToFloor(camEntry.cam, [((Number(box[0]) + Number(box[2])) / 2) * w, Number(top ? box[1] : box[3]) * h], w, h, planeZ)
+	return p && p.every(Number.isFinite) ? p : null
+}
+
+/** Feet point on the floor, rounded to mm (what clients see). */
+function boxToFloor(box, camEntry, planeZ = 0) {
+	const p = boxPoint(box, camEntry, planeZ)
+	return p ? p.map((v) => Math.round(v * 1000) / 1000) : null
 }
 
 /** One sidecar `tracks` message → the persons list a client / the pinning engine sees. */
@@ -110,4 +142,4 @@ function personsFrom(msg, camEntry, planeZ = 0) {
 	return out
 }
 
-module.exports = { DETECTION_DEFAULTS, normalizeDetection, detectCameras, boxToFloor, personsFrom }
+module.exports = { DETECTION_DEFAULTS, normalizeDetection, detectCameras, boxPoint, boxToFloor, personsFrom }

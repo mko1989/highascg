@@ -61,6 +61,8 @@ class Camera:
         self.path = ""
         self.masks = []
         self.reader = None
+        self.ino = None
+        self.opened = 0.0
         self.det = detector.CameraDetector()
         self.last_step = 0.0
         self.last_frame = 0.0
@@ -79,6 +81,16 @@ class Camera:
             self.reader.close()
         self.reader = None
 
+    def replaced(self):
+        """Stale and the name now points at another segment (Caspar recreated the consumer: a server restart's
+        REMOVE + ADD) or at none — the mapping we hold is an unlinked segment nobody writes any more."""
+        if time.monotonic() - max(self.last_frame, self.opened) <= STALE_S:
+            return False
+        try:
+            return os.stat(self.path).st_ino != self.ino
+        except OSError:
+            return True
+
     def poll(self):
         """→ (info, pixels) of a new frame, or None. (Re)opens the segment as needed."""
         if self.reader is None:
@@ -86,11 +98,16 @@ class Camera:
                 self.detail = "no surface at " + self.path
                 return None
             try:
+                self.ino = os.stat(self.path).st_ino
                 self.reader = hshm_abi.Reader(self.path)
+                self.opened = time.monotonic()
             except (OSError, ValueError) as e:
                 self.detail = str(e)
                 return None
         kind, info, pixels = self.reader.poll()
+        if kind != "frame" and self.replaced():
+            self.close()
+            return None
         if kind == "geometry":
             self.close()
             return None

@@ -11,10 +11,14 @@ extends Node
 ## comes from the project directly, so markers stay live whatever tab / previs mode the operator is in.
 ## T11: also keeps the server follow engine's aims (`tracking:follow`) for the beams and the Follow section.
 ## T7: and the server zone engine's occupancy (`tracking:zones`) for the zone fills and the Zones section.
+## T9b detection pinning: an assisted marker's broadcast carries `anchor` — that is what we steer (our position), the
+## AI-corrected output is kept as `out` for drawing. A marker the replace pin owns (`driven`, said by the server) gets
+## no heartbeats and no moves (the server drops them anyway). `detections` = the last `tracking:detections`.
 
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const T := preload("res://features/previs/tracking/tracking_model.gd")
+const D := preload("res://features/previs/tracking/detect_model.gd")
 
 const SEND_MS := 33
 const HEARTBEAT_MS := 250
@@ -25,9 +29,10 @@ const BODY_M := 1.7  # drawn person height above the marker
 const SMOOTHING := 0.6
 
 signal updated  # positions / selection / speed changed → redraw, refresh the Inspector
+signal detected  # a tracking:detections broadcast landed (boxes only: ≤ 15 Hz, kept off `updated`)
 
 var defs: Array = []  # [{id, name, color}] — this client's markers (project)
-var positions := {}  # id → {x, y, z, stale, name}  (server state, our moves applied at once)
+var positions := {}  # id → {x, y, z, stale, name, out, driven, status}  (server state, our moves applied at once)
 var selected := 0
 var speed := MI.SPEED_DEFAULT
 var curve := "linear"
@@ -43,6 +48,7 @@ var follow_on := false  # the server's Art-Net output master
 var zones := {}  # zone id → {occupied, count, occupants, last_kind} (server zone engine, WO-616 T7)
 var zones_on := false
 var zones_seen := false  # the server zone engine answered (module on)
+var detections := {}  # tracking:detections {enabled, running, cameras:[{id, role, stale, persons:[{tid, box, score, marker?}]}]}
 var _target: Variant = null
 var _axes: Array = []
 var _dirty := {}
@@ -125,7 +131,8 @@ func pos(id: int) -> Dictionary:
 	return p if p is Dictionary else {"x": home.x, "y": home.y, "z": floor_z, "stale": true, "name": ""}
 
 
-## Everything to draw / grab in the camera view: [{id, name, color, pos, stale, own, centre, top, ring}].
+## Everything to draw / grab in the camera view: [{id, name, color, pos, stale, own, centre, top, foot, ring,
+## assisted, driven, status}] — centre / ring = what the operator steers, foot / top = where the marker really is.
 func marks() -> Array:
 	var out := []
 	var ids := positions.keys()
@@ -140,11 +147,14 @@ func marks() -> Array:
 			if int(x.id) == id:
 				d = x
 		var at := [float(p.x), float(p.y), float(p.z)]
-		var px := O.shown(entry, [at, [at[0], at[1], at[2] + BODY_M]]) if not entry.is_empty() else [null, null]
+		var o: Array = p.out if p.get("out") is Array else at  # assist: the ring is the anchor, the body the output
+		var px := O.shown(entry, [at, [o[0], o[1], o[2] + BODY_M], o]) if not entry.is_empty() else [null, null, null]
 		out.append({"id": id, "name": str(d.get("name", p.get("name", "Marker %d" % id))),
 			"color": Color.html(str(d.get("color", "#9aa0a6"))), "pos": at, "stale": p.stale == true or not positions.has(id),
 			"own": not d.is_empty(), "centre": Vector2(px[0][0], px[0][1]) if px.size() > 0 and px[0] != null else null,
 			"top": Vector2(px[1][0], px[1][1]) if px.size() > 1 and px[1] != null else null,
+			"foot": Vector2(px[2][0], px[2][1]) if px.size() > 2 and px[2] != null else null,
+			"assisted": p.get("out") is Array, "driven": p.get("driven", false), "status": float(p.get("status", 1.0)),
 			"ring": MI.ground_ring(entry, at, RING_M) if not entry.is_empty() else PackedVector2Array()})
 	return out
 
@@ -195,7 +205,7 @@ func _process(dt: float) -> void:
 		for d in defs:
 			var id := int(d.id)
 			var other := now - int(_seen.get(id, -100000)) < QUIET_MS and now - int(_mine.get(id, -100000)) >= QUIET_MS
-			if not _dirty.has(id) and not other:
+			if not _dirty.has(id) and not other and not pos(id).get("driven", false):
 				idle.append(id)
 		_send(idle, now)
 
@@ -240,6 +250,8 @@ func _edge(dev: int, button: int) -> bool:
 
 func _move(id: int, at: Vector2, now: int) -> void:
 	var p := pos(id).duplicate()
+	if p.get("driven", false):
+		return  # the replace pin owns it
 	p["x"] = snappedf(at.x, 0.0001)
 	p["y"] = snappedf(at.y, 0.0001)
 	p["stale"] = false
@@ -270,6 +282,9 @@ func _on_ws(type: String, data: Variant) -> void:
 		_adopt_follow(data)
 	elif type == "tracking:zones" and data is Dictionary:
 		_adopt_zones(data)
+	elif type == "tracking:detections" and data is Dictionary:
+		detections = data
+		detected.emit()
 
 
 func _adopt_follow(data: Dictionary) -> void:
@@ -299,11 +314,11 @@ func _adopt(list: Array) -> void:
 		if not (m is Dictionary) or not (m.get("id") is float or m.get("id") is int):
 			continue
 		var id := int(m.id)
+		var p := D.position_of(m)
 		if now - int(_mine.get(id, -100000)) < QUIET_MS and positions.has(id):
-			next[id] = positions[id]  # we are driving it: our state wins over echoes
+			next[id] = (positions[id] as Dictionary).duplicate()  # we are driving it: our state wins over echoes
+			next[id]["out"] = p.out
 			continue
-		var p := {"x": float(m.get("x", 0.0)), "y": float(m.get("y", 0.0)), "z": float(m.get("z", 0.0)),
-			"stale": m.get("stale") == true, "name": str(m.get("name", ""))}
 		var old: Variant = positions.get(id)
 		if old == null or old.x != p.x or old.y != p.y or old.z != p.z:
 			_seen[id] = now
@@ -311,6 +326,8 @@ func _adopt(list: Array) -> void:
 	for d in defs:  # ours, missing from the hub (server restart): keep where we had it — the heartbeat restores it
 		var id := int(d.id)
 		if not next.has(id) and positions.has(id):
-			next[id] = positions[id]
+			next[id] = (positions[id] as Dictionary).duplicate()
+			next[id]["driven"] = false  # nothing drives a marker the hub lost — the heartbeat brings it back
+			next[id]["out"] = null
 	positions = next
 	updated.emit()

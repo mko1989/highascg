@@ -9,6 +9,8 @@
  * Project – Paul Hermann, Michel Honold, Vinzenz Schultz): a marker counts as live for MARKER_STALE_AFTER_MS after
  * its last write, a never-written marker is stale, and stale positions are still listed (so a follow can hold)
  * but flagged. Sources keep a parked marker live by re-sending it (the Godot driver heartbeats every 250 ms).
+ * `status` is the PSN tracker validity 0–1 (marker.py set_status): 1 for operator writes; the T9 replace pin grades
+ * it from the detection (detect-pin.js detectionStatus) and changes it alone with setStatus (no freshness refresh).
  * Changes: JavaScript; milliseconds; one hub for every source instead of per-station markers.
  */
 
@@ -18,7 +20,7 @@ const MAX_ID = 65535 // PSN / Art-Net follow ids are 16-bit
 const NAME_MAX = 64
 
 const round = (v) => Math.round(v * 1e4) / 1e4
-const PUBLIC = ['name', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'source']
+const PUBLIC = ['name', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'source', 'status']
 
 class MarkerHub {
 	/** @param {{ now?: () => number }} [opts] */
@@ -31,7 +33,7 @@ class MarkerHub {
 
 	/**
 	 * Write one marker position. → { ok: true, marker } | { ok: false, error }
-	 * @param {{ id: unknown, x: unknown, y: unknown, z?: unknown, name?: unknown, source?: unknown }} m
+	 * @param {{ id: unknown, x: unknown, y: unknown, z?: unknown, name?: unknown, source?: unknown, status?: unknown }} m
 	 */
 	set(m) {
 		const id = Number(m?.id)
@@ -50,13 +52,26 @@ class MarkerHub {
 		}
 		const name = m.name == null ? prev?.name || `Marker ${id}` : String(m.name).slice(0, NAME_MAX)
 		const source = m.source == null ? prev?.source || 'api' : String(m.source).slice(0, 32)
-		const rec = { id, name, x: round(x), y: round(y), z: round(z), vx: round(vx), vy: round(vy), vz: round(vz), source, at: now }
+		const status = m.status == null || !Number.isFinite(Number(m.status)) ? 1 : Math.min(1, Math.max(0, round(Number(m.status))))
+		const rec = { id, name, x: round(x), y: round(y), z: round(z), vx: round(vx), vy: round(vy), vz: round(vz), source, status, at: now }
 		this.markers.set(id, rec)
 		// A heartbeat (same position, name, source) only refreshes freshness: no rev bump, so idle sources keeping
 		// a parked marker live do not make the broadcaster send. A marker coming back from stale still sends
 		// (the stale set changes).
 		if (!prev || PUBLIC.some((k) => prev[k] !== rec[k])) this.rev++
 		return { ok: true, marker: this.view(rec, now) }
+	}
+
+	/** Change only the validity of an existing marker (its freshness is untouched). → false when there is no such marker. */
+	setStatus(id, status) {
+		const rec = this.markers.get(Number(id))
+		if (!rec) return false
+		const v = Math.min(1, Math.max(0, round(Number(status) || 0)))
+		if (rec.status !== v) {
+			rec.status = v
+			this.rev++
+		}
+		return true
 	}
 
 	remove(id) {
@@ -69,7 +84,7 @@ class MarkerHub {
 	view(rec, now = this.now()) {
 		const age = now - rec.at
 		return { id: rec.id, name: rec.name, x: rec.x, y: rec.y, z: rec.z, vx: rec.vx, vy: rec.vy, vz: rec.vz,
-			source: rec.source, age_ms: age, stale: !(age >= 0 && age < MARKER_STALE_AFTER_MS) }
+			source: rec.source, status: rec.status, age_ms: age, stale: !(age >= 0 && age < MARKER_STALE_AFTER_MS) }
 	}
 
 	/** Every marker, id order, aged against one `now` (one notion of "now" per packet). */

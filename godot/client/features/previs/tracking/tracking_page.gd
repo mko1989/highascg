@@ -7,6 +7,7 @@ extends VBoxContainer
 ## T11: | Follow — the follow patch (follow_section, project.fixtures); markers stay draggable and beams are drawn.
 ## T12: a "3D stage overlay" toggle + opacity under the modes (the view draws it; previs_tab remembers it).
 ## T7: | Zones — trigger zones (zones_section, data.zones); while drawing, the view's click adds a floor corner.
+## T9b: | Detect — person detection + pinning (detect_section, data.detection); markers stay draggable, boxes drawn.
 
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const R := preload("res://features/previs/tracking/camera_refine.gd")
@@ -14,6 +15,7 @@ const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const MarkersSection := preload("res://features/previs/tracking/markers_section.gd")
 const FollowSection := preload("res://features/previs/tracking/follow_section.gd")
 const ZonesSection := preload("res://features/previs/tracking/zones_section.gd")
+const DetectSection := preload("res://features/previs/tracking/detect_section.gd")
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
@@ -30,10 +32,11 @@ signal changed  # data / camera / active point changed → the view redraws
 signal ghost_changed(on: bool, opacity: float)  # T12 overlay toggle / opacity
 
 var data := T.normalize({})
-var mode := "calibrate"  # | "markers" | "follow" | "zones"
+var mode := "calibrate"  # | "markers" | "follow" | "zones" | "detect"
 var markers: MarkersSection
 var follow: FollowSection
 var zones: ZonesSection
+var detect: DetectSection
 var ghost_on := false
 var ghost_opacity := 0.6
 var _ghost_cb: CheckBox
@@ -71,7 +74,7 @@ func _ready() -> void:
 	add_child(row)
 	var modes := HBoxContainer.new()
 	var group := ButtonGroup.new()
-	for m in ["calibrate", "markers", "follow", "zones"]:
+	for m in ["calibrate", "markers", "follow", "zones", "detect"]:
 		var b := _button(m.capitalize(), func() -> void: set_mode(m))
 		b.toggle_mode = true
 		b.button_group = group
@@ -119,6 +122,13 @@ func _ready() -> void:
 		_persist())
 	zones.drawing_changed.connect(func() -> void: changed.emit())
 	add_child(zones)
+	detect = DetectSection.new()
+	detect.driver = driver
+	detect.visible = false
+	detect.edit.connect(func(d: Dictionary) -> void:
+		data["detection"] = d
+		_persist())
+	add_child(detect)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Delete this tracking camera and its calibration?"
 	_confirm.confirmed.connect(_delete_cam)
@@ -377,6 +387,8 @@ func _sync() -> void:
 	follow.visible = mode == "follow"
 	zones.visible = mode == "zones"
 	zones.set_zones(data.get("zones"))
+	detect.visible = mode == "detect"
+	detect.set_detection(data.get("detection"), str(ce.get("id", "")))
 	markers.set_defs(data.markers)
 	for k in _grid:
 		(_grid[k] as SpinBox).set_value_no_signal(float(data.grid[k]))

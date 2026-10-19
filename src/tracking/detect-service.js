@@ -7,7 +7,7 @@
  * renewed every LEASE_MS), sends the sidecar its config as a JSON line on stdin (again on every project change),
  * turns each `tracks` line into floor points (detect-model.personsFrom) and keeps the latest per camera.
  * A sidecar that exits is respawned with backoff (1 s doubling to 30 s, reset once it reports ready); its stdin
- * closing (server gone) ends it, so it never outlives the server. Pinning detections to markers is T9b.
+ * closing (server gone) ends it, so it never outlives the server. Pinning detections to markers: detect-pin.js (T9b).
  *
  * Runtime outside the repo (Syncthing, AGPL weights): HIGHASCG_TRACKING_PYTHON (default
  * ~/.local/share/highascg/tracking-venv/bin/python, tools/tracking-detect/setup-venv.sh) and
@@ -34,6 +34,13 @@ function createDetectService(ctx, deps = {}) {
 	const now = deps.now || Date.now
 	const spawn = deps.spawn || childProcess.spawn
 	const exists = deps.exists || fs.existsSync
+	const listModels = deps.listModels || (() => {
+		try {
+			return fs.readdirSync(modelsDir).filter((f) => f.endsWith('.onnx')).sort()
+		} catch {
+			return []
+		}
+	})
 	const python = deps.python || process.env.HIGHASCG_TRACKING_PYTHON || path.join(DATA, 'tracking-venv', 'bin', 'python')
 	const modelsDir = deps.modelsDir || process.env.HIGHASCG_TRACKING_MODELS || path.join(DATA, 'models')
 	const lease = deps.lease || ((roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(LEASE_ID, roles))
@@ -221,6 +228,7 @@ function createDetectService(ctx, deps = {}) {
 		return {
 			enabled: det.enabled,
 			running: !!child && ready,
+			error: det.enabled ? error : '',
 			cameras: cams.map((c) => {
 				const l = latest.get(c.id)
 				const fresh = !!l && t - l.at <= STALE_MS
@@ -234,7 +242,27 @@ function createDetectService(ctx, deps = {}) {
 		get rev() {
 			return rev
 		},
-		status: () => ({ ...snapshot(), config: det, model: det.model, models_dir: modelsDir, python, providers, error,
+		get config() {
+			return det
+		},
+		get available() {
+			return !!child && ready
+		},
+		get planeZ() {
+			return planeZ
+		},
+		/** Fresh persons of every watched camera, for the pin (detect-pin.js): key `camera:tid`. */
+		persons() {
+			const t = now()
+			const out = []
+			for (const c of cams) {
+				const l = latest.get(c.id)
+				if (!l || t - l.at > STALE_MS) continue
+				for (const p of l.persons) out.push({ key: `${c.id}:${p.tid}`, camera: c.id, tid: p.tid, box: p.box, score: p.score, age_s: p.age_s, camEntry: c })
+			}
+			return out
+		},
+		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
 		stop() {

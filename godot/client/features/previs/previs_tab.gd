@@ -95,6 +95,10 @@ func _ready() -> void:
 		if track_page.zones != null:
 			track_page.zones.refresh()
 		_push_zones())
+	markers.detected.connect(func() -> void:
+		track_view.set_detections(markers.detections)
+		if track_page.detect != null:
+			track_page.detect.refresh_status())
 	track_view.grab.connect(func(px: Vector2) -> void: markers.grab_at(px))
 	track_view.drag.connect(markers.drag_to)
 	track_view.let_go.connect(markers.release)
@@ -140,9 +144,10 @@ func _on_tracking_changed() -> void:
 	if track_page.is_inside_tree():  # before the Inspector adopts it the page holds no project data (driver reads the project)
 		markers.entry = track_page.entry()
 		markers.set_defs(track_page.data.markers, track_page.data.grid)
-	track_view.markers_mode = track_page.mode in ["markers", "follow"]
+	track_view.markers_mode = track_page.mode in ["markers", "follow", "detect"]
 	track_view.follow_mode = track_page.mode == "follow"
 	track_view.zones_mode = track_page.mode == "zones"
+	track_view.detect_mode = track_page.mode == "detect"
 	_push_zones()
 	_apply_drive()
 
@@ -170,7 +175,7 @@ func _beams() -> Array:
 
 
 func _apply_drive() -> void:
-	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow", "zones"]
+	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow", "zones", "detect"]
 	if not markers.driving:
 		markers.release()
 

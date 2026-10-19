@@ -25,6 +25,7 @@ function rig(opts = {}) {
 		getChannelMap: () => MAP,
 		getOperatorSurface: opts.operator ? () => ({ role: 'opgui', channel: 5 }) : undefined,
 		now: () => t,
+		settleMs: 0,
 	})
 	return { m, lines, advance: (ms) => (t += ms) }
 }
@@ -42,6 +43,22 @@ test('WO-597: first lease ADDs once with the reserved index; a second client add
 	const { m, lines } = rig()
 	await m.lease('godot-a', ['pgm1'])
 	await m.lease('godot-b', ['pgm1'])
+	assert.deepEqual(lines, ['REMOVE 1-741', 'ADD 1-741 SHM NAME pgm1'], 'a leftover consumer on the index is cleared first')
+})
+
+test('WO-616 T9b: concurrent leases of one role share a single ADD (a second ADD unlinks the shm name)', async () => {
+	const { m, lines } = rig()
+	await Promise.all([m.lease('tracking-detect', ['pgm1']), m.lease('godot-a', ['pgm1']), m.lease('godot-b', ['pgm1', 'prv1'])])
+	assert.deepEqual(lines.sort(), ['ADD 1-741 SHM NAME pgm1', 'ADD 2-742 SHM NAME prv1', 'REMOVE 1-741', 'REMOVE 2-742'])
+	assert.equal(m.list().find((s) => s.role === 'pgm1').leases, 3)
+})
+
+test('WO-616 T9b: a role this manager removed itself is re-ADDed without another cleanup', async () => {
+	const { m, lines } = rig()
+	await m.lease('a', ['pgm1'])
+	await m.lease('a', [])
+	lines.length = 0
+	await m.lease('a', ['pgm1'])
 	assert.deepEqual(lines, ['ADD 1-741 SHM NAME pgm1'])
 })
 
@@ -49,6 +66,7 @@ test('WO-597: REMOVE only when the LAST client stops leasing', async () => {
 	const { m, lines } = rig()
 	await m.lease('a', ['pgm1', 'prv1'])
 	await m.lease('b', ['pgm1'])
+	lines.length = 0 // the pre-ADD cleanup is not what this test is about
 	await m.lease('a', []) // a no longer needs anything
 	assert.ok(lines.includes('REMOVE 2-742'), 'prv1 had only a → removed')
 	assert.ok(!lines.includes('REMOVE 1-741'), 'pgm1 still leased by b')
@@ -59,6 +77,7 @@ test('WO-597: REMOVE only when the LAST client stops leasing', async () => {
 test('WO-597: a client that stops renewing loses its lease after the TTL (crash safety)', async () => {
 	const { m, lines, advance } = rig()
 	await m.lease('crashy', ['pgm2'])
+	lines.length = 0
 	advance(LEASE_TTL_MS - 1)
 	await m.sweep()
 	assert.ok(!lines.includes('REMOVE 3-743'), 'still within TTL')
@@ -80,7 +99,8 @@ test('WO-597: Caspar reconnect re-ADDs every leased role; no AMCP = deferred unt
 	const r2 = rig()
 	await r2.m.lease('a', ['pgm1'])
 	await r2.m.onCasparReady()
-	assert.deepEqual(r2.lines, ['ADD 1-741 SHM NAME pgm1', 'ADD 1-741 SHM NAME pgm1'])
+	assert.deepEqual(r2.lines, ['REMOVE 1-741', 'ADD 1-741 SHM NAME pgm1', 'REMOVE 1-741', 'ADD 1-741 SHM NAME pgm1'],
+		'unknown Caspar state (start, reconnect) → clear the index, then ADD — never ADD over a live consumer')
 })
 
 test('WO-597: list() exposes the configured operator surface + runtime roles with segment paths', async () => {
@@ -129,12 +149,14 @@ test('WO-616 T1: inN = DeckLink input N\'s own channel, chN = any channel Caspar
 		getAmcp: () => ({ basic: { add: async (ch, c, p, i) => lines.push(`ADD ${ch}-${i} ${c} ${p}`), remove: async (ch, c, i) => lines.push(`REMOVE ${ch}-${i}`) } }),
 		getChannelMap: () => map,
 		now: () => 1,
+		settleMs: 0,
 	})
 	await m.lease('g', ['in2', 'ch7', 'ch9'])
-	assert.deepEqual(lines, ['ADD 8-752 SHM NAME in2', 'ADD 7-807 SHM NAME ch7'])
+	assert.deepEqual(lines, ['REMOVE 8-752', 'ADD 8-752 SHM NAME in2', 'REMOVE 7-807', 'ADD 7-807 SHM NAME ch7'])
 	const roles = m.list().map((s) => s.role)
 	assert.ok(roles.includes('in1') && roles.includes('in2'), 'every DeckLink input is announced')
 	assert.ok(roles.includes('ch7') && !roles.includes('ch1'), 'chN only while leased')
+	lines.length = 0
 	await m.lease('g', [])
 	assert.ok(lines.includes('REMOVE 8-752') && lines.includes('REMOVE 7-807'))
 	assert.ok(!m.list().some((s) => s.role === 'ch7'), 'released chN drops out of the list')

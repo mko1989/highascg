@@ -19,10 +19,14 @@ HighAsCG's previs tracking (WO-616) contains code ported from OpenFollow at comm
   src/tracking/zone-engine.js                            ← openfollow/zones/engine.py, docs/architecture/zones.md
   tools/tracking-detect/bytetrack.py                     ← openfollow/video/tracking.py
   tools/tracking-detect/detector.py                      ← openfollow/video/detection.py
+  src/tracking/detect-pin.js                             ← openfollow/runtime/services_detection_pin.py,
+                                                            openfollow/runtime/frame_timing.py,
+                                                            openfollow/video/detection.py (tracked_detection)
   godot/client/tests/test_tracking_camera.gd,
   tools/smoke/smoke-wo616-tracking-camera-model.test.js  ← test vectors from tests/test_solver.py,
                                                             tests/test_solver_distortion.py, tests/test_lens_model.py
   tools/smoke/smoke-wo616-tracking-zones.test.js         ← test vectors from tests/test_zone_geometry.py
+  tools/smoke/smoke-wo616-tracking-pin.test.js           ← test vectors from tests/test_services_detection_pin.py
 
 Each ported file carries this attribution and lists its changes. The OpenFollow name and logo are not
 covered by the licence; HighAsCG calls the feature "Tracking" and credits OpenFollow here and in the files.

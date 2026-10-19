@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); next: T9b pinning + Godot detection UI. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); next: T9c mask editor, T10 two-camera fusion. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -114,7 +114,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 - [ ] T8 PSN input (OpenFollow stations as sources).
 - [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), ~~systemd unit~~ server-owned child, GPU EP; masks.
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
-      Inspector detection controls. T9c mask editor in the camera view.
+      Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view.
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
@@ -998,3 +998,148 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
   - The CUDA provider (no CUDA onnxruntime installed).
   - Masks on the box. The feet-point filter is unit-covered only; there is no editor until T9c.
   - Two cameras at once: the code path is per-camera, but the box has one solved camera.
+
+## T9b — detection pinning (replace / assist) + Godot Detect mode (2026-10-19) — DONE (box-verified; real camera = owner QA)
+
+### Investigation
+- **OpenFollow's pin** (`runtime/services_detection_pin.py`, `runtime/frame_timing.py`, `video/detection.py`
+  `tracked_detection` @ 2f8aa257, read in full):
+  - Two modes. `replace`: the selected marker is written from one tracked person. `assist`: the operator keeps
+    steering, and the marker is pulled toward the nearest person inside `assist_radius_m`, eased by
+    `assist_strength`.
+  - Smoothing is dt-corrected: `dt_steps` = dt / (1/60), clamped to [1 ms, 0.2 s], and `ema_factor(a, n)` =
+    1 − (1 − a)^n. Velocity EMA α 0.3. Lookahead is `prediction` frames (8). Position EMA `smoothing` (0.15).
+  - Validity: 0.5 at the confidence threshold, 1 at score 1, fading linearly over the coast window.
+  - Re-acquire in replace: sticky by track id, else the nearest box centre within 0.15 of the frame, else the
+    largest box.
+  - `pin_point` top casts the head onto the marker's own height; bottom casts the feet onto the floor.
+- **Assist needs an anchor.** The Godot marker driver (`marker_driver.gd`) adopts hub positions and heartbeats
+  every 250 ms. If assist wrote the AI-corrected position into the hub, the driver would adopt it and send it back,
+  and the marker would creep toward the person with no one steering. So the operator's position (the ANCHOR) and the
+  output have to be two different things on the wire.
+- **Found on the box while verifying** (each fixed below):
+  1. `driven` inferred from `source: 'detect'` deadlocks. A dead assist anchor leaves `source: 'detect'` on a
+     marker nobody drives. The client then stopped heartbeating it, so it stayed stale for good (screenshot: "Marker
+     1 · stale" in Detect mode). The same happened after a server restart: the client kept its last copy of a marker
+     the hub had lost, still flagged driven, so it never re-created it and replace had nothing to drive.
+  2. **`/dev/shm/highascg-ch1` vanished at boot** ("no picture from ch1" in the camera view) while the sidecar
+     kept detecting. The journal had two `ADD 1-801 SHM NAME ch1` 200 ms apart: the detection service leases at
+     boot, then `onCasparReady` clears `active` and re-ADDs. AMCP probe on a spare index (`1-899`):
+     - ADD over a live consumer → name gone.
+     - REMOVE then an immediate ADD → name gone.
+     - REMOVE, wait 20 / 60 / 120 / 250 ms, ADD → name present.
+     - REMOVE on an empty index → `404 REMOVE FAILED`.
+
+     So Caspar tears the old shm consumer down on a later channel tick, and that teardown unlinks the NAME the new
+     consumer just created. Readers that had already mapped it carry on; anything opening it afterwards finds
+     nothing. A concurrent-lease variant exists too (`lease()` only marks `active` after the ADD reply).
+  3. **The sidecar can hold a dead segment.** Started before the boot ADD, it maps the previous process's segment.
+     The REMOVE + ADD then gives the name a new segment, and the sidecar reports `stale` with 0 fps forever. The
+     Godot reader re-opens the path on every read (`shm_reader.gd` `_read`), so it never has this problem.
+
+### What was done
+- **`src/tracking/detect-pin.js`** (new; OpenFollow port, attributed) `DetectPin.step()`, every 33 ms tick:
+  - **replace**: drives `pin_marker_id`, which must exist in the hub (OpenFollow's −1 "controller-selected" has no
+    server equivalent):
+    - `status` per `detectionStatus`.
+    - Nobody tracked → held in place at status 0, still written so it stays fresh.
+    - Sidecar down → released to status 1.
+    - `drives(id)` says the pin owns the marker.
+  - **assist**: operator writes become anchors (dropped after 1 s with no refresh).
+    - Each anchored marker glides toward the nearest matched person within the radius, else back home to the
+      anchor.
+    - The outer glide is seeded once, so the marker never snaps.
+  - Mode switch or off: releases everything.
+- **`src/tracking/marker-hub.js`**: a `status` field (0–1, default 1), plus `setStatus()`.
+- **`src/tracking/detect-model.js`**: pin fields with OpenFollow defaults, a per-camera `masks_enabled`
+  master (default off), and `boxPoint()` (unrounded, head or feet).
+- **`src/tracking/register.js`**:
+  - Assist: operator writes go to the anchor.
+  - Replace: operator writes to a driven marker are dropped (otherwise the client heartbeat flips `source`).
+  - Markers carry `anchor` (assist) or `driven: true` (replace), as the server's own statement. **Never inferred
+    from `source`** (fix 1).
+  - Persons in `tracking:detections` and in `GET /api/tracking/detections` carry `marker` when pinned.
+- **`src/tracking/detect-service.js`**:
+  - Snapshot gains `error`; status gains `models` (the `.onnx` files on the box).
+  - Getters `config` / `available` / `planeZ` and `persons()` for the pin.
+- **`src/system/video-surfaces.js`** (fix 2):
+  - `ensure()` makes concurrent leases of one role share one in-flight ADD.
+  - A role whose Caspar state the manager has not set itself since the last (re)connect gets a quiet REMOVE first.
+    If that REMOVE found a consumer, the ADD waits `SETTLE_MS` (200 ms) for its teardown.
+- **`tools/tracking-detect/sidecar.py`** (fix 3): once a camera has been stale for 1 s, it compares the segment's
+  inode with the one it opened, and re-opens when the name now points elsewhere (or nowhere).
+- **Godot**:
+  - **`detect_model.gd`** (new): the slice's client mirror (defaults, clamps, unknown keys kept), `camera_on` /
+    `with_camera`, `status_line`, and `position_of` (hub item → driver position; anchor → `out`, `driven` from the
+    server).
+  - **`detect_section.gd`** (new): the Detect Inspector section, with:
+    - a master switch with a confirm;
+    - Detect on <camera>;
+    - the model (from the box's list), confidence, interval, max persons, keep-lost;
+    - pin mode, marker (replace only), pin point, smoothing, lookahead, assist radius / strength (assist only).
+
+    Detection broadcasts refresh the status line only, so an open dropdown stays open at 15 Hz.
+  - **`tracking_page.gd`**: a fifth mode, Detect.
+  - **`previs_tab.gd`**: Detect drags and drives markers like Markers mode, and the boxes go to the view.
+  - **`marker_driver.gd`**:
+    - Assisted markers are steered at their anchor.
+    - Driven markers get no heartbeat and no moves.
+    - A marker the hub lost is never driven.
+    - `tracking:detections` is kept and emitted on its own `detected` signal (not `updated`).
+  - **`tracking_view.gd`**:
+    - Detected persons of the camera on screen are boxed, with `#tid score%`. The pinned one is drawn thick in its
+      marker's colour; coasting boxes are faded.
+    - An assisted marker's ring is the anchor, with a thin line to the body at the output.
+    - Marker labels gain `· assist` / `· AI` / `· AI lost`.
+- **Tests**:
+  - `tools/smoke/smoke-wo616-tracking-pin.test.js`: 20 tests. 19 were written by a Haiku subagent and reviewed;
+    its one flagged "discrepancy" was arithmetic in my spec, not the code. They include OpenFollow's
+    `detectionStatus` vectors. The drives / freshness test was added after fix 1.
+  - `smoke-wo616-tracking-detect.test.js`: the new fields.
+  - `smoke-wo597-video-surfaces.test.js`: +2 tests (concurrent leases share one ADD; a role removed by the manager
+    re-ADDs without cleanup). Its exact AMCP sequences now include the pre-ADD cleanup; where that cleanup is
+    incidental, `lines` is reset after setup so the REMOVE assertions stay meaningful.
+  - `godot/client/tests/test_tracking_detect.gd`: 9 tests (normalize / camera / status_line written by Haiku;
+    `position_of` mine). The driver can't be loaded in the test runner (autoload `Ws`), which is why
+    `position_of` was extracted.
+- **Notices**: `THIRD_PARTY_NOTICES` lists `detect-pin.js` and the pin test vectors.
+
+### What was VERIFIED
+- **Gates**:
+  - Offline suite: 2727 / 2730 pass. The one failure is the known `wo577` library-panel test, plus 2 skips.
+  - Godot `--check` boot OK; `--test` 1191 passed, 0 failed.
+  - ESLint clean. `format:check` clean. 0 files over 500 lines.
+- **Server, over WS** (probe script; it drives marker 1 as `operator` every 250 ms, like the Godot driver;
+  `t9_pedestrians` on 1-1000):
+  - Replace, head (`top`): marker 1 → `source: 'detect'`, status 0.8125 (score ~0.8 at threshold 0.2), and person
+    tid 4 pinned. Broadcasts: 1 `operator`, then 11 `detect`, so no source flapping. The head point lands far from
+    the feet: the photo doesn't match the stage the camera was calibrated on (people look like giants), so this is
+    expected.
+  - Replace, feet (`bottom`): the marker converged on tid 4's feet floor point (7.866, 9.049) within ~1 s and held
+    there.
+  - Assist, anchor (7.5, 9.0), strength 0.5: output (7.6831, 9.0245) = anchor + 0.5 × (person − anchor), exactly.
+    With the anchor at (0, 5), nobody is within 1 m, so output = anchor and nothing is pinned. After the probe
+    closed, the anchor dropped and the marker went stale.
+- **Through the Godot GUI** (screenshots):
+  - Detect mode shows the section, "Running — 10 persons", and 10 boxes on the people.
+  - Dragging marker 1's ring next to person 6 (assist): anchor (−2.8847, 4.2685), output (−2.9569, 4.3355),
+    halfway to their feet at (−3.029, 4.403). The anchor stayed bit-identical for 6 s (no creep). Box #6 is drawn
+    in marker 1's red, "1 pinned" shows, and Fixture 1's beam follows the output.
+  - Pin → Replace in the Inspector: persisted (server `pin_mode: replace`). Marker 1 jumped to the largest person
+    (#4), tagged `AI`, `driven: true`, status 0.81. The Marker row appeared and the assist rows hid. The dropdown
+    stayed open while detections streamed.
+  - Server restarted under the running GUI: marker 1 re-created by the client heartbeat, re-pinned to #4, and the
+    camera picture kept.
+- **Fix 2**:
+  - Boot journal after the fix: one `ADD 1-801 SHM NAME ch1`.
+  - `/dev/shm/highascg-ch1` present; the camera view shows the picture again.
+- **Fix 3**:
+  - The sidecar started 0.6 s before the boot ADD (the dead-segment case).
+  - With the fix it re-opened and ran at 15 fps with 10 persons.
+  - Before the fix the same sequence gave `state: stale`, 0 fps.
+- **Not verified**:
+  - Moving people / a real camera. Pin smoothing, prediction and re-acquire under motion are unit-covered only.
+    Owner QA.
+  - Two cameras pinning at once (one solved camera on the box).
+  - The project is left with detection ON, in replace on marker 1 (feet), against the test still on 1-1000.
+

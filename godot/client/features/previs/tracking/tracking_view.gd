@@ -12,6 +12,8 @@ extends Control
 ## then a click is a floor corner (`clicked`).
 ## T12: optional 3D ghost (camera_overlay.gd: the previs stage rendered through the solved camera, lens applied in
 ## its shader) between the picture and the 2D lines — the picture and ghost are children drawn behind this node.
+## T9b: detected persons of this camera are boxed (the one a marker is pinned to in that marker's colour, thicker);
+## an assisted marker's ring is the operator's anchor, a thin line joins it to the body at the AI-corrected output.
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -29,9 +31,11 @@ var selected_marker := 0
 var follow_mode := false
 var beams: Array = []  # follow_model.beams()
 var zones_mode := false
+var detect_mode := false
 var zone_drawing := false
 var zone_shapes: Array = []  # [{name, color, loop: [[x, y, z]…], occupied, selected, open}]
 var _held := false
+var detections := {}  # marker_driver.detections (tracking:detections)
 
 var entry := {}
 var active := ""
@@ -114,6 +118,11 @@ func set_zones(shapes: Array, drawing: bool) -> void:
 func set_marks(m: Array, sel: int) -> void:
 	marks = m
 	selected_marker = sel
+	queue_redraw()
+
+
+func set_detections(d: Dictionary) -> void:
+	detections = d
 	queue_redraw()
 
 
@@ -226,6 +235,7 @@ func _draw() -> void:
 		_draw_zones(font)
 	if markers_mode:
 		_draw_beams(font)
+	_draw_boxes(font)
 	_draw_marks(font)
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
 	var tail := " · ctrl+click: pick point · wheel: zoom · right-drag: pan · F: fit"
@@ -234,6 +244,8 @@ func _draw() -> void:
 		tail = " · LB/RB speed · D-pad ◀▶ marker · wheel: zoom · right-drag: pan"
 	if follow_mode:
 		head = "Follow — beams show where the server aims each fixture · drag / drive a marker to test"
+	if detect_mode:
+		head = "Detect — boxes = detected persons (pinned one in its marker's colour) · assist: drag the ring, the body follows the AI"
 	if zones_mode:
 		head = ("Zones — click the zone's corners on the floor · Draw shape again to finish" if zone_drawing else
 			"Zones — filled = a marker is inside (server) · drag / drive a marker through a zone to test")
@@ -253,13 +265,50 @@ func _draw_marks(font: Font) -> void:
 		if (m.ring as PackedVector2Array).size() >= 2:
 			draw_polyline(_xf(m.ring), col, 3.0 if sel else 2.0, true)
 		var c := to_view(m.centre)
-		var top := to_view(m.top) if m.top != null else c
-		draw_line(c, top, col, 2.0, true)
+		var foot := to_view(m.foot) if m.get("foot") != null else c
+		var top := to_view(m.top) if m.top != null else foot
+		if m.get("assisted", false) and foot.distance_to(c) > 1.0:
+			draw_line(c, foot, Color(col, col.a * 0.6), 1.5, true)
+			draw_arc(foot, 5.0, 0.0, TAU, 14, col, 2.0, true)
+		draw_line(foot, top, col, 2.0, true)
 		draw_circle(top, 5.0 if sel else 4.0, col)
-		var label := "%s%s" % [m.name, " · stale" if m.stale else ""]
+		var label := "%s%s%s" % [m.name, " · stale" if m.stale else "", _pin_tag(m)]
 		draw_string(font, top + Vector2(8, -4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14 if sel else 13, col)
 		if sel:
 			draw_arc(c, 4.0, 0.0, TAU, 12, ThemeBuilder.TEXT, 2.0, true)
+
+
+func _pin_tag(m: Dictionary) -> String:
+	if m.get("assisted", false):
+		return " · assist"
+	if m.get("driven", false):
+		return " · AI" if float(m.get("status", 1.0)) > 0.0 else " · AI lost"
+	return ""
+
+
+func _draw_boxes(font: Font) -> void:
+	if entry.is_empty() or detections.get("enabled") != true or not (markers_mode or zones_mode):
+		return
+	var r := _raster()
+	var cols := {}
+	for m in marks:
+		cols[int(m.id)] = m.color
+	for cam in detections.get("cameras", []):
+		if not (cam is Dictionary) or str(cam.get("id", "")) != str(entry.get("id", "")) or cam.get("stale") == true:
+			continue
+		for p in cam.get("persons", []):
+			var b: Array = p.get("box", [])
+			if b.size() < 4:
+				continue
+			var pinned: bool = p.has("marker")
+			var col: Color = cols.get(int(p.get("marker", 0)), ThemeBuilder.ACCENT) if pinned else Color(ThemeBuilder.ACCENT, 0.7)
+			if float(p.get("age_s", 0.0)) > 0.0:
+				col.a *= 0.45  # coasting: the tracker predicts it, no box matched this step
+			var a := to_view(Vector2(float(b[0]) * r.x, float(b[1]) * r.y))
+			var z := to_view(Vector2(float(b[2]) * r.x, float(b[3]) * r.y))
+			draw_rect(Rect2(a, z - a), col, false, 3.0 if pinned else 1.5)
+			draw_string(font, a + Vector2(3, -4), "#%d %.0f%%" % [int(p.get("tid", 0)), float(p.get("score", 0.0)) * 100.0],
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
 
 
 func _draw_zones(font: Font) -> void:
