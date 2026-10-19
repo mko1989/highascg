@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); T10d verification walk done (server measure + Inspector walk + `verified` stamp, box-verified through the GUI; a real walk with two cameras = owner QA) — T10 complete; T8 PSN input DROPPED by the owner (no other tracker on the rig); next: attribution (About-page credit). T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); T10d verification walk done (server measure + Inspector walk + `verified` stamp, box-verified through the GUI; a real walk with two cameras = owner QA) — T10 complete; T8 PSN input DROPPED by the owner (no other tracker on the rig); attribution done (file headers + THIRD_PARTY_NOTICES + Settings → About from GET /api/about, box-verified in the Godot GUI; the web About pane is deferred by the owner); remaining: T13 fixture calibration (waits on WO-615 fixtures). T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -119,7 +119,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons ✔ (box, twin camera). T10c coverage view ✔ (box GUI).
       T10d verification walk ✔ (box GUI; real two-camera walk = owner QA).
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
-- [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
+- [x] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note. (About: Godot pane done; web pane deferred — see "Attribution — About page".)
 
 ## Acceptance
 
@@ -250,7 +250,7 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
     `licenses/` is a tracked symlink to the generated `/usr/share/doc/highascg/licenses`, so nothing hand-written
     belongs there. `tools/release/collect-third-party-licenses.sh` copies the notice to
     `third-party/highascg-THIRD_PARTY_NOTICES.txt` and lists an `openfollow` component in the manifest / INDEX.
-  - About-page credit: still open (the About page is WO-608).
+  - About-page credit: done — see "Attribution — About page" below.
 - Tests:
   - `godot/client/tests/test_tracking_camera.gd`, 67 assertions on OpenFollow's own vectors:
     - golden pixels for the head-on camera at roll 0 / -12 / 25;
@@ -1498,4 +1498,31 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
 - **Not verified / owner QA**:
   - A real walk, by a person, along a taped line, with two rigged cameras. The fused-vs-per-camera split only shows
     there.
-  - The " · " separators in the status text render blank (Rewir glyph). That is a follow-up.
+  - The " · " separators in the status text render blank (Rewir glyph). That is a follow-up. → Fixed by
+    [WO-620](./620_WO_rewir_middot_blank_glyph.md).
+
+## Attribution — About page (2026-10-19)
+
+**Investigation.** AGPL §5(d) wants the interactive UI to show Appropriate Legal Notices, and OpenFollow's notice asks
+for a credit. Neither client had an About page; the Godot Settings tab (WO-608) had Defaults / Companion / Media · USB
+panes only. The owner picked "Settings → About (both clients)", then said "Leave the webui for now" mid-way.
+
+**What was done.**
+- `src/api/routes-about.js` (new) — `GET /api/about` (`requireCaspar: false`, registered in `src/api/router.js`):
+  name, version (package.json), the first `Copyright` line of COPYRIGHT, licence, warranty, source URL, where the full
+  notices live, and six credits (OpenFollow, CasparCG Server, Godot, Ultralytics YOLO26, ONNX Runtime, Rewir). One
+  server-side source so both clients' panes can never drift.
+- Godot: `features/settings/about_model.gd` (new, pure: payload → `[kind, text]` rows), `settings_panes.gd`
+  `about()` renders them, `settings_tab.gd` adds the About pane and fetches on first open of the tab. The rows live in
+  a model file because `settings_panes.gd` / `settings_form.gd` reference the `Settings` autoload, which the headless
+  test runner does not register (same split as `walk_model.gd`).
+- Web pane: written but **not committed** (owner: "Leave the webui for now"); kept in the session scratchpad
+  (`settings-modal-about.js` + a `settings-modal.patch` adding the tab). It is a thin renderer of the same endpoint.
+
+**What was VERIFIED.**
+- `tools/smoke/smoke-wo616-about.test.js` — 7 tests (fields vs package.json / COPYRIGHT, OpenFollow credit ==
+  THIRD_PARTY_NOTICES, fixture root, empty root, handler, router wiring), in the curated offline list.
+- `godot/client/tests/test_settings_about.gd` — loading / error rows, legal rows, credits (non-dict entries skipped).
+- Godot `--test` 1306/1306, `--check` boot OK; on the box Settings → About shows HighAsCG 2026.05.20, the copyright,
+  licence + warranty, source link and all six credits, with no SCRIPT ERROR; `curl /api/about` returns the same.
+

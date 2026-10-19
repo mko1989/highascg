@@ -54,6 +54,7 @@ const routesVideoSurfaces = require('./routes-video-surfaces')
 const routesPipOverlay = require('./routes-pip-overlay')
 const routesArtnet = require('./routes-artnet')
 const routesModules = require('./routes-modules')
+const routesAbout = require('./routes-about')
 const routesDeviceView = require('./routes-device-view')
 const routesHostLive = require('./routes-host-live')
 const routesOperatorGui = require('./routes-operator-gui')
@@ -188,6 +189,7 @@ routes.get('/api/system/update', ({ path, ctx, query }) => routesSystemUpdate.ha
 routes.post('/api/system/update/apply', ({ path, body, ctx }) => routesSystemUpdate.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/modules', () => routesModules.handle('GET', '/api/modules'), { requireCaspar: false })
+routes.get('/api/about', () => routesAbout.handleGet(), { requireCaspar: false })
 
 // Scene live
 routes.get('/api/scene/layer-options', ({ query, ctx }) => require('./routes-scene-layer-tools').handleLayerOptions(query, ctx), { requireCaspar: false }) // WO-601

@@ -3,6 +3,7 @@ extends RefCounted
 ## buildSettingsPayload in settings-modal-logic.js, editor-defaults.js). Built on settings_form.gd rows.
 
 const Form := preload("res://features/settings/settings_form.gd")
+const AboutModel := preload("res://features/settings/about_model.gd")
 const T := preload("res://features/live/transitions.gd")
 
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"],
@@ -93,3 +94,16 @@ static func media(f: Form) -> void:
 	f.option("When file already exists", "usbIngest.overwritePolicy",
 		[["rename", "Rename"], ["skip", "Skip"], ["overwrite", "Overwrite"]], "rename")
 	f.check("Verify SHA1 after copy", "usbIngest.verifyHash", false)
+
+
+## WO-616 attribution / AGPL §5(d) — Settings → About; rows from about_model.gd (GET /api/about).
+static func about(f: Form, a: Dictionary, error := "") -> void:
+	for c in f.get_children():
+		f.remove_child(c)
+		c.queue_free()
+	f.target = f
+	for r in AboutModel.rows(a, error):
+		if r[0] == "heading":
+			f.heading(r[1])
+		else:
+			f.note(r[1])

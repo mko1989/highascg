@@ -1,7 +1,8 @@
 extends VBoxContainer
 ## WO-608 — the Settings tab (web client/components/settings-modal.js — a modal there, a workspace tab here since the
 ## Godot client replaces the kiosk): sub-tabs over settings_form.gd panes, autosaved through the Settings mirror (600 ms,
-## no Save button, web parity) with the save result in the status line. Slice 1: Defaults, Companion, Media / USB.
+## no Save button, web parity) with the save result in the status line. Slice 1: Defaults, Companion, Media / USB;
+## About (WO-616 attribution, GET /api/about).
 
 const Form := preload("res://features/settings/settings_form.gd")
 const Panes := preload("res://features/settings/settings_panes.gd")
@@ -14,6 +15,7 @@ var _forms: Array[Form] = []
 var _status: Label
 var _comp_status: Label
 var _comp_check: Button
+var _about: Form
 
 
 func _ready() -> void:
@@ -35,9 +37,13 @@ func _ready() -> void:
 	_comp_check.pressed.connect(_check_companion)
 	Panes.companion(_pane("Companion"), _comp_status, _comp_check)
 	Panes.media(_pane("Media / USB"))
+	_about = _pane("About")
+	Panes.about(_about, {})
 	_tabs.tab_changed.connect(func(i: int) -> void:
 		if _tabs.get_tab_title(i) == "Companion":
-			_check_companion())
+			_check_companion()
+		elif _tabs.get_tab_title(i) == "About":
+			_load_about())
 	Settings.changed.connect(_hydrate)
 	Settings.saved.connect(_on_saved)
 	visibility_changed.connect(func() -> void:
@@ -96,3 +102,8 @@ func _check_companion() -> void:
 	var on := r.data is Dictionary and M.is_on((r.data as Dictionary).get("connected"), false)
 	_comp_status.text = ("Connected — " if on else "Not connected — ") + M.companion_status_text(r.data)
 	_comp_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if on else ThemeBuilder.ERROR)
+
+
+func _load_about() -> void:
+	var r: Dictionary = await Api.get_json("/api/about")
+	Panes.about(_about, r.data if r.ok and r.data is Dictionary else {}, "" if r.ok else str(r.error))
