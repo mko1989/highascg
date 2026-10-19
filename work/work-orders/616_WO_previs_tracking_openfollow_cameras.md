@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); next: T10b wiring (pin + WS + Godot), T10c coverage view, T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); next: T10c coverage view, T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -116,7 +116,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
       Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view ✔ (box-verified).
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
-      T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons. T10c coverage view.
+      T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons ✔ (box, twin camera). T10c coverage view.
       T10d verification walk.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
@@ -1271,3 +1271,79 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
 - Offline suite: 2746 passed, 1 failed (the known wo577), 2 skipped. Lint, Prettier and line limits are clean.
 - **Not verified**: anything live. The engine is not wired yet (T10b), and the box has one physical camera.
 
+
+## T10b — fusion wired: world persons drive the pin, WS `world` block, Godot P-tags (2026-10-19) — DONE (box-verified with a twin camera; two real cameras = owner QA)
+
+### Investigation
+
+- Before T10b, the pin (`detect-pin.js`) worked on camera persons: keys are `camera:tid` and positions come from
+  `boxPoint`. With two cameras, the same person showed up as two candidates, and a ByteTrack id switch in either
+  camera dropped the pin. The world id from T10a is the key that survives both.
+- `detect-service` exposed only the fresh persons, with no `at` / `frame` / entry, so the fusion step had nothing
+  to judge freshness or solve rays with. It needed a `frames()` view of the latest frame per watched, solved
+  camera.
+- Pin semantics that depend on the person shape:
+  - "Matched this step" is `age_s <= 0`. Fusion's `age_s` was time since last support, so it read as coasting even
+    in the step that measured it. It is now 0 for every track supported in the latest step.
+  - A fresh pick takes the largest box. A world person has no box, so it carries `area`, the largest member box
+    area.
+  - Re-acquire uses picture distance ≤ 0.15. A world person is in metres, so it needs its own floor threshold.
+- The box has one physical camera. For a live end-to-end run, a second tracking camera (`cam_2`) was added as an
+  exact copy of `cam_1` on the same ch1 surface. Its rays are parallel to `cam_1`'s, so `measure` correctly uses the
+  feet mean (`triangulated: false`), and the whole path (two sidecar feeds → association → tracks → pin → WS →
+  Godot) runs live.
+
+### What was done
+
+- **`src/tracking/fusion.js`**: `measure` adds `area` (the largest member box area), carried through
+  `_update` / `_spawn` / `persons()`. In `persons()`, `age_s` is 0 for tracks supported in the latest step.
+- **`src/tracking/detect-service.js`**:
+  - `frames()` returns `[{id, entry, at, frame, persons}]` for watched cameras with a solved `cam`.
+  - The `solvedCameras` getter counts those cameras.
+- **`src/tracking/detect-pin.js`**: accepts world persons `{key: 'w:<id>', camera: 'world', world: [x, y], area, age_s}`.
+  - `centreOf` / `sizeOf` / `pointOf` pick world x/y (the marker z is kept for `top`, `planeZ` for feet) or the old
+    box path.
+  - Re-acquire after a world person is lost uses `REACQUIRE_MAX_FLOOR_M` = 0.75 m (the association gate) instead
+    of the picture 0.15.
+- **`src/tracking/register.js`**:
+  - One `Fusion` instance, reset on boot and while detection is off.
+  - The pin tick steps it with `_detect.frames()`. The pin is then fed world persons when two or more cameras are
+    solved, and camera persons otherwise, so the one-camera behaviour is unchanged.
+  - The `tracking:detections` snapshot gains `world: {fused, plane_z, persons}`. Persons keep their `marker`, and
+    each camera person gains `world: <id>`. A camera person's `marker` is set either directly or through the
+    pinned world person that owns its key.
+- **Godot `tracking_view.gd`**:
+  - Boxes of fused persons get a `P<id> · ` tag.
+  - In a fused world, a world person that this camera does not currently see is drawn as a hollow ring at its
+    floor point, through the camera's own lens-correct projection. It is tagged `P<id> · <source>`, and the pinned
+    one is in its marker's colour, so the operator sees where the other camera has the person.
+- **`detect_model.gd`**: the Detect status line appends `world: N (k seen by 2+ cameras)` when fused.
+- **Tests**: `smoke-wo616-tracking-pin.test.js` gains 7 world-person tests (Haiku-written, reviewed):
+  - the largest pick and stickiness;
+  - re-acquire at 0.5 m accepted and at 1.0 m rejected;
+  - `top` keeps z;
+  - assist pull;
+  - a coasting world person is not freshly picked.
+
+### What was VERIFIED
+
+- **Gates**:
+  - Offline suite: 2753 passed, 1 failed (the known wo577), 2 skipped.
+  - Godot `--test`: 1209 passed, 0 failed.
+  - eslint, Prettier and the 500-line check are clean.
+- **Box, live, twin camera** (`t9_pedestrians.png` still on 1-1000, replace pin on marker 1, feet):
+  - **Fusion**: `GET /api/tracking/detections` gave `world.fused: true` and 10 world persons, every one `source:
+    fused` with keys `cam_1:n + cam_2:n`.
+  - **Pin**: on `w:5`, the largest area (0.156). World ids and positions held identical over 4 samples, about 6 s
+    apart (the source is a still image, so v = 0).
+  - **GUI**: boxes tagged `P1 · #0 86%` and so on. The status line read "Running — 10 persons 1 pinned world: 10
+    (10 seen by 2+ cameras)".
+- **Occlusion in one camera** (`cam_1` mask over the right half, `cam_2` unmasked):
+  - **Fusion**: `cam_1` dropped to 5 persons. The other 5 kept their world ids and switched to `source: cam_2`.
+    The pin stayed on P5, now seen only by `cam_2`.
+  - **GUI**: hollow rings `P4 · cam_2`, `P5 · cam_2` (red, pinned) and others at their floor points. The status
+    line read "world: 10 (5 seen by 2+ cameras)".
+- **Restored**: mask off, `cam_2` removed. The snapshot went back to `world.fused: false`, and the pin went back to
+  a direct `cam_1` person. The box is left with one camera.
+- **Not verified**: triangulated height from two real, separated cameras. The box has one camera, so this is
+  owner QA, or the T10d walk once a second camera is rigged.

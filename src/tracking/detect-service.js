@@ -262,6 +262,19 @@ function createDetectService(ctx, deps = {}) {
 			}
 			return out
 		},
+		/** Latest frame of every watched, solved camera for fusion (fusion.js judges freshness): [{ id, entry, at, frame, persons }]. */
+		frames() {
+			const out = []
+			for (const c of cams) {
+				const l = latest.get(c.id)
+				if (l && c.cam) out.push({ id: c.id, entry: c, at: l.at, frame: l.frame, persons: l.persons })
+			}
+			return out
+		},
+		/** Watched cameras with a solved pose — from 2 up, the pin follows fused world persons (WO-616 T10b). */
+		get solvedCameras() {
+			return cams.filter((c) => c.cam).length
+		},
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,

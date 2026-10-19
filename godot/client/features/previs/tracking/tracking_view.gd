@@ -324,8 +324,30 @@ func _draw_boxes(font: Font) -> void:
 			draw_rect(Rect2(a, z - a), col, false, 3.0 if pinned else 1.5)
 			if detect_mode and masks_on:
 				draw_circle(Vector2((a.x + z.x) / 2.0, z.y), 4.0, col)  # the feet point the masks test
-			draw_string(font, a + Vector2(3, -4), "#%d %.0f%%" % [int(p.get("tid", 0)), float(p.get("score", 0.0)) * 100.0],
+			var wtag := "P%d · " % int(p.world) if p.has("world") else ""
+			draw_string(font, a + Vector2(3, -4), "%s#%d %.0f%%" % [wtag, int(p.get("tid", 0)), float(p.get("score", 0.0)) * 100.0],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
+	_draw_unseen(font, cols)
+
+
+## T10b: world persons this camera has no box for (seen by another camera, or predicted) — a hollow ring at their
+## floor point, tagged with who sees them: the occlusion handover made visible.
+func _draw_unseen(font: Font, cols: Dictionary) -> void:
+	var world: Variant = detections.get("world")
+	if not (world is Dictionary) or world.get("fused") != true or not (entry.get("cam") is Dictionary):
+		return
+	var me := str(entry.get("id", ""))
+	for w in world.get("persons", []):
+		if not (w is Dictionary) or (w.get("cameras", []) as Array).has(me) and float(w.get("age_s", 0.0)) <= 0.0:
+			continue
+		var at: Variant = O.shown(entry, [[float(w.x), float(w.y), float(world.get("plane_z", 0.0))]])[0]
+		if at == null:
+			continue
+		var col: Color = cols.get(int(w.get("marker", 0)), ThemeBuilder.ACCENT) if w.has("marker") else Color(ThemeBuilder.ACCENT, 0.7)
+		var v := to_view(Vector2(at[0], at[1]))
+		draw_arc(v, 14.0, 0.0, TAU, 28, col, 2.0, true)
+		var who := "predicted" if float(w.get("age_s", 0.0)) > 0.0 else "/".join(w.get("cameras", []))
+		draw_string(font, v + Vector2(16, 4), "P%d · %s" % [int(w.id), who], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
 
 
 func _draw_masks() -> void:

@@ -22,6 +22,10 @@
  * writes to the pinned marker are dropped while the pin drives it (status 0 = nobody tracked, held in place) and it
  * carries `driven: true` — the client stops heartbeating it (never inferred from `source`: a dead anchor leaves
  * source 'detect' on a marker nobody drives, and the operator must be able to take it back).
+ * Fusion (T10, src/tracking/fusion.js) steps every tick on each watched camera's latest frame: tracking:detections
+ * carries `world: {fused, plane_z, persons:[{id,x,y,vx,vy,height,source,cameras,keys,score,area,age_s,marker?}]}`; each
+ * camera person the world person it belongs to (`world: id`). With 2+ solved cameras (`fused`) the pin follows
+ * world persons (key `w:<id>`), so a person hidden in one camera stays pinned from the other.
  */
 
 'use strict'
@@ -31,6 +35,7 @@ const { createFollowService } = require('../fixtures/follow-service')
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
+const { Fusion } = require('./fusion')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -54,6 +59,7 @@ let _zonesSent = ''
 let _detect = null
 let _detectSent = { json: '', at: 0 }
 const pin = new DetectPin()
+const fusion = new Fusion()
 let _pinAt = 0
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
@@ -97,7 +103,16 @@ function pinTick() {
 	const now = hub.now()
 	const dt = _pinAt ? (now - _pinAt) / 1000 : TICK_MS / 1000
 	_pinAt = now
-	pin.step({ cfg: _detect.config, available: _detect.available, persons: _detect.persons(), hub, planeZ: _detect.planeZ, now, dt })
+	const cfg = _detect.config
+	if (cfg.enabled) fusion.step({ cams: _detect.frames(), now, planeZ: _detect.planeZ })
+	else fusion.reset()
+	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
+	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
+}
+
+/** Fused world persons in the pin's person shape (detect-pin.js T10b). */
+function worldPersons(now) {
+	return fusion.persons(now).map((w) => ({ key: `w:${w.id}`, camera: 'world', tid: w.id, world: [w.x, w.y], score: w.score, age_s: w.age_s, area: w.area }))
 }
 
 /** Broadcast when a write landed, the stale set changed, or the heartbeat is due (never for an empty, idle hub). */
@@ -134,10 +149,28 @@ function zonesTick() {
 	_ctx._wsBroadcast(ZONES_EVENT, snap)
 }
 
-/** A detections snapshot with `marker` on each person a marker is pinned to (copies — the service's own stay clean). */
-function withPins(snap) {
+/**
+ * A detections snapshot + `world` (fusion) — `marker` on each person a marker is pinned to, a camera person also
+ * when the world person it belongs to (`world: id`, from the latest fusion step only) is pinned. Copies: the
+ * service's own lists stay clean.
+ */
+function withPins(snap, now = hub.now()) {
 	const att = pin.attached()
-	for (const c of snap.cameras) c.persons = c.persons.map((p) => (att[`${c.id}:${p.tid}`] ? { ...p, marker: att[`${c.id}:${p.tid}`] } : p))
+	const world = fusion.persons(now)
+	const owner = new Map()
+	for (const w of world) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
+	for (const c of snap.cameras) {
+		c.persons = c.persons.map((p) => {
+			const k = `${c.id}:${p.tid}`
+			const wid = owner.get(k)
+			const m = att[k] ?? (wid !== undefined ? att[`w:${wid}`] : undefined)
+			if (wid === undefined && m === undefined) return p
+			const q = wid !== undefined ? { ...p, world: wid } : { ...p }
+			if (m !== undefined) q.marker = m
+			return q
+		})
+	}
+	snap.world = { fused: !!_detect && _detect.solvedCameras >= 2, plane_z: _detect ? _detect.planeZ : 0, persons: world.map((w) => (att[`w:${w.id}`] !== undefined ? { ...w, marker: att[`w:${w.id}`] } : w)) }
 	return snap
 }
 
@@ -230,6 +263,7 @@ module.exports = {
 		if (_detect) _detect.stop()
 		_detect = createDetectService(ctx)
 		_detectSent = { json: '', at: 0 }
+		fusion.reset()
 	},
 
 	async onShutdown() {

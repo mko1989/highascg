@@ -83,7 +83,7 @@ static func status_line(snap: Dictionary, cam_id: String) -> String:
 				return "Running — no frames from %s (%s) yet" % [cam_id, str(c.get("role", ""))]
 			var ps: Array = c.get("persons", [])
 			var pinned: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and p.has("marker")).size()
-			return "Running — %d person%s%s" % [ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else ""]
+			return "Running — %d person%s%s%s" % [ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else "", world_line(snap)]
 	return "Running — this camera is not watched (no surface role, or switched off)"
 
 
@@ -118,3 +118,14 @@ static func masks_active(mk: Dictionary) -> bool:
 		if m.enabled and (m.vertices as Array).size() >= 3:
 			return true
 	return false
+
+
+## T10b: " · world: N (k seen by 2+ cameras)" while the server fuses 2+ solved cameras, else "".
+static func world_line(snap: Dictionary) -> String:
+	var w: Variant = snap.get("world")
+	if not (w is Dictionary) or w.get("fused") != true:
+		return ""
+	var ps: Array = w.get("persons", [])
+	var both: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and str(p.get("source", "")) == "fused").size()
+	return " · world: %d (%d seen by 2+ cameras)" % [ps.size(), both]
+

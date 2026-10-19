@@ -134,11 +134,12 @@ function maxRayAngle(rays) {
 	return best
 }
 
-/** A cluster → one floor measurement { x, y, height, sigma, source, cameras, keys }. */
+/** A cluster → one floor measurement { x, y, height, sigma, source, cameras, keys, score, area (largest box) }. */
 function measure(cl, planeZ = 0) {
 	const cameras = cl.map((o) => o.camera)
 	const keys = cl.map((o) => o.key)
 	const score = Math.max(...cl.map((o) => o.score))
+	const area = Math.max(...cl.map((o) => (o.box[2] - o.box[0]) * (o.box[3] - o.box[1])))
 	if (cl.length >= 2) {
 		const rays = cl.map((o) => o.ray).filter(Boolean)
 		const tri = rays.length >= 2 && maxRayAngle(rays) >= MIN_RAY_ANGLE_DEG ? triangulate(rays) : null
@@ -154,6 +155,7 @@ function measure(cl, planeZ = 0) {
 				cameras,
 				keys,
 				score,
+				area,
 			}
 		}
 		let sw = 0,
@@ -175,6 +177,7 @@ function measure(cl, planeZ = 0) {
 			cameras,
 			keys,
 			score,
+			area,
 		}
 	}
 	const o = cl[0]
@@ -188,6 +191,7 @@ function measure(cl, planeZ = 0) {
 		cameras,
 		keys,
 		score,
+		area,
 	}
 }
 
@@ -270,7 +274,7 @@ class Fusion {
 		const r = m.sigma * m.sigma
 		kfUpdate(t.ax, m.x, r)
 		kfUpdate(t.ay, m.y, r)
-		Object.assign(t, { seen: now, source: m.source, cameras: m.cameras, keys: m.keys, score: m.score })
+		Object.assign(t, { seen: now, source: m.source, cameras: m.cameras, keys: m.keys, score: m.score, area: m.area })
 		if (m.height !== null) t.height = t.height === null ? m.height : t.height + 0.3 * (m.height - t.height)
 	}
 
@@ -286,6 +290,7 @@ class Fusion {
 			cameras: m.cameras,
 			keys: m.keys,
 			score: m.score,
+			area: m.area,
 		})
 	}
 
@@ -294,7 +299,10 @@ class Fusion {
 		if (!this.tracks.length && this.lastAt !== null && now - this.lastAt > STALE_MS) this.frames.clear()
 	}
 
-	/** World persons for clients / the pin: [{ id, x, y, vx, vy, height, source, cameras, keys, score, age_s }]. */
+	/**
+	 * World persons for clients / the pin: [{ id, x, y, vx, vy, height, source, cameras, keys, score, area, age_s }].
+	 * age_s is 0 for a person supported in the latest step (as the sidecar's boxes), else the time since its last support.
+	 */
 	persons(now) {
 		const r3 = (v) => Math.round(v * 1000) / 1000
 		return this.tracks.map((t) => ({
@@ -308,7 +316,8 @@ class Fusion {
 			cameras: t.cameras,
 			keys: t.keys,
 			score: t.score,
-			age_s: Math.max(0, (now - t.seen) / 1000),
+			area: t.area,
+			age_s: t.seen === this.lastAt ? 0 : Math.max(0, (now - t.seen) / 1000), // 0 = supported in the latest step (sidecar semantics)
 		}))
 	}
 

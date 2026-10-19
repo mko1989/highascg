@@ -20,6 +20,9 @@
  * Changes: JavaScript; several cameras (a person is `camera:tid`, re-acquire stays on the same camera); the replace
  * target is an explicit id; no paths / touch remote; an anchor nobody refreshed for ANCHOR_STALE_MS (the client went
  * away) stops being driven, so its marker goes stale like any other; box age is the sidecar's at its last step.
+ * WO-616 T10b: with 2+ solved cameras the persons are FUSED world persons (fusion.js; key `w:<id>`, camera 'world',
+ * `world: [x, y]`, `area` = largest member box) — no box to cast; re-acquire is by floor distance
+ * (REACQUIRE_MAX_FLOOR_M) instead of picture distance, largest box still wins a fresh pick.
  */
 
 const { boxPoint } = require('./detect-model')
@@ -29,6 +32,7 @@ const MIN_SMOOTH_DT = 1 / 1000
 const MAX_SMOOTH_DT = 0.2
 const VELOCITY_ALPHA = 0.3
 const REACQUIRE_MAX_CENTER_DIST = 0.15
+const REACQUIRE_MAX_FLOOR_M = 0.75
 const ANCHOR_STALE_MS = 1000
 
 /** Elapsed seconds as a multiple of the nominal 60 fps frame, clamped for EMA stability. */
@@ -80,6 +84,11 @@ function advanceSmoothing(s, tx, ty, cfg, steps) {
 
 const centre = (b) => [(b[0] + b[2]) / 2, (b[1] + b[3]) / 2]
 const area = (b) => (b[2] - b[0]) * (b[3] - b[1])
+/** Where a person is for re-acquire: picture box centre, or a world person's floor point. */
+const centreOf = (p) => (p.world ? p.world : centre(p.box))
+const sizeOf = (p) => (p.world ? Number(p.area) || 0 : area(p.box))
+/** A person → the PSN point to pin: its box cast onto z (top / feet), or a world person's floor point at z. */
+const pointOf = (p, z, top) => (p.world ? [p.world[0], p.world[1], z] : boxPoint(p.box, p.camEntry, z, top))
 
 class DetectPin {
 	constructor() {
@@ -141,7 +150,8 @@ class DetectPin {
 	}
 
 	/**
-	 * One animate tick. persons: [{ key, camera, tid, box, score, age_s, camEntry }] (fresh cameras only);
+	 * One animate tick. persons: [{ key, camera, tid, box, score, age_s, camEntry }] (fresh cameras only), or fused
+	 * world persons [{ key: 'w:<id>', camera: 'world', tid, world: [x, y], score, age_s, area }];
 	 * cfg: normalizeDetection; available: the sidecar is up with a model; dt: seconds since the last tick.
 	 */
 	step({ cfg, available, persons, hub, planeZ = 0, now, dt = NOMINAL_FRAME_DT }) {
@@ -183,7 +193,7 @@ class DetectPin {
 		}
 		s.attached = best.key
 		const top = cfg.pin_point === 'top'
-		const world = boxPoint(best.box, best.camEntry, top ? marker.z : planeZ, top)
+		const world = pointOf(best, top ? marker.z : planeZ, top)
 		if (!world) return invalid()
 		const [x, y] = advanceSmoothing(s, world[0], world[1], cfg, steps)
 		s.status = detectionStatus(best.score, cfg.confidence, best.age_s, coastS)
@@ -195,7 +205,7 @@ class DetectPin {
 		if (this.pinnedKey !== null) {
 			const p = persons.find((q) => q.key === this.pinnedKey)
 			if (p && p.age_s <= coastS) {
-				this.lastCentre = { camera: p.camera, c: centre(p.box) }
+				this.lastCentre = { camera: p.camera, c: centreOf(p) }
 				return p
 			}
 			this.pinnedKey = null
@@ -204,10 +214,10 @@ class DetectPin {
 		if (!matched.length) return null
 		let best = null
 		if (this.lastCentre) {
-			let bd = REACQUIRE_MAX_CENTER_DIST ** 2
+			let bd = (this.lastCentre.camera === 'world' ? REACQUIRE_MAX_FLOOR_M : REACQUIRE_MAX_CENTER_DIST) ** 2
 			for (const p of matched) {
 				if (p.camera !== this.lastCentre.camera) continue
-				const [cx, cy] = centre(p.box)
+				const [cx, cy] = centreOf(p)
 				const d = (cx - this.lastCentre.c[0]) ** 2 + (cy - this.lastCentre.c[1]) ** 2
 				if (d <= bd) {
 					bd = d
@@ -215,9 +225,9 @@ class DetectPin {
 				}
 			}
 		}
-		if (!best) best = matched.reduce((a, b) => (area(b.box) > area(a.box) ? b : a))
+		if (!best) best = matched.reduce((a, b) => (sizeOf(b) > sizeOf(a) ? b : a))
 		this.pinnedKey = best.key
-		this.lastCentre = { camera: best.camera, c: centre(best.box) }
+		this.lastCentre = { camera: best.camera, c: centreOf(best) }
 		return best
 	}
 
@@ -232,7 +242,7 @@ class DetectPin {
 			if (!cache.has(z)) {
 				const out = []
 				for (const p of matched) {
-					const w = boxPoint(p.box, p.camEntry, z, top)
+					const w = pointOf(p, z, top)
 					if (w) out.push({ key: p.key, x: w[0], y: w[1] })
 				}
 				cache.set(z, out)
@@ -278,4 +288,4 @@ class DetectPin {
 	}
 }
 
-module.exports = { DetectPin, detectionStatus, dtSteps, emaFactor, advanceSmoothing, ANCHOR_STALE_MS, REACQUIRE_MAX_CENTER_DIST }
+module.exports = { DetectPin, detectionStatus, dtSteps, emaFactor, advanceSmoothing, ANCHOR_STALE_MS, REACQUIRE_MAX_CENTER_DIST, REACQUIRE_MAX_FLOOR_M }
