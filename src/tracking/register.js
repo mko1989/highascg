@@ -11,12 +11,15 @@
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
+ *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
+ * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
  */
 
 'use strict'
 
 const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
+const { createZoneService } = require('./zone-service')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -24,6 +27,7 @@ const HEARTBEAT_MS = 1000
 const WS_EVENT = 'tracking:markers'
 const FOLLOW_EVENT = 'tracking:follow'
 const FOLLOW_MS = 100
+const ZONES_EVENT = 'tracking:zones'
 
 const hub = new MarkerHub()
 let _timer = null
@@ -32,6 +36,8 @@ let _sent = { rev: -1, stale: '', at: 0 }
 let _writes = 0
 let _follow = null
 let _followSent = { json: '', at: 0 }
+let _zones = null
+let _zonesSent = ''
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
@@ -72,6 +78,16 @@ function followTick() {
 	_ctx._wsBroadcast(FOLLOW_EVENT, snap)
 }
 
+/** Zone occupancy: only when it changed (the engine itself evaluates at 10 Hz). */
+function zonesTick() {
+	if (!_zones || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
+	const snap = _zones.snapshot()
+	const json = JSON.stringify(snap)
+	if (json === _zonesSent) return
+	_zonesSent = json
+	_ctx._wsBroadcast(ZONES_EVENT, snap)
+}
+
 async function handleApi({ method, path, body }) {
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, { module: 'tracking', status: 'markers', markers: hub.markers.size, writes: _writes,
@@ -79,6 +95,9 @@ async function handleApi({ method, path, body }) {
 	}
 	if (method === 'GET' && path === '/api/tracking/follow') {
 		return _follow ? reply(200, _follow.status()) : reply(503, { error: 'follow engine not running' })
+	}
+	if (method === 'GET' && path === '/api/tracking/zones') {
+		return _zones ? reply(200, _zones.status()) : reply(503, { error: 'zone engine not running' })
 	}
 	if (path === '/api/tracking/markers') {
 		if (method === 'GET') return reply(200, { markers: hub.list(), stale_after_ms: MARKER_STALE_AFTER_MS })
@@ -129,11 +148,15 @@ module.exports = {
 		_timer = setInterval(() => {
 			tick()
 			followTick()
+			zonesTick()
 		}, TICK_MS)
 		if (typeof _timer.unref === 'function') _timer.unref()
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
+		if (_zones) _zones.stop()
+		_zones = createZoneService(ctx, hub)
+		_zonesSent = ''
 	},
 
 	async onShutdown() {
@@ -141,6 +164,8 @@ module.exports = {
 		_timer = null
 		if (_follow) _follow.stop()
 		_follow = null
+		if (_zones) _zones.stop()
+		_zones = null
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
 		_ctx = null
 	},
