@@ -6,6 +6,8 @@ extends MarginContainer
 ## Slice 2c: cabling — click an output dot to arm (targets tint valid/invalid, a ghost follows the pointer), click a
 ## target to connect; click a cable (or its row) to select it, then Delete/Backspace removes it or clicking one of its
 ## ends lifts that end to move it; Esc / empty space cancels; Ctrl+Z undoes. cable_gesture.gd does the writes.
+## Slice 3: the left column is destinations_panel.gd — add / edit / remove destinations through the Inspector, plus
+## the input & host channel cards. A selected cable and a selected destination exclude each other.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -14,10 +16,11 @@ const RearPanel := preload("res://features/devices/rear_panel.gd")
 const CableLayer := preload("res://features/devices/cable_layer.gd")
 const CableGesture := preload("res://features/devices/cable_gesture.gd")
 const CableModel := preload("res://features/devices/cable_model.gd")
-const PGM := Color("#e74c3c")
-const PRV := Color("#2ecc71")
+const H := preload("res://features/devices/host_channels.gd")
+const DestinationsPanel := preload("res://features/devices/destinations_panel.gd")
+const CableRules := preload("res://features/devices/cable_rules.gd")
 
-var _dests: VBoxContainer
+var _dests: DestinationsPanel
 var _rear: PanelContainer
 var _list: VBoxContainer
 var _cables: Control
@@ -57,13 +60,28 @@ func _ready() -> void:
 	body.add_theme_constant_override("separation", 40)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body)
-	var left := VBoxContainer.new()
-	left.custom_minimum_size.x = 250
+	var left := ScrollContainer.new()
+	left.custom_minimum_size.x = 280
+	left.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(left)
-	left.add_child(_label("Screen destinations", ThemeBuilder.TEXT_MUTED, 13))
-	_dests = VBoxContainer.new()
-	_dests.add_theme_constant_override("separation", 12)
+	_dests = DestinationsPanel.new()
+	_dests.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_child(_dests)
+	_dests.status.connect(_set_status)
+	_dests.changed.connect(func() -> void:
+		_gesture.set_dirty(true)
+		refresh())
+	_dests.selected.connect(func(id: String) -> void:
+		if id != "" and _gesture.selected_edge != "":
+			_gesture.selected_edge = ""
+			_sync())
+	# The web opens that connector's inspector (GPU / DeckLink pages — later slices); until then select its cable.
+	_dests.focus_connector.connect(func(id: String) -> void:
+		for e in CableRules.a(CableRules.d(_gesture.payload.get("graph")).get("edges")):
+			if e is Dictionary and CableRules.s(e.get("sinkId")) == id:
+				_gesture.select_edge(CableRules.s(e.get("id")))
+				return
+		_set_status("%s has no cable." % id, false))
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 12)
@@ -149,16 +167,13 @@ func refresh() -> void:
 	_gesture.payload = r.data
 	if _gesture.selected_edge != "" and _gesture.edge(_gesture.selected_edge).is_empty():
 		_gesture.selected_edge = ""
-	show_model(Model.build(r.data))
+	var payload := H.merge_settings(r.data, Settings.settings if Settings.is_loaded else null)
+	show_model(Model.build(payload, Store.get_value("channelMap"), Store.get_value("configComparison")), payload)
 
 
-func show_model(m: Dictionary) -> void:
+func show_model(m: Dictionary, payload: Dictionary) -> void:
 	var anchors := {}
-	_clear(_dests)
-	if m.destinations.is_empty():
-		_dests.add_child(_label("No screen destinations yet.", ThemeBuilder.TEXT_MUTED, 13))
-	for d in m.destinations:
-		_dests.add_child(_dest_card(d, anchors))
+	_dests.show_model(m, payload, anchors)
 	_rear.show_slots(m.slots)
 	anchors.merge(_rear.anchors)
 	_clear(_list)
@@ -185,6 +200,8 @@ func _sync() -> void:
 		p.target = "" if not g.armed() else "armed" if id == g.source_id else "valid" if g.target_ok(id) else "invalid"
 		p.active = ends.any(func(e: String) -> bool: return e == key or (not key.contains("#") and e.get_slice("#", 0) == key))
 	_cables.selected_id = g.selected_edge
+	if g.selected_edge != "":
+		_dests.deselect()
 	_cables.hidden_id = str(g.regrab.get("edgeId", ""))
 	_cables.ghost_from = g.ghost_anchor()
 	_cancel_btn.visible = g.armed()
@@ -264,44 +281,6 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif (k.keycode == KEY_DELETE or k.keycode == KEY_BACKSPACE) and _gesture.selected_edge != "":
 		get_viewport().set_input_as_handled()
 		_gesture.remove_edge(_gesture.selected_edge)
-
-
-## Title, "PGM/PRV · 1920x1080@50", then the output dot(s): one per half for a PGM/PRV pair (`id#pgm`, `id#prv`),
-## else one on the title row. Under the card: what each output is cabled to.
-func _dest_card(d: Dictionary, anchors: Dictionary) -> Control:
-	var wrap := VBoxContainer.new()
-	var card := PanelContainer.new()
-	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, ThemeBuilder.BORDER, 1))
-	wrap.add_child(card)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 2)
-	card.add_child(v)
-	var title := HBoxContainer.new()
-	v.add_child(title)
-	var t := _label(str(d.label), ThemeBuilder.TEXT, 15)
-	t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.add_child(t)
-	if d.halves.is_empty():
-		title.add_child(_dot(anchors, d.connector, "%s output" % d.label))
-	v.add_child(_label(str(d.sub), ThemeBuilder.TEXT_MUTED, 12))
-	for half in d.halves:
-		var row := HBoxContainer.new()
-		row.custom_minimum_size.y = 26
-		var tag := _label(str(half).to_upper(), PGM if half == "pgm" else PRV, 11)
-		tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.add_child(tag)
-		row.add_child(_dot(anchors, Model.anchor_key(d.connector, half), "%s %s output" % [d.label, str(half).to_upper()]))
-		v.add_child(row)
-	for l in d.links:
-		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
-	return wrap
-
-
-func _dot(anchors: Dictionary, key: String, tip: String) -> Control:
-	var p := PortIcon.make("", Vector2(14, 14), tip)
-	p.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	anchors[key] = p
-	return p
 
 
 ## A cables-list row: the cable's colour, "Source → Sink"; hovering it thickens that cable, clicking selects it

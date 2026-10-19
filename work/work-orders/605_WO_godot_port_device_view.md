@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server. Next: slice 3 destinations / host channels. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Next: 3c per-role host-channel inspector controls (WO-601 moved scope), then slice 4 GPU / modeline. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -251,3 +251,42 @@ settings GET identical to the backup at the end):
 - Godot `--test` 2232/2232, `--check` boot OK, `check-max-file-lines` 0 over 500.
 Owner-QA: the feel of the hit targets (6 px cable tolerance, 3 px port growth) next to the web.
 
+
+## Slice 3 — destinations + host channels (2026-10-19, DONE)
+
+### Investigation
+Web: `device-view-destinations-ui.js` (cards, type select — `populateDestinationTypeSelect` lists only the five screen
+types, no host entries), `device-view-events.js:117-176` (the "+" handler: `nextMainScreenIndex`, `addDestination` → the
+action forwards only `type` + `mainScreenIndex`, so the `videoMode` the handler computes never reaches the server, which
+picks the mode itself; then `shouldSeedScreenConsumerDefaults` → `screenConsumerSeedSettingsPatch` for a fresh physical
+screen N, restart-dirty, forced reload), `device-view-destinations-inspector-form.js` (summary table, mapped outputs with
+a focus-connector link, name / main index / mode / audio layout / video mode + size (size editable only under
+"Custom") / pixel-map Art-Net / operator-GUI fields, Remove), `lib/device-view-host-channels.js` (pinned + auto host
+channels, planned-vs-live channel map, "(planned)" badge), `lib/math-input.js` (number fields take expressions).
+The mapped-output link's web target is the connector inspector (GPU / DeckLink pages) — not ported yet.
+
+### What was done
+- 3a (commit 78b4b97a): `host_channels.gd` (listing, golden over seven payloads; `devices_model.build` now emits host
+  cards), `destinations_model.gd` + `destination_inspector.gd` (the Inspector page; emits only `patch` / `remove` /
+  `focus_connector` / `launch_operator_gui`), `core/math_input.gd` (grammar, clamp, toFixed, restore last good).
+- 3b: `destinations_panel.gd` (new, 232 lines) — the tab's left column: "Screen destinations" head with the type select
+  and "+", the cards (host cards under "Input & host channels"), click = select → `InspectorPanel.current.present(page)`;
+  "+" = `DM.add_request` → `POST /api/device-view {addDestination}` → `DM.seed_patch` → `POST /api/settings` when the new
+  screen N is unseeded → `changed` (tab marks restart-dirty + reloads, the web's forced load); page edits →
+  `updateDestination`; Remove → `removeDestination` + deselect; the page follows its destination across reloads and
+  closes when it is gone. `devices_tab.gd`: the left column is now the panel in a ScrollContainer; a selected cable
+  and a selected destination exclude each other; the page's mapped-output link selects that connector's cable (the web
+  opens the connector inspector — later slices) or reports "<id> has no cable.".
+
+### What was VERIFIED
+- Godot `--test` 2736/2736, `--check` boot OK, headless boot straight into `--tab=4` clean, line limits 0 over 500.
+- Box GUI (`run-client.sh --screen=0 --tab=4`, xdotool, x11grab; `config/*.json` backed up first): card click → Inspector
+  page with the summary (PGM/PRV channels 1/2, mapped output `P3` = the connector's own label, as the web), fields and
+  Remove. "+" (PGM/PRV) → `dst_mvfsgp2y_1` "PGM/PRV 2" at mainScreenIndex 1 appeared as a card with PGM/PRV dots, Apply
+  turned amber; screen_2 was already seeded so no settings write (correct per `shouldSeedScreenConsumerDefaults`).
+  Name "Side LED" + Enter → server label updated. Width "640*2" under 1080p5000 → no write (field read-only unless
+  Custom, as the web). Mapped-output link on Main LED → its cable selected (Remove row shown, destination released).
+  Remove destination → gone from the server and the cards, Inspector "Select an item". No SCRIPT ERROR in the GUI log.
+  After the run every `config/*.json` is byte-identical to the backup.
+- Not exercised live: Custom video mode + size patch, pixel-map / operator-GUI fields (golden-tested against the web
+  form over 63 actions in 3a); host cards (no host channels configured on this box) — owner QA.
