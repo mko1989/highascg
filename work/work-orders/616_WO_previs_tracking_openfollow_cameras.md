@@ -160,3 +160,40 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
 - [ ] T12 "Camera view" overlay mode in previs: background = camera surface, `Camera3D` = solved camera,
       ghosted stage + markers/zones, lens-distortion shader; opacity slider.
 - [ ] T13 Camera-assisted fixture calibration (WO-615 fixtures): spot detection + pose solve; manual click fallback.
+
+## T1 — surface roles `inN` / `chN` (2026-10-19) — DONE
+
+### Investigation
+- `src/system/video-surfaces.js` knew only `pgm1…4/prv1…4` (`ROLE_SLOTS`, indices 741–748, 749 reserved); every
+  other role name was dropped by `lease()`'s filter before AMCP. The Godot side mirrored that as a fixed
+  `RUNTIME_ROLES` list (`godot/client/video/video_surfaces.gd:13`), so a camera role would never be leased.
+- DeckLink input N's own channel is `channelMap.inputChannels[] {kind:'decklink', slot:N, channel}`
+  (`src/config/routing-map.js:302`). Look up by `slot`, not by array position: live-audio / v4l2 / host
+  entries share the array.
+- `chN` must only name channels Caspar actually runs. The manager's map is the config-only `getChannelMap(cfg)`,
+  which has no channel list; `channelResolutionsByChannel` is only added by `buildChannelMap(ctx)`
+  (`src/config/channel-map-from-ctx.js:62`) from Caspar's INFO CONFIG. The first box probe returned
+  `ch1 → channel: null` for exactly this reason. `buildChannelMap` was not used whole: its `previewChannels`
+  follow the switcher's active bus, which would change what `prvN` means today.
+- The box has no DeckLink inputs (`decklinkCount: 0`), so `inN` can only be proven offline here; `chN` is live-testable.
+
+### What was done
+- `src/system/video-surfaces.js`: `roleIndex(role)` replaces the `ROLE_SLOTS` lookups.
+  - `pgm/prv` → 741–748 (unchanged); `in1…in16` → 750+N; `ch1…ch99` → 800+N.
+  - `resolveRoleChannel`: `inN` → the DeckLink entry with slot N; `chN` → N only if Caspar's INFO lists it.
+  - `list()`: pgm/prv as before, plus `inN` for every configured DeckLink input, plus `chN` only while leased
+    (99 idle rows would be noise).
+  - The singleton's map is `getChannelMap(cfg)` plus `channelResolutionsByChannel` from `ctx.gatheredInfo.infoConfig`.
+- `godot/client/video/surface_holders.gd`: `is_runtime_role()` (the same grammar as `roleIndex`, kept in the pure
+  file so the test runner can load it); `video_surfaces.gd` leases by it; the fixed list is gone.
+- Tests: `smoke-wo597-video-surfaces.test.js` gains a WO-616 case (slot lookup, unknown channel, index grammar,
+  ADD/REMOVE lines, list membership); `test_video_surfaces.gd` gains `test_runtime_roles`.
+
+### What was VERIFIED
+- Offline: smoke 9/9; Godot `--check` OK, `--test` 927 passed; offline suite 2676 tests, 2673 pass, 1 fail (the known
+  local-only `smoke-wo577-shader-controls`, which reads the gitignored `data/shaders`); 0 files over 500 lines.
+- Box, after a node restart: `POST /api/video-surfaces/lease {roles:["ch1","in1"]}` → journal
+  `ADD 1-801 SHM NAME ch1`, descriptor `{role:"ch1", channel:1, index:801, active:true}`; `in1` was not listed (no
+  DeckLink input). `hshm_probe.py --path /dev/shm/highascg-ch1 --duration 2` → 1920×1080 @ 50.49 fps, 101 frames,
+  0 gaps, 0 torn, latency p50 2.05 ms. With no renewal, the journal shows `REMOVE 1-801 (ch1: no leases)` after the TTL.
+- Not proven on this box: `inN` against a real DeckLink input (needs a box with capture hardware).

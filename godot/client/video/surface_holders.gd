@@ -2,6 +2,7 @@ extends RefCounted
 ## WO-617 — who holds which video surface. Pure bookkeeping (no autoloads) so it is unit-testable;
 ## VideoSurfaces polls, uploads and leases only roles that are held.
 
+static var _runtime_re := RegEx.create_from_string("^(?:(?:pgm|prv)[1-4]|in(?:[1-9]|1[0-6])|ch[1-9][0-9]?)$")
 var _holders := {}  # role -> { owner instance id: true }
 
 
@@ -32,3 +33,9 @@ func is_held(role: String) -> bool:
 
 func roles() -> Array:
 	return _holders.keys()
+
+
+## Leased (server-ADDed) roles: pgm/prv 1–4, WO-616 inN (DeckLink input N's channel) and chN (any channel).
+## Mirrors src/system/video-surfaces.js roleIndex(); anything else (the operator surface) is config, never leased.
+static func is_runtime_role(role: String) -> bool:
+	return _runtime_re.search(role) != null

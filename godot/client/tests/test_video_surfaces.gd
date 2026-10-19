@@ -30,3 +30,10 @@ func test_drop_all() -> void:
 	h.hold("prv1", b)
 	h.drop_all(a)
 	t.eq(h.roles(), ["prv1"], "only the role b still holds remains")
+
+
+func test_runtime_roles() -> void:
+	for r in ["pgm1", "prv4", "in1", "in16", "ch1", "ch99"]:
+		t.ok(H.is_runtime_role(r), r)
+	for r in ["opgui", "pgm5", "in0", "in17", "ch0", "ch01", "ch100", "in1x", ""]:
+		t.ok(not H.is_runtime_role(r), "not leased: " + r)

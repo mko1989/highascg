@@ -107,3 +107,35 @@ test('WO-597: lease route parses a raw JSON body (HTTP layer passes strings) and
 	assert.equal(good.status, 200)
 	assert.ok(JSON.parse(good.body).surfaces.some((s) => s.role === 'pgm1'))
 })
+
+test('WO-616 T1: inN = DeckLink input N\'s own channel, chN = any channel Caspar has; reserved indices', async () => {
+	const { roleIndex } = require('../../src/system/video-surfaces')
+	const map = {
+		...MAP,
+		inputChannels: [{ kind: 'decklink', slot: 1, channel: 6 }, { kind: 'live_audio', slot: 1, channel: 7 }, { kind: 'decklink', slot: 2, channel: 8 }],
+		channelResolutionsByChannel: { 1: {}, 2: {}, 3: {}, 6: {}, 7: {}, 8: {} },
+	}
+	assert.equal(resolveRoleChannel('in1', map), 6)
+	assert.equal(resolveRoleChannel('in2', map), 8, 'by DeckLink slot, not by inputChannels position')
+	assert.equal(resolveRoleChannel('in3', map), null, 'no third DeckLink input')
+	assert.equal(resolveRoleChannel('ch7', map), 7)
+	assert.equal(resolveRoleChannel('ch9', map), null, 'a channel Caspar does not have')
+	assert.equal(resolveRoleChannel('ch1', MAP), null, 'no channel list → nothing')
+	assert.deepEqual(['pgm1', 'prv4', 'in1', 'in16', 'ch1', 'ch99'].map(roleIndex), [741, 748, 751, 766, 801, 899])
+	for (const bad of ['in0', 'in17', 'ch0', 'ch100', 'ch01', 'in1x', 'opgui']) assert.equal(roleIndex(bad), null, bad)
+
+	const lines = []
+	const m = createVideoSurfaceManager({
+		getAmcp: () => ({ basic: { add: async (ch, c, p, i) => lines.push(`ADD ${ch}-${i} ${c} ${p}`), remove: async (ch, c, i) => lines.push(`REMOVE ${ch}-${i}`) } }),
+		getChannelMap: () => map,
+		now: () => 1,
+	})
+	await m.lease('g', ['in2', 'ch7', 'ch9'])
+	assert.deepEqual(lines, ['ADD 8-752 SHM NAME in2', 'ADD 7-807 SHM NAME ch7'])
+	const roles = m.list().map((s) => s.role)
+	assert.ok(roles.includes('in1') && roles.includes('in2'), 'every DeckLink input is announced')
+	assert.ok(roles.includes('ch7') && !roles.includes('ch1'), 'chN only while leased')
+	await m.lease('g', [])
+	assert.ok(lines.includes('REMOVE 8-752') && lines.includes('REMOVE 7-807'))
+	assert.ok(!m.list().some((s) => s.role === 'ch7'), 'released chN drops out of the list')
+})

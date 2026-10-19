@@ -1,6 +1,6 @@
 extends Node
 ## WO-599/596/597 — live Caspar channel surfaces (shared memory → Texture2D), one per role.
-## The server announces surfaces (GET /api/video-surfaces) and keeps runtime ones (pgm1/prv1/… for
+## The server announces surfaces (GET /api/video-surfaces) and keeps runtime ones (pgm1/prv1/…, WO-616 inN/chN for
 ## previs) alive only while leased: this node POSTs /api/video-surfaces/lease every LEASE_EVERY_S with the
 ## runtime roles the UI currently draws (TTL 15 s server-side → a crashed client releases on-air channels).
 ## Uses the hshm GDExtension when installed (godot/extensions/hshm/build.sh), else the GDScript reader.
@@ -10,7 +10,6 @@ const ShmNative := preload("res://video/shm_native.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
 const SurfaceHolders := preload("res://video/surface_holders.gd")
 const LEASE_EVERY_S := 5.0
-const RUNTIME_ROLES := ["pgm1", "prv1", "pgm2", "prv2", "pgm3", "prv3", "pgm4", "prv4"]
 
 var client_id := "godot-%d-%d" % [OS.get_process_id(), Time.get_unix_time_from_system()]
 var descriptors := {}  # role -> server descriptor (path, channel, active, …)
@@ -41,7 +40,7 @@ func texture(role: String) -> Texture2D:
 
 ## WO-617: hold a surface for `owner` (polled, uploaded and leased while ≥ 1 holder). Same texture as texture().
 func acquire(role: String, owner: Object) -> Texture2D:
-	if holders.hold(role, owner) and role in RUNTIME_ROLES and _timer != null and not _timer.is_stopped():
+	if holders.hold(role, owner) and SurfaceHolders.is_runtime_role(role) and _timer != null and not _timer.is_stopped():
 		_renew()  # lease now, not at the next 5 s tick
 	return texture(role)
 
@@ -87,7 +86,7 @@ func path_for(role: String) -> String:
 func _renew() -> void:
 	var wanted := []
 	for role in holders.roles():
-		if role in RUNTIME_ROLES:
+		if SurfaceHolders.is_runtime_role(role):
 			wanted.append(role)
 	var res: Dictionary = await Api.post_json("/api/video-surfaces/lease", {"clientId": client_id, "roles": wanted})
 	leasing = res.ok
