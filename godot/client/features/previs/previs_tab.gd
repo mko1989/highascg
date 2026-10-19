@@ -15,6 +15,7 @@ const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
 const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
 const FollowModel := preload("res://features/previs/tracking/follow_model.gd")
+const ZoneModel := preload("res://features/previs/tracking/zone_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["front", "plan", "3d", "camera"]
@@ -80,7 +81,10 @@ func _ready() -> void:
 		if track_page.markers != null:
 			track_page.markers.refresh()
 		if track_page.follow != null:
-			track_page.follow.refresh())
+			track_page.follow.refresh()
+		if track_page.zones != null:
+			track_page.zones.refresh()
+		_push_zones())
 	track_view.grab.connect(func(px: Vector2) -> void: markers.grab_at(px))
 	track_view.drag.connect(markers.drag_to)
 	track_view.let_go.connect(markers.release)
@@ -126,7 +130,21 @@ func _on_tracking_changed() -> void:
 		markers.set_defs(track_page.data.markers, track_page.data.grid)
 	track_view.markers_mode = track_page.mode in ["markers", "follow"]
 	track_view.follow_mode = track_page.mode == "follow"
+	track_view.zones_mode = track_page.mode == "zones"
+	_push_zones()
 	_apply_drive()
+
+
+## WO-616 T7: the trigger zones as floor loops + the server's occupancy.
+func _push_zones() -> void:
+	var zs: Dictionary = ZoneModel.normalize(track_page.data.get("zones"))
+	var cur := str(track_page.zones.current().get("id", "")) if track_page.zones != null else ""
+	var shapes := []
+	for z in zs.list:
+		var o: Variant = markers.zones.get(z.id)
+		shapes.append({"name": z.name, "color": z.color, "loop": ZoneModel.loop3(z.vertices, markers.floor_z),
+			"occupied": o is Dictionary and o.get("occupied") == true, "selected": z.id == cur})
+	track_view.set_zones(shapes, track_page.zones != null and track_page.zones.drawing and track_page.mode == "zones")
 
 
 ## WO-616 T11: the follow fixtures' beams from the server's aims (project.fixtures, marker positions).
@@ -140,7 +158,7 @@ func _beams() -> Array:
 
 
 func _apply_drive() -> void:
-	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow"]
+	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow", "zones"]
 	if not markers.driving:
 		markers.release()
 

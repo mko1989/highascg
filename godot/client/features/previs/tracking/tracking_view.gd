@@ -7,6 +7,9 @@ extends Control
 ## T5b Markers mode: markers drawn on the floor (ground circle + body line + name; stale = dimmed); press on a
 ## marker's circle grabs it, drag moves it, release lets go (marker_driver); calibration clicks are off.
 ## T11 Follow mode: the same, plus each follow fixture's beam as the server aims it (dimmed while holding).
+## T7: trigger zones are drawn on the floor in Markers / Follow / Zones mode (filled while the server says a marker
+## is inside; the selected one thicker). Zones mode drags markers like Markers mode, except while drawing a shape:
+## then a click is a floor corner (`clicked`).
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -23,6 +26,9 @@ var marks: Array = []  # marker_driver.marks()
 var selected_marker := 0
 var follow_mode := false
 var beams: Array = []  # follow_model.beams()
+var zones_mode := false
+var zone_drawing := false
+var zone_shapes: Array = []  # [{name, color, loop: [[x, y, z]…], occupied, selected, open}]
 var _held := false
 
 var entry := {}
@@ -60,6 +66,12 @@ func set_beams(b: Array) -> void:
 	beams = b
 	if markers_mode:
 		queue_redraw()
+
+
+func set_zones(shapes: Array, drawing: bool) -> void:
+	zone_shapes = shapes
+	zone_drawing = drawing
+	queue_redraw()
 
 
 func set_marks(m: Array, sel: int) -> void:
@@ -147,7 +159,7 @@ func _draw() -> void:
 		if not (o.lines as Array).is_empty() and (o.lines[0] as PackedVector2Array).size() > 0:
 			draw_string(font, to_view(o.lines[0][0]) + Vector2(4, -6), o.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, ThemeBuilder.WARN)
 	var act: Dictionary = {}
-	for p in _pts if not markers_mode else []:  # Markers mode: grid + objects only, the markers are the subject
+	for p in _pts if not (markers_mode or zones_mode) else []:  # Markers mode: grid + objects only, the markers are the subject
 		if p.id == active:
 			act = p
 		var s: Variant = p.shown
@@ -160,8 +172,10 @@ func _draw() -> void:
 			draw_arc(to_view(k), 6.0, 0.0, TAU, 20, ThemeBuilder.ACCENT, 2.0, true)
 	if not act.is_empty():
 		var at: Variant = act.click if act.click != null else act.shown
-		if at != null and not markers_mode:
+		if at != null and not (markers_mode or zones_mode):
 			draw_arc(to_view(at), 13.0, 0.0, TAU, 28, ThemeBuilder.ACCENT_HOVER, 2.5, true)
+	if markers_mode or zones_mode:
+		_draw_zones(font)
 	if markers_mode:
 		_draw_beams(font)
 	_draw_marks(font)
@@ -172,6 +186,9 @@ func _draw() -> void:
 		tail = " · LB/RB speed · D-pad ◀▶ marker · wheel: zoom · right-drag: pan"
 	if follow_mode:
 		head = "Follow — beams show where the server aims each fixture · drag / drive a marker to test"
+	if zones_mode:
+		head = ("Zones — click the zone's corners on the floor · Draw shape again to finish" if zone_drawing else
+			"Zones — filled = a marker is inside (server) · drag / drive a marker through a zone to test")
 	var rs := " · RMS %.2f px" % rms if rms >= 0.0 else " · not calibrated"
 	draw_rect(Rect2(0, size.y - 26, size.x, 26), Color(ThemeBuilder.BG_DARK, 0.75))
 	draw_string(font, Vector2(10, size.y - 8), head + rs + tail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 20, 13, ThemeBuilder.TEXT)
@@ -195,6 +212,31 @@ func _draw_marks(font: Font) -> void:
 		draw_string(font, top + Vector2(8, -4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14 if sel else 13, col)
 		if sel:
 			draw_arc(c, 4.0, 0.0, TAU, 12, ThemeBuilder.TEXT, 2.0, true)
+
+
+func _draw_zones(font: Font) -> void:
+	for z in zone_shapes:
+		var col := Color(z.color)
+		var loop: Array = z.loop
+		if loop.size() < 2:
+			continue
+		var px := O.shown(entry, loop)
+		if z.occupied and not px.has(null) and px.size() >= 4:
+			var poly := PackedVector2Array()
+			for i in px.size() - 1:
+				poly.append(to_view(Vector2(px[i][0], px[i][1])))
+			if not Geometry2D.triangulate_polygon(poly).is_empty():
+				draw_colored_polygon(poly, Color(col, 0.3))
+		for i in loop.size() - 1:
+			for pl in O.edge(entry, loop[i], loop[i + 1]):
+				draw_polyline(_xf(pl), col, 3.0 if z.selected else 1.5, true)
+		if z.selected and zone_drawing:
+			for p in px:
+				if p != null:
+					draw_circle(to_view(Vector2(p[0], p[1])), 4.0, col)
+		var at: Variant = px[0]
+		if at != null:
+			draw_string(font, to_view(Vector2(at[0], at[1])) + Vector2(6, -6), z.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
 
 func _draw_beams(font: Font) -> void:
@@ -224,7 +266,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
-		if mb.button_index == MOUSE_BUTTON_LEFT and markers_mode:
+		if mb.button_index == MOUSE_BUTTON_LEFT and (markers_mode or zones_mode) and not zone_drawing:
 			grab_focus()
 			if mb.pressed:
 				grab.emit(to_raster(mb.position))
@@ -255,10 +297,10 @@ func _gui_input(event: InputEvent) -> void:
 			queue_redraw()
 			accept_event()
 	var k := event as InputEventKey
-	if k != null and markers_mode and k.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+	if k != null and (markers_mode or zones_mode) and k.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
 		accept_event()  # held arrows drive the marker (marker_driver polls them), not UI focus navigation
 	var mm := event as InputEventMouseMotion
-	if mm != null and _held and markers_mode:
+	if mm != null and _held and (markers_mode or zones_mode):
 		drag.emit(to_raster(mm.position))
 		accept_event()
 	if mm != null and _drag:

@@ -10,6 +10,7 @@ extends Node
 ## last write; identical writes do not broadcast), except one another client is moving right now. The marker list
 ## comes from the project directly, so markers stay live whatever tab / previs mode the operator is in.
 ## T11: also keeps the server follow engine's aims (`tracking:follow`) for the beams and the Follow section.
+## T7: and the server zone engine's occupancy (`tracking:zones`) for the zone fills and the Zones section.
 
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
@@ -39,6 +40,9 @@ var grabbed := 0
 var synced := false  # the hub answered (module on) — no heartbeats into a missing module
 var follow := {}  # fixture id → {state, pan, tilt, problem} (server follow engine, WO-616 T11)
 var follow_on := false  # the server's Art-Net output master
+var zones := {}  # zone id → {occupied, count, occupants, last_kind} (server zone engine, WO-616 T7)
+var zones_on := false
+var zones_seen := false  # the server zone engine answered (module on)
 var _target: Variant = null
 var _axes: Array = []
 var _dirty := {}
@@ -70,6 +74,9 @@ func resync() -> void:
 	var fr: Dictionary = await Api.get_json("/api/tracking/follow")
 	if fr.ok and fr.data is Dictionary:
 		_adopt_follow(fr.data)
+	var zr: Dictionary = await Api.get_json("/api/tracking/zones")
+	if zr.ok and zr.data is Dictionary:
+		_adopt_zones(zr.data)
 
 
 ## Project markers + floor grid (home = grid centre on the floor).
@@ -261,6 +268,8 @@ func _on_ws(type: String, data: Variant) -> void:
 		_adopt((data as Dictionary).get("markers", []))
 	elif type == "tracking:follow" and data is Dictionary:
 		_adopt_follow(data)
+	elif type == "tracking:zones" and data is Dictionary:
+		_adopt_zones(data)
 
 
 func _adopt_follow(data: Dictionary) -> void:
@@ -269,6 +278,16 @@ func _adopt_follow(data: Dictionary) -> void:
 	for f in data.get("fixtures", []):
 		if f is Dictionary:
 			follow[str(f.get("id", ""))] = f
+	updated.emit()
+
+
+func _adopt_zones(data: Dictionary) -> void:
+	zones_seen = true
+	zones_on = data.get("enabled") == true
+	zones = {}
+	for z in data.get("zones", []):
+		if z is Dictionary:
+			zones[str(z.get("id", ""))] = z
 	updated.emit()
 
 

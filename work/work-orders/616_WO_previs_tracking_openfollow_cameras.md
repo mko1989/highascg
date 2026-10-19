@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); next: T7 zones. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); next: T4/T12 overlay parts, T9 detection. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -110,7 +110,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       relay it directly to artnet")**. Markers leave the box as Art-Net through the WO-615 fixture engine
       (server-side, `src/sampling/dmx-output.js` senders): marker → follow IK (WO-615 T9 / T11 here) → DMX.
       The 1 s freshness rule stays in the hub, so follow can hold or release a fixture on a stale marker.
-- [ ] T7 Zones (port `zones/engine.py` state machine + shrink) → OSC / Companion.
+- [x] T7 Zones (port `zones/engine.py` state machine + shrink) → ~~OSC~~ look take / Companion press (no outbound OSC on this box).
 - [ ] T8 PSN input (OpenFollow stations as sources).
 - [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), systemd unit, GPU EP; masks.
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
@@ -685,3 +685,117 @@ replace the profile later. Art-Net only; sACN waits for WO-615 T4. WO-31 Compani
   channels, ranges, invert and pose (yaw, hang) set to match the rig — check each axis by moving the marker.
   sACN and per-universe enables are WO-615 T4. Test layer cleared. The dev project keeps Fixture 1 (loopback
   127.0.0.1:6455, output off).
+
+## T7 — trigger zones (2026-10-19) — DONE (box-verified)
+
+Each zone is a floor polygon. When markers cross it, the zone fires an action per transition. This is the OpenFollow zones
+state machine, evaluated on the server so it runs with no client open.
+
+### Investigation
+- **OpenFollow source** (`openfollow/zones/{engine,geometry}.py`, `docs/architecture/zones.md`, `tests/test_zone_*.py`
+  @ 2f8aa257):
+  - Per-zone occupant set. Transitions run entries first (sorted): count 0 → 1 = `first_entry`, otherwise
+    `additional_entry`. Exits follow: → 0 = `final_exit`, otherwise `partial_exit`.
+  - Entry tests the drawn polygon; an occupant's exit tests the polygon shrunk inward by `hysteresis` (0.05 m).
+  - Shrink guards: a miter clamp (cos ≥ 0.2), a half-shorter-edge bound, and a fallback to the original polygon on a
+    winding flip or < 5 % of the area.
+  - A change inside `debounce_ms` (200) of the zone's last event is **held**: occupancy is not advanced, and the change is
+    re-evaluated next tick (engine.py:238 `return False`).
+  - Reload carries occupancy by signature (vertices, trigger, enabled, triggered_by), FIFO. Nothing is carried when the
+    master is off. A disabled zone clears its occupancy. A zone with fewer than 3 vertices is skipped.
+  - `last_event_time` is stamped only when an address was actually sent (engine.py:273).
+- **What a zone can fire on this box.** Haiku survey; I re-checked the load-bearing claims myself.
+  - There is **no outbound OSC sender**. `osc` is used only by the receiver `src/osc/osc-listener.js:52`, and T6 OSC out
+    was dropped by the owner.
+  - Two server-side paths can fire:
+    - `handleTakeLook(body, ctx)` (`src/api/routes-scene-take-look.js:24`, WO-598: take a stored look by id; `target:
+      'preview'` stages it).
+    - The Companion HTTP press (`src/engine/timeline-playback.js:194-245`): `POST
+      http://<companion.host>:<port>/api/location/p/r/c/press`, with host and port from `resolveCompanionConfig`. This
+      is HTTP only by design (WO-547).
+  - On the box, Companion listens on :8000, and pressing an empty location answers 404.
+- **Storage.** `previs` is already a client-owned slice (WO-607), and tracking_model `normalize` keeps unknown keys.
+  `project.previs.tracking.zones` therefore needs no new slice registration. The server reads it through
+  `project-events` like the follow patch.
+
+### What was done
+- **Server**:
+  - `src/tracking/zone-geometry.js`: a line-for-line port of geometry.py (point in polygon, signed area, shrink).
+  - `src/tracking/zone-engine.js`: the `ZoneEngine` port (`normalizeZones`, `reload` with signature carry, `update`,
+    `states`). AGPL header with the changes listed:
+    - Markers only. Detection is T9.
+    - A marker the hub calls **stale keeps its membership**, so an operator client dropping does not fire an exit cue. A
+      marker removed from the hub exits.
+    - Every transition fires the sink, so debounce stamps on every transition. OpenFollow stamps only sent addresses.
+  - `src/tracking/zone-actions.js`: what a zone's four slots name instead of an OSC address:
+    - `look:<sceneId>[@preview]` → `handleTakeLook` (no second take path);
+    - `companion:<page>/<row>/<col>` → the HTTP press;
+    - blank = nothing;
+    - anything else → `invalid`, logged.
+  - `src/tracking/zone-service.js`: 10 Hz evaluation (OpenFollow's default) of `hub.list()`. The project slice is loaded
+    at boot and on every project write. It keeps the last 20 transitions and their results.
+  - `register.js`: starts and stops the service. Adds `GET /api/tracking/zones` and WS `tracking:zones` (on change).
+  - **The master defaults off.**
+- **Godot**:
+  - `zone_model.gd`: the client mirror of `normalizeZones` and the action grammar.
+  - `zones_section.gd`: the Zones mode of the tracking Inspector page:
+    - master, which asks before arming: "Arm the zone engine? … take looks, press Companion buttons";
+    - debounce and exit margin;
+    - zone list with live occupancy;
+    - name, enabled, triggered-by marker ids, and the 4 actions (invalid ones turn red, with the reason);
+    - Draw shape / Undo point / Clear shape.
+  - `tracking_page.gd`: the 4th mode, Zones, persisted through the page. The page owns the whole `previs.tracking`
+    dict, so a sibling write would be overwritten by its next save. While drawing, the view's click adds a floor corner
+    (`marker_input.floor_point` at the grid floor height).
+  - `tracking_view.gd`: zones drawn on the floor through the solved camera and lens in Markers / Follow / Zones mode.
+    A zone is filled while the server says it is occupied; the selected zone is thicker; corners are shown while
+    drawing. Zones mode drags markers, except while drawing.
+  - `marker_driver.gd`: adopts `tracking:zones` and GETs it on resync.
+  - `previs_tab.gd`: `_push_zones()`.
+- **Credit**: the zone files and `marker_input.gd` (missing until now) were added to `THIRD_PARTY_NOTICES`.
+
+### What was VERIFIED
+- **Offline**:
+  - `smoke-wo616-tracking-zones.test.js`: 11 tests, added to the curated list.
+    - All of OpenFollow's geometry vectors pass: square, L-shape notch, winding, shrink 0/negative, the 0.5 m square,
+      clockwise, coincident, hairpin, acute miter clamp, narrow strip, needle → original, equilateral → original.
+    - Normalize.
+    - Transition kinds and order (entry counted before a simultaneous exit).
+    - Hysteresis.
+    - Debounce hold: a held exit fires at 250 ms, and a bounce that returns inside the hold fires nothing.
+    - `triggered_by`; disabled zone; degenerate zone.
+    - Reload carry: a renamed zone is carried, a reshaped zone re-enters, and master off → re-arm fires `first_entry`.
+    - Stale hold vs removal.
+    - Action parse/run through seams. The Companion URL comes from config.
+    - Service via project-events.
+  - Offline suite: 2699 tests, 2696 pass, 2 skipped, 1 failure: the known `wo577` library test.
+  - Godot `--check` OK. `--test` 1125 passed (+23 assertions in `tests/test_zone_model.gd`, written by a Haiku agent and
+    reviewed).
+  - eslint clean on the new files; 0 files over 500 lines.
+- **On the box, server only** (GUI stopped):
+  - A zone "Downstage centre" (−1…1 × 2…4 m) was written via `/api/project/autosave`. Journal: `[zones] 1 zone(s), engine
+    ON`, with no restart (project-events).
+  - Two markers were driven over HTTP: m1 in, m2 in, m2 out, m1 out. `/api/tracking/zones` `recent`:
+    - `first_entry` m1 → `look look-1 → preview`;
+    - `additional_entry` m2 → `companion 99/0/0 → 404` (warn; the failure path);
+    - `partial_exit` → none;
+    - `final_exit` → `look look-2 → preview`.
+  - The journal shows the real take path ran (`[scene-take] preview-only path prv=2`). AMCP `INFO 2-10` showed the look's
+    clips on preview.
+  - A marker parked inside with writes stopped went **stale and stayed inside**. `DELETE` → `final_exit`.
+- **On the box, GUI** (DP-3, previs Camera mode, Camera 1 calibrated):
+  - Zones mode showed the server-written zone on the floor, filled with "inside: Marker 1" (screenshot).
+  - Add zone → Draw → four clicks on the floor drew "Zone 1" corner by corner. After the autosave the server had it, at
+    (−2.51, 2.39) … (−2.02, 4.9).
+  - Dragging Marker 1 from Downstage centre into Zone 1: the server fired `final_exit` (look-2 → preview) then
+    `first_entry` (Zone 1, no action). The view refilled the new zone, and the list read "Zone 1 · 4 pts · inside:
+    Marker 1" (screenshot).
+  - Typing `bogus` as First entry turned the field red and showed "First entry: unknown action "bogus"". The server
+    logged the same warning on reload. The field was then cleared.
+  - Master toggled off from the GUI → `[zones] 2 zone(s), engine off`.
+- **Not verified (owner QA)**:
+  - Zones driven by real tracking (gamepad / detection T9).
+  - A Companion press on a real button.
+  - Taking a look to **program** from a zone. The same `handleTakeLook` path ran for preview.
+- **Left in the dev project**: zones "Downstage centre" (look-1 / companion 99/0/0 / look-2 @preview) and "Zone 1"
+  (no actions), engine off.
