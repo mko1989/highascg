@@ -320,6 +320,7 @@ const FILES = [
 	'tools/smoke/smoke-wo616-tracking-marker-hub.test.js',
 	'tools/smoke/smoke-wo616-follow-artnet.test.js',
 	'tools/smoke/smoke-wo616-tracking-zones.test.js',
+	'tools/smoke/smoke-wo616-tracking-detect.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
 	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',

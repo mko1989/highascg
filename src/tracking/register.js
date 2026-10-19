@@ -13,6 +13,9 @@
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
+ * Detection (T9, src/tracking/detect-service.js): GET /api/tracking/detections — sidecar state + latest persons;
+ *       WS tracking:detections {enabled, running, cameras:[{id,role,frame,stale,persons:[{tid,box,score,age_s,floor}]}]}
+ *       (≤ 15 Hz while persons change, and when a camera goes stale).
  */
 
 'use strict'
@@ -20,6 +23,7 @@
 const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
 const { createZoneService } = require('./zone-service')
+const { createDetectService } = require('./detect-service')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -28,6 +32,8 @@ const WS_EVENT = 'tracking:markers'
 const FOLLOW_EVENT = 'tracking:follow'
 const FOLLOW_MS = 100
 const ZONES_EVENT = 'tracking:zones'
+const DETECT_EVENT = 'tracking:detections'
+const DETECT_MS = 66
 
 const hub = new MarkerHub()
 let _timer = null
@@ -38,6 +44,8 @@ let _follow = null
 let _followSent = { json: '', at: 0 }
 let _zones = null
 let _zonesSent = ''
+let _detect = null
+let _detectSent = { json: '', at: 0 }
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
@@ -88,6 +96,18 @@ function zonesTick() {
 	_ctx._wsBroadcast(ZONES_EVENT, snap)
 }
 
+/** Detected persons: ≤ 15 Hz, only when something changed (a step with the same boxes sends nothing). */
+function detectTick() {
+	if (!_detect || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
+	const now = hub.now()
+	if (now - _detectSent.at < DETECT_MS) return
+	const snap = _detect.snapshot()
+	const json = JSON.stringify(snap)
+	if (json === _detectSent.json) return
+	_detectSent = { json, at: now }
+	_ctx._wsBroadcast(DETECT_EVENT, snap)
+}
+
 async function handleApi({ method, path, body }) {
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, { module: 'tracking', status: 'markers', markers: hub.markers.size, writes: _writes,
@@ -98,6 +118,9 @@ async function handleApi({ method, path, body }) {
 	}
 	if (method === 'GET' && path === '/api/tracking/zones') {
 		return _zones ? reply(200, _zones.status()) : reply(503, { error: 'zone engine not running' })
+	}
+	if (method === 'GET' && path === '/api/tracking/detections') {
+		return _detect ? reply(200, _detect.status()) : reply(503, { error: 'detection service not running' })
 	}
 	if (path === '/api/tracking/markers') {
 		if (method === 'GET') return reply(200, { markers: hub.list(), stale_after_ms: MARKER_STALE_AFTER_MS })
@@ -149,6 +172,7 @@ module.exports = {
 			tick()
 			followTick()
 			zonesTick()
+			detectTick()
 		}, TICK_MS)
 		if (typeof _timer.unref === 'function') _timer.unref()
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
@@ -157,6 +181,9 @@ module.exports = {
 		if (_zones) _zones.stop()
 		_zones = createZoneService(ctx, hub)
 		_zonesSent = ''
+		if (_detect) _detect.stop()
+		_detect = createDetectService(ctx)
+		_detectSent = { json: '', at: 0 }
 	},
 
 	async onShutdown() {
@@ -166,6 +193,8 @@ module.exports = {
 		_follow = null
 		if (_zones) _zones.stop()
 		_zones = null
+		if (_detect) _detect.stop()
+		_detect = null
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
 		_ctx = null
 	},

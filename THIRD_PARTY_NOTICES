@@ -17,6 +17,8 @@ HighAsCG's previs tracking (WO-616) contains code ported from OpenFollow at comm
   src/tracking/camera-model.js                           ← openfollow/scene/solver.py, openfollow/lens_model.py
   src/tracking/zone-geometry.js                          ← openfollow/zones/geometry.py
   src/tracking/zone-engine.js                            ← openfollow/zones/engine.py, docs/architecture/zones.md
+  tools/tracking-detect/bytetrack.py                     ← openfollow/video/tracking.py
+  tools/tracking-detect/detector.py                      ← openfollow/video/detection.py
   godot/client/tests/test_tracking_camera.gd,
   tools/smoke/smoke-wo616-tracking-camera-model.test.js  ← test vectors from tests/test_solver.py,
                                                             tests/test_solver_distortion.py, tests/test_lens_model.py
@@ -24,3 +26,12 @@ HighAsCG's previs tracking (WO-616) contains code ported from OpenFollow at comm
 
 Each ported file carries this attribution and lists its changes. The OpenFollow name and logo are not
 covered by the licence; HighAsCG calls the feature "Tracking" and credits OpenFollow here and in the files.
+
+Person detection (WO-616 T9) — runtime components NOT shipped in this repository; installed per machine
+outside the tree by tools/tracking-detect/setup-venv.sh and export-models.sh:
+
+  Ultralytics YOLO26 weights (yolo26n / yolo26s, exported to ONNX) — https://github.com/ultralytics/ultralytics
+  Copyright Ultralytics. License: AGPL-3.0.
+  ONNX Runtime — https://github.com/microsoft/onnxruntime — Copyright Microsoft Corporation. License: MIT.
+  OpenCV (opencv-python-headless) — https://opencv.org — License: Apache-2.0.
+  NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); next: T9 detection. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); next: T9b pinning + Godot detection UI. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -112,7 +112,9 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       The 1 s freshness rule stays in the hub, so follow can hold or release a fixture on a stale marker.
 - [x] T7 Zones (port `zones/engine.py` state machine + shrink) → ~~OSC~~ look take / Companion press (no outbound OSC on this box).
 - [ ] T8 PSN input (OpenFollow stations as sources).
-- [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), systemd unit, GPU EP; masks.
+- [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), ~~systemd unit~~ server-owned child, GPU EP; masks.
+      T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
+      Inspector detection controls. T9c mask editor in the camera view.
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
@@ -877,3 +879,122 @@ state machine, evaluated on the server so it runs with no client open.
     camera's −0.197 is the barrel case shown, and the test covers the overscan maths.
   - Real DeckLink input. Owner QA: on a calibrated real camera, check that the ghost walls sit on the real walls.
 - Test colour cleared (`CLEAR 1-90`).
+
+## T9a — person detection: sidecar + server service (2026-10-19) — DONE (box-verified; real camera = owner QA)
+
+Scope: OpenFollow's detection path (YOLO + ByteTrack), ending in floor points on the server and a WS feed.
+Pinning detections to markers (`replace` / `assist`), the Godot boxes and controls are T9b; the mask editor is T9c.
+
+### Investigation
+- OpenFollow `openfollow/video/detection.py` + `tracking.py` @ 2f8aa257, read in full:
+  - Pre-processing: CLAHE on LAB L (clip 2.0, 8×8 tiles), then letterbox to the model square (pad 114), /255, NCHW RGB.
+  - Two heads:
+    - 6-column end-to-end head `[x1,y1,x2,y2,conf,cls]`: person class only, no NMS.
+    - 84-column `[cx,cy,w,h,80 class scores]` head: column 4 = person, greedy NMS keeps IoU ≤ 0.45.
+  - Raw boxes are pulled down to `min(0.1, confidence)` (the ByteTrack low band), capped at `max(3·max_persons, 60)`.
+  - ROI masks test the **feet point** (bottom-centre) in normalised polygons.
+  - ByteTrack:
+    - Kalman on `[cx,cy,w/h,h]`, noise h/20 (position) and h/160 (velocity).
+    - First pass: the high band, gated at IoU 0.2 with a centre-distance rescue at 1.5× the predicted width.
+    - Second pass: the low band at IoU 0.5.
+    - Only high boxes spawn tracks.
+  - Track lifetime:
+    - Allowance = max(interval, longest of the last 8 step gaps).
+    - Coast = max(grace 500 ms, allowance).
+    - A lost track is kept for allowance + coast.
+  - Defaults: confidence 0.2, interval 67 ms, max 10 persons, model `yolo26n.onnx`.
+  - Execution providers: CoreML → CPU.
+- Models: OpenFollow downloads YOLO26 (Ultralytics, AGPL-3.0) at runtime; nothing is vendored. Exported here, once:
+  - Ultralytics 8.4.182, `v8.4.0/yolo26{n,s}.pt`, exported to `~/.local/share/highascg/models/`.
+  - `yolo26n.onnx`: 9,930,306 B, sha256 b95b0fb6….
+  - `yolo26s.onnx`: 38,279,479 B, sha256 8eb5c37a….
+  - Both: input `images [1,3,640,640]`, output `output0 [1,84,8400]`, i.e. the 84-column head, so NMS applies.
+  - CPU, 4 threads: n 13.7 ms, s 41.7 ms per inference.
+  - The box has no CUDA onnxruntime. The ~3 GB CUDA pip stack is deferred; CPU is enough at 15 Hz.
+- Input: the WO-597 shm surfaces (`/dev/shm/highascg-<role>`, BGRA, `tools/hshm-bridge/hshm_abi.Reader`). They
+  exist only while some client holds a lease (15 s TTL), so the detector must lease its own roles; a headless
+  server with detection on must not depend on a Godot client being open.
+- Sudo is limited to an allowlist, so a systemd unit cannot be installed from a session. A child process of
+  the server needs no root, dies with the server (stdin EOF), and is already how the shape helper runs.
+- First pipeline run gave `tracks: []`. That was correct: the frame was the idle slate (`led_grid_test.html` on
+  layer 999 covers layer 90), and `of_concert_default.jpg` has no people on stage anyway. Testing then used
+  frame 150 of `testowe/pedestrian_area.yuv` (the classic 1080p pedestrian sequence), saved as
+  `testowe/t9_pedestrians.png` and played on `1-1000`.
+
+### What was done
+- **`tools/tracking-detect/`** (Python; runtime outside the repo, since Syncthing syncs the repo and the weights are AGPL):
+  - `bytetrack.py`: a reviewed port of `tracking.py`. Boxes are `(x1,y1,x2,y2,score)` tuples; same constants,
+    noise, gates, ranking and lifecycle.
+  - `detector.py`: a port of `detection.py`:
+    - `Backend`: the input size is read from the ONNX shape, both heads are handled, NMS.
+    - `to_rgb`: BGRA → RGB, downscaled to the model size *before* CLAHE (OpenFollow's appsink pre-scales; this
+      keeps CLAHE off a 1080p frame).
+    - `filter_masks`: the feet-point test.
+    - `CameraDetector.step`: the allowance / coast timing and the high / low split.
+    - Providers: CUDA when the onnxruntime build has it, otherwise CPU.
+  - `sidecar.py`: the JSON-lines protocol (config on stdin; `ready` / `tracks` / 1 Hz `status` / `error` on
+    stdout). One shm `Reader` per camera, reopened on a geometry change. The model reloads when the config names
+    a new one. The sidecar exits on stdin EOF.
+  - `setup-venv.sh` + `requirements.txt` (numpy 2.5.4, onnxruntime 1.31.0, opencv-python-headless 5.0.0.93)
+    create `~/.local/share/highascg/tracking-venv`. They cope with this box's python3 having no ensurepip
+    (`--without-pip` + get-pip.py).
+  - `export-models.sh`: a one-off ultralytics export in a throwaway venv (several GB; run by hand).
+- **`src/tracking/detect-model.js`** (pure):
+  - `normalizeDetection`: the `project.previs.tracking.detection` slice. Every field is clamped. `model` must be a
+    bare `*.onnx` file name (no paths, no `..`). Per-camera `{enabled, masks}`.
+  - `detectCameras`: tracking cameras with a valid surface role that are not switched off.
+  - `boxToFloor` / `personsFrom`: feet pixel at the camera's calibration raster → `pixelToFloor` on z = `grid.z_offset`.
+  - The Godot `tracking_model.normalize` deep-copies the slice and keeps unknown keys, so `detection` survives
+    client writes. No client change was needed.
+- **`src/tracking/detect-service.js`**:
+  - Runs the sidecar while detection is enabled and ≥ 1 camera qualifies. Config comes from the active project at
+    boot, then from `project-events` on every write. A config change goes to the running child as a new stdin
+    line; there is no respawn.
+  - Leases the roles under client id `tracking-detect` every 5 s, and leases `[]` (immediate REMOVE) when detection
+    is off.
+  - Respawns with backoff (1 s doubling to 30 s, reset on `ready`).
+  - A missing venv or model is a status error naming the setup script, retried every 5 s.
+  - Keeps the latest persons per camera; they go stale after 1 s.
+  - Overridable through `HIGHASCG_TRACKING_PYTHON` / `HIGHASCG_TRACKING_MODELS`.
+- **`src/tracking/register.js`**:
+  - `GET /api/tracking/detections`: sidecar state, providers, error, pid, per-camera fps / ms, latest persons.
+  - WS `tracking:detections` `{enabled, running, cameras:[{id, role, frame, stale, persons:[{tid, box, score, age_s, floor}]}]}`,
+    sent at ≤ 15 Hz when it changes.
+- **`THIRD_PARTY_NOTICES`**: `bytetrack.py` / `detector.py` added to the OpenFollow port list. A new block names
+  the runtime components that are installed per machine and not shipped in the repo (YOLO26 AGPL-3.0, ONNX
+  Runtime MIT, OpenCV Apache-2.0, NumPy BSD-3).
+- `tools/smoke/smoke-wo616-tracking-detect.test.js` (9 tests; written by a Haiku subagent, reviewed): slice
+  clamps and model-name rejection, camera selection, a box → floor round trip against `project`, and the service
+  against a fake child: config line, line buffering across chunks, staleness, unknown camera, reconfigure without
+  respawn, disable → SIGTERM + lease `[]`, crash → respawn after 1 s, missing venv.
+
+### What was VERIFIED
+- Offline suite: 2705 / 2708 pass. The 9 new tests pass. The single failure is the known `wo577` one, plus 2 skips.
+  ESLint clean. `format:check` clean. 0 files over 500 lines.
+  - `setup-venv.sh` was run end to end into a fresh scratch venv: `ok 1.31.0 [... 'CPUExecutionProvider']`. The
+    scratch venv was then removed.
+- **Sidecar alone, on the box** (ch1 leased by hand, `t9_pedestrians` on 1-1000):
+  - `ready` on CPUExecutionProvider, input 640. Status `ok` at 14 fps, ~17 ms per step (decode + CLAHE + yolo26n + track).
+  - 10 people found (scores 0.24–0.86). Drawing the boxes on the frame: each box is on a person, and each feet
+    point is at that person's feet.
+  - The same 10 track ids for all 86 steps (no churn on a still frame).
+- **Through the server** (server restarted; detection switched on via `POST /api/project/autosave` with
+  `previs.tracking.detection = {enabled: true}`, Godot closed so it could not autosave over it):
+  - Journal: `sidecar started`, `[video-surfaces] ADD 1-801 SHM NAME ch1`, then `sidecar ready: yolo26n.onnx on
+    CPUExecutionProvider`.
+  - `GET /api/tracking/detections`: running, `cam_1` fresh, 10 persons with floor points. Camera 1 (the T3b solve)
+    sits upstage and faces downstage, so feet near the bottom of the frame map near it (person 0: y 7.98 m) and a
+    far figure maps downstage (person 9: y 1.80 m); image-left maps to +X. (The pedestrian picture is not the
+    stage the camera was calibrated on, so the metres are geometry only.)
+  - Reprojecting person 0's floor point through `project` + `applyDistortion` gave pixel (917.1, 1001.4), the
+    feet pixel exactly.
+  - WS `/api/ws`: 39 `tracking:detections` messages in 3 s (~13 Hz). The payload was as above.
+  - `kill -9` on the sidecar: journal `sidecar exited (SIGKILL) — restart in 1000 ms`. A new pid, ready, and the
+    same 10 persons within 4 s.
+  - Detection off (autosave `{enabled: false}`): `sidecar stopped`, `[video-surfaces] REMOVE 1-801 (ch1: no
+    leases)`. `/dev/shm/highascg-ch1` gone, no sidecar process. The project is left with detection off.
+- **Not verified**:
+  - A real camera / moving people. Owner QA, once T9b shows boxes in the camera view.
+  - The CUDA provider (no CUDA onnxruntime installed).
+  - Masks on the box. The feet-point filter is unit-covered only; there is no editor until T9c.
+  - Two cameras at once: the code path is per-camera, but the box has one solved camera.
