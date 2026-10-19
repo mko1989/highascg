@@ -39,3 +39,13 @@ outside the tree by tools/tracking-detect/setup-venv.sh and export-models.sh:
   ONNX Runtime — https://github.com/microsoft/onnxruntime — Copyright Microsoft Corporation. License: MIT.
   OpenCV (opencv-python-headless) — https://opencv.org — License: Apache-2.0.
   NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.
+
+================================================================================
+Rewir — https://github.com/warszawskie-kroje/rewir
+Copyright © 2016 Stowarzyszenie Kulturotwórcze Miastodwa
+License: SIL Open Font License 1.1 (https://scripts.sil.org/OFL). No Reserved Font Name is declared.
+
+  client/fonts/Rewir-Light.ttf               — unmodified.
+  godot/client/assets/fonts/Rewir-Light.ttf  — modified (WO-620): outlines added for "·" U+00B7 and "•" U+2022 (composites
+                                               of the font's own period), DSIG removed. See
+                                               godot/client/assets/fonts/README.txt and tools/dev/patch-rewir-middot.py.
