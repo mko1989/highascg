@@ -5,6 +5,7 @@ extends VBoxContainer
 ## errors. Owns project.previs.tracking (ProjectSync autosave, client-owned slice WO-607); remote edits reload.
 ## T5b: Calibrate | Markers — Markers mode swaps the calibration fields for the markers section (markers_section).
 ## T11: | Follow — the follow patch (follow_section, project.fixtures); markers stay draggable and beams are drawn.
+## T12: a "3D stage overlay" toggle + opacity under the modes (the view draws it; previs_tab remembers it).
 ## T7: | Zones — trigger zones (zones_section, data.zones); while drawing, the view's click adds a floor corner.
 
 const T := preload("res://features/previs/tracking/tracking_model.gd")
@@ -26,12 +27,17 @@ const GRID := [["Width m", "width", 0.5, 200, 0.1], ["Depth m", "depth", 0.5, 20
 	["Centre X m", "x_offset", -100, 100, 0.1], ["Centre Y m", "y_offset", -100, 100, 0.1], ["Floor Z m", "z_offset", -10, 50, 0.01]]
 
 signal changed  # data / camera / active point changed → the view redraws
+signal ghost_changed(on: bool, opacity: float)  # T12 overlay toggle / opacity
 
 var data := T.normalize({})
 var mode := "calibrate"  # | "markers" | "follow" | "zones"
 var markers: MarkersSection
 var follow: FollowSection
 var zones: ZonesSection
+var ghost_on := false
+var ghost_opacity := 0.6
+var _ghost_cb: CheckBox
+var _ghost_sl: HSlider
 var driver: Node  # marker_driver.gd (previs_tab)
 var cam_idx := 0
 var active := ""
@@ -73,6 +79,27 @@ func _ready() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		modes.add_child(b)
 	add_child(modes)
+	var gr := HBoxContainer.new()
+	_ghost_cb = CheckBox.new()
+	_ghost_cb.text = "3D stage overlay"
+	_ghost_cb.tooltip_text = "The previs stage through this camera's solved pose and lens — LED-wall edges must sit on the real walls."
+	_ghost_cb.toggled.connect(func(on: bool) -> void:
+		ghost_on = on
+		ghost_changed.emit(ghost_on, ghost_opacity))
+	gr.add_child(_ghost_cb)
+	_ghost_sl = HSlider.new()
+	_ghost_sl.min_value = 0.05
+	_ghost_sl.max_value = 1.0
+	_ghost_sl.step = 0.05
+	_ghost_sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ghost_sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_ghost_sl.tooltip_text = "Overlay opacity"
+	_ghost_sl.value_changed.connect(func(v: float) -> void:
+		ghost_opacity = v
+		ghost_changed.emit(ghost_on, ghost_opacity))
+	gr.add_child(_ghost_sl)
+	add_child(gr)
+	set_ghost(ghost_on, ghost_opacity)
 	markers = MarkersSection.new()
 	markers.driver = driver
 	markers.visible = false
@@ -151,6 +178,15 @@ func _ready() -> void:
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	_maybe_reload()
 	_sync()
+
+
+## Initial overlay state (previs_tab's ui.cfg) — no signal.
+func set_ghost(on: bool, opacity: float) -> void:
+	ghost_on = on
+	ghost_opacity = opacity
+	if _ghost_cb != null:
+		_ghost_cb.set_pressed_no_signal(on)
+		_ghost_sl.set_value_no_signal(opacity)
 
 
 func set_mode(m: String) -> void:

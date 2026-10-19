@@ -4,7 +4,8 @@ extends HSplitContainer
 ## renders only in 3D mode, and video surfaces are held only by what is visible (VideoSurfaces refcount).
 ## WO-616: a 4th mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
 ## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's
-## markers (marker_driver → server hub) and draws them on the picture.
+## markers (marker_driver → server hub) and draws them on the picture. T12: the 3D stage through the solved camera
+## as an optional ghost overlay (camera_overlay.gd).
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -16,6 +17,7 @@ const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
 const FollowModel := preload("res://features/previs/tracking/follow_model.gd")
 const ZoneModel := preload("res://features/previs/tracking/zone_model.gd")
+const CameraOverlay := preload("res://features/previs/tracking/camera_overlay.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["front", "plan", "3d", "camera"]
@@ -69,12 +71,20 @@ func _ready() -> void:
 	track_view = TrackingView.new()
 	track_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(track_view)
+	var ghost := CameraOverlay.new()
+	ghost.attach(_sv.find_world_3d(), stage.environment, PrevisStage.FLOOR_LAYER)
+	track_view.add_child(ghost)
+	track_view.ghost = ghost
 	track_page = TrackingPage.new()
 	markers = MarkerDriver.new()
 	markers.key_focus = track_view
 	add_child(markers)
 	track_page.driver = markers
 	track_page.changed.connect(_on_tracking_changed)
+	track_page.ghost_changed.connect(func(on: bool, op: float) -> void:
+		track_view.set_ghost(on, op)
+		_apply_mode()
+		_save_ui())
 	markers.updated.connect(func() -> void:
 		track_view.set_marks(markers.marks(), markers.selected)
 		track_view.set_beams(_beams())
@@ -118,6 +128,8 @@ func _ready() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	_pictures.button_pressed = cfg.get_value("previs", "live_pictures", false) == true
+	track_page.set_ghost(cfg.get_value("previs", "ghost_on", false) == true, float(cfg.get_value("previs", "ghost_opacity", 0.6)))
+	track_view.set_ghost(track_page.ghost_on, track_page.ghost_opacity)
 	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "front"))))
 	visibility_changed.connect(_apply_mode)
 	refresh_models()
@@ -224,10 +236,16 @@ func set_mode(m: String) -> void:
 	for k in _mode_btns:
 		(_mode_btns[k] as Button).set_pressed_no_signal(k == mode)
 	_apply_mode()
+	_save_ui()
+
+
+func _save_ui() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	cfg.set_value("previs", "mode", mode)
 	cfg.set_value("previs", "live_pictures", _pictures.button_pressed)
+	cfg.set_value("previs", "ghost_on", track_page.ghost_on)
+	cfg.set_value("previs", "ghost_opacity", track_page.ghost_opacity)
 	cfg.save(UI_CFG)
 
 
@@ -238,7 +256,7 @@ func _apply_mode() -> void:
 	var is3d := mode == "3d"
 	_svc.visible = is3d
 	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
-	builder.set_live(is3d and shown)
+	builder.set_live((is3d or (mode == "camera" and track_view.ghost_on)) and shown)  # T12: the ghost shows live walls
 	if is3d and shown and not stage.screens.is_empty():  # GLB screens only — no model, no hold
 		VideoSurfaces.acquire(_glb_role, self)
 	else:

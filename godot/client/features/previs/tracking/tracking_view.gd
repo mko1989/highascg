@@ -10,6 +10,8 @@ extends Control
 ## T7: trigger zones are drawn on the floor in Markers / Follow / Zones mode (filled while the server says a marker
 ## is inside; the selected one thicker). Zones mode drags markers like Markers mode, except while drawing a shape:
 ## then a click is a floor corner (`clicked`).
+## T12: optional 3D ghost (camera_overlay.gd: the previs stage rendered through the solved camera, lens applied in
+## its shader) between the picture and the 2D lines — the picture and ghost are children drawn behind this node.
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -42,6 +44,10 @@ var _zoom := 1.0
 var _pan := Vector2.ZERO
 var _drag := false
 var _told := Vector2i.ZERO
+var ghost: SubViewport  # camera_overlay.gd (previs_tab), or null
+var ghost_on := false
+var _back: Control
+var _ghost: TextureRect
 
 
 func _ready() -> void:
@@ -49,6 +55,19 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK  # arrows drive the selected marker while the view has focus
 	visibility_changed.connect(_hold)
+	_back = Control.new()
+	_back.show_behind_parent = true
+	_back.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_back.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_back.draw.connect(_draw_back)
+	add_child(_back)
+	_ghost = TextureRect.new()
+	_ghost.show_behind_parent = true
+	_ghost.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_ghost.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_ghost.stretch_mode = TextureRect.STRETCH_SCALE
+	_ghost.visible = false
+	add_child(_ghost)
 	resized.connect(queue_redraw)
 
 
@@ -59,7 +78,25 @@ func set_state(t: Dictionary, ce: Dictionary, objects: Array, active_id: String)
 	_pts = O.points(t, ce, objects) if not ce.is_empty() else []
 	rms = float(ce.get("rms", -1.0))
 	_hold()
+	_sync_ghost()
 	queue_redraw()
+
+
+## T12: show / hide the 3D ghost (rendered only while shown).
+func set_ghost(on: bool, opacity: float) -> void:
+	ghost_on = on
+	if ghost != null:
+		ghost.set_opacity(opacity)
+	_sync_ghost()
+
+
+func _sync_ghost() -> void:
+	var on: bool = ghost != null and ghost_on and _on and is_visible_in_tree() and ghost.set_camera(entry)
+	if ghost != null:
+		ghost.set_active(on)
+		_ghost.texture = ghost.get_texture()
+		_ghost.material = ghost.material
+	_ghost.visible = on
 
 
 func set_beams(b: Array) -> void:
@@ -83,6 +120,7 @@ func set_marks(m: Array, sel: int) -> void:
 func set_on(on: bool) -> void:
 	_on = on
 	_hold()
+	_sync_ghost()
 
 
 func fit() -> void:
@@ -110,6 +148,7 @@ func _exit_tree() -> void:
 
 func _process(_d: float) -> void:
 	queue_redraw()  # the surface texture updates in place, but its size can arrive after the lease
+	_back.queue_redraw()
 
 
 func _raster() -> Vector2:
@@ -133,23 +172,32 @@ func to_raster(p: Vector2) -> Vector2:
 	return (p - _origin()) / _scale()
 
 
-func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), ThemeBuilder.BG_DARK)
-	var font := get_theme_default_font()
+## Behind everything (child `_back`): background + the camera picture. The ghost (child `_ghost`) sits on it.
+func _draw_back() -> void:
+	_back.draw_rect(Rect2(Vector2.ZERO, size), ThemeBuilder.BG_DARK)
 	if entry.is_empty():
-		draw_string(font, Vector2(16, 32), "No tracking camera — Add one in the Inspector.", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
 		return
 	var img := Rect2(_origin(), _raster() * _scale())
+	_ghost.position = img.position
+	_ghost.size = img.size
 	var tex: Texture2D = VideoSurfaces.texture(_role) if _role != "" else null
 	if tex != null and tex.get_width() > 1:
-		draw_texture_rect(tex, img, false)
+		_back.draw_texture_rect(tex, img, false)
 		var real := Vector2i(tex.get_width(), tex.get_height())
 		if real != Vector2i(_raster()) and real != _told:
 			_told = real
 			source_size.emit.call_deferred(real)
 	else:
-		draw_rect(img, ThemeBuilder.BG_ELEVATED)
-		draw_string(font, img.position + Vector2(16, 28), "no picture from %s" % entry.role, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
+		_back.draw_rect(img, ThemeBuilder.BG_ELEVATED)
+		_back.draw_string(get_theme_default_font(), img.position + Vector2(16, 28), "no picture from %s" % entry.role, HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
+
+
+func _draw() -> void:
+	_back.queue_redraw()
+	var font := get_theme_default_font()
+	if entry.is_empty():
+		draw_string(font, Vector2(16, 32), "No tracking camera — Add one in the Inspector.", HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
+		return
 	var gcol := Color(ThemeBuilder.ACCENT_GREEN, 0.6)
 	for pl in _lines.get("grid", []):
 		draw_polyline(_xf(pl), gcol, 1.5, true)

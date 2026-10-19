@@ -6,9 +6,11 @@ extends Node3D
 
 signal model_loaded(meshes: Array)
 
+const FLOOR_LAYER := 1 << 19  # WO-616 T12: the camera overlay culls the floor plane (the real floor is in the picture)
 const PRESETS := {"Front": Vector3(0.0, 0.12, 12.0), "Top": Vector3(0.0, 1.45, 14.0), "ISO": Vector3(-0.75, 0.45, 13.0)}
 
 var live_texture: Texture2D
+var environment: Environment
 var screens := {}  # MeshInstance3D -> true
 var _model: Node3D
 var _cam: Camera3D
@@ -30,6 +32,7 @@ func _ready() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.6
 	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR  # keep LED colours true (filmic washed them out, WO-595)
+	environment = env
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
@@ -44,6 +47,7 @@ func _ready() -> void:
 	var fm := StandardMaterial3D.new()
 	fm.albedo_color = Color(0.11, 0.11, 0.13)
 	floor_mi.material_override = fm
+	floor_mi.layers = FLOOR_LAYER
 	add_child(floor_mi)
 	_cam = Camera3D.new()
 	_cam.fov = 50

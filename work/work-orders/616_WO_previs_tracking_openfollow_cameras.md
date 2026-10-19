@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); next: T4/T12 overlay parts, T9 detection. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); next: T9 detection. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -104,7 +104,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       needs project/unproject for fusion) with OpenFollow's test vectors (bundled gallery calibrations
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
 - [x] T3 (T3a model + solve, T3b Camera mode + Inspector page) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
-- [ ] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera.
+- [x] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera. (Delivered by T3b/T5b/T7; closed with T12.)
 - [x] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`. (T5a hub ✔, T5b driver ✔)
 - [ ] ~~T6 PSN output + OSC output~~ — **DROPPED (owner, 2026-10-19: "No need for the PSN osc output. We will
       relay it directly to artnet")**. Markers leave the box as Art-Net through the WO-615 fixture engine
@@ -161,7 +161,7 @@ OpenFollow's HUD does the same with Cairo. Uses: (a) verification — LED-wall e
 walls; (b) manual calibration — drag 3D points onto the video; (c) operator view with previs overlay.
 
 ### Added tasks
-- [ ] T12 "Camera view" overlay mode in previs: background = camera surface, `Camera3D` = solved camera,
+- [x] T12 "Camera view" overlay mode in previs: background = camera surface, `Camera3D` = solved camera,
       ghosted stage + markers/zones, lens-distortion shader; opacity slider.
 - [ ] T13 Camera-assisted fixture calibration (WO-615 fixtures): spot detection + pose solve; manual click fallback.
 
@@ -799,3 +799,81 @@ state machine, evaluated on the server so it runs with no client open.
   - Taking a look to **program** from a zone. The same `handleTakeLook` path ran for preview.
 - **Left in the dev project**: zones "Downstage centre" (look-1 / companion 99/0/0 / look-2 @preview) and "Zone 1"
   (no actions), engine off.
+
+## T12 — 3D stage ghost in the camera view (+ T4 closed) (2026-10-19) — DONE (box-verified)
+
+### Investigation
+- **T4 was already delivered piecewise.** The Camera mode view (T3b, `tracking_view.gd`) draws the camera's live
+  surface letterboxed to the raster. On it go the stage-object outlines and grid (T3b, `tracking_overlay.gd`, edges
+  cut into 24 pieces so the lens bends them), the markers (T5b) and the zones (T7), all through the solved camera
+  (`camera_model.project` + `apply_distortion`). What it lacked is T12's part: the stage itself (the wall
+  *pictures*, curved surfaces, occlusion), which 2D outlines cannot show.
+- A Godot `Camera3D` is a pinhole and has no radial distortion. The solved camera has k1/k2 (Camera 1: −0.197 /
+  0.032), and drawing the 3D render without them would put the ghost a few px off the 2D outlines and off the real
+  walls near the frame edges. That is exactly where an operator checks calibration.
+- The lens model is `camera_model._radial`: coordinates are normalised by the half-diagonal, and
+  rd = ru·(1 + k1·ru² + k2·ru⁴). Doing it per *pixel* needs the inverse (for each output pixel at rd, which pinhole
+  pixel at ru?). There is no closed form, but Newton converges in a few steps below the fold radius
+  (`lens_fold_radius`).
+- With barrel distortion (k1 < 0), the picture corner (rd = 1) comes from ru = `invert_radius(1)` > 1, which is
+  outside a raster-sized pinhole render. So the render must be **overscanned** by that factor, or the corners go
+  blank.
+- The previs stage (`previs_stage.gd`) is one World3D. A second SubViewport can share it (`world_3d`) and render it
+  from another Camera3D with no copy of the scene. The live wall textures come from `stage_builder.set_live`, which
+  the 3D tab only switched on in 3D mode.
+- The stage floor is a dark plane. Through the camera it would cover the real floor in the picture, so it has to go
+  from the ghost and only from the ghost (the 3D tab keeps it).
+
+### What was done
+- `features/previs/tracking/camera_overlay.gd` (new, a SubViewport):
+  - It shares the stage World3D. Its Camera3D gets `camera_model.godot_transform` and
+    fov = 2·atan(overscan·tan(vfov/2)) with KEEP_HEIGHT. Its environment is the stage's, duplicated, with a clear
+    colour (`transparent_bg`) and no glow, so only geometry lands on the picture.
+  - `cull_mask` drops `PrevisStage.FLOOR_LAYER`.
+  - The render size is raster × overscan, capped at 2048 px wide. The overscan is clamped to 1…2 (pincushion needs
+    none).
+  - `material`, a canvas shader: for each output pixel at distorted radius rd, a 12-step Newton solve finds the
+    pinhole radius (capped at the fold radius) and samples the overscanned render there. Anything outside the render
+    is transparent. Alpha is × opacity.
+  - It renders only while active (`UPDATE_DISABLED` otherwise).
+- `previs_stage.gd`: `FLOOR_LAYER` (bit 19) on the floor mesh. `environment` is exposed.
+- `tracking_view.gd`:
+  - The background and picture moved from `_draw` into a child Control `_back` (`show_behind_parent`), and a
+    `TextureRect` `_ghost` sits between it and the parent's 2D lines. Order back to front: picture, ghost, outlines /
+    grid / markers / zones.
+  - `_ghost` follows the letterboxed image rect, so zoom and pan carry it.
+  - `set_ghost(on, opacity)`. `_sync_ghost` runs on every state / visibility change. It turns the viewport on only
+    when the view is shown, the ghost is on and the camera is valid.
+- `tracking_page.gd`: a row under the mode buttons with a "3D stage overlay" check box and an opacity slider
+  (0.05–1). Signal `ghost_changed`.
+- `previs_tab.gd`:
+  - It builds the overlay, attaches it to the stage world and wires `ghost_changed`.
+  - `builder.set_live` also runs in Camera mode while the ghost is on, so the walls carry their live pictures.
+  - `ghost_on` / `ghost_opacity` persist in `ui.cfg` with the mode (`_save_ui`, factored out of `set_mode`). They
+    are operator view state, not project data.
+- `tests/test_camera_overlay.gd` (written by a Haiku agent, reviewed): 6 tests (empty entry rejected; no lens = pinhole fov and raster size; barrel k1 −0.2 overscan = clamped
+  `invert_radius(1)`, fov widened to 2·atan(overscan·tan(vfov/2)), width ≤ 2048 with aspect kept; pincushion clamps to 1;
+  pose = `godot_transform`; active ⇄ UPDATE_ALWAYS/DISABLED, opacity clamped).
+
+### What was VERIFIED
+- Godot `--check` OK. `--test` 1145 passed, 0 failed (+20 assertions). 0 files over 500 lines. No JS touched.
+- **On the box** (GUI on DP-3, previs Camera mode, Camera 1 = the T3b lens solve, k1 −0.197, k2 0.032):
+  - Ticking "3D stage overlay": the ghost filled the amber 2D outlines of Main LED, DSM TV and Side L, and Main LED
+    (DP-7), which runs off the left edge, was cut at the same place. In a 2× zoom crop, Main LED's ghost edge sits
+    on the barrel-bent outline along its whole top edge. Side L (curved) shows the true curved surface, where the 2D
+    outline is straight corner-to-corner segments, as expected.
+  - Camera 1 sits upstage (y +13 m) looking downstage, so it sees the walls' *backs*, which are black. That matches
+    the 3D tab, where the same walls only show green on their edges from behind and the full picture from Front.
+  - With `PLAY 1-90 #FF00C040` on ch1 (the camera's source), the picture went green and the ghost stayed on top of
+    it at 60 %. The floor was not ghosted (the real floor stays visible). Order check: picture, ghost, lines.
+  - A temporary **Camera 2** (default pose, downstage y −11 m facing the walls) showed the walls' **live pictures**
+    in the ghost: the opgui content on Main LED and the left wall. It was clipped at the picture's top edge where
+    the outline runs above it. Lens k1 +0.3 (pincushion): the ghost edges followed the re-bent outlines. Camera 2
+    was then deleted (confirm dialog), and the project is back to Camera 1 only.
+  - Opacity slider: 0.6, then 0.15 (visibly fainter), then 0.85. `ui.cfg` read `ghost_on=true`,
+    `ghost_opacity=0.15…`, then `0.85…`, and `mode="camera"`.
+- **Not verified**:
+  - A barrel lens with k1 below −0.2 on the box (xdotool cannot type a minus into the SpinBox here). The T3b
+    camera's −0.197 is the barrel case shown, and the test covers the overscan maths.
+  - Real DeckLink input. Owner QA: on a calibrated real camera, check that the ghost walls sit on the real walls.
+- Test colour cleared (`CLEAR 1-90`).
