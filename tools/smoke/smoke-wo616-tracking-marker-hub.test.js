@@ -33,6 +33,17 @@ test('WO-616 T5: freshness, speed and validation', () => {
 		assert.equal(hub.set(bad).ok, false, JSON.stringify(bad))
 	}
 	assert.equal(hub.markers.size, 1, 'rejected writes leave no trace')
+	now += 100
+	hub.set({ id: 1, x: 3, y: 2 }) // parked: speed 0 → 0 is no change either
+	const beat = hub.rev
+	now += 250
+	assert.equal(hub.set({ id: 1, x: 3, y: 2 }).marker.stale, false)
+	assert.equal(hub.rev, beat, 'an identical heartbeat refreshes freshness without a rev bump')
+	now += 2000
+	assert.equal(hub.staleKey(), '1')
+	hub.set({ id: 1, x: 3, y: 2 })
+	assert.equal(hub.staleKey(), '', 'a heartbeat revives a stale marker (the stale-set change broadcasts)')
+	assert.equal(hub.rev, beat)
 	const rev = hub.rev
 	assert.equal(hub.remove(1), true)
 	assert.equal(hub.rev, rev + 1)

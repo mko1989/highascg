@@ -18,6 +18,7 @@ const MAX_ID = 65535 // PSN / Art-Net follow ids are 16-bit
 const NAME_MAX = 64
 
 const round = (v) => Math.round(v * 1e4) / 1e4
+const PUBLIC = ['name', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'source']
 
 class MarkerHub {
 	/** @param {{ now?: () => number }} [opts] */
@@ -25,7 +26,7 @@ class MarkerHub {
 		this.now = opts.now || Date.now
 		/** @type {Map<number, {id:number,name:string,x:number,y:number,z:number,vx:number,vy:number,vz:number,source:string,at:number}>} */
 		this.markers = new Map()
-		this.rev = 0 // bumps on every accepted write / removal — the broadcaster sends when it moves
+		this.rev = 0 // bumps on every change / removal (not on an identical heartbeat) — the broadcaster sends when it moves
 	}
 
 	/**
@@ -51,7 +52,10 @@ class MarkerHub {
 		const source = m.source == null ? prev?.source || 'api' : String(m.source).slice(0, 32)
 		const rec = { id, name, x: round(x), y: round(y), z: round(z), vx: round(vx), vy: round(vy), vz: round(vz), source, at: now }
 		this.markers.set(id, rec)
-		this.rev++
+		// A heartbeat (same position, name, source) only refreshes freshness: no rev bump, so idle sources keeping
+		// a parked marker live do not make the broadcaster send. A marker coming back from stale still sends
+		// (the stale set changes).
+		if (!prev || PUBLIC.some((k) => prev[k] !== rec[k])) this.rev++
 		return { ok: true, marker: this.view(rec, now) }
 	}
 

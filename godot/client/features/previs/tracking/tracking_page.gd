@@ -3,10 +3,12 @@ extends VBoxContainer
 ## tracking cameras (add / delete / name / source surface / raster), the solved pose + lens, the floor grid, the
 ## calibration point list (pick the active one, the view's click sets it), Solve (± lens fit) with RMS and per-point
 ## errors. Owns project.previs.tracking (ProjectSync autosave, client-owned slice WO-607); remote edits reload.
+## T5b: Calibrate | Markers — Markers mode swaps the calibration fields for the markers section (markers_section).
 
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const R := preload("res://features/previs/tracking/camera_refine.gd")
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
+const MarkersSection := preload("res://features/previs/tracking/markers_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 const ROLES := ["in1", "in2", "in3", "in4", "ch1", "ch2", "ch3", "ch4", "pgm1", "prv1", "pgm2", "prv2"]
@@ -21,6 +23,9 @@ const GRID := [["Width m", "width", 0.5, 200, 0.1], ["Depth m", "depth", 0.5, 20
 signal changed  # data / camera / active point changed → the view redraws
 
 var data := T.normalize({})
+var mode := "calibrate"  # | "markers"
+var markers: MarkersSection
+var driver: Node  # marker_driver.gd (previs_tab)
 var cam_idx := 0
 var active := ""
 var objects: Array = []
@@ -51,6 +56,23 @@ func _ready() -> void:
 	row.add_child(_button("Add", _add_cam))
 	row.add_child(_button("Delete", func() -> void: _confirm.popup_centered()))
 	add_child(row)
+	var modes := HBoxContainer.new()
+	var group := ButtonGroup.new()
+	for m in ["calibrate", "markers"]:
+		var b := _button(m.capitalize(), func() -> void: set_mode(m))
+		b.toggle_mode = true
+		b.button_group = group
+		b.button_pressed = m == mode
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		modes.add_child(b)
+	add_child(modes)
+	markers = MarkersSection.new()
+	markers.driver = driver
+	markers.visible = false
+	markers.edit.connect(func(list: Array) -> void:
+		data.markers = list
+		_persist())
+	add_child(markers)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Delete this tracking camera and its calibration?"
 	_confirm.confirmed.connect(_delete_cam)
@@ -110,6 +132,12 @@ func _ready() -> void:
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	_maybe_reload()
 	_sync()
+
+
+func set_mode(m: String) -> void:
+	mode = m
+	_sync()
+	changed.emit()
 
 
 func entry() -> Dictionary:
@@ -282,7 +310,9 @@ func _sync() -> void:
 	for c in data.cameras:
 		_cams.add_item("%s · %s" % [c.name, c.role])
 	var ce := entry()
-	_body.visible = not ce.is_empty()
+	_body.visible = not ce.is_empty() and mode == "calibrate"
+	markers.visible = mode == "markers"
+	markers.set_defs(data.markers)
 	for k in _grid:
 		(_grid[k] as SpinBox).set_value_no_signal(float(data.grid[k]))
 	if ce.is_empty():

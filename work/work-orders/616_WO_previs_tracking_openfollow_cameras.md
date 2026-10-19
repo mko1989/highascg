@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5a server marker hub done (box-verified); T5b Godot marker driver next. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); next: T11 follow → WO-615 Art-Net, T7 zones. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -105,7 +105,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
 - [x] T3 (T3a model + solve, T3b Camera mode + Inspector page) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
 - [ ] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera.
-- [ ] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`. (T5a hub ✔; T5b Godot driver open)
+- [x] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`. (T5a hub ✔, T5b driver ✔)
 - [ ] ~~T6 PSN output + OSC output~~ — **DROPPED (owner, 2026-10-19: "No need for the PSN osc output. We will
       relay it directly to artnet")**. Markers leave the box as Art-Net through the WO-615 fixture engine
       (server-side, `src/sampling/dmx-output.js` senders): marker → follow IK (WO-615 T9 / T11 here) → DMX.
@@ -435,8 +435,8 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
   - HTTP GET/POST/DELETE, including 400 on bad JSON and 404 on a second delete;
   - immediate broadcast on write;
   - `ctx.trackingHub` set on boot and withdrawn on shutdown.
-- Offline suite: 2680 tests, 2679 pass, 1 fail = the known local `smoke-wo577-shader-controls`. 0 files over 500
-  lines.
+- Offline suite: 2680 tests, 2677 pass, 2 skipped, 1 fail = the known local `smoke-wo577-shader-controls`
+  (corrected in T5b; first written as "2679 pass"). 0 files over 500 lines.
 - On the box:
   - Server restarted. `POST /api/plugins/tracking/enable` → `{"ok":true,"requiresRestart":false}`. Journal:
     `[modules] loaded "tracking"`, `[tracking] marker hub up (WO-616) — tracking:markers`.
@@ -451,3 +451,101 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
     Stats: `markers 0, writes 2`.
 - The Tracking plugin is left enabled on the box; the change is persisted in `config/` (live state, not committed).
 - Not yet: the Godot driver and the markers drawn in previs (T5b), and the WO-615 follow consumer (T11).
+
+## T5b — operator markers in Godot: driver, camera view, Inspector (2026-10-19) — DONE (box-verified; gamepad = owner QA)
+
+### Investigation
+- OpenFollow input, read from the source:
+  - `input/shaping.py`: deadzone rescale + linear / logarithmic / quadratic / s-law curves. The gamepad default
+    deadzone is 0.15.
+  - `input/control_frame.py`: the "camera" frame. Directions latch while the input is non-zero, and the output keeps
+    the input's magnitude.
+  - `docs/architecture/input.md`:
+    - speed steps 0.1 m/s (0.5 above 4), clamped 0.1–3.0;
+    - LB/RB = speed, D-pad ◀▶ = marker;
+    - mouse grab on the ground circle glides with alpha = 1 − smoothing (floored); a grab never yanks the marker to
+      the click.
+- `Ws.on()` keeps handlers forever and calls them without a validity check (`core/ws.gd` `_dispatch`). A freed
+  previs would leave a dead callable, so the driver uses the `Ws.message` signal, which disconnects on free.
+- First box run: held arrows did nothing.
+  - A probe showed the GUI focus walking View → Button → OptionButton. Godot's `ui_right` focus navigation
+    consumed the arrows, so the driver's "view has focus" check failed.
+  - Fix: the view accepts arrow keys in Markers mode.
+- Second box run: after a client restart on another tab, markers stayed stale.
+  - Probe: `defs=0`. A stage change calls `track_page.set_objects` → `changed`, and previs_tab pushed the
+    *unadopted* page's empty default list into the driver. The page only reads the project after the Inspector
+    adopts it.
+  - Fix: the driver reads `project.previs.tracking.markers` itself (`Store.project_changed`). The page feeds it
+    only while in the tree.
+- Idle cost: four writes a second per client would broadcast four times a second. The hub now bumps `rev` only on
+  a real change (`src/tracking/marker-hub.js` `PUBLIC` fields), so a heartbeat refreshes freshness silently.
+
+### What was done
+- `features/previs/tracking/marker_input.gd` (new, pure, AGPL credit + change list):
+  - `apply_curve` / `shape_axis` ported from OpenFollow.
+  - `ground_axes(cam)`: the camera's right axis from this repo's `camera_model.rotation`, flattened onto the floor;
+    forward = right turned 90° left; stage axes when degenerate.
+  - `orient`, which keeps the input magnitude.
+  - `step_speed`, `glide`.
+  - `floor_point`: `invert_distortion` then `unproject` at the marker's z.
+  - `ground_ring` and `grab_target` (inside the ring, else a centre radius; nearest centre wins).
+- `tracking_model.gd`:
+  - `markers: [{id 1..65535, name, color}]` in `normalize`; ids are unique, a bad colour falls back to the palette.
+  - `new_marker` takes the lowest free id.
+  - Positions are not stored in the project: the hub is their single owner.
+- `features/previs/tracking/marker_driver.gd` (new Node under previs_tab):
+  - Gamepad: left stick and arrows (Markers mode, view focused), camera-relative and latched; LB/RB speed; D-pad
+    marker.
+  - Mouse grab and drag, gliding at smoothing 0.6.
+  - Sends WS `tracking:marker` at ≤ 30 Hz while moving.
+  - Every 250 ms it re-sends parked markers. It skips one that another client changed within 400 ms, so two
+    clients never fight over a marker being driven.
+  - Our own echoes are ignored for 400 ms after we move a marker.
+  - `GET /api/tracking/markers` on start and on WS reconnect. A defined marker missing on the server starts at the
+    grid centre on the floor.
+  - Delete → `DELETE /api/tracking/markers/<id>`.
+- `tracking_view.gd`:
+  - Markers are drawn as ground circle + 1.7 m body line + name; stale ones are dimmed and marked "· stale"; the
+    selected one is drawn bolder.
+  - In Markers mode, press / drag / release go to the driver, calibration clicks are off and the calibration dots
+    are hidden.
+  - The view takes focus on click, so the arrows are its own.
+- `features/previs/tracking/markers_section.gd` (new; keeps tracking_page under 500 lines):
+  - Marker list with live / stale state, Add / Delete (with confirm) / Home, name, speed (m/s), stick curve.
+- `tracking_page.gd`: a Calibrate | Markers switch. Markers mode swaps the calibration fields for the section;
+  the camera picker stays, because it is the control frame.
+- `previs_tab.gd`:
+  - Creates and wires the driver.
+  - Arrows go to the driver instead of the stage nudge while driving.
+  - Driving is on only in Camera mode + Markers + previs shown; leaving it releases any grab.
+
+### What was VERIFIED
+- Godot `--check` OK; `--test` 1080 passed, 0 failed (+40 assertions in `tests/test_tracking_markers.gd`):
+  - OpenFollow shaping values;
+  - camera axes for FOH / upstage / yaw 90;
+  - "stick right = right in the picture" through a projected camera;
+  - speed clamps and the glide floor;
+  - floor_point round trips through a k1 −0.2 / k2 0.03 lens to < 0.1 mm;
+  - ring and grab;
+  - marker definition normalising.
+- Hub smoke extended: an identical heartbeat does not bump `rev`, and a heartbeat revives a stale marker. Offline
+  suite 2680 / 2677 pass / 2 skipped / 1 known `wo577` fail. 0 files over 500 lines.
+- On the box (server restarted for the hub change; GUI on DP-3, Camera mode, calibrated Camera 1 on `ch1` with the
+  concert picture):
+  - Add marker ×2 → the hub showed ids 1 and 2 at the grid centre (0, 3), live, `source: operator`. The project
+    holds the two definitions.
+  - Drag: the ring was dragged to the grid crossing the solved camera shows at (−4, 4). Hub: **(−3.99, 3.98)**.
+  - Arrows (this camera looks downstage):
+    - Right held about 1.02 s → x −3.99 → −5.01 with `vx −1` m/s while moving and 0 after. Camera-right = −X.
+    - Up held 0.5 s → y 3.98 → 3.46. Camera-forward = −Y.
+  - Client killed → both markers `stale: true` at 1.4 s.
+  - Client relaunched on the **Live** tab → both live again within the first heartbeats, at the same positions.
+  - Idle: a WS watcher saw 5 `tracking:markers` in 5 s (the hub's 1 Hz) while the client wrote at 4 Hz (stats
+    `writes` rising); no stale entries.
+  - Delete (confirm) → the hub lists only id 1; the project's `markers` holds only Marker 1.
+  - Screenshots: the markers stand on the stage floor of the live picture, and the calibration dots are hidden in
+    Markers mode.
+- Not verified: no gamepad is attached to this box. The stick, LB/RB and D-pad paths are the same code as the
+  arrows plus `Input.get_joy_axis` → owner QA with a controller. Test layer cleared (`CLEAR 1-90`); Marker 1 stays
+  in the dev project.
+- Next: T11, follow → WO-615 DMX engine (`ctx.trackingHub` → pan/tilt → Art-Net); T7 zones.

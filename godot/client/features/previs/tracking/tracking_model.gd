@@ -1,7 +1,8 @@
 extends RefCounted
 ## WO-616 T3 — tracking data as plain dictionaries, persisted in project.previs.tracking (the previs slice is
-## client-owned, WO-607): the floor grid (OpenFollow's [grid]: a measured rectangle on the stage floor) and the
-## tracking cameras (source surface role, solved camera, calibration points). Pure: no nodes, no autoloads.
+## client-owned, WO-607): the floor grid (OpenFollow's [grid]: a measured rectangle on the stage floor), the
+## tracking cameras (source surface role, solved camera, calibration points) and the operator's markers (T5b:
+## id / name / colour — positions live in the server hub). Pure: no nodes, no autoloads.
 ## World = PSN metres (X stage left, Y upstage, Z up); stage objects are converted from the previs (Godot) frame.
 
 const C := preload("res://features/previs/tracking/camera_model.gd")
@@ -9,6 +10,8 @@ const S := preload("res://features/previs/stage_objects.gd")
 
 const GRID_DEFAULT := {"width": 10.0, "depth": 6.0, "spacing": 1.0, "x_offset": 0.0, "y_offset": 3.0, "z_offset": 0.0}
 const RASTER_DEFAULT := [1920, 1080]
+const MARKER_COLORS := ["#ff5a5a", "#4fc3ff", "#ffd54f", "#8bea6b", "#d48cff", "#ff9f43"]
+const MARKER_ID_MAX := 65535  # the server hub's id range (16-bit, like PSN / follow ids)
 
 
 static func normalize(src: Variant) -> Dictionary:
@@ -24,7 +27,28 @@ static func normalize(src: Variant) -> Dictionary:
 				ids[n.id] = true
 				cams.append(n)
 	t["cameras"] = cams
+	var marks := []
+	var mids := {}
+	for m in t.get("markers", []) if t.get("markers") is Array else []:
+		var id := int(m.get("id", 0)) if m is Dictionary and (m.get("id") is int or m.get("id") is float) else 0
+		if id >= 1 and id <= MARKER_ID_MAX and not mids.has(id):
+			mids[id] = true
+			var col := str(m.get("color", ""))
+			marks.append({"id": id, "name": str(m.get("name", "Marker %d" % id)),
+				"color": col if Color.html_is_valid(col) else MARKER_COLORS[(id - 1) % MARKER_COLORS.size()]})
+	t["markers"] = marks
 	return t
+
+
+## A marker definition (the operator's list; positions live in the server hub, WO-616 T5a): lowest free id.
+static func new_marker(existing: Array) -> Dictionary:
+	var used := {}
+	for m in existing:
+		used[int(m.id)] = true
+	var id := 1
+	while used.has(id):
+		id += 1
+	return {"id": id, "name": "Marker %d" % id, "color": MARKER_COLORS[(id - 1) % MARKER_COLORS.size()]}
 
 
 static func normalize_grid(src: Variant) -> Dictionary:

@@ -3,7 +3,8 @@ extends HSplitContainer
 ## screen meshes, camera presets). WO-617: view modes 2D front (default) · 2D plan · 3D; the 3D SubViewport
 ## renders only in 3D mode, and video surfaces are held only by what is visible (VideoSurfaces refcount).
 ## WO-616: a 4th mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
-## settings and calibration live on an Inspector page (WO-608 R2).
+## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's
+## markers (marker_driver → server hub) and draws them on the picture.
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -12,6 +13,7 @@ const StagePanel := preload("res://features/previs/stage_panel.gd")
 const Stage2D := preload("res://features/previs/stage_2d_view.gd")
 const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
 const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
+const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["front", "plan", "3d", "camera"]
@@ -33,6 +35,7 @@ var _mode_btns := {}
 var _glb_role := ""
 var track_view: TrackingView
 var track_page: TrackingPage
+var markers: MarkerDriver
 
 
 func _ready() -> void:
@@ -65,8 +68,18 @@ func _ready() -> void:
 	track_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(track_view)
 	track_page = TrackingPage.new()
-	track_page.changed.connect(func() -> void:
-		track_view.set_state(track_page.data, track_page.entry(), track_page.objects, track_page.active))
+	markers = MarkerDriver.new()
+	markers.key_focus = track_view
+	add_child(markers)
+	track_page.driver = markers
+	track_page.changed.connect(_on_tracking_changed)
+	markers.updated.connect(func() -> void:
+		track_view.set_marks(markers.marks(), markers.selected)
+		if track_page.markers != null:
+			track_page.markers.refresh())
+	track_view.grab.connect(func(px: Vector2) -> void: markers.grab_at(px))
+	track_view.drag.connect(markers.drag_to)
+	track_view.let_go.connect(markers.release)
 	track_view.clicked.connect(track_page.click)
 	track_view.picked.connect(track_page.pick)
 	track_view.source_size.connect(track_page.adopt_size)
@@ -102,6 +115,21 @@ func _ready() -> void:
 	refresh_models()
 
 
+func _on_tracking_changed() -> void:
+	track_view.set_state(track_page.data, track_page.entry(), track_page.objects, track_page.active)
+	if track_page.is_inside_tree():  # before the Inspector adopts it the page holds no project data (driver reads the project)
+		markers.entry = track_page.entry()
+		markers.set_defs(track_page.data.markers, track_page.data.grid)
+	track_view.markers_mode = track_page.mode == "markers"
+	_apply_drive()
+
+
+func _apply_drive() -> void:
+	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode == "markers"
+	if not markers.driving:
+		markers.release()
+
+
 var _press_at := Vector2.INF
 
 
@@ -124,6 +152,9 @@ func _on_3d_input(e: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or not is_visible_in_tree():
+		return
+	if markers.driving and k.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
+		get_viewport().set_input_as_handled()  # the marker driver reads the arrows (held), not the stage nudge
 		return
 	var step := 0.5 if k.shift_pressed else 0.05
 	var handled := true
@@ -187,6 +218,7 @@ func _apply_mode() -> void:
 	view2d.set_live_pictures(_pictures.button_pressed and view2d.visible and shown)
 	track_view.visible = iscam
 	track_view.set_on(iscam and shown)
+	_apply_drive()
 	if InspectorPanel.current != null:
 		if iscam and shown:
 			InspectorPanel.current.present(track_page)
