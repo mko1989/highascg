@@ -4,9 +4,14 @@ extends Control
 ## cable only when its endpoints or the loop count change (web getOrBuild cache), and only once the anchors have
 ## been still for SETTLE_MS — while they move (splitter drag, resize) the last build is warped onto them. Polls
 ## anchors each frame because cards and sockets move with layout, not through signals.
+## Slice 2c: `selected_id` thickens a cable like hover, `hidden_id` hides the cable whose end is held (re-grab), and
+## while `ghost_from` is set a dashed straight ghost runs from that anchor to `pointer` (web --ghost, dasharray 5 4).
+## `hit()` is the click hit-test the tab uses, since the layer itself stays click-through.
 
 const CableModel := preload("res://features/devices/cable_model.gd")
 const SETTLE_MS := 150
+const GHOST := Color("#58a6ff")
+const HIT_PX := 6.0
 
 var anchors := {}  # anchor key → port_icon.gd Control
 var cables: Array = []  # devices_model.gd build().cables
@@ -18,6 +23,24 @@ var active_id := "":
 	set(v):
 		active_id = v
 		queue_redraw()
+
+var selected_id := "":
+	set(v):
+		selected_id = v
+		queue_redraw()
+var hidden_id := "":
+	set(v):
+		hidden_id = v
+		queue_redraw()
+var ghost_from := "":  # anchor key, "" = no ghost
+	set(v):
+		ghost_from = v
+		queue_redraw()
+var pointer := Vector2.ZERO:  # local
+	set(v):
+		pointer = v
+		if ghost_from != "":
+			queue_redraw()
 
 var _built := {}  # cable id → {key, pts, color, ends}
 var _ends := {}  # cable id → [from, to] (local), as of the last anchor change
@@ -36,11 +59,14 @@ func set_cables(list: Array, anchor_map: Dictionary) -> void:
 	_sig = ""
 
 
-## A destination's `id#pgm` falls back to the plain id when the card has no pair dots (web connectorCenter).
+## A destination's `id#pgm` falls back to the plain id when the card has no pair dots (web connectorCenter), and a
+## bare destination id to its PGM dot when it has them (web anchorKeyFor(id, 'pgm')).
 func _find(key: String) -> Control:
 	var c: Variant = anchors.get(key)
 	if c == null and key.contains("#"):
 		c = anchors.get(key.get_slice("#", 0))
+	elif c == null:
+		c = anchors.get(key + "#pgm")
 	return c if c is Control and is_instance_valid(c) and c.is_visible_in_tree() else null
 
 
@@ -105,12 +131,33 @@ func _shape(id: String) -> PackedVector2Array:
 	return out
 
 
+## The visible cable under `local` (within HIT_PX of its drawn polyline), nearest first; "" when none.
+func hit(local: Vector2) -> String:
+	var best := ""
+	var best_d := HIT_PX
+	for id in _ends:
+		if id == hidden_id:
+			continue
+		var pts := _shape(id)
+		for i in range(pts.size() - 1):
+			var dist := local.distance_to(Geometry2D.get_closest_point_to_segment(local, pts[i], pts[i + 1]))
+			if dist < best_d:
+				best_d = dist
+				best = id
+	return best
+
+
 func _draw() -> void:
 	for id in _ends:
+		if id == hidden_id:
+			continue
 		var pts := _shape(id)
 		var color: Color = _built[id].color if _built.has(id) else CableModel.color(id)
 		var shadow := PackedVector2Array()
 		for p in pts:
 			shadow.append(p + Vector2(0, 3))
 		draw_polyline(shadow, Color(0, 0, 0, 0.45), 4.0, true)
-		draw_polyline(pts, color, 4.2 if id == active_id else 2.8, true)
+		draw_polyline(pts, color, 4.2 if id == active_id or id == selected_id else 2.8, true)
+	var a := _find(ghost_from) if ghost_from != "" else null
+	if a:
+		draw_dashed_line(get_global_transform().affine_inverse() * a.anchor(), pointer, GHOST, 2.5, 5.0, true, true)

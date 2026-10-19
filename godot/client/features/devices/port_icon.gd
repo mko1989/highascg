@@ -1,10 +1,12 @@
 extends Control
 ## WO-605 slice 1 — one connector on the Devices tab: a rear-panel socket drawn from the web's port SVG
 ## (assets/devices/, rasterised at runtime — no import step), or a plain dot (screen-destination outputs).
-## Its centre is the cable anchor; `active` rings it (hovered / selected cable).
+## Its centre is the cable anchor; `active` rings it (hovered / selected cable); `target` tints it during a cable
+## gesture like the web's --cable-armed / --connector-target-valid / -invalid classes.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const DIR := "res://assets/devices/"
+const TINT := {"armed": Color("#f59e0b"), "valid": Color("#22c55e"), "invalid": Color("#ef4444")}
 
 static var _cache := {}
 
@@ -14,6 +16,11 @@ var active := false:
 	set(v):
 		active = v
 		queue_redraw()
+var target := "":  # "" | armed | valid | invalid
+	set(v):
+		if target != v:
+			target = v
+			queue_redraw()
 
 
 static func make(svg: String, size: Vector2, tip: String) -> Control:
@@ -48,10 +55,13 @@ func anchor() -> Vector2:
 
 func _draw() -> void:
 	var c := size / 2.0
+	var tint: Color = TINT.get(target, Color.TRANSPARENT)
 	if icon == "":
 		var r := minf(size.x, size.y) / 2.0 - 1.0
-		draw_circle(c, r, ThemeBuilder.BG_DARK)
-		draw_arc(c, r, 0.0, TAU, 24, ThemeBuilder.ACCENT if active else dot_color, 1.5, true)
+		draw_circle(c, r, ThemeBuilder.BG_DARK if target != "valid" and target != "invalid" else tint)
+		draw_arc(c, r, 0.0, TAU, 24, tint if target != "" else ThemeBuilder.ACCENT if active else dot_color, 1.5, true)
+		if target != "":
+			draw_arc(c, r + 2.0, 0.0, TAU, 24, Color(tint, 0.4), 2.0, true)
 		return
 	var tex := texture(icon, int(size.y * 0.8))
 	if tex:
@@ -59,5 +69,8 @@ func _draw() -> void:
 		if ts.x > size.x:
 			ts *= size.x / ts.x
 		draw_texture_rect(tex, Rect2(c - ts / 2.0, ts), false)
-	if active:
+	if target != "":
+		draw_rect(Rect2(Vector2.ZERO, size), Color(tint, 0.18))
+		draw_rect(Rect2(Vector2.ONE, size - Vector2(2, 2)), tint, false, 2.0)
+	elif active:
 		draw_rect(Rect2(Vector2.ONE, size - Vector2(2, 2)), ThemeBuilder.ACCENT, false, 1.5)

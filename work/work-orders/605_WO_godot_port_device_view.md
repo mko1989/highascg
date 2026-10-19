@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) in progress — 2a cable rules + 2b write planning DONE (golden-tested), next 2c gesture controller + UI. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server. Next: slice 3 destinations / host channels. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -132,7 +132,7 @@ Not GraphEdit, per the port plan: Controls for cards/sockets + one `_draw` layer
   for the layout to settle and run one cable per frame.
 - Not verified live: the WS `gpu_topology_changed` refresh (needs a DRM hotplug); owner QA.
 
-## Slice 2 — patching + undo (2026-10-19, in progress)
+## Slice 2 — patching + undo (2026-10-19, DONE)
 
 ### Investigation
 Web gesture = `client/components/device-view-cable.js` (455) + `device-view-cable-outputs.js` (removeEdge,
@@ -204,3 +204,50 @@ preflight with split ids, suggested rows, topology-only and unknown sockets, and
 `gpu_sink_writes` (PGM, PRV head writes no settings, multiview always-on-top, already-seeded screen, non-GPU sink).
 Comparison normalises int/float (Godot's Dictionary `==` tells 720 from 720.0; JSON does not).
 Godot `--test` 2232/2232 (+207), `--check` boot OK.
+
+### 2c — What was done
+- `features/devices/cable_gesture.gd` (new, Node child of the tab): gesture state (armed connector + half, re-grab,
+  selected edge, busy, restart-dirty), the 2.5 s snapshot prewarm Timer (only alive between arm and commit/cancel),
+  and every write in the web's order — `_complete` (= tryAddCable: order → canonical ids → socket conflict → undo
+  push → preflight `deviceGraph` save → `addEdge`, one unknown-connector recovery that saves `gpuPhysicalTopology`,
+  re-reads and re-preflights → PRV note → `gpu_sink_writes` on the post-addEdge payload → restart-dirty → reload),
+  `_commit_regrab` (plan first, remove-then-add, rollback, PRV layer carried), `remove_edge`, `remove_all`,
+  `undo` (50 deep; push skipped without `screenDestinations`, as the web), `apply_caspar` (`{force:true}`, WS
+  `log_line` `[Full apply]` progress). Status texts are the web's. The web api client throws on 4xx, so an addEdge
+  rejection shows only `describe_rejection(reason)` — the web's `res.error` "(src → sink)" branch is dead code there.
+- `port_icon.gd`: `target` tint (armed amber / valid green / invalid red, the web CSS colours).
+- `cable_layer.gd`: `selected_id` (thick like hover), `hidden_id` (held cable), dashed straight ghost from
+  `ghost_from` to `pointer`, `hit()` (6 px from the drawn polyline — the web hits only the 2.8 px stroke), and a
+  bare destination id now resolves to its `#pgm` dot (web anchorKeyFor).
+- `devices_tab.gd`: clicks are taken in `_input` (anchor rects grown 3 px first, then cables; anything else cancels
+  an armed gesture and passes through), guarded to clicks that land on the tab (`gui_get_hovered_control`) and not
+  while the confirm dialog is up; cable hover highlight; Esc / Ctrl+Z / Delete+Backspace in
+  `_unhandled_key_input` (tab visible, no text field focused); toolbar Cancel cable / Reset all cabling (confirm) /
+  Apply Caspar config (restart) with the dirty highlight; Cables rows select and show Remove; settings loaded before
+  the first payload; a reload asked for mid-flight re-runs after it; gesture prompts give way to "Updated …" on
+  reload while results and errors stay (↻ always overwrites).
+- Not testable in the unit runner (it never loads scripts that touch autoloads); the decisions it sequences are the
+  golden-tested 2a/2b functions, so the gesture itself is proven on the box.
+
+### 2c — What was VERIFIED
+Box GUI (`run-client.sh --screen=0 --tab=4`, xdotool clicks, x11grab screenshots, `GET /api/device-view` /
+`/api/settings` after each step; config/ backed up first and restored after — every `config/*.json` and the full
+settings GET identical to the backup at the end):
+- Arm on Main LED PRV dot → both its dots amber, Operator GUI dot red, GPU + DeckLink sockets green, dashed ghost
+  from the PRV dot to the pointer; Esc → "Cable mode cancelled", nothing written.
+- PRV → DP 4/5: edge `dst_in_dst_mvcvbk52_1 → gpu_p2` note `{"outputLayer":2}`, gpu_p2 `caspar` gained
+  `mode 1080p5000` + `outputBinding {screen_prv, 1}`, settings untouched (PRV head seeds nothing), Apply turned amber.
+- Cable click (on the stroke) and Cables-row click select: thick cable, ringed ends, Remove shown.
+- Re-grab: click the selected cable's DP 4/5 end → cable hidden, ghost from the PRV dot, all targets tinted; drop on
+  DP 0/1 → edge now `→ gpu_p0` still `{"outputLayer":2}`, "Cable moved to gpu_p0".
+- Delete removed it; Ctrl+Z ×2 restored `gpu_p0` then `gpu_p2` (graph matches each step); a third → "Nothing to
+  undo". PGM onto the occupied DP 4/5 → "gpu_p2 already has a cable from dst_ch1. Remove that cable first.", no
+  write. Backspace removed the PRV cable; PGM → DP 4/5 then wrote `outputBinding {screen, 1}` (+ mode); casparServer
+  unchanged since screen_3 already held the inherited values.
+- Reset all cabling → confirm dialog → OK → edges `[]`, "All cabling removed"; Ctrl+Z → all three back.
+- Apply: button "Applying…" + disabled, status streamed "Step 3 — applying live xrandr layout", "Step 4 — reload
+  Caspar …", then "Config written; layout applied; Caspar restarted.", dirty highlight cleared; casparcg-server
+  active on a new PID. GUI log free of script errors.
+- Godot `--test` 2232/2232, `--check` boot OK, `check-max-file-lines` 0 over 500.
+Owner-QA: the feel of the hit targets (6 px cable tolerance, 3 px port growth) next to the web.
+
