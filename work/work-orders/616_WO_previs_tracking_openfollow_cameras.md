@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); next: T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); T10d verification walk done (server measure + Inspector walk + `verified` stamp, box-verified through the GUI; a real walk with two cameras = owner QA) — T10 complete; next: T8 PSN input, attribution. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -115,9 +115,9 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 - [x] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), ~~systemd unit~~ server-owned child, GPU EP; masks.
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
       Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view ✔ (box-verified).
-- [ ] T10 Two-camera fusion + verification walk + coverage view.
+- [x] T10 Two-camera fusion + verification walk + coverage view.
       T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons ✔ (box, twin camera). T10c coverage view ✔ (box GUI).
-      T10d verification walk.
+      T10d verification walk ✔ (box GUI; real two-camera walk = owner QA).
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
 
@@ -1416,3 +1416,86 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
 - **Restored**: `cam_2` removed. The project holds `cam_1` only again, and the GUI is back in Camera mode.
 - **Owner QA**: whether the verdict line and colours read well on the show stage, and a real second camera's
   placement.
+
+## T10d — verification walk: walk a grid line, measure tracking against it, stamp the cameras (2026-10-19) — DONE (box-verified through the GUI; a real two-camera walk = owner QA)
+
+### Investigation
+
+- Workflow step 6 is "walk a known line and see how far tracking puts you off it". The two numbers worth having are
+  the world position (fused when 2+ cameras see the walker) and each camera's own feet point. A gap between the two
+  shows which camera's calibration is off.
+- The walker has to be one person, followed by an id that survives ByteTrack id switches and occlusion. That is the
+  T10a world id. The walker is picked as the first fresh world person within 1 m of the line, between its ends, and
+  is then kept by id.
+- Only persons measured in the latest fusion step (`age_s` 0) count. Coasting predictions are not measurements.
+  Sampling is driven from `pinTick` after a fusion step that brought a new frame, so the rate is the detection
+  rate. On the box that was about 15 samples/s.
+- Box test source: layer 1-1000 plays `media/testowe/t9_pedestrians.png`, a still. Its world person P2 stands at
+  (−3.599, 6.243), 24.3 cm off the grid's upstage edge (y = 6). That gives a known non-zero answer.
+- **Found while verifying** (not T10d's to fix): Rewir-Light maps "·" (U+00B7) and "•" (U+2022) to **empty glyphs**.
+  A Godot probe (`TextServer.font_get_glyph_contours`) gave 0 points for both, while "." has 12. Every " · "
+  separator in the Godot client (about 20 files) therefore renders as a blank gap. A font fallback cannot help,
+  because Rewir claims the codepoint. ↔ / → are truly absent from Rewir (`has_char` false). This is a follow-up unit.
+
+### What was done
+
+- **`src/tracking/verify-walk.js`** (new, pure):
+  - `VerifyWalk.start({a, b, person?})` refuses lines shorter than 0.5 m and non-points.
+  - `sample(snap)` records the walker's distance from segment a–b, each camera's own `floor` distance (camera
+    persons whose `world` is the walker), the world source per sample, and which of 20 stretches of the line were
+    walked.
+  - `stop()` returns `{samples, duration_s, world: {n, mean_cm, rms_cm, max_cm}, cameras: {id: stats}, sources,
+    covered, ok}`. The walk counts as `ok` from 10 samples. It auto-stops after 120 s.
+  - Also exported: `segDist`, `stats`.
+- **`src/tracking/register.js`**:
+  - `pinTick` feeds the walk the `withPins` snapshot after a fusion step that stepped.
+  - `GET /api/tracking/verify` returns `{running, live, result}`.
+  - `POST` takes `{action: start | stop | reset}`. Stop stops first, then replies with the status, so the reply
+    already says `running: false`.
+- **Godot**:
+  - `walk_model.gd` (new, pure — no autoloads, so the headless test runner can load it):
+    - `lines(grid)`: the grid's 4 edges and 2 centre lines, walkable end to end.
+    - `describe(status)`: the live line and the result text.
+  - `walk_section.gd` (new): "Verification walk" in the Detect section under the masks, with a line picker,
+    Start walk / Stop, Accept (enabled only for an `ok` result), and a 0.5 s poll while running.
+  - `tracking_view.gd`: draws the chosen line in the camera picture in Detect mode, labelled "Walk: <name>".
+  - `tracking_page.gd`: Accept stamps every tracking camera with
+    `verified: {at, line, samples, world_rms_cm, rms_cm (that camera alone), covered}` and persists it. The
+    calibration then carries when and how well it was proven.
+  - `previs_tab.gd` pushes the line to the view.
+- **Tests**:
+  - `tools/smoke/smoke-wo616-verify-walk.test.js`: 11 tests (Haiku, reviewed), registered in
+    `run-offline-tests.js`. They cover `segDist`, `stats`, start validation, the pick gate, keeping the walker by
+    id, `age_s` filtering, per-camera stats, coverage bins, `ok` / too few samples, and auto-stop.
+  - `godot/client/tests/test_tracking_walk.gd`: 10 tests (Haiku, reviewed), covering lines and offsets, and
+    describe for idle, waiting, live, too few samples, the full result and null cm.
+
+### What was VERIFIED
+
+- **Gates**:
+  - Offline: 2767 tests, 2764 pass, 1 fail. The failure is the known wo577 "library: main panel stays small…".
+  - Godot `--test`: 1297 passed, 0 failed. `--check` boots clean.
+  - Line limits are clean. eslint is clean. Prettier is clean on the CI scope (`tools/ci`) and on the new
+    `verify-walk.js`.
+- **Server, live on the box**:
+  - A 0.2 m line returned 400 "the line must be at least 0.5 m long".
+  - On the upstage edge [−6, 6]–[6, 6] it picked P2 at 24.3 cm. Stop replied with `running: false` and the
+    result. Reset cleared it.
+- **Box GUI**, Camera view → Detect, Inspector "Verification walk":
+  - The line picker listed the 6 lines, and "Walk: Upstage edge" was drawn in the camera picture.
+  - Start walk turned the button into Stop, disabled the picker, and showed the live line "Walking — P2 · 58 samples
+    · 4.0 s · off the line: mean 24.3 cm · 5 % of the line walked".
+  - Stop gave 304 samples in 20.8 s, `world` mean / RMS / max of 24.3 cm, `cam_1` alone 24.3 cm, source `cam_1`
+    100 %, and `ok`.
+  - Accept wrote `cameras[0].verified = {line: "Upstage edge", samples: 304, world_rms_cm: 24.3, rms_cm: 24.3,
+    covered: 0.05}`, read back via `GET /api/project`. Accept then disables itself.
+  - On the downstage edge, with nobody within 1 m, the GUI showed "step onto the line: waiting…", and Stop gave
+    `ok: false`.
+  - After the `walk_model` split and the `_toggle` fix (a ternary lambda had called the coroutines without
+    `await`), Start and Stop logged no SCRIPT ERROR.
+- **Restored**: the test `verified` stamp was removed from `cam_1`, because a still image is not a calibration proof.
+  The walk state was reset.
+- **Not verified / owner QA**:
+  - A real walk, by a person, along a taped line, with two rigged cameras. The fused-vs-per-camera split only shows
+    there.
+  - The " · " separators in the status text render blank (Rewir glyph). That is a follow-up.

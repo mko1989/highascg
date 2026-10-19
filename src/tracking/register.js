@@ -26,6 +26,8 @@
  * carries `world: {fused, plane_z, persons:[{id,x,y,vx,vy,height,source,cameras,keys,score,area,age_s,marker?}]}`; each
  * camera person the world person it belongs to (`world: id`). With 2+ solved cameras (`fused`) the pin follows
  * world persons (key `w:<id>`), so a person hidden in one camera stays pinned from the other.
+ * Verification walk (T10d, src/tracking/verify-walk.js): GET /api/tracking/verify · POST {action: 'start', a: [x,y],
+ *       b: [x,y], person?} | {action: 'stop'} | {action: 'reset'} — sampled after every fusion step with a new frame.
  */
 
 'use strict'
@@ -36,6 +38,7 @@ const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
 const { Fusion } = require('./fusion')
+const { VerifyWalk } = require('./verify-walk')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -60,6 +63,7 @@ let _detect = null
 let _detectSent = { json: '', at: 0 }
 const pin = new DetectPin()
 const fusion = new Fusion()
+const walk = new VerifyWalk()
 let _pinAt = 0
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
@@ -104,8 +108,9 @@ function pinTick() {
 	const dt = _pinAt ? (now - _pinAt) / 1000 : TICK_MS / 1000
 	_pinAt = now
 	const cfg = _detect.config
-	if (cfg.enabled) fusion.step({ cams: _detect.frames(), now, planeZ: _detect.planeZ })
-	else fusion.reset()
+	const stepped = cfg.enabled && fusion.step({ cams: _detect.frames(), now, planeZ: _detect.planeZ })
+	if (!cfg.enabled) fusion.reset()
+	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
 	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
 	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
 }
@@ -199,6 +204,31 @@ async function handleApi({ method, path, body }) {
 	}
 	if (method === 'GET' && path === '/api/tracking/detections') {
 		return _detect ? reply(200, withPins(_detect.status())) : reply(503, { error: 'detection service not running' })
+	}
+	if (path === '/api/tracking/verify') {
+		if (method === 'GET') return reply(200, walk.status(hub.now()))
+		if (method === 'POST') {
+			let data
+			try {
+				data = JSON.parse(body || '{}')
+			} catch {
+				return reply(400, { error: 'body must be JSON' })
+			}
+			const now = hub.now()
+			if (data.action === 'start') {
+				const r = walk.start(data, now)
+				return reply(r.ok ? 200 : 400, r.ok ? walk.status(now) : r)
+			}
+			if (data.action === 'stop') {
+				walk.stop(now)
+				return reply(200, walk.status(now))
+			}
+			if (data.action === 'reset') {
+				walk.reset()
+				return reply(200, walk.status(now))
+			}
+			return reply(400, { error: 'action must be start | stop | reset' })
+		}
 	}
 	if (path === '/api/tracking/markers') {
 		if (method === 'GET') return reply(200, { markers: markersView(), stale_after_ms: MARKER_STALE_AFTER_MS })

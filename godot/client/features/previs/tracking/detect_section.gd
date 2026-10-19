@@ -6,9 +6,11 @@ extends VBoxContainer
 ## The master starts off and asks before it arms: in Replace a marker — and every fixture following it — chases a
 ## detected person.
 ## T9c: the camera's ROI masks below the fields (mask_section.gd; drawn by clicking in the camera view).
+## T10d: the verification walk below the masks (walk_section.gd).
 
 const D := preload("res://features/previs/tracking/detect_model.gd")
 const MaskSection := preload("res://features/previs/tracking/mask_section.gd")
+const WalkSection := preload("res://features/previs/tracking/walk_section.gd")
 
 signal edit(detection: Dictionary)  # new detection slice → persist
 
@@ -28,6 +30,7 @@ var _assist_rows: Array = []
 var _replace_rows: Array = []
 var _confirm_on: ConfirmationDialog
 var masks := MaskSection.new()  # created here so tracking_page can connect it before _ready
+var walk := WalkSection.new()  # T10d verification walk (tracking_page connects accepted / view_changed)
 
 
 func _ready() -> void:
@@ -83,6 +86,7 @@ func _ready() -> void:
 		data = D.with_masks(data, cam_id, on, ms)
 		_persist())
 	add_child(masks)
+	add_child(walk)
 	_load_models()
 	refresh()
 

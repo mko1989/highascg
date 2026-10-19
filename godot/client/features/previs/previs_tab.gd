@@ -197,6 +197,7 @@ func _push_masks() -> void:
 	if ms == null:
 		return
 	track_view.set_masks(ms.shapes(), DetectModel.masks_active(ms.mk), ms.drawing and track_page.mode == "detect")
+	track_view.set_walk_line(track_page.detect.walk.line())
 
 
 ## WO-616 T7: the trigger zones as floor loops + the server's occupancy.

@@ -36,6 +36,7 @@ var zones_mode := false
 var detect_mode := false
 var zone_drawing := false
 var zone_shapes: Array = []  # [{name, color, loop: [[x, y, z]…], occupied, selected, open}]
+var walk_line := {}  # T10d: walk_section.line() {name, a, b, z} — drawn in Detect mode
 var mask_shapes: Array = []  # mask_section.shapes(): [{vertices: [[x, y] 0–1…], enabled, selected}]
 var mask_drawing := false
 var masks_on := false  # the set filters (detect_model.masks_active)
@@ -249,6 +250,7 @@ func _draw() -> void:
 		_draw_beams(font)
 	if detect_mode:
 		_draw_masks()
+		_draw_walk(font)
 	_draw_boxes(font)
 	_draw_marks(font)
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
@@ -393,6 +395,23 @@ func _draw_zones(font: Font) -> void:
 		var at: Variant = px[0]
 		if at != null:
 			draw_string(font, to_view(Vector2(at[0], at[1])) + Vector2(6, -6), z.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
+
+
+func set_walk_line(l: Dictionary) -> void:
+	walk_line = l
+	queue_redraw()
+
+
+func _draw_walk(font: Font) -> void:
+	if walk_line.is_empty() or not entry.get("cam") is Dictionary:
+		return
+	var a := [walk_line.a[0], walk_line.a[1], walk_line.z]
+	var col := Color(ThemeBuilder.ACCENT_HOVER, 0.9)
+	for pl in O.edge(entry, a, [walk_line.b[0], walk_line.b[1], walk_line.z]):
+		draw_polyline(_xf(pl), col, 3.0, true)
+	var s: Variant = O.shown(entry, [a])[0]
+	if s != null:
+		draw_string(font, to_view(Vector2(s[0], s[1])) + Vector2(8, -8), "Walk: " + str(walk_line.name), HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
 
 func _draw_beams(font: Font) -> void:

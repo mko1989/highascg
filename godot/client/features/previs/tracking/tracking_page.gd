@@ -130,6 +130,8 @@ func _ready() -> void:
 		data["detection"] = d
 		_persist())
 	detect.masks.view_changed.connect(func() -> void: changed.emit())
+	detect.walk.view_changed.connect(func() -> void: changed.emit())
+	detect.walk.accepted.connect(_stamp_verified)
 	add_child(detect)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Delete this tracking camera and its calibration?"
@@ -349,6 +351,16 @@ func _edit(mutate: Callable) -> void:
 	_persist()
 
 
+## T10d Accept: every tracking camera records the walk that proved it (its own RMS when it saw the walker).
+func _stamp_verified(r: Dictionary, line_name: String) -> void:
+	var cams: Dictionary = r.get("cameras", {})
+	for c in data.cameras:
+		var own: Variant = (cams.get(c.id) as Dictionary).get("rms_cm") if cams.get(c.id) is Dictionary else null
+		c["verified"] = {"at": Time.get_datetime_string_from_system(true), "line": line_name, "samples": r.samples,
+			"world_rms_cm": r.world.rms_cm, "rms_cm": own, "covered": r.covered}
+	_persist()
+
+
 func _edit_grid(key: String, v: float) -> void:
 	data.grid[key] = v
 	data.grid = T.normalize_grid(data.grid)
@@ -397,6 +409,7 @@ func _sync() -> void:
 	zones.set_zones(data.get("zones"))
 	detect.visible = mode == "detect"
 	detect.set_detection(data.get("detection"), str(ce.get("id", "")))
+	detect.walk.set_grid(data.grid)
 	markers.set_defs(data.markers)
 	for k in _grid:
 		(_grid[k] as SpinBox).set_value_no_signal(float(data.grid[k]))
