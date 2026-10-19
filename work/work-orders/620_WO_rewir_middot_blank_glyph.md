@@ -1,4 +1,4 @@
-**Status: DONE (2026-10-19, Godot glyph probe + box GUI screenshots; Godot --test 1297/1297) — web client font left unmodified (owner decision, below).**
+**Status: DONE (2026-10-19, Godot glyph probe + box GUI screenshots; Godot --test 1297/1297; web client woff/ttf patched too, Firefox render-verified).**
 
 # WO-620 — Rewir "·" renders blank: every " · " separator in the Godot client was a gap
 
@@ -38,11 +38,14 @@ Related: [WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md) R3 (Rewir 
   glyph changed.
 - **`godot/client/assets/fonts/README.txt`** and **`THIRD_PARTY_NOTICES`** (a new Rewir block) record the
   modification. `THIRD_PARTY_NOTICES` had no Rewir entry before.
-- **Not changed:**
-  - `client/fonts/Rewir-Light.ttf`, the web client's copy, has the same blank glyph. About 53 web client files use
-    "·".
-  - Patching it means copying the file, `npm run build:client` and a kiosk reload. That changes the production web
-    UI, so it is left for the owner to decide.
+- **Web client** (owner, 19.10: "Patch it in web too, it's not on air"):
+  - `client/fonts/Rewir-Light.woff` was patched with the same script. The flavor stays woff and the glyf outlines
+    are the same.
+  - `client/fonts/Rewir-Light.ttf` is now byte-identical to the Godot copy. Each fontTools save stamps
+    `head.modified`, so the second run's output was replaced with the committed file.
+  - `Rewir-Light.otf` is not referenced by `01a1-base-theme-tokens.css`, so it stays upstream.
+  - Both READMEs and `THIRD_PARTY_NOTICES` list which files are modified.
+  - `npm run build:client` was run. `dist-web` is gitignored and is rebuilt on the box.
 
 ## What was VERIFIED
 
@@ -57,5 +60,11 @@ Related: [WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md) R3 (Rewir 
   - The test walk was reset afterwards.
 - **Gates:** Godot `--check` boots clean, and `--test` gives 1297 passed, 0 failed. No smoke test reads the font or
   the notices. The release script copies `THIRD_PARTY_NOTICES` as a whole.
+- **Web**:
+  - `dist-web/assets/Rewir-Light-*.woff`, as served by `:4200`, is byte-identical to the patched woff, with
+    `periodcentered` as a composite.
+  - Headless `firefox-esr` (the kiosk's browser) rendered a side-by-side page. The upstream woff showed
+    "Mask 1   4 pts   x" with gaps. The patched woff showed "Mask 1 · 4 pts • x" in Rewir.
+  - No kiosk was running, so there was no live reload.
 - **Owner QA:** whether the dot's height and weight read well next to Rewir text in the other tabs (Live, Timeline,
   Settings).
