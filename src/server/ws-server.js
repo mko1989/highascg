@@ -8,6 +8,7 @@
 const WebSocket = require('ws')
 const { dispatchStructuredAmcp, isStructuredAmcpMessage } = require('./ws-amcp-dispatch')
 const { dispatchCatalogWsMessage } = require('./ws-catalog-handlers')
+const moduleRegistry = require('../module-registry')
 const { getCompanionBridgeRegistry } = require('../companion-bridge/registry')
 const { WS: COMPANION_WS } = require('../companion-bridge/contract')
 
@@ -316,7 +317,6 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				if (!trimmed) return
 				if (trimmed[0] !== '{' && trimmed[0] !== '[') return
 				const msg = JSON.parse(trimmed)
-				
 				if (typeof ctx.log === 'function') {
 					ctx.log('debug', `[WS] Incoming type=${String(msg.type || 'unknown')} len=${trimmed.length}`)
 				}
@@ -337,7 +337,7 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					}
 					const data = await dispatchStructuredAmcp(ctx, msg)
 					ws.send(safeStringify({ type: 'amcp_result', data, id: msg.id }))
-				} else if (await dispatchCatalogWsMessage(ws, ctx, msg, safeStringify)) {
+				} else if ((await dispatchCatalogWsMessage(ws, ctx, msg, safeStringify)) || moduleRegistry.handleWs(ws, ctx, msg)) {
 					return
 				} else if (msg.type === 'osc_resync') {
 					sendOscBootstrap(ws)

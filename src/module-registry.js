@@ -16,6 +16,7 @@
  *     apiPathPrefixes: ['/api/previs'],   // paths dispatched to handleApi
  *     handleApi: async ({ method, path, body, ctx, req, query }) => response | null,
  *     wsNamespaces: ['previs:'],          // WS event name prefixes this module broadcasts on
+ *     handleWs: (msg, { ws, ctx }) => bool, // WO-616: inbound client messages whose type is in a namespace
  *     webBundles: ['/assets/modules/previs/entry.js'],  // dynamic-import URLs for the web client
  *     webStyles:  ['/assets/modules/previs/previs.css'], // stylesheets to inject
  *   }
@@ -226,6 +227,32 @@ async function handleApi(method, path, body, ctx, req, query) {
 }
 
 /**
+ * WO-616: hand an inbound WS client message to the module whose `wsNamespaces` prefix its `type` (e.g.
+ * `tracking:marker` → the tracking module). True when a module took it; false leaves it to core (unknown types are
+ * ignored there as before). A throwing handler is logged and counts as taken.
+ * @param {any} ws
+ * @param {any} ctx
+ * @param {{ type?: unknown }} msg
+ * @returns {boolean}
+ */
+function handleWs(ws, ctx, msg) {
+	const type = typeof msg?.type === 'string' ? msg.type : ''
+	if (!type) return false
+	for (const m of _modules) {
+		if (typeof m.handleWs !== 'function' || !Array.isArray(m.wsNamespaces)) continue
+		if (!m.wsNamespaces.some((ns) => typeof ns === 'string' && ns && type.startsWith(ns))) continue
+		try {
+			if (m.handleWs(msg, { ws, ctx })) return true
+		} catch (e) {
+			const err = e && e.message ? e.message : String(e)
+			if (ctx && typeof ctx.log === 'function') ctx.log('warn', `[modules] handleWs("${m.name}") threw: ${err}`)
+			return true
+		}
+	}
+	return false
+}
+
+/**
  * Merge every loaded module's `staticMounts` (URL prefix -> on-disk dir, WO-265) into one map,
  * suitable for spreading into the `vendorDirs` option of `serveWebApp`. First registration of a
  * prefix wins; duplicates are logged and skipped so one module can't silently shadow another.
@@ -279,6 +306,7 @@ module.exports = {
 	bootAll,
 	shutdownAll,
 	handleApi,
+	handleWs,
 	collectStaticMounts,
 	describe,
 }

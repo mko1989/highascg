@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified) and T2 camera maths (offline, OpenFollow test vectors) done; T3 calibration wizard next. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5a server marker hub done (box-verified); T5b Godot marker driver next. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -105,9 +105,11 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
 - [x] T3 (T3a model + solve, T3b Camera mode + Inspector page) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
 - [ ] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera.
-- [ ] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`.
-- [ ] T6 PSN output (spec: posistage.net; 60 Hz, multicast 236.10.10.10:56565, data + info packets) + OSC
-      output; freshness/stale semantics; test against a PSN receiver.
+- [ ] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`. (T5a hub ✔; T5b Godot driver open)
+- [ ] ~~T6 PSN output + OSC output~~ — **DROPPED (owner, 2026-10-19: "No need for the PSN osc output. We will
+      relay it directly to artnet")**. Markers leave the box as Art-Net through the WO-615 fixture engine
+      (server-side, `src/sampling/dmx-output.js` senders): marker → follow IK (WO-615 T9 / T11 here) → DMX.
+      The 1 s freshness rule stays in the hub, so follow can hold or release a fixture on a stale marker.
 - [ ] T7 Zones (port `zones/engine.py` state machine + shrink) → OSC / Companion.
 - [ ] T8 PSN input (OpenFollow stations as sources).
 - [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), systemd unit, GPU EP; masks.
@@ -118,7 +120,9 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 ## Acceptance
 
 - P1: with one DeckLink camera, calibration from previs points reaches RMS < 3 px; a gamepad-driven marker
-  appears at the right floor spot in the camera view and in 3D, and a lighting console receives it over PSN.
+  appears at the right floor spot in the camera view and in 3D, and reaches the server hub
+  (`tracking:markers`) for WO-615 follow → Art-Net. (Was "a console receives it over PSN" — PSN dropped
+  by the owner 2026-10-19.)
 - P4: a person walking behind an obstacle visible to one camera stays tracked (no ID change), fused
   position error < 20 cm over the verification walk.
 
@@ -378,3 +382,72 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
 - Test layer cleared afterwards (`CLEAR 1-90`). The "Camera 1" tracking entry stays in the live project as dev data.
 - Owner QA: calibrate a real camera (DeckLink `inN` once a capture card is fitted), and check the click precision
   with wheel zoom.
+
+## T5a — server marker hub (2026-10-19) — DONE (box-verified)
+
+### Investigation
+- The `tracking` module was a WO-19 skeleton: `src/tracking/register.js` (HEAD) only stubbed `GET /api/tracking/stats`
+  (`status: 'skeleton'`). Its `webBundles` entry pointed at `web/assets/modules/tracking/…`, which does not exist,
+  so a web client would have imported a 404 once the module was on. No smoke test references the stub.
+- Modules had no inbound WS path. `src/server/ws-server.js` handled core message types and then the catalog
+  handlers. `src/module-registry.js` only knew `wsNamespaces` as *outbound* prefixes (`getWebManifest`). A Godot
+  client could therefore not send a marker over the socket it already holds.
+- OpenFollow's freshness rule (`openfollow/psn/marker.py`): `MARKER_STALE_AFTER_S = 1.0`, a never-written marker is
+  stale, and a stale marker is still reported but flagged. This is the contract the WO-615 follow needs: hold on
+  stale, never jump.
+- Owner, mid-T5: "No need for the PSN osc output. We will relay it directly to artnet". The hub's consumers are the
+  previs on every client and the WO-615 DMX engine (`src/sampling/dmx-output.js` Art-Net/sACN). There are no
+  network protocols out of the hub.
+
+### What was done
+- `src/tracking/marker-hub.js` (new, pure, injectable clock): `MarkerHub.set / remove / view / list / staleKey`.
+  - Positions are in the PSN frame (m; X stage left, Y upstage, Z up).
+  - Ids are integers 1..65535 (16-bit, like PSN / follow ids). x/y/z must be finite and within 500 m of the origin.
+    A refused write leaves no trace.
+  - Speed comes from the last two writes when they are ≤ 1 s apart (0 across a stale gap).
+  - Name and source carry over from the previous write.
+  - `rev` bumps on every accepted change.
+  - The header carries the AGPL OpenFollow credit and lists the changes.
+- `src/tracking/register.js` (rewritten):
+  - One hub per process, exposed as `ctx.trackingHub` (withdrawn on shutdown).
+  - A 33 ms tick broadcasts `tracking:markers {markers, stale_after_ms}` when `rev` moves, when the stale set
+    changes, or as a 1 Hz heartbeat while the hub is non-empty. An empty, idle hub sends nothing.
+  - HTTP: `GET/POST /api/tracking/markers` (one marker or `{markers:[…]}`), `DELETE /api/tracking/markers/<id>`,
+    and `GET /api/tracking/stats` (now real counts).
+  - WS intake: `tracking:marker` (source `operator`). Refused entries go back to the sender only, as
+    `tracking:error`.
+  - The phantom `webBundles` entry was removed.
+- `src/module-registry.js`: new `handleWs(ws, ctx, msg)`. It routes an inbound message to the loaded module whose
+  `wsNamespaces` prefix matches `msg.type` and calls `m.handleWs(msg, {ws, ctx})`. If the handler throws, the error
+  is logged and the message counts as taken, so it never falls through to core handlers.
+- `src/server/ws-server.js`: calls `moduleRegistry.handleWs` right after the catalog dispatch, before core's
+  remaining `else if` chain. A module only sees types in its own namespace.
+- Why WS intake and not HTTP only: the Godot driver (T5b) streams at ≤ 30 Hz on the socket it already has.
+  Per-sample HTTP would add connection churn on the box serving playout.
+
+### What was VERIFIED
+- New smoke `tools/smoke/smoke-wo616-tracking-marker-hub.test.js` (2 tests, in the curated FILES list):
+  - live just under 1 s, stale at exactly 1 s, still listed;
+  - 2 m/s from 1 m in 0.5 s; no speed across a stale gap;
+  - six invalid writes refused, no trace left;
+  - registry WS routing (a `tracking:` type is taken, `amcp` is not);
+  - `tracking:error` reply goes to the sender;
+  - HTTP GET/POST/DELETE, including 400 on bad JSON and 404 on a second delete;
+  - immediate broadcast on write;
+  - `ctx.trackingHub` set on boot and withdrawn on shutdown.
+- Offline suite: 2680 tests, 2679 pass, 1 fail = the known local `smoke-wo577-shader-controls`. 0 files over 500
+  lines.
+- On the box:
+  - Server restarted. `POST /api/plugins/tracking/enable` → `{"ok":true,"requiresRestart":false}`. Journal:
+    `[modules] loaded "tracking"`, `[tracking] marker hub up (WO-616) — tracking:markers`.
+  - A WS probe ran two real clients on `ws://127.0.0.1:4200/api/ws`. The sender wrote id 42 (1, 3), 250 ms later
+    (1.5, 3), then an invalid id 0. The watcher saw:
+    - `32ms 42:Probe:1,3:live`
+    - `263ms …1.5,3:live:vx2.1645` (0.5 m over the real ~231 ms gap)
+    - `1255ms …STALE` (1 s after the last write)
+    - `2277ms …STALE` (heartbeat)
+  - Only the sender got `tracking:error {id:0, "id must be an integer 1..65535"}`.
+  - `GET /api/tracking/markers` showed the stale marker with `source: operator`. `DELETE …/42` → `{"ok":true}`.
+    Stats: `markers 0, writes 2`.
+- The Tracking plugin is left enabled on the box; the change is persisted in `config/` (live state, not committed).
+- Not yet: the Godot driver and the markers drawn in previs (T5b), and the WO-615 follow consumer (T11).
