@@ -136,4 +136,23 @@ function pixelToFloor(cam, px, w, h, planeZ = 0) {
 	return unproject(cam, invertDistortion([px], w, h, k1, k2), w, h, planeZ)[0] ?? null
 }
 
-module.exports = { hfovToVfov, rotation, project, unproject, lensFoldRadius, invertRadius, applyDistortion, invertDistortion, pixelToFloor }
+/**
+ * WO-616 T10: a pixel on the real (distorted) picture → its viewing ray in PSN metres: { o: camera centre, d: unit
+ * direction }, or null for an invalid camera. Fusion triangulates two cameras' head rays with this.
+ */
+function pixelRay(cam, px, w, h) {
+	if (!validView(cam, w, h)) return null
+	const k1 = Number(cam.lens_k1) || 0, k2 = Number(cam.lens_k2) || 0
+	const s = invertDistortion([px], w, h, k1, k2)[0]
+	if (!s) return null
+	const { r, aspect, f } = view(cam, w, h)
+	const dx = ((s[0] / w) * 2 - 1) * aspect / f
+	const dy = (1 - (s[1] / h) * 2) / f
+	const wx = r[0] * dx + r[1] * dy - r[2]
+	const wy = r[3] * dx + r[4] * dy - r[5]
+	const wz = r[6] * dx + r[7] * dy - r[8]
+	const n = Math.hypot(wx, wy, wz)
+	return { o: [Number(cam.pos_x), Number(cam.pos_y), Number(cam.pos_z)], d: [wx / n, -wz / n, wy / n] }
+}
+
+module.exports = { hfovToVfov, rotation, project, unproject, lensFoldRadius, invertRadius, applyDistortion, invertDistortion, pixelToFloor, pixelRay }

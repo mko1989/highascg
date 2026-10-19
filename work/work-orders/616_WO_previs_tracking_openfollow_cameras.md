@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); next: T10 two-camera fusion. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); next: T10b wiring (pin + WS + Godot), T10c coverage view, T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -116,6 +116,8 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
       Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view ✔ (box-verified).
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
+      T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons. T10c coverage view.
+      T10d verification walk.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
 
@@ -1203,4 +1205,69 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
 - **Not verified**: masks on a real moving camera, and several masks per camera, which are covered only by the
   `filter_masks` "any polygon" rule. Owner QA.
 - Left on the box: `cam_1` keeps one mask with "Use masks" off.
+
+## T10a — multi-camera fusion engine (server) — DONE (2026-10-19, offline on a synthetic two-camera stage)
+
+### Investigation
+
+- OpenFollow has no fusion. A code search for `triangulat` finds nothing, and its stations only share markers. The
+  design below is new work, following this WO's "Two-camera workflow" steps 3–5. OpenFollow supplies only the
+  per-camera inputs: its detector and ByteTrack (T9a).
+- Inputs already on the server:
+  - `detect-service` keeps the latest `{at, frame, persons}` per watched camera.
+  - `detect-model.boxPoint` casts a box's feet or head onto a plane.
+  - `camera-model.js` has the lens-correct project / unproject.
+- What was missing was a viewing ray for a pixel, so that two cameras' head rays can be intersected without
+  guessing the plane they cross.
+- The cameras are not frame-locked (each sidecar step arrives independently, about 15 fps). Fusing each camera's
+  latest frame while it is under 250 ms old costs at most one interval of skew: 67 ms at walking pace (1.4 m/s) is
+  about 9 cm, inside the 20 cm acceptance. Stepping only when some camera brings a new frame stops the Kalman filter
+  from being fed the same frame repeatedly at the 60 Hz tick.
+- **Gating:** the Hungarian solver (Haiku-written) originally dropped pairs over the gate only after solving. For
+  gate 1, `[[0.1, 0.9], [0.9, 1.5]]` then gave one match (0.1 + 1.5, with 1.5 dropped) instead of two in-gate
+  matches (0.9 + 0.9). Over-gate pairs are now forbidden before solving.
+
+### What was done
+
+- **`src/tracking/camera-model.js`**: `pixelRay(cam, px, w, h)` returns `{o, d}`, the camera centre and a unit
+  direction in PSN metres, with the lens inverted.
+- **`src/tracking/hungarian.js`** (new; Haiku-written, then reviewed and fixed): `assign(cost, gate)` is an e-maxx
+  Kuhn–Munkres O(n³) solver for rectangular matrices. Infinity and over-gate costs are forbidden, so the result
+  maximises in-gate pairs first and then minimises cost.
+- **`src/tracking/fusion.js`** (new): the `Fusion` class plus pure helpers.
+  - `observe`: turns a box into its feet point, head ray and distance from the camera.
+  - `associate`: goes through the cameras in id order, Hungarian-matching each camera's feet points to the
+    clusters built so far (gate 0.75 m, at most one box per camera per cluster).
+  - `measure`: for two or more cameras, takes the least-squares point nearest all head rays as x/y and height. It
+    refuses that point if the rays are under 8° apart, miss each other by more than 0.35 m, or put the head
+    outside 0.9–2.5 m; it then uses an inverse-variance mean of the feet points instead. For one camera, it uses
+    the feet point with sigma = 5 cm + 2 cm per metre of distance.
+  - Tracks: one constant-velocity Kalman filter per world person. Clusters are matched to tracks by Hungarian on
+    distance to the prediction (gate 1 m). A `camera:tid` key the track carried on its last step makes the match
+    free (up to 2 m), which keeps ByteTrack's id continuity.
+  - An unsupported track shows `predicted` and is dropped after 1 s (the OpenFollow rule).
+  - Only boxes matched in the current sidecar step count as measurements; the sidecar's coasted boxes do not.
+- **Tests**:
+  - `tools/smoke/smoke-wo616-hungarian.test.js`: 7 tests (Haiku-written, plus the gate-before-solve test), checked
+    against brute force on 200 seeded matrices.
+  - `tools/smoke/smoke-wo616-tracking-fusion.test.js`: 12 tests.
+  - Both registered in `run-offline-tests.js`.
+
+### What was VERIFIED
+
+- **Offline, synthetic stage** (`smoke-wo616-tracking-fusion`): a FOH camera at (0.3, −9, 4) with k1 −0.12 and a
+  stage-right camera at (−9, 3, 5) with yaw 90 and k1 −0.05, 90° apart. Boxes are made by projecting each person's
+  head top (1.75 m) and feet through the same camera model.
+  - `pixelRay` matches `pixelToFloor` through the lens to 1e-9.
+  - Three people at once are associated as the correct tid pairs.
+  - One fused measurement is within 5 cm, with height 1.75 ± 0.05 m. The few-cm residual is the box-centre bias:
+    the head and feet are 10 px apart in the side camera, the same as a real detector box.
+  - Three walkers over 4 s at 15 fps: every fused position is under 20 cm off (the P4 acceptance number), with
+    stable world ids.
+  - Hidden from FOH for 1 s: tracked as `cam_2` with the same id and under 20 cm off, then `fused` again.
+  - A ByteTrack id switch in one camera keeps the world id.
+  - With no support the track goes `predicted`, is dropped after 1 s, and stale frames are not re-stepped.
+  - Near-parallel cameras do not triangulate.
+- Offline suite: 2746 passed, 1 failed (the known wo577), 2 skipped. Lint, Prettier and line limits are clean.
+- **Not verified**: anything live. The engine is not wired yet (T10b), and the box has one physical camera.
 
