@@ -8,6 +8,7 @@ const LiveTab := preload("res://features/live/live_tab.gd")
 const PrevisTab := preload("res://features/previs/previs_tab.gd")
 const TimelineTab := preload("res://features/timeline/timeline_tab.gd")
 const SettingsTab := preload("res://features/settings/settings_tab.gd")
+const DevicesTab := preload("res://features/devices/devices_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -53,8 +54,10 @@ func _ready() -> void:
 	var timeline := TimelineTab.new()  # WO-602
 	timeline.name = "Timeline"
 	tabs.add_child(timeline)
-	for t in [["Audio", "WO-604"], ["Devices", "WO-605"]]:  # Inspector = the right column, media = Sources (R1/R2)
-		tabs.add_child(_placeholder(t[0], t[1]))
+	tabs.add_child(_placeholder("Audio", "WO-604"))  # Inspector = the right column, media = Sources (R1/R2)
+	var devices := DevicesTab.new()  # WO-605
+	devices.name = "Devices"
+	tabs.add_child(devices)
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
 	tabs.add_child(settings)

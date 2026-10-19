@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation + port plan written; nothing implemented. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); next: slice 2 patching + undo. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -51,7 +51,7 @@ stream/record/vcam/audio outputs · Caspar server/hot backup/mapping nodes · sn
 
 ## What was done / What was VERIFIED
 
-Nothing yet. Orphan-file claim verified by hand.
+Orphan-file claim verified by hand. Per-slice records below.
 
 ## Scope moved in from WO-601 (2026-10-18)
 The inspector's "live sources + host channels" sub-feature belongs here, not in a Sources-tab inspector (owner rule
@@ -62,3 +62,72 @@ host-channel inspector: `inspector-browser-display.js` (URL/size/fps, operator-m
 origin), `inspector-ndi-host.js` (`GET /api/ndi/list`), `inspector-decklink-host.js`, `inspector-v4l2-input.js`,
 `inspector-live-audio-input.js` (device, shader-FFT source single-select, refresh, start/stop, remove),
 `inspector-source-label.js` (`POST /api/sources/label`). Endpoints: see WO-601 inventory "Live sources and host channels".
+
+## Slice 1 — read-only rear panel + cables (2026-10-19)
+
+### Investigation
+Reference: the web Devices tab on this box (screenshot 2026-10-19, `GET /api/device-view` of the same moment):
+- **Payload.** `graph.connectors` (10): `dst_in_dst_*` (kind `destination_in`, device `destinations`, `externalRef` =
+  the screen-destination id), `dlsdi_1..4` (`decklink_io`, `index` 0..3), `gpu_p0..p3` (`gpu_out`). `graph.edges` (2):
+  `{id, sourceId: dst_in_*, sinkId: gpu_pN, note?}`. `screenDestinations.destinations[]` carries `mode`
+  (`pgm_prv` | `pgm_only` | `multiview` | `stream` | `pixelmap` | `operator_gui` | `host_channel`), size, fps.
+  `suggested.connectors` repeats the graph ones and adds stream/record/vcam/audio/v4l2 connectors when they exist.
+  `live.gpu.physicalMap.effectiveTopology[]` = `{physicalPortId, dpA, dpB}` per socket; `live.gpu.displays[]` = the
+  connected heads (`DP-6`, `DP-2`).
+- **Layout** (web `device-view-destinations-ui.js`, `device-view-caspar-rear-data.js`): left card column "Screen
+  destinations" — title, subtitle `destinationRectLabel` (`device-view-ui-utils.js:5`: OPG / PGM / PGM/PRV / MVR /
+  PXM / STREAM + `WxH@fps`), one output dot, or for `pgm_prv` two half rows PGM / PRV each with a dot
+  (WO-365 anchor key `dst_in_x#pgm|#prv`), and the routes under the card ("PGM: Gpu p3"). Right: "Rear panel" with
+  slot columns GPU, DeckLink, (USB video), Stream, Virtual cam, Record, Audio. "Cables" list under it.
+- **GPU socket label** = `labelForTopologyPairs` (`lib/device-view-gpu-port-entries.js:30`): `DP 0/1`, `HDMI …`,
+  plus ` · <active head>` when a connected display matches one of the pair (`DP 2/3 · DP-2`). The full entry builder
+  (468 lines: bracket-pair collapse, EDID names, virtual sockets) is not needed while the panel is read-only;
+  slice 1 takes topology rows only and falls back to the gpu_out connectors' own labels when there is no topology.
+- **Edge half**: `lib/device-view-output-layer.js:15` — `note` = number, JSON `{outputLayer}` or `outputLayer=N`;
+  layer ≥ 2 → PRV.
+- **Cables**: `device-view-cables-physics.js` — 32-colour palette, string hash `h = (h<<5) - h + c` (only the shift is int32-truncated; `h` itself is an exact double, so it
+  can leave int32 range — e.g. `e_dst_in_dst_mvcrp9bs_1_gpu_p1` → −3115929809),
+  index `abs(h)*7 % 32`; Verlet rope (gravity 0.85, 200 iterations × 6 substeps, pinned ends + "boot" points 16 px
+  below the ends), loops 0–2 from the "Cable loops" slider (web default 0, not persisted). Seed = sum of id char codes.
+- Web oddities not copied: the DeckLink column order comes from a per-browser localStorage order (box shows 4,2,3,1);
+  the Cables list labels both destinations `dst_ch1` (`friendlyConnectorLabel` falls back to `mainScreenIndex`, which
+  is 0 for both). Godot orders DeckLink by `index` and labels cables with the connector labels.
+- Refresh triggers: tab shown, Refresh button, WS `gpu_topology_changed` (web `app-ws-handlers.js:283`).
+
+### What was done
+New `godot/client/features/devices/` (all under the 500-line limit):
+- `cable_model.gd` — 1:1 port of `device-view-cables-physics.js`: palette, `hash_id` (`_i32` truncates only the
+  shift, matching JS), `color_hex`, `seed_of`, `srand`, `build()` (waypoints + coils + Verlet `_relax`). Pure.
+- `devices_model.gd` — payload → `{destinations, slots, cables}`: `output_layer` / `anchor_key` / `source_anchor`
+  (output-layer.js), `gpu_pair_label` (labelForTopologyPairs), `dest_sub` (destinationRectLabel), GPU sockets from
+  `live.gpu.physicalMap.ports` by `slotOrder` (fallback: gpu_out connectors), DeckLink by `index`, then Stream /
+  Virtual cam / Record / Audio. Screen destinations only — host channels come with the destinations slice. Pure.
+- `port_icon.gd` — one socket: the web's port SVG (copied to `assets/devices/`, rasterised at runtime with
+  `Image.load_svg_from_buffer`, cached per size) or a dot; its centre is the cable anchor.
+- `rear_panel.gd` — GPU and DeckLink plates (label | socket rows, REF drawn but never cabled), extra slots beside.
+- `cable_layer.gd` — click-through overlay over the whole tab; polls anchor positions each frame (layout moves
+  them without signals), rebuilds a cable only when its endpoints or the loop count change (web getOrBuild cache),
+  draws shadow + colour polyline; `active_id` thickens one. `id#pgm` falls back to the plain id (web connectorCenter).
+- `devices_tab.gd` — toolbar (title, Cable loops 0–2, status, ↻), destination cards (PGM/PRV half dots), rear panel,
+  cables list (hover = highlight). Fetches `GET /api/device-view` when shown, on ↻, and on WS
+  `gpu_topology_changed`.
+- `app/shell.gd` — the Devices placeholder replaced by `DevicesTab`.
+Not GraphEdit, per the port plan: Controls for cards/sockets + one `_draw` layer.
+
+### What was VERIFIED
+- `tests/test_devices_cable.gd` (golden, values generated by running the web module under Node): colour of 10 ids
+  incl. a 73-char id and a non-ASCII one, `hash_id` / `seed_of` for 4 ids (one hash outside int32), and six full
+  `build()` polylines — loops 0/1/2, short / mid / long, both directions; point count exact, every point within
+  0.01 px (456 points). `tests/test_devices_model.gd`: 10 methods (output layer note forms, anchors, pair labels,
+  `dest_sub`, a fixture modelled on the box payload: host-channel skip, slot order, GPU slotOrder sort + labels,
+  DeckLink by index, PRV cable from `#prv`, cable labels, gpu_out fallback, empty payload).
+  Godot `--test` 1842/1842; `--check` boot OK; line limits OK.
+- Box, Godot GUI `--tab=4` against the live `/api/device-view`: both cards (Operator GUI `OPG · 1920x1080@50`;
+  Main LED `PGM/PRV` with PGM/PRV dots), GPU `DP 0/1`, `DP 2/3 · DP-2`, `DP 4/5`, `DP 6/7 · DP-6` (unconnected muted),
+  DeckLink 1–4 + REF, empty Stream / Virtual cam / Record / Audio; two cables, pink Operator GUI → DP 2/3 and green
+  Main LED PGM → DP 6/7 — the same colours and sag as the web view of the same payload. Cable loops 2 draws coils;
+  hovering a Cables row thickens its cable; dragging the Sources splitter moves the tab and the cables stay on their
+  sockets (warp while moving, rebuild after 150 ms still). No SCRIPT ERROR.
+- Measured: a GDScript `build()` costs 36 ms (74 points, loops 0) / 72 ms (144 points, loops 2) — why rebuilds wait
+  for the layout to settle and run one cable per frame.
+- Not verified live: the WS `gpu_topology_changed` refresh (needs a DRM hotplug); owner QA.

@@ -1,0 +1,194 @@
+extends RefCounted
+## WO-605 slice 1 — GET /api/device-view → what the read-only Devices tab draws: destination cards, rear-panel
+## columns (GPU, DeckLink, stream / virtual cam / record / audio), and cables as anchor-key pairs. Ports of
+## device-view-output-layer.js (PGM/PRV halves), destinationRectLabel (ui-utils), labelForTopologyPairs /
+## entryFromTopologyRow (gpu-port-entries) and the caspar-rear-data.js kind filters. Pure (tests preload it).
+
+const CASPAR_HOST := "caspar_host"
+const MODE_TAG := {"pgm_only": "PGM", "multiview": "MVR", "stream": "STREAM", "pixelmap": "PXM",
+	"operator_gui": "OPG"}
+## Rear-panel slots after GPU / DeckLink, in the web's order: [title, connector kinds].
+const EXTRA_SLOTS := [["Stream", ["stream_out"]], ["Virtual cam", ["v4l2_out"]], ["Record", ["record_out"]]]
+
+
+## The `{outputLayer}` note WO-364 puts on destination edges: 1 = PGM, 2 = PRV (edgeOutputLayer).
+static func output_layer(edge: Dictionary) -> int:
+	var raw: Variant = edge.get("note")
+	if raw == null:
+		return 1
+	if raw is int or raw is float:
+		return maxi(1, roundi(float(raw)))
+	var s := str(raw).strip_edges()
+	if s == "":
+		return 1
+	var j: Variant = JSON.parse_string(s) if s.begins_with("{") else null  # parse_string logs on non-JSON
+	if j is Dictionary:
+		var n: Variant = j.get("outputLayer")
+		return maxi(1, roundi(float(n))) if (n is int or n is float) else 1
+	var re := RegEx.create_from_string("(?i)outputLayer\\s*[:=]\\s*(\\d+)")
+	var m := re.search(s)
+	return maxi(1, int(m.get_string(1))) if m else 1
+
+
+static func is_destination_connector(id: String) -> bool:
+	return id.begins_with("dst_in_")
+
+
+## Anchor identity: a pgm_prv destination is ONE connector with two halves, so its dots are `id#pgm` / `id#prv`.
+static func anchor_key(id: String, half := "") -> String:
+	return "%s#%s" % [id, half] if half == "pgm" or half == "prv" else id
+
+
+## Where a cable leaves: destination sources carry their half (PRV edges leave the PRV dot), others the plain id.
+static func source_anchor(edge: Dictionary) -> String:
+	var id := str(edge.get("sourceId", ""))
+	if not is_destination_connector(id):
+		return id
+	return anchor_key(id, "prv" if output_layer(edge) >= 2 else "pgm")
+
+
+## "DP-0", "DP-1" → "DP 0/1"; HDMI keeps its prefix; eDP pairs are joined (labelForTopologyPairs).
+static func gpu_pair_label(pairs: Array) -> String:
+	var list: Array[String] = []
+	for p in pairs:
+		if str(p) != "":
+			list.append(str(p))
+	if list.is_empty():
+		return ""
+	var blob := " ".join(list).to_upper()
+	if blob.contains("HDMI"):
+		var tails: Array[String] = []
+		for p in list:
+			var parts := p.split("-")
+			tails.append("-".join(parts.slice(1)))
+		return "HDMI " + "/".join(tails)
+	if blob.contains("EDP"):
+		return " · ".join(list)
+	var nums: Array[String] = []
+	for p in list:
+		nums.append(p.trim_prefix("DP-").trim_prefix("dp-"))
+	return "DP " + "/".join(nums)
+
+
+## "OPG · 1920x1080@50" (destinationRectLabel, screen destinations).
+static func dest_sub(d: Dictionary) -> String:
+	var mode := str(d.get("mode", "pgm_prv"))
+	var tag: String = MODE_TAG.get(mode, "PGM/PRV")
+	if mode == "stream":
+		var st: Variant = d.get("stream")
+		return "%s · %s" % [tag, str(st.get("type", "rtmp") if st is Dictionary else "rtmp").to_upper()]
+	var w := maxi(64, int(d.get("width", 1920)) if d.get("width") != null else 1920)
+	var h := maxi(64, int(d.get("height", 1080)) if d.get("height") != null else 1080)
+	var fps := maxf(1.0, float(d.get("fps", 50)) if d.get("fps") != null else 50.0)
+	return "%s · %dx%d@%s" % [tag, w, h, _num(fps)]
+
+
+static func _num(v: float) -> String:
+	return str(int(v)) if is_equal_approx(v, roundf(v)) else str(v)
+
+
+## graph + suggested connectors, first occurrence of each id wins.
+static func connectors(payload: Dictionary) -> Dictionary:
+	var out := {}
+	for key in ["graph", "suggested"]:
+		var src: Variant = payload.get(key)
+		if not src is Dictionary:
+			continue
+		for c in src.get("connectors", []):
+			if c is Dictionary and str(c.get("id", "")) != "" and not out.has(str(c.id)):
+				out[str(c.id)] = c
+	return out
+
+
+## GPU sockets from live.gpu.physicalMap.ports (slot order); a connected socket shows its active output.
+## Without a physical map, the gpu_out connectors stand in (label = their externalRef).
+static func gpu_ports(payload: Dictionary, conns: Dictionary) -> Array:
+	var out := []
+	var live: Variant = payload.get("live")
+	var gpu: Variant = live.get("gpu") if live is Dictionary else null
+	var pm: Variant = gpu.get("physicalMap") if gpu is Dictionary else null
+	var ports: Array = pm.get("ports", []) if pm is Dictionary and pm.get("ports") is Array else []
+	ports = ports.filter(func(p: Variant) -> bool: return p is Dictionary and str(p.get("physicalPortId", "")) != "")
+	ports.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slotOrder", 0)) < int(b.get("slotOrder", 0)))
+	for p in ports:
+		var pair: Dictionary = p.get("pair", {}) if p.get("pair") is Dictionary else {}
+		var rt: Dictionary = p.get("runtime", {}) if p.get("runtime") is Dictionary else {}
+		var id := str(p.physicalPortId)
+		var label := gpu_pair_label([pair.get("dpA", ""), pair.get("dpB", "")])
+		label = label if label != "" else id
+		var active := str(rt.get("activePort", "") if rt.get("activePort") != null else "")
+		var connected := bool(rt.get("connected", false))
+		if connected and active != "":
+			label += " · " + active
+		out.append({"id": id, "label": label, "connected": connected, "hdmi": label.begins_with("HDMI")})
+	if not out.is_empty():
+		return out
+	for c in conns.values():
+		if c.get("kind") == "gpu_out" and c.get("deviceId") == CASPAR_HOST:
+			var ref := str(c.get("externalRef", ""))
+			out.append({"id": str(c.id), "label": ref if ref != "" else str(c.get("label", c.id)),
+				"connected": false, "hdmi": ref.to_upper().contains("HDMI")})
+	return out
+
+
+static func _of_kinds(conns: Dictionary, kinds: Array) -> Array:
+	var out := []
+	for c in conns.values():
+		if c.get("deviceId") == CASPAR_HOST and kinds.has(str(c.get("kind", ""))):
+			out.append({"id": str(c.id), "label": str(c.get("label", c.id)), "kind": str(c.kind),
+				"index": int(c.get("index", 0)) if c.get("index") != null else 0})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.index < b.index)
+	return out
+
+
+## Everything the tab draws. Destinations: screen destinations only (host channels arrive with a later slice).
+static func build(payload: Dictionary) -> Dictionary:
+	var conns := connectors(payload)
+	var labels := {}
+	var gpu := gpu_ports(payload, conns)
+	var deck := _of_kinds(conns, ["decklink_io", "decklink_out"])
+	var slots := [{"title": "GPU", "kind": "gpu", "items": gpu}, {"title": "DeckLink", "kind": "decklink", "items": deck}]
+	for s in EXTRA_SLOTS:
+		slots.append({"title": s[0], "kind": s[1][0], "items": _of_kinds(conns, s[1])})
+	var audio := []
+	for a in payload.get("audioOutputs", []):
+		if a is Dictionary and str(a.get("id", "")) != "":
+			audio.append({"id": str(a.id), "label": str(a.get("label", a.get("name", a.id))).left(80)})
+	slots.append({"title": "Audio", "kind": "audio_out", "items": audio})
+	for s in slots:
+		for it in s.items:
+			labels[it.id] = it.label
+	var edges := []
+	var graph: Dictionary = payload.get("graph", {}) if payload.get("graph") is Dictionary else {}
+	for e in graph.get("edges", []):
+		if e is Dictionary and str(e.get("sourceId", "")) != "" and str(e.get("sinkId", "")) != "":
+			edges.append(e)
+	var dests := []
+	var sd: Variant = payload.get("screenDestinations")
+	for d in (sd.get("destinations", []) if sd is Dictionary else []):
+		if not d is Dictionary or str(d.get("id", "")) == "" or d.get("mode") == "host_channel" or d.get("virtual") == true:
+			continue
+		var conn := _dest_connector(conns, str(d.id))
+		var mode := str(d.get("mode", "pgm_prv"))
+		labels[conn] = str(d.get("label", d.id))
+		var links := []
+		for e in edges.filter(func(x: Dictionary) -> bool: return str(x.sourceId) == conn):
+			var prefix := ("PGM: " if output_layer(e) == 1 else "PRV: ") if mode == "pgm_prv" else ""
+			links.append([output_layer(e), prefix + str(labels.get(str(e.sinkId), e.sinkId))])
+		links.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+		dests.append({"id": str(d.id), "label": str(d.get("label", d.id)), "sub": dest_sub(d), "mode": mode,
+			"connector": conn, "halves": ["pgm", "prv"] if mode == "pgm_prv" else [],
+			"links": links.map(func(l: Array) -> String: return l[1])})
+	var cables := []
+	for e in edges:
+		cables.append({"id": str(e.get("id", "")), "from": source_anchor(e), "to": str(e.sinkId),
+			"label": "%s → %s" % [labels.get(str(e.sourceId), e.sourceId), labels.get(str(e.sinkId), e.sinkId)]})
+	return {"destinations": dests, "slots": slots, "cables": cables}
+
+
+## resolveDestinationSinkConnectorId: the destination_in connector whose externalRef is the destination id.
+static func _dest_connector(conns: Dictionary, did: String) -> String:
+	for c in conns.values():
+		if c.get("kind") == "destination_in" and str(c.get("externalRef", "")) == did:
+			return str(c.id)
+	return "dst_in_" + did
