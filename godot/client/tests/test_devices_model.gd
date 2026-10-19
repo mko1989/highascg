@@ -93,7 +93,12 @@ func test_dest_sub() -> void:
 
 func test_build_destinations() -> void:
 	var built := M.build(_fixture())
-	t.eq(built.destinations.size(), 2, "host_channel destination is skipped, two screen destinations remain")
+	t.eq(built.destinations.size(), 3, "two screen destinations, then the pinned host channel (slice 3)")
+	t.eq([built.screen_count, built.host_count], [2, 1], "screen / host counts for the host heading")
+	var host: Dictionary = built.destinations[2]
+	t.eq([host.id, host.host, host.sub, host.halves], ["host_1", true, "HOST · ch 2", []], "pinned host card")
+	t.eq(M.build(_fixture(), null, {"serverChannels": [{"index": 1}]}).destinations[2].sub, "HOST · ch 2 (planned)",
+		"running Caspar has no ch 2 → planned")
 	var op: Dictionary = built.destinations[0]
 	t.eq(op.id, "dst_op_1", "operator GUI first, in payload order")
 	t.eq(op.connector, "dst_in_dst_op_1", "connector is the dst_in_ id")

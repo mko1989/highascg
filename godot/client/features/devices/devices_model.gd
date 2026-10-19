@@ -4,6 +4,7 @@ extends RefCounted
 ## device-view-output-layer.js (PGM/PRV halves), destinationRectLabel (ui-utils), labelForTopologyPairs /
 ## entryFromTopologyRow (gpu-port-entries) and the caspar-rear-data.js kind filters. Pure (tests preload it).
 
+const H := preload("res://features/devices/host_channels.gd")
 const CASPAR_HOST := "caspar_host"
 const MODE_TAG := {"pgm_only": "PGM", "multiview": "MVR", "stream": "STREAM", "pixelmap": "PXM",
 	"operator_gui": "OPG"}
@@ -70,9 +71,12 @@ static func gpu_pair_label(pairs: Array) -> String:
 	return "DP " + "/".join(nums)
 
 
-## "OPG · 1920x1080@50" (destinationRectLabel, screen destinations).
+## "OPG · 1920x1080@50" / "NDI host · ch 4" (destinationRectLabel).
 static func dest_sub(d: Dictionary) -> String:
 	var mode := str(d.get("mode", "pgm_prv"))
+	if mode == "host_channel":
+		var role := H.role_label(str(d.hostRole)) if H.truthy(d.get("hostRole")) else "Host"
+		return "%s · ch %s" % [role, H.R.s(d.casparChannel)] if d.get("casparChannel") != null else role
 	var tag: String = MODE_TAG.get(mode, "PGM/PRV")
 	if mode == "stream":
 		var st: Variant = d.get("stream")
@@ -141,8 +145,9 @@ static func _of_kinds(conns: Dictionary, kinds: Array) -> Array:
 	return out
 
 
-## Everything the tab draws. Destinations: screen destinations only (host channels arrive with a later slice).
-static func build(payload: Dictionary) -> Dictionary:
+## Everything the tab draws. Destinations: screen destinations, then pinned and auto-detected host channels
+## (host_channels.gd); `live_cm` is the WS state channelMap, `cc` the state configComparison (the "(planned)" badge).
+static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = null) -> Dictionary:
 	var conns := connectors(payload)
 	var labels := {}
 	var gpu := gpu_ports(payload, conns)
@@ -163,27 +168,43 @@ static func build(payload: Dictionary) -> Dictionary:
 	for e in graph.get("edges", []):
 		if e is Dictionary and str(e.get("sourceId", "")) != "" and str(e.get("sinkId", "")) != "":
 			edges.append(e)
+	var caspar := H.R.d(H.R.d(payload.get("live")).get("caspar"))
+	var intents := {}
+	for it in H.R.a(H.R.d(caspar.get("destinationIntent")).get("items")):
+		if it is Dictionary and not intents.has(H.R.s(it.get("id"))):
+			intents[H.R.s(it.get("id"))] = it
+	var switcher_bus := H.R.s(H.R.d(caspar.get("channelMap")).get("transitionModel")) == "switcher_bus"
 	var dests := []
-	var sd: Variant = payload.get("screenDestinations")
-	for d in (sd.get("destinations", []) if sd is Dictionary else []):
-		if not d is Dictionary or str(d.get("id", "")) == "" or d.get("mode") == "host_channel" or d.get("virtual") == true:
+	var counts := {"screen": 0, "host": 0}
+	for d in H.all_destinations(payload, live_cm):
+		var did := H.R.s(d.get("id")).strip_edges()
+		if did == "" or dests.any(func(x: Dictionary) -> bool: return x.id == did):
 			continue
-		var conn := _dest_connector(conns, str(d.id))
+		var host := H.is_host(d)
+		counts["host" if host else "screen"] += 1
+		var conn := _dest_connector(conns, did)
 		var mode := str(d.get("mode", "pgm_prv"))
-		labels[conn] = str(d.get("label", d.id))
+		var name := H.R.s(d.label) if H.truthy(d.get("label")) else did
+		labels[conn] = name
+		var intent: Variant = intents.get(did)
+		var sub := dest_sub(d)
+		if host:
+			var ch: Variant = H.coalesce([d.get("casparChannel"), H.R.d(intent).get("pgmChannel")])
+			sub = "HOST · ch %s%s" % [H.R.s(ch) if ch != null else "?", " (planned)" if H.channel_planned(ch, cc) else ""]
 		var links := []
 		for e in edges.filter(func(x: Dictionary) -> bool: return str(x.sourceId) == conn):
 			var prefix := ("PGM: " if output_layer(e) == 1 else "PRV: ") if mode == "pgm_prv" else ""
 			links.append([output_layer(e), prefix + str(labels.get(str(e.sinkId), e.sinkId))])
 		links.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
-		dests.append({"id": str(d.id), "label": str(d.get("label", d.id)), "sub": dest_sub(d), "mode": mode,
-			"connector": conn, "halves": ["pgm", "prv"] if mode == "pgm_prv" else [],
-			"links": links.map(func(l: Array) -> String: return l[1])})
+		dests.append({"id": did, "label": name, "sub": sub, "mode": mode, "host": host, "connector": conn,
+			"halves": ["pgm", "prv"] if mode == "pgm_prv" else [], "prv_dot": not switcher_bus, "dest": d,
+			"intent": intent, "links": links.map(func(l: Array) -> String: return l[1])})
 	var cables := []
 	for e in edges:
 		cables.append({"id": str(e.get("id", "")), "from": source_anchor(e), "to": str(e.sinkId),
 			"label": "%s → %s" % [labels.get(str(e.sourceId), e.sourceId), labels.get(str(e.sinkId), e.sinkId)]})
-	return {"destinations": dests, "slots": slots, "cables": cables}
+	return {"destinations": dests, "slots": slots, "cables": cables, "screen_count": counts.screen,
+		"host_count": counts.host}
 
 
 ## resolveDestinationSinkConnectorId: the destination_in connector whose externalRef is the destination id.

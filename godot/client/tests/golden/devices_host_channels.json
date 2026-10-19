@@ -1,0 +1,1366 @@
+{
+ "cases": {
+  "dedicated": {
+   "graph": {
+    "connectors": [
+     {
+      "id": "dlsdi_1",
+      "kind": "decklink_io",
+      "index": 0,
+      "caspar": {
+       "ioDirection": "in"
+      }
+     },
+     {
+      "id": "dlsdi_2",
+      "kind": "decklink_io",
+      "index": 1,
+      "caspar": {
+       "ioDirection": "out"
+      }
+     },
+     {
+      "id": "dlsdi_4",
+      "kind": "decklink_io",
+      "externalRef": "4",
+      "caspar": {
+       "ioDirection": "IN"
+      }
+     }
+    ],
+    "edges": []
+   },
+   "screenDestinations": {
+    "destinations": [
+     {
+      "id": "dst_a",
+      "label": "Main",
+      "mode": "pgm_prv",
+      "mainScreenIndex": 0
+     },
+     {
+      "id": "dst_a",
+      "label": "dup"
+     },
+     {
+      "id": "host_pinned",
+      "mode": "host_channel",
+      "hostRole": "streaming_channel",
+      "casparChannel": 9,
+      "label": "Pinned"
+     },
+     {
+      "id": "dst_opg",
+      "mode": "operator_gui"
+     }
+    ]
+   },
+   "live": {
+    "decklink": {
+     "inputs": [
+      {
+       "slot": 1,
+       "ioDirection": "in",
+       "device": 1
+      },
+      {
+       "slot": 2,
+       "ioDirection": "IN",
+       "device": "3"
+      },
+      {
+       "slot": 3,
+       "ioDirection": "out",
+       "device": 2
+      }
+     ]
+    },
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 2,
+      "decklinkInputChannels": [
+       5,
+       6
+      ],
+      "liveAudioCount": 2,
+      "liveAudioInputChannels": [
+       7,
+       8
+      ],
+      "v4l2InputCount": 1,
+      "inputChannels": [
+       {
+        "kind": "decklink",
+        "slot": 1,
+        "channel": 5,
+        "layer": 1,
+        "route": "route://5-1"
+       },
+       {
+        "kind": "decklink",
+        "slot": 2,
+        "channel": 6,
+        "layer": 2,
+        "route": "route://6-2"
+       },
+       {
+        "kind": "live_audio",
+        "slot": 1,
+        "channel": 7
+       },
+       {
+        "kind": "live_audio",
+        "slot": 2,
+        "channel": 8
+       },
+       {
+        "kind": "v4l2",
+        "slot": 1,
+        "channel": 10,
+        "label": "USB: Cam (ch 10)"
+       },
+       {
+        "kind": "v4l2",
+        "slot": 2,
+        "channel": 11
+       },
+       {
+        "kind": "webpage_host",
+        "channel": 12,
+        "sourceId": "wp1",
+        "label": "Clock"
+       },
+       {
+        "kind": "ndi_host",
+        "channel": 13,
+        "sourceId": "ndi1"
+       },
+       {
+        "kind": "browser_display",
+        "channel": 14,
+        "sourceId": "br1"
+       },
+       {
+        "kind": "browser_display",
+        "channel": null,
+        "sourceId": "br2"
+       }
+      ]
+     },
+     "generatedChannelOrder": [
+      {
+       "role": "pgm",
+       "ch": 1
+      },
+      {
+       "role": "extra_audio",
+       "ch": 15
+      },
+      {
+       "role": "decklink_input",
+       "ch": 16,
+       "slot": 3
+      },
+      {
+       "role": "streaming_channel",
+       "ch": 9
+      },
+      {
+       "role": "inputs_host",
+       "ch": "4"
+      }
+     ],
+     "destinationIntent": {
+      "items": [
+       {
+        "id": "dst_a",
+        "pgmChannel": 1
+       },
+       {
+        "hostRole": "ndi_host",
+        "pgmChannel": 13,
+        "sourceId": "ndi1",
+        "label": ""
+       },
+       {
+        "hostRole": "live_audio_input",
+        "casparChannel": 30,
+        "inputSlot": 2
+       },
+       {
+        "hostRole": "decklink_input",
+        "casparChannel": 31,
+        "inputSlot": 4
+       }
+      ]
+     }
+    }
+   }
+  },
+  "shared": {
+   "graph": {
+    "connectors": [
+     {
+      "id": "dlsdi_1",
+      "kind": "decklink_io",
+      "index": 0,
+      "caspar": {
+       "ioDirection": "in"
+      }
+     },
+     {
+      "id": "dlsdi_2",
+      "kind": "decklink_io",
+      "index": 1,
+      "caspar": {
+       "ioDirection": "out"
+      }
+     },
+     {
+      "id": "dlsdi_4",
+      "kind": "decklink_io",
+      "externalRef": "4",
+      "caspar": {
+       "ioDirection": "IN"
+      }
+     }
+    ],
+    "edges": []
+   },
+   "screenDestinations": {
+    "destinations": [
+     {
+      "id": "dst_a",
+      "label": "Main",
+      "mode": "pgm_prv",
+      "mainScreenIndex": 0
+     },
+     {
+      "id": "dst_a",
+      "label": "dup"
+     },
+     {
+      "id": "host_pinned",
+      "mode": "host_channel",
+      "hostRole": "streaming_channel",
+      "casparChannel": 9,
+      "label": "Pinned"
+     },
+     {
+      "id": "dst_opg",
+      "mode": "operator_gui"
+     }
+    ]
+   },
+   "live": {
+    "decklink": {
+     "inputs": [
+      {
+       "slot": 1,
+       "ioDirection": "in",
+       "device": 1
+      },
+      {
+       "slot": 2,
+       "ioDirection": "in",
+       "device": 2
+      }
+     ]
+    },
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 2,
+      "inputsCh": 4
+     }
+    }
+   }
+  },
+  "mvr": {
+   "graph": {
+    "connectors": [
+     {
+      "id": "dlsdi_1",
+      "kind": "decklink_io",
+      "index": 0,
+      "caspar": {
+       "ioDirection": "in"
+      }
+     },
+     {
+      "id": "dlsdi_2",
+      "kind": "decklink_io",
+      "index": 1,
+      "caspar": {
+       "ioDirection": "out"
+      }
+     },
+     {
+      "id": "dlsdi_4",
+      "kind": "decklink_io",
+      "externalRef": "4",
+      "caspar": {
+       "ioDirection": "IN"
+      }
+     }
+    ],
+    "edges": []
+   },
+   "screenDestinations": {
+    "destinations": [
+     {
+      "id": "dst_a",
+      "label": "Main",
+      "mode": "pgm_prv",
+      "mainScreenIndex": 0
+     },
+     {
+      "id": "dst_a",
+      "label": "dup"
+     },
+     {
+      "id": "host_pinned",
+      "mode": "host_channel",
+      "hostRole": "streaming_channel",
+      "casparChannel": 9,
+      "label": "Pinned"
+     },
+     {
+      "id": "dst_opg",
+      "mode": "operator_gui"
+     }
+    ]
+   },
+   "live": {
+    "decklink": {
+     "inputs": [
+      {
+       "slot": 1,
+       "ioDirection": "in",
+       "device": 1
+      }
+     ]
+    },
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 1,
+      "inputsCh": 4,
+      "inputsOnMvr": true,
+      "multiviewCh": 3
+     }
+    }
+   }
+  },
+  "orderHost": {
+   "graph": {
+    "connectors": [
+     {
+      "id": "dlsdi_1",
+      "kind": "decklink_io",
+      "index": 0,
+      "caspar": {
+       "ioDirection": "in"
+      }
+     },
+     {
+      "id": "dlsdi_2",
+      "kind": "decklink_io",
+      "index": 1,
+      "caspar": {
+       "ioDirection": "out"
+      }
+     },
+     {
+      "id": "dlsdi_4",
+      "kind": "decklink_io",
+      "externalRef": "4",
+      "caspar": {
+       "ioDirection": "IN"
+      }
+     }
+    ],
+    "edges": []
+   },
+   "screenDestinations": {
+    "destinations": [
+     {
+      "id": "dst_a",
+      "label": "Main",
+      "mode": "pgm_prv",
+      "mainScreenIndex": 0
+     },
+     {
+      "id": "dst_a",
+      "label": "dup"
+     },
+     {
+      "id": "host_pinned",
+      "mode": "host_channel",
+      "hostRole": "streaming_channel",
+      "casparChannel": 9,
+      "label": "Pinned"
+     },
+     {
+      "id": "dst_opg",
+      "mode": "operator_gui"
+     }
+    ]
+   },
+   "live": {
+    "decklink": {
+     "inputs": [
+      {
+       "slot": 2,
+       "ioDirection": "in",
+       "device": 2
+      }
+     ]
+    },
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 0
+     },
+     "generatedChannelOrder": [
+      {
+       "role": "inputs_host",
+       "ch": 6
+      }
+     ]
+    }
+   }
+  },
+  "planned": {
+   "graph": {
+    "connectors": [],
+    "edges": []
+   },
+   "screenDestinations": {
+    "destinations": [
+     {
+      "id": "dst_a",
+      "label": "Main",
+      "mode": "pgm_prv",
+      "mainScreenIndex": 0
+     },
+     {
+      "id": "dst_a",
+      "label": "dup"
+     },
+     {
+      "id": "host_pinned",
+      "mode": "host_channel",
+      "hostRole": "streaming_channel",
+      "casparChannel": 9,
+      "label": "Pinned"
+     },
+     {
+      "id": "dst_opg",
+      "mode": "operator_gui"
+     }
+    ]
+   },
+   "live": {
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 1,
+      "decklinkInputChannels": [
+       5
+      ],
+      "inputChannels": [
+       {
+        "kind": "webpage_host",
+        "channel": 7,
+        "sourceId": "wp1"
+       }
+      ]
+     },
+     "destinationIntent": {
+      "items": [
+       {
+        "hostRole": "decklink_input",
+        "casparChannel": 5,
+        "inputSlot": 1
+       },
+       {
+        "hostRole": "v4l2_input",
+        "casparChannel": 3,
+        "inputSlot": 1,
+        "label": "USB: Cam (ch 3)"
+       },
+       {
+        "hostRole": "webpage_host",
+        "casparChannel": 7,
+        "sourceId": "wp1"
+       }
+      ]
+     }
+    }
+   },
+   "_settings": {
+    "casparServer": {
+     "decklink_input_count": 1,
+     "decklink_input_1_direction": "in",
+     "decklink_input_1_device": 2
+    },
+    "channelMap": {
+     "decklinkCount": 1,
+     "decklinkInputChannels": [
+      8
+     ],
+     "liveAudioCount": 1,
+     "liveAudioInputChannels": [
+      9
+     ],
+     "inputChannels": [
+      {
+       "kind": "webpage_host",
+       "channel": 11,
+       "sourceId": "wp1"
+      }
+     ]
+    }
+   },
+   "settings": {
+    "casparServer": {
+     "decklink_input_count": 1,
+     "decklink_input_1_direction": "in",
+     "decklink_input_1_device": 2
+    },
+    "channelMap": {
+     "decklinkCount": 1,
+     "decklinkInputChannels": [
+      8
+     ],
+     "liveAudioCount": 1,
+     "liveAudioInputChannels": [
+      9
+     ],
+     "inputChannels": [
+      {
+       "kind": "webpage_host",
+       "channel": 11,
+       "sourceId": "wp1"
+      }
+     ]
+    }
+   }
+  },
+  "settingsSlot": {
+   "screenDestinations": {},
+   "live": {
+    "caspar": {
+     "channelMap": {
+      "decklinkCount": 2,
+      "inputsCh": 4
+     },
+     "destinationIntent": {
+      "items": [
+       {
+        "hostRole": "decklink_input",
+        "casparChannel": 4,
+        "inputSlot": 2
+       },
+       {
+        "hostRole": "decklink_input",
+        "casparChannel": 4,
+        "inputSlot": 1
+       }
+      ]
+     }
+    }
+   },
+   "_settings": {
+    "casparServer": {
+     "decklink_input_count": 2,
+     "decklink_input_1_direction": "in",
+     "decklink_input_1_device": 1,
+     "decklink_input_2_direction": "out",
+     "decklink_input_2_device": 2
+    }
+   },
+   "settings": {
+    "casparServer": {
+     "decklink_input_count": 2,
+     "decklink_input_1_direction": "in",
+     "decklink_input_1_device": 1,
+     "decklink_input_2_direction": "out",
+     "decklink_input_2_device": 2
+    }
+   }
+  },
+  "empty": {
+   "screenDestinations": {
+    "destinations": []
+   }
+  }
+ },
+ "all": {
+  "dedicated": [
+   {
+    "id": "dst_a",
+    "label": "Main",
+    "mode": "pgm_prv",
+    "mainScreenIndex": 0
+   },
+   {
+    "id": "dst_opg",
+    "mode": "operator_gui"
+   },
+   {
+    "id": "host_pinned",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "label": "Pinned"
+   },
+   {
+    "id": "host_decklink_input_1",
+    "label": "DeckLink input 1",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 5,
+    "virtual": true,
+    "inputSlot": 1
+   },
+   {
+    "id": "host_decklink_input_2",
+    "label": "DeckLink input 2",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 6,
+    "virtual": true,
+    "inputSlot": 2
+   },
+   {
+    "id": "host_live_audio_input_1",
+    "label": "Live audio input 1",
+    "mode": "host_channel",
+    "hostRole": "live_audio_input",
+    "casparChannel": 7,
+    "virtual": true,
+    "inputSlot": 1
+   },
+   {
+    "id": "host_live_audio_input_2",
+    "label": "Live audio input 2",
+    "mode": "host_channel",
+    "hostRole": "live_audio_input",
+    "casparChannel": 8,
+    "virtual": true,
+    "inputSlot": 2
+   },
+   {
+    "id": "host_v4l2_ch_10",
+    "label": "USB: Cam (ch 10)",
+    "mode": "host_channel",
+    "hostRole": "v4l2_input",
+    "casparChannel": 10,
+    "virtual": true,
+    "inputSlot": 1
+   },
+   {
+    "id": "host_v4l2_ch_11",
+    "label": "USB video 2",
+    "mode": "host_channel",
+    "hostRole": "v4l2_input",
+    "casparChannel": 11,
+    "virtual": true,
+    "inputSlot": 2
+   },
+   {
+    "id": "host_webpage_wp1",
+    "label": "Clock",
+    "mode": "host_channel",
+    "hostRole": "webpage_host",
+    "casparChannel": 12,
+    "virtual": true,
+    "sourceId": "wp1"
+   },
+   {
+    "id": "host_ndi_ndi1",
+    "label": "NDI: ndi1 (ch 13)",
+    "mode": "host_channel",
+    "hostRole": "ndi_host",
+    "casparChannel": 13,
+    "virtual": true,
+    "sourceId": "ndi1"
+   },
+   {
+    "id": "host_browser_br1",
+    "label": "Browser: br1 (ch 14)",
+    "mode": "host_channel",
+    "hostRole": "browser_display",
+    "casparChannel": 14,
+    "virtual": true,
+    "sourceId": "br1"
+   },
+   {
+    "id": "host_extra_audio_15",
+    "label": "Extra audio (ch 15)",
+    "mode": "host_channel",
+    "hostRole": "extra_audio",
+    "casparChannel": 15,
+    "virtual": true
+   },
+   {
+    "id": "host_streaming",
+    "label": "Streaming channel (ch 9)",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "virtual": true
+   },
+   {
+    "id": "host_inputs",
+    "label": "Inputs host (ch 4)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 4,
+    "virtual": true
+   },
+   {
+    "id": "host_decklink_input_4",
+    "label": "DeckLink input 4 (ch 31)",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 31,
+    "virtual": true,
+    "inputSlot": 4
+   }
+  ],
+  "shared": [
+   {
+    "id": "dst_a",
+    "label": "Main",
+    "mode": "pgm_prv",
+    "mainScreenIndex": 0
+   },
+   {
+    "id": "dst_opg",
+    "mode": "operator_gui"
+   },
+   {
+    "id": "host_pinned",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "label": "Pinned"
+   },
+   {
+    "id": "host_inputs",
+    "label": "Inputs host (ch 4)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 4,
+    "virtual": true
+   }
+  ],
+  "mvr": [
+   {
+    "id": "dst_a",
+    "label": "Main",
+    "mode": "pgm_prv",
+    "mainScreenIndex": 0
+   },
+   {
+    "id": "dst_opg",
+    "mode": "operator_gui"
+   },
+   {
+    "id": "host_pinned",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "label": "Pinned"
+   },
+   {
+    "id": "host_inputs_mvr",
+    "label": "DeckLink inputs (MVR ch 3)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 3,
+    "virtual": true
+   }
+  ],
+  "orderHost": [
+   {
+    "id": "dst_a",
+    "label": "Main",
+    "mode": "pgm_prv",
+    "mainScreenIndex": 0
+   },
+   {
+    "id": "dst_opg",
+    "mode": "operator_gui"
+   },
+   {
+    "id": "host_pinned",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "label": "Pinned"
+   },
+   {
+    "id": "host_inputs",
+    "label": "Inputs host (ch 6)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 6,
+    "virtual": true
+   }
+  ],
+  "planned": [
+   {
+    "id": "dst_a",
+    "label": "Main",
+    "mode": "pgm_prv",
+    "mainScreenIndex": 0
+   },
+   {
+    "id": "dst_opg",
+    "mode": "operator_gui"
+   },
+   {
+    "id": "host_pinned",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 9,
+    "label": "Pinned"
+   },
+   {
+    "id": "host_decklink_input_1",
+    "label": "DeckLink input 1",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 8,
+    "virtual": true,
+    "inputSlot": 1
+   },
+   {
+    "id": "host_webpage_wp1",
+    "label": "Webpage: wp1 (ch 11)",
+    "mode": "host_channel",
+    "hostRole": "webpage_host",
+    "casparChannel": 11,
+    "virtual": true,
+    "sourceId": "wp1"
+   },
+   {
+    "id": "host_v4l2_ch_3",
+    "label": "USB: Cam (ch 3)",
+    "mode": "host_channel",
+    "hostRole": "v4l2_input",
+    "casparChannel": 3,
+    "virtual": true,
+    "inputSlot": 1
+   }
+  ],
+  "settingsSlot": [
+   {
+    "id": "host_inputs",
+    "label": "Inputs host (ch 4)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 4,
+    "virtual": true
+   },
+   {
+    "id": "host_decklink_input_1",
+    "label": "DeckLink input 1 (ch 4)",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 4,
+    "virtual": true,
+    "inputSlot": 1
+   }
+  ],
+  "empty": []
+ },
+ "hostIds": [
+  [
+   [
+    "inputs_host",
+    2
+   ],
+   "host_inputs"
+  ],
+  [
+   [
+    "streaming_channel",
+    3
+   ],
+   "host_streaming"
+  ],
+  [
+   [
+    "extra_audio",
+    4
+   ],
+   "host_extra_audio_4"
+  ],
+  [
+   [
+    "decklink_input",
+    5,
+    2
+   ],
+   "host_decklink_input_2"
+  ],
+  [
+   [
+    "decklink_input",
+    5
+   ],
+   "host_decklink_ch_5"
+  ],
+  [
+   [
+    "decklink_input",
+    5,
+    "x"
+   ],
+   "host_decklink_ch_5"
+  ],
+  [
+   [
+    "live_audio_input",
+    6,
+    1
+   ],
+   "host_live_audio_input_1"
+  ],
+  [
+   [
+    "live_audio_input",
+    6
+   ],
+   "host_live_audio_ch_6"
+  ],
+  [
+   [
+    "v4l2_input",
+    7,
+    3
+   ],
+   "host_v4l2_input_3"
+  ],
+  [
+   [
+    "v4l2_input",
+    7
+   ],
+   "host_v4l2_ch_7"
+  ],
+  [
+   [
+    "webpage_host",
+    8,
+    "wp"
+   ],
+   "host_webpage_wp"
+  ],
+  [
+   [
+    "webpage_host",
+    8
+   ],
+   "host_webpage_8"
+  ],
+  [
+   [
+    "ndi_host",
+    9,
+    "n"
+   ],
+   "host_ndi_n"
+  ],
+  [
+   [
+    "browser_display",
+    10,
+    "b"
+   ],
+   "host_browser_b"
+  ],
+  [
+   [
+    "browser_display",
+    10,
+    ""
+   ],
+   "host_browser_ch_10"
+  ],
+  [
+   [
+    "weird",
+    11
+   ],
+   "host_weird_11"
+  ]
+ ],
+ "labels": [
+  [
+   {
+    "role": "decklink_input",
+    "ch": 2,
+    "slot": 1
+   },
+   "DeckLink input 1 (ch 2)"
+  ],
+  [
+   {
+    "role": "decklink_input",
+    "slot": 1
+   },
+   "DeckLink input 1"
+  ],
+  [
+   {
+    "role": "live_audio_input",
+    "ch": 3,
+    "slot": 2
+   },
+   "Live audio input 2 (ch 3)"
+  ],
+  [
+   {
+    "role": "v4l2_input",
+    "ch": 4,
+    "slot": 1,
+    "label": "Cam"
+   },
+   "USB: Cam (ch 4)"
+  ],
+  [
+   {
+    "role": "v4l2_input",
+    "slot": 1
+   },
+   "USB: USB video"
+  ],
+  [
+   {
+    "role": "webpage_host",
+    "ch": 5,
+    "sourceId": "s"
+   },
+   "Webpage: s (ch 5)"
+  ],
+  [
+   {
+    "role": "ndi_host"
+   },
+   "NDI: NDI"
+  ],
+  [
+   {
+    "role": "browser_display",
+    "ch": 6,
+    "label": "B"
+   },
+   "Browser: B (ch 6)"
+  ],
+  [
+   {
+    "role": "inputs_host",
+    "ch": 4
+   },
+   "Inputs host (ch 4)"
+  ],
+  [
+   {
+    "role": "streaming_channel"
+   },
+   "Streaming channel"
+  ],
+  [
+   {
+    "role": "zzz",
+    "ch": 1
+   },
+   "zzz (ch 1)"
+  ]
+ ],
+ "norm": [
+  [
+   null,
+   null
+  ],
+  [
+   {
+    "role": "pgm",
+    "ch": 1
+   },
+   null
+  ],
+  [
+   {
+    "hostRole": "inputs_host",
+    "casparChannel": "3"
+   },
+   {
+    "id": "host_inputs",
+    "label": "Inputs host (ch 3)",
+    "mode": "host_channel",
+    "hostRole": "inputs_host",
+    "casparChannel": 3,
+    "virtual": true
+   }
+  ],
+  [
+   {
+    "role": "decklink_input",
+    "ch": 0,
+    "slot": 1
+   },
+   null
+  ],
+  [
+   {
+    "role": "decklink_input",
+    "ch": 5
+   },
+   {
+    "id": "host_decklink_ch_5",
+    "label": "DeckLink input NaN (ch 5)",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 5,
+    "virtual": true
+   }
+  ],
+  [
+   {
+    "role": "decklink_input",
+    "ch": 5,
+    "slot": 2
+   },
+   {
+    "id": "host_decklink_input_2",
+    "label": "DeckLink input 2 (ch 5)",
+    "mode": "host_channel",
+    "hostRole": "decklink_input",
+    "casparChannel": 5,
+    "virtual": true,
+    "inputSlot": 2
+   }
+  ],
+  [
+   {
+    "role": "extra_audio",
+    "pgmChannel": 7.6
+   },
+   {
+    "id": "host_extra_audio_7",
+    "label": "Extra audio (ch 7)",
+    "mode": "host_channel",
+    "hostRole": "extra_audio",
+    "casparChannel": 7,
+    "virtual": true
+   }
+  ],
+  [
+   {
+    "role": "webpage_host",
+    "ch": 8,
+    "sourceId": "12ab"
+   },
+   {
+    "id": "host_webpage_12ab",
+    "label": "Webpage: Webpage (ch 8)",
+    "mode": "host_channel",
+    "hostRole": "webpage_host",
+    "casparChannel": 8,
+    "virtual": true,
+    "sourceId": "12ab",
+    "inputSlot": 12
+   }
+  ],
+  [
+   {
+    "role": "ndi_host",
+    "ch": 9,
+    "sourceId": "cam",
+    "label": "  Lbl  "
+   },
+   {
+    "id": "host_ndi_cam",
+    "label": "Lbl",
+    "mode": "host_channel",
+    "hostRole": "ndi_host",
+    "casparChannel": 9,
+    "virtual": true,
+    "sourceId": "cam"
+   }
+  ],
+  [
+   {
+    "role": "v4l2_input",
+    "ch": 4,
+    "inputSlot": 2,
+    "devicePath": "/dev/video0"
+   },
+   {
+    "id": "host_v4l2_ch_4",
+    "label": "USB: USB video (ch 4)",
+    "mode": "host_channel",
+    "hostRole": "v4l2_input",
+    "casparChannel": 4,
+    "virtual": true,
+    "inputSlot": 2,
+    "devicePath": "/dev/video0"
+   }
+  ],
+  [
+   {
+    "id": "given",
+    "role": "streaming_channel",
+    "ch": 2
+   },
+   {
+    "id": "given",
+    "label": "Streaming channel (ch 2)",
+    "mode": "host_channel",
+    "hostRole": "streaming_channel",
+    "casparChannel": 2,
+    "virtual": true
+   }
+  ]
+ ],
+ "planned": [
+  [
+   1,
+   {
+    "serverChannels": [
+     {
+      "index": 1
+     },
+     {
+      "index": "2"
+     },
+     {
+      "index": "x"
+     }
+    ]
+   },
+   false
+  ],
+  [
+   3,
+   {
+    "serverChannels": [
+     {
+      "index": 1
+     },
+     {
+      "index": "2"
+     },
+     {
+      "index": "x"
+     }
+    ]
+   },
+   true
+  ],
+  [
+   "2",
+   {
+    "serverChannels": [
+     {
+      "index": 1
+     },
+     {
+      "index": "2"
+     },
+     {
+      "index": "x"
+     }
+    ]
+   },
+   false
+  ],
+  [
+   null,
+   {
+    "serverChannels": [
+     {
+      "index": 1
+     },
+     {
+      "index": "2"
+     },
+     {
+      "index": "x"
+     }
+    ]
+   },
+   false
+  ],
+  [
+   3,
+   null,
+   false
+  ],
+  [
+   3,
+   {
+    "serverChannels": []
+   },
+   false
+  ]
+ ],
+ "roles": {
+  "pgm": "Main 2 OUTPUT/PGM",
+  "prv": "Main 2 PRV",
+  "bus1": "Main 2 Bus 1",
+  "bus2": "Main 2 Bus 2",
+  "multiview": "Multiview",
+  "webpage_host": "Webpage host",
+  "odd": "odd",
+  "": "channel"
+ },
+ "rect": [
+  [
+   {
+    "mode": "host_channel",
+    "hostRole": "ndi_host",
+    "casparChannel": 4
+   },
+   "NDI host · ch 4"
+  ],
+  [
+   {
+    "mode": "host_channel"
+   },
+   "Host"
+  ],
+  [
+   {
+    "mode": "pgm_only",
+    "width": 3840,
+    "height": "2160",
+    "fps": 59.94
+   },
+   "PGM · 3840x2160@59.94"
+  ],
+  [
+   {
+    "mode": "stream",
+    "stream": {
+     "type": "srt"
+    }
+   },
+   "STREAM · SRT"
+  ],
+  [
+   {
+    "mode": "pixelmap",
+    "width": 10
+   },
+   "PXM · 64x1080@50"
+  ],
+  [
+   {},
+   "PGM/PRV · 1920x1080@50"
+  ]
+ ]
+}

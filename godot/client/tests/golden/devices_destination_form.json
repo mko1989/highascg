@@ -1,0 +1,1901 @@
+{
+  "cases": [
+    {
+      "name": "pgm_prv",
+      "d": {
+        "id": "dst_a",
+        "label": "Main LED",
+        "mode": "pgm_prv",
+        "mainScreenIndex": 1,
+        "videoMode": "1080p5000",
+        "width": 1920,
+        "height": 1080,
+        "fps": 50,
+        "audioLayout": "4ch"
+      },
+      "intent": {
+        "pgmChannel": 1,
+        "previewChannelGenerated": 2
+      },
+      "rows": [
+        [
+          "Label",
+          "Main LED"
+        ],
+        [
+          "Mode",
+          "PGM/PRV"
+        ],
+        [
+          "Main index",
+          "1"
+        ],
+        [
+          "Audio outputs",
+          "4 channels"
+        ],
+        [
+          "Video mode",
+          "1080p5000"
+        ],
+        [
+          "Resolution",
+          "1920x1080"
+        ],
+        [
+          "FPS",
+          "50"
+        ],
+        [
+          "PGM channel",
+          "1"
+        ],
+        [
+          "PRV channel",
+          "2"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "Main LED",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "pgm_prv",
+          "disabled": false,
+          "placeholder": null,
+          "options": [
+            [
+              "pgm_prv",
+              "PGM/PRV"
+            ],
+            [
+              "pgm_only",
+              "PGM only"
+            ],
+            [
+              "multiview",
+              "Multiview"
+            ],
+            [
+              "pixelmap",
+              "Pixel Map (native Art-Net)"
+            ],
+            [
+              "operator_gui",
+              "Operator GUI (Firefox + shaped overlay)"
+            ]
+          ]
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "4ch",
+          "disabled": false,
+          "placeholder": null,
+          "options": [
+            [
+              "stereo",
+              "2 channels"
+            ],
+            [
+              "4ch",
+              "4 channels"
+            ],
+            [
+              "8ch",
+              "8 channels"
+            ],
+            [
+              "16ch",
+              "16 channels"
+            ]
+          ]
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "1080p5000",
+          "disabled": false,
+          "placeholder": null,
+          "options": [
+            [
+              "custom",
+              "Custom"
+            ],
+            [
+              "PAL",
+              "PAL"
+            ],
+            [
+              "NTSC",
+              "NTSC"
+            ],
+            [
+              "576p2500",
+              "576p2500"
+            ],
+            [
+              "720p2398",
+              "720p2398"
+            ],
+            [
+              "720p2400",
+              "720p2400"
+            ],
+            [
+              "720p2500",
+              "720p2500"
+            ],
+            [
+              "720p2997",
+              "720p2997"
+            ],
+            [
+              "720p3000",
+              "720p3000"
+            ],
+            [
+              "720p5000",
+              "720p5000"
+            ],
+            [
+              "720p5994",
+              "720p5994"
+            ],
+            [
+              "720p6000",
+              "720p6000"
+            ],
+            [
+              "1080i5000",
+              "1080i5000"
+            ],
+            [
+              "1080i5994",
+              "1080i5994"
+            ],
+            [
+              "1080i6000",
+              "1080i6000"
+            ],
+            [
+              "1080p2398",
+              "1080p2398"
+            ],
+            [
+              "1080p2400",
+              "1080p2400"
+            ],
+            [
+              "1080p2500",
+              "1080p2500"
+            ],
+            [
+              "1080p2997",
+              "1080p2997"
+            ],
+            [
+              "1080p3000",
+              "1080p3000"
+            ],
+            [
+              "1080p5000",
+              "1080p5000"
+            ],
+            [
+              "1080p5994",
+              "1080p5994"
+            ],
+            [
+              "1080p6000",
+              "1080p6000"
+            ],
+            [
+              "1556p2398",
+              "1556p2398"
+            ],
+            [
+              "1556p2400",
+              "1556p2400"
+            ],
+            [
+              "1556p2500",
+              "1556p2500"
+            ],
+            [
+              "2160p2398",
+              "2160p2398"
+            ],
+            [
+              "2160p2400",
+              "2160p2400"
+            ],
+            [
+              "2160p2500",
+              "2160p2500"
+            ],
+            [
+              "2160p2997",
+              "2160p2997"
+            ],
+            [
+              "2160p3000",
+              "2160p3000"
+            ],
+            [
+              "2160p5000",
+              "2160p5000"
+            ],
+            [
+              "2160p5994",
+              "2160p5994"
+            ],
+            [
+              "2160p6000",
+              "2160p6000"
+            ],
+            [
+              "dci1080p2398",
+              "dci1080p2398"
+            ],
+            [
+              "dci1080p2400",
+              "dci1080p2400"
+            ],
+            [
+              "dci1080p2500",
+              "dci1080p2500"
+            ],
+            [
+              "dci2160p2398",
+              "dci2160p2398"
+            ],
+            [
+              "dci2160p2400",
+              "dci2160p2400"
+            ],
+            [
+              "dci2160p2500",
+              "dci2160p2500"
+            ]
+          ]
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1920",
+          "disabled": true,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1080",
+          "disabled": true,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "50.00",
+          "disabled": true,
+          "placeholder": "Frame rate"
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080,
+                "fps": 50,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "label": "Main LED"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ],
+        [
+          "audio layout -> 8ch",
+          [
+            {
+              "id": "dst_a",
+              "patch": {
+                "audioLayout": "8ch"
+              }
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "pgm_only custom",
+      "d": {
+        "id": "dst_b",
+        "mode": "pgm_only",
+        "videoMode": "custom",
+        "width": "2048",
+        "height": 858,
+        "fps": "24"
+      },
+      "intent": null,
+      "rows": [
+        [
+          "Label",
+          "dst_b"
+        ],
+        [
+          "Mode",
+          "PGM only"
+        ],
+        [
+          "Main index",
+          "0"
+        ],
+        [
+          "Audio outputs",
+          "2 channels"
+        ],
+        [
+          "Video mode",
+          "custom"
+        ],
+        [
+          "Resolution",
+          "2048x858"
+        ],
+        [
+          "FPS",
+          "24"
+        ],
+        [
+          "PGM channel",
+          "-"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "dst_b",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "0",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "pgm_only",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "stereo",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "custom",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "2048",
+          "disabled": false,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "858",
+          "disabled": false,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "24.00",
+          "disabled": false,
+          "placeholder": "Frame rate"
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "videoMode": "custom",
+                "width": 2048,
+                "height": 858,
+                "fps": 24,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 858
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "videoMode": "custom",
+                "width": 2048,
+                "height": 858
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "label": "dst_b"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ],
+        [
+          "audio layout -> 8ch",
+          [
+            {
+              "id": "dst_b",
+              "patch": {
+                "audioLayout": "8ch"
+              }
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "inherits",
+      "d": {
+        "id": "dst_c",
+        "mode": "pgm_prv"
+      },
+      "intent": {
+        "pgmChannel": 3,
+        "previewChannelIntended": 4
+      },
+      "rows": [
+        [
+          "Label",
+          "dst_c"
+        ],
+        [
+          "Mode",
+          "PGM/PRV"
+        ],
+        [
+          "Main index",
+          "0"
+        ],
+        [
+          "Audio outputs",
+          "2 channels"
+        ],
+        [
+          "Video mode",
+          "1080p5000"
+        ],
+        [
+          "Resolution",
+          "1920x1080"
+        ],
+        [
+          "FPS",
+          "50"
+        ],
+        [
+          "PGM channel",
+          "3"
+        ],
+        [
+          "PRV channel",
+          "4"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "dst_c",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "0",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "pgm_prv",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "stereo",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "1080p2500",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1920",
+          "disabled": true,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1080",
+          "disabled": true,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "50.00",
+          "disabled": true,
+          "placeholder": "Frame rate"
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080,
+                "fps": 50,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "label": "dst_c"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ],
+        [
+          "audio layout -> 8ch",
+          [
+            {
+              "id": "dst_c",
+              "patch": {
+                "audioLayout": "8ch"
+              }
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "pixelmap",
+      "d": {
+        "id": "dst_p",
+        "label": "Wall",
+        "mode": "pixelmap",
+        "width": 64,
+        "height": 32,
+        "artnet": {
+          "ip": "1.2.3.4",
+          "cols": 2,
+          "rows": 3,
+          "colorOrder": "rgbw",
+          "startUniverse": 5,
+          "startAddress": 7,
+          "refreshRateHz": 30
+        }
+      },
+      "intent": {
+        "pgmChannel": 5
+      },
+      "rows": [
+        [
+          "Label",
+          "Wall"
+        ],
+        [
+          "Mode",
+          "Pixel Map (native Art-Net)"
+        ],
+        [
+          "Main index",
+          "0"
+        ],
+        [
+          "Audio outputs",
+          "2 channels"
+        ],
+        [
+          "Video mode",
+          "1080p5000"
+        ],
+        [
+          "Resolution",
+          "64x64"
+        ],
+        [
+          "FPS",
+          "50"
+        ],
+        [
+          "PGM channel",
+          "5"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "Wall",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "0",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "pixelmap",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "stereo",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "1080p2500",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "64",
+          "disabled": true,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "64",
+          "disabled": true,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "50.00",
+          "disabled": true,
+          "placeholder": "Frame rate"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1.2.3.4",
+          "disabled": false,
+          "placeholder": "192.168.1.50"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "2",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "3",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "RGBW",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "5",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "7",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "30",
+          "disabled": false,
+          "placeholder": null
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "videoMode": "custom",
+                "width": 64,
+                "height": 64,
+                "fps": 50,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 64
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "videoMode": "custom",
+                "width": 64,
+                "height": 64
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "label": "Wall"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ],
+        [
+          "audio layout -> 8ch",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "audioLayout": "8ch"
+              }
+            }
+          ]
+        ],
+        [
+          "artnet ip",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "ip": "10.0.0.9"
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet cols",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "cols": 1
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet rows",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "rows": 3
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet fixture type -> RGBW",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "colorOrder": "RGBW"
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet start universe",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "startUniverse": 32767
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet start DMX channel",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "startAddress": 1
+                }
+              }
+            }
+          ]
+        ],
+        [
+          "artnet DMX sends/sec",
+          [
+            {
+              "id": "dst_p",
+              "patch": {
+                "artnet": {
+                  "refreshRateHz": 30
+                }
+              }
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "operator_gui",
+      "d": {
+        "id": "dst_o",
+        "label": "Operator GUI",
+        "mode": "operator_gui",
+        "guiUrl": "http://127.0.0.1:4200/?operatorGui=1",
+        "physicalPort": 2,
+        "autoLaunch": false
+      },
+      "intent": null,
+      "rows": [
+        [
+          "Label",
+          "Operator GUI"
+        ],
+        [
+          "Mode",
+          "Operator GUI (Firefox + shaped overlay)"
+        ],
+        [
+          "Main index",
+          "0"
+        ],
+        [
+          "Video mode",
+          "1080p5000"
+        ],
+        [
+          "Resolution",
+          "1920x1080"
+        ],
+        [
+          "FPS",
+          "50"
+        ],
+        [
+          "PGM channel",
+          "-"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "Operator GUI",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "0",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "operator_gui",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "1080p2500",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1920",
+          "disabled": true,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1080",
+          "disabled": true,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "50.00",
+          "disabled": true,
+          "placeholder": "Frame rate"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "http://127.0.0.1:4200/?operatorGui=1",
+          "disabled": false,
+          "placeholder": "http://127.0.0.1:4200/?operatorGui=1"
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "2",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "checkbox",
+          "value": "",
+          "disabled": false,
+          "placeholder": null
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080,
+                "fps": 50,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "label": "Operator GUI"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ],
+        [
+          "operator gui url",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "guiUrl": "http://x/?operatorGui=1"
+              }
+            }
+          ]
+        ],
+        [
+          "physical port -> auto",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "physicalPort": null
+              }
+            }
+          ]
+        ],
+        [
+          "physical port -> 3",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "physicalPort": 3
+              }
+            }
+          ]
+        ],
+        [
+          "auto-launch -> false",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "autoLaunch": false
+              }
+            }
+          ]
+        ]
+      ]
+    },
+    {
+      "name": "multiview",
+      "d": {
+        "id": "dst_m",
+        "mode": "multiview",
+        "mainScreenIndex": 0
+      },
+      "intent": {
+        "pgmChannel": 6
+      },
+      "rows": [
+        [
+          "Label",
+          "dst_m"
+        ],
+        [
+          "Mode",
+          "Multiview"
+        ],
+        [
+          "Main index",
+          "0"
+        ],
+        [
+          "Video mode",
+          "1080p5000"
+        ],
+        [
+          "Resolution",
+          "1920x1080"
+        ],
+        [
+          "FPS",
+          "50"
+        ],
+        [
+          "PGM channel",
+          "6"
+        ]
+      ],
+      "fields": [
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "dst_m",
+          "disabled": false,
+          "placeholder": "Name"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "0",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "multiview",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "select",
+          "type": "select-one",
+          "value": "1080p2500",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1920",
+          "disabled": true,
+          "placeholder": "Width"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "1080",
+          "disabled": true,
+          "placeholder": "Height"
+        },
+        {
+          "tag": "input",
+          "type": "text",
+          "value": "50.00",
+          "disabled": true,
+          "placeholder": "Frame rate"
+        }
+      ],
+      "actions": [
+        [
+          "video mode -> 1080p2500",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "videoMode": "1080p2500",
+                "width": 1920,
+                "height": 1080,
+                "fps": 25,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "video mode -> custom",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080,
+                "fps": 50,
+                "inheritsProjectFps": false
+              }
+            }
+          ]
+        ],
+        [
+          "width -> 1280",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1280,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "height -> \"\"",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "videoMode": "custom",
+                "width": 1920,
+                "height": 1080
+              }
+            }
+          ]
+        ],
+        [
+          "fps -> 29.97",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "videoMode": "custom",
+                "fps": 29.97
+              }
+            }
+          ]
+        ],
+        [
+          "name -> \"   \"",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "label": "dst_m"
+              }
+            }
+          ]
+        ],
+        [
+          "main index -> -3",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "mainScreenIndex": 0
+              }
+            }
+          ]
+        ],
+        [
+          "mode -> pgm_only",
+          [
+            {
+              "id": "dst_m",
+              "patch": {
+                "mode": "pgm_only"
+              }
+            }
+          ]
+        ]
+      ]
+    }
+  ],
+  "options": {
+    "2 select": [
+      [
+        "pgm_prv",
+        "PGM/PRV"
+      ],
+      [
+        "pgm_only",
+        "PGM only"
+      ],
+      [
+        "multiview",
+        "Multiview"
+      ],
+      [
+        "pixelmap",
+        "Pixel Map (native Art-Net)"
+      ],
+      [
+        "operator_gui",
+        "Operator GUI (Firefox + shaped overlay)"
+      ]
+    ],
+    "3 Number of audio output channels for this destination (program bus width)": [
+      [
+        "stereo",
+        "2 channels"
+      ],
+      [
+        "4ch",
+        "4 channels"
+      ],
+      [
+        "8ch",
+        "8 channels"
+      ],
+      [
+        "16ch",
+        "16 channels"
+      ]
+    ],
+    "4 select": [
+      [
+        "custom",
+        "Custom"
+      ],
+      [
+        "PAL",
+        "PAL"
+      ],
+      [
+        "NTSC",
+        "NTSC"
+      ],
+      [
+        "576p2500",
+        "576p2500"
+      ],
+      [
+        "720p2398",
+        "720p2398"
+      ],
+      [
+        "720p2400",
+        "720p2400"
+      ],
+      [
+        "720p2500",
+        "720p2500"
+      ],
+      [
+        "720p2997",
+        "720p2997"
+      ],
+      [
+        "720p3000",
+        "720p3000"
+      ],
+      [
+        "720p5000",
+        "720p5000"
+      ],
+      [
+        "720p5994",
+        "720p5994"
+      ],
+      [
+        "720p6000",
+        "720p6000"
+      ],
+      [
+        "1080i5000",
+        "1080i5000"
+      ],
+      [
+        "1080i5994",
+        "1080i5994"
+      ],
+      [
+        "1080i6000",
+        "1080i6000"
+      ],
+      [
+        "1080p2398",
+        "1080p2398"
+      ],
+      [
+        "1080p2400",
+        "1080p2400"
+      ],
+      [
+        "1080p2500",
+        "1080p2500"
+      ],
+      [
+        "1080p2997",
+        "1080p2997"
+      ],
+      [
+        "1080p3000",
+        "1080p3000"
+      ],
+      [
+        "1080p5000",
+        "1080p5000"
+      ],
+      [
+        "1080p5994",
+        "1080p5994"
+      ],
+      [
+        "1080p6000",
+        "1080p6000"
+      ],
+      [
+        "1556p2398",
+        "1556p2398"
+      ],
+      [
+        "1556p2400",
+        "1556p2400"
+      ],
+      [
+        "1556p2500",
+        "1556p2500"
+      ],
+      [
+        "2160p2398",
+        "2160p2398"
+      ],
+      [
+        "2160p2400",
+        "2160p2400"
+      ],
+      [
+        "2160p2500",
+        "2160p2500"
+      ],
+      [
+        "2160p2997",
+        "2160p2997"
+      ],
+      [
+        "2160p3000",
+        "2160p3000"
+      ],
+      [
+        "2160p5000",
+        "2160p5000"
+      ],
+      [
+        "2160p5994",
+        "2160p5994"
+      ],
+      [
+        "2160p6000",
+        "2160p6000"
+      ],
+      [
+        "dci1080p2398",
+        "dci1080p2398"
+      ],
+      [
+        "dci1080p2400",
+        "dci1080p2400"
+      ],
+      [
+        "dci1080p2500",
+        "dci1080p2500"
+      ],
+      [
+        "dci2160p2398",
+        "dci2160p2398"
+      ],
+      [
+        "dci2160p2400",
+        "dci2160p2400"
+      ],
+      [
+        "dci2160p2500",
+        "dci2160p2500"
+      ]
+    ]
+  }
+}
