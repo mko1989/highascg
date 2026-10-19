@@ -1521,38 +1521,8 @@ panes only. The owner picked "Settings → About (both clients)", then said "Lea
 
 **What was VERIFIED.**
 - `tools/smoke/smoke-wo616-about.test.js` — 7 tests (fields vs package.json / COPYRIGHT, OpenFollow credit ==
-  THIRD_PARTY_NOTICES, fixture root, empty root, handler, router wiring), in the curated offline list.
+  THIRD_PARTY_NOTICES, fixture root, empty root, handler, router wiring), in the curated offline list; the curated
+  suite: 2774 tests, 2771 pass, 1 fail (the known wo577 shader-label test).
 - `godot/client/tests/test_settings_about.gd` — loading / error rows, legal rows, credits (non-dict entries skipped).
 - Godot `--test` 1306/1306, `--check` boot OK; on the box Settings → About shows HighAsCG 2026.05.20, the copyright,
   licence + warranty, source link and all six credits, with no SCRIPT ERROR; `curl /api/about` returns the same.
-
-## Attribution — About page (2026-10-19)
-
-### Investigation
-- AGPL §5(d) asks an interactive UI to show Appropriate Legal Notices; OpenFollow's AGPL (and the ported code) asks
-  for visible credit. Neither client had an About surface: the Godot Settings tab had Defaults / Companion /
-  Media / USB (`godot/client/features/settings/settings_tab.gd`), the web settings modal had no About tab.
-- The facts already live in the repo: version in `package.json`, the copyright line in `COPYRIGHT`, full texts in
-  `THIRD_PARTY_NOTICES` + `licenses/INDEX.md`. Two hand-copied panes would drift, so one server payload feeds both.
-- The headless Godot test runner (`tests/run_tests.gd`) registers no autoloads; `settings_panes.gd` /
-  `settings_form.gd` reference `Settings` at compile time, so a test cannot preload them (the first test attempt
-  failed with "Identifier not found: Settings").
-
-### What was done
-- `src/api/routes-about.js` (new): `aboutInfo(root)` → `{name, version, copyright, license, warranty, source,
-  notices, credits}`; credits = OpenFollow, CasparCG Server, Godot Engine, Ultralytics YOLO26, ONNX Runtime, Rewir
-  (WO-620 patch noted). `src/api/router.js`: `GET /api/about` (no Caspar needed).
-- Godot: `features/settings/about_model.gd` (new, pure) builds `[kind, text]` rows (loading / error / legal /
-  credits); `settings_panes.gd` `about()` renders them on a `Form`; `settings_tab.gd` adds the About pane and
-  fetches `/api/about` each time the tab opens.
-- Web pane: built, then **deferred by the owner** ("Leave the webui for now"); the change was reverted and kept
-  outside the repo (session scratchpad `web-about-deferred/`). Reopen as a small web task when wanted.
-
-### What was VERIFIED
-- `node --test tools/smoke/smoke-wo616-about.test.js`: 7/7 (repo fields vs package.json / COPYRIGHT, OpenFollow
-  copyright == THIRD_PARTY_NOTICES, fixture root, empty root, handler, router wiring). Curated offline suite:
-  2774 tests, 2771 pass, 1 fail (the known wo577 shader-label test).
-- Godot `--test`: 1306/1306 (`tests/test_settings_about.gd`: loading/error, legal rows, credits, non-dict skip);
-  `run-client.sh --check`: boot OK. eslint clean; line limits OK.
-- Box: `curl :4200/api/about` returns the payload; Godot Settings → About shows "HighAsCG 2026.05.20", the
-  copyright, licence + warranty, source URL, notices pointer and all 6 credits (screenshot), no SCRIPT ERROR.
