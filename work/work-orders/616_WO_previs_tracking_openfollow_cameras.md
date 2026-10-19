@@ -103,7 +103,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 - [x] T2 Port camera math (DLT, homography, k1/k2, project/unproject) to GDScript **and** JS (server hub
       needs project/unproject for fusion) with OpenFollow's test vectors (bundled gallery calibrations
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
-- [ ] T3 (T3a model + solve DONE) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
+- [x] T3 (T3a model + solve, T3b Camera mode + Inspector page) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
 - [ ] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera.
 - [ ] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`.
 - [ ] T6 PSN output (spec: posistage.net; 60 Hz, multicast 236.10.10.10:56565, data + info packets) + OSC
@@ -312,3 +312,69 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
 - Yawed-object corner orientation checked numerically. A 65″ TV at yaw 90° faces stage left, its 1.439 m width runs
   along PSN Y, and the viewer-left corner is downstage. The first test expectation had this backwards; the code was
   right.
+
+## T3b — Camera view mode + Inspector calibration page (2026-10-19) — DONE (box-verified)
+
+### Investigation
+- The previs tab (`previs_tab.gd`) already switches modes 2D front / 2D plan / 3D over a shared `stack`, and holds
+  surfaces only while something visible needs them (WO-617). A 4th mode can follow the same pattern.
+- R2 says per-selection settings go on the one Inspector (`InspectorPanel.current.present/release`, see
+  `look_editor.gd:305` and `timeline_tab.gd:127`). The previs tab still has its own right column (stage objects,
+  models). That is a pre-existing R2 violation and is left as is; the tracking UI does NOT add to it.
+- Clicks have to be stored in camera raster pixels, not view pixels, so they survive zoom, pan and window size.
+  The raster has to match the real surface size.
+
+### What was done
+- `features/previs/tracking/tracking_overlay.gd` (pure). What the view draws, in the camera's lens pixels:
+  - grid lines and stage-object outlines, each edge cut into 24 pieces so the lens bends it like the real picture,
+    and split where the edge goes behind the camera;
+  - every candidate point with `shown` / `click` / `err`;
+  - `nearest` for ctrl+click picking (ties go to the earlier point, so a grid corner beats the crossing at the same
+    spot).
+- `features/previs/tracking/tracking_view.gd`, the Camera mode view:
+  - It draws the camera's surface, letterboxed to the raster, and holds it only while shown. Over it go the green
+    grid, amber object outlines with names, dots where the camera shows each point, a blue ring for each click, and
+    a red line from click to dot (the error).
+  - A click sets the active point. Ctrl+click picks a point; the wheel zooms about the cursor (×40); right-drag
+    pans; F fits.
+  - It emits `source_size` when the surface's real size differs from the raster.
+- `features/previs/tracking/tracking_page.gd`, the Inspector page, owns `project.previs.tracking`:
+  - camera picker with Add / Delete (with a confirm), name, Source role (inN / chN / pgm / prv), raster;
+  - the pose and lens as editable fields;
+  - the point list (● clicked / ○ not, with each point's error in px), Clear click / Clear all;
+  - Fit lens + Solve, showing RMS, worst error and method;
+  - the floor grid fields.
+  - A click auto-advances to the next unclicked visible point, so a grid can be clicked through without touching
+    the list.
+  - The raster follows the surface size while nothing is clicked; after that it shows a warning instead.
+  - Persists like `stage_panel` (`_canon` echo guard, `ProjectSync.mark_dirty`).
+- `features/previs/previs_tab.gd`: the "Camera" mode button. `_apply_mode` shows the view, `set_on` holds the
+  surface, and the page is presented on the Inspector (released in every other mode or when the tab is hidden).
+  Stage-object edits reach the page.
+- `godot/client/tests/test_tracking_overlay.gd`.
+
+### What was VERIFIED
+- Godot `--check` OK; `--test` 1040 passed, 0 failed. 0 files over 500 lines. No JS touched.
+- On the box (GUI on DP-3, `--tab=1 --previs-mode=camera`), with OpenFollow's `concert_default.jpg` (1920×1080)
+  PLAYed on ch1 layer 90:
+  - Add → "Camera 1" on `pgm1` (the first mapped role, no DeckLink here) showed the picture and the default
+    overlay.
+  - Source → `ch1`: `/api/video-surfaces` showed `ch1` channel 1 active and `pgm1` inactive, so the old role's
+    lease was released.
+  - Grid set to 12 × 6 m at 2 m spacing in the Inspector.
+  - Client restart: the camera, role and grid reloaded from the project.
+  - Ctrl+click picked "Grid corner DSR". Four corner clicks (auto-advancing DSR → DSL → USL → USR → X0/Y0) were
+    made at the truth-camera pixels; the screen clicks quantise to about ±1.1 raster px at 0.451 view scale, and
+    they land on the picture's corner brackets. Solve → floor+refine: Y 14.57, Z 13.76, pitch −48.1, yaw 180,
+    fov 65.3.
+  - All 28 crossings clicked through (auto-advance), 32 points:
+    - Solve without the lens: RMS 6.48 px, worst 9.91 px.
+    - Solve with Fit lens: **RMS 0.71 px, worst 1.52 px**, pos (−0.003, 13.09, 12.10), pitch −47.99, yaw 179.99,
+      roll −0.01, fov 69.53, k1 −0.1967, k2 0.0319. Truth: (0, 13, 12), −48, 180, 0, 70, −0.2, 0.03. The P1
+      calibration target (RMS < 3 px) is met; what is left is click quantisation.
+  - `GET /api/project` returns `previs.tracking` with the same solved camera, `rms` 0.7103, 32 clicked points.
+  - Screenshots: the overlay sits on the clicked marks after the lens solve; before the solve the error lines are
+    visible.
+- Test layer cleared afterwards (`CLEAR 1-90`). The "Camera 1" tracking entry stays in the live project as dev data.
+- Owner QA: calibrate a real camera (DeckLink `inN` once a capture card is fitted), and check the click precision
+  with wheel zoom.

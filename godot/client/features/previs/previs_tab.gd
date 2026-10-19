@@ -2,14 +2,19 @@ extends HSplitContainer
 ## WO-607 — Previs tab: stage view + side panel (stage objects, models from /api/previs/models, live source,
 ## screen meshes, camera presets). WO-617: view modes 2D front (default) · 2D plan · 3D; the 3D SubViewport
 ## renders only in 3D mode, and video surfaces are held only by what is visible (VideoSurfaces refcount).
+## WO-616: a 4th mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
+## settings and calibration live on an Inspector page (WO-608 R2).
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
 const StagePanel := preload("res://features/previs/stage_panel.gd")
 const Stage2D := preload("res://features/previs/stage_2d_view.gd")
+const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
+const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
-const MODES := ["front", "plan", "3d"]
+const MODES := ["front", "plan", "3d", "camera"]
 
 var stage: PrevisStage
 var builder: StageBuilder
@@ -26,6 +31,8 @@ var _svc: SubViewportContainer
 var _pictures: CheckBox
 var _mode_btns := {}
 var _glb_role := ""
+var track_view: TrackingView
+var track_page: TrackingPage
 
 
 func _ready() -> void:
@@ -54,6 +61,15 @@ func _ready() -> void:
 	view2d = Stage2D.new()
 	view2d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(view2d)
+	track_view = TrackingView.new()
+	track_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(track_view)
+	track_page = TrackingPage.new()
+	track_page.changed.connect(func() -> void:
+		track_view.set_state(track_page.data, track_page.entry(), track_page.objects, track_page.active))
+	track_view.clicked.connect(track_page.click)
+	track_view.picked.connect(track_page.pick)
+	track_view.source_size.connect(track_page.adopt_size)
 	add_child(_build_panel())
 	stage.model_loaded.connect(_on_model_loaded)
 	var framed := [false]
@@ -62,7 +78,9 @@ func _ready() -> void:
 			framed[0] = true
 			stage.frame_box.call_deferred(builder.bounds())
 			view2d.fit.call_deferred())
-	stage_panel.stage_changed.connect(func() -> void: view2d.set_objects(builder.objects.duplicate(true)))
+	stage_panel.stage_changed.connect(func() -> void:
+		view2d.set_objects(builder.objects.duplicate(true))
+		track_page.set_objects(builder.objects.duplicate(true)))
 	stage_panel.selection_changed.connect(func(id: String) -> void:
 		view2d.select(id)
 		builder.set_selected(id))
@@ -128,6 +146,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			stage_panel.turn(-15.0 if k.shift_pressed else -5.0)
 		KEY_F:
 			view2d.fit()
+			track_view.fit()
 			stage.frame_box(builder.bounds())
 		_:
 			handled = false
@@ -160,17 +179,31 @@ func _apply_mode() -> void:
 		VideoSurfaces.acquire(_glb_role, self)
 	else:
 		VideoSurfaces.release(_glb_role, self)
-	view2d.visible = not is3d
-	if not is3d and view2d.view != mode:
+	var iscam := mode == "camera"
+	view2d.visible = not is3d and not iscam
+	if not is3d and not iscam and view2d.view != mode:
 		view2d.set_view(mode)
-	_pictures.disabled = is3d
-	view2d.set_live_pictures(_pictures.button_pressed and not is3d and shown)
+	_pictures.disabled = is3d or iscam
+	view2d.set_live_pictures(_pictures.button_pressed and view2d.visible and shown)
+	track_view.visible = iscam
+	track_view.set_on(iscam and shown)
+	if InspectorPanel.current != null:
+		if iscam and shown:
+			InspectorPanel.current.present(track_page)
+			track_page.set_objects(builder.objects.duplicate(true))
+		else:
+			InspectorPanel.current.release(track_page)
+
+
+func _exit_tree() -> void:
+	if track_page != null and not track_page.is_inside_tree():  # never adopted by the Inspector
+		track_page.free()
 
 
 func _build_toolbar() -> Control:
 	var bar := HBoxContainer.new()
 	var group := ButtonGroup.new()
-	for spec in [["front", "2D front"], ["plan", "2D plan"], ["3d", "3D"]]:
+	for spec in [["front", "2D front"], ["plan", "2D plan"], ["3d", "3D"], ["camera", "Camera"]]:
 		var b := Button.new()
 		b.text = spec[1]
 		b.toggle_mode = true
