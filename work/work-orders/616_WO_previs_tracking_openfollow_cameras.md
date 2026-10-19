@@ -103,7 +103,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 - [x] T2 Port camera math (DLT, homography, k1/k2, project/unproject) to GDScript **and** JS (server hub
       needs project/unproject for fusion) with OpenFollow's test vectors (bundled gallery calibrations
       `video/inputs/assets/*_default.toml` give known camera+grid pairs).
-- [ ] T3 Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
+- [ ] T3 (T3a model + solve DONE) Godot: camera stage object, calibration wizard (3D pick ↔ 2D click), reprojection error display.
 - [ ] T4 Godot camera view: live surface + overlay (stage edges, grid, markers, zones) using the solved camera.
 - [ ] T5 Markers: gamepad/mouse/keyboard input in Godot → server hub; hub state + WS `tracking:markers`.
 - [ ] T6 PSN output (spec: posistage.net; 60 Hz, multicast 236.10.10.10:56565, data + info packets) + OSC
@@ -265,3 +265,50 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
 - The collector's manifest block, run against a temp `licenses/` holding only the copied notice, emits the
   `openfollow` component. The full collector was not run (it rewrites the system licence tree from dpkg state).
 - Nothing to prove on the box yet: no camera object consumes this until T3/T4.
+
+## T3a — tracking data model + calibration solve (2026-10-19) — DONE (offline; UI is T3b)
+
+### Investigation
+- OpenFollow calibrates from exactly 4 floor-grid corners (`scene/solver.py` homography → pose), with the lens
+  fitted separately by a plumb-line tool (`lens_fit.py`). On a real stage the operator often can't see all four
+  floor corners, but can see LED-wall and screen edges, and those sit at other heights. A 4-point homography can't
+  use them.
+- On OpenFollow's own concert render (k1 −0.2, k2 0.03), clicking the 28 grid crossings and solving with no lens
+  leaves 6.26 px RMS (12.6 px max), which already fails the 3 px acceptance target. So the solve has to fit the
+  lens from the same clicks.
+- `stage_objects.gd` keeps objects in the Godot frame with Node3D Euler order YXZ. LED walls bend (`column_edges`),
+  so their picture corners are the end column edges, not ±size/2.
+
+### What was done
+- `godot/client/features/previs/tracking/tracking_model.gd` (pure). `project.previs.tracking` =
+  `{version, grid, cameras[]}`:
+  - Grid: OpenFollow's `[grid]` keys.
+  - Camera entry: `{id, name, role, raster, cam, points[{id,label,world,screen|null}], rms}`.
+  - `normalize*` clamps every field and pulls a folding lens back to valid.
+  - `candidate_points` lists the grid corners (DSR/DSL/USL/USR), every grid crossing, and each visible stage
+    object's picture corners. `object_corners` converts those to PSN.
+- `godot/client/features/previs/tracking/camera_refine.gd` (HighAsCG code). `calibrate` works from any ≥ 4 clicked
+  points:
+  - Seeding: from the largest same-height group via `solve_floor` (lens undone with the current k1/k2), falling back
+    to a raw homography decompose when the 20 px gate refuses noisy clicks. With no 4 coplanar points, it starts
+    from the camera as it stands.
+  - Then Levenberg–Marquardt over pos/pitch/yaw/roll/fov, plus k1 (and k2 with ≥ 8 points) when `fit_lens` is set.
+    The Jacobian is numeric (central differences); fov is clamped and the lens is kept unfolded.
+  - Returns `{ok, cam, rms, errors[], method}`.
+  - Why: one solver covers both the classic grid workflow and "click whatever you can see", and it fits the lens
+    without a separate plumb-line pass.
+- `godot/client/tests/test_tracking_calibrate.gd`.
+
+### What was VERIFIED
+- Godot `--check` OK; `--test` 1025 passed, 0 failed (5 new tests; the rest are other suites' growth since T2). No
+  JS touched, so the offline suite wasn't rerun; 0 files over 500 lines.
+- Concert camera, starting from the default front-of-house camera (the wrong end of the stage), 28 exact
+  crossings with `fit_lens` → pos (0, 13, 12), pitch −48, yaw ±180, fov 70, k1 −0.2000, k2 0.0300, RMS 2e-13 px,
+  7 ms. Without the lens fit: RMS 6.26 px (asserted > 3).
+- 12 mixed-height points (a curved LED wall, a TV yawed 30°, grid corners) with ±0.7 px click noise → RMS < 1.2 px,
+  position within 25 cm.
+- No same-height group (wall + yawed projection screen) → `method: refine` converges from a rough start; 3 points
+  are refused.
+- Yawed-object corner orientation checked numerically. A 65″ TV at yaw 90° faces stage left, its 1.439 m width runs
+  along PSN Y, and the viewer-left corner is downstage. The first test expectation had this backwards; the code was
+  right.
