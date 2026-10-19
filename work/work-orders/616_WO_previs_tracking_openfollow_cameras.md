@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); next: T10c coverage view, T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); next: T10d verification walk. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -116,7 +116,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
       Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view ✔ (box-verified).
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
-      T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons ✔ (box, twin camera). T10c coverage view.
+      T10a fusion engine (server, pure) ✔ (offline). T10b pin + WS + Godot world persons ✔ (box, twin camera). T10c coverage view ✔ (box GUI).
       T10d verification walk.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
@@ -1347,3 +1347,72 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
   a direct `cam_1` person. The box is left with one camera.
 - **Not verified**: triangulated height from two real, separated cameras. The box has one camera, so this is
   owner QA, or the T10d walk once a second camera is rigged.
+
+## T10c — coverage view: tracking cameras + floor coverage on the 3D stage (2026-10-19) — DONE (box-verified in the GUI)
+
+### Investigation
+
+- The "Two-camera workflow" step 1 asks for each frustum on the 3D stage and the coverage overlap on the floor.
+  Before T10c, the 3D stage (`previs_stage.gd`) had no tracking cameras at all. They existed only in the Camera view
+  (`tracking_page.gd`), whose data loads only while the Inspector holds the page. The 3D mode therefore reads
+  `Store.project.previs.tracking` itself, through `tracking_model.normalize`, and refreshes on
+  `Store.project_changed`.
+- Normalised cameras always carry a `cam`, so coverage includes uncalibrated cameras too. Typing a planned pose shows
+  its coverage before the camera is rigged. This is the placement use.
+- "Covered" has to mean what fusion needs: the person's feet (floor point) and head top (head ray), both inside the
+  picture after the lens. A point past a barrel lens's fold radius is mapped back inside the frame by
+  `apply_distortion`, so those points are refused before the raster test.
+- A 1 cm lift made the footprint lines z-fight the floor plane from across the stage, so they drew dashed. 4 cm
+  draws them solid.
+- Fit framed only the stage objects, which left the cameras off-screen. While the coverage view is shown, Fit now
+  includes the cameras and the grid.
+
+### What was done
+
+- **`godot/client/features/previs/tracking/coverage_model.gd`** (new, pure, PSN metres):
+  - `seen` / `sees`: in front, before the lens fold, inside the raster after the lens. `seen` handles one camera's
+    points in one projection pass.
+  - `coverage(cams, grid)`: cells of 0.25 m, growing if a cell count would pass 40 000. Each cell gets a camera bit
+    mask for "feet and head at 1.75 m seen", plus the m² seen by one camera and by 2+.
+  - `separation` / `pairs`: the horizontal angle between cameras seen from the grid centre. 45° or more is
+    advised; fusion triangulates only at 8° or more.
+  - `ray` / `reach` / `frustum`: a lens-correct pixel ray, its floor hit or a 30 m reach, and the 4 picture corners.
+  - `footprint`: the picture border on the floor, 16 samples per edge, split above the horizon.
+- **`coverage_3d.gd`** (new, Node3D under the stage):
+  - Per camera: the frustum and footprint lines in the camera's colour, plus a name label.
+  - The grid outline, and cells tinted by the mask: one camera in its colour at α 0.22, two or more in green.
+  - `summary` is a one-line verdict, for example "Grid 12 × 6 m — a standing person is seen by 2+ cameras on
+    63 %, one camera on 37 %, none on 0 % · cam_1 ↔ cam_2 90° apart". Under 45° it adds the advice; with one camera
+    it suggests adding a second. Percentages use cumulative rounding so they always sum to 100.
+  - Rebuilt only when the cameras or grid change.
+- **`previs_tab.gd`**:
+  - A 3D-only toolbar toggle, "Tracking cameras", remembered in `ui.cfg`.
+  - The verdict line sits under the 3D view.
+  - It refreshes on `Store.project_changed` and on tracking page changes.
+  - Fit / F frame the cameras and the grid as well while the view is shown.
+- **Tests**: `godot/client/tests/test_tracking_coverage.gd`, 10 tests (Haiku-written, reviewed). They cover:
+  - seen and unseen points;
+  - single-camera, two-camera and twin coverage;
+  - separation of 90° and of 0°;
+  - `ray` against `unproject`, with and without the lens;
+  - the floor reach and the far clamp;
+  - the frustum, the straight-down footprint ring (65 points) and the horizon footprint;
+  - the 200 m grid cap.
+  
+  Three tolerances are 1e-4 or 1e-6 because Godot's `Vector2`/`Vector3` are float32. This only affects drawing.
+
+### What was VERIFIED
+
+- Godot `--test`: 1250 passed, 0 failed. `--check` boots clean. Line limits are clean.
+- **Box GUI** (3D mode, toggle on), with real `cam_1` (calibrated, upstage-high looking downstage) and a planning
+  `cam_2` at (−12, 3, 6), yaw 90, pitch −25:
+  - At FOV 70: both frustums are drawn and the whole grid is green. The verdict read "2+ cameras on 100 % … cam_1 ↔
+    cam_2 90° apart".
+  - At FOV 35: green overlap plus a `cam_1`-only blue band. The verdict read "63 %, one camera on 37 %, none on
+    0 %".
+  - Cross-check: an independent count with the server's JS camera model (`camera-model.js` `project` +
+    `applyDistortion`, same 1152 cells) gave 62.5 % / 37.5 %.
+  - Fit framed both cameras and the grid, the labels were readable, and the `cam_1` footprint was lens-bent.
+- **Restored**: `cam_2` removed. The project holds `cam_1` only again, and the GUI is back in Camera mode.
+- **Owner QA**: whether the verdict line and colours read well on the show stage, and a real second camera's
+  placement.

@@ -5,7 +5,8 @@ extends HSplitContainer
 ## WO-616: a 4th mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
 ## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's
 ## markers (marker_driver → server hub) and draws them on the picture. T12: the 3D stage through the solved camera
-## as an optional ghost overlay (camera_overlay.gd).
+## as an optional ghost overlay (camera_overlay.gd). T10c: 3D mode's "Tracking cameras" toggle shows each tracking
+## camera's frustum + footprint and the grid's coverage (coverage_3d.gd), with a one-line verdict under the view.
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -19,6 +20,8 @@ const FollowModel := preload("res://features/previs/tracking/follow_model.gd")
 const ZoneModel := preload("res://features/previs/tracking/zone_model.gd")
 const DetectModel := preload("res://features/previs/tracking/detect_model.gd")
 const CameraOverlay := preload("res://features/previs/tracking/camera_overlay.gd")
+const Coverage3D := preload("res://features/previs/tracking/coverage_3d.gd")
+const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["front", "plan", "3d", "camera"]
@@ -41,6 +44,9 @@ var _glb_role := ""
 var track_view: TrackingView
 var track_page: TrackingPage
 var markers: MarkerDriver
+var coverage: Coverage3D
+var _coverage_cb: CheckBox
+var _coverage_note: Label
 
 
 func _ready() -> void:
@@ -65,7 +71,16 @@ func _ready() -> void:
 	builder = StageBuilder.new()
 	builder.live = false
 	stage.add_child(builder)
+	coverage = Coverage3D.new()
+	stage.add_child(coverage)
 	_svc.gui_input.connect(_on_3d_input)
+	_coverage_note = Label.new()
+	_coverage_note.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	_coverage_note.offset_left = 10
+	_coverage_note.offset_top = -30
+	_coverage_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_coverage_note.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	stack.add_child(_coverage_note)
 	view2d = Stage2D.new()
 	view2d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(view2d)
@@ -133,6 +148,8 @@ func _ready() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	_pictures.button_pressed = cfg.get_value("previs", "live_pictures", false) == true
+	_coverage_cb.set_pressed_no_signal(cfg.get_value("previs", "coverage", false) == true)
+	Store.project_changed.connect(func(_p: Dictionary) -> void: _refresh_coverage())
 	track_page.set_ghost(cfg.get_value("previs", "ghost_on", false) == true, float(cfg.get_value("previs", "ghost_opacity", 0.6)))
 	track_view.set_ghost(track_page.ghost_on, track_page.ghost_opacity)
 	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "front"))))
@@ -152,6 +169,26 @@ func _on_tracking_changed() -> void:
 	_push_zones()
 	_push_masks()
 	_apply_drive()
+	_refresh_coverage()
+
+
+## Fit / F: the stage objects, plus the tracking cameras and grid while they are shown (T10c).
+func _fit_box() -> AABB:
+	var b := builder.bounds()
+	if not coverage.visible or coverage.box.size == Vector3.ZERO:
+		return b
+	return coverage.box if b.size == Vector3.ZERO else b.merge(coverage.box)
+
+
+## WO-616 T10c: the tracking cameras + coverage on the 3D stage (only built while shown).
+func _refresh_coverage() -> void:
+	var on := mode == "3d" and _coverage_cb.button_pressed
+	coverage.visible = on
+	_coverage_note.visible = on
+	if on:
+		var pv: Variant = Store.project.get("previs")
+		coverage.set_tracking(TrackingModel.normalize((pv as Dictionary).get("tracking") if pv is Dictionary else null))
+		_coverage_note.text = coverage.summary
 
 
 ## WO-616 T9c: the camera's detection ROI masks (Detect mode).
@@ -238,7 +275,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_F:
 			view2d.fit()
 			track_view.fit()
-			stage.frame_box(builder.bounds())
+			stage.frame_box(_fit_box())
 		_:
 			handled = false
 	if handled:
@@ -259,6 +296,7 @@ func _save_ui() -> void:
 	cfg.load(UI_CFG)
 	cfg.set_value("previs", "mode", mode)
 	cfg.set_value("previs", "live_pictures", _pictures.button_pressed)
+	cfg.set_value("previs", "coverage", _coverage_cb.button_pressed)
 	cfg.set_value("previs", "ghost_on", track_page.ghost_on)
 	cfg.set_value("previs", "ghost_opacity", track_page.ghost_opacity)
 	cfg.save(UI_CFG)
@@ -281,6 +319,8 @@ func _apply_mode() -> void:
 	if not is3d and not iscam and view2d.view != mode:
 		view2d.set_view(mode)
 	_pictures.disabled = is3d or iscam
+	_coverage_cb.visible = is3d
+	_refresh_coverage()
 	view2d.set_live_pictures(_pictures.button_pressed and view2d.visible and shown)
 	track_view.visible = iscam
 	track_view.set_on(iscam and shown)
@@ -315,11 +355,18 @@ func _build_toolbar() -> Control:
 	_pictures.tooltip_text = "2D only. Off = layout only: no video surfaces are read (Caspar and the client do no copying)."
 	_pictures.toggled.connect(func(_on: bool) -> void: set_mode(mode))
 	bar.add_child(_pictures)
+	_coverage_cb = CheckBox.new()
+	_coverage_cb.text = "Tracking cameras"
+	_coverage_cb.tooltip_text = "Each tracking camera's view on the stage and where a standing person is seen by one camera or by two or more (fused)."
+	_coverage_cb.toggled.connect(func(_on: bool) -> void:
+		_refresh_coverage()
+		_save_ui())
+	bar.add_child(_coverage_cb)
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void:
 		view2d.fit()
-		stage.frame_box(builder.bounds()))
+		stage.frame_box(_fit_box()))
 	bar.add_child(fit)
 	return bar
 
