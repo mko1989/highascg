@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); next: T9c mask editor, T10 two-camera fusion. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); next: T10 two-camera fusion. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -112,9 +112,9 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
       The 1 s freshness rule stays in the hub, so follow can hold or release a fixture on a stale marker.
 - [x] T7 Zones (port `zones/engine.py` state machine + shrink) → ~~OSC~~ look take / Companion press (no outbound OSC on this box).
 - [ ] T8 PSN input (OpenFollow stations as sources).
-- [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), ~~systemd unit~~ server-owned child, GPU EP; masks.
+- [x] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), ~~systemd unit~~ server-owned child, GPU EP; masks.
       T9a sidecar + server service + WS ✔ (box-verified). T9b pin modes replace / assist → hub, Godot boxes +
-      Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view.
+      Inspector detection controls ✔ (box-verified). T9c mask editor in the camera view ✔ (box-verified).
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
 - [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
@@ -1142,4 +1142,65 @@ Pinning detections to markers (`replace` / `assist`), the Godot boxes and contro
     Owner QA.
   - Two cameras pinning at once (one solved camera on the box).
   - The project is left with detection ON, in replace on marker 1 (feet), against the test still on 1-1000.
+
+## T9c — ROI mask editor in the camera view — DONE (2026-10-19, box-verified through the GUI)
+
+### Investigation
+
+- The server and the sidecar already handled masks since T9a; only the editor was missing.
+  - `src/tracking/detect-model.js` `normalizeMasks` stores `cameras.<id>.masks` as `[{enabled, vertices: [[x, y]
+    0–1]}]`, keeping a mask only when it has 3+ corners, plus `masks_enabled` (OpenFollow's master switch, default
+    off). `detectCameras` hands the sidecar the masks only when `masks_enabled` is set.
+  - `tools/tracking-detect/detector.py` `filter_masks` keeps a raw box only when its feet point (bottom-centre)
+    is inside an enabled 3+-corner polygon. If no mask is usable, every box passes. Filtering runs before
+    ByteTrack, so a masked-out person never gets a track id.
+- Masks are picture coordinates (0–1 of the frame), not floor coordinates. Unlike the Zones editor, a click is not
+  projected to the floor: it is the raster px divided by the camera raster, the same space the boxes are drawn in.
+- `detect_section.gd` was at 168 lines and `tracking_page.gd` at 476, so the editor went into its own file rather
+  than growing either.
+
+### What was done
+
+- **`godot/client/features/previs/tracking/detect_model.gd`**:
+  - `masks_of(d, cam)` returns copies of one camera's masks.
+  - `with_masks(d, cam, on, masks)` replaces them. It keeps the camera's `enabled`; a camera with no entry yet is
+    created watched.
+  - `masks_active(mk)` mirrors the sidecar's "does this set filter at all" rule.
+- **`mask_section.gd`** (new, inside the Detect section):
+  - Controls: "Use masks", a mask list, Add / Delete (with confirm), Enabled, Draw shape / Undo point / Clear
+    shape, and a status line that says whether the set filters and why not.
+  - It owns no data. `detect_section` hands it `masks_of(...)` and writes its `edit` back through `with_masks`.
+  - The first mask turns "Use masks" on, since it is drawn to be used.
+- **`detect_section.gd`**: adds the mask section. A camera switch stops drawing.
+- **`tracking_page.gd`**:
+  - In Detect mode, `click` adds a 0–1 picture corner while a mask is being drawn.
+  - Leaving Detect stops drawing.
+  - The mask section's `view_changed` triggers a redraw.
+- **`tracking_view.gd`**:
+  - Detect mode draws the masks: green, filled while the set filters, outline only while it is off; the selected
+    mask is thicker and shows corner dots while drawing.
+  - While masks filter, a dot marks each box's feet point (the point the sidecar tests).
+  - While drawing, a left click is a corner (`clicked`) rather than a marker grab.
+  - The hint line changes while drawing.
+- **`previs_tab.gd`**: `_push_masks()` on every tracking change.
+- **Tests**: `godot/client/tests/test_tracking_detect.gd` gets 6 tests (Haiku-written, reviewed) for
+  `masks_of` / `with_masks` / `masks_active`: copies, kept `enabled`, other cameras untouched, the filtering
+  rule, and the round trip.
+
+### What was VERIFIED
+
+- Godot `--check` boots clean. `--test`: 1209 passed, 0 failed. Line limits: 0 files over 500.
+- **Through the Godot GUI** on the box (screenshots), test still on 1-1000, detection on, replace on marker 1 (feet):
+  - Before: "Running — 10 persons · 1 pinned", marker 1 on the largest person at the left edge.
+  - Add mask, then four clicks over the right half of the pavement. The polygon drew with corner dots, and "Use
+    masks" switched on.
+  - The server stored `cam_1: {enabled: true, masks_enabled: true, masks: [{enabled: true, vertices:
+    [[0.507, 0.598], [0.998, 0.598], [0.998, 0.988], [0.507, 0.988]]}]}`.
+  - Within ~3 s the sidecar reported 5 persons, all with feet inside the polygon (x 0.64–0.97, y 0.64–0.84). The
+    boxes on the left were gone, and the status read "5 persons · 1 pinned".
+  - The Replace pin re-acquired: marker 1 moved onto a person inside the mask.
+  - Unticking "Use masks" brought back 10 persons, with the polygon kept (`masks_enabled: false`).
+- **Not verified**: masks on a real moving camera, and several masks per camera, which are covered only by the
+  `filter_masks` "any polygon" rule. Owner QA.
+- Left on the box: `cam_1` keeps one mask with "Use masks" off.
 

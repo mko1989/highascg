@@ -14,6 +14,8 @@ extends Control
 ## its shader) between the picture and the 2D lines — the picture and ghost are children drawn behind this node.
 ## T9b: detected persons of this camera are boxed (the one a marker is pinned to in that marker's colour, thicker);
 ## an assisted marker's ring is the operator's anchor, a thin line joins it to the body at the AI-corrected output.
+## T9c: Detect mode draws the camera's ROI masks (filled while they filter, outline only while off); while one is
+## being drawn a click is a picture corner (`clicked`) instead of a marker grab.
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -34,6 +36,9 @@ var zones_mode := false
 var detect_mode := false
 var zone_drawing := false
 var zone_shapes: Array = []  # [{name, color, loop: [[x, y, z]…], occupied, selected, open}]
+var mask_shapes: Array = []  # mask_section.shapes(): [{vertices: [[x, y] 0–1…], enabled, selected}]
+var mask_drawing := false
+var masks_on := false  # the set filters (detect_model.masks_active)
 var _held := false
 var detections := {}  # marker_driver.detections (tracking:detections)
 
@@ -112,6 +117,13 @@ func set_beams(b: Array) -> void:
 func set_zones(shapes: Array, drawing: bool) -> void:
 	zone_shapes = shapes
 	zone_drawing = drawing
+	queue_redraw()
+
+
+func set_masks(shapes: Array, on: bool, drawing: bool) -> void:
+	mask_shapes = shapes
+	masks_on = on
+	mask_drawing = drawing
 	queue_redraw()
 
 
@@ -235,6 +247,8 @@ func _draw() -> void:
 		_draw_zones(font)
 	if markers_mode:
 		_draw_beams(font)
+	if detect_mode:
+		_draw_masks()
 	_draw_boxes(font)
 	_draw_marks(font)
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
@@ -245,7 +259,8 @@ func _draw() -> void:
 	if follow_mode:
 		head = "Follow — beams show where the server aims each fixture · drag / drive a marker to test"
 	if detect_mode:
-		head = "Detect — boxes = detected persons (pinned one in its marker's colour) · assist: drag the ring, the body follows the AI"
+		head = ("Detect — click the mask's corners in the picture · Draw shape again to finish" if mask_drawing else
+			"Detect — boxes = detected persons (pinned one in its marker's colour) · assist: drag the ring, the body follows the AI")
 	if zones_mode:
 		head = ("Zones — click the zone's corners on the floor · Draw shape again to finish" if zone_drawing else
 			"Zones — filled = a marker is inside (server) · drag / drive a marker through a zone to test")
@@ -307,8 +322,30 @@ func _draw_boxes(font: Font) -> void:
 			var a := to_view(Vector2(float(b[0]) * r.x, float(b[1]) * r.y))
 			var z := to_view(Vector2(float(b[2]) * r.x, float(b[3]) * r.y))
 			draw_rect(Rect2(a, z - a), col, false, 3.0 if pinned else 1.5)
+			if detect_mode and masks_on:
+				draw_circle(Vector2((a.x + z.x) / 2.0, z.y), 4.0, col)  # the feet point the masks test
 			draw_string(font, a + Vector2(3, -4), "#%d %.0f%%" % [int(p.get("tid", 0)), float(p.get("score", 0.0)) * 100.0],
 				HORIZONTAL_ALIGNMENT_LEFT, -1, 12, col)
+
+
+func _draw_masks() -> void:
+	var r := _raster()
+	for m in mask_shapes:
+		var poly := PackedVector2Array()
+		for v in m.vertices:
+			poly.append(to_view(Vector2(float(v[0]) * r.x, float(v[1]) * r.y)))
+		var live: bool = masks_on and m.enabled
+		var col := Color(ThemeBuilder.ACCENT_GREEN, 1.0 if live else 0.45)
+		if live and poly.size() >= 3 and not Geometry2D.triangulate_polygon(poly).is_empty():
+			draw_colored_polygon(poly, Color(col, 0.12))
+		if poly.size() >= 2:
+			var loop := poly.duplicate()
+			if poly.size() >= 3:
+				loop.append(poly[0])
+			draw_polyline(loop, col, 3.0 if m.selected else 1.5, true)
+		if m.selected and mask_drawing:
+			for p in poly:
+				draw_circle(p, 4.0, col)
 
 
 func _draw_zones(font: Font) -> void:
@@ -363,7 +400,7 @@ func _gui_input(event: InputEvent) -> void:
 		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
-		if mb.button_index == MOUSE_BUTTON_LEFT and (markers_mode or zones_mode) and not zone_drawing:
+		if mb.button_index == MOUSE_BUTTON_LEFT and (markers_mode or zones_mode) and not (zone_drawing or mask_drawing):
 			grab_focus()
 			if mb.pressed:
 				grab.emit(to_raster(mb.position))

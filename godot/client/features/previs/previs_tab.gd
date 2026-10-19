@@ -17,6 +17,7 @@ const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
 const FollowModel := preload("res://features/previs/tracking/follow_model.gd")
 const ZoneModel := preload("res://features/previs/tracking/zone_model.gd")
+const DetectModel := preload("res://features/previs/tracking/detect_model.gd")
 const CameraOverlay := preload("res://features/previs/tracking/camera_overlay.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
@@ -149,7 +150,16 @@ func _on_tracking_changed() -> void:
 	track_view.zones_mode = track_page.mode == "zones"
 	track_view.detect_mode = track_page.mode == "detect"
 	_push_zones()
+	_push_masks()
 	_apply_drive()
+
+
+## WO-616 T9c: the camera's detection ROI masks (Detect mode).
+func _push_masks() -> void:
+	var ms = track_page.detect.masks if track_page.detect != null else null
+	if ms == null:
+		return
+	track_view.set_masks(ms.shapes(), DetectModel.masks_active(ms.mk), ms.drawing and track_page.mode == "detect")
 
 
 ## WO-616 T7: the trigger zones as floor loops + the server's occupancy.

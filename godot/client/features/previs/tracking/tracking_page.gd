@@ -8,6 +8,7 @@ extends VBoxContainer
 ## T12: a "3D stage overlay" toggle + opacity under the modes (the view draws it; previs_tab remembers it).
 ## T7: | Zones — trigger zones (zones_section, data.zones); while drawing, the view's click adds a floor corner.
 ## T9b: | Detect — person detection + pinning (detect_section, data.detection); markers stay draggable, boxes drawn.
+## T9c: while a Detect mask is being drawn the view's click adds a picture corner (0–1 of the frame).
 
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const R := preload("res://features/previs/tracking/camera_refine.gd")
@@ -128,6 +129,7 @@ func _ready() -> void:
 	detect.edit.connect(func(d: Dictionary) -> void:
 		data["detection"] = d
 		_persist())
+	detect.masks.view_changed.connect(func() -> void: changed.emit())
 	add_child(detect)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Delete this tracking camera and its calibration?"
@@ -203,6 +205,8 @@ func set_mode(m: String) -> void:
 	mode = m
 	if zones != null and m != "zones":
 		zones.set_drawing(false)
+	if detect != null and m != "detect":
+		detect.masks.set_drawing(false)
 	_sync()
 	changed.emit()
 
@@ -231,6 +235,10 @@ func click(px: Vector2) -> void:
 		var hit: Variant = MI.floor_point(ce, px, float(data.grid.z_offset)) if not ce.is_empty() else null
 		if hit != null:
 			zones.add_point(hit)
+		return
+	if mode == "detect":
+		if not ce.is_empty():
+			detect.masks.add_point([px.x / float(ce.raster[0]), px.y / float(ce.raster[1])])
 		return
 	if ce.is_empty() or active == "":
 		return

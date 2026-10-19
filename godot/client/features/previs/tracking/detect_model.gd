@@ -85,3 +85,36 @@ static func status_line(snap: Dictionary, cam_id: String) -> String:
 			var pinned: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and p.has("marker")).size()
 			return "Running — %d person%s%s" % [ps.size(), "" if ps.size() == 1 else "s", " · %d pinned" % pinned if pinned > 0 else ""]
 	return "Running — this camera is not watched (no surface role, or switched off)"
+
+
+## Camera `cam_id`'s ROI masks: {masks_enabled, masks: [{enabled, vertices: [[x, y] 0–1 of the picture]…]}} (copies).
+static func masks_of(d: Dictionary, cam_id: String) -> Dictionary:
+	var c: Variant = (d.get("cameras", {}) as Dictionary).get(cam_id)
+	var ms: Variant = c.get("masks") if c is Dictionary else null
+	var out := []
+	for m in (ms as Array if ms is Array else []):
+		if m is Dictionary:
+			out.append({"enabled": m.get("enabled") != false, "vertices": (m.get("vertices", []) as Array).duplicate(true)})
+	return {"masks_enabled": c is Dictionary and c.get("masks_enabled") == true, "masks": out}
+
+
+## d with camera `cam_id`'s masks replaced (its `enabled` kept; no entry yet = watched).
+static func with_masks(d: Dictionary, cam_id: String, masks_enabled: bool, masks: Array) -> Dictionary:
+	var out := d.duplicate(true)
+	var cams: Dictionary = out.get("cameras", {})
+	var c: Dictionary = (cams.get(cam_id) as Dictionary).duplicate(true) if cams.get(cam_id) is Dictionary else {"enabled": true}
+	c["masks_enabled"] = masks_enabled
+	c["masks"] = masks.duplicate(true)
+	cams[cam_id] = c
+	out["cameras"] = cams
+	return out
+
+
+## Does mask set `mk` (masks_of) filter anything? The sidecar keeps every box when no enabled mask has 3+ corners.
+static func masks_active(mk: Dictionary) -> bool:
+	if mk.get("masks_enabled") != true:
+		return false
+	for m in mk.get("masks", []):
+		if m.enabled and (m.vertices as Array).size() >= 3:
+			return true
+	return false

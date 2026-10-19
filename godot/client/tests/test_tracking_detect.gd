@@ -94,3 +94,54 @@ func test_position_of_replace_driven_and_operator() -> void:
 	t.eq([o.driven, o.status, o.stale, o.name, o.z], [false, 1.0, true, "A", 0.0], "operator marker: free, status defaults to 1")
 	var dead := D.position_of({"id": 3, "x": 1.0, "y": 1.0, "source": "detect", "stale": true})
 	t.eq(dead.driven, false, "source detect alone (a dead assist anchor) is not driven: the operator can take it back")
+
+
+func test_masks_of_no_entry_is_empty() -> void:
+	t.eq(D.masks_of({}, "cam_1"), {"masks_enabled": false, "masks": []}, "no entry gives masks off and none")
+	var other := {"cameras": {"cam_2": {"masks_enabled": true, "masks": [{"enabled": true, "vertices": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]}]}}}
+	t.eq(D.masks_of(other, "cam_1"), {"masks_enabled": false, "masks": []}, "another camera's masks are not returned")
+
+
+func test_masks_of_returns_copies() -> void:
+	var src := {"cameras": {"cam_1": {"masks_enabled": true, "masks": [{"vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}, {"enabled": false, "vertices": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]}]}}}
+	var mk := D.masks_of(src, "cam_1")
+	t.eq(mk.masks[0].enabled, true, "a mask without enabled comes back enabled")
+	t.eq(mk.masks[1].enabled, false, "enabled false stays false")
+	mk.masks[0].vertices.append([0.0, 0.0])
+	mk.masks[0].vertices[0][0] = 0.7
+	t.eq(src.cameras.cam_1.masks[0].vertices.size(), 3, "mutating the copy's vertices does not change the input")
+	t.eq(src.cameras.cam_1.masks[0].vertices[0][0], 0.1, "nested vertex arrays are copied too")
+
+
+func test_with_masks_creates_and_keeps_enabled() -> void:
+	var ms := [{"enabled": true, "vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}]
+	var made := D.with_masks({}, "cam_1", true, ms)
+	t.eq(made.cameras.cam_1, {"enabled": true, "masks_enabled": true, "masks": ms}, "no entry: created with enabled true")
+	ms[0].vertices.append([0.0, 0.0])
+	t.eq(made.cameras.cam_1.masks[0].vertices.size(), 3, "the stored masks are a copy")
+	var d := {"cameras": {"cam_1": {"enabled": false, "masks_enabled": false, "masks": []}}}
+	var kept := D.with_masks(d, "cam_1", true, ms)
+	t.eq(kept.cameras.cam_1.enabled, false, "an existing enabled false is kept")
+	t.eq(kept.cameras.cam_1.masks_enabled, true, "masks_enabled replaced")
+	t.eq(d.cameras.cam_1.masks_enabled, false, "the input dictionary is not mutated")
+
+
+func test_with_masks_keeps_other_cameras() -> void:
+	var d := {"cameras": {"cam_2": {"enabled": false, "masks_enabled": true, "masks": [{"enabled": true, "vertices": [[0.2, 0.2], [0.8, 0.2], [0.5, 0.8]]}]}}}
+	var out := D.with_masks(d, "cam_1", true, [])
+	t.eq(out.cameras.cam_2, d.cameras.cam_2, "another camera's entry is untouched")
+	t.ok(out.cameras.has("cam_1"), "the new camera is added")
+
+
+func test_masks_active_states() -> void:
+	var tri := [{"enabled": true, "vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}]
+	t.eq(D.masks_active({"masks_enabled": false, "masks": tri}), false, "masks off: not active even with a valid triangle")
+	t.eq(D.masks_active({"masks_enabled": true, "masks": [{"enabled": true, "vertices": [[0.1, 0.1], [0.9, 0.1]]}]}), false, "an enabled mask with 2 corners does not filter")
+	t.eq(D.masks_active({"masks_enabled": true, "masks": [{"enabled": false, "vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}]}), false, "a disabled mask does not filter")
+	t.eq(D.masks_active({"masks_enabled": true, "masks": tri}), true, "masks on with one enabled triangle is active")
+
+
+func test_masks_round_trip() -> void:
+	var ms := [{"enabled": true, "vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}, {"enabled": false, "vertices": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]}]
+	var d := D.with_masks({}, "cam_1", true, ms)
+	t.eq(D.masks_of(d, "cam_1"), {"masks_enabled": true, "masks": ms}, "round trip gives back what was written")

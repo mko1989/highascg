@@ -5,8 +5,10 @@ extends VBoxContainer
 ## persists it); the boxes and the live status come from `tracking:detections` via the marker driver.
 ## The master starts off and asks before it arms: in Replace a marker — and every fixture following it — chases a
 ## detected person.
+## T9c: the camera's ROI masks below the fields (mask_section.gd; drawn by clicking in the camera view).
 
 const D := preload("res://features/previs/tracking/detect_model.gd")
+const MaskSection := preload("res://features/previs/tracking/mask_section.gd")
 
 signal edit(detection: Dictionary)  # new detection slice → persist
 
@@ -25,6 +27,7 @@ var _spins := {}
 var _assist_rows: Array = []
 var _replace_rows: Array = []
 var _confirm_on: ConfirmationDialog
+var masks := MaskSection.new()  # created here so tracking_page can connect it before _ready
 
 
 func _ready() -> void:
@@ -76,6 +79,10 @@ func _ready() -> void:
 	_num(g, "Lookahead", "prediction", 1, "fr")
 	_assist_rows = _num(g, "Assist radius", "assist_radius_m", 0.1, "m") + _num(g, "Assist strength", "assist_strength", 0.05, "")
 	add_child(g)
+	masks.edit.connect(func(on: bool, ms: Array) -> void:
+		data = D.with_masks(data, cam_id, on, ms)
+		_persist())
+	add_child(masks)
 	_load_models()
 	refresh()
 
@@ -83,6 +90,8 @@ func _ready() -> void:
 ## The page hands over the slice and the camera on screen.
 func set_detection(src: Variant, camera_id: String) -> void:
 	data = D.normalize(src)
+	if camera_id != cam_id:
+		masks.set_drawing(false)
 	cam_id = camera_id
 	refresh()
 
@@ -95,6 +104,8 @@ func refresh() -> void:
 	_cam.visible = not cam_id.is_empty()
 	_cam.text = "Detect on %s" % cam_id
 	_cam.set_pressed_no_signal(D.camera_on(data, cam_id))
+	masks.visible = not cam_id.is_empty()
+	masks.set_masks(D.masks_of(data, cam_id))
 	_model.clear()
 	var models := _models.duplicate()
 	if not models.has(data.model):
