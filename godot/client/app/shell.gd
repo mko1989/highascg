@@ -1,12 +1,13 @@
 extends VBoxContainer
 ## WO-599/608 — app shell (web client/index.html): header (logo + title, project name, connection eyes) over three
 ## columns — Sources (full height, shared by every tab — R1), the workspace tabs, and the Inspector (always on the
-## right, content follows the selection — R2). Tabs other than Live/Previs/Timeline are placeholders until their WOs land.
+## right, content follows the selection — R2). Audio / Devices are placeholders until their WOs land.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LiveTab := preload("res://features/live/live_tab.gd")
 const PrevisTab := preload("res://features/previs/previs_tab.gd")
 const TimelineTab := preload("res://features/timeline/timeline_tab.gd")
+const SettingsTab := preload("res://features/settings/settings_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -52,10 +53,13 @@ func _ready() -> void:
 	var timeline := TimelineTab.new()  # WO-602
 	timeline.name = "Timeline"
 	tabs.add_child(timeline)
+	for t in [["Audio", "WO-604"], ["Devices", "WO-605"]]:  # Inspector = the right column, media = Sources (R1/R2)
+		tabs.add_child(_placeholder(t[0], t[1]))
+	var settings := SettingsTab.new()  # WO-608
+	settings.name = "Settings"
+	tabs.add_child(settings)
 	if Config.args.has("tab"):
 		tabs.current_tab = clampi(int(Config.args["tab"]), 0, tabs.get_tab_count() - 1)
-	for t in [["Audio", "WO-604"], ["Devices", "WO-605"], ["Settings", "WO-608"]]:  # Inspector = the right column, media = Sources (R1/R2)
-		tabs.add_child(_placeholder(t[0], t[1]))
 	Ws.connected.connect(_refresh_eye)
 	Ws.disconnected.connect(_refresh_eye)
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())

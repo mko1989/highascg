@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — owner layout rules R1–R5 DONE (box-verified 18.10, below); settings/logs/modals open. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
+**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs, logs and modals open. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
 
@@ -13,7 +13,7 @@ via 45 `@import`s).
 |------|-------|
 | Boot (`app.js:66-381`) | settings → state → project; WS handlers attach before open (WO-599 replicates) |
 | Header bar (`header-bar.js` 347) + tabs (`app-tabs.js`) + workspace side panels (`workspace-layout.js` 149) | Godot `TabContainer`/`HSplitContainer`; collapsible side panels |
-| Settings modal (no Save button, 600 ms whole-object autosave) | tabs: defaults, companion, media/usb, updates, system, decklink, diagnostics, tailscale, live audio (+ ALSA mixer), **nuclear** (password option), variables |
+| Settings modal (no Save button, 600 ms whole-object autosave — Godot posts changed sections only, 19.10) | tabs: defaults, companion, media/usb, updates, system, decklink, diagnostics, tailscale, live audio (+ ALSA mixer), **nuclear** (password option), variables |
 | Logs modal (`logs-modal.js` 473 + filter 177) | `log_line` WS; needs a **virtualized** list in Godot (research risk 4) |
 | Connection eye (365) + A/B hot-backup profiles | status from `state`/`caspar.connection` |
 | Project: load modal (434), new/reset/factory reset, hardware reconcile modal (policy in `localStorage['highascg_hardware_policy']` → server prefs, WO-598 D), media gather/reconcile | Download/upload of project JSON → Godot `FileDialog` (no portal) |
@@ -136,5 +136,69 @@ Waves; click Background → back (thumbnail doesn't eat the click). Not covered:
 cached render — label for now), the web's on-air snapshot mode (`isSnapshotComposePreview`), card reorder drag and
 the "＋" new-look tile.
 
+### 19.10 — Settings slice 1: Defaults, Companion, Media / USB (port plan step 2)
+
+Investigation:
+- The web modal autosaves 600 ms after any input with a **whole-object** body: `settings-modal-logic.js`
+  `buildSettingsPayload` = `{...prevAll, editorDefaults, companion, ui, osc, composePreview, usbIngest, …}` minus
+  `offline_mode`. The server merges each section and leaves absent ones untouched (`src/api/settings-post.js`: caspar /
+  osc / streaming per field, ui / composePreview / casparServer / rtmp / companion merged with the stored value,
+  operatorTools only the keys present — WO-268). So a body with only the changed sections is safe.
+- Echoing the whole GET back is **not** safe:
+  - GET is redacted (`redact-settings.js`: password / token / secret / auth keys read `"[REDACTED]"`, strings over
+    4096 chars are truncated), and the server stores a posted placeholder verbatim (box-probed, see
+    [WO-619](./619_WO_settings_editor_defaults_never_persisted.md));
+  - every web save also re-posts `osc`, which restarts the OSC subsystem (`settings-post.js` `restartOscSubsystem`).
+- A text field autosaving per keystroke is risky: `local_media_path` symlinks `~/highascg/media` to the typed path
+  as soon as the path exists (`settings-post.js` local_media_path branch), and a half-typed `/home` exists.
+- Found while verifying: Defaults-tab saves never persisted (server bug, fixed in WO-619).
+
+Done:
+- `core/settings_payload.gd` (new, pure) builds the POST body: only the dirty top-level sections, with
+  `"[REDACTED]"` / truncated values dropped so the server keeps what it stores. `ui.nuclearPassword` stays
+  `"[REDACTED]"`, which is the server's keep-the-hash signal. `offline_mode` is never sent.
+- `core/settings_state.gd`:
+  - `patch` marks top-level keys dirty, and `_flush` posts only those sections; a failed post re-marks them;
+  - new `saved(ok, info)` signal;
+  - after a save with nothing new pending, settings are re-read (web `settingsState.load()`), and an edit made
+    while the GET is in flight is kept.
+- `features/settings/settings_form.gd` (new) builds a pane from rows bound to a settings path (option, check, text,
+  number, heading, note, group). A change becomes `Settings.patch(nest(path, v))`, and `hydrate()` re-reads every row
+  but skips a field that has focus. Text fields commit on Enter or on leaving the field (deviation, reason above).
+- `features/settings/settings_model.gd` (new, pure) holds `nest`, `is_on` (unset = fallback, only `true` / `"true"`
+  count) and the Companion status text and query (web `formatStatusText` / `buildStatusQuery`). JSON floats print as
+  integers.
+- `features/settings/settings_panes.gd` (new):
+  - **Defaults**: coordinate origin, scene loop / start / content sizing, timeline loop-always / content sizing, the
+    default transition (type, duration shown resolved to frames, tween), compose preview mode with the ffmpeg fields
+    only for JPEG mode, invert touchpad scroll.
+  - **Companion**: a Check button with the connection status (`GET /api/companion/connection-status`, also run when
+    the pane opens), host / port / satellite fields.
+  - **Media / USB**: project media location, CasparCG media path, project-scoped uploads, USB import fields.
+- `features/settings/settings_tab.gd` (new) holds the sub-tabs and a status line: "Saved", the server's
+  sideEffects / warnings, or the error. `app/shell.gd` replaces the Settings placeholder with it; `--tab=` is now
+  applied after all tabs exist (Settings = 5).
+- `tests/test_settings.gd` (new) covers the payload (dirty only, redaction strip, mirror untouched), the path
+  helpers and the Companion text / query.
+
+Verified (box, 19.10):
+- `--test` 912 passed / 0 failed; `--check` boot OK; 0 files over 500 lines.
+- DP-3, `--tab=5`, all three panes render in Rewir with the stored values.
+- Loop always → `editor_defaults.json` `true` (after the WO-619 fix), and the box stays ticked after the reload.
+- Content sizing "Fit canvas" → `fill-canvas` stored.
+- Invert touchpad scroll on / off → `config/ui.json` keeps `nuclearRequirePassword: false` and an empty hash (no
+  placeholder written).
+- Companion: Check → "Connected — HTTP press API reachable at 127.0.0.1:8000. Satellite preview connected at
+  127.0.0.1:16622."; preview bitmap size ▲ → `companion.json` 73, ▼ → 72.
+- USB subfolder template: typing `usb/{label}` saved nothing for 1.5 s; Enter → `usb_ingest.json` stored it; cleared
+  and stored `""` again.
+- Every touched slice was compared with the pre-test snapshot. It matches, except `ui.json` now carries an explicit
+  `invertTouchpadScroll: false`, plus the WO-619 side notes (`screen_count`, `osc.wsDeltaBroadcast`).
+
+Not ported yet (next slices): updates, system (hardware / mounts), decklink, diagnostics, Tailscale, live audio (+ ALSA
+mixer), variables, nuclear (password + restart / reboot / Caspar actions); the media pane's exFAT sync table; the
+web's WebCodecs warning for the stream preview mode (irrelevant here). The Godot client does not yet honour
+`ui.invertTouchpadScroll` (its zoom / pan controls); the setting is kept for the browser client.
+
 Open: Inspector modes (Layer presets / Look presets) and the bottom Playlists / Timers /
-Program audio strip; settings / logs / project modals (plan steps 2–4).
+Program audio strip; the remaining settings tabs, logs and project modals (plan steps 2–4).
