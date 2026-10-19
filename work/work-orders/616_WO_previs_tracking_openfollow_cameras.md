@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); next: T11 follow → WO-615 Art-Net, T7 zones. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); next: T7 zones. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -114,7 +114,7 @@ server (Node) tracking hub: cameras {pose, intrinsics, k1,k2}, markers, fusion, 
 - [ ] T8 PSN input (OpenFollow stations as sources).
 - [ ] T9 Detection sidecar from shm (Python, ONNX, ByteTrack), systemd unit, GPU EP; masks.
 - [ ] T10 Two-camera fusion + verification walk + coverage view.
-- [ ] T11 Follow: markers → WO-615 fixture IK and WO-31 Companion variables.
+- [x] T11 Follow: markers → fixture IK → Art-Net (generic profile; WO-615 T3/T4/T9 slice). WO-31 Companion variables not done (owner route = Art-Net).
 - [ ] Attribution: header in every ported file + About page credit; `THIRD_PARTY` note.
 
 ## Acceptance
@@ -549,3 +549,139 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
   arrows plus `Input.get_joy_axis` → owner QA with a controller. Test layer cleared (`CLEAR 1-90`); Marker 1 stays
   in the dev project.
 - Next: T11, follow → WO-615 DMX engine (`ctx.trackingHub` → pan/tilt → Art-Net); T7 zones.
+
+## T11 — follow: markers → moving-head pan / tilt → Art-Net (2026-10-19) — DONE (box-verified on loopback; real fixture = owner QA)
+
+Scope: a vertical slice of WO-615 T3 (patch), T4 (engine + Art-Net) and T9 (follow IK). It uses a **manual
+generic moving-head profile** (pan / tilt channels, 8- or 16-bit, ranges, inverts) instead of GDTF; WO-615 T1/T2
+replace the profile later. Art-Net only; sACN waits for WO-615 T4. WO-31 Companion variables were not done
+(the owner's route is Art-Net).
+
+### Investigation
+- **dmxnet 0.9.0 is the wrong sender for this** (`node_modules/dmxnet/lib.js`):
+  - Its constructor binds a UDP listener on **:6454** (reuseAddr) and throws on a socket error. That port is
+    already the box's lighting input (`src/artnet/lighting-input-receiver.js`).
+  - `setChannel` transmits one packet per call. `src/sampling/dmx-output.js` `send()` calls it per channel, so a
+    16-bit pan/tilt frame would be 4+ packets.
+  - It clamps the universe to 0–15.
+  - The follow engine needs one full-universe ArtDmx per frame to a 15-bit port-address, so a ~40-line encoder
+    over a send-only ephemeral socket is simpler and safer.
+- **Self-loop hazard.** The box listens for Art-Net on :6454 at port-address `net/subnet/universe` (default 0/0/0
+  — `resolveArtnetPatch`, `src/artnet/artnet-slot-config.js:68`); that input drives the global border. A follow
+  fixture on universe 0 broadcast to 255.255.255.255 would feed our own pan/tilt bytes into that input.
+  Confirmed on the box: the first fixture added with the defaults was refused for exactly this.
+- **Project → server engine.** Every project write path calls `scheduleProjectSyncBroadcast(ctx, project)`
+  (`src/api/routes-data-project-sync.js`):
+  - autosave (`routes-data-project-handlers.js:470`, on a changed save only);
+  - save, activate, replication, media links, mixer inspector, global border.
+  
+  That makes it the one place to tell a server consumer about the stamped project. Before this, nothing
+  server-side could observe a project change without re-reading the disk.
+- **Slice ownership.** The web client rebuilds its save payload from a fixed key list, so a Godot-only top-level
+  key is erased by the next web autosave unless it is in `CLIENT_OWNED_SLICES`
+  (`src/engine/project-client-slices.js`, WO-614). WO-615 planned `project.fixtures.patch[]`, so the slice is
+  `project.fixtures`.
+- **Moving-head IK.** Every target has two solutions per turn: (pan₀ + 360k, t) and (pan₀ + 180 + 360k, −t).
+  With a 540° pan, picking the wrong one whips the head the long way round, so the engine keeps the previous aim
+  and picks the in-range solution nearest to it.
+
+### What was done
+- `src/fixtures/artdmx.js` (new):
+  - `encodeArtDmx` / `decodeArtDmx`: Art-Net 4, OpCode 0x5000, ProtVer 14, SubUni/Net from the 15-bit
+    port-address, even length.
+  - `parseDest`: `ip[:port]`.
+  - `ArtnetSender`: one ephemeral, broadcast-enabled socket that never binds :6454; send errors are counted and
+    rate-limited in the log.
+- `src/fixtures/follow-patch.js` (new): normalizes `project.fixtures`:
+  - `{output: {enabled: false}, patch: [{id, name, enabled, universe, address, dest, pan/tilt {ch, fine, range,
+    invert}, pose {x, y, z, hang truss|floor, yaw}, fixed "ch=value, …", follow, aim_z}]}`.
+  - A fixture with a **problem** is never output: bad destination, footprint past channel 512, or a channel
+    already used by an earlier fixture on the same destination+universe (WO-615 "collisions are refused").
+- `src/fixtures/follow-ik.js` (new, pure):
+  - Base axis u (+Z standing, −Z hung).
+  - f = yaw direction (same convention as the camera: 0 upstage, 90 stage left).
+  - g = positive pan, clockwise from above when standing, mirrored when hung.
+  - `aim()` = nearest in-range solution; `null` if unreachable.
+  - `axisBytes()` handles 16-bit coarse/fine and invert; `writeFixture()` writes pan/tilt plus the fixed
+    channels.
+- `src/fixtures/follow-engine.js` (new), 23 ms tick (≈ 43.5 Hz, under the Art-Net 44 Hz ceiling):
+  - live marker → aim at (x, y, z + aim_z);
+  - stale or missing → **hold** the last aim (the hub's 1 s rule);
+  - never aimed → pan/tilt centre;
+  - unreachable → hold.
+  - One packet per destination+universe, only when its bytes change, plus a 1 s refresh.
+  - **Master off = nothing transmitted** (the default). Re-patching keeps each fixture's aim, so heads do not snap.
+- `src/fixtures/follow-service.js` (new): wires the engine to the hub, the sender and the project.
+  - Loads `project.fixtures` at boot (`loadFullProject`), then on every project write via project-events.
+  - Refuses any destination that would reach this box's own Art-Net input: loopback, 255.255.255.255, own
+    addresses and directed broadcasts on :6454, at the input's port-address.
+  - Logs `[follow] patch: N fixture(s), M outputtable, output ON|off` plus one warning per problem.
+- `src/engine/project-events.js` (new) is an in-process bus. `scheduleProjectSyncBroadcast` emits the unmasked
+  project on it before the WS debounce, and listener errors are contained.
+- `src/engine/project-client-slices.js`: `CLIENT_OWNED_SLICES = ['previs', 'fixtures']`.
+- `src/tracking/register.js` starts and stops the follow service with the module.
+  - New route `GET /api/tracking/follow`: output state, per-fixture state / pan / tilt / problem, per-universe
+    packet counts, send errors.
+  - New WS message `tracking:follow {output_enabled, fixtures:[{id, state, pan, tilt, problem}]}`, at most
+    10 Hz and only on change.
+- Godot:
+  - `features/previs/tracking/follow_model.gd` (new): the twin of follow-patch normalization. It also has
+    `new_fixture` (next free address after the last fixture, same profile, +2 m in X), `beam()` (same frame as
+    the server), `beam_end` (to the marker's aim point, else the floor) and `beams()`.
+  - `follow_section.gd` (new): the Follow section of the tracking Inspector page (R2: same page, no new panel).
+    - "Art-Net output" master, with a confirm dialog before it transmits; it saves immediately
+      (`ProjectSync.mark_dirty(true)`) instead of after the 3 s debounce.
+    - Fixture list showing U.addr → marker · state · pan/tilt; problems in red.
+    - Add / Delete (with confirm).
+    - Fields: name, follows (the project's markers), destination, universe, address, pan/tilt ch / fine /
+      range / invert, pose X/Y/Z, hung, yaw, aim height, fixed channels, enabled.
+    - Status line.
+  - `tracking_page.gd`: Calibrate | Markers | **Follow**.
+  - `marker_driver.gd`: keeps the server's `follow` aims (WS `tracking:follow`, plus a GET on resync).
+  - `previs_tab.gd`: Follow mode drives markers like Markers mode and feeds `track_view.set_beams`.
+  - `tracking_view.gd`: draws each fixture as a square plus a lens-curved beam from the server's pan/tilt.
+    The beam is bright while following and dim while holding.
+
+### What was VERIFIED
+- Offline: `smoke-wo616-follow-artnet.test.js`, 8 tests, added to the curated CI list.
+  - ArtDmx header bytes are exact, and decode round-trips.
+  - IK: a hung head at tilt 0 points straight down; an upstage target gives tilt +45°; 4 targets round-trip
+    through `beam()` to 1e-9; the 540° pan keeps to the side nearest the last aim; ±45° tilt reports
+    unreachable; for a standing head, positive pan is clockwise from above.
+  - DMX: 16-bit centre = 128/0, invert and clamp.
+  - Patch: an overlap is refused ("channel 12 already used by Spot A"), as are a bad destination and a
+    footprint past 512; fixed-channel parsing works.
+  - Engine:
+    - master off → 0 packets;
+    - on → exact pan/tilt/fixed bytes, with unpatched channels at 0;
+    - unchanged → no packet; stale → hold; 1 s refresh;
+    - the self-loop is refused.
+  - A real UDP loopback send/receive works.
+  - The hook fires on `scheduleProjectSyncBroadcast`, and `fixtures` is client-owned.
+- Offline suite: 2688 / 2685 pass / 2 skipped / 1 known `wo577` fail. Godot `--check` OK; `--test` 1102 passed
+  (+22 in `tests/test_follow_model.gd`). 0 files over 500 lines; eslint clean on the new files.
+- On the box (server restarted; GUI on DP-3, previs Camera mode, Camera 1 calibrated; Marker 1 live at
+  (−5.0086, 3.4609)):
+  - Follow → Add fixture: Fixture 1 at U0.001, broadcast, hung at (0, 0, 6). The journal and the list said
+    **not output — "would loop into this box's Art-Net input (universe 0)"**, and nothing was sent.
+  - Destination set to `127.0.0.1:6455` → state "following", **pan 55.36° / tilt 50.60°**. Hand check: d =
+    (−5.0086, 3.4609, −5); tilt = acos(5/7.878) = 50.6°; pan = atan2(5.0086, 3.4609) = 55.36°. With output
+    still off, 0 packets.
+  - Art-Net output → confirm → OK. A Python listener on :6455 captured **36 packets**, all op 0x5000, ver 14,
+    port-address 0, length 512, with nothing non-zero beyond channel 4.
+    - The first packet decodes to exactly 55.36° / 50.60°.
+    - Right arrow held 1 s → marker x −5.01 → −6.03. The engine reported 60.14° / 54.27°, which matches the
+      hand IK, and the last packet decodes to the same.
+    - 26 packets during the move, min gap 22 ms (≈ 44 Hz); 1.013–1.017 s gaps while idle.
+    - The sequence number cycled 1…36 without a gap.
+  - The camera view drew the beam from the fixture to the marker's 1 m aim point, following the marker
+    (screenshot).
+  - GUI killed (the marker goes stale) → `holding (stale)` 60.14 / 54.27. Six packets, 1 s apart, all with the
+    same bytes (40066 / 45941).
+  - GUI relaunched → marker live again → "following". Output toggled **off** → journal `output off`, and a 4 s
+    capture saw **0 packets**.
+  - Server restarted → `[follow] patch: 1 fixture(s), 1 outputtable, output off` (loaded from the project at boot).
+- Not verified (owner QA): a real moving head on the owner's Art-Net node. That needs the fixture's pan/tilt
+  channels, ranges, invert and pose (yaw, hang) set to match the rig — check each axis by moving the marker.
+  sACN and per-universe enables are WO-615 T4. Test layer cleared. The dev project keeps Fixture 1 (loopback
+  127.0.0.1:6455, output off).

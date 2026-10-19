@@ -1,6 +1,7 @@
 'use strict'
 
 const { maskProjectStreamCredentials } = require('../engine/project-stream-credentials')
+const { emitProjectChanged } = require('../engine/project-events')
 
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _projectSyncBroadcastTimer = null
@@ -32,6 +33,7 @@ function flushProjectSyncBroadcast() {
 }
 
 function scheduleProjectSyncBroadcast(ctx, project) {
+	emitProjectChanged(project) // WO-616 T11: server consumers (follow engine) see every write, unmasked
 	if (typeof ctx?._wsBroadcast !== 'function') return
 	if (PROJECT_SYNC_DEBOUNCE_MS <= 0) {
 		try {

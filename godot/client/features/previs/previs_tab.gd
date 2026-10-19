@@ -14,6 +14,7 @@ const Stage2D := preload("res://features/previs/stage_2d_view.gd")
 const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
 const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
+const FollowModel := preload("res://features/previs/tracking/follow_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["front", "plan", "3d", "camera"]
@@ -75,8 +76,11 @@ func _ready() -> void:
 	track_page.changed.connect(_on_tracking_changed)
 	markers.updated.connect(func() -> void:
 		track_view.set_marks(markers.marks(), markers.selected)
+		track_view.set_beams(_beams())
 		if track_page.markers != null:
-			track_page.markers.refresh())
+			track_page.markers.refresh()
+		if track_page.follow != null:
+			track_page.follow.refresh())
 	track_view.grab.connect(func(px: Vector2) -> void: markers.grab_at(px))
 	track_view.drag.connect(markers.drag_to)
 	track_view.let_go.connect(markers.release)
@@ -120,12 +124,23 @@ func _on_tracking_changed() -> void:
 	if track_page.is_inside_tree():  # before the Inspector adopts it the page holds no project data (driver reads the project)
 		markers.entry = track_page.entry()
 		markers.set_defs(track_page.data.markers, track_page.data.grid)
-	track_view.markers_mode = track_page.mode == "markers"
+	track_view.markers_mode = track_page.mode in ["markers", "follow"]
+	track_view.follow_mode = track_page.mode == "follow"
 	_apply_drive()
 
 
+## WO-616 T11: the follow fixtures' beams from the server's aims (project.fixtures, marker positions).
+func _beams() -> Array:
+	var targets := {}
+	for id in markers.positions:
+		var p: Dictionary = markers.positions[id]
+		targets[id] = [p.x, p.y, p.z]
+	var patch: Array = FollowModel.normalize(Store.project.get("fixtures")).patch
+	return FollowModel.beams(patch, markers.follow, targets, markers.floor_z)
+
+
 func _apply_drive() -> void:
-	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode == "markers"
+	markers.driving = mode == "camera" and is_visible_in_tree() and track_page.mode in ["markers", "follow"]
 	if not markers.driving:
 		markers.release()
 

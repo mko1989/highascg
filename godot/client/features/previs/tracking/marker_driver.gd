@@ -9,6 +9,7 @@ extends Node
 ## Sends ≤ 30 Hz while moving; every 250 ms re-sends parked markers (the hub calls a marker stale 1 s after its
 ## last write; identical writes do not broadcast), except one another client is moving right now. The marker list
 ## comes from the project directly, so markers stay live whatever tab / previs mode the operator is in.
+## T11: also keeps the server follow engine's aims (`tracking:follow`) for the beams and the Follow section.
 
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
@@ -36,6 +37,8 @@ var floor_z := 0.0
 var home := Vector2.ZERO
 var grabbed := 0
 var synced := false  # the hub answered (module on) — no heartbeats into a missing module
+var follow := {}  # fixture id → {state, pan, tilt, problem} (server follow engine, WO-616 T11)
+var follow_on := false  # the server's Art-Net output master
 var _target: Variant = null
 var _axes: Array = []
 var _dirty := {}
@@ -64,6 +67,9 @@ func resync() -> void:
 	var res: Dictionary = await Api.get_json("/api/tracking/markers")
 	if res.ok and res.data is Dictionary:
 		_adopt((res.data as Dictionary).get("markers", []))
+	var fr: Dictionary = await Api.get_json("/api/tracking/follow")
+	if fr.ok and fr.data is Dictionary:
+		_adopt_follow(fr.data)
 
 
 ## Project markers + floor grid (home = grid centre on the floor).
@@ -253,6 +259,17 @@ func _send(ids: Array, _now: int) -> void:
 func _on_ws(type: String, data: Variant) -> void:
 	if type == "tracking:markers" and data is Dictionary:
 		_adopt((data as Dictionary).get("markers", []))
+	elif type == "tracking:follow" and data is Dictionary:
+		_adopt_follow(data)
+
+
+func _adopt_follow(data: Dictionary) -> void:
+	follow_on = data.get("output_enabled") == true
+	follow = {}
+	for f in data.get("fixtures", []):
+		if f is Dictionary:
+			follow[str(f.get("id", ""))] = f
+	updated.emit()
 
 
 func _adopt(list: Array) -> void:

@@ -6,6 +6,7 @@ extends Control
 ## Holds its surface only while shown (VideoSurfaces refcount, WO-617).
 ## T5b Markers mode: markers drawn on the floor (ground circle + body line + name; stale = dimmed); press on a
 ## marker's circle grabs it, drag moves it, release lets go (marker_driver); calibration clicks are off.
+## T11 Follow mode: the same, plus each follow fixture's beam as the server aims it (dimmed while holding).
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -20,6 +21,8 @@ signal let_go
 var markers_mode := false
 var marks: Array = []  # marker_driver.marks()
 var selected_marker := 0
+var follow_mode := false
+var beams: Array = []  # follow_model.beams()
 var _held := false
 
 var entry := {}
@@ -51,6 +54,12 @@ func set_state(t: Dictionary, ce: Dictionary, objects: Array, active_id: String)
 	rms = float(ce.get("rms", -1.0))
 	_hold()
 	queue_redraw()
+
+
+func set_beams(b: Array) -> void:
+	beams = b
+	if markers_mode:
+		queue_redraw()
 
 
 func set_marks(m: Array, sel: int) -> void:
@@ -153,12 +162,16 @@ func _draw() -> void:
 		var at: Variant = act.click if act.click != null else act.shown
 		if at != null and not markers_mode:
 			draw_arc(to_view(at), 13.0, 0.0, TAU, 28, ThemeBuilder.ACCENT_HOVER, 2.5, true)
+	if markers_mode:
+		_draw_beams(font)
 	_draw_marks(font)
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
 	var tail := " · ctrl+click: pick point · wheel: zoom · right-drag: pan · F: fit"
 	if markers_mode:
 		head = "Markers — drag a marker's circle · stick / arrows move the selected one (camera-relative)"
 		tail = " · LB/RB speed · D-pad ◀▶ marker · wheel: zoom · right-drag: pan"
+	if follow_mode:
+		head = "Follow — beams show where the server aims each fixture · drag / drive a marker to test"
 	var rs := " · RMS %.2f px" % rms if rms >= 0.0 else " · not calibrated"
 	draw_rect(Rect2(0, size.y - 26, size.x, 26), Color(ThemeBuilder.BG_DARK, 0.75))
 	draw_string(font, Vector2(10, size.y - 8), head + rs + tail, HORIZONTAL_ALIGNMENT_LEFT, size.x - 20, 13, ThemeBuilder.TEXT)
@@ -182,6 +195,18 @@ func _draw_marks(font: Font) -> void:
 		draw_string(font, top + Vector2(8, -4), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 14 if sel else 13, col)
 		if sel:
 			draw_arc(c, 4.0, 0.0, TAU, 12, ThemeBuilder.TEXT, 2.0, true)
+
+
+func _draw_beams(font: Font) -> void:
+	for b in beams:
+		var col := Color(ThemeBuilder.WARN, 0.95 if b.live else 0.4)
+		for pl in O.edge(entry, b.from, b.to):
+			draw_polyline(_xf(pl), col, 2.5 if b.live else 1.5, true)
+		var head: Variant = O.shown(entry, [b.from])[0]
+		if head != null:
+			var at := to_view(Vector2(head[0], head[1]))
+			draw_rect(Rect2(at - Vector2(5, 5), Vector2(10, 10)), col)
+			draw_string(font, at + Vector2(8, 14), b.name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)
 
 
 func _xf(pl: PackedVector2Array) -> PackedVector2Array:

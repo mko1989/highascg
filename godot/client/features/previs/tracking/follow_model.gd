@@ -1,0 +1,122 @@
+extends RefCounted
+## WO-616 T11 — the follow patch `project.fixtures` (Godot-owned slice; the engine is server-side,
+## src/fixtures/follow-patch.js normalizes the same way): a manual generic moving-head profile per fixture
+## (GDTF comes with WO-615 T1), its marker, and the beam the server's aim draws in the camera view.
+##   {output: {enabled}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
+##    invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
+
+const DEFAULT_DEST := "255.255.255.255"
+const PORT_ADDRESS_MAX := 32767
+
+
+static func _num(v: Variant, d: float, lo: float, hi: float) -> float:
+	return clampf(float(v), lo, hi) if (v is float or v is int) else d
+
+
+static func _axis(a: Variant, ch: int, fine: int, range_deg: float) -> Dictionary:
+	var o: Dictionary = a if a is Dictionary else {}
+	return {"ch": int(_num(o.get("ch"), ch, 1, 512)), "fine": int(_num(o.get("fine"), fine, 0, 512)),
+		"range": _num(o.get("range"), range_deg, 1, 1080), "invert": o.get("invert") == true}
+
+
+static func normalize_fixture(f: Variant, i: int) -> Dictionary:
+	var o: Dictionary = f if f is Dictionary else {}
+	var pose: Dictionary = o.get("pose") if o.get("pose") is Dictionary else {}
+	var dest := str(o.get("dest", "")).strip_edges()
+	return {
+		"id": str(o.get("id", "")) if str(o.get("id", "")) != "" else "fx%d" % (i + 1),
+		"name": str(o.get("name", "")) if str(o.get("name", "")) != "" else "Fixture %d" % (i + 1),
+		"enabled": o.get("enabled") != false, "protocol": "artnet",
+		"universe": int(_num(o.get("universe"), 0, 0, PORT_ADDRESS_MAX)), "address": int(_num(o.get("address"), 1, 1, 512)),
+		"dest": dest if dest != "" else DEFAULT_DEST,
+		"pan": _axis(o.get("pan"), 1, 2, 540.0), "tilt": _axis(o.get("tilt"), 3, 4, 270.0),
+		"pose": {"x": _num(pose.get("x"), 0, -500, 500), "y": _num(pose.get("y"), 0, -500, 500),
+			"z": _num(pose.get("z"), 6, -50, 200), "hang": "floor" if pose.get("hang") == "floor" else "truss",
+			"yaw": _num(pose.get("yaw"), 0, -360, 360)},
+		"fixed": str(o.get("fixed", "")), "follow": int(_num(o.get("follow"), 0, 0, 65535)),
+		"aim_z": _num(o.get("aim_z"), 1, -5, 10),
+	}
+
+
+static func normalize(slice: Variant) -> Dictionary:
+	var s: Dictionary = slice if slice is Dictionary else {}
+	var out := []
+	var ids := {}
+	var list: Array = s.get("patch") if s.get("patch") is Array else []
+	for i in list.size():
+		var fx := normalize_fixture(list[i], i)
+		while ids.has(fx.id):
+			fx.id += "_"
+		ids[fx.id] = true
+		out.append(fx)
+	var o: Variant = s.get("output")
+	return {"output": {"enabled": o is Dictionary and (o as Dictionary).get("enabled") == true}, "patch": out}
+
+
+## A new fixture after the last one: same universe / destination, the next free address, the given marker.
+static func new_fixture(patch: Array, marker_id: int) -> Dictionary:
+	var n := 1
+	var ids := patch.map(func(f: Dictionary) -> String: return f.id)
+	while ids.has("fx%d" % n):
+		n += 1
+	var fx := normalize_fixture({"id": "fx%d" % n, "name": "Fixture %d" % n, "follow": marker_id}, n - 1)
+	if not patch.is_empty():
+		var last: Dictionary = patch[-1]
+		fx.universe = last.universe
+		fx.dest = last.dest
+		fx.address = mini(512, int(last.address) + footprint(last))
+		fx.pan = last.pan.duplicate()
+		fx.tilt = last.tilt.duplicate()
+		fx.fixed = last.fixed
+		fx.pose = last.pose.duplicate()
+		fx.pose.x = float(last.pose.x) + 2.0
+	return fx
+
+
+## Channels the profile spans (highest offset it writes).
+static func footprint(fx: Dictionary) -> int:
+	var hi := maxi(maxi(fx.pan.ch, fx.pan.fine), maxi(fx.tilt.ch, fx.tilt.fine))
+	for part in str(fx.fixed).replace(";", ",").split(",", false):
+		var kv := part.strip_edges().split("=")
+		if kv.size() == 2 and kv[0].is_valid_int():
+			hi = maxi(hi, int(kv[0]))
+	return hi
+
+
+## Beam direction (PSN, unit) for pan / tilt degrees — the server's follow-ik.js beam().
+static func beam(pose: Dictionary, pan: float, tilt: float) -> Vector3:
+	var s := 1.0 if pose.hang == "floor" else -1.0
+	var yaw := deg_to_rad(float(pose.yaw))
+	var u := Vector3(0, 0, s)
+	var f := Vector3(sin(yaw), cos(yaw), 0)
+	var g := Vector3(s * cos(yaw), -s * sin(yaw), 0)
+	var p := deg_to_rad(pan)
+	var t := deg_to_rad(tilt)
+	return cos(t) * u + sin(t) * (cos(p) * f + sin(p) * g)
+
+
+## Where the drawn beam ends: as far as its marker's aim point, else down to the floor (≤ 40 m). PSN [x, y, z].
+static func beam_end(fx: Dictionary, aim: Dictionary, target: Variant, floor_z: float) -> Array:
+	var o := Vector3(fx.pose.x, fx.pose.y, fx.pose.z)
+	var d := beam(fx.pose, float(aim.get("pan", 0.0)), float(aim.get("tilt", 0.0)))
+	var reach := 40.0
+	if target is Array:
+		reach = o.distance_to(Vector3(target[0], target[1], float(target[2]) + float(fx.aim_z)))
+	elif d.z < -1e-3:
+		reach = minf(reach, (floor_z - o.z) / d.z)
+	var e := o + d * reach
+	return [e.x, e.y, e.z]
+
+
+## Beams to draw in the camera view from the server's aims: [{name, from, to, live}] (PSN [x, y, z]).
+## `targets` = marker id → [x, y, z]; a fixture the server does not report is not drawn.
+static func beams(patch: Array, aims: Dictionary, targets: Dictionary, floor_z: float) -> Array:
+	var out := []
+	for fx in patch:
+		var a: Variant = aims.get(fx.id)
+		if not (a is Dictionary) or (a.get("problem") != null and str(a.problem) != ""):
+			continue
+		var from := [float(fx.pose.x), float(fx.pose.y), float(fx.pose.z)]
+		out.append({"name": fx.name, "from": from, "to": beam_end(fx, a, targets.get(fx.follow), floor_z),
+			"live": a.get("state") == "following"})
+	return out

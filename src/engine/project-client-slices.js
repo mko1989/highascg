@@ -6,8 +6,9 @@
  * (client/lib/project-state.js exportProject) and never sends it, so without this rule one web
  * autosave erased the whole stage. A write that omits a client-owned key keeps the stored copy;
  * the owning client always sends the key (possibly empty), which is how it edits or clears it.
+ * WO-616 T11: `fixtures` (the follow → Art-Net patch, src/fixtures/follow-patch.js) is Godot-owned too.
  */
-const CLIENT_OWNED_SLICES = ['previs']
+const CLIENT_OWNED_SLICES = ['previs', 'fixtures']
 
 /**
  * @param {object} project incoming payload (mutated)

@@ -4,11 +4,13 @@ extends VBoxContainer
 ## calibration point list (pick the active one, the view's click sets it), Solve (± lens fit) with RMS and per-point
 ## errors. Owns project.previs.tracking (ProjectSync autosave, client-owned slice WO-607); remote edits reload.
 ## T5b: Calibrate | Markers — Markers mode swaps the calibration fields for the markers section (markers_section).
+## T11: | Follow — the follow patch (follow_section, project.fixtures); markers stay draggable and beams are drawn.
 
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const R := preload("res://features/previs/tracking/camera_refine.gd")
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const MarkersSection := preload("res://features/previs/tracking/markers_section.gd")
+const FollowSection := preload("res://features/previs/tracking/follow_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 const ROLES := ["in1", "in2", "in3", "in4", "ch1", "ch2", "ch3", "ch4", "pgm1", "prv1", "pgm2", "prv2"]
@@ -23,8 +25,9 @@ const GRID := [["Width m", "width", 0.5, 200, 0.1], ["Depth m", "depth", 0.5, 20
 signal changed  # data / camera / active point changed → the view redraws
 
 var data := T.normalize({})
-var mode := "calibrate"  # | "markers"
+var mode := "calibrate"  # | "markers" | "follow"
 var markers: MarkersSection
+var follow: FollowSection
 var driver: Node  # marker_driver.gd (previs_tab)
 var cam_idx := 0
 var active := ""
@@ -58,7 +61,7 @@ func _ready() -> void:
 	add_child(row)
 	var modes := HBoxContainer.new()
 	var group := ButtonGroup.new()
-	for m in ["calibrate", "markers"]:
+	for m in ["calibrate", "markers", "follow"]:
 		var b := _button(m.capitalize(), func() -> void: set_mode(m))
 		b.toggle_mode = true
 		b.button_group = group
@@ -73,6 +76,10 @@ func _ready() -> void:
 		data.markers = list
 		_persist())
 	add_child(markers)
+	follow = FollowSection.new()
+	follow.driver = driver
+	follow.visible = false
+	add_child(follow)
 	_confirm = ConfirmationDialog.new()
 	_confirm.dialog_text = "Delete this tracking camera and its calibration?"
 	_confirm.confirmed.connect(_delete_cam)
@@ -312,6 +319,7 @@ func _sync() -> void:
 	var ce := entry()
 	_body.visible = not ce.is_empty() and mode == "calibrate"
 	markers.visible = mode == "markers"
+	follow.visible = mode == "follow"
 	markers.set_defs(data.markers)
 	for k in _grid:
 		(_grid[k] as SpinBox).set_value_no_signal(float(data.grid[k]))
