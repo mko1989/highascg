@@ -1,0 +1,1159 @@
+{
+ "payload": {
+  "graph": {
+   "devices": [
+    {
+     "id": "caspar_host",
+     "role": "caspar_host",
+     "label": "Caspar / HighAsCG host"
+    }
+   ],
+   "connectors": [
+    {
+     "id": "dst_in_dst_a",
+     "deviceId": "destinations",
+     "kind": "destination_in",
+     "externalRef": "dst_a"
+    },
+    {
+     "id": "gpu_p0",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out",
+     "caspar": {
+      "outputBinding": {
+       "type": "screen",
+       "index": 3
+      }
+     }
+    },
+    {
+     "id": "gpu_p5",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out",
+     "caspar": {
+      "mainIndex": 2
+     }
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "sourceId": "dst_in_dst_b",
+     "sinkId": "gpu_p1",
+     "note": "x"
+    },
+    {
+     "id": "e2",
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "gpu_p2"
+    }
+   ],
+   "sources": [
+    {
+     "id": "dst_in_dst_src",
+     "videoMode": "2160p2500",
+     "label": "From graph"
+    }
+   ]
+  },
+  "suggested": {
+   "connectors": [
+    {
+     "id": "gpu_out_x",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out"
+    },
+    {
+     "id": "gpu_out_y",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out"
+    },
+    {
+     "id": "gpu_p7",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out",
+     "label": "Sugg 7"
+    }
+   ]
+  },
+  "screenDestinations": {
+   "destinations": [
+    {
+     "id": "dst_a",
+     "label": "LED",
+     "mode": "pgm_prv",
+     "mainScreenIndex": 1,
+     "videoMode": "1080p5000",
+     "width": 3840,
+     "height": 1080,
+     "fps": 50
+    },
+    {
+     "id": "dst_b",
+     "label": "Side",
+     "mode": "pgm_only",
+     "mainScreenIndex": 0,
+     "videoMode": "1556p2400"
+    },
+    {
+     "id": "dst_mv",
+     "label": "MV",
+     "mode": "multiview"
+    },
+    {
+     "id": "dst_c",
+     "label": "",
+     "mode": "",
+     "mainScreenIndex": "2",
+     "fps": "29.97",
+     "width": "1280.7"
+    },
+    {
+     "id": "dst_d",
+     "label": "Custom",
+     "videoMode": "2048x858p24"
+    }
+   ]
+  },
+  "live": {
+   "gpu": {
+    "physicalMap": {
+     "ports": [
+      {
+       "physicalPortId": "gpu_p1",
+       "slotOrder": 1,
+       "pair": {
+        "name": "DP-2/DP-3",
+        "dpA": "DP-2",
+        "dpB": "DP-3"
+       },
+       "runtime": {
+        "activePort": "DP-3"
+       }
+      },
+      {
+       "physicalPortId": "gpu_p4",
+       "slotOrder": 0,
+       "pair": {
+        "dpA": "DP-8"
+       },
+       "runtime": {}
+      }
+     ],
+     "effectiveTopology": [
+      {
+       "physicalPortId": "gpu_p3",
+       "slotOrder": 3,
+       "dpA": "DP-6",
+       "dpB": "DP-7"
+      }
+     ]
+    }
+   },
+   "caspar": {
+    "destinationIntent": {
+     "items": [
+      {
+       "id": "dst_b",
+       "videoMode": "720p5994",
+       "width": 1280,
+       "height": 720,
+       "fps": 59.94,
+       "label": "Side intent"
+      }
+     ]
+    }
+   }
+  }
+ },
+ "out": {
+  "fps": {
+   "0": [
+    50,
+    "1080p5000"
+   ],
+   "25": [
+    25,
+    "1080p2500"
+   ],
+   "30": [
+    30,
+    "1080p3000"
+   ],
+   "48": [
+    50,
+    "1080p5000"
+   ],
+   "59": [
+    59.94,
+    "1080p5994"
+   ],
+   "61": [
+    60,
+    "1080p6000"
+   ],
+   "null": [
+    50,
+    "1080p5000"
+   ],
+   "-3": [
+    50,
+    "1080p5000"
+   ],
+   "x": [
+    50,
+    "1080p5000"
+   ],
+   "24.5": [
+    24,
+    "1080p2400"
+   ],
+   "29.9": [
+    29.97,
+    "1080p2997"
+   ],
+   "23.976": [
+    23.98,
+    "1080p2398"
+   ]
+  },
+  "projFps": [
+   [
+    {},
+    50,
+    "1080p5000"
+   ],
+   [
+    {
+     "machineProfile": {
+      "defaultProjectFps": 59.94
+     }
+    },
+    59.94,
+    "1080p5994"
+   ],
+   [
+    {
+     "channelMap": {
+      "programResolutions": [
+       {
+        "fps": 25
+       }
+      ]
+     }
+    },
+    25,
+    "1080p2500"
+   ],
+   [
+    {
+     "channelMap": {
+      "programResolutions": [
+       {
+        "fps": 0
+       }
+      ]
+     }
+    },
+    50,
+    "1080p5000"
+   ]
+  ],
+  "spec": {
+   "PAL": {
+    "width": 720,
+    "height": 576,
+    "fps": 25
+   },
+   "NTSC": {
+    "width": 720,
+    "height": 486,
+    "fps": 29.97
+   },
+   "576p2500": {
+    "width": 720,
+    "height": 576,
+    "fps": 25
+   },
+   "720p2398": {
+    "width": 1280,
+    "height": 720,
+    "fps": 23.98
+   },
+   "720p2400": {
+    "width": 1280,
+    "height": 720,
+    "fps": 24
+   },
+   "720p2500": {
+    "width": 1280,
+    "height": 720,
+    "fps": 25
+   },
+   "720p2997": {
+    "width": 1280,
+    "height": 720,
+    "fps": 29.97
+   },
+   "720p3000": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30
+   },
+   "720p5000": {
+    "width": 1280,
+    "height": 720,
+    "fps": 50
+   },
+   "720p5994": {
+    "width": 1280,
+    "height": 720,
+    "fps": 59.94
+   },
+   "720p6000": {
+    "width": 1280,
+    "height": 720,
+    "fps": 60
+   },
+   "1080i5000": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 50
+   },
+   "1080i5994": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 59.94
+   },
+   "1080i6000": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60
+   },
+   "1080p2398": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 23.98
+   },
+   "1080p2400": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 24
+   },
+   "1080p2500": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 25
+   },
+   "1080p2997": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 29.97
+   },
+   "1080p3000": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+   },
+   "1080p5000": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 50
+   },
+   "1080p5994": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 59.94
+   },
+   "1080p6000": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60
+   },
+   "1556p2398": {
+    "width": 2048,
+    "height": 1556,
+    "fps": 23.98
+   },
+   "1556p2400": {
+    "width": 2048,
+    "height": 1556,
+    "fps": 24
+   },
+   "1556p2500": {
+    "width": 2048,
+    "height": 1556,
+    "fps": 25
+   },
+   "2160p2398": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 23.98
+   },
+   "2160p2400": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 24
+   },
+   "2160p2500": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 25
+   },
+   "2160p2997": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 29.97
+   },
+   "2160p3000": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 30
+   },
+   "2160p5000": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 50
+   },
+   "2160p5994": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 59.94
+   },
+   "2160p6000": {
+    "width": 3840,
+    "height": 2160,
+    "fps": 60
+   },
+   "dci1080p2398": {
+    "width": 2048,
+    "height": 1080,
+    "fps": 23.98
+   },
+   "dci1080p2400": {
+    "width": 2048,
+    "height": 1080,
+    "fps": 24
+   },
+   "dci1080p2500": {
+    "width": 2048,
+    "height": 1080,
+    "fps": 25
+   },
+   "dci2160p2398": {
+    "width": 4096,
+    "height": 2160,
+    "fps": 23.98
+   },
+   "dci2160p2400": {
+    "width": 4096,
+    "height": 2160,
+    "fps": 24
+   },
+   "dci2160p2500": {
+    "width": 4096,
+    "height": 2160,
+    "fps": 25
+   },
+   "576p5000": null,
+   "1080i2500": null,
+   "dci1080p5000": null,
+   "bogus": null,
+   "": null,
+   "4000x2000p25": null,
+   "1080x720p0": null
+  },
+  "res": {
+   "PAL": {
+    "w": 720,
+    "h": 576,
+    "fps": 25
+   },
+   "NTSC": {
+    "w": 720,
+    "h": 486,
+    "fps": 29.97
+   },
+   "576p2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "720p2398": {
+    "w": 1280,
+    "h": 720,
+    "fps": 23.98
+   },
+   "720p2400": {
+    "w": 1280,
+    "h": 720,
+    "fps": 24
+   },
+   "720p2500": {
+    "w": 1280,
+    "h": 720,
+    "fps": 25
+   },
+   "720p2997": {
+    "w": 1280,
+    "h": 720,
+    "fps": 29.97
+   },
+   "720p3000": {
+    "w": 1280,
+    "h": 720,
+    "fps": 30
+   },
+   "720p5000": {
+    "w": 1280,
+    "h": 720,
+    "fps": 50
+   },
+   "720p5994": {
+    "w": 1280,
+    "h": 720,
+    "fps": 59.94
+   },
+   "720p6000": {
+    "w": 1280,
+    "h": 720,
+    "fps": 60
+   },
+   "1080i5000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "1080i5994": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 59.94
+   },
+   "1080i6000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 60
+   },
+   "1080p2398": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 23.98
+   },
+   "1080p2400": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 24
+   },
+   "1080p2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 25
+   },
+   "1080p2997": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 29.97
+   },
+   "1080p3000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 30
+   },
+   "1080p5000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "1080p5994": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 59.94
+   },
+   "1080p6000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 60
+   },
+   "1556p2398": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "1556p2400": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "1556p2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "2160p2398": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 23.98
+   },
+   "2160p2400": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 24
+   },
+   "2160p2500": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 25
+   },
+   "2160p2997": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 29.97
+   },
+   "2160p3000": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 30
+   },
+   "2160p5000": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 50
+   },
+   "2160p5994": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 59.94
+   },
+   "2160p6000": {
+    "w": 3840,
+    "h": 2160,
+    "fps": 60
+   },
+   "dci1080p2398": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "dci1080p2400": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "dci1080p2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "dci2160p2398": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "dci2160p2400": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "dci2160p2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "576p5000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "1080i2500": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 25
+   },
+   "dci1080p5000": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "bogus": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "": {
+    "w": 1920,
+    "h": 1080,
+    "fps": 50
+   },
+   "4000x2000p25": {
+    "w": 4000,
+    "h": 2000,
+    "fps": 25
+   },
+   "1080x720p0": {
+    "w": 1080,
+    "h": 720,
+    "fps": 50
+   }
+  },
+  "feed": {
+   "dst_in_dst_a": {
+    "id": "dst_in_dst_a",
+    "label": "LED",
+    "videoMode": "1080p5000",
+    "width": 3840,
+    "height": 1080,
+    "fps": 50
+   },
+   "dst_in_dst_b": {
+    "id": "dst_in_dst_b",
+    "label": "Side intent",
+    "videoMode": "720p5994",
+    "width": 1280,
+    "height": 720,
+    "fps": 59.94
+   },
+   "dst_in_dst_mv": {
+    "id": "dst_in_dst_mv",
+    "label": "MV",
+    "videoMode": "1080p5000",
+    "width": 1920,
+    "height": 1080,
+    "fps": 50
+   },
+   "dst_in_dst_c": {
+    "id": "dst_in_dst_c",
+    "label": "",
+    "videoMode": "1080p5000",
+    "width": 1280,
+    "height": 1080,
+    "fps": 29.97
+   },
+   "dst_in_dst_d": {
+    "id": "dst_in_dst_d",
+    "label": "Custom",
+    "videoMode": "2048x858p24",
+    "width": 2048,
+    "height": 858,
+    "fps": 50
+   },
+   "dst_in_dst_src": {
+    "id": "dst_in_dst_src",
+    "label": "From graph",
+    "videoMode": "2160p2500",
+    "width": 3840,
+    "height": 2160,
+    "fps": 25
+   },
+   "dst_in_nope": null,
+   "dst_in_": null,
+   "gpu_p0": null
+  },
+  "binding": {
+   "dst_in_dst_a": [
+    {
+     "type": "screen",
+     "index": 2
+    },
+    {
+     "type": "screen_prv",
+     "index": 2
+    }
+   ],
+   "dst_in_dst_b": [
+    {
+     "type": "screen",
+     "index": 1
+    },
+    {
+     "type": "screen",
+     "index": 1
+    }
+   ],
+   "dst_in_dst_mv": [
+    {
+     "type": "multiview"
+    },
+    {
+     "type": "multiview"
+    }
+   ],
+   "dst_in_dst_c": [
+    {
+     "type": "screen",
+     "index": 3
+    },
+    {
+     "type": "screen_prv",
+     "index": 3
+    }
+   ],
+   "dst_in_dst_d": [
+    {
+     "type": "screen",
+     "index": 1
+    },
+    {
+     "type": "screen_prv",
+     "index": 1
+    }
+   ],
+   "dst_in_dst_src": [
+    null,
+    null
+   ],
+   "dst_in_nope": [
+    null,
+    null
+   ],
+   "dst_in_": [
+    null,
+    null
+   ],
+   "gpu_p0": [
+    null,
+    null
+   ]
+  },
+  "seed": [
+   [
+    {},
+    {
+     "casparServer": {
+      "screen_2_windowed": true,
+      "screen_2_borderless": true,
+      "screen_2_vsync": false
+     }
+    },
+    {
+     "casparServer": {
+      "screen_2_windowed": true,
+      "screen_2_borderless": true,
+      "screen_2_vsync": false,
+      "screen_2_mode": "1080p2500"
+     }
+    },
+    true
+   ],
+   [
+    {
+     "screen_2_windowed": false
+    },
+    {
+     "casparServer": {}
+    },
+    {
+     "casparServer": {
+      "screen_2_mode": "1080p2500"
+     }
+    },
+    false
+   ],
+   [
+    {
+     "screen_2_windowed": true,
+     "screen_2_borderless": "false"
+    },
+    {
+     "casparServer": {
+      "screen_2_borderless": true
+     }
+    },
+    {
+     "casparServer": {
+      "screen_2_borderless": true,
+      "screen_2_mode": "1080p2500"
+     }
+    },
+    true
+   ],
+   [
+    {
+     "screen_2_vsync": true
+    },
+    {
+     "casparServer": {}
+    },
+    {
+     "casparServer": {
+      "screen_2_mode": "1080p2500"
+     }
+    },
+    false
+   ],
+   [
+    {
+     "screen_2_borderless": false,
+     "screen_2_windowed": "false"
+    },
+    {
+     "casparServer": {}
+    },
+    {
+     "casparServer": {
+      "screen_2_mode": "1080p2500"
+     }
+    },
+    false
+   ],
+   [
+    {
+     "screen_2_mode": "720p5000"
+    },
+    {
+     "casparServer": {
+      "screen_2_windowed": true,
+      "screen_2_borderless": true,
+      "screen_2_vsync": false
+     }
+    },
+    {
+     "casparServer": {
+      "screen_2_windowed": true,
+      "screen_2_borderless": true,
+      "screen_2_vsync": false
+     }
+    },
+    true
+   ]
+  ],
+  "inherit": [
+   {
+    "casparServer": {
+     "screen_1_mode": "1080p5000",
+     "screen_1_custom_width": 1920,
+     "screen_1_custom_height": 1080,
+     "screen_1_custom_fps": 50
+    }
+   },
+   {
+    "casparServer": {
+     "screen_3_mode": "720p5000",
+     "screen_3_custom_width": 1280,
+     "screen_3_custom_height": 64,
+     "screen_3_custom_fps": 59.94
+    }
+   }
+  ],
+  "merge": {
+   "casparServer": {
+    "a": 2,
+    "b": 3
+   },
+   "other": 4
+  },
+  "screen": {
+   "gpu_p0": 3,
+   "gpu_p1": 1,
+   "gpu_p2": 1,
+   "gpu_p3": 1,
+   "gpu_p4": 1,
+   "gpu_p5": 3,
+   "gpu_p7": 3,
+   "gpu_out_y": 2,
+   "gpu_out_z": 1,
+   "gpu_p9__DP_1": 1
+  },
+  "phys": {
+   "gpu_p0": 1,
+   "gpu_p1": 2,
+   "gpu_p2": 3,
+   "gpu_p3": 4,
+   "gpu_p4": 4,
+   "gpu_p5": 4,
+   "gpu_p7": 4,
+   "gpu_out_y": 2,
+   "gpu_out_z": 1,
+   "gpu_p9__DP_1": 4
+  },
+  "pre": {
+   "graph": {
+    "devices": [
+     {
+      "id": "caspar_host",
+      "role": "caspar_host",
+      "label": "Caspar / HighAsCG host"
+     },
+     {
+      "id": "destinations",
+      "role": "destinations",
+      "label": "Screen destinations"
+     }
+    ],
+    "connectors": [
+     {
+      "id": "dst_in_dst_a",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "externalRef": "dst_a"
+     },
+     {
+      "id": "gpu_p0",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "caspar": {
+       "outputBinding": {
+        "type": "screen",
+        "index": 3
+       }
+      }
+     },
+     {
+      "id": "gpu_p5",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "caspar": {
+       "mainIndex": 2
+      }
+     },
+     {
+      "id": "gpu_p1",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P1",
+      "externalRef": "DP-3",
+      "caspar": {
+       "bus": "pgm",
+       "mainIndex": 0
+      },
+      "gpuPhysical": {
+       "pair": {
+        "dpA": "DP-2",
+        "dpB": "DP-3",
+        "name": "DP-2/DP-3"
+       },
+       "slotOrder": 1
+      }
+     },
+     {
+      "id": "gpu_p3",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P3",
+      "externalRef": "DP-6",
+      "caspar": {
+       "bus": "pgm",
+       "mainIndex": 0
+      },
+      "gpuPhysical": {
+       "pair": {
+        "dpA": "DP-6",
+        "dpB": "DP-7",
+        "name": "DP-6/DP-7"
+       },
+       "slotOrder": 3
+      }
+     },
+     {
+      "id": "gpu_p4",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P4",
+      "externalRef": "DP-8",
+      "caspar": {
+       "bus": "pgm",
+       "mainIndex": 0
+      },
+      "gpuPhysical": {
+       "pair": {
+        "dpA": "DP-8",
+        "dpB": "",
+        "name": "DP-8"
+       },
+       "slotOrder": 0
+      }
+     },
+     {
+      "id": "gpu_p7",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "Sugg 7"
+     },
+     {
+      "id": "gpu_p8",
+      "deviceId": "caspar_host",
+      "kind": "gpu_out",
+      "label": "P8",
+      "externalRef": "gpu_p8",
+      "caspar": {
+       "bus": "pgm",
+       "mainIndex": 0
+      }
+     },
+     {
+      "id": "dst_in_dst_b",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "externalRef": "dst_b",
+      "label": "Side"
+     },
+     {
+      "id": "dst_in_zz",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "externalRef": "zz",
+      "label": "zz"
+     }
+    ],
+    "edges": [
+     {
+      "id": "e1",
+      "sourceId": "dst_in_dst_b",
+      "sinkId": "gpu_p1",
+      "note": "x"
+     },
+     {
+      "id": "e2",
+      "sourceId": "dst_in_dst_mv",
+      "sinkId": "gpu_p2"
+     }
+    ],
+    "sources": [
+     {
+      "id": "dst_in_dst_src",
+      "videoMode": "2160p2500",
+      "label": "From graph"
+     }
+    ]
+   },
+   "addedIds": [
+    "gpu_p1",
+    "gpu_p3",
+    "gpu_p4",
+    "gpu_p7",
+    "gpu_p8",
+    "dst_in_dst_b",
+    "dst_in_zz"
+   ]
+  },
+  "preEmpty": {
+   "graph": {
+    "version": 1,
+    "devices": [
+     {
+      "id": "caspar_host",
+      "role": "caspar_host",
+      "label": "Caspar / HighAsCG host"
+     },
+     {
+      "id": "destinations",
+      "role": "destinations",
+      "label": "Screen destinations"
+     }
+    ],
+    "connectors": [
+     {
+      "id": "dst_in_q",
+      "deviceId": "destinations",
+      "kind": "destination_in",
+      "externalRef": "q",
+      "label": "q"
+     }
+    ],
+    "edges": []
+   },
+   "addedIds": [
+    "dst_in_q"
+   ]
+  }
+ }
+}

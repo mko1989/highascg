@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) in progress — 2a cable rules DONE, next 2b write planning (`cable_seed.gd`). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) in progress — 2a cable rules + 2b write planning DONE (golden-tested), next 2c gesture controller + UI. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -181,3 +181,26 @@ modules under Node on one payload: 24 connector ids × connector/role/label, 10 
 `card0-DP-9` xrandrName and `card1-HDMI-1`, 10 orderings both directions, 6 sink conflicts incl. split ids,
 14 re-grab cases covering every plan outcome, rejection texts, restart matrix). Godot `--test` 2025/2025 (+183),
 `--check` boot OK.
+
+### 2b — What was done
+`features/devices/cable_seed.gd` (408 lines, pure): `normalize_fps` / `default_mode_for_fps` / `project_fps` /
+`default_video_mode` (project-fps.js), `mode_spec` (CASPAR_VIDEO_MODE_SPECS, derived from the mode id + the web's rate
+sets instead of a copied 40-row table), `mode_resolution` (videoModeToResolution), `feed_source` (graph source →
+live intent → saved destination), `output_binding` (multiview / screen N / WO-364 screen_prv N),
+`screen_seed_caspar_patch` / `screen_seed_patch`, `inherited_patch`, `merge_patches`, `screen_number` /
+`physical_screen_index` (gpu-resolve), `gpu_sink_writes` (tryAddCable's gpu_out block → `{settings, connector}`),
+`with_output_layer` (PRV note), `preflight` (patchGraphWithMissingCableConnectors).
+Contract found while testing: `gpu_sink_writes` must see the graph AFTER addEdge (the web assigns `res.graph`
+first) — without the new edge `screen_number` falls back to the suggested-list position and inherits into the wrong
+screen_N. Documented on the function and pinned by the test. Not ported: mapping-node output feeds (no mapping
+nodes drawn in Godot yet).
+
+### 2b — What was VERIFIED
+`tests/test_devices_cable_seed.gd` + `tests/golden/devices_cable_seed.json` (Node run of the web modules: 12 fps
+inputs, 4 settings shapes, all 39 standard mode ids + 7 off-table / custom ids through spec and resolution, 9 feed /
+binding ids incl. a graph source, a custom `WxHpF` mode (web keeps fps 50 there — ported as is) and string numbers,
+6 consumer-seed states × with/without settings, inherit, merge, 10 screen-number / physical-index connectors,
+preflight with split ids, suggested rows, topology-only and unknown sockets, and from no graph). Plus hand cases for
+`gpu_sink_writes` (PGM, PRV head writes no settings, multiview always-on-top, already-seeded screen, non-GPU sink).
+Comparison normalises int/float (Godot's Dictionary `==` tells 720 from 720.0; JSON does not).
+Godot `--test` 2232/2232 (+207), `--check` boot OK.
