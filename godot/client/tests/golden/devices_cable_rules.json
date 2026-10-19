@@ -1,0 +1,855 @@
+{
+ "payload": {
+  "graph": {
+   "connectors": [
+    {
+     "id": "dst_in_dst_a",
+     "deviceId": "destinations",
+     "kind": "destination_in",
+     "label": "Main LED",
+     "externalRef": "dst_a"
+    },
+    {
+     "id": "dst_in_dst_mv",
+     "deviceId": "destinations",
+     "kind": "destination_in",
+     "label": "MV",
+     "externalRef": "dst_mv"
+    },
+    {
+     "id": "gpu_p0",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out",
+     "label": "GPU 0",
+     "externalRef": "DP-0",
+     "gpuPhysical": {
+      "pair": {
+       "name": "DP-0/DP-1"
+      }
+     }
+    },
+    {
+     "id": "dlsdi_1",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 0,
+     "externalRef": "1",
+     "caspar": {
+      "ioDirection": "unassigned"
+     }
+    },
+    {
+     "id": "dlsdi_2",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 1,
+     "externalRef": "2",
+     "caspar": {
+      "ioDirection": "in"
+     }
+    },
+    {
+     "id": "dlsdi_3",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 2,
+     "caspar": {
+      "ioDirection": "OUT"
+     }
+    },
+    {
+     "id": "pm_1_in",
+     "deviceId": "pm_1",
+     "kind": "pixel_map_in"
+    },
+    {
+     "id": "pm_1_o1",
+     "deviceId": "pm_1",
+     "kind": "pixel_map_out"
+    },
+    {
+     "id": "str_2",
+     "deviceId": "caspar_host",
+     "kind": "stream_out",
+     "label": "Stream"
+    },
+    {
+     "id": "rec_1",
+     "deviceId": "caspar_host",
+     "kind": "record_out"
+    },
+    {
+     "id": "vcam_1",
+     "deviceId": "caspar_host",
+     "kind": "v4l2_out",
+     "label": ""
+    },
+    {
+     "id": "weird",
+     "deviceId": "x",
+     "kind": "thing",
+     "label": "Odd"
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    {
+     "id": "e2",
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "dlsdi_1"
+    },
+    {
+     "id": "e3",
+     "sourceId": "pm_1_o1",
+     "sinkId": "gpu_p0"
+    }
+   ]
+  },
+  "suggested": {
+   "connectors": [
+    {
+     "id": "gpu_out_hdmi",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out",
+     "externalRef": "card1-HDMI-1"
+    }
+   ]
+  },
+  "screenDestinations": {
+   "destinations": [
+    {
+     "id": "dst_a",
+     "label": "Main LED",
+     "mode": "pgm_prv"
+    },
+    {
+     "id": "dst_b",
+     "label": "Side"
+    },
+    {
+     "id": "host_x",
+     "label": "",
+     "casparChannel": 4
+    }
+   ]
+  },
+  "live": {
+   "gpu": {
+    "physicalMap": {
+     "ports": [
+      {
+       "physicalPortId": "gpu_p1",
+       "slotOrder": 1,
+       "pair": {
+        "name": "DP-2/DP-3",
+        "dpA": "DP-2",
+        "dpB": "DP-3"
+       },
+       "runtime": {
+        "activePort": "DP-2"
+       }
+      },
+      {
+       "physicalPortId": "gpu_p2",
+       "slotOrder": 2,
+       "pair": {
+        "dpA": "DP-4",
+        "dpB": "DP-5"
+       },
+       "runtime": {
+        "xrandrName": "card0-DP-9"
+       },
+       "probe": {
+        "connectorA": {
+         "shortName": "DP-4",
+         "name": "card0-DP-4"
+        }
+       }
+      }
+     ],
+     "effectiveTopology": [
+      {
+       "physicalPortId": "gpu_p3",
+       "slotOrder": 3,
+       "dpA": "DP-6",
+       "dpB": "DP-7"
+      }
+     ]
+    }
+   },
+   "caspar": {
+    "destinationIntent": {
+     "items": [
+      {
+       "id": "dst_a",
+       "mainScreenIndex": 1
+      },
+      {
+       "id": "dst_mv",
+       "mode": "multiview",
+       "mainScreenIndex": 0
+      }
+     ]
+    }
+   }
+  }
+ },
+ "out": {
+  "conn": {
+   "dst_in_dst_a": {
+    "kind": "destination_in",
+    "deviceId": "destinations",
+    "label": "Main LED",
+    "externalRef": "dst_a",
+    "slot": null
+   },
+   "dst_in_dst_b": {
+    "kind": "destination_in",
+    "deviceId": "destinations",
+    "label": "Side",
+    "externalRef": "dst_b",
+    "slot": null
+   },
+   "dst_in_dst_mv": {
+    "kind": "destination_in",
+    "deviceId": "destinations",
+    "label": "MV",
+    "externalRef": "dst_mv",
+    "slot": null
+   },
+   "dst_in_host_x": {
+    "kind": "destination_in",
+    "deviceId": "destinations",
+    "label": "host_x",
+    "externalRef": "host_x",
+    "slot": null
+   },
+   "dst_in_zzz": {
+    "kind": "destination_in",
+    "deviceId": "destinations",
+    "label": "zzz",
+    "externalRef": "zzz",
+    "slot": null
+   },
+   "dst_in_": null,
+   "gpu_p0": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "GPU 0",
+    "externalRef": "DP-0",
+    "slot": null
+   },
+   "gpu_p1": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "DP-2/DP-3",
+    "externalRef": "DP-2",
+    "slot": 1
+   },
+   "gpu_p2__DP_4": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "DP-4",
+    "externalRef": "card0-DP-4",
+    "slot": 2
+   },
+   "gpu_p3": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "DP-6/DP-7",
+    "externalRef": "DP-6",
+    "slot": 3
+   },
+   "gpu_p9": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "gpu_p9",
+    "externalRef": "gpu_p9",
+    "slot": null
+   },
+   "DP-7": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "DP-7",
+    "externalRef": null,
+    "slot": null
+   },
+   "HDMI-2": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": "HDMI-2",
+    "externalRef": null,
+    "slot": null
+   },
+   "gpu_out_hdmi": {
+    "kind": "gpu_out",
+    "deviceId": "caspar_host",
+    "label": null,
+    "externalRef": "card1-HDMI-1",
+    "slot": null
+   },
+   "dlsdi_1": {
+    "kind": "decklink_io",
+    "deviceId": "caspar_host",
+    "label": null,
+    "externalRef": "1",
+    "slot": null
+   },
+   "dlsdi_2": {
+    "kind": "decklink_io",
+    "deviceId": "caspar_host",
+    "label": null,
+    "externalRef": "2",
+    "slot": null
+   },
+   "dlsdi_3": {
+    "kind": "decklink_io",
+    "deviceId": "caspar_host",
+    "label": null,
+    "externalRef": null,
+    "slot": null
+   },
+   "pm_1_in": {
+    "kind": "pixel_map_in",
+    "deviceId": "pm_1",
+    "label": null,
+    "externalRef": null,
+    "slot": null
+   },
+   "pm_1_o1": {
+    "kind": "pixel_map_out",
+    "deviceId": "pm_1",
+    "label": null,
+    "externalRef": null,
+    "slot": null
+   },
+   "str_2": {
+    "kind": "stream_out",
+    "deviceId": "caspar_host",
+    "label": "Stream",
+    "externalRef": null,
+    "slot": null
+   },
+   "rec_1": {
+    "kind": "record_out",
+    "deviceId": "caspar_host",
+    "label": null,
+    "externalRef": null,
+    "slot": null
+   },
+   "vcam_1": {
+    "kind": "v4l2_out",
+    "deviceId": "caspar_host",
+    "label": "",
+    "externalRef": null,
+    "slot": null
+   },
+   "weird": {
+    "kind": "thing",
+    "deviceId": "x",
+    "label": "Odd",
+    "externalRef": null,
+    "slot": null
+   },
+   "nope": null
+  },
+  "role": {
+   "dst_in_dst_a": "destination_out",
+   "dst_in_dst_b": "destination_out",
+   "dst_in_dst_mv": "destination_out",
+   "dst_in_host_x": "destination_out",
+   "dst_in_zzz": "destination_out",
+   "dst_in_": "other",
+   "gpu_p0": "caspar_out",
+   "gpu_p1": "caspar_out",
+   "gpu_p2__DP_4": "caspar_out",
+   "gpu_p3": "caspar_out",
+   "gpu_p9": "caspar_out",
+   "DP-7": "caspar_out",
+   "HDMI-2": "caspar_out",
+   "gpu_out_hdmi": "caspar_out",
+   "dlsdi_1": "caspar_out",
+   "dlsdi_2": "caspar_in",
+   "dlsdi_3": "caspar_out",
+   "pm_1_in": "pixel_mapping_in",
+   "pm_1_o1": "pixel_mapping_out",
+   "str_2": "caspar_out",
+   "rec_1": "caspar_out",
+   "vcam_1": "caspar_out",
+   "weird": "other",
+   "nope": "other"
+  },
+  "label": {
+   "dst_in_dst_a": "dst_ch2",
+   "dst_in_dst_b": "dst_out_b",
+   "dst_in_dst_mv": "dst_mv1",
+   "dst_in_host_x": "host_ch4",
+   "dst_in_zzz": "dst_out_zzz",
+   "dst_in_": "dst_in_",
+   "gpu_p0": "gpu_p0 (DP-0/DP-1)",
+   "gpu_p1": "gpu_p1 (DP-2/DP-3)",
+   "gpu_p2__DP_4": "DP-4",
+   "gpu_p3": "gpu_p3 (DP-6/DP-7)",
+   "gpu_p9": "gpu_p9",
+   "DP-7": "gpu_DP-7",
+   "HDMI-2": "gpu_HDMI-2",
+   "gpu_out_hdmi": "gpu_card1-HDMI-1",
+   "dlsdi_1": "decklink_1",
+   "dlsdi_2": "decklink_2",
+   "dlsdi_3": "decklink_3",
+   "pm_1_in": "pm_1_in",
+   "pm_1_o1": "pm_1_o1",
+   "str_2": "str2",
+   "rec_1": "rec1",
+   "vcam_1": "Virtual cam",
+   "weird": "Odd",
+   "nope": "nope"
+  },
+  "canon": {
+   "gpu_p0__DP_1": "gpu_p0",
+   "gpu_p12": "gpu_p12",
+   "DP-2": "gpu_p1",
+   "DP-4": "gpu_p2",
+   "dp-9": "gpu_p2",
+   "HDMI-1": "gpu_out_hdmi",
+   "DP-0": "gpu_p0",
+   "DP-99": "DP-99",
+   "dst_in_dst_a": "dst_in_dst_a",
+   "": ""
+  },
+  "order": [
+   [
+    "dst_in_dst_a",
+    "gpu_p2",
+    {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p2"
+    }
+   ],
+   [
+    "gpu_p2",
+    "dst_in_dst_a",
+    {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p2"
+    }
+   ],
+   [
+    "dst_in_dst_a",
+    "pm_1_in",
+    {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "pm_1_in"
+    }
+   ],
+   [
+    "pm_1_o1",
+    "dlsdi_3",
+    {
+     "sourceId": "pm_1_o1",
+     "sinkId": "dlsdi_3"
+    }
+   ],
+   [
+    "dlsdi_2",
+    "dst_in_dst_a",
+    null
+   ],
+   [
+    "dst_in_dst_a",
+    "dst_in_dst_b",
+    null
+   ],
+   [
+    "dst_in_dst_b",
+    "str_2",
+    {
+     "sourceId": "dst_in_dst_b",
+     "sinkId": "str_2"
+    }
+   ],
+   [
+    "pm_1_in",
+    "gpu_p0",
+    null
+   ],
+   [
+    "nope",
+    "gpu_p0",
+    null
+   ],
+   [
+    "weird",
+    "gpu_p0",
+    null
+   ]
+  ],
+  "conflict": {
+   "gpu_p1": "e1",
+   "gpu_p1__DP_3": "e1",
+   "gpu_p0": "e3",
+   "dlsdi_1": "e2",
+   "gpu_p7": null,
+   "": null
+  },
+  "regrab": [
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "gpu_p2",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "retarget",
+     "removeEdgeId": "e1",
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p2"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "Connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "gpu_p0",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "sink-occupied",
+     "conflictEdgeId": "e3"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "That input already has a cable. Remove it first — connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "cancelled"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "Cable re-grab cancelled — connection left as it was."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "gpu_p1__DP_2",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "unchanged"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "Cable dropped back on the same port — nothing changed."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "dst_in_dst_a",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "self"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "A cable cannot connect a port to itself — connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p1",
+    "target": "dst_in_dst_b",
+    "grab": {
+     "edgeId": "e1",
+     "end": "sink",
+     "anchorId": "dst_in_dst_a",
+     "movingId": "gpu_p1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "invalid-target"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "These connectors cannot be cabled together (wrong roles or direction) — connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "dst_in_dst_a",
+    "target": "dst_in_dst_b",
+    "grab": {
+     "edgeId": "e1",
+     "end": "source",
+     "anchorId": "gpu_p1",
+     "movingId": "dst_in_dst_a"
+    },
+    "plan": {
+     "action": "retarget",
+     "removeEdgeId": "e1",
+     "sourceId": "dst_in_dst_b",
+     "sinkId": "gpu_p1"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "Connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "dst_in_dst_a",
+    "target": "gpu_p2",
+    "grab": {
+     "edgeId": "e1",
+     "end": "source",
+     "anchorId": "gpu_p1",
+     "movingId": "dst_in_dst_a"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "invalid-target"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "These connectors cannot be cabled together (wrong roles or direction) — connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "dst_in_dst_a",
+    "target": "dst_in_dst_mv",
+    "grab": {
+     "edgeId": "e1",
+     "end": "source",
+     "anchorId": "gpu_p1",
+     "movingId": "dst_in_dst_a"
+    },
+    "plan": {
+     "action": "retarget",
+     "removeEdgeId": "e1",
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "gpu_p1"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    "text": "Connection restored."
+   },
+   {
+    "sel": "e2",
+    "at": "dlsdi_1",
+    "target": "dlsdi_3",
+    "grab": {
+     "edgeId": "e2",
+     "end": "sink",
+     "anchorId": "dst_in_dst_mv",
+     "movingId": "dlsdi_1"
+    },
+    "plan": {
+     "action": "retarget",
+     "removeEdgeId": "e2",
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "dlsdi_3"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "dlsdi_1"
+    },
+    "text": "Connection restored."
+   },
+   {
+    "sel": "e2",
+    "at": "dlsdi_1",
+    "target": "dlsdi_2",
+    "grab": {
+     "edgeId": "e2",
+     "end": "sink",
+     "anchorId": "dst_in_dst_mv",
+     "movingId": "dlsdi_1"
+    },
+    "plan": {
+     "action": "restore",
+     "reason": "invalid-target"
+    },
+    "rollback": {
+     "sourceId": "dst_in_dst_mv",
+     "sinkId": "dlsdi_1"
+    },
+    "text": "These connectors cannot be cabled together (wrong roles or direction) — connection restored."
+   },
+   {
+    "sel": "e3",
+    "at": "gpu_p0",
+    "target": "gpu_p3",
+    "grab": {
+     "edgeId": "e3",
+     "end": "sink",
+     "anchorId": "pm_1_o1",
+     "movingId": "gpu_p0"
+    },
+    "plan": {
+     "action": "retarget",
+     "removeEdgeId": "e3",
+     "sourceId": "pm_1_o1",
+     "sinkId": "gpu_p3"
+    },
+    "rollback": {
+     "sourceId": "pm_1_o1",
+     "sinkId": "gpu_p0"
+    },
+    "text": "Connection restored."
+   },
+   {
+    "sel": "e1",
+    "at": "gpu_p0",
+    "target": "gpu_p2",
+    "grab": null,
+    "plan": {
+     "action": "none"
+    },
+    "rollback": null,
+    "text": "Connection restored."
+   },
+   {
+    "sel": "",
+    "at": "gpu_p1",
+    "target": "gpu_p2",
+    "grab": null,
+    "plan": {
+     "action": "none"
+    },
+    "rollback": null,
+    "text": "Connection restored."
+   }
+  ],
+  "msg": {
+   "": [
+    "Cable could not be saved.",
+    false
+   ],
+   "duplicate": [
+    "This cable is already in the graph.",
+    false
+   ],
+   "x sink_already_connected y": [
+    "That output already has a cable. Remove the existing cable first, then connect from the mapping output again.",
+    false
+   ],
+   "allowed: no": [
+    "This pairing is not allowed — try the other direction (signal flows destination feed → mapping input, mapping output → GPU/DeckLink output).",
+    false
+   ],
+   "Invalid deviceGraph": [
+    "Graph validation failed: Invalid deviceGraph",
+    false
+   ],
+   "cannot validate": [
+    "Graph validation failed: cannot validate",
+    false
+   ],
+   "something else": [
+    "something else",
+    false
+   ],
+   "unknown_sink": [
+    "Unknown sink connector — refresh Device View or sync from hardware.",
+    true
+   ]
+  },
+  "restart": [
+   [
+    "stream_out",
+    true,
+    true
+   ],
+   [
+    "stream_out",
+    false,
+    false
+   ],
+   [
+    "record_out",
+    true,
+    false
+   ],
+   [
+    "v4l2_out",
+    true,
+    false
+   ],
+   [
+    "gpu_out",
+    false,
+    true
+   ],
+   [
+    "",
+    false,
+    true
+   ]
+  ],
+  "endpoints": [
+   {
+    "edgeId": "loop",
+    "end": "sink",
+    "anchorId": "x",
+    "movingId": "x"
+   }
+  ],
+  "fromErr": "Cannot connect a connector to itself.",
+  "ded": [
+   true,
+   false,
+   false
+  ]
+ }
+}

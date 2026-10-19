@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); next: slice 2 patching + undo. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) in progress — 2a cable rules DONE, next 2b write planning (`cable_seed.gd`). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -131,3 +131,53 @@ Not GraphEdit, per the port plan: Controls for cards/sockets + one `_draw` layer
 - Measured: a GDScript `build()` costs 36 ms (74 points, loops 0) / 72 ms (144 points, loops 2) — why rebuilds wait
   for the layout to settle and run one cable per frame.
 - Not verified live: the WS `gpu_topology_changed` refresh (needs a DRM hotplug); owner QA.
+
+## Slice 2 — patching + undo (2026-10-19, in progress)
+
+### Investigation
+Web gesture = `client/components/device-view-cable.js` (455) + `device-view-cable-outputs.js` (removeEdge,
+resetCabling, updateDestinationOutputLayer) + key/click handlers in `device-view-events.js:194-245`:
+- **Arm**: click a connector whose role is `destination_out` / `caspar_out` / `pixel_mapping_out`; a pgm_prv card
+  remembers the half (PRV → after `addEdge` the new edge gets note `{"outputLayer":2}` via a `deviceGraph` save).
+  While armed: every other connector is tinted valid/invalid by `orderEdgeForDeviceView`; a dashed STRAIGHT ghost
+  line runs from the armed anchor to the pointer (no physics per move). Click empty space or Esc = cancel (client
+  only — nothing persisted). `GET /api/device-view/snapshot` is polled during the gesture to warm the server cache.
+- **Complete** (`tryAddCable`): order → canonical ids (`gpu_p0__DP_1` / `DP-2` → `gpu_pN`) → one-cable-per-socket
+  check (status + abort) → pushUndo → preflight: write missing `gpu_pN` / `dst_in_*` rows into the saved graph
+  (`device-view-cable-preflight.js`) → `POST /api/device-view {addEdge}`; on `unknown_source|sink` save topology,
+  re-preflight, retry once → PRV note → **gpu_out sink only**: settings seeding (`screen-consumer-defaults.js`:
+  windowed/borderless/vsync defaults for an unseeded screen_N, multiview always-on-top default;
+  `device-view-gpu-source-inherit.js`: screen_N mode + custom size/fps inherited from the source feed, skipped for a
+  PRV head) via `POST /api/settings`, then `updateConnector {caspar:{mode, outputBinding}}` → restart-dirty unless
+  the sink is record / vcam / stream-in-attach-mode → forced reload.
+- **Select / remove**: click a cable (or a Cables row) selects it; Delete/Backspace or the edge inspector's button
+  → `removeEdge`; toolbar "reset cabling" (confirm) → `removeAllEdges`.
+- **Re-grab** (WO-278): with a cable selected, clicking one of ITS ends lifts that end (held edge hidden, ghost from
+  the far end); drop = `planCableRegrab` → retarget is remove-then-add with rollback, PRV note carried across.
+- **Undo** (Ctrl+Z, 50 deep): snapshot `{graph, screenDestinations}` before every mutation; undo =
+  `POST /api/settings {deviceGraph, screenDestinations}` + restart-dirty.
+- Server rejections come back as `{error: reason}` (`device-view-crud.js:238`), e.g. `sink_already_connected`.
+
+### Plan
+- 2a pure decision logic → `cable_rules.gd` (golden-tested). **DONE, below.**
+- 2b pure write planning → `cable_seed.gd`: preflight rows, GPU-sink settings/connector patches, PRV note,
+  screen-index resolution, project-fps default mode (golden-tested the same way).
+- 2c gesture controller + UI: port click → arm/complete, valid/invalid tint, dashed ghost, cable hit-test select,
+  Esc / Delete / Ctrl+Z (tab-visible only), re-grab, remove-all (ConfirmationDialog), undo stack, restart-dirty
+  + "Apply to Caspar" (`POST /api/caspar-config/apply {force:true}`), snapshot prewarm. Box-verify against the web.
+
+### 2a — What was done
+`features/devices/cable_rules.gd` (383 lines, pure): `connector_by_id` (graph → suggested → synthetic
+`gpu_pN[__tag]` from physicalMap / topology, `DP|HDMI-N`, `dst_in_*`), `role` (DeckLink unassigned = output sink),
+`order_edge`, `can_start`, `gpu_port_cable_id`, `canonical_id`, `sink_conflict`, `describe_rejection`,
+`is_unknown_connector_error`, `endpoints_at` / `pick_regrab` / `plan_regrab` / `regrab_rollback` /
+`describe_restore`, `dedicated_streaming`, `sink_needs_restart`, `friendly_label`, `topology`.
+Deliberately not ported: the localStorage GPU layout prefs `canonicalCableConnectorId` consults first (no layout
+editor in Godot yet) and auto host-channel destinations in `friendly_label` (destinations slice).
+
+### 2a — What was VERIFIED
+`tests/test_devices_cable_rules.gd` + `tests/golden/devices_cable_rules.json` (golden generated by importing the web
+modules under Node on one payload: 24 connector ids × connector/role/label, 10 canonical ids incl. `dp-9` via
+`card0-DP-9` xrandrName and `card1-HDMI-1`, 10 orderings both directions, 6 sink conflicts incl. split ids,
+14 re-grab cases covering every plan outcome, rejection texts, restart matrix). Godot `--test` 2025/2025 (+183),
+`--check` boot OK.
