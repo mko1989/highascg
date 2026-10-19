@@ -2,7 +2,9 @@
 
 const START_BEHAVIOURS = new Set(['beginning', 'relativeToPrevious'])
 const COORDINATE_ORIGINS = new Set(['topLeft', 'center'])
-const CONTENT_FITS = new Set(['native', 'stretch'])
+// WO-619: the client enum (client/lib/scene-content-fit.js) — this held only native / stretch, so a saved
+// fill-canvas / horizontal / vertical default came back as native.
+const CONTENT_FITS = new Set(['native', 'fill-canvas', 'horizontal', 'vertical', 'stretch'])
 
 function editorDefaultsDefaults() {
 	return {
