@@ -15,15 +15,8 @@ const { isTimelessPlaylistItem } = require('../engine/scene-take-lbg-playlist')
 const { buildMediaIndex, clipMissing } = require('../media/media-exists')
 
 const DEFAULT_TIMELESS_SECS = 20
-
-/** Web timelessSecsOf: the first timeless item's positive duration, else 20. */
-function timelessSecsOf(playlist) {
-	for (const it of playlist || []) {
-		const d = Number(it?.duration)
-		if (isTimelessPlaylistItem(it) && it?.duration != null && Number.isFinite(d) && d > 0) return d
-	}
-	return DEFAULT_TIMELESS_SECS
-}
+/** Web timelessSecsOf: the first timeless item's positive duration, else 20 (one copy: engine/playlist-edit.js). */
+const { timelessSecsOf } = require('../engine/playlist-edit')
 
 /** Panel rows for one playlist — label, value, duration, type, loop, timeless, missing. */
 function panelItems(playlist, mediaIndex) {

@@ -169,6 +169,8 @@ func _on_selection() -> void:
 	if sel.size() == 1 and meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
 		InspectorPanel.current.present(inspector)
 		inspector.show_media(meta.row)
+	elif sel.size() > 1 and InspectorPanel.current.showing(inspector):
+		InspectorPanel.current.release(inspector)  # several files have no one inspector; the covered page returns
 
 
 func _reload_current() -> void:
@@ -248,11 +250,16 @@ func _drag_data(at: Vector2) -> Variant:
 	var it := _tree.get_item_at_position(at)
 	if it == null or not (it.get_metadata(0) is Dictionary) or not (it.get_metadata(0) as Dictionary).has("value"):
 		return null
+	var sel: Array = []  # WO-603: a row inside a multi-selection drags the whole selection (web multi payload)
+	var s := _tree.get_next_selected(null)
+	while s != null:
+		if s.get_metadata(0) is Dictionary and (s.get_metadata(0) as Dictionary).get("row") is Dictionary:
+			sel.append(s.get_metadata(0))
+		s = _tree.get_next_selected(s)
+	var data := Ops.drag_payload(it.get_metadata(0), sel)  # the web shape; the row is for the inspector only
 	var l := Label.new()
-	l.text = "＋ " + it.get_text(0)
+	l.text = "＋ %d files" % (data.items as Array).size() if data.get("type") == "multi" else "＋ " + it.get_text(0)
 	set_drag_preview(l)
-	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
-	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
 	return data
 
 

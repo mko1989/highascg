@@ -13,6 +13,8 @@ var _body: VBoxContainer
 var _footer: VBoxContainer
 var _empty: Label
 var _title: Label
+var _covered: Control = null  # the page the last present() hid — shown again when that page is released
+var _released := {}  # pages their owner released (never brought back by a release of another page)
 
 
 func _init() -> void:
@@ -51,8 +53,11 @@ func present(page: Control) -> void:
 		page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_body.add_child(page)
 		page.visibility_changed.connect(_sync_empty)
+	_released.erase(page)
 	for c in _body.get_children():
 		if c != page and c != _empty:
+			if (c as Control).visible:
+				_covered = c
 			(c as Control).visible = false
 	page.visible = true
 	_sync_empty()
@@ -65,10 +70,16 @@ func add_footer(section: Control) -> void:
 	_footer.add_child(section)
 
 
-## The selection that owned `page` went away.
+## The selection that owned `page` went away. When `page` was covering another page that is still selected (a look
+## layer under a media file — WO-603: ctrl-clicking a second file gives the layer's playlist drop zone back), that
+## page shows again.
 func release(page: Control) -> void:
+	_released[page] = true
 	if page.get_parent() == _body:
+		var was := page.visible
 		page.visible = false
+		if was and is_instance_valid(_covered) and _covered != page and _covered.get_parent() == _body and not _released.has(_covered):
+			_covered.visible = true
 	_sync_empty()
 
 

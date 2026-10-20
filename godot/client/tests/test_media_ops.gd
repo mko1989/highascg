@@ -46,3 +46,12 @@ func test_tree_merges_cls_folders_into_disk_spelling() -> void:
 func test_rename_plan_body() -> void:
 	t.eq(O.plan_body(["a/01_X.mov"], "Y", false, 1, 1, 2), {"ids": ["a/01_X.mov"], "title": "Y", "renumber": null}, "title only")
 	t.eq(O.plan_body(["a"], "", true, 10.0, 5.0, 3.0), {"ids": ["a"], "title": "", "renumber": {"start": 10, "step": 5, "pad": 3}}, "renumber ints")
+
+
+func test_drag_payload_multi_only_from_the_selection() -> void:
+	var a := {"type": "media", "value": "a.mov", "label": "a.mov", "row": {"id": "a.mov"}}
+	var b := {"type": "media", "value": "b.png", "label": "b.png", "row": {"id": "b.png"}}
+	var c := {"type": "media", "value": "c.mov", "label": "c.mov", "row": {"id": "c.mov"}}
+	t.eq(O.drag_payload(a, [a, b]), {"type": "multi", "items": [{"type": "media", "value": "a.mov", "label": "a.mov"}, {"type": "media", "value": "b.png", "label": "b.png"}]}, "dragged row is selected → all of the selection (web multi)")
+	t.eq(O.drag_payload(c, [a, b]), {"type": "media", "value": "c.mov", "label": "c.mov"}, "dragging an unselected row drags only it")
+	t.eq(O.drag_payload(a, [a]), {"type": "media", "value": "a.mov", "label": "a.mov"}, "a single selection stays a single payload")

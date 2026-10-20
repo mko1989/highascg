@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node), box-verified; multi-drag, remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag), box-verified; remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -297,8 +297,105 @@ panel incl. media tree + ingest, 16 / 2,683 LOC).
 - Not proven on the box: the live path (`goto` / `prev` / `next` on program and `set_timeless` patching a live
   copy). A take would have replaced the owner's program. Covered offline; owner QA.
 
-### Still open
+### Still open (after slice 5)
 
 Drag of a multi-selection, remote (HTTP streaming) upload, parity checklist. The layer playlist editor (add /
 reorder items, advance mode) is WO-601's "layer playlist + playback mode" sub-feature. Godot cannot create a
-playlist yet.
+playlist yet. → the editor and the multi-drag are slice 6.
+
+## Slice 6 (20.10) — look-layer playlist editor + multi-selection drag, edits planned in node
+
+### Investigation
+
+- Web `client/components/inspector-layer-playlist.js` (414 LOC) is the layer inspector's "Layer Playback Mode" group:
+  - **Mode.** Single Media / Playlist Workflow. Switching to a list seeds it from `source`; switching back takes
+    `source` from item 0.
+  - **Item list.** Drag to reorder, ✕, a duration field on timeless items (else the clip length from
+    `client/lib/media-duration.js`), and a per-item Loop check.
+  - **Drop zone.** It takes one source or a `{type:'multi', items}` payload.
+  - **Settings.** Advance (auto / manual), Loop List, Transition type + frames, Timeless "Apply to all", and
+    "Next ▶" (shown for manual advance or when an item loops).
+  - **Who decided.** Every rule ran in the browser, which patched the look through `sceneState.patchLayer` and
+    pushed live copies with `update_live`. Against the owner's D directive ("anything that happens in casparcg is
+    composed in the node server"), that is the same split slice 5 removed for "Set all".
+- Looks stay client-owned (deck sync), so the server can only plan. It returns a layer patch; the client stores it
+  through its normal look-edit path (`patch` → look editor → PRV push + deck sync + autosave).
+- Multi-drag: the web `media-browser` builds the multi payload only when the dragged tile is part of the selection.
+  The Godot media tree dragged one row only.
+- Box finding during the test: clicking a file in Sources presents the media-file inspector (WO-592), which
+  **covers the look layer's page**. The drop zone is then unreachable exactly when a multi-selection exists, so
+  the multi-drag could not land without a rule change.
+
+### What was done
+
+- Server (all pure planning, plus one live push):
+  - `src/engine/playlist-edit.js`: `planPlaylistEdit(layer, op, args)` with ops `mode`, `add {items}`,
+    `move {from,to}`, `remove`, `item {index, duration|loop}`, `settings {advance, loop, transition}` and
+    `timeless {secs}`. These are the web rules: list seeding, `source` follows item 0, durations only on timeless
+    items, clamped to 1–86400 s. Also `showsNext` and the shared `timelessSecsOf` (the panel module now imports it;
+    one copy).
+  - `src/media/media-duration.js`: a CommonJS port of the web clip-length index.
+  - `src/api/routes-playlist-edit.js`:
+    - `POST /api/playlist/edit` returns `{patch, rows, showsNext, timelessSecs, patched}`. Rows carry name,
+      timeless, missing, duration, clip length and loop. Op `describe` returns rows only. When the playlist changed
+      and the look is live, the shared `patchLivePlaylist` updates the running engine.
+    - `POST /api/playlist/edit/next` returns 409 unless the look is on a program channel (a PRV recall is not
+      live, WO-581), then delegates to `/api/playlist/next`.
+    - Both routes are wired in `router.js`.
+- Godot:
+  - `features/live/playlist_edit_model.gd` (pure): the label tables, the request body, the ⚠ row name,
+    `drop_index` (the tree drop position mapped to the server's splice index) and `droppable`.
+  - `features/live/playlist_section.gd`, mounted in `layer_inspector.gd` under the mixer as in the web order:
+    - the mode picker;
+    - a Tree with drag-reorder, an editable seconds cell on timeless rows (clip length otherwise), a Loop check
+      and a ✕ (`close.svg`);
+    - the drop zone (the tree also accepts drops);
+    - Advance / Loop List / Transition / Frames, Timeless (s) + Apply to all, and Next with an error line.
+    - It never edits the playlist itself. Every change is a POST, and the returned patch is emitted.
+  - `media_ops.drag_payload` + `media_panel._drag_data`: dragging a row that is part of a 2+ selection sends the
+    web multi payload (preview "＋ N files").
+  - `app/inspector_panel.gd`: `release()` brings back the page the released one covered, unless its owner released
+    it meanwhile. `media_panel` releases the file inspector when the selection grows past one file (several
+    files have no single inspector). Ctrl-clicking a second file therefore gives the look layer back, and its drop
+    zone with it. The alternative, "never cover a look layer", would have broken the owner-requested WO-592 file
+    inspector.
+
+### What was VERIFIED
+
+- Offline:
+  - `smoke-wo603-playlist-edit.test.js` 6/6 (curated): every op against the web rules; refusals; `describe` rows
+    (timeless, missing, clip length); a changed playlist is pushed into the live copy; Next resolves the program
+    channel (never the PRV one, ch2) and is 409 off program.
+  - Panel smoke 5/5 still passes after the `timelessSecsOf` move.
+  - Full suite 2858 pass / 1 known fail (smoke-wo577).
+  - Prettier clean, eslint clean on the new files, no file over 500 lines.
+  - Godot: `test_playlist_edit_model.gd` (drop-index splice cases, droppable, bodies),
+    `test_media_ops.gd::drag_payload` and `test_inspector_panel.gd` (covered page returns; a released page stays
+    gone). Total 16062 pass; boot check clean.
+- Box (node restarted, real GUI, temporary look "WO603 S6" injected via `scene_deck_sync`, edited on PRV):
+  - Selecting layer L10 showed "Layer Playback Mode · 2. Playlist Workflow" with the drop zone and a
+    "10Dealz.PNG · 20 · Loop · ✕" row.
+  - Clicking one file showed the file inspector. Ctrl-clicking two more showed "3 selected" and the layer page came
+    back.
+  - Dragging the selection showed "3 files" and the drop added 3 rows: 10Dealz (20), "4. Tło 4" (1:00) and
+    "5. Filmy w przerwie" (4:53). The server project held them with `pl_…` ids, `image` / `media` types and a
+    duration on the still only.
+  - Dragging the last row above the first gave the order `[5. Filmy, 10Dealz, 10Dealz, 4. Tło 4]`, and `source`
+    followed item 0.
+  - ✕ on row 3 left 3 items. Loop on "4. Tło 4" stored `loop: true` and Next appeared.
+  - Typing 7 into the duration cell stored `duration: 7`, and "Timeless items (s)" read 7.
+  - Pressing Next showed "This look is not on program — Next works while it plays." (409).
+  - Apply to all = 9 stored `duration: 9`.
+  - Advance → Manual Next, Transition → CUT and Loop List off were stored as `manual`, `{type:'CUT', duration:12}`
+    and `false`.
+  - Mode → Single stored `sourceMode: single` and `source` = "5. Filmy w przerwie.mp4" (PRV showed it), with the
+    3-item list kept as on the web.
+  - Cleanup: PRV was re-staged with the owner's Look 4, the test look was removed with "Delete look…", and the
+    project is back to its 4 looks. The GUI is left running.
+- Not proven on the box: edits reaching a look that is live on program (`patched` > 0) and Next on air. A take
+  would replace the owner's program. Covered offline; owner QA.
+
+### Still open
+
+Remote (HTTP streaming) upload; parity checklist; multi-drop onto compose tiles and a multi-selection "Move to"
+by drag (the web accepts both).

@@ -65,6 +65,7 @@ const routesNdi = require('./routes-ndi')
 const routesLowerThirds = require('./routes-lower-thirds')
 const routesCountdown = require('./routes-countdown')
 const routesPlaylist = require('./routes-playlist')
+const routesPlaylistEdit = require('./routes-playlist-edit')
 const routesScreenTimers = require('./routes-screen-timers')
 const routesScreens = require('./routes-screens')
 const routesSources = require('./routes-sources')
@@ -399,6 +400,9 @@ routes.post('/api/countdown', ({ path, body, ctx }) => routesCountdown.handlePos
 routes.post('/api/playlist/next', ({ path, body, ctx }) => routesPlaylist.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/playlist/control', ({ path, body, ctx }) => routesPlaylist.handlePost(path, body, ctx), { requireCaspar: true })
 routes.get('/api/playlist/state', ({ ctx }) => routesPlaylist.handleStateGet(ctx), { requireCaspar: false })
+// WO-603 slice 6: look-layer playlist editor — edits planned in node, the client stores the patch
+routes.post('/api/playlist/edit', ({ body, ctx }) => routesPlaylistEdit.handleEdit(body, ctx), { requireCaspar: false })
+routes.post('/api/playlist/edit/next', ({ body, ctx }) => routesPlaylistEdit.handleNext(body, ctx), { requireCaspar: true })
 
 // Screen timers (WO-210) — panel-owned timer assignments, persistent across restarts
 routes.get('/api/timers/list', ({ path, ctx }) => routesScreenTimers.handleGet(path, ctx), { requireCaspar: false })

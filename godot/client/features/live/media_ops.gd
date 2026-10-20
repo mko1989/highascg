@@ -91,3 +91,16 @@ static func tree_entries(rows: Array, filter := "") -> Array:
 			if not pass_dirs:
 				out.append({"kind": "file", "parent": key, "label": parts[parts.size() - 1], "row": r})
 	return out
+
+
+## Drag payload (web sources-panel-helpers.js dragstart): a row that is part of a multi-selection drags them all as
+## {type:"multi", items:[…]} in tree order; otherwise the one row {type, value, label}. `row` metadata is dropped.
+static func drag_payload(dragged: Dictionary, selected: Array) -> Dictionary:
+	var strip := func(m: Dictionary) -> Dictionary:
+		var d := m.duplicate()
+		d.erase("row")
+		return d
+	var in_sel := selected.any(func(m: Variant) -> bool: return m is Dictionary and str(m.get("value", "")) == str(dragged.get("value", "")))
+	if in_sel and selected.size() > 1:
+		return {"type": "multi", "items": selected.map(func(m: Dictionary) -> Dictionary: return strip.call(m))}
+	return strip.call(dragged)
