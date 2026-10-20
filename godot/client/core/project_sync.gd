@@ -144,3 +144,33 @@ func flush() -> void:
 	if pending:
 		pending = false
 		flush()
+
+
+## Header Save (web header-bar.js saveToServer): let a running autosave finish, then POST /api/project/save — the
+## server stamps the named file, retires a renamed slug and pushes to the replication peer. Its project_sync echo is
+## skipped like an autosave's. Returns the Api result.
+func save_now() -> Dictionary:
+	_timer.stop()
+	pending = false
+	while in_flight:
+		await get_tree().process_frame
+	if Store.project.is_empty():
+		return {"ok": false, "status": 0, "data": null, "error": "no project"}
+	Store.project["savedAt"] = Time.get_datetime_string_from_system(true) + "Z"
+	var res: Dictionary = await Api.post_json("/api/project/save", {"project": Store.project})
+	if res.ok:
+		var d: Dictionary = res.data if res.data is Dictionary else {}
+		if d.get("rev") != null:
+			Store.project["rev"] = int(d["rev"])
+		_skip_next_sync = true
+		project_gone = false  # an explicit save writes the file again (WO-311: clears the condition)
+	return res
+
+
+## A Load / New project replaced the show on the server (web resetServerProjectSync): forget the old project's state.
+func reset() -> void:
+	_timer.stop()
+	pending = false
+	project_gone = false
+	_skip_next_sync = false
+	_last_deck_json = ""

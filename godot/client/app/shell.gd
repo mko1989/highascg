@@ -17,9 +17,14 @@ const PlaylistsPanel := preload("res://features/live/playlists_panel.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
+const HeaderProject := preload("res://app/header_project.gd")
+const HeaderTools := preload("res://app/header_tools.gd")
+const HeaderStatus := preload("res://app/header_status.gd")
 
 var _eye: ConnectionEye
-var _project: Label
+var header_project: HeaderProject
+var header_tools: HeaderTools
+var header_status: HeaderStatus
 var _status := ""
 var tabs: TabContainer
 var sources: MediaPanel
@@ -79,7 +84,8 @@ func _ready() -> void:
 	Ws.connected.connect(_refresh_eye)
 	Ws.disconnected.connect(_refresh_eye)
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
-	Store.project_changed.connect(func(p: Dictionary) -> void: _project.text = str(p.get("name", "—")))
+	header_tools.settings_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(settings))
+	header_tools.notice.connect(header_project.say)
 	_refresh_eye()
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
@@ -117,13 +123,18 @@ func _build_header() -> Control:
 	title.text = "HighAsCG"
 	title.add_theme_font_size_override("font_size", 20)
 	row.add_child(title)
-	_project = Label.new()
-	_project.text = "—"
-	_project.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
-	row.add_child(_project)
+	header_project = HeaderProject.new()  # WO-608 header: name · save · load · new · notice line
+	header_project.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(header_project)
+	header_tools = HeaderTools.new()  # ⚙ · FTB
+	header_tools.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(header_tools)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
+	header_status = HeaderStatus.new()  # wall clock
+	header_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(header_status)
 	_perf_btn = UiIcons.button("pulse", "Performance overlay — CPU / GPU / RAM of this client and the box (F3)")
 	_perf_btn.toggle_mode = true
 	_perf_btn.flat = true

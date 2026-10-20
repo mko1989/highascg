@@ -222,3 +222,78 @@ has nothing to scroll. A headless probe (main.tscn instanced under a SceneTree s
 and Calibrate mode. Both columns now fit the window and each has a scrollbar. Wheel over the Inspector scrolled it
 down to Floor grid / Width / Depth / Spacing. Wheel over a nested list (calibration points) scrolls that list first,
 which is standard.
+
+## 2026-10-20 — Header slice 1: project name, Save / Load / New, notice line, ⚙, FTB, wall clock
+
+Owner: "work on filling the top bar like it is in the webui".
+
+**Investigation.** Web header, left to right (`client/components/header-bar.js`, screenshot of :4200):
+- logo, HighAsCG and the project-name input;
+- Save (arrow→disk; Shift = download the JSON), Load (←disk; modal, Shift = upload a file), New project (confirm);
+- the autosave line;
+- Server ▾ (`header-bar-config-strip.js`), ⚙ (settings modal), the LED test checkbox with Test card… and FTB
+  (`header-bar-led-test.js`);
+- stream/record badges (`header-bar-streaming.js`), the replication L/F badge (`header-bar-replication.js`);
+- the PGM now-playing timer (`app-pgm-header-timer.js`), wall clock, audio-monitor headphones (`header-bar-audio.js`)
+  and the eyes.
+
+The Godot header only had the logo, title, project label, the perf toggle and the eyes. Every action already has a
+server endpoint:
+- `POST /api/project/save | load | new` and `GET /api/project/list | file/:slug/download`
+  (`src/api/routes-data-project-handlers.js`, `routes-data-project-read.js`);
+- `POST /api/ftb {}`, which with no `screenIdx` fades every PGM + PRV (`src/api/routes-ftb.js`).
+
+The server also owns the side effects:
+- an autosave of a renamed project retires the old slug (handlers.js, autosave branch);
+- load activates the show and, with `applyHardware`, the Device View;
+- new builds the starter project and broadcasts.
+
+So the client only posts. Two web findings:
+- **The web autosave line never shows.** `client/app.js:187` dispatches `project-autosaved` on `document`
+  (`bubbles` false), but `header-bar.js` listens on `window`. Not fixed in the web (WO-608 retires it).
+- **The LED test card is client-composed.** Its settings live in browser localStorage (`led-test-modal.js`), and
+  `led-test-apply.js` picks targets and builds payloads in the browser. Directive D needs a server-side store and
+  endpoint first, so it is a separate slice (below, open).
+
+**Done.**
+- **`app/header_project.gd`** — the left group:
+  - Name LineEdit: Enter or focus-out sets `project.name` and flushes the autosave; the server renames.
+  - Save (`ProjectSync.save_now()`): waits out a running autosave, then `POST /api/project/save`. It adopts `rev` and
+    skips the project_sync echo.
+  - Load (`app/project_load_dialog.gd`): a Project / Saved tree from `/api/project/list` with the active project
+    preselected. Choosing one posts `load {slug, applyHardware: true}`, the same final call as the web
+    `finishImport`.
+  - New project: confirm, then `POST /api/project/new`.
+  - After Load / New: `ProjectSync.reset()`, `Store.set_project`, then re-pull settings + `/api/state` and force a
+    deck sync (the web's `startNewProject` / `finishImport`).
+  - **Right-click menus** replace the web's Shift+click (owner 20.10: no intricate shortcuts):
+    - Save → "Save to file…" writes the server's `file/:slug/download` bytes verbatim. A Godot JSON round trip
+      turns every integer into a float, e.g. `"rev": 599.0`.
+    - Load → "Load from file…" (also a button in the dialog) posts the file as `save {project, allowReplace}`,
+      then loads the returned slug.
+  - The notice line takes autosave ok / failed / project-gone (sticky, WO-311) plus action results; it clears after
+    6 s.
+- **`app/header_tools.gd`** — ⚙ switches to the Settings tab; red FTB posts `/api/ftb {}`.
+- **`app/header_status.gd`** — wall clock (HH:MM:SS), left of the perf toggle and eyes.
+- **`app/header_model.gd`** — pure helpers (notices, list rows, load reply/notice, file parse).
+- Icons `save.svg` / `load.svg` (the web's arrow + disk pair in one 2:1 drawing).
+
+**Verified.**
+- Godot suite 16118 passed / 0 failed (new `tests/test_header_model.gd`); file-line gate 0 over.
+- Box (screen 0) header reads:
+  `logo · HighAsCG · [Untitled] · →💾 · ←💾 · New project · ⚙ · FTB … 20:23:50 · pulse · eyes`.
+- Save → "Saved at 20:23". The server's `savedAt` stayed 20:18:19: unchanged content is not rewritten
+  (`project-scenes.js:243`, WO-329B).
+- The Load dialog listed all server projects, Untitled ● preselected; cancelled.
+- The New project confirm was shown and cancelled.
+- Right-click Save → Save to file… → `~/Untitled.json` is byte-identical to `GET /api/project/file/untitled/download`
+  (`cmp`). The file was removed afterwards.
+- **Not exercised on the box** (each one replaces or blacks out the owner's live show): a real Load / Load from file /
+  New project, a rename, FTB. Owner-QA.
+
+**Next header slices (open):**
+- Server ▾ strip (`configComparison`).
+- Stream/record + replication badges.
+- PGM now-playing timer.
+- Audio-monitor menu.
+- LED test card: needs server-side settings + a master endpoint first.
