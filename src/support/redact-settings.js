@@ -23,6 +23,9 @@ function listRedactedKeyPatterns() {
  */
 function redactValue(value, key = '') {
 	if (value == null) return value
+	// WO-611 #6: a flag leaks nothing — redacting `nuclearRequirePassword` made every client read it as off (and the
+	// web Settings save then wrote false back, silently dropping the password requirement).
+	if (typeof value === 'boolean') return value
 	if (SENSITIVE_KEY_RE.test(key)) return '[REDACTED]'
 	if (typeof value === 'string') {
 		if (value.length > 4096) return value.slice(0, 4096) + '…[truncated]'

@@ -1,4 +1,4 @@
-**Status: ✅ Defects #1–#5 fixed (#4/#5 18.10, #1–#3 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
+**Status: ✅ Defects #1–#6 fixed (#4/#5 18.10, #1–#3 + #6 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
 
 # WO-611 — Web client defects found during the Godot port inventory
 
@@ -48,6 +48,15 @@ reaches that hook → a clip dropped on the compose frame came in without its de
 (media-file-defaults.js) applied after setLayerSource; the same helper serves POST /api/scene/new-layer. Smoke
 `smoke-wo611-compose-drop-file-defaults` 2/2; dist-web rebuilt.
 
+### 6. Settings GET redacted the `nuclearRequirePassword` flag (found 2026-10-20 building the Godot Nuclear pane)
+
+- `src/support/redact-settings.js:24` `redactValue` replaced EVERY value whose key matches `SENSITIVE_KEY_RE`
+  (`/password/i`) with `'[REDACTED]'` — the boolean `ui.nuclearRequirePassword` included. Probed: with the
+  requirement on, `GET /api/settings` returned `"nuclearRequirePassword": "[REDACTED]"`.
+- Web `settings-modal-logic.js` reads it as `=== true` → checkbox unticked, and any Settings save posts
+  `false` back → the nuclear password requirement is silently dropped (hash kept, gate off). Godot read it off too.
+- Fix: booleans pass through `redactValue` (a flag leaks nothing); strings under sensitive keys stay redacted.
+
 ### Also noted (not defects, for cleanup)
 
 - Dead: `client/components/inspector-panel-routing.js` (173 LOC), `components/sync-modal.js`,
@@ -70,9 +79,18 @@ Smoke `tools/smoke/smoke-wo611-web-client-defects.test.js` (curated): the catalo
 WsClient (fails on the old code: the request arrives as a string), the dispatch/listen pair, no
 `window.showToast` left. `dist-web` rebuilt.
 
+### #6 (2026-10-20)
+
+- `src/support/redact-settings.js`: `if (typeof value === 'boolean') return value` before the key test.
+  Empty-string secrets stay `'[REDACTED]'` on purpose — `mergeUiNuclearPasswordSettings` keeps the hash only
+  for the placeholder when the requirement is off, so unredacting `''` would change what a web save does.
+- `tools/smoke/smoke-wo611-redact-keeps-flags.test.js` (curated): flags pass, password + hash stay redacted.
+
 ## What was VERIFIED
 
 - #2 against the live server (`ws://127.0.0.1:4200/api/ws`): a double-encoded `catalog_request` gets no reply;
   the single-encoded one gets its `catalog_chunk` (5 templates).
 - Smoke 3/3; #1 and #3 by the source assertions only (no browser session on the box for a click test).
 - Owner-visible effect of #1 (border-only edit, reload within 3 s) not run.
+- #6 live: after the server restart `GET /api/settings` → `ui.nuclearRequirePassword: false` (a boolean), with
+  `nuclearPassword` / `nuclearPasswordHash` still `'[REDACTED]'`. Smoke 2/2. Web checkbox click-through not run.
