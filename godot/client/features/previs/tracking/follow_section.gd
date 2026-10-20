@@ -33,7 +33,7 @@ var _state: Label
 var _confirm_on: ConfirmationDialog
 var _confirm_del: ConfirmationDialog
 var _form: GridContainer
-var _calib: VBoxContainer  # WO-624 E3 calibrate_section.gd
+var _calib: Calibrate  # WO-624 E3 calibrate_section.gd
 
 
 func _ready() -> void:
@@ -262,3 +262,12 @@ func _button(text: String, cb: Callable) -> Button:
 	b.text = text
 	b.pressed.connect(cb)
 	return b
+
+
+## WO-630 F1: a camera click while this fixture is being calibrated adds a point at the floor spot.
+func calibrating() -> bool:
+	return _calib != null and _calib.visible and _calib.is_open()
+
+
+func add_calib_point(at: Array) -> void:
+	_calib.add_floor_point(at)

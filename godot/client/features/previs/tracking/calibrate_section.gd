@@ -34,7 +34,7 @@ func _ready() -> void:
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, drag the selected marker onto the spot, then Add point. 4+ spots spread over the stage.")
+	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture — that adds the point (or drop the selected marker on it and Add point). 4+ spots spread over the stage.")
 	_box.add_child(how)
 	_pan = _axis_row("Pan °", "pan", "dpan")
 	_tilt = _axis_row("Tilt °", "tilt", "dtilt")
@@ -79,6 +79,17 @@ func _apply_current() -> void:
 	refresh()
 	if cur is Dictionary and cur.get("solve") is Dictionary and cur.solve.get("ok") == true:
 		apply_requested.emit(cur.solve)
+
+
+## Is the shown fixture being calibrated (a camera click then means "the beam is here")?
+func is_open() -> bool:
+	return _sessions.get(fixture_id) is Dictionary
+
+
+## WO-630 F1: the beam spot the operator clicked in the camera picture (PSN metres) — no marker to place first.
+func add_floor_point(at: Array) -> void:
+	if is_open():
+		_act({"action": "point", "at": at})
 
 
 func set_fixture(id: String) -> void:

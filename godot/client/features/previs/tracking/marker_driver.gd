@@ -173,6 +173,26 @@ func grab_at(px: Vector2, radius_px := GRAB_RADIUS_PX) -> bool:
 	return true
 
 
+## WO-630 F1: the floor point (PSN metres) under a camera-picture click, at height `z` — or null.
+func floor_at(px: Vector2, z := 0.0) -> Variant:
+	return MI.floor_point(entry, px, z)
+
+
+## WO-630 F1 (owner 20.10: "i cant seem to simply put the markers with mouse"): a press on empty floor puts the
+## selected marker right there — no glide — and holds it, so keeping the button down drags it on. → true if placed.
+func place_at(px: Vector2) -> bool:
+	var own := marks().filter(func(m: Dictionary) -> bool: return m.own and int(m.id) == selected)
+	if own.is_empty() or own[0].driven:
+		return false
+	var hit: Variant = floor_at(px, float(pos(selected).z))
+	if hit == null:
+		return false
+	_move(selected, Vector2(hit[0], hit[1]), Time.get_ticks_msec())
+	grabbed = selected
+	_target = Vector2(hit[0], hit[1])
+	return true
+
+
 func drag_to(px: Vector2) -> void:
 	if grabbed == 0:
 		return

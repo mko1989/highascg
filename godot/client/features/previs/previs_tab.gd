@@ -96,6 +96,7 @@ func _ready() -> void:
 		_apply_mode()
 		_save_ui())
 	markers.updated.connect(func() -> void:
+		track_view.calibrating = track_view.follow_mode and track_page.follow != null and track_page.follow.calibrating()
 		track_view.set_marks(markers.marks(), markers.selected)
 		track_view.set_beams(_beams())
 		if track_page.markers != null:
@@ -110,11 +111,20 @@ func _ready() -> void:
 		if track_page.detect != null:
 			track_page.detect.refresh_status())
 	track_view.grab.connect(func(px: Vector2) -> void:
-		# WO-624 E2: in Detect mode a press that grabs no marker picks the person under it as the one to follow.
-		if not markers.grab_at(px) and track_page.mode == "detect" and track_page.detect != null:
+		if markers.grab_at(px):
+			return
+		# A press that grabs no marker: WO-624 E2 Detect picks the person under it as the one to follow; WO-630 F1
+		# Follow while calibrating adds the beam spot under it; Markers puts the selected marker there.
+		if track_page.mode == "detect" and track_page.detect != null:
 			var key := track_view.person_at(px)
 			if key != "":
-				track_page.detect.pick_person(key))
+				track_page.detect.pick_person(key)
+		elif track_page.mode == "follow" and track_page.follow != null and track_page.follow.calibrating():
+			var hit: Variant = markers.floor_at(px)
+			if hit != null:
+				track_page.follow.add_calib_point([hit[0], hit[1], 0.0])
+		elif track_page.mode == "markers":
+			markers.place_at(px))
 	track_view.drag.connect(markers.drag_to)
 	track_view.let_go.connect(markers.release)
 	track_view.clicked.connect(track_page.click)
@@ -152,6 +162,7 @@ func _on_tracking_changed() -> void:
 		markers.set_defs(track_page.data.markers, track_page.data.grid)
 	track_view.markers_mode = track_page.mode in ["markers", "follow", "detect"]
 	track_view.follow_mode = track_page.mode == "follow"
+	track_view.calibrating = track_view.follow_mode and track_page.follow != null and track_page.follow.calibrating()
 	track_view.zones_mode = track_page.mode == "zones"
 	track_view.detect_mode = track_page.mode == "detect"
 	_push_zones()

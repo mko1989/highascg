@@ -32,6 +32,7 @@ var markers_mode := false
 var marks: Array = []  # marker_driver.marks()
 var selected_marker := 0
 var follow_mode := false
+var calibrating := false  # WO-630 F1: Follow mode with a fixture calibration open — a floor click is the beam spot
 var beams: Array = []  # follow_model.beams()
 var zones_mode := false
 var detect_mode := false
@@ -262,10 +263,13 @@ func _draw() -> void:
 	var head := "Active: %s — click where it is in the picture" % act.label if not act.is_empty() else "Pick a point in the Inspector list"
 	var tail := " · ctrl+click: pick point · wheel: zoom · right-drag: pan · F: fit"
 	if markers_mode:
-		head = "Markers — drag a marker's circle · stick / arrows move the selected one (camera-relative)"
+		head = "Markers — click the floor: the selected marker goes there · drag a circle · stick / arrows move it"
+		if marks.any(func(m: Dictionary) -> bool: return int(m.id) == selected_marker and m.get("driven", false)):
+			head = "Markers — the selected marker is steered by detection (replace pin): set Detect's pin to off or assist to place it"
 		tail = " · LB/RB speed · D-pad ◀▶ marker · wheel: zoom · right-drag: pan"
 	if follow_mode:
-		head = "Follow — beams show where the server aims each fixture · drag / drive a marker to test"
+		head = ("Follow — calibrating: jog the beam onto a floor spot, then click the spot in the picture" if calibrating else
+			"Follow — beams show where the server aims each fixture · drag / drive a marker to test")
 	if detect_mode:
 		head = ("Detect — click the mask's corners in the picture · Draw shape again to finish" if mask_drawing else
 			"Detect — boxes = detected persons (pinned one in its marker's colour) · assist: drag the ring, the body follows the AI")

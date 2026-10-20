@@ -7,6 +7,8 @@
  *   {action: 'start', id}                      park the head where it is aimed (follow-engine hold)
  *   {action: 'jog', id, pan?, tilt?, dpan?, dtilt?}  absolute and / or relative commanded degrees
  *   {action: 'point', id, marker}              the beam spot is where `marker` stands → one (pan, tilt) ↔ point pair
+ *   {action: 'point', id, at: [x, y, z]}       … or the floor spot the operator clicked in a camera picture
+ *                                              (WO-630 F1: no marker to place first; PSN metres)
  *   {action: 'undo', id}                       drop the last pair
  *   {action: 'end', id}                        release the head (it follows its marker again)
  * Each reply carries the session and, from 3 pairs, the solved pose (calibrate-solve.js). The pose is applied by
@@ -60,7 +62,11 @@ function createCalibration({ engine, hub }) {
 			return { status: 200, body: view(id) }
 		}
 		if (action === 'point') {
-			const m = (hub.list(hub.now()) || []).find((k) => k.id === Number(data.marker))
+			const at = Array.isArray(data.at) ? data.at.map(Number) : null
+			if (at && (at.length !== 3 || !at.every((v) => Number.isFinite(v) && Math.abs(v) <= 500))) {
+				return { status: 400, body: { error: 'at must be [x, y, z] in metres, within 500 m of the origin' } }
+			}
+			const m = at ? { x: at[0], y: at[1], z: at[2] } : (hub.list(hub.now()) || []).find((k) => k.id === Number(data.marker))
 			if (!m) return { status: 404, body: { error: `no marker ${data.marker} — place one on the beam spot` } }
 			// a stale marker still stands where the operator dropped it — its position is all a pair needs
 			Object.assign(s, engine.hold(id, s.pan, s.tilt)) // refresh the hold's TTL
