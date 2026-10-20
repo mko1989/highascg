@@ -1,4 +1,4 @@
-**Status: ✅ Defects #1–#6 fixed (#4/#5 18.10, #1–#3 + #6 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
+**Status: ✅ Defects #1–#7 fixed (#4/#5 18.10, #1–#3 + #6 + #7 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
 
 # WO-611 — Web client defects found during the Godot port inventory
 
@@ -57,6 +57,13 @@ reaches that hook → a clip dropped on the compose frame came in without its de
   `false` back → the nuclear password requirement is silently dropped (hash kept, gate off). Godot read it off too.
 - Fix: booleans pass through `redactValue` (a flag leaks nothing); strings under sensitive keys stay redacted.
 
+### 7. Settings → System printed every disk size as "NaN GB" (found 2026-10-20 porting the System pane)
+
+- `GET /api/system/hardware` → `disks[].size` is lsblk text (`"8G"`, `"953.9G"`, `"1.9T"` — probed live).
+- `client/components/settings-modal-mount-hardware-summary.js:12` `formatBytes` compared it with numbers (all
+  false) and fell through to `(NaN).toFixed(1) + ' GB'`.
+- Fix: strings pass through unchanged (Godot `system_model.gd` `fmt_bytes` does the same).
+
 ### Also noted (not defects, for cleanup)
 
 - Dead: `client/components/inspector-panel-routing.js` (173 LOC), `components/sync-modal.js`,
@@ -86,6 +93,10 @@ WsClient (fails on the old code: the request arrives as a string), the dispatch/
   for the placeholder when the requirement is off, so unredacting `''` would change what a web save does.
 - `tools/smoke/smoke-wo611-redact-keeps-flags.test.js` (curated): flags pass, password + hash stay redacted.
 
+### #7 (2026-10-20)
+
+- `settings-modal-mount-hardware-summary.js` `formatBytes`: `if (typeof bytes === 'string') return bytes || '—'`.
+
 ## What was VERIFIED
 
 - #2 against the live server (`ws://127.0.0.1:4200/api/ws`): a double-encoded `catalog_request` gets no reply;
@@ -94,3 +105,5 @@ WsClient (fails on the old code: the request arrives as a string), the dispatch/
 - Owner-visible effect of #1 (border-only edit, reload within 3 s) not run.
 - #6 live: after the server restart `GET /api/settings` → `ui.nuclearRequirePassword: false` (a boolean), with
   `nuclearPassword` / `nuclearPasswordHash` still `'[REDACTED]'`. Smoke 2/2. Web checkbox click-through not run.
+- #7: `tools/smoke/smoke-wo611-disk-size-text.test.js` (curated) evaluates the real `formatBytes` body: "953.9G"
+  passes through, numbers still format. Web Settings → System not opened in a browser after the fix.

@@ -11,6 +11,8 @@ import { escapeHtml } from '../lib/dom-escape.js'
  */
 function formatBytes(bytes) {
 	if (bytes == null) return '—'
+	// WO-611 #7: lsblk sizes arrive as text ("953.9G") — printing them through the math gave "NaN GB".
+	if (typeof bytes === 'string') return bytes || '—'
 	if (bytes < 1024) return `${bytes} B`
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
 	if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
