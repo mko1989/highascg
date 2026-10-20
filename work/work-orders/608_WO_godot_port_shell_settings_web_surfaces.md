@@ -558,3 +558,23 @@ and amber soft lines; Remember shows / hides the policy picker; Open Device View
 — check Devices" notice, no policy written to ui.cfg; Load device snapshot… → Devices + the snapshot Load dialog
 (Cancelled). NOT pressed: Apply project hardware (rewrites routing / OS layout / Caspar config) — checklist.
 
+## 2026-10-20 — Missing assets after a project pull / Load (web runPostImportMediaReconcile)
+
+**Investigation.** The web asks `POST /api/project/reconcile` first, which only walks the LIVE channels (on this
+box: `usedMedia: []` while the project references 5 clips), and its client fallback (project refs vs `/api/media`
++ templates) is case- and extension-sensitive, so Caspar CLS ids (`PROJECTS/AIRPORT/1. TLO 1 - …`, no extension)
+would read as missing. Result: a banner "Missing assets — N media clips and M templates not found on this server"
+with the first 6 refs, plus a toast.
+
+**What was done.** `src/api/routes-project-assets.js` — `GET /api/project/missing-assets` (project refs from the
+web's pure `project-media-refs.js`, catalogs from `media-catalog.js`; matching ignores case and extension; folders
+never count). Godot `hardware_reconcile.gd` `after_pull()` (boot / reconnect: hardware check, then assets) and
+`check_assets()` on the new `header_project.loaded` signal (Load, Load from file); a missing report becomes a
+sticky warn notice whose tooltip lists the refs (`say()` now takes an optional `tip`).
+
+**What was VERIFIED (box, 20.10).** Smoke `smoke-wo608-missing-assets.test.js` 3/3; offline 2948 pass; Godot
+16407/0 (+`test_missing_notice`). Live endpoint: first cut reported the 3 upper-case airport refs missing; after
+indexing names without extension → `isClean: true` (all 5 refs exist, e.g. `projects/airport/1. Tlo 1 - napisy MEUC
+w tle.mp4`). Boot with a clean project: no notice, 0 script errors. A missing-asset notice on screen was not
+produced (the box project is clean) — the notice text / tooltip are unit-tested.
+

@@ -29,6 +29,7 @@ func _ready() -> void:
 	hw_reconcile = HardwareReconcile.new()
 	hw_reconcile.shell = shell
 	add_child(hw_reconcile)
+	shell.header_project.loaded.connect(hw_reconcile.check_assets)
 	_wire_ws()
 	await bootstrap()
 	Ws.start()
@@ -365,7 +366,7 @@ func bootstrap() -> void:
 	var pr: Dictionary = await Api.get_json("/api/project")
 	if pr.ok:
 		Store.set_project(pr.data)
-		hw_reconcile.check()
+		hw_reconcile.after_pull()
 	_log("project %s (%d looks)" % ["ok" if pr.ok else pr.error, look_count()])
 
 
@@ -393,7 +394,7 @@ func _on_ws_connect(_d: Variant) -> void:
 		var pr: Dictionary = await Api.get_json("/api/project")
 		if pr.ok:
 			Store.set_project(pr.data)
-			hw_reconcile.check()
+			hw_reconcile.after_pull()
 
 
 func _on_change(d: Variant) -> void:

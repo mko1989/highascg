@@ -272,7 +272,10 @@ async function handleBundle(ctx) {
 
 async function handleGet(pathStr, query, ctx) {
 	if (pathStr === '/api/project/bundle') return handleBundle(ctx)
-	return require('./routes-project-hardware').handleGet(pathStr, ctx) // WO-608 hardware-check
+	return (
+		(await require('./routes-project-hardware').handleGet(pathStr, ctx)) || // WO-608 hardware-check
+		require('./routes-project-assets').handleGet(pathStr, ctx) // WO-608 missing-assets
+	)
 }
 
 module.exports = { handlePost, handleGet }

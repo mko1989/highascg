@@ -5,6 +5,8 @@ extends HBoxContainer
 ## /api/project/new (the server builds the starter project). Right-click Save / Load for the file variants (the web's
 ## Shift+click — Godot keeps shortcuts out, right-click menus instead).
 
+signal loaded  ## a header Load / Load-from-file finished (WO-608: the missing-assets check)
+
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderModel := preload("res://app/header_model.gd")
@@ -83,7 +85,7 @@ func _ready() -> void:
 
 func say(n: Dictionary) -> void:
 	notice_label.text = str(n.text)
-	notice_label.tooltip_text = str(n.text)
+	notice_label.tooltip_text = str(n.get("tip", n.text))
 	var tone := str(n.get("tone", "ok"))
 	var tones := {"error": ThemeBuilder.ERROR, "warn": ThemeBuilder.WARN, "muted": ThemeBuilder.TEXT_MUTED}
 	notice_label.add_theme_color_override("font_color", tones.get(tone, ThemeBuilder.SUCCESS))
@@ -119,6 +121,7 @@ func load_slug(slug: String) -> void:
 		return
 	await _adopt(HeaderModel.loaded_project(res.data))
 	say(HeaderModel.load_notice(res.data))
+	loaded.emit()
 
 
 func new_project() -> void:

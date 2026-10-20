@@ -23,7 +23,11 @@ const lib = () => (_lib ||= import(MISMATCH_LIB))
 function bodyOf(r) {
 	if (!r || (r.status && r.status >= 400)) return null
 	try {
-		return typeof r.body === 'string' ? JSON.parse(r.body) : r.body && typeof r.body === 'object' ? JSON.parse(String(r.body)) : null
+		return typeof r.body === 'string'
+			? JSON.parse(r.body)
+			: r.body && typeof r.body === 'object'
+				? JSON.parse(String(r.body))
+				: null
 	} catch {
 		return null
 	}
@@ -31,7 +35,10 @@ function bodyOf(r) {
 
 /** The web fetchLiveHardwareContext, in-process. */
 async function liveContext(ctx) {
-	const safe = (fn) => Promise.resolve().then(fn).then(bodyOf, () => null)
+	const safe = (fn) =>
+		Promise.resolve()
+			.then(fn)
+			.then(bodyOf, () => null)
 	const [deviceViewSnap, deviceSnapBuild, settings] = await Promise.all([
 		safe(() => require('./routes-device-view').handleGet('/api/device-view/snapshot', ctx, {})),
 		safe(() => require('./routes-device-snapshot').handleGet('/api/device-snapshot/build', ctx)),
@@ -65,7 +72,11 @@ async function apply(ctx) {
 	if (!M.hasProjectHardwareConfig(hw)) return { ok: false, error: 'The project has no saved hardware' }
 	const steps = []
 	const warnings = []
-	const r1 = await require('./routes-data').handleProject('/api/project/apply-hardware', JSON.stringify({ hardwareConfig: hw }), ctx)
+	const r1 = await require('./routes-data').handleProject(
+		'/api/project/apply-hardware',
+		JSON.stringify({ hardwareConfig: hw }),
+		ctx
+	)
 	const b1 = bodyOf(r1)
 	if (!b1 || !b1.ok) return { ok: false, error: (b1 && b1.error) || 'Project hardware apply failed' }
 	if (b1.applied === true) steps.push('Device graph, destinations, and routing applied')
@@ -73,7 +84,9 @@ async function apply(ctx) {
 	const osPatch = M.osDisplayKeysFromHardware(hw)
 	if (Object.keys(osPatch).length) {
 		try {
-			const b2 = bodyOf(await require('./routes-settings').handleOsPost('/api/settings/apply-os', JSON.stringify(osPatch), ctx))
+			const b2 = bodyOf(
+				await require('./routes-settings').handleOsPost('/api/settings/apply-os', JSON.stringify(osPatch), ctx)
+			)
 			if (!b2 || b2.ok === false) warnings.push((b2 && b2.error) || 'OS layout apply returned not ok')
 			else steps.push('GPU / xrandr layout applied')
 		} catch (e) {

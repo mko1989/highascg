@@ -40,3 +40,16 @@ func test_apply_notice() -> void:
 	t.eq(M.apply_notice(true, {"ok": true, "steps": ["A", "B"], "warnings": []}), {"text": "A · B", "tone": "ok"}, "steps")
 	t.eq(M.apply_notice(true, {"ok": true, "steps": [], "warnings": ["W"]}).text, "Project hardware applied (W)", "warning")
 	t.eq(M.apply_notice(false, {"error": "nope"}).text, "Project hardware apply failed: nope", "error")
+
+
+func test_missing_notice() -> void:
+	t.eq(M.missing_notice({"isClean": true}), {}, "clean")
+	t.eq(M.missing_notice(null), {}, "no data")
+	var n := M.missing_notice({"isClean": false, "missingMedia": ["a.mov"], "missingTemplates": ["T1", "T2"]})
+	t.eq(n.text, "Missing assets — 1 media clip and 2 templates not found on this server", "text")
+	t.eq(n.tip, "a.mov\ntemplate:T1\ntemplate:T2", "tip")
+	t.eq(n.sticky, true, "sticky")
+	var many: Array = []
+	for i in 8:
+		many.append("c%d" % i)
+	t.eq(M.missing_notice({"isClean": false, "missingMedia": many}).tip.ends_with("c5\n(+2 more)"), true, "more")

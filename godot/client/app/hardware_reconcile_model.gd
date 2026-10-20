@@ -63,3 +63,31 @@ static func apply_notice(ok: bool, data: Variant) -> Dictionary:
 	if not warns.is_empty():
 		return {"text": "%s (%s)" % [msg, str(warns[0])], "tone": "warn"}
 	return {"text": msg, "tone": "ok"}
+
+
+static func _count(n: int, one: String) -> String:
+	return "%d %s%s" % [n, one, "" if n == 1 else "s"]
+
+
+## GET /api/project/missing-assets → sticky header notice (web showMissingMediaBanner), {} when clean. The tooltip
+## carries the first 6 refs (+N more), like the web banner preview.
+static func missing_notice(report: Variant) -> Dictionary:
+	if not (report is Dictionary) or report.get("isClean", true) == true:
+		return {}
+	var mm: Array = report.get("missingMedia", []) if report.get("missingMedia") is Array else []
+	var mt: Array = report.get("missingTemplates", []) if report.get("missingTemplates") is Array else []
+	if mm.is_empty() and mt.is_empty():
+		return {}
+	var parts: Array = []
+	if not mm.is_empty():
+		parts.append(_count(mm.size(), "media clip"))
+	if not mt.is_empty():
+		parts.append(_count(mt.size(), "template"))
+	var all: Array = mm.duplicate()
+	for x in mt:
+		all.append("template:" + str(x))
+	var tip := "\n".join(all.slice(0, 6).map(func(x: Variant) -> String: return str(x)))
+	if all.size() > 6:
+		tip += "\n(+%d more)" % (all.size() - 6)
+	return {"text": "Missing assets — %s not found on this server" % " and ".join(parts), "tone": "warn", "sticky": true, "tip": tip}
+

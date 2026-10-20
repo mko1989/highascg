@@ -68,6 +68,7 @@ const FILES = [
 	'tools/smoke/smoke-wo611-live-audio-settings.test.js',
 	'tools/smoke/smoke-wo606-shader-live-server.test.js',
 	'tools/smoke/smoke-wo608-hardware-check.test.js',
+	'tools/smoke/smoke-wo608-missing-assets.test.js',
 	'tools/smoke/smoke-wo600-new-layer.test.js',
 	'tools/smoke/smoke-wo623-host-cpu-usage.test.js',
 	'tools/smoke/smoke-wo623-new-look.test.js',

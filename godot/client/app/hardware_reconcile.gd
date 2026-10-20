@@ -5,6 +5,7 @@ extends Node
 ## (ui.cfg [project] hardware_policy — the web's localStorage key) may answer without asking. Apply = POST
 ## /api/project/hardware-apply (Device View + routing, OS layout, Caspar config — server-side). Keep = a sticky header
 ## notice (the web banner). Header Load needs none of this: POST /api/project/load {applyHardware} restores it.
+## Missing clips / templates (GET /api/project/missing-assets) become a sticky notice after every pull and Load.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://app/hardware_reconcile_model.gd")
@@ -26,6 +27,20 @@ static func set_policy(p: String) -> void:
 	cfg.load(UI_CFG)
 	cfg.set_value("project", "hardware_policy", M.policy_of(p))
 	cfg.save(UI_CFG)
+
+
+## After every project pull (boot / reconnect): hardware first, then missing assets.
+func after_pull() -> void:
+	await check()
+	check_assets()
+
+
+## Web runPostImportMediaReconcile — also after a header Load (header_project.loaded).
+func check_assets() -> void:
+	var r: Dictionary = await Api.get_json("/api/project/missing-assets")
+	var n := M.missing_notice(r.data) if r.ok else {}
+	if not n.is_empty():
+		_say(n)
 
 
 func check() -> void:
