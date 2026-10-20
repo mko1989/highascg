@@ -12,6 +12,8 @@ const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
 const StagePanel := preload("res://features/previs/stage_panel.gd")
+const MvrScene := preload("res://features/previs/mvr_scene.gd")
+const MvrSection := preload("res://features/previs/mvr_section.gd")
 const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
 const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
@@ -28,6 +30,8 @@ const MODES := ["3d", "camera"]
 var stage: PrevisStage
 var builder: StageBuilder
 var stage_panel: StagePanel
+var mvr: MvrScene
+var mvr_section: MvrSection
 var _models: ItemList
 var _meshes: VBoxContainer
 var _source: OptionButton
@@ -68,6 +72,8 @@ func _ready() -> void:
 	builder = StageBuilder.new()
 	builder.live = false
 	stage.add_child(builder)
+	mvr = MvrScene.new()
+	stage.add_child(mvr)
 	coverage = Coverage3D.new()
 	stage.add_child(coverage)
 	_svc.gui_input.connect(_on_3d_input)
@@ -140,6 +146,10 @@ func _ready() -> void:
 	stage_panel.stage_changed.connect(func() -> void: track_page.set_objects(builder.objects.duplicate(true)))
 	stage_panel.selection_changed.connect(func(id: String) -> void: builder.set_selected(id))
 	stage_panel.bind(builder)
+	mvr_section.scene_loaded.connect(func(info: Dictionary) -> void:
+		if info.has("parts") and builder.objects.is_empty():
+			stage.frame_box(mvr.bounds()))
+	mvr_section.bind(mvr)
 	if Config.args.has("probe-stage-add"):  # dev: --probe-stage-add=<menu id> (0 LED, 1 TV, 2 projection)
 		get_tree().create_timer(3.0).timeout.connect(func() -> void: stage_panel._on_add(int(Config.args["probe-stage-add"])))
 	_glb_role = str(Config.args.get("previs-source", "opgui"))
@@ -171,9 +181,12 @@ func _on_tracking_changed() -> void:
 	_refresh_coverage()
 
 
-## Fit / F: the stage objects, plus the tracking cameras and grid while they are shown (T10c).
+## Fit / F: the stage objects and the MVR scene, plus the tracking cameras and grid while they are shown (T10c).
 func _fit_box() -> AABB:
 	var b := builder.bounds()
+	var m := mvr.bounds()
+	if m.size != Vector3.ZERO:
+		b = m if b.size == Vector3.ZERO else b.merge(m)
 	if not coverage.visible or coverage.box.size == Vector3.ZERO:
 		return b
 	return coverage.box if b.size == Vector3.ZERO else b.merge(coverage.box)
@@ -421,6 +434,9 @@ func _build_panel() -> Control:
 	v.add_child(_heading("Stage (WO-614)"))
 	stage_panel = StagePanel.new()
 	v.add_child(stage_panel)
+	v.add_child(_heading("MVR scene (WO-612)"))
+	mvr_section = MvrSection.new()
+	v.add_child(mvr_section)
 	v.add_child(_heading("Models"))
 	_models = ItemList.new()
 	_models.custom_minimum_size.y = 120

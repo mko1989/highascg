@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation written; nothing implemented. Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
+**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. Open: T5 (VideoScreen → screen bindings), T7 (MVR export), a real Capture file (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
 
 # WO-612 — Previs: import MVR scenes (e.g. from Capture) into the Godot stage
 
@@ -66,12 +66,12 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 
 ## Tasks
 
-- [ ] T1 Get one real Capture-exported `.mvr` (and the Capture version) → confirm geometry format(s), fixture GDTF content, whether VideoScreens/Mappings are written.
-- [ ] T2 `Loader3DS` + tests (fixture `.3ds` files incl. one from the Capture sample).
-- [ ] T3 `MvrImporter`: scene objects, transforms, symbols, glTF + 3DS geometry; import report (counts, skipped objects).
-- [ ] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
+- [~] T1 (answered with 4 grandMA3 exports from MVR-Stash; a Capture export is still on the owner checklist) Get one real Capture-exported `.mvr` (and the Capture version) → confirm geometry format(s), fixture GDTF content, whether VideoScreens/Mappings are written.
+- [x] T2 `Loader3DS` + tests (fixture `.3ds` files incl. one from the Capture sample).
+- [x] T3 `MvrImporter`: scene objects, transforms, symbols, glTF + 3DS geometry; import report (counts, skipped objects).
+- [x] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
 - [ ] T5 VideoScreen Sources/Mappings → previs screen bindings + UV crops.
-- [ ] T6 Persistence: store the `.mvr` via `/api/previs/models` (allow the extension) + parsed metadata.
+- [x] T6 Persistence (own store `projects/_mvr/`, not `/api/previs/models`): store the `.mvr` via `/api/previs/models` (allow the extension) + parsed metadata.
 - [ ] T7 Export the WO-614 stage (LED walls / TVs / projection = `VideoScreen` + generated glb geometry, `Sources`/`Mappings` from each object's role + crop) via `ZIPPacker` (moved here from WO-614 T7).
 - [ ] Later: MVR-xchange client (live sync).
 
@@ -94,3 +94,52 @@ MCP. **Not a real-time DMX visualiser** (README) — that is exactly the gap WO-
   `mvr/mvr_export_archive_writer` as references (tests in `tests/gdtfloader_*` give fixture cases).
 - No `VideoScreen`/projector specific code found in its tree (2026-10-17) → screens from Perastage arrive as
   plain scene objects; our importer tags them by name/size until confirmed with a real file.
+
+## What was done (2026-10-20)
+
+Directive D (the node composes, every function is an endpoint) moved the importer to the **server**; Godot
+only fetches ready GLB meshes and places them. The design above (GDScript importer) is superseded.
+
+- `src/stage/mvr-scene.js` — `GeneralSceneDescription.xml` → layers + objects (`SceneObject`, `Truss`, `Support`,
+  `VideoScreen`, `Projector`, `Fixture`, `Symbol` → `Symdef`, nested groups) with a flat list of parts
+  `{mesh key, 12-number Godot transform}`; `VideoScreen` `Sources` are parsed and kept for T5. Import report:
+  counts, missing GDTFs (→ 0.3 m box), missing files, unsupported nodes.
+- `src/stage/mvr-gdtf.js` — fixture geometry from the GDTF tree of the patched DMX mode (`GeometryReference`
+  expanded; beams / wiring / filters skipped); mesh = `models/gltf/<file>.glb`, else `models/3ds`, else a box
+  of the model's L × W × H.
+- `src/stage/mvr-math.js` — MVR `{u}{v}{w}{o}` (mm, Z-up) and GDTF 4×4 (m) → Godot (m, Y-up); glb meshes are
+  glTF-frame (Y-up), 3DS meshes are mm Z-up. Handedness checked against the MVR-Stash screenshot.
+- `src/stage/mvr-3ds.js` — own 3DS chunk reader (main/edit/object/trimesh/vertices/faces/smoothing, material
+  colours) → GLB; `src/stage/glb-write.js` — GLB writer/reader, and `embedGlbImages`: glb meshes whose
+  textures are separate files in the archive get them embedded (else all textures are dropped) — Godot's
+  `append_from_buffer` has no base path and refuses the whole mesh over one external image.
+- `src/stage/mvr-store.js` — `projects/_mvr/<sha1-12>.mvr` + `.json`; meshes read from the archive on demand
+  (LRU 400).
+- API (`src/api/routes-stage-mvr.js`): `GET /api/stage/mvr`, `POST /api/stage/mvr` (multipart, 300 MB),
+  `GET /api/stage/mvr/<id>`, `GET /api/stage/mvr/<id>/mesh?key=`, `DELETE /api/stage/mvr/<id>`.
+- Godot Previs → "MVR scene (WO-612)": picker, Import… (file dialog + streamed upload), Remove (confirm),
+  Layers ▾ (hide/show per MVR layer); the choice is saved in the project (`previs.mvr` = id, name,
+  hidden layers). The scene loads under the WO-614 stage; Fit frames it too.
+- Tests: `tools/smoke/smoke-wo612-mvr-import.test.js` (5 tests: transforms, 3DS, image embedding, synthetic
+  MVR + GDTF import, the routes) in the curated offline list; Godot `tests/test_mvr_scene.gd`.
+
+## What was VERIFIED (2026-10-20, box)
+
+- All 4 MVR-Stash grandMA3 exports (Basic Festival, Circle Stage, Messy Patch, Midsize w GP) import in
+  0.2–0.5 s and every mesh key returns a valid GLB.
+- Midsize w GP: 115 objects / 76 fixtures / 203 parts / 28 meshes; the front view matches the author's
+  screenshot (guitarist stage right).
+- GUI Import… with the file dialog → Circle Stage uploaded, listed, rendered. First try showed "Meshes that
+  failed to load: 44" (the deck glbs reference `vsBlkDeckTexture.png` next to them in the archive) → fixed by
+  `embedGlbImages`; after the fix all 60 meshes load and the deck texture shows.
+- Fit frames stage + MVR scene; Remove → confirm → list empty, picker back to "— no MVR scene —", Remove and
+  Layers disabled. Test scenes deleted afterwards; project back to no MVR scene.
+- Gates: file lines, lint (217 ≤ 218), prettier, unwired exports, offline suite (2926 pass), Godot 16193 pass.
+
+## Open
+
+- T5 VideoScreen `Sources`/`Mappings` → WO-614 screen bindings (sources are parsed; nothing binds yet).
+- T7 MVR export of the WO-614 stage.
+- A real **Capture** export (owner checklist) — Capture writes 3DS (vendor forum); the 3DS path is tested with
+  synthetic files and the 3DS members of the MA3 GDTFs only.
+- No beams / DMX simulation (WO-615 / WO-180).

@@ -14,16 +14,16 @@ static func save_path(host: Node, title: String, file_name: String) -> String:
 	return await _run(host, FileDialog.FILE_MODE_SAVE_FILE, title, file_name)
 
 
-static func open_path(host: Node, title: String) -> String:
-	return await _run(host, FileDialog.FILE_MODE_OPEN_FILE, title, "")
+static func open_path(host: Node, title: String, filters := [JSON_FILTER]) -> String:
+	return await _run(host, FileDialog.FILE_MODE_OPEN_FILE, title, "", filters)
 
 
-static func _run(host: Node, mode: FileDialog.FileMode, title: String, file_name: String) -> String:
+static func _run(host: Node, mode: FileDialog.FileMode, title: String, file_name: String, filters := [JSON_FILTER]) -> String:
 	var dlg := FileDialog.new()
 	dlg.file_mode = mode
 	dlg.access = FileDialog.ACCESS_FILESYSTEM
 	dlg.title = title
-	dlg.filters = PackedStringArray([JSON_FILTER])
+	dlg.filters = PackedStringArray(filters)
 	var home := OS.get_environment("HOME")
 	var dl := home.path_join("Downloads")
 	dlg.current_dir = dl if DirAccess.dir_exists_absolute(dl) else home

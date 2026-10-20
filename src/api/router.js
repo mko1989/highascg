@@ -485,9 +485,8 @@ routes.get('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.ha
 routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
-const { makeRouteRequest } = require('./router-dispatch')
-
-const routeRequest = makeRouteRequest(routes)
+require('./routes-stage-mvr').register(routes) // WO-612 MVR import (/api/stage/mvr)
+const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 
 module.exports = {
 	routeRequest,

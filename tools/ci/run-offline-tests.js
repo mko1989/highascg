@@ -350,6 +350,7 @@ const FILES = [
 	'tools/smoke/smoke-wo630-calibrate-click.test.js',
 	'tools/smoke/smoke-wo631-psn-output.test.js',
 	'tools/smoke/smoke-wo632-artnet-read-through.test.js',
+	'tools/smoke/smoke-wo612-mvr-import.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
 	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',
