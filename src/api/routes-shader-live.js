@@ -8,6 +8,9 @@
  *   POST /api/shader-live/shaders/:id/:op      → { ok, view, push }   op = set | macro | reset | preset |
  *        preset-save | preset-delete | pin | hide | unhide | label | randomize | wiggle | save
  *   POST /api/shader-live/mixer { channel, layer, cmd, value }   universal Caspar-mixer rides
+ *   POST /api/shader-live/audition { value, label?, mainIndex? }  stage a library shader on PRV (Templates click)
+ * GET also carries `stack` — the main's PGM look-band layers 10–20 and their occupants (web shader-live-stack.js);
+ * landing / clearing rides the existing POST /api/shader-stack.
  * Value changes land on EVERY live instance of the shader via `CG UPDATE` (player.js hot-recompiles).
  */
 
@@ -16,6 +19,9 @@ const S = require('../shaderfx/shader-live-session')
 const Ops = require('../shaderfx/shader-live-ops')
 const { liveShaderInstances } = require('../shaderfx/shader-live-instances')
 const playbackTracker = require('../state/playback-tracker')
+const liveSceneState = require('../state/live-scene-state')
+const { getRouteMap } = require('./routes-scene-shared')
+const { STACK_LAYER_MIN, STACK_LAYER_MAX } = require('./routes-shader-stack')
 
 /* Web MIXER_ROWS (shader-live-rows.js) — available for every shader, no GLSL literals needed. */
 const MIXER_CMDS = { OPACITY: [0, 1], BRIGHTNESS: [0, 3], SATURATION: [0, 3], CONTRAST: [0, 3] }
@@ -74,9 +80,49 @@ async function handleMixer(body, ctx) {
 	}
 }
 
+/** Occupant name of a stack row: the source's basename without extension (web occupantLabel). */
+function occupantLabel(layer) {
+	const v = String(layer?.source?.value || '')
+	return (v.replace(/\\/g, '/').split('/').pop() || v).replace(/\.[a-z0-9]+$/i, '')
+}
+
+/** @param {object} ctx @param {number} main */
+function stackOf(ctx, main) {
+	const ch = getRouteMap(ctx).programChannels?.[main]
+	const scene = ch != null ? liveSceneState.getChannel(ch)?.scene : null
+	const byNum = new Map((scene?.layers || []).map((l) => [Number(l.layerNumber), l]))
+	const rows = []
+	for (let n = STACK_LAYER_MIN; n <= STACK_LAYER_MAX; n++) rows.push({ layerNumber: n, occupant: occupantLabel(byNum.get(n)) })
+	return { main, channel: ch ?? null, rows }
+}
+
+/** Templates click while Shader Live is open: an ephemeral one-layer look on the main's PRV (web shader-live-audition.js). */
+async function handleAudition(body, ctx) {
+	const b = parseBody(body) || {}
+	const value = String(b.value || '').trim()
+	const sid = (value.toLowerCase().match(/sh-[a-z0-9-]+$/) || [])[0]
+	if (!sid) return reply(400, { ok: false, error: 'value must be a shader template (…/sh-<id>)' })
+	const main = Math.max(0, parseInt(b.mainIndex, 10) || 0)
+	const rm = getRouteMap(ctx)
+	const programCh = rm.programChannels?.[main]
+	const prvCh = rm.previewChannels?.[main]
+	if (!programCh || !prvCh) return reply(409, { ok: false, error: 'no preview bus for this main' })
+	const label = String(b.label || sid)
+	const incomingScene = {
+		id: `shader-audition-${main}`,
+		name: `Audition ${label}`,
+		layers: [{ layerNumber: 10, source: { type: 'template', value }, opacity: 1, fill: { x: 0, y: 0, scaleX: 1, scaleY: 1 } }],
+	}
+	const take = { channel: programCh, target: 'preview', forceCut: true, useServerLive: true, incomingScene }
+	const r = await require('./routes-scene').handlePost('/api/scene/take', JSON.stringify(take), ctx)
+	if (!r || r.status >= 400) return r || reply(503, { ok: false, error: 'Caspar not connected' })
+	return reply(200, { ok: true, key: `${sid}@${prvCh}-10` })
+}
+
 /** @param {any} routes */
 function register(routes) {
-	routes.get('/api/shader-live', ({ ctx }) => reply(200, { instances: liveShaderInstances(ctx) }), { requireCaspar: false })
+	routes.get('/api/shader-live', ({ ctx, query }) => reply(200, { instances: liveShaderInstances(ctx), stack: stackOf(ctx, Math.max(0, parseInt(query?.main, 10) || 0)) }), { requireCaspar: false })
+	routes.post('/api/shader-live/audition', ({ body, ctx }) => handleAudition(body, ctx), { requireCaspar: true })
 	routes.get('/api/shader-live/shaders/*', ({ path }) => {
 		const m = String(path).match(/^\/api\/shader-live\/shaders\/([^/]+)$/)
 		return m ? handleView(decodeURIComponent(m[1]).toLowerCase()) : reply(404, { ok: false, error: 'not found' })

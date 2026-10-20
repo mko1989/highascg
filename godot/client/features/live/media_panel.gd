@@ -22,6 +22,7 @@ signal tab_requested(name: String)
 signal caspar_changed
 signal connector_dropped
 
+const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -81,6 +82,10 @@ func _ready() -> void:
 	templates.name = "Templates"
 	templates.empty_text = "No templates (↻ re-reads Caspar TLS)"
 	templates.provider = func(f: String) -> Array: return Lists.template_rows(_tls, _shader_names, f)
+	templates.row_clicked.connect(func(p: Dictionary, kind: String) -> void:  # WO-606: audition while Shader Live is open
+		var shl: Node = ShaderLivePanel.current
+		if kind == "shader" and is_instance_valid(shl) and shl.is_visible_in_tree():
+			shl.audition(str(p.get("value", "")), str(p.get("label", p.get("value", "")))))
 	_tabs.add_child(templates)
 	live = LivePanel.new()
 	live.name = "Live"

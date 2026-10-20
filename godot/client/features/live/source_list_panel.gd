@@ -5,6 +5,8 @@ extends VBoxContainer
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
+signal row_clicked(payload: Dictionary, kind: String)  # WO-606: Shader Live auditions a clicked shader
+
 var provider: Callable
 var empty_text := "No items"
 var _filter: LineEdit
@@ -31,6 +33,10 @@ func _ready() -> void:
 	_tree.set_column_custom_minimum_width(0, 34)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag, Callable(), Callable())
+	_tree.item_mouse_selected.connect(func(_at: Vector2, button: int) -> void:
+		var it := _tree.get_selected()
+		if button == MOUSE_BUTTON_LEFT and it != null and it.get_metadata(0) is Dictionary:
+			row_clicked.emit(it.get_metadata(0), str(it.get_metadata(1))))
 	add_child(_tree)
 
 
@@ -52,6 +58,7 @@ func rebuild() -> void:
 		it.set_tooltip_text(0, str(r.tip))
 		it.set_tooltip_text(1, str(r.tip))
 		it.set_metadata(0, r.payload)
+		it.set_metadata(1, str(r.get("kind", "")))
 	_empty.text = empty_text
 	_empty.visible = rows.is_empty()
 

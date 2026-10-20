@@ -98,6 +98,7 @@ func _ready() -> void:
 	shader_live.visible = false
 	shader_live.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	shader_live.take_cb = func() -> Dictionary: return await deck.take_main(0)
+	shader_live.transition_cb = resolved_default_transition
 	shader_live.close_requested.connect(func() -> void: toggle_shader_live(false))
 	bottom.add_child(shader_live)
 	shader_live.visibility_changed.connect(func() -> void:
@@ -225,10 +226,9 @@ func _transition_toolbar() -> Control:
 	return bar
 
 
-## Shows the resolved default (auto sentinel → frames at screen 0's fps), like getResolvedGlobalDefaultTransition.
-func _sync_default_row() -> void:
-	if _default_row == null:
-		return
+## The project's default transition with the auto sentinel resolved to frames at screen 0's fps
+## (web getResolvedGlobalDefaultTransition) — the toolbar row and Shader Live's stack both use it.
+func resolved_default_transition() -> Dictionary:
 	var root: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
 	var g: Dictionary = T.default_transition()
 	if root.get("globalDefaultTransition") is Dictionary:
@@ -239,6 +239,14 @@ func _sync_default_row() -> void:
 	if rl is Array and not (rl as Array).is_empty() and rl[0] is Dictionary:
 		fps = float(rl[0].get("fps", 50))
 	g["duration"] = T.resolve_duration(g.get("duration"), fps)
+	return g
+
+
+func _sync_default_row() -> void:
+	if _default_row == null:
+		return
+	var g := resolved_default_transition()
+	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
 	var any_pgm_only := false
 	for i in DeckModel.screen_count(cm):
 		if not DeckModel.preview_bus_available(cm, i):

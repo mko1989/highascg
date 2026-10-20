@@ -10,8 +10,12 @@ const M := preload("res://features/live/shader_live_model.gd")
 const W := preload("res://features/live/shader_live_controls.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Kit := preload("res://features/settings/pane_kit.gd")
+const Stack := preload("res://features/live/shader_live_stack.gd")
+
+static var current: Node  # the open panel — Templates clicks audition through it (web shader-audition-request)
 
 var take_cb: Callable  # the deck's PRV → PGM take for screen 1 (web #shl-take clicked the global take)
+var transition_cb: Callable  # the deck's resolved default transition (stack land / clear)
 
 var _instances: Array = []
 var _list_sig := ""
@@ -28,6 +32,7 @@ var _adv_btn: Button
 var _adv: VBoxContainer
 var _adv_open := false
 var _poll: Timer
+var _stack: Stack
 
 
 func _ready() -> void:
@@ -58,10 +63,18 @@ func _ready() -> void:
 	Kit.button(bar, "✕", func() -> void: close_requested.emit()).tooltip_text = "Back to looks"
 	_status = W.muted("")
 	add_child(_status)
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(body)
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	body.add_child(scroll)
+	_stack = Stack.new()
+	_stack.selected_cb = func() -> Dictionary: return M.find_instance(_instances, _selected)
+	_stack.transition_cb = func() -> Variant: return transition_cb.call() if transition_cb.is_valid() else null
+	_stack.said.connect(_say)
+	body.add_child(_stack)
 	var content := VBoxContainer.new()
 	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content.add_theme_constant_override("separation", 8)
@@ -85,6 +98,7 @@ func _ready() -> void:
 	add_child(_poll)
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
+			current = self
 			_poll.start()
 			_refresh_instances()
 		else:
@@ -93,9 +107,10 @@ func _ready() -> void:
 
 ## Server-resolved instance list (playlists on air, banks) — polled while open, like the web tracker.
 func _refresh_instances() -> void:
-	var r: Dictionary = await Api.get_json("/api/shader-live")
+	var r: Dictionary = await Api.get_json("/api/shader-live?main=0")
 	if not r.ok or not (r.data is Dictionary):
 		return
+	_stack.show_stack(r.data.get("stack"))
 	_instances = r.data.get("instances", [])
 	var sig := JSON.stringify(_instances)
 	if sig == _list_sig:
@@ -104,7 +119,7 @@ func _refresh_instances() -> void:
 	_pick.clear()
 	var dev := str(Config.args.get("shader-live-id", ""))  # dev: a library shader's view with no live instance (pushes nothing)
 	if _instances.is_empty() and dev != "":
-		_instances = [{"key": dev + "@0-0", "shaderId": dev, "channel": 0, "pLayer": 0, "isPrv": true, "sceneName": "not on air"}]
+		_instances = [{"key": dev + "@0-0", "shaderId": dev, "channel": 0, "pLayer": 0, "isPrv": false, "sceneName": "not on air"}]
 	if _instances.is_empty():
 		_pick.add_item("— no live shader —")
 		_pick.set_item_metadata(0, "")
@@ -190,6 +205,18 @@ func mixer(cmd: String, v: float) -> void:
 	var r: Dictionary = await Api.post_json("/api/shader-live/mixer", {"channel": inst.channel, "layer": inst.pLayer, "cmd": cmd, "value": v})
 	if not r.ok:
 		_say("MIXER %s failed: %s" % [cmd, r.error], false)
+
+
+## Templates click while open: the node stages the shader alone on PRV; select that instance once it shows.
+func audition(value: String, label: String) -> void:
+	var r: Dictionary = await Api.post_json("/api/shader-live/audition", {"value": value, "label": label, "mainIndex": 0})
+	if not r.ok or not (r.data is Dictionary) or not r.data.get("ok", false):
+		_say("Audition failed: %s" % (r.data.get("error", r.error) if r.data is Dictionary else r.error), false)
+		return
+	_selected = str(r.data.get("key", _selected))
+	_list_sig = ""
+	_say("%s → preview" % label, true)
+	_refresh_instances()
 
 
 func _take() -> void:

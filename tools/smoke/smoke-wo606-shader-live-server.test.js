@@ -22,7 +22,17 @@ store.saveShader = async (cfg) => {
 
 const liveSceneState = require('../../src/state/live-scene-state')
 const LIVE = {
-	1: { scene: { id: 'a', name: 'Look A', layers: [{ layerNumber: 3, source: { value: 'shaders/sh-test' } }, { layerNumber: 4, source: { value: 'clip.mp4' } }] } },
+	1: {
+		scene: {
+			id: 'a',
+			name: 'Look A',
+			layers: [
+				{ layerNumber: 3, source: { value: 'shaders/sh-test' } },
+				{ layerNumber: 4, source: { value: 'clip.mp4' } },
+				{ layerNumber: 12, source: { value: 'media\\sub/Waves.MOV' } },
+			],
+		},
+	},
 	2: { scene: { id: 'a', name: 'Look A', layers: [{ layerNumber: 3, source: { value: 'shaders/sh-test' } }] } },
 	5: {
 		scene: {
@@ -33,6 +43,7 @@ const LIVE = {
 	},
 }
 liveSceneState.getAll = () => LIVE
+liveSceneState.getChannel = (ch) => LIVE[ch] || null
 
 const { liveShaderInstances } = require('../../src/shaderfx/shader-live-instances')
 const { playlistRuntimeKey } = require('../../src/engine/scene-take-lbg-playlist')
@@ -137,4 +148,18 @@ test('bad input is rejected; wiggle needs a preview instance', async () => {
 test('router registers the Shader Live routes (500-line router: one register line)', () => {
 	const src = require('fs').readFileSync(require('path').join(__dirname, '../../src/api/router.js'), 'utf8')
 	assert.match(src, /require\('\.\/routes-shader-live'\)\.register\(routes\)/)
+})
+
+test('GET carries the PGM stack (layers 10–20, occupant basenames); audition rejects non-shaders', async () => {
+	const h = {}
+	const routes = { get: (p, fn) => (h[`GET ${p}`] = fn), post: (p, fn) => (h[`POST ${p}`] = fn) }
+	require('../../src/api/routes-shader-live').register(routes)
+	const r = h['GET /api/shader-live']({ ctx: makeCtx(), query: { main: '0' } })
+	const body = JSON.parse(r.body)
+	assert.equal(body.instances.length, 3)
+	assert.equal(body.stack.channel, 1)
+	assert.deepEqual(body.stack.rows.map((x) => x.layerNumber), [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
+	assert.equal(body.stack.rows.find((x) => x.layerNumber === 12).occupant, 'Waves')
+	const bad = await h['POST /api/shader-live/audition']({ body: JSON.stringify({ value: 'clip.mp4' }), ctx: makeCtx() })
+	assert.equal(bad.status, 400)
 })

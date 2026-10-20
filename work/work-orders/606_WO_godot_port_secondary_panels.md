@@ -1,4 +1,4 @@
-**Status: 🟡 IN PROGRESS (2026-10-20) — Shader Live slice 1 done (node-side working copy + Godot panel); open: PGM stack (10–20), Templates audition, Shader FX modal (GLSL editor). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
+**Status: 🟡 IN PROGRESS (2026-10-20) — Shader Live slices 1–2 done (node-side working copy + Godot panel, PGM stack, Templates audition); open: Shader FX modal (GLSL editor). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
 
 # WO-606 — Godot port: Shader Live/FX, timers, CG/lower thirds, LED test/pixel map/fixtures, variables, streaming/recording/inputs
 
@@ -70,6 +70,18 @@ Directive D: the web editor kept the working copy in the browser, rewrote GLSL l
 - Smoke `tools/smoke/smoke-wo606-shader-live-server.test.js` (5 tests, store stubbed); Godot
   `tests/test_shader_live_model.gd`.
 
+### Shader Live, slice 2 (20.10) — PGM stack + audition
+
+- `GET /api/shader-live?main=N` also returns `stack` (the main's PGM layers 10–20 + occupant basenames, web
+  `occupantLabel`); land / clear ride the existing `POST /api/shader-stack` with the deck's resolved default
+  transition (`live_tab.resolved_default_transition()`, split out of the toolbar sync).
+- `POST /api/shader-live/audition { value, label, mainIndex }` — the web's `shader-audition-request` handler moved
+  to the node: an ephemeral one-layer look (L10) through the normal `/api/scene/take` pipeline to the main's PRV;
+  answers the instance key to select.
+- Godot `shader_live_stack.gd` (right column; click = land the selected **PRV** instance, ✕ on occupied rows =
+  fade off air), `source_list_panel.row_clicked` → `media_panel` auditions a clicked shader template while the
+  panel is open (`ShaderLivePanel.current`).
+
 ## What was VERIFIED
 
 - Smoke: instance resolution (bank B, PRV, playlist on air), literal rewrite + 3 pushes + 403 re-host with the
@@ -85,7 +97,9 @@ Directive D: the web editor kept the working copy in the browser, rewrote GLSL l
 
 ## Open
 
+- Slice 2 on the box: the stack column shows `PGM stack ch1` with L10 = BAZA 2 (✕) and L11–20 empty; a row click
+  with a non-PRV selection says "Select the PRV instance…" and posts nothing (PGM checked unchanged). Smoke 6/6
+  (stack rows / occupant basename, audition 400). Landing, clearing and auditioning were NOT pressed (PGM/PRV).
 - **Never driven against a shader on air** — no shader live on the box, GPU CEF off, PGM/PRV off limits
   (owner check in `work/checklist20.10.26_owner_checks.md`).
-- PGM stack column (layers 10–20, `/api/shader-stack` — server exists), Templates audition while open
-  (`shader-live-audition.js`), Shader FX modal (GLSL `CodeEdit`, Shadertoy import, preview via PRV).
+- Shader FX modal (GLSL `CodeEdit`, Shadertoy import, preview via PRV).
