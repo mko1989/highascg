@@ -56,3 +56,28 @@ Clean `git archive` export of the commit, with no `data/shaders`, `.git` or `con
 - The wo577 test was also run ALONE in that export: 8/8 pass, and `data/shaders` was created with 190 JSONs.
 - Godot client tests: 16087 pass.
 - GitHub CI on the pushed main is recorded below.
+
+## Follow-up — first CI run on the merged main was red (run 39469797612)
+
+**Investigation.** The run failed in Offline tests: 2862 pass, 4 fail. The four were `smoke-wo598-deck-sync-persist-race`
+(3) and `smoke-wo617-tests-never-touch-live-projects` (1), all with
+`EACCES: permission denied, mkdir '/home/casparcg/highascg/media/projects/raceshow'`.
+- `persistProject` (`src/engine/project-scenes.js:264`) calls `ensureProjectMediaDir`, which creates
+  `<media root>/projects/<slug>`.
+- With no `local_media_path`, the media root is the hard-coded `/home/casparcg/highascg/media`
+  (`src/media/local-media-paths.js:60`). WO-617 sent test PROJECTS to a temp dir but never covered this media
+  folder.
+- On the box that path is writable, so the clean-export run passed and the suite quietly created empty `newshow`,
+  `oldshow`, `raceshow` and `raceshow2` in the LIVE `media/projects` (dated 18.10 08:00, with no project files).
+- Lesson: a local clean export cannot catch writes to absolute box paths. Only the runner, with no `/home/casparcg`,
+  can.
+
+**Done.** `ensureProjectMediaDir` (`src/media/project-media-root.js`): under the Node test runner it creates
+folders only under `os.tmpdir()`, i.e. a temp `local_media_path` the test chose. Otherwise it returns null, as it
+already does when project-scoped media is off. I removed the four empty test folders from the live
+`media/projects` with `rmdir`, which only removes empty directories.
+
+**Verified.**
+- wo598, wo617 and `smoke-project-media-root`: 14/14 pass, and the four folders are not recreated.
+- Full clean-export suite: 2874 tests, 2870 pass, 3 skipped, 1 fail (wo498, which needs `.git`, an archive artifact).
+- After that full run, the live `media/projects` holds only the real project folders.

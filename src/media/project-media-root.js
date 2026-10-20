@@ -4,6 +4,7 @@
 'use strict'
 
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 const { getMediaIngestBasePath, normalizeMediaIdKey, resolveSafe } = require('./local-media-paths')
 const {
@@ -122,6 +123,9 @@ function ensureProjectMediaDir(config, slug, store) {
 	const s = String(slug || getActiveProjectSlug(store) || '').trim()
 	if (!s) return null
 	const dir = getProjectMediaRoot(config, store, s)
+	// WO-626: a test process creates media folders only under a temp local_media_path it chose. Persist smokes left
+	// empty newshow/raceshow/… folders in the box's live media/projects (and hit EACCES on the CI runner).
+	if (require('../engine/projects-root').underTestRunner() && !path.resolve(dir).startsWith(path.resolve(os.tmpdir()) + path.sep)) return null
 	fs.mkdirSync(dir, { recursive: true })
 	return dir
 }
