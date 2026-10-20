@@ -73,3 +73,22 @@ static func confirm(host: Node, text: String, then: Callable) -> void:
 	host.add_child(d)
 	d.popup_centered()
 	d.get_cancel_button().grab_focus.call_deferred()
+
+
+## One-line text prompt (web window.prompt). `then(text)` runs on OK / Enter; Cancel does nothing.
+static func prompt(host: Node, title: String, initial: String, then: Callable) -> void:
+	var d := ConfirmationDialog.new()
+	d.title = title
+	var e := LineEdit.new()
+	e.text = initial
+	e.custom_minimum_size.x = 360
+	d.add_child(e)
+	d.register_text_enter(e)
+	d.confirmed.connect(func() -> void: then.call(e.text))
+	d.visibility_changed.connect(func() -> void:
+		if not d.visible:
+			d.queue_free())
+	host.add_child(d)
+	d.popup_centered()
+	e.grab_focus.call_deferred()
+	e.select_all.call_deferred()

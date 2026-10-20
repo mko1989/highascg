@@ -14,6 +14,7 @@ const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
 const ComposeTiles := preload("res://features/live/compose_tiles.gd")
+const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const UI_CFG := "user://ui.cfg"
 
 var _video: TextureRect
@@ -26,6 +27,7 @@ var _action: Label
 var osc: Node  # the shell's OscMirror (set before _ready)
 var stage3d: LiveStage3D
 var tiles: ComposeTiles  # WO-621 N1: destination window outlines, labels, move / resize
+var shader_live: ShaderLivePanel  # WO-606: replaces the deck while open (web shader-live-overlay)
 var view := "standard"  # WO-621 N6: "standard" (operator picture) | "3d" (the Previs stage)
 var _view_btns := {}
 
@@ -92,6 +94,16 @@ func _ready() -> void:
 	editor.visibility_changed.connect(func() -> void:  # WO-621 N5: an open editor is the only thing at the bottom
 		for c in [_action, bar, deck]:
 			c.visible = not editor.visible)
+	shader_live = ShaderLivePanel.new()
+	shader_live.visible = false
+	shader_live.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	shader_live.take_cb = func() -> Dictionary: return await deck.take_main(0)
+	shader_live.close_requested.connect(func() -> void: toggle_shader_live(false))
+	bottom.add_child(shader_live)
+	shader_live.visibility_changed.connect(func() -> void:
+		inner.visible = not shader_live.visible
+		for c in [_action, bar]:
+			c.visible = not shader_live.visible and not editor.visible)
 	timers = ScreenTimerPanel.new()  # R2: screen timers / border are Inspector pages, not tab panels
 	timers.visible = false
 	add_child(timers)
@@ -114,6 +126,11 @@ func _ready() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
+
+
+## WO-606 — Shader Live on / off (header logo, deck toolbar). `on` null = toggle.
+func toggle_shader_live(on: Variant = null) -> void:
+	shader_live.visible = (not shader_live.visible) if on == null else bool(on)
 
 
 ## WO-621 N6 — Standard / 3D switch over the preview (web previs-pgm-3d.js toggle). Remembered in ui.cfg.
@@ -195,6 +212,11 @@ func _transition_toolbar() -> Control:
 	all.tooltip_text = "Set the default transition on every look (with 2+ mains: the active main's deck)"
 	all.pressed.connect(func() -> void: deck.apply_default_to_all())
 	bar.add_child(all)
+	var shl := Button.new()
+	shl.text = "Shader Live"
+	shl.tooltip_text = "Edit the shaders on air live — every value rides onto the running output (also: click the logo)"
+	shl.pressed.connect(func() -> void: toggle_shader_live(true))
+	bar.add_child(shl)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _sync_default_row())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path == "channelMap":

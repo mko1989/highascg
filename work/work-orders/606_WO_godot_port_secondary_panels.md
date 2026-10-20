@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation + port plan written; nothing implemented. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
+**Status: 🟡 IN PROGRESS (2026-10-20) — Shader Live slice 1 done (node-side working copy + Godot panel); open: PGM stack (10–20), Templates audition, Shader FX modal (GLSL editor). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
 
 # WO-606 — Godot port: Shader Live/FX, timers, CG/lower thirds, LED test/pixel map/fixtures, variables, streaming/recording/inputs
 
@@ -29,6 +29,63 @@ Inventory (Haiku): [`timeline-audio-media-secondary.md` §5–11](../godot-port/
 
 Parity checklists per panel under `work/godot-port/parity/`, owner-ticked.
 
-## What was done / What was VERIFIED
+## Investigation (20.10) — what already exists in Godot
 
-Nothing yet. Haiku inventory only.
+A grep of `godot/client/features` before starting: most rows above were ported under other WOs —
+timers / countdowns (`screen_timer_panel.gd`, `countdown_section.gd`, WO-601), lower thirds
+(`lower_third_section.gd`, `lt_roster_section.gd`), variables (Settings → Variables, WO-608), LED test card
+(WO-629), pixel map / mapping (`mapping_panel.gd`, devices), stream / record / v4l2 / vcam (devices tab).
+Nothing existed for **Shader Live / Shader FX** (the web's `shader-live-editor.js` 492 + controls panel 228 +
+rows / stack / audition + 4 libs ≈ 2.4k LOC). That is this WO's remaining body.
+
+## What was done
+
+### Shader Live, slice 1 (20.10)
+
+Directive D: the web editor kept the working copy in the browser, rewrote GLSL literals and pushed
+`CG UPDATE` through `/api/raw`. Now the node does all of it:
+
+- `src/shaderfx/shader-live-instances.js` — CJS mirror of `client/lib/shader-live-instances.js`: every shader
+  live on any channel from the live scene state, bank B → +100, PRV stays bank A, PGM first; a running playlist
+  on a program channel resolves to the item on air (`ctx.playlistActiveIndices`, the index
+  `GET /api/playlist/state` reports) instead of the client polling it.
+- `src/shaderfx/shader-live-session.js` — one working copy per shader id (an edited copy survives reopen; an
+  unedited one re-reads the library). The scanner / control synthesis are the web's own ESM modules
+  (`shader-controls.js`, `shader-param-scan.js`, `shader-param-naming.js`) loaded by dynamic import — one
+  implementation, no CJS fork. Push = `CG UPDATE` to every live instance with the web's AMCP escaping; a 403
+  (PLAY-hosted html after a MIX hop) re-hosts with `CG ADD` once and retries. `dirty` = edited values differ
+  from the library (reverting the last change clears it — the web kept it set).
+- `src/shaderfx/shader-live-ops.js` — set / macro / reset (one key, one control, all) / preset (apply,
+  original, save, delete) / pin / hide / unhide / label / randomize / wiggle (PRV instances only, ~1.3 s,
+  restore) / save (child `<root>-cN`, never overwrites). Curation persists with the library's pristine source.
+- `src/api/routes-shader-live.js` (one `register` line in the 499-line router): `GET /api/shader-live`,
+  `GET /api/shader-live/shaders/:id`, `POST /api/shader-live/shaders/:id/:op`, `POST /api/shader-live/mixer`
+  (opacity / brightness / saturation / contrast, clamped). Ops serialize per shader.
+- Godot: `features/live/shader_live_panel.gd` (bar: instance picker, ▶ Take = deck PRV→PGM for screen 1,
+  dirty badge, Reset all, Save to library, ✕; presets bar; key controls by section; summary + restore hidden;
+  Caspar-mixer rows; Advanced fold-away built only while open), `shader_live_controls.gd` (widgets — sliders
+  apply on release or 150 ms after a wheel/key burst, colour pickers 250 ms after the last change, toggles,
+  macro rides), `shader_live_model.gd` (pure). Opens from the header logo (web mascot) or the deck toolbar's
+  **Shader Live** button; replaces the deck like the web overlay. `window.prompt` → `pane_kit.prompt`.
+- Smoke `tools/smoke/smoke-wo606-shader-live-server.test.js` (5 tests, store stubbed); Godot
+  `tests/test_shader_live_model.gd`.
+
+## What was VERIFIED
+
+- Smoke: instance resolution (bank B, PRV, playlist on air), literal rewrite + 3 pushes + 403 re-host with the
+  on-air template path, `\\n` escaping, preset save → reset all → apply, curation keeps the pristine source,
+  save → `sh-test-c2`, bad input 400, wiggle without PRV 409. Offline suite 2939 pass; Godot 16344 pass.
+- Box (node + Godot GUI, `--shader-live-id=sh-audio-reactive-galaxy` dev arg: a library shader's view with no
+  live instance, so nothing reached air): logo opens the panel on the Live tab; slider drag → server value
+  15.37 + dirty badge + "Not on air" note; ↺ → back to library; ✎ rename → label persisted; Randomize (7
+  values); + Preset "T1" → Original → T1 → × delete; ✕ hide → "restore 1 hidden" → restore; Advanced (48
+  values, 4 groups); ★ pin (dissolves the 2-member Speed macro, as on the web); Save → child c2 created;
+  Reset all → 0 changed; ≋ wiggle → "Load this shader on preview first"; ✕ → deck back. Library files restored
+  byte-identical and the child deleted afterwards.
+
+## Open
+
+- **Never driven against a shader on air** — no shader live on the box, GPU CEF off, PGM/PRV off limits
+  (owner check in `work/checklist20.10.26_owner_checks.md`).
+- PGM stack column (layers 10–20, `/api/shader-stack` — server exists), Templates audition while open
+  (`shader-live-audition.js`), Shader FX modal (GLSL `CodeEdit`, Shadertoy import, preview via PRV).

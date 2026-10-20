@@ -215,6 +215,21 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	return card
 
 
+## WO-606 — Shader Live's ▶ (web #shl-take clicked the deck's take): the look on `main`'s PRV → PGM.
+func take_main(main := 0) -> Dictionary:
+	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
+	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
+	var known := {}
+	for s in ps.get("scenes", []):
+		if s is Dictionary:
+			known[str((s as Dictionary).get("id", ""))] = true
+	var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
+	if str(bus.get("prv", "")) == "":
+		return {"ok": false, "error": "no look on PRV"}
+	return await request_take(str(bus.prv), main, "program")
+
+
 ## WO-598 C1: click = stage on PRV, double-click = take to PGM — server builds the payload
 ## (POST /api/scene/take-look); the deck re-highlights from the scene.live broadcast that follows.
 func _on_card_input(event: InputEvent, scene_id: String, main: int) -> void:

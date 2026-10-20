@@ -30,6 +30,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       Install driver were not pressed. Also say if System time belongs below the hardware list (web order).
 - [ ] **WO-608** — Settings → Live audio: Save config / Apply PLAY + PGM routes not pressed (0 live-audio slots on
       the box); with a slot configured, check the status line now names its channel (WO-611 #8).
+- [ ] **WO-606** — Shader Live (logo click or deck toolbar → Shader Live): never tried on air — this box has no
+      shader live and GPU CEF is off, and PGM/PRV were off limits. Take a shader look to PRV, then ride a slider,
+      ≋ wiggle, a preset, Randomize, ▶ Take, and a playlist hop (the picker should follow the layer). Say if the
+      logo should only open it while GPU CEF is on (the web's bunny-with-shades rule).
 - [ ] **WO-628** — dock: bottom-centre, hides itself; reveal after 0.4 s of hover, hide 1 s after leaving. Too
       eager or too slow?
 - [ ] **WO-629** — header "Test card" master on/off and the Test card… dialog on a real LED wall (pattern,

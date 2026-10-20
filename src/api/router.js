@@ -486,6 +486,7 @@ routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.h
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
 require('./routes-stage-mvr').register(routes) // WO-612 MVR import (/api/stage/mvr)
+require('./routes-shader-live').register(routes) // WO-606 Shader Live (/api/shader-live)
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 
 module.exports = {
