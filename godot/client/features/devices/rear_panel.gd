@@ -207,7 +207,7 @@ func _extra_slot(s: Dictionary) -> Control:
 		v.add_child(_small("—", ThemeBuilder.TEXT_MUTED))
 	for it in s.items:
 		var h := HBoxContainer.new()
-		var p := PortIcon.make(ICON.get(s.kind, "jack-svg"), Vector2(30, 24), "%s (%s)" % [it.label, it.id])
+		var p := PortIcon.make(ICON.get(s.kind, "jack-svg"), Vector2(40, 40), "%s (%s)" % [it.label, it.id])
 		p.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		_icons[str(it.id)] = p
 		_dot(p, str(it.id))

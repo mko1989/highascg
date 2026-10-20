@@ -1498,6 +1498,10 @@ and finish only from the dots", then "the dots should be in the middle of the co
     panels did not move. A background click cancelled it ("Cable mode cancelled").
 - Not exercised: completing a cable dot-to-dot on the box. The gesture keys are unchanged, so this is the slice 2
   path, but it writes config, so it is left to owner QA.
+- Follow-up (owner: "the audio, record etc icons needs to be bigger, because now its just the dot"): the
+  Stream / Virtual cam / Record / Audio sockets went from 30×24 to 40×40, so the dot sits inside a visible socket.
+  On the box a click on the Rec1 socket edge opened Rec1, a click on its centre armed a cable, and the config md5
+  was unchanged.
 - Noticed, not changed: right after arming, before the first mouse motion, the ghost line runs from the
   window's top-left (pre-existing).
 
