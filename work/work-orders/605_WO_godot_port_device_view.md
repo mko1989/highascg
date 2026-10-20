@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Next: slice 4 GPU / modeline. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Next: slice 5 DeckLink connector page. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -345,3 +345,74 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   0 SCRIPT ERROR in the GUI log; every `config/*.json` byte-identical to the backup afterwards.
 - Not exercised live: NDI, browser-source, DeckLink, live-audio and V4L2 role pages (no such inputs on the dev box) —
   golden-tested only; owner QA on the production box.
+
+## Slice 4 — GPU outputs + video modeline (2026-10-20, DONE)
+
+### Investigation
+- The web opens a `gpu_out` connector in the Inspector through `device-view-selection.js` → `renderConnectorInspector`
+  with `connectorById(lastPayload, id)` (graph connectors first, so no `gpuPhysical` — `cable_rules.connector_by_id`
+  already ports that). The page is `buildGpuInspectorSummaryRows` + `renderGpuOutControls`
+  (`device-view-inspector-gpu.js`, 474 lines) + `populateGpuVideoModelineSection` (`-video-modeline.js`, 475) with its
+  `-os-settings.js` / `-preview.js` helpers, `-gpu-resolve.js`, `lib/edid-preferred-mode.js`, the mode tables in
+  `device-view-destinations-inspector-modes.js` and `lib/screen-consumer-defaults.js`.
+- Key routing: video-mode keys use the Caspar screen the jack is bound to (`screen_N_mode`, `_custom_*`); consumer and
+  OS keys use the rear port (`gpu_pN` → N+1). A multiview-bound jack shares `multiview_always_on_top` /
+  `multiview_interactive`. Opening a port whose consumer keys were never written fires a seed POST then `load()`.
+- Golden surface: the generator (scratchpad `gpu_output_golden.mjs`, DOM shim from slice 3c plus `createTextNode`,
+  CSS-string `style`, select value reset on `innerHTML`) renders the real web page for 9 cases (live P3 PGM, live P1
+  operator GUI, disconnected P0, P2 multiview unseeded, EDID native not in the RandR list, saved OS EDID mode, saved
+  bare OS mode, P9 with no display, P1 with top-level OS keys) and fires ~40 edits, recording every request, the status
+  line, all control values and the preview text (fake preview reply; the timings are the server's).
+- Findings in the WEB code, ported as-is (owner decision whether to fix):
+  1. **EDID override is never saved** — `saveCasparSettings` has no `screen_N_edid_override` key (the field only reads it).
+  2. **GET /api/settings omits `screen_N_os_timing_source` / `_os_mode_source`** (`src/api/settings-get.js:62`
+     hand-lists the OS keys) although POST stores them in `config/general.json` — so the timing select and the Custom
+     pick reopen as CVT / list mode in both clients after a save.
+  3. **Reset leaves the OS keys** — it nulls `screen_N_os_*` / `system_id` under `casparServer`, but those are stored
+     top-level (`settings-os.js`), so they survive. Reset also nulls the *shared* `screen_1_mode` when the jack is on
+     Caspar screen 1 (by design in the web, but worth knowing: it touches the PGM screen's mode).
+  4. Unticking Operator monitor / editing custom W/H/FPS posts the same body 2–3 times (two listeners); harmless, not ported.
+
+### What was done
+- `gpu_modeline_model.gd` (412, pure): JS-number helpers, mode aliases / normalisation / dimension matching,
+  `os_mode_and_rate`, `screen_os_dims`, detected-mode options (`format_mode_option`, `unique_modes`, `display_options`),
+  EDID preferred parse / selectability, `mode_from_display`, `resolve_video_mode`, sibling ports, cable-fed resolution,
+  `state()` (everything the controls start as), `os_resolution` / `os_fields` / `per_port_os_patch`.
+- `gpu_modeline_preview.gd` (85, pure): `preview_dims`, `preview_query`, `timing_label`, `preview_lines` (thousands
+  separators, ≈ refresh). Timings stay server-side (`GET /api/hardware/modeline-preview`).
+- `gpu_output_model.gd` (280, pure): `detected_display`, `is_multiview_bound`, `summary_rows` (NBSP like the web),
+  `physical_mode`, `mode_options`, `consumer_state` (indices, seed patch, every toggle), `caspar_patch`, `os_patch`,
+  `save_status`, `reset_patch`, `confine_patch`, `physical_line`.
+- `gpu_output_ui.gd` (75, pure): the page's control values as one dict + `apply(ui, field, value)` → effects
+  (`caspar` / `os` / `confine` / `preview`), Fullscreen ⇄ Windowed mirroring, Operator monitor ⇒ Interactive, Custom
+  prefill from the last standard mode. The controller only mirrors widgets, so the replay test covers the page logic.
+- `gpu_output_controls.gd` (363, Api / Settings — not under the unit runner): builds the page in web order (title,
+  summary grid, toggle row + confine select, Video Mode + custom row, EDID headline / detected modes / OS custom row /
+  Override, timing select + tier + preview debounced 280 ms with a stale-reply guard, advanced block, Reset with confirm).
+  Saves are serialised per kind and built at send time (a burst ends with the newest body); success → status
+  (caspar / confine), `dirty` → the tab's Apply button, then `Settings.load_from_server()`; seed and Reset reload the tab.
+  Rebuilds on every tab reload keep the focused field and the advanced open state.
+- `devices_tab.gd` / `rear_panel.gd`: a GPU port's row label opens the page (hit-tested in the tab's `_input` before the
+  cables, which hang over the labels — a `gui_input` handler never saw the click); a destination's mapped-output link
+  (`focus_connector`) opens it for `gpu_out`; the GPU page and a destination page exclude each other; the page follows
+  reloads or closes when the connector is gone. The socket dot keeps its cable gesture (web: body = inspector, dot = cable).
+- Not ported: the layout editor (web edit mode only — Godot has no edit mode yet).
+
+### What was VERIFIED
+- `tests/test_devices_gpu_output.gd` + `tests/golden/devices_gpu_output.json` (fixtures = live device-view / settings
+  captures, per-case mutations as data ops): summary rows, every select's options, all starting control values / rows /
+  notes, the seed + first preview GET, then each web edit replayed through `gpu_output_ui.apply` — effects, every POST
+  body (consumer, OS, confine, reset), preview GET + preview text, status line, and all control values afterwards.
+  Godot `--test` 5113 / 5113 (2911 + 2202 new), `--check` boot OK, 0 files over 500 lines.
+- Box GUI (`./run-client.sh --screen=0 --tab=4`, `config/` copied + md5-listed first): label "DP 6/7 · DP-6" → page P3
+  matches the web's start state (DP-6, P80 / 16843009, Windowed + Always on top, 1080p5000, 1920x1080 @ 50 Hz, CVT
+  preview from the server 141.5 MHz, tier SL; notes "Caspar screen 1 — shared with gpu_p0, gpu_p1, gpu_p2" and the
+  cable feed). V-sync on/off → `screen_4_vsync` true/false on the server, status "GPU port 4 (Caspar screen 1) saved",
+  Apply button restart-dirty. Timing → GTF: preview re-fetched (141.45 MHz, −HSync +Vsync), `general.json` got
+  `screen_4_os_timing_source: "gtf"`, `system_id: "DP-6"`. Screen name "Test" + Enter → `screen_4_name: "Test"`.
+  Reset → dialog "Are you sure you want to reset all settings for GPU port 4?" → keys nulled, status "Settings for GPU
+  port 4 cleared", page reloaded. P1 page: DP-2, Windowed + Operator monitor + Interactive, port 2 / screen 1. Main LED
+  card → mapped output "P3" opens the GPU page. Afterwards `caspar_server.json` / `general.json` restored from the copy +
+  node restart → every `config/*.json` byte-identical, server reads the original values; 0 SCRIPT ERROR in the GUI log.
+- Not exercised live: multiview-bound jack (seed + shared keys), the EDID-native-unselectable and no-display paths, the
+  NVIDIA backend — golden-tested only.

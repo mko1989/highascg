@@ -8,6 +8,8 @@ extends MarginContainer
 ## ends lifts that end to move it; Esc / empty space cancels; Ctrl+Z undoes. cable_gesture.gd does the writes.
 ## Slice 3: the left column is destinations_panel.gd — add / edit / remove destinations through the Inspector, plus
 ## the input & host channel cards. A selected cable and a selected destination exclude each other.
+## Slice 4: a GPU port's row label (or a destination's mapped GPU output) opens gpu_output_controls.gd's page in the
+## Inspector; it and a destination page exclude each other.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -19,9 +21,11 @@ const CableModel := preload("res://features/devices/cable_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const DestinationsPanel := preload("res://features/devices/destinations_panel.gd")
 const CableRules := preload("res://features/devices/cable_rules.gd")
+const GpuControls := preload("res://features/devices/gpu_output_controls.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
-var _rear: PanelContainer
+var _rear: RearPanel
 var _list: VBoxContainer
 var _cables: Control
 var _status: Label
@@ -36,6 +40,8 @@ var _bar: Control
 var _cancel_btn: Button
 var _apply_btn: Button
 var _confirm: ConfirmationDialog
+var _gpu: GpuControls
+var _payload := {}  # the merged device-view payload the page was built from
 
 
 func _ready() -> void:
@@ -73,11 +79,21 @@ func _ready() -> void:
 		_gesture.set_dirty(true)
 		refresh())
 	_dests.selected.connect(func(id: String) -> void:
+		if id != "":
+			_close_gpu()
 		if id != "" and _gesture.selected_edge != "":
 			_gesture.selected_edge = ""
 			_sync())
-	# The web opens that connector's inspector (GPU / DeckLink pages — later slices); until then select its cable.
+	_gpu = GpuControls.new()
+	add_child(_gpu)
+	_gpu.status.connect(_set_status)
+	_gpu.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	_gpu.reload.connect(func(_dirty: bool) -> void: refresh())
+	# The web opens that connector's inspector: GPU outputs here; DeckLink (later slice) still selects its cable.
 	_dests.focus_connector.connect(func(id: String) -> void:
+		if not _connector(id).is_empty() and _connector(id).get("kind") == "gpu_out":
+			_open_gpu(id)
+			return
 		for e in CableRules.a(CableRules.d(_gesture.payload.get("graph")).get("edges")):
 			if e is Dictionary and CableRules.s(e.get("sinkId")) == id:
 				_gesture.select_edge(CableRules.s(e.get("id")))
@@ -173,6 +189,7 @@ func refresh() -> void:
 
 
 func show_model(m: Dictionary, payload: Dictionary) -> void:
+	_payload = payload
 	var anchors := {}
 	_dests.show_model(m, payload, anchors)
 	_rear.show_slots(m.slots)
@@ -185,7 +202,36 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 		_list.add_child(_cable_row(c))
 	_cables.set_cables(m.cables, anchors)
 	_anchors = anchors
+	if _gpu.conn_id != "":
+		var conn := _connector(_gpu.conn_id)
+		if conn.is_empty():
+			_close_gpu()
+		else:
+			_gpu.show_connector(conn, payload, Settings.settings)
 	_sync()
+
+
+func _connector(id: String) -> Dictionary:
+	return CableRules.connector_by_id(_payload, id)
+
+
+## The GPU-output page for connector `id` in the shared Inspector (a destination page gives way).
+func _open_gpu(id: String) -> void:
+	var conn := _connector(id)
+	if conn.is_empty():
+		return
+	_dests.deselect()
+	_gpu.show_connector(conn, _payload, Settings.settings)
+	if InspectorPanel.current != null:
+		InspectorPanel.current.present(_gpu.page)
+
+
+func _close_gpu() -> void:
+	if _gpu.conn_id == "":
+		return
+	_gpu.close()
+	if InspectorPanel.current != null:
+		InspectorPanel.current.release(_gpu.page)
 
 
 ## Gesture state → port tints, the overlay (selected / held / ghost), the toolbar and the cables list.
@@ -223,7 +269,8 @@ func _set_status(text: String, ok: bool) -> void:
 	_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
 
 
-## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, then a cable selects;
+## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, a GPU row label opens
+## its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _confirm.visible:
@@ -250,6 +297,11 @@ func _input(event: InputEvent) -> void:
 			return
 	if _gesture.armed():
 		_gesture.cancel()
+		return
+	var port := _rear.label_at(pos)
+	if port != "":
+		get_viewport().set_input_as_handled()
+		_open_gpu(port)
 		return
 	var on_ui := _list.get_global_rect().has_point(pos) or _bar.get_global_rect().has_point(pos)
 	var hit: String = _cables.hit(_cables.get_global_transform().affine_inverse() * pos)

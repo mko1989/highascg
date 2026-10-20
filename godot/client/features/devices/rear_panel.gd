@@ -2,6 +2,8 @@ extends PanelContainer
 ## WO-605 slice 1 — the Caspar host's rear panel (web device-view-caspar-render.js, read-only): the GPU and DeckLink
 ## sockets as labelled plates, then the Stream / Virtual cam / Record / Audio outputs. Every socket is a
 ## port_icon.gd registered in `anchors` (connector id → Control) for the cable layer.
+## Slice 4: a GPU port's row label opens its connector page (web: the marker body opens the inspector, the dot
+## cables). Cables hang over the labels, so the tab hit-tests them first (`label_at`) instead of a gui_input handler.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
@@ -11,6 +13,7 @@ const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon"
 	"record_out": "record-port-icon", "audio_out": "jack-svg"}
 
 var anchors := {}
+var _labels := {}  # GPU connector id → its row Label
 
 
 func _ready() -> void:
@@ -23,6 +26,7 @@ func show_slots(slots: Array) -> void:
 		remove_child(c)
 		c.queue_free()
 	anchors = {}
+	_labels = {}
 	var v := VBoxContainer.new()
 	add_child(v)
 	v.add_child(_small("REAR PANEL", ThemeBuilder.TEXT_MUTED))
@@ -71,6 +75,11 @@ func _plate_column(s: Dictionary) -> Control:
 		var l := _row_label(str(it.label))
 		if s.kind == "gpu" and not it.get("connected", false):
 			l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+		if s.kind == "gpu" and it.id != "":
+			l.mouse_filter = Control.MOUSE_FILTER_STOP
+			l.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+			l.tooltip_text = "%s — open in the Inspector" % it.label
+			_labels[str(it.id)] = l
 		labels.add_child(l)
 		var svg: String = ("hdmi-port-icon" if it.get("hdmi", false) else "display-port-icon") if s.kind == "gpu" \
 			else ICON.decklink
@@ -97,6 +106,15 @@ func _extra_slot(s: Dictionary) -> Control:
 		h.add_child(_small(str(it.label), ThemeBuilder.TEXT))
 		v.add_child(h)
 	return v
+
+
+## The GPU connector whose row label is under `pos` (global), else "".
+func label_at(pos: Vector2) -> String:
+	for id in _labels:
+		var l: Label = _labels[id]
+		if is_instance_valid(l) and l.is_visible_in_tree() and l.get_global_rect().has_point(pos):
+			return id
+	return ""
 
 
 func _row_label(text: String) -> Label:
