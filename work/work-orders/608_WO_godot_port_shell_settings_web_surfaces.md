@@ -435,3 +435,31 @@ tailnet) and Cancel puts the checkbox back; confirms focus Cancel. Tab sits betw
 Copy disabled; Advanced boxes match `config`. Unticking Enable → confirm → Cancel → box ticked again, status still
 `connected: true, enabled: true`. NOT pressed: Log in / operator monitor / Log out / Save preferences / Admin
 console / actually turning the service off (owner checklist — would cut remote access).
+
+## 2026-10-20 — Settings → System and DeckLink
+
+**Investigation.** Web `settings-modal-templates.js:204-254`, `settings-modal-mount-hardware.js` (operator display,
+DeckLink list / install / upload, system time WO-193), `settings-modal-mount-hardware-summary.js` (hardware
+sections), `settings-modal.js:207-225` (`/api/system/gui-launch` for firefox / file-manager / desktopvideo_setup /
+desktop_video_updater). `GET /api/system/hardware` takes ~4 s on the box. Disk sizes are lsblk text — the web
+showed "NaN GB" (WO-611 #7, fixed).
+
+**What was done.**
+- `system_model.gd` (pure, tested): bytes / uptime / operator line / hardware sections in the web order / time
+  parse + the web's 24 h normalisation / DeckLink lines / launch note. JSON floats print as integers.
+- `system_pane.gd`: operator display, Open browser / file manager / Refresh, **System time above the hardware
+  list** (the web has it below; the hardware call is slow and long) with a locally ticking server clock, NTP toggle
+  and Set time (validation first, then a confirm with Cancel focused), hardware grids last ("Loading hardware…").
+- `decklink_pane.gd`: card list, Refresh, Desktop Video Setup / Updater, driver package upload (FileDialog →
+  streamed multipart, `core/stream_upload.gd`, progress in MB) and Install driver (confirm; enabled only when
+  `vendorAvailable`). All POSTs via `NuclearGate.post`.
+- `pane_kit.gd`: heading / note / button / row / key-value grid / Cancel-focused confirm for these panes.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16273/0 (+`test_system_model.gd`, 5 tests). System: operator
+line "Operator monitor: DP-2 … Pointer confine: active.", clock ticking "2026-10-20 22:40:19 Etc/UTC (unsynced)",
+NTP unticked (matches `ntp:false`), hardware grids (i7-14700KF / 28 cores, 12.0 GB / 62.6 GB, 953.9G / 1.9T disks,
+RTX PRO 4000, DP-2 ✓ DP-6 ✓, 4 DeckLinks, 34 audio devices). Set time "25:00" → "Error: time must be HH:MM[:SS]…";
+"9:05" → confirm "2026-10-20 09:05:00" with Cancel focused → Cancel (clock unchanged). Open file manager →
+thunar on /home/casparcg/highascg/media, "Started: /usr/bin/thunar" (closed after). DeckLink: 4 cards with
+externalRefs, Install enabled; Desktop Video Setup → window opened, "Started: /usr/bin/BlackmagicDesktopVideoSetup"
+(closed after). NOT pressed: NTP toggle, real Set time, Open browser, Updater, Upload, Install driver (checklist).

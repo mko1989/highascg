@@ -26,6 +26,8 @@ Not on this list: anything a session can do alone. The node server has been rest
       Install also not pressed (dev box runs from git).
 - [ ] **WO-608** — Settings → Tailscale: only viewed (and Cancel on "turn off"). Log out / log in / operator-monitor
       login / Save preferences / Admin console not pressed — try when losing remote access briefly is OK.
+- [ ] **WO-608** — Settings → System / DeckLink: NTP toggle, a real Set time, Desktop Video Updater, driver Upload and
+      Install driver were not pressed. Also say if System time belongs below the hardware list (web order).
 - [ ] **WO-628** — dock: bottom-centre, hides itself; reveal after 0.4 s of hover, hide 1 s after leaving. Too
       eager or too slow?
 - [ ] **WO-629** — header "Test card" master on/off and the Test card… dialog on a real LED wall (pattern,

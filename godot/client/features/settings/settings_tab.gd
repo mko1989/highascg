@@ -13,6 +13,8 @@ const FilePick := preload("res://features/devices/file_pick.gd")
 const UpdatesPane := preload("res://features/settings/updates_pane.gd")
 const NuclearPane := preload("res://features/settings/nuclear_pane.gd")
 const TailscalePane := preload("res://features/settings/tailscale_pane.gd")
+const SystemPane := preload("res://features/settings/system_pane.gd")
+const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
 
 signal logs_requested
 
@@ -46,6 +48,8 @@ func _ready() -> void:
 	Panes.companion(_pane("Companion"), _comp_status, _comp_check)
 	Panes.media(_pane("Media / USB"))
 	_pane("Updates").add_child(UpdatesPane.new())
+	_pane("System").add_child(SystemPane.new())
+	_pane("DeckLink").add_child(DecklinkPane.new())
 	_bundle = Button.new()
 	_bundle.text = "Save support bundle…"
 	_bundle.pressed.connect(_save_bundle)
