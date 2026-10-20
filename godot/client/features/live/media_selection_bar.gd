@@ -1,6 +1,7 @@
 extends VBoxContainer
 ## WO-603 slice 2 — the web media selection bar (sources-panel-shell.js `sources-media-selection-bar`): "N selected ·
-## Rename… (slice 3, media_rename_dialog.gd) · Copy to… · Move to… · Delete · Clear", plus "New folder…" under the selected folder. Every action is one server
+## Rename… (slice 3, media_rename_dialog.gd) · Copy to… · Move to… · HAP… (slice 4: media_hap_dialog.gd, job line +
+## Cancel HAP from `media:hap-encode`) · Delete · Clear", plus "New folder…" under the selected folder. Every action is one server
 ## call (media_ops.gd); the folder picker lists the on-disk folders and takes a typed new path.
 
 signal changed  # the library changed on disk → the panel reloads
@@ -9,6 +10,8 @@ signal clear_requested
 const Ops := preload("res://features/live/media_ops.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const RenameDialog := preload("res://features/live/media_rename_dialog.gd")
+const HapDialog := preload("res://features/live/media_hap_dialog.gd")
+const Hap := preload("res://features/live/hap_status.gd")
 
 var ids: Array = []  # selected media ids (files)
 var folder := ""  # the selected folder row ("" = root): New folder… goes under it
@@ -17,6 +20,9 @@ var before_delete: Callable  # stops a running preview of a file about to go
 var _bar: HFlowContainer
 var _count: Label
 var status: Label
+var _hap_cancel: Button
+var _jobs := {}  # jobId → the server's job snapshot (media:hap-encode / GET /api/media/hap-encode)
+var _announced := {}
 
 
 func _ready() -> void:
@@ -28,18 +34,27 @@ func _ready() -> void:
 	_bar.add_child(_button("Rename…", _rename, "Rename the selected files — keeps their numbering; looks, playlists and timelines follow"))
 	_bar.add_child(_button("Copy to…", func() -> void: _pick("copy")))
 	_bar.add_child(_button("Move to…", func() -> void: _pick("move")))
+	_bar.add_child(_button("HAP…", _hap, "Encode the selected clips to HAP (light-CPU playback codec), saved next to the original as _HAP.mov"))
 	_bar.add_child(_button("Delete", _confirm_delete))
 	_bar.add_child(_button("✕", clear_requested.emit, "Clear the selection"))
 	add_child(_bar)
-	var row := HBoxContainer.new()
-	status = Label.new()
-	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status = Label.new()  # its own full-width line: the HAP progress must not be clipped by the buttons
 	status.clip_text = true
 	status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	row.add_child(status)
+	add_child(status)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_END
+	_hap_cancel = _button("Cancel HAP", _cancel_hap, "Cancel the running HAP encode")
+	_hap_cancel.visible = false
+	row.add_child(_hap_cancel)
 	row.add_child(_button("New folder…", _new_folder, "Create a folder under the selected one"))
 	add_child(row)
+	_say("")
 	set_selection([], "")
+	Ws.message.connect(func(type: String, data: Variant) -> void:
+		if type == "media:hap-encode" and data is Dictionary:
+			_on_job(data))
+	_attach_hap()
 
 
 func set_selection(sel: Array, at_folder: String) -> void:
@@ -58,6 +73,7 @@ func _button(text: String, cb: Callable, tip := "") -> Button:
 
 
 func _say(text: String) -> void:
+	status.visible = text != ""
 	status.text = text
 	status.tooltip_text = text
 
@@ -113,6 +129,59 @@ func _rename() -> void:
 		changed.emit())
 	add_child(dlg)
 	dlg.popup_centered()
+
+
+func _hap() -> void:
+	var sel := ids.duplicate()
+	var dlg := HapDialog.new(sel)
+	dlg.encode.connect(func(alpha: bool, hq: bool) -> void:
+		_say("Queueing %s for HAP…" % Ops.plural(sel.size()))
+		var res: Dictionary = await Api.post_json("/api/media/hap-encode", {"ids": sel, "alpha": alpha, "hq": hq})
+		if res.ok and res.data is Dictionary:
+			_on_job(res.data)
+		else:
+			_say("✗ HAP encode failed to start: %s" % res.error))
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+## A relaunched client re-attaches to whatever is still encoding; finished jobs are not re-announced (web attach()).
+func _attach_hap() -> void:
+	var res: Dictionary = await Api.get_json("/api/media/hap-encode")
+	if not res.ok or not (res.data is Dictionary):
+		return
+	for j in res.data.get("jobs", []):
+		if j is Dictionary and j.has("jobId"):
+			if not Hap.job_active(j):
+				_announced[j.jobId] = true
+			_jobs[j.jobId] = j
+	_render_hap()
+
+
+func _on_job(job: Dictionary) -> void:
+	if not job.has("jobId"):
+		return
+	_jobs[job.jobId] = job
+	if not Hap.job_active(job) and not _announced.has(job.jobId):
+		_announced[job.jobId] = true
+		var sum := Hap.finished_summary(job)
+		_say(("✓ " if sum.kind == "ok" else ("✗ " if sum.kind == "error" else "")) + str(sum.text))
+		if int((job.get("counts", {}) as Dictionary).get("done", 0)) > 0:
+			changed.emit()
+	_render_hap()
+
+
+func _render_hap() -> void:
+	var line := Hap.progress_text(_jobs.values())
+	_hap_cancel.visible = line != ""
+	if line != "":
+		_say(line)
+
+
+func _cancel_hap() -> void:
+	for j in _jobs.values():
+		if Hap.job_active(j):
+			Api.post_json("/api/media/hap-encode/cancel", {"jobId": j.jobId})
 
 
 func _confirm_delete() -> void:

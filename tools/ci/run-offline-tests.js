@@ -71,6 +71,7 @@ const FILES = [
 	'tools/smoke/smoke-wo604-input-audio-routing.test.js',
 	'tools/smoke/smoke-wo603-ingest-local.test.js',
 	'tools/smoke/smoke-wo603-multi-rename-plan.test.js',
+	'tools/smoke/smoke-wo603-hap-onair.test.js',
 	'tools/smoke/smoke-wo624-operator-gui-source-cells.test.js',
 	'tools/smoke/smoke-wo624-tracking-pick.test.js',
 	'tools/smoke/smoke-wo624-fixture-calibrate.test.js',

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–3 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node), box-verified; HAP, playlists still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node), box-verified; playlists, multi-drag still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -190,6 +190,48 @@ panel incl. media tree + ingest, 16 / 2,683 LOC).
   - from 3 → `03_/04_Probe Beta`, Rename → renamed on disk, "✓ Renamed 2 files — looks follow", tree refreshed.
   - Probes deleted via the API; config md5 unchanged (bar the boot-time `device_graph.json`).
 
+## Slice 4 (20.10) — HAP encode: options dialog, progress, cancel
+
+### Investigation
+
+- The web encode is already server-side: `POST /api/media/hap-encode/probe`, `POST /api/media/hap-encode` (202, the
+  queue runs ffmpeg), `GET /api/media/hap-encode`, `POST /api/media/hap-encode/cancel`, WS `media:hap-encode`
+  (`src/api/routes-media-hap.js`).
+- The browser held one decision: the on-air warning. `client/components/sources-panel-hap-encode.js:48` passed
+  `isAnythingPlaying(stateStore.getState())` (`client/lib/hap-encode-status.js:17`), which reads the client's copy of
+  the playback matrix. The rest of `hap-encode-status.js` only formats the dialog text and the progress text.
+
+### What was done
+
+- `routes-media-hap.js`: `isAnythingPlaying(ctx)` reads `getMatrixForState(ctx)` (OSC or tracker matrix) on the
+  server; the probe reply adds `onAir`. Under the D directive the decision is made in node, not in a client.
+- Godot `features/live/hap_status.gd`: a GDScript port of the web formatting functions (`format_for`,
+  `modal_warnings`, `job_active`, `progress_text`, `finished_summary`). It is pure text; the GOLD cases come from the
+  web module.
+- `features/live/media_hap_dialog.gd`: file list, Alpha / HAP Q options, the format line and warnings (from the probe
+  reply: no-alpha source, oversize, on-air). Autowrap labels get a min width, and the dialog re-fits after each
+  warning change; otherwise it grows screen-tall.
+- `media_selection_bar.gd`: "HAP…" opens the dialog, Encode posts the job, and the bar follows `media:hap-encode`. It
+  re-attaches to a running job via GET on open. The status line has its own full-width row ("Encoding HAP Q 1/3 ·
+  N%", then the summary), and "Cancel HAP" sits beside "New folder…" while a job is active.
+- `media_rename_dialog.gd`: the same autowrap min-width fix for the error label.
+
+### What was VERIFIED
+
+- Offline:
+  - `smoke-wo603-hap-onair.test.js` 1/1 (curated);
+  - full suite 2847 pass / 1 known fail (smoke-wo577);
+  - Godot `test_hap_status.gd` (GOLD from the web module), total 16009 pass;
+  - eslint, prettier and line-limit checks clean.
+- Box (real GUI, node restarted):
+  - a 2 s and a 40 s 1080p clip → `_HAP.mov`, "✓ HAP: 1 encoded";
+  - a 4K clip as HAP Q → `_HAP.mov`;
+  - three 4K clips with HAP Q ticked: the dialog showed "Format: HAP Q" plus the on-air warning (owner's audio-only
+    look playing), and the bar showed "Encoding HAP Q 1/3 · 0%" unclipped.
+  - "Cancel HAP" → GET shows `cancelled: 3`, finished, no `_HAP` leftovers on disk. The bar shows "HAP: 3 cancelled"
+    and the Cancel button is hidden.
+  - Probes deleted via the API; config md5 unchanged (bar the boot-time `device_graph.json`).
+
 ### Still open
 
-HAP encode options, drag of a multi-selection, playlists footer, remote (HTTP streaming) upload, parity checklist.
+Drag of a multi-selection, playlists footer, remote (HTTP streaming) upload, parity checklist.

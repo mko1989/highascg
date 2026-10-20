@@ -55,6 +55,7 @@ func _init(selected: Array) -> void:
 	_err = Label.new()
 	_err.add_theme_color_override("font_color", BAD)
 	_err.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_err.custom_minimum_size = Vector2(560, 0)  # an autowrap label without a width makes the dialog screen-tall
 	box.add_child(_err)
 	add_child(box)
 	register_text_enter(_title)

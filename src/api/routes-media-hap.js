@@ -36,12 +36,25 @@ async function handleHapEncodeStart(body, ctx) {
 	return reply(202, { ok: true, ...job })
 }
 
+/**
+ * WO-603: the on-air warning's input, decided here (web isAnythingPlaying read the client's copy of the matrix):
+ * anything playing on any channel/layer of the server playback matrix.
+ */
+function isAnythingPlaying(ctx) {
+	try {
+		const matrix = require('../state/playback-tracker').getMatrixForState(ctx) || {}
+		return Object.values(matrix).some((cell) => cell && cell.playing)
+	} catch {
+		return false
+	}
+}
+
 async function handleHapEncodeProbe(body, ctx) {
 	const b = parseBody(body)
 	const ids = readIds(b)
 	if (!ids) return reply(400, { error: 'ids required' })
 	if (ids.length > MAX_IDS) return reply(400, { error: `at most ${MAX_IDS} files per batch` })
-	return reply(200, { ok: true, items: await getQueue(ctx).probeFiles(ids) })
+	return reply(200, { ok: true, items: await getQueue(ctx).probeFiles(ids), onAir: isAnythingPlaying(ctx) })
 }
 
 async function handleHapEncodeState(ctx) {
@@ -55,4 +68,4 @@ async function handleHapEncodeCancel(body, ctx) {
 	return ok ? reply(200, { ok: true }) : reply(404, { error: 'unknown jobId' })
 }
 
-module.exports = { handleHapEncodeStart, handleHapEncodeProbe, handleHapEncodeState, handleHapEncodeCancel }
+module.exports = { isAnythingPlaying, handleHapEncodeStart, handleHapEncodeProbe, handleHapEncodeState, handleHapEncodeCancel }
