@@ -23,6 +23,7 @@ const { listConfiguredLiveAudioSlots, normalizeAlsaCaptureUri } = require('../co
 const { getChannelMap } = require('../config/routing')
 const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const mixerState = require('../audio/mixer-state')
 
 /**
  * Apply an input-strip volume to every live look layer consuming the target via a LAYER route.
@@ -71,6 +72,22 @@ async function fanOutVolumeToRouteConsumers(amcp, channel, layer, b) {
 		}
 	}
 	return applied
+}
+
+/**
+ * MIXER (MASTER)VOLUME for one strip + the layer-route fanout. Shared by /api/audio/volume and the
+ * WO-604 /api/audio/mute action.
+ * @param {object} ctx
+ * @param {{ channel?: unknown, layer?: unknown, master?: boolean, volume?: unknown, duration?: unknown, tween?: unknown, defer?: unknown }} b
+ */
+async function applyVolume(ctx, b) {
+	const channel = b.channel != null ? parseInt(String(b.channel), 10) : 1
+	const amcp = ctx.amcp
+	if (b.master === true) return amcp.mixer.mixerMastervolume(channel, b.volume, b.duration, b.tween, b.defer)
+	const layer = b.layer != null ? parseInt(String(b.layer), 10) : 0
+	const r = await amcp.mixer.mixerVolume(channel, layer, b.volume, b.duration, b.tween, b.defer)
+	const fanout = await fanOutVolumeToRouteConsumers(amcp, channel, layer, b)
+	return fanout.length ? { ...r, fanout } : r
 }
 
 /**
@@ -168,17 +185,11 @@ async function handlePost(path, body, ctx) {
 		if (!b || typeof b !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
-		const channel = b.channel != null ? parseInt(String(b.channel), 10) : 1
-		const amcp = ctx.amcp
 		try {
-			if (b.master === true) {
-				const r = await amcp.mixer.mixerMastervolume(channel, b.volume, b.duration, b.tween, b.defer)
-				return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
-			}
-			const layer = b.layer != null ? parseInt(String(b.layer), 10) : 0
-			const r = await amcp.mixer.mixerVolume(channel, layer, b.volume, b.duration, b.tween, b.defer)
-			const fanout = await fanOutVolumeToRouteConsumers(amcp, channel, layer, b)
-			return { status: 200, headers: JSON_HEADERS, body: jsonBody(fanout.length ? { ...r, fanout } : r) }
+			const r = await applyVolume(ctx, b)
+			// WO-604: a console strip no look owns sends its key — the server keeps the gain.
+			if (mixerState.isMixerKey(b.key)) mixerState.setGain(ctx, b.key, b.volume)
+			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
 		} catch (e) {
 			const msg = e?.message || String(e)
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: msg }) }
@@ -286,7 +297,9 @@ async function handlePost(path, body, ctx) {
 		if (!b || typeof b !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
-		const solos = Array.isArray(b.solos) ? b.solos : [] // [{ channel, layer }]
+		// WO-604: `keys` (console strip keys) → the server keeps the solo set and derives the targets.
+		const keyed = Array.isArray(b.keys)
+		const solos = keyed ? b.keys.filter(mixerState.isMixerKey).map(mixerState.soloKeyToTarget) : Array.isArray(b.solos) ? b.solos : [] // [{ channel, layer }]
 		if (!ctx.amcp) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}
@@ -314,6 +327,7 @@ async function handlePost(path, body, ctx) {
 						await ctx.amcp.clear(monitorCh, l)
 					} catch (_) {}
 				}
+				if (keyed) mixerState.setSolos(ctx, [])
 				return {
 					status: 200,
 					headers: JSON_HEADERS,
@@ -331,6 +345,7 @@ async function handlePost(path, body, ctx) {
 					await ctx.amcp.clear(monitorCh, l)
 				} catch (_) {}
 			}
+			if (keyed) mixerState.setSolos(ctx, b.keys)
 			return {
 				status: 200,
 				headers: JSON_HEADERS,
@@ -438,4 +453,4 @@ async function handlePost(path, body, ctx) {
 	return null
 }
 
-module.exports = { handleGet, handlePost }
+module.exports = { handleGet, handlePost, applyVolume }
