@@ -92,7 +92,7 @@ describe('WO-624 E3 calibration session over the real follow engine', () => {
 		const sent = []
 		const engine = new FollowEngine({ hub, now: () => t.ms, send: (to, pkt) => sent.push(pkt) })
 		// the patch is wrong on purpose: the head really hangs at (3, 5, 7) facing yaw 30
-		engine.configure({ output: { enabled: true }, patch: [{ id: 'fx1', name: 'Spot L', follow: 1, address: 1,
+		engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [{ id: 'fx1', name: 'Spot L', follow: 1, address: 1,
 			dest: '10.0.0.50', pose: { x: 0, y: 0, z: 6, hang: 'truss', yaw: 0 } }] })
 		hub.set({ id: 1, x: 1, y: 1, z: 0 })
 		return { t, hub, engine, sent, cal: createCalibration({ engine, hub }) }
@@ -122,12 +122,12 @@ describe('WO-624 E3 calibration session over the real follow engine', () => {
 		near(res.body.solve.pose.z, 7, 0.1, 'z')
 		// the operator applies a pose with Invert pan flipped: the pairs taken before are re-read mirrored
 		const flipped = JSON.parse(JSON.stringify(r.engine.fixtures[0]))
-		r.engine.configure({ output: { enabled: true }, patch: [{ ...flipped, pan: { ...flipped.pan, invert: true } }] })
+		r.engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [{ ...flipped, pan: { ...flipped.pan, invert: true } }] })
 		const before = res.body.points.map((p) => p.pan)
 		res = r.cal.handle({ action: 'undo', id: 'fx1' })
 		assert.deepEqual(res.body.points.map((p) => p.pan), before.slice(0, 4).map((p) => -p))
 		assert.equal(res.body.solve.flip_pan, true, 'mirrored pairs now ask to flip back')
-		r.engine.configure({ output: { enabled: true }, patch: [flipped] })
+		r.engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [flipped] })
 		r.cal.handle({ action: 'jog', id: 'fx1', pan: pairs(truth).at(-1).pan })
 		r.cal.handle({ action: 'point', id: 'fx1', marker: 2 })
 		res = r.cal.handle({ action: 'jog', id: 'fx1', dpan: 10 })

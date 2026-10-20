@@ -7,6 +7,7 @@ extends VBoxContainer
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
+const FollowOutput := preload("res://features/previs/tracking/follow_output.gd")
 
 ## [label, path, min, max, step]  (path "pan.ch" = data.pan.ch)
 const FIELDS := [["Universe (port-addr)", "universe", 0, 32767, 1], ["Address", "address", 1, 512, 1],
@@ -34,12 +35,15 @@ var _confirm_on: ConfirmationDialog
 var _confirm_del: ConfirmationDialog
 var _form: GridContainer
 var _calib: Calibrate  # WO-624 E3 calibrate_section.gd
+var _output: FollowOutput  # WO-631 PSN / Art-Net choice
+var _pending := {}  # an output change waiting for the "switch while ON" confirmation
+var _confirm_switch: ConfirmationDialog
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
 	_out = CheckButton.new()
-	_out.text = "Art-Net output"
+	_out.text = "Output"
 	_out.toggled.connect(func(on: bool) -> void:
 		_out.set_pressed_no_signal(data.output.enabled)
 		if on:
@@ -47,8 +51,20 @@ func _ready() -> void:
 		else:
 			_set_output(false))
 	add_child(_out)
-	_confirm_on = _dialog("Start Art-Net output? Every patched universe is sent at 44 Hz — channels no fixture uses go out as 0.",
-		func() -> void: _set_output(true))
+	_confirm_on = _dialog("", func() -> void: _set_output(true))
+	_output = FollowOutput.new()
+	_output.edited.connect(func(o: Dictionary) -> void:
+		if data.output.enabled and o.protocol != data.output.protocol:
+			_pending = o
+			_confirm_switch.dialog_text = ("Switch the live output to %s now?" %
+				("PosiStageNet — this box stops sending Art-Net to the heads" if o.protocol == "psn" else
+				"Art-Net — this box starts aiming the patched heads itself"))
+			_confirm_switch.popup_centered()
+			show_output()
+			return
+		_apply_output(o))
+	add_child(_output)
+	_confirm_switch = _dialog("", func() -> void: _apply_output(_pending))
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 120
 	_list.item_selected.connect(func(i: int) -> void:
@@ -120,9 +136,24 @@ func _persist(now := false) -> void:
 	refresh()
 
 
+func _apply_output(o: Dictionary) -> void:
+	data.output.protocol = o.protocol
+	data.output.psn = o.psn
+	_persist(true)
+	_output.poll()
+
+
+func show_output() -> void:
+	_output.show_output(data.output)
+	_confirm_on.dialog_text = ("Start PosiStageNet output? Every marker goes out as a PSN tracker to %s:%d at 60 Hz." %
+		[data.output.psn.group, int(data.output.psn.port)] if data.output.protocol == "psn" else
+		"Start Art-Net output? Every patched universe is sent at 44 Hz — channels no fixture uses go out as 0.")
+
+
 func _set_output(on: bool) -> void:
 	data.output.enabled = on
-	_persist(true)  # the master reaches the engine at once, not after the autosave debounce
+	_persist(true)
+	_output.poll()  # the master reaches the engine at once, not after the autosave debounce
 
 
 func _edit(path: String, v: Variant) -> void:
@@ -171,6 +202,7 @@ func refresh() -> void:
 	if _list == null:
 		return
 	_out.set_pressed_no_signal(data.output.enabled)
+	show_output()
 	_list.clear()
 	for fx in data.patch:
 		var a := aim(fx.id)

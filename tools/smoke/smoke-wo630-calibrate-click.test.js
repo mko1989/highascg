@@ -27,7 +27,7 @@ function rig() {
 	const hub = new MarkerHub({ now: () => t.ms })
 	const engine = new FollowEngine({ hub, now: () => t.ms, send: () => {} })
 	engine.configure({
-		output: { enabled: true },
+		output: { enabled: true, protocol: 'artnet' },
 		patch: [
 			{
 				id: 'fx1',

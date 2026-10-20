@@ -5,7 +5,10 @@
  * CLIENT_OWNED_SLICES): a manual generic moving-head profile per fixture (no GDTF yet — WO-615 T1). The Godot
  * twin is godot/client/features/previs/tracking/follow_model.gd; both normalize the same way.
  *
- *   fixtures: { output: { enabled: false },          ← master; nothing is transmitted while false
+ *   fixtures: { output: { enabled: false,            ← master; nothing is transmitted while false
+ *                         protocol: "psn" | "artnet", ← WO-631: PSN trackers to the console (default) or this box's
+ *                                                       own pan/tilt over Art-Net (the backup)
+ *                         psn: { group, port, iface, system_name, axes "stage" | "y_up" } },
  *     patch: [{ id, name, enabled, protocol: "artnet", universe (Art-Net port-address 0–32767), address 1–512,
  *               dest "a.b.c.d[:port]", pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
  *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left) },
@@ -16,6 +19,8 @@
 const { parseDest, MAX_PORT_ADDRESS } = require('./artdmx')
 
 const DEFAULT_DEST = '255.255.255.255'
+const PROTOCOLS = ['psn', 'artnet']
+const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/
 
 const num = (v, d, lo, hi) => {
 	const n = Number(v)
@@ -71,8 +76,23 @@ function footprint(fx) {
 	return [...new Set(chs)].sort((a, b) => a - b)
 }
 
+/** output.psn → { group (a 224–239 multicast address), port, iface ('' = OS default, else an IPv4), system_name, axes }. */
+function normalizePsn(raw) {
+	const o = raw && typeof raw === 'object' ? raw : {}
+	const g = String(o.group ?? '').trim()
+	const first = Number(g.split('.')[0])
+	const iface = String(o.iface ?? '').trim()
+	return {
+		group: IPV4.test(g) && first >= 224 && first <= 239 ? g : '236.10.10.10',
+		port: int(o.port, 56565, 1, 65535),
+		iface: IPV4.test(iface) ? iface : '',
+		system_name: String(o.system_name ?? '').trim().slice(0, 64) || 'HighAsCG',
+		axes: o.axes === 'y_up' ? 'y_up' : 'stage',
+	}
+}
+
 /**
- * project.fixtures → { enabled, fixtures: [{ …fixture, to, slots: [abs 0-based], problem }] }. A fixture with a
+ * project.fixtures → { enabled, protocol, psn, fixtures: [{ …fixture, to, slots: [abs 0-based], problem }] }. A fixture with a
  * problem (bad dest, past channel 512, overlaps an earlier fixture on the same universe) is never output.
  */
 function normalizePatch(slice) {
@@ -99,7 +119,8 @@ function normalizePatch(slice) {
 		}
 		return fx
 	})
-	return { enabled: s.output?.enabled === true, fixtures }
+	const protocol = PROTOCOLS.includes(s.output?.protocol) ? s.output.protocol : 'psn'
+	return { enabled: s.output?.enabled === true, protocol, psn: normalizePsn(s.output?.psn), fixtures }
 }
 
-module.exports = { DEFAULT_DEST, normalizeFixture, normalizePatch, parseFixed, footprint }
+module.exports = { DEFAULT_DEST, PROTOCOLS, normalizePsn, normalizeFixture, normalizePatch, parseFixed, footprint }

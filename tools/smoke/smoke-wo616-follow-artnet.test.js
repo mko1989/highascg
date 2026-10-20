@@ -78,7 +78,7 @@ describe('WO-616 T11 follow → Art-Net', () => {
 	})
 
 	it('patch rules: defaults, fixed channels, overlap / bad dest / past 512 are not output', () => {
-		const p = normalizePatch({ output: { enabled: true }, patch: [FX(), FX({ id: 'b', name: 'Spot B', address: 12 }),
+		const p = normalizePatch({ output: { enabled: true, protocol: 'artnet' }, patch: [FX(), FX({ id: 'b', name: 'Spot B', address: 12 }),
 			FX({ id: 'c', dest: 'nowhere' }), FX({ id: 'd', address: 511 }), FX({ id: 'e', universe: 4 })] })
 		assert.equal(p.enabled, true)
 		assert.equal(normalizePatch({}).enabled, false, 'output starts disabled')
@@ -98,7 +98,7 @@ describe('WO-616 T11 follow → Art-Net', () => {
 		eng.configure({ output: { enabled: false }, patch })
 		assert.equal(eng.tick(), 0)
 		assert.equal(sent.length, 0, 'master off: nothing on the wire')
-		eng.configure({ output: { enabled: true }, patch })
+		eng.configure({ output: { enabled: true, protocol: 'artnet' }, patch })
 		assert.equal(eng.tick(), 1)
 		const d = sent[0].d
 		assert.equal(sent[0].to.host, '10.0.0.9')
@@ -118,7 +118,7 @@ describe('WO-616 T11 follow → Art-Net', () => {
 		t += 1000
 		assert.equal(eng.tick(), 1, '1 s refresh')
 		assert.deepEqual([...sent[1].d.data], [...d.data])
-		eng.configure({ output: { enabled: true }, patch: [FX({ dest: '10.0.0.66' })] })
+		eng.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [FX({ dest: '10.0.0.66' })] })
 		assert.equal(eng.status().fixtures[0].state, 'not output')
 		assert.match(eng.status().fixtures[0].problem, /loop into this box/)
 	})

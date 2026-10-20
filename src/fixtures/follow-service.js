@@ -5,11 +5,14 @@
  * `project.fixtures` from the active project (at boot, then on every project write via project-events), Art-Net
  * out through one ephemeral socket. Refuses destinations that would land on this box's own lighting input
  * (src/artnet/lighting-input-receiver.js listens on :6454 for one port-address — the global border).
+ * WO-631: with `output.protocol` "psn" (the default) the markers go out as PosiStageNet trackers instead (psn.js)
+ * and the console aims its own fixtures; "artnet" is the backup where this box drives pan/tilt itself.
  */
 
 const os = require('os')
 const { FollowEngine } = require('./follow-engine')
 const { ArtnetSender, ARTNET_PORT } = require('./artdmx')
+const { PsnSender } = require('./psn')
 const { onProjectChanged } = require('../engine/project-events')
 
 function ipv4ToInt(ip) {
@@ -32,6 +35,15 @@ function localTargets() {
 	return out
 }
 
+/** This box's IPv4 addresses (the PSN interface choices). */
+function ipv4Addresses() {
+	const out = []
+	for (const [name, list] of Object.entries(os.networkInterfaces())) {
+		for (const a of list || []) if ((a.family === 'IPv4' || a.family === 4) && !a.internal) out.push({ name, address: a.address })
+	}
+	return out
+}
+
 /** Port-address the box's Art-Net input listens on, or null when that input is off. */
 function inputPortAddress(ctx) {
 	const dmx = ctx?.config?.dmx || {}
@@ -48,6 +60,7 @@ function inputPortAddress(ctx) {
 function createFollowService(ctx, hub) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
 	const sender = new ArtnetSender({ log })
+	const psn = new PsnSender({ hub, log })
 	let targets = localTargets()
 	const engine = new FollowEngine({
 		hub,
@@ -66,8 +79,9 @@ function createFollowService(ctx, hub) {
 		lastJson = json
 		targets = localTargets()
 		engine.configure(slice)
+		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
 		const ok = engine.fixtures.filter((f) => !f.problem).length
-		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'}`)
+		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol})`)
 		for (const f of engine.fixtures) if (f.problem) log('warn', `[follow] ${f.name}: ${f.problem}`)
 	}
 	try {
@@ -81,17 +95,19 @@ function createFollowService(ctx, hub) {
 	return {
 		engine,
 		sender,
-		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors }),
+		psn,
+		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors, psn: { ...psn.status(), interfaces: ipv4Addresses() } }),
 		/** What clients draw (WS `tracking:follow`): no counters, so it only changes when an aim / state does. */
 		snapshot: () => {
 			const s = engine.status()
-			return { output_enabled: s.output_enabled,
+			return { output_enabled: s.output_enabled, protocol: s.protocol,
 				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem }) => ({ id, state, pan, tilt, problem })) }
 		},
 		stop() {
 			off()
 			engine.stop()
 			sender.close()
+			psn.close()
 		},
 	}
 }

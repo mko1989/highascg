@@ -34,6 +34,7 @@ class FollowEngine {
 		this._isSelfLoop = typeof isSelfLoop === 'function' ? isSelfLoop : () => false
 		this.now = typeof now === 'function' ? now : () => Date.now()
 		this.enabled = false
+		this.protocol = 'psn' // WO-631: Art-Net goes out only while the output is the 'artnet' backup
 		this.fixtures = []
 		this._aim = new Map() // fixture id → { pan, tilt, state }
 		this._hold = new Map() // fixture id → { pan, tilt, until } (WO-624 E3 calibration jog)
@@ -52,6 +53,8 @@ class FollowEngine {
 		}
 		const wasOn = this.enabled
 		this.enabled = p.enabled
+		this.protocol = p.protocol
+		this.psn = p.psn
 		this.fixtures = p.fixtures
 		const live = new Set(p.fixtures.map((f) => f.id))
 		for (const id of [...this._aim.keys()]) if (!live.has(id)) this._aim.delete(id)
@@ -124,7 +127,7 @@ class FollowEngine {
 			}
 			writeFixture(u.buf, fx, next, fx.fixedList)
 		}
-		if (!this.enabled) return 0
+		if (!this.enabled || this.protocol !== 'artnet') return 0
 		let sent = 0
 		for (const u of this._uni.values()) {
 			const same = u.last && Buffer.from(u.buf).equals(u.last)
@@ -143,6 +146,7 @@ class FollowEngine {
 		const now = this.now()
 		return {
 			output_enabled: this.enabled,
+			protocol: this.protocol,
 			tick_hz: Math.round(1000 / TICK_MS),
 			fixtures: this.fixtures.map((fx) => {
 				const a = this._aim.get(fx.id) || { pan: 0, tilt: 0, state: 'centre' }

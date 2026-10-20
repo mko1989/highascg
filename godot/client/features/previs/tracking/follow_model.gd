@@ -2,7 +2,7 @@ extends RefCounted
 ## WO-616 T11 — the follow patch `project.fixtures` (Godot-owned slice; the engine is server-side,
 ## src/fixtures/follow-patch.js normalizes the same way): a manual generic moving-head profile per fixture
 ## (GDTF comes with WO-615 T1), its marker, and the beam the server's aim draws in the camera view.
-##   {output: {enabled}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
+##   {output: {enabled, protocol "psn" | "artnet", psn {group, port, iface, system_name, axes}}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
 ##    invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
 
 const DEFAULT_DEST := "255.255.255.255"
@@ -49,8 +49,25 @@ static func normalize(slice: Variant) -> Dictionary:
 			fx.id += "_"
 		ids[fx.id] = true
 		out.append(fx)
-	var o: Variant = s.get("output")
-	return {"output": {"enabled": o is Dictionary and (o as Dictionary).get("enabled") == true}, "patch": out}
+	var o: Dictionary = s.get("output") if s.get("output") is Dictionary else {}
+	return {"output": {"enabled": o.get("enabled") == true,
+		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn"))}, "patch": out}
+
+
+## WO-631 output.psn — the twin of follow-patch.js normalizePsn (multicast group, port, interface IPv4 or "", name, axes).
+static func normalize_psn(raw: Variant) -> Dictionary:
+	var o: Dictionary = raw if raw is Dictionary else {}
+	var g := str(o.get("group", "")).strip_edges()
+	var first := int(g.get_slice(".", 0)) if g.is_valid_ip_address() and g.count(".") == 3 else 0
+	var iface := str(o.get("iface", "")).strip_edges()
+	var name := str(o.get("system_name", "")).strip_edges().left(64)
+	return {
+		"group": g if first >= 224 and first <= 239 else "236.10.10.10",
+		"port": clampi(int(o.port), 1, 65535) if o.get("port") is int or o.get("port") is float else 56565,
+		"iface": iface if iface.is_valid_ip_address() and iface.count(".") == 3 else "",
+		"system_name": name if name != "" else "HighAsCG",
+		"axes": "y_up" if o.get("axes") == "y_up" else "stage",
+	}
 
 
 ## A new fixture after the last one: same universe / destination, the next free address, the given marker.

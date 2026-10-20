@@ -22,6 +22,20 @@ func test_normalize_defaults_and_ids() -> void:
 	t.eq(p.patch[0].dest, F.DEFAULT_DEST)
 
 
+func test_output_protocol_and_psn() -> void:
+	# WO-631 — same answers as smoke-wo631-psn-output.test.js normalizePsn / normalizePatch.
+	var d := F.normalize({})
+	t.eq(d.output.protocol, "psn", "PSN is the default output")
+	t.eq(d.output.psn, {"group": "236.10.10.10", "port": 56565, "iface": "", "system_name": "HighAsCG", "axes": "stage"})
+	t.eq(F.normalize({"output": {"protocol": "artnet"}}).output.protocol, "artnet")
+	t.eq(F.normalize({"output": {"protocol": "sacn"}}).output.protocol, "psn")
+	t.eq(F.normalize_psn({"group": "10.0.0.1"}).group, "236.10.10.10", "unicast refused")
+	t.eq(F.normalize_psn({"group": "239.1.2.3"}).group, "239.1.2.3")
+	t.eq(F.normalize_psn({"iface": "eth0"}).iface, "")
+	t.eq(F.normalize_psn({"iface": "192.168.1.20", "axes": "y_up", "port": 7000.0}),
+		{"group": "236.10.10.10", "port": 7000, "iface": "192.168.1.20", "system_name": "HighAsCG", "axes": "y_up"})
+
+
 func test_new_fixture_follows_the_last() -> void:
 	var a := F.new_fixture([], 2)
 	t.eq([a.id, a.follow, a.address], ["fx1", 2, 1])
