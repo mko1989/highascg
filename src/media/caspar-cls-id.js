@@ -2,7 +2,7 @@
 
 const fs = require('fs')
 const path = require('path')
-const { canonicalMediaBasenameKey } = require('../utils/media-browser-dedupe')
+const { canonicalMediaBasenameKey, MEDIA_FILE_EXT } = require('../utils/media-browser-dedupe')
 const { resolveSafe } = require('./local-media-paths')
 const {
 	expandMediaIdToMediaRoot,
@@ -13,8 +13,6 @@ const {
 	normalizeMediaIdForProject,
 } = require('./project-media-root')
 
-/** Last-segment extensions Caspar strips from CLS media ids. */
-const MEDIA_FILE_EXT = /\.(mov|qt|mp4|mxf|mkv|avi|webm|m4v|mpg|mpeg|png|jpe?g|tga|gif|bmp|svg|wav|mp3|aac|m4a|flac|ts|m2ts|mts)$/i
 
 /**
  * @param {string} id

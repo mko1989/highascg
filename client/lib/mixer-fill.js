@@ -106,12 +106,16 @@ function stripEncodingTechSuffixFromBasename(base) {
 }
 
 /** Lowercase, strip extension — Caspar AMCP often omits extension vs media list ids. */
+/** WO-625: only a real media extension is stripped — a CLS id has none, and a generic "last dot onward" strip turned
+ * `4. TŁO 4 - DELIKATNE FALE` into `4`. KEEP IN SYNC with src/utils/media-browser-dedupe.js MEDIA_FILE_EXT. */
+const MEDIA_FILE_EXT = /\.(mov|qt|mp4|mxf|mkv|avi|webm|m4v|mpg|mpeg|png|jpe?g|tga|gif|bmp|svg|webp|tiff?|wav|mp3|aac|m4a|flac|ogg|ts|m2ts|mts)$/i
+
 export function normalizeMediaIdForMatch(id) {
 	let base = String(id || '')
 		.toLowerCase()
 		.replace(/\\/g, '/')
 		.replace(/^.*\//, '')
-		.replace(/\.[^./]+$/, '')
+		.replace(MEDIA_FILE_EXT, '')
 		.trim()
 	base = stripEncodingTechSuffixFromBasename(base)
 	return base

@@ -9,6 +9,7 @@
 
 const { parseCinfMedia } = require('../media/cinf-parse')
 const { resolveCasparCinfMediaId } = require('../media/caspar-cls-id')
+const { MEDIA_FILE_EXT } = require('../utils/media-browser-dedupe')
 const { isTemplateClip } = require('../state/playback-tracker-media')
 const { getChannelMap } = require('../config/routing')
 const { getModeDimensions } = require('../config/config-modes')
@@ -38,12 +39,13 @@ function parseResolutionString(s) {
 	return m ? { w: parseInt(m[1], 10) || 0, h: parseInt(m[2], 10) || 0 } : null
 }
 
+/** WO-625: only a real media extension is stripped (a CLS id has none — `4. TŁO …` must not become `4`). */
 function normalizeMediaIdForMatch(id) {
 	return String(id || '')
 		.toLowerCase()
 		.replace(/\\/g, '/')
 		.replace(/^.*\//, '')
-		.replace(/\.[^./]+$/, '')
+		.replace(MEDIA_FILE_EXT, '')
 		.trim()
 }
 

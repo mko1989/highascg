@@ -23,6 +23,14 @@ function stripEncodingTechSuffixVariants(base) {
 }
 
 /**
+ * Last-segment extensions Caspar strips from CLS media ids. Only these count as an extension: a CLS id has none, so a
+ * generic "last dot onward" strip ate numbered / dotted names (WO-625: `4. TŁO 4 - DELIKATNE FALE` → `4`, never
+ * matching its disk row `4. Tło 4 - delikatne fale.mp4` — the take lost the clip's resolution and fell back to 16:9).
+ * KEEP IN SYNC with client/lib/mixer-fill.js MEDIA_FILE_EXT.
+ */
+const MEDIA_FILE_EXT = /\.(mov|qt|mp4|mxf|mkv|avi|webm|m4v|mpg|mpeg|png|jpe?g|tga|gif|bmp|svg|webp|tiff?|wav|mp3|aac|m4a|flac|ogg|ts|m2ts|mts)$/i
+
+/**
  * Lowercase basename without extension — same logical file for Caspar PLAY / ffprobe.
  * @param {string} id
  */
@@ -31,7 +39,7 @@ function canonicalMediaBasenameKey(id) {
 		.toLowerCase()
 		.replace(/\\/g, '/')
 		.replace(/^.*\//, '')
-		.replace(/\.[^./]+$/, '')
+		.replace(MEDIA_FILE_EXT, '')
 		.trim()
 	base = stripEncodingTechSuffixVariants(base)
 	return base
@@ -137,4 +145,4 @@ function dedupeMediaList(media) {
 	return out.sort((a, b) => String(a.id).localeCompare(String(b.id), undefined, { sensitivity: 'base' }))
 }
 
-module.exports = { dedupeMediaList, canonicalMediaBasenameKey, canonicalMediaRowKey }
+module.exports = { dedupeMediaList, canonicalMediaBasenameKey, canonicalMediaRowKey, MEDIA_FILE_EXT }
