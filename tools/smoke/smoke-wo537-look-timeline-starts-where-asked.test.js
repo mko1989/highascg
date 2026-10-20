@@ -75,7 +75,8 @@ describe('WO-537: play(fromMs) honours an explicit restart', () => {
 			const { eng, tl } = pausedAt(12000)
 			const paused = eng.getPlayback().position
 			eng.play(tl.id, 0, opts)
-			assert.equal(eng.getPlayback().position, paused, `opts=${JSON.stringify(opts)} must not restart`)
+			const pos = eng.getPlayback().position // wall clock: within a frame of the paused position, never 0
+			assert.ok(pos >= paused && pos - paused < 40, `opts=${JSON.stringify(opts)} must not restart (${pos} vs ${paused})`)
 			eng.stop(tl.id, { skipAmcp: true })
 		}
 	})
