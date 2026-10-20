@@ -6,8 +6,10 @@ extends Control
 const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Shell := preload("res://app/shell.gd")
+const HardwareReconcile := preload("res://app/hardware_reconcile.gd")
 
 var shell: Shell
+var hw_reconcile: HardwareReconcile  # WO-608: after each project pull (boot / reconnect)
 var boot_log := PackedStringArray()
 
 
@@ -24,6 +26,9 @@ func _ready() -> void:
 	add_child(shell)
 	shell.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_apply_window_args()
+	hw_reconcile = HardwareReconcile.new()
+	hw_reconcile.shell = shell
+	add_child(hw_reconcile)
 	_wire_ws()
 	await bootstrap()
 	Ws.start()
@@ -48,6 +53,10 @@ func _ready() -> void:
 		print("[client] transition ", lt3.deck.set_look_transition(tp[0], {"type": tp[1], "duration": int(tp[2])}))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
+	if Config.args.has("probe-hw-reconcile"):  # dev: the reconcile dialog over a fake foreign-machine report
+		hw_reconcile.run({"prompt": true, "severity": "hard", "sameMachine": false, "projectName": "Probe show",
+			"items": [{"section": "Device graph", "message": "Connector count differs (3 in project vs 1 live).", "severity": "hard"},
+				{"section": "Screen destinations", "message": "Destination count differs (2 saved vs 1 live).", "severity": "soft"}]})
 	if Config.args.has("probe-snapshot-load"):  # dev: the Load device snapshot dialog (its entry is WO-608's)
 		shell.tabs.get_node("Devices").snapshots.open_load()
 	if Config.args.has("probe-edit"):  # dev: --probe-edit=<sceneId> opens the look editor (WO-600 F)
@@ -356,6 +365,7 @@ func bootstrap() -> void:
 	var pr: Dictionary = await Api.get_json("/api/project")
 	if pr.ok:
 		Store.set_project(pr.data)
+		hw_reconcile.check()
 	_log("project %s (%d looks)" % ["ok" if pr.ok else pr.error, look_count()])
 
 
@@ -383,6 +393,7 @@ func _on_ws_connect(_d: Variant) -> void:
 		var pr: Dictionary = await Api.get_json("/api/project")
 		if pr.ok:
 			Store.set_project(pr.data)
+			hw_reconcile.check()
 
 
 func _on_change(d: Variant) -> void:

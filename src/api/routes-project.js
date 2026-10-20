@@ -244,7 +244,7 @@ async function handlePost(requestPath, body, ctx) {
 	if (requestPath === '/api/project/sync') return handleSyncPush(ctx)
 	if (requestPath === '/api/project/diff') return handleManifestDiff(body, ctx)
 	if (requestPath === '/api/project/apply-bundle') return handleApplyBundle(body, ctx)
-	return null
+	return require('./routes-project-hardware').handlePost(requestPath, ctx) // WO-608 hardware-apply
 }
 
 async function handleBundle(ctx) {
@@ -272,7 +272,7 @@ async function handleBundle(ctx) {
 
 async function handleGet(pathStr, query, ctx) {
 	if (pathStr === '/api/project/bundle') return handleBundle(ctx)
-	return null
+	return require('./routes-project-hardware').handleGet(pathStr, ctx) // WO-608 hardware-check
 }
 
 module.exports = { handlePost, handleGet }

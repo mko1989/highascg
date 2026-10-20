@@ -528,3 +528,33 @@ check cells; Import / Safely eject as dialog buttons). Media "+" → **Import fr
 box: the dialog shows the empty hint and "No USB / removable volume detected"; Import → "Select a drive first";
 ↻ re-reads; Close. Browse / Import / Cancel / Eject against a real drive are an owner check (checklist).
 
+## 2026-10-20 — Project hardware reconcile (port plan step 3, project part)
+
+**Investigation.** Web `project-import-flow.js`: the reconcile modal only appears on the server bootstrap /
+reconnect import (the header Load and Load-from-file paths import looks only; the server's `POST /api/project/load
+{applyHardware}` restores Device View, which Godot's header Load already sends). It asks when the saved
+`hardwareConfig` differs (`project-hardware-mismatch.js`, three live reads) unless it is the same machine or only
+soft OS-layout / Caspar-mode drift; a remembered policy (localStorage) can answer instead — `apply_saved` never
+auto-applies a hard mismatch. Apply = three client calls (`/api/project/apply-hardware`, `/api/settings/apply-os`,
+`/api/caspar-config/apply`). Web quirk: the remember picker always has a value ("Ask every time"), so remembering
+Apply / Keep stored "ask" — the `else if (choice…)` branch is unreachable.
+
+**What was done.** Node (directive D): `src/api/routes-project-hardware.js` — `GET /api/project/hardware-check`
+runs the web's pure mismatch lib (dynamic import) against the three live routes in-process and returns the report
++ `prompt` (the boot rule); `POST /api/project/hardware-apply` runs the three apply steps server-side →
+`{steps, warnings}`. Hooked through the `routes-project.js` wildcard (router.js stays at 499 lines). Godot:
+`app/hardware_reconcile_model.gd` (decide / lead / diff lines ≤ 12 + "…and N more" / remembered policy / apply
+notice) and `app/hardware_reconcile.gd` (check after each project pull — boot and WS reconnect; policy in ui.cfg
+`[project] hardware_policy`; dialog: Load device snapshot… / Open Device View / Keep live hardware / Apply
+project hardware; Keep / Device View leave a sticky header notice, the web banner). Remembering takes the pressed
+choice unless a non-"ask" policy is picked (fixes the web quirk above). Dev arg `--probe-hw-reconcile` shows the
+dialog over a fake foreign-machine report.
+
+**What was VERIFIED (box, 20.10).** Smoke `smoke-wo608-hardware-check.test.js` 4/4 (boot rule; no-hardware;
+3-vs-1 connectors on another hardwareId → hard + prompt, same hardwareId → no prompt; route dispatch + 400).
+Godot tests 16401/0 (+`test_hardware_reconcile_model.gd`). Live `GET /api/project/hardware-check` → `severity none,
+sameMachine true, prompt false` — a normal boot shows no dialog (0 script errors). Probe: dialog with the red hard
+and amber soft lines; Remember shows / hides the policy picker; Open Device View → Devices tab + "Live routing kept
+— check Devices" notice, no policy written to ui.cfg; Load device snapshot… → Devices + the snapshot Load dialog
+(Cancelled). NOT pressed: Apply project hardware (rewrites routing / OS layout / Caspar config) — checklist.
+
