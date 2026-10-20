@@ -69,3 +69,13 @@ static func _num(v: Variant) -> String:
 static func _int_or(v: Variant, fallback: int) -> int:
 	var n := int(v) if (v is int or v is float or (v is String and (v as String).is_valid_int())) else 0
 	return n if n != 0 else fallback
+
+
+## `Content-Disposition: attachment; filename="x.zip"` among raw response headers → "x.zip" (else `fallback`).
+static func attachment_name(headers: PackedStringArray, fallback: String) -> String:
+	for h in headers:
+		if h.to_lower().begins_with("content-disposition:"):
+			var m := RegEx.create_from_string("filename=\"?([^\";]+)\"?").search(h)
+			if m != null:
+				return m.get_string(1).get_file()
+	return fallback

@@ -10,8 +10,8 @@ class _Wait:
 	signal done(path: String)
 
 
-static func save_path(host: Node, title: String, file_name: String) -> String:
-	return await _run(host, FileDialog.FILE_MODE_SAVE_FILE, title, file_name)
+static func save_path(host: Node, title: String, file_name: String, filters := [JSON_FILTER]) -> String:
+	return await _run(host, FileDialog.FILE_MODE_SAVE_FILE, title, file_name, filters)
 
 
 static func open_path(host: Node, title: String, filters := [JSON_FILTER]) -> String:
@@ -37,6 +37,16 @@ static func _run(host: Node, mode: FileDialog.FileMode, title: String, file_name
 	var path: String = await w.done
 	dlg.queue_free()
 	return path
+
+
+## Write `bytes` to `path`; "" on success, else the reason.
+static func write_bytes(path: String, bytes: PackedByteArray) -> String:
+	var f := FileAccess.open(path, FileAccess.WRITE)
+	if f == null:
+		return "cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())]
+	f.store_buffer(bytes)
+	f.close()
+	return ""
 
 
 ## Write `text` to `path`; "" on success, else the reason.

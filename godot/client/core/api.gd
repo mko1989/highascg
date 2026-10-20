@@ -57,7 +57,7 @@ func request(method: int, path: String, body: Variant) -> Dictionary:
 	return NetUtil.parse_response(res[0], res[1], res[3])
 
 
-## Binary GET (models, thumbnails): { ok, status, bytes, error }.
+## Binary GET (models, thumbnails, support bundle): { ok, status, bytes, headers, error }.
 func get_bytes(path: String) -> Dictionary:
 	while _free.is_empty():
 		await _slot_freed
@@ -65,12 +65,12 @@ func get_bytes(path: String) -> Dictionary:
 	var err := r.request(Config.origin + path)
 	if err != OK:
 		_release(r)
-		return {"ok": false, "status": 0, "bytes": PackedByteArray(), "error": error_string(err)}
+		return {"ok": false, "status": 0, "bytes": PackedByteArray(), "headers": PackedStringArray(), "error": error_string(err)}
 	var res: Array = await r.request_completed
 	_release(r)
 	var status: int = res[1]
 	var ok: bool = res[0] == HTTPRequest.RESULT_SUCCESS and status >= 200 and status < 300
-	return {"ok": ok, "status": status, "bytes": res[3], "error": "" if ok else "HTTP %d" % status}
+	return {"ok": ok, "status": status, "bytes": res[3], "headers": res[2], "error": "" if ok else "HTTP %d" % status}
 
 
 func _release(r: HTTPRequest) -> void:

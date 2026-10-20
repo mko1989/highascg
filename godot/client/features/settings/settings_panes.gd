@@ -107,3 +107,19 @@ static func about(f: Form, a: Dictionary, error := "") -> void:
 			f.heading(r[1])
 		else:
 			f.note(r[1])
+
+
+## Web settings-modal-diagnostics.js — support bundle (GET /api/support/bundle) + the logs window.
+static func diagnostics(f: Form, bundle: Button, logs: Button, status: Label) -> void:
+	f.heading("Diagnostics & support")
+	f.note("A ZIP with redacted config, Caspar XML, project summary, system inventory, GPU / xrandr layout and recent "
+		+ "HighAsCG + Caspar log tails (highascg-support_<hostname>_<timestamp>.zip). Use after a failure or before "
+		+ "contacting support.")
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	row.add_child(bundle)
+	row.add_child(logs)
+	f.add_child(row)
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	f.add_child(status)
+	f.note("The logs window also opens from the connection eyes (top right).")

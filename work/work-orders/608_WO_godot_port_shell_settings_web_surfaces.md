@@ -195,7 +195,7 @@ Verified (box, 19.10):
 - Every touched slice was compared with the pre-test snapshot. It matches, except `ui.json` now carries an explicit
   `invertTouchpadScroll: false`, plus the WO-619 side notes (`screen_count`, `osc.wsDeltaBroadcast`).
 
-Not ported yet (next slices): updates, system (hardware / mounts), decklink, diagnostics, Tailscale, live audio (+ ALSA
+Not ported yet (next slices): updates, system (hardware / mounts), decklink, Tailscale, live audio (+ ALSA
 mixer), variables, nuclear (password + restart / reboot / Caspar actions); the media pane's exFAT sync table; the
 web's WebCodecs warning for the stream preview mode (irrelevant here). The Godot client does not yet honour
 `ui.invertTouchpadScroll` (its zoom / pan controls); the setting is kept for the browser client.
@@ -359,3 +359,14 @@ Owner: logs were the next named slice after the header. Web: `client/components/
 `[debug]` WS lines; a second WS client connecting → its `[WS] client connected` lines arrived live; AMCP `VERSION`
 → `<< 2.5.1 886998cc1 Stable` under the input and the command in the Caspar tail; Categories menu shows 13/14
 with Debug off; a second eye click closes the window. Godot tests 16209 pass.
+
+## 2026-10-20 — Settings → Diagnostics
+
+Web `settings-modal-diagnostics.js`. **Settings → Diagnostics**: "Save support bundle…" (`GET /api/support/bundle`;
+the server's `Content-Disposition` filename is offered in a Save dialog — `Api.get_bytes` now returns the response
+headers, `settings_model.attachment_name` strips any path parts; `file_pick.gd` gained `write_bytes` and a filter
+argument on `save_path`) and "Open server logs" (the logs window above).
+
+**VERIFIED (box, 20.10):** Save → the dialog offered `highascg-support_highascg7580_2026-10-20T22-20-21-753Z.zip`;
+saved 469 KB, `unzip -l` lists the 12 members; status line "Saved … (469 KB)"; "Open server logs" opens the logs
+window. Godot tests 16213 pass.

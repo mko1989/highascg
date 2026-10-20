@@ -9,6 +9,9 @@ const Panes := preload("res://features/settings/settings_panes.gd")
 const M := preload("res://features/settings/settings_model.gd")
 const SendTo := preload("res://features/timeline/timeline_send_to.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const FilePick := preload("res://features/devices/file_pick.gd")
+
+signal logs_requested
 
 var _tabs: TabContainer
 var _forms: Array[Form] = []
@@ -16,6 +19,8 @@ var _status: Label
 var _comp_status: Label
 var _comp_check: Button
 var _about: Form
+var _bundle: Button
+var _bundle_status: Label
 
 
 func _ready() -> void:
@@ -37,6 +42,14 @@ func _ready() -> void:
 	_comp_check.pressed.connect(_check_companion)
 	Panes.companion(_pane("Companion"), _comp_status, _comp_check)
 	Panes.media(_pane("Media / USB"))
+	_bundle = Button.new()
+	_bundle.text = "Save support bundle…"
+	_bundle.pressed.connect(_save_bundle)
+	var logs := Button.new()
+	logs.text = "Open server logs"
+	logs.pressed.connect(logs_requested.emit)
+	_bundle_status = Label.new()
+	Panes.diagnostics(_pane("Diagnostics"), _bundle, logs, _bundle_status)
 	_about = _pane("About")
 	Panes.about(_about, {})
 	_tabs.tab_changed.connect(func(i: int) -> void:
@@ -107,3 +120,21 @@ func _check_companion() -> void:
 func _load_about() -> void:
 	var r: Dictionary = await Api.get_json("/api/about")
 	Panes.about(_about, r.data if r.ok and r.data is Dictionary else {}, "" if r.ok else str(r.error))
+
+
+func _save_bundle() -> void:
+	_bundle.disabled = true
+	_bundle_status.text = "Building support bundle…"
+	var r: Dictionary = await Api.get_bytes("/api/support/bundle")
+	if not r.ok:
+		_bundle.disabled = false
+		_bundle_status.text = "Support bundle failed: %s" % str(r.error)
+		return
+	var name := M.attachment_name(r.headers, "highascg-support.zip")
+	var path: String = await FilePick.save_path(self, "Save the support bundle", name, ["*.zip ; ZIP"])
+	_bundle.disabled = false
+	if path == "":
+		_bundle_status.text = "Not saved."
+		return
+	var err := FilePick.write_bytes(path, r.bytes)
+	_bundle_status.text = err if err != "" else "Saved %s (%d KB)." % [path, r.bytes.size() / 1024]

@@ -49,3 +49,11 @@ func test_companion_status() -> void:
 	t.eq(M.companion_query({}), "host=127.0.0.1&port=8000&satelliteEnabled=1&satellitePort=16622", "web defaults")
 	t.eq(M.companion_query({"host": " a b ", "port": "9000", "satelliteEnabled": false, "satelliteHost": "s"}),
 		"host=a%20b&port=9000&satelliteEnabled=0&satellitePort=16622&satelliteHost=s")
+
+
+func test_attachment_name() -> void:
+	var h := PackedStringArray(["Content-Type: application/zip", 'Content-Disposition: attachment; filename="highascg-support_box_2026.zip"'])
+	t.eq(M.attachment_name(h, "x.zip"), "highascg-support_box_2026.zip")
+	t.eq(M.attachment_name(PackedStringArray(["content-disposition: attachment; filename=a.zip"]), "x.zip"), "a.zip")
+	t.eq(M.attachment_name(PackedStringArray(['Content-Disposition: attachment; filename="../../etc/p.zip"']), "x.zip"), "p.zip", "no path parts")
+	t.eq(M.attachment_name(PackedStringArray(), "x.zip"), "x.zip")

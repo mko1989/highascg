@@ -82,6 +82,7 @@ func _ready() -> void:
 	sources.tab_requested.connect(func(n: String) -> void: tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node(n.capitalize())))
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
+	settings.logs_requested.connect(_open_logs)
 	tabs.add_child(settings)
 	if Config.args.has("tab"):
 		tabs.current_tab = clampi(int(Config.args["tab"]), 0, tabs.get_tab_count() - 1)
