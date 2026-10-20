@@ -9,6 +9,8 @@ extends VBoxContainer
 ## DeckLink / audio / USB inputs, saved live sources, all draggable onto the look editor). A DeckLink dropped on the
 ## Media tree switches to Live, which maps it and highlights the new source; the signals are Live's, re-emitted for
 ## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
+## WO-623 C: the owner's four tabs — Media, Templates (Caspar TLS; shaders show their library name), Live, Timelines (this
+## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -19,6 +21,8 @@ const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const LivePanel := preload("res://features/live/live_sources_panel.gd")
+const ListPanel := preload("res://features/live/source_list_panel.gd")
+const Lists := preload("res://features/live/source_lists_model.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -28,6 +32,10 @@ var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
 var _tabs: TabContainer
 var live: LivePanel
+var templates: ListPanel
+var timelines: ListPanel
+var _tls: Array = []  # GET /api/templates
+var _shader_names := {}
 
 
 func _ready() -> void:
@@ -41,7 +49,7 @@ func _ready() -> void:
 	var refresh := Button.new()
 	refresh.text = "↻"
 	refresh.tooltip_text = "Reload the list"
-	refresh.pressed.connect(func() -> void: load_media() if _tabs.current_tab == 0 else live.reload())
+	refresh.pressed.connect(_reload_current)
 	head.add_child(refresh)
 	add_child(head)
 	_tabs = TabContainer.new()
@@ -51,9 +59,27 @@ func _ready() -> void:
 	media.name = "Media"
 	media.add_theme_constant_override("separation", 4)
 	_tabs.add_child(media)
+	templates = ListPanel.new()
+	templates.name = "Templates"
+	templates.empty_text = "No templates (↻ re-reads Caspar TLS)"
+	templates.provider = func(f: String) -> Array: return Lists.template_rows(_tls, _shader_names, f)
+	_tabs.add_child(templates)
 	live = LivePanel.new()
 	live.name = "Live"
 	_tabs.add_child(live)
+	timelines = ListPanel.new()
+	timelines.name = "Timelines"
+	timelines.empty_text = "No timelines in this project (Timeline tab → New)"
+	timelines.provider = func(f: String) -> Array:
+		var tl: Variant = Store.project.get("timelines")
+		return Lists.timeline_rows((tl as Dictionary).get("timelines", []) if tl is Dictionary else [], f)
+	_tabs.add_child(timelines)
+	Store.project_changed.connect(func(_p: Dictionary) -> void: timelines.rebuild())
+	_tabs.tab_changed.connect(func(_i: int) -> void:
+		if _tabs.get_current_tab_control() == timelines:
+			timelines.rebuild()
+		elif _tabs.get_current_tab_control() == templates and _tls.is_empty():
+			load_templates())
 	live.tab_requested.connect(tab_requested.emit)
 	live.caspar_changed.connect(caspar_changed.emit)
 	live.connector_dropped.connect(connector_dropped.emit)
@@ -65,7 +91,7 @@ func _ready() -> void:
 	_tree.hide_root = true
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, live.can_drop_connector, func(_at: Vector2, data: Variant) -> void:
-		_tabs.current_tab = 1
+		_tabs.current_tab = live.get_index()
 		live.drop_connector(Drop.parse(data)))
 	media.add_child(_tree)
 	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
@@ -79,9 +105,26 @@ func _ready() -> void:
 			inspector.show_media(meta.row))
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
-	if Config.args.has("sources-tab"):  # dev: open on Media (0) or Live (1)
+	if Config.args.has("sources-tab"):  # dev: open on Media (0), Templates (1), Live (2) or Timelines (3)
 		_tabs.current_tab = int(Config.args["sources-tab"])
 	load_media()
+
+
+func _reload_current() -> void:
+	match _tabs.get_current_tab_control():
+		live: live.reload()
+		templates: load_templates()
+		timelines: timelines.rebuild()
+		_: load_media()
+
+
+## Web fetchTemplates (Refresh): GET /api/templates (the server's TLS catalogue) + shader library names.
+func load_templates() -> void:
+	var res: Dictionary = await Api.get_json("/api/templates")
+	_tls = res.data if res.ok and res.data is Array else []
+	var sh: Dictionary = await Api.get_json("/api/shaders")
+	_shader_names = Lists.shader_names(sh.data if sh.ok else null)
+	templates.rebuild()
 
 
 func load_media() -> void:

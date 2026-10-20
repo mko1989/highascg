@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — A (performance overlay) and B (new look: deck drop / "+" / delete) DONE and box-verified; C (Sources Templates / Timelines tabs), D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
+**Status: IN PROGRESS (2026-10-20) — A (performance overlay), B (new look: deck drop / "+" / delete) and C (Sources Templates / Timelines tabs) DONE and box-verified; D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
 
 # WO-623 — Godot: owner's next.md notes (round 2)
 
@@ -157,6 +157,32 @@ re-checked by hand as noted.
   - `look_edits.gd` `remove_look()` mirrors web `removeScene`: it drops the look and the look presets pointing at it.
   - The live tab closes the editor if it shows the deleted look.
 
+### C — Sources Templates / Timelines (DONE)
+
+- **Tabs.** `media_panel.gd` now has four tabs in the owner's order: Media / Templates / Live / Timelines. The web's
+  Effects tab stays as the EFFECTS group in the Media tree (WO-602 slice 9).
+  - Tab switches go by control rather than index. That covers the DeckLink drop → Live switch and ↻ reloading the
+    current tab.
+  - The dev arg `--sources-tab` is now 0..3.
+- **`source_lists_model.gd`** (pure) mirrors the web:
+  - `template_rows`: the TLS `{id, label}` with the web's fallbacks. The filter matches the TLS label, not the display
+    name.
+    - `shaders/sh-…` rows get an FX pill and their library name from `/api/shaders` (owner bug 27.07.26), while the
+      drag label stays the TLS label.
+    - CG Studio `lower-thirds/lt-` rows are kind `cg`; everything else is FT.
+  - `timeline_rows`: `{id: t.id || t.name, label: t.name || t.id}` from `project.timelines.timelines`, with a tooltip
+    showing duration and layer count.
+  - Payloads are the web's `{type: "template" | "timeline", value, label}`.
+- **`source_list_panel.gd`** is a reusable list: filter, two-column Tree (pill | label), drag forwarding, a render-key
+  skip, and an empty-state line.
+  - Templates load lazily on first view (`/api/templates` + `/api/shaders`); ↻ re-reads them.
+  - Timelines rebuild on `project_changed` and on tab show.
+- **Left out of the web rows:**
+  - The CG Studio "Edit" button, which opens the web studio or :4300.
+  - The shader "Edit" (the web Shader FX modal) and the shader audition click (the web Shader Live mode).
+  - Timeline rename by right-click; the Timeline tab owns the name.
+- Both kinds drop anywhere a source does: look editor frame, deck blank space / "+" (B), and timeline clips.
+
 ## What was VERIFIED
 
 ### A
@@ -205,3 +231,23 @@ re-checked by hand as noted.
   - The project is back to `['Opening', 'Background', 'Waves']` with lookPresets `[]`. PGM = Opening, PRV =
     Background.
   - The `config/` md5 manifest is identical before and after.
+
+### C
+
+- **Godot:** `test_source_lists.gd` (shader names, rows / pills / kinds with the box's uppercase TLS ids, backslash ids,
+  label/id fallbacks, filter-on-TLS-label, timeline rows / tooltips / filter). The full suite is 15509/15509 and `--check`
+  boots clean.
+- **Box:**
+  - The Templates tab listed the 221 TLS entries.
+  - Filter "sh-3d" showed seven FX rows named "mirrors c2…c7" and "mirrors", not the TLS ids.
+  - **BLACK → blank deck space:** made a look with L10 `{type: template, value: BLACK}` and full-frame fill, staged on
+    PRV (`/api/scene/live` ch 2). Two such looks came out, because the first drop landed just before the owner switched
+    the workspace to Previs ("that was me").
+  - **Timelines tab:** listed "Timeline" (the project's one).
+  - **Timeline → blank deck space:** made "Look 6" with L10 `{type: timeline, value: tmve1ppeug1t}`, staged on PRV. The
+    timeline state went to `playing: true, position 3003`, which is WO-541's timeline-only look take.
+- **Cleanup:**
+  - Re-staging Background on PRV stopped the timeline (`playing: false, position 0`).
+  - Looks 6/5/4 were deleted through the card menu. The project is back to Opening / Background / Waves, with PGM
+    Opening and PRV Background.
+  - The `config/` md5 manifest is identical.
