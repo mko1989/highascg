@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
+**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
 
 # WO-604 — Godot port: audio mixer, meters, cross-screen audio routing
 
@@ -119,10 +119,77 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
     are the 16:40:41 server restart's re-normalisation of the PRV live scene and the operator-GUI
     layout save; neither came from the Audio tab.
 
+## Slice 2 (2026-10-20) — web console on the server store
+
+### Investigation
+
+- `client/lib/audio-mixer-state.js` kept gains / mutes / solos in localStorage `casparcg_audio_mixer_v1`.
+  The Godot console (slice 1) reads the server store, so the same box showed two different mixers.
+  The six strip renderers (`audio-mixer-{console,panel}-*.js`) post `/api/audio/volume` with no `key`, so the
+  server store never learned a web move. Mute was a client-side volume-0 write. Solo mapped keys to
+  targets in the client (`soloKeyToTarget`).
+- Reading gain back from the fader position gave 0.98629 for unity. The 0..100 fader has no step at
+  0 dB (83 → −0.12 dB), so every reset and unmute sent `MIXER … VOLUME 0.98629`. Godot already avoids
+  this with `Strip.gain()`.
+- **Pre-existing double-click bug (box-reproduced with a fetch hook in headless Firefox):**
+  - `client/lib/app-range-dblclick.js` registers a page-wide `document` dblclick handler. It resets any
+    range to its HTML `value` attribute, which holds the gain at render time, and dispatches input + change.
+  - The strip's reset (`bindFaderResetGestures`) fires first and posts 1. The event then bubbles to
+    the document handler, which posts the render-time value.
+  - Log at 17:35:20 for a strip rendered at 67: `MIXER 4-1 VOLUME 1`, then `MIXER 4-1 VOLUME 0.508…`.
+    The reset reverted to wherever the fader was when the page drew it. With localStorage it was the same.
+
+### What was done
+
+- `audio-mixer-state.js`:
+  - Now an in-memory cache. `ingestServerMixer(snap)` fills it.
+  - The setters only update the cache optimistically; the server learns the change from the write itself.
+  - `faderGain(key, percent)` returns the stored gain while the fader still shows it, otherwise the
+    position's gain (the Godot rule).
+  - No localStorage migration: the server store is authoritative and already shared with Godot.
+- `audio-mixer-server-sync.js` (new):
+  - `bindAudioMixerServer({ws, stateStore})`, wired in `app.js`, does GET `/api/audio/mixer` on every
+    WS `state` and on the `audioMixer` change broadcast.
+  - Strips are synced in place, only for keys whose server value changed. A fader being dragged
+    (`:active`) keeps its own value. Solos always re-sync.
+  - `resyncAudioMixer()` runs after a refused write.
+- Strip writes:
+  - Fader and mute writes carry `key` unless a look owns the strip; that makes 16 writes across six files.
+  - Mute uses `postAudioMute` → `/api/audio/mute`, which mutes on the server.
+  - Solo posts `{ keys }`, and the server maps them. A refused solo re-syncs, so the button goes dark.
+  - The AFV policy writes in panel-live-inputs stay key-less: they are derived gains, not the operator's fader.
+- `audio-mixer-fader-bind.js`: the dblclick reset calls `stopPropagation()`, so the page-wide range
+  reset never re-posts. This covers all 8 users of the helper.
+- Smokes:
+  - `smoke-wo604-web-mixer-server-state.test.js` (new, 7 tests, curated).
+  - `smoke-wo409-prv-mixer-strips` now asserts the server-side solo mapper (`mixerState.soloKeyToTarget`)
+    instead of the client one.
+
+### What was VERIFIED
+
+- **Offline suite:** 2823 pass, 1 fail — the known smoke-wo577 "junk label". Line limit 0 files over,
+  prettier clean, touched files add no eslint warnings. Mutation check: dropping the `stopPropagation`
+  turns the new smoke red. Config md5 unchanged.
+- **Box, web in headless Firefox (WebDriver BiDi) against :4200, plus the Godot client:**
+  - **API → web:** API volume and mute changes (Godot-like writes) updated the web DOM live.
+  - **Web → server and Caspar:**
+    - A web unmute sent `MIXER 6-3 VOLUME 1` and cleared `muted`.
+    - A fader move to 67 stored `input:4: 0.508`.
+    - A double-click reset stored exactly 1, with the fanout `MIXER 2-10 VOLUME 1`.
+  - **Refused solo:** solo is refused on this box (400, no audio preview), and the solo button goes dark again.
+  - **Web → Godot:** after web fader 67 and a mute on `input:6`, the Godot Audio tab showed DeckLink 1 at
+    −5.9 dB and DeckLink 3 MUTE lit. Restoring from the web showed 0.0 dB and unlit in Godot.
+  - **Double-click fix, re-tested:** a strip rendered at 67 and double-clicked now posts 1 twice (the
+    immediate and the debounced write). The log shows `MIXER 4-1 VOLUME 1` at 17:38:24, and the store
+    holds `input:4: 1`.
+  - Box mixer state was restored to defaults (`muted {}`, `input:4` = 1).
+- **Owner QA:** with the Firefox kiosk and Godot side by side, a fader move in either one should show in the other.
+- **Note:** `npm run lint` is over its warning budget on origin/main already (221 > 218, pre-existing; e.g. an
+  unused `cl` in `sources-panel-live-render-actions.js`). Not caused here.
+
 ### Still open (later slices)
 
 - Cross-screen / stereo-pair routing matrix (`audio-cross-screen-*`, `route://`).
 - Live-input PGM route buttons and START, audio-only look STOP (`/api/scene/audio-only/stop`).
 - Click a live-audio strip to inspect it. Add-input modal. Auto-mix policy toggle.
-- Switch the web console from `localStorage` to the server store, so both clients share one console.
 - Side-by-side meter ballistics check web vs Godot, and the parity checklist (owner).
