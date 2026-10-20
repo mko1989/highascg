@@ -38,7 +38,7 @@ func _ready() -> void:
 	_bar.add_child(_button("Copy to…", func() -> void: _pick("copy")))
 	_bar.add_child(_button("Move to…", func() -> void: _pick("move")))
 	_bar.add_child(_button("HAP…", _hap, "Encode the selected clips to HAP (light-CPU playback codec), saved next to the original as _HAP.mov"))
-	_bar.add_child(_button("Delete", _confirm_delete))
+	_bar.add_child(_button("Delete", confirm_delete))
 	_bar.add_child(_button("✕", clear_requested.emit, "Clear the selection"))
 	add_child(_bar)
 	status = Label.new()  # its own full-width line: the HAP progress must not be clipped by the buttons
@@ -194,7 +194,7 @@ func _cancel_hap() -> void:
 			Api.post_json("/api/media/hap-encode/cancel", {"jobId": j.jobId})
 
 
-func _confirm_delete() -> void:
+func confirm_delete() -> void:
 	var sel := ids.duplicate()
 	var dlg := ConfirmationDialog.new()
 	dlg.title = "Delete permanently?"
@@ -207,6 +207,25 @@ func _confirm_delete() -> void:
 		_say("Deleting %s…" % Ops.plural(sel.size()))
 		var res: Dictionary = await Api.post_json("/api/media/delete", Ops.delete_body(sel))
 		_say(Ops.result_text("Deleted", sel.size(), res))
+		clear_requested.emit()
+		changed.emit())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+## WO-603 slice 9: a folder and everything in it (web ✕ on the folder row, sources-panel-media.js:114-131).
+func confirm_delete_folder(path: String) -> void:
+	var dlg := ConfirmationDialog.new()
+	dlg.title = "Delete folder?"
+	dlg.ok_button_text = "Delete"
+	dlg.dialog_text = "Delete folder \"%s\" and all its contents?\n\nThis cannot be undone." % path.get_file()
+	dlg.confirmed.connect(func() -> void:
+		dlg.queue_free()
+		if before_delete.is_valid():
+			await before_delete.call([path])
+		var res: Dictionary = await Api.post_json("/api/media/delete", Ops.delete_body([path]))
+		_say(("✓ Deleted folder %s" % path) if res.ok else ("✗ Delete failed: %s" % res.error))
 		clear_requested.emit()
 		changed.emit())
 	dlg.canceled.connect(dlg.queue_free)

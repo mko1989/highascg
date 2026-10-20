@@ -105,6 +105,7 @@ func _ready() -> void:
 	_tree.select_mode = Tree.SELECT_MULTI
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, _can_drop, _drop)
+	_tree.gui_input.connect(_tree_input)
 	media.add_child(_tree)
 	_bar = SelectionBar.new()
 	_bar.changed.connect(load_media)
@@ -112,7 +113,7 @@ func _ready() -> void:
 		_tree.deselect_all()
 		_bar.set_selection([], ""))
 	_bar.before_delete = func(sel: Array) -> void:
-		if inspector.is_inside_tree() and sel.has(inspector.id):
+		if inspector.is_inside_tree() and Ops.covers(sel, str(inspector.id)):
 			await inspector.preview.stop_preview()
 			inspector.visible = false
 	media.add_child(_bar)
@@ -172,6 +173,30 @@ func _on_selection() -> void:
 		inspector.show_media(meta.row)
 	elif sel.size() > 1 and InspectorPanel.current.showing(inspector):
 		InspectorPanel.current.release(inspector)  # several files have no one inspector; the covered page returns
+
+
+## WO-603 slice 9: Delete / Backspace deletes the selected files (web sources-panel.js:336, same confirm); a
+## right-click on a folder offers "Delete folder…" (the web ✕ on the folder row).
+func _tree_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k != null and k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and not _bar.ids.is_empty():
+		_tree.accept_event()
+		_bar.confirm_delete()
+		return
+	var mb := event as InputEventMouseButton
+	var f: Variant = _folder_at(mb.position) if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT else null
+	if f == null or str(f) == "":
+		return
+	_tree.accept_event()
+	var menu := PopupMenu.new()
+	menu.add_item("Delete folder…")
+	menu.id_pressed.connect(func(_id: int) -> void: _bar.confirm_delete_folder(str(f)))
+	menu.popup_hide.connect(menu.queue_free, CONNECT_DEFERRED)
+	add_child(menu)
+	var at := Vector2i(get_viewport().get_mouse_position())
+	if not get_viewport().gui_embed_subwindows:  # embedded popups take window coordinates (deck_view._card_menu)
+		at += get_window().position
+	menu.popup(Rect2i(at, Vector2i.ZERO))
 
 
 ## A folder row under the pointer (web: folders are the move targets), or null.

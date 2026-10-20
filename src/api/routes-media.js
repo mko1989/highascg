@@ -269,6 +269,16 @@ function triggerMediaRescan(ctx) {
 	if (typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
 }
 
+/** Caspar's scanner drops deleted clips a moment after the unlink (box 20.10: a deleted folder's nested clip was still
+ * in CLS ~2 s later), so the immediate rescan can re-list them; a second pass once it has settled clears the ghost. */
+const DELETE_SETTLE_MS = 3000
+
+function triggerMediaRescanSettled(ctx) {
+	triggerMediaRescan(ctx)
+	const t = setTimeout(() => triggerMediaRescan(ctx), DELETE_SETTLE_MS)
+	if (t.unref) t.unref()
+}
+
 async function handleMediaDelete(body, ctx) {
 	const b = parseBody(body)
 	const ids = collectTransferIds(b, 'id', 'ids')
@@ -285,11 +295,11 @@ async function handleMediaDelete(body, ctx) {
 	}
 	if (ids.length === 1) {
 		const r = await unlinkOne(ids[0])
-		if (r.status === 200) triggerMediaRescan(ctx)
+		if (r.status === 200) triggerMediaRescanSettled(ctx)
 		return r
 	}
 	const r = await runBatchMediaOp(ctx, ids, 'deleted', unlinkOne)
-	if (r.status === 200) triggerMediaRescan(ctx)
+	if (r.status === 200) triggerMediaRescanSettled(ctx)
 	return r
 }
 

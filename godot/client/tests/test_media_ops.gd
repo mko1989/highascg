@@ -66,3 +66,12 @@ func test_folder_drop_ids_web_rule() -> void:
 	t.eq(O.folder_drop_ids({"type": "multi", "items": [a, {"type": "effect", "value": "blur"}]}, "z"), ["x/a.mov"], "media items only")
 	t.eq(O.folder_drop_ids({"type": "route", "value": "route://3"}, "z"), [], "live sources never move")
 	t.eq(O.folder_drop_ids({"type": "media", "value": "x"}, "x"), [], "a folder onto itself")
+
+
+func test_covers_files_and_folders() -> void:
+	t.eq(O.covers(["a/b.mov"], "a/b.mov"), true)
+	t.eq(O.covers(["a"], "a/b.mov"), true, "a folder takes its files")
+	t.eq(O.covers(["a/"], "a/sub/c.png"), true)
+	t.eq(O.covers(["a"], "ab/c.png"), false, "a sibling with the same prefix is not inside")
+	t.eq(O.covers([""], "x"), false)
+	t.eq(O.covers([], "x"), false)

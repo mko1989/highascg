@@ -41,6 +41,15 @@ static func delete_body(ids: Array) -> Dictionary:
 	return {"ids": ids}
 
 
+## Does deleting `sel` (files and/or folders) take `id` with it? A folder covers everything under it.
+static func covers(sel: Array, id: String) -> bool:
+	for v in sel:
+		var s := str(v)
+		if s != "" and (id == s or id.begins_with(clean_folder(s) + "/")):
+			return true
+	return false
+
+
 static func plural(n: int) -> String:
 	return "%d file%s" % [n, "" if n == 1 else "s"]
 

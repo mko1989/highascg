@@ -550,3 +550,58 @@ AMCP-failure note on a take, no Delete key on the media selection, no folder del
   - Re-staging Opening read "PRV ok", so there was no false positive on a clean look.
   - Cleanup: the test look was deleted from the deck, leaving 4 looks with PGM and PRV both on look-1, as they were.
     Nothing was taken to PGM.
+
+### 9b — Delete key on the selection, delete a folder (and the ghost it left)
+
+#### Investigation
+
+- The web deletes the media selection on Delete / Backspace unless an input has focus
+  (`client/components/sources-panel.js:336-343`), through the same confirm as the Delete button.
+- Every web folder row has a ✕ (`sources-panel-media.js:114-131`): confirm
+  `Delete folder "<name>" and all its contents?\n\nThis cannot be undone.`, then `POST /api/media/delete {id: path}`.
+  `unlinkMediaById` removes directories recursively (`src/media/local-media-api.js:150-151`).
+- Godot had neither.
+- **Box finding (20.10), a node bug and not Godot's:**
+  - After deleting `wo603del` (holding `sub/del_two.png`), the disk was clean and Caspar's own CLS no longer listed
+    the clip.
+  - Node's library (`GET /api/media`) still had `WO603DEL/SUB/DEL_TWO` 30 s later; `POST /api/media/refresh`
+    cleared it.
+  - Reproduced via the API with `wo603race/sub/r.png`: CLS polled right after the delete still listed it, and it was
+    gone about 2 s later.
+  - `handleMediaDelete` ran its one rescan (`triggerMediaRescan`, the CLS cycle) immediately, so it re-read Caspar
+    before Caspar's scanner had caught up.
+  - The web calls the same endpoint, so it had the same ghost.
+
+#### What was done
+
+- `src/api/routes-media.js`: `triggerMediaRescanSettled` rescans at once and again after `DELETE_SETTLE_MS` (3 s,
+  unref'd timer). Both delete paths use it.
+- Godot:
+  - `media_selection_bar.gd`: `_confirm_delete` is now the public `confirm_delete`. New `confirm_delete_folder(path)`
+    uses the web text and reports "✓ Deleted folder <path>" or "✗ Delete failed: …".
+  - `media_panel._tree_input`:
+    - Delete / Backspace with files selected opens `confirm_delete`. The tree must have focus, so typing in the filter
+      never deletes.
+    - Right-clicking a folder row pops a one-item menu, "Delete folder…", placed in window coordinates like
+      `deck_view._card_menu`. Adding the window position first pushed it to the screen edge.
+  - `media_ops.covers(sel, id)`: the delete hook stops a running preview whose file is inside a deleted folder, not
+    only one deleted by name.
+
+#### What was VERIFIED
+
+- Offline:
+  - new `smoke-wo603-media-delete-settle.test.js` (curated) deletes a real temp folder, with the registry and versions
+    redirected to temp, and checks 1 rescan at once, still 1 at 2999 ms and 2 at 3000 ms under mock timers;
+  - `smoke-media-file-ops-routes` still passes;
+  - Godot 16087 pass, including `test_covers_files_and_folders`;
+  - full suite 2863 pass / 1 known fail (smoke-wo577), confirmed over two runs. One earlier run reported a second
+    failure that never recurred and that I could not identify; treat it as a flake to watch.
+- Box (node restarted, GUI relaunched):
+  - In a scratch `wo603del`, selecting `del_one.png` and pressing Delete opened "Delete 1 file permanently?". Delete
+    showed "✓ Deleted 1 file" and the file was gone from disk.
+  - Right-clicking the folder showed "Delete folder…" at the pointer, then the web confirm text. Delete showed
+    "✓ Deleted folder wo603del".
+  - With the settle pass, the library still had `WO603DEL/SUB/DEL_TWO` 1 s after the delete and nothing at 5 s. The
+    GUI tree was clean without a manual ↻.
+  - Before the fix, the same entry was still listed after 30 s.
+  - Cleanup: both scratch folders are gone, and the media root is back to bridge / drive / exfat / projects / testowe.
