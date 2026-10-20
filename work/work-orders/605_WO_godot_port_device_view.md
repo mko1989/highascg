@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Next: slice 6 stream / record / vcam / audio connector pages. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Next: slice 7 Caspar server / hot backup / mapping nodes. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -486,3 +486,76 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   node restart → every config file byte-identical; 0 SCRIPT ERROR in the GUI log.
 - Not exercised live: the already-input / shared-inputs-host start branches, `decklink_out` kind, multiview key/fill —
   golden-tested only (no such config on the dev box).
+
+## Slice 6 — Stream / Record / Virtual cam / Audio pages (2026-10-20, DONE)
+
+### Investigation
+- Web path: `device-view-inspectors.js` → `stream_out` / `record_out` / `v4l2_out` / `audio_out` get the summary table
+  (Name / Device / Type + per-kind extras: record adds Output ID / Source / CRF, then Out / In cables) and their page:
+  `device-view-inspector-stream.js` (type rtmp / srt / udp / ndi — URL / key / SRT mode+latency+passphrase /
+  encoder / quality / audio pair rows shown by type; Save writes `streamOutputs[i]` then `/api/streaming-channel/
+  credentials` for rtmp / srt; NDI → restart-dirty + "NDI output saved — Apply Caspar config…"; Start enables
+  `streamingChannel` (+ dirty) and posts `/api/streaming-channel/rtmp`; log box = last 20 `rtmp.logs`),
+  `-record.js` (name / CRF / codecs / bitrates / preset, Save → `recordOutputs[i]`, Start / Stop →
+  `/api/streaming-channel/record`), `-virtual-cam.js` (`/api/virtual-camera/status` → status lines; Save / Start / Stop /
+  config with `persist:true`), `-audio.js` (type portaudio / system-audio, device select from `live.audio` enumeration +
+  manual name, monitor bus, layout limited by the device's max channels, host API / buffer / latency / FIFO; every edit
+  auto-saves `audioOutputs[i]` + restart-dirty; an empty enumeration re-fires the device GETs once).
+  Add / remove live in `device-view-cable-outputs.js` (`registerDeviceViewCableOutputs`): the band "+" adds
+  `str_N`/`StrN`, `rec_N`/`RecN`, `audio_N`/`"Audio N"`, vcam config `{showInDeviceView:true, enabled:false}`; Remove
+  (confirm) filters the settings row, prunes `deviceGraph` edges, marks dirty for audio and for a stream with
+  `dedicatedOutputChannel`; vcam remove = stop (failure ignored) + config `{showInDeviceView:false, enabled:false}`.
+  Numeric fields are `math-input` (focus → set → blur commit with per-kind clamps: CRF 18–51, bitrates ≥0 / ≥32 …).
+- Web gaps found (ported as the web behaves unless noted; owner to decide):
+  1. `startStreamingChannelRtmp` drops `type`, the SRT fields and `audioSourcePair` from the start body — only the
+     saved settings row carries them.
+  2. Virtual-cam success statuses ("Virtual camera settings saved." etc.) are painted with the error style. **Godot
+     shows them as OK** (the golden's ok flag is not compared for vcam).
+  3. Stream / record Save throws uncaught on a failed POST — no status at all. **Godot shows "Save failed: …".**
+  4. Audio: picking a device after typing a manual name saves the stale manual value (the manual field is read
+     first). Ported as-is (the manual field is cleared after the save, as in the web's re-render).
+  5. Audio: ticking Monitor forces `system-audio` without rebuilding the device list, so a monitor row can keep a
+     16-channel layout.
+  6. Add ids are `count + 1` — removing a middle row then adding collides with the last id.
+  7. Stream Save for rtmp / srt sets no status on success (only NDI does); record Save likewise.
+
+### What was done
+- `features/devices/output_ports_model.gd` (pure): JS-shaped coercion (`js`, `is_true` / `not_false` / `flag` — avoids
+  GDScript's bool==String runtime error, `or_`, `int_or`, `pick`, `js_json`), the per-kind math clamps
+  (`math_initial` / `math_commit`), summary table (`head_items`), log text, row lookup, and the add / remove plans
+  (`add_plan`, `remove_confirm`, `remove_plan` with the graph prune + dirty rules).
+- `features/devices/stream_record_model.gd` (pure): stream state / items (visibility by type, notes, NDI attribution),
+  save (row + creds, NDI dirty + status), start / stop; record state / items / save / start / stop.
+- `features/devices/vcam_audio_model.gd` (pure): vcam saved row, state, status lines from the live status, items,
+  patch / body / start status; audio device + layout options (max channels, hint, disabled), the type / device /
+  monitor transitions (each returns the row to auto-save), items, the enumeration-retry check, save.
+- `features/devices/output_port_controls.gd`: one page class for the four kinds — builds widgets from the item lists,
+  math inputs commit on submit / focus-out, selects / checks route through the model transitions, buttons run the
+  plans via `host_controls_base._run` (settings re-read + reload after writes), Remove asks a confirm dialog; on open
+  it fetches the stream / record logs, the vcam status, or re-enumerates audio devices once.
+- `rear_panel.gd`: each extra band (Stream / Virtual cam / Record / Audio) gets a "+" (`add_requested(kind)`), and its
+  item labels are clickable. `devices_tab.gd`: routes those kinds to the new page, "+" to `add_output`.
+- Not ported: the live WebSocket streaming-status subscription — the page fetches logs / status on open and after each
+  action instead.
+
+### What was VERIFIED
+- `tests/test_devices_output_ports.gd` + `tests/golden/devices_output_ports.json` (generator runs the four web pages
+  and the real `registerDeviceViewCableOutputs` remove handlers under Node on a DOM shim with real `<select>` value
+  semantics and math inputs driven focus → set → blur; streaming status seeded per case): 28 cases (13 stream, 4 record,
+  4 vcam, 7 audio, not-found cases included) with 96 replayed steps (38 buttons, 33 inputs, 19 selects, 6 checks) — initial page,
+  then after every step the request list, restart-dirty, status text, ok flag (except vcam, gap 2) and the re-rendered
+  page; plus add plans and helpers. Godot `--test` 6200 / 6200 (5745 + 455 new), `--check` boot OK, 0 files over 500
+  lines.
+- Box GUI (`config/` copied + md5-listed first): Stream "+" → `streamOutputs` gains str_1, "Added stream output Str1";
+  label opens the page; type → NDI rebuilds (URL / encoder / Start / Stop gone, NDI note + attribution shown); rename
+  "Wall NDI" + Save → row `{type:ndi, name/label:"Wall NDI"}`, status "NDI output saved — Apply Caspar config to put it
+  on air.", Apply restart-dirty. Record "+" → rec_1 / "Added record output Rec1"; CRF 99 + Enter clamps to 51 and Save
+  writes `crf:51`. Audio "+" → audio_1; device select lists the box's PCH / HDMI 0–3 (16ch); picking HDMI 1 auto-saves
+  `deviceName:"hw:1,7"`, status `Audio output "Audio 1" saved (stereo PortAudio)…`, layout hint "Device reports up to
+  16 output channel(s)…". Virtual cam "+" → "Virtual camera output added", page shows the live status lines (Running:
+  no, pipeline, mic device); Save → "Virtual camera settings saved.". Remove on each (confirm dialog text matches the
+  web) → vcam `showInDeviceView:false`, `audioOutputs` / `recordOutputs` / `streamOutputs` empty, matching statuses,
+  inspector cleared. Afterwards `general.json` (the persisted virtualCamera block) + the state file restored + node
+  restart → every config file byte-identical; 0 SCRIPT ERROR in the GUI log.
+- Not exercised live: Start / Stop stream and record, vcam Start (they would put outputs on air / need a cabled
+  source) — golden-tested only.

@@ -4,6 +4,10 @@ extends PanelContainer
 ## port_icon.gd registered in `anchors` (connector id → Control) for the cable layer.
 ## Slice 4/5: a GPU / DeckLink port's row label opens its connector page (web: the marker body opens the inspector, the dot
 ## cables). Cables hang over the labels, so the tab hit-tests them first (`label_at`) instead of a gui_input handler.
+## Slice 6: the Stream / Virtual cam / Record / Audio labels open their pages too, and each of those headers has the
+## web's "+" (`add_requested`).
+
+signal add_requested(kind: String)
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
@@ -13,7 +17,7 @@ const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon"
 	"record_out": "record-port-icon", "audio_out": "jack-svg"}
 
 var anchors := {}
-var _labels := {}  # GPU / DeckLink connector id → its row Label
+var _labels := {}  # connector id → its clickable row Label
 
 
 func _ready() -> void:
@@ -95,7 +99,16 @@ func _plate_column(s: Dictionary) -> Control:
 
 func _extra_slot(s: Dictionary) -> Control:
 	var v := VBoxContainer.new()
-	v.add_child(_small(str(s.title).to_upper(), ThemeBuilder.TEXT_MUTED))
+	var head := HBoxContainer.new()
+	head.add_child(_small(str(s.title).to_upper(), ThemeBuilder.TEXT_MUTED))
+	var plus := Button.new()
+	plus.text = "+"
+	plus.flat = true
+	plus.tooltip_text = "Add new %s output" % str(s.title).to_lower()
+	plus.add_theme_font_size_override("font_size", 12)
+	plus.pressed.connect(func() -> void: add_requested.emit(str(s.kind)))
+	head.add_child(plus)
+	v.add_child(head)
 	if s.items.is_empty():
 		v.add_child(_small("—", ThemeBuilder.TEXT_MUTED))
 	for it in s.items:
@@ -103,12 +116,17 @@ func _extra_slot(s: Dictionary) -> Control:
 		var p := PortIcon.make(ICON.get(s.kind, "jack-svg"), Vector2(30, 24), "%s (%s)" % [it.label, it.id])
 		anchors[it.id] = p
 		h.add_child(p)
-		h.add_child(_small(str(it.label), ThemeBuilder.TEXT))
+		var l := _small(str(it.label), ThemeBuilder.TEXT)
+		l.mouse_filter = Control.MOUSE_FILTER_STOP
+		l.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		l.tooltip_text = "%s — open in the Inspector" % it.label
+		_labels[str(it.id)] = l
+		h.add_child(l)
 		v.add_child(h)
 	return v
 
 
-## The GPU / DeckLink connector whose row label is under `pos` (global), else "".
+## The connector whose row label is under `pos` (global), else "".
 func label_at(pos: Vector2) -> String:
 	for id in _labels:
 		var l: Label = _labels[id]

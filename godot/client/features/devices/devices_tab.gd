@@ -10,6 +10,8 @@ extends MarginContainer
 ## the input & host channel cards. A selected cable and a selected destination exclude each other.
 ## Slice 4: a GPU port's row label (or a destination's mapped GPU output) opens gpu_output_controls.gd's page in the
 ## Inspector; it and a destination page exclude each other.
+## Slice 5/6: DeckLink ports and the Stream / Record / Virtual cam / Audio outputs open their pages the same way;
+## the rear panel's "+" adds an output (output_port_controls.gd).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -23,6 +25,7 @@ const DestinationsPanel := preload("res://features/devices/destinations_panel.gd
 const CableRules := preload("res://features/devices/cable_rules.gd")
 const GpuControls := preload("res://features/devices/gpu_output_controls.gd")
 const DeckLinkControls := preload("res://features/devices/decklink_port_controls.gd")
+const OutputControls := preload("res://features/devices/output_port_controls.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
@@ -43,6 +46,7 @@ var _apply_btn: Button
 var _confirm: ConfirmationDialog
 var _gpu: GpuControls
 var _deck: DeckLinkControls
+var _outp: OutputControls
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -96,6 +100,11 @@ func _ready() -> void:
 	_deck.status.connect(_set_status)
 	_deck.dirty.connect(func() -> void: _gesture.set_dirty(true))
 	_deck.reload.connect(func(_dirty: bool) -> void: refresh())
+	_outp = OutputControls.new()
+	add_child(_outp)
+	_outp.status.connect(_set_status)
+	_outp.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	_outp.reload.connect(func(_dirty: bool) -> void: refresh())
 	# The web opens that connector's inspector (GPU outputs, DeckLink ports); anything else selects its cable.
 	_dests.focus_connector.connect(func(id: String) -> void:
 		if _open_port(id):
@@ -110,6 +119,7 @@ func _ready() -> void:
 	right.add_theme_constant_override("separation", 12)
 	body.add_child(right)
 	_rear = RearPanel.new()
+	_rear.add_requested.connect(_outp.add_output)
 	right.add_child(_rear)
 	right.add_child(_label("CABLES", ThemeBuilder.TEXT_MUTED, 12))
 	_list = VBoxContainer.new()
@@ -208,7 +218,7 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 		_list.add_child(_cable_row(c))
 	_cables.set_cables(m.cables, anchors)
 	_anchors = anchors
-	for page in [_gpu, _deck]:
+	for page in [_gpu, _deck, _outp]:
 		if page.conn_id != "":
 			var conn := _connector(page.conn_id)
 			if conn.is_empty():
@@ -222,12 +232,13 @@ func _connector(id: String) -> Dictionary:
 	return CableRules.connector_by_id(_payload, id)
 
 
-## The connector page for `id` (GPU output or DeckLink port) in the shared Inspector (a destination page gives
-## way); false when the connector has no page.
+## The connector page for `id` (GPU output, DeckLink port, stream / record / virtual cam / audio output) in the shared
+## Inspector (a destination page gives way); false when the connector has no page.
 func _open_port(id: String) -> bool:
 	var conn := _connector(id)
 	var kind := str(conn.get("kind", ""))
-	var page: Node = _gpu if kind == "gpu_out" else (_deck if kind in ["decklink_io", "decklink_out"] else null)
+	var page: Node = _gpu if kind == "gpu_out" else (_deck if kind in ["decklink_io", "decklink_out"] else
+		(_outp if kind in OutputControls.KINDS else null))
 	if page == null:
 		return false
 	_dests.deselect()
@@ -239,7 +250,7 @@ func _open_port(id: String) -> bool:
 
 
 func _close_port() -> void:
-	for page in [_gpu, _deck]:
+	for page in [_gpu, _deck, _outp]:
 		if page.conn_id != "":
 			page.close()
 			if InspectorPanel.current != null:
