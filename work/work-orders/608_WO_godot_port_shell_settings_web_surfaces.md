@@ -202,3 +202,23 @@ web's WebCodecs warning for the stream preview mode (irrelevant here). The Godot
 
 Open: Inspector modes (Layer presets / Look presets) and the bottom Playlists / Timers /
 Program audio strip; the remaining settings tabs, logs and project modals (plan steps 2–4).
+
+## 2026-10-20 — Inspector would not scroll (owner report)
+
+**Investigation.** Owner: "i cant scroll inspector when the contents overflow it". On the box (Previs → Camera,
+tracking page in Calibrate mode) the Inspector content ran off the bottom of the screen ("Floor grid" cut) with
+no scrollbar, and the Previs Stage column was cut off at "Live source" too. `app/inspector_panel.gd` already
+wraps pages in a ScrollContainer, so that box was not the cause. The Previs side panel
+(`features/previs/previs_tab.gd` `_build_panel`) was a plain VBox: with a stage screen selected, its form plus the
+Models / Live source / Camera / Screens blocks made the tab's minimum height larger than the window. Godot then
+grows the shell past the bottom of the screen, so the Inspector's ScrollContainer gets the full content height and
+has nothing to scroll. A headless probe (main.tscn instanced under a SceneTree script, per-tab
+`get_combined_minimum_size`) measured Previs at 695 px with *no* screen selected; selecting one adds ~500 px.
+
+**Done.** The Previs side panel sits in its own ScrollContainer (horizontal off; the inner Screens list keeps a
+120 px minimum so it stays visible when the outer scroll is in play).
+
+**Verified.** Godot suite 15509 passed / 0 failed. Box: relaunched on Previs, selected the LED screen (long form)
+and Calibrate mode. Both columns now fit the window and each has a scrollbar. Wheel over the Inspector scrolled it
+down to Floor grid / Width / Depth / Spacing. Wheel over a nested list (calibration points) scrolls that list first,
+which is standard.

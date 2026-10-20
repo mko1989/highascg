@@ -392,9 +392,16 @@ func _on_model_loaded(meshes: Array) -> void:
 func _build_panel() -> Control:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size.x = ThemeBuilder.PANEL_W + 40
+	# Own scroll: unscrolled, a selected screen's long form made this column taller than the window, which pushed
+	# the whole shell (and the Inspector's scroll area with it) past the bottom of the screen.
+	var outer := ScrollContainer.new()
+	outer.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	panel.add_child(outer)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
-	panel.add_child(v)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	outer.add_child(v)
 	v.add_child(_heading("Stage (WO-614)"))
 	stage_panel = StagePanel.new()
 	v.add_child(stage_panel)
@@ -421,6 +428,7 @@ func _build_panel() -> Control:
 	v.add_child(_heading("Screens (live texture)"))
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.custom_minimum_size.y = 120  # keeps the list visible when the outer scroll is in play
 	_meshes = VBoxContainer.new()
 	scroll.add_child(_meshes)
 	v.add_child(scroll)
