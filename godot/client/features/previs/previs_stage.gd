@@ -145,10 +145,13 @@ func camera() -> Camera3D:
 	return _cam
 
 
-## Aim the orbit camera at a world box (stage builder objects, WO-614).
-func frame_box(box: AABB) -> void:
+## Aim the orbit camera at a world box (stage builder objects, WO-614). `yaw` (radians, NAN = keep) sets the side
+## it looks from: 0 = from +Z.
+func frame_box(box: AABB, yaw := NAN) -> void:
 	if box.size == Vector3.ZERO:
 		return
+	if not is_nan(yaw):
+		_yaw = yaw
 	_target = box.get_center()
 	_dist = maxf(4.0, box.get_longest_axis_size() * 1.4)
 	_update_camera()

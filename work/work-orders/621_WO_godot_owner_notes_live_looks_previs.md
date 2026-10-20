@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock) DONE, box-verified. Next: N6 Live standard ↔ 3D switch, N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
+**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock), N6 (Live Standard ↔ 3D switch) DONE, box-verified. Next: N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
 
 # WO-621 — Godot client: owner notes 20.10 (`next.md`) — Live preview chrome, look editor, look cards, Previs
 
@@ -122,3 +122,43 @@ Owner notes added to `next.md` (20.10), quoted per item:
   - Width 1386 → back to 485, so the test edit is reverted.
 - Owner QA: the align buttons and centre-origin mode on the box (both covered by the golden test only), and frame
   drags with the lock on.
+
+## N6 — Live tab: Standard ↔ 3D switch (DONE)
+
+### Investigation
+- The web puts a 2D/3D toggle on the PGM compose cell (`client/components/previs-pgm-3d.js:120-130`). 3D replaces
+  the flat PGM video with the Three.js stage with PGM mapped onto its screens, and `onExpand(true)` grows the cell.
+  Its toolbar (`previs-pgm-3d-toolbar.js`) is GLB model load / clear / saved models. In Godot those already live in
+  the Previs tab.
+- In Godot the Live tab's preview is a single TextureRect on the operator surface (`live_tab.gd`). The Previs stage
+  (`previs_stage.gd` + `stage_builder.gd`, objects in `project.previs.stage.objects`) can run in any SubViewport.
+  The builder holds each object's source surface (WO-617 refcount), so a second instance costs nothing while hidden.
+- Found while verifying: this project's only object, "Main LED (DP-7)" on `pgm1`, has `rotation [0,180,0]`, so its
+  picture faces −Z. The stage camera's default (and Fit) looks from +Z, so both the Previs 3D view and the new Live
+  view first showed the wall's dark cabinet back. The probe confirmed the source was fine: `pgm1` held, 50 frames/s
+  arriving, texture 1920×1080, `has_video` true. Orbiting 180° showed the live PGM picture on the wall.
+
+### What was done
+- New `features/live/live_stage_3d.gd` is the read-only stage view: its own world, objects reloaded on
+  `Store.project_changed` (only when the list changed), and orbit / wheel zoom through
+  `PrevisStage.handle_input`. It renders and holds surfaces only while shown. Fit frames the stage from the side
+  its pictures face: the sum of the visible objects' facing directions (+Z at rotation 0), with the Previs default's
+  0.35 rad offset. It fits once when the objects first arrive.
+- `previs_stage.gd`: `frame_box(box, yaw := NAN)` takes an optional yaw; existing callers are unchanged.
+- `live_tab.gd`: a Standard / 3D switch (+ Fit in 3D) is overlaid at the preview's top-left.
+  - 3D hides the operator picture and releases its surface hold; Standard brings it back.
+  - The choice is remembered in `user://ui.cfg [live] view`; `--live-view=3d` is the dev override.
+  - "NO SIGNAL" shows only in Standard.
+- Not ported: the web's GLB model toolbar on the PGM cell (the Previs tab owns models). Stage editing stays in Previs.
+
+### What was VERIFIED
+- Suite 14804 / 14804 passing, `--check` boots clean, 0 files over 500 lines.
+- Box (config md5 unchanged):
+  - Live shows Standard · 3D at the preview's top-left.
+  - 3D → the stage view and journal `ADD 1-741 SHM NAME pgm1`. A drag orbits.
+  - After a relaunch with 3D remembered, the view opens facing the wall with the live PGM look ("Opening",
+    red) on it.
+  - Standard → the operator picture is back and journal `REMOVE 1-741 (pgm1: no leases)` 1 s later.
+  - Left on Standard.
+- Owner QA: whether the Previs tab's own Fit / default camera should also face the pictures. It still looks from
+  +Z and shows this project's wall from behind; that was left unchanged.

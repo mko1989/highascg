@@ -12,6 +12,8 @@ const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
+const UI_CFG := "user://ui.cfg"
 
 var _video: TextureRect
 var _no_signal: Label
@@ -21,6 +23,9 @@ var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
 var _action: Label
 var osc: Node  # the shell's OscMirror (set before _ready)
+var stage3d: LiveStage3D
+var view := "standard"  # WO-621 N6: "standard" (operator picture) | "3d" (the Previs stage)
+var _view_btns := {}
 
 
 func _ready() -> void:
@@ -47,6 +52,11 @@ func _ready() -> void:
 	_no_signal.add_theme_color_override("font_color", ThemeBuilder.WARN)
 	_no_signal.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	stack.add_child(_no_signal)
+	stage3d = LiveStage3D.new()
+	stage3d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stage3d.visible = false
+	stack.add_child(stage3d)
+	stack.add_child(_view_switch())
 	var bottom := VBoxContainer.new()
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(bottom)
@@ -92,6 +102,49 @@ func _ready() -> void:
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
+
+
+## WO-621 N6 — Standard / 3D switch over the preview (web previs-pgm-3d.js toggle). Remembered in ui.cfg.
+func _view_switch() -> Control:
+	var row := HBoxContainer.new()
+	row.position = Vector2(8, 8)
+	var group := ButtonGroup.new()
+	for spec in [["standard", "Standard", "The operator channel's picture"], ["3d", "3D", "The Previs stage with the live pictures on its walls (drag: orbit, wheel: zoom)"]]:
+		var b := Button.new()
+		b.text = spec[1]
+		b.tooltip_text = spec[2]
+		b.toggle_mode = true
+		b.button_group = group
+		var v: String = spec[0]
+		b.pressed.connect(func() -> void: set_view(v))
+		row.add_child(b)
+		_view_btns[v] = b
+	var fit := Button.new()
+	fit.text = "Fit"
+	fit.tooltip_text = "Frame the whole stage"
+	fit.pressed.connect(func() -> void: stage3d.fit())
+	row.add_child(fit)
+	_view_btns["fit"] = fit
+	return row
+
+
+func set_view(v: String, save := true) -> void:
+	view = "3d" if v == "3d" else "standard"
+	var is3d := view == "3d"
+	for k in ["standard", "3d"]:
+		(_view_btns[k] as Button).set_pressed_no_signal(k == view)
+	(_view_btns["fit"] as Button).visible = is3d
+	stage3d.visible = is3d
+	_video.visible = not is3d
+	_hold_surface()
+	if save:
+		var cfg := ConfigFile.new()
+		cfg.load(UI_CFG)
+		cfg.set_value("live", "view", view)
+		cfg.save(UI_CFG)
 
 
 func _role() -> String:
@@ -99,7 +152,7 @@ func _role() -> String:
 
 
 func _hold_surface() -> void:
-	if is_visible_in_tree():
+	if is_visible_in_tree() and view == "standard":
 		VideoSurfaces.acquire(_role(), self)
 	else:
 		VideoSurfaces.release(_role(), self)
@@ -110,7 +163,7 @@ func _process(_delta: float) -> void:
 		return
 	var r: Variant = VideoSurfaces.reader(_role())
 	var lost: bool = r.signal_lost
-	_no_signal.visible = lost
+	_no_signal.visible = lost and view == "standard"
 	_video.modulate = Color(0.35, 0.35, 0.35) if lost else Color.WHITE
 
 
