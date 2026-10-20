@@ -11,6 +11,7 @@ const T := preload("res://features/live/screen_timer_model.gd")
 const C := preload("res://features/live/countdown_model.gd")
 const P := preload("res://features/live/pip_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Icons := preload("res://app/ui_icons.gd")
 
 var screen_idx := 0
 var screen_label := ""
@@ -117,9 +118,10 @@ func _section(rec: Dictionary) -> Control:
 	_readouts[id] = ro
 	box.add_child(head)
 	var tr := HBoxContainer.new()
-	for c in [["▶", "start"], ["⏸", "pause"], ["⟲", "reset"]]:
-		var cmd: String = c[1]
-		tr.add_child(_btn(c[0], cmd.capitalize(), func() -> void: _post("/api/timers/cmd", {"timerId": id, "cmd": cmd})))
+	for cmd in ["start", "pause", "reset"]:  # icons: the box has no ⏸ glyph (WO-621)
+		var b := Icons.button({"start": "play"}.get(cmd, cmd), cmd.capitalize())
+		b.pressed.connect(func() -> void: _post("/api/timers/cmd", {"timerId": id, "cmd": cmd}))
+		tr.add_child(b)
 	var vis: bool = entry.get("visible") == true
 	tr.add_child(_btn("Hide" if vis else "Show", "Cut", func() -> void: _visible(id, not vis, 0)))
 	tr.add_child(_btn("Fade In", "", func() -> void: _visible(id, true, T.FADE_FRAMES)))

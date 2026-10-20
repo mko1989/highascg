@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin) DONE, box-verified. Next: N3 timer icon, N4 look-card cog/play, N5 editor alone at the bottom, N2 look editor px + aspect lock, N6 Live standard ↔ 3D switch, N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
+**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom) DONE, box-verified. Next: N2 look editor px + aspect lock, N6 Live standard ↔ 3D switch, N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
 
 # WO-621 — Godot client: owner notes 20.10 (`next.md`) — Live preview chrome, look editor, look cards, Previs
 
@@ -40,3 +40,41 @@ Owner notes added to `next.md` (20.10), quoted per item:
 - Box: Previs showed the toolbar 3D · Camera · Tracking cameras · Fit, and Camera mode still worked. In 3D, two
   captures 6 s apart (mouse parked outside the view) had 0 changed pixels over the 870×900 view. The owner's
   remembered Camera mode was restored afterwards.
+
+## N3 / N4 / N5 — timer icon, look-card ▶ and cog, editor alone at the bottom (DONE)
+
+### Investigation
+- N3: the deck column's timer button was `text = "⏱"` (`deck_view.gd:87`). U+23F1 is not in Rewir, and the box has
+  no fallback font for it: `fc-list ':charset=23f1'` is empty, as is U+23F8 ⏸. The other glyphs in use (▶ ✕ ⟲ ❚)
+  fall back to DejaVu and render. ⏸ also appears in the screen-timer transport (`screen_timer_panel.gd:120`) and the
+  countdown section (`countdown_section.gd:146`), which were blank the same way. The web uses inline SVG for exactly
+  this reason (`client/components/ui-icons.js`, comment: "The box has no emoji/symbol font").
+- N4: the web card footer (`client/components/scene-list-column.js:292-330`) is ▶ take (`Take live`), CUT and ⚙
+  edit. The Godot card had none of these. Taking needed a double-click, and editing needed right-click → "Edit
+  look…".
+- N5: `live_tab.gd` put the editor in an HSplit beside the deck, under the action line and the transition toolbar.
+
+### What was done
+- New `app/ui_icons.gd` (`texture(name, px)`, `button(name, tip, px)`) rasterises `assets/ui/icons/*.svg` at
+  runtime, cached, with no import step, like `assets/devices/`. timer / play / pause / reset are the web's
+  `ui-icons.js` paths; cog is a generated 8-tooth gear. There is a README alongside.
+- `deck_view.gd`: the timer button is the timer icon. Each card's meta line now shares a footer row with ▶ ("Take
+  live — this look to the screen (PGM)" → `request_take(id, main, "program")`, the same server take as a
+  double-click) and a cog ("Edit look" → `edit_requested`). CUT is left out: the owner asked for ▶ and cog only.
+- `screen_timer_panel.gd`: Start / Pause / Reset are icon buttons with tooltips. `countdown_section.gd`: icon +
+  "Start" / "Pause" / "Reset". The `app/main.gd` dev probe matches the new texts.
+- `live_tab.gd`: while the editor is visible, the action line, the transition toolbar and the deck are hidden, and
+  the editor fills the width. Close brings them back.
+
+### What was VERIFIED
+- Suite 13012 / 13012 passing, `--check` boots clean.
+- Box (Live tab, config md5 unchanged):
+  - the timer icon is visible in the column header and opens "Timers — Main LED (DP-7)" in the Inspector;
+  - every card shows ▶ and the cog;
+  - the cog on "Background" opened "Edit look: Background" as the only thing under the preview; Close brought
+    the deck back;
+  - ▶ on "Opening" (already on PGM, so nothing changed on air) → `take-look program look-1 → 200`, status
+    "TAKE ok".
+- Not exercised on the box: the screen-timer / countdown transport icons. No timer exists, and adding one writes
+  the project. They use the same `Icons.button` as the deck.
+

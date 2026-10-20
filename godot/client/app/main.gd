@@ -160,7 +160,7 @@ func _ready() -> void:
 			(cds._w.h as SpinBox).value = 0
 			await get_tree().create_timer(1.2).timeout
 			print("[client] cd durationSec ", ed6._layers()[ed6._sel].get("cgData", {}).get("durationSec"))
-			for b in ["▶ Start", "⏸ Pause", "⟲ Reset"]:
+			for b in ["Start", "Pause", "Reset"]:
 				(cds.find_children("*", "Button", true, false).filter(func(x: Button) -> bool: return x.text == b)[0] as Button).pressed.emit()
 				await get_tree().create_timer(1.0).timeout
 				print("[client] cd ", b, " | ", cds._status.text)

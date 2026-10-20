@@ -8,6 +8,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const T := preload("res://features/live/transitions.gd")
 const E := preload("res://features/live/look_edits.gd")
 const TimerView := preload("res://features/live/pgm_timer_view.gd")
+const Icons := preload("res://app/ui_icons.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
 const CARD_W := 200
@@ -83,9 +84,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	ftb.tooltip_text = "Fade to black (PGM + PRV), then clear"
 	ftb.pressed.connect(func() -> void: request_ftb(main, cm))
 	head_row.add_child(ftb)
-	var tmr := Button.new()
-	tmr.text = "⏱"
-	tmr.tooltip_text = "Screen timers"
+	var tmr := Icons.button("timer", "Screen timers")
 	tmr.pressed.connect(func() -> void: timers_requested.emit(main, title))
 	head_row.add_child(tmr)
 	var brd := Button.new()
@@ -149,7 +148,17 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	meta.add_theme_font_size_override("font_size", 12)
 	meta.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	meta.custom_minimum_size.x = 1
-	v.add_child(meta)
+	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var foot := HBoxContainer.new()  # WO-621 N4: web .scenes-card__footer ▶ take · ⚙ edit (CUT left out)
+	foot.add_child(meta)
+	var main := _main_for_card
+	var play := Icons.button("play", "Take live — this look to the screen (PGM)", 12)
+	play.pressed.connect(func() -> void: request_take(id, main, "program"))
+	foot.add_child(play)
+	var cog := Icons.button("cog", "Edit look", 12)
+	cog.pressed.connect(func() -> void: edit_requested.emit(id, main))
+	foot.add_child(cog)
+	v.add_child(foot)
 	return card
 
 

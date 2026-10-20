@@ -10,6 +10,7 @@ signal patch(p: Dictionary)
 const C := preload("res://features/live/countdown_model.gd")
 const P := preload("res://features/live/pip_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Icons := preload("res://app/ui_icons.gd")
 
 var _scene_id := ""
 var _main := 0
@@ -143,8 +144,8 @@ func _build() -> void:
 		var k: String = a[0]
 		_line(g, a[1], str(_cfg.get(k, "")), "", func(t: String) -> void: _change({k: t}))
 	var row := HBoxContainer.new()
-	for b in [["▶ Start", "start"], ["⏸ Pause", "pause"], ["⟲ Reset", "reset"]]:
-		var btn := Button.new()
+	for b in [["Start", "start", "play"], ["Pause", "pause", "pause"], ["Reset", "reset", "reset"]]:  # icons: no ⏸ glyph (WO-621)
+		var btn := Icons.button(b[2], "")
 		btn.text = b[0]
 		var action: String = b[1]
 		btn.pressed.connect(func() -> void: _transport(action))

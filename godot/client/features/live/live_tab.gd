@@ -57,7 +57,8 @@ func _ready() -> void:
 	if osc == null:
 		osc = OscMirror.new()
 		add_child(osc)
-	bottom.add_child(_transition_toolbar())
+	var bar := _transition_toolbar()
+	bottom.add_child(bar)
 	deck = DeckView.new()
 	deck.osc_mirror = osc
 	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -69,8 +70,12 @@ func _ready() -> void:
 	inner.add_child(deck)
 	editor = LookEditor.new()  # the compose frame + layer list stay in the workspace; the layer page goes to the Inspector
 	editor.custom_minimum_size.x = 560
+	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor.visible = false
 	inner.add_child(editor)
+	editor.visibility_changed.connect(func() -> void:  # WO-621 N5: an open editor is the only thing at the bottom
+		for c in [_action, bar, deck]:
+			c.visible = not editor.visible)
 	timers = ScreenTimerPanel.new()  # R2: screen timers / border are Inspector pages, not tab panels
 	timers.visible = false
 	add_child(timers)
