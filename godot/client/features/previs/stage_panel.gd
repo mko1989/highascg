@@ -22,7 +22,7 @@ const FIELDS := {
 		["Res W", "resolution", 0, "i", 1, 16384, 1], ["Res H", "resolution", 1, "i", 1, 16384, 1], ["Brightness", "brightness", -1, "f", 0, 4, 0.05]],
 }
 signal stage_loaded(count: int)
-signal stage_changed            # any edit/reload (WO-617: the 2D view redraws from builder.objects)
+signal stage_changed            # any edit/reload (the tracking page re-reads builder.objects)
 signal selection_changed(id: String)
 
 const RECT := [["Crop X px", "x"], ["Crop Y px", "y"], ["Crop W px", "w"], ["Crop H px", "h"]]
@@ -189,16 +189,16 @@ func _array_dialog() -> void:
 	dlg.popup_centered()
 
 
-## Public (keyboard / 2D view): move the selection by a delta in metres, or turn it.
+## Public (keyboard): move the selection by a delta in metres, or turn it.
 func nudge(delta: Vector3) -> void:
 	_edit(func(x: Dictionary) -> void:
 		x.position = [snappedf(float(x.position[0]) + delta.x, 0.001), snappedf(float(x.position[1]) + delta.y, 0.001), snappedf(float(x.position[2]) + delta.z, 0.001)])
 	_build_inspector()
 
 
-func turn(yaw_deg: float, absolute := false) -> void:
+func turn(yaw_deg: float) -> void:
 	_edit(func(x: Dictionary) -> void:
-		var y := yaw_deg if absolute else float(x.rotation[1]) + yaw_deg
+		var y := float(x.rotation[1]) + yaw_deg
 		x.rotation = [x.rotation[0], wrapf(snappedf(y, 0.5), -180.0, 180.0), x.rotation[2]])
 	_build_inspector()
 
@@ -233,19 +233,9 @@ func _free_x() -> float:
 	return b.end.x + 2.5
 
 
-## Public: select from outside (2D view click).
+## Public: select from outside (3D click).
 func select(id: String) -> void:
 	_select(id)
-
-
-## Public: 2D drag-move finished → same path as an inspector edit (rebuild + persist).
-func move_object(id: String, position: Array) -> void:
-	var keep := _selected
-	_selected = id
-	_edit(func(x: Dictionary) -> void: x.position = position)
-	_selected = keep
-	if keep == id:
-		_build_inspector()
 
 
 func _select(id: String) -> void:

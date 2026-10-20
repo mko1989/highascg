@@ -1,8 +1,8 @@
 extends HSplitContainer
 ## WO-607 — Previs tab: stage view + side panel (stage objects, models from /api/previs/models, live source,
-## screen meshes, camera presets). WO-617: view modes 2D front (default) · 2D plan · 3D; the 3D SubViewport
-## renders only in 3D mode, and video surfaces are held only by what is visible (VideoSurfaces refcount).
-## WO-616: a 4th mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
+## screen meshes, camera presets). WO-617: the 3D SubViewport renders only while shown, and video surfaces are held
+## only by what is visible (VideoSurfaces refcount). WO-621: the 2D front / plan views are gone (owner: "in the previs
+## i dont need 2d, that was a misunderstanding") — 3D is the stage view. WO-616: a 2nd mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
 ## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's
 ## markers (marker_driver → server hub) and draws them on the picture. T12: the 3D stage through the solved camera
 ## as an optional ghost overlay (camera_overlay.gd). T10c: 3D mode's "Tracking cameras" toggle shows each tracking
@@ -12,7 +12,6 @@ const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
 const StagePanel := preload("res://features/previs/stage_panel.gd")
-const Stage2D := preload("res://features/previs/stage_2d_view.gd")
 const TrackingView := preload("res://features/previs/tracking/tracking_view.gd")
 const TrackingPage := preload("res://features/previs/tracking/tracking_page.gd")
 const MarkerDriver := preload("res://features/previs/tracking/marker_driver.gd")
@@ -24,7 +23,7 @@ const Coverage3D := preload("res://features/previs/tracking/coverage_3d.gd")
 const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const UI_CFG := "user://ui.cfg"
-const MODES := ["front", "plan", "3d", "camera"]
+const MODES := ["3d", "camera"]
 
 var stage: PrevisStage
 var builder: StageBuilder
@@ -34,11 +33,9 @@ var _meshes: VBoxContainer
 var _source: OptionButton
 var _status: Label
 var _model_ids: Array = []
-var view2d: Stage2D
-var mode := "front"
+var mode := "3d"
 var _sv: SubViewport
 var _svc: SubViewportContainer
-var _pictures: CheckBox
 var _mode_btns := {}
 var _glb_role := ""
 var track_view: TrackingView
@@ -81,9 +78,6 @@ func _ready() -> void:
 	_coverage_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_coverage_note.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	stack.add_child(_coverage_note)
-	view2d = Stage2D.new()
-	view2d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	stack.add_child(view2d)
 	track_view = TrackingView.new()
 	track_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(track_view)
@@ -127,19 +121,9 @@ func _ready() -> void:
 	stage_panel.stage_loaded.connect(func(n: int) -> void:
 		if n > 0 and not framed[0]:
 			framed[0] = true
-			stage.frame_box.call_deferred(builder.bounds())
-			view2d.fit.call_deferred())
-	stage_panel.stage_changed.connect(func() -> void:
-		view2d.set_objects(builder.objects.duplicate(true))
-		track_page.set_objects(builder.objects.duplicate(true)))
-	stage_panel.selection_changed.connect(func(id: String) -> void:
-		view2d.select(id)
-		builder.set_selected(id))
-	view2d.rotated.connect(func(id: String, yaw: float) -> void:
-		stage_panel.select(id)
-		stage_panel.turn(yaw, true))
-	view2d.selected.connect(func(id: String) -> void: stage_panel.select(id))
-	view2d.moved.connect(func(id: String, pos: Array) -> void: stage_panel.move_object(id, pos))
+			stage.frame_box.call_deferred(builder.bounds()))
+	stage_panel.stage_changed.connect(func() -> void: track_page.set_objects(builder.objects.duplicate(true)))
+	stage_panel.selection_changed.connect(func(id: String) -> void: builder.set_selected(id))
 	stage_panel.bind(builder)
 	if Config.args.has("probe-stage-add"):  # dev: --probe-stage-add=<menu id> (0 LED, 1 TV, 2 projection)
 		get_tree().create_timer(3.0).timeout.connect(func() -> void: stage_panel._on_add(int(Config.args["probe-stage-add"])))
@@ -147,12 +131,11 @@ func _ready() -> void:
 	stage.set_live_texture(VideoSurfaces.texture(_glb_role))
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
-	_pictures.button_pressed = cfg.get_value("previs", "live_pictures", false) == true
 	_coverage_cb.set_pressed_no_signal(cfg.get_value("previs", "coverage", false) == true)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _refresh_coverage())
 	track_page.set_ghost(cfg.get_value("previs", "ghost_on", false) == true, float(cfg.get_value("previs", "ghost_opacity", 0.6)))
 	track_view.set_ghost(track_page.ghost_on, track_page.ghost_opacity)
-	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "front"))))
+	set_mode(str(Config.args.get("previs-mode", cfg.get_value("previs", "mode", "3d"))))
 	visibility_changed.connect(_apply_mode)
 	refresh_models()
 
@@ -245,7 +228,7 @@ func _on_3d_input(e: InputEvent) -> void:
 
 
 ## Keys while the previs is shown (text fields consume their own keys first):
-## Delete remove · Ctrl+D duplicate · arrows nudge 5 cm (shift 50 cm; front: X/height, plan/3D: X/Z)
+## Delete remove · Ctrl+D duplicate · arrows nudge 5 cm (shift 50 cm; X/Z)
 ## · Q/E turn 5° (shift 15°) · F fit.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
@@ -266,15 +249,14 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		KEY_RIGHT:
 			stage_panel.nudge(Vector3(step, 0, 0))
 		KEY_UP:
-			stage_panel.nudge(Vector3(0, step, 0) if mode == "front" else Vector3(0, 0, -step))
+			stage_panel.nudge(Vector3(0, 0, -step))
 		KEY_DOWN:
-			stage_panel.nudge(Vector3(0, -step, 0) if mode == "front" else Vector3(0, 0, step))
+			stage_panel.nudge(Vector3(0, 0, step))
 		KEY_Q:
 			stage_panel.turn(15.0 if k.shift_pressed else 5.0)
 		KEY_E:
 			stage_panel.turn(-15.0 if k.shift_pressed else -5.0)
 		KEY_F:
-			view2d.fit()
 			track_view.fit()
 			stage.frame_box(_fit_box())
 		_:
@@ -283,9 +265,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-## "front" | "plan" (2D, no 3D rendering) | "3d". Remembered per client (UI preference, not show data).
+## "3d" | "camera". Remembered per client (UI preference, not show data); an old 2D pick falls back to 3D.
 func set_mode(m: String) -> void:
-	mode = m if MODES.has(m) else "front"
+	mode = m if MODES.has(m) else "3d"
 	for k in _mode_btns:
 		(_mode_btns[k] as Button).set_pressed_no_signal(k == mode)
 	_apply_mode()
@@ -296,7 +278,6 @@ func _save_ui() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	cfg.set_value("previs", "mode", mode)
-	cfg.set_value("previs", "live_pictures", _pictures.button_pressed)
 	cfg.set_value("previs", "coverage", _coverage_cb.button_pressed)
 	cfg.set_value("previs", "ghost_on", track_page.ghost_on)
 	cfg.set_value("previs", "ghost_opacity", track_page.ghost_opacity)
@@ -316,13 +297,8 @@ func _apply_mode() -> void:
 	else:
 		VideoSurfaces.release(_glb_role, self)
 	var iscam := mode == "camera"
-	view2d.visible = not is3d and not iscam
-	if not is3d and not iscam and view2d.view != mode:
-		view2d.set_view(mode)
-	_pictures.disabled = is3d or iscam
 	_coverage_cb.visible = is3d
 	_refresh_coverage()
-	view2d.set_live_pictures(_pictures.button_pressed and view2d.visible and shown)
 	track_view.visible = iscam
 	track_view.set_on(iscam and shown)
 	_apply_drive()
@@ -342,7 +318,7 @@ func _exit_tree() -> void:
 func _build_toolbar() -> Control:
 	var bar := HBoxContainer.new()
 	var group := ButtonGroup.new()
-	for spec in [["front", "2D front"], ["plan", "2D plan"], ["3d", "3D"], ["camera", "Camera"]]:
+	for spec in [["3d", "3D"], ["camera", "Camera"]]:
 		var b := Button.new()
 		b.text = spec[1]
 		b.toggle_mode = true
@@ -351,11 +327,6 @@ func _build_toolbar() -> Control:
 		b.pressed.connect(func() -> void: set_mode(m))
 		bar.add_child(b)
 		_mode_btns[m] = b
-	_pictures = CheckBox.new()
-	_pictures.text = "Live pictures"
-	_pictures.tooltip_text = "2D only. Off = layout only: no video surfaces are read (Caspar and the client do no copying)."
-	_pictures.toggled.connect(func(_on: bool) -> void: set_mode(mode))
-	bar.add_child(_pictures)
 	_coverage_cb = CheckBox.new()
 	_coverage_cb.text = "Tracking cameras"
 	_coverage_cb.tooltip_text = "Each tracking camera's view on the stage and where a standing person is seen by one camera or by two or more (fused)."
@@ -365,9 +336,7 @@ func _build_toolbar() -> Control:
 	bar.add_child(_coverage_cb)
 	var fit := Button.new()
 	fit.text = "Fit"
-	fit.pressed.connect(func() -> void:
-		view2d.fit()
-		stage.frame_box(_fit_box()))
+	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box()))
 	bar.add_child(fit)
 	return bar
 

@@ -19,7 +19,6 @@ var _pitch := 0.18
 var _dist := 12.0
 var _target := Vector3(0, 2.2, 0)
 var _orbiting := false
-var _idle := 0.0
 var _fly_tween: Tween
 
 
@@ -117,14 +116,6 @@ static func led_material(tex: Texture2D) -> StandardMaterial3D:
 	return m
 
 
-func _process(delta: float) -> void:
-	if not _orbiting:
-		_idle += delta
-		if _idle > 4.0:
-			_yaw += delta * 0.1
-			_update_camera()
-
-
 func handle_input(event: InputEvent) -> void:
 	var mb := event as InputEventMouseButton
 	if mb != null:
@@ -134,13 +125,11 @@ func handle_input(event: InputEvent) -> void:
 			_dist = maxf(2.0, _dist * 0.9)
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			_dist = minf(80.0, _dist * 1.1)
-		_idle = 0.0
 		_update_camera()
 	var mm := event as InputEventMouseMotion
 	if mm != null and _orbiting:
 		_yaw -= mm.relative.x * 0.005
 		_pitch = clampf(_pitch + mm.relative.y * 0.005, -0.2, 1.5)
-		_idle = 0.0
 		_update_camera()
 
 

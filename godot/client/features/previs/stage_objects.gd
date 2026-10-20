@@ -196,7 +196,7 @@ static func _fvec2(v: Variant, lo: float, hi: float) -> Array:
 	return [clampf(float(a[0]), lo, hi), clampf(float(a[1]), lo, hi)]
 
 
-## WO-617 2D views. Footprint = the picture line seen from above, in world XZ (yaw applied, tilt ignored).
+## Footprint (WO-617, used for placement) = the picture line seen from above, in world XZ (yaw applied, tilt ignored).
 static func footprint(o: Dictionary) -> PackedVector2Array:
 	var local := PackedVector2Array()
 	if str(o.get("type")) == "led_wall":

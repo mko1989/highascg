@@ -1,4 +1,4 @@
-**Status: DONE (2026-10-17, measured + server lease cycle verified on the shop dev box) — open follow-up only: profile the remaining ~7 % idle client CPU. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md), [WO-594](./594_WO_caspar_shm_frame_consumer.md).**
+**Status: DONE (2026-10-17, measured + server lease cycle verified on the shop dev box) — open follow-up only: profile the remaining ~7 % idle client CPU. **20.10: the 2D front/plan views were removed by [WO-621](./621_WO_godot_owner_notes_live_looks_previs.md) N7. The owner says the 17.10 note meant a Live-tab standard↔3D switch (WO-621 N6). The surface refcount and hidden-3D-not-rendered half stands.** Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md), [WO-594](./594_WO_caspar_shm_frame_consumer.md).**
 
 # WO-617 — Previs 2D mode (default) + video surfaces only while something shows them
 
