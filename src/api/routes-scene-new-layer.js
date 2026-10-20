@@ -10,7 +10,11 @@
  * The pure client modules are imported (one implementation). The file's trim/mute defaults ARE applied (WO-592
  * owner decision; the web compose drop skipped them — fixed there as WO-611 #5). Nothing is stored — the client appends the
  * layer and saves it like any edit (deck sync → preview-push → autosave).
- * Route sources (self-route / recursion rules, WO-156) are refused until those rules move server-side.
+ * WO-622: route sources (the Godot Sources "Live" tab — PGM/PRV, DeckLink / audio / USB inputs) go through the web's
+ * WO-156 rule (input-channels.js routeDropRejectionMessage: no whole-channel route into this main's own PGM / PRV, no
+ * route onto its own channel-layer) with the look-stack channels the web compose resolves (look-stack-amcp-channel.js,
+ * active main = mainIdx), and fit to the routed channel's resolution (mixer-fill.js getContentResolution).
+ * A `live_audio` source starts at opacity 0 like the web drop.
  */
 
 const path = require('path')
@@ -24,8 +28,10 @@ let _libs = null
 async function libs() {
 	if (!_libs) {
 		const load = (n) => import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', n)).href)
-		const [helpers, fill, ed] = await Promise.all([load('scene-state-helpers.js'), load('fill-math.js'), load('editor-defaults-constants.js')])
-		_libs = { helpers, fill, ed }
+		const [helpers, fill, ed, inputs, stack, mixer] = await Promise.all(
+			['scene-state-helpers.js', 'fill-math.js', 'editor-defaults-constants.js', 'input-channels.js', 'look-stack-amcp-channel.js', 'mixer-fill.js'].map(load),
+		)
+		_libs = { helpers, fill, ed, inputs, stack, mixer }
 	}
 	return _libs
 }
@@ -34,10 +40,17 @@ function out(status, payload) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
 }
 
-/** source.resolution → server media details → ffprobe of the file on disk (web fetchMediaContentResolution order). */
-async function defaultMediaResolution(ctx, source) {
+/**
+ * source.resolution → server media details (routes / live audio: the channel map) → ffprobe of the file on disk
+ * (web fetchMediaContentResolution order).
+ */
+async function defaultMediaResolution(ctx, source, map = {}, mainIdx = 0) {
 	const { parseResolutionString, getMediaResolutionFromSelf } = require('../engine/scene-native-fill')
 	let r = source.resolution ? parseResolutionString(source.resolution) : null
+	const t = String(source.type || '')
+	if (!(r?.w > 0) && (t === 'route' || t === 'live_audio' || String(source.value).startsWith('route://'))) {
+		r = (await libs()).mixer.getContentResolution(source, { getState: () => ({ channelMap: map }) }, mainIdx)
+	}
 	if (!(r?.w > 0)) r = getMediaResolutionFromSelf(ctx, source.value)
 	if (!(r?.w > 0)) {
 		try {
@@ -64,15 +77,25 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	const src = b.source && typeof b.source === 'object' ? b.source : null
 	if (!sceneId || !src || !String(src.value || '').trim()) return out(400, { ok: false, error: 'sceneId and source.value required' })
 	const type = String(src.type || 'media')
-	if (type === 'route' || String(src.value).startsWith('route://')) {
-		return out(400, { ok: false, error: 'route sources are not supported here yet (WO-156 rules are client-side)' })
-	}
 	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
 
-	const { helpers, fill, ed } = await libs()
+	const { helpers, ed, inputs, stack } = await libs()
 	const n = helpers.nextLayerNumber(scene)
 	if (n < 0) return out(409, { ok: false, error: helpers.LOOK_FULL_MESSAGE })
+	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
+	const map = getMap()
+	const scope = parseInt(String(scene.mainScope ?? ''), 10)
+	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	if (type === 'route' || String(src.value).startsWith('route://')) {
+		const active = { activeScreenIndex: mainIdx }
+		const why = inputs.routeDropRejectionMessage(src.value, {
+			editChannel: stack.resolveLookStackChannelForBus(map, active, scene, 'edit'),
+			pgmChannel: stack.resolveLookStackChannelForBus(map, active, scene, 'pgm'),
+			targetLayerNumber: n,
+		})
+		if (why) return out(400, { ok: false, error: why })
+	}
 	const layer = helpers.defaultLayerConfig(n)
 	const defaults = ed.mergeEditorDefaults(deps.editorDefaults ? deps.editorDefaults() : ctx?.config?.editorDefaults).scene
 	layer.loop = !!defaults.loop
@@ -80,6 +103,7 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	layer.contentFit = defaults.contentFit
 	layer.source = { ...src, type, value: String(src.value), label: src.label || String(src.value) }
 	if (IMAGE_RE.test(String(src.value))) layer.loop = false
+	if (type === 'live_audio') layer.opacity = 0
 	/* WO-592 owner decision (04.10): a dropped clip brings its file's trim/mute defaults — via the web's own
 	 * withMediaFileDefaults (the web compose drop missed this until WO-611 #5). */
 	const fileDefaults = deps.fileDefaults ? deps.fileDefaults(String(src.value)) : require('../media/media-library-registry').getEntryByPath(String(src.value))?.defaults
@@ -89,13 +113,9 @@ async function handleNewLayer(body, ctx, deps = {}) {
 		Object.assign(layer, mfd.fileDefaultsPatchForNewSource(layer.source))
 	}
 
-	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
-	const map = getMap()
-	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
 	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
 	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
-	const fit = await fitFillForSource(ctx, layer.source, layer.contentFit, canvas, deps.mediaResolution)
+	const fit = await fitFillForSource(ctx, layer.source, layer.contentFit, canvas, deps.mediaResolution, map, mainIdx)
 	if (fit.fill) layer.fill = fit.fill
 	return out(200, { ok: true, layer, mainIdx, contentResolution: fit.contentResolution })
 }
@@ -104,9 +124,9 @@ async function handleNewLayer(body, ctx, deps = {}) {
  * Web reapplyLayerFrameForContentFit / applyNativeFillForSource: fill for `contentFit` from the source's
  * resolution on `canvas`; `fill: null` when the resolution is unknown (caller keeps the current fill).
  */
-async function fitFillForSource(ctx, source, contentFit, canvas, mediaResolution = null) {
+async function fitFillForSource(ctx, source, contentFit, canvas, mediaResolution = null, map = {}, mainIdx = 0) {
 	const { fill } = await libs()
-	const contentRes = await (mediaResolution ? mediaResolution(source) : defaultMediaResolution(ctx, source))
+	const contentRes = await (mediaResolution ? mediaResolution(source) : defaultMediaResolution(ctx, source, map, mainIdx))
 	if (!contentRes) return { fill: null, contentResolution: null }
 	const rect = fill.sceneLayerPixelRectForContentFit(canvas.width, canvas.height, contentRes.w, contentRes.h, contentFit || 'native')
 	return { fill: fill.pixelRectToFill(rect, canvas), contentResolution: contentRes }

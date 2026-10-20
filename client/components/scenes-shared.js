@@ -457,31 +457,6 @@ export function parseRouteChannelLayer(value) {
 // many existing importers. Imported (not `export … from`) because this module also uses it.
 export { parseRouteValue }
 
-/**
- * WO-156: rejection message for assigning a route source to a look, or null when allowed.
- * Blocks:
- *  - whole-channel routes to the look's own PGM or PRV/edit channel (`route://3` onto ch 3
- *    wedges the channel in CasparCG — the on-air incident behind WO-156);
- *  - same-channel routes to the exact target layer (Caspar recursion; pre-existing rule).
- * Same-channel routes to a *different* layer stay allowed — that is intra-look routing.
- * @param {unknown} value — dropped source value
- * @param {{ editChannel?: number | null, pgmChannel?: number | null, targetLayerNumber?: number | null }} target
- * @returns {string | null} toast message when the drop must be rejected
- */
-export function routeDropRejectionMessage(value, { editChannel = null, pgmChannel = null, targetLayerNumber = null } = {}) {
-	const parsed = parseRouteValue(value)
-	if (!parsed) return null
-	if (parsed.layer == null) {
-		if (pgmChannel != null && parsed.channel === Number(pgmChannel)) {
-			return `Cannot use route://${parsed.channel} here — it routes this screen's program channel (${parsed.channel}) into itself and freezes the channel.`
-		}
-		if (editChannel != null && parsed.channel === Number(editChannel)) {
-			return `Cannot use route://${parsed.channel} here — it routes this screen's preview channel (${parsed.channel}) into itself and freezes the channel.`
-		}
-		return null
-	}
-	if (editChannel != null && targetLayerNumber != null && parsed.channel === Number(editChannel) && parsed.layer === Number(targetLayerNumber)) {
-		return 'A layer cannot play a route to itself (same channel and layer).'
-	}
-	return null
-}
+// routeDropRejectionMessage (WO-156) lives in input-channels.js so POST /api/scene/new-layer (WO-622) runs the same
+// rule server-side; re-exported here for the web importers.
+export { routeDropRejectionMessage } from '../lib/input-channels.js'

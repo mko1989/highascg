@@ -187,7 +187,7 @@ func _draw_frame() -> void:
 		var r := _fill_rect(l.get("fill", {}) if l.get("fill") is Dictionary else {})
 		var sel := i == _sel
 		_overlay.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
-		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _short(str(l.source.value))], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
+		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _name(l.source)], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
 		var crop: Variant = _crop_of(l)
 		if crop != null:
 			_overlay.draw_rect(_crop_rect(r, crop), CROP_COLOR, false, 1.5)
@@ -335,8 +335,8 @@ func _refresh_list() -> void:
 	_title.text = "Edit look: %s  (main %d → PRV)" % [look().get("name", "?"), main + 1]
 	_list.clear()
 	for l in _layers():
-		var src := str((l.get("source", {}) as Dictionary).get("value", "")) if l.get("source") is Dictionary else ""
-		_list.add_item("L%d  %s" % [int(l.get("layerNumber", 0)), _short(src) if src != "" else "(empty)"])
+		var src: Dictionary = l.source if l.get("source") is Dictionary else {}
+		_list.add_item("L%d  %s" % [int(l.get("layerNumber", 0)), _name(src) if str(src.get("value", "")) != "" else "(empty)"])
 	if _sel >= 0:
 		_select(_sel, false)  # a background project update keeps the selection but never takes the Inspector back
 
@@ -348,6 +348,14 @@ func _hold(on: bool) -> void:
 		VideoSurfaces.acquire(_role, self)
 	else:
 		VideoSurfaces.release(_role, self)
+
+
+## Media: the file name; live / template sources (WO-622): their label ("DeckLink 2", not "5-2"), as the web layer row.
+static func _name(src: Dictionary) -> String:
+	var label := str(src.get("label", ""))
+	if str(src.get("type", "media")) != "media" and label != "":
+		return label
+	return _short(str(src.get("value", "")))
 
 
 static func _short(s: String) -> String:

@@ -4,9 +4,11 @@ extends VBoxContainer
 ## WO-602 slice 9: an EFFECTS group (web sources-panel-effects.js — the registry by category, filtered by label or
 ## category) whose items drag {type: "effect"} onto timeline clips.
 ## WO-605 slice 12: a DeckLink port dragged off the Devices rear panel drops on the list and becomes a live input
-## (web sources-panel-decklink-drop.js, decklink_drop_flow.gd); the status line under the list reports it, the Live
-## tab opens (`tab_requested`), the Devices tab marks Caspar restart-dirty when the plan needs it (`caspar_changed`) and
-## re-reads the device view afterwards (`connector_dropped`).
+## (web sources-panel-decklink-drop.js, decklink_drop_flow.gd).
+## WO-622: two tabs like the web Sources panel — Media (this tree) and Live (live_sources_panel.gd: PGM/PRV routes,
+## DeckLink / audio / USB inputs, saved live sources, all draggable onto the look editor). A DeckLink dropped on the
+## Media tree switches to Live, which maps it and highlights the new source; the signals are Live's, re-emitted for
+## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -16,7 +18,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
-const DropIo := preload("res://features/devices/decklink_drop_io.gd")
+const LivePanel := preload("res://features/live/live_sources_panel.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -24,8 +26,8 @@ var _tree: Tree
 var _rows: Array = []
 var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
-var _status: Label
-var _dropping := false
+var _tabs: TabContainer
+var live: LivePanel
 
 
 func _ready() -> void:
@@ -38,25 +40,34 @@ func _ready() -> void:
 	head.add_child(l)
 	var refresh := Button.new()
 	refresh.text = "↻"
-	refresh.tooltip_text = "Reload the media list"
-	refresh.pressed.connect(load_media)
+	refresh.tooltip_text = "Reload the list"
+	refresh.pressed.connect(func() -> void: load_media() if _tabs.current_tab == 0 else live.reload())
 	head.add_child(refresh)
 	add_child(head)
+	_tabs = TabContainer.new()
+	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	add_child(_tabs)
+	var media := VBoxContainer.new()
+	media.name = "Media"
+	media.add_theme_constant_override("separation", 4)
+	_tabs.add_child(media)
+	live = LivePanel.new()
+	live.name = "Live"
+	_tabs.add_child(live)
+	live.tab_requested.connect(tab_requested.emit)
+	live.caspar_changed.connect(caspar_changed.emit)
+	live.connector_dropped.connect(connector_dropped.emit)
 	_filter = LineEdit.new()
 	_filter.placeholder_text = "Filter…"
 	_filter.text_changed.connect(func(_t: String) -> void: _build())
-	add_child(_filter)
+	media.add_child(_filter)
 	_tree = Tree.new()
 	_tree.hide_root = true
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tree.set_drag_forwarding(_drag_data, func(_at: Vector2, data: Variant) -> bool: return not _dropping and Drop.parse(data) != "",
-		func(_at: Vector2, data: Variant) -> void: _drop_connector(Drop.parse(data)))
-	add_child(_tree)
-	_status = Label.new()
-	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_status.add_theme_font_size_override("font_size", 12)
-	_status.visible = false
-	add_child(_status)
+	_tree.set_drag_forwarding(_drag_data, live.can_drop_connector, func(_at: Vector2, data: Variant) -> void:
+		_tabs.current_tab = 1
+		live.drop_connector(Drop.parse(data)))
+	media.add_child(_tree)
 	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
 	inspector.library_changed.connect(load_media)
 	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
@@ -68,6 +79,8 @@ func _ready() -> void:
 			inspector.show_media(meta.row))
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
+	if Config.args.has("sources-tab"):  # dev: open on Media (0) or Live (1)
+		_tabs.current_tab = int(Config.args["sources-tab"])
 	load_media()
 
 
@@ -144,21 +157,6 @@ func _drag_data(at: Vector2) -> Variant:
 	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
 	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
 	return data
-
-
-## mapDecklinkToLiveInput, one at a time.
-func _drop_connector(cid: String) -> void:
-	_dropping = true
-	var io := DropIo.new()
-	io.on_status = func(text: String, ok: bool) -> void:
-		_status.text = text
-		_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED if ok else ThemeBuilder.ERROR)
-		_status.visible = true
-	io.on_dirty = func() -> void: caspar_changed.emit()
-	io.on_tab = func(name: String) -> void: tab_requested.emit(name)
-	await Drop.new(io).to_live_input(cid)
-	_dropping = false
-	connector_dropped.emit()
 
 
 func _exit_tree() -> void:
