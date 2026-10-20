@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs and modals open; logs window done 20.10. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
+**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs and modals open; logs window, Diagnostics, Updates, Nuclear done 20.10. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
 
@@ -389,3 +389,30 @@ pressed, nothing installed** (status `{"active":false}`; this dev box runs from 
 `POST /api/settings` → dock File browser → prompt → "wrong" → "Wrong password — try again." → right one → thunar
 opened (`dock file-manager → 200`), closed again; password removed, `config/ui.json` byte-identical to the backup.
 Godot tests 16231 pass.
+
+## 2026-10-20 — Settings → Nuclear
+
+**Investigation.** Web `settings-modal.js:120-205` (+ `settings-modal-logic.js`): Require-password checkbox +
+password field, then host actions (restart WM, reboot, shut down), Calamares install, Caspar stop/start/restart, with
+status from `GET /api/system/setup` (`casparService`, `calamares`). Building it found WO-611 #6: the settings GET
+redacted the *boolean* `ui.nuclearRequirePassword`, so every client showed it off (fixed `7e313ca2`). The
+password and hash stay `'[REDACTED]'`; the shared `Form.text()` would hydrate that string and post `""` on focus exit.
+
+**What was done.**
+- `settings_panes.gd` `nuclear(f)`: the checkbox via `Form.check`; the password row is a dedicated secret LineEdit
+  (not `Form.text`) that posts only non-empty typed text and then clears itself — the redacted value is never
+  shown or sent back. The row only shows while the requirement is ticked.
+- `features/settings/nuclear_pane.gd`: the action buttons, each behind a ConfirmationDialog (also the WM restart,
+  which closes this GUI; Caspar start has none, like the web) and `NuclearGate.post` (password prompt on 403).
+  Caspar status line + Install enabled only when Calamares is installed with sudo launch, with a tooltip saying why
+  not. Caspar actions re-read the status after 0 / 3 / 30 s. **Cancel gets the default focus** (a stray Enter must
+  not reboot the box); the same was applied to the Updates → Install confirm.
+- `settings_tab.gd`: `Nuclear` tab between Diagnostics and About.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16231/0. Pane shows "Caspar scanner: active · server: active",
+Install enabled (Calamares installed). Ticking the checkbox → `ui.json` `nuclearRequirePassword: true`; typing
+`t3st` + Enter → `nuclearPasswordHash: scrypt$…`, field cleared. Start CasparCG (no-op on active units —
+`caspar-systemd-control.sh start` only `systemctl start`s) → password prompt; wrong → "Wrong password — try again.";
+right → journal `sudo … caspar-systemd-control.sh start`, pane "Done.". Reboot → confirm with Cancel focused →
+Cancel (uptime unchanged). `ui.json` restored byte-identical (`cmp`). NOT pressed: WM restart, reboot, shut down,
+install, Caspar stop/restart (owner checklist).

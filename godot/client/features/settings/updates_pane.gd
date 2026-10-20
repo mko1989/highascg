@@ -35,7 +35,9 @@ func _ready() -> void:
 	_apply = Button.new()
 	_apply.text = "Install latest release"
 	_apply.disabled = true
-	_apply.pressed.connect(func() -> void: _confirm.popup_centered())
+	_apply.pressed.connect(func() -> void:
+		_confirm.popup_centered()
+		_confirm.get_cancel_button().grab_focus.call_deferred())
 	row.add_child(_apply)
 	add_child(row)
 	_check = _note("")

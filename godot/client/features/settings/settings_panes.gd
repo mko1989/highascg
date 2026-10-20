@@ -123,3 +123,30 @@ static func diagnostics(f: Form, bundle: Button, logs: Button, status: Label) ->
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	f.add_child(status)
 	f.note("The logs window also opens from the connection eyes (top right).")
+
+
+## Web Settings → Nuclear, password part (settings-modal-logic.js). GET /api/settings redacts the password and its hash;
+## the field stays empty ("[REDACTED]" is never shown or sent back); only typed text is posted, hashed server-side.
+static func nuclear(f: Form) -> void:
+	f.heading("Danger zone")
+	f.note("These actions can interrupt output immediately.")
+	var req := f.check("Require password for nuclear actions", "ui.nuclearRequirePassword", false)
+	var g := f.group()
+	f.target = g
+	var pw := LineEdit.new()
+	pw.secret = true
+	pw.custom_minimum_size.x = 320
+	pw.placeholder_text = "type to set or change (Enter)"
+	var commit := func() -> void:
+		if pw.text.strip_edges() != "":
+			Settings.patch({"ui": {"nuclearPassword": pw.text.strip_edges()}})
+			pw.text = ""
+	pw.text_submitted.connect(func(_t: String) -> void: commit.call())
+	pw.focus_exited.connect(commit)
+	f._row("Nuclear password", pw)
+	f.note("Asked for by reboot / shut down / Caspar stop, updates, Tailscale, DeckLink and the dock while required.")
+	f.target = f
+	var sync := func() -> void:
+		g.visible = req.button_pressed
+	req.toggled.connect(func(_on: bool) -> void: sync.call())
+	f.on_hydrate(sync)
