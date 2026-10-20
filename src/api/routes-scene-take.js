@@ -16,6 +16,7 @@ const { withTakeGroup } = require('../engine/take-sync-barrier')
 const { clearSceneProgramLookStackLayers } = require('../engine/scene-exit-layers')
 const { resolveSceneById } = require('../engine/project-scenes')
 const { withScreenGlobalBorderForChannel } = require('../engine/global-border-control')
+const { missingMediaField } = require('./media-index') // WO-603: web warnMissingMediaOnTake, decided in node
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
 const {
 	stripEphemeralTakeFields,
@@ -484,6 +485,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 			ok: true,
 			sceneLive: liveSceneState.getAll(),
 			playbackMatrix: matrix,
+			...missingMediaField(ctx, b.incomingScene),
 			...(takeFailures.length
 				? { amcpFailures: takeFailures.map((f) => ({ code: f.code, command: f.command, line: f.line })) }
 				: {}),

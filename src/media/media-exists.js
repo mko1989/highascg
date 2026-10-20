@@ -51,4 +51,28 @@ function clipMissing(value, index) {
 	return true
 }
 
-module.exports = { buildMediaIndex, clipMissing }
+/** Layer sources that are not plain media files (web NON_PLAIN_MEDIA_LAYER_TYPES). */
+const NON_PLAIN_MEDIA_LAYER_TYPES = new Set([
+	'timeline',
+	'template',
+	'live_audio',
+	'placeholder',
+	'effect',
+	'browser',
+	'route',
+])
+
+/** Missing plain-media values across a look's layers + playlists (web missingMediaInScene). @returns {string[]} */
+function missingMediaInScene(scene, index) {
+	const out = []
+	for (const layer of scene?.layers || []) {
+		if (NON_PLAIN_MEDIA_LAYER_TYPES.has(layer?.source?.type)) continue
+		const vals = []
+		if (layer?.source?.value) vals.push(layer.source.value)
+		if (Array.isArray(layer?.playlist)) for (const it of layer.playlist) if (it?.value) vals.push(it.value)
+		for (const v of vals) if (clipMissing(v, index) === true && !out.includes(v)) out.push(v)
+	}
+	return out
+}
+
+module.exports = { buildMediaIndex, clipMissing, missingMediaInScene }

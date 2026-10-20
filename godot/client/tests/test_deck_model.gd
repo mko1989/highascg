@@ -79,3 +79,13 @@ func test_preview_bus_available() -> void:
 	t.ok(not DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": []}, 0), "no prv → PGM-only")
 	t.ok(not DeckModel.preview_bus_available({"programChannels": [1], "previewChannels": [2], "previewEnabledByMain": [false]}, 0), "preview disabled")
 	t.ok(DeckModel.preview_bus_available({"previewChannels": [3]}, 0), "prv without pgm → available")
+
+
+func test_take_warning_names_missing_media_and_amcp_failures() -> void:
+	t.eq(DeckModel.take_warning({"ok": true}), "")
+	t.eq(DeckModel.take_warning(null), "")
+	t.eq(DeckModel.take_warning({"missingMedia": ["clips/intro", "C:\\x\\gone"]}), "⚠ Missing in Caspar media: intro, gone")
+	var fails := {"amcpFailures": [{"command": "PLAY 1-10 \"AMB\" LOOP", "line": "404 PLAY FAILED"}, {"command": "x"}]}
+	t.eq(DeckModel.take_warning(fails), "⚠ 2 command(s) failed during take — first: PLAY 1-10 \"AMB\" → 404 PLAY FAILED")
+	t.eq(DeckModel.take_warning({"missingMedia": ["a"], "amcpFailures": [{"command": "STOP 1-2", "code": 501}]}),
+		"⚠ Missing in Caspar media: a · ⚠ 1 command(s) failed during take — first: STOP 1-2 → 501")

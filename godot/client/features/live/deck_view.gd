@@ -230,7 +230,10 @@ func _on_card_input(event: InputEvent, scene_id: String, main: int) -> void:
 func request_take(scene_id: String, main: int, target: String) -> Dictionary:
 	var res: Dictionary = await Api.post_json("/api/scene/take-look", {"sceneId": scene_id, "mainIdx": main, "target": target})
 	var what := "TAKE" if target == "program" else "PRV"
-	if res.ok:
+	var warn := DeckModel.take_warning(res.data) if res.ok else ""
+	if warn != "":
+		action_result.emit("%s %s" % [what, warn], false)
+	elif res.ok:
 		action_result.emit("%s ok" % what, true)
 	else:
 		action_result.emit("%s refused: %s" % [what, res.error], false)

@@ -493,6 +493,60 @@ Remote (HTTP streaming) upload; parity checklist. → slice 8.
 - Not covered: a remote client on another machine (WO-610, deferred) and a WeTransfer link. The upload has no
   Cancel; the web upload has none either.
 
-### Still open
+### Still open (after slice 8)
 
-Parity checklist.
+Parity checklist; the slice-9 gaps below.
+
+## Slice 9 (20.10) — parity gaps: take warnings, …
+
+Gaps found while checking slices 1–8 against the web: no warning when a take carries media Caspar does not have, no
+AMCP-failure note on a take, no Delete key on the media selection, no folder delete.
+
+### 9a — missing media and failed commands on a take
+
+#### Investigation
+
+- The web warns before every take, PRV staging included: `scenes-preview-runtime.js:226` and
+  `scenes-editor-support.js:198` call `warnMissingMediaOnTake(incomingScene)`, which toasts
+  `⚠ Missing in Caspar media: <basenames>` from `missingMediaInScene` (`client/lib/media-exists.js:74`). Layers whose
+  `source.type` is timeline / template / live_audio / placeholder / effect / browser / route are skipped (WO-560).
+  Playlist items count like the source.
+- After the take, `toastTakeAmcpFailures(res)` (`media-exists.js:96`) names the first of `res.amcpFailures`. The
+  server already collects these per take (WO-360).
+- The Godot deck takes through `POST /api/scene/take-look` (`deck_view.gd:231`). That route builds the incoming
+  look in node and hands it to `handleSceneTake`, so one field on the take reply reaches every client. Godot read
+  neither field and showed only "PRV ok" / "TAKE ok".
+- `src/media/media-exists.js` already had `clipMissing` and `buildMediaIndex` (slice 5). `routes-scene-take.js`
+  was at 496 lines.
+
+#### What was done
+
+- `src/media/media-exists.js`: `missingMediaInScene(scene, index)`, the web rule with the same
+  `NON_PLAIN_MEDIA_LAYER_TYPES`.
+- New `src/api/media-index.js`:
+  - `mediaIndexFor(ctx)` moved here from `routes-playlist-panel.js`, which re-exports it, so existing imports still
+    work.
+  - `missingMediaField(ctx, scene)` returns `{ missingMedia }` or `{}`.
+- `routes-scene-take.js`: the 200 body spreads `...missingMediaField(ctx, b.incomingScene)`, which costs 2 lines (the
+  file is now 498). The warning is decided in node, so the web can later read it from the reply as well.
+- Godot:
+  - `deck_model.gd`: `take_warning(data)` builds the web wording, joining missing media and the first AMCP failure
+    with " · ".
+  - `deck_view.request_take`: a 200 reply with a warning shows "PRV ⚠ …" / "TAKE ⚠ …" in the error colour instead of
+    "ok".
+
+#### What was VERIFIED
+
+- Offline:
+  - new `smoke-wo603-take-missing-media.test.js` (curated, 4 pass), covering missing and duplicate values, playlist
+    items, timeline / route / template sources, no media list, the ctx catalog read, and the take spread;
+  - full suite 2862 pass / 1 known fail (smoke-wo577);
+  - Godot 16081 pass, including `test_take_warning_names_missing_media_and_amcp_failures`.
+- Box (node restarted, GUI relaunched):
+  - A test look "WO603 S9" with one media layer `wo603/missing_clip_s9` was injected and clicked once to stage it on
+    PRV. The status line read
+    `PRV ⚠ Missing in Caspar media: missing_clip_s9 · ⚠ 1 command(s) failed during take — first: LOADBG 2-10 WO603/MISSING_CLIP_S9 → 404 LOADBG FAILED`,
+    so both fields came from the real take.
+  - Re-staging Opening read "PRV ok", so there was no false positive on a clean look.
+  - Cleanup: the test look was deleted from the deck, leaving 4 looks with PGM and PRV both on look-1, as they were.
+    Nothing was taken to PGM.

@@ -94,3 +94,29 @@ static func _num_at(arr: Variant, i: int) -> float:
 	if arr is Array and i < (arr as Array).size() and (arr[i] is int or arr[i] is float):
 		return float(arr[i])
 	return NAN
+
+
+## WO-603 — what a take reply warns about (web warnMissingMediaOnTake + toastTakeAmcpFailures, media-exists.js:87-106).
+## The server lists the look's missing plain media (`missingMedia`) and the AMCP commands that failed inside the take
+## (`amcpFailures`); "" when the take was clean.
+static func take_warning(data: Variant) -> String:
+	if not (data is Dictionary):
+		return ""
+	var d: Dictionary = data
+	var parts: Array[String] = []
+	var missing: Array = d.get("missingMedia", []) if d.get("missingMedia") is Array else []
+	if not missing.is_empty():
+		var names: Array[String] = []
+		for v in missing:
+			var segs := str(v).replace("\\", "/").split("/", false)
+			names.append(segs[segs.size() - 1] if segs.size() > 0 else str(v))
+		parts.append("⚠ Missing in Caspar media: " + ", ".join(names))
+	var fails: Array = d.get("amcpFailures", []) if d.get("amcpFailures") is Array else []
+	if not fails.is_empty():
+		var first: Dictionary = fails[0] if fails[0] is Dictionary else {}
+		var cmd := " ".join(str(first.get("command", "")).split(" ").slice(0, 3))
+		var why: Variant = first.get("line", "")
+		if str(why) == "":
+			why = first.get("code", "")
+		parts.append("⚠ %d command(s) failed during take — first: %s → %s" % [fails.size(), cmd, str(why)])
+	return " · ".join(parts)

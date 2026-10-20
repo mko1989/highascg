@@ -12,7 +12,7 @@
 
 const liveSceneState = require('../state/live-scene-state')
 const { isTimelessPlaylistItem } = require('../engine/scene-take-lbg-playlist')
-const { buildMediaIndex, clipMissing } = require('../media/media-exists')
+const { clipMissing } = require('../media/media-exists')
 
 const DEFAULT_TIMELESS_SECS = 20
 /** Web timelessSecsOf: the first timeless item's positive duration, else 20 (one copy: engine/playlist-edit.js). */
@@ -31,13 +31,7 @@ function panelItems(playlist, mediaIndex) {
 	}))
 }
 
-function mediaIndexFor(ctx) {
-	try {
-		return buildMediaIndex(require('./media-catalog').getRawMediaCatalog(ctx))
-	} catch {
-		return buildMediaIndex([])
-	}
-}
+const { mediaIndexFor } = require('./media-index')
 
 /**
  * Pure: every timeless item gets `duration: secs` (1…86400, web clamp).
