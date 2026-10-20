@@ -247,6 +247,11 @@ func _matrix_add(what: String) -> void:
 
 ## GET /api/device-view (+ settings once — the cable writes seed from them). A reload asked for while one is in
 ## flight runs again after it, so a mutation is never answered by a read that started before it.
+## Something outside the tab changed Caspar's plan (a DeckLink dropped on Sources).
+func mark_restart_dirty() -> void:
+	_gesture.set_dirty(true)
+
+
 func refresh() -> void:
 	if _loading:
 		_reload_again = true
@@ -429,7 +434,7 @@ func _input(event: InputEvent) -> void:
 	if _gesture.armed():
 		_gesture.cancel()
 		return
-	if _rear.visible and _rear.begin_drag(pos):  # DeckLink edit mode: a label press drags (release on itself opens the page)
+	if _rear.visible and _rear.begin_drag(pos):  # a DeckLink label press drags (release without a drop opens the page)
 		get_viewport().set_input_as_handled()
 		return
 	var port := _rear.label_at(pos) if _rear.visible else ""

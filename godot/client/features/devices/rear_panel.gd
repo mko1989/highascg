@@ -13,6 +13,9 @@ extends PanelContainer
 ## Slice 9b-2: the GPU header's pencil toggles GPU edit mode (gpu_layout.gd `edit`): Show all / Clear layout join the
 ## header, hidden ports come back dimmed, and a GPU label dropped on another swaps the two sockets (`gpu_edit`,
 ## carried out by gpu_output_controls.gd). Turning either mode on hands the first port to open (`edit_toggled`).
+## Slice 12: outside DeckLink edit mode a decklink_io port's label / socket drags too (web marker dragstart): moved
+## 6 px it becomes a GUI drag carrying decklink_drop_flow.gd's payload — a destination card or the Sources list takes
+## it; released without moving it opens the page, as before.
 
 signal add_requested(kind: String)
 signal edit_toggled(first: String)
@@ -25,6 +28,8 @@ const PortIcon := preload("res://features/devices/port_icon.gd")
 const DO := preload("res://features/devices/decklink_order.gd")
 const GL := preload("res://features/devices/gpu_layout.gd")
 const H := preload("res://features/devices/host_channels.gd")
+const Drop := preload("res://features/devices/decklink_drop_flow.gd")
+const DRAG_PX := 6.0
 const ROW_H := 44
 const DOT_TIP := "Start or complete cable at this connector"
 const PLATE := Color("#2b3038")
@@ -40,6 +45,8 @@ var _icons := {}  # connector id → its socket (clicks open the page like the l
 var _deck_ids: Array = []  # the DeckLink ports in panel order
 var _gpu_slots := {}  # GPU connector id → its layout slot id (what the swap moves)
 var _drag := ""  # the DeckLink / GPU port being dragged (edit mode)
+var _io_ids: Array = []  # the decklink_io ports (they drag out as connectors outside edit mode)
+var _press := {}  # {id, at}: a decklink_io press waiting to become a drag or a click
 var _over := ""
 
 
@@ -56,7 +63,9 @@ func show_slots(slots: Array) -> void:
 	_labels = {}
 	_icons = {}
 	_drag = ""
+	_press = {}
 	_deck_ids = []
+	_io_ids = []
 	_gpu_slots = {}
 	var v := VBoxContainer.new()
 	add_child(v)
@@ -93,6 +102,8 @@ func _plate_column(s: Dictionary) -> Control:
 	if s.kind == "decklink":
 		hb.add_child(_pencil(false))
 		_deck_ids = s.items.map(func(it: Dictionary) -> String: return str(it.id))
+		_io_ids = s.items.filter(func(it: Dictionary) -> bool: return it.get("kind") == "decklink_io").map(
+			func(it: Dictionary) -> String: return str(it.id))
 		rows.append({"id": "", "label": "REF"})  # genlock input: drawn, never cabled
 		col.add_child(_plate(rows, s.kind))
 		return col
@@ -165,6 +176,8 @@ func _plate(rows: Array, kind: String) -> Control:
 			l.mouse_filter = Control.MOUSE_FILTER_STOP
 			l.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			l.tooltip_text = "%s — open in the Inspector" % it.label
+			if it.get("kind") == "decklink_io":
+				l.tooltip_text += ", or drag onto a destination (output) or Sources (live input)"
 			if kind == "decklink" and DO.edit:
 				l.tooltip_text = "%s — drag onto another port to swap" % it.label
 				l.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
@@ -244,9 +257,13 @@ func _pencil(gpu: bool) -> Button:
 	return b
 
 
-## Edit mode: a press on a DeckLink / GPU label starts a drag (true = taken).
+## Edit mode: a press on a DeckLink / GPU label starts a swap drag; outside it a press on a decklink_io port arms
+## the connector drag (true = taken).
 func begin_drag(pos: Vector2) -> bool:
 	var id := label_at(pos)
+	if not DO.edit and _io_ids.has(id):
+		_press = {"id": id, "at": pos}
+		return true
 	if not (DO.edit and _deck_ids.has(id)) and not (GL.edit and _gpu_slots.has(id)):
 		return false
 	_drag = id
@@ -255,6 +272,9 @@ func begin_drag(pos: Vector2) -> bool:
 
 
 func _input(event: InputEvent) -> void:
+	if not _press.is_empty():
+		_connector_drag(event)
+		return
 	if _drag == "":
 		return
 	if event is InputEventMouseMotion:
@@ -277,6 +297,18 @@ func _input(event: InputEvent) -> void:
 		elif _same_kind(from, to):
 			DO.save(DO.swap(_deck_ids, from, to))
 			order_changed.emit()
+
+
+func _connector_drag(event: InputEvent) -> void:
+	var id: String = _press.id
+	if event is InputEventMouseMotion and event.global_position.distance_to(_press.at) > DRAG_PX:
+		_press = {}
+		var l := _small("⇢ " + (_labels[id].text if _labels.has(id) and is_instance_valid(_labels[id]) else id), ThemeBuilder.ACCENT)
+		force_drag(Drop.payload(id), l)
+	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		_press = {}
+		get_viewport().set_input_as_handled()
+		open_requested.emit(id)
 
 
 ## A drag from port `a` can land on port `b` (DeckLink onto DeckLink, GPU onto GPU).

@@ -6,6 +6,8 @@ extends VBoxContainer
 ## Under the cards: the "Add live input" band (web device-view-live-sources-render.js) — "+" opens the live-input
 ## dialog (the tab owns it), then live sources that have no host-channel card yet (a DeckLink / USB row opens its
 ## connector page).
+## Slice 12: a DeckLink port dragged off the rear panel drops on a card (not a stream destination) and becomes that
+## destination's output (decklink_drop_flow.gd; the web takes it on the output dots, but ignores which half).
 
 signal selected(id: String)  # "" = cleared; the tab drops a selected cable when a destination takes the Inspector
 signal status(text: String, ok: bool)
@@ -22,6 +24,8 @@ const PortIcon := preload("res://features/devices/port_icon.gd")
 const Inspector := preload("res://features/devices/destination_inspector.gd")
 const HostControls := preload("res://features/devices/host_channel_controls.gd")
 const LI := preload("res://features/devices/live_input_model.gd")
+const Drop := preload("res://features/devices/decklink_drop_flow.gd")
+const DropIo := preload("res://features/devices/decklink_drop_io.gd")
 const PGM := Color("#e74c3c")
 const PRV := Color("#2ecc71")
 
@@ -243,6 +247,9 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 	card.gui_input.connect(func(e: InputEvent) -> void:
 		if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 			select(d.id))
+	if Drop.accepts(d.dest):
+		card.set_drag_forwarding(Callable(), func(_at: Vector2, data: Variant) -> bool: return Drop.parse(data) != "",
+			func(_at: Vector2, data: Variant) -> void: _drop(Drop.parse(data), d))
 	wrap.add_child(card)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 2)
@@ -270,6 +277,14 @@ func _card(d: Dictionary, anchors: Dictionary) -> Control:
 	for l in d.links:
 		wrap.add_child(_label("  • " + str(l), ThemeBuilder.TEXT_MUTED, 11))
 	return wrap
+
+
+## A DeckLink connector dropped on destination `d`: status, then restart-dirty + reload (`changed`).
+func _drop(cid: String, d: Dictionary) -> void:
+	var io := DropIo.new()
+	io.on_status = func(text: String, ok: bool) -> void: status.emit(text, ok)
+	io.on_reload = func() -> void: changed.emit()
+	await Drop.new(io).to_destination(cid, d.dest, d.intent)
 
 
 func _dot(anchors: Dictionary, key: String, tip: String) -> Control:

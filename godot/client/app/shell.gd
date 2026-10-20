@@ -58,6 +58,9 @@ func _ready() -> void:
 	var devices := DevicesTab.new()  # WO-605
 	devices.name = "Devices"
 	tabs.add_child(devices)
+	sources.caspar_changed.connect(devices.mark_restart_dirty)  # WO-605 slice 12: a DeckLink dropped on Sources
+	sources.connector_dropped.connect(devices.refresh)
+	sources.tab_requested.connect(func(n: String) -> void: tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node(n.capitalize())))
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
 	tabs.add_child(settings)

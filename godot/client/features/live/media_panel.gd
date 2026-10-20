@@ -3,10 +3,20 @@ extends VBoxContainer
 ## filter, drag into the look editor. Drag payload = the web's {type, value, label} (operator-compose-tiles.js).
 ## WO-602 slice 9: an EFFECTS group (web sources-panel-effects.js — the registry by category, filtered by label or
 ## category) whose items drag {type: "effect"} onto timeline clips.
+## WO-605 slice 12: a DeckLink port dragged off the Devices rear panel drops on the list and becomes a live input
+## (web sources-panel-decklink-drop.js, decklink_drop_flow.gd); the status line under the list reports it, the Live
+## tab opens (`tab_requested`), the Devices tab marks Caspar restart-dirty when the plan needs it (`caspar_changed`) and
+## re-reads the device view afterwards (`connector_dropped`).
+
+signal tab_requested(name: String)
+signal caspar_changed
+signal connector_dropped
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const Drop := preload("res://features/devices/decklink_drop_flow.gd")
+const DropIo := preload("res://features/devices/decklink_drop_io.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -14,6 +24,8 @@ var _tree: Tree
 var _rows: Array = []
 var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
+var _status: Label
+var _dropping := false
 
 
 func _ready() -> void:
@@ -37,8 +49,14 @@ func _ready() -> void:
 	_tree = Tree.new()
 	_tree.hide_root = true
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tree.set_drag_forwarding(_drag_data, Callable(), Callable())
+	_tree.set_drag_forwarding(_drag_data, func(_at: Vector2, data: Variant) -> bool: return not _dropping and Drop.parse(data) != "",
+		func(_at: Vector2, data: Variant) -> void: _drop_connector(Drop.parse(data)))
 	add_child(_tree)
+	_status = Label.new()
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.add_theme_font_size_override("font_size", 12)
+	_status.visible = false
+	add_child(_status)
 	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
 	inspector.library_changed.connect(load_media)
 	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
@@ -126,6 +144,21 @@ func _drag_data(at: Vector2) -> Variant:
 	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
 	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
 	return data
+
+
+## mapDecklinkToLiveInput, one at a time.
+func _drop_connector(cid: String) -> void:
+	_dropping = true
+	var io := DropIo.new()
+	io.on_status = func(text: String, ok: bool) -> void:
+		_status.text = text
+		_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED if ok else ThemeBuilder.ERROR)
+		_status.visible = true
+	io.on_dirty = func() -> void: caspar_changed.emit()
+	io.on_tab = func(name: String) -> void: tab_requested.emit(name)
+	await Drop.new(io).to_live_input(cid)
+	_dropping = false
+	connector_dropped.emit()
 
 
 func _exit_tree() -> void:

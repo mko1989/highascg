@@ -5,6 +5,7 @@ extends VBoxContainer
 ## inputs, the right otherwise — is a port_icon.gd registered in `anchors` under the cable id, so the cable layer and
 ## the tab's gesture treat it like a rear-panel socket. `highlight` rings the open page's card (blue) and the armed
 ## cable source's (amber), like --selected / --armed.
+## Slice 12: a decklink_io card drags out as a connector (web node.draggable) onto a destination card or Sources.
 
 signal add_requested(kind: String)
 signal open_requested(id: String)
@@ -12,6 +13,7 @@ signal open_requested(id: String)
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const NV := preload("res://features/devices/node_view_model.gd")
+const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const COL_W := 200.0
 const GAP := Vector2(24, 14)
 const CARD := Color("#18181c")
@@ -107,6 +109,13 @@ func _card(n: Dictionary) -> Button:
 	if n.dim:
 		b.modulate.a = 0.55
 	b.pressed.connect(func() -> void: open_requested.emit(str(n.id)))
+	if n.kind == "decklink_io":
+		b.set_drag_forwarding(func(_at: Vector2) -> Variant:
+			var l := Label.new()
+			l.text = "⇢ " + str(n.label)
+			l.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
+			b.set_drag_preview(l)
+			return Drop.payload(str(n.id)), Callable(), Callable())
 	var row := HBoxContainer.new()
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_theme_constant_override("separation", 8)
