@@ -5,8 +5,8 @@ extends "res://features/devices/host_controls_base.gd"
 ## (+ custom W/H/FPS), the detected-modes / custom OS resolution block with Override, the CVT/GTF timing preview
 ## (server GET, debounced 280 ms), and the advanced block (OS backend, EDID override, stretch, colour, name, aspect,
 ## X/Y, Reset). Control values live in gpu_output_ui.gd's dict; every body comes from the golden-tested models.
-## Saves mark Caspar restart-dirty (`dirty`) without rebuilding the page, like the web. Not ported: the layout
-## editor (web edit mode only). Web parity kept on purpose: the EDID override field is shown but never saved
+## Saves mark Caspar restart-dirty (`dirty`) without rebuilding the page, like the web. In GPU edit mode the layout
+## editor (gpu_layout_editor.gd, slice 9b-2) sits under the summary. Web parity kept on purpose: the EDID override field is shown but never saved
 ## (saveCasparSettings has no edid key) — see WO-605 slice 4.
 
 signal dirty()
@@ -16,6 +16,7 @@ const GM := preload("res://features/devices/gpu_modeline_model.gd")
 const GP := preload("res://features/devices/gpu_modeline_preview.gd")
 const GU := preload("res://features/devices/gpu_output_ui.gd")
 const MI := preload("res://core/math_input.gd")
+const GLE := preload("res://features/devices/gpu_layout_editor.gd")
 const BASE_CHECKS := [["fullscreen", "Fullscreen", "Run in fullscreen mode"], ["windowed", "Windowed", "Run in windowed mode"],
 	["border", "Border", "Show window border"], ["vsync", "V-sync", "Sync with monitor refresh rate"]]
 ## LineEdit field → [placeholder, min, decimals] (decimals < 0 = plain text, no math commit)
@@ -36,6 +37,7 @@ var _timer := Timer.new()
 var _seq := 0
 var _inflight := {}  # save kind → true while posting
 var _again := {}  # save kind → another edit landed meanwhile; post the newest body once more
+var _layout: Variant = null  # the layout editor's flow while GPU edit mode is on (its rows outlive the reloads)
 
 
 func _init() -> void:
@@ -62,6 +64,14 @@ func show_connector(conn: Dictionary, payload: Dictionary, settings: Variant) ->
 	ui = GU.initial(cst, mst)
 	page.add_child(_title(str(conn.get("label")) if GO.H.truthy(conn.get("label")) else conn_id))
 	page.add_child(_summary(GO.summary_rows(conn, payload, settings)))
+	if GLE.FLOW.GL.edit:  # web: the layout editor sits between the summary and the toggles
+		if _layout == null or _layout.stale:
+			_layout = GLE.FLOW.new(payload, GLE.FLOW.GL.saved(), _io())
+		var ed := GLE.new()
+		ed.setup(_layout)
+		page.add_child(ed)
+	else:
+		_layout = null
 	page.add_child(_toggles())
 	page.add_child(_video_mode(mst))
 	page.add_child(_system_resolution(mst))
@@ -91,8 +101,32 @@ func show_connector(conn: Dictionary, payload: Dictionary, settings: Variant) ->
 
 func close() -> void:
 	conn_id = ""
+	_layout = null
 	_timer.stop()
 	_seq += 1
+
+
+func _io() -> Variant:
+	return GLE.make_io(func(text: String) -> bool: return await _confirm(text, "OK"),
+		func(text: String, ok: bool) -> void: status.emit(text, ok), func() -> void: reload.emit(false))
+
+
+## The rear panel's GPU edit actions (web device-view-caspar-render.js pencil / Show all / Clear layout, -markers.js
+## label drag), here to share the page's io; each drops the open editor's rows so it re-reads the saved layout.
+func rear_action(what: String, a: String, b: String, payload: Dictionary) -> void:
+	_layout = null
+	match what:
+		"show_all":
+			GLE.FLOW.GL.save(GLE.FLOW.show_all(payload.get("live"), GLE.FLOW.suggested_outs(payload)))
+			status.emit("All GPU ports shown", true)
+			reload.emit(false)
+		"clear":
+			await GLE.FLOW.clear_layout(_io())
+		"swap":
+			var saved := GLE.FLOW.GL.saved()
+			var flow = GLE.FLOW.new(payload, saved, _io())
+			flow.items = GLE.FLOW.GL.layout_items(GLE.FLOW.GL.column_entries(payload, saved))
+			await flow.swap(a, b)
 
 
 ## Opening a jack whose consumer keys were never written seeds them (web), then reloads so the page reads them back.

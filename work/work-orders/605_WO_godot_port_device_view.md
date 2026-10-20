@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Next: slice 9b-2/3 GPU edit mode + layout editor. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Next: Node view / Matrix view toggles (last unported Device View piece). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -1001,3 +1001,159 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   - With `[gpu] layout` = gpu_p0 hidden + gpu_p2 "Wall", the header reads "GPU (1 hidden)", DP 0/1 is gone, P2 reads
     "Wall", and cables still land.
 - The folder is golden / model-tested only. The box has no non-topology GPU socket.
+
+## Slice 9b-2/3 — GPU edit mode + layout editor (2026-10-20, DONE)
+
+### Investigation
+- **GPU edit mode** (`device-view-caspar-render.js:220-330`).
+  - The GPU header's pencil toggles `gpuEditMode`, which sets the band class `device-view--edit-mode`. DeckLink has
+    its own `-decklink` class, so the two modes are independent.
+  - While edit mode is on:
+    - **Show all** (`buildGpuLayoutItemsFromLive(live, gpuOuts)` with every row visible) writes localStorage only.
+      Status "All GPU ports shown".
+    - **Clear layout** confirms "Clear saved GPU layout and rebuild from detected outputs?", clears the prefs, POSTs
+      `/api/system/gpu-ports-reset {}` (reply ignored), then shows "GPU layout cleared — refreshed from detected
+      outputs".
+    - Hidden markers come back at opacity 0.3.
+    - Turning the mode on opens the first layout item's page.
+- **Inspector editor** (`device-view-inspector-gpu-layout-editor.js`, appended after the GPU page summary).
+  - Rows are `layoutItemsFromGpuEntries(buildGpuSelectablePortEntries({live, suggested gpu outs, savedTopology:
+    payload.gpuPhysicalTopology}))`. The device-view payload carries no `gpuPhysicalTopology`, so the order comes from
+    the live `effectiveTopology`. The server reconciles that from the saved config (`gpu-physical-map.js:253`).
+  - Each row has Port A / Port B (None + `collectGpuPortNameOptions`) and Hide connector.
+    - Any change recomputes the label: eDP pairs joined " · ", else `HDMI|DP` + the suffixes after the first `-`,
+      joined "/".
+    - It also recomputes the type (hdmi > edp > dp) and the hidden flag.
+    - The web keeps duplicates, e.g. Port A = DP-1 on a DP-0/DP-1 row gives `[DP-1, DP-1]`, labelled "DP 1/1".
+  - Rows can be dragged with half insert (`dropAfter`).
+  - **Unmapped live displays**: `physicalMap.ports[].unmapped` rows. A socket select over the `gpu_pN` rows plus
+    **Assign** fills pairs[0], else pairs[1], else replaces pairs[0].
+  - **Bulk buttons**: Show all / Hide disconnected (pairs vs `live.gpu.displays[].connected`) / Hide all.
+  - **Save** (`saveAndRefresh`) writes localStorage, then POSTs `/api/settings {gpuPhysicalTopology}` when there are
+    `gpu_pN` rows, then shows "GPU layout saved (topology persisted)" and reloads.
+  - **Export** writes `<MODEL>_<n>ports_layout.json`: the model upper-cased, default `NVIDIA_GPU`, whitespace → `_`.
+  - **Load**:
+    - a non-array alerts;
+    - otherwise `mergeLoadedGpuLayout` runs: rows named in the file merge over theirs or are appended, and file
+      order comes first;
+    - then it saves, POSTs the topology and alerts.
+  - **Reset layout**:
+    - POSTs gpu-ports-reset `{}`.
+    - With no pairs (or an error): confirm, clear the prefs, rebuild from live.
+    - With pairs: confirm the current-vs-discovered diff, clear the prefs and merge the discovery. It then POSTs
+      `{persist: true}` and, when that reply isn't `persisted`, the topology itself.
+- **Rear marker drag** (`-markers.js:246-300`): in edit mode, dropping one GPU marker on another swaps the two layout
+  items in localStorage.
+- **Web gaps**:
+  1. The rear GPU marker swap writes localStorage only. The column's order comes from the topology (slice 9b-1), so the
+     swap is undone on the next load and never sticks.
+  2. A failed topology POST (Save / an edit / Load / the Reset fallback) is only logged to the console. The status
+     still says "GPU layout saved (topology persisted)" / "…saved to server.".
+  3. The bulk buttons and Load don't re-render the rows. `load()` keeps the inspector DOM, so the ticks and order
+     stay stale until the next edit re-renders.
+  4. After Reset layout from discovery, the rows keep the old Hide ticks (merge over the current rows) although the
+     saved layout they came from was just cleared. The rear panel shows everything; the editor disagrees.
+  5. A pair name not among the options (e.g. HDMI-0 from discovery on a box without one) shows as None in its
+     `<select>`, while the row still holds it.
+  6. Still not ported (unchanged): the Node view / Matrix view toggles.
+
+### What was done
+- `features/devices/gpu_layout_flow.gd` (new): the editor's rows and every request, over an injected `io`
+  (`post_json` / `confirm` / `reload` / `status` / `prefs_save` / `prefs_clear`).
+  - Rows and options: `rows`, `unmapped`, `edit`, `move`, `bulk`, `assign`.
+  - Requests: `save`, `export_name` / `export_text`, `load_text` + `merge_loaded`, `reset` with `layout_rows`.
+  - Rear actions: `show_all`, `clear_layout`, `swap`.
+  - Departures from the web, on purpose:
+    - Gap 2: a failed POST is reported ("…topology not saved: <error>", red).
+    - The web's alerts go to the status line.
+    - Gap 4: after a Reset the flow is marked `stale`, so the page re-reads its rows.
+    - Gap 1: the rear swap also saves the topology, so it sticks.
+- `features/devices/gpu_layout_editor.gd` (new): the editor UI. It builds:
+  - the heading;
+  - socket rows (title + ≡, Port A/B OptionButtons, Hide connector), dragged via `set_drag_forwarding` with the
+    half-insert highlight;
+  - the unmapped section;
+  - the bulk and action rows (Export / Load through FilePick).
+
+  Its `Io` class wires the flow to Api / the client prefs / the page's confirm, status and reload. Gap 3 needs no
+  handling: every change rebuilds the page from the flow.
+- `gpu_layout.gd`:
+  - `static var edit` (GPU edit mode);
+  - `column_entries` split out of `column`, because the rear swap needs the column's layout items.
+- `gpu_output_controls.gd`:
+  - The editor goes between the summary and the toggles (web position) while `GL.edit` is on.
+  - The page keeps the flow across reloads (web: the editor outlives `load()`) until it closes, edit mode goes off
+    or a reset makes it stale.
+  - `rear_action(what, a, b, payload)` carries out the rear Show all / Clear layout / swap. They live here, not in
+    `devices_tab.gd`, to keep that file under 500 lines.
+- `rear_panel.gd`:
+  - The pencil is generic (`_pencil(gpu)`). The GPU one carries the web tooltip.
+  - In GPU edit mode the header gains Show all / Clear layout, and hidden rows show at 0.3 alpha.
+  - GPU labels drag onto GPU labels; the drop emits `gpu_edit("swap", slot, slot)`.
+  - `edit_toggled(first)` now carries the first port to open. This replaces the tab's own DeckLink lookup and
+    serves both modes.
+  - **Bug found on the box and fixed**: the release handler cleared `_drag` before the kind check read it, so a GPU
+    drop did nothing. `_same_kind(a, b)` now takes both ids.
+- `devices_tab.gd`: the edit lambda opens `first`, and `gpu_edit` routes to `_gpu.rear_action`. Net +1 line (496).
+
+### What was VERIFIED
+- `tests/test_devices_gpu_editor.gd` + `tests/golden/devices_gpu_editor.json`.
+  - The scratchpad generator `ge_golden.mjs` (`sv_shim.part` DOM + api stub + localStorage + confirm / alert /
+    download capture) drives the real web editor through 5 cases:
+    - box edits: ports, hide, 4 drops including two no-ops, the bulk buttons, Save, Export;
+    - load + reset: a non-array file, bad JSON, a merge file, Reset with no discovery (cancel / OK), with discovery
+      (cancel / OK / `persisted`), and with a 500;
+    - Assign ×3;
+    - eDP + HDMI labels and types, Assign onto a socket already holding that display, Hide disconnected, Export;
+    - a GPU-model export name and a failed topology save.
+  - For every step the test compares the localStorage writes / clears, POST bodies, confirms (exact text including
+    the diff), reloads, the download (name + byte-identical text), status + ok, rows and the unmapped list.
+  - The test maps three things on purpose:
+    - alerts → status;
+    - stale web rows → what it saved;
+    - the failed POST → the Godot message.
+  - Plus Show all vs the web's `buildGpuLayoutItemsFromLive`, `merge_loaded` and the `layout_rows` edge cases.
+  - Mutation check: these single edits each fail the suite:
+    - insert-after flipped;
+    - persisted ignored;
+    - eDP join changed;
+    - hdmi/edp type order swapped;
+    - the HDMI label dropped;
+    - the Assign "already holds this display" branch.
+
+    The last three were only caught after adding the eDP/HDMI case.
+- Godot `--test` 12210 / 12210, `--check` boot OK, the file-line gate passes (0 over 500).
+- Box GUI (config backed up first; the client's `devices.cfg` was the only other write):
+  - **Pencil**: opens P0's page with the editor under the summary. The header gains Show all / Clear layout, and
+    hidden DP 0/1 shows dimmed.
+  - **Port B → None** on socket 2: `general.json` gpu_p1 `dpB ""`, prefs saved, status green. The rear label and
+    cable list read "DP 2".
+  - **Editor drag**, socket 4 onto socket 1's upper half: server topology p3,p0,p1,p2, and the rear plate follows.
+  - **Rear label drag**: "DP 6/7 · DP-6" onto "Wall" swaps p3 ↔ p2 on the server. The cable follows its socket.
+  - **Export**: `NVIDIA_GPU_4ports_layout.json`, byte-identical to Node's `JSON.stringify(items, null, 2)`.
+  - **Load**: a non-array file gives a red status. A valid file merges (p3 first as "Main", p1 hidden), saves the
+    topology and shows "GPU layout loaded from file."; the rear reads "(2 hidden)".
+  - **Hide disconnected**: hides exactly the two sockets without a connected display (live DP-6 / DP-2).
+  - **Reset layout**:
+    - The diff confirm lists current vs discovered. Cancel leaves `general.json`'s md5 unchanged.
+    - OK writes the discovered topology with `gpuPhysicalTopologyOperatorSaved: true`, clears the prefs, and shows
+      "GPU layout reset from discovery and saved to server.".
+    - The rows re-read after a relaunch.
+  - **Hide all, then rear Show all**: prefs all visible, `general.json` md5 untouched (web: Show all saves no
+    topology), status "All GPU ports shown", and the editor re-reads.
+  - **Clear layout**: Cancel keeps the prefs. OK clears them and shows "GPU layout cleared — refreshed from detected
+    outputs".
+  - **Pencil off**: the editor and header buttons are gone.
+  - Prefs + topology survived a GUI restart.
+  - Cleanup:
+    - `config/general.json` restored from the backup and node restarted; the md5 matches the backup after the
+      restart. The run had changed only `gpuPhysicalTopologyOperatorSaved`; the topology itself came back to
+      discovery = original.
+    - `.highascg-state.json` differed only in look-layer transforms not touched by this slice, so it was left alone
+      as live state.
+    - The test files and the final `devices.cfg` moved to the scratchpad (`devices.cfg` did not exist before).
+    - The GUI was relaunched.
+- **Golden / model-tested only**:
+  - Assign: the box has no unmapped display.
+  - A failing topology POST: the server can't be made to fail it on demand.
+  - Reset with no discovery.

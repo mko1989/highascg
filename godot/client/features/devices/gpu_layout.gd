@@ -11,6 +11,9 @@ const H := preload("res://features/devices/host_channels.gd")
 
 const PREFS := "user://devices.cfg"
 
+## Rear-panel GPU edit mode (web gpuEditMode: the pencil; the GPU page shows the layout editor while it is on).
+static var edit := false
+
 
 ## readGpuLayoutPrefs over a saved list: {by_id, order} (rows without a gpu_pN[__tag] id are skipped).
 static func prefs_of(list: Variant) -> Dictionary:
@@ -126,6 +129,16 @@ static func rear_items(live: Variant, list: Array) -> Array:
 ## The Devices tab's GPU column from a (settings-merged) device-view payload and this client's saved layout list:
 ## rear items plus `hdmi` (icon) and `folder` (goes in the "Disconnected" folder). Web: caspar-rear-data.js.
 static func column(payload: Dictionary, saved_list: Array) -> Array:
+	var items := rear_items(payload.get("live"), column_entries(payload, saved_list))
+	for it in items:
+		it.hdmi = it.icon == E.ICON_HDMI
+		it.folder = in_folder(it)
+	return items
+
+
+## The column's entries (graph + suggested gpu outs, the settings topology, the saved layout) — the rear label drag
+## swaps their layout items.
+static func column_entries(payload: Dictionary, saved_list: Array) -> Array:
 	var gpu_outs := []
 	var seen := {}
 	for key in ["graph", "suggested"]:
@@ -136,12 +149,7 @@ static func column(payload: Dictionary, saved_list: Array) -> Array:
 	var graph_outs := R.a(R.d(payload.get("graph")).get("connectors")).filter(func(c: Variant) -> bool:
 		return c is Dictionary and c.get("kind") in ["gpu_out", "gpu_output"])
 	var saved_topo: Variant = E.or_([R.d(payload.get("_settings")).get("gpuPhysicalTopology"), payload.get("gpuPhysicalTopology")])
-	var live: Variant = payload.get("live")
-	var items := rear_items(live, entries(live, gpu_outs, graph_outs, saved_topo, prefs_of(saved_list)))
-	for it in items:
-		it.hdmi = it.icon == E.ICON_HDMI
-		it.folder = in_folder(it)
-	return items
+	return entries(payload.get("live"), gpu_outs, graph_outs, saved_topo, prefs_of(saved_list))
 
 
 ## isDisconnectedGpu: not a topology socket and nothing live on it.

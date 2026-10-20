@@ -159,11 +159,11 @@ func _ready() -> void:
 	_rear.add_requested.connect(_outp.add_output)
 	_rear.order_changed.connect(refresh)
 	_rear.open_requested.connect(_open_port)
-	_rear.edit_toggled.connect(func(on: bool) -> void:  # web: edit mode opens the first DeckLink port's page
-		var ids: Array = RearPanel.DO.ids(RearPanel.DO.current(RearPanel.DO.merged(_payload), RearPanel.DO.saved()))
-		if on and not ids.is_empty():
-			_open_port(ids[0])
+	_rear.edit_toggled.connect(func(first: String) -> void:  # web: edit mode on opens the first port's page
+		if first != "":
+			_open_port(first)
 		refresh())
+	_rear.gpu_edit.connect(func(what: String, a: String, b: String) -> void: _gpu.rear_action(what, a, b, _payload))
 	right.add_child(_rear)
 	right.add_child(_label("CABLES", ThemeBuilder.TEXT_MUTED, 12))
 	_list = VBoxContainer.new()

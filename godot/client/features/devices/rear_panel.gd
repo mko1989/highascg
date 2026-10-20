@@ -9,18 +9,24 @@ extends PanelContainer
 ## Slice 9a: the DeckLink header's pencil toggles DeckLink edit mode (decklink_order.gd `edit`): the port labels
 ## turn draggable — drop one on another and they trade places (saved per client, `order_changed`); a press without
 ## a drop still opens the page (`open_requested`). The Devices tab hands the press over through `begin_drag`.
+## Slice 9b-2: the GPU header's pencil toggles GPU edit mode (gpu_layout.gd `edit`): Show all / Clear layout join the
+## header, hidden ports come back dimmed, and a GPU label dropped on another swaps the two sockets (`gpu_edit`,
+## carried out by gpu_output_controls.gd). Turning either mode on hands the first port to open (`edit_toggled`).
 
 signal add_requested(kind: String)
-signal edit_toggled(on: bool)
+signal edit_toggled(first: String)
+signal gpu_edit(what: String, a: String, b: String)  # "show_all" | "clear" | "swap" (slot a ↔ slot b)
 signal order_changed
 signal open_requested(id: String)
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const DO := preload("res://features/devices/decklink_order.gd")
+const GL := preload("res://features/devices/gpu_layout.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const ROW_H := 44
 const PLATE := Color("#2b3038")
+const GPU_EDIT_TIP := "Edit GPU layout — reorder ports, Show all, or Reset Layout (xrandr)"
 const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon", "v4l2_out": "hdmi-port-icon",
 	"record_out": "record-port-icon", "audio_out": "jack-svg"}
 
@@ -29,7 +35,8 @@ static var folder_open := false  # the GPU "Disconnected" fold (web <details>, c
 var anchors := {}
 var _labels := {}  # connector id → its clickable row Label
 var _deck_ids: Array = []  # the DeckLink ports in panel order
-var _drag := ""  # the DeckLink port being dragged (edit mode)
+var _gpu_slots := {}  # GPU connector id → its layout slot id (what the swap moves)
+var _drag := ""  # the DeckLink / GPU port being dragged (edit mode)
 var _over := ""
 
 
@@ -46,6 +53,7 @@ func show_slots(slots: Array) -> void:
 	_labels = {}
 	_drag = ""
 	_deck_ids = []
+	_gpu_slots = {}
 	var v := VBoxContainer.new()
 	add_child(v)
 	v.add_child(_small("REAR PANEL", ThemeBuilder.TEXT_MUTED))
@@ -79,7 +87,7 @@ func _plate_column(s: Dictionary) -> Control:
 	col.add_child(hb)
 	var rows: Array = s.items.duplicate()
 	if s.kind == "decklink":
-		hb.add_child(_pencil())
+		hb.add_child(_pencil(false))
 		_deck_ids = s.items.map(func(it: Dictionary) -> String: return str(it.id))
 		rows.append({"id": "", "label": "REF"})  # genlock input: drawn, never cabled
 		col.add_child(_plate(rows, s.kind))
@@ -90,6 +98,23 @@ func _plate_column(s: Dictionary) -> Control:
 		hint.tooltip_text = "Open GPU layout editor (pencil) and click Show all"
 		hint.mouse_filter = Control.MOUSE_FILTER_STOP
 		hb.add_child(hint)
+	hb.add_child(_pencil(true))
+	if GL.edit:
+		for b in [["Show all", "show_all", "Show every GPU port on the rear panel"],
+				["Clear layout", "clear", "Discard saved GPU layout and rebuild from detected outputs"]]:
+			var what: String = b[1]
+			var btn := Button.new()
+			btn.text = b[0]
+			btn.tooltip_text = b[2]
+			btn.flat = true
+			btn.focus_mode = Control.FOCUS_NONE
+			btn.add_theme_font_size_override("font_size", 10)
+			if what == "clear":
+				btn.add_theme_color_override("font_color", Color("#ff9f9f"))
+			btn.pressed.connect(func() -> void: gpu_edit.emit(what, "", ""))
+			hb.add_child(btn)
+	for it in rows:
+		_gpu_slots[str(it.id)] = str(it.get("layoutSlotId", it.id))
 	var folder := rows.filter(func(it: Dictionary) -> bool: return it.get("folder", false))
 	col.add_child(_plate(rows.filter(func(it: Dictionary) -> bool: return not it.get("folder", false)), s.kind))
 	if not folder.is_empty():
@@ -123,7 +148,7 @@ func _plate(rows: Array, kind: String) -> Control:
 	var icons := VBoxContainer.new()
 	icons.add_theme_constant_override("separation", 0)
 	plate.add_child(icons)
-	if kind == "gpu":
+	if kind == "gpu" and not GL.edit:  # edit mode shows the hidden ports dimmed (web: opacity 0.3)
 		rows = rows.filter(func(it: Dictionary) -> bool: return not H.truthy(it.get("hidden")))
 	if rows.is_empty():
 		labels.add_child(_row_label("none"))
@@ -140,12 +165,18 @@ func _plate(rows: Array, kind: String) -> Control:
 				l.tooltip_text = "%s — drag onto another port to swap" % it.label
 				l.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 				l.mouse_default_cursor_shape = Control.CURSOR_DRAG
+			if kind == "gpu" and GL.edit:
+				l.tooltip_text = "%s — drag onto another GPU port to swap sockets" % it.label
+				l.mouse_default_cursor_shape = Control.CURSOR_DRAG
 			_labels[str(it.id)] = l
 		labels.add_child(l)
 		var svg: String = ("hdmi-port-icon" if it.get("hdmi", false) else "display-port-icon") if kind == "gpu" \
 			else ICON.decklink
 		var size := Vector2(46, ROW_H) if kind == "gpu" else Vector2(34, ROW_H)
 		var p := PortIcon.make(svg, size, "%s (%s)" % [it.label, it.id] if it.id != "" else str(it.label))
+		if kind == "gpu" and H.truthy(it.get("hidden")):
+			l.modulate.a = 0.3
+			p.modulate.a = 0.3
 		if it.id == "":
 			p.modulate.a = 0.4
 		else:
@@ -183,30 +214,32 @@ func _extra_slot(s: Dictionary) -> Control:
 	return v
 
 
-## The DeckLink edit-mode pencil (web: the slot title's edit button; blue while on).
-func _pencil() -> Button:
+## The DeckLink / GPU edit-mode pencil (web: the slot title's edit button; blue while on).
+func _pencil(gpu: bool) -> Button:
 	var b := Button.new()
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
 	b.custom_minimum_size = Vector2(20, 18)
-	b.tooltip_text = DO.EDIT_TIP
+	b.tooltip_text = GPU_EDIT_TIP if gpu else DO.EDIT_TIP
 	b.pressed.connect(func() -> void:
-		DO.edit = not DO.edit
-		edit_toggled.emit(DO.edit))
+		if gpu:
+			GL.edit = not GL.edit
+			edit_toggled.emit(_gpu_slots.keys().front() if GL.edit and not _gpu_slots.is_empty() else "")
+		else:
+			DO.edit = not DO.edit
+			edit_toggled.emit(_deck_ids.front() if DO.edit and not _deck_ids.is_empty() else ""))
 	b.draw.connect(func() -> void:
-		var col: Color = ThemeBuilder.ACCENT if DO.edit else ThemeBuilder.TEXT_MUTED
+		var col: Color = ThemeBuilder.ACCENT if (GL.edit if gpu else DO.edit) else ThemeBuilder.TEXT_MUTED
 		var c := b.size / 2.0
 		b.draw_polyline([c + Vector2(-1, -6), c + Vector2(-6, -6), c + Vector2(-6, 6), c + Vector2(6, 6), c + Vector2(6, 1)], col, 1.5, true)
 		b.draw_line(c + Vector2(-2, 2), c + Vector2(6, -6), col, 2.0, true))
 	return b
 
 
-## Edit mode: a press on a DeckLink label starts a drag (true = taken).
+## Edit mode: a press on a DeckLink / GPU label starts a drag (true = taken).
 func begin_drag(pos: Vector2) -> bool:
-	if not DO.edit:
-		return false
 	var id := label_at(pos)
-	if not _deck_ids.has(id):
+	if not (DO.edit and _deck_ids.has(id)) and not (GL.edit and _gpu_slots.has(id)):
 		return false
 	_drag = id
 	_over = id
@@ -218,7 +251,7 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseMotion:
 		var id := label_at(event.global_position)
-		id = id if _deck_ids.has(id) else ""
+		id = id if _same_kind(_drag, id) else ""
 		if id != _over:
 			_mark(_over, false)
 			_over = id
@@ -231,9 +264,16 @@ func _input(event: InputEvent) -> void:
 		_drag = ""
 		if to == from:
 			open_requested.emit(from)
-		elif _deck_ids.has(to):
+		elif _same_kind(from, to) and _gpu_slots.has(to):
+			gpu_edit.emit("swap", _gpu_slots[from], _gpu_slots[to])
+		elif _same_kind(from, to):
 			DO.save(DO.swap(_deck_ids, from, to))
 			order_changed.emit()
+
+
+## A drag from port `a` can land on port `b` (DeckLink onto DeckLink, GPU onto GPU).
+func _same_kind(a: String, b: String) -> bool:
+	return (_deck_ids.has(a) and _deck_ids.has(b)) or (_gpu_slots.has(a) and _gpu_slots.has(b))
 
 
 func _mark(id: String, on: bool) -> void:
