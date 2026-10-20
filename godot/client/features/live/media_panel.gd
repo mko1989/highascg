@@ -32,6 +32,7 @@ const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const LivePanel := preload("res://features/live/live_sources_panel.gd")
 const ListPanel := preload("res://features/live/source_list_panel.gd")
 const Lists := preload("res://features/live/source_lists_model.gd")
+const Placeholders := preload("res://features/live/placeholders_panel.gd")
 const Upload := preload("res://core/stream_upload.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
@@ -90,6 +91,16 @@ func _ready() -> void:
 			shl.audition(str(p.get("value", "")), str(p.get("label", p.get("value", "")))))
 	templates.row_context.connect(_template_menu)
 	_tabs.add_child(templates)
+	var ph := Placeholders.new()  # WO-603 row 26: offline / preshow only, like the web (dev: -- --placeholders)
+	ph.name = "Placeholders"
+	_tabs.add_child(ph)
+	var ph_vis := func(_a: Variant = null) -> void:
+		var i := _tabs.get_tab_idx_from_control(ph)
+		_tabs.set_tab_hidden(i, not ph.M.tab_visible(Settings.get_setting("offline_mode", false) == true, Config.args.has("placeholders")))
+		if _tabs.is_tab_hidden(i) and _tabs.current_tab == i:
+			_tabs.current_tab = 0
+	Settings.changed.connect(ph_vis)
+	ph_vis.call()
 	live = LivePanel.new()
 	live.name = "Live"
 	_tabs.add_child(live)

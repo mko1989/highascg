@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag) + slice 7 (files dropped on a media folder move / Alt-copy) + slice 8 ("+" menu: Select file(s)… / New folder… / Download from URL…; HTTP streaming upload when the server refuses a local path), box-verified; parity checklist open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag) + slice 7 (files dropped on a media folder move / Alt-copy) + slice 8 ("+" menu: Select file(s)… / New folder… / Download from URL…; HTTP streaming upload when the server refuses a local path), box-verified; slices 9–12 (take warnings, Delete key, project media bar + Gather, download, Placeholders tab) done 20.10 — every parity row ported, owner ticks open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -734,3 +734,42 @@ breaks. The confirm dialog lists the source paths, so this is visible before it 
   `test_downloads_dir_fallback`. All 16098 tests pass.
 - Box GUI: right-clicked `projects/airport/Slide5.PNG`, chose Download, and saved into the scratchpad. The result
   was 127390 bytes and `cmp` with the media file found it IDENTICAL.
+
+## Slice 12 (20.10) — Placeholders tab (parity row 26); row 21 closed by WO-608
+
+**Status of this slice: DONE (20.10, Godot tests + box GUI with the dev flag)**
+
+### Investigation
+
+- Web: `lib/placeholder-state.js` (localStorage `casparcg_placeholders`, also exported into / loaded from the
+  project's `placeholders` key — every saved project on the box has `placeholders: []`), `placeholder-modal.js`
+  (label, 6 templates, 5 resolutions, solid fill colour; duration field hidden → 60 s), and
+  `sources-panel-placeholders.js` (rows drag as `media` with `isPlaceholder`, `template`, `resolution`, `durationMs`,
+  `value` — the extra spreads last, so a solid placeholder lands with its colour as `value`). Tab + menu item only
+  while the server runs in `offline_mode`.
+- Server already handles it: `POST /api/scene/new-layer` spreads the source (probe: both a grid id and a solid
+  colour came back as a layer, look unchanged); `scene-look-kind`, `project-media-refs` and `routing-setup` skip
+  placeholders.
+- Row 21 (Import USB…) is the WO-608 USB dialog (Media + → Import from USB (N)…), done earlier today.
+
+### What was done
+
+- `features/live/placeholders_model.gd` (pure): templates / resolutions, `make()` (web id
+  `PLC_<TEMPLATE>_<base36 ms>` and defaults), `payload()` (web drag payload incl. the colour quirk), `rows()`,
+  `list_of()` / `without()`, `tab_visible(offline)`.
+- `features/live/placeholders_panel.gd`: Sources tab "Placeholders" (after Templates, like the web) — list,
+  "+ Add placeholder…" dialog, right-click → Remove placeholder… (confirm). Edits write
+  `Store.project.placeholders` + `ProjectSync.mark_dirty()`; the project is the only copy (no localStorage).
+- `media_panel.gd`: the tab is hidden unless `offline_mode` (re-checked on `Settings.changed`); dev flag
+  `-- --placeholders` shows it on a live box.
+
+### What was VERIFIED
+
+- Godot: `test_placeholders_model.gd` (id = `Date.now().toString(36).toUpperCase()`, defaults, payload, rows,
+  filter, visibility). All 16450 tests pass.
+- Box GUI (dev flag; this box is not in offline mode): tab after Templates (the tab bar scrolls with 5 tabs);
+  empty text; Add placeholder → label CLAUDE_TEST_PH, Solid Color (colour picker appears), 1080p50 → Save → row
+  "PH CLAUDE_TEST_PH 1080p5000 · 1:00"; `GET /api/project` placeholders = `[{id: PLC_SOLID_MVHCDIK1, …, value:
+  "#3b82f6"}]`; right-click → Remove → confirm → `placeholders: []` again (the project as before). Normal relaunch:
+  no Placeholders tab, 0 script errors.
+- Not done: dragging a placeholder onto a look (would stage on PRV) — owner checklist, offline mode.

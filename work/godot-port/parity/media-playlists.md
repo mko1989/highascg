@@ -32,12 +32,12 @@ web features found while porting.
 | 18 | Download a file to this computer (web: Alt+click) | right-click a file → Download to this computer… (media_download.gd, streamed to disk) | ported (slice 11) | [ ] |
 | 19 | Remove a file from the server (web: Ctrl+Alt+click, with confirm) | right-click a file → Delete… ; Delete key; bar button (all confirm) | ported (slice 11; owner: right-click menu instead of shortcuts) | [ ] |
 | 20 | Project media bar: project folder path, "project only" filter, Gather referenced clips into it | project_media_bar.gd above the Media filter; server plans + moves (GET /api/media/project, POST /api/media/gather) | ported (slice 10) | [ ] |
-| 21 | Import USB… (drive picker, copy into media) | only the Settings toggle | gap (WO-608 owns the USB modal) | [ ] |
+| 21 | Import USB… (drive picker, copy into media) | Media + → Import from USB (N)… — drive picker, folders, checked files, progress, cancel, eject (WO-608 `usb_import_dialog.gd`) | ported (WO-608) | [ ] |
 | 22 | Drag media onto a look / layer | look editor drop, multi-file drop onto a layer playlist | ported (WO-600, slice 6) | [ ] |
 | 23 | Drag media onto the multiview editor | — | other WO (WO-600 multiview editor) | [ ] |
 | 24 | Drag an effect onto a layer | effects drop on timeline clips; layer effects via the Inspector | other WO (WO-601 / WO-602) | [ ] |
 | 25 | Templates tab | Sources → Templates (TLS, shader library names) | ported (WO-623 C) | [ ] |
-| 26 | Placeholders tab + "Add Placeholder…" | — | gap (unassigned) | [ ] |
+| 26 | Placeholders tab + "Add Placeholder…" | Sources → Placeholders (offline mode only): + Add placeholder… (label / template / resolution / fill colour), right-click → Remove, rows drag onto looks; project `placeholders` slice | ported (12) | [ ] |
 | 27 | ShaderFX "New shader…", shader audition, sub-app at :4300 | — | other WO (WO-606 Shader Live / FX, WO-608 modules) | [ ] |
 | 28 | Rename a timeline (right-click in Sources) | Timeline tab ✎ Rename timeline | ported (WO-602) — not from the Sources row | [ ] |
 
