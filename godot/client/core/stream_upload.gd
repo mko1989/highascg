@@ -24,10 +24,14 @@ static func parse_origin(origin: String) -> Dictionary:
 	return {"host": hp.substr(0, i), "port": hp.substr(i + 1).to_int()}
 
 
-## Multipart framing around the file bytes (field "file").
-static func multipart_parts(boundary: String, file_name: String) -> Dictionary:
+## Multipart framing around the file bytes (field "file"). `fields` go first — busboy streams parts in order, so a
+## field after the file would arrive too late (the web ingest sends `path` first for the same reason).
+static func multipart_parts(boundary: String, file_name: String, fields := {}) -> Dictionary:
 	var safe := file_name.replace("\"", "_").replace("\r", "").replace("\n", "")
-	var head := "--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\nContent-Type: application/octet-stream\r\n\r\n" % [boundary, safe]
+	var head := ""
+	for k in fields:
+		head += "--%s\r\nContent-Disposition: form-data; name=\"%s\"\r\n\r\n%s\r\n" % [boundary, k, str(fields[k])]
+	head += "--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\nContent-Type: application/octet-stream\r\n\r\n" % [boundary, safe]
 	return {"head": head.to_utf8_buffer(), "tail": ("\r\n--%s--\r\n" % boundary).to_utf8_buffer()}
 
 
@@ -69,8 +73,9 @@ static func parse_http_response(raw: PackedByteArray) -> Dictionary:
 	return {"status": status, "body": body}
 
 
-## Upload `file_path` to `path` (with query). progress(sent: int, total: int). Returns the Api-shaped result.
-static func upload(origin: String, path: String, file_path: String, progress := Callable()) -> Dictionary:
+## Upload `file_path` to `path` (with query), plus form `fields`. progress(sent: int, total: int). Returns the Api-shaped
+## result.
+static func upload(origin: String, path: String, file_path: String, progress := Callable(), fields := {}) -> Dictionary:
 	var fail := func(msg: String) -> Dictionary: return {"ok": false, "status": 0, "data": null, "error": msg, "reason": ""}
 	var hp := parse_origin(origin)
 	if hp.is_empty():
@@ -80,7 +85,7 @@ static func upload(origin: String, path: String, file_path: String, progress := 
 		return fail.call("cannot read %s" % file_path.get_file())
 	var tree := Engine.get_main_loop() as SceneTree
 	var boundary := "----highascg%08x%08x" % [randi(), randi()]
-	var mp := multipart_parts(boundary, file_path.get_file())
+	var mp := multipart_parts(boundary, file_path.get_file(), fields)
 	var total: int = mp.head.size() + f.get_length() + mp.tail.size()
 	var tcp := StreamPeerTCP.new()
 	if tcp.connect_to_host(str(hp.host), int(hp.port)) != OK:

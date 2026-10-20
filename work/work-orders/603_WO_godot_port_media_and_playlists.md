@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag) + slice 7 (files dropped on a media folder move / Alt-copy), box-verified; remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag) + slice 7 (files dropped on a media folder move / Alt-copy) + slice 8 ("+" menu: Select file(s)… / New folder… / Download from URL…; HTTP streaming upload when the server refuses a local path), box-verified; parity checklist open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -436,6 +436,63 @@ by drag (the web accepts both). → slice 7.
     kept.
   - Cleanup: `POST /api/media/delete {ids:["wo603dnd"]}`; the folder is gone.
 
+### Still open (after slice 7)
+
+Remote (HTTP streaming) upload; parity checklist. → slice 8.
+
+## Slice 8 (20.10) — the "+" menu (files, folder, URL) and HTTP upload for an off-box client
+
+### Investigation
+
+- Web Sources footer "+" dropup (`client/components/sources-panel-shell.js`, `ingest-dropup-menu`):
+  - Select File(s) → multipart `POST /api/ingest/upload` with `path` sent first
+    (`sources-panel-ingest-logic.js:60-71`);
+  - New Folder…; Import USB…; Add Placeholder… (offline only);
+  - a URL row → `POST /api/ingest/download {url, path}`, then `GET /api/ingest/download-status` polled every
+    450 ms (`createDownloadPoller`).
+- Godot had a "New folder…" button only. Desktop drops used the loopback-only `ingest-local`
+  (`routes-media-ingest-local.js:41` → 403 for any other caller). A client off the box (WO-610, deferred) could
+  not add media at all.
+- `core/stream_upload.gd` (the WO-601 "New version…" upload) already streams one file in 1 MiB chunks over raw TCP.
+  It lacked form fields, and the ingest route reads its target folder from a `path` field that busboy must see
+  before the file (`routes-ingest.js:145`).
+
+### What was done
+
+- `core/stream_upload.gd`: `multipart_parts` / `upload` take form `fields`, framed before the file.
+- `features/live/media_add_menu.gd`: a "+" MenuButton with Select file(s)… (a FileDialog with multi-select,
+  starting in ~/Downloads), New folder… (the bar's existing dialog) and Download from URL…. It replaces the bar's
+  "New folder…" button.
+- `media_panel`:
+  - Desktop drops and picked files share `_ingest(paths, folder)`. It tries the local-path ingest first; on 403
+    it falls back to one streamed `POST /api/ingest/upload` per file, following `Ingest.upload_plan` (a dropped
+    folder keeps its name and subfolders, as the server-side walk does), with an "Uploading i/n · %" line.
+  - `_download(url)` posts to the selected folder and polls the status with the web poller's wording
+    (`Ingest.download_text`).
+- No server change. Picking the ingest path by the server's 403, rather than by guessing whether the origin is
+  local, keeps the decision with the server.
+
+### What was VERIFIED
+
+- Godot:
+  - `test_stream_upload.gd`: the `path` field is framed before the file.
+  - `test_media_ingest.gd`: the folder walk keeps names and subfolders, hidden and missing paths are skipped;
+    upload and download lines.
+  - Total 16076 pass; boot check clean (a `match` inside a lambda did not parse and was moved into a method).
+- Box, on-box client (`--server` default 127.0.0.1), target folder `wo603up` selected:
+  - + → Select file(s)… → `up_one.png` showed "✓ Imported 1 file(s)" (local-path ingest).
+  - + → Download from URL… `http://127.0.0.1:8765/url_dl.png` (a scratch `http.server`) showed "✓ Saved
+    url_dl.png". The journal shows `[Ingest] HTTP download starting → url_dl.png … complete`.
+- Box, client launched with `--server=http://192.168.50.64:4200`, so the server sees a LAN caller:
+  - The same pick showed "✓ Uploaded 1 file" (the upload wording, not "Imported"), and the file was rewritten at
+    19:12:36.
+  - A real XDND drop of the folder `dropdir/` (`up_two.png`, `sub/up_three.png`) from a GTK drag source showed
+    "✓ Uploaded 2 files" and landed as `wo603up/dropdir/up_two.png` and `wo603up/dropdir/sub/up_three.png`.
+- Cleanup: `POST /api/media/delete {ids:["wo603up"]}`; the scratch HTTP server was stopped; the GUI was relaunched
+  against 127.0.0.1.
+- Not covered: a remote client on another machine (WO-610, deferred) and a WeTransfer link. The upload has no
+  Cancel; the web upload has none either.
+
 ### Still open
 
-Remote (HTTP streaming) upload; parity checklist.
+Parity checklist.

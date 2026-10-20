@@ -1,12 +1,14 @@
 extends VBoxContainer
 ## WO-603 slice 2 — the web media selection bar (sources-panel-shell.js `sources-media-selection-bar`): "N selected ·
 ## Rename… (slice 3, media_rename_dialog.gd) · Copy to… · Move to… · HAP… (slice 4: media_hap_dialog.gd, job line +
-## Cancel HAP from `media:hap-encode`) · Delete · Clear", plus "New folder…" under the selected folder. Every action is one server
+## Cancel HAP from `media:hap-encode`) · Delete · Clear", plus the "+" menu (slice 8, media_add_menu.gd; New folder… goes
+## under the selected folder). Every action is one server
 ## call (media_ops.gd); the folder picker lists the on-disk folders and takes a typed new path.
 
 signal changed  # the library changed on disk → the panel reloads
 signal clear_requested
 
+const AddMenu := preload("res://features/live/media_add_menu.gd")
 const Ops := preload("res://features/live/media_ops.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const RenameDialog := preload("res://features/live/media_rename_dialog.gd")
@@ -14,6 +16,7 @@ const HapDialog := preload("res://features/live/media_hap_dialog.gd")
 const Hap := preload("res://features/live/hap_status.gd")
 
 var ids: Array = []  # selected media ids (files)
+var add_menu: AddMenu  # the media panel ingests what it picks
 var folder := ""  # the selected folder row ("" = root): New folder… goes under it
 var rows: Array = []  # GET /api/media (for the picker)
 var before_delete: Callable  # stops a running preview of a file about to go
@@ -47,7 +50,9 @@ func _ready() -> void:
 	_hap_cancel = _button("Cancel HAP", _cancel_hap, "Cancel the running HAP encode")
 	_hap_cancel.visible = false
 	row.add_child(_hap_cancel)
-	row.add_child(_button("New folder…", _new_folder, "Create a folder under the selected one"))
+	add_menu = AddMenu.new()  # web "+" dropup: Select file(s)… · New folder… · Download from URL…
+	add_menu.new_folder_requested.connect(_new_folder)
+	row.add_child(add_menu)
 	add_child(row)
 	_say("")
 	set_selection([], "")

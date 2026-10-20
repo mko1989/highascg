@@ -29,3 +29,8 @@ func test_response_parse() -> void:
 	t.eq(c.status, 409, "error status")
 	t.eq(c.body.get_string_from_utf8(), "{\"err\":\"x\"}", "chunked decoded")
 	t.eq(U.parse_http_response("garbage".to_utf8_buffer()).status, 0, "unparseable")
+
+
+func test_fields_go_before_the_file() -> void:
+	var mp := U.multipart_parts("B", "a.png", {"path": "projects/x"})
+	t.eq(mp.head.get_string_from_utf8(), "--B\r\nContent-Disposition: form-data; name=\"path\"\r\n\r\nprojects/x\r\n--B\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.png\"\r\nContent-Type: application/octet-stream\r\n\r\n", "path field first (busboy order)")

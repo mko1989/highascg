@@ -41,3 +41,51 @@ static func status_text(st: Dictionary) -> String:
 
 static func busy(st: Dictionary) -> bool:
 	return bool(st.get("active", false))
+
+
+## Off-box client (the server refuses a local-path ingest, 403): the same drop as HTTP uploads — one per file, its
+## target folder in the `path` field. A dropped folder lands as a folder of that name (subfolders kept), like the
+## server-side walk and the web WO-591 drop. → [{file, path}]
+static func upload_plan(paths: PackedStringArray, folder: String) -> Array:
+	var out: Array = []
+	for p in paths:
+		if DirAccess.dir_exists_absolute(p):
+			_walk(p, join(folder, p.trim_suffix("/").get_file()), out)
+		elif FileAccess.file_exists(p):
+			out.append({"file": p, "path": folder})
+	return out
+
+
+static func _walk(dir: String, target: String, out: Array) -> void:
+	var d := DirAccess.open(dir)
+	if d == null:
+		return
+	d.include_hidden = false
+	var files := d.get_files()
+	files.sort()
+	for f in files:
+		out.append({"file": dir.path_join(f), "path": target})
+	var dirs := d.get_directories()
+	dirs.sort()
+	for sub in dirs:
+		_walk(dir.path_join(sub), join(target, sub), out)
+
+
+static func join(folder: String, name: String) -> String:
+	return name if folder == "" else folder + "/" + name
+
+
+## Upload progress line: "Uploading 2/5 · 40%  clip.mov".
+static func upload_text(index: int, total: int, sent: int, size: int, file: String) -> String:
+	var pct := int(round(100.0 * sent / size)) if size > 0 else 0
+	return "Uploading %d/%d · %d%%  %s" % [index + 1, total, pct, file.get_file()]
+
+
+## Web createDownloadPoller line for GET /api/ingest/download-status; "" while there is nothing to report.
+static func download_text(st: Dictionary) -> String:
+	if st.get("active", false):
+		var p: Variant = st.get("progress")
+		return "%s%s" % [st.get("message", "Working…") if str(st.get("message", "")) != "" else "Working…", (" %d%%" % int(round(float(p)))) if p != null and float(p) > 0 else ""]
+	if str(st.get("error", "")) not in ["", "<null>"] and st.get("error") != null:
+		return "✗ " + str(st.error)
+	return "✓ " + (str(st.message) if str(st.get("message", "")) != "" else "Done")

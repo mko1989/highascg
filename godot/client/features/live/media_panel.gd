@@ -28,6 +28,7 @@ const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const LivePanel := preload("res://features/live/live_sources_panel.gd")
 const ListPanel := preload("res://features/live/source_list_panel.gd")
 const Lists := preload("res://features/live/source_lists_model.gd")
+const Upload := preload("res://core/stream_upload.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
@@ -115,6 +116,8 @@ func _ready() -> void:
 			await inspector.preview.stop_preview()
 			inspector.visible = false
 	media.add_child(_bar)
+	_bar.add_menu.files_chosen.connect(func(paths: PackedStringArray) -> void: _ingest(paths, _bar.folder))
+	_bar.add_menu.url_chosen.connect(_download)
 	_ingest_row = HBoxContainer.new()
 	_ingest_row.visible = false
 	_ingest_label = Label.new()
@@ -296,17 +299,65 @@ func _on_files_dropped(files: PackedStringArray) -> void:
 		var it := _tree.get_item_at_position(_tree.get_local_mouse_position())
 		folder = Ingest.folder_for(it.get_metadata(0) if it != null else null)
 	_tabs.current_tab = _tree.get_parent().get_index()
+	_ingest(files, folder)
+
+
+## Local paths → the library: the server copies them (on the box); a client elsewhere is refused (403, loopback
+## only) and streams them over HTTP instead (POST /api/ingest/upload, one file per request, `path` = its folder).
+func _ingest(files: PackedStringArray, folder: String) -> void:
 	_show_ingest({"phase": "copying", "fileTotal": files.size()})
 	var res: Dictionary = await Api.post_json("/api/media/ingest-local", Ingest.request(files, folder))
-	if not res.ok:
+	if res.ok:
+		return
+	if int(res.get("status", 0)) != 403:
 		_show_ingest({"phase": "error", "message": "Ingest refused", "error": res.error})
+		return
+	var plan := Ingest.upload_plan(files, folder)
+	var done := 0
+	for i in plan.size():
+		var file: String = plan[i].file
+		var up: Dictionary = await Upload.upload(Config.origin, "/api/ingest/upload", file, func(sent: int, total: int) -> void:
+			_line(Ingest.upload_text(i, plan.size(), sent, total, file)), {"path": plan[i].path})
+		if not up.ok:
+			_line("✗ Upload of %s failed: %s" % [file.get_file(), up.error])
+			load_media()
+			return
+		done += 1
+	_line("✓ Uploaded %d file%s" % [done, "" if done == 1 else "s"])
+	load_media()
+
+
+## Web URL ingest: the server downloads (POST /api/ingest/download) into the selected folder; poll its status.
+func _download(url: String) -> void:
+	_tabs.current_tab = _tree.get_parent().get_index()
+	_line("Starting…")
+	var body := {"url": url}
+	if _bar.folder != "":
+		body["path"] = _bar.folder
+	var res: Dictionary = await Api.post_json("/api/ingest/download", body)
+	if not res.ok:
+		_line("✗ " + str(res.error))
+		return
+	while is_inside_tree():
+		await get_tree().create_timer(0.45).timeout
+		var st: Dictionary = await Api.get_json("/api/ingest/download-status")
+		if not (st.ok and st.data is Dictionary):
+			_line("✗ " + str(st.error))
+			return
+		_line(Ingest.download_text(st.data))
+		if not st.data.get("active", false):
+			load_media()
+			return
+
+
+func _line(text: String) -> void:
+	_ingest_row.visible = text != ""
+	_ingest_label.text = text
+	_ingest_label.tooltip_text = text
 
 
 func _show_ingest(st: Dictionary) -> void:
-	var line := Ingest.status_text(st)
-	_ingest_row.visible = line != ""
-	_ingest_label.text = line
-	_ingest_label.tooltip_text = line
+	_line(Ingest.status_text(st))
 	if str(st.get("phase", "")) in ["complete", "cancelled", "error"] and st.has("updatedAt"):
 		load_media()
 
