@@ -43,6 +43,8 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-603** — Placeholders (offline / preshow mode only): with the server in offline mode the Sources panel gets
       a **Placeholders** tab; add one, drag it onto a look and check the preview; tick the rows of
       `work/godot-port/parity/media-playlists.md`. (Box test used the dev flag `-- --placeholders`; no drag.)
+- [ ] **WO-607** — only if you use the GLB model library (server `previs` module, off on this box): load a model in
+      Previs → Models, tick / untick meshes under "Screens (live texture)", reload the model → the ticks stay.
 - [ ] **WO-606** — Shader Live (logo click or deck toolbar → Shader Live): never tried on air — this box has no
       shader live and GPU CEF is off, and PGM/PRV were off limits. Take a shader look to PRV, then ride a slider,
       ≋ wiggle, a preset, Randomize, ▶ Take, a playlist hop (the picker should follow the layer), a Templates

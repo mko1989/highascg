@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — T2 (UV mapper port) done + tested; T3 (server models → runtime glTF, screen tagging) + T5 (live shm sources) + camera presets working in the Godot client against the simulator; T1 (tags off localStorage) still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Supersedes the three.js renderer of [WO-17](./17_WO_3D_PREVIS.md) once accepted (WO-17 keeps its history; its data model and server API are reused). Depends on: WO-596 (shm textures), WO-597 (`video-surfaces` for PGM/PRV), WO-599 (foundation).**
+**Status: IN PROGRESS (2026-10-17) — T2 (UV mapper port) done + tested; T3 (server models → runtime glTF, screen tagging) + T5 (live shm sources) + camera presets working in the Godot client against the simulator; T1 closed 20.10 (nothing in the box's browser storage to migrate; Godot keeps GLB screen tags in the project). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Supersedes the three.js renderer of [WO-17](./17_WO_3D_PREVIS.md) once accepted (WO-17 keeps its history; its data model and server API are reused). Depends on: WO-596 (shm textures), WO-597 (`video-surfaces` for PGM/PRV), WO-599 (foundation).**
 
 # WO-607 — Previs in Godot: native 3D stage with live channel textures
 
@@ -77,7 +77,7 @@ UI (Control, same window): toolbar, mesh inspector, camera list, display toggles
 
 ## Tasks
 
-- [ ] T1 — **(web, before anything else)** move previs tags/presets/UI from `localStorage` to the
+- [x] T1 (20.10, see below) — **(web, before anything else)** move previs tags/presets/UI from `localStorage` to the
       server (per-model metadata under `/api/previs/models/<id>` or project); one-time migration
       on next web load. Smoke + owner check that the existing stage keeps its tags.
 - [ ] T2 — `previs_uv_mapper.gd` + tests ported from `__selfTest` (pure).
@@ -123,3 +123,27 @@ UI (Control, same window): toolbar, mesh inspector, camera list, display toggles
 
 Earlier desk checks: file sizes (`wc -l`), WO-17 status lines, `GLTFDocument`/`FBXDocument`/`Texture2DRD`
 presence in Godot 4.6.3 (headless ClassDB probe, WO-595).
+
+## 2026-10-20 — T1 closed: screen tags in the project, nothing to migrate
+
+**Investigation.**
+- Read-only copy of the box's Firefox localStorage for `http://127.0.0.1:4200`: 16 keys. None of them is previs
+  state (`tags` / `presets` / `ui`), the LED test card, placeholders or A/B hosts, so nothing has to be migrated.
+- The server `previs` module (GLB model library, `/api/previs/models`) is not enabled on this box (`GET
+  /api/modules` → tracking, cg-studio; `/api/previs/models` → 404), and `.highascg-previs/models` is empty.
+- The owner's stage now lives server-side in the project: WO-614 stage builder `previs.stage` and WO-612 MVR. Godot
+  camera presets are built in (Front / Top / ISO), and its UI toggles are in ui.cfg.
+- The only Godot gap was the GLB "Screens (live texture)" checkboxes, which were never saved: every load re-ran the
+  `screen` / `led` name rule.
+
+**What was done.**
+- `features/previs/glb_screens_model.gd` (pure): `saved()`, `is_screen()` (a saved list beats the name rule, an
+  empty list means none) and `store()` → `project.previs.modelScreens[<model id>] = [sorted mesh names]`.
+- The server keeps `previs` across web autosaves (`CLIENT_OWNED_SLICES`).
+- `previs_tab.gd`: on model load, the saved tags are applied before the checkboxes are built; each toggle stores
+  them and calls `ProjectSync.mark_dirty()`.
+
+**What was VERIFIED.**
+- `test_glb_screens_model.gd`: Godot tests 16459/0; the boot check is clean.
+- **Not box-verified:** this box has no GLB library (module off, no models). Enabling it would mean changing
+  `config/` and installing `three`, so it is on the owner checklist.

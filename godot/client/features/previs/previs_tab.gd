@@ -24,6 +24,7 @@ const CameraOverlay := preload("res://features/previs/tracking/camera_overlay.gd
 const Coverage3D := preload("res://features/previs/tracking/coverage_3d.gd")
 const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const GlbScreens := preload("res://features/previs/glb_screens_model.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["3d", "camera"]
 
@@ -42,6 +43,7 @@ var _sv: SubViewport
 var _svc: SubViewportContainer
 var _mode_btns := {}
 var _glb_role := ""
+var _glb_id := ""  # WO-607 T1: server model id whose screen tags live in project.previs.modelScreens
 var track_view: TrackingView
 var track_page: TrackingPage
 var markers: MarkerDriver
@@ -389,6 +391,7 @@ func load_model(idx: int) -> void:
 	if idx < 0 or idx >= _model_ids.size():
 		return
 	_status.text = "loading…"
+	_glb_id = str(_model_ids[idx])
 	var res: Dictionary = await Api.get_bytes("/api/previs/models/%s" % _model_ids[idx])
 	if not res.ok:
 		_status.text = "download failed: %s" % res.error
@@ -409,11 +412,16 @@ func _on_model_loaded(meshes: Array) -> void:
 	_apply_mode.call_deferred()  # (re)hold the GLB source now that screen meshes exist
 	for c in _meshes.get_children():
 		c.queue_free()
+	var tagged: Variant = GlbScreens.saved(Store.project, _glb_id)
 	for mi in meshes:
+		stage.set_screen(mi, GlbScreens.is_screen(str(mi.name), tagged))
 		var cb := CheckBox.new()
 		cb.text = str((mi as MeshInstance3D).name)
 		cb.button_pressed = stage.screens.has(mi)
-		cb.toggled.connect(func(on: bool) -> void: stage.set_screen(mi, on))
+		cb.toggled.connect(func(on: bool) -> void:
+			stage.set_screen(mi, on)
+			GlbScreens.store(Store.project, _glb_id, stage.screens.keys().map(func(m: Variant) -> String: return str(m.name)))
+			ProjectSync.mark_dirty())
 		_meshes.add_child(cb)
 	_status.text = "%d meshes, %d screens" % [meshes.size(), stage.screens.size()]
 
