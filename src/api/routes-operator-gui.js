@@ -8,6 +8,10 @@
  *                                        src/system/operator-gui-channel.js). Also feeds the
  *                                        python-xlib shape helper.
  *   DELETE /api/operator-gui/layout   — clears route layers + hides the shape overlay.
+ *   POST   /api/operator-gui/cell     — WO-624: add a window for a Sources-panel route item
+ *                                        `{ item: { type, value, label, resolution }, at: { x, y } }` (server rules +
+ *                                        default size, src/system/operator-gui-source-cells.js).
+ *   POST   /api/operator-gui/cell/remove — WO-624: `{ id }` removes that window.
  *   POST   /api/operator-gui/launch   — WO-255: launch (or raise, if already running) the
  *                                        fullscreen Firefox GUI process on the operator monitor.
  *   POST   /api/operator-gui/raise    — WO-255: bring the already-running Firefox GUI to front.
@@ -18,6 +22,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { applyOperatorGuiLayout, clearOperatorGuiLayout, getPersistedOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
 const { launchOperatorGuiBrowser, raiseOperatorGuiBrowser } = require('../system/operator-gui-launcher')
+const { addSourceCell, removeCell, noteReportedCells } = require('../system/operator-gui-source-cells')
 
 /** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Final phase of the operator-
  * GUI startup timeline (kiosk spawn probes: operator-gui-launcher.js; shape helper probes:
@@ -46,11 +51,17 @@ async function handlePost(path, body, ctx) {
 		// Caspar is mid-reload still tells us what the operator has on screen, and that is exactly
 		// the window in which `ensureOperatorGuiChannel` decides whether to re-assert the holes.
 		noteClientLayoutReport(ctx, cells)
+		noteReportedCells(cells)
 		if (!ctx.amcp) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 		}
 		const result = await applyOperatorGuiLayout(ctx, cells, { suppressHoles })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...result }) }
+	}
+	if (path === '/api/operator-gui/cell' || path === '/api/operator-gui/cell/remove') {
+		const j = parseBody(body) || {}
+		const r = path === '/api/operator-gui/cell' ? await addSourceCell(ctx, j) : await removeCell(ctx, j)
+		return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 	}
 	if (path === '/api/operator-gui/launch') {
 		const result = await launchOperatorGuiBrowser(ctx)

@@ -91,3 +91,14 @@ func test_corner_at() -> void:
 	t.eq(TM.corner_at(r, Vector2(98, 204), 14.0), Vector2i(-1, 1), "bottom-left")
 	t.eq(TM.corner_at(r, Vector2(300, 200), 14.0), Vector2i(1, 1), "bottom-right")
 	t.eq(TM.corner_at(r, Vector2(200, 150), 14.0), Vector2i.ZERO, "middle → none")
+
+
+
+## WO-624 E1: Sources "Live" rows drop onto the preview (route:// only; media files and looks pass through), and the
+## ✕ at the right end of a label strip is its own square (the overlay picks it ahead of move / resize).
+func test_source_drop_and_close_zone() -> void:
+	t.ok(TM.droppable({"type": "route", "value": "route://5", "label": "DeckLink 2"}), "a live route drops")
+	t.ok(not TM.droppable({"type": "file", "value": "AMB"}), "a media file does not")
+	t.ok(not TM.droppable("route://5"), "only the row payload shape")
+	var pic := Rect2(100, 100, 400, 225)
+	t.eq(TM.close_rect(pic, 18.0, 18.0), Rect2(484, 327, 18, 18), "right end of the strip, under the picture")

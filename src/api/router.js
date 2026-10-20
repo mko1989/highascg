@@ -272,6 +272,8 @@ routes.get('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.hand
 routes.delete('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleDelete(path, ctx), { requireCaspar: false })
 routes.post('/api/operator-gui/launch', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/operator-gui/raise', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/operator-gui/cell', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false }) // WO-624
+routes.post('/api/operator-gui/cell/remove', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 
 routes.get('/api/device-snapshot/build', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/device-snapshot/schema', ({ path, ctx }) => routesDeviceSnapshot.handleGet(path, ctx), { requireCaspar: false })

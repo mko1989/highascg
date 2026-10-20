@@ -105,3 +105,14 @@ static func fit(p: Rect2, ar: float) -> Rect2:
 		h = p.size.y
 		w = h * ar
 	return Rect2(p.position + (p.size - Vector2(w, h)) / 2.0, Vector2(w, h))
+
+
+## WO-624 E1: a Sources "Live" row payload ({type, value: "route://…", label, resolution, …}) — what the preview takes
+## as a new window. Media files, looks and bare strings pass through.
+static func droppable(data: Variant) -> bool:
+	return data is Dictionary and str(data.get("value", "")).begins_with("route://")
+
+
+## The ✕ square at the right end of a window's label strip (the strip hangs 2 px below the picture, 2 px wider).
+static func close_rect(picture: Rect2, label_h: float, w: float) -> Rect2:
+	return Rect2(picture.end.x + 2.0 - w, picture.end.y + 2.0, w, label_h)

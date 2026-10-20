@@ -8,6 +8,8 @@ extends Control
 ## picture follows the frame. Other clients' moves arrive as the `operatorGuiLayout` broadcast. The
 ## media-inspector cell is never drawn or touched, and is passed back unchanged so a running media preview
 ## survives a move.
+## WO-624 E1: a Sources "Live" row dropped anywhere on the preview becomes a window (the server checks and sizes it:
+## POST /api/operator-gui/cell); the ✕ at the end of a label strip removes that window (/cell/remove).
 
 const TM := preload("res://features/live/compose_tile_math.gd")
 const OUTLINE := {"pgm": Color("#e63946"), "prv": Color("#2a9d8f")}
@@ -16,6 +18,8 @@ const OTHER := Color("#457b9d")
 const OTHER_STRIP := Color("#2563eb")
 const LABEL_H := 18.0
 const GRIP := 14.0
+const CLOSE_W := 18.0  # the ✕ hot zone at the right end of a label strip
+const MSG_S := 4.0
 
 var role := "opgui"
 var cells: Array = []  # compose cells (server shape), drawn in order
@@ -23,6 +27,8 @@ var _media: Array = []  # the server's media-inspector cell(s), passed through u
 var _drag := {}  # {i, mode: "move"|"resize", corner: Vector2i, start: Rect2 (canvas px), at: Vector2 (local px)}
 var _posting := false
 var _pending := false
+var _msg := ""  # a refused drop / remove, drawn on the preview for MSG_S
+var _msg_until := 0
 
 
 func _ready() -> void:
@@ -117,14 +123,41 @@ func _draw() -> void:
 		draw_rect(strip, STRIP.get(k, OTHER_STRIP))
 		var line := TextLine.new()
 		line.add_string(label_text(c), font, 11)
-		line.width = maxf(0.0, strip.size.x - 12.0)
+		line.width = maxf(0.0, strip.size.x - 12.0 - CLOSE_W)
 		line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		line.draw(get_canvas_item(), strip.position + Vector2(6, (LABEL_H - line.get_size().y) / 2.0), Color.WHITE)
+		var x := TextLine.new()
+		x.add_string("✕", font, 11)
+		var xr := _close_rect(r)
+		x.draw(get_canvas_item(), xr.position + (xr.size - x.get_size()) / 2.0, Color(1, 1, 1, 0.85))
+	if _msg != "" and Time.get_ticks_msec() < _msg_until:
+		var ir := image_rect()
+		var m := TextLine.new()
+		m.add_string(_msg, font, 13)
+		m.width = ir.size.x - 16.0
+		m.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		var at := Vector2(ir.position.x + 8.0, ir.end.y - m.get_size().y - 10.0)
+		draw_rect(Rect2(at - Vector2(6, 4), m.get_size() + Vector2(12, 8)), Color(0, 0, 0, 0.75))
+		m.draw(get_canvas_item(), at, Color("#fbbf24"))
+
+
+func _close_rect(picture: Rect2) -> Rect2:
+	return TM.close_rect(picture, LABEL_H, CLOSE_W)
+
+
+func _flash(text: String) -> void:
+	_msg = text
+	_msg_until = Time.get_ticks_msec() + int(MSG_S * 1000)
+	queue_redraw()
+	get_tree().create_timer(MSG_S + 0.05).timeout.connect(queue_redraw)
 
 
 ## [index, mode, corner] under a local point: the corner zones first (they overhang the corners), then picture +
 ## label strip.
 func _pick(p: Vector2) -> Array:
+	for i in range(cells.size() - 1, -1, -1):
+		if _close_rect(_screen(i)).has_point(p):
+			return [i, "remove", Vector2i.ZERO]
 	for i in range(cells.size() - 1, -1, -1):
 		var c := TM.corner_at(_screen(i), p, GRIP)
 		if c != Vector2i.ZERO:
@@ -137,7 +170,25 @@ func _pick(p: Vector2) -> Array:
 
 
 func _has_point(p: Vector2) -> bool:
+	if get_viewport() != null and get_viewport().gui_is_dragging():
+		return TM.droppable(get_viewport().gui_get_drag_data())  # a Live source can land anywhere on the canvas
 	return not _drag.is_empty() or _pick(p)[0] >= 0
+
+
+func _can_drop_data(_at: Vector2, data: Variant) -> bool:
+	return TM.droppable(data)
+
+
+func _drop_data(at: Vector2, data: Variant) -> void:
+	var ir := image_rect()
+	var f := ((at - ir.position) / ir.size).clamp(Vector2.ZERO, Vector2.ONE)
+	var item := {}
+	for k in ["type", "value", "label", "resolution"]:
+		if (data as Dictionary).has(k):
+			item[k] = data[k]
+	var res: Dictionary = await Api.post_json("/api/operator-gui/cell", {"item": item, "at": {"x": f.x, "y": f.y}})
+	if not res.ok:
+		_flash(str(res.get("error", res.get("status"))))
 
 
 func _gui_input(e: InputEvent) -> void:
@@ -145,6 +196,10 @@ func _gui_input(e: InputEvent) -> void:
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
 		if mb.pressed:
 			var hit := _pick(mb.position)
+			if hit[1] == "remove":
+				accept_event()
+				_remove(str(cells[hit[0]].get("id", "")))
+				return
 			if hit[0] >= 0:
 				_drag = {"i": hit[0], "mode": hit[1], "corner": hit[2], "start": _picture(hit[0]), "at": mb.position}
 				accept_event()
@@ -159,7 +214,7 @@ func _gui_input(e: InputEvent) -> void:
 	if _drag.is_empty():
 		var hit := _pick(mm.position)
 		var c: Vector2i = hit[2]
-		mouse_default_cursor_shape = Control.CURSOR_MOVE if c == Vector2i.ZERO else \
+		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hit[1] == "remove" else Control.CURSOR_MOVE if c == Vector2i.ZERO else \
 			(Control.CURSOR_FDIAGSIZE if c.x == c.y else Control.CURSOR_BDIAGSIZE)  # ↘↖ vs ↗↙
 		return
 	var d: Vector2 = (mm.position - _drag.at) * (canvas().x / image_rect().size.x)
@@ -169,6 +224,12 @@ func _gui_input(e: InputEvent) -> void:
 	queue_redraw()
 	_post()
 	accept_event()
+
+
+func _remove(id: String) -> void:
+	var res: Dictionary = await Api.post_json("/api/operator-gui/cell/remove", {"id": id})
+	if not res.ok:
+		_flash(str(res.get("error", res.get("status"))))
 
 
 ## POST the whole cell set; while one is in flight, the latest state goes out right after it (no queue build-up).
