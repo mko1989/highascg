@@ -24,6 +24,7 @@ const { getChannelMap } = require('../config/routing')
 const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const mixerState = require('../audio/mixer-state')
+const inputRouting = require('../audio/input-audio-routing')
 
 /**
  * Apply an input-strip volume to every live look layer consuming the target via a LAYER route.
@@ -186,7 +187,11 @@ async function handlePost(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid body' }) }
 		}
 		try {
-			const r = await applyVolume(ctx, b)
+			// WO-604 slice 3: a DeckLink / v4l2 strip applies its audio-send policy and route matrix (input-audio-routing.js).
+			const input = mixerState.isMixerKey(b.key) && b.master !== true ? inputRouting.inputForKey(ctx.config, b.key) : null
+			const r = input
+				? await inputRouting.applyInputStrip(ctx, input, { ...b, gain: b.volume, muted: mixerState.snapshot().muted[b.key] === true })
+				: await applyVolume(ctx, b)
 			// WO-604: a console strip no look owns sends its key — the server keeps the gain.
 			if (mixerState.isMixerKey(b.key)) mixerState.setGain(ctx, b.key, b.volume)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(r) }
@@ -395,6 +400,8 @@ async function handlePost(path, body, ctx) {
 				return { status: status || 502, headers: JSON_HEADERS, body: jsonBody({ ...payload, error: res.reason }) }
 			}
 			apiLog(ctx, 'info', `[input-start] ${res.kind} slot ${res.slot} capture started on ${res.channel}-${res.layer}`)
+			// WO-604 slice 3: the server puts the input's persisted program routes back (was the client's job).
+			payload.routesRestored = await inputRouting.restoreInputRoutes(ctx, res.kind, res.slot)
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody(payload) }
 		} catch (e) {
 			return { status: 502, headers: JSON_HEADERS, body: jsonBody({ error: e?.message || String(e) }) }
@@ -453,4 +460,4 @@ async function handlePost(path, body, ctx) {
 	return null
 }
 
-module.exports = { handleGet, handlePost, applyVolume }
+module.exports = { handleGet, handlePost, applyVolume, fanOutVolumeToRouteConsumers }

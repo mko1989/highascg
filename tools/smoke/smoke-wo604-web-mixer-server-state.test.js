@@ -67,7 +67,7 @@ describe('WO-604 slice 2 — web mixer cache', () => {
 })
 
 describe('WO-604 slice 2 — web writes reach the server store', () => {
-	it('every strip fader write carries its key unless a look owns the strip; the AFV policy writes carry none', () => {
+	it('every strip fader write carries its key unless a look owns the strip; the policy gains are the server\'s', () => {
 		let keyed = 0
 		for (const f of STRIPS) {
 			const src = read(f)
@@ -75,8 +75,10 @@ describe('WO-604 slice 2 — web writes reach the server store', () => {
 		}
 		assert.equal(keyed, 16, 'fader + mute writes across the six strip renderers')
 		const live = read('client/components/audio-mixer-panel-live-inputs.js')
-		assert.match(live, /postAudioVolume\(\{ channel: r\.ch, layer: r\.layer, linearGain: effective \}\)/)
-		assert.match(live, /postAudioVolume\(\{ channel: r\.ch, layer: r\.layer, linearGain: embedded \}\)/)
+		// WO-604 slice 3: the AFV / matrix embedded-copy gains are composed on the server (input-audio-routing.js).
+		assert.doesNotMatch(live, /linearGain: (effective|embedded)/)
+		assert.match(live, /await postInputSend\(r\.inputKind, slot, next\)/)
+		assert.match(live, /await postInputRoute\(r\.inputKind, slot, ch, on\)/)
 	})
 
 	it('mute goes through POST /api/audio/mute; solo posts the keys', () => {

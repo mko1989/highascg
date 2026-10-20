@@ -20,6 +20,7 @@ import {
 } from '../lib/live-audio-routing.js'
 import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
 import { api } from '../lib/api-client.js'
+import { isServerRoutedKind, postAutoMix, postInputRoute, postInputSend, serverAudioTargets } from '../lib/input-audio-routing-api.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -56,7 +57,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 	autoMixBtn.onclick = async (e) => {
 		e.stopPropagation()
 		try {
-			await api.post('/api/settings', { casparServer: { audio_auto_mix: !autoMixOn } })
+			await postAutoMix(!autoMixOn)
 			await settingsState.load()
 			autoMixBtn.classList.toggle('audio-mixer__automix-btn--active', !autoMixOn)
 			showScenesToast(`Auto mix ${!autoMixOn ? 'ON' : 'OFF'} — applies from the next take.`, 'info')
@@ -76,8 +77,11 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 			r?.inputKind === 'live_audio' ? !!(liveUi?.slots?.[slot - 1] || '') : !!inputRouteForRow(cm, r)
 		const destLayer = pgmDestLayerForInput(r?.inputKind, slot, liveUi)
 		const targetKey = inputTargetKey(r?.inputKind, slot)
-		const enabledTargets = getMultiPlayTargets(targetKey)
-		const enabledChannels = new Set(enabledTargets.map((t) => Number(t.channel)))
+		// WO-604 slice 3: DeckLink / v4l2 targets are the server's (config); ALSA slots keep localStorage.
+		const serverRouted = isServerRoutedKind(r?.inputKind)
+		const enabledChannels = serverRouted
+			? new Set(serverAudioTargets(csNow, r.inputKind, slot))
+			: new Set(getMultiPlayTargets(targetKey).map((t) => Number(t.channel)))
 
 		const isMuted = !!r.muted
 		const muteHtml = `<button type="button" class="audio-mixer__mute-btn${isMuted ? ' audio-mixer__mute-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Mute live input">M</button>`
@@ -114,8 +118,8 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 
 		// Audio-send policy per video-capable input (DeckLink / v4l2). Owner workflow: three cameras,
 		// one carries the sound mixer — that one 'always', the others 'never', so PGM takes never
-		// drag camera audio in. Server applies it at take time; flipping it here also pushes the
-		// matching volume NOW through the strip fanout so the on-air state changes immediately.
+		// drag camera audio in. Server applies it at take time, and POST /api/audio/inputs/send also
+		// pushes the matching volume NOW so the on-air state changes immediately (WO-604 slice 3).
 		if (r?.inputKind === 'decklink' || r?.inputKind === 'v4l2') {
 			const policyKey = `${r.inputKind}_input_${slot}_audio_send`
 			const cur = String(csNow[policyKey] || 'afv').toLowerCase()
@@ -132,15 +136,8 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				e.stopPropagation()
 				const next = String(sendSel.value || 'afv')
 				try {
-					await api.post('/api/settings', { casparServer: { [policyKey]: next } })
+					await postInputSend(r.inputKind, slot, next)
 					await settingsState.load()
-					// Make it bite NOW, not only on the next take: the server fans this volume out to
-					// every live look layer consuming this input's route (f343e5e).
-					const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
-					const gain = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
-					const autoOn = !(settingsState.getSettings()?.casparServer?.audio_auto_mix === false)
-					const effective = next === 'afv' ? (autoOn ? gain : 0) : 0
-					await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: effective })
 					showScenesToast(`${r.label}: audio ${next}`, 'success')
 				} catch (err) {
 					showScenesToast(err?.message || String(err), 'error')
@@ -178,6 +175,21 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 					if (busy) return
 					btn.dataset.busy = '1'
 					btn.disabled = true
+					if (serverRouted) {
+						// WO-604 slice 3: one call — route PLAY/STOP, persisted targets, embedded-copy volume.
+						const on = !btn.classList.contains('audio-mixer__live-route-btn--active')
+						try {
+							await postInputRoute(r.inputKind, slot, ch, on)
+							btn.classList.toggle('audio-mixer__live-route-btn--active', on)
+							await settingsState.load()
+						} catch (err) {
+							showScenesToast(err?.message || String(err), 'error')
+						} finally {
+							btn.dataset.busy = '0'
+							btn.disabled = !routable
+						}
+						return
+					}
 					const curTargets = getMultiPlayTargets(targetKey)
 					const curEnabled = curTargets.some((t) => Number(t.channel) === ch && Number(t.layer) === destLayer)
 					try {
@@ -191,27 +203,6 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 							await disableLiveAudioPgmRoute(ch, destLayer)
 							setMultiPlayTargets(targetKey, curTargets.filter((t) => !(Number(t.channel) === ch && Number(t.layer) === destLayer)))
 							btn.classList.remove('audio-mixer__live-route-btn--active')
-						}
-						// The matrix is authoritative (owner: "not selected to route to ch3 yet it
-						// plays on ch3"). Mirror targets into config so the TAKE pipeline can honor
-						// them — localStorage is invisible to the server — and push the embedded-copy
-						// volume NOW: any lit Ch button means the matrix rules and the embedded copy
-						// goes silent everywhere (audio arrives via the audio-only routes, so no
-						// doubling); an empty matrix under AFV returns to follow-the-video.
-						if (r?.inputKind === 'decklink' || r?.inputKind === 'v4l2') {
-							const nowTargets = getMultiPlayTargets(targetKey)
-							const chans = [...new Set(nowTargets.map((t) => Number(t.channel)).filter((n) => n >= 1))]
-							await api.post('/api/settings', {
-								casparServer: { [`${r.inputKind}_input_${slot}_audio_targets`]: chans },
-							})
-							await settingsState.load()
-							const csNext = settingsState.getSettings()?.casparServer || {}
-							const policy = String(csNext[`${r.inputKind}_input_${slot}_audio_send`] || 'afv')
-							const autoOn = !(csNext.audio_auto_mix === false || csNext.audio_auto_mix === 'false')
-							const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
-							const gain = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
-							const embedded = policy === 'afv' && autoOn && chans.length === 0 ? gain : 0
-							await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: embedded })
 						}
 					} catch (err) {
 						showScenesToast(err?.message || String(err), 'error')
@@ -238,7 +229,8 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				try {
 					await runInputStart(r, {
 						post: (p, b) => api.post(p, b),
-						targets: getMultiPlayTargets(targetKey),
+						// DeckLink / v4l2: the server restores the persisted routes itself (WO-604 slice 3).
+						targets: serverRouted ? [] : getMultiPlayTargets(targetKey),
 						playRoute: playRouteOnChannel,
 						route: inputRouteForRow(cm, r),
 						audioOnly: liveUi?.pgmAudioOnly !== false,

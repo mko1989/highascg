@@ -20,6 +20,7 @@ import {
 } from '../lib/live-audio-routing.js'
 import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
 import { api } from '../lib/api-client.js'
+import { isServerRoutedKind } from '../lib/input-audio-routing-api.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -149,7 +150,8 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 			try {
 				await runInputStart(r, {
 					post: (p, b) => api.post(p, b),
-					targets: getMultiPlayTargets(targetKey),
+					// DeckLink / v4l2: the server restores the persisted routes itself (WO-604 slice 3).
+					targets: isServerRoutedKind(r?.inputKind) ? [] : getMultiPlayTargets(targetKey),
 					playRoute: playRouteOnChannel,
 					route: inputRouteForRow(cm, r),
 					audioOnly: liveUi?.pgmAudioOnly !== false,
