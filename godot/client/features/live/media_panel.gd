@@ -22,6 +22,7 @@ signal tab_requested(name: String)
 signal caspar_changed
 signal connector_dropped
 
+const UsbImport := preload("res://features/live/usb_import_dialog.gd")
 const ShaderFx := preload("res://features/live/shader_fx_dialog.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -138,6 +139,7 @@ func _ready() -> void:
 	media.add_child(_bar)
 	_bar.add_menu.files_chosen.connect(func(paths: PackedStringArray) -> void: _ingest(paths, _bar.folder))
 	_bar.add_menu.url_chosen.connect(_download)
+	_bar.add_menu.usb_requested.connect(func() -> void: UsbImport.show_import(self, load_media))
 	_ingest_row = HBoxContainer.new()
 	_ingest_row.visible = false
 	_ingest_label = Label.new()

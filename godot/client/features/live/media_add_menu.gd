@@ -1,13 +1,14 @@
 extends MenuButton
 ## WO-603 slice 8 — the web Sources "+" dropup (sources-panel-shell.js ingest-dropup-menu): Select file(s)… ·
-## New folder… · Download from URL… · Shader FX… (WO-606 editor). The menu only asks; the media panel ingests the chosen files (local-path
+## New folder… · Download from URL… · Import from USB… (WO-608) · Shader FX… (WO-606 editor). The menu only asks; the media panel ingests the chosen files (local-path
 ## ingest on the box, HTTP upload off it) and the server downloads the URL (POST /api/ingest/download).
 
 signal files_chosen(paths: PackedStringArray)
 signal new_folder_requested
 signal url_chosen(url: String)
+signal usb_requested
 
-enum { FILES, FOLDER, URL, FX }
+enum { FILES, FOLDER, URL, FX, USB }
 
 const ShaderFx := preload("res://features/live/shader_fx_dialog.gd")
 
@@ -20,9 +21,19 @@ func _ready() -> void:
 	p.add_item("Select file(s)…", FILES)
 	p.add_item("New folder…", FOLDER)
 	p.add_item("Download from URL…", URL)
+	p.add_item("Import from USB…", USB)
 	p.add_separator()
 	p.add_item("Shader FX…", FX)
 	p.id_pressed.connect(_on_item)
+	about_to_popup.connect(_count_usb)
+
+
+## The web USB button's badge: the item carries the server's drive count.
+func _count_usb() -> void:
+	var p := get_popup()
+	var r: Dictionary = await Api.get_json("/api/usb/drives")
+	var n: int = (r.data.get("drives", []) as Array).size() if r.ok and r.data is Dictionary and r.data.get("drives") is Array else 0
+	p.set_item_text(p.get_item_index(USB), "Import from USB (%d)…" % n if n > 0 else "Import from USB…")
 
 
 func _on_item(id: int) -> void:
@@ -35,6 +46,8 @@ func _on_item(id: int) -> void:
 			_ask_url()
 		FX:
 			ShaderFx.show_editor(self)
+		USB:
+			usb_requested.emit()
 
 
 func _pick_files() -> void:

@@ -30,6 +30,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       Install driver were not pressed. Also say if System time belongs below the hardware list (web order).
 - [ ] **WO-608** — Settings → Live audio: Save config / Apply PLAY + PGM routes not pressed (0 live-audio slots on
       the box); with a slot configured, check the status line now names its channel (WO-611 #8).
+- [ ] **WO-608** — Import from USB (Media + → Import from USB…): no stick was plugged in, so only the empty state
+      was seen. With a stick: the menu item shows the drive count, browse folders, Select media in folder, Import
+      (progress bar + Cancel copy; the clips land in the project folder and the Media list refreshes), Safely eject.
 - [ ] **WO-606** — Shader Live (logo click or deck toolbar → Shader Live): never tried on air — this box has no
       shader live and GPU CEF is off, and PGM/PRV were off limits. Take a shader look to PRV, then ride a slider,
       ≋ wiggle, a preset, Randomize, ▶ Take, a playlist hop (the picker should follow the layer), a Templates

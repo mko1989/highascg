@@ -508,3 +508,23 @@ percent 32` → dragged back → `value 0` (restored; the control was muted thro
 Apply routes, Refresh devices, Launch alsamixer.
 
 **Settings port status:** every web Settings tab now has a Godot pane.
+
+## 2026-10-20 — Import from USB (port plan step 3, USB part)
+
+**Investigation.** Web `usb-import-modal.js` (456 lines): drive select (`GET /api/usb/drives`, platform note /
+empty hint), folder browse with breadcrumb + `..` (`GET /api/usb/browse?driveId=&path=`), per-file checkboxes +
+"Select media in folder" (extension set), Import (`POST /api/usb/import {driveId, items, targetSubdir?}`), progress
+from `usb:copy-progress` + `/api/usb/import-status` polled every 400 ms, Cancel copy, Safely eject; drives re-read
+on `usb:attached/detached`. Opened from the Sources ingest dropup with a drive-count badge. The node already
+falls back to the project ingest folder when `targetSubdir` is absent (`getDefaultIngestSubdir`), so the client's
+`getDefaultUploadSubdir()` is not ported (directive D: the node composes).
+
+**What was done.** `usb_import_model.gd` (media test, size format, drive label, breadcrumb / parent, progress from
+either the poll or the WS frame) + `usb_import_dialog.gd` (one per app; folder rows open on click, files are
+check cells; Import / Safely eject as dialog buttons). Media "+" → **Import from USB…** (the item reads
+"Import from USB (N)…" when the server sees N drives); a finished copy reloads the Media list.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16382/0 (+`test_usb_import_model.gd`, 4 cases). No stick on the
+box: the dialog shows the empty hint and "No USB / removable volume detected"; Import → "Select a drive first";
+↻ re-reads; Close. Browse / Import / Cancel / Eject against a real drive are an owner check (checklist).
+
