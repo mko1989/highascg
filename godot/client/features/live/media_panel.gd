@@ -13,6 +13,9 @@ extends VBoxContainer
 ## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
 ## WO-603 slice 1: files / folders dropped from the desktop onto this panel are copied by the server from their local
 ## paths into the folder under the cursor (media_ingest.gd; POST /api/media/ingest-local) with a progress line.
+## WO-603 slice 2: multi-select + the web selection bar (media_selection_bar.gd: Copy to… / Move to… / Delete / New
+## folder…); the tree is media_ops.tree_entries — empty on-disk folders show (a new folder is visible before anything
+## is in it) and CLS upper-case folders merge into the on-disk one, as on the web.
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -26,6 +29,8 @@ const LivePanel := preload("res://features/live/live_sources_panel.gd")
 const ListPanel := preload("res://features/live/source_list_panel.gd")
 const Lists := preload("res://features/live/source_lists_model.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
+const SelectionBar := preload("res://features/live/media_selection_bar.gd")
+const Ops := preload("res://features/live/media_ops.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -41,6 +46,8 @@ var _tls: Array = []  # GET /api/templates
 var _shader_names := {}
 var _ingest_row: HBoxContainer
 var _ingest_label: Label
+var _bar: SelectionBar
+var _select_queued := false
 
 
 func _ready() -> void:
@@ -94,11 +101,22 @@ func _ready() -> void:
 	media.add_child(_filter)
 	_tree = Tree.new()
 	_tree.hide_root = true
+	_tree.select_mode = Tree.SELECT_MULTI
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, live.can_drop_connector, func(_at: Vector2, data: Variant) -> void:
 		_tabs.current_tab = live.get_index()
 		live.drop_connector(Drop.parse(data)))
 	media.add_child(_tree)
+	_bar = SelectionBar.new()
+	_bar.changed.connect(load_media)
+	_bar.clear_requested.connect(func() -> void:
+		_tree.deselect_all()
+		_bar.set_selection([], ""))
+	_bar.before_delete = func(sel: Array) -> void:
+		if inspector.is_inside_tree() and sel.has(inspector.id):
+			await inspector.preview.stop_preview()
+			inspector.visible = false
+	media.add_child(_bar)
 	_ingest_row = HBoxContainer.new()
 	_ingest_row.visible = false
 	_ingest_label = Label.new()
@@ -123,17 +141,34 @@ func _ready() -> void:
 	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
 	inspector.library_changed.connect(load_media)
 	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
-	_tree.item_selected.connect(func() -> void:
-		var it := _tree.get_selected()
-		var meta: Variant = it.get_metadata(0) if it != null else null
-		if meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
-			InspectorPanel.current.present(inspector)
-			inspector.show_media(meta.row))
+	_tree.multi_selected.connect(func(_it: TreeItem, _col: int, _on: bool) -> void:
+		if not _select_queued:  # one update per click (a range select emits per row)
+			_select_queued = true
+			_on_selection.call_deferred())
 	if Config.args.has("sources-filter"):  # dev: preset the filter (tests)
 		_filter.text = str(Config.args["sources-filter"])
 	if Config.args.has("sources-tab"):  # dev: open on Media (0), Templates (1), Live (2) or Timelines (3)
 		_tabs.current_tab = int(Config.args["sources-tab"])
 	load_media()
+
+
+## The bar gets every selected file; the focused row picks the folder (New folder…, picker start) and — when it is
+## the only file — the Inspector (web: a single selection announces the file).
+func _on_selection() -> void:
+	_select_queued = false
+	var sel: Array = []
+	var it := _tree.get_next_selected(null)
+	while it != null:
+		var m: Variant = it.get_metadata(0)
+		if m is Dictionary and (m as Dictionary).get("row") is Dictionary:
+			sel.append(str(m.value))
+		it = _tree.get_next_selected(it)
+	var focus := _tree.get_selected()
+	var meta: Variant = focus.get_metadata(0) if focus != null else null
+	_bar.set_selection(sel, Ingest.folder_for(meta))
+	if sel.size() == 1 and meta is Dictionary and (meta as Dictionary).get("row") is Dictionary:
+		InspectorPanel.current.present(inspector)
+		inspector.show_media(meta.row)
 
 
 func _reload_current() -> void:
@@ -156,6 +191,7 @@ func load_templates() -> void:
 func load_media() -> void:
 	var res: Dictionary = await Api.get_json("/api/media")
 	_rows = res.data if res.ok and res.data is Array else []
+	_bar.rows = _rows
 	if _fx.is_empty():
 		var fr: Dictionary = await Api.get_json("/api/scene/effect-registry")
 		_fx = fr.data if fr.ok and fr.data is Dictionary else {}
@@ -167,26 +203,17 @@ func _build() -> void:
 	var root := _tree.create_item()
 	var dirs := {"": root}
 	var f := _filter.text.strip_edges().to_lower()
-	for r in _rows:
-		if not (r is Dictionary) or r.get("isDir", false):
+	_bar.set_selection([], "")
+	for e in Ops.tree_entries(_rows, f):
+		var it := _tree.create_item(dirs[e.parent])
+		it.set_text(0, e.label)
+		if e.kind == "dir":
+			it.collapsed = f == ""
+			it.set_metadata(0, {"folder": e.folder})
+			dirs[e.key] = it
 			continue
+		var r: Dictionary = e.row
 		var id := str(r.get("id", ""))
-		if id == "" or (f != "" and not id.to_lower().contains(f)):
-			continue
-		var parts := id.split("/")
-		var parent: TreeItem = root
-		var acc := ""
-		for i in parts.size() - 1:
-			acc = parts[i] if acc == "" else acc + "/" + parts[i]
-			if not dirs.has(acc):
-				var d := _tree.create_item(parent)
-				d.set_text(0, parts[i])
-				d.collapsed = f == ""
-				d.set_metadata(0, {"folder": acc})
-				dirs[acc] = d
-			parent = dirs[acc]
-		var it := _tree.create_item(parent)
-		it.set_text(0, parts[parts.size() - 1])
 		it.set_tooltip_text(0, "%s · %s" % [id, r.get("type", "")])
 		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
 

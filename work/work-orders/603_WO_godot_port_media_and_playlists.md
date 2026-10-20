@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 done (desktop drop → server local-path ingest, box-verified with a real XDND drop); media context menu, multi-rename, HAP, playlists still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–2 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged), box-verified; multi-rename, HAP, playlists still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -107,7 +107,53 @@ panel incl. media tree + ingest, 16 / 2,683 LOC).
     rewritten at node boot (18:06:16, the boot-time save seen in WO-604 slice 3), not by the ingest.
 - Owner-QA: drop a large folder (progress line), and a drop on an upper-case CLS folder.
 
+## Slice 2 (20.10) — multi-select + selection bar (Copy to… / Move to… / Delete / New folder…)
+
+### Investigation
+
+- Web: `client/components/sources-panel-shell.js` selection bar ("N selected · Rename… · Copy to… · Move to… · Encode to
+  HAP… · Delete · Clear") + "+" menu "New Folder…". Ops are `client/lib/media-file-ops.js`: batch
+  `POST /api/media/copy|move {sourceIds, targetId}` and `/delete {ids}`. `sources-panel-media-selection.js:92` does a
+  `mkdir` before a move into a typed new folder, but the server already creates the target dir
+  (`src/media/local-media-api.js:297,340`), so that extra round trip is not ported. A batch with failures answers
+  **HTTP 200** `{ok:false, count, errors[]}` (`routes-media.js` runBatchMediaOp), so the result must read the body.
+- Web tree (`sources-panel-media.js:11,76`): isDir rows first, folders merged **case-insensitively** under the
+  first (on-disk) spelling. The Godot tree built folders from file ids only, so it showed `PROJECTS` next to
+  `projects` (the Caspar CLS rows) and never showed empty folders, so a new folder was invisible.
+- Every operation already has a server endpoint; nothing new is composed on the client.
+
+### What was done
+
+- `features/live/media_ops.gd` (pure):
+  - `folders` (picker: on-disk isDir rows only); `clean_folder` / `join_folder`; request bodies; `result_text`
+    (all / partial-in-200 / refused);
+  - `tree_entries(rows, filter)`: the web grouping. Folder rows feed the on-disk spelling even under a filter, so
+    New folder… and drops under a filtered `PROJECTS/AIRPORT` hit `projects/airport`.
+- `features/live/media_selection_bar.gd`:
+  - HFlow bar (wraps, so the Sources column keeps its width; the first HBox try widened it ~60 px);
+  - Copy/Move folder picker: a ConfirmationDialog with a folder Tree and an editable path, where a typed new path is
+    created by the server;
+  - Delete confirmation (final; stops a running inspector preview of a file being deleted first);
+  - New folder… under the focused folder (Enter submits).
+- `media_panel.gd`: `Tree.SELECT_MULTI`. `multi_selected` is coalesced (deferred) into one update: files → bar, the
+  focused row → folder, one file → Inspector. `_build` materializes `tree_entries`.
+
+### What was VERIFIED
+
+- Godot suite 15989 pass (`test_media_ops.gd`: picker folders, bodies, result lines, CLS merge, filter spelling,
+  parent order). Boot `--check` clean.
+- Box (real GUI, xdotool):
+  - ctrl-click and shift-click selected 2 files and the bar read "2 selected";
+  - Move to… → typed `testowe/wo603moved` → both files moved on disk, "✓ Moved 2 files", tree refreshed and
+    selection cleared;
+  - New folder… under `wo603moved` → `wo603new` on disk and in `/api/media`;
+  - Delete → confirm → files gone, "✓ Deleted 2 files";
+  - the unfiltered tree shows `projects`/`testowe` once (CLS duplicates merged), plus the empty on-disk folders.
+  - Probe folders removed via `POST /api/media/delete`. Config md5 unchanged apart from the boot-time
+    `device_graph.json` (slice 1).
+- No client errors in the GUI log.
+
 ### Still open
 
-Media context menu (copy/move/delete/rename/new folder/versions), multi-rename with preview, HAP encode options,
-playlists footer, remote (HTTP streaming) upload, parity checklist.
+Multi-rename with live preview (web Rename…), HAP encode options, drag of a multi-selection, playlists footer,
+remote (HTTP streaming) upload, parity checklist.
