@@ -85,7 +85,8 @@ func say(n: Dictionary) -> void:
 	notice_label.text = str(n.text)
 	notice_label.tooltip_text = str(n.text)
 	var tone := str(n.get("tone", "ok"))
-	notice_label.add_theme_color_override("font_color", ThemeBuilder.ERROR if tone == "error" else (ThemeBuilder.TEXT_MUTED if tone == "muted" else ThemeBuilder.SUCCESS))
+	var tones := {"error": ThemeBuilder.ERROR, "warn": ThemeBuilder.WARN, "muted": ThemeBuilder.TEXT_MUTED}
+	notice_label.add_theme_color_override("font_color", tones.get(tone, ThemeBuilder.SUCCESS))
 	_sticky = n.get("sticky") == true
 	if not _sticky:
 		_fade.start(NOTICE_S)

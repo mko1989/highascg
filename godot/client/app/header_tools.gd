@@ -2,11 +2,15 @@ extends HBoxContainer
 ## WO-608 header — the web header-bar.js middle group: Server ▾ (running Caspar config vs the app's channel layout,
 ## state.configComparison — header-bar-config-strip.js), ⚙ (the Settings tab here; the web opens a modal), FTB
 ## (POST /api/ftb {} — the server fades every PGM + PRV layer to black, then clears) and the status badges.
+## WO-629: the LED test card switch + "Test card…" (header-bar-led-test.js) sit before FTB; the checkbox mirrors
+## node's state.ledTestPatternActive, so the startup card and other clients show here too.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const M := preload("res://app/header_badges_model.gd")
 const Badges := preload("res://app/header_badges.gd")
+const LedTestDialog := preload("res://app/led_test_dialog.gd")
+const LedTest := preload("res://app/led_test_model.gd")
 
 signal settings_requested
 signal notice(n: Dictionary)
@@ -14,6 +18,9 @@ signal notice(n: Dictionary)
 var server_btn: Button
 var settings_btn: Button
 var ftb_btn: Button
+var test_cb: CheckBox
+var test_btn: Button
+var test_dialog: LedTestDialog
 var badges: Badges
 var _strip: PopupPanel
 var _strip_box: VBoxContainer
@@ -37,6 +44,22 @@ func _ready() -> void:
 	settings_btn.flat = true
 	settings_btn.pressed.connect(func() -> void: settings_requested.emit())
 	add_child(settings_btn)
+	test_cb = CheckBox.new()
+	test_cb.text = "Test card"
+	test_cb.focus_mode = Control.FOCUS_NONE
+	test_cb.tooltip_text = "LED test card on layer 999: the channels picked in Test card…, else every program channel"
+	test_cb.button_pressed = Store.get_value("ledTestPatternActive") == true
+	test_cb.toggled.connect(set_test_card)
+	add_child(test_cb)
+	test_btn = Button.new()
+	test_btn.text = "Test card…"
+	test_btn.focus_mode = Control.FOCUS_NONE
+	test_btn.tooltip_text = "Pattern, grid size, labels and channels"
+	add_child(test_btn)
+	test_dialog = LedTestDialog.new()
+	test_dialog.notice.connect(func(n: Dictionary) -> void: notice.emit(n))
+	add_child(test_dialog)
+	test_btn.pressed.connect(test_dialog.open)
 	ftb_btn = Button.new()
 	ftb_btn.text = "FTB"
 	ftb_btn.focus_mode = Control.FOCUS_NONE
@@ -51,7 +74,9 @@ func _ready() -> void:
 	add_child(badges)
 	Store.changed.connect(func(p: String, _v: Variant) -> void:
 		if p == "configComparison" or p == "*":
-			_tint_server())
+			_tint_server()
+		if p == "ledTestPatternActive" or p == "*":
+			test_cb.set_pressed_no_signal(Store.get_value("ledTestPatternActive") == true))
 	_tint_server()
 
 
@@ -121,3 +146,16 @@ func ftb() -> void:
 	ftb_btn.disabled = false
 	if not res.ok:
 		notice.emit({"text": "FTB: " + str(res.error), "tone": "error"})
+
+
+## The master switch: node picks the channels and answers which took it; the checkbox then follows the WS
+## `ledTestPatternActive` change (put back here only when nothing changed on the server).
+func set_test_card(on: bool) -> void:
+	test_cb.disabled = true
+	var res: Dictionary = await Api.post_json("/api/led-test-card/master", {"enabled": on})
+	test_cb.disabled = false
+	var n := LedTest.switch_notice(res, on)
+	if not n.is_empty():
+		notice.emit(n)
+	if not res.ok:
+		test_cb.set_pressed_no_signal(Store.get_value("ledTestPatternActive") == true)

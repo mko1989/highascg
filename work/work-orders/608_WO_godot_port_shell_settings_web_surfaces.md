@@ -334,7 +334,7 @@ Box state: one screen, `monitorCh` null, `audioPreview.enabled` false; replicati
 - **Not exercised on the box:** a live recording turning R1 red, the replication letter, multi-screen chips and the
   monitor menu. This box has no such state; each one is covered by the model tests. Owner-QA.
 
-**Next header slice (open):** LED test card. Its settings live in browser localStorage and the targets / payloads are
-built in the browser (`led-test-apply.js`), so directive D first needs a server-side settings store + a master
-endpoint (`POST /api/led-test-card/master {enabled}`), then the Godot checkbox + Test card… dialog. Also not ported:
+**Header slice 3 (done 20.10, [WO-629](./629_WO_led_test_card_server_side.md)):** LED test card. Settings + master
+switch now live in node (`/api/led-test-card/settings`, `…/master`, `…/channel`); Godot has the checkbox + Test card…
+dialog. The web's "Open window ▾" taskbar is replaced by the dock ([WO-628](./628_WO_operator_dock.md)). Also not ported:
 the web's "Paired with <peer>" label beside the replication letter.
