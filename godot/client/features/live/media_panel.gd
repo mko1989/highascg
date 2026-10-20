@@ -11,6 +11,8 @@ extends VBoxContainer
 ## the shell (Live workspace tab, Devices restart-dirty, device view re-read).
 ## WO-623 C: the owner's four tabs — Media, Templates (Caspar TLS; shaders show their library name), Live, Timelines (this
 ## project's) — source_list_panel.gd rows drag the web payload ({type: "template" | "timeline", value, label}).
+## WO-603 slice 1: files / folders dropped from the desktop onto this panel are copied by the server from their local
+## paths into the folder under the cursor (media_ingest.gd; POST /api/media/ingest-local) with a progress line.
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -23,6 +25,7 @@ const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const LivePanel := preload("res://features/live/live_sources_panel.gd")
 const ListPanel := preload("res://features/live/source_list_panel.gd")
 const Lists := preload("res://features/live/source_lists_model.gd")
+const Ingest := preload("res://features/live/media_ingest.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -36,6 +39,8 @@ var templates: ListPanel
 var timelines: ListPanel
 var _tls: Array = []  # GET /api/templates
 var _shader_names := {}
+var _ingest_row: HBoxContainer
+var _ingest_label: Label
 
 
 func _ready() -> void:
@@ -94,6 +99,27 @@ func _ready() -> void:
 		_tabs.current_tab = live.get_index()
 		live.drop_connector(Drop.parse(data)))
 	media.add_child(_tree)
+	_ingest_row = HBoxContainer.new()
+	_ingest_row.visible = false
+	_ingest_label = Label.new()
+	_ingest_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_ingest_label.clip_text = true
+	_ingest_label.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	_ingest_row.add_child(_ingest_label)
+	var stop := Button.new()
+	stop.text = "✕"
+	stop.tooltip_text = "Cancel the copy / hide"
+	stop.pressed.connect(func() -> void:
+		if _ingest_label.text.begins_with("Copying"):
+			Api.post_json("/api/media/ingest-local/cancel", {})
+		else:
+			_ingest_row.visible = false)
+	_ingest_row.add_child(stop)
+	media.add_child(_ingest_row)
+	get_window().files_dropped.connect(_on_files_dropped)
+	Ws.message.connect(func(type: String, data: Variant) -> void:
+		if type == Ingest.EVENT and data is Dictionary:
+			_show_ingest(data))
 	inspector = MediaInspector.new()  # WO-608 R2: shown in the global Inspector column when a file is selected
 	inspector.library_changed.connect(load_media)
 	Api.post_json("/api/media/preview", {"action": "stop"})  # a previous run killed mid-preview leaves the clip on the layer
@@ -156,6 +182,7 @@ func _build() -> void:
 				var d := _tree.create_item(parent)
 				d.set_text(0, parts[i])
 				d.collapsed = f == ""
+				d.set_metadata(0, {"folder": acc})
 				dirs[acc] = d
 			parent = dirs[acc]
 		var it := _tree.create_item(parent)
@@ -192,7 +219,7 @@ func _build_effects(root: TreeItem, f: String) -> void:
 
 func _drag_data(at: Vector2) -> Variant:
 	var it := _tree.get_item_at_position(at)
-	if it == null or not (it.get_metadata(0) is Dictionary):
+	if it == null or not (it.get_metadata(0) is Dictionary) or not (it.get_metadata(0) as Dictionary).has("value"):
 		return null
 	var l := Label.new()
 	l.text = "＋ " + it.get_text(0)
@@ -200,6 +227,30 @@ func _drag_data(at: Vector2) -> Variant:
 	var data: Dictionary = (it.get_metadata(0) as Dictionary).duplicate()
 	data.erase("row")  # the payload is the web shape {type, value, label}; the row is for the inspector only
 	return data
+
+
+## Desktop drop (WO-603): only drops over this panel ingest; the folder under the cursor is the target.
+func _on_files_dropped(files: PackedStringArray) -> void:
+	if not is_visible_in_tree() or not get_global_rect().has_point(get_global_mouse_position()):
+		return
+	var folder := ""
+	if _tabs.get_current_tab_control() == _tree.get_parent() and _tree.get_global_rect().has_point(get_global_mouse_position()):
+		var it := _tree.get_item_at_position(_tree.get_local_mouse_position())
+		folder = Ingest.folder_for(it.get_metadata(0) if it != null else null)
+	_tabs.current_tab = _tree.get_parent().get_index()
+	_show_ingest({"phase": "copying", "fileTotal": files.size()})
+	var res: Dictionary = await Api.post_json("/api/media/ingest-local", Ingest.request(files, folder))
+	if not res.ok:
+		_show_ingest({"phase": "error", "message": "Ingest refused", "error": res.error})
+
+
+func _show_ingest(st: Dictionary) -> void:
+	var line := Ingest.status_text(st)
+	_ingest_row.visible = line != ""
+	_ingest_label.text = line
+	_ingest_label.tooltip_text = line
+	if str(st.get("phase", "")) in ["complete", "cancelled", "error"] and st.has("updatedAt"):
+		load_media()
 
 
 func _exit_tree() -> void:
