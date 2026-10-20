@@ -36,6 +36,12 @@ func test_output_protocol_and_psn() -> void:
 		{"group": "236.10.10.10", "port": 7000, "iface": "192.168.1.20", "system_name": "HighAsCG", "axes": "y_up"})
 
 
+func test_output_through() -> void:
+	# WO-632 — same answers as smoke-wo632 normalizeThrough.
+	t.eq(F.normalize({}).output.through, {"enabled": false, "offset": 0, "fade_s": 1.0}, "read-through off by default")
+	t.eq(F.normalize_through({"enabled": true, "offset": 4.4, "fade_s": 99}), {"enabled": true, "offset": 4, "fade_s": 30.0})
+
+
 func test_new_fixture_follows_the_last() -> void:
 	var a := F.new_fixture([], 2)
 	t.eq([a.id, a.follow, a.address], ["fx1", 2, 1])

@@ -13,6 +13,7 @@ const os = require('os')
 const { FollowEngine } = require('./follow-engine')
 const { ArtnetSender, ARTNET_PORT } = require('./artdmx')
 const { PsnSender } = require('./psn')
+const { ConsoleFrames } = require('./follow-through')
 const { onProjectChanged } = require('../engine/project-events')
 
 function ipv4ToInt(ip) {
@@ -61,15 +62,15 @@ function createFollowService(ctx, hub) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
 	const sender = new ArtnetSender({ log })
 	const psn = new PsnSender({ hub, log })
+	const consoleFrames = new ConsoleFrames({ log })
 	let targets = localTargets()
+	const reachesSelf = (to) => to.port === ARTNET_PORT && (to.host.startsWith('127.') || targets.has(to.host))
 	const engine = new FollowEngine({
 		hub,
+		consoleFrames,
 		send: (to, packet) => sender.send(to, packet),
-		isSelfLoop: (to, universe) => {
-			if (to.port !== ARTNET_PORT) return false
-			const local = to.host.startsWith('127.') || targets.has(to.host)
-			return local && inputPortAddress(ctx) === universe
-		},
+		isSelfLoop: (to, universe) => reachesSelf(to) && inputPortAddress(ctx) === universe,
+		reachesSelf,
 	})
 	let lastJson = ''
 	const apply = (project) => {
@@ -80,6 +81,8 @@ function createFollowService(ctx, hub) {
 		targets = localTargets()
 		engine.configure(slice)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
+		if (engine.through.enabled && engine.protocol === 'artnet') consoleFrames.start()
+		else consoleFrames.stop()
 		const ok = engine.fixtures.filter((f) => !f.problem).length
 		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol})`)
 		for (const f of engine.fixtures) if (f.problem) log('warn', `[follow] ${f.name}: ${f.problem}`)
@@ -96,18 +99,21 @@ function createFollowService(ctx, hub) {
 		engine,
 		sender,
 		psn,
-		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors, psn: { ...psn.status(), interfaces: ipv4Addresses() } }),
+		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors, psn: { ...psn.status(), interfaces: ipv4Addresses() },
+			console: consoleFrames.status() }),
 		/** What clients draw (WS `tracking:follow`): no counters, so it only changes when an aim / state does. */
 		snapshot: () => {
 			const s = engine.status()
 			return { output_enabled: s.output_enabled, protocol: s.protocol,
-				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem }) => ({ id, state, pan, tilt, problem })) }
+				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) =>
+					({ id, state, pan, tilt, problem, through, console })) }
 		},
 		stop() {
 			off()
 			engine.stop()
 			sender.close()
 			psn.close()
+			consoleFrames.stop()
 		},
 	}
 }

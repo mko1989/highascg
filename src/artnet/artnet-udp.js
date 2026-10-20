@@ -3,14 +3,18 @@
 const dgram = require('dgram')
 const { portKeyFromPacket, parseArtDmx, readByte } = require('./artnet-packet')
 const { PATCH_CHANNEL_COUNT } = require('./artnet-constants')
+const tap = require('./artnet-tap')
 
 function bindUdpSocket(receiver) {
 	try {
 		const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+		let owning = false // counted in artnet-tap while listening
 		socket.on('error', (e) => {
 			receiver.log('error', `[ArtNet] UDP socket error: ${e.message}`)
 		})
 		socket.on('close', () => {
+			if (owning) tap.ownerChanged(-1)
+			owning = false
 			if (receiver._socket === socket) {
 				receiver._socket = null
 				receiver.log('warn', '[ArtNet] UDP socket closed — will re-bind on next reconfigure if listen is enabled')
@@ -18,6 +22,8 @@ function bindUdpSocket(receiver) {
 		})
 		socket.on('message', (msg, rinfo) => onUdpMessage(receiver, msg, rinfo))
 		socket.on('listening', () => {
+			owning = true
+			tap.ownerChanged(1)
 			const addr = socket.address()
 			receiver.log(
 				'info',
@@ -41,7 +47,8 @@ function ensureSocketListening(receiver) {
 	bindUdpSocket(receiver)
 }
 
-function onUdpMessage(receiver, msg, _rinfo) {
+function onUdpMessage(receiver, msg, rinfo) {
+	tap.publish(msg, rinfo) // WO-632: the follow read-through sees every universe before this input filters
 	try {
 		receiver._bumpStat('udp')
 		receiver._maybeLogStats()

@@ -19,6 +19,11 @@ var _iface: OptionButton
 var _sys: LineEdit
 var _axes: OptionButton
 var _status: Label
+var _thru: GridContainer  # WO-632 read-through (Art-Net backup only)
+var _thru_on: CheckBox
+var _offset: SpinBox
+var _fade: SpinBox
+var _console := {}  # the last GET /api/tracking/follow `console` (frames the box sees)
 var _ifaces: Array = []  # [{name, address}]
 var _server := {}  # the last GET /api/tracking/follow `psn` (kept for refreshes that don't poll)
 
@@ -40,6 +45,19 @@ func _ready() -> void:
 	_pair("System name", _sys)
 	_axes = _options(AXES, func(i: int) -> void: _emit_psn("axes", AXES[i][0]))
 	_pair("Axes", _axes)
+	_thru = GridContainer.new()
+	_thru.columns = 2
+	add_child(_thru)
+	_thru_on = CheckBox.new()
+	_thru_on.text = "Read the console first"
+	_thru_on.tooltip_text = ("The console sends the heads' universes to this box; every channel passes through, and pan / tilt\n" +
+		"fade to tracking while the marker is tracked, then back to the console's values when it is lost.")
+	_thru_on.toggled.connect(func(on: bool) -> void: _emit_through("enabled", on))
+	_pair_in(_thru, "Read-through", _thru_on)
+	_offset = _spin(-32767, 32767, 1, func(v: float) -> void: _emit_through("offset", int(v)))
+	_pair_in(_thru, "Console universe = out +", _offset)
+	_fade = _spin(0, 30, 0.1, func(v: float) -> void: _emit_through("fade_s", v))
+	_pair_in(_thru, "Handover fade s", _fade)
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -47,6 +65,13 @@ func _ready() -> void:
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			poll())
+	var t := Timer.new()  # counters + console frames stay live while the page is open
+	t.wait_time = 2.0
+	t.timeout.connect(func() -> void:
+		if is_visible_in_tree():
+			poll())
+	add_child(t)
+	t.start()
 
 
 ## Server counters + interface list (on show, and from follow_section's refresh).
@@ -56,6 +81,7 @@ func poll() -> void:
 	var psn: Dictionary = body.get("psn") if body.get("psn") is Dictionary else {}
 	_ifaces = psn.get("interfaces") if psn.get("interfaces") is Array else []
 	_server = psn
+	_console = body.get("console") if body.get("console") is Dictionary else {}
 	show_output(output)
 
 
@@ -84,8 +110,23 @@ func show_output(o: Dictionary) -> void:
 		_iface.add_item("%s (not on this box)" % psn.iface)
 		at = _iface.item_count - 1
 	_iface.select(at)
+	var thru: Dictionary = o.get("through", F.normalize_through({}))
+	_thru.visible = not is_psn
+	_thru_on.set_pressed_no_signal(thru.enabled)
+	if not _offset.get_line_edit().has_focus():
+		_offset.set_value_no_signal(thru.offset)
+	if not _fade.get_line_edit().has_focus():
+		_fade.set_value_no_signal(thru.fade_s)
+	_offset.editable = thru.enabled
+	_fade.editable = thru.enabled
 	if not is_psn:
-		_status.text = "Art-Net backup: the patched heads below are aimed by this box. Release them on the console first."
+		_status.text = ("Art-Net backup: this box aims the patched heads. " + ("Read-through: the console keeps them until " +
+			"a head's marker is tracked, then pan / tilt fade over. Send the console's universes to this box at output + %d." % thru.offset
+			if thru.enabled else "Release them on the console first."))
+		var seen: Array = _console.get("universes", []) if _console.get("universes") is Array else []
+		if thru.enabled:
+			_status.text += ("\nConsole frames: none yet" if seen.is_empty() else "\nConsole frames: " + ", ".join(seen.map(
+				func(u: Dictionary) -> String: return "U%d from %s (%.1f s)" % [int(u.universe), u.from, float(u.age_ms) / 1000.0])))
 		return
 	_status.text = ("Trackers = markers (id = marker id). On the console: PSN input, map tracker ids to fixtures." +
 		" Calibrate (below) jogs heads over Art-Net — pick the backup while calibrating.")
@@ -113,6 +154,26 @@ func _emit_psn(key: String, v: Variant) -> void:
 	edited.emit(o)
 
 
+func _emit_through(key: String, v: Variant) -> void:
+	var o := output.duplicate(true)
+	var th: Dictionary = o.get("through", F.normalize_through({}))
+	if th.get(key) == v:
+		return
+	th[key] = v
+	o["through"] = F.normalize_through(th)
+	edited.emit(o)
+
+
+func _spin(lo: float, hi: float, step: float, cb: Callable) -> SpinBox:
+	var sb := SpinBox.new()
+	sb.min_value = lo
+	sb.max_value = hi
+	sb.step = step
+	sb.update_on_text_changed = true
+	sb.value_changed.connect(cb)
+	return sb
+
+
 func _options(items: Array, cb: Callable) -> OptionButton:
 	var b := OptionButton.new()
 	for it in items:
@@ -122,12 +183,16 @@ func _options(items: Array, cb: Callable) -> OptionButton:
 
 
 func _pair(text: String, c: Control) -> void:
+	_pair_in(_grid, text, c)
+
+
+func _pair_in(grid: GridContainer, text: String, c: Control) -> void:
 	var l := Label.new()
 	l.text = text
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	_grid.add_child(l)
+	grid.add_child(l)
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_grid.add_child(c)
+	grid.add_child(c)
 
 
 func _line(cb: Callable) -> LineEdit:

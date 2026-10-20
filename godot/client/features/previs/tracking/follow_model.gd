@@ -2,7 +2,8 @@ extends RefCounted
 ## WO-616 T11 — the follow patch `project.fixtures` (Godot-owned slice; the engine is server-side,
 ## src/fixtures/follow-patch.js normalizes the same way): a manual generic moving-head profile per fixture
 ## (GDTF comes with WO-615 T1), its marker, and the beam the server's aim draws in the camera view.
-##   {output: {enabled, protocol "psn" | "artnet", psn {group, port, iface, system_name, axes}}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
+##   {output: {enabled, protocol "psn" | "artnet", psn {group, port, iface, system_name, axes}, through {enabled, offset,
+##   fade_s}}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
 ##    invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
 
 const DEFAULT_DEST := "255.255.255.255"
@@ -51,7 +52,18 @@ static func normalize(slice: Variant) -> Dictionary:
 		out.append(fx)
 	var o: Dictionary = s.get("output") if s.get("output") is Dictionary else {}
 	return {"output": {"enabled": o.get("enabled") == true,
-		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn"))}, "patch": out}
+		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn")),
+		"through": normalize_through(o.get("through"))}, "patch": out}
+
+
+## WO-632 output.through — twin of follow-through.js normalizeThrough (read the console's Art-Net first).
+static func normalize_through(raw: Variant) -> Dictionary:
+	var o: Dictionary = raw if raw is Dictionary else {}
+	var off: Variant = o.get("offset")
+	var fade: Variant = o.get("fade_s")
+	return {"enabled": o.get("enabled") == true,
+		"offset": clampi(roundi(float(off)), -PORT_ADDRESS_MAX, PORT_ADDRESS_MAX) if off is int or off is float else 0,
+		"fade_s": clampf(float(fade), 0.0, 30.0) if fade is int or fade is float else 1.0}
 
 
 ## WO-631 output.psn — the twin of follow-patch.js normalizePsn (multicast group, port, interface IPv4 or "", name, axes).

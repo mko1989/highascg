@@ -8,7 +8,8 @@
  *   fixtures: { output: { enabled: false,            ← master; nothing is transmitted while false
  *                         protocol: "psn" | "artnet", ← WO-631: PSN trackers to the console (default) or this box's
  *                                                       own pan/tilt over Art-Net (the backup)
- *                         psn: { group, port, iface, system_name, axes "stage" | "y_up" } },
+ *                         psn: { group, port, iface, system_name, axes "stage" | "y_up" },
+ *                         through: { enabled, offset, fade_s } },  ← WO-632 Art-Net read-through (backup only)
  *     patch: [{ id, name, enabled, protocol: "artnet", universe (Art-Net port-address 0–32767), address 1–512,
  *               dest "a.b.c.d[:port]", pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
  *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left) },
@@ -17,6 +18,7 @@
  */
 
 const { parseDest, MAX_PORT_ADDRESS } = require('./artdmx')
+const { normalizeThrough } = require('./follow-through')
 
 const DEFAULT_DEST = '255.255.255.255'
 const PROTOCOLS = ['psn', 'artnet']
@@ -120,7 +122,8 @@ function normalizePatch(slice) {
 		return fx
 	})
 	const protocol = PROTOCOLS.includes(s.output?.protocol) ? s.output.protocol : 'psn'
-	return { enabled: s.output?.enabled === true, protocol, psn: normalizePsn(s.output?.psn), fixtures }
+	return { enabled: s.output?.enabled === true, protocol, psn: normalizePsn(s.output?.psn),
+		through: normalizeThrough(s.output?.through), fixtures }
 }
 
 module.exports = { DEFAULT_DEST, PROTOCOLS, normalizePsn, normalizeFixture, normalizePatch, parseFixed, footprint }

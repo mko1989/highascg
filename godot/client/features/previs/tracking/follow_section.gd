@@ -139,6 +139,7 @@ func _persist(now := false) -> void:
 func _apply_output(o: Dictionary) -> void:
 	data.output.protocol = o.protocol
 	data.output.psn = o.psn
+	data.output.through = o.through
 	_persist(true)
 	_output.poll()
 
@@ -147,7 +148,9 @@ func show_output() -> void:
 	_output.show_output(data.output)
 	_confirm_on.dialog_text = ("Start PosiStageNet output? Every marker goes out as a PSN tracker to %s:%d at 60 Hz." %
 		[data.output.psn.group, int(data.output.psn.port)] if data.output.protocol == "psn" else
-		"Start Art-Net output? Every patched universe is sent at 44 Hz — channels no fixture uses go out as 0.")
+		"Start Art-Net output? Every patched universe is sent at 44 Hz — " + ("the console's values pass through; " +
+		"pan / tilt fade to tracking only while a head's marker is tracked." if data.output.get("through", {}).get("enabled", false)
+		else "channels no fixture uses go out as 0."))
 
 
 func _set_output(on: bool) -> void:
@@ -210,6 +213,9 @@ func refresh() -> void:
 		var txt := "%s  U%d.%03d → %s · %s" % [fx.name, fx.universe, fx.address, _marker_name(fx.follow), st]
 		if st == "following":
 			txt += "  %.1f° / %.1f°" % [float(a.pan), float(a.tilt)]
+		if a.get("through") is String:  # WO-632 read-through: who has pan / tilt, and is the console feed live
+			txt += "  [%s%s]" % [a.through, {"held": " · console lost, its look held", "none": " · no console frames"}.get(
+				str(a.get("console", "")), "")]
 		_list.add_item(txt)
 		_list.set_item_custom_fg_color(_list.item_count - 1, ThemeBuilder.ERROR if a.get("problem") != null and a.get("problem") != "" else
 			ThemeBuilder.TEXT if st == "following" else ThemeBuilder.TEXT_MUTED)

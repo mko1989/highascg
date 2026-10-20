@@ -50,6 +50,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       "Y up". Same on the MagicQ MQ500. A managed switch needs IGMP snooping with a querier.
 - [ ] **WO-631** — Art-Net backup: switch Output to "Art-Net backup" with the console released, and check the head
       follows.
+- [ ] **WO-632** — read-through: send the follow heads' universes from the console to this box as well, at output
+      + offset (e.g. +10), tick Follow → Output → "Read the console first", then Output ON. Nothing should move.
+      Track a marker → the head fades to it; lose it → back to the console's look. Pull the console's cable → the
+      look holds.
 
 ## 2. Caspar build, outputs, performance (carried over)
 
