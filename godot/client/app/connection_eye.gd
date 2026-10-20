@@ -15,6 +15,7 @@ const BLINK_PHASE_S := 0.25
 const CELEBRATION_S := 5.0
 
 signal clicked
+signal context_requested  # right-click → app/connection_menu.gd (A/B hosts)
 
 var connected := false
 var offline := false
@@ -51,6 +52,9 @@ static func load_png(path: String) -> Texture2D:
 func _gui_input(e: InputEvent) -> void:
 	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
 		clicked.emit()
+		accept_event()
+	elif e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_RIGHT:
+		context_requested.emit()
 		accept_event()
 
 

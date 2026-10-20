@@ -15,6 +15,8 @@ const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const PlaylistsPanel := preload("res://features/live/playlists_panel.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
+const ConnectionMenu := preload("res://app/connection_menu.gd")
+const Profiles := preload("res://core/connection_profiles_model.gd")
 const LogsDialog := preload("res://app/logs_dialog.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
@@ -164,6 +166,7 @@ func _build_header() -> Control:
 	row.add_child(_perf_btn)
 	_eye = ConnectionEye.new()
 	_eye.clicked.connect(_open_logs)
+	_eye.context_requested.connect(func() -> void: ConnectionMenu.show_menu(_eye))
 	row.add_child(_eye)
 	return bar
 
@@ -189,5 +192,6 @@ func _refresh_eye() -> void:
 		caspar_ok = bool((caspar as Dictionary).get("connected", false))
 	var state := "server offline" if not Ws.is_open else ("server ok · Caspar offline" if not caspar_ok else "connected")
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
-		"%s\n%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else ""])
+		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
+			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])
 

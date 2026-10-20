@@ -37,6 +37,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       fake report (`--probe-hw-reconcile`). With a project saved on ANOTHER machine as the server's project, restart
       the Godot client: the "Hardware does not match this project" dialog should list the differences; try **Apply
       project hardware** (Device View + routing, OS layout, Caspar config regenerate) and Remember my choice.
+- [ ] **WO-608** — Connection A/B hosts: only tested with two names for this box (127.0.0.1 / localhost). With the
+      backup box up, right-click the connection eyes → **A/B hosts…** → A = this box, B = the backup's IP → Save →
+      right-click → **Connect to B**: the GUI restarts showing the backup's project and state; Connect to A returns.
 - [ ] **WO-606** — Shader Live (logo click or deck toolbar → Shader Live): never tried on air — this box has no
       shader live and GPU CEF is off, and PGM/PRV were off limits. Take a shader look to PRV, then ride a slider,
       ≋ wiggle, a preset, Randomize, ▶ Take, a playlist hop (the picker should follow the layer), a Templates

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs and modals open; logs window, Diagnostics, Updates, Nuclear done 20.10. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
+**Status: ✅ DONE (2026-10-20) — every port-plan step (shell R1–R5, header, all Settings tabs, logs, project / USB modals, hardware reconcile, missing assets, optional modules / CG Studio, connection A/B profiles) ported and box-verified; owner checks in work/checklist20.10.26_owner_checks.md. D1/D2 decided by the owner 17.10; D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
 
@@ -595,3 +595,33 @@ browser of the machine running the Godot client, so a remote Godot client opens 
 http://127.0.0.1:4200/cg-studio/index.html` opened "CG Studio — Mozilla Firefox" on the operator screen with the
 template list, canvas and inspector; window closed afterwards. Godot tests 16407/0.
 
+
+## 2026-10-20 — Connection A/B hot-backup profiles (port plan step 4, connection part)
+
+**Investigation.** Web `lib/connection-profiles.js` (WO-54 T5.1) keeps `{hostA, hostB, active}` in localStorage;
+its only user, `replication-status-banner.js` (Connect to A/B, Promote / Failover, A/B hosts via `window.prompt`),
+is never mounted — `initReplicationStatusBanner()` has no caller, so the web had no reachable A/B UI. Promote /
+become-leader already lives in the Godot Devices → Server page (server_flow.gd). `connection-eye.js` ignores
+profiles. The Godot origin is fixed at boot by `core/config.gd` and read by every autoload (Api, Ws, uploads).
+
+**What was done.**
+- `core/connection_profiles_model.gd`: the web helpers (normalize → `http://host:4200`, active / peer origin,
+  flip, has_dual) + ui.cfg `[connection] host_a / host_b / active` load / store + restart args.
+- `core/config.gd`: origin precedence `--server=` → `HIGHASCG_SERVER` → **active A/B profile** → 127.0.0.1:4200;
+  `profiles()` (cached) / `save_profiles()`.
+- `app/connection_menu.gd`: **right-click the connection eyes** → "Connect to B — http://…" (disabled until both
+  hosts are set; confirm, Cancel focused) and "A/B hosts…" (two fields, Save; offers a reconnect when the active
+  host changed). A switch stores the flipped profile and restarts the client (`OS.set_restart_on_exit`, same window
+  args minus `--server=`) — the web did `location.reload()`; a restart rebuilds every autoload on the new host.
+  `HIGHASCG_SERVER` still wins and is reported instead of restarting.
+- Eye tooltip adds "Host A (origin) · right-click for A/B hosts".
+
+**What was VERIFIED (box, 20.10).** ui.cfg backed up. Right-click eyes → menu with the switch item disabled;
+A/B hosts… → A `127.0.0.1`, B `localhost` → Save → ui.cfg `host_a="http://127.0.0.1:4200"`,
+`host_b="http://localhost:4200"`, `active="A"`; menu then reads "Connect to B — http://localhost:4200" → confirm →
+the client restarted (`godot --path …/client/ -- --screen=0 --tab=0`), tooltip "connected · http://localhost:4200 ·
+Host B"; Connect to A → back on http://127.0.0.1:4200, "Host A". The menu was clipped at the right screen edge →
+now opens leftwards of the pointer (re-checked). ui.cfg restored from the backup, GUI relaunched normally, 0 script
+errors. Godot tests 16431/0 (`test_connection_profiles_model.gd`).
+
+Open: a real two-box switch (owner checklist). Promote / Failover stays on Devices → Server.
