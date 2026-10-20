@@ -222,3 +222,31 @@ Owner notes added to `next.md` (20.10), quoted per item:
     broadcast back, and the server layout equals the saved one exactly.
 - Owner QA: how it feels by hand. With the web kiosk running alongside, check that its tiles accept the moved
   layout (the broadcast is `source: report`).
+
+## Owner follow-ups (20.10, after N1–N7)
+
+### Investigation
+- "i should be able to resize the windows by any corner not only the bottom right": N1 resized from a single
+  bottom-right hot zone (`compose_tile_math.gd` `resized` anchored the top-left).
+- "yes. i rotated the wall" answers N6's owner-QA question: the Previs tab's Fit and first framing should also
+  face the pictures. `previs_tab.gd` called `frame_box` with no yaw (from +Z), so a wall turned 180° was framed
+  from behind.
+
+### What was done
+- Any-corner resize:
+  - `compose_tile_math.gd`: `resized(start, d, canvas, corner)` with corner (±1, ±1) keeps the opposite corner
+    fixed. The room to grow is measured from that anchor, so a capped resize still keeps the aspect.
+  - New `corner_at(rect, p, zone)` finds which corner's hot square is under the pointer.
+  - `compose_tiles.gd`: all four corners resize, with a ↘↖ / ↗↙ resize cursor; no grips are drawn.
+- Previs framing: the facing logic moved from `live_stage_3d.gd` to `StageBuilder.front_yaw()`. It is used by the
+  Live 3D Fit and by the Previs tab's first framing, Fit button and F key.
+
+### What was VERIFIED
+- Suite 14851 / 14851 passing (new: `test_resize_any_corner`, `test_corner_at`,
+  `test_front_yaw_faces_the_pictures`), `--check` boots clean.
+- Box (config md5 unchanged):
+  - Previs 3D → Fit frames the wall from its picture side (the live PGM look visible).
+  - Live: a real drag of the owner's PGM window's top-left corner +80/+50 shrank it. The bottom-right stayed
+    at exactly (1649.8, 488) canvas px, 16:9 was kept and the composed picture followed.
+  - Afterwards the owner's own layout was POSTed back (identical to the saved copy), and their Live 3D view
+    and Previs Camera mode were restored.

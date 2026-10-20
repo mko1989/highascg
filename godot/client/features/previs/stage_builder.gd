@@ -75,6 +75,18 @@ func node_for(id: String) -> Node3D:
 
 
 ## World-space bounds of everything built (for camera framing).
+## Orbit yaw (PrevisStage frame_box) that looks at the side the visible pictures face — an object's picture faces
+## +Z at rotation 0 — a little off-axis (the Previs default 0.35 rad). Owner 20.10: Fit shows the pictures, not
+## the cabinet backs (their wall is turned 180°).
+func front_yaw() -> float:
+	var facing := Vector2.ZERO
+	for o in objects:
+		if o.visible:
+			var ry := deg_to_rad(float(o.rotation[1]))
+			facing += Vector2(sin(ry), cos(ry))
+	return (atan2(facing.x, facing.y) if facing.length() > 0.01 else 0.0) - 0.35
+
+
 func bounds() -> AABB:
 	var box := AABB()
 	var first := true

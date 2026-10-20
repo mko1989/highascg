@@ -49,15 +49,9 @@ func _reload() -> void:
 		fit.call_deferred()
 
 
-## Frame the stage from the side its pictures face (an object's picture faces +Z at rotation 0), a little off-axis
-## like the Previs default — an operator wants the picture, not the cabinet backs.
+## Frame the stage from the side its pictures face (StageBuilder.front_yaw).
 func fit() -> void:
-	var facing := Vector2.ZERO
-	for o in builder.objects:
-		if o.visible:
-			var ry := deg_to_rad(float(o.rotation[1]))
-			facing += Vector2(sin(ry), cos(ry))
-	stage.frame_box(builder.bounds(), (atan2(facing.x, facing.y) if facing.length() > 0.01 else 0.0) - 0.35)
+	stage.frame_box(builder.bounds(), builder.front_yaw())
 
 
 func _apply() -> void:

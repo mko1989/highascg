@@ -121,7 +121,7 @@ func _ready() -> void:
 	stage_panel.stage_loaded.connect(func(n: int) -> void:
 		if n > 0 and not framed[0]:
 			framed[0] = true
-			stage.frame_box.call_deferred(builder.bounds()))
+			stage.frame_box.call_deferred(builder.bounds(), builder.front_yaw()))
 	stage_panel.stage_changed.connect(func() -> void: track_page.set_objects(builder.objects.duplicate(true)))
 	stage_panel.selection_changed.connect(func(id: String) -> void: builder.set_selected(id))
 	stage_panel.bind(builder)
@@ -258,7 +258,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			stage_panel.turn(-15.0 if k.shift_pressed else -5.0)
 		KEY_F:
 			track_view.fit()
-			stage.frame_box(_fit_box())
+			stage.frame_box(_fit_box(), builder.front_yaw())
 		_:
 			handled = false
 	if handled:
@@ -336,7 +336,7 @@ func _build_toolbar() -> Control:
 	bar.add_child(_coverage_cb)
 	var fit := Button.new()
 	fit.text = "Fit"
-	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box()))
+	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
 	bar.add_child(fit)
 	return bar
 

@@ -58,3 +58,21 @@ func test_upsert_and_remove() -> void:
 	t.eq(b.objects.size(), 0, "removed")
 	t.ok(b.node_for("led_wall_1") == null, "node gone")
 	b.free()
+
+
+func test_front_yaw_faces_the_pictures() -> void:
+	var b := _builder()
+	var w := S.new_object("led_wall")
+	b.set_objects([w])
+	t.ok(is_equal_approx(b.front_yaw(), -0.35), "rotation 0 → picture faces +Z → the default view")
+	w.rotation = [0, 180, 0]
+	b.set_objects([w])
+	t.ok(is_equal_approx(b.front_yaw(), PI - 0.35), "turned 180° → look from −Z")
+	var hidden := S.new_object("tv")
+	hidden.rotation = [0, 90, 0]
+	hidden.visible = false
+	b.set_objects([w, hidden])
+	t.ok(is_equal_approx(b.front_yaw(), PI - 0.35), "hidden objects don't count")
+	b.set_objects([])
+	t.ok(is_equal_approx(b.front_yaw(), -0.35), "empty stage → the default view")
+	b.free()

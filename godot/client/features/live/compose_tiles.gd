@@ -2,8 +2,8 @@ extends Control
 ## WO-621 N1 — the operator compose windows over the Live preview (web operator-compose-tiles.js chrome): each
 ## PRV / PGM window gets a role-coloured outline just outside its picture and a label strip below it
 ## ("PRV 1 / <screen label>", web tileLabelText) — both hug the picture, not a mis-shaped cell. Drag the picture
-## or the label to move it; drag the bottom-right corner to resize it, aspect kept (no drawn grip — owner 20.10;
-## the resize cursor shows the spot). Rects are the server's operator-GUI cells (GET/POST
+## or the label to move it; drag any corner to resize it, the opposite corner fixed and the aspect kept (no
+## drawn grips — owner 20.10; the resize cursor shows the spot). Rects are the server's operator-GUI cells (GET/POST
 ## /api/operator-gui/layout, fractions of the operator canvas) — a move re-composes the operator channel, so the
 ## picture follows the frame. Other clients' moves arrive as the `operatorGuiLayout` broadcast. The
 ## media-inspector cell is never drawn or touched, and is passed back unchanged so a running media preview
@@ -20,7 +20,7 @@ const GRIP := 14.0
 var role := "opgui"
 var cells: Array = []  # compose cells (server shape), drawn in order
 var _media: Array = []  # the server's media-inspector cell(s), passed through untouched
-var _drag := {}  # {i, mode: "move"|"resize", start: Rect2 (canvas px), at: Vector2 (local px)}
+var _drag := {}  # {i, mode: "move"|"resize", corner: Vector2i, start: Rect2 (canvas px), at: Vector2 (local px)}
 var _posting := false
 var _pending := false
 
@@ -93,9 +93,6 @@ func _screen(i: int) -> Rect2:
 	return Rect2(ir.position + p.position * k, p.size * k)
 
 
-## The invisible corner hot zone that resizes.
-func _grip(r: Rect2) -> Rect2:
-	return Rect2(r.end - Vector2(GRIP, GRIP) * 0.5, Vector2(GRIP, GRIP))
 
 
 func label_text(c: Dictionary) -> String:
@@ -125,16 +122,18 @@ func _draw() -> void:
 		line.draw(get_canvas_item(), strip.position + Vector2(6, (LABEL_H - line.get_size().y) / 2.0), Color.WHITE)
 
 
-## [index, mode] under a local point: the corner zone first (it overhangs the corner), then picture + label strip.
+## [index, mode, corner] under a local point: the corner zones first (they overhang the corners), then picture +
+## label strip.
 func _pick(p: Vector2) -> Array:
 	for i in range(cells.size() - 1, -1, -1):
-		if _grip(_screen(i)).has_point(p):
-			return [i, "resize"]
+		var c := TM.corner_at(_screen(i), p, GRIP)
+		if c != Vector2i.ZERO:
+			return [i, "resize", c]
 	var rects := []
 	for i in cells.size():
 		rects.append(_screen(i).grow(2.0))
 	var i := TM.hit(rects, p, LABEL_H + 2.0)
-	return [i, "move"] if i >= 0 else [-1, ""]
+	return [i, "move", Vector2i.ZERO] if i >= 0 else [-1, "", Vector2i.ZERO]
 
 
 func _has_point(p: Vector2) -> bool:
@@ -147,7 +146,7 @@ func _gui_input(e: InputEvent) -> void:
 		if mb.pressed:
 			var hit := _pick(mb.position)
 			if hit[0] >= 0:
-				_drag = {"i": hit[0], "mode": hit[1], "start": _picture(hit[0]), "at": mb.position}
+				_drag = {"i": hit[0], "mode": hit[1], "corner": hit[2], "start": _picture(hit[0]), "at": mb.position}
 				accept_event()
 		elif not _drag.is_empty():
 			_drag = {}
@@ -159,11 +158,13 @@ func _gui_input(e: InputEvent) -> void:
 		return
 	if _drag.is_empty():
 		var hit := _pick(mm.position)
-		mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE if hit[1] == "resize" else Control.CURSOR_MOVE
+		var c: Vector2i = hit[2]
+		mouse_default_cursor_shape = Control.CURSOR_MOVE if c == Vector2i.ZERO else \
+			(Control.CURSOR_FDIAGSIZE if c.x == c.y else Control.CURSOR_BDIAGSIZE)  # ↘↖ vs ↗↙
 		return
 	var d: Vector2 = (mm.position - _drag.at) * (canvas().x / image_rect().size.x)
 	var start: Rect2 = _drag.start
-	var r := TM.moved(start, d, canvas()) if _drag.mode == "move" else TM.resized(start, d, canvas())
+	var r := TM.moved(start, d, canvas()) if _drag.mode == "move" else TM.resized(start, d, canvas(), _drag.corner)
 	cells[_drag.i].rect = TM.to_frac(r, canvas())
 	queue_redraw()
 	_post()

@@ -35,22 +35,36 @@ static func moved(start: Rect2, d: Vector2, canvas: Vector2) -> Rect2:
 	return clamp_rect(Rect2(snap(start.position.x + d.x), snap(start.position.y + d.y), start.size.x, start.size.y), canvas)
 
 
-## Drag the bottom-right corner by `d` canvas px: the larger relative change wins and the other side follows the
-## start aspect; the minimum and the canvas edge both cap it without distorting the picture.
-static func resized(start: Rect2, d: Vector2, canvas: Vector2) -> Rect2:
+## Drag a corner by `d` canvas px: `corner` = (±1, ±1), +1 = right / bottom. The opposite corner stays put; the
+## larger relative change wins and the other side follows the start aspect; the minimum and the canvas edge both
+## cap it without distorting the picture.
+static func resized(start: Rect2, d: Vector2, canvas: Vector2, corner := Vector2i(1, 1)) -> Rect2:
 	var ar := start.size.x / start.size.y if start.size.y > 0 else 16.0 / 9.0
-	var w := start.size.x + d.x
-	var h := start.size.y + d.y
+	var w := start.size.x + d.x * corner.x
+	var h := start.size.y + d.y * corner.y
 	if absf(d.x) / maxf(start.size.x, 1.0) >= absf(d.y) / maxf(start.size.y, 1.0):
 		w = snap(w)
 		h = w / ar
 	else:
 		h = snap(h)
 		w = h * ar
+	var room_x := canvas.x - start.position.x if corner.x > 0 else start.end.x
+	var room_y := canvas.y - start.position.y if corner.y > 0 else start.end.y
 	var lo := maxf(MIN.x, MIN.y * ar)  # smallest width meeting both minimums at this aspect
-	var hi := minf(canvas.x - start.position.x, (canvas.y - start.position.y) * ar)
-	w = clampf(w, lo, maxf(lo, hi))
-	return Rect2(start.position, Vector2(w, w / ar))
+	w = clampf(w, lo, maxf(lo, minf(room_x, room_y * ar)))
+	h = w / ar
+	var x := start.position.x if corner.x > 0 else start.end.x - w
+	var y := start.position.y if corner.y > 0 else start.end.y - h
+	return Rect2(x, y, w, h)
+
+
+## Which corner (±1, ±1) of `r` has its `zone`-sized hot square under `p`, or (0, 0).
+static func corner_at(r: Rect2, p: Vector2, zone: float) -> Vector2i:
+	for c in [Vector2i(1, 1), Vector2i(-1, 1), Vector2i(1, -1), Vector2i(-1, -1)]:
+		var at := Vector2(r.end.x if c.x > 0 else r.position.x, r.end.y if c.y > 0 else r.position.y)
+		if Rect2(at - Vector2(zone, zone) * 0.5, Vector2(zone, zone)).has_point(p):
+			return c
+	return Vector2i.ZERO
 
 
 ## Index of the window under canvas point `p` (topmost = last drawn), or -1. `below` (canvas px) widens the hit

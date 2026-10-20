@@ -66,3 +66,28 @@ func test_source_aspect_and_fit() -> void:
 	t.ok(is_equal_approx(TM.source_aspect({"role": "pgm", "mainIndex": 0}, null), 16.0 / 9.0), "no channel map → 16:9")
 	t.eq(TM.fit(Rect2(433, 188, 504, 168), 16.0 / 9.0), Rect2(535.6666666666666, 188, 298.6666666666667, 168), "3:1 cell → pillarboxed 16:9")
 	t.eq(TM.fit(Rect2(0, 0, 160, 300), 16.0 / 9.0), Rect2(0, 105, 160, 90), "tall cell → letterboxed")
+
+
+func test_resize_any_corner() -> void:
+	var s := Rect2(400, 200, 480, 270)
+	var tl := TM.resized(s, Vector2(-96, 0), C, Vector2i(-1, -1))
+	t.eq(tl.end, s.end, "top-left: the bottom-right corner stays put")
+	t.eq(tl.size.x, 576.0, "top-left: dragging out grows it")
+	var tr := TM.resized(s, Vector2(96, 0), C, Vector2i(1, -1))
+	t.eq(Vector2(tr.position.x, tr.end.y), Vector2(s.position.x, s.end.y), "top-right: bottom-left anchored")
+	var bl := TM.resized(s, Vector2(96, 0), C, Vector2i(-1, 1))
+	t.eq(Vector2(bl.end.x, bl.position.y), Vector2(s.end.x, s.position.y), "bottom-left: top-right anchored")
+	t.eq(bl.size.x, 384.0, "bottom-left: dragging inward shrinks it")
+	var cap := TM.resized(s, Vector2(-5000, 0), C, Vector2i(-1, -1))
+	t.ok(cap.position.x >= -0.001 and cap.position.y >= -0.001, "top-left: capped at the canvas origin")
+	t.ok(is_equal_approx(cap.size.x / cap.size.y, 16.0 / 9.0), "capped without distortion")
+	t.eq(cap.end, s.end, "still anchored when capped")
+
+
+func test_corner_at() -> void:
+	var r := Rect2(100, 100, 200, 100)
+	t.eq(TM.corner_at(r, Vector2(101, 99), 14.0), Vector2i(-1, -1), "top-left")
+	t.eq(TM.corner_at(r, Vector2(305, 102), 14.0), Vector2i(1, -1), "top-right")
+	t.eq(TM.corner_at(r, Vector2(98, 204), 14.0), Vector2i(-1, 1), "bottom-left")
+	t.eq(TM.corner_at(r, Vector2(300, 200), 14.0), Vector2i(1, 1), "bottom-right")
+	t.eq(TM.corner_at(r, Vector2(200, 150), 14.0), Vector2i.ZERO, "middle → none")
