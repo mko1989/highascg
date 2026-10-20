@@ -1,5 +1,8 @@
 # Open issues (operator / production)
 
+> **20.10.26 — owner checks:** every open item that needs the owner (QA on the glass / rig, a tick, a decision) is
+> listed in **[checklist20.10.26_owner_checks.md](./checklist20.10.26_owner_checks.md)**, newest (Godot / tracking / PSN) first.
+
 > **06.08.26 — "close all open WOs" sweep (WO-445..451 session):** 58 stale rows corrected to
 > their WO status lines; WO-176/190/215/221/247/262/390/403/404 closed (see each WO's closure
 > note). Everything still open is an owner tick/action/decision consolidated in
