@@ -145,3 +145,23 @@ func test_masks_round_trip() -> void:
 	var ms := [{"enabled": true, "vertices": [[0.1, 0.1], [0.9, 0.1], [0.5, 0.9]]}, {"enabled": false, "vertices": [[0.0, 0.0], [1.0, 0.0], [1.0, 1.0]]}]
 	var d := D.with_masks({}, "cam_1", true, ms)
 	t.eq(D.masks_of(d, "cam_1"), {"masks_enabled": true, "masks": ms}, "round trip gives back what was written")
+
+
+## WO-624 E2: the click → person key the server pins (`w:<id>` for a fused person, else `<camera>:<tid>`); the smaller
+## nearest centre wins an overlap; other cameras, stale cameras and detection-off snapshots hit nothing.
+func test_person_at_click() -> void:
+	var R := Vector2(1920, 1080)
+	var snap := {"enabled": true, "cameras": [
+		{"id": "cam_1", "persons": [{"tid": 3, "box": [0.1, 0.1, 0.5, 0.9]}, {"tid": 4, "box": [0.3, 0.4, 0.4, 0.6]},
+			{"tid": 8, "box": [0.7, 0.2, 0.8, 0.6], "world": 2}]},
+		{"id": "cam_2", "persons": [{"tid": 1, "box": [0, 0, 1, 1]}]}]}
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.15, 0.2) * R), "cam_1:3", "inside one box")
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.35, 0.5) * R), "cam_1:4", "overlap: the box centred under the click")
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.32, 0.42) * R), "cam_1:3", "overlap, nearer the big box's centre: the big one")
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.75, 0.3) * R), "w:2", "a fused person is picked by its world id")
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.95, 0.95) * R), "", "no box")
+	snap.cameras[0].stale = true
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.15, 0.2) * R), "", "a stale camera")
+	snap.cameras[0].stale = false
+	snap.enabled = false
+	t.eq(D.person_at(snap, "cam_1", R, Vector2(0.15, 0.2) * R), "", "detection off")

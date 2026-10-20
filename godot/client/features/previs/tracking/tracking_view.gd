@@ -19,6 +19,7 @@ extends Control
 
 const O := preload("res://features/previs/tracking/tracking_overlay.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const D := preload("res://features/previs/tracking/detect_model.gd")
 
 signal clicked(px: Vector2)          # raster pixels of the camera picture
 signal picked(id: String)
@@ -171,6 +172,11 @@ func _exit_tree() -> void:
 func _process(_d: float) -> void:
 	queue_redraw()  # the surface texture updates in place, but its size can arrive after the lease
 	_back.queue_redraw()
+
+
+## WO-624 E2: the detected person (pin key) under a raster point of this camera, "" for none.
+func person_at(px: Vector2) -> String:
+	return D.person_at(detections, str(entry.get("id", "")), _raster(), px)
 
 
 func _raster() -> Vector2:

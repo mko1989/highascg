@@ -129,3 +129,24 @@ static func world_line(snap: Dictionary) -> String:
 	var both: int = ps.filter(func(p: Variant) -> bool: return p is Dictionary and str(p.get("source", "")) == "fused").size()
 	return " · world: %d (%d seen by 2+ cameras)" % [ps.size(), both]
 
+
+
+## WO-624 E2: the person under a click in the camera view (raster px) — the pin key the server knows: `w:<id>` when
+## the box belongs to a fused world person, else `<camera>:<tid>`. Where boxes overlap, the one whose centre is
+## nearest the click wins: the operator aims at the middle of the person they mean (box-verified: two people one
+## behind the other — "smallest box" picked the wrong one). "" when the click hits no box.
+static func person_at(snap: Dictionary, cam_id: String, raster: Vector2, px: Vector2) -> String:
+	var best := ""
+	var best_d := INF
+	for cam in snap.get("cameras", []) if snap.get("enabled") == true else []:
+		if not (cam is Dictionary) or str(cam.get("id", "")) != cam_id or cam.get("stale") == true:
+			continue
+		for p in cam.get("persons", []):
+			var b: Variant = p.get("box") if p is Dictionary else null
+			if not (b is Array) or (b as Array).size() < 4:
+				continue
+			var r := Rect2(Vector2(float(b[0]) * raster.x, float(b[1]) * raster.y), Vector2(float(b[2]) - float(b[0]), float(b[3]) - float(b[1])) * raster)
+			if r.has_point(px) and r.get_center().distance_squared_to(px) < best_d:
+				best_d = r.get_center().distance_squared_to(px)
+				best = "w:%d" % int(p.world) if p.get("world") != null else "%s:%d" % [cam_id, int(p.get("tid", 0))]
+	return best

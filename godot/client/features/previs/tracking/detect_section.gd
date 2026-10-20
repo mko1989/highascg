@@ -29,6 +29,7 @@ var _spins := {}
 var _assist_rows: Array = []
 var _replace_rows: Array = []
 var _confirm_on: ConfirmationDialog
+var _pick_note := ""  # WO-624 E2: the last person pick's outcome, under the live status
 var masks := MaskSection.new()  # created here so tracking_page can connect it before _ready
 var walk := WalkSection.new()  # T10d verification walk (tracking_page connects accepted / view_changed)
 
@@ -139,7 +140,27 @@ func refresh_status() -> void:
 	if _state == null:
 		return
 	var snap: Dictionary = driver.detections if driver != null else {}
-	_state.text = D.status_line(snap, cam_id) + "\n" + str(D.PIN_LABELS[data.pin_mode])
+	_state.text = D.status_line(snap, cam_id) + "\n" + str(D.PIN_LABELS[data.pin_mode]) + ("\n" + _pick_note if _pick_note != "" else "")
+
+
+## WO-624 E2: a person box clicked in the camera view — the marker this page pins follows that person. Switches the
+## pin to Replace when it is not (the server keeps the pick until the mode change arrives); never arms detection.
+func pick_person(key: String) -> void:
+	if not data.enabled:
+		_pick_note = "Turn detection on to follow a person."
+		refresh_status()
+		return
+	if data.pin_mode != "replace":
+		_set_key("pin_mode", "replace")
+	var res: Dictionary = await Api.post_json("/api/tracking/detect/pick", {"key": key})
+	var who := "person " + key.get_slice(":", 1) if not key.begins_with("w:") else "P" + key.get_slice(":", 1)
+	if not res.ok:
+		_pick_note = "Pick failed: %s" % res.error
+	elif res.data is Dictionary and res.data.get("marker_missing") == true:
+		_pick_note = "Picked %s — but marker %d is not live, so nothing follows yet." % [who, data.pin_marker_id]
+	else:
+		_pick_note = "Marker %d follows %s." % [data.pin_marker_id, who]
+	refresh_status()
 
 
 ## Models actually installed on the box (GET /api/tracking/detections → models).

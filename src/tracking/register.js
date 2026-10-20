@@ -10,6 +10,7 @@
  *
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status)
+ *       · POST /api/tracking/detect/pick {key} (WO-624 E2: the replace pin follows this detected person)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
@@ -191,6 +192,37 @@ function detectTick() {
 	_ctx._wsBroadcast(DETECT_EVENT, snap)
 }
 
+/**
+ * WO-624 E2 — POST /api/tracking/detect/pick {key}: the operator picked a detected person (a box clicked in the camera
+ * view; `camera:tid`, or `w:<id>` for a fused world person). The replace pin takes it next (detect-pin.js request);
+ * until the project's pin_mode is replace the pick waits (PICK_TTL_MS) — the client switches the mode itself
+ * (project.previs is client-owned).
+ */
+function pick(body) {
+	let data
+	try {
+		data = JSON.parse(body || '{}')
+	} catch {
+		return reply(400, { error: 'body must be JSON' })
+	}
+	if (!_detect) return reply(503, { error: 'detection service not running' })
+	const key = String(data?.key || '')
+	if (!/^\S+:\d+$/.test(key)) return reply(400, { error: 'key must be camera:tid or w:<id>' })
+	const now = hub.now()
+	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
+	if (!persons.some((p) => p.key === key)) return reply(404, { error: `no detected person ${key} right now` })
+	pin.request(key, now)
+	const cfg = _detect.config
+	return reply(200, {
+		ok: true,
+		key,
+		pin_mode: cfg.pin_mode,
+		marker: cfg.pin_marker_id,
+		waiting_for_replace: !cfg.enabled || cfg.pin_mode !== 'replace',
+		marker_missing: !hub.markers.has(cfg.pin_marker_id),
+	})
+}
+
 async function handleApi({ method, path, body }) {
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, { module: 'tracking', status: 'markers', markers: hub.markers.size, writes: _writes,
@@ -230,6 +262,7 @@ async function handleApi({ method, path, body }) {
 			return reply(400, { error: 'action must be start | stop | reset' })
 		}
 	}
+	if (method === 'POST' && path === '/api/tracking/detect/pick') return pick(body)
 	if (path === '/api/tracking/markers') {
 		if (method === 'GET') return reply(200, { markers: markersView(), stale_after_ms: MARKER_STALE_AFTER_MS })
 		if (method === 'POST') {

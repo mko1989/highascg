@@ -34,6 +34,7 @@ const VELOCITY_ALPHA = 0.3
 const REACQUIRE_MAX_CENTER_DIST = 0.15
 const REACQUIRE_MAX_FLOOR_M = 0.75
 const ANCHOR_STALE_MS = 1000
+const PICK_TTL_MS = 10000 // WO-624 E2: a pick waits this long for its person / for replace mode
 
 /** Elapsed seconds as a multiple of the nominal 60 fps frame, clamped for EMA stability. */
 const dtSteps = (dt) => Math.min(Math.max(dt, MIN_SMOOTH_DT), MAX_SMOOTH_DT) / NOMINAL_FRAME_DT
@@ -97,7 +98,18 @@ class DetectPin {
 		this.mode = null
 		this.pinnedKey = null
 		this.lastCentre = null // { camera, c: [cx, cy] }
+		this.requested = null // { key, at } — the operator's pick (WO-624 E2), taken by the next replace step that sees it
 		this.rev = 0
+	}
+
+	/**
+	 * WO-624 E2 — the operator picked this person (a box clicked in the camera view): the replace pin takes it next,
+	 * ahead of the sticky / nearest / largest rule. It survives a switch into replace (the client flips pin_mode in
+	 * the same gesture and the project write lands a debounce later) and expires after PICK_TTL_MS unseen.
+	 */
+	request(key, now) {
+		this.requested = { key: String(key), at: now }
+		this.rev++
 	}
 
 	static assistActive(cfg) {
@@ -170,10 +182,10 @@ class DetectPin {
 		const steps = dtSteps(dt)
 		if (cfg.pin_mode === 'assist') return this._assist(cfg, available ? persons : [], hub, planeZ, now, steps)
 		this.anchors.clear()
-		this._replace(cfg, available, persons, hub, planeZ, steps)
+		this._replace(cfg, available, persons, hub, planeZ, steps, now)
 	}
 
-	_replace(cfg, available, persons, hub, planeZ, steps) {
+	_replace(cfg, available, persons, hub, planeZ, steps, now) {
 		const id = cfg.pin_marker_id
 		const marker = hub.markers.get(id)
 		if (!marker) return this._prune(hub, new Set())
@@ -182,7 +194,7 @@ class DetectPin {
 		s.attached = null
 		if (!available) return this._release(hub, id, s)
 		const coastS = Math.max(cfg.grace_ms, cfg.interval_ms) / 1000
-		const best = this._tracked(persons, coastS)
+		const best = this._tracked(persons, coastS, now)
 		const invalid = () => {
 			hub.set({ id, x: marker.x, y: marker.y, z: marker.z, status: 0, source: 'detect' }) // held, fresh, invalid
 			s.status = 0
@@ -200,8 +212,19 @@ class DetectPin {
 		hub.set({ id, x, y, z: marker.z, status: s.status, source: 'detect' })
 	}
 
-	/** detection.py tracked_detection: sticky by track, else nearest the last centre, else the largest box. */
-	_tracked(persons, coastS) {
+	/** detection.py tracked_detection: sticky by track, else nearest the last centre, else the largest box — after
+	 * an operator pick (request) that is in frame. */
+	_tracked(persons, coastS, now) {
+		if (this.requested && !(now - this.requested.at <= PICK_TTL_MS)) this.requested = null
+		if (this.requested) {
+			const p = persons.find((q) => q.key === this.requested.key && q.age_s <= coastS)
+			if (p) {
+				this.requested = null
+				this.pinnedKey = p.key
+				this.lastCentre = { camera: p.camera, c: centreOf(p) }
+				return p
+			}
+		}
 		if (this.pinnedKey !== null) {
 			const p = persons.find((q) => q.key === this.pinnedKey)
 			if (p && p.age_s <= coastS) {
@@ -288,4 +311,4 @@ class DetectPin {
 	}
 }
 
-module.exports = { DetectPin, detectionStatus, dtSteps, emaFactor, advanceSmoothing, ANCHOR_STALE_MS, REACQUIRE_MAX_CENTER_DIST, REACQUIRE_MAX_FLOOR_M }
+module.exports = { DetectPin, detectionStatus, dtSteps, emaFactor, advanceSmoothing, ANCHOR_STALE_MS, PICK_TTL_MS, REACQUIRE_MAX_CENTER_DIST, REACQUIRE_MAX_FLOOR_M }

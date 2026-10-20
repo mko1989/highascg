@@ -109,7 +109,12 @@ func _ready() -> void:
 		track_view.set_detections(markers.detections)
 		if track_page.detect != null:
 			track_page.detect.refresh_status())
-	track_view.grab.connect(func(px: Vector2) -> void: markers.grab_at(px))
+	track_view.grab.connect(func(px: Vector2) -> void:
+		# WO-624 E2: in Detect mode a press that grabs no marker picks the person under it as the one to follow.
+		if not markers.grab_at(px) and track_page.mode == "detect" and track_page.detect != null:
+			var key := track_view.person_at(px)
+			if key != "":
+				track_page.detect.pick_person(key))
 	track_view.drag.connect(markers.drag_to)
 	track_view.let_go.connect(markers.release)
 	track_view.clicked.connect(track_page.click)
