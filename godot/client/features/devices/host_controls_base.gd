@@ -1,6 +1,7 @@
 extends Node
 ## WO-605 slice 3c — shared base of the host-channel inspector controllers (host_live_controls.gd,
-## host_input_controls.gd): the small widget builders, a modal confirm (the web's window.confirm) and `_run`, which
+## host_input_controls.gd, and since slice 5 decklink_port_controls.gd): the small widget builders, the DeckLink device
+## switcher + shared source label (both pages mount them), a modal confirm (the web's window.confirm) and `_run`, which
 ## posts a planned request list from host_source_model.gd / input_slots_model.gd. Status lines go to the Devices tab's
 ## status label (the web toasts); `reload` asks the tab to re-fetch the device view (dirty = also mark Caspar
 ## restart-dirty); `removed` = the selected host destination is gone. Uses the Api / Settings / Store autoloads, so the
@@ -157,3 +158,75 @@ static func _label_of(src: Dictionary, dest: Dictionary, fallback: String) -> St
 		if H.truthy(v):
 			return str(v)
 	return fallback
+
+
+# ---------------------------------------------------------------- DeckLink input (host page + DeckLink port page)
+
+## mountDecklinkHostSourceControls: device switcher + Apply / Reload. `with_label` = also the shared source label
+## (the port page mounts its own, before Stop input); `done` = the status when the reply carries no message.
+func _decklink(src: Dictionary, payload: Dictionary, settings: Variant, slot: int, with_label := true, done := "") -> Control:
+	var box := _section()
+	var cid := H.R.s(src.get("connectorId")).strip_edges()
+	if with_label and cid != "":  # WO-525: the shared source label, before the title, only with a stable connector key
+		box.add_child(_label_control(payload, cid, "DeckLink %d" % slot))
+	box.add_child(_title("DeckLink device"))
+	var active := HS.decklink_active_device(src, settings, slot)
+	var sel := _select(HS.decklink_options(payload, slot, active), active, "Which DeckLink device feeds this input slot")
+	box.add_child(sel)
+	var post := func(body: Dictionary, ok_text: String) -> void:
+		if body.is_empty() or _busy:
+			return
+		_busy = true
+		var res: Dictionary = await Api.post_json("/api/host-live/decklink", body)
+		_busy = false
+		var err := _reply_error(res)
+		if err != "":
+			status.emit(err, false)
+			return
+		var msg: Variant = H.R.d(res.data).get("message")
+		status.emit(str(msg) if H.truthy(msg) else ok_text, true)
+		reload.emit(false)
+	var row := _row()
+	row.add_child(_button("Apply source", func() -> void:
+		post.call(HS.decklink_update_body(slot, sel.get_selected_metadata(), src.get("connectorId"), src.get("value")), done if done != "" else "DeckLink source updated")))
+	row.add_child(_button("Reload", func() -> void:
+		post.call(HS.decklink_reload_body(slot, src.get("connectorId"), src.get("value")), done if done != "" else "DeckLink reloaded")))
+	box.add_child(row)
+	return box
+
+
+## mountSourceLabelControl: the operator's override of the generated source name (blank = generated).
+func _label_control(payload: Dictionary, cid: String, fallback: String) -> Control:
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 2)
+	v.add_child(_caption("Label"))
+	var st := HS.label_state(payload.get("extraLiveSources"), cid, fallback)
+	var le := _line(st.custom, st.generated if st.generated != "" else cid,
+		"Shown wherever this source appears. Leave empty to use the generated name.")
+	le.max_length = 64
+	v.add_child(le)
+	var hint := _caption(HS.label_hint(st.custom, st.generated))
+	v.add_child(hint)
+	var save := func() -> void:
+		if _busy:
+			return
+		var label := le.text.strip_edges()
+		if label == st.custom:
+			return
+		_busy = true
+		var res: Dictionary = await Api.post_json("/api/sources/label", {"sourceId": cid, "label": label})
+		_busy = false
+		var err := _reply_error(res)
+		if err != "":
+			hint.text = "Save failed: " + err
+			return
+		HS.apply_saved_label(payload.get("extraLiveSources"), cid, label)
+		var next := HS.label_state(payload.get("extraLiveSources"), cid, fallback)
+		st.custom = next.custom
+		le.text = next.custom
+		le.placeholder_text = next.generated if next.generated != "" else cid
+		hint.text = HS.label_hint(next.custom, next.generated)
+		reload.emit(false)
+	le.text_submitted.connect(func(_t: String) -> void: save.call())
+	le.focus_exited.connect(save)
+	return v

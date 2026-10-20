@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Next: slice 5 DeckLink connector page. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Next: slice 6 stream / record / vcam / audio connector pages. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -416,3 +416,73 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   node restart → every `config/*.json` byte-identical, server reads the original values; 0 SCRIPT ERROR in the GUI log.
 - Not exercised live: multiview-bound jack (seed + shared keys), the EDID-native-unselectable and no-display paths, the
   NVIDIA backend — golden-tested only.
+
+## Slice 5 — DeckLink connector page (2026-10-20, DONE)
+
+### Investigation
+- Web path: `device-view-inspectors.js` → for `decklink_io` / `decklink_out` no summary table, straight to
+  `renderDeckLinkIoControls` (`device-view-inspector-decklink.js`): rear-order editor (only in the web's DeckLink edit
+  mode — `document.querySelector('.device-view__band--caspar')` — not ported), then for `decklink_io` the Input section
+  (`-decklink-input.js`), an hr, the Output heading + a note (input mode / cabled N / unassigned / program output, WO-479
+  cable count), then — unless the port is an input — `renderDecklinkOutputInheritControls` (live.decklink.outputs row:
+  upstream label + mode, 1:1 passthrough line, warn / reason / override notes), `renderDecklinkConsumerSettingsControls`
+  (format, layout, latency, buffer depth, colour space, pixel format + WO-493 2160p YUV warning, embedded audio, low
+  latency; any change posts the whole set) and `renderDecklinkKeyFillControls` (`lib/device-view-decklink-keyfill.js`
+  `resolveDecklinkKeyFillState` + `collectDecklinkDeviceIndices`). `decklink_out` gets the last three only.
+- Input section: `ioDirection == 'in'` → shared source label (WO-525), Stop input (`removeDecklinkInputSlot` — the same
+  remove the slice-3c host page runs, `host_source_model.decklink_remove_plan`) and, when the channel map has the slot's
+  host channel, `mountDecklinkHostSourceControls` with `includeLabel:false`; otherwise an optional "Set
+  decklink_input_count ≥ N" note and Start an input (`addDecklinkInputSlot`, `lib/decklink-add-input.js:128`: settings +
+  device-view read, `updateConnector {ioDirection:'in'}`, re-read, then one of four branches — count grew → live source
+  only + restart-dirty; already input with tile and live channel → `/api/host-live/decklink` update or replay; no
+  channel → live source + pending apply; else STOP / MIXER CLEAR / PLAY DECKLINK + live source).
+- Web gaps found (ported as-is, owner to decide):
+  1. `readDecklinkConsumerCaspar` (`-decklink-shared.js`) never reads `decklinkLowLatency`, so "Low-latency mode" always
+     opens unchecked and every SDI save writes `decklinkLowLatency: false` — a saved true is lost on the next edit of any
+     other field. One-line fix in the web reader (+ `consumer_state` here).
+  2. The start status prints `Port N is input on ch null.` when no host channel is planned yet (template literal of null).
+  3. Buffer depth "0" saves 3 (`parseInt(...) || 3`), not the clamp's 1.
+
+### What was done
+- `features/devices/decklink_port_model.gd` (pure): `page_spec` — the page as the flat item list the web renders
+  (heading / note / small / warn / hr / caption / select / input / hint / check / button / label / host); output note +
+  cable count, `output_status`, `inherited_mode_text`, `inherit_items`, `consumer_state` / `consumer_items` /
+  `consumer_patch` (+ binding / key fields the connector carries), `needs_yuv` / `yuv_warning`, `keyfill_state`
+  (multiview / screen binding, key-only-port rule), `device_indices`, `keyfill_items`, `key_after_toggle`,
+  `keyfill_patch`.
+- `features/devices/decklink_input_model.gd` (pure): `view` (direction, device, slot, channel map — live, else the
+  settings one — and the slot's entry), `host_source`, `input_items`, `stop_args` / `stop_status`, and the start plan split
+  where the web re-reads the server: `add_prepare` (validation errors, connector, tile, the ioDirection write) and
+  `add_finish` (the four branches, live source body, PLAY), `add_status`.
+- `features/devices/decklink_port_controls.gd`: builds widgets from the spec; selects / checks save through
+  `updateConnector` (dropped while a save is in flight, like the web's `saving`), then restart-dirty + status + reload;
+  the pixel warning and key-select enable stay live; buffer depth saves the raw text then math-commits (1–3); Start /
+  Stop run the model plans with the same settings / device-view re-reads.
+- `host_controls_base.gd`: the DeckLink device switcher and the shared source label moved here from
+  `host_live_controls.gd` (both pages mount them); `_decklink(..., with_label, done)` for the port page's own label and
+  "DeckLink updated on ch N." status.
+- `devices_tab.gd`: `_open_port` / `_close_port` pick the GPU or DeckLink page by connector kind; row labels and a
+  destination's mapped-output link open either. `rear_panel.gd`: DeckLink row labels are clickable too.
+- Not ported: the rear-order editor (web edit mode), and the fill→key virtual cable on the overlay
+  (`collectDecklinkKeyFillVirtualEdges`) — the cable layer's job, follow-up with the overlay work.
+
+### What was VERIFIED
+- `tests/test_devices_decklink_port.gd` + `tests/golden/devices_decklink_port.json` (generator runs the web inspector and
+  `addDecklinkInputSlot` under Node on a DOM shim and a fake server that applies per-case `onUpdate` ops on the
+  ioDirection write): 16 page cases — every spec item vs the flattened web DOM (host switcher by options), then each
+  edit / press replayed: POST bodies, restart-dirty, status text + ok/err, yuv hint, key select state — and 8 direct
+  start runs (3 validation errors, device-only, already-input same / other device, planned restart entry, shared inputs
+  host). Godot `--test` 5745 / 5745 (5113 + 632 new), `--check` boot OK, 0 files over 500 lines.
+- Box GUI (`config/` copied + md5-listed first): label "DeckLink 1" → page as the web (Start an input, unassigned note,
+  "Upstream: Upstream feed — —", Select SDI format… disabled placeholder, Stereo / normal / 3 / bt709 / Auto, embedded
+  audio on, key select disabled on 2). Fill + key → `device_graph.json` dlsdi_1 `{ioDirection:out, decklinkKeyFill:true,
+  decklinkKeyDevice:2, decklinkKeyer:internal}`, status "Key on port 2.", Apply button restart-dirty, page reloaded with
+  the server's outputs row ("Upstream: Program 1 — 1080p5000 (1920×1080 @ 50 Hz)", passthrough line, inherited
+  1080p5000). Pixel → RGBA: full consumer patch saved, "SDI settings saved.". Format → 2160p5000: saved, the YUV warning
+  shows. DeckLink 4 → Start an input: `decklink_input_count` 4, dlsdi_4 `in`, status "Port 4 is input on ch 4. Apply
+  Caspar config and restart if the input does not appear.", host destination "DeckLink input 4 · ch 4 (planned)", page
+  now label + Stop input + device switcher. Stop input: count 0, port unassigned, live source + host destination gone,
+  "Port 4: unassigned.". Afterwards `caspar_server.json` / `device_graph.json` (+ the state file's timestamps) restored +
+  node restart → every config file byte-identical; 0 SCRIPT ERROR in the GUI log.
+- Not exercised live: the already-input / shared-inputs-host start branches, `decklink_out` kind, multiview key/fill —
+  golden-tested only (no such config on the dev box).

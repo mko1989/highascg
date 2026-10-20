@@ -22,6 +22,7 @@ const H := preload("res://features/devices/host_channels.gd")
 const DestinationsPanel := preload("res://features/devices/destinations_panel.gd")
 const CableRules := preload("res://features/devices/cable_rules.gd")
 const GpuControls := preload("res://features/devices/gpu_output_controls.gd")
+const DeckLinkControls := preload("res://features/devices/decklink_port_controls.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
@@ -41,6 +42,7 @@ var _cancel_btn: Button
 var _apply_btn: Button
 var _confirm: ConfirmationDialog
 var _gpu: GpuControls
+var _deck: DeckLinkControls
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -80,7 +82,7 @@ func _ready() -> void:
 		refresh())
 	_dests.selected.connect(func(id: String) -> void:
 		if id != "":
-			_close_gpu()
+			_close_port()
 		if id != "" and _gesture.selected_edge != "":
 			_gesture.selected_edge = ""
 			_sync())
@@ -89,10 +91,14 @@ func _ready() -> void:
 	_gpu.status.connect(_set_status)
 	_gpu.dirty.connect(func() -> void: _gesture.set_dirty(true))
 	_gpu.reload.connect(func(_dirty: bool) -> void: refresh())
-	# The web opens that connector's inspector: GPU outputs here; DeckLink (later slice) still selects its cable.
+	_deck = DeckLinkControls.new()
+	add_child(_deck)
+	_deck.status.connect(_set_status)
+	_deck.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	_deck.reload.connect(func(_dirty: bool) -> void: refresh())
+	# The web opens that connector's inspector (GPU outputs, DeckLink ports); anything else selects its cable.
 	_dests.focus_connector.connect(func(id: String) -> void:
-		if not _connector(id).is_empty() and _connector(id).get("kind") == "gpu_out":
-			_open_gpu(id)
+		if _open_port(id):
 			return
 		for e in CableRules.a(CableRules.d(_gesture.payload.get("graph")).get("edges")):
 			if e is Dictionary and CableRules.s(e.get("sinkId")) == id:
@@ -202,12 +208,13 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 		_list.add_child(_cable_row(c))
 	_cables.set_cables(m.cables, anchors)
 	_anchors = anchors
-	if _gpu.conn_id != "":
-		var conn := _connector(_gpu.conn_id)
-		if conn.is_empty():
-			_close_gpu()
-		else:
-			_gpu.show_connector(conn, payload, Settings.settings)
+	for page in [_gpu, _deck]:
+		if page.conn_id != "":
+			var conn := _connector(page.conn_id)
+			if conn.is_empty():
+				_close_port()
+			else:
+				page.show_connector(conn, payload, Settings.settings)
 	_sync()
 
 
@@ -215,23 +222,28 @@ func _connector(id: String) -> Dictionary:
 	return CableRules.connector_by_id(_payload, id)
 
 
-## The GPU-output page for connector `id` in the shared Inspector (a destination page gives way).
-func _open_gpu(id: String) -> void:
+## The connector page for `id` (GPU output or DeckLink port) in the shared Inspector (a destination page gives
+## way); false when the connector has no page.
+func _open_port(id: String) -> bool:
 	var conn := _connector(id)
-	if conn.is_empty():
-		return
+	var kind := str(conn.get("kind", ""))
+	var page: Node = _gpu if kind == "gpu_out" else (_deck if kind in ["decklink_io", "decklink_out"] else null)
+	if page == null:
+		return false
 	_dests.deselect()
-	_gpu.show_connector(conn, _payload, Settings.settings)
+	_close_port()
+	page.show_connector(conn, _payload, Settings.settings)
 	if InspectorPanel.current != null:
-		InspectorPanel.current.present(_gpu.page)
+		InspectorPanel.current.present(page.page)
+	return true
 
 
-func _close_gpu() -> void:
-	if _gpu.conn_id == "":
-		return
-	_gpu.close()
-	if InspectorPanel.current != null:
-		InspectorPanel.current.release(_gpu.page)
+func _close_port() -> void:
+	for page in [_gpu, _deck]:
+		if page.conn_id != "":
+			page.close()
+			if InspectorPanel.current != null:
+				InspectorPanel.current.release(page.page)
 
 
 ## Gesture state → port tints, the overlay (selected / held / ghost), the toolbar and the cables list.
@@ -301,7 +313,7 @@ func _input(event: InputEvent) -> void:
 	var port := _rear.label_at(pos)
 	if port != "":
 		get_viewport().set_input_as_handled()
-		_open_gpu(port)
+		_open_port(port)
 		return
 	var on_ui := _list.get_global_rect().has_point(pos) or _bar.get_global_rect().has_point(pos)
 	var hit: String = _cables.hit(_cables.get_global_transform().affine_inverse() * pos)
