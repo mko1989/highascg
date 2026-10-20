@@ -578,3 +578,20 @@ indexing names without extension → `isClean: true` (all 5 refs exist, e.g. `pr
 w tle.mp4`). Boot with a clean project: no notice, 0 script errors. A missing-asset notice on screen was not
 produced (the box project is clean) — the notice text / tooltip are unit-tested.
 
+## 2026-10-20 — Optional modules + CG Studio launcher (port plan step 4)
+
+**Investigation.** Web `optional-modules.js` loads `assets/modules/<name>/entry.js` for each name in `GET
+/api/modules` (this box: `{"enabled":["tracking","cg-studio"]}`). previs registers a "3D Previs" settings tab
+(Godot: the Previs tab and its settings are built in, WO-607); tracking is built into the Godot Previs tab (WO-624 /
+WO-630); autofollow's entry is a skeleton that only logs WS frames (nothing to port); cg-studio mounts
+`/cg-studio/index.html` in a workspace-tab iframe. D2 (owner 17.10): CG Studio may be a separate browser.
+`POST /api/system/gui-launch firefox` takes no URL and needs the nuclear password, so it does not fit.
+
+**What was done.** Header **CG Studio ↗** button (after Test card…), visible only while `/api/modules` lists
+`cg-studio` (re-read on every WS connect); it opens `<server>/cg-studio/index.html` with `OS.shell_open` — the
+browser of the machine running the Godot client, so a remote Godot client opens it locally, as the web iframe did.
+
+**What was VERIFIED (box, 20.10).** The button shows (module enabled); click → `firefox-esr
+http://127.0.0.1:4200/cg-studio/index.html` opened "CG Studio — Mozilla Firefox" on the operator screen with the
+template list, canvas and inspector; window closed afterwards. Godot tests 16407/0.
+

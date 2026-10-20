@@ -21,6 +21,7 @@ var ftb_btn: Button
 var test_cb: CheckBox
 var test_btn: Button
 var test_dialog: LedTestDialog
+var cg_btn: Button  # WO-608 D2: CG Studio in its own browser window, shown when the server enables the module
 var badges: Badges
 var _strip: PopupPanel
 var _strip_box: VBoxContainer
@@ -60,6 +61,15 @@ func _ready() -> void:
 	test_dialog.notice.connect(func(n: Dictionary) -> void: notice.emit(n))
 	add_child(test_dialog)
 	test_btn.pressed.connect(test_dialog.open)
+	cg_btn = Button.new()
+	cg_btn.text = "CG Studio ↗"
+	cg_btn.focus_mode = Control.FOCUS_NONE
+	cg_btn.visible = false
+	cg_btn.tooltip_text = "Open CG Studio (lower thirds designer) in a browser window"
+	cg_btn.pressed.connect(func() -> void: OS.shell_open(Config.origin + "/cg-studio/index.html"))
+	add_child(cg_btn)
+	Ws.connected.connect(_modules)
+	_modules()
 	ftb_btn = Button.new()
 	ftb_btn.text = "FTB"
 	ftb_btn.focus_mode = Control.FOCUS_NONE
@@ -159,3 +169,11 @@ func set_test_card(on: bool) -> void:
 		notice.emit(n)
 	if not res.ok:
 		test_cb.set_pressed_no_signal(Store.get_value("ledTestPatternActive") == true)
+
+
+## Web optional-modules.js: GET /api/modules → which optional surfaces exist (Previs / tracking are built in here).
+func _modules() -> void:
+	var r: Dictionary = await Api.get_json("/api/modules")
+	if r.ok and r.data is Dictionary:
+		cg_btn.visible = (r.data.get("enabled", []) as Array).has("cg-studio")
+
