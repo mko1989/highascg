@@ -1,6 +1,6 @@
 extends VBoxContainer
 ## WO-603 slice 2 — the web media selection bar (sources-panel-shell.js `sources-media-selection-bar`): "N selected ·
-## Copy to… · Move to… · Delete · Clear", plus "New folder…" under the selected folder. Every action is one server
+## Rename… (slice 3, media_rename_dialog.gd) · Copy to… · Move to… · Delete · Clear", plus "New folder…" under the selected folder. Every action is one server
 ## call (media_ops.gd); the folder picker lists the on-disk folders and takes a typed new path.
 
 signal changed  # the library changed on disk → the panel reloads
@@ -8,6 +8,7 @@ signal clear_requested
 
 const Ops := preload("res://features/live/media_ops.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const RenameDialog := preload("res://features/live/media_rename_dialog.gd")
 
 var ids: Array = []  # selected media ids (files)
 var folder := ""  # the selected folder row ("" = root): New folder… goes under it
@@ -24,6 +25,7 @@ func _ready() -> void:
 	_count = Label.new()
 	_count.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_bar.add_child(_count)
+	_bar.add_child(_button("Rename…", _rename, "Rename the selected files — keeps their numbering; looks, playlists and timelines follow"))
 	_bar.add_child(_button("Copy to…", func() -> void: _pick("copy")))
 	_bar.add_child(_button("Move to…", func() -> void: _pick("move")))
 	_bar.add_child(_button("Delete", _confirm_delete))
@@ -99,6 +101,16 @@ func _pick(op: String) -> void:
 			clear_requested.emit()
 		changed.emit())
 	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func _rename() -> void:
+	var dlg := RenameDialog.new(ids.duplicate())
+	dlg.files_renamed.connect(func(n: int) -> void:
+		_say("✓ Renamed %s — looks follow" % Ops.plural(n))
+		clear_requested.emit()
+		changed.emit())
 	add_child(dlg)
 	dlg.popup_centered()
 

@@ -11,6 +11,8 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const registry = require('../media/media-library-registry')
 const { renameMediaFiles, findMediaUsage } = require('../media/media-links')
+const { buildMultiRenamePlan, parseNumberedName } = require('../media/media-multi-rename')
+const { getRawMediaCatalog } = require('./media-catalog')
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -18,6 +20,29 @@ async function handleRename(body, ctx) {
 	const b = parseBody(body) || {}
 	const r = await renameMediaFiles(ctx, Array.isArray(b.renames) ? b.renames : [])
 	return reply(r.status, r.body)
+}
+
+/**
+ * POST /api/media/rename/plan { ids[], title?, renumber?: { start, step, pad } | null } — WO-603: the multi-rename
+ * preview, planned in node against the server's catalogue. Nothing changes; the client applies `renames` with
+ * POST /api/media/rename (all-or-nothing, references follow). `commonTitle` seeds the dialog (web modal rule).
+ */
+function handleRenamePlan(body, ctx) {
+	const b = parseBody(body) || {}
+	const ids = Array.isArray(b.ids) ? b.ids.map((x) => String(x || '')).filter(Boolean) : []
+	if (!ids.length) return reply(400, { error: 'ids[] required' })
+	const rn = b.renumber && typeof b.renumber === 'object' ? b.renumber : null
+	const renumber = rn ? { start: Number(rn.start) || 0, step: Number(rn.step) || 1, pad: Number(rn.pad) || 0 } : null
+	const existing = getRawMediaCatalog(ctx).map((m) => String(m?.id ?? m))
+	const plan = buildMultiRenamePlan(ids, { title: String(b.title ?? ''), renumber }, existing)
+	const titles = ids.map((id) => parseNumberedName(id.slice(id.lastIndexOf('/') + 1)).title)
+	const renames = plan.filter((r) => r.from !== r.to).map(({ from, to }) => ({ from, to }))
+	return reply(200, {
+		plan,
+		renames,
+		ok: renames.length > 0 && !plan.some((r) => r.error),
+		commonTitle: titles.every((t) => t === titles[0]) ? titles[0] : '',
+	})
 }
 
 /** The entry for a path, adopting it on first sight (a file the reconcile hasn't seen yet). */
@@ -78,4 +103,4 @@ function handleDefaultsGet() {
 	return reply(200, { defaults: out })
 }
 
-module.exports = { handleRename, handleEntryGet, handleDefaultsPost, handleDefaultsGet }
+module.exports = { handleRename, handleRenamePlan, handleEntryGet, handleDefaultsPost, handleDefaultsGet }

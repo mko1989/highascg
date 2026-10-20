@@ -41,3 +41,8 @@ func test_tree_merges_cls_folders_into_disk_spelling() -> void:
 	t.eq(f.map(func(x: Dictionary) -> String: return x.label), ["projects", "airport", "1. GŁÓWNE TŁO"], "filter (unicode lower): only the match's folders, still on-disk spelling")
 	t.eq(f[1].folder, "projects/airport", "New folder… / drops under a filtered folder use the disk path")
 	t.eq(O.tree_entries([{"id": "a/b.mov"}]).map(func(x: Dictionary) -> String: return x.kind), ["dir", "file"], "parent before child")
+
+
+func test_rename_plan_body() -> void:
+	t.eq(O.plan_body(["a/01_X.mov"], "Y", false, 1, 1, 2), {"ids": ["a/01_X.mov"], "title": "Y", "renumber": null}, "title only")
+	t.eq(O.plan_body(["a"], "", true, 10.0, 5.0, 3.0), {"ids": ["a"], "title": "", "renumber": {"start": 10, "step": 5, "pad": 3}}, "renumber ints")

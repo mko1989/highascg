@@ -28,6 +28,11 @@ static func join_folder(base: String, name: String) -> String:
 	return clean_folder(base + "/" + name)
 
 
+## POST /api/media/rename/plan body (slice 3, media_rename_dialog.gd).
+static func plan_body(sel: Array, title_text: String, renumber: bool, start: float, step: float, pad: float) -> Dictionary:
+	return {"ids": sel, "title": title_text, "renumber": {"start": int(start), "step": int(step), "pad": int(pad)} if renumber else null}
+
+
 static func transfer_body(ids: Array, folder: String) -> Dictionary:
 	return {"sourceIds": ids, "targetId": clean_folder(folder)}
 

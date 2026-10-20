@@ -344,6 +344,7 @@ routes.post('/api/media/hap-encode/cancel', ({ body, ctx }) => routesMediaHap.ha
 routes.get('/api/media/hap-encode', ({ ctx }) => routesMediaHap.handleHapEncodeState(ctx), { requireCaspar: false })
 routes.post('/api/media/preview', ({ body, ctx }) => routesMediaPreview.handleMediaPreviewPost(body, ctx), { requireCaspar: false }) // WO-592 kiosk preview
 routes.post('/api/media/rename', ({ body, ctx }) => routesMediaLibrary.handleRename(body, ctx), { requireCaspar: false }) // WO-592 links
+routes.post('/api/media/rename/plan', ({ body, ctx }) => routesMediaLibrary.handleRenamePlan(body, ctx), { requireCaspar: false }) // WO-603
 routes.get('/api/media/library/entry', ({ query, ctx }) => routesMediaLibrary.handleEntryGet(query, ctx), { requireCaspar: false })
 routes.post('/api/media/library/defaults', ({ body, ctx }) => routesMediaLibrary.handleDefaultsPost(body, ctx), { requireCaspar: false })
 routes.get('/api/media/library/defaults', () => routesMediaLibrary.handleDefaultsGet(), { requireCaspar: false })

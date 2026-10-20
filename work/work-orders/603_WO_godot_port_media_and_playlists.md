@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–2 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged), box-verified; multi-rename, HAP, playlists still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–3 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node), box-verified; HAP, playlists still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -153,7 +153,43 @@ panel incl. media tree + ingest, 16 / 2,683 LOC).
     `device_graph.json` (slice 1).
 - No client errors in the GUI log.
 
+## Slice 3 (20.10) — multi-rename, planned in node
+
+### Investigation
+
+- Web (WO-592 D): `client/lib/media-multi-rename.js` (pure `parseNumberedName` / `buildMultiRenamePlan`) runs in the
+  browser. `client/components/media-multi-rename-modal.js` re-plans on every input, with the conflict check against
+  the **client's** media list (`sources-panel.js:317`). Only the final `POST /api/media/rename {renames}`
+  (all-or-nothing, references follow, `src/media/media-links.js:109`) is on the server.
+- Under the owner's D directive the plan belongs in node, and a second client-side copy (GDScript) would be a third
+  implementation to keep in sync.
+
+### What was done
+
+- `src/media/media-multi-rename.js`: verbatim CommonJS port of the web planner (the web keeps its copy until WO-609).
+- `POST /api/media/rename/plan {ids, title?, renumber?}` (`routes-media-library.js` `handleRenamePlan`): plans
+  against `getRawMediaCatalog(ctx)` (the server's list) and returns `{plan, renames, ok, commonTitle}`. Nothing
+  changes on disk.
+- Godot `features/live/media_rename_dialog.gd`: title field (seeded with the server's `commonTitle`), Renumber
+  from/step/digits, and a preview (conflicts red, unchanged muted). Every edit re-plans in node; stale replies are
+  dropped by a sequence number. "Rename N files" posts the plan's `renames` and stays open with the error on
+  failure. "Rename…" is the first button of the selection bar. `media_ops.plan_body` is pure (tested).
+
+### What was VERIFIED
+
+- Offline: `smoke-wo603-multi-rename-plan.test.js` 5/5 (curated):
+  - 7 cases give identical plans and `parseNumberedName` from the server port and the web ESM module;
+  - the rules are pinned;
+  - the handler: catalogue conflicts, `commonTitle`, renumber normalization, 400.
+  - Full suite 2846 pass / 1 known fail (smoke-wo577). Godot 15991 pass; boot check clean.
+- Box (node restarted, real GUI):
+  - three probes `01_/02_Probe Alpha`, `07_Probe Beta`;
+  - the dialog seeded "Probe Alpha" with "Rename 0 files" disabled;
+  - title "Probe Beta" + Renumber from 7 showed `01_Probe Alpha → 07_Probe Beta (a file with this name exists)` in red
+    with Rename disabled;
+  - from 3 → `03_/04_Probe Beta`, Rename → renamed on disk, "✓ Renamed 2 files — looks follow", tree refreshed.
+  - Probes deleted via the API; config md5 unchanged (bar the boot-time `device_graph.json`).
+
 ### Still open
 
-Multi-rename with live preview (web Rename…), HAP encode options, drag of a multi-selection, playlists footer,
-remote (HTTP streaming) upload, parity checklist.
+HAP encode options, drag of a multi-selection, playlists footer, remote (HTTP streaming) upload, parity checklist.
