@@ -345,6 +345,7 @@ const FILES = [
 	'tools/smoke/smoke-wo616-tracking-fusion.test.js',
 	'tools/smoke/smoke-wo616-verify-walk.test.js',
 	'tools/smoke/smoke-wo616-about.test.js',
+	'tools/smoke/smoke-wo628-operator-dock.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
 	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',

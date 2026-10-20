@@ -20,6 +20,8 @@ const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderProject := preload("res://app/header_project.gd")
 const HeaderTools := preload("res://app/header_tools.gd")
 const HeaderStatus := preload("res://app/header_status.gd")
+const OperatorDock := preload("res://app/operator_dock.gd")
+const DockModel := preload("res://app/operator_dock_model.gd")
 
 var _eye: ConnectionEye
 var header_project: HeaderProject
@@ -93,6 +95,10 @@ func _ready() -> void:
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
 	add_child(perf)
+	if DockModel.wanted(Config.origin, Config.args):  # WO-628 — bottom-centre app dock on the box's own screen
+		var dock := OperatorDock.new()
+		dock.notice.connect(header_project.say)
+		add_child(dock)
 
 
 ## WO-623 — F3 toggles the performance overlay from anywhere (the header pulse button does the same).
