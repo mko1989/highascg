@@ -15,6 +15,7 @@ const NuclearPane := preload("res://features/settings/nuclear_pane.gd")
 const TailscalePane := preload("res://features/settings/tailscale_pane.gd")
 const SystemPane := preload("res://features/settings/system_pane.gd")
 const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
+const VariablesPane := preload("res://features/settings/variables_pane.gd")
 
 signal logs_requested
 
@@ -59,6 +60,7 @@ func _ready() -> void:
 	_bundle_status = Label.new()
 	Panes.diagnostics(_pane("Diagnostics"), _bundle, logs, _bundle_status)
 	_pane("Tailscale").add_child(TailscalePane.new())
+	_pane("Variables").add_child(VariablesPane.new())
 	var nuclear := _pane("Nuclear")
 	Panes.nuclear(nuclear)
 	nuclear.add_child(NuclearPane.new())

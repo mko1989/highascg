@@ -463,3 +463,19 @@ RTX PRO 4000, DP-2 ✓ DP-6 ✓, 4 DeckLinks, 34 audio devices). Set time "25:00
 thunar on /home/casparcg/highascg/media, "Started: /usr/bin/thunar" (closed after). DeckLink: 4 cards with
 externalRefs, Install enabled; Desktop Video Setup → window opened, "Started: /usr/bin/BlackmagicDesktopVideoSetup"
 (closed after). NOT pressed: NTP toggle, real Set time, Open browser, Updater, Upload, Install driver (checklist).
+
+## 2026-10-20 — Settings → Variables
+
+**Investigation.** Web `variables-panel.js` (mounted into `#settings-pane-variables`): the Companion variable store
+(`lib/variable-state.js`: WS `state.variables` then `variable_update` deltas), search, All / OSC / App / Caspar
+prefix filters, values shortened past 56 chars, copy `$(highascg:key)`. `GET /api/variables` returns the same map
+(330 keys on the box).
+
+**What was done.** `variables_model.gd` (filter / clip / display — tested) and `variables_pane.gd`: GET once on show,
+then WS `variable_update` / `state` merged and redrawn at most 2×/s; when the visible key list is unchanged only
+the values are rewritten (scroll and selection hold while OSC ticks). Click (or Enter) on a row copies its
+reference; "Copied …" shows for 2 s. Searching a pasted `$(highascg:key)` finds that key.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16283/0 (+`test_variables_model.gd`). Tab shows "330 of 330";
+OSC + "time" → 15 rows; `osc_ch2_l10_time` ticked 19.06 → 19.1 live; clicking it and pasting into the search
+field gave `$(highascg:osc_ch2_l10_time)`; searching `$(highascg:media_count)` → that one row (346), "Copied …".
