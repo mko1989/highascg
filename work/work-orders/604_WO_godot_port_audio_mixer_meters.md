@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
+**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
 
 # WO-604 — Godot port: audio mixer, meters, cross-screen audio routing
 
@@ -187,9 +187,87 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 - **Note:** `npm run lint` is over its warning budget on origin/main already (221 > 218, pre-existing; e.g. an
   unused `cl` in `sources-panel-live-render-actions.js`). Not caused here.
 
+
+## Slice 3 (2026-10-20) — live-input routing, AUTO MIX, START, audio-only STOP
+
+### Investigation
+
+- **The web did all of this in the client** (`audio-mixer-panel-live-inputs.js`):
+  - **A Ch button:** PLAY / STOP of the input's audio-only route on a program channel (layer 320 + slot) through
+    `/api/host-live/layer`. Targets were kept in localStorage `casparcg_live_audio_play_targets_multi`, mirrored
+    into `<kind>_input_<slot>_audio_targets` with the full `/api/settings` POST, and then followed by a key-less
+    embedded-copy volume push.
+  - **The audio-send select and AUTO MIX:** a settings write, then the same volume push.
+  - **START:** `/api/audio/inputs/start`, then the client re-played the localStorage routes.
+  - Under the owner's directive, each of these is now one server call.
+- **Policy bug that predates this slice (both clients):**
+  - A DeckLink fader move posted its gain to the input layer, and `fanOutVolumeToRouteConsumers` copied it to every
+    look layer consuming the route.
+  - With a Ch target lit, that re-opened the look's embedded copy the take had silenced (the matrix is
+    authoritative, `live-input-audio-policy.js`). The same signal then played twice, which comb-filters.
+  - The 320+ routed copies tap the source before the host mixer (f343e5e), so they never followed the fader at all.
+- The box has DeckLink 1–4 plus USB video (v4l2) 1. No ALSA slots, and no `_audio_*` / `audio_auto_mix` keys.
+- **Layer collision:** DeckLink 1 and v4l2 1 both get dest layer 321. That is the existing 320 + slot rule, the same
+  in the web and WO-312.
+
+### What was done
+
+- **`src/audio/input-audio-routing.js` (new):**
+  - `routingSnapshot(config)` lists the routable inputs: key, route, dest layer, send policy, targets.
+  - `embeddedGain` is the policy rule.
+  - `applyInputStrip` handles one strip gain:
+    - the input layer gets the gain;
+    - the consuming looks get the embedded gain;
+    - the routed copies get the gain;
+    - muted is 0 everywhere.
+  - `setRoute` applies the AMCP first and persists only on success. `setSendPolicy` and `setAutoMix` persist
+    (a default deletes the key, so no `[]` / `'afv'` residue is left in config). `restoreInputRoutes` replays routes.
+  - Every change broadcasts `audioInputRouting`.
+- **Endpoints** (in `routes-audio-mixer.js`):
+  - `GET /api/audio/inputs/routing`
+  - `POST /api/audio/inputs/route`, `/inputs/send` and `/api/audio/auto-mix`
+  - `/api/audio/volume` and `/api/audio/mute` now use `applyInputStrip` for DeckLink / v4l2 strip keys.
+  - `/api/audio/inputs/start` returns `routesRestored`.
+- **Web:** DeckLink / v4l2 Ch buttons, the send select and AUTO MIX call the endpoints (`client/lib/input-audio-routing-api.js`).
+  Lit buttons come from config, not localStorage. START no longer replays routes for these kinds. ALSA slots keep
+  their client flow.
+- **Godot:**
+  - `audio_actions.gd` has the pure request builders.
+  - `audio_strip.gd`: START on DeckLink / live-audio inputs; an AFV / ALWAYS / NEVER picker and one Ch toggle per
+    program channel on DeckLink / v4l2; STOP on audio-only look strips.
+  - `audio_tab.gd`: AUTO MIX in the Live-inputs header. Routing comes from GET plus the `audioInputRouting` change,
+    and a refused call re-syncs the toggles.
+
+### What was VERIFIED
+
+- **Offline and tests:**
+  - Offline suite 2834 pass, 1 fail (known smoke-wo577).
+  - `smoke-wo604-input-audio-routing.test.js` (new, 11 tests, curated) uses a fake AMCP / config manager.
+    Mutations of the policy line and of the target push turn it red (3 and 1 fails).
+  - Godot suite 15960 / 15960 (new `test_live_input_routing_requests`); `--check` boots clean.
+- **Box, API (Caspar log 17:47–17:48):**
+  - **Route on:** `STOP / MIXER CLEAR / PLAY 1-321 route://4-1 / OPACITY 0`, answered `202 PLAY OK`.
+  - **Fader 0.5:** `MIXER 4-1 VOLUME 0.5`, `2-10 VOLUME 0` (the look copy stays silent), `1-321 VOLUME 0.5`.
+  - **Mute and unmute:** 0, then 0.5 on all three.
+  - **START:** `PLAY 4-1 DECKLINK 1` then `routesRestored: 1`.
+  - **Send and auto mix:** ALWAYS, then AFV; auto mix off, then on.
+  - **Route off:** the embedded copy back to the gain. `caspar_server.json` is byte-identical afterwards.
+  - The save also persisted the in-memory `device_graph.json` (the USB capture connector the server already had).
+    Any config save does this; it is not a regression.
+- **Box, Godot clicks:**
+  - Ch1 on DeckLink 1 gave targets `[1]` and the same AMCP. The button lit, and a second click cleared it.
+  - The picker set ALWAYS (config key written), then AFV (key removed).
+  - AUTO MIX went false, then true.
+  - START: "DeckLink 1 capture started (0 route(s) restored)".
+- **Not clicked on the box:** STOP on the owner's live audio-only look `Look_8`; it would end their audio.
+  The request builder is tested, and the endpoint is the one the web already uses. Owner QA.
+
 ### Still open (later slices)
 
 - Cross-screen / stereo-pair routing matrix (`audio-cross-screen-*`, `route://`).
-- Live-input PGM route buttons and START, audio-only look STOP (`/api/scene/audio-only/stop`).
-- Click a live-audio strip to inspect it. Add-input modal. Auto-mix policy toggle.
+- ALSA `live_audio` routes: their targets are still client localStorage (plus the separate WO-571
+  `live_audio_input_N_pgm_channels` band). They need one server-owned store, like DeckLink.
+- DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
+  Moving a band changes layers that may already be on air on deployed boxes.
+- Click a live-audio strip to inspect it. Add-input modal.
 - Side-by-side meter ballistics check web vs Godot, and the parity checklist (owner).

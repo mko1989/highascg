@@ -62,3 +62,22 @@ func test_strip_gain_keeps_exact_stored_value() -> void:
 	s.fader.drag_ended.emit(true)  # the release of a double-click reset, with no drag_started before it
 	t.eq(reset, [], "an unpaired drag_ended writes nothing")
 	s.free()
+
+
+## WO-604 slice 3: the live-input routing gestures are one server call each (kind + integer slot from the row).
+func test_live_input_routing_requests() -> void:
+	var dl := {"key": "input:4", "ch": 4.0, "layer": 1.0, "isLiveInput": true, "inputKind": "decklink", "slot": 1.0}
+	var la := {"key": "input:9", "ch": 9.0, "layer": 10.0, "isLiveInput": true, "inputKind": "live_audio", "slot": 2.0}
+	var ndi := {"key": "input:11", "ch": 11.0, "layer": 1.0, "isLiveInput": true, "inputKind": "ndi_host", "slot": 1.0}
+	t.ok(AA.routed(dl) and not AA.routed(la) and not AA.routed(ndi), "Ch buttons + send policy: DeckLink / v4l2 only")
+	t.ok(AA.startable(dl) and AA.startable(la) and not AA.startable(ndi), "START: DeckLink / live audio")
+	t.ok(not AA.routed({"key": "pgm:1", "isMaster": true}), "never a master")
+	t.eq(AA.route_request(dl, 1, true), ["POST", "/api/audio/inputs/route", {"kind": "decklink", "slot": 1, "channel": 1, "on": true}])
+	t.eq(AA.send_request(dl, "always"), ["POST", "/api/audio/inputs/send", {"kind": "decklink", "slot": 1, "send": "always"}])
+	t.eq(AA.start_request(la), ["POST", "/api/audio/inputs/start", {"kind": "live_audio", "slot": 2}])
+	t.eq(AA.auto_mix_request(false), ["POST", "/api/audio/auto-mix", {"on": false}])
+	t.eq(AA.audio_only_stop_request({"ch": 1.0, "isAudioOnlyLook": true}), ["POST", "/api/scene/audio-only/stop", {"channel": 1}])
+	var snap := {"autoMix": true, "inputs": [{"key": "input:5", "targets": []}, {"key": "input:4", "send": "always", "targets": [1.0]}]}
+	t.eq(AA.routing_entry(snap, dl).get("send"), "always", "matched by strip key")
+	t.eq(AA.routing_entry(snap, la), {}, "no entry → {}")
+	t.eq(AA.routing_entry(null, dl), {}, "no snapshot yet")

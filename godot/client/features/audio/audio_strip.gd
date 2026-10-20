@@ -2,14 +2,23 @@ extends PanelContainer
 ## WO-604 — one console strip (web audio-mixer-view__strip): label, meter (bank), fader scale, 0–100 fader on the
 ## web taper, dB readout, SOLO / MUTE / PGM-PRV badge, "no signal" on dedicated inputs. Double-click or Ctrl+click
 ## the fader resets to 0 dB. The strip only emits; audio_tab.gd turns that into server calls.
+## WO-604 slice 3: DeckLink / v4l2 inputs add the audio-send policy and one Ch toggle per program channel (the input's
+## audio-only route there), startable inputs a START, audio-only looks a STOP.
 
 signal gain_changed(gain: float, final: bool)
 signal solo_pressed(multi: bool)
 signal mute_pressed
+signal route_toggled(channel: int, on: bool)
+signal send_selected(send: String)
+signal start_pressed
+signal stop_pressed
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MM := preload("res://features/live/mixer_math.gd")
 const MeterBank := preload("res://features/audio/meter_bank.gd")
+const AA := preload("res://features/audio/audio_actions.gd")
+const SEND_TEXT := {"afv": "AFV", "always": "ALWAYS", "never": "NEVER"}
+const SEND_TIP := "Audio send — AFV: audio follows video on takes (respects AUTO MIX) · ALWAYS: feeds its routed Ch buses even off-PGM · NEVER: video only"
 const SCALE := [[100.0, "+6"], [83.333, "0"], [66.667, "-6"], [50.0, "-12"], [33.333, "-24"], [16.667, "-48"], [0.0, "-∞"]]
 
 var row: Dictionary
@@ -21,9 +30,11 @@ var _solo: Button
 var _mute: Button
 var _nosig: Label
 var _syncing := false
+var _send: OptionButton
+var _routes := {}  # program channel → toggle
 
 
-func setup(r: Dictionary, bars: int, dense: bool) -> void:
+func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 	row = r
 	var master: bool = r.get("isMaster", false) == true
 	custom_minimum_size = Vector2(100 + maxi(0, bars - 2) * 9 if master else (64 if dense else 84), 360)
@@ -106,6 +117,53 @@ func setup(r: Dictionary, bars: int, dense: bool) -> void:
 		_mute.button_pressed = r.get("muted", false) == true
 		_mute.pressed.connect(func() -> void: mute_pressed.emit())  # the button has already toggled: muted() = the new state
 		acts.add_child(_mute)
+	if r.get("isAudioOnlyLook", false) == true:
+		var stop := _button("STOP", "Stop this audio-only look (the channel's video look stays)")
+		stop.pressed.connect(func() -> void: stop_pressed.emit())
+		acts.add_child(stop)
+	if AA.startable(r):
+		var start := _button("START", "Start / restart this input's capture (its routes come back too)")
+		start.pressed.connect(func() -> void: start_pressed.emit())
+		acts.add_child(start)
+	if AA.routed(r):
+		_send = OptionButton.new()
+		_send.focus_mode = Control.FOCUS_NONE
+		_send.tooltip_text = SEND_TIP
+		_send.add_theme_font_size_override("font_size", 10)
+		_send.fit_to_longest_item = false
+		for k in AA.SENDS:
+			_send.add_item(SEND_TEXT[k])
+		_send.item_selected.connect(func(i: int) -> void: send_selected.emit(AA.SENDS[i]))
+		acts.add_child(_send)
+		var grid := HFlowContainer.new()
+		grid.add_theme_constant_override("h_separation", 3)
+		grid.add_theme_constant_override("v_separation", 3)
+		for p in programs:
+			var ch := int(p)
+			var b := _toggle("Ch%d" % ch, "Route this input's audio onto program channel %d (audio-only)" % ch, ThemeBuilder.ACCENT)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.pressed.connect(func() -> void: route_toggled.emit(ch, b.button_pressed))
+			_routes[ch] = b
+			grid.add_child(b)
+		acts.add_child(grid)
+
+
+func _button(text: String, tip: String) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.tooltip_text = tip
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 11)
+	return b
+
+
+## The server's routing entry for this input ({send, targets}); {} = defaults (AFV, nothing routed).
+func set_routing(entry: Dictionary) -> void:
+	if _send:
+		_send.select(maxi(0, AA.SENDS.find(str(entry.get("send", "afv")))))
+	var targets: Array = entry.get("targets", []) if entry.get("targets") is Array else []
+	for ch in _routes:
+		(_routes[ch] as Button).set_pressed_no_signal(targets.any(func(t: Variant) -> bool: return int(t) == ch))
 
 
 func _toggle(text: String, tip: String, on_colour: Color) -> Button:

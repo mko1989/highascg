@@ -83,3 +83,54 @@ static func patch_live_layer(live: Variant, ch: Variant, layer_number: Variant, 
 		for l in layers:
 			if l is Dictionary and l.get("layerNumber") != null and float(l.layerNumber) == float(layer_number):
 				l.merge(patch, true)
+
+
+## WO-604 slice 3 — live-input audio routing, composed on the server (src/audio/input-audio-routing.js). DeckLink /
+## v4l2 inputs get the Ch route buttons and the audio-send policy; DeckLink / live-audio capture can be (re)started.
+const ROUTED_KINDS := ["decklink", "v4l2"]
+const START_KINDS := ["decklink", "live_audio"]
+const SENDS := ["afv", "always", "never"]
+
+
+static func routed(row: Dictionary) -> bool:
+	return row.get("isLiveInput", false) == true and ROUTED_KINDS.has(str(row.get("inputKind", "")))
+
+
+static func startable(row: Dictionary) -> bool:
+	return row.get("isLiveInput", false) == true and START_KINDS.has(str(row.get("inputKind", ""))) and _slot(row) >= 1
+
+
+static func _slot(row: Dictionary) -> int:
+	var s: Variant = row.get("slot")
+	return int(s) if (s is float or s is int) else (int(s) if str(s).is_valid_int() else 0)
+
+
+## The server's routing entry for a strip ({send, targets, …}), matched by strip key; {} when the input has none.
+static func routing_entry(snap: Variant, row: Dictionary) -> Dictionary:
+	var inputs: Variant = snap.get("inputs") if snap is Dictionary else null
+	if inputs is Array:
+		for i in inputs:
+			if i is Dictionary and str(i.get("key", "")) == str(row.get("key", "")):
+				return i
+	return {}
+
+
+static func route_request(row: Dictionary, channel: int, on: bool) -> Array:
+	return ["POST", "/api/audio/inputs/route", {"kind": str(row.inputKind), "slot": _slot(row), "channel": channel, "on": on}]
+
+
+static func send_request(row: Dictionary, send: String) -> Array:
+	return ["POST", "/api/audio/inputs/send", {"kind": str(row.inputKind), "slot": _slot(row), "send": send}]
+
+
+static func start_request(row: Dictionary) -> Array:
+	return ["POST", "/api/audio/inputs/start", {"kind": str(row.inputKind), "slot": _slot(row)}]
+
+
+static func auto_mix_request(on: bool) -> Array:
+	return ["POST", "/api/audio/auto-mix", {"on": on}]
+
+
+## The ■ on an audio-only look strip: clears that look on its channel, the channel's video look untouched.
+static func audio_only_stop_request(row: Dictionary) -> Array:
+	return ["POST", "/api/scene/audio-only/stop", {"channel": int(row.ch)}]

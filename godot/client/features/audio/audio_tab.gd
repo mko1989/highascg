@@ -5,6 +5,8 @@ extends VBoxContainer
 ## bus channel. Strips rebuild only when the strip list changes; values sync in place (never under a held fader).
 ## Console state (gains, mutes, solos) is the server's (GET /api/audio/mixer + `audioMixer` changes); look layers
 ## keep volume / muted on the look. Meters tick at 20 Hz while the tab is visible, from the shared OSC mirror.
+## WO-604 slice 3: live-input routing (Ch buttons, audio send, AUTO MIX, START) and audio-only STOP are server calls;
+## the routing state is GET /api/audio/inputs/routing + the `audioInputRouting` change.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const AR := preload("res://features/audio/audio_rows.gd")
@@ -17,6 +19,8 @@ const EMPTY := "No active program inputs playing audio. Play a scene look with a
 var osc: Node  # shell's OscMirror
 var _mixer := {}
 var _live_inputs: Variant = null
+var _routing := {}
+var _auto_mix: Button
 var _rows: Array = []
 var _sig := ""
 var _strips := {}  # key → Strip
@@ -67,13 +71,18 @@ func _on_visible() -> void:
 	var li: Dictionary = await Api.get_json("/api/audio/live-inputs")
 	if li.ok:
 		_live_inputs = li.data
+	var ro: Dictionary = await Api.get_json("/api/audio/inputs/routing")
+	if ro.ok and ro.data is Dictionary:
+		_routing = ro.data
 	_refresh()
 
 
 func _on_store(path: String, value: Variant) -> void:
 	if path == "audioMixer" and value is Dictionary:
 		_mixer = value
-	if path in ["*", "channelMap", "audioMixer", "timeline.playback"] or path.begins_with("scene"):
+	if path == "audioInputRouting" and value is Dictionary:
+		_routing = value
+	if path in ["*", "channelMap", "audioMixer", "audioInputRouting", "timeline.playback"] or path.begins_with("scene"):
 		_refresh()
 
 
@@ -95,7 +104,7 @@ func _refresh() -> void:
 	var st := _state()
 	var cm: Dictionary = st.channelMap
 	_rows = AR.input_rows(cm, _mixer) + AR.program_rows(st)
-	var sig := []
+	var sig := [_programs(cm)]
 	for r in _rows:
 		var bars := AR.bus_channel_count(Settings.settings, cm, r.ch) if r.get("isMaster", false) == true else 1
 		sig.append([r.key, r.label, r.get("sceneId"), bars, r.get("liveAudioSlot")])
@@ -114,6 +123,9 @@ func _refresh() -> void:
 			strip.set_gain(float(r.get("v", 1.0)))
 		strip.set_muted(r.get("muted", false) == true)
 		strip.set_solo(solos.has(r.key))
+		strip.set_routing(AA.routing_entry(_routing, r))
+	if _auto_mix:
+		_auto_mix.set_pressed_no_signal(_routing.get("autoMix", true) != false)
 
 
 func _rebuild(cm: Dictionary) -> void:
@@ -123,10 +135,14 @@ func _rebuild(cm: Dictionary) -> void:
 	_strips.clear()
 	_smooth.clear()
 	_metas.clear()
-	var progs: Array = cm.get("programChannels", []) if cm.get("programChannels") is Array and not cm.programChannels.is_empty() else [1]
+	var progs := _programs(cm)
+	_auto_mix = null
 	var live_inputs := _rows.filter(func(r: Dictionary) -> bool: return r.get("isLiveInput", false) == true)
 	if not live_inputs.is_empty():
-		_inputs.add_child(_group("Live inputs", live_inputs, cm))
+		var g := _group("Live inputs", live_inputs, cm)
+		_auto_mix = _auto_mix_button()
+		g.get_child(0).get_child(0).add_child(_auto_mix)
+		_inputs.add_child(g)
 	for i in progs.size():
 		var list := _rows.filter(func(r: Dictionary) -> bool:
 			return r.get("isMaster", false) != true and r.get("isLiveInput", false) != true and float(r.ch) == float(progs[i]))
@@ -143,7 +159,26 @@ func _rebuild(cm: Dictionary) -> void:
 		_masters.add_child(_strip(r, AR.bus_channel_count(Settings.settings, cm, r.ch), false))
 
 
-func _group(title: String, rows: Array, _cm: Dictionary) -> Control:
+static func _programs(cm: Dictionary) -> Array:
+	return cm.get("programChannels", []) if cm.get("programChannels") is Array and not cm.programChannels.is_empty() else [1]
+
+
+## Mixer-wide audio-follows-video at TAKE time; deliberately not retroactive (the next take applies it).
+func _auto_mix_button() -> Button:
+	var b := Button.new()
+	b.text = "AUTO MIX"
+	b.toggle_mode = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 11)
+	b.tooltip_text = "ON: takes bring AFV inputs' audio with the video. OFF: takes bring live inputs in silent — mix with the strips. Applies from the next take."
+	b.add_theme_stylebox_override("pressed", ThemeBuilder.box(ThemeBuilder.ACCENT.darkened(0.35), ThemeBuilder.ACCENT, 1, 4))
+	b.pressed.connect(func() -> void:
+		var res := await _send(AA.auto_mix_request(b.button_pressed))
+		_status.text = ("Auto mix %s — applies from the next take." % ("ON" if b.button_pressed else "OFF")) if res.ok else _status.text)
+	return b
+
+
+func _group(title: String, rows: Array, cm: Dictionary) -> Control:
 	var card := PanelContainer.new()
 	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_DARK, ThemeBuilder.BORDER, 1, 6))
 	var v := VBoxContainer.new()
@@ -151,24 +186,34 @@ func _group(title: String, rows: Array, _cm: Dictionary) -> Control:
 	var h := Label.new()
 	h.text = title
 	h.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	v.add_child(h)
+	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var head := HBoxContainer.new()  # the title, then any group-wide control (Live inputs: AUTO MIX)
+	head.add_child(h)
+	v.add_child(head)
 	var strips := HBoxContainer.new()
 	strips.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	strips.add_theme_constant_override("separation", 4)
 	v.add_child(strips)
 	for r in rows:
-		strips.add_child(_strip(r, 1, rows.size() > 4))
+		strips.add_child(_strip(r, 1, rows.size() > 4, _programs(cm)))
 	return card
 
 
-func _strip(r: Dictionary, bars: int, dense: bool) -> Strip:
+func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> Strip:
 	var s := Strip.new()
-	s.setup(r, bars, dense)
+	s.setup(r, bars, dense, programs)
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var key: String = r.key
 	s.gain_changed.connect(func(g: float, final: bool) -> void: _on_gain(key, g, final))
 	s.solo_pressed.connect(func(multi: bool) -> void: _on_solo(key, multi))
 	s.mute_pressed.connect(func() -> void: _on_mute(key))
+	s.route_toggled.connect(func(ch: int, on: bool) -> void: _after(await _send(AA.route_request(s.row, ch, on))))
+	s.send_selected.connect(func(send: String) -> void: _after(await _send(AA.send_request(s.row, send))))
+	s.start_pressed.connect(func() -> void:
+		var res := await _send(AA.start_request(s.row))
+		if res.ok:
+			_status.text = "%s capture started (%d route(s) restored)." % [str(s.row.label), int(_d(res.get("data")).get("routesRestored", 0))])
+	s.stop_pressed.connect(func() -> void: _send(AA.audio_only_stop_request(s.row)))
 	_strips[key] = s
 	_metas[key] = AR.meter_meta(r)
 	return s
@@ -215,6 +260,12 @@ func _on_mute(key: String) -> void:
 			ProjectSync.mark_dirty()
 	_metas[key] = AR.meter_meta(r.merged({"muted": next}, true))
 	_send(AA.mute_request(r, next, s.gain()))
+
+
+## A refused routing call puts the toggles back on the server's state.
+func _after(res: Dictionary) -> void:
+	if not res.ok:
+		_refresh()
 
 
 func _send(req: Array) -> Dictionary:
