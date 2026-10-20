@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Next: slice 9b GPU layout editor. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Next: slice 9b-2/3 GPU edit mode + layout editor. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -930,3 +930,74 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
     posting `gpuPhysicalTopology`, gpu-ports-reset);
   - the web cable row's "Node view" (simple wiring) and "Matrix view" toggles;
   - the GPU band's "Disconnected (N)" folder.
+
+## Slice 9b-1 — GPU column = the web's GPU port model (2026-10-20, DONE)
+
+### Investigation
+- The web GPU column is not a plain `physicalMap.ports` read (slice 1 simplified it that way).
+  `device-view-caspar-rear-data.js:52-64` runs `buildGpuSelectablePortEntries` (`lib/device-view-gpu-port-list.js:103`):
+  1. Rows come from the topology (`resolveTopologyForDeviceView`): `physicalMap.effectiveTopology`, else the saved
+     `gpuPhysicalTopology` (settings, then payload), else `physicalMap.suggestedTopology`.
+     Each row goes through `entryFromTopologyRow` (`-entries.js:42`): its label is the pair label plus
+     " · <active>", or " (no mode)" when the active output has no resolution.
+  2. Raw live entries are added only when their id is **not** `gpu_pN`. `buildRawGpuPortEntriesFromLive` drops every
+     non-`gpu_pN` id when the server has a DRM map. So on a DRM box the column is exactly the topology, and the raw
+     pass only matters without one: suggested non-`gpu_pN` connectors, physical ports with odd ids, and display rows
+     not already bound to a jack.
+  3. `mergeGpuLayoutEntriesWithPrefs` (`-merge.js:34`):
+     - localStorage `gpu_custom_layout` adds **hidden flags and labels only**.
+     - Order follows the topology **array** order, not slotOrder.
+     - Topology rows with no entry are appended, taking the pairs from the prefs.
+  4. `entryToRearPanelGpuItem` builds each marker. A marker that is not a topology slot and is neither live nor
+     connected goes in the "Disconnected (N)" `<details>` (`-markers.js:51`, `render.js:390-455`). Hidden markers are
+     `display:none`, and the title shows " (N hidden)".
+- Consequences:
+  - With a DRM map but no topology, the web shows **no** GPU jacks. Slice 1 showed the ports.
+  - Without a topology, `gpu_pN` suggested connectors make no jacks either. The server always publishes
+    `effectiveTopology` with its map, so the box is unaffected.
+- Not ported:
+  - the one-time legacy localStorage → server migration (`-migrate.js`; Godot has no legacy prefs);
+  - the debug tracer (`-layout-debug.js`);
+  - the inferred `gpu_pN` padding in the raw pass and the localStorage port-count override behind it. Those entries
+    are `gpu_pN`, so they never survive to the column.
+
+### What was done
+- `features/devices/gpu_entries.gd` (pure):
+  - the norm / coercion helpers;
+  - `topology`, `from_topology_row` / `from_topology`, `matching` (displaysMatchingPairs), `pair_label`, `is_primary`,
+    `has_server_map`;
+  - `raw_extra`: the raw pass reduced to what can reach the output, keeping the `gpu_pN` entries for the "already
+    bound" checks.
+- `features/devices/gpu_layout.gd`:
+  - `prefs_of`, `merge`, `entries`, `inventory`, `rear_item(s)`, `in_folder`, `column` (the tab's payload →
+    items with `hdmi` / `folder`);
+  - `layout_items`, `items_from_live`, `to_topology` (gpuLayoutItemsToPhysicalTopology) and `port_options`;
+  - the client prefs on `user://devices.cfg` `[gpu] layout`.
+- `devices_model.gd`: `build(…, gpu_saved)` uses `GL.column`. The old `gpu_ports` / `gpu_pair_label` are removed
+  (the test now calls `pair_label`).
+- `rear_panel.gd`: the GPU plate skips hidden rows and adds the "(N hidden)" hint with the web's tooltip. Folder rows
+  go under a "▸ Disconnected (N)" fold, closed like the web's `<details>` and kept open per session once opened.
+- `devices_tab.gd` passes `GL.saved()`.
+
+### What was VERIFIED
+- `tests/test_devices_gpu_layout.gd` + `tests/golden/devices_gpu_layout.json`. The scratchpad generator
+  `gl_golden.mjs` runs the web lib + the markers' folder test under Node on the box's GPU block and 9 variants:
+  - box with and without prefs (hidden, label, an orphan pref, a bad id, a row without an id);
+  - saved topology only (reordered, HDMI);
+  - suggested topology only;
+  - extra ports outside the topology;
+  - no physical map (suggested + displays, including a covered one);
+  - inventory only;
+  - `totalPorts` only;
+  - split ids + eDP + "no mode" + an unmapped port + prefs;
+  - a topology row missing from the entries, with pref pairs.
+- Per case the test compares every entry, every rear item, the folder flags, the layout items, the topology rows,
+  `items_from_live` and the port options. It also covers odd topology rows and options with no GPU data.
+- `test_devices_model.gd`: the fixture gained the server's `effectiveTopology` + a display. There are new cases for no
+  topology (only `gpu_out_x` → the folder) and a saved layout.
+- Godot `--test` 11972 / 11972, `--check` boot OK.
+- Box GUI:
+  - With no prefs the GPU column is unchanged (DP 0/1, DP 2/3 · DP-2, DP 4/5, DP 6/7 · DP-6, cables on P1 / P3).
+  - With `[gpu] layout` = gpu_p0 hidden + gpu_p2 "Wall", the header reads "GPU (1 hidden)", DP 0/1 is gone, P2 reads
+    "Wall", and cables still land.
+- The folder is golden / model-tested only. The box has no non-topology GPU socket.

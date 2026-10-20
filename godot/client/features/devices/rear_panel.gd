@@ -18,10 +18,13 @@ signal open_requested(id: String)
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const DO := preload("res://features/devices/decklink_order.gd")
+const H := preload("res://features/devices/host_channels.gd")
 const ROW_H := 44
 const PLATE := Color("#2b3038")
 const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon", "v4l2_out": "hdmi-port-icon",
 	"record_out": "record-port-icon", "audio_out": "jack-svg"}
+
+static var folder_open := false  # the GPU "Disconnected" fold (web <details>, closed per page load)
 
 var anchors := {}
 var _labels := {}  # connector id → its clickable row Label
@@ -63,23 +66,54 @@ func show_slots(slots: Array) -> void:
 	row.add_child(extras)
 
 
-## Header, then label | socket rows; the sockets sit on a plate like the hardware bracket.
+## Header, then label | socket rows; the sockets sit on a plate like the hardware bracket. GPU (slice 9b): rows the
+## client's layout hides are left out ("(N hidden)" in the header) and sockets that are neither topology slots nor
+## live go in a "Disconnected (N)" fold under the plate (web: a closed <details>).
 func _plate_column(s: Dictionary) -> Control:
 	var col := VBoxContainer.new()
 	var head := _small(str(s.title).to_upper(), ThemeBuilder.TEXT_MUTED)
 	head.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	var hb := HBoxContainer.new()
+	hb.alignment = BoxContainer.ALIGNMENT_END
+	hb.add_child(head)
+	col.add_child(hb)
+	var rows: Array = s.items.duplicate()
 	if s.kind == "decklink":
-		var hb := HBoxContainer.new()
-		hb.alignment = BoxContainer.ALIGNMENT_END
-		hb.add_child(head)
 		hb.add_child(_pencil())
-		col.add_child(hb)
 		_deck_ids = s.items.map(func(it: Dictionary) -> String: return str(it.id))
-	else:
-		col.add_child(head)
+		rows.append({"id": "", "label": "REF"})  # genlock input: drawn, never cabled
+		col.add_child(_plate(rows, s.kind))
+		return col
+	var hidden := rows.filter(func(it: Dictionary) -> bool: return H.truthy(it.get("hidden"))).size()
+	if hidden > 0:
+		var hint := _small("(%d hidden)" % hidden, ThemeBuilder.TEXT_MUTED)
+		hint.tooltip_text = "Open GPU layout editor (pencil) and click Show all"
+		hint.mouse_filter = Control.MOUSE_FILTER_STOP
+		hb.add_child(hint)
+	var folder := rows.filter(func(it: Dictionary) -> bool: return it.get("folder", false))
+	col.add_child(_plate(rows.filter(func(it: Dictionary) -> bool: return not it.get("folder", false)), s.kind))
+	if not folder.is_empty():
+		var fold := _plate(folder, s.kind)
+		fold.visible = folder_open
+		var b := Button.new()
+		b.flat = true
+		b.focus_mode = Control.FOCUS_NONE
+		b.alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		b.add_theme_font_size_override("font_size", 11)
+		b.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+		b.text = "%s Disconnected (%d)" % ["▾" if folder_open else "▸", folder.size()]
+		b.pressed.connect(func() -> void:
+			folder_open = not folder_open
+			fold.visible = folder_open
+			b.text = "%s Disconnected (%d)" % ["▾" if folder_open else "▸", folder.size()])
+		col.add_child(b)
+		col.add_child(fold)
+	return col
+
+
+func _plate(rows: Array, kind: String) -> Control:
 	var h := HBoxContainer.new()
 	h.add_theme_constant_override("separation", 6)
-	col.add_child(h)
 	var labels := VBoxContainer.new()
 	labels.add_theme_constant_override("separation", 0)
 	h.add_child(labels)
@@ -89,36 +123,35 @@ func _plate_column(s: Dictionary) -> Control:
 	var icons := VBoxContainer.new()
 	icons.add_theme_constant_override("separation", 0)
 	plate.add_child(icons)
-	var rows: Array = s.items.duplicate()
-	if s.kind == "decklink":
-		rows.append({"id": "", "label": "REF"})  # genlock input: drawn, never cabled
+	if kind == "gpu":
+		rows = rows.filter(func(it: Dictionary) -> bool: return not H.truthy(it.get("hidden")))
 	if rows.is_empty():
 		labels.add_child(_row_label("none"))
 		icons.add_child(_spacer())
 	for it in rows:
 		var l := _row_label(str(it.label))
-		if s.kind == "gpu" and not it.get("connected", false):
+		if kind == "gpu" and not it.get("connected", false):
 			l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-		if (s.kind == "gpu" or s.kind == "decklink") and it.id != "":
+		if (kind == "gpu" or kind == "decklink") and it.id != "":
 			l.mouse_filter = Control.MOUSE_FILTER_STOP
 			l.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 			l.tooltip_text = "%s — open in the Inspector" % it.label
-			if s.kind == "decklink" and DO.edit:
+			if kind == "decklink" and DO.edit:
 				l.tooltip_text = "%s — drag onto another port to swap" % it.label
 				l.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 				l.mouse_default_cursor_shape = Control.CURSOR_DRAG
 			_labels[str(it.id)] = l
 		labels.add_child(l)
-		var svg: String = ("hdmi-port-icon" if it.get("hdmi", false) else "display-port-icon") if s.kind == "gpu" \
+		var svg: String = ("hdmi-port-icon" if it.get("hdmi", false) else "display-port-icon") if kind == "gpu" \
 			else ICON.decklink
-		var size := Vector2(46, ROW_H) if s.kind == "gpu" else Vector2(34, ROW_H)
+		var size := Vector2(46, ROW_H) if kind == "gpu" else Vector2(34, ROW_H)
 		var p := PortIcon.make(svg, size, "%s (%s)" % [it.label, it.id] if it.id != "" else str(it.label))
 		if it.id == "":
 			p.modulate.a = 0.4
 		else:
 			anchors[it.id] = p
 		icons.add_child(p)
-	return col
+	return h
 
 
 func _extra_slot(s: Dictionary) -> Control:

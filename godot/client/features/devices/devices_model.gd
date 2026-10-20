@@ -1,10 +1,11 @@
 extends RefCounted
 ## WO-605 slice 1 — GET /api/device-view → what the read-only Devices tab draws: destination cards, rear-panel
 ## columns (GPU, DeckLink, stream / virtual cam / record / audio), and cables as anchor-key pairs. Ports of
-## device-view-output-layer.js (PGM/PRV halves), destinationRectLabel (ui-utils), labelForTopologyPairs /
-## entryFromTopologyRow (gpu-port-entries) and the caspar-rear-data.js kind filters. Pure (tests preload it).
+## device-view-output-layer.js (PGM/PRV halves), destinationRectLabel (ui-utils) and the caspar-rear-data.js kind
+## filters; the GPU column is gpu_layout.gd (slice 9b). Pure (tests preload it).
 
 const DO := preload("res://features/devices/decklink_order.gd")
+const GL := preload("res://features/devices/gpu_layout.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const CASPAR_HOST := "caspar_host"
 const MODE_TAG := {"pgm_only": "PGM", "multiview": "MVR", "stream": "STREAM", "pixelmap": "PXM",
@@ -49,29 +50,6 @@ static func source_anchor(edge: Dictionary) -> String:
 	return anchor_key(id, "prv" if output_layer(edge) >= 2 else "pgm")
 
 
-## "DP-0", "DP-1" → "DP 0/1"; HDMI keeps its prefix; eDP pairs are joined (labelForTopologyPairs).
-static func gpu_pair_label(pairs: Array) -> String:
-	var list: Array[String] = []
-	for p in pairs:
-		if str(p) != "":
-			list.append(str(p))
-	if list.is_empty():
-		return ""
-	var blob := " ".join(list).to_upper()
-	if blob.contains("HDMI"):
-		var tails: Array[String] = []
-		for p in list:
-			var parts := p.split("-")
-			tails.append("-".join(parts.slice(1)))
-		return "HDMI " + "/".join(tails)
-	if blob.contains("EDP"):
-		return " · ".join(list)
-	var nums: Array[String] = []
-	for p in list:
-		nums.append(p.trim_prefix("DP-").trim_prefix("dp-"))
-	return "DP " + "/".join(nums)
-
-
 ## "OPG · 1920x1080@50" / "NDI host · ch 4" (destinationRectLabel).
 static func dest_sub(d: Dictionary) -> String:
 	var mode := str(d.get("mode", "pgm_prv"))
@@ -105,37 +83,6 @@ static func connectors(payload: Dictionary) -> Dictionary:
 	return out
 
 
-## GPU sockets from live.gpu.physicalMap.ports (slot order); a connected socket shows its active output.
-## Without a physical map, the gpu_out connectors stand in (label = their externalRef).
-static func gpu_ports(payload: Dictionary, conns: Dictionary) -> Array:
-	var out := []
-	var live: Variant = payload.get("live")
-	var gpu: Variant = live.get("gpu") if live is Dictionary else null
-	var pm: Variant = gpu.get("physicalMap") if gpu is Dictionary else null
-	var ports: Array = pm.get("ports", []) if pm is Dictionary and pm.get("ports") is Array else []
-	ports = ports.filter(func(p: Variant) -> bool: return p is Dictionary and str(p.get("physicalPortId", "")) != "")
-	ports.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a.get("slotOrder", 0)) < int(b.get("slotOrder", 0)))
-	for p in ports:
-		var pair: Dictionary = p.get("pair", {}) if p.get("pair") is Dictionary else {}
-		var rt: Dictionary = p.get("runtime", {}) if p.get("runtime") is Dictionary else {}
-		var id := str(p.physicalPortId)
-		var label := gpu_pair_label([pair.get("dpA", ""), pair.get("dpB", "")])
-		label = label if label != "" else id
-		var active := str(rt.get("activePort", "") if rt.get("activePort") != null else "")
-		var connected := bool(rt.get("connected", false))
-		if connected and active != "":
-			label += " · " + active
-		out.append({"id": id, "label": label, "connected": connected, "hdmi": label.begins_with("HDMI")})
-	if not out.is_empty():
-		return out
-	for c in conns.values():
-		if c.get("kind") == "gpu_out" and c.get("deviceId") == CASPAR_HOST:
-			var ref := str(c.get("externalRef", ""))
-			out.append({"id": str(c.id), "label": ref if ref != "" else str(c.get("label", c.id)),
-				"connected": false, "hdmi": ref.to_upper().contains("HDMI")})
-	return out
-
-
 static func _of_kinds(conns: Dictionary, kinds: Array) -> Array:
 	var out := []
 	for c in conns.values():
@@ -148,11 +95,13 @@ static func _of_kinds(conns: Dictionary, kinds: Array) -> Array:
 
 ## Everything the tab draws. Destinations: screen destinations, then pinned and auto-detected host channels
 ## (host_channels.gd); `live_cm` is the WS state channelMap, `cc` the state configComparison (the "(planned)" badge).
-## `deck_saved` = the client's saved DeckLink rear order (decklink_order.gd; [] = the web's default order).
-static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = null, deck_saved: Array = []) -> Dictionary:
+## `deck_saved` = the client's saved DeckLink rear order (decklink_order.gd; [] = the web's default order);
+## `gpu_saved` = its saved GPU layout rows (gpu_layout.gd: hidden flags + labels over the server topology).
+static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = null, deck_saved: Array = [],
+		gpu_saved: Array = []) -> Dictionary:
 	var conns := connectors(payload)
 	var labels := {}
-	var gpu := gpu_ports(payload, conns)
+	var gpu := GL.column(payload, gpu_saved)
 	var deck := DO.current(_of_kinds(conns, ["decklink_io", "decklink_out"]), deck_saved)
 	var slots := [{"title": "GPU", "kind": "gpu", "items": gpu}, {"title": "DeckLink", "kind": "decklink", "items": deck}]
 	for s in EXTRA_SLOTS:

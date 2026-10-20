@@ -7,7 +7,8 @@ var t
 
 
 ## Small payload modelled on GET /api/device-view: one operator-GUI destination (plain connector), one pgm_prv
-## destination (two halves), one host_channel destination (must be skipped), two GPU sockets given out of slot order.
+## destination (two halves), one host_channel destination (must be skipped), two GPU sockets given out of slot order
+## (the column follows the server's effectiveTopology rows in their array order, as the web's does — gpu_layout.gd).
 func _fixture() -> Dictionary:
 	return {
 		"graph": {
@@ -24,7 +25,10 @@ func _fixture() -> Dictionary:
 				{"id": "e_pv_gpu_p0", "sourceId": "dst_in_dst_pv_1", "sinkId": "gpu_p0", "note": "{\"outputLayer\":2}"},
 			],
 		},
-		"live": {"gpu": {"physicalMap": {"ports": [
+		"live": {"gpu": {"displays": [{"name": "DP-2", "connected": true, "resolution": "1920x1080"}], "physicalMap": {
+			"effectiveTopology": [{"physicalPortId": "gpu_p0", "slotOrder": 0, "dpA": "DP-0", "dpB": "DP-1"},
+				{"physicalPortId": "gpu_p1", "slotOrder": 1, "dpA": "DP-2", "dpB": "DP-3"}],
+			"ports": [
 			{"physicalPortId": "gpu_p1", "slotOrder": 1, "pair": {"dpA": "DP-2", "dpB": "DP-3"},
 				"runtime": {"connected": true, "activePort": "DP-2"}},
 			{"physicalPortId": "gpu_p0", "slotOrder": 0, "pair": {"dpA": "DP-0", "dpB": "DP-1"},
@@ -74,10 +78,10 @@ func test_anchor_key_and_source_anchor() -> void:
 
 
 func test_gpu_pair_label() -> void:
-	t.eq(M.gpu_pair_label(["DP-0", "DP-1"]), "DP 0/1", "two DP pairs join with a slash")
-	t.eq(M.gpu_pair_label(["DP-6", ""]), "DP 6", "empty second pair is dropped")
-	t.eq(M.gpu_pair_label(["HDMI-0"]), "HDMI 0", "HDMI keeps its prefix")
-	t.eq(M.gpu_pair_label([]), "", "no pairs gives an empty label")
+	t.eq(M.GL.E.pair_label(["DP-0", "DP-1"]), "DP 0/1", "two DP pairs join with a slash")
+	t.eq(M.GL.E.pair_label(["DP-6", ""]), "DP 6", "empty second pair is dropped")
+	t.eq(M.GL.E.pair_label(["HDMI-0"]), "HDMI 0", "HDMI keeps its prefix")
+	t.eq(M.GL.E.pair_label([]), "", "no pairs gives an empty label")
 
 
 func test_dest_sub() -> void:
@@ -122,7 +126,7 @@ func test_build_slots_and_gpu_items() -> void:
 		titles.append(s.title)
 	t.eq(titles, ["GPU", "DeckLink", "Stream", "Virtual cam", "Record", "Audio"], "rear-panel slot titles in order")
 	var gpu: Array = _slot(built, "GPU").items
-	t.eq(_ids(gpu), ["gpu_p0", "gpu_p1"], "GPU sockets sorted by slotOrder (gpu_p0 first)")
+	t.eq(_ids(gpu), ["gpu_p0", "gpu_p1"], "GPU sockets in topology order (gpu_p0 first)")
 	t.eq(gpu[0].label, "DP 0/1", "unconnected socket label is its pair")
 	t.eq(gpu[1].label, "DP 2/3 · DP-2", "connected socket label appends the active output")
 	t.eq(gpu[0].connected, false, "gpu_p0 not connected")
@@ -147,15 +151,19 @@ func test_build_cables() -> void:
 	t.eq(pv_cable.label, "Main LED (DP-7) → DP 0/1", "PRV cable label uses the destination label")
 
 
-func test_gpu_ports_fallback_to_gpu_out() -> void:
+func test_gpu_column_without_topology() -> void:
 	var payload := _fixture()
 	payload.live = {}
-	var built := M.build(payload)
-	var items: Array = _slot(built, "GPU").items
-	t.eq(_ids(items), ["gpu_p0", "gpu_p1"], "without a physical map the gpu_out connectors stand in")
-	t.eq(items[0].label, "DP-0", "fallback label is the connector externalRef")
-	t.eq(items[1].label, "DP-2", "fallback label is the externalRef for gpu_p1 too")
-	t.eq(items[0].connected, false, "fallback sockets are never connected")
+	payload.graph.connectors.append({"id": "gpu_out_x", "deviceId": CASPAR, "kind": "gpu_out", "label": "Extra", "externalRef": "DP-9"})
+	var items: Array = _slot(M.build(payload), "GPU").items
+	t.eq(_ids(items), ["gpu_out_x"], "without a topology only non-gpu_pN connectors make jacks (web)")
+	t.eq(items[0].label, "Extra", "label = the connector label")
+	t.eq(items[0].folder, true, "not a topology socket and nothing live → the Disconnected folder")
+
+
+func test_gpu_column_saved_layout() -> void:
+	var items: Array = _slot(M.build(_fixture(), null, null, [], [{"id": "gpu_p0", "hidden": true, "label": "Spare"}]), "GPU").items
+	t.eq([items[0].label, items[0].hidden, items[1].hidden], ["Spare", true, false], "saved hidden flag + label apply")
 
 
 func test_build_empty_payload() -> void:
