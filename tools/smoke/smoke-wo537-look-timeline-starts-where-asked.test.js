@@ -56,7 +56,10 @@ describe('WO-537: play(fromMs) honours an explicit restart', () => {
 		const paused = eng.getPlayback().position
 		assert.ok(paused > 11000, 'sanity: really paused mid-timeline')
 		eng.play(tl.id, 0)
-		assert.equal(eng.getPlayback().position, paused, 'the documented resume behaviour, unchanged')
+		// Resume runs on the wall clock — a slow CI runner already shows paused + 1 ms (run on fde428ab). Within a frame
+		// (40 ms at 25 fps) is "kept the paused position"; the bug this guards against is a jump to 0.
+		const pos = eng.getPlayback().position
+		assert.ok(pos >= paused && pos - paused < 40, `the documented resume behaviour, unchanged (${pos} vs ${paused})`)
 		eng.stop(tl.id, { skipAmcp: true })
 	})
 
