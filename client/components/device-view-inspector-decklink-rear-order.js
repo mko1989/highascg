@@ -4,6 +4,7 @@
  */
 import { orderDecklinkConnectors, DECKLINK_REAR_ORDER_KEY, readSavedDecklinkOrder } from '../lib/device-view-decklink-order.js'
 import { decklinkMergedConnectors } from './device-view-inspector-decklink-shared.js'
+import { escapeHtml } from '../lib/dom-escape.js'
 
 /** Rear-panel DeckLink port order editor (matches GPU layout inspector pattern). */
 export function renderDecklinkRearOrderEditor(h, { lastPayload, load }) {

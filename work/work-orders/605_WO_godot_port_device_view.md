@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Next: slice 9 GPU / DeckLink edit modes. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Next: slice 9b GPU layout editor. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -89,7 +89,7 @@ Reference: the web Devices tab on this box (screenshot 2026-10-19, `GET /api/dev
   can leave int32 range — e.g. `e_dst_in_dst_mvcrp9bs_1_gpu_p1` → −3115929809),
   index `abs(h)*7 % 32`; Verlet rope (gravity 0.85, 200 iterations × 6 substeps, pinned ends + "boot" points 16 px
   below the ends), loops 0–2 from the "Cable loops" slider (web default 0, not persisted). Seed = sum of id char codes.
-- Web oddities not copied: the DeckLink column order comes from a per-browser localStorage order (box shows 4,2,3,1);
+- Web oddities not copied: the DeckLink column order comes from a per-browser localStorage order (box shows 4,2,3,1 — *corrected in slice 9a: 4,2,3,1 is the markers' no-saved-order default*);
   the Cables list labels both destinations `dst_ch1` (`friendlyConnectorLabel` falls back to `mainScreenIndex`, which
   is 0 for both). Godot orders DeckLink by `index` and labels cables with the connector labels.
 - Refresh triggers: tab shown, Refresh button, WS `gpu_topology_changed` (web `app-ws-handlers.js:283`).
@@ -822,3 +822,111 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
 - Still unported in the Device View: the GPU layout and DeckLink rear-order edit modes (the band headers' pencil
   buttons: drag markers, Show all, Clear layout, the inspector layout editors). That is slice 9. The Caspar config
   editor modal (Devices header icon) is in WO-608's inventory.
+
+## Slice 9a — DeckLink edit mode (2026-10-20, DONE)
+
+### Investigation
+- Toggle: the DeckLink band header's pencil (`device-view-caspar-render.js:340-370`), title "Edit DeckLink port order —
+  drag markers on the rear panel, or use Save / Export / Load in the inspector (same as GPU layout).".
+  - It flips a module-level `decklinkEditMode` and the band class `device-view--edit-mode-decklink`, and makes the
+    DeckLink markers draggable.
+  - Turning it on opens the inspector on `decklinkRearOrderIds[0]`.
+- Order: `lib/device-view-decklink-order.js`. localStorage `decklink_rear_panel_order` holds an id list.
+  `orderDecklinkConnectors` puts saved ids first and appends the rest in payload order. The merged list is
+  `suggested.connectors` decklink_io then decklink_out on caspar_host, deduped (`device-view-caspar-rear-data.js:66-85`).
+- Panel default: `device-view-caspar-render-markers.js:14`. With ≥4 DeckLink items and **no saved order**, the panel
+  shows 4,2,3,1 (an item matches n when its label contains n or its index is n-1). That is why the box shows 4,2,3,1.
+  **Slice 1's note (line 92) that this order comes from localStorage was wrong.**
+- Rear-panel drag (`-markers.js:~188-236`): dropping a marker on another swaps the two ids and saves.
+- Inspector editor (`device-view-inspector-decklink-rear-order.js`). It renders only in edit mode and lists
+  "Slot N" / label / id / "≡" rows.
+  - Row drop splices the row out and inserts it at the target index (−1 when dragging down).
+  - Save writes the list.
+  - Export downloads `decklink_rear_panel_order.json` = `{version: 1, decklinkRearOrder}` (2-space JSON).
+  - Load accepts an array, `{decklinkRearOrder}` or `{connectorIds}`. A bad file gives
+    `alert('Invalid DeckLink order file: …')`.
+  - Reset order asks "Clear saved DeckLink rear panel order?", then removes the key.
+  - Every change re-renders the device view.
+- Web gaps found:
+  1. **Two orders.** With no saved order the panel shows 4,2,3,1, but the editor, Save, Export and the rear-panel swap
+     all work on the unsorted order. Example: swapping the panel's top two markers actually swaps DeckLink 1 and 2.
+     **Godot uses the shown order everywhere:** the editor lists what the panel shows, and Save / Export / swap start
+     from it.
+  2. Dragging a row onto the next row down is a no-op (the −1 lands it back in place). **Godot inserts by drop
+     half:** the lower half of a row means "after it".
+  3. In the 4,2,3,1 pick, a label like "Port 12" matches both 1 and 2, and the web lists it twice. **Godot dedupes.**
+  4. Edit mode opens the first unsorted id. **Godot opens the first port shown.**
+  5. **Bug (fixed here, web):** `device-view-inspector-decklink-rear-order.js` called `escapeHtml` without importing
+     it. That threw a ReferenceError whenever edit mode rendered a DeckLink page, so the editor never appeared in the
+     browser. The bug dates from the WO-479 split (cccb6939). The fix adds `import { escapeHtml } from
+     '../lib/dom-escape.js'`.
+  6. The web alert on a bad Load file becomes the Devices status line. **A successful Load reports
+     "Loaded <file>" there** (otherwise an earlier error would survive the refresh).
+- Storage: the order is per-browser in the web, so it is per-client here. It lives in `user://devices.cfg`
+  (`[decklink] rear_order`) and is never sent to the server, like the previs `user://ui.cfg`.
+
+### What was done
+- `features/devices/decklink_order.gd` (pure + prefs):
+  - `merged`, `order`, `display` (4,2,3,1 when not persisted, deduped) and `current` (the shown order);
+  - `move` (half-based insert), `swap`, `parse_file` and `export_text` (byte-equal to `JSON.stringify(…, null, 2)`);
+  - the texts, and `saved / save / clear` on `user://devices.cfg`;
+  - `static var edit`, the per-session edit-mode flag, like the web's module variable.
+- `devices_model.gd`: `build(…, deck_saved)` orders the DeckLink column with `DO.current`.
+- `rear_panel.gd`:
+  - the DeckLink header gets a pencil (ACCENT when on);
+  - in edit mode the labels turn accent-coloured with a drag cursor and the tip "— drag onto another port to swap";
+  - `begin_drag` plus `_input` run a manual drag that outlines the target. Dropping on another DeckLink label swaps
+    and saves. Releasing on the same label opens its page.
+  - The drag is manual because the tab's click capture owns label presses, so native Godot drag cannot start there.
+- `decklink_order_editor.gd` (new): the inspector editor.
+  - Native `set_drag_forwarding` rows show an accent edge on the drop half.
+  - Save / Export (save-file dialog) / Load (open dialog) / Reset order (red, confirm).
+  - Each change saves and asks for a reload.
+- `decklink_port_controls.gd`: the editor goes under the title when edit mode is on.
+- `devices_tab.gd`: passes the saved order to the model and starts rear drags before `label_at`. Its
+  `order_changed`, `open_requested` and `edit_toggled` handlers do the following:
+  - on: open the first shown port, then refresh;
+  - off: refresh, which re-renders the open page without the editor.
+- `file_pick.gd` (new): the shared save / open FileDialog wrapper (`~/Downloads`, `*.json`) and `write_text`.
+  `snapshot_dialogs.gd` now uses it instead of its own dialog code.
+- Web: the `escapeHtml` import (gap 5), rebuilt with `npm run build:client`.
+
+### What was VERIFIED
+- `tests/test_devices_decklink_order.gd` + `tests/golden/devices_decklink_order.json`. The scratchpad generator
+  `dk_golden.mjs` runs the real web lib + editor + markers display code under Node on the DOM shim, with
+  localStorage / confirm / alert / download stubbed. It covers:
+  - 5 order cases and 8 display cases (including the duplicate pick);
+  - 4 editor replays: no saved order, saved order, Load of each file shape plus bad files, and Reset with confirm
+    on / off. Rows are compared in shown order (gap 1).
+  - Also: move / swap tables, and no editor when not in edit mode.
+  - Godot `--test` 11780 / 11780, `--check` boot OK, 0 files over 500 lines (devices_tab 496).
+- Box GUI (only `user://devices.cfg` was written; no `config/` file changed in the run):
+  - The fresh panel shows DeckLink 4, 2, 3, 1.
+  - Pencil on: the labels turn accent-coloured, the inspector opens DeckLink 4 with the editor at Slot 1–4 = 4, 2, 3, 1,
+    and the pencil turns accent.
+  - Rear drag from DeckLink 4 to DeckLink 1: the target is outlined during the drag. On release the panel and editor
+    show 1, 2, 3, 4 and `rear_order=["dlsdi_1","dlsdi_2","dlsdi_3","dlsdi_4"]`.
+  - Editor drag of Slot 4 onto Slot 1's upper half gives 4, 1, 2, 3, saved, and the panel follows.
+  - Export opens the "Export DeckLink rear order" dialog at `~/Downloads/decklink_rear_panel_order.json`. The file is
+    byte-identical to Node's `JSON.stringify({version:1, decklinkRearOrder:[…]}, null, 2)`, and the status reads
+    "Exported decklink_rear_panel_order.json".
+  - Load `dk_bad.json` (`{nope`) gives "Invalid DeckLink order file: Expected key (line 1)" with the order unchanged.
+    Load `dk_good.json` (an array) gives 3, 2, 1, 4, saved, with the status "Loaded dk_good.json".
+  - After a GUI restart, 3, 2, 1, 4 is still shown and edit mode is off. Pencil on opens DeckLink 3, the first shown.
+  - Reset order shows the confirm "Clear saved DeckLink rear panel order?". Cancel leaves the order alone. Reset
+    empties the prefs and the panel and editor return to 4, 2, 3, 1.
+  - A click (no drag) on DeckLink 2 in edit mode opens DeckLink 2. Pencil off: white labels, and the open page loses
+    the editor.
+  - The snapshot dialogs after the FilePick refactor:
+    - Save "s9check" writes a file with the same keys as slice 8 and a 616×310 PNG `visual`.
+    - Load via `--probe-snapshot-load`: Choose file… opens "Open a File", and Preview of s9check gives "Changed keys:
+      (none)". Cancelled, nothing applied.
+  - Cleanup: test files moved to the scratchpad (`s9a_files/`), `devices.cfg` removed (it did not exist before), and the
+    GUI relaunched.
+- The web fix was not clicked in a browser (no kiosk on the dev box). It is proven by the golden generator, which
+  threw the ReferenceError before the import and renders the editor after it, and by the rebuilt bundle.
+- Still unported in the Device View:
+  - slice 9b, the GPU layout edit mode (pencil Show all / Clear layout, hidden markers, the inspector layout editor
+    posting `gpuPhysicalTopology`, gpu-ports-reset);
+  - the web cable row's "Node view" (simple wiring) and "Matrix view" toggles;
+  - the GPU band's "Disconnected (N)" folder.

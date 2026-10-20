@@ -10,10 +10,10 @@ extends Node
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/devices/snapshot_model.gd")
 const Flow := preload("res://features/devices/snapshot_flow.gd")
+const FilePick := preload("res://features/devices/file_pick.gd")
 
 signal status(text: String, ok: bool)
 signal applied  ## settings + device view changed (the web's highascg-settings-applied + onApplied)
-signal _picked(path: String)
 signal _decided(ok: bool)
 
 var _shot: Variant = null  # the rear-panel visual grabbed at open (null = capture failed)
@@ -167,28 +167,13 @@ func _do_save() -> void:
 
 ## The file dialog for the saved JSON → the written file's name ("" = cancelled / not written).
 func _write(file_name: String, text: String) -> String:
-	var dlg := FileDialog.new()
-	dlg.file_mode = FileDialog.FILE_MODE_SAVE_FILE
-	dlg.access = FileDialog.ACCESS_FILESYSTEM
-	dlg.title = "Save device snapshot"
-	dlg.filters = PackedStringArray(["*.json ; JSON"])
-	var dl := OS.get_environment("HOME").path_join("Downloads")
-	dlg.current_dir = dl if DirAccess.dir_exists_absolute(dl) else OS.get_environment("HOME")
-	dlg.current_file = file_name
-	dlg.file_selected.connect(func(p: String) -> void: _picked.emit(p))
-	dlg.canceled.connect(func() -> void: _picked.emit(""))
-	add_child(dlg)
-	dlg.popup_centered_ratio(0.6)
-	var path: String = await _picked
-	dlg.queue_free()
+	var path: String = await FilePick.save_path(self, "Save device snapshot", file_name)
 	if path == "":
 		return ""
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		status.emit("Save failed: cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())], false)
+	var err := FilePick.write_text(path, text)
+	if err != "":
+		status.emit("Save failed: " + err, false)
 		return ""
-	f.store_string(text)
-	f.close()
 	return path.get_file()
 
 
@@ -253,18 +238,7 @@ func _render_load() -> void:
 
 
 func _pick_file() -> void:
-	var dlg := FileDialog.new()
-	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILE
-	dlg.access = FileDialog.ACCESS_FILESYSTEM
-	dlg.filters = PackedStringArray(["*.json ; JSON"])
-	var dl := OS.get_environment("HOME").path_join("Downloads")
-	dlg.current_dir = dl if DirAccess.dir_exists_absolute(dl) else OS.get_environment("HOME")
-	dlg.file_selected.connect(func(p: String) -> void: _picked.emit(p))
-	dlg.canceled.connect(func() -> void: _picked.emit(""))
-	add_child(dlg)
-	dlg.popup_centered_ratio(0.6)
-	var path: String = await _picked
-	dlg.queue_free()
+	var path: String = await FilePick.open_path(self, "Open a File")
 	if path == "":
 		return
 	_picked_name.text = path.get_file()

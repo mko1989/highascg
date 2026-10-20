@@ -4,6 +4,7 @@ extends RefCounted
 ## device-view-output-layer.js (PGM/PRV halves), destinationRectLabel (ui-utils), labelForTopologyPairs /
 ## entryFromTopologyRow (gpu-port-entries) and the caspar-rear-data.js kind filters. Pure (tests preload it).
 
+const DO := preload("res://features/devices/decklink_order.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const CASPAR_HOST := "caspar_host"
 const MODE_TAG := {"pgm_only": "PGM", "multiview": "MVR", "stream": "STREAM", "pixelmap": "PXM",
@@ -147,11 +148,12 @@ static func _of_kinds(conns: Dictionary, kinds: Array) -> Array:
 
 ## Everything the tab draws. Destinations: screen destinations, then pinned and auto-detected host channels
 ## (host_channels.gd); `live_cm` is the WS state channelMap, `cc` the state configComparison (the "(planned)" badge).
-static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = null) -> Dictionary:
+## `deck_saved` = the client's saved DeckLink rear order (decklink_order.gd; [] = the web's default order).
+static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = null, deck_saved: Array = []) -> Dictionary:
 	var conns := connectors(payload)
 	var labels := {}
 	var gpu := gpu_ports(payload, conns)
-	var deck := _of_kinds(conns, ["decklink_io", "decklink_out"])
+	var deck := DO.current(_of_kinds(conns, ["decklink_io", "decklink_out"]), deck_saved)
 	var slots := [{"title": "GPU", "kind": "gpu", "items": gpu}, {"title": "DeckLink", "kind": "decklink", "items": deck}]
 	for s in EXTRA_SLOTS:
 		slots.append({"title": s[0], "kind": s[1][0], "items": _of_kinds(conns, s[1])})

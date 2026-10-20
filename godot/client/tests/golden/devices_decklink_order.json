@@ -1,0 +1,1121 @@
+{
+ "order": [
+  {
+   "name": "none saved",
+   "merged": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_4"
+   ],
+   "saved": [],
+   "ids": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_4"
+   ]
+  },
+  {
+   "name": "full saved",
+   "merged": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_4"
+   ],
+   "saved": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ],
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ]
+  },
+  {
+   "name": "partial saved",
+   "merged": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_4"
+   ],
+   "saved": [
+    "dlsdi_3"
+   ],
+   "ids": [
+    "dlsdi_3",
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_4"
+   ]
+  },
+  {
+   "name": "unknown + dup ids",
+   "merged": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3"
+   ],
+   "saved": [
+    "x",
+    "dlsdi_2",
+    "dlsdi_2",
+    "dlsdi_1"
+   ],
+   "ids": [
+    "dlsdi_2",
+    "dlsdi_1",
+    "dlsdi_3"
+   ]
+  },
+  {
+   "name": "numbers in saved",
+   "merged": [
+    "dlsdi_1",
+    "dlsdi_2"
+   ],
+   "saved": [
+    2,
+    "dlsdi_2"
+   ],
+   "ids": [
+    "dlsdi_2",
+    "dlsdi_1"
+   ]
+  }
+ ],
+ "display": [
+  {
+   "name": "four, default",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "DeckLink 4",
+     "kind": "decklink_io",
+     "index": 3
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ]
+  },
+  {
+   "name": "four, persisted",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "DeckLink 4",
+     "kind": "decklink_io",
+     "index": 3
+    }
+   ],
+   "persisted": true,
+   "ids": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_4"
+   ]
+  },
+  {
+   "name": "three",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": 2
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_1",
+    "dlsdi_2",
+    "dlsdi_3"
+   ]
+  },
+  {
+   "name": "six",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "DeckLink 4",
+     "kind": "decklink_io",
+     "index": 3
+    },
+    {
+     "id": "dlsdi_5",
+     "label": "DeckLink 5",
+     "kind": "decklink_io",
+     "index": 4
+    },
+    {
+     "id": "dlsdi_6",
+     "label": "DeckLink 6",
+     "kind": "decklink_io",
+     "index": 5
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1",
+    "dlsdi_5",
+    "dlsdi_6"
+   ]
+  },
+  {
+   "name": "saved order then default",
+   "items": [
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "DeckLink 4",
+     "kind": "decklink_io",
+     "index": 3
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": 1
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ]
+  },
+  {
+   "name": "labels without digits",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "SDI A",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "SDI B",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "SDI C",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "SDI D",
+     "kind": "decklink_io",
+     "index": 3
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ]
+  },
+  {
+   "name": "label 12 first",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "Port 12",
+     "kind": "decklink_io",
+     "index": 0
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "Port 2",
+     "kind": "decklink_io",
+     "index": 1
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "Port 3",
+     "kind": "decklink_io",
+     "index": 2
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "Port 4",
+     "kind": "decklink_io",
+     "index": 3
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_1",
+    "dlsdi_3",
+    "dlsdi_1",
+    "dlsdi_2"
+   ]
+  },
+  {
+   "name": "no index",
+   "items": [
+    {
+     "id": "dlsdi_1",
+     "label": "DeckLink 1",
+     "kind": "decklink_io",
+     "index": null
+    },
+    {
+     "id": "dlsdi_2",
+     "label": "DeckLink 2",
+     "kind": "decklink_io",
+     "index": null
+    },
+    {
+     "id": "dlsdi_3",
+     "label": "DeckLink 3",
+     "kind": "decklink_io",
+     "index": null
+    },
+    {
+     "id": "dlsdi_4",
+     "label": "DeckLink 4",
+     "kind": "decklink_io",
+     "index": null
+    }
+   ],
+   "persisted": false,
+   "ids": [
+    "dlsdi_4",
+    "dlsdi_2",
+    "dlsdi_3",
+    "dlsdi_1"
+   ]
+  }
+ ],
+ "editor": [
+  {
+   "name": "no saved order",
+   "init": null,
+   "rows": [
+    [
+     "Slot 1",
+     "DeckLink 1",
+     "dlsdi_1"
+    ],
+    [
+     "Slot 2",
+     "DeckLink 2",
+     "dlsdi_2"
+    ],
+    [
+     "Slot 3",
+     "DeckLink 3",
+     "dlsdi_3"
+    ],
+    [
+     "Slot 4",
+     "DeckLink 4",
+     "dlsdi_4"
+    ],
+    [
+     "Slot 5",
+     "Out <X>",
+     "dlo_x"
+    ]
+   ],
+   "acts": [
+    {
+     "step": {
+      "button": "Save"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Export"
+     },
+     "calls": [
+      [
+       "DOWNLOAD",
+       "decklink_rear_panel_order.json",
+       "{\n  \"version\": 1,\n  \"decklinkRearOrder\": [\n    \"dlsdi_1\",\n    \"dlsdi_2\",\n    \"dlsdi_3\",\n    \"dlsdi_4\",\n    \"dlo_x\"\n  ]\n}"
+      ]
+     ],
+     "saved": [
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "saved order",
+   "init": [
+    "dlsdi_4",
+    "dlo_x",
+    "dlsdi_1"
+   ],
+   "rows": [
+    [
+     "Slot 1",
+     "DeckLink 4",
+     "dlsdi_4"
+    ],
+    [
+     "Slot 2",
+     "Out <X>",
+     "dlo_x"
+    ],
+    [
+     "Slot 3",
+     "DeckLink 1",
+     "dlsdi_1"
+    ],
+    [
+     "Slot 4",
+     "DeckLink 2",
+     "dlsdi_2"
+    ],
+    [
+     "Slot 5",
+     "DeckLink 3",
+     "dlsdi_3"
+    ]
+   ],
+   "acts": [
+    {
+     "step": {
+      "button": "Export"
+     },
+     "calls": [
+      [
+       "DOWNLOAD",
+       "decklink_rear_panel_order.json",
+       "{\n  \"version\": 1,\n  \"decklinkRearOrder\": [\n    \"dlsdi_4\",\n    \"dlo_x\",\n    \"dlsdi_1\",\n    \"dlsdi_2\",\n    \"dlsdi_3\"\n  ]\n}"
+      ]
+     ],
+     "saved": [
+      "dlsdi_4",
+      "dlo_x",
+      "dlsdi_1"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 2",
+       "Out <X>",
+       "dlo_x"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 5",
+       "DeckLink 3",
+       "dlsdi_3"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Save"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlsdi_4",
+      "dlo_x",
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 2",
+       "Out <X>",
+       "dlo_x"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 5",
+       "DeckLink 3",
+       "dlsdi_3"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "load files",
+   "init": null,
+   "rows": [
+    [
+     "Slot 1",
+     "DeckLink 1",
+     "dlsdi_1"
+    ],
+    [
+     "Slot 2",
+     "DeckLink 2",
+     "dlsdi_2"
+    ],
+    [
+     "Slot 3",
+     "DeckLink 3",
+     "dlsdi_3"
+    ],
+    [
+     "Slot 4",
+     "DeckLink 4",
+     "dlsdi_4"
+    ],
+    [
+     "Slot 5",
+     "Out <X>",
+     "dlo_x"
+    ]
+   ],
+   "acts": [
+    {
+     "step": {
+      "button": "Load",
+      "file": "[\"dlsdi_3\",\"dlsdi_1\"]"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlsdi_3",
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Load",
+      "file": "{\"version\":1,\"decklinkRearOrder\":[\"dlo_x\"]}"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlo_x",
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "Out <X>",
+       "dlo_x"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 5",
+       "DeckLink 4",
+       "dlsdi_4"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Load",
+      "file": "{\"connectorIds\":[\"dlsdi_2\",7]}"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlsdi_2",
+      "dlsdi_1",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Load",
+      "file": "{\"other\":1}"
+     },
+     "calls": [
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": [
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Load",
+      "file": "{ nope"
+     },
+     "calls": [
+      [
+       "ALERT",
+       "Invalid DeckLink order file: Expected property name or '}' in JSON at position 2 (line 1 column 3)"
+      ]
+     ],
+     "saved": [
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Load",
+      "file": null
+     },
+     "calls": [],
+     "saved": [
+      "dlsdi_1",
+      "dlsdi_2",
+      "dlsdi_3",
+      "dlsdi_4",
+      "dlo_x"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "reset",
+   "init": [
+    "dlsdi_2"
+   ],
+   "rows": [
+    [
+     "Slot 1",
+     "DeckLink 2",
+     "dlsdi_2"
+    ],
+    [
+     "Slot 2",
+     "DeckLink 1",
+     "dlsdi_1"
+    ],
+    [
+     "Slot 3",
+     "DeckLink 3",
+     "dlsdi_3"
+    ],
+    [
+     "Slot 4",
+     "DeckLink 4",
+     "dlsdi_4"
+    ],
+    [
+     "Slot 5",
+     "Out <X>",
+     "dlo_x"
+    ]
+   ],
+   "acts": [
+    {
+     "step": {
+      "button": "Reset order",
+      "confirm": false
+     },
+     "calls": [
+      [
+       "CONFIRM",
+       "Clear saved DeckLink rear panel order?"
+      ]
+     ],
+     "saved": [
+      "dlsdi_2"
+     ],
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    },
+    {
+     "step": {
+      "button": "Reset order",
+      "confirm": true
+     },
+     "calls": [
+      [
+       "CONFIRM",
+       "Clear saved DeckLink rear panel order?"
+      ],
+      [
+       "LOAD"
+      ]
+     ],
+     "saved": null,
+     "rows": [
+      [
+       "Slot 1",
+       "DeckLink 1",
+       "dlsdi_1"
+      ],
+      [
+       "Slot 2",
+       "DeckLink 2",
+       "dlsdi_2"
+      ],
+      [
+       "Slot 3",
+       "DeckLink 3",
+       "dlsdi_3"
+      ],
+      [
+       "Slot 4",
+       "DeckLink 4",
+       "dlsdi_4"
+      ],
+      [
+       "Slot 5",
+       "Out <X>",
+       "dlo_x"
+      ]
+     ]
+    }
+   ]
+  }
+ ],
+ "editorOffWhenNotEditing": 0,
+ "payload": {
+  "suggested": {
+   "connectors": [
+    {
+     "id": "dlsdi_1",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 0,
+     "label": "DeckLink 1"
+    },
+    {
+     "id": "dlsdi_2",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 1,
+     "label": "DeckLink 2"
+    },
+    {
+     "id": "dlo_x",
+     "deviceId": "caspar_host",
+     "kind": "decklink_out",
+     "label": "Out <X>"
+    },
+    {
+     "id": "dlsdi_3",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 2,
+     "label": "DeckLink 3"
+    },
+    {
+     "id": "dlsdi_4",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 3,
+     "label": "DeckLink 4"
+    },
+    {
+     "id": "dlsdi_2",
+     "deviceId": "caspar_host",
+     "kind": "decklink_io",
+     "index": 1,
+     "label": "DeckLink 2"
+    },
+    {
+     "id": "gpu_p0",
+     "deviceId": "caspar_host",
+     "kind": "gpu_out"
+    },
+    {
+     "id": "dlsdi_5",
+     "deviceId": "other",
+     "kind": "decklink_io",
+     "index": 4,
+     "label": "DeckLink 5"
+    }
+   ]
+  }
+ }
+}

@@ -157,6 +157,13 @@ func _ready() -> void:
 	body.add_child(right)
 	_rear = RearPanel.new()
 	_rear.add_requested.connect(_outp.add_output)
+	_rear.order_changed.connect(refresh)
+	_rear.open_requested.connect(_open_port)
+	_rear.edit_toggled.connect(func(on: bool) -> void:  # web: edit mode opens the first DeckLink port's page
+		var ids: Array = RearPanel.DO.ids(RearPanel.DO.current(RearPanel.DO.merged(_payload), RearPanel.DO.saved()))
+		if on and not ids.is_empty():
+			_open_port(ids[0])
+		refresh())
 	right.add_child(_rear)
 	right.add_child(_label("CABLES", ThemeBuilder.TEXT_MUTED, 12))
 	_list = VBoxContainer.new()
@@ -239,7 +246,8 @@ func refresh() -> void:
 	if _gesture.selected_edge != "" and _gesture.edge(_gesture.selected_edge).is_empty():
 		_gesture.selected_edge = ""
 	var payload := H.merge_settings(r.data, Settings.settings if Settings.is_loaded else null)
-	show_model(Model.build(payload, Store.get_value("channelMap"), Store.get_value("configComparison")), payload)
+	show_model(Model.build(payload, Store.get_value("channelMap"), Store.get_value("configComparison"),
+		RearPanel.DO.saved()), payload)
 
 
 func show_model(m: Dictionary, payload: Dictionary) -> void:
@@ -395,6 +403,9 @@ func _input(event: InputEvent) -> void:
 			return
 	if _gesture.armed():
 		_gesture.cancel()
+		return
+	if _rear.begin_drag(pos):  # DeckLink edit mode: a label press drags (release on itself opens the page)
+		get_viewport().set_input_as_handled()
 		return
 	var port := _rear.label_at(pos)
 	if port != "":

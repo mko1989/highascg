@@ -4,14 +4,15 @@ extends "res://features/devices/host_controls_base.gd"
 ## Input (Start an input / source label + Stop input + the host channel's device switcher), Output note, SDI output
 ## (inherited feed), SDI consumer (format, layout, latency, buffer depth, colour space, pixel format + the 2160p YUV
 ## warning, embedded audio, low latency) and Fill + key. Every request body comes from the golden-tested models;
-## a successful write marks Caspar restart-dirty and reloads the device view, like the web. Not ported: the rear-order
-## editor (web edit mode only).
+## a successful write marks Caspar restart-dirty and reloads the device view, like the web. In DeckLink edit mode (rear
+## panel pencil) the rear-order editor (decklink_order_editor.gd) sits under the title, as in the web.
 
 signal dirty()
 
 const DP := preload("res://features/devices/decklink_port_model.gd")
 const DI := preload("res://features/devices/decklink_input_model.gd")
 const MI := preload("res://core/math_input.gd")
+const OrderEditor := preload("res://features/devices/decklink_order_editor.gd")
 
 var page := VBoxContainer.new()
 var conn_id := ""
@@ -42,6 +43,13 @@ func show_connector(conn: Dictionary, payload: Dictionary, settings: Variant) ->
 	var kfi := DP.keyfill_items(conn, payload)
 	kf = {"on": kfi[0].checked, "key": kfi[1].value}
 	page.add_child(_title(str(conn.get("label")) if DP.H.truthy(conn.get("label")) else conn_id))
+	if OrderEditor.DO.edit:
+		var ed := OrderEditor.new()
+		ed.confirm = func(text: String) -> bool: return await _confirm(text, "Reset")
+		ed.setup(payload)
+		ed.changed.connect(func() -> void: reload.emit(false))
+		ed.status.connect(func(text: String, ok: bool) -> void: status.emit(text, ok))
+		page.add_child(ed)
 	for it in DP.page_spec(conn, payload, settings):
 		var c := _item(it)
 		if c != null:
