@@ -496,5 +496,5 @@ function shouldForceAdvance(state) {
 }
 
 module.exports = {
-	playlistRuntimeKey, resolvePlaylistPlayingIndex,
+	playlistRuntimeKey, resolvePlaylistPlayingIndex, isTimelessPlaylistItem,
 	clearChannelPlaylistState, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance, stagePlaylistItem }

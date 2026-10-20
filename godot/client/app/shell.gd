@@ -13,6 +13,7 @@ const AudioTab := preload("res://features/audio/audio_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const PlaylistsPanel := preload("res://features/live/playlists_panel.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
@@ -48,6 +49,7 @@ func _ready() -> void:
 	inspector = InspectorPanel.new()
 	inspector.custom_minimum_size.x = 400
 	right.add_child(inspector)
+	inspector.add_footer(PlaylistsPanel.new())  # WO-603: web Playlists footer panel
 	sources.inspector.osc_mirror = osc
 	var live := LiveTab.new()
 	live.name = "Live"

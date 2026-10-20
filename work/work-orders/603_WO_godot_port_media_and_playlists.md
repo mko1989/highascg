@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node), box-verified; playlists, multi-drag still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node), box-verified; multi-drag, remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -232,6 +232,73 @@ panel incl. media tree + ingest, 16 / 2,683 LOC).
     and the Cancel button is hidden.
   - Probes deleted via the API; config md5 unchanged (bar the boot-time `device_graph.json`).
 
+## Slice 5 (20.10) — Playlists footer panel, its rules in node
+
+### Investigation
+
+- Web `client/components/playlist-control-panel.js` (235 LOC, inspector footer, collapsed by default) lists
+  `GET /api/playlist/state` (live playlists first, then every playlist in the looks, WO-347 / WO-581) and drives
+  `POST /api/playlist/control`: `goto` / `prev` / `next` (live) and `set_start` / `step_preview` (not live).
+- The browser decided three things itself:
+  - **Timeless items.** `client/lib/playlist-timeless.js`, a mirror of the engine's
+    `isTimelessPlaylistItem` (`src/engine/scene-take-lbg-playlist.js:17`), decides which items are timeless. That
+    decides which items get "(Ns)" and the value the "Timeless (s)" field shows.
+  - **Missing media.** The ⚠ marker came from `clipMissing` (`client/lib/media-exists.js:63`), checked against the
+    client's media list.
+  - **"Set all".** The browser rewrote the look's playlist (`sceneState.patchLayer`, panel line ~135), then
+    `update_live` reached the running engine (`client/lib/playlist-live-sync.js`).
+- Looks are client-owned in this system (deck sync / autosave; `new-layer` and `new-look` are computed by the
+  server and stored by the client). The server can plan an edit but not write it, or the next client sync would
+  overwrite it.
+
+### What was done
+
+- `src/media/media-exists.js`: CommonJS port of the web index (`buildMediaIndex`, `clipMissing`); pure.
+- `src/api/routes-playlist-panel.js`:
+  - `panelItems` adds `timeless` (the engine's own rule, now exported) and `missing` (against
+    `getRawMediaCatalog`) to every state item;
+  - `timelessSecsOf` gives each playlist `timelessSecs`;
+  - `planTimeless` and `setTimeless` serve `action:'set_timeless' {sceneId, layerNumber, secs}`: the new playlist
+    is planned from the look (`resolveLiveSceneById`), pushed into every channel where that look is live, and
+    returned as `{playlist, touched, secs, patched}`;
+  - `patchLivePlaylist` is the former `update_live` body, now shared.
+- `routes-playlist.js` uses the panel module (342 lines).
+- Godot:
+  - `features/live/playlists_model.gd` (pure): list and item labels (● playing / ▸ start item, ⚠ missing,
+    basename, "(Ns)" only on timeless items) and the request bodies; `store_playlist` puts the server's plan on
+    the look.
+  - `features/live/playlists_panel.gd`: collapsible "Playlists" section with a count; playlist and item pickers,
+    Timeless (s) + Set all, and ⏮ ▶ ⏭ (▶ only while live). It polls every 2 s while open, and the open/closed
+    state is kept in `ui.cfg`. "Set all" stores the returned playlist and runs `deck_changed` + `mark_dirty`. The
+    status line clears when its playlist is no longer shown.
+  - `app/inspector_panel.gd` gains `add_footer()` (the web inspector footer, outside the scroll), and `shell.gd`
+    mounts the panel there, so it is on every tab (WO-608 R2).
+  - `assets/ui/icons/prev.svg` / `next.svg` (the web transport paths; the font has no ⏮ / ⏭).
+
+### What was VERIFIED
+
+- Offline:
+  - `smoke-wo603-playlist-panel.test.js` 5/5 (curated): parity with the web `playlist-timeless.js` (`timeless`,
+    `timelessSecsOf`) and the `media-exists` rules; `planTimeless` clamps and refuses bad input;
+    `set_timeless` patches a live channel without mutating the look, and returns 404 / 400.
+  - The playlist smokes wo224 / wo371 / wo581 still pass.
+  - Full suite 2852 pass / 1 known fail (smoke-wo577).
+  - Godot `test_playlists_model.gd`, total 16029 pass; boot check clean after the status-line change.
+- Box (node restarted, real GUI):
+  - A temporary look "WO603 Playlist" was added via `scene_deck_sync`, with a still, a clip and a missing still.
+  - The state API marked them timeless / timed / timeless + `missing`.
+  - The panel showed "WO603 Playlist · L10 · not live", "▸ 1. t9_pedestrians.png", Timeless 20, and ▶ disabled;
+    the item list showed "⚠ 3. WO603_MISSING.png".
+  - Picking item 3 → `startIndex` 2; ⏭ → 0 (wrap); ⏮ → 2.
+  - Timeless 7 + Set all → "✓ 2 timeless items → 7s". The server project (via the client's deck sync) then had
+    durations `[7, null, 7]` and `timelessSecs` 7; the item read "(7s)".
+  - The look was deleted through the deck's "Delete look…" and the project is back to its 4 looks; the panel shows
+    "— no playlists in the looks —".
+- Not proven on the box: the live path (`goto` / `prev` / `next` on program and `set_timeless` patching a live
+  copy). A take would have replaced the owner's program. Covered offline; owner QA.
+
 ### Still open
 
-Drag of a multi-selection, playlists footer, remote (HTTP streaming) upload, parity checklist.
+Drag of a multi-selection, remote (HTTP streaming) upload, parity checklist. The layer playlist editor (add /
+reorder items, advance mode) is WO-601's "layer playlist + playback mode" sub-feature. Godot cannot create a
+playlist yet.

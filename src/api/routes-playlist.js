@@ -11,6 +11,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { physicalProgramLayer } = require('../engine/scene-transition')
 const { triggerPlaylistAdvance, playlistRuntimeKey, stagePlaylistItem } = require('../engine/scene-take-lbg-playlist')
+const panel = require('./routes-playlist-panel')
 
 /**
  * Owner request 2026-07-26 — Playlists footer panel: enumerate every playlist layer currently
@@ -20,6 +21,7 @@ const { triggerPlaylistAdvance, playlistRuntimeKey, stagePlaylistItem } = requir
 function handleStateGet(ctx) {
 	const all = liveSceneState.getAll()
 	const playlists = []
+	const mediaIndex = panel.mediaIndexFor(ctx)
 	const seen = new Set()
 	const pushEntry = (scene, layer, channel, previewChannel = null) => {
 		const pKey = `${scene.id}-${layer.layerNumber}`
@@ -38,13 +40,9 @@ function handleStateGet(ctx) {
 			loop: layer.playlistLoop !== false,
 			activeIndex: (rtKey != null ? (ctx.playlistActiveIndices || {})[rtKey] : undefined) ?? (ctx.playlistStartIndices || {})[pKey] ?? 0,
 			startIndex: (ctx.playlistStartIndices || {})[pKey] ?? 0,
-			items: layer.playlist.map((it) => ({
-				label: it.label || it.value,
-				value: it.value,
-				duration: it.duration ?? null,
-				type: it.type || 'media',
-				loop: it.loop === true,
-			})),
+			/* WO-603: timeless / missing / timelessSecs are decided here, not in each client. */
+			timelessSecs: panel.timelessSecsOf(layer.playlist),
+			items: panel.panelItems(layer.playlist, mediaIndex),
 		})
 	}
 	/* WO-581: a look recalled on PREVIEW is not live — playlists run on program only (WO-355).
@@ -126,19 +124,14 @@ async function handleControlPost(body, ctx) {
 		if (!sceneId || !Number.isFinite(layerNumber) || !items) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: 'sceneId, layerNumber, playlist required' }) }
 		}
-		let patched = 0
-		for (const [chKey, entry] of Object.entries(liveSceneState.getAll() || {})) {
-			const scene = entry?.scene
-			if (!scene || String(scene.id) !== sceneId || !Array.isArray(scene.layers)) continue
-			const idx = scene.layers.findIndex((l) => Number(l?.layerNumber) === layerNumber)
-			if (idx < 0) continue
-			const next = JSON.parse(JSON.stringify(scene))
-			next.layers[idx] = { ...next.layers[idx], playlist: items }
-			await liveSceneState.setChannel(parseInt(chKey, 10), { sceneId: entry.sceneId, scene: next })
-			patched++
-		}
-		if (patched > 0) liveSceneState.broadcastSceneLive(ctx, { skipChannelMap: true })
+		const patched = await panel.patchLivePlaylist(ctx, sceneId, layerNumber, items)
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, patched }) }
+	}
+
+	/* WO-603: Playlists panel "Set all" — the timeless durations are planned here; the client stores the result. */
+	if (action === 'set_timeless') {
+		const r = await panel.setTimeless({ ...b, layerNumber }, ctx)
+		return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 	}
 
 	/* WO-347: pre-playout start item for a NOT-live playlist — keyed by sceneId, consumed by

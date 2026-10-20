@@ -10,6 +10,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 static var current: Node  # the shell's instance — features reach it through InspectorPanel.current
 
 var _body: VBoxContainer
+var _footer: VBoxContainer
 var _empty: Label
 var _title: Label
 
@@ -38,6 +39,8 @@ func _ready() -> void:
 	_empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_empty.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	_body.add_child(_empty)
+	_footer = VBoxContainer.new()  # web inspector footer: compact always-there sections (Playlists, WO-603)
+	col.add_child(_footer)
 
 
 ## Show `page` (re-parented here on first use), hiding whatever was shown.
@@ -53,6 +56,13 @@ func present(page: Control) -> void:
 			(c as Control).visible = false
 	page.visible = true
 	_sync_empty()
+
+
+## A compact section under the pages (web inspector footer), present on every tab, outside the scroll.
+func add_footer(section: Control) -> void:
+	var sep := HSeparator.new()
+	_footer.add_child(sep)
+	_footer.add_child(section)
 
 
 ## The selection that owned `page` went away.
