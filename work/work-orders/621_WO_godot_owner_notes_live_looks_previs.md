@@ -273,6 +273,9 @@ Owner notes added to `next.md` (20.10), quoted per item:
 - Godot suite 15949 / 15949 passing (new: `test_outside_bars_mark_the_canvas_edge`).
 - Box: the relaunched client's Live → Standard view shows the canvas framed (screen x 488–1311). The edge windows
   sit on the frame. The owner's layout is byte-identical (no drag in this test).
-- **Seen, not yet investigated:** the composed PGM picture fills only about 70 % of its PGM window, anchored left and
-  about 27 px down (the window frame is the client's fit to the 1920×1152 PGM source). This could be Caspar's fill
-  for a route from a non-1080 channel. It needs its own look.
+- **Side check:** the composed PGM picture fills only about 70 % of its PGM window, anchored left and about 27 px down.
+  This is **not a compose bug**:
+  - The server's fill is exactly the window rect: `MIXER 3-11 FILL 0.4667 0.0593 0.3926 0.3926` at 17:47:37.
+  - Channel 1's own output has that margin. The Previs LED wall shows the same red area over about 70 % of the wall,
+    black to the right and below.
+  - So the PGM window shows ch1 truthfully, and the margin comes from the live look's layer geometry.
