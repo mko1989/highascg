@@ -479,3 +479,32 @@ reference; "Copied …" shows for 2 s. Searching a pasted `$(highascg:key)` find
 **What was VERIFIED (box, 20.10).** Godot tests 16283/0 (+`test_variables_model.gd`). Tab shows "330 of 330";
 OSC + "time" → 15 rows; `osc_ch2_l10_time` ticked 19.06 → 19.1 live; clicking it and pasting into the search
 field gave `$(highascg:osc_ch2_l10_time)`; searching `$(highascg:media_count)` → that one row (346), "Copied …".
+
+## 2026-10-20 — Settings → Live audio (+ ALSA mixer) — last web settings tab
+
+**Investigation.** Web `settings-live-audio-panel.js` (status, slot capture devices, PGM routing, headphones
+preview bus, Refresh devices / Save config / Apply routes) + `settings-alsa-mixer-panel.js` / `lib/alsa-mixer-api.js`
+(card + view pickers, volume / mute / switch / enum rows, `GET|POST /api/audio/alsa-mixer`, Launch alsamixer).
+Found WO-611 #8 (status read a channelMap the endpoint never sends) and #9 (percent rescaled) — fixed in the web;
+the Godot models follow the fixed rules. The web's hidden slot count never changes in this pane, so Save always
+re-applies (the web's restart branch is unreachable here).
+
+**What was done.**
+- `live_audio_model.gd` (status lines, map from the payload, preview sinks) and `live_audio_pane.gd`, reusing
+  `features/devices/input_slots_model.gd` `read_live_audio` / `live_audio_body` / `alsa_options` (the same body the
+  Devices inspector posts). Save → config POST → settings reload → apply.
+- `alsa_mixer_model.gd` (normalize / view filter / percent / switch state / POST body) and `alsa_mixer_panel.gd`
+  (slider posts at most every 100 ms + once on release, mute toggle, switch, enum; Launch alsamixer via the gate).
+- Tab order now matches the web: Defaults, Companion, Media / USB, Updates, System, DeckLink, Diagnostics,
+  Tailscale, Live audio, Variables, Nuclear, About.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16313/0 (+`test_live_audio_settings.gd`). Pane: "Add capture
+devices…" (0 slots), PGM always-on ✓ / screen 1 / layer 2 / audio-only ✓, preview off / Preview 1 / Default sink —
+matching `casparServer`. Mixer: card "HDA-Intel - HDA Intel PCH (0)", 18 controls, Playback view rows incl. PCM /
+Digital switches and both Input Source enums. First run hit `float == bool` on the switch rows (GUI log
+`SCRIPT ERROR: Invalid operands 'float' and 'bool'`) → `switch_on()`; 0 script errors after. Front Mic mute:
+muted → click → `muted=False` (API, refresh=1) → click → `muted=True`. Front Mic slider dragged → `value 10,
+percent 32` → dragged back → `value 0` (restored; the control was muted throughout). NOT pressed: Save config,
+Apply routes, Refresh devices, Launch alsamixer.
+
+**Settings port status:** every web Settings tab now has a Godot pane.
