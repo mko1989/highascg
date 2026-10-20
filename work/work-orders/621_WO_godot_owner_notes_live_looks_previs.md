@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock), N6 (Live Standard ↔ 3D switch) DONE, box-verified. Next: N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
+**Status: DONE (2026-10-20, all seven notes box-verified) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock), N6 (Live Standard ↔ 3D switch), N1 (preview window outlines + labels + move/resize) DONE, box-verified — all owner notes done. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
 
 # WO-621 — Godot client: owner notes 20.10 (`next.md`) — Live preview chrome, look editor, look cards, Previs
 
@@ -162,3 +162,63 @@ Owner notes added to `next.md` (20.10), quoted per item:
   - Left on Standard.
 - Owner QA: whether the Previs tab's own Fit / default camera should also face the pictures. It still looks from
   +Z and shows this project's wall from behind; that was left unchanged.
+
+## N1 — Live preview: destination window outlines + labels, move / resize (DONE)
+
+### Investigation
+- The Live preview draws the operator surface (`opgui`, channel 3 here) as one picture. Caspar composes it from the
+  server's operator-GUI cells (`GET /api/operator-gui/layout`): PRV / PGM `route://` layers placed at
+  `rect {x, y, w, h}` (fractions of the operator canvas), contain-fitted to the source. Nothing in Godot drew
+  chrome or edited those rects (WO-600 B/C were never ported). The box's cells were `prv_1` / `pgm_1` at
+  0.2625 × 0.1556, i.e. 504 × 168 canvas px (≈3:1), so the 16:9 pictures were pillarboxed inside them.
+- The web chrome (`client/components/operator-compose-tiles*.js`, `client/styles/10b-operator-compose-tiles.css`):
+  - a 2 px outline whose inner edge is the picture edge (PGM `#e63946`, PRV `#2a9d8f`);
+  - a footer BELOW the picture (owner: chrome never over the video) with the label row
+    `${ROLE} ${mainIndex+1} / ${screenLabel}` (`tile-controller.js:387`, `screen-label.js`) on `#c92a2a` /
+    `#0d9488`, over the playback timer;
+  - a bottom-right resize grip. Moves and resizes snap to 8 px and clamp inside the canvas, min body 160 × 90
+    (`operator-compose-tiles-geometry.js`). The hole keeps the source aspect (`resolveTileAspect`), so the
+    server's contain-fit is a no-op.
+  - Every move POSTs the cells, and the server broadcasts `operatorGuiLayout` so all clients re-sync
+    (`src/system/operator-gui-channel.js:242-255`; the broadcast omits the media-inspector cell).
+
+### What was done
+- New `features/live/compose_tile_math.gd` holds the pure rules:
+  - canvas px ↔ fraction, the 8 px snap and the web `clampTileRect`;
+  - move;
+  - bottom-right resize: the larger relative change wins, the aspect is kept, capped by the minimum and the
+    canvas edge without distortion;
+  - hit test, topmost first, label strip included;
+  - `source_aspect`: cell srcW/srcH → channel resolution → screen resolution → 16:9;
+  - `fit`: the server's contain-fit.
+- New `features/live/compose_tiles.gd` is the overlay over the Standard preview. For each non-media cell it draws:
+  - the outline around the fitted picture, not the mis-shaped cell;
+  - the label strip below it, from `channelMap.screenLabels`, redrawn when the channel map arrives;
+  Interaction and sync:
+  - Dragging the picture or the strip moves it. Dragging the bottom-right corner resizes it: a 14 px hot zone
+    with the resize cursor. No grip is drawn — the owner asked for the square to be removed (20.10).
+  - During a drag the full cell set is POSTed with at most one request in flight (the latest state goes out next).
+  - The first edit stores the fitted (source-aspect) rect, as the web does.
+  - It follows `operatorGuiLayout` broadcasts. A broadcast arriving while its own drag or post is in flight is
+    ignored, so the frame doesn't rewind to an older position.
+  - The media-inspector cell is passed back untouched, so a running media preview survives a move.
+  - Clicks outside the windows fall through (`_has_point`).
+- `live_tab.gd`: the overlay sits between the picture and the Standard / 3D switch and is hidden in 3D.
+- Not ported: the footer's playback timer row, the web's PGM label buttons (EDIT PGM / CAPTURE) and the default
+  grid layout / "Reset layout". The owner asked for borders, labels and positioning.
+
+### What was VERIFIED
+- Suite 14834 / 14834 passing (`test_live_compose_tiles`: px/fraction, move snap/clamp, aspect-kept resize and its
+  limits, hit test, source aspect, fit), `--check` boots clean, 0 files over 500 lines.
+- Box (config md5 unchanged):
+  - The outlines and strips hug the 16:9 pictures, labelled "PRV 1 / Main LED (DP-7)" (teal) and
+    "PGM 1 / Main LED (DP-7)" (red).
+  - Real drag of the PGM strip +200/+150 px: the frame moved and Caspar's composed PGM picture moved into it.
+  - Real drag of the PRV corner +120/+60 px: the frame and picture grew. The server then held 16:9 rects (PRV
+    0.3 × 0.3 → 576 × 324 canvas px).
+  - After the grip square was removed: no square is drawn, and a +100/+50 corner drag still resized PRV
+    (0.2792 × 0.2792, 16:9 in px).
+  - The original layout was restored by a curl POST from outside the client. The overlay followed the
+    broadcast back, and the server layout equals the saved one exactly.
+- Owner QA: how it feels by hand. With the web kiosk running alongside, check that its tiles accept the moved
+  layout (the broadcast is `source: report`).

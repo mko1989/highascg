@@ -13,6 +13,7 @@ const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
+const ComposeTiles := preload("res://features/live/compose_tiles.gd")
 const UI_CFG := "user://ui.cfg"
 
 var _video: TextureRect
@@ -24,6 +25,7 @@ var border: GlobalBorderPanel
 var _action: Label
 var osc: Node  # the shell's OscMirror (set before _ready)
 var stage3d: LiveStage3D
+var tiles: ComposeTiles  # WO-621 N1: destination window outlines, labels, move / resize
 var view := "standard"  # WO-621 N6: "standard" (operator picture) | "3d" (the Previs stage)
 var _view_btns := {}
 
@@ -52,6 +54,10 @@ func _ready() -> void:
 	_no_signal.add_theme_color_override("font_color", ThemeBuilder.WARN)
 	_no_signal.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
 	stack.add_child(_no_signal)
+	tiles = ComposeTiles.new()
+	tiles.role = _role()
+	tiles.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	stack.add_child(tiles)
 	stage3d = LiveStage3D.new()
 	stage3d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage3d.visible = false
@@ -139,6 +145,7 @@ func set_view(v: String, save := true) -> void:
 	(_view_btns["fit"] as Button).visible = is3d
 	stage3d.visible = is3d
 	_video.visible = not is3d
+	tiles.visible = not is3d
 	_hold_surface()
 	if save:
 		var cfg := ConfigFile.new()
