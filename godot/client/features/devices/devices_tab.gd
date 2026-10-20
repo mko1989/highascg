@@ -400,8 +400,8 @@ func _set_status(text: String, ok: bool) -> void:
 	_bar.set_status(text, ok)
 
 
-## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, a GPU row label opens
-## its page, then a cable selects;
+## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, a rear-panel port's
+## row label or socket opens its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
 	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or live_inputs.is_open() or _matrix.visible:

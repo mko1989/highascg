@@ -1,8 +1,9 @@
 extends PanelContainer
 ## WO-605 slice 1 — the Caspar host's rear panel (web device-view-caspar-render.js, read-only): the GPU and DeckLink
-## sockets as labelled plates, then the Stream / Virtual cam / Record / Audio outputs. Every socket is a
-## port_icon.gd registered in `anchors` (connector id → Control) for the cable layer.
-## Slice 4/5: a GPU / DeckLink port's row label opens its connector page (web: the marker body opens the inspector, the dot
+## sockets as labelled plates, then the Stream / Virtual cam / Record / Audio outputs. Every socket has a small
+## port_icon.gd dot in its middle, registered in `anchors` (connector id → Control) for the cable layer: cables start
+## and finish only on the dots (web: .device-view__connector-dot), so a click on the rest of the socket opens its page.
+## Slice 4/5: a GPU / DeckLink port's row label (or socket) opens its connector page (web: the marker body opens the inspector, the dot
 ## cables). Cables hang over the labels, so the tab hit-tests them first (`label_at`) instead of a gui_input handler.
 ## Slice 6: the Stream / Virtual cam / Record / Audio labels open their pages too, and each of those headers has the
 ## web's "+" (`add_requested`).
@@ -25,6 +26,7 @@ const DO := preload("res://features/devices/decklink_order.gd")
 const GL := preload("res://features/devices/gpu_layout.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const ROW_H := 44
+const DOT_TIP := "Start or complete cable at this connector"
 const PLATE := Color("#2b3038")
 const GPU_EDIT_TIP := "Edit GPU layout — reorder ports, Show all, or Reset Layout (xrandr)"
 const ICON := {"decklink": "bnc_female_axis", "stream_out": "ethernet-port-icon", "v4l2_out": "hdmi-port-icon",
@@ -34,6 +36,7 @@ static var folder_open := false  # the GPU "Disconnected" fold (web <details>, c
 
 var anchors := {}
 var _labels := {}  # connector id → its clickable row Label
+var _icons := {}  # connector id → its socket (clicks open the page like the label)
 var _deck_ids: Array = []  # the DeckLink ports in panel order
 var _gpu_slots := {}  # GPU connector id → its layout slot id (what the swap moves)
 var _drag := ""  # the DeckLink / GPU port being dragged (edit mode)
@@ -51,6 +54,7 @@ func show_slots(slots: Array) -> void:
 		c.queue_free()
 	anchors = {}
 	_labels = {}
+	_icons = {}
 	_drag = ""
 	_deck_ids = []
 	_gpu_slots = {}
@@ -180,7 +184,9 @@ func _plate(rows: Array, kind: String) -> Control:
 		if it.id == "":
 			p.modulate.a = 0.4
 		else:
-			anchors[it.id] = p
+			p.mouse_default_cursor_shape = l.mouse_default_cursor_shape
+			_icons[str(it.id)] = p
+			_dot(p, str(it.id))
 		icons.add_child(p)
 	return h
 
@@ -202,7 +208,9 @@ func _extra_slot(s: Dictionary) -> Control:
 	for it in s.items:
 		var h := HBoxContainer.new()
 		var p := PortIcon.make(ICON.get(s.kind, "jack-svg"), Vector2(30, 24), "%s (%s)" % [it.label, it.id])
-		anchors[it.id] = p
+		p.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		_icons[str(it.id)] = p
+		_dot(p, str(it.id))
 		h.add_child(p)
 		var l := _small(str(it.label), ThemeBuilder.TEXT)
 		l.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -282,13 +290,27 @@ func _mark(id: String, on: bool) -> void:
 		_labels[id].add_theme_constant_override("outline_size", 3 if on else 0)
 
 
-## The connector whose row label is under `pos` (global), else "".
+## The connector whose row label or socket is under `pos` (global), else "".
 func label_at(pos: Vector2) -> String:
-	for id in _labels:
-		var l: Label = _labels[id]
-		if is_instance_valid(l) and l.is_visible_in_tree() and l.get_global_rect().has_point(pos):
-			return id
+	for m in [_labels, _icons]:
+		for id in m:
+			var c: Control = m[id]
+			if is_instance_valid(c) and c.is_visible_in_tree() and c.get_global_rect().has_point(pos):
+				return id
 	return ""
+
+
+## The socket's cable dot (12 px, web .device-view__connector-dot), centred on it.
+func _dot(socket: Control, id: String) -> void:
+	var d := PortIcon.make("", Vector2(12, 12), DOT_TIP)
+	d.mouse_default_cursor_shape = Control.CURSOR_CROSS
+	d.set_anchors_preset(Control.PRESET_CENTER)
+	d.offset_left = -6
+	d.offset_top = -6
+	d.offset_right = 6
+	d.offset_bottom = 6
+	socket.add_child(d)
+	anchors[id] = d
 
 
 func _row_label(text: String) -> Label:

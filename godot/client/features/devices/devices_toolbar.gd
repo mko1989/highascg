@@ -54,10 +54,11 @@ func _init() -> void:
 	_simple.toggled.connect(func(on: bool) -> void: _pick(_matrix, on))
 	_matrix = _check("Matrix view", "Dense Dante-style routing matrix.", saved_view() == "matrix")
 	_matrix.toggled.connect(func(on: bool) -> void: _pick(_simple, on))
-	var fill := Control.new()
-	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(fill)
-	_status = _label("", ThemeBuilder.TEXT_MUTED, 12)
+	_status = _label("", ThemeBuilder.TEXT_MUTED, 12)  # fills the gap and clips: a long prompt never shifts the panels
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_status.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(_status)
 	cancel_btn = _button("Cancel cable", cancel_pressed.emit)
 	cancel_btn.visible = false
@@ -109,6 +110,7 @@ func _pick(other: CheckBox, on: bool) -> void:
 
 func set_status(text: String, ok: bool) -> void:
 	_status.text = text
+	_status.tooltip_text = text
 	_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
 
 
