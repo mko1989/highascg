@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Next: 3c per-role host-channel inspector controls (WO-601 moved scope), then slice 4 GPU / modeline. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Next: slice 4 GPU / modeline. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -290,3 +290,58 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   After the run every `config/*.json` is byte-identical to the backup.
 - Not exercised live: Custom video mode + size patch, pixel-map / operator-GUI fields (golden-tested against the web
   form over 63 actions in 3a); host cards (no host channels configured on this box) — owner QA.
+
+## Slice 3c — host-channel inspector controls (2026-10-20, DONE)
+
+### Investigation
+- The web host-channel page (`device-view-destinations-inspector-host-channel.js`) is a dispatcher: it renders the
+  summary table, then mounts a per-role block from six modules — `inspector-host-webpage.js` (template / URL, reload vs
+  update by target ≠ saved page), `inspector-host-ndi.js` (name, discover via `GET /api/ndi/list`), `inspector-host-browser.js`
+  (URL / width / height / fps clamps, `browser/interact` toggle), `inspector-host-decklink.js` (device switcher, shared
+  source label via `POST /api/sources/label`, the long remove that re-reads settings, re-fetches the device view, plans
+  `decklink_remove_plan` and marks dirty when the DeckLink count shrank), `inspector-live-audio-input.js` (capture device,
+  FFT slot, Refresh / Start / Stop, `live-audio-remove-input.js`), `v4l2-remove-input.js`. Every block ends in a plain
+  request list (`POST` bodies, soft `/api/raw` STOP + MIXER CLEAR, a restart-dirty mark) — that is the golden surface.
+- Role detection and the `inputChannels` row (layer / route) already exist in `destinations_model.gd` (`host_role`) and
+  `host_channels.gd`; the page only needed the resolved `extraLiveSources` row (`find_live_source` by role + channel).
+- Web `confirm()` → a `ConfirmationDialog`; it hides BEFORE `confirmed` fires, so awaiting `visibility_changed` reads the
+  wrong order — the base awaits its own `_decided` signal instead.
+
+### What was done
+- `host_source_model.gd` (438 lines, pure RefCounted): slot resolvers, `find_live_source`, webpage / NDI / browser /
+  DeckLink request builders + messages, template options, label state / hint, `remove_live_plan`,
+  `decklink_remove_plan` / `_tail` / `decklink_count`. Requests are `["POST", path, body]` (+ `"soft"`) or `["DIRTY"]`.
+- `input_slots_model.gd` (234 lines, pure): live-audio settings read / body, ALSA options, status message, FFT and
+  device-change request lists, start body / error, `live_audio_remove_plan`, V4L2 read / body / remove plan.
+- `host_controls_base.gd` (159): `_run` (posts a plan in order, soft failures ignored, stops on the first hard one),
+  `_confirm`, widget helpers (`_select` sets `fit_to_longest_item = false` — 221 template names widened the Inspector).
+- `host_live_controls.gd` (314): the webpage / NDI / browser / DeckLink blocks + "Remove … source" flows.
+  `host_input_controls.gd` (159): live-audio block (deferred boot GETs `/api/audio/live-inputs`, `/api/audio/devices`)
+  and the two slot removes. `host_channel_controls.gd` (39): facade dispatching by role; relays status / reload / removed.
+- `destination_inspector.gd`: `_host_page` resolves role / channel / source row and places `top` controls under the
+  summary, `bottom` after "Cabled to" (web order); `destinations_model.gd`: `host_entry`, Source ID row;
+  `destinations_panel.gd`: owns the facade, relays status, `reload(dirty)` → `changed` / new `refresh_requested`
+  (ternary over two `emit()` calls is a runtime error in GDScript — if/else), `removed` → deselect + `changed`;
+  `devices_tab.gd` connects `refresh_requested` to `refresh`.
+- Golden: `tests/golden/devices_host_source.json` generated by running the six web modules under Node with a DOM shim
+  (scratchpad `host_source_golden.mjs`); `tests/test_devices_host_source.gd` (175 assertions) compares request bodies,
+  messages, options, label state and all remove plans. The DeckLink "withSource" case uses a duplicate row with
+  `decklinkDevice = 2` because the web apply case mutates the shared fixture after capture.
+- Not ported (deliberate): the browser-stored live-audio PGM play-target restore on Start (localStorage; Start restarts the
+  capture only), and the Sources-tab `refreshLiveAudioConfigured` / `refreshV4l2Configured` store nudges after a remove
+  (the Godot panel reloads the device view instead).
+
+### What was VERIFIED
+- Godot `--test` 2911/2911 (2736 + 175 new), `--check` boot OK (no script errors), line limits 0 over 500.
+- Box GUI (`GODOT=~/.local/opt/godot/godot ./run-client.sh --screen=0 --tab=4`, xdotool / x11grab at +1920,0;
+  `config/*.json` md5-listed first): a webpage host created over `POST /api/device-view {addExtraLiveSource:{type:
+  "browser", templateOrUrl:"http://127.0.0.1:4200/template/LOWER.html"}}` → card "HOST · ch 4 (planned)", page shows the
+  summary with Source ID `webpage_127_0_0_1`, the Page block (Template ticked, select on the placeholder because no
+  "LOWER" template exists among the box's 221 — same as the web), Reload, notes, "Remove webpage source". Untick
+  Template + `https://example.org/` + Enter → server playArg / templateOrUrl / label updated, status "Webpage updated on
+  ch 4 (route unchanged)". Reload → "Reloaded webpage on ch 4", card label follows. Remove → dialog `Remove
+  "https://example.org/" from Live sources?` (Cancel / Remove) → `extraLiveSources []`, `inputChannels []`; journal shows
+  the soft `STOP 4-1` / `MIXER 4-1 CLEAR` (rejected by Caspar because channel 4 was planned only — ignored, as the web).
+  0 SCRIPT ERROR in the GUI log; every `config/*.json` byte-identical to the backup afterwards.
+- Not exercised live: NDI, browser-source, DeckLink, live-audio and V4L2 role pages (no such inputs on the dev box) —
+  golden-tested only; owner QA on the production box.

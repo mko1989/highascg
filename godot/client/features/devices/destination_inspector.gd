@@ -2,7 +2,8 @@ extends VBoxContainer
 ## WO-605 slice 3a — the destination page the Devices tab hands to the shared Inspector column (web
 ## renderDestinationInspector): summary table, mapped outputs, then the edits — name, main index, mode, audio
 ## outputs, video mode + size + fps, the pixel-map Art-Net fields, the operator-GUI fields — and Remove. Host channels
-## get their own summary, role note and "Cabled to" list (their per-role controls are slice 3b). The page only
+## get their own summary, role note and "Cabled to" list, plus the per-role controls host_channel_controls.gd builds
+## (slice 3c; injected by the panel as `host_controls`, absent under the unit runner). The page only
 ## builds requests: `patch` / `remove` go to the tab, which posts, marks Caspar restart-dirty and reloads;
 ## `launch_operator_gui` is posted by the tab too (answer via launch_status) — no autoloads here, so it tests headless.
 
@@ -16,8 +17,10 @@ const DM := preload("res://features/devices/destinations_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const MI := preload("res://core/math_input.gd")
+const HS := preload("res://features/devices/host_source_model.gd")
 
 var dest_id := ""
+var host_controls: Node  # host_channel_controls.gd, or null (headless tests)
 var _d: Dictionary
 var _vals := {}  # summary key → value Label
 var _size_fields: Array[LineEdit] = []  # width, height, fps
@@ -42,7 +45,7 @@ func show_destination(entry: Dictionary, payload: Dictionary, settings: Variant)
 	dest_id = entry.id
 	var edges := R_edges(payload, entry.connector)
 	if entry.host:
-		_host_page(entry, payload, edges)
+		_host_page(entry, payload, settings, edges)
 	else:
 		_screen_page(entry, payload, settings, edges)
 	if focus >= 0:
@@ -54,15 +57,24 @@ static func R_edges(payload: Dictionary, connector: String) -> Array:
 		func(e: Variant) -> bool: return e is Dictionary and H.R.s(e.get("sourceId")) == connector)
 
 
-func _host_page(entry: Dictionary, payload: Dictionary, edges: Array) -> void:
-	_table(DM.host_rows(_d, entry.intent, payload))
-	var note := DM.host_note(DM.host_role(_d, entry.intent))
+## Web order: summary table, the role's controls, the role note, "Cabled to", then the removes / input-slot blocks.
+func _host_page(entry: Dictionary, payload: Dictionary, settings: Variant, edges: Array) -> void:
+	var role := DM.host_role(_d, entry.intent)
+	var ch: Variant = H.coalesce([_d.get("casparChannel"), H.R.d(entry.intent).get("pgmChannel")])
+	var src := HS.find_live_source(_d, role, ch, payload.get("extraLiveSources"))
+	_table(DM.host_rows(_d, entry.intent, payload, src))
+	var parts: Dictionary = host_controls.build(entry, payload, settings, src) if host_controls != null else {}
+	for c in parts.get("top", []):
+		add_child(c)
+	var note := DM.host_note(role)
 	if note != "":
 		add_child(_note(note))
 	if not edges.is_empty():
 		add_child(_caption("Cabled to"))
 		for e in edges:
 			add_child(_link(e, payload, false))
+	for c in parts.get("bottom", []):
+		add_child(c)
 
 
 func _screen_page(entry: Dictionary, payload: Dictionary, settings: Variant, edges: Array) -> void:

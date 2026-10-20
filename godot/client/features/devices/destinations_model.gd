@@ -234,19 +234,27 @@ static func host_note(role: String) -> String:
 	return HOST_NOTES.get(role, HOST_NOTE_OTHER)
 
 
+## The live channelMap inputChannels row on host channel `ch` for `role` ({} when none).
+static func host_entry(payload: Dictionary, role: String, ch: Variant) -> Dictionary:
+	var cm := R.d(R.d(R.d(payload.get("live")).get("caspar")).get("channelMap"))
+	for e in R.a(cm.get("inputChannels")):
+		if e is Dictionary and H._num_eq(e.get("channel"), ch) and (e.get("kind") == role or role == ""):
+			return e
+	return {}
+
+
 ## Host-channel summary (renderHostChannelDestinationInspector): Label, Type, Caspar channel, then Host layer / Route
-## from the snapshot's channelMap entry on that channel. Source ID (the live source) arrives with slice 3b.
-static func host_rows(d: Dictionary, intent: Variant, payload: Dictionary) -> Array:
+## from the snapshot's channelMap entry on that channel, then Source ID when the live source (`src`) has one.
+static func host_rows(d: Dictionary, intent: Variant, payload: Dictionary, src: Dictionary = {}) -> Array:
 	var role := host_role(d, intent)
 	var ch: Variant = H.coalesce([d.get("casparChannel"), R.d(intent).get("pgmChannel")])
 	var rows := [["Label", R.s(d.label) if H.truthy(d.get("label")) else (R.s(d.id) if H.truthy(d.get("id")) else "Host channel")],
 		["Type", H.role_label(role)], ["Caspar channel", R.s(ch) if ch != null else "-"]]
-	var cm := R.d(R.d(R.d(payload.get("live")).get("caspar")).get("channelMap"))
-	for e in R.a(cm.get("inputChannels")):
-		if e is Dictionary and H._num_eq(e.get("channel"), ch) and (e.get("kind") == role or role == ""):
-			if e.get("layer") != null:
-				rows.append(["Host layer", R.s(e.layer)])
-			if H.truthy(e.get("route")):
-				rows.append(["Route", R.s(e.route)])
-			break
+	var e := host_entry(payload, role, ch)
+	if e.get("layer") != null:
+		rows.append(["Host layer", R.s(e.layer)])
+	if H.truthy(e.get("route")):
+		rows.append(["Route", R.s(e.route)])
+	if H.truthy(src.get("sourceId")):
+		rows.append(["Source ID", R.s(src.sourceId)])
 	return rows

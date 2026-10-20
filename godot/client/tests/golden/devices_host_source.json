@@ -1,0 +1,3825 @@
+{
+ "slots": [
+  [
+   3,
+   3,
+   3
+  ],
+  [
+   2,
+   null,
+   null
+  ],
+  [
+   null,
+   null,
+   null
+  ],
+  [
+   null,
+   4,
+   null
+  ],
+  [
+   5,
+   5,
+   5
+  ],
+  [
+   null,
+   null,
+   1
+  ],
+  [
+   null,
+   null,
+   null
+  ],
+  [
+   2,
+   2,
+   2
+  ],
+  [
+   null,
+   null,
+   null
+  ],
+  [
+   null,
+   null,
+   null
+  ]
+ ],
+ "extras": [
+  {
+   "sourceId": "web_1",
+   "routeType": "webpage_host",
+   "hostChannel": 7,
+   "value": "route://7-1",
+   "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+   "label": "Webpage: LOWER",
+   "hostLayer": 1
+  },
+  {
+   "sourceId": "ndi_1",
+   "routeType": "ndi_host",
+   "hostChannel": 8,
+   "value": "route://8-1",
+   "ndiName": "CAM-A (NDI)",
+   "label": "NDI: CAM-A"
+  },
+  {
+   "sourceId": "br_1",
+   "routeType": "browser_display",
+   "hostChannel": 9,
+   "value": "route://9-1",
+   "url": "https://example.org/",
+   "width": 1280,
+   "height": 720,
+   "fps": 30,
+   "label": "Browser"
+  },
+  {
+   "routeType": "decklink",
+   "decklinkSlot": 2,
+   "inputsChannel": 5,
+   "inputsLayer": 2,
+   "value": "route://5-2",
+   "decklinkDevice": 4,
+   "connectorId": "dlsdi_2",
+   "label": "Cam 2",
+   "generatedLabel": "DeckLink 2",
+   "labelIsCustom": true
+  },
+  {
+   "routeType": "decklink",
+   "decklinkSlot": 1,
+   "inputsChannel": 4,
+   "value": "route://4-1",
+   "connectorId": "dlsdi_1",
+   "label": "DeckLink 1",
+   "generatedLabel": "DeckLink 1",
+   "labelIsCustom": false
+  },
+  {
+   "sourceId": "web_2",
+   "routeType": "webpage_host",
+   "hostChannel": 10,
+   "value": "route://10-1",
+   "playArg": "https://news.example/"
+  }
+ ],
+ "find": [
+  [
+   [
+    {
+     "id": "host_decklink_input_2"
+    },
+    "decklink_input",
+    5
+   ],
+   {
+    "routeType": "decklink",
+    "decklinkSlot": 2,
+    "inputsChannel": 5,
+    "inputsLayer": 2,
+    "value": "route://5-2",
+    "decklinkDevice": 4,
+    "connectorId": "dlsdi_2",
+    "label": "Cam 2",
+    "generatedLabel": "DeckLink 2",
+    "labelIsCustom": true
+   }
+  ],
+  [
+   [
+    {
+     "id": "host_decklink_input_9"
+    },
+    "decklink_input",
+    5
+   ],
+   {
+    "routeType": "decklink",
+    "decklinkSlot": 2,
+    "inputsChannel": 5,
+    "inputsLayer": 2,
+    "value": "route://5-2",
+    "decklinkDevice": 4,
+    "connectorId": "dlsdi_2",
+    "label": "Cam 2",
+    "generatedLabel": "DeckLink 2",
+    "labelIsCustom": true
+   }
+  ],
+  [
+   [
+    {
+     "id": "host_decklink_input_9"
+    },
+    "decklink_input",
+    99
+   ],
+   null
+  ],
+  [
+   [
+    {
+     "id": "host_decklink_input_9"
+    },
+    "decklink_input",
+    null
+   ],
+   null
+  ],
+  [
+   [
+    {
+     "sourceId": "ndi_1"
+    },
+    "ndi_host",
+    1
+   ],
+   {
+    "sourceId": "ndi_1",
+    "routeType": "ndi_host",
+    "hostChannel": 8,
+    "value": "route://8-1",
+    "ndiName": "CAM-A (NDI)",
+    "label": "NDI: CAM-A"
+   }
+  ],
+  [
+   [
+    {
+     "sourceId": "nope"
+    },
+    "ndi_host",
+    8
+   ],
+   {
+    "sourceId": "ndi_1",
+    "routeType": "ndi_host",
+    "hostChannel": 8,
+    "value": "route://8-1",
+    "ndiName": "CAM-A (NDI)",
+    "label": "NDI: CAM-A"
+   }
+  ],
+  [
+   [
+    {
+     "sourceId": "nope"
+    },
+    "webpage_host",
+    8
+   ],
+   null
+  ],
+  [
+   [
+    {},
+    "browser_display",
+    9
+   ],
+   {
+    "sourceId": "br_1",
+    "routeType": "browser_display",
+    "hostChannel": 9,
+    "value": "route://9-1",
+    "url": "https://example.org/",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "label": "Browser"
+   }
+  ],
+  [
+   [
+    {},
+    "browser_display",
+    null
+   ],
+   null
+  ],
+  [
+   [
+    {
+     "id": "x"
+    },
+    "webpage_host",
+    10
+   ],
+   {
+    "sourceId": "web_2",
+    "routeType": "webpage_host",
+    "hostChannel": 10,
+    "value": "route://10-1",
+    "playArg": "https://news.example/"
+   }
+  ]
+ ],
+ "webpage": [
+  {
+   "name": "template saved",
+   "source": {
+    "sourceId": "web_1",
+    "routeType": "webpage_host",
+    "hostChannel": 7,
+    "value": "route://7-1",
+    "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+    "label": "Webpage: LOWER",
+    "hostLayer": 1
+   },
+   "init": {
+    "url": "http://127.0.0.1:4200/template/LOWER.html",
+    "useTemplate": true,
+    "template": "LOWER",
+    "options": [
+     {
+      "value": "",
+      "label": "— Select a template —",
+      "selected": false
+     },
+     {
+      "value": "BLACK",
+      "label": "BLACK",
+      "selected": false
+     },
+     {
+      "value": "LOWER",
+      "label": "Lower third",
+      "selected": true
+     },
+     {
+      "value": "ONLYLABEL",
+      "label": "ONLYLABEL",
+      "selected": false
+     }
+    ]
+   },
+   "acts": [
+    {
+     "step": {},
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_1",
+        "value": "route://7-1",
+        "action": "reload"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "url": "x"
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_1",
+        "value": "route://7-1",
+        "action": "update",
+        "templateOrUrl": "http://127.0.0.1:4200/template/LOWER.html"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "useTemplate": false,
+      "url": " https://a.b/ "
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_1",
+        "value": "route://7-1",
+        "action": "update",
+        "templateOrUrl": "https://a.b/"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "useTemplate": false,
+      "url": "  "
+     },
+     "calls": [],
+     "toasts": [
+      "Enter a page URL or select a template"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "useTemplate": true,
+      "template": ""
+     },
+     "calls": [],
+     "toasts": [
+      "Select a template"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "useTemplate": true,
+      "template": "BLACK"
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_1",
+        "value": "route://7-1",
+        "action": "update",
+        "templateOrUrl": "http://127.0.0.1:4200/template/BLACK.html"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "useTemplate": true,
+      "template": "LOWER.html"
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_1",
+        "value": "route://7-1",
+        "action": "update",
+        "templateOrUrl": "http://127.0.0.1:4200/template/LOWER.html"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    }
+   ]
+  },
+  {
+   "name": "plain url saved",
+   "source": {
+    "sourceId": "web_2",
+    "routeType": "webpage_host",
+    "hostChannel": 10,
+    "value": "route://10-1",
+    "playArg": "https://news.example/"
+   },
+   "init": {
+    "url": "https://news.example/",
+    "useTemplate": false,
+    "template": "",
+    "options": [
+     {
+      "value": "",
+      "label": "— Select a template —",
+      "selected": false
+     },
+     {
+      "value": "BLACK",
+      "label": "BLACK",
+      "selected": false
+     },
+     {
+      "value": "LOWER",
+      "label": "Lower third",
+      "selected": false
+     },
+     {
+      "value": "ONLYLABEL",
+      "label": "ONLYLABEL",
+      "selected": false
+     }
+    ]
+   },
+   "acts": [
+    {
+     "step": {},
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_2",
+        "value": "route://10-1",
+        "action": "reload"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "url": "https://news.example/"
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_2",
+        "value": "route://10-1",
+        "action": "update",
+        "templateOrUrl": "https://news.example/"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    },
+    {
+     "step": {
+      "url": "https://other/"
+     },
+     "calls": [
+      [
+       "POST",
+       "/api/host-live/webpage",
+       {
+        "sourceId": "web_2",
+        "value": "route://10-1",
+        "action": "update",
+        "templateOrUrl": "https://other/"
+       }
+      ]
+     ],
+     "toasts": [
+      "Webpage updated"
+     ],
+     "saved": "NEW"
+    }
+   ]
+  },
+  {
+   "name": "no value",
+   "source": {
+    "sourceId": "s",
+    "value": "route://3-1",
+    "hostChannel": 3
+   },
+   "init": {
+    "url": "",
+    "useTemplate": false,
+    "template": "",
+    "options": [
+     {
+      "value": "",
+      "label": "— Select a template —",
+      "selected": false
+     },
+     {
+      "value": "BLACK",
+      "label": "BLACK",
+      "selected": false
+     },
+     {
+      "value": "LOWER",
+      "label": "Lower third",
+      "selected": false
+     },
+     {
+      "value": "ONLYLABEL",
+      "label": "ONLYLABEL",
+      "selected": false
+     }
+    ]
+   },
+   "acts": [
+    {
+     "step": {},
+     "calls": [],
+     "toasts": [
+      "Enter a page URL or select a template"
+     ]
+    }
+   ]
+  }
+ ],
+ "ndi": {
+  "source": {
+   "sourceId": "ndi_1",
+   "routeType": "ndi_host",
+   "hostChannel": 8,
+   "value": "route://8-1",
+   "ndiName": "CAM-A (NDI)",
+   "label": "NDI: CAM-A"
+  },
+  "init": {
+   "name": "CAM-A (NDI)"
+  },
+  "discover": {
+   "calls": [
+    [
+     "GET",
+     "/api/ndi/list"
+    ]
+   ],
+   "toasts": [],
+   "options": [
+    {
+     "value": "CAM-A (NDI)",
+     "label": "CAM-A (NDI)",
+     "selected": false
+    },
+    {
+     "value": "PC (Screen 1)",
+     "label": "PC (Screen 1)",
+     "selected": false
+    }
+   ],
+   "pickShown": ""
+  },
+  "picked": {
+   "name": "PC (Screen 1)"
+  },
+  "discoverEmpty": {
+   "calls": [
+    [
+     "GET",
+     "/api/ndi/list"
+    ]
+   ],
+   "toasts": [
+    "No NDI sources found"
+   ]
+  },
+  "discoverList": {
+   "calls": [
+    [
+     "GET",
+     "/api/ndi/list"
+    ]
+   ],
+   "toasts": [],
+   "options": [
+    {
+     "value": "X",
+     "label": "X",
+     "selected": false
+    }
+   ]
+  },
+  "apply": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/ndi",
+     {
+      "sourceId": "ndi_1",
+      "value": "route://8-1",
+      "ndiName": "PC (Screen 1)",
+      "action": "update"
+     }
+    ]
+   ],
+   "toasts": [
+    "NDI source updated"
+   ],
+   "src": {
+    "ndiName": "PC (Screen 1)",
+    "label": "NDI: PC"
+   }
+  },
+  "applyEmpty": {
+   "calls": [],
+   "toasts": [
+    "Enter or pick an NDI source name"
+   ]
+  },
+  "reload": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/ndi",
+     {
+      "sourceId": "ndi_1",
+      "value": "route://8-1",
+      "action": "reload"
+     }
+    ]
+   ],
+   "toasts": [
+    "NDI reloaded"
+   ]
+  }
+ },
+ "browser": {
+  "source": {
+   "sourceId": "br_1",
+   "routeType": "browser_display",
+   "hostChannel": 9,
+   "value": "route://9-1",
+   "url": "https://example.org/",
+   "width": 1280,
+   "height": 720,
+   "fps": 30,
+   "label": "Browser"
+  },
+  "init": {
+   "url": "https://example.org/",
+   "width": "1280",
+   "height": "720",
+   "fps": "30"
+  },
+  "initDefaults": {
+   "url": "",
+   "width": "1152",
+   "height": "648",
+   "fps": "25"
+  },
+  "apply": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser",
+     {
+      "sourceId": "br_1",
+      "value": "route://9-1",
+      "action": "update",
+      "url": "https://new/",
+      "width": 160,
+      "height": 648,
+      "fps": 60
+     }
+    ]
+   ],
+   "toasts": [
+    "Browser source updated"
+   ],
+   "src": {
+    "url": "https://new/",
+    "width": 160,
+    "height": 648,
+    "fps": 60
+   }
+  },
+  "applyGarbage": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser",
+     {
+      "sourceId": "br_1",
+      "value": "route://9-1",
+      "action": "update",
+      "url": "https://new/",
+      "width": 1152,
+      "height": 2000,
+      "fps": 25
+     }
+    ]
+   ],
+   "toasts": [
+    "Browser source updated"
+   ]
+  },
+  "applyPlayFailed": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser",
+     {
+      "sourceId": "br_1",
+      "value": "route://9-1",
+      "action": "update",
+      "url": "https://new/",
+      "width": 1152,
+      "height": 2000,
+      "fps": 25
+     }
+    ]
+   ],
+   "toasts": [
+    "Applied, but: PLAY failed"
+   ]
+  },
+  "applyEmpty": {
+   "calls": [],
+   "toasts": [
+    "Enter a URL"
+   ]
+  },
+  "toggleInit": "Move to operator monitor",
+  "toggleOn": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser/interact",
+     {
+      "sourceId": "br_1",
+      "action": "toggle"
+     }
+    ]
+   ],
+   "toasts": [
+    "Moved"
+   ],
+   "text": "Return to background"
+  },
+  "toggleOff": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser/interact",
+     {
+      "sourceId": "br_1",
+      "action": "toggle"
+     }
+    ]
+   ],
+   "toasts": [
+    "Returned to background"
+   ],
+   "text": "Move to operator monitor"
+  },
+  "toggleErr": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/browser/interact",
+     {
+      "sourceId": "br_1",
+      "action": "toggle"
+     }
+    ]
+   ],
+   "toasts": [
+    "no window"
+   ],
+   "text": "Move to operator monitor"
+  }
+ },
+ "dv": {
+  "graph": {
+   "connectors": [
+    {
+     "id": "dlsdi_1",
+     "kind": "decklink_io",
+     "label": "DeckLink 1",
+     "externalRef": "1",
+     "index": 0,
+     "caspar": {
+      "ioDirection": "unassigned"
+     }
+    },
+    {
+     "id": "dlsdi_2",
+     "kind": "decklink_io",
+     "label": "Cam 2 (SDI)",
+     "externalRef": "2",
+     "index": 1,
+     "caspar": {
+      "ioDirection": "input"
+     }
+    },
+    {
+     "id": "dlsdi_3",
+     "kind": "decklink_io",
+     "label": "",
+     "externalRef": "3",
+     "index": 2
+    },
+    {
+     "id": "dst_in_host_decklink_input_2",
+     "kind": "destination_in",
+     "externalRef": "host_decklink_input_2"
+    },
+    {
+     "id": "gpu_p0",
+     "kind": "gpu_out",
+     "label": "P0"
+    }
+   ],
+   "edges": [
+    {
+     "id": "e1",
+     "sourceId": "dst_in_host_decklink_input_2",
+     "sinkId": "gpu_p0"
+    },
+    {
+     "id": "e2",
+     "sourceId": "dst_in_dst_a",
+     "sinkId": "gpu_p1"
+    },
+    {
+     "id": "e3",
+     "sourceId": "dst_in_host_decklink_input_2",
+     "sinkId": "rec_1"
+    }
+   ]
+  },
+  "suggested": {
+   "connectors": [
+    {
+     "id": "dlsdi_4",
+     "kind": "decklink_io",
+     "label": "DeckLink 4",
+     "externalRef": "4",
+     "index": 3
+    },
+    {
+     "id": "dlsdi_2",
+     "kind": "decklink_io",
+     "label": "dup",
+     "externalRef": "2",
+     "index": 1
+    }
+   ]
+  },
+  "extraLiveSources": [
+   {
+    "sourceId": "web_1",
+    "routeType": "webpage_host",
+    "hostChannel": 7,
+    "value": "route://7-1",
+    "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+    "label": "Webpage: LOWER",
+    "hostLayer": 1
+   },
+   {
+    "sourceId": "ndi_1",
+    "routeType": "ndi_host",
+    "hostChannel": 8,
+    "value": "route://8-1",
+    "ndiName": "CAM-A (NDI)",
+    "label": "NDI: CAM-A"
+   },
+   {
+    "sourceId": "br_1",
+    "routeType": "browser_display",
+    "hostChannel": 9,
+    "value": "route://9-1",
+    "url": "https://example.org/",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "label": "Browser"
+   },
+   {
+    "routeType": "decklink",
+    "decklinkSlot": 2,
+    "inputsChannel": 5,
+    "inputsLayer": 2,
+    "value": "route://5-2",
+    "decklinkDevice": 4,
+    "connectorId": "dlsdi_2",
+    "label": "Cam 2",
+    "generatedLabel": "DeckLink 2",
+    "labelIsCustom": true
+   },
+   {
+    "routeType": "decklink",
+    "decklinkSlot": 1,
+    "inputsChannel": 4,
+    "value": "route://4-1",
+    "connectorId": "dlsdi_1",
+    "label": "DeckLink 1",
+    "generatedLabel": "DeckLink 1",
+    "labelIsCustom": false
+   },
+   {
+    "sourceId": "web_2",
+    "routeType": "webpage_host",
+    "hostChannel": 10,
+    "value": "route://10-1",
+    "playArg": "https://news.example/"
+   }
+  ],
+  "live": {
+   "caspar": {
+    "channelMap": {
+     "inputChannels": [
+      {
+       "kind": "decklink",
+       "slot": 2,
+       "channel": 5,
+       "layer": 2,
+       "route": "route://5-2"
+      },
+      {
+       "kind": "live_audio",
+       "slot": 1,
+       "channel": 6,
+       "layer": 10,
+       "route": "route://6"
+      },
+      {
+       "kind": "v4l2",
+       "slot": 1,
+       "channel": 7,
+       "layer": 1,
+       "route": "route://7-1"
+      }
+     ]
+    }
+   }
+  }
+ },
+ "settings": {
+  "casparServer": {
+   "decklink_input_count": 2,
+   "decklink_input_1_device": 0,
+   "decklink_input_2_device": 3,
+   "live_audio_input_count": 2,
+   "live_audio_input_1_device": "alsa://hw:1,0",
+   "live_audio_input_2_device": "alsa://hw:2,0",
+   "live_audio_input_3_device": "",
+   "live_audio_pgm_always_on": true,
+   "live_audio_pgm_layer": 2,
+   "live_audio_pgm_audio_only": true,
+   "live_audio_inputs_host_channel_enabled": false,
+   "live_audio_inputs_channel_mode": "1080p5000",
+   "live_audio_input_1_pgm_channels": "1,3",
+   "live_audio_input_2_pgm_channels": null,
+   "audio_fft_source_slot": 2,
+   "v4l2_input_count": 1,
+   "v4l2_input_1_device": "/dev/video0",
+   "v4l2_input_1_label": "Cam",
+   "v4l2_input_1_format": "auto",
+   "v4l2_input_1_width": 0,
+   "v4l2_capture_bridge": "true",
+   "v4l2_input_channel_mode": "720p5000",
+   "audioRouting": {
+    "audioPreview": {
+     "enabled": "true",
+     "bus": "preview_2",
+     "screenIndex": 2,
+     "deviceName": "hw:0",
+     "defaultSource": "preview_2"
+    }
+   }
+  }
+ },
+ "decklink": {
+  "slotOnly": {
+   "options": [
+    {
+     "value": "1",
+     "label": "DeckLink 1",
+     "selected": false
+    },
+    {
+     "value": "2",
+     "label": "Cam 2 (SDI)",
+     "selected": false
+    },
+    {
+     "value": "3",
+     "label": "SDI 3",
+     "selected": true
+    },
+    {
+     "value": "4",
+     "label": "DeckLink 4",
+     "selected": false
+    }
+   ],
+   "hasLabel": false
+  },
+  "withSource": {
+   "options": [
+    {
+     "value": "1",
+     "label": "DeckLink 1",
+     "selected": false
+    },
+    {
+     "value": "2",
+     "label": "Cam 2 (SDI)",
+     "selected": true
+    },
+    {
+     "value": "3",
+     "label": "SDI 3",
+     "selected": false
+    },
+    {
+     "value": "4",
+     "label": "DeckLink 4",
+     "selected": false
+    }
+   ],
+   "label": {
+    "value": "Cam 2",
+    "placeholder": "DeckLink 2",
+    "hint": [
+     "Label",
+     "Top-bar chip: Cam"
+    ]
+   }
+  },
+  "apply": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/decklink",
+     {
+      "action": "update",
+      "slot": 2,
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "value": "route://5-2"
+     }
+    ]
+   ],
+   "toasts": [
+    "DeckLink source updated"
+   ]
+  },
+  "reload": {
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/decklink",
+     {
+      "action": "reload",
+      "slot": 2,
+      "connectorId": "dlsdi_2",
+      "value": "route://5-2"
+     }
+    ]
+   ],
+   "toasts": [
+    "DeckLink reloaded"
+   ]
+  },
+  "applyZero": {
+   "calls": [],
+   "toasts": []
+  },
+  "noConnectors": {
+   "options": [
+    {
+     "value": "2",
+     "label": "Device 2",
+     "selected": true
+    }
+   ]
+  },
+  "activeNotListed": {
+   "options": [
+    {
+     "value": "7",
+     "label": "Device 7",
+     "selected": true
+    },
+    {
+     "value": "1",
+     "label": "DeckLink 1",
+     "selected": false
+    },
+    {
+     "value": "2",
+     "label": "Cam 2 (SDI)",
+     "selected": false
+    },
+    {
+     "value": "3",
+     "label": "SDI 3",
+     "selected": false
+    },
+    {
+     "value": "4",
+     "label": "DeckLink 4",
+     "selected": false
+    }
+   ]
+  },
+  "settingsDevice": {
+   "options": [
+    {
+     "value": "1",
+     "label": "DeckLink 1",
+     "selected": false
+    },
+    {
+     "value": "2",
+     "label": "Cam 2 (SDI)",
+     "selected": false
+    },
+    {
+     "value": "3",
+     "label": "SDI 3",
+     "selected": true
+    },
+    {
+     "value": "4",
+     "label": "DeckLink 4",
+     "selected": false
+    }
+   ]
+  },
+  "noLabel": {
+   "hasLabel": false
+  },
+  "slotZero": {
+   "children": 0
+  },
+  "labelCustom": {
+   "value": "Cam 2",
+   "placeholder": "DeckLink 2",
+   "hint": "Top-bar chip: Cam"
+  },
+  "labelSave": {
+   "calls": [
+    [
+     "POST",
+     "/api/sources/label",
+     {
+      "sourceId": "dlsdi_2",
+      "label": "Camera Two"
+     }
+    ]
+   ],
+   "toasts": [],
+   "entry": {
+    "routeType": "decklink",
+    "decklinkSlot": 2,
+    "inputsChannel": 5,
+    "inputsLayer": 2,
+    "value": "route://5-2",
+    "decklinkDevice": 4,
+    "connectorId": "dlsdi_2",
+    "label": "Camera Two",
+    "generatedLabel": "DeckLink 2",
+    "labelIsCustom": true
+   }
+  },
+  "labelClear": {
+   "calls": [
+    [
+     "POST",
+     "/api/sources/label",
+     {
+      "sourceId": "dlsdi_2",
+      "label": ""
+     }
+    ]
+   ],
+   "toasts": [],
+   "entry": {
+    "routeType": "decklink",
+    "decklinkSlot": 2,
+    "inputsChannel": 5,
+    "inputsLayer": 2,
+    "value": "route://5-2",
+    "decklinkDevice": 4,
+    "connectorId": "dlsdi_2",
+    "label": "DeckLink 2",
+    "generatedLabel": "DeckLink 2",
+    "labelIsCustom": false
+   }
+  },
+  "labelGenerated": {
+   "value": "",
+   "placeholder": "DeckLink 1",
+   "hint": "Top-bar chip: Dec"
+  },
+  "labelUnknown": {
+   "value": "",
+   "placeholder": "dlsdi_9",
+   "hint": ""
+  },
+  "labelNoKey": true,
+  "labelState": [
+   [
+    [
+     "dlsdi_2",
+     ""
+    ],
+    {
+     "custom": "Cam 2",
+     "generated": "DeckLink 2"
+    }
+   ],
+   [
+    [
+     "dlsdi_1",
+     "fb"
+    ],
+    {
+     "custom": "",
+     "generated": "DeckLink 1"
+    }
+   ],
+   [
+    [
+     "nope",
+     "fb"
+    ],
+    {
+     "custom": "",
+     "generated": "fb"
+    }
+   ],
+   [
+    [
+     "",
+     ""
+    ],
+    {
+     "custom": "",
+     "generated": "Webpage: LOWER"
+    }
+   ]
+  ],
+  "pill": [
+   [
+    "Main",
+    "Mai"
+   ],
+   [
+    "Stage Left",
+    "Sta"
+   ],
+   [
+    "  ab ",
+    "ab"
+   ],
+   [
+    "",
+    ""
+   ],
+   [
+    null,
+    ""
+   ],
+   [
+    "ñandú",
+    "ñan"
+   ]
+  ]
+ },
+ "liveAudio": {
+  "mount": {
+   "calls": [
+    [
+     "GET",
+     "/api/audio/live-inputs"
+    ],
+    [
+     "GET",
+     "/api/audio/devices"
+    ]
+   ],
+   "toasts": [],
+   "status": "Running on 6-10",
+   "statusClass": "status-ok",
+   "shown": "",
+   "options": [
+    {
+     "value": "",
+     "label": "— none —",
+     "selected": false
+    },
+    {
+     "value": "alsa://hw:1,0",
+     "label": "USB Audio (alsa://hw:1,0)",
+     "selected": true
+    },
+    {
+     "value": "alsa://hw:2,0",
+     "label": "alsa://hw:2,0",
+     "selected": false
+    }
+   ],
+   "fft": false,
+   "fftText": "",
+   "startDisabled": false
+  },
+  "fftOn": {
+   "calls": [
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "audio_fft_source_slot": 1
+     }
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/apply",
+     {}
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ]
+   ],
+   "toasts": [
+    "Shaders now react to slot 1 audio."
+   ]
+  },
+  "fftOff": {
+   "calls": [
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "audio_fft_source_slot": 0
+     }
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/apply",
+     {}
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ]
+   ],
+   "toasts": [
+    "Shader FFT source cleared."
+   ]
+  },
+  "deviceChange": {
+   "calls": [
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "live_audio_input_count": 2,
+      "live_audio_pgm_always_on": true,
+      "live_audio_input_1_device": "alsa://hw:2,0",
+      "live_audio_input_2_device": "alsa://hw:2,0",
+      "live_audio_input_3_device": "",
+      "live_audio_input_4_device": "",
+      "live_audio_input_5_device": "",
+      "live_audio_input_6_device": "",
+      "live_audio_input_7_device": "",
+      "live_audio_input_8_device": ""
+     }
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/apply",
+     {}
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ]
+   ],
+   "toasts": [
+    "Capture re-applied on host channel."
+   ]
+  },
+  "refresh": {
+   "calls": [
+    [
+     "GET",
+     "/api/audio/devices?refresh=1"
+    ]
+   ],
+   "toasts": [
+    "Device list updated."
+   ]
+  },
+  "stop": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 6-10"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 6-10 CLEAR"
+     }
+    ]
+   ],
+   "toasts": []
+  },
+  "start": {
+   "calls": [
+    [
+     "POST",
+     "/api/audio/inputs/start",
+     {
+      "kind": "live_audio",
+      "slot": 1
+     }
+    ]
+   ],
+   "toasts": [
+    "Capture started on the dedicated channel."
+   ]
+  },
+  "startFail": {
+   "calls": [
+    [
+     "POST",
+     "/api/audio/inputs/start",
+     {
+      "kind": "live_audio",
+      "slot": 1
+     }
+    ]
+   ],
+   "toasts": [
+    "capture busy"
+   ]
+  },
+  "mountNoChannel": {
+   "calls": [
+    [
+     "GET",
+     "/api/audio/devices"
+    ]
+   ],
+   "toasts": [],
+   "status": "AMCP offline — live audio not started",
+   "startDisabled": true,
+   "stopDisabled": true,
+   "fft": true,
+   "options": [
+    {
+     "value": "",
+     "label": "— none —",
+     "selected": false
+    },
+    {
+     "value": "alsa://hw:1,0",
+     "label": "USB Audio (alsa://hw:1,0)",
+     "selected": false
+    },
+    {
+     "value": "alsa://hw:2,0",
+     "label": "alsa://hw:2,0",
+     "selected": true
+    }
+   ]
+  },
+  "noChannelButtons": {
+   "calls": [],
+   "toasts": []
+  },
+  "mountEmptyStatus": {
+   "fftText": "",
+   "options": [
+    {
+     "value": "",
+     "label": "— none —",
+     "selected": true
+    },
+    {
+     "value": "alsa://hw:1,0",
+     "label": "USB Audio (alsa://hw:1,0)",
+     "selected": false
+    },
+    {
+     "value": "alsa://hw:2,0",
+     "label": "alsa://hw:2,0",
+     "selected": false
+    }
+   ]
+  },
+  "read": [
+   [
+    {
+     "decklink_input_count": 2,
+     "decklink_input_1_device": 0,
+     "decklink_input_2_device": 3,
+     "live_audio_input_count": 2,
+     "live_audio_input_1_device": "alsa://hw:1,0",
+     "live_audio_input_2_device": "alsa://hw:2,0",
+     "live_audio_input_3_device": "",
+     "live_audio_pgm_always_on": true,
+     "live_audio_pgm_layer": 2,
+     "live_audio_pgm_audio_only": true,
+     "live_audio_inputs_host_channel_enabled": false,
+     "live_audio_inputs_channel_mode": "1080p5000",
+     "live_audio_input_1_pgm_channels": "1,3",
+     "live_audio_input_2_pgm_channels": null,
+     "audio_fft_source_slot": 2,
+     "v4l2_input_count": 1,
+     "v4l2_input_1_device": "/dev/video0",
+     "v4l2_input_1_label": "Cam",
+     "v4l2_input_1_format": "auto",
+     "v4l2_input_1_width": 0,
+     "v4l2_capture_bridge": "true",
+     "v4l2_input_channel_mode": "720p5000",
+     "audioRouting": {
+      "audioPreview": {
+       "enabled": "true",
+       "bus": "preview_2",
+       "screenIndex": 2,
+       "deviceName": "hw:0",
+       "defaultSource": "preview_2"
+      }
+     }
+    },
+    {
+     "count": 2,
+     "slots": [
+      "alsa://hw:1,0",
+      "alsa://hw:2,0",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "routeTargets": [
+      [
+       {
+        "channel": 1,
+        "layer": 2
+       },
+       {
+        "channel": 3,
+        "layer": 2
+       }
+      ],
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "pgmAlwaysOn": true,
+     "pgmScreen": 1,
+     "pgmLayer": 2,
+     "pgmAudioOnly": true,
+     "hostChannelEnabled": false,
+     "inputsChannelMode": "1080p5000",
+     "audioPreviewEnabled": true,
+     "audioPreviewBus": "preview_2",
+     "audioPreviewScreen": 2,
+     "audioPreviewDevice": "hw:0",
+     "audioPreviewDefaultSource": "preview_2"
+    }
+   ],
+   [
+    {},
+    {
+     "count": 0,
+     "slots": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "routeTargets": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "pgmAlwaysOn": true,
+     "pgmScreen": 1,
+     "pgmLayer": 2,
+     "pgmAudioOnly": true,
+     "hostChannelEnabled": false,
+     "inputsChannelMode": "1080p5000",
+     "audioPreviewEnabled": false,
+     "audioPreviewBus": "preview_1",
+     "audioPreviewScreen": 1,
+     "audioPreviewDevice": "",
+     "audioPreviewDefaultSource": "preview_1"
+    }
+   ],
+   [
+    {
+     "live_audio_input_count": "12",
+     "live_audio_input_1_device": " hw:9 ",
+     "live_audio_pgm_always_on": "false",
+     "live_audio_input_1_pgm_channels": "2; 4,x",
+     "live_audio_pgm_layer": "0",
+     "audio_preview_enabled": true
+    },
+    {
+     "count": 8,
+     "slots": [
+      "hw:9",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "routeTargets": [
+      [
+       {
+        "channel": 2,
+        "layer": 2
+       },
+       {
+        "channel": 4,
+        "layer": 2
+       }
+      ],
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+     ],
+     "pgmAlwaysOn": false,
+     "pgmScreen": 1,
+     "pgmLayer": 2,
+     "pgmAudioOnly": true,
+     "hostChannelEnabled": false,
+     "inputsChannelMode": "1080p5000",
+     "audioPreviewEnabled": true,
+     "audioPreviewBus": "preview_1",
+     "audioPreviewScreen": 1,
+     "audioPreviewDevice": "",
+     "audioPreviewDefaultSource": "preview_1"
+    }
+   ]
+  ],
+  "body": [
+   {
+    "live_audio_input_count": 2,
+    "live_audio_pgm_always_on": true,
+    "live_audio_pgm_screen": 1,
+    "live_audio_pgm_layer": 2,
+    "live_audio_pgm_audio_only": true,
+    "live_audio_inputs_host_channel_enabled": false,
+    "live_audio_inputs_channel_mode": "1080p5000",
+    "live_audio_input_channel_mode": "1080p5000",
+    "audio_preview_enabled": true,
+    "audio_preview_bus": "preview_2",
+    "audio_preview_screen": 2,
+    "audio_preview_device_name": "hw:0",
+    "audio_preview_default_source": "preview_2",
+    "live_audio_input_1_device": "alsa://hw:1,0",
+    "live_audio_input_1_pgm_channels": "1,3",
+    "live_audio_input_2_device": "alsa://hw:2,0",
+    "live_audio_input_3_device": "",
+    "live_audio_input_4_device": "",
+    "live_audio_input_5_device": "",
+    "live_audio_input_6_device": "",
+    "live_audio_input_7_device": "",
+    "live_audio_input_8_device": ""
+   },
+   {
+    "live_audio_input_count": 0,
+    "live_audio_pgm_always_on": true,
+    "live_audio_pgm_screen": 1,
+    "live_audio_pgm_layer": 2,
+    "live_audio_pgm_audio_only": true,
+    "live_audio_inputs_host_channel_enabled": false,
+    "live_audio_inputs_channel_mode": "1080p5000",
+    "live_audio_input_channel_mode": "1080p5000",
+    "audio_preview_enabled": false,
+    "audio_preview_bus": "preview_1",
+    "audio_preview_screen": 1,
+    "audio_preview_device_name": "",
+    "audio_preview_default_source": "preview_1",
+    "live_audio_input_1_device": "",
+    "live_audio_input_2_device": "",
+    "live_audio_input_3_device": "",
+    "live_audio_input_4_device": "",
+    "live_audio_input_5_device": "",
+    "live_audio_input_6_device": "",
+    "live_audio_input_7_device": "",
+    "live_audio_input_8_device": ""
+   },
+   {
+    "live_audio_input_count": 8,
+    "live_audio_pgm_always_on": false,
+    "live_audio_pgm_screen": 1,
+    "live_audio_pgm_layer": 2,
+    "live_audio_pgm_audio_only": true,
+    "live_audio_inputs_host_channel_enabled": false,
+    "live_audio_inputs_channel_mode": "1080p5000",
+    "live_audio_input_channel_mode": "1080p5000",
+    "audio_preview_enabled": true,
+    "audio_preview_bus": "preview_1",
+    "audio_preview_screen": 1,
+    "audio_preview_device_name": "",
+    "audio_preview_default_source": "preview_1",
+    "live_audio_input_1_device": "hw:9",
+    "live_audio_input_1_pgm_channels": "2,4",
+    "live_audio_input_2_device": "",
+    "live_audio_input_3_device": "",
+    "live_audio_input_4_device": "",
+    "live_audio_input_5_device": "",
+    "live_audio_input_6_device": "",
+    "live_audio_input_7_device": "",
+    "live_audio_input_8_device": ""
+   }
+  ],
+  "statusMsg": [
+   [
+    [
+     null,
+     1,
+     null
+    ],
+    ""
+   ],
+   [
+    [
+     {
+      "enabled": false,
+      "reason": "amcp_disconnected"
+     },
+     1,
+     null
+    ],
+    "AMCP offline — live audio not started"
+   ],
+   [
+    [
+     {
+      "failed": [
+       {
+        "channel": 6,
+        "layer": 10
+       }
+      ]
+     },
+     1,
+     {
+      "channel": 6,
+      "layer": 10
+     }
+    ],
+    "PLAY failed on this slot"
+   ],
+   [
+    [
+     {
+      "failed": [
+       {
+        "slot": 2,
+        "message": "boom"
+       }
+      ]
+     },
+     2,
+     null
+    ],
+    "boom"
+   ],
+   [
+    [
+     {
+      "started": [
+       {
+        "slot": 1
+       }
+      ]
+     },
+     1,
+     {
+      "channel": 6,
+      "layer": 10
+     }
+    ],
+    "Running on 6-10"
+   ],
+   [
+    [
+     {
+      "started": [
+       {
+        "channel": 6,
+        "layer": 10
+       }
+      ]
+     },
+     3,
+     {
+      "channel": 6,
+      "layer": 10
+     }
+    ],
+    "Running on 6-10"
+   ],
+   [
+    [
+     {
+      "started": [
+       {
+        "slot": 1
+       }
+      ]
+     },
+     1,
+     null
+    ],
+    "Running"
+   ],
+   [
+    [
+     {
+      "started": [
+       {
+        "slot": 9
+       }
+      ]
+     },
+     1,
+     null
+    ],
+    ""
+   ]
+  ],
+  "alsa": [
+   {
+    "value": "",
+    "label": "— none —"
+   },
+   {
+    "value": "alsa://hw:1,0",
+    "label": "USB Audio (alsa://hw:1,0)"
+   },
+   {
+    "value": "alsa://hw:2,0",
+    "label": "alsa://hw:2,0"
+   }
+  ]
+ },
+ "v4l2": {
+  "read": [
+   [
+    {
+     "decklink_input_count": 2,
+     "decklink_input_1_device": 0,
+     "decklink_input_2_device": 3,
+     "live_audio_input_count": 2,
+     "live_audio_input_1_device": "alsa://hw:1,0",
+     "live_audio_input_2_device": "alsa://hw:2,0",
+     "live_audio_input_3_device": "",
+     "live_audio_pgm_always_on": true,
+     "live_audio_pgm_layer": 2,
+     "live_audio_pgm_audio_only": true,
+     "live_audio_inputs_host_channel_enabled": false,
+     "live_audio_inputs_channel_mode": "1080p5000",
+     "live_audio_input_1_pgm_channels": "1,3",
+     "live_audio_input_2_pgm_channels": null,
+     "audio_fft_source_slot": 2,
+     "v4l2_input_count": 1,
+     "v4l2_input_1_device": "/dev/video0",
+     "v4l2_input_1_label": "Cam",
+     "v4l2_input_1_format": "auto",
+     "v4l2_input_1_width": 0,
+     "v4l2_capture_bridge": "true",
+     "v4l2_input_channel_mode": "720p5000",
+     "audioRouting": {
+      "audioPreview": {
+       "enabled": "true",
+       "bus": "preview_2",
+       "screenIndex": 2,
+       "deviceName": "hw:0",
+       "defaultSource": "preview_2"
+      }
+     }
+    },
+    {
+     "count": 1,
+     "slots": [
+      "/dev/video0",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "captureBridge": true,
+     "inputsChannelMode": "720p5000"
+    }
+   ],
+   [
+    {},
+    {
+     "count": 0,
+     "slots": [
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "captureBridge": false,
+     "inputsChannelMode": ""
+    }
+   ],
+   [
+    {
+     "v4l2_input_count": 99,
+     "v4l2_input_2_device": " /dev/video2 ",
+     "v4l2_capture_bridge": true,
+     "inputs_channel_mode": " 1080p5000 "
+    },
+    {
+     "count": 8,
+     "slots": [
+      "",
+      "/dev/video2",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+     ],
+     "captureBridge": true,
+     "inputsChannelMode": "1080p5000"
+    }
+   ]
+  ],
+  "body": [
+   {
+    "v4l2_input_count": 1,
+    "v4l2_capture_bridge": true,
+    "v4l2_input_channel_mode": "720p5000",
+    "v4l2_input_1_device": "/dev/video0",
+    "v4l2_input_2_device": "",
+    "v4l2_input_3_device": "",
+    "v4l2_input_4_device": "",
+    "v4l2_input_5_device": "",
+    "v4l2_input_6_device": "",
+    "v4l2_input_7_device": "",
+    "v4l2_input_8_device": ""
+   },
+   {
+    "v4l2_input_count": 0,
+    "v4l2_capture_bridge": false,
+    "v4l2_input_1_device": "",
+    "v4l2_input_2_device": "",
+    "v4l2_input_3_device": "",
+    "v4l2_input_4_device": "",
+    "v4l2_input_5_device": "",
+    "v4l2_input_6_device": "",
+    "v4l2_input_7_device": "",
+    "v4l2_input_8_device": ""
+   },
+   {
+    "v4l2_input_count": 8,
+    "v4l2_capture_bridge": true,
+    "v4l2_input_channel_mode": "1080p5000",
+    "v4l2_input_1_device": "",
+    "v4l2_input_2_device": "/dev/video2",
+    "v4l2_input_3_device": "",
+    "v4l2_input_4_device": "",
+    "v4l2_input_5_device": "",
+    "v4l2_input_6_device": "",
+    "v4l2_input_7_device": "",
+    "v4l2_input_8_device": ""
+   }
+  ],
+  "bodyLabels": {
+   "v4l2_input_count": 1,
+   "v4l2_capture_bridge": true,
+   "v4l2_input_channel_mode": "720p5000",
+   "v4l2_input_1_device": "/dev/video0",
+   "v4l2_input_1_label": "Cam",
+   "v4l2_input_1_format": "mjpeg",
+   "v4l2_input_1_width": 1280,
+   "v4l2_input_1_height": 720,
+   "v4l2_input_1_fps": 30,
+   "v4l2_input_1_audio": "hw:1",
+   "v4l2_input_2_device": "",
+   "v4l2_input_3_device": "",
+   "v4l2_input_4_device": "",
+   "v4l2_input_5_device": "",
+   "v4l2_input_6_device": "",
+   "v4l2_input_7_device": "",
+   "v4l2_input_8_device": ""
+  }
+ },
+ "remove": {
+  "webpage": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 7-1"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 7-1 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://7-1"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "browserFs": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 9-1"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 9-1 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/host-live/operator-fullscreen",
+     {
+      "action": "off",
+      "sourceId": "br_1"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://9-1"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "browserFsOther": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 9-1"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 9-1 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://9-1"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "inputsCh": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 12-3"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 12-3 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://12-3"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "defaultLayer": {
+   "calls": [
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 12-1"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 12-1 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://12"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "noChannel": {
+   "calls": [
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://13-1"
+      }
+     }
+    ],
+    [
+     "DIRTY"
+    ]
+   ],
+   "toasts": []
+  },
+  "noValue": {
+   "error": "Live source route missing",
+   "calls": [],
+   "toasts": []
+  },
+  "liveAudio1": {
+   "result": {
+    "ok": true,
+    "slot": 1,
+    "casparRestartNeeded": false,
+    "liveAudioConfigured": {
+     "configured": {}
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 6-10"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 6-10 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "live_audio_input_count": 2,
+      "live_audio_pgm_always_on": true,
+      "live_audio_pgm_screen": 1,
+      "live_audio_pgm_layer": 2,
+      "live_audio_pgm_audio_only": true,
+      "live_audio_inputs_host_channel_enabled": true,
+      "live_audio_inputs_channel_mode": "1080p5000",
+      "live_audio_input_channel_mode": "1080p5000",
+      "audio_preview_enabled": true,
+      "audio_preview_bus": "preview_2",
+      "audio_preview_screen": 2,
+      "audio_preview_device_name": "hw:0",
+      "audio_preview_default_source": "preview_2",
+      "live_audio_input_1_device": "",
+      "live_audio_input_1_pgm_channels": "1,3",
+      "live_audio_input_2_device": "alsa://hw:2,0",
+      "live_audio_input_3_device": "",
+      "live_audio_input_4_device": "",
+      "live_audio_input_5_device": "",
+      "live_audio_input_6_device": "",
+      "live_audio_input_7_device": "",
+      "live_audio_input_8_device": ""
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/audio/live-inputs"
+    ]
+   ],
+   "toasts": []
+  },
+  "liveAudio2": {
+   "result": {
+    "ok": true,
+    "slot": 2,
+    "casparRestartNeeded": true,
+    "liveAudioConfigured": {
+     "configured": {}
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "live_audio_input_count": 1,
+      "live_audio_pgm_always_on": true,
+      "live_audio_pgm_screen": 1,
+      "live_audio_pgm_layer": 2,
+      "live_audio_pgm_audio_only": true,
+      "live_audio_inputs_host_channel_enabled": true,
+      "live_audio_inputs_channel_mode": "1080p5000",
+      "live_audio_input_channel_mode": "1080p5000",
+      "audio_preview_enabled": true,
+      "audio_preview_bus": "preview_2",
+      "audio_preview_screen": 2,
+      "audio_preview_device_name": "hw:0",
+      "audio_preview_default_source": "preview_2",
+      "live_audio_input_1_device": "alsa://hw:1,0",
+      "live_audio_input_1_pgm_channels": "1,3",
+      "live_audio_input_2_device": "",
+      "live_audio_input_3_device": "",
+      "live_audio_input_4_device": "",
+      "live_audio_input_5_device": "",
+      "live_audio_input_6_device": "",
+      "live_audio_input_7_device": "",
+      "live_audio_input_8_device": ""
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "DIRTY"
+    ],
+    [
+     "GET",
+     "/api/audio/live-inputs"
+    ]
+   ],
+   "toasts": []
+  },
+  "liveAudioNoStore": {
+   "result": {
+    "ok": true,
+    "slot": 1,
+    "casparRestartNeeded": false,
+    "liveAudioConfigured": null
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/audio/live-inputs/config",
+     {
+      "live_audio_input_count": 2,
+      "live_audio_pgm_always_on": true,
+      "live_audio_pgm_screen": 1,
+      "live_audio_pgm_layer": 2,
+      "live_audio_pgm_audio_only": true,
+      "live_audio_inputs_host_channel_enabled": true,
+      "live_audio_inputs_channel_mode": "1080p5000",
+      "live_audio_input_channel_mode": "1080p5000",
+      "audio_preview_enabled": true,
+      "audio_preview_bus": "preview_2",
+      "audio_preview_screen": 2,
+      "audio_preview_device_name": "hw:0",
+      "audio_preview_default_source": "preview_2",
+      "live_audio_input_1_device": "",
+      "live_audio_input_1_pgm_channels": "1,3",
+      "live_audio_input_2_device": "alsa://hw:2,0",
+      "live_audio_input_3_device": "",
+      "live_audio_input_4_device": "",
+      "live_audio_input_5_device": "",
+      "live_audio_input_6_device": "",
+      "live_audio_input_7_device": "",
+      "live_audio_input_8_device": ""
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ]
+   ],
+   "toasts": []
+  },
+  "v4l2_1": {
+   "result": {
+    "ok": true,
+    "slot": 1,
+    "casparRestartNeeded": true,
+    "v4l2Configured": {}
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 7-1"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 7-1 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/v4l2-inputs/config",
+     {
+      "v4l2_input_count": 0,
+      "v4l2_capture_bridge": true,
+      "v4l2_input_channel_mode": "720p5000",
+      "v4l2_input_1_device": "",
+      "v4l2_input_2_device": "",
+      "v4l2_input_3_device": "",
+      "v4l2_input_4_device": "",
+      "v4l2_input_5_device": "",
+      "v4l2_input_6_device": "",
+      "v4l2_input_7_device": "",
+      "v4l2_input_8_device": ""
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "DIRTY"
+    ],
+    [
+     "GET",
+     "/api/v4l2-inputs"
+    ]
+   ],
+   "toasts": []
+  },
+  "v4l2_2": {
+   "result": {
+    "ok": true,
+    "slot": 2,
+    "casparRestartNeeded": false,
+    "v4l2Configured": {}
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/v4l2-inputs/config",
+     {
+      "v4l2_input_count": 1,
+      "v4l2_capture_bridge": true,
+      "v4l2_input_channel_mode": "720p5000",
+      "v4l2_input_1_device": "/dev/video0",
+      "v4l2_input_2_device": "",
+      "v4l2_input_3_device": "",
+      "v4l2_input_4_device": "",
+      "v4l2_input_5_device": "",
+      "v4l2_input_6_device": "",
+      "v4l2_input_7_device": "",
+      "v4l2_input_8_device": ""
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/v4l2-inputs"
+    ]
+   ],
+   "toasts": []
+  },
+  "decklink2": {
+   "result": {
+    "ok": true,
+    "slot": 2,
+    "connectorId": "dlsdi_2",
+    "casparRestartNeeded": true,
+    "extraLiveSources": [
+     {
+      "sourceId": "web_1",
+      "routeType": "webpage_host",
+      "hostChannel": 7,
+      "value": "route://7-1",
+      "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+      "label": "Webpage: LOWER",
+      "hostLayer": 1
+     },
+     {
+      "sourceId": "ndi_1",
+      "routeType": "ndi_host",
+      "hostChannel": 8,
+      "value": "route://8-1",
+      "ndiName": "CAM-A (NDI)",
+      "label": "NDI: CAM-A"
+     },
+     {
+      "sourceId": "br_1",
+      "routeType": "browser_display",
+      "hostChannel": 9,
+      "value": "route://9-1",
+      "url": "https://example.org/",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "label": "Browser"
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 2,
+      "inputsChannel": 5,
+      "inputsLayer": 2,
+      "value": "route://5-2",
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "label": "Cam 2",
+      "generatedLabel": "DeckLink 2",
+      "labelIsCustom": true
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 1,
+      "inputsChannel": 4,
+      "value": "route://4-1",
+      "connectorId": "dlsdi_1",
+      "label": "DeckLink 1",
+      "generatedLabel": "DeckLink 1",
+      "labelIsCustom": false
+     },
+     {
+      "sourceId": "web_2",
+      "routeType": "webpage_host",
+      "hostChannel": 10,
+      "value": "route://10-1",
+      "playArg": "https://news.example/"
+     }
+    ],
+    "payload": {
+     "graph": {
+      "connectors": [
+       {
+        "id": "dlsdi_1",
+        "kind": "decklink_io",
+        "label": "DeckLink 1",
+        "externalRef": "1",
+        "index": 0,
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "Cam 2 (SDI)",
+        "externalRef": "2",
+        "index": 1,
+        "caspar": {
+         "ioDirection": "input"
+        }
+       },
+       {
+        "id": "dlsdi_3",
+        "kind": "decklink_io",
+        "label": "",
+        "externalRef": "3",
+        "index": 2
+       },
+       {
+        "id": "dst_in_host_decklink_input_2",
+        "kind": "destination_in",
+        "externalRef": "host_decklink_input_2"
+       },
+       {
+        "id": "gpu_p0",
+        "kind": "gpu_out",
+        "label": "P0"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "gpu_p0"
+       },
+       {
+        "id": "e2",
+        "sourceId": "dst_in_dst_a",
+        "sinkId": "gpu_p1"
+       },
+       {
+        "id": "e3",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "rec_1"
+       }
+      ]
+     },
+     "suggested": {
+      "connectors": [
+       {
+        "id": "dlsdi_4",
+        "kind": "decklink_io",
+        "label": "DeckLink 4",
+        "externalRef": "4",
+        "index": 3
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "dup",
+        "externalRef": "2",
+        "index": 1
+       }
+      ]
+     },
+     "extraLiveSources": [
+      {
+       "sourceId": "web_1",
+       "routeType": "webpage_host",
+       "hostChannel": 7,
+       "value": "route://7-1",
+       "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+       "label": "Webpage: LOWER",
+       "hostLayer": 1
+      },
+      {
+       "sourceId": "ndi_1",
+       "routeType": "ndi_host",
+       "hostChannel": 8,
+       "value": "route://8-1",
+       "ndiName": "CAM-A (NDI)",
+       "label": "NDI: CAM-A"
+      },
+      {
+       "sourceId": "br_1",
+       "routeType": "browser_display",
+       "hostChannel": 9,
+       "value": "route://9-1",
+       "url": "https://example.org/",
+       "width": 1280,
+       "height": 720,
+       "fps": 30,
+       "label": "Browser"
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 2,
+       "inputsChannel": 5,
+       "inputsLayer": 2,
+       "value": "route://5-2",
+       "decklinkDevice": 4,
+       "connectorId": "dlsdi_2",
+       "label": "Cam 2",
+       "generatedLabel": "DeckLink 2",
+       "labelIsCustom": true
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 1,
+       "inputsChannel": 4,
+       "value": "route://4-1",
+       "connectorId": "dlsdi_1",
+       "label": "DeckLink 1",
+       "generatedLabel": "DeckLink 1",
+       "labelIsCustom": false
+      },
+      {
+       "sourceId": "web_2",
+       "routeType": "webpage_host",
+       "hostChannel": 10,
+       "value": "route://10-1",
+       "playArg": "https://news.example/"
+      }
+     ],
+     "live": {
+      "caspar": {
+       "channelMap": {
+        "inputChannels": [
+         {
+          "kind": "decklink",
+          "slot": 2,
+          "channel": 5,
+          "layer": 2,
+          "route": "route://5-2"
+         },
+         {
+          "kind": "live_audio",
+          "slot": 1,
+          "channel": 6,
+          "layer": 10,
+          "route": "route://6"
+         },
+         {
+          "kind": "v4l2",
+          "slot": 1,
+          "channel": 7,
+          "layer": 1,
+          "route": "route://7-1"
+         }
+        ]
+       }
+      }
+     }
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeEdge": {
+       "id": "e1"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeEdge": {
+       "id": "e3"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 5-2"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 5-2 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://5-2"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "updateConnector": {
+       "id": "dlsdi_2",
+       "patch": {
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       }
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "DIRTY"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeDestination": {
+       "id": "host_decklink_input_2"
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ]
+   ],
+   "toasts": []
+  },
+  "decklink2NoShrink": {
+   "result": {
+    "ok": true,
+    "slot": 2,
+    "connectorId": "dlsdi_2",
+    "casparRestartNeeded": false,
+    "extraLiveSources": [
+     {
+      "sourceId": "web_1",
+      "routeType": "webpage_host",
+      "hostChannel": 7,
+      "value": "route://7-1",
+      "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+      "label": "Webpage: LOWER",
+      "hostLayer": 1
+     },
+     {
+      "sourceId": "ndi_1",
+      "routeType": "ndi_host",
+      "hostChannel": 8,
+      "value": "route://8-1",
+      "ndiName": "CAM-A (NDI)",
+      "label": "NDI: CAM-A"
+     },
+     {
+      "sourceId": "br_1",
+      "routeType": "browser_display",
+      "hostChannel": 9,
+      "value": "route://9-1",
+      "url": "https://example.org/",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "label": "Browser"
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 2,
+      "inputsChannel": 5,
+      "inputsLayer": 2,
+      "value": "route://5-2",
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "label": "Cam 2",
+      "generatedLabel": "DeckLink 2",
+      "labelIsCustom": true
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 1,
+      "inputsChannel": 4,
+      "value": "route://4-1",
+      "connectorId": "dlsdi_1",
+      "label": "DeckLink 1",
+      "generatedLabel": "DeckLink 1",
+      "labelIsCustom": false
+     },
+     {
+      "sourceId": "web_2",
+      "routeType": "webpage_host",
+      "hostChannel": 10,
+      "value": "route://10-1",
+      "playArg": "https://news.example/"
+     }
+    ],
+    "payload": {
+     "graph": {
+      "connectors": [
+       {
+        "id": "dlsdi_1",
+        "kind": "decklink_io",
+        "label": "DeckLink 1",
+        "externalRef": "1",
+        "index": 0,
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "Cam 2 (SDI)",
+        "externalRef": "2",
+        "index": 1,
+        "caspar": {
+         "ioDirection": "input"
+        }
+       },
+       {
+        "id": "dlsdi_3",
+        "kind": "decklink_io",
+        "label": "",
+        "externalRef": "3",
+        "index": 2
+       },
+       {
+        "id": "dst_in_host_decklink_input_2",
+        "kind": "destination_in",
+        "externalRef": "host_decklink_input_2"
+       },
+       {
+        "id": "gpu_p0",
+        "kind": "gpu_out",
+        "label": "P0"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "gpu_p0"
+       },
+       {
+        "id": "e2",
+        "sourceId": "dst_in_dst_a",
+        "sinkId": "gpu_p1"
+       },
+       {
+        "id": "e3",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "rec_1"
+       }
+      ]
+     },
+     "suggested": {
+      "connectors": [
+       {
+        "id": "dlsdi_4",
+        "kind": "decklink_io",
+        "label": "DeckLink 4",
+        "externalRef": "4",
+        "index": 3
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "dup",
+        "externalRef": "2",
+        "index": 1
+       }
+      ]
+     },
+     "extraLiveSources": [
+      {
+       "sourceId": "web_1",
+       "routeType": "webpage_host",
+       "hostChannel": 7,
+       "value": "route://7-1",
+       "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+       "label": "Webpage: LOWER",
+       "hostLayer": 1
+      },
+      {
+       "sourceId": "ndi_1",
+       "routeType": "ndi_host",
+       "hostChannel": 8,
+       "value": "route://8-1",
+       "ndiName": "CAM-A (NDI)",
+       "label": "NDI: CAM-A"
+      },
+      {
+       "sourceId": "br_1",
+       "routeType": "browser_display",
+       "hostChannel": 9,
+       "value": "route://9-1",
+       "url": "https://example.org/",
+       "width": 1280,
+       "height": 720,
+       "fps": 30,
+       "label": "Browser"
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 2,
+       "inputsChannel": 5,
+       "inputsLayer": 2,
+       "value": "route://5-2",
+       "decklinkDevice": 4,
+       "connectorId": "dlsdi_2",
+       "label": "Cam 2",
+       "generatedLabel": "DeckLink 2",
+       "labelIsCustom": true
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 1,
+       "inputsChannel": 4,
+       "value": "route://4-1",
+       "connectorId": "dlsdi_1",
+       "label": "DeckLink 1",
+       "generatedLabel": "DeckLink 1",
+       "labelIsCustom": false
+      },
+      {
+       "sourceId": "web_2",
+       "routeType": "webpage_host",
+       "hostChannel": 10,
+       "value": "route://10-1",
+       "playArg": "https://news.example/"
+      }
+     ],
+     "live": {
+      "caspar": {
+       "channelMap": {
+        "inputChannels": [
+         {
+          "kind": "decklink",
+          "slot": 2,
+          "channel": 5,
+          "layer": 2,
+          "route": "route://5-2"
+         },
+         {
+          "kind": "live_audio",
+          "slot": 1,
+          "channel": 6,
+          "layer": 10,
+          "route": "route://6"
+         },
+         {
+          "kind": "v4l2",
+          "slot": 1,
+          "channel": 7,
+          "layer": 1,
+          "route": "route://7-1"
+         }
+        ]
+       }
+      }
+     }
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeEdge": {
+       "id": "e1"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeEdge": {
+       "id": "e3"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "STOP 5-2"
+     }
+    ],
+    [
+     "POST",
+     "/api/raw",
+     {
+      "cmd": "MIXER 5-2 CLEAR"
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeExtraLiveSource": {
+       "value": "route://5-2"
+      }
+     }
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "updateConnector": {
+       "id": "dlsdi_2",
+       "patch": {
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       }
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeDestination": {
+       "id": "host_decklink_input_2"
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ]
+   ],
+   "toasts": []
+  },
+  "decklink4": {
+   "result": {
+    "ok": true,
+    "slot": 4,
+    "connectorId": "dlsdi_4",
+    "casparRestartNeeded": false,
+    "extraLiveSources": [
+     {
+      "sourceId": "web_1",
+      "routeType": "webpage_host",
+      "hostChannel": 7,
+      "value": "route://7-1",
+      "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+      "label": "Webpage: LOWER",
+      "hostLayer": 1
+     },
+     {
+      "sourceId": "ndi_1",
+      "routeType": "ndi_host",
+      "hostChannel": 8,
+      "value": "route://8-1",
+      "ndiName": "CAM-A (NDI)",
+      "label": "NDI: CAM-A"
+     },
+     {
+      "sourceId": "br_1",
+      "routeType": "browser_display",
+      "hostChannel": 9,
+      "value": "route://9-1",
+      "url": "https://example.org/",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "label": "Browser"
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 2,
+      "inputsChannel": 5,
+      "inputsLayer": 2,
+      "value": "route://5-2",
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "label": "Cam 2",
+      "generatedLabel": "DeckLink 2",
+      "labelIsCustom": true
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 1,
+      "inputsChannel": 4,
+      "value": "route://4-1",
+      "connectorId": "dlsdi_1",
+      "label": "DeckLink 1",
+      "generatedLabel": "DeckLink 1",
+      "labelIsCustom": false
+     },
+     {
+      "sourceId": "web_2",
+      "routeType": "webpage_host",
+      "hostChannel": 10,
+      "value": "route://10-1",
+      "playArg": "https://news.example/"
+     }
+    ],
+    "payload": {
+     "graph": {
+      "connectors": [
+       {
+        "id": "dlsdi_1",
+        "kind": "decklink_io",
+        "label": "DeckLink 1",
+        "externalRef": "1",
+        "index": 0,
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "Cam 2 (SDI)",
+        "externalRef": "2",
+        "index": 1,
+        "caspar": {
+         "ioDirection": "input"
+        }
+       },
+       {
+        "id": "dlsdi_3",
+        "kind": "decklink_io",
+        "label": "",
+        "externalRef": "3",
+        "index": 2
+       },
+       {
+        "id": "dst_in_host_decklink_input_2",
+        "kind": "destination_in",
+        "externalRef": "host_decklink_input_2"
+       },
+       {
+        "id": "gpu_p0",
+        "kind": "gpu_out",
+        "label": "P0"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "gpu_p0"
+       },
+       {
+        "id": "e2",
+        "sourceId": "dst_in_dst_a",
+        "sinkId": "gpu_p1"
+       },
+       {
+        "id": "e3",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "rec_1"
+       }
+      ]
+     },
+     "suggested": {
+      "connectors": [
+       {
+        "id": "dlsdi_4",
+        "kind": "decklink_io",
+        "label": "DeckLink 4",
+        "externalRef": "4",
+        "index": 3
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "dup",
+        "externalRef": "2",
+        "index": 1
+       }
+      ]
+     },
+     "extraLiveSources": [
+      {
+       "sourceId": "web_1",
+       "routeType": "webpage_host",
+       "hostChannel": 7,
+       "value": "route://7-1",
+       "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+       "label": "Webpage: LOWER",
+       "hostLayer": 1
+      },
+      {
+       "sourceId": "ndi_1",
+       "routeType": "ndi_host",
+       "hostChannel": 8,
+       "value": "route://8-1",
+       "ndiName": "CAM-A (NDI)",
+       "label": "NDI: CAM-A"
+      },
+      {
+       "sourceId": "br_1",
+       "routeType": "browser_display",
+       "hostChannel": 9,
+       "value": "route://9-1",
+       "url": "https://example.org/",
+       "width": 1280,
+       "height": 720,
+       "fps": 30,
+       "label": "Browser"
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 2,
+       "inputsChannel": 5,
+       "inputsLayer": 2,
+       "value": "route://5-2",
+       "decklinkDevice": 4,
+       "connectorId": "dlsdi_2",
+       "label": "Cam 2",
+       "generatedLabel": "DeckLink 2",
+       "labelIsCustom": true
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 1,
+       "inputsChannel": 4,
+       "value": "route://4-1",
+       "connectorId": "dlsdi_1",
+       "label": "DeckLink 1",
+       "generatedLabel": "DeckLink 1",
+       "labelIsCustom": false
+      },
+      {
+       "sourceId": "web_2",
+       "routeType": "webpage_host",
+       "hostChannel": 10,
+       "value": "route://10-1",
+       "playArg": "https://news.example/"
+      }
+     ],
+     "live": {
+      "caspar": {
+       "channelMap": {
+        "inputChannels": [
+         {
+          "kind": "decklink",
+          "slot": 2,
+          "channel": 5,
+          "layer": 2,
+          "route": "route://5-2"
+         },
+         {
+          "kind": "live_audio",
+          "slot": 1,
+          "channel": 6,
+          "layer": 10,
+          "route": "route://6"
+         },
+         {
+          "kind": "v4l2",
+          "slot": 1,
+          "channel": 7,
+          "layer": 1,
+          "route": "route://7-1"
+         }
+        ]
+       }
+      }
+     }
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "updateConnector": {
+       "id": "dlsdi_4",
+       "patch": {
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       }
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeDestination": {
+       "id": "host_decklink_input_4"
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ]
+   ],
+   "toasts": []
+  },
+  "decklink3": {
+   "result": {
+    "ok": true,
+    "slot": 3,
+    "connectorId": "dlsdi_3",
+    "casparRestartNeeded": false,
+    "extraLiveSources": [
+     {
+      "sourceId": "web_1",
+      "routeType": "webpage_host",
+      "hostChannel": 7,
+      "value": "route://7-1",
+      "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+      "label": "Webpage: LOWER",
+      "hostLayer": 1
+     },
+     {
+      "sourceId": "ndi_1",
+      "routeType": "ndi_host",
+      "hostChannel": 8,
+      "value": "route://8-1",
+      "ndiName": "CAM-A (NDI)",
+      "label": "NDI: CAM-A"
+     },
+     {
+      "sourceId": "br_1",
+      "routeType": "browser_display",
+      "hostChannel": 9,
+      "value": "route://9-1",
+      "url": "https://example.org/",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "label": "Browser"
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 2,
+      "inputsChannel": 5,
+      "inputsLayer": 2,
+      "value": "route://5-2",
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "label": "Cam 2",
+      "generatedLabel": "DeckLink 2",
+      "labelIsCustom": true
+     },
+     {
+      "routeType": "decklink",
+      "decklinkSlot": 1,
+      "inputsChannel": 4,
+      "value": "route://4-1",
+      "connectorId": "dlsdi_1",
+      "label": "DeckLink 1",
+      "generatedLabel": "DeckLink 1",
+      "labelIsCustom": false
+     },
+     {
+      "sourceId": "web_2",
+      "routeType": "webpage_host",
+      "hostChannel": 10,
+      "value": "route://10-1",
+      "playArg": "https://news.example/"
+     }
+    ],
+    "payload": {
+     "graph": {
+      "connectors": [
+       {
+        "id": "dlsdi_1",
+        "kind": "decklink_io",
+        "label": "DeckLink 1",
+        "externalRef": "1",
+        "index": 0,
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "Cam 2 (SDI)",
+        "externalRef": "2",
+        "index": 1,
+        "caspar": {
+         "ioDirection": "input"
+        }
+       },
+       {
+        "id": "dlsdi_3",
+        "kind": "decklink_io",
+        "label": "",
+        "externalRef": "3",
+        "index": 2
+       },
+       {
+        "id": "dst_in_host_decklink_input_2",
+        "kind": "destination_in",
+        "externalRef": "host_decklink_input_2"
+       },
+       {
+        "id": "gpu_p0",
+        "kind": "gpu_out",
+        "label": "P0"
+       }
+      ],
+      "edges": [
+       {
+        "id": "e1",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "gpu_p0"
+       },
+       {
+        "id": "e2",
+        "sourceId": "dst_in_dst_a",
+        "sinkId": "gpu_p1"
+       },
+       {
+        "id": "e3",
+        "sourceId": "dst_in_host_decklink_input_2",
+        "sinkId": "rec_1"
+       }
+      ]
+     },
+     "suggested": {
+      "connectors": [
+       {
+        "id": "dlsdi_4",
+        "kind": "decklink_io",
+        "label": "DeckLink 4",
+        "externalRef": "4",
+        "index": 3
+       },
+       {
+        "id": "dlsdi_2",
+        "kind": "decklink_io",
+        "label": "dup",
+        "externalRef": "2",
+        "index": 1
+       }
+      ]
+     },
+     "extraLiveSources": [
+      {
+       "sourceId": "web_1",
+       "routeType": "webpage_host",
+       "hostChannel": 7,
+       "value": "route://7-1",
+       "playArg": "http://127.0.0.1:4200/template/LOWER.html",
+       "label": "Webpage: LOWER",
+       "hostLayer": 1
+      },
+      {
+       "sourceId": "ndi_1",
+       "routeType": "ndi_host",
+       "hostChannel": 8,
+       "value": "route://8-1",
+       "ndiName": "CAM-A (NDI)",
+       "label": "NDI: CAM-A"
+      },
+      {
+       "sourceId": "br_1",
+       "routeType": "browser_display",
+       "hostChannel": 9,
+       "value": "route://9-1",
+       "url": "https://example.org/",
+       "width": 1280,
+       "height": 720,
+       "fps": 30,
+       "label": "Browser"
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 2,
+       "inputsChannel": 5,
+       "inputsLayer": 2,
+       "value": "route://5-2",
+       "decklinkDevice": 4,
+       "connectorId": "dlsdi_2",
+       "label": "Cam 2",
+       "generatedLabel": "DeckLink 2",
+       "labelIsCustom": true
+      },
+      {
+       "routeType": "decklink",
+       "decklinkSlot": 1,
+       "inputsChannel": 4,
+       "value": "route://4-1",
+       "connectorId": "dlsdi_1",
+       "label": "DeckLink 1",
+       "generatedLabel": "DeckLink 1",
+       "labelIsCustom": false
+      },
+      {
+       "sourceId": "web_2",
+       "routeType": "webpage_host",
+       "hostChannel": 10,
+       "value": "route://10-1",
+       "playArg": "https://news.example/"
+      }
+     ],
+     "live": {
+      "caspar": {
+       "channelMap": {
+        "inputChannels": [
+         {
+          "kind": "decklink",
+          "slot": 2,
+          "channel": 5,
+          "layer": 2,
+          "route": "route://5-2"
+         },
+         {
+          "kind": "live_audio",
+          "slot": 1,
+          "channel": 6,
+          "layer": 10,
+          "route": "route://6"
+         },
+         {
+          "kind": "v4l2",
+          "slot": 1,
+          "channel": 7,
+          "layer": 1,
+          "route": "route://7-1"
+         }
+        ]
+       }
+      }
+     }
+    }
+   },
+   "calls": [
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "updateConnector": {
+       "id": "dlsdi_3",
+       "patch": {
+        "caspar": {
+         "ioDirection": "unassigned"
+        }
+       }
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/settings"
+    ],
+    [
+     "POST",
+     "/api/device-view",
+     {
+      "removeDestination": {
+       "id": "host_decklink_input_3"
+      }
+     }
+    ],
+    [
+     "GET",
+     "/api/device-view"
+    ]
+   ],
+   "toasts": []
+  },
+  "changeDevice": {
+   "result": {
+    "ok": true
+   },
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/decklink",
+     {
+      "action": "update",
+      "slot": 2,
+      "decklinkDevice": 4,
+      "connectorId": "dlsdi_2",
+      "value": "route://5-2"
+     }
+    ]
+   ],
+   "toasts": []
+  },
+  "changeDeviceBare": {
+   "result": {
+    "ok": true
+   },
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/decklink",
+     {
+      "action": "update",
+      "slot": 1,
+      "decklinkDevice": 2
+     }
+    ]
+   ],
+   "toasts": []
+  },
+  "reloadDevice": {
+   "result": {
+    "ok": true
+   },
+   "calls": [
+    [
+     "POST",
+     "/api/host-live/decklink",
+     {
+      "action": "reload",
+      "slot": 1
+     }
+    ]
+   ],
+   "toasts": []
+  },
+  "findConnector": [
+   [
+    [
+     0,
+     2
+    ],
+    "dlsdi_2"
+   ],
+   [
+    [
+     2,
+     0
+    ],
+    "dlsdi_2"
+   ],
+   [
+    [
+     4,
+     0
+    ],
+    "dlsdi_4"
+   ],
+   [
+    [
+     9,
+     0
+    ],
+    null
+   ],
+   [
+    [
+     2,
+     9
+    ],
+    "dlsdi_2"
+   ],
+   [
+    [
+     3,
+     0
+    ],
+    "dlsdi_3"
+   ]
+  ],
+  "findConnectorEmpty": null
+ }
+}

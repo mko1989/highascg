@@ -7,6 +7,7 @@ extends VBoxContainer
 signal selected(id: String)  # "" = cleared; the tab drops a selected cable when a destination takes the Inspector
 signal status(text: String, ok: bool)
 signal changed  # a write landed → restart-dirty + reload
+signal refresh_requested  # a host-channel control applied something that needs no Caspar restart → reload only
 signal focus_connector(id: String)  # a mapped output clicked on the page (web: opens that connector's inspector)
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -15,6 +16,7 @@ const Model := preload("res://features/devices/devices_model.gd")
 const DM := preload("res://features/devices/destinations_model.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const Inspector := preload("res://features/devices/destination_inspector.gd")
+const HostControls := preload("res://features/devices/host_channel_controls.gd")
 const PGM := Color("#e74c3c")
 const PRV := Color("#2ecc71")
 
@@ -22,6 +24,7 @@ var selected_id := ""
 var _cards: VBoxContainer
 var _type: OptionButton
 var _page: Inspector
+var _host: HostControls
 var _payload := {}
 var _entries := {}  # id → devices_model destination entry
 var _busy := false
@@ -56,6 +59,18 @@ func _init() -> void:
 	_page.remove.connect(_remove)
 	_page.launch_operator_gui.connect(_launch)
 	_page.focus_connector.connect(func(id: String) -> void: focus_connector.emit(id))
+	_host = HostControls.new()
+	add_child(_host)
+	_page.host_controls = _host
+	_host.status.connect(func(text: String, ok: bool) -> void: status.emit(text, ok))
+	_host.reload.connect(func(dirty: bool) -> void:
+		if dirty:
+			changed.emit()
+		else:
+			refresh_requested.emit())
+	_host.removed.connect(func() -> void:  # web onHostInputRemoved: clear selection, restart-dirty, reload
+		deselect()
+		changed.emit())
 
 
 ## Rebuild the cards from build() (`anchors` collects the output dots for the cable layer); the open page follows

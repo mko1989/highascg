@@ -68,6 +68,7 @@ func _ready() -> void:
 	_dests.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.add_child(_dests)
 	_dests.status.connect(_set_status)
+	_dests.refresh_requested.connect(refresh)
 	_dests.changed.connect(func() -> void:
 		_gesture.set_dirty(true)
 		refresh())
