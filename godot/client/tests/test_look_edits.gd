@@ -49,3 +49,14 @@ func test_reorder_layers_like_web() -> void:
 	t.eq((out as Array).map(func(l: Dictionary) -> int: return int(l.layerNumber)), [10, 11, 12], "renumbered from 10")
 	t.ok(E.reorder_layers(ls, 1, 1) == null, "same index → null")
 	t.ok(E.reorder_layers(ls, 0, 5) == null, "out of range → null")
+
+
+func test_remove_look() -> void:  # WO-623 B — web sceneState.removeScene
+	var root := {"scenes": [{"id": "a"}, {"id": "b"}, {"id": "c"}],
+		"lookPresets": [{"id": "p1", "sceneId": "b"}, {"id": "p2", "sceneId": "c"}, "junk"]}
+	t.ok(E.remove_look(root, "b"), "found")
+	t.eq(root.scenes.map(func(s: Dictionary) -> String: return s.id), ["a", "c"], "order kept")
+	t.eq(root.lookPresets.size(), 2, "the preset of b went; others (and junk) stay")
+	t.eq(root.lookPresets[0].id, "p2", "c's preset kept")
+	t.ok(not E.remove_look(root, "zz"), "unknown id → false")
+	t.ok(not E.remove_look({}, "a"), "no scenes")

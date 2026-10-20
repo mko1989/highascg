@@ -99,6 +99,9 @@ func _ready() -> void:
 	border.visible = false
 	add_child(border)
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
+	deck.look_deleted.connect(func(id: String) -> void:
+		if editor.visible and editor.scene_id == id:
+			editor.close_editor())
 	deck.timers_requested.connect(func(m: int, label: String) -> void:
 		InspectorPanel.current.present(timers)
 		timers.open(m, label))

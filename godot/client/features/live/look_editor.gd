@@ -47,11 +47,7 @@ func _ready() -> void:
 	head.add_child(_title)
 	var close := Button.new()
 	close.text = "Close"
-	close.pressed.connect(func() -> void:
-		_hold(false)
-		visible = false
-		_release_page()
-		closed.emit())
+	close.pressed.connect(close_editor)
 	head.add_child(close)
 	add_child(head)
 	_frame = Control.new()
@@ -133,7 +129,17 @@ func open(look_id: String, main_idx: int) -> void:
 	_hold(true)
 	_sel = -1
 	_refresh_list()
-	pusher.schedule(scene_id, main)  # stage it on PRV (re-take or nudge, server decides)
+	if _layers().any(func(l: Variant) -> bool: return l is Dictionary and (l as Dictionary).get("source") is Dictionary):
+		pusher.schedule(scene_id, main)  # stage it on PRV (re-take or nudge, server decides)
+	else:  # WO-623 B: a new empty look (deck "+") — the web stages nothing; the take route refuses a look with no sources
+		_status.text = "Empty look — drop a source on the frame to stage it on PRV"
+
+
+func close_editor() -> void:
+	_hold(false)
+	visible = false
+	_release_page()
+	closed.emit()
 
 
 func look() -> Dictionary:

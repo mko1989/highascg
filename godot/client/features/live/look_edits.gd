@@ -29,6 +29,19 @@ static func set_look_transition(root: Dictionary, scene_id: String, t: Dictionar
 	return false
 
 
+## WO-623 B — web sceneState.removeScene: drop the look and the look presets that point at it.
+static func remove_look(root: Dictionary, scene_id: String) -> bool:
+	var scenes: Array = root.get("scenes", []) if root.get("scenes") is Array else []
+	for i in scenes.size():
+		if scenes[i] is Dictionary and str(scenes[i].get("id", "")) == scene_id:
+			scenes.remove_at(i)
+			if root.get("lookPresets") is Array:
+				root["lookPresets"] = (root.lookPresets as Array).filter(func(p: Variant) -> bool:
+					return not (p is Dictionary and str((p as Dictionary).get("sceneId", "")) == scene_id))
+			return true
+	return false
+
+
 ## Web rule: with 2+ mains only the active main's deck (activeScreenIndex) gets it, else every look.
 static func apply_default_to_all(root: Dictionary, screen_count: int) -> int:
 	var g := T.default_transition()

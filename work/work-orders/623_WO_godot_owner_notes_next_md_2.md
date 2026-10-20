@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — A (performance overlay) DONE and box-verified; B (new look by deck drop), C (Sources Templates / Timelines tabs), D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
+**Status: IN PROGRESS (2026-10-20) — A (performance overlay) and B (new look: deck drop / "+" / delete) DONE and box-verified; C (Sources Templates / Timelines tabs), D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
 
 # WO-623 — Godot: owner's next.md notes (round 2)
 
@@ -125,6 +125,38 @@ re-checked by hand as noted.
 - **Why not a WS stats broadcast:** polling only while the overlay is visible costs the server nothing when it is off.
   The web tooltip already pulls the same route.
 
+### B — new look (DONE)
+
+- **Server** `src/api/routes-scene-new-look.js` (new) — `POST /api/scene/new-look {mainIdx, mainScope?, source?}`.
+  - It builds, but does not store, web `addScene`'s object, using the web's own `migrateScene` / `newId` /
+    `defaultTransition` from `client/lib/scene-state-helpers.js`:
+    - name `Look N+1`, where N is the live deck's snapshot count, else the stored project's;
+    - the column's `mainScope`;
+    - `{...defaultTransition(), ...project.scenes.globalDefaultTransition}`.
+  - With a `source`, the look's first layer (L10) is built by `buildLayerForSource`. That function was split out of
+    `routes-scene-new-layer.js` `handleNewLayer`, so the deck drop and the editor drop share one implementation:
+    editor defaults, images never loop, file trim/mute defaults, native fill on that main's canvas, and the WO-156
+    route rule.
+  - Timer payloads are refused, as in the web deck drop. A look is never stored by the server: the client appends it
+    and deck-syncs it like any edit.
+  - Routed in `routes-scene.js`.
+- **Godot** `deck_view.gd`:
+  - Each screen column and its card grid are drop targets (`set_drag_forwarding`). The columns now fill the deck's
+    height, so all the blank space under the cards takes a drop.
+  - A "+" tile follows the cards. A click makes an empty look, and a drop makes a look with that source.
+  - `create_look()` POSTs, appends to `project.scenes.scenes`, commits (deck sync + autosave), and opens the look in
+    the editor. That stages it on PRV, as the web's `setEditingScene` + preview push does.
+  - `mainScope` is `'0'` with one screen, else the column, following the web drop.
+- **Godot** `look_editor.gd`:
+  - `open()` no longer pushes a look with no sourced layer. The take route refuses one ("incomingScene has no layers
+    with sources"), which showed as "push failed" on a fresh "+" look. The web "+" stages nothing either. The status
+    line says to drop a source instead.
+  - The Close button's body became `close_editor()`.
+- **Delete look** (needed to undo a stray new look; the Godot deck had no delete):
+  - The card menu gains "Delete look…" with the web's confirm text (`Delete look "X"?`).
+  - `look_edits.gd` `remove_look()` mirrors web `removeScene`: it drops the look and the look presets pointing at it.
+  - The live tab closes the editor if it shows the deleted look.
+
 ## What was VERIFIED
 
 ### A
@@ -145,3 +177,31 @@ re-checked by hand as noted.
   - A header click hid the overlay, with the icon white. F3 showed it again, with the icon blue, and `ui.cfg` gained
     `[overlay] perf=true`. `ui.cfg` was restored to the owner's copy afterwards, so the overlay starts off.
 - **Owner-QA:** whether the panel's position and contents are what they want, and whether it should start on.
+
+### B
+
+- **Offline smoke:** `smoke-wo623-new-look` 5/5:
+  - the "+" shape equals web `migrateScene` of the `addScene` object;
+  - a media drop gives L10 with native fill on a 3840×1080 main;
+  - the live deck count wins over the stored project;
+  - mainScope rules and unique ids;
+  - refusals: empty value, timer, and self-route — the last is the WO-156 message, checked by hand.
+- `smoke-wo600-new-layer` is still 12/12 after the `buildLayerForSource` split.
+- **Full offline suite:** 2786/2789, with only the known `wo577` shader failure.
+- **Godot:** `test_look_edits` `test_remove_look`; the full suite is 15493/15493.
+- **Box** (server restarted for the route):
+  - `curl POST /api/scene/new-look {mainIdx:0}` returned an empty "Look 4" with mainScope `"0"` and MIX 12 linear.
+  - **Drop on blank space:** "4. Tło 4 - delikatne fale.mp4" (Sources tree) dropped on blank deck space under the
+    cards. The result was "Look 4" with L10 = that clip, opened in the editor, and "PRV: take". `/api/scene/live`
+    channel 2 = Look 4 with fill x −0.5, scaleX 2, scaleY 1.244. That is native for the clip, whose ffprobe size is
+    3840×1344.
+  - **"+" click:** made an empty "Look 5". The first build showed the push-failed line; after the fix, reopening it
+    shows the "Empty look — drop a source…" hint, and PRV was untouched (still Background).
+  - **Drop on "+":** "Bankiet.PNG" made "Look 6" with L10 `loop:false` and native fill 0.667 centred. It was staged on
+    PRV.
+  - All three looks survived a client relaunch, so they were persisted.
+- **Cleanup through the new Delete:**
+  - Background was re-staged on PRV, then Looks 6, 5 and 4 were deleted via the card menu and confirm dialog.
+  - The project is back to `['Opening', 'Background', 'Waves']` with lookPresets `[]`. PGM = Opening, PRV =
+    Background.
+  - The `config/` md5 manifest is identical before and after.

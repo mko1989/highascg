@@ -76,17 +76,26 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	const sceneId = String(b.sceneId || '').trim()
 	const src = b.source && typeof b.source === 'object' ? b.source : null
 	if (!sceneId || !src || !String(src.value || '').trim()) return out(400, { ok: false, error: 'sceneId and source.value required' })
-	const type = String(src.type || 'media')
 	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
+	const r = await buildLayerForSource(ctx, scene, src, b.mainIdx, deps)
+	if (r.error) return out(r.status, { ok: false, error: r.error })
+	return out(200, { ok: true, layer: r.layer, mainIdx: r.mainIdx, contentResolution: r.contentResolution })
+}
 
+/**
+ * The layer `src` becomes on `scene` (shared with WO-623 POST /api/scene/new-look).
+ * @returns {Promise<{ layer?: object, mainIdx?: number, contentResolution?: object|null, status?: number, error?: string }>}
+ */
+async function buildLayerForSource(ctx, scene, src, mainIdxIn, deps = {}) {
+	const type = String(src.type || 'media')
 	const { helpers, ed, inputs, stack } = await libs()
 	const n = helpers.nextLayerNumber(scene)
-	if (n < 0) return out(409, { ok: false, error: helpers.LOOK_FULL_MESSAGE })
+	if (n < 0) return { status: 409, error: helpers.LOOK_FULL_MESSAGE }
 	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
 	const map = getMap()
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
-	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
+	const mainIdx = Number.isFinite(Number(mainIdxIn)) ? Math.max(0, Math.floor(Number(mainIdxIn))) : Number.isFinite(scope) ? scope : 0
 	if (type === 'route' || String(src.value).startsWith('route://')) {
 		const active = { activeScreenIndex: mainIdx }
 		const why = inputs.routeDropRejectionMessage(src.value, {
@@ -94,7 +103,7 @@ async function handleNewLayer(body, ctx, deps = {}) {
 			pgmChannel: stack.resolveLookStackChannelForBus(map, active, scene, 'pgm'),
 			targetLayerNumber: n,
 		})
-		if (why) return out(400, { ok: false, error: why })
+		if (why) return { status: 400, error: why }
 	}
 	const layer = helpers.defaultLayerConfig(n)
 	const defaults = ed.mergeEditorDefaults(deps.editorDefaults ? deps.editorDefaults() : ctx?.config?.editorDefaults).scene
@@ -117,7 +126,7 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	const canvas = { width: Number(res.w) > 0 ? Number(res.w) : 1920, height: Number(res.h) > 0 ? Number(res.h) : 1080 }
 	const fit = await fitFillForSource(ctx, layer.source, layer.contentFit, canvas, deps.mediaResolution, map, mainIdx)
 	if (fit.fill) layer.fill = fit.fill
-	return out(200, { ok: true, layer, mainIdx, contentResolution: fit.contentResolution })
+	return { layer, mainIdx, contentResolution: fit.contentResolution }
 }
 
 /**
@@ -132,4 +141,4 @@ async function fitFillForSource(ctx, source, contentFit, canvas, mediaResolution
 	return { fill: fill.pixelRectToFill(rect, canvas), contentResolution: contentRes }
 }
 
-module.exports = { handleNewLayer, fitFillForSource, libs }
+module.exports = { handleNewLayer, buildLayerForSource, fitFillForSource, libs }

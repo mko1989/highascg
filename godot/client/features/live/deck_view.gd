@@ -17,6 +17,7 @@ signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
 signal timers_requested(main: int, label: String)  # WO-601: web per-screen ⏱ → screen-timer inspector
 signal border_requested(main: int, label: String)  # WO-601: global border inspector
+signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look
 
 var _columns: HBoxContainer
 var _dirty := true
@@ -29,6 +30,7 @@ func _ready() -> void:
 	_columns = HBoxContainer.new()
 	_columns.add_theme_constant_override("separation", 12)
 	_columns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_columns.size_flags_vertical = Control.SIZE_EXPAND_FILL  # columns reach the bottom: all of it is drop space
 	add_child(_columns)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _dirty = true)
 	Store.changed.connect(_on_store_changed)
@@ -67,6 +69,8 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.custom_minimum_size.x = 240
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override("separation", 8)
+	col.mouse_filter = Control.MOUSE_FILTER_PASS
+	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
 	var head_row := HBoxContainer.new()
 	var head := Label.new()
 	head.text = "%s  ·  %d looks" % [title, looks.size()]
@@ -99,10 +103,59 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	var grid := HFlowContainer.new()  # web .scenes-deck: auto-fill grid of thumbnail cards, 12 px gap
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
+	grid.mouse_filter = Control.MOUSE_FILTER_PASS
+	grid.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
 	col.add_child(grid)
 	for s in looks:
 		grid.add_child(_card(s, bus))
+	grid.add_child(_add_tile(main))
 	return col
+
+
+## WO-623 B — web .scenes-deck__add-look: "+" makes an empty look on this screen and opens it; a source dropped on
+## it (or anywhere on the column's blank space) becomes the new look's first layer.
+func _add_tile(main: int) -> Control:
+	var b := Button.new()
+	b.text = "+"
+	b.add_theme_font_size_override("font_size", 32)
+	b.custom_minimum_size = Vector2(CARD_W, CARD_W * 9.0 / 16.0)
+	b.focus_mode = Control.FOCUS_NONE
+	b.tooltip_text = "New look — or drop a media file here / on empty deck space"
+	b.pressed.connect(func() -> void: create_look(main, null))
+	b.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
+	return b
+
+
+## Same sources the look editor takes (web isDraggableLayerSourcePayload: never an effect); timers never make a look.
+func _can_drop_new(_at: Vector2, data: Variant, _main: int) -> bool:
+	if not (data is Dictionary) or str((data as Dictionary).get("value", "")) == "":
+		return false
+	return not (str((data as Dictionary).get("type", "")) in ["effect", "timer"])
+
+
+func _drop_new(_at: Vector2, data: Variant, main: int) -> void:
+	create_look(main, data)
+
+
+## The server builds the look (POST /api/scene/new-look — web addScene + the drop's first layer); the deck appends it,
+## syncs, and opens it in the editor, which stages it on PRV like the web's setEditingScene + preview push.
+func create_look(main: int, src: Variant) -> String:
+	var body := {"mainIdx": main, "mainScope": "0" if DeckModel.screen_count(_cm()) < 2 else str(main)}
+	if src is Dictionary:
+		body["source"] = src
+	var res: Dictionary = await Api.post_json("/api/scene/new-look", body)
+	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("look") is Dictionary):
+		action_result.emit("New look refused: %s" % res.error, false)
+		return ""
+	var lk: Dictionary = res.data.look
+	var root := _scenes_root()
+	if not (root.get("scenes") is Array):
+		root["scenes"] = []
+	(root.scenes as Array).append(lk)
+	_commit_looks()
+	action_result.emit("New look: %s" % str(lk.get("name", "")), true)
+	edit_requested.emit(str(lk.id), main)
+	return str(lk.id)
 
 
 func _card(scene: Dictionary, bus: Dictionary) -> Control:
@@ -240,6 +293,8 @@ func _card_menu(scene_id: String, main: int) -> void:
 	pm.add_item("Use default transition", 2)
 	pm.add_separator()
 	pm.add_item("Edit look…", 3)
+	pm.add_separator()
+	pm.add_item("Delete look…", 4)
 	pm.id_pressed.connect(_on_card_menu.bind(scene_id, main))
 	pm.popup_hide.connect(pm.queue_free)
 	add_child(pm)
@@ -256,8 +311,34 @@ func _on_card_menu(id: int, scene_id: String, main: int) -> void:
 		_prompt_transition(scene_id, main)
 	elif id == 3:
 		edit_requested.emit(scene_id, main)
+	elif id == 4:
+		_confirm_delete(scene_id)
 	elif id == 2:
 		set_look_transition(scene_id, _scenes_root().get("globalDefaultTransition", T.default_transition()))
+
+
+func _confirm_delete(scene_id: String) -> void:
+	var name := ""
+	for s in _scenes_root().get("scenes", []):
+		if s is Dictionary and str(s.get("id", "")) == scene_id:
+			name = str(s.get("name", ""))
+	var dlg := ConfirmationDialog.new()
+	dlg.dialog_text = "Delete look \"%s\"?" % name  # web confirm(`Delete look "${sc.name}"?`)
+	dlg.confirmed.connect(func() -> void:
+		delete_look(scene_id)
+		dlg.queue_free())
+	dlg.canceled.connect(dlg.queue_free)
+	add_child(dlg)
+	dlg.popup_centered()
+
+
+func delete_look(scene_id: String) -> bool:
+	if not E.remove_look(_scenes_root(), scene_id):
+		return false
+	_commit_looks()
+	look_deleted.emit(scene_id)
+	action_result.emit("Look deleted", true)
+	return true
 
 
 func _prompt_transition(scene_id: String, main: int) -> void:

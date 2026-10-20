@@ -29,6 +29,10 @@ async function handlePost(path, body, ctx) {
 		// WO-600 F: build (not store) the layer a media drop creates — same client modules as the web.
 		return handleNewLayer(body, ctx)
 	}
+	if (path === '/api/scene/new-look') {
+		// WO-623 B: build (not store) a new look — deck "+" / media dropped on blank deck space.
+		return require('./routes-scene-new-look').handleNewLook(body, ctx)
+	}
 	if (path === '/api/scene/layer-fit') {
 		// WO-601: refit a layer for its content sizing (web reapplyLayerFrameForContentFit) — computed, not stored.
 		return handleLayerFit(body, ctx)
