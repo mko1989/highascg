@@ -1,8 +1,7 @@
 import * as audioMixerState from '../lib/audio-mixer-state.js'
-import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
+import { debounceAsync, postAudioMute, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
-	faderPercentToLinearGain,
 	formatVolumeDb,
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
@@ -138,7 +137,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 					// Make it bite NOW, not only on the next take: the server fans this volume out to
 					// every live look layer consuming this input's route (f343e5e).
 					const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
-					const gain = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+					const gain = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
 					const autoOn = !(settingsState.getSettings()?.casparServer?.audio_auto_mix === false)
 					const effective = next === 'afv' ? (autoOn ? gain : 0) : 0
 					await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: effective })
@@ -210,7 +209,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 							const policy = String(csNext[`${r.inputKind}_input_${slot}_audio_send`] || 'afv')
 							const autoOn = !(csNext.audio_auto_mix === false || csNext.audio_auto_mix === 'false')
 							const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
-							const gain = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+							const gain = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
 							const embedded = policy === 'afv' && autoOn && chans.length === 0 ? gain : 0
 							await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: embedded })
 						}
@@ -264,12 +263,14 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				const meta = meterLayerMeta.get(r.key)
 				if (meta) meta.muted = nextMuted
 				const faderEl = row.querySelector('.audio-mixer__fader-horizontal')
-				const currentVol = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+				const currentVol = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
 				try {
-					await postAudioVolume({
+					await postAudioMute({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: nextMuted ? 0 : currentVol,
+						muted: nextMuted,
+						volume: currentVol,
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('MUTE playout update failed:', e?.message || e)
@@ -285,14 +286,15 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 					await postAudioVolume({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: faderPercentToLinearGain(fader.value),
+						linearGain: audioMixerState.faderGain(r.key, fader.value),
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)
 				}
 			})
 			fader.addEventListener('input', () => {
-				const x = faderPercentToLinearGain(fader.value)
+				const x = audioMixerState.faderGain(r.key, fader.value)
 				valEl.textContent = formatVolumeDb(x)
 				audioMixerState.setMasterVolume(r.key, x)
 				syncFaderUI(r.key, fader.value)
@@ -303,7 +305,8 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 					await postAudioVolume({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: faderPercentToLinearGain(fader.value),
+						linearGain: audioMixerState.faderGain(r.key, fader.value),
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)

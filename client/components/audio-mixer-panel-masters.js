@@ -2,7 +2,6 @@ import * as audioMixerState from '../lib/audio-mixer-state.js'
 import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
-	faderPercentToLinearGain,
 	formatVolumeDb,
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
@@ -48,14 +47,15 @@ export function renderInspectorMasterBuses(mastersEl, { mastersList, settings, c
 				await postAudioVolume({
 					channel: r.ch,
 					master: true,
-					linearGain: faderPercentToLinearGain(fader.value),
+					linearGain: audioMixerState.faderGain(r.key, fader.value),
+					key: r.sceneId ? undefined : r.key,
 				})
 			} catch (e) {
 				console.warn('VOLUME failed:', e?.message || e)
 			}
 		})
 		fader.addEventListener('input', () => {
-			const x = faderPercentToLinearGain(fader.value)
+			const x = audioMixerState.faderGain(r.key, fader.value)
 			valEl.textContent = formatVolumeDb(x)
 			audioMixerState.setMasterVolume(r.key, x)
 			syncFaderUI(r.key, fader.value)
@@ -66,7 +66,8 @@ export function renderInspectorMasterBuses(mastersEl, { mastersList, settings, c
 				await postAudioVolume({
 					channel: r.ch,
 					master: true,
-					linearGain: faderPercentToLinearGain(fader.value),
+					linearGain: audioMixerState.faderGain(r.key, fader.value),
+					key: r.sceneId ? undefined : r.key,
 				})
 			} catch (e) {
 				console.warn('VOLUME failed:', e?.message || e)

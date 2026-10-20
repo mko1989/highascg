@@ -1,81 +1,81 @@
 /**
- * Persisted audio mixer: program master faders (per Caspar channel key).
+ * Audio mixer console state: strip gains, mutes and solos (per web strip key).
  * Per-layer stereo pairs use `audioRoute` on scene/dashboard layers (AMCP AF pan), not this store.
+ *
+ * WO-604 slice 2: the server owns this state (`GET /api/audio/mixer`, src/audio/mixer-state.js) so the web and the
+ * Godot console show one mixer. This module is the synchronous cache the strip renderers read; it is filled by
+ * audio-mixer-server-sync.js (GET on every WS (re)connect + the `audioMixer` change broadcast). The setters only
+ * update the cache optimistically — the server learns a change from the write itself (`key` on /api/audio/volume,
+ * /api/audio/mute, `keys` on /api/audio/solo). Was browser localStorage `casparcg_audio_mixer_v1` until then.
  */
 
-const STORAGE_KEY = 'casparcg_audio_mixer_v1'
+import { faderPercentToLinearGain, linearGainToFaderPercent } from './audio-volume-scale.js'
 
-/** @typedef {{ master: Record<string, number>, layerRoutes: Record<string, number | null>, soloedLayers: string[] }} AudioMixerPersisted */
+/** @type {{ gains: Record<string, number>, muted: Record<string, boolean>, solos: string[], layerRoutes: Record<string, number> }} */
+const cache = { gains: {}, muted: {}, solos: [], layerRoutes: {} }
 
-function load() {
-	try {
-		const raw = localStorage.getItem(STORAGE_KEY)
-		if (!raw) return { master: {}, layerRoutes: {}, soloedLayers: [], muted: {} }
-		const j = JSON.parse(raw)
-		return {
-			master: typeof j.master === 'object' && j.master ? j.master : {},
-			layerRoutes: typeof j.layerRoutes === 'object' && j.layerRoutes ? j.layerRoutes : {},
-			soloedLayers: Array.isArray(j.soloedLayers) ? j.soloedLayers : [],
-			muted: typeof j.muted === 'object' && j.muted ? j.muted : {},
-		}
-	} catch {
-		return { master: {}, layerRoutes: {}, soloedLayers: [], muted: {} }
-	}
-}
-
-function save(data) {
-	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-	} catch {}
+/**
+ * Replace the cache with the server's snapshot ({ gains, muted, solos }).
+ * @param {unknown} snap
+ */
+export function ingestServerMixer(snap) {
+	const j = snap && typeof snap === 'object' ? /** @type {any} */ (snap) : {}
+	cache.gains = j.gains && typeof j.gains === 'object' ? { ...j.gains } : {}
+	cache.muted = j.muted && typeof j.muted === 'object' ? { ...j.muted } : {}
+	cache.solos = Array.isArray(j.solos) ? [...j.solos] : []
 }
 
 /** @param {string} chKey */
 export function getMasterVolume(chKey) {
-	const d = load()
-	const v = d.master[chKey]
-	return typeof v === 'number' && v >= 0 && v <= 1 ? v : 1
+	const v = cache.gains[chKey]
+	return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : 1
 }
 
-/** @param {string} chKey @param {number} v 0..1 */
+/** @param {string} chKey @param {number} v linear gain */
 export function setMasterVolume(chKey, v) {
-	const d = load()
-	d.master[chKey] = Math.max(0, Math.min(1, v))
-	save(d)
+	cache.gains[chKey] = Math.max(0, Number(v) || 0)
+}
+
+/**
+ * The gain a strip's fader position stands for: the stored gain while the fader still shows it, else the position's
+ * gain. 0 dB falls between two fader steps, so reading unity back from the position sends 0.98629 (−0.12 dB) on every
+ * double-click reset and unmute (WO-604; the Godot strip's gain() rule).
+ * @param {string} key @param {number | string} percent fader value 0..100
+ */
+export function faderGain(key, percent) {
+	const v = getMasterVolume(key)
+	return linearGainToFaderPercent(v) === Math.round(Number(percent)) ? v : faderPercentToLinearGain(percent)
 }
 
 /** @param {string} key @returns {boolean} */
 export function getMuted(key) {
-	return !!load().muted[key]
+	return cache.muted[key] === true
 }
 
 /** @param {string} key @param {boolean} m */
 export function setMuted(key, m) {
-	const d = load()
-	d.muted[key] = !!m
-	save(d)
+	if (m) cache.muted[key] = true
+	else delete cache.muted[key]
 }
 
 /** @param {number} layerNum @returns {number | null} destination Caspar channel or null */
 export function getLayerRoute(layerNum) {
-	const d = load()
 	const k = String(layerNum)
-	if (!Object.prototype.hasOwnProperty.call(d.layerRoutes, k)) return null
-	const x = d.layerRoutes[k]
+	if (!Object.prototype.hasOwnProperty.call(cache.layerRoutes, k)) return null
+	const x = cache.layerRoutes[k]
 	return typeof x === 'number' && x > 0 ? x : null
 }
 
 /** @param {number} layerNum @param {number | null} destCasparChannel */
 export function setLayerRoute(layerNum, destCasparChannel) {
-	const d = load()
 	const k = String(layerNum)
-	if (destCasparChannel == null) delete d.layerRoutes[k]
-	else d.layerRoutes[k] = destCasparChannel
-	save(d)
+	if (destCasparChannel == null) delete cache.layerRoutes[k]
+	else cache.layerRoutes[k] = destCasparChannel
 }
 
 /** @returns {Record<string, number | null>} */
 export function getAllLayerRoutes() {
-	return { ...load().layerRoutes }
+	return { ...cache.layerRoutes }
 }
 
 /**
@@ -84,27 +84,25 @@ export function getAllLayerRoutes() {
  * @param {boolean} multi - if true, toggle in list; if false, replace list (or clear if already soloed alone)
  */
 export function toggleSolo(layerKey, multi) {
-	const d = load()
-	const idx = d.soloedLayers.indexOf(layerKey)
+	const idx = cache.solos.indexOf(layerKey)
 	if (multi) {
-		if (idx >= 0) d.soloedLayers.splice(idx, 1)
-		else d.soloedLayers.push(layerKey)
+		if (idx >= 0) cache.solos.splice(idx, 1)
+		else cache.solos.push(layerKey)
 	} else {
-		if (idx >= 0 && d.soloedLayers.length === 1) d.soloedLayers = []
-		else d.soloedLayers = [layerKey]
+		if (idx >= 0 && cache.solos.length === 1) cache.solos = []
+		else cache.solos = [layerKey]
 	}
-	save(d)
-	return [...d.soloedLayers]
+	return [...cache.solos]
 }
 
 /** @param {string} layerKey @returns {boolean} */
 export function isSoloed(layerKey) {
-	return load().soloedLayers.includes(layerKey)
+	return cache.solos.includes(layerKey)
 }
 
 /** @returns {string[]} */
 export function getSoloedLayers() {
-	return [...load().soloedLayers]
+	return [...cache.solos]
 }
 
 /**
@@ -122,7 +120,5 @@ export function soloKeyToTarget(key) {
 }
 
 export function clearSolos() {
-	const d = load()
-	d.soloedLayers = []
-	save(d)
+	cache.solos = []
 }

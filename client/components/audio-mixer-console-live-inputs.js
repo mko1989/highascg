@@ -1,8 +1,7 @@
 import * as audioMixerState from '../lib/audio-mixer-state.js'
-import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
+import { debounceAsync, postAudioMute, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
-	faderPercentToLinearGain,
 	formatVolumeDb,
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
@@ -176,14 +175,15 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 					await postAudioVolume({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: faderPercentToLinearGain(fader.value),
+						linearGain: audioMixerState.faderGain(r.key, fader.value),
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)
 				}
 			})
 			fader.addEventListener('input', () => {
-				const x = faderPercentToLinearGain(fader.value)
+				const x = audioMixerState.faderGain(r.key, fader.value)
 				valEl.textContent = formatVolumeDb(x)
 				audioMixerState.setMasterVolume(r.key, x)
 				syncFaderUI(r.key, fader.value)
@@ -194,7 +194,8 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 					await postAudioVolume({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: faderPercentToLinearGain(fader.value),
+						linearGain: audioMixerState.faderGain(r.key, fader.value),
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)
@@ -218,12 +219,14 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 			const meta = meterLayerMeta.get(r.key)
 			if (meta) meta.muted = nextMuted
 			const faderEl = strip.querySelector('.audio-mixer-view__fader')
-			const currentVol = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+			const currentVol = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
 			try {
-				await postAudioVolume({
+				await postAudioMute({
 					channel: r.ch,
 					layer: r.layer,
-					linearGain: nextMuted ? 0 : currentVol,
+					muted: nextMuted,
+					volume: currentVol,
+					key: r.sceneId ? undefined : r.key,
 				})
 			} catch (err) {
 				console.warn('MUTE playout update failed:', err?.message || err)

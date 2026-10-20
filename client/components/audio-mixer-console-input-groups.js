@@ -1,6 +1,7 @@
 import { api } from '../lib/api-client.js'
 import * as audioMixerState from '../lib/audio-mixer-state.js'
-import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
+import { resyncAudioMixer } from '../lib/audio-mixer-server-sync.js'
+import { debounceAsync, postAudioMute, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { audioOutputRoutesForLayout } from '../lib/audio-routes.js'
 import { resolveProgramLayoutForProgramChannel } from '../lib/program-audio-layouts.js'
 import { sceneState } from '../lib/scene-state.js'
@@ -8,7 +9,6 @@ import { showScenesToast } from './scenes-editor-support.js'
 import { meterMetaForInputRow } from '../lib/audio-mixer-rows.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
-	faderPercentToLinearGain,
 	formatVolumeDb,
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
@@ -154,14 +154,15 @@ export function renderConsoleInputGroups(
 					await postAudioVolume({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: faderPercentToLinearGain(fader.value),
+						linearGain: audioMixerState.faderGain(r.key, fader.value),
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)
 				}
 			})
 			fader.addEventListener('input', () => {
-				const x = faderPercentToLinearGain(fader.value)
+				const x = audioMixerState.faderGain(r.key, fader.value)
 				valEl.textContent = formatVolumeDb(x)
 				// For timeline clips, don't try to update scene data (they're not in scene.live)
 				if (!r.isTimelineClip) {
@@ -179,7 +180,7 @@ export function renderConsoleInputGroups(
 				postLayerVolume()
 			})
 			fader.addEventListener('change', async () => {
-				const x = faderPercentToLinearGain(fader.value)
+				const x = audioMixerState.faderGain(r.key, fader.value)
 				if (r.sceneId) {
 					const scene = sceneState.getScene(r.sceneId)
 					if (scene) {
@@ -188,7 +189,7 @@ export function renderConsoleInputGroups(
 					}
 				}
 				try {
-					await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: x })
+					await postAudioVolume({ channel: r.ch, layer: r.layer, linearGain: x, key: r.sceneId ? undefined : r.key })
 				} catch (e) {
 					console.warn('VOLUME failed:', e?.message || e)
 				}
@@ -203,10 +204,12 @@ export function renderConsoleInputGroups(
 				audioMixerState.toggleSolo(r.key, e.metaKey || e.ctrlKey)
 				syncAllSolosUI()
 				try {
-					const solos = audioMixerState.getSoloedLayers().map(audioMixerState.soloKeyToTarget)
-					await api.post('/api/audio/solo', { solos })
-				} catch {
-					console.warn('Solo API not supported on this playout server. Solo state will remain client-side only.')
+					// WO-604 slice 2: the server keeps the solo set and derives the targets
+					await api.post('/api/audio/solo', { keys: audioMixerState.getSoloedLayers() })
+				} catch (e) {
+					// the server refused (e.g. no audio preview channel): show its solo set again, not the optimistic toggle
+					console.warn('Solo not applied:', e?.message || e)
+					void resyncAudioMixer()
 				}
 			})
 
@@ -241,12 +244,14 @@ export function renderConsoleInputGroups(
 				const meta = meterLayerMeta.get(r.key)
 				if (meta) meta.muted = nextMuted
 				const faderEl = document.querySelector(`input[data-key="${r.key}"]`)
-				const currentVol = faderEl ? faderPercentToLinearGain(faderEl.value) : r.v
+				const currentVol = faderEl ? audioMixerState.faderGain(r.key, faderEl.value) : r.v
 				try {
-					await postAudioVolume({
+					await postAudioMute({
 						channel: r.ch,
 						layer: r.layer,
-						linearGain: nextMuted ? 0 : currentVol,
+						muted: nextMuted,
+						volume: currentVol,
+						key: r.sceneId ? undefined : r.key,
 					})
 				} catch (e) {
 					console.warn('MUTE playout update failed:', e?.message || e)

@@ -53,6 +53,7 @@ import {
 import * as Status from './lib/app-status.js'
 import { clearStaleApiOriginOverrideOnPlayoutUi } from './lib/api-origin.js'
 import * as Handlers from './lib/app-ws-handlers.js'
+import { bindAudioMixerServer } from './lib/audio-mixer-server-sync.js'
 import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
@@ -149,6 +150,7 @@ async function init() {
 	setAppRuntime({ ws, osc: _oscClient, stateStore, appLogic, getVariableStore: () => getVariableStore(ws) })
 
 	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
+	bindAudioMixerServer({ ws, stateStore }) // WO-604 slice 2: one mixer for every client
 	// WO-254 T254.2 (kept under the WO-255 rename): re-POST cached merged cell rects on WS
 	// reconnect / server nudge / 60s heartbeat. Hard-gated inside — no-op for every normal
 	// (non-operator-GUI) session.

@@ -1,9 +1,9 @@
 import * as audioMixerState from '../lib/audio-mixer-state.js'
+import { resyncAudioMixer } from '../lib/audio-mixer-server-sync.js'
 import { api } from '../lib/api-client.js'
 import { debounceAsync, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
 import {
-	faderPercentToLinearGain,
 	formatVolumeDb,
 	linearGainToFaderPercent,
 } from '../lib/audio-volume-scale.js'
@@ -51,10 +51,12 @@ export function renderConsoleMasterStrips(mastersListEl, { mastersList, settings
 			audioMixerState.toggleSolo(r.key, e.metaKey || e.ctrlKey)
 			syncAllSolosUI()
 			try {
-				const solos = audioMixerState.getSoloedLayers().map(audioMixerState.soloKeyToTarget)
-				await api.post('/api/audio/solo', { solos })
-			} catch {
-				console.warn('Solo API not supported on this playout server. Solo state will remain client-side only.')
+				// WO-604 slice 2: the server keeps the solo set and derives the targets
+				await api.post('/api/audio/solo', { keys: audioMixerState.getSoloedLayers() })
+			} catch (e) {
+				// the server refused (e.g. no audio preview channel): show its solo set again, not the optimistic toggle
+				console.warn('Solo not applied:', e?.message || e)
+				void resyncAudioMixer()
 			}
 		})
 		registerBusMeterFills(r.key, strip, meterFills, busChCount, 'audio-mixer-view')
@@ -65,14 +67,15 @@ export function renderConsoleMasterStrips(mastersListEl, { mastersList, settings
 				await postAudioVolume({
 					channel: r.ch,
 					master: true,
-					linearGain: faderPercentToLinearGain(fader.value),
+					linearGain: audioMixerState.faderGain(r.key, fader.value),
+					key: r.sceneId ? undefined : r.key,
 				})
 			} catch (e) {
 				console.warn('VOLUME failed:', e?.message || e)
 			}
 		})
 		fader.addEventListener('input', () => {
-			const x = faderPercentToLinearGain(fader.value)
+			const x = audioMixerState.faderGain(r.key, fader.value)
 			valEl.textContent = formatVolumeDb(x)
 			audioMixerState.setMasterVolume(r.key, x)
 			syncFaderUI(r.key, fader.value)
@@ -83,7 +86,8 @@ export function renderConsoleMasterStrips(mastersListEl, { mastersList, settings
 				await postAudioVolume({
 					channel: r.ch,
 					master: true,
-					linearGain: faderPercentToLinearGain(fader.value),
+					linearGain: audioMixerState.faderGain(r.key, fader.value),
+					key: r.sceneId ? undefined : r.key,
 				})
 			} catch (e) {
 				console.warn('VOLUME failed:', e?.message || e)

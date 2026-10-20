@@ -36,15 +36,18 @@ test('WO-409: row model emits a PRV master strip per screen', () => {
 test('WO-409: console masters render PRV badge + SOLO through the shared mapper', () => {
 	const masters = read('client/components/audio-mixer-console-masters.js')
 	assert.match(masters, /\$\{r\.isPreview \? 'PRV' : 'PGM'\}/, 'badge says PRV on preview strips')
-	assert.match(masters, /audioMixerState\.getSoloedLayers\(\)\.map\(audioMixerState\.soloKeyToTarget\)/, 'solo posts via the shared mapper')
-
-	// Both pre-existing solo call sites now use the mapper too — the inline parser would
-	// have sent { layer: NaN } for a prv key.
-	for (const f of ['client/components/audio-mixer-console-input-groups.js', 'client/components/audio-mixer-panel-input-layers.js']) {
+	// WO-604 slice 2: the clients post the solo KEYS and the server maps them with the same shared mapper
+	// (src/audio/mixer-state.js soloKeyToTarget) — a prv key still never becomes { layer: NaN }.
+	for (const f of ['client/components/audio-mixer-console-masters.js', 'client/components/audio-mixer-console-input-groups.js', 'client/components/audio-mixer-panel-input-layers.js']) {
 		const src = read(f)
-		assert.match(src, /map\(audioMixerState\.soloKeyToTarget\)/, `${f} uses the mapper`)
+		assert.match(src, /api\.post\('\/api\/audio\/solo', \{ keys: audioMixerState\.getSoloedLayers\(\) \}\)/, `${f} posts the solo keys`)
 		assert.doesNotMatch(src, /parseInt\(parts\[3\], 10\)/, `${f} inline parser removed`)
 	}
+	const routes = read('src/api/routes-audio.js')
+	assert.match(routes, /b\.keys\.filter\(mixerState\.isMixerKey\)\.map\(mixerState\.soloKeyToTarget\)/, 'the server maps keys with the shared mapper')
+	const { soloKeyToTarget } = require('../../src/audio/mixer-state')
+	assert.deepEqual(soloKeyToTarget('prv:2'), { channel: 2 })
+	assert.deepEqual(soloKeyToTarget('pgm:1:layer:10'), { channel: 1, layer: 10 })
 })
 
 test('WO-409: solo API routes a layer-less target as the whole channel', () => {

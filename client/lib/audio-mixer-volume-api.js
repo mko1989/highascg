@@ -17,10 +17,13 @@ import { volumeApiPayload } from './audio-volume-scale.js'
  * linear value) AND carrying the route-consumer fanout (f343e5e), so the direct send was pure
  * duplication — dropping it removes the unit conflict and halves the per-fader work.
  *
- * @param {{ channel: number, layer?: number, master?: boolean, linearGain: number }} opts
+ * WO-604 slice 2: `key` (a console strip no look owns — `pgm:1`, `input:4`, …) makes the server keep the gain
+ * (src/audio/mixer-state.js), so every client shows it. Look layers and policy writes (AFV zeroing) send none.
+ *
+ * @param {{ channel: number, layer?: number, master?: boolean, linearGain: number, key?: string }} opts
  */
 export async function postAudioVolume(opts) {
-	const { channel, layer, master, linearGain } = opts
+	const { channel, layer, master, linearGain, key } = opts
 	const ch = Number(channel)
 	if (!Number.isFinite(ch) || ch < 1) return
 	if (!master) {
@@ -32,11 +35,32 @@ export async function postAudioVolume(opts) {
 			channel: ch,
 			...(master ? { master: true } : { layer: Number(layer) }),
 			...volumeApiPayload(linearGain),
+			...(typeof key === 'string' && key ? { key } : {}),
 		})
 	} catch (e) {
 		// Sole writer now: if this fails the gain did NOT reach Caspar. Say so plainly —
 		// the old message claimed "AMCP applied", which is no longer true.
 		console.warn('[AudioVolume] volume NOT applied (REST write failed):', e?.message || e)
+	}
+}
+
+/**
+ * WO-604 slice 2 — mute / unmute a console strip on the server (POST /api/audio/mute): muted → volume 0, unmuted →
+ * `volume` (the fader's gain). With a strip `key` the server keeps the mute; a look layer's mute stays on the look.
+ * @param {{ channel: number, layer?: number, master?: boolean, muted: boolean, volume?: number, key?: string }} opts
+ */
+export async function postAudioMute(opts) {
+	const { channel, layer, master, muted, volume, key } = opts
+	try {
+		await api.post('/api/audio/mute', {
+			channel: Number(channel),
+			...(master ? { master: true } : { layer: Number(layer) }),
+			muted: !!muted,
+			...(Number.isFinite(Number(volume)) ? volumeApiPayload(Number(volume)) : {}),
+			...(typeof key === 'string' && key ? { key } : {}),
+		})
+	} catch (e) {
+		console.warn('[AudioVolume] mute NOT applied (REST write failed):', e?.message || e)
 	}
 }
 
