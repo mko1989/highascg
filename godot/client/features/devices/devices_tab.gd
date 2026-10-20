@@ -17,15 +17,14 @@ extends MarginContainer
 ## Slice 7c: the "Mapping nodes" column (mapping_panel.gd) between the destinations and the rear panel; a card (or a
 ## mapping connector focused from a destination) opens the node page (mapping_controls.gd).
 ## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd); Load opens from WO-608.
-## Slice 10: the header (devices_toolbar.gd) toggles the Matrix view (matrix_view.gd) in place of the panels.
+## Slice 10: the header (devices_toolbar.gd) toggles the Matrix view (matrix_view.gd) in place of the panels, and
+## the Node view (node_panel.gd's cards in place of the rear panel, Bézier cables). The cables list is cables_list.gd.
 
-const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const CableLayer := preload("res://features/devices/cable_layer.gd")
 const CableGesture := preload("res://features/devices/cable_gesture.gd")
-const CableModel := preload("res://features/devices/cable_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const DestinationsPanel := preload("res://features/devices/destinations_panel.gd")
 const CableRules := preload("res://features/devices/cable_rules.gd")
@@ -38,18 +37,21 @@ const MappingControls := preload("res://features/devices/mapping_controls.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const Toolbar := preload("res://features/devices/devices_toolbar.gd")
 const MatrixView := preload("res://features/devices/matrix_view.gd")
+const NodePanel := preload("res://features/devices/node_panel.gd")
+const NV := preload("res://features/devices/node_view_model.gd")
+const CablesList := preload("res://features/devices/cables_list.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
 var _rear: RearPanel
-var _list: VBoxContainer
+var _list: CablesList
+var _nodes: NodePanel
 var _cables: Control
 var _loading := false
 var _reload_again := false
 var _sticky := false  # the status holds a result/error worth keeping over the next "Updated …"
 var _gesture: Node
 var _anchors := {}  # anchor key → port_icon.gd
-var _rows := {}  # cable id → [row button, remove button]
 var _bar: Toolbar
 var _body: Control
 var _matrix: MatrixView
@@ -180,8 +182,16 @@ func _ready() -> void:
 		refresh())
 	_rear.gpu_edit.connect(func(what: String, a: String, b: String) -> void: _gpu.rear_action(what, a, b, _payload))
 	right.add_child(_rear)
-	right.add_child(_label("CABLES", ThemeBuilder.TEXT_MUTED, 12))
-	_list = VBoxContainer.new()
+	_nodes = NodePanel.new()
+	_nodes.add_requested.connect(_outp.add_output)
+	_nodes.open_requested.connect(_open_port)
+	right.add_child(_nodes)
+	_list = CablesList.new()
+	_list.hover.connect(func(id: String, on: bool) -> void:
+		if on or _cables.active_id == id:
+			_cables.active_id = id if on else "")
+	_list.select.connect(func(id: String) -> void: _gesture.select_edge(id))
+	_list.remove.connect(func(id: String) -> void: _gesture.remove_edge(id))
 	right.add_child(_list)
 	_cables = CableLayer.new()
 	add_child(_cables)
@@ -201,6 +211,9 @@ func _show_mode() -> void:
 	_body.visible = not matrix
 	_cables.visible = not matrix
 	_matrix.visible = matrix
+	_cables.simple = _bar.mode() == "simple"
+	_rear.visible = not _cables.simple
+	_nodes.visible = _cables.simple
 
 
 ## Matrix header: a destination opens its card, a connector its page (web selectDestinationById / selectKey).
@@ -260,14 +273,14 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 	_maps.show_nodes(payload, anchors, _mapc.node_id)
 	if _matrix.visible:
 		_matrix.show_payload(payload, Store.get_value("channelMap"))
-	_rear.show_slots(m.slots)
-	anchors.merge(_rear.anchors)
-	_clear(_list)
-	_rows = {}
-	if m.cables.is_empty():
-		_list.add_child(_label("No cables.", ThemeBuilder.TEXT_MUTED, 12))
-	for c in m.cables:
-		_list.add_child(_cable_row(c))
+	if _nodes.visible:
+		_nodes.show_sections(NV.sections(m.slots, payload))
+		anchors.merge(_nodes.anchors)
+	else:
+		_rear.show_slots(m.slots)
+		anchors.merge(_rear.anchors)
+	_list.show_cables(m.cables)
+	_cables.edges = CableRules.a(CableRules.d(payload.get("graph")).get("edges"))
 	_cables.set_cables(m.cables, anchors)
 	_anchors = anchors
 	for page in [_gpu, _deck, _outp]:
@@ -308,6 +321,7 @@ func _open_port(id: String) -> bool:
 	page.show_connector(conn, _payload, Settings.settings)
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(page.page)
+	_sync()
 	return true
 
 
@@ -326,6 +340,7 @@ func _close_port() -> void:
 		_maps.highlight("")
 		if InspectorPanel.current != null:
 			InspectorPanel.current.release(_mapc.page)
+	_sync()
 
 
 func _open_mapping(id: String) -> void:
@@ -363,10 +378,11 @@ func _sync() -> void:
 	_cables.hidden_id = str(g.regrab.get("edgeId", ""))
 	_cables.ghost_from = g.ghost_anchor()
 	_bar.sync(g)
-	for id in _rows:
-		_rows[id][1].visible = id == g.selected_edge
-		_rows[id][0].add_theme_color_override("font_outline_color", ThemeBuilder.ACCENT)
-		_rows[id][0].add_theme_constant_override("outline_size", 1 if id == g.selected_edge else 0)
+	_list.mark(g.selected_edge)
+	var open := ""
+	for page in [_gpu, _deck, _outp]:
+		open = page.conn_id if page.conn_id != "" else open
+	_nodes.highlight(open, g.source_id if g.armed() else "")
 
 
 ## Gesture prompts ("Cable armed…", "Cable end grabbed…") give way to the next reload; results and errors stay.
@@ -404,10 +420,10 @@ func _input(event: InputEvent) -> void:
 	if _gesture.armed():
 		_gesture.cancel()
 		return
-	if _rear.begin_drag(pos):  # DeckLink edit mode: a label press drags (release on itself opens the page)
+	if _rear.visible and _rear.begin_drag(pos):  # DeckLink edit mode: a label press drags (release on itself opens the page)
 		get_viewport().set_input_as_handled()
 		return
-	var port := _rear.label_at(pos)
+	var port := _rear.label_at(pos) if _rear.visible else ""
 	if port != "":
 		get_viewport().set_input_as_handled()
 		_open_port(port)
@@ -417,7 +433,7 @@ func _input(event: InputEvent) -> void:
 	if hit != "":
 		get_viewport().set_input_as_handled()
 		_gesture.select_edge(hit)
-	elif _rear.get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
+	elif (_rear if _rear.visible else _nodes).get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
 		if _gesture.selected_edge != "":
 			_gesture.selected_edge = ""
 			_sync()
@@ -448,49 +464,3 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	elif (k.keycode == KEY_DELETE or k.keycode == KEY_BACKSPACE) and _gesture.selected_edge != "":
 		get_viewport().set_input_as_handled()
 		_gesture.remove_edge(_gesture.selected_edge)
-
-
-## A cables-list row: the cable's colour, "Source → Sink"; hovering it thickens that cable, clicking selects it
-## (then a Remove button shows, like the web edge inspector's).
-func _cable_row(c: Dictionary) -> Control:
-	var h := HBoxContainer.new()
-	var b := Button.new()
-	b.flat = true
-	b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	b.focus_mode = Control.FOCUS_NONE
-	b.text = "●  " + str(c.label)
-	b.add_theme_font_size_override("font_size", 12)
-	var col: Color = CableModel.color(c.id)
-	b.add_theme_color_override("font_color", col.lerp(ThemeBuilder.TEXT, 0.35))
-	b.mouse_entered.connect(func() -> void: _cables.active_id = c.id)
-	b.mouse_exited.connect(func() -> void: if _cables.active_id == c.id: _cables.active_id = "")
-	b.pressed.connect(func() -> void: _gesture.select_edge(c.id))
-	h.add_child(b)
-	var rm := _button("Remove", func() -> void: _gesture.remove_edge(c.id))
-	rm.visible = false
-	h.add_child(rm)
-	_rows[c.id] = [b, rm]
-	return h
-
-
-func _button(text: String, on_press: Callable) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_size_override("font_size", 12)
-	b.pressed.connect(on_press)
-	return b
-
-
-func _clear(n: Node) -> void:
-	for c in n.get_children():
-		n.remove_child(c)
-		c.queue_free()
-
-
-func _label(text: String, color: Color, size: int) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	return l

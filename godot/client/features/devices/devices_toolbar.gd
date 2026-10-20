@@ -3,9 +3,11 @@ extends HBoxContainer
 ## toggle, the status line, Cancel cable / Reset all cabling / Apply Caspar config, the snapshot arrow and reload.
 ## Slice 10: "Matrix view" swaps the panels for the routing matrix (matrix_view.gd); the pick is a per-client pref
 ## (web localStorage `device-view-matrix`, here user://devices.cfg [view] mode). The loops slider hides with it.
+## Slice 10b: "Node view" (web simple wiring, `highascg_device_view_simple_wiring` → [view] simple) swaps the rear
+## panel for node_panel.gd's cards with Bézier cables. Checking either view unchecks (and saves off) the other.
 
 signal loops_changed(n: int)
-signal view_changed(mode: String)  # "" (panels) | "matrix"
+signal view_changed(mode: String)  # "" (panels) | "simple" (Node view) | "matrix"
 signal cancel_pressed
 signal reset_pressed
 signal apply_pressed
@@ -22,6 +24,7 @@ var apply_btn: Button
 var _status: Label
 var _loops: Control
 var _matrix: CheckBox
+var _simple: CheckBox
 
 
 func _init() -> void:
@@ -47,17 +50,10 @@ func _init() -> void:
 	s.value_changed.connect(func(x: float) -> void:
 		value.text = str(int(x))
 		loops_changed.emit(int(x)))
-	_matrix = CheckBox.new()
-	_matrix.text = "Matrix view"
-	_matrix.tooltip_text = "Dense Dante-style routing matrix."
-	_matrix.focus_mode = Control.FOCUS_NONE
-	_matrix.add_theme_font_size_override("font_size", 13)
-	_matrix.button_pressed = saved_view() == "matrix"
-	_matrix.toggled.connect(func(_on: bool) -> void:
-		save_view(mode())
-		_sync_mode()
-		view_changed.emit(mode()))
-	add_child(_matrix)
+	_simple = _check("Node view", "Compact node layout and straight cable lines on the rear panel.", saved_simple())
+	_simple.toggled.connect(func(on: bool) -> void: _pick(_matrix, on))
+	_matrix = _check("Matrix view", "Dense Dante-style routing matrix.", saved_view() == "matrix")
+	_matrix.toggled.connect(func(on: bool) -> void: _pick(_simple, on))
 	var fill := Control.new()
 	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(fill)
@@ -80,11 +76,35 @@ func _init() -> void:
 
 
 func mode() -> String:
-	return "matrix" if _matrix.button_pressed else ""
+	return "matrix" if _matrix.button_pressed else "simple" if _simple.button_pressed else ""
 
 
 func _sync_mode() -> void:
 	_loops.visible = mode() == ""
+	_simple.visible = not _matrix.button_pressed
+
+
+func _check(text: String, tip: String, on: bool) -> CheckBox:
+	var c := CheckBox.new()
+	c.text = text
+	c.tooltip_text = tip
+	c.focus_mode = Control.FOCUS_NONE
+	c.add_theme_font_size_override("font_size", 13)
+	c.button_pressed = on
+	add_child(c)
+	return c
+
+
+func _pick(other: CheckBox, on: bool) -> void:
+	if on:
+		other.set_pressed_no_signal(false)
+	var cfg := ConfigFile.new()
+	cfg.load(PREFS)
+	cfg.set_value("view", "simple", _simple.button_pressed)
+	cfg.set_value("view", "mode", "matrix" if _matrix.button_pressed else "")
+	cfg.save(PREFS)
+	_sync_mode()
+	view_changed.emit(mode())
 
 
 func set_status(text: String, ok: bool) -> void:
@@ -106,11 +126,9 @@ static func saved_view() -> String:
 	return str(cfg.get_value("view", "mode", "")) if cfg.load(PREFS) == OK else ""
 
 
-static func save_view(m: String) -> void:
+static func saved_simple() -> bool:
 	var cfg := ConfigFile.new()
-	cfg.load(PREFS)
-	cfg.set_value("view", "mode", m)
-	cfg.save(PREFS)
+	return cfg.get_value("view", "simple", false) == true if cfg.load(PREFS) == OK else false
 
 
 func _button(text: String, on_press: Callable) -> Button:

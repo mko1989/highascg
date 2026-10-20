@@ -2,6 +2,8 @@ extends RefCounted
 ## WO-605 slice 1 — device-view cables, ported 1:1 from client/components/device-view-cables-physics.js: the
 ## per-edge colour (string hash → 32-colour palette) and the Verlet "hanging cable" with optional coils. Pure (tests
 ## preload it); the view caches build() results per edge and endpoints, as the web getOrBuild() does.
+## Slice 10b: the Node view's cables instead (device-view-cables.js buildSmoothSimpleMap / buildSmoothSimpleCable) —
+## a cubic Bézier whose ends fan out 18° per cable sharing the port.
 
 const COLORS := [
 	"#FF3333", "#FF6633", "#FF9933", "#FFCC33", "#FFFF33",
@@ -173,4 +175,44 @@ static func _relax(px: PackedFloat64Array, py: PackedFloat64Array, lp: PackedByt
 	var out := PackedVector2Array()
 	for i in n + 1:
 		out.append(Vector2(px[i], py[i]))
+	return out
+
+
+## buildSmoothSimpleMap: port id → the ids of the edges at it (either end), sorted — the fan order.
+static func simple_fans(edges: Array) -> Dictionary:
+	var out := {}
+	for e in edges:
+		if not e is Dictionary:
+			continue
+		for end in ["sourceId", "sinkId"]:
+			var id := str(e.get(end, "")) if e.get(end) != null else ""
+			if id != "":
+				if not out.has(id):
+					out[id] = []
+				out[id].append(str(e.get("id", "")))
+	for k in out:
+		out[k].sort()
+	return out
+
+
+## buildSmoothSimpleCable: [start, control 1, control 2, end]. Tension max(80, |dx|/2); each end turns by
+## (index − (n−1)/2)·π/10 within its port's fan (an edge missing from the fan — the ghost — counts as index −1).
+static func simple_curve(edge: Dictionary, a: Vector2, b: Vector2, fans: Dictionary) -> Array:
+	var id := str(edge.get("id", ""))
+	var src: Array = fans.get(str(edge.get("sourceId", "")), [id])
+	var sink: Array = fans.get(str(edge.get("sinkId", "")), [id])
+	var t := maxf(80.0, absf(b.x - a.x) * 0.5)
+	var step := PI / 10.0
+	var sa := (src.find(id) - (src.size() - 1) / 2.0) * step if src.size() > 1 else 0.0
+	var ka := (sink.find(id) - (sink.size() - 1) / 2.0) * step if sink.size() > 1 else 0.0
+	return [a, a + Vector2(t * cos(sa), t * sin(sa)), Vector2(b.x - t * cos(ka), b.y + t * sin(ka)), b]
+
+
+## The curve as a polyline (`n` segments) for drawing and hit tests.
+static func bezier(p: Array, n := 32) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in n + 1:
+		var u := i / float(n)
+		var v := 1.0 - u
+		out.append(p[0] * v * v * v + p[1] * 3.0 * v * v * u + p[2] * 3.0 * v * u * u + p[3] * u * u * u)
 	return out

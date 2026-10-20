@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Slice 10a (Matrix view) DONE 2026-10-20 — rows / crosspoints golden-replayed against the web matrix (mutation-checked), box-verified route / disconnect / undo / headers / adds (config restored; web "+ Stream"/"+ Record" list wipe fixed in Godot). Next: Node view (slice 10b, last unported Device View piece). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Slice 10a (Matrix view) DONE 2026-10-20 — rows / crosspoints golden-replayed against the web matrix (mutation-checked), box-verified route / disconnect / undo / headers / adds (config restored; web "+ Stream"/"+ Record" list wipe fixed in Godot). Slice 10b (Node view) DONE 2026-10-20 — sections / cards / Bézier cables golden-replayed against the web simple band (mutation-checked), box-verified card pages / cabling / undo / server page / add / toggles (config restored; web GPU subtitle gap fixed in Godot). Next: slice 11, DeckLink connector drag onto a destination / the Sources panel (unported in both rear views). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -1270,3 +1270,96 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
     the backup except `.highascg-state.json` (unrelated look-state autosave, rev bump).
 - Owner QA: the matrix's look on a big show file (50+ rows scroll) and whether "+ Live input" is wanted before the
   live-input modal is ported.
+
+## Slice 10b — Node view (2026-10-20, DONE)
+
+### Investigation
+- **Toggle** (`device-view-toolbar.js:86-95, 192-275`).
+  - "Node view" (tooltip "Compact node layout and straight cable lines on the rear panel.") persists in localStorage
+    `highascg_device_view_simple_wiring` ('1' or removed, `lib/device-view-simple-wiring-prefs.js`).
+  - The two view checkboxes are mutually exclusive (`:268-275`): checking one unchecks the other, and the sync
+    writes both prefs. Unchecking Matrix therefore returns to the classic panel, not to Node view.
+  - Node view hides the cable-loops slider. Matrix mode hides the Node view checkbox.
+- **Cards** (`device-view-caspar-render-simple.js` `renderCasparBandSimple`).
+  - Sections in a fixed order (`:108`): GPU, DeckLink, USB video, Virtual cam, Stream, Record, Audio.
+    - Items come from `buildCasparRearPanelData().markerItems` minus hidden ones and `decklink_ref`.
+    - Virtual cam / Stream / Record / Audio always show, with a "+" ("Add new x output") and "None yet — click + to
+      add." when empty. The other sections show only when they have items.
+  - A card holds: an icon (the item's own icon, else a per-kind one), the tag-stripped label, a status subtitle
+    (`statusSubtitle`, `:30-60`) and one dot.
+    - The dot sits on the left for inputs (`decklink_io` with direction "in", `audio_in`, `v4l2_in`) and on the
+      right otherwise (`appendSimpleNodeDot`, CSS `09d-…:125-129`). GPU outputs get right-side dots, so a
+      destination's cable crosses the card. The port keeps this.
+    - The card is dim when it is virtual or a disconnected GPU port. It is outlined when its connector's page is
+      open (`--selected`) or when it is the armed cable source (`--armed`).
+  - A card click opens the port's page (`onPortClick`). A click on the band but not on a card or dot opens the
+    Caspar server page (`:239-242`).
+  - A `decklink_io` card is draggable (`:219-228`) with `application/x-highascg-connector`. The drop targets are a
+    destination row (`setDecklinkAsDestinationOutput`) and the Sources panel (`sources-panel-decklink-drop.js`).
+    The classic rear panel has the same drag (`device-view-caspar-render-markers.js:193`), and neither view's drag
+    is ported to Godot yet → slice 11.
+- **Cables** (`device-view-cables.js:190-215` `buildSmoothSimpleCable`).
+  - A cubic Bézier with tension `max(80, |dx|·0.5)`.
+  - Each port's edges fan out by π/10 per step around its mean (`buildSmoothSimpleMap`); the held edge is excluded.
+  - The armed ghost uses the same curve, dashed.
+- **Web gaps**:
+  1. GPU subtitle: the marker items never carry `monitor` / `resolution` / `refreshHz`, so every connected GPU card
+     reads "Connected". Godot shows the intended "P80 · 1920x1080 · 50 Hz" line, taken from the rear-panel slot
+     data (`buildCasparRearPanelData` items matched by `gpuPhysicalPortCableId`).
+  2. `resolveStatusClass` adds a per-card status class, but the simple-wiring CSS overrides its colours, so it has
+     no visible effect. Not ported.
+  3. The classic rear panel has no USB video slot, while Node view does (suggested `v4l2_in` connectors on
+     `caspar_host`). Ported as the web has it.
+  4. The GPU split-id cable mapping in the card builder is unreachable: GPU items never carry split ids.
+
+### What was done
+- `features/devices/node_view_model.gd` (new, pure): `sections(slots, payload)` → titled sections of
+  `{id, label, sub, kind, icon, dim, input}`, `subtitle(item, live)`, `kind_title(kind)`. Built on
+  `devices_model.gd`'s slots, so the GPU ids and labels are the classic panel's.
+- `features/devices/node_panel.gd` (new): a "REAR PANEL" grid of section columns, which reflows on resize.
+  - Card Buttons with a `port_icon.gd` dot registered in `anchors` (the cable overlay and gesture use the same
+    anchor map as the classic panel).
+  - `highlight(selected, armed)` sets the outline.
+  - Signals: `add_requested(kind)`, `open_requested(id)`.
+- `cable_model.gd`: `simple_fans(edges)`, `simple_curve(edge, a, b, fans)`, `bezier(pts)`.
+  `cable_layer.gd`: `simple` + `edges`.
+  - In simple mode the layer rebuilds the Bézier set on any anchor change. There is no Verlet settle.
+  - The ghost is drawn dashed.
+- `devices_toolbar.gd`: the "Node view" checkbox (pref `[view] simple`), mutually exclusive with Matrix like the
+  web. `mode()` returns "", "simple" or "matrix".
+- `devices_tab.gd`: Node mode swaps `_rear` for `_nodes` and feeds anchors from whichever is visible.
+  - The rear-panel-only gestures (DeckLink edit drag, GPU row label) are skipped in Node mode.
+  - The background → server page check uses the visible panel.
+  - `_open_port` / `_close_port` re-run `_sync`, so the card outline follows the open page.
+  - The cables list moved to `cables_list.gd` (the tab was at 496 / 500 lines; it is now 466).
+
+### What was VERIFIED
+- **Golden replay**: `tests/test_devices_node_view.gd` against `tests/golden/devices_node_view.json`. The
+  generator runs the real `renderCasparBandSimple` and `buildSmoothSimpleCable` under Node on a fake DOM.
+  - Payloads:
+    - the live box;
+    - a rich payload: a DeckLink IN in both the graph and suggested, a faulted / inherited DeckLink, USB video,
+      active stream / record / virtual cam, audio, a `<b>` label;
+    - saved DeckLink order;
+    - empty;
+    - the 10 GPU-topology fixtures;
+    - a split connector id.
+  - Checked: sections, cards (GPU subtitle against the intended slot line) and cable d-strings within 0.051 px,
+    ghost included.
+  - Suite: 12772 / 12772 passing (+476 over 10a). `--check` boots clean; no file is over 500 lines.
+- **Mutation check**: every mutant was killed except the GPU split-id mapping (equivalent; gap 4).
+- **Box** (GUI on the Devices tab, live server; config backed up first):
+  - Node view showed GPU (DP 0/1 and DP 4/5 dim "Disconnected", DP 2/3 and DP 6/7 "P80 · 1920x1080 · 50 Hz"),
+    DeckLink 1-4 and the empty Virtual cam / Stream / Record / Audio sections, with the two live cables as Béziers.
+  - A DP 2/3 card click opened the GPU page (P1) with the card outlined.
+  - Arming Main LED PRV tinted the targets and drew the dashed ghost. A click on the DP 4/5 dot wrote the `gpu_p2`
+    edge (`config/device_graph.json`) and Apply turned restart-dirty. Ctrl+Z removed it ("Undo successful").
+  - A click on the band background opened the Server page.
+  - Stream "+" added Str1 as an Idle card ("Added stream output Str1").
+  - A click on a cable selected it (thick line, blue ends, list row with Remove).
+  - Toggles:
+    - Node → Matrix unchecked Node (`simple=false mode="matrix"`) and hid it.
+    - Matrix off → classic panel with the loops slider (`simple=false mode=""`).
+  - Restore: `stream_outputs.json` was copied back and node restarted. The md5s match the backup except
+    `.highascg-state.json` (the look-state autosave). The GUI was left running in the default view.
+- Owner QA: Node view on a larger show file (many outputs → grid reflow).

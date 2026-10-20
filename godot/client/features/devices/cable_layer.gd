@@ -7,6 +7,9 @@ extends Control
 ## Slice 2c: `selected_id` thickens a cable like hover, `hidden_id` hides the cable whose end is held (re-grab), and
 ## while `ghost_from` is set a dashed straight ghost runs from that anchor to `pointer` (web --ghost, dasharray 5 4).
 ## `hit()` is the click hit-test the tab uses, since the layer itself stays click-through.
+## Slice 10b: `simple` (Node view) draws each cable as cable_model.gd's fanned Bézier instead — rebuilt at once on
+## any anchor change (it is cheap), the fan counted over `edges` (the graph's, minus the held one, like the web) — and
+## the ghost as a dashed curve.
 
 const CableModel := preload("res://features/devices/cable_model.gd")
 const SETTLE_MS := 150
@@ -31,7 +34,15 @@ var selected_id := "":
 var hidden_id := "":
 	set(v):
 		hidden_id = v
+		if simple:
+			_sig = ""
 		queue_redraw()
+var simple := false:
+	set(v):
+		simple = v
+		_sig = ""
+		_built = {}
+var edges: Array = []  # the graph's edges (Node view fans)
 var ghost_from := "":  # anchor key, "" = no ghost
 	set(v):
 		ghost_from = v
@@ -94,8 +105,10 @@ func _process(_delta: float) -> void:
 		for id in _built.keys():
 			if not ends.has(id):
 				_built.erase(id)
+		if simple:
+			_build_simple()
 		queue_redraw()
-	if now < _settle_at:
+	if simple or now < _settle_at:
 		return
 	# Settled: rebuild ONE stale cable per frame (a GDScript build costs ~35–75 ms).
 	for c in cables:
@@ -110,6 +123,20 @@ func _process(_delta: float) -> void:
 			"pts": CableModel.build(e[0].x, e[0].y, e[1].x, e[1].y, loops, CableModel.seed_of(c.id))}
 		queue_redraw()
 		return
+
+
+func _fans() -> Dictionary:
+	return CableModel.simple_fans(edges.filter(func(e: Variant) -> bool: return not (e is Dictionary and str(e.get("id", "")) == hidden_id)))
+
+
+func _build_simple() -> void:
+	var fans := _fans()
+	for c in cables:
+		if _ends.has(c.id):
+			var e: Array = _ends[c.id]
+			var edge := {"id": c.id, "sourceId": str(c.from).get_slice("#", 0), "sinkId": c.to}
+			_built[c.id] = {"key": "", "color": CableModel.color(c.id), "ends": e,
+				"pts": CableModel.bezier(CableModel.simple_curve(edge, e[0], e[1], fans))}
 
 
 ## The cable as drawn now: its last build, its ends shifted onto the current anchors (a linear blend along the
@@ -159,5 +186,30 @@ func _draw() -> void:
 		draw_polyline(shadow, Color(0, 0, 0, 0.45), 4.0, true)
 		draw_polyline(pts, color, 4.2 if id == active_id or id == selected_id else 2.8, true)
 	var a := _find(ghost_from) if ghost_from != "" else null
-	if a:
+	if a and simple:
+		var from: Vector2 = get_global_transform().affine_inverse() * a.anchor()
+		var ghost := {"id": "ghost", "sourceId": ghost_from.get_slice("#", 0), "sinkId": "ghost-sink"}
+		_dashes(CableModel.bezier(CableModel.simple_curve(ghost, from, pointer, _fans())))
+	elif a:
 		draw_dashed_line(get_global_transform().affine_inverse() * a.anchor(), pointer, GHOST, 2.5, 5.0, true, true)
+
+
+## A polyline dashed 5 on / 4 off (stroke-dasharray 5 4).
+func _dashes(pts: PackedVector2Array) -> void:
+	var on := true
+	var left := 5.0
+	for i in range(pts.size() - 1):
+		var p := pts[i]
+		var q := pts[i + 1]
+		var seg := p.distance_to(q)
+		while seg > 0.0:
+			var run := minf(left, seg)
+			var r := p + (q - p).normalized() * run
+			if on:
+				draw_line(p, r, GHOST, 2.5, true)
+			p = r
+			seg -= run
+			left -= run
+			if left <= 0.0:
+				on = not on
+				left = 5.0 if on else 4.0
