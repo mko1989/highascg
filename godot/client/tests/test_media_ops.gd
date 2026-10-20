@@ -3,6 +3,7 @@ extends RefCounted
 ## src/api/routes-media.js runBatchMediaOp).
 
 const O := preload("res://features/live/media_ops.gd")
+const D := preload("res://features/live/media_download.gd")
 var t
 
 
@@ -99,3 +100,15 @@ func test_gather_text() -> void:
 	t.eq(O.gather_text({"ok": true, "data": {"ok": true, "folder": "p", "moved": [], "failed": []}}), "✓ Every referenced clip is already in the project folder")
 	t.eq(O.gather_text({"ok": true, "data": {"ok": false, "folder": "p", "moved": [{}], "failed": [{"id": "x", "error": "Destination file already exists"}]}}), "✗ Gathered 1 file into p/, 1 failed — first: Destination file already exists")
 	t.eq(O.gather_text({"ok": false, "status": 409, "data": {"ok": false, "error": "No project is open."}}), "✗ Gather failed: No project is open.")
+
+
+func test_download_url_and_progress() -> void:
+	t.eq(D.file_url("projects/airport/1. Główne Tło.mov"), "/api/local-media/projects%2Fairport%2F1.%20G%C5%82%C3%B3wne%20T%C5%82o.mov/file", "one encoded id segment, like the web encodeURIComponent")
+	t.eq(D.progress_text("a.mov", 524288000, 1048576000), "Downloading a.mov… 50% (500 MB of 1000 MB)")
+	t.eq(D.progress_text("a.wav", 1048576, -1), "Downloading a.wav… 1.0 MB", "no Content-Length → bytes only")
+
+
+func test_downloads_dir_fallback() -> void:
+	var home := OS.get_environment("HOME")
+	t.eq(D.downloads_dir("/x/Dl", home), "/x/Dl", "a configured XDG dir wins")
+	t.eq(D.downloads_dir(home, home), home.path_join("Downloads") if DirAccess.dir_exists_absolute(home.path_join("Downloads")) else home)

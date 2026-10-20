@@ -34,6 +34,7 @@ const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
 const ProjectBar := preload("res://features/live/project_media_bar.gd")
+const Download := preload("res://features/live/media_download.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -52,6 +53,7 @@ var _ingest_label: Label
 var _bar: SelectionBar
 var _select_queued := false
 var project_bar: ProjectBar
+var _dl: Download
 
 
 func _ready() -> void:
@@ -140,12 +142,17 @@ func _ready() -> void:
 	stop.text = "✕"
 	stop.tooltip_text = "Cancel the copy / hide"
 	stop.pressed.connect(func() -> void:
-		if _ingest_label.text.begins_with("Copying"):
+		if _dl.active():
+			_dl.cancel()
+		elif _ingest_label.text.begins_with("Copying"):
 			Api.post_json("/api/media/ingest-local/cancel", {})
 		else:
 			_ingest_row.visible = false)
 	_ingest_row.add_child(stop)
 	media.add_child(_ingest_row)
+	_dl = Download.new()
+	_dl.line.connect(_line)
+	add_child(_dl)
 	get_window().files_dropped.connect(_on_files_dropped)
 	Ws.message.connect(func(type: String, data: Variant) -> void:
 		if type == Ingest.EVENT and data is Dictionary:
@@ -187,6 +194,8 @@ func _on_selection() -> void:
 
 ## WO-603 slice 9: Delete / Backspace deletes the selected files (web sources-panel.js:336, same confirm); a
 ## right-click on a folder offers "Delete folder…" (the web ✕ on the folder row).
+## Slice 11: a right-click on a file offers Download to this computer… and Delete… (owner 20.10: the right-click menu
+## replaces the web's Alt / Ctrl+Alt+click shortcuts — openbox also grabs Alt+click for window moves).
 func _tree_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k != null and k.pressed and not k.echo and k.keycode in [KEY_DELETE, KEY_BACKSPACE] and not _bar.ids.is_empty():
@@ -194,19 +203,45 @@ func _tree_input(event: InputEvent) -> void:
 		_bar.confirm_delete()
 		return
 	var mb := event as InputEventMouseButton
-	var f: Variant = _folder_at(mb.position) if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT else null
-	if f == null or str(f) == "":
+	if mb == null or not mb.pressed:
+		return
+	if mb.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	var file := _file_at(mb.position)
+	var f: Variant = _folder_at(mb.position)
+	if (f == null or str(f) == "") and file == "":
 		return
 	_tree.accept_event()
 	var menu := PopupMenu.new()
-	menu.add_item("Delete folder…")
-	menu.id_pressed.connect(func(_id: int) -> void: _bar.confirm_delete_folder(str(f)))
+	if file != "":
+		menu.add_item("Download to this computer…", 0)
+		menu.add_item("Delete…", 1)
+		menu.id_pressed.connect(func(i: int) -> void:
+			if i == 0:
+				_dl.ask(file, Config.origin)
+			else:
+				_delete_one(file))
+	else:
+		menu.add_item("Delete folder…")
+		menu.id_pressed.connect(func(_id: int) -> void: _bar.confirm_delete_folder(str(f)))
 	menu.popup_hide.connect(menu.queue_free, CONNECT_DEFERRED)
 	add_child(menu)
 	var at := Vector2i(get_viewport().get_mouse_position())
 	if not get_viewport().gui_embed_subwindows:  # embedded popups take window coordinates (deck_view._card_menu)
 		at += get_window().position
 	menu.popup(Rect2i(at, Vector2i.ZERO))
+
+
+## A media file row under the pointer → its id, or "".
+func _file_at(at: Vector2) -> String:
+	var it := _tree.get_item_at_position(at)
+	var m: Variant = it.get_metadata(0) if it != null else null
+	return str(m.value) if m is Dictionary and (m as Dictionary).has("row") else ""
+
+
+func _delete_one(id: String) -> void:
+	_bar.set_selection([id], id.get_base_dir())
+	_bar.confirm_delete()
 
 
 ## A folder row under the pointer (web: folders are the move targets), or null.

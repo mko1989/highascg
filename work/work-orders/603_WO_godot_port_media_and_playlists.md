@@ -696,5 +696,41 @@ breaks. The confirm dialog lists the source paths, so this is visible before it 
 
 ### Still open (after slice 10)
 
-- Ctrl+click download and Placeholders.
+- Placeholders (slice 11 below did the download).
 - The owner's ticks on the checklist.
+
+## Slice 11 (20.10) — download to this computer; right-click file menu
+
+**Status of this slice: DONE (20.10, Godot tests + box GUI download byte-identical)**
+
+### Investigation
+
+- The parity rows were wrong about the web (`client/components/sources-panel-helpers.js:79-110`):
+  - **Alt**+click downloads (Ctrl+click is multi-select);
+  - Ctrl+Alt+click removes, and it DOES confirm ("Remove … from the server? This cannot be undone.").
+
+  So the owner question on row 19 ("keep the no-confirm shortcut?") was moot.
+- `GET /api/local-media/<encoded id>/file` already streams the file with `Content-Disposition` and
+  `Content-Length`. Box check: an 823 MB WAV arrived at its exact size.
+- Box: openbox grabs Alt+Left for window moves, so an Alt+click never reaches the app. Owner 20.10: "no need for
+  intricate shortcuts in godot as we have the right click menu here".
+
+### What was done
+
+- New `features/live/media_download.gd`.
+  - A save FileDialog: the system Downloads dir, falling back to `~/Downloads` when Godot answers `$HOME`. The file
+    name is prefilled.
+  - Then an `HTTPRequest.download_file` stream straight to disk (HAP clips are GBs and are never buffered), with no
+    timeout and a progress line every 0.5 s ("Downloading x… 45% (370 MB of 823 MB)").
+  - ✕ cancels, and a cancelled or failed download deletes its partial file.
+  - The caller passes `Config.origin` (the test runner has no autoloads).
+- `media_panel.gd`: a right-click on a FILE opens "Download to this computer…" / "Delete…". Delete selects the file
+  and uses the bar's normal confirm. A right-click on a folder still offers "Delete folder…". There are no modifier
+  shortcuts.
+
+### What was VERIFIED
+
+- Godot: `test_download_url_and_progress` (the id is encoded as one segment, matching `encodeURIComponent`) and
+  `test_downloads_dir_fallback`. All 16098 tests pass.
+- Box GUI: right-clicked `projects/airport/Slide5.PNG`, chose Download, and saved into the scratchpad. The result
+  was 127390 bytes and `cmp` with the media file found it IDENTICAL.

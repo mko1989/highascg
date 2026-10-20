@@ -29,8 +29,8 @@ web features found while porting.
 | 15 | Download from a URL, with progress | "+" → Download from URL…, status polled | ported (slice 8) | [ ] |
 | 16 | Warn on take when the look's media is missing | take reply `missingMedia` (node) → "⚠ Missing in Caspar media: …" on the deck status line | ported (9a) | [ ] |
 | 17 | Name the AMCP commands that failed during a take | same status line, "⚠ N command(s) failed during take — first: …" | ported (9a) | [ ] |
-| 18 | Ctrl/⌘+click downloads a file to this computer | — | gap | [ ] |
-| 19 | Ctrl/⌘+Alt+click removes a file from the server (no confirm) | — (Delete key / button with confirm covers removal) | gap — ask: keep the no-confirm shortcut? | [ ] |
+| 18 | Download a file to this computer (web: Alt+click) | right-click a file → Download to this computer… (media_download.gd, streamed to disk) | ported (slice 11) | [ ] |
+| 19 | Remove a file from the server (web: Ctrl+Alt+click, with confirm) | right-click a file → Delete… ; Delete key; bar button (all confirm) | ported (slice 11; owner: right-click menu instead of shortcuts) | [ ] |
 | 20 | Project media bar: project folder path, "project only" filter, Gather referenced clips into it | project_media_bar.gd above the Media filter; server plans + moves (GET /api/media/project, POST /api/media/gather) | ported (slice 10) | [ ] |
 | 21 | Import USB… (drive picker, copy into media) | only the Settings toggle | gap (WO-608 owns the USB modal) | [ ] |
 | 22 | Drag media onto a look / layer | look editor drop, multi-file drop onto a layer playlist | ported (WO-600, slice 6) | [ ] |
