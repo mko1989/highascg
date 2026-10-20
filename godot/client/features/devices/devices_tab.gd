@@ -16,6 +16,7 @@ extends MarginContainer
 ## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
 ## Slice 7c: the "Mapping nodes" column (mapping_panel.gd) between the destinations and the rear panel; a card (or a
 ## mapping connector focused from a destination) opens the node page (mapping_controls.gd).
+## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd); Load opens from WO-608.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -33,6 +34,7 @@ const OutputControls := preload("res://features/devices/output_port_controls.gd"
 const ServerControls := preload("res://features/devices/server_controls.gd")
 const MappingPanel := preload("res://features/devices/mapping_panel.gd")
 const MappingControls := preload("res://features/devices/mapping_controls.gd")
+const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
@@ -57,6 +59,7 @@ var _outp: OutputControls
 var _server: ServerControls
 var _maps: MappingPanel
 var _mapc: MappingControls
+var snapshots: SnapshotDialogs
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -76,6 +79,10 @@ func _ready() -> void:
 	_confirm.dialog_text = "Are you sure you want to remove ALL cable connections?"
 	_confirm.confirmed.connect(_gesture.remove_all)
 	add_child(_confirm)
+	snapshots = SnapshotDialogs.new()
+	add_child(snapshots)
+	snapshots.status.connect(_set_status)
+	snapshots.applied.connect(refresh)
 	_bar = _toolbar()
 	v.add_child(_bar)
 	var body := HBoxContainer.new()
@@ -194,6 +201,7 @@ func _toolbar() -> Control:
 	h.add_child(_button("Reset all cabling", func() -> void: _confirm.popup_centered()))
 	_apply_btn = _button("Apply Caspar config (restart)", _gesture.apply_caspar)
 	h.add_child(_apply_btn)
+	h.add_child(SnapshotDialogs.save_button(func() -> void: snapshots.open_save(_rear, _cables)))
 	var r := Button.new()
 	r.text = "↻"
 	r.tooltip_text = "Reload devices"
@@ -363,7 +371,7 @@ func _set_status(text: String, ok: bool) -> void:
 ## its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _confirm.visible:
+	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open():
 		return
 	if event is InputEventMouseMotion:
 		var lp: Vector2 = _cables.get_global_transform().affine_inverse() * event.global_position

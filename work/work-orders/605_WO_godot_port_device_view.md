@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Next: slice 8 snapshots. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Next: slice 9 GPU / DeckLink edit modes. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -715,3 +715,110 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
 - Not exercised live: the failure paths (golden-tested only) and Apply Caspar config with a mapping node cabled. The
   Caspar side of pixel mapping is outside this port.
 
+
+## Slice 8 — device snapshots (2026-10-20, DONE)
+
+### Investigation
+- Save entry: the Devices header's download-arrow button (`device-view-toolbar.js:28-51`, re-wired by WO-445 /
+  b96324a4 after WO-435 removed the old text buttons), title "Save device snapshot (cabling + GPU/DeckLink profile as
+  JSON)". It calls `openSaveDeviceSnapshotModal` (`device-view-snapshot-modals.js:39`):
+  - The modal has a device name (placeholder "e.g. OB truck Caspar 1"), a live "File: <slug>.json" line, an "Embed
+    rear-panel image (PNG)" checkbox (on by default), the scope note, and Cancel / "Save…".
+  - Save… runs these steps:
+    1. An empty name gives "Enter a device name.".
+    2. GET `/api/device-snapshot/build`. Anything but `{ok, kind: highascg-device-snapshot}` gives "Save failed: <error
+       | 'Server did not return a device snapshot envelope'>".
+    3. With the checkbox on, it captures the rear panel (`lib/device-snapshot-capture.js`: html-to-image `toPng` of the
+       rear-panel element at pixelRatio 2, giving `{mimeType, encoding: base64, width, height, data}`). A failure gives
+       "Saved without image (capture failed).".
+    4. It builds the doc in key order kind, version, deviceName, slug, createdAt (build's or now), appVersion?, host?,
+       visual?, payload.
+    5. It downloads `<slug>.json` as `JSON.stringify(doc, null, 2)`, shows "Saved <slug>.json" and closes.
+  - Slug rule: lowercase, runs of non-`[a-z0-9]` become "-", trimmed of "-", and "" becomes "device".
+- Load: `openLoadDeviceSnapshotModal` (`:120`). It has no Devices entry since WO-435 ("snapshots ride in the project
+  file"); only `project-hardware-reconcile-modal.js` opens it, and that modal is WO-608 scope.
+  - Layout: the intro, a file input, mode Full / Graph only, a preview, and Cancel / Preview / Apply (Apply disabled).
+  - Picking a file shows "No file selected." / "Click Preview to validate and list changes." / "Invalid JSON: …".
+  - Preview POSTs `/api/device-snapshot/apply {snapshot, mode, dryRun: true}`, giving "Mode / Sections / Changed keys …
+    Click Apply to write to config." or "Error: <msg | 'Validation failed'>". Apply is enabled only after a passing
+    preview.
+  - Apply asks to confirm, then POSTs with dryRun false. Success gives "Device snapshot applied.", fires
+    `highascg-settings-applied` + onApplied, and closes. Failure gives "Apply failed: <msg | 'Apply failed'>".
+- Server (`src/api/routes-device-snapshot.js`, `src/config/device-snapshot.js`) is unchanged. A rejected snapshot is 400
+  `{ok: false, error: 'Invalid device snapshot', details: […]}`.
+- Web gaps found (ported as the web behaves unless noted):
+  1. "Saved without image (capture failed)." is overwritten by "Saved …" in the same tick (both show here too, in
+     order).
+  2. A failed apply reads "Apply failed: Apply failed" when the server gives no message (ported as-is).
+  3. The dry run's 400 `details` list is dropped. **Godot lists them under the error.**
+  4. The capture is html-to-image of the element at 2×. **Godot crops the window's pixels under the rear panel at 1×,
+     grabbed when Save opens, with the cable layer hidden for that frame** (the web's element capture excludes the
+     cable overlay too).
+  5. The browser downloads silently to the default folder. **Godot opens a save-file dialog** (default
+     `~/Downloads/<slug>.json`). Cancelling it leaves the Save dialog open; a write failure goes to the status line.
+  6. The Load dialog keeps the web's lack of a Devices entry. It is reachable from WO-608's reconcile modal (to port)
+     and from a dev flag `--probe-snapshot-load`.
+  7. Observation, server side: applying a full snapshot rewrote `general.json` without its empty
+     `"multiview_os_rate": ""` key. The web client calls the same endpoint, so it behaves the same; this was not chased
+     here.
+
+### What was done
+- `features/devices/snapshot_model.gd` (pure):
+  - the texts and the slug / file label;
+  - `iso(ms)` (toISOString), the envelope check and the document (web key order);
+  - `to_text`: integral floats are written as ints, so Godot's text equals `JSON.stringify(doc, null, 2)` byte for
+    byte;
+  - the file parse (line numbers from 1), the dry-run text and the confirm text.
+- `features/devices/snapshot_flow.gd`: save / on_file / dry_run / apply over an injected io, shared by the dialogs and
+  the golden replay.
+- `features/devices/snapshot_dialogs.gd`:
+  - the header button (the web's download-arrow icon drawn in `_draw`);
+  - the Save dialog (fresh name / checkbox each open like the web's new modal, with an autowrapped note given a width
+    so the dialog does not grow a line per word), the rear-panel capture and the save-file dialog;
+  - the Load dialog (Choose file… / mode / preview, plus Cancel / Preview / Apply) and its confirm.
+  - Apply re-reads Settings and emits `applied`, which reloads the Devices tab.
+- `devices_tab.gd`: the button after "Apply Caspar config" (the web's order), dialog status lines to the tab status,
+  and the tab's click capture stands down while a snapshot dialog is open. `app/main.gd`: `--probe-snapshot-load`.
+
+### What was VERIFIED
+- `tests/test_devices_snapshot.gd` + `tests/golden/devices_snapshot.json`: the scratchpad generator `sn_golden.mjs`
+  runs the web modals + capture module under Node on the DOM shim against a scripted server, with Date pinned.
+  - 22 cases and 51 replayed steps:
+    - Save: name edits, empty name, with / without capture, a unicode slug, an odd payload (unicode, escapes, 29.97,
+      1e21, -0), a bare envelope (createdAt from now), build failure / not ok / wrong kind, Cancel.
+    - Load: no file, an invalid file, Preview before a file, dry run ok / not ok / thrown, mode switch, confirm
+      declined, apply ok / not ok / thrown, Cancel.
+  - Per step the test compares the requests (GET / POST mode·dryRun·kind / confirms / settings-applied), the status
+    lines, open / closed, the downloaded file name and its exact text, the preview and whether Apply is enabled. JSON
+    parse messages are compared by their "Invalid JSON: " prefix only.
+  - Also checked: slug and ISO tables, document key order with a visual, the details list (gap 3), and parse error
+    line numbers.
+  - Godot `--test` 11714 / 11714, `--check` boot OK, 0 files over 500 lines.
+- Box GUI (`config/` copied + md5-listed first):
+  - The arrow button sits after Apply Caspar config.
+  - Save with the image: "Shop Box Caspar 1" (File line followed: `shop-box-caspar-1.json`) → Save… → file dialog at
+    `~/Downloads` with that name → Save → status "Saved shop-box-caspar-1.json".
+    - The written file has keys `kind, version, deviceName, slug, createdAt, appVersion, host, visual, payload`.
+    - Its text equals Node's `JSON.stringify(JSON.parse(text), null, 2)`.
+    - payload and host equal a fresh GET `/api/device-snapshot/build`.
+    - The visual decodes as a 616×308 PNG of the rear panel alone (no cables).
+    - The server dry run accepts it: `sections` deviceGraph / screenDestinations / gpuPhysicalTopology / systemDisplay /
+      casparServer, `changedKeys: []`.
+  - Save edge paths:
+    - An empty name gives "Enter a device name." and the dialog stays open.
+    - The checkbox off, then a cancelled file dialog: the Save dialog stays open and nothing is written.
+    - Saving again gives `no-image.json` without `visual`.
+  - Load (via `--probe-snapshot-load`):
+    - Preview without a file gives "Select a valid JSON file first.".
+    - `broken-snap.json` gives "Invalid JSON: Expected key …".
+    - A copy of the saved snapshot with one destination renamed, then Preview, gives "Mode: full / Sections: … /
+      Changed keys: screenDestinations", and Apply is enabled.
+    - Apply shows the confirm "Apply device snapshot (full)? This updates saved configuration." Pressing OK closes the
+      dialog, shows "Device snapshot applied." and the card re-renders as "Main LED SNAP".
+  - Afterwards `screen_destinations.json`, `general.json` and `.highascg-state.json` were restored and node restarted.
+    Every config file was byte-identical, and the GUI was relaunched showing "Main LED (DP-7)". The test files were
+    moved out of `~/Downloads` to the scratchpad.
+- Not exercised live: graph-only mode apply and the server-error paths (golden-tested only).
+- Still unported in the Device View: the GPU layout and DeckLink rear-order edit modes (the band headers' pencil
+  buttons: drag markers, Show all, Clear layout, the inspector layout editors). That is slice 9. The Caspar config
+  editor modal (Devices header icon) is in WO-608's inventory.

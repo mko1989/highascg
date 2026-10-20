@@ -48,6 +48,8 @@ func _ready() -> void:
 		print("[client] transition ", lt3.deck.set_look_transition(tp[0], {"type": tp[1], "duration": int(tp[2])}))
 		await ProjectSync.saved
 		print("[client] saved rev ", Store.project.get("rev"))
+	if Config.args.has("probe-snapshot-load"):  # dev: the Load device snapshot dialog (its entry is WO-608's)
+		shell.tabs.get_node("Devices").snapshots.open_load()
 	if Config.args.has("probe-edit"):  # dev: --probe-edit=<sceneId> opens the look editor (WO-600 F)
 		if not Ws.is_open:
 			await Ws.connected
