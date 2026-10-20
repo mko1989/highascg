@@ -291,9 +291,50 @@ So the client only posts. Two web findings:
 - **Not exercised on the box** (each one replaces or blacks out the owner's live show): a real Load / Load from file /
   New project, a rename, FTB. Owner-QA.
 
-**Next header slices (open):**
-- Server ▾ strip (`configComparison`).
-- Stream/record + replication badges.
-- PGM now-playing timer.
-- Audio-monitor menu.
-- LED test card: needs server-side settings + a master endpoint first.
+## 2026-10-20 — Header slice 2: Server ▾, stream/record + replication badges, PGM timer, headphones
+
+**Investigation.** The web gets its data like this:
+- **Badges** (`header-bar-streaming.js`): settings `streamOutputs` / `recordOutputs`, plus the live status from
+  `GET /api/streaming-channel` and the WS `streaming_channel` event (`routes-streaming-channel-log.js:35`).
+- **Replication letter** (`replication-ui-state.js`): polls `/api/replication/status` every 2.5 s, plus WS
+  `replication_status`.
+- **PGM timer** (`app-pgm-header-timer.js`): the shared `mountPgmTopLayerPlaybackTimer`, which Godot already has as
+  `features/live/pgm_timer_view.gd` (WO-600 O, the deck columns). There is one 3-letter chip per screen (WO-506).
+- **Headphones** (`header-bar-audio.js`): the upper half picks which browser preview stream plays locally. The Godot
+  client plays no stream audio. The lower half (`POST /api/audio/monitor-source`) appears only with a monitor or
+  preview bus.
+- **Server ▾** (`header-bar-config-strip.js`): `state.configComparison`.
+
+Box state: one screen, `monitorCh` null, `audioPreview.enabled` false; replication standalone; one record output
+`rec_1`.
+
+**Done.**
+- **`app/header_badges_model.gd`** (pure): `stream_badges` (S/R + number, or the name's initial),
+  `replication_badge` (L/F, active / pending / available), `timer_chips`, `monitor_options`, `config_strip`, and the
+  web CSS badge colours.
+- **`app/header_badges.gd`** — round 24 px badges after FTB. Clicking one opens the Devices tab.
+- **`app/header_tools.gd`**:
+  - Server ▾ / ▴ opens an opaque popup with the summary, the # / Module expects / Server table, issues and hint.
+  - New beyond the web: a mismatch tints the button WARN and the summary is in its tooltip, so the operator sees it
+    without opening the strip.
+- **`app/header_status.gd`**:
+  - Screen chips (only with more than one screen; the choice is kept in `ui.cfg [header] timer_main`).
+  - The reused `TimerView` and the wall clock.
+  - Headphones (`headphones.svg`, the web's Lucide path) with the server monitor menu. Hidden without a monitor bus.
+- `shell.gd` wiring: badges → Devices tab, ⚙ → Settings tab, the OSC mirror → header timer.
+
+**Verified.**
+- Godot suite 16143 passed / 0 failed (new `tests/test_header_badges_model.gd`, 25 assertions).
+- Box header now reads: `… Server ▾ · ⚙ · FTB · (R1) … PROJECTS/NPCC/TLO ORANGE BALL/B… 0:20 / 0:20 (−0:00)
+  [red bar] · 20:29:33 · pulse · eyes`, which matches the web screenshot. Headphones are absent, as expected on
+  this box.
+- Server ▴ popup: "Server config matches module settings (8 channels). Caspar screen outputs: 1 (ch 1). App
+  screens: 1." It shows 8 rows (ch 1 "(screen)") and the INFO CONFIG hint.
+- R1 click → Devices tab. ⚙ → Settings tab. Then back to Live.
+- **Not exercised on the box:** a live recording turning R1 red, the replication letter, multi-screen chips and the
+  monitor menu. This box has no such state; each one is covered by the model tests. Owner-QA.
+
+**Next header slice (open):** LED test card. Its settings live in browser localStorage and the targets / payloads are
+built in the browser (`led-test-apply.js`), so directive D first needs a server-side settings store + a master
+endpoint (`POST /api/led-test-card/master {enabled}`), then the Godot checkbox + Test card… dialog. Also not ported:
+the web's "Paired with <peer>" label beside the replication letter.

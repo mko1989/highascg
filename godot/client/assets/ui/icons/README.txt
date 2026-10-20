@@ -6,3 +6,4 @@ raw and rasterised at runtime by app/ui_icons.gd — no import step, like assets
 no font with ⏱ (U+23F1) or ⏸ (U+23F8): `fc-list ':charset=23f1'` is empty, so those glyphs rendered blank.
 save / load (WO-608 header) are the web header's two-image buttons (client/assets/arrow-right|left.svg + save.svg,
 IcoMoon 17×17) joined into one 34×17 drawing — width 48 / height 24 so the px/24 raster scale keeps them 2:1.
+headphones (WO-608 header audio monitor) is the web header-bar-audio.js Lucide stroke path.

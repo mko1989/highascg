@@ -86,6 +86,9 @@ func _ready() -> void:
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
 	header_tools.settings_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(settings))
 	header_tools.notice.connect(header_project.say)
+	header_tools.badges.devices_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(devices))
+	header_status.notice.connect(header_project.say)
+	header_status.setup(osc)
 	_refresh_eye()
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
@@ -132,7 +135,7 @@ func _build_header() -> Control:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
-	header_status = HeaderStatus.new()  # wall clock
+	header_status = HeaderStatus.new()  # PGM timer · wall clock · headphones
 	header_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	row.add_child(header_status)
 	_perf_btn = UiIcons.button("pulse", "Performance overlay — CPU / GPU / RAM of this client and the box (F3)")
