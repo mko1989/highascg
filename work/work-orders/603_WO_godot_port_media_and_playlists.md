@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag), box-verified; remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
+**Status: IN PROGRESS (2026-10-20) — slices 1–4 done (desktop drop → server local-path ingest; multi-select + Copy/Move/Delete/New folder bar, CLS folders merged; multi-rename planned in node; HAP encode dialog/progress/cancel, on-air decided in node) + slice 5 (Playlists footer, timeless/missing/Set all planned in node) + slice 6 (look-layer playlist editor, every edit planned by `POST /api/playlist/edit`; multi-selection drag) + slice 7 (files dropped on a media folder move / Alt-copy), box-verified; remote upload, parity checklist still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (HTTP upload layer), WO-600 (sources panel K = the media browser tree), WO-601 (media file inspector).**
 
 # WO-603 — Godot port: media library operations, ingest/uploads, HAP encode, multi-rename, playlists
 
@@ -395,7 +395,47 @@ playlist yet. → the editor and the multi-drag are slice 6.
 - Not proven on the box: edits reaching a look that is live on program (`patched` > 0) and Next on air. A take
   would replace the owner's program. Covered offline; owner QA.
 
-### Still open
+### Still open (after slice 6)
 
 Remote (HTTP streaming) upload; parity checklist; multi-drop onto compose tiles and a multi-selection "Move to"
-by drag (the web accepts both).
+by drag (the web accepts both). → slice 7.
+
+## Slice 7 (20.10) — drop files on a media folder (move, Alt = copy)
+
+### Investigation
+
+- Web `client/components/sources-panel-media.js:136-170`: every folder row is a drop target.
+  - `mediaIdsFromDragPayload` (line 31) takes the `media` items of a single or multi payload.
+  - The row accepts when at least one id is not already inside that folder, at any depth (`startsWith(folder +
+    '/')`). It then moves them all through `onMoveItems` (Alt → `onCopyItems`). The server reports the ones
+    already there.
+- The Godot media tree only accepted desktop DeckLink connector drops (`live.can_drop_connector`), so the only way
+  to move files was the "Move to…" picker.
+- Compose tiles: the web `normalizeSourceDropItems` flattens a multi payload, but `sourceTileRejection` refuses
+  anything that is not `route://`. In Godot the only multi payloads are media-file selections; the Live sources
+  tab drags one input at a time. A multi-drop onto the compose canvas would therefore be refused item by item,
+  so there is nothing to port. `compose_tile_math.droppable` (route values only) already refuses the payload.
+
+### What was done
+
+- `media_ops.folder_drop_ids(data, folder)` (pure): the web rule above.
+- `media_selection_bar.transfer(op, ids, target)`: the picker's copy / move + report, now shared by the "Copy to…"
+  / "Move to…" dialog and the drop.
+- `media_panel`: `_can_drop` / `_drop`. A folder row that takes the payload shows the on-item outline and moves
+  the files (Alt held at release → copy). Everything else still falls through to the DeckLink connector drop.
+
+### What was VERIFIED
+
+- Godot `test_media_ops.gd::test_folder_drop_ids_web_rule`: single, multi, already there, media-only, live
+  sources, a folder onto itself. Total 16068 pass; boot check clean.
+- Box (real GUI), with throwaway copies `media/wo603dnd/src/dnd_{a,b}.png` and an empty `dst/`:
+  - Ctrl-selecting both files and dropping them on their ancestor `wo603dnd` was refused (the web rule; no
+    request).
+  - Dropping them on `dst` (on-item outline, "2 files") showed "✓ Moved 2 files", and both are in `dst/` on disk.
+  - Alt-dropping `dst/dnd_a.png` on `src` showed "✓ Copied 1 file", leaving a copy in `src/` with the original
+    kept.
+  - Cleanup: `POST /api/media/delete {ids:["wo603dnd"]}`; the folder is gone.
+
+### Still open
+
+Remote (HTTP streaming) upload; parity checklist.

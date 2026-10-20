@@ -110,15 +110,20 @@ func _pick(op: String) -> void:
 	dlg.add_child(box)
 	dlg.confirmed.connect(func() -> void:
 		dlg.queue_free()
-		_say("%s %s…" % ["Copying" if op == "copy" else "Moving", Ops.plural(sel.size())])
-		var res: Dictionary = await Api.post_json("/api/media/%s" % op, Ops.transfer_body(sel, path.text))
-		_say(Ops.result_text("Copied" if op == "copy" else "Moved", sel.size(), res))
-		if op == "move" and res.ok:
-			clear_requested.emit()
-		changed.emit())
+		transfer(op, sel, path.text))
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered()
+
+
+## Copy / move `sel` into `target` (the picker, or files dropped on a folder row) and report like the web.
+func transfer(op: String, sel: Array, target: String) -> void:
+	_say("%s %s…" % ["Copying" if op == "copy" else "Moving", Ops.plural(sel.size())])
+	var res: Dictionary = await Api.post_json("/api/media/%s" % op, Ops.transfer_body(sel, target))
+	_say(Ops.result_text("Copied" if op == "copy" else "Moved", sel.size(), res))
+	if op == "move" and res.ok:
+		clear_requested.emit()
+	changed.emit()
 
 
 func _rename() -> void:

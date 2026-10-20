@@ -104,3 +104,18 @@ static func drag_payload(dragged: Dictionary, selected: Array) -> Dictionary:
 	if in_sel and selected.size() > 1:
 		return {"type": "multi", "items": selected.map(func(m: Dictionary) -> Dictionary: return strip.call(m))}
 	return strip.call(dragged)
+
+
+## Web sources-panel-media.js folder drop: the media ids a drag payload moves into `folder` — media items only
+## (single or multi), and nothing when every one of them already sits inside that folder.
+static func folder_drop_ids(data: Variant, folder: String) -> Array:
+	if not data is Dictionary:
+		return []
+	var d: Dictionary = data
+	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
+	var ids: Array = []
+	for it in items:
+		if it is Dictionary and it.get("type") == "media" and str(it.get("value", "")) != "":
+			ids.append(str(it.value))
+	var movable := ids.any(func(v: String) -> bool: return not v.begins_with(folder + "/") and v != folder)
+	return ids if movable else []

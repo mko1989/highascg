@@ -103,9 +103,7 @@ func _ready() -> void:
 	_tree.hide_root = true
 	_tree.select_mode = Tree.SELECT_MULTI
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_tree.set_drag_forwarding(_drag_data, live.can_drop_connector, func(_at: Vector2, data: Variant) -> void:
-		_tabs.current_tab = live.get_index()
-		live.drop_connector(Drop.parse(data)))
+	_tree.set_drag_forwarding(_drag_data, _can_drop, _drop)
 	media.add_child(_tree)
 	_bar = SelectionBar.new()
 	_bar.changed.connect(load_media)
@@ -171,6 +169,32 @@ func _on_selection() -> void:
 		inspector.show_media(meta.row)
 	elif sel.size() > 1 and InspectorPanel.current.showing(inspector):
 		InspectorPanel.current.release(inspector)  # several files have no one inspector; the covered page returns
+
+
+## A folder row under the pointer (web: folders are the move targets), or null.
+func _folder_at(at: Vector2) -> Variant:
+	var it := _tree.get_item_at_position(at)
+	var m: Variant = it.get_metadata(0) if it != null else null
+	return m.folder if m is Dictionary and (m as Dictionary).has("folder") else null
+
+
+## Desktop DeckLink connectors (live sources) or media files onto a folder (move; Alt = copy, like the web).
+func _can_drop(at: Vector2, data: Variant) -> bool:
+	var f: Variant = _folder_at(at)
+	var files := f != null and not Ops.folder_drop_ids(data, str(f)).is_empty()
+	_tree.drop_mode_flags = Tree.DROP_MODE_ON_ITEM if files else Tree.DROP_MODE_DISABLED
+	return files or live.can_drop_connector(at, data)
+
+
+func _drop(at: Vector2, data: Variant) -> void:
+	_tree.drop_mode_flags = Tree.DROP_MODE_DISABLED
+	var f: Variant = _folder_at(at)
+	var ids: Array = Ops.folder_drop_ids(data, str(f)) if f != null else []
+	if not ids.is_empty():
+		_bar.transfer("copy" if Input.is_key_pressed(KEY_ALT) else "move", ids, str(f))
+		return
+	_tabs.current_tab = live.get_index()
+	live.drop_connector(Drop.parse(data))
 
 
 func _reload_current() -> void:

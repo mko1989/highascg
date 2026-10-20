@@ -55,3 +55,14 @@ func test_drag_payload_multi_only_from_the_selection() -> void:
 	t.eq(O.drag_payload(a, [a, b]), {"type": "multi", "items": [{"type": "media", "value": "a.mov", "label": "a.mov"}, {"type": "media", "value": "b.png", "label": "b.png"}]}, "dragged row is selected → all of the selection (web multi)")
 	t.eq(O.drag_payload(c, [a, b]), {"type": "media", "value": "c.mov", "label": "c.mov"}, "dragging an unselected row drags only it")
 	t.eq(O.drag_payload(a, [a]), {"type": "media", "value": "a.mov", "label": "a.mov"}, "a single selection stays a single payload")
+
+
+func test_folder_drop_ids_web_rule() -> void:
+	var a := {"type": "media", "value": "x/a.mov", "label": "x/a.mov"}
+	var b := {"type": "media", "value": "y/b.png", "label": "y/b.png"}
+	t.eq(O.folder_drop_ids(a, "y"), ["x/a.mov"], "one file into another folder")
+	t.eq(O.folder_drop_ids(a, "x"), [], "already there → no drop")
+	t.eq(O.folder_drop_ids({"type": "multi", "items": [a, b]}, "y"), ["x/a.mov", "y/b.png"], "any movable → all ids (the server reports the one already there)")
+	t.eq(O.folder_drop_ids({"type": "multi", "items": [a, {"type": "effect", "value": "blur"}]}, "z"), ["x/a.mov"], "media items only")
+	t.eq(O.folder_drop_ids({"type": "route", "value": "route://3"}, "z"), [], "live sources never move")
+	t.eq(O.folder_drop_ids({"type": "media", "value": "x"}, "x"), [], "a folder onto itself")
