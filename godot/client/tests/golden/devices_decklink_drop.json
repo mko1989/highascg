@@ -467,23 +467,12 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 6-3"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 6-3 CLEAR"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "PLAY 6-3 DECKLINK 3"
+      "action": "decklink",
+      "channel": 6,
+      "layer": 3,
+      "device": 3
      }
     ],
     [
@@ -661,23 +650,12 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 5-2"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 5-2 CLEAR"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "PLAY 5-2 DECKLINK 2"
+      "action": "decklink",
+      "channel": 5,
+      "layer": 2,
+      "device": 2
      }
     ],
     [
@@ -932,23 +910,12 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 8-3"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 8-3 CLEAR"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "PLAY 8-3 DECKLINK 3"
+      "action": "decklink",
+      "channel": 8,
+      "layer": 3,
+      "device": 3
      }
     ],
     [

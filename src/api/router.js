@@ -255,6 +255,7 @@ routes.post('/api/host-live/operator-fullscreen', ({ body, ctx }) => routesHostL
 routes.post('/api/host-live/webpage', ({ body, ctx }) => routesHostLive.handleWebpagePost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/ndi', ({ body, ctx }) => routesHostLive.handleNdiPost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/decklink', ({ body, ctx }) => routesHostLive.handleDecklinkPost(body, ctx), { requireCaspar: true })
+routes.post('/api/host-live/layer', ({ body, ctx }) => routesHostLive.handleLayerPost(body, ctx), { requireCaspar: true })
 // WO-258 T258.3/T258.4: browser_display source update/reload + "Interact on operator screen" toggle.
 routes.post('/api/host-live/browser', ({ body, ctx }) => routesHostLive.handleBrowserPost(body, ctx), { requireCaspar: true })
 routes.post('/api/host-live/browser/interact', ({ body, ctx }) => routesHostLive.handleBrowserInteractPost(body, ctx), {

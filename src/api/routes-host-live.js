@@ -7,6 +7,7 @@ const { enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
 const { handleWebpageHostLive } = require('./host-live-webpage')
 const { handleNdiHostLive } = require('./host-live-ndi')
 const { handleDecklinkHostLive } = require('./host-live-decklink')
+const { handleHostLiveLayer } = require('./host-live-layer')
 const { handleBrowserDisplayHostLive, handleBrowserDisplayInteract } = require('./host-live-browser')
 
 /**
@@ -139,6 +140,19 @@ async function handleDecklinkPost(body, ctx) {
 }
 
 /**
+ * WO-623 D — STOP / CLEAR / PLAY on one host channel-layer, composed server-side.
+ * @param {string} body
+ * @param {object} ctx
+ */
+async function handleLayerPost(body, ctx) {
+	const res = await handleHostLiveLayer(ctx, parseBody(body) || {})
+	if (res.status) {
+		return { status: res.status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: res.error }) }
+	}
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody(res) }
+}
+
+/**
  * @param {string} body
  * @param {object} ctx
  */
@@ -171,6 +185,7 @@ module.exports = {
 	handleWebpagePost,
 	handleNdiPost,
 	handleDecklinkPost,
+	handleLayerPost,
 	handleBrowserPost,
 	handleBrowserInteractPost,
 }

@@ -11,9 +11,8 @@ export async function stopHostChannelPlayback(source) {
 	const ch = source?.hostChannel ?? source?.inputsChannel
 	const layer = source?.hostLayer ?? source?.inputsLayer ?? 1
 	if (ch == null) return
-	const cl = `${ch}-${layer}`
-	await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-	await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
+	// WO-623 D: STOP + MIXER CLEAR composed on the server.
+	await api.post('/api/host-live/layer', { action: 'stop', channel: ch, layer }).catch(() => {})
 }
 
 /**

@@ -137,12 +137,11 @@ static func _add_live(entry: Dictionary, prep: Dictionary) -> Array:
 		"connectorId": prep.connector_id}}]
 
 
-## playDecklinkOnHost: STOP / MIXER CLEAR (failures ignored), then PLAY.
+## playDecklinkOnHost: STOP / MIXER CLEAR (failures ignored), then PLAY — one server action since WO-623 D
+## (a failed PLAY comes back as a 502, so the request stays hard).
 static func _play(entry: Dictionary, slot: int, dev: int) -> Array:
 	var layer: Variant = H.coalesce([entry.get("layer"), slot])
-	var reqs := HS.stop_cmds(entry.channel, layer)
-	reqs.append(["POST", "/api/raw", {"cmd": "PLAY %s-%s DECKLINK %d" % [R.s(entry.channel), R.s(layer), dev]}])
-	return reqs
+	return [["POST", "/api/host-live/layer", {"action": "decklink", "channel": entry.channel, "layer": layer, "device": dev}]]
 
 
 ## The page's status after a successful start (`dev` = the port's externalRef as the page read it).

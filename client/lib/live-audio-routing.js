@@ -25,13 +25,15 @@ export async function playRouteOnChannel(channel, layer, routeClip, opts = {}) {
 	const ln = Math.max(1, parseInt(String(layer), 10) || 1)
 	const clip = String(routeClip || '').trim()
 	if (!clip.startsWith('route://')) throw new Error('Invalid route source')
-	const cl = `${ch}-${ln}`
-	await api.post('/api/raw', { cmd: `STOP ${cl}` })
-	await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` })
-	await api.post('/api/raw', { cmd: `PLAY ${cl} ${clip}` })
-	if (opts.audioOnly !== false) {
-		await api.post('/api/raw', { cmd: `MIXER ${cl} OPACITY 0` })
-	}
+	// WO-623 D: STOP / CLEAR / PLAY (+ OPACITY 0) composed on the server — the same sequence its
+	// WO-312 reassert replays (amcpForPlannedRoute).
+	await api.post('/api/host-live/layer', {
+		action: 'route',
+		channel: ch,
+		layer: ln,
+		route: clip,
+		audioOnly: opts.audioOnly !== false,
+	})
 }
 
 /**
@@ -41,9 +43,7 @@ export async function playRouteOnChannel(channel, layer, routeClip, opts = {}) {
 export async function clearRouteFromChannel(channel, layer) {
 	const ch = Math.max(1, parseInt(String(channel), 10) || 1)
 	const ln = Math.max(1, parseInt(String(layer), 10) || 1)
-	const cl = `${ch}-${ln}`
-	await api.post('/api/raw', { cmd: `STOP ${cl}` })
-	await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` })
+	await api.post('/api/host-live/layer', { action: 'stop', channel: ch, layer: ln })
 }
 
 /**

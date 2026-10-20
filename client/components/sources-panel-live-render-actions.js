@@ -51,18 +51,21 @@ export function attachLiveSourceActionButtons(el, s, hostOperatorFullscreen) {
 		el.appendChild(btnGroup)
 	} else if (s.routeType === 'decklink' && s.inputsChannel != null && s.decklinkSlot != null) {
 		const cl = `${s.inputsChannel}-${s.inputsLayer ?? s.decklinkSlot}`
+		// WO-623 D: STOP / CLEAR / PLAY DECKLINK composed on the server.
+		const hostLayer = { channel: s.inputsChannel, layer: s.inputsLayer ?? s.decklinkSlot }
+		const stopLayer = () => api.post('/api/host-live/layer', { action: 'stop', ...hostLayer })
 		const btnGroup = document.createElement('div'); btnGroup.className = 'source-item__live-actions'
 
 		const restartBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'source-item__live-btn source-item__live-btn--restart', title: `Restart ${cl}`, textContent: 'Restart' })
 		restartBtn.onclick = async (e) => {
 			e.stopPropagation(); restartBtn.disabled = true; try {
-				await api.post('/api/raw', { cmd: `STOP ${cl}` }); await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` })
-				if (s.decklinkDevice != null) await api.post('/api/raw', { cmd: `PLAY ${cl} DECKLINK ${s.decklinkDevice}` })
+				if (s.decklinkDevice != null) await api.post('/api/host-live/layer', { action: 'decklink', ...hostLayer, device: s.decklinkDevice })
+				else await stopLayer()
 			} finally { restartBtn.disabled = false }
 		}
 
 		const stopBtn = Object.assign(document.createElement('button'), { type: 'button', className: 'source-item__live-btn source-item__live-btn--stop', title: `Stop ${cl}`, textContent: 'Stop' })
-		stopBtn.onclick = async (e) => { e.stopPropagation(); stopBtn.disabled = true; try { await api.post('/api/raw', { cmd: `STOP ${cl}` }); await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }) } finally { stopBtn.disabled = false } }
+		stopBtn.onclick = async (e) => { e.stopPropagation(); stopBtn.disabled = true; try { await stopLayer() } finally { stopBtn.disabled = false } }
 
 		btnGroup.append(restartBtn, stopBtn)
 
@@ -71,7 +74,7 @@ export function attachLiveSourceActionButtons(el, s, hostOperatorFullscreen) {
 				removeBtn.onclick = async (e) => {
 				e.stopPropagation(); if (!confirm(`Remove "${s.label}"? This will revert the SDI connector back to output role.`)) return
 				removeBtn.disabled = true; try {
-					await api.post('/api/raw', { cmd: `STOP ${cl}` }); await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` })
+					await stopLayer()
 					await api.post('/api/device-view', { updateConnector: { id: s.connectorId, patch: { caspar: { ioDirection: 'out' } } } })
 					const rm = await api.post('/api/device-view', { removeExtraLiveSource: { value: s.value } })
 					if (Array.isArray(rm?.extraLiveSources) && typeof window.__highascgApplyExtraLiveSources === 'function') {

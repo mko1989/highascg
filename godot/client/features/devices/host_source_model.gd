@@ -351,9 +351,9 @@ static func label_hint(custom: String, generated: String) -> String:
 
 # ---------------------------------------------------------------- stop / remove plans
 
+## WO-623 D: STOP + MIXER CLEAR composed on the server (POST /api/host-live/layer).
 static func stop_cmds(ch: Variant, layer: Variant) -> Array:
-	var cl := "%s-%s" % [R.s(ch), R.s(layer)]
-	return [["POST", "/api/raw", {"cmd": "STOP " + cl}, "soft"], ["POST", "/api/raw", {"cmd": "MIXER %s CLEAR" % cl}, "soft"]]
+	return [["POST", "/api/host-live/layer", {"action": "stop", "channel": ch, "layer": layer}, "soft"]]
 
 
 ## stopHostChannelPlayback: hostChannel ?? inputsChannel on hostLayer ?? inputsLayer ?? 1.

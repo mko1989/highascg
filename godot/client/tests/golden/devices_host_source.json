@@ -1458,16 +1458,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 6-10"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 6-10 CLEAR"
+      "action": "stop",
+      "channel": 6,
+      "layer": 10
      }
     ]
    ],
@@ -2091,16 +2086,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 7-1"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 7-1 CLEAR"
+      "action": "stop",
+      "channel": 7,
+      "layer": 1
      }
     ],
     [
@@ -2122,16 +2112,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 9-1"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 9-1 CLEAR"
+      "action": "stop",
+      "channel": 9,
+      "layer": 1
      }
     ],
     [
@@ -2161,16 +2146,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 9-1"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 9-1 CLEAR"
+      "action": "stop",
+      "channel": 9,
+      "layer": 1
      }
     ],
     [
@@ -2192,16 +2172,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 12-3"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 12-3 CLEAR"
+      "action": "stop",
+      "channel": 12,
+      "layer": 3
      }
     ],
     [
@@ -2223,16 +2198,11 @@
    "calls": [
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 12-1"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 12-1 CLEAR"
+      "action": "stop",
+      "channel": 12,
+      "layer": 1
      }
     ],
     [
@@ -2288,16 +2258,11 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 6-10"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 6-10 CLEAR"
+      "action": "stop",
+      "channel": 6,
+      "layer": 10
      }
     ],
     [
@@ -2456,16 +2421,11 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 7-1"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 7-1 CLEAR"
+      "action": "stop",
+      "channel": 7,
+      "layer": 1
      }
     ],
     [
@@ -2800,16 +2760,11 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 5-2"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 5-2 CLEAR"
+      "action": "stop",
+      "channel": 5,
+      "layer": 2
      }
     ],
     [
@@ -3119,16 +3074,11 @@
     ],
     [
      "POST",
-     "/api/raw",
+     "/api/host-live/layer",
      {
-      "cmd": "STOP 5-2"
-     }
-    ],
-    [
-     "POST",
-     "/api/raw",
-     {
-      "cmd": "MIXER 5-2 CLEAR"
+      "action": "stop",
+      "channel": 5,
+      "layer": 2
      }
     ],
     [

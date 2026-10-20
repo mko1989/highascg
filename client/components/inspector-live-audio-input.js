@@ -204,9 +204,8 @@ export function mountLiveAudioSlotControls(host, opts) {
 		if (ch == null || ln == null) return
 		stopBtn.disabled = true
 		try {
-			const cl = `${ch}-${ln}`
-			await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-			await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
+			// WO-623 D: STOP + MIXER CLEAR composed on the server.
+			await api.post('/api/host-live/layer', { action: 'stop', channel: ch, layer: ln }).catch(() => {})
 		} finally {
 			stopBtn.disabled = false
 		}

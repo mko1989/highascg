@@ -75,10 +75,8 @@ function buildDecklinkLiveSource({ entry, resolvedSlot, devNum, connectorId, con
 async function playDecklinkOnHost(entry, resolvedSlot, devNum) {
 	if (entry?.channel == null) return false
 	const layer = entry.layer ?? resolvedSlot
-	const cl = `${entry.channel}-${layer}`
-	await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-	await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
-	await api.post('/api/raw', { cmd: `PLAY ${cl} DECKLINK ${devNum}` })
+	// WO-623 D: STOP / CLEAR (tolerated) + PLAY composed on the server; a failed PLAY is a 502.
+	await api.post('/api/host-live/layer', { action: 'decklink', channel: entry.channel, layer, device: devNum })
 	return true
 }
 
@@ -319,9 +317,7 @@ export async function removeDecklinkInputSlot(stateStore, { slot, connectorId, l
 	const entry = decklinkInputForSlot(cm, resolvedSlot)
 	if (entry?.channel != null) {
 		const layer = entry.layer ?? resolvedSlot
-		const cl = `${entry.channel}-${layer}`
-		await api.post('/api/raw', { cmd: `STOP ${cl}` }).catch(() => {})
-		await api.post('/api/raw', { cmd: `MIXER ${cl} CLEAR` }).catch(() => {})
+		await api.post('/api/host-live/layer', { action: 'stop', channel: entry.channel, layer }).catch(() => {})
 	}
 
 	const routeValue =

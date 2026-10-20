@@ -168,6 +168,21 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   fails on the old code), C1 parity still green; Godot `test_project_roundtrip` (fixtures + synthetic, exact floats + key order).
 - Offline suite 2620/2623 — the shader-library failure also fails on `main`. Godot headless 275/0, `--check` OK.
 
+## 2026-10-20 — host-channel layer actions moved server-side (via WO-623 D)
+
+- [WO-623](./623_WO_godot_owner_notes_next_md_2.md) D added `POST /api/host-live/layer` (`stop` / `decklink` / `route`).
+  - The Godot client now makes no `/api/raw`, `/api/amcp/*` or WS `amcp` call.
+  - The web DeckLink add/remove, Sources Live Restart/Stop/Remove, extra-live-source remove, live-audio inspector Stop and
+    live-audio PGM routes use the endpoint. Request plans were golden-checked, and it was box-verified through Caspar's log.
+- **Still composed in the web client (open here):**
+  - `shader-live-editor.js`: MIXER param writes and CG ADD.
+  - `shader-cg-update.js`: CG UPDATE.
+  - `multiview-editor-canvas-apply.js`: `/api/amcp/batch` audio focus.
+  - `amcp-preview-batch.js`: the web PRV preview pipeline (scene PRV push, global border, live effects, edit-chrome
+    clear, PRV runtime clear). Godot stages PRV through `/api/scene/*` instead.
+  - `logs-modal.js` stays a raw console by design.
+- **Rule for the Godot port:** a port of any of these lands its server endpoint first. It never uses `/api/raw`.
+
 ## Earlier notes
 
 Nothing yet. Facts ✔ re-read by hand; counts from greps (2026-10-17).

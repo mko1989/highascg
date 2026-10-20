@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — A (performance overlay), B (new look: deck drop / "+" / delete) and C (Sources Templates / Timelines tabs) DONE and box-verified; D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
+**Status: DONE (2026-10-20, A/B/C/D box-verified; offline suite + Godot suite green) — A (performance overlay), B (new look: deck drop / "+" / delete), C (Sources Templates / Timelines tabs), D (host-channel STOP / CLEAR / PLAY composed on the server: `POST /api/host-live/layer`; the Godot client now sends no raw AMCP at all). Remaining web-only AMCP composition is handed to [WO-598](./598_WO_client_contract_and_thin_client.md). Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
 
 # WO-623 — Godot: owner's next.md notes (round 2)
 
@@ -91,6 +91,23 @@ re-checked by hand as noted.
     effects, edit-chrome clear and PRV runtime clear.
 - The server pass-throughs are `/api/raw`, `/api/amcp/raw`, `/api/amcp/batch` and `/api/amcp/raw-batch`
   (`src/api/routes-amcp.js`), plus WS `amcp`.
+- **The three Godot sites and six of the web features send the same two sequences** on a host channel-layer:
+  - STOP + `MIXER c-l CLEAR` (stop / remove an input), with or without a following `PLAY c-l DECKLINK n`;
+  - STOP + CLEAR + `PLAY c-l route://…` (+ `MIXER c-l OPACITY 0` when audio-only) for live-audio PGM routes.
+- **The server already composes both, just not behind an endpoint a client can call per layer:**
+  - `playDecklinkInputNow` (`src/api/host-live-decklink.js:57`) runs STOP / CLEAR / PLAY DECKLINK, but is reachable only
+    through the slot-based `update` / `reload` actions of `/api/host-live/decklink`.
+  - `amcpForPlannedRoute` (`src/engine/live-input-route-reassert.js:120`) builds the exact route sequence for WO-312's
+    boot reassert; its comment says it mirrors the client's `playRouteOnChannel`.
+- **Error semantics differ by site.**
+  - Godot marks both stop requests "soft" (a failure is not reported); its PLAY is hard.
+  - The web DeckLink add / remove and inspector paths `.catch()` STOP / CLEAR and let PLAY throw.
+  - The Sources Live Restart / Stop / Remove buttons and `live-audio-routing.js` let every command throw.
+  - On this Caspar build, STOP on an empty layer answers OK, so tolerating STOP / CLEAR failures loses nothing; a failed
+    PLAY (`403 PLAY FAILED`) is the only failure worth surfacing.
+- **Goldens.** `devices_decklink_drop` / `host_source` / `live_input` / `decklink_port` hold 43 raw calls recorded from the
+  web modules. Their generators (`dkdrop_golden.mjs`, `host_source_golden.mjs`, scratchpad) only print to stdout, so
+  they can be re-run to check a translated golden.
 
 ## What was done
 
@@ -183,6 +200,49 @@ re-checked by hand as noted.
   - Timeline rename by right-click; the Timeline tab owns the name.
 - Both kinds drop anywhere a source does: look editor frame, deck blank space / "+" (B), and timeline clips.
 
+### D — host-channel layer actions on the server (DONE)
+
+- **`src/api/host-live-layer.js`** (new): `POST /api/host-live/layer {action, channel, layer, …}`, routed with
+  `requireCaspar` (`router.js`, `routes-host-live.js handleLayerPost`).
+  - `stop`: STOP + MIXER CLEAR.
+  - `decklink {device}`: STOP + CLEAR + `PLAY c-l DECKLINK n`. Kept as a plain PLAY, the same as the clients sent and
+    `playDecklinkInputNow` does, rather than `tryPlayDecklinkInput`'s WO-316 already-open probes.
+  - `route {route, audioOnly?}`: `amcpForPlannedRoute`, so the client route and WO-312's reassert stay one sequence.
+    Only `route://N` / `route://N-N` is accepted; every route value in `client/` and `src/` has that shape.
+  - One error rule for every caller: STOP / CLEAR / OPACITY failures are tolerated and returned in `errors`. A failed
+    PLAY returns 502 `{ok:false, error:"PLAY …: …"}`, which the web `api.post` throws on and the Godot runners show.
+    Bad input returns 400 without touching Caspar; no AMCP returns 503.
+  - Why one endpoint and not three: all three sequences address one host channel-layer and share the error rule. The
+    owner asked for "each function or set of actions" to be an endpoint, and this keeps them in one module next to the
+    other `/api/host-live/*` actions.
+- **Godot** (`features/devices/`): `input_slots_model._stop` and `host_source_model.stop_cmds` return one soft `stop`
+  request; `decklink_input_model._play` returns one hard `decklink` request. The Godot client has no `/api/raw`,
+  `/api/amcp/*` or WS `amcp` call left.
+- **Web:**
+  - `decklink-add-input.js` (`playDecklinkOnHost` + remove-slot stop);
+  - `sources-panel-live-render-actions.js` (Restart = `decklink`, Stop / Remove = `stop`);
+  - `extra-live-source-remove.js` (`stopHostChannelPlayback`);
+  - `inspector-live-audio-input.js` (Stop);
+  - `live-audio-routing.js` (`playRouteOnChannel` = `route`, `clearRouteFromChannel` = `stop`).
+  Then `npm run build:client`.
+- **Goldens:** the four goldens were rewritten by a one-shot transform: STOP + CLEAR (+ PLAY DECKLINK) → the matching
+  `/api/host-live/layer` request, keeping each file's formatting. That gives 3 + 10 + 1 + 4 = 18 requests in place of
+  the 43 raw calls; no unmatched raw call remained.
+- **`tools/smoke/smoke-wo623-host-live-layer.test.js`** (curated list), 5 tests:
+  - the three plans;
+  - 400 / 503 refusals with nothing sent, including an injected `route://5 ; CLEAR 1`;
+  - tolerated STOP / CLEAR versus a 502 PLAY, with no OPACITY after a failed PLAY;
+  - a source guard: the 8 switched client files contain no `/api/raw` and do call `/api/host-live/layer`;
+  - the router line.
+- **Left for [WO-598](./598_WO_client_contract_and_thin_client.md)** (web only; Godot has none of these yet, and its
+  ports must land a server endpoint first):
+  - `shader-live-editor.js` (MIXER param writes, CG ADD);
+  - `shader-cg-update.js` (CG UPDATE);
+  - `multiview-editor-canvas-apply.js` (`/api/amcp/batch` audio focus);
+  - `amcp-preview-batch.js`, the web PRV preview pipeline. Godot already stages PRV through `/api/scene/*`.
+  - `logs-modal.js` stays a raw AMCP console by design.
+  - `/api/amcp/print` is already a server action.
+
 ## What was VERIFIED
 
 ### A
@@ -251,3 +311,39 @@ re-checked by hand as noted.
   - Looks 6/5/4 were deleted through the card menu. The project is back to Opening / Background / Waves, with PGM
     Opening and PRV Background.
   - The `config/` md5 manifest is identical.
+
+### D
+
+- **Offline:**
+  - The new smoke passes 5/5.
+  - `run-offline-tests.js`: 2791/2794 pass, with 2 skipped. The single failure is the known untracked
+    `data/shaders/sh-sa-fluidic-space.json` in smoke-wo577.
+  - `check-max-file-lines`: 0 files over the limit.
+  - `npm run build:client` is clean.
+- **Godot:** 15509/15509. A mutation run gave 18 failures across all four golden suites: stop layer → 99 and
+  device + 1, with the files restored from copies and checked by grep.
+- **Goldens cross-checked:** re-running `dkdrop_golden.mjs` and `host_source_golden.mjs` against the switched web code gives
+  JSON identical to the translated goldens (3 / 10 layer requests, 0 raw). The web and Godot now send the same request,
+  value for value.
+- **Box** (server restarted onto the new route; checked against Caspar's own log `log/caspar_2026-10-20.log` and `INFO 7`):
+  - `route` 7-50 ← `route://5-2`: four commands. The opacity reads 0; with `audioOnly:false` there are three, opacity 1,
+    and INFO shows the route producer from channel 5 layer 2.
+  - `stop` 7-50: the layer goes back to empty.
+  - `decklink` 7-51 device 99: 502 `PLAY 7-51 DECKLINK 99: 403 PLAY FAILED`, with 7-4 untouched.
+  - `decklink` 7-4 device 4 re-acquired the live card (INFO: `decklink 4`).
+  - The bad route and the unknown action each returned 400.
+  - **GUI:** relaunched the Godot client on Devices and dragged rear-panel DeckLink 4 (already an input, same device) onto
+    the Sources list.
+    - Caspar logged `STOP 7-4`, `MIXER 7-4 CLEAR`, `PLAY 7-4 DECKLINK 4`, sent through the endpoint, since no raw path is
+      left in Godot.
+    - 7-4 was back on DeckLink 4, and the client switched to Live with DeckLink 4 selected.
+- **Restore / side effects:**
+  - The drop's pre-existing `updateConnector` writes persisted the server-synthesized `dst_in_host_decklink_input_4`
+    into `device_graph.json`. That is not D's change; the API lists all four host destinations either way. The file was
+    restored from the pre-test copy, and its md5 matches.
+  - `.highascg-state.json` differs only by the in-memory state that the server restart flushed: `web_project` rev 545 →
+    557 and the PRV live scene from the earlier A/B/C tests, already restored.
+  - Owner state is unchanged: Opening on PGM, Background on PRV, looks Opening / Background / Waves.
+- **Owner QA:** the web Sources Live Restart / Stop / Remove buttons and the live-audio PGM routes go through the endpoint
+  now. They were checked by golden and by direct API, not clicked in the web UI. This box has no ALSA live-audio inputs.
+

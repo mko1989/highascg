@@ -189,9 +189,9 @@ static func _shrunk(prev: Dictionary, s: int) -> Dictionary:
 	return next
 
 
+## WO-623 D: STOP + MIXER CLEAR composed on the server (POST /api/host-live/layer).
 static func _stop(ch: Variant, layer: Variant) -> Array:
-	var cl := "%s-%s" % [R.s(ch), R.s(layer)]
-	return [["POST", "/api/raw", {"cmd": "STOP " + cl}, "soft"], ["POST", "/api/raw", {"cmd": "MIXER %s CLEAR" % cl}, "soft"]]
+	return [["POST", "/api/host-live/layer", {"action": "stop", "channel": ch, "layer": layer}, "soft"]]
 
 
 # ---------------------------------------------------------------- USB video (V4L2)
