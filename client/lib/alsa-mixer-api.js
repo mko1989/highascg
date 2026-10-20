@@ -82,7 +82,8 @@ export function alsaControlPercent(ctrl) {
 	const raw = ctrl.percent ?? ctrl.value ?? ctrl.volume
 	const n = parseFloat(String(raw))
 	if (!Number.isFinite(n)) return 0
-	if (max > min && n >= min && n <= max) {
+	// WO-611 #9: a server `percent` is already 0..100 — rescaling it by min..max showed 57 % for 50 % on a 0..87 control.
+	if (ctrl.percent == null && max > min && n >= min && n <= max) {
 		return Math.round(((n - min) / (max - min)) * 100)
 	}
 	if (n >= 0 && n <= 100) return Math.round(n)

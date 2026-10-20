@@ -1,4 +1,4 @@
-**Status: ✅ Defects #1–#7 fixed (#4/#5 18.10, #1–#3 + #6 + #7 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
+**Status: ✅ Defects #1–#9 fixed (#4/#5 18.10, #1–#3 + #6–#9 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
 
 # WO-611 — Web client defects found during the Godot port inventory
 
@@ -64,6 +64,22 @@ reaches that hook → a clip dropped on the compose frame came in without its de
   false) and fell through to `(NaN).toFixed(1) + ' GB'`.
 - Fix: strings pass through unchanged (Godot `system_model.gd` `fmt_bytes` does the same).
 
+### 8. Settings → Live audio always warned "not in channelMap yet" (found 2026-10-20 porting the pane)
+
+- `client/components/settings-live-audio-panel.js:126` `renderStatus` read `liveState?.channelMap`, but
+  `GET /api/audio/live-inputs` (`src/api/routes-audio.js:114-127`) returns `inputsCh`, `liveAudioInputChannels`,
+  `liveAudioCount`, `configured`, `status` — no `channelMap`. `listInputChannels({})` is empty, so with any slot
+  configured the pane showed the "Apply Caspar config and restart" warning even when the channels existed.
+- Fix: fall back to `{ liveAudioCount, liveAudioInputChannels }` from the same payload — `listInputChannels`
+  already synthesises live-audio entries from those (`client/lib/input-channels.js:148-152`).
+
+### 9. ALSA mixer rescaled the server's percent (found 2026-10-20)
+
+- `client/lib/alsa-mixer-api.js` `alsaControlPercent` takes `percent ?? value`, then rescales by `min..max`
+  whenever the number falls inside that range. The server always sends `percent` (0..100, probed: Master
+  `max 87, value 87, percent 100`), so any percent ≤ max was rescaled again: 50 % on a 0..87 control showed 57 %.
+- Fix: rescale only when no `percent` was sent.
+
 ### Also noted (not defects, for cleanup)
 
 - Dead: `client/components/inspector-panel-routing.js` (173 LOC), `components/sync-modal.js`,
@@ -97,6 +113,11 @@ WsClient (fails on the old code: the request arrives as a string), the dispatch/
 
 - `settings-modal-mount-hardware-summary.js` `formatBytes`: `if (typeof bytes === 'string') return bytes || '—'`.
 
+### #8 / #9 (2026-10-20)
+
+- `settings-live-audio-panel.js` `renderStatus`: `cm = liveState?.channelMap || { liveAudioCount, liveAudioInputChannels }`.
+- `alsa-mixer-api.js` `alsaControlPercent`: `if (ctrl.percent == null && max > min && …)`.
+
 ## What was VERIFIED
 
 - #2 against the live server (`ws://127.0.0.1:4200/api/ws`): a double-encoded `catalog_request` gets no reply;
@@ -107,3 +128,6 @@ WsClient (fails on the old code: the request arrives as a string), the dispatch/
   `nuclearPassword` / `nuclearPasswordHash` still `'[REDACTED]'`. Smoke 2/2. Web checkbox click-through not run.
 - #7: `tools/smoke/smoke-wo611-disk-size-text.test.js` (curated) evaluates the real `formatBytes` body: "953.9G"
   passes through, numbers still format. Web Settings → System not opened in a browser after the fix.
+- #8 / #9: `tools/smoke/smoke-wo611-live-audio-settings.test.js` (curated, 2 tests) pins the fallback and imports the
+  real `listInputChannels` ({count 2, channels [5, 6]} → slots 1→5, 2→6) and `alsaControlPercent` (49 stays 49).
+  Not reproduced in a browser — the box has 0 live-audio slots; the Godot pane shares both rules.

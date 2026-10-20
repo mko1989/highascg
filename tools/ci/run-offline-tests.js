@@ -65,6 +65,7 @@ const FILES = [
 	'tools/smoke/smoke-wo611-web-client-defects.test.js',
 	'tools/smoke/smoke-wo611-redact-keeps-flags.test.js',
 	'tools/smoke/smoke-wo611-disk-size-text.test.js',
+	'tools/smoke/smoke-wo611-live-audio-settings.test.js',
 	'tools/smoke/smoke-wo600-new-layer.test.js',
 	'tools/smoke/smoke-wo623-host-cpu-usage.test.js',
 	'tools/smoke/smoke-wo623-new-look.test.js',

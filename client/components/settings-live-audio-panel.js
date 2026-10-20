@@ -123,7 +123,11 @@ export async function mountLiveAudioSettingsPanel(container, opts = {}) {
 		const el = mainEl.querySelector('#live-audio-status')
 		if (!el) return
 		const st = liveState?.status || liveState?.liveAudioInputsStatus
-		const cm = liveState?.channelMap || {}
+		// WO-611 #8: GET /api/audio/live-inputs has no channelMap — build the live-audio part from its own fields.
+		const cm = liveState?.channelMap || {
+			liveAudioCount: liveState?.liveAudioCount,
+			liveAudioInputChannels: liveState?.liveAudioInputChannels,
+		}
 		const inputEntries = listInputChannels(cm).filter((e) => e.kind === 'live_audio')
 		if (inputEntries.length === 0) {
 			const count = parseInt(String(liveState?.liveAudioCount ?? liveState?.configured?.count ?? '0'), 10) || 0
