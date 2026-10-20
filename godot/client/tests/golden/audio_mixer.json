@@ -1,0 +1,6329 @@
+{
+	"shorten": [
+		[
+			"",
+			"",
+			"",
+			""
+		],
+		[
+			"  ",
+			"",
+			"",
+			""
+		],
+		[
+			"clip.mov",
+			"clip",
+			"clip",
+			"clip"
+		],
+		[
+			"AIRPORT_intro_1920x1080_25fps_HAP_final.mov",
+			"AIRPORT_intro_1920…080",
+			"AIRPORT_intro…",
+			"AIRP…080"
+		],
+		[
+			"my-show.opener.v2.mp4",
+			"my_show_opener_v2",
+			"my_show_opene…",
+			"my_s…_v2"
+		],
+		[
+			"Band 2024 4k HDR r709 master.mxf",
+			"Band_2024",
+			"Band_2024",
+			"Band…024"
+		],
+		[
+			"20240512_123456_cam.mov",
+			"cam",
+			"cam",
+			"cam"
+		],
+		[
+			"a.b",
+			"a_b",
+			"a_b",
+			"a_b"
+		],
+		[
+			"Tło główne bardzo długie z polskimi znakami.mp4",
+			"Tło_główne_bardzo_…ami",
+			"Tło_główne_ba…",
+			"Tło_…ami"
+		],
+		[
+			"VERY_LONG_NAME_THAT_KEEPS_GOING_FOREVER.wav",
+			"VERY_LONG_NAME_THA…VER",
+			"VERY_LONG_NAM…",
+			"VERY…VER"
+		],
+		[
+			"25p_hd_prores.mov",
+			"25p_hd_prores",
+			"25p_hd_prores",
+			"25p_…res"
+		],
+		[
+			"show 29.97dfx file",
+			"show_29_file",
+			"show_29_file",
+			"show…ile"
+		],
+		[
+			"1. GŁÓWNE TŁO",
+			"1_GŁÓWNE_TŁO",
+			"1_GŁÓWNE_TŁO",
+			"1_GŁ…TŁO"
+		]
+	],
+	"hasAudio": [
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": "a/clip.mov"
+				}
+			},
+			true
+		],
+		[
+			{
+				"source": {
+					"type": "file",
+					"value": "still.PNG"
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": "x.jpeg"
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": ""
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "live_audio",
+					"value": "2"
+				}
+			},
+			true
+		],
+		[
+			{
+				"source": {
+					"type": "live_audio",
+					"value": ""
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "placeholder",
+					"value": "p.mov"
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": "p.mov",
+					"isPlaceholder": true
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "route",
+					"value": "route://4-1"
+				}
+			},
+			false
+		],
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": "noext"
+				}
+			},
+			true
+		],
+		[
+			{
+				"source": {
+					"type": "media",
+					"value": "song.wav"
+				}
+			},
+			true
+		],
+		[
+			{},
+			false
+		],
+		[
+			null,
+			false
+		]
+	],
+	"programRows": [
+		{
+			"name": "box_idle",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				}
+			]
+		},
+		{
+			"name": "box_look",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"live": {
+					"1": {
+						"sceneId": "look-1",
+						"scene": {
+							"layers": [
+								{
+									"layerNumber": 1,
+									"source": {
+										"type": "media",
+										"value": "PROJECTS/AIRPORT/1. GŁÓWNE TŁO.mov"
+									},
+									"volume": 0.5,
+									"audioRoute": "3+4",
+									"audioScreens": [
+										2
+									]
+								},
+								{
+									"layerNumber": 2,
+									"source": {
+										"type": "media",
+										"value": "bg.png"
+									}
+								},
+								{
+									"layerNumber": 3,
+									"source": {
+										"type": "live_audio",
+										"value": "1",
+										"label": "Desk"
+									},
+									"muted": true,
+									"routeSourceAudio": "1+2"
+								},
+								{
+									"layerNumber": 4,
+									"source": {
+										"type": "timeline",
+										"value": "tl1"
+									}
+								},
+								{
+									"layerNumber": 5,
+									"source": {
+										"type": "live_audio",
+										"value": "2"
+									},
+									"routeSourceAudio": "all"
+								},
+								{
+									"layerNumber": 6,
+									"source": {
+										"type": "media",
+										"value": "music.wav"
+									},
+									"volume": 0
+								}
+							]
+						}
+					}
+				},
+				"mixer": {
+					"gains": {
+						"pgm:1": 0.8,
+						"prv:2": 0.25
+					},
+					"muted": {}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 0.8,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 0.25,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:1",
+					"ch": 1,
+					"layer": 1,
+					"label": "L1 · 1_GŁÓWNE_TŁO",
+					"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+					"v": 0.5,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "3+4",
+					"audioScreens": [
+						2
+					],
+					"sceneId": "look-1"
+				},
+				{
+					"key": "pgm:1:layer:3",
+					"ch": 1,
+					"layer": 3,
+					"label": "L3 · Desk",
+					"labelTitle": "L3: Desk",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sourceAudioPair": "1+2",
+					"sceneId": "look-1",
+					"liveAudioSlot": 1,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:5",
+					"ch": 1,
+					"layer": 5,
+					"label": "L5 · Live_audio_2",
+					"labelTitle": "L5: Live audio 2",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sceneId": "look-1",
+					"liveAudioSlot": 2,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:6",
+					"ch": 1,
+					"layer": 6,
+					"label": "L6 · music",
+					"labelTitle": "L6: music.wav",
+					"v": 0,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sceneId": "look-1"
+				}
+			]
+		},
+		{
+			"name": "audio_only",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"liveAudioOnly": {
+					"1": {
+						"scene": {
+							"name": "  Walk-in music  "
+						}
+					}
+				},
+				"mixer": {
+					"gains": {
+						"pgm:1:layer:200": 0.4
+					},
+					"muted": {
+						"pgm:1:layer:200": true
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:200",
+					"ch": 1,
+					"layer": 200,
+					"label": "🔊 Walk_in_music",
+					"labelTitle": "Walk-in music (Audio-only look · Ch 1 L200)",
+					"v": 0.4,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isAudioOnlyLook": true
+				}
+			]
+		},
+		{
+			"name": "audio_only_unnamed",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"liveAudioOnly": {
+					"1": {
+						"scene": {}
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:200",
+					"ch": 1,
+					"layer": 200,
+					"label": "🔊 Audio_only",
+					"labelTitle": "Audio only (Audio-only look · Ch 1 L200)",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isAudioOnlyLook": true
+				}
+			]
+		},
+		{
+			"name": "tl_screen0",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "tl1",
+					"sendTo": {
+						"program": true,
+						"screenIdx": 0
+					}
+				},
+				"live": {
+					"1": {
+						"sceneId": "x",
+						"scene": {
+							"layers": [
+								{
+									"layerNumber": 1,
+									"source": {
+										"type": "media",
+										"value": "PROJECTS/AIRPORT/1. GŁÓWNE TŁO.mov"
+									},
+									"volume": 0.5,
+									"audioRoute": "3+4",
+									"audioScreens": [
+										2
+									]
+								},
+								{
+									"layerNumber": 2,
+									"source": {
+										"type": "media",
+										"value": "bg.png"
+									}
+								},
+								{
+									"layerNumber": 3,
+									"source": {
+										"type": "live_audio",
+										"value": "1",
+										"label": "Desk"
+									},
+									"muted": true,
+									"routeSourceAudio": "1+2"
+								},
+								{
+									"layerNumber": 4,
+									"source": {
+										"type": "timeline",
+										"value": "tl1"
+									}
+								},
+								{
+									"layerNumber": 5,
+									"source": {
+										"type": "live_audio",
+										"value": "2"
+									},
+									"routeSourceAudio": "all"
+								},
+								{
+									"layerNumber": 6,
+									"source": {
+										"type": "media",
+										"value": "music.wav"
+									},
+									"volume": 0
+								}
+							]
+						}
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:210",
+					"ch": 1,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:1:layer:213",
+					"ch": 1,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				}
+			]
+		},
+		{
+			"name": "tl_all",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1,
+						3
+					],
+					"previewChannels": [
+						2,
+						4
+					],
+					"liveAudioCount": 2,
+					"liveAudioInputChannels": [
+						8,
+						9
+					],
+					"inputChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "tl1",
+					"sendTo": {
+						"program": true,
+						"screenIdx": "all"
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:210",
+					"ch": 1,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:1:layer:213",
+					"ch": 1,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:3",
+					"ch": 3,
+					"label": "PGM 2 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:4",
+					"ch": 4,
+					"label": "PRV 2 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3:layer:210",
+					"ch": 3,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:3:layer:213",
+					"ch": 3,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				}
+			]
+		},
+		{
+			"name": "tl_null",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1,
+						3
+					],
+					"previewChannels": [
+						2,
+						4
+					],
+					"liveAudioCount": 2,
+					"liveAudioInputChannels": [
+						8,
+						9
+					],
+					"inputChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "tl1",
+					"sendTo": {
+						"program": true,
+						"screenIdx": null
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:210",
+					"ch": 1,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:1:layer:213",
+					"ch": 1,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:3",
+					"ch": 3,
+					"label": "PGM 2 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:4",
+					"ch": 4,
+					"label": "PRV 2 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3:layer:210",
+					"ch": 3,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:3:layer:213",
+					"ch": 3,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				}
+			]
+		},
+		{
+			"name": "tl_screen1",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1,
+						3
+					],
+					"previewChannels": [
+						2,
+						4
+					],
+					"liveAudioCount": 2,
+					"liveAudioInputChannels": [
+						8,
+						9
+					],
+					"inputChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "tl1",
+					"sendTo": {
+						"program": true,
+						"screenIdx": 1
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3",
+					"ch": 3,
+					"label": "PGM 2 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:4",
+					"ch": 4,
+					"label": "PRV 2 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3:layer:210",
+					"ch": 3,
+					"layer": 210,
+					"label": "Opener",
+					"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+					"v": 0.7,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "5+6",
+					"sceneId": null,
+					"isTimelineClip": true
+				},
+				{
+					"key": "pgm:3:layer:213",
+					"ch": 3,
+					"layer": 213,
+					"label": "Clip_4",
+					"labelTitle": "Clip 4 (Timeline layer)",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"isTimelineClip": true
+				}
+			]
+		},
+		{
+			"name": "tl_preview_only",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "tl1",
+					"sendTo": {
+						"program": false,
+						"preview": true,
+						"screenIdx": 0
+					}
+				},
+				"live": {
+					"1": {
+						"scene": {
+							"layers": [
+								{
+									"layerNumber": 1,
+									"source": {
+										"type": "media",
+										"value": "PROJECTS/AIRPORT/1. GŁÓWNE TŁO.mov"
+									},
+									"volume": 0.5,
+									"audioRoute": "3+4",
+									"audioScreens": [
+										2
+									]
+								},
+								{
+									"layerNumber": 2,
+									"source": {
+										"type": "media",
+										"value": "bg.png"
+									}
+								},
+								{
+									"layerNumber": 3,
+									"source": {
+										"type": "live_audio",
+										"value": "1",
+										"label": "Desk"
+									},
+									"muted": true,
+									"routeSourceAudio": "1+2"
+								},
+								{
+									"layerNumber": 4,
+									"source": {
+										"type": "timeline",
+										"value": "tl1"
+									}
+								},
+								{
+									"layerNumber": 5,
+									"source": {
+										"type": "live_audio",
+										"value": "2"
+									},
+									"routeSourceAudio": "all"
+								},
+								{
+									"layerNumber": 6,
+									"source": {
+										"type": "media",
+										"value": "music.wav"
+									},
+									"volume": 0
+								}
+							]
+						}
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:1",
+					"ch": 1,
+					"layer": 1,
+					"label": "L1 · 1_GŁÓWNE_TŁO",
+					"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+					"v": 0.5,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "3+4",
+					"audioScreens": [
+						2
+					]
+				},
+				{
+					"key": "pgm:1:layer:3",
+					"ch": 1,
+					"layer": 3,
+					"label": "L3 · Desk",
+					"labelTitle": "L3: Desk",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sourceAudioPair": "1+2",
+					"liveAudioSlot": 1,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:5",
+					"ch": 1,
+					"layer": 5,
+					"label": "L5 · Live_audio_2",
+					"labelTitle": "L5: Live audio 2",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"liveAudioSlot": 2,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:6",
+					"ch": 1,
+					"layer": 6,
+					"label": "L6 · music",
+					"labelTitle": "L6: music.wav",
+					"v": 0,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": []
+				}
+			]
+		},
+		{
+			"name": "tl_missing",
+			"input": {
+				"channelMap": {
+					"screenCount": 1,
+					"screenLabels": [
+						"Main LED (DP-7)"
+					],
+					"virtualMainChannels": [],
+					"decklinkCount": 4,
+					"liveAudioCount": 0,
+					"v4l2InputCount": 0,
+					"decklinkInputsHost": "dedicated",
+					"inputsOnMvr": false,
+					"audioPreview": {
+						"enabled": false,
+						"bus": "preview_1",
+						"screenIndex": 1,
+						"deviceName": "",
+						"soloLayerStart": 1,
+						"soloLayerCount": 8,
+						"defaultSource": "preview_1"
+					},
+					"audioPreviewCh": null,
+					"programChannels": [
+						1
+					],
+					"previewChannels": [
+						2
+					],
+					"switcherBus1Channels": [
+						2
+					],
+					"switcherBusChannels": [
+						null
+					],
+					"transitionModel": "dynamic_layer",
+					"previewEnabledByMain": [
+						true
+					],
+					"multiviewCh": null,
+					"multiviewChannels": [],
+					"streamingCh": null,
+					"streamingContentLayer": 10,
+					"inputsCh": 4,
+					"programResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"previewResolutions": [
+						{
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					],
+					"inputsResolution": null,
+					"channelResolutionsByChannel": {
+						"1": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"2": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"3": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"4": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"5": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"6": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						},
+						"7": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					"programAudioLayouts": [
+						"stereo"
+					],
+					"audioOnlyChannels": [],
+					"audioOnlyLayouts": [],
+					"audioOnlyResolutions": [],
+					"inputChannels": [
+						{
+							"kind": "decklink",
+							"slot": 1,
+							"channel": 4,
+							"layer": 1,
+							"mode": "1080p5000",
+							"route": "route://4-1",
+							"label": "DeckLink 1",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 2,
+							"channel": 5,
+							"layer": 2,
+							"mode": "1080p5000",
+							"route": "route://5-2",
+							"label": "DeckLink 2",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 3,
+							"channel": 6,
+							"layer": 3,
+							"mode": "1080p5000",
+							"route": "route://6-3",
+							"label": "DeckLink 3",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						},
+						{
+							"kind": "decklink",
+							"slot": 4,
+							"channel": 7,
+							"layer": 4,
+							"mode": "1080p5000",
+							"route": "route://7-4",
+							"label": "DeckLink 4",
+							"resolution": {
+								"w": 1920,
+								"h": 1080,
+								"fps": 50
+							}
+						}
+					],
+					"decklinkInputChannels": [
+						4,
+						5,
+						6,
+						7
+					],
+					"liveAudioInputChannels": [],
+					"v4l2InputChannels": [],
+					"hostLiveChannels": [],
+					"webpageHostChannels": [],
+					"ndiHostChannels": []
+				},
+				"timelines": [
+					{
+						"id": "tl1",
+						"name": "TL",
+						"layers": [
+							{
+								"clips": [
+									{
+										"name": "Opener_HAP_25fps.mov",
+										"volume": 0.7,
+										"audioRoute": "5+6"
+									}
+								]
+							},
+							{
+								"clips": []
+							},
+							null,
+							{
+								"clips": [
+									{
+										"muted": true
+									}
+								]
+							}
+						]
+					},
+					{
+						"id": "tl2",
+						"layers": []
+					}
+				],
+				"playback": {
+					"timelineId": "nope",
+					"sendTo": {
+						"program": true,
+						"screenIdx": 0
+					}
+				},
+				"live": {
+					"1": {
+						"scene": {
+							"layers": [
+								{
+									"layerNumber": 1,
+									"source": {
+										"type": "media",
+										"value": "PROJECTS/AIRPORT/1. GŁÓWNE TŁO.mov"
+									},
+									"volume": 0.5,
+									"audioRoute": "3+4",
+									"audioScreens": [
+										2
+									]
+								},
+								{
+									"layerNumber": 2,
+									"source": {
+										"type": "media",
+										"value": "bg.png"
+									}
+								},
+								{
+									"layerNumber": 3,
+									"source": {
+										"type": "live_audio",
+										"value": "1",
+										"label": "Desk"
+									},
+									"muted": true,
+									"routeSourceAudio": "1+2"
+								},
+								{
+									"layerNumber": 4,
+									"source": {
+										"type": "timeline",
+										"value": "tl1"
+									}
+								},
+								{
+									"layerNumber": 5,
+									"source": {
+										"type": "live_audio",
+										"value": "2"
+									},
+									"routeSourceAudio": "all"
+								},
+								{
+									"layerNumber": 6,
+									"source": {
+										"type": "media",
+										"value": "music.wav"
+									},
+									"volume": 0
+								}
+							]
+						}
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:1:layer:1",
+					"ch": 1,
+					"layer": 1,
+					"label": "L1 · 1_GŁÓWNE_TŁO",
+					"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+					"v": 0.5,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "3+4",
+					"audioScreens": [
+						2
+					]
+				},
+				{
+					"key": "pgm:1:layer:3",
+					"ch": 1,
+					"layer": 3,
+					"label": "L3 · Desk",
+					"labelTitle": "L3: Desk",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sourceAudioPair": "1+2",
+					"liveAudioSlot": 1,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:5",
+					"ch": 1,
+					"layer": 5,
+					"label": "L5 · Live_audio_2",
+					"labelTitle": "L5: Live audio 2",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"liveAudioSlot": 2,
+					"hostChannel": null
+				},
+				{
+					"key": "pgm:1:layer:6",
+					"ch": 1,
+					"layer": 6,
+					"label": "L6 · music",
+					"labelTitle": "L6: music.wav",
+					"v": 0,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": []
+				}
+			]
+		},
+		{
+			"name": "live_slots_cm",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1,
+						3
+					],
+					"previewChannels": [
+						2,
+						4
+					],
+					"liveAudioCount": 2,
+					"liveAudioInputChannels": [
+						8,
+						9
+					],
+					"inputChannels": []
+				},
+				"casparServer": {
+					"live_audio_input_1_device": "alsa://hw:1",
+					"live_audio_input_2_device": "Desk L/R"
+				},
+				"live": {
+					"3": {
+						"sceneId": "s3",
+						"scene": {
+							"layers": [
+								{
+									"layerNumber": 3,
+									"source": {
+										"type": "live_audio",
+										"value": "1",
+										"label": "Desk"
+									},
+									"muted": true,
+									"routeSourceAudio": "1+2"
+								}
+							]
+						}
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:2",
+					"ch": 2,
+					"label": "PRV 1 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3",
+					"ch": 3,
+					"label": "PGM 2 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "prv:4",
+					"ch": 4,
+					"label": "PRV 2 Master",
+					"v": 1,
+					"isMaster": true,
+					"isPreview": true
+				},
+				{
+					"key": "pgm:3:layer:3",
+					"ch": 3,
+					"layer": 3,
+					"label": "L3 · Desk",
+					"labelTitle": "L3: Desk",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"audioScreens": [],
+					"sourceAudioPair": "1+2",
+					"sceneId": "s3",
+					"liveAudioSlot": 1,
+					"hostChannel": 8
+				},
+				{
+					"key": "pgm:8:layer:10",
+					"ch": 8,
+					"layer": 10,
+					"label": "hw:1",
+					"labelTitle": "hw:1 (Live audio · Ch 8 L10)",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"liveAudioSlot": 1,
+					"hostChannel": 8
+				},
+				{
+					"key": "pgm:9:layer:10",
+					"ch": 9,
+					"layer": 10,
+					"label": "Desk_L/R",
+					"labelTitle": "Desk L/R (Live audio · Ch 9 L10)",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"liveAudioSlot": 2,
+					"hostChannel": 9
+				}
+			]
+		},
+		{
+			"name": "live_slots_api",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1
+					],
+					"inputChannels": [
+						{
+							"kind": "live_audio",
+							"slot": 2,
+							"channel": 6,
+							"layer": 10,
+							"route": "route://6",
+							"label": "Ambient"
+						}
+					]
+				},
+				"liveInputs": {
+					"configured": {
+						"slots": [
+							{
+								"slot": 1,
+								"device": "alsa://",
+								"channel": 5
+							},
+							{
+								"slot": 2,
+								"clip": "hw:2"
+							},
+							{
+								"slot": 3
+							},
+							null,
+							{
+								"slot": 0,
+								"device": "x"
+							}
+						]
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "pgm:5:layer:10",
+					"ch": 5,
+					"layer": 10,
+					"label": "Live_audio_1",
+					"labelTitle": "Live audio 1 (Live audio · Ch 5 L10)",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"liveAudioSlot": 1,
+					"hostChannel": 5
+				},
+				{
+					"key": "pgm:6:layer:10",
+					"ch": 6,
+					"layer": 10,
+					"label": "Ambient",
+					"labelTitle": "Ambient (Live audio · Ch 6 L10)",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"audioRoute": "1+2",
+					"sceneId": null,
+					"liveAudioSlot": 2,
+					"hostChannel": 6
+				}
+			]
+		},
+		{
+			"name": "live_slots_count_only",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1
+					]
+				},
+				"casparServer": {
+					"live_audio_input_count": "2",
+					"live_audio_input_2_device": "alsa://hw:3"
+				},
+				"liveInputs": {
+					"configured": {
+						"slots": []
+					}
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				}
+			]
+		},
+		{
+			"name": "no_programs",
+			"input": {
+				"channelMap": {}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				}
+			]
+		},
+		{
+			"name": "no_preview",
+			"input": {
+				"channelMap": {
+					"programChannels": [
+						1,
+						2
+					],
+					"previewChannels": [
+						null,
+						0
+					]
+				}
+			},
+			"rows": [
+				{
+					"key": "pgm:1",
+					"ch": 1,
+					"label": "PGM 1 Master",
+					"v": 1,
+					"isMaster": true
+				},
+				{
+					"key": "pgm:2",
+					"ch": 2,
+					"label": "PGM 2 Master",
+					"v": 1,
+					"isMaster": true
+				}
+			]
+		}
+	],
+	"inputRows": [
+		{
+			"name": "box",
+			"cm": {
+				"screenCount": 1,
+				"screenLabels": [
+					"Main LED (DP-7)"
+				],
+				"virtualMainChannels": [],
+				"decklinkCount": 4,
+				"liveAudioCount": 0,
+				"v4l2InputCount": 0,
+				"decklinkInputsHost": "dedicated",
+				"inputsOnMvr": false,
+				"audioPreview": {
+					"enabled": false,
+					"bus": "preview_1",
+					"screenIndex": 1,
+					"deviceName": "",
+					"soloLayerStart": 1,
+					"soloLayerCount": 8,
+					"defaultSource": "preview_1"
+				},
+				"audioPreviewCh": null,
+				"programChannels": [
+					1
+				],
+				"previewChannels": [
+					2
+				],
+				"switcherBus1Channels": [
+					2
+				],
+				"switcherBusChannels": [
+					null
+				],
+				"transitionModel": "dynamic_layer",
+				"previewEnabledByMain": [
+					true
+				],
+				"multiviewCh": null,
+				"multiviewChannels": [],
+				"streamingCh": null,
+				"streamingContentLayer": 10,
+				"inputsCh": 4,
+				"programResolutions": [
+					{
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					}
+				],
+				"previewResolutions": [
+					{
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					}
+				],
+				"inputsResolution": null,
+				"channelResolutionsByChannel": {
+					"1": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"2": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"3": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"4": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"5": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"6": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					},
+					"7": {
+						"w": 1920,
+						"h": 1080,
+						"fps": 50
+					}
+				},
+				"programAudioLayouts": [
+					"stereo"
+				],
+				"audioOnlyChannels": [],
+				"audioOnlyLayouts": [],
+				"audioOnlyResolutions": [],
+				"inputChannels": [
+					{
+						"kind": "decklink",
+						"slot": 1,
+						"channel": 4,
+						"layer": 1,
+						"mode": "1080p5000",
+						"route": "route://4-1",
+						"label": "DeckLink 1",
+						"resolution": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					{
+						"kind": "decklink",
+						"slot": 2,
+						"channel": 5,
+						"layer": 2,
+						"mode": "1080p5000",
+						"route": "route://5-2",
+						"label": "DeckLink 2",
+						"resolution": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					{
+						"kind": "decklink",
+						"slot": 3,
+						"channel": 6,
+						"layer": 3,
+						"mode": "1080p5000",
+						"route": "route://6-3",
+						"label": "DeckLink 3",
+						"resolution": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					},
+					{
+						"kind": "decklink",
+						"slot": 4,
+						"channel": 7,
+						"layer": 4,
+						"mode": "1080p5000",
+						"route": "route://7-4",
+						"label": "DeckLink 4",
+						"resolution": {
+							"w": 1920,
+							"h": 1080,
+							"fps": 50
+						}
+					}
+				],
+				"decklinkInputChannels": [
+					4,
+					5,
+					6,
+					7
+				],
+				"liveAudioInputChannels": [],
+				"v4l2InputChannels": [],
+				"hostLiveChannels": [],
+				"webpageHostChannels": [],
+				"ndiHostChannels": []
+			},
+			"mixer": {
+				"gains": {
+					"input:4": 0.3
+				},
+				"muted": {
+					"input:5": true
+				}
+			},
+			"rows": [
+				{
+					"key": "input:4",
+					"ch": 4,
+					"layer": 1,
+					"label": "DeckLink 1",
+					"labelTitle": "Ch 4 · L1 — route://4-1",
+					"v": 0.3,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 1,
+					"route": "route://4-1",
+					"hostChannel": 4
+				},
+				{
+					"key": "input:5",
+					"ch": 5,
+					"layer": 2,
+					"label": "DeckLink 2",
+					"labelTitle": "Ch 5 · L2 — route://5-2",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 2,
+					"route": "route://5-2",
+					"hostChannel": 5
+				},
+				{
+					"key": "input:6",
+					"ch": 6,
+					"layer": 3,
+					"label": "DeckLink 3",
+					"labelTitle": "Ch 6 · L3 — route://6-3",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 3,
+					"route": "route://6-3",
+					"hostChannel": 6
+				},
+				{
+					"key": "input:7",
+					"ch": 7,
+					"layer": 4,
+					"label": "DeckLink 4",
+					"labelTitle": "Ch 7 · L4 — route://7-4",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 4,
+					"route": "route://7-4",
+					"hostChannel": 7
+				}
+			]
+		},
+		{
+			"name": "synth",
+			"cm": {
+				"decklinkCount": 2,
+				"decklinkInputChannels": [
+					4,
+					5
+				],
+				"liveAudioCount": 1,
+				"liveAudioInputChannels": [
+					6
+				],
+				"v4l2InputCount": 1,
+				"v4l2InputChannels": [
+					7
+				]
+			},
+			"mixer": {
+				"gains": {
+					"input:4": 0.3
+				},
+				"muted": {
+					"input:5": true
+				}
+			},
+			"rows": [
+				{
+					"key": "input:4",
+					"ch": 4,
+					"layer": 1,
+					"label": "DeckLink 1",
+					"labelTitle": "Ch 4 · L1 — route://4-1",
+					"v": 0.3,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 1,
+					"route": "route://4-1",
+					"hostChannel": 4
+				},
+				{
+					"key": "input:5",
+					"ch": 5,
+					"layer": 2,
+					"label": "DeckLink 2",
+					"labelTitle": "Ch 5 · L2 — route://5-2",
+					"v": 1,
+					"muted": true,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 2,
+					"route": "route://5-2",
+					"hostChannel": 5
+				},
+				{
+					"key": "input:6",
+					"ch": 6,
+					"layer": 10,
+					"label": "Live audio 1",
+					"labelTitle": "Ch 6 · L10 — route://6",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "live_audio",
+					"slot": 1,
+					"route": "route://6",
+					"hostChannel": 6
+				}
+			]
+		},
+		{
+			"name": "shared",
+			"cm": {
+				"decklinkCount": 2,
+				"inputsCh": 3
+			},
+			"mixer": {
+				"gains": {
+					"input:4": 0.3
+				},
+				"muted": {
+					"input:5": true
+				}
+			},
+			"rows": [
+				{
+					"key": "input:3",
+					"ch": 3,
+					"layer": 1,
+					"label": "DeckLink 1",
+					"labelTitle": "Ch 3 · L1 — route://3-1",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 1,
+					"route": "route://3-1",
+					"hostChannel": 3
+				},
+				{
+					"key": "input:3",
+					"ch": 3,
+					"layer": 2,
+					"label": "DeckLink 2",
+					"labelTitle": "Ch 3 · L2 — route://3-2",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"slot": 2,
+					"route": "route://3-2",
+					"hostChannel": 3
+				}
+			]
+		},
+		{
+			"name": "kinds",
+			"cm": {
+				"inputChannels": [
+					{
+						"kind": "ndi_host",
+						"slot": 1,
+						"channel": 9,
+						"layer": 1
+					},
+					{
+						"kind": "v4l2",
+						"slot": 1,
+						"channel": 10
+					},
+					{
+						"kind": "live_audio",
+						"slot": 3,
+						"channel": 11,
+						"route": "route://11"
+					},
+					{
+						"kind": "browser_display",
+						"channel": 12
+					},
+					{
+						"kind": "decklink",
+						"channel": 13,
+						"label": "Cam A"
+					},
+					{
+						"kind": "decklink",
+						"slot": 4
+					}
+				]
+			},
+			"mixer": {
+				"gains": {
+					"input:4": 0.3
+				},
+				"muted": {
+					"input:5": true
+				}
+			},
+			"rows": [
+				{
+					"key": "input:9",
+					"ch": 9,
+					"layer": 1,
+					"label": "Input 1",
+					"labelTitle": "Ch 9 · L1 — ",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "ndi_host",
+					"slot": 1,
+					"route": null,
+					"hostChannel": 9
+				},
+				{
+					"key": "input:11",
+					"ch": 11,
+					"layer": 10,
+					"label": "Live audio 3",
+					"labelTitle": "Ch 11 · L10 — route://11",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "live_audio",
+					"slot": 3,
+					"route": "route://11",
+					"hostChannel": 11
+				},
+				{
+					"key": "input:13",
+					"ch": 13,
+					"layer": 1,
+					"label": "Cam A",
+					"labelTitle": "Ch 13 · L1 — ",
+					"v": 1,
+					"muted": false,
+					"isMaster": false,
+					"isLiveInput": true,
+					"inputKind": "decklink",
+					"route": null,
+					"hostChannel": 13
+				}
+			]
+		}
+	],
+	"meterMeta": [
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 0.8,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 0.25,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:1",
+				"ch": 1,
+				"layer": 1,
+				"label": "L1 · 1_GŁÓWNE_TŁO",
+				"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+				"v": 0.5,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "3+4",
+				"audioScreens": [
+					2
+				],
+				"sceneId": "look-1"
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:3",
+				"ch": 1,
+				"layer": 3,
+				"label": "L3 · Desk",
+				"labelTitle": "L3: Desk",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sourceAudioPair": "1+2",
+				"sceneId": "look-1",
+				"liveAudioSlot": 1,
+				"hostChannel": null
+			},
+			{
+				"muted": true,
+				"layer": 3,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:5",
+				"ch": 1,
+				"layer": 5,
+				"label": "L5 · Live_audio_2",
+				"labelTitle": "L5: Live audio 2",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sceneId": "look-1",
+				"liveAudioSlot": 2,
+				"hostChannel": null
+			},
+			{
+				"muted": false,
+				"layer": 5,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:6",
+				"ch": 1,
+				"layer": 6,
+				"label": "L6 · music",
+				"labelTitle": "L6: music.wav",
+				"v": 0,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sceneId": "look-1"
+			},
+			{
+				"muted": false,
+				"layer": 6,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:200",
+				"ch": 1,
+				"layer": 200,
+				"label": "🔊 Walk_in_music",
+				"labelTitle": "Walk-in music (Audio-only look · Ch 1 L200)",
+				"v": 0.4,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isAudioOnlyLook": true
+			},
+			{
+				"muted": true,
+				"layer": 200,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:200",
+				"ch": 1,
+				"layer": 200,
+				"label": "🔊 Audio_only",
+				"labelTitle": "Audio only (Audio-only look · Ch 1 L200)",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isAudioOnlyLook": true
+			},
+			{
+				"muted": false,
+				"layer": 200,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:210",
+				"ch": 1,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:213",
+				"ch": 1,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:210",
+				"ch": 1,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:213",
+				"ch": 1,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3",
+				"ch": 3,
+				"label": "PGM 2 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:4",
+				"ch": 4,
+				"label": "PRV 2 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 4,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:210",
+				"ch": 3,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:213",
+				"ch": 3,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:210",
+				"ch": 1,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:213",
+				"ch": 1,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3",
+				"ch": 3,
+				"label": "PGM 2 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:4",
+				"ch": 4,
+				"label": "PRV 2 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 4,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:210",
+				"ch": 3,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:213",
+				"ch": 3,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3",
+				"ch": 3,
+				"label": "PGM 2 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:4",
+				"ch": 4,
+				"label": "PRV 2 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 4,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:210",
+				"ch": 3,
+				"layer": 210,
+				"label": "Opener",
+				"labelTitle": "Opener_HAP_25fps.mov (Timeline layer)",
+				"v": 0.7,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "5+6",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": false,
+				"layer": 210,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:213",
+				"ch": 3,
+				"layer": 213,
+				"label": "Clip_4",
+				"labelTitle": "Clip 4 (Timeline layer)",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"isTimelineClip": true
+			},
+			{
+				"muted": true,
+				"layer": 213,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "timeline",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:1",
+				"ch": 1,
+				"layer": 1,
+				"label": "L1 · 1_GŁÓWNE_TŁO",
+				"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+				"v": 0.5,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "3+4",
+				"audioScreens": [
+					2
+				]
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:3",
+				"ch": 1,
+				"layer": 3,
+				"label": "L3 · Desk",
+				"labelTitle": "L3: Desk",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sourceAudioPair": "1+2",
+				"liveAudioSlot": 1,
+				"hostChannel": null
+			},
+			{
+				"muted": true,
+				"layer": 3,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:5",
+				"ch": 1,
+				"layer": 5,
+				"label": "L5 · Live_audio_2",
+				"labelTitle": "L5: Live audio 2",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"liveAudioSlot": 2,
+				"hostChannel": null
+			},
+			{
+				"muted": false,
+				"layer": 5,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:6",
+				"ch": 1,
+				"layer": 6,
+				"label": "L6 · music",
+				"labelTitle": "L6: music.wav",
+				"v": 0,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": []
+			},
+			{
+				"muted": false,
+				"layer": 6,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:1",
+				"ch": 1,
+				"layer": 1,
+				"label": "L1 · 1_GŁÓWNE_TŁO",
+				"labelTitle": "L1: 1. GŁÓWNE TŁO.mov",
+				"v": 0.5,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "3+4",
+				"audioScreens": [
+					2
+				]
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:3",
+				"ch": 1,
+				"layer": 3,
+				"label": "L3 · Desk",
+				"labelTitle": "L3: Desk",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sourceAudioPair": "1+2",
+				"liveAudioSlot": 1,
+				"hostChannel": null
+			},
+			{
+				"muted": true,
+				"layer": 3,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:5",
+				"ch": 1,
+				"layer": 5,
+				"label": "L5 · Live_audio_2",
+				"labelTitle": "L5: Live audio 2",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"liveAudioSlot": 2,
+				"hostChannel": null
+			},
+			{
+				"muted": false,
+				"layer": 5,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1:layer:6",
+				"ch": 1,
+				"layer": 6,
+				"label": "L6 · music",
+				"labelTitle": "L6: music.wav",
+				"v": 0,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": []
+			},
+			{
+				"muted": false,
+				"layer": 6,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:2",
+				"ch": 2,
+				"label": "PRV 1 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3",
+				"ch": 3,
+				"label": "PGM 2 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 3,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "prv:4",
+				"ch": 4,
+				"label": "PRV 2 Master",
+				"v": 1,
+				"isMaster": true,
+				"isPreview": true
+			},
+			{
+				"muted": false,
+				"ch": 4,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:3:layer:3",
+				"ch": 3,
+				"layer": 3,
+				"label": "L3 · Desk",
+				"labelTitle": "L3: Desk",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"audioScreens": [],
+				"sourceAudioPair": "1+2",
+				"sceneId": "s3",
+				"liveAudioSlot": 1,
+				"hostChannel": 8
+			},
+			{
+				"muted": true,
+				"layer": 3,
+				"ch": 3,
+				"hostChannel": 8,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:8:layer:10",
+				"ch": 8,
+				"layer": 10,
+				"label": "hw:1",
+				"labelTitle": "hw:1 (Live audio · Ch 8 L10)",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"liveAudioSlot": 1,
+				"hostChannel": 8
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 8,
+				"hostChannel": 8,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:9:layer:10",
+				"ch": 9,
+				"layer": 10,
+				"label": "Desk_L/R",
+				"labelTitle": "Desk L/R (Live audio · Ch 9 L10)",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"liveAudioSlot": 2,
+				"hostChannel": 9
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 9,
+				"hostChannel": 9,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:5:layer:10",
+				"ch": 5,
+				"layer": 10,
+				"label": "Live_audio_1",
+				"labelTitle": "Live audio 1 (Live audio · Ch 5 L10)",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"liveAudioSlot": 1,
+				"hostChannel": 5
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 5,
+				"hostChannel": 5,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:6:layer:10",
+				"ch": 6,
+				"layer": 10,
+				"label": "Ambient",
+				"labelTitle": "Ambient (Live audio · Ch 6 L10)",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"audioRoute": "1+2",
+				"sceneId": null,
+				"liveAudioSlot": 2,
+				"hostChannel": 6
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 6,
+				"hostChannel": 6,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:1",
+				"ch": 1,
+				"label": "PGM 1 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 1,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "pgm:2",
+				"ch": 2,
+				"label": "PGM 2 Master",
+				"v": 1,
+				"isMaster": true
+			},
+			{
+				"muted": false,
+				"ch": 2,
+				"hostChannel": null,
+				"expectAudio": true,
+				"sourceType": "media",
+				"inputLayer": null
+			}
+		],
+		[
+			{
+				"key": "input:4",
+				"ch": 4,
+				"layer": 1,
+				"label": "DeckLink 1",
+				"labelTitle": "Ch 4 · L1 — route://4-1",
+				"v": 0.3,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 1,
+				"route": "route://4-1",
+				"hostChannel": 4
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 4,
+				"hostChannel": 4,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 1
+			}
+		],
+		[
+			{
+				"key": "input:5",
+				"ch": 5,
+				"layer": 2,
+				"label": "DeckLink 2",
+				"labelTitle": "Ch 5 · L2 — route://5-2",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 2,
+				"route": "route://5-2",
+				"hostChannel": 5
+			},
+			{
+				"muted": true,
+				"layer": 2,
+				"ch": 5,
+				"hostChannel": 5,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 2
+			}
+		],
+		[
+			{
+				"key": "input:6",
+				"ch": 6,
+				"layer": 3,
+				"label": "DeckLink 3",
+				"labelTitle": "Ch 6 · L3 — route://6-3",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 3,
+				"route": "route://6-3",
+				"hostChannel": 6
+			},
+			{
+				"muted": false,
+				"layer": 3,
+				"ch": 6,
+				"hostChannel": 6,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 3
+			}
+		],
+		[
+			{
+				"key": "input:7",
+				"ch": 7,
+				"layer": 4,
+				"label": "DeckLink 4",
+				"labelTitle": "Ch 7 · L4 — route://7-4",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 4,
+				"route": "route://7-4",
+				"hostChannel": 7
+			},
+			{
+				"muted": false,
+				"layer": 4,
+				"ch": 7,
+				"hostChannel": 7,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 4
+			}
+		],
+		[
+			{
+				"key": "input:4",
+				"ch": 4,
+				"layer": 1,
+				"label": "DeckLink 1",
+				"labelTitle": "Ch 4 · L1 — route://4-1",
+				"v": 0.3,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 1,
+				"route": "route://4-1",
+				"hostChannel": 4
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 4,
+				"hostChannel": 4,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 1
+			}
+		],
+		[
+			{
+				"key": "input:5",
+				"ch": 5,
+				"layer": 2,
+				"label": "DeckLink 2",
+				"labelTitle": "Ch 5 · L2 — route://5-2",
+				"v": 1,
+				"muted": true,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 2,
+				"route": "route://5-2",
+				"hostChannel": 5
+			},
+			{
+				"muted": true,
+				"layer": 2,
+				"ch": 5,
+				"hostChannel": 5,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 2
+			}
+		],
+		[
+			{
+				"key": "input:6",
+				"ch": 6,
+				"layer": 10,
+				"label": "Live audio 1",
+				"labelTitle": "Ch 6 · L10 — route://6",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "live_audio",
+				"slot": 1,
+				"route": "route://6",
+				"hostChannel": 6
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 6,
+				"hostChannel": 6,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 10
+			}
+		],
+		[
+			{
+				"key": "input:3",
+				"ch": 3,
+				"layer": 1,
+				"label": "DeckLink 1",
+				"labelTitle": "Ch 3 · L1 — route://3-1",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 1,
+				"route": "route://3-1",
+				"hostChannel": 3
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 3,
+				"hostChannel": 3,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 1
+			}
+		],
+		[
+			{
+				"key": "input:3",
+				"ch": 3,
+				"layer": 2,
+				"label": "DeckLink 2",
+				"labelTitle": "Ch 3 · L2 — route://3-2",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"slot": 2,
+				"route": "route://3-2",
+				"hostChannel": 3
+			},
+			{
+				"muted": false,
+				"layer": 2,
+				"ch": 3,
+				"hostChannel": 3,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 2
+			}
+		],
+		[
+			{
+				"key": "input:9",
+				"ch": 9,
+				"layer": 1,
+				"label": "Input 1",
+				"labelTitle": "Ch 9 · L1 — ",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "ndi_host",
+				"slot": 1,
+				"route": null,
+				"hostChannel": 9
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 9,
+				"hostChannel": 9,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 1
+			}
+		],
+		[
+			{
+				"key": "input:11",
+				"ch": 11,
+				"layer": 10,
+				"label": "Live audio 3",
+				"labelTitle": "Ch 11 · L10 — route://11",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "live_audio",
+				"slot": 3,
+				"route": "route://11",
+				"hostChannel": 11
+			},
+			{
+				"muted": false,
+				"layer": 10,
+				"ch": 11,
+				"hostChannel": 11,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 10
+			}
+		],
+		[
+			{
+				"key": "input:13",
+				"ch": 13,
+				"layer": 1,
+				"label": "Cam A",
+				"labelTitle": "Ch 13 · L1 — ",
+				"v": 1,
+				"muted": false,
+				"isMaster": false,
+				"isLiveInput": true,
+				"inputKind": "decklink",
+				"route": null,
+				"hostChannel": 13
+			},
+			{
+				"muted": false,
+				"layer": 1,
+				"ch": 13,
+				"hostChannel": 13,
+				"expectAudio": true,
+				"sourceType": "live_audio",
+				"inputLayer": 1
+			}
+		]
+	],
+	"busCount": [
+		[
+			{},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			1,
+			2
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			5,
+			2
+		],
+		[
+			{
+				"screenDestinations": {
+					"destinations": [
+						{
+							"id": "d1",
+							"mode": "pgm_prv",
+							"mainScreenIndex": 0,
+							"audioLayout": "8ch"
+						}
+					]
+				}
+			},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			1,
+			8
+		],
+		[
+			{
+				"screenDestinations": {
+					"destinations": [
+						{
+							"id": "d1",
+							"mode": "multiview",
+							"mainScreenIndex": 0,
+							"audioLayout": "8ch"
+						}
+					]
+				}
+			},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			1,
+			2
+		],
+		[
+			{
+				"screenDestinations": {
+					"destinations": [
+						{
+							"id": "d1",
+							"mainScreenIndex": "1",
+							"audioLayout": "mono"
+						},
+						{
+							"id": "d2",
+							"mainScreenIndex": 0,
+							"audioLayout": "4ch"
+						}
+					]
+				}
+			},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"screenCount": 2
+			},
+			3,
+			2
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"programAudioLayouts": [
+					"16ch",
+					"bogus"
+				],
+				"screenCount": 2
+			},
+			3,
+			2
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"programAudioLayouts": [
+					"16ch",
+					"bogus"
+				],
+				"screenCount": 2
+			},
+			1,
+			16
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"programAudioLayouts": [
+					"16ch"
+				],
+				"screenCount": 2
+			},
+			1,
+			2
+		],
+		[
+			{
+				"screenDestinations": {
+					"destinations": [
+						{
+							"id": "d1",
+							"mainScreenIndex": 0,
+							"audioLayout": "stereo"
+						}
+					]
+				},
+				"audioOutputs": [
+					{
+						"id": "a1",
+						"channelLayout": "8ch"
+					},
+					{
+						"id": "a2",
+						"type": "system-audio",
+						"channelLayout": "16ch"
+					},
+					{
+						"id": "a3",
+						"enabled": false,
+						"channelLayout": "16ch"
+					}
+				],
+				"deviceGraph": {
+					"edges": [
+						{
+							"sinkId": "a1",
+							"sourceId": "dst_in_d1"
+						},
+						{
+							"sinkId": "a2",
+							"sourceId": "dst_in_d1"
+						},
+						{
+							"sinkId": "a3",
+							"sourceId": "dst_in_d1"
+						}
+					]
+				}
+			},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			1,
+			8
+		],
+		[
+			{
+				"casparServer": {
+					"screen_count": 2
+				}
+			},
+			{
+				"programChannels": [
+					1,
+					3
+				]
+			},
+			3,
+			2
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"screenCount": 1
+			},
+			3,
+			2
+		],
+		[
+			{},
+			{
+				"programChannels": [
+					1,
+					3
+				],
+				"programAudioLayouts": [
+					"4ch",
+					"8ch"
+				]
+			},
+			3,
+			2
+		]
+	],
+	"meterCtx": {
+		"osc": {
+			"1": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -12,
+							"peak": -12,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -30,
+							"peak": -30,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -0.5,
+							"peak": -0.5,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"10": {
+						"type": "ffmpeg",
+						"file": {
+							"name": "a.mov"
+						},
+						"audio": {
+							"levels": [
+								{
+									"dBFS": -20,
+									"peak": -20,
+									"peakAge": 0
+								},
+								{
+									"dBFS": -25,
+									"peak": -25,
+									"peakAge": 0
+								}
+							]
+						}
+					},
+					"11": {
+						"type": "ffmpeg",
+						"paused": true
+					},
+					"12": {
+						"type": "ffmpeg",
+						"speed": 0
+					},
+					"13": {
+						"type": "empty"
+					},
+					"14": {
+						"file": {
+							"elapsed": 0
+						}
+					},
+					"15": {
+						"type": "route"
+					},
+					"96": {
+						"type": "ffmpeg",
+						"file": {
+							"path": "udp://x"
+						}
+					}
+				}
+			},
+			"2": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -0.2,
+							"peak": -0.2,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -50,
+							"peak": -50,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {}
+			},
+			"4": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"1": {
+						"type": "decklink"
+					}
+				}
+			},
+			"5": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -35,
+							"peak": -35,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -40,
+							"peak": -40,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"2": {
+						"type": "empty"
+					}
+				}
+			},
+			"6": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -35,
+							"peak": -35,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -40,
+							"peak": -40,
+							"peakAge": 0
+						}
+					]
+				}
+			},
+			"7": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -18,
+							"peak": -18,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -15,
+							"peak": -15,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"4": {
+						"type": "",
+						"producer": "decklink"
+					}
+				}
+			},
+			"8": {
+				"audio": {
+					"levels": []
+				},
+				"layers": {}
+			},
+			"9": {
+				"audio": {
+					"levels": [
+						{},
+						{
+							"dBFS": -70
+						}
+					]
+				}
+			}
+		},
+		"info": [
+			{
+				"id": 1,
+				"layers": [
+					null,
+					null,
+					{
+						"fgClip": "x.mov"
+					},
+					{
+						"fgClip": "",
+						"durationSec": "12.5"
+					},
+					{
+						"clip": " y "
+					}
+				]
+			},
+			null,
+			{
+				"channel": 3,
+				"layers": {
+					"a": {
+						"layer": 7,
+						"fgClip": "z"
+					}
+				}
+			}
+		],
+		"live": {
+			"1": {
+				"scene": {
+					"layers": [
+						{
+							"layerNumber": 20,
+							"source": {
+								"type": "media",
+								"value": "only.mov"
+							}
+						}
+					]
+				}
+			},
+			"3": {
+				"scene": {
+					"layers": [
+						{
+							"layerNumber": 1,
+							"source": {
+								"type": "media",
+								"value": "a.mov"
+							}
+						},
+						{
+							"layerNumber": 2,
+							"source": {
+								"type": "file",
+								"value": "b.mov"
+							}
+						}
+					]
+				}
+			}
+		},
+		"vars": {
+			"osc_ch3_audio_L": "-22.5",
+			"osc_ch3_audio_R": "x",
+			"osc_ch3_audio_c3_dBFS": "-44",
+			"osc_ch10_audio_c1_dBFS": "-8dB"
+		}
+	},
+	"meters": [
+		{
+			"key": "pgm:1",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "prv:2",
+			"meta": {},
+			"seq": [
+				[
+					0.9966666666666666,
+					"99.7%",
+					"var(--accent-red)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:3",
+			"meta": {},
+			"seq": [
+				[
+					0.625,
+					"62.5%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:10",
+			"meta": {},
+			"seq": [
+				[
+					0.8666666666666667,
+					"86.7%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:99",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:x",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:bus:0",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:bus:3",
+			"meta": {},
+			"seq": [
+				[
+					0.9916666666666667,
+					"99.2%",
+					"var(--accent-red)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:bus:9",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "prv:3:bus:0",
+			"meta": {},
+			"seq": [
+				[
+					0.625,
+					"62.5%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "prv:3:bus:1",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:3:bus:2",
+			"meta": {},
+			"seq": [
+				[
+					0.26666666666666666,
+					"26.7%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:10:bus:0",
+			"meta": {},
+			"seq": [
+				[
+					0.8666666666666667,
+					"86.7%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:10",
+			"meta": {},
+			"seq": [
+				[
+					0.6666666666666666,
+					"66.7%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:10",
+			"meta": {
+				"muted": true
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:11",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:12",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:13",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:14",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:15",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:96",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:2",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:3",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:4",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:20",
+			"meta": {},
+			"seq": [
+				[
+					0.8,
+					"80.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:21",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:3:layer:7",
+			"meta": {},
+			"seq": [
+				[
+					0.625,
+					"62.5%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:3:layer:1",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:2:layer:1",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:3",
+			"meta": {
+				"hostChannel": 7
+			},
+			"seq": [
+				[
+					0.75,
+					"75.0%",
+					"var(--accent-green)",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:3",
+			"meta": {
+				"hostChannel": 7,
+				"muted": true
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "pgm:1:layer:3",
+			"meta": {
+				"hostChannel": "x"
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					""
+				]
+			]
+		},
+		{
+			"key": "input:4",
+			"meta": {
+				"inputLayer": 1
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"silent"
+				]
+			]
+		},
+		{
+			"key": "input:5",
+			"meta": {
+				"inputLayer": 2
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"no-data"
+				]
+			]
+		},
+		{
+			"key": "input:6",
+			"meta": {
+				"inputLayer": 1
+			},
+			"seq": [
+				[
+					0.4166666666666667,
+					"41.7%",
+					"var(--accent-green)",
+					"signal"
+				]
+			]
+		},
+		{
+			"key": "input:7",
+			"meta": {
+				"inputLayer": 4
+			},
+			"seq": [
+				[
+					0.75,
+					"75.0%",
+					"var(--accent-green)",
+					"signal"
+				]
+			]
+		},
+		{
+			"key": "input:7",
+			"meta": {
+				"inputLayer": 4,
+				"muted": true
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"silent"
+				]
+			]
+		},
+		{
+			"key": "input:7",
+			"meta": {
+				"inputLayer": 3
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"no-data"
+				]
+			]
+		},
+		{
+			"key": "input:8",
+			"meta": {
+				"inputLayer": 1
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"no-data"
+				]
+			]
+		},
+		{
+			"key": "input:9",
+			"meta": {
+				"inputLayer": null
+			},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"silent"
+				]
+			]
+		},
+		{
+			"key": "input:10",
+			"meta": {},
+			"seq": [
+				[
+					0.8666666666666667,
+					"86.7%",
+					"var(--accent-green)",
+					"signal"
+				]
+			]
+		},
+		{
+			"key": "input:11",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"no-data"
+				]
+			]
+		},
+		{
+			"key": "input:0",
+			"meta": {},
+			"seq": [
+				[
+					0,
+					"0.0%",
+					"",
+					"no-data"
+				]
+			]
+		},
+		{
+			"key": "input:2",
+			"meta": {
+				"inputLayer": 1
+			},
+			"seq": [
+				[
+					0.9966666666666666,
+					"99.7%",
+					"var(--accent-red)",
+					"signal"
+				]
+			]
+		}
+	],
+	"smoothCtx": {
+		"osc": {
+			"1": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -12,
+							"peak": -12,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -30,
+							"peak": -30,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -0.5,
+							"peak": -0.5,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"10": {
+						"type": "ffmpeg",
+						"file": {
+							"name": "a.mov"
+						},
+						"audio": {
+							"levels": [
+								{
+									"dBFS": -20,
+									"peak": -20,
+									"peakAge": 0
+								},
+								{
+									"dBFS": -25,
+									"peak": -25,
+									"peakAge": 0
+								}
+							]
+						}
+					},
+					"11": {
+						"type": "ffmpeg",
+						"paused": true
+					},
+					"12": {
+						"type": "ffmpeg",
+						"speed": 0
+					},
+					"13": {
+						"type": "empty"
+					},
+					"14": {
+						"file": {
+							"elapsed": 0
+						}
+					},
+					"15": {
+						"type": "route"
+					},
+					"96": {
+						"type": "ffmpeg",
+						"file": {
+							"path": "udp://x"
+						}
+					}
+				}
+			},
+			"2": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -0.2,
+							"peak": -0.2,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -50,
+							"peak": -50,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {}
+			},
+			"4": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -120,
+							"peak": -120,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"1": {
+						"type": "decklink"
+					}
+				}
+			},
+			"5": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -35,
+							"peak": -35,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -40,
+							"peak": -40,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"2": {
+						"type": "empty"
+					}
+				}
+			},
+			"6": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -35,
+							"peak": -35,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -40,
+							"peak": -40,
+							"peakAge": 0
+						}
+					]
+				}
+			},
+			"7": {
+				"audio": {
+					"levels": [
+						{
+							"dBFS": -18,
+							"peak": -18,
+							"peakAge": 0
+						},
+						{
+							"dBFS": -15,
+							"peak": -15,
+							"peakAge": 0
+						}
+					]
+				},
+				"layers": {
+					"4": {
+						"type": "",
+						"producer": "decklink"
+					}
+				}
+			},
+			"8": {
+				"audio": {
+					"levels": []
+				},
+				"layers": {}
+			},
+			"9": {
+				"audio": {
+					"levels": [
+						{},
+						{
+							"dBFS": -70
+						}
+					]
+				}
+			}
+		},
+		"info": [
+			{
+				"id": 1,
+				"layers": [
+					null,
+					null,
+					{
+						"fgClip": "x.mov"
+					},
+					{
+						"fgClip": "",
+						"durationSec": "12.5"
+					},
+					{
+						"clip": " y "
+					}
+				]
+			},
+			null,
+			{
+				"channel": 3,
+				"layers": {
+					"a": {
+						"layer": 7,
+						"fgClip": "z"
+					}
+				}
+			}
+		],
+		"live": {
+			"1": {
+				"scene": {
+					"layers": [
+						{
+							"layerNumber": 20,
+							"source": {
+								"type": "media",
+								"value": "only.mov"
+							}
+						}
+					]
+				}
+			},
+			"3": {
+				"scene": {
+					"layers": [
+						{
+							"layerNumber": 1,
+							"source": {
+								"type": "media",
+								"value": "a.mov"
+							}
+						},
+						{
+							"layerNumber": 2,
+							"source": {
+								"type": "file",
+								"value": "b.mov"
+							}
+						}
+					]
+				}
+			}
+		},
+		"vars": {
+			"osc_ch3_audio_L": "-22.5",
+			"osc_ch3_audio_R": "x",
+			"osc_ch3_audio_c3_dBFS": "-44",
+			"osc_ch10_audio_c1_dBFS": "-8dB"
+		}
+	},
+	"smooth": [
+		[
+			0.8,
+			"80.0%",
+			"var(--accent-green)",
+			""
+		],
+		[
+			0.44,
+			"44.0%",
+			"",
+			""
+		],
+		[
+			0.242,
+			"24.2%",
+			"",
+			""
+		],
+		[
+			0.1331,
+			"13.3%",
+			"",
+			""
+		],
+		[
+			0.07320499999999999,
+			"7.3%",
+			"",
+			""
+		],
+		[
+			0.04026274999999999,
+			"4.0%",
+			"",
+			""
+		],
+		[
+			0.95,
+			"95.0%",
+			"var(--accent-green)",
+			""
+		],
+		[
+			0.95,
+			"95.0%",
+			"var(--accent-green)",
+			""
+		]
+	]
+}

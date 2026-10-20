@@ -73,3 +73,16 @@ func test_merge_channel_keeps_file_fields() -> void:
 	t.eq(m.layers["10"].file.elapsed, 2.0, "delta updates elapsed")
 	t.eq(m.layers["10"].type, "ffmpeg", "other layer fields kept")
 
+
+
+## WO-604 — web mergeChannel: meter slots merge slot-wise; the delta's slot count wins.
+func test_merge_channel_audio_levels_slotwise() -> void:
+	var a := {"audio": {"nbChannels": 2, "levels": [{"dBFS": -10.0, "peak": -3.0}, {"dBFS": -12.0, "peak": -4.0}]}}
+	var b := {"audio": {"levels": [{"dBFS": -120.0}]}}
+	var m := P.merge_channel(a, b)
+	t.eq(m.audio.nbChannels, 2, "other audio fields kept")
+	t.eq(m.audio.levels.size(), 1, "the delta's slot list wins")
+	t.eq(m.audio.levels[0].dBFS, -120.0, "fresh dBFS replaces the stale one")
+	t.eq(m.audio.levels[0].peak, -3.0, "fields the delta omits are kept")
+	t.eq(a.audio.levels[0].dBFS, -10.0, "the old snapshot is not mutated")
+	t.eq(P.merge_channel({}, {"audio": {"levels": [{"dBFS": -5.0}]}}).audio.levels[0].dBFS, -5.0, "no previous audio")

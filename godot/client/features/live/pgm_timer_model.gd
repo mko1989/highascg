@@ -153,6 +153,21 @@ static func merge_channel(a: Variant, b: Variant) -> Dictionary:
 				merged["file"] = f
 			layers[k] = merged
 		o["layers"] = layers
+	# WO-604: meter slots merge slot-wise (web osc-client mergeChannel), so a delta's fresh dBFS replaces a stale peak.
+	var ba: Variant = (b as Dictionary).get("audio")
+	if ba is Dictionary and ba.get("levels") is Array:
+		var aa: Dictionary = a.get("audio") if a.get("audio") is Dictionary else {}
+		var al: Variant = aa.get("levels")
+		var audio := aa.duplicate()
+		audio.merge(ba, true)
+		var levels := []
+		for i in (ba.levels as Array).size():
+			var slot: Dictionary = (al[i] as Dictionary).duplicate() if al is Array and i < al.size() and al[i] is Dictionary else {}
+			if ba.levels[i] is Dictionary:
+				slot.merge(ba.levels[i], true)
+			levels.append(slot)
+		audio["levels"] = levels
+		o["audio"] = audio
 	return o
 
 
