@@ -10,7 +10,7 @@ import { formatMediaTimecode } from './inspector-media-file-wave.js'
 import { mountMediaFileVersions } from './inspector-media-file-versions.js'
 
 /** "1:02.5" / "62.5" / "1:02:03" → seconds; '' → null; garbage → NaN */
-export function parseTimeInput(text) {
+function parseTimeInput(text) {
 	const t = String(text ?? '').trim()
 	if (!t) return null
 	const parts = t.split(':').map((x) => Number(x))

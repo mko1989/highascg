@@ -191,7 +191,6 @@ module.exports = {
 	save,
 	getEntry,
 	getEntryByPath,
-	walkMediaFiles,
 	reconcileRegistry,
 	reconcileWithDisk,
 	recordRenames,

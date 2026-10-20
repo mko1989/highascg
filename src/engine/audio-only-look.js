@@ -111,7 +111,6 @@ async function stopAudioOnlyLook({ amcp, channel }) {
 
 module.exports = {
 	AUDIO_ONLY_LOOK_LAYER,
-	AUDIO_ONLY_TRANSITION,
 	isAudioOnlyLook,
 	resolveAudioOnlyLookLayer,
 	takeAudioOnlyLook,

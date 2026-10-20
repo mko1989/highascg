@@ -334,8 +334,6 @@ module.exports = {
 	associate,
 	measure,
 	triangulate,
-	ASSOC_GATE_M,
-	TRACK_GATE_M,
 	STALE_MS,
 	FRAME_MAX_AGE_MS,
 }

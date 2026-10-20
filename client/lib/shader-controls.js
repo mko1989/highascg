@@ -41,7 +41,7 @@ export function scanShaderCfg(cfg) {
  * Stable identity that survives editing a NEIGHBOURING literal (numbers are masked out of the
  * context) — the manifest and presets are keyed by this. Duplicates get an occurrence suffix.
  */
-export function assignKeys(params) {
+function assignKeys(params) {
 	const seen = new Map()
 	for (const p of params) {
 		const base = p.deep
@@ -64,7 +64,7 @@ const NOT_COLOR_RE = /sd[A-Z]\w*\s*\(|\blength\s*\(|normalize|cross|reflect|\bdo
  * phrases ("strength multiplier on the value next to it" fits every `x * 0.3`).
  * @returns {'color'|'speed'|'zoom'|'size'|'intensity'|'detail'|'audio'|'other'}
  */
-export function roleOf(p) {
+function roleOf(p) {
 	if (p.kind === 'color') return 'color'
 	const name = String(p.name || '').replace(/ #\d+$/, '')
 	const desc = String(p.desc || '')
@@ -80,7 +80,7 @@ export function roleOf(p) {
 const ROLE_BASE = { speed: 6, zoom: 5, size: 5, intensity: 5, detail: 5, audio: 4, color: 3, other: 0 }
 
 /** Higher = more likely a value a human wants to ride. ≥ MIN_SCORE makes the main panel. */
-export function scoreParam(p, role = roleOf(p)) {
+function scoreParam(p, role = roleOf(p)) {
 	let s = ROLE_BASE[role]
 	if (!p.deep) return Math.max(s, 5) + 1 // author-declared const/#define — the shader's own knobs
 	const expr = p.expr || ''
@@ -113,7 +113,7 @@ function colorLabel(p) {
 }
 
 /** 'SPEED' → 'Speed', 'FREQ_RANGE' → 'Freq range', 'beatMove' → 'Beat move'. */
-export function prettyLabel(name) {
+function prettyLabel(name) {
 	const s = String(name || '')
 		.replace(/([a-z])([A-Z])/g, '$1 $2')
 		.replace(/[_\s]+/g, ' ')
@@ -123,7 +123,7 @@ export function prettyLabel(name) {
 }
 
 /** True when the literal DIVIDES (`iTime / ◆`) — a macro must then scale it by 1/k, or "faster" runs backwards. */
-export const isDivisor = (p) => /\/\s*$/.test(String(p.expr || '').split('◆')[0])
+const isDivisor = (p) => /\/\s*$/.test(String(p.expr || '').split('◆')[0])
 
 const isToggle = (p) => !p.deep && p.vec === 1 && p.intLiteral && (p.values[0] === 0 || p.values[0] === 1)
 

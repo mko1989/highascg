@@ -4,7 +4,7 @@
  */
 'use strict'
 
-const path = require('path'); const os = require('os'); const fs = require('fs')
+const path = require('path'); const fs = require('fs')
 const { createLogger } = require('./src/utils/logger'); const logBuffer = require('./src/utils/log-buffer')
 const { config: configLogger } = require('./src/utils/buffered-logger')
 const { StateManager } = require('./src/state/state-manager')

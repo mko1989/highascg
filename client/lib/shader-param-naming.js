@@ -5,7 +5,7 @@
  * with shader-param-scan spans. Pure string heuristics — no GLSL parser needed for naming:
  *   float speed = ◆;        → "speed"
  *   p.x += ◆                → "p.x"
- *   mix(a, b, ◆)            → "mix amount"
+ *   mix(a, b, ◆)            → "mix amount"  (mix(◆, …) → "mix from", mix(a, ◆, …) → "mix to")
  *   sin(iTime * ◆)          → "speed"          (multiplies time)
  *   uv * ◆                  → "scale"          (multiplies coords)
  *   for (i=0; i<◆; i++)     → "iterations"
@@ -14,7 +14,7 @@
 
 /** Known function → per-argument role names (1-based gaps fall back to "arg N"). */
 const FN_ARGS = {
-	mix: [null, null, 'mix amount'],
+	mix: ['mix from', 'mix to', 'mix amount'], // WO-577: a bare `return mix(◆, …)` literal fell through to "value"
 	pow: ['base', 'exponent'],
 	smoothstep: ['edge low', 'edge high', null],
 	step: ['edge', null],

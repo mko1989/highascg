@@ -11,7 +11,7 @@ import { getDefaultUploadSubdir } from './project-media-context.js'
 let byPath = new Map()
 const key = (p) => String(p || '').normalize('NFC').replace(/\\/g, '/').toLowerCase()
 
-export async function refreshMediaFileDefaults() {
+async function refreshMediaFileDefaults() {
 	try {
 		const r = await api.get('/api/media/library/defaults')
 		byPath = new Map(Object.entries(r?.defaults || {}).map(([p, d]) => [key(p), d]))
@@ -26,7 +26,7 @@ export function setLocalMediaFileDefaults(path, defaults) {
 }
 
 /** @param {string} value - layer source value (full media id, or project-relative) */
-export function mediaFileDefaultsFor(value) {
+function mediaFileDefaultsFor(value) {
 	const v = String(value || '')
 	if (!v) return null
 	const hit = byPath.get(key(v))

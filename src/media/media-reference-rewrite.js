@@ -140,9 +140,6 @@ function findProjectMediaUsage(project, slug, filePath, config) {
 }
 
 module.exports = {
-	forEachProjectMediaRef,
-	resolveRefValue,
-	refMatchesPath,
 	rewriteProjectMediaRefs,
 	findProjectMediaUsage,
 }

@@ -19,15 +19,19 @@ const { normalizeShaderConfig } = require('../../src/shaderfx/shader-store.js')
 
 const cfgOf = (image, common = '') => ({ common, passes: { image: { source: image } } })
 
+/** data/shaders is the box's runtime library (git-ignored) — CI has none, so the library test runs on the box only. */
+const LIBRARY_DIR = path.join(ROOT, 'data/shaders')
+const NO_LIBRARY = !fs.existsSync(LIBRARY_DIR) && 'no local shader library (data/shaders is runtime data, absent in CI)'
+
 function library() {
-	const dir = path.join(ROOT, 'data/shaders')
+	const dir = LIBRARY_DIR
 	return fs
 		.readdirSync(dir)
 		.filter((f) => f.endsWith('.json'))
 		.map((f) => ({ f, cfg: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) }))
 }
 
-test('library: main panel stays small and never shows junk-named controls', async () => {
+test('library: main panel stays small and never shows junk-named controls', { skip: NO_LIBRARY }, async () => {
 	const { scanShaderCfg, buildControls } = await libPromise
 	const lib = library()
 	assert.ok(lib.length > 10, 'library present')

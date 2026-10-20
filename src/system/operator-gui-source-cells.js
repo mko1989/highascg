@@ -172,8 +172,6 @@ async function removeCell(ctx, body) {
 module.exports = {
 	noteReportedCells,
 	parseResolution,
-	sourceCellRejection,
-	defaultRect,
 	planSourceCell,
 	planRemoveCell,
 	addSourceCell,

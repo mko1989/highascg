@@ -4,9 +4,8 @@
  */
 'use strict'
 
-const os = require('os')
 const path = require('path')
-const { execSync, execFileSync } = require('child_process')
+const { execFileSync } = require('child_process')
 
 const CACHE_TTL_MS = 30000
 /** @type {{ at: number, payload: object } | null} */

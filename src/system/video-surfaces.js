@@ -234,7 +234,5 @@ module.exports = {
 	getVideoSurfaceManager,
 	resolveRoleChannel,
 	roleIndex,
-	SHM_INDEX_BASE,
-	ROLE_SLOTS,
 	LEASE_TTL_MS,
 }
