@@ -51,3 +51,20 @@ func test_beams_end_at_the_marker_or_the_floor() -> void:
 		{"a": {"state": "following", "pan": 0.0, "tilt": 45.0}, "c": {"state": "not output", "problem": "bad"}}, {}, 0.0)
 	t.eq(bs.size(), 1, "unreported and problem fixtures are not drawn")
 	t.eq([bs[0].name, bs[0].live], ["A", true])
+
+
+## WO-624 E3: the server's calibration solve applied to a fixture, and the Inspector line.
+func test_calibration_solve_applies_pose_and_pan_flip() -> void:
+	var fx := F.normalize_fixture({"id": "a", "pose": {"x": 0, "y": 0, "z": 6, "hang": "floor", "yaw": 0}}, 0)
+	var solve := {"ok": true, "pose": {"x": 3.0, "y": 5.0, "z": 7.01, "yaw": 30.1, "hang": "truss"}, "flip_pan": true,
+		"rms_deg": 0.12, "max_deg": 0.2, "warning": null}
+	var out := F.apply_solve(fx, solve)
+	t.eq([out.pose.x, out.pose.y, out.pose.z, out.pose.yaw], [3.0, 5.0, 7.01, 30.1])
+	t.eq(out.pose.hang, "floor", "the hang stays the operator's")
+	t.eq(out.pan.invert, true, "a mirrored pan flips Invert pan")
+	t.eq(fx.pose.x, 0.0, "the input is not touched")
+	t.eq(F.apply_solve(fx, {"ok": false, "need": 2}), fx, "no solve → unchanged")
+	var line := F.calib_summary({"points": [{}, {}, {}, {}], "solve": solve})
+	t.ok(line.begins_with("4 points · fit 0.12° RMS (max 0.20°) → X 3.00  Y 5.00  Z 7.01  yaw 30.1°"), line)
+	t.ok(line.contains("Invert pan"), line)
+	t.eq(F.calib_summary({"points": [{}], "solve": {"ok": false, "need": 2}}), "1 point — 2 more to solve.")

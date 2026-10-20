@@ -120,3 +120,34 @@ static func beams(patch: Array, aims: Dictionary, targets: Dictionary, floor_z: 
 		out.append({"name": fx.name, "from": from, "to": beam_end(fx, a, targets.get(fx.follow), floor_z),
 			"live": a.get("state") == "following"})
 	return out
+
+
+## WO-624 E3 — the fixture with a calibration solve applied (POST /api/tracking/follow/calibrate → solve): the solved
+## position and yaw (the hang stays the operator's), and Invert pan flipped when the server says the pan runs mirrored.
+static func apply_solve(fx: Dictionary, solve: Dictionary) -> Dictionary:
+	var out := fx.duplicate(true)
+	if solve.get("ok") != true:
+		return out
+	var p: Dictionary = solve.pose
+	for k in ["x", "y", "z", "yaw"]:
+		out.pose[k] = float(p[k])
+	if solve.get("flip_pan") == true:
+		out.pan.invert = not bool(out.pan.invert)
+	return out
+
+
+## One line for the Inspector from a calibration session reply.
+static func calib_summary(sess: Dictionary) -> String:
+	var n: int = (sess.get("points", []) as Array).size()
+	var s: Dictionary = sess.get("solve", {}) if sess.get("solve") is Dictionary else {}
+	if s.get("ok") != true:
+		var need := int(s.get("need", 3 - n))
+		return "%d point%s — %d more to solve." % [n, "" if n == 1 else "s", need]
+	var p: Dictionary = s.pose
+	var txt := "%d points · fit %.2f° RMS (max %.2f°) → X %.2f  Y %.2f  Z %.2f  yaw %.1f°" % [n, float(s.rms_deg),
+		float(s.max_deg), float(p.x), float(p.y), float(p.z), float(p.yaw)]
+	if s.get("flip_pan") == true:
+		txt += "\nPan runs the other way — Apply also flips Invert pan."
+	if s.get("warning") != null and str(s.warning) != "":
+		txt += "\n" + str(s.warning)
+	return txt

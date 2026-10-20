@@ -10,6 +10,9 @@
  *   Master off (`project.fixtures.output.enabled` false, the default) → nothing is transmitted; a fixture with a
  *   problem (bad destination, overlap, past 512, loops into this box's own Art-Net input) is never written.
  * The universe belongs to this engine: channels no fixture writes go out as 0.
+ * WO-624 E3: hold(id, pan, tilt) parks a head at a jogged aim (calibration, state 'calibrating') ahead of its
+ * marker until release(id), a re-patch without it, or HOLD_TTL_MS without a refresh (a vanished client never
+ * leaves a head parked).
  */
 
 const { encodeArtDmx } = require('./artdmx')
@@ -18,6 +21,7 @@ const { aim, writeFixture } = require('./follow-ik')
 
 const TICK_MS = Math.round(1000 / 44)
 const REFRESH_MS = 1000
+const HOLD_TTL_MS = 10 * 60 * 1000
 
 class FollowEngine {
 	/**
@@ -32,6 +36,7 @@ class FollowEngine {
 		this.enabled = false
 		this.fixtures = []
 		this._aim = new Map() // fixture id → { pan, tilt, state }
+		this._hold = new Map() // fixture id → { pan, tilt, until } (WO-624 E3 calibration jog)
 		this._uni = new Map() // "host:port|universe" → { to, universe, buf, last: Buffer|null, at, seq, packets }
 		this._timer = null
 	}
@@ -50,9 +55,29 @@ class FollowEngine {
 		this.fixtures = p.fixtures
 		const live = new Set(p.fixtures.map((f) => f.id))
 		for (const id of [...this._aim.keys()]) if (!live.has(id)) this._aim.delete(id)
+		for (const id of [...this._hold.keys()]) if (!live.has(id)) this._hold.delete(id)
 		const keys = new Set(p.fixtures.filter((f) => f.to && !f.problem && f.enabled).map((f) => this._key(f)))
 		for (const k of [...this._uni.keys()]) if (!keys.has(k)) this._uni.delete(k)
 		if (this.enabled !== wasOn) for (const u of this._uni.values()) u.last = null // send at once
+	}
+
+	/** Park fixture `id` at pan / tilt (commanded degrees, clamped to its ranges). → the held aim, or null. */
+	hold(id, pan, tilt) {
+		const fx = this.fixtures.find((f) => f.id === id)
+		if (!fx) return null
+		const clamp = (v, range) => Math.max(-range / 2, Math.min(range / 2, Number(v) || 0))
+		const h = { pan: clamp(pan, fx.pan.range), tilt: clamp(tilt, fx.tilt.range), until: this.now() + HOLD_TTL_MS }
+		this._hold.set(id, h)
+		return { pan: h.pan, tilt: h.tilt }
+	}
+
+	release(id) {
+		return this._hold.delete(id)
+	}
+
+	/** The aim fixture `id` was last given ({ pan, tilt, state }) — where a calibration jog starts from. */
+	aimOf(id) {
+		return this._aim.get(id) || { pan: 0, tilt: 0, state: 'centre' }
 	}
 
 	_key(fx) {
@@ -79,7 +104,10 @@ class FollowEngine {
 			const prev = this._aim.get(fx.id) || { pan: 0, tilt: 0, state: 'centre' }
 			let next
 			const m = fx.follow ? marks.get(fx.follow) : null
-			if (!fx.follow) next = { ...prev, state: prev.state === 'centre' ? 'centre' : 'holding' }
+			const h = this._hold.get(fx.id)
+			if (h && now > h.until) this._hold.delete(fx.id)
+			if (h && now <= h.until) next = { pan: h.pan, tilt: h.tilt, state: 'calibrating' }
+			else if (!fx.follow) next = { ...prev, state: prev.state === 'centre' ? 'centre' : 'holding' }
 			else if (!m) next = { ...prev, state: 'no marker' }
 			else if (m.stale) next = { ...prev, state: 'holding (stale)' }
 			else {
@@ -128,4 +156,4 @@ class FollowEngine {
 	}
 }
 
-module.exports = { FollowEngine, TICK_MS, REFRESH_MS }
+module.exports = { FollowEngine, TICK_MS, REFRESH_MS, HOLD_TTL_MS }

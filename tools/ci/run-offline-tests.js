@@ -69,6 +69,7 @@ const FILES = [
 	'tools/smoke/smoke-wo604-audio-mixer-state.test.js',
 	'tools/smoke/smoke-wo624-operator-gui-source-cells.test.js',
 	'tools/smoke/smoke-wo624-tracking-pick.test.js',
+	'tools/smoke/smoke-wo624-fixture-calibrate.test.js',
 	'tools/smoke/smoke-wo601-layer-tools.test.js',
 	'tools/smoke/smoke-wo601-effects-nudge.test.js',
 	'tools/smoke/smoke-wo601-pip-preview.test.js',

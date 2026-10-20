@@ -6,6 +6,7 @@ extends VBoxContainer
 
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
 
 ## [label, path, min, max, step]  (path "pan.ch" = data.pan.ch)
 const FIELDS := [["Universe (port-addr)", "universe", 0, 32767, 1], ["Address", "address", 1, 512, 1],
@@ -32,6 +33,7 @@ var _state: Label
 var _confirm_on: ConfirmationDialog
 var _confirm_del: ConfirmationDialog
 var _form: GridContainer
+var _calib: VBoxContainer  # WO-624 E3 calibrate_section.gd
 
 
 func _ready() -> void:
@@ -88,6 +90,10 @@ func _ready() -> void:
 	_fixed.placeholder_text = "e.g. 6=255, 7=8  (shutter, dimmer)"
 	_pair("Fixed channels", _fixed)
 	add_child(_form)
+	_calib = Calibrate.new()
+	_calib.driver = driver
+	_calib.apply_requested.connect(_apply_solve)
+	add_child(_calib)
 	_state = Label.new()
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -146,6 +152,15 @@ func _delete() -> void:
 		_persist()
 
 
+## WO-624 E3: the server's calibration solve → this fixture's pose (+ Invert pan), sent to the engine at once.
+func _apply_solve(solve: Dictionary) -> void:
+	for i in data.patch.size():
+		if data.patch[i].id == _calib.fixture_id:
+			data.patch[i] = F.apply_solve(data.patch[i], solve)
+			_persist(true)
+			return
+
+
 func aim(id: String) -> Dictionary:
 	var a: Variant = driver.follow.get(id) if driver != null else null
 	return a if a is Dictionary else {}
@@ -167,6 +182,8 @@ func refresh() -> void:
 		_list.set_item_custom_fg_color(_list.item_count - 1, ThemeBuilder.ERROR if a.get("problem") != null and a.get("problem") != "" else
 			ThemeBuilder.TEXT if st == "following" else ThemeBuilder.TEXT_MUTED)
 	_form.visible = not data.patch.is_empty()
+	_calib.set_fixture("" if data.patch.is_empty() else str(data.patch[sel].id))
+	_calib.refresh()
 	if data.patch.is_empty():
 		_state.text = "No follow fixtures — Add one (it follows the selected marker)."
 		return

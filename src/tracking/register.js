@@ -11,6 +11,8 @@
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status)
  *       · POST /api/tracking/detect/pick {key} (WO-624 E2: the replace pin follows this detected person)
+ *       · GET / POST /api/tracking/follow/calibrate {action, id, …} (WO-624 E3: fixture position calibration,
+ *         src/fixtures/calibrate-session.js)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
@@ -35,6 +37,7 @@
 
 const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
+const { createCalibration } = require('../fixtures/calibrate-session')
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
@@ -57,6 +60,7 @@ let _ctx = null
 let _sent = { rev: -1, stale: '', at: 0 }
 let _writes = 0
 let _follow = null
+let _calib = null
 let _followSent = { json: '', at: 0 }
 let _zones = null
 let _zonesSent = ''
@@ -263,6 +267,20 @@ async function handleApi({ method, path, body }) {
 		}
 	}
 	if (method === 'POST' && path === '/api/tracking/detect/pick') return pick(body)
+	if (path === '/api/tracking/follow/calibrate') {
+		if (!_calib) return reply(503, { error: 'follow engine not running' })
+		if (method === 'GET') return reply(200, { sessions: _calib.list() })
+		if (method === 'POST') {
+			let data
+			try {
+				data = JSON.parse(body || '{}')
+			} catch {
+				return reply(400, { error: 'body must be JSON' })
+			}
+			const r = _calib.handle(data)
+			return reply(r.status, r.body)
+		}
+	}
 	if (path === '/api/tracking/markers') {
 		if (method === 'GET') return reply(200, { markers: markersView(), stale_after_ms: MARKER_STALE_AFTER_MS })
 		if (method === 'POST') {
@@ -320,6 +338,7 @@ module.exports = {
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
+		_calib = createCalibration({ engine: _follow.engine, hub })
 		if (_zones) _zones.stop()
 		_zones = createZoneService(ctx, hub)
 		_zonesSent = ''
@@ -334,6 +353,7 @@ module.exports = {
 		_timer = null
 		if (_follow) _follow.stop()
 		_follow = null
+		_calib = null
 		if (_zones) _zones.stop()
 		_zones = null
 		if (_detect) _detect.stop()
