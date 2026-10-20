@@ -122,6 +122,12 @@ function prettyLabel(name) {
 	return s ? s[0].toUpperCase() + s.slice(1) : 'Value'
 }
 
+/** An author's one-letter constant (`const vec3 W = …`) says nothing alone — prefix its section ("Look W"). */
+function declaredLabel(p, role) {
+	const name = String(p.name || '')
+	return name.length === 1 ? `${SECTION_OF[role] || 'Look'} ${name}` : prettyLabel(name)
+}
+
 /** True when the literal DIVIDES (`iTime / ◆`) — a macro must then scale it by 1/k, or "faster" runs backwards. */
 const isDivisor = (p) => /\/\s*$/.test(String(p.expr || '').split('◆')[0])
 
@@ -148,11 +154,12 @@ export function buildControls(params, opts = {}) {
 	const manifest = opts.manifest || {}
 	const hidden = new Set(manifest.hidden || [])
 	const pins = new Map((manifest.pinned || []).map((x) => [x.key, x]))
-	const labelOf = (p) => opts.labelOf?.(p) || (p.deep && p.kind === 'color' ? colorLabel(p) : prettyLabel(p.name))
 	const rows = params.map((p) => {
 		const role = roleOf(p)
 		return { p, role, score: hidden.has(p.key) ? -99 : scoreParam(p, role) }
 	})
+	const roleByKey = new Map(rows.map((r) => [r.p.key, r.role]))
+	const labelOf = (p) => opts.labelOf?.(p) || (p.deep && p.kind === 'color' ? colorLabel(p) : declaredLabel(p, roleByKey.get(p.key)))
 
 	/** @type {Control[]} */
 	const out = []

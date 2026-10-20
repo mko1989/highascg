@@ -15,8 +15,11 @@ Owner 20.10: "commit push all the recent work … actually we can merge godot in
   1. **Unwired exports:** 21 orphans. 15 were already on main, and 6 came from godot (operator-gui-source-cells,
      video-surfaces, fusion). All 21 are used inside their own file; they were exported but never imported.
   2. **ESLint:** 221 warnings against the `--max-warnings 218` budget. Main was already at 221.
-  3. **Offline tests:** `smoke-wo577-shader-controls` "library" test. In CI it reads `data/shaders`, which is the
-     git-ignored runtime library, so `readdirSync` throws. On the box it failed on the junk label "Value" in
+  3. **Offline tests:** `smoke-wo577-shader-controls` "library" test. It reads `data/shaders`, the git-ignored
+     runtime library. In a full CI run that directory DOES exist: `reconcileShaderStore`
+     (`src/shaderfx/shader-store.js:226`) recovers all 190 JSONs from the tracked `template/shaders/*.html` whenever
+     an earlier test lists shaders. Run alone in a fresh clone, though, `readdirSync` throws, because the recovery
+     writes fail silently when `data/shaders` is missing (nothing created the directory). On the box it failed on the junk label "Value" in
      `sh-sa-fluidic-space`: the scanner named the first argument of `return mix(◆, 1., v)` "value", because
      `FN_ARGS.mix` (`client/lib/shader-param-naming.js:17`) named only the third argument.
   4. **npm audit (prod):** `brace-expansion` 5.0.9 high (two DoS advisories). It is a `devOptional` dependency via
@@ -31,14 +34,25 @@ Owner 20.10: "commit push all the recent work … actually we can merge godot in
 - ESLint: removed four unused imports of Node built-ins: `os` in `index.js`, `os` and `execSync` in
   `src/audio/audio-devices.js`, and `path` in `src/api/routes-companion-preview.js`, whose `path` was in any case
   shadowed by the handler parameter. That gives 217 warnings.
-- Shader naming: `FN_ARGS.mix = ['mix from', 'mix to', 'mix amount']`. The wo577 library test skips when
-  `data/shaders` is absent (CI) and runs in full on the box.
+- Shader naming: `FN_ARGS.mix = ['mix from', 'mix to', 'mix amount']`.
+- One-letter declared constants (`const vec3 W` luminance weights in `sh-sa-magfest-station-event`, `float w` in
+  `sh-sa-moving-without-travelling`, `float z` in `sh-sa-tribute-to-my-old-atari`) are labelled with their section,
+  e.g. "Look W" (`declaredLabel` in `client/lib/shader-controls.js`). The author's name is kept, but the label now
+  says where the control lives rather than showing a bare letter. These three were the last junk labels in the library.
+- `reconcileShaderStore` creates `data/shaders` before recovering into it, so a fresh clone gets its library on the
+  first list. The wo577 library test calls it first, so it runs the same 190 shaders in CI as on the box, in any
+  order. (An earlier draft skipped the test when `data/shaders` was absent. That premise was wrong, because the
+  suite regenerates the directory, so the skip was removed.)
 - `npm update brace-expansion` changed `package-lock.json` only, 5.0.9 → 5.0.12.
 
 ## What was VERIFIED
 
-See the merge commit's gate run (below). Box-only, still open: 3 of 190 library shaders have author-declared
-single-letter constants (`const vec3 W` luminance weights in `sh-sa-magfest-station-event`, `float w` in
-`sh-sa-moving-without-travelling`, `float z` in `sh-sa-tribute-to-my-old-atari`) that the wo577 junk-label rule
-flags. These are the authors' own names and were not renamed here. On the box this test still fails on them; in CI it
-skips.
+Clean `git archive` export of the commit, with no `data/shaders`, `.git` or `config/` runtime state:
+- Integrity, 500-line limit, unwired exports, boot (`--no-http`), ESLint (217 ≤ 218), Prettier and npm audit (prod)
+  all exit 0.
+- `xvfb-run -a npm run test:ci`: 2870 tests, 2866 pass, 3 skipped, 1 fail. The failure is `smoke-wo498`
+  ("nginx proxy is gone"), which runs `git ls-files` and so needs a `.git` that an archive does not have. In real CI
+  it runs in a checkout.
+- The wo577 test was also run ALONE in that export: 8/8 pass, and `data/shaders` was created with 190 JSONs.
+- Godot client tests: 16087 pass.
+- GitHub CI on the pushed main is recorded below.

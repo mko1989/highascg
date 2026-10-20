@@ -15,25 +15,24 @@ const { pathToFileURL } = require('node:url')
 const ROOT = path.join(__dirname, '../..')
 const libPromise = import(pathToFileURL(path.join(ROOT, 'client/lib/shader-controls.js')).href)
 const scanPromise = import(pathToFileURL(path.join(ROOT, 'client/lib/shader-param-scan.js')).href)
-const { normalizeShaderConfig } = require('../../src/shaderfx/shader-store.js')
+const { normalizeShaderConfig, reconcileShaderStore, SHADERS_DATA_DIR } = require('../../src/shaderfx/shader-store.js')
 
 const cfgOf = (image, common = '') => ({ common, passes: { image: { source: image } } })
 
-/** data/shaders is the box's runtime library (git-ignored) — CI has none, so the library test runs on the box only. */
-const LIBRARY_DIR = path.join(ROOT, 'data/shaders')
-const NO_LIBRARY = !fs.existsSync(LIBRARY_DIR) && 'no local shader library (data/shaders is runtime data, absent in CI)'
-
-function library() {
-	const dir = LIBRARY_DIR
+/** data/shaders is git-ignored runtime data; reconcileShaderStore recovers it from the tracked template/shaders/*.html
+ * (what the server does on every listShaders), so a fresh CI clone tests the same 190-shader library as the box. */
+async function library() {
+	const dir = SHADERS_DATA_DIR
+	await reconcileShaderStore()
 	return fs
 		.readdirSync(dir)
 		.filter((f) => f.endsWith('.json'))
 		.map((f) => ({ f, cfg: JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) }))
 }
 
-test('library: main panel stays small and never shows junk-named controls', { skip: NO_LIBRARY }, async () => {
+test('library: main panel stays small and never shows junk-named controls', async () => {
 	const { scanShaderCfg, buildControls } = await libPromise
-	const lib = library()
+	const lib = await library()
 	assert.ok(lib.length > 10, 'library present')
 	let raw = 0
 	let main = 0

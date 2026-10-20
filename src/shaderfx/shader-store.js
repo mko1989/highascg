@@ -250,6 +250,8 @@ async function reconcileShaderStore() {
 		}
 	}
 
+	// A fresh clone has no data/shaders at all — without it every recovery write below fails silently.
+	if (tplIds.some((id) => !dataSet.has(id))) await fsp.mkdir(SHADERS_DATA_DIR, { recursive: true })
 	for (const id of tplIds) {
 		if (!isValidShaderId(id) || dataSet.has(id)) continue
 		try {
