@@ -605,3 +605,22 @@ AMCP-failure note on a take, no Delete key on the media selection, no folder del
     GUI tree was clean without a manual ↻.
   - Before the fix, the same entry was still listed after 30 s.
   - Cleanup: both scratch folders are gone, and the media root is back to bridge / drive / exfat / projects / testowe.
+
+### Parity checklist
+
+`work/godot-port/parity/media-playlists.md` has 35 rows, one per inventory "What the operator can do" bullet (§3,
+§4, §K) plus web features found while porting. 27 rows are ported, 2 belong to other port WOs, and these remain:
+
+- Ctrl+click download; Ctrl+Alt+click remove without a confirm (owner question: keep that shortcut?);
+- the project media bar (path, "project only" filter, Gather);
+- Import USB (WO-608);
+- Placeholders tab and Add Placeholder (unassigned);
+- multiview media drop (WO-600);
+- ShaderFX / audition / :4300 (WO-606 / WO-608).
+
+The Owner ✓ column is the QA hand-off.
+
+### Still open (after slice 9)
+
+- Ctrl+click download, the project media bar, and Placeholders (next WO-603 slices unless the owner moves them).
+- The owner's ticks on the checklist.
