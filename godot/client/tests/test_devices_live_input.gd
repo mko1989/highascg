@@ -112,6 +112,9 @@ func test_dialog_replay() -> void:
 	for c in g.cases:
 		var io := FakeIo.new()
 		io.srv = c.srv.duplicate(true)
+		for k in ["dv", "s"]:  # "@name" = a shared fixture
+			if io.srv[k] is String:
+				io.srv[k] = g.fixtures[io.srv[k].substr(1)].duplicate(true)
 		var flow = FLOW.new(io.srv.s.duplicate(true), c.state.duplicate(true), io)
 		await flow.start()
 		t.eq(_norm(_view(flow)), _norm(c.init), c.name + ": init")
