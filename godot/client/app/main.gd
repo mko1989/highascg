@@ -362,6 +362,7 @@ func bootstrap() -> void:
 func _wire_ws() -> void:
 	Ws.on("state", func(d: Variant) -> void: Store.set_state(d))
 	Ws.on("change", _on_change)
+	Ws.on("timeline.playback", func(pb: Variant) -> void: Store.apply_change("timeline.playback", pb))  # web app-ws-handlers
 	Ws.on("project_sync", func(d: Variant) -> void:
 		if ProjectSync.accept_remote_sync():  # skip exactly one echo of our own save (WO-329B)
 			Store.set_project(d))

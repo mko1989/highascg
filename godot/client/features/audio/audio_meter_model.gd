@@ -114,12 +114,12 @@ static func _has_content(l: Dictionary) -> bool:
 
 ## isLayerStripOnAir: this exact layer is playing (live OSC), else INFO says it has a clip / timing.
 static func is_layer_on_air(ctx: Dictionary, ch: int, ln: int, hints: Dictionary) -> bool:
-	if hints.get("muted") == true:
+	if hints.get("muted") is bool and hints.muted:
 		return false
 	var cs: Variant = _chan(ctx, ch)
 	var ol: Variant = _osc_layer(cs, ln)
 	if ol != null and not is_meter_utility_osc_layer(ln, ol):
-		if ol.get("paused") == true:
+		if ol.get("paused") is bool and ol.paused:
 			return false
 		var sp: Variant = ol.get("speed") if ol.get("speed") != null else (ol.get("playbackSpeed") if ol.get("playbackSpeed") != null else _dict(ol.get("file")).get("speed"))
 		if (_fin(sp) and float(sp) == 0.0) or (sp is String and sp == "0"):
@@ -196,7 +196,7 @@ static func _sole_live_media_layer(ctx: Dictionary, ch: int, ln: int) -> bool:
 
 ## readLayerPeakDbfs: −99 unless this layer is on air (or the only live media layer with bus audio).
 static func layer_peak(ctx: Dictionary, ch: int, ln: int, meta: Dictionary) -> float:
-	if meta.get("muted") == true:
+	if meta.get("muted") is bool and meta.muted:
 		return -99.0
 	var bus := bus_peak(ctx, ch)
 	if not is_layer_on_air(ctx, ch, ln, meta) and not (_sole_live_media_layer(ctx, ch, ln) and bus > -90):

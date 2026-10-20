@@ -5157,6 +5157,59 @@
 		],
 		[
 			{
+				"screenDestinations": {
+					"destinations": [
+						{
+							"id": "d1",
+							"mainScreenIndex": 0
+						}
+					]
+				},
+				"audioOutputs": [
+					{
+						"id": "a1",
+						"enabled": true,
+						"channelLayout": "4ch"
+					},
+					{
+						"id": "a2",
+						"enabled": "false",
+						"channelLayout": "16ch"
+					},
+					{
+						"id": "a3",
+						"enabled": "true",
+						"type": "PortAudio",
+						"channelLayout": "8ch"
+					}
+				],
+				"deviceGraph": {
+					"edges": [
+						{
+							"sinkId": "a1",
+							"sourceId": "dst_in_d1"
+						},
+						{
+							"sinkId": "a2",
+							"sourceId": "dst_in_d1"
+						},
+						{
+							"sinkId": "a3",
+							"sourceId": "dst_in_d1"
+						}
+					]
+				}
+			},
+			{
+				"programChannels": [
+					1
+				]
+			},
+			1,
+			8
+		],
+		[
+			{
 				"casparServer": {
 					"screen_count": 2
 				}
@@ -6324,6 +6377,136 @@
 			"95.0%",
 			"var(--accent-green)",
 			""
+		]
+	],
+	"volumePayload": [
+		[
+			0,
+			{
+				"volume": 0,
+				"volumeDb": -60
+			}
+		],
+		[
+			0.001,
+			{
+				"volume": 0.001,
+				"volumeDb": -60
+			}
+		],
+		[
+			0.5,
+			{
+				"volume": 0.5,
+				"volumeDb": -6.020599913279624
+			}
+		],
+		[
+			1,
+			{
+				"volume": 1,
+				"volumeDb": 0
+			}
+		],
+		[
+			1.5,
+			{
+				"volume": 1.5,
+				"volumeDb": 3.5218251811136247
+			}
+		],
+		[
+			1.99526,
+			{
+				"volume": 1.99526,
+				"volumeDb": 5.999989922339674
+			}
+		],
+		[
+			2,
+			{
+				"volume": 1.9952623149688795,
+				"volumeDb": 5.999999999999998
+			}
+		],
+		[
+			3,
+			{
+				"volume": 1.9952623149688795,
+				"volumeDb": 5.999999999999998
+			}
+		],
+		[
+			-1,
+			{
+				"volume": 0,
+				"volumeDb": -60
+			}
+		]
+	],
+	"solo": [
+		[
+			"pgm:1:layer:10",
+			false,
+			[
+				"pgm:1:layer:10"
+			]
+		],
+		[
+			"pgm:1:layer:11",
+			true,
+			[
+				"pgm:1:layer:10",
+				"pgm:1:layer:11"
+			]
+		],
+		[
+			"prv:2",
+			true,
+			[
+				"pgm:1:layer:10",
+				"pgm:1:layer:11",
+				"prv:2"
+			]
+		],
+		[
+			"pgm:1:layer:11",
+			true,
+			[
+				"pgm:1:layer:10",
+				"prv:2"
+			]
+		],
+		[
+			"pgm:1:layer:10",
+			false,
+			[
+				"pgm:1:layer:10"
+			]
+		],
+		[
+			"pgm:1:layer:10",
+			false,
+			[]
+		],
+		[
+			"pgm:1",
+			false,
+			[
+				"pgm:1"
+			]
+		],
+		[
+			"pgm:1",
+			true,
+			[]
+		],
+		[
+			"pgm:1:layer:10",
+			true,
+			[
+				"pgm:1:layer:10"
+			]
 		]
 	]
 }

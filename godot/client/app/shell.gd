@@ -1,7 +1,7 @@
 extends VBoxContainer
 ## WO-599/608 — app shell (web client/index.html): header (logo + title, project name, connection eyes) over three
 ## columns — Sources (full height, shared by every tab — R1), the workspace tabs, and the Inspector (always on the
-## right, content follows the selection — R2). Audio / Devices are placeholders until their WOs land.
+## right, content follows the selection — R2).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LiveTab := preload("res://features/live/live_tab.gd")
@@ -9,6 +9,7 @@ const PrevisTab := preload("res://features/previs/previs_tab.gd")
 const TimelineTab := preload("res://features/timeline/timeline_tab.gd")
 const SettingsTab := preload("res://features/settings/settings_tab.gd")
 const DevicesTab := preload("res://features/devices/devices_tab.gd")
+const AudioTab := preload("res://features/audio/audio_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -58,7 +59,10 @@ func _ready() -> void:
 	var timeline := TimelineTab.new()  # WO-602
 	timeline.name = "Timeline"
 	tabs.add_child(timeline)
-	tabs.add_child(_placeholder("Audio", "WO-604"))  # Inspector = the right column, media = Sources (R1/R2)
+	var audio := AudioTab.new()  # WO-604
+	audio.name = "Audio"
+	audio.osc = osc
+	tabs.add_child(audio)
 	var devices := DevicesTab.new()  # WO-605
 	devices.name = "Devices"
 	tabs.add_child(devices)
@@ -142,12 +146,3 @@ func _refresh_eye() -> void:
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
 		"%s\n%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else ""])
 
-
-func _placeholder(title: String, wo: String) -> Control:
-	var c := CenterContainer.new()
-	c.name = title
-	var l := Label.new()
-	l.text = "%s — not ported yet (%s)" % [title, wo]
-	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	c.add_child(l)
-	return c

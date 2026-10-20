@@ -27,7 +27,8 @@ static func gain(mixer: Dictionary, key: String) -> float:
 
 
 static func muted(mixer: Dictionary, key: String) -> bool:
-	return R.d(mixer.get("muted")).get(key) == true
+	var m: Variant = R.d(mixer.get("muted")).get(key)
+	return m is bool and m
 
 
 static func shorten_media_name(raw: Variant, max_len := 22, tail := 3) -> String:
@@ -78,7 +79,7 @@ static func meter_meta(row: Dictionary) -> Dictionary:
 ## The timeline sent to this program channel (web getActiveTimelineForChannel: screenIdx null / 'all' = every screen).
 static func _active_timeline(cm: Dictionary, pb: Variant, timelines: Array, ch: Variant) -> Dictionary:
 	var p := R.d(pb)
-	if not HC.truthy(p.get("timelineId")) or not (p.get("sendTo") is Dictionary) or p.sendTo.get("program") != true:
+	if not HC.truthy(p.get("timelineId")) or not (p.get("sendTo") is Dictionary) or not (p.sendTo.get("program") is bool and p.sendTo.program):
 		return {}
 	var si: Variant = p.sendTo.get("screenIdx")
 	var progs := R.a(cm.get("programChannels"))
@@ -88,7 +89,7 @@ static func _active_timeline(cm: Dictionary, pb: Variant, timelines: Array, ch: 
 	elif not (si is float or si is int) or int(si) < 0 or int(si) >= progs.size() or HC._js_num(progs[int(si)]) != HC._js_num(ch):
 		return {}
 	for t in timelines:
-		if t is Dictionary and t.get("id") == p.timelineId:
+		if t is Dictionary and str(t.get("id")) == str(p.timelineId):
 			return t
 	return {}
 
@@ -168,7 +169,7 @@ static func _scene_rows(rows: Array, cm: Dictionary, live: Dictionary, ch: Varia
 		return
 	for layer in layers:
 		var src := R.d(R.d(layer).get("source"))
-		if src.get("type") == "timeline" or not layer_has_mixer_audio(layer):
+		if str(src.get("type")) == "timeline" or not layer_has_mixer_audio(layer):
 			continue
 		var ln: Variant = layer.get("layerNumber")
 		var ty := str(src.get("type", "")).to_lower() if src.get("type") != null else ""
@@ -290,7 +291,7 @@ static func bus_channel_count(settings: Dictionary, cm: Dictionary, program_ch: 
 	var cabled := {}
 	var edges := R.a(R.d(settings.get("deviceGraph")).get("edges"))
 	for o in R.a(settings.get("audioOutputs")):
-		if not (o is Dictionary) or o.get("enabled") == false or o.get("enabled") == "false":
+		if not (o is Dictionary) or (o.get("enabled") is bool and not o.enabled) or str(o.get("enabled")) == "false":
 			continue
 		if (str(o.type) if HC.truthy(o.get("type")) else "portaudio").to_lower() == "system-audio" or R.s(o.get("id")) == "":
 			continue
