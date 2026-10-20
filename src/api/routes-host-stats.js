@@ -20,6 +20,7 @@ const execFileAsync = promisify(execFile)
 const { JSON_HEADERS, jsonBody } = require('./response')
 const { getMediaIngestBasePath } = require('../media/local-media')
 const { getCasparPidCached, getProcessUsage } = require('../system/proc-stats')
+const { sampleMachineCpuPct } = require('../system/host-cpu-usage')
 
 /**
  * @returns {{ uid: number, gid: number, username: string | null, homedir?: string }}
@@ -38,7 +39,7 @@ function getProcessIdentity() {
 	}
 }
 
-/** @type {{ text: string|null, at: number, utilizationPct?: number|null, source?: string|null }} */
+/** @type {{ text: string|null, at: number, utilizationPct?: number|null, source?: string|null, vramUsedMiB?: number|null, vramTotalMiB?: number|null, tempC?: number|null }} */
 let _gpuCache = { text: null, at: 0, utilizationPct: null, source: null }
 /** @type {{ text: string|null, at: number }} */
 let _glCache = { text: null, at: 0 }
@@ -125,14 +126,14 @@ function normalizeAmcpData(data) {
 }
 
 /**
- * NVIDIA GPU utilization + VRAM from the host (no Caspar).
- * @returns {Promise<{ text: string, utilizationPct: number, source: string }|null>}
+ * NVIDIA GPU utilization + VRAM (+ temperature, WO-623 overlay) from the host (no Caspar).
+ * @returns {Promise<{ text: string, utilizationPct: number, source: string, vramUsedMiB: number|null, vramTotalMiB: number|null, tempC: number|null }|null>}
  */
 async function probeNvidiaSmi() {
 	try {
 		const { stdout } = await execFileAsync(
 			'nvidia-smi',
-			['--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
+			['--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu', '--format=csv,noheader,nounits'],
 			{ timeout: 4000, maxBuffer: 65536 },
 		)
 		const line = String(stdout).trim().split(/\r?\n/)[0] || ''
@@ -140,19 +141,28 @@ async function probeNvidiaSmi() {
 		const util = parseInt(parts[0], 10)
 		const memUsed = parseInt(parts[1], 10)
 		const memTot = parseInt(parts[2], 10)
+		const temp = parseInt(parts[3], 10)
 		if (!Number.isFinite(util)) return null
 		const text =
 			Number.isFinite(memUsed) && Number.isFinite(memTot)
 				? `${util}% · ${memUsed}/${memTot} MiB VRAM`
 				: `${util}%`
-		return { text, utilizationPct: util, source: 'nvidia-smi' }
+		const num = (n) => (Number.isFinite(n) ? n : null)
+		return {
+			text,
+			utilizationPct: util,
+			source: 'nvidia-smi',
+			vramUsedMiB: num(memUsed),
+			vramTotalMiB: num(memTot),
+			tempC: num(temp),
+		}
 	} catch {
 		return null
 	}
 }
 
 /**
- * @returns {Promise<{ text: string|null, utilizationPct: number|null, source: string|null }>}
+ * @returns {Promise<{ text: string|null, utilizationPct: number|null, source: string|null, vramUsedMiB?: number|null, vramTotalMiB?: number|null, tempC?: number|null }>}
  */
 async function getGpuCached() {
 	const now = Date.now()
@@ -162,16 +172,13 @@ async function getGpuCached() {
 	 * nvidia-smi sat in the process list burning CPU. `at` starts at 0, so the first probe still
 	 * runs. */
 	if (_gpuCache.at && now - _gpuCache.at < GPU_TTL_MS) {
-		return {
-			text: _gpuCache.text,
-			utilizationPct: _gpuCache.utilizationPct ?? null,
-			source: _gpuCache.source || null,
-		}
+		const { at: _at, ...cached } = _gpuCache
+		return cached
 	}
 	const n = await probeNvidiaSmi()
 	if (n) {
-		_gpuCache = { text: n.text, at: now, utilizationPct: n.utilizationPct, source: n.source }
-		return { text: n.text, utilizationPct: n.utilizationPct, source: n.source }
+		_gpuCache = { ...n, at: now }
+		return n
 	}
 	_gpuCache = { text: null, at: now, utilizationPct: null, source: null }
 	return { text: null, utilizationPct: null, source: null }
@@ -238,12 +245,13 @@ async function handleGet(ctx) {
 
 	const wantGl = wantGlInfoViaAmcp(ctx) && ctx.amcp
 
-	const [disk, folderUsedBytes, gpu, glInfo, processes] = await Promise.all([
+	const [disk, folderUsedBytes, gpu, glInfo, processes, usagePct] = await Promise.all([
 		diskForPath(mediaPath),
 		gatherMediaDirSizeCached(mediaPath, wantDu),
 		getGpuCached(),
 		wantGl ? getGlInfoCached(ctx) : Promise.resolve(null),
 		gatherProcessStats(),
+		sampleMachineCpuPct(),
 	])
 
 	// Add normalized CPU% (machine share) to each process
@@ -265,6 +273,7 @@ async function handleGet(ctx) {
 				load5: load[1],
 				load15: load[2],
 				cores,
+				usagePct,
 			},
 			memory: {
 				totalBytes: memTotal,
@@ -281,6 +290,9 @@ async function handleGet(ctx) {
 				text: gpu.text,
 				utilizationPct: gpu.utilizationPct,
 				source: gpu.source,
+				vramUsedMiB: gpu.vramUsedMiB ?? null,
+				vramTotalMiB: gpu.vramTotalMiB ?? null,
+				tempC: gpu.tempC ?? null,
 			},
 			caspar: {
 				glInfo,

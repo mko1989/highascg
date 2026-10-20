@@ -63,6 +63,7 @@ const FILES = [
 	'tools/smoke/smoke-wo611-compose-move-snap.test.js',
 	'tools/smoke/smoke-wo611-compose-drop-file-defaults.test.js',
 	'tools/smoke/smoke-wo600-new-layer.test.js',
+	'tools/smoke/smoke-wo623-host-cpu-usage.test.js',
 	'tools/smoke/smoke-wo601-layer-tools.test.js',
 	'tools/smoke/smoke-wo601-effects-nudge.test.js',
 	'tools/smoke/smoke-wo601-pip-preview.test.js',

@@ -1,0 +1,147 @@
+**Status: IN PROGRESS (2026-10-20) — A (performance overlay) DONE and box-verified; B (new look by deck drop), C (Sources Templates / Timelines tabs), D (Godot raw-AMCP sites → server endpoints) to follow. Parent: [WO-593](./593_WO_godot_client_port_epic.md). D continues [WO-598](./598_WO_client_contract_and_thin_client.md).**
+
+# WO-623 — Godot: owner's next.md notes (round 2)
+
+Owner, 20.10 (`next.md`, added after WO-621):
+
+1. *"i dont see a way to create a new look. dragging a media file onto an empty space in looks deck should create a new
+   look with that media on first layer."*
+2. *"sources tab is lacking tabs with media templates live and timelines."* (Media and Live exist since WO-622.)
+3. *"as a bigger task i also need you to make sure anything that happens in casparcg is composed in the node server
+   and not in the client. this way im a sure each function or set of actions is an api endpoint."*
+4. *"the godot client is coming up very nice by the way. im wondering about performance and how it affects resources.
+   can i get a system overlay that can be turned on/off with performance stats. cpu gpu ram etc."*
+
+Each part is its own unit: A = note 4, B = note 1, C = note 2, D = note 3.
+
+## Investigation
+
+The research was split across four read-only Haiku agents (one per note). Their load-bearing claims were then
+re-checked by hand as noted.
+
+### A — what the server already measures (note 4)
+
+- **`GET /api/host-stats`** (`src/api/router.js:107` → `src/api/routes-host-stats.js` `handleGet`). Checked live on the
+  box. It returns:
+  - `cpu {load1, load5, load15, cores}` from `os.loadavg()`. That is a run-queue length (load1 9.76 on a box whose CPUs
+    were about 21 % busy), not a utilisation.
+  - `memory {totalBytes, freeBytes, usedBytes}`.
+  - `media.disk` (statfs).
+  - `gpu {text, utilizationPct, source}` from `nvidia-smi --query-gpu=utilization.gpu,memory.used,memory.total`,
+    cached 5 s, with the negative result cached too (smoke `smoke-host-stats-gpu-negative-cache`). VRAM appears only
+    inside the `text` string, and there is no temperature.
+  - `processes.caspar` / `processes.highascg` `{pid, cpuPct, rssBytes, cpuPctOfMachine}` from `/proc`
+    (`src/system/proc-stats.js`, WO-165).
+  - Preshow (`offline_mode`) returns a stub of nulls.
+- The web shows these figures only in the connection-eye hover tooltip (`client/components/connection-eye.js:277`,
+  fetched on mouseenter, throttled to 2.5 s). No WS message carries them and nothing polls them.
+- **What the Godot client can measure itself:**
+  - Godot's `Performance` monitors (`TIME_PROCESS`, `RENDER_TOTAL_DRAW_CALLS_IN_FRAME`, `RENDER_TOTAL_OBJECTS_IN_FRAME`,
+    `RENDER_VIDEO_MEM_USED`) and `Engine.get_frames_per_second()`.
+  - Per-viewport render time (`RenderingServer.viewport_get_measured_render_time_cpu/gpu`, as the dev
+    `app/perf_probe.gd` already used for WO-617).
+  - Its own CPU and RSS from `/proc/self/stat|status`.
+- **Gotcha, measured:** `FileAccess.get_file_as_string("/proc/self/stat")` returns `""`, because procfs reports length
+  0. A headless probe printed `as_string len=0` but `get_line len=1558 has VmRSS=true`. The first overlay build
+  therefore showed CPU "—" and silently fell back to Godot's static-memory figure for RAM. `/proc` must be read line by
+  line.
+- The root window's measured GPU time is near 0 (it is 2D). The 3D previs renders in SubViewports, so the overlay must
+  sum every viewport, as `perf_probe.gd` does.
+
+### B — new look (note 1)
+
+- **The web has two paths:**
+  - The "+" tile at the end of each main's deck: `client/components/scene-list-column.js:427-440` calls
+    `sceneState.addScene(undefined, {mainScope: col})` and then opens the look in the editor.
+  - A media drop on blank deck space: `scene-list-column.js:461-490` → `scenes-editor-deck-drop.js:34-130`. It calls
+    `addScene` (mainScope `'0'` with one screen, else the column), then for each payload `addLayer` + `setLayerSource` +
+    `applyNativeFillForSource`, opens the look, and pushes PRV. Timer payloads do not create a look.
+- **`addScene`** (`client/lib/scene-state.js:291-295`) builds `{id: uuid, name: "Look N+1", layers: [], mainScope,
+  defaultTransition: {...defaultTransition(), ...globalDefaultTransition}}` and appends it to the end of the list.
+- **No server endpoint creates a look.** Looks are persisted by the client through deck sync. `POST
+  /api/scene/new-layer` (WO-600 / 622) already builds the layer the drop needs, from a source.
+
+### C — Sources Templates / Timelines (note 2)
+
+- **Templates** (`client/components/sources-panel-templates.js:32-115`):
+  - The data comes from `GET /api/templates`, which is Caspar TLS (`src/api/media-catalog.js:58-66`), as `{id, label}`.
+  - Rows show an FT pill. Shader rows (`shaders/sh-…`) show an FX pill with the library name from `/api/shaders`.
+  - CG Studio lower-thirds get an "Edit" button.
+  - The drag payload is `{type:'template', value:id, label}`.
+- **Timelines:** `renderSourceList(…, 'timeline')` over `timelineState.getAll()`. The rows are `{id, label: name}` with
+  the drag payload `{type:'timeline', value:id, label}`. Right-click renames the timeline (PUT `/api/timelines/:id`).
+
+### D — client-composed AMCP (note 3)
+
+- **Godot** sends raw AMCP from three sites:
+  - `features/devices/decklink_input_model.gd:144`: `PLAY c-l DECKLINK n` after `HS.stop_cmds`.
+  - `input_slots_model.gd:194`: STOP + `MIXER c-l CLEAR`.
+  - `host_source_model.gd:356`: the same STOP + `MIXER c-l CLEAR` pair.
+- **The web** composes AMCP in about 10 features (31 sites):
+  - live-audio routing;
+  - DeckLink add/change;
+  - Sources Live row stop/start;
+  - extra live source remove;
+  - inspector live-audio stop;
+  - shader live editor MIXER/CG;
+  - shader CG UPDATE;
+  - multiview audio focus (`/api/amcp/batch`);
+  - logs console (raw by design);
+  - the shared PRV preview pipeline (`client/lib/amcp-preview-batch.js`), used by scene PRV push, global border, live
+    effects, edit-chrome clear and PRV runtime clear.
+- The server pass-throughs are `/api/raw`, `/api/amcp/raw`, `/api/amcp/batch` and `/api/amcp/raw-batch`
+  (`src/api/routes-amcp.js`), plus WS `amcp`.
+
+## What was done
+
+### A — performance overlay (DONE)
+
+- **Server** (`src/system/host-cpu-usage.js`, new):
+  - Whole-machine CPU busy % from the `/proc/stat` `cpu` line. Idle counts iowait, and guest columns are excluded
+    because the kernel already counts them in user/nice.
+  - The delta window is the time since the previous call, so a 2 s poller gets a 2 s average. The first call, or one
+    made within 250 ms of the last, measures 200 ms.
+- **Server** (`routes-host-stats.js`):
+  - Adds `cpu.usagePct`.
+  - Adds `temperature.gpu` to the nvidia-smi query, and returns numeric `gpu.vramUsedMiB`, `vramTotalMiB` and `tempC`
+    beside the unchanged `text`, so the web tooltip is untouched.
+  - The cache-hit path now returns the whole cached probe. The negative-cache stamp is unchanged.
+- **Godot** `app/perf_overlay_model.gd` (pure) and `app/perf_overlay.gd`:
+  - A `CanvasLayer` (layer 90) holding a click-through panel at the top right, under the header, in two sections.
+  - **THIS CLIENT:** FPS, frame (process) ms, render cpu/gpu ms summed over the window and every SubViewport (rescanned
+    every 5 s, because tabs build theirs lazily), draw calls and objects, Godot VRAM, CPU % per core with its share of
+    the box, and RSS.
+  - **BOX:** CPU % with load, RAM used/total, GPU % and °C, VRAM used/total, media disk free, and CasparCG / HighAsCG
+    process CPU and RSS.
+  - Warn and alarm colours use the theme's WARN / ERROR (e.g. CPU ≥ 70 / 90 %, GPU temperature ≥ 80 / 88 °C, disk ≥ 85
+    / 95 % full, FPS < 45 / 20).
+  - It polls only while shown. Client figures refresh every 0.5 s and `/api/host-stats` every 2 s, with no overlapping
+    requests. Labels are reused rather than rebuilt.
+- **Toggle:**
+  - A pulse icon in the header, left of the connection eyes (`assets/ui/icons/pulse.svg`). It is tinted ACCENT while
+    on.
+  - `F3` toggles from anywhere (`shell.gd` `_shortcut_input`).
+  - The state is remembered in `ui.cfg [overlay] perf`. The dev arg `--perf=1` forces it on without saving.
+- **Why not a WS stats broadcast:** polling only while the overlay is visible costs the server nothing when it is off.
+  The web tooltip already pulls the same route.
+
+## What was VERIFIED
+
+### A
+
+- **Offline smoke:** `smoke-wo623-host-cpu-usage` 4/4 (parse, delta, a live sample in 0..100, route fields), plus the
+  existing `smoke-host-stats-gpu-negative-cache` 2/2. Added to the curated list.
+- **Full offline suite:** 2781/2784. The single failure is the pre-existing `smoke-wo577-shader-controls`, caused by
+  the untracked `data/shaders/sh-sa-fluidic-space.json`, and is unrelated.
+- **Godot:** `test_perf_overlay.gd` (34 assertions), with the host body captured from the box. The full suite passes
+  15487/15487, and `--check` boots clean.
+- **Box, after a server restart:**
+  - `/api/host-stats` → `cpu.usagePct 21.1` (then 20.5 two seconds later) and `gpu {utilizationPct 32, vramUsedMiB
+    2321, vramTotalMiB 24467, tempC 57}`.
+  - In the overlay on the Live tab, client RAM 747 MiB matched `ps` RSS 765452 kB, and client CPU 22–26 % matched `top`
+    (20.0 / 22.9 / 25.0 %).
+  - The box rows matched the API. On Previs, render showed `cpu 0.6 · gpu 0.2 ms`; before the SubViewport sum, the
+    root window alone read gpu 0.0.
+  - A header click hid the overlay, with the icon white. F3 showed it again, with the icon blue, and `ui.cfg` gained
+    `[overlay] perf=true`. `ui.cfg` was restored to the owner's copy afterwards, so the overlay starts off.
+- **Owner-QA:** whether the panel's position and contents are what they want, and whether it should start on.

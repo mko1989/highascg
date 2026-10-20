@@ -13,6 +13,8 @@ const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
+const PerfOverlay := preload("res://app/perf_overlay.gd")
+const UiIcons := preload("res://app/ui_icons.gd")
 
 var _eye: ConnectionEye
 var _project: Label
@@ -21,6 +23,8 @@ var tabs: TabContainer
 var sources: MediaPanel
 var inspector: InspectorPanel
 var osc: OscMirror
+var perf: PerfOverlay
+var _perf_btn: Button
 
 
 func _ready() -> void:
@@ -71,6 +75,17 @@ func _ready() -> void:
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
 	Store.project_changed.connect(func(p: Dictionary) -> void: _project.text = str(p.get("name", "—")))
 	_refresh_eye()
+	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
+	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
+	add_child(perf)
+
+
+## WO-623 — F3 toggles the performance overlay from anywhere (the header pulse button does the same).
+func _shortcut_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k and k.pressed and not k.echo and k.keycode == KEY_F3:
+		perf.set_on(not perf.is_on())
+		get_viewport().set_input_as_handled()
 
 
 ## Boot/status lines go to the eyes' tooltip — the header carries no debug text (R4).
@@ -103,6 +118,13 @@ func _build_header() -> Control:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(spacer)
+	_perf_btn = UiIcons.button("pulse", "Performance overlay — CPU / GPU / RAM of this client and the box (F3)")
+	_perf_btn.toggle_mode = true
+	_perf_btn.flat = true
+	_perf_btn.add_theme_color_override("icon_pressed_color", ThemeBuilder.ACCENT)
+	_perf_btn.add_theme_color_override("icon_hover_pressed_color", ThemeBuilder.ACCENT_HOVER)
+	_perf_btn.toggled.connect(func(on: bool) -> void: perf.set_on(on))
+	row.add_child(_perf_btn)
 	_eye = ConnectionEye.new()
 	row.add_child(_eye)
 	return bar
