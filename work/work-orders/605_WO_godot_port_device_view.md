@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Next: slice 7c mapping nodes, then slice 8 snapshots. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Next: slice 8 snapshots. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -625,3 +625,93 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   byte-identical.
 - Not exercised live: connect / disconnect / refresh / apply Device View → Caspar against a real peer (single box) and
   Apply network — golden-tested only.
+
+## Slice 7c — mapping nodes (2026-10-20, DONE)
+
+### Investigation
+- Web path: `device-view-toolbar.js:126` puts a `device-view__mappings-column` between the destinations and the rear
+  panel; `device-view-mappings-render.js` fills it — "Mapping nodes" + "+" (`Actions.addMappingNode` → POST
+  `/api/device-view {addMappingNode:true}`, the server builds the node), then one card per `role: pixel_mapping`
+  device: label, the `pixel_map_in` dot (left), the `pixel_map_out` dots sorted by index with their 1-based number,
+  and a "+" (`mappingPersist(addMappingOutput)`). A card click → `selectDevice(id)` →
+  `device-view-inspector-render.js:109` → `renderMappingNodeInspector` (`device-view-inspector-mapping.js`): node
+  label, input resolution (the cable into `pixel_map_in` resolved like a GPU feed), "Propose outputs from input",
+  per output Label / Mode (Custom + the standard modes; W / H / FPS math inputs) / Src X·Y·W·H (the output's slice
+  rect), Remove, then "+ Add Output", "Show Mapping Preview", Duplicate / Delete. Every node edit is
+  `lib/mapping-node-service.js`: GET `/api/device-view?_ts=` (WO-436 cache bust) → edit the graph → POST
+  `{deviceGraph}`. Mapping outputs also feed GPU / DeckLink ports: `cable_seed.feed_source` must resolve
+  `pixel_map_out` sources to the output's own size (WO-437 precedence: stored dims, else the custom mode string,
+  else the standard mode).
+- Web gaps found (ported as the web behaves unless noted):
+  1. The inspector-render call passes no `statusEl`, so rename / propose statuses never show on the web. **Godot shows
+     them.**
+  2. Label / mode / rect / add-output / duplicate / delete failures are dropped silently, and a failed rect save throws
+     uncaught. **Godot puts them on the status line ("Mapping save failed: …").**
+  3. Duplicate never marks restart-dirty (ported as-is).
+  4. The `change` event fires before the math-input blur commit, so typing `1920/2` saves 1920. **Godot evaluates
+     and clamps first, then saves.**
+  5. A remove-output failure uses `alert()`. Godot shows it on the status line.
+  6. `removeMappingOutput` re-points the removed output's slices at the first remaining output
+     (`mapping-node-service.js:341`), so that output then carries two slices. Seen on the box; ported as-is.
+  7. `duplicateMappingNode` renumbers the copy's outputs `out_1…` but keeps every slice's old `outputId`
+     (`mapping-node-service.js:241-262`), so the copy's slices can point at the wrong or missing outputs. Ported as-is.
+  8. Not ported: "Show Mapping Preview" (the pixel-map editor is outside WO-605) and the per-connector mapping page
+     (`renderMappingConnectorControls`) — a mapping connector focused from a destination opens its node's page.
+
+### What was done
+- `features/devices/mapping_graph.gd` (pure): mapping-node-service's graph edits — rename, duplicate, add / remove
+  output (connectors synced, cables to removed outputs pruned), field updates, propose layout, slice rect save,
+  custom-mode parse / format, WO-437 output resolution.
+- `features/devices/mapping_page_model.gd` (pure): the column cards, input resolution / readout, field state and
+  `items()` — the page spec.
+- `features/devices/mapping_flow.gd`: every request sequence (rename, propose, label, mode, custom size, rect, add /
+  remove output, duplicate, delete, column add node / add output) over an injected io.
+- `features/devices/mapping_controls.gd`: renders the items into the Inspector (W / H / FPS share a row), commits text
+  fields like the web's `change` (Enter / leaving, only when changed; math evaluated first), keeps focus across the
+  re-render a save's reload causes.
+- `features/devices/mapping_panel.gd`: the column — "+", cards with in / out dots registered as cable anchors, card
+  "+", the open node's card outlined.
+- `devices_tab.gd`: the column between destinations and rear panel; a card or a `pixel_map_*` connector opens the node
+  page; it excludes the destination / port / server pages; a reload re-renders it or closes it when the node is gone.
+- `cable_seed.gd`: `feed_source` resolves a mapping output's feed (size and label), so GPU / DeckLink pages fed by a
+  mapping output show its resolution. `devices_model.gd`: cables to and from mapping connectors are labelled
+  "<node> in" / "<node> out N" (the web lists raw ids).
+- Found on the box and fixed: duplicate drew one random tag for all slices, so the copy's slice ids collided. The web
+  draws `Math.random()` per slice, and the golden pins `Math.random`, so it could not catch this. `duplicate_node` now
+  takes a Callable drawn per slice, and a unit test pins it. (`G.duplicate` also clashed with `Resource.duplicate` on
+  the script object, so it is named `duplicate_node`.)
+
+### What was VERIFIED
+- `tests/test_devices_mapping.gd` + `tests/golden/devices_mapping.json` (scratchpad generator `mp_golden.mjs` runs the
+  web band, inspector and mapping-node-service under Node on the DOM shim against a scripted device-graph server, Date
+  / Math.random pinned): 12 cases (rename, propose, propose without input, output fields, stale dims, rects, remove
+  output and its failure, add / duplicate / delete, column adds, no nodes, failures) with 41 replayed steps. Per step
+  the test compares the request list (GETs, POST bodies, confirms, alerts, dirty, reload), the status, the server graph
+  afterwards, the re-rendered page ("Show Mapping Preview" dropped), the column cards and the mapping-output feed
+  resolutions. Helper tables (parse / format / resolve / propose) are also checked. Godot `--test` 11362 / 11362,
+  `--check` boot OK, 0 files over 500 lines.
+- Box GUI (`config/` copied + md5-listed first):
+  - Adding a node: column "+" → "Pixel Mapping 1" card with IN + 2 numbered dots, status "Added pixel mapping node",
+    Apply goes restart-dirty.
+  - Cabling: Main LED PRV → mapping IN (edge note `outputLayer:2`), mapping out 1 → DP 4/5; the cables list reads
+    "Main LED (DP-7) → Pixel Mapping 1 in" / "Pixel Mapping 1 out 1 → DP 4/5".
+  - Card click → page with "1920×1080 @ 50 Hz — Main LED (DP-7)".
+  - Propose → "Proposed Out 1: 960×1080 @ x=0 · Out 2: 960×1080 @ x=960", server slices x 0 / 960.
+  - Field edits:
+    - Custom W `1920/2+100` → 1060, saved as `1060x1080p50`.
+    - Src Y 20 saved in the slice rect, with focus kept in the field.
+    - Mode 720p5000 saved as 1280×720@50; the W / H / FPS row shows it disabled.
+    - Node rename "LED Wall" and output label "Left" are saved; the card and cable labels follow.
+  - Outputs:
+    - Card "+" → out_3, status "Mapping updated".
+    - Remove on the cabled Output 1 → confirm → output, connector and cable gone (gap 6 seen).
+  - Duplicate → "LED Wall Copy" with its own connectors and no cables. After the fix its slice ids are distinct
+    (`map_mvglqyf0_tsnh0k` / `…_rur1pl`).
+  - Delete on the copy → confirm → node and connectors gone, page closed.
+  - Page exclusion and opening paths: the server page, a mapping page and a destination page replace each other, and
+    the card outline follows. Main LED's "Input Feed (Layer 2)" mapped-output link opens the LED Wall page.
+  - Afterwards `device_graph.json` + `.highascg-state.json` were restored and node restarted → every config file
+    byte-identical.
+- Not exercised live: the failure paths (golden-tested only) and Apply Caspar config with a mapping node cabled. The
+  Caspar side of pixel mapping is outside this port.
+

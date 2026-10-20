@@ -165,6 +165,14 @@ static func build(payload: Dictionary, live_cm: Variant = null, cc: Variant = nu
 			labels[it.id] = it.label
 	var edges := []
 	var graph: Dictionary = payload.get("graph", {}) if payload.get("graph") is Dictionary else {}
+	var nodes := {}
+	for d in H.R.a(graph.get("devices")):
+		if d is Dictionary and d.get("role") == "pixel_mapping":
+			nodes[H.R.s(d.get("id"))] = H.R.s(d.label) if H.truthy(d.get("label")) else H.R.s(d.get("id"))
+	for c in conns.values():  # mapping connectors: "<node> in" / "<node> out N" (the web shows the raw id)
+		if c.get("kind") in ["pixel_map_in", "pixel_map_out"]:
+			var node: String = nodes.get(H.R.s(c.get("deviceId")), H.R.s(c.get("deviceId")))
+			labels[c.id] = node + (" in" if c.kind == "pixel_map_in" else " out %d" % (int(H.R.d(c).get("index", 0)) + 1))
 	for e in graph.get("edges", []):
 		if e is Dictionary and str(e.get("sourceId", "")) != "" and str(e.get("sinkId", "")) != "":
 			edges.append(e)

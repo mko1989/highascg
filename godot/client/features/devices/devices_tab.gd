@@ -14,6 +14,8 @@ extends MarginContainer
 ## the rear panel's "+" adds an output (output_port_controls.gd).
 ## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
 ## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
+## Slice 7c: the "Mapping nodes" column (mapping_panel.gd) between the destinations and the rear panel; a card (or a
+## mapping connector focused from a destination) opens the node page (mapping_controls.gd).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -29,6 +31,8 @@ const GpuControls := preload("res://features/devices/gpu_output_controls.gd")
 const DeckLinkControls := preload("res://features/devices/decklink_port_controls.gd")
 const OutputControls := preload("res://features/devices/output_port_controls.gd")
 const ServerControls := preload("res://features/devices/server_controls.gd")
+const MappingPanel := preload("res://features/devices/mapping_panel.gd")
+const MappingControls := preload("res://features/devices/mapping_controls.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
@@ -51,6 +55,8 @@ var _gpu: GpuControls
 var _deck: DeckLinkControls
 var _outp: OutputControls
 var _server: ServerControls
+var _maps: MappingPanel
+var _mapc: MappingControls
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -114,6 +120,21 @@ func _ready() -> void:
 	_server.status.connect(_set_status)
 	_server.dirty.connect(func() -> void: _gesture.set_dirty(true))
 	_server.reload.connect(func(_dirty: bool) -> void: refresh())
+	_mapc = MappingControls.new()
+	add_child(_mapc)
+	_mapc.status.connect(_set_status)
+	_mapc.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	_mapc.reload.connect(func(_dirty: bool) -> void: refresh())
+	var mid := ScrollContainer.new()
+	mid.custom_minimum_size.x = 190
+	mid.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(mid)
+	_maps = MappingPanel.new()
+	_maps.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mid.add_child(_maps)
+	_maps.add_node.connect(_mapc.add_node)
+	_maps.add_output.connect(_mapc.add_card_output)
+	_maps.open_node.connect(_open_mapping)
 	# The web opens that connector's inspector (GPU outputs, DeckLink ports); anything else selects its cable.
 	_dests.focus_connector.connect(func(id: String) -> void:
 		if _open_port(id):
@@ -217,6 +238,7 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 	_payload = payload
 	var anchors := {}
 	_dests.show_model(m, payload, anchors)
+	_maps.show_nodes(payload, anchors, _mapc.node_id)
 	_rear.show_slots(m.slots)
 	anchors.merge(_rear.anchors)
 	_clear(_list)
@@ -236,6 +258,11 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 				page.show_connector(conn, payload, Settings.settings)
 	if _server.is_open:
 		_server.show_server(payload, Settings.settings)
+	if _mapc.node_id != "":
+		if _mapc.G.find_node(payload.get("graph"), _mapc.node_id).is_empty():
+			_close_port()
+		else:
+			_mapc.show_node(payload, _mapc.node_id)
 	_sync()
 
 
@@ -248,6 +275,9 @@ func _connector(id: String) -> Dictionary:
 func _open_port(id: String) -> bool:
 	var conn := _connector(id)
 	var kind := str(conn.get("kind", ""))
+	if kind in ["pixel_map_in", "pixel_map_out"]:
+		_open_mapping(str(conn.get("deviceId", "")))
+		return true
 	var page: Node = _gpu if kind == "gpu_out" else (_deck if kind in ["decklink_io", "decklink_out"] else
 		(_outp if kind in OutputControls.KINDS else null))
 	if page == null:
@@ -270,6 +300,20 @@ func _close_port() -> void:
 		_server.close()
 		if InspectorPanel.current != null:
 			InspectorPanel.current.release(_server.page)
+	if _mapc.node_id != "":
+		_mapc.close()
+		_maps.highlight("")
+		if InspectorPanel.current != null:
+			InspectorPanel.current.release(_mapc.page)
+
+
+func _open_mapping(id: String) -> void:
+	_dests.deselect()
+	_close_port()
+	_mapc.show_node(_payload, id)
+	_maps.highlight(id)
+	if InspectorPanel.current != null:
+		InspectorPanel.current.present(_mapc.page)
 
 
 func _open_server() -> void:

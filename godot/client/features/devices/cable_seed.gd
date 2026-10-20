@@ -5,10 +5,11 @@ extends RefCounted
 ## onto a GPU socket seeds screen_N consumer flags and inherits the source feed's mode/size/fps; WO-364: a PRV head
 ## only gets its binding), project-fps.js, the outputLayer note (device-view-cable-outputs.js) and the Caspar
 ## video-mode dims (CASPAR_VIDEO_MODE_SPECS / videoModeToResolution). Golden-tested (test_devices_cable_seed.gd).
-## Not ported: mapping-node output feeds (resolveMappingOutputFeedSource) — Godot draws no mapping nodes yet, so no
-## cable can start from one; feed_source() returns {} for them.
+## Slice 7c: mapping-node output feeds too (resolveMappingOutputFeedSource, via mapping_graph.gd).
 
 const R := preload("res://features/devices/cable_rules.gd")
+const H := preload("res://features/devices/host_channels.gd")
+const F := preload("res://features/devices/replication_format.gd")
 const PROJECT_FPS := [23.98, 24.0, 25.0, 29.97, 30.0, 50.0, 59.94, 60.0]
 const SCREEN_DEFAULTS := {"windowed": true, "borderless": true, "vsync": false}
 const MODE_DIMS := {"576": [720, 576], "720": [1280, 720], "1080": [1920, 1080], "1556": [2048, 1556],
@@ -129,8 +130,47 @@ static func _feed(raw: Dictionary, settings: Variant) -> Dictionary:
 	return out
 
 
-## resolveCableSourceResolution (destination feeds): graph source row → live destination intent → saved destination.
+## resolveCableSourceResolution: a destination feed, else a mapping node's output.
 static func feed_source(payload: Dictionary, source_id: String) -> Dictionary:
+	var dest := _destination_feed(payload, source_id)
+	return dest if not dest.is_empty() else _mapping_feed(payload, source_id)
+
+
+## resolveMappingOutputFeedSource: the node output behind a pixel_map_out (by "<node>_<out id>", else by index); its
+## size follows mapping_graph.gd resolve_output (WO-437 precedence). Loaded lazily — mapping_graph.gd preloads this.
+static func _mapping_feed(payload: Dictionary, source_id: String) -> Dictionary:
+	var sid := source_id.strip_edges()
+	var graph := R.d(payload.get("graph"))
+	var conn := {}
+	for c in R.a(graph.get("connectors")):
+		if c is Dictionary and R.s(c.get("id")) == sid:
+			conn = c
+			break
+	if conn.get("kind") != "pixel_map_out":
+		return {}
+	var did := R.s(conn.get("deviceId"))
+	var outputs := []
+	for d in R.a(graph.get("devices")):
+		if d is Dictionary and R.s(d.get("id")) == did:
+			outputs = R.a(R.d(d.get("settings")).get("outputs"))
+			break
+	var key := sid.substr(did.length() + 1) if did != "" and sid.begins_with(did + "_") else ""
+	var output: Variant = null
+	for o in outputs:
+		if R.s(R.d(o).get("id")) == key:
+			output = o
+			break
+	if output == null:
+		var idx := F._num(conn, "index")  # Number(conn.index): absent → NaN → no output
+		if is_finite(idx) and idx == floorf(idx) and idx >= 0 and idx < outputs.size():
+			output = outputs[int(idx)]
+	var res: Dictionary = load("res://features/devices/mapping_graph.gd").resolve_output(output)
+	var label: Variant = R.d(output).get("label")
+	return _feed({"id": sid, "label": label if H.truthy(label) else conn.get("label"), "videoMode": res.mode,
+		"width": res.width, "height": res.height, "fps": res.fps}, payload.get("_settings"))
+
+
+static func _destination_feed(payload: Dictionary, source_id: String) -> Dictionary:
 	var sid := source_id.strip_edges()
 	if not sid.begins_with("dst_in_"):
 		return {}
