@@ -20,6 +20,8 @@ const LABEL_H := 18.0
 const GRIP := 14.0
 const CLOSE_W := 18.0  # the ✕ hot zone at the right end of a label strip
 const MSG_S := 4.0
+const OUTSIDE := Color("#161b24")  # the preview area beside the canvas — not reachable, so not black like the canvas
+const CANVAS_EDGE := Color(1, 1, 1, 0.22)
 
 var role := "opgui"
 var cells: Array = []  # compose cells (server shape), drawn in order
@@ -114,6 +116,10 @@ func label_text(c: Dictionary) -> String:
 
 func _draw() -> void:
 	var font := get_theme_default_font()
+	var ir := image_rect()
+	for bar in TM.outside(size, ir):
+		draw_rect(bar, OUTSIDE)
+	draw_rect(ir.grow(0.5), CANVAS_EDGE, false, 1.0)  # the canvas edge: windows move and resize up to it
 	for i in cells.size():
 		var c: Dictionary = cells[i]
 		var r := _screen(i)
@@ -131,7 +137,6 @@ func _draw() -> void:
 		var xr := _close_rect(r)
 		x.draw(get_canvas_item(), xr.position + (xr.size - x.get_size()) / 2.0, Color(1, 1, 1, 0.85))
 	if _msg != "" and Time.get_ticks_msec() < _msg_until:
-		var ir := image_rect()
 		var m := TextLine.new()
 		m.add_string(_msg, font, 13)
 		m.width = ir.size.x - 16.0

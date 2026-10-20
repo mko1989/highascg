@@ -102,3 +102,12 @@ func test_source_drop_and_close_zone() -> void:
 	t.ok(not TM.droppable("route://5"), "only the row payload shape")
 	var pic := Rect2(100, 100, 400, 225)
 	t.eq(TM.close_rect(pic, 18.0, 18.0), Rect2(484, 327, 18, 18), "right end of the strip, under the picture")
+
+
+## Owner 20.10 "invisible barriers": the bars beside the canvas are drawn as not-canvas (pillarbox left / right,
+## letterbox top / bottom); a canvas that fills the area leaves none.
+func test_outside_bars_mark_the_canvas_edge() -> void:
+	var ir := Rect2(175, 0, 850, 478)
+	t.eq(TM.outside(Vector2(1200, 478), ir), [Rect2(0, 0, 175, 478), Rect2(1025, 0, 175, 478)], "pillarbox")
+	t.eq(TM.outside(Vector2(850, 600), Rect2(0, 61, 850, 478)), [Rect2(0, 0, 850, 61), Rect2(0, 539, 850, 61)], "letterbox")
+	t.eq(TM.outside(Vector2(850, 478), Rect2(0, 0, 850, 478)), [], "exact fit: none")

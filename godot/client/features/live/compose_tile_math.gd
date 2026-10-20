@@ -116,3 +116,19 @@ static func droppable(data: Variant) -> bool:
 ## The ✕ square at the right end of a window's label strip (the strip hangs 2 px below the picture, 2 px wider).
 static func close_rect(picture: Rect2, label_h: float, w: float) -> Rect2:
 	return Rect2(picture.end.x + 2.0 - w, picture.end.y + 2.0, w, label_h)
+
+
+## The preview area outside the canvas (`canvas_r` fit-centred in `area`): the letterbox / pillarbox bars. Owner
+## 20.10: "invisible barriers … should be able to position it along the whole canvas" — the canvas edge was not drawn,
+## so the black bars beside a 16:9 canvas read as canvas the windows could not reach.
+static func outside(area: Vector2, canvas_r: Rect2) -> Array:
+	var out := []
+	if canvas_r.position.x > 0.5:
+		out.append(Rect2(0, 0, canvas_r.position.x, area.y))
+	if area.x - canvas_r.end.x > 0.5:
+		out.append(Rect2(canvas_r.end.x, 0, area.x - canvas_r.end.x, area.y))
+	if canvas_r.position.y > 0.5:
+		out.append(Rect2(canvas_r.position.x, 0, canvas_r.size.x, canvas_r.position.y))
+	if area.y - canvas_r.end.y > 0.5:
+		out.append(Rect2(canvas_r.position.x, canvas_r.end.y, canvas_r.size.x, area.y - canvas_r.end.y))
+	return out

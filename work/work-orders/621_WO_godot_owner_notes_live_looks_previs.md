@@ -250,3 +250,29 @@ Owner notes added to `next.md` (20.10), quoted per item:
     at exactly (1649.8, 488) canvas px, 16:9 was kept and the composed picture followed.
   - Afterwards the owner's own layout was POSTed back (identical to the saved copy), and their Live 3D view
     and Previs Camera mode were restored.
+
+## Owner follow-up (20.10, 18:00) — "invisible barriers" on the Live preview
+
+### Investigation
+- Owner: "there are invisible barriers not letting me move the windows in live standard view more to the sides,
+  left/right. should be able to position it along the whole canvas".
+- **Box screenshot:**
+  - The Live preview area is 1197 × 476 px. The operator canvas is 1920 × 1080 and is drawn fit-centred in it
+    (`compose_tiles.gd` `image_rect`), about 846 px wide.
+  - So roughly 175 px of black on each side was letterbox, not canvas, and looked exactly like canvas.
+- **The windows already reach the real edges.** The saved layout had PRV and DeckLink 1 at `x = 0` and the USB window
+  at `x + w = 1`. The clamps are the canvas edges: client `compose_tile_math.gd` `clamp_rect`, server `clampFraction`.
+  The "barrier" was the canvas edge, and nothing drew it.
+
+### What was done
+- `compose_tile_math.gd` `outside(area, canvas_rect)` (pure) returns the pillarbox / letterbox bars around the canvas.
+- `compose_tiles.gd` `_draw` paints those bars in the panel shade (`#161b24`) and draws a 1 px outline at the canvas
+  edge before the windows. Window movement is unchanged: windows move and resize up to that edge.
+
+### What was VERIFIED
+- Godot suite 15949 / 15949 passing (new: `test_outside_bars_mark_the_canvas_edge`).
+- Box: the relaunched client's Live → Standard view shows the canvas framed (screen x 488–1311). The edge windows
+  sit on the frame. The owner's layout is byte-identical (no drag in this test).
+- **Seen, not yet investigated:** the composed PGM picture fills only about 70 % of its PGM window, anchored left and
+  about 27 px down (the window frame is the client's fit to the 1920×1152 PGM source). This could be Caspar's fill
+  for a route from a non-1080 channel. It needs its own look.
