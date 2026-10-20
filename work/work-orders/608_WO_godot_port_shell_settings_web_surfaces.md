@@ -195,7 +195,7 @@ Verified (box, 19.10):
 - Every touched slice was compared with the pre-test snapshot. It matches, except `ui.json` now carries an explicit
   `invertTouchpadScroll: false`, plus the WO-619 side notes (`screen_count`, `osc.wsDeltaBroadcast`).
 
-Not ported yet (next slices): updates, system (hardware / mounts), decklink, Tailscale, live audio (+ ALSA
+Not ported yet (next slices): system (hardware / mounts), decklink, Tailscale, live audio (+ ALSA
 mixer), variables, nuclear (password + restart / reboot / Caspar actions); the media pane's exFAT sync table; the
 web's WebCodecs warning for the stream preview mode (irrelevant here). The Godot client does not yet honour
 `ui.invertTouchpadScroll` (its zoom / pan controls); the setting is kept for the browser client.
@@ -370,3 +370,22 @@ argument on `save_path`) and "Open server logs" (the logs window above).
 **VERIFIED (box, 20.10):** Save → the dialog offered `highascg-support_highascg7580_2026-10-20T22-20-21-753Z.zip`;
 saved 469 KB, `unzip -l` lists the 12 members; status line "Saved … (469 KB)"; "Open server logs" opens the logs
 window. Godot tests 16213 pass.
+
+## 2026-10-20 — Settings → Updates + nuclear password prompt
+
+- **`features/settings/updates_pane.gd`** (+ `updates_model.gd`, tests in `test_settings.gd`) — web
+  `settings-modal-system-updates.js`: build stamp (`GET /api/system/version`), USB / bridge drop-update line, GitHub
+  check (`/api/system/update/check`, Check now = `?force=1`), Install latest release behind a confirm →
+  `POST /api/system/update/apply {confirm}` and the apply log polled every 1.5 s (`/api/system/update/status`; a log
+  in progress is picked up when the pane opens).
+- **`app/nuclear_gate.gd`** (+ pure `nuclear_model.gd`, `tests/test_nuclear_model.gd`) — every nuclear-gated POST:
+  on 403 "Invalid password." / `passwordRequired` ask for the password, retry with `body.password`, keep a working one
+  in memory for the session; "… not configured." is not asked (cannot succeed). Used by Install and the dock (closes
+  the WO-628 open item); the next nuclear-gated panes (System, DeckLink, Tailscale, Nuclear) reuse it.
+
+**VERIFIED (box, 20.10):** Updates shows 2026.05.20, "USB exFAT: not mounted · Bridge drop: — · retain mode", "Latest:
+2026-10-04T033256Z — update available (cached)" → Check now drops "(cached)"; Install opens the confirm — **Cancel
+pressed, nothing installed** (status `{"active":false}`; this dev box runs from git). Gate: temporary password via
+`POST /api/settings` → dock File browser → prompt → "wrong" → "Wrong password — try again." → right one → thunar
+opened (`dock file-manager → 200`), closed again; password removed, `config/ui.json` byte-identical to the backup.
+Godot tests 16231 pass.

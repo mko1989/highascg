@@ -12,6 +12,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
 const D := preload("res://app/operator_dock_model.gd")
 const DockMenu := preload("res://app/operator_dock_menu.gd")
+const NuclearGate := preload("res://app/nuclear_gate.gd")
 
 signal notice(n: Dictionary)
 
@@ -204,7 +205,7 @@ func _open_more() -> void:
 func launch(action: String, b: Button) -> void:
 	if b != null:
 		b.modulate = Color(1, 1, 1, 0.45)  # pressed feedback until the server answers
-	var res: Dictionary = await Api.post_json("/api/system/dock/launch", {"action": action})
+	var res: Dictionary = await NuclearGate.post(self, "/api/system/dock/launch", {"action": action})
 	if b != null and is_instance_valid(b):
 		b.modulate = Color.WHITE
 	print("[client] dock %s → %s %s" % [action, res.status, res.error])

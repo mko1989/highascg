@@ -10,6 +10,7 @@ const M := preload("res://features/settings/settings_model.gd")
 const SendTo := preload("res://features/timeline/timeline_send_to.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
+const UpdatesPane := preload("res://features/settings/updates_pane.gd")
 
 signal logs_requested
 
@@ -42,6 +43,7 @@ func _ready() -> void:
 	_comp_check.pressed.connect(_check_companion)
 	Panes.companion(_pane("Companion"), _comp_status, _comp_check)
 	Panes.media(_pane("Media / USB"))
+	_pane("Updates").add_child(UpdatesPane.new())
 	_bundle = Button.new()
 	_bundle.text = "Save support bundle…"
 	_bundle.pressed.connect(_save_bundle)

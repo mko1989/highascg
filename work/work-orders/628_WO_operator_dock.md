@@ -67,8 +67,10 @@ to auto hide and not be too triggery to pop up."
 
 ## Open
 
-- A configured nuclear password makes launch answer 403 `passwordRequired`. The dock only shows the error and has no
-  prompt yet.
+- ~~A configured nuclear password makes launch answer 403 `passwordRequired`. The dock only shows the error and has no
+  prompt yet.~~ Fixed 20.10: launches go through `app/nuclear_gate.gd` (prompt, retry, remembered for the session) —
+  box-verified with a temporary password (wrong → "Wrong password — try again", right → File browser opened; ui.json
+  restored byte-identical). See WO-608 "Settings → Updates + nuclear password prompt".
 - One Firefox click right after a node restart launched a second Firefox instead of focusing (window search probably
   timed out during startup). Not reproduced since.
 - No running-app indicators (macOS dots) and no user-editable pinned set.

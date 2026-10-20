@@ -57,3 +57,21 @@ func test_attachment_name() -> void:
 	t.eq(M.attachment_name(PackedStringArray(["content-disposition: attachment; filename=a.zip"]), "x.zip"), "a.zip")
 	t.eq(M.attachment_name(PackedStringArray(['Content-Disposition: attachment; filename="../../etc/p.zip"']), "x.zip"), "p.zip", "no path parts")
 	t.eq(M.attachment_name(PackedStringArray(), "x.zip"), "x.zip")
+
+
+func test_updates_texts() -> void:
+	var U := preload("res://features/settings/updates_model.gd")
+	var ver := {"buildStamp": "2026.05.20", "retainDrop": true, "volumes": {"usb": {"mounted": false},
+		"bridge": {"mounted": true, "dropStamp": null}}}
+	t.eq(U.stamp(ver), "2026.05.20")
+	t.eq(U.stamp({"packageVersion": "1.2"}), "1.2")
+	t.eq(U.stamp({}), "(unknown)")
+	t.eq(U.volumes(ver), "USB exFAT: not mounted · Bridge drop: — · retain mode")
+	t.eq(U.volumes({"volumes": {"usb": {"mounted": true, "dropStamp": "a", "appliedStamp": "b"}}}), "USB drop: a (applied b) · Bridge: not mounted")
+	t.eq(U.check_line({"latest": "2026-10-04T033256Z", "updateAvailable": true, "error": null}), "Latest: 2026-10-04T033256Z — update available")
+	t.eq(U.check_line({"latest": "x", "updateAvailable": false, "cached": true}), "Latest: x — up to date (cached)")
+	t.eq(U.check_line({"error": "rate limited"}), "GitHub check failed: rate limited")
+	t.eq(U.check_line({}), "No highascg-server_*.tar.gz asset on the latest release.")
+	t.eq(U.can_apply({"updateAvailable": true, "error": null}), true)
+	t.eq(U.can_apply({"updateAvailable": true, "error": "x"}), false)
+	t.eq(U.status_log({"phase": "download", "log": ["a", "b"], "error": "boom"}), "Phase: download\na\nb\nERROR: boom")
