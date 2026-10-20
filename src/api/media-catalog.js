@@ -76,15 +76,19 @@ async function enrichMediaListForHttp(ctx, media, opts = {}) {
 	const basePath = (ctx.config?.local_media_path || '').trim() || getMediaIngestBasePath(ctx.config)
 	if (basePath) {
 		ctx._mediaProbeCache = ctx._mediaProbeCache || {}
+		const tried = (ctx._mediaProbeTried = ctx._mediaProbeTried || new Set())
 		const toProbe = media
-			.filter((m) => !m.isDir && (!m.resolution || (m.fps == null && m.fps !== 0)))
+			// Skip ids already probed (WO-497 rule) — else every call re-probed the SAME first 120 and a large library's
+			// later files never got a resolution (owner 20.10: 225 of 345 clips, takes fell back to 16:9).
+			.filter((m) => !m.isDir && !tried.has(m.id) && (!m.resolution || (m.fps == null && m.fps !== 0)))
 			.slice(0, 120)
 		await Promise.all(
 			toProbe.map(async (m) => {
 				const fp = resolveSafe(basePath, m.id)
 				if (fp) {
 					const probed = await probeMedia(fp)
-					if (Object.keys(probed).length) ctx._mediaProbeCache[m.id] = probed
+					tried.add(m.id) // even when empty — "tried, nothing" is an answer too (a playback durationMs-only entry is not)
+					if (Object.keys(probed).length) ctx._mediaProbeCache[m.id] = { ...(ctx._mediaProbeCache[m.id] || {}), ...probed }
 				}
 			}),
 		)

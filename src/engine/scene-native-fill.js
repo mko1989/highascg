@@ -269,6 +269,26 @@ async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	return null
 }
 
+/**
+ * Last resort: ffprobe the file itself (once — cached in `_mediaProbeCache` under the clip value). This Caspar build's
+ * CINF carries no resolution and the media list probes only a bounded slice of a large library, so without this a
+ * take fell back to 16:9 and Caspar squeezed a locked-aspect 2.4:1 clip the editor drew correctly (owner 20.10).
+ * @returns {Promise<{ w: number, h: number } | null>}
+ */
+async function probeResolutionFromDisk(self, clipValue) {
+	if (!clipValue || !self || /^[a-z]+:\/\//i.test(String(clipValue))) return null
+	const cache = (self._mediaProbeCache = self._mediaProbeCache || {})
+	const tried = (self._mediaProbeTried = self._mediaProbeTried || new Set())
+	if (tried.has(clipValue)) return resolutionFromProbeEntry(cache[clipValue])
+	const { resolveMediaFileOnDisk } = require('../media/local-media-paths')
+	const fp = resolveMediaFileOnDisk(self.config || {}, clipValue)
+	if (!fp) return null
+	const p = await require('../media/local-media-ffmpeg').probeMedia(fp)
+	tried.add(clipValue)
+	if (p && Object.keys(p).length) cache[clipValue] = { ...(cache[clipValue] || {}), ...p }
+	return resolutionFromProbeEntry(cache[clipValue])
+}
+
 function clipPath(layer) {
 	const v = layer.source && layer.source.value
 	return v != null ? String(v) : ''
@@ -391,6 +411,7 @@ async function getResolvedFillForSceneLayer(self, layer, channel, incomingScene)
 	) {
 		const fromAmcp = await fetchCinfResolutionFromAmcp(self, clip)
 		if (fromAmcp) mediaRes = fromAmcp
+		else mediaRes = (await probeResolutionFromDisk(self, clip)) || mediaRes
 	}
 	return resolveSceneLayerFill(layer, authW, authH, targetW, targetH, mediaRes)
 }
@@ -400,6 +421,7 @@ module.exports = {
 	getChannelResolutionForChannel,
 	getMediaResolutionFromSelf,
 	fetchCinfResolutionFromAmcp,
+	probeResolutionFromDisk,
 	resolveSceneLayerFill,
 	getResolvedFillForSceneLayer,
 	parseResolutionString,
