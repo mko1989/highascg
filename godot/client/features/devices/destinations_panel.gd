@@ -3,12 +3,16 @@ extends VBoxContainer
 ## destinations" with the type select and "+", the destination cards, then "Input & host channels". Clicking a card
 ## selects it and hands destination_inspector.gd to the shared Inspector column; its edits post here. Every write
 ## (add / update / remove) marks Caspar restart-dirty and reloads, like the web's forced device-view load.
+## Under the cards: the "Add live input" band (web device-view-live-sources-render.js) — "+" opens the live-input
+## dialog (the tab owns it), then live sources that have no host-channel card yet (a DeckLink / USB row opens its
+## connector page).
 
 signal selected(id: String)  # "" = cleared; the tab drops a selected cable when a destination takes the Inspector
 signal status(text: String, ok: bool)
 signal changed  # a write landed → restart-dirty + reload
 signal refresh_requested  # a host-channel control applied something that needs no Caspar restart → reload only
 signal focus_connector(id: String)  # a mapped output clicked on the page (web: opens that connector's inspector)
+signal add_live_input  # the band's "+"
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -17,11 +21,13 @@ const DM := preload("res://features/devices/destinations_model.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
 const Inspector := preload("res://features/devices/destination_inspector.gd")
 const HostControls := preload("res://features/devices/host_channel_controls.gd")
+const LI := preload("res://features/devices/live_input_model.gd")
 const PGM := Color("#e74c3c")
 const PRV := Color("#2ecc71")
 
 var selected_id := ""
 var _cards: VBoxContainer
+var _band: VBoxContainer
 var _type: OptionButton
 var _page: Inspector
 var _host: HostControls
@@ -54,6 +60,20 @@ func _init() -> void:
 	_cards = VBoxContainer.new()
 	_cards.add_theme_constant_override("separation", 12)
 	add_child(_cards)
+	var band_head := HBoxContainer.new()
+	add_child(band_head)
+	var band_title := _label("Add live input", ThemeBuilder.TEXT_MUTED, 13)
+	band_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	band_head.add_child(band_title)
+	var add_live := Button.new()
+	add_live.text = "+"
+	add_live.tooltip_text = "Add DeckLink, NDI, USB video, live audio, or webpage"
+	add_live.focus_mode = Control.FOCUS_NONE
+	add_live.pressed.connect(func() -> void: add_live_input.emit())
+	band_head.add_child(add_live)
+	_band = VBoxContainer.new()
+	_band.add_theme_constant_override("separation", 4)
+	add_child(_band)
 	_page = Inspector.new()
 	_page.patch.connect(_patch)
 	_page.remove.connect(_remove)
@@ -91,6 +111,7 @@ func show_model(m: Dictionary, payload: Dictionary, anchors: Dictionary) -> void
 			_cards.add_child(_label("Input & host channels" if int(m.get("screen_count", 0)) > 0 else "Host channels",
 				ThemeBuilder.TEXT_MUTED, 13))
 		_cards.add_child(_card(d, anchors))
+	_show_band(payload)
 	if selected_id != "" and not _entries.has(selected_id):
 		deselect()
 	elif selected_id != "":
@@ -184,6 +205,28 @@ func _highlight() -> void:
 			var on: bool = c.get_meta("dest_id") == selected_id
 			card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED,
 				ThemeBuilder.ACCENT if on else ThemeBuilder.BORDER, 1))
+
+
+## The band's rows, or its note (host channels configured above / nothing yet).
+func _show_band(payload: Dictionary) -> void:
+	for c in _band.get_children():
+		_band.remove_child(c)
+		c.queue_free()
+	var live_cm: Variant = Store.get_value("channelMap")
+	var rows := LI.band_rows(payload, live_cm)
+	if rows.is_empty():
+		_band.add_child(_note(LI.BAND_HOSTS_NOTE if not LI.H.host_destinations(payload, live_cm).is_empty() else LI.BAND_EMPTY_NOTE))
+	for r in rows:
+		var b := Button.new()
+		b.text = "%s\n%s" % [r.label, r.detail]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.focus_mode = Control.FOCUS_NONE
+		b.disabled = r.connectorId == ""
+		b.add_theme_font_size_override("font_size", 12)
+		if r.connectorId != "":
+			b.tooltip_text = "Open this connector's settings"
+			b.pressed.connect(func() -> void: focus_connector.emit(r.connectorId))
+		_band.add_child(b)
 
 
 ## Title, "PGM/PRV · 1920x1080@50" (or "HOST · ch N"), then the output dot(s): one per half for a PGM/PRV pair

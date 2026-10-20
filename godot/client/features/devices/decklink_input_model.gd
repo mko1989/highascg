@@ -86,7 +86,8 @@ static func add_prepare(dv: Dictionary, device: int, slot: int) -> Dictionary:
 
 
 ## The rest, after the settings re-read (`prev` / `next` = decklink_input_count before / after) and the device-view
-## re-read `dv`. {requests, host_channel, restart (count grew), pending}.
+## re-read `dv`. {requests, host_channel, route (the live source's value), restart (count grew), pending,
+## already (the port was already a live input — capture refreshed)}.
 static func add_finish(prep: Dictionary, prev: int, next: int, dv: Dictionary, settings: Variant) -> Dictionary:
 	var slot: int = prep.slot
 	var runtime_cm := R.d(R.d(R.d(dv.get("live")).get("caspar")).get("channelMap")).duplicate()
@@ -98,7 +99,7 @@ static func add_finish(prep: Dictionary, prev: int, next: int, dv: Dictionary, s
 	if next > prev:
 		reqs.append(["DIRTY"])
 		reqs.append(_add_live(entry, prep))
-		return {"requests": reqs, "host_channel": entry.get("channel"), "restart": true, "pending": true}
+		return {"requests": reqs, "host_channel": entry.get("channel"), "route": _value(entry, prep), "restart": true, "pending": true}
 	if prep.already_input and not prep.tile.is_empty() and runtime.get("channel") != null:
 		var layer: Variant = H.coalesce([runtime.get("layer"), slot])
 		var route: String = str(runtime.route) if H.truthy(runtime.get("route")) else "route://%s-%s" % [R.s(runtime.channel), R.s(layer)]
@@ -107,22 +108,28 @@ static func add_finish(prep: Dictionary, prev: int, next: int, dv: Dictionary, s
 				"connectorId": prep.connector_id, "value": route}])
 		else:
 			reqs.append_array(_play(runtime, slot, prep.dev))
-		return {"requests": reqs, "host_channel": runtime.channel, "restart": false, "pending": false}
+		return {"requests": reqs, "host_channel": runtime.channel, "route": route, "restart": false, "pending": false, "already": true}
 	var e := runtime if not runtime.is_empty() else entry
 	if not H.truthy(e.get("channel")):
 		reqs.append(_add_live(e, prep))
-		return {"requests": reqs, "host_channel": e.get("channel"), "restart": true, "pending": true}
+		return {"requests": reqs, "host_channel": e.get("channel"), "route": _value(e, prep), "restart": true, "pending": true}
 	reqs.append_array(_play(e, slot, prep.dev))
 	reqs.append(_add_live(e, prep))
-	return {"requests": reqs, "host_channel": e.channel, "restart": false, "pending": false}
+	return {"requests": reqs, "host_channel": e.channel, "route": _value(e, prep), "restart": false, "pending": false}
+
+
+## buildDecklinkLiveSource's value: the entry's route, else route://channel-layer, else decklink://device.
+static func _value(entry: Dictionary, prep: Dictionary) -> String:
+	var ch: Variant = entry.get("channel")
+	return str(entry.route) if H.truthy(entry.get("route")) else \
+		("route://%s-%s" % [R.s(ch), R.s(H.coalesce([entry.get("layer"), prep.slot]))] if ch != null else "decklink://%d" % prep.dev)
 
 
 ## buildDecklinkLiveSource as the addExtraLiveSource request.
 static func _add_live(entry: Dictionary, prep: Dictionary) -> Array:
 	var layer: Variant = H.coalesce([entry.get("layer"), prep.slot])
 	var ch: Variant = entry.get("channel")
-	var value: String = str(entry.route) if H.truthy(entry.get("route")) else \
-		("route://%s-%s" % [R.s(ch), R.s(layer)] if ch != null else "decklink://%d" % prep.dev)
+	var value := _value(entry, prep)
 	var label: Variant = entry.get("label") if H.truthy(entry.get("label")) else \
 		(prep.connector.label if H.truthy(prep.connector.get("label")) else "DeckLink %d" % prep.slot)
 	return ["POST", "/api/device-view", {"addExtraLiveSource": {"type": "route", "routeType": "decklink", "value": value,

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Slice 10a (Matrix view) DONE 2026-10-20 — rows / crosspoints golden-replayed against the web matrix (mutation-checked), box-verified route / disconnect / undo / headers / adds (config restored; web "+ Stream"/"+ Record" list wipe fixed in Godot). Slice 10b (Node view) DONE 2026-10-20 — sections / cards / Bézier cables golden-replayed against the web simple band (mutation-checked), box-verified card pages / cabling / undo / server page / add / toggles (config restored; web GPU subtitle gap fixed in Godot). Next: slice 11, DeckLink connector drag onto a destination / the Sources panel (unported in both rear views). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Slice 10a (Matrix view) DONE 2026-10-20 — rows / crosspoints golden-replayed against the web matrix (mutation-checked), box-verified route / disconnect / undo / headers / adds (config restored; web "+ Stream"/"+ Record" list wipe fixed in Godot). Slice 10b (Node view) DONE 2026-10-20 — sections / cards / Bézier cables golden-replayed against the web simple band (mutation-checked), box-verified card pages / cabling / undo / server page / add / toggles (config restored; web GPU subtitle gap fixed in Godot). Slice 11 ("Add live input" dialog + Devices band + Matrix "+ Live input") DONE 2026-10-20 — golden replay of the web modal (14 cases / 52 steps) and band rows, box-verified NDI discover + add → host-channel card (config restored). Next: slice 12, DeckLink connector drag onto a destination / the Sources panel (unported in both rear views). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -1363,3 +1363,98 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   - Restore: `stream_outputs.json` was copied back and node restarted. The md5s match the backup except
     `.highascg-state.json` (the look-state autosave). The GUI was left running in the default view.
 - Owner QA: Node view on a larger show file (many outputs → grid reflow).
+
+## Slice 11 — "Add live input" dialog + band (2026-10-20, DONE)
+
+Owner report: "i dont see a way to add an input host channel". The Godot Devices tab had no way to create an input
+host channel (DeckLink, NDI, USB video, live audio or webpage). The web does this through the "Add live input" modal.
+This slice ports that modal, ahead of the DeckLink connector drag, which moves to slice 12.
+
+### Investigation
+- **Entry points**:
+  - the Devices "Add live input" band under the destinations (`device-view-live-sources-render.js`
+    `renderLiveSourcesBand`; it sits in `destLiveHost` after the cards, `device-view-toolbar.js:122-124`);
+  - Matrix "+ Live input" (`device-view-matrix.js:52-59`, second in the toolbar, `:85`);
+  - the Sources panel's live "+" (`sources-panel.js:111`). There is no Godot Sources panel yet.
+- **Modal** (`live-input-modal.js`, `-shell.js`, `-shell-v4l2.js`).
+  - Six types: Decklink / NDI / Web Browser (system) / Web Browser (CG template) / Live Audio / USB Video (V4L2).
+  - One section per type, plus an HTML hint per type. The DeckLink hint depends on the selected port's
+    `decklinkInputForSlot` entry; the webpage hint depends on the CG checkbox.
+  - The DeckLink port list comes from GET `/api/device-view` (graph and suggested `decklink_io` connectors, deduped
+    and sorted by slot, with "· input" / "· output" tags). With no connectors it falls back to SDI 1-4.
+  - The "Caspar host channel" row reads "planned" from `hostChannelPendingApply` (WO-381, configComparison).
+  - The live-audio and USB slot hints read the channel map captured when the modal opened.
+- **Submit** (`live-input-modal-submit.js`):
+  - DeckLink runs `addDecklinkInputSlot` with no device. It is the same plan as `decklink_input_model.gd`, and the
+    status reads `DeckLink input slot N . host channel X . route.` plus the apply / "(capture refreshed on existing
+    host channel.)" suffixes.
+  - NDI, system browser and webpage do one `addExtraLiveSource`. The status is "Added to Live Sources." plus the
+    host-PLAY and apply suffixes. A CG webpage never marks restart-dirty.
+  - Live audio and USB video run `addLiveAudioInputSlot` / `addV4l2InputSlot`:
+    1. pick the first empty slot or append, max 8;
+    2. POST `…/config`;
+    3. reload settings; mark restart-dirty if the count grew;
+    4. GET `/api/audio/live-inputs` or `/api/v4l2-inputs`;
+    5. if the new slot already has a route and no restart is needed, POST `…/apply`.
+  - A successful add calls onAdded (Devices reload) and closes the modal after 1.5 s.
+- **Band rows** (`collectUnlistedLiveSourceRows`): extra live sources with no listed host destination, suggested
+  `v4l2_in` connectors without one, and DeckLink inputs that are "in" but not shown. When there are no rows, a note
+  says either "Configured live inputs appear above…" (host channels exist) or "No live inputs yet…".
+- **Web gaps / quirks**:
+  1. The DeckLink status uses " . " separators. Ported verbatim.
+  2. The slot hints use the open-time channel map and only re-run on a field edit, so after an add they can name a
+     stale slot. Ported as is.
+  3. After Discover, the NDI select holds the first source, so Add right after Discover adds it. Same in Godot.
+  4. The band highlights the selected port row (`selectedKey`). Not ported: a Godot row opens the connector's page,
+     whose card already shows the selection.
+
+### What was done
+- `features/devices/live_input_model.gd` (new, pure):
+  - the type list, the hint HTML and `bbcode()` for the RichTextLabel;
+  - `decklink_ports`, `decklink_channel`, the NDI list and labels, the ALSA / V4L2 pickers;
+  - `pick_slot` / `slot_hint`;
+  - the NDI / system-browser / webpage items and the status texts;
+  - the band: `band_rows`, `extra_host_id`, `reconcile_extra`, `extra_detail`.
+- `features/devices/live_input_flow.gd` (new): the modal's state, with fields keyed by the web element ids, and its
+  request sequences over an injected io (`get_json` / `post_json` / `load_settings` / `dirty` / `added` /
+  `changed`), so the dialog and the golden replay share them. DeckLink reuses `decklink_input_model.gd`'s
+  `add_prepare` / `add_finish`, which now also returns `already` for the refreshed-capture suffix.
+- `features/devices/live_input_dialog.gd` (new): an AcceptDialog built fresh on each open. It has the type select,
+  hint, sections, "Add live source" and a status line (red on error), and closes 1.5 s after an add.
+- Wiring:
+  - `destinations_panel.gd`: the band (title, "+", rows or note). A DeckLink / USB row opens its connector page.
+  - `matrix_view.gd`: "+ Live input", second in the toolbar like the web.
+  - `devices_tab.gd`: owns the dialog. `dirty` marks restart-dirty, `added` reloads, and the tab's click capture
+    stands down while the dialog is open.
+
+### What was VERIFIED
+- **Golden replay**: `tests/test_devices_live_input.gd`.
+  - `tests/golden/devices_live_input.json`: 14 cases and 52 steps. The real web modal runs under Node on a fake
+    DOM against a scripted server. Cases:
+    - DeckLink: new port with the count growing, already input on a planned channel and on a live channel with
+      another device, no connectors, update failure;
+    - NDI: pick / typed / host-PLAY error; discover empty / error / none;
+    - system browser: clamps and failure;
+    - webpage: URL / template / CG;
+    - live audio: new slot, empty-slot reuse with apply success and failure, full;
+    - USB video: options with disabled devices, extras, second slot with live apply and its failure.
+  - Each step compares the POSTs, restart-dirty and onAdded counts, and the dialog (section, hint HTML, status +
+    error, port list and host-channel row, pickers, statuses, slot hints).
+  - `tests/golden/devices_live_band.json` (4 payloads, including a hosted DeckLink row being hidden): the row list
+    and the host count.
+  - Suite: 13012 / 13012 passing (+235). `--check` boots clean; no file is over 500 lines.
+- **Mutation check**: changing the refreshed-capture suffix fails 3 assertions.
+- **Box** (GUI on the Devices tab, live server; config backed up first):
+  - the band shows "No live inputs yet…"; "+" opens the dialog;
+  - DeckLink lists "4 port(s) from Device View" with "— (Apply Caspar config to allocate)";
+  - Live Audio scanned 34 ALSA devices, hint "Will use slot 1…";
+  - NDI Discover found the real "ndi_hx Avonic-4K" on the network;
+  - Add gave "Added to Live Sources. Apply Caspar config and restart in Device View to start capture." The dialog
+    closed, Apply went restart-dirty (orange), and a "ndi_hx Avonic-4K · HOST · ch 4 (planned)" host-channel card
+    appeared, with the band switching to the host-channels note;
+  - Matrix "+ Live input" opens the same dialog.
+  - Afterwards `general.json` and `device_graph.json` were restored and md5-verified. The node restart's boot
+    hardware sync had re-added `rec_1` / `audio_1`, so that file was put back too. Only `.highascg-state.json`, the
+    look autosave, differs. The GUI was relaunched in the default view.
+- **Owner QA**: actually adding DeckLink, live audio, USB video and webpage inputs on the box (each needs an Apply
+  Caspar config restart to capture).

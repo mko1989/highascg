@@ -3,15 +3,15 @@ extends VBoxContainer
 ## dense routing grid, sources down the left, sinks across the top (vertical labels). A crosspoint click connects or
 ## disconnects (matrix_model.gd builds the whole new graph); a header click opens that destination or connector.
 ## The grid is drawn, not built from buttons — a box with 50 sources × 20 sinks would be 1000 controls.
-## "+ Live input" is not here: the live-input modal is unported.
+## "+ Live input" opens the tab's live-input dialog (WO-605 slice 11).
 
 signal route(graph: Dictionary)
 signal header(id: String)
-signal add(what: String)  # "destination" | "stream_out" | "record_out" | "v4l2_out" | "pixel_map"
+signal add(what: String)  # "destination" | "live_input" | "stream_out" | "record_out" | "v4l2_out" | "pixel_map"
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/devices/matrix_model.gd")
-const ADDS := [["+ Destination", "destination"], ["+ Stream", "stream_out"], ["+ Record", "record_out"],
+const ADDS := [["+ Destination", "destination"], ["+ Live input", "live_input"], ["+ Stream", "stream_out"], ["+ Record", "record_out"],
 	["+ Virtual cam", "v4l2_out"], ["+ Pixel Map", "pixel_map"]]
 
 var _grid: Grid

@@ -202,6 +202,7 @@ func test_add_slot() -> void:
 		t.eq(_norm(_posts(reqs)), _norm(_posts(c.calls)), c.name + ": requests")
 		t.eq(_dirty(reqs), _dirty(c.calls), c.name + ": restart-dirty event")
 		t.eq(_norm(fin.host_channel), _norm(c.res.hostChannel), c.name + ": host channel")
+		t.eq(fin.route, c.res.route, c.name + ": route")
 		t.eq(fin.restart, c.res.casparRestartNeeded, c.name + ": restart needed")
 		t.eq(fin.pending, c.res.pendingApply, c.name + ": pending apply")
 		t.eq(prep.slot, int(c.res.slot), c.name + ": slot")

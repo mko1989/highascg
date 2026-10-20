@@ -35,6 +35,7 @@ const ServerControls := preload("res://features/devices/server_controls.gd")
 const MappingPanel := preload("res://features/devices/mapping_panel.gd")
 const MappingControls := preload("res://features/devices/mapping_controls.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
+const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
 const Toolbar := preload("res://features/devices/devices_toolbar.gd")
 const MatrixView := preload("res://features/devices/matrix_view.gd")
 const NodePanel := preload("res://features/devices/node_panel.gd")
@@ -63,6 +64,7 @@ var _server: ServerControls
 var _maps: MappingPanel
 var _mapc: MappingControls
 var snapshots: SnapshotDialogs
+var live_inputs: LiveInputDialog
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -86,6 +88,10 @@ func _ready() -> void:
 	add_child(snapshots)
 	snapshots.status.connect(_set_status)
 	snapshots.applied.connect(refresh)
+	live_inputs = LiveInputDialog.new()
+	add_child(live_inputs)
+	live_inputs.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	live_inputs.added.connect(refresh)
 	_bar = Toolbar.new()
 	v.add_child(_bar)
 	_bar.cancel_pressed.connect(func() -> void: _gesture.cancel())
@@ -115,6 +121,7 @@ func _ready() -> void:
 	left.add_child(_dests)
 	_dests.status.connect(_set_status)
 	_dests.refresh_requested.connect(refresh)
+	_dests.add_live_input.connect(live_inputs.open)
 	_dests.changed.connect(func() -> void:
 		_gesture.set_dirty(true)
 		refresh())
@@ -232,6 +239,8 @@ func _matrix_add(what: String) -> void:
 			await _dests.add("pgm_prv")
 		"pixel_map":
 			await _mapc.add_node()
+		"live_input":
+			live_inputs.open()
 		_:
 			await _outp.add_output(what)
 
@@ -395,7 +404,7 @@ func _set_status(text: String, ok: bool) -> void:
 ## its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or _matrix.visible:
+	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or live_inputs.is_open() or _matrix.visible:
 		return
 	if event is InputEventMouseMotion:
 		var lp: Vector2 = _cables.get_global_transform().affine_inverse() * event.global_position
