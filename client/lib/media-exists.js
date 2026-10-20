@@ -10,6 +10,8 @@
  *           placeholders) — callers must not mark these.
  */
 
+import { showAppToast } from './app-toast.js'
+
 let _ids = new Set()
 let _basenames = new Set()
 let _ready = false
@@ -88,7 +90,7 @@ export function warnMissingMediaOnTake(scene) {
 	const missing = missingMediaInScene(scene)
 	if (!missing.length) return
 	const names = missing.map((v) => String(v).replace(/\\/g, '/').split('/').filter(Boolean).pop()).join(', ')
-	window.showToast?.(`⚠ Missing in Caspar media: ${names}`, 'error')
+	showAppToast(`⚠ Missing in Caspar media: ${names}`, 'error')
 	console.warn('[media-exists] take with missing media:', missing)
 }
 
@@ -98,7 +100,7 @@ export function toastTakeAmcpFailures(res) {
 	if (!fails.length) return
 	const first = fails[0]
 	const cmd = String(first.command || '').split(' ').slice(0, 3).join(' ')
-	window.showToast?.(
+	showAppToast(
 		`⚠ ${fails.length} command(s) failed during take — first: ${cmd} → ${first.line || first.code}`,
 		'error',
 	)

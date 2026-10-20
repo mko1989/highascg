@@ -20,6 +20,7 @@ import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml, advancedHtml } from
 import { createShaderControlsPanel } from './shader-controls-panel.js'
 import { installShaderAudition } from './shader-live-audition.js'
 import { createShaderLiveStack } from './shader-live-stack.js'
+import { showAppToast } from '../lib/app-toast.js'
 
 export function initShaderLiveEditor(stateStore) {
 	let overlay = null
@@ -69,7 +70,7 @@ export function initShaderLiveEditor(stateStore) {
 		overlay.querySelector('#shl-take').addEventListener('click', () => {
 			const takeBtn = document.querySelector('#scenes-global-take')
 			if (takeBtn) takeBtn.click()
-			else window.showToast?.('Take unavailable — deck not mounted', 'error')
+			else showAppToast('Take unavailable — deck not mounted', 'error')
 		})
 		overlay.querySelector('#shl-reset-all').addEventListener('click', () => void resetAll())
 		_stack = createShaderLiveStack({ stateStore, getSelected: selected })
@@ -300,7 +301,7 @@ export function initShaderLiveEditor(stateStore) {
 		if (!p || !inst || !shaderCfg || t.disabled) return
 		const prvTargets = instances().filter((i) => i.shaderId === inst.shaderId && i.isPrv)
 		if (!prvTargets.length) {
-			window.showToast?.('Load this shader on preview first (click it in Templates while in Shader Live)', 'info')
+			showAppToast('Load this shader on preview first (click it in Templates while in Shader Live)', 'info')
 			return
 		}
 		t.disabled = true
@@ -432,10 +433,10 @@ export function initShaderLiveEditor(stateStore) {
 			if (!r?.ok) throw new Error(r?.error || 'save failed')
 			dirty = false
 			syncDirty()
-			window.showToast?.(`Saved as ${child.id} (child of ${rootId})`, 'success')
+			showAppToast(`Saved as ${child.id} (child of ${rootId})`, 'success')
 		} catch (e) {
 			console.warn('[shader-live] save failed:', e?.message || e)
-			window.showToast?.(`Save failed: ${e?.message || e}`, 'error')
+			showAppToast(`Save failed: ${e?.message || e}`, 'error')
 		}
 	}
 

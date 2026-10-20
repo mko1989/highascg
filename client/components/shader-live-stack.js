@@ -8,6 +8,7 @@
 import { api } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { sceneState } from '../lib/scene-state.js'
+import { showAppToast } from '../lib/app-toast.js'
 
 const LAYERS = Array.from({ length: 11 }, (_, i) => 10 + i)
 
@@ -39,7 +40,7 @@ export function createShaderLiveStack(deps) {
 		const inst = getSelected()
 		if (!inst) return
 		if (!inst.isPrv) {
-			window.showToast?.('Select the PRV instance of the shader first (or audition one from Templates)', 'info')
+			showAppToast('Select the PRV instance of the shader first (or audition one from Templates)', 'info')
 			return
 		}
 		const { mIdx } = pgmScene()
@@ -52,9 +53,9 @@ export function createShaderLiveStack(deps) {
 				transition: { type: t.type || 'MIX', duration: t.duration ?? 12 },
 			})
 			if (r?.error || r?.ok === false) throw new Error(r?.error || 'failed')
-			window.showToast?.(`${inst.shaderId} → PGM L${layerNumber}`, 'success')
+			showAppToast(`${inst.shaderId} → PGM L${layerNumber}`, 'success')
 		} catch (e) {
-			window.showToast?.(`Stack failed: ${e?.message || e}`, 'error')
+			showAppToast(`Stack failed: ${e?.message || e}`, 'error')
 		}
 	}
 
@@ -71,9 +72,9 @@ export function createShaderLiveStack(deps) {
 				transition: { type: t.type || 'MIX', duration: t.duration ?? 12 },
 			})
 			if (r?.error || r?.ok === false) throw new Error(r?.error || 'failed')
-			window.showToast?.(`PGM L${layerNumber} cleared`, 'success')
+			showAppToast(`PGM L${layerNumber} cleared`, 'success')
 		} catch (e) {
-			window.showToast?.(`Clear failed: ${e?.message || e}`, 'error')
+			showAppToast(`Clear failed: ${e?.message || e}`, 'error')
 		}
 	}
 

@@ -55,7 +55,7 @@ export async function loadDeferredCatalogOverWs(ws, stateStore, applyFullStateSi
 				unsubChunk()
 				unsubErr()
 			}
-			ws.send(JSON.stringify({ type: 'catalog_request', slice, offset, limit, id }))
+			ws.send({ type: 'catalog_request', slice, offset, limit, id })
 		})
 
 	try {
@@ -97,7 +97,7 @@ export async function loadDeferredCatalogOverWs(ws, stateStore, applyFullStateSi
 				unsubChunk()
 				unsubErr()
 			}
-			ws.send(JSON.stringify({ type: 'catalog_subscribe', slice: 'media', id: mid }))
+			ws.send({ type: 'catalog_subscribe', slice: 'media', id: mid })
 		})
 		stateStore.applyChange('media', buf)
 		stateStore.applyChange('catalogDeferred', false)

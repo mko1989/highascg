@@ -25,6 +25,7 @@ import {
 import { isOperatorGuiModeActive } from '../lib/operator-gui-mode.js'
 import { setOccluderOpen } from '../lib/operator-gui-interaction-suppress.js'
 import { createOperatorAppSection, appLabelFor, loadOperatorApps } from './header-bar-operator-app-menu.js'
+import { showAppToast } from '../lib/app-toast.js'
 
 /** The five CURATED tools, pinned above the installed-app list (WO-387). Each one launches through
  * a bespoke server path — see header-bar-operator-app-menu.js's header for why that matters —
@@ -120,19 +121,19 @@ export function initHeaderBarOperatorHelper(container) {
 		// window can run at once; otherwise the WO-283 single-helper open (mutually exclusive).
 		if (_taskbarOn) {
 			const r = await operatorHelperTaskbarAction(action, action)
-			if (r.error) window.showToast?.(r.error, 'error')
-			else window.showToast?.(`${label} opening — use the taskbar to send it behind the GUI.`, 'info')
+			if (r.error) showAppToast(r.error, 'error')
+			else showAppToast(`${label} opening — use the taskbar to send it behind the GUI.`, 'info')
 			void refresh()
 			return
 		}
 		render('opening', action)
 		const r = await openOperatorHelperWindow(action)
 		if (r.error) {
-			window.showToast?.(r.error, 'error')
+			showAppToast(r.error, 'error')
 			render('idle', null)
 			return
 		}
-		window.showToast?.(`${label} opening — the operator GUI returns when you close it.`, 'info')
+		showAppToast(`${label} opening — the operator GUI returns when you close it.`, 'info')
 		void refresh()
 	}
 
@@ -168,7 +169,7 @@ export function initHeaderBarOperatorHelper(container) {
 		backBtn.disabled = true
 		try {
 			const r = await closeOperatorHelperWindow()
-			if (r.error) window.showToast?.(r.error, 'error')
+			if (r.error) showAppToast(r.error, 'error')
 		} finally {
 			backBtn.disabled = false
 			void refresh()
@@ -232,7 +233,7 @@ export function initHeaderBarOperatorHelper(container) {
 				e.preventDefault()
 				chip.disabled = true
 				const r = await operatorHelperTaskbarAction(h.id, h.info?.action || h.id)
-				if (r.error) window.showToast?.(r.error, 'error')
+				if (r.error) showAppToast(r.error, 'error')
 				else if (Array.isArray(r.helpers)) renderTaskbar(r.helpers)
 				void refresh()
 			})

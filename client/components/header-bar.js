@@ -29,6 +29,7 @@ import { initComposePreviewStreamDriver } from './compose-preview-stream-driver.
 import { initLedTestCard } from './header-bar-led-test.js'
 import { initStreamingBadge } from './header-bar-streaming.js'
 import { initReplicationBadge } from './header-bar-replication.js'
+import { showAppToast } from '../lib/app-toast.js'
 
 /**
  * @param {HTMLElement} headerEl - Header element (contains title + status)
@@ -218,10 +219,10 @@ export function initHeaderBar(headerEl, statusEl, stateStore) {
 		if (!confirm('Start a fresh project? Unsaved changes will be lost. Screen destinations reset to one PGM.')) return
 		newProjectBtn.disabled = true
 		try {
-			await startNewProject({ showToast: (msg, type) => window.showToast?.(msg, type) })
+			await startNewProject({ showToast: (msg, type) => showAppToast(msg, type) })
 			nameInp.value = projectState.getProjectName()
 		} catch (e) {
-			window.showToast?.(e?.message || 'New project failed', 'error')
+			showAppToast(e?.message || 'New project failed', 'error')
 		} finally {
 			newProjectBtn.disabled = false
 		}

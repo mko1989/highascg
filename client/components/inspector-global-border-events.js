@@ -3,5 +3,5 @@ export function requestGlobalBorderPush() {
 }
 
 export function scheduleGlobalBorderConfigSave() {
-	window.dispatchEvent(new CustomEvent('highascg-global-border-config-save'))
+	document.dispatchEvent(new CustomEvent('highascg-global-border-config-save'))
 }

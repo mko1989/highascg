@@ -8,6 +8,7 @@
 
 import { api } from '../lib/api-client.js'
 import { sceneState } from '../lib/scene-state.js'
+import { showAppToast } from '../lib/app-toast.js'
 
 export function installShaderAudition({ stateStore, isOpen, select }) {
 /* todos27: templates-browser shader rows dispatch this on click. Only ACT while shaders
@@ -36,9 +37,9 @@ document.addEventListener('shader-audition-request', (e) => {
 			const sid = (id.toLowerCase().match(/sh-[a-z0-9-]+$/) || [])[0]
 			const prvCh = cm.previewChannels?.[mIdx]
 			if (sid && prvCh) select(`${sid}@${prvCh}-10`)
-			window.showToast?.(`${label} → preview`, 'info')
+			showAppToast(`${label} → preview`, 'info')
 		} catch (err) {
-			window.showToast?.(`Audition failed: ${err?.message || err}`, 'error')
+			showAppToast(`Audition failed: ${err?.message || err}`, 'error')
 		}
 	})()
 })

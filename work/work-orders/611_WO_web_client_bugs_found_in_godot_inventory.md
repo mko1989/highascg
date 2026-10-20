@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — three defects confirmed by code reading; not fixed, nothing run on the box. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). Independent of the port: fix in the web client (it stays for remote browsers, WO-608).**
+**Status: ✅ Defects #1–#5 fixed (#4/#5 18.10, #1–#3 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
 
 # WO-611 — Web client defects found during the Godot port inventory
 
@@ -60,10 +60,19 @@ reaches that hook → a clip dropped on the compose frame came in without its de
   17.10** after checking each was byte-identical on the backup branch and unreferenced by tracked code
   (the two name hits — `entry.js`, `device-view-gpu-source-inherit.js` — point at different, tracked files).
 
-## What was done
+## What was done (2026-10-20, #1–#3)
 
-Nothing yet.
+1. `inspector-global-border-events.js` dispatches `highascg-global-border-config-save` on `document`.
+2. `deferred-catalog-ws.js` passes the request objects to `WsClient.send` (one JSON encoding).
+3. The 21 `window.showToast?.(…)` calls in 6 files import and call `showAppToast` (`client/lib/app-toast.js`).
+
+Smoke `tools/smoke/smoke-wo611-web-client-defects.test.js` (curated): the catalog loader against a fake
+WsClient (fails on the old code: the request arrives as a string), the dispatch/listen pair, no
+`window.showToast` left. `dist-web` rebuilt.
 
 ## What was VERIFIED
 
-Code reading only (both ends of each defect). No runtime confirmation.
+- #2 against the live server (`ws://127.0.0.1:4200/api/ws`): a double-encoded `catalog_request` gets no reply;
+  the single-encoded one gets its `catalog_chunk` (5 templates).
+- Smoke 3/3; #1 and #3 by the source assertions only (no browser session on the box for a click test).
+- Owner-visible effect of #1 (border-only edit, reload within 3 s) not run.
