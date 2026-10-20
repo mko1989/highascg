@@ -24,6 +24,8 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-608** — Settings → Nuclear: WM restart, reboot, shut down, Install to disk, Caspar stop / restart were not
       pressed (only Start on a running Caspar + the password prompt). Try each once when a break is OK; Updates →
       Install also not pressed (dev box runs from git).
+- [ ] **WO-608** — Settings → Tailscale: only viewed (and Cancel on "turn off"). Log out / log in / operator-monitor
+      login / Save preferences / Admin console not pressed — try when losing remote access briefly is OK.
 - [ ] **WO-628** — dock: bottom-centre, hides itself; reveal after 0.4 s of hover, hide 1 s after leaving. Too
       eager or too slow?
 - [ ] **WO-629** — header "Test card" master on/off and the Test card… dialog on a real LED wall (pattern,

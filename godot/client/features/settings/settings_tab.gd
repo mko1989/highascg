@@ -12,6 +12,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
 const UpdatesPane := preload("res://features/settings/updates_pane.gd")
 const NuclearPane := preload("res://features/settings/nuclear_pane.gd")
+const TailscalePane := preload("res://features/settings/tailscale_pane.gd")
 
 signal logs_requested
 
@@ -53,6 +54,7 @@ func _ready() -> void:
 	logs.pressed.connect(logs_requested.emit)
 	_bundle_status = Label.new()
 	Panes.diagnostics(_pane("Diagnostics"), _bundle, logs, _bundle_status)
+	_pane("Tailscale").add_child(TailscalePane.new())
 	var nuclear := _pane("Nuclear")
 	Panes.nuclear(nuclear)
 	nuclear.add_child(NuclearPane.new())

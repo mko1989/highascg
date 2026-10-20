@@ -416,3 +416,22 @@ Install enabled (Calamares installed). Ticking the checkbox → `ui.json` `nucle
 right → journal `sudo … caspar-systemd-control.sh start`, pane "Done.". Reboot → confirm with Cancel focused →
 Cancel (uptime unchanged). `ui.json` restored byte-identical (`cmp`). NOT pressed: WM restart, reboot, shut down,
 install, Caspar stop/restart (owner checklist).
+
+## 2026-10-20 — Settings → Tailscale
+
+**Investigation.** Web `settings-modal-tailscale.js` (WO-91) + template `settings-modal-templates.js:265-300`:
+status from `GET /api/network/tailscale/status` (summary, IPv4, machine, daemon, login URL), service on/off
+(`/enable`), Log in (`/login`, then poll every 3 s up to 2 min), Open on operator monitor (`/login-operator-ui`),
+Copy login URL, Log out (`/logout`, confirm), Admin console link, Advanced prefs (`/prefs`: auto-login on boot,
+operator login assist, accept routes, hostname). All POSTs carry the nuclear password.
+
+**What was done.** `features/settings/tailscale_model.gd` (summary / rows / auth URL — pure, tested) and
+`tailscale_pane.gd` (POSTs via `NuclearGate.post`; Admin console → `OS.shell_open`; Copy → clipboard). Differs
+from the web on purpose: turning the service **off** asks first (remote access to the box may run over the
+tailnet) and Cancel puts the checkbox back; confirms focus Cancel. Tab sits between Diagnostics and Nuclear.
+
+**What was VERIFIED (box, 20.10).** Godot tests 16240/0 (+`test_tailscale_model.gd`). Live pane: "Connected
+(Running)", 100.101.245.97, highascg7580.tailc30860.ts.net, active (tailscaled.service), "— (already connected)",
+Copy disabled; Advanced boxes match `config`. Unticking Enable → confirm → Cancel → box ticked again, status still
+`connected: true, enabled: true`. NOT pressed: Log in / operator monitor / Log out / Save preferences / Admin
+console / actually turning the service off (owner checklist — would cut remote access).
