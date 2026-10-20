@@ -34,6 +34,7 @@ var _style: LayerStyleRow
 signal status(text: String)
 var _content_key := ""
 var _content := Vector2i.ZERO
+var content_known := Vector2.ZERO  # the server-reported media size only (no channel fallback): the aspect lock's ratio
 
 
 func _ready() -> void:
@@ -131,6 +132,8 @@ func _refresh_content() -> void:
 	if key == _content_key:
 		return
 	_content_key = key
+	content_known = Vector2.ZERO
+	var known := false
 	var c := Vector2i(1920, 1080)
 	var rl: Variant = (Store.get_value("channelMap", {}) as Dictionary).get("programResolutions", []) if Store.get_value("channelMap") is Dictionary else []
 	if rl is Array and main < (rl as Array).size() and rl[main] is Dictionary:
@@ -140,8 +143,10 @@ func _refresh_content() -> void:
 		var cr: Dictionary = res.data.contentResolution
 		if float(cr.get("w", 0)) > 0 and float(cr.get("h", 0)) > 0:
 			c = Vector2i(int(cr.w), int(cr.h))
+			known = true
 	if key != _content_key:
 		return
+	content_known = Vector2(c) if known else Vector2.ZERO
 	_content = c
 	_fx.show_effects(_layer.get("effects", []) if _layer.get("effects") is Array else [], _content)
 

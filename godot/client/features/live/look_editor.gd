@@ -10,6 +10,7 @@ const Pusher := preload("res://features/live/preview_pusher.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const E := preload("res://features/live/look_edits.gd")
 const LayerInspector := preload("res://features/live/layer_inspector.gd")
+const Geometry := preload("res://features/live/layer_geometry_section.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const HANDLE := 8.0
 
@@ -27,6 +28,7 @@ var _drag := {}
 var _role := ""
 var _status: Label
 var _inspector: LayerInspector
+var _geo: Geometry
 var _page: VBoxContainer  # WO-608 R2: geometry + layer inspector, shown in the global Inspector while a layer is selected
 var _crop_mode := false
 var _crop_btn: Button
@@ -90,24 +92,25 @@ func _ready() -> void:
 	_list.custom_minimum_size.y = 90
 	_list.item_selected.connect(func(i: int) -> void: _select(i))
 	add_child(_list)
+	_geo = Geometry.new()  # WO-621 N2: canvas px + aspect lock (was raw 0–1 fill fields)
+	_geo.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
 	var g := GridContainer.new()
 	g.columns = 4
-	for spec in [["X", "x"], ["Y", "y"], ["W", "scaleX"], ["H", "scaleY"], ["Opacity", "opacity"]]:
-		var l := Label.new()
-		l.text = spec[0]
-		g.add_child(l)
-		var sb := SpinBox.new()
-		sb.step = 0.001
-		sb.min_value = -5 if spec[1] in ["x", "y"] else 0
-		sb.max_value = 5 if spec[1] != "opacity" else 1
-		var key: String = spec[1]
-		sb.value_changed.connect(func(v: float) -> void: _set_field(key, v))
-		g.add_child(sb)
-		_fields[key] = sb
+	var ol := Label.new()
+	ol.text = "Opacity"
+	g.add_child(ol)
+	var sb := SpinBox.new()
+	sb.step = 0.001
+	sb.max_value = 1
+	sb.value_changed.connect(func(v: float) -> void: _set_field("opacity", v))
+	g.add_child(sb)
+	_fields["opacity"] = sb
 	_page = VBoxContainer.new()
 	_page.visible = false
+	_page.add_child(_geo)
 	_page.add_child(g)
 	_inspector = LayerInspector.new()
+	_geo.content = func() -> Vector2: return _inspector.content_known
 	_inspector.visible = false
 	_inspector.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
 	_inspector.status.connect(func(t: String) -> void: _status.text = t)
@@ -227,7 +230,8 @@ func _frame_input(event: InputEvent) -> void:
 			var ys := _snap_candidates(false)
 			var tx := 10.0 / b.size.x
 			var ty := 10.0 / b.size.y
-			f = C.edge_resize(_drag.edge, start, d.x, d.y, not mm.shift_pressed, 0.02,
+			var locked: bool = _layers()[_sel].get("aspectLocked") != false and not mm.shift_pressed  # web: layer lock && !Shift
+			f = C.edge_resize(_drag.edge, start, d.x, d.y, locked, 0.02,
 				func(v: float) -> float: return C.snap_value(v, xs, tx), func(v: float) -> float: return C.snap_value(v, ys, ty))
 		_apply_layer({"fill": f})
 
@@ -278,14 +282,8 @@ func _set_field(key: String, v: float) -> void:
 	if _sel < 0 or _drag.size() > 0:
 		return
 	var l: Dictionary = _layers()[_sel]
-	if key == "opacity":
-		if absf(float(l.get("opacity", 1.0)) - v) > 1e-9:
-			_apply_layer({"opacity": v})
-		return
-	var f: Dictionary = (l.get("fill", {"x": 0, "y": 0, "scaleX": 1, "scaleY": 1}) as Dictionary).duplicate()
-	if absf(float(f.get(key, 0)) - v) > 1e-9:
-		f[key] = v
-		_apply_layer({"fill": f})
+	if key == "opacity" and absf(float(l.get("opacity", 1.0)) - v) > 1e-9:
+		_apply_layer({"opacity": v})
 
 
 ## Patch the selected layer in the show document and schedule the PRV push.
@@ -326,12 +324,10 @@ func _sync_fields() -> void:
 		_inspector.show_layer(scene_id, main, layers[_sel] if has else {}, _sel)
 	for k in _fields:
 		(_fields[k] as SpinBox).editable = has
+	_geo.show_layer(layers[_sel] if has else {}, _canvas(), Settings.get_setting("editorDefaults.coordinateOrigin", "") == "center")
 	if not has:
 		return
 	var l: Dictionary = layers[_sel]
-	var f: Dictionary = l.get("fill", {}) if l.get("fill") is Dictionary else {}
-	for k in ["x", "y", "scaleX", "scaleY"]:
-		(_fields[k] as SpinBox).set_value_no_signal(float(f.get(k, 1.0 if k.begins_with("scale") else 0.0)))
 	(_fields.opacity as SpinBox).set_value_no_signal(float(l.get("opacity", 1.0)))
 
 

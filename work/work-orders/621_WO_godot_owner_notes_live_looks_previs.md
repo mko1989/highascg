@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom) DONE, box-verified. Next: N2 look editor px + aspect lock, N6 Live standard ↔ 3D switch, N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
+**Status: IN PROGRESS (2026-10-20) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock) DONE, box-verified. Next: N6 Live standard ↔ 3D switch, N1 preview destination chrome + tile move/resize. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
 
 # WO-621 — Godot client: owner notes 20.10 (`next.md`) — Live preview chrome, look editor, look cards, Previs
 
@@ -78,3 +78,47 @@ Owner notes added to `next.md` (20.10), quoted per item:
 - Not exercised on the box: the screen-timer / countdown transport icons. No timer exists, and adding one writes
   the project. They use the same `Icons.button` as the deck.
 
+
+## N2 — look editor: pixel position / size + aspect lock (DONE)
+
+### Investigation
+- `look_editor.gd` edited `layer.fill.{x,y,scaleX,scaleY}` directly in a 0–1 grid. It had no aspect lock setting, and its
+  frame edge-drags always locked the ratio unless Shift was held.
+- The web Inspector (`client/components/inspector-fill.js:95` `appendSceneLayerFillGroup`, with
+  `inspector-scene-layer.js:136-170` `patchFillPx`) shows the layer's VISIBLE rect in canvas px. The visible rect
+  is the fill rect minus the crop effect (`client/lib/layer-crop.js:163` `visibleRectForLayer`). It is shown as
+  centre offsets when `editorDefaults.coordinateOrigin == "center"` (`client/lib/coordinate-origin.js:27`).
+  - An edit maps back through `applyFillPxPatch` (`coordinate-origin.js:62`) and `layerRectFromVisibleRect`
+    (`layer-crop.js:145`).
+  - `aspectLocked` (default on, `!== false`) makes W↔H follow a ratio. The ratio is the content's media ratio if
+    known; otherwise it is the ratio at the first edit, kept for 500 ms (`inspector-scene-layer.js:147-162`);
+    otherwise it is the visible rect's ratio.
+  - The align buttons use `alignFillForCrop` (`layer-crop.js:186`).
+
+### What was done
+- New `features/live/layer_rect_math.gd` ports that maths: fill↔px, visible rect ↔ layer rect with crop, the
+  display/centre transform, the lock ratio, `patch_fill`, and `align_fill`. It reuses `compose_math.gd`
+  (crop normalisation) and `px_rect_math.gd`.
+- New `features/live/layer_geometry_section.gd` contains:
+  - the "Position / size (canvas px)" title and the centre-origin subtitle;
+  - the align row;
+  - X / Y / Width / Height SpinBoxes (step 1, w/h ≥ 1);
+  - an "Aspect lock" CheckBox that writes `aspectLocked`.
+  It emits `{fill}` patches.
+- `look_editor.gd`: the 0–1 grid is replaced by that section plus Opacity. The frame's edge-resize lock now follows
+  the layer's `aspectLocked` (Shift still frees it, as on the web); before, every edge-drag locked unless Shift was held.
+- `layer_inspector.gd`: exposes `content_known` (the server layer-fit's `contentResolution`) as the lock's ratio.
+- Golden test `tests/test_live_layer_rect.gd` + `tests/golden/live_layer_rect.json`: 28 layers (crop / no crop,
+  centre / corner origin, locked / unlocked, known / unknown content) × 784 patches. They come from the real web
+  modules run under Node (generator `lrect_gen.mjs`, scratchpad), compared to 1e-9 relative. As a mutation check,
+  swapping the crop sides made 112 cases fail.
+
+### What was VERIFIED
+- Suite 14804 / 14804 passing, `--check` boots clean, 0 files over 500 lines.
+- Box (Live tab → cog on "Background" → layer selected; config md5 unchanged):
+  - the Inspector shows "Position / size (canvas px)": X 483, Y 422, Width 1386, Height 485, plus the align row;
+  - "Aspect lock" is ticked by default;
+  - Width 1000 → Height 350 (485 × 1000 / 1386);
+  - Width 1386 → back to 485, so the test edit is reverted.
+- Owner QA: the align buttons and centre-origin mode on the box (both covered by the golden test only), and frame
+  drags with the lock on.
