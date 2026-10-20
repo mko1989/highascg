@@ -31,7 +31,7 @@ web features found while porting.
 | 17 | Name the AMCP commands that failed during a take | same status line, "⚠ N command(s) failed during take — first: …" | ported (9a) | [ ] |
 | 18 | Ctrl/⌘+click downloads a file to this computer | — | gap | [ ] |
 | 19 | Ctrl/⌘+Alt+click removes a file from the server (no confirm) | — (Delete key / button with confirm covers removal) | gap — ask: keep the no-confirm shortcut? | [ ] |
-| 20 | Project media bar: project folder path, "project only" filter, Gather referenced clips into it | — | gap | [ ] |
+| 20 | Project media bar: project folder path, "project only" filter, Gather referenced clips into it | project_media_bar.gd above the Media filter; server plans + moves (GET /api/media/project, POST /api/media/gather) | ported (slice 10) | [ ] |
 | 21 | Import USB… (drive picker, copy into media) | only the Settings toggle | gap (WO-608 owns the USB modal) | [ ] |
 | 22 | Drag media onto a look / layer | look editor drop, multi-file drop onto a layer playlist | ported (WO-600, slice 6) | [ ] |
 | 23 | Drag media onto the multiview editor | — | other WO (WO-600 multiview editor) | [ ] |

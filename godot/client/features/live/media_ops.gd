@@ -50,6 +50,35 @@ static func covers(sel: Array, id: String) -> bool:
 	return false
 
 
+## WO-603 "project only" (web filterMediaForActiveProject): rows inside the project media folder. Case-insensitive —
+## Caspar's CLS rows are upper-case ("PROJECTS/DEMO/CLIP") next to the on-disk spelling.
+static func in_folder(rows: Array, folder: String) -> Array:
+	var f := clean_folder(folder).to_lower()
+	if f == "":
+		return rows
+	var out := []
+	for r in rows:
+		var id := clean_folder(str(r.get("id", ""))).to_lower() if r is Dictionary else ""
+		if id.begins_with(f + "/") or (id == f and r.get("isDir", false) == true):
+			out.append(r)
+	return out
+
+
+## POST /api/media/gather reply → the status line.
+static func gather_text(res: Dictionary) -> String:
+	if not res.get("ok", false) and not (res.get("data") is Dictionary and res.data.has("moved")):
+		var err: Variant = res.data.get("error") if res.get("data") is Dictionary else null
+		return "✗ Gather failed: %s" % (err if err != null else res.get("error", "HTTP %s" % res.get("status", "?")))
+	var d: Dictionary = res.data
+	var moved: int = (d.get("moved", []) as Array).size()
+	var failed: Array = d.get("failed", [])
+	if failed.size() > 0:
+		return "✗ Gathered %s into %s/, %d failed — first: %s" % [plural(moved), d.get("folder", ""), failed.size(), failed[0].get("error", "")]
+	if moved == 0:
+		return "✓ Every referenced clip is already in the project folder"
+	return "✓ Gathered %s into %s/ — %d reference(s) follow" % [plural(moved), d.get("folder", ""), int(d.get("refs", 0))]
+
+
 static func plural(n: int) -> String:
 	return "%d file%s" % [n, "" if n == 1 else "s"]
 

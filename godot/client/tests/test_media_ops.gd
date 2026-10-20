@@ -75,3 +75,27 @@ func test_covers_files_and_folders() -> void:
 	t.eq(O.covers(["a"], "ab/c.png"), false, "a sibling with the same prefix is not inside")
 	t.eq(O.covers([""], "x"), false)
 	t.eq(O.covers([], "x"), false)
+
+
+func test_in_folder_project_only_rule() -> void:
+	var rows := [
+		{"id": "projects", "isDir": true},
+		{"id": "projects/demo", "isDir": true},
+		{"id": "projects/demo/sub", "isDir": true},
+		{"id": "projects/demo/a.mov"},
+		{"id": "PROJECTS/DEMO/A"},
+		{"id": "projects/demo2/b.mov"},
+		{"id": "other/c.mov"},
+	]
+	var ids := []
+	for r in O.in_folder(rows, "projects/demo/"):
+		ids.append(r.id)
+	t.eq(ids, ["projects/demo", "projects/demo/sub", "projects/demo/a.mov", "PROJECTS/DEMO/A"], "CLS rows count; a sibling prefix does not")
+	t.eq(O.in_folder(rows, "").size(), rows.size(), "no folder → no filter")
+
+
+func test_gather_text() -> void:
+	t.eq(O.gather_text({"ok": true, "data": {"ok": true, "folder": "projects/demo", "moved": [{}, {}], "failed": [], "refs": 3}}), "✓ Gathered 2 files into projects/demo/ — 3 reference(s) follow")
+	t.eq(O.gather_text({"ok": true, "data": {"ok": true, "folder": "p", "moved": [], "failed": []}}), "✓ Every referenced clip is already in the project folder")
+	t.eq(O.gather_text({"ok": true, "data": {"ok": false, "folder": "p", "moved": [{}], "failed": [{"id": "x", "error": "Destination file already exists"}]}}), "✗ Gathered 1 file into p/, 1 failed — first: Destination file already exists")
+	t.eq(O.gather_text({"ok": false, "status": 409, "data": {"ok": false, "error": "No project is open."}}), "✗ Gather failed: No project is open.")

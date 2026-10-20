@@ -103,4 +103,16 @@ function handleDefaultsGet() {
 	return reply(200, { defaults: out })
 }
 
-module.exports = { handleRename, handleRenamePlan, handleEntryGet, handleDefaultsPost, handleDefaultsGet }
+/** GET /api/media/project — WO-603 project media bar: `{ enabled, slug, folder, pending[] }`. */
+function handleProjectGet(ctx) {
+	return reply(200, require('../media/project-media-gather').projectMediaInfo(ctx))
+}
+
+/** POST /api/media/gather — move the project's referenced clips into its folder; references follow. */
+async function handleGather(ctx) {
+	const r = await require('../media/project-media-gather').gatherProjectMedia(ctx)
+	if (r.body.moved?.length) require('./routes-media').triggerMediaRescanSettled(ctx)
+	return reply(r.status, r.body)
+}
+
+module.exports = { handleRename, handleRenamePlan, handleEntryGet, handleDefaultsPost, handleDefaultsGet, handleProjectGet, handleGather }

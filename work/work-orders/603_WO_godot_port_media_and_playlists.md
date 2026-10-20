@@ -624,3 +624,77 @@ The Owner ✓ column is the QA hand-off.
 
 - Ctrl+click download, the project media bar, and Placeholders (next WO-603 slices unless the owner moves them).
 - The owner's ticks on the checklist.
+
+## Slice 10 (20.10) — project media bar: folder, "project only", Gather
+
+**Status of this slice: DONE (20.10, smoke + Godot tests + box GUI; the move itself was proven offline only, see
+VERIFIED)**
+
+### Investigation
+
+- Web: `client/components/sources-panel-project-gather.js` and `client/lib/project-media-gather.js` (343 lines).
+  - The browser exported the whole project, matched each media ref against the media list, planned moves into
+    `projects/<slug>/`, moved the files with `/api/media/move`, and then rewrote and re-imported the project itself.
+  - "project only" is `filterMediaForActiveProject` (`client/lib/project-media-context.js:230`): folders at or under
+    the project folder, plus files inside it.
+- The server already owns both halves.
+  - **Moves where every reference follows:** `followMediaMoves` (`src/media/media-links.js:155`, WO-592) rewrites
+    every project; the active one goes through persistProject + project_sync.
+  - **Ref resolution in all three value shapes:** `resolveRefValue` and `refMatchesPath` in
+    `src/media/media-reference-rewrite.js`.
+  - So, per owner directive D, the planning moves to node and the client keeps no project-rewrite code.
+- Live probe on the box: the open project `untitled` references 4 to 5 clips in `projects/airport`, `dtlodz` and
+  `npcc`, and its own folder is empty.
+- Side finding, fixed in WO-626: the offline suite had left empty `newshow`, `raceshow` and similar folders in the
+  live `media/projects`.
+
+### What was done
+
+- `src/media/media-reference-rewrite.js`: `projectReferencedFiles(project, slug, catalogIds, config)`. It returns the
+  catalog files a project references, deduped, using the same resolver as rename/move. CLS-form values with no
+  extension resolve too.
+- New `src/media/project-media-gather.js`:
+  - `planGather`: the referenced files outside the folder (pure);
+  - `projectMediaInfo`: `{ enabled, slug, folder, pending[] }`;
+  - `gatherProjectMedia`: `moveMediaFile` for each pending clip, then one `followMediaMoves`. It replies
+    `{ moved[], failed[], refs, folder }` and returns 409 when project folders are off or no project is open.
+- Routes (`src/api/routes-media-library.js`, `router.js`):
+  - `GET /api/media/project`;
+  - `POST /api/media/gather`, which runs a settled rescan after moving (`triggerMediaRescanSettled`, exported from
+    `routes-media.js`).
+- Godot:
+  - new `features/live/project_media_bar.gd` above the Media filter. It shows the folder name (full path on hover),
+    a "project only" CheckBox, and a "Gather (N)" button that is visible only when clips are pending. The button
+    opens a confirm dialog listing the files (first 8). The bar re-plans 0.4 s after project edits settle (the web's
+    debounce) and after every media reload.
+  - `media_ops.gd`: `in_folder` (the web filter, case-insensitive so CLS rows count) and `gather_text` (the result
+    line).
+  - `media_panel.gd` filters the tree through `in_folder` while "project only" is on, expands folders in that mode,
+    and reloads after a gather.
+
+Gather moves clips OUT of other projects' folders, as the web did. Those projects' references follow, so nothing
+breaks. The confirm dialog lists the source paths, so this is visible before it happens.
+
+### What was VERIFIED
+
+- `tools/smoke/smoke-wo603-media-gather.test.js` (curated): 4/4 pass, on temp media and projects dirs.
+  - It covers the pure plan: dedupe, CLS form, inside/missing/route refs skipped.
+  - GET returns the folder and the pending list.
+  - Gather moves two files. The look ref, the CLS-form ref (shape kept) and the timeline ref all follow, unreferenced
+    clips stay, and nothing is pending afterwards.
+  - It returns 409 when folders are off or no project is open.
+- Godot: `test_in_folder_project_only_rule` and `test_gather_text`. All 16093 tests pass.
+- Full offline suite on a clean export: 2870 pass, with 1 known archive-only failure (wo498).
+- Box, after a node restart, `GET /api/media/project` returned
+  `{"enabled":true,"slug":"untitled","folder":"projects/untitled","pending":[4 clips]}`.
+- Godot GUI (screenshots):
+  - The bar shows `untitled/`, "project only" and "Gather (5)".
+  - Ticking "project only" leaves only `projects ▸ untitled` (expanded).
+  - Gather opens "Move 5 files into projects/untitled/?" with the 5 paths. I pressed **Cancel**, and the owner's
+    clips were not moved.
+- Owner QA: press Gather on a real project (or on a throwaway one) and confirm the looks still play.
+
+### Still open (after slice 10)
+
+- Ctrl+click download and Placeholders.
+- The owner's ticks on the checklist.

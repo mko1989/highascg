@@ -76,6 +76,7 @@ const FILES = [
 	'tools/smoke/smoke-wo603-playlist-edit.test.js',
 	'tools/smoke/smoke-wo603-take-missing-media.test.js',
 	'tools/smoke/smoke-wo603-media-delete-settle.test.js',
+	'tools/smoke/smoke-wo603-media-gather.test.js',
 	'tools/smoke/smoke-wo625-numbered-media-names.test.js',
 	'tools/smoke/smoke-wo624-operator-gui-source-cells.test.js',
 	'tools/smoke/smoke-wo624-tracking-pick.test.js',

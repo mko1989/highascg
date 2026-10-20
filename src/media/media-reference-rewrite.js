@@ -139,7 +139,25 @@ function findProjectMediaUsage(project, slug, filePath, config) {
 	return [...rows.values()]
 }
 
+/**
+ * WO-603 Gather: the catalog files a project references (one entry per file, media-root relative).
+ * @param {string[]} catalogIds - media-root file ids (with extension)
+ * @returns {string[]}
+ */
+function projectReferencedFiles(project, slug, catalogIds, config) {
+	const files = (catalogIds || []).map(nfc).filter(Boolean)
+	const out = new Set()
+	forEachProjectMediaRef(project, (ref) => {
+		const resolved = resolveRefValue(ref, slug, config)
+		if (!resolved) return
+		const hit = files.find((f) => refMatchesPath(resolved, f))
+		if (hit) out.add(hit)
+	})
+	return [...out]
+}
+
 module.exports = {
 	rewriteProjectMediaRefs,
 	findProjectMediaUsage,
+	projectReferencedFiles,
 }

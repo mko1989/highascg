@@ -16,6 +16,7 @@ extends VBoxContainer
 ## WO-603 slice 2: multi-select + the web selection bar (media_selection_bar.gd: Copy to… / Move to… / Delete / New
 ## folder…); the tree is media_ops.tree_entries — empty on-disk folders show (a new folder is visible before anything
 ## is in it) and CLS upper-case folders merge into the on-disk one, as on the web.
+## WO-603: project media bar (project_media_bar.gd) — project folder, "project only" filter, Gather.
 
 signal tab_requested(name: String)
 signal caspar_changed
@@ -32,6 +33,7 @@ const Upload := preload("res://core/stream_upload.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
+const ProjectBar := preload("res://features/live/project_media_bar.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 
 var _filter: LineEdit
@@ -49,6 +51,7 @@ var _ingest_row: HBoxContainer
 var _ingest_label: Label
 var _bar: SelectionBar
 var _select_queued := false
+var project_bar: ProjectBar
 
 
 func _ready() -> void:
@@ -96,6 +99,13 @@ func _ready() -> void:
 	live.tab_requested.connect(tab_requested.emit)
 	live.caspar_changed.connect(caspar_changed.emit)
 	live.connector_dropped.connect(connector_dropped.emit)
+	project_bar = ProjectBar.new()
+	project_bar.filter_toggled.connect(_build)
+	project_bar.gathered.connect(func(text: String) -> void:
+		_line(text)
+		if not text.ends_with("…"):
+			load_media())
+	media.add_child(project_bar)
 	_filter = LineEdit.new()
 	_filter.placeholder_text = "Filter…"
 	_filter.text_changed.connect(func(_t: String) -> void: _build())
@@ -246,6 +256,7 @@ func load_media() -> void:
 	var res: Dictionary = await Api.get_json("/api/media")
 	_rows = res.data if res.ok and res.data is Array else []
 	_bar.rows = _rows
+	project_bar.refresh()
 	if _fx.is_empty():
 		var fr: Dictionary = await Api.get_json("/api/scene/effect-registry")
 		_fx = fr.data if fr.ok and fr.data is Dictionary else {}
@@ -258,11 +269,11 @@ func _build() -> void:
 	var dirs := {"": root}
 	var f := _filter.text.strip_edges().to_lower()
 	_bar.set_selection([], "")
-	for e in Ops.tree_entries(_rows, f):
+	for e in Ops.tree_entries(Ops.in_folder(_rows, project_bar.folder) if project_bar.project_only() else _rows, f):
 		var it := _tree.create_item(dirs[e.parent])
 		it.set_text(0, e.label)
 		if e.kind == "dir":
-			it.collapsed = f == ""
+			it.collapsed = f == "" and not project_bar.project_only()
 			it.set_metadata(0, {"folder": e.folder})
 			dirs[e.key] = it
 			continue

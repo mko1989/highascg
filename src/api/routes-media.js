@@ -489,4 +489,5 @@ module.exports = {
 	handleMediaMkdir,
 	handleMediaMove,
 	handleMediaCopy,
+	triggerMediaRescanSettled,
 }
