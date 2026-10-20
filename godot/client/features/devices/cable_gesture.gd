@@ -275,6 +275,22 @@ func _set_output_layer(edge_id: String, layer: int) -> void:
 		status.emit("Output mapping update failed: " + R.s(r.error), false)
 
 
+## Matrix view crosspoint: the whole new graph through settings (the web's saveSettingsPatch({deviceGraph})), then
+## restart-dirty + reload. The web only logs a failure to the console; here it shows in the status line.
+func route(g: Dictionary) -> void:
+	if busy:
+		return
+	_push_undo()
+	_set_busy(true)
+	var r := await _post_settings({"deviceGraph": g})
+	_set_busy(false)
+	if not r.ok:
+		status.emit("Matrix route failed: " + R.s(r.error), false)
+		return
+	set_dirty(true)
+	reload_requested.emit()
+
+
 func remove_edge(id: String) -> void:
 	if busy or id == "":
 		return

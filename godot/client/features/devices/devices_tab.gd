@@ -17,6 +17,7 @@ extends MarginContainer
 ## Slice 7c: the "Mapping nodes" column (mapping_panel.gd) between the destinations and the rear panel; a card (or a
 ## mapping connector focused from a destination) opens the node page (mapping_controls.gd).
 ## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd); Load opens from WO-608.
+## Slice 10: the header (devices_toolbar.gd) toggles the Matrix view (matrix_view.gd) in place of the panels.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -35,23 +36,23 @@ const ServerControls := preload("res://features/devices/server_controls.gd")
 const MappingPanel := preload("res://features/devices/mapping_panel.gd")
 const MappingControls := preload("res://features/devices/mapping_controls.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
+const Toolbar := preload("res://features/devices/devices_toolbar.gd")
+const MatrixView := preload("res://features/devices/matrix_view.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
 var _rear: RearPanel
 var _list: VBoxContainer
 var _cables: Control
-var _status: Label
-var _loops_value: Label
 var _loading := false
 var _reload_again := false
 var _sticky := false  # the status holds a result/error worth keeping over the next "Updated …"
 var _gesture: Node
 var _anchors := {}  # anchor key → port_icon.gd
 var _rows := {}  # cable id → [row button, remove button]
-var _bar: Control
-var _cancel_btn: Button
-var _apply_btn: Button
+var _bar: Toolbar
+var _body: Control
+var _matrix: MatrixView
 var _confirm: ConfirmationDialog
 var _gpu: GpuControls
 var _deck: DeckLinkControls
@@ -83,12 +84,26 @@ func _ready() -> void:
 	add_child(snapshots)
 	snapshots.status.connect(_set_status)
 	snapshots.applied.connect(refresh)
-	_bar = _toolbar()
+	_bar = Toolbar.new()
 	v.add_child(_bar)
+	_bar.cancel_pressed.connect(func() -> void: _gesture.cancel())
+	_bar.reset_pressed.connect(func() -> void: _confirm.popup_centered())
+	_bar.apply_pressed.connect(_gesture.apply_caspar)
+	_bar.save_pressed.connect(func() -> void: snapshots.open_save(_rear, _cables))
+	_bar.reload_pressed.connect(func() -> void:
+		_sticky = false
+		refresh())
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 40)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(body)
+	_body = body
+	_matrix = MatrixView.new()
+	_matrix.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	v.add_child(_matrix)
+	_matrix.route.connect(_gesture.route)
+	_matrix.header.connect(_open_header)
+	_matrix.add.connect(_matrix_add)
 	var left := ScrollContainer.new()
 	left.custom_minimum_size.x = 280
 	left.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -170,54 +185,42 @@ func _ready() -> void:
 	right.add_child(_list)
 	_cables = CableLayer.new()
 	add_child(_cables)
+	_bar.loops_changed.connect(func(n: int) -> void: _cables.loops = n)
+	_bar.view_changed.connect(func(_m: String) -> void:
+		_show_mode()
+		refresh())
+	_show_mode()
 	visibility_changed.connect(func() -> void: if is_visible_in_tree(): refresh())
 	Ws.on("gpu_topology_changed", func(_d: Variant) -> void: if is_visible_in_tree(): refresh())  # DRM hotplug
 	if is_visible_in_tree():
 		refresh()
 
 
-func _toolbar() -> Control:
-	var h := HBoxContainer.new()
-	h.add_theme_constant_override("separation", 10)
-	h.add_child(_label("Devices", ThemeBuilder.TEXT, 17))
-	var gap := Control.new()
-	gap.custom_minimum_size.x = 24
-	h.add_child(gap)
-	h.add_child(_label("Cable loops", ThemeBuilder.TEXT_MUTED, 13))
-	var s := HSlider.new()
-	s.min_value = 0
-	s.max_value = 2
-	s.step = 1
-	s.custom_minimum_size = Vector2(70, 0)
-	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	s.focus_mode = Control.FOCUS_NONE
-	h.add_child(s)
-	_loops_value = _label("0", ThemeBuilder.TEXT, 13)
-	h.add_child(_loops_value)
-	s.value_changed.connect(func(x: float) -> void:
-		_cables.loops = int(x)
-		_loops_value.text = str(int(x)))
-	var fill := Control.new()
-	fill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	h.add_child(fill)
-	_status = _label("", ThemeBuilder.TEXT_MUTED, 12)
-	h.add_child(_status)
-	_cancel_btn = _button("Cancel cable", func() -> void: _gesture.cancel())
-	_cancel_btn.visible = false
-	h.add_child(_cancel_btn)
-	h.add_child(_button("Reset all cabling", func() -> void: _confirm.popup_centered()))
-	_apply_btn = _button("Apply Caspar config (restart)", _gesture.apply_caspar)
-	h.add_child(_apply_btn)
-	h.add_child(SnapshotDialogs.save_button(func() -> void: snapshots.open_save(_rear, _cables)))
-	var r := Button.new()
-	r.text = "↻"
-	r.tooltip_text = "Reload devices"
-	r.focus_mode = Control.FOCUS_NONE
-	r.pressed.connect(func() -> void:
-		_sticky = false
-		refresh())
-	h.add_child(r)
-	return h
+func _show_mode() -> void:
+	var matrix := _bar.mode() == "matrix"
+	_body.visible = not matrix
+	_cables.visible = not matrix
+	_matrix.visible = matrix
+
+
+## Matrix header: a destination opens its card, a connector its page (web selectDestinationById / selectKey).
+func _open_header(id: String) -> void:
+	var h := MatrixView.M.header_target(id)
+	if h[0] == "dest":
+		_close_port()
+		_dests.select(h[1])
+	elif not _open_port(h[1]):
+		_set_status("%s has no settings page." % CableRules.friendly_label(_payload, id), false)
+
+
+func _matrix_add(what: String) -> void:
+	match what:
+		"destination":
+			await _dests.add("pgm_prv")
+		"pixel_map":
+			await _mapc.add_node()
+		_:
+			await _outp.add_output(what)
 
 
 ## GET /api/device-view (+ settings once — the cable writes seed from them). A reload asked for while one is in
@@ -255,6 +258,8 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 	var anchors := {}
 	_dests.show_model(m, payload, anchors)
 	_maps.show_nodes(payload, anchors, _mapc.node_id)
+	if _matrix.visible:
+		_matrix.show_payload(payload, Store.get_value("channelMap"))
 	_rear.show_slots(m.slots)
 	anchors.merge(_rear.anchors)
 	_clear(_list)
@@ -357,11 +362,7 @@ func _sync() -> void:
 		_dests.deselect()
 	_cables.hidden_id = str(g.regrab.get("edgeId", ""))
 	_cables.ghost_from = g.ghost_anchor()
-	_cancel_btn.visible = g.armed()
-	_apply_btn.disabled = g.busy
-	_apply_btn.text = "Applying…" if g.applying else "Apply Caspar config (restart)"
-	_apply_btn.add_theme_color_override("font_color", ThemeBuilder.WARN if g.restart_dirty else ThemeBuilder.TEXT)
-	_apply_btn.tooltip_text = "Cabling changed — restart Caspar to apply" if g.restart_dirty else ""
+	_bar.sync(g)
 	for id in _rows:
 		_rows[id][1].visible = id == g.selected_edge
 		_rows[id][0].add_theme_color_override("font_outline_color", ThemeBuilder.ACCENT)
@@ -371,15 +372,14 @@ func _sync() -> void:
 ## Gesture prompts ("Cable armed…", "Cable end grabbed…") give way to the next reload; results and errors stay.
 func _set_status(text: String, ok: bool) -> void:
 	_sticky = not ok or not (text.begins_with("Cable armed") or text.begins_with("Cable end grabbed") or text.begins_with("Applying"))
-	_status.text = text
-	_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
+	_bar.set_status(text, ok)
 
 
 ## Clicks are taken here, before the GUI: a connector dot (rect grown 3 px) drives the gesture, a GPU row label opens
 ## its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open():
+	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or _matrix.visible:
 		return
 	if event is InputEventMouseMotion:
 		var lp: Vector2 = _cables.get_global_transform().affine_inverse() * event.global_position

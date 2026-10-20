@@ -121,9 +121,13 @@ func deselect() -> void:
 ## The "+" button: POST addDestination (the server picks the video mode), then seed the new screen's consumer
 ## settings when it is a fresh screen N (web shouldSeedScreenConsumerDefaults), then dirty + reload.
 func _add() -> void:
+	await add(str(_type.get_selected_metadata()))
+
+
+## Also the Matrix view's "+ Destination" (pgm_prv; the web's skips the consumer seeding, here it is the same add).
+func add(type: String) -> void:
 	if _busy:
 		return
-	var type := str(_type.get_selected_metadata())
 	var dests: Array = DM.R.a(DM.R.d(_payload.get("screenDestinations")).get("destinations"))
 	var req := DM.add_request(dests, type)
 	_busy = true

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Next: Node view / Matrix view toggles (last unported Device View piece). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Slice 7c (mapping nodes) DONE 2026-10-20 — column, node page and every edit golden-replayed against the web band / inspector / mapping-node-service, box-verified add / cable / propose / mode / math size / rect / rename / add + remove output / duplicate / delete (config restored byte-identical). Slice 8 (device snapshots) DONE 2026-10-20 — save / load flows golden-replayed against the web modals (file text byte-identical), box-verified save with / without the rear-panel PNG, load preview + apply (config restored byte-identical). Slice 9a (DeckLink edit mode) DONE 2026-10-20 — order / editor golden-replayed against the web lib + inspector, box-verified pencil / rear swap / editor drag / Export (byte-identical) / Load / Reset (only per-client prefs written; web escapeHtml crash fixed). Slice 9b-1 (GPU column = the web's GPU port model: topology order, client hidden / labels, Disconnected fold) DONE 2026-10-20 — golden vs the web lib on 10 payload variants, box-verified. Slice 9b-2/3 (GPU edit mode + layout editor) DONE 2026-10-20 — flow golden-replayed against the web editor (5 cases, mutation-checked), box-verified pencil / edit / editor + rear drag / Export (byte-identical) / Load / Hide disconnected / Reset / Show all / Clear layout (config restored byte-identical; 5 web gaps logged, 2 fixed in Godot). Slice 10a (Matrix view) DONE 2026-10-20 — rows / crosspoints golden-replayed against the web matrix (mutation-checked), box-verified route / disconnect / undo / headers / adds (config restored; web "+ Stream"/"+ Record" list wipe fixed in Godot). Next: Node view (slice 10b, last unported Device View piece). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -1157,3 +1157,116 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   - Assign: the box has no unmapped display.
   - A failing topology POST: the server can't be made to fail it on demand.
   - Reset with no discovery.
+
+## Slice 10a — Matrix view (2026-10-20, DONE)
+
+### Investigation
+- **Toggle** (`device-view-toolbar.js:86-107, 192-280`).
+  - The "Matrix view" checkbox (tooltip "Dense Dante-style routing matrix.") persists in localStorage
+    `device-view-matrix`.
+  - It is mutually exclusive with "Node view": checking either one unchecks the other.
+  - Matrix mode hides the destinations, mapping and rear panels, the cable overlay, the Node view checkbox and the
+    cable-loops slider. It shows `matrixHost`; the inspector stays.
+- **Rows / columns** (`client/lib/device-view-matrix-ports.js` `extractMatrixPorts`). Rows are sources, columns are
+  sinks.
+  - Rows, in this order:
+    1. `listAllScreenDestinationsForDeviceView`. A non-host `pgm_prv` destination becomes two rows (`— PGM`, `— PRV`,
+       WO-364) sharing one graph id. Host / virtual destinations are grouped as "Host channels".
+    2. The remaining `listHostChannelDestinations`.
+  - Pixel maps: the first `pixel_map_in` connector is a column ("<label> In"). The `pixel_map_out` connectors are
+    rows ("<label> Out n"), stable-sorted by `Number(index) || 0`.
+  - Suggested connectors:
+    - These 8 kinds are columns: gpu_out, decklink_out, decklink_io, caspar_mv_out, stream_out, record_out,
+      audio_out, v4l2_out.
+    - audio_in and v4l2_in are rows.
+    - Group names come from substring tests on the kind, applied in order: DeckLink, GPU, USB video,
+      Streams/Records, otherwise "Outputs".
+  - Edge ends not yet on screen become "Other Sources" / "Other Outputs". The dedupe uses bare ids (WO-365).
+- **Crosspoint click** (`device-view-matrix.js:150-190`).
+  - The edge test: same `sourceId` and `sinkId`, and on a half row the same `edgeOutputLayer` (WO-364).
+  - An active cell disconnects only that half's edge.
+  - An empty cell first drops every other edge into a single-input sink (`isSingleInputSinkId`, the same 8 kinds;
+    WO-373: "a crosspoint REPLACES, like a router"). It then appends `edge_<Date.now()>_<rand 0..999>`. A PRV row
+    adds the note `{"outputLayer":2}`.
+  - `pushUndo()` runs first. The whole graph goes out as `POST /api/settings {deviceGraph}`. On success that is
+    followed by restart-dirty and a reload; on failure there is only a `console.error`.
+- **Header clicks**: a `dst_in_` id opens that destination (`selectDestinationById`); anything else runs
+  `selectKey('conn:'+id)`.
+- **Toolbar**:
+  - "+ Destination": `addDestination({mode:'pgm_prv'})`. `addDestination` reads `.type`, so the type falls back to
+    pgm_prv. There is no consumer seeding and no dirty flag.
+  - "+ Live input" (`showLiveInputModal`), "+ Stream", "+ Record", "+ Virtual cam" (the same body as the rear "+")
+    and "+ Pixel Map" (`addMappingNode`).
+- **Web gaps**:
+  1. "+ Stream" / "+ Record" read `payload.settings.streamOutputs` / `.recordOutputs`. The merged payload's
+     `settings` block holds only `casparServer` + `channelMap`, so the list is always empty and the POST replaces
+     every configured stream / record with one `str_1` / `rec_1`.
+     - Reproduced under Node with `mergeSettingsIntoDeviceViewPayload` and two streams: the POST was
+       `{"streamOutputs":[{"id":"str_1",…}]}`, so `str_2` was lost.
+     - "+ Record" behaves the same, and its body (`type h264, quality medium`) differs from the rear "+" one
+       (`source program_1, crf 26`).
+  2. A failed route POST is silent: there is no status, only the console.
+  3. If the graph has no `edges` array, a click on a single-input sink throws (`newGraph.edges.filter`).
+
+### What was done
+- `features/devices/matrix_model.gd` (new, pure):
+  - `ports(payload, live_cm)` ports extractMatrixPorts on top of `host_channels.gd`'s `all_destinations` /
+    `host_destinations`, and uses a decorated sort for the pixel-map outs.
+  - `single_input_sink`, `is_edge` / `active`, `toggle(payload, src, sink, id)` → the whole new graph,
+    `new_edge_id()`, `header_target(id)`.
+- `features/devices/matrix_view.gd` (new):
+  - The add buttons above a drawn grid (an inner `Grid` Control, not 1 000 Buttons): vertical sink labels, a
+    crosshair hover, and a filled dot that turns red on hover ("a click disconnects").
+  - Signals: `route(graph)`, `header(id)`, `add(what)`.
+  - "+ Live input" is left out (the live-input modal is unported).
+- `features/devices/devices_toolbar.gd` (new):
+  - The tab's header row moved out of `devices_tab.gd`, which had 4 lines of headroom.
+  - Adds the "Matrix view" CheckBox, a per-client pref in `user://devices.cfg [view] mode`. The loops slider hides
+    while it is on.
+- `devices_tab.gd`:
+  - Matrix mode hides the body and the cable overlay and shows the matrix. `_input` steps aside so the grid gets
+    its clicks.
+  - `_open_header`: a destination calls `_dests.select`; a connector opens its page, or the status says it has
+    none.
+  - `_matrix_add`:
+    - "+ Destination" → `_dests.add("pgm_prv")`. This is the panel's own add, with seeding and dirty, instead of the
+      web's bare POST.
+    - "+ Stream" / "+ Record" / "+ Virtual cam" → the rear panel's `add_output` plan. This appends to Settings, so
+      it fixes gap 1.
+    - "+ Pixel Map" → `mapping_controls.add_node`.
+- `cable_gesture.gd` `route(graph)`: push undo, `POST /api/settings {deviceGraph}`, Settings reload, dirty and
+  reload. A failure shows "Matrix route failed: …" (gap 2 fixed). Ctrl+Z undoes it like any cable edit.
+- `destinations_panel.gd`: `_add()` → public `add(type)`.
+- Gap 3 can't happen in the port: `toggle` treats a missing `edges` as `[]`.
+
+### What was VERIFIED
+- **Golden replay**: `tests/test_devices_matrix.gd` against `tests/golden/devices_matrix.json`. The generator runs
+  the real `extractMatrixPorts` + `renderMatrix` under Node on a fake DOM, with `Date.now` / `Math.random` scripted.
+  - Payloads:
+    - the live box;
+    - a rich one: split / pinned / virtual / pgm_only destinations; pixel maps with unsorted, string, missing and
+      40-way tied indexes, plus a second `pixel_map_in`; every suggested kind, a connector with no id and a
+      duplicate id; ghost / `DP-3` / `gpu_p9` edge ends; a text-note PRV edge;
+    - no graph at all;
+    - the 7 host-channel payloads.
+  - Checked: rows and columns, the single-input flags, the header-click targets, the grid, and 15 crosspoint clicks.
+    Each click checks the posted `deviceGraph`; a failed POST keeps the graph. Rows, columns and grid are compared
+    again after each reload.
+  - Suite: 12296 / 12296 passing (was 12210).
+- **Mutation check**: 10 mutants. Killed: the single-input filter, the half-layer test, the PRV note, the
+  consumed-id dedupe, the virtual flag, the Streams/Records group, the externalRef label fallback, the sort
+  tie-break and the first-`In`-only rule. The last two survived until the 40-way tie and the second `pixel_map_in`
+  were added to the payload.
+  - One equivalent mutant: the host-channel `seen` check is redundant behind the `added` dedupe.
+- **Box** (GUI on the Devices tab, live server; config backed up first):
+  - Matrix view showed the box's 3 × 8 grid: Operator GUI→P1 and Main LED PGM→P3 active.
+  - PRV→P0 wrote `{"id":"edge_1792501404550_628", …, "note":"{\"outputLayer\":2}"}` (GET /api/device-view). Apply
+    turned restart-dirty, and the hovered dot showed red.
+  - A second click removed the edge. Ctrl+Z put it back ("Undo successful"), and Ctrl+Z again removed it.
+  - The P0 header opened the GPU page; the "Main LED — PGM" header opened the destination page.
+  - "+ Pixel Map" added "Pixel Mapping 1 In" as a column and Out 1 / Out 2 as rows. "+ Stream" added Str1 ("Added
+    stream output Str1", Streams/Records column).
+  - Restore: `device_graph.json` and `stream_outputs.json` were copied back and node was restarted. The md5s match
+    the backup except `.highascg-state.json` (unrelated look-state autosave, rev bump).
+- Owner QA: the matrix's look on a big show file (50+ rows scroll) and whether "+ Live input" is wanted before the
+  live-input modal is ported.
