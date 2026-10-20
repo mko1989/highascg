@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs, logs and modals open. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
+**Status: IN PROGRESS (2026-10-19) — owner layout rules R1–R5 DONE (box-verified 18.10, below); Settings slice 1 (Defaults / Companion / Media-USB) DONE 19.10; other settings tabs and modals open; logs window done 20.10. D1/D2 decided by the owner 17.10 (below); D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
 
@@ -338,3 +338,24 @@ Box state: one screen, `monitorCh` null, `audioPreview.enabled` false; replicati
 switch now live in node (`/api/led-test-card/settings`, `…/master`, `…/channel`); Godot has the checkbox + Test card…
 dialog. The web's "Open window ▾" taskbar is replaced by the dock ([WO-628](./628_WO_operator_dock.md)). Also not ported:
 the web's "Paired with <peer>" label beside the replication letter.
+
+## 2026-10-20 — Logs window (port plan step 3, logs part)
+
+Owner: logs were the next named slice after the header. Web: `client/components/logs-modal.js` (eye click).
+
+- **`app/logs_dialog.gd`** — non-exclusive "Server logs" window, opened and closed by clicking the connection eyes
+  (`connection_eye.gd` emits `clicked`; it now stops the mouse event and shows a hand cursor). HighAsCG pane:
+  `GET /api/logs?…&caspar=0&categories=…&levels=…` (node filters), then live WS `log_line` filtered the same way,
+  2000-line cap; CasparCG pane: the Caspar log file tailed every 2 s (`highascg=0`), replaced only when it changed;
+  toggles for both panes, info / warn / error / debug, Categories ▾ (All + 14, debug off by default), Pause, Copy
+  (both panes to the clipboard), Clear HighAsCG (`POST /api/logs/clear`), AMCP line → `POST /api/raw` with the
+  command + reply shown under it (an echo inside the pane would be replaced by the next tail).
+- **`app/logs_model.gd`** — categories, query, payload → record, filter, capped append; `tests/test_logs_model.gd`
+  (same answers as `logs-modal-filter.js`).
+- Not ported: the web's Shortcuts tab (owner: no intricate shortcuts in Godot — right-click menus) and the
+  Support bundle download (a settings → diagnostics item, next slice).
+
+**VERIFIED (box, 20.10):** eye click opens the window with both panes filled; debug on → the pane reloads with the
+`[debug]` WS lines; a second WS client connecting → its `[WS] client connected` lines arrived live; AMCP `VERSION`
+→ `<< 2.5.1 886998cc1 Stable` under the input and the command in the Caspar tail; Categories menu shows 13/14
+with Debug off; a second eye click closes the window. Godot tests 16209 pass.

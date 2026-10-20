@@ -2,7 +2,7 @@ extends TextureRect
 ## WO-608 R4 — connection eyes (client/components/connection-eye.js): green = this host's Caspar AMCP connected,
 ## red = server or AMCP down, blue = offline (preshow) mode. Blink every 30 s (left closed → right closed → open,
 ## 250 ms phases); for 5 s after AMCP connects, random open / left / right frames every 280–780 ms. The hover
-## panel (CPU / GPU / disk / logs) is a later WO-608 step — the tooltip carries the connection state for now.
+## panel (CPU / GPU / disk) is a later WO-608 step — the tooltip carries the connection state; a click opens the logs.
 
 const DIR := "res://assets/ui/"
 const FRAMES := {
@@ -13,6 +13,8 @@ const FRAMES := {
 const BLINK_EVERY_S := 30.0
 const BLINK_PHASE_S := 0.25
 const CELEBRATION_S := 5.0
+
+signal clicked
 
 var connected := false
 var offline := false
@@ -25,7 +27,8 @@ func _ready() -> void:
 	expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	custom_minimum_size = Vector2(64, 32)
-	mouse_filter = Control.MOUSE_FILTER_PASS
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	for k in FRAMES:
 		for i in 3:
 			_tex["%s/%d" % [k, i]] = load_png(DIR + FRAMES[k][i] + ".png")
@@ -43,6 +46,12 @@ static func load_png(path: String) -> Texture2D:
 	if img.load_png_from_buffer(FileAccess.get_file_as_bytes(path)) != OK:
 		return null
 	return ImageTexture.create_from_image(img)
+
+
+func _gui_input(e: InputEvent) -> void:
+	if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+		clicked.emit()
+		accept_event()
 
 
 func set_state(is_connected: bool, is_offline: bool, tip: String) -> void:

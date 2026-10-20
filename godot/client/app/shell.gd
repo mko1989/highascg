@@ -15,6 +15,7 @@ const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const PlaylistsPanel := preload("res://features/live/playlists_panel.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
+const LogsDialog := preload("res://app/logs_dialog.gd")
 const PerfOverlay := preload("res://app/perf_overlay.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderProject := preload("res://app/header_project.gd")
@@ -24,6 +25,7 @@ const OperatorDock := preload("res://app/operator_dock.gd")
 const DockModel := preload("res://app/operator_dock_model.gd")
 
 var _eye: ConnectionEye
+var _logs: LogsDialog
 var header_project: HeaderProject
 var header_tools: HeaderTools
 var header_status: HeaderStatus
@@ -152,8 +154,20 @@ func _build_header() -> Control:
 	_perf_btn.toggled.connect(func(on: bool) -> void: perf.set_on(on))
 	row.add_child(_perf_btn)
 	_eye = ConnectionEye.new()
+	_eye.clicked.connect(_open_logs)
 	row.add_child(_eye)
 	return bar
+
+
+## Eye click → server logs (the web's connection-eye click); a second click closes them.
+func _open_logs() -> void:
+	if _logs == null:
+		_logs = LogsDialog.new()
+		add_child(_logs)
+	if _logs.visible:
+		_logs.hide()
+	else:
+		_logs.open()
 
 
 ## Connection eye: WS + Caspar link (state.caspar.connection, like client/components/connection-eye.js).
