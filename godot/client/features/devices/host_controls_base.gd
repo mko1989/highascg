@@ -131,6 +131,7 @@ func _select(options: Array, value: Variant, tip := "") -> OptionButton:
 	ob.tooltip_text = tip
 	ob.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	ob.fit_to_longest_item = false  # 200+ template names must not widen the Inspector column
+	ob.clip_text = true  # nor a long selected label (the "no leaders found" hint)
 	_fill(ob, options, value)
 	return ob
 

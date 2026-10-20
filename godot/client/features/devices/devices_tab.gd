@@ -12,6 +12,8 @@ extends MarginContainer
 ## Inspector; it and a destination page exclude each other.
 ## Slice 5/6: DeckLink ports and the Stream / Record / Virtual cam / Audio outputs open their pages the same way;
 ## the rear panel's "+" adds an output (output_port_controls.gd).
+## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
+## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -26,6 +28,7 @@ const CableRules := preload("res://features/devices/cable_rules.gd")
 const GpuControls := preload("res://features/devices/gpu_output_controls.gd")
 const DeckLinkControls := preload("res://features/devices/decklink_port_controls.gd")
 const OutputControls := preload("res://features/devices/output_port_controls.gd")
+const ServerControls := preload("res://features/devices/server_controls.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var _dests: DestinationsPanel
@@ -47,6 +50,7 @@ var _confirm: ConfirmationDialog
 var _gpu: GpuControls
 var _deck: DeckLinkControls
 var _outp: OutputControls
+var _server: ServerControls
 var _payload := {}  # the merged device-view payload the page was built from
 
 
@@ -105,6 +109,11 @@ func _ready() -> void:
 	_outp.status.connect(_set_status)
 	_outp.dirty.connect(func() -> void: _gesture.set_dirty(true))
 	_outp.reload.connect(func(_dirty: bool) -> void: refresh())
+	_server = ServerControls.new()
+	add_child(_server)
+	_server.status.connect(_set_status)
+	_server.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	_server.reload.connect(func(_dirty: bool) -> void: refresh())
 	# The web opens that connector's inspector (GPU outputs, DeckLink ports); anything else selects its cable.
 	_dests.focus_connector.connect(func(id: String) -> void:
 		if _open_port(id):
@@ -225,6 +234,8 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 				_close_port()
 			else:
 				page.show_connector(conn, payload, Settings.settings)
+	if _server.is_open:
+		_server.show_server(payload, Settings.settings)
 	_sync()
 
 
@@ -255,6 +266,18 @@ func _close_port() -> void:
 			page.close()
 			if InspectorPanel.current != null:
 				InspectorPanel.current.release(page.page)
+	if _server.is_open:
+		_server.close()
+		if InspectorPanel.current != null:
+			InspectorPanel.current.release(_server.page)
+
+
+func _open_server() -> void:
+	_dests.deselect()
+	_close_port()
+	_server.show_server(_payload, Settings.settings)
+	if InspectorPanel.current != null:
+		InspectorPanel.current.present(_server.page)
 
 
 ## Gesture state → port tints, the overlay (selected / held / ghost), the toolbar and the cables list.
@@ -331,6 +354,11 @@ func _input(event: InputEvent) -> void:
 	if hit != "":
 		get_viewport().set_input_as_handled()
 		_gesture.select_edge(hit)
+	elif _rear.get_global_rect().has_point(pos) and not get_viewport().gui_get_hovered_control() is BaseButton:
+		if _gesture.selected_edge != "":
+			_gesture.selected_edge = ""
+			_sync()
+		_open_server()
 	elif not on_ui and _gesture.selected_edge != "":
 		_gesture.selected_edge = ""
 		_sync()

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Next: slice 7 Caspar server / hot backup / mapping nodes. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
+**Status: IN PROGRESS (2026-10-19) — slice 1 (read-only rear panel + cables) DONE (golden-tested against the web JS, box-verified in the GUI); slice 2 (patching + undo) DONE — 2a cable rules + 2b write planning golden-tested, 2c gesture + UI box-verified in the GUI against the live server; slice 3 (destinations + host-channel listing) DONE — 3a listing / inspector page / math input golden-tested, 3b panel add / edit / remove box-verified. Slice 3c (per-role host-channel inspector controls, WO-601 moved scope) DONE 2026-10-20 — request bodies / plans golden-tested against the web modules, webpage role box-verified end to end (update, reload, remove); NDI / browser / DeckLink / live-audio / V4L2 role pages golden-tested only (no such inputs on the dev box) — owner QA. Slice 4 (GPU-output connector page + video modeline) DONE 2026-10-20 — models golden-tested against the web inspector replayed edit by edit, page box-verified on P3 / P1 (save, OS save + live CVT/GTF preview, Reset, config restored byte-identical). Slice 5 (DeckLink connector page) DONE 2026-10-20 — page spec, SDI consumer / fill+key patches and the start / stop plans golden-tested against the web inspector + addDecklinkInputSlot, box-verified (fill+key, consumer saves, 2160p YUV warning, Start / Stop input; config restored byte-identical). Slice 6 (stream / record / virtual cam / audio connector pages) DONE 2026-10-20 — pages, add / remove and every edit golden-replayed against the web inspectors, box-verified add / edit / auto-save / remove for all four kinds (config restored byte-identical; Start / Stop golden-only). Slice 7a/b (Caspar server page + hot backup) DONE 2026-10-20 — page and every action golden-replayed against the web inspector, box-verified fps / CEF / scan / leader on-off / poll / follower picker (config restored byte-identical; peer connect + network apply golden-only). Next: slice 7c mapping nodes, then slice 8 snapshots. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599. Largest single area after the live core.**
 
 # WO-605 — Godot port: Device View (rear panel, cables, port bands, destinations, inspectors, snapshots)
 
@@ -559,3 +559,69 @@ The mapped-output link's web target is the connector inspector (GPU / DeckLink p
   restart → every config file byte-identical; 0 SCRIPT ERROR in the GUI log.
 - Not exercised live: Start / Stop stream and record, vcam Start (they would put outputs on air / need a cabled
   source) — golden-tested only.
+
+## Slice 7a/b — Caspar server page + hot backup (2026-10-20, DONE)
+
+### Investigation
+- Web path: `device-view-caspar-render.js:457` — a click on the Caspar band that is not on a port / connector / marker
+  calls `selectDevice(CASPAR_HOST)` → `device-view-inspector-caspar.js`: Server table (hostname / hardware id /
+  platform / AMCP / host), Project (default frame rate select over the standard rates, value from
+  `machineProfile.defaultProjectFps` else `channelMap.programResolutions[0].fps` else 50, normalised to the nearest
+  standard rate; Save → POST `/api/settings {machineProfile:{defaultProjectFps}}` + restart-dirty + reload), Templates
+  (CEF GPU check → `operatorTools.cefEnableGpu`, reverted on failure), Network (GET `/api/system/network` → interface
+  select, DHCP / static radios, static fields; Apply → `/api/system/network/apply`), Factory reset, then
+  `renderReplicationInspector` (`device-view-inspector-replication*.js` + `lib/hot-backup-project.js`): status line,
+  pair line, connection panel (channel / Caspar parity, local / peer / transport tables, warnings), output warnings,
+  wiring note, Mode select (standalone / leader / follower, remembered in sessionStorage
+  `highascg.replication.inspectorMode`), leader picker (follower), buttons shown by role (Scan / Become / Stop
+  offering / Connect / Disconnect / Refresh connection / Apply Device View → Caspar), 3 s status poll
+  (`-replication-controls.js:353`).
+- Web gaps found (ported as the web behaves unless noted):
+  1. The parity line's tone flips on `classList.toggle(cls, cp.ok)` with `cp.ok` undefined — both `--ok` and `--warn`
+     end up set (CSS shows warn). Godot shows warn.
+  2. `device-view-inspector-caspar.js:197` drops the cleanup `renderReplicationInspector` returns, so every re-render
+     (each `load()`) leaks another 3 s poll interval. **Godot runs one poll, stopped when the page closes.**
+  3. Refresh connection with a `status` in the reply re-renders from it but skips the pair line, wiring note and mode
+     sync that a normal status refresh does (ported as-is).
+  4. Toasts: the web toasts alongside the status line. Godot has no toasts — a toast reaches the Devices tab's status
+     line only when the action set no status itself.
+  5. Not ported: Factory reset (needs the default-project builder New Project uses — WO-608) and the header badge's
+     replication phase toasts (`replication-ui-state.js`, WO-608).
+
+### What was done
+- `features/devices/replication_format.gd` (pure): the shared formatters (fps fraction, age, drift, channel / Caspar
+  parity, status line, local / peer / transport rows, pairing title / pair line, output warnings).
+- `features/devices/server_page_model.gd` (pure): page state from settings + device view, network apply / body,
+  replication status apply (full and reply-only), leaders, button visibility, and `items()` — the page spec.
+- `features/devices/server_flow.gd`: every request sequence (start, poll, save fps, CEF, network, scan, mode change,
+  become / stop leader, connect, disconnect with confirm, refresh connection, apply Device View → Caspar) over an
+  injected io, so the golden replay and the page share it; `static var session_intent` stands in for sessionStorage.
+- `features/devices/server_controls.gd`: renders the items into the Inspector, io adapter over Api (errors reshaped
+  to the web's `HTTP <code>: <detail>`, settings re-read after `/api/settings`), 3 s poll Timer while open; it only
+  rebuilds when the items changed and keeps a focused field's caret, so typing and open selects survive the poll.
+- `devices_tab.gd`: a click on the rear panel's background (not a port, cable or "+") opens the server page; port /
+  destination pages and the server page exclude each other; a reload re-renders it like the web.
+- `host_controls_base.gd`: selects clip their label (the long "no leaders found" option widened the Inspector column
+  by ~95 px on the box).
+
+### What was VERIFIED
+- `tests/test_devices_server_page.gd` + `tests/golden/devices_server_page.json` (scratchpad generator `sv_golden.mjs`
+  runs the web page under Node on the DOM shim with live fixtures from GET `/api/device-view`, `/api/settings`,
+  `/api/replication/status`, `/api/system/network` and a scripted server): 20 cases (fps sources, network variants,
+  standalone / leader / follower / paired leader / paired follower / unavailable, intents) with 61 replayed steps —
+  initial requests + page, then per step the request list (POSTs, confirms, dirty, reload, leader scans), status text,
+  ok flag, toasts and the re-rendered page (Danger zone dropped). Godot `--test` 8746 / 8746 (2546 new), `--check`
+  boot OK, 0 files over 500 lines.
+- Box GUI (`config/` copied + md5-listed first): rear panel background click → Server page with live data
+  (highascg7580, AMCP connected, eno1 — 192.168.50.64, "Role: standalone · not paired…"). Manual (static) shows the
+  static fields, typed IP survives a poll, back to DHCP (network never applied). 25 fps + Save → status "Project frame
+  rate saved (25 fps)", Apply turns restart-dirty, destination cards re-read @25, `general.json` 25. CEF on / off →
+  both statuses, `cefEnableGpu` true / false in config. Scan → "Found 0 leader(s)". Mode Leader → Become leader →
+  "This server is now available as leader", line "accepting followers", mode kept across the reload; Stop offering →
+  "Leader availability stopped", `leaderAvailable:false`. Poll: become-leader / stop-leader posted with curl from
+  outside → the page followed both within 4 s with no click. Mode Follower → its scan ("Found 0 leader(s)"), leader
+  picker + Connect; Connect without a leader → red "Select a leader first (Scan for leaders)". GPU label click
+  replaces the server page. Afterwards the 4 changed config files restored + node restart → every config file
+  byte-identical.
+- Not exercised live: connect / disconnect / refresh / apply Device View → Caspar against a real peer (single box) and
+  Apply network — golden-tested only.
