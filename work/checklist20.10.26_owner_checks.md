@@ -34,7 +34,8 @@ Not on this list: anything a session can do alone. The node server has been rest
       shader live and GPU CEF is off, and PGM/PRV were off limits. Take a shader look to PRV, then ride a slider,
       ≋ wiggle, a preset, Randomize, ▶ Take, a playlist hop (the picker should follow the layer), a Templates
       shader click (audition → PRV), and land / ✕ clear on the PGM stack column. Say if the
-      logo should only open it while GPU CEF is on (the web's bunny-with-shades rule).
+      logo should only open it while GPU CEF is on (the web's bunny-with-shades rule). Shader FX editor (Media + →
+      Shader FX…): press **Preview on PRV** on a saved shader — it should play alone on PRV.
 - [ ] **WO-628** — dock: bottom-centre, hides itself; reveal after 0.4 s of hover, hide 1 s after leaving. Too
       eager or too slow?
 - [ ] **WO-629** — header "Test card" master on/off and the Test card… dialog on a real LED wall (pattern,

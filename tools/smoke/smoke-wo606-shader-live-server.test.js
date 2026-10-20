@@ -163,3 +163,15 @@ test('GET carries the PGM stack (layers 10–20, occupant basenames); audition r
 	const bad = await h['POST /api/shader-live/audition']({ body: JSON.stringify({ value: 'clip.mp4' }), ctx: makeCtx() })
 	assert.equal(bad.status, 400)
 })
+
+test('Shader FX params: scan unsaved sources, rewrite one literal by scan index', async () => {
+	const FX = require('../../src/shaderfx/shader-fx-params')
+	const body = { common: '#define GLOW 0.25\n', passes: { image: { source: SRC }, bufferA: { source: '  ' } } }
+	const params = await FX.scan(body)
+	assert.deepEqual(params.map((p) => [p.index, p.passKey, p.name]), [[0, 'common', 'GLOW'], [1, 'image', 'SPEED']])
+	const r = await FX.rewrite({ ...body, index: 1, values: [0.9] })
+	assert.equal(r.passKey, 'image')
+	assert.match(r.source, /SPEED = 0\.9;/)
+	assert.ok('error' in (await FX.rewrite({ ...body, index: 7, values: [1] })))
+	assert.ok('error' in (await FX.rewrite({ ...body, index: 0, values: [1, 2] })))
+})

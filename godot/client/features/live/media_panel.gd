@@ -22,6 +22,7 @@ signal tab_requested(name: String)
 signal caspar_changed
 signal connector_dropped
 
+const ShaderFx := preload("res://features/live/shader_fx_dialog.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MediaInspector := preload("res://features/live/media_inspector.gd")
@@ -86,6 +87,7 @@ func _ready() -> void:
 		var shl: Node = ShaderLivePanel.current
 		if kind == "shader" and is_instance_valid(shl) and shl.is_visible_in_tree():
 			shl.audition(str(p.get("value", "")), str(p.get("label", p.get("value", "")))))
+	templates.row_context.connect(_template_menu)
 	_tabs.add_child(templates)
 	live = LivePanel.new()
 	live.name = "Live"
@@ -441,3 +443,18 @@ func _show_ingest(st: Dictionary) -> void:
 func _exit_tree() -> void:
 	if inspector != null and not inspector.is_inside_tree():  # never selected → never adopted by the Inspector
 		inspector.free()
+
+
+## WO-606: right-click a shader template → open it in the Shader FX editor (the web row's edit button).
+func _template_menu(p: Dictionary, kind: String) -> void:
+	if kind != "shader":
+		return
+	var menu := PopupMenu.new()
+	menu.add_item("Edit shader…")
+	menu.id_pressed.connect(func(_i: int) -> void: ShaderFx.show_editor(self, str(p.get("value", "")).to_lower().replace("\\", "/").get_file()))  # TLS ids are upper-case
+	menu.popup_hide.connect(menu.queue_free, CONNECT_DEFERRED)
+	add_child(menu)
+	var at := Vector2i(get_viewport().get_mouse_position())
+	if not get_viewport().gui_embed_subwindows:
+		at += get_window().position
+	menu.popup(Rect2i(at, Vector2i.ZERO))

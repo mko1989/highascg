@@ -9,6 +9,8 @@
  *        preset-save | preset-delete | pin | hide | unhide | label | randomize | wiggle | save
  *   POST /api/shader-live/mixer { channel, layer, cmd, value }   universal Caspar-mixer rides
  *   POST /api/shader-live/audition { value, label?, mainIndex? }  stage a library shader on PRV (Templates click)
+ *   POST /api/shader-live/scan { common, passes }  → { params }   Shader FX editor: params of UNSAVED sources
+ *   POST /api/shader-live/rewrite { common, passes, index, values } → { passKey, source }   one literal rewritten
  * GET also carries `stack` — the main's PGM look-band layers 10–20 and their occupants (web shader-live-stack.js);
  * landing / clearing rides the existing POST /api/shader-stack.
  * Value changes land on EVERY live instance of the shader via `CG UPDATE` (player.js hot-recompiles).
@@ -122,6 +124,12 @@ async function handleAudition(body, ctx) {
 /** @param {any} routes */
 function register(routes) {
 	routes.get('/api/shader-live', ({ ctx, query }) => reply(200, { instances: liveShaderInstances(ctx), stack: stackOf(ctx, Math.max(0, parseInt(query?.main, 10) || 0)) }), { requireCaspar: false })
+	const FX = require('../shaderfx/shader-fx-params')
+	routes.post('/api/shader-live/scan', async ({ body }) => reply(200, { params: await FX.scan(parseBody(body) || {}) }), { requireCaspar: false })
+	routes.post('/api/shader-live/rewrite', async ({ body }) => {
+		const r = await FX.rewrite(parseBody(body) || {})
+		return 'error' in r ? reply(400, { ok: false, error: r.error }) : reply(200, { ok: true, ...r })
+	}, { requireCaspar: false })
 	routes.post('/api/shader-live/audition', ({ body, ctx }) => handleAudition(body, ctx), { requireCaspar: true })
 	routes.get('/api/shader-live/shaders/*', ({ path }) => {
 		const m = String(path).match(/^\/api\/shader-live\/shaders\/([^/]+)$/)

@@ -1,4 +1,4 @@
-**Status: 🟡 IN PROGRESS (2026-10-20) — Shader Live slices 1–2 done (node-side working copy + Godot panel, PGM stack, Templates audition); open: Shader FX modal (GLSL editor). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
+**Status: ✅ DONE (2026-10-20) — Shader Live slices 1–2 (node-side working copy + Godot panel, PGM stack, Templates audition) and slice 3 Shader FX editor done; on-air behaviour is an owner check. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
 
 # WO-606 — Godot port: Shader Live/FX, timers, CG/lower thirds, LED test/pixel map/fixtures, variables, streaming/recording/inputs
 
@@ -82,6 +82,20 @@ Directive D: the web editor kept the working copy in the browser, rewrote GLSL l
   fade off air), `source_list_panel.row_clicked` → `media_panel` auditions a clicked shader template while the
   panel is open (`ShaderLivePanel.current`).
 
+### Shader FX editor, slice 3 (20.10)
+
+- Node: `src/shaderfx/shader-fx-params.js` + `POST /api/shader-live/scan` (detected params of UNSAVED sources,
+  `scanAllPassSources`) and `/rewrite` (one literal → `{passKey, source}`) — the web modal ran the same pure libs
+  in the browser.
+- Godot `shader_fx_dialog.gd` (one per app, `show_editor(host, id)`): library list + New, Shadertoy import (fills
+  the form as a NEW shader, never saves — WO-380), name / audio / alpha, Common + Image + Buffer A–D `CodeEdit`s
+  with a GLSL/Shadertoy highlighter and 4 iChannel selects per pass, Save & export (`POST /api/shaders`), Delete
+  (confirm → `DELETE`), **Preview on PRV** (the Shader Live audition instead of the web `<iframe>`).
+  `shader_fx_params.gd`: collapsible detected-params grid (slider / colour), rescans 300 ms after typing; a change
+  rewrites the pass text and saves, like the web. Pure parts in `shader_fx_model.gd` (tested).
+- Entry points: Media "+" → **Shader FX…**; right-click a shader row in Templates → **Edit shader…** (TLS ids are
+  upper-case → lower-cased to the library id).
+
 ## What was VERIFIED
 
 - Smoke: instance resolution (bank B, PRV, playlist on air), literal rewrite + 3 pushes + 403 re-host with the
@@ -102,4 +116,11 @@ Directive D: the web editor kept the working copy in the browser, rewrote GLSL l
   (stack rows / occupant basename, audition 400). Landing, clearing and auditioning were NOT pressed (PGM/PRV).
 - **Never driven against a shader on air** — no shader live on the box, GPU CEF off, PGM/PRV off limits
   (owner check in `work/checklist20.10.26_owner_checks.md`).
-- Shader FX modal (GLSL `CodeEdit`, Shadertoy import, preview via PRV).
+- Slice 3 on the box: Media + → Shader FX… opens the editor (list of 190 shaders); a library row loads source +
+  iCh0 = audio with highlighting; a typed scratch shader showed 2 detected params (speed slider, tint colour);
+  Save & export → `sh-zz-fx-scratch.json/.html`; a speed click rewrote the text to 1.5 and saved; Delete →
+  confirm → both files gone and `data/shaders` + `template/shaders` sha256-identical to before. Right-click
+  Templates → Edit shader… opens Audio Reactive Galaxy. Smoke 7/7 (scan/rewrite). Fixed on the way: an autowrap
+  note sized the dialog 1685 px tall; a long server error widened it (status now clipped, full text in tooltip).
+- Not pressed: **Preview on PRV** (PRV off limits). Shadertoy Fetch answered "No Shadertoy API key configured"
+  (owner action, WO-380 checklist item).

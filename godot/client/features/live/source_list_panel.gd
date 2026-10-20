@@ -6,6 +6,7 @@ extends VBoxContainer
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 signal row_clicked(payload: Dictionary, kind: String)  # WO-606: Shader Live auditions a clicked shader
+signal row_context(payload: Dictionary, kind: String)  # right-click (WO-606: shader rows → Edit shader…)
 
 var provider: Callable
 var empty_text := "No items"
@@ -33,10 +34,15 @@ func _ready() -> void:
 	_tree.set_column_custom_minimum_width(0, 34)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag, Callable(), Callable())
+	_tree.allow_rmb_select = true
 	_tree.item_mouse_selected.connect(func(_at: Vector2, button: int) -> void:
 		var it := _tree.get_selected()
-		if button == MOUSE_BUTTON_LEFT and it != null and it.get_metadata(0) is Dictionary:
-			row_clicked.emit(it.get_metadata(0), str(it.get_metadata(1))))
+		if it == null or not (it.get_metadata(0) is Dictionary):
+			return
+		if button == MOUSE_BUTTON_LEFT:
+			row_clicked.emit(it.get_metadata(0), str(it.get_metadata(1)))
+		elif button == MOUSE_BUTTON_RIGHT:
+			row_context.emit(it.get_metadata(0), str(it.get_metadata(1))))
 	add_child(_tree)
 
 
