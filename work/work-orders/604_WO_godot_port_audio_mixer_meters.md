@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); slice 4 DONE (cross-screen audio on the server + Godot Screens row, 21.10; real two-screen routing is an owner check); slice 5 DONE (ALSA Ch buttons on the server store, 21.10; real ALSA routing is an owner check); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
+**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); slice 4 DONE (cross-screen audio on the server + Godot Screens row, 21.10; real two-screen routing is an owner check); slice 5 DONE (ALSA Ch buttons on the server store, 21.10; real ALSA routing is an owner check); slice 6 DONE (one server ALSA route path — the modal's client PLAY loop retired, 21.10); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
 
 # WO-604 — Godot port: audio mixer, meters, cross-screen audio routing
 
@@ -355,11 +355,43 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 - **Open:** a box with an ALSA slot needs to check that the Ch button lights match what plays after boot, and that
   toggling one in Godot lights it in the web (owner checklist).
 
+## Slice 6 (2026-10-21) — one ALSA route path
+
+### Investigation
+
+- Save & Apply in the WO-571 modal posted the config, called `/api/audio/live-inputs/apply` (whose
+  `setupLiveAudioPgmRoutes` already plays every slot's saved routes), then PLAYed the same routes again from the
+  browser (`applyPgmRoutesForSlot`).
+- The two paths disagreed:
+  - Layer: the boot path used base + the slot's INDEX among configured slots (`listLiveAudioPgmProtectedLayers` too).
+    The browser, the slice-5 store and the docs use base + slot − 1. With the capture bridge off and an earlier slot
+    without a device, boot put slot 2 on the layer the Ch buttons call slot 1's.
+  - Audio-only: boot defaulted it OFF (`=== true`), everything else ON (`!== false`). So after a reboot an ALSA
+    route layer was not OPACITY 0 until someone pressed Save & Apply.
+  - Boot obeys "Route live inputs to program after connect" (`live_audio_pgm_always_on`); the browser loop did not.
+
+### What was done
+
+- `liveAudioPgmLayerForSlot(cfg, slot)` in `live-audio-input.js` is the one rule (base + slot − 1, null past 9). Boot
+  routing, the protected-layer list and the routing store (`input-audio-routing.js`, was `alsaDestLayer`) use it.
+- `setupLiveAudioPgmRoutes(self, {force})`: audio-only via `isPgmAudioOnly` (default on), commands via
+  `amcpForPlannedRoute` (STOP / CLEAR / PLAY / OPACITY, as every other route path). `force` skips the auto-route gate.
+- `POST /api/audio/live-inputs/apply {routes: true}` = force. The modal calls `applyLiveAudioCapture({routes: true})`
+  and no longer PLAYs anything itself; `applyPgmRoutesForSlot` is deleted.
+- Smoke (`smoke-wo604-alsa-routes.test.js`, 3 more): the gap keeps slot 2 on layer 3 in boot, protected layers and
+  the store; audio-only by default; auto-route off → boot plays nothing, force routes; the modal has no PLAY loop.
+
+### What was VERIFIED
+
+- Gates: lines, lint 216, prettier, unwired-exports, offline 2972 pass, `--no-http`, client build.
+- Box: node restarted; `/api/audio/inputs/routing` byte-identical before/after; boot log clean. The box has no ALSA
+  slots, so a real Save & Apply with a USB interface is on the owner checklist (WO-604 ALSA entry).
+
 ### Still open (later slices)
 
 - Stereo-pair split of a cross-screen route (the web has none either; the route carries the whole layout).
-- The WO-571 Live Audio Mixer modal still mirrors its route selection into localStorage and applies routes itself on
-  Save & Apply (same key and layer as the server, so it agrees; one more client-side AMCP path to fold in).
+- The WO-571 modal still mirrors its selection into localStorage (display only now) and STOPs a removed slot's
+  routes client-side (`live-audio-remove-input.js`). Its Save & Apply PLAY loop is retired (slice 6).
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
   Moving a band changes layers that may already be on air on deployed boxes.
 - Click a live-audio strip to inspect it. Add-input modal.

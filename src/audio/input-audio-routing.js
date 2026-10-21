@@ -27,8 +27,7 @@ const {
 } = require('../engine/live-input-audio-policy')
 const { REPLAYABLE_KINDS, pgmDestLayerForInput, isPgmAudioOnly, amcpForPlannedRoute } = require('../engine/live-input-route-reassert')
 
-const { resolveLiveAudioSlotPgmChannels } = require('../config/live-audio-input')
-const { readCasparSetting } = require('../config/routing-map')
+const { resolveLiveAudioSlotPgmChannels, liveAudioPgmLayerForSlot } = require('../config/live-audio-input')
 
 /** Routable on the console: the WO-312 replayable kinds plus ALSA slots. */
 const ROUTABLE_KINDS = new Set([...REPLAYABLE_KINDS, 'live_audio'])
@@ -62,19 +61,12 @@ function routingSnapshot(config) {
 			channel: Number(e.channel),
 			layer: Number(e.layer),
 			route,
-			destLayer: alsa ? alsaDestLayer(config, slot) : pgmDestLayerForInput(kind, slot),
+			destLayer: alsa ? liveAudioPgmLayerForSlot(config, slot) : pgmDestLayerForInput(kind, slot),
 			send: alsa ? 'always' : liveInputAudioSendPolicy(config, kind, slot),
 			targets: alsa ? resolveLiveAudioSlotPgmChannels(config, slot) : liveInputAudioTargets(config, kind, slot),
 		})
 	}
 	return { autoMix: isAutoMixEnabled(config), programChannels, inputs }
-}
-
-/** ALSA slot N's PGM layer — the boot routing's rule (base clamped to 9; a layer past the audio tracks is null). */
-function alsaDestLayer(config, slot) {
-	const base = Math.min(9, Math.max(1, parseInt(String(readCasparSetting(config, 'live_audio_pgm_layer') ?? 2), 10) || 2))
-	const layer = base + slot - 1
-	return layer <= 9 ? layer : null
 }
 
 /**

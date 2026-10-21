@@ -22,7 +22,6 @@ import {
 import { liveAudioInputForSlot } from '../lib/input-channels.js'
 import {
 	applyLiveAudioCapture,
-	applyPgmRoutesForSlot,
 	clearRouteFromChannel,
 	dedicatedInputRoute,
 	pgmDestLayerForSlot,
@@ -328,20 +327,11 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 					ui.count > 0 &&
 					Array.from({ length: ui.count }, (_, i) => dedicatedInputRoute(cm, i + 1)).some(Boolean)
 				if (hasDedicated) {
+					// The server plays capture AND each slot's saved PGM routes (WO-604: no client-side PLAY loop).
 					try {
-						await applyLiveAudioCapture()
+						await applyLiveAudioCapture({ routes: true })
 					} catch (err) {
-						errors.push(`Apply capture: ${err?.message || err}`)
-					}
-					for (let i = 1; i <= ui.count; i++) {
-						const device = ui.slots[i - 1]
-						const targets = ui.routeTargets[i - 1] || []
-						if (!device || targets.length === 0) continue
-						try {
-							await applyPgmRoutesForSlot(i, cm, ui, targets)
-						} catch (err) {
-							errors.push(`Slot ${i} routes: ${err?.message || err}`)
-						}
+						errors.push(`Apply: ${err?.message || err}`)
 					}
 				} else if (ui.count > 0) {
 					setStatus(

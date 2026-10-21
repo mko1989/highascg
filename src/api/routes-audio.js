@@ -376,7 +376,8 @@ async function handlePost(path, body, ctx) {
 				apiLog(ctx, 'warn', `[AudioFFT] restart on live-inputs apply: ${e?.message || e}`)
 			}
 			await setupLiveAudioInputs(ctx)
-			await setupLiveAudioPgmRoutes(ctx)
+			// { routes: true } = the Live Audio Mixer's Save & Apply: route the saved selection even with auto-route off.
+			await setupLiveAudioPgmRoutes(ctx, { force: parseBody(body)?.routes === true })
 			return {
 				status: 200,
 				headers: JSON_HEADERS,

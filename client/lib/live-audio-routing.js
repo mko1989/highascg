@@ -56,9 +56,10 @@ export function dedicatedInputRoute(channelMap, slot) {
 
 /**
  * Start ALSA capture on dedicated channels + server PGM routes.
+ * @param {{ routes?: boolean }} [opts] routes: put every slot's saved PGM selection on air even with auto-route off
  */
-export async function applyLiveAudioCapture() {
-	await api.post('/api/audio/live-inputs/apply', {})
+export async function applyLiveAudioCapture(opts = {}) {
+	await api.post('/api/audio/live-inputs/apply', opts.routes ? { routes: true } : {})
 }
 
 /**
@@ -129,22 +130,4 @@ export async function enableInputPgmRoute(row, pgmCh, channelMap, liveUi) {
 	const layer = pgmDestLayerForInput(row?.inputKind, row?.slot, liveUi)
 	await playRouteOnChannel(pgmCh, layer, route, { audioOnly: liveUi?.pgmAudioOnly !== false })
 	return { channel: pgmCh, layer }
-}
-
-/**
- * @param {number} slot - 1-based
- * @param {object | null | undefined} channelMap
- * @param {{ pgmAudioOnly?: boolean, pgmLayer?: number } | null | undefined} liveUi
- * @param {{ channel: number, layer: number }[]} targets
- */
-export async function applyPgmRoutesForSlot(slot, channelMap, liveUi, targets) {
-	const route = dedicatedInputRoute(channelMap, slot)
-	if (!route || !Array.isArray(targets) || targets.length === 0) return
-	for (const t of targets) {
-		if (!t || typeof t !== 'object') continue
-		const ch = Math.max(1, parseInt(String(t.channel), 10) || 0)
-		const ln = Math.max(1, parseInt(String(t.layer), 10) || 0)
-		if (!Number.isFinite(ch) || !Number.isFinite(ln)) continue
-		await playRouteOnChannel(ch, ln, route, { audioOnly: liveUi?.pgmAudioOnly !== false })
-	}
 }

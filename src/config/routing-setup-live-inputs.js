@@ -1,7 +1,8 @@
 'use strict'
 
 const routingMap = require('./routing-map')
-const { listConfiguredLiveAudioSlots, resolveLiveAudioRouteString } = require('./live-audio-input')
+const { listConfiguredLiveAudioSlots, resolveLiveAudioRouteString, liveAudioPgmLayerForSlot } = require('./live-audio-input')
+const { isPgmAudioOnly, amcpForPlannedRoute } = require('../engine/live-input-route-reassert')
 const { playLiveAlsaClipWithRecovery } = require('../audio/live-audio-health')
 const { listConfiguredV4l2Slots } = require('../capture/v4l2-input-config')
 const { playV4l2ClipWithRecovery } = require('../capture/v4l2-input-health')
@@ -91,50 +92,43 @@ async function setupV4l2Inputs(self) {
 	self.log('info', `V4L2 inputs: ${playOk}/${playable.length} PLAY on dedicated channel(s) ${playable.map((s) => s.channel).join(', ')}`)
 }
 
-async function setupLiveAudioPgmRoutes(self) {
+/**
+ * Put each ALSA slot's persisted PGM routes on air. Boot/connect obeys `live_audio_pgm_always_on`; `force` (the Live
+ * Audio Mixer's Save & Apply) routes the saved selection regardless — that used to be a second, client-side PLAY loop.
+ * @param {object} self
+ * @param {{ force?: boolean }} [opts]
+ */
+async function setupLiveAudioPgmRoutes(self, opts = {}) {
 	if (!self.amcp) return
 	const alwaysOn =
 		routingMap.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== false &&
 		routingMap.readCasparSetting(self.config, 'live_audio_pgm_always_on') !== 'false'
-	if (!alwaysOn) return
+	if (!alwaysOn && !opts.force) return
 	const { slots } = listConfiguredLiveAudioSlots(self.config)
 	if (!slots.length) return
 
-	const baseLayer = Math.min(
-		9,
-		Math.max(1, parseInt(String(routingMap.readCasparSetting(self.config, 'live_audio_pgm_layer') ?? 2), 10) || 2),
-	)
-	const audioOnly =
-		routingMap.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === true ||
-		routingMap.readCasparSetting(self.config, 'live_audio_pgm_audio_only') === 'true'
+	// Audio-only defaults ON, as everywhere else (reassert, routing store, web modal) — boot used to default it off.
+	const audioOnly = isPgmAudioOnly(self.config)
 	const routes = []
 
 	// WO-571: each slot routes only to its own persisted `pgmChannels` selection (the Live Audio
 	// Mixer's per-slot "Route to program" buttons) — never blanket-routed to every PGM screen
 	// regardless of what's selected. A slot with none selected stays off PGM entirely.
-	for (let i = 0; i < slots.length; i++) {
-		const slot = slots[i]
+	for (const slot of slots) {
 		if (!slot.pgmChannels.length) continue
 		const route = slot.route || resolveLiveAudioRouteString(self.config, slot.slot)
 		if (!route) continue
-		const layer = baseLayer + i
-		if (layer > 9) {
-			self.log('warn', `Live audio PGM route skipped slot ${slot.slot}: layer ${layer} exceeds audio track range 1–9`)
+		const layer = liveAudioPgmLayerForSlot(self.config, slot.slot)
+		if (layer == null) {
+			self.log('warn', `Live audio PGM route skipped slot ${slot.slot}: its layer exceeds audio track range 1–9`)
 			continue
 		}
 		for (const pgmCh of slot.pgmChannels) {
-			const cl = `${pgmCh}-${layer}`
 			try {
-				await self.amcp.raw(`PLAY ${cl} ${route}`)
-				if (audioOnly) {
-					try {
-						await self.amcp.raw(`MIXER ${cl} OPACITY 0`)
-						await self.amcp.raw(`MIXER ${cl} VOLUME 1`)
-					} catch (_) {}
-				}
+				for (const c of amcpForPlannedRoute({ channel: pgmCh, layer, route, audioOnly })) await self.amcp.raw(c)
 				routes.push({ channel: pgmCh, layer, route, audioOnly })
 			} catch (e) {
-				self.log('warn', `Live audio PGM route ${cl} ${route}: ${e?.message || e}`)
+				self.log('warn', `Live audio PGM route ${pgmCh}-${layer} ${route}: ${e?.message || e}`)
 			}
 		}
 	}

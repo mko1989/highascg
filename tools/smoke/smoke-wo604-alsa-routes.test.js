@@ -15,6 +15,8 @@ const persistence = require('../../src/utils/persistence')
 const mixerState = require('../../src/audio/mixer-state')
 const routing = require('../../src/audio/input-audio-routing')
 const routesMixer = require('../../src/api/routes-audio-mixer')
+const { setupLiveAudioPgmRoutes } = require('../../src/config/routing-setup-live-inputs')
+const { listLiveAudioPgmProtectedLayers } = require('../../src/config/live-audio-input')
 
 const ROOT = path.join(__dirname, '../..')
 
@@ -89,5 +91,32 @@ describe('WO-604 slice 5 ALSA Ch buttons', () => {
 	it('the web console posts ALSA Ch buttons and START leaves the replay to the server', () => {
 		const api = fs.readFileSync(path.join(ROOT, 'client/lib/input-audio-routing-api.js'), 'utf8')
 		assert.match(api, /kind === 'live_audio'/)
+	})
+})
+
+describe('WO-604 one ALSA route path: boot, Save & Apply and the Ch buttons agree', () => {
+	/** Bridge off + slot 1 without a device = a gap: slot 2 keeps ITS layer (base + 2 − 1), not the first free one. */
+	const gap = { live_audio_capture_bridge: false, live_audio_input_1_device: '', live_audio_input_2_pgm_channels: '1' }
+	it('a gap moves no layer: boot, protected layers and the routing store all use slot 2 → layer 3', async () => {
+		const r = rig(gap)
+		await setupLiveAudioPgmRoutes(r.ctx)
+		assert.deepEqual(r.raw, ['STOP 1-3', 'MIXER 1-3 CLEAR', 'PLAY 1-3 route://6', 'MIXER 1-3 OPACITY 0'], 'audio-only by default')
+		assert.deepEqual(listLiveAudioPgmProtectedLayers(r.ctx.config).map((p) => p.layer), [3])
+		assert.equal(routing.routingSnapshot(r.ctx.config).inputs.find((i) => i.slot === 2).destLayer, 3)
+	})
+	it('auto-route off: boot plays nothing, Save & Apply (force) still routes the saved selection', async () => {
+		const r = rig({ ...gap, live_audio_pgm_always_on: false, live_audio_pgm_audio_only: false })
+		await setupLiveAudioPgmRoutes(r.ctx)
+		assert.deepEqual(r.raw, [])
+		await setupLiveAudioPgmRoutes(r.ctx, { force: true })
+		assert.deepEqual(r.raw, ['STOP 1-3', 'MIXER 1-3 CLEAR', 'PLAY 1-3 route://6'])
+	})
+	it('the web modal leaves PGM routing to the server (no client PLAY loop)', () => {
+		const modal = fs.readFileSync(path.join(ROOT, 'client/components/live-audio-mixer-modal.js'), 'utf8')
+		const lib = fs.readFileSync(path.join(ROOT, 'client/lib/live-audio-routing.js'), 'utf8')
+		const srv = fs.readFileSync(path.join(ROOT, 'src/api/routes-audio.js'), 'utf8')
+		assert.match(modal, /applyLiveAudioCapture\(\{ routes: true \}\)/)
+		assert.doesNotMatch(modal + lib, /applyPgmRoutesForSlot/)
+		assert.match(srv, /setupLiveAudioPgmRoutes\(ctx, \{ force: parseBody\(body\)\?\.routes === true \}\)/)
 	})
 })

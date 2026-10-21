@@ -338,6 +338,23 @@ function resolveLiveAudioPgmTargetScreens(cfg) {
 }
 
 /**
+ * ALSA slot N's PGM route layer: `live_audio_pgm_layer` (default 2, clamped to the audio tracks) + slot − 1, or null
+ * past track 9. Keyed by the SLOT, not its index among configured slots, so a gap (slot 1 empty) moves nothing — the
+ * one rule for boot routing, the server routing store and the web modal (WO-604).
+ * @param {object} cfg
+ * @param {number} slot 1-based
+ * @returns {number | null}
+ */
+function liveAudioPgmLayerForSlot(cfg, slot) {
+	const base = Math.min(
+		PGM_AUDIO_TRACK_LAYER_MAX,
+		Math.max(1, parseInt(String(readCasparSetting(cfg, 'live_audio_pgm_layer') ?? 2), 10) || 2),
+	)
+	const layer = base + Math.max(1, parseInt(String(slot), 10) || 1) - 1
+	return layer <= PGM_AUDIO_TRACK_LAYER_MAX ? layer : null
+}
+
+/**
  * PGM layers used by live_audio_pgm_always_on routes (must stay within audio track slots 1–9).
  * @param {object} cfg
  * @returns {Array<{ channel: number, layer: number, slot: number, screen: number }>}
@@ -349,17 +366,11 @@ function listLiveAudioPgmProtectedLayers(cfg) {
 	if (!alwaysOn) return []
 	const { slots } = listConfiguredLiveAudioSlots(cfg)
 	if (!slots.length) return []
-	const baseLayer = Math.min(
-		PGM_AUDIO_TRACK_LAYER_MAX,
-		Math.max(1, parseInt(String(readCasparSetting(cfg, 'live_audio_pgm_layer') ?? 2), 10) || 2),
-	)
 	const out = []
-	for (let i = 0; i < slots.length; i++) {
-		const layer = baseLayer + i
-		if (layer < 1 || layer > PGM_AUDIO_TRACK_LAYER_MAX) continue
-		for (const pgmCh of slots[i].pgmChannels) {
-			out.push({ channel: pgmCh, layer, slot: slots[i].slot })
-		}
+	for (const s of slots) {
+		const layer = liveAudioPgmLayerForSlot(cfg, s.slot)
+		if (layer == null) continue
+		for (const pgmCh of s.pgmChannels) out.push({ channel: pgmCh, layer, slot: s.slot })
 	}
 	return out
 }
@@ -397,4 +408,5 @@ module.exports = {
 	resolveLiveAudioPgmTargetScreens,
 	resolveLiveAudioSlotPgmChannels,
 	listLiveAudioPgmProtectedLayers,
+	liveAudioPgmLayerForSlot,
 }
