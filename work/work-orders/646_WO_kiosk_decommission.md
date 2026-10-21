@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21)**
+**Status: DONE (2026-10-21, offline suite 2757/0, lint/format/lines/exports clean, client built; stages A+B box-verified)**
 
 # WO-646 — Delete the Firefox kiosk operator GUI; two clients remain (web UI, Godot GUI)
 
@@ -81,6 +81,35 @@ Importer map (rg `require(...)`, 21.10):
   each; 243 keeps its older "partially deprecated" banner). The OPERATOR-GUI-CEF and OPERATOR-GUI-V2 queue rows are
   marked deprecated.
 
+### Stage C (web client)
+
+- Kiosk mode out of the web UI. Deleted:
+  - `client/lib/`: `operator-gui-mode.js`, `-rects.js`, `-report.js`, `operator-gui-interaction-suppress.js`,
+    `operator-gui-launch.js`, `element-position-watch.js`, `hole-rect.js`;
+  - `client/components/`: `header-bar-operator-helper.js`, `-app-menu.js`, the five `operator-compose-tiles*.js`;
+  - `client/styles/10-operator-gui-mode.css`, `10b-operator-compose-tiles.css` (and their `styles.css` imports).
+- Call sites cleaned: `app.js`, `app-ws-handlers.js` (the `operatorGuiLayout` broadcast), `osc-client.js` (kiosk
+  throttle), `header-bar.js`, `scenes-editor*.js` (WO-343 PRV watch hole), `timeline-editor.js`, `multiview-editor.js`
+  (hole reporter, the hidden `#mv-live-toggle`), `cg-studio-tab.js`, `inspector-media-file.js`. The destination
+  inspector lost the Web-UI URL, auto-launch and Launch button.
+- Compose preview = thumbnails. `compose-preview-url.js` has two modes, `canvas` / `ffmpeg_jpeg`; a saved `native`
+  or `stream` shows canvas thumbnails. The WO-319 web "Live stream" overlay lived inside the deleted compose tiles,
+  so it went too: `compose-preview-stream-driver.js`, `preview-canvas-live-stream.js`, `operator-stream-view.js`,
+  `lib/gui-stream-client.js`, the Settings "Live stream" option and its WebCodecs warning. `preview-canvas-panel.js`
+  lost the tiles mode, the tile "Reset" button and the dead `surface` / `getOscClient` options (callers trimmed).
+- Smokes: 11 kiosk-only files deleted (wo256 ×4, wo319 live-canvas + remote-view, wo343, wo529, wo533, hole-rect,
+  plus `tools/smoke/lib/operator-compose-tiles-read.js`) and dropped from the curated list. 12 mixed files lost only
+  their kiosk cases (wo243, wo256-wiring, wo265, wo271, wo287-289, wo297, wo323, wo408, wo530, wo597; wo297 keeps
+  its 22 playback-timer idle-label tests). Trimmed by two Haiku agents, diffs reviewed here.
+- Unwired-exports baseline rewritten (no new orphans); two stray unused vars fixed so lint is back under its cap.
+
+### Follow-ups (not done)
+
+- Server WO-319 gui-stream (NVENC encoder, `src/bootstrap/operator-gui-stream.js`, `routes-gui-stream.js`) has no
+  client any more — delete in a follow-up.
+- `client/lib/input-channels.js` `resolveMvCellSourceChannel` lost its only caller (the multiview hole reporter).
+- Kept on purpose: the server atlas (`atlas: true`) — the Godot compose tiles still send it (WO-597 §D).
+
 ## What was VERIFIED
 
 - Stages A + B, 21.10:
@@ -90,3 +119,9 @@ Importer map (rg `require(...)`, 21.10):
   - Box: node restarted (up after 8 s, no errors). `GET /api/operator-gui/layout`, `/api/system/dock` and
     `/api/system/apps` → 200. `/api/operator-gui/launch` and `/api/system/operator-helper-window` → 404. The Godot GUI
     relaunched without script errors.
+- Stage C, 21.10:
+  - `npm run -s test:ci`: 2759 tests, 2757 pass, 0 fail, 2 skipped.
+  - Lint (0 errors, under the warning cap), `format:check`, `check-max-file-lines`, `check-unwired-exports` clean.
+  - `npm run build:client` OK (every import resolves).
+  - Owner QA: open the web UI from another machine → the Looks compose preview shows HQ thumbnails; Settings → Compose
+    preview offers Canvas / Caspar JPEG only.

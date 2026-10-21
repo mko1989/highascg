@@ -58,17 +58,11 @@ import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
-import { applyOperatorGuiHtmlClass, initOperatorGuiRectReporting } from './lib/operator-gui-mode.js'
-import { initOperatorGuiInteractionSuppress } from './lib/operator-gui-interaction-suppress.js'
 import { initDecklinkInputToasts, initLiveInputFailureToasts } from './lib/decklink-input-toast.js'
 import { initMediaExistsIndex } from './lib/media-exists.js'
 import { initMediaDurationIndex } from './lib/media-duration.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
-// WO-243/255: hard-gated on ?operatorGui / legacy ?cefOperator in the query string — no-op
-// (removes the class, which is already absent) for every normal browser session.
-applyOperatorGuiHtmlClass()
-initOperatorGuiInteractionSuppress()
 
 export const stateStore = new StateStore()
 initDecklinkInputToasts(stateStore)
@@ -151,10 +145,6 @@ async function init() {
 
 	Handlers.attachWsHandlers(ws, { stateStore, sceneState, timelineState, multiviewState, programOutputState, projectState, dmxState, variableStore: getVariableStore(ws), appLogic })
 	bindAudioMixerServer({ ws, stateStore }) // WO-604 slice 2: one mixer for every client
-	// WO-254 T254.2 (kept under the WO-255 rename): re-POST cached merged cell rects on WS
-	// reconnect / server nudge / 60s heartbeat. Hard-gated inside — no-op for every normal
-	// (non-operator-GUI) session.
-	initOperatorGuiRectReporting(ws)
 
 	let autosaveTimeout = null
 	let autosaveInFlight = null

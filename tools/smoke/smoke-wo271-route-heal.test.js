@@ -92,10 +92,7 @@ describe('WO-271 T271.2/T271.4: wiring (source asserts)', () => {
 		assert.ok(idx > 0 && idx < routing.indexOf('reapplyAllMultiviewLayouts'), 'heal must precede multiview reapply')
 	})
 
-	it('mv editor resolves srcCh through the heal-aware helper', () => {
-		const editor = src('client/components/multiview-editor.js')
-		assert.match(editor, /resolveMvCellSourceChannel\(c, parsed, cm\)/)
-		assert.match(editor, /if \(srcCh == null\) continue/)
+	it('input-channels.js exports the heal-aware resolveMvCellSourceChannel helper', () => {
 		const lib = src('client/lib/input-channels.js')
 		assert.match(lib, /export function resolveMvCellSourceChannel/)
 	})

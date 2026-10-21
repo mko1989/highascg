@@ -12,7 +12,6 @@
  *    `pickTopLayerStateForPlayback` (single implementation, asserted structurally below).
  *  - `mountPgmTopLayerPlaybackTimer` idle rendering: label in the row, progress bar hidden,
  *    no per-frame DOM writes while idle, bar restored when playback resumes.
- *  - operator-compose-tiles.js `TILE_CHROME.footerH` is untouched (the hole geometry depends on it).
  *
  * playback-timer.js is plain ESM but has no top-level DOM access, so `require()` works under
  * node:test (same pattern as smoke-wo250-timer-bank-mv-bars.test.js). The mount tests install a
@@ -31,7 +30,6 @@ const {
 	pickTopLayerStateForPlayback,
 	mountPgmTopLayerPlaybackTimer,
 } = require('../../client/components/playback-timer.js')
-const { TILE_CHROME } = require('../../client/components/operator-compose-tiles.js')
 
 const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
 
@@ -343,8 +341,7 @@ describe('WO-297: compose-tile footer with NO running source', () => {
 		})
 	})
 
-	it('the footer height contract is untouched (hole geometry depends on TILE_CHROME)', () => {
-		assert.equal(TILE_CHROME.footerH, 34, 'idle mode hides the bar with display:none — it must not resize the footer')
+	it('idle hides the bar without resizing its host', () => {
 		const src = read('client/components/playback-timer.js')
 		assert.match(src, /bar\.style\.display = 'none'/, 'idle hides the bar rather than removing it from the DOM')
 		assert.doesNotMatch(src, /container\.style\.height/, 'the timer never sizes its own host — the footer owns that')

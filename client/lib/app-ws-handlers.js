@@ -22,7 +22,6 @@ import {
 	syncComposePreviewFromChannelMap,
 } from '../components/preview-canvas-compose-snapshot.js'
 import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-url.js'
-import { applySharedLayoutBroadcast } from './operator-gui-mode.js'
 import { invalidateCompanionFlagThumbs, noteCompanionButtonPreviewUpdate } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
 import { applyClientPrefsBroadcast, loadClientPrefs } from './client-prefs.js'
@@ -193,9 +192,6 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 	ws.on('streaming_channel', (data) => ingestStreamingChannelWsEvent(data))
 
 	ws.on('compose.preview', (data) => ingestComposePreviewWs(data))
-
-	// WO-319: the shared operator compose layout changed (any client moved a window) — re-sync tiles.
-	ws.on('operatorGuiLayout', (data) => applySharedLayoutBroadcast(data?.cells, { source: data?.source, atlas: data?.atlas }))
 
 	ws.on('companion.buttonPreview', (data) => {
 		/* Record the fresh mtime BEFORE invalidating so the re-fetch is cache-busted past the

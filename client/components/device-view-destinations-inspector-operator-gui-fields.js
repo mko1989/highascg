@@ -1,10 +1,9 @@
-import { api } from '../lib/api-client.js'
-
 /**
- * WO-243/255: guiUrl/physicalPort fields + a Launch/Bring-to-front button for the `operator_gui`
- * destination inspector — split out of device-view-destinations-inspector-form.js to keep that
- * file under the repo's ~500-line target (mirrors the pixelmap fixture-array block's
- * `field()`-helper pattern there).
+ * WO-243/255: physicalPort + video-output fields for the `operator_gui` destination inspector —
+ * split out of device-view-destinations-inspector-form.js to keep that file under the repo's
+ * ~500-line target (mirrors the pixelmap fixture-array block's `field()`-helper pattern there).
+ * WO-646: the Firefox operator-GUI kiosk was deleted, so its URL, boot-start and launch controls
+ * are gone; only fields that configure the Caspar operator channel remain.
  * @param {{ d: object, patchDestination: (id: string, patch: object) => void }} args
  * @returns {HTMLElement[]}
  */
@@ -21,14 +20,6 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 		wrap.append(lab, input)
 		return wrap
 	}
-
-	const guiUrlIn = document.createElement('input')
-	guiUrlIn.type = 'text'
-	guiUrlIn.className = 'device-view__destinations-type'
-	guiUrlIn.placeholder = 'http://127.0.0.1:4200/?operatorGui=1'
-	guiUrlIn.value = String(d?.guiUrl || '')
-	guiUrlIn.title = 'Fullscreen Firefox web-UI URL — must include ?operatorGui (or legacy ?cefOperator) for the client bundle to enter operator mode'
-	guiUrlIn.addEventListener('change', () => patchDestination(d.id, { guiUrl: String(guiUrlIn.value || '').trim() }))
 
 	// A select with an explicit Auto entry: a bare number input read as "required" and gave no
 	// way back to auto once a port was typed (the PATCH also swallowed null — fixed server-side).
@@ -51,65 +42,23 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 		patchDestination(d.id, { physicalPort: raw === '' ? null : (Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : null) })
 	})
 
-	// WO-597 T4: where Caspar puts the operator channel — a screen window (Firefox kiosk) or shared memory (native client).
+	// WO-597 T4: where Caspar puts the operator channel — a screen window or shared memory (Godot GUI).
 	const videoOutputIn = document.createElement('select')
 	videoOutputIn.className = 'device-view__destinations-type'
 	for (const [value, text] of [
-		['screen', 'Screen (window under the Firefox kiosk)'],
-		['shm', 'Shared memory (native Godot client)'],
+		['screen', 'Screen (a Caspar window on the operator monitor)'],
+		['shm', 'Shared memory (the Godot GUI)'],
 	]) {
 		videoOutputIn.appendChild(Object.assign(document.createElement('option'), { value, textContent: text }))
 	}
 	videoOutputIn.value = d?.videoOutput === 'shm' ? 'shm' : 'screen'
-	videoOutputIn.title = 'Operator channel output. Shared memory has no screen window and no kiosk auto-launch. Regenerate + restart Caspar to apply.'
+	videoOutputIn.title = 'Operator channel output. Shared memory has no screen window. Regenerate + restart Caspar to apply.'
 	videoOutputIn.addEventListener('change', () => patchDestination(d.id, { videoOutput: videoOutputIn.value === 'shm' ? 'shm' : 'screen' }))
-
-	// WO-264 T264.4: boot-time auto-start toggle (default on; server launches when a monitor resolves).
-	const autoLaunchWrap = Object.assign(document.createElement('label'), {
-		className: 'device-view__inspector-label',
-		style: 'display:flex; align-items:center; gap:6px; font-size:10px;opacity:.7',
-	})
-	const autoLaunchIn = document.createElement('input')
-	autoLaunchIn.type = 'checkbox'
-	autoLaunchIn.checked = d?.autoLaunch !== false
-	autoLaunchIn.title =
-		'Launch the operator GUI browser automatically when HighAsCG starts (skipped when no operator monitor resolves — multiple displays need a screen_N_operator_monitor flag or an explicit port).'
-	autoLaunchIn.addEventListener('change', () => patchDestination(d.id, { autoLaunch: autoLaunchIn.checked }))
-	autoLaunchWrap.append(autoLaunchIn, document.createTextNode('Auto-start at boot'))
 
 	const note = document.createElement('p')
 	note.className = 'device-view__note'
 	note.textContent =
 		'Route layers (10-49) mirror routed compose/timeline/mv-edit preview cells, shaped above fullscreen Firefox via X SHAPE. Regenerate + restart Caspar to apply the channel/screen consumer.'
 
-	// WO-255 T255.2: Launch (or raise, if already running) the fullscreen Firefox GUI process.
-	const launchBtn = document.createElement('button')
-	launchBtn.type = 'button'
-	launchBtn.className = 'device-view__btn'
-	launchBtn.textContent = 'Launch / Bring to front'
-	const statusLine = document.createElement('p')
-	statusLine.className = 'device-view__note'
-	statusLine.style.minHeight = '1em'
-	launchBtn.addEventListener('click', async () => {
-		launchBtn.disabled = true
-		statusLine.textContent = 'Launching...'
-		try {
-			const res = await api.post('/api/operator-gui/launch', {})
-			if (res?.ok) {
-				statusLine.textContent = res.action === 'raised' ? 'Brought to front.' : 'Launched.'
-			} else {
-				statusLine.textContent = `Failed: ${res?.reason || 'unknown error'}`
-			}
-		} catch (e) {
-			statusLine.textContent = `Failed: ${e?.reason || e?.message || e}`
-		} finally {
-			launchBtn.disabled = false
-		}
-	})
-	const launchWrap = Object.assign(document.createElement('div'), {
-		style: 'display:flex; flex-direction:column; gap:4px; width:100%',
-	})
-	launchWrap.append(launchBtn, statusLine)
-
-	return [field('Web-UI URL', guiUrlIn), field('Physical GPU port (optional)', physicalPortIn), field('Video output', videoOutputIn), autoLaunchWrap, note, launchWrap]
+	return [field('Physical GPU port (optional)', physicalPortIn), field('Video output', videoOutputIn), note]
 }

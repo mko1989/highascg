@@ -70,20 +70,6 @@ export class OscClient {
 
 	_ingest(d) {
 		if (!d || typeof d !== 'object') return
-		// WO-255: the original reason for this throttle (operator mode running INSIDE Caspar's own
-		// CEF process — a booting GUI starved AMCP, 2026-07-16) no longer applies now that the GUI is
-		// a separate Firefox process, but coalescing full-snapshot OSC ticks (~20/s) to ~4 Hz is still
-		// a harmless perf win for that heavy page, so it's kept for both the current (?operatorGui)
-		// and legacy (?cefOperator) query params. Deltas are never dropped (they compound).
-		if (
-			!d.delta &&
-			typeof location !== 'undefined' &&
-			(new URLSearchParams(location.search).has('operatorGui') || new URLSearchParams(location.search).has('cefOperator'))
-		) {
-			const now = Date.now()
-			if (this._lastCefIngestAt && now - this._lastCefIngestAt < 250) return
-			this._lastCefIngestAt = now
-		}
 		if (d.delta && d.channels) {
 			for (const k of Object.keys(d.channels)) this._ch[k] = mergeChannel(this._ch[k], d.channels[k])
 		} else if (d.channels) this._ch = { ...d.channels }

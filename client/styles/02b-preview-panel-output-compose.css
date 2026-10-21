@@ -34,22 +34,6 @@
 	line-height: 1;
 }
 
-/* The Reset button had no rule at all — browser-default metrics made it the tallest child. */
-.preview-panel__grab {
-	padding: 1px 6px;
-	font-size: 10px;
-	line-height: 1.4;
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	background: var(--bg-panel);
-	color: var(--text);
-	cursor: pointer;
-}
-
-.preview-panel__grab:hover {
-	background: var(--border);
-}
-
 .preview-panel__toggle:hover {
 	background: var(--border);
 }

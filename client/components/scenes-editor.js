@@ -24,11 +24,10 @@ import { mountPgmTopLayerPlaybackTimer } from './playback-timer.js'
 import { SCENE_THUMB_MAX_W, showScenesToast, appendScenesEditorShell, bindScenesPreviewSplitDrag, createTakeSceneToProgram } from './scenes-editor-support.js'
 import { LOOK_PRESET_RECALL_PGM, LOOK_PRESET_RECALL_PRV } from '../lib/look-preset-events.js'
 import * as Logic from './scenes-editor-logic.js'
-import { renderEdit, livePrvViewRef } from './scenes-editor-edit.js'
+import { renderEdit } from './scenes-editor-edit.js'
 import { attachScenesEditorKeyboard } from './scenes-editor-keyboard.js'
 import { resolveLookStackChannelForBus, resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { isPreviewBusAvailable } from '../lib/scenes-preview-look-stack.js'
-import { reportComposeCellRects } from '../lib/operator-gui-mode.js'
 import { refreshSceneLiveFromServer, syncPreviewLiveToServer } from '../lib/scene-live-sync.js'
 import { commitPendingLookNameEdits } from '../lib/scene-look-name-commit.js'
 import { createBuildLayerRouteDescriptor } from './scenes-editor-layer-route.js'
@@ -122,10 +121,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		selectedLayerIndexRef.current = null
 		dispatchLayerSelect(null)
 		previewRuntime.clearLastPreviewLayers()
-		// WO-343: withdraw the live-PRV hole when leaving the editor (report() sees
-		// editingSceneId === null and sends the empty surface).
-		livePrvViewRef.report?.()
-		livePrvViewRef.report = null
 	}
 
 	window.addEventListener('highascg-border-preset-recall', (ev) => {
@@ -212,13 +207,6 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		title: 'Compose preview', storageKeyPrefix: 'casparcg_preview_scenes', getOutputResolution: getResolution, stateStore, streamName: 'prv_1', composePrvPgmLayoutToggle: true, fillParentHeight: true, hideInnerResize: true, getProgramChannel,
 		getDualStreamNames: getComposeStreamNames,
 		showDestinationVisualOverlay: false,
-		// WO-256: threaded through to the operator-GUI free-tile canvas's per-tile progress bars
-		// (mountPgmTopLayerPlaybackTimer) — unused/no-op on the normal (non-operator-tiles) path.
-		getOscClient,
-		// WO-243/255: no-op unless operator-GUI mode is active (reportComposeCellRects hard-gates
-		// itself) — this is the main operator output preview, so its compose cells are the
-		// 'compose' surface merged into the operator-GUI channel's route holes (10-49).
-		onComposeCellRects: (cellRects, viewport) => reportComposeCellRects(cellRects, viewport),
 		onCollapsedChange: c => { previewHost.classList.toggle('preview-host--collapsed', !!c); previewHost.style.flex = c ? '0 0 auto' : `0 0 ${splitPx.current}px` },
 		draw: (ctx, W, H, isLive, meta = {}) => {
 			const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'; const isDual = meta.composePrvPgmLayoutToggle

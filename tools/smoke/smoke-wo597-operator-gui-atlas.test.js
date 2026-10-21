@@ -190,23 +190,3 @@ describe('WO-597 §D atlas mode — apply path', () => {
 		)
 	})
 })
-
-describe('WO-597 §D atlas — web remote view crops the slots', () => {
-	const fs = require('node:fs')
-	const path = require('node:path')
-	const read = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
-	it('the WS broadcast, the subscriber and the initial GET all hand the descriptor to seedFromCells', () => {
-		assert.match(
-			read('client/lib/app-ws-handlers.js'),
-			/applySharedLayoutBroadcast\(data\?\.cells, \{[^}]*atlas: data\?\.atlas/
-		)
-		const tiles = read('client/components/operator-compose-tiles.js')
-		assert.match(tiles, /subscribeSharedLayout\(\(cells, meta\) => seedFromCells\(cells, \{ atlas: meta\?\.atlas \}\)\)/)
-		assert.match(tiles, /positions: true, atlas: j\?\.atlas/)
-		assert.match(
-			read('client/components/operator-compose-tiles-tile-controller.js'),
-			/slots\[c\.id\]/,
-			'crop source = slot by cell id'
-		)
-	})
-})

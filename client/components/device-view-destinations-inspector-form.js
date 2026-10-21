@@ -437,7 +437,7 @@ export function renderDestinationInspector(args) {
 		pixelmapFields.push(note)
 	}
 
-	// WO-243: guiUrl/physicalPort fields for the operator_gui destination — extracted to keep this
+	// WO-243: physicalPort/video-output fields for the operator_gui destination — extracted to keep this
 	// file under the repo's ~500-line target (device-view-destinations-inspector-operator-gui-fields.js).
 	const operatorGuiFields = mode === 'operator_gui' ? buildOperatorGuiFields({ d, patchDestination }) : []
 

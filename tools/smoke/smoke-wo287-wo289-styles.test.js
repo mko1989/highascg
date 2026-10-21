@@ -104,21 +104,6 @@ describe('WO-289: Looks editor checkerboard canvas', () => {
 			'.scenes-compose must retain the dark base background color #0d1117')
 	})
 
-	it('operator-compose-tiles remain fully transparent', () => {
-		const css = src('client/styles/10b-operator-compose-tiles.css')
-		const operatorTiles = css.match(/\.operator-tile \{[^}]*?\}/s)?.[0] || ''
-		assert.match(operatorTiles, /background:\s*transparent/,
-			'.operator-tile must have fully transparent background (not checkerboard)')
-	})
-
-	it('operator-compose-tiles mount has dark background (not checkerboard)', () => {
-		const css = src('client/styles/10b-operator-compose-tiles.css')
-		// The preview-panel mount should have a solid dark background
-		const mount = css.match(/\.preview-panel__operator-tiles-mount \{[^}]*?\}/s)?.[0] || ''
-		// It should NOT have linear-gradient checkerboard
-		assert.doesNotMatch(mount, /linear-gradient/,
-			'operator-tiles mount must not have checkerboard pattern')
-	})
 })
 
 describe('WO-287b: modal overlays carry no scrim tint at all', () => {

@@ -12,7 +12,6 @@
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
-const path = require('path')
 
 const {
 	resolvePickerOptIn,

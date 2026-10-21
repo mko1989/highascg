@@ -39,11 +39,9 @@ import {
 	attachTimelineEditorInput,
 } from './timeline-editor-handlers.js'
 import { createTimelinePlaybackRuntime } from './timeline-editor-playback.js'
-import { reportTimelineCellRects } from '../lib/operator-gui-mode.js'
 import { initTimelinePreviewSplit, bindTimelinePreviewSplitDrag } from './timeline-editor-split.js'
 
-export function initTimelineEditor(root, stateStore, opts = {}) {
-	const getOscClient = opts.getOscClient || (() => null)
+export function initTimelineEditor(root, stateStore, _opts = {}) {
 	let redrawTimelineView = () => {}
 
 	let selectedClip = null  // { layerIdx, clipId, timelineId, clip }
@@ -227,9 +225,6 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 	previewPanel = initPreviewPanel(previewHost, {
 		title: 'Timeline output',
 		storageKeyPrefix: 'casparcg_preview_timeline',
-		// WO-529: matches reportTimelineCellRects' tag, so this canvas seeds only from its own cells
-		// and never adopts the looks editor's arrangement (their seed keys are identical).
-		surface: 'timeline',
 		fillParentHeight: true,
 		hideInnerResize: true,
 		onCollapsedChange: (isCollapsed) => {
@@ -246,9 +241,6 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 		 * screenDestinations custom width/height, so a custom-res screen previewed as 16:9. */
 		getOutputResolution: () => getResolutionForScreen(view.sendTo.screenIdx ?? 0, sceneState, stateStore),
 		stateStore,
-		// Per-tile playback progress bars on the operator-GUI free-tile canvas (same as the
-		// main compose preview) — no-op on the normal draw path.
-		getOscClient,
 		getComposeCellDefs: () => {
 			const s = Math.max(0, view.sendTo.screenIdx ?? 0)
 			const cm = stateStore.getState()?.channelMap || {}
@@ -280,12 +272,6 @@ export function initTimelineEditor(root, stateStore, opts = {}) {
 		},
 		showDestinationVisualOverlay: false,
 		composePrvPgmLayoutToggle: true,
-		// WO-255 regression fix: this wiring only ever landed in the orphaned
-		// timeline-editor-preview.js, so the live timeline editor never reported its tile rects
-		// and the operator-GUI free-tile canvas stayed hole-less (no PGM/PRV video). No-op unless
-		// operator-GUI mode is active (reportTimelineCellRects hard-gates itself) — these cells
-		// are the 'timeline' surface merged into the operator-GUI channel's route holes.
-		onComposeCellRects: (cellRects) => reportTimelineCellRects(cellRects),
 		draw(ctx, W, H, isLive, meta = {}) {
 			if (isSnapshotComposePreview() && meta.composeCell) {
 				const layout = meta.composePrvPgmLayout === 'tb' ? 'tb' : 'lr'

@@ -121,7 +121,7 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 	})
 })
 
-describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks', () => {
+describe('WO-243/255 T243.1/T243.2/T243.3: UI source checks', () => {
 	const read = (rel) => fs.readFileSync(path.join(__dirname, '../..', rel), 'utf8')
 
 	it('destination type select + inspector form know about operator_gui', () => {
@@ -129,8 +129,6 @@ describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks
 		const form = read('client/components/device-view-destinations-inspector-form.js')
 		assert.match(form, /'operator_gui'/)
 		assert.match(form, /buildOperatorGuiFields/)
-		const fields = read('client/components/device-view-destinations-inspector-operator-gui-fields.js')
-		assert.match(fields, /Web-UI URL/)
 	})
 
 	it('addDestination() client action normalizes the operator_gui type', () => {
@@ -141,50 +139,12 @@ describe('WO-243/255 T243.1/T243.2/T243.3/T255.3: UI + client-gate source checks
 		assert.match(read('src/api/device-view-crud.js'), /At most one Operator GUI destination is allowed/)
 	})
 
-	it('operator-gui-mode.js (renamed from cef-operator-mode.js, WO-255) hard-gates on ?operatorGui / legacy ?cefOperator', () => {
+	it('WO-646: kiosk client-gate files stay deleted (cef-operator-mode rename, orphan timeline-editor-preview, old CSS)', () => {
 		assert.ok(!fs.existsSync(path.join(__dirname, '../../client/lib/cef-operator-mode.js')), 'old file removed')
-		const src = read('client/lib/operator-gui-mode.js')
-		assert.match(src, /has\('operatorGui'\)/)
-		assert.match(src, /has\('cefOperator'\)/, 'legacy query param still accepted')
-	})
-
-	it('preview-canvas-panel.js wires the operator-GUI gate (draw skip) without unconditional behavior change', () => {
-		const src = read('client/components/preview-canvas-panel.js')
-		assert.match(src, /isOperatorGuiModeActive/)
-		assert.match(src, /operatorGuiActive/)
-	})
-
-	it('app.js applies the operator-gui html class + interaction-suppress detector at bootstrap', () => {
-		const src = read('client/app.js')
-		assert.match(src, /applyOperatorGuiHtmlClass/)
-		assert.match(src, /initOperatorGuiInteractionSuppress/)
-	})
-
-	it('WO-255 T255.3: three surfaces report into operator-gui-mode.js (compose/timeline/mv-edit)', () => {
-		assert.match(read('client/components/scenes-editor.js'), /reportComposeCellRects/)
-		// The timeline wiring MUST live in the LIVE editor (timeline-editor.js). It originally
-		// landed only in the orphaned, never-imported timeline-editor-preview.js (deleted), which
-		// left the timeline surface silent — no rects, no holes, no video in operator-GUI mode.
-		assert.match(read('client/components/timeline-editor.js'), /reportTimelineCellRects/)
 		assert.ok(
 			!fs.existsSync(path.join(__dirname, '../../client/components/timeline-editor-preview.js')),
 			'orphaned timeline-editor-preview.js stays deleted (dead copy that masked the WO-255 wiring regression)',
 		)
-		assert.match(read('client/components/multiview-editor.js'), /reportMultiviewEditRect/)
-	})
-
-	it('WO-255 T255.3: interaction suppression detector wired at bootstrap and hooks modal-overlay + preview surfaces', () => {
-		const src = read('client/lib/operator-gui-interaction-suppress.js')
-		assert.match(src, /modal-overlay/)
-		assert.match(src, /pointerdown/)
-		assert.match(src, /setInteractionSuppressed/)
-	})
-
-	it('WO-255 T255.3: 10-operator-gui-mode.css replaces the WO-243 transparent-holes CSS with a dark backing', () => {
 		assert.ok(!fs.existsSync(path.join(__dirname, '../../client/styles/10-cef-operator-mode.css')), 'old CSS file removed')
-		const css = read('client/styles/10-operator-gui-mode.css')
-		assert.match(css, /#0a0a0a/)
-		assert.match(css, /html\.operator-gui/)
-		assert.match(read('client/styles.css'), /10-operator-gui-mode\.css/)
 	})
 })

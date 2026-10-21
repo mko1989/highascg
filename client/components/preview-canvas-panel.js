@@ -6,20 +6,13 @@ import { streamState, shouldShowLiveVideo } from '../lib/stream-state.js'
 import { settingsState } from '../lib/settings-state.js'
 import * as ResizeH from './preview-panel-resize.js'
 import { createDestinationLayoutOverlay } from './preview-canvas-destination-overlay.js'
-import { isOperatorGuiModeActive, setOperatorStreamViewActive } from '../lib/operator-gui-mode.js'
 import { createComposeCellObj } from './preview-canvas-compose-cell-chrome.js'
-import { initOperatorComposeTiles } from './operator-compose-tiles.js'
-import { subscribeOperatorLiveCanvasState, operatorLiveCanvasState } from './preview-canvas-live-stream.js'
 
 const G = 6; const BORDER_FADE = 400
 
 export function initPreviewPanel(host, options) {
-	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null, getOscClient = null, surface = 'compose' } = options
+	const { title = 'Output preview', storageKeyPrefix = 'casparcg_preview', getOutputResolution, draw, stateStore, streamName, getStreamName = null, getDualStreamNames = null, getComposeCellDefs: getComposeCellDefsOverride = null, composePrvPgmLayoutToggle = false, fillParentHeight = false, hideInnerResize = false, onCollapsedChange = null, showDestinationVisualOverlay = false, onComposeCellRects = null } = options
 	const kC = `${storageKeyPrefix}_collapsed`; const kH = `${storageKeyPrefix}_height`; const kL = `${storageKeyPrefix}_compose_prv_pgm_layout`; const kS = `${storageKeyPrefix}_compose_prv_pgm_split`; const kW = `${storageKeyPrefix}_compose_cell_weights`
-	// WO-256: operator-GUI mode replaces the compose canvas-pair with a free-tile canvas
-	// (client/components/operator-compose-tiles.js) — hard-gated, zero effect otherwise.
-	const operatorTilesActive = composePrvPgmLayoutToggle && isOperatorGuiModeActive()
-	let composeTilesMode = operatorTilesActive // WO-319: dynamic — Live preview flips a client into the tiles+stream view
 
 	let layout = (localStorage.getItem(kL) === 'tb' || localStorage.getItem(kL) === 'lr') ? localStorage.getItem(kL) : 'lr'
 	let prvPct = parseFloat(localStorage.getItem(kS) || '0.5'); if (isNaN(prvPct) || prvPct < 0.05 || prvPct > 0.95) prvPct = 0.5
@@ -35,22 +28,11 @@ export function initPreviewPanel(host, options) {
 	const titleEl = document.createElement('span'); titleEl.className = 'preview-panel__title'; titleEl.textContent = title
 	const composeLayoutBtn = document.createElement('button'); composeLayoutBtn.className = 'preview-panel__compose-layout'; composeLayoutBtn.hidden = true
 	const resEl = document.createElement('span'); resEl.className = 'preview-panel__res'
-	const grabBtn = document.createElement('button'); grabBtn.className = 'preview-panel__grab'; grabBtn.textContent = 'Reset'; grabBtn.title = 'Reset compose preview windows to default layout'
-	headerEl.append(toggleBtn, titleEl, composeLayoutBtn, resEl, grabBtn)
+	headerEl.append(toggleBtn, titleEl, composeLayoutBtn, resEl)
 	const bodyEl = document.createElement('div'); bodyEl.className = bodyCls; if (!fillParentHeight) bodyEl.style.height = `${bodyH}px`
 	const resizeEl = document.createElement('div'); resizeEl.className = 'preview-panel__resize'
 	const canvasOuterEl = document.createElement('div'); canvasOuterEl.className = 'preview-panel__canvas-outer'
-	let tilesMountEl = null
-	if (operatorTilesActive) {
-		// WO-256: free-tile canvas mount — no webrtc containers/canvas-pair DOM at all, the shaped
-		// Caspar video renders ABOVE this page; the tile bodies are just reported rects.
-		tilesMountEl = document.createElement('div'); tilesMountEl.className = 'preview-panel__operator-tiles-mount'
-		canvasOuterEl.appendChild(tilesMountEl)
-	} else if (composePrvPgmLayoutToggle) {
-		// WO-319: a tiles mount ALSO exists on non-operator clients, hidden until Live preview flips
-		// the compose view from thumbnails to the operator stream view (see setComposeTilesMode).
-		tilesMountEl = document.createElement('div'); tilesMountEl.className = 'preview-panel__operator-tiles-mount'; tilesMountEl.style.display = 'none'
-		canvasOuterEl.appendChild(tilesMountEl)
+	if (composePrvPgmLayoutToggle) {
 		const wrapEl = document.createElement('div'); wrapEl.className = 'preview-panel__canvas-wrap'
 		const pairEl = document.createElement('div'); pairEl.className = `preview-panel__compose-pair ${cCls}`
 		const prvCell = document.createElement('div'); prvCell.className = 'preview-panel__compose-cell preview-panel__compose-cell--prv'
@@ -77,7 +59,7 @@ export function initPreviewPanel(host, options) {
 	root.append(headerEl, bodyEl)
 	host.appendChild(root)
 
-	const btn = root.querySelector('.preview-panel__toggle'); const cLayoutBtn = root.querySelector('.preview-panel__compose-layout'); const resStatusEl = root.querySelector('.preview-panel__res'); const grabBtnEl = root.querySelector('.preview-panel__grab'); const body = root.querySelector('.preview-panel__body'); const resizeH = root.querySelector('.preview-panel__resize'); const wrap = root.querySelector('.preview-panel__canvas-wrap'); const cPairEl = root.querySelector('.preview-panel__compose-pair'); const layoutOverlayEl = root.querySelector('.preview-panel__visual-layout-overlay')
+	const btn = root.querySelector('.preview-panel__toggle'); const cLayoutBtn = root.querySelector('.preview-panel__compose-layout'); const resStatusEl = root.querySelector('.preview-panel__res'); const body = root.querySelector('.preview-panel__body'); const resizeH = root.querySelector('.preview-panel__resize'); const wrap = root.querySelector('.preview-panel__canvas-wrap'); const cPairEl = root.querySelector('.preview-panel__compose-pair'); const layoutOverlayEl = root.querySelector('.preview-panel__visual-layout-overlay')
 	const prvVC = root.querySelector('[data-preview-webrtc="prv"]'); const pgmVC = root.querySelector('[data-preview-webrtc="pgm"]'); const VC = root.querySelector('.preview-panel__video-container')
 	const canv = root.querySelector('.preview-panel__canvas')
 	const ctx = canv?.getContext('2d')
@@ -264,22 +246,16 @@ export function initPreviewPanel(host, options) {
 	})
 	const paint = () => {
 		if (collapsed) return
-		// WO-256: operator-GUI free-tile canvas owns its own layout/resize/report loop entirely
-		// (client/components/operator-compose-tiles.js) — nothing to paint here.
-		if (operatorTilesActive) return
 		const { w, h } = getOutputResolution(); if (resStatusEl) resStatusEl.textContent = `${w}×${h}`; const dpr = Math.min(window.devicePixelRatio || 1, 2)
 		let cw = wrap.clientWidth; let ch = wrap.clientHeight; if (!cw) cw = 320; if (!ch) ch = 160
 		const isLive = !!(streamName && shouldShowLiveVideo())
-		// WO-243/255: skip canvas draw work when operator-GUI mode shows the shaped video overlay
-		// instead — inert/false otherwise.
-		const operatorGuiActive = isOperatorGuiModeActive()
 		if (!composePrvPgmLayoutToggle) {
 			canv.width = Math.round(w * dpr)
 			canv.height = Math.round(h * dpr)
 			ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 			canv.style.width = `${Math.floor(w * Math.min(cw / w, ch / h))}px`
 			canv.style.height = `${Math.floor(h * Math.min(cw / w, ch / h))}px`
-			if (!operatorGuiActive) { try { draw(ctx, w, h, isLive, {}) } catch (err) { console.warn('[preview] compose draw failed:', err?.message || err) } }
+			try { draw(ctx, w, h, isLive, {}) } catch (err) { console.warn('[preview] compose draw failed:', err?.message || err) }
 			renderDestinationLayoutOverlay()
 			return
 		}
@@ -329,7 +305,6 @@ export function initPreviewPanel(host, options) {
 			if (layout === 'tb') cPairEl.style.flexDirection = 'column'
 			else cPairEl.style.flexDirection = 'row'
 		}
-		const cellRectsForOperatorGui = operatorGuiActive && typeof onComposeCellRects === 'function' ? [] : null
 		for (const item of composeCells) {
 			const cellRect = item.cellEl.getBoundingClientRect()
 			const pairRect = cPairEl.getBoundingClientRect()
@@ -338,32 +313,24 @@ export function initPreviewPanel(host, options) {
 			item.canvas.width = Math.max(1, Math.round(wCell * dpr))
 			item.canvas.height = Math.max(1, Math.round(hCell * dpr))
 			if (item.ctx) item.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-			if (!operatorGuiActive) {
-				try {
-					draw(item.ctx, w, h, false, {
-						layout,
-						composeCell: item.role,
-						composePrvPgmLayoutToggle: true,
-						composeDualStreamPreview: true,
-						composeCellViewport: { w: wCell, h: hCell },
-						composeScreenIdx: item.mainIndex,
-						composeCellZoom: item.zoom || 1.0,
-					})
-				} catch (err) {
-					console.warn('[preview] compose cell draw failed:', err?.message || err)
-				}
+			try {
+				draw(item.ctx, w, h, false, {
+					layout,
+					composeCell: item.role,
+					composePrvPgmLayoutToggle: true,
+					composeDualStreamPreview: true,
+					composeCellViewport: { w: wCell, h: hCell },
+					composeScreenIdx: item.mainIndex,
+					composeCellZoom: item.zoom || 1.0,
+				})
+			} catch (err) {
+				console.warn('[preview] compose cell draw failed:', err?.message || err)
 			}
-			// WO-243 T243.3: reuse this getBoundingClientRect() for the operator-GUI route-hole rect report.
-			if (cellRectsForOperatorGui) cellRectsForOperatorGui.push({ id: item.id, role: item.role, mainIndex: item.mainIndex, rect: cellRect })
 		}
-		if (cellRectsForOperatorGui) onComposeCellRects(cellRectsForOperatorGui)
 		renderDestinationLayoutOverlay()
 	}
 
 	const updateLive = () => {
-		// WO-256: tiles never mount webrtc video (prvVC/pgmVC don't exist) — the shaped Caspar
-		// overlay is the video, above this page.
-		if (operatorTilesActive) return
 		const currentSingle = typeof getStreamName === 'function' ? getStreamName() : streamName
 		const dualNames = typeof getDualStreamNames === 'function' ? getDualStreamNames() : { prv: 'prv_1', pgm: 'pgm_1' }
 		const should = !!(((composePrvPgmLayoutToggle ? dualNames?.pgm || dualNames?.prv : currentSingle)) && shouldShowLiveVideo() && !collapsed && !composePrvPgmLayoutToggle)
@@ -382,11 +349,8 @@ export function initPreviewPanel(host, options) {
 	}
 
 	const setColl = (c) => { collapsed = c; root.classList.toggle('preview-panel--collapsed', c); body.hidden = c; btn.textContent = c ? '▸' : '▾'; localStorage.setItem(kC, c ? '1' : '0'); onCollapsedChange?.(c); if (c && typeof onComposeCellRects === 'function') onComposeCellRects([]); updateLive() }
-	btn.onclick = () => setColl(!collapsed); /* WO-533: name the surface — both editors stay mounted, so an unaddressed reset hit both. */
-	grabBtnEl.onclick = () => { window.dispatchEvent(new CustomEvent('operator-tiles-reset-request', { detail: { surface } })) }
-	if (composePrvPgmLayoutToggle && !operatorTilesActive) {
-		// WO-256: the Stack/Side toggle only affects the legacy canvas-pair's flex direction — the
-		// free-tile canvas has no such single-axis layout, so the control would otherwise be dead.
+	btn.onclick = () => setColl(!collapsed)
+	if (composePrvPgmLayoutToggle) {
 		cLayoutBtn.hidden = false; const syncB = () => { cLayoutBtn.textContent = layout === 'tb' ? 'Stack' : 'Side'; cPairEl.classList.remove('preview-panel__compose-pair--lr', 'preview-panel__compose-pair--tb'); cPairEl.classList.add(layout === 'tb' ? 'preview-panel__compose-pair--tb' : 'preview-panel__compose-pair--lr') }
 		syncB(); cLayoutBtn.onclick = () => { layout = layout === 'tb' ? 'lr' : 'tb'; localStorage.setItem(kL, layout); syncB(); scheduleDraw() }
 		// initGutterResizing is bound dynamically to rebuilt gutters in rebuildComposeCellsIfNeeded
@@ -404,54 +368,16 @@ export function initPreviewPanel(host, options) {
 	if (!hideInnerResize) ResizeH.initPanelResizing(resizeH, body, { collapsed: () => collapsed, onHeightChange: scheduleDraw, maxPanelBodyPx: () => Math.min(1200, window.innerHeight * 0.9) })
 	if (wrap && typeof ResizeObserver !== 'undefined') { const ro = new ResizeObserver(scheduleDraw); ro.observe(wrap) }
 	window.addEventListener('resize', scheduleDraw);
-	// WO-243/255: operator-GUI mode needs rects fresh across scroll too (viewport-relative) — gated, no extra listener otherwise.
-	if (isOperatorGuiModeActive()) window.addEventListener('scroll', scheduleDraw, true)
 	const unsubS = streamState.subscribe(updateLive);
 	const unsubSe = settingsState.subscribe(updateLive)
-	// WO-256: the free-tile canvas owns its own defs-changed/redraw handling; the legacy
-	// canvas-pair path (rebuildComposeCellsIfNeeded/scheduleDraw) is skipped entirely for it.
-	// WO-319: tiles handle — built now on the host operator kiosk, lazily on the first Live-preview-on
-	// for any other client (setComposeTilesMode). Held in a ref because it is created dynamically.
-	const tilesRef = { h: operatorTilesActive
-		? initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects, surface })
-		: null }
 	const unsubCm = stateStore?.on('channelMap', () => {
-		if (tilesRef.h) tilesRef.h.refreshDefs()
-		else { rebuildComposeCellsIfNeeded(); scheduleDraw() }
+		rebuildComposeCellsIfNeeded(); scheduleDraw()
 	})
-
-	// WO-319: on a NON-operator client, the Live-preview toggle flips the compose view between the
-	// thumbnail pair (off) and the operator STREAM VIEW (on): operator-stream-tiles draws the ch4
-	// stream letterboxed with framed windows at the shared FILL positions over it (punch-hole model,
-	// correct by construction). The host operator kiosk keeps its own WO-256 tiles (real X holes).
-	let unsubTilesToggle = null
-	function setComposeTilesMode(on) {
-		if (operatorTilesActive) return
-		if (on === composeTilesMode) return
-		composeTilesMode = on
-		if (on && !tilesRef.h && tilesMountEl) {
-			tilesMountEl.style.position = 'relative'
-			tilesRef.h = initOperatorComposeTiles(tilesMountEl, { getComposeCellDefs, stateStore, storageKeyPrefix, getOscClient, onCellRects: onComposeCellRects, surface })
-		}
-		if (tilesMountEl) tilesMountEl.style.display = on ? '' : 'none'
-		if (wrap) wrap.style.display = on ? 'none' : ''
-		// DISPLAY-ONLY for now: the client follows the host's shared layout and fills windows from the
-		// stream, but must NOT report — two clients reporting to the one shared layout with different
-		// coordinate bases fight (the FILL oscillates and they re-seed each other). One writer = the host.
-		setOperatorStreamViewActive(false)
-		if (on) tilesRef.h?.refreshDefs()
-		scheduleDraw()
-	}
-	if (!operatorTilesActive && composePrvPgmLayoutToggle) {
-		unsubTilesToggle = subscribeOperatorLiveCanvasState((st) => setComposeTilesMode(!!(st && st.available && st.enabled)))
-		const st0 = operatorLiveCanvasState()
-		if (st0 && st0.available && st0.enabled) setComposeTilesMode(true)
-	}
 
 	body.hidden = collapsed;
 	updateLive();
 	// Force an initial draw and cell rebuild to ensure canvases are populated even before first state update.
 	rebuildComposeCellsIfNeeded();
 	scheduleDraw();
-	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); unsubTilesToggle?.(); setOperatorStreamViewActive(false); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); tilesRef.h?.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
+	return { scheduleDraw, destroy: () => { if (rafDraw) cancelAnimationFrame(rafDraw); if (offTimer) clearTimeout(offTimer); window.removeEventListener('resize', scheduleDraw); window.removeEventListener('scroll', scheduleDraw, true); unsubS(); unsubSe(); unsubCm?.(); if (pollTimer) clearInterval(pollTimer); if (liveView) liveView.destroy(); if (typeof onComposeCellRects === 'function') onComposeCellRects([]); root.remove() } }
 }

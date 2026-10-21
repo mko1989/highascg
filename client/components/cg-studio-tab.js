@@ -5,16 +5,10 @@
  * `cg-studio` module as loaded (`isModuleEnabled` after `initOptionalModules`), hosting the
  * studio UI (served by the playout server at `/cg-studio/index.html`) in a lazy iframe that is
  * created on first activation and kept alive across tab switches so editor state survives.
- *
- * Operator-GUI mode: while this tab is foreground the video shape-holes must stay closed —
- * the studio page has no preview cells and any lingering rect would punch a hole through it.
- * Declared via `registerVideoBlockingTab` (no-op outside operator-GUI mode); the central
- * listener in operator-gui-mode drives the latch so multiple full-window tabs can't race it.
  */
 
 import { isModuleEnabled } from '../lib/optional-modules.js'
 import { resolveApiUrl } from '../lib/api-origin.js'
-import { registerVideoBlockingTab } from '../lib/operator-gui-mode.js'
 
 export const CG_STUDIO_TAB = 'cg-studio'
 
@@ -67,7 +61,6 @@ export function initCgStudioTab() {
 	pane.id = `tab-${CG_STUDIO_TAB}`
 	content.appendChild(pane)
 
-	registerVideoBlockingTab(CG_STUDIO_TAB)
 	window.addEventListener('highascg-workspace-tab-activated', (ev) => {
 		const tab = /** @type {CustomEvent} */ (ev).detail?.tab
 		if (tab === CG_STUDIO_TAB) ensureIframe(pane)
