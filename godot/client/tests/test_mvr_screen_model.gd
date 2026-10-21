@@ -74,6 +74,11 @@ func test_pack_centre_and_totems_on_one_canvas() -> void:
 	var r := W.pack([mk.call(12.0, 20), mk.call(5.75, 2), mk.call(18.4, 2)])
 	t.eq(r.objects.map(func(o: Dictionary) -> Dictionary: return o.source.rect), [{"x": 384, "y": 0, "w": 3840, "h": 1536},
 		{"x": 0, "y": 0, "w": 384, "h": 1536}, {"x": 4224, "y": 0, "w": 384, "h": 1536}], "L | centre | R, top-aligned")
-	t.eq(r.canvas, Vector2i(4608, 1536))
-	t.ok(W.fit_note(r.canvas, Vector2i(3840, 2160)).contains("4608 × 1536"), "too wide for UHD → said")
+	t.eq([r.canvas, r.scale], [Vector2i(4608, 1536), 1.0])
+	t.ok(W.fit_note(r.canvas, Vector2i(3840, 2160)).contains("×0.83 into it (3840 × 1280)"), "too wide for UHD → said")
 	t.eq(W.fit_note(r.canvas, Vector2i(4608, 2160)), "")
+	var fit := W.pack([mk.call(12.0, 20), mk.call(5.75, 2), mk.call(18.4, 2)], Vector2i(3840, 2160))
+	t.eq(fit.objects.map(func(o: Dictionary) -> Dictionary: return o.source.rect), [{"x": 320, "y": 0, "w": 3200, "h": 1280},
+		{"x": 0, "y": 0, "w": 320, "h": 1280}, {"x": 3520, "y": 0, "w": 320, "h": 1280}], "scaled ×5/6 into UHD, no gaps")
+	t.eq(W.pack([mk.call(0.0, 2)], Vector2i(3840, 2160)).objects[0].source.rect, {"x": 0, "y": 0, "w": 384, "h": 1536},
+		"fits → native pixels")

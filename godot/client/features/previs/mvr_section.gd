@@ -8,12 +8,14 @@ extends VBoxContainer
 ## models. Unpatch removes this scene's fixtures from the patch again.
 ## Place (project.previs.mvr.place): where the file's frame sits on our stage — an MVR's origin is its author's (Capture
 ## venues can sit metres off to one side, floor below ours). Import fits a scene that is off; patched fixtures move along.
+## WO-634: click a wall in the 3D view → Make LED screen(s)… (mvr_screens.gd; project.previs.mvr.hidden_objects).
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const M := preload("res://features/previs/mvr_model.gd")
+const MvrScreens := preload("res://features/previs/mvr_screens.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## a patch imported GDTF types (the Fixtures section re-lists them)
@@ -32,11 +34,14 @@ var _patch_status: Label
 var _unpatch_confirm: ConfirmationDialog
 var _place := {}  # "x" / "y" / "z" / "yaw" → SpinBox
 var _fit_on_load := false
+var _screens: MvrScreens
 
 
 func bind(s: MvrScene) -> void:
 	scene = s
 	scene.loaded.connect(_on_loaded)
+	if _screens != null:
+		_screens.scene = s
 	Store.project_changed.connect(func(_p: Dictionary) -> void:
 		_maybe_reload()
 		_sync_patch_ui())
@@ -99,6 +104,9 @@ func _ready() -> void:
 	fit.pressed.connect(func() -> void: _set_place(M.fit_place(scene.bounds(true), float(_place.yaw.value))))
 	place.add_child(fit)
 	add_child(place)
+	_screens = MvrScreens.new()
+	_screens.scene = scene
+	add_child(_screens)
 	var prow := HBoxContainer.new()
 	_patch_btn = Button.new()
 	_patch_btn.text = "Patch fixtures"
@@ -144,6 +152,8 @@ func _maybe_reload() -> void:
 		(_place[k] as SpinBox).set_value_no_signal(p[k])
 	scene.set_place(p)
 	scene.set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
+	scene.set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
+	_screens.refresh()
 	scene.show_scene(str(c.get("id", "")))
 
 
@@ -259,7 +269,13 @@ func _toggle_layer(i: int) -> void:
 	_save(c)
 
 
+## WO-634: a 3D click that hit no fixture / stage object → maybe an MVR wall. → whether it hit one.
+func click(cam: Camera3D, at: Vector2, shift: bool) -> bool:
+	return _screens.click(cam, at, shift)
+
+
 func _on_loaded(info: Dictionary) -> void:
+	_screens.clear()
 	_patch_status.text = ""
 	_sync_patch_ui()
 	_layers.disabled = scene.layers.is_empty()

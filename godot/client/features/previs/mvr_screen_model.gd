@@ -120,9 +120,10 @@ static func panel_mm_for(frame: Dictionary, multi: bool, preset_mm: Array) -> Ve
 	return Vector2(float(preset_mm[0]), float(preset_mm[1]))
 
 
-## Crops packed left → right (as the audience sees them: by stage X), top-aligned from 0,0.
-## → {objects (copies, same order as given), canvas: Vector2i}
-static func pack(walls: Array) -> Dictionary:
+## Crops packed left → right (as the audience sees them: by stage X), top-aligned from 0,0, at the walls' native pixels.
+## A canvas bigger than `raster` (when given) is scaled into it, proportions kept — the media server's one output still
+## covers every wall, as the owner's rig is fed. → {objects (copies, same order as given), canvas (native), scale (≤ 1)}
+static func pack(walls: Array, raster := Vector2i.ZERO) -> Dictionary:
 	var order := range(walls.size())
 	order.sort_custom(func(a: int, b: int) -> bool: return float(walls[a].position[0]) < float(walls[b].position[0]))
 	var out := walls.map(func(o: Dictionary) -> Dictionary: return o.duplicate(true))
@@ -133,12 +134,21 @@ static func pack(walls: Array) -> Dictionary:
 		out[i].source.rect = {"x": x, "y": 0, "w": px.x, "h": px.y}
 		x += px.x
 		h = maxi(h, px.y)
-	return {"objects": out, "canvas": Vector2i(x, h)}
+	var k := 1.0
+	if raster.x > 0 and raster.y > 0 and x > 0 and h > 0:
+		k = minf(1.0, minf(float(raster.x) / x, float(raster.y) / h))
+	if k < 1.0:
+		for o in out:
+			var r: Dictionary = o.source.rect
+			var x0 := roundi(r.x * k)
+			o.source.rect = {"x": x0, "y": 0, "w": maxi(1, roundi((r.x + r.w) * k) - x0), "h": maxi(1, roundi(r.h * k))}
+	return {"objects": out, "canvas": Vector2i(x, h), "scale": k}
 
 
 ## Operator note for a packed canvas against the destination raster ("" = fits).
 static func fit_note(canvas: Vector2i, raster: Vector2i) -> String:
 	if canvas.x <= raster.x and canvas.y <= raster.y:
 		return ""
-	return "The walls need %d × %d px but the destination is %d × %d — pick a coarser panel or edit the crops." % [
-		canvas.x, canvas.y, raster.x, raster.y]
+	var k := minf(float(raster.x) / canvas.x, float(raster.y) / canvas.y)
+	return "The walls are %d × %d px, the destination %d × %d: the canvas is scaled ×%.2f into it (%d × %d)." % [
+		canvas.x, canvas.y, raster.x, raster.y, k, roundi(canvas.x * k), roundi(canvas.y * k)]

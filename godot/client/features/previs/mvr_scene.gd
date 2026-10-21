@@ -20,6 +20,8 @@ var _live := false
 var _held := {}
 var _patched := {}  # WO-615 T10: uuid (lower case) → true — the live patch draws these, so the static model hides
 var fixture_uuids: Array = []  ## uuids (lower case) of the scene's fixtures, for Unpatch
+var _gone := {}  # WO-634: uuid → true — objects an LED screen replaced (project.previs.mvr.hidden_objects)
+var _marks: Array = []  # WO-634: selection boxes (top level, stage frame)
 
 
 func show_scene(id: String) -> void:
@@ -32,6 +34,7 @@ func show_scene(id: String) -> void:
 		c.queue_free()
 	layers = []
 	fixture_uuids = []
+	_marks = []  # freed with the other children
 	_screens = []
 	_sync_holds()
 	if id == "":
@@ -66,6 +69,9 @@ func show_scene(id: String) -> void:
 		node.set_meta("layer", str(o.get("layer", "")))
 		node.set_meta("kind", str(o.get("kind", "")))
 		node.set_meta("uuid", str(o.get("uuid", "")).to_lower())
+		var keys: Array = o.get("parts", []).map(func(p: Dictionary) -> String: return str(p.get("mesh", "")))
+		keys.sort()
+		node.set_meta("model", ",".join(keys))  # WO-634: same model = same parts (one LED panel type)
 		add_child(node)
 		_show(node)
 		if o.has("fixture"):
@@ -158,7 +164,102 @@ func set_patched(uuids: Dictionary) -> void:
 
 
 func _show(n: Node3D) -> void:
-	n.visible = not _hidden.has(str(n.get_meta("layer", ""))) and not _patched.has(str(n.get_meta("uuid", "")))
+	var uuid := str(n.get_meta("uuid", ""))
+	n.visible = not _hidden.has(str(n.get_meta("layer", ""))) and not _patched.has(uuid) and not _gone.has(uuid)
+
+
+## WO-634 — objects an LED screen now stands in for (uuids, lower case).
+func set_hidden_objects(uuids: Array) -> void:
+	_gone = {}
+	for u in uuids:
+		_gone[str(u).to_lower()] = true
+	for c in get_children():
+		if c is Node3D and c.has_meta("uuid"):
+			_show(c as Node3D)
+
+
+func _objects() -> Array:
+	return get_children().filter(func(c: Node) -> bool: return c is Node3D and c.has_meta("uuid") and (c as Node3D).visible)
+
+
+## WO-634 — the visible object under a screen point (ray against its mesh boxes, nearest); "" = none.
+func pick(cam: Camera3D, at: Vector2) -> String:
+	var from := cam.project_ray_origin(at)
+	var dir := cam.project_ray_normal(at)
+	var best := ""
+	var best_d := INF
+	for n in _objects():
+		for mi in (n as Node).find_children("*", "MeshInstance3D", true, false):
+			var hit: Variant = ((mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()).intersects_ray(from, dir)
+			if hit != null and from.distance_to(hit) < best_d:
+				best_d = from.distance_to(hit)
+				best = str(n.get_meta("uuid"))
+	return best
+
+
+## Visible objects as mvr_screen_model.cluster items: {uuid, key (model), box (world AABB)}.
+func cluster_items() -> Array:
+	var out := []
+	for n in _objects():
+		var box := AABB()
+		var first := true
+		for mi in (n as Node).find_children("*", "MeshInstance3D", true, false):
+			var b := (mi as MeshInstance3D).global_transform * (mi as MeshInstance3D).get_aabb()
+			box = b if first else box.merge(b)
+			first = false
+		if not first:
+			out.append({"uuid": str(n.get_meta("uuid")), "key": str(n.get_meta("model", "")), "box": box})
+	return out
+
+
+## Per object (in `uuids` order), its boxes in the stage frame (this node's parent — where WO-614 objects live).
+func wall_boxes(uuids: Array) -> Array:
+	var to_stage := _stage_inv()
+	var by := {}
+	for n in get_children():
+		if n.has_meta("uuid"):
+			by[str(n.get_meta("uuid"))] = n
+	var out := []
+	for u in uuids:
+		var boxes := []
+		for mi in ((by[u] as Node).find_children("*", "MeshInstance3D", true, false) if by.has(u) else []):
+			boxes.append({"xf": to_stage * (mi as MeshInstance3D).global_transform, "aabb": (mi as MeshInstance3D).get_aabb()})
+		if not boxes.is_empty():
+			out.append(boxes)
+	return out
+
+
+func to_stage(world: Vector3) -> Vector3:
+	return _stage_inv() * world
+
+
+func _stage_inv() -> Transform3D:
+	var p := get_parent() as Node3D
+	return p.global_transform.affine_inverse() if p != null else Transform3D.IDENTITY
+
+
+## Selection marks: one translucent box per wall frame (mvr_screen_model.wall_frame, stage frame).
+func mark(frames: Array) -> void:
+	for m in _marks:
+		(m as Node).queue_free()
+	_marks = []
+	var p := get_parent() as Node3D
+	for f in frames:
+		var mi := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = Vector3((f.size as Vector2).x + 0.06, (f.size as Vector2).y + 0.06, 0.06)
+		var mat := StandardMaterial3D.new()
+		mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		mat.albedo_color = Color(1.0, 0.85, 0.1, 0.35)
+		box.material = mat
+		mi.mesh = box
+		mi.top_level = true
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(mi)
+		var local := Transform3D(f.basis, f.origin) * Transform3D(Basis.IDENTITY, Vector3(0, (f.size as Vector2).y / 2.0, 0.03))
+		mi.global_transform = (p.global_transform if p != null else Transform3D.IDENTITY) * local
+		_marks.append(mi)
 
 
 ## The scene's placement on our stage (mvr_model place_of): this node's transform; the parts stay in the file's frame.
@@ -173,7 +274,7 @@ func bounds(local := false) -> AABB:
 	var to_local := global_transform.affine_inverse()
 	for mi in find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if not m.is_visible_in_tree():
+		if not m.is_visible_in_tree() or _marks.has(m):
 			continue
 		var b := (to_local * m.global_transform if local else m.global_transform) * m.get_aabb()
 		box = b if first else box.merge(b)

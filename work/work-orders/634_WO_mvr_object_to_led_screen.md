@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — investigation written; implementation started. Parent: [WO-612](./612_WO_previs_mvr_import.md). Related: [WO-614](./614_WO_previs_stage_builder.md) (the LED wall it creates).**
+**Status: DONE (2026-10-21, Godot unit tests + box test: Pabianice centre wall + 2 totems → 3 LED walls on PGM 1). Parent: [WO-612](./612_WO_previs_mvr_import.md). Related: [WO-614](./614_WO_previs_stage_builder.md) (the LED wall it creates).**
 
 # WO-634 — Make an LED screen from an MVR object (map a destination onto the MVR's wall)
 
@@ -24,11 +24,21 @@ walls."
   stage panel edits the rect (X / Y / W / H spin boxes, `stage_panel.gd:269-271`); `uv_rect` crops the role's raster
   (`stage_objects.gd:149`). WO-614's design names it ("Several objects can share one raster … each gets its own rect;
   default placement packs rects left→right"). Missing: creating the walls and their canvas layout in one step.
+- **A Capture LED wall is not one object** (measured 2026-10-21, scratch script: GLB POSITION min/max per part × the
+  part xform, unioned per object): Pabianice's walls are **192 SceneObjects of 0.5 × 0.5 × 0.08 m, one per panel**
+  (2 parts each, same meshes). Touching panels cluster into exactly the owner's three walls: 160 panels x 7.00→17.00,
+  y −1.60→2.40 (10 × 4 m, 20 × 8) and two totems of 16 (1 × 4 m, 2 × 8) at x 5.25→6.25 and 17.90→18.90, 0.75 / 0.90 m
+  apart, all at z ≈ −9.2. A click therefore has to select the panel's wall, not the panel — and the panel size and count
+  come from the file. The part xform is `[1,0,0, 0,−1,0, 0,0,−1, …]` (Y and Z flipped), so axes must be taken from the
+  geometry, not assumed.
 - 3D clicks: `previs_tab.gd _on_3d_input` → `fixtures3d.click`, then `builder.pick` (ray vs mesh AABBs). MVR objects are
   not pickable. `previs_tab.gd` is at 497 lines (500 limit) — the MVR pick must live in the MVR section / scene.
 
 ## Design
 
+- **Wall = cluster** (added after the measurement above): the clicked object plus every object of the same model (same
+  part meshes) whose box touches the selection (5 cm), transitively. A one-object wall (other exporters) is a cluster
+  of one.
 - **Pick:** a click that hits no fixture and no stage object tests the MVR scene (`mvr_scene.pick`, ray vs each visible
   object's mesh boxes, nearest) → the MVR section shows "Selected: <name> — W × H m" with **Make LED screen…**; a yellow
   box marks it.
@@ -49,12 +59,52 @@ walls."
 
 ## Tasks
 
-- [ ] T1 Pure model (`mvr_screen_model.gd`): frame from an oriented box, LED wall object from frame + panel + role,
-  canvas packing of several walls (+ tests).
-- [ ] T2 Pick (shift = add) + selection marks in `mvr_scene.gd`; hidden objects; section row + dialog; stage panel
-  `add_objects`.
-- [ ] T3 Box: Pabianice's centre wall + side walls → one PGM destination, packed crops, the picture spans them.
+- [x] T1 Pure model (`mvr_screen_model.gd`): cluster, frame from oriented boxes, LED wall object, canvas packing (+ tests). 1070d0db
+- [x] T2 Pick (shift = add) + selection marks in `mvr_scene.gd`; hidden objects; section row + dialog. (No stage panel
+  `add_objects`: the walls are written to `project.previs.stage.objects` and the Stage panel reloads on
+  `project_changed` like any other change — one less hook through `previs_tab.gd`, which is at 499 / 500 lines.)
+- [x] T3 Box: Pabianice's centre wall + side walls → one PGM destination, packed crops, the picture spans them.
 
 ## What was done
 
+- `features/previs/mvr_screen_model.gd` (new, pure): `cluster(items, seed, gap)`; `wall_frame(objects, toward)` — the
+  clicked object's main box (largest extents) gives the axes: thinnest = picture normal, flipped to face the viewer
+  (camera position), the other axis nearest world up = height (sign up), width = up × normal; every corner of every
+  object projected onto those axes → size, front face, bottom centre; the clicked object alone → `cell` (panel size);
+  `wall_object` (WO-614 `led_wall`: rotation = the basis' YXZ Euler, panels = size / panel mm); `panel_mm_for` (a
+  multi-object wall uses its own panel size, a single object the preset's); `pack(walls, raster)` — crops left → right
+  by stage X (= audience left → right; the WO-614 three-walls template has the same order), top-aligned, native pixels;
+  **a canvas bigger than the destination is scaled into it, proportions kept** (the three-walls template does the
+  same) — on this box the only PGM is 1920 × 1080 and even P4.8 panels need 2496 × 832, so warn-only would have made
+  nothing usable; the owner's "one output … a full canvas that covers the 3 walls" is exactly the scaled case.
+  `fit_note` says the scale.
+- `mvr_scene.gd`: per-object `model` meta (sorted part mesh keys); `set_hidden_objects`; `pick` (ray vs visible mesh
+  boxes, nearest); `cluster_items`; `wall_boxes` (stage frame = the scene's parent, where WO-614 objects live — the
+  MVR placement is folded in); `to_stage`; `mark` (translucent yellow box per selected wall, top level; excluded from
+  `bounds()` so Fit ignores it).
+- `mvr_screens.gd` (new, in the MVR section): "Selected: 10.00 × 4.00 m (160 objects), …", **Make LED screen(s)…**
+  (destination without the operator GUI, panel preset defaulting to the finest that fits unscaled, per-wall panels /
+  pixels / crop, canvas or scale note), Make → walls appended to the stage, their MVR objects into
+  `project.previs.mvr.hidden_objects`; **Show N replaced** clears it (key removed).
+- `mvr_section.gd`: hosts it, `click()`, applies `hidden_objects` on reload, clears the selection on scene load.
+- `previs_tab.gd`: a click that picks no fixture and no stage object goes to `mvr_section.click` (+2 lines → 499).
+
 ## What was VERIFIED
+
+- Godot `--test` 20598 pass / 0 fail (`test_mvr_screen_model.gd`: cluster stops at the 0.75 m gap and at another model;
+  frame of a Y/Z-flipped panel grid = identity, 2 × 1 m, cell 0.5, origin front-bottom-centre; seen from behind → −Z;
+  turned 90° → rotation [0, 90, 0] and the rotated position; 20 × 8 panels / 3840 × 1536 at 192 px; L | C | R packing,
+  scaled ×5/6 into UHD without gaps, native when it fits); `--check` boot OK. Offline suite 3073 pass / 0 fail; line
+  limit 0 over.
+- Box (2026-10-21, `godot_test`, Pabianice placed at −12.87 / 0.68 / 2.37): click on the centre wall → "Selected:
+  10.00 × 4.00 m (160 objects)", yellow mark over the wall; shift-click both totems → "+ 1.00 × 4.00 m (16 objects)"
+  × 2. Dialog on "PGM/PRV 1 1920×1080 → pgm1", P4.8 picked (coarsest; none fits unscaled): 20 × 8 / 2 × 8 / 2 × 8
+  panels of 500 mm, crops L 0,0 160 × 640 · C 160,0 1600 × 640 · R 1760,0 160 × 640, "scaled ×0.77 into it
+  (1920 × 640)". Make → `previs.stage.objects` = 3 LED walls, rotation 0, positions centre (−0.865, 0.769, −9.812),
+  L (−7.12, 0.073, −9.812), R (5.534, 0.019, −9.795) — matching the raw file by hand (centre x 12 − 12.87, bottom
+  −1.60 + 2.37, front −9.13 − 0.68); `hidden_objects` 192; the 3D view shows the live PGM test card across the centre
+  wall and its outer edges (corner diagonals near the top) on the totems; `GET /api/stage/mvr-export` →
+  `X-MVR-Screens: 3`. Show 192 replaced → panels back, saved list 0.
+- Restored: the 3 walls deleted in the Stage panel (stage objects `[]`), hidden list empty, `project.fixtures`
+  unchanged.
+- Owner QA: the real sending-card map (edit crops per wall), a destination at the show's real raster.

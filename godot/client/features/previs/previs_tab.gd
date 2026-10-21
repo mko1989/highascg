@@ -262,6 +262,8 @@ func _on_3d_input(e: InputEvent) -> void:
 			var id := builder.pick(stage.camera(), mb.position)
 			if id != "":
 				stage_panel.select(id)
+			else:  # WO-634: an MVR wall → Make LED screen(s)…
+				mvr_section.click(stage.camera(), mb.position, mb.shift_pressed)
 
 
 ## Keys while the previs is shown (text fields consume their own keys first):
