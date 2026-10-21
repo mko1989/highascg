@@ -64,3 +64,11 @@ func test_typed_filter_cone_light_budget_tint() -> void:
 	t.ok(not F.is_cell_rig(bar))
 	t.eq(F.tint({"i": 0.5, "c": [1, 0, 0]}), Color(1, 0, 0, 0.5))
 	t.eq(F.tint({"i": 3, "c": "x"}), Color(1, 1, 1, 1), "clamped, bad colour → white")
+
+
+
+## WO-649 — Lights off renders no light (cone, spot, lens glow all follow the tint's alpha); on is the DMX tint.
+func test_lights_off_renders_no_light() -> void:
+	var b := {"i": 1.0, "c": [1, 0.5, 0]}
+	t.eq(F.shown_tint(b, true), Color(1, 0.5, 0, 1), "on: the decoded beam")
+	t.eq(F.shown_tint(b, false).a, 0.0, "off: dark")

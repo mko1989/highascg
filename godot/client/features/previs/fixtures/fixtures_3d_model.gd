@@ -72,6 +72,11 @@ static func tint(b: Dictionary) -> Color:
 	return Color(float(c[0]), float(c[1]), float(c[2]), i)
 
 
+## WO-649 — the tint a beam is drawn with: dark while the view renders no light (Live 3D "Lights" off).
+static func shown_tint(b: Dictionary, beams_on: bool) -> Color:
+	return tint(b) if beams_on else Color(0, 0, 0, 0)
+
+
 ## Where a view ray meets the stage floor (Godot y = 0, PSN z = 0) in front of the camera, or null.
 static func floor_hit(from: Vector3, dir: Vector3) -> Variant:
 	if absf(dir.y) < 1e-5:

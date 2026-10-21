@@ -1,4 +1,4 @@
-**Status: DONE (2026-10-21; Godot 20696/0, box: the toggle switches 2D ↔ 3D, the Live 3D view shows the Pabianice MVR model with the rig, Lights off / on, both remembered). Owner QA: beams with a live console, the framing.**
+**Status: DONE (2026-10-21; Godot 20696/0, box: the toggle switches 2D ↔ 3D, the Live 3D view shows the Pabianice MVR model with the rig, Lights off keeps the heads, both remembered). Owner QA: beams with a live console, the framing.**
 
 # WO-649 — Live preview: one 2D / 3D toggle; the 3D view shows the MVR model, with or without lights
 
@@ -33,8 +33,10 @@ rig), [WO-648](./648_WO_live_preview_fills_width.md) (the 2D view fills the widt
 - `features/live/live_stage_3d.gd`:
   - an `MvrScene` beside the StageBuilder;
   - on the first show it creates a `fixtures_3d.gd` rig and starts following `project.previs.mvr` (`_reload_mvr`);
-  - `set_lights(on)`: shows / hides the rig; on, the static models of patched fixtures hide (`set_patched`), off,
-    nothing is hidden for the rig;
+  - `set_lights(on)` → `fixtures_3d.gd set_beams(on)`. Owner correction, 21.10: *"for the lights on of it should be
+    to render the actual lights or not, the heads should stay either way."* So the rig (heads, pan / tilt) always
+    stays. Off draws every beam dark: cone, SpotLight and lens glow all follow the tint's alpha
+    (`fixtures_3d_model.gd shown_tint`). The first cut hid the whole rig, and the heads went with it;
   - Fit merges the stage, MVR and (shown) rig bounds, like the Previs tab's `_fit_box`; a loaded scene is framed
     once.
 - `features/live/live_tab.gd`:
@@ -48,8 +50,10 @@ rig), [WO-648](./648_WO_live_preview_fills_width.md) (the 2D view fills the widt
 - Box (21.10, 20:49, DP-0, project godot_test, MVR "Pabianice Final Patch", 418 objects):
   - The Live tab shows one **2D** button. Clicked, it reads **3D** (lit), Fit and Lights appear, and the view shows the
     MVR model (trusses, stage, walls, the patched heads) on the floor.
-  - **Lights** off: the rig goes, and only small static bits stay where the heads hung (this file has no real
-    fixture bodies of its own). ui.cfg `lights=false`. On again: the heads are back, `lights=true`.
+  - **Lights** off, first cut: the rig went with it, and only small static bits stayed (this file has no fixture
+    bodies of its own). Hence the correction.
+  - After it (20:54): Lights off keeps every head on the trusses. ui.cfg `lights=false`; on again `lights=true`.
+  - `test_fixtures_3d_model.gd::test_lights_off_renders_no_light` covers the beam on / off rule (Godot 20698/0).
   - Back to 2D: `view="standard"`; the owner's 2D state is left as it was.
   - Fit frames the same box as the Previs tab (`frame_box`, longest axis × 1.4). In the wide, short Live area that
     leaves the model small.

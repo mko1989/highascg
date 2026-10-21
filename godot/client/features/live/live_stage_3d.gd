@@ -4,7 +4,7 @@ extends Control
 ## and Fit. Read-only — stage editing and GLB models stay in the Previs tab. Renders and holds video surfaces
 ## only while shown (WO-617).
 ## WO-649: the project's MVR scene too (MvrScene.configure, as the Previs tab applies it), loaded on the first show, and
-## the patched GDTF rig while `lights` is on; off, the fixtures show as the scene's own static models.
+## the patched GDTF rig; `lights` renders its beams or not (the heads stay either way).
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
@@ -74,20 +74,19 @@ func _reload_mvr() -> void:
 	if js != _mvr_json:
 		_mvr_json = js
 		mvr.configure(c)
-	mvr.set_patched(M.patched_uuids(FollowModel.normalize(Store.project.get("fixtures")).patch) if lights else {})
+	mvr.set_patched(M.patched_uuids(FollowModel.normalize(Store.project.get("fixtures")).patch))
 
 
 func set_lights(on: bool) -> void:
 	lights = on
 	if rig != null:
-		rig.visible = on
-	_reload_mvr()
+		rig.set_beams(on)
 
 
 ## Frame the stage from the side its pictures face (StageBuilder.front_yaw).
 func fit() -> void:
 	var b := builder.bounds()
-	for m: AABB in [mvr.bounds(), rig.bounds() if rig != null and rig.visible else AABB()]:
+	for m: AABB in [mvr.bounds(), rig.bounds() if rig != null else AABB()]:
 		if m.size != Vector3.ZERO:
 			b = m if b.size == Vector3.ZERO else b.merge(m)
 	stage.frame_box(b, builder.front_yaw())
@@ -100,7 +99,7 @@ func _apply() -> void:
 	mvr.set_live(shown)
 	if shown and rig == null:
 		rig = Fixtures3D.new()
-		rig.visible = lights
+		rig.beams_on = lights
 		stage.add_child(rig)
 		Store.project_changed.connect(func(_p: Dictionary) -> void: _reload_mvr())
 		_reload_mvr()

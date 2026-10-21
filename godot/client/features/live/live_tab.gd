@@ -171,7 +171,7 @@ func _view_switch() -> Control:
 	var lights := Button.new()
 	lights.text = "Lights"
 	lights.toggle_mode = true
-	lights.tooltip_text = "The patched lighting rig with its beams (off: the model without it)"
+	lights.tooltip_text = "Render the light beams (the heads stay either way)"
 	lights.toggled.connect(func(on: bool) -> void:
 		stage3d.set_lights(on)
 		_save_ui("lights", on))

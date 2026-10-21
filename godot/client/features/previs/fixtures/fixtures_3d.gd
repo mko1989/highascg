@@ -41,6 +41,7 @@ var _cone: CylinderMesh
 var lights := 0
 var gobo_lights := 0
 var sel: RefCounted = Sel.shared()
+var beams_on := true  # WO-649: false = the heads only, no beams / spots / lens glow (Live 3D "Lights")
 
 
 func _ready() -> void:
@@ -289,8 +290,16 @@ func apply(data: Dictionary) -> void:
 			_light(parts.beams[id], beams.get(id, {}) if beams.get(id) is Dictionary else {})
 
 
+## WO-649 — render the light output or not; the heads and their pan / tilt stay.
+func set_beams(on: bool) -> void:
+	if on == beams_on:
+		return
+	beams_on = on
+	apply(_last)
+
+
 func _light(p: Dictionary, b: Dictionary) -> void:
-	var t := F.tint(b)
+	var t := F.shown_tint(b, beams_on)
 	var lit := t.a > 0.004
 	(p.lens as StandardMaterial3D).emission = Color(t.r, t.g, t.b)
 	(p.lens as StandardMaterial3D).emission_energy_multiplier = t.a * 4.0
