@@ -152,6 +152,8 @@ func _ready() -> void:
 	stage3d.set_lights(lit)
 	tiles.times = bool(cfg.get_value("live", "times", false))
 	(_view_btns["times"] as Button).set_pressed_no_signal(tiles.times)
+	(_view_btns["auto"] as Button).set_pressed_no_signal(bool(cfg.get_value("live", "auto", true)))
+	tiles.set_auto(bool(cfg.get_value("live", "auto", true)))
 	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
 
 
@@ -192,10 +194,23 @@ func _view_switch() -> Control:
 	times.tooltip_text = "Show each layer's media / playlist time on the windows (the top running layer biggest)"
 	times.toggled.connect(func(on: bool) -> void:
 		tiles.times = on
+		tiles.set_auto(tiles.auto)  # Auto re-tiles with (or without) room for the times
 		tiles.queue_redraw()
 		_save_ui("times", on))
 	row.add_child(times)
 	_view_btns["times"] = times
+	var auto := Button.new()  # WO-658
+	auto.text = "Auto"
+	auto.toggle_mode = true
+	auto.tooltip_text = "Lay out a PGM (top) and PRV (bottom) window per screen, fitted to this panel. Moving a window turns it off"
+	auto.toggled.connect(func(on: bool) -> void:
+		tiles.set_auto(on)
+		_save_ui("auto", on))
+	tiles.auto_changed.connect(func(on: bool) -> void:
+		auto.set_pressed_no_signal(on)
+		_save_ui("auto", on))
+	row.add_child(auto)
+	_view_btns["auto"] = auto
 	return row
 
 
@@ -208,6 +223,7 @@ func set_view(v: String, save := true) -> void:
 	(_view_btns["fit"] as Button).visible = is3d
 	(_view_btns["lights"] as Button).visible = is3d
 	(_view_btns["times"] as Button).visible = not is3d
+	(_view_btns["auto"] as Button).visible = not is3d
 	stage3d.visible = is3d
 	_video.visible = _show_whole()
 	tiles.visible = not is3d

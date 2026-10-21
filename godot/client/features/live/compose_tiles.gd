@@ -15,11 +15,13 @@ extends Control
 ## the parent hides the whole-surface picture (atlas_changed) — moves and small resizes then cost no AMCP at all.
 
 signal atlas_changed(on: bool)
+signal auto_changed(on: bool)  # WO-658: a manual move / resize / remove turns Auto off
 
 const TM := preload("res://features/live/compose_tile_math.gd")
 const CT := preload("res://features/live/compose_times_model.gd")
 const P := preload("res://features/live/pgm_timer_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
+const AL := preload("res://features/live/compose_auto_layout.gd")
 const OUTLINE := {"pgm": Color("#e63946"), "prv": Color("#2a9d8f")}
 const STRIP := {"pgm": Color("#c92a2a"), "prv": Color("#0d9488")}
 const OTHER := Color("#457b9d")
@@ -28,6 +30,7 @@ const LABEL_H := 18.0
 const GRIP := 14.0
 const CLOSE_W := 18.0  # the ✕ hot zone at the right end of a label strip
 const MSG_S := 4.0
+const TIMES_H := 64.0  # WO-658: Auto leaves this much under a window for the Times rows (big row + bar + two small)
 const OUTSIDE := Color("#161b24")  # the preview area beside the canvas — not reachable, so not black like the canvas
 const CANVAS_EDGE := Color(1, 1, 1, 0.22)
 
@@ -45,6 +48,8 @@ var _asked_atlas := false
 var pan := 0.0  # WO-648: px the overflowing canvas is scrolled (TM.width_fit)
 var times := false  # WO-652: per-layer media / playlist times over each window (live_tab's Times toggle)
 var osc: Node  # the live tab's OscMirror; its `updated` redraws while `times` is on
+var auto := false  # WO-658: PGM / PRV windows tiled per screen into the visible canvas (live_tab's Auto toggle)
+var _retile_timer: Timer
 var _over: Control  # WO-652: the times paint here, above the atlas crops (children paint over the parent's _draw)
 
 
@@ -56,14 +61,22 @@ func _ready() -> void:
 	_over.z_index = 1
 	_over.draw.connect(_draw_over)
 	add_child(_over)
+	_retile_timer = Timer.new()
+	_retile_timer.one_shot = true
+	_retile_timer.wait_time = 0.25  # a panel drag-resize posts once it settles, not per frame
+	_retile_timer.timeout.connect(_retile)
+	add_child(_retile_timer)
 	Ws.message.connect(_on_ws)
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			refresh())
-	resized.connect(queue_redraw)
+	resized.connect(func() -> void:
+		queue_redraw()
+		_retile_soon())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path.begins_with("channelMap"):
-			queue_redraw())
+			queue_redraw()
+			_retile_soon())
 	refresh()
 
 
@@ -92,6 +105,7 @@ func _take(list: Array, with_media: bool) -> void:
 		elif c.get("rect") is Dictionary:
 			cells.append(c.duplicate(true))
 	queue_redraw()
+	_retile_soon()
 
 
 func _on_ws(type: String, data: Variant) -> void:
@@ -283,11 +297,46 @@ func _time_rows(c: Dictionary) -> Array:
 	return CT.rows(looks[id], osc.channels.get(str(ch)), bank, pgm, Time.get_unix_time_from_system() * 1000.0)
 
 
+## WO-658 Auto: one PGM (top) + PRV (bottom) window per screen, tiled into what the panel shows of the canvas.
+func set_auto(on: bool) -> void:
+	auto = on
+	_retile()
+
+
+func _retile_soon() -> void:
+	if auto and _retile_timer != null:
+		_retile_timer.start()
+
+
+func _retile() -> void:
+	var ir := image_rect()
+	if not auto or not _drag.is_empty() or not is_visible_in_tree() or ir.size.x <= 0.0:
+		return
+	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+	var res: Array = cm.get("programResolutions", []) if cm.get("programResolutions") is Array else []
+	var mains := []
+	for mi in DeckModel.screen_count(cm):
+		var r: Dictionary = res[mi] if mi < res.size() and res[mi] is Dictionary else {}
+		var ar := float(r.get("w", 16)) / maxf(1.0, float(r.get("h", 9)))
+		mains.append({"main": mi, "prv": DeckModel.preview_bus_available(cm, mi), "aspect": ar})
+	var k := canvas().x / ir.size.x
+	if AL.apply(cells, AL.tile(mains, AL.visible_view(size, ir, canvas()), canvas(), (LABEL_H + 6.0 + (TIMES_H if times else 0.0)) * k)):
+		queue_redraw()
+		_post()
+
+
+func _manual() -> void:
+	if auto:
+		auto = false
+		auto_changed.emit(false)
+
+
 ## A wheel step over the preview → pan; also called for wheels that miss the windows (live_tab's stack).
 func wheel(mb: InputEventMouseButton) -> bool:
 	if mb == null or not mb.pressed or not mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		return false
 	pan_by(-40.0 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else 40.0)
+	_retile_soon()
 	return true
 
 
@@ -351,6 +400,7 @@ func _gui_input(e: InputEvent) -> void:
 			var hit := _pick(mb.position)
 			if hit[1] == "remove":
 				accept_event()
+				_manual()
 				_remove(str(cells[hit[0]].get("id", "")))
 				return
 			if hit[0] >= 0:
@@ -358,6 +408,7 @@ func _gui_input(e: InputEvent) -> void:
 				accept_event()
 		elif not _drag.is_empty():
 			_drag = {}
+			_manual()
 			_post()
 			accept_event()
 		return
