@@ -9,8 +9,8 @@
  * here is idempotent-by-accident, and every call is audible on air.
  */
 
+import { api } from './api-client.js'
 import { sceneState } from './scene-state.js'
-import { clearRouteFromChannel, playRouteOnChannel } from './live-audio-routing.js'
 import {
 	nextCrossScreenTargets,
 	parseCrossScreenTargets,
@@ -47,15 +47,18 @@ export async function toggleCrossScreenAudio(req) {
 	})
 	if (!check.ok) return { ok: false, reason: check.reason, targets: current }
 
-	if (enable) {
-		await playRouteOnChannel(check.targetChannel, check.destLayer, check.route, {
-			audioOnly: req?.pgmAudioOnly !== false,
-		})
-	} else {
-		await clearRouteFromChannel(check.targetChannel, check.destLayer)
-	}
+	// WO-604: the server re-validates and composes the route PLAY / STOP (src/api/routes-audio-cross-screen.js, the
+	// endpoint the Godot client uses too); it throws on a failed apply, so nothing is persisted then.
+	const res = await api.post('/api/audio/cross-screen', {
+		channel: row?.ch,
+		layer: row?.layer,
+		target: check.targetChannel,
+		enable,
+		current,
+		audioOnly: req?.pgmAudioOnly !== false,
+	})
 
-	const targets = nextCrossScreenTargets(current, check.targetChannel, enable)
+	const targets = Array.isArray(res?.targets) ? res.targets : nextCrossScreenTargets(current, check.targetChannel, enable)
 	persistCrossScreenTargets(row, targets)
 	return { ok: true, targets }
 }

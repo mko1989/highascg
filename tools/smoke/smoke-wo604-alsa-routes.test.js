@@ -26,9 +26,20 @@ function rig(cs = {}) {
 	const vol = []
 	const saved = []
 	const ctx = {
-		config: { casparServer: { screen_count: 2, live_audio_input_count: 2, live_audio_input_1_device: 'alsa://hw:1', live_audio_input_2_device: 'alsa://hw:2', ...cs } },
+		config: {
+			casparServer: {
+				screen_count: 2,
+				live_audio_input_count: 2,
+				live_audio_input_1_device: 'alsa://hw:1',
+				live_audio_input_2_device: 'alsa://hw:2',
+				...cs,
+			},
+		},
 		log: () => {},
-		amcp: { raw: async (c) => raw.push(c), mixer: { mixerVolume: async (ch, layer, v) => vol.push(`${ch}-${layer}=${v}`) } },
+		amcp: {
+			raw: async (c) => raw.push(c),
+			mixer: { mixerVolume: async (ch, layer, v) => vol.push(`${ch}-${layer}=${v}`) },
+		},
 		configManager: { get: () => ({}), save: (c) => saved.push(c) },
 		_wsBroadcast: () => {},
 	}
@@ -41,10 +52,13 @@ beforeEach(() => persistence.set(mixerState.STATE_KEY, null))
 describe('WO-604 slice 5 ALSA routing snapshot', () => {
 	it('lists ALSA slots with the boot routing layer and the WO-571 targets (legacy fallback = every PGM)', () => {
 		const s = routing.routingSnapshot(rig({ live_audio_input_2_pgm_channels: '3' }).ctx.config)
-		assert.deepEqual(s.inputs.map((i) => [i.kind, i.key, i.route, i.destLayer, i.send, i.targets]), [
-			['live_audio', 'input:5', 'route://5', 2, 'always', [1, 3]],
-			['live_audio', 'input:6', 'route://6', 3, 'always', [3]],
-		])
+		assert.deepEqual(
+			s.inputs.map((i) => [i.kind, i.key, i.route, i.destLayer, i.send, i.targets]),
+			[
+				['live_audio', 'input:5', 'route://5', 2, 'always', [1, 3]],
+				['live_audio', 'input:6', 'route://6', 3, 'always', [3]],
+			]
+		)
 	})
 	it('a layer past the audio tracks has no dest layer', () => {
 		assert.equal(routing.routingSnapshot(rig({ live_audio_pgm_layer: 9 }).ctx.config).inputs[1].destLayer, null)
@@ -72,7 +86,10 @@ describe('WO-604 slice 5 ALSA Ch buttons', () => {
 	})
 	it('no free audio track → 409; no send policy for ALSA', async () => {
 		const r = rig({ live_audio_pgm_layer: 9 })
-		assert.equal((await post(r, '/api/audio/inputs/route', { kind: 'live_audio', slot: 2, channel: 1, on: true })).status, 409)
+		assert.equal(
+			(await post(r, '/api/audio/inputs/route', { kind: 'live_audio', slot: 2, channel: 1, on: true })).status,
+			409
+		)
 		assert.equal((await post(r, '/api/audio/inputs/send', { kind: 'live_audio', slot: 1, send: 'never' })).status, 400)
 		assert.deepEqual(r.raw, [])
 	})
@@ -86,7 +103,10 @@ describe('WO-604 slice 5 ALSA Ch buttons', () => {
 	it('START restores the slot routes on the server', async () => {
 		const r = rig({ live_audio_input_1_pgm_channels: '1,3' })
 		assert.equal(await routing.restoreInputRoutes(r.ctx, 'live_audio', 1), 2)
-		assert.deepEqual(r.raw.filter((c) => c.startsWith('PLAY')), ['PLAY 1-2 route://5', 'PLAY 3-2 route://5'])
+		assert.deepEqual(
+			r.raw.filter((c) => c.startsWith('PLAY')),
+			['PLAY 1-2 route://5', 'PLAY 3-2 route://5']
+		)
 	})
 	it('the web console posts ALSA Ch buttons and START leaves the replay to the server', () => {
 		const api = fs.readFileSync(path.join(ROOT, 'client/lib/input-audio-routing-api.js'), 'utf8')
@@ -100,8 +120,15 @@ describe('WO-604 one ALSA route path: boot, Save & Apply and the Ch buttons agre
 	it('a gap moves no layer: boot, protected layers and the routing store all use slot 2 → layer 3', async () => {
 		const r = rig(gap)
 		await setupLiveAudioPgmRoutes(r.ctx)
-		assert.deepEqual(r.raw, ['STOP 1-3', 'MIXER 1-3 CLEAR', 'PLAY 1-3 route://6', 'MIXER 1-3 OPACITY 0'], 'audio-only by default')
-		assert.deepEqual(listLiveAudioPgmProtectedLayers(r.ctx.config).map((p) => p.layer), [3])
+		assert.deepEqual(
+			r.raw,
+			['STOP 1-3', 'MIXER 1-3 CLEAR', 'PLAY 1-3 route://6', 'MIXER 1-3 OPACITY 0'],
+			'audio-only by default'
+		)
+		assert.deepEqual(
+			listLiveAudioPgmProtectedLayers(r.ctx.config).map((p) => p.layer),
+			[3]
+		)
 		assert.equal(routing.routingSnapshot(r.ctx.config).inputs.find((i) => i.slot === 2).destLayer, 3)
 	})
 	it('auto-route off: boot plays nothing, Save & Apply (force) still routes the saved selection', async () => {
@@ -123,7 +150,8 @@ describe('WO-604 one ALSA route path: boot, Save & Apply and the Ch buttons agre
 
 describe('WO-604 — a Live Audio Mixer save STOPs dropped PGM routes on the server', () => {
 	const routesAudio = require('../../src/api/routes-audio')
-	const save = (r, b) => routesAudio.handlePost('/api/audio/live-inputs/config', JSON.stringify(b), r.ctx).then((x) => JSON.parse(x.body))
+	const save = (r, b) =>
+		routesAudio.handlePost('/api/audio/live-inputs/config', JSON.stringify(b), r.ctx).then((x) => JSON.parse(x.body))
 	const both = { live_audio_input_1_pgm_channels: '1,3', live_audio_input_2_pgm_channels: '1' }
 	it('removing slot 2 stops its route (layer 3) and leaves slot 1 alone', async () => {
 		const r = rig(both)
@@ -145,4 +173,3 @@ describe('WO-604 — a Live Audio Mixer save STOPs dropped PGM routes on the ser
 		}
 	})
 })
-

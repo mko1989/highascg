@@ -59,7 +59,7 @@ describe('WO-293: audio-capable input enumeration', () => {
 		assert.equal(decklinks.length, 3)
 		assert.deepEqual(
 			decklinks.map((r) => r.channel),
-			[4, 5, 6],
+			[4, 5, 6]
 		)
 		// Regression fence: the pre-fix filter produced exactly one row.
 		const legacy = rows.filter((r) => r.kind === 'live_audio')
@@ -86,7 +86,7 @@ describe('WO-293: audio-capable input enumeration', () => {
 		assert.equal(rows.length, 2)
 		assert.deepEqual(
 			rows.map((r) => r.channel),
-			[4, 5],
+			[4, 5]
 		)
 	})
 
@@ -95,7 +95,7 @@ describe('WO-293: audio-capable input enumeration', () => {
 		assert.ok(rows.includes('listAudioInputChannels'), 'collectLiveInputMeterRows must use the shared enumeration')
 		assert.ok(
 			!/\.filter\(\s*\(entry\)\s*=>\s*entry\.kind === 'live_audio'\s*\)/.test(rows),
-			'the live_audio-only filter must be gone',
+			'the live_audio-only filter must be gone'
 		)
 	})
 })
@@ -176,7 +176,7 @@ describe('WO-284: level → meter mapping', () => {
 		assert.equal(
 			inputHasAudioData({ channelState, inputLayer: 10, dbfs: -35 }),
 			true,
-			'a build that never emits stage/layer OSC must not mark every input dead',
+			'a build that never emits stage/layer OSC must not mark every input dead'
 		)
 	})
 
@@ -251,8 +251,14 @@ describe('WO-284: cross-screen audio routing validation', () => {
 
 	it('rejects malformed source/target', async () => {
 		const { validateCrossScreenAudioTarget } = await crossScreenP
-		assert.equal(validateCrossScreenAudioTarget({ ...BASE, sourceChannel: 0, targetChannel: 2 }).reason, 'invalid-source-channel')
-		assert.equal(validateCrossScreenAudioTarget({ ...BASE, sourceLayer: NaN, targetChannel: 2 }).reason, 'invalid-source-layer')
+		assert.equal(
+			validateCrossScreenAudioTarget({ ...BASE, sourceChannel: 0, targetChannel: 2 }).reason,
+			'invalid-source-channel'
+		)
+		assert.equal(
+			validateCrossScreenAudioTarget({ ...BASE, sourceLayer: NaN, targetChannel: 2 }).reason,
+			'invalid-source-layer'
+		)
 		assert.equal(validateCrossScreenAudioTarget({ ...BASE, targetChannel: 'x' }).reason, 'invalid-target-channel')
 	})
 
@@ -300,7 +306,7 @@ describe('WO-284: cross-screen audio routing validation', () => {
 		assert.ok(apply.includes('sceneState.patchLayer'), 'must use the scene layer persistence path')
 		assert.ok(apply.includes('audioScreens'))
 		// Apply-to-air must happen before persistence, so a failed AMCP records nothing.
-		const airAt = Math.min(apply.indexOf('playRouteOnChannel('), apply.indexOf('clearRouteFromChannel('))
+		const airAt = apply.indexOf("api.post('/api/audio/cross-screen'") // WO-604: the server applies it
 		assert.ok(airAt > 0)
 		assert.ok(apply.indexOf('persistCrossScreenTargets(row') > airAt, 'persist only after the apply')
 	})
@@ -308,6 +314,6 @@ describe('WO-284: cross-screen audio routing validation', () => {
 	it('nothing routes as a side effect of rendering', () => {
 		const bind = src('client/components/audio-mixer-cross-screen-bind.js')
 		assert.ok(bind.includes("addEventListener('click'"), 'apply is click-driven only')
-		assert.ok(bind.includes("dataset.busy"), 'single-flight guard against retry storms')
+		assert.ok(bind.includes('dataset.busy'), 'single-flight guard against retry storms')
 	})
 })

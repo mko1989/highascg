@@ -184,12 +184,18 @@ describe('input start: stop -> start round trip', () => {
 
 	it('a successful start clears that slot from the recorded failure list', async () => {
 		const ctx = fakeCtx()
-		ctx._liveAudioInputsStatus = { enabled: true, failed: [{ slot: 1, message: 'play_failed' }, { slot: 2, message: 'play_failed' }] }
+		ctx._liveAudioInputsStatus = {
+			enabled: true,
+			failed: [
+				{ slot: 1, message: 'play_failed' },
+				{ slot: 2, message: 'play_failed' },
+			],
+		}
 		await startInputCapture(ctx, { kind: 'live_audio', slot: 1 })
 		assert.deepEqual(
 			ctx._liveAudioInputsStatus.failed.map((f) => f.slot),
 			[2],
-			'only the started slot is cleared',
+			'only the started slot is cleared'
 		)
 	})
 })
@@ -237,7 +243,7 @@ describe('client: start control on a live input strip', () => {
 				],
 				playRoute: async (ch, ln, route, opts) => calls.push(['play', ch, ln, route, opts.audioOnly]),
 				route: 'route://7',
-			},
+			}
 		)
 		assert.equal(res.routesRestored, 2)
 		assert.deepEqual(calls, [
@@ -258,9 +264,9 @@ describe('client: start control on a live input strip', () => {
 					targets: [{ channel: 1, layer: 1 }],
 					playRoute: async (...a) => played.push(a),
 					route: 'route://7',
-				},
+				}
 			),
-			/slot_not_configured/,
+			/slot_not_configured/
 		)
 		assert.deepEqual(played, [], 'no route may be applied after a failed start')
 	})
@@ -275,7 +281,7 @@ describe('client: start control on a live input strip', () => {
 				targets: [{ channel: 1, layer: 321 }],
 				playRoute: async (...a) => played.push(a),
 				route: 'alsa://hw:1,0',
-			},
+			}
 		)
 		assert.equal(res.routesRestored, 0)
 		assert.deepEqual(played, [])
@@ -296,7 +302,7 @@ describe('UI wiring: stop and start live in the same places', () => {
 			assert.ok(s.includes('shouldShowStartControl'), `${rel} must decide the start control centrally`)
 			assert.ok(s.includes('data-input-start'), `${rel} must render a start control`)
 			assert.ok(s.includes('runInputStart'), `${rel} must use the shared start path`)
-			assert.ok(s.includes("dataset.busy"), `${rel} start must be single-flight`)
+			assert.ok(s.includes('dataset.busy'), `${rel} start must be single-flight`)
 			assert.ok(!/hidden.*data-input-start/.test(s), `${rel} must not ship the start control hidden`)
 		}
 	})
@@ -308,7 +314,7 @@ describe('UI wiring: stop and start live in the same places', () => {
 		assert.ok(s.includes('runInputStart'), 'Start must use the shared start path')
 		assert.ok(
 			s.indexOf('data-live-audio-start') < s.indexOf('data-live-audio-stop'),
-			'Start is rendered before Stop so it is not hidden past the destructive control',
+			'Start is rendered before Stop so it is not hidden past the destructive control'
 		)
 	})
 
@@ -347,7 +353,7 @@ describe('WO-284/293 regression guard', () => {
 		assert.equal(
 			inputHasAudioData({ channelState: { layers: { 10: { type: 'empty' } } }, inputLayer: 10, dbfs: -20 }),
 			false,
-			'stopped capture layer reads as no-data',
+			'stopped capture layer reads as no-data'
 		)
 		assert.equal(mapLevelToMeter({ dbfs: -20, hasData: false }).state, METER_STATE.NO_DATA)
 		assert.equal(mapLevelToMeter({ dbfs: -80, hasData: true }).state, METER_STATE.SILENT)
@@ -356,7 +362,7 @@ describe('WO-284/293 regression guard', () => {
 
 	it('cross-screen routing still applies to air before it persists', () => {
 		const apply = src('client/lib/audio-cross-screen-apply.js')
-		const airAt = Math.min(apply.indexOf('playRouteOnChannel('), apply.indexOf('clearRouteFromChannel('))
+		const airAt = apply.indexOf("api.post('/api/audio/cross-screen'") // WO-604: the server applies it
 		assert.ok(airAt > 0)
 		assert.ok(apply.indexOf('persistCrossScreenTargets(row') > airAt, 'persist only after the apply')
 	})

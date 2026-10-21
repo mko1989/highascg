@@ -392,8 +392,8 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 - Stereo-pair split of a cross-screen route (the web has none either; the route carries the whole layout).
 - ~~Client-side STOP of a removed slot's routes~~ — done 2026-10-21 (slice 7 below). The modal's localStorage
   mirror stays: the web mixer console still reads it for display of non-ALSA kinds (WO-604 leftover, not a Caspar action).
-- The web cross-screen audio apply (`client/lib/audio-cross-screen-apply.js`) still PLAYs / STOPs routes from the
-  browser through `/api/host-live/layer` — a candidate for the same server move.
+- ~~The web cross-screen audio apply composed its own route PLAY / STOP~~ — done 2026-10-21: it now posts
+  `POST /api/audio/cross-screen` (the Godot endpoint) and persists the targets the server returns.
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
   Moving a band changes layers that may already be on air on deployed boxes.
 - Click a live-audio strip to inspect it. Add-input modal.
@@ -412,4 +412,10 @@ gets the same server STOP.
 untick one target → only that channel, unchanged save → nothing, no client STOP). Gates: lines, lint 216, prettier,
 unwired-exports, API contract, offline 3010 pass, `--no-http`, client build, Godot 20419. Box: the node runs it; the
 box has no ALSA slots, so the real Save & Apply check stays on the owner checklist (WO-604 ALSA entry).
+
+**Also (2026-10-21):** the web cross-screen toggle (`client/lib/audio-cross-screen-apply.js`) validates locally for the
+toast text, then posts `/api/audio/cross-screen` and persists the server's `targets`. The two smokes that pinned
+"apply to air before persist" are repointed to the POST (still ordered before `persistCrossScreenTargets`); a new pin
+in `smoke-wo604-cross-screen-audio.test.js` forbids a browser-side route. Offline 3011 pass. Not clicked on the box
+(no web browser session); the server endpoint is the one the Godot Audio tab already drives.
 
