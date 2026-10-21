@@ -96,6 +96,7 @@ const FILES = [
 	'tools/smoke/smoke-wo601-countdown.test.js',
 	'tools/smoke/smoke-wo601-screen-timer-reassign.test.js',
 	'tools/smoke/smoke-wo601-lt-roster-import.test.js',
+	'tools/smoke/smoke-wo601-look-preset-recall.test.js',
 	'tools/smoke/smoke-wo601-global-border-slot-edits.test.js',
 	'tools/smoke/smoke-wo614-project-client-slices.test.js',
 	'tools/smoke/smoke-wo617-tests-never-touch-live-projects.test.js',

@@ -1,0 +1,96 @@
+'use strict'
+
+/**
+ * WO-601 — POST /api/scene/look-preset/recall { id, target?: 'preview'|'program', forceCut?, useGlobalTransition? }
+ *
+ * Recall a look preset (a named screen → look bookmark, `scenes.lookPresets`, client-owned like the rest of the deck):
+ * every item goes through the take-look path for its own screen, all at once (WO-150 B150.6: screens take together,
+ * not one after another's transition). `useGlobalTransition` (program, not a cut) replaces each look's own transition
+ * with the deck default, as the web preset card's "Take (global)" does (B150.5). Web: scenes-editor-logic.js
+ * runLookRecall. Saving / overwriting / deleting a preset is a deck edit and travels with the deck sync.
+ */
+
+const path = require('path')
+const { pathToFileURL } = require('url')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+
+const REPO_ROOT = path.join(__dirname, '..', '..')
+
+function out(status, payload) {
+	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
+}
+
+/**
+ * Pure (web lookRecallItemsFromPreset): the preset's { mainIdx, sceneId } items whose look still exists; a legacy
+ * single-look preset ({ sceneId, targetMain }) is one item. Mains clamp to 0–3 like the web.
+ * @param {object} preset
+ * @param {(id: string) => boolean} exists
+ */
+function recallItems(preset, exists) {
+	const main = (v) => {
+		const m = Number(v)
+		return Number.isFinite(m) && m >= 0 && m <= 3 ? Math.floor(m) : 0
+	}
+	const items = []
+	for (const it of Array.isArray(preset?.items) ? preset.items : []) {
+		const sid = String(it?.sceneId || '').trim()
+		if (sid && exists(sid)) items.push({ mainIdx: main(it.mainIdx), sceneId: sid })
+	}
+	if (items.length) return items
+	const sid = String(preset?.sceneId || '').trim()
+	return sid && exists(sid) ? [{ mainIdx: main(preset.targetMain), sceneId: sid }] : []
+}
+
+/** The deck default transition with its duration resolved at screen 1's fps (web getResolvedGlobalDefaultTransition). */
+async function globalTransition(scenes, fps) {
+	const t = scenes?.globalDefaultTransition && typeof scenes.globalDefaultTransition === 'object' ? scenes.globalDefaultTransition : {}
+	const td = await import(pathToFileURL(path.join(REPO_ROOT, 'client', 'lib', 'transition-duration.js')).href)
+	return { type: 'MIX', tween: 'linear', ...t, duration: td.resolveTransitionDuration(t.duration, fps) }
+}
+
+/**
+ * @param {unknown} body
+ * @param {object} ctx
+ * @param {{ project?: () => object, takeLook?: Function, resolveSceneById?: Function, fps?: number }} [deps]
+ */
+async function handleLookPresetRecall(body, ctx, deps = {}) {
+	const b = parseBody(body) || {}
+	const id = String(b.id || '').trim()
+	if (!id) return out(400, { ok: false, error: 'id required' })
+	const project = deps.project ? deps.project() : require('../engine/project-scenes').loadFullProject()
+	const scenes = project?.scenes && typeof project.scenes === 'object' ? project.scenes : {}
+	// The live deck (scene_deck_sync) is newer than the autosave; fall back to the stored project.
+	const list = Array.isArray(ctx?.sceneDeck?.lookPresets) ? ctx.sceneDeck.lookPresets : scenes.lookPresets || []
+	const preset = list.find((p) => p && String(p.id) === id)
+	if (!preset) return out(404, { ok: false, error: `look preset ${id} not found` })
+	const resolve = deps.resolveSceneById || ((sid) => require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sid))
+	const items = recallItems(preset, (sid) => !!resolve(sid))
+	if (!items.length) return out(409, { ok: false, error: `look preset "${preset.name || id}" has no look left` })
+
+	const target = b.target === 'program' ? 'program' : 'preview'
+	const forceCut = target === 'program' && b.forceCut === true
+	let transitionOverride = null
+	if (target === 'program' && !forceCut && b.useGlobalTransition === true) {
+		const fps = deps.fps ?? require('../config/routing').getChannelMap(ctx?.config || {})?.programResolutions?.[0]?.fps ?? 50
+		transitionOverride = await globalTransition(scenes, fps)
+	}
+	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))
+	const results = await Promise.all(
+		items.map(async (it) => {
+			const res = await takeLook({ sceneId: it.sceneId, mainIdx: it.mainIdx, target, forceCut, ...(transitionOverride ? { transitionOverride } : {}) })
+			let err = null
+			if (res?.status >= 400) {
+				try {
+					err = JSON.parse(res.body)?.error || `HTTP ${res.status}`
+				} catch {
+					err = `HTTP ${res.status}`
+				}
+			}
+			return { ...it, status: res?.status ?? 0, error: err }
+		}),
+	)
+	const failed = results.filter((r) => r.error)
+	return out(failed.length === results.length ? 502 : 200, { ok: failed.length === 0, target, items: results })
+}
+
+module.exports = { handleLookPresetRecall, recallItems }

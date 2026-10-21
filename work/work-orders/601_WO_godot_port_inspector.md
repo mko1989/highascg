@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets, media-file versions and the global border (incl. Art-Net/sACN lighting input) ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). media-file Caspar preview (addendum 8 resolved: single local client) ported and verified. Next per plan: CG/LT/timers, live sources, timeline props. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
+**Status: IN PROGRESS (2026-10-18) — look-layer mixer/audio + content sizing + clip start + crop (with WO-600) the media file inspector (facts, waveform, trim/mute defaults, used-in, rename, delete) the mixer-effects editor, the PIP overlay editor, the HTML-template group (reload + timers config), the lower-third editor, the countdown/timer editor, the screen-timer inspector, the lower-third data sheet, the layer-style clipboard/presets, media-file versions and the global border (incl. Art-Net/sACN lighting input) ported and verified on the box. Live sources / host channels moved to WO-605 (owner rule: per-input controls live in the device-view host-channel inspector, never a Sources-tab inspector). media-file Caspar preview (addendum 8 resolved: single local client) ported and verified. Timeline props were ported with WO-602 (clip / flag / layer / keyframe inspector pages). Look presets DONE 21.10 (save / overwrite / remove in the deck, recall composed on the server; box: save/overwrite/remove + deck sync; a real recall is an owner check) — every sub-feature of the plan is ported. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation, shared input controls), WO-600 (selection sources: deck, compose frame, timeline). Side findings §3 are web-client bugs to fix independently of the port.**
 
 # WO-601 — Godot port: inspector (layer / media / effects / PIP / CG / timers / live sources / timeline props)
 
@@ -252,3 +252,43 @@ Bugs 1–2, 5 and 9 stay in the web client (Godot no longer uses those paths) �
   (deck sync), stored look verified. Owner QA: dragging the effect sliders interactively.
 
 Side findings re-checked by hand (`git grep`, file reads). Everything else is the Haiku inventory.
+
+## Look presets (2026-10-21)
+
+### Investigation
+
+- The web keeps look presets in `scenes.lookPresets` (deck state, synced with `scene_deck_sync`, autosaved):
+  `{id, name, createdAt, items: [{mainIdx, sceneId, sourceKind}], sceneId, sourceKind, targetMain}`
+  (`client/lib/scene-state-preset-actions.js`). Save captures the PRV / PGM / open look of the armed screens (or the
+  active one). The UI is the Inspector "Look presets" mode (`inspector-panel-presets-modes.js:138`).
+- Recall (`scenes-editor-logic.js:82 runLookRecall`): Preview sends each item's look to its screen's PRV; ▶ / Auto / Cut
+  take all items in ONE batch (WO-150 B150.6), Auto with the deck default transition (B150.5,
+  `getResolvedGlobalDefaultTransition` = duration resolved at screen 1's fps; pgm-only screens map it through
+  `normalizeTransitionForPgmOnly` of `transition-presets.js`).
+- Godot already round-trips `lookPresets` in its deck payload (`project_sync.gd build_deck_payload`), so presets are a
+  deck edit there too. Only recall touches Caspar, so only recall needs an endpoint (directive D).
+
+### What was done
+
+- `POST /api/scene/look-preset/recall {id, target, forceCut, useGlobalTransition}` (`routes-scene-look-preset.js`,
+  dispatched from `routes-scene.js`): the preset comes from the live deck (else the autosave); its items whose look
+  still exists go through `handleTakeLook` together (`Promise.all`). 404 unknown id, 409 no look left, 502 when every
+  screen failed; the reply lists each screen's status / error.
+- `handleTakeLook` takes an optional `transitionOverride` (program only; pgm-only screens through the web's
+  `normalizeTransitionForPgmOnly`).
+- Godot: `look_preset_model.gd` (pure: unique names, capture per screen, make / overwrite / remove, card meta,
+  "on PRV now") and `look_preset_page.gd` (Inspector page from the deck column's **Presets**: From PRV / From PGM / From
+  open look, "All screens" on 2+ screens, cards with ▶ / Preview / Auto / Cut / Overwrite / Remove). Edits go through
+  the deck sync + autosave; recall flushes an unsent deck edit first. The web "Import from server" button is not ported
+  (Godot reads the server's project directly).
+- Smoke `smoke-wo601-look-preset-recall.test.js` (6 tests, curated list); Godot `test_look_presets.gd` (3 tests).
+
+### What was VERIFIED
+
+- Gates: lines, lint 216, prettier, unwired-exports, offline 2978 pass, `--no-http`; Godot 16500 pass, `--check` clean.
+- Box (node restarted; PGM and PRV both on look-3 "Waves"): `recall {id:"nope"}` → 404, no AMCP. GUI → Presets: From PRV
+  disabled (PRV = PGM, so no separate PRV look), From PGM enabled, "All screens" hidden on the 1-screen box. Saved
+  "T_preset" → card "PGM · main 1 → “Waves”", server deck `lookPresets` = the preset. Overwrite → confirm → `createdAt`
+  updated on the server. Remove → confirm → deck and autosave `lookPresets: []` (as before the test); buses unchanged.
+- Not run on the box: an actual recall (it would re-take PRV / PGM). Owner checklist.
+

@@ -11,6 +11,7 @@ const DeckModel := preload("res://features/live/deck_model.gd")
 const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
+const LookPresetPage := preload("res://features/live/look_preset_page.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
 const ComposeTiles := preload("res://features/live/compose_tiles.gd")
@@ -23,6 +24,7 @@ var deck: DeckView
 var editor: LookEditor
 var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
+var presets: LookPresetPage
 var _action: Label
 var osc: Node  # the shell's OscMirror (set before _ready)
 var stage3d: LiveStage3D
@@ -111,6 +113,10 @@ func _ready() -> void:
 	border = GlobalBorderPanel.new()
 	border.visible = false
 	add_child(border)
+	presets = LookPresetPage.new()
+	presets.visible = false
+	presets.editing_cb = func() -> String: return editor.scene_id if editor.visible else ""
+	add_child(presets)
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	deck.look_deleted.connect(func(id: String) -> void:
 		if editor.visible and editor.scene_id == id:
@@ -121,6 +127,9 @@ func _ready() -> void:
 	deck.border_requested.connect(func(m: int, label: String) -> void:
 		InspectorPanel.current.present(border)
 		border.open(m, label))
+	deck.presets_requested.connect(func(m: int, label: String) -> void:
+		InspectorPanel.current.present(presets)
+		presets.open(m, label))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))

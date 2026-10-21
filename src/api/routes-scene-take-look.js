@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * WO-598 C1 — POST /api/scene/take-look { sceneId, mainIdx?, target?: 'program'|'preview', forceCut? }
+ * WO-598 C1 — POST /api/scene/take-look { sceneId, mainIdx?, target?: 'program'|'preview', forceCut?, transitionOverride? }
  *
  * Take (or stage on PRV) a stored look BY ID: the server builds the incomingScene itself
  * (src/engine/scene-take-payload.js — parity-tested against the web builder) and hands the exact body
@@ -48,6 +48,12 @@ async function handleTakeLook(body, ctx, deps = {}) {
 	})
 	const withBorder = deps.withBorder || require('../engine/global-border-control').withScreenGlobalBorderForChannel
 	incomingScene = withBorder(incomingScene, ctx, programCh)
+	// Look-preset "Take (global)": the deck default replaces the look's own transition (web takeScenesToProgram).
+	const tOver = b.transitionOverride && typeof b.transitionOverride === 'object' ? b.transitionOverride : null
+	if (tOver && target === 'program') {
+		const tp = await import(require('url').pathToFileURL(require('path').join(__dirname, '../../client/lib/transition-presets.js')).href)
+		incomingScene = { ...incomingScene, defaultTransition: pgmOnly ? tp.normalizeTransitionForPgmOnly(tOver) : { ...tOver } }
+	}
 
 	const takeBody = {
 		channel: programCh,

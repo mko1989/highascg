@@ -33,6 +33,11 @@ async function handlePost(path, body, ctx) {
 		// WO-623 B: build (not store) a new look — deck "+" / media dropped on blank deck space.
 		return require('./routes-scene-new-look').handleNewLook(body, ctx)
 	}
+	if (path === '/api/scene/look-preset/recall') {
+		// WO-601: recall a look preset — every screen's look through take-look, all at once.
+		if (!ctx.amcp) return null
+		return require('./routes-scene-look-preset').handleLookPresetRecall(body, ctx)
+	}
 	if (path === '/api/scene/layer-fit') {
 		// WO-601: refit a layer for its content sizing (web reapplyLayerFrameForContentFit) — computed, not stored.
 		return handleLayerFit(body, ctx)

@@ -17,6 +17,7 @@ signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
 signal timers_requested(main: int, label: String)  # WO-601: web per-screen ⏱ → screen-timer inspector
 signal border_requested(main: int, label: String)  # WO-601: global border inspector
+signal presets_requested(main: int, label: String)  # WO-601: look presets inspector
 signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look
 
 var _columns: HBoxContainer
@@ -96,6 +97,11 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	brd.tooltip_text = "Global border for this screen"
 	brd.pressed.connect(func() -> void: border_requested.emit(main, title))
 	head_row.add_child(brd)
+	var lp := Button.new()
+	lp.text = "Presets"
+	lp.tooltip_text = "Look presets: bookmark what is on PRV / PGM and recall it"
+	lp.pressed.connect(func() -> void: presets_requested.emit(main, title))
+	head_row.add_child(lp)
 	col.add_child(head_row)
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)

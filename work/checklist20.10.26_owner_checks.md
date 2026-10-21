@@ -66,6 +66,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       Then the web Live Audio Mixer → Save & Apply: the audio keeps playing on the same PGMs (now routed by the server).
 - [ ] **WO-604** — Screens row (2-screen box only): on a look strip, press the other screen's number. Its PGM
       should play the layer's audio (no picture). Press again → silent. Reload the look: the button stays lit.
+- [ ] **WO-601** — Live → a screen's **Presets** → From PRV / From PGM → name it. Then Preview (PRV gets the look),
+      ▶ (take with the look's transition), Auto (deck default transition), Cut. On a 2-screen box tick "All screens"
+      first: one preset takes both screens at once.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source
