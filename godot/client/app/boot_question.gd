@@ -1,0 +1,43 @@
+extends Node
+## WO-638 / WO-645 — the start-up questions (out of main.gd): the server says whether this boot asks.
+## - launcher (startup.mode ask): "Start operator here / Run headless" on every screen while this window sits
+##   minimized (Godot cannot hide its main window); Run headless quits the client, Caspar runs on.
+## - boot question (startup.mode gui): WO-638's 120 s "which screen is the operator's".
+## - a client the session autostart started (--autostart) quits at once when this boot runs headless.
+## Otherwise a fresh multi-screen box with no operator monitor flagged gets the plain prompt (WO-290's, natively).
+
+const ScreenPicker := preload("res://app/operator_screen_picker.gd")
+const ScreenModel := preload("res://app/operator_screen_model.gd")
+
+signal said(line: String)
+
+
+func ask(fresh: bool) -> void:
+	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
+	if not r.ok or not r.data is Dictionary:
+		return
+	var boot: Variant = r.data.get("boot")
+	if ScreenModel.autostart_quits(boot, Config.args.has("autostart")):
+		said.emit("this boot runs headless — the operator GUI is not started")
+		get_tree().quit()
+		return
+	var asked := boot is Dictionary and bool((boot as Dictionary).get("pending", false))
+	if not asked and not (fresh and r.data.get("port") == null):
+		return
+	var launcher := asked and bool((boot as Dictionary).get("launcher", false))
+	var w := get_window()
+	var mode := w.mode
+	if launcher:
+		w.mode = Window.MODE_MINIMIZED
+	var picker := ScreenPicker.new()
+	add_child(picker)
+	picker.finished.connect(func(res: Dictionary) -> void:
+		said.emit("operator screen: %s" % res.get("name", res.get("error", "")))
+		if res.get("headless", false):
+			said.emit("run headless — the operator GUI closes, CasparCG runs on")
+			get_tree().quit()
+		elif launcher:
+			w.mode = mode)
+	var shown: bool = await picker.open_boot(boot) if asked else await picker.open()
+	if not shown and launcher:
+		w.mode = mode  # the launcher could not open: show the GUI rather than nothing

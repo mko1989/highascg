@@ -6,6 +6,8 @@ extends Node
 ## WO-638 boot mode (open_boot): asked once per machine boot while Caspar is held — the stacked screens are laid out
 ## first, every prompt counts down from 120 s and names the default; Esc / timeout settle on the default, and the
 ## answer also moves the destination cables onto the other screens (server: boot-screen-assignment.js).
+## WO-645 launcher (boot.launcher, startup.mode ask): no countdown and no default — "Start operator here" or "Run
+## headless" on every screen, Caspar starts on the answer; finished carries {ok, headless: true} for the second.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Placement := preload("res://app/window_placement.gd")
@@ -67,6 +69,8 @@ func open() -> bool:
 		_timer.timeout.connect(func() -> void: _close({"ok": false, "error": "timed out"}))
 		add_child(_timer)
 		_timer.start(TIMEOUT_S)
+	elif _launcher():
+		add_child(_timer)  # never started: a person answers (paused in _pick like the boot timer)
 	else:
 		_timer.timeout.connect(func() -> void: _pick(-1, "", "timeout"))
 		add_child(_timer)
@@ -74,8 +78,12 @@ func open() -> bool:
 	return true
 
 
+func _launcher() -> bool:
+	return bool(_boot.get("launcher", false))
+
+
 func _process(_d: float) -> void:
-	if _boot.is_empty() or _timer == null or _counts.is_empty():
+	if _boot.is_empty() or _launcher() or _timer == null or _counts.is_empty():
 		return
 	var line := M.boot_countdown(int(ceil(_timer.time_left)), str(_boot.get("defaultName", "")))
 	for l in _counts:
@@ -106,6 +114,9 @@ func _prompt(i: int, screen: Rect2i, o: Dictionary) -> Window:
 	line.text = M.screen_line(i, o)
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(line)
+	if _launcher():
+		_launcher_buttons(w, col, i, o)
+		return w
 	if not _boot.is_empty():
 		var count := Label.new()
 		count.text = M.boot_countdown(int(_boot.get("timeoutS", 120)), str(_boot.get("defaultName", "")))
@@ -137,6 +148,36 @@ func _prompt(i: int, screen: Rect2i, o: Dictionary) -> Window:
 	return w
 
 
+## WO-645: HighAsCG starts here — nothing runs until one of the two is pressed (no Esc, no close).
+func _launcher_buttons(w: Window, col: VBoxContainer, i: int, o: Dictionary) -> void:
+	w.title = "HighAsCG"
+	var note := Label.new()
+	note.text = "CasparCG starts when you choose."
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	note.modulate = Color(1, 1, 1, 0.7)
+	col.add_child(note)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	col.add_child(row)
+	var here := Button.new()
+	here.text = "Start operator here"
+	here.custom_minimum_size = Vector2(220, 56)
+	here.disabled = o.is_empty() or o.get("port") == null
+	if here.disabled:
+		here.tooltip_text = "This output has no GPU port slot (1–4) the server can flag."
+	here.pressed.connect(func() -> void: _pick(i, str(o.get("name", ""))))
+	row.add_child(here)
+	var headless := Button.new()
+	headless.text = "Run headless"
+	headless.custom_minimum_size = Vector2(180, 56)
+	headless.tooltip_text = "Start CasparCG without the operator GUI — work from the web UI on another computer."
+	headless.pressed.connect(func() -> void: _pick(-1, "", "headless"))
+	row.add_child(headless)
+	add_child(w)
+	w.show()
+
+
 func _theme() -> Theme:  # native windows do not inherit main.gd's theme
 	var c := get_tree().current_scene as Control
 	return c.theme if c != null and c.theme != null else ThemeBuilder.build()
@@ -164,6 +205,9 @@ func _pick(i: int, output: String, how := "") -> void:
 			b["name"] = output
 		_timer.paused = true
 		res = await Api.post_json("/api/system/operator-screen", b)
+		if res.ok and how == "headless":
+			_close({"ok": true, "headless": true, "name": str(res.data.get("name", "")) if res.data is Dictionary else ""})
+			return
 		if res.ok and res.data is Dictionary:
 			# The server re-laid X out before answering: screen indices may have moved — find the output by name.
 			output = str(res.data.get("name", output))

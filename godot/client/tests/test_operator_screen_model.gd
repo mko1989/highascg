@@ -37,3 +37,11 @@ func test_boot_countdown() -> void:  # WO-638
 	t.eq(P.boot_countdown(120, "DP-0"), "DP-0 becomes the operator screen in 120 s")
 	t.eq(P.boot_countdown(-3, "DP-4"), "DP-4 becomes the operator screen in 0 s")
 	t.eq(P.boot_countdown(7, ""), "Choose the operator screen — 7 s")
+
+
+func test_autostart_quits_on_a_headless_boot() -> void:
+	t.eq(P.autostart_quits({"headless": true, "pending": false}, true), true, "startup.mode headless / Run headless")
+	t.eq(P.autostart_quits({"headless": true, "pending": false}, false), false, "started by hand: runs")
+	t.eq(P.autostart_quits({"headless": false, "pending": false}, true), false, "an operator boot")
+	t.eq(P.autostart_quits({"launcher": true, "pending": true}, true), false, "the launcher is still up")
+	t.eq(P.autostart_quits(null, true), false, "no answer from the server")

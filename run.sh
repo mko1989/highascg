@@ -169,16 +169,20 @@ run_caspar() {
 # the "make this the operator screen" prompts must not sit under always-on-top screen consumers, and
 # the answer rewrites casparcg.config. Node writes this boot's id into the file (at once when nothing
 # needs asking). Backstop CASPAR_SCREEN_GATE_SEC (0 = off); relaunches never wait.
+# WO-645: while the hold file carries this boot's id (startup.mode ask: the start-up launcher waits for a person),
+# the backstop does not apply — Caspar starts on Start operator here / Run headless.
 _gate_file="${CASPAR_SCREEN_GATE_FILE:-${HOME:-/home/casparcg}/.highascg/run/caspar-screens-ready}"
+_hold_file="${CASPAR_SCREEN_HOLD_FILE:-$(dirname "$_gate_file")/caspar-screens-hold}"
 _gate_sec="${CASPAR_SCREEN_GATE_SEC:-240}"
 _boot_id="$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)"
 if [ "$_gate_sec" != "0" ] && [ -n "$_boot_id" ] && [ "$(cat "$_gate_file" 2>/dev/null)" != "$_boot_id" ]; then
 	caspar_supervisor_log "[run.sh] waiting for the boot screen choice ($_gate_file, up to ${_gate_sec}s)"
 	_waited=0
-	while [ "$_waited" -lt "$_gate_sec" ] && [ "$(cat "$_gate_file" 2>/dev/null)" != "$_boot_id" ]; do
+	while [ "$(cat "$_gate_file" 2>/dev/null)" != "$_boot_id" ] &&
+		{ [ "$_waited" -lt "$_gate_sec" ] || [ "$(cat "$_hold_file" 2>/dev/null)" = "$_boot_id" ]; }; do
 		sleep 1 && _waited=$((_waited + 1))
 	done
-	caspar_supervisor_log "[run.sh] boot screen gate: $([ "$_waited" -lt "$_gate_sec" ] && echo "released after ${_waited}s" || echo "timed out after ${_gate_sec}s — starting anyway")"
+	caspar_supervisor_log "[run.sh] boot screen gate: $([ "$(cat "$_gate_file" 2>/dev/null)" = "$_boot_id" ] && echo "released after ${_waited}s" || echo "timed out after ${_gate_sec}s — starting anyway")"
 fi
 
 while :; do

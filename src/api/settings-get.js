@@ -64,6 +64,7 @@ async function handleGet(path, ctx) {
 			x11_horizontal_swap: !!cfg.x11_horizontal_swap, multiview_system_id: cfg.multiview_system_id ?? '', multiview_os_mode: cfg.multiview_os_mode ?? '', multiview_os_backend: cfg.multiview_os_backend ?? 'xrandr', multiview_os_rate: cfg.multiview_os_rate ?? '',
 			usbIngest: { ...defaults.usbIngest, ...(cfg.usbIngest || {}) },
 			operatorTools: { ...defaults.operatorTools, ...(cfg.operatorTools || {}) },
+			startup: { ...defaults.startup, ...(cfg.startup || {}) }, // WO-645
 			projectScopedMedia: { ...defaults.projectScopedMedia, ...(cfg.projectScopedMedia || {}) },
 			streamingChannel: (() => {
 				const sc = { ...defaults.streamingChannel, ...(cfg.streamingChannel || {}) }

@@ -102,7 +102,7 @@ the web client itself stays for remote work (WO-608 D1).
 ## Tasks
 
 - [ ] T1 — export pipeline + `15-godot-operator.sh` + version pin + offline templates.
-- [ ] T2 — user unit + autostart wiring + `autoLaunch` honour.
+- [ ] T2 — user unit + autostart wiring + `autoLaunch` honour. *(Start policy superseded by [WO-645](./645_WO_startup_launcher_autostart_opt_in.md): launcher by default, autostart opt-in; the user unit remains.)*
 - [ ] T3 — kiosk suppression switch (single source of truth: destination `videoOutput`).
 - [ ] T4 — ISO/eggs: include `/opt/highascg/operator`, exclude Godot user data; `ISO_CONTENTS.md`.
 - [ ] T5 — after step 3: deletion commit (21 files / 3,799 LOC + 13 routes + ~17 smokes + CI apt dep).

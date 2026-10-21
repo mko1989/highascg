@@ -30,6 +30,14 @@
  *
  * Done is recorded against the kernel boot id, so a node or client restart never asks again; a box
  * with one screen never asks. `operatorTools.bootScreenPicker: false` turns it off.
+ *
+ * WO-645 — `startup.mode` (owner 21.10: autostart is an opt-in; normal operation boots to the desktop with "start
+ * operator here, or run headless" on each screen):
+ *   ask      (default) every boot shows the launcher on each screen, one screen too; Caspar is held with no
+ *            backstop (HOLD_FILE tells run.sh) and no server fallback until Start operator here / Run headless.
+ *   gui      autostart Caspar + the operator GUI: the WO-638 question above (multi-screen, 120 s, default).
+ *   headless autostart Caspar, no question; the client started by the session autostart quits at once.
+ * Run headless settles on the default operator jack (so a GUI started later lands there) and records how=headless.
  */
 
 const fs = require('fs')
@@ -41,12 +49,22 @@ const persistence = require('../utils/persistence')
 const STATE_KEY = 'bootScreenAssignment'
 const TIMEOUT_S = 120
 /** Why the default was taken (the client says; logged and stored with the choice). */
-const HOW_DEFAULT = { now: 'default_now', timeout: 'timeout', server: 'server_fallback' }
+const HOW_DEFAULT = { now: 'default_now', timeout: 'timeout', server: 'server_fallback', headless: 'headless' }
+const STARTUP_MODES = ['ask', 'gui', 'headless']
 /** No client answered (Godot not running): node takes the default itself. Below run.sh's 240 s gate. */
 const SERVER_FALLBACK_S = 200
 /** run.sh reads the same path (CASPAR_SCREEN_GATE_FILE); its content is the kernel boot id. */
 const GATE_FILE =
 	process.env.CASPAR_SCREEN_GATE_FILE || path.join(os.homedir(), '.highascg', 'run', 'caspar-screens-ready')
+
+/** WO-645: run.sh waits for GATE_FILE with no backstop while this file holds the boot id (the launcher is up). */
+const HOLD_FILE = process.env.CASPAR_SCREEN_HOLD_FILE || path.join(path.dirname(GATE_FILE), 'caspar-screens-hold')
+
+/** PURE. `startup.mode`, default ask. */
+function startupMode(config) {
+	const m = String(config?.startup?.mode || '').toLowerCase()
+	return STARTUP_MODES.includes(m) ? m : 'ask'
+}
 
 function bootId() {
 	return require('../bootstrap/startup-led-test-pattern').getMachineBootIdentity()
@@ -72,6 +90,22 @@ function openGate(id, log, file = GATE_FILE) {
 		fs.mkdirSync(path.dirname(file), { recursive: true })
 		fs.writeFileSync(file, `${rawBootId(id)}\n`)
 		log?.('info', `[Boot screens] Caspar start released (${file})`)
+		return true
+	} catch (e) {
+		log?.(
+			'warn',
+			`[Boot screens] could not write ${file}: ${e?.message || e} — run.sh starts Caspar after its own timeout`
+		)
+		return false
+	}
+}
+
+/** WO-645: keep run.sh waiting past its backstop for this boot (the launcher waits for a person). */
+function holdGate(id, log, file = HOLD_FILE) {
+	if (!id) return false
+	try {
+		fs.mkdirSync(path.dirname(file), { recursive: true })
+		fs.writeFileSync(file, `${rawBootId(id)}\n`)
 		return true
 	} catch (e) {
 		log?.(
@@ -231,6 +265,7 @@ function liveDeps(deps) {
 		/** xrandr / DRM reads are cached (TTL): after the spread, the canvas check and the jack map must see the new layout. */
 		invalidate: deps.invalidate || (() => require('../utils/hardware-info').invalidateXrandrCache()),
 		openGate: deps.openGate || openGate,
+		holdGate: deps.holdGate || holdGate,
 		/** Caspar is up: the normal full apply (write, layout, restart). */
 		apply:
 			deps.apply ||
@@ -266,12 +301,20 @@ function runXrandr(args) {
  */
 function bootStatus(config, deps = {}) {
 	const d = liveDeps(deps)
-	const base = { pending: false, timeoutS: TIMEOUT_S }
-	if (config?.operatorTools?.bootScreenPicker === false) return { ...base, reason: 'off' }
+	const mode = startupMode(config)
+	const base = { pending: false, timeoutS: TIMEOUT_S, mode }
 	const id = d.bootId()
 	if (!id) return { ...base, reason: 'no_boot_id' }
-	if (isDoneForBoot(d.store.get(STATE_KEY), id)) return { ...base, reason: 'done_this_boot' }
+	const rec = d.store.get(STATE_KEY)
+	if (isDoneForBoot(rec, id)) return { ...base, reason: 'done_this_boot', headless: rec?.how === 'headless' }
+	if (mode === 'headless') return { ...base, reason: 'autostart_headless', headless: true }
 	const lit = litPorts(d.gpuMap(config))
+	if (mode === 'ask') {
+		if (!lit.length) return { ...base, reason: 'no_screens' }
+		const def = defaultOperator(config, lit, d.flagPort(config))
+		return { ...base, pending: true, launcher: true, timeoutS: 0, reason: 'launcher', defaultName: def?.name || null }
+	}
+	if (config?.operatorTools?.bootScreenPicker === false) return { ...base, reason: 'off' }
 	if (lit.length < 2) return { ...base, reason: lit.length ? 'single_screen' : 'no_screens' }
 	const def = defaultOperator(config, lit, d.flagPort(config))
 	return { ...base, pending: true, reason: 'ask', defaultName: def?.name || null }
@@ -313,6 +356,12 @@ async function resolve(ctx, pick, deps = {}) {
 	const flagPort = d.flagPort(config)
 	const how = name ? 'clicked' : HOW_DEFAULT[pick?.how] || 'timeout'
 	const op = name ? lit.find((p) => p.name === name) : defaultOperator(config, lit, flagPort)
+	if (!op && how === 'headless') {
+		d.store.set(STATE_KEY, { bootId: id, name: null, port: null, how, at: new Date().toISOString() })
+		ctx?.log?.('info', '[Boot screens] run headless (no lit GPU jack)')
+		d.openGate(id, (level, msg) => ctx?.log?.(level, msg))
+		return { ok: true, status: 200, name: null, port: null, how }
+	}
 	if (!op)
 		return { ok: false, status: name ? 404 : 409, error: name ? `${name} is not a lit GPU jack` : 'no lit GPU jack' }
 
@@ -389,6 +438,11 @@ function startBootScreenGate(ctx, deps = {}) {
 	} catch (e) {
 		st = { pending: false, reason: `error: ${e?.message || e}` }
 	}
+	if (st.launcher) {
+		log('info', '[Boot screens] start-up launcher on every screen (startup.mode ask); Caspar held until it is answered')
+		d.holdGate(d.bootId(), log)
+		return st
+	}
 	log(
 		'info',
 		`[Boot screens] ${st.pending ? `asking on every screen (default ${st.defaultName}, ${TIMEOUT_S} s); Caspar held until then` : `no question (${st.reason})`}`
@@ -411,6 +465,8 @@ function startBootScreenGate(ctx, deps = {}) {
 
 module.exports = {
 	STATE_KEY,
+	HOLD_FILE,
+	startupMode,
 	TIMEOUT_S,
 	SERVER_FALLBACK_S,
 	GATE_FILE,

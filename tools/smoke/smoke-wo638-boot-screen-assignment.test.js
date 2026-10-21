@@ -17,6 +17,7 @@ const { handlePost } = require('../../src/api/routes-operator-screen')
 /** The owner's box on 21.10 19:04: saved operator on gpu_p1, PGM on gpu_p3, monitors now on gpu_p0 + gpu_p2. */
 function boxConfig() {
 	return {
+		startup: { mode: 'gui' }, // WO-645: the 120 s question is the "autostart Caspar + GUI" mode
 		casparServer: { screen_2_operator_monitor: true },
 		screenDestinations: {
 			destinations: [

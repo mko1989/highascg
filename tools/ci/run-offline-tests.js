@@ -362,6 +362,7 @@ const FILES = [
 	'tools/smoke/smoke-wo616-beam-spot.test.js',
 	'tools/smoke/smoke-wo599-operator-screen.test.js',
 	'tools/smoke/smoke-wo638-boot-screen-assignment.test.js',
+	'tools/smoke/smoke-wo645-startup-mode.test.js',
 	'tools/smoke/smoke-wo604-cross-screen-audio.test.js',
 	'tools/smoke/smoke-wo604-alsa-routes.test.js',
 	'tools/smoke/smoke-wo628-operator-dock.test.js',

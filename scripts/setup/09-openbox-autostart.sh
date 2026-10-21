@@ -142,14 +142,31 @@ ${CASPAR_PLAYOUT_BLOCK}
   :
   # Godot operator client — reconnects to the node API on its own while highascg.service boots. No --screen: the
   # server's operator monitor places it, and on a multi-screen boot it asks which screen that is (WO-638).
+  # --autostart (WO-645): it shows the start-up launcher (startup.mode ask), and quits when this boot runs headless.
   _godot="\${HOME}/.local/opt/godot/godot"
   if [ -x ${PLAYOUT}/godot/client/run-client.sh ] && [ -x "\$_godot" ]; then
     mkdir -p "\${HOME}/.highascg/log"
-    (sleep 8; GODOT="\$_godot" exec ${PLAYOUT}/godot/client/run-client.sh >>"\${HOME}/.highascg/log/godot-client.log" 2>&1) &
+    (sleep 8; GODOT="\$_godot" exec ${PLAYOUT}/godot/client/run-client.sh --autostart >>"\${HOME}/.highascg/log/godot-client.log" 2>&1) &
   fi
 fi
 AST
 chmod +x "/home/${USER_CASPAR}/.config/openbox/autostart"
+
+# WO-645: right-click the desktop → Operator GUI (after Run headless, or a closed client). No --autostart here: started
+# by hand the client always runs.
+cat > "/home/${USER_CASPAR}/.config/openbox/menu.xml" <<MENU
+<?xml version="1.0" encoding="UTF-8"?>
+<openbox_menu xmlns="http://openbox.org/3.4/menu">
+  <menu id="root-menu" label="HighAsCG">
+    <item label="Operator GUI">
+      <action name="Execute"><command>sh -c 'GODOT=\$HOME/.local/opt/godot/godot exec ${PLAYOUT}/godot/client/run-client.sh >>\$HOME/.highascg/log/godot-client.log 2>&amp;1'</command></action>
+    </item>
+    <item label="Terminal"><action name="Execute"><command>xterm</command></action></item>
+    <separator />
+    <item label="Reconfigure"><action name="Reconfigure" /></item>
+  </menu>
+</openbox_menu>
+MENU
 chown -R "${USER_CASPAR}:${USER_CASPAR}" "/home/${USER_CASPAR}/.config"
 
 if [[ "${OPENBOX_SKIP_NODM_RESTART:-0}" != "1" ]]; then

@@ -37,6 +37,9 @@ function coreDefaults() {
 			overwritePolicy: 'rename',
 			verifyHash: false,
 		},
+		// WO-645: what a boot starts. 'ask' = the desktop with "Start operator here / Run headless" on every screen
+		// (Caspar waits); 'gui' / 'headless' = autostart Caspar with / without the operator GUI (opt-in).
+		startup: { mode: 'ask' },
 		operatorTools: {
 			pointerConfineMultiview: false,
 			// WO-308: 'auto' (default) keeps the pre-existing rule — confine follows whatever

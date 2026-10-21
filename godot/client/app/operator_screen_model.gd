@@ -39,6 +39,13 @@ static func should_auto_open(rect: Variant, port: Variant, screen_count: int) ->
 	return not rect is Dictionary and port == null and screen_count > 1
 
 
+## WO-645: the client the session autostart started (--autostart) quits when this boot runs headless — startup.mode
+## headless, or Run headless was answered this boot. Started by hand it always runs.
+static func autostart_quits(boot: Variant, autostart: bool) -> bool:
+	return autostart and boot is Dictionary and bool((boot as Dictionary).get("headless", false)) \
+		and not bool((boot as Dictionary).get("pending", false))
+
+
 ## WO-638 boot mode: the line under every prompt.
 static func boot_countdown(seconds: int, default_name: String) -> String:
 	if default_name == "":

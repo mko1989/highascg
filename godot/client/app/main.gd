@@ -6,7 +6,7 @@ extends Control
 const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Placement := preload("res://app/window_placement.gd")
-const ScreenPicker := preload("res://app/operator_screen_picker.gd")
+const BootQuestion := preload("res://app/boot_question.gd")
 const ScreenModel := preload("res://app/operator_screen_model.gd")
 const Shell := preload("res://app/shell.gd")
 const HardwareReconcile := preload("res://app/hardware_reconcile.gd")
@@ -462,22 +462,12 @@ func _apply_window_args() -> void:
 	_screen_question(fresh)
 
 
-## WO-638: the once-per-boot "which screen is the operator's" question (asked even with --screen — the server
-## decides when, and holds Caspar until it is answered); otherwise a fresh multi-screen box with no operator monitor
-## flagged gets the plain prompt (WO-290's boot prompt, natively).
+## WO-638 / WO-645: the start-up questions (app/boot_question.gd).
 func _screen_question(fresh: bool) -> void:
-	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
-	if not r.ok or not r.data is Dictionary:
-		return
-	var boot: Variant = r.data.get("boot")
-	var asked := boot is Dictionary and bool((boot as Dictionary).get("pending", false))
-	if not asked and not (fresh and r.data.get("port") == null):
-		return
-	var picker := ScreenPicker.new()
-	add_child(picker)
-	picker.finished.connect(func(res: Dictionary) -> void: _log("operator screen: %s" % res.get("name", res.get("error", ""))))
-	if asked: picker.open_boot(boot)
-	else: picker.open()
+	var q := BootQuestion.new()
+	add_child(q)
+	q.said.connect(_log)
+	q.ask(fresh)
 
 
 func _log(line: String) -> void:

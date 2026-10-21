@@ -59,6 +59,12 @@ static func defaults(f: Form, fps: Callable) -> void:
 	f.heading("Input — mouse and touchpad")
 	f.check("Invert touchpad scroll", "ui.invertTouchpadScroll", false)
 	f.note("Reverses two-finger touchpad scrolling in the browser client's zoom / pan controls.")
+	f.heading("Start-up")  # WO-645
+	f.option("When the box starts", "startup.mode", [["ask", "Ask on every screen — Start operator here / Run headless"],
+		["gui", "Start CasparCG and the operator GUI"], ["headless", "Start CasparCG headless (web UI only)"]], "ask")
+	f.note("Ask: the desktop comes up with a small window on every screen and CasparCG waits for the choice. The other "
+		+ "two start everything by themselves. Takes effect at the next boot. Right-click the desktop → Operator GUI "
+		+ "opens this client later.")
 	f.heading("This screen")  # WO-599 T4: kept in this screen's ui.cfg, not shared with other clients
 	f.local_option("UI scale", Placement.SCALES, Placement.saved_scale(), Placement.apply_scale)
 	f.note("Auto draws 1× at 1080p and 2× at 4K. Kept on this screen only.")
