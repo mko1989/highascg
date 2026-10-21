@@ -253,6 +253,7 @@ func _option(key: String, items: Array, cb: Callable) -> OptionButton:
 
 func _check(key: String, cb: Callable) -> CheckBox:
 	var c := CheckBox.new()
+	c.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN  # a toggle, not as wide as the dropdowns
 	c.toggled.connect(func(on: bool) -> void:
 		if not _syncing:
 			cb.call(on))

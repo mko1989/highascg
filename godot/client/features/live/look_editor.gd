@@ -13,6 +13,7 @@ const LayerInspector := preload("res://features/live/layer_inspector.gd")
 const Geometry := preload("res://features/live/layer_geometry_section.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Fit := preload("res://features/live/look_editor_fit.gd")  # WO-653: boxes = what Caspar shows
+const View := preload("res://features/live/look_editor_view.gd")  # WO-654: wheel zoom / middle-drag pan
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -34,6 +35,7 @@ var _page: VBoxContainer  # WO-608 R2: geometry + layer inspector, shown in the 
 var _crop_mode := false
 var _crop_btn: Button
 var _fit := Fit.new()
+var _view := View.new()
 const CROP_COLOR := Color("#e3b341")
 
 
@@ -130,6 +132,7 @@ func _ready() -> void:
 func open(look_id: String, main_idx: int) -> void:
 	scene_id = look_id
 	main = main_idx
+	_view.reset()
 	_role = "prv%d" % (main + 1)
 	_video.texture = VideoSurfaces.texture(_role)
 	visible = true
@@ -180,12 +183,7 @@ func _canvas() -> Vector2:
 func _shown(l: Dictionary) -> Dictionary: return _fit.shown_fill(scene_id, main, l, _canvas())
 
 
-## Aspect box of the canvas inside the frame (letterboxed).
-func _box() -> Rect2:
-	var c := _canvas()
-	var s := minf(_frame.size.x / c.x, _frame.size.y / c.y)
-	var sz := c * s
-	return Rect2((_frame.size - sz) / 2.0, sz)
+func _box() -> Rect2: return _view.box(_frame.size, _canvas())  # the canvas in the frame: letterboxed, zoomed, panned
 
 
 func _fill_rect(f: Dictionary) -> Rect2:
@@ -238,6 +236,8 @@ func _handles(r: Rect2) -> Dictionary:
 
 
 func _frame_input(event: InputEvent) -> void:
+	if _view.input(event, _frame.size, _canvas()):
+		return _frame.accept_event()
 	var mb := event as InputEventMouseButton
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
 		if mb.pressed:

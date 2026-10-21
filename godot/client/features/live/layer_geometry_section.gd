@@ -55,6 +55,7 @@ func _ready() -> void:
 		g.add_child(sb)
 		_f[k] = sb
 	_lock = CheckBox.new()
+	_lock.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_lock.text = "Aspect lock"
 	_lock.tooltip_text = "Width and height keep the content's aspect ratio (Shift-drag in the frame ignores it)"
 	_lock.toggled.connect(func(on: bool) -> void:

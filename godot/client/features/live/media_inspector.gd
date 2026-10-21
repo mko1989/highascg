@@ -62,6 +62,7 @@ func _ready() -> void:
 	trim.add_child(clr)
 	_lib.add_child(trim)
 	_mute = CheckBox.new()
+	_mute.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_mute.text = "Mute audio"
 	_mute.toggled.connect(func(on: bool) -> void: _save({"muted": on}))
 	_lib.add_child(_mute)
