@@ -134,7 +134,10 @@ function normalizeDmx(raw) {
 		const m = /^(artnet|sacn):(\d{1,5})$/.exec(String(u))
 		if (m && (m[1] === 'artnet' ? Number(m[2]) <= 32767 : Number(m[2]) >= 1 && Number(m[2]) <= 63999)) universes.add(`${m[1]}:${Number(m[2])}`)
 	}
-	return { enabled: o.enabled === true, priority: Number.isFinite(p) ? Math.max(0, Math.min(200, Math.round(p))) : 100, universes }
+	const port = Number(o.sacn_port)
+	return { enabled: o.enabled === true, priority: Number.isFinite(p) ? Math.max(0, Math.min(200, Math.round(p))) : 100, universes,
+		visualise: o.visualise === true, // T7: the console's input drives the previs; typed universes are never sent
+		sacn_port: Number.isInteger(port) && port >= 1024 && port <= 65535 ? port : 5568 }
 }
 
 module.exports = { DMX_PROTOCOLS, applyType, gdtfFootprint, valueFor, encodeValue, writeGdtf, cleanValue, normalizeDmx }

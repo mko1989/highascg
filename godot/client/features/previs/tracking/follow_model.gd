@@ -66,7 +66,8 @@ static func normalize(slice: Variant) -> Dictionary:
 		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups"))}
 
 
-## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated).
+## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated;
+## T7 visualise = the console's DMX drives the previs, sACN input port).
 static func normalize_dmx(raw: Variant) -> Dictionary:
 	var o: Dictionary = raw if raw is Dictionary else {}
 	var pr: Variant = o.get("priority")
@@ -81,8 +82,11 @@ static func normalize_dmx(raw: Variant) -> Dictionary:
 		var key := "%s:%d" % [m.get_string(1), n]
 		if ok and not unis.has(key):
 			unis.append(key)
+	var port: Variant = o.get("sacn_port")
+	var port_ok := (port is int or port is float) and float(port) == floorf(float(port)) and float(port) >= 1024 and float(port) <= 65535
 	return {"enabled": o.get("enabled") == true,
-		"priority": clampi(roundi(float(pr)), 0, 200) if pr is int or pr is float else 100, "universes": unis}
+		"priority": clampi(roundi(float(pr)), 0, 200) if pr is int or pr is float else 100, "universes": unis,
+		"visualise": o.get("visualise") == true, "sacn_port": int(port) if port_ok else 5568}
 
 
 ## WO-632 output.through — twin of follow-through.js normalizeThrough (read the console's Art-Net first).

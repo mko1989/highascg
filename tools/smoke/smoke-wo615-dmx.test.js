@@ -226,7 +226,7 @@ test('routes: usage map, frame, programmer', async () => {
 	const ctx = { fixtureService: { engine: e } }
 	const call = (method, p, body = '', query = {}) => routes.dispatch(method, p, body, ctx, undefined, query)
 	const usage = JSON.parse((await call('GET', '/api/fixtures/dmx')).body)
-	assert.deepStrictEqual(usage.dmx, { enabled: true, priority: 100, universes: ['artnet:4'] })
+	assert.deepStrictEqual(usage.dmx, { enabled: true, priority: 100, universes: ['artnet:4'], visualise: false, sacn_port: 5568 })
 	assert.deepStrictEqual(usage.universes[0].fixtures[0], {
 		id: 'spot',
 		name: 'Spot',

@@ -47,3 +47,13 @@ func test_usage_lines_and_universe_toggle() -> void:
 	t.eq(d.universes, ["artnet:0", "sacn:1"])
 	t.eq(M.toggle_universe(d, "artnet:0", false).universes, ["sacn:1"])
 	t.eq(M.toggle_universe(d, "sacn:1", true).universes, ["artnet:0", "sacn:1"], "no duplicates")
+
+
+func test_input_lines_while_visualising() -> void:
+	var unis := [{"protocol": "sacn", "universe": 7}, {"protocol": "artnet", "universe": 2}]
+	var input := {"visualise": true, "sacn": {"universes": [{"universe": 7, "from": "10.0.0.5", "source": "desk", "age_ms": 40}]},
+		"artnet": {"universes": [{"universe": 2, "from": "10.0.0.6", "age_ms": 9000}]}}
+	t.eq(M.input_lines(unis, input), PackedStringArray(["sACN 7 ← 10.0.0.5 (desk)", "Art-Net 2 ← no console input (rig dark)"]),
+		"fresh source shown; a stale one reads as no input")
+	t.eq(M.input_lines(unis, {"visualise": false}), PackedStringArray(), "nothing while not visualising")
+	t.eq(M.input_lines(unis, null), PackedStringArray())

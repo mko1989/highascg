@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -77,7 +77,7 @@ with actual patch and way to artnet/sacn output."
       (2026-10-21 — additive cones instead of volumetric fog, see the T5 section)
 - [x] T6 Programmer UI: select fixtures (previs click / sheet), intensity, colour (RGB/CMY/CTO from
       available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups. (2026-10-21)
-- [ ] T7 Visualiser mode (incoming Art-Net/sACN through the patch).
+- [x] T7 Visualiser mode (incoming Art-Net/sACN through the patch). (2026-10-21)
 - [ ] T8 Looks integration (store/recall fixture states, TAKE crossfade).
 - [ ] T9 Follow IK (consumes WO-616 markers). **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
 - [ ] T10 MVR: fixtures from MVR (WO-612 T4) arrive patched (MVR carries `Addresses`, `GDTFMode`).
@@ -371,3 +371,60 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
 - Restored: fixtures slice identical to the snapshot (checked again after closing and relaunching the GUI), types
   deleted, programmer empty, `ui.cfg` identical, GUI back on tab 5.
 - Owner QA: the programmer driving a real head (checklist).
+
+## T7 — visualiser mode (2026-10-21)
+
+### Investigation
+- **Art-Net input already exists.** WO-632 read-through gets the console through `follow-through.js`
+  `ConsoleFrames`, which taps the lighting input's shared :6454 socket (or opens its own). It keeps one fresh frame per
+  universe (`STALE_MS` 2500) and is started only for read-through. Visualising Art-Net needs it started, nothing else.
+- **No sACN input exists.** `sacn.js` already has `decodeE131` and `multicastOf`, but nothing listens on 5568. A
+  console sends a universe to its multicast group (239.255.hi.lo) or unicast, so the listener joins the group of
+  every patched sACN universe on every IPv4 interface and also takes unicast on the same socket.
+- **Self-loop.** With the DMX output master on, the engine would send the programmer's frame to the same universes
+  it is now reading, and the previs would show our bytes, not the console's. In visualiser mode the box is a
+  receiver only. `_live` returns false for every typed universe while `visualise` is on, whatever the master says.
+- **No console = dark rig**, not a frozen last look. A previs that keeps the last frame after the desk is unplugged
+  lies about the stage.
+
+### What was done
+- `src/fixtures/dmx-input.js` (new): `SacnFrames` binds one udp4 socket (reuseAddr) on `fixtures.dmx.sacn_port`
+  (default 5568), joins the multicast group of each wanted universe, keeps only patched universes, and reports frames
+  as fresh within `STALE_MS`. It closes when no universe is wanted. `inputFrame(fx, {artnet, sacn})` returns the fresh
+  frame of fx's protocol + universe, else `ZERO`.
+- `gdtf-patch.js normalizeDmx`: `visualise` (strict boolean) and `sacn_port` (1024–65535, default 5568). The Godot
+  twin `follow_model.gd normalize_dmx` matches it.
+- `follow-engine.js`: `_live` never sends a typed universe while visualising. A visualise flip resends at once
+  (wasOn / isOn key). `status().dmx` carries `visualise`, `sacn_port`.
+- `follow-service.js`: when visualising, it starts `ConsoleFrames` if any enabled typed fixture is on Art-Net and
+  configures `SacnFrames` for the sACN ones. `visual()` decodes `inputFrame` instead of `engine.frameOf`. `input()`
+  reports what is received. `GET /api/fixtures/dmx` adds `input: { visualise, artnet, sacn }` (per universe: from,
+  source name, age).
+- Godot `fixtures_section.gd`: a **Visualise console** toggle next to DMX output (`_set_dmx`). Under the send lines it
+  shows one input line per patched universe ("sACN 7 ← 10.0.0.5 (desk)" / "← no console input (rig dark)",
+  `fixtures_model.gd input_lines`), refreshed every 2 s while visualising and visible.
+- **Deliberately not done:** no merge of console + programmer (HTP/LTP). Visualise is console-only and output is
+  programmer-only. The read-through for follow heads stays WO-632. sACN priority is ignored (the newest packet wins).
+
+### What was VERIFIED
+- Offline: `tools/smoke/smoke-wo615-visualise.test.js` 4/4:
+  - normalize;
+  - the engine never sends typed universes while visualising, even with the master on;
+  - a real UDP E1.31 round trip on a free port (frame, source, staleness → ZERO, socket closed on stop);
+  - Art-Net through `ConsoleFrames.feed`.
+
+  The `smoke-wo615-dmx` expectation was updated. Offline suite: 3055 tests, 3053 pass, 0 fail (2 skipped). Boot OK;
+  lint 216; lines, format, unwired and contract (462 routes) pass. Godot (`test_follow_model` port clamp,
+  `test_fixtures_model` input lines): 20529 pass, `--check` OK.
+- Box (server restarted, real Robin Esprite, 4 hung on sACN U7, `visualise: true`, `sacn_port: 5569`, **DMX output
+  master off**): a fake desk script (`encodeE131` + `writeGdtf`, unicast 127.0.0.1:5569, 30 Hz, Dimmer full, Color1
+  "Deep blue", pan sweeping ±60°, tilt 40) was run for 25 s.
+  - `GET /api/fixtures/dmx` showed `input.sacn` listening on [7], from 127.0.0.1 "T7 fake desk", age 2 ms; all
+    universes `live=false`.
+  - The GUI showed "sACN 7 ← 127.0.0.1 (T7 fake desk)", and four blue beams swept in the 3D view between two
+    screenshots 1.5 s apart.
+  - The desk sent 756 packets and the box received 755, so the engine added none (output stayed off).
+  - After the desk stopped, the line read "no console input (rig dark)" and every beam went out.
+- Restored: fixtures slice identical to the snapshot (checked after closing the GUI and restarting the server).
+  Types deleted; sACN input closed (`port: null`) once visualise was off; `ui.cfg` identical; GUI back on tab 5.
+- Owner QA: point the real console at the box and toggle Visualise console (checklist).

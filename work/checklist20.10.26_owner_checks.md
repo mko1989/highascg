@@ -149,6 +149,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       **Programmer (T6):** Previs → Fixtures → Programmer: click the head in the 3D view (shift-click adds), move
       Intensity / Pan / Tilt, pick a colour and a gobo thumbnail, then Point at + click the floor where you stand —
       does the real beam land there? Release hands it back to its defaults.
+      **Visualiser (T7):** send the console's universes for the patched heads to this box (Art-Net, or sACN
+      multicast / unicast to the box), then tick **Visualise console**. The Fixtures section should show
+      "sACN n ← <console IP> (<desk name>)". Does the previs follow the console (pan / tilt, colour, gobo)? Unplug
+      the console: after ~3 s the rig goes dark. The box sends nothing while this is on.
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.

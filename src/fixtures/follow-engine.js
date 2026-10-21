@@ -22,6 +22,7 @@
  * typed fixture is transmitted only while `fixtures.dmx` is on AND lists it ("artnet:0", "sacn:1"); other
  * universes keep the WO-616/631 rule (follow master on + Art-Net backup) and may also be listed. sACN universes
  * go out as E1.31 (sacn.js), multicast unless the patch names a unicast destination.
+ * WO-615 T7: while `fixtures.dmx.visualise` is on, no typed universe is sent at all (the console drives them).
  */
 
 const { encodeArtDmx } = require('./artdmx')
@@ -78,7 +79,7 @@ class FollowEngine {
 			}
 			fx.fixedList = parseFixed(fx.fixed)
 		}
-		const wasOn = `${this.enabled}|${this.protocol}|${this.dmx.enabled}|${[...this.dmx.universes]}`
+		const wasOn = `${this.enabled}|${this.protocol}|${this.dmx.enabled}|${this.dmx.visualise}|${[...this.dmx.universes]}`
 		this.dmx = p.dmx
 		this.enabled = p.enabled
 		this.protocol = p.protocol
@@ -95,7 +96,7 @@ class FollowEngine {
 		for (const k of [...this._uni.keys()]) if (!keys.has(k)) this._uni.delete(k)
 		for (const [k, u] of this._uni) u.typed = typed.has(k)
 		this._typed = typed
-		const isOn = `${this.enabled}|${this.protocol}|${this.dmx.enabled}|${[...this.dmx.universes]}`
+		const isOn = `${this.enabled}|${this.protocol}|${this.dmx.enabled}|${this.dmx.visualise}|${[...this.dmx.universes]}`
 		if (isOn !== wasOn) for (const u of this._uni.values()) u.last = null // send at once
 	}
 
@@ -133,6 +134,7 @@ class FollowEngine {
 
 	/** Whether universe u may be transmitted right now (see the header). */
 	_live(u) {
+		if (u.typed && this.dmx.visualise) return false // WO-615 T7: the console drives these — never send what we show
 		if (this.dmx.enabled && this.dmx.universes.has(`${u.protocol}:${u.universe}`)) return true
 		return !u.typed && u.protocol === 'artnet' && this.enabled && this.protocol === 'artnet'
 	}
@@ -268,7 +270,8 @@ class FollowEngine {
 					state: fx.problem ? 'not output' : a.state, pan: Math.round(a.pan * 100) / 100,
 					tilt: Math.round(a.tilt * 100) / 100, universe: fx.universe, address: fx.address, dest: fx.dest }
 			}),
-			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes] },
+			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes],
+				visualise: this.dmx.visualise, sacn_port: this.dmx.sacn_port },
 			universes: [...this._uni.values()].map((u) => ({ protocol: u.protocol, dest: `${u.to.host}:${u.to.port}`,
 				universe: u.universe, typed: u.typed, live: this._live(u), packets: u.packets,
 				last_sent_ms_ago: u.at ? now - u.at : null })),

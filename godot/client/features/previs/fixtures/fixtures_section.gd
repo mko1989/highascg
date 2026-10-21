@@ -3,7 +3,8 @@ extends VBoxContainer
 ## /api/fixtures/types; the server parses and keeps it), pick a type + mode, Add N at the next free addresses of a
 ## universe (Art-Net port-address or sACN universe) into project.fixtures.patch (follow_model.gd shape — the
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
-## master `fixtures.dmx` (off by default, asks first) with the universes it sends. The Programmer (T6) sits below.
+## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Visualise console (T7) lets the
+## console's input drive the previs instead (and sends nothing on those universes). The Programmer (T6) sits below.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -20,6 +21,7 @@ var _proto: OptionButton
 var _universe: SpinBox
 var _count: SpinBox
 var _master: CheckButton
+var _visualise: CheckButton
 var _send: MenuButton
 var _usage: Label
 var _status: Label
@@ -82,6 +84,12 @@ func _ready() -> void:
 	_send.get_popup().hide_on_checkable_item_selection = false
 	_send.get_popup().index_pressed.connect(_toggle_send)
 	out.add_child(_send)
+	_visualise = CheckButton.new()
+	_visualise.text = "Visualise console"
+	_visualise.tooltip_text = ("T7: the console's Art-Net / sACN for the patched universes drives the previs; " +
+		"the box sends nothing on them meanwhile")
+	_visualise.toggled.connect(func(on: bool) -> void: _set_dmx({"visualise": on}))
+	out.add_child(_visualise)
 	add_child(out)
 	_usage = _label()
 	_status = _label()
@@ -95,6 +103,13 @@ func _ready() -> void:
 	_confirm_rm = ConfirmationDialog.new()
 	_confirm_rm.confirmed.connect(_remove)
 	add_child(_confirm_rm)
+	var poll := Timer.new()  # T7: the console input status, while visualising
+	poll.wait_time = 2.0
+	poll.timeout.connect(func() -> void:
+		if _dmx().visualise and is_visible_in_tree():
+			refresh_usage())
+	add_child(poll)
+	poll.start()
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	await refresh_types()
 	_maybe_reload()
@@ -132,6 +147,7 @@ func _maybe_reload() -> void:
 		return
 	_last = js
 	_master.set_pressed_no_signal(_dmx().enabled)
+	_visualise.set_pressed_no_signal(_dmx().visualise)
 	refresh_usage()
 
 
@@ -179,6 +195,7 @@ func refresh_usage() -> void:
 	var res: Dictionary = await Api.get_json("/api/fixtures/dmx")
 	usage = res.data.get("universes", []) if res.ok and res.data is Dictionary else []
 	var lines := M.usage_lines(usage)
+	lines.append_array(M.input_lines(usage, res.data.get("input") if res.ok and res.data is Dictionary else null))
 	_usage.text = "\n".join(lines) if not lines.is_empty() else ("No patched universes." if res.ok else
 		"Fixture engine not reporting — the Tracking module is off on the server.")
 

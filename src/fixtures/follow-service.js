@@ -21,6 +21,7 @@ const { onProjectChanged } = require('../engine/project-events')
 const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
 const { features, aimValues } = require('./gdtf-features')
+const { SacnFrames, inputFrame } = require('./dmx-input')
 const { SACN_PORT } = require('./sacn')
 
 function ipv4ToInt(ip) {
@@ -87,6 +88,7 @@ function createFollowService(ctx, hub) {
 	const sender = new ArtnetSender({ log })
 	const psn = new PsnSender({ hub, log })
 	const consoleFrames = new ConsoleFrames({ log })
+	const sacnIn = new SacnFrames({ log }) // WO-615 T7 visualiser input
 	let targets = localTargets()
 	const reachesSelf = (to) => to.port === ARTNET_PORT && (to.host.startsWith('127.') || targets.has(to.host))
 	const sacnReachesSelf = (to) => isMulticast(to.host) || (to.port === SACN_PORT && (to.host.startsWith('127.') || targets.has(to.host)))
@@ -115,8 +117,11 @@ function createFollowService(ctx, hub) {
 		targets = localTargets()
 		engine.configure(slice)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
-		if (engine.through.enabled && engine.protocol === 'artnet') consoleFrames.start()
+		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
+		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
+		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.some((f) => f.protocol === 'artnet')) consoleFrames.start()
 		else consoleFrames.stop()
+		sacnIn.configure(vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe), engine.dmx.sacn_port)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
 		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol})`)
 		for (const f of engine.fixtures) if (f.problem) log('warn', `[follow] ${f.name}: ${f.problem}`)
@@ -151,13 +156,17 @@ function createFollowService(ctx, hub) {
 				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) =>
 					({ id, state, pan, tilt, problem, through, console })) }
 		},
-		/** WO-615 T5 (WS `tracking:fixtures`): every outputtable typed fixture's axes / beams, decoded from its bytes. */
+		/**
+		 * WO-615 T5 (WS `tracking:fixtures`): every outputtable typed fixture's axes / beams, decoded from its bytes —
+		 * ours, or in visualiser mode (T7) the console's (no fresh input = dark).
+		 */
 		visual: () => {
 			const fixtures = []
+			const inputs = { artnet: consoleFrames, sacn: sacnIn }
 			for (const fx of engine.fixtures) {
 				if (!fx.gdtf || !fx.enabled || fx.problem) continue
 				const v = gdtfStore.visual(fx.typeId, fx.mode)
-				const buf = engine.frameOf(fx)
+				const buf = engine.dmx.visualise ? inputFrame(fx, inputs) : engine.frameOf(fx)
 				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address) })
 			}
 			return { fixtures }
@@ -183,8 +192,11 @@ function createFollowService(ctx, hub) {
 			}
 			return { aimed, unreachable }
 		},
+		/** WO-615 T7: what the visualiser receives. */
+		input: () => ({ visualise: engine.dmx.visualise, artnet: consoleFrames.status(), sacn: sacnIn.status() }),
 		stop() {
 			off()
+			sacnIn.stop()
 			engine.stop()
 			sender.close()
 			psn.close()

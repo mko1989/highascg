@@ -2,9 +2,10 @@
 
 /**
  * WO-615 T3/T4 — the fixture DMX engine (src/fixtures/follow-engine.js, via ctx.fixtureService):
- *   GET    /api/fixtures/dmx                         → { dmx (master, priority, enabled universes), universes:
- *                                                        [{ protocol, universe, dest, live, used, fixtures:
- *                                                        [{ id, name, address, from, to, channels, problem }] }] }
+ *   GET    /api/fixtures/dmx                         → { dmx (master, priority, enabled universes, visualise,
+ *                                                        sacn_port), universes: [{ protocol, universe, dest, live, used,
+ *                                                        fixtures: [{ id, name, address, from, to, channels, problem }] }],
+ *                                                        input: { visualise, artnet, sacn } (T7: frames received) }
  *   GET    /api/fixtures/dmx/frame?protocol=&universe=  → { protocol, universe, dest, live, data: [512] } (what goes
  *                                                        out — or would, while the universe is not live)
  *   GET    /api/fixtures/program                     → { values: { fixtureId: { key: value } } }
@@ -83,7 +84,8 @@ function register(routes) {
 	const svc = (ctx) => ctx?.fixtureService || null
 	routes.get('/api/fixtures/dmx', ({ ctx }) => {
 		const s = svc(ctx)
-		return s ? reply(200, { dmx: s.engine.status().dmx, universes: usage(s.engine) }) : reply(503, NO_ENGINE)
+		return s ? reply(200, { dmx: s.engine.status().dmx, universes: usage(s.engine), input: s.input?.() ?? null })
+			: reply(503, NO_ENGINE)
 	}, opt)
 	routes.get('/api/fixtures/dmx/frame', ({ ctx, query }) => (svc(ctx) ? frame(svc(ctx).engine, query) : reply(503, NO_ENGINE)), opt)
 	const program = (method) => ({ ctx, body, query }) =>

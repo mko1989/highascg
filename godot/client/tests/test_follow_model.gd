@@ -58,8 +58,12 @@ func test_typed_and_sacn_fixtures_survive_a_save() -> void:
 	var d := F.normalize({"dmx": {"enabled": true, "priority": 250, "universes": ["sacn:1", "sacn:0", "artnet:3", "sacn:1", "x"]},
 		"patch": [{"id": "s", "protocol": "sacn", "universe": 0, "typeId": "0123456789ab", "mode": "Standard"},
 		{"id": "a", "typeId": "../etc", "universe": 4}]})
-	t.eq(d.dmx, {"enabled": true, "priority": 200, "universes": ["sacn:1", "artnet:3"]})
-	t.eq(F.normalize({}).dmx, {"enabled": false, "priority": 100, "universes": []}, "DMX master off by default")
+	t.eq(d.dmx, {"enabled": true, "priority": 200, "universes": ["sacn:1", "artnet:3"],
+		"visualise": false, "sacn_port": 5568})
+	t.eq(F.normalize({}).dmx, {"enabled": false, "priority": 100, "universes": [], "visualise": false, "sacn_port": 5568},
+		"DMX master off, not visualising by default")
+	t.eq(F.normalize_dmx({"visualise": true, "sacn_port": 5569}).sacn_port, 5569)
+	t.eq([F.normalize_dmx({"sacn_port": 80}).sacn_port, F.normalize_dmx({"sacn_port": 5568.5}).sacn_port], [5568, 5568])
 	var s: Dictionary = d.patch[0]
 	t.eq([s.protocol, s.universe, s.dest, s.typeId, s.mode], ["sacn", 1, "", "0123456789ab", "Standard"],
 		"sACN from universe 1, multicast dest, type kept")

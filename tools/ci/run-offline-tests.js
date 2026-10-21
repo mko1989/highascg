@@ -374,6 +374,7 @@ const FILES = [
 	'tools/smoke/smoke-wo615-dmx.test.js',
 	'tools/smoke/smoke-wo615-visual.test.js',
 	'tools/smoke/smoke-wo615-programmer.test.js',
+	'tools/smoke/smoke-wo615-visualise.test.js',
 	'tools/smoke/smoke-wo285-box-size-inspector.test.js',
 	'tools/smoke/smoke-wo286-touchpad-invert.test.js',
 	'tools/smoke/smoke-wo271-route-heal.test.js',

@@ -96,6 +96,27 @@ static func usage_lines(universes: Array) -> PackedStringArray:
 	return out
 
 
+## T7 visualiser: what arrives from the console for each patched universe (GET /api/fixtures/dmx `input`).
+static func input_lines(universes: Array, input: Variant) -> PackedStringArray:
+	var out := PackedStringArray()
+	if not input is Dictionary or input.get("visualise") != true:
+		return out
+	for u in universes:
+		if not u is Dictionary:
+			continue
+		var proto := "sacn" if u.get("protocol") == "sacn" else "artnet"
+		var seen := {}
+		for r in ((input.get(proto, {}) as Dictionary).get("universes", []) if input.get(proto) is Dictionary else []):
+			if r is Dictionary and int(r.get("universe", -1)) == int(u.universe):
+				seen = r
+		var name := "%s %d" % ["sACN" if proto == "sacn" else "Art-Net", int(u.universe)]
+		if seen.is_empty() or float(seen.get("age_ms", 1e9)) > 2500.0:
+			out.append("%s ← no console input (rig dark)" % name)
+		else:
+			out.append("%s ← %s%s" % [name, str(seen.get("from", "?")), " (%s)" % seen.source if str(seen.get("source", "")) != "" else ""])
+	return out
+
+
 ## fixtures.dmx.universes with `key` ("sacn:1") switched on or off (normalized, order kept).
 static func toggle_universe(dmx: Dictionary, key: String, on: bool) -> Dictionary:
 	var d := F.normalize_dmx(dmx)
