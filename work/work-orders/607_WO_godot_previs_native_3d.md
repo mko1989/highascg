@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — T2 (UV mapper port) done + tested; T3 (server models → runtime glTF, screen tagging) + T5 (live shm sources) + camera presets working in the Godot client against the simulator; T1 closed 20.10 (nothing in the box's browser storage to migrate; Godot keeps GLB screen tags in the project). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Supersedes the three.js renderer of [WO-17](./17_WO_3D_PREVIS.md) once accepted (WO-17 keeps its history; its data model and server API are reused). Depends on: WO-596 (shm textures), WO-597 (`video-surfaces` for PGM/PRV), WO-599 (foundation).**
+**Status: IN PROGRESS (2026-10-21) — T1–T5 done (UV mapper, model load + saved screen tags, `led_screen.gdshader` used by the stage builder and MVR scenes, live shm sources with leases); T6 done without the key shortcuts (owner: the right-click menu replaces them); T7 done as the Live tab Standard ↔ 3D switch (WO-621 N6) — the pop-out window is deferred (one monitor on the box, no owner request); T8 (UV drag editor, a deferred WO-17 idea) not requested — parked. Owner checks: see the checklist (WO-607). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Supersedes the three.js renderer of [WO-17](./17_WO_3D_PREVIS.md) once accepted (WO-17 keeps its history; its data model and server API are reused). Depends on: WO-596 (shm textures), WO-597 (`video-surfaces` for PGM/PRV), WO-599 (foundation).**
 
 # WO-607 — Previs in Godot: native 3D stage with live channel textures
 
@@ -80,16 +80,21 @@ UI (Control, same window): toolbar, mesh inspector, camera list, display toggles
 - [x] T1 (20.10, see below) — **(web, before anything else)** move previs tags/presets/UI from `localStorage` to the
       server (per-model metadata under `/api/previs/models/<id>` or project); one-time migration
       on next web load. Smoke + owner check that the existing stage keeps its tags.
-- [ ] T2 — `previs_uv_mapper.gd` + tests ported from `__selfTest` (pure).
-- [ ] T3 — model load (GLB/GLTF/FBX) from server, mesh list, tag/untag, selection outline.
-- [ ] T4 — `led_screen.gdshader` (uv_rect, emissive glow, optional pixel-grid at `pixelPitch`).
-- [ ] T5 — sources: PGM/PRV/Channel N via `VideoSurfaces`; refcount; NO SIGNAL state.
-- [ ] T6 — camera presets + keys `1-9 F G W Esc` + fly-to; display toggles; scene settings.
-- [ ] T7 — 2D/3D toggle on the PGM tile + pop-out window; `previs_mode_changed` signal for WO-19/31.
-- [ ] T8 — UV/virtual-canvas drag editor (the deferred WO-17 item) — natural in Godot 2D.
-- [ ] **MVR scene import (Capture etc.) → [WO-612](./612_WO_previs_mvr_import.md)** (needs a 3DS loader; MVR
+- [x] T2 — `previs_uv_mapper.gd` + tests ported from `__selfTest` (pure).
+- [x] T3 — model load (GLB/GLTF/FBX) from server, mesh list, tag/untag, selection outline.
+- [x] T4 — `led_screen.gdshader` (uv_rect, emissive glow, optional pixel-grid at `pixelPitch`).
+- [x] T5 — sources: PGM/PRV/Channel N via `VideoSurfaces`; refcount; NO SIGNAL state.
+- [x] T6 — camera presets + keys `1-9 F G W Esc` + fly-to; display toggles; scene settings. *(21.10: presets, fly-to,
+      toggles in ui.cfg done; the key shortcuts dropped — owner: "no need for intricate shortcuts in godot as we have
+      the right click menu".)*
+- [~] T7 — 2D/3D toggle on the PGM tile + pop-out window; `previs_mode_changed` signal for WO-19/31. *(21.10: the
+      toggle is the Live tab's Standard ↔ 3D switch, WO-621 N6. Pop-out window deferred: one monitor on the box and no
+      owner request. The signal had web-era consumers only.)*
+- [ ] T8 — UV/virtual-canvas drag editor (the deferred WO-17 item) — natural in Godot 2D. *(21.10: parked — not
+      requested; the stage builder's numeric crop fields cover mapping today.)*
+- [x] **MVR scene import (Capture etc.) → [WO-612](./612_WO_previs_mvr_import.md)** (needs a 3DS loader; MVR
       VideoScreen Sources/Mappings map onto these screen bindings).
-- [ ] **Stage builder (LED walls / TVs / projection from numbers, bound to channels) → [WO-614](./614_WO_previs_stage_builder.md)**
+- [x] **Stage builder (LED walls / TVs / projection from numbers, bound to channels) → [WO-614](./614_WO_previs_stage_builder.md)**
 - [ ] **Fixtures: GDTF, patch, Art-Net/sACN out, beams → [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md)**
 - [ ] **Tracking: OpenFollow port, DeckLink/channel camera, two-camera fusion → [WO-616](./616_WO_previs_tracking_openfollow_cameras.md)**
 
