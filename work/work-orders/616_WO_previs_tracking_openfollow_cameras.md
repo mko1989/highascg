@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); T10d verification walk done (server measure + Inspector walk + `verified` stamp, box-verified through the GUI; a real walk with two cameras = owner QA) — T10 complete; T8 PSN input DROPPED by the owner (no other tracker on the rig); attribution done (file headers + THIRD_PARTY_NOTICES + Settings → About from GET /api/about, box-verified in the Godot GUI; the web About pane is deferred by the owner); T13 fixture calibration, manual slice (jog the head onto floor spots, drop a marker on each → server pose solve, Apply into project.fixtures) done via [WO-624](./624_WO_godot_owner_notes_next_md_3.md) E3 (box-verified API + GUI; real head = owner QA); remaining: T13b automatic beam-spot detection in the camera image. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
+**Status: IN PROGRESS (2026-10-19) — T1 surface roles (box-verified), T2 camera maths (offline), T3 calibration (box-verified, RMS 0.71 px) done; T5 markers done (hub + Godot driver, box-verified; gamepad = owner QA); T11 follow → Art-Net done (generic moving-head profile, loopback-verified; real fixture = owner QA); T7 trigger zones done (server engine + Godot Zones mode, box-verified; actions = look take / Companion press); T4 + T12 camera view with lens-correct 3D stage ghost done (box-verified); T9a detection sidecar + server service done (box-verified, CPU yolo26n ~17 ms); T9b pinning (replace / assist) + Godot Detect mode done (box-verified through the GUI); T9c ROI mask editor done (box-verified through the GUI); T10a fusion engine done (offline, synthetic two-camera stage); T10b fusion wiring done (pin on world persons, WS `world` block, Godot P-tags + unseen rings; box-verified with a twin camera); T10c coverage view done (3D frustums + floor coverage + placement verdict, box-verified in the GUI); T10d verification walk done (server measure + Inspector walk + `verified` stamp, box-verified through the GUI; a real walk with two cameras = owner QA) — T10 complete; T8 PSN input DROPPED by the owner (no other tracker on the rig); attribution done (file headers + THIRD_PARTY_NOTICES + Settings → About from GET /api/about, box-verified in the Godot GUI; the web About pane is deferred by the owner); T13 fixture calibration, manual slice (jog the head onto floor spots, drop a marker on each → server pose solve, Apply into project.fixtures) done via [WO-624](./624_WO_godot_owner_notes_next_md_3.md) E3 (box-verified API + GUI; real head = owner QA); T13b automatic beam-spot detection done (server finds the spot in the camera still; box-verified API + GUI on the real DeckLink cameras; a real beam = owner QA) — all tasks done or dropped. T6 PSN/OSC out DROPPED by the owner (Art-Net instead, via WO-615). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the *approach* of [WO-19](./19_WO_PERSON_TRACKING.md) (browser TF.js detection) and the Companion-only device path of [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) — both keep their goals; implementation moves here. Related: [WO-614](./614_WO_previs_stage_builder.md) (cameras + calibration points are stage objects), [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (follow → fixtures).**
 
 # WO-616 — Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera workflow
 
@@ -168,7 +168,7 @@ walls; (b) manual calibration — drag 3D points onto the video; (c) operator vi
 - [x] T12 "Camera view" overlay mode in previs: background = camera surface, `Camera3D` = solved camera,
       ghosted stage + markers/zones, lens-distortion shader; opacity slider.
 - [x] T13 Camera-assisted fixture calibration (WO-615 fixtures): pose solve + manual fallback — done 2026-10-20 via [WO-624](./624_WO_godot_owner_notes_next_md_3.md) E3 (`src/fixtures/calibrate-solve.js`, `calibrate-session.js`, Godot `calibrate_section.gd`).
-- [ ] T13b Automatic beam-spot detection (find the spot in the camera image instead of the operator's marker drop).
+- [x] T13b Automatic beam-spot detection (find the spot in the camera image instead of the operator's marker drop) — done 2026-10-21 (`src/fixtures/beam-spot.js`, `calibrate-spot.js`, `src/tracking/hshm-read.js`; Godot Find beam spot / Beam-off reference).
 
 ## T1 — surface roles `inN` / `chN` (2026-10-19) — DONE
 
@@ -1527,3 +1527,54 @@ panes only. The owner picked "Settings → About (both clients)", then said "Lea
 - `godot/client/tests/test_settings_about.gd` — loading / error rows, legal rows, credits (non-dict entries skipped).
 - Godot `--test` 1306/1306, `--check` boot OK; on the box Settings → About shows HighAsCG 2026.05.20, the copyright,
   licence + warranty, source link and all six credits, with no SCRIPT ERROR; `curl /api/about` returns the same.
+
+## T13b — automatic beam-spot detection for the fixture calibration (2026-10-21) — DONE (box-verified API + GUI on the real cameras; a real beam = owner QA)
+
+### Investigation
+- The calibration (T13 / WO-624 E3) pairs each jogged (pan, tilt) with a floor point the operator gives: a marker
+  dropped on the spot, or (WO-630 F1) a click on the spot in the camera picture. T13b removes that step: the server
+  finds the spot itself.
+- Frames: the tracking cameras already have shm surfaces (WO-597 roles `inN` / `pgmN` / …, leased by the detection
+  sidecar). Only Python (sidecar) and the Godot GDExtension read them; the server needs one still now and then, not a
+  stream, so a positional-read Node reader of HASCGSHM v1 is enough (no mmap, seqlock checked before and after).
+- Floor point: `camera-model.pixelToFloor` (lens-corrected) on the solved camera, plane = the grid's z offset — the
+  same cast the detection feet use.
+- Real venue picture (cam_2 = in1): the brightest thing is the white logo on the LED screen, not the floor. A plain
+  "brightest blob" would add that as a point, so the finder must (a) refuse areas too big to be a spot, (b) flag a
+  second, nearly-as-bright area, and (c) offer a beam-off reference so only what got BRIGHTER counts.
+
+### What was done
+- `src/tracking/hshm-read.js` — `readLatestFrame(file, {since})` → the latest published frame or
+  `missing / invalid / none / lapped`.
+- `src/fixtures/beam-spot.js` — `lumaGrid(frames)` (every 2nd pixel, averaged over the frames) and
+  `findBeamSpot(grid, {ref})`: peak, median, contrast; refused below 40 contrast or when the blob is over 2 % of the
+  picture; blob = 4-connected ≥ halfway between median and peak; weighted centre; `ambiguous` when a separate area
+  reaches 80 % of the contrast. With `ref`, the grid is `max(0, now − ref)`.
+- `src/fixtures/calibrate-spot.js` — POST `/api/tracking/follow/calibrate/spot {camera, action?, id?, add?}`:
+  leases the camera's surface (client `fixture-calibrate`), averages 3 distinct frames (≤ 2 s), finds the spot,
+  scales it to the camera raster, casts it onto the floor. With `id` an unambiguous spot is added as a calibration
+  point (`calibrate-session` `point {at}`) and the reply is the session + `spot`; ambiguous → 409, no spot → 422,
+  no picture → 503, unsolved camera → 409. `action: 'reference' | 'clear'` holds / drops a beam-off picture per camera.
+  Routed in `src/tracking/register.js`.
+- Godot `calibrate_section.gd`: **Find beam spot** (through the camera on screen — `previs_tab` passes the
+  tracking page's active camera via `follow_section.set_calib_camera`) and **Beam-off reference** / **Clear
+  reference**; the found spot shows under the summary (`follow_model.spot_line`).
+- Smoke `tools/smoke/smoke-wo616-beam-spot.test.js` (8: reader round trip / torn / since / invalid; sub-pixel spot;
+  flat picture and lit wall refused; reference takes the wall out; two spots ambiguous; finder end-to-end with a
+  projected floor point within 5 cm; add-as-point; reference / clear / refusals; route pin). Godot
+  `test_follow_model.gd` +3 for `spot_line`.
+
+### What was VERIFIED
+- Offline: 3019 pass / 0 fail; Godot 20422 pass, `--check` clean; lint 216, format, line limit, unwired exports, API
+  contract regenerated.
+- Box API, real DeckLink frames (node restarted): cam_1 (in2, no signal) → 422 "no spot stands out" (peak 0);
+  cam_2 (in1, the venue) → found the LED-screen logo at px (277, 371), correctly **ambiguous** (second 190 vs peak
+  191) — with `id: fx1` it was refused (409) and nothing added. Beam-off reference then find on the unchanged
+  picture → 422 (residual noise peak 27 < 40); clear → `reference: false`. Unknown camera → 404.
+- Box GUI: Previs → Follow → Calibrate position… shows Find beam spot / Beam-off reference; Find on Camera 1 put
+  "no spot stands out of the picture — is the beam on and in view?" under the summary; the reference button toggled
+  to Clear reference and back; Done ended the session (GET sessions → []). Patch unchanged; ui.cfg restored.
+
+### Open
+- A real beam: owner QA (checklist). Art-Net output was off on the box, so no head moved.
+

@@ -88,3 +88,8 @@ func test_calibration_solve_applies_pose_and_pan_flip() -> void:
 	t.ok(line.begins_with("4 points · fit 0.12° RMS (max 0.20°) → X 3.00  Y 5.00  Z 7.01  yaw 30.1°"), line)
 	t.ok(line.contains("Invert pan"), line)
 	t.eq(F.calib_summary({"points": [{}], "solve": {"ok": false, "need": 2}}), "1 point — 2 more to solve.")
+	# WO-616 T13b: the beam spot the server found
+	t.eq(F.spot_line({"at": [1.5, 2.04, 0], "px": [1012.4, 655.9], "contrast": 180, "reference": true}),
+		"Beam spot at X 1.50  Y 2.04 (pixel 1012, 655 · contrast 180 · vs reference)")
+	t.eq(F.spot_line({"ok": false, "peak": 60}), "", "no floor point → no line")
+	t.eq(F.spot_line(null), "")

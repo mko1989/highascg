@@ -175,6 +175,8 @@ func _on_tracking_changed() -> void:
 	track_view.markers_mode = track_page.mode in ["markers", "follow", "detect"]
 	track_view.follow_mode = track_page.mode == "follow"
 	track_view.calibrating = track_view.follow_mode and track_page.follow != null and track_page.follow.calibrating()
+	if track_page.follow != null:
+		track_page.follow.set_calib_camera(str(track_page.entry().get("id", "")))
 	track_view.zones_mode = track_page.mode == "zones"
 	track_view.detect_mode = track_page.mode == "detect"
 	_push_zones()

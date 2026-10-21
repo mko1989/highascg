@@ -105,6 +105,9 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-630** — Follow → Calibrate on a real moving head. Jog the beam onto a floor spot, **click that spot in
       the camera picture** (no marker needed), repeat 4+ times, Solve, Apply. The head should then hit the marker.
       In Markers mode, a click on the floor puts the selected marker there.
+- [ ] **WO-616 T13b** — same calibration, but press **Find beam spot** instead of clicking: the server finds the
+      beam in the camera picture and adds the point. On a stage with a lit LED wall, first aim the beam off stage (or
+      close the shutter) and press **Beam-off reference**. Does it find the real spot every time?
 - [ ] **WO-630** — a marker held by Detect's **replace** pin can't be placed by hand (the bottom line says so). Is
       that right, or should a held marker with nobody tracked be movable by hand, as OpenFollow allows?
 - [ ] **WO-630 Q2** — play a real Resolume **DXV3 HQ with alpha** export over a colour layer. Does the edge key?

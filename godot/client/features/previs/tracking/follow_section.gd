@@ -307,5 +307,11 @@ func calibrating() -> bool:
 	return _calib != null and _calib.visible and _calib.is_open()
 
 
+func set_calib_camera(id: String) -> void:
+	if _calib != null and id != _calib.camera_id:
+		_calib.camera_id = id
+		_calib.refresh()
+
+
 func add_calib_point(at: Array) -> void:
 	_calib.add_floor_point(at)

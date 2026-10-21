@@ -13,6 +13,11 @@ signal apply_requested(solve: Dictionary)
 
 var driver: Node  # marker_driver.gd: the selected marker is the one dropped on the spot
 var fixture_id := ""
+var camera_id := ""  # the camera on screen: WO-616 T13b Find beam spot looks through it
+var _refs := {}  # camera id → a beam-off reference is held by the server
+var _spot := ""
+var _find: Button
+var _ref: Button
 var _sessions := {}  # fixture id → last session reply
 var _start: Button
 var _box: VBoxContainer
@@ -34,7 +39,7 @@ func _ready() -> void:
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture — that adds the point (or drop the selected marker on it and Add point). 4+ spots spread over the stage.")
+	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage.")
 	_box.add_child(how)
 	_pan = _axis_row("Pan °", "pan", "dpan")
 	_tilt = _axis_row("Tilt °", "tilt", "dtilt")
@@ -42,6 +47,14 @@ func _ready() -> void:
 	_add = _button("Add point", func() -> void: _act({"action": "point", "marker": int(driver.selected) if driver != null else 0}))
 	row.add_child(_add)
 	row.add_child(_button("Undo point", func() -> void: _act({"action": "undo"})))
+	_box.add_child(row)
+	row = HBoxContainer.new()
+	_find = _button("Find beam spot", func() -> void: _spot_act("find"))
+	_find.tooltip_text = "The server looks for the beam in this camera's picture and adds it as a point."
+	row.add_child(_find)
+	_ref = _button("Beam-off reference", func() -> void: _spot_act("clear" if _refs.get(camera_id) == true else "reference"))
+	_ref.tooltip_text = "Take the picture with the beam off (or aimed off stage): later finds only look at what got brighter — LED walls and lit scenery drop out."
+	row.add_child(_ref)
 	_box.add_child(row)
 	_summary = _muted("")
 	_box.add_child(_summary)
@@ -96,7 +109,26 @@ func set_fixture(id: String) -> void:
 	if id != fixture_id:
 		fixture_id = id
 		_err = ""
+		_spot = ""
 		refresh()
+
+
+## WO-616 T13b: find (and add) the beam spot in camera_id's picture, or take / clear its beam-off reference.
+func _spot_act(action: String) -> void:
+	if fixture_id == "" or camera_id == "":
+		return
+	var id := fixture_id
+	var cam := camera_id
+	var res: Dictionary = await Api.post_json("/api/tracking/follow/calibrate/spot", {"camera": cam, "action": action, "id": id})
+	_err = "" if res.ok else str(res.error)
+	if action != "find":
+		if res.ok:
+			_refs[cam] = action == "reference"
+	elif res.data is Dictionary:
+		_spot = F.spot_line(res.data.get("spot"))
+		if res.ok and res.data.has("points"):
+			_sessions[id] = res.data
+	refresh()
 
 
 func _act(body: Dictionary) -> void:
@@ -132,7 +164,13 @@ func refresh() -> void:
 	var marker := int(driver.selected) if driver != null else 0
 	_add.disabled = marker == 0
 	_add.text = "Add point at %s" % _marker_name(marker) if marker != 0 else "Add point (select a marker)"
+	_find.disabled = camera_id == ""
+	_find.text = "Find beam spot" if camera_id != "" else "Find beam spot (no camera)"
+	_ref.disabled = camera_id == ""
+	_ref.text = "Clear reference" if _refs.get(camera_id) == true else "Beam-off reference"
 	var txt := F.calib_summary(s)
+	if _spot != "":
+		txt += "\n" + _spot
 	if s.get("output_enabled") != true:
 		txt = "Art-Net output is off — the head will not move.\n" + txt
 	if _err != "":

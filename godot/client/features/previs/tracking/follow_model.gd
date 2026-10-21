@@ -180,3 +180,12 @@ static func calib_summary(sess: Dictionary) -> String:
 	if s.get("warning") != null and str(s.warning) != "":
 		txt += "\n" + str(s.warning)
 	return txt
+
+
+## WO-616 T13b: the server's beam-spot reply (POST …/calibrate/spot) → one line for the calibration Inspector.
+static func spot_line(spot: Variant) -> String:
+	if not (spot is Dictionary) or not (spot.get("at") is Array):
+		return ""
+	var px: Array = spot.get("px") if spot.get("px") is Array else [0, 0]
+	return "Beam spot at X %.2f  Y %.2f (pixel %d, %d · contrast %d%s)" % [float(spot.at[0]), float(spot.at[1]),
+		int(px[0]), int(px[1]), int(spot.get("contrast", 0)), " · vs reference" if spot.get("reference") == true else ""]

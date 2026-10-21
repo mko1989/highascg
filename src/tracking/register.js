@@ -12,7 +12,8 @@
  *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status)
  *       · POST /api/tracking/detect/pick {key} (WO-624 E2: the replace pin follows this detected person)
  *       · GET / POST /api/tracking/follow/calibrate {action, id, …} (WO-624 E3: fixture position calibration,
- *         src/fixtures/calibrate-session.js)
+ *         src/fixtures/calibrate-session.js) · POST …/calibrate/spot {camera, action?, id?} (T13b: the server finds
+ *         the beam spot in the camera picture, src/fixtures/calibrate-spot.js)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
@@ -38,6 +39,7 @@
 const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
 const { createCalibration } = require('../fixtures/calibrate-session')
+const { createSpotFinder, LEASE_ID: SPOT_LEASE_ID } = require('../fixtures/calibrate-spot')
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
@@ -61,6 +63,7 @@ let _sent = { rev: -1, stale: '', at: 0 }
 let _writes = 0
 let _follow = null
 let _calib = null
+let _spot = null
 let _followSent = { json: '', at: 0 }
 let _zones = null
 let _zonesSent = ''
@@ -267,6 +270,17 @@ async function handleApi({ method, path, body }) {
 		}
 	}
 	if (method === 'POST' && path === '/api/tracking/detect/pick') return pick(body)
+	if (method === 'POST' && path === '/api/tracking/follow/calibrate/spot') {
+		if (!_spot) return reply(503, { error: 'follow engine not running' })
+		let data
+		try {
+			data = JSON.parse(body || '{}')
+		} catch {
+			return reply(400, { error: 'body must be JSON' })
+		}
+		const r = await _spot.handle(data)
+		return reply(r.status, r.body)
+	}
 	if (path === '/api/tracking/follow/calibrate') {
 		if (!_calib) return reply(503, { error: 'follow engine not running' })
 		if (method === 'GET') return reply(200, { sessions: _calib.list() })
@@ -339,6 +353,11 @@ module.exports = {
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
 		_calib = createCalibration({ engine: _follow.engine, hub })
+		_spot = createSpotFinder({
+			calib: _calib,
+			project: () => require('../engine/project-scenes').loadFullProject(),
+			lease: (roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(SPOT_LEASE_ID, roles),
+		})
 		if (_zones) _zones.stop()
 		_zones = createZoneService(ctx, hub)
 		_zonesSent = ''
@@ -354,6 +373,7 @@ module.exports = {
 		if (_follow) _follow.stop()
 		_follow = null
 		_calib = null
+		_spot = null
 		if (_zones) _zones.stop()
 		_zones = null
 		if (_detect) _detect.stop()
