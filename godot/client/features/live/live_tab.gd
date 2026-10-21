@@ -12,6 +12,7 @@ const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const LookPresetPage := preload("res://features/live/look_preset_page.gd")
+const Icons := preload("res://app/ui_icons.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
 const ComposeTiles := preload("res://features/live/compose_tiles.gd")
@@ -169,6 +170,7 @@ func _view_switch() -> Control:
 	row.position = Vector2(8, 8)
 	var v3 := Button.new()
 	v3.toggle_mode = true
+	v3.focus_mode = Control.FOCUS_NONE
 	v3.tooltip_text = "2D: the operator channel's picture · 3D: the Previs stage and MVR model with the live pictures on its walls (drag: orbit, wheel: zoom)"
 	v3.toggled.connect(func(on: bool) -> void: set_view("3d" if on else "standard"))
 	row.add_child(v3)
@@ -189,9 +191,10 @@ func _view_switch() -> Control:
 	row.add_child(lights)
 	_view_btns["lights"] = lights
 	var times := Button.new()  # WO-652
-	times.text = "Times"
+	times.icon = Icons.texture("clock")  # WO-659
 	times.toggle_mode = true
-	times.tooltip_text = "Show each layer's media / playlist time on the windows (the top running layer biggest)"
+	times.focus_mode = Control.FOCUS_NONE
+	times.tooltip_text = "Times: show each layer's media / playlist time on the windows (the top running layer biggest)"
 	times.toggled.connect(func(on: bool) -> void:
 		tiles.times = on
 		tiles.set_auto(tiles.auto)  # Auto re-tiles with (or without) room for the times
@@ -219,7 +222,7 @@ func set_view(v: String, save := true) -> void:
 	var is3d := view == "3d"
 	var b3 := _view_btns["3d"] as Button
 	b3.set_pressed_no_signal(is3d)
-	b3.text = "3D" if is3d else "2D"
+	b3.icon = Icons.texture("cube" if is3d else "cube_face")  # WO-659: one side = 2D, three sides = 3D
 	(_view_btns["fit"] as Button).visible = is3d
 	(_view_btns["lights"] as Button).visible = is3d
 	(_view_btns["times"] as Button).visible = not is3d
