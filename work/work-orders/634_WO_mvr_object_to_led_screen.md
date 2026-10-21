@@ -108,3 +108,70 @@ walls."
 - Restored: the 3 walls deleted in the Stage panel (stage objects `[]`), hidden list empty, `project.fixtures`
   unchanged.
 - Owner QA: the real sending-card map (edit crops per wall), a destination at the show's real raster.
+
+## Follow-up (2026-10-21) — the owner's other six MVRs
+
+### Investigation
+
+Every file from `~/Downloads` imported into a scratch store (`HIGHASCG_PROJECTS_DIR`, live store untouched), then
+clustered the way `mvr_screen_model.cluster` does (same mesh signature, boxes grown 5 cm):
+
+| file | LED walls found | panel | notes |
+|---|---|---|---|
+| Pabianice | 20 × 8 + 2 × (2 × 8) | 0.5 × 0.5 | the WO's own case |
+| Narvill Pozytywni Serock | 10 × 4 m (80) + two 5 × 3 m side walls (30 each) | 0.5 × 1.0 | side walls flat, turned 8.6° / 11.5° (one rotation per wall) → the clicked object's axes are right |
+| guttmany25 | 12 × 4 m centre + 6 stepped columns 1 × 4 / 3.5 / 3 m | 0.5 × 0.5 | **1374 objects on 276 positions** — every panel stacked ~5× (named vp25…); columns 0.5 m from the centre → separate walls |
+| WEKTORY 2025 | 24 × 3.5 m (336) | 0.5 × 0.5 | one wall |
+| ATM Final Patch | 15 × 4.5 m (270) | 0.5 × 0.5 | far from the origin (−50, −64, −93) |
+| SLUZEW, TAMOOS | — | — | fixtures only, no geometry |
+
+Box test on guttmany (Godot client, timing prints added to `click()` for the test only, not committed): the centre
+click selects "12.00 × 4.00 m (1248 objects)", shift-click adds the columns (24 / 21 / 18 objects), marks correct. But:
+
+1. **`cluster()` takes 536 ms** on the 1248-object wall (pick 30 ms, `cluster_items` 44 ms over 15 479 visible objects,
+   frame 18 ms) — every grown member rescans the whole same-model pool (1374) twice: O(cluster × pool), a 0.6 s UI
+   freeze per click on this rig. Columns: 15–19 ms.
+2. **Facing.** The default view of guttmany (Fit) looks at the wall from backstage, so the walls made from that click
+   would face backstage (WO design: the picture faces the clicking camera). The panel's own geometry is no better
+   default: every Capture panel is body + a flat face plate 3.3–4 cm off-centre along the normal, and the face points
+   at the audience in Pabianice (+Z), guttmany (−Z, tables at z < 30, wall at 32.5), Narvill (−Z, tables −14.4,
+   wall −1.5) and WEKTORY (+Z, rig at +3.3) — but **ATM's panels are the same mesh turned 180°** (face −Z while its rig
+   −86, chairs −24 and trusses −83 are all on the +Z side of the −93.4 screen). The designer's panel orientation is not
+   reliable; what the operator sees is, plus a way to turn it.
+3. **Crop order bug.** `pack()` orders walls by stage X ascending = the audience's left → right only for walls facing
+   +Z. guttmany and Narvill face −Z: the audience's left is +X, so the crops would come out mirrored against the
+   sending card (centre/totem L/R swapped).
+
+### Fix plan
+
+- `cluster`: uuid → box map + a uniform grid (cell = largest box extent + gap) so each member only tests its 27
+  neighbouring cells.
+- `wall_frame` returns `depth`; new `turned(frame)` = same wall seen from the other side (X and normal negated, origin
+  on the other face).
+- `pack` orders along the walls' own width axis (the first wall's rotation), not stage X.
+- Dialog: a **Turn around** check (the picture faces the other side) — frames turned before building.
+
+### What was done
+
+- `mvr_screen_model.gd`: `cluster` keeps a uuid → box map and buckets the same-model pool into a grid (cell = the
+  largest box extent + gap ⇒ touching boxes are at most one cell apart, so each member tests 27 cells, not the pool).
+  `wall_frame` also returns `depth`; `turned(frame)` = basis (−X, Y, −N), origin moved by `depth` to the other face.
+  `pack` sorts along the first wall's own width axis (from its YXZ rotation) instead of stage X.
+- `mvr_screens.gd`: **Turn around (the picture faces the other side)** check in the Make dialog (reset on open);
+  `_build` turns every selected frame when ticked, so the summary/crops update live.
+- Tests: stacked ×3 copies of a 24 × 8 wall at (−56, 0, −93.4) with a column 0.5 m away (negative grid cells, all
+  copies in, column out); `turned` = the frame seen from behind, twice = as clicked; walls facing −Z pack +X first.
+
+### What was VERIFIED
+
+- Godot `--test` 20604 pass / 0 fail (+6), `--check` boot OK; offline suite 3073 pass / 0 fail; line limit 0 over.
+- Box (guttmany25 uploaded to the live store for the test, room layers hidden, timing prints only during the test):
+  centre wall `cluster` **536 → 24.5 ms**, columns 15–19 → 8 ms. Centre + three left columns from the backstage view:
+  crops column 3 m at 0, 3.5 m at 128, 4 m at 256, centre at 384 (the viewer's left → right); ticking Turn around →
+  centre 0, 4 m 1536, 3.5 m 1664, 3 m 1792 (×0.62 into PGM 1 1920 × 1080). Make → 4 LED walls, rotation [0, 180, 0],
+  front face z 32.43 (wall centre 32.47 − half depth), x 0.024 / −6.976 / −8.476 / −9.976 = the scratch survey's
+  positions; 1311 objects hidden (1248 + 24 + 21 + 18); the live PGM test card reads unmirrored from the room side.
+- Restored: walls deleted, Show 1311 replaced, scene back to Pabianice at −12.87 / 0.68 / 2.37, guttmany removed
+  from the store (`DELETE /api/stage/mvr/86cc4dc91e3e`; store = Pabianice only).
+- Not changed: the default facing (the clicked side) and top-aligned crops for stepped columns (guttmany's columns
+  share a bottom line, so their crops' real map is the sending card's — editable per wall).

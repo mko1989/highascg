@@ -40,6 +40,21 @@ func test_cluster_takes_the_touching_panels_of_one_wall() -> void:
 	t.eq(W.cluster(items, "t1"), ["t1", "t0"])
 
 
+## guttmany25: every panel stacked ~5× (1374 objects on 276 positions); ATM sits at (−50, −64, −93) — grid cells with
+## negative indices.
+func test_cluster_stacked_duplicates_far_from_the_origin() -> void:
+	var at := Basis.IDENTITY
+	var items := []
+	for k in 3:
+		items.append_array(_items(_wall(24, 8, -56.0, -93.4, at), "c%d_" % k, "vp"))
+	for k in 3:
+		items.append_array(_items(_wall(2, 8, -31.5, -93.4, at), "r%d_" % k, "vp"))  # 0.5 m right of the centre wall
+	var c := W.cluster(items, "c1_40")
+	t.eq(c.size(), 3 * 24 * 8, "all three copies of the centre wall, not the column")
+	t.ok(not c.has("r0_0"), "the column stays out")
+	t.eq(W.cluster(items, "r2_3").size(), 3 * 2 * 8)
+
+
 func test_wall_frame_flat_and_turned() -> void:
 	var f := W.wall_frame(_wall(4, 2, 0.0, -9.2), Vector3(1, 1, 10))
 	t.ok((f.basis as Basis).is_equal_approx(Basis.IDENTITY), "faces the viewer (+Z), Y up despite the flipped parts")
@@ -48,9 +63,13 @@ func test_wall_frame_flat_and_turned() -> void:
 	t.ok((f.origin as Vector3).is_equal_approx(Vector3(1.0, 0.0, -9.16)), "front face, bottom centre: %s" % f.origin)
 	var back := W.wall_frame(_wall(4, 2, 0.0, -9.2), Vector3(1, 1, -20))
 	t.ok((back.basis as Basis).z.is_equal_approx(Vector3(0, 0, -1)), "seen from behind → faces −Z")
+	var turned := W.turned(f)
+	t.ok((turned.basis as Basis).is_equal_approx(back.basis) and (turned.origin as Vector3).is_equal_approx(back.origin),
+		"Turn around = the frame seen from behind: %s %s" % [turned.origin, back.origin])
+	t.ok((W.turned(turned).origin as Vector3).is_equal_approx(f.origin), "twice = as clicked")
 	var rot := Basis(Vector3.UP, PI / 2.0)
-	var turned := W.wall_frame(_wall(4, 2, 0.0, -9.2, rot), rot * Vector3(1, 1, 10))
-	var o := W.wall_object(turned, [192, 192], Vector2(500, 500), "pgm1", [])
+	var side := W.wall_frame(_wall(4, 2, 0.0, -9.2, rot), rot * Vector3(1, 1, 10))
+	var o := W.wall_object(side, [192, 192], Vector2(500, 500), "pgm1", [])
 	t.ok(absf(float(o.rotation[1]) - 90.0) < 0.01 and absf(float(o.rotation[0])) < 0.01, "yaw 90: %s" % [o.rotation])
 	var p := rot * Vector3(1.0, 0.0, -9.16)
 	t.ok(Vector3(o.position[0], o.position[1], o.position[2]).is_equal_approx(p.snapped(Vector3.ONE * 0.001)), "%s" % [o.position])
@@ -82,3 +101,14 @@ func test_pack_centre_and_totems_on_one_canvas() -> void:
 		{"x": 0, "y": 0, "w": 320, "h": 1280}, {"x": 3520, "y": 0, "w": 320, "h": 1280}], "scaled ×5/6 into UHD, no gaps")
 	t.eq(W.pack([mk.call(0.0, 2)], Vector2i(3840, 2160)).objects[0].source.rect, {"x": 0, "y": 0, "w": 384, "h": 1536},
 		"fits → native pixels")
+
+
+## guttmany / Narvill face −Z: the audience's left is stage +X, so the crops run right → left in stage X.
+func test_pack_walls_facing_minus_z() -> void:
+	var mk := func(x: float, cols: int) -> Dictionary:
+		var f := {"basis": Basis(Vector3.UP, PI), "origin": Vector3(x, 0, 0), "size": Vector2(0.5 * cols, 4),
+			"cell": Vector2(0.5, 0.5)}
+		return W.wall_object(f, [192, 192], Vector2(500, 500), "pgm1", [])
+	var r := W.pack([mk.call(0.0, 24), mk.call(-7.0, 2), mk.call(7.0, 2)])
+	t.eq(r.objects.map(func(o: Dictionary) -> int: return o.source.rect.x), [384, 4992, 0],
+		"stage +X wall first (audience left), the −X column last")

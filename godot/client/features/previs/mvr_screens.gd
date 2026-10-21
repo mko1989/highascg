@@ -17,6 +17,7 @@ var _restore: Button
 var _dlg: ConfirmationDialog
 var _dest: OptionButton
 var _panel: OptionButton
+var _turn: CheckBox
 var _sum: Label
 var _dests: Array = []
 
@@ -53,6 +54,11 @@ func _ready() -> void:
 		_panel.add_item(str(p.name))
 	_panel.item_selected.connect(func(_i: int) -> void: _summarise())
 	box.add_child(_panel)
+	_turn = CheckBox.new()
+	_turn.text = "Turn around (the picture faces the other side)"
+	_turn.tooltip_text = "The screens face the side you clicked from — tick when that was backstage"
+	_turn.toggled.connect(func(_on: bool) -> void: _summarise())
+	box.add_child(_turn)
 	_sum = Label.new()
 	_sum.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_sum.custom_minimum_size = Vector2(520, 0)
@@ -120,6 +126,7 @@ func _open() -> void:
 	var all: Array = (sd as Dictionary).get("destinations", []) if sd is Dictionary else []
 	_dests = all.filter(func(d: Variant) -> bool: return d is Dictionary and str(d.get("mode", "")) != "operator_gui")
 	_dest.clear()
+	_turn.set_pressed_no_signal(false)
 	for d in _dests:
 		_dest.add_item("%s  %d×%d → pgm%d" % [d.get("label", "Screen"), int(d.get("width", 0)), int(d.get("height", 0)),
 			int(d.get("mainScreenIndex", 0)) + 1])
@@ -148,7 +155,8 @@ func _build(i: int) -> Dictionary:
 	var existing: Array = _stage_objects()
 	var walls := []
 	for s in _sel:
-		var o := W.wall_object(s.frame, p.px, W.panel_mm_for(s.frame, (s.uuids as Array).size() > 1, p.mm), _role(), existing + walls)
+		var f: Dictionary = W.turned(s.frame) if _turn.button_pressed else s.frame
+		var o := W.wall_object(f, p.px, W.panel_mm_for(f, (s.uuids as Array).size() > 1, p.mm), _role(), existing + walls)
 		walls.append(o)
 	return W.pack(walls, _raster())
 

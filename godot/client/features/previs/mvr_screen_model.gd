@@ -12,24 +12,39 @@ const S := preload("res://features/previs/stage_objects.gd")
 
 ## Objects connected to `seed` through touching boxes (grown by `gap` m) that share its `key` (model signature).
 ## items: [{uuid, key, box: AABB}] → uuids, seed first.
+## Grid-bucketed (cell ≥ the largest box + gap, so touching boxes are in neighbouring cells): guttmany's 1248-object
+## wall in a 1374-object pool took 536 ms as a full rescan per member.
 static func cluster(items: Array, seed: String, gap := 0.05) -> Array:
 	var key := ""
 	for it in items:
 		if str(it.uuid) == seed:
 			key = str(it.key)
-	var pool := items.filter(func(it: Dictionary) -> bool: return str(it.key) == key)
+	var box := {}
+	var cell := gap
+	for it in items:
+		if str(it.key) == key:
+			box[str(it.uuid)] = it.box
+			var s: Vector3 = (it.box as AABB).size
+			cell = maxf(cell, maxf(s.x, maxf(s.y, s.z)) + gap)
+	var grid := {}
+	for u in box:
+		var c := Vector3i(((box[u] as AABB).get_center() / cell).floor())
+		if not grid.has(c):
+			grid[c] = []
+		grid[c].append(u)
 	var out := [seed]
 	var seen := {seed: true}
 	var i := 0
 	while i < out.size():
-		var a: AABB
-		for it in pool:
-			if str(it.uuid) == out[i]:
-				a = (it.box as AABB).grow(gap)
-		for it in pool:
-			if not seen.has(str(it.uuid)) and a.intersects(it.box as AABB):
-				seen[str(it.uuid)] = true
-				out.append(str(it.uuid))
+		var a := (box[out[i]] as AABB).grow(gap)
+		var c := Vector3i((a.get_center() / cell).floor())
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				for dz in [-1, 0, 1]:
+					for u in grid.get(c + Vector3i(dx, dy, dz), []):
+						if not seen.has(u) and a.intersects(box[u] as AABB):
+							seen[u] = true
+							out.append(u)
 		i += 1
 	return out
 
@@ -77,7 +92,17 @@ static func wall_frame(objects: Array, toward: Vector3) -> Dictionary:
 	var one := _span([first], centre, x, y, n)
 	var origin: Vector3 = centre + x * (all[0].x + all[1].x) / 2.0 + y * all[0].y + n * all[1].z
 	return {"basis": Basis(x, y, n), "origin": origin, "size": Vector2(all[1].x - all[0].x, all[1].y - all[0].y),
-		"cell": Vector2(one[1].x - one[0].x, one[1].y - one[0].y)}
+		"cell": Vector2(one[1].x - one[0].x, one[1].y - one[0].y), "depth": all[1].z - all[0].z}
+
+
+## The same wall with its picture on the other side (the operator clicked it from backstage — Capture's panel face
+## plate is no guide: ATM's panels are the same mesh as WEKTORY's, turned 180°).
+static func turned(frame: Dictionary) -> Dictionary:
+	var b: Basis = frame.basis
+	var out := frame.duplicate()
+	out["basis"] = Basis(-b.x, b.y, -b.z)
+	out["origin"] = (frame.origin as Vector3) - b.z * float(frame.get("depth", 0.0))
+	return out
 
 
 ## [min, max] of every corner in (x, y, n) coordinates around `ref`.
@@ -120,12 +145,16 @@ static func panel_mm_for(frame: Dictionary, multi: bool, preset_mm: Array) -> Ve
 	return Vector2(float(preset_mm[0]), float(preset_mm[1]))
 
 
-## Crops packed left → right (as the audience sees them: by stage X), top-aligned from 0,0, at the walls' native pixels.
+## Crops packed left → right as the audience sees them (along the first wall's width axis: stage +X for walls facing
+## +Z, −X for guttmany's / Narvill's facing −Z), top-aligned from 0,0, at the walls' native pixels.
 ## A canvas bigger than `raster` (when given) is scaled into it, proportions kept — the media server's one output still
 ## covers every wall, as the owner's rig is fed. → {objects (copies, same order as given), canvas (native), scale (≤ 1)}
 static func pack(walls: Array, raster := Vector2i.ZERO) -> Dictionary:
 	var order := range(walls.size())
-	order.sort_custom(func(a: int, b: int) -> bool: return float(walls[a].position[0]) < float(walls[b].position[0]))
+	var rot: Array = walls[0].rotation if not walls.is_empty() else [0, 0, 0]
+	var across := Basis.from_euler(Vector3(deg_to_rad(rot[0]), deg_to_rad(rot[1]), deg_to_rad(rot[2])), EULER_ORDER_YXZ).x
+	var along := func(o: Dictionary) -> float: return Vector3(o.position[0], o.position[1], o.position[2]).dot(across)
+	order.sort_custom(func(a: int, b: int) -> bool: return along.call(walls[a]) < along.call(walls[b]))
 	var out := walls.map(func(o: Dictionary) -> Dictionary: return o.duplicate(true))
 	var x := 0
 	var h := 0
