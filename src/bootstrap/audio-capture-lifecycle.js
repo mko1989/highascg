@@ -77,6 +77,9 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 					wave: Buffer.from(frame.wave).toString('base64'),
 					rms: Math.round(frame.rms * 1000) / 1000,
 					device: frame.device,
+					// WO-662: beat {n, age, bpm, conf, phase, level} + bands [bass, mid, high] 0..1
+					beat: frame.beat,
+					bands: frame.bands,
 				})
 			},
 		})

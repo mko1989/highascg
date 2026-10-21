@@ -47,6 +47,21 @@ function isValidShaderId(id) {
 }
 
 /**
+ * WO-662 — the shader's beat knobs (player-beat.js): flash, bump, kick, each 0..1. Null when all are off, so
+ * configs without beat reactivity keep their old shape.
+ * @param {any} b
+ * @returns {{ flash: number, bump: number, kick: number } | null}
+ */
+function normalizeBeatKnobs(b) {
+	const k = (v) => {
+		const n = Number(v)
+		return Number.isFinite(n) ? Math.round(Math.max(0, Math.min(1, n)) * 100) / 100 : 0
+	}
+	const out = { flash: k(b?.flash), bump: k(b?.bump), kick: k(b?.kick) }
+	return out.flash || out.bump || out.kick ? out : null
+}
+
+/**
  * Normalize + validate a shader config payload. Throws Error with a user-readable message.
  * @param {any} input
  * @returns {{ id: string, name: string, common: string, passes: Record<string, {source: string, channels: Array<string|null>}|null>, audio: { enabled: boolean }, opts: { alpha: boolean } }}
@@ -117,6 +132,7 @@ function normalizeShaderConfig(input) {
 	}
 
 	const controls = normalizeControlsManifest(payload.controls)
+	const beat = normalizeBeatKnobs(payload.audio?.beat)
 
 	/* todos27.07.26: child shaders — every Shader Live save is a NEW config pointing at the
 	 * shader it was derived from. One level: children attach to the root parent. */
@@ -130,7 +146,7 @@ function normalizeShaderConfig(input) {
 		name,
 		common,
 		passes,
-		audio: { enabled: payload.audio?.enabled !== false },
+		audio: { enabled: payload.audio?.enabled !== false, ...(beat ? { beat } : {}) },
 		opts: { alpha: payload.opts?.alpha === true },
 		...(Object.keys(paramLabels).length ? { paramLabels } : {}),
 		...(controls ? { controls } : {}),

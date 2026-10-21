@@ -83,6 +83,17 @@
 	white-space: nowrap;
 }
 
+/* WO-662 — beat knobs */
+.shaderfx-beat label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.shaderfx-beat input[type='range'] {
+	width: 90px;
+}
+
 .shaderfx-pass {
 	border: 1px solid var(--border-color, #333);
 	border-radius: 4px;

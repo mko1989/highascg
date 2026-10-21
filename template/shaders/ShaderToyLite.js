@@ -6,6 +6,10 @@
  * LOCAL PATCH (WO-266): setShader accepts custom iChannel keys (e.g. 'audio') registered via
  * addTexture(), not only 'A'-'D' — upstream exposes addTexture but gives no way to bind the
  * texture to a channel. Single-condition change, marked "WO-266 patch" below.
+ *
+ * LOCAL PATCH (WO-662): beat reactivity — `iBeat` / `iAudioBands` uniforms every pass can read, `iBeatFx`
+ * (per-shader flash / bump, applied around mainImage in the Image pass only), setBeat() to feed them and
+ * addTime() for the "kick" knob (iTime surges on the beat). Marked "WO-662 patch" below.
  */
 function ShaderToyLite(canvasId) {
 
@@ -31,12 +35,18 @@ function ShaderToyLite(canvasId) {
     uniform sampler2D iChannel3;             // input channel 3
     uniform vec4      iDate;                 // (year, month, day, unixtime in seconds)
     uniform float     iSampleRate;           // sound sample rate (i.e., 44100)
+    uniform vec4      iBeat;                 // WO-662 patch: x pulse 1→0 after each beat, y BPM, z phase 0..1, w beat count
+    uniform vec4      iAudioBands;           // WO-662 patch: bass, mid, high, low-band level (0..1)
+    uniform vec4      iBeatFx;               // WO-662 patch: x flash, y bump (Image pass only; zero elsewhere)
     out vec4          frag_out_color;
     void mainImage( out vec4 c, in vec2 f );
     void main( void )
     {
         vec4 color = vec4(0.0,0.0,0.0,0.0);
-        mainImage( color, gl_FragCoord.xy );
+        // WO-662 patch: bump zooms toward the centre on the beat, flash lifts brightness.
+        vec2 fc = (gl_FragCoord.xy - 0.5 * iResolution.xy) / (1.0 + 0.12 * iBeatFx.y * iBeat.x) + 0.5 * iResolution.xy;
+        mainImage( color, fc );
+        color.rgb *= 1.0 + iBeatFx.x * iBeat.x;
         frag_out_color = vec4(color);
     }
     `;
@@ -91,6 +101,8 @@ function ShaderToyLite(canvasId) {
     // uniforms
     var iFrame = 0;
     var iMouse = {x: 0, y: 0, clickX: 0, clickY: 0};
+    var beatU = {iBeat: [0, 0, 0, 0], iAudioBands: [0, 0, 0, 0], iBeatFx: [0, 0, 0, 0]}; // WO-662 patch
+    var noFx = new Float32Array(4);
     
     // shader common source 
     var common = "";
@@ -230,6 +242,9 @@ function ShaderToyLite(canvasId) {
         location[key]["iMouse"]             = gl.getUniformLocation(program, "iMouse");
         location[key]["iDate"]              = gl.getUniformLocation(program, "iDate");
         location[key]["iSampleRate"]        = gl.getUniformLocation(program, "iSampleRate");
+        location[key]["iBeat"]              = gl.getUniformLocation(program, "iBeat");       // WO-662 patch
+        location[key]["iAudioBands"]        = gl.getUniformLocation(program, "iAudioBands"); // WO-662 patch
+        location[key]["iBeatFx"]            = gl.getUniformLocation(program, "iBeatFx");     // WO-662 patch
         location[key]["vertexInPosition"]   = gl.getAttribLocation(program, "vertexInPosition");
     
         return program;
@@ -343,6 +358,9 @@ function ShaderToyLite(canvasId) {
                 gl.uniform4f( location[key]["iMouse"], iMouse.x, iMouse.y, iMouse.clickX, iMouse.clickY);
                 gl.uniform4f( location[key]["iDate"], iDate[0], iDate[1], iDate[2], iDate[3]);
                 gl.uniform1f( location[key]["iSampleRate"], 44100);
+                gl.uniform4fv(location[key]["iBeat"], beatU.iBeat);             // WO-662 patch
+                gl.uniform4fv(location[key]["iAudioBands"], beatU.iAudioBands); // WO-662 patch
+                gl.uniform4fv(location[key]["iBeatFx"], key === "Image" ? beatU.iBeatFx : noFx);
     
                 // viewport
                 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -420,6 +438,18 @@ function ShaderToyLite(canvasId) {
         }
     }
     
+    // WO-662 patch: beat uniforms (each a 4-number array) — called from the draw callback.
+    this.setBeat = (beat, bands, fx) => {
+        beatU.iBeat = new Float32Array(beat);
+        beatU.iAudioBands = new Float32Array(bands);
+        beatU.iBeatFx = new Float32Array(fx);
+    }
+
+    // WO-662 patch: push iTime forward by `sec` (the beat "kick"); play() keeps the offset.
+    this.addTime = (sec) => {
+        if (sec > 0) firstDrawTime -= sec * 1000;
+    }
+
     this.time = () => {
         return (prevDrawTime - firstDrawTime) * 0.001;
     }

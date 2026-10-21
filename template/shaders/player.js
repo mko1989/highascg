@@ -56,6 +56,11 @@
 			if (!toyRef) return
 			if (data.paused === true) toyRef.pause()
 			else if (data.paused === false) toyRef.play()
+			// WO-662: beat knobs { flash, bump, kick } — uniforms only, no recompile.
+			if (data.beat && typeof data.beat === 'object') {
+				config.audio = Object.assign({}, config.audio, { beat: data.beat })
+				if (beatFeed) beatFeed.setFx(data.beat)
+			}
 			if (data.common != null || (data.passes && typeof data.passes === 'object')) {
 				applyLiveSourceUpdate(data)
 			}
@@ -63,6 +68,7 @@
 			/* malformed update payloads are ignored */
 		}
 	}
+	let beatFeed = null // WO-662 player-beat.js companion
 	if (!canvas) return
 
 	const query = new URLSearchParams(location.search)
@@ -225,6 +231,7 @@
 						b64ToBytes(msg.data.freq, freqBytes)
 						if (msg.data.wave) b64ToBytes(msg.data.wave, waveBytes)
 						lastFftAt = Date.now()
+						if (beatFeed) beatFeed.onFrame(msg.data)
 						return
 					}
 					if (msg.type !== 'osc' || !msg.data) return
@@ -326,6 +333,17 @@
 		cameraFeed = mod.create({ gl, toy, apiBase, query, thumbMode: THUMB_MODE })
 	}
 
+	/* WO-662 — beat uniforms (iBeat / iAudioBands / iBeatFx) from the WS beat fields; companion file for the same
+	 * line-limit reason as the camera. Missing file → the uniforms stay zero and the shader runs as before. */
+	function initBeat() {
+		const el = document.createElement('script')
+		el.src = 'player-beat.js'
+		el.onload = () => {
+			if (window.__SHADERFX_BEAT__) beatFeed = window.__SHADERFX_BEAT__.create({ toy, config })
+		}
+		document.head.appendChild(el)
+	}
+
 	// --- wire passes -------------------------------------------------------------------------
 
 	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
@@ -407,6 +425,7 @@
 			initTierB()
 			// WO-344: no capture device in headless Chrome — asking only delays first paint.
 			if (!THUMB_MODE) void initTierA()
+			if (!THUMB_MODE) initBeat()
 		}
 		if (usesCameraChannel()) {
 			// The companion registers a black 1×1 immediately so the pass compiles and samples
@@ -423,6 +442,7 @@
 		toy.setOnDraw(() => {
 			updateAudio()
 			if (cameraFeed) cameraFeed.update()
+			if (beatFeed) beatFeed.update()
 		})
 		toy.play()
 	}

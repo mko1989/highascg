@@ -12,6 +12,8 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const store = require('../shaderfx/shader-store')
 const { htmlGpuState } = require('../shaderfx/caspar-html-gpu')
+const { liveShaderInstances } = require('../shaderfx/shader-live-instances')
+const { pushPayload } = require('../shaderfx/shader-live-session')
 const { shadertoyIdFromInput, shadertoyConfigFromApiJson, fetchShadertoyShader } = require('../shaderfx/shadertoy-import')
 
 /**
@@ -57,9 +59,28 @@ async function handlePost(p, body, ctx) {
 	try {
 		const { config, casparPath } = await store.saveShader(parseBody(body))
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', `[shaderfx] saved "${config.id}" → template ${casparPath}`)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, id: config.id, casparPath }) }
+		const live = await pushBeatKnobs(ctx, config)
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, id: config.id, casparPath, ...(live ? { live } : {}) }) }
 	} catch (e) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: String(e?.message || e) }) }
+	}
+}
+
+/**
+ * WO-662 — the beat knobs are uniforms, so a save reaches every instance already on air (CG UPDATE `{ beat }`,
+ * no recompile, no reload). Source edits still need a re-take or Shader Live, as before.
+ * @returns {Promise<{ targets: number, errors: string[] } | null>}
+ */
+async function pushBeatKnobs(ctx, config) {
+	if (!ctx?.amcp || !config.audio?.enabled) return null
+	try {
+		const targets = liveShaderInstances(ctx).filter((i) => i.shaderId === config.id)
+		if (!targets.length) return null
+		const beat = config.audio.beat || { flash: 0, bump: 0, kick: 0 }
+		return { targets: targets.length, errors: await pushPayload(ctx, targets, { beat }) }
+	} catch (e) {
+		// The save itself succeeded — a failed live push must not turn it into a 400.
+		return { targets: 0, errors: [String(e?.message || e)] }
 	}
 }
 

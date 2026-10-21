@@ -30,6 +30,7 @@
 const { spawn, execFileSync } = require('child_process')
 const dgram = require('dgram')
 const { pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf } = require('./fft')
+const { createBeatDetector, bandsOf } = require('./beat-detect')
 
 const ARECORD_BINS = ['arecord', '/usr/bin/arecord']
 
@@ -104,7 +105,7 @@ function listCaptureDevices() {
  * @param {object} opts
  * @param {ReturnType<typeof normalizeAudioCaptureConfig>} opts.config
  * @param {(level: string, msg: string) => void} opts.log
- * @param {(frame: { freq: Uint8Array, wave: Uint8Array, rms: number, device: string }) => void} opts.onFrame
+ * @param {(frame: { freq: Uint8Array, wave: Uint8Array, rms: number, device: string, beat?: object, bands?: number[] }) => void} opts.onFrame
  */
 function createAudioCaptureFft({ config, log, onFrame }) {
 	const cfg = config
@@ -125,6 +126,8 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	const smoothState = new Float32Array(cfg.fftSize >> 1)
 	/** S16 frame alignment across chunk boundaries. */
 	let pending = Buffer.alloc(0)
+	/** WO-662: onsets on every sample (≈11 ms hops), not on the 30 Hz frames. */
+	const beat = createBeatDetector({ sampleRate: cfg.sampleRate })
 
 	function resolveDevice() {
 		if (cfg.deviceMatch) {
@@ -137,6 +140,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	}
 
 	function pushSamples(f32) {
+		beat.push(f32)
 		const n = f32.length
 		if (n >= ring.length) {
 			ring.set(f32.subarray(n - ring.length))
@@ -164,18 +168,21 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			if (staleFrameSent) return
 			staleFrameSent = true
 			smoothState.fill(0)
+			beat.reset()
 			onFrame({
 				freq: new Uint8Array(cfg.fftSize >> 1),
 				wave: waveformBytes(new Float32Array(0), cfg.fftSize >> 1),
 				rms: 0,
 				device: activeDevice,
+				beat: beat.snapshot(),
+				bands: [0, 0, 0],
 			})
 			return
 		}
 		if (ringFill < ring.length) return
 		const freq = analyserFreqBytes(ring, smoothState, cfg)
 		const wave = waveformBytes(ring, cfg.fftSize >> 1)
-		onFrame({ freq, wave, rms: rmsOf(ring), device: activeDevice })
+		onFrame({ freq, wave, rms: rmsOf(ring), device: activeDevice, beat: beat.snapshot(), bands: bandsOf(freq, cfg.sampleRate) })
 	}
 
 	function scheduleRetry(why) {

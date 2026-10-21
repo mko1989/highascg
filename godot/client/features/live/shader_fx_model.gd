@@ -22,8 +22,20 @@ static func channel_index(v: Variant) -> int:
 	return maxi(0, i)
 
 
+## WO-662 — the three beat knobs (flash / bump / kick), each clamped 0..1, missing → 0.
+static func beat_knobs(src: Variant) -> Dictionary:
+	var d: Dictionary = src if src is Dictionary else {}
+	return {"flash": clampf(float(d.get("flash", 0.0)), 0.0, 1.0), "bump": clampf(float(d.get("bump", 0.0)), 0.0, 1.0), "kick": clampf(float(d.get("kick", 0.0)), 0.0, 1.0)}
+
+
+## WO-662 — a loaded config's audio.beat (missing → all zeros).
+static func beat_of(cfg: Dictionary) -> Dictionary:
+	var audio: Variant = cfg.get("audio")
+	return beat_knobs(audio.get("beat") if audio is Dictionary else null)
+
+
 ## The POST /api/shaders body (web collectForm): empty passes dropped, "" channels → null.
-static func collect(id: String, name: String, common: String, sources: Dictionary, channels: Dictionary, audio: bool, alpha: bool) -> Dictionary:
+static func collect(id: String, name: String, common: String, sources: Dictionary, channels: Dictionary, audio: bool, alpha: bool, beat: Dictionary = {}) -> Dictionary:
 	var passes := {}
 	for p in PASSES:
 		var k: String = p[0]
@@ -34,7 +46,7 @@ static func collect(id: String, name: String, common: String, sources: Dictionar
 		for c in channels.get(k, ["", "", "", ""]):
 			chs.append(null if str(c) == "" else str(c))
 		passes[k] = {"source": src, "channels": chs}
-	var body := {"name": name.strip_edges(), "common": common, "passes": passes, "audio": {"enabled": audio}, "opts": {"alpha": alpha}}
+	var body := {"name": name.strip_edges(), "common": common, "passes": passes, "audio": {"enabled": audio, "beat": beat_knobs(beat)}, "opts": {"alpha": alpha}}
 	if id != "":
 		body["id"] = id
 	return body

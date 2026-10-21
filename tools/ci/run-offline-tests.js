@@ -310,6 +310,7 @@ const FILES = [
 	'tools/smoke/smoke-wo323-compose-source-tiles.test.js',
 	'tools/smoke/smoke-wo297-idle-top-layer-footer.test.js',
 	'tools/smoke/smoke-wo661-template-categories.test.js',
+	'tools/smoke/smoke-wo662-beat-detect.test.js',
 	'tools/smoke/smoke-wo290-operator-monitor-picker.test.js',
 	'tools/smoke/smoke-wo278-cable-regrab.test.js',
 	'tools/smoke/smoke-wo303-graph-edit-no-restart-and-regrab.test.js',

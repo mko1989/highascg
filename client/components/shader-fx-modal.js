@@ -20,6 +20,7 @@ const PASSES = [
 	{ key: 'bufferC', label: 'Buffer C' },
 	{ key: 'bufferD', label: 'Buffer D' },
 ]
+const BEAT_KNOBS = ['flash', 'bump', 'kick'] // WO-662 — player-beat.js
 const CHANNEL_OPTIONS = ['', 'A', 'B', 'C', 'D', 'audio', 'camera'] // WO-376: camera = the virtual cam
 
 function channelSelects(passKey, channels) {
@@ -83,6 +84,13 @@ export function showShaderFxModal(opts = {}) {
 						<label class="shaderfx-flag"><input type="checkbox" id="shaderfx-audio" checked> audio reactive</label>
 						<label class="shaderfx-flag" title="Transparent background (overlay use)"><input type="checkbox" id="shaderfx-alpha"> alpha</label>
 					</div>
+					<!-- WO-662: beat knobs — uniforms, so a save reaches the shader on air without a re-take. -->
+					<div class="shaderfx-row shaderfx-beat" id="shaderfx-beat" title="On the beat: flash = brighter, bump = zoom pulse, kick = time surge. Shaders can also read iBeat (pulse, BPM, phase, count) and iAudioBands (bass, mid, high, level). Applies live on save.">
+						<span class="shaderfx-beat__label">Beat</span>
+						<label>flash <input type="range" min="0" max="1" step="0.05" value="0" data-beat="flash"></label>
+						<label>bump <input type="range" min="0" max="1" step="0.05" value="0" data-beat="bump"></label>
+						<label>kick <input type="range" min="0" max="1" step="0.05" value="0" data-beat="kick"></label>
+					</div>
 					<details class="shaderfx-pass" data-pass-section="common">
 						<summary>Common</summary>
 						<textarea id="shaderfx-common" rows="6" spellcheck="false" placeholder="// optional: Shadertoy Common tab"></textarea>
@@ -110,6 +118,12 @@ export function showShaderFxModal(opts = {}) {
 		statusEl.className = `shaderfx-status${cls ? ` shaderfx-status--${cls}` : ''}`
 	}
 
+	/** WO-662: beat knobs follow the audio flag — no audio, no beat. */
+	function setBeat(beat) {
+		for (const k of BEAT_KNOBS) modal.querySelector(`input[data-beat="${k}"]`).value = String(Number(beat?.[k]) || 0)
+		el('shaderfx-beat').style.display = el('shaderfx-audio').checked ? '' : 'none'
+	}
+
 	function renderPasses(data) {
 		el('shaderfx-passes').innerHTML = PASSES.map((p) => passSection(p, data)).join('')
 	}
@@ -119,6 +133,7 @@ export function showShaderFxModal(opts = {}) {
 		el('shaderfx-name').value = data?.name || ''
 		el('shaderfx-audio').checked = data ? data.audio?.enabled !== false : true
 		el('shaderfx-alpha').checked = data?.opts?.alpha === true
+		setBeat(data?.audio?.beat)
 		el('shaderfx-common').value = data?.common || ''
 		renderPasses(data)
 		el('shaderfx-delete').disabled = !currentId
@@ -141,7 +156,10 @@ export function showShaderFxModal(opts = {}) {
 			name: el('shaderfx-name').value.trim(),
 			common: el('shaderfx-common').value,
 			passes,
-			audio: { enabled: el('shaderfx-audio').checked },
+			audio: {
+				enabled: el('shaderfx-audio').checked,
+				beat: Object.fromEntries(BEAT_KNOBS.map((k) => [k, Number(modal.querySelector(`input[data-beat="${k}"]`).value) || 0])),
+			},
 			opts: { alpha: el('shaderfx-alpha').checked },
 		}
 	}
@@ -180,6 +198,7 @@ export function showShaderFxModal(opts = {}) {
 			el('shaderfx-name').value = cfg.name || ''
 			el('shaderfx-audio').checked = cfg.audio?.enabled === true
 			el('shaderfx-alpha').checked = cfg.opts?.alpha === true
+			setBeat(null)
 			el('shaderfx-common').value = cfg.common || ''
 			renderPasses(cfg)
 			el('shaderfx-delete').disabled = true
@@ -227,7 +246,8 @@ export function showShaderFxModal(opts = {}) {
 			const r = await api.post('/api/shaders', collectForm())
 			if (!r?.ok) throw new Error(r?.error || 'save failed')
 			currentId = r.id
-			setStatus(`Saved — Caspar template "${r.casparPath}" (refresh Templates to play)`, 'ok')
+			const live = r.live?.targets ? ` · beat knobs live on ${r.live.targets} layer${r.live.targets > 1 ? 's' : ''}` : ''
+			setStatus(`Saved — Caspar template "${r.casparPath}" (refresh Templates to play)${live}`, r.live?.errors?.length ? 'warn' : 'ok')
 			await refreshList(r.id)
 			el('shaderfx-delete').disabled = false
 			el('shaderfx-preview').src = resolveApiUrl(`/templates/shaders/${r.id}.html?_=${Date.now()}`)
@@ -241,6 +261,7 @@ export function showShaderFxModal(opts = {}) {
 		if (e.target === modal) modal.remove()
 	})
 	el('shaderfx-new').addEventListener('click', () => fillForm(null))
+	el('shaderfx-audio').addEventListener('change', () => (el('shaderfx-beat').style.display = el('shaderfx-audio').checked ? '' : 'none'))
 	// WO-380: Fetch button + Enter in the field (a pasted link is usually followed by Enter).
 	el('shaderfx-import-go').addEventListener('click', () => void importFromShadertoy())
 	el('shaderfx-import-url').addEventListener('keydown', (e) => {

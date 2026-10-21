@@ -15,6 +15,8 @@ var _import: LineEdit
 var _name: LineEdit
 var _audio: CheckBox
 var _alpha: CheckBox
+var _beat_row: HBoxContainer  # WO-662: visible only while "audio reactive" is on
+var _beat_sliders := {}  # "flash" | "bump" | "kick" → HSlider
 var _tabs: TabContainer
 var _code := {}  # "common" | pass key → CodeEdit
 var _chans := {}  # pass key → [OptionButton × 4]
@@ -80,6 +82,21 @@ func _init() -> void:
 	_alpha.text = "alpha"
 	_alpha.tooltip_text = "Transparent background (overlay use)"
 	meta.add_child(_alpha)
+	# WO-662: beat knobs under the audio checkbox (shown only while audio reactive is on).
+	_beat_row = Kit.row(right)
+	_beat_row.tooltip_text = "On the beat: flash = brighter, bump = zoom pulse, kick = time surge. Shaders can also read iBeat (pulse, BPM, phase, count) and iAudioBands (bass, mid, high, level). Applies live on save."
+	_beat_row.add_child(_lbl("Beat"))
+	for k in ["flash", "bump", "kick"]:
+		_beat_row.add_child(_lbl(k))
+		var s := HSlider.new()
+		s.min_value = 0.0
+		s.max_value = 1.0
+		s.step = 0.05
+		s.custom_minimum_size.x = 90
+		s.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_beat_row.add_child(s)
+		_beat_sliders[k] = s
+	_audio.toggled.connect(func(_on: bool) -> void: _beat_row.visible = _audio.button_pressed)
 	_tabs = TabContainer.new()
 	_tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	right.add_child(_tabs)
@@ -164,6 +181,10 @@ func _fill(cfg: Dictionary) -> void:
 	_name.text = str(cfg.get("name", ""))
 	var audio: Variant = cfg.get("audio")
 	_audio.button_pressed = (not (audio is Dictionary) or audio.get("enabled", true) != false) if not cfg.is_empty() else true
+	_beat_row.visible = _audio.button_pressed  # WO-662: set_pressed doesn't emit toggled
+	var beat: Dictionary = FX.beat_of(cfg)
+	for k in _beat_sliders:
+		(_beat_sliders[k] as HSlider).value = beat[k]
 	var opts: Variant = cfg.get("opts")
 	_alpha.button_pressed = opts is Dictionary and opts.get("alpha", false) == true
 	(_code["common"] as CodeEdit).text = str(cfg.get("common", ""))
@@ -220,7 +241,10 @@ func _do_import() -> void:
 
 func _save() -> void:
 	_say("Saving…", true)
-	var body := FX.collect(_id, _name.text, (_code["common"] as CodeEdit).text, _sources(), _channels(), _audio.button_pressed, _alpha.button_pressed)
+	var beat := {}
+	for k in _beat_sliders:
+		beat[k] = (_beat_sliders[k] as HSlider).value
+	var body := FX.collect(_id, _name.text, (_code["common"] as CodeEdit).text, _sources(), _channels(), _audio.button_pressed, _alpha.button_pressed, beat)
 	var r: Dictionary = await Api.post_json("/api/shaders", body)
 	if not r.ok or not (r.data is Dictionary) or not r.data.get("ok", false):
 		_say(str(r.data.get("error", r.error)) if r.data is Dictionary else r.error, false)
