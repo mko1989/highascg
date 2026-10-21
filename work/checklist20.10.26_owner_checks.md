@@ -61,6 +61,8 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-603** — drop a big folder (progress line) and drop onto an upper-case CLS folder. Should Ctrl+Alt+click
       delete keep skipping the confirmation?
 - [ ] **WO-604** — move a fader in the web and in Godot: both show it and the meters match. (Look_8 stays playing.)
+- [ ] **WO-604** — Godot Audio tab → **+ Live audio input** adds an ALSA input (then Apply + restart in Devices).
+      Click its strip: Devices opens on that input's host-channel page (Remove is there).
 - [ ] **WO-604** — ALSA live-audio input (box with an ALSA slot): after a reboot the Ch buttons light for the PGMs it
       plays on. Press one in Godot: the web console button follows, and the route stops or starts.
       Then the web Live Audio Mixer → Save & Apply: the audio keeps playing on the same PGMs (now routed by the server).

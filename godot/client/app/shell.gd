@@ -82,6 +82,10 @@ func _ready() -> void:
 	tabs.add_child(devices)
 	sources.caspar_changed.connect(devices.mark_restart_dirty)  # WO-605 slice 12: a DeckLink dropped on Sources
 	sources.connector_dropped.connect(devices.refresh)
+	audio.caspar_changed.connect(devices.mark_restart_dirty)
+	audio.inspect_destination.connect(func(id: String) -> void:  # WO-604: a live-audio strip → its host-channel page
+		tabs.current_tab = devices.get_index()
+		devices.inspect_destination(id))
 	var multiview := MultiviewTab.new()  # WO-600 M
 	multiview.name = "Multiview"
 	tabs.add_child(multiview)

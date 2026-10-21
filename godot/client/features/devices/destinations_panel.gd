@@ -122,6 +122,10 @@ func show_model(m: Dictionary, payload: Dictionary, anchors: Dictionary) -> void
 		_page.show_destination(_entries[selected_id], _payload, Settings.settings)
 
 
+func has(id: String) -> bool:
+	return _entries.has(id)
+
+
 func select(id: String) -> void:
 	if not _entries.has(id):
 		return

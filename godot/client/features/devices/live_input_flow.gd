@@ -36,8 +36,8 @@ func _init(settings_: Variant, state_: Dictionary, io_: Variant) -> void:
 	_open_cm = M.channel_map(settings, state)
 
 
-func start() -> void:
-	await set_kind("decklink")
+func start(kind := "decklink") -> void:
+	await set_kind(kind)
 
 
 func set_kind(k: String) -> void:

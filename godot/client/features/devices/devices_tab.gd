@@ -250,6 +250,14 @@ func _matrix_add(what: String) -> void:
 
 ## GET /api/device-view (+ settings once — the cable writes seed from them). A reload asked for while one is in
 ## flight runs again after it, so a mutation is never answered by a read that started before it.
+## WO-604: a live-audio strip clicked in the Audio tab → that slot's host-channel page (web live-audio-input-select).
+func inspect_destination(id: String) -> void:
+	if not _dests.has(id):
+		await refresh()
+	_close_port()
+	_dests.select(id)
+
+
 ## Something outside the tab changed Caspar's plan (a DeckLink dropped on Sources).
 func mark_restart_dirty() -> void:
 	_gesture.set_dirty(true)

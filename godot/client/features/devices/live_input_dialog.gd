@@ -3,7 +3,8 @@ extends Node
 ## live_input_flow.gd: type, hint, one section per type (DeckLink port + host channel, NDI discover / name,
 ## system browser URL + size, webpage URL / template + CG, ALSA device, V4L2 device + format / fps / audio), then
 ## "Add live source" and its status line. A fresh dialog per open, like the web modal; it closes 1.5 s after an add.
-## Opened by the Devices "Add live input" band's "+" and the Matrix view's "+ Live input".
+## Opened by the Devices "Add live input" band's "+" and the Matrix view's "+ Live input"; the Audio tab's "+" opens it
+## on Live Audio (WO-604, the web mixer's add-input button).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/devices/live_input_model.gd")
@@ -58,15 +59,15 @@ func is_open() -> bool:
 	return _dlg != null and is_instance_valid(_dlg) and _dlg.visible
 
 
-func open() -> void:
+func open(kind := "decklink") -> void:
 	if is_open():
 		_dlg.queue_free()
-	_build()
+	_build(kind)
 	_flow = Flow.new(Settings.settings, {"channelMap": Store.get_value("channelMap"),
 		"configComparison": Store.get_value("configComparison"), "templates": Store.get_value("templates")}, _Io.new(self))
 	_render()
 	_dlg.popup_centered(Vector2i(560, 0))
-	await _flow.start()
+	await _flow.start(kind)
 
 
 func _close_later() -> void:
@@ -76,7 +77,7 @@ func _close_later() -> void:
 		d.queue_free()
 
 
-func _build() -> void:
+func _build(first_kind: String) -> void:
 	_w = {}
 	_sections = {}
 	_dlg = AcceptDialog.new()
@@ -92,7 +93,7 @@ func _build() -> void:
 	_dlg.add_child(v)
 	v.add_child(_text("Type"))
 	var kind := _select("kind", v)
-	_fill(kind, M.KINDS, "decklink")
+	_fill(kind, M.KINDS, first_kind)
 	kind.item_selected.connect(func(i: int) -> void: _flow.set_kind(kind.get_item_metadata(i)))
 	var hint := RichTextLabel.new()
 	hint.bbcode_enabled = true

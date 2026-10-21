@@ -396,7 +396,7 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
   `POST /api/audio/cross-screen` (the Godot endpoint) and persists the targets the server returns.
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
   Moving a band changes layers that may already be on air on deployed boxes.
-- Click a live-audio strip to inspect it. Add-input modal.
+- ~~Click a live-audio strip to inspect it. Add-input modal.~~ — done 2026-10-21 (slice 8 below).
 - Side-by-side meter ballistics check web vs Godot, and the parity checklist (owner).
 
 ## Slice 7 (2026-10-21) — the server STOPs dropped live-audio PGM routes
@@ -418,4 +418,21 @@ toast text, then posts `/api/audio/cross-screen` and persists the server's `targ
 "apply to air before persist" are repointed to the POST (still ordered before `persistCrossScreenTargets`); a new pin
 in `smoke-wo604-cross-screen-audio.test.js` forbids a browser-side route. Offline 3011 pass. Not clicked on the box
 (no web browser session); the server endpoint is the one the Godot Audio tab already drives.
+
+## Slice 8 (2026-10-21) — Audio tab "+ Live audio input" and live-audio strip → its inspector
+
+**What was done:** the web mixer's "+" (`audio-mixer-view__add-input-btn`) and its strips' `live-audio-input-select`
+click, ported. The Audio tab's footer has **+ Live audio input**: the Devices "Add live input" dialog
+(`live_input_dialog.gd`, now `open(kind)` / `Flow.start(kind)`) opened on Live Audio; an add marks Devices
+restart-dirty (`caspar_changed` → `devices.mark_restart_dirty`, like a DeckLink dropped on Sources) and refetches the
+console. A live-audio strip (Live inputs strip of kind `live_audio`, or a program layer fed by a slot — the web's two
+cases, `audio_actions.inspect_slot`) says "Click to inspect / remove"; a click on its body switches to Devices and
+selects that slot's host channel (`host_live_audio_input_N`, `host_channels.destination_id`) — the owner rule puts
+per-input controls in the device-view host-channel inspector, and removal lives there.
+
+**What was VERIFIED:** Godot `test_audio_actions.gd` +6 (`inspect_slot` per row kind; a strip body click emits
+`inspect_requested`; the tooltip); 20428 pass, `--check` clean. Box GUI: the Audio tab shows the button; it opened
+"Add live input" on **Live Audio** with the box's 34 ALSA devices listed; closed with × (live-inputs config still
+`count: 0`). The strip click was not clicked on the box: it has no live-audio slot, and adding one needs a Caspar
+restart (owner checklist).
 

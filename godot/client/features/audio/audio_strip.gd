@@ -15,6 +15,7 @@ signal screen_toggled(channel: int, on: bool)
 signal send_selected(send: String)
 signal start_pressed
 signal stop_pressed
+signal inspect_requested  ## a click on a live-audio strip's body (web: "Click to inspect / remove")
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MM := preload("res://features/live/mixer_math.gd")
@@ -46,6 +47,11 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	add_child(v)
+	if AA.inspect_slot(r) > 0:
+		tooltip_text = "Click to inspect / remove"
+		gui_input.connect(func(e: InputEvent) -> void:
+			if e is InputEventMouseButton and e.pressed and e.button_index == MOUSE_BUTTON_LEFT:
+				inspect_requested.emit())
 	var lab := Label.new()
 	lab.text = str(r.get("label", "")).trim_prefix("🔊 ")  # the UI font has no emoji; the tooltip says "Audio-only look"
 	lab.tooltip_text = str(r.get("labelTitle", r.get("label", "")))

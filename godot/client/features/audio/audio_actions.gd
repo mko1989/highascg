@@ -182,3 +182,11 @@ static func cross_screen_buttons(plan: Variant, row: Dictionary) -> Array:
 static func cross_screen_request(row: Dictionary, target: int, on: bool) -> Array:
 	return ["POST", "/api/audio/cross-screen",
 		{"channel": int(row.ch), "layer": int(row.layer), "target": target, "enable": on, "current": cross_screen_targets(row)}]
+
+
+## The live-audio slot a click on this strip inspects (web live-audio-input-select): a Live inputs strip of kind
+## live_audio (`slot`), or a program-group layer fed by one (`liveAudioSlot`). 0 = the strip inspects nothing.
+static func inspect_slot(row: Dictionary) -> int:
+	if row.get("inputKind") == "live_audio" and row.get("slot") != null:
+		return int(row.slot)
+	return int(row.liveAudioSlot) if row.get("liveAudioSlot") != null else 0

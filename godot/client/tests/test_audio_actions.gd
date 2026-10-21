@@ -99,3 +99,25 @@ func test_cross_screen_requests() -> void:
 	t.eq(AA.cross_screen_buttons(plan, look).size(), 1, "matched by channel-layer")
 	t.eq(AA.cross_screen_buttons(plan, tl), [], "no entry")
 	t.eq(AA.cross_screen_buttons(null, look), [], "no plan yet")
+
+
+## WO-604: a click on a live-audio strip inspects its slot (web live-audio-input-select) — Live inputs strips by
+## kind + slot, program layers by liveAudioSlot; anything else is not clickable.
+func test_live_audio_strip_inspects_its_slot() -> void:
+	t.eq(AA.inspect_slot({"inputKind": "live_audio", "slot": 2.0, "ch": 9.0}), 2)
+	t.eq(AA.inspect_slot({"key": "pgm:1:layer:31", "liveAudioSlot": 1.0, "hostChannel": 8.0}), 1)
+	t.eq(AA.inspect_slot({"inputKind": "decklink", "slot": 1.0}), 0, "DeckLink strips do not")
+	t.eq(AA.inspect_slot({"key": "pgm:1:layer:10"}), 0, "look layers do not")
+	var Strip := preload("res://features/audio/audio_strip.gd")
+	var s = Strip.new()
+	s.setup({"key": "input:9", "label": "Desk", "ch": 9.0, "layer": 10.0, "isLiveInput": true, "inputKind": "live_audio", "slot": 2.0}, 1, false)
+	var hits := []
+	s.inspect_requested.connect(func() -> void: hits.append(1))
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	s.gui_input.emit(click)
+	t.eq(hits.size(), 1, "a click on the strip body asks to inspect")
+	t.eq(s.tooltip_text, "Click to inspect / remove")
+	s.free()
+

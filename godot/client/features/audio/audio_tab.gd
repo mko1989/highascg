@@ -15,8 +15,12 @@ const AR := preload("res://features/audio/audio_rows.gd")
 const AM := preload("res://features/audio/audio_meter_model.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const Strip := preload("res://features/audio/audio_strip.gd")
+const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
 const DEBOUNCE_MS := 80
 const EMPTY := "No active program inputs playing audio. Play a scene look with audio/video media to see channel strips here."
+
+signal inspect_destination(id: String)  ## a live-audio strip → its host-channel page in Devices
+signal caspar_changed  ## a live input was added: Devices shows Apply + restart
 
 var osc: Node  # shell's OscMirror
 var _mixer := {}
@@ -34,6 +38,7 @@ var _tick_acc := 0.0
 var _inputs: HBoxContainer
 var _masters: HBoxContainer
 var _status: Label
+var _add: LiveInputDialog
 
 
 func _ready() -> void:
@@ -53,9 +58,21 @@ func _ready() -> void:
 	_masters = HBoxContainer.new()
 	_masters.add_theme_constant_override("separation", 6)
 	bays.add_child(_masters)
+	var foot := HBoxContainer.new()
+	add_child(foot)
 	_status = Label.new()
+	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	add_child(_status)
+	foot.add_child(_status)
+	_add = LiveInputDialog.new()
+	add_child(_add)
+	_add.dirty.connect(caspar_changed.emit)
+	_add.added.connect(_on_visible)
+	var plus := Button.new()
+	plus.text = "+ Live audio input"
+	plus.tooltip_text = "Add a live audio (ALSA / USB) input. Its device and routing: Settings → Live audio; remove it from its strip."
+	plus.pressed.connect(func() -> void: _add.open("live_audio"))
+	foot.add_child(plus)
 	Store.changed.connect(_on_store)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _refresh())
 	Settings.changed.connect(_refresh)
@@ -220,6 +237,8 @@ func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> Stri
 		if res.ok:
 			_status.text = "%s capture started (%d route(s) restored)." % [str(s.row.label), int(_d(res.get("data")).get("routesRestored", 0))])
 	s.stop_pressed.connect(func() -> void: _send(AA.audio_only_stop_request(s.row)))
+	s.inspect_requested.connect(func() -> void: inspect_destination.emit(
+		AR.HC.destination_id("live_audio_input", s.row.get("hostChannel", s.row.ch), AA.inspect_slot(s.row))))
 	_strips[key] = s
 	_metas[key] = AR.meter_meta(r)
 	return s
