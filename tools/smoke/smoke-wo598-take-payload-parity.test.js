@@ -129,3 +129,23 @@ test('WO-598 C1: /api/scene/take-look builds the same take body the web client s
 	assert.equal((await handleTakeLook({ sceneId: 'nope' }, {}, deps)).status, 404)
 	assert.equal((await handleTakeLook({ sceneId: 'cov-media', mainIdx: 3 }, {}, deps)).status, 400)
 })
+
+test('WO-655: the real routing map has no programResolutions — the take canvas comes from the live channel map', async () => {
+	const { handleTakeLook } = require('../../src/api/routes-scene-take-look')
+	const fixture = JSON.parse(fs.readFileSync(path.join(REPO, 'tools/fixtures/projects/take-payload-coverage.json'), 'utf8'))
+	const byId = Object.fromEntries(fixture.scenes.scenes.map((s) => [s.id, s]))
+	const sent = []
+	const deps = {
+		resolveSceneById: (id) => byId[id] || null,
+		getChannelMap: () => ({ programChannels: [1, 3], previewChannels: [2, 3] }), // routing.getChannelMap shape
+		withBorder: (scene) => scene,
+		take: async (b) => {
+			sent.push(b)
+			return { status: 200 }
+		},
+	}
+	const ctx = { state: { getState: () => ({ channelMap: { programResolutions: [{ w: 3072, h: 1024, fps: 25 }] } }) } }
+	await handleTakeLook({ sceneId: 'cov-media' }, ctx, deps)
+	assert.deepStrictEqual(sent[0].incomingScene.composeCanvas, { w: 3072, h: 1024 }, 'not the 1920×1080 fallback')
+	assert.equal(sent[0].framerate, 25)
+})

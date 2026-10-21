@@ -67,7 +67,7 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found in the stored project` })
 
 	const getMap = deps.getChannelMap || require('../config/routing').getChannelMap
-	const map = getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
+	const map = require('../engine/scene-take-payload').withProgramResolutions(getMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
 	const pgmCh = Number(map.programChannels?.[mainIdx] ?? map.playbackChannels?.[mainIdx])

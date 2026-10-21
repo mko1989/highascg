@@ -133,4 +133,19 @@ async function buildServerIncomingScene(scene, opts) {
 	return payload
 }
 
-module.exports = { buildServerIncomingScene, canvasForMain, loadClientHelpers }
+/**
+ * WO-655: routing.getChannelMap() carries no programResolutions, so the server-built take / preview push fell back to
+ * a 1920×1080 canvas and letterboxed every look authored on the real program canvas (3072×1024 → x pushed ~235 px).
+ * Fill them from the live merged channel map — the one clients author on (GET /api/state channelMap).
+ */
+function withProgramResolutions(map, ctx) {
+	if (Array.isArray(map?.programResolutions) && map.programResolutions.length) return map
+	let pr
+	try {
+		pr = ctx?.state?.getState?.()?.channelMap?.programResolutions
+		if (!Array.isArray(pr) && ctx?.config) pr = require('../config/channel-map-from-ctx').buildChannelMap(ctx)?.programResolutions
+	} catch (_) {}
+	return Array.isArray(pr) && pr.length ? { ...map, programResolutions: pr } : map
+}
+
+module.exports = { buildServerIncomingScene, canvasForMain, loadClientHelpers, withProgramResolutions }
