@@ -42,6 +42,35 @@ static func remove_look(root: Dictionary, scene_id: String) -> bool:
 	return false
 
 
+## WO-656 — web sceneState.duplicateScene: a deep copy (layers, scope, transition) under a fresh id and the next free
+## "<name> (copy)" / "(copy N)" name (scene-state-look-logic.js uniqueLookNameForDuplicate), placed right after the
+## original. Returns the copy, {} when `scene_id` is unknown.
+static func duplicate_look(root: Dictionary, scene_id: String, new_id: String) -> Dictionary:
+	var scenes: Array = root.get("scenes", []) if root.get("scenes") is Array else []
+	for i in scenes.size():
+		if scenes[i] is Dictionary and str(scenes[i].get("id", "")) == scene_id:
+			var dupe: Dictionary = (scenes[i] as Dictionary).duplicate(true)
+			dupe["id"] = new_id
+			dupe["name"] = copy_name(scenes, str(scenes[i].get("name", "")))
+			scenes.insert(i + 1, dupe)
+			return dupe
+	return {}
+
+
+static func copy_name(scenes: Array, base_name: String) -> String:
+	var base := base_name.strip_edges() if base_name.strip_edges() != "" else "Look"
+	var taken := {}
+	for s in scenes:
+		if s is Dictionary:
+			taken[str(s.get("name", "")).strip_edges().to_lower()] = true
+	if not taken.has(("%s (copy)" % base).to_lower()):
+		return "%s (copy)" % base
+	for n in range(2, 1000):
+		if not taken.has(("%s (copy %d)" % [base, n]).to_lower()):
+			return "%s (copy %d)" % [base, n]
+	return "%s (copy %d)" % [base, Time.get_ticks_msec()]
+
+
 ## Web rule: with 2+ mains only the active main's deck (activeScreenIndex) gets it, else every look.
 static func apply_default_to_all(root: Dictionary, screen_count: int) -> int:
 	var g := T.default_transition()

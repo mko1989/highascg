@@ -9,3 +9,4 @@ IcoMoon 17×17) joined into one 34×17 drawing — width 48 / height 24 so the p
 headphones (WO-608 header audio monitor) is the web header-bar-audio.js Lucide stroke path.
 eye / eye_off (WO-647 previs layer visibility) are hand-drawn: an almond outline with a pupil, and the same
 outline struck through.
+copy (WO-656 look card duplicate) is hand-drawn: two offset rounded squares, the front one hollow.

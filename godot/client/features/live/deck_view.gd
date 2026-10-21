@@ -188,17 +188,21 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	var thumb := LookThumb.new()  # WO-608 R5: looks show as thumbnails
 	thumb.setup(scene, _res(_main_for_card), _cm())
 	v.add_child(thumb)
-	var del := Icons.button("close", "Delete look", 12)  # WO-651: ✕ in the corner above the ⚙
-	del.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	del.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	del.pressed.connect(func() -> void: _confirm_delete(id))
-	thumb.add_child(del)
 	var name_l := Label.new()
 	name_l.text = str(scene.get("name", "(unnamed)"))
 	name_l.add_theme_font_size_override("font_size", 15)
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	name_l.custom_minimum_size.x = 1  # let a long name ellipsize instead of widening the card
-	v.add_child(name_l)
+	name_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var head := HBoxContainer.new()  # WO-656: ⧉ duplicate · ✕ delete (WO-651) right above ▶ · ⚙
+	head.add_child(name_l)
+	var dup := Icons.button("copy", "Duplicate look", 12)
+	dup.pressed.connect(func() -> void: duplicate_look(id))
+	head.add_child(dup)
+	var del := Icons.button("close", "Delete look", 12)
+	del.pressed.connect(func() -> void: _confirm_delete(id))
+	head.add_child(del)
+	v.add_child(head)
 	var meta := Label.new()
 	var layers: Array = scene.get("layers", [])
 	var tags := PackedStringArray(["%d layers" % layers.size()])
@@ -399,6 +403,15 @@ func _confirm_delete(scene_id: String) -> void:
 	dlg.canceled.connect(dlg.queue_free)
 	add_child(dlg)
 	dlg.popup_centered()
+
+
+func duplicate_look(scene_id: String) -> String:
+	var dupe := E.duplicate_look(_scenes_root(), scene_id, preload("res://features/live/layer_style_row.gd")._uuid())
+	if dupe.is_empty():
+		return ""
+	_commit_looks()
+	action_result.emit("Duplicated: %s" % str(dupe.name), true)
+	return str(dupe.id)
 
 
 func delete_look(scene_id: String) -> bool:
