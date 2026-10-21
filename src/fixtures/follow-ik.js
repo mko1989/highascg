@@ -80,7 +80,7 @@ function axisBytes(ax, deg) {
 
 /**
  * Write one fixture into a 512-byte universe: pan / tilt (+ fine) and its fixed channels.
- * @param {Uint8Array} buf @param {object} fx normalized (follow-patch) @param {{ pan, tilt }} pt @param {Array} fixed
+ * @param {Uint8Array} buf @param {object} fx normalized (follow-patch) @param {{ pan, tilt } | null} pt @param {Array} fixed
  */
 function writeFixture(buf, fx, pt, fixed) {
 	const at = (ch) => fx.address - 1 + ch - 1
@@ -89,6 +89,7 @@ function writeFixture(buf, fx, pt, fixed) {
 		if (i >= 0 && i < 512) buf[i] = v
 	}
 	for (const c of fixed) put(c.ch, c.value)
+	if (!pt) return // WO-615: a typed fixture that is not aimed keeps its GDTF / programmer pan / tilt
 	for (const [ax, deg] of [[fx.pan, pt.pan], [fx.tilt, pt.tilt]]) {
 		const b = axisBytes(ax, deg)
 		put(ax.ch, b[0])

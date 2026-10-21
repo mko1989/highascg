@@ -53,6 +53,23 @@ func test_new_fixture_follows_the_last() -> void:
 	t.ok(is_equal_approx(b.pose.x, a.pose.x + 2.0))
 
 
+func test_typed_and_sacn_fixtures_survive_a_save() -> void:
+	# WO-615 T3/T4 — same answers as smoke-wo615-dmx.test.js (normalizeFixture / normalizeDmx).
+	var d := F.normalize({"dmx": {"enabled": true, "priority": 250, "universes": ["sacn:1", "sacn:0", "artnet:3", "sacn:1", "x"]},
+		"patch": [{"id": "s", "protocol": "sacn", "universe": 0, "typeId": "0123456789ab", "mode": "Standard"},
+		{"id": "a", "typeId": "../etc", "universe": 4}]})
+	t.eq(d.dmx, {"enabled": true, "priority": 200, "universes": ["sacn:1", "artnet:3"]})
+	t.eq(F.normalize({}).dmx, {"enabled": false, "priority": 100, "universes": []}, "DMX master off by default")
+	var s: Dictionary = d.patch[0]
+	t.eq([s.protocol, s.universe, s.dest, s.typeId, s.mode], ["sacn", 1, "", "0123456789ab", "Standard"],
+		"sACN from universe 1, multicast dest, type kept")
+	t.eq([d.patch[1].protocol, d.patch[1].typeId, d.patch[1].dest], ["artnet", "", F.DEFAULT_DEST], "junk type id dropped")
+	t.eq(F.normalize(d), d, "normalize is idempotent — a Godot save keeps every field")
+	var n := F.new_fixture([s], 0, 7)
+	t.eq([n.protocol, n.universe, n.typeId, n.mode, n.address], ["sacn", 1, "0123456789ab", "Standard", 8],
+		"next fixture: same type, after its GDTF footprint")
+
+
 func test_beam_frame_matches_the_server() -> void:
 	var hung := {"hang": "truss", "yaw": 0.0}
 	t.ok(F.beam(hung, 0, 0).is_equal_approx(Vector3(0, 0, -1)), "hung: tilt 0 = straight down")

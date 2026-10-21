@@ -3,11 +3,14 @@ extends RefCounted
 ## src/fixtures/follow-patch.js normalizes the same way): a manual generic moving-head profile per fixture
 ## (GDTF comes with WO-615 T1), its marker, and the beam the server's aim draws in the camera view.
 ##   {output: {enabled, protocol "psn" | "artnet", psn {group, port, iface, system_name, axes}, through {enabled, offset,
-##   fade_s}}, patch: [{id, name, enabled, protocol, universe, address, dest, pan / tilt {ch, fine, range,
-##    invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
+##   fade_s}}, dmx {enabled, priority, universes ["artnet:0", "sacn:1"]} (WO-615 T4 master for typed fixtures),
+##   patch: [{id, name, enabled, protocol "artnet" | "sacn", universe, address, dest ("" + sACN = multicast),
+##    typeId, mode (WO-615 T3 GDTF type — the server derives pan / tilt / channels from it), pan / tilt {ch, fine,
+##    range, invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
 
 const DEFAULT_DEST := "255.255.255.255"
 const PORT_ADDRESS_MAX := 32767
+const SACN_UNIVERSE_MAX := 63999
 
 
 static func _num(v: Variant, d: float, lo: float, hi: float) -> float:
@@ -24,12 +27,18 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 	var o: Dictionary = f if f is Dictionary else {}
 	var pose: Dictionary = o.get("pose") if o.get("pose") is Dictionary else {}
 	var dest := str(o.get("dest", "")).strip_edges()
+	var sacn: bool = o.get("protocol") == "sacn"
+	var type_id := str(o.get("typeId", ""))
+	var hex := RegEx.create_from_string("^[0-9a-f]{12}$")
 	return {
 		"id": str(o.get("id", "")) if str(o.get("id", "")) != "" else "fx%d" % (i + 1),
 		"name": str(o.get("name", "")) if str(o.get("name", "")) != "" else "Fixture %d" % (i + 1),
-		"enabled": o.get("enabled") != false, "protocol": "artnet",
-		"universe": int(_num(o.get("universe"), 0, 0, PORT_ADDRESS_MAX)), "address": int(_num(o.get("address"), 1, 1, 512)),
-		"dest": dest if dest != "" else DEFAULT_DEST,
+		"enabled": o.get("enabled") != false, "protocol": "sacn" if sacn else "artnet",
+		"universe": int(_num(o.get("universe"), 1, 1, SACN_UNIVERSE_MAX)) if sacn
+			else int(_num(o.get("universe"), 0, 0, PORT_ADDRESS_MAX)),
+		"address": int(_num(o.get("address"), 1, 1, 512)),
+		"dest": dest if dest != "" or sacn else DEFAULT_DEST,
+		"typeId": type_id if hex.search(type_id) else "", "mode": str(o.get("mode", "")).left(128),
 		"pan": _axis(o.get("pan"), 1, 2, 540.0), "tilt": _axis(o.get("tilt"), 3, 4, 270.0),
 		"pose": {"x": _num(pose.get("x"), 0, -500, 500), "y": _num(pose.get("y"), 0, -500, 500),
 			"z": _num(pose.get("z"), 6, -50, 200), "hang": "floor" if pose.get("hang") == "floor" else "truss",
@@ -53,7 +62,26 @@ static func normalize(slice: Variant) -> Dictionary:
 	var o: Dictionary = s.get("output") if s.get("output") is Dictionary else {}
 	return {"output": {"enabled": o.get("enabled") == true,
 		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn")),
-		"through": normalize_through(o.get("through"))}, "patch": out}
+		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out}
+
+
+## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated).
+static func normalize_dmx(raw: Variant) -> Dictionary:
+	var o: Dictionary = raw if raw is Dictionary else {}
+	var pr: Variant = o.get("priority")
+	var re := RegEx.create_from_string("^(artnet|sacn):(\\d{1,5})$")
+	var unis := []
+	for u in (o.get("universes") if o.get("universes") is Array else []):
+		var m := re.search(str(u))
+		if m == null:
+			continue
+		var n := int(m.get_string(2))
+		var ok := n <= PORT_ADDRESS_MAX if m.get_string(1) == "artnet" else (n >= 1 and n <= SACN_UNIVERSE_MAX)
+		var key := "%s:%d" % [m.get_string(1), n]
+		if ok and not unis.has(key):
+			unis.append(key)
+	return {"enabled": o.get("enabled") == true,
+		"priority": clampi(roundi(float(pr)), 0, 200) if pr is int or pr is float else 100, "universes": unis}
 
 
 ## WO-632 output.through — twin of follow-through.js normalizeThrough (read the console's Art-Net first).
@@ -82,8 +110,9 @@ static func normalize_psn(raw: Variant) -> Dictionary:
 	}
 
 
-## A new fixture after the last one: same universe / destination, the next free address, the given marker.
-static func new_fixture(patch: Array, marker_id: int) -> Dictionary:
+## A new fixture after the last one: same universe / destination / type, the next free address, the given marker.
+## type_fp = the last fixture's GDTF mode footprint when it has a type (the client knows it from /api/fixtures/types).
+static func new_fixture(patch: Array, marker_id: int, type_fp := 0) -> Dictionary:
 	var n := 1
 	var ids := patch.map(func(f: Dictionary) -> String: return f.id)
 	while ids.has("fx%d" % n):
@@ -91,9 +120,12 @@ static func new_fixture(patch: Array, marker_id: int) -> Dictionary:
 	var fx := normalize_fixture({"id": "fx%d" % n, "name": "Fixture %d" % n, "follow": marker_id}, n - 1)
 	if not patch.is_empty():
 		var last: Dictionary = patch[-1]
+		fx.protocol = last.get("protocol", "artnet")
 		fx.universe = last.universe
 		fx.dest = last.dest
-		fx.address = mini(512, int(last.address) + footprint(last))
+		fx.typeId = last.get("typeId", "")
+		fx.mode = last.get("mode", "")
+		fx.address = mini(512, int(last.address) + maxi(footprint(last), type_fp))
 		fx.pan = last.pan.duplicate()
 		fx.tilt = last.tilt.duplicate()
 		fx.fixed = last.fixed

@@ -8,6 +8,7 @@
  *   GET    /api/fixtures/types/<id>/mode?name=<m>    → { name, geometry, breaks, footprint, channels[], warnings }
  *   GET    /api/fixtures/types/<id>/file?path=<p>    → an archive member (wheel image, model)
  *   DELETE /api/fixtures/types/<id>
+ * An import or delete re-resolves the fixture patch (ctx.fixtureService.reload(): typed fixtures waiting for it).
  */
 
 const path = require('path')
@@ -23,7 +24,9 @@ async function handleUpload(req, deps = {}) {
 	const up = await (deps.readUpload || readUpload)(req)
 	if (up.error) return reply(400, { error: up.error })
 	try {
-		return reply(200, await store.importGdtf(up.file.buf, up.file.name))
+		const summary = await store.importGdtf(up.file.buf, up.file.name)
+		deps.ctx?.fixtureService?.reload?.()
+		return reply(200, summary)
 	} catch (e) {
 		return reply(400, { error: `GDTF import failed: ${e.message}` })
 	}
@@ -50,11 +53,13 @@ async function handleGet(p, query) {
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/fixtures/types', () => reply(200, { types: store.list() }), opt)
-	routes.post('/api/fixtures/types', ({ req }) => handleUpload(req), opt)
+	routes.post('/api/fixtures/types', ({ req, ctx }) => handleUpload(req, { ctx }), opt)
 	routes.get('/api/fixtures/types/*', ({ path: p, query }) => handleGet(p, query), opt)
-	routes.delete('/api/fixtures/types/*', ({ path: p }) => {
+	routes.delete('/api/fixtures/types/*', ({ path: p, ctx }) => {
 		const m = /^\/api\/fixtures\/types\/([0-9a-f]{12})$/.exec(p)
-		return m && store.remove(m[1]) ? reply(200, { ok: true }) : reply(404, { error: 'no such fixture type' })
+		if (!m || !store.remove(m[1])) return reply(404, { error: 'no such fixture type' })
+		ctx?.fixtureService?.reload?.()
+		return reply(200, { ok: true })
 	}, opt)
 }
 

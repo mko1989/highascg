@@ -352,6 +352,7 @@ module.exports = {
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
+		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
 		_calib = createCalibration({ engine: _follow.engine, hub })
 		_spot = createSpotFinder({
 			calib: _calib,
@@ -379,6 +380,7 @@ module.exports = {
 		if (_detect) _detect.stop()
 		_detect = null
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
+		if (_ctx) delete _ctx.fixtureService
 		_ctx = null
 	},
 }

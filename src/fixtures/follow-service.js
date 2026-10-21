@@ -7,6 +7,9 @@
  * (src/artnet/lighting-input-receiver.js listens on :6454 for one port-address — the global border).
  * WO-631: with `output.protocol` "psn" (the default) the markers go out as PosiStageNet trackers instead (psn.js)
  * and the console aims its own fixtures; "artnet" is the backup where this box drives pan/tilt itself.
+ * WO-615 T4: typed fixtures resolve their GDTF mode through gdtf-store.js (reload() after an import / delete);
+ * sACN goes out through the same socket and is refused on the box's own input universe when it would land here
+ * (multicast, or unicast to a local address on :5568).
  */
 
 const os = require('os')
@@ -15,6 +18,8 @@ const { ArtnetSender, ARTNET_PORT } = require('./artdmx')
 const { PsnSender } = require('./psn')
 const { ConsoleFrames } = require('./follow-through')
 const { onProjectChanged } = require('../engine/project-events')
+const gdtfStore = require('./gdtf-store')
+const { SACN_PORT } = require('./sacn')
 
 function ipv4ToInt(ip) {
 	return ip.split('.').reduce((a, b) => ((a << 8) | Number(b)) >>> 0, 0)
@@ -58,6 +63,23 @@ function inputPortAddress(ctx) {
 	}
 }
 
+/** The universe number the box's lighting input uses (it may run sACN on it), or null when the input is off. */
+function inputUniverse(ctx) {
+	const dmx = ctx?.config?.dmx || {}
+	if (dmx.artnetInputEnabled === false) return null
+	try {
+		const { resolveArtnetPatch } = require('../artnet/artnet-slot-config')
+		return resolveArtnetPatch(ctx, dmx).universe & 0x0f
+	} catch (_) {
+		return 0
+	}
+}
+
+const isMulticast = (host) => {
+	const first = Number(String(host).split('.')[0])
+	return first >= 224 && first <= 239
+}
+
 function createFollowService(ctx, hub) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
 	const sender = new ArtnetSender({ log })
@@ -65,12 +87,22 @@ function createFollowService(ctx, hub) {
 	const consoleFrames = new ConsoleFrames({ log })
 	let targets = localTargets()
 	const reachesSelf = (to) => to.port === ARTNET_PORT && (to.host.startsWith('127.') || targets.has(to.host))
+	const sacnReachesSelf = (to) => isMulticast(to.host) || (to.port === SACN_PORT && (to.host.startsWith('127.') || targets.has(to.host)))
 	const engine = new FollowEngine({
 		hub,
 		consoleFrames,
 		send: (to, packet) => sender.send(to, packet),
-		isSelfLoop: (to, universe) => reachesSelf(to) && inputPortAddress(ctx) === universe,
+		isSelfLoop: (to, universe, protocol) => protocol === 'sacn'
+			? sacnReachesSelf(to) && inputUniverse(ctx) === universe
+			: reachesSelf(to) && inputPortAddress(ctx) === universe,
 		reachesSelf,
+		resolveMode: (typeId, mode) => {
+			try {
+				return gdtfStore.mode(typeId, mode)
+			} catch (_) {
+				return null
+			}
+		},
 	})
 	let lastJson = ''
 	const apply = (project) => {
@@ -97,6 +129,15 @@ function createFollowService(ctx, hub) {
 	engine.start()
 	return {
 		engine,
+		/** Re-resolve the patch (a GDTF type was imported or deleted). */
+		reload() {
+			lastJson = ''
+			try {
+				apply(require('../engine/project-scenes').loadFullProject())
+			} catch (e) {
+				log('warn', '[follow] reload: ' + (e?.message || e))
+			}
+		},
 		sender,
 		psn,
 		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors, psn: { ...psn.status(), interfaces: ipv4Addresses() },
