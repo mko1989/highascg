@@ -7,8 +7,7 @@ import { markCasparRestartDirty } from './caspar-restart-hint.js'
 import { refreshLiveAudioConfigured } from './live-audio-state.js'
 import { buildLiveAudioConfigBody, readLiveAudioCasparSettings, LIVE_AUDIO_MAX_SLOTS } from './live-audio-inputs.js'
 import { liveAudioInputForSlot } from './input-channels.js'
-import { clearMultiPlayTargets, clearPlayTarget, getMultiPlayTargets } from './live-audio-play-targets.js'
-import { clearRouteFromChannel } from './live-audio-routing.js'
+import { clearMultiPlayTargets, clearPlayTarget } from './live-audio-play-targets.js'
 import { stopHostChannelPlayback } from './extra-live-source-remove.js'
 
 /**
@@ -22,10 +21,7 @@ export async function removeLiveAudioInputSlot(stateStore, slot) {
 	const cm = stateStore?.getState?.()?.channelMap || {}
 	const entry = liveAudioInputForSlot(cm, s)
 
-	const multiTargets = getMultiPlayTargets(s)
-	for (const t of multiTargets) {
-		await clearRouteFromChannel(t.channel, t.layer).catch(() => {})
-	}
+	// WO-604: the config POST below makes the server STOP this slot's PGM routes (no client-side STOP).
 	clearMultiPlayTargets(s)
 	clearPlayTarget(s)
 

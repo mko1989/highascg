@@ -428,6 +428,7 @@ async function handlePost(path, body, ctx) {
 		if (!b || typeof b !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
 		}
+		const prevCfg = { ...ctx.config, casparServer: { ...(ctx.config.casparServer || {}) } }
 		const cs = { ...(ctx.config.casparServer || {}), ...(b.casparServer || {}) }
 		if (b.live_audio_input_count != null) cs.live_audio_input_count = b.live_audio_input_count
 		for (let i = 1; i <= 8; i++) {
@@ -455,7 +456,9 @@ async function handlePost(path, body, ctx) {
 		if (ctx.configManager) {
 			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })
 		}
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, casparServer: ctx.config.casparServer }) }
+		const { stopDroppedLiveAudioPgmRoutes } = require('../config/routing-setup-live-inputs')
+		const stoppedRoutes = await stopDroppedLiveAudioPgmRoutes(ctx, prevCfg) // WO-604: the server, not the client, STOPs them
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, casparServer: ctx.config.casparServer, stoppedRoutes }) }
 	}
 
 	return null

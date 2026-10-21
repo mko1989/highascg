@@ -120,3 +120,29 @@ describe('WO-604 one ALSA route path: boot, Save & Apply and the Ch buttons agre
 		assert.match(srv, /setupLiveAudioPgmRoutes\(ctx, \{ force: parseBody\(body\)\?\.routes === true \}\)/)
 	})
 })
+
+describe('WO-604 — a Live Audio Mixer save STOPs dropped PGM routes on the server', () => {
+	const routesAudio = require('../../src/api/routes-audio')
+	const save = (r, b) => routesAudio.handlePost('/api/audio/live-inputs/config', JSON.stringify(b), r.ctx).then((x) => JSON.parse(x.body))
+	const both = { live_audio_input_1_pgm_channels: '1,3', live_audio_input_2_pgm_channels: '1' }
+	it('removing slot 2 stops its route (layer 3) and leaves slot 1 alone', async () => {
+		const r = rig(both)
+		const res = await save(r, { live_audio_input_count: 1, live_audio_input_2_device: '' })
+		assert.deepEqual(res.stoppedRoutes, ['1-3'])
+		assert.deepEqual(r.raw, ['STOP 1-3', 'MIXER 1-3 CLEAR'])
+	})
+	it('unticking one PGM target stops only that channel; an unchanged save stops nothing', async () => {
+		const r = rig(both)
+		await save(r, { live_audio_input_1_pgm_channels: [1] })
+		assert.deepEqual(r.raw, ['STOP 3-2', 'MIXER 3-2 CLEAR'])
+		r.raw.length = 0
+		await save(r, { live_audio_input_1_pgm_channels: [1] })
+		assert.deepEqual(r.raw, [])
+	})
+	it('no client STOPs a removed slot itself any more', () => {
+		for (const f of ['client/components/live-audio-mixer-modal.js', 'client/lib/live-audio-remove-input.js']) {
+			assert.doesNotMatch(fs.readFileSync(path.join(ROOT, f), 'utf8'), /clearRouteFromChannel/, f)
+		}
+	})
+})
+

@@ -390,9 +390,26 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 ### Still open (later slices)
 
 - Stereo-pair split of a cross-screen route (the web has none either; the route carries the whole layout).
-- The WO-571 modal still mirrors its selection into localStorage (display only now) and STOPs a removed slot's
-  routes client-side (`live-audio-remove-input.js`). Its Save & Apply PLAY loop is retired (slice 6).
+- ~~Client-side STOP of a removed slot's routes~~ — done 2026-10-21 (slice 7 below). The modal's localStorage
+  mirror stays: the web mixer console still reads it for display of non-ALSA kinds (WO-604 leftover, not a Caspar action).
+- The web cross-screen audio apply (`client/lib/audio-cross-screen-apply.js`) still PLAYs / STOPs routes from the
+  browser through `/api/host-live/layer` — a candidate for the same server move.
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
   Moving a band changes layers that may already be on air on deployed boxes.
 - Click a live-audio strip to inspect it. Add-input modal.
 - Side-by-side meter ballistics check web vs Godot, and the parity checklist (owner).
+
+## Slice 7 (2026-10-21) — the server STOPs dropped live-audio PGM routes
+
+**What was done:** `POST /api/audio/live-inputs/config` now keeps the config from before the save and calls
+`stopDroppedLiveAudioPgmRoutes` (`src/config/routing-setup-live-inputs.js`): every channel-layer the old config routed
+that the new config no longer routes, or routes from a different source, gets `STOP` + `MIXER CLEAR`; unchanged
+routes are left alone. The reply lists them (`stoppedRoutes`). The web modal's remove button and
+`live-audio-remove-input.js` no longer STOP anything themselves (directive D). Godot never did; its remove plan now
+gets the same server STOP.
+
+**What was VERIFIED:** smoke `smoke-wo604-alsa-routes.test.js` +3 (remove slot 2 → `STOP 1-3`/`MIXER 1-3 CLEAR`,
+untick one target → only that channel, unchanged save → nothing, no client STOP). Gates: lines, lint 216, prettier,
+unwired-exports, API contract, offline 3010 pass, `--no-http`, client build, Godot 20419. Box: the node runs it; the
+box has no ALSA slots, so the real Save & Apply check stays on the owner checklist (WO-604 ALSA entry).
+

@@ -141,8 +141,45 @@ async function setupLiveAudioPgmRoutes(self, opts = {}) {
 	}
 }
 
+/**
+ * WO-604: a Live Audio Mixer save that drops a slot, or one of its PGM targets, STOPs that route here — clients no
+ * longer STOP routes themselves. Compares the config before the save with the current one; a channel-layer that
+ * keeps the same route is left alone, one whose route changed is cleared for the next route apply to re-PLAY.
+ * @param {object} self - ctx with amcp + config (already holding the saved settings)
+ * @param {object} prevCfg - the config before the save
+ * @returns {Promise<string[]>} the stopped `channel-layer` keys
+ */
+async function stopDroppedLiveAudioPgmRoutes(self, prevCfg) {
+	if (!self.amcp) return []
+	const pairs = (cfg) => {
+		const out = new Map()
+		for (const s of listConfiguredLiveAudioSlots(cfg).slots) {
+			const layer = liveAudioPgmLayerForSlot(cfg, s.slot)
+			if (layer == null) continue
+			const route = s.route || resolveLiveAudioRouteString(cfg, s.slot)
+			for (const ch of s.pgmChannels) out.set(`${ch}-${layer}`, { channel: ch, layer, route })
+		}
+		return out
+	}
+	const after = pairs(self.config)
+	const stopped = []
+	for (const [key, r] of pairs(prevCfg)) {
+		if (after.get(key)?.route === r.route) continue
+		try {
+			await self.amcp.raw(`STOP ${key}`)
+			await self.amcp.raw(`MIXER ${key} CLEAR`)
+			stopped.push(key)
+		} catch (e) {
+			self.log?.('warn', `Live audio PGM route ${key} stop: ${e?.message || e}`)
+		}
+	}
+	if (stopped.length) self.log?.('info', `Live ALSA: stopped dropped PGM route(s) ${stopped.join(', ')}`)
+	return stopped
+}
+
 module.exports = {
 	setupLiveAudioInputs,
 	setupV4l2Inputs,
 	setupLiveAudioPgmRoutes,
+	stopDroppedLiveAudioPgmRoutes,
 }

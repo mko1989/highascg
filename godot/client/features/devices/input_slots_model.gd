@@ -164,6 +164,7 @@ static func start_error(r: Variant) -> String:
 
 ## removeLiveAudioInputSlot between the two settings loads: {requests, restart}. `cm` = state channelMap.
 ## (The web also clears this slot's browser-stored PGM play targets; Godot keeps none, so there is nothing to clear.)
+## The config POST makes the server STOP this slot's PGM routes (WO-604) — no client STOPs them.
 static func live_audio_remove_plan(cs: Variant, cm: Dictionary, slot: Variant) -> Dictionary:
 	var s := clamp_slot(slot)
 	var prev := read_live_audio(cs)

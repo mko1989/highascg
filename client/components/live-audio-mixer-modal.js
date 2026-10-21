@@ -22,7 +22,6 @@ import {
 import { liveAudioInputForSlot } from '../lib/input-channels.js'
 import {
 	applyLiveAudioCapture,
-	clearRouteFromChannel,
 	dedicatedInputRoute,
 	pgmDestLayerForSlot,
 } from '../lib/live-audio-routing.js'
@@ -251,10 +250,7 @@ async function mountLiveAudioMixerPanel(container, stateStore) {
 			if (!Number.isFinite(idx) || idx < 0) return
 			const currentUi = readUiFromDom()
 			const slotNum = idx + 1
-			const prevTargets = getMultiPlayTargets(slotNum)
-			for (const t of prevTargets) {
-				await clearRouteFromChannel(t.channel, t.layer).catch(() => {})
-			}
+			// WO-604: no client-side STOP — Save & Apply posts the config and the server STOPs the dropped routes.
 			clearMultiPlayTargets(slotNum)
 			clearPlayTarget(slotNum)
 
