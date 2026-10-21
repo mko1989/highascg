@@ -139,6 +139,13 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/disp
   fi
 else
 ${CASPAR_PLAYOUT_BLOCK}
+  :
+  # Godot operator client — reconnects to the node API on its own while highascg.service boots.
+  _godot="\${HOME}/.local/opt/godot/godot"
+  if [ -x ${PLAYOUT}/godot/client/run-client.sh ] && [ -x "\$_godot" ]; then
+    mkdir -p "\${HOME}/.highascg/log"
+    (sleep 8; GODOT="\$_godot" exec ${PLAYOUT}/godot/client/run-client.sh --screen=0 >>"\${HOME}/.highascg/log/godot-client.log" 2>&1) &
+  fi
 fi
 AST
 chmod +x "/home/${USER_CASPAR}/.config/openbox/autostart"
