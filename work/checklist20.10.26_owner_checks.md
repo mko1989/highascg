@@ -77,6 +77,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       Both outputs change live. Press a param's wiggle button: only PRV wobbles, then it settles back. The Opacity /
       Brightness rows still ride the layer. A playlist hop with a MIX transition restarts the shader once on its first
       edit (re-host), then it edits smoothly.
+- [ ] **WO-598 shared multiview presets** — open the web Multiview editor in a browser and the Godot Multiview tab
+      at the same time. Save a preset in one: its button lights up in the other within a second. Recall it in the
+      other one. Switch both to multiviewer 2 (if you have one): a layout edit in one shows in the other.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source

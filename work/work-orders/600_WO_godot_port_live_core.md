@@ -124,7 +124,7 @@ next free number, editor defaults, images never loop, native fill for the conten
   (Audio focus · Clear source · Lock aspect · Remove cell · Default layout · Clear all cells — replaces the web's
   right-click-clears and Shift+click on presets). Sources rows drop on a cell (new source) or on empty canvas (new cell).
   The multiview channel's own picture is leased (`ch<N>`) behind the cells. Multiviewer 1 = `project.multiview`
-  (autosaved, so the web editor sees it); multiviewers 2+ and the presets live in ui.cfg (the web keeps them in the browser).
+  (autosaved, so the web editor sees it); multiviewers 2+ and the presets live on the node since 2026-10-21 (WO-598 D, `/api/client-prefs`, shared with the web editor; ui.cfg is the offline fallback).
 - Server: `POST /api/multiview/audio-focus {n, cellId}` composes the focus lines against the APPLIED layout
   (smoke `smoke-wo600-multiview-audio-focus`, 4 tests). **Web bug fixed on the way:** the web editor sent
   `MIXER 3 VOLUME 11 -60` through raw `/api/amcp/batch` — dB in a linear field, and the layer in the volume slot, so the

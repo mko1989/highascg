@@ -5,10 +5,40 @@
  */
 
 import { DEFAULT_WIDTH, DEFAULT_HEIGHT, migratePreviewRouteSources, defaultLayout, cellsToApiLayout } from './multiview-state-layout.js'
+import { getClientPref, setClientPref, onClientPrefsChange } from './client-prefs.js'
 
 const STORAGE_KEY_BASE = 'casparcg_multiview_layout'
-/** Four quick-save slots (localStorage); first click saves, later clicks recall (see multiview-editor). */
+/** Four quick-save slots; first click saves, later clicks recall (see multiview-editor). */
 const PRESETS_STORAGE_KEY_BASE = 'casparcg_multiview_presets_v1'
+
+/* WO-598 D: every multiviewer's presets and multiviewer 2+ layouts live on the node (client-prefs mirror) so the
+ * Godot client sees them too; localStorage is written alongside as the offline fallback. Multiviewer 1's layout
+ * is the project's multiview slice. */
+const storageKey = (kind, idx) => {
+	const base = kind === 'presets' ? PRESETS_STORAGE_KEY_BASE : STORAGE_KEY_BASE
+	return idx === 1 ? base : `${base}_${idx}`
+}
+const prefKey = (kind, idx) => (kind === 'presets' ? 'multiviewPresets' : idx === 1 ? null : 'multiviewLayouts')
+
+function readStored(kind, idx) {
+	const pk = prefKey(kind, idx)
+	const v = pk ? getClientPref(pk, idx) : undefined
+	if (v !== undefined) return v == null ? null : JSON.parse(JSON.stringify(v))
+	try {
+		const raw = localStorage.getItem(storageKey(kind, idx))
+		return raw ? JSON.parse(raw) : null
+	} catch {
+		return null
+	}
+}
+
+function writeStored(kind, idx, value) {
+	try {
+		localStorage.setItem(storageKey(kind, idx), JSON.stringify(value))
+	} catch {}
+	const pk = prefKey(kind, idx)
+	if (pk) setClientPref(pk, idx, value)
+}
 
 export class MultiviewState {
 	constructor() {
@@ -27,6 +57,7 @@ export class MultiviewState {
 		this.dragInProgress = false
 		this._listeners = new Map()
 		this._load()
+		onClientPrefsChange((d) => this._onClientPrefs(d))
 	}
 
 	/**
@@ -53,11 +84,9 @@ export class MultiviewState {
 	}
 
 	_load() {
-		const key = this.currentIndex === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${this.currentIndex}`
 		try {
-			const raw = localStorage.getItem(key)
-			if (raw) {
-				const data = JSON.parse(raw)
+			const data = readStored('layout', this.currentIndex)
+			if (data) {
 				if (Array.isArray(data.cells) && data.cells.length > 0) {
 					const prev = data.cells
 					this.cells = migratePreviewRouteSources(data.cells)
@@ -258,24 +287,18 @@ export class MultiviewState {
 	}
 
 	_persistLayout(applyToCaspar, emitChange) {
-		const key = this.currentIndex === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${this.currentIndex}`
-		try {
-			localStorage.setItem(
-				key,
-				JSON.stringify({
-					cells: this.cells,
-					canvasWidth: this.canvasWidth,
-					canvasHeight: this.canvasHeight,
-					showOverlay: this.showOverlay,
-					bgColor: this.bgColor,
-					showTimersUnderLabels: this.showTimersUnderLabels,
-					timerScale: this.timerScale,
-					highlightTopTimer: this.highlightTopTimer,
-					autoApply: this.autoApply,
-					audioActiveCellId: this.audioActiveCellId,
-				}),
-			)
-		} catch {}
+		writeStored('layout', this.currentIndex, {
+			cells: this.cells,
+			canvasWidth: this.canvasWidth,
+			canvasHeight: this.canvasHeight,
+			showOverlay: this.showOverlay,
+			bgColor: this.bgColor,
+			showTimersUnderLabels: this.showTimersUnderLabels,
+			timerScale: this.timerScale,
+			highlightTopTimer: this.highlightTopTimer,
+			autoApply: this.autoApply,
+			audioActiveCellId: this.audioActiveCellId,
+		})
 		if (emitChange) this._emit('change')
 		if (applyToCaspar) this._emit('apply-request')
 	}
@@ -321,12 +344,9 @@ export class MultiviewState {
 				highlightTopTimer: this.highlightTopTimer,
 			}
 		}
-		const key = idx === 1 ? STORAGE_KEY_BASE : `${STORAGE_KEY_BASE}_${idx}`
 		try {
-			const raw = localStorage.getItem(key)
-			if (!raw) return null
-			const data = JSON.parse(raw)
-			if (!Array.isArray(data.cells) || data.cells.length === 0) return null
+			const data = readStored('layout', idx)
+			if (!data || !Array.isArray(data.cells) || data.cells.length === 0) return null
 			return {
 				n: idx,
 				layout: cellsToApiLayout(data.cells, data.canvasWidth ?? DEFAULT_WIDTH, data.canvasHeight ?? DEFAULT_HEIGHT),
@@ -375,15 +395,8 @@ export class MultiviewState {
 
 	/** @returns {(object | null)[]} length 4 — null = slot never saved */
 	getPresetSlots() {
-		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
-		try {
-			const raw = localStorage.getItem(key)
-			if (raw) {
-				const arr = JSON.parse(raw)
-				if (Array.isArray(arr) && arr.length === 4) return arr
-			}
-		} catch {}
-		return [null, null, null, null]
+		const arr = readStored('presets', this.currentIndex)
+		return Array.isArray(arr) && arr.length === 4 ? arr : [null, null, null, null]
 	}
 
 	/** @param {number} index 0–3 */
@@ -391,10 +404,7 @@ export class MultiviewState {
 		if (index < 0 || index > 3 || !snapshot) return
 		const slots = this.getPresetSlots()
 		slots[index] = snapshot
-		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
-		try {
-			localStorage.setItem(key, JSON.stringify(slots))
-		} catch {}
+		writeStored('presets', this.currentIndex, slots)
 	}
 
 	/** Clear a preset slot (Shift+click in multiview editor). */
@@ -402,10 +412,30 @@ export class MultiviewState {
 		if (index < 0 || index > 3) return
 		const slots = this.getPresetSlots()
 		slots[index] = null
-		const key = this.currentIndex === 1 ? PRESETS_STORAGE_KEY_BASE : `${PRESETS_STORAGE_KEY_BASE}_${this.currentIndex}`
-		try {
-			localStorage.setItem(key, JSON.stringify(slots))
-		} catch {}
+		writeStored('presets', this.currentIndex, slots)
+	}
+
+	/**
+	 * WO-598 D: the node's copy arrived (boot / reconnect) or another client wrote one. On load, entries only this
+	 * browser had are pushed up once; a change to the open multiviewer reloads it (not mid-drag).
+	 */
+	_onClientPrefs(detail) {
+		if (detail.loaded) {
+			for (let n = 1; n <= 4; n++) {
+				for (const kind of ['presets', 'layout']) {
+					const pk = prefKey(kind, n)
+					if (!pk || getClientPref(pk, n) !== undefined) continue
+					try {
+						const v = JSON.parse(localStorage.getItem(storageKey(kind, n)) || 'null')
+						const empty = !v || (Array.isArray(v) && v.every((x) => x == null))
+						if (!empty) setClientPref(pk, n, v)
+					} catch {}
+				}
+			}
+		} else if (detail.n !== this.currentIndex) return
+		if (this.dragInProgress) return
+		if (detail.loaded || prefKey('layout', this.currentIndex) === detail.key) this._load()
+		this._emit('change')
 	}
 }
 

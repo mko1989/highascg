@@ -104,7 +104,7 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 - [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
 - [x] T5 constants endpoint (C4) ✔ 2026-10-21 — `GET /api/contract/constants`; client copies pinned by a CI parity smoke instead of a boot fetch (see below).
 - [ ] T6 effects/PIP/border server routes (C3).
-- [ ] T7 client-local storage migration (D).
+- [~] T7 client-local storage migration (D): multiview presets + multiviewer 2+ layouts on the node ✔ 2026-10-21 (`/api/client-prefs`); GPU layout prefs, DeckLink rear order, hardware policy still per client.
 
 ## Acceptance
 
@@ -245,6 +245,39 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
 - **What was VERIFIED:** the smoke passes 4/4; offline suite 2990/0. On the box after a node restart, the endpoint
   returns the document (200).
 - **Open:** none. A new copy elsewhere should be added to the smoke's `COPIES` table.
+
+## 2026-10-21 — T7 / D slice 1: multiview presets and multiviewer 2+ layouts on the node
+
+- **Investigation:** the web client kept the four multiview preset slots of every multiviewer, plus the layouts of
+  multiviewers 2+, in browser localStorage. The Godot port (WO-600 M) kept them in `ui.cfg`. So a preset saved in
+  one client never reached the other. Multiviewer 1's layout was already shared (the project's `multiview` slice).
+- **What was done:**
+  - New `src/api/routes-client-prefs.js` (registered on the existing router line):
+    - `GET /api/client-prefs` returns `{ prefs }`.
+    - `POST { key, n, value }` writes one multiviewer's entry, so two clients on different multiviewers never
+      clobber each other. `value: null` removes it.
+    - Keys are whitelisted (`multiviewPresets` = 4 slots of `{cells}`|null, `multiviewLayouts` = `{cells}`, n 2–16)
+      and capped at 512 KB.
+    - Data is stored in the node's test-isolated persistence file (`clientPrefs`, already in .gitignore + .stignore).
+      Each write broadcasts WS `client_prefs`.
+  - Web: new `client/lib/client-prefs.js` mirror, loaded on every WS connect. `multiview-state.js` reads the node's
+    copy first and falls back to localStorage, and writes both. After a load, entries only this browser had are
+    pushed up once (empty ones are skipped). The echo of our own write is ignored, so there's no redraw or autosave.
+  - Godot: `mv_prefs.gd` (pure) + `multiview_tab.gd` follow the same rules against `ui.cfg`. A change to the open
+    multiviewer reloads it (not mid-drag).
+- **What was VERIFIED:**
+  - Smoke `smoke-wo598-client-prefs`, 4 tests: per-n writes, 8 refused shapes changing nothing, the GET shape, and
+    the real web modules with a stubbed fetch (node wins, migration pushes only what the node lacked, own echo
+    ignored, the other client's layout reloads).
+  - Godot `test_multiview_prefs.gd` (+22). Offline suite 2994/0, Godot suite 20386/0.
+  - On the box (node restarted, GUI relaunched on Multiview):
+    - The empty `presets_1` in `ui.cfg` was not pushed.
+    - Clicking preset 2 in Godot put it on the node.
+    - A write from another client (curl) lit preset 3 in Godot over WS.
+    - Right-click → Clear on both cleared `ui.cfg` and the node. The node entry was then removed, which restores the
+      starting state; GUI log 0 errors.
+- **Open:** a live web ↔ Godot check (web editor in a browser) is on the owner checklist. Still per client: GPU
+  layout view prefs (hidden ports / labels), DeckLink rear order, hardware policy, live-audio play targets.
 
 ## Earlier notes
 

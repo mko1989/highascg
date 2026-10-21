@@ -1,8 +1,8 @@
 extends VBoxContainer
 ## WO-600 M — the Multiview tab (web client/components/multiview-editor.js toolbar + state wiring). Multiviewer 1's
 ## layout is the project's `multiview` slice (autosaved like every other show edit, so a web editor on the same show
-## sees it); multiviewers 2+ and the four preset slots stay on this machine (ui.cfg — the web keeps them in the
-## browser). Edits apply through POST /api/multiview/apply (the server composes every AMCP line, directive D):
+## sees it); multiviewers 2+ and the four preset slots live on the node (WO-598 D: /api/client-prefs, shared with the
+## web editor, ui.cfg kept as the offline fallback — mv_prefs.gd). Edits apply through POST /api/multiview/apply (the server composes every AMCP line, directive D):
 ## right away after a drag / drop / menu edit, 800 ms after a toggle, only when Auto-apply is on — the style
 ## settings (timers under labels, timer size, highlight, BG) always apply, like the web. Click a cell = audio focus
 ## (POST /api/multiview/audio-focus). Without a multiview destination the canvas says so and nothing is sent.
@@ -10,6 +10,7 @@ extends VBoxContainer
 const L := preload("res://features/multiview/mv_layout.gd")
 const D := preload("res://features/multiview/mv_doc.gd")
 const MvCanvas := preload("res://features/multiview/mv_canvas.gd")
+const P := preload("res://features/multiview/mv_prefs.gd")
 const UI_CFG := "user://ui.cfg"
 const APPLY_DEBOUNCE_S := 0.8
 
@@ -28,6 +29,7 @@ var _timer: Timer
 var _applying := false
 var _apply_again := false
 var _quiet := false  # set while the toolbar is filled from state (no edit signals)
+var _prefs := P.empty()  # mirror of GET /api/client-prefs
 
 
 func _ready() -> void:
@@ -84,8 +86,11 @@ func _ready() -> void:
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path.begins_with("channelMap"):
 			_on_channel_map())
+	Ws.on("client_prefs", _on_client_prefs)
+	Ws.connected.connect(_load_prefs)
 	_on_channel_map()
 	reload()
+	_load_prefs()
 
 
 func _button(text: String, cb: Callable, tip := "") -> Button:
@@ -151,7 +156,7 @@ func _sync_canvas_size() -> void:
 func reload() -> void:
 	if not canvas._drag.is_empty():
 		return
-	var data: Variant = Store.project.get("multiview") if index == 1 else _cfg().get_value("multiview", "layout_%d" % index, {})
+	var data: Variant = Store.project.get("multiview") if index == 1 else _stored("layout", index)
 	var next: Variant = D.load(data, _cm)
 	var focus: Variant = st.get("audioActiveCellId")
 	st.clear()
@@ -178,7 +183,7 @@ func _fill_toolbar() -> void:
 		_checks[k].button_pressed = bool(st[k])
 	_scale.value = float(st.timerScale)
 	_bg.color = Color.from_string(str(st.bgColor), Color.BLACK)
-	var slots := D.slots(_cfg().get_value("multiview", "presets_%d" % index, []))
+	var slots := D.slots(_stored("presets", index))
 	for i in 4:
 		_presets[i].modulate = Color("#7ee787") if slots[i] != null else Color.WHITE
 	_quiet = false
@@ -207,9 +212,7 @@ func persist(apply: bool, now: bool) -> void:
 		Store.project["multiview"] = D.export(st)
 		ProjectSync.mark_dirty()
 	else:
-		var cfg := _cfg()
-		cfg.set_value("multiview", "layout_%d" % index, D.snapshot(st))
-		cfg.save(UI_CFG)
+		_store("layout", index, D.snapshot(st))
 	if apply and st.autoApply and enabled():
 		if now:
 			_timer.stop()
@@ -244,7 +247,7 @@ func refresh_output() -> void:
 	var ok := 0
 	var bad := 0
 	for n in range(1, chs.size() + 1):
-		var data: Variant = D.export(st) if n == index else (Store.project.get("multiview") if n == 1 else _cfg().get_value("multiview", "layout_%d" % n, {}))
+		var data: Variant = D.export(st) if n == index else (Store.project.get("multiview") if n == 1 else _stored("layout", n))
 		var body: Variant = L.apply_body(n, data) if data is Dictionary else null
 		if body == null:
 			continue
@@ -273,8 +276,49 @@ func _cfg() -> ConfigFile:
 	return cfg
 
 
+## kind = "presets" | "layout": the node's copy, else ui.cfg.
+func _stored(kind: String, n: int) -> Variant:
+	return P.stored(_prefs, kind, n, _cfg().get_value("multiview", P.cfg_key(kind, n), [] if kind == "presets" else {}))
+
+
+func _store(kind: String, n: int, value: Variant) -> void:
+	var cfg := _cfg()
+	cfg.set_value("multiview", P.cfg_key(kind, n), value)
+	cfg.save(UI_CFG)
+	var body: Variant = P.write(_prefs, kind, n, value)
+	if body != null:
+		Api.post_json("/api/client-prefs", body)
+
+
+## Boot / reconnect: read the node's copy, push up what only this machine had (once), reload the open multiviewer.
+func _load_prefs() -> void:
+	var res: Dictionary = await Api.get_json("/api/client-prefs")
+	if not res.ok:
+		return
+	_prefs = P.from_reply(res.get("data"))
+	var cfg := _cfg()
+	var local := {}
+	for n in range(1, 5):
+		for kind in ["presets", "layout"]:
+			var k := P.cfg_key(kind, n)
+			local[k] = cfg.get_value("multiview", k) if cfg.has_section_key("multiview", k) else null  # a null default errors
+	for body in P.to_push(_prefs, local):
+		P.write(_prefs, "presets" if body.key == "multiviewPresets" else "layout", body.n, body.value)
+		Api.post_json("/api/client-prefs", body)
+	reload()
+
+
+func _on_client_prefs(d: Variant) -> void:
+	if not P.apply_broadcast(_prefs, d) or int(d.get("n", 0)) != index:
+		return
+	if str(d.get("key")) == "multiviewLayouts":
+		reload()
+	else:
+		_fill_toolbar()
+
+
 func _preset_click(i: int) -> void:
-	var slots := D.slots(_cfg().get_value("multiview", "presets_%d" % index, []))
+	var slots := D.slots(_stored("presets", index))
 	if slots[i] == null:
 		_save_preset(i)
 	else:
@@ -291,11 +335,9 @@ func _preset_click(i: int) -> void:
 
 
 func _save_preset(i: int) -> void:
-	var cfg := _cfg()
-	var slots := D.slots(cfg.get_value("multiview", "presets_%d" % index, []))
+	var slots := D.slots(_stored("presets", index))
 	slots[i] = D.snapshot(st)
-	cfg.set_value("multiview", "presets_%d" % index, slots)
-	cfg.save(UI_CFG)
+	_store("presets", index, slots)
 	_fill_toolbar()
 	say("Layout saved to preset %d." % (i + 1))
 
@@ -311,11 +353,9 @@ func _preset_input(e: InputEvent, i: int) -> void:
 		if id == 0:
 			_save_preset(i)
 		else:
-			var cfg := _cfg()
-			var slots := D.slots(cfg.get_value("multiview", "presets_%d" % index, []))
+			var slots := D.slots(_stored("presets", index))
 			slots[i] = null
-			cfg.set_value("multiview", "presets_%d" % index, slots)
-			cfg.save(UI_CFG)
+			_store("presets", index, slots)
 			_fill_toolbar())
 	pm.popup_hide.connect(pm.queue_free)
 	add_child(pm)

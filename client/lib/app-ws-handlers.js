@@ -25,6 +25,7 @@ import { resolveComposePreviewChannelsFromChannelMap } from './compose-preview-u
 import { applySharedLayoutBroadcast } from './operator-gui-mode.js'
 import { invalidateCompanionFlagThumbs, noteCompanionButtonPreviewUpdate } from './companion-button-preview-url.js'
 import { showAppToast } from './app-toast.js'
+import { applyClientPrefsBroadcast, loadClientPrefs } from './client-prefs.js'
 import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
 
 /** WO-213: Track previous sceneId per channel to detect PRV rewrites. */
@@ -291,7 +292,9 @@ export function attachWsHandlers(ws, { stateStore, sceneState, timelineState, mu
 		appLogic.scheduleMultiviewRefresh()
 		appLogic.onConnect()
 		void bootstrapStreamingChannelStatus()
+		void loadClientPrefs()
 	})
+	ws.on('client_prefs', (data) => applyClientPrefsBroadcast(data))
 
 	ws.on('disconnect', async () => {
 		clearStreamingChannelStatus()
