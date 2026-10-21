@@ -73,7 +73,7 @@ async function handleGet(path, query) {
 /**
  * WO-615 T10 — POST /api/stage/mvr/<id>/patch {protocol: "artnet" | "sacn"}. Imports each GDTFSpec's embedded file once
  * (gdtf-store ensureGdtf: content-addressed, an already-known type is not re-parsed), then builds the entries.
- * @param {{ fixtureScene?: Function, ensureGdtf?: Function }} [deps]
+ * @param {{ fixtureScene?: Function, ensureGdtf?: Function, typeInfo?: Function }} [deps]
  */
 async function handlePatch(ctx, id, body, deps = {}) {
 	const fixtureScene = deps.fixtureScene || store.fixtureScene
@@ -90,7 +90,10 @@ async function handlePatch(ctx, id, body, deps = {}) {
 			continue
 		}
 		try {
-			types.set(spec, await ensureGdtf(g.buf, g.name))
+			const t = await ensureGdtf(g.buf, g.name)
+			// WO-633: a placeholder the operator replaced → the real type, modes translated (unpaired ones keep the stub)
+			const real = t.replacedBy ? (deps.typeInfo || require('../fixtures/gdtf-store').info)(t.replacedBy.to) : null
+			types.set(spec, real ? { ...real, modeMap: t.replacedBy.modes, stub: t } : t)
 		} catch (e) {
 			types.set(spec, { error: `GDTF "${spec}" could not be read: ${e.message}` })
 		}
@@ -99,6 +102,7 @@ async function handlePatch(ctx, id, body, deps = {}) {
 	if (types.size) ctx?.fixtureService?.reload?.()
 	const byId = new Map() // two GDTFSpec spellings of one file ("X" / "X.gdtf") are one type
 	for (const [spec, t] of types) if (t && !t.error && !byId.has(t.id)) byId.set(t.id, { spec, t })
+	for (const t of types.values()) if (t?.stub && !byId.has(t.stub.id)) byId.set(t.stub.id, { spec: '', t: t.stub })
 	const used = [...byId.values()].map(({ spec, t }) => ({ spec, id: t.id, name: t.name,
 		manufacturer: t.manufacturer, fixtures: out.fixtures.filter((f) => f.typeId === t.id).length }))
 	return reply(200, { protocol, ...out, types: used })

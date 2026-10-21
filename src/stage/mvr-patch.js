@@ -103,8 +103,9 @@ function matchMode(modeNames, wanted) {
 
 /**
  * @param {object[]} objects mvr-scene.js objects (kind 'Fixture' carry `fixture { spec, mode, id, addresses, matrix }`)
- * @param {{ protocol?: 'artnet' | 'sacn', typeFor: (spec: string) => { id: string, modes: { name: string, breaks?: number }[] } |
- *   { error: string } | null }} opts  typeFor: the stored type of a GDTFSpec (null = not in the archive)
+ * @param {{ protocol?: 'artnet' | 'sacn', typeFor: (spec: string) => { id: string, modes: { name: string, breaks?: number }[],
+ *   modeMap?: object, stub?: object } | { error: string } | null }} opts  typeFor: the stored type of a GDTFSpec (null = not
+ *   in the archive; modeMap + stub = a placeholder replaced by this type, WO-633)
  * @returns {{ fixtures: object[], skipped: { uuid: string, name: string, reason: string }[], notes: string[] }}
  */
 function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
@@ -136,7 +137,19 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 			skip(f.spec ? `GDTF "${f.spec}" is not in the MVR file` : 'no GDTFSpec')
 			continue
 		}
-		const modeName = matchMode(type.modes.map((m) => m.name), f.mode)
+		// WO-633: a replaced placeholder carries modeMap (its mode → the real type's) + the stub itself
+		let use = type
+		let modeName = ''
+		if (type.modeMap && type.stub) {
+			const from = matchMode(type.stub.modes.map((m) => m.name), f.mode)
+			modeName = (from && type.modeMap[from]) || ''
+			if (!modeName) {
+				use = type.stub
+				modeName = from
+			}
+		} else {
+			modeName = matchMode(type.modes.map((m) => m.name), f.mode)
+		}
 		if (!modeName) {
 			skip(String(f.mode ?? '').trim() ? `mode "${f.mode}" not in ${f.spec}` : 'no GDTFMode in the MVR file')
 			continue
@@ -146,7 +159,7 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 			skip('no DMX address (unpatched in the MVR file)')
 			continue
 		}
-		if ((type.modes.find((m) => m.name === modeName)?.breaks || 1) > 1) multiBreak.add(`${f.spec} · ${modeName}`)
+		if ((use.modes.find((m) => m.name === modeName)?.breaks || 1) > 1) multiBreak.add(`${f.spec} · ${modeName}`)
 		const pose = Array.isArray(f.matrix) && f.matrix.length === 16 ? poseFromMatrix(f.matrix) : { x: 0, y: 0, z: 6, hang: 'truss', yaw: 0, pitch: 0, roll: 0 }
 		if (pose.mirrored) {
 			mirrored++
@@ -160,7 +173,7 @@ function buildMvrPatch(objects, { protocol = 'artnet', typeFor }) {
 			universe: sacn ? at.universe : at.universe - 1,
 			address: at.address,
 			dest: sacn ? '' : DEFAULT_DEST,
-			typeId: type.id,
+			typeId: use.id,
 			mode: modeName,
 			pose,
 		})

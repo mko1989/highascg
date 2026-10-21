@@ -14,6 +14,7 @@ const { projectsRoot } = require('../engine/projects-root')
 const { parseGdtf } = require('./gdtf-parse')
 const { buildRig } = require('./gdtf-rig')
 const { compileVisual } = require('./gdtf-visual')
+const aliases = require('./gdtf-aliases')
 
 const ID = /^[0-9a-f]{12}$/
 const _types = new Map() // id → parsed record (the engine's working set)
@@ -38,12 +39,17 @@ function modeWarnings(mode) {
 
 function summary(rec) {
 	const t = rec.type
-	return {
+	const out = {
 		id: rec.id, name: t.name, shortName: t.shortName, manufacturer: t.manufacturer, fixtureTypeId: t.fixtureTypeId,
 		file: rec.file, importedAt: rec.importedAt, bytes: rec.bytes,
 		modes: t.modes.map((m) => ({ name: m.name, footprint: m.footprint, channels: m.channels.length, breaks: m.breaks,
 			warnings: modeWarnings(m) })),
 	}
+	// WO-633: an MVR placeholder (Capture stub / "Dummy -") and the real type it was replaced by
+	if (aliases.isPlaceholder(t)) out.placeholder = true
+	const a = aliases.aliasFor(out, (id) => fs.existsSync(fileOf(id, '.json') || ''), !!out.placeholder)
+	if (a) out.replacedBy = a
+	return out
 }
 
 /** @returns {Promise<object>} the summary */
@@ -95,6 +101,12 @@ function describe(id) {
 	return { ...summary(rec), dataVersion, geometry, models, wheels, attributes, files }
 }
 
+/** The summary of one stored type, or null. */
+function info(id) {
+	const rec = record(id)
+	return rec ? summary(rec) : null
+}
+
 /** One DMX mode with its channels, or null. */
 function mode(id, name) {
 	const rec = record(id)
@@ -132,4 +144,4 @@ function remove(id) {
 	return files.length > 0
 }
 
-module.exports = { importGdtf, ensureGdtf, record, list, describe, mode, visual, member, remove, modeWarnings }
+module.exports = { importGdtf, ensureGdtf, record, info, list, describe, mode, visual, member, remove, modeWarnings }
