@@ -39,5 +39,6 @@ test('both directions are covered, including handler-literal routes and register
 	assert.match(w, /\| server → clients \| `client_prefs` \|/)
 	assert.match(w, /\| server → clients \| `state` \|/)
 	assert.match(w, /\| client → server \| `tracking:marker` \|/)
+	assert.match(w, /\| server → clients \| `timeline\.playback` \| `index\.js` \|/, 'index.js boot wiring is scanned')
 	assert.doesNotMatch(w, /`string`/, 'typeof checks are not message types')
 })

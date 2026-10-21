@@ -290,7 +290,7 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   - New `tools/dev/gen-api-contract.js` scans `src/` and writes:
     - `docs/wiki/api/contract/http.md`: 447 routes as Method | Path | registry/handler | module, plus a blurb per
       module.
-    - `docs/wiki/api/contract/ws.md`: 81 types as direction | type | module | note, where the note gives the
+    - `docs/wiki/api/contract/ws.md`: 81 types (83 after the correction below) as direction | type | module | note, where the note gives the
       `TYPE_TO_PATH` target.
   - No line numbers, so unrelated edits don't make the docs stale. `--check` exits 1 when they are stale.
   - `router.js` also exports `routes` (on the existing export line; still 499 lines).
@@ -304,8 +304,9 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
     it passed again once the module was removed.
   - Runtime cross-check: 301/301 registry routes are in http.md.
   - Offline suite 2997/0 (2 skipped); lint 216; lines OK.
-- **Open:** payload schemas are not generated. The table points at each module's JSDoc. Two web WS listeners have no
-  sender in `src/` (`log_line`, `timeline.playback`); the web may be listening for nothing there.
+- **Open:** payload schemas are not generated. The table points at each module's JSDoc.
+- **Correction (same day):** `log_line` and `timeline.playback` looked like listeners with no sender. Both are
+  broadcast from `index.js` (boot wiring), which the first scan left out. The generator now scans `index.js` too (83 types).
 
 ## 2026-10-21 — T7 / D slice 2: GPU layout rows, DeckLink rear order, hardware policy on the node
 

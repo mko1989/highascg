@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-81 types.
+83 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -52,7 +52,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `caspar-apply-pending` | `src/api/device-view-decklink-wiring.js` |  |
 | server → clients | `catalog_chunk` | `src/server/ws-catalog-handlers.js`, `src/utils/media-catalog-broadcast.js` |  |
 | server → clients | `catalog_error` | `src/server/ws-catalog-handlers.js` |  |
-| server → clients | `change` | `src/api/host-live-browser.js`, `src/api/host-live-decklink.js`, `src/api/host-live-ndi.js`, `src/api/host-live-webpage.js`, `src/api/host-operator-fullscreen.js`, `src/api/routes-data-project-handlers.js`, `src/api/routes-device-snapshot.js`, `src/api/routes-device-view.js`, `src/api/routes-host-live.js`, `src/api/routes-led-test-card.js`, `src/api/routes-screens.js`, `src/api/routes-sources.js`, `src/api/settings-post.js`, `src/audio/input-audio-routing.js`, `src/audio/mixer-state.js`, `src/bootstrap/startup-led-test-pattern.js`, `src/config/config-compare.js`, `src/engine/project-activate.js`, `src/server/ws-server.js`, `src/state/live-audio-only-look-state.js`, `src/state/live-scene-state.js`, `src/utils/media-catalog-broadcast.js`, `src/utils/periodic-sync.js` |  |
+| server → clients | `change` | `index.js`, `src/api/host-live-browser.js`, `src/api/host-live-decklink.js`, `src/api/host-live-ndi.js`, `src/api/host-live-webpage.js`, `src/api/host-operator-fullscreen.js`, `src/api/routes-data-project-handlers.js`, `src/api/routes-device-snapshot.js`, `src/api/routes-device-view.js`, `src/api/routes-host-live.js`, `src/api/routes-led-test-card.js`, `src/api/routes-screens.js`, `src/api/routes-sources.js`, `src/api/settings-post.js`, `src/audio/input-audio-routing.js`, `src/audio/mixer-state.js`, `src/bootstrap/startup-led-test-pattern.js`, `src/config/config-compare.js`, `src/engine/project-activate.js`, `src/server/ws-server.js`, `src/state/live-audio-only-look-state.js`, `src/state/live-scene-state.js`, `src/utils/media-catalog-broadcast.js`, `src/utils/periodic-sync.js` |  |
 | server → clients | `client_prefs` | `src/api/routes-client-prefs.js` |  |
 | server → clients | `companion.buttonPreview` | `src/api/routes-companion-preview.js` |  |
 | server → clients | `companion.hello_ack` | `src/server/ws-server.js` |  |
@@ -66,6 +66,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `gui_stream_config` | `src/preview/gui-stream-ws-relay.js` |  |
 | server → clients | `gui_stream_error` | `src/preview/gui-stream-ws-relay.js` |  |
 | server → clients | `live_state` | `src/replication/live-state-feed.js`, `src/server/ws-server.js` |  |
+| server → clients | `log_line` | `index.js` |  |
 | server → clients | `lower-third.state` | `src/api/routes-lower-thirds.js` |  |
 | server → clients | `media:hap-encode` | `src/media/hap-encode-queue.js` |  |
 | server → clients | `media:ingest-progress` | `src/api/routes-media-ingest-local.js` |  |
@@ -79,6 +80,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `replication_status` | `src/replication/replication-ui-notify.js` |  |
 | server → clients | `state` | `src/api/get-state.js`, `src/server/ws-server.js` |  |
 | server → clients | `streaming_channel` | `src/api/routes-streaming-channel-log.js` |  |
+| server → clients | `timeline.playback` | `index.js` |  |
 | server → clients | `timeline.tick` | `src/engine/timeline-playback-runtime.js` |  |
 | server → clients | `tracking:detections` | `src/tracking/register.js` |  |
 | server → clients | `tracking:error` | `src/tracking/register.js` |  |

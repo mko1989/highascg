@@ -51,7 +51,7 @@ function enclosingMethod(src, idx) {
 }
 
 function scan() {
-	const files = walk(path.join(ROOT, 'src')).sort()
+	const files = [...walk(path.join(ROOT, 'src')), path.join(ROOT, 'index.js')].sort() // index.js: boot-time broadcasts (log_line, timeline.playback)
 	const http = new Map()
 	const ws = new Map()
 	const blurbs = new Map()
