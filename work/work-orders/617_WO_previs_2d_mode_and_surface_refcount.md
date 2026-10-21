@@ -1,4 +1,4 @@
-**Status: DONE (2026-10-17, measured + server lease cycle verified on the shop dev box) — open follow-up only: profile the remaining ~7 % idle client CPU. **20.10: the 2D front/plan views were removed by [WO-621](./621_WO_godot_owner_notes_live_looks_previs.md) N7. The owner says the 17.10 note meant a Live-tab standard↔3D switch (WO-621 N6). The surface refcount and hidden-3D-not-rendered half stands.** Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md), [WO-594](./594_WO_caspar_shm_frame_consumer.md).**
+**Status: DONE (2026-10-17, measured + server lease cycle verified on the shop dev box) — the idle-CPU follow-up was audited 21.10 and left (see the end). **20.10: the 2D front/plan views were removed by [WO-621](./621_WO_godot_owner_notes_live_looks_previs.md) N7. The owner says the 17.10 note meant a Live-tab standard↔3D switch (WO-621 N6). The surface refcount and hidden-3D-not-rendered half stands.** Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-614](./614_WO_previs_stage_builder.md), [WO-597](./597_WO_server_video_surfaces_shm_and_atlas.md), [WO-594](./594_WO_caspar_shm_frame_consumer.md).**
 
 # WO-617 — Previs 2D mode (default) + video surfaces only while something shows them
 
@@ -92,3 +92,19 @@ scripts still run every loop iteration; the idle cost needs profiling, not a fla
 - **Server lease cycle (after the owner added a second screen → real PGM channel 1):** 3D with an LED wall on `pgm1`
   → journal `[video-surfaces] ADD 1-741 SHM NAME pgm1` (1 lease); real click on "2D front" → lease dropped →
   `REMOVE 1-741 (pgm1: no leases)` 12 s later (TTL); client `held_roles: []` at exit.
+
+## 2026-10-21 — idle CPU follow-up: audited, left
+
+**Investigation:** the client at rest on the Multiview tab (opgui held) measured 9.6–10.0 % of one core (`top`, 3 × 10 s;
+the box has 28 cores). Per-thread `/proc` totals put all of it on the main `godot` thread (the Vulkan / CUDA helper
+threads are noise). Every script `_process` in the client (13: timeline transport, marker driver, stage builder, MVR
+scene, cable layer, audio tab, preview pusher, deck view, media preview, look editor, live tab, video surfaces, ws) is a
+visibility / dirty-flag guard or a poll that returns at once when idle — none does steady work. What is left is the
+engine drawing the whole 1080p UI every vsync. `perf record` is blocked on the box (`kernel.perf_event_paranoid = 4`,
+needs root), so the native split was not measured.
+
+**Decision:** left as is — about 0.35 % of the machine, with no stutter or lag reported. If it ever matters (laptops,
+WO-610), the lever is a redraw-on-demand mode (only draw when a texture or a control changed), which needs every
+continuously-updating label / video surface to request redraws explicitly — profile with `perf` first
+(`sudo sysctl kernel.perf_event_paranoid=1`).
+
