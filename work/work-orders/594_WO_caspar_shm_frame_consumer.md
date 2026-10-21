@@ -267,4 +267,5 @@ smoke ran on ch1 (`ADD 5-740` correctly answers 400 here — no ch5).
 | `kill -STOP` reader 10 s | **PASS** — writer_dropped 0, torn 0 after CONT (gaps = frames missed while stopped) |
 | Caspar restart | **PASS** — reader reopened (`reopens 1`) after each of 3 RESTARTs |
 | Caspar CPU added | **FAIL vs target** — 4 alternating 8 s windows, clip playing: off 63–67 %, on 68–72 % → **+5.2 % of one core** (target < 3 %). Next: profile the worker copy (page faults on the mapping? `MAP_POPULATE`/hugepages; non-temporal copy) |
-| 1 h soak, ADD/REMOVE on an on-air PGM, channel frame-time delta | not run |
+| 1 h soak (21.10, `opgui`, build v2, Godot client reading alongside) | **fps PASS, gaps 8 vs 0** — 3600 s, 179 990 frames (180 000 expected), fps 50.00, lapped 0, torn 0, latency p50 2.61 / p95 3.71 ms; 8 skipped seqs (the python probe polling late, once per ~7.5 min on average — `lapped 0` means no slot was overwritten under it). `writer_dropped` read **169** at the end and stayed 169 through a 60 s probe right after; Caspar had been up since 20.10 17:43, so the soak cannot place them — a second hour with per-window lines is running to tell |
+| ADD/REMOVE on an on-air PGM, channel frame-time delta | not run (maintenance window) |
