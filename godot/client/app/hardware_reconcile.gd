@@ -2,13 +2,15 @@ extends Node
 ## WO-608 — project hardware reconcile (web project-import-flow.js boot / reconnect branch +
 ## project-hardware-reconcile-modal.js). After the project is pulled, GET /api/project/hardware-check (the node
 ## compares the saved hardwareConfig with the live machine and applies the web's ask rule); the remembered policy
-## (ui.cfg [project] hardware_policy — the web's localStorage key) may answer without asking. Apply = POST
+## (shared by every client: core/client_prefs.gd `hardwarePolicy`, WO-598 D; ui.cfg [project] hardware_policy is this
+## machine's fallback copy) may answer without asking. Apply = POST
 ## /api/project/hardware-apply (Device View + routing, OS layout, Caspar config — server-side). Keep = a sticky header
 ## notice (the web banner). Header Load needs none of this: POST /api/project/load {applyHardware} restores it.
 ## Missing clips / templates (GET /api/project/missing-assets) become a sticky notice after every pull and Load.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://app/hardware_reconcile_model.gd")
+const CP := preload("res://core/client_prefs.gd")
 const UI_CFG := "user://ui.cfg"
 
 var shell: Node  # app/shell.gd: header_project.say, tabs, Devices.snapshots
@@ -16,10 +18,14 @@ var _dlg: AcceptDialog
 var _busy := false
 
 
-static func policy() -> String:
+## This machine's own copy (null = none).
+static func local_policy() -> Variant:
 	var cfg := ConfigFile.new()
-	cfg.load(UI_CFG)
-	return M.policy_of(cfg.get_value("project", "hardware_policy", "ask"))
+	return cfg.get_value("project", "hardware_policy") if cfg.load(UI_CFG) == OK and cfg.has_section_key("project", "hardware_policy") else null
+
+
+static func policy() -> String:
+	return M.policy_of(CP.value("hardwarePolicy", local_policy()))
 
 
 static func set_policy(p: String) -> void:
@@ -27,6 +33,7 @@ static func set_policy(p: String) -> void:
 	cfg.load(UI_CFG)
 	cfg.set_value("project", "hardware_policy", M.policy_of(p))
 	cfg.save(UI_CFG)
+	CP.post("hardwarePolicy", M.policy_of(p))
 
 
 ## After every project pull (boot / reconnect): hardware first, then missing assets.

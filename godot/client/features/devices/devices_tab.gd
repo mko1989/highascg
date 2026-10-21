@@ -209,6 +209,9 @@ func _ready() -> void:
 	_show_mode()
 	visibility_changed.connect(func() -> void: if is_visible_in_tree(): refresh())
 	Ws.on("gpu_topology_changed", func(_d: Variant) -> void: if is_visible_in_tree(): refresh())  # DRM hotplug
+	Model.GL.CP.listen(func(keys: Array) -> void:  # WO-598 D: shared GPU rows / DeckLink order loaded or changed elsewhere
+		if is_visible_in_tree() and (keys.has("loaded") or keys.has("gpuLayout") or keys.has("decklinkRearOrder")):
+			refresh())
 	if is_visible_in_tree():
 		refresh()
 

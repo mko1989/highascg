@@ -1,14 +1,16 @@
 extends RefCounted
 ## WO-605 slice 9b — the GPU column after the layout prefs (web lib/device-view-gpu-port-list.js
 ## buildGpuSelectablePortEntries + entryToRearPanelGpuItem, -merge.js, -layout-prefs.js, -utils.js
-## collectGpuPortNameOptions): order and pairs come from the server topology; this client's saved layout
-## (web localStorage `gpu_custom_layout`, here `user://devices.cfg` [gpu] layout) only adds hidden flags and labels.
+## collectGpuPortNameOptions): order and pairs come from the server topology; the saved layout only adds hidden
+## flags and labels. It is shared by every client on the node (WO-598 D: core/client_prefs.gd `gpuLayout`, the web's
+## too); `user://devices.cfg` [gpu] layout keeps this machine's copy as the fallback.
 ## The editor rows (layout items) turn into the `gpuPhysicalTopology` the server keeps. Pure apart from the prefs.
 
 const E := preload("res://features/devices/gpu_entries.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const H := preload("res://features/devices/host_channels.gd")
 
+const CP := preload("res://core/client_prefs.gd")
 const PREFS := "user://devices.cfg"
 
 ## Rear-panel GPU edit mode (web gpuEditMode: the pencil; the GPU page shows the layout editor while it is on).
@@ -239,9 +241,14 @@ static func _parse_int(t: String) -> int:
 
 # ---------------------------------------------------------------- this client's saved layout
 
-static func saved() -> Array:
+## This machine's own copy (null = none).
+static func local() -> Variant:
 	var cfg := ConfigFile.new()
-	return R.a(cfg.get_value("gpu", "layout", [])) if cfg.load(PREFS) == OK else []
+	return cfg.get_value("gpu", "layout") if cfg.load(PREFS) == OK and cfg.has_section_key("gpu", "layout") else null
+
+
+static func saved() -> Array:
+	return R.a(CP.value("gpuLayout", local()))
 
 
 static func save(items: Array) -> void:
@@ -249,6 +256,7 @@ static func save(items: Array) -> void:
 	cfg.load(PREFS)
 	cfg.set_value("gpu", "layout", items)
 	cfg.save(PREFS)
+	CP.post("gpuLayout", items)
 
 
 static func clear() -> void:
@@ -256,3 +264,4 @@ static func clear() -> void:
 	if cfg.load(PREFS) == OK and cfg.has_section_key("gpu", "layout"):
 		cfg.erase_section_key("gpu", "layout")
 		cfg.save(PREFS)
+	CP.post("gpuLayout", null)

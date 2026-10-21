@@ -1,5 +1,5 @@
 import { normRandrCaspar, resolveCanonicalGpuConnectorId } from './device-view-caspar-render-helpers.js'
-import { GPU_CUSTOM_LAYOUT_KEY } from '../lib/device-view-gpu-port-list.js'
+import { saveGpuLayoutPrefs } from '../lib/device-view-gpu-port-layout-prefs.js'
 
 /** @type {object | null} Latest rear-panel GPU layout context (updated each render). */
 let listenerCtx = null
@@ -67,8 +67,7 @@ export function bindCasparGpuLayoutDocumentListeners(ctx) {
 
 /** @param {object[]} items */
 export function saveGpuLayoutToStorage(items) {
-	if (!Array.isArray(items)) return
-	localStorage.setItem(GPU_CUSTOM_LAYOUT_KEY, JSON.stringify(items))
+	saveGpuLayoutPrefs(items)
 }
 
 /** @param {object[]} items @param {string} [gpuModel] */

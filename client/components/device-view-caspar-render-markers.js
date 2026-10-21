@@ -1,6 +1,7 @@
 import { escapeHtml, escapeAttr } from '../lib/dom-escape.js'
-import { DECKLINK_REAR_ORDER_KEY } from '../lib/device-view-decklink-order.js'
-import { GPU_CUSTOM_LAYOUT_KEY, gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { saveDecklinkOrder } from '../lib/device-view-decklink-order.js'
+import { gpuPhysicalPortCableId } from '../lib/device-view-gpu-port-list.js'
+import { saveGpuLayoutPrefs } from '../lib/device-view-gpu-port-layout-prefs.js'
 import { gpuLayoutLog, isGpuLayoutDebugEnabled } from '../lib/device-view-gpu-layout-debug.js'
 import { casparRearKindTitle, casparRearKindToIcon } from './device-view-caspar-render-helpers.js'
 
@@ -235,11 +236,7 @@ export function appendCasparRearPanelMarkers({
 							decklinkRearOrderIds[dragIdx] = decklinkRearOrderIds[dropIdx]
 							decklinkRearOrderIds[dropIdx] = t
 						}
-						try {
-							localStorage.setItem(DECKLINK_REAR_ORDER_KEY, JSON.stringify(decklinkRearOrderIds))
-						} catch (e) {
-							console.warn('[device-view] decklink order persist', e)
-						}
+						saveDecklinkOrder(decklinkRearOrderIds)
 					}
 				})
 			}
@@ -291,9 +288,7 @@ export function appendCasparRearPanelMarkers({
 								const temp = customGpuItems[dragIdx]
 								customGpuItems[dragIdx] = customGpuItems[dropIdx]
 								customGpuItems[dropIdx] = temp
-								try {
-									localStorage.setItem(GPU_CUSTOM_LAYOUT_KEY, JSON.stringify(customGpuItems))
-								} catch (_) {}
+								saveGpuLayoutPrefs(customGpuItems)
 							}
 						}
 					}

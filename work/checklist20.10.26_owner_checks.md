@@ -80,6 +80,10 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-598 shared multiview presets** — open the web Multiview editor in a browser and the Godot Multiview tab
       at the same time. Save a preset in one: its button lights up in the other within a second. Recall it in the
       other one. Switch both to multiviewer 2 (if you have one): a layout edit in one shows in the other.
+- [ ] **WO-598 shared Device View setup** — web Devices tab in a browser and the Godot Devices tab side by side.
+      Rename or hide a GPU port in one, or reorder the DeckLink ports: the other follows within a second. On the
+      project-load hardware question, pick "remember": the other client stops asking too. Note: the web **New
+      project** clears the saved GPU rows for every client now (they are shared); say if that should stay per browser.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source

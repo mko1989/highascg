@@ -2,7 +2,7 @@
  * Rear-panel DeckLink port order editor — split out of device-view-inspector-decklink-output.js
  * (WO-479) to keep that file under the 500-line CI limit.
  */
-import { orderDecklinkConnectors, DECKLINK_REAR_ORDER_KEY, readSavedDecklinkOrder } from '../lib/device-view-decklink-order.js'
+import { orderDecklinkConnectors, readSavedDecklinkOrder, saveDecklinkOrder } from '../lib/device-view-decklink-order.js'
 import { decklinkMergedConnectors } from './device-view-inspector-decklink-shared.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 
@@ -28,11 +28,7 @@ export function renderDecklinkRearOrderEditor(h, { lastPayload, load }) {
 	})
 
 	const persistAndRefresh = async () => {
-		try {
-			localStorage.setItem(DECKLINK_REAR_ORDER_KEY, JSON.stringify(orderIds))
-		} catch (e) {
-			console.warn('[device-view] decklink order persist', e)
-		}
+		saveDecklinkOrder(orderIds)
 		if (load) await load()
 	}
 
@@ -102,7 +98,7 @@ export function renderDecklinkRearOrderEditor(h, { lastPayload, load }) {
 		className: 'header-btn',
 		textContent: 'Reset order',
 		style: 'color: #ff6b6b; border-color: #ff6b6b33; margin-left: auto;',
-		title: 'Clear saved DeckLink rear order for this browser',
+		title: 'Clear the saved DeckLink rear order (shared by every client)',
 	})
 	const fileIn = Object.assign(document.createElement('input'), { type: 'file', accept: '.json,application/json' })
 	fileIn.style.display = 'none'
@@ -143,11 +139,7 @@ export function renderDecklinkRearOrderEditor(h, { lastPayload, load }) {
 
 	resetBtn.onclick = async () => {
 		if (!confirm('Clear saved DeckLink rear panel order?')) return
-		try {
-			localStorage.removeItem(DECKLINK_REAR_ORDER_KEY)
-		} catch (e) {
-			console.warn('[device-view] decklink order reset', e)
-		}
+		saveDecklinkOrder(null)
 		orderIds = orderDecklinkConnectors(deckMerged, []).orderIds.slice()
 		if (load) await load()
 	}

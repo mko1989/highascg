@@ -7,6 +7,9 @@ const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Shell := preload("res://app/shell.gd")
 const HardwareReconcile := preload("res://app/hardware_reconcile.gd")
+const ClientPrefs := preload("res://core/client_prefs.gd")
+const DeckOrder := preload("res://features/devices/decklink_order.gd")
+const GpuLayout := preload("res://features/devices/gpu_layout.gd")
 
 var shell: Shell
 var hw_reconcile: HardwareReconcile  # WO-608: after each project pull (boot / reconnect)
@@ -32,6 +35,8 @@ func _ready() -> void:
 	shell.header_project.loaded.connect(hw_reconcile.check_assets)
 	_wire_ws()
 	await bootstrap()
+	ClientPrefs.attach(func() -> Dictionary:  # WO-598 D: GPU rows, DeckLink order, hardware policy shared on the node
+		return {"gpuLayout": GpuLayout.local(), "decklinkRearOrder": DeckOrder.local(), "hardwarePolicy": HardwareReconcile.local_policy()})
 	Ws.start()
 	VideoSurfaces.start()
 	if Config.args.has("probe-take"):  # dev: --probe-take=<sceneId>[:program]

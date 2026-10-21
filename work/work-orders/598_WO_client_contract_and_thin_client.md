@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — done: C1 take by id + C2 PRV push by id (verified on real Caspar), B golden round trip in both languages, C4 constants endpoint, A generated contract docs + CI guard, D slice 1 (multiview presets/layouts on the node); C3 is server-side for the Godot client. Open: switching the web client to C1/C2/C3 (owner QA), the rest of D (GPU layout view prefs, DeckLink rear order, hardware policy, live-audio play targets), optional `project.schema.json`. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
+**Status: IN PROGRESS (2026-10-21) — done: C1 take by id + C2 PRV push by id (verified on real Caspar), B golden round trip in both languages, C4 constants endpoint, A generated contract docs + CI guard, D (multiview presets/layouts, GPU rows, DeckLink order, hardware policy on the node); C3 is server-side for the Godot client. Open: switching the web client to C1/C2/C3 (owner QA), optional `project.schema.json`. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
 
 # WO-598 — Client contract: document it, make it testable, move show logic to the server ("thin client")
 
@@ -104,7 +104,7 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 - [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
 - [x] T5 constants endpoint (C4) ✔ 2026-10-21 — `GET /api/contract/constants`; client copies pinned by a CI parity smoke instead of a boot fetch (see below).
 - [~] T6 effects/PIP/border server routes (C3): server side ✔ — registries served as JSON (`GET /api/scene/effect-registry`), PIP overlay preview-push mode, global-border routes, effects via take/preview-push; the Godot client builds none of it. The web client still builds its own PRV AMCP (`amcp-preview-batch.js` → `/api/raw`) until its switch with T4 (owner QA).
-- [~] T7 client-local storage migration (D): multiview presets + multiviewer 2+ layouts on the node ✔ 2026-10-21 (`/api/client-prefs`); GPU layout prefs, DeckLink rear order, hardware policy still per client.
+- [x] T7 client-local storage migration (D): multiview presets + multiviewer 2+ layouts ✔ 2026-10-21 (`/api/client-prefs`); slice 2 ✔ 2026-10-21: GPU layout rows, DeckLink rear order, hardware policy. Previs view state (2D/3D, ghost, coverage) stays per screen on purpose; previs tags/presets are already project data (WO-607).
 
 ## Acceptance
 
@@ -306,6 +306,52 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   - Offline suite 2997/0 (2 skipped); lint 216; lines OK.
 - **Open:** payload schemas are not generated. The table points at each module's JSDoc. Two web WS listeners have no
   sender in `src/` (`log_line`, `timeline.playback`); the web may be listening for nothing there.
+
+## 2026-10-21 — T7 / D slice 2: GPU layout rows, DeckLink rear order, hardware policy on the node
+
+- **Investigation:**
+  - Three more pieces of operator setup lived in one client's storage:
+    - the Device View GPU rows (hidden flags + labels): web `gpu_custom_layout`, Godot `devices.cfg [gpu] layout`;
+    - the DeckLink rear-panel order: web `decklink_rear_panel_order`, Godot `devices.cfg [decklink] rear_order`;
+    - the project-load hardware policy: web `highascg_hardware_policy`, Godot `ui.cfg [project] hardware_policy`.
+  - Both clients already used the same shapes: rows with an `id`, string ids, and one of three words.
+  - "Live-audio play targets" (listed as open in slice 1) are not client prefs. DeckLink / v4l2 / ALSA targets are
+    server config already (WO-604 slices 3 + 5). The remaining input kinds' targets in `live-audio-play-targets.js`
+    are the WO-604 leftover and belong there, not in this key-value store.
+- **What was done:**
+  - `routes-client-prefs.js` gained **global keys** (no `n`): `gpuLayout`, `decklinkRearOrder`, `hardwarePolicy`.
+    - Strict shapes; `null` = none / remove.
+    - The broadcast is `client_prefs {key, value}`.
+    - GET returns all five keys.
+  - Web:
+    - `client-prefs.js` gained `readGlobalPref` (the node's value, else localStorage) and `writeGlobalPref` (both).
+      After a load, values only this browser had are pushed up once.
+    - The three owner modules read through it. `saveDecklinkOrder` and `saveGpuLayoutPrefs` replace seven direct
+      localStorage writes.
+    - The device view reloads when another client changes the rows or the order: right away when on screen, otherwise
+      when the Devices tab is next shown.
+  - Godot:
+    - New `core/client_prefs.gd`: a static mirror plus `attach()` from main.gd (GET on every connect, push-up, WS).
+    - `gpu_layout.gd`, `decklink_order.gd` and `hardware_reconcile.gd` read the node first and write both. The Devices
+      tab refreshes on a change.
+    - Autoloads are looked up by name at runtime, so the pure test runner (which has no autoloads) can't write to the
+      live node.
+  - The DeckLink reset tooltip no longer says "for this browser".
+- **What was VERIFIED:**
+  - Smoke `smoke-wo598-client-prefs`, 6 tests (+2): global writes, 4 refused shapes, no `n` in the broadcast, and the
+    real web modules (node wins, push-up of browser-only values, the localStorage copy kept, own echo ignored,
+    another client's rows applied). A mutation that disables the push-up fails it.
+  - Godot `test_client_prefs_global.gd` (+25 → 20411/0). Offline suite 2999/0; lint 216.
+  - On the box (node restarted, GUI relaunched on Devices):
+    - With no local copies, nothing was pushed.
+    - A curl write (`gpu_p0` label "SHARED TEST", DeckLink order 1·2·3·4) showed on the Godot rear panel live.
+    - GPU pencil → **Show all** in Godot put the four rows on the node.
+    - Restored: node keys back to null, the `[gpu]` key the click wrote removed from `devices.cfg`, GUI relaunched on
+      Multiview; GUI log 0 errors.
+- **Open:**
+  - A web ↔ Godot check with a browser is on the owner checklist.
+  - The web **New project** now clears the shared GPU rows for every client (before, it cleared one browser's copy).
+    Owner to confirm.
 
 ## Earlier notes
 

@@ -1,18 +1,19 @@
 /**
- * DeckLink rear-panel port order (Device View) — persisted in localStorage.
+ * DeckLink rear-panel port order (Device View) — shared by every client on the node (WO-598 D, client-prefs
+ * `decklinkRearOrder`), with this browser's localStorage copy as the fallback.
  */
 
-export const DECKLINK_REAR_ORDER_KEY = 'decklink_rear_panel_order'
+import { readGlobalPref, writeGlobalPref } from './client-prefs.js'
 
 /** @returns {string[]} */
 export function readSavedDecklinkOrder() {
-	try {
-		const raw = localStorage.getItem(DECKLINK_REAR_ORDER_KEY)
-		const p = raw ? JSON.parse(raw) : []
-		return Array.isArray(p) ? p.map((x) => String(x)) : []
-	} catch {
-		return []
-	}
+	const p = readGlobalPref('decklinkRearOrder')
+	return Array.isArray(p) ? p.map((x) => String(x)) : []
+}
+
+/** @param {string[] | null} ids  null clears the saved order */
+export function saveDecklinkOrder(ids) {
+	writeGlobalPref('decklinkRearOrder', ids ? ids.map((x) => String(x)) : null)
 }
 
 /**

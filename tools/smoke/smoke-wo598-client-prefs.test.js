@@ -3,7 +3,8 @@
 /**
  * WO-598 D — /api/client-prefs: multiview presets (every multiviewer) and multiviewer 2+ layouts live on the node,
  * not in one client's storage. Per-multiviewer writes (two clients editing different multiviewers never clobber
- * each other), strict value shapes, a WS broadcast per write. Persistence is an in-memory stub.
+ * each other), strict value shapes, a WS broadcast per write. Slice 2: the global keys (GPU layout rows, DeckLink
+ * rear order, hardware policy) take no n. Persistence is an in-memory stub.
  */
 
 const { test } = require('node:test')
@@ -60,7 +61,9 @@ test('GET returns every key, empty when nothing is stored; routes need no Caspar
 	const h = {}
 	register({ get: (p, fn, o) => (h[`GET ${p}`] = { fn, o }), post: (p, fn, o) => (h[`POST ${p}`] = { fn, o }) })
 	const ctx = makeCtx()
-	assert.deepEqual(JSON.parse(h['GET /api/client-prefs'].fn({ ctx }).body), { prefs: { multiviewPresets: {}, multiviewLayouts: {} } })
+	assert.deepEqual(JSON.parse(h['GET /api/client-prefs'].fn({ ctx }).body), {
+		prefs: { multiviewPresets: {}, multiviewLayouts: {}, gpuLayout: null, decklinkRearOrder: null, hardwarePolicy: null },
+	})
 	assert.equal(h['GET /api/client-prefs'].o.requireCaspar, false)
 	assert.equal(h['POST /api/client-prefs'].o.requireCaspar, false)
 	h['POST /api/client-prefs'].fn({ ctx, body: JSON.stringify({ key: 'multiviewLayouts', n: 3, value: snap(9) }) })
@@ -109,4 +112,84 @@ test('web mirror: node copy wins, browser-only entries are pushed up once, own e
 	P.applyClientPrefsBroadcast({ key: 'multiviewLayouts', n: 4, value: snap(5) })
 	assert.equal(changes, 1, 'another multiviewer: no redraw')
 	served = null
+})
+
+test('global keys: one value per node, no n, strict shapes, null removes', () => {
+	const ctx = makeCtx()
+	const rows = [{ id: 'gpu_p1', hidden: true, pairs: [], label: 'Main' }]
+	assert.equal(post(ctx, { key: 'gpuLayout', value: rows }).status, 200)
+	assert.equal(post(ctx, { key: 'decklinkRearOrder', n: 7, value: ['dl_2', 'dl_1'] }).status, 200, 'a stray n is ignored')
+	assert.equal(post(ctx, { key: 'hardwarePolicy', value: 'keep_live' }).status, 200)
+	assert.deepEqual(ctx.mem.clientPrefs.gpuLayout, rows)
+	assert.deepEqual(ctx.mem.clientPrefs.decklinkRearOrder, ['dl_2', 'dl_1'])
+	assert.deepEqual(ctx.sent[1], ['client_prefs', { key: 'decklinkRearOrder', value: ['dl_2', 'dl_1'] }], 'broadcast has no n')
+	const before = JSON.stringify(ctx.mem)
+	for (const bad of [
+		{ key: 'gpuLayout', value: [{ hidden: true }] },
+		{ key: 'gpuLayout', value: { id: 'gpu_p1' } },
+		{ key: 'decklinkRearOrder', value: [1, 2] },
+		{ key: 'hardwarePolicy', value: 'always' },
+	]) {
+		assert.equal(post(ctx, bad).status, 400, JSON.stringify(bad))
+	}
+	assert.equal(JSON.stringify(ctx.mem), before, 'refused writes change nothing')
+	assert.equal(post(ctx, { key: 'hardwarePolicy', value: null }).status, 200)
+	assert.equal(ctx.mem.clientPrefs.hardwarePolicy, null)
+	assert.deepEqual(Object.keys(ctx.mem.clientPrefs.multiviewPresets), [], 'per-n keys untouched')
+})
+
+test('web: GPU rows, DeckLink order and hardware policy read the node first and write both', async () => {
+	const mem = new Map()
+	const posts = []
+	const served = { multiviewPresets: {}, multiviewLayouts: {}, gpuLayout: [{ id: 'gpu_p2', label: 'Node' }], decklinkRearOrder: null, hardwarePolicy: null }
+	globalThis.localStorage = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, String(v)), removeItem: (k) => mem.delete(k) }
+	globalThis.fetch = async (url, opts = {}) => {
+		if (opts.method === 'POST') posts.push(JSON.parse(opts.body))
+		const body = opts.method === 'POST' ? { ok: true } : { prefs: served }
+		return { ok: true, status: 200, headers: { get: () => 'application/json' }, json: async () => body, text: async () => JSON.stringify(body) }
+	}
+	const path = require('path')
+	const lib = (f) => import(path.join(__dirname, '../../client/lib', f))
+	const P = await lib('client-prefs.js')
+	const DO = await lib('device-view-decklink-order.js')
+	const GL = await lib('device-view-gpu-port-layout-prefs.js')
+	const HP = await lib('project-hardware-policy.js')
+	mem.set('gpu_custom_layout', JSON.stringify([{ id: 'gpu_p1', label: 'Local' }]))
+	mem.set('decklink_rear_panel_order', JSON.stringify(['dl_3', 'dl_1']))
+	mem.set('highascg_hardware_policy', 'apply_saved')
+	await P.loadClientPrefs()
+	assert.deepEqual(
+		posts.map((p) => [p.key, p.n, p.value]),
+		[
+			['decklinkRearOrder', undefined, ['dl_3', 'dl_1']],
+			['hardwarePolicy', undefined, 'apply_saved'],
+		],
+		'pushed up: what only this browser had (the node already had GPU rows)',
+	)
+	assert.deepEqual(GL.readGpuLayoutPrefs().orderIds, ['gpu_p2'], "the node's GPU rows win")
+	assert.deepEqual(DO.readSavedDecklinkOrder(), ['dl_3', 'dl_1'])
+	assert.equal(HP.getHardwarePolicy(), 'apply_saved')
+	posts.length = 0
+	DO.saveDecklinkOrder(['dl_1', 'dl_3'])
+	HP.setHardwarePolicy('keep_live')
+	GL.clearGpuLayoutPrefs()
+	assert.deepEqual(
+		posts.map((p) => [p.key, p.value]),
+		[
+			['decklinkRearOrder', ['dl_1', 'dl_3']],
+			['hardwarePolicy', 'keep_live'],
+			['gpuLayout', null],
+		],
+	)
+	assert.equal(mem.get('decklink_rear_panel_order'), '["dl_1","dl_3"]', 'localStorage copy kept as the fallback')
+	assert.equal(mem.get('highascg_hardware_policy'), 'keep_live', 'policy stays a raw string')
+	assert.equal(mem.has('gpu_custom_layout'), false)
+	let heard = []
+	const off = P.onClientPrefsChange((d) => heard.push(d.key))
+	P.applyClientPrefsBroadcast({ key: 'hardwarePolicy', value: 'keep_live' })
+	assert.deepEqual(heard, [], 'own echo')
+	P.applyClientPrefsBroadcast({ key: 'gpuLayout', value: [{ id: 'gpu_p4', hidden: true }] })
+	assert.deepEqual(heard, ['gpuLayout'])
+	assert.deepEqual(GL.readGpuLayoutPrefs().orderIds, ['gpu_p4'], "another client's rows")
+	off()
 })

@@ -1,19 +1,19 @@
-import { GPU_CUSTOM_LAYOUT_KEY } from './device-view-gpu-port-constants.js'
+import { readGlobalPref, writeGlobalPref } from './client-prefs.js'
 
-/** Remove saved rear-panel order/hidden/port mapping from localStorage. */
+/** Remove the saved rear-panel order/hidden/port mapping (shared on the node, WO-598 D, + localStorage). */
 export function clearGpuLayoutPrefs() {
-	try {
-		localStorage.removeItem(GPU_CUSTOM_LAYOUT_KEY)
-	} catch {
-		/* ignore */
-	}
+	writeGlobalPref('gpuLayout', null)
+}
+
+/** @param {object[]} items rear-panel layout rows (hidden flags + labels) */
+export function saveGpuLayoutPrefs(items) {
+	if (Array.isArray(items)) writeGlobalPref('gpuLayout', items)
 }
 
 /** @returns {{ byId: Map<string, object>, orderIds: string[] }} */
 export function readGpuLayoutPrefs() {
 	try {
-		const raw = localStorage.getItem(GPU_CUSTOM_LAYOUT_KEY)
-		const arr = raw ? JSON.parse(raw) : null
+		const arr = readGlobalPref('gpuLayout')
 		if (!Array.isArray(arr)) return { byId: new Map(), orderIds: [] }
 		const byId = new Map()
 		const orderIds = []

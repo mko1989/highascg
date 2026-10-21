@@ -1,15 +1,16 @@
 extends RefCounted
 ## WO-605 slice 9a — the DeckLink rear-panel port order (web lib/device-view-decklink-order.js, the markers' default
 ## order in device-view-caspar-render-markers.js, the rear-order editor device-view-inspector-decklink-rear-order.js).
-## The web keeps the order per browser (localStorage `decklink_rear_panel_order`); here it is per client in
-## user://devices.cfg. One deliberate difference: the web's panel shows the 4·2·3·1 default while its editor, Save,
+## The order is shared by every client on the node (WO-598 D: core/client_prefs.gd `decklinkRearOrder`, the web's
+## too); user://devices.cfg keeps this machine's copy as the fallback. One deliberate difference: the web's panel shows the 4·2·3·1 default while its editor, Save,
 ## Export and swaps work on the unsorted id order, so the first edit reshuffles the panel. Here the panel order IS
 ## the edited / saved / exported order. The order functions are pure (tests preload them).
 
+const CP := preload("res://core/client_prefs.gd")
 const PREFS := "user://devices.cfg"
 const EDIT_TIP := "Edit DeckLink port order — drag markers on the rear panel, or use Save / Export / Load in the inspector (same as GPU layout)."
 const HEADING := "DeckLink rear order (drag to reorder)"
-const RESET_TIP := "Clear saved DeckLink rear order for this browser"
+const RESET_TIP := "Clear the saved DeckLink rear order (shared by every client)"
 const RESET_CONFIRM := "Clear saved DeckLink rear panel order?"
 const EXPORT_NAME := "decklink_rear_panel_order.json"
 const CASPAR := "caspar_host"
@@ -135,19 +136,24 @@ static func _js(x: Variant) -> String:
 	return "null" if x == null else str(x)
 
 
-static func saved() -> Array:
+## This machine's own copy (null = none).
+static func local() -> Variant:
 	var cfg := ConfigFile.new()
-	if cfg.load(PREFS) != OK:
-		return []
-	var v: Variant = cfg.get_value("decklink", "rear_order", [])
+	return cfg.get_value("decklink", "rear_order") if cfg.load(PREFS) == OK and cfg.has_section_key("decklink", "rear_order") else null
+
+
+static func saved() -> Array:
+	var v: Variant = CP.value("decklinkRearOrder", local())
 	return (v as Array).map(func(x: Variant) -> String: return str(x)) if v is Array else []
 
 
 static func save(list: Array) -> void:
+	var ids := list.map(func(x: Variant) -> String: return str(x))
 	var cfg := ConfigFile.new()
 	cfg.load(PREFS)
-	cfg.set_value("decklink", "rear_order", list)
+	cfg.set_value("decklink", "rear_order", ids)
 	cfg.save(PREFS)
+	CP.post("decklinkRearOrder", ids)
 
 
 static func clear() -> void:
@@ -155,3 +161,4 @@ static func clear() -> void:
 	if cfg.load(PREFS) == OK and cfg.has_section_key("decklink", "rear_order"):
 		cfg.erase_section_key("decklink", "rear_order")
 		cfg.save(PREFS)
+	CP.post("decklinkRearOrder", null)

@@ -13,6 +13,7 @@ import {
 import { nextMainScreenIndex } from '../lib/screen-destination-index.js'
 import { rafThrottle } from '../lib/raf-throttle.js'
 import * as Actions from './device-view-actions.js'
+import { onClientPrefsChange } from '../lib/client-prefs.js'
 
 export function attachDeviceViewEvents(ctx) {
 	const { refs, state, wrap } = ctx
@@ -247,6 +248,19 @@ export function attachDeviceViewEvents(ctx) {
 	 * answered from cache. */
 	document.addEventListener('highascg-settings-applied', () => ctx.load({ forceRefresh: true }))
 	window.addEventListener('highascg-device-view-reload', () => ctx.load({ forceRefresh: true }))
+	// WO-598 D: another client changed the shared GPU rows / DeckLink order (or the node's copy just loaded) —
+	// re-render now when on screen, else when the Devices tab is next shown (its activation only redraws cables)
+	let prefsStale = false
+	onClientPrefsChange((d) => {
+		if (!(d.loaded || d.key === 'gpuLayout' || d.key === 'decklinkRearOrder')) return
+		if (wrap?.isConnected && wrap.offsetParent !== null) ctx.load({ forceRefresh: true })
+		else prefsStale = true
+	})
+	window.addEventListener('highascg-workspace-tab-activated', (ev) => {
+		if (!prefsStale || ev.detail?.tab !== 'device-view') return
+		prefsStale = false
+		ctx.load({ forceRefresh: true })
+	})
 	window.addEventListener('highascg-device-view-focus-connector', (ev) => {
 		const cid = String(ev?.detail?.connectorId || '').trim()
 		if (cid) ctx.focusConnectorById(cid)

@@ -5,11 +5,11 @@ import {
 	buildGpuSelectablePortEntries,
 	clearGpuLayoutPrefs,
 	collectGpuPortNameOptions,
-	GPU_CUSTOM_LAYOUT_KEY,
 	gpuLayoutItemsToPhysicalTopology,
 	layoutItemsFromGpuEntries,
 } from '../lib/device-view-gpu-port-list.js'
 import { setStatus } from './device-view-ui-utils.js'
+import { saveGpuLayoutPrefs } from '../lib/device-view-gpu-port-layout-prefs.js'
 import { exportGpuLayoutFile, saveGpuLayoutToStorage } from './device-view-caspar-render-gpu-doc-listeners.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 
@@ -332,7 +332,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 				return
 			}
 			customGpuItems = mergeLoadedGpuLayout(parsed)
-			localStorage.setItem(GPU_CUSTOM_LAYOUT_KEY, JSON.stringify(customGpuItems))
+			saveGpuLayoutPrefs(customGpuItems)
 			try {
 				const topo = gpuLayoutItemsToPhysicalTopology(customGpuItems)
 				if (topo.length) await Actions.saveGpuPhysicalTopology(topo)
