@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8 looks DONE (offline + box: store / recall from the look menu, a 3 s DMX crossfade sampled, wheels snap; PGM TAKE owner-QA); T9–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8 looks DONE (offline + box: store / recall from the look menu, a 3 s DMX crossfade sampled, wheels snap; PGM TAKE owner-QA); T9 follow IK on the GDTF axis chain DONE (offline + 4 real files + box: Point at lands within 0.6 mm through the engine frame); T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -79,7 +79,7 @@ with actual patch and way to artnet/sacn output."
       available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups. (2026-10-21)
 - [x] T7 Visualiser mode (incoming Art-Net/sACN through the patch). (2026-10-21)
 - [x] T8 Looks integration (store/recall fixture states, TAKE crossfade). (2026-10-21)
-- [ ] T9 Follow IK (consumes WO-616 markers). **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
+- [x] T9 Follow IK (consumes WO-616 markers). (2026-10-21 — on the type's GDTF Axis chain, see the T9 section) **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
 - [ ] T10 MVR: fixtures from MVR (WO-612 T4) arrive patched (MVR carries `Addresses`, `GDTFMode`).
 
 ## Acceptance
@@ -510,3 +510,75 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
   deleted, programmer empty, `ui.cfg` identical, GUI back on tab 5.
 - Owner QA: store a look's fixtures, TAKE it to PGM and watch the rig crossfade over the look's transition
   (checklist).
+
+## T9 — follow IK on the GDTF Axis chain (2026-10-21)
+
+### Investigation
+- **The generic model pivots everything at the pose point** (`follow-ik.js aim`: beam = rotation of the base axis
+  about the fixture origin). Real heads hang their tilt pivot and lens well below the clamp. From the real files'
+  chains (`gdtf-rig.js` nodes, offsets below the hang point):
+
+  | Head | Pan axis | Tilt pivot | Beam leaves at |
+  |---|---|---|---|
+  | Robin Esprite | 0.076 m | 0.414 m | 0.724 m |
+  | LEDBeam 150 RGBW | — | 0.227 m | 0.360 m |
+  | LEDBeam 350 | — | 0.299 m | 0.415 m |
+  | LedPOINTE | — | 0.381 m | 0.657 m |
+
+  Over 50 stage targets per pose, the generic answer misses by up to **0.355 m** (Esprite hung at 6 m), 0.413 m
+  standing, and 0.195–0.381 m for the others.
+- **One FK, the previs's.** T5 already places a type's rig exactly:
+  - `fixtures_3d_model.gd pose_xform` places the fixture (hung = the GDTF rest pose, floor = turned over about Z,
+    yaw about Y);
+  - each Axis node is rest · rotation (pan about local Y, tilt about local X, physical degrees);
+  - the beam runs along its node's −Y.
+
+  Solving on that same chain means the IK's answer is what the previs then draws, which avoids a second, drifting
+  geometry model.
+- **The patch flip.** T6 fixed its meaning: a flipped axis means the real head turns opposite to its file and gets
+  the mirror value. The chain IK solves the geometric angle and converts it with the file's own direction (a falling
+  range inverts, the flip does not). `axisBytes` then applies flip XOR falling, so flipped heads still get the
+  mirror on the wire.
+- **Cost.** A warm-started solve (following a walking target at 44 Hz) takes **10.2 µs** on the box. 48 heads ×
+  44 Hz ≈ 2 % of one core.
+
+### What was done
+- `src/fixtures/gdtf-ik.js` (new, pure):
+  - `chainOf(rig)`: root → the first Beam under both a pan and a tilt Axis, else null.
+  - `beamOf(chain, pose, pan, tilt)`: origin + direction in PSN, the previs's FK.
+  - `aimFixture(fx, target, prev)`: the chain solve when `fx.gdtf.chain`, else the generic `aim`. The chain solve is
+    damped Gauss-Newton on (pan, tilt) physical degrees from the previous aim and its flipped branch, then a coarse
+    30° grid if neither converges. Every pan ± 360° copy inside the function's range is a candidate and the nearest
+    to the previous aim wins. It returns commanded degrees (null when out of range).
+  - `toPhys` / `toDeg` / `axisFn` moved here from `gdtf-features.js`.
+- `follow-service.js resolveMode` attaches `chainOf(gdtfStore.visual(…).rig)`; `gdtf-patch.js applyType` keeps it
+  as `fx.gdtf.chain`. `follow-engine.js` (following) and `gdtf-features.js aimValues` (Point at) call `aimFixture`.
+- **Deliberately not done:**
+  - fixtures without a pan and a tilt axis over one beam keep the generic model;
+  - multi-beam heads aim their first such beam;
+  - no lens-offset compensation beyond the beam node's position;
+  - the calibration jog and WO-632 read-through `consoleAim` still use the generic inverse (they work in commanded
+    degrees and are unaffected).
+
+### What was VERIFIED
+- Offline: `tools/smoke/smoke-wo615-follow-ik.test.js` 5/5:
+  - `chainOf` (spot chain, none for the pixel bar);
+  - `beamOf` (hung origin 6 + 0.2 − 0.3 − 0.2 = 5.7 m pointing down, floor up, tilt + upstage, yaw 90 → stage left);
+  - `aimFixture` puts the beam within 1 cm of every target across 3 poses (hung, hung with yaw 30 and flipped tilt,
+    floor with yaw 90), where the generic model misses by > 5 cm;
+  - the nearest +360 copy, the flipped branch from the flipped side, null straight up from a hung head;
+  - the engine following a marker and Point at both land on the point.
+
+  Offline suite: 3066 tests, 3064 pass, 0 fail (2 skipped). Boot OK; lint 216; lines, format, unwired and contract
+  pass.
+- Real files (scratch script; the .gdtf stay out of the repo). Esprite, LEDBeam 150 RGBW, LEDBeam 350 and LedPOINTE,
+  each hung at 6 m and standing at yaw 45, over 50 targets: the chain's worst miss is **0.0000 m** for every head.
+- Box (server restarted, real Esprite × 4 hung on sACN U7 at yaw 0 / 20 / 40 / 60, **DMX output master off**):
+  - `POST /api/fixtures/program/aim {target: [0, 3, 0]}` aimed all 4.
+  - The engine's real frame (`/api/fixtures/dmx/frame`), decoded as the previs does (`decodeVisual`), put every
+    head's beam on the floor within **0.5–0.6 mm** of (0, 3), 16-bit quantisation included. Decoded pan −66.04 /
+    −16.87 / 76.87 / −53.96 for the four yaws.
+  - In the previs the four beams meet in one spot.
+- Restored: fixtures and scenes identical to the snapshot (GUI closed, server restarted). Types deleted, programmer
+  empty, `ui.cfg` identical, GUI back on tab 5.
+- Owner QA: follow a tracked performer with a real head and check the beam centre sits on them (checklist).

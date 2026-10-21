@@ -157,6 +157,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       something else, then TAKE that look to PGM (DMX output on): does the rig crossfade over the look's transition
       time, with colour / gobo wheels snapping rather than scrolling? Edit the look on air (edit-on-PGM): the rig
       should not move. **Clear fixtures** on the look's menu removes it.
+      **Follow on the head's own axes (T9):** with a GDTF head following a tracked performer (Follow → Output on
+      Art-Net, or Point at), does the centre of the real beam sit on the person and not ~0.3 m off? The previs beam
+      should land on the same spot.
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.

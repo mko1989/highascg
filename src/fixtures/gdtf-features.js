@@ -9,11 +9,12 @@
  *                           the type's wheels. Wheel entries are the channel sets of a Color<n> / Gobo<n> function that
  *                           name a wheel slot, one per slot (`{ [attr]: { set: name } }` selects it); `media` is its image
  *                           ("wheels/<media>.png" in the archive), rgb its CIE colour in sRGB.
- *   aimValues(fx, target, values)  → { Pan, Tilt } physical degrees pointing the beam at a PSN stage point (follow-ik.js
- *                           aim, nearest the programmer's current pan / tilt), or null (no pan / tilt, unreachable).
+ *   aimValues(fx, target, values)  → { Pan, Tilt } physical degrees pointing the beam at a PSN stage point (gdtf-ik.js
+ *                           aimFixture: the type's axis chain, else follow-ik.js aim; nearest the programmer's current
+ *                           pan / tilt), or null (no pan / tilt, unreachable).
  */
 
-const { aim } = require('./follow-ik')
+const { aimFixture, axisFn, toPhys, toDeg } = require('./gdtf-ik')
 const { cieToRgb } = require('./gdtf-visual')
 
 const ADD = /^(ColorAdd_[A-Za-z]+|ColorRGB_[A-Za-z]+)$/
@@ -62,31 +63,6 @@ function features(fx, wheels) {
 	return out
 }
 
-function axisFn(fx, attribute) {
-	for (const c of fx.gdtf?.channels || []) {
-		const f = initialFn(c)
-		if (f && f.attribute === attribute) return f
-	}
-	return null
-}
-
-/**
- * IK degrees from the DMX centre ↔ the function's physical value, as follow-ik.js axisBytes writes them (`invert` =
- * the patch's flip XOR a falling range, gdtf-patch.js applyType) — so an unflipped head gets physical = IK degrees.
- */
-function toPhys(f, ax, deg) {
-	let n = Math.max(0, Math.min(1, (deg + ax.range / 2) / ax.range))
-	if (ax.invert) n = 1 - n
-	return f.physFrom + n * (f.physTo - f.physFrom)
-}
-
-function toDeg(f, ax, phys) {
-	const span = f.physTo - f.physFrom
-	let n = span === 0 ? 0.5 : (phys - f.physFrom) / span
-	if (ax.invert) n = 1 - n
-	return n * ax.range - ax.range / 2
-}
-
 function aimValues(fx, target, values) {
 	const pf = axisFn(fx, 'Pan')
 	const tf = axisFn(fx, 'Tilt')
@@ -95,7 +71,7 @@ function aimValues(fx, target, values) {
 		pan: Number.isFinite(values?.Pan) ? toDeg(pf, fx.pan, values.Pan) : 0,
 		tilt: Number.isFinite(values?.Tilt) ? toDeg(tf, fx.tilt, values.Tilt) : 0,
 	}
-	const pt = aim(fx, target, prev)
+	const pt = aimFixture(fx, target, prev)
 	if (!pt) return null
 	const r = (v) => Math.round(v * 100) / 100
 	return { Pan: r(toPhys(pf, fx.pan, pt.pan)), Tilt: r(toPhys(tf, fx.tilt, pt.tilt)) }

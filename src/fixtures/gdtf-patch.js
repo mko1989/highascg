@@ -32,7 +32,8 @@ function pickAxis(channels, attribute) {
 /** Derive pan / tilt and the channel list from a resolved GDTF mode (mutates and returns fx). */
 function applyType(fx, mode) {
 	const channels = mode.channels.filter((c) => c.break === 1 && c.offsets.length)
-	fx.gdtf = { footprint: mode.footprint, channels, skipped: mode.channels.filter((c) => c.break !== 1).length }
+	fx.gdtf = { footprint: mode.footprint, channels, skipped: mode.channels.filter((c) => c.break !== 1).length,
+		chain: mode.chain || null } // T9: the type's Axis chain (gdtf-ik.js), when the resolver supplies it
 	const pan = pickAxis(channels, 'Pan')
 	const tilt = pickAxis(channels, 'Tilt')
 	fx.moving = Boolean(pan && tilt)

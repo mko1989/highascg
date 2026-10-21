@@ -23,11 +23,13 @@
  * universes keep the WO-616/631 rule (follow master on + Art-Net backup) and may also be listed. sACN universes
  * go out as E1.31 (sacn.js), multicast unless the patch names a unicast destination.
  * WO-615 T7: while `fixtures.dmx.visualise` is on, no typed universe is sent at all (the console drives them).
+ * WO-615 T9: a typed head follows through its own GDTF axis chain (gdtf-ik.js aimFixture), the generic model otherwise.
  */
 
 const { encodeArtDmx } = require('./artdmx')
 const { normalizePatch, parseFixed } = require('./follow-patch')
-const { aim, writeFixture } = require('./follow-ik')
+const { writeFixture } = require('./follow-ik')
+const { aimFixture } = require('./gdtf-ik')
 const { consoleAim, blendFixture } = require('./follow-through')
 const { writeGdtf, cleanValue, normalizeDmx } = require('./gdtf-patch')
 const { encodeE131, boxCid } = require('./sacn')
@@ -220,7 +222,7 @@ class FollowEngine {
 			else if (!m) next = { ...prev, state: 'no marker' }
 			else if (m.stale) next = { ...prev, state: 'holding (stale)' }
 			else {
-				const pt = aim(fx, [m.x, m.y, m.z + fx.aim_z], prev)
+				const pt = aimFixture(fx, [m.x, m.y, m.z + fx.aim_z], prev) // T9: a typed head's own axis chain
 				next = pt ? { ...pt, state: 'following' } : { ...prev, state: 'out of range' }
 			}
 			this._aim.set(fx.id, next)

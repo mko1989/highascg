@@ -23,6 +23,7 @@ const { decodeVisual } = require('./gdtf-visual')
 const { features, aimValues } = require('./gdtf-features')
 const { SacnFrames, inputFrame } = require('./dmx-input')
 const { normalizeLooks, recallInto } = require('./fixture-looks')
+const { chainOf } = require('./gdtf-ik')
 const { cleanValue } = require('./gdtf-patch')
 const { SACN_PORT } = require('./sacn')
 
@@ -104,7 +105,9 @@ function createFollowService(ctx, hub) {
 		reachesSelf,
 		resolveMode: (typeId, mode) => {
 			try {
-				return gdtfStore.mode(typeId, mode)
+				const m = gdtfStore.mode(typeId, mode)
+				if (m) m.chain = chainOf(gdtfStore.visual(typeId, mode)?.rig) // WO-615 T9: IK on the type's own axes
+				return m
 			} catch (_) {
 				return null
 			}
