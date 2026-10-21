@@ -153,6 +153,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       multicast / unicast to the box), then tick **Visualise console**. The Fixtures section should show
       "sACN n ← <console IP> (<desk name>)". Does the previs follow the console (pan / tilt, colour, gobo)? Unplug
       the console: after ~3 s the rig goes dark. The box sends nothing while this is on.
+      **Looks (T8):** set the rig in the Programmer, right-click a look → **Store fixtures from programmer**. Set
+      something else, then TAKE that look to PGM (DMX output on): does the rig crossfade over the look's transition
+      time, with colour / gobo wheels snapping rather than scrolling? Edit the look on air (edit-on-PGM): the rig
+      should not move. **Clear fixtures** on the look's menu removes it.
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.

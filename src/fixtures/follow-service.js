@@ -22,6 +22,8 @@ const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
 const { features, aimValues } = require('./gdtf-features')
 const { SacnFrames, inputFrame } = require('./dmx-input')
+const { normalizeLooks, recallInto } = require('./fixture-looks')
+const { cleanValue } = require('./gdtf-patch')
 const { SACN_PORT } = require('./sacn')
 
 function ipv4ToInt(ip) {
@@ -109,6 +111,7 @@ function createFollowService(ctx, hub) {
 		},
 	})
 	let lastJson = ''
+	let looks = {} // WO-615 T8: fixtures.looks — fixture states stored per look
 	const apply = (project) => {
 		const slice = project?.fixtures ?? null
 		const json = JSON.stringify(slice)
@@ -116,6 +119,7 @@ function createFollowService(ctx, hub) {
 		lastJson = json
 		targets = localTargets()
 		engine.configure(slice)
+		looks = normalizeLooks(slice?.looks, cleanValue)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
 		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
@@ -192,6 +196,13 @@ function createFollowService(ctx, hub) {
 			}
 			return { aimed, unreachable }
 		},
+		/** WO-615 T8: { lookId: { fixtures: n } } — looks that carry fixture states. */
+		looks: () => Object.fromEntries(Object.entries(looks).map(([id, e]) => [id, { fixtures: Object.keys(e.values).length }])),
+		/**
+		 * WO-615 T8: the programmer becomes look `lookId`'s stored state (typed fixtures it does not list are released),
+		 * crossfading over `ms`. → { fixtures, fade_ms } or null when the look carries no fixture state.
+		 */
+		recallLook: (lookId, ms) => (looks[String(lookId)] ? recallInto(engine, looks[String(lookId)], ms) : null),
 		/** WO-615 T7: what the visualiser receives. */
 		input: () => ({ visualise: engine.dmx.visualise, artnet: consoleFrames.status(), sacn: sacnIn.status() }),
 		stop() {

@@ -63,7 +63,8 @@ static func normalize(slice: Variant) -> Dictionary:
 	return {"output": {"enabled": o.get("enabled") == true,
 		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn")),
 		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out,
-		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups"))}
+		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups")),
+		"looks": preload("res://features/previs/fixtures/look_fixtures_model.gd").normalize_looks(s.get("looks"))}
 
 
 ## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated;

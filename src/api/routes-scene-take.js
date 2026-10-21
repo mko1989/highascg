@@ -18,6 +18,7 @@ const { resolveSceneById } = require('../engine/project-scenes')
 const { withScreenGlobalBorderForChannel } = require('../engine/global-border-control')
 const { missingMediaField } = require('./media-index') // WO-603: web warnMissingMediaOnTake, decided in node
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+const { programTakeStarted } = require('../engine/scene-take-program-start') // replication + WO-615 T8 fixtures
 const {
 	stripEphemeralTakeFields,
 	resolvePreviewChannel,
@@ -26,22 +27,6 @@ const {
 } = require('./routes-scene-shared')
 
 const TAKE_TIMEOUT_MS = 120000
-
-/** Stamp + WS broadcast at PGM take start so hot backup mirrors leader transitions in sync. */
-function announceProgramTakeToReplication(ctx, mainIdx, inc, forceCut) {
-	if (mainIdx < 0 || !inc?.id) return Date.now()
-	const rt = ctx._replication
-	if (!rt || rt.roleState?.getRole() !== 'leader') return Date.now()
-	const takeUpdatedAt = Date.now()
-	const { announceLeaderProgramTake } = require('../replication/live-state-feed')
-	announceLeaderProgramTake(rt, ctx, {
-		screenIdx: mainIdx + 1,
-		sceneId: String(inc.id),
-		forceCut: !!forceCut,
-		takeUpdatedAt,
-	})
-	return takeUpdatedAt
-}
 
 function liveEntryFromTake(inc, takeUpdatedAt) {
 	return {
@@ -394,7 +379,9 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				return previewExchangePromise
 			}
 
-			const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
+			const takeUpdatedAt = programTakeStarted(ctx, {
+				mainIdx, inc, forceCut: !!b.forceCut, channel, previousId: previousPgmScene?.id, framerate: b.framerate,
+			})
 			const pgmTakePromise = runSceneTakeLbg(ctx.amcp, {
 				...takeOpts,
 				channel,
@@ -429,7 +416,9 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				`[scene-take] pgm-only channel — LBG bank pipeline with unconditional orphan sweep (WO-160b) ch=${channel}${sharedPreviewBus ? ' shared-preview-bus' : ''}`,
 			)
 		}
-		const takeUpdatedAt = announceProgramTakeToReplication(ctx, mainIdx, inc, !!b.forceCut)
+		const takeUpdatedAt = programTakeStarted(ctx, {
+			mainIdx, inc, forceCut: !!b.forceCut, channel, previousId: currentScene?.id, framerate: b.framerate,
+		})
 		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, playSync: sync })
 		if (inc && typeof inc === 'object' && inc.id) {
 			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))

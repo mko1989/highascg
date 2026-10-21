@@ -31,6 +31,7 @@ const { aim, writeFixture } = require('./follow-ik')
 const { consoleAim, blendFixture } = require('./follow-through')
 const { writeGdtf, cleanValue, normalizeDmx } = require('./gdtf-patch')
 const { encodeE131, boxCid } = require('./sacn')
+const { snapshotChannels, blendChannels } = require('./fixture-looks')
 
 const TICK_MS = Math.round(1000 / 44)
 const REFRESH_MS = 1000
@@ -48,6 +49,7 @@ class FollowEngine {
 		this._resolveMode = typeof resolveMode === 'function' ? resolveMode : null
 		this.dmx = normalizeDmx()
 		this._values = new Map() // fixture id → programmer values (WO-615 T4; in memory — looks persist them, T8)
+		this._fades = new Map() // fixture id → { from: DMX per channel, t0, ms } (T8 look crossfade)
 		this._cid = boxCid()
 		this.consoleFrames = consoleFrames || null
 		this.through = { enabled: false, offset: 0, fade_s: 1 }
@@ -130,6 +132,17 @@ class FollowEngine {
 
 	values() {
 		return Object.fromEntries(this._values)
+	}
+
+	/** WO-615 T8: crossfade typed fixtures `ids` from what they output now to whatever is programmed next, over ms. */
+	fade(ids, ms) {
+		const now = this.now()
+		for (const fx of this.fixtures) {
+			if (!fx.gdtf || !ids.includes(fx.id)) continue
+			const buf = this.frameOf(fx)
+			if (buf && ms > 0) this._fades.set(fx.id, { from: snapshotChannels(fx, buf), t0: now, ms })
+			else this._fades.delete(fx.id)
+		}
 	}
 
 	/** Whether universe u may be transmitted right now (see the header). */
@@ -228,7 +241,12 @@ class FollowEngine {
 			const aimed = !fx.gdtf || fx.follow > 0 || next.state === 'calibrating'
 			if (cf && fx.moving) blendFixture(u.buf, fx, cf, next, fx.fixedList, this._w.get(fx.id))
 			else if (!cf) {
-				if (fx.gdtf) writeGdtf(u.buf, fx, this._values.get(fx.id))
+				if (fx.gdtf) {
+					writeGdtf(u.buf, fx, this._values.get(fx.id))
+					const f = this._fades.get(fx.id)
+					if (f && now - f.t0 >= f.ms) this._fades.delete(fx.id)
+					else if (f) blendChannels(u.buf, fx, f.from, (now - f.t0) / f.ms)
+				}
 				writeFixture(u.buf, fx, fx.moving && aimed ? next : null, fx.fixedList)
 			}
 		}

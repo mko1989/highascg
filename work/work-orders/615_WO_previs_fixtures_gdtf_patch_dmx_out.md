@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8 looks DONE (offline + box: store / recall from the look menu, a 3 s DMX crossfade sampled, wheels snap; PGM TAKE owner-QA); T9–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -78,7 +78,7 @@ with actual patch and way to artnet/sacn output."
 - [x] T6 Programmer UI: select fixtures (previs click / sheet), intensity, colour (RGB/CMY/CTO from
       available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups. (2026-10-21)
 - [x] T7 Visualiser mode (incoming Art-Net/sACN through the patch). (2026-10-21)
-- [ ] T8 Looks integration (store/recall fixture states, TAKE crossfade).
+- [x] T8 Looks integration (store/recall fixture states, TAKE crossfade). (2026-10-21)
 - [ ] T9 Follow IK (consumes WO-616 markers). **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
 - [ ] T10 MVR: fixtures from MVR (WO-612 T4) arrive patched (MVR carries `Addresses`, `GDTFMode`).
 
@@ -428,3 +428,85 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
 - Restored: fixtures slice identical to the snapshot (checked after closing the GUI and restarting the server).
   Types deleted; sACN input closed (`port: null`) once visualise was off; `ui.cfg` identical; GUI back on tab 5.
 - Owner QA: point the real console at the box and toggle Visualise console (checklist).
+
+## T8 — looks carry fixture states (2026-10-21)
+
+### Investigation
+- **Where to store.** A field on the look is the obvious place, but the web `migrateScene`
+  (`client/lib/scene-state-helpers.js:191`) builds looks from a whitelist (WO-572 needed an explicit line for
+  `audioOnlyLook`), so one web load + autosave would drop it. The server take-look path also rebuilds the look from
+  named keys (`scene-take-payload.js buildServerIncomingScene`). `project.fixtures` is in `CLIENT_OWNED_SLICES`
+  (`project-client-slices.js:11`) and already holds groups (T6). So: `project.fixtures.looks[lookId]`, looked up by
+  the taken look's id.
+- **Where TAKE is hooked.** `routes-scene-take.js` has one "PGM take starts" point on each program path (pgm/prv
+  exchange and direct program): the replication stamp `announceProgramTakeToReplication`. Preview-only takes and
+  follower fan-out return before it. The file was at 498 lines. Moving the stamp into
+  `src/engine/scene-take-program-start.js`, together with the fixture recall, freed 15 lines.
+- **Fade time = the look's transition.** It uses the same numbers as the LBG mixer fade (`scene-take-lbg.js:144`):
+  `normalizeTransition(inc.defaultTransition, forceCut)` duration in frames ÷
+  `resolveChannelFramerateForMixerTween`. A forced cut or CUT snaps.
+- **Crossfade in DMX space, not value space.** Programmer values come in four shapes (physical number, `{norm}`,
+  `{dmx}`, `{set}`), and an attribute may be absent on one side. Interpolating the fixture's channels between the
+  bytes it outputs now and the bytes the new programmer produces handles every shape and defaults alike. Consoles
+  snap wheel selections rather than scroll through slots, so a channel fades only when both ends lie in the same
+  channel function, that function is not on a wheel, and it is not a discrete family (shutter, control, prism,
+  macro, mode).
+- **WO-272 re-takes.** Edit-on-PGM pushes re-take the look that is already on air. Re-fading the rig there would
+  wipe the operator's live programmer tweaks, so a take of the on-air look id leaves the rig alone.
+
+### What was done
+- `src/fixtures/fixture-looks.js` (new, pure):
+  - `normalizeLooks(raw, cleanValue)`;
+  - `snapshotChannels` / `blendChannels` / `fades` (the DMX-space crossfade);
+  - `recallInto(engine, entry, ms)`: fade typed fixtures, release them, program the entry with `replace`, so fixtures
+    the look does not list fade to their defaults.
+- `follow-engine.js`: `fade(ids, ms)` snapshots each typed fixture's current channels. `tick` blends them toward the
+  newly written frame until `ms` elapses; follow IK writes after the blend, so a following head still owns pan / tilt.
+- `follow-service.js`: `looks` normalized from each project write; `looks()`, `recallLook(id, ms)`.
+- `src/engine/scene-take-program-start.js` (new): `programTakeStarted` = fixture recall + the moved replication stamp.
+  `recallFixtureLook` skips non-program channels (mainIdx < 0), re-takes of the on-air look and a missing engine. A
+  throw is logged and never fails the take. Both program paths in `routes-scene-take.js` call it with the previous
+  PGM look id.
+- Routes: `GET /api/fixtures/looks`; `POST /api/fixtures/looks/recall {lookId, fade_ms?}` (400 / 404 when the look
+  stores none / 503). Contract regenerated (464 routes).
+- Godot: `look_fixtures_model.gd` (pure: normalize twin, count, store, clear). `follow_model.normalize` keeps `looks`.
+  The look card's right-click menu gains **Store fixtures from programmer**, plus **Recall fixtures (n)** /
+  **Clear fixtures** when the look stores some. Delete look drops its entry.
+- **Deliberately not done:**
+  - no per-look fixture fade override (the look's transition is the fade);
+  - no move-in-black (a released head moves to centre while it fades out);
+  - looks are full-rig cues, not tracking (unlisted typed fixtures release);
+  - the audio-only take path and timeline takes do not recall fixtures;
+  - look presets and replication followers do nothing extra.
+
+### What was VERIFIED
+- Offline: `tools/smoke/smoke-wo615-looks.test.js` 6/6:
+  - normalize;
+  - engine fade at 0 / 500 / 1000 ms (dimmer and pan halfway, wheel snapped, on target, fade map empty);
+  - recall releases unlisted fixtures, ms 0 snaps;
+  - `fades` rules;
+  - take hook: 25 f @ 50 fps = 500 ms, forceCut / CUT = 0, the 25 fps hint, re-take / PRV / no engine → null, a
+    throw is logged; both call sites pinned;
+  - routes 400 / 404 / 200 (clamped) / 503.
+
+  Offline suite: 3061 tests, 3059 pass, 0 fail (2 skipped). Boot OK; lint 216; lines, format, unwired and contract
+  pass. Godot `test_look_fixtures_model.gd`: 20541 pass, `--check` OK.
+- Box (server restarted; real Robin Esprite, 4 hung on sACN U7; **DMX output master off, nothing transmitted**):
+  - Programmer state A (Dimmer 1, Pan 0, Tilt 30, Deep blue) went in through the API. In the Live tab, a right-click
+    on "Look 4" showed **Store fixtures from programmer** only. Clicking it gave "Stored 4 fixture(s) in the look",
+    and both the project's `fixtures.looks` and `GET /api/fixtures/looks` showed the look with 4 fixtures.
+  - With state B programmed (Dimmer 0, Pan 90, Deep red), `POST /api/fixtures/looks/recall {fade_ms: 3000}` was
+    sampled every 250 ms from `/api/fixtures/dmx/frame`:
+    - dimmer 0 → 5549 → 10726 → … → 65535 at 3037 ms, a straight line;
+    - pan 43690 (90°) → 32768 (0°);
+    - Color1 jumped 11 → 32 at t = 0 (snap).
+
+    Afterwards the programmer held state A.
+  - The menu then showed **Recall fixtures (4)** and **Clear fixtures**. Recall snapped all 4 back from Dimmer 0.2
+    ("Fixtures recalled"). Clear emptied both the project entry and the server view.
+- Not done on the box: a real PGM TAKE (owner rule: no looks to PGM). The hook is covered offline (unit + both call
+  sites pinned).
+- Restored: fixtures and scenes identical to the snapshot (after closing the GUI and restarting the server). Types
+  deleted, programmer empty, `ui.cfg` identical, GUI back on tab 5.
+- Owner QA: store a look's fixtures, TAKE it to PGM and watch the rig crossfade over the look's transition
+  (checklist).

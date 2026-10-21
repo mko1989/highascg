@@ -15,6 +15,10 @@
  *                                                        (dimmer, colour mixing / wheel, CTO, pan, tilt, zoom, gobos)
  *   POST   /api/fixtures/program/aim {ids, target: [x, y, z]}  → { aimed, unreachable } — Pan / Tilt pointing the
  *                                                        beams at a stage point (PSN metres: x stage left, y upstage, z up)
+ *   GET    /api/fixtures/looks                       → { looks: { lookId: { fixtures: n } } } (T8: looks with fixture states)
+ *   POST   /api/fixtures/looks/recall {lookId, fade_ms?}  → { fixtures, fade_ms } — the programmer becomes the look's
+ *                                                        stored state, crossfading (what a PGM TAKE of the look does);
+ *                                                        404 when the look stores none
  * The patch itself stays in `project.fixtures` (Godot-owned slice); the master and universe list are its `dmx` key.
  */
 
@@ -79,6 +83,16 @@ function handleAim(body, service) {
 	return reply(200, service.aim(ids, t))
 }
 
+/** WO-615 T8: recall a look's stored fixture state (fade_ms 0–600000, default 0 = snap). */
+function handleRecallLook(body, service) {
+	const b = parseBody(body) || {}
+	const id = b.lookId ?? b.sceneId
+	if (id == null || String(id).trim() === '') return reply(400, { error: 'lookId required' })
+	const ms = Number(b.fade_ms)
+	const r = service.recallLook(String(id), Number.isFinite(ms) ? Math.max(0, Math.min(600000, ms)) : 0)
+	return r ? reply(200, r) : reply(404, { error: `look ${id} stores no fixture state` })
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	const svc = (ctx) => ctx?.fixtureService || null
@@ -98,6 +112,9 @@ function register(routes) {
 		return svc(ctx) ? reply(200, { fixtures: svc(ctx).features(ids) }) : reply(503, NO_ENGINE)
 	}, opt)
 	routes.post('/api/fixtures/program/aim', ({ ctx, body }) => (svc(ctx) ? handleAim(body, svc(ctx)) : reply(503, NO_ENGINE)), opt)
+	routes.get('/api/fixtures/looks', ({ ctx }) => (svc(ctx) ? reply(200, { looks: svc(ctx).looks() }) : reply(503, NO_ENGINE)), opt)
+	routes.post('/api/fixtures/looks/recall', ({ ctx, body }) =>
+		(svc(ctx) ? handleRecallLook(body, svc(ctx)) : reply(503, NO_ENGINE)), opt)
 }
 
-module.exports = { register, usage, frame, handleProgram, handleAim }
+module.exports = { register, usage, frame, handleProgram, handleAim, handleRecallLook }
