@@ -2,6 +2,7 @@ extends RefCounted
 ## WO-608 slice 1 — the Defaults, Companion and Media / USB panes (web settings-modal-templates.js, hydrate /
 ## buildSettingsPayload in settings-modal-logic.js, editor-defaults.js). Built on settings_form.gd rows.
 
+const Placement := preload("res://app/window_placement.gd")
 const Form := preload("res://features/settings/settings_form.gd")
 const AboutModel := preload("res://features/settings/about_model.gd")
 const T := preload("res://features/live/transitions.gd")
@@ -57,6 +58,9 @@ static func defaults(f: Form, fps: Callable) -> void:
 	f.heading("Input — mouse and touchpad")
 	f.check("Invert touchpad scroll", "ui.invertTouchpadScroll", false)
 	f.note("Reverses two-finger touchpad scrolling in the browser client's zoom / pan controls.")
+	f.heading("This screen")  # WO-599 T4: kept in this screen's ui.cfg, not shared with other clients
+	f.local_option("UI scale", Placement.SCALES, Placement.saved_scale(), Placement.apply_scale)
+	f.note("Auto draws 1× at 1080p and 2× at 4K. Kept on this screen only.")
 
 
 static func companion(f: Form, status: Label, check: Button) -> void:

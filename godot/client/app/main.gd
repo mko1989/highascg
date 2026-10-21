@@ -5,6 +5,7 @@ extends Control
 
 const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const Placement := preload("res://app/window_placement.gd")
 const Shell := preload("res://app/shell.gd")
 const HardwareReconcile := preload("res://app/hardware_reconcile.gd")
 const ClientPrefs := preload("res://core/client_prefs.gd")
@@ -432,11 +433,25 @@ func look_names() -> Array:
 	return out
 
 
+## WO-599 T4: --screen wins; otherwise the server's operator monitor (GET /api/system/operator-display). The UI scale
+## follows that screen's size (4K → 2×) unless ui.cfg [window] ui_scale or --ui-scale sets it.
 func _apply_window_args() -> void:
+	var w := get_window()
 	if Config.args.has("screen"):
-		get_window().current_screen = int(Config.args["screen"])
+		w.current_screen = int(Config.args["screen"])
+	else:
+		var res: Dictionary = await Api.get_json("/api/system/operator-display")
+		var screens := []
+		for i in DisplayServer.get_screen_count():
+			screens.append(Rect2i(DisplayServer.screen_get_position(i), DisplayServer.screen_get_size(i)))
+		var i := Placement.pick_screen(res.data.get("rect") if res.ok and res.data is Dictionary else null, screens)
+		if i >= 0 and i != w.current_screen:
+			w.current_screen = i
+			_log("operator monitor: screen %d" % i)
+	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
+	w.content_scale_factor = Placement.ui_scale(DisplayServer.screen_get_size(w.current_screen), override)
 	if Config.args.has("fullscreen"):
-		get_window().mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+		w.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
 
 
 func _log(line: String) -> void:

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); open: HiDPI, multi-monitor placement, systemd unit, CI job run. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
+**Status: DONE except the native monitor picker (2026-10-21) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); CI `godot` job green on every push; operator-monitor placement + HiDPI done 2026-10-21 (box-verified); the systemd unit moved to [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) T2; open: the native "Make this the operator screen" picker (WO-290 redo). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
 
 # WO-599 — Godot client foundation: project, engine pin, networking, state, theme, windows, CI, dev loop
 
@@ -104,11 +104,11 @@ the web client (inventory E) → define the Godot palette explicitly, owner-appr
 
 ## Tasks
 
-- [ ] T1 `.gitignore` + `.stignore` (box **and** Mac) for `godot/.godot/`, `godot/build/` — FIRST commit.
-- [ ] T2 project skeleton + engine pin + CI job (empty app boots headless, exports).
-- [ ] T3 Ws / StateStore / Api / SettingsState / ProjectSync + tests against a recorded WS session.
-- [ ] T4 WindowManager + operator display + native picker + HiDPI.
-- [ ] T5 UI kit + Theme from tokens (owner look-and-feel review).
+- [x] T1 `.gitignore` + `.stignore` (box **and** Mac) for `godot/.godot/`, `godot/build/` — FIRST commit (+ the `core/` un-ignore, box run 17.10).
+- [x] T2 project skeleton + engine pin + CI job (`godot` job: shm seqlock, bridge round trip, unit tests, `--check` boot — green on every push; the export is WO-609 T1).
+- [x] T3 Ws / StateStore / Api / SettingsState / ProjectSync + tests (box acceptance 17.10).
+- [~] T4 WindowManager + operator display + HiDPI ✔ 2026-10-21 (below); native picker open.
+- [x] T5 UI kit + Theme from tokens (`app/theme_builder.gd`; owner look-and-feel notes handled in WO-621…630).
 - [ ] T6 dev reload message + logs to journald (stdout) with the server's log format.
 
 ## Acceptance
@@ -184,3 +184,33 @@ mirror the `.stignore` line, then `git add godot/client/core tools/fixtures/proj
 ## Earlier notes
 
 Nothing yet. Engine/godot-cpp versions verified by `git ls-remote`; everything else from research + inventory.
+
+## 2026-10-21 — T4: open on the operator monitor, HiDPI scale
+
+**Investigation:** the client honoured only `--screen=N` (`main.gd`), and the box's two monitors make a wrong
+default costly: DP-2 at +1920 is the operator monitor, DP-6 at 0,0 is a Caspar output. The server already says which
+one is the operator's (`GET /api/system/operator-display` → `rect {x, y, width, height}`, from the destination
+config). The kiosk scaled its UI with `operator-gui-scale.js` (Firefox `devPixelsPerPx` = resolution ÷ 1920×1080,
+clamped 1–4); `screen_get_scale()` is 1.0 on X11, so the Godot client had no scaling at all.
+
+**What was done:**
+- `app/window_placement.gd` (pure): `pick_screen(rect, screens)` (exact origin, else the screen holding the rect's
+  centre, else -1) and `ui_scale(size, override)` (the kiosk rule: 1 at / under 1080p, 2 at 2160p, 2 decimals,
+  clamped; an override wins); `saved_scale()` / `apply_scale()` for ui.cfg `[window] ui_scale`.
+- `main.gd` `_apply_window_args`: `--screen` wins; otherwise the operator monitor from the server; then
+  `content_scale_factor` from that screen's size, or ui.cfg / `--ui-scale`.
+- Settings → Defaults → **This screen → UI scale** (Auto / 1× / 1.25× / 1.5× / 2×), kept in this screen's ui.cfg
+  (not a server setting — another screen may differ), applied at once (`settings_form.local_option`).
+- Tests: `tests/test_window_placement.gd` (14: the box's two-monitor layout, inset rect, no answer, headless; scale
+  at 720p / 1080p / 1440p / 2160p / ultra-wide, override + clamp).
+
+**What was VERIFIED:** Godot 20442 pass, `--check` clean. Box: launched with no `--screen` → the window sits on DP-2
+(`xdotool`: position 1922,32 screen 0, 1918×1059), DP-6 still shows the PGM output; scale 1× at 1080p. Settings → UI
+scale → 1.25× redrew the whole client at once and wrote `ui_scale=1.25`; Auto put it back (1×). ui.cfg restored
+byte-identical afterwards. Not on the box: a 4K operator monitor (Auto = 2×) and the move from a wrong screen (the
+window manager already opened it on DP-2; forcing it onto the PGM monitor to watch it jump was not worth showing a
+window on that output) — `pick_screen` is unit-tested for that case.
+
+**Note:** a manual scale above Auto squeezes the layout (1.25× on 1080p = 1536 logical px wide; the header clips its
+right end). It is meant for small high-density panels, not to enlarge a 1080p screen.
+

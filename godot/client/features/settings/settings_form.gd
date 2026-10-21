@@ -45,6 +45,18 @@ func note(text: String) -> Label:
 	return l
 
 
+## An option kept on this screen, not in the server settings (ui.cfg): `on_pick(value)` stores and applies it.
+func local_option(label: String, items: Array, value: Variant, on_pick: Callable) -> OptionButton:
+	var ob := OptionButton.new()
+	for i in items.size():
+		ob.add_item(str(items[i][1]))
+		if items[i][0] == value:
+			ob.select(i)
+	ob.item_selected.connect(func(i: int) -> void: on_pick.call(items[i][0]))
+	_row(label, ob)
+	return ob
+
+
 ## items: [[value, label], …]; an unknown stored value shows the first item.
 func option(label: String, path: String, items: Array, fallback: String) -> OptionButton:
 	var ob := OptionButton.new()
