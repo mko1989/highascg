@@ -61,6 +61,16 @@ static func import_check(cur: Dictionary, id: String, name: String) -> Array:
 	return ["", ""]
 
 
+## WO-647: the distinct layers of these objects, in order (`layer_of(uuid)` → name) — the rows to highlight.
+static func layers_of(uuids: Array, layer_of: Callable) -> Array:
+	var out := []
+	for u in uuids:
+		var l: String = layer_of.call(str(u))
+		if not out.has(l):
+			out.append(l)
+	return out
+
+
 static func placement(place: Dictionary) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, -deg_to_rad(float(place.yaw))), Vector3(place.x, place.z, -float(place.y)))
 

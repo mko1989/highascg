@@ -3,6 +3,7 @@ extends RefCounted
 
 const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
+const MvrModel := preload("res://features/previs/mvr_model.gd")
 var t
 
 
@@ -56,3 +57,30 @@ func test_rows_keep_the_picker_on_same_names() -> void:
 	(r.find_children("*", "Button", true, false).filter(func(b: Node) -> bool: return (b as Button).text == "↺")[1] as Button).pressed.emit()
 	t.eq(got, [["Set", null]], "↺ clears")
 	r.free()
+
+
+func test_layer_rows_eyes_and_highlight() -> void:  # WO-647
+	var rows := ColorRows.new()
+	rows.eyes = true
+	var shown := []
+	rows.visibility_toggled.connect(func(n: String, on: bool) -> void: shown.append([n, on]))
+	rows.fill(["Truss", "Walls"], {}, {}, ["Walls"])
+	var eye_t: Button = rows._rows["Truss"][2]
+	var eye_w: Button = rows._rows["Walls"][2]
+	t.eq([eye_t.button_pressed, eye_w.button_pressed], [true, false], "a hidden layer shows a closed eye")
+	eye_t.button_pressed = false
+	t.eq(shown, [["Truss", false]], "the eye hides the layer")
+	rows.highlight(["Walls"])
+	var lit: StyleBox = (rows._rows["Walls"][3] as PanelContainer).get_theme_stylebox("panel")
+	var off: StyleBox = (rows._rows["Truss"][3] as PanelContainer).get_theme_stylebox("panel")
+	t.eq([(lit as StyleBoxFlat).border_color.a > 0, (off as StyleBoxFlat).border_color.a], [true, 0.0], "only the selected object's layer is marked")
+	t.eq(lit.get_minimum_size(), off.get_minimum_size(), "lighting a row does not move the list")
+	rows.fill(["Truss", "Walls"], {}, {}, [])
+	t.ok((rows._rows["Walls"][3] as PanelContainer).get_theme_stylebox("panel") is StyleBoxFlat, "a reload keeps the mark")
+	t.eq(eye_w.button_pressed, true, "and follows the project")
+	var plain := ColorRows.new()
+	plain.fill(["A"], {})
+	t.eq(plain._rows["A"][2], null, "no eye unless asked (fixture Body colour)")
+	rows.free()
+	plain.free()
+	t.eq(MvrModel.layers_of(["a", "b", "c"], func(u: String) -> String: return {"a": "Truss", "b": "Truss", "c": ""}[u]), ["Truss", ""])

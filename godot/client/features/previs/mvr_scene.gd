@@ -196,6 +196,14 @@ func _objects() -> Array:
 	return get_children().filter(func(c: Node) -> bool: return c is Node3D and c.has_meta("uuid") and (c as Node3D).visible)
 
 
+## WO-647 — the layer an object is on ("" for none / unknown).
+func layer_of(uuid: String) -> String:
+	for c in get_children():
+		if c.has_meta("uuid") and str(c.get_meta("uuid")) == uuid:
+			return str(c.get_meta("layer", ""))
+	return ""
+
+
 ## WO-634 — the visible object under a screen point (ray against its mesh boxes, nearest); "" = none.
 func pick(cam: Camera3D, at: Vector2) -> String:
 	var from := cam.project_ray_origin(at)

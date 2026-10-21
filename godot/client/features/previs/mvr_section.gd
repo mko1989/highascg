@@ -27,7 +27,6 @@ signal types_changed  ## GDTF types were imported (scene shown, or a patch) — 
 
 var scene: MvrScene
 var _pick: OptionButton
-var _layers: MenuButton
 var _remove_btn: Button
 var _status: Label
 var _confirm: ConfirmationDialog
@@ -73,19 +72,13 @@ func _ready() -> void:
 		row.add_child(b)
 		_remove_btn = b  # the loop ends on Remove
 	_remove_btn.disabled = true
-	_layers = MenuButton.new()
-	_layers.text = "Layers ▾"
-	_layers.flat = false
-	_layers.about_to_popup.connect(_fill_layers)
-	_layers.get_popup().hide_on_checkable_item_selection = false
-	_layers.get_popup().index_pressed.connect(_toggle_layer)
-	_layers.disabled = true
-	row.add_child(_layers)
 	add_child(row)
+	_colors.eyes = true  # WO-647: colour + eye per layer (was the Layers ▾ checklist)
 	_colors.previewed.connect(func(l: String, c: Color) -> void:
 		scene.set_layer_colors(Tint.with_color(Tint.colors(_cfg(), "layer_colors"), l, c)))
 	_colors.changed.connect(_set_layer_color)
-	add_child(Fold.new("Layer colours", [_colors]))
+	_colors.visibility_toggled.connect(_set_layer_shown)
+	add_child(Fold.new("Layers", [_colors]))
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -117,6 +110,7 @@ func _ready() -> void:
 	place.add_child(fit)
 	add_child(place)
 	_screens = MvrScreens.new()
+	_screens.selection_changed.connect(func(uuids: Array) -> void: _colors.highlight([] if scene == null else M.layers_of(uuids, scene.layer_of)))
 	_screens.scene = scene
 	add_child(_screens)
 	var prow := HBoxContainer.new()
@@ -166,7 +160,7 @@ func _maybe_reload() -> void:
 	scene.set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
 	scene.set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
 	scene.set_layer_colors(Tint.colors(c, "layer_colors"))
-	_colors.fill(scene.layers, Tint.colors(c, "layer_colors"))
+	_colors.fill(scene.layers, Tint.colors(c, "layer_colors"), {}, _hidden_layers())
 	_screens.refresh()
 	scene.show_scene(str(c.get("id", "")))
 
@@ -278,13 +272,8 @@ func _remove() -> void:
 	await refresh_list()
 
 
-func _fill_layers() -> void:
-	var p := _layers.get_popup()
-	p.clear()
-	var hidden: Array = _cfg().get("hidden_layers", []) if _cfg().get("hidden_layers") is Array else []
-	for l in scene.layers:
-		p.add_check_item(str(l))
-		p.set_item_checked(p.item_count - 1, not hidden.has(l))
+func _hidden_layers() -> Array:
+	return _cfg().get("hidden_layers", []) if _cfg().get("hidden_layers") is Array else []
 
 
 func _set_layer_color(layer: String, c: Variant) -> void:
@@ -294,18 +283,16 @@ func _set_layer_color(layer: String, c: Variant) -> void:
 		_save(cfg)
 
 
-func _toggle_layer(i: int) -> void:
+## WO-647: a layer row's eye.
+func _set_layer_shown(name: String, shown: bool) -> void:
 	var c := _cfg().duplicate(true)
 	if c.is_empty():
 		return
-	var name := _layers.get_popup().get_item_text(i)
 	var hidden: Array = c.get("hidden_layers", []) if c.get("hidden_layers") is Array else []
-	if hidden.has(name):
-		hidden.erase(name)
-	else:
+	hidden.erase(name)
+	if not shown:
 		hidden.append(name)
 	c["hidden_layers"] = hidden
-	_layers.get_popup().set_item_checked(i, not hidden.has(name))
 	_save(c)
 
 
@@ -318,8 +305,7 @@ func _on_loaded(info: Dictionary) -> void:
 	_screens.clear()
 	_patch_status.text = ""
 	_sync_patch_ui()
-	_layers.disabled = scene.layers.is_empty()
-	_colors.fill(scene.layers, Tint.colors(_cfg(), "layer_colors"))
+	_colors.fill(scene.layers, Tint.colors(_cfg(), "layer_colors"), {}, _hidden_layers())
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
 	_info = info
 	_status.text = M.summary(info)

@@ -10,12 +10,14 @@ extends VBoxContainer
 const W := preload("res://features/previs/mvr_screen_model.gd")
 const S := preload("res://features/previs/stage_objects.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const M := preload("res://features/previs/mvr_model.gd")
 
 const HINT := "Click an LED wall in the 3D view to map a screen onto it (ctrl-click adds walls fed by the same output)."
 
 var scene: Node3D  # mvr_scene.gd
 var _sel: Array = []  # [{uuids, frame}]
 var _info: Label
+signal selection_changed(uuids: Array)  # WO-647: every selected object (the Layers list highlights their layers)
 var _row: HBoxContainer
 var _dest: OptionButton
 var _turn: CheckBox
@@ -93,8 +95,15 @@ func refresh() -> void:
 		var f: Dictionary = s.frame
 		var n := (s.uuids as Array).size()
 		return "%.2f × %.2f m%s" % [f.size.x, f.size.y, "" if n == 1 else " (%d objects)" % n])
+	var uuids := []
+	for s in _sel:
+		uuids.append_array(s.uuids)
+	selection_changed.emit(uuids)
 	if not _sel.is_empty():
 		_info.text = "Selected: " + ", ".join(parts)
+		var names := [] if scene == null else M.layers_of(uuids, scene.layer_of).filter(func(l: String) -> bool: return l != "")
+		if not names.is_empty():
+			_info.text += " — layer " + ", ".join(names)
 	else:
 		_info.text = _note if _note != "" else HINT
 	_row.visible = not _sel.is_empty()
