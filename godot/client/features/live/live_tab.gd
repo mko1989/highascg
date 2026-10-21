@@ -84,6 +84,10 @@ func _ready() -> void:
 		add_child(osc)
 	var bar := _transition_toolbar()
 	bottom.add_child(bar)
+	tiles.osc = osc
+	osc.updated.connect(func() -> void:
+		if tiles.times and tiles.is_visible_in_tree():
+			tiles.queue_redraw())
 	deck = DeckView.new()
 	deck.osc_mirror = osc
 	deck.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -146,6 +150,8 @@ func _ready() -> void:
 	var lit := bool(cfg.get_value("live", "lights", true))
 	(_view_btns["lights"] as Button).set_pressed_no_signal(lit)
 	stage3d.set_lights(lit)
+	tiles.times = bool(cfg.get_value("live", "times", false))
+	(_view_btns["times"] as Button).set_pressed_no_signal(tiles.times)
 	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
 
 
@@ -180,6 +186,16 @@ func _view_switch() -> Control:
 		_save_ui("lights", on))
 	row.add_child(lights)
 	_view_btns["lights"] = lights
+	var times := Button.new()  # WO-652
+	times.text = "Times"
+	times.toggle_mode = true
+	times.tooltip_text = "Show each layer's media / playlist time on the windows (the top running layer biggest)"
+	times.toggled.connect(func(on: bool) -> void:
+		tiles.times = on
+		tiles.queue_redraw()
+		_save_ui("times", on))
+	row.add_child(times)
+	_view_btns["times"] = times
 	return row
 
 
@@ -191,6 +207,7 @@ func set_view(v: String, save := true) -> void:
 	b3.text = "3D" if is3d else "2D"
 	(_view_btns["fit"] as Button).visible = is3d
 	(_view_btns["lights"] as Button).visible = is3d
+	(_view_btns["times"] as Button).visible = not is3d
 	stage3d.visible = is3d
 	_video.visible = _show_whole()
 	tiles.visible = not is3d

@@ -17,6 +17,9 @@ extends Control
 signal atlas_changed(on: bool)
 
 const TM := preload("res://features/live/compose_tile_math.gd")
+const CT := preload("res://features/live/compose_times_model.gd")
+const P := preload("res://features/live/pgm_timer_model.gd")
+const DeckModel := preload("res://features/live/deck_model.gd")
 const OUTLINE := {"pgm": Color("#e63946"), "prv": Color("#2a9d8f")}
 const STRIP := {"pgm": Color("#c92a2a"), "prv": Color("#0d9488")}
 const OTHER := Color("#457b9d")
@@ -40,10 +43,19 @@ var atlas := {}  # WO-597 §D: {w, h, slots: {cell id: {x, y, w, h} fractions}} 
 var _crops: Array[TextureRect] = []
 var _asked_atlas := false
 var pan := 0.0  # WO-648: px the overflowing canvas is scrolled (TM.width_fit)
+var times := false  # WO-652: per-layer media / playlist times over each window (live_tab's Times toggle)
+var osc: Node  # the live tab's OscMirror; its `updated` redraws while `times` is on
+var _over: Control  # WO-652: the times paint here, above the atlas crops (children paint over the parent's _draw)
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_over = Control.new()
+	_over.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_over.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_over.z_index = 1
+	_over.draw.connect(_draw_over)
+	add_child(_over)
 	Ws.message.connect(_on_ws)
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
@@ -199,6 +211,7 @@ func _draw() -> void:
 		x.add_string("✕", font, 11)
 		var xr := _close_rect(r)
 		x.draw(get_canvas_item(), xr.position + (xr.size - x.get_size()) / 2.0, Color(1, 1, 1, 0.85))
+	_over.queue_redraw()
 	if _msg != "" and Time.get_ticks_msec() < _msg_until:
 		var m := TextLine.new()
 		m.add_string(_msg, font, 13)
@@ -207,6 +220,67 @@ func _draw() -> void:
 		var at := Vector2(ir.position.x + 8.0, minf(ir.end.y, size.y) - m.get_size().y - 10.0)
 		draw_rect(Rect2(at - Vector2(6, 4), m.get_size() + Vector2(12, 8)), Color(0, 0, 0, 0.75))
 		m.draw(get_canvas_item(), at, Color("#fbbf24"))
+
+
+## WO-652: text on the transparent preview under the label strip (owner 21.10: "under the label not on the screen"),
+## outlined to stay readable; the top running layer big.
+func _draw_over() -> void:
+	if not times:
+		return
+	for i in cells.size():
+		if str(cells[i].get("role", "")) in ["pgm", "prv"]:
+			_draw_times(_screen(i), cells[i], get_theme_default_font())
+
+
+func _draw_times(r: Rect2, c: Dictionary, font: Font) -> void:
+	var ci := _over.get_canvas_item()
+	var y := r.end.y + 2.0 + LABEL_H + 3.0
+	for row in _time_rows(c):
+		var big: bool = row.top
+		var line := TextLine.new()
+		var t := CT.time_text(row)
+		line.add_string(row.label + ("   " + t if t != "" else ""), font, 20 if big else 12)
+		line.width = maxf(0.0, r.size.x)
+		line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		if y + line.get_size().y > size.y:
+			return
+		var col: Color = P.COLORS[P.tier(CT.remaining(row))].fill if row.running else Color(1, 1, 1, 0.8)
+		var at := Vector2(r.position.x, y)
+		line.draw_outline(ci, at, 4 if big else 3, Color(0, 0, 0, 0.85))
+		line.draw(ci, at, col)
+		y += line.get_size().y + 1.0
+		if row.running:
+			_over.draw_rect(Rect2(at.x, y, r.size.x * CT.progress(row), 3.0 if big else 2.0), col)
+			y += 4.0
+
+
+## The look on this window's bus and its OSC channel (PGM: the bank-resolved channel; PRV: bank-less).
+func _time_rows(c: Dictionary) -> Array:
+	var mi := int(c.get("mainIndex", 0))
+	var pgm := str(c.get("role", "")) == "pgm"
+	var cm: Dictionary = Store.get_value("channelMap", {}) if Store.get_value("channelMap") is Dictionary else {}
+	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
+	var ps: Dictionary = Store.project.get("scenes", {}) if Store.project.get("scenes") is Dictionary else {}
+	var looks := {}
+	for s in ps.get("scenes", []):
+		if s is Dictionary:
+			looks[str(s.get("id", ""))] = s
+	var id := str(DeckModel.resolve_bus_look_ids(mi, live, cm, looks, ps).get("pgm" if pgm else "prv", ""))
+	var ch: Variant
+	var bank: Variant = null
+	if pgm:
+		var res := P.resolve_pgm(cm, Store.get_value("scene"), mi)
+		ch = res.channel
+		bank = res.bank
+	else:
+		var prv: Array = cm.get("previewChannels", []) if cm.get("previewChannels") is Array else []
+		ch = prv[mi] if mi < prv.size() else null
+		var staged := DeckModel._live_scene_id(live, int(ch)) if ch != null else ""
+		if looks.has(staged):
+			id = staged  # the deck blanks a PRV that holds the PGM look; its times still show
+	if not looks.has(id) or osc == null:
+		return []
+	return CT.rows(looks[id], osc.channels.get(str(ch)), bank, pgm, Time.get_unix_time_from_system() * 1000.0)
 
 
 ## A wheel step over the preview → pan; also called for wheels that miss the windows (live_tab's stack).
