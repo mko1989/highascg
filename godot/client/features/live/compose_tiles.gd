@@ -10,6 +10,11 @@ extends Control
 ## survives a move.
 ## WO-624 E1: a Sources "Live" row dropped anywhere on the preview becomes a window (the server checks and sizes it:
 ## POST /api/operator-gui/cell); the ✕ at the end of a label strip removes that window (/cell/remove).
+## WO-597 §D atlas: reports carry `atlas: true`; on an shm surface the server then packs each window into its own slot
+## of the operator channel and answers with the slots. Each window crops its slot (a child TextureRect per window) and
+## the parent hides the whole-surface picture (atlas_changed) — moves and small resizes then cost no AMCP at all.
+
+signal atlas_changed(on: bool)
 
 const TM := preload("res://features/live/compose_tile_math.gd")
 const OUTLINE := {"pgm": Color("#e63946"), "prv": Color("#2a9d8f")}
@@ -31,6 +36,9 @@ var _posting := false
 var _pending := false
 var _msg := ""  # a refused drop / remove, drawn on the preview for MSG_S
 var _msg_until := 0
+var atlas := {}  # WO-597 §D: {w, h, slots: {cell id: {x, y, w, h} fractions}} while the server packs the windows
+var _crops: Array[TextureRect] = []
+var _asked_atlas := false
 
 
 func _ready() -> void:
@@ -50,6 +58,10 @@ func refresh() -> void:
 	var g: Dictionary = await Api.get_json("/api/operator-gui/layout")
 	if g.ok and g.data is Dictionary and g.data.get("cells") is Array:
 		_take(g.data.cells, true)
+		_set_atlas(g.data.get("atlas"))
+		if atlas.is_empty() and not cells.is_empty() and not _asked_atlas:
+			_asked_atlas = true  # once per run: opt the server into atlas mode (a screen surface ignores it)
+			_post()
 
 
 func _take(list: Array, with_media: bool) -> void:
@@ -72,6 +84,50 @@ func _take(list: Array, with_media: bool) -> void:
 func _on_ws(type: String, data: Variant) -> void:
 	if type == "operatorGuiLayout" and data is Dictionary and data.get("cells") is Array:
 		_take(data.cells, false)  # the broadcast is the persistable set (no media cell) — keep ours
+		_set_atlas(data.get("atlas"))
+
+
+func _set_atlas(a: Variant) -> void:
+	var next := TM.atlas_of(a)
+	if next == atlas:
+		return
+	var was := not atlas.is_empty()
+	atlas = next
+	if was != not atlas.is_empty():
+		atlas_changed.emit(not atlas.is_empty())
+	queue_redraw()
+
+
+## The slot (texture px) window `i` crops in atlas mode; an empty rect when it has none (not packed yet).
+func slot_px(i: int) -> Rect2:
+	return TM.slot_px(atlas, str(cells[i].get("id", "#%d" % i)), canvas())
+
+
+## One premultiplied crop per window, laid over its picture (below the outline ring, which sits outside it).
+func _layout_crops() -> void:
+	var want := cells.size() if not atlas.is_empty() else 0
+	while _crops.size() < want:
+		var t := TextureRect.new()
+		t.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		t.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		t.stretch_mode = TextureRect.STRETCH_SCALE
+		var m := CanvasItemMaterial.new()
+		m.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
+		t.material = m
+		t.texture = AtlasTexture.new()
+		add_child(t)
+		_crops.append(t)
+	while _crops.size() > want:
+		_crops.pop_back().queue_free()
+	for i in want:
+		var t := _crops[i]
+		var region := slot_px(i)
+		t.visible = region.size.x > 0
+		(t.texture as AtlasTexture).atlas = VideoSurfaces.texture(role)
+		(t.texture as AtlasTexture).region = region
+		var r := _screen(i)
+		t.position = r.position
+		t.size = r.size
 
 
 func canvas() -> Vector2:
@@ -119,6 +175,7 @@ func _draw() -> void:
 	var ir := image_rect()
 	for bar in TM.outside(size, ir):
 		draw_rect(bar, OUTSIDE)
+	_layout_crops()  # atlas mode: the panel's black shows around the crops (the NO SIGNAL label stays visible)
 	draw_rect(ir.grow(0.5), CANVAS_EDGE, false, 1.0)  # the canvas edge: windows move and resize up to it
 	for i in cells.size():
 		var c: Dictionary = cells[i]
@@ -243,8 +300,10 @@ func _post() -> void:
 		_pending = true
 		return
 	_posting = true
-	await Api.post_json("/api/operator-gui/layout", {"cells": cells.duplicate(true) + _media.duplicate(true)})
+	var res: Dictionary = await Api.post_json("/api/operator-gui/layout", {"cells": cells.duplicate(true) + _media.duplicate(true), "atlas": true})
 	_posting = false
+	if res.ok and res.data is Dictionary and res.data.has("atlas"):
+		_set_atlas(res.data.atlas)
 	if _pending:
 		_pending = false
 		_post()

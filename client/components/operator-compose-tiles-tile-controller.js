@@ -158,17 +158,21 @@ export function createOperatorComposeTileController(env) {
 	//      layout only ONCE, and only when the user has no layout of their own yet; thereafter it is
 	//      local and must NOT be stomped by a later broadcast (that stomp — including a transient
 	//      tiny-hole report from the host mid-transition — was what "refreshed to tiny by itself").
-	// @param {{ positions?: boolean }} [opts] positions:true only for the initial seed.
+	// @param {{ positions?: boolean, atlas?: object|null }} [opts] positions:true only for the initial seed.
+	//   WO-597 §D: with an atlas descriptor the crop source is the cell's packed slot, not its screen rect.
 	function seedFromCells(cells, opts = {}) {
 		if (!isClient) return
 		// WO-323: source tiles all carry mainIndex 0 — key them by their routed channel instead
 		// (tileSeedKey), so two source tiles never collide with each other or with PGM/PRV cells.
 		// WO-529: this canvas' OWN surface only — the other editor's cells share our seed keys.
-		const byKey = new Map(cellsForSurface(cells, getSurface?.()).map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
+		const own = cellsForSurface(cells, getSurface?.())
+		const byKey = new Map(own.map((c) => [tileSeedKey(c), c.rect]).filter(([, r]) => r && r.w > 0 && r.h > 0))
 		if (!byKey.size) return
 		// (1) Crop source — always.
+		const slots = opts.atlas?.slots
+		const cropKey = slots ? new Map(own.map((c) => [tileSeedKey(c), slots[c.id]]).filter(([, r]) => r && r.w > 0 && r.h > 0)) : byKey
 		for (const t of tiles.values()) {
-			const fill = byKey.get(tileSeedKey(t.def))
+			const fill = cropKey.get(tileSeedKey(t.def))
 			if (fill) t.fill = { x: fill.x, y: fill.y, w: fill.w, h: fill.h }
 		}
 		// (2) Display position — once, first run only.

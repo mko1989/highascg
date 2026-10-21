@@ -188,6 +188,10 @@ func _operator_fields() -> void:
 	_field("Physical GPU port (optional)", _select(ports, H.R.s(_d.get("physicalPort")) if _d.get("physicalPort") != null else "",
 		"Physical GPU port for the operator-GUI window. Auto = the screen_N_operator_monitor flag (single connected display wins), falling back to the multiview jack — never a program screen.",
 		func(v: String) -> void: _send(DM.physical_port_patch(v))))
+	_field("Video output", _select([["screen", "Screen (window under the Firefox kiosk)"], ["shm", "Shared memory (native Godot client)"]],
+		"shm" if _d.get("videoOutput") == "shm" else "screen",
+		"Operator channel output. Shared memory has no screen window and no kiosk auto-launch. Regenerate + restart Caspar to apply.",
+		func(v: String) -> void: _send({"videoOutput": "shm" if v == "shm" else "screen"})))  # WO-597 T4
 	var auto := CheckBox.new()
 	auto.text = "Auto-start at boot"
 	auto.button_pressed = _d.get("autoLaunch") != false

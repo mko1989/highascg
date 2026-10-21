@@ -132,3 +132,16 @@ static func outside(area: Vector2, canvas_r: Rect2) -> Array:
 	if area.y - canvas_r.end.y > 0.5:
 		out.append(Rect2(canvas_r.position.x, canvas_r.end.y, canvas_r.size.x, area.y - canvas_r.end.y))
 	return out
+
+
+## WO-597 §D: the server's atlas descriptor ({w, h, slots: {id: rect fractions}}), or {} for the monitor mosaic.
+static func atlas_of(v: Variant) -> Dictionary:
+	return (v as Dictionary).duplicate(true) if v is Dictionary and v.get("slots") is Dictionary else {}
+
+
+## The slot window `id` crops, in texture px; an empty rect when the atlas has none for it.
+static func slot_px(atlas: Dictionary, id: String, canvas: Vector2) -> Rect2:
+	var s: Variant = (atlas.get("slots", {}) as Dictionary).get(id)
+	if not (s is Dictionary):
+		return Rect2()
+	return Rect2(float(s.get("x", 0)) * canvas.x, float(s.get("y", 0)) * canvas.y, float(s.get("w", 0)) * canvas.x, float(s.get("h", 0)) * canvas.y)

@@ -62,6 +62,7 @@ func _ready() -> void:
 	tiles.role = _role()
 	tiles.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(tiles)
+	tiles.atlas_changed.connect(func(_on: bool) -> void: _video.visible = _show_whole())  # WO-597 §D: windows crop
 	stage3d = LiveStage3D.new()
 	stage3d.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stage3d.visible = false
@@ -174,7 +175,7 @@ func set_view(v: String, save := true) -> void:
 		(_view_btns[k] as Button).set_pressed_no_signal(k == view)
 	(_view_btns["fit"] as Button).visible = is3d
 	stage3d.visible = is3d
-	_video.visible = not is3d
+	_video.visible = _show_whole()
 	tiles.visible = not is3d
 	_hold_surface()
 	if save:
@@ -182,6 +183,11 @@ func set_view(v: String, save := true) -> void:
 		cfg.load(UI_CFG)
 		cfg.set_value("live", "view", view)
 		cfg.save(UI_CFG)
+
+
+## The whole operator surface is drawn only in the standard view and outside atlas mode.
+func _show_whole() -> bool:
+	return view != "3d" and tiles.atlas.is_empty()
 
 
 func _role() -> String:

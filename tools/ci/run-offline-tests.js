@@ -57,6 +57,7 @@ const FILES = [
 	'tools/smoke/smoke-wo325-headless-operator-gui.test.js',
 	'tools/smoke/smoke-wo597-operator-gui-shm-output.test.js',
 	'tools/smoke/smoke-wo597-video-surfaces.test.js',
+	'tools/smoke/smoke-wo597-operator-gui-atlas.test.js',
 	'tools/smoke/smoke-wo598-take-payload-parity.test.js',
 	'tools/smoke/smoke-wo598-preview-push.test.js',
 	'tools/smoke/smoke-wo598-deck-sync-persist-race.test.js',

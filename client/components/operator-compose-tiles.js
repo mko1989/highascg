@@ -368,12 +368,12 @@ export function initOperatorComposeTiles(container, options) {
 	if (isClient) {
 		unsubLiveFrame = subscribeOperatorLiveCanvasRepaint(drawLiveCrops)
 		// Broadcasts refresh crop sources only — they never move this client's windows.
-		unsubShared = subscribeSharedLayout((cells) => seedFromCells(cells))
+		unsubShared = subscribeSharedLayout((cells, meta) => seedFromCells(cells, { atlas: meta?.atlas }))
 		void (async () => {
 			try {
 				const res = await fetch('/api/operator-gui/layout', { cache: 'no-store' })
 				// Initial seed MAY place windows on their routes (first run, no local layout yet).
-				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : [], { positions: true }) }
+				if (res.ok) { const j = await res.json(); seedFromCells(Array.isArray(j?.cells) ? j.cells : [], { positions: true, atlas: j?.atlas }) }
 			} catch { /* keep local/default until a broadcast arrives */ }
 		})()
 		// Diagnostic (client only): one call from the laptop console pinpoints where the chain breaks —

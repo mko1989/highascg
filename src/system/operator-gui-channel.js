@@ -37,6 +37,8 @@ const {
 	computeOperatorGuiCellPlan,
 } = require('./operator-gui-channel-geometry')
 const { splitMediaPreviewEntries, persistableCells, applyMediaPreviewLayer } = require('./operator-gui-media-layer')
+const { scheduleComposeLayoutProjectPersist } = require('./operator-gui-compose-persist')
+const atlasMode = require('./operator-gui-atlas')
 
 // WO-338: 150 → 50 ms — the per-channel chain already serializes applies; the client throttles at 150 ms.
 const APPLY_DEBOUNCE_MS = 50
@@ -159,7 +161,10 @@ function shouldIgnoreBootShrink(ch, cells, log) {
  */
 async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	const map = getChannelMap(ctx.config)
-	const plan = computeOperatorGuiCellPlan(cells, map, ctx.config)
+	// WO-597 §D: in atlas mode the cells' rects are rewritten to packed slots; an unchanged plan sends no AMCP.
+	const atlas = atlasMode.atlasLayout(ctx, ch, cells, opts.atlas)
+	const plan = computeOperatorGuiCellPlan(atlas ? atlas.cells : cells, map, ctx.config)
+	if (atlas && atlasMode.atlasPlanUnchanged(ch, plan)) return finishOperatorGuiApply(ctx, ch, cells, plan, atlas, opts)
 	try {
 		const monitorRect = resolveOperatorGuiMonitorRect(ctx.config)
 		if (monitorRect) {
@@ -167,7 +172,7 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 			// WO-319: suppressHoles keeps the mosaic (routes + FILL, applied below) but feeds the
 			// shape overlay an EMPTY rect set, so no hole is cut — the browser draws the decoded
 			// crops itself. Without this, a hole would reveal the screen consumer THROUGH the canvas.
-			const shapeRects = opts.suppressHoles ? [] : plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect))
+			const shapeRects = opts.suppressHoles || atlas ? [] : plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect))
 			updateShapeRects(monitorRect, shapeRects, { log: ctx.log, channel: ch })
 		}
 	} catch (e) {
@@ -218,6 +223,12 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	}
 	lastAppliedRouteByChannel.set(ch, nextRoutes)
 	lastMaxLayerByChannel.set(ch, newMax)
+	if (atlas) atlasMode.noteAtlasApplied(ch, plan)
+	return finishOperatorGuiApply(ctx, ch, cells, plan, atlas, opts)
+}
+
+/** Persist + broadcast an applied layout (the reported cells, never the atlas rewrite). */
+function finishOperatorGuiApply(ctx, ch, cells, plan, atlas, opts) {
 	// Persist the applied cell set (mirrors routes-multiview.js persisting `multiviewLayout`)
 	// so `ensureOperatorGuiChannel` can re-apply the saved layout at boot/reconnect.
 	/* Never persist an EMPTY cell set. An empty apply means "no client is currently reporting"
@@ -249,45 +260,13 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 				channel: ch,
 				cells: persistableCells(cells),
 				source: opts.source || 'report',
+				atlas: atlas ? atlas.descriptor : null,
 			})
 		}
 	} catch (_) {
 		/* broadcast optional */
 	}
-	return { ch, plan }
-}
-
-/* Owner request 2026-07-26 (compose placement is project state): debounced merge of the applied
- * cell set into the active project file. bumpRev:false + pushVolumes:false like deck-sync merges —
- * this must never outrun a client's rev echo or spam the volume push. Content-equal merges no-op
- * both here and in persistProject. */
-const COMPOSE_PROJECT_PERSIST_DEBOUNCE_MS = 2000
-let _composeProjectPersistTimer = null
-let _composeProjectPersistPending = null
-function scheduleComposeLayoutProjectPersist(ctx, cells) {
-	_composeProjectPersistPending = { ctx, cells }
-	if (_composeProjectPersistTimer) clearTimeout(_composeProjectPersistTimer)
-	_composeProjectPersistTimer = setTimeout(() => {
-		_composeProjectPersistTimer = null
-		const pending = _composeProjectPersistPending
-		_composeProjectPersistPending = null
-		if (!pending?.ctx || !Array.isArray(pending.cells) || !pending.cells.length) return
-		try {
-			const { loadFullProject } = require('../engine/project-scenes-load')
-			const { persistProject } = require('../engine/project-scenes')
-			const existing = loadFullProject()
-			if (!existing) return
-			if (JSON.stringify(existing.operatorCompose?.cells || []) === JSON.stringify(pending.cells)) return
-			const project = {
-				...existing,
-				operatorCompose: { cells: pending.cells, savedAt: new Date().toISOString() },
-			}
-			void persistProject(pending.ctx, project, { writeAutosave: true, pushVolumes: false, bumpRev: false })
-		} catch (e) {
-			pending.ctx.log?.('warn', `[operator-gui] compose layout project persist: ${e?.message || e}`)
-		}
-	}, COMPOSE_PROJECT_PERSIST_DEBOUNCE_MS)
-	if (_composeProjectPersistTimer.unref) _composeProjectPersistTimer.unref()
+	return { ch, plan, atlas: atlas ? atlas.descriptor : null }
 }
 
 /**
@@ -355,7 +334,7 @@ function getPersistedOperatorGuiLayout(ctx) {
 	} catch {
 		/* no persistence — empty */
 	}
-	return { cells, channel: resolved ? resolved.ch : null }
+	return { cells, channel: resolved ? resolved.ch : null, atlas: atlasMode.getAtlasDescriptor(ctx, resolved?.ch) }
 }
 
 function clearOperatorGuiLayout(ctx) {
@@ -396,6 +375,7 @@ async function ensureOperatorGuiChannel(ctx) {
 	// cache describes the previous instance, so forget it or the re-apply skips every PLAY.
 	lastAppliedRouteByChannel.delete(ch)
 	lastMaxLayerByChannel.delete(ch)
+	atlasMode.forgetAtlasApplied(ch)
 	// WO-255 migration hygiene: the retired CEF web-UI layer (100) may still be PLAYing from a
 	// pre-pivot server run — a Caspar restart clears it, but don't rely on one. Harmless when empty.
 	try {
@@ -471,6 +451,7 @@ function resetOperatorGuiStateForTests() {
 	debounceTimers.clear()
 	bootShrinkGuard = null
 	lastClientIntentByChannel.clear()
+	atlasMode.resetAtlasStateForTests()
 }
 
 module.exports = {

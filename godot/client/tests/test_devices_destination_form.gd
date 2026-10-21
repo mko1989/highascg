@@ -65,7 +65,7 @@ func _find(ctrls: Array, action: String) -> Control:
 	var by_tip := {"main index": "Main index (zero-based)", "artnet cols": "Fixture columns", "artnet rows": "Fixture rows",
 		"artnet fixture type": "Fixture type (fixture/type)", "artnet start universe": "Start Art-Net universe",
 		"artnet start DMX channel": "Start DMX channel", "artnet DMX sends/sec": "DMX sends/sec"}
-	var by_opt := {"video mode": "1080p5000", "mode": "operator_gui", "audio layout": "8ch", "physical port": "3"}
+	var by_opt := {"video mode": "1080p5000", "mode": "operator_gui", "audio layout": "8ch", "physical port": "3", "video output": "shm"}
 	var key := action.split(" -> ")[0]
 	for c in ctrls:
 		if by_ph.has(key) and c is LineEdit and c.placeholder_text.begins_with(by_ph[key]):
@@ -92,7 +92,8 @@ const TYPED := {"width -> 1280": "1280", "height -> \"\"": "", "fps -> 29.97": "
 	"artnet start universe": "40000", "artnet start DMX channel": "0", "artnet DMX sends/sec": "",
 	"operator gui url": " http://x/?operatorGui=1 "}
 const PICKED := {"video mode -> 1080p2500": "1080p2500", "video mode -> custom": "custom", "mode -> pgm_only": "pgm_only",
-	"audio layout -> 8ch": "8ch", "artnet fixture type -> RGBW": "RGBW", "physical port -> auto": "", "physical port -> 3": "3"}
+	"audio layout -> 8ch": "8ch", "artnet fixture type -> RGBW": "RGBW", "physical port -> auto": "", "physical port -> 3": "3",
+	"video output -> shm": "shm"}
 
 
 func test_summary_and_initial_fields() -> void:

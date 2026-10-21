@@ -1343,6 +1343,13 @@
           "placeholder": null
         },
         {
+          "tag": "select",
+          "type": "select-one",
+          "value": "screen",
+          "disabled": false,
+          "placeholder": null
+        },
+        {
           "tag": "input",
           "type": "checkbox",
           "value": "",
@@ -1481,6 +1488,17 @@
               "id": "dst_o",
               "patch": {
                 "physicalPort": 3
+              }
+            }
+          ]
+        ],
+        [
+          "video output -> shm",
+          [
+            {
+              "id": "dst_o",
+              "patch": {
+                "videoOutput": "shm"
               }
             }
           ]

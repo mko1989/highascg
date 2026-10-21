@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — A (config `videoOutput`) + B/C (runtime surfaces, descriptor + lease API) implemented, offline-tested and exercised on the simulator; D (atlas) open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (consumer exists). Needed by: WO-599 (canvas mode), WO-600 (atlas mode), WO-607 (previs sources).**
+**Status: DONE pending owner check (2026-10-21) — A (config `videoOutput`), B/C (runtime surfaces, descriptor + lease API), D (atlas: moves cost zero AMCP, box-verified) and T4 (Video output selector in both clients) implemented. Owner check: see the checklist entry "WO-597 atlas". Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (consumer exists). Needed by: WO-599 (canvas mode), WO-600 (atlas mode), WO-607 (previs sources).**
 
 # WO-597 — Server: "video surfaces" (shm consumers in config + runtime), descriptor API, atlas allocator
 
@@ -100,15 +100,15 @@ The client never guesses segment names; it maps whatever the server announces.
 
 ## Tasks
 
-- [ ] T1 — `videoOutput` dest key + generator branch + normalization in `screen-destinations.js`;
+- [x] T1 — `videoOutput` dest key + generator branch + normalization in `screen-destinations.js`;
       smoke: shm XML emitted, screen XML unchanged when `'screen'`.
-- [ ] T2 — `src/system/video-surfaces.js` + routes + WS broadcast + lease-per-WS-connection; smoke
+- [x] T2 — `src/system/video-surfaces.js` + routes + WS broadcast + lease-per-WS-connection; smoke
       with fake AMCP (indices 740–749, grace timer, reconnect re-ADD).
-- [ ] T3 — Atlas allocator (pure, offline-testable: packing, hysteresis, aspect) + apply path +
+- [x] T3 — Atlas allocator (pure, offline-testable: packing, hysteresis, aspect) + apply path +
       API; smoke covers "UI move/resize ⇒ zero AMCP".
-- [ ] T4 — Device View (operator_gui destination inspector): `Video output: Screen | Shared memory`
+- [x] T4 — Device View (operator_gui destination inspector): `Video output: Screen | Shared memory`
       selector (web client; minimalism — one select).
-- [ ] T5 — Docs: `docs/wiki/api/` entries for the new routes (WO-593 contract doc).
+- [x] T5 — Docs: `docs/wiki/api/` entries for the new routes (WO-593 contract doc).
 
 ## Acceptance
 
@@ -172,3 +172,46 @@ from its `opgui` surface (WO-601 addendum 8).
 **Resolved without §D (2026-10-18, owner):** only one local operator client ever runs (Godot replaces the kiosk; the remote
 browser has thumbnails only and reports no cells), so Godot re-sends the compose cells + its media cell — see WO-601
 "What was done". §D stays open on its own merits (no AMCP on UI moves), not as a blocker for the media preview.
+
+## What was done (2026-10-21) — §D atlas + T4 + T5
+
+**Design change vs §D above:** no separate `/atlas/demand` route. The client keeps reporting its cells to
+`POST /api/operator-gui/layout` and adds `atlas: true`; the server derives each tile's needed pixels from the
+cell's aspect-fitted rect. One route, one persistence record, and the WO-624 server-side cell edits and the boot
+re-apply keep working unchanged (they omit the key, so the remembered mode applies). The descriptor rides the
+existing answers instead of a new `operator_gui_atlas` message: the POST reply, `GET /api/operator-gui/layout`
+and the `operatorGuiLayout` broadcast all carry `atlas: {channel, w, h, slots: {cellId: {x,y,w,h}}} | null`.
+
+| File | Change |
+|------|--------|
+| `src/system/operator-gui-atlas.js` (new) | mode (shm surfaces only; `atlas` key from the report, else remembered, persisted as `operatorGuiAtlas`), shelf packing (4 px gutter, tallest first, uniform 0.9 down-scale until it fits), 25 % hysteresis on each tile's needed size, plan-key skip |
+| `src/system/operator-gui-channel.js` | `_doApplyOperatorGuiLayout` plans from the rewritten cells; an unchanged atlas plan returns before any AMCP; no shape-overlay holes in atlas mode; persist/broadcast moved to `finishOperatorGuiApply` (persists the REPORTED cells, never the slots); `ensureOperatorGuiChannel` forgets the applied plan on (re)connect |
+| `src/system/operator-gui-compose-persist.js` (new) | `scheduleComposeLayoutProjectPersist` moved out unchanged (line budget) |
+| `src/api/routes-operator-gui.js` | POST passes `atlas` when it is a boolean; GET returns `atlas` |
+| `godot/client/features/live/compose_tiles.gd` + `compose_tile_math.gd` | reports carry `atlas: true` (and one opt-in report per run when the GET shows no atlas); a premultiplied `AtlasTexture` crop per window at its picture rect; `atlas_changed` signal |
+| `godot/client/features/live/live_tab.gd` | hides the whole-surface picture while the windows crop |
+| web `operator-compose-tiles*.js`, `app-ws-handlers.js` | the remote view's crop source is the window's slot when an atlas is announced (positions still come from the reported rects) |
+| T4: `device-view-destinations-inspector-operator-gui-fields.js`, Godot `destination_inspector.gd` | `Video output: Screen | Shared memory` select → `{videoOutput}` patch (golden extended by hand: one field + one action) |
+| T5 | no new routes, so the generated contract (`docs/wiki/api/contract/`) is unchanged and `--check` passes |
+| Tests | `smoke-wo597-operator-gui-atlas.test.js` (7: packing, scaling, move ⇒ zero AMCP, > 25 % resize ⇒ FILL only, add source ⇒ one apply, mode memory, screen surface never atlas, atlas off ⇒ mosaic, web wiring); shm-output smoke +1 (T4 web); Godot `test_atlas_slots` + destination-form golden |
+
+## What was VERIFIED (2026-10-21)
+
+- Offline suite 3006 pass / 0 fail / 2 skipped; Godot tests 20419 pass; eslint 216 warnings; prettier, line
+  limit, unwired exports, API contract `--check`, `node index.js --no-http` and `build:client` all clean.
+- **Box (shm operator surface, ch 3), Caspar log counted:** the first atlas report gave 5 AMCP lines (4 FILL + COMMIT,
+  no PLAY: the routes were already live); a report with two windows moved gave **0**; a report without the
+  `atlas` key gave **0** (mode remembered); a **real drag of the DeckLink window in the Godot GUI gave 0** and the
+  picture followed the window. `MIXER 3-1x FILL` queries returned exactly the slot rects.
+- A dump of the shm frame shows the four routes packed top-left; the Godot crops match the mosaic-mode picture
+  pixel for pixel (the PGM/PRV inset framing seen in both is the looks' own layer transform, not the atlas).
+- Restored afterwards: the original cells (diffed equal), Live view back to 3D (`ui.cfg` diffed equal). **The box
+  stays in atlas mode** (`operatorGuiAtlas: true`); switch back with `POST /api/operator-gui/layout
+  {cells, atlas:false}`.
+
+### Open
+
+- Owner check (checklist): drag/resize windows in the Godot Live view and compare with the web remote view.
+- Packing is simple shelves; a tight canvas scales every tile down uniformly (no per-tile priority yet).
+- Not verified: the web remote view against an atlas (no remote browser was open during the test).
+

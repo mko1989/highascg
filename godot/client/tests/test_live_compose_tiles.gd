@@ -111,3 +111,14 @@ func test_outside_bars_mark_the_canvas_edge() -> void:
 	t.eq(TM.outside(Vector2(1200, 478), ir), [Rect2(0, 0, 175, 478), Rect2(1025, 0, 175, 478)], "pillarbox")
 	t.eq(TM.outside(Vector2(850, 600), Rect2(0, 61, 850, 478)), [Rect2(0, 0, 850, 61), Rect2(0, 539, 850, 61)], "letterbox")
 	t.eq(TM.outside(Vector2(850, 478), Rect2(0, 0, 850, 478)), [], "exact fit: none")
+
+
+func test_atlas_slots() -> void:
+	t.eq(TM.atlas_of(null), {}, "no atlas → mosaic")
+	t.eq(TM.atlas_of({"channel": 5}), {}, "a descriptor without slots is no atlas")
+	var a := TM.atlas_of({"w": 1920, "h": 1080, "slots": {"pgm_1": {"x": 0.0, "y": 0.0, "w": 0.5, "h": 0.5}, "prv_1": {"x": 0.5, "y": 0.25, "w": 0.25, "h": 0.25}}})
+	t.eq(TM.slot_px(a, "pgm_1", C), Rect2(0, 0, 960, 540), "slot fractions → texture px")
+	t.eq(TM.slot_px(a, "prv_1", C), Rect2(960, 270, 480, 270), "second slot")
+	t.eq(TM.slot_px(a, "src_route_8_1", C), Rect2(), "a window without a slot crops nothing")
+	t.eq(TM.slot_px({}, "pgm_1", C), Rect2(), "no atlas → no slot")
+

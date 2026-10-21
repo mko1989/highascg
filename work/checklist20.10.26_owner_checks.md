@@ -84,6 +84,13 @@ Not on this list: anything a session can do alone. The node server has been rest
       Rename or hide a GPU port in one, or reorder the DeckLink ports: the other follows within a second. On the
       project-load hardware question, pick "remember": the other client stops asking too. Note: the web **New
       project** clears the saved GPU rows for every client now (they are shared); say if that should stay per browser.
+- [ ] **WO-597 atlas** — Godot Live tab, Standard view: drag and resize the PRV / PGM / source windows. The picture
+      follows at once with no flicker, and the Caspar log shows no `MIXER 3-…` lines while you only move. A big resize
+      (more than a quarter) or adding a source re-packs once. The box is left in atlas mode; to go back, POST
+      `/api/operator-gui/layout` with `atlas:false` (or say so and I add a toggle). If a browser remote view is open,
+      its windows should still show the right pictures.
+- [ ] **WO-597 T4** — Devices → operator GUI destination: the new **Video output** select (Screen / Shared memory)
+      shows "Shared memory" on this box. Don't change it unless you mean to: it needs a Caspar regenerate + restart.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source

@@ -51,6 +51,19 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 		patchDestination(d.id, { physicalPort: raw === '' ? null : (Number.isFinite(n) ? Math.min(4, Math.max(1, n)) : null) })
 	})
 
+	// WO-597 T4: where Caspar puts the operator channel — a screen window (Firefox kiosk) or shared memory (native client).
+	const videoOutputIn = document.createElement('select')
+	videoOutputIn.className = 'device-view__destinations-type'
+	for (const [value, text] of [
+		['screen', 'Screen (window under the Firefox kiosk)'],
+		['shm', 'Shared memory (native Godot client)'],
+	]) {
+		videoOutputIn.appendChild(Object.assign(document.createElement('option'), { value, textContent: text }))
+	}
+	videoOutputIn.value = d?.videoOutput === 'shm' ? 'shm' : 'screen'
+	videoOutputIn.title = 'Operator channel output. Shared memory has no screen window and no kiosk auto-launch. Regenerate + restart Caspar to apply.'
+	videoOutputIn.addEventListener('change', () => patchDestination(d.id, { videoOutput: videoOutputIn.value === 'shm' ? 'shm' : 'screen' }))
+
 	// WO-264 T264.4: boot-time auto-start toggle (default on; server launches when a monitor resolves).
 	const autoLaunchWrap = Object.assign(document.createElement('label'), {
 		className: 'device-view__inspector-label',
@@ -98,5 +111,5 @@ export function buildOperatorGuiFields({ d, patchDestination }) {
 	})
 	launchWrap.append(launchBtn, statusLine)
 
-	return [field('Web-UI URL', guiUrlIn), field('Physical GPU port (optional)', physicalPortIn), autoLaunchWrap, note, launchWrap]
+	return [field('Web-UI URL', guiUrlIn), field('Physical GPU port (optional)', physicalPortIn), field('Video output', videoOutputIn), autoLaunchWrap, note, launchWrap]
 }

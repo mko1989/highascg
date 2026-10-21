@@ -53,11 +53,26 @@ test('WO-597: default operator GUI XML is unchanged (still <screen>)', () => {
 })
 
 test('WO-597: no Firefox kiosk auto-launch when the operator surface is shm', () => {
-	const cfg = { screenDestinations: { version: 1, destinations: [{ id: 'og', mode: 'operator_gui', videoOutput: 'shm' }] } }
+	const cfg = {
+		screenDestinations: { version: 1, destinations: [{ id: 'og', mode: 'operator_gui', videoOutput: 'shm' }] },
+	}
 	const verdict = shouldAutoLaunchOperatorGui(cfg, {
 		resolveMonitorPort: () => {
 			throw new Error('resolver must not be consulted for an shm operator surface')
 		},
 	})
 	assert.deepEqual(verdict, { launch: false, reason: 'native_client_shm' })
+})
+
+test('WO-597 T4: the web operator_gui inspector offers Video output: Screen | Shared memory', () => {
+	const src = require('node:fs').readFileSync(
+		require('node:path').join(
+			__dirname,
+			'../../client/components/device-view-destinations-inspector-operator-gui-fields.js'
+		),
+		'utf8'
+	)
+	assert.match(src, /\['screen', 'Screen[^']*'\],\s*\['shm', 'Shared memory[^']*'\]/)
+	assert.match(src, /patchDestination\(d\.id, \{ videoOutput: videoOutputIn\.value === 'shm' \? 'shm' : 'screen' \}\)/)
+	assert.match(src, /field\('Video output', videoOutputIn\)/)
 })

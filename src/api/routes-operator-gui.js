@@ -7,6 +7,8 @@
  *                                        server-side; serialized per-channel (see
  *                                        src/system/operator-gui-channel.js). Also feeds the
  *                                        python-xlib shape helper.
+ *                                        WO-597 §D: `atlas: true|false` opts an shm operator surface
+ *                                        into atlas mode (slots in the reply / GET / WS `atlas`).
  *   DELETE /api/operator-gui/layout   — clears route layers + hides the shape overlay.
  *   POST   /api/operator-gui/cell     — WO-624: add a window for a Sources-panel route item
  *                                        `{ item: { type, value, label, resolution }, at: { x, y } }` (server rules +
@@ -55,7 +57,7 @@ async function handlePost(path, body, ctx) {
 		if (!ctx.amcp) {
 			return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
 		}
-		const result = await applyOperatorGuiLayout(ctx, cells, { suppressHoles })
+		const result = await applyOperatorGuiLayout(ctx, cells, { suppressHoles, atlas: typeof j.atlas === 'boolean' ? j.atlas : undefined })
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...result }) }
 	}
 	if (path === '/api/operator-gui/cell' || path === '/api/operator-gui/cell/remove') {
@@ -82,8 +84,8 @@ async function handlePost(path, body, ctx) {
  */
 function handleGet(path, ctx) {
 	if (path !== '/api/operator-gui/layout') return null
-	const { cells, channel } = getPersistedOperatorGuiLayout(ctx)
-	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel, cells }) }
+	const { cells, channel, atlas } = getPersistedOperatorGuiLayout(ctx)
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel, cells, atlas }) }
 }
 
 /**
