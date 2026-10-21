@@ -45,12 +45,18 @@ test('export: archive layout, sources, crops, mapping definitions', async () => 
 	assert.match(xml, /<SizeX>1920<\/SizeX><SizeY>1080<\/SizeY>/, 'opgui falls back to the crops bounding box')
 	assert.match(xml, /type="CaptureDevice">highascg:pgm1<\/Source>/)
 	assert.match(xml, /<ux>1920<\/ux><uy>0<\/uy><ox>1080<\/ox><oy>1920<\/oy>/)
-	for (const f of ['led_wall_1.glb', 'tv_1.glb', 'projection_1.glb']) assert.ok(readGlb(files[f]).json.meshes.length === 1, f)
+	for (const f of ['led_wall_1.glb', 'tv_1.glb', 'projection_1.glb']) {
+		const { json } = readGlb(files[f])
+		assert.ok(json.meshes.length === 1, f)
+		const pic = json.meshes[0].primitives[0]
+		assert.strictEqual(json.materials[pic.material].name, 'screen', `${f}: the picture surface is named for T5`)
+		assert.ok(pic.attributes.TEXCOORD_0 != null, `${f}: picture UVs`)
+	}
 	assert.strictEqual(buildStageMvr(OBJECTS).buffer.equals(buildStageMvr(OBJECTS).buffer), true, 'deterministic (stable uuids)')
 })
 
 test('round trip through the importer: every object comes back at its Godot transform', async () => {
-	const { buffer } = buildStageMvr(OBJECTS)
+	const { buffer } = buildStageMvr(OBJECTS, { rasterFor: (role) => (role === 'pgm1' ? { w: 3840, h: 2160 } : null) })
 	const rec = await store.importMvr(buffer, 'roundtrip.mvr')
 	try {
 		const objs = rec.scene.objects
@@ -60,6 +66,8 @@ test('round trip through the importer: every object comes back at its Godot tran
 			assert.ok(back, o.name)
 			assert.strictEqual(back.kind, 'VideoScreen')
 			assert.deepStrictEqual(back.sources, [{ type: 'CaptureDevice', linkedGeometry: o.id, value: `highascg:${o.source.role}` }])
+			assert.deepStrictEqual(back.screen, { role: o.source.role, raster: o.source.role === 'pgm1' ? { w: 3840, h: 2160 } : { w: 1920, h: 1080 }, rect: o.source.rect },
+				'T5: the binding (role, raster, crop) comes back')
 			const g = godotMatrix(o)
 			const want = [g[0], g[1], g[2], g[4], g[5], g[6], g[8], g[9], g[10], g[12], g[13], g[14]]
 			back.parts[0].xform.forEach((v, i) => assert.ok(Math.abs(v - want[i]) < 1e-4, `${o.id}[${i}] ${v} vs ${want[i]}`))
@@ -68,6 +76,18 @@ test('round trip through the importer: every object comes back at its Godot tran
 	} finally {
 		store.remove(rec.id)
 	}
+})
+
+test('T5 binding: foreign sources stay unbound; a mapping-definition source binds too', async () => {
+	const { parseScene } = require('../../src/stage/mvr-scene')
+	const xml = (src, defSrc) => `<GeneralSceneDescription verMajor="1" verMinor="6"><Scene><AUXData>
+		<MappingDefinition uuid="AA"><SizeX>100</SizeX><SizeY>50</SizeY><Source type="NDI">${defSrc}</Source></MappingDefinition></AUXData>
+		<Layers><Layer name="L"><ChildList><VideoScreen name="S" uuid="1"><Sources><Source type="NDI">${src}</Source></Sources>
+		<Mappings><Mapping linkedDef="AA"><ux>10</ux><uy>5</uy><ox>40</ox><oy>20</oy></Mapping></Mappings></VideoScreen></ChildList></Layer></Layers></Scene></GeneralSceneDescription>`
+	const io = { has: () => false, resolveGdtf: async () => null }
+	assert.strictEqual((await parseScene(xml('CAM 1', 'CAM 1'), io)).objects[0].screen, undefined)
+	assert.deepStrictEqual((await parseScene(xml('CAM 1', 'highascg:PRV2'), io)).objects[0].screen,
+		{ role: 'prv2', raster: { w: 100, h: 50 }, rect: { x: 10, y: 5, w: 40, h: 20 } })
 })
 
 test('geometry sizes follow stage_objects.gd', () => {

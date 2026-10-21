@@ -32,11 +32,32 @@ function resolveFile(fileName, has) {
  * @param {{ has: (file: string) => boolean, resolveGdtf: (spec: string, mode: string) => Promise<{ file: string,
  *   parts: { mesh: string, m: number[] }[] } | null> }} io
  */
+/**
+ * WO-612 T5 — a VideoScreen showing a HighAsCG surface: its Source (or its mapping definition's) is `highascg:<role>`
+ * (what our export writes); the first Mapping gives the crop (ux/uy offset, ox/oy size, px) against the definition's
+ * SizeX × SizeY raster. Other sources (NDI, File, CITP, capture cards) stay unbound → null.
+ */
+function screenBinding(sources, mappings, mapDefs) {
+	const num = (node, name) => Number(text(node, name))
+	const mp = kids(mappings).find((m) => m['#name'] === 'Mapping')
+	const def = mp ? mapDefs.get(String(attr(mp, 'linkedDef')).toUpperCase()) : null
+	const role = (v) => (/^highascg:([\w-]+)$/i.exec(String(v || '').trim()) || [])[1] || ''
+	const r = role(sources.find((s) => role(s.value))?.value) || role(text(def, 'Source'))
+	if (!r) return null
+	const raster = def && num(def, 'SizeX') > 0 && num(def, 'SizeY') > 0 ? { w: num(def, 'SizeX'), h: num(def, 'SizeY') } : null
+	const rect = mp && num(mp, 'ox') > 0 && num(mp, 'oy') > 0 ? { x: num(mp, 'ux') || 0, y: num(mp, 'uy') || 0, w: num(mp, 'ox'), h: num(mp, 'oy') } : null
+	return { role: r.toLowerCase(), raster, rect }
+}
+
 async function parseScene(xmlText, { has, resolveGdtf }) {
 	const root = await parseXml(xmlText)
 	const scene = child(root, 'Scene')
 	const symdefs = new Map()
-	for (const s of kids(child(scene, 'AUXData'))) if (s['#name'] === 'Symdef') symdefs.set(String(attr(s, 'uuid')).toUpperCase(), s)
+	const mapDefs = new Map()
+	for (const s of kids(child(scene, 'AUXData'))) {
+		if (s['#name'] === 'Symdef') symdefs.set(String(attr(s, 'uuid')).toUpperCase(), s)
+		if (s['#name'] === 'MappingDefinition') mapDefs.set(String(attr(s, 'uuid')).toUpperCase(), s)
+	}
 	const objects = []
 	const meshes = new Set()
 	const report = { objects: 0, fixtures: 0, parts: 0, missing_gdtf: new Set(), missing_files: new Set(), unsupported: new Set() }
@@ -82,6 +103,8 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 			}
 			if (kind === 'VideoScreen') {
 				obj.sources = kids(child(node, 'Sources')).map((s) => ({ type: attr(s, 'type') || '', linkedGeometry: attr(s, 'linkedGeometry') || '', value: String(s._ ?? '').trim() }))
+				const screen = screenBinding(obj.sources, child(node, 'Mappings'), mapDefs)
+				if (screen) obj.screen = screen
 			}
 			if (parts.length || obj.fixture || obj.sources) {
 				obj.parts = parts.map((p) => {

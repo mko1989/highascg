@@ -1,4 +1,4 @@
-**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). Open: T5 (VideoScreen → screen bindings), a real Capture file (owner), opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
+**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). T5 VideoScreen → live screen bindings DONE (2026-10-21, box-verified). Open: a real Capture file (owner), opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
 
 # WO-612 — Previs: import MVR scenes (e.g. from Capture) into the Godot stage
 
@@ -70,7 +70,7 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 - [x] T2 `Loader3DS` + tests (fixture `.3ds` files incl. one from the Capture sample).
 - [x] T3 `MvrImporter`: scene objects, transforms, symbols, glTF + 3DS geometry; import report (counts, skipped objects).
 - [x] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
-- [ ] T5 VideoScreen Sources/Mappings → previs screen bindings + UV crops.
+- [x] T5 VideoScreen Sources/Mappings → previs screen bindings + UV crops (`highascg:<role>` sources only).
 - [x] T6 Persistence (own store `projects/_mvr/`, not `/api/previs/models`): store the `.mvr` via `/api/previs/models` (allow the extension) + parsed metadata.
 - [x] T7 Export the WO-614 stage (LED walls / TVs / projection = `VideoScreen` + generated glb geometry, `Sources`/`Mappings` from each object's role + crop) via `ZIPPacker` (moved here from WO-614 T7).
 - [ ] Later: MVR-xchange client (live sync).
@@ -176,9 +176,40 @@ only fetches ready GLB meshes and places them. The design above (GDScript import
   The status line reads "Exported the stage to …".
 - Gates: lines, lint 216, prettier, unwired-exports, offline 2968 pass, `--no-http`, Godot 16473 pass.
 
+## T5 — VideoScreen bindings (2026-10-21)
+
+### Investigation
+
+- An imported VideoScreen carries its picture as `Sources/Source`; a crop is a `Mapping` (ux/uy offset, ox/oy size)
+  against an AUXData `MappingDefinition` (SizeX/Y raster). Foreign sources (a media server's own names, NDI names)
+  mean nothing to this box, so only `highascg:<role>` binds — what our T7 export writes.
+- A mesh can have many surfaces (screen + cabinet). The export now names the picture material `screen` and gives
+  it UVs, so the binding paints that surface only; for other files the first surface is used.
+- The live pictures are already shared per role by `VideoSurfaces` (WO-597), which the stage walls use.
+
+### What was done
+
+- `glb-write.js`: primitives may carry `TEXCOORD_0` and a material name. `mvr-export.js`: picture strips get UVs
+  (u per column edge, v = 0 at the top) and the material `screen`.
+- `mvr-scene.js`: `screenBinding()` → `obj.screen = {role, raster, rect}` for `highascg:<role>` sources (on the
+  object or on its MappingDefinition); null for anything else.
+- Godot `mvr_model.gd` `screen_uv()` / `screen_role()`; `mvr_scene.gd` puts the LED shader on the `screen`
+  surface with the crop as `uv_rect`, holds the role in `VideoSurfaces` only while the previs is in 3D and shown,
+  and refreshes the texture twice a second. The section summary says how many screens show channels.
+- Smoke: round trip keeps `screen`; the GLB picture primitive has material `screen` + TEXCOORD_0; foreign sources
+  stay unbound and a definition-only source binds. Godot `test_screen_binding_helpers`.
+
+### What was VERIFIED (box)
+
+- The live stage exported, re-imported as "T5_roundtrip": `GET /api/stage/mvr/<id>` →
+  `screen {role pgm1, raster 1920×1080, full rect}`.
+- GUI: picking the scene shows "1 video screen(s) show HighAsCG channels (3D view)." The MVR wall paints the live
+  PGM over the stage wall (the cabinet grid of the stage wall disappears under it); "— no MVR scene —" brings the
+  grid back. Test scene deleted, project back to no MVR scene.
+- Gates: lines, lint 216, prettier, unwired-exports, offline 2969 pass, Godot 16479 pass.
+
 ## Open
 
-- T5 VideoScreen `Sources`/`Mappings` → WO-614 screen bindings (sources are parsed; nothing binds yet).
 - Open our export in Capture / a console (owner): does the receiving tool honour the CaptureDevice source + Mapping?
 - A real **Capture** export (owner checklist) — Capture writes 3DS (vendor forum); the 3DS path is tested with
   synthetic files and the 3DS members of the MA3 GDTFs only.

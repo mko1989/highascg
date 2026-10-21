@@ -68,7 +68,7 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source
-      and crop?
+      and crop? Re-importing a `highascg:` .mvr shows the live channel on its screens in the 3D previs (T5).
 - [ ] **WO-607** — the previs stage keeps its tags; the PGM 3072×1728 surface looks right on the real stage.
 - [ ] **WO-618** — take a look with a non-linear transition (e.g. easeinoutsine) and watch the curve.
 

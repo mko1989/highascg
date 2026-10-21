@@ -21,3 +21,13 @@ func test_summary() -> void:
 	var s := M.summary({"name": "Show", "objects": 3, "fixtures": 2, "parts": 7, "meshes": 4, "failed": ["x"],
 		"report": {"missing_gdtf": ["A@B"], "missing_files": []}})
 	t.eq(s, "Show — 3 objects (2 fixtures), 7 parts from 4 meshes.\nNo GDTF (shown as boxes): A@B\nMeshes that failed to load: 1")
+
+
+func test_screen_binding_helpers() -> void:
+	var uv := M.screen_uv({"role": "pgm1", "raster": {"w": 3840.0, "h": 2160.0}, "rect": {"x": 1920.0, "y": 0.0, "w": 1080.0, "h": 1920.0}})
+	t.ok(uv.is_equal_approx(Vector4(0.5, 0.0, 0.28125, 1920.0 / 2160.0)), "crop against the mapping raster")
+	t.eq(M.screen_uv({"role": "pgm1", "raster": null, "rect": null}), Vector4(0, 0, 1, 1), "no mapping → full picture")
+	t.eq(M.screen_uv(null), Vector4(0, 0, 1, 1))
+	t.eq(M.screen_role({"kind": "VideoScreen", "screen": {"role": "prv2"}}), "prv2")
+	t.eq(M.screen_role({"kind": "VideoScreen"}), "", "foreign / unbound screen")
+	t.ok(M.summary({"name": "x", "screens": 2}).contains("2 video screen(s)"))

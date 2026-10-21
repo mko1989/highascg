@@ -323,6 +323,7 @@ func _apply_mode() -> void:
 	_svc.visible = is3d
 	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if is3d and shown else SubViewport.UPDATE_DISABLED
 	builder.set_live((is3d or (mode == "camera" and track_view.ghost_on)) and shown)  # T12: the ghost shows live walls
+	mvr.set_live(is3d and shown)  # WO-612 T5: MVR VideoScreens bound to HighAsCG surfaces
 	if is3d and shown and not stage.screens.is_empty():  # GLB screens only — no model, no hold
 		VideoSurfaces.acquire(_glb_role, self)
 	else:

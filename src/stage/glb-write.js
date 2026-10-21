@@ -5,7 +5,8 @@
  * previs; Godot loads every MVR mesh the same way, through GLTFDocument). Positions / normals float32, uint32 indices,
  * one node per mesh, one PBR material per colour. Pure.
  *
- * @typedef {{ positions: Float32Array, normals?: Float32Array, indices: Uint32Array, color?: number[] }} Prim
+ * @typedef {{ positions: Float32Array, normals?: Float32Array, uvs?: Float32Array, indices: Uint32Array, color?: number[],
+ *   material?: string }} Prim  (uvs → TEXCOORD_0; material = the glTF material name, e.g. the WO-612 export's 'screen')
  * @typedef {{ name: string, primitives: Prim[] }} Mesh
  */
 
@@ -52,11 +53,11 @@ function writeGlb(meshes) {
 		offset += padded
 		return json.bufferViews.length - 1
 	}
-	const material = (color) => {
+	const material = (color, name) => {
 		const c = (color || [0.7, 0.7, 0.7, 1]).map((v) => Math.round(v * 1000) / 1000)
-		const key = c.join(',')
+		const key = `${c.join(',')}|${name || ''}`
 		if (!mats.has(key)) {
-			json.materials.push({ pbrMetallicRoughness: { baseColorFactor: c, metallicFactor: 0, roughnessFactor: 0.8 },
+			json.materials.push({ ...(name ? { name } : {}), pbrMetallicRoughness: { baseColorFactor: c, metallicFactor: 0, roughnessFactor: 0.8 },
 				doubleSided: true })
 			mats.set(key, json.materials.length - 1)
 		}
@@ -79,9 +80,13 @@ function writeGlb(meshes) {
 			json.accessors.push({ bufferView: view(p.normals || smoothNormals(p.positions, p.indices), 34962),
 				componentType: 5126, count, type: 'VEC3' })
 			const nAcc = json.accessors.length - 1
+			const attributes = { POSITION: posAcc, NORMAL: nAcc }
+			if (p.uvs && p.uvs.length === count * 2) {
+				json.accessors.push({ bufferView: view(p.uvs, 34962), componentType: 5126, count, type: 'VEC2' })
+				attributes.TEXCOORD_0 = json.accessors.length - 1
+			}
 			json.accessors.push({ bufferView: view(p.indices, 34963), componentType: 5125, count: p.indices.length, type: 'SCALAR' })
-			prims.push({ attributes: { POSITION: posAcc, NORMAL: nAcc }, indices: json.accessors.length - 1,
-				material: material(p.color), mode: 4 })
+			prims.push({ attributes, indices: json.accessors.length - 1, material: material(p.color, p.material), mode: 4 })
 		}
 		if (!prims.length) continue
 		json.meshes.push({ name: m.name, primitives: prims })

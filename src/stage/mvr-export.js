@@ -62,9 +62,14 @@ function columnEdges(o) {
 	return out
 }
 
-/** Vertical strip through the edges from y 0 → h, pushed back by `back` m (stage_builder.gd _strip), as a primitive. */
-function strip(edges, h, back, color) {
+/**
+ * Vertical strip through the edges from y 0 → h, pushed back by `back` m (stage_builder.gd _strip), as a primitive.
+ * UV (0,0) = top-left, u even per column (panel seams on panel edges). `material` 'screen' marks the picture surface
+ * the importer binds video to (T5).
+ */
+function strip(edges, h, back, color, material) {
 	const pos = []
+	const uv = []
 	const idx = []
 	for (let j = 0; j + 1 < edges.length; j++) {
 		const [x0, z0] = edges[j]
@@ -74,8 +79,10 @@ function strip(edges, h, back, color) {
 		const b = pos.length / 3
 		pos.push(x0 - nx * back, 0, z0 - nz * back, x1 - nx * back, 0, z1 - nz * back, x1 - nx * back, h, z1 - nz * back, x0 - nx * back, h, z0 - nz * back)
 		idx.push(b, b + 1, b + 2, b, b + 2, b + 3)
+		const [u0, u1] = [j / (edges.length - 1), (j + 1) / (edges.length - 1)]
+		uv.push(u0, 1, u1, 1, u1, 0, u0, 0)
 	}
-	return { positions: new Float32Array(pos), indices: new Uint32Array(idx), color }
+	return { positions: new Float32Array(pos), uvs: new Float32Array(uv), indices: new Uint32Array(idx), color, ...(material ? { material } : {}) }
 }
 
 /** Axis-aligned box centred at c with size s. */
@@ -93,15 +100,15 @@ function primitives(o) {
 	if (o.type === 'tv') {
 		const b = num(o.bezel_mm, 10) / 1000
 		const d = Math.max(0.01, num(o.depth_m, 0.06))
-		return [strip([[-w / 2, 0], [w / 2, 0]], h, 0, SCREEN), box([0, h / 2, -d / 2 - 0.002], [w + 2 * b, h + 2 * b, d], DARK)]
+		return [strip([[-w / 2, 0], [w / 2, 0]], h, 0, SCREEN, 'screen'), box([0, h / 2, -d / 2 - 0.002], [w + 2 * b, h + 2 * b, d], DARK)]
 	}
 	if (o.type === 'projection') {
 		const throwM = num(o.throw, 1.5) * w
 		const p = [0, h * (0.5 + num(o.lens_shift_v, 0)), o.rear === true ? -throwM : throwM]
-		return [strip([[-w / 2, 0], [w / 2, 0]], h, 0, LIGHT), box(p, [0.45, 0.18, 0.4], DARK)]
+		return [strip([[-w / 2, 0], [w / 2, 0]], h, 0, LIGHT, 'screen'), box(p, [0.45, 0.18, 0.4], DARK)]
 	}
 	const edges = columnEdges(o)
-	const out = [strip(edges, h, 0, SCREEN)]
+	const out = [strip(edges, h, 0, SCREEN, 'screen')]
 	if (num(o.depth_m, 0.08) > 0) out.push(strip(edges, h, num(o.depth_m, 0.08), DARK))
 	return out
 }
