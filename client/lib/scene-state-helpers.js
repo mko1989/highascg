@@ -161,7 +161,10 @@ export function migrateScene(s) {
 					if (!base.fadeOnEnd || typeof base.fadeOnEnd !== 'object') {
 						base.fadeOnEnd = { enabled: false, frames: 12 }
 					}
-					if (!Array.isArray(base.pipOverlays)) {
+					/* defaultLayerConfig() already carries pipOverlays: [] — test the stored layer, or the
+					 * legacy single pipOverlay below was deleted unread on every load (WO-598 round trip). An empty
+					 * list falls back to the legacy overlay, as getPipOverlaysFromLayer / src / Godot read it. */
+					if (!(Array.isArray(l.pipOverlays) && l.pipOverlays.length)) {
 						if (base.pipOverlay && typeof base.pipOverlay === 'object' && base.pipOverlay.type) {
 							base.pipOverlays = [
 								{
@@ -204,7 +207,8 @@ export function migrateScene(s) {
 			type: 'border',
 			params: { side: 'inside' },
 			slices: [],
-			artnetPatch: { startChannel: 1, universe: 0 }
+			artnetPatch: { startChannel: 1, universe: 0 },
+			activePgmLayer: 998, // as the branch above writes it — else the 2nd load differs from the 1st
 		}
 	}
 }

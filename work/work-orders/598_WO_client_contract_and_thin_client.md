@@ -99,7 +99,7 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 ## Tasks
 
 - [ ] T1 contract docs (A) + CI guard.
-- [~] T2 golden round trip: Godot side ✔ (`test_project_roundtrip.gd`); JS exportProject∘importProject still open.
+- [x] T2 golden round trip: Godot side ✔ (`test_project_roundtrip.gd`); JS side ✔ 2026-10-21 (`smoke-wo598-web-project-roundtrip`).
 - [ ] T3 take-by-id parity diff test → switch web client (C1).
 - [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
 - [ ] T5 constants endpoint (C4); web client consumes it.
@@ -201,6 +201,33 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
     payload gives 400.
 - **Open:** a real shader edit / wiggle needs a shader on air, so it is an owner check (box rules: no landing).
   The remaining raw paths are `amcp-preview-batch.js` (needs owner QA to switch) and `logs-modal.js` (by design).
+
+## 2026-10-21 — T2 JS side: web exportProject∘importProject pinned (two web load bugs fixed)
+
+- **Investigation:** the real web state modules (`scene-state`, `timeline-state`, `multiview-state`,
+  `program-output-state`, `placeholder-state`, `project-state`) load in node with a small browser stub. All 60 shows
+  in `projects/` were run through import → export twice. Every one reached a fixed point after one pass. The only
+  first-pass changes were documented one-way ones: WO-160 layer renumbering, and the flat legacy
+  `scenes.previewSceneId` rewritten from `previewSceneIdByMain`. The server keeps its own deck PRV id across a save.
+- **Bugs found by the committed fixture** (`take-payload-coverage.json`):
+  1. A legacy single `pipOverlay` was **deleted on every web load**. `migrateScene` spreads `defaultLayerConfig()`,
+     which carries `pipOverlays: []`, so the "no list yet → migrate the legacy overlay" branch never ran. The server,
+     Godot `pip_model.gd` and the web `getPipOverlaysFromLayer` all read an empty list as "use the legacy overlay".
+     The migration now tests the stored layer with the same rule.
+  2. A look with no `globalBorder` got a default without `activePgmLayer`, and the next load added 998. A second
+     load + save therefore differed from the first (rev bump + broadcast for nothing). The default now carries 998.
+- **What was done:** new fixture `tools/fixtures/projects/web-roundtrip-show.json` (a real show shape, media names
+  anonymised, already web-normalised). The Godot round-trip test reads the same directory. New smoke
+  `smoke-wo598-web-project-roundtrip` (curated list), with 3 tests:
+  - the fixture is byte-identical per slice after a web load + save (values + key order);
+  - every fixture loses no input leaf beyond the documented normalisations and is a fixed point;
+  - an unknown layer key survives.
+  Look-level keys are a whitelist (WO-572); the Godot client writes none of its own.
+- **What was VERIFIED:**
+  - The smoke fails with the old `pipOverlays` check (mutation run) and passes with the fix.
+  - Offline suite 2986/0, Godot suite 20364/0 (+3 fixture cases), all gates green.
+- **Open:** nothing for T2. A show saved with a legacy `pipOverlay` and opened in the web client before this fix has
+  already lost that overlay on disk; that cannot be recovered.
 
 ## Earlier notes
 
