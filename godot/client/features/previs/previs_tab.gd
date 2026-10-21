@@ -7,6 +7,7 @@ extends HSplitContainer
 ## markers (marker_driver → server hub) and draws them on the picture. T12: the 3D stage through the solved camera
 ## as an optional ghost overlay (camera_overlay.gd). T10c: 3D mode's "Tracking cameras" toggle shows each tracking
 ## camera's frustum + footprint and the grid's coverage (coverage_3d.gd), with a one-line verdict under the view.
+## WO-640: 3D mode's stage / MVR / fixtures / models column is an Inspector page too (`_side`), not a second column.
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -26,6 +27,7 @@ const Coverage3D := preload("res://features/previs/tracking/coverage_3d.gd")
 const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const GlbScreens := preload("res://features/previs/glb_screens_model.gd")
+const Fold := preload("res://features/previs/fold_section.gd")
 const UI_CFG := "user://ui.cfg"
 const MODES := ["3d", "camera"]
 
@@ -52,10 +54,10 @@ var coverage: Coverage3D
 var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
 var _coverage_cb: CheckBox
 var _coverage_note: Label
+var _side: Control  # the 3D mode Inspector page; parked hidden here until the Inspector adopts it
 
 
 func _ready() -> void:
-	split_offset = -320
 	var left := VBoxContainer.new()
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(left)
@@ -141,7 +143,9 @@ func _ready() -> void:
 	track_view.clicked.connect(track_page.click)
 	track_view.picked.connect(track_page.pick)
 	track_view.source_size.connect(track_page.adopt_size)
-	add_child(_build_panel())
+	_side = _build_panel()
+	_side.visible = false
+	add_child(_side)  # in the tree before stage_panel.bind (its _ready builds the list)
 	stage.model_loaded.connect(_on_model_loaded)
 	var framed := [false]
 	stage_panel.stage_loaded.connect(func(n: int) -> void:
@@ -348,6 +352,10 @@ func _apply_mode() -> void:
 			track_page.set_objects(builder.objects.duplicate(true))
 		else:
 			InspectorPanel.current.release(track_page)
+		if is3d and shown:
+			InspectorPanel.current.present(_side)
+		else:
+			InspectorPanel.current.release(_side)
 
 
 func _exit_tree() -> void:
@@ -435,65 +443,40 @@ func _on_model_loaded(meshes: Array) -> void:
 	_status.text = "%d meshes, %d screens" % [meshes.size(), stage.screens.size()]
 
 
+## The 3D mode Inspector page (the Inspector scrolls it), in collapsible sections (WO-640).
 func _build_panel() -> Control:
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size.x = ThemeBuilder.PANEL_W + 40
-	# Own scroll: unscrolled, a selected screen's long form made this column taller than the window, which pushed
-	# the whole shell (and the Inspector's scroll area with it) past the bottom of the screen.
-	var outer := ScrollContainer.new()
-	outer.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	panel.add_child(outer)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
-	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	v.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	outer.add_child(v)
-	v.add_child(_heading("Stage (WO-614)"))
 	stage_panel = StagePanel.new()
-	v.add_child(stage_panel)
-	v.add_child(_heading("MVR scene (WO-612)"))
+	v.add_child(Fold.new("Stage", [stage_panel]))
 	mvr_section = MvrSection.new()
-	v.add_child(mvr_section)
-	v.add_child(_heading("Fixtures (WO-615)"))
+	v.add_child(Fold.new("MVR scene", [mvr_section]))
 	var fixtures_section := FixturesSection.new()
-	v.add_child(fixtures_section)
+	v.add_child(Fold.new("Fixtures", [fixtures_section]))
 	mvr_section.types_changed.connect(fixtures_section.refresh_types)  # WO-615 T10: a patch imports GDTF types
-	v.add_child(_heading("Models"))
 	_models = ItemList.new()
 	_models.custom_minimum_size.y = 120
 	_models.item_activated.connect(load_model)
 	_models.item_selected.connect(load_model)
-	v.add_child(_models)
-	v.add_child(_heading("Live source"))
+	v.add_child(Fold.new("Models", [_models]))
 	_source = OptionButton.new()
 	for role in ["opgui", "pgm1", "prv1", "pgm2", "prv2"]:
 		_source.add_item(role)
 	_source.item_selected.connect(func(i: int) -> void: _set_source(_source.get_item_text(i)))
-	v.add_child(_source)
-	v.add_child(_heading("Camera"))
+	v.add_child(Fold.new("Live source", [_source]))
 	var cams := HBoxContainer.new()
 	for p in ["Front", "Top", "ISO"]:
 		var b := Button.new()
 		b.text = p
 		b.pressed.connect(func() -> void: stage.fly_to_preset(p))
 		cams.add_child(b)
-	v.add_child(cams)
-	v.add_child(_heading("Screens (live texture)"))
+	v.add_child(Fold.new("Camera", [cams]))
 	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.custom_minimum_size.y = 120  # keeps the list visible when the outer scroll is in play
+	scroll.custom_minimum_size.y = 120
 	_meshes = VBoxContainer.new()
 	scroll.add_child(_meshes)
-	v.add_child(scroll)
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
-	v.add_child(_status)
-	return panel
-
-
-func _heading(text: String) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	return l
+	v.add_child(Fold.new("Screens (live texture)", [scroll, _status]))
+	return v

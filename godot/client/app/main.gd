@@ -447,7 +447,8 @@ func _apply_window_args() -> void:
 		var screens := []
 		for i in DisplayServer.get_screen_count():
 			screens.append(Rect2i(DisplayServer.screen_get_position(i), DisplayServer.screen_get_size(i)))
-		var rect: Variant = res.data.get("rect") if res.ok and res.data is Dictionary else null
+		var outs: Dictionary = await Api.get_json("/api/system/operator-screen")  # live places, by output name
+		var rect: Variant = Placement.live_rect(res.data.get("rect") if res.ok and res.data is Dictionary else null, outs.data.get("outputs") if outs.ok and outs.data is Dictionary else null)
 		var i := Placement.pick_screen(rect, screens)
 		if i >= 0 and i != w.current_screen:
 			w.current_screen = i

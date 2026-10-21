@@ -9,6 +9,21 @@ const MAX_SCALE := 4.0
 
 ## The screen index whose rect is the server's operator monitor (`rect` {x, y, width, height}): exact origin first,
 ## else the screen holding the rect's centre; -1 when none does (stay where the window manager put us).
+## The operator rect at its LIVE place: the server's rect is the layout plan, which X need not match yet (a cable
+## change re-plans without applying; box 21.10: plan DP-0 at 0,0, X still DP-4 at 0,0). Its sysId names the output;
+## `outputs` are /api/system/operator-screen's live xrandr rows.
+static func live_rect(rect: Variant, outputs: Variant) -> Variant:
+	if not rect is Dictionary or not outputs is Array:
+		return rect
+	for o in outputs:
+		if o is Dictionary and str(o.get("name", "")) != "" and str(o.get("name")) == str(rect.get("sysId", "")):
+			var r: Dictionary = (rect as Dictionary).duplicate()
+			for k in ["x", "y", "width", "height"]:
+				r[k] = o.get(k, r.get(k))
+			return r
+	return rect
+
+
 static func pick_screen(rect: Variant, screens: Array) -> int:
 	if not rect is Dictionary or not rect.has("x") or not rect.has("y"):
 		return -1

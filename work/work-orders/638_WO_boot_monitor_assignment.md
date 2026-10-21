@@ -112,3 +112,11 @@ Not done / alternatives rejected:
 - **Owner QA:** a real power-cycle boot (Openbox autostart → client → prompts → Caspar start), and the 120 s
   unattended timeout path. The timeout is unit-tested and the server fallback is in place, but both live answers came
   from clicks.
+
+## Follow-up 21.10 (evening): client landed on the PGM screen
+
+A relaunch without `--screen` put the client on DP-4 (PGM). `GET /api/system/operator-display` answered from the
+layout plan, `DP-0 @ 0,0`, re-planned after the PGM cable was removed at 19:45 and never applied. X still had DP-4
+at 0,0 and DP-0 at +1920. `main.gd` matched the screen by position. It now first moves the rect to the live place
+of its `sysId` output, taken from `/api/system/operator-screen` outputs (`window_placement.gd` `live_rect`;
+`tests/test_window_placement.gd` `test_live_rect`). Box: after relaunch, the window is at 1922,32 (DP-0).
