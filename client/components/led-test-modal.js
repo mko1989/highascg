@@ -4,101 +4,66 @@
 
 import { escapeHtml } from '../lib/dom-escape.js'
 import { attachMathInput } from '../lib/math-input.js'
+import { api } from '../lib/api-client.js'
 
-const LS = {
-	cols: 'highascg_led_test_cols',
-	rows: 'highascg_led_test_rows',
-	pw: 'highascg_led_test_pw',
-	ph: 'highascg_led_test_ph',
-	label: 'highascg_led_test_label',
-	centerChar: 'highascg_led_test_center_char',
-	labelOn: 'highascg_led_test_label_on',
-	specOn: 'highascg_led_test_spec_on',
-	circle: 'highascg_led_test_show_circle',
-	cross: 'highascg_led_test_show_cross',
-	gridByCh: 'highascg_led_test_grid_by_ch',
-	channelsEnabled: 'highascg_led_test_channels_enabled',
-	pattern: 'highascg_led_test_pattern',
-	charCount: 'highascg_led_test_char_count',
-	builderSpeed: 'highascg_led_test_builder_speed',
+/** Web modal defaults — the same as the node's (src/engine/led-test-card-control.js DEFAULTS). */
+const DEFAULTS = Object.freeze({
+	cols: 20,
+	rows: 10,
+	panelWidth: 192,
+	panelHeight: 108,
+	centerLabel: 'HighAsCG',
+	showCenterCharacter: true,
+	showPanelLabels: true,
+	showSpecLine: true,
+	showCircle: true,
+	showCross: true,
+	gridByChannel: {},
+	channelsEnabled: {},
+	pattern: 'grid-white',
+	charCount: 3,
+	builderSpeed: 3,
+})
+
+/** WO-629: the node owns these settings (GET/POST /api/led-test-card/settings); this is the last copy read. */
+let cached = { ...DEFAULTS }
+
+/** Re-read the settings from the node (header init, before the modal opens). */
+export async function syncLedTestSettings() {
+	const r = await api.get('/api/led-test-card/settings')
+	if (r?.settings && typeof r.settings === 'object') cached = { ...DEFAULTS, ...r.settings }
+	return r
 }
 
 function loadGridByChannel() {
-	try {
-		const raw = localStorage.getItem(LS.gridByCh)
-		if (!raw) return {}
-		const o = JSON.parse(raw)
-		return o && typeof o === 'object' ? o : {}
-	} catch {
-		return {}
-	}
+	return { ...(cached.gridByChannel || {}) }
 }
 
 function loadChannelsEnabled() {
-	try {
-		const raw = localStorage.getItem(LS.channelsEnabled)
-		if (raw) {
-			const o = JSON.parse(raw)
-			if (o && typeof o === 'object') return o
-		}
-	} catch {}
-	return {}
+	return { ...(cached.channelsEnabled || {}) }
 }
 
 /**
  * @returns {{ cols: number, rows: number, panelWidth: number, panelHeight: number, centerLabel: string, showCenterCharacter: boolean, showPanelLabels: boolean, showSpecLine: boolean, showCircle: boolean, showCross: boolean, gridByChannel: Record<string, boolean>, channelsEnabled: Record<string, boolean>, pattern: string, charCount: number, builderSpeed: number }}
  */
-export function getLedTestSettings(stateStore) {
-	return {
-		cols: Math.max(1, parseInt(localStorage.getItem(LS.cols) || '20', 10) || 20),
-		rows: Math.max(1, parseInt(localStorage.getItem(LS.rows) || '10', 10) || 10),
-		panelWidth: Math.max(1, parseInt(localStorage.getItem(LS.pw) || '192', 10) || 192),
-		panelHeight: Math.max(1, parseInt(localStorage.getItem(LS.ph) || '108', 10) || 108),
-		centerLabel: localStorage.getItem(LS.label) || 'HighAsCG',
-		showCenterCharacter: localStorage.getItem(LS.centerChar) !== 'false',
-		showPanelLabels: localStorage.getItem(LS.labelOn) !== 'false',
-		showSpecLine: localStorage.getItem(LS.specOn) !== 'false',
-		showCircle: localStorage.getItem(LS.circle) !== 'false',
-		showCross: localStorage.getItem(LS.cross) !== 'false',
-		gridByChannel: loadGridByChannel(),
-		channelsEnabled: loadChannelsEnabled(),
-		pattern: localStorage.getItem(LS.pattern) || 'grid-white',
-		charCount: Math.max(1, Math.min(48, parseInt(localStorage.getItem(LS.charCount) || '3', 10) || 3)),
-		builderSpeed: Math.max(1, Math.min(10, parseInt(localStorage.getItem(LS.builderSpeed) || '3', 10) || 3)),
-	}
+export function getLedTestSettings() {
+	return { ...cached, gridByChannel: loadGridByChannel(), channelsEnabled: loadChannelsEnabled() }
 }
 
 /**
+ * Store in the node, which normalises the values and re-applies the card while it is up.
  * @param {ReturnType<typeof getLedTestSettings>} s
  */
-export function saveLedTestSettings(s) {
-	localStorage.setItem(LS.cols, String(s.cols))
-	localStorage.setItem(LS.rows, String(s.rows))
-	localStorage.setItem(LS.pw, String(s.panelWidth))
-	localStorage.setItem(LS.ph, String(s.panelHeight))
-	localStorage.setItem(LS.label, s.centerLabel || 'HighAsCG')
-	localStorage.setItem(LS.centerChar, s.showCenterCharacter !== false ? 'true' : 'false')
-	localStorage.setItem(LS.labelOn, s.showPanelLabels ? 'true' : 'false')
-	localStorage.setItem(LS.specOn, s.showSpecLine ? 'true' : 'false')
-	localStorage.setItem(LS.circle, s.showCircle !== false ? 'true' : 'false')
-	localStorage.setItem(LS.cross, s.showCross !== false ? 'true' : 'false')
-	if (s.gridByChannel && typeof s.gridByChannel === 'object') {
-		localStorage.setItem(LS.gridByCh, JSON.stringify(s.gridByChannel))
+export async function saveLedTestSettings(s) {
+	cached = { ...cached, ...s }
+	try {
+		const r = await api.post('/api/led-test-card/settings', s)
+		if (r?.settings && typeof r.settings === 'object') cached = { ...DEFAULTS, ...r.settings }
+		return r
+	} catch (e) {
+		console.warn('LED test card: settings not saved —', e?.message || e)
+		return null
 	}
-	if (s.channelsEnabled && typeof s.channelsEnabled === 'object') {
-		localStorage.setItem(LS.channelsEnabled, JSON.stringify(s.channelsEnabled))
-	}
-	localStorage.setItem(LS.pattern, s.pattern || 'grid-white')
-	localStorage.setItem(LS.charCount, String(Math.max(1, Math.min(48, s.charCount || 1))))
-	localStorage.setItem(LS.builderSpeed, String(Math.max(1, Math.min(10, s.builderSpeed || 3))))
-}
-
-/**
- * @param {number} channel
- */
-export function getLedTestShowGridForChannel(channel) {
-	const m = loadGridByChannel()
-	return m[String(channel)] === true
 }
 
 /**
@@ -287,6 +252,7 @@ export function showLedTestModal(onApplied, stateStore) {
 	})
 
 	function close() {
+		if (settingsApplyTimer || labelDebounce) void saveLedTestSettings(collectSettings()) // flush a pending edit
 		clearTimeout(settingsApplyTimer)
 		clearTimeout(labelDebounce)
 		modal.remove()
@@ -325,11 +291,12 @@ export function showLedTestModal(onApplied, stateStore) {
 		}
 	}
 
+	/* WO-629: a channel switch goes to POST /api/led-test-card/channel (the node remembers it); other edits are saved
+	 * 400 ms after the last change and the node re-applies the card itself while it is up. */
 	function persistAndApply(event) {
-		saveLedTestSettings(collectSettings())
-		if (typeof onApplied !== 'function') return
 		if (event?.type === 'channel') {
-			onApplied(event)
+			cached = { ...cached, channelsEnabled: collectSettings().channelsEnabled }
+			if (typeof onApplied === 'function') onApplied(event)
 			return
 		}
 		scheduleSettingsApply()
@@ -340,14 +307,19 @@ export function showLedTestModal(onApplied, stateStore) {
 		clearTimeout(settingsApplyTimer)
 		settingsApplyTimer = setTimeout(() => {
 			settingsApplyTimer = null
-			if (typeof onApplied === 'function') onApplied()
+			void saveLedTestSettings(collectSettings()).then(() => {
+				if (typeof onApplied === 'function') onApplied()
+			})
 		}, 400)
 	}
 
 	let labelDebounce = null
 	function persistAndApplyDebounced() {
 		clearTimeout(labelDebounce)
-		labelDebounce = setTimeout(() => persistAndApply(), 300)
+		labelDebounce = setTimeout(() => {
+			labelDebounce = null
+			persistAndApply()
+		}, 300)
 	}
 
 	for (const el of [cols, rows, pw, ph, charCountInp, builderSpeedInp]) {

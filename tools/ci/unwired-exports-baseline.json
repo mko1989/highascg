@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 668,
+	"count": 667,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -233,7 +233,6 @@
 		"client/lib/screen-consumer-defaults.js: screenConsumerCasparPatch",
 		"client/lib/server-project-sync.js: isProjectGoneOnServer",
 		"client/lib/server-project-sync.js: isServerProjectSynced",
-		"client/lib/shader-cg-update.js: cgUpdateJson",
 		"client/lib/streaming-channel-state.js: normalizeStreamingChannelStatus",
 		"client/lib/streaming-channel-state.js: parseActiveFlag",
 		"client/lib/streaming-channel-state.js: setStreamingChannelStatus",

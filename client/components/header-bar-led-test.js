@@ -3,7 +3,7 @@
  */
 
 import { api } from '../lib/api-client.js'
-import { showLedTestModal, getLedTestSettings } from './led-test-modal.js'
+import { showLedTestModal, getLedTestSettings, syncLedTestSettings } from './led-test-modal.js'
 import {
 	applyLedTestPattern,
 	isLedTestMasterEnabled,
@@ -15,6 +15,7 @@ export function initLedTestCard(container, stateStore) {
 	ledTestCb.type = 'checkbox'
 	ledTestCb.id = 'header-led-test-cb'
 	ledTestCb.checked = isLedTestMasterEnabled()
+	void syncLedTestSettings().catch(() => {})
 	ledTestCb.title = 'Show LED test card on all program channels (layer 999): screens + resolution + IPs by default; full grid per channel in Test card…'
 
 	const ledTestBtn = document.createElement('button')
@@ -25,7 +26,6 @@ export function initLedTestCard(container, stateStore) {
 
 	let ftbBusy = false
 	let ledTestApplyBusy = false
-	let ledTestServerSyncDone = false
 
 	const ftbBtn = document.createElement('button')
 	ftbBtn.type = 'button'
@@ -56,12 +56,6 @@ export function initLedTestCard(container, stateStore) {
 				}
 			}
 		} catch (e) {
-			if (e?.code === 'NO_CHANNELS') {
-				setLedTestMasterEnabled(false)
-				ledTestCb.checked = false
-				alert(e.message)
-				return
-			}
 			setLedTestMasterEnabled(false)
 			ledTestCb.checked = false
 			alert('LED test card: ' + (e?.message || e))
@@ -76,7 +70,8 @@ export function initLedTestCard(container, stateStore) {
 		void applyLedTest(enabled)
 	})
 
-	ledTestBtn.addEventListener('click', () => {
+	ledTestBtn.addEventListener('click', async () => {
+		await syncLedTestSettings().catch(() => {}) // WO-629: the node's settings (Godot may have changed them)
 		showLedTestModal((event) => {
 			if (event?.type === 'channel') {
 				if (event.enabled) {
@@ -93,8 +88,7 @@ export function initLedTestCard(container, stateStore) {
 				void applyLedTest(event.enabled, { channels: [event.channel] })
 				return
 			}
-			if (!isLedTestMasterEnabled()) return
-			void applyLedTest(true)
+			/* Settings edits: the node already re-applied the card while it is up (POST …/settings). */
 		}, stateStore)
 	})
 
@@ -104,9 +98,7 @@ export function initLedTestCard(container, stateStore) {
 			ftbBusy = true
 			ftbBtn.disabled = true
 			try {
-				await api.post('/api/ftb', {})
-				setLedTestMasterEnabled(false)
-				ledTestCb.checked = false
+				await api.post('/api/ftb', {}) // layer 999 stays — the checkbox keeps following the node (WO-629)
 			} catch (e) {
 				alert('FTB: ' + (e?.message || e))
 			} finally {
@@ -116,17 +108,13 @@ export function initLedTestCard(container, stateStore) {
 		})()
 	})
 
-	// One-time sync from server on connect (startup splash). Do not fight user toggles afterward.
+	// WO-629: the checkbox mirrors the node's state.ledTestPatternActive (a Godot client or the startup splash may
+	// switch it), except while this client's own switch is in flight.
 	stateStore?.on?.('*', () => {
-		if (ledTestApplyBusy || ledTestServerSyncDone) return
-		const st = stateStore.getState()
-		if (st.ledTestPatternActive !== true) return
-		if (isLedTestMasterEnabled()) {
-			ledTestServerSyncDone = true
-			return
-		}
-		ledTestServerSyncDone = true
-		setLedTestMasterEnabled(true)
-		ledTestCb.checked = true
+		if (ledTestApplyBusy) return
+		const on = stateStore.getState()?.ledTestPatternActive === true
+		if (on === isLedTestMasterEnabled()) return
+		setLedTestMasterEnabled(on)
+		ledTestCb.checked = on
 	})
 }

@@ -54,7 +54,8 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-628** — dock: bottom-centre, hides itself; reveal after 0.4 s of hover, hide 1 s after leaving. Too
       eager or too slow?
 - [ ] **WO-629** — header "Test card" master on/off and the Test card… dialog on a real LED wall (pattern,
-      bunny, labels).
+      bunny, labels). Since 21.10 the web header uses the same node settings: tick "Test card" in the web header →
+      the Godot checkbox ticks too (and the other way round); a label changed in one dialog shows in the other.
 - [ ] **WO-600 / WO-601 / WO-602** — looks deck, Inspector, timeline: compare the feel against the web (trim In/Out,
       effect sliders, clip move/resize/keyframes, route change while playing, align icons).
 - [ ] **WO-603** — drop a big folder (progress line) and drop onto an upper-case CLS folder. Should Ctrl+Alt+click

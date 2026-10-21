@@ -68,7 +68,45 @@ the server first.
 
 ## Open
 
-- The web client still keeps its own localStorage settings and master flag. Moving it onto these endpoints is a
-  follow-up; until then a web toggle and a Godot toggle drive the same layer 999 from different settings.
+- ~~The web client still keeps its own localStorage settings and master flag.~~ Done 21.10 (below).
 - FTB does not clear layer 999 (unchanged). The web only unticked its own checkbox; here the checkbox follows the
   server, so it stays ticked while the card is up.
+
+## 2026-10-21 — Web client on the node endpoints (the WO's open item)
+
+**Investigation.**
+- Web `led-test-modal.js` kept 15 localStorage keys, and `led-test-apply.js` kept the master flag in localStorage. That
+  file also planned the targets and posted `/api/led-test-card` once per channel. The planning differed from the node:
+  the web refused with NO_CHANNELS, while the node falls back to every program channel.
+- The box's Firefox storage (read-only copy) holds none of these keys, so there is nothing to migrate.
+- `getLedTestShowGridForChannel` lost its only importer and was deleted (unwired-exports gate).
+
+**What was done.**
+- `led-test-modal.js`:
+  - Holds a module cache seeded with the node's DEFAULTS.
+  - `syncLedTestSettings()` does `GET /api/led-test-card/settings`.
+  - `saveLedTestSettings()` does `POST …/settings`; the node normalises the values and re-applies the card while it is up.
+  - Edits are saved 400 ms after the last change, and a pending edit is flushed on close.
+  - A channel's "Show test card" goes only to `POST …/channel`, which the node remembers.
+- `led-test-apply.js`: `applyLedTestPattern()` posts `…/master` or `…/channel` and maps the node's
+  `{targets, failures}` to the web's shape. The master flag is in memory.
+- `header-bar-led-test.js`:
+  - The checkbox mirrors `state.ledTestPatternActive` on every state change, except while its own switch is in
+    flight. Before, it synced once at startup.
+  - Settings are re-read before the dialog opens.
+  - Settings edits no longer trigger a second web-side apply.
+  - FTB no longer unticks the box, which matches Godot.
+- The lint warning cap went from 218 to 216, the unwired-exports baseline from 668 to 667, and dist-web was rebuilt.
+
+**What was VERIFIED (box, 21.10).**
+- The real web modules were imported in Node against the live server. `fetch` was given the origin; `localStorage.setItem`
+  was made to throw.
+- `syncLedTestSettings()` returned active false and cols 20. Saving cols 21 / "WEBTEST" read back as 21 / WEBTEST,
+  with no `applied` because the card was off. Saving the original values back left the settings byte-identical to
+  before (`cmp`). No localStorage write happened.
+- The master switch was not pressed: it puts layer 999 on PGM. That is on the owner checklist.
+- Gates:
+  - lint 216 warnings
+  - unwired exports: no new orphans
+  - offline suite 2948 pass
+  - `index.js --no-http` OK
