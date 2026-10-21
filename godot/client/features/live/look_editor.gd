@@ -1,7 +1,6 @@
 extends VBoxContainer
 ## WO-600 F — look editor: compose frame over the live PRV picture + layer list. Edits mutate the look in
-## Store.project and are pushed by PreviewPusher (deck sync → /api/scene/preview-push → autosave).
-## Math = compose_math.gd (1:1 with the web, golden-tested). Not yet: crop handles, reorder, media drop.
+## Store.project and are pushed by PreviewPusher (deck sync → /api/scene/preview-push → autosave). Math = compose_math.gd.
 
 signal closed
 signal take_requested(scene_id: String, main: int)
@@ -13,6 +12,7 @@ const E := preload("res://features/live/look_edits.gd")
 const LayerInspector := preload("res://features/live/layer_inspector.gd")
 const Geometry := preload("res://features/live/layer_geometry_section.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const Fit := preload("res://features/live/look_editor_fit.gd")  # WO-653: boxes = what Caspar shows
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -33,6 +33,7 @@ var _geo: Geometry
 var _page: VBoxContainer  # WO-608 R2: geometry + layer inspector, shown in the global Inspector while a layer is selected
 var _crop_mode := false
 var _crop_btn: Button
+var _fit := Fit.new()
 const CROP_COLOR := Color("#e3b341")
 
 
@@ -147,8 +148,7 @@ func _take() -> void:
 	take_requested.emit(scene_id, main)
 
 
-func show_status(text: String) -> void:
-	_status.text = text
+func show_status(text: String) -> void: _status.text = text
 
 
 func close_editor() -> void:
@@ -175,6 +175,9 @@ func _canvas() -> Vector2:
 	if rl is Array and main < (rl as Array).size() and rl[main] is Dictionary:
 		return Vector2(float(rl[main].get("w", 1920)), float(rl[main].get("h", 1080)))
 	return Vector2(1920, 1080)
+
+
+func _shown(l: Dictionary) -> Dictionary: return _fit.shown_fill(scene_id, main, l, _canvas())
 
 
 ## Aspect box of the canvas inside the frame (letterboxed).
@@ -212,7 +215,7 @@ func _draw_frame() -> void:
 		var l: Dictionary = layers[i]
 		if not (l.get("source") is Dictionary) or str(l.source.get("value", "")) == "":
 			continue
-		var r := _fill_rect(l.get("fill", {}) if l.get("fill") is Dictionary else {})
+		var r := _fill_rect(_shown(l))
 		var sel := i == _sel
 		_overlay.draw_set_transform_matrix(C.layer_xform(r, _deg(l)))
 		_overlay.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
@@ -271,7 +274,7 @@ func _frame_input(event: InputEvent) -> void:
 func _begin_drag(at: Vector2) -> void:
 	var layers := _layers()
 	if _sel >= 0 and _sel < layers.size():
-		var r := _fill_rect(layers[_sel].get("fill", {}))
+		var r := _fill_rect(_shown(layers[_sel]))
 		var deg := _deg(layers[_sel])
 		var lat := C.layer_xform(r, deg).affine_inverse() * at  # the pointer in the layer's unrotated frame
 		if _crop_mode:
@@ -284,14 +287,14 @@ func _begin_drag(at: Vector2) -> void:
 		var hs := _handles(r)
 		for k in hs:
 			if (hs[k] as Vector2).distance_to(lat) <= HANDLE:
-				_drag = {"start": at, "fill": (layers[_sel].get("fill", {}) as Dictionary).duplicate(), "edge": k, "deg": deg}
+				_drag = {"start": at, "fill": _shown(layers[_sel]).duplicate(), "edge": k, "deg": deg}
 				return
 	for i in range(layers.size() - 1, -1, -1):  # topmost first
 		var l: Dictionary = layers[i]
-		var fr := _fill_rect(l.get("fill", {}))
+		var fr := _fill_rect(_shown(l))
 		if l.get("source") is Dictionary and str(l.source.get("value", "")) != "" and fr.has_point(C.layer_xform(fr, _deg(l)).affine_inverse() * at):
 			_select(i)
-			_drag = {"start": at, "fill": (l.get("fill", {"x": 0, "y": 0, "scaleX": 1, "scaleY": 1}) as Dictionary).duplicate(), "edge": ""}
+			_drag = {"start": at, "fill": _shown(l).duplicate(), "edge": ""}
 			return
 	_select(-1)
 
@@ -301,7 +304,7 @@ func _others_fills(skip: int) -> Array:
 	var layers := _layers()
 	for i in layers.size():
 		if i != skip and layers[i].get("fill") is Dictionary:
-			out.append(layers[i].fill)
+			out.append(_shown(layers[i]))
 	return out
 
 
@@ -359,7 +362,7 @@ func _sync_fields() -> void:
 		_inspector.show_layer(scene_id, main, layers[_sel] if has else {}, _sel)
 	for k in _fields:
 		(_fields[k] as SpinBox).editable = has
-	_geo.show_layer(layers[_sel] if has else {}, _canvas(), Settings.get_setting("editorDefaults.coordinateOrigin", "") == "center")
+	_geo.show_layer(layers[_sel].merged({"fill": _shown(layers[_sel])}, true) if has else {}, _canvas(), Settings.get_setting("editorDefaults.coordinateOrigin", "") == "center")
 	if not has:
 		return
 	var l: Dictionary = layers[_sel]
