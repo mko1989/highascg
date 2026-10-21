@@ -33,3 +33,9 @@ dropdowns. Same flag the timeline clip inspector already used. Box: Loop / Strai
 - Box: Look 1 editor, 3 × wheel-up over the L11 box → zoomed about the pointer, the L11 box still on the clip;
   3 × wheel-down → back to the fit. Screenshots in the session scratchpad.
 - Owner QA: middle-drag pan, pinch on a trackpad.
+
+## Follow-up 21.10 — top border hidden
+
+Owner: "cant see the top border of the canvas in look's editor". A height-bound canvas filled the frame exactly, so its
+1 px outline at y 0 sat on the frame's clipped edge. `look_editor_view.gd box()` now fits inside a 4 px MARGIN; test
+asserts the top stays ≥ MARGIN. Godot tests 20747/0.

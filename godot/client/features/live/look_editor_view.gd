@@ -5,6 +5,7 @@ extends RefCounted
 const MIN := 0.5
 const MAX := 8.0
 const STEP := 1.15
+const MARGIN := 4.0
 
 var zoom := 1.0
 var pan := Vector2.ZERO  # px offset of the zoomed canvas from its fitted, centred place
@@ -12,8 +13,10 @@ var _grab := Vector2.INF
 
 
 ## The canvas's rect inside a `frame`-sized control: letterboxed fit × zoom, shifted by pan.
+## MARGIN keeps the canvas outline off the frame's clipped edge (owner 21.10: the top border was invisible).
 func box(frame: Vector2, canvas: Vector2) -> Rect2:
-	var s := minf(frame.x / maxf(1.0, canvas.x), frame.y / maxf(1.0, canvas.y)) * zoom
+	var room := (frame - Vector2(MARGIN, MARGIN) * 2.0).max(Vector2.ONE)
+	var s := minf(room.x / maxf(1.0, canvas.x), room.y / maxf(1.0, canvas.y)) * zoom
 	var sz := canvas * s
 	return Rect2((frame - sz) / 2.0 + pan, sz)
 

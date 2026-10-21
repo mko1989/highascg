@@ -11,12 +11,15 @@ const CANVAS := Vector2(3072, 1024)
 func test_fit_and_zoom_about_the_pointer() -> void:
 	var v := V.new()
 	var b := v.box(FRAME, CANVAS)
-	t.ok(absf(b.size.x - 1000.0) < 1e-3 and absf(b.position.y - (500.0 - 1000.0 / 3.0) / 2.0) < 1e-3, "1× = letterboxed fit")
+	var fw := 1000.0 - 2.0 * V.MARGIN
+	t.ok(absf(b.size.x - fw) < 1e-3 and absf(b.position.y - (500.0 - fw / 3.0) / 2.0) < 1e-3, "1× = letterboxed fit inside the margin")
+	var tall := v.box(Vector2(1000, 300), CANVAS)
+	t.ok(tall.position.y >= V.MARGIN - 1e-3, "height-bound: the top outline stays inside the frame")
 	var at := Vector2(700, 260)
 	var rel := (at - b.position) / b.size
 	v.zoom_at(at, 3.0, FRAME, CANVAS)
 	var z := v.box(FRAME, CANVAS)
-	t.ok(absf(z.size.x - 1000.0 * pow(V.STEP, 3)) < 1e-2, "3 wheel steps = STEP³")
+	t.ok(absf(z.size.x - fw * pow(V.STEP, 3)) < 1e-2, "3 wheel steps = STEP³")
 	t.ok((z.position + rel * z.size).distance_to(at) < 1e-3, "the point under the pointer stays put")
 
 
