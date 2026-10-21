@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — C1 (take by id) and C2 (PRV push by id) implemented + verified on real Caspar; B Godot side done (wire JSON byte-compatible, golden round-trip test); two server data-safety bugs found and fixed on the way (stale-disk look resolution, deck-sync write overwriting autosaves). Open: B JS side (web exportProject∘importProject), A contract doc, C3/C4, D, switching the web client to C1/C2 (owner QA). Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
+**Status: IN PROGRESS (2026-10-21) — done: C1 take by id + C2 PRV push by id (verified on real Caspar), B golden round trip in both languages, C4 constants endpoint, A generated contract docs + CI guard, D slice 1 (multiview presets/layouts on the node); C3 is server-side for the Godot client. Open: switching the web client to C1/C2/C3 (owner QA), the rest of D (GPU layout view prefs, DeckLink rear order, hardware policy, live-audio play targets), optional `project.schema.json`. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
 
 # WO-598 — Client contract: document it, make it testable, move show logic to the server ("thin client")
 
@@ -98,12 +98,12 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 
 ## Tasks
 
-- [ ] T1 contract docs (A) + CI guard.
+- [x] T1 contract docs (A) + CI guard ✔ 2026-10-21 — generated `docs/wiki/api/contract/{http,ws}.md` + `smoke-wo598-api-contract`; `project.schema.json` not done (the T2 golden fixtures pin the document instead).
 - [x] T2 golden round trip: Godot side ✔ (`test_project_roundtrip.gd`); JS side ✔ 2026-10-21 (`smoke-wo598-web-project-roundtrip`).
 - [ ] T3 take-by-id parity diff test → switch web client (C1).
 - [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
 - [x] T5 constants endpoint (C4) ✔ 2026-10-21 — `GET /api/contract/constants`; client copies pinned by a CI parity smoke instead of a boot fetch (see below).
-- [ ] T6 effects/PIP/border server routes (C3).
+- [~] T6 effects/PIP/border server routes (C3): server side ✔ — registries served as JSON (`GET /api/scene/effect-registry`), PIP overlay preview-push mode, global-border routes, effects via take/preview-push; the Godot client builds none of it. The web client still builds its own PRV AMCP (`amcp-preview-batch.js` → `/api/raw`) until its switch with T4 (owner QA).
 - [~] T7 client-local storage migration (D): multiview presets + multiviewer 2+ layouts on the node ✔ 2026-10-21 (`/api/client-prefs`); GPU layout prefs, DeckLink rear order, hardware policy still per client.
 
 ## Acceptance
@@ -278,6 +278,34 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
       starting state; GUI log 0 errors.
 - **Open:** a live web ↔ Godot check (web editor in a browser) is on the owner checklist. Still per client: GPU
   layout view prefs (hidden ports / labels), DeckLink rear order, hardware policy, live-audio play targets.
+
+## 2026-10-21 — T1 / A: generated HTTP + WebSocket contract, CI guard
+
+- **Investigation:** routes are declared in two ways. Some go through the RouteRegistry (`routes.get/post/delete` in
+  `router.js` and the modules' `register(routes)`, 301 at runtime). The rest are matched by path literal inside the
+  fallthrough handlers of `router-dispatch.js` (`p === '/api/…'`). WS types are sent with `_wsBroadcast` /
+  `broadcast` / `JSON.stringify({ type })` and handled in `src/server/` and `src/tracking/register.js`. Structured
+  AMCP types map to HTTP routes through `TYPE_TO_PATH`.
+- **What was done:**
+  - New `tools/dev/gen-api-contract.js` scans `src/` and writes:
+    - `docs/wiki/api/contract/http.md`: 447 routes as Method | Path | registry/handler | module, plus a blurb per
+      module.
+    - `docs/wiki/api/contract/ws.md`: 81 types as direction | type | module | note, where the note gives the
+      `TYPE_TO_PATH` target.
+  - No line numbers, so unrelated edits don't make the docs stale. `--check` exits 1 when they are stale.
+  - `router.js` also exports `routes` (on the existing export line; still 499 lines).
+  - New smoke `smoke-wo598-api-contract` (curated list), 3 tests:
+    - the committed docs equal the generator output;
+    - every runtime registry route is in http.md;
+    - both directions and both route kinds are present, and the `typeof t !== 'string'` false positive is not.
+- **What was VERIFIED:**
+  - Smoke 3/3.
+  - Mutation check: a temporary `routes.get('/api/zz-mutation')` module failed the smoke as "http.md is stale", and
+    it passed again once the module was removed.
+  - Runtime cross-check: 301/301 registry routes are in http.md.
+  - Offline suite 2997/0 (2 skipped); lint 216; lines OK.
+- **Open:** payload schemas are not generated. The table points at each module's JSDoc. Two web WS listeners have no
+  sender in `src/` (`log_line`, `timeline.playback`); the web may be listening for nothing there.
 
 ## Earlier notes
 

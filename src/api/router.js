@@ -490,7 +490,7 @@ require('./routes-shader-live').register(routes); require('./routes-audio-cross-
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 
 module.exports = {
-	routeRequest,
+	routeRequest, routes, // routes: the registry, read by tools/dev/gen-api-contract.js checks (WO-598 A)
 	getState,
 	parseBody,
 	parseQueryString,

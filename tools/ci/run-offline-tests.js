@@ -101,6 +101,7 @@ const FILES = [
 	'tools/smoke/smoke-wo598-web-project-roundtrip.test.js',
 	'tools/smoke/smoke-wo598-contract-constants.test.js',
 	'tools/smoke/smoke-wo598-client-prefs.test.js',
+	'tools/smoke/smoke-wo598-api-contract.test.js',
 	'tools/smoke/smoke-wo601-global-border-slot-edits.test.js',
 	'tools/smoke/smoke-wo614-project-client-slices.test.js',
 	'tools/smoke/smoke-wo617-tests-never-touch-live-projects.test.js',
