@@ -100,6 +100,11 @@ Not on this list: anything a session can do alone. The node server has been rest
       its windows should still show the right pictures.
 - [ ] **WO-597 T4** — Devices → operator GUI destination: the new **Video output** select (Screen / Shared memory)
       shows "Shared memory" on this box. Don't change it unless you mean to: it needs a Caspar regenerate + restart.
+- [ ] **WO-594 question: shm consumer CPU** — the Godot picture feed costs Caspar +5.2 % of one core at 1080p50
+      (target < 3 %); the 1 h soaks are clean (no writer drops). Getting under target means rebuilding Caspar and
+      swapping the binary (Caspar restarts a few times), plus `sudo sysctl kernel.perf_event_paranoid=1` to profile.
+      OK to do that on this box, or leave it (it is about 0.2 % of the machine)? Also still open: ADD/REMOVE of the
+      consumer on an on-air PGM, which needs a maintenance window.
 - [ ] **WO-599 T4** — on a **4K operator monitor** the Godot client should open on it by itself and draw at 2×
       (same size as at 1080p). Settings → Defaults → This screen → UI scale overrides it per screen.
 - [ ] **WO-599 picker** — Settings → Defaults → This screen → **Choose operator screen…**: a button on every screen
