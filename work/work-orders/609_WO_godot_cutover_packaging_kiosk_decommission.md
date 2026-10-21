@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation written; nothing implemented. Parent: [WO-593](./593_WO_godot_client_port_epic.md). LAST in the chain: runs only after the parity WOs (600–608) are owner-accepted on real shows.**
+**Status: IN PROGRESS (2026-10-21) — investigation written 17.10; interim on the owner's box 21.10: Openbox autostarts the dev Godot client (stand-in for T2) and the operator destination runs `videoOutput: shm` (cutover step 2), New project keeps it. T1–T6 not packaged; ISO / factory reset still seed the kiosk. Next: boot-time operator/destination monitor assignment → [WO-638](./638_WO_boot_monitor_assignment.md). Parent: [WO-593](./593_WO_godot_client_port_epic.md). LAST in the chain: runs only after the parity WOs (600–608) are owner-accepted on real shows.**
 
 # WO-609 — Cutover: package + install the Godot operator client, then decommission the Firefox kiosk
 
