@@ -1502,8 +1502,9 @@ and finish only from the dots", then "the dots should be in the middle of the co
   Stream / Virtual cam / Record / Audio sockets went from 30×24 to 40×40, so the dot sits inside a visible socket.
   On the box a click on the Rec1 socket edge opened Rec1, a click on its centre armed a cable, and the config md5
   was unchanged.
-- Noticed, not changed: right after arming, before the first mouse motion, the ghost line runs from the
-  window's top-left (pre-existing).
+- ~~Right after arming, before the first mouse motion, the ghost line ran from the window's top-left~~ — fixed
+  2026-10-21: `cable_layer.gd` seeds `pointer` from the mouse when the ghost is armed. Box: armed DP 0/1 with no
+  motion → no line; one motion → the dashed ghost follows; Cancel cable → "Cable mode cancelled", config md5 unchanged.
 
 
 ## Slice 12 — DeckLink connector drag onto a destination / Sources (2026-10-20, DONE)

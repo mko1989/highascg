@@ -45,6 +45,8 @@ var simple := false:
 var edges: Array = []  # the graph's edges (Node view fans)
 var ghost_from := "":  # anchor key, "" = no ghost
 	set(v):
+		if v != "" and ghost_from == "" and is_inside_tree():
+			pointer = get_local_mouse_position()  # arming: start at the mouse, not (0, 0), before the first motion
 		ghost_from = v
 		queue_redraw()
 var pointer := Vector2.ZERO:  # local
