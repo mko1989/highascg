@@ -483,7 +483,7 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k.keycode == KEY_ESCAPE and _gesture.cancel():
 		get_viewport().set_input_as_handled()
-	elif k.keycode == KEY_Z and k.is_command_or_control_pressed() and not k.shift_pressed:
+	elif k.keycode == KEY_Z and k.is_command_or_control_pressed() and not k.shift_pressed and _gesture.can_undo():
 		get_viewport().set_input_as_handled()
 		_gesture.undo()
 	elif (k.keycode == KEY_DELETE or k.keycode == KEY_BACKSPACE) and _gesture.selected_edge != "":

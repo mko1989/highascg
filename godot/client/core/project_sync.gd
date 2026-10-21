@@ -13,6 +13,7 @@ const NetUtil := preload("res://core/net_util.gd")
 
 signal saved(rev: int)
 signal save_failed(reason: String)
+signal edited  # WO-642: every local edit (mark_dirty / deck_changed) — ProjectUndo snapshots on it
 
 const DEBOUNCE_S := 3.0
 const DECK_DEBOUNCE_S := 0.1
@@ -53,6 +54,7 @@ func _ready() -> void:
 func deck_changed() -> void:
 	if not project_gone:
 		_deck_timer.start()
+		edited.emit()
 
 
 func send_deck_sync(force: bool) -> bool:
@@ -95,6 +97,7 @@ static func build_deck_payload(project: Dictionary) -> Dictionary:
 func mark_dirty(immediate := false) -> void:
 	if project_gone:
 		return
+	edited.emit()
 	if immediate:
 		_timer.stop()
 		flush()
