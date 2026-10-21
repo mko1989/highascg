@@ -106,7 +106,9 @@ Importer map (rg `require(...)`, 21.10):
 ### Follow-ups (not done)
 
 - Server WO-319 gui-stream had no client any more — removed in [WO-660](./660_WO_remove_gui_stream_encoder.md).
-- `client/lib/input-channels.js` `resolveMvCellSourceChannel` lost its only caller (the multiview hole reporter).
+- `client/lib/input-channels.js` `resolveMvCellSourceChannel` lost its only caller (the multiview hole reporter) —
+  removed 21.10 with its two WO-271 source pins (the server `live-source-route-heal.js` and Godot `mv_layout.gd`
+  copies are the live ones; Godot's comment repointed). `test:ci` 2728/0 after.
 - Kept on purpose: the server atlas (`atlas: true`) — the Godot compose tiles still send it (WO-597 §D).
 
 ## What was VERIFIED

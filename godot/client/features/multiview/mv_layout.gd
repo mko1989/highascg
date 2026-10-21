@@ -310,7 +310,8 @@ static func drop_cell(data: Dictionary, x: float, y: float, cw: float, ch: float
 		"source": {"value": data.get("value"), "type": data.get("type") if data.get("type") else "media", "label": label}, "aspectLocked": true}
 
 
-## web resolveMvCellSourceChannel (WO-271) — a cell's live source channel against the CURRENT map (identity first).
+## WO-271 — a cell's live source channel against the CURRENT map, identity first (server mirror:
+## src/config/live-source-route-heal.js healMultiviewCellSource; the web copy went with the kiosk, WO-646).
 static func mv_cell_source_channel(c: Dictionary, parsed: Variant, cm: Dictionary) -> Variant:
 	if not (parsed is Dictionary):
 		return null

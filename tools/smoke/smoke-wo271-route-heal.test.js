@@ -92,16 +92,4 @@ describe('WO-271 T271.2/T271.4: wiring (source asserts)', () => {
 		assert.ok(idx > 0 && idx < routing.indexOf('reapplyAllMultiviewLayouts'), 'heal must precede multiview reapply')
 	})
 
-	it('input-channels.js exports the heal-aware resolveMvCellSourceChannel helper', () => {
-		const lib = src('client/lib/input-channels.js')
-		assert.match(lib, /export function resolveMvCellSourceChannel/)
-	})
-
-	it('client resolver resolves identity BEFORE the known-number fallback (mirror lockstep)', () => {
-		const lib = src('client/lib/input-channels.js')
-		const body = lib.slice(lib.indexOf('export function resolveMvCellSourceChannel'))
-		const identityAt = body.indexOf("e.kind === 'decklink' && e.slot === slot")
-		const knownAt = body.indexOf('known.has(ch)')
-		assert.ok(identityAt > 0 && knownAt > 0 && identityAt < knownAt, 'identity resolution must precede the known-number check')
-	})
 })
