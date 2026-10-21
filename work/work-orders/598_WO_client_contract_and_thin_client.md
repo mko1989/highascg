@@ -175,13 +175,32 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   - The web DeckLink add/remove, Sources Live Restart/Stop/Remove, extra-live-source remove, live-audio inspector Stop and
     live-audio PGM routes use the endpoint. Request plans were golden-checked, and it was box-verified through Caspar's log.
 - **Still composed in the web client (open here):**
-  - `shader-live-editor.js`: MIXER param writes and CG ADD.
-  - `shader-cg-update.js`: CG UPDATE.
-  - `multiview-editor-canvas-apply.js`: `/api/amcp/batch` audio focus.
+  - ~~`shader-live-editor.js` MIXER / CG ADD, `shader-cg-update.js` CG UPDATE~~ — done 2026-10-21, see below.
+  - ~~`multiview-editor-canvas-apply.js` audio focus~~ — done 2026-10-21 (8c93f7a9): `POST /api/multiview/audio-focus`.
   - `amcp-preview-batch.js`: the web PRV preview pipeline (scene PRV push, global border, live effects, edit-chrome
     clear, PRV runtime clear). Godot stages PRV through `/api/scene/*` instead.
   - `logs-modal.js` stays a raw console by design.
 - **Rule for the Godot port:** a port of any of these lands its server endpoint first. It never uses `/api/raw`.
+
+## 2026-10-21 — web shader-live editor and multiview audio focus moved server-side
+
+- **What was done:**
+  - New `POST /api/shader-live/push { shaderId, payload, prvOnly? }` in `routes-shader-live.js`. It CG UPDATEs the
+    web editor's unsaved working copy onto every live instance of the shader, or only the PRV instances for a wiggle.
+    It reuses `pushPayload`: AMCP escaping, and a 403 re-hosts once via CG ADD. A payload with any key other than
+    `common` / `passes.*.source` is rejected (400), so the endpoint is not a raw AMCP pipe.
+  - `shader-cg-update.js` now has `pushShaderPayload()` (the `cgUpdateJson` / `pushCgUpdateTo` raw path is gone).
+    `shader-live-editor.js` `pushLive` is one endpoint call, and the MIXER rides go to `/api/shader-live/mixer`.
+  - Multiview audio focus (WO-600 M slice 1) is `POST /api/multiview/audio-focus`. It also fixed a web bug: the
+    old batch sent `MIXER <ch> VOLUME <layer> -60`, a dB value with the layer in the volume slot.
+- **What was VERIFIED:**
+  - Smoke `smoke-wo606-shader-live-server` gained a push test. It covers: 3 targets, a 403 re-host, exact AMCP
+    escaping of quotes and `\n`, `prvOnly` → PRV only, 5 bad payloads → 400 with nothing sent, and an unknown
+    shader → 0 targets.
+  - Offline suite 2983/0. On the box after a node restart: an unknown shader gives `{ok, targets:0}` and a bad
+    payload gives 400.
+- **Open:** a real shader edit / wiggle needs a shader on air, so it is an owner check (box rules: no landing).
+  The remaining raw paths are `amcp-preview-batch.js` (needs owner QA to switch) and `logs-modal.js` (by design).
 
 ## Earlier notes
 

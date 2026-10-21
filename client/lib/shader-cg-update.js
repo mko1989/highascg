@@ -1,44 +1,35 @@
 /**
- * shader-cg-update.js — shared CG UPDATE push for Shader Live (editor + wiggle preview).
- * AMCP quoted-string escaping: BACKSLASHES FIRST, then quotes — multi-line GLSL serializes
- * with \n escapes, and without doubling them Caspar unescapes them into real newlines inside
- * a JSON string literal = invalid JSON = silent no-op.
+ * shader-cg-update.js — shared live push for Shader Live (editor + wiggle preview).
+ * WO-598 directive D: the node composes the CG UPDATE (AMCP escaping, 403 → CG ADD re-host) —
+ * POST /api/shader-live/push lands the payload on every live instance of the shader.
  */
-
-/** @param {object} payload  @returns {string} the escaped inline-JSON argument */
-export function cgUpdateJson(payload) {
-	return JSON.stringify(payload).replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-}
 
 /**
- * Push one payload to a set of instances. Returns per-target errors (403 = not CG-hosted).
+ * Push one payload to every live instance of a shader (or only its PRV instances).
  * @param {{ post: Function }} api
- * @param {Array<{ channel: number, pLayer: number }>} targets
- * @param {object} payload
+ * @param {string} shaderId
+ * @param {object} payload  { common } | { passes: { key: { source } } }
+ * @param {boolean} [prvOnly]
+ * @returns {Promise<string[]>} per-target errors
  */
-export async function pushCgUpdateTo(api, targets, payload) {
-	const json = cgUpdateJson(payload)
-	const errors = []
-	for (const t of targets) {
-		try {
-			const r = await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} UPDATE 0 "${json}"` })
-			if (r?.error) errors.push({ target: t, error: String(r.error) })
-		} catch (e) {
-			errors.push({ target: t, error: String(e?.message || e) })
-		}
+export async function pushShaderPayload(api, shaderId, payload, prvOnly = false) {
+	try {
+		const r = await api.post('/api/shader-live/push', { shaderId, payload, prvOnly })
+		return Array.isArray(r?.errors) ? r.errors : r?.error ? [String(r.error)] : []
+	} catch (e) {
+		return [String(e?.message || e)]
 	}
-	return errors
 }
 
 /**
  * todos27: WIGGLE preview — oscillate a param on the PREVIEW instances only for ~1.3s, then
  * restore, so the operator can SEE what the value does before committing to it. Never touches
  * shaderCfg (works on a scratch copy of the pass source) and never rides onto PGM.
- * @param {{ api: object, param: object, source: string, passKey: string,
+ * @param {{ api: object, param: object, source: string, passKey: string, shaderId: string,
  *   prvTargets: Array<{channel:number,pLayer:number}>, rewrite: Function }} opts
  */
 export async function wiggleParamOnPreview(opts) {
-	const { api, param, source, passKey, prvTargets, rewrite } = opts
+	const { api, param, source, passKey, shaderId, prvTargets, rewrite } = opts
 	if (!prvTargets.length) return { ok: false, reason: 'no_preview_instance' }
 	const orig = [...param.values]
 	const span = Number.isFinite(param.max) && Number.isFinite(param.min) ? param.max - param.min : 0
@@ -46,7 +37,7 @@ export async function wiggleParamOnPreview(opts) {
 	const push = async (vals) => {
 		const src = rewrite(source, param, vals)
 		const payload = passKey === 'common' ? { common: src } : { passes: { [passKey]: { source: src } } }
-		await pushCgUpdateTo(api, prvTargets, payload)
+		await pushShaderPayload(api, shaderId, payload, true)
 	}
 	try {
 		for (let i = 0; i < STEPS; i++) {

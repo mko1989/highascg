@@ -15,7 +15,7 @@ import { escapeHtml } from '../lib/dom-escape.js'
 import { rewriteParamValues } from '../lib/shader-param-scan.js'
 import { scanShaderCfg } from '../lib/shader-controls.js'
 import { liveShaderInstances, createPlaylistNowTracker } from '../lib/shader-live-instances.js'
-import { pushCgUpdateTo, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
+import { pushShaderPayload, wiggleParamOnPreview } from '../lib/shader-cg-update.js'
 import { MIXER_ROWS, mixerRowsHtml, groupHtml, paramRowHtml, advancedHtml } from './shader-live-rows.js'
 import { createShaderControlsPanel } from './shader-controls-panel.js'
 import { installShaderAudition } from './shader-live-audition.js'
@@ -247,7 +247,7 @@ export function initShaderLiveEditor(stateStore) {
 			const inst = selected()
 			const v = Number(t.value)
 			if (!row || !inst || !Number.isFinite(v)) return
-			void api.post('/api/raw', { cmd: `MIXER ${inst.channel}-${inst.pLayer} ${row.cmd} ${v}` }).catch(() => {})
+			void api.post('/api/shader-live/mixer', { channel: inst.channel, layer: inst.pLayer, cmd: row.cmd, value: v }).catch(() => {})
 			return
 		}
 		if (t.dataset.p == null) return
@@ -278,18 +278,9 @@ export function initShaderLiveEditor(stateStore) {
 			passKey === 'common'
 				? { common: shaderCfg.common }
 				: { passes: { [passKey]: { source: shaderCfg.passes[passKey].source } } }
-		const targets = instances().filter((i) => i.shaderId === inst.shaderId)
-		for (const { target: t, error } of await pushCgUpdateTo(api, targets, payload)) {
-			/* todos27: playlist hops with a MIX transition PLAY plain html producers — CG UPDATE
-			 * 403s on those. Re-host via CG ADD once (one visible restart, only at edit time). */
-			if (/403/.test(error) && t.cgName) {
-				await api.post('/api/raw', { cmd: `CG ${t.channel}-${t.pLayer} ADD 0 "${t.cgName}" 1 "{}"` }).catch(() => {})
-				const again = await pushCgUpdateTo(api, [t], payload)
-				if (again.length) console.warn('[shader-live] re-host retry failed:', again[0].error)
-			} else {
-				console.warn('[shader-live] CG UPDATE failed:', error)
-			}
-		}
+		/* todos27: playlist hops with a MIX transition PLAY plain html producers — CG UPDATE 403s
+		 * on those; the node re-hosts via CG ADD once (one visible restart, only at edit time). */
+		for (const error of await pushShaderPayload(api, inst.shaderId, payload)) console.warn('[shader-live] CG UPDATE failed:', error)
 	}
 
 	/* todos27: SHOW what a value does — wiggle it briefly on the PREVIEW instances, restore. */
@@ -306,7 +297,7 @@ export function initShaderLiveEditor(stateStore) {
 		}
 		t.disabled = true
 		try {
-			await wiggleParamOnPreview({ api, param: p, source: sourceOf(p.passKey), passKey: p.passKey, prvTargets, rewrite: rewriteParamValues })
+			await wiggleParamOnPreview({ api, param: p, source: sourceOf(p.passKey), passKey: p.passKey, shaderId: inst.shaderId, prvTargets, rewrite: rewriteParamValues })
 		} finally {
 			t.disabled = false
 		}

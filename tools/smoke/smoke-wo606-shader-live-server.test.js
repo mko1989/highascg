@@ -175,3 +175,25 @@ test('Shader FX params: scan unsaved sources, rewrite one literal by scan index'
 	assert.ok('error' in (await FX.rewrite({ ...body, index: 7, values: [1] })))
 	assert.ok('error' in (await FX.rewrite({ ...body, index: 0, values: [1, 2] })))
 })
+
+test('push: web working copy lands on every instance (prvOnly → PRV only), 403 re-hosts, bad payloads 400', async () => {
+	const h = {}
+	const routes = { get: (p, fn) => (h[`GET ${p}`] = fn), post: (p, fn) => (h[`POST ${p}`] = fn) }
+	require('../../src/api/routes-shader-live').register(routes)
+	const push = h['POST /api/shader-live/push']
+	const ctx = makeCtx(new Set(['1-103']))
+	const r = await push({ body: JSON.stringify({ shaderId: 'SH-TEST', payload: { passes: { image: { source: 'x "q"\n' } } } }), ctx })
+	assert.deepEqual(JSON.parse(r.body), { ok: true, targets: 3, errors: [] })
+	assert.ok(ctx.sent.includes('CG 1-103 ADD 0 "shaders/sh-test" 1 "{}"'))
+	assert.equal(ctx.sent[0], 'CG 1-103 UPDATE 0 "{\\"passes\\":{\\"image\\":{\\"source\\":\\"x \\\\\\"q\\\\\\"\\\\n\\"}}}"')
+	const prv = makeCtx()
+	const w = JSON.parse((await push({ body: JSON.stringify({ shaderId: 'sh-test', payload: { common: '' }, prvOnly: true }), ctx: prv })).body)
+	assert.equal(w.targets, 1)
+	assert.deepEqual(prv.sent, ['CG 2-3 UPDATE 0 "{\\"common\\":\\"\\"}"'])
+	for (const payload of [null, {}, { common: 3 }, { passes: { image: {} } }, { common: '', cmd: 'x' }]) {
+		const bad = makeCtx()
+		assert.equal((await push({ body: JSON.stringify({ shaderId: 'sh-test', payload }), ctx: bad })).status, 400)
+		assert.deepEqual(bad.sent, [])
+	}
+	assert.equal(JSON.parse((await push({ body: JSON.stringify({ shaderId: 'sh-none', payload: { common: '' } }), ctx: makeCtx() })).body).targets, 0)
+})

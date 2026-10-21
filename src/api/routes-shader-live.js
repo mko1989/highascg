@@ -11,6 +11,8 @@
  *   POST /api/shader-live/audition { value, label?, mainIndex? }  stage a library shader on PRV (Templates click)
  *   POST /api/shader-live/scan { common, passes }  → { params }   Shader FX editor: params of UNSAVED sources
  *   POST /api/shader-live/rewrite { common, passes, index, values } → { passKey, source }   one literal rewritten
+ *   POST /api/shader-live/push { shaderId, payload, prvOnly? } → { targets, errors }   CG UPDATE an UNSAVED edit
+ *        (web shader-live-editor.js working copy, wiggle preview) onto the live instances; 403 re-hosts once
  * GET also carries `stack` — the main's PGM look-band layers 10–20 and their occupants (web shader-live-stack.js);
  * landing / clearing rides the existing POST /api/shader-stack.
  * Value changes land on EVERY live instance of the shader via `CG UPDATE` (player.js hot-recompiles).
@@ -121,6 +123,20 @@ async function handleAudition(body, ctx) {
 	return reply(200, { ok: true, key: `${sid}@${prvCh}-10` })
 }
 
+/** Web editor's own working copy → every live instance (or only PRV for a wiggle). payload = { common } | { passes: { k: { source } } }. */
+async function handlePush(body, ctx) {
+	const b = parseBody(body) || {}
+	const id = String(b.shaderId || '').trim().toLowerCase()
+	const pl = b.payload && typeof b.payload === 'object' ? b.payload : null
+	const passesOk = (ps) => ps && typeof ps === 'object' && Object.values(ps).every((v) => v && typeof v.source === 'string')
+	const keys = pl ? Object.keys(pl) : []
+	const ok = keys.length > 0 && keys.every((k) => (k === 'common' ? typeof pl.common === 'string' : k === 'passes' && passesOk(pl.passes)))
+	if (!id || !ok) return reply(400, { ok: false, error: 'shaderId and payload { common } | { passes: { key: { source } } } required' })
+	const targets = liveShaderInstances(ctx).filter((i) => i.shaderId === id && (!b.prvOnly || i.isPrv))
+	const errors = await serialized(id, () => S.pushPayload(ctx, targets, pl))
+	return reply(200, { ok: true, targets: targets.length, errors })
+}
+
 /** @param {any} routes */
 function register(routes) {
 	routes.get('/api/shader-live', ({ ctx, query }) => reply(200, { instances: liveShaderInstances(ctx), stack: stackOf(ctx, Math.max(0, parseInt(query?.main, 10) || 0)) }), { requireCaspar: false })
@@ -135,6 +151,7 @@ function register(routes) {
 		const m = String(path).match(/^\/api\/shader-live\/shaders\/([^/]+)$/)
 		return m ? handleView(decodeURIComponent(m[1]).toLowerCase()) : reply(404, { ok: false, error: 'not found' })
 	}, { requireCaspar: false })
+	routes.post('/api/shader-live/push', ({ body, ctx }) => handlePush(body, ctx), { requireCaspar: true })
 	routes.post('/api/shader-live/mixer', ({ body, ctx }) => handleMixer(body, ctx), { requireCaspar: true })
 	routes.post('/api/shader-live/shaders/*', ({ path, body, ctx }) => {
 		const m = String(path).match(/^\/api\/shader-live\/shaders\/([^/]+)\/([a-z-]+)$/)
@@ -142,4 +159,4 @@ function register(routes) {
 	}, { requireCaspar: true })
 }
 
-module.exports = { register, MIXER_CMDS }
+module.exports = { register, handlePush, MIXER_CMDS }

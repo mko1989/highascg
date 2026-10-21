@@ -73,6 +73,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       multiview output shows PGM / PRV where the boxes are. Drag a DeckLink from Sources → Live onto the canvas: a new
       window appears on the multiview. Click it: you hear only that window (the speaker mark moves). The web Multiview
       tab shows the same layout after a reload.
+- [ ] **WO-598 shader push** — web client: put a shader look on PGM and PRV, open Shader Live, drag a param slider.
+      Both outputs change live. Press a param's wiggle button: only PRV wobbles, then it settles back. The Opacity /
+      Brightness rows still ride the layer. A playlist hop with a MIX transition restarts the shader once on its first
+      edit (re-host), then it edits smoothly.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source
