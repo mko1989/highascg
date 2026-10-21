@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — investigation complete, 18 child WOs (594–611); owner decisions answered (§8); M0 trial + Caspar shm consumer BUILT and verified on the dev Mac (WO-595/594). Next action: move the trial to the box when available → WO-595 box steps → GO/NO-GO.**
+**Status: IN PROGRESS (2026-10-21) — phases 0–5 built and box-verified: the Godot client runs on the shop box over the Caspar `shm` consumer and does everything the web operator client does (per-area parity in WO-600…608, owner ticks in `work/checklist20.10.26_owner_checks.md`); WO-595's GO was taken in practice (the owner said to continue the port on the box, 17.10) without filling its M1–M12 table. Remaining: owner QA on real shows → [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) (package + cut over + delete the kiosk); [WO-610](./610_WO_godot_remote_native_client.md) deferred; [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) GDTF lighting not started. See "Progress (2026-10-21)" at the end.**
 
 # WO-593 — Port the operator client to Godot, built around Caspar channels in shared memory (EPIC)
 
@@ -215,3 +215,21 @@ Investigation only (2026-10-17): inventories, desk probes, research, 19 work ord
 - Hand re-checks of every inventory claim a WO relies on (marked ✔ in the child WOs); three
   inventory claims were corrected in the process (meter peak-hold, keyframe easing scope, orphan file).
 - Nothing was run on the production box.
+
+## Progress (2026-10-21)
+
+| Phase | WO | State |
+|-------|----|-------|
+| 0 | 595 M0 spike | box numbers recorded under WO-599 "Box run" (canvas 49.3 fps, previs 3072×1728 45.7 fps); GO taken in practice, M1–M12 table not filled |
+| 0 | 594 shm consumer | built into Caspar v2.5.1 (`highascg-build-v2`), running on the box; CPU +5.2 % of a core vs < 3 % target; 1 h soak open |
+| 0 | 611 web bugs | #1–#9 fixed |
+| 1 | 599 foundation | done except the native monitor picker (placement + HiDPI 21.10) |
+| 1 | 596 hshm GDExtension | Linux build in use on the box (`addons/hshm`), CI runs the seqlock + bridge tests; the `.so` is built locally (no CI build) |
+| 1 | 597 video surfaces + atlas | done pending owner check (atlas 21.10) |
+| 2 | 598 contract | done for the Godot client; the web client's switch to take-by-id / PRV push is owner QA |
+| 3 | 600 live core | done pending owner ticks (atlas step 4, 21.10) |
+| 4 | 607 previs | done (T7 pop-out deferred, T8 parked); 612 MVR import, 614 stage builder, 616 tracking done |
+| 5 | 601–606, 608 | built and box-verified slice by slice; owner ticks open |
+| 6 | 609 cutover | not started — gated on ≥ 3 real shows on the native client |
+| — | 621–632 | the owner's next.md rounds 1–4, the dock, LED test card, PSN out, Art-Net read-through: done |
+

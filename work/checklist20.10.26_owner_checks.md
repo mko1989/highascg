@@ -93,6 +93,8 @@ Not on this list: anything a session can do alone. The node server has been rest
       its windows should still show the right pictures.
 - [ ] **WO-597 T4** — Devices → operator GUI destination: the new **Video output** select (Screen / Shared memory)
       shows "Shared memory" on this box. Don't change it unless you mean to: it needs a Caspar regenerate + restart.
+- [ ] **WO-599 T4** — on a **4K operator monitor** the Godot client should open on it by itself and draw at 2×
+      (same size as at 1080p). Settings → Defaults → This screen → UI scale overrides it per screen.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.
 - [ ] **WO-612 T7** — Previs → MVR scene → Export…, then open the .mvr in Capture (or MA3 / Perastage). The LED
       walls / TVs / projection should sit where they are in our previs. Does the tool show the `highascg:pgm1` source

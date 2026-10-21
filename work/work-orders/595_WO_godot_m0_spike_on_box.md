@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-17) — trial BUILT and verified on the dev Mac (owner: no box available now; "create the trial here and then i will move it to the box"). Box steps (runbook `godot/spikes/m0/README.md`) still to run. Parent: [WO-593](./593_WO_godot_client_port_epic.md). GATE: the full port (WO-598…610) does not start until this WO records GO.**
+**Status: SUPERSEDED IN PRACTICE (2026-10-21) — trial built on the dev Mac, then run on the box 17.10 (numbers under [WO-599](./599_WO_godot_client_foundation.md) "Box run": canvas 49.3 fps, atlas 49.2 fps, previs 3072×1728 45.7 fps with 17 % gaps); the owner had the port continue on the box, which is the GO; the M1–M12 table below was never filled in. Parent: [WO-593](./593_WO_godot_client_port_epic.md). GATE: the full port (WO-598…610) does not start until this WO records GO.**
 
 # WO-595 — M0 spike: Godot on the box, video from shared memory, UI over video, 3D previs quad
 
