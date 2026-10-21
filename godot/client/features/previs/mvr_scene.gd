@@ -285,6 +285,16 @@ func mark(frames: Array) -> void:
 
 
 ## The scene's placement on our stage (mvr_model place_of): this node's transform; the parts stay in the file's frame.
+## WO-649 — apply project.previs.mvr (place, hidden layers / objects, layer colours, the scene) — the Previs section and
+## the Live 3D view share it.
+func configure(c: Dictionary) -> void:
+	set_place(M.place_of(c))
+	set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
+	set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
+	set_layer_colors(Tint.colors(c, "layer_colors"))
+	show_scene(str(c.get("id", "")))
+
+
 func set_place(place: Dictionary) -> void:
 	transform = M.placement(place)
 

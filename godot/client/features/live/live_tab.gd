@@ -140,6 +140,9 @@ func _ready() -> void:
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
+	var lit := bool(cfg.get_value("live", "lights", true))
+	(_view_btns["lights"] as Button).set_pressed_no_signal(lit)
+	stage3d.set_lights(lit)
 	set_view(str(Config.args.get("live-view", cfg.get_value("live", "view", "standard"))), false)
 
 
@@ -148,45 +151,56 @@ func toggle_shader_live(on: Variant = null) -> void:
 	shader_live.visible = (not shader_live.visible) if on == null else bool(on)
 
 
-## WO-621 N6 — Standard / 3D switch over the preview (web previs-pgm-3d.js toggle). Remembered in ui.cfg.
+## WO-621 N6 / WO-649 — one 2D / 3D toggle over the preview (web previs-pgm-3d.js toggle; it names the view shown),
+## then Fit and Lights in 3D. View and lights are remembered in ui.cfg.
 func _view_switch() -> Control:
 	var row := HBoxContainer.new()
 	row.position = Vector2(8, 8)
-	var group := ButtonGroup.new()
-	for spec in [["standard", "Standard", "The operator channel's picture"], ["3d", "3D", "The Previs stage with the live pictures on its walls (drag: orbit, wheel: zoom)"]]:
-		var b := Button.new()
-		b.text = spec[1]
-		b.tooltip_text = spec[2]
-		b.toggle_mode = true
-		b.button_group = group
-		var v: String = spec[0]
-		b.pressed.connect(func() -> void: set_view(v))
-		row.add_child(b)
-		_view_btns[v] = b
+	var v3 := Button.new()
+	v3.toggle_mode = true
+	v3.tooltip_text = "2D: the operator channel's picture · 3D: the Previs stage and MVR model with the live pictures on its walls (drag: orbit, wheel: zoom)"
+	v3.toggled.connect(func(on: bool) -> void: set_view("3d" if on else "standard"))
+	row.add_child(v3)
+	_view_btns["3d"] = v3
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.tooltip_text = "Frame the whole stage"
 	fit.pressed.connect(func() -> void: stage3d.fit())
 	row.add_child(fit)
 	_view_btns["fit"] = fit
+	var lights := Button.new()
+	lights.text = "Lights"
+	lights.toggle_mode = true
+	lights.tooltip_text = "The patched lighting rig with its beams (off: the model without it)"
+	lights.toggled.connect(func(on: bool) -> void:
+		stage3d.set_lights(on)
+		_save_ui("lights", on))
+	row.add_child(lights)
+	_view_btns["lights"] = lights
 	return row
 
 
 func set_view(v: String, save := true) -> void:
 	view = "3d" if v == "3d" else "standard"
 	var is3d := view == "3d"
-	for k in ["standard", "3d"]:
-		(_view_btns[k] as Button).set_pressed_no_signal(k == view)
+	var b3 := _view_btns["3d"] as Button
+	b3.set_pressed_no_signal(is3d)
+	b3.text = "3D" if is3d else "2D"
 	(_view_btns["fit"] as Button).visible = is3d
+	(_view_btns["lights"] as Button).visible = is3d
 	stage3d.visible = is3d
 	_video.visible = _show_whole()
 	tiles.visible = not is3d
 	_hold_surface()
 	if save:
-		var cfg := ConfigFile.new()
-		cfg.load(UI_CFG)
-		cfg.set_value("live", "view", view)
-		cfg.save(UI_CFG)
+		_save_ui("view", view)
+
+
+func _save_ui(key: String, value: Variant) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	cfg.set_value("live", key, value)
+	cfg.save(UI_CFG)
 
 
 ## The whole operator surface is drawn only in the standard view and outside atlas mode.

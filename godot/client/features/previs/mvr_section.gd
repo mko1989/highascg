@@ -156,13 +156,9 @@ func _maybe_reload() -> void:
 	var p := M.place_of(c)
 	for k in _place:
 		(_place[k] as SpinBox).set_value_no_signal(p[k])
-	scene.set_place(p)
-	scene.set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
-	scene.set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
-	scene.set_layer_colors(Tint.colors(c, "layer_colors"))
+	scene.configure(c)
 	_colors.fill(scene.layers, Tint.colors(c, "layer_colors"), {}, _hidden_layers())
 	_screens.refresh()
-	scene.show_scene(str(c.get("id", "")))
 
 
 func refresh_list() -> void:
