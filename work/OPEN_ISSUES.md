@@ -17,6 +17,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | ID | Summary | Tracker | Status |
 |----|---------|---------|--------|
+| WO-651 | 21.10: Look editor TAKE button (the deck's TAKE hides while editing); a ✕ on the look card above the ⚙ deletes the look (confirm) | [WO-651](./work-orders/651_WO_look_editor_take_and_card_delete.md) | 🟡 Done 21.10 (Godot 20694/0; box: TAKE 200, ✕ → confirm, Cancel keeps it) |
 | WO-650 | 21.10: Look editor — removing the only layer left it on PRV until the editor closed; preview-push now clears PRV for a look with no sources | [WO-650](./work-orders/650_WO_look_editor_last_layer_remove_clears_prv.md) | 🟡 Done 21.10 (smoke 26/0); owner: remove the only layer → PRV empty |
 | WO-649 | 21.10: Live preview — one 2D / 3D toggle (was Standard / 3D); the Live 3D view shows the project's MVR model and the patched lighting rig, Lights on / off | [WO-649](./work-orders/649_WO_live_preview_2d_3d_toggle_mvr_model.md) | 🟡 Done 21.10 (Godot 20696/0; box: toggle, MVR model, Lights off / on); owner: beams with a console, framing |
 | WO-648 | 21.10: Live "Standard" preview fills the width — the 16:9 canvas overflows top / bottom (never stretched), the mouse wheel scrolls the overflow | [WO-648](./work-orders/648_WO_live_preview_fills_width.md) | 🟡 Done 21.10 (Godot 20696/0; box: full width, wheel pans both ways); owner: move / resize / drop on it |

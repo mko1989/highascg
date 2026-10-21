@@ -123,6 +123,7 @@ func _ready() -> void:
 	presets.editing_cb = func() -> String: return editor.scene_id if editor.visible else ""
 	add_child(presets)
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
+	editor.take_requested.connect(func(id: String, m: int) -> void: deck.request_take(id, m, "program"))
 	deck.look_deleted.connect(func(id: String) -> void:
 		if editor.visible and editor.scene_id == id:
 			editor.close_editor())
@@ -137,7 +138,9 @@ func _ready() -> void:
 		presets.open(m, label))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
-		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR))
+		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)
+		if editor.visible:  # the action line hides with the deck (WO-621 N5); the editor TAKE answers in its own status
+			editor.show_status(text))
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	var lit := bool(cfg.get_value("live", "lights", true))

@@ -4,6 +4,7 @@ extends VBoxContainer
 ## Math = compose_math.gd (1:1 with the web, golden-tested). Not yet: crop handles, reorder, media drop.
 
 signal closed
+signal take_requested(scene_id: String, main: int)
 
 const C := preload("res://features/live/compose_math.gd")
 const Pusher := preload("res://features/live/preview_pusher.gd")
@@ -45,6 +46,11 @@ func _ready() -> void:
 	_title = Label.new()
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
+	var take := Button.new()  # WO-651: the deck (and its TAKE) is hidden while the editor is open
+	take.text = "TAKE"
+	take.tooltip_text = "Take this look to PGM"
+	take.pressed.connect(_take)
+	head.add_child(take)
 	var close := Button.new()
 	close.text = "Close"
 	close.pressed.connect(close_editor)
@@ -133,6 +139,16 @@ func open(look_id: String, main_idx: int) -> void:
 		pusher.schedule(scene_id, main)  # stage it on PRV (re-take or nudge, server decides)
 	else:  # WO-623 B: a new empty look (deck "+") — the web stages nothing; the take route refuses a look with no sources
 		_status.text = "Empty look — drop a source on the frame to stage it on PRV"
+
+
+## The look is already staged on PRV by the pushes; the live tab takes it like the deck's TAKE.
+func _take() -> void:
+	ProjectSync.send_deck_sync(true)  # an edit still inside the push debounce reaches the server first
+	take_requested.emit(scene_id, main)
+
+
+func show_status(text: String) -> void:
+	_status.text = text
 
 
 func close_editor() -> void:

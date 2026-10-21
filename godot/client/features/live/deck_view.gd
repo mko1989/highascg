@@ -188,6 +188,11 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	var thumb := LookThumb.new()  # WO-608 R5: looks show as thumbnails
 	thumb.setup(scene, _res(_main_for_card), _cm())
 	v.add_child(thumb)
+	var del := Icons.button("close", "Delete look", 12)  # WO-651: ✕ in the corner above the ⚙
+	del.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	del.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	del.pressed.connect(func() -> void: _confirm_delete(id))
+	thumb.add_child(del)
 	var name_l := Label.new()
 	name_l.text = str(scene.get("name", "(unnamed)"))
 	name_l.add_theme_font_size_override("font_size", 15)
