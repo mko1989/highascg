@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- WO-615 synthetic test fixture (not a real product): a 16-bit moving head with a pan mode master, a colour wheel,
+     a virtual dimmer and, in mode "Pixels", a 3-pixel bar through GeometryReference + Break. -->
+<GDTF DataVersion="1.2">
+  <FixtureType Name="Test Spot" ShortName="TSpot" Manufacturer="HighAsCG" FixtureTypeID="00000000-0000-0000-0000-000000000615">
+    <AttributeDefinitions>
+      <Attributes>
+        <Attribute Name="Pan" Pretty="P" Feature="Position.PanTilt" PhysicalUnit="Angle"/>
+        <Attribute Name="Tilt" Pretty="T" Feature="Position.PanTilt" PhysicalUnit="Angle"/>
+        <Attribute Name="Dimmer" Pretty="Dim" Feature="Dimmer.Dimmer" PhysicalUnit="LuminousIntensity"/>
+        <Attribute Name="Color1" Pretty="C1" Feature="Color.Color" PhysicalUnit="None"/>
+        <Attribute Name="ColorAdd_R" Pretty="R" Feature="Color.RGB" PhysicalUnit="ColorComponent"/>
+      </Attributes>
+    </AttributeDefinitions>
+    <Wheels>
+      <Wheel Name="Color1">
+        <Slot Name="Open" Color="0.3127,0.3290,100.000"/>
+        <Slot Name="Red" Color="0.6400,0.3300,21.260"/>
+        <Slot Name="Gobo" MediaFileName="gobo1"/>
+      </Wheel>
+    </Wheels>
+    <Models>
+      <Model Name="Base" File="base" Length="0.4" Width="0.3" Height="0.2" PrimitiveType="Undefined"/>
+      <Model Name="Head" File="" Length="0.3" Width="0.3" Height="0.4" PrimitiveType="Cube"/>
+      <Model Name="Cell" File="" Length="0.1" Width="0.1" Height="0.05" PrimitiveType="Cube"/>
+    </Models>
+    <Geometries>
+      <Geometry Name="Base" Model="Base" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}">
+        <Axis Name="Yoke" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0.2}{0,0,0,1}">
+          <Axis Name="Head" Model="Head" Position="{1,0,0,0}{0,1,0,0}{0,0,1,-0.3}{0,0,0,1}">
+            <Beam Name="Beam" Position="{1,0,0,0}{0,1,0,0}{0,0,1,-0.2}{0,0,0,1}" LampType="LED" BeamType="Spot" BeamAngle="18" FieldAngle="24" BeamRadius="0.06" LuminousFlux="12000" ColorTemperature="6500" PowerConsumption="300"/>
+          </Axis>
+        </Axis>
+        <WiringObject Name="Power IN" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}"/>
+      </Geometry>
+      <Beam Name="Cell" Model="Cell" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}" BeamType="Glow" BeamAngle="60"/>
+      <Geometry Name="Bar" Model="Base" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}">
+        <GeometryReference Name="Pixel 1" Geometry="Cell" Position="{1,0,0,-0.1}{0,1,0,0}{0,0,1,0}{0,0,0,1}"><Break DMXBreak="1" DMXOffset="2"/></GeometryReference>
+        <GeometryReference Name="Pixel 2" Geometry="Cell" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}"><Break DMXBreak="1" DMXOffset="3"/></GeometryReference>
+        <GeometryReference Name="Pixel 3" Geometry="Cell" Position="{1,0,0,0.1}{0,1,0,0}{0,0,1,0}{0,0,0,1}"><Break DMXBreak="1" DMXOffset="4"/></GeometryReference>
+      </Geometry>
+    </Geometries>
+    <DMXModes>
+      <DMXMode Name="Standard" Geometry="Base">
+        <DMXChannels>
+          <DMXChannel DMXBreak="1" Offset="1,2" Highlight="None" Geometry="Yoke" InitialFunction="Yoke_Pan.Pan.Pan">
+            <LogicalChannel Attribute="Pan">
+              <ChannelFunction Name="Pan" Attribute="Pan" DMXFrom="0/2" Default="32768/2" PhysicalFrom="-270" PhysicalTo="270" ModeMaster="Yoke_PanMode" ModeFrom="0/1" ModeTo="0/1"/>
+              <ChannelFunction Name="Pan 360" Attribute="Pan" DMXFrom="0/2" Default="32768/2" PhysicalFrom="-180" PhysicalTo="180" ModeMaster="Yoke_PanMode" ModeFrom="1/1" ModeTo="1/1"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="3,4" Highlight="None" Geometry="Head" InitialFunction="Head_Tilt.Tilt.Tilt">
+            <LogicalChannel Attribute="Tilt">
+              <ChannelFunction Name="Tilt" Attribute="Tilt" DMXFrom="0/2" Default="128/1" PhysicalFrom="135" PhysicalTo="-135"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="5" Highlight="None" Geometry="Yoke" InitialFunction="Yoke_PanMode.PanMode.Normal">
+            <LogicalChannel Attribute="PanMode">
+              <ChannelFunction Name="Normal" Attribute="PanMode" DMXFrom="0/1" Default="0/1"/>
+              <ChannelFunction Name="360" Attribute="PanMode" DMXFrom="128/1" Default="128/1"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="6" Highlight="255/1" Geometry="Beam" InitialFunction="Beam_Dimmer.Dimmer.Dimmer">
+            <LogicalChannel Attribute="Dimmer">
+              <ChannelFunction Name="Dimmer" Attribute="Dimmer" DMXFrom="0/1" Default="0/1" PhysicalFrom="0" PhysicalTo="1"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="7" Highlight="None" Geometry="Beam" InitialFunction="Beam_Color1.Color1.Wheel">
+            <LogicalChannel Attribute="Color1">
+              <ChannelFunction Name="Wheel" Attribute="Color1" DMXFrom="0/1" Default="0/1" Wheel="Color1">
+                <ChannelSet Name="Open" DMXFrom="0/1" WheelSlotIndex="1"/>
+                <ChannelSet Name="Red" DMXFrom="10/1" WheelSlotIndex="2"/>
+                <ChannelSet Name="Gobo" DMXFrom="20/1" WheelSlotIndex="3"/>
+              </ChannelFunction>
+              <ChannelFunction Name="Spin" Attribute="Color1WheelSpin" DMXFrom="128/1" Default="128/1" PhysicalFrom="-1" PhysicalTo="1"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="" Highlight="None" Geometry="Beam" InitialFunction="Beam_Dimmer.Dimmer.Virtual">
+            <LogicalChannel Attribute="Dimmer">
+              <ChannelFunction Name="Virtual" Attribute="Dimmer" DMXFrom="0/1" Default="255/1"/>
+            </LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="7" Highlight="None" Geometry="Beam" InitialFunction="Beam_Shutter.Shutter.Open">
+            <LogicalChannel Attribute="Shutter1"><ChannelFunction Name="Open" Attribute="Shutter1" DMXFrom="0/1" Default="0/1"/></LogicalChannel>
+          </DMXChannel>
+        </DMXChannels>
+      </DMXMode>
+      <DMXMode Name="Pixels" Geometry="Bar">
+        <DMXChannels>
+          <DMXChannel DMXBreak="1" Offset="1" Highlight="None" Geometry="Bar" InitialFunction="Bar_Dimmer.Dimmer.Dimmer">
+            <LogicalChannel Attribute="Dimmer"><ChannelFunction Name="Dimmer" Attribute="Dimmer" DMXFrom="0/1" Default="0/1"/></LogicalChannel>
+          </DMXChannel>
+          <DMXChannel DMXBreak="1" Offset="1" Highlight="None" Geometry="Cell" InitialFunction="Cell_ColorAdd_R.ColorAdd_R.Red">
+            <LogicalChannel Attribute="ColorAdd_R"><ChannelFunction Name="Red" Attribute="ColorAdd_R" DMXFrom="0/1" Default="0/1" PhysicalFrom="0" PhysicalTo="1"/></LogicalChannel>
+          </DMXChannel>
+        </DMXChannels>
+      </DMXMode>
+    </DMXModes>
+  </FixtureType>
+</GDTF>

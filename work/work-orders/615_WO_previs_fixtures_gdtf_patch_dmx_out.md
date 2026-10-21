@@ -1,4 +1,4 @@
-**Status: OPEN (2026-10-17) — investigation + design written; the follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net); GDTF tasks not started. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -63,11 +63,11 @@ with actual patch and way to artnet/sacn output."
 
 ## Tasks
 
-- [ ] T1 GDTF parser (server, JS): zip + `description.xml` → normalized JSON (modes, channels with
+- [x] T1 GDTF parser (server, JS): zip + `description.xml` → normalized JSON (modes, channels with
       offsets/coarse-fine, logical attributes, channel functions + physical ranges + defaults, geometry tree,
       beams, wheels); tests with 3 real files from GDTF Share (moving head spot, wash, LED par) stored in
       `tools/fixtures/gdtf/` (license check: GDTF Share files are manufacturer-published; keep small ones).
-- [ ] T2 `/api/fixtures/types` (upload/list/get/delete; store under the media/data dir, `.stignore` checked).
+- [x] T2 `/api/fixtures/types` (upload/list/get/delete; store under the media/data dir, `.stignore` checked).
 - [ ] T3 Patch model in the project (`project.fixtures.patch`), address-collision check, universe usage map; Godot patch sheet UI.
 - [ ] T4 DMX engine + encoder (attribute physical value → DMX incl. 16-bit, defaults for untouched
       channels), Art-Net/sACN via `dmx-output.js`; per-universe enable; wire test: loopback sACN/Art-Net
@@ -98,3 +98,54 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
   real-time DMX visualiser). Its `core/gdtf_description_reader` + `tests/gdtfloader_*` (channel modes, geometry
   roots, primitives) are reference material for T1.
 - Fixture position calibration from the stage camera → WO-616 T13 (OpenFollow has no fixture model).
+
+## T1 + T2 — GDTF parser and fixture-type store (2026-10-21)
+
+### Investigation
+- Test corpus: the 8 real `.gdtf` files from the owner's MVR set (scratchpad `mvr-work/midsize/`: Robin LedPOINTE,
+  Astera FP3 Hyperion Tube, Elation Pulse Panel, …). **Not committed** — GDTF Share files are manufacturer content;
+  the committed test uses a synthetic `tools/fixtures/gdtf/test-spot.xml` covering every case found in the real ones.
+- What the real files need beyond the spec summary above:
+  - **DMX values are "value/bytes"** (`32768/2`, `255/1`) and must be scaled to the channel's resolution
+    (bytes = number of offsets). Shift by whole bytes, but an all-ones value stays all-ones (`255/1` → 65535 at 16 bit).
+  - **ModeMaster overlap**: Pan and "Pan 360 Shortcut" both start at DMX 0 on the same channel, on different
+    branches of a mode-master channel. A function's `to` is the next function's `from` − 1 *within the same
+    (modeMaster, modeFrom, modeTo) branch*, not the next function overall.
+  - **Pixel fixtures** place one template geometry many times via `GeometryReference` + `Break DMXOffset`; the
+    DMX channel names the template (`Geometry="Main RGB"`) and must be instanced per reference at
+    offset + DMXOffset − 1 (Hyperion: 32 px × 165 modes).
+  - **Virtual channels** have `Offset=""` (no DMX slot; a virtual per-pixel dimmer).
+  - `InitialFunction` is `Geom_Attr.Attr.FunctionName` (function names may contain dots).
+  - **Elation Pulse Panel 60CH has two channels at offset 12 in the file itself** — kept as written and reported
+    as a mode warning, not "fixed".
+  - Some pixel modes have footprint > channel count (stride-4 layout with gaps) — that is the file's layout.
+- Size: the Hyperion parse is 7.5 MB of JSON (165 modes), so the API serves summaries and one mode per request.
+  Parse time ≤ 181 ms for every file.
+
+### What was done
+- `src/fixtures/gdtf-dmx.js` — modes → channels `{geometry, break, offsets, res, attribute, default, highlight,
+  initial, functions[{name, attribute, from, to, default, physFrom, physTo, wheel, modeMaster, modeFrom, modeTo, sets}]}`,
+  footprint = highest break-1 offset. Pure.
+- `src/fixtures/gdtf-parse.js` — archive (unzipper) → `{name, shortName, manufacturer, fixtureTypeId, dataVersion,
+  modes, geometry (Axis/Beam tree; GeometryReference kept as `ref` for the viewer to instance; wiring/inventory
+  dropped), models, files, wheels (CIE colour, media), attributes}`. Reuses the WO-612 xml2js helpers and
+  `gdtfMatrix`.
+- `src/fixtures/gdtf-store.js` — `projects/_gdtf/<sha1-12>.gdtf` + `.json` (content-addressed: re-importing the same
+  file is the same type; ids are hex-only, so no path traversal). Test-isolated through `projectsRoot()`. Synced to
+  peers like the rest of `projects/` — content-addressed and append-only, so a peer cannot revert it.
+- `src/api/routes-fixture-types.js` — `GET/POST /api/fixtures/types`, `GET /api/fixtures/types/<id>[/mode?name=|/file?path=]`,
+  `DELETE /api/fixtures/types/<id>`; multipart via the WO-612 `readUpload` (now exported). One line on router.js:488.
+- `tools/smoke/lib/zip-stored.js` — a stored-ZIP builder for tests (the WO-612 test keeps its own copy, unchanged).
+- Note: query strings decode `%20`, not `+` (`parseQueryString`, box-wide); both clients send `%20`. Not changed —
+  a box-wide `+` → space decode could break hand-built paths that contain a literal `+`.
+
+### What was VERIFIED
+- `tools/smoke/smoke-wo615-gdtf.test.js` — 6 tests: value scaling, 16-bit offsets/defaults, mode-master branches,
+  channel sets with ranges, virtual channel, duplicate-offset warning, pixel instancing, geometry tree, wheels, store
+  (content id, list/describe/mode/member/remove, traversal), routes with a real multipart upload + bad upload.
+  Offline suite 3030 pass / 0 fail; lint ≤ 216; prettier, line limit, unwired exports, API contract (regenerated) green.
+- All 8 real files parsed via a scratch script; one offset collision, the Pulse Panel's own.
+- Box (node restarted): `curl -F file=@"Astera LED Technology@FP3 Hyperion Tube.gdtf"` → id `9d0e29135cc2`, 165 modes
+  (`1: RGB` 3 ch … `4: DIM RGB` 4 ch, no warnings); list → 1 type; describe 150 KB (wheel "Virtual ColorWheel",
+  5 archive files); `mode?name=4%3A%20DIM%20RGB` → Dimmer @1 + pixel channels; `file?path=thumbnail.png` → 200
+  image/png 75 430 B; DELETE → ok, `projects/_gdtf` empty again.

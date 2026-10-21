@@ -108,4 +108,4 @@ function register(routes) {
 	}, opt)
 }
 
-module.exports = { register, handleExport }
+module.exports = { register, handleExport, readUpload }

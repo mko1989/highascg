@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-450 routes.
+454 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -89,6 +89,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/device-view/snapshot` | registry | `src/api/router.js`, `src/api/routes-device-view.js` |
 | POST | `/api/device-view/snapshot` | registry | `src/api/router.js` |
 | * | `/api/export` | handler | `src/cg-studio/routes.js` |
+| GET | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
+| POST | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
+| DELETE | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
+| GET | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
 | GET | `/api/fonts` | registry | `src/api/router.js` |
 | POST | `/api/ftb/*` | registry | `src/api/router.js` |
 | GET | `/api/gui-stream/status` | registry | `src/api/router.js` |
@@ -481,6 +485,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-data-project-handlers.js` | WO-329: broadcast the STAMPED project so other clients pick up the new rev. |
 | `src/api/routes-device-snapshot.js` | WO-49 — Device-wide snapshot: build envelope, apply validated snapshot. |
 | `src/api/routes-device-view.js` | Device View API Routes. |
+| `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
 | `src/api/routes-host-live.js` |  |
 | `src/api/routes-lower-thirds.js` | routes-lower-thirds.js — CRUD + playback API for lower-third templates. |
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |
