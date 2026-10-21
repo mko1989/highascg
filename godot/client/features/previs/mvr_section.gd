@@ -2,6 +2,7 @@ extends VBoxContainer
 ## WO-612 — previs "MVR scene": Import… a .mvr from this machine (POST /api/stage/mvr; the server parses it and keeps
 ## it in projects/_mvr), pick which imported scene this project shows (project.previs.mvr {id, name, hidden_layers},
 ## ProjectSync autosave), hide layers, Remove one from the box.
+## WO-612 T7: Export… saves this project's WO-614 stage as an .mvr (GET /api/stage/mvr-export, built on the server).
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -35,9 +36,11 @@ func _ready() -> void:
 	_pick.item_selected.connect(_on_pick)
 	add_child(_pick)
 	var row := HBoxContainer.new()
-	for spec in [["Import…", _import], ["Remove", _ask_remove]]:
+	for spec in [["Import…", _import], ["Export…", _export], ["Remove", _ask_remove]]:
 		var b := Button.new()
 		b.text = spec[0]
+		if spec[0] == "Export…":
+			b.tooltip_text = "Save this project's stage (LED walls, TVs, projection) as an .mvr for Capture, consoles, Perastage"
 		b.pressed.connect(spec[1])
 		row.add_child(b)
 		_remove_btn = b  # the loop ends on Remove
@@ -126,6 +129,26 @@ func _import() -> void:
 		return
 	await refresh_list()
 	_save({"id": str(res.data.id), "name": str(res.data.name), "hidden_layers": []})
+
+
+func _export() -> void:
+	var name := str(Store.project.get("name", "stage")).validate_filename().replace(" ", "_")
+	var path: String = await FilePick.save_path(self, "Export the stage as MVR", (name if name != "" else "stage") + ".mvr", ["*.mvr ; MVR scene"])
+	if path == "":
+		return
+	if not path.to_lower().ends_with(".mvr"):
+		path += ".mvr"
+	_status.text = "Exporting…"
+	ProjectSync.flush()  # the server builds it from the saved project: let the latest stage edit land first
+	while ProjectSync.in_flight:
+		await get_tree().process_frame
+	var res: Dictionary = await Api.get_bytes("/api/stage/mvr-export")
+	if not res.ok:
+		var body: Variant = JSON.parse_string((res.bytes as PackedByteArray).get_string_from_utf8())
+		_status.text = "Export failed: %s" % (body.get("error", res.error) if body is Dictionary else res.error)
+		return
+	var err := FilePick.write_bytes(path, res.bytes)
+	_status.text = ("Exported the stage to %s" % path) if err == "" else "Export failed: %s" % err
 
 
 func _ask_remove() -> void:

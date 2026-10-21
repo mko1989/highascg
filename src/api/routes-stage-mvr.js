@@ -12,6 +12,7 @@
 
 const busboy = require('busboy')
 const store = require('../stage/mvr-store')
+const { buildStageMvr } = require('../stage/mvr-export')
 const { JSON_HEADERS, jsonBody } = require('./response')
 
 const MAX_BYTES = 300 * 1024 * 1024
@@ -65,9 +66,40 @@ async function handleGet(path, query) {
 	return rec ? reply(200, rec) : reply(404, { error: 'no such MVR scene' })
 }
 
+/**
+ * WO-612 T7 — GET /api/stage/mvr-export → the project's WO-614 stage as an .mvr download. Crops are described against
+ * each role's live raster (pgmN / prvN → that channel's resolution); other roles use the crops' bounding box.
+ * @param {object} ctx  @param {{ loadProject?: () => object }} [deps]
+ */
+function handleExport(ctx, deps = {}) {
+	const loadProject = deps.loadProject || (() => require('../engine/project-scenes').loadFullProject())
+	const project = loadProject() || {}
+	const objects = project?.previs?.stage?.objects
+	if (!Array.isArray(objects) || !objects.length) return reply(404, { error: 'The stage is empty — add LED walls, TVs or projection screens first.' })
+	const rasterFor = (role) => {
+		const m = /^(pgm|prv)(\d+)$/.exec(role)
+		if (!m) return null
+		try {
+			const { getChannelMap } = require('../config/routing-map')
+			const { getChannelResolutionForChannel } = require('../engine/scene-native-fill')
+			const map = getChannelMap(ctx?.config || {})
+			const ch = m[1] === 'pgm' ? map.programCh(Number(m[2])) : map.previewCh(Number(m[2]))
+			return ch ? getChannelResolutionForChannel(ctx.config, ch, ctx) : null
+		} catch {
+			return null
+		}
+	}
+	const name = String(project.name || 'HighAsCG stage')
+	const { buffer, report } = buildStageMvr(objects, { name, rasterFor })
+	const file = `${name.replace(/[^\w.-]+/g, '_') || 'stage'}.mvr`
+	return { status: 200, headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': `attachment; filename="${file}"`,
+		'X-MVR-Screens': String(report.screens) }, body: buffer }
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	routes.get('/api/stage/mvr', () => reply(200, { scenes: store.list() }), opt)
+	routes.get('/api/stage/mvr-export', ({ ctx }) => handleExport(ctx), opt)
 	routes.post('/api/stage/mvr', ({ req }) => handleUpload(req), opt)
 	routes.get('/api/stage/mvr/*', ({ path, query }) => handleGet(path, query), opt)
 	routes.delete('/api/stage/mvr/*', ({ path }) => {
@@ -76,4 +108,4 @@ function register(routes) {
 	}, opt)
 }
 
-module.exports = { register }
+module.exports = { register, handleExport }

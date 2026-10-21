@@ -1,4 +1,4 @@
-**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. Open: T5 (VideoScreen → screen bindings), T7 (MVR export), a real Capture file (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
+**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). Open: T5 (VideoScreen → screen bindings), a real Capture file (owner), opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
 
 # WO-612 — Previs: import MVR scenes (e.g. from Capture) into the Godot stage
 
@@ -72,7 +72,7 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 - [x] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
 - [ ] T5 VideoScreen Sources/Mappings → previs screen bindings + UV crops.
 - [x] T6 Persistence (own store `projects/_mvr/`, not `/api/previs/models`): store the `.mvr` via `/api/previs/models` (allow the extension) + parsed metadata.
-- [ ] T7 Export the WO-614 stage (LED walls / TVs / projection = `VideoScreen` + generated glb geometry, `Sources`/`Mappings` from each object's role + crop) via `ZIPPacker` (moved here from WO-614 T7).
+- [x] T7 Export the WO-614 stage (LED walls / TVs / projection = `VideoScreen` + generated glb geometry, `Sources`/`Mappings` from each object's role + crop) via `ZIPPacker` (moved here from WO-614 T7).
 - [ ] Later: MVR-xchange client (live sync).
 
 ## What was done / What was VERIFIED
@@ -136,10 +136,50 @@ only fetches ready GLB meshes and places them. The design above (GDScript import
   Layers disabled. Test scenes deleted afterwards; project back to no MVR scene.
 - Gates: file lines, lint (217 ≤ 218), prettier, unwired exports, offline suite (2926 pass), Godot 16193 pass.
 
+## T7 — MVR export (2026-10-21)
+
+### Investigation
+
+- The stage lives in the client-owned `project.previs.stage.objects` slice. The server reads it from the saved
+  project (`loadFullProject`, as the follow service does), so the export has the same source the importer and
+  autosave use.
+- The importer (`mvr-scene.js`) places a glTF-frame mesh with `GODOT_FROM_MVR · m · MVR_FROM_GLTF`. The export
+  writes geometry in the object's own frame and the matrix `MVR_FROM_GLTF · G · GODOT_FROM_MVR` (G = the Godot
+  Node3D transform, YXZ Euler), so a re-import lands where the object was.
+- A stored-only ZIP writer already exists (`src/support/zip-store.js`), so no new dependency.
+
+### What was done
+
+- `src/stage/mvr-export.js` `buildStageMvr(objects, {name, rasterFor})`: one `VideoScreen` per visible
+  `led_wall` / `tv` / `projection` (other types are counted as skipped).
+  - Geometry: a GLB per object, built with the `stage_objects.gd` / `stage_builder.gd` math. LED wall = curved
+    front strip plus a back strip at `depth_m`; TV = screen plus bezel cabinet; projection = screen plus the
+    projector body at its throw.
+  - `Sources/Source type="CaptureDevice"` carries `highascg:<role>` (the design's proposal).
+  - Crops: an AUXData `MappingDefinition` per role (SizeX/Y = the role's live raster, else the crops' bounding box)
+    and a per-object `Mapping` (ux/uy offset, ox/oy size, px).
+  - UUIDs are hashed from the ids, so the archive is deterministic and a re-export updates the same objects in the
+    receiving tool.
+- `GET /api/stage/mvr-export` (`routes-stage-mvr.js`): an attachment `<project>.mvr` plus `X-MVR-Screens`. pgmN /
+  prvN rasters come from `getChannelResolutionForChannel`. An empty stage returns 404 with a reason.
+- Godot previs → MVR scene → **Export…**: save dialog, then the latest stage edit is flushed (`ProjectSync.flush`),
+  then the bytes are fetched and written to the chosen file.
+- Smoke `tools/smoke/smoke-wo612-mvr-export.test.js` (4 tests, curated list): archive layout, sources, crops,
+  mapping definitions, determinism; a **round trip through the real importer** (every object back at its Godot
+  transform within 1e-4, sources intact, meshes served); sizes; route headers and the empty-stage 404.
+
+### What was VERIFIED (box)
+
+- `curl /api/stage/mvr-export` on the live project gives `Untitled.mvr` with 1 VideoScreen ("Main LED (DP-7)",
+  `{0,7000,1000}` mm = Godot (0, 1, −7)) and pgm1 at the live 1920×1080.
+- GUI: Previs → Export… → save dialog → the file written in the scratchpad is byte-identical to the curl download.
+  The status line reads "Exported the stage to …".
+- Gates: lines, lint 216, prettier, unwired-exports, offline 2968 pass, `--no-http`, Godot 16473 pass.
+
 ## Open
 
 - T5 VideoScreen `Sources`/`Mappings` → WO-614 screen bindings (sources are parsed; nothing binds yet).
-- T7 MVR export of the WO-614 stage.
+- Open our export in Capture / a console (owner): does the receiving tool honour the CaptureDevice source + Mapping?
 - A real **Capture** export (owner checklist) — Capture writes 3DS (vendor forum); the 3DS path is tested with
   synthetic files and the 3DS members of the MA3 GDTFs only.
 - No beams / DMX simulation (WO-615 / WO-180).
