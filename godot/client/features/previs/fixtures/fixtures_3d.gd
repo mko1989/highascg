@@ -10,6 +10,7 @@ extends Node3D
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
+const Tint := preload("res://features/previs/model_tint.gd")
 
 const CONE_SHADER := """
 shader_type spatial;
@@ -26,6 +27,7 @@ void fragment() {
 }
 """ % F.CONE_ALPHA
 
+var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
 var _key := ""
 var _gen := 0
 var _rigs := {}  # "typeId|mode" → rig Dictionary (or {} = failed)
@@ -67,6 +69,11 @@ func _on_ws(type: String, data: Variant) -> void:
 
 
 func _on_project(project: Variant) -> void:
+	var cols := Tint.colors((project as Dictionary).get("previs") if project is Dictionary else null, "fixture_colors")
+	if cols != _colors:  # WO-641: a type's body colour
+		_colors = cols.duplicate()
+		for id in _fx:
+			Tint.apply(_fx[id].root, Tint.parse(_colors.get(_fx[id].get("type", ""))))
 	var list := F.typed((project as Dictionary).get("fixtures") if project is Dictionary else null)
 	var key := JSON.stringify(list.map(func(f: Dictionary) -> Array:
 		return [f.get("id"), F.rig_key(f), f.get("pose"), f.get("enabled", true)]))
@@ -145,6 +152,8 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 	parts.box = _body_box(root)
 	parts.mark = _mark(parts.box)
 	root.add_child(parts.mark)
+	parts.type = str(f.typeId)
+	Tint.apply(root, Tint.parse(_colors.get(parts.type)))  # WO-641
 	_fx[str(f.id)] = parts
 
 
@@ -176,6 +185,7 @@ func _mark(box: AABB) -> MeshInstance3D:
 	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	mi.visible = false
+	mi.set_meta("no_tint", true)
 	return mi
 
 
@@ -233,6 +243,7 @@ func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
 	lmat.albedo_color = Color(0.05, 0.05, 0.05)
 	lmat.emission_enabled = true
 	lens.material_override = lmat
+	lens.set_meta("no_tint", true)
 	node.add_child(lens)
 	var out := {"lens": lmat, "body": body if beam.get("beamType") == "Glow" else null}
 	if beam.get("beamType") == "Glow":
@@ -244,6 +255,7 @@ func _beam(node: Node3D, beam: Dictionary, body: Node3D) -> Dictionary:
 	cone.material_override = cmat
 	cone.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	cone.visible = false
+	cone.set_meta("no_tint", true)
 	node.add_child(cone)
 	out.cone = cone
 	out.cmat = cmat

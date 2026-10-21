@@ -3,7 +3,7 @@ extends VBoxContainer
 ## /api/fixtures/types; the server parses and keeps it), pick a type + mode, Add N at the next free addresses of a
 ## universe (Art-Net port-address or sACN universe) into project.fixtures.patch (follow_model.gd shape — the
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
-## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Visualise console (T7) lets the
+## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Art-Net / sACN input (T7, renamed WO-641) lets the
 ## console's input drive the previs instead (and sends nothing on those universes). The Programmer (T6) sits below.
 
 const Upload := preload("res://core/stream_upload.gd")
@@ -14,6 +14,8 @@ const M := preload("res://features/previs/fixtures/fixtures_model.gd")
 const Programmer := preload("res://features/previs/fixtures/programmer_section.gd")
 const Replace := preload("res://features/previs/fixtures/replace_type_dialog.gd")
 const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
+const Tint := preload("res://features/previs/model_tint.gd")
+const ColorRows := preload("res://features/previs/color_rows.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -32,6 +34,7 @@ var _confirm_rm: ConfirmationDialog
 var _replace: Button
 var _replace_dlg: ConfirmationDialog
 var _last := ""
+var _body := ColorRows.new()  # WO-641: the selected type's body colour
 
 
 func _ready() -> void:
@@ -52,6 +55,9 @@ func _ready() -> void:
 	_replace.pressed.connect(func() -> void: _replace_dlg.open(types, M.find_type(types, _type_id())))
 	row.add_child(_replace)
 	add_child(row)
+	_body.previewed.connect(func(id: String, c: Color) -> void: _set_body(id, c, false))
+	_body.changed.connect(func(id: String, c: Variant) -> void: _set_body(id, c, true))
+	add_child(_body)
 	_mode = OptionButton.new()
 	_mode.fit_to_longest_item = false
 	_mode.item_selected.connect(_on_mode)
@@ -94,9 +100,9 @@ func _ready() -> void:
 	_send.get_popup().index_pressed.connect(_toggle_send)
 	out.add_child(_send)
 	_visualise = CheckButton.new()
-	_visualise.text = "Visualise console"
-	_visualise.tooltip_text = ("T7: the console's Art-Net / sACN for the patched universes drives the previs; " +
-		"the box sends nothing on them meanwhile")
+	_visualise.text = "Art-Net / sACN input"
+	_visualise.tooltip_text = ("A lighting console's Art-Net / sACN on the patched universes drives the previs " +
+		"fixtures; the box sends nothing on those universes meanwhile")
 	_visualise.toggled.connect(func(on: bool) -> void: _set_dmx({"visualise": on}))
 	out.add_child(_visualise)
 	add_child(out)
@@ -194,6 +200,8 @@ func _fill_modes() -> void:
 		_mode.set_item_metadata(_mode.item_count - 1, str(m.name))
 	var t := M.find_type(types, _type_id())
 	_replace.visible = t.get("placeholder", false)
+	_body.fill([] if t.is_empty() else [_type_id()], Tint.colors(Store.project.get("previs"), "fixture_colors"),
+		{_type_id(): "Body colour"})
 	_status.text = "" if t.is_empty() else "%s — %d modes. %s" % [t.get("file", ""), (t.get("modes", []) as Array).size(),
 		_mode_warning()]
 
@@ -214,6 +222,17 @@ func refresh_usage() -> void:
 	lines.append_array(M.input_lines(usage, res.data.get("input") if res.ok and res.data is Dictionary else null))
 	_usage.text = "\n".join(lines) if not lines.is_empty() else ("No patched universes." if res.ok else
 		"Fixture engine not reporting — the Tracking module is off on the server.")
+
+
+## WO-641: project.previs.fixture_colors[type] (fixtures_3d re-tints on project_changed); `save` false = a preview.
+func _set_body(id: String, c: Variant, save: bool) -> void:
+	var previs: Dictionary = Store.project.get("previs", {}) if Store.project.get("previs") is Dictionary else {}
+	previs["fixture_colors"] = Tint.with_color(Tint.colors(previs, "fixture_colors"), id, c)
+	Store.project["previs"] = previs
+	Store.project_changed.emit(Store.project)
+	if save:
+		ProjectSync.mark_dirty()
+		_fill_modes()
 
 
 func _persist(slice: Dictionary) -> void:

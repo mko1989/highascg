@@ -7,6 +7,7 @@ extends Node3D
 ## the role is held only while the 3D view is live (set_live, like the WO-614 stage).
 
 const M := preload("res://features/previs/mvr_model.gd")
+const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 
 signal loaded(info: Dictionary)  ## {} when cleared; else {name, objects, fixtures, parts, meshes, failed, report} or {error}
@@ -15,6 +16,7 @@ var scene_id := ""
 var layers: Array = []  ## layer names in file order
 var _gen := 0  # a newer show_scene() cancels an older one still fetching
 var _hidden := {}
+var _layer_colors := {}  # WO-641
 var _screens: Array = []  # [{role, mat}]
 var _live := false
 var _held := {}
@@ -86,6 +88,7 @@ func show_scene(id: String) -> void:
 				parts += 1
 		if M.screen_role(o) != "":
 			_bind_screen(node, o.screen)
+		Tint.apply(node, Tint.parse(_layer_colors.get(node.get_meta("layer"))))
 	for t in templates.values():
 		(t as Node).free()
 	for l in sc.get("layers", []):
@@ -115,6 +118,7 @@ func _bind_screen(node: Node3D, screen: Dictionary) -> void:
 	mat.shader = LED_SHADER
 	mat.set_shader_parameter("uv_rect", M.screen_uv(screen))
 	target.set_surface_override_material(surface, mat)
+	target.set_meta("no_tint", true)  # WO-641: a layer colour must not cover the picture
 	_screens.append({"role": str(screen.role), "mat": mat})
 	_apply(_screens[-1])
 
@@ -146,6 +150,16 @@ func _apply(s: Dictionary) -> void:
 	var tex: Texture2D = VideoSurfaces.texture(s.role) if _live else null
 	(s.mat as ShaderMaterial).set_shader_parameter("video", tex)
 	(s.mat as ShaderMaterial).set_shader_parameter("has_video", tex != null and tex.get_width() > 0)
+
+
+## WO-641 — layer name → "#rrggbb"; a layer left out shows the model's own materials.
+func set_layer_colors(cols: Dictionary) -> void:
+	if cols == _layer_colors:
+		return
+	_layer_colors = cols.duplicate()
+	for c in get_children():
+		if c.has_meta("layer"):
+			Tint.apply(c, Tint.parse(_layer_colors.get(c.get_meta("layer"))))
 
 
 func set_hidden_layers(names: Array) -> void:

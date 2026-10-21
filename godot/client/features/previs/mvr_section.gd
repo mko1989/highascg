@@ -17,6 +17,9 @@ const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 const MvrScreens := preload("res://features/previs/mvr_screens.gd")
 const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
+const Tint := preload("res://features/previs/model_tint.gd")
+const ColorRows := preload("res://features/previs/color_rows.gd")
+const Fold := preload("res://features/previs/fold_section.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
@@ -38,6 +41,7 @@ var _unpatch_confirm: ConfirmationDialog
 var _place := {}  # "x" / "y" / "z" / "yaw" → SpinBox
 var _fit_on_load := false
 var _screens: MvrScreens
+var _colors := ColorRows.new()  # WO-641: a colour per layer
 
 
 func bind(s: MvrScene) -> void:
@@ -77,6 +81,10 @@ func _ready() -> void:
 	_layers.disabled = true
 	row.add_child(_layers)
 	add_child(row)
+	_colors.previewed.connect(func(l: String, c: Color) -> void:
+		scene.set_layer_colors(Tint.with_color(Tint.colors(_cfg(), "layer_colors"), l, c)))
+	_colors.changed.connect(_set_layer_color)
+	add_child(Fold.new("Layer colours", [_colors]))
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -156,6 +164,8 @@ func _maybe_reload() -> void:
 	scene.set_place(p)
 	scene.set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
 	scene.set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
+	scene.set_layer_colors(Tint.colors(c, "layer_colors"))
+	_colors.fill(scene.layers, Tint.colors(c, "layer_colors"))
 	_screens.refresh()
 	scene.show_scene(str(c.get("id", "")))
 
@@ -257,6 +267,13 @@ func _fill_layers() -> void:
 		p.set_item_checked(p.item_count - 1, not hidden.has(l))
 
 
+func _set_layer_color(layer: String, c: Variant) -> void:
+	var cfg := _cfg().duplicate(true)
+	if not cfg.is_empty():
+		cfg["layer_colors"] = Tint.with_color(Tint.colors(cfg, "layer_colors"), layer, c)
+		_save(cfg)
+
+
 func _toggle_layer(i: int) -> void:
 	var c := _cfg().duplicate(true)
 	if c.is_empty():
@@ -282,6 +299,7 @@ func _on_loaded(info: Dictionary) -> void:
 	_patch_status.text = ""
 	_sync_patch_ui()
 	_layers.disabled = scene.layers.is_empty()
+	_colors.fill(scene.layers, Tint.colors(_cfg(), "layer_colors"))
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
 	_info = info
 	_status.text = M.summary(info)
