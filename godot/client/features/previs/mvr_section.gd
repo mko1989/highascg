@@ -18,7 +18,7 @@ const M := preload("res://features/previs/mvr_model.gd")
 const MvrScreens := preload("res://features/previs/mvr_screens.gd")
 
 signal scene_loaded(info: Dictionary)
-signal types_changed  ## a patch imported GDTF types (the Fixtures section re-lists them)
+signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
 
 var scene: MvrScene
 var _pick: OptionButton
@@ -28,6 +28,7 @@ var _status: Label
 var _confirm: ConfirmationDialog
 var _last := ""
 var _patch_btn: Button
+var _typed := {}  # scene ids whose GDTF types were loaded this session (WO-636)
 var _unpatch_btn: Button
 var _proto: OptionButton
 var _patch_status: Label
@@ -288,6 +289,24 @@ func _on_loaded(info: Dictionary) -> void:
 			_status.text += "\nMoved onto the stage (its origin was off) — adjust under Place, or 0 / 0 / 0 to undo."
 	_fit_on_load = false
 	scene_loaded.emit(info)
+	_load_types()
+
+
+## WO-636: a shown scene's fixtures carry over — none of them patched yet → the file's own patch (addresses, modes,
+## poses) is applied, which also imports its GDTFs; after an Unpatch (mvr.unpatched) only the GDTFs are loaded
+## (POST …/types; content-addressed, a known type is not re-read), so the Fixtures section and Replace… list them.
+func _load_types() -> void:
+	var c := _cfg()
+	var id := str(c.get("id", ""))
+	if id == "" or _typed.has(id) or scene == null or scene.fixture_uuids.is_empty():
+		return
+	_typed[id] = true
+	if _patched_here() == 0 and not c.get("unpatched", false):
+		_patch()
+		return
+	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/types" % id, {})
+	if res.ok and res.data is Dictionary and not (res.data.get("types", []) as Array).is_empty():
+		types_changed.emit()
 
 
 func _fixtures_slice() -> Dictionary:
@@ -334,6 +353,7 @@ func _patch() -> void:
 		return f)
 	var s := _fixtures_slice()
 	s.patch = M.merge_patch(s.patch, incoming)
+	_mark_unpatched(false)
 	_persist_fixtures(s)
 	_patch_status.text = M.patch_summary(res.data)
 	types_changed.emit()
@@ -343,8 +363,23 @@ func _unpatch() -> void:
 	var s := _fixtures_slice()
 	var before: int = s.patch.size()
 	s.patch = M.unpatch(s.patch, scene.fixture_uuids)
+	_mark_unpatched(true)
 	_persist_fixtures(s)
 	_patch_status.text = "Unpatched %d fixture(s)." % (before - s.patch.size())
+
+
+## Unpatch is remembered (project.previs.mvr.unpatched) so showing the scene again does not re-patch it. _last follows
+## the write: the scene is not reloaded for it.
+func _mark_unpatched(on: bool) -> void:
+	var c := _cfg()
+	if c.is_empty() or bool(c.get("unpatched", false)) == on:
+		return
+	if on:
+		c["unpatched"] = true
+	else:
+		c.erase("unpatched")
+	(Store.project["previs"] as Dictionary)["mvr"] = c
+	_last = JSON.stringify(c)
 
 
 ## Same write as the Fixtures section: the whole normalized slice, then project_changed so every fixtures view reloads.

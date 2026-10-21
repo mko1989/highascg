@@ -10,6 +10,8 @@
  *   POST   /api/stage/mvr/<id>/patch {protocol} → WO-615 T10: the scene's fixtures as patch entries { fixtures, skipped,
  *                                                notes, types } — every embedded GDTF it uses is imported into the
  *                                                fixture-type store; the client merges `fixtures` into project.fixtures
+ *   POST   /api/stage/mvr/<id>/types         → WO-636: only the import — the scene's GDTFs into the type store, no
+ *                                                patch → { types: [{ spec, id, name, manufacturer, placeholder }], missing }
  *   DELETE /api/stage/mvr/<id>
  */
 
@@ -71,17 +73,11 @@ async function handleGet(path, query) {
 }
 
 /**
- * WO-615 T10 — POST /api/stage/mvr/<id>/patch {protocol: "artnet" | "sacn"}. Imports each GDTFSpec's embedded file once
- * (gdtf-store ensureGdtf: content-addressed, an already-known type is not re-parsed), then builds the entries.
- * @param {{ fixtureScene?: Function, ensureGdtf?: Function, typeInfo?: Function }} [deps]
+ * Each GDTFSpec the scene's fixtures use → its stored type (imported once: gdtf-store ensureGdtf is content-addressed,
+ * an already-known type is not re-parsed); null = not in the file, { error } = unreadable.
  */
-async function handlePatch(ctx, id, body, deps = {}) {
-	const fixtureScene = deps.fixtureScene || store.fixtureScene
+async function sceneTypes(sc, deps = {}) {
 	const ensureGdtf = deps.ensureGdtf || require('../fixtures/gdtf-store').ensureGdtf
-	const b = parseBody(body) || {}
-	const protocol = b.protocol === 'sacn' ? 'sacn' : 'artnet'
-	const sc = await fixtureScene(id)
-	if (!sc) return reply(404, { error: 'no such MVR scene' })
 	const types = new Map()
 	for (const spec of new Set(sc.objects.map((o) => o.fixture.spec).filter(Boolean))) {
 		const g = await sc.gdtf(spec)
@@ -90,13 +86,50 @@ async function handlePatch(ctx, id, body, deps = {}) {
 			continue
 		}
 		try {
-			const t = await ensureGdtf(g.buf, g.name)
-			// WO-633: a placeholder the operator replaced → the real type, modes translated (unpaired ones keep the stub)
-			const real = t.replacedBy ? (deps.typeInfo || require('../fixtures/gdtf-store').info)(t.replacedBy.to) : null
-			types.set(spec, real ? { ...real, modeMap: t.replacedBy.modes, stub: t } : t)
+			types.set(spec, await ensureGdtf(g.buf, g.name))
 		} catch (e) {
 			types.set(spec, { error: `GDTF "${spec}" could not be read: ${e.message}` })
 		}
+	}
+	return types
+}
+
+/**
+ * WO-636 — POST /api/stage/mvr/<id>/types: the scene's fixture types into the store when the scene is shown, so the
+ * Fixtures section and Replace… (WO-633) list them before anything is patched.
+ * @param {{ fixtureScene?: Function, ensureGdtf?: Function }} [deps]
+ */
+async function handleTypes(ctx, id, deps = {}) {
+	const sc = await (deps.fixtureScene || store.fixtureScene)(id)
+	if (!sc) return reply(404, { error: 'no such MVR scene' })
+	const types = await sceneTypes(sc, deps)
+	if (types.size) ctx?.fixtureService?.reload?.()
+	const seen = new Set()
+	const out = []
+	for (const [spec, t] of types) {
+		if (!t || t.error || seen.has(t.id)) continue
+		seen.add(t.id)
+		out.push({ spec, id: t.id, name: t.name, manufacturer: t.manufacturer, placeholder: !!t.placeholder })
+	}
+	return reply(200, { types: out, missing: [...types].filter(([, t]) => !t || t.error).map(([spec]) => spec) })
+}
+
+/**
+ * WO-615 T10 — POST /api/stage/mvr/<id>/patch {protocol: "artnet" | "sacn"}. Imports each GDTFSpec's embedded file once
+ * (gdtf-store ensureGdtf: content-addressed, an already-known type is not re-parsed), then builds the entries.
+ * @param {{ fixtureScene?: Function, ensureGdtf?: Function, typeInfo?: Function }} [deps]
+ */
+async function handlePatch(ctx, id, body, deps = {}) {
+	const fixtureScene = deps.fixtureScene || store.fixtureScene
+	const b = parseBody(body) || {}
+	const protocol = b.protocol === 'sacn' ? 'sacn' : 'artnet'
+	const sc = await fixtureScene(id)
+	if (!sc) return reply(404, { error: 'no such MVR scene' })
+	const types = await sceneTypes(sc, deps)
+	for (const [spec, t] of types) {
+		// WO-633: a placeholder the operator replaced → the real type, modes translated (unpaired ones keep the stub)
+		const real = t?.replacedBy ? (deps.typeInfo || require('../fixtures/gdtf-store').info)(t.replacedBy.to) : null
+		if (real) types.set(spec, { ...real, modeMap: t.replacedBy.modes, stub: t })
 	}
 	const out = buildMvrPatch(sc.objects, { protocol, typeFor: (spec) => types.get(spec) ?? null })
 	if (types.size) ctx?.fixtureService?.reload?.()
@@ -145,8 +178,9 @@ function register(routes) {
 	routes.post('/api/stage/mvr', ({ req }) => handleUpload(req), opt)
 	routes.get('/api/stage/mvr/*', ({ path, query }) => handleGet(path, query), opt)
 	routes.post('/api/stage/mvr/*', ({ ctx, path, body }) => {
-		const m = /^\/api\/stage\/mvr\/([0-9a-f]{12})\/patch$/.exec(path)
-		return m ? handlePatch(ctx, m[1], body) : reply(404, { error: 'unknown MVR path' })
+		const m = /^\/api\/stage\/mvr\/([0-9a-f]{12})\/(patch|types)$/.exec(path)
+		if (!m) return reply(404, { error: 'unknown MVR path' })
+		return m[2] === 'types' ? handleTypes(ctx, m[1]) : handlePatch(ctx, m[1], body)
 	}, opt)
 	routes.delete('/api/stage/mvr/*', ({ path }) => {
 		const id = String(path).split('/').pop()
@@ -154,4 +188,4 @@ function register(routes) {
 	}, opt)
 }
 
-module.exports = { register, handleExport, handlePatch, readUpload }
+module.exports = { register, handleExport, handlePatch, handleTypes, readUpload }
