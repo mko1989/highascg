@@ -107,6 +107,19 @@ static func fit(p: Rect2, ar: float) -> Rect2:
 	return Rect2(p.position + (p.size - Vector2(w, h)) / 2.0, Vector2(w, h))
 
 
+## WO-648: where the preview draws the canvas — always the full width of `area` (never stretched), centred; a canvas
+## taller than the area overflows top and bottom, `pan` px shifts it (clamped to the overflow).
+static func width_fit(area: Vector2, canvas: Vector2, pan := 0.0) -> Rect2:
+	var d := canvas * (area.x / canvas.x)
+	var lim := pan_limit(area, canvas)
+	return Rect2(0.0, (area.y - d.y) / 2.0 + clampf(pan, -lim, lim), d.x, d.y)
+
+
+## How far the width-fitted canvas can pan either way (half its overflow; 0 when it fits).
+static func pan_limit(area: Vector2, canvas: Vector2) -> float:
+	return maxf(0.0, canvas.y * area.x / canvas.x - area.y) / 2.0
+
+
 ## WO-624 E1: a Sources "Live" row payload ({type, value: "route://…", label, resolution, …}) — what the preview takes
 ## as a new window. Media files, looks and bare strings pass through.
 static func droppable(data: Variant) -> bool:

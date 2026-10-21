@@ -39,6 +39,7 @@ var _msg_until := 0
 var atlas := {}  # WO-597 §D: {w, h, slots: {cell id: {x, y, w, h} fractions}} while the server packs the windows
 var _crops: Array[TextureRect] = []
 var _asked_atlas := false
+var pan := 0.0  # WO-648: px the overflowing canvas is scrolled (TM.width_fit)
 
 
 func _ready() -> void:
@@ -135,12 +136,17 @@ func canvas() -> Vector2:
 	return Vector2(t.get_width(), t.get_height()) if t != null and t.get_width() > 0 else Vector2(1920, 1080)
 
 
-## Where the preview draws the operator canvas (the TextureRect's keep-aspect-centred fit).
+## Where the preview draws the operator canvas: the full width, overflowing top / bottom (WO-648; live_tab places
+## the picture here too).
 func image_rect() -> Rect2:
-	var c := canvas()
-	var s := minf(size.x / c.x, size.y / c.y)
-	var d := c * s
-	return Rect2((size - d) / 2.0, d)
+	return TM.width_fit(size, canvas(), pan)
+
+
+## WO-648: the mouse wheel scrolls the overflow (a wheel step down shows more of the canvas bottom).
+func pan_by(dy: float) -> void:
+	var lim := TM.pan_limit(size, canvas())
+	pan = clampf(pan + dy, -lim, lim)
+	queue_redraw()
 
 
 ## A window's picture in canvas px: the cell rect contain-fitted to the source aspect, like the server draws it
@@ -198,9 +204,17 @@ func _draw() -> void:
 		m.add_string(_msg, font, 13)
 		m.width = ir.size.x - 16.0
 		m.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		var at := Vector2(ir.position.x + 8.0, ir.end.y - m.get_size().y - 10.0)
+		var at := Vector2(ir.position.x + 8.0, minf(ir.end.y, size.y) - m.get_size().y - 10.0)
 		draw_rect(Rect2(at - Vector2(6, 4), m.get_size() + Vector2(12, 8)), Color(0, 0, 0, 0.75))
 		m.draw(get_canvas_item(), at, Color("#fbbf24"))
+
+
+## A wheel step over the preview → pan; also called for wheels that miss the windows (live_tab's stack).
+func wheel(mb: InputEventMouseButton) -> bool:
+	if mb == null or not mb.pressed or not mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return false
+	pan_by(-40.0 if mb.button_index == MOUSE_BUTTON_WHEEL_DOWN else 40.0)
+	return true
 
 
 func _close_rect(picture: Rect2) -> Rect2:
@@ -255,6 +269,9 @@ func _drop_data(at: Vector2, data: Variant) -> void:
 
 func _gui_input(e: InputEvent) -> void:
 	var mb := e as InputEventMouseButton
+	if wheel(mb):
+		accept_event()
+		return
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
 		if mb.pressed:
 			var hit := _pick(mb.position)

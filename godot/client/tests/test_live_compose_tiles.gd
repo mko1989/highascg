@@ -122,3 +122,15 @@ func test_atlas_slots() -> void:
 	t.eq(TM.slot_px(a, "src_route_8_1", C), Rect2(), "a window without a slot crops nothing")
 	t.eq(TM.slot_px({}, "pgm_1", C), Rect2(), "no atlas → no slot")
 
+
+
+func test_preview_fills_the_width_and_pans_the_overflow() -> void:  # WO-648
+	var wide := Vector2(1176, 460)
+	var r := TM.width_fit(wide, C)
+	t.ok(r.is_equal_approx(Rect2(0, (460 - 661.5) / 2.0, 1176, 661.5)), "full width, centred, 16:9 kept")
+	t.eq(TM.pan_limit(wide, C), 100.75)
+	t.eq(TM.width_fit(wide, C, 500).position.y, 0.0, "panned down to the canvas top, no further")
+	t.eq(TM.width_fit(wide, C, -500).end.y, 460.0, "panned up to the canvas bottom")
+	var tall := Vector2(800, 900)
+	t.ok(TM.width_fit(tall, C, 50).is_equal_approx(Rect2(0, 225, 800, 450)), "a tall area: full width, no pan")
+	t.eq(TM.outside(wide, r), [], "nothing beside an overflowing canvas")

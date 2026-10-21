@@ -41,17 +41,18 @@ func _ready() -> void:
 	video_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(video_panel)
 	var stack := Control.new()
+	stack.clip_contents = true  # WO-648: the width-filled canvas overflows top / bottom
 	video_panel.add_child(stack)
 	_video = TextureRect.new()
 	_video.texture = VideoSurfaces.texture(_role())
 	visibility_changed.connect(_hold_surface)  # WO-617: read the operator surface only while shown
 	_hold_surface.call_deferred()
 	_video.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_video.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_video.stretch_mode = TextureRect.STRETCH_SCALE  # placed on tiles.image_rect() (_process)
+	_video.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var premult := CanvasItemMaterial.new()
 	premult.blend_mode = CanvasItemMaterial.BLEND_MODE_PREMULT_ALPHA
 	_video.material = premult
-	_video.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(_video)
 	_no_signal = Label.new()
 	_no_signal.text = "OPERATOR CHANNEL — NO SIGNAL"
@@ -68,6 +69,9 @@ func _ready() -> void:
 	stage3d.visible = false
 	stack.add_child(stage3d)
 	stack.add_child(_view_switch())
+	stack.gui_input.connect(func(e: InputEvent) -> void:  # a wheel off the windows pans too
+		if view == "standard" and tiles.wheel(e as InputEventMouseButton):
+			stack.accept_event())
 	var bottom := VBoxContainer.new()
 	bottom.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(bottom)
@@ -204,6 +208,10 @@ func _hold_surface() -> void:
 func _process(_delta: float) -> void:
 	if not is_visible_in_tree():
 		return
+	var ir := tiles.image_rect()
+	if _video.position != ir.position or _video.size != ir.size:
+		_video.position = ir.position
+		_video.size = ir.size
 	var r: Variant = VideoSurfaces.reader(_role())
 	var lost: bool = r.signal_lost
 	_no_signal.visible = lost and view == "standard"
