@@ -20,6 +20,7 @@ const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
+const PaneKit := preload("res://features/settings/pane_kit.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
@@ -211,6 +212,24 @@ func _import() -> void:
 	var path: String = await FilePick.open_path(self, "Import an MVR scene", ["*.mvr ; MVR scene"])
 	if path == "":
 		return
+	# WO-643: the same file again is said, not re-imported; a new version of the shown scene is asked first.
+	var check := M.import_check(_cfg(), M.file_id(FileAccess.get_file_as_bytes(path)), M.file_name(path))
+	if check[0] == "same":
+		var d := AcceptDialog.new()
+		d.title = "Already imported"
+		d.dialog_text = check[1]
+		d.visibility_changed.connect(func() -> void:
+			if not d.visible:
+				d.queue_free())
+		add_child(d)
+		d.popup_centered()
+	elif check[0] == "version":
+		PaneKit.confirm(self, check[1], _upload.bind(path))
+	else:
+		_upload(path)
+
+
+func _upload(path: String) -> void:
 	_status.text = "Uploading %s…" % path.get_file()
 	var res: Dictionary = await Upload.upload(Config.origin, "/api/stage/mvr", path, func(sent: int, total: int) -> void:
 		_status.text = "Uploading %s… %d%%" % [path.get_file(), int(100.0 * sent / maxf(1.0, total))])

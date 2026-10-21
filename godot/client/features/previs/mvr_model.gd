@@ -34,6 +34,33 @@ static func import_cfg(cur: Dictionary, id: String, name: String) -> Dictionary:
 	return {"id": id, "name": name, "hidden_layers": []}
 
 
+## WO-643 — the scene id the server gives these bytes (src/stage/mvr-store.js importMvr: sha1, 12 hex) and the name
+## it gives the file, so an import can be checked against the shown scene before the upload.
+static func file_id(bytes: PackedByteArray) -> String:
+	var h := HashingContext.new()
+	h.start(HashingContext.HASH_SHA1)
+	h.update(bytes)
+	return h.finish().hex_encode().left(12)
+
+
+static func file_name(path: String) -> String:
+	var n := path.get_file()
+	return (n.left(-4) if n.to_lower().ends_with(".mvr") else n).left(120)
+
+
+## → [kind, text] for importing `id` / `name` while `cur` is shown: "same" (nothing to import), "version" (ask first)
+## or "" (another scene, no question).
+static func import_check(cur: Dictionary, id: String, name: String) -> Array:
+	if cur.is_empty():
+		return ["", ""]
+	if str(cur.get("id", "")) == id:
+		return ["same", "%s is already imported — the same file, the same objects and patch. Nothing to import." % name]
+	if str(cur.get("name", "")) == name:
+		return ["version", ("Import this as a new version of %s?\n\nThe scene keeps its place, layer colours and hidden walls, " +
+			"and the patched fixtures stay as they are (Re-patch fixtures afterwards to take address changes).") % name]
+	return ["", ""]
+
+
 static func placement(place: Dictionary) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, -deg_to_rad(float(place.yaw))), Vector3(place.x, place.z, -float(place.y)))
 

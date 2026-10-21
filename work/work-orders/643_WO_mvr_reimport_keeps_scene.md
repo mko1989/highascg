@@ -35,6 +35,14 @@ Owner, 21.10: *"ive tried reimporting the mvr and it just added the second set o
   `POST /api/project/autosave` (rev 61→62). The server broadcasts the sync, and the client reloads the scene
   without touching the patch.
 
+- Follow-up, owner 21.10: *"i deleted the screens, couldnt undo, so i wanted to import the mvr sencond time think
+  there would be a warning that im try to import same stuff and same patch"*. `mvr_model.gd` `file_id` / `file_name`
+  compute the id and name the server will give the file (`mvr-store.js:56` sha1, 12 hex; file name without .mvr),
+  before the upload. `import_check` sorts the result:
+  - same bytes as the shown scene: an "Already imported" note, and nothing is uploaded or saved;
+  - same name, new bytes: a confirm (Cancel focused) saying what is kept;
+  - any other scene: imports silently.
+
 ## What was VERIFIED
 
 - `tests/test_mvr_scene.gd` `test_reimport_keeps_the_scene_settings`: same file keeps everything, a new version keeps
@@ -43,4 +51,9 @@ Owner, 21.10: *"ive tried reimporting the mvr and it just added the second set o
 - Box, the restore: `projects/godot_test.json` rev 62 has the place, and `fixtures.patch` is byte-identical to
   before. The running client picked it up (Place shows −12.87 / 0.68 / 2.37), and the screenshot shows the heads on
   the trusses again.
-- Not driven on the box: a re-import would change the owner's live scene. Owner QA above.
+- `test_import_check_before_the_upload`: same / renamed copy / new version / other / empty, sha1 of "abc" =
+  `a9993e364706` like Node's, the .MVR suffix. Godot `--test` 20677 passed, 0 failed; `--check` boot OK.
+- Box: Import… → `~/Downloads/Pabianice Final Patch.mvr` shows "Pabianice Final Patch is already imported — the same
+  file, the same objects and patch. Nothing to import." (screenshot). The store's importedAt stayed 19:58:42 and
+  the project rev stayed 62.
+- The new-version confirm was not driven on the box (no second version of the file). Owner QA above.

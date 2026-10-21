@@ -117,3 +117,14 @@ func test_reimport_keeps_the_scene_settings() -> void:
 	t.eq(M.import_cfg(cur, "f00d", "Other venue"), {"id": "f00d", "name": "Other venue", "hidden_layers": []}, "another scene starts fresh")
 	t.eq(M.import_cfg({}, "f00d", "X"), {"id": "f00d", "name": "X", "hidden_layers": []}, "nothing shown yet")
 	t.ok(not cur.has("junk") and cur.id == "d74a", "input untouched")
+
+
+func test_import_check_before_the_upload() -> void:
+	var cur := {"id": "d74a223cd12a", "name": "Pabianice Final Patch", "place": {"x": 1.0}}
+	t.eq(M.import_check(cur, "d74a223cd12a", "Pabianice Final Patch")[0], "same", "the same bytes: nothing to import")
+	t.eq(M.import_check(cur, "d74a223cd12a", "renamed copy")[0], "same", "the same bytes under another name")
+	t.eq(M.import_check(cur, "0000aaaa1111", "Pabianice Final Patch")[0], "version", "same name, new bytes: ask")
+	t.eq(M.import_check(cur, "0000aaaa1111", "Other venue"), ["", ""], "another scene")
+	t.eq(M.import_check({}, "0000aaaa1111", "X"), ["", ""], "nothing shown")
+	t.eq(M.file_id("abc".to_utf8_buffer()), "a9993e364706", "sha1 like mvr-store.js")
+	t.eq([M.file_name("/m/Pabianice Final Patch.MVR"), M.file_name("x.zip")], ["Pabianice Final Patch", "x.zip"])
