@@ -272,6 +272,7 @@ function withScreenGlobalBorderForChannel(scene, ctx, channel) {
 }
 
 module.exports = {
+	GLOBAL_BORDER_LAYER_PRV_MIRROR,
 	defaultGlobalBorderSlot,
 	normalizeGlobalBordersArray,
 	applyControlToSlot,

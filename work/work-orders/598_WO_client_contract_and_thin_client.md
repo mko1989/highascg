@@ -102,7 +102,7 @@ prefs (`/api/settings` `ui.*` or a `clientPrefs` object) so any client sees the 
 - [x] T2 golden round trip: Godot side ✔ (`test_project_roundtrip.gd`); JS side ✔ 2026-10-21 (`smoke-wo598-web-project-roundtrip`).
 - [ ] T3 take-by-id parity diff test → switch web client (C1).
 - [~] T4 PRV-push-by-id (C2) ✔ server endpoint + verified on Caspar; web client switch pending owner QA.
-- [ ] T5 constants endpoint (C4); web client consumes it.
+- [x] T5 constants endpoint (C4) ✔ 2026-10-21 — `GET /api/contract/constants`; client copies pinned by a CI parity smoke instead of a boot fetch (see below).
 - [ ] T6 effects/PIP/border server routes (C3).
 - [ ] T7 client-local storage migration (D).
 
@@ -228,6 +228,23 @@ and resends a deck edit made while the socket was down (the web drops it). Verif
   - Offline suite 2986/0, Godot suite 20364/0 (+3 fixture cases), all gates green.
 - **Open:** nothing for T2. A show saved with a legacy `pipOverlay` and opened in the web client before this fix has
   already lost that overlay on disk; that cannot be recovered.
+
+## 2026-10-21 — T5 / C4: `GET /api/contract/constants`
+
+- **What was done:**
+  - New `src/api/routes-contract.js`, registered on the existing router line, so router.js stays at 499 lines.
+  - It serves `{ version: 1, layers }`, built from the modules that own each band: `look-layer-ranges.js`,
+    `global-border(-control).js`, `multiview-apply.js`, `routes-shader-stack.js` and `live-audio-input.js`.
+  - Contents: audio buses, look bank A/B, audio-only 200, timelines 210+50, PIP 260–979 ×4, edit chrome 990,
+    borders 996/997/998, ceiling 999, live-audio layer 10, shader stack 10–20, and multiview BG / cells / overlay.
+  - `routes-scene-global-border.js` imports the PRV mirror 997 instead of redefining it.
+- **Decision:** the clients keep their compile-time copies. Both render before any fetch returns, and making the
+  copies async would touch dozens of call sites for no runtime change. Instead, `smoke-wo598-contract-constants`
+  reads 22 copies (16 web, 5 Godot, 1 in `src/routing-map.js`) and fails CI when any of them differs from the
+  document. It also checks that the bands are ordered without overlap, and that the route runs without Caspar.
+- **What was VERIFIED:** the smoke passes 4/4; offline suite 2990/0. On the box after a node restart, the endpoint
+  returns the document (200).
+- **Open:** none. A new copy elsewhere should be added to the smoke's `COPIES` table.
 
 ## Earlier notes
 

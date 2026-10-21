@@ -23,8 +23,8 @@ const {
 	GLOBAL_BORDER_LAYER_PGM_B,
 	buildGlobalBorderPresetCrossfadeLines,
 } = require('../engine/global-border')
-const GLOBAL_BORDER_LAYER_PRV_MIRROR = 997
 const {
+	GLOBAL_BORDER_LAYER_PRV_MIRROR,
 	normalizeGlobalBordersArray,
 	applyControlToSlot,
 	screenBorderCasparSlots,
