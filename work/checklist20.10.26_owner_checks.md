@@ -136,6 +136,13 @@ Not on this list: anything a session can do alone. The node server has been rest
       "Y up". Same on the MagicQ MQ500. A managed switch needs IGMP snooping with a querier.
 - [ ] **WO-631** — Art-Net backup: switch Output to "Art-Net backup" with the console released, and check the head
       follows.
+- [ ] **WO-615** — real fixtures from GDTF: Previs → Fixtures → **Import GDTF…** a moving head you own (from
+      GDTF Share). Does the mode list match its manual? Add one at the universe / address it is set to, check that
+      universe under **Send ▾**, then turn **DMX output** on. The head should go to its defaults (centred, dark).
+      Then try the same over **sACN**.
+      To drive it before the programmer UI lands:
+      `curl -X POST http://<box>:4200/api/fixtures/program -d '{"id":"fx2","values":{"Dimmer":1,"Pan":90}}'`.
+      Turn DMX output off when done.
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.

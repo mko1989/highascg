@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch model + T4 DMX engine / sACN DONE server-side (offline + loopback wire test with a real Robin LedPOINTE file) — T3's Godot patch sheet, T5–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -68,7 +68,7 @@ with actual patch and way to artnet/sacn output."
       beams, wheels); tests with 3 real files from GDTF Share (moving head spot, wash, LED par) stored in
       `tools/fixtures/gdtf/` (license check: GDTF Share files are manufacturer-published; keep small ones).
 - [x] T2 `/api/fixtures/types` (upload/list/get/delete; store under the media/data dir, `.stignore` checked).
-- [ ] T3 Patch model in the project (`project.fixtures.patch`), address-collision check, universe usage map; Godot patch sheet UI. **Server side + Godot model twin done 2026-10-21; patch sheet UI open.**
+- [x] T3 Patch model in the project (`project.fixtures.patch`), address-collision check, universe usage map; Godot patch sheet UI. (2026-10-21)
 - [x] T4 DMX engine + encoder (attribute physical value → DMX incl. 16-bit, defaults for untouched
       channels), Art-Net/sACN via `dmx-output.js`; per-universe enable; wire test: loopback sACN/Art-Net
       receive asserts exact channel bytes.
@@ -210,3 +210,31 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
   170,170; Tilt −45° (135 → −135) → 170,170; Color1 set "Deep Red - Positioning" (16-bit 2304) → 9,0; Dimmer → 255,255;
   every other channel at its GDTF default; Art-Net U0 and sACN U7 @101 byte-identical.
 - Owner check pending: a real rig over Art-Net **and** sACN (checklist once the patch sheet lands).
+
+## T3 — Godot patch sheet (2026-10-21)
+
+### What was done
+- `godot/client/features/previs/fixtures/fixtures_section.gd` (new, previs side panel under "MVR scene"): fixture
+  type picker (GET /api/fixtures/types), **Import GDTF…** (stream upload) / **Remove** (warns how many patched
+  fixtures use it), mode picker ("name · N ch", ⚠ when the file has shared offsets), protocol (Art-Net / sACN),
+  universe ("U"), count ("×"), **Add** → N fixtures at the next free addresses of that universe + destination,
+  spread along X; the universe usage lines (GET /api/fixtures/dmx: "Art-Net 5 → 255.255.255.255:6454 · 78 / 512 ch ·
+  2 fixtures · off"); **DMX output** master (confirmation first) and **Send ▾** (check the universes it sends).
+  Writes the whole normalized `project.fixtures` slice and re-emits `Store.project_changed`, so the Follow list
+  (the per-fixture editor) reloads.
+- `fixtures_model.gd` (pure, tested): footprints (GDTF mode / generic profile), occupancy per (protocol, universe,
+  destination), first free gap, `add_typed`, usage lines, universe toggle.
+- `follow_section.gd`: the list shows "sACN " and "[mode]" for typed fixtures; a typed fixture hides the six pan /
+  tilt channel / range rows (the server derives them); universe limits and label follow the protocol; sACN
+  destination placeholder "empty = multicast".
+
+### What was VERIFIED
+- Godot tests 20478 pass (`test_fixtures_model.gd`: footprints, gaps, 13 × 39 ch fill a universe, usage, toggles),
+  `--check` boot OK.
+- Box GUI (owner project snapshotted first): LedPOINTE imported → section lists "Robe Lighting · Robin LedPOINTE",
+  "Mode 1 - Standard 16 - bit · 39 ch"; U5 × 2 → **Add** → "Added 2 at 5.001, 5.040", autosaved; server
+  `/api/fixtures/dmx` → Art-Net 5, fx2 1–39 + fx3 40–78, no problems; Send ▾ → Art-Net 5 checked →
+  `dmx.universes ["artnet:5"]`, master off → `live false`, 0 packets; DMX output → confirmation shown → Cancel → still
+  off; Tracking → Follow lists "LedPOINTE 1 U5.001 [Mode 1 - Standard 16 - bit]" and its form has no pan / tilt rows.
+- Restore: the `fixtures` slice posted back on the current rev (the stale-rev guard refused the older snapshot, as
+  designed) → equal to the snapshot; type deleted; `config/` byte-identical to the backup; ui.cfg restored.

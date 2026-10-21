@@ -16,6 +16,7 @@ const FIELDS := [["Universe (port-addr)", "universe", 0, 32767, 1], ["Address", 
 	["X m (stage left +)", "pose.x", -500, 500, 0.01], ["Y m (upstage +)", "pose.y", -500, 500, 0.01],
 	["Z m (height)", "pose.z", -50, 200, 0.01], ["Yaw ° (tilt+ swings to)", "pose.yaw", -360, 360, 1],
 	["Aim height m", "aim_z", -5, 10, 0.05]]
+const DERIVED := ["pan.ch", "pan.fine", "pan.range", "tilt.ch", "tilt.fine", "tilt.range"]  # WO-615: from the GDTF
 const CHECKS := [["Enabled", "enabled"], ["Hung (truss)", "pose.hang"], ["Invert pan", "pan.invert"], ["Invert tilt", "tilt.invert"]]
 
 var driver: Node  # marker_driver.gd: marker names + the server's `follow` aims
@@ -210,7 +211,8 @@ func refresh() -> void:
 	for fx in data.patch:
 		var a := aim(fx.id)
 		var st := str(a.get("state", "—"))
-		var txt := "%s  U%d.%03d → %s · %s" % [fx.name, fx.universe, fx.address, _marker_name(fx.follow), st]
+		var txt := "%s  %sU%d.%03d%s → %s · %s" % [fx.name, "sACN " if fx.protocol == "sacn" else "", fx.universe,
+			fx.address, " [%s]" % fx.mode if str(fx.typeId) != "" else "", _marker_name(fx.follow), st]
 		if st == "following":
 			txt += "  %.1f° / %.1f°" % [float(a.pan), float(a.tilt)]
 		if a.get("through") is String:  # WO-632 read-through: who has pan / tilt, and is the console feed live
@@ -243,6 +245,15 @@ func refresh() -> void:
 		_follow.add_item("Marker %d (not in this project)" % fx.follow, fx.follow)
 		ids.append(fx.follow)
 	_follow.select(ids.find(fx.follow))
+	var typed := str(fx.typeId) != ""
+	for key in DERIVED:  # a GDTF type sets pan / tilt channels and ranges on the server
+		_spins[key].visible = not typed
+		_spins[key].get_meta("label").visible = not typed
+	var sacn: bool = fx.protocol == "sacn"
+	_spins.universe.min_value = 1 if sacn else 0
+	_spins.universe.max_value = F.SACN_UNIVERSE_MAX if sacn else F.PORT_ADDRESS_MAX
+	_spins.universe.get_meta("label").text = "Universe (sACN)" if sacn else "Universe (port-addr)"
+	_dest.placeholder_text = "empty = multicast, or ip[:port]" if sacn else F.DEFAULT_DEST + "  (ip[:port])"
 	for key in _spins:
 		(_spins[key] as SpinBox).set_value_no_signal(float(_at(fx, key)))
 	for key in _checks:
@@ -276,6 +287,7 @@ func _pair(text: String, c: Control) -> void:
 	l.text = text
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	_form.add_child(l)
+	c.set_meta("label", l)
 	c.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_form.add_child(c)
 
