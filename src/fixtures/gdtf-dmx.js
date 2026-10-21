@@ -92,6 +92,7 @@ function channelFunctions(ch, res) {
 				.map((s) => ({ name: attr(s, 'Name') || '', from: atRes(dmxValue(attr(s, 'DMXFrom')), res) ?? 0,
 					slot: numOr(attr(s, 'WheelSlotIndex'), 0) }))
 			const mm = attr(cf, 'ModeMaster')
+			const raw = mm ? [dmxValue(attr(cf, 'ModeFrom')), dmxValue(attr(cf, 'ModeTo'))] : null
 			fns.push({
 				name: attr(cf, 'Name') || '',
 				lcName: attr(lc, 'Attribute') || '',
@@ -102,8 +103,9 @@ function channelFunctions(ch, res) {
 				physTo: numOr(attr(cf, 'PhysicalTo'), 1),
 				wheel: attr(cf, 'Wheel') || '',
 				modeMaster: mm || '',
-				modeFrom: mm ? atRes(dmxValue(attr(cf, 'ModeFrom')), 2) ?? 0 : 0,
-				modeTo: mm ? atRes(dmxValue(attr(cf, 'ModeTo')), 2) ?? 0 : 0,
+				modeFrom: mm ? atRes(raw[0], 2) ?? 0 : 0, // rescaled to the master channel's resolution in parseModes
+				modeTo: mm ? atRes(raw[1], 2) ?? 0 : 0,
+				_mode: raw,
 				sets,
 			})
 		}
@@ -130,6 +132,9 @@ function initialIndex(text, fns) {
 }
 
 function parseChannel(ch, geometry, shift, brk) {
+	const lc = kids(ch).find((n) => n['#name'] === 'LogicalChannel')
+	// The DMX channel's name (mode masters refer to it): Name, else "<Geometry>_<first logical attribute>".
+	const name = attr(ch, 'Name') || `${attr(ch, 'Geometry') || ''}_${attr(lc, 'Attribute') || ''}`
 	const raw = String(attr(ch, 'Offset') ?? '').trim()
 	const offsets = raw ? raw.split(',').map((s) => Number(s.trim()) + shift).filter((n) => n >= 1) : []
 	const res = Math.min(MAX_RES, Math.max(1, offsets.length))
@@ -137,6 +142,7 @@ function parseChannel(ch, geometry, shift, brk) {
 	const initial = initialIndex(attr(ch, 'InitialFunction'), functions)
 	const fn = functions[initial]
 	return {
+		name,
 		geometry,
 		break: brk,
 		offsets,
@@ -177,6 +183,17 @@ function parseModes(ft) {
 			for (const r of instances) {
 				const shift = (r.breaks[brk] ?? r.breaks[1] ?? 1) - 1
 				channels.push(parseChannel(ch, r.name, shift, brk))
+			}
+		}
+		// Mode-master ranges at the master channel's own resolution (a 1-byte PanMode: "1/1" stays 1).
+		for (const c of channels) {
+			for (const f of c.functions) {
+				if (f._mode) {
+					const master = channels.find((x) => x.name === f.modeMaster)
+					f.modeFrom = atRes(f._mode[0], master ? master.res : 2) ?? 0
+					f.modeTo = atRes(f._mode[1], master ? master.res : 2) ?? 0
+				}
+				delete f._mode
 			}
 		}
 		const breaks = [...new Set(channels.map((c) => c.break))].sort((a, b) => a - b)

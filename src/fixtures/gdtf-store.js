@@ -12,9 +12,12 @@ const path = require('path')
 const unzipper = require('unzipper')
 const { projectsRoot } = require('../engine/projects-root')
 const { parseGdtf } = require('./gdtf-parse')
+const { buildRig } = require('./gdtf-rig')
+const { compileVisual } = require('./gdtf-visual')
 
 const ID = /^[0-9a-f]{12}$/
 const _types = new Map() // id → parsed record (the engine's working set)
+const _rigs = new Map() // "id|mode" → { rig, plan } (WO-615 T5)
 
 function dir() {
 	return path.join(projectsRoot(), '_gdtf')
@@ -92,6 +95,19 @@ function mode(id, name) {
 	return m ? { ...m, warnings: modeWarnings(m) } : null
 }
 
+/** WO-615 T5: the previs rig (gdtf-rig.js) and DMX decode plan (gdtf-visual.js) of one mode, or null. Cached. */
+function visual(id, name) {
+	const key = `${id}|${name}`
+	if (_rigs.has(key)) return _rigs.get(key)
+	const rec = record(id)
+	const m = rec?.type.modes.find((x) => x.name === name)
+	if (!m) return null
+	const rig = buildRig(rec.type, m)
+	const out = { rig, plan: compileVisual(rec.type, m, rig) }
+	_rigs.set(key, out)
+	return out
+}
+
 /** A member of the stored archive (wheel image, model) as bytes, or null. */
 async function member(id, file) {
 	const f = fileOf(id, '.gdtf')
@@ -105,7 +121,8 @@ function remove(id) {
 	const files = [fileOf(id, '.json'), fileOf(id, '.gdtf')].filter((f) => f && fs.existsSync(f))
 	for (const f of files) fs.unlinkSync(f)
 	_types.delete(id)
+	for (const k of [..._rigs.keys()]) if (k.startsWith(`${id}|`)) _rigs.delete(k)
 	return files.length > 0
 }
 
-module.exports = { importGdtf, record, list, describe, mode, member, remove, modeWarnings }
+module.exports = { importGdtf, record, list, describe, mode, visual, member, remove, modeWarnings }

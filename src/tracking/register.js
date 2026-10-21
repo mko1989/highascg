@@ -9,12 +9,13 @@
  * src/fixtures/follow-service.js: hub → pan / tilt → ArtDmx, patch in `project.fixtures`).
  *
  * HTTP: GET /api/tracking/markers · POST /api/tracking/markers {id,x,y,z,name?} or {markers:[…]} ·
- *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status)
+ *       DELETE /api/tracking/markers/<id> · GET /api/tracking/stats · GET /api/tracking/follow (engine status) · GET /api/tracking/fixtures (WO-615 T5 GDTF axes / beams)
  *       · POST /api/tracking/detect/pick {key} (WO-624 E2: the replace pin follows this detected person)
  *       · GET / POST /api/tracking/follow/calibrate {action, id, …} (WO-624 E3: fixture position calibration,
  *         src/fixtures/calibrate-session.js) · POST …/calibrate/spot {camera, action?, id?} (T13b: the server finds
  *         the beam spot in the camera picture, src/fixtures/calibrate-spot.js)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
+ *   · tracking:fixtures {fixtures:[{id, axes, beams}]} (WO-615 T5, GDTF fixtures decoded from their DMX; ≤ 30 Hz on change)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
  * Detection (T9, src/tracking/detect-service.js): GET /api/tracking/detections — sidecar state + latest persons;
@@ -52,6 +53,7 @@ const HEARTBEAT_MS = 1000
 const WS_EVENT = 'tracking:markers'
 const FOLLOW_EVENT = 'tracking:follow'
 const FOLLOW_MS = 100
+const FIXTURES_EVENT = 'tracking:fixtures' // WO-615 T5: typed fixtures' axes / beams, ≤ 30 Hz on change
 const ZONES_EVENT = 'tracking:zones'
 const DETECT_EVENT = 'tracking:detections'
 const DETECT_MS = 66
@@ -65,6 +67,7 @@ let _follow = null
 let _calib = null
 let _spot = null
 let _followSent = { json: '', at: 0 }
+let _fixturesSent = ''
 let _zones = null
 let _zonesSent = ''
 let _detect = null
@@ -152,6 +155,16 @@ function followTick() {
 	_ctx._wsBroadcast(FOLLOW_EVENT, snap)
 }
 
+/** GDTF fixtures for the previs (WO-615 T5): on change, at the 33 ms tick. */
+function fixturesTick() {
+	if (!_follow?.visual || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
+	const snap = _follow.visual()
+	const json = JSON.stringify(snap)
+	if (json === _fixturesSent) return
+	_fixturesSent = json
+	_ctx._wsBroadcast(FIXTURES_EVENT, snap)
+}
+
 /** Zone occupancy: only when it changed (the engine itself evaluates at 10 Hz). */
 function zonesTick() {
 	if (!_zones || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
@@ -237,6 +250,9 @@ async function handleApi({ method, path, body }) {
 	}
 	if (method === 'GET' && path === '/api/tracking/follow') {
 		return _follow ? reply(200, _follow.status()) : reply(503, { error: 'follow engine not running' })
+	}
+	if (method === 'GET' && path === '/api/tracking/fixtures') {
+		return _follow?.visual ? reply(200, _follow.visual()) : reply(503, { error: 'follow engine not running' })
 	}
 	if (method === 'GET' && path === '/api/tracking/zones') {
 		return _zones ? reply(200, _zones.status()) : reply(503, { error: 'zone engine not running' })
@@ -345,6 +361,7 @@ module.exports = {
 			pinTick()
 			tick()
 			followTick()
+			fixturesTick()
 			zonesTick()
 			detectTick()
 		}, TICK_MS)
@@ -352,6 +369,7 @@ module.exports = {
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
+		_fixturesSent = ''
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
 		_calib = createCalibration({ engine: _follow.engine, hub })
 		_spot = createSpotFinder({

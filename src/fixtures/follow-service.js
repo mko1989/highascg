@@ -19,6 +19,7 @@ const { PsnSender } = require('./psn')
 const { ConsoleFrames } = require('./follow-through')
 const { onProjectChanged } = require('../engine/project-events')
 const gdtfStore = require('./gdtf-store')
+const { decodeVisual } = require('./gdtf-visual')
 const { SACN_PORT } = require('./sacn')
 
 function ipv4ToInt(ip) {
@@ -148,6 +149,17 @@ function createFollowService(ctx, hub) {
 			return { output_enabled: s.output_enabled, protocol: s.protocol,
 				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) =>
 					({ id, state, pan, tilt, problem, through, console })) }
+		},
+		/** WO-615 T5 (WS `tracking:fixtures`): every outputtable typed fixture's axes / beams, decoded from its bytes. */
+		visual: () => {
+			const fixtures = []
+			for (const fx of engine.fixtures) {
+				if (!fx.gdtf || !fx.enabled || fx.problem) continue
+				const v = gdtfStore.visual(fx.typeId, fx.mode)
+				const buf = engine.frameOf(fx)
+				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address) })
+			}
+			return { fixtures }
 		},
 		stop() {
 			off()

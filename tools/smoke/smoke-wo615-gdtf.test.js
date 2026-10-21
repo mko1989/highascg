@@ -51,7 +51,7 @@ test('standard mode: offsets, resolution, defaults, mode-master branches, sets, 
 		pan.functions.map((f) => [f.name, f.from, f.to, f.modeFrom]),
 		[
 			['Pan', 0, 65535, 0],
-			['Pan 360', 0, 65535, 256],
+			['Pan 360', 0, 65535, 1],
 		]
 	)
 	assert.deepStrictEqual([pan.functions[0].physFrom, pan.functions[0].physTo], [-270, 270])

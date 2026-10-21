@@ -49,6 +49,7 @@ var track_view: TrackingView
 var track_page: TrackingPage
 var markers: MarkerDriver
 var coverage: Coverage3D
+var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
 var _coverage_cb: CheckBox
 var _coverage_note: Label
 
@@ -79,6 +80,7 @@ func _ready() -> void:
 	stage.add_child(mvr)
 	coverage = Coverage3D.new()
 	stage.add_child(coverage)
+	stage.add_child(fixtures3d)
 	_svc.gui_input.connect(_on_3d_input)
 	_coverage_note = Label.new()
 	_coverage_note.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -186,12 +188,13 @@ func _on_tracking_changed() -> void:
 	_refresh_coverage()
 
 
-## Fit / F: the stage objects and the MVR scene, plus the tracking cameras and grid while they are shown (T10c).
+## Fit / F: the stage objects, the MVR scene and the GDTF fixtures, plus the tracking cameras and grid while they are
+## shown (T10c).
 func _fit_box() -> AABB:
 	var b := builder.bounds()
-	var m := mvr.bounds()
-	if m.size != Vector3.ZERO:
-		b = m if b.size == Vector3.ZERO else b.merge(m)
+	for m: AABB in [mvr.bounds(), fixtures3d.bounds()]:
+		if m.size != Vector3.ZERO:
+			b = m if b.size == Vector3.ZERO else b.merge(m)
 	if not coverage.visible or coverage.box.size == Vector3.ZERO:
 		return b
 	return coverage.box if b.size == Vector3.ZERO else b.merge(coverage.box)

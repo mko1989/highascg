@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-83 types.
+84 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -84,6 +84,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `timeline.tick` | `src/engine/timeline-playback-runtime.js` |  |
 | server → clients | `tracking:detections` | `src/tracking/register.js` |  |
 | server → clients | `tracking:error` | `src/tracking/register.js` |  |
+| server → clients | `tracking:fixtures` | `src/tracking/register.js` |  |
 | server → clients | `tracking:follow` | `src/tracking/register.js` |  |
 | server → clients | `tracking:markers` | `src/tracking/register.js` |  |
 | server → clients | `tracking:zones` | `src/tracking/register.js` |  |

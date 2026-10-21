@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-459 routes.
+460 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -437,6 +437,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/timers/visible` | registry | `src/api/router.js` |
 | * | `/api/tracking/detect/pick` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/detections` | handler | `src/tracking/register.js` |
+| * | `/api/tracking/fixtures` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow/calibrate` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/follow/calibrate/spot` | handler | `src/tracking/register.js` |

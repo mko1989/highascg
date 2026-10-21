@@ -156,6 +156,11 @@ class FollowEngine {
 		return this._aim.get(id) || { pan: 0, tilt: 0, state: 'centre' }
 	}
 
+	/** WO-615 T5: the 512 bytes fixture fx was last written into (what the previs decodes), or null. */
+	frameOf(fx) {
+		return fx.to ? this._uni.get(this._key(fx))?.buf || null : null
+	}
+
 	_key(fx) {
 		return `${fx.protocol}|${fx.to.host}:${fx.to.port}|${fx.universe}`
 	}

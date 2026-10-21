@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -72,8 +72,9 @@ with actual patch and way to artnet/sacn output."
 - [x] T4 DMX engine + encoder (attribute physical value → DMX incl. 16-bit, defaults for untouched
       channels), Art-Net/sACN via `dmx-output.js`; per-universe enable; wire test: loopback sACN/Art-Net
       receive asserts exact channel bytes.
-- [ ] T5 Godot fixture visualisation: GDTF geometry (glb; 3DS via WO-612 loader), Axis animation, beams
+- [x] T5 Godot fixture visualisation: GDTF geometry (glb; 3DS via WO-612 loader), Axis animation, beams
       (SpotLight3D + volumetric fog), gobo projector textures from wheels; perf budget (≥ 50 fps with 48 fixtures).
+      (2026-10-21 — additive cones instead of volumetric fog, see the T5 section)
 - [ ] T6 Programmer UI: select fixtures (previs click / sheet), intensity, colour (RGB/CMY/CTO from
       available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups.
 - [ ] T7 Visualiser mode (incoming Art-Net/sACN through the patch).
@@ -238,3 +239,74 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
   off; Tracking → Follow lists "LedPOINTE 1 U5.001 [Mode 1 - Standard 16 - bit]" and its form has no pan / tilt rows.
 - Restore: the `fixtures` slice posted back on the current rev (the stale-rev guard refused the older snapshot, as
   designed) → equal to the snapshot; type deleted; `config/` byte-identical to the backup; ui.cfg restored.
+
+## T5 — previs fixtures: rig, DMX decode, beams (2026-10-21)
+
+### Investigation
+- **GDTF models hang.** Building every real file's rig (8 types from the MVR test set) and composing the transforms,
+  the beam of every type points along GDTF −Z with the base above it (Robin Esprite beam 0.72 m below the base,
+  LedPOINTE 0.66 m, Pulse Panel, Fresnel, LEDBeam alike). So the GDTF model as-is is the patch's `hang: "truss"`,
+  and positive Tilt (right-handed about the tilt Axis's X) swings −Z toward +Y — exactly follow-ik.js's frame
+  (`f` = upstage at yaw 0). Positive Pan about Z sends it to −X, follow-ik's hung `g`. Standing (`floor`) is the
+  same model turned 180° about stage Y (not X — about X would flip `f` to downstage). Yaw = rotation −yaw about Z.
+  No extra offsets are needed between the IK and the drawing.
+- **Mode masters need the master's resolution.** `ModeFrom="1/1"` was scaled to 2 bytes (256) for every function
+  (`gdtf-dmx.js` assumed 2), but the Esprite / LedPOINTE masters are 1-byte channels, so a decoder comparing the master
+  channel's raw value would never pick "Pan 360". Mode-master ranges are now rescaled to the master channel's own
+  resolution after all channels are parsed (channels carry `name`: the DMX channel Name, else `<Geometry>_<Attribute>`,
+  what `ModeMaster` refers to). All 42 mode-master functions in the real files resolve to a channel.
+- **What lights a beam.** Real files put Dimmer / Shutter / colour on `Head` or `Base`, not on the Beam geometry, and
+  pixel fixtures put the master dimmer on the bar and RGB on each cell. So a beam's scope = channels on the beam or
+  any ancestor (in the instanced tree). Shutter sets are named "Closed" / "Close" / "Shutter closed" (survey of
+  every Shutter1 function in the real files); strobe functions read as open. Pulse Panel 3CH patches only its CW
+  cells: its RGB beams have no channel in scope and must stay dark (they read white before that rule).
+- **Godot light facts found on the box.** (1) The default distance falloff (≈ 1/d) left a 5 m pool at ~10 % on the
+  dark floor (invisible) — `spot_attenuation = 0`. (2) A `light_projector` on a shadowless SpotLight3D renders the
+  light **black**: Godot projects through the shadow map. Screenshots: open gobo → pool, Gobo2 → nothing; with
+  `shadow_enabled` → the Esprite's swirl gobo. (3) The previs Fit framed only the wall; fixtures behind the camera.
+
+### What was done
+- `src/fixtures/gdtf-dmx.js`: channel `name`; mode-master ranges at the master channel's resolution.
+- `src/fixtures/gdtf-rig.js` (new): the mode's geometry flattened parent-first with GeometryReference instanced
+  (reference name; template children `<ref>/<child>`, the same naming gdtf-dmx.js gives instanced channels), local
+  transforms conjugated into Godot's frame (GDTF Z = Godot Y, same angle sign), meshes as WO-612 (glb, else 3ds,
+  else a box of the model size with `mesh_xf`), Pan / Tilt axis nodes marked from the mode's channels.
+- `src/fixtures/gdtf-visual.js` (new): `compileVisual` (per type + mode: beam scopes) and `decodeVisual` (DMX →
+  axes in degrees; per beam intensity = dimmers in scope × additive level, 0 on a Closed shutter or with no channel
+  in scope; colour = additive emitters normalised, else white, × CMY × colour-wheel slot (CIE xy → sRGB); zoom = Zoom
+  physical else BeamAngle; gobo = first gobo wheel slot with media). Shared with T7.
+- `gdtf-store.js` `visual(id, mode)` (cached rig + plan, cleared on remove); routes
+  `GET /api/fixtures/types/<id>/rig?mode=` and `/model?path=models/(gltf|3ds)/…` (3ds → GLB, WO-612 converter);
+  `follow-engine.js` `frameOf(fx)`; `follow-service.js` `visual()`; `src/tracking/register.js` WS
+  `tracking:fixtures` (33 ms tick, on change) + `GET /api/tracking/fixtures` (first state for a client).
+- Godot `features/previs/fixtures/fixtures_3d.gd` (new, mounted in the previs stage) + `fixtures_3d_model.gd`
+  (pure: pose, axes, cone size, light budget, tint): builds each typed fixture from its rig (GLB meshes once per
+  type, duplicated), poses it, turns axes and lights beams from `tracking:fixtures`. A beam = additive fading cone
+  (shader: alpha falls off along the beam and toward the silhouette) + emissive lens + a SpotLight3D (no distance
+  falloff, hard edge) while 64 lights last; gobos project the wheel image (`wheels/<media>.png`, mipmapped), with
+  shadows on only for those (16 max); a rig with > 4 beams (pixel panel / bar) draws glowing cells only. Fit
+  includes the fixture bodies (`previs_tab.gd`).
+- **Not done, deliberately:** volumetric fog (the cones read better, cost nothing and do not haze the LED wall
+  preview); prism / frost / iris / CTO / animation wheels are decoded nowhere yet; channels on DMX breaks > 1 are
+  still not output (T4) so they are not drawn either; untyped (generic profile) heads stay drawn by the follow view.
+
+### What was VERIFIED
+- Offline: `tools/smoke/smoke-wo615-visual.test.js` 7/7 (rig order / axes / Godot-frame conversion / box sizing,
+  GeometryReference instancing, decode of defaults / dimmer + wheel colour / pan / mode-master switching (PanMode 0 →
+  ±270, 1 → ±180, other → none), pixel bar master × cell colour, Closed shutter, CMY, zoom, engine `frameOf`, store
+  cache, `/rig` + `/model` routes). WO-615 smokes 21/21; offline suite 3047 tests, 3045 pass, 0 fail (2 skipped);
+  `node index.js --no-http` boots; lint 216 (= cap), file lines, format, api-contract regenerated (`tracking:fixtures`,
+  `/api/tracking/fixtures`). Godot: `test_fixtures_3d_model.gd` (pose + axes give the IK's beam directions for hung
+  and standing heads, yaw 90, cell rigs, light budget, tint); 20497 pass, `--check` boot OK.
+- Real files (decode, offline): Esprite / LEDBeam / LedPOINTE pan 45 / tilt 30 decode to 45.00 / 30.00; LEDBeam
+  R 1 + its default W 65535 → [1, 0.5, 0.5] (correct: W defaults full); ~0.01 ms per fixture decode.
+- Box (server restarted, GUI relaunched): imported LedPOINTE / LEDBeam 150 / Pulse Panel / Esprite; patched up to
+  48 typed fixtures (sACN U7–U11 unicast 127.0.0.1:5569, **DMX output master off — 0 packets**), drove them through
+  `/api/fixtures/program`. Seen in the previs: real GLB models (Esprite base / yoke / head), hung spots fanned by
+  pan −60…+60, floor beams up in their RGB colours, pixel panels as glowing cells, positive tilt swinging the head
+  upstage, the Esprite's real Gobo2 swirl projected on the floor. **48 fixtures / 704 beams: 50 fps (vsync cap),
+  render cpu 1.0–1.5 ms / gpu 0.3–0.4 ms, also during a 25 Hz pan / tilt / colour sweep with 16 gobo spots**;
+  server 12.7 % CPU during the sweep.
+- Restored: fixtures slice identical to before, programmer cleared, all imported types deleted, `ui.cfg` identical,
+  GUI back on tab 5.
+- Owner QA: does a real head (and its gobo) match the previs — direction of pan / tilt included (checklist).

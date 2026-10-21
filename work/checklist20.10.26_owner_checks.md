@@ -143,6 +143,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       To drive it before the programmer UI lands:
       `curl -X POST http://<box>:4200/api/fixtures/program -d '{"id":"fx2","values":{"Dimmer":1,"Pan":90}}'`.
       Turn DMX output off when done.
+      **Previs (T5):** the patched head appears on the 3D stage at its pose (Follow form: x / y / z, truss / floor, yaw)
+      and follows what you send — does pan / tilt go the **same way** as the real head, and does a gobo you pick
+      (`"Gobo1":{"set":"<slot name>"}`) show the same image?
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.
