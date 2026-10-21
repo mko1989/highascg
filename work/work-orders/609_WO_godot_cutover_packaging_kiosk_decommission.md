@@ -110,9 +110,22 @@ the web client itself stays for remote work (WO-608 D1).
 
 ## What was done
 
-Nothing yet.
+Nothing packaged yet. Interim on the owner's box (2026-10-21, owner asked for the Godot GUI to auto-start):
+- Openbox autostart starts `godot/client/run-client.sh --screen=0` from the dev install (`~/.local/opt/godot`), log
+  `~/.highascg/log/godot-client.log`; also in `scripts/setup/09-openbox-autostart.sh` (944767b1). That commit also fixes
+  the generated autostart's comment-only `else`, a bash syntax error that stopped the script at that block. Stand-in for T2.
+- Step 2 of the cutover sequence done on this box: operator destination `videoOutput: 'shm'`, applied. Owner report
+  that prompted it: a New project + apply brought the kiosk back, because New project reseeded the factory `'screen'`.
+  Fix (7a19fa5e): `new-project.js keepOperatorVideoOutput` keeps the live `videoOutput` / `shmName` (a machine property,
+  like `gpuPhysicalTopology`). Factory reset and the ISO still seed `'screen'` — `.local` is excluded from the ISO, so a
+  fresh install has no Godot client.
 
 ## What was VERIFIED
+
+- 2026-10-21 box: after the shm apply, `config/casparcg.config` has `<shm><name>opgui</name>` on the operator channel,
+  `/dev/shm/highascg-opgui` is written, node logs `[Operator GUI] auto-start skipped: native_client_shm`, no kiosk
+  process, Godot reconnected and shows the Devices tab on DP-2. Smoke `smoke-new-project.test.js` 6/6 (the new test fails
+  with the call removed).
 
 Inventory claims re-checked by hand: browser-source Firefox spawn (`browser-source-session.js:187-189`),
 "Open browser" spawn (`system-hardware-gui.js:147-148`), helper routes (`router.js:136-157`),
