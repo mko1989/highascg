@@ -197,3 +197,34 @@ test('createNewProject keeps the machine GPU port layout (gpuPhysicalTopology)',
 		fs.rmSync(mediaRoot, { recursive: true, force: true })
 	}
 })
+
+test('createNewProject keeps the machine operator-GUI video output (native client, no kiosk)', () => {
+	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-shm-'))
+	try {
+		const ctx = makeCtx(mediaRoot)
+		ctx.config.screenDestinations = {
+			version: 1,
+			destinations: [{ id: 'dst_operator_gui', label: 'Operator GUI', mainScreenIndex: 0, mode: 'operator_gui',
+				videoOutput: 'shm', shmName: 'opgui2' }],
+		}
+		const { project } = createNewProject(ctx)
+		const op = (d) => (d.screenDestinations?.destinations || []).find((x) => x.mode === 'operator_gui')
+		assert.equal(op(ctx.config).videoOutput, 'shm')
+		assert.equal(op(ctx.config).shmName, 'opgui2')
+		assert.equal(op(project.hardwareConfig).videoOutput, 'shm', 'the Untitled project carries it too')
+	} finally {
+		fs.rmSync(mediaRoot, { recursive: true, force: true })
+	}
+})
+
+test('createNewProject on a kiosk box stays on the factory screen output', () => {
+	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-screen-'))
+	try {
+		const ctx = makeCtx(mediaRoot)
+		createNewProject(ctx)
+		const op = (ctx.config.screenDestinations?.destinations || []).find((x) => x.mode === 'operator_gui')
+		assert.equal(op.videoOutput, 'screen')
+	} finally {
+		fs.rmSync(mediaRoot, { recursive: true, force: true })
+	}
+})

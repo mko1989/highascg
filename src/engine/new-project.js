@@ -60,6 +60,25 @@ function copyLiveGpuTopology(cfg) {
 }
 
 /**
+ * How this machine shows the operator GUI is a property of the box, not of a show: 'shm' means the native Godot client
+ * (installed per machine, WO-593) owns the operator monitor and the Firefox kiosk is never started. A New project
+ * keeps the live operator destination's videoOutput / shmName instead of the factory 'screen' (which brought the kiosk
+ * back on the next apply). Factory reset and the ISO still seed 'screen' — the ISO carries no Godot client (WO-609).
+ * @param {object} hardwareConfig the starter config (mutated)
+ * @param {object} cfg live config
+ */
+function keepOperatorVideoOutput(hardwareConfig, cfg) {
+	const live = (cfg?.screenDestinations?.destinations || []).find((d) => d?.mode === 'operator_gui')
+	const dests = hardwareConfig?.screenDestinations?.destinations || []
+	if (live?.videoOutput !== 'shm') return
+	for (const d of dests) {
+		if (d?.mode !== 'operator_gui') continue
+		d.videoOutput = 'shm'
+		d.shmName = live.shmName || d.shmName
+	}
+}
+
+/**
  * Apply starter routing and persist empty Untitled project.
  * @param {object} ctx
  * @returns {{ project: object, slug: string }}
@@ -107,6 +126,7 @@ function createNewProject(ctx) {
 	const liveTopology = copyLiveGpuTopology(ctx.configManager.get())
 	if (liveTopology) hardwareConfig.gpuPhysicalTopology = liveTopology
 	else delete hardwareConfig.gpuPhysicalTopology
+	keepOperatorVideoOutput(hardwareConfig, ctx.configManager.get())
 
 	if (!applyHardwareConfigToCtx(ctx, hardwareConfig)) {
 		throw new Error('Failed to apply starter hardware configuration')
@@ -173,4 +193,5 @@ module.exports = {
 	buildNewUntitledProject,
 	buildStarterHardwareConfig,
 	createNewProject,
+	keepOperatorVideoOutput,
 }
