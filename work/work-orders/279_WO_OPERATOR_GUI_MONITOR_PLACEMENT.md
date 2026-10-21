@@ -1,3 +1,5 @@
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
+
 # WO-279 — Operator-GUI Firefox opens on the wrong monitor
 
 **Source:** todos19.07.26 — "the operator gui firefox fails to open on the selected monitor. but the

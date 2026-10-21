@@ -1,3 +1,5 @@
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
+
 # WO-283 — Operator GUI prevents opening any window on top of it
 
 **Source:** todos19.07.26 — "the operator gui prevents opening any windows on top, like decklink

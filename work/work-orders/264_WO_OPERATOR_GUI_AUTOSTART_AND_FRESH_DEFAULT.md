@@ -1,6 +1,6 @@
 # WO-264 — Operator GUI auto-start at boot + fresh-system default (one screen with the GUI)
 
-**Status:** Implemented (owner acceptance A264.1 pending — live boot/positioning cannot be exercised offline)
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
 **Priority:** HIGH (owner request 2026-07-17, todos17.07.26)
 **Depends on:** WO-255 (Firefox launcher + shape overlay), WO-246 (operator monitor auto-select), WO-262/263 (hole-in-Firefox inversion)
 

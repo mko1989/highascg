@@ -1,6 +1,6 @@
 # WO-255 — Operator GUI v2: shaped Caspar video overlay above fullscreen Firefox (CEF route retired)
 
-**Status:** IMPLEMENTED (all T-tasks done; the operator GUI has been the daily driver since — owner acceptance A255.1 on `work/checklist06.08.26_close_all_wos.md`)
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
 **Priority:** HIGH (owner architecture decision 2026-07-16: "shaper and firefox")
 **Owner check:** A255.1
 

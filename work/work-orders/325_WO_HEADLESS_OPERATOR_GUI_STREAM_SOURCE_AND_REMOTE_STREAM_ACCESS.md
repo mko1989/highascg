@@ -1,3 +1,5 @@
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
+
 # WO-325 — Operator GUI as headless stream-only source (multiview owns the port); remote laptop stream access
 
 **Source:** todos22.07.26 line 13 (elaborates line 11 / **WO-324**) — "operator gui present because

@@ -1,6 +1,6 @@
 # WO-269 — Shape overlay: stop the 5 Hz identical-payload log flood
 
-**Status:** Implemented (owner acceptance A269.1 pending)
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
 **Priority:** HIGH (owner report 2026-07-18, todos18.07.26 — "logs flooding the highascg logs, not good")
 
 ## Symptom (owner log 12:41)

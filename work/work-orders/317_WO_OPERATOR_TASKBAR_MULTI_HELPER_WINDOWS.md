@@ -1,3 +1,5 @@
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
+
 # WO-317 — Multiple helper windows + taskbar on the operator monitor, browser stacked UNDER Caspar
 
 **Source:** todos21.07.26 — "the app needs to be able to run multiple 'windows' file browser and

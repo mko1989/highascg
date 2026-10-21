@@ -75,6 +75,12 @@ Importer map (rg `require(...)`, 21.10):
 - Unwired-exports gate: three helpers exported only for the deleted smokes were unexported; the baseline shrank 667 →
   654.
 
+### Stage D (docs)
+
+- WO-243, 255, 264, 269, 279, 283, 290, 317 and 325 carry `DEPRECATED (… successor WO-646)` status lines (one line
+  each; 243 keeps its older "partially deprecated" banner). The OPERATOR-GUI-CEF and OPERATOR-GUI-V2 queue rows are
+  marked deprecated.
+
 ## What was VERIFIED
 
 - Stages A + B, 21.10:

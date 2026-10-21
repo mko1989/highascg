@@ -1,3 +1,5 @@
+**Status: DEPRECATED (2026-10-21: the Firefox kiosk operator GUI was deleted; successor [WO-646](./646_WO_kiosk_decommission.md))**
+
 # WO-290 — Opt-in operator-GUI monitor picker for a fresh / factory-reset system
 
 **Source:** todos19.07.26 — "idea for opt in operator gui start on a fresh, not configured yet
