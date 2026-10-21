@@ -13,6 +13,7 @@ const {
 	fetchMultiviewInfoXml,
 	resolveMultiviewChannel,
 	getLastAppliedDebug,
+	MV_CELL_LAYER_START,
 } = require('../engine/multiview-apply')
 const liveSceneState = require('../state/live-scene-state')
 
@@ -155,10 +156,47 @@ async function handleMultiviewDebug(ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ debug: payload }) }
 }
 
+/**
+ * MIXER VOLUME lines for multiview audio focus: layers 1–10 (MV DeckLink inputs + BG) and every
+ * other cell silenced, the focused cell at unity. VOLUME is a LINEAR coefficient on this build
+ * (src/caspar/amcp-mixer.js mixerVolume) — the web editor used to send dB here (−60 / 0), i.e.
+ * phase-inverted ×60 on the "muted" layers and silence on the focused one.
+ * @param {number} ch multiview channel
+ * @param {number} cellCount cells in the applied layout
+ * @param {number} focusIdx 0-based index of the focused cell
+ */
+function buildAudioFocusLines(ch, cellCount, focusIdx) {
+	const lines = []
+	for (let L = 1; L < MV_CELL_LAYER_START; L++) lines.push(`MIXER ${ch}-${L} VOLUME 0`)
+	for (let i = 0; i < cellCount; i++) {
+		lines.push(`MIXER ${ch}-${MV_CELL_LAYER_START + i} VOLUME ${i === focusIdx ? 1 : 0}`)
+	}
+	return lines
+}
+
+/** POST /api/multiview/audio-focus {n, cellId} — focus one cell of the LAST APPLIED layout of multiviewer n. */
+async function handleMultiviewAudioFocus(body, ctx) {
+	const b = parseBody(body)
+	const n = Math.max(1, parseInt(b.n || 1, 10) || 1)
+	const map = getChannelMap(ctx.config || {}, ctx.switcherOutputBusByChannel)
+	const ch = resolveMultiviewChannel({ n }, map)
+	if (ch == null) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Multiviewer ${n} not enabled` }) }
+	const applied = ctx._multiviewLayouts?.[n] || (ctx.persistence || persistence).get(n === 1 ? 'multiviewLayout' : `multiviewLayout_${n}`)
+	const layout = Array.isArray(applied?.layout) ? applied.layout : []
+	if (layout.length === 0) {
+		return { status: 409, headers: JSON_HEADERS, body: jsonBody({ error: `No layout applied to multiviewer ${n} yet` }) }
+	}
+	const idx = layout.findIndex((c) => c && c.id === b.cellId)
+	if (idx < 0) return { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: `Cell ${b.cellId} not in the applied layout` }) }
+	await ctx.amcp.batchSendChunked(buildAudioFocusLines(ch, layout.length, idx))
+	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel: ch, layer: MV_CELL_LAYER_START + idx }) }
+}
+
 async function handlePost(path, body, ctx) {
-	if (path !== '/api/multiview/apply') return null
 	if (!ctx.amcp) return null
-	return handleMultiviewApply(body, ctx)
+	if (path === '/api/multiview/apply') return handleMultiviewApply(body, ctx)
+	if (path === '/api/multiview/audio-focus') return handleMultiviewAudioFocus(body, ctx)
+	return null
 }
 
 async function handleGet(path, ctx) {
@@ -166,4 +204,4 @@ async function handleGet(path, ctx) {
 	return handleMultiviewDebug(ctx)
 }
 
-module.exports = { handlePost, handleGet, handleMultiviewApply, handleMultiviewDebug }
+module.exports = { handlePost, handleGet, handleMultiviewApply, handleMultiviewDebug, handleMultiviewAudioFocus, buildAudioFocusLines }

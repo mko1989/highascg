@@ -1,43 +1,18 @@
 import { multiviewState } from '../lib/multiview-state.js'
 import { api } from '../lib/api-client.js'
-import { linearGainToCasparDb } from '../lib/audio-volume-scale.js'
 import { streamState } from '../lib/stream-state.js'
-import { getAppStateStore } from '../lib/app-runtime.js'
 
 export async function applyMultiviewAudioFocus() {
-	const cells = multiviewState.getCells()
 	const targetId = multiviewState.audioActiveCellId
 	if (!targetId) return
-
-	const n = multiviewState.currentIndex || 1
-	const cm = (getAppStateStore()?.getState()?.channelMap || {})
-	const mvChs = Array.isArray(cm.multiviewChannels) ? cm.multiviewChannels : (cm.multiviewCh != null ? [cm.multiviewCh] : [])
-	const MV_CH = mvChs[n - 1] || 3
-
-	const MV_CELL_LAYER_START = 11
-
-	const idx = cells.findIndex(c => c.id === targetId)
-	if (idx < 0) return
-
-	const targetLayer = idx + MV_CELL_LAYER_START
-
 	streamState.setAudioSource('multiview')
 	streamState.setMuted(false)
-
+	// Server composes the MIXER VOLUME lines against the applied layout (linear gain — this used
+	// to send dB with the layer in the volume slot: `MIXER 3 VOLUME 11 -60`).
 	try {
-		const cmds = []
-		const muteDb = linearGainToCasparDb(0)
-		const focusDb = linearGainToCasparDb(1)
-		for (let L = 1; L <= 10; L++) {
-			cmds.push(`MIXER ${MV_CH} VOLUME ${L} ${muteDb}`)
-		}
-		cells.forEach((c, i) => {
-			const L = i + MV_CELL_LAYER_START
-			cmds.push(`MIXER ${MV_CH} VOLUME ${L} ${L === targetLayer ? focusDb : muteDb}`)
-		})
-		await api.post('/api/amcp/batch', { commands: cmds })
+		await api.post('/api/multiview/audio-focus', { n: multiviewState.currentIndex || 1, cellId: targetId })
 	} catch (e) {
-		console.error('Audio focus AMCP failed:', e)
+		console.error('Multiview audio focus failed:', e)
 	}
 }
 
