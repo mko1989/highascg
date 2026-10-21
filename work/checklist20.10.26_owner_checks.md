@@ -19,6 +19,10 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-619** — should a Settings save also persist the editor Defaults tab, or only explicit Defaults saves?
 
 ### Look and feel (Godot client on the box)
+- [ ] **WO-638** — power-cycle the box with two or more screens. A "Make this the operator screen" prompt should
+      appear on each screen with a 120 s countdown, and no Caspar output until you answer. Pick one: the GUI moves
+      there, PGM comes up on the other screen. Then reboot once more and leave it alone: after 120 s the saved choice
+      is kept. Off switch: `operatorTools.bootScreenPicker: false`.
 - [ ] **WO-608** — header: Save / Load / Load from file / New project / rename / FTB. These were deliberately not
       pressed on the box (they change your show). Try each once on a scratch project.
 - [ ] **WO-608** — Settings → Nuclear: WM restart, reboot, shut down, Install to disk, Caspar stop / restart were not

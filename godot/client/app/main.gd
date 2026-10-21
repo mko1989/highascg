@@ -439,6 +439,7 @@ func look_names() -> Array:
 ## follows that screen's size (4K → 2×) unless ui.cfg [window] ui_scale or --ui-scale sets it.
 func _apply_window_args() -> void:
 	var w := get_window()
+	var fresh := false
 	if Config.args.has("screen"):
 		w.current_screen = int(Config.args["screen"])
 	else:
@@ -452,21 +453,30 @@ func _apply_window_args() -> void:
 			w.current_screen = i
 			_log("operator monitor: screen %d" % i)
 		elif res.ok and ScreenModel.should_auto_open(rect, null, screens.size()):
-			_fresh_box_picker()
+			fresh = true
 	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
 	w.content_scale_factor = Placement.ui_scale(DisplayServer.screen_get_size(w.current_screen), override)
 	if Config.args.has("fullscreen"):
 		w.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+	_screen_question(fresh)
 
 
-## Fresh multi-screen box: ask which screen is the operator's (WO-290's boot prompt, natively) unless one is flagged.
-func _fresh_box_picker() -> void:
+## WO-638: the once-per-boot "which screen is the operator's" question (asked even with --screen — the server
+## decides when, and holds Caspar until it is answered); otherwise a fresh multi-screen box with no operator monitor
+## flagged gets the plain prompt (WO-290's boot prompt, natively).
+func _screen_question(fresh: bool) -> void:
 	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
-	if r.ok and r.data is Dictionary and r.data.get("port") == null:
-		var picker := ScreenPicker.new()
-		add_child(picker)
-		picker.finished.connect(func(res: Dictionary) -> void: _log("operator screen: %s" % res.get("name", res.get("error", ""))))
-		picker.open()
+	if not r.ok or not r.data is Dictionary:
+		return
+	var boot: Variant = r.data.get("boot")
+	var asked := boot is Dictionary and bool((boot as Dictionary).get("pending", false))
+	if not asked and not (fresh and r.data.get("port") == null):
+		return
+	var picker := ScreenPicker.new()
+	add_child(picker)
+	picker.finished.connect(func(res: Dictionary) -> void: _log("operator screen: %s" % res.get("name", res.get("error", ""))))
+	if asked: picker.open_boot(boot)
+	else: picker.open()
 
 
 func _log(line: String) -> void:

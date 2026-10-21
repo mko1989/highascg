@@ -37,3 +37,10 @@ static func screen_line(i: int, o: Dictionary) -> String:
 ## boot picker did for the kiosk.
 static func should_auto_open(rect: Variant, port: Variant, screen_count: int) -> bool:
 	return not rect is Dictionary and port == null and screen_count > 1
+
+
+## WO-638 boot mode: the line under every prompt.
+static func boot_countdown(seconds: int, default_name: String) -> String:
+	if default_name == "":
+		return "Choose the operator screen — %d s" % max(seconds, 0)
+	return "%s becomes the operator screen in %d s" % [default_name, max(seconds, 0)]

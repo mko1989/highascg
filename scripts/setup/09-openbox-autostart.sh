@@ -140,11 +140,12 @@ if [ -f /etc/highascg/display-mode ] && grep -q '^x11-only\$' /etc/highascg/disp
 else
 ${CASPAR_PLAYOUT_BLOCK}
   :
-  # Godot operator client — reconnects to the node API on its own while highascg.service boots.
+  # Godot operator client — reconnects to the node API on its own while highascg.service boots. No --screen: the
+  # server's operator monitor places it, and on a multi-screen boot it asks which screen that is (WO-638).
   _godot="\${HOME}/.local/opt/godot/godot"
   if [ -x ${PLAYOUT}/godot/client/run-client.sh ] && [ -x "\$_godot" ]; then
     mkdir -p "\${HOME}/.highascg/log"
-    (sleep 8; GODOT="\$_godot" exec ${PLAYOUT}/godot/client/run-client.sh --screen=0 >>"\${HOME}/.highascg/log/godot-client.log" 2>&1) &
+    (sleep 8; GODOT="\$_godot" exec ${PLAYOUT}/godot/client/run-client.sh >>"\${HOME}/.highascg/log/godot-client.log" 2>&1) &
   fi
 fi
 AST

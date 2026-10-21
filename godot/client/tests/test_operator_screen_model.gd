@@ -31,3 +31,9 @@ func test_should_auto_open() -> void:
 	t.ok(not P.should_auto_open(null, null, 1), "one screen: nothing to choose")
 	t.ok(not P.should_auto_open({"x": 0, "y": 0}, null, 2), "a monitor resolves")
 	t.ok(not P.should_auto_open(null, 2, 2), "a port is flagged")
+
+
+func test_boot_countdown() -> void:  # WO-638
+	t.eq(P.boot_countdown(120, "DP-0"), "DP-0 becomes the operator screen in 120 s")
+	t.eq(P.boot_countdown(-3, "DP-4"), "DP-4 becomes the operator screen in 0 s")
+	t.eq(P.boot_countdown(7, ""), "Choose the operator screen — 7 s")

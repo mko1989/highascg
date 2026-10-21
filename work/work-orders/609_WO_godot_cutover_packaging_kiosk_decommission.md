@@ -119,6 +119,8 @@ Nothing packaged yet. Interim on the owner's box (2026-10-21, owner asked for th
   Fix (7a19fa5e): `new-project.js keepOperatorVideoOutput` keeps the live `videoOutput` / `shmName` (a machine property,
   like `gpuPhysicalTopology`). Factory reset and the ISO still seed `'screen'` — `.local` is excluded from the ISO, so a
   fresh install has no Godot client.
+- 2026-10-21 (WO-638): the autostart line dropped `--screen=0` (setup script + this box). The client follows the
+  server's operator monitor, and on a multi-screen boot asks which screen that is while `run.sh` holds Caspar.
 
 ## What was VERIFIED
 

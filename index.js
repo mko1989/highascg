@@ -350,7 +350,10 @@ function main() {
 				appCtx.log('warn', `[tailscale] Boot auto-login: ${e?.message || e}`)
 			})
 		}, 4000)
-		appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
+		// WO-638: a boot whose screens need choosing holds Caspar and asks on every screen; the answer lays out X,
+		// so the watchdog (which can only replay the stale plan) sits that boot out.
+		const bootScreens = require('./src/system/boot-screen-assignment').startBootScreenGate(appCtx)
+		if (!bootScreens.pending) appCtx._stopOsLayoutWatchdog = startOsLayoutWatchdog(appCtx)
 
 		if (casparConn && !config.offline_mode) {
 			appCtx._stopCasparAmcpWatchdog = startCasparAmcpWatchdog(appCtx)

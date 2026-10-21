@@ -12,6 +12,10 @@
  *   POST /api/system/operator-screen { name }   { ok, name, port } | 400 no name | 404 unknown output | 422 unmapped
  *   POST /api/system/operator-screen { prompt } true: the prompt is up — let the pointer leave the operator monitor;
  *                                               false: it closed with no pick — confine again
+ *   GET  …  also carries `boot`: { pending, defaultName, timeoutS } — WO-638, ask once per machine boot
+ *   POST …  { boot: 'prepare' }                 unstack mirrored outputs so every screen gets a prompt
+ *   POST …  { boot: 'resolve', name?, how? }    the boot answer (no name → the default; how: now | timeout): operator flag +
+ *                                               cable, destination cables onto the other lit jacks, then Caspar starts
  *
  * The pointer confine (WO-279) keeps the mouse on the operator monitor, so the prompts on the other screens could
  * never be clicked: it is released while the prompt is up (PROMPT_MAX_MS backstop if the client vanishes) and
@@ -65,10 +69,33 @@ function handleGet(ctx, deps = {}) {
 	const config = ctx?.config || {}
 	const outputs = (deps.listOutputs || picker.listPickerOutputs)(config) || []
 	const port = (deps.resolveFlagPort || require('../utils/operator-monitor-resolve').resolveFlagPort)(config)
+	let boot
+	try {
+		boot = (deps.bootStatus || require('../system/boot-screen-assignment').bootStatus)(config)
+	} catch (e) {
+		boot = { pending: false, reason: `error: ${e?.message || e}` }
+	}
 	return reply(200, {
 		outputs: outputs.map((o) => ({ ...o, current: port != null && o.port === port })),
 		port: port ?? null,
+		boot,
 	})
+}
+
+/** WO-638 boot steps. */
+async function handleBoot(body, ctx, deps = {}) {
+	const boot = deps.boot || require('../system/boot-screen-assignment')
+	if (body.boot === 'prepare') {
+		releaseConfine(ctx, deps)
+		return reply(200, await boot.prepare(ctx))
+	}
+	if (body.boot === 'resolve') {
+		const name = String(body?.name || '').trim() || null
+		const r = await boot.resolve(ctx, { name, how: String(body?.how || '') })
+		restoreConfine(ctx, deps)
+		return reply(r.status || 200, r)
+	}
+	return reply(400, { error: "boot must be 'prepare' or 'resolve'" })
 }
 
 /**
@@ -78,6 +105,7 @@ function handleGet(ctx, deps = {}) {
  */
 function handlePost(raw, ctx, deps = {}) {
 	const body = parseBody(raw) || {}
+	if (typeof body?.boot === 'string') return handleBoot(body, ctx, deps)
 	const picker = require('../system/operator-monitor-picker')
 	if (typeof body?.prompt === 'boolean' && !body?.name) {
 		const confined = body.prompt ? releaseConfine(ctx, deps) : restoreConfine(ctx, deps)
@@ -110,4 +138,4 @@ function register(routes) {
 	routes.post('/api/system/operator-screen', ({ body, ctx }) => handlePost(body, ctx), { requireCaspar: false })
 }
 
-module.exports = { register, handleGet, handlePost, PROMPT_MAX_MS }
+module.exports = { register, handleGet, handlePost, handleBoot, PROMPT_MAX_MS }
