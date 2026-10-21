@@ -20,6 +20,20 @@ static func place_of(c: Variant) -> Dictionary:
 	return {"x": n.call("x", -500, 500), "y": n.call("y", -500, 500), "z": n.call("z", -50, 200), "yaw": n.call("yaw", -360, 360)}
 
 
+## WO-643 — the scene settings after importing `id` / `name` while `cur` is shown. The same file again (the store is
+## content-addressed: same bytes, same id) keeps everything; a new version of the shown scene (same name) keeps its
+## place, layer colours, hidden layers / objects and patch state (MVR uuids are stable across versions); anything else
+## starts fresh (and gets fitted). A re-import used to reset all of it — the scene fell back to the file's own origin
+## while its patched fixtures stayed placed (owner, 21.10: "added the second set of models … wrong 0,0,0").
+static func import_cfg(cur: Dictionary, id: String, name: String) -> Dictionary:
+	if not cur.is_empty() and (str(cur.get("id", "")) == id or str(cur.get("name", "")) == name):
+		var c := cur.duplicate(true)
+		c["id"] = id
+		c["name"] = name
+		return c
+	return {"id": id, "name": name, "hidden_layers": []}
+
+
 static func placement(place: Dictionary) -> Transform3D:
 	return Transform3D(Basis(Vector3.UP, -deg_to_rad(float(place.yaw))), Vector3(place.x, place.z, -float(place.y)))
 

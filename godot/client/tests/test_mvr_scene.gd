@@ -105,3 +105,15 @@ func test_share_note() -> void:
 	t.ok(after.contains("C@D@r2.gdtf") and not after.contains("A@B@r1.gdtf"), after)
 	t.ok(not M.summary(M.without_specs(info, ["A@B@r1.gdtf", "C@D@r2.gdtf"])).contains("shown as boxes"))
 	t.eq((info.report.gdtf_no_model as Array).size(), 2, "the input is not changed")
+
+
+func test_reimport_keeps_the_scene_settings() -> void:
+	var cur := {"id": "d74a", "name": "Pabianice", "place": {"x": -12.87, "y": 0.68, "z": 2.37, "yaw": 0.0},
+		"hidden_objects": ["u1"], "layer_colors": {"Truss": "#000000"}, "hidden_layers": ["L"]}
+	t.eq(M.import_cfg(cur, "d74a", "Pabianice"), cur, "the same file again: nothing reset")
+	var v2 := M.import_cfg(cur, "e85b", "Pabianice")
+	t.eq([v2.id, v2.place.x, v2.hidden_objects, v2.layer_colors], ["e85b", -12.87, ["u1"], {"Truss": "#000000"}],
+		"a new version of the shown scene keeps its place and settings")
+	t.eq(M.import_cfg(cur, "f00d", "Other venue"), {"id": "f00d", "name": "Other venue", "hidden_layers": []}, "another scene starts fresh")
+	t.eq(M.import_cfg({}, "f00d", "X"), {"id": "f00d", "name": "X", "hidden_layers": []}, "nothing shown yet")
+	t.ok(not cur.has("junk") and cur.id == "d74a", "input untouched")

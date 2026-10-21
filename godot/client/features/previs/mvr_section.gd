@@ -218,8 +218,9 @@ func _import() -> void:
 		_status.text = "Import failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
 		return
 	await refresh_list()
-	_fit_on_load = true
-	_save({"id": str(res.data.id), "name": str(res.data.name), "hidden_layers": []})
+	var c := M.import_cfg(_cfg(), str(res.data.id), str(res.data.name))
+	_fit_on_load = not c.has("place")  # WO-643: a re-import keeps the scene where it was
+	_save(c)
 
 
 func _export() -> void:
