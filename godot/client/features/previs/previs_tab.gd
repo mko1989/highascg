@@ -453,7 +453,9 @@ func _build_panel() -> Control:
 	mvr_section = MvrSection.new()
 	v.add_child(mvr_section)
 	v.add_child(_heading("Fixtures (WO-615)"))
-	v.add_child(FixturesSection.new())
+	var fixtures_section := FixturesSection.new()
+	v.add_child(fixtures_section)
+	mvr_section.types_changed.connect(fixtures_section.refresh_types)  # WO-615 T10: a patch imports GDTF types
 	v.add_child(_heading("Models"))
 	_models = ItemList.new()
 	_models.custom_minimum_size.y = 120

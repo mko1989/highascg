@@ -46,3 +46,67 @@ static func summary(info: Dictionary) -> String:
 	if not failed.is_empty():
 		txt += "\nMeshes that failed to load: %d" % failed.size()
 	return txt
+
+
+## WO-615 T10 — "mvr-<uuid>" patch ids (POST /api/stage/mvr/<id>/patch) → {uuid: true}: the fixtures the live rig draws.
+static func patched_uuids(patch: Variant) -> Dictionary:
+	var out := {}
+	for f in patch if patch is Array else []:
+		var id := str(f.get("id", "")) if f is Dictionary else ""
+		if id.begins_with("mvr-"):
+			out[id.substr(4)] = true
+	return out
+
+
+## The server's entries merged into the patch: a re-patch refreshes address / type / mode / pose from the file but keeps
+## what the operator set on the fixture since (follow, fixed channels, aim height, enabled, pan / tilt invert, name).
+static func merge_patch(patch: Array, incoming: Array) -> Array:
+	var by_id := {}
+	for f in incoming:
+		if f is Dictionary:
+			by_id[str(f.get("id", ""))] = f
+	var out := []
+	for f in patch:
+		var id := str(f.get("id", "")) if f is Dictionary else ""
+		if not by_id.has(id):
+			out.append(f)
+			continue
+		var fx: Dictionary = (by_id[id] as Dictionary).duplicate(true)
+		for k in ["follow", "fixed", "aim_z", "enabled", "pan", "tilt", "name"]:
+			if (f as Dictionary).has(k):
+				fx[k] = f[k]
+		out.append(fx)
+		by_id.erase(id)
+	for f in incoming:
+		if f is Dictionary and by_id.has(str(f.get("id", ""))):
+			out.append(f)
+	return out
+
+
+## The patch without this scene's fixtures (uuids lower case, mvr_scene.fixture_uuids).
+static func unpatch(patch: Array, uuids: Array) -> Array:
+	var gone := {}
+	for u in uuids:
+		gone["mvr-" + str(u)] = true
+	return patch.filter(func(f: Variant) -> bool: return not (f is Dictionary and gone.has(str(f.get("id", "")))))
+
+
+## The patch reply → the section's status line.
+static func patch_summary(res: Dictionary) -> String:
+	var fx: Array = res.get("fixtures", []) if res.get("fixtures") is Array else []
+	var skipped: Array = res.get("skipped", []) if res.get("skipped") is Array else []
+	var types: Array = res.get("types", []) if res.get("types") is Array else []
+	var txt := "Patched %d fixture%s (%s, %d type%s)." % [fx.size(), "" if fx.size() == 1 else "s",
+		"sACN" if res.get("protocol") == "sacn" else "Art-Net", types.size(), "" if types.size() == 1 else "s"]
+	if not skipped.is_empty():
+		var why := {}
+		for s in skipped:
+			why[str(s.get("reason", "?"))] = int(why.get(str(s.get("reason", "?")), 0)) + 1
+		var parts := PackedStringArray()
+		for r in why:
+			parts.append("%s ×%d" % [r, why[r]])
+		txt += "\nNot patched: " + "; ".join(parts)
+	for n in res.get("notes", []) if res.get("notes") is Array else []:
+		txt += "\n" + str(n)
+	txt += "\nDMX output stays off until you enable it under Fixtures."
+	return txt

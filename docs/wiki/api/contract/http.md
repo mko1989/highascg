@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-464 routes.
+465 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -334,6 +334,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/stage/mvr-export` | registry | `src/api/routes-stage-mvr.js` |
 | DELETE | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | GET | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
+| POST | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | GET | `/api/state` | registry | `src/api/router.js` |
 | GET | `/api/state/*` | registry | `src/api/router.js` |
 | GET | `/api/streaming-channel` | registry | `src/api/router.js`, `src/api/routes-streaming-channel.js` |

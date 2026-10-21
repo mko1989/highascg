@@ -169,7 +169,9 @@ test('import: groups, symbols, GDTF fixture parts, missing GDTF box, video scree
 	assert.deepStrictEqual(by.Riser.parts.map((p) => p.mesh), ['mvr:cube.glb', 'mvr:person.3ds'])
 	assert.deepStrictEqual(origin(by.Riser.parts[1].xform), [1, 0, -2], 'symbol offset composed onto its object')
 	const spot = by['Spot 1']
-	assert.deepStrictEqual(spot.fixture, { spec: 'Maker@Spot', mode: 'Std', id: '101', unit: '', addresses: [{ break: 0, address: 513 }] })
+	const { matrix, ...fixture } = spot.fixture
+	assert.deepStrictEqual(fixture, { spec: 'Maker@Spot', mode: 'Std', id: '101', unit: '', addresses: [{ break: 0, address: 513 }] })
+	assert.deepStrictEqual(matrix.slice(12), [0.5, 0, 6, 1], 'WO-615 T10: the fixture world matrix (MVR frame, m) for its patch pose')
 	assert.deepStrictEqual(spot.parts.map((p) => p.mesh), ['gdtf:Maker@Spot.gdtf:models/gltf/base.glb', 'prim:box'],
 		'base mesh + file-less head as a box; beam and pigtail skipped')
 	assert.deepStrictEqual(origin(spot.parts[0].xform), [0.5, 6, 0], 'group (z 6 m) + fixture offset')

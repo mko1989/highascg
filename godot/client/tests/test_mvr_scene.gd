@@ -31,3 +31,25 @@ func test_screen_binding_helpers() -> void:
 	t.eq(M.screen_role({"kind": "VideoScreen", "screen": {"role": "prv2"}}), "prv2")
 	t.eq(M.screen_role({"kind": "VideoScreen"}), "", "foreign / unbound screen")
 	t.ok(M.summary({"name": "x", "screens": 2}).contains("2 video screen(s)"))
+
+
+## WO-615 T10 — MVR fixtures arrive patched: ids "mvr-<uuid>", a re-patch keeps the operator's edits, Unpatch.
+func test_patch_merge_and_unpatch() -> void:
+	var patch := [
+		{"id": "fx1", "name": "Manual"},
+		{"id": "mvr-aaa", "name": "Renamed", "address": 1, "follow": 3, "fixed": "6=255", "enabled": false},
+	]
+	t.eq(M.patched_uuids(patch), {"aaa": true})
+	t.eq(M.patched_uuids(null), {})
+	var incoming := [{"id": "mvr-aaa", "name": "Spot 101", "address": 40, "follow": 0, "pose": {"pitch": 60}},
+		{"id": "mvr-bbb", "name": "Spot 102", "address": 80}]
+	var merged := M.merge_patch(patch, incoming)
+	t.eq(merged.map(func(f: Dictionary) -> String: return f.id), ["fx1", "mvr-aaa", "mvr-bbb"], "order kept, new ones appended")
+	t.eq([merged[1].address, merged[1].pose.pitch], [40, 60], "address / pose come from the file")
+	t.eq([merged[1].name, merged[1].follow, merged[1].fixed, merged[1].enabled], ["Renamed", 3, "6=255", false],
+		"the operator's edits stay")
+	t.eq(M.unpatch(merged, ["aaa", "bbb"]).map(func(f: Dictionary) -> String: return f.id), ["fx1"])
+	var txt := M.patch_summary({"protocol": "sacn", "fixtures": [{}, {}], "types": [{}],
+		"skipped": [{"reason": "no GDTFMode in the MVR file"}, {"reason": "no GDTFMode in the MVR file"}], "notes": ["n1"]})
+	t.ok(txt.begins_with("Patched 2 fixtures (sACN, 1 type)."), txt)
+	t.ok(txt.contains("Not patched: no GDTFMode in the MVR file ×2") and txt.contains("\nn1"), txt)

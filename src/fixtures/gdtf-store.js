@@ -59,6 +59,13 @@ async function importGdtf(buf, name) {
 	return summary(rec)
 }
 
+/** WO-615 T10: the stored type for these bytes (same content id), importing them only when new. @returns {Promise<object>} the summary */
+async function ensureGdtf(buf, name) {
+	const id = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12)
+	const rec = record(id)
+	return rec ? summary(rec) : importGdtf(buf, name)
+}
+
 /** The full stored record (parsed type included), or null. */
 function record(id) {
 	if (_types.has(id)) return _types.get(id)
@@ -125,4 +132,4 @@ function remove(id) {
 	return files.length > 0
 }
 
-module.exports = { importGdtf, record, list, describe, mode, visual, member, remove, modeWarnings }
+module.exports = { importGdtf, ensureGdtf, record, list, describe, mode, visual, member, remove, modeWarnings }

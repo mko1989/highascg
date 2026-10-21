@@ -46,9 +46,18 @@ function rotX(deg) {
 	return [1, 0, 0, 0, c, s, 0, -s, c, 0, 0, 0]
 }
 
-/** fixtures_3d_model.gd pose_xform: position (x, z, −y), yaw about Y (negated), floor = turned over about Z. */
+function rotZ(deg) {
+	const c = Math.cos(deg * RAD)
+	const s = Math.sin(deg * RAD)
+	return [c, s, 0, -s, c, 0, 0, 0, 1, 0, 0, 0]
+}
+
+/**
+ * fixtures_3d_model.gd pose_xform: position (x, z, −y); rotation Y(−yaw) · X(pitch) · Z(roll) (Godot's YXZ Euler —
+ * pitch / roll come from MVR mounts, WO-615 T10), floor = turned over about Z.
+ */
 function poseXf(pose) {
-	let m = rotY(-(Number(pose.yaw) || 0))
+	let m = mul(mul(rotY(-(Number(pose.yaw) || 0)), rotX(Number(pose.pitch) || 0)), rotZ(Number(pose.roll) || 0))
 	if (pose.hang === 'floor') m = mul(m, [-1, 0, 0, 0, -1, 0, 0, 0, 1, 0, 0, 0])
 	m[9] = Number(pose.x) || 0
 	m[10] = Number.isFinite(Number(pose.z)) ? Number(pose.z) : 6

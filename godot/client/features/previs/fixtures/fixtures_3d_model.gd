@@ -32,7 +32,9 @@ static func rig_key(fx: Dictionary) -> String:
 static func pose_xform(pose: Variant) -> Transform3D:
 	var p: Dictionary = pose if pose is Dictionary else {}
 	var pos := Vector3(float(p.get("x", 0.0)), float(p.get("z", 6.0)), -float(p.get("y", 0.0)))
-	var b := Basis(Vector3.UP, -deg_to_rad(float(p.get("yaw", 0.0))))
+	# YXZ Euler: yaw about up (negated), then the WO-615 T10 MVR mount pitch / roll — gdtf-ik.js poseXf is the twin.
+	var b := Basis.from_euler(Vector3(deg_to_rad(float(p.get("pitch", 0.0))), -deg_to_rad(float(p.get("yaw", 0.0))),
+		deg_to_rad(float(p.get("roll", 0.0)))))
 	if str(p.get("hang", "truss")) == "floor":
 		b = b * Basis(Vector3.BACK, PI)
 	return Transform3D(b, pos)

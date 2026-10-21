@@ -20,6 +20,14 @@ const text = (node, name) => {
 	return c ? String(c._ ?? '').trim() : ''
 }
 
+/** MVR Address text → absolute DMX address (universe 1 = 1…512): a number, or "Universe.Address" (MVR 1.5+). 0 = none. */
+function absAddress(v) {
+	const t = String(v ?? '').trim()
+	const ua = /^(\d+)\.(\d+)$/.exec(t)
+	if (ua) return Number(ua[1]) >= 1 && Number(ua[2]) >= 1 && Number(ua[2]) <= 512 ? (Number(ua[1]) - 1) * 512 + Number(ua[2]) : 0
+	return /^\d+$/.test(t) ? Number(t) : 0
+}
+
 /** Archive member for a Geometry3D fileName ('' = none). No extension means 3DS (MVR spec). */
 function resolveFile(fileName, has) {
 	const f = String(fileName || '')
@@ -97,8 +105,10 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 					report.missing_gdtf.add(spec || '(none)')
 					parts.push({ mesh: 'prim:box', m: mul(m, scale(0.3)) })
 				}
+				// WO-615 T10: `matrix` = the fixture's world transform (MVR frame, metres, column-major 4×4) for its patch pose.
 				obj.fixture = { spec, mode, id: text(node, 'FixtureID'), unit: text(node, 'UnitNumber'),
-					addresses: kids(child(node, 'Addresses')).map((a) => ({ break: Number(attr(a, 'break')) || 0, address: Number(a._) || 0 })) }
+					addresses: kids(child(node, 'Addresses')).map((a) => ({ break: Number(attr(a, 'break')) || 0, address: absAddress(a._) })),
+					matrix: m.map((v) => Math.round(v * 1e6) / 1e6) }
 				report.fixtures++
 			}
 			if (kind === 'VideoScreen') {
@@ -136,4 +146,4 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 	}
 }
 
-module.exports = { parseScene, resolveFile }
+module.exports = { parseScene, resolveFile, absAddress }

@@ -193,5 +193,4 @@ module.exports = {
 	buildNewUntitledProject,
 	buildStarterHardwareConfig,
 	createNewProject,
-	keepOperatorVideoOutput,
 }

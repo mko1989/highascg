@@ -6,7 +6,8 @@ extends RefCounted
 ##   fade_s}}, dmx {enabled, priority, universes ["artnet:0", "sacn:1"]} (WO-615 T4 master for typed fixtures),
 ##   patch: [{id, name, enabled, protocol "artnet" | "sacn", universe, address, dest ("" + sACN = multicast),
 ##    typeId, mode (WO-615 T3 GDTF type — the server derives pan / tilt / channels from it), pan / tilt {ch, fine,
-##    range, invert}, pose {x, y, z, hang "truss" | "floor", yaw}, fixed "ch=value, …", follow (marker id), aim_z}]}
+##    range, invert}, pose {x, y, z, hang "truss" | "floor", yaw, pitch, roll (WO-615 T10: MVR mounts, GDTF fixtures only)},
+##    fixed "ch=value, …", follow (marker id), aim_z}]}
 
 const DEFAULT_DEST := "255.255.255.255"
 const PORT_ADDRESS_MAX := 32767
@@ -42,7 +43,8 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 		"pan": _axis(o.get("pan"), 1, 2, 540.0), "tilt": _axis(o.get("tilt"), 3, 4, 270.0),
 		"pose": {"x": _num(pose.get("x"), 0, -500, 500), "y": _num(pose.get("y"), 0, -500, 500),
 			"z": _num(pose.get("z"), 6, -50, 200), "hang": "floor" if pose.get("hang") == "floor" else "truss",
-			"yaw": _num(pose.get("yaw"), 0, -360, 360)},
+			"yaw": _num(pose.get("yaw"), 0, -360, 360), "pitch": _num(pose.get("pitch"), 0, -180, 180),
+			"roll": _num(pose.get("roll"), 0, -180, 180)},
 		"fixed": str(o.get("fixed", "")), "follow": int(_num(o.get("follow"), 0, 0, 65535)),
 		"aim_z": _num(o.get("aim_z"), 1, -5, 10),
 	}

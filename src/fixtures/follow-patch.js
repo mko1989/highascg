@@ -14,7 +14,8 @@
  *     patch: [{ id, name, enabled, protocol: "artnet" | "sacn", universe (Art-Net port-address 0–32767 | sACN
  *               1–63999), address 1–512, dest "a.b.c.d[:port]" ("" with sACN = the universe's multicast group),
  *               typeId, mode (WO-615 T3: a GDTF type from gdtf-store.js — pan / tilt / channels come from it), pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
- *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left) },
+ *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left), pitch / roll °
+ *                      (WO-615 T10: a tilted / side mount from MVR — GDTF fixtures only; the generic profile ignores them) },
  *               fixed "ch=value, …" (shutter / dimmer / colour held open), follow (marker id, 0 = none),
  *               aim_z (m above the marker) }] }
  */
@@ -70,7 +71,8 @@ function normalizeFixture(f, i) {
 		pan: axis(o.pan, 1, 2, 540),
 		tilt: axis(o.tilt, 3, 4, 270),
 		pose: { x: num(pose.x, 0, -500, 500), y: num(pose.y, 0, -500, 500), z: num(pose.z, 6, -50, 200),
-			hang: pose.hang === 'floor' ? 'floor' : 'truss', yaw: num(pose.yaw, 0, -360, 360) },
+			hang: pose.hang === 'floor' ? 'floor' : 'truss', yaw: num(pose.yaw, 0, -360, 360),
+			pitch: num(pose.pitch, 0, -180, 180), roll: num(pose.roll, 0, -180, 180) },
 		fixed: String(o.fixed ?? ''),
 		follow: int(o.follow, 0, 0, 65535),
 		aim_z: num(o.aim_z, 1, -5, 10),

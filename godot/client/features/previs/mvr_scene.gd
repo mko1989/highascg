@@ -18,6 +18,8 @@ var _hidden := {}
 var _screens: Array = []  # [{role, mat}]
 var _live := false
 var _held := {}
+var _patched := {}  # WO-615 T10: uuid (lower case) → true — the live patch draws these, so the static model hides
+var fixture_uuids: Array = []  ## uuids (lower case) of the scene's fixtures, for Unpatch
 
 
 func show_scene(id: String) -> void:
@@ -29,6 +31,7 @@ func show_scene(id: String) -> void:
 	for c in get_children():
 		c.queue_free()
 	layers = []
+	fixture_uuids = []
 	_screens = []
 	_sync_holds()
 	if id == "":
@@ -62,9 +65,12 @@ func show_scene(id: String) -> void:
 		node.name = str(o.get("name", "object")).validate_node_name()
 		node.set_meta("layer", str(o.get("layer", "")))
 		node.set_meta("kind", str(o.get("kind", "")))
-		node.visible = not _hidden.has(str(o.get("layer", "")))
+		node.set_meta("uuid", str(o.get("uuid", "")).to_lower())
 		add_child(node)
-		fixtures += 1 if o.has("fixture") else 0
+		_show(node)
+		if o.has("fixture"):
+			fixtures += 1
+			fixture_uuids.append(str(o.get("uuid", "")).to_lower())
 		for p in o.get("parts", []):
 			var t: Node3D = templates.get(p.mesh)
 			if t != null:
@@ -141,7 +147,18 @@ func set_hidden_layers(names: Array) -> void:
 	for n in names:
 		_hidden[str(n)] = true
 	for c in get_children():
-		(c as Node3D).visible = not _hidden.has(str(c.get_meta("layer", "")))
+		_show(c as Node3D)
+
+
+## WO-615 T10 — fixtures patched from this scene are drawn by the live rig (fixtures_3d.gd): hide their static model.
+func set_patched(uuids: Dictionary) -> void:
+	_patched = uuids
+	for c in get_children():
+		_show(c as Node3D)
+
+
+func _show(n: Node3D) -> void:
+	n.visible = not _hidden.has(str(n.get_meta("layer", ""))) and not _patched.has(str(n.get_meta("uuid", "")))
 
 
 ## World AABB of every visible mesh (camera framing).

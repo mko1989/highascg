@@ -75,6 +75,25 @@ async function importMvr(buf, name) {
 	return rec
 }
 
+/**
+ * WO-615 T10 — the scene's fixtures re-read from the stored archive (scenes imported before T10 have no fixture matrix in
+ * their JSON) plus a reader for each GDTFSpec's embedded .gdtf. No meshes are built. null = no such scene.
+ * @returns {Promise<{ objects: object[], gdtf: (spec: string) => Promise<{ name: string, buf: Buffer } | null> } | null>}
+ */
+async function fixtureScene(id) {
+	const f = fileOf(id, '.mvr')
+	if (!f || !fs.existsSync(f)) return null
+	const map = await members(await unzipper.Open.file(f))
+	const xml = find(map, 'GeneralSceneDescription.xml')
+	if (!xml) return null
+	const scene = await parseScene((await xml.buffer()).toString('utf8'), { has: () => false, resolveGdtf: async () => null })
+	const gdtf = async (spec) => {
+		const m = gdtfMember(map, spec)
+		return m ? { name: path.posix.basename(m.path), buf: await m.buffer() } : null
+	}
+	return { objects: scene.objects.filter((o) => o.fixture), gdtf }
+}
+
 function list() {
 	if (!fs.existsSync(dir())) return []
 	return fs.readdirSync(dir()).filter((f) => /^[0-9a-f]{12}\.json$/.test(f)).map((f) => {
@@ -164,4 +183,4 @@ async function mesh(id, key) {
 	return out
 }
 
-module.exports = { importMvr, list, get, remove, mesh, unitBox }
+module.exports = { importMvr, fixtureScene, list, get, remove, mesh, unitBox }

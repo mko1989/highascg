@@ -3,6 +3,9 @@ extends VBoxContainer
 ## it in projects/_mvr), pick which imported scene this project shows (project.previs.mvr {id, name, hidden_layers},
 ## ProjectSync autosave), hide layers, Remove one from the box.
 ## WO-612 T7: Export… saves this project's WO-614 stage as an .mvr (GET /api/stage/mvr-export, built on the server).
+## WO-615 T10: Patch fixtures — the server imports the scene's GDTFs and builds patch entries (address, mode, pose from
+## the file; POST /api/stage/mvr/<id>/patch); they are merged into project.fixtures and the live rig replaces the static
+## models. Unpatch removes this scene's fixtures from the patch again.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -11,6 +14,7 @@ const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 
 signal scene_loaded(info: Dictionary)
+signal types_changed  ## a patch imported GDTF types (the Fixtures section re-lists them)
 
 var scene: MvrScene
 var _pick: OptionButton
@@ -19,12 +23,19 @@ var _remove_btn: Button
 var _status: Label
 var _confirm: ConfirmationDialog
 var _last := ""
+var _patch_btn: Button
+var _unpatch_btn: Button
+var _proto: OptionButton
+var _patch_status: Label
+var _unpatch_confirm: ConfirmationDialog
 
 
 func bind(s: MvrScene) -> void:
 	scene = s
 	scene.loaded.connect(_on_loaded)
-	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
+	Store.project_changed.connect(func(_p: Dictionary) -> void:
+		_maybe_reload()
+		_sync_patch_ui())
 	await refresh_list()
 	_maybe_reload()
 
@@ -62,6 +73,32 @@ func _ready() -> void:
 	_confirm = ConfirmationDialog.new()
 	_confirm.confirmed.connect(_remove)
 	add_child(_confirm)
+	var prow := HBoxContainer.new()
+	_patch_btn = Button.new()
+	_patch_btn.text = "Patch fixtures"
+	_patch_btn.tooltip_text = "Patch the scene's fixtures at the addresses, modes and positions in the file (GDTFs are imported)"
+	_patch_btn.pressed.connect(_patch)
+	prow.add_child(_patch_btn)
+	_proto = OptionButton.new()
+	_proto.add_item("Art-Net")
+	_proto.add_item("sACN")
+	_proto.tooltip_text = "MVR universe 1 = Art-Net 0 / sACN 1"
+	prow.add_child(_proto)
+	_unpatch_btn = Button.new()
+	_unpatch_btn.text = "Unpatch"
+	_unpatch_btn.pressed.connect(func() -> void:
+		_unpatch_confirm.dialog_text = "Remove this scene's %d patched fixture(s) from the patch?" % _patched_here()
+		_unpatch_confirm.popup_centered())
+	prow.add_child(_unpatch_btn)
+	add_child(prow)
+	_patch_status = Label.new()
+	_patch_status.autowrap_mode = TextServer.AUTOWRAP_WORD
+	_patch_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+	add_child(_patch_status)
+	_unpatch_confirm = ConfirmationDialog.new()
+	_unpatch_confirm.confirmed.connect(_unpatch)
+	add_child(_unpatch_confirm)
+	_sync_patch_ui()
 
 
 func _cfg() -> Dictionary:
@@ -192,7 +229,68 @@ func _toggle_layer(i: int) -> void:
 
 
 func _on_loaded(info: Dictionary) -> void:
+	_patch_status.text = ""
+	_sync_patch_ui()
 	_layers.disabled = scene.layers.is_empty()
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
 	_status.text = M.summary(info)
 	scene_loaded.emit(info)
+
+
+func _fixtures_slice() -> Dictionary:
+	return preload("res://features/previs/tracking/follow_model.gd").normalize(Store.project.get("fixtures"))
+
+
+func _patched_here() -> int:
+	if scene == null:
+		return 0
+	var ids := M.patched_uuids(_fixtures_slice().patch)
+	return scene.fixture_uuids.filter(func(u: String) -> bool: return ids.has(u)).size()
+
+
+## Buttons + hiding the static models of fixtures the live rig draws.
+func _sync_patch_ui() -> void:
+	if _patch_btn == null:
+		return
+	var n: int = scene.fixture_uuids.size() if scene != null else 0
+	var here := _patched_here()
+	_patch_btn.disabled = n == 0
+	_patch_btn.text = "Re-patch fixtures" if here > 0 else "Patch fixtures"
+	_unpatch_btn.disabled = here == 0
+	if scene != null:
+		scene.set_patched(M.patched_uuids(_fixtures_slice().patch))
+	if _patch_status.text == "" and n > 0:
+		_patch_status.text = "%d of %d fixtures patched." % [here, n] if here > 0 else "%d fixtures, not patched." % n
+
+
+func _patch() -> void:
+	var id := str(_cfg().get("id", ""))
+	if id == "":
+		return
+	_patch_btn.disabled = true
+	_patch_status.text = "Patching… (importing the scene's GDTF files)"
+	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/patch" % id, {"protocol": "sacn" if _proto.selected == 1 else "artnet"})
+	if not res.ok or not (res.data is Dictionary):
+		_patch_status.text = "Patch failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
+		_sync_patch_ui()
+		return
+	var s := _fixtures_slice()
+	s.patch = M.merge_patch(s.patch, res.data.get("fixtures", []))
+	_persist_fixtures(s)
+	_patch_status.text = M.patch_summary(res.data)
+	types_changed.emit()
+
+
+func _unpatch() -> void:
+	var s := _fixtures_slice()
+	var before: int = s.patch.size()
+	s.patch = M.unpatch(s.patch, scene.fixture_uuids)
+	_persist_fixtures(s)
+	_patch_status.text = "Unpatched %d fixture(s)." % (before - s.patch.size())
+
+
+## Same write as the Fixtures section: the whole normalized slice, then project_changed so every fixtures view reloads.
+func _persist_fixtures(slice: Dictionary) -> void:
+	Store.project["fixtures"] = slice
+	ProjectSync.mark_dirty(true)
+	Store.project_changed.emit(Store.project)
