@@ -86,6 +86,10 @@ Not on this list: anything a session can do alone. The node server has been rest
       Rename or hide a GPU port in one, or reorder the DeckLink ports: the other follows within a second. On the
       project-load hardware question, pick "remember": the other client stops asking too. Note: the web **New
       project** clears the saved GPU rows for every client now (they are shared); say if that should stay per browser.
+- [ ] **WO-598 question: web client takes** — the Godot client takes looks and fills PRV through the server
+      (`POST /api/scene/take`, PRV push by id). The web client still builds its own AMCP for both. Switch the web
+      client to the server path too (one code path, but a short test window on real looks), or leave the web client as
+      it is until the kiosk is retired (WO-609)? Answer yes / leave.
 - [ ] **WO-597 atlas** — Godot Live tab, Standard view: drag and resize the PRV / PGM / source windows. The picture
       follows at once with no flicker, and the Caspar log shows no `MIXER 3-…` lines while you only move. A big resize
       (more than a quarter) or adding a source re-packs once. The box is left in atlas mode; to go back, POST
