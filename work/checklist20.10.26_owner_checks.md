@@ -146,6 +146,9 @@ Not on this list: anything a session can do alone. The node server has been rest
       **Previs (T5):** the patched head appears on the 3D stage at its pose (Follow form: x / y / z, truss / floor, yaw)
       and follows what you send — does pan / tilt go the **same way** as the real head, and does a gobo you pick
       (`"Gobo1":{"set":"<slot name>"}`) show the same image?
+      **Programmer (T6):** Previs → Fixtures → Programmer: click the head in the 3D view (shift-click adds), move
+      Intensity / Pan / Tilt, pick a colour and a gobo thumbnail, then Point at + click the floor where you stand —
+      does the real beam land there? Release hands it back to its defaults.
 - [ ] **WO-612** — MVR import: export your rig as `.mvr` from **Capture** (and from Vectorworks / the MA3 if you
       use them), then Previs → MVR scene → Import…. Do the trusses, fixtures and screens land where they are in
       Capture? Note anything listed as "missing" in the status line.

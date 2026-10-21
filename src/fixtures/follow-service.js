@@ -20,6 +20,7 @@ const { ConsoleFrames } = require('./follow-through')
 const { onProjectChanged } = require('../engine/project-events')
 const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
+const { features, aimValues } = require('./gdtf-features')
 const { SACN_PORT } = require('./sacn')
 
 function ipv4ToInt(ip) {
@@ -160,6 +161,27 @@ function createFollowService(ctx, hub) {
 				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address) })
 			}
 			return { fixtures }
+		},
+		/** WO-615 T6: what the programmer can set on each typed fixture of `ids` (all when omitted). */
+		features: (ids) => {
+			const out = {}
+			for (const fx of engine.fixtures) {
+				if (fx.gdtf && (!ids || ids.includes(fx.id))) out[fx.id] = features(fx, gdtfStore.record(fx.typeId)?.type.wheels)
+			}
+			return out
+		},
+		/** WO-615 T6: point `ids` at a PSN stage point (programs Pan / Tilt). → { aimed, unreachable } (ids) */
+		aim: (ids, target) => {
+			const values = engine.values()
+			const aimed = []
+			const unreachable = []
+			for (const fx of engine.fixtures) {
+				if (!fx.gdtf || !ids.includes(fx.id)) continue
+				const pt = aimValues(fx, target, values[fx.id])
+				if (pt) aimed.push(...engine.program([fx.id], pt))
+				else unreachable.push(fx.id)
+			}
+			return { aimed, unreachable }
 		},
 		stop() {
 			off()

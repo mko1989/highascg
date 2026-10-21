@@ -10,6 +10,10 @@
  *   GET    /api/fixtures/program                     → { values: { fixtureId: { key: value } } }
  *   POST   /api/fixtures/program {ids | id, values, replace?}  → { changed: [ids] }
  *   DELETE /api/fixtures/program[?id=<id>]           → release (all, or one fixture) — channels back to defaults
+ *   GET    /api/fixtures/program/features[?ids=a,b]  → { fixtures: { id: features } } what each typed fixture can set
+ *                                                        (dimmer, colour mixing / wheel, CTO, pan, tilt, zoom, gobos)
+ *   POST   /api/fixtures/program/aim {ids, target: [x, y, z]}  → { aimed, unreachable } — Pan / Tilt pointing the
+ *                                                        beams at a stage point (PSN metres: x stage left, y upstage, z up)
  * The patch itself stays in `project.fixtures` (Godot-owned slice); the master and universe list are its `dmx` key.
  */
 
@@ -65,6 +69,15 @@ function handleProgram(method, body, query, service) {
 	return reply(200, { changed: engine.program(ids, b.values, { replace: b.replace === true }) })
 }
 
+function handleAim(body, service) {
+	const b = parseBody(body) || {}
+	const ids = Array.isArray(b.ids) ? b.ids.map(String) : []
+	const t = Array.isArray(b.target) ? b.target.slice(0, 3).map(Number) : []
+	if (!ids.length) return reply(400, { error: 'ids required' })
+	if (t.length !== 3 || !t.every(Number.isFinite)) return reply(400, { error: 'target [x, y, z] (metres) required' })
+	return reply(200, service.aim(ids, t))
+}
+
 function register(routes) {
 	const opt = { requireCaspar: false }
 	const svc = (ctx) => ctx?.fixtureService || null
@@ -78,6 +91,11 @@ function register(routes) {
 	routes.get('/api/fixtures/program', program('GET'), opt)
 	routes.post('/api/fixtures/program', program('POST'), opt)
 	routes.delete('/api/fixtures/program', program('DELETE'), opt)
+	routes.get('/api/fixtures/program/features', ({ ctx, query }) => {
+		const ids = query?.ids ? String(query.ids).split(',').filter(Boolean) : null
+		return svc(ctx) ? reply(200, { fixtures: svc(ctx).features(ids) }) : reply(503, NO_ENGINE)
+	}, opt)
+	routes.post('/api/fixtures/program/aim', ({ ctx, body }) => (svc(ctx) ? handleAim(body, svc(ctx)) : reply(503, NO_ENGINE)), opt)
 }
 
-module.exports = { register, usage, frame, handleProgram }
+module.exports = { register, usage, frame, handleProgram, handleAim }

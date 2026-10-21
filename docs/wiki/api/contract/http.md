@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-460 routes.
+462 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -94,6 +94,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | DELETE | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
 | POST | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
+| POST | `/api/fixtures/program/aim` | registry | `src/api/routes-fixture-dmx.js` |
+| GET | `/api/fixtures/program/features` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
 | POST | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
 | DELETE | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |

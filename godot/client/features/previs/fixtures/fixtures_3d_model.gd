@@ -68,3 +68,11 @@ static func tint(b: Dictionary) -> Color:
 	var c: Array = b.get("c", [1, 1, 1]) if b.get("c") is Array and (b.get("c") as Array).size() == 3 else [1, 1, 1]
 	var i := clampf(float(b.get("i", 0.0)), 0.0, 1.0)
 	return Color(float(c[0]), float(c[1]), float(c[2]), i)
+
+
+## Where a view ray meets the stage floor (Godot y = 0, PSN z = 0) in front of the camera, or null.
+static func floor_hit(from: Vector3, dir: Vector3) -> Variant:
+	if absf(dir.y) < 1e-5:
+		return null
+	var t := -from.y / dir.y
+	return from + dir * t if t > 0.0 else null

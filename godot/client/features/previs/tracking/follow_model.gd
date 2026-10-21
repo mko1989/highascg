@@ -62,7 +62,8 @@ static func normalize(slice: Variant) -> Dictionary:
 	var o: Dictionary = s.get("output") if s.get("output") is Dictionary else {}
 	return {"output": {"enabled": o.get("enabled") == true,
 		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn")),
-		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out}
+		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out,
+		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups"))}
 
 
 ## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated).

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7–T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -75,8 +75,8 @@ with actual patch and way to artnet/sacn output."
 - [x] T5 Godot fixture visualisation: GDTF geometry (glb; 3DS via WO-612 loader), Axis animation, beams
       (SpotLight3D + volumetric fog), gobo projector textures from wheels; perf budget (≥ 50 fps with 48 fixtures).
       (2026-10-21 — additive cones instead of volumetric fog, see the T5 section)
-- [ ] T6 Programmer UI: select fixtures (previs click / sheet), intensity, colour (RGB/CMY/CTO from
-      available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups.
+- [x] T6 Programmer UI: select fixtures (previs click / sheet), intensity, colour (RGB/CMY/CTO from
+      available attributes), position (pan/tilt or "point at" floor click), zoom, gobo; groups. (2026-10-21)
 - [ ] T7 Visualiser mode (incoming Art-Net/sACN through the patch).
 - [ ] T8 Looks integration (store/recall fixture states, TAKE crossfade).
 - [ ] T9 Follow IK (consumes WO-616 markers). **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
@@ -310,3 +310,64 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
 - Restored: fixtures slice identical to before, programmer cleared, all imported types deleted, `ui.cfg` identical,
   GUI back on tab 5.
 - Owner QA: does a real head (and its gobo) match the previs — direction of pan / tilt included (checklist).
+
+## T6 — the programmer (2026-10-21)
+
+### Investigation
+- **What the UI needs per fixture is in the patched mode, not the type summary.** `fx.gdtf.channels` (applyType) has
+  each channel's initial function with its physical range and DMX default; the wheels (slot colour CIE, media) are
+  in the stored type. Real Robin Esprite (Mode 1 Standard 16 bit): Dimmer, CMY, CTO 6500→3000 K, Zoom 50→5°, pan
+  ±270, tilt ±131.8, two colour wheels and two gobo wheels. Its channel sets repeat slots ("Deep red" and
+  "Deep red step", "Gobo1" and its shake sets) — 18 colour entries for 12 slots — so wheel entries are one per
+  slot. Both colour wheels have an "Open/white", so the client keys wheel entries by attribute + name.
+- **Point at reuses the follow IK exactly.** follow-ik.js `aim` returns degrees from the DMX centre and the follow
+  output writes them with `invert` (patch flip XOR a falling range, gdtf-patch.js applyType). Mapping those degrees
+  onto the function's physical range the same way gives physical = IK degrees for an unflipped head — the value the
+  T5 previs draws. Offline: hung at 6 m, a point 3 m upstage → Pan 0, Tilt 26.57, and the T5 decode of the
+  resulting DMX frame reads Head 26.57 back.
+- **Mixing next to a colour wheel.** On the box, picking a colour with the picker on an Esprite whose wheel sat on
+  "Deep red" went black: CMY cyan through a red filter (physically right; operator-wrong). The picker now also
+  opens that fixture's colour wheels (first slot).
+- **CTO / zoom "current" value.** An unprogrammed control has to show what the channel's GDTF default means
+  (LEDBeam CTO: DMX 0 = 8000 K), not the slider's low end — `at` in each range.
+
+### What was done
+- `src/fixtures/gdtf-features.js` (new, pure): `features(fx, wheels)` (dimmer, ColorAdd_* / ColorRGB_* and
+  ColorSub_* present, CTO / pan / tilt / zoom `{from, to, at}`, colour-wheel slots with sRGB via `cieToRgb`, gobo
+  slots with media) and `aimValues(fx, target, values)` (IK nearest the current programmer pan / tilt → physical
+  Pan / Tilt, null when unreachable or no axes).
+- `follow-service.js` `features(ids)` / `aim(ids, target)`; `routes-fixture-dmx.js`:
+  `GET /api/fixtures/program/features[?ids=]`, `POST /api/fixtures/program/aim {ids, target: [x, y, z]}` (PSN metres;
+  400 on missing ids / non-numeric target). API contract regenerated (462 routes).
+- Godot: `fixture_selection.gd` (one shared selection per client: pick / shift-pick, Point at state, `aim_at`);
+  `fixtures_3d.gd` picks the nearest fixture body under a click (ray vs each fixture's rest-pose body box) and draws
+  a yellow box on selected ones, and with Point at on turns a floor click (`fixtures_3d_model.gd floor_hit`, y = 0)
+  into `aim_at`; `previs_tab.gd` offers the click to the fixtures before the stage builder (same line count).
+  `programmer_section.gd` (under the Fixtures section): typed-fixture list (multi-select, synced with the 3D picks),
+  All / None / Release / Release all / Groups ▾ (pick, Save selection as group…, Forget group ▸), and controls for
+  what the selection has: Intensity, Colour (picker) + wheel swatches, CTO, Pan, Tilt, Point at, Zoom, gobo
+  thumbnails (the wheel PNGs). Writes are coalesced to 20 Hz into `POST /api/fixtures/program`; a wheel pick goes only
+  to the selected fixtures that have that slot. `programmer_model.gd` (pure): merge, colour → per-fixture values
+  (RGB mix with other emitters off, else CMY, else the nearest wheel slot; mixing opens the wheels), wheel owners,
+  groups. Groups live in `project.fixtures.groups` (`follow_model.gd normalize` keeps them, idempotent).
+- **Deliberately not done:** programmer values stay in server memory (T8 looks persist them); no fan / spread
+  tools and no per-pixel colour (cells take the fixture-wide ColorAdd values); Point at aims at the floor plane only.
+
+### What was VERIFIED
+- Offline: `tools/smoke/smoke-wo615-programmer.test.js` 4/4 (features of the synthetic spot and pixel bar, gobo /
+  CTO / zoom / CMY and slot dedupe, aim → DMX → decode round trip, flipped head, nearest solution, routes and their
+  validation, 503 without the engine); offline suite 3051 tests, 3049 pass, 0 fail (2 skipped); boot OK; lint 216,
+  lines, format, unwired, contract. Godot `test_programmer_model.gd` (merge, colour per fixture type incl. wheel
+  opening, owners, groups + normalize idempotent, selection, floor hit); 20524 pass, `--check` OK.
+- Box (server restarted, GUI on the Previs tab; real Robin Esprite + LEDBeam 150, 4 hung + 4 standing on sACN U7 to
+  127.0.0.1:5569, **DMX output master off — both universes `live=false` throughout**): a click in the 3D view
+  selected one head (yellow box, list row in sync); All → 8 with the controls of both types (Esprite wheel swatches
+  and its 18 real gobo thumbnails, CTO, pan / tilt, zoom); Intensity 100 %; Point at + a floor click → the four hung
+  Esprites converged on the clicked spot (pan 29.9 / 10.1 / −12.3 / −31.5, tilt −52…−56), the standing LEDBeams to
+  tilt 90 (floor level = horizontal, the IK's answer); red swatch + Gobo2 → only the Esprites took
+  `Color1 Deep red` / `Gobo1 Gobo2` and projected the swirl in red; picker #ff8000 → Esprites CMY 0 / 0.5 / 1 with
+  both wheels opened, LEDBeams R 1 G 0.5 B 0 W 0 — all orange in the previs; group "T6 all" saved into the project,
+  recalled after None; Release → programmer empty, every beam i = 0; shift-click → 2 selected.
+- Restored: fixtures slice identical to the snapshot (checked again after closing and relaunching the GUI), types
+  deleted, programmer empty, `ui.cfg` identical, GUI back on tab 5.
+- Owner QA: the programmer driving a real head (checklist).

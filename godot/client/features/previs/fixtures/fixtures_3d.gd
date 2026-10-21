@@ -4,10 +4,12 @@ extends Node3D
 ## pose, with axes turned and beams lit from the server's decode of the DMX it sends (WS `tracking:fixtures`,
 ## first state from GET /api/tracking/fixtures). A beam is an additive cone + an emissive lens, and a shadowless
 ## SpotLight3D while the light budget lasts (fixtures_3d_model.gd) projecting the beam's gobo wheel slot. Rebuilt only
-## when typed fixtures or poses change.
+## when typed fixtures or poses change. WO-615 T6: a click picks a fixture into the programmer selection
+## (fixture_selection.gd; selected bodies get a box) or, while Point at is on, aims the selection at the floor.
 
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
 const M := preload("res://features/previs/mvr_model.gd")
+const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 
 const CONE_SHADER := """
 shader_type spatial;
@@ -36,6 +38,7 @@ var _shader: Shader
 var _cone: CylinderMesh
 var lights := 0
 var gobo_lights := 0
+var sel: RefCounted = Sel.shared()
 
 
 func _ready() -> void:
@@ -51,6 +54,7 @@ func _ready() -> void:
 	_cone.cap_bottom = false
 	Store.project_changed.connect(_on_project)
 	Ws.message.connect(_on_ws)
+	sel.changed.connect(_show_selection)
 	_on_project(Store.project)
 	var res: Dictionary = await Api.get_json("/api/tracking/fixtures")
 	if res.ok and res.data is Dictionary and _last.is_empty():
@@ -105,6 +109,7 @@ func _rebuild(list: Array) -> void:
 		_build(f, rig)
 	if not _last.is_empty():
 		apply(_last)
+	_show_selection()
 
 
 func _build(f: Dictionary, rig: Dictionary) -> void:
@@ -131,7 +136,71 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 			var beam: Dictionary = n.get("beam", {}) if n.get("beam") is Dictionary else {}
 			parts.beams[str(n.id)] = _beam(node, {"beamType": "Glow", "radius": beam.get("radius", 0.05)} if cells else beam, mesh)
 			parts.beams[str(n.id)].type = str(f.typeId)
+	parts.root = root
+	parts.box = _body_box(root)
+	parts.mark = _mark(parts.box)
+	root.add_child(parts.mark)
 	_fx[str(f.id)] = parts
+
+
+## The fixture's body (not its cones) in its own frame, at rest — what a click hits.
+func _body_box(root: Node3D) -> AABB:
+	var inv := root.global_transform.affine_inverse()
+	var box := AABB(Vector3(-0.15, -0.15, -0.15), Vector3(0.3, 0.3, 0.3))
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		if m.mesh != _cone:
+			box = box.merge(inv * m.global_transform * m.get_aabb())
+	return box
+
+
+## Selection mark: the body box's edges, drawn over everything.
+func _mark(box: AABB) -> MeshInstance3D:
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINES)
+	for e in [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [2, 6], [3, 7]]:
+		for i in e:
+			im.surface_add_vertex(box.get_endpoint(i))
+	im.surface_end()
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.no_depth_test = true
+	mat.albedo_color = Color(1.0, 0.8, 0.2)
+	var mi := MeshInstance3D.new()
+	mi.mesh = im
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mi.visible = false
+	return mi
+
+
+func _show_selection() -> void:
+	for id in _fx:
+		(_fx[id].mark as MeshInstance3D).visible = sel.ids.has(id)
+
+
+## A click (no drag) in the 3D view. Point at on: a floor hit aims the selection there. Else the nearest fixture
+## body under the mouse is picked (`add`: shift toggles it). → whether the click was used (else the stage picks).
+func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
+	var from := cam.project_ray_origin(pos)
+	var dir := cam.project_ray_normal(pos)
+	if sel.point_at and not sel.ids.is_empty():
+		var floor_hit: Variant = F.floor_hit(from, dir)
+		if floor_hit != null:
+			sel.aim_at.emit([floor_hit.x, -floor_hit.z, 0.0])
+		return floor_hit != null
+	var best := ""
+	var near := INF
+	for id in _fx:
+		var root := _fx[id].root as Node3D
+		var inv := root.global_transform.affine_inverse()
+		var hit: Variant = (_fx[id].box as AABB).intersects_ray(inv * from, inv.basis * dir)
+		if hit != null and from.distance_to(root.global_transform * (hit as Vector3)) < near:
+			near = from.distance_to(root.global_transform * (hit as Vector3))
+			best = id
+	if best != "":
+		sel.pick(best, add)
+	return best != ""
 
 
 func _mesh(type_id: String, key: String) -> Node3D:
@@ -275,7 +344,7 @@ func bounds() -> AABB:
 	var first := true
 	for mi in find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if m.mesh == _cone or not m.is_visible_in_tree():
+		if m.mesh == _cone or m.mesh is ImmediateMesh or not m.is_visible_in_tree():
 			continue
 		var b := m.global_transform * m.get_aabb()
 		box = b if first else box.merge(b)

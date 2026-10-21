@@ -251,14 +251,14 @@ func _apply_drive() -> void:
 var _press_at := Vector2.INF
 
 
-## 3D: orbit as before; a click without drag selects the object under the mouse.
+## 3D: orbit as before; a click without drag picks a fixture (WO-615 T6 programmer), else the object under it.
 func _on_3d_input(e: InputEvent) -> void:
 	stage.handle_input(e)
 	var mb := e as InputEventMouseButton
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
 		if mb.pressed:
 			_press_at = mb.position
-		elif mb.position.distance_to(_press_at) < 4.0:
+		elif mb.position.distance_to(_press_at) < 4.0 and not fixtures3d.click(stage.camera(), mb.position, mb.shift_pressed):
 			var id := builder.pick(stage.camera(), mb.position)
 			if id != "":
 				stage_panel.select(id)

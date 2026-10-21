@@ -3,13 +3,14 @@ extends VBoxContainer
 ## /api/fixtures/types; the server parses and keeps it), pick a type + mode, Add N at the next free addresses of a
 ## universe (Art-Net port-address or sACN universe) into project.fixtures.patch (follow_model.gd shape — the
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
-## master `fixtures.dmx` (off by default, asks first) with the universes it sends.
+## master `fixtures.dmx` (off by default, asks first) with the universes it sends. The Programmer (T6) sits below.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const M := preload("res://features/previs/fixtures/fixtures_model.gd")
+const Programmer := preload("res://features/previs/fixtures/programmer_section.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -84,6 +85,8 @@ func _ready() -> void:
 	add_child(out)
 	_usage = _label()
 	_status = _label()
+	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, shift-click adds"
+	add_child(Programmer.new())
 	_confirm_on = ConfirmationDialog.new()
 	_confirm_on.dialog_text = ("Start DMX output? The universes checked under Send ▾ go out at 44 Hz with every " +
 		"patched fixture at its programmer value or GDTF default.")
