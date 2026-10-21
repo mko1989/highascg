@@ -20,7 +20,7 @@ import {
 } from '../lib/live-audio-routing.js'
 import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
 import { api } from '../lib/api-client.js'
-import { isServerRoutedKind, postAutoMix, postInputRoute, postInputSend, serverAudioTargets } from '../lib/input-audio-routing-api.js'
+import { isServerRoutedKind, postAutoMix, postInputRoute, postInputSend, repaintUnsavedAlsaTargets, serverAudioTargets } from '../lib/input-audio-routing-api.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -77,7 +77,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 			r?.inputKind === 'live_audio' ? !!(liveUi?.slots?.[slot - 1] || '') : !!inputRouteForRow(cm, r)
 		const destLayer = pgmDestLayerForInput(r?.inputKind, slot, liveUi)
 		const targetKey = inputTargetKey(r?.inputKind, slot)
-		// WO-604 slice 3: DeckLink / v4l2 targets are the server's (config); ALSA slots keep localStorage.
+		// WO-604 slices 3 + 5: DeckLink / v4l2 / ALSA targets are the server's (config); other kinds keep localStorage.
 		const serverRouted = isServerRoutedKind(r?.inputKind)
 		const enabledChannels = serverRouted
 			? new Set(serverAudioTargets(csNow, r.inputKind, slot))
@@ -216,6 +216,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 		}
 
 		inputsEl.appendChild(row)
+		if (btnWrap) repaintUnsavedAlsaTargets(r?.inputKind, slot, csNow, [...btnWrap.children], 'audio-mixer__live-route-btn--active', (b) => Number(b.dataset.channel))
 		meterFills.set(r.key, row.querySelector('.audio-mixer__meter-fill'))
 		meterLayerMeta.set(r.key, meterMetaForInputRow(r))
 
@@ -229,7 +230,7 @@ export function renderInspectorLiveInputs(inputsEl, { liveInputMeters, programCh
 				try {
 					await runInputStart(r, {
 						post: (p, b) => api.post(p, b),
-						// DeckLink / v4l2: the server restores the persisted routes itself (WO-604 slice 3).
+						// DeckLink / v4l2 / ALSA: the server restores the persisted routes itself (WO-604 slices 3 + 5).
 						targets: serverRouted ? [] : getMultiPlayTargets(targetKey),
 						playRoute: playRouteOnChannel,
 						route: inputRouteForRow(cm, r),

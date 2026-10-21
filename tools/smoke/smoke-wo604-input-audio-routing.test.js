@@ -99,7 +99,7 @@ describe('WO-604 slice 3 POST /api/audio/inputs/route — the Ch button', () => 
 		const post = (b) => routesMixer.handleInputsPost('/api/audio/inputs/route', JSON.stringify(b), r.ctx)
 		assert.equal((await post({ kind: 'decklink', slot: 1, channel: 2, on: true })).status, 400)
 		assert.equal((await post({ kind: 'decklink', slot: 9, channel: 1, on: true })).status, 404)
-		assert.equal((await post({ kind: 'live_audio', slot: 1, channel: 1, on: true })).status, 400)
+		assert.equal((await post({ kind: 'ndi_host', slot: 1, channel: 1, on: true })).status, 400)
 		assert.equal((await post({ kind: 'decklink', slot: 1, channel: 1 })).status, 400)
 		r.ctx.amcp.raw = async () => {
 			throw new Error('404 PLAY FAILED')

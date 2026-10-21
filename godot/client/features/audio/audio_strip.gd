@@ -129,7 +129,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 		var start := _button("START", "Start / restart this input's capture (its routes come back too)")
 		start.pressed.connect(func() -> void: start_pressed.emit())
 		acts.add_child(start)
-	if AA.routed(r):
+	if AA.has_send(r):
 		_send = OptionButton.new()
 		_send.focus_mode = Control.FOCUS_NONE
 		_send.tooltip_text = SEND_TIP
@@ -139,6 +139,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 			_send.add_item(SEND_TEXT[k])
 		_send.item_selected.connect(func(i: int) -> void: send_selected.emit(AA.SENDS[i]))
 		acts.add_child(_send)
+	if AA.routed(r):
 		var grid := HFlowContainer.new()
 		grid.add_theme_constant_override("h_separation", 3)
 		grid.add_theme_constant_override("v_separation", 3)

@@ -8,7 +8,10 @@
  * channel, kept the targets in localStorage, mirrored them into `<kind>_input_<slot>_audio_targets`, then pushed the
  * embedded-copy volume; the audio-send select and AUTO MIX wrote settings and pushed the volume the same way; START
  * re-played the routes from localStorage. Here each is one call, for the config-persisted kinds (DeckLink, v4l2 —
- * the WO-312 replayable set). ALSA `live_audio` slots keep their client flow (targets still in localStorage).
+ * the WO-312 replayable set). WO-604 slice 5: ALSA `live_audio` slots too — their store is the WO-571
+ * `live_audio_input_N_pgm_channels` key the boot routing already replays (routing-setup-live-inputs.js), on the same
+ * PGM layer (live_audio_pgm_layer + slot − 1, audio tracks ≤ 9). ALSA routes are whole-channel (`route://ch`, after
+ * the host mixer), so their copies never take the strip gain, and they have no audio-send policy.
  *
  * Every change broadcasts `change` path `audioInputRouting` with the snapshot below.
  */
@@ -23,6 +26,12 @@ const {
 	isAutoMixEnabled,
 } = require('../engine/live-input-audio-policy')
 const { REPLAYABLE_KINDS, pgmDestLayerForInput, isPgmAudioOnly, amcpForPlannedRoute } = require('../engine/live-input-route-reassert')
+
+const { resolveLiveAudioSlotPgmChannels } = require('../config/live-audio-input')
+const { readCasparSetting } = require('../config/routing-map')
+
+/** Routable on the console: the WO-312 replayable kinds plus ALSA slots. */
+const ROUTABLE_KINDS = new Set([...REPLAYABLE_KINDS, 'live_audio'])
 
 const cs = (config) => (config?.casparServer && typeof config.casparServer === 'object' ? config.casparServer : {})
 
@@ -42,8 +51,9 @@ function routingSnapshot(config) {
 	for (const e of Array.isArray(map.inputChannels) ? map.inputChannels : []) {
 		const kind = String(e?.kind || '')
 		const slot = parseInt(String(e?.slot), 10)
-		if (!REPLAYABLE_KINDS.has(kind) || !Number.isFinite(slot) || slot < 1) continue
+		if (!ROUTABLE_KINDS.has(kind) || !Number.isFinite(slot) || slot < 1) continue
 		const route = parseRouteClip(String(e.route || '')) ? String(e.route) : null
+		const alsa = kind === 'live_audio'
 		inputs.push({
 			kind,
 			slot,
@@ -52,12 +62,19 @@ function routingSnapshot(config) {
 			channel: Number(e.channel),
 			layer: Number(e.layer),
 			route,
-			destLayer: pgmDestLayerForInput(kind, slot),
-			send: liveInputAudioSendPolicy(config, kind, slot),
-			targets: liveInputAudioTargets(config, kind, slot),
+			destLayer: alsa ? alsaDestLayer(config, slot) : pgmDestLayerForInput(kind, slot),
+			send: alsa ? 'always' : liveInputAudioSendPolicy(config, kind, slot),
+			targets: alsa ? resolveLiveAudioSlotPgmChannels(config, slot) : liveInputAudioTargets(config, kind, slot),
 		})
 	}
 	return { autoMix: isAutoMixEnabled(config), programChannels, inputs }
+}
+
+/** ALSA slot N's PGM layer — the boot routing's rule (base clamped to 9; a layer past the audio tracks is null). */
+function alsaDestLayer(config, slot) {
+	const base = Math.min(9, Math.max(1, parseInt(String(readCasparSetting(config, 'live_audio_pgm_layer') ?? 2), 10) || 2))
+	const layer = base + slot - 1
+	return layer <= 9 ? layer : null
 }
 
 /**
@@ -67,6 +84,7 @@ function routingSnapshot(config) {
  */
 function embeddedGain(config, input, gain, muted) {
 	if (muted) return 0
+	if (input.kind === 'live_audio') return gain  // its looks are not policy-silenced: ALSA has no AFV
 	if (liveInputAudioSendPolicy(config, input.kind, input.slot) !== 'afv' || !isAutoMixEnabled(config)) return 0
 	return liveInputAudioTargets(config, input.kind, input.slot).length === 0 ? gain : 0
 }
@@ -75,7 +93,7 @@ function embeddedGain(config, input, gain, muted) {
 function findInput(config, kind, slot) {
 	const k = String(kind || '')
 	const n = parseInt(String(slot), 10)
-	if (!REPLAYABLE_KINDS.has(k)) return { status: 400, error: `kind must be one of ${[...REPLAYABLE_KINDS].join(', ')}` }
+	if (!ROUTABLE_KINDS.has(k)) return { status: 400, error: `kind must be one of ${[...ROUTABLE_KINDS].join(', ')}` }
 	const input = routingSnapshot(config).inputs.find((i) => i.kind === k && i.slot === n)
 	return input ? { input } : { status: 404, error: `No ${k} input ${slot} in the channel map.` }
 }
@@ -116,7 +134,7 @@ async function applyInputStrip(ctx, input, o) {
 	const r = await ctx.amcp.mixer.mixerVolume(input.channel, input.layer, gain, t.duration, t.tween, t.defer)
 	const fanout = await fanOutVolumeToRouteConsumers(ctx.amcp, input.channel, input.layer, { volume: embedded, ...t })
 	const routes = []
-	if (input.send !== 'never') {
+	if (input.send !== 'never' && input.kind !== 'live_audio') {
 		for (const ch of input.targets) {
 			await ctx.amcp.mixer.mixerVolume(ch, input.destLayer, gain, t.duration, t.tween, t.defer)
 			routes.push({ channel: ch, layer: input.destLayer })
@@ -147,6 +165,7 @@ async function setRoute(ctx, body) {
 	if (!snap.programChannels.includes(ch)) return { status: 400, error: `Channel ${body?.channel} is not a program channel.` }
 	if (typeof body?.on !== 'boolean') return { status: 400, error: 'on must be true or false' }
 	if (!input.route) return { status: 409, error: `Input "${input.label}" has no dedicated channel route yet.` }
+	if (!input.destLayer) return { status: 409, error: `Input "${input.label}" has no free PGM audio track (live_audio_pgm_layer + slot > 9).` }
 	if (parseRouteClip(input.route).channel === ch) return { status: 400, error: 'A route must never feed the channel it is sourced from.' }
 	if (!ctx.amcp) return { status: 503, error: 'Caspar not connected' }
 	const cl = `${ch}-${input.destLayer}`
@@ -157,7 +176,10 @@ async function setRoute(ctx, body) {
 	const targets = input.targets.filter((t) => t !== ch)
 	if (body.on) targets.push(ch)
 	targets.sort((a, b) => a - b)
-	patchCasparServer(ctx, { [`${input.kind}_input_${input.slot}_audio_targets`]: targets.length ? targets : null })
+	// ALSA: the WO-571 key, written even when empty — once present it is authoritative (no blanket fallback).
+	patchCasparServer(ctx, input.kind === 'live_audio'
+		? { [`live_audio_input_${input.slot}_pgm_channels`]: targets.join(',') }
+		: { [`${input.kind}_input_${input.slot}_audio_targets`]: targets.length ? targets : null })
 	const applied = await reapplyStored(ctx, input.key)
 	broadcast(ctx)
 	return { ok: true, targets, embedded: applied?.embedded }
@@ -167,6 +189,7 @@ async function setRoute(ctx, body) {
 async function setSendPolicy(ctx, body) {
 	const found = findInput(ctx.config, body?.kind, body?.slot)
 	if (!found.input) return found
+	if (found.input.kind === 'live_audio') return { status: 400, error: 'ALSA inputs have no audio-send policy (their routes always play).' }
 	const send = String(body?.send || '').toLowerCase()
 	if (!VALID_POLICIES.has(send)) return { status: 400, error: 'send must be afv, always or never' }
 	if (!ctx.amcp) return { status: 503, error: 'Caspar not connected' }

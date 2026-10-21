@@ -61,6 +61,8 @@ Not on this list: anything a session can do alone. The node server has been rest
 - [ ] **WO-603** — drop a big folder (progress line) and drop onto an upper-case CLS folder. Should Ctrl+Alt+click
       delete keep skipping the confirmation?
 - [ ] **WO-604** — move a fader in the web and in Godot: both show it and the meters match. (Look_8 stays playing.)
+- [ ] **WO-604** — ALSA live-audio input (box with an ALSA slot): after a reboot the Ch buttons light for the PGMs it
+      plays on. Press one in Godot: the web console button follows, and the route stops or starts.
 - [ ] **WO-604** — Screens row (2-screen box only): on a look strip, press the other screen's number. Its PGM
       should play the layer's audio (no picture). Press again → silent. Reload the look: the button stays lit.
 - [ ] **WO-605** — Device view on a big show file: cable hit-targets, Matrix with 50+ rows, Node view.

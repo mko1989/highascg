@@ -87,13 +87,20 @@ static func patch_live_layer(live: Variant, ch: Variant, layer_number: Variant, 
 
 ## WO-604 slice 3 — live-input audio routing, composed on the server (src/audio/input-audio-routing.js). DeckLink /
 ## v4l2 inputs get the Ch route buttons and the audio-send policy; DeckLink / live-audio capture can be (re)started.
-const ROUTED_KINDS := ["decklink", "v4l2"]
+## Slice 5: ALSA live-audio slots get the Ch buttons too (server store = WO-571 `live_audio_input_N_pgm_channels`) but
+## no send policy (their routes always play).
+const ROUTED_KINDS := ["decklink", "v4l2", "live_audio"]
+const SEND_KINDS := ["decklink", "v4l2"]
 const START_KINDS := ["decklink", "live_audio"]
 const SENDS := ["afv", "always", "never"]
 
 
 static func routed(row: Dictionary) -> bool:
 	return row.get("isLiveInput", false) == true and ROUTED_KINDS.has(str(row.get("inputKind", "")))
+
+
+static func has_send(row: Dictionary) -> bool:
+	return routed(row) and SEND_KINDS.has(str(row.get("inputKind", "")))
 
 
 static func startable(row: Dictionary) -> bool:

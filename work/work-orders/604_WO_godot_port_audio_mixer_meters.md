@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); slice 4 DONE (cross-screen audio on the server + Godot Screens row, 21.10; real two-screen routing is an owner check); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
+**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); slice 4 DONE (cross-screen audio on the server + Godot Screens row, 21.10; real two-screen routing is an owner check); slice 5 DONE (ALSA Ch buttons on the server store, 21.10; real ALSA routing is an owner check); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
 
 # WO-604 — Godot port: audio mixer, meters, cross-screen audio routing
 
@@ -308,11 +308,58 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 - **Open:** a real enable/disable between two screens needs a 2-screen box (owner checklist). PGM was never routed
   here.
 
+## Slice 5 (2026-10-21) — ALSA live-audio routes on the server
+
+### Investigation
+
+- ALSA slots already have a server-owned store: the WO-571 `live_audio_input_N_pgm_channels` key. Boot routing
+  replays it (`routing-setup-live-inputs.js`, layer `live_audio_pgm_layer` (default 2) + slot − 1, audio tracks
+  ≤ 9). A key-less slot falls back to the legacy blanket routing (`live_audio_pgm_always_on` → every PGM screen).
+- The console's Ch buttons ignored that key. They used a second, browser-only store (localStorage
+  `highascg_live_audio_play_targets_multi`) on the same layer rule (`readLiveAudioCasparSettings().pgmLayer`). So a
+  button could read off while the boot routing played that slot on the channel, and the other client never saw the
+  change.
+- **Slice-3 gap found:** the full web console (`audio-mixer-console-live-inputs.js`) still used localStorage +
+  client AMCP for DeckLink / v4l2 Ch buttons. Only the panel view had moved to the endpoint.
+- ALSA routes are whole-channel (`route://5`). They tap after the host mixer, so they already follow the strip
+  gain; applying the gain to the copies as well would square it.
+
+### What was done
+
+- `src/audio/input-audio-routing.js`:
+  - `ROUTABLE_KINDS` = DeckLink / v4l2 + `live_audio`. The snapshot lists ALSA slots with `destLayer` = the boot
+    rule (null past layer 9), `send: 'always'` and `targets` from `resolveLiveAudioSlotPgmChannels` (the boot
+    routing's own resolver, legacy fallback included).
+  - `setRoute` writes the WO-571 key as a comma list, even when empty, because an empty list is authoritative and
+    turns the blanket fallback off. A slot with no free audio track gets 409.
+  - `setSendPolicy` refuses ALSA (400).
+  - `applyInputStrip` never rides ALSA route copies; an ALSA strip's looks get the plain gain (no AFV policy).
+  - `restoreInputRoutes` replays ALSA routes on START.
+- Web:
+  - `input-audio-routing-api.js`: `isServerRoutedKind` includes `live_audio`. `serverAudioTargets` reads the WO-571
+    key, or the GET snapshot for a never-saved slot (`repaintUnsavedAlsaTargets` repaints once it arrives).
+  - Panel and full console both post `/api/audio/inputs/route` for DeckLink / v4l2 / ALSA. START leaves the replay to
+    the server. NDI keeps its localStorage flow.
+- Godot: `audio_actions.gd` `ROUTED_KINDS` gains `live_audio`; the new `has_send` keeps the AFV picker on
+  DeckLink / v4l2. ALSA strips get Ch toggles only.
+- Smoke `tools/smoke/smoke-wo604-alsa-routes.test.js` (8 tests, curated list): snapshot + legacy fallback, layer > 9,
+  on/off persistence (including off on a key-less slot), 409/400 refusals with no AMCP, gain not riding the routes,
+  START restore, web wiring. The slice-3 smoke's "kind refused" case now uses `ndi_host`.
+
+### What was VERIFIED
+
+- Offline suite 2964 pass; lint 216; unwired-exports baseline unchanged (a new internal helper was un-exported);
+  dist-web built; Godot 16473 pass; boot OK.
+- Live node after restart: `GET /api/audio/inputs/routing` is byte-identical (DeckLink 1–4 + v4l2 1; the box has
+  no ALSA slots). An ALSA route request → 404 "No live_audio input 1", NDI send → 400; no AMCP sent.
+- **Open:** a box with an ALSA slot needs to check that the Ch button lights match what plays after boot, and that
+  toggling one in Godot lights it in the web (owner checklist).
+
 ### Still open (later slices)
 
 - Stereo-pair split of a cross-screen route (the web has none either; the route carries the whole layout).
-- ALSA `live_audio` routes: their targets are still client localStorage (plus the separate WO-571
-  `live_audio_input_N_pgm_channels` band). They need one server-owned store, like DeckLink.
+- The WO-571 Live Audio Mixer modal still mirrors its route selection into localStorage and applies routes itself on
+  Save & Apply (same key and layer as the server, so it agrees; one more client-side AMCP path to fold in).
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.
   Moving a band changes layers that may already be on air on deployed boxes.
 - Click a live-audio strip to inspect it. Add-input modal.

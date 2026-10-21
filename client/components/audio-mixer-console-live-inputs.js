@@ -20,7 +20,7 @@ import {
 } from '../lib/live-audio-routing.js'
 import { runInputStart, shouldShowStartControl } from '../lib/live-input-start.js'
 import { api } from '../lib/api-client.js'
-import { isServerRoutedKind } from '../lib/input-audio-routing-api.js'
+import { isServerRoutedKind, postInputRoute, repaintUnsavedAlsaTargets, serverAudioTargets } from '../lib/input-audio-routing-api.js'
 import { showScenesToast } from './scenes-editor-support.js'
 
 /**
@@ -56,8 +56,14 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 				: !!inputRouteForRow(cm, r)
 		const destLayer = slot ? pgmDestLayerForInput(r?.inputKind, slot, liveUi) : 1
 		const targetKey = inputTargetKey(r?.inputKind, slot)
-		const enabledTargets = slot ? getMultiPlayTargets(targetKey) : []
-		const enabledChannels = new Set(enabledTargets.map((t) => Number(t.channel)))
+		// WO-604 slices 3 + 5: DeckLink / v4l2 / ALSA targets are the server's (config); other kinds keep localStorage.
+		const serverRouted = isServerRoutedKind(r?.inputKind)
+		const csNow = settingsState.getSettings()?.casparServer || {}
+		const enabledChannels = !slot
+			? new Set()
+			: serverRouted
+				? new Set(serverAudioTargets(csNow, r.inputKind, slot))
+				: new Set(getMultiPlayTargets(targetKey).map((t) => Number(t.channel)))
 
 		const pgmButtonsHtml = Array.isArray(programChannels)
 			? programChannels
@@ -116,10 +122,25 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 				// Single-flight per button — a dead input must not turn clicks into a retry storm.
 				if (btn.dataset.busy === '1') return
 
-				const curTargets = getMultiPlayTargets(targetKey)
-				const curEnabled = curTargets.some((t) => Number(t.channel) === ch && Number(t.layer) === destLayer)
 				btn.dataset.busy = '1'
 				btn.disabled = true
+				if (serverRouted) {
+					// One call — route PLAY/STOP, persisted targets, embedded-copy volume (the server's).
+					const on = !btn.classList.contains('audio-mixer-view__matrix-btn--active')
+					try {
+						await postInputRoute(r.inputKind, slot, ch, on)
+						btn.classList.toggle('audio-mixer-view__matrix-btn--active', on)
+						await settingsState.load()
+					} catch (err) {
+						showScenesToast(err?.message || String(err), 'error')
+					} finally {
+						btn.dataset.busy = '0'
+						btn.disabled = false
+					}
+					return
+				}
+				const curTargets = getMultiPlayTargets(targetKey)
+				const curEnabled = curTargets.some((t) => Number(t.channel) === ch && Number(t.layer) === destLayer)
 				try {
 					if (!curEnabled) {
 						// Apply first, persist on success only.
@@ -150,8 +171,8 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 			try {
 				await runInputStart(r, {
 					post: (p, b) => api.post(p, b),
-					// DeckLink / v4l2: the server restores the persisted routes itself (WO-604 slice 3).
-					targets: isServerRoutedKind(r?.inputKind) ? [] : getMultiPlayTargets(targetKey),
+					// DeckLink / v4l2 / ALSA: the server restores the persisted routes itself (WO-604 slices 3 + 5).
+					targets: serverRouted ? [] : getMultiPlayTargets(targetKey),
 					playRoute: playRouteOnChannel,
 					route: inputRouteForRow(cm, r),
 					audioOnly: liveUi?.pgmAudioOnly !== false,
@@ -166,6 +187,7 @@ export function renderConsoleLiveInputs(inputsListEl, { liveInputMeters, program
 		})
 
 		stripsEl.appendChild(strip)
+		repaintUnsavedAlsaTargets(r?.inputKind, slot, csNow, [...strip.querySelectorAll('[data-route-ch]')], 'audio-mixer-view__matrix-btn--active', (b) => Number(b.dataset.routeCh))
 		meterFills.set(r.key, strip.querySelector('.audio-mixer-view__meter-fill'))
 		meterLayerMeta.set(r.key, meterMetaForInputRow(r))
 

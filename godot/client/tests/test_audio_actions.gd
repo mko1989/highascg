@@ -69,7 +69,9 @@ func test_live_input_routing_requests() -> void:
 	var dl := {"key": "input:4", "ch": 4.0, "layer": 1.0, "isLiveInput": true, "inputKind": "decklink", "slot": 1.0}
 	var la := {"key": "input:9", "ch": 9.0, "layer": 10.0, "isLiveInput": true, "inputKind": "live_audio", "slot": 2.0}
 	var ndi := {"key": "input:11", "ch": 11.0, "layer": 1.0, "isLiveInput": true, "inputKind": "ndi_host", "slot": 1.0}
-	t.ok(AA.routed(dl) and not AA.routed(la) and not AA.routed(ndi), "Ch buttons + send policy: DeckLink / v4l2 only")
+	t.ok(AA.routed(dl) and AA.routed(la) and not AA.routed(ndi), "Ch buttons: DeckLink / v4l2 / ALSA (slice 5)")
+	t.ok(AA.has_send(dl) and not AA.has_send(la) and not AA.has_send(ndi), "send policy: DeckLink / v4l2 only")
+	t.eq(AA.route_request(la, 3, false), ["POST", "/api/audio/inputs/route", {"kind": "live_audio", "slot": 2, "channel": 3, "on": false}])
 	t.ok(AA.startable(dl) and AA.startable(la) and not AA.startable(ndi), "START: DeckLink / live audio")
 	t.ok(not AA.routed({"key": "pgm:1", "isMaster": true}), "never a master")
 	t.eq(AA.route_request(dl, 1, true), ["POST", "/api/audio/inputs/route", {"kind": "decklink", "slot": 1, "channel": 1, "on": true}])
