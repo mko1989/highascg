@@ -84,6 +84,8 @@ func test_wall_object_panels() -> void:
 	t.eq(o.source, {"role": "pgm1", "rect": {"x": 0, "y": 0, "w": 3840, "h": 1536}})
 	t.eq(W.wall_object(f, [128, 256], W.panel_mm_for(f, false, [500, 1000]), "pgm1", []).panels, [20, 4],
 		"one object → the preset's panel")
+	t.eq(W.panel_px_for(Vector2(500, 1000), 500.0 / 128.0), [128, 256], "Narvill's 0.5 × 1 m panels at P3.9")
+	t.eq(W.panel_px_for(Vector2(500, 500), 500.0 / 104.0), [104, 104])
 
 
 func test_pack_centre_and_totems_on_one_canvas() -> void:

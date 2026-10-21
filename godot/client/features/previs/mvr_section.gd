@@ -8,7 +8,7 @@ extends VBoxContainer
 ## models. Unpatch removes this scene's fixtures from the patch again.
 ## Place (project.previs.mvr.place): where the file's frame sits on our stage — an MVR's origin is its author's (Capture
 ## venues can sit metres off to one side, floor below ours). Import fits a scene that is off; patched fixtures move along.
-## WO-634: click a wall in the 3D view → Make LED screen(s)… (mvr_screens.gd; project.previs.mvr.hidden_objects).
+## WO-634: click a wall in the 3D view (ctrl adds walls) → Map onto a destination (mvr_screens.gd; project.previs.mvr.hidden_objects).
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -270,8 +270,8 @@ func _toggle_layer(i: int) -> void:
 
 
 ## WO-634: a 3D click that hit no fixture / stage object → maybe an MVR wall. → whether it hit one.
-func click(cam: Camera3D, at: Vector2, shift: bool) -> bool:
-	return _screens.click(cam, at, shift)
+func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
+	return _screens.click(cam, at, add)
 
 
 func _on_loaded(info: Dictionary) -> void:

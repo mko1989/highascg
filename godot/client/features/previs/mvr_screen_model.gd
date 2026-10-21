@@ -137,6 +137,11 @@ static func wall_object(frame: Dictionary, panel_px: Array, panel_mm: Vector2, r
 	return o
 
 
+## Pixels of a `panel_mm` panel at `pitch` mm (Narvill's 500 × 1000 panels at P3.9 → 128 × 256, not the preset's square).
+static func panel_px_for(panel_mm: Vector2, pitch: float) -> Array:
+	return [maxi(1, roundi(panel_mm.x / pitch)), maxi(1, roundi(panel_mm.y / pitch))]
+
+
 ## Panel size to build with: a multi-object wall's own panel (its clicked object), else the preset's.
 static func panel_mm_for(frame: Dictionary, multi: bool, preset_mm: Array) -> Vector2:
 	var cell: Vector2 = frame.cell

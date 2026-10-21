@@ -175,3 +175,17 @@ click selects "12.00 × 4.00 m (1248 objects)", shift-click adds the columns (24
   from the store (`DELETE /api/stage/mvr/86cc4dc91e3e`; store = Pabianice only).
 - Not changed: the default facing (the clicked side) and top-aligned crops for stepped columns (guttmany's columns
   share a bottom line, so their crops' real map is the sending card's — editable per wall).
+
+## Follow-up 2 (2026-10-21) — owner: "let user click with control to select multiple walls and map directly"
+
+- `previs_tab.gd`: the MVR click passes `shift or ctrl` as "add" (shift kept — it is the fixtures' multi-select key).
+- `mvr_screens.gd`: the modal Make dialog is gone. Under the selection: **[destination ▾] [Map] [Turn around]**
+  (row hidden while nothing is selected; the destination choice is kept across selections). Map builds at once: the
+  MVR's own panel size, the finest pitch whose packed canvas fits the destination unscaled (else the coarsest), crops
+  left → right as the audience sees them; the info line then says what was mapped (canvas, scale).
+- `mvr_screen_model.gd`: `panel_px_for(panel_mm, pitch)` — pixels from the preset's pitch, not its panel; the old path
+  gave Narvill's 500 × 1000 mm panels the preset's square 192 × 192 px.
+- VERIFIED: Godot `--test` 20606 pass / 0 fail (+2: P3.9 0.5 × 1 m → 128 × 256, P4.8 → 104), `--check` boot OK.
+  **Not box-tested**: when relaunched, the owner's `godot_test` project already held their own 3 Pabianice walls
+  (192 objects replaced) — a live Map test would have meant un-hiding and re-mapping their work. Owner QA: ctrl-click
+  the walls, pick the destination, Map.
