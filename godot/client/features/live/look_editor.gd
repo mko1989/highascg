@@ -174,6 +174,12 @@ func _fill_rect(f: Dictionary) -> Rect2:
 	return Rect2(b.position + Vector2(float(f.get("x", 0)), float(f.get("y", 0))) * b.size, Vector2(float(f.get("scaleX", 1)), float(f.get("scaleY", 1))) * b.size)
 
 
+## WO-635: a layer's chrome is drawn under C.layer_xform (its rotation about the fill centre, as Caspar turns it) and
+## the pointer is mapped back through it.
+static func _deg(l: Dictionary) -> float:
+	return float(l.get("rotation", 0.0)) if l.get("rotation") != null else 0.0
+
+
 func _process(_d: float) -> void:
 	if visible:
 		var b := _box()
@@ -192,6 +198,7 @@ func _draw_frame() -> void:
 			continue
 		var r := _fill_rect(l.get("fill", {}) if l.get("fill") is Dictionary else {})
 		var sel := i == _sel
+		_overlay.draw_set_transform_matrix(C.layer_xform(r, _deg(l)))
 		_overlay.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
 		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _name(l.source)], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
 		var crop: Variant = _crop_of(l)
@@ -202,6 +209,7 @@ func _draw_frame() -> void:
 			var hc := CROP_COLOR if _crop_mode else ThemeBuilder.ACCENT
 			for p in _handles(hr).values():
 				_overlay.draw_rect(Rect2(p - Vector2(HANDLE, HANDLE) / 2.0, Vector2(HANDLE, HANDLE)), hc)
+		_overlay.draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
 func _handles(r: Rect2) -> Dictionary:
@@ -222,9 +230,10 @@ func _frame_input(event: InputEvent) -> void:
 		var b := _box()
 		var from: Vector2 = _drag.start
 		var d: Vector2 = (mm.position - from) / b.size
+		var local: Vector2 = (mm.position - from).rotated(-deg_to_rad(float(_drag.get("deg", 0.0))))  # a turned layer's own axes
 		if _drag.get("is_crop", false):
 			var lp: Vector2 = _drag.layer_px
-			var cd: Vector2 = (mm.position - from) / Vector2(maxf(1.0, lp.x), maxf(1.0, lp.y))
+			var cd: Vector2 = local / Vector2(maxf(1.0, lp.x), maxf(1.0, lp.y))
 			_set_crop(C.crop_delta(_drag.edge, _drag.crop, cd.x, cd.y))
 			return
 		var start: Dictionary = _drag.fill
@@ -232,6 +241,7 @@ func _frame_input(event: InputEvent) -> void:
 		if _drag.edge == "":
 			f = C.move_fill(start, d.x, d.y, _others_fills(_sel), 10.0 / b.size.x, 10.0 / b.size.y)
 		else:
+			d = local / b.size
 			var xs := _snap_candidates(true)
 			var ys := _snap_candidates(false)
 			var tx := 10.0 / b.size.x
@@ -246,21 +256,24 @@ func _begin_drag(at: Vector2) -> void:
 	var layers := _layers()
 	if _sel >= 0 and _sel < layers.size():
 		var r := _fill_rect(layers[_sel].get("fill", {}))
+		var deg := _deg(layers[_sel])
+		var lat := C.layer_xform(r, deg).affine_inverse() * at  # the pointer in the layer's unrotated frame
 		if _crop_mode:
 			var cr: Variant = _crop_of(layers[_sel])
 			var hs_c := _handles(_crop_rect(r, cr if cr != null else C.normalize_crop({})))
 			for k in hs_c:
-				if (hs_c[k] as Vector2).distance_to(at) <= HANDLE:
-					_drag = {"start": at, "crop": cr if cr != null else C.normalize_crop({}), "layer_px": r.size, "edge": k, "is_crop": true}
+				if (hs_c[k] as Vector2).distance_to(lat) <= HANDLE:
+					_drag = {"start": at, "crop": cr if cr != null else C.normalize_crop({}), "layer_px": r.size, "edge": k, "is_crop": true, "deg": deg}
 					return
 		var hs := _handles(r)
 		for k in hs:
-			if (hs[k] as Vector2).distance_to(at) <= HANDLE:
-				_drag = {"start": at, "fill": (layers[_sel].get("fill", {}) as Dictionary).duplicate(), "edge": k}
+			if (hs[k] as Vector2).distance_to(lat) <= HANDLE:
+				_drag = {"start": at, "fill": (layers[_sel].get("fill", {}) as Dictionary).duplicate(), "edge": k, "deg": deg}
 				return
 	for i in range(layers.size() - 1, -1, -1):  # topmost first
 		var l: Dictionary = layers[i]
-		if l.get("source") is Dictionary and str(l.source.get("value", "")) != "" and _fill_rect(l.get("fill", {})).has_point(at):
+		var fr := _fill_rect(l.get("fill", {}))
+		if l.get("source") is Dictionary and str(l.source.get("value", "")) != "" and fr.has_point(C.layer_xform(fr, _deg(l)).affine_inverse() * at):
 			_select(i)
 			_drag = {"start": at, "fill": (l.get("fill", {"x": 0, "y": 0, "scaleX": 1, "scaleY": 1}) as Dictionary).duplicate(), "edge": ""}
 			return

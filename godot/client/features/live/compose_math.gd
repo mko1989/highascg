@@ -179,3 +179,10 @@ static func crop_delta(edge: String, start_crop: Variant, dx: float, dy: float, 
 		if edge.contains("n"):
 			top = maxf(0.0, bottom - min_frac)
 	return normalize_crop({"left": left, "top": top, "right": right, "bottom": bottom})
+
+
+## WO-635: a look layer turns about its fill centre (Caspar ANCHOR 0.5 0.5 + ROTATION, scene-layer-rotation-amcp.js;
+## positive = clockwise on screen, as CSS rotate()) → the transform its look-editor chrome is drawn under.
+static func layer_xform(r: Rect2, deg: float) -> Transform2D:
+	var c := r.get_center()
+	return Transform2D(deg_to_rad(deg), c) * Transform2D(0.0, -c)
