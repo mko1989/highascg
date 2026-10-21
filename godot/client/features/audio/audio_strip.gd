@@ -4,11 +4,14 @@ extends PanelContainer
 ## the fader resets to 0 dB. The strip only emits; audio_tab.gd turns that into server calls.
 ## WO-604 slice 3: DeckLink / v4l2 inputs add the audio-send policy and one Ch toggle per program channel (the input's
 ## audio-only route there), startable inputs a START, audio-only looks a STOP.
+## Look layers add the "Screens" row (web WO-284): one button per program channel — the host lit and fixed, the
+## others route this layer's audio there (set_screens applies the server's plan + the look's `audioScreens`).
 
 signal gain_changed(gain: float, final: bool)
 signal solo_pressed(multi: bool)
 signal mute_pressed
 signal route_toggled(channel: int, on: bool)
+signal screen_toggled(channel: int, on: bool)
 signal send_selected(send: String)
 signal start_pressed
 signal stop_pressed
@@ -32,6 +35,7 @@ var _nosig: Label
 var _syncing := false
 var _send: OptionButton
 var _routes := {}  # program channel → toggle
+var _screens := {}  # program channel → Screens toggle
 
 
 func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
@@ -146,6 +150,46 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 			_routes[ch] = b
 			grid.add_child(b)
 		acts.add_child(grid)
+	if AA.cross_screen(r) and not programs.is_empty():
+		var t := Label.new()
+		t.text = "Screens"
+		t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		t.add_theme_font_size_override("font_size", 10)
+		t.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+		acts.add_child(t)
+		var sg := HFlowContainer.new()
+		sg.add_theme_constant_override("h_separation", 3)
+		sg.add_theme_constant_override("v_separation", 3)
+		for p in programs:
+			var ch := int(p)
+			var b := _toggle(str(ch), "Checking…", ThemeBuilder.ACCENT)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.disabled = true  # until the plan says otherwise
+			b.pressed.connect(func() -> void: screen_toggled.emit(ch, b.button_pressed))
+			_screens[ch] = b
+			sg.add_child(b)
+		acts.add_child(sg)
+		set_screens([], AA.cross_screen_targets(r))
+
+
+## Screens row: `buttons` = the server plan for this layer ([{channel, ok, host, reasonText}]), `targets` = the
+## look's audioScreens. The host button is lit and disabled; a refused target is disabled with the reason.
+func set_screens(buttons: Array, targets: Array) -> void:
+	for ch in _screens:
+		var b: Button = _screens[ch]
+		var host: bool = int(row.get("ch", 0)) == ch
+		var info: Dictionary = {}
+		for x in buttons:
+			if x is Dictionary and int(x.get("channel", 0)) == ch:
+				info = x
+		b.disabled = host or info.get("ok", false) != true
+		if host:  # a disabled Button draws the same pressed or not — keep the host visibly lit
+			b.add_theme_stylebox_override("disabled", b.get_theme_stylebox("pressed"))
+		else:
+			b.remove_theme_stylebox_override("disabled")
+		b.set_pressed_no_signal(host or targets.has(ch))
+		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to PGM channel %d" % ch if info.get("ok", false) == true
+			else str(info.get("reasonText", "Checking…")))
 
 
 func _button(text: String, tip: String) -> Button:

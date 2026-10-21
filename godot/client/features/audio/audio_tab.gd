@@ -7,6 +7,8 @@ extends VBoxContainer
 ## keep volume / muted on the look. Meters tick at 20 Hz while the tab is visible, from the shared OSC mirror.
 ## WO-604 slice 3: live-input routing (Ch buttons, audio send, AUTO MIX, START) and audio-only STOP are server calls;
 ## the routing state is GET /api/audio/inputs/routing + the `audioInputRouting` change.
+## Look strips' Screens row (cross-screen audio) is server-planned (POST /api/audio/cross-screen/plan, refetched on
+## every strip rebuild) and toggled through POST /api/audio/cross-screen; the returned targets land on the look layer.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const AR := preload("res://features/audio/audio_rows.gd")
@@ -20,6 +22,7 @@ var osc: Node  # shell's OscMirror
 var _mixer := {}
 var _live_inputs: Variant = null
 var _routing := {}
+var _xplan := {}  # cross-screen plan for the current strips
 var _auto_mix: Button
 var _rows: Array = []
 var _sig := ""
@@ -112,6 +115,7 @@ func _refresh() -> void:
 	if s != _sig:
 		_sig = s
 		_rebuild(cm)
+		_fetch_plan()
 	var solos: Array = _mixer.get("solos", []) if _mixer.get("solos") is Array else []
 	for r in _rows:
 		var strip: Strip = _strips.get(r.key)
@@ -124,6 +128,7 @@ func _refresh() -> void:
 		strip.set_muted(r.get("muted", false) == true)
 		strip.set_solo(solos.has(r.key))
 		strip.set_routing(AA.routing_entry(_routing, r))
+		strip.set_screens(AA.cross_screen_buttons(_xplan, r), AA.cross_screen_targets(r))
 	if _auto_mix:
 		_auto_mix.set_pressed_no_signal(_routing.get("autoMix", true) != false)
 
@@ -208,6 +213,7 @@ func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> Stri
 	s.solo_pressed.connect(func(multi: bool) -> void: _on_solo(key, multi))
 	s.mute_pressed.connect(func() -> void: _on_mute(key))
 	s.route_toggled.connect(func(ch: int, on: bool) -> void: _after(await _send(AA.route_request(s.row, ch, on))))
+	s.screen_toggled.connect(func(ch: int, on: bool) -> void: _on_screen(key, ch, on))
 	s.send_selected.connect(func(send: String) -> void: _after(await _send(AA.send_request(s.row, send))))
 	s.start_pressed.connect(func() -> void:
 		var res := await _send(AA.start_request(s.row))
@@ -260,6 +266,35 @@ func _on_mute(key: String) -> void:
 			ProjectSync.mark_dirty()
 	_metas[key] = AR.meter_meta(r.merged({"muted": next}, true))
 	_send(AA.mute_request(r, next, s.gain()))
+
+
+func _fetch_plan() -> void:
+	var req := AA.cross_screen_plan_request(_rows)
+	if (req[2].sources as Array).is_empty():
+		_xplan = {}
+		return
+	var res: Dictionary = await Api.post_json(req[1], req[2])
+	_xplan = _d(res.get("data")) if res.ok else {}
+	_refresh()
+
+
+## A Screens toggle: on success the server's target list becomes the look layer's audioScreens (web patchLayer).
+func _on_screen(key: String, ch: int, on: bool) -> void:
+	var s: Strip = _strips.get(key)
+	if s == null:
+		return
+	var r: Dictionary = s.row
+	var res := await _send(AA.cross_screen_request(r, ch, on))
+	if res.ok:
+		var targets: Array = _d(res.get("data")).get("targets", [])
+		AA.patch_live_layer(Store.get_value("scene.live"), r.ch, r.layer, {"audioScreens": targets})
+		if AA.patch_look_layer(Store.project, str(r.sceneId), r.layer, {"audioScreens": targets}):
+			ProjectSync.deck_changed()
+			ProjectSync.mark_dirty()
+		r.audioScreens = targets
+	elif str(_d(res.get("data")).get("reasonText", "")) != "":
+		_status.text = str(res.data.reasonText)
+	_refresh()
 
 
 ## A refused routing call puts the toggles back on the server's state.

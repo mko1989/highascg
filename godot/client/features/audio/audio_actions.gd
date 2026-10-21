@@ -134,3 +134,44 @@ static func auto_mix_request(on: bool) -> Array:
 ## The ■ on an audio-only look strip: clears that look on its channel, the channel's video look untouched.
 static func audio_only_stop_request(row: Dictionary) -> Array:
 	return ["POST", "/api/scene/audio-only/stop", {"channel": int(row.ch)}]
+
+
+## WO-604 — cross-screen audio (web WO-284 "Screens" row): a look layer's audio routed onto other program channels,
+## composed on the server (src/api/routes-audio-cross-screen.js). Only look layers have it (the targets persist on
+## the look layer as `audioScreens`).
+static func cross_screen(row: Dictionary) -> bool:
+	return row.get("sceneId") != null and str(row.get("sceneId")) != "" and row.get("isMaster", false) != true \
+		and row.get("isLiveInput", false) != true
+
+
+static func cross_screen_targets(row: Dictionary) -> Array:
+	var out: Array = []
+	for v in (row.get("audioScreens", []) if row.get("audioScreens") is Array else []):
+		var n := int(v.get("channel", 0)) if v is Dictionary else (int(v) if (v is float or v is int or str(v).is_valid_int()) else 0)
+		if n >= 1 and not out.has(n):
+			out.append(n)
+	out.sort()
+	return out
+
+
+static func cross_screen_plan_request(rows: Array) -> Array:
+	var sources: Array = []
+	for r in rows:
+		if r is Dictionary and cross_screen(r):
+			sources.append({"channel": int(r.ch), "layer": int(r.layer)})
+	return ["POST", "/api/audio/cross-screen/plan", {"sources": sources}]
+
+
+## The plan's buttons for one row ([] when the plan has no entry for its channel-layer yet).
+static func cross_screen_buttons(plan: Variant, row: Dictionary) -> Array:
+	var sources: Variant = plan.get("sources") if plan is Dictionary else null
+	if sources is Array:
+		for s in sources:
+			if s is Dictionary and float(s.get("channel", 0)) == float(row.get("ch", -1)) and float(s.get("layer", 0)) == float(row.get("layer", -1)):
+				return s.get("buttons", []) if s.get("buttons") is Array else []
+	return []
+
+
+static func cross_screen_request(row: Dictionary, target: int, on: bool) -> Array:
+	return ["POST", "/api/audio/cross-screen",
+		{"channel": int(row.ch), "layer": int(row.layer), "target": target, "enable": on, "current": cross_screen_targets(row)}]

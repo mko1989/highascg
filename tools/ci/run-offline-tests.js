@@ -352,6 +352,7 @@ const FILES = [
 	'tools/smoke/smoke-wo616-tracking-fusion.test.js',
 	'tools/smoke/smoke-wo616-verify-walk.test.js',
 	'tools/smoke/smoke-wo616-about.test.js',
+	'tools/smoke/smoke-wo604-cross-screen-audio.test.js',
 	'tools/smoke/smoke-wo628-operator-dock.test.js',
 	'tools/smoke/smoke-wo629-led-test-control.test.js',
 	'tools/smoke/smoke-wo630-calibrate-click.test.js',

@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
+**Status: IN PROGRESS (2026-10-20) — slice 1 DONE and box-verified (server mixer store bbb3bf42, Godot models 953f9d5b, Audio tab 5c47b389); slice 2 DONE and box-verified (web console on the server store, b4e031a0); slice 3 DONE and box-verified (live-input routing on the server ec3acbdd + Godot controls); slice 4 DONE (cross-screen audio on the server + Godot Screens row, 21.10; real two-screen routing is an owner check); later slices open (below). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600 (live inputs L).**
 
 # WO-604 — Godot port: audio mixer, meters, cross-screen audio routing
 
@@ -262,9 +262,55 @@ Scope: **26 JS files, 3,352 LOC + 1,201 CSS**.
 - **Not clicked on the box:** STOP on the owner's live audio-only look `Look_8`; it would end their audio.
   The request builder is tested, and the endpoint is the one the web already uses. Owner QA.
 
+## Slice 4 (2026-10-21) — cross-screen audio routing (Screens row)
+
+### Investigation
+
+- The web's WO-284 Screens row (`audio-mixer-console-input-groups.js`, `audio-mixer-panel-input-layers.js`) shows one
+  button per program channel on every look-layer strip. The host button is lit and disabled. The others are
+  validated in the browser (`audio-cross-screen-routing.js`) and applied in the browser
+  (`audio-cross-screen-apply.js` → `playRouteOnChannel` / `clearRouteFromChannel`). Targets are persisted as the
+  look layer's `audioScreens` through `sceneState.patchLayer`.
+- Destination layer = 300 + ch·1000 + layer (≥ 1301). It never collides with look layers, the timeline band (210+)
+  or the DeckLink/v4l2 audio band (320 + N).
+- `router.js` is at 499 lines, so the new route file is registered on the existing shader-live register line.
+
+### What was done
+
+- `src/api/routes-audio-cross-screen.js` (new; registered from `router.js:489` on the same line):
+  - `POST /api/audio/cross-screen/plan {sources:[{channel, layer}]}` → `{screens, sources:[{channel, layer,
+    destLayer, buttons:[{channel, ok, host, reason, reasonText}]}]}`. The rules are the web's pure module (dynamic
+    import), fed the server channel map (`getRouteMap`).
+  - `POST /api/audio/cross-screen {channel, layer, target, enable, current}`. It validates first; a refused target
+    returns 400 with the reason and sends no AMCP. Enable = `host-live-layer.js` action `route` (audio-only
+    `route://ch-layer`, MIXER OPACITY 0). Disable = action `stop` (STOP + MIXER CLEAR). Returns the next target
+    list; a failed PLAY returns 502 with `current` unchanged. Nothing is stored server-side: the client writes
+    `audioScreens` on the look like the web does.
+- Smoke `tools/smoke/smoke-wo604-cross-screen-audio.test.js` (7 tests, curated list): plan states on a 2-screen
+  map, invalid sources, enable/disable AMCP, host/PRV/unknown targets refused with zero AMCP, PLAY failure.
+- Godot:
+  - `audio_actions.gd`: `cross_screen`, `cross_screen_targets`, `cross_screen_plan_request`,
+    `cross_screen_buttons`, `cross_screen_request`.
+  - `audio_strip.gd`: "Screens" row of toggles on look-layer strips, plus `set_screens`. The host button is lit
+    and disabled (it keeps its pressed style while disabled); refused targets are disabled with the reason as the
+    tooltip.
+  - `audio_tab.gd`: fetches the plan on every strip rebuild. On a successful toggle the returned targets are
+    written to the look layer and the live copy (`patch_look_layer` / `patch_live_layer` → deck sync + autosave).
+  - Test `test_cross_screen_requests`.
+
+### What was VERIFIED
+
+- Live node (1 program channel): plan → host button only (`host-channel`). A toggle to ch 1 → 400 host-channel;
+  to ch 2 (PRV) → 400 not-a-program-channel. Neither sent any AMCP.
+- Smoke 7/7; offline suite 2956 pass; lint 216; unwired-exports baseline unchanged; Godot 16471 pass; boot OK.
+- Godot Audio tab on the box: the Screens row appears under the L10 look strip with "1" lit and the "Host channel"
+  tooltip. The audio-only Look_8 strip has no Screens row (no sceneId, same as the web).
+- **Open:** a real enable/disable between two screens needs a 2-screen box (owner checklist). PGM was never routed
+  here.
+
 ### Still open (later slices)
 
-- Cross-screen / stereo-pair routing matrix (`audio-cross-screen-*`, `route://`).
+- Stereo-pair split of a cross-screen route (the web has none either; the route carries the whole layout).
 - ALSA `live_audio` routes: their targets are still client localStorage (plus the separate WO-571
   `live_audio_input_N_pgm_channels` band). They need one server-owned store, like DeckLink.
 - DeckLink N and v4l2 N share PGM audio layer 320 + N (found in slice 3). Routing both to the same channel collides.

@@ -81,3 +81,19 @@ func test_live_input_routing_requests() -> void:
 	t.eq(AA.routing_entry(snap, dl).get("send"), "always", "matched by strip key")
 	t.eq(AA.routing_entry(snap, la), {}, "no entry → {}")
 	t.eq(AA.routing_entry(null, dl), {}, "no snapshot yet")
+
+
+func test_cross_screen_requests() -> void:
+	var look := {"key": "l:1:12", "ch": 1.0, "layer": 12.0, "sceneId": "sc1", "audioScreens": [3.0, {"channel": 5}, 3, "x"]}
+	var tl := {"key": "t:1:210", "ch": 1.0, "layer": 210.0, "sceneId": null}
+	t.ok(AA.cross_screen(look) and not AA.cross_screen(tl), "Screens row: look layers only")
+	t.ok(not AA.cross_screen({"sceneId": "x", "isMaster": true}) and not AA.cross_screen({"sceneId": ""}), "never a master / empty id")
+	t.eq(AA.cross_screen_targets(look), [3, 5], "ints, deduped, sorted, junk dropped")
+	t.eq(AA.cross_screen_targets(tl), [])
+	t.eq(AA.cross_screen_plan_request([look, tl]), ["POST", "/api/audio/cross-screen/plan", {"sources": [{"channel": 1, "layer": 12}]}])
+	t.eq(AA.cross_screen_request(look, 3, false), ["POST", "/api/audio/cross-screen",
+		{"channel": 1, "layer": 12, "target": 3, "enable": false, "current": [3, 5]}])
+	var plan := {"sources": [{"channel": 1.0, "layer": 12.0, "buttons": [{"channel": 3.0, "ok": true}]}]}
+	t.eq(AA.cross_screen_buttons(plan, look).size(), 1, "matched by channel-layer")
+	t.eq(AA.cross_screen_buttons(plan, tl), [], "no entry")
+	t.eq(AA.cross_screen_buttons(null, look), [], "no plan yet")
