@@ -164,7 +164,7 @@ static func migrate_preview_route_sources(cells: Array, cm: Dictionary) -> Array
 static func add_cell(opts: Dictionary, cw: float, ch: float, now_ms: int = 0) -> Dictionary:
 	var t: Variant = opts.get("type")
 	var al: Variant = opts.get("aspectLocked")
-	return {"id": opts.id if opts.get("id") else "cell_" + _base36(now_ms if now_ms else Time.get_ticks_msec()),
+	return {"id": opts.id if opts.get("id") else "cell_" + _base36(now_ms if now_ms else int(Time.get_unix_time_from_system() * 1000.0)),
 		"type": t if t else "media", "label": opts.label if opts.get("label") else "Cell",
 		"x": G.jround(float(opts.get("x", 0)) if opts.get("x") != null else 0.0),
 		"y": G.jround(float(opts.get("y", 0)) if opts.get("y") != null else 0.0),

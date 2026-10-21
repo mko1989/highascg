@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-18) — steps 1–2 done on the box; steps 3a–3c (look editor: compose frame over live PRV, move/resize, crop, layer fields; Sources panel + drop to add; remove/reorder) done on the box. Next: layer inspector depth (content fit, loop, audio, transitions per layer → WO-601), effects/PIP/border (J, needs WO-598 C3), route sources (WO-156 rules server-side — DONE in WO-622 for new layers), multiview editor (M). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
+**Status: IN PROGRESS (2026-10-18) — steps 1–2 done on the box; steps 3a–3c (look editor: compose frame over live PRV, move/resize, crop, layer fields; Sources panel + drop to add; remove/reorder) done on the box. Next: layer inspector depth (content fit, loop, audio, transitions per layer → WO-601), effects/PIP/border (J, needs WO-598 C3), route sources (WO-156 rules server-side — DONE in WO-622 for new layers). Multiview editor (M) DONE 2026-10-21 (Multiview tab; apply on a real multiview channel is an owner check). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599 (foundation), WO-598 (contract/thin-client decisions), WO-597 (atlas). First feature WO after the foundation; previs (WO-607) follows it.**
 
 # WO-600 — Godot port: live operation core (deck, PRV/PGM, compose tiles, look editor, take, sources, live inputs, multiview editor, timers)
 
@@ -111,6 +111,25 @@ next free number, editor defaults, images never loop, native fill for the conten
 (reorder = web reorderLayers, renumber from 10), crop mode (crop math golden-tested; effects[{type:'crop'}]), overlay fix
 (boxes paint above the PRV picture).
 
+**M — multiview editor (2026-10-21):** `godot/client/features/multiview/`:
+- `mv_geometry.gd` + `mv_layout.gd` — 1:1 port of the web editor math (default layout, API layout, overlay type,
+  resolution suffix, contained video rect, aspect solver, resize handles, addCell, canvas rescale, move/resize snapping +
+  aspect lock, drop sizing, legacy route migration, WO-271 source-channel healing). **Golden-tested**:
+  `tests/golden/multiview_editor.json` is written by `tools/dev/gen-godot-golden-multiview.mjs`, which runs the web
+  modules under node (the inline move/resize/drop blocks of multiview-editor.js are copied into it verbatim);
+  `test_multiview_model.gd` checks ~3.8 k cases. `mv_doc.gd` = load/export/presets/cell label (`test_multiview_doc.gd`).
+- `multiview_tab.gd` + `mv_canvas.gd` — new **Multiview** tab (after Devices; Settings moves to index 6). Toolbar as the
+  web (index picker, Refresh output, Auto-apply, Borders, Timers under labels, Timer size %, Highlight top timer, BG,
+  Presets 1–4). Drag = move with snapping, edge/corner = resize, click = audio focus, Delete removes, right-click menu
+  (Audio focus · Clear source · Lock aspect · Remove cell · Default layout · Clear all cells — replaces the web's
+  right-click-clears and Shift+click on presets). Sources rows drop on a cell (new source) or on empty canvas (new cell).
+  The multiview channel's own picture is leased (`ch<N>`) behind the cells. Multiviewer 1 = `project.multiview`
+  (autosaved, so the web editor sees it); multiviewers 2+ and the presets live in ui.cfg (the web keeps them in the browser).
+- Server: `POST /api/multiview/audio-focus {n, cellId}` composes the focus lines against the APPLIED layout
+  (smoke `smoke-wo600-multiview-audio-focus`, 4 tests). **Web bug fixed on the way:** the web editor sent
+  `MIXER 3 VOLUME 11 -60` through raw `/api/amcp/batch` — dB in a linear field, and the layer in the volume slot, so the
+  "muted" cells got phase-inverted gain and the focused cell went silent. The web now calls the endpoint too.
+
 ## What was VERIFIED
 
 - Against the simulator's real project (5 looks): column "Main 1 · 2 looks" = Look 1 + Look 3 (`mainScope '0'`),
@@ -130,6 +149,15 @@ next free number, editor defaults, images never loop, native fill for the conten
 - **Steps 3b/3c on the box:** real XTEST drag Sources → frame added layer 11, PRV re-taken (`LOADBG 2-11 …`); ▼ Down renumbered
   10/11; Remove dropped the layer, numbers kept (web); new-layer on a 3840×1344 clip → native fill 2.0×1.244 at x −0.5; real
   crop drag → `MIXER 2-10 CROP 0 0 0.79 1` nudge, effects stored. Server smoke `smoke-wo600-new-layer` 5/5; Godot 387/0.
+
+- **M on the box (2026-10-21, no multiview destination on this box):** the tab shows "No Multiview Channel" like the web;
+  right-click → Default layout → PGM/PRV cells, `project.multiview` autosaved (rev 637); real XTEST drags: PRV moved to
+  x 639.5 then snapped to the PGM edge at exactly 960; PGM bottom edge → h 599; Sources → Live "DeckLink 2" dropped on
+  empty canvas → aspect-solved 480×303 cell with `route://5-2`; preset 1 saved → Clear all → recall restored the 3 cells;
+  click = audio-focus speaker mark; Delete removed the cell; Timers under labels on/off persisted. Restored: `multiview`
+  is byte-equal to the pre-test snapshot, preset slot cleared. `/api/multiview/audio-focus` on the box → 400
+  "Multiviewer 1 not enabled" (no AMCP). Godot 20361/0, `--check` OK; offline suite 2982/0.
+- **Open (owner):** apply + audio focus on a box with a multiview destination (checklist).
 
 Inventory facts 1, 2, 3 re-checked by hand (refs above). The remaining refs are Haiku-read and
 must be re-grepped when each sub-feature is started.

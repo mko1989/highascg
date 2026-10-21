@@ -10,6 +10,7 @@ const TimelineTab := preload("res://features/timeline/timeline_tab.gd")
 const SettingsTab := preload("res://features/settings/settings_tab.gd")
 const DevicesTab := preload("res://features/devices/devices_tab.gd")
 const AudioTab := preload("res://features/audio/audio_tab.gd")
+const MultiviewTab := preload("res://features/multiview/multiview_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -81,6 +82,9 @@ func _ready() -> void:
 	tabs.add_child(devices)
 	sources.caspar_changed.connect(devices.mark_restart_dirty)  # WO-605 slice 12: a DeckLink dropped on Sources
 	sources.connector_dropped.connect(devices.refresh)
+	var multiview := MultiviewTab.new()  # WO-600 M
+	multiview.name = "Multiview"
+	tabs.add_child(multiview)
 	sources.tab_requested.connect(func(n: String) -> void: tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node(n.capitalize())))
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
