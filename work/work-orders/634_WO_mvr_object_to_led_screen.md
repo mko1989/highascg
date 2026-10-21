@@ -186,6 +186,12 @@ click selects "12.00 × 4.00 m (1248 objects)", shift-click adds the columns (24
 - `mvr_screen_model.gd`: `panel_px_for(panel_mm, pitch)` — pixels from the preset's pitch, not its panel; the old path
   gave Narvill's 500 × 1000 mm panels the preset's square 192 × 192 px.
 - VERIFIED: Godot `--test` 20606 pass / 0 fail (+2: P3.9 0.5 × 1 m → 128 × 256, P4.8 → 104), `--check` boot OK.
-  **Not box-tested**: when relaunched, the owner's `godot_test` project already held their own 3 Pabianice walls
-  (192 objects replaced) — a live Map test would have meant un-hiding and re-mapping their work. Owner QA: ctrl-click
-  the walls, pick the destination, Map.
+- Box 21.10 (owner: "you can do what you want to the project"; the previs slice was snapshotted first): Show 192
+  replaced, the owner's 3 stage walls deleted (stage objects win the click), plain click on the centre wall, ctrl-click
+  each totem → "Selected: 10.00 × 4.00 m (160 objects), 1.00 × 4.00 m (16 objects), 1.00 × 4.00 m (16 objects)", all
+  three tinted, row PGM/PRV 1 1920×1080. Map → "Mapped 3 walls onto pgm1: canvas 2496 × 832 px, scaled ×0.77 into
+  1920 × 1080"; `/api/project`: led_wall_1 20 × 8 / led_wall_2 / led_wall_3 2 × 8, P4.8 (104 px), at the owner's own
+  wall positions (−0.865 / −7.12 / 5.534), crops 160–1760 | 0–160 | 1760–1920 (left totem, centre, right totem, no
+  gaps), 192 hidden; the test card spans the three in the 3D view. No pitch fits 1920 × 1080 unscaled, so the coarsest.
+  Restored afterwards: the snapshot's `previs` posted to `/api/project/autosave` (current rev, fresh savedAt) — the
+  server and the GUI (project_sync) are back to the owner's walls (2560 × 1280 centre, their hand-set crops).
