@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8 looks DONE (offline + box: store / recall from the look menu, a 3 s DMX crossfade sampled, wheels snap; PGM TAKE owner-QA); T9 follow IK on the GDTF axis chain DONE (offline + 4 real files + box: Point at lands within 0.6 mm through the engine frame); T10 open. The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
+**Status: IN PROGRESS (2026-10-21) — T1 GDTF parser + T2 `/api/fixtures/types` DONE (offline suite + real files on the box); T3 patch (server, Godot model, previs Fixtures patch sheet) + T4 DMX engine / sACN DONE (offline, loopback wire test with a real Robin LedPOINTE file, GUI on the box) — owner rig check pending; T5 previs fixtures + beams DONE (offline + box: real Robin models, 48 fixtures at 50 fps, a real gobo projected); T6 programmer DONE (offline + box: pick in 3D / list / groups, intensity, colour, wheels, gobos, point at floor); T7 visualiser mode DONE (offline + box: a fake desk on sACN drove the previs, output stayed off, dark when the desk stops); T8 looks DONE (offline + box: store / recall from the look menu, a 3 s DMX crossfade sampled, wheels snap; PGM TAKE owner-QA); T9 follow IK on the GDTF axis chain DONE (offline + 4 real files + box: Point at lands within 0.6 mm through the engine frame); T10 MVR fixtures arrive patched DONE (offline + 11 real files + box: Pabianice patched, placed and turned in the GUI; Capture stub GDTFs patch DMX only). The follow slice of T3/T4/T9 landed via WO-616 T11 (2026-10-19, generic profile, Art-Net). Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Supersedes the scope of [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) for real fixtures (WO-180 stays for pixel-map GDTF export). Related: [WO-612](./612_WO_previs_mvr_import.md) (MVR fixtures reference GDTF), [WO-614](./614_WO_previs_stage_builder.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) (follow), [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md).**
 
 # WO-615 — Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams
 
@@ -80,7 +80,7 @@ with actual patch and way to artnet/sacn output."
 - [x] T7 Visualiser mode (incoming Art-Net/sACN through the patch). (2026-10-21)
 - [x] T8 Looks integration (store/recall fixture states, TAKE crossfade). (2026-10-21)
 - [x] T9 Follow IK (consumes WO-616 markers). (2026-10-21 — on the type's GDTF Axis chain, see the T9 section) **First slice done in [WO-616 T11](./616_WO_previs_tracking_openfollow_cameras.md)** (2026-10-19): generic manual profile, `project.fixtures` patch, server engine `src/fixtures/` (ArtDmx sender, nearest-solution IK, hold on stale, master off by default, self-loop refusal). GDTF Axis chains replace the profile after T1.
-- [ ] T10 MVR: fixtures from MVR (WO-612 T4) arrive patched (MVR carries `Addresses`, `GDTFMode`).
+- [x] T10 MVR: fixtures from MVR (WO-612 T4) arrive patched (MVR carries `Addresses`, `GDTFMode`).
 
 ## Acceptance
 
@@ -582,3 +582,62 @@ Desk only (2026-10-17): codebase search for GDTF/DMX paths, spec structure; Godo
 - Restored: fixtures and scenes identical to the snapshot (GUI closed, server restarted). Types deleted, programmer
   empty, `ui.cfg` identical, GUI back on tab 5.
 - Owner QA: follow a tracked performer with a real head and check the beam centre sits on them (checklist).
+
+## T10 — MVR fixtures arrive patched (2026-10-21)
+
+### Investigation
+
+- `mvr-scene.js` read `GDTFSpec` / `GDTFMode` / `Addresses` but kept only the parts it draws; the fixture's world
+  matrix (needed for a pose) was folded into each part's transform. 4 real grandMA3 MVRs (MVR-Stash) + 7 real
+  Capture exports (owner, `~/Downloads`, 2026-10-21) were the reference set.
+- Addresses: MVR writes the absolute address (`2601` = universe 6 channel 41) or `"Universe.Address"`; break 0 is the
+  first break. Capture writes `0` for an unpatched fixture (WEKTORY 2025, guttmany25: every fixture), TAMOOS an empty
+  `<Addresses>` (58 of 136).
+- Mounts: many real fixtures are pitched / rolled (pitch 20 / 40 / 51 / 60 / ±90, side-mounted LEDBeams roll 90). The
+  patch pose had only `yaw` + `hang`, so T10 adds `pitch` / `roll`, the Godot YXZ order (`Ry(−yaw)·Rx(pitch)·Rz(roll)`,
+  then the floor flip). The decomposition was checked on every fixture of the 4 grandMA3 files: worst basis / position
+  error ≈ 7e-4.
+- Basic Festival #327 has an empty `GDTFMode`: falling back to the type's first mode (275 channels) overlapped its
+  neighbours, so an empty mode is skipped, not guessed. Circle Stage has no `FixtureID`, so names collided → " (n)".
+- **Capture's GDTF export is a stub**: `description.xml` only, one `Model Name="Base"` with no size or file, one empty
+  `Base` geometry, every channel a generic `Dimmer1…N` attribute (Pabianice `ADJ@Focus Profile@r3009.gdtf`: 3 modes,
+  36 / 40 / 51 ch). The DMX footprint is right; there is no pan / tilt / colour meaning and nothing to draw.
+  `guttmany25` carries 8 full GDTFs, the others 0–2.
+
+### What was done
+
+- `src/stage/mvr-scene.js`: `absAddress` (number or "U.A"); fixtures keep `addresses` and `matrix` (world 4×4, MVR frame,
+  m). The report splits `gdtf_no_model` (stub: in the file, nothing to draw) from `missing_gdtf`.
+- `src/stage/mvr-patch.js` (new, pure): `poseFromMatrix` (columns normalized, mirrored frames flipped and counted,
+  `Q = C·R·Cᵀ`, Godot `get_euler` YXZ; a roll past ±90° = hang floor + the rest), `matchMode` (exact, then trimmed /
+  case-insensitive; empty never guessed), `buildMvrPatch` (id `mvr-<uuid>`, Art-Net U−1 / sACN U, skip reasons, notes
+  for multi-break modes and mirrored matrices).
+- `src/fixtures/gdtf-store.js` `ensureGdtf` (content-addressed; a known type is not re-parsed); `mvr-store.js`
+  `fixtureScene` (re-reads the stored .mvr, so scenes imported before T10 patch too).
+- `POST /api/stage/mvr/<id>/patch {protocol}` (`routes-stage-mvr.js handlePatch`): imports each GDTF once, builds the
+  entries, reloads the fixture engine; replies `{fixtures, skipped, notes, types}` (types de-duplicated by id: "X" and
+  "X.gdtf" spellings of one file are one type — the new smoke caught the double count).
+- Pose `pitch` / `roll` in `follow-patch.js`, `gdtf-ik.js poseXf`, Godot `follow_model.gd` and `fixtures_3d_model.gd`.
+- Godot Previs MVR section: Patch / Re-patch (keeps the operator's follow, fixed, aim height, enabled, invert, name),
+  Art-Net / sACN, Unpatch (confirm). The static model of a patched fixture hides (the live rig draws it). A type with
+  nothing to draw (Capture stub) gets the scene's 0.3 m box in the live rig (`fixtures_3d.gd`).
+- Placement (WO-612): patched poses are placed with the scene and move with it (see WO-612 "Placement").
+
+### What was VERIFIED
+
+- Offline: `smoke-wo615-mvr-patch.test.js` 5/5 (addresses, 200 random rotations round-trip through `poseXf` < 2e-3,
+  modes, skip reasons, the route on a synthetic MVR with a full and a Capture-stub GDTF → entries resolve in the
+  server's `normalizePatch` with no problems, re-patch idempotent); `smoke-wo612-mvr-import` 5/5; whole offline suite
+  3071 pass / 0 fail; Godot `--test` 20568 / 0 (pose pitch / roll = the server's vectors, patch merge / unpatch,
+  placement); `--check` boot OK; eslint 216 warnings (baseline); line limit OK.
+- Patch builder on real files: grandMA3 Basic Festival 145 + 1 skipped (empty mode), Circle Stage 74, Messy Patch 135,
+  Midsize 76; Capture ATM 184, Narvill 107, Pabianice 52, SLUZEW 99, TAMOOS 78 + 58 unaddressed, WEKTORY 0 + 83 and
+  guttmany25 0 + 250 (address 0 in the file). 33–545 ms each.
+- Box, owner's `godot_test` project with Pabianice (GUI clicks): Patch → 52 fixtures, 5 types, Art-Net 1/2/3/5…;
+  Focus Profile 402 = universe 5 channel 41 "40 Channel" at (−8.147, −9.794, 4.074) = file position + Place exactly;
+  the live rig's boxes land where the static boxes were; turn 90° → poses match the hand computation. Restored after:
+  Unpatch, the 5 test-imported types deleted, Place left at Fit (the owner's fix).
+
+Limits (open): only the first DMX break is output; the camera calibration solve and the generic follow IK ignore
+pitch / roll; hiding an MVR layer does not hide patched fixtures; an empty `GDTFMode` is skipped; Capture stub GDTFs
+patch the footprint only (Dimmer1…N) — swap in the real GDTF (GDTF Share) for pan / tilt / colour.

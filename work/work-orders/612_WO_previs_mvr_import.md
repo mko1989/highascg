@@ -1,4 +1,4 @@
-**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). T5 VideoScreen → live screen bindings DONE (2026-10-21, box-verified). Open: a real Capture file (owner), opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
+**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). T5 VideoScreen → live screen bindings DONE (2026-10-21, box-verified). Placement (Capture origins: Place row + Fit, auto-fit on import) DONE 2026-10-21 (box, real Capture file). Open: opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
 
 # WO-612 — Previs: import MVR scenes (e.g. from Capture) into the Godot stage
 
@@ -66,7 +66,7 @@ WO-597 video surfaces. Unknown sources stay unbound (operator picks in the previ
 
 ## Tasks
 
-- [~] T1 (answered with 4 grandMA3 exports from MVR-Stash; a Capture export is still on the owner checklist) Get one real Capture-exported `.mvr` (and the Capture version) → confirm geometry format(s), fixture GDTF content, whether VideoScreens/Mappings are written.
+- [x] T1 (4 grandMA3 exports from MVR-Stash; 7 real Capture exports 2026-10-21 — 3DS, stub GDTFs, no VideoScreens) Get one real Capture-exported `.mvr` (and the Capture version) → confirm geometry format(s), fixture GDTF content, whether VideoScreens/Mappings are written.
 - [x] T2 `Loader3DS` + tests (fixture `.3ds` files incl. one from the Capture sample).
 - [x] T3 `MvrImporter`: scene objects, transforms, symbols, glTF + 3DS geometry; import report (counts, skipped objects).
 - [x] T4 Fixtures via GDTF (geometry only; DMX/beam simulation is a later WO, shared with WO-180).
@@ -208,9 +208,44 @@ only fetches ready GLB meshes and places them. The design above (GDScript import
   grid back. Test scene deleted, project back to no MVR scene.
 - Gates: lines, lint 216, prettier, unwired-exports, offline 2969 pass, Godot 16479 pass.
 
+## Placement + real Capture exports (2026-10-21)
+
+### Investigation
+
+- Owner report: "loaded [a Capture MVR] … it has problem translating the position of the whole model, its half way
+  through the floor and to the right side. probably mismatch of 0,0,0." File: `Pabianice Final Patch.mvr`.
+- World bounds of every part (Godot frame, scratch script over the stored scene + its 3DS members): x 3.18…22.56,
+  y −2.37…4.14, z −9.66…11.02. The importer was right — the file's own origin sits 3–22 m to one side of the rig, with
+  the venue floor 2.37 m below it. An MVR's origin is its author's; nothing in MVR says where "stage centre" is. Other
+  Capture files: WEKTORY already on the stage (x −12…12, floor −0.02); ATM spans 100 m (venue model, floor −64 m).
+- The 7 Capture exports answer T1: MVR 1.4, geometry **3DS only** (5 files; the forum note holds), no VideoScreens /
+  Mappings / Sources, GDTFs mostly **stubs** (description.xml only, one empty geometry — WO-615 T10). Two MVR 1.5 files
+  (SLUZEW, TAMOOS: no provider, fixtures only, no geometry) are from another exporter. Before this, stubs were reported
+  as "No GDTF" although they are in the file.
+
+### What was done
+
+- `project.previs.mvr.place {x, y, z, yaw}` (stage frame: x stage left, y upstage, z up, m; yaw as a pose's) =
+  `mvr_scene.gd` node transform (`mvr_model.gd placement`). Previs MVR section: a Place row (X / Y / Z / turn + Fit).
+  **Fit** centres the visible content's footprint and stands its lowest point on our floor (`fit_place`, keeps the turn).
+  **Import** fits by itself when the scene is off (`needs_fit`: footprint misses the origin, or lowest point > 0.5 m off
+  the floor) and says so in the status; a scene already on the stage is left alone.
+- Patched fixtures (WO-615 T10) are placed on patch and move by the same change on every Place edit (`replace_patch`,
+  delta = old placement inverse, then the new one; the operator's own pose edits survive).
+- Report: `gdtf_no_model` ("GDTF without a 3D model (shown as boxes)") apart from `missing_gdtf`.
+
+### What was VERIFIED
+
+- Godot `--test`: placement / inverse / patch shift / Fit (the Pabianice bounds → X −12.87, Y 0.68, Z 2.37; placed
+  bounds centred at 0 with the floor at 0, also turned 90°; WEKTORY's bounds need no fit). Smoke: the stub GDTF lands in
+  `gdtf_no_model`.
+- Box, the owner's `godot_test` project (screenshots): before — towers through the floor; Fit → −12.88 / 0.68 / 2.37,
+  the towers stand on their base plates, deck + LED wall centred; patched fixtures sit on the rig and follow a 90° turn
+  (Focus Profile 402 pose = hand computation). Left at Fit, turn 0. Owner-QA: the front of the stage faces the right way
+  for the owner's use (turn if not), ATM / other venues.
+
 ## Open
 
 - Open our export in Capture / a console (owner): does the receiving tool honour the CaptureDevice source + Mapping?
-- A real **Capture** export (owner checklist) — Capture writes 3DS (vendor forum); the 3DS path is tested with
-  synthetic files and the 3DS members of the MA3 GDTFs only.
+- Capture GDTF stubs: no model, no pan / tilt — the real GDTF has to come from GDTF Share (WO-615).
 - No beams / DMX simulation (WO-615 / WO-180).
