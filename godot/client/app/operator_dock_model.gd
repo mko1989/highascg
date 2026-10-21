@@ -12,6 +12,7 @@ const HIDE_S := 1.0       # grace after the pointer leaves the dock / its menu
 const MENU_W := 300       # the ⋯ list
 const MENU_ROW := 34
 const MENU_ICON := 22
+const DOT := 5            # running-app dot under an icon (WO-628, macOS style)
 
 
 ## The dock launches apps on the BOX's display, so it only makes sense when this client runs on the box itself
@@ -57,3 +58,13 @@ static func decode_icon(bytes: PackedByteArray, px: int) -> Image:
 		return null
 	img.resize(px, px, Image.INTERPOLATE_LANCZOS)
 	return img
+
+
+## GET /api/system/dock `running` → {action: true}; the HighAsCG button is always running (it is this window).
+static func running_set(data: Variant) -> Dictionary:
+	var out := {"highascg": true}
+	var r: Variant = (data as Dictionary).get("running") if data is Dictionary else null
+	if r is Array:
+		for a in r:
+			out[str(a)] = true
+	return out

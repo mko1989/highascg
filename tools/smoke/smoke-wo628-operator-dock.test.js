@@ -113,11 +113,28 @@ describe('WO-628 launch or focus', () => {
 })
 
 describe('WO-628 routes', () => {
-	it('GET returns pinned + apps', () => {
-		const r = routes.handleGet()
+	it('GET returns pinned + apps + running', async () => {
+		const r = await routes.handleGet({ listApps: () => [], findGuiWindowIds: async () => [] })
 		const body = JSON.parse(r.body)
 		assert.equal(r.status, 200)
 		assert.ok(Array.isArray(body.pinned) && Array.isArray(body.apps))
+		assert.deepEqual(body.running, [])
+	})
+
+	it('running = pinned tools with a window (a profile-lock dialog counts); lookup errors = not running', async () => {
+		const wins = {
+			firefox: [{ id: '5', name: 'Close Firefox' }],
+			'file-manager': [{ id: '6', name: 'media — Thunar' }],
+		}
+		const { getDock } = require('../../src/system/operator-dock')
+		const d = await getDock({
+			listApps: () => [],
+			findGuiWindowIds: async (a) => {
+				if (a === 'nvidia-settings') throw new Error('no display')
+				return wins[a] || []
+			},
+		})
+		assert.deepEqual(d.running, ['firefox', 'file-manager'])
 	})
 
 	it('POST is wired into the router', () => {

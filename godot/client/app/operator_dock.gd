@@ -27,6 +27,7 @@ var _handle: ColorRect
 var _panel: PanelContainer
 var _bubble: Window  # the hovered app's name above its icon (macOS dock style)
 var _bubble_label: Label
+var _dots := {}  # action → the running dot under its button
 
 
 func _init() -> void:
@@ -109,8 +110,10 @@ func _load() -> void:
 		b.pressed.connect(launch.bind(str(p.action), b))
 		row.add_child(b)
 		_icon_into(b, str(p.action))
+		_add_dot(b, str(p.action))
 	_apps = res.data.get("apps", []) if res.data.get("apps") is Array else []
 	more_menu.fill(_apps)
+	_show_running(res.data)
 	var more := _button("More apps")
 	more.text = "⋯"
 	more.add_theme_font_size_override("font_size", 28)
@@ -128,6 +131,34 @@ func _add_self_button() -> void:
 			main.mode = Window.MODE_MAXIMIZED
 		launch("highascg", b))  # the server activates it — Openbox refuses a window raising itself
 	row.add_child(b)
+	_add_dot(b, "highascg")
+
+
+## WO-628 running dots: a small dot under each app with an open window (GET /api/system/dock `running`).
+func _add_dot(b: Button, action: String) -> void:
+	var dot := ColorRect.new()
+	dot.color = ThemeBuilder.TEXT_MUTED
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	dot.offset_left = -D.DOT / 2.0
+	dot.offset_right = D.DOT / 2.0
+	dot.offset_top = -D.DOT - 1
+	dot.offset_bottom = -1
+	dot.visible = action == "highascg"
+	b.add_child(dot)
+	_dots[action] = dot
+
+
+func _show_running(data: Variant) -> void:
+	var on := D.running_set(data)
+	for a in _dots:
+		(_dots[a] as ColorRect).visible = on.has(a)
+
+
+func _refresh_running() -> void:
+	var res: Dictionary = await Api.get_json("/api/system/dock")
+	if res.ok:
+		_show_running(res.data)
 
 
 ## A name bubble instead of tooltips: a Godot tooltip is clamped to the screen bottom, which puts it ON the dock under
@@ -209,12 +240,15 @@ func launch(action: String, b: Button) -> void:
 	if b != null and is_instance_valid(b):
 		b.modulate = Color.WHITE
 	print("[client] dock %s → %s %s" % [action, res.status, res.error])
+	get_tree().create_timer(2.0).timeout.connect(_refresh_running)  # a launched app maps its window a moment later
 	if not res.ok:
 		var d: Dictionary = res.data if res.data is Dictionary else {}
 		notice.emit({"text": "Could not open %s: %s" % [action, str(d.get("error", res.error))], "tone": "error"})
 
 
 func set_expanded(on: bool) -> void:
+	if on and not expanded and not _dots.is_empty():
+		_refresh_running()
 	expanded = on
 	if not on and _bubble != null:
 		_bubble.hide()

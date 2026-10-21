@@ -73,4 +73,25 @@ to auto hide and not be too triggery to pop up."
   restored byte-identical). See WO-608 "Settings → Updates + nuclear password prompt".
 - One Firefox click right after a node restart launched a second Firefox instead of focusing (window search probably
   timed out during startup). Not reproduced since.
-- No running-app indicators (macOS dots) and no user-editable pinned set.
+- ~~No running-app indicators (macOS dots)~~ — done 21.10 (below). No user-editable pinned set.
+
+## 2026-10-21 — Running dots (the WO's open item)
+
+**What was done.**
+- Node `getDock()` (now async) adds `running` to `GET /api/system/dock`: the pinned tools that have a window open.
+  It uses the same `findGuiWindowIds` + `classifyHelperWindows` lookup as launch-or-focus, so a Firefox
+  profile-lock dialog counts. The 5 lookups run in parallel (≈70 ms on the box); a lookup error counts as "not
+  running".
+- Godot dock: a 5 px dot under each running app (the HighAsCG button always has one).
+  - Refreshed on every reveal and 2 s after a launch.
+  - `operator_dock_model.gd running_set()` holds the logic.
+
+**What was VERIFIED (box, 21.10).**
+- Smoke: `smoke-wo628-operator-dock.test.js` 12/12, with new cases for running + profile-lock + lookup error.
+  Godot tests 16462/0; offline suite 2949 pass.
+- On the box:
+  - The revealed dock showed the dot under HighAsCG only.
+  - Dock → File browser: the server log shows `launched /usr/bin/thunar`, the API reports `running: ["file-manager"]`,
+    and the dot appeared under File browser.
+  - Closing Thunar (SIGTERM to the process the dock started) made the API answer `[]`, and the next reveal showed no
+    dot. 0 script errors.

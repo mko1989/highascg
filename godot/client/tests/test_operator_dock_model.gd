@@ -38,3 +38,9 @@ func test_icons() -> void:
 	var img := Image.create(64, 64, false, Image.FORMAT_RGBA8)
 	t.eq(D.decode_icon(img.save_png_to_buffer(), 44).get_size(), Vector2i(44, 44), "png → 44 px")
 	t.eq(D.decode_icon("not an image".to_utf8_buffer(), 44), null, "junk")
+
+
+func test_running_set() -> void:
+	t.eq(D.running_set(null), {"highascg": true}, "self always running")
+	t.eq(D.running_set({"running": ["firefox", "file-manager"]}), {"highascg": true, "firefox": true, "file-manager": true}, "pinned")
+	t.eq(D.running_set({"running": "junk"}), {"highascg": true}, "bad shape")

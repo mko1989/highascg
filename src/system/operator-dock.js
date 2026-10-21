@@ -52,14 +52,31 @@ function dockModel(apps) {
 	return { pinned, apps: more }
 }
 
-function getDock() {
+/**
+ * The dock's content + `running`: the pinned tools that have a window open (the dots under their icons). A Firefox
+ * profile-lock dialog counts, as in launchOrFocus. No xdotool / display → none running.
+ * @param {{ findGuiWindowIds?: Function, listApps?: Function }} [deps]
+ */
+async function getDock(deps = {}) {
 	let apps = []
 	try {
-		apps = require('../utils/desktop-app-catalog').listAppsForMenu()
+		apps = (deps.listApps || require('../utils/desktop-app-catalog').listAppsForMenu)()
 	} catch {
 		/* no catalog → pinned tools only */
 	}
-	return dockModel(apps)
+	const model = dockModel(apps)
+	const find = deps.findGuiWindowIds || require('../utils/x-display-session').findGuiWindowIds
+	const hits = await Promise.all(
+		model.pinned.map(async ({ action }) => {
+			try {
+				const w = classifyHelperWindows(await find(action, { excludeTitle: OPERATOR_TITLE_MARKER, withNames: true }))
+				return w.usable.length || w.blocked.length ? action : null
+			} catch {
+				return null
+			}
+		})
+	)
+	return { ...model, running: hits.filter(Boolean) }
 }
 
 /**
