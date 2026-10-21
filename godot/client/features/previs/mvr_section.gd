@@ -6,6 +6,8 @@ extends VBoxContainer
 ## WO-615 T10: Patch fixtures — the server imports the scene's GDTFs and builds patch entries (address, mode, pose from
 ## the file; POST /api/stage/mvr/<id>/patch); they are merged into project.fixtures and the live rig replaces the static
 ## models. Unpatch removes this scene's fixtures from the patch again.
+## Place (project.previs.mvr.place): where the file's frame sits on our stage — an MVR's origin is its author's (Capture
+## venues can sit metres off to one side, floor below ours). Import fits a scene that is off; patched fixtures move along.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -28,6 +30,8 @@ var _unpatch_btn: Button
 var _proto: OptionButton
 var _patch_status: Label
 var _unpatch_confirm: ConfirmationDialog
+var _place := {}  # "x" / "y" / "z" / "yaw" → SpinBox
+var _fit_on_load := false
 
 
 func bind(s: MvrScene) -> void:
@@ -73,6 +77,28 @@ func _ready() -> void:
 	_confirm = ConfirmationDialog.new()
 	_confirm.confirmed.connect(_remove)
 	add_child(_confirm)
+	var place := HBoxContainer.new()
+	for spec in [["x", "X ", -500, 500, "Stage left (m)"], ["y", "Y ", -500, 500, "Upstage (m)"], ["z", "Z ", -50, 200, "Up (m)"],
+			["yaw", "↻ ", -180, 180, "Turn (°)"]]:
+		var sb := SpinBox.new()
+		sb.prefix = spec[1]
+		sb.min_value = spec[2]
+		sb.max_value = spec[3]
+		sb.step = 0.01 if spec[0] != "yaw" else 0.5
+		sb.allow_greater = spec[0] == "yaw"
+		sb.allow_lesser = spec[0] == "yaw"
+		sb.tooltip_text = "Move the MVR scene on the stage: " + spec[4]
+		sb.select_all_on_focus = true
+		sb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		sb.value_changed.connect(func(_v: float) -> void: _set_place(_place_from_ui()))
+		place.add_child(sb)
+		_place[spec[0]] = sb
+	var fit := Button.new()
+	fit.text = "Fit"
+	fit.tooltip_text = "Centre the visible scene on the stage and stand it on the floor"
+	fit.pressed.connect(func() -> void: _set_place(M.fit_place(scene.bounds(true), float(_place.yaw.value))))
+	place.add_child(fit)
+	add_child(place)
 	var prow := HBoxContainer.new()
 	_patch_btn = Button.new()
 	_patch_btn.text = "Patch fixtures"
@@ -113,6 +139,10 @@ func _maybe_reload() -> void:
 		return
 	_last = js
 	_select(str(c.get("id", "")))
+	var p := M.place_of(c)
+	for k in _place:
+		(_place[k] as SpinBox).set_value_no_signal(p[k])
+	scene.set_place(p)
 	scene.set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
 	scene.show_scene(str(c.get("id", "")))
 
@@ -165,6 +195,7 @@ func _import() -> void:
 		_status.text = "Import failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
 		return
 	await refresh_list()
+	_fit_on_load = true
 	_save({"id": str(res.data.id), "name": str(res.data.name), "hidden_layers": []})
 
 
@@ -234,6 +265,12 @@ func _on_loaded(info: Dictionary) -> void:
 	_layers.disabled = scene.layers.is_empty()
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
 	_status.text = M.summary(info)
+	if _fit_on_load and info.has("parts"):
+		var b := scene.bounds(true)
+		if M.needs_fit(b):
+			_set_place(M.fit_place(b, 0.0))
+			_status.text += "\nMoved onto the stage (its origin was off) — adjust under Place, or 0 / 0 / 0 to undo."
+	_fit_on_load = false
 	scene_loaded.emit(info)
 
 
@@ -274,8 +311,13 @@ func _patch() -> void:
 		_patch_status.text = "Patch failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
 		_sync_patch_ui()
 		return
+	var p := M.place_of(_cfg())
+	var incoming: Array = (res.data.get("fixtures", []) as Array).map(func(f: Variant) -> Variant:
+		if f is Dictionary and f.get("pose") is Dictionary:
+			f.pose = M.place_pose(f.pose, p)
+		return f)
 	var s := _fixtures_slice()
-	s.patch = M.merge_patch(s.patch, res.data.get("fixtures", []))
+	s.patch = M.merge_patch(s.patch, incoming)
 	_persist_fixtures(s)
 	_patch_status.text = M.patch_summary(res.data)
 	types_changed.emit()
@@ -294,3 +336,24 @@ func _persist_fixtures(slice: Dictionary) -> void:
 	Store.project["fixtures"] = slice
 	ProjectSync.mark_dirty(true)
 	Store.project_changed.emit(Store.project)
+
+
+func _place_from_ui() -> Dictionary:
+	var p := {}
+	for k in _place:
+		p[k] = (_place[k] as SpinBox).value
+	return p
+
+
+## New placement: saved with the scene; this scene's patched fixtures move by the same change.
+func _set_place(p: Dictionary) -> void:
+	var c := _cfg().duplicate(true)
+	if c.is_empty():
+		return
+	var old := M.place_of(c)
+	c["place"] = p
+	_save(c)
+	if _patched_here() > 0:
+		var s := _fixtures_slice()
+		s.patch = M.replace_patch(s.patch, scene.fixture_uuids, old, M.place_of(c))
+		_persist_fixtures(s)

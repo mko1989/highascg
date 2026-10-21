@@ -161,15 +161,21 @@ func _show(n: Node3D) -> void:
 	n.visible = not _hidden.has(str(n.get_meta("layer", ""))) and not _patched.has(str(n.get_meta("uuid", "")))
 
 
-## World AABB of every visible mesh (camera framing).
-func bounds() -> AABB:
+## The scene's placement on our stage (mvr_model place_of): this node's transform; the parts stay in the file's frame.
+func set_place(place: Dictionary) -> void:
+	transform = M.placement(place)
+
+
+## World AABB of every visible mesh (camera framing); local = in the scene's own, unplaced frame (Fit).
+func bounds(local := false) -> AABB:
 	var box := AABB()
 	var first := true
+	var to_local := global_transform.affine_inverse()
 	for mi in find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
 		if not m.is_visible_in_tree():
 			continue
-		var b := m.global_transform * m.get_aabb()
+		var b := (to_local * m.global_transform if local else m.global_transform) * m.get_aabb()
 		box = b if first else box.merge(b)
 		first = false
 	return box

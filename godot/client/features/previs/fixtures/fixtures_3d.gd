@@ -136,6 +136,11 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 			var beam: Dictionary = n.get("beam", {}) if n.get("beam") is Dictionary else {}
 			parts.beams[str(n.id)] = _beam(node, {"beamType": "Glow", "radius": beam.get("radius", 0.05)} if cells else beam, mesh)
 			parts.beams[str(n.id)].type = str(f.typeId)
+	if root.find_children("*", "MeshInstance3D", true, false).is_empty():
+		# WO-615 T10: Capture's GDTF export is a stub (one empty "Base" geometry) — the MVR scene's 0.3 m box stands in
+		var ph := _mesh("", "prim:box")
+		ph.scale = Vector3.ONE * 0.3
+		root.add_child(ph)
 	parts.root = root
 	parts.box = _body_box(root)
 	parts.mark = _mark(parts.box)

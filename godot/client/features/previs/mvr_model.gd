@@ -9,6 +9,67 @@ static func xform(a: Array) -> Transform3D:
 	return Transform3D(Basis(Vector3(a[0], a[1], a[2]), Vector3(a[3], a[4], a[5]), Vector3(a[6], a[7], a[8])), Vector3(a[9], a[10], a[11]))
 
 
+## Where the scene sits on our stage: project.previs.mvr.place {x, y, z (m, stage frame: x stage left, y upstage, z up),
+## yaw (°, the pose convention: Godot Ry(−yaw))}. An MVR's origin is wherever its author drew (a Capture venue can sit
+## metres off to one side with its floor below ours), so the file's frame is moved, not trusted.
+static func place_of(c: Variant) -> Dictionary:
+	var p: Dictionary = c.get("place") if c is Dictionary and c.get("place") is Dictionary else {}
+	var n := func(k: String, lo: float, hi: float) -> float:
+		var v: Variant = p.get(k)
+		return clampf(float(v), lo, hi) if v is float or v is int else 0.0
+	return {"x": n.call("x", -500, 500), "y": n.call("y", -500, 500), "z": n.call("z", -50, 200), "yaw": n.call("yaw", -360, 360)}
+
+
+static func placement(place: Dictionary) -> Transform3D:
+	return Transform3D(Basis(Vector3.UP, -deg_to_rad(float(place.yaw))), Vector3(place.x, place.z, -float(place.y)))
+
+
+## A patch pose taken from the file's frame onto the stage (inverse = back): position moved, yaw turned; the hang, pitch
+## and roll ride along (yaw is the outermost rotation of the pose).
+static func place_pose(pose: Dictionary, place: Dictionary, inverse := false) -> Dictionary:
+	var t := placement(place)
+	if inverse:
+		t = t.affine_inverse()
+	var q := t * Vector3(float(pose.get("x", 0)), float(pose.get("z", 0)), -float(pose.get("y", 0)))
+	var out := pose.duplicate()
+	out.x = snappedf(q.x, 0.0001)
+	out.y = snappedf(-q.z, 0.0001)
+	out.z = snappedf(q.y, 0.0001)
+	out.yaw = snappedf(wrapf(float(pose.get("yaw", 0)) + (-1.0 if inverse else 1.0) * float(place.yaw), -180.0, 180.0), 0.001)
+	return out
+
+
+## The patch with this scene's fixtures (uuids lower case) moved from one placement to another.
+static func replace_patch(patch: Array, uuids: Array, from: Dictionary, to: Dictionary) -> Array:
+	var mine := {}
+	for u in uuids:
+		mine["mvr-" + str(u)] = true
+	var out := []
+	for f in patch:
+		if f is Dictionary and mine.has(str(f.get("id", ""))) and f.get("pose") is Dictionary:
+			var g: Dictionary = (f as Dictionary).duplicate(true)
+			g.pose = place_pose(place_pose(f.pose, from, true), to)
+			out.append(g)
+		else:
+			out.append(f)
+	return out
+
+
+## "Fit": the placement that centres the scene's footprint on the stage and stands its lowest point on the floor, keeping
+## the yaw. `local` = the content bounds in the scene's own (unplaced) frame.
+static func fit_place(local: AABB, yaw: float) -> Dictionary:
+	var b := Transform3D(Basis(Vector3.UP, -deg_to_rad(yaw)), Vector3.ZERO) * local
+	var c := b.get_center()
+	return {"x": snappedf(-c.x, 0.01), "y": snappedf(c.z, 0.01), "z": snappedf(-b.position.y, 0.01), "yaw": yaw}
+
+
+## Import fits only a scene that is off: its footprint misses the stage origin, or its lowest point is off our floor.
+static func needs_fit(local: AABB) -> bool:
+	var e := local.end
+	var p := local.position
+	return not (p.x <= 0.0 and e.x >= 0.0 and p.z <= 0.0 and e.z >= 0.0) or absf(p.y) > 0.5
+
+
 ## WO-612 T5 — a bound VideoScreen's crop ({role, raster{w,h}, rect{x,y,w,h}} from the server) → the LED shader's
 ## uv_rect (x, y, w, h in 0..1). No raster or no rect → the full picture.
 static func screen_uv(screen: Variant) -> Vector4:
@@ -37,7 +98,8 @@ static func summary(info: Dictionary) -> String:
 	var rep: Dictionary = info.get("report", {}) if info.get("report") is Dictionary else {}
 	var txt := "%s — %d objects (%d fixtures), %d parts from %d meshes." % [info.get("name", ""), int(info.get("objects", 0)),
 		int(info.get("fixtures", 0)), int(info.get("parts", 0)), int(info.get("meshes", 0))]
-	for k in [["missing_gdtf", "No GDTF (shown as boxes)"], ["missing_files", "Missing files"], ["unsupported", "Not supported"]]:
+	for k in [["missing_gdtf", "No GDTF (shown as boxes)"], ["gdtf_no_model", "GDTF without a 3D model (shown as boxes)"],
+			["missing_files", "Missing files"], ["unsupported", "Not supported"]]:
 		if rep.get(k[0]) is Array and not (rep[k[0]] as Array).is_empty():
 			txt += "\n%s: %s" % [k[1], ", ".join(rep[k[0]])]
 	if int(info.get("screens", 0)) > 0:

@@ -122,6 +122,16 @@ test('entries: ids, protocols, names, skip reasons, notes', () => {
 	assert.deepStrictEqual(s.fixtures[0].pose, { x: 0, y: 0, z: 6, hang: 'truss', yaw: 0, pitch: 0, roll: 0 })
 })
 
+/** What Capture exports (Pabianice Final Patch.mvr, 2026-10): description.xml only, one empty "Base" geometry, DimmerN. */
+const STUB = `<?xml version="1.0" encoding="UTF-8"?><GDTF DataVersion="1.1"><FixtureType Name="Focus Profile" Manufacturer="ADJ"
+	FixtureTypeID="9B8D3AF0-0000-4000-8000-000000000001"><AttributeDefinitions><Attributes><Attribute Name="Dimmer1" Pretty="D1"/>
+	<Attribute Name="Dimmer2" Pretty="D2"/></Attributes></AttributeDefinitions><Models><Model Name="Base"/></Models><Geometries>
+	<Geometry Model="Base" Name="Base" Position="{1,0,0,0}{0,1,0,0}{0,0,1,0}{0,0,0,1}"/></Geometries><DMXModes>
+	<DMXMode Name="2 Channel" Geometry="Base"><DMXChannels>
+	<DMXChannel DMXBreak="1" Geometry="Base" Offset="1"><LogicalChannel Attribute="Dimmer1"><ChannelFunction Attribute="Dimmer1" DMXFrom="0/1" Name=""/></LogicalChannel></DMXChannel>
+	<DMXChannel DMXBreak="1" Geometry="Base" Offset="2"><LogicalChannel Attribute="Dimmer2"><ChannelFunction Attribute="Dimmer2" DMXFrom="0/1" Name=""/></LogicalChannel></DMXChannel>
+	</DMXChannels></DMXMode></DMXModes></FixtureType></GDTF>`
+
 function sampleMvr() {
 	const gdtf = zipStored({ 'description.xml': XML })
 	const xml = `<?xml version="1.0"?><GeneralSceneDescription verMajor="1" verMinor="6"><Scene><Layers>
@@ -130,13 +140,19 @@ function sampleMvr() {
 			<GDTFMode>Standard</GDTFMode><Addresses><Address break="0">2.1</Address></Addresses><FixtureID>101</FixtureID></Fixture>
 		<Fixture uuid="F2-AA" name="Bar"><GDTFSpec>HighAsCG@Test Spot.gdtf</GDTFSpec><GDTFMode>Pixels</GDTFMode>
 			<Addresses><Address break="0">600</Address></Addresses><FixtureID>102</FixtureID></Fixture>
+		<Fixture uuid="F4-AA" name="Focus Profile"><Matrix>{1,0,0}{0,1,0}{0,0,1}{4732.70459,-10474.0527,1703.71191}</Matrix>
+			<GDTFSpec>ADJ@Focus Profile@r3009.gdtf</GDTFSpec><GDTFMode>2 Channel</GDTFMode><Addresses><Address break="0">2601</Address></Addresses>
+			<FixtureID>402</FixtureID></Fixture>
 		<Fixture uuid="F3-AA" name="Ghost"><GDTFSpec>Nobody@Ghost</GDTFSpec><GDTFMode>A</GDTFMode><Addresses><Address break="0">1</Address></Addresses></Fixture>
 	</ChildList></GroupObject></ChildList></Layer></Layers></Scene></GeneralSceneDescription>`
-	return zipStored({ 'GeneralSceneDescription.xml': xml, 'HighAsCG@Test Spot.gdtf': gdtf })
+	return zipStored({ 'GeneralSceneDescription.xml': xml, 'HighAsCG@Test Spot.gdtf': gdtf,
+		'ADJ@Focus Profile@r3009.gdtf': zipStored({ 'description.xml': STUB }) })
 }
 
 test('POST /api/stage/mvr/<id>/patch: GDTFs imported once, entries resolve in the server patch', async () => {
 	const rec = await mvrStore.importMvr(sampleMvr(), 'Rig.mvr')
+	assert.deepStrictEqual([rec.scene.report.missing_gdtf, rec.scene.report.gdtf_no_model], [['Nobody@Ghost'], ['ADJ@Focus Profile@r3009.gdtf']],
+		'a Capture stub GDTF is in the file — it just has nothing to draw')
 	const routes = new RouteRegistry()
 	register(routes)
 	const reloads = []
@@ -150,21 +166,23 @@ test('POST /api/stage/mvr/<id>/patch: GDTFs imported once, entries resolve in th
 	assert.deepStrictEqual(r.body.fixtures.map((f) => [f.id, f.name, f.universe, f.address, f.mode]), [
 		['mvr-f1-aa', 'Spot 101', 1, 1, 'Standard'],
 		['mvr-f2-aa', 'Bar 102', 1, 88, 'Pixels'],
-	])
+		['mvr-f4-aa', 'Focus Profile 402', 5, 41, '2 Channel'],
+	], 'absolute 2601 = universe 6 channel 41 = Art-Net 5')
 	assert.deepStrictEqual(r.body.skipped.map((s) => s.name + ': ' + s.reason), ['Ghost: GDTF "Nobody@Ghost" is not in the MVR file'])
 	const spot = r.body.fixtures[0]
 	assert.deepStrictEqual(spot.pose, { x: 1, y: 2, z: 6, hang: 'truss', yaw: 0, pitch: 60, roll: 0 }, 'group + fixture matrix, pitched 60°')
-	assert.strictEqual(r.body.types.length, 1)
-	assert.strictEqual(r.body.types[0].fixtures, 2)
-	assert.strictEqual(gdtfStore.list().length, 1)
+	assert.deepStrictEqual(r.body.types.map((t) => [t.name, t.fixtures]), [['Test Spot', 2], ['Focus Profile', 1]])
+	assert.strictEqual(gdtfStore.list().length, 2)
 	assert.strictEqual(reloads.length, 1, 'the engine re-resolves the patch')
 	const n = normalizePatch({ patch: r.body.fixtures }, { resolveMode: (id, m) => gdtfStore.mode(id, m) })
-	assert.deepStrictEqual(n.fixtures.map((f) => f.problem), [null, null])
+	assert.deepStrictEqual(n.fixtures.map((f) => f.problem), [null, null, null], 'the Capture stub patches too (DMX only)')
+	assert.strictEqual(n.fixtures[2].moving, false, 'no pan / tilt in a Capture stub')
 	assert.deepStrictEqual([n.fixtures[0].pose.pitch, n.fixtures[0].moving], [60, true], 'pitch survives normalization; the head moves')
 
 	const again = await post(`/api/stage/mvr/${rec.id}/patch`, { protocol: 'sacn' })
-	assert.deepStrictEqual(again.body.fixtures.map((f) => [f.protocol, f.universe, f.typeId]), [['sacn', 2, spot.typeId], ['sacn', 2, spot.typeId]])
-	assert.strictEqual(gdtfStore.list().length, 1, 'same bytes → same type, not a second copy')
+	assert.deepStrictEqual(again.body.fixtures.map((f) => [f.protocol, f.universe, f.typeId]), [['sacn', 2, spot.typeId], ['sacn', 2, spot.typeId],
+		['sacn', 6, r.body.fixtures[2].typeId]])
+	assert.strictEqual(gdtfStore.list().length, 2, 'same bytes → same type, not a second copy')
 	assert.strictEqual((await post('/api/stage/mvr/0123456789ab/patch', {})).status, 404)
 	assert.strictEqual((await post(`/api/stage/mvr/${rec.id}/other`, {})).status, 404)
 })

@@ -68,7 +68,7 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 	}
 	const objects = []
 	const meshes = new Set()
-	const report = { objects: 0, fixtures: 0, parts: 0, missing_gdtf: new Set(), missing_files: new Set(), unsupported: new Set() }
+	const report = { objects: 0, fixtures: 0, parts: 0, missing_gdtf: new Set(), gdtf_no_model: new Set(), missing_files: new Set(), unsupported: new Set() }
 	const gdtfCache = new Map()
 
 	const addGeometry = (parts, node, m, depth) => {
@@ -102,7 +102,8 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 				const g = gdtfCache.get(key)
 				if (g) for (const p of g.parts) parts.push({ mesh: p.mesh === 'prim:box' ? 'prim:box' : `gdtf:${g.file}:${p.mesh}`, m: mul(m, p.m) })
 				if (!g || !g.parts.length) {
-					report.missing_gdtf.add(spec || '(none)')
+					// Capture's GDTF export is a stub (one empty "Base" geometry, no model files): present, nothing to draw
+					;(g ? report.gdtf_no_model : report.missing_gdtf).add(spec || '(none)')
 					parts.push({ mesh: 'prim:box', m: mul(m, scale(0.3)) })
 				}
 				// WO-615 T10: `matrix` = the fixture's world transform (MVR frame, metres, column-major 4×4) for its patch pose.
@@ -142,7 +143,7 @@ async function parseScene(xmlText, { has, resolveGdtf }) {
 		layers,
 		objects,
 		meshes: [...meshes],
-		report: { ...report, missing_gdtf: [...report.missing_gdtf], missing_files: [...report.missing_files], unsupported: [...report.unsupported] },
+		report: { ...report, missing_gdtf: [...report.missing_gdtf], gdtf_no_model: [...report.gdtf_no_model], missing_files: [...report.missing_files], unsupported: [...report.unsupported] },
 	}
 }
 
