@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-460 routes.
+459 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -108,7 +108,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
 | GET | `/api/fonts` | registry | `src/api/router.js` |
 | POST | `/api/ftb/*` | registry | `src/api/router.js` |
-| GET | `/api/gui-stream/status` | registry | `src/api/router.js` |
 | GET | `/api/hardware/displays` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | GET | `/api/hardware/modeline-preview` | registry | `src/api/router.js`, `src/api/routes-settings.js` |
 | * | `/api/health` | handler | `src/cg-studio/routes.js` |

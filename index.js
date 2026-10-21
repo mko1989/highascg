@@ -42,7 +42,6 @@ const { REPO_ROOT, resolveWebDir } = require('./src/repo-paths')
 const { isHeadlessMode } = require('./src/server/headless-mode')
 const { loadRepoDotEnv } = require('./src/bootstrap/dotenv')
 const { createOnAfterInfoConfigReady } = require('./src/bootstrap/caspar-info-ready')
-const { setupOperatorGuiStream } = require('./src/bootstrap/operator-gui-stream')
 const { startSafeMode } = require('./src/bootstrap/safe-mode')
 
 loadRepoDotEnv(REPO_ROOT)
@@ -313,7 +312,6 @@ function main() {
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
 		appCtx._getWsLogLineStats = typeof wsHandle.getLogLineStats === 'function' ? () => wsHandle.getLogLineStats() : null
 
-		setupOperatorGuiStream({ config, appCtx, httpServer, logger })
 		startReplicationService(appCtx, {
 			clients: wsHandle.clients,
 			getOperatorWsCount: () => wsHandle.clients.size,
@@ -379,9 +377,6 @@ function main() {
 					if (appCtx.samplingManager) appCtx.samplingManager.updateConfig(config.dmx).catch(e => appCtx.log('error', '[DMX] Initial failed: ' + (e.message || e)))
 					if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onCasparConnected()
 					if (appCtx._v4l2BridgeLifecycle) appCtx._v4l2BridgeLifecycle.onCasparConnected()
-					// WO-319: Caspar restart drops the NVENC consumer — refresh the GUI stream for any
-					// clients still watching (no-op when nobody is). Event-driven, not polled.
-					if (appCtx._guiStreamIngest) appCtx._guiStreamIngest.onCasparConnected().catch(() => {})
 				} else if (payload.connected === false) {
 					wasConnected = false
 					// WO-268: quarantine (not clear) tracked template hosts — the reconnect INFO gather

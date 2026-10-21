@@ -11,7 +11,7 @@
  *
  * This is a PROXY, not a change to the app server: highascg keeps serving plain HTTP on :4200,
  * untouched; this process terminates TLS on :4443 and forwards everything — regular requests AND
- * WebSocket upgrades (the operator WS and the /ws/gui-stream video relay) — to it. Built on Node
+ * WebSocket upgrades (the operator WS) — to it. Built on Node
  * built-ins only (https/http/net), no dependencies.
  *
  * HOST HEADER IS PRESERVED on purpose: highascg's isOriginAllowed() accepts an Origin that equals
@@ -93,7 +93,7 @@ const server = https.createServer(tlsOpts, (creq, cres) => {
 	creq.pipe(preq)
 })
 
-// WebSocket upgrades (operator WS + /ws/gui-stream) — forward the raw stream to the app server.
+// WebSocket upgrades (operator WS) — forward the raw stream to the app server.
 server.on('upgrade', (creq, csocket, head) => {
 	// Latency: disable Nagle on both legs so video frames are not held ~40ms to coalesce.
 	try {

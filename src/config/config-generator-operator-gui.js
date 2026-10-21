@@ -121,10 +121,10 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
         </channel>`
 	}
 
-	// WO-325: headless / stream-only — emit the channel (raster + audio-osc, which the route layers
-	// 10-49 and the runtime NVENC gui-stream consumer depend on) but NO physical <screen> consumer.
-	// The channel still renders, so the runtime STREAM consumer keeps feeding the remote client; the
-	// operator monitor is left entirely to the multiview.
+	// WO-325: headless — emit the channel (raster + audio-osc, which the route layers 10-49 depend on) but
+	// NO physical <screen> consumer; the channel still renders for the Godot GUI's shm surface. (The XML
+	// comment below still says "stream-only": its text is part of the generated config, left unchanged so
+	// the config compare does not flag a diff; the WO-319 gui-stream it names is gone, WO-660.)
 	if (dest?.headless === true) {
 		return `${channelXmlComment(
 			`Caspar channel ${ch}: Operator GUI channel "${label}" — HEADLESS (stream-only, no physical screen consumer); routed preview layers (10-49) + runtime NVENC gui-stream feed remote clients only`,

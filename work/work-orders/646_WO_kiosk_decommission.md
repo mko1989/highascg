@@ -105,8 +105,7 @@ Importer map (rg `require(...)`, 21.10):
 
 ### Follow-ups (not done)
 
-- Server WO-319 gui-stream (NVENC encoder, `src/bootstrap/operator-gui-stream.js`, `routes-gui-stream.js`) has no
-  client any more — delete in a follow-up.
+- Server WO-319 gui-stream had no client any more — removed in [WO-660](./660_WO_remove_gui_stream_encoder.md).
 - `client/lib/input-channels.js` `resolveMvCellSourceChannel` lost its only caller (the multiview hole reporter).
 - Kept on purpose: the server atlas (`atlas: true`) — the Godot compose tiles still send it (WO-597 §D).
 

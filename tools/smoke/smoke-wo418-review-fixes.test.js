@@ -63,7 +63,6 @@ test('WO-418.3/4/5: error handlers + take log + healthy semantics (source pins)'
 	// Row 3: every spawn/stream site the review named now registers 'error'.
 	assert.match(read('src/audio/live-audio-bridge.js'), /proc\.on\('error'/, 'live-audio-bridge')
 	assert.match(read('src/capture/v4l2-input-bridge.js'), /proc\.on\('error'/, 'v4l2-input-bridge')
-	assert.match(read('src/preview/gui-stream-ingest.js'), /proc\.on\('error'/, 'gui-stream-ingest')
 	assert.match(read('src/media/usb-drives-discovery.js'), /child\.on\('error'/, 'usb-drives-discovery')
 	const ingest = read('src/api/routes-ingest.js')
 	assert.match(ingest, /writeStream\.on\('error', onStreamError\)/, 'ingest write stream')

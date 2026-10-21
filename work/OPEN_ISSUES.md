@@ -17,7 +17,8 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | ID | Summary | Tracker | Status |
 |----|---------|---------|--------|
-| WO-646 | 21.10: Firefox kiosk deleted — two clients remain (web UI with HQ-thumbnail compose preview; Godot GUI). Server, Godot, web, docs | [WO-646](./work-orders/646_WO_kiosk_decommission.md) | ✅ Done 21.10 (2757/0 offline; box A+B); follow-up: server gui-stream encoder |
+| WO-660 | 21.10: WO-319 GUI live stream (NVENC → web) removed from the server — the web overlay went with the kiosk | [WO-660](./work-orders/660_WO_remove_gui_stream_encoder.md) | ✅ Done 21.10 (2710/0; box: route 404, node clean) |
+| WO-646 | 21.10: Firefox kiosk deleted — two clients remain (web UI with HQ-thumbnail compose preview; Godot GUI). Server, Godot, web, docs | [WO-646](./work-orders/646_WO_kiosk_decommission.md) | ✅ Done 21.10 (2757/0 offline; box A+B); server gui-stream → WO-660 |
 | WO-659 | 21.10: Live view toolbar icons — clock for Times, one-face / three-face cube for the 2D / 3D toggle | [WO-659](./work-orders/659_WO_live_view_toggle_icons.md) | ✅ Done 21.10 (box screenshots) |
 | WO-658 | 21.10: Live 2D Auto — a PGM (top) + PRV (bottom) window per screen, tiled into the visible panel and re-tiled on resize; moving a window turns Auto off | [WO-658](./work-orders/658_WO_live_2d_auto_window_layout.md) | 🟡 Done 21.10 (Godot 20762/0; box: tiled + Times fit); owner: splitter shrink, 2nd screen |
 | WO-657 | 21.10: Look editor Fit button (zoom back to the frame) + Mirror copy (selected layer copied onto the next number, mirrored left↔right) | [WO-657](./work-orders/657_WO_look_editor_fit_and_mirror_copy.md) | 🟡 Done 21.10 (Godot 20745/0; box: L11 x 961 → L12 x 859; Fit resets zoom) |
