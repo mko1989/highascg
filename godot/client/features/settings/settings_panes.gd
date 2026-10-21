@@ -3,6 +3,7 @@ extends RefCounted
 ## buildSettingsPayload in settings-modal-logic.js, editor-defaults.js). Built on settings_form.gd rows.
 
 const Placement := preload("res://app/window_placement.gd")
+const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 const Form := preload("res://features/settings/settings_form.gd")
 const AboutModel := preload("res://features/settings/about_model.gd")
 const T := preload("res://features/live/transitions.gd")
@@ -61,6 +62,20 @@ static func defaults(f: Form, fps: Callable) -> void:
 	f.heading("This screen")  # WO-599 T4: kept in this screen's ui.cfg, not shared with other clients
 	f.local_option("UI scale", Placement.SCALES, Placement.saved_scale(), Placement.apply_scale)
 	f.note("Auto draws 1× at 1080p and 2× at 4K. Kept on this screen only.")
+	var picker := ScreenPicker.new()
+	f.add_child(picker)
+	var choose := Button.new()
+	choose.text = "Choose operator screen…"
+	choose.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	f._row("Operator screen", choose)
+	var said := f.note("Shows a button on every screen; the one you press becomes the operator screen (same as "
+		+ "cabling the operator GUI in the Devices tab). Esc cancels.")
+	choose.pressed.connect(func() -> void:
+		choose.disabled = true
+		picker.open())
+	picker.finished.connect(func(r: Dictionary) -> void:
+		choose.disabled = false
+		said.text = ("Operator screen: %s." % r.name) if r.ok else ("Nothing changed — %s." % r.get("error", "")))
 
 
 static func companion(f: Form, status: Label, check: Button) -> void:

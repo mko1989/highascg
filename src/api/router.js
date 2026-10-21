@@ -485,7 +485,7 @@ routes.get('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.ha
 routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
-require('./routes-stage-mvr').register(routes) // WO-612 MVR import (/api/stage/mvr)
+require('./routes-stage-mvr').register(routes); require('./routes-operator-screen').register(routes) // WO-612 MVR import (/api/stage/mvr), WO-599 T4 operator-screen picker
 require('./routes-shader-live').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes) // WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 

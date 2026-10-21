@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-448 routes.
+450 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -377,6 +377,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/system/operator-helper-window` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/operator-helper-window` | registry | `src/api/router.js` |
 | POST | `/api/system/operator-helper-window` | registry | `src/api/router.js` |
+| GET | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
+| POST | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
 | * | `/api/system/pointer-confine` | handler | `src/api/routes-system-hardware.js` |
 | POST | `/api/system/pointer-confine` | registry | `src/api/router.js` |
 | GET | `/api/system/setup` | registry | `src/api/router.js` |
@@ -485,6 +487,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-multiview.js` | POST /api/multiview/apply — layout cells + route layers; single full-screen CG chrome template (multiview_master) draws all borders/labels/timers. |
 | `src/api/routes-network-tailscale.js` |  |
 | `src/api/routes-operator-gui.js` | routes-operator-gui.js — WO-243/255 operator GUI layout + launcher endpoints. |
+| `src/api/routes-operator-screen.js` | routes-operator-screen.js — WO-599 T4: server half of the native Godot "Make this the operator screen" picker (the WO-290 python picker re-done in the client). |
 | `src/api/routes-osc.js` | REST endpoints for CasparCG OSC aggregate state (UDP listener → {@link OscState}). |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |

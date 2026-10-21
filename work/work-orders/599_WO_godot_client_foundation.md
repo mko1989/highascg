@@ -1,4 +1,4 @@
-**Status: DONE except the native monitor picker (2026-10-21) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); CI `godot` job green on every push; operator-monitor placement + HiDPI done 2026-10-21 (box-verified); the systemd unit moved to [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) T2; open: the native "Make this the operator screen" picker (WO-290 redo). Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
+**Status: DONE pending owner check (2026-10-21) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); CI `godot` job green on every push; operator-monitor placement + HiDPI + the native "Make this the operator screen" picker done 2026-10-21 (box-verified); the systemd unit moved to [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) T2; T6 (dev reload + journald log format) is a nicety left open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
 
 # WO-599 — Godot client foundation: project, engine pin, networking, state, theme, windows, CI, dev loop
 
@@ -107,7 +107,7 @@ the web client (inventory E) → define the Godot palette explicitly, owner-appr
 - [x] T1 `.gitignore` + `.stignore` (box **and** Mac) for `godot/.godot/`, `godot/build/` — FIRST commit (+ the `core/` un-ignore, box run 17.10).
 - [x] T2 project skeleton + engine pin + CI job (`godot` job: shm seqlock, bridge round trip, unit tests, `--check` boot — green on every push; the export is WO-609 T1).
 - [x] T3 Ws / StateStore / Api / SettingsState / ProjectSync + tests (box acceptance 17.10).
-- [~] T4 WindowManager + operator display + HiDPI ✔ 2026-10-21 (below); native picker open.
+- [x] T4 WindowManager + operator display + HiDPI + native operator-screen picker ✔ 2026-10-21 (below).
 - [x] T5 UI kit + Theme from tokens (`app/theme_builder.gd`; owner look-and-feel notes handled in WO-621…630).
 - [ ] T6 dev reload message + logs to journald (stdout) with the server's log format.
 
@@ -213,4 +213,45 @@ window on that output) — `pick_screen` is unit-tested for that case.
 
 **Note:** a manual scale above Auto squeezes the layout (1.25× on 1080p = 1536 logical px wide; the header clips its
 right end). It is meant for small high-density panels, not to enlarge a 1080p screen.
+
+## 2026-10-21 — T4: the native "Make this the operator screen" picker
+
+**Investigation:** the WO-290 picker is a python-xlib prompt (`tools/runtime/operator-monitor-picker.py`) that the
+kiosk launcher runs on a fresh multi-screen boot; its decision code (`src/system/operator-monitor-picker.js`) is pure:
+`listPickerOutputs` (xrandr outputs + their 1-based flag port, from the same GPU map the resolver uses) and
+`applyOperatorMonitorChoice` (sets `casparServer.screen_N_operator_monitor`, clears the others at both levels, wires
+the operator_gui cable). No HTTP route exposed either. First box try: the prompts appeared on both screens, but the
+pointer confine (XFixes barriers on DP-2) made the DP-6 prompt unclickable — and toggling the confine over HTTP needs
+the nuclear password; the buttons also drew unthemed (native windows do not inherit `main.gd`'s theme).
+
+**What was done:**
+- `src/api/routes-operator-screen.js` (registered on router line 488, no new router line):
+  `GET /api/system/operator-screen` → `{ outputs[{name, port, x, y, width, height, current}], port }`;
+  `POST … { name }` → WO-290's `applyOperatorMonitorChoice` + `configManager.save` (400 / 404 / 422 for no name /
+  unknown output / no port slot); `POST … { prompt: true|false }` lets the pointer off the operator monitor while the
+  prompts are up and confines again on close (75 s backstop if the client vanishes); after a pick it re-confines to the
+  NEW monitor. It only ever re-confines what it released itself.
+- `app/operator_screen_picker.gd` (Node) + `app/operator_screen_model.gd` (pure: `match_outputs` screen → output by
+  origin, else centre; `screen_line`; `should_auto_open`): one borderless, always-on-top window centred on every
+  screen (scaled like the main window), "Make this the operator screen" (disabled for an output with no port slot) +
+  "Cancel (Esc)"; 60 s timeout. Native windows need `gui_embed_subwindows = false` on the root, which Godot refuses
+  while an embedded dialog shows — the picker says "close the open dialog first" then; the flag is put back (windows
+  hidden first) on close. A pick moves this window to that screen.
+- Settings → Defaults → This screen → **Operator screen: Choose operator screen…** with a result line.
+- `main.gd`: a fresh box (no rect from `/operator-display`, no flagged port, > 1 screen) opens the picker at start-up —
+  the WO-290 boot prompt, natively, for when the Godot client replaces the kiosk (WO-609).
+- Tests: `tools/smoke/smoke-wo599-operator-screen.test.js` (5: GET marks the flagged output; POST moves the flag,
+  clears both levels, rewires the cable; refusals save nothing; raw JSON body; confine release / restore on cancel,
+  pick, backstop, never-released; registry GET + POST without Caspar) and `tests/test_operator_screen_model.gd` (12).
+
+**What was VERIFIED:** offline 3024 pass, Godot 20454 pass, `--check` clean, lint 216, files ≤ 500, contract
+regenerated. Box: Settings → Choose operator screen… → "Screen 2 — DP-6" over the PGM output and "Screen 1 — DP-2
+(operator screen now)" on the operator monitor, themed; the barrier process stopped (`xdotool mousemove_relative`
+from x 1930 by -100 reached 1830; with the confine on it stops at 1920); **Cancel** on DP-6 closed both, the barrier
+came back (stops at 1920 again), "Nothing changed — cancelled."; **Make this the operator screen** on DP-2 → "Operator
+screen: DP-2.", journal shows the confine re-synced on DP-2, `caspar_server.json` / `device_graph.json` semantically
+unchanged (the `false` flags dropped, the cable re-added) — both restored byte-identical from the backup and node
+restarted. Popups still embed afterwards (UI scale dropdown); ui.cfg unchanged. An earlier run also showed the 60 s
+timeout restoring the confine. Not on the box: actually moving the operator screen to DP-6 (it is the PGM output),
+and the fresh-box start-up prompt (the box has a monitor flagged) — `should_auto_open` is unit-tested.
 

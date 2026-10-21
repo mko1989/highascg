@@ -6,6 +6,8 @@ extends Control
 const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Placement := preload("res://app/window_placement.gd")
+const ScreenPicker := preload("res://app/operator_screen_picker.gd")
+const ScreenModel := preload("res://app/operator_screen_model.gd")
 const Shell := preload("res://app/shell.gd")
 const HardwareReconcile := preload("res://app/hardware_reconcile.gd")
 const ClientPrefs := preload("res://core/client_prefs.gd")
@@ -444,14 +446,27 @@ func _apply_window_args() -> void:
 		var screens := []
 		for i in DisplayServer.get_screen_count():
 			screens.append(Rect2i(DisplayServer.screen_get_position(i), DisplayServer.screen_get_size(i)))
-		var i := Placement.pick_screen(res.data.get("rect") if res.ok and res.data is Dictionary else null, screens)
+		var rect: Variant = res.data.get("rect") if res.ok and res.data is Dictionary else null
+		var i := Placement.pick_screen(rect, screens)
 		if i >= 0 and i != w.current_screen:
 			w.current_screen = i
 			_log("operator monitor: screen %d" % i)
+		elif res.ok and ScreenModel.should_auto_open(rect, null, screens.size()):
+			_fresh_box_picker()
 	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
 	w.content_scale_factor = Placement.ui_scale(DisplayServer.screen_get_size(w.current_screen), override)
 	if Config.args.has("fullscreen"):
 		w.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+
+
+## Fresh multi-screen box: ask which screen is the operator's (WO-290's boot prompt, natively) unless one is flagged.
+func _fresh_box_picker() -> void:
+	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
+	if r.ok and r.data is Dictionary and r.data.get("port") == null:
+		var picker := ScreenPicker.new()
+		add_child(picker)
+		picker.finished.connect(func(res: Dictionary) -> void: _log("operator screen: %s" % res.get("name", res.get("error", ""))))
+		picker.open()
 
 
 func _log(line: String) -> void:
