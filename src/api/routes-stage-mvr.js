@@ -11,7 +11,8 @@
  *                                                notes, types } — every embedded GDTF it uses is imported into the
  *                                                fixture-type store; the client merges `fixtures` into project.fixtures
  *   POST   /api/stage/mvr/<id>/types         → WO-636: only the import — the scene's GDTFs into the type store, no
- *                                                patch → { types: [{ spec, id, name, manufacturer, placeholder }], missing }
+ *                                                patch → { types: [{ spec, id, name, manufacturer, placeholder,
+ *                                                replacedBy? }], missing }
  *   DELETE /api/stage/mvr/<id>
  */
 
@@ -109,7 +110,8 @@ async function handleTypes(ctx, id, deps = {}) {
 	for (const [spec, t] of types) {
 		if (!t || t.error || seen.has(t.id)) continue
 		seen.add(t.id)
-		out.push({ spec, id: t.id, name: t.name, manufacturer: t.manufacturer, placeholder: !!t.placeholder })
+		out.push({ spec, id: t.id, name: t.name, manufacturer: t.manufacturer, placeholder: !!t.placeholder,
+			...(t.replacedBy ? { replacedBy: t.replacedBy.to } : {}) })
 	}
 	return reply(200, { types: out, missing: [...types].filter(([, t]) => !t || t.error).map(([spec]) => spec) })
 }

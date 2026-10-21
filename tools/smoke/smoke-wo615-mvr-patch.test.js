@@ -201,6 +201,7 @@ test('WO-636 POST /api/stage/mvr/<id>/types: the GDTFs land in the store without
 	assert.deepStrictEqual(body.types.map((t) => [t.name, t.placeholder]), [['Test Spot', false], ['Focus Profile', true]],
 		'the Capture stub is listed as a placeholder (Replace…, WO-633)')
 	assert.deepStrictEqual(body.missing, ['Nobody@Ghost'])
+	assert.ok(body.types.every((t) => !('replacedBy' in t)), 'no alias yet')
 	assert.deepStrictEqual(gdtfStore.list().map((t) => t.name).sort(), ['Focus Profile', 'Test Spot'])
 	assert.strictEqual(reloads.length, 1)
 	assert.strictEqual(body.fixtures, undefined, 'no patch entries')

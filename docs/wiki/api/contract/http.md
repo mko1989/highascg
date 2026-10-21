@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-466 routes.
+469 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -98,6 +98,9 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
 | POST | `/api/fixtures/program/aim` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/program/features` | registry | `src/api/routes-fixture-dmx.js` |
+| GET | `/api/fixtures/share/account` | registry | `src/api/routes-gdtf-share.js` |
+| POST | `/api/fixtures/share/account` | registry | `src/api/routes-gdtf-share.js` |
+| POST | `/api/fixtures/share/resolve` | registry | `src/api/routes-gdtf-share.js` |
 | GET | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
 | POST | `/api/fixtures/types` | registry | `src/api/routes-fixture-types.js` |
 | DELETE | `/api/fixtures/types/*` | registry | `src/api/routes-fixture-types.js` |
@@ -499,6 +502,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-device-view.js` | Device View API Routes. |
 | `src/api/routes-fixture-dmx.js` | WO-615 T3/T4 — the fixture DMX engine (src/fixtures/follow-engine.js, via ctx.fixtureService): GET    /api/fixtures/dmx                         → { dmx (master, |
 | `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
+| `src/api/routes-gdtf-share.js` | WO-637 — GDTF Share (src/fixtures/gdtf-share.js): GET  /api/fixtures/share/account               → { user, set }  (the password is never returned) POST /api/fix |
 | `src/api/routes-host-live.js` |  |
 | `src/api/routes-lower-thirds.js` | routes-lower-thirds.js — CRUD + playback API for lower-third templates. |
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |

@@ -486,6 +486,7 @@ routes.post('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.h
 routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline.handle(method, path, body, ctx), { requireCaspar: true })
 
 require('./routes-stage-mvr').register(routes); require('./routes-operator-screen').register(routes); require('./routes-fixture-types').register(routes); require('./routes-fixture-dmx').register(routes) // WO-612 MVR import, WO-599 T4 operator-screen picker, WO-615 GDTF types + DMX engine
+require('./routes-gdtf-share').register(routes) // WO-637 GDTF Share: placeholders → real GDTFs
 require('./routes-shader-live').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes) // WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 

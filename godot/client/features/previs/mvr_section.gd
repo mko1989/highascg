@@ -16,6 +16,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 const MvrScreens := preload("res://features/previs/mvr_screens.gd")
+const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
@@ -29,6 +30,7 @@ var _confirm: ConfirmationDialog
 var _last := ""
 var _patch_btn: Button
 var _typed := {}  # scene ids whose GDTF types were loaded this session (WO-636)
+var _info := {}  # the shown scene's info (summary line)
 var _unpatch_btn: Button
 var _proto: OptionButton
 var _patch_status: Label
@@ -281,6 +283,7 @@ func _on_loaded(info: Dictionary) -> void:
 	_sync_patch_ui()
 	_layers.disabled = scene.layers.is_empty()
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
+	_info = info
 	_status.text = M.summary(info)
 	if _fit_on_load and info.has("parts"):
 		var b := scene.bounds(true)
@@ -292,21 +295,51 @@ func _on_loaded(info: Dictionary) -> void:
 	_load_types()
 
 
-## WO-636: a shown scene's fixtures carry over — none of them patched yet → the file's own patch (addresses, modes,
-## poses) is applied, which also imports its GDTFs; after an Unpatch (mvr.unpatched) only the GDTFs are loaded
-## (POST …/types; content-addressed, a known type is not re-read), so the Fixtures section and Replace… list them.
+## WO-636: a shown scene's GDTFs go into the box's type store (POST …/types; content-addressed, a known type is not
+## re-read) and its fixtures carry over — none patched yet and no Unpatch (mvr.unpatched) → the file's own patch.
+## WO-637: placeholders among them are first swapped for the real files from GDTF Share (when an account is set), so
+## the patch lands on the real types; fixtures patched before move over (RM.repoint).
 func _load_types() -> void:
 	var c := _cfg()
 	var id := str(c.get("id", ""))
 	if id == "" or _typed.has(id) or scene == null or scene.fixture_uuids.is_empty():
 		return
 	_typed[id] = true
+	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/types" % id, {})
+	var types: Array = res.data.get("types", []) if res.ok and res.data is Dictionary else []
+	var real := await _from_share(types)
 	if _patched_here() == 0 and not c.get("unpatched", false):
 		_patch()
 		return
-	var res: Dictionary = await Api.post_json("/api/stage/mvr/%s/types" % id, {})
-	if res.ok and res.data is Dictionary and not (res.data.get("types", []) as Array).is_empty():
+	if not real.is_empty():
+		var s := _fixtures_slice()
+		for r in real:
+			s.patch = RM.repoint(s.patch, str(r.id), str(r.to), r.modes).patch
+		_persist_fixtures(s)
+	if not types.is_empty():
 		types_changed.emit()
+
+
+## WO-637: POST /api/fixtures/share/resolve for the placeholders in `types` → the ones replaced ({id, to, modes}).
+## The outcome goes under the scene summary; no account / nothing to do → silent.
+func _from_share(types: Array) -> Array:
+	var ids := types.filter(func(t: Dictionary) -> bool: return t.get("placeholder", false) and not t.has("replacedBy")).map(
+		func(t: Dictionary) -> String: return str(t.id))
+	var done := types.filter(func(t: Dictionary) -> bool: return t.has("replacedBy")).map(func(t: Dictionary) -> String: return str(t.spec))
+	if ids.is_empty():
+		_status.text = _status.text.replace(M.summary(_info), M.summary(M.without_specs(_info, done)))
+		return []
+	_status.text += "\nGDTF Share: looking up %d placeholder fixture type%s…" % [ids.size(), "" if ids.size() == 1 else "s"]
+	var res: Dictionary = await Api.post_json("/api/fixtures/share/resolve", {"ids": ids})
+	_status.text = _status.text.get_slice("\nGDTF Share:", 0)
+	var out: Array = res.data.get("results", []) if res.ok and res.data is Dictionary else []
+	var gone := out.filter(func(r: Dictionary) -> bool: return r.get("status", "") == "replaced").map(func(r: Dictionary) -> String: return str(r.id))
+	var specs := types.filter(func(t: Dictionary) -> bool: return gone.has(str(t.id))).map(func(t: Dictionary) -> String: return str(t.get("spec", "")))
+	_status.text = _status.text.replace(M.summary(_info), M.summary(M.without_specs(_info, done + specs)))
+	var note := M.share_note(out, res.data.get("offline", "") if res.data is Dictionary else str(res.error))
+	if note != "":
+		_status.text += "\n" + note
+	return out.filter(func(r: Dictionary) -> bool: return r.get("status", "") == "replaced")
 
 
 func _fixtures_slice() -> Dictionary:

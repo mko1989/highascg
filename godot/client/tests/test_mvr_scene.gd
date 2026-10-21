@@ -91,3 +91,17 @@ func test_fit() -> void:
 	t.ok(M.needs_fit(AABB(Vector3(-12, -2, -0.5), Vector3(24, 5, 8.2))), "floor 2 m low")
 	var turned := M.placement(M.fit_place(b, 90.0)) * b
 	t.eq([snappedf(turned.position.y, 0.01), snappedf(turned.get_center().x, 0.01), snappedf(turned.get_center().z, 0.01)], [0.0, 0.0, 0.0], "with a turn")
+
+
+func test_share_note() -> void:
+	var rs := [{"name": "Focus Profile", "status": "replaced"}, {"name": "Sharpy Plus", "status": "replaced"},
+		{"name": "X", "status": "choose"}, {"name": "Y", "status": "none"}]
+	t.eq(M.share_note(rs, ""), "GDTF Share: real GDTF for Focus Profile, Sharpy Plus; 1 to pick by hand (Fixtures → Replace…); 1 not on GDTF Share.")
+	t.eq(M.share_note([], ""), "", "nothing to resolve / no account → silent")
+	t.ok(M.share_note([], "offline").contains("unreachable"))
+	t.ok(M.share_note(rs.slice(0, 1), "HTTP 500").ends_with("(cached list: HTTP 500)"))
+	var info := {"name": "Rig", "objects": 3, "fixtures": 2, "report": {"gdtf_no_model": ["A@B@r1.gdtf", "C@D@r2.gdtf"]}}
+	var after := M.summary(M.without_specs(info, ["A@B@r1.gdtf"]))
+	t.ok(after.contains("C@D@r2.gdtf") and not after.contains("A@B@r1.gdtf"), after)
+	t.ok(not M.summary(M.without_specs(info, ["A@B@r1.gdtf", "C@D@r2.gdtf"])).contains("shown as boxes"))
+	t.eq((info.report.gdtf_no_model as Array).size(), 2, "the input is not changed")

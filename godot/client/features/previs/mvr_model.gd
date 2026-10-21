@@ -172,3 +172,29 @@ static func patch_summary(res: Dictionary) -> String:
 		txt += "\n" + str(n)
 	txt += "\nDMX output stays off until you enable it under Fixtures."
 	return txt
+
+
+## WO-637: POST /api/fixtures/share/resolve results → one line under the scene summary ("" = nothing to say).
+static func share_note(results: Array, offline: String) -> String:
+	var got := results.filter(func(r: Dictionary) -> bool: return r.get("status", "") == "replaced")
+	var pick := results.filter(func(r: Dictionary) -> bool: return r.get("status", "") in ["choose", "error"])
+	var none := results.filter(func(r: Dictionary) -> bool: return r.get("status", "") == "none")
+	var parts := PackedStringArray()
+	if not got.is_empty():
+		parts.append("real GDTF for %s" % ", ".join(PackedStringArray(got.map(func(r: Dictionary) -> String: return str(r.name)))))
+	if not pick.is_empty():
+		parts.append("%d to pick by hand (Fixtures → Replace…)" % pick.size())
+	if not none.is_empty():
+		parts.append("%d not on GDTF Share" % none.size())
+	if parts.is_empty():
+		return "" if offline == "" else "GDTF Share unreachable (%s) — placeholders kept." % offline
+	return "GDTF Share: " + "; ".join(parts) + "." + ("" if offline == "" else " (cached list: %s)" % offline)
+
+
+## WO-637: `info` without the GDTF specs now replaced by real files (they no longer draw as boxes).
+static func without_specs(info: Dictionary, specs: Array) -> Dictionary:
+	var out := info.duplicate(true)
+	var rep: Variant = out.get("report")
+	if rep is Dictionary and (rep as Dictionary).get("gdtf_no_model") is Array:
+		rep.gdtf_no_model = (rep.gdtf_no_model as Array).filter(func(s: Variant) -> bool: return not specs.has(str(s)))
+	return out
