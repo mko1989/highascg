@@ -25,6 +25,7 @@ var _d: Dictionary
 var _vals := {}  # summary key → value Label
 var _size_fields: Array[LineEdit] = []  # width, height, fps
 var _vm: OptionButton
+var _custom_for := ""  # dest id whose select the operator set to Custom (WO-639)
 var _launch_btn: Button
 var _launch_line: Label
 
@@ -42,6 +43,8 @@ func show_destination(entry: Dictionary, payload: Dictionary, settings: Variant)
 	_vals = {}
 	_size_fields = []
 	_d = entry.dest
+	if entry.id != dest_id:
+		_custom_for = ""
 	dest_id = entry.id
 	var edges := R_edges(payload, entry.connector)
 	if entry.host:
@@ -103,7 +106,9 @@ func _screen_page(entry: Dictionary, payload: Dictionary, settings: Variant, edg
 	var modes := [["custom", "Custom"]]
 	for m in DM.STANDARD_VIDEO_MODES:
 		modes.append([m, m])
-	var choice := DM.video_mode_choice(_d, settings)
+	# WO-639: the server files custom-at-a-shipped-size under that mode (WO-486), so the reload after picking
+	# Custom would snap the select back and lock the size fields; Custom stays picked until another mode is.
+	var choice := "custom" if _custom_for == dest_id else DM.video_mode_choice(_d, settings)
 	_vm = _select(modes, choice, "", _on_video_mode)
 	_field("Video mode", _vm)
 	var custom := choice == "custom"
@@ -128,6 +133,7 @@ func _on_video_mode(choice: String) -> void:
 	var r := DM.video_mode_patch(choice, _d)
 	if r.is_empty():
 		return
+	_custom_for = dest_id if choice == "custom" else ""
 	_set_num(_size_fields[0], float(r.width))
 	_set_num(_size_fields[1], float(r.height))
 	_set_num(_size_fields[2], float(r.fps))
@@ -140,6 +146,7 @@ func _on_video_mode(choice: String) -> void:
 ## Typing a size switches the select to Custom (ensureCustomModeSelected) and sends what the web sends.
 func _on_size(field: String) -> void:
 	_vm.select(0)
+	_custom_for = dest_id
 	for le in _size_fields:
 		le.editable = true
 	var p := DM.size_patch(field, _size_fields[0].text, _size_fields[1].text, _size_fields[2].text, _d)

@@ -172,3 +172,38 @@ func test_video_mode_preset_fills_size_fields() -> void:
 	w.text_submitted.emit("")
 	t.eq([w.text, calls.size()], ["1280", 1], "blank after preset restores preset, no extra patch")
 	p.free()
+
+
+## WO-639: picking Custom on a 1920x1080@50 screen posts custom 1920x1080@50, which the server files back as
+## 1080p5000 (WO-486). The rebuild after that reload must keep Custom picked and the size fields open.
+func test_custom_survives_the_reload() -> void:
+	var c: Dictionary = _golden().cases[0]  # pgm_prv 1080p5000
+	var calls := []
+	var p := _page(c, calls)
+	var vm: OptionButton = _find(_controls(p), "video mode")
+	var i := _opt(vm, "custom")
+	vm.select(i)
+	vm.item_selected.emit(i)
+	t.eq(calls.size(), 1, "custom posts once")
+	var entry := {"id": c.d.id, "label": c.d.id, "mode": "pgm_prv", "host": false, "connector": "", "dest": c.d,
+		"intent": c.intent}
+	p.show_destination(entry, {}, SETTINGS)  # the reload: the record still says 1080p5000
+	var ctrls := _controls(p)
+	t.eq(str(_find(ctrls, "video mode").get_selected_metadata()), "custom", "Custom still picked")
+	t.eq(_find(ctrls, "width").editable, true, "size open")
+	vm = _find(ctrls, "video mode")
+	i = _opt(vm, "1080p2500")
+	vm.select(i)
+	vm.item_selected.emit(i)
+	p.show_destination(entry, {}, SETTINGS)
+	t.eq(str(_find(_controls(p), "video mode").get_selected_metadata()), "1080p5000", "a real mode ends it")
+	var other := entry.duplicate()
+	other.id = "other"
+	p.show_destination(entry, {}, SETTINGS)
+	vm = _find(_controls(p), "video mode")
+	vm.select(_opt(vm, "custom"))
+	vm.item_selected.emit(_opt(vm, "custom"))
+	p.show_destination(other, {}, SETTINGS)
+	p.show_destination(entry, {}, SETTINGS)
+	t.eq(str(_find(_controls(p), "video mode").get_selected_metadata()), "1080p5000", "another destination ends it")
+	p.free()
