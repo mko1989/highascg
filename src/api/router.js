@@ -427,7 +427,7 @@ routes.get('/api/pip-overlay', ({ path, ctx }) => routesPipOverlay.handleGet(pat
 // State + Caspar INFO routes (registry `/*` does not match bare `/api/foo`)
 const casparStateGet = ({ path, ctx, query }) => routesState.handleGet(path, ctx, query)
 // Shader FX library (WO-266) — pure fs CRUD, no Caspar dependency
-routes.get('/api/shaders', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
+routes.get('/api/shaders', ({ path, ctx }) => routesShaders.handleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/shaders/*', ({ path }) => routesShaders.handleGet(path), { requireCaspar: false })
 routes.post('/api/shaders', ({ path, body, ctx }) => routesShaders.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/shaders/import', ({ path, body, ctx }) => routesShaders.handlePost(path, body, ctx), { requireCaspar: false })

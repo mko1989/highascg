@@ -4,6 +4,10 @@ extends RefCounted
 ## A row is {text, pill, tip, kind, payload}; payload is the web makeDraggable JSON {type, value, label}.
 
 static var _SHADER_RE: RegEx
+static var _LT_RE: RegEx
+
+## WO-661 — the Templates tab in three groups (owner 21.10), web client/lib/template-category.js TEMPLATE_GROUPS.
+const GROUPS := [["templates", "Templates"], ["lower_thirds", "Lower thirds"], ["shaders", "Shaders"]]
 
 
 ## GET /api/shaders → {lowercased id: library name} (web refreshShaderNames; owner bug 27.07.26: renamed shaders
@@ -22,6 +26,7 @@ static func shader_names(resp: Variant) -> Dictionary:
 static func template_rows(templates: Variant, names: Dictionary, filter := "") -> Array:
 	if _SHADER_RE == null:
 		_SHADER_RE = RegEx.create_from_string("shaders/(sh-[a-z0-9-]+)$")
+		_LT_RE = RegEx.create_from_string("(^|/)(lower-thirds|lower_thirds|studio)/lt-")
 	var f := filter.strip_edges().to_lower()
 	var rows := []
 	for item in (templates if templates is Array else []):
@@ -35,16 +40,32 @@ static func template_rows(templates: Variant, names: Dictionary, filter := "") -
 		if f != "" and not (label if label != "" else id).to_lower().contains(f):
 			continue
 		var norm := id.to_lower().replace("\\", "/")
-		var row := {"text": label, "pill": "FT", "tip": label, "kind": "template",
+		var row := {"text": label, "pill": "FT", "tip": label, "kind": "template", "group": "templates",
 			"payload": {"type": "template", "value": id, "label": label}}
 		var m := _SHADER_RE.search(norm)
-		if norm.contains("lower-thirds/lt-") or norm.contains("lower_thirds/lt-"):
-			row.kind = "cg"  # CG Studio lower third
-		elif m != null:
+		if m != null:
 			var shown := str(names.get(m.get_string(1), label))
-			row.merge({"text": shown, "pill": "FX", "kind": "shader", "tip": "%s (%s) — Shader FX template" % [shown, label]}, true)
+			row.merge({"text": shown, "pill": "FX", "kind": "shader", "group": "shaders",
+				"tip": "%s (%s) — Shader FX template" % [shown, label]}, true)
+		elif _LT_RE.search(norm) != null:
+			row.merge({"kind": "cg", "group": "lower_thirds"}, true)  # CG Studio lower third (studio/lt-* too, WO-661)
 		rows.append(row)
 	return rows
+
+
+## WO-661 — GET /api/shaders `gpu` {running, setting} → the ⚠ text on shaders, "" when Caspar renders WebGL
+## (web shaderGpuWarning). running null = INFO CONFIG not gathered yet → trust the setting.
+static func gpu_warning(resp: Variant) -> String:
+	var g: Variant = (resp as Dictionary).get("gpu") if resp is Dictionary else null
+	if not g is Dictionary:
+		return ""
+	var running: Variant = g.get("running")
+	var setting: bool = g.get("setting") == true
+	if running == true or (running == null and setting):
+		return ""
+	if setting:
+		return "GPU acceleration is on in settings, but CasparCG is still running without it: apply the Caspar config and restart Caspar. Until then shaders render nothing on air."
+	return "GPU acceleration is off in CasparCG, so shaders render nothing on air (they need WebGL). Turn on \"Enable GPU in CEF templates\" in Devices → Caspar server, then apply and restart Caspar."
 
 
 ## project.timelines.timelines → rows {id: t.id || t.name, label: t.name || t.id}; filter on label (else id).

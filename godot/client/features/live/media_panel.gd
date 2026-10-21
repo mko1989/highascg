@@ -85,6 +85,7 @@ func _ready() -> void:
 	templates.name = "Templates"
 	templates.empty_text = "No templates (↻ re-reads Caspar TLS)"
 	templates.provider = func(f: String) -> Array: return Lists.template_rows(_tls, _shader_names, f)
+	templates.groups = Lists.GROUPS  # WO-661
 	templates.row_clicked.connect(func(p: Dictionary, kind: String) -> void:  # WO-606: audition while Shader Live is open
 		var shl: Node = ShaderLivePanel.current
 		if kind == "shader" and is_instance_valid(shl) and shl.is_visible_in_tree():
@@ -304,6 +305,7 @@ func load_templates() -> void:
 	_tls = res.data if res.ok and res.data is Array else []
 	var sh: Dictionary = await Api.get_json("/api/shaders")
 	_shader_names = Lists.shader_names(sh.data if sh.ok else null)
+	templates.group_warning = {"shaders": Lists.gpu_warning(sh.data if sh.ok else null)}
 	templates.rebuild()
 
 

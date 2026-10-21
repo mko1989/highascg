@@ -1,6 +1,6 @@
 /**
  * WO-266 — Shader FX library routes.
- *   GET    /api/shaders          → { shaders: [meta] }
+ *   GET    /api/shaders          → { shaders: [meta], gpu: { running, setting } } (WO-661: Caspar HTML GPU)
  *   GET    /api/shaders/:id      → full config
  *   POST   /api/shaders          → create/update (normalizes, persists, exports Caspar template)
  *   DELETE /api/shaders/:id      → remove config + exported template
@@ -11,14 +11,16 @@
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const store = require('../shaderfx/shader-store')
+const { htmlGpuState } = require('../shaderfx/caspar-html-gpu')
 const { shadertoyIdFromInput, shadertoyConfigFromApiJson, fetchShadertoyShader } = require('../shaderfx/shadertoy-import')
 
 /**
  * @param {string} p
+ * @param {any} [ctx]
  */
-async function handleGet(p) {
+async function handleGet(p, ctx) {
 	if (p === '/api/shaders') {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ shaders: await store.listShaders() }) }
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ shaders: await store.listShaders(), gpu: htmlGpuState(ctx) }) }
 	}
 	const m = p.match(/^\/api\/shaders\/([^/]+)$/)
 	if (!m) return null

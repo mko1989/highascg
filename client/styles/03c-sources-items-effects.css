@@ -393,3 +393,32 @@
 	color: var(--accent);
 	border-color: var(--accent);
 }
+
+/* WO-661: Templates tab groups (Templates / Lower thirds / Shaders) and the shader GPU warning. */
+.sources-group__head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 6px 0 2px;
+	padding: 3px 4px;
+	cursor: pointer;
+	user-select: none;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--text-muted, var(--text));
+	border-bottom: 1px solid var(--border);
+}
+.sources-group__head:hover {
+	color: var(--text);
+}
+.sources-group__caret {
+	width: 10px;
+}
+.sources-group__count {
+	opacity: 0.6;
+	font-weight: 400;
+}
+.source-item__warn {
+	color: #f5b041;
+	cursor: help;
+}

@@ -11,6 +11,7 @@ const TLS := [
 	{"id": "SHADERS/SH-3D-METERS-C2", "label": "SHADERS/SH-3D-METERS-C2"},
 	{"id": "SHADERS/SH-UNNAMED", "label": "SHADERS/SH-UNNAMED"},
 	{"id": "LOWER-THIRDS/LT-NAME", "label": "LOWER-THIRDS/LT-NAME"},
+	{"id": "STUDIO/LT-GRADIENT-WAVE", "label": "STUDIO/LT-GRADIENT-WAVE"},
 	{"id": "WIN\\SHADERS\\SH-BALATRO"},
 	{"label": "ONLY_LABEL"},
 	{},
@@ -32,13 +33,27 @@ func test_template_rows() -> void:
 		"FX|shader|mirrors c2",  # owner bug 27.07.26: the library name, not the TLS id
 		"FX|shader|SHADERS/SH-UNNAMED",  # not in the library → the TLS label
 		"FT|cg|LOWER-THIRDS/LT-NAME",
+		"FT|cg|STUDIO/LT-GRADIENT-WAVE",  # WO-661: CG Studio exports are lower thirds too
 		"FX|shader|sh-balatro",  # backslashes normalised before matching
 		"FT|template|ONLY_LABEL",
 	], "pills / kinds / shown text")
 	t.eq(rows[2].payload, {"type": "template", "value": "SHADERS/SH-3D-METERS-C2", "label": "SHADERS/SH-3D-METERS-C2"},
 		"drag label stays the raw TLS label (web makeDraggable(el, 'template', id, label))")
-	t.eq(rows[5].payload, {"type": "template", "value": "WIN\\SHADERS\\SH-BALATRO", "label": "WIN\\SHADERS\\SH-BALATRO"}, "label falls back to id")
-	t.eq(rows[6].payload.value, "ONLY_LABEL", "id falls back to label")
+	t.eq(rows[6].payload, {"type": "template", "value": "WIN\\SHADERS\\SH-BALATRO", "label": "WIN\\SHADERS\\SH-BALATRO"}, "label falls back to id")
+	t.eq(rows[7].payload.value, "ONLY_LABEL", "id falls back to label")
+	t.eq(rows.map(func(r: Dictionary) -> String: return r.group), ["templates", "templates", "shaders", "shaders",
+		"lower_thirds", "lower_thirds", "shaders", "templates"], "WO-661 groups")
+	t.eq(M.GROUPS.map(func(g: Array) -> String: return g[0]), ["templates", "lower_thirds", "shaders"], "group order")
+
+
+func test_gpu_warning() -> void:
+	t.eq(M.gpu_warning({"gpu": {"running": true, "setting": false}}), "", "Caspar runs with GPU → no warning")
+	t.eq(M.gpu_warning({"gpu": {"running": null, "setting": true}}), "", "not gathered yet, setting on → trust it")
+	t.ok(M.gpu_warning({"gpu": {"running": false, "setting": false}}).begins_with("GPU acceleration is off"), "off")
+	t.ok(M.gpu_warning({"gpu": {"running": null, "setting": false}}).begins_with("GPU acceleration is off"), "unknown + off")
+	t.ok(M.gpu_warning({"gpu": {"running": false, "setting": true}}).contains("restart Caspar"), "on but not applied")
+	t.eq(M.gpu_warning({"shaders": []}), "", "older server: no gpu field")
+	t.eq(M.gpu_warning(null), "", "request failed")
 
 
 func test_template_filter() -> void:
