@@ -1,4 +1,4 @@
-**Status: IN PROGRESS (2026-10-21) — investigation written; implementation started. Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 found the stubs). Related: [WO-612](./612_WO_previs_mvr_import.md).**
+**Status: DONE (2026-10-21, offline smoke + Godot unit tests + box test on Pabianice with the real ADJ Focus Profile). Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 found the stubs). Related: [WO-612](./612_WO_previs_mvr_import.md).**
 
 # WO-633 — Replace a stub GDTF (Capture placeholder) with the real fixture file
 
@@ -68,10 +68,65 @@ Names never match (`40 Channel` vs `Standard Mode 40ch`); the footprint does, ex
 
 ## Tasks
 
-- [ ] T1 Server: stub flag, alias store, replace route, MVR patch uses aliases (+ smoke).
-- [ ] T2 Godot: Replace… dialog, mode pairing, re-point the project's entries (+ tests).
-- [ ] T3 Box: Pabianice patched with the stub, replaced by the real Focus Profile from guttmany25, re-patch keeps it.
+- [x] T1 Server: placeholder flag, alias store, replace route, MVR patch uses aliases (+ smoke). a63c1145
+- [x] T2 Godot: Replace… dialog, mode pairing, re-point the project's entries (+ tests).
+- [x] T3 Box: Pabianice patched with the stub, replaced by the real Focus Profile from guttmany25, re-patch keeps it.
 
 ## What was done
 
+**T1 — server** (a63c1145)
+
+- `src/fixtures/gdtf-aliases.js` (new): `projects/_gdtf/aliases.json` read / write, `aliasFor(from, exists, byName)`,
+  `setAlias`, `clearAlias`, `isPlaceholder`. The flag is **`placeholder`**, not the designed `stub`, and broader:
+  a name starting "Dummy" (the MVR 1.5 exporter — its stubs *do* carry a drawable model, so "no model" alone misses
+  them) OR no model with a file / non-zero size and no node other than plain `Geometry` (Capture). The DimmerN-only
+  test was dropped: the geometry test already separates every stub from every real file in the 7 exports, and a real
+  dimmer-only fixture (a par) must not be flagged.
+- The maker + name fallback runs **only for placeholders**: the real Focus Profile has the same maker + name as the
+  stub, and without the guard the real type's summary showed `replacedBy` itself (caught in the smoke).
+- `gdtf-store.js`: `summary()` adds `placeholder` / `replacedBy`; new `info(id)`.
+- `routes-fixture-types.js`: `POST /api/fixtures/types/<id>/replace {to, modes}` — both types must exist, `to` ≠ the
+  stub, every mode named must exist on its side (400 naming the bad one); empty values are dropped (= keep placeholder).
+  `DELETE …/replace` → 404 when there is no alias. The fixture engine reloads after both.
+- `routes-stage-mvr.js handlePatch` + `mvr-patch.js`: an aliased spec resolves to `{...real, modeMap, stub}`; each
+  fixture's mode is matched on the stub, translated through the map, and a mode without a pair stays on the stub type
+  (address + footprint still right). The returned `types` list includes the stub when some fixtures stayed on it.
+
+**T2 — Godot**
+
+- `features/previs/fixtures/replace_type_model.gd` (new, pure): `norm` (lowercase alnum, "Dummy -" dropped),
+  `targets` (non-placeholder types, best name match first; makers agree when one is a prefix of the other —
+  "Robe" / "Robe Lighting"), `pair_modes` (same footprint; ties broken by shared words / numbers, each real mode used
+  once while unused ones remain — "4 Channel RGBW" → "4Ch-RGBW", not "4Ch-Strobe", from the real Pixel Strobe pair),
+  `repoint` (patch copies, `moved` count).
+- `features/previs/fixtures/replace_type_dialog.gd` (new): target type + one row per placeholder mode (prefilled, or
+  the stored pairing when already replaced; "— keep placeholder —"), Replace → POST; "Use placeholder again" (only when
+  replaced) → DELETE. Fitted to its content one frame after popup — a wrapping label measured at width 0 made it
+  screen-tall on the first box run.
+- `fixtures_section.gd`: type list tags "(placeholder)" / "(placeholder → <real>)"; **Replace…** shown only for a
+  placeholder; on success this project's entries of the stub move to the real type + mode (`_persist`, so the engine
+  and the 3D view pick them up). Undo leaves already-moved entries on the real type (said in the status line) —
+  Re-patch from the MVR section is the way back, and guessing which real-type entries were once stubs is not safe.
+
+Not done: GDTF Share download on the box (needs the owner's account; listed as later in the design). The MVR import
+report keeps listing the stub file under "GDTF without a 3D model" — it describes the file, not the patch.
+
 ## What was VERIFIED
+
+- Offline suite: 3073 pass / 0 fail (3075 incl. 2 skipped); `smoke-wo633-gdtf-replace` 2/2 (placeholder flag; route
+  validation, by-name revision lookup + the real-type guard, MVR patch real for paired / stub for unpaired, delete +
+  404, alias gone → stub again); wo615-gdtf 6/6, wo615-mvr-patch 5/5, wo612-mvr-import 5/5, wo615-dmx 8/8. eslint 0
+  errors (216 warnings = baseline), line limit 0 over, no new unwired exports, API contract regenerated.
+- Godot: `--test` 20578 pass / 0 fail (+10 from `test_replace_type_model.gd`: norm/targets, footprint pairing incl. the
+  Pixel Strobe tie and reuse, repoint), `--check` boot OK.
+- Box (2026-10-21, `godot_test`, Pabianice Final Patch): Patch fixtures → 52 patched, 5 types all "(placeholder)",
+  Replace… visible. Real `ADJ@Focus_Profile@25-13-11_Release.gdtf` imported (id cb73a616bb97). Dialog prefilled
+  36→Basic Mode 36ch, 40→Standard Mode 40ch, 51→Extended Mode 51ch; Replace → `aliases.json` holds exactly that, the 8
+  Focus Profiles moved from `8ce8f4981de1 / 40 Channel` to `cb73a616bb97 / Standard Mode 40ch` at unchanged addresses
+  (Art-Net 5, 1–320), `/api/fixtures/dmx` reports them with no problem, and the 3D view draws moving heads on the three
+  truss towers instead of boxes. Re-patch fixtures → still on the real type (server alias path). GUI relaunched →
+  dialog shows the stored pairing + "Use placeholder again"; that → `aliases.json` `{}`, type back to "(placeholder)".
+  Dialog re-measured after the fit fix: content-sized.
+- Restored: unpatched, the 6 types deleted, `aliases.json` removed; `project.fixtures` identical to the saved copy,
+  `previs.mvr` identical except the float spelling of place.x.
+- Owner QA: replace a stub with a file from GDTF Share on a real show file; X-Dot Max (6 of 9 modes pair).

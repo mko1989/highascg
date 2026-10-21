@@ -12,6 +12,8 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const M := preload("res://features/previs/fixtures/fixtures_model.gd")
 const Programmer := preload("res://features/previs/fixtures/programmer_section.gd")
+const Replace := preload("res://features/previs/fixtures/replace_type_dialog.gd")
+const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -27,6 +29,8 @@ var _usage: Label
 var _status: Label
 var _confirm_on: ConfirmationDialog
 var _confirm_rm: ConfirmationDialog
+var _replace: Button
+var _replace_dlg: ConfirmationDialog
 var _last := ""
 
 
@@ -42,6 +46,11 @@ func _ready() -> void:
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
 		row.add_child(b)
+	_replace = Button.new()  # WO-633: an MVR placeholder GDTF → the real type
+	_replace.text = "Replace…"
+	_replace.tooltip_text = "This type is an MVR placeholder (no model, dimmer channels) — use the real GDTF instead"
+	_replace.pressed.connect(func() -> void: _replace_dlg.open(types, M.find_type(types, _type_id())))
+	row.add_child(_replace)
 	add_child(row)
 	_mode = OptionButton.new()
 	_mode.fit_to_longest_item = false
@@ -103,6 +112,10 @@ func _ready() -> void:
 	_confirm_rm = ConfirmationDialog.new()
 	_confirm_rm.confirmed.connect(_remove)
 	add_child(_confirm_rm)
+	_replace_dlg = Replace.new()
+	_replace_dlg.replaced.connect(_on_replaced)
+	_replace_dlg.failed.connect(func(msg: String) -> void: _status.text = "Replace failed: %s" % msg)
+	add_child(_replace_dlg)
 	var poll := Timer.new()  # T7: the console input status, while visualising
 	poll.wait_time = 2.0
 	poll.timeout.connect(func() -> void:
@@ -160,7 +173,9 @@ func refresh_types() -> void:
 		_type.add_item("— no fixture types: Import GDTF… —")
 		_type.set_item_metadata(0, "")
 	for t in types:
-		_type.add_item("%s · %s" % [t.get("manufacturer", "?"), t.get("name", "?")])
+		var tag := "" if not t.get("placeholder", false) else ("  (placeholder → %s)" % M.find_type(types,
+			str(t.replacedBy.to)).get("name", "?") if t.get("replacedBy") is Dictionary else "  (placeholder)")
+		_type.add_item("%s · %s%s" % [t.get("manufacturer", "?"), t.get("name", "?"), tag])
 		_type.set_item_metadata(_type.item_count - 1, str(t.id))
 		if str(t.id) == keep:
 			_type.select(_type.item_count - 1)
@@ -178,6 +193,7 @@ func _fill_modes() -> void:
 		_mode.add_item("%s · %d ch%s" % [m.name, int(m.footprint), "  ⚠" if not warn.is_empty() else ""])
 		_mode.set_item_metadata(_mode.item_count - 1, str(m.name))
 	var t := M.find_type(types, _type_id())
+	_replace.visible = t.get("placeholder", false)
 	_status.text = "" if t.is_empty() else "%s — %d modes. %s" % [t.get("file", ""), (t.get("modes", []) as Array).size(),
 		_mode_warning()]
 
@@ -298,3 +314,18 @@ func _remove() -> void:
 	await Api.delete_json("/api/fixtures/types/" + _type_id())
 	await refresh_types()
 	refresh_usage()
+
+
+## WO-633: the alias is stored on the box; this project's fixtures of the placeholder move to the real type + mode.
+func _on_replaced(stub_id: String, to: String, modes: Dictionary) -> void:
+	await refresh_types()
+	if to == "":
+		_status.text = "Back to the placeholder for new MVR patches (fixtures already moved stay on the real type)."
+		return
+	var s := _slice()
+	var r := RM.repoint(s.patch, stub_id, to, modes)
+	_status.text = "Replaced by %s; %d patched fixture%s moved to it." % [M.find_type(types, to).get("name", "?"),
+		r.moved, "" if r.moved == 1 else "s"]
+	if r.moved > 0:
+		s.patch = r.patch
+		_persist(s)
