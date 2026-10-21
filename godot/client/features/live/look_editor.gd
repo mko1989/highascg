@@ -14,6 +14,7 @@ const Geometry := preload("res://features/live/layer_geometry_section.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Fit := preload("res://features/live/look_editor_fit.gd")  # WO-653: boxes = what Caspar shows
 const View := preload("res://features/live/look_editor_view.gd")  # WO-654: wheel zoom / middle-drag pan
+const Ops := preload("res://features/live/look_layer_ops.gd")  # WO-657: mirror copy, layer names
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -77,7 +78,8 @@ func _ready() -> void:
 	_frame.set_drag_forwarding(Callable(), _can_drop, _drop)
 	add_child(_frame)
 	var ops := HBoxContainer.new()
-	for spec in [["Remove layer", _remove_layer], ["▲ Up", func() -> void: _move_layer(1)], ["▼ Down", func() -> void: _move_layer(-1)]]:
+	for spec in [["Remove layer", _remove_layer], ["▲ Up", func() -> void: _move_layer(1)], ["▼ Down", func() -> void: _move_layer(-1)],
+			["Fit", func() -> void: _view.reset()], ["Mirror copy", _mirror_copy]]:  # WO-657
 		var bt := Button.new()
 		bt.text = spec[0]
 		bt.pressed.connect(spec[1])
@@ -217,7 +219,7 @@ func _draw_frame() -> void:
 		var sel := i == _sel
 		_overlay.draw_set_transform_matrix(C.layer_xform(r, _deg(l)))
 		_overlay.draw_rect(r, ThemeBuilder.ACCENT if sel else Color(1, 1, 1, 0.6), false, 2.0 if sel else 1.0)
-		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), _name(l.source)], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
+		_overlay.draw_string(get_theme_default_font(), r.position + Vector2(4, 14), "L%d %s" % [int(l.get("layerNumber", 0)), Ops.layer_name(l.source)], HORIZONTAL_ALIGNMENT_LEFT, r.size.x - 8, 12, Color.WHITE)
 		var crop: Variant = _crop_of(l)
 		if crop != null:
 			_overlay.draw_rect(_crop_rect(r, crop), CROP_COLOR, false, 1.5)
@@ -374,7 +376,7 @@ func _refresh_list() -> void:
 	_list.clear()
 	for l in _layers():
 		var src: Dictionary = l.source if l.get("source") is Dictionary else {}
-		_list.add_item("L%d  %s" % [int(l.get("layerNumber", 0)), _name(src) if str(src.get("value", "")) != "" else "(empty)"])
+		_list.add_item("L%d  %s" % [int(l.get("layerNumber", 0)), Ops.layer_name(src) if str(src.get("value", "")) != "" else "(empty)"])
 	if _sel >= 0:
 		_select(_sel, false)  # a background project update keeps the selection but never takes the Inspector back
 
@@ -386,19 +388,6 @@ func _hold(on: bool) -> void:
 		VideoSurfaces.acquire(_role, self)
 	else:
 		VideoSurfaces.release(_role, self)
-
-
-## Media: the file name; live / template sources (WO-622): their label ("DeckLink 2", not "5-2"), as the web layer row.
-static func _name(src: Dictionary) -> String:
-	var label := str(src.get("label", ""))
-	if str(src.get("type", "media")) != "media" and label != "":
-		return label
-	return _short(str(src.get("value", "")))
-
-
-static func _short(s: String) -> String:
-	var seg := s.replace("\\", "/").split("/", false)
-	return seg[seg.size() - 1] if not seg.is_empty() else s
 
 
 ## --- WO-600 K: drop media from the Sources panel → server builds the layer (web rules) → append + push.
@@ -433,6 +422,17 @@ func _remove_layer() -> void:
 	layers.remove_at(_sel)
 	_sel = -1
 	_refresh_list()
+	pusher.schedule(scene_id, main)
+
+
+func _mirror_copy() -> void:  # WO-657: onto the next free number, mirrored left↔right (empty when the look is full)
+	var layers := _layers()
+	var d := Ops.mirror_copy(layers, layers[_sel], _shown(layers[_sel])) if _sel >= 0 and _sel < layers.size() else {}
+	if d.is_empty():
+		return
+	layers.append(d)
+	_refresh_list()
+	_select(layers.size() - 1)
 	pusher.schedule(scene_id, main)
 
 

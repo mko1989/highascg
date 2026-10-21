@@ -17,6 +17,7 @@ Lightweight index of **unresolved** work. Close items here when verified on hard
 
 | ID | Summary | Tracker | Status |
 |----|---------|---------|--------|
+| WO-657 | 21.10: Look editor Fit button (zoom back to the frame) + Mirror copy (selected layer copied onto the next number, mirrored left↔right) | [WO-657](./work-orders/657_WO_look_editor_fit_and_mirror_copy.md) | 🟡 Done 21.10 (Godot 20745/0; box: L11 x 961 → L12 x 859; Fit resets zoom) |
 | WO-656 | 21.10: Look card ⧉ duplicate (left of the ✕): deep copy, "<name> (copy)", placed after the original | [WO-656](./work-orders/656_WO_look_card_duplicate.md) | 🟡 Done 21.10 (Godot 20734/0; box: Look 1 (copy) created) |
 | WO-655 | 21.10: Server-built takes / preview pushes used a 1920×1080 fallback canvas (routing map has no programResolutions) — looks letterboxed, clip ~235 px right of the editor box | [WO-655](./work-orders/655_WO_take_canvas_fallback_1920.md) | 🟡 Done 21.10 (2880/0; box: PRV at x 961); owner: next TAKE moves PGM to match |
 | WO-654 | 21.10: Look editor wheel zoom (about the pointer), middle-drag pan, middle double-click fit; inspector toggles no longer stretched | [WO-654](./work-orders/654_WO_look_editor_scroll_zoom.md) | 🟡 Done 21.10 (Godot 20729/0; box: zoom in/out) |
