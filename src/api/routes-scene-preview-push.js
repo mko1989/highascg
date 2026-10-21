@@ -11,6 +11,8 @@
  *     staleness-guarded, queued on the per-channel take chain); the staged payload is then refreshed;
  *   - anything else (clip, loop, audio, PIP, layers added/removed, another look staged) → the existing
  *     take-look path, target preview + forceCut (what the web uses for deck recall).
+ *   - no sourced layer left (the editor removed the last one) → clear PRV (/api/scene/live/preview/clear). A take
+ *     refuses an empty look, so without this the removed layer stayed on PRV until the look changed (WO-650).
  * No new AMCP builder. PGM-only mains have no PRV bus → nothing to push (mode 'none').
  */
 
@@ -72,6 +74,13 @@ async function handlePreviewPush(body, ctx, deps = {}) {
 	const prvCh = Number(map.previewChannels?.[mainIdx])
 	if (!(Number.isFinite(prvCh) && prvCh > 0 && prvCh !== pgmCh)) {
 		return out(200, { ok: true, mode: 'none', reason: 'pgm_only', mainIdx })
+	}
+
+	if (!(scene.layers || []).some((l) => l?.source?.value)) {
+		const clear = deps.clearPreview || ((cb) => require('./routes-scene-preview').handlePreviewLiveClear(cb, ctx))
+		const cr = await clear({ mainIndex: mainIdx })
+		const parsed = parseRes(cr)
+		return out(cr?.status || 500, { ...parsed, ok: cr?.status === 200 && parsed.ok !== false, mode: 'clear', mainIdx, previewChannel: prvCh })
 	}
 
 	const getStaged = deps.getStaged || ((ch) => require('../state/live-scene-state').getChannel(ch))

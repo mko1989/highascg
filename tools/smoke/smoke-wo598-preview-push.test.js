@@ -92,6 +92,18 @@ describe('WO-598 C2 handlePreviewPush routing (deps injected)', () => {
 		assert.equal(JSON.parse(res.body).mode, 'none')
 		assert.equal(calls.length, 0)
 	})
+	it('WO-650: no sourced layer left → PRV cleared, never a take (a take refuses an empty look)', async () => {
+		const calls = []
+		const d = deps({ sceneId: 'L1', scene: look() }, calls)
+		d.resolveSceneById = () => look({ layers: [{ layerNumber: 10, source: { type: 'media', value: '' } }] })
+		d.clearPreview = async (b) => { calls.push(['clear', b]); return { status: 200, body: JSON.stringify({ ok: true, cleared: true }) } }
+		const res = await handlePreviewPush({ sceneId: 'L1' }, {}, d)
+		assert.equal(JSON.parse(res.body).mode, 'clear')
+		assert.equal(JSON.parse(res.body).ok, true)
+		assert.deepEqual(calls, [['clear', { mainIndex: 0 }]])
+		d.resolveSceneById = () => look({ layers: [] })
+		assert.equal(JSON.parse((await handlePreviewPush({ sceneId: 'L1' }, {}, d)).body).mode, 'clear')
+	})
 	it('400 / 404', async () => {
 		assert.equal((await handlePreviewPush({}, {}, deps(null, []))).status, 400)
 		assert.equal((await handlePreviewPush({ sceneId: 'nope' }, {}, deps(null, []))).status, 404)
