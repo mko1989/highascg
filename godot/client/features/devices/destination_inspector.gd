@@ -4,13 +4,12 @@ extends VBoxContainer
 ## outputs, video mode + size + fps, the pixel-map Art-Net fields, the operator-GUI fields — and Remove. Host channels
 ## get their own summary, role note and "Cabled to" list, plus the per-role controls host_channel_controls.gd builds
 ## (slice 3c; injected by the panel as `host_controls`, absent under the unit runner). The page only
-## builds requests: `patch` / `remove` go to the tab, which posts, marks Caspar restart-dirty and reloads;
-## `launch_operator_gui` is posted by the tab too (answer via launch_status) — no autoloads here, so it tests headless.
+## builds requests: `patch` / `remove` go to the tab, which posts, marks Caspar restart-dirty and reloads — no
+## autoloads here, so it tests headless. The kiosk's Web-UI URL / auto-start / Launch went with WO-646.
 
 signal patch(id: String, body: Dictionary)
 signal remove(id: String)
 signal focus_connector(id: String)
-signal launch_operator_gui()
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const DM := preload("res://features/devices/destinations_model.gd")
@@ -26,8 +25,6 @@ var _vals := {}  # summary key → value Label
 var _size_fields: Array[LineEdit] = []  # width, height, fps
 var _vm: OptionButton
 var _custom_for := ""  # dest id whose select the operator set to Custom (WO-639)
-var _launch_btn: Button
-var _launch_line: Label
 
 
 func _init() -> void:
@@ -186,41 +183,17 @@ func _artnet_int_field(spec: Array) -> void:
 
 
 func _operator_fields() -> void:
-	_field("Web-UI URL", _line(H.R.s(_d.get("guiUrl")), "http://127.0.0.1:4200/?operatorGui=1",
-		"Fullscreen Firefox web-UI URL — must include ?operatorGui (or legacy ?cefOperator) for the client bundle to enter operator mode",
-		func(t: String) -> void: _send({"guiUrl": t.strip_edges()})))
 	var ports := [["", "Auto (operator monitor, else multiview jack)"]]
 	for n in range(1, 5):
 		ports.append([str(n), "Port %d" % n])
 	_field("Physical GPU port (optional)", _select(ports, H.R.s(_d.get("physicalPort")) if _d.get("physicalPort") != null else "",
 		"Physical GPU port for the operator-GUI window. Auto = the screen_N_operator_monitor flag (single connected display wins), falling back to the multiview jack — never a program screen.",
 		func(v: String) -> void: _send(DM.physical_port_patch(v))))
-	_field("Video output", _select([["screen", "Screen (window under the Firefox kiosk)"], ["shm", "Shared memory (native Godot client)"]],
+	_field("Video output", _select([["screen", "Screen (a Caspar window on the operator monitor)"], ["shm", "Shared memory (the Godot GUI)"]],
 		"shm" if _d.get("videoOutput") == "shm" else "screen",
-		"Operator channel output. Shared memory has no screen window and no kiosk auto-launch. Regenerate + restart Caspar to apply.",
+		"Operator channel output. Shared memory has no screen window; the Godot GUI draws it. Regenerate + restart Caspar to apply.",
 		func(v: String) -> void: _send({"videoOutput": "shm" if v == "shm" else "screen"})))  # WO-597 T4
-	var auto := CheckBox.new()
-	auto.text = "Auto-start at boot"
-	auto.button_pressed = _d.get("autoLaunch") != false
-	auto.tooltip_text = "Launch the operator GUI browser automatically when HighAsCG starts (skipped when no operator monitor resolves — multiple displays need a screen_N_operator_monitor flag or an explicit port)."
-	auto.toggled.connect(func(on: bool) -> void: _send({"autoLaunch": on}))
-	add_child(auto)
 	add_child(_note(DM.OPG_NOTE))
-	_launch_btn = Button.new()
-	_launch_btn.text = "Launch / Bring to front"
-	_launch_line = _muted("")
-	_launch_btn.pressed.connect(func() -> void:
-		launch_status("Launching...", true)
-		launch_operator_gui.emit())
-	add_child(_launch_btn)
-	add_child(_launch_line)
-
-
-## The tab reports the POST /api/operator-gui/launch outcome back here.
-func launch_status(text: String, busy: bool) -> void:
-	if is_instance_valid(_launch_line):
-		_launch_line.text = text
-		_launch_btn.disabled = busy
 
 
 func _send(body: Dictionary) -> void:

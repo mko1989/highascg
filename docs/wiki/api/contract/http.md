@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-469 routes.
+460 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -197,11 +197,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/network/tailscale/status` | registry | `src/api/router.js` |
 | POST | `/api/operator-gui/cell` | registry | `src/api/router.js`, `src/api/routes-operator-gui.js` |
 | POST | `/api/operator-gui/cell/remove` | registry | `src/api/router.js`, `src/api/routes-operator-gui.js` |
-| POST | `/api/operator-gui/launch` | registry | `src/api/router.js`, `src/api/routes-operator-gui.js` |
-| DELETE | `/api/operator-gui/layout` | registry | `src/api/router.js` |
 | GET | `/api/operator-gui/layout` | registry | `src/api/router.js` |
 | POST | `/api/operator-gui/layout` | registry | `src/api/router.js`, `src/api/routes-operator-gui.js` |
-| POST | `/api/operator-gui/raise` | registry | `src/api/router.js`, `src/api/routes-operator-gui.js` |
 | GET | `/api/osc` | registry | `src/api/router.js` |
 | GET | `/api/osc/*` | registry | `src/api/router.js` |
 | GET | `/api/osc/config-hint` | handler | `src/api/routes-osc.js` |
@@ -389,12 +386,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/system/operator-display` | registry | `src/api/router.js` |
 | * | `/api/system/operator-helper-icon` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/operator-helper-icon` | registry | `src/api/router.js` |
-| * | `/api/system/operator-helper-taskbar` | handler | `src/api/routes-system-hardware.js` |
-| GET | `/api/system/operator-helper-taskbar` | registry | `src/api/router.js` |
-| POST | `/api/system/operator-helper-taskbar` | registry | `src/api/router.js` |
-| * | `/api/system/operator-helper-window` | handler | `src/api/routes-system-hardware.js` |
-| GET | `/api/system/operator-helper-window` | registry | `src/api/router.js` |
-| POST | `/api/system/operator-helper-window` | registry | `src/api/router.js` |
 | GET | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
 | POST | `/api/system/operator-screen` | registry | `src/api/routes-operator-screen.js` |
 | * | `/api/system/pointer-confine` | handler | `src/api/routes-system-hardware.js` |
@@ -508,7 +499,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |
 | `src/api/routes-multiview.js` | POST /api/multiview/apply — layout cells + route layers; single full-screen CG chrome template (multiview_master) draws all borders/labels/timers. |
 | `src/api/routes-network-tailscale.js` |  |
-| `src/api/routes-operator-gui.js` | routes-operator-gui.js — WO-243/255 operator GUI layout + launcher endpoints. |
+| `src/api/routes-operator-gui.js` | routes-operator-gui.js — WO-243/255 operator GUI layout endpoints (the compose windows of the operator channel). |
 | `src/api/routes-operator-screen.js` | routes-operator-screen.js — WO-599 T4: server half of the native Godot "Make this the operator screen" picker (the WO-290 python picker re-done in the client). |
 | `src/api/routes-osc.js` | REST endpoints for CasparCG OSC aggregate state (UDP listener → {@link OscState}). |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |

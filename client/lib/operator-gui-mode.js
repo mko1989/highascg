@@ -113,7 +113,7 @@ export function applySharedLayoutBroadcast(cells, meta) {
  * operator opens — are never shaped. It stands in for the URL, which X11 does not expose as a
  * window property. Kept in sync with tools/runtime/operator-shape-overlay.py's OPERATOR_TITLE_MARKER.
  */
-export const OPERATOR_GUI_TITLE_MARKER = 'HIGHASCG-OPERATOR-GUI'
+const OPERATOR_GUI_TITLE_MARKER = 'HIGHASCG-OPERATOR-GUI'
 
 let _titleMarkerObserver = null
 
@@ -123,7 +123,7 @@ let _titleMarkerObserver = null
  * shape helper's URL check depends on it never dropping. No-op outside operator mode.
  * @param {Document} [doc]
  */
-export function applyOperatorGuiTitleMarker(doc) {
+function applyOperatorGuiTitleMarker(doc) {
 	const d = doc || (typeof document !== 'undefined' ? document : null)
 	if (!d || !isOperatorGuiModeActive()) return
 	const ensure = () => {

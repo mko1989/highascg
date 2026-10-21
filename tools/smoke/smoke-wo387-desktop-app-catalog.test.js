@@ -195,7 +195,7 @@ test('a console entry is dropped when no terminal emulator exists to host it', (
 /* ───────────────────────────────────────────────────────────────────────────── */
 
 test('an action that is not an installed app is refused', () => {
-	const { isHelperAction, HELPER_ACTIONS } = require('../../src/system/operator-helper-window')
+	const { isHelperAction, HELPER_ACTIONS } = require('../../src/system/operator-dock') // WO-646: moved from the kiosk helper window
 	for (const a of HELPER_ACTIONS) assert.equal(isHelperAction(a), true, `${a} is a pinned action`)
 	assert.equal(isHelperAction('app:definitely-not-installed-xyz'), false)
 	assert.equal(isHelperAction('app:../../bin/sh'), false)
@@ -217,54 +217,6 @@ test('window classes for an unknown app action are empty, not thrown', () => {
 /* ───────────────────────────────────────────────────────────────────────────── */
 /* MORE THAN ONE WINDOW AT A TIME (owner report, 29.07) */
 /* ───────────────────────────────────────────────────────────────────────────── */
-
-test('the single WO-283 session can be yielded so a second helper may open', async () => {
-	const {
-		openOperatorHelperWindow,
-		closeOperatorHelperWindow,
-		yieldOperatorHelperSession,
-		getOperatorHelperState,
-		STATE,
-	} = require('../../src/system/operator-helper-window')
-	const deps = {
-		findGuiWindowIds: async () => [],
-		spawnGuiDetached: () => '/usr/bin/fake-helper',
-		promoteGuiWindowsAboveKiosk: async () => true,
-		setKioskTopAssert: () => {},
-		raiseOperatorGuiBrowser: async () => ({ ok: true }),
-		watchdogIntervalMs: 10_000, // never fires inside the test
-	}
-	const opts = { log: () => {}, deps }
-	try {
-		assert.equal(yieldOperatorHelperSession('nothing to yield'), false, 'an idle session yields nothing')
-
-		const first = await openOperatorHelperWindow('app:definitely-not-installed-xyz', {}, opts)
-		assert.equal(first.ok, false, 'an uninstalled app is still refused — yielding does not widen the vocabulary')
-
-		assert.equal((await openOperatorHelperWindow('firefox', {}, opts)).ok, true)
-		// The WO-283 refusal itself is UNCHANGED: with the taskbar off, one helper at a time.
-		const second = await openOperatorHelperWindow('nvidia-settings', {}, opts)
-		assert.equal(second.ok, false)
-		assert.match(second.reason, /^busy_/)
-
-		// ...and this is what the taskbar coordinator does instead of inheriting that refusal.
-		assert.equal(yieldOperatorHelperSession('taskbar launching nvidia-settings'), true)
-		assert.equal(getOperatorHelperState().state, STATE.IDLE, 'yield leaves the session free, not restoring')
-		assert.equal((await openOperatorHelperWindow('nvidia-settings', {}, opts)).ok, true)
-	} finally {
-		await closeOperatorHelperWindow({}, opts).catch(() => {})
-	}
-})
-
-test('the taskbar launch path yields the single session before delegating', () => {
-	// Source-text guard: the delegation in operator-helper-live.js is the ONLY reason a second
-	// window could not open, and it has no offline test of its own (every branch needs a live X).
-	const src = fs.readFileSync(path.join(__dirname, '../../src/system/operator-helper-live.js'), 'utf8')
-	assert.match(src, /yieldOperatorHelperSession\(/, 'launchHelper must yield before openOperatorHelperWindow')
-	const yieldAt = src.indexOf('yieldOperatorHelperSession(`')
-	const openAt = src.indexOf('await openOperatorHelperWindow(')
-	assert.ok(yieldAt > 0 && openAt > yieldAt, 'the yield must come BEFORE the delegated open')
-})
 
 /* ───────────────────────────────────────────────────────────────────────────── */
 /* ICONS */

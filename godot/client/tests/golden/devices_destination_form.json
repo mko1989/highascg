@@ -1329,13 +1329,6 @@
           "placeholder": "Frame rate"
         },
         {
-          "tag": "input",
-          "type": "text",
-          "value": "http://127.0.0.1:4200/?operatorGui=1",
-          "disabled": false,
-          "placeholder": "http://127.0.0.1:4200/?operatorGui=1"
-        },
-        {
           "tag": "select",
           "type": "select-one",
           "value": "2",
@@ -1346,13 +1339,6 @@
           "tag": "select",
           "type": "select-one",
           "value": "screen",
-          "disabled": false,
-          "placeholder": null
-        },
-        {
-          "tag": "input",
-          "type": "checkbox",
-          "value": "",
           "disabled": false,
           "placeholder": null
         }
@@ -1460,17 +1446,6 @@
           ]
         ],
         [
-          "operator gui url",
-          [
-            {
-              "id": "dst_o",
-              "patch": {
-                "guiUrl": "http://x/?operatorGui=1"
-              }
-            }
-          ]
-        ],
-        [
           "physical port -> auto",
           [
             {
@@ -1499,17 +1474,6 @@
               "id": "dst_o",
               "patch": {
                 "videoOutput": "shm"
-              }
-            }
-          ]
-        ],
-        [
-          "auto-launch -> false",
-          [
-            {
-              "id": "dst_o",
-              "patch": {
-                "autoLaunch": false
               }
             }
           ]

@@ -12,11 +12,9 @@
  *    (WO-254). Line-building mirrors src/engine/multiview-apply.js's conventions: PLAY only when
  *    the route changed, MIXER FILL every apply, STOP+MIXER CLEAR hygiene for layers beyond the
  *    current cell count, one MIXER COMMIT at the end, and per-channel serialization via a promise
- *    chain. Each apply also feeds the python-xlib shape helper (operator-shape-overlay.js) so the
- *    Caspar screen consumer window is shaped to exactly these rects, above Firefox.
- * WO-255: the CEF web-UI layer (100) and its auto-arm input focus are RETIRED — the operator GUI
- * is now a fullscreen Firefox process (src/system/operator-gui-launcher.js), not a Caspar layer.
- * Route layers remain visual only (out of scope: PRV interactivity through the shaped holes).
+ *    chain.
+ * WO-255: the CEF web-UI layer (100) is RETIRED. WO-646: so is the Firefox kiosk and its X shape overlay — the
+ * Godot GUI draws this channel from its shm surface (WO-597), so an apply only drives Caspar.
  */
 'use strict'
 
@@ -165,19 +163,6 @@ async function _doApplyOperatorGuiLayout(ctx, ch, cells, opts = {}) {
 	const atlas = atlasMode.atlasLayout(ctx, ch, cells, opts.atlas)
 	const plan = computeOperatorGuiCellPlan(atlas ? atlas.cells : cells, map, ctx.config)
 	if (atlas && atlasMode.atlasPlanUnchanged(ch, plan)) return finishOperatorGuiApply(ctx, ch, cells, plan, atlas, opts)
-	try {
-		const monitorRect = resolveOperatorGuiMonitorRect(ctx.config)
-		if (monitorRect) {
-			const { updateShapeRects } = require('./operator-shape-overlay')
-			// WO-319: suppressHoles keeps the mosaic (routes + FILL, applied below) but feeds the
-			// shape overlay an EMPTY rect set, so no hole is cut — the browser draws the decoded
-			// crops itself. Without this, a hole would reveal the screen consumer THROUGH the canvas.
-			const shapeRects = opts.suppressHoles || atlas ? [] : plan.map((entry) => fractionRectToMonitorPx(entry, monitorRect))
-			updateShapeRects(monitorRect, shapeRects, { log: ctx.log, channel: ch })
-		}
-	} catch (e) {
-		ctx.log?.('warn', `operator-gui: shape overlay feed failed: ${e?.message || e}`)
-	}
 	const priorRoutes = lastAppliedRouteByChannel.get(ch) || new Map()
 	const nextRoutes = new Map()
 	const { routes: routePlan, media: mediaPlan } = splitMediaPreviewEntries(plan) // WO-592
@@ -382,12 +367,6 @@ async function ensureOperatorGuiChannel(ctx) {
 		await ctx.amcp.stop(ch, 100)
 	} catch (_) {
 		/* layer empty / caspar variant without content — nothing to stop */
-	}
-	try {
-		const { reapplyOperatorShapeOverlay } = require('./operator-shape-overlay')
-		reapplyOperatorShapeOverlay({ log: ctx.log })
-	} catch (e) {
-		ctx.log?.('warn', `operator-gui: shape overlay re-feed failed: ${e?.message || e}`)
 	}
 	// Mirror multiview re-apply (WO-156): re-apply the last persisted cell layout NOW —
 	// Caspar survives a highascg restart with the previous run's route layers/rects still

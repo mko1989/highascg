@@ -1,35 +1,28 @@
 /**
- * routes-operator-gui.js — WO-243/255 operator GUI layout + launcher endpoints.
+ * routes-operator-gui.js — WO-243/255 operator GUI layout endpoints (the compose windows of the operator channel).
  *
  * Endpoints:
  *   POST   /api/operator-gui/layout   — body `{ cells: [{ id, role, mainIndex, rect:{x,y,w,h}, surface? }] }`
  *                                        (rect in viewport fractions 0-1). Debounced 150ms
  *                                        server-side; serialized per-channel (see
- *                                        src/system/operator-gui-channel.js). Also feeds the
- *                                        python-xlib shape helper.
+ *                                        src/system/operator-gui-channel.js).
  *                                        WO-597 §D: `atlas: true|false` opts an shm operator surface
  *                                        into atlas mode (slots in the reply / GET / WS `atlas`).
- *   DELETE /api/operator-gui/layout   — clears route layers + hides the shape overlay.
  *   POST   /api/operator-gui/cell     — WO-624: add a window for a Sources-panel route item
  *                                        `{ item: { type, value, label, resolution }, at: { x, y } }` (server rules +
  *                                        default size, src/system/operator-gui-source-cells.js).
  *   POST   /api/operator-gui/cell/remove — WO-624: `{ id }` removes that window.
- *   POST   /api/operator-gui/launch   — WO-255: launch (or raise, if already running) the
- *                                        fullscreen Firefox GUI process on the operator monitor.
- *   POST   /api/operator-gui/raise    — WO-255: bring the already-running Firefox GUI to front.
+ * WO-646: the kiosk's launch / raise and the layout DELETE (shape overlay withdraw) are gone with the kiosk.
  */
 
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
-const { applyOperatorGuiLayout, clearOperatorGuiLayout, getPersistedOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
-const { launchOperatorGuiBrowser, raiseOperatorGuiBrowser } = require('../system/operator-gui-launcher')
+const { applyOperatorGuiLayout, getPersistedOperatorGuiLayout, noteClientLayoutReport } = require('../system/operator-gui-channel')
 const { addSourceCell, removeCell, noteReportedCells } = require('../system/operator-gui-source-cells')
 
-/** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Final phase of the operator-
- * GUI startup timeline (kiosk spawn probes: operator-gui-launcher.js; shape helper probes:
- * operator-shape-overlay.js). Logged once per server run, before the amcp gate so a report that
- * arrives while Caspar is still connecting is timed too. */
+/** todos19.07.26 release: first-rect-report timing probe — LOG-ONLY. Logged once per server run, before the amcp
+ * gate so a report that arrives while Caspar is still connecting is timed too. */
 let firstLayoutReportSeen = false
 
 /**
@@ -65,14 +58,6 @@ async function handlePost(path, body, ctx) {
 		const r = path === '/api/operator-gui/cell' ? await addSourceCell(ctx, j) : await removeCell(ctx, j)
 		return { status: r.status, headers: JSON_HEADERS, body: jsonBody(r.body) }
 	}
-	if (path === '/api/operator-gui/launch') {
-		const result = await launchOperatorGuiBrowser(ctx)
-		return { status: result.ok ? 200 : 500, headers: JSON_HEADERS, body: jsonBody(result) }
-	}
-	if (path === '/api/operator-gui/raise') {
-		const result = await raiseOperatorGuiBrowser(ctx)
-		return { status: result.ok ? 200 : 500, headers: JSON_HEADERS, body: jsonBody(result) }
-	}
 	return null
 }
 
@@ -88,20 +73,4 @@ function handleGet(path, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, channel, cells, atlas }) }
 }
 
-/**
- * @param {string} path
- * @param {object} ctx
- */
-async function handleDelete(path, ctx) {
-	if (path !== '/api/operator-gui/layout') return null
-	// A DELETE is the client withdrawing every surface — the authoritative "nothing is on screen"
-	// signal that vetoes the reconnect re-apply (src/system/operator-gui-channel.js).
-	noteClientLayoutReport(ctx, [])
-	if (!ctx.amcp) {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, skipped: true, reason: 'amcp_disconnected' }) }
-	}
-	const result = await clearOperatorGuiLayout(ctx)
-	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, ...result }) }
-}
-
-module.exports = { handlePost, handleGet, handleDelete }
+module.exports = { handlePost, handleGet }

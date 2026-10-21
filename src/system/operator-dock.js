@@ -12,11 +12,52 @@
  *
  * Vocabulary and gate are the WO-283/387 ones: the five curated tools (their bespoke launch paths — isolated Firefox
  * profile, media-path file manager, NVIDIA display policy — live in spawnGuiDetached) plus `app:<desktop-id>` for any
- * installed application, re-checked against the catalog on every launch (operator-helper-window.js isHelperAction).
+ * installed application, re-checked against the catalog on every launch (isHelperAction).
+ * WO-646: the kiosk's helper-window modules are gone; their vocabulary, gate and window check live here now.
  */
 
-const { HELPER_ACTIONS, isHelperAction } = require('./operator-helper-window')
-const { classifyHelperWindows } = require('./operator-helper-window-state')
+/** The five curated tools (bespoke launch paths in system-hardware-gui.js spawnGuiDetached). @readonly */
+const HELPER_ACTIONS = /** @type {const} */ ([
+	'nvidia-settings',
+	'desktopvideo_setup',
+	'desktop_video_updater',
+	'firefox',
+	'file-manager',
+])
+
+/** A Firefox profile-lock / error modal: it looks like a window appeared, but nobody can work in it. */
+const PROFILE_LOCK_TITLE_RE = /close firefox|already running|profile (?:is )?(?:in use|missing)|restart firefox/i
+
+/**
+ * WO-387 — an action the operator may open: a curated tool, or `app:<desktop-id>` of an installed application. The
+ * catalog is re-read here rather than trusted from the request, so an app removed since the menu render is refused.
+ * @param {string} action
+ */
+function isHelperAction(action) {
+	if (HELPER_ACTIONS.includes(/** @type {any} */ (action))) return true
+	try {
+		return require('../utils/desktop-app-catalog').isAppAction(action)
+	} catch {
+		return false
+	}
+}
+
+/**
+ * PURE. Windows the operator can work in vs. profile-lock / error modals that only look like a window.
+ * @param {Array<string|{ id: string, name?: string }>} windows
+ * @returns {{ usable: {id: string, name: string}[], blocked: {id: string, name: string}[] }}
+ */
+function classifyHelperWindows(windows) {
+	const usable = []
+	const blocked = []
+	for (const w of Array.isArray(windows) ? windows : []) {
+		const entry = typeof w === 'string' ? { id: w, name: '' } : { id: String(w?.id ?? ''), name: String(w?.name ?? '') }
+		if (!entry.id) continue
+		if (entry.name && PROFILE_LOCK_TITLE_RE.test(entry.name)) blocked.push(entry)
+		else usable.push(entry)
+	}
+	return { usable, blocked }
+}
 
 /** Pinned order + dock names (web header-bar-operator-helper.js HELPER_ITEMS). */
 const PINNED = [
@@ -159,4 +200,4 @@ async function activateWindow(wid) {
 	})
 }
 
-module.exports = { PINNED, SELF_ACTION, dockModel, getDock, launchOrFocus }
+module.exports = { PINNED, SELF_ACTION, HELPER_ACTIONS, isHelperAction, classifyHelperWindows, dockModel, getDock, launchOrFocus }

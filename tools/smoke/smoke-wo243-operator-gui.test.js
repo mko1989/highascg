@@ -329,8 +329,8 @@ describe('WO-243 T243.2: router registration (repeat-offender grep)', () => {
 		assert.ok(routerContent.includes("require(" + "'./routes-operator-gui')"), 'router should import routes-operator-gui')
 		assert.ok(routerContent.includes("'/api/operator-gui/layout'"), 'router should register the /api/operator-gui/layout path')
 		assert.match(routerContent, /routes\.post\('\/api\/operator-gui\/layout'/, 'POST route registered')
-		assert.match(routerContent, /routes\.delete\('\/api\/operator-gui\/layout'/, 'DELETE route registered')
 		assert.ok(routerContent.includes('routesOperatorGui.handlePost'))
-		assert.ok(routerContent.includes('routesOperatorGui.handleDelete'))
+		// WO-646: the layout DELETE (the kiosk tab withdrawing its holes) went with the kiosk.
+		assert.doesNotMatch(routerContent, /routes\.delete\('\/api\/operator-gui\/layout'/)
 	})
 })

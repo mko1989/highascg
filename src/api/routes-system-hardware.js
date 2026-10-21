@@ -35,14 +35,6 @@ async function hardwareHandleGet(p, ctx, query) {
 	if (p === '/api/system/xrandr-layout') return handleXrandrLayoutGet(ctx)
 	if (p === '/api/system/network') return handleNetworkGet(ctx)
 	if (p === '/api/system/operator-display') return operatorDisplayGet(ctx)
-	if (p === '/api/system/operator-helper-window') {
-		const { handleOperatorHelperWindowGet } = require('./system-hardware-gui')
-		return handleOperatorHelperWindowGet()
-	}
-	if (p === '/api/system/operator-helper-taskbar') {
-		const { handleOperatorHelperTaskbarGet } = require('./system-hardware-gui')
-		return handleOperatorHelperTaskbarGet(ctx)
-	}
 	if (p === '/api/system/operator-helper-icon') {
 		const { handleOperatorHelperIconGet } = require('./system-hardware-gui')
 		return handleOperatorHelperIconGet(query)
@@ -65,14 +57,6 @@ async function hardwareHandlePost(p, body, ctx) {
 	if (p === '/api/system/pointer-confine') {
 		const { handlePointerConfinePost } = require('./system-hardware-gui')
 		return handlePointerConfinePost(body, ctx)
-	}
-	if (p === '/api/system/operator-helper-window') {
-		const { handleOperatorHelperWindowPost } = require('./system-hardware-gui')
-		return handleOperatorHelperWindowPost(body, ctx)
-	}
-	if (p === '/api/system/operator-helper-taskbar') {
-		const { handleOperatorHelperTaskbarPost } = require('./system-hardware-gui')
-		return handleOperatorHelperTaskbarPost(body, ctx)
 	}
 	if (p === '/api/system/gpu-ports-reset') return handleGpuPortsReset(body, ctx)
 	if (p === '/api/system/time') return handleSystemTimePost(body, ctx)

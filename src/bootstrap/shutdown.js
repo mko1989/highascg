@@ -82,10 +82,6 @@ function createShutdownHandler({ logger, appCtx, moduleRegistry, stopStreamingSu
 			if (typeof appCtx._stopCasparAmcpWatchdog === 'function') appCtx._stopCasparAmcpWatchdog()
 			if (typeof appCtx._stopReplicationService === 'function') appCtx._stopReplicationService()
 			try {
-				const { stopOperatorShapeOverlay } = require('../system/operator-shape-overlay')
-				stopOperatorShapeOverlay()
-			} catch (_) {}
-			try {
 				const { stopPointerConfine } = require('../system/pointer-confine')
 				stopPointerConfine()
 			} catch (_) {}

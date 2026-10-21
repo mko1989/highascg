@@ -247,8 +247,6 @@ module.exports = {
 	resolveOperatorDisplayRect,
 	// WO-283 follow-up: helper windows are placed inside the operator monitor so they cannot cover a
 	// PGM head now that both they and the PGM consumers live in the EWMH ABOVE layer.
-	rectsIntersect,
-	listProgramConsumerRects,
 	resolveHelperWindowRect,
 	HELPER_WINDOW_INSET,
 	isOperatorPointerConfineDesired,

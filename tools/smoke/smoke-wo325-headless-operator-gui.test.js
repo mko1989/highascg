@@ -12,7 +12,6 @@
 
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { shouldAutoLaunchOperatorGui } = require('../../src/system/operator-gui-launcher')
 const { normalizeScreenDestinations } = require('../../src/config/screen-destinations')
 const { buildOperatorGuiChannel, resolveOperatorGuiPort } = require('../../src/config/config-generator-operator-gui')
 
@@ -50,15 +49,4 @@ test('WO-325: resolveOperatorGuiPort returns null for headless even when an expl
 	assert.equal(resolveOperatorGuiPort({}, headlessWithPort), null, 'headless never resolves a port')
 	const plainWithPort = normDest({ id: 'og', mode: 'operator_gui', physicalPort: 3 })
 	assert.equal(resolveOperatorGuiPort({}, plainWithPort), 3, 'non-headless honors explicit port')
-})
-
-test('WO-325: headless suppresses the boot kiosk and takes precedence over the monitor resolver', () => {
-	const cfg = { screenDestinations: { version: 1, destinations: [{ id: 'og', mode: 'operator_gui', headless: true }] } }
-	const verdict = shouldAutoLaunchOperatorGui(cfg, {
-		resolveMonitorPort: () => {
-			throw new Error('resolver must not be consulted for a headless operator GUI')
-		},
-	})
-	assert.equal(verdict.launch, false)
-	assert.equal(verdict.reason, 'headless')
 })

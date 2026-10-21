@@ -81,7 +81,6 @@ func _init() -> void:
 	_page = Inspector.new()
 	_page.patch.connect(_patch)
 	_page.remove.connect(_remove)
-	_page.launch_operator_gui.connect(_launch)
 	_page.focus_connector.connect(func(id: String) -> void: focus_connector.emit(id))
 	_host = HostControls.new()
 	add_child(_host)
@@ -189,14 +188,6 @@ func _done(r: Dictionary, what: String) -> void:
 	else:
 		status.emit("%s failed: %s" % [what, _error(r)], false)
 
-
-func _launch() -> void:
-	var r: Dictionary = await Api.post_json("/api/operator-gui/launch", {})
-	var data: Dictionary = r.data if r.data is Dictionary else {}
-	if r.ok and data.get("ok"):
-		_page.launch_status("Brought to front." if data.get("action") == "raised" else "Launched.", false)
-	else:
-		_page.launch_status("Failed: %s" % str(data.get("reason", r.get("error", "unknown error"))), false)
 
 
 static func _error(r: Dictionary) -> String:

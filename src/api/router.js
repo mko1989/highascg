@@ -144,9 +144,7 @@ routes.get('/api/system/xrandr-layout', ({ path, ctx }) => routesSystemHardware.
 routes.get('/api/system/network', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/operator-display', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/hardware', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
-routes.get('/api/system/operator-helper-window', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 // WO-317: the taskbar handlers shipped in routes-system-hardware without this registration — every call 404'd.
-routes.get('/api/system/operator-helper-taskbar', ({ path, ctx }) => routesSystemHardware.hardwareHandleGet(path, ctx), { requireCaspar: false })
 routes.get('/api/system/operator-helper-icon', ({ path, ctx, query }) => routesSystemHardware.hardwareHandleGet(path, ctx, query), { requireCaspar: false })
 routes.get('/api/system/apps', ({ path, ctx, query }) => routesSystemHardware.hardwareHandleGet(path, ctx, query), { requireCaspar: false })
 routes.post('/api/shader-stack', ({ body, ctx }) => require('./routes-shader-stack').handlePost(body, ctx))
@@ -166,8 +164,6 @@ routes.post('/api/system/dock/launch', ({ body, ctx }) => routesOperatorDock.han
 routes.get('/api/led-test-card/settings', ({ ctx }) => routesLedTestControl.handleGet(ctx), { requireCaspar: false }) // WO-629
 routes.post('/api/led-test-card/:op', ({ params, body, ctx }) => routesLedTestControl.handlePost(params.op, body, ctx), { requireCaspar: false })
 routes.post('/api/system/pointer-confine', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/system/operator-helper-window', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/system/operator-helper-taskbar', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/gpu-ports-reset', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/xrandr-layout/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/system/network/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
@@ -281,9 +277,6 @@ routes.post('/api/host-live/migration', ({ body, ctx }) => routesHostLive.handle
 // WO-243 T243.2: Operator GUI channel — routed preview-hole layout apply/clear.
 routes.post('/api/operator-gui/layout', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 routes.get('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleGet(path, ctx), { requireCaspar: false })
-routes.delete('/api/operator-gui/layout', ({ path, ctx }) => routesOperatorGui.handleDelete(path, ctx), { requireCaspar: false })
-routes.post('/api/operator-gui/launch', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/operator-gui/raise', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 routes.post('/api/operator-gui/cell', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false }) // WO-624
 routes.post('/api/operator-gui/cell/remove', ({ path, body, ctx }) => routesOperatorGui.handlePost(path, body, ctx), { requireCaspar: false })
 

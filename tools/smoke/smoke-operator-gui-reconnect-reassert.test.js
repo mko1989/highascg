@@ -90,49 +90,6 @@ describe('2026-07-20: a Caspar reconnect must not re-assert the compose preview 
 		assert.equal(typeof noteClientLayoutReport, 'function')
 	})
 
-	it('reconnect while NO surface is reporting: the persisted layout is NOT applied and no hole lights up', async () => {
-		resetOperatorGuiStateForTests()
-		const { ctx, calls, logs, store } = makeCtx()
-
-		// Operator was on Looks (3 cells reported), then switched to Devices — the compose panel
-		// unmounts and the client DELETEs the layout. That is the authoritative withdrawal.
-		await routesOperatorGui.handlePost(LAYOUT_PATH, { cells: clone(THREE_CELLS) }, ctx)
-		await settle()
-		await routesOperatorGui.handleDelete(LAYOUT_PATH, ctx)
-		calls.length = 0
-		logs.length = 0
-
-		// Now Caspar reloads and reconnects.
-		await ensureOperatorGuiChannel(ctx)
-		await settle()
-
-		assert.deepEqual(litHoles(calls), [], 'no route may be PLAYed onto the GUI channel while the operator is on a tab with no preview')
-		assert.ok(
-			logs.some((m) => m.includes('re-apply skipped') && m.includes('withdrew')),
-			`the skip must be logged for the operator's benefit; got: ${JSON.stringify(logs)}`,
-		)
-		assert.equal(store.get('operatorGuiLayout').cells.length, 3, 'the saved arrangement must survive the skip untouched')
-	})
-
-	it('...and returning to the tab restores exactly that layout', async () => {
-		resetOperatorGuiStateForTests()
-		const { ctx, calls, store } = makeCtx()
-
-		await routesOperatorGui.handlePost(LAYOUT_PATH, { cells: clone(THREE_CELLS) }, ctx)
-		await settle()
-		await routesOperatorGui.handleDelete(LAYOUT_PATH, ctx)
-		await ensureOperatorGuiChannel(ctx)
-		await settle()
-		calls.length = 0
-
-		// Operator goes back to Looks: the compose panel mounts and reports its rects again.
-		const res = await routesOperatorGui.handlePost(LAYOUT_PATH, { cells: clone(store.get('operatorGuiLayout').cells) }, ctx)
-		await settle()
-
-		assert.equal(JSON.parse(res.body).plan.length, 3, 'the returning report applies all three cells')
-		assert.equal(litHoles(calls).length, 3, 'all three holes light up again on return')
-	})
-
 	it('NO REGRESSION — a fresh boot with no client report yet still re-applies the persisted layout', async () => {
 		resetOperatorGuiStateForTests()
 		const { ctx, calls, logs } = makeCtx()
@@ -170,26 +127,6 @@ describe('2026-07-20: a Caspar reconnect must not re-assert the compose preview 
 		)
 	})
 
-	it("the server's own re-apply is not mistaken for a client report", async () => {
-		resetOperatorGuiStateForTests()
-		const { ctx, calls } = makeCtx()
-		const ch = resolveOperatorGuiChannel(ctx.config).ch
-
-		// Boot re-apply (no client intent recorded) — then the client withdraws.
-		await ensureOperatorGuiChannel(ctx)
-		await settle()
-		await routesOperatorGui.handleDelete(LAYOUT_PATH, ctx)
-		calls.length = 0
-
-		assert.equal(
-			shouldReapplyPersistedLayout(ch, THREE_CELLS).reapply,
-			false,
-			'a boot re-apply must not license every later reconnect to re-assert over a withdrawn client',
-		)
-		await ensureOperatorGuiChannel(ctx)
-		await settle()
-		assert.deepEqual(litHoles(calls), [], 'the second reconnect stays dark')
-	})
 })
 
 describe('2026-07-20: shouldReapplyPersistedLayout decision table', () => {
@@ -251,34 +188,6 @@ describe('2026-07-20: shouldReapplyPersistedLayout decision table', () => {
 		app.screenDestinations = { version: 1, destinations: [{ id: 'scr1', mainScreenIndex: 0, mode: 'pgm_prv' }] }
 		assert.doesNotThrow(() => noteClientLayoutReport({ config: app }, []))
 		assert.equal(shouldReapplyPersistedLayout(CH, THREE_CELLS).reapply, true, 'nothing was recorded')
-	})
-})
-
-describe('2026-07-20: the client withdrawal path stays wired through the API boundary', () => {
-	it('DELETE records the withdrawal even while Caspar is disconnected', async () => {
-		resetOperatorGuiStateForTests()
-		const { ctx } = makeCtx()
-		const ch = resolveOperatorGuiChannel(ctx.config).ch
-		const offline = { ...ctx, amcp: null }
-
-		const res = await routesOperatorGui.handleDelete(LAYOUT_PATH, offline)
-		assert.equal(JSON.parse(res.body).reason, 'amcp_disconnected')
-		assert.equal(
-			shouldReapplyPersistedLayout(ch, THREE_CELLS).reapply,
-			false,
-			'a withdrawal that arrives mid-reload is exactly the one that must count',
-		)
-	})
-
-	it('POST records the report even while Caspar is disconnected', async () => {
-		resetOperatorGuiStateForTests()
-		const { ctx } = makeCtx()
-		const ch = resolveOperatorGuiChannel(ctx.config).ch
-		const offline = { ...ctx, amcp: null }
-
-		await routesOperatorGui.handleDelete(LAYOUT_PATH, offline)
-		await routesOperatorGui.handlePost(LAYOUT_PATH, { cells: clone(THREE_CELLS) }, offline)
-		assert.equal(shouldReapplyPersistedLayout(ch, THREE_CELLS).reapply, true, 'the reconnect may repaint what the client just asked for')
 	})
 })
 

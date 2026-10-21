@@ -185,70 +185,6 @@ async function handlePointerConfinePost(body, ctx) {
 	return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, active: isPointerConfineActive() }) }
 }
 
-/**
- * WO-283 — POST /api/system/operator-helper-window. Open a foreign window (DeckLink setup,
- * nvidia-settings, file manager, browser) ON TOP of the shaped operator kiosk, on operator
- * request, and guarantee the kiosk comes back when it closes or dies.
- *
- * This is `/api/system/gui-launch` plus stacking: the same `spawnGuiDetached` launcher, the same
- * nuclear-password gate, the same action vocabulary. The difference lives in
- * src/system/operator-helper-window.js — it suspends the shape overlay's kiosk top-assert, puts
- * the helper in Openbox's ABOVE layer so the raise can actually win, and runs a watchdog that
- * restores the kiosk on ANY helper exit (clean close, crash, or kill -9).
- *
- * `mode: 'close'` does not kill the helper — the operator closes their own window. It only forces
- * the restore, so a helper that somehow outlives its window can never strand the GUI.
- *
- * @param {string} body
- * @param {*} ctx
- */
-async function handleOperatorHelperWindowPost(body, ctx) {
-	const pw = checkNuclearPassword(body, ctx)
-	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
-
-	const b = parseBody(body)
-	const mode = String(b?.mode ?? 'open').trim() || 'open'
-	const log = (level, msg) => {
-		if (typeof ctx.log === 'function') ctx.log(level, msg)
-	}
-	const {
-		openOperatorHelperWindow,
-		closeOperatorHelperWindow,
-		getOperatorHelperState,
-		HELPER_ACTIONS,
-		isHelperAction,
-	} = require('../system/operator-helper-window')
-
-	if (mode === 'close') {
-		const r = await closeOperatorHelperWindow(ctx.config || {}, { log })
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ...r, ...getOperatorHelperState() }) }
-	}
-	if (mode !== 'open') {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown mode: ${mode}` }) }
-	}
-
-	const action = String(b?.action ?? '').trim()
-	if (!isHelperAction(action)) {
-		return {
-			status: 400,
-			headers: JSON_HEADERS,
-			body: jsonBody({
-				error: `Unknown action: ${action} (expected one of ${HELPER_ACTIONS.join(', ')}, or app:<id> for an installed application)`,
-			}),
-		}
-	}
-	const r = await openOperatorHelperWindow(action, ctx.config || {}, { log, url: b?.url })
-	return {
-		status: r.ok ? 200 : 409,
-		headers: JSON_HEADERS,
-		body: jsonBody(r.ok ? { ...r, ...getOperatorHelperState() } : { error: r.reason, ...getOperatorHelperState() }),
-	}
-}
-
-/**
- * WO-317 — GET /api/system/operator-helper-taskbar. Returns the multi-helper taskbar model when the
- * feature is enabled, else `{ enabled: false }` so the client renders the WO-283 single button.
- */
 /* todos27.07.26: taskbar chips show the real app icons; WO-387 extends that to every installed
  * app by resolving the .desktop `Icon=` through the standard icon directories. The five pinned
  * tools keep their exact hard-coded paths. Path safety and the candidate order live in
@@ -282,76 +218,6 @@ function handleSystemAppsGet() {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, apps: listAppsForMenu() }) }
 	} catch (e) {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: false, apps: [], error: e?.message || String(e) }) }
-	}
-}
-
-async function handleOperatorHelperTaskbarGet(ctx) {
-	const { getHelperCoordinator, isMultiHelperTaskbarEnabled, reconcileHelperWindows } = require('../system/operator-helper-live')
-	if (!isMultiHelperTaskbarEnabled(ctx?.config)) {
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, enabled: false, helpers: [] }) }
-	}
-	const coord = getHelperCoordinator(ctx)
-	/* todos27.07.26: the 1.5s client poll is the only signal a helper's window was closed by the
-	 * operator — reconcile registry vs live windows here so chips never show ghosts. */
-	try {
-		await reconcileHelperWindows(ctx)
-	} catch {
-		/* reconcile is best-effort — never fail the poll */
-	}
-	const { HELPER_ACTIONS } = require('../system/operator-helper-window')
-	return {
-		status: 200,
-		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, enabled: true, helpers: coord ? coord.taskbar() : [], actions: HELPER_ACTIONS }),
-	}
-}
-
-/**
- * WO-317 — POST /api/system/operator-helper-taskbar. Body: { id, action?, password }. Runs the
- * coordinator's decide→plan→apply pipeline (launch / raise / park). Password-gated like the WO-283
- * helper POST. Returns 400 when the feature flag is off (the client should not have called it).
- */
-async function handleOperatorHelperTaskbarPost(body, ctx) {
-	const pw = checkNuclearPassword(body, ctx)
-	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
-
-	const { getHelperCoordinator, isMultiHelperTaskbarEnabled } = require('../system/operator-helper-live')
-	if (!isMultiHelperTaskbarEnabled(ctx?.config)) {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'multi-helper taskbar disabled' }) }
-	}
-	const coord = getHelperCoordinator(ctx)
-	if (!coord) return { status: 500, headers: JSON_HEADERS, body: jsonBody({ error: 'coordinator unavailable' }) }
-
-	const b = parseBody(body)
-	const id = String(b?.id ?? '').trim()
-	if (!id) return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'id required' }) }
-	const action = b?.action ? String(b.action).trim() : id
-	/* WO-387: refuse an unknown action HERE rather than letting the coordinator register a helper
-	 * that can never launch — a chip for a non-existent app would sit in 'launching' until the
-	 * 20s poll gives up. Validation is the same gate the WO-283 path uses (pinned five + any
-	 * installed app), so both routes share one vocabulary. */
-	const { isHelperAction } = require('../system/operator-helper-window')
-	if (!isHelperAction(action)) {
-		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: `Unknown action: ${action}` }) }
-	}
-	const r = await coord.handleAction(id, { action })
-	return {
-		status: r.ok ? 200 : 409,
-		headers: JSON_HEADERS,
-		body: jsonBody({ ...r, helpers: coord.taskbar() }),
-	}
-}
-
-/**
- * WO-283 — GET /api/system/operator-helper-window. Lets the operator button render "Close helper"
- * while one is up, and lets a stuck state be seen without reading the journal.
- */
-function handleOperatorHelperWindowGet() {
-	const { getOperatorHelperState, HELPER_ACTIONS } = require('../system/operator-helper-window')
-	return {
-		status: 200,
-		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, ...getOperatorHelperState(), actions: HELPER_ACTIONS }),
 	}
 }
 
@@ -427,11 +293,7 @@ module.exports = {
 	spawnGuiDetached,
 	spawnOperatorFirefox,
 	handleGuiLaunchPost,
-	handleOperatorHelperWindowPost,
-	handleOperatorHelperWindowGet,
-	handleOperatorHelperTaskbarGet,
 	handleOperatorHelperIconGet,
 	handleSystemAppsGet,
-	handleOperatorHelperTaskbarPost,
 	handlePointerConfinePost,
 }

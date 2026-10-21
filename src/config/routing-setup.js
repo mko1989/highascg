@@ -184,10 +184,6 @@ async function setupAllRouting(self) {
 		} catch (e) {
 			self.log('warn', `Operator GUI channel: ${e?.message || e}`)
 		}
-		// WO-264: auto-start the operator GUI browser at boot when defined + monitor resolvable.
-		// Fire-and-forget (internal retry loop covers X coming up late); never throws.
-		const { maybeAutoLaunchOperatorGui } = require('../system/operator-gui-launcher')
-		maybeAutoLaunchOperatorGui(self)
 	}
 	// WO-597: runtime shm consumers (previs PGM/PRV surfaces) die with Caspar — re-ADD every leased role.
 	try {

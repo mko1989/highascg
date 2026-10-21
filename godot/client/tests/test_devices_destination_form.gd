@@ -60,8 +60,7 @@ func _field(c: Control) -> Array:
 
 ## The web harness's finders (placeholder / title / option value) over the Godot controls.
 func _find(ctrls: Array, action: String) -> Control:
-	var by_ph := {"width": "Width", "height": "Height", "fps": "Frame rate", "name": "Name", "artnet ip": "192.168.1.50",
-		"operator gui url": "http://127.0.0.1:4200"}
+	var by_ph := {"width": "Width", "height": "Height", "fps": "Frame rate", "name": "Name", "artnet ip": "192.168.1.50"}
 	var by_tip := {"main index": "Main index (zero-based)", "artnet cols": "Fixture columns", "artnet rows": "Fixture rows",
 		"artnet fixture type": "Fixture type (fixture/type)", "artnet start universe": "Start Art-Net universe",
 		"artnet start DMX channel": "Start DMX channel", "artnet DMX sends/sec": "DMX sends/sec"}
@@ -73,8 +72,6 @@ func _find(ctrls: Array, action: String) -> Control:
 		if by_tip.has(key) and c.tooltip_text.begins_with(by_tip[key]):
 			return c
 		if by_opt.has(key) and c is OptionButton and _opt(c, by_opt[key]) >= 0:
-			return c
-		if key == "auto-launch" and c is CheckBox:
 			return c
 	return null
 
@@ -89,8 +86,7 @@ static func _opt(ob: OptionButton, value: String) -> int:
 ## What the harness typed for each action (form_golden.mjs ACTIONS).
 const TYPED := {"width -> 1280": "1280", "height -> \"\"": "", "fps -> 29.97": "29.97", "name -> \"   \"": "   ",
 	"main index -> -3": "-3", "artnet ip": " 10.0.0.9 ", "artnet cols": "0", "artnet rows": "abc",
-	"artnet start universe": "40000", "artnet start DMX channel": "0", "artnet DMX sends/sec": "",
-	"operator gui url": " http://x/?operatorGui=1 "}
+	"artnet start universe": "40000", "artnet start DMX channel": "0", "artnet DMX sends/sec": ""}
 const PICKED := {"video mode -> 1080p2500": "1080p2500", "video mode -> custom": "custom", "mode -> pgm_only": "pgm_only",
 	"audio layout -> 8ch": "8ch", "artnet fixture type -> RGBW": "RGBW", "physical port -> auto": "", "physical port -> 3": "3",
 	"video output -> shm": "shm"}
@@ -103,7 +99,6 @@ func test_summary_and_initial_fields() -> void:
 		var got := _controls(p).map(_field)
 		var want: Array = c.fields.map(func(f: Dictionary) -> Array:
 			return [("SEL:" if f.tag == "select" else "") + str(f.value), f.disabled])
-		# The web's checkbox value attribute is "" — compare it as such; its state is the auto-launch action.
 		t.eq(got, want, "fields " + c.name)
 		p.free()
 
@@ -138,7 +133,8 @@ func test_actions_send_the_web_patches() -> void:
 				t.eq(_norm(calls), _norm(a[1]), "patch %s / %s" % [c.name, name])
 				n += 1
 			p.free()
-	t.ok(n >= 50, "most actions produce a patch (%d)" % n)
+	# WO-646: the kiosk's Web-UI URL and auto-launch actions left the golden (51 → 49).
+	t.ok(n >= 48, "most actions produce a patch (%d)" % n)
 
 
 func test_math_corrections_show_in_the_field() -> void:

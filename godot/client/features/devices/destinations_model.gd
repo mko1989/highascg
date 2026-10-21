@@ -19,7 +19,7 @@ const STANDARD_VIDEO_MODES := ["PAL", "NTSC", "576p2500", "720p2398", "720p2400"
 	"dci1080p2398", "dci1080p2400", "dci1080p2500", "dci2160p2398", "dci2160p2400", "dci2160p2500"]
 const EMPTY_NOTE := "No destinations yet. Use + to add PGM/PRV, PGM only, Multiview, or a host channel (DeckLink, USB, NDI…)."
 const PIXELMAP_NOTE := "This channel samples its own full raster into one native <artnet> fixture group (whole-frame area averaging). Universes beyond the first auto-spill per the deployed consumer’s addressing rule. Regenerate + restart Caspar to apply."
-const OPG_NOTE := "Route layers (10-49) mirror routed compose/timeline/mv-edit preview cells, shaped above fullscreen Firefox via X SHAPE. Regenerate + restart Caspar to apply the channel/screen consumer."
+const OPG_NOTE := "Route layers (10-49) mirror the compose windows of the Live preview. Regenerate + restart Caspar to apply the channel."
 
 
 static func is_main_bus(mode: Variant) -> bool:
