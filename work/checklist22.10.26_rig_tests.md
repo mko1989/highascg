@@ -1,0 +1,95 @@
+# Checklist 22.10.26 — owner tests for when the right setup is in place
+
+Owner, 22.10: *"write owner tests file that i can come back to when i have a correct setup and check it."*
+
+How to use it:
+- Find the section that matches the setup you have today (cameras, lighting rig, LED wall, stick, …).
+- Do its checks. Tick each box, or write a word next to it: "ok", "no: …", or "skip".
+- Tell the session. It flips the matching `OPEN_ISSUES.md` rows.
+
+This file covers WO-633 … WO-669. Older checks up to WO-632 are in
+[checklist20.10.26_owner_checks.md](./checklist20.10.26_owner_checks.md). Its section 1 has the tracking / follow / PSN /
+lighting checks (WO-615, 616, 624, 630, 631, 632). Do those in the same session as section A or B below.
+
+## A. Cameras + tracking (two solved tracking cameras, people on stage)
+
+Setup, once:
+1. Tracking cameras calibrated (Previs → Tracking).
+2. Previs → Tracking → Detection: model `yolo26n-seg.onnx`.
+3. Body pose: `yolo26n-pose.onnx`.
+
+- [ ] **WO-665: cut-out cards.** Previs 3D toolbar → People: **cut-outs**. Each tracked person is a flat card with
+      their own picture, cut out by the mask, standing at their spot, turning to face you as you orbit. The card height
+      matches the person.
+- [ ] **WO-666: painted dummies.** People: **dummies**. Each person is a mannequin painted from the cameras that
+      see them, with the front and sides from the camera on that side. The back (no camera) takes the person's mean
+      colour.
+- [ ] **WO-667: posed dummies.** With Body pose on, raise an arm, step wide, crouch: the dummy follows within
+      about ⅓ s.
+      - With one camera only, the limbs sit on a flat plane facing that camera. That is expected.
+      - With both cameras, the limbs get real depth (an arm pointing at the audience comes forward).
+- [ ] **WO-667: speed.** Two cameras with seg + pose on CPU: is the detect rate (Tracking status) good enough to
+      follow? About 9 fps per camera was measured with one camera. If it's too slow, say so; the next step is GPU
+      inference.
+- [ ] **WO-666: colour match.** Do the two cameras' colours differ visibly on one dummy? Per-camera gain/tint was
+      deferred until this answer.
+
+## B. Real lighting rig (console, moving heads, a show MVR)
+
+- [ ] **WO-633:** in a real show file, replace a stub fixture type with the file from GDTF Share. Also check the
+      X-Dot Max: only 6 of its 9 modes pair.
+- [ ] **WO-637:** a new MVR import, end to end: placeholders resolve from GDTF Share by themselves. A placeholder
+      that is only *offered* ("choose") still lists only imported types under Replace….
+- [ ] **WO-641:** Fixtures → pick a type → Body colour. The heads on the live rig previs take that colour.
+- [ ] **WO-643:** re-import a newer version of the same MVR. Confirm the prompt; the scene stays where it was, and
+      there is no second set of heads.
+
+## C. LED walls / multiple screens
+
+- [ ] **WO-634:** MVR object → LED screen with the show's real sending-card map: edit the crops per wall. The
+      destination runs at the show's real raster.
+- [ ] **WO-638 / WO-645:** a real power-cycle with two or more screens.
+      1. A "Start operator here / Run headless" window appears on each screen.
+      2. Caspar is held until you answer.
+      3. Try **Run headless** once, then the Settings → Start-up autostart switch (with and without GUI).
+
+## D. Next ISO / stick build (WO-669)
+
+- [ ] After `eggs produce`, run `tools/eggs/live-usb/verify-iso-squashfs-excludes.sh` on the ISO. It must say
+      `present: home/casparcg/.local/opt/godot/godot`, with no `bad` lines.
+- [ ] Install the stick on a spare machine. "Start operator here" opens the Godot GUI. Before WO-669 the GUI binary
+      was not on the ISO.
+- [ ] Decide:
+      1. Ship the tracking venv + models (+375 MB) on the ISO, or install them by hand when needed?
+      2. Ship the dev box's Companion database as starter buttons, or a clean Companion?
+- [ ] Session can check (say "go"): does eggs give every install its own SSH host keys?
+
+## E. Audio on air (a live-audio input routed)
+
+- [ ] **WO-662: beat-reactive shaders.**
+      1. Route the FFT source (DM3 slot) in the live-audio inspector.
+      2. Put an audio-reactive shader on air.
+      3. Set flash / bump in Shader FX and save: it pulses on the beat without a re-take.
+      4. Does the Godot Shader FX dialog's Beat row look right?
+
+## F. Another machine on the network (web UI)
+
+- [ ] **WO-646:** open the web UI from a laptop. The Looks compose preview shows HQ thumbnails; Settings → Compose
+      preview offers Canvas / Caspar JPEG only.
+- [ ] **WO-661:** web Templates tab: Templates / Lower thirds / Shaders groups, ⚠ tooltip on shaders. After turning
+      GPU on + a Caspar restart, the ⚠ disappears.
+
+## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
+
+- [ ] **WO-663:** drop `STUDIO/LT-GRADIENT-WAVE-MARCIN` on a look.
+      1. Both inspectors show "Lower Third", pre-filled.
+      2. Take without typing: the baked text shows.
+      3. Change the title, take again: the new text shows.
+- [ ] **WO-650:** in the look editor, delete the only layer of a look: PRV goes empty at once.
+- [ ] **WO-652:** Live 2D → Times, with a multi-layer look and a playlist layer.
+- [ ] **WO-658:** Live 2D Auto.
+      1. Drag the Live / deck splitter smaller: the windows shrink.
+      2. Move a window: Auto turns off.
+      3. A second screen gets a second column.
+- [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
+      Inspector title is white.
