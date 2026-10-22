@@ -3,6 +3,7 @@
 const { channelCountFromLayout, normalizeProgramLayout, maxProgramLayout } = require('./audio-channel-layouts')
 const { destinationsFromConfig, destinationAudioLayoutsByMain } = require('./screen-destinations')
 const { resolveMonitorBus } = require('./monitor-bus')
+const { portAudioOutputId, normalizeHostApi } = require('./portaudio-output')
 
 /**
  * Device View destination `audioLayout` → `screen_N_audio_layout` for Caspar PGM bus width.
@@ -22,6 +23,7 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 	const audioOutputs = Array.isArray(appConfig?.audioOutputs) ? appConfig.audioOutputs : []
 	const destinations = destinationsFromConfig(appConfig || {})
 	const edges = Array.isArray(appConfig?.deviceGraph?.edges) ? appConfig.deviceGraph.edges : []
+	const paId = portAudioOutputId(audioOutputs)
 
 	// Map each cabled audio output to the corresponding screen in Caspar (Device View).
 	audioOutputs.forEach((out) => {
@@ -33,6 +35,8 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 		const deviceName = String(out.deviceName || '').trim()
 		// OpenAL default sink uses empty device name → bare `<system-audio />`; PortAudio needs a device.
 		if (consumerType !== 'system-audio' && !deviceName) return
+		// WO-683: Caspar's PortAudio settings are global — only the server's one PortAudio output becomes a consumer.
+		if (consumerType !== 'system-audio' && id !== paId) return
 
 		// Find edge pointing to this audio output
 		const edge = edges.find((e) => String(e.sinkId) === id)
@@ -55,6 +59,8 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 		if (consumerType === 'system-audio') {
 			merged[`${prefix}system_audio_enabled`] = true
 			merged[`${prefix}system_audio_device_name`] = deviceName
+			// WO-683: asked for by a cable — reconcileCustomLivePortAudioVsOpenAl keeps it next to PortAudio.
+			merged[`${prefix}system_audio_cabled`] = true
 			// If this is a main screen and we enabled system audio via cabling,
 			// make sure we don't accidentally enable PortAudio fallback if not cabled.
 			if (!merged[`${prefix}portaudio_consumers`]) {
@@ -72,7 +78,7 @@ function applyAudioOutputOverridesToScreens(merged, appConfig) {
 
 			const consumer = {
 				deviceName: out.deviceName,
-				hostApi: out.hostApi || 'auto',
+				hostApi: normalizeHostApi(out.hostApi),
 				outputChannels: chCount,
 				audioLayout: layout,
 				bufferFrames: parseInt(String(out.bufferFrames), 10) || 128,
@@ -155,6 +161,8 @@ function assignStereoBusPatchesOnScreens(merged) {
  * `mergeAudioRoutingIntoConfig` runs before device-graph PortAudio wiring. When this pass adds
  * `<portaudio/>` consumers, OpenAL `<system-audio>` on the same program channel must be off —
  * otherwise Caspar can end up with two real-world sinks (silent/wrong device, flaky meters).
+ * WO-683: an OAL output the operator cabled to that destination (`*_system_audio_cabled`) is asked
+ * for and stays on — Enhanced OAL + one PortAudio device on the same program is a supported setup.
  * @param {Record<string, unknown>} merged
  */
 function reconcileCustomLivePortAudioVsOpenAl(merged) {
@@ -167,7 +175,8 @@ function reconcileCustomLivePortAudioVsOpenAl(merged) {
 		const paEn = merged[`${pref}portaudio_enabled`] === true || merged[`${pref}portaudio_enabled`] === 'true'
 		const list = merged[`${pref}portaudio_consumers`]
 		const hasList = Array.isArray(list) && list.length > 0
-		if (hasList || (globalPa && paEn)) {
+		const oalCabled = merged[`${pref}system_audio_cabled`] === true
+		if (!oalCabled && (hasList || (globalPa && paEn))) {
 			merged[`${pref}system_audio_enabled`] = false
 		}
 	}

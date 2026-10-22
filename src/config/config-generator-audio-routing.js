@@ -85,9 +85,12 @@ function mergeAudioRoutingIntoConfig(config) {
 		out[`screen_${n}_preview_system_audio_enabled`] = previewBusOn
 		out[`screen_${n}_preview_system_audio_device_name`] =
 			previewBusOn && apDev ? apDev : prevDev[n - 1] || ''
-		/** PortAudio (PR #1720) replaces OpenAL program output for this screen — avoid duplicate consumers */
+		/** PortAudio (PR #1720) replaces OpenAL program output for this screen — avoid duplicate consumers.
+		 * WO-683: buildConfigXml merges again after the cable pass, so an OAL output cabled to this
+		 * destination (`system_audio_cabled`) must survive here too. */
 		if (
 			profile === 'custom_live' &&
+			out[`screen_${n}_system_audio_cabled`] !== true &&
 			(out[`screen_${n}_portaudio_enabled`] === true || out[`screen_${n}_portaudio_enabled`] === 'true')
 		) {
 			out[`screen_${n}_system_audio_enabled`] = false

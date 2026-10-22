@@ -208,3 +208,26 @@ func test_helpers() -> void:
 	t.eq(O.math_initial("v4l2_out", "fps", "0"), "1", "fps clamps to 1")
 	t.eq(O.remove_confirm("v4l2_out", "vcam_1"), "Remove virtual camera output from Device View?", "vcam confirm")
 	t.eq(VA.vcam_patch({}, {"res": "640", "label": "", "device": "", "fps": "", "audio": true, "shader": false}).height, 1080, "no x → height 1080")
+
+
+## WO-683: Caspar's PortAudio settings are global — one PortAudio output per server.
+func test_single_portaudio() -> void:
+	t.eq(O.portaudio_output_id([{"id": "a", "type": "system-audio"}, {"id": "b"}, {"id": "c", "type": "portaudio"}]), "b",
+		"missing type = PortAudio, first one wins")
+	t.eq(O.portaudio_output_id([{"id": "a", "enabled": false}, {"id": "b", "enabled": "false"}]), "", "disabled rows hold nothing")
+	var s := {"audioOutputs": [{"id": "audio_1", "label": "HDMI 8ch", "type": "portaudio"}]}
+	t.eq(O.add_plan("audio_out", s).requests[0][2].audioOutputs[1].type, "system-audio", "second row starts as System Audio")
+	t.eq(O.add_plan("audio_out", {"audioOutputs": []}).requests[0][2].audioOutputs[0].type, "portaudio", "first row is PortAudio")
+	s.audioOutputs.append({"id": "audio_2", "label": "Audio 2", "type": "portaudio", "hostApi": "ASIO"})
+	var ui := VA.audio_state({"id": "audio_2"}, {}, s)
+	t.eq(ui.type, "system-audio", "the second row cannot be PortAudio")
+	t.eq(ui.host_api, "auto", "a Windows host API shows as Auto")
+	var items := VA.audio_items({"id": "audio_2"}, {}, s, ui)
+	var type_sel: Dictionary = items.filter(func(i: Dictionary) -> bool: return i.get("key") == "type")[0]
+	t.eq(type_sel.options, [["system-audio", "System Audio (stereo monitor)"]], "PortAudio is not offered")
+	t.eq(items.any(func(i: Dictionary) -> bool: return i.get("t") == "warn" and str(i.text).contains("HDMI 8ch")), true,
+		"saved-as-PortAudio row warns it is skipped")
+	var own := VA.audio_items({"id": "audio_1"}, {}, s, VA.audio_state({"id": "audio_1"}, {}, s))
+	t.eq(own.filter(func(i: Dictionary) -> bool: return i.get("key") == "type")[0].options.size(), 2, "the PortAudio output keeps both types")
+	var host: Dictionary = own.filter(func(i: Dictionary) -> bool: return i.get("key") == "host_api")[0]
+	t.eq(host.options.map(func(o: Array) -> String: return o[0]), ["auto", "ALSA", "JACK"], "Linux host APIs")

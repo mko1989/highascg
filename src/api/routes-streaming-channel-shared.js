@@ -7,6 +7,7 @@ const { getChannelMap } = require('../config/routing')
 const { buildAudioDownmixFilterChain } = require('../streaming/streaming-channel-ffmpeg')
 const { destinationAudioLayoutsByMain, destinationsFromConfig } = require('../config/screen-destinations')
 const { normalizeProgramLayout, maxProgramLayout } = require('../config/audio-channel-layouts')
+const { portAudioOutputId } = require('../config/portaudio-output')
 
 const STREAMING_RTMP_CONSUMER_INDEX = 97
 const STREAMING_RECORD_CONSUMER_INDEX = 96
@@ -209,6 +210,7 @@ function cabledAudioOutputLayoutForMain(config, mainIdx) {
 	if (!outputs.length || !edges.length) return null
 	const destinations = destinationsFromConfig(config || {})
 	if (!destinations.length) return null
+	const paId = portAudioOutputId(outputs)
 	let layout = null
 	for (const out of outputs) {
 		if (!out || typeof out !== 'object') continue
@@ -217,7 +219,8 @@ function cabledAudioOutputLayoutForMain(config, mainIdx) {
 		if (String(out.type || 'portaudio').toLowerCase() === 'system-audio') continue
 		if (!String(out.deviceName || '').trim()) continue
 		const id = String(out.id || '').trim()
-		if (!id) continue
+		// WO-683: only the server's one PortAudio output becomes a consumer.
+		if (!id || id !== paId) continue
 		const edge = edges.find((e) => String(e?.sinkId) === id)
 		if (!edge) continue
 		const srcId = String(edge.sourceId || '')

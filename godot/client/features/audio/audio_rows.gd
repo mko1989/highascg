@@ -7,6 +7,7 @@ extends RefCounted
 const HC := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const MM := preload("res://features/live/mixer_math.gd")
+const OP := preload("res://features/devices/output_ports_model.gd")
 
 const TIMELINE_LAYER_BASE := 210
 const AUDIO_ONLY_LOOK_LAYER := 200
@@ -290,10 +291,13 @@ static func bus_channel_count(settings: Dictionary, cm: Dictionary, program_ch: 
 			by_dest[_main_idx(d)] = _norm_layout(d.get("audioLayout") if HC.truthy(d.get("audioLayout")) else "stereo")
 	var cabled := {}
 	var edges := R.a(R.d(settings.get("deviceGraph")).get("edges"))
+	var pa_id := OP.portaudio_output_id(settings.get("audioOutputs"))  # WO-683: the only PortAudio consumer
 	for o in R.a(settings.get("audioOutputs")):
 		if not (o is Dictionary) or (o.get("enabled") is bool and not o.enabled) or str(o.get("enabled")) == "false":
 			continue
 		if (str(o.type) if HC.truthy(o.get("type")) else "portaudio").to_lower() == "system-audio" or R.s(o.get("id")) == "":
+			continue
+		if R.s(o.get("id")) != pa_id:
 			continue
 		var edge: Variant = null
 		for e in edges:

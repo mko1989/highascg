@@ -12,12 +12,15 @@ const H := O.H
 const VCAM_NOTE := "Virtual webcam for Zoom/OBS: Caspar channel → mjpeg stream (loopback UDP) → ffmpeg → v4l2loopback. Audio via ALSA loopback capture device. Cable a destination to this port and Apply to set the source channel."
 const VCAM_JPEG_NOTE := "Virtual webcam for Zoom/OBS (LEGACY jpeg mode): Caspar channel → JPEG buffer → v4l2loopback. Audio via ALSA loopback capture device. Cable a destination to this port and Apply to set the source channel."
 const AUDIO_TYPES := [["portaudio", "PortAudio (multi-ch)"], ["system-audio", "System Audio (stereo monitor)"]]
-const HOST_APIS := [["auto", "Auto Host API"], ["ASIO", "ASIO"], ["ALSA", "ALSA"], ["CoreAudio", "CoreAudio"], ["WASAPI", "WASAPI"]]
+## WO-683: the Linux build resolves ALSA and JACK only (auto = ALSA, then JACK); older saved values show as Auto.
+const HOST_APIS := [["auto", "Auto Host API (ALSA, then JACK)"], ["ALSA", "ALSA"], ["JACK", "JACK"]]
 const LAYOUTS := [["mono", "Mono (1ch)", 1], ["stereo", "Stereo (2ch)", 2], ["4ch", "4-Channel", 4], ["8ch", "8-Channel", 8],
 	["16ch", "16-Channel", 16]]
 const STOCK_WARN := "⚠ PortAudio requires the \"Custom Live\" build profile. HighAsCG will attempt to auto-switch this for you when you Apply."
 const BUS_NOTE := "Caspar program bus width (mixer pairs) is set on each screen destination — select the destination and use Audio outputs."
 const AUDIO_FOOT := "PortAudio supports up to 16 channels. Master layout controls mixer routing pairs (ch1+2 … ch15+16) and Caspar channel-layout on cabled PGM outputs."
+const PA_TAKEN := "PortAudio is used by \"%s\" — Caspar drives one PortAudio device per server."
+const PA_SKIPPED := "⚠ Saved as PortAudio, but \"%s\" already has it — this output is skipped on Apply. Pick System Audio or remove it."
 const REFRESHED := "Audio device list refreshed. Re-open inspector to see full list."
 const REFRESH_REQUESTS := ["/api/audio/portaudio-devices?refresh=1&outputsOnly=false", "/api/audio/devices?refresh=1"]
 
@@ -193,10 +196,20 @@ static func _refresh_layout(ui: Dictionary, payload: Dictionary, existing: Dicti
 static func audio_state(conn: Dictionary, payload: Dictionary, settings: Variant) -> Dictionary:
 	var ex := _existing(conn, settings)
 	var ui := {"name": O.js(O.or_([ex.get("label"), conn.get("label"), ""])), "type": O.pick(AUDIO_TYPES, O.js(O.or_([ex.get("type"), "portaudio"]))),
-		"layout": "", "monitor": O.js(O.or_([ex.get("role"), ""])) == "monitor", "host_api": O.pick(HOST_APIS, O.js(O.or_([ex.get("hostApi"), "auto"]))),
+		"layout": "", "monitor": O.js(O.or_([ex.get("role"), ""])) == "monitor",
+		"host_api": O.js(O.or_([O.pick(HOST_APIS, O.js(O.or_([ex.get("hostApi"), "auto"]))), "auto"])),
 		"buffer": O.math_initial("audio_out", "buffer", O.js(H.coalesce([ex.get("bufferFrames"), 128]))),
 		"latency": O.math_initial("audio_out", "latency", O.js(H.coalesce([ex.get("latencyMs"), 40]))),
 		"fifo": O.math_initial("audio_out", "fifo", O.js(H.coalesce([ex.get("fifoMs"), 50])))}
+	# WO-683: Caspar's PortAudio settings are global — another row holding PortAudio leaves System Audio here.
+	var rows: Variant = R.d(settings).get("audioOutputs")
+	var pa := O.portaudio_output_id(rows)
+	ui.pa_other = ""
+	ui.saved_pa = O.js(O.or_([ex.get("type"), "portaudio"])) != "system-audio"
+	if pa != "" and pa != O.js(conn.get("id")):
+		var owner := O.saved_row({"audioOutputs": rows}, "audioOutputs", pa)
+		ui.pa_other = O.js(O.or_([owner.get("label"), pa]))
+		ui.type = "system-audio"
 	_refresh_devices(ui, payload, ex)
 	ui.manual = "" if ui.device != "" else O.js(O.or_([ex.get("deviceName"), ""]))
 	if ui.monitor and ui.type != "system-audio":
@@ -241,7 +254,11 @@ static func audio_items(conn: Dictionary, payload: Dictionary, settings: Variant
 	var inp := func(k: String, ph: String) -> Dictionary: return {"t": "input", "key": k, "value": ui[k], "placeholder": ph, "secret": false}
 	var sel := func(k: String, opts: Array, v: String, dis := false) -> Dictionary:
 		return {"t": "select", "key": k, "value": v, "options": opts, "disabled": dis}
-	items.append_array([inp.call("name", "Output label"), sel.call("type", AUDIO_TYPES, ui.type),
+	var types: Array = AUDIO_TYPES if ui.get("pa_other", "") == "" else [AUDIO_TYPES[1]]
+	items.append_array([inp.call("name", "Output label"), sel.call("type", types, ui.type)])
+	if ui.get("pa_other", "") != "":
+		items.append({"t": "warn", "text": PA_SKIPPED % ui.pa_other} if ui.get("saved_pa", false) else {"t": "small", "text": PA_TAKEN % ui.pa_other})
+	items.append_array([
 		sel.call("device", dv[0], O.pick(dv[0], ui.device)), inp.call("manual", "or type device name manually"),
 		{"t": "check", "key": "monitor", "text": "Monitor / headphone bus (mixer SOLO output)", "checked": ui.monitor},
 		{"t": "small", "text": BUS_NOTE}, {"t": "caption", "text": "PortAudio output layout"},

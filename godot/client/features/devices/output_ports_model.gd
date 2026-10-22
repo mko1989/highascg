@@ -150,6 +150,20 @@ static func saved_row(settings: Variant, key: String, id: String) -> Dictionary:
 	return {}
 
 
+## WO-683 (mirror of src/config/portaudio-output.js): Caspar's PortAudio settings are global, so a server drives one
+## PortAudio device — the first enabled PortAudio row (a missing type reads as PortAudio). '' when there is none.
+static func portaudio_output_id(outputs: Variant) -> String:
+	for o in R.a(outputs):
+		if not (o is Dictionary) or (o.get("enabled") is bool and not o.enabled) or str(o.get("enabled")) == "false":
+			continue
+		if js(or_([o.get("type"), "portaudio"])).to_lower() == "system-audio":
+			continue
+		var id := js(or_([o.get("id"), ""])).strip_edges()
+		if id != "":
+			return id
+	return ""
+
+
 static func row_index(settings: Variant, key: String, id: String) -> int:
 	var rows := R.a(R.d(settings).get(key))
 	for i in rows.size():
@@ -218,7 +232,9 @@ static func add_plan(kind: String, settings: Variant) -> Dictionary:
 			row = {"id": "rec_%d" % i, "label": label, "enabled": true, "name": label, "source": "program_1", "crf": 26}
 		_:
 			label = "Audio %d" % i
-			row = {"id": "audio_%d" % i, "label": label, "enabled": true, "deviceName": "", "channelLayout": "stereo"}
+			# WO-683: one PortAudio output per server — later ones start as System Audio (OAL).
+			var type := "system-audio" if portaudio_output_id(cur) != "" else "portaudio"
+			row = {"id": "audio_%d" % i, "label": label, "enabled": true, "type": type, "deviceName": "", "channelLayout": "stereo"}
 	var next := cur.duplicate()
 	next.append(row)
 	var what: String = {"stream_out": "stream", "record_out": "record", "audio_out": "audio"}[kind]

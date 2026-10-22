@@ -5,6 +5,7 @@ import { appendCableAffordance } from './device-view-cable-affordance.js'
 import { decklinkInputState, stateClass } from './device-view-helpers.js'
 import { normalizeDecklinkIoDirection } from '../lib/decklink-io-direction.js'
 import { setStatus } from './device-view-ui-utils.js'
+import { portAudioOutputId } from '../lib/program-audio-layouts.js'
 import * as Actions from './device-view-actions.js'
 import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camera-state.js'
 import { renderCasparBand } from './device-view-caspar-render.js'
@@ -374,7 +375,9 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 			try {
 				const cur = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : [];
 				const idx = cur.length + 1;
-				const next = [...cur, { id: `audio_${idx}`, label: `Audio ${idx}`, enabled: true, deviceName: '', channelLayout: 'stereo' }];
+				// WO-683: one PortAudio output per server — later ones start as System Audio (OAL).
+				const type = portAudioOutputId(cur) ? 'system-audio' : 'portaudio';
+				const next = [...cur, { id: `audio_${idx}`, label: `Audio ${idx}`, enabled: true, type, deviceName: '', channelLayout: 'stereo' }];
 				await Actions.saveSettingsPatch({ audioOutputs: next });
 				setStatus(statusEl, `Added audio output Audio ${idx}`, true);
 				await load({ forceRefresh: true })

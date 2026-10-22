@@ -30,6 +30,22 @@ export function destinationAudioLayoutsByMain(settings) {
 }
 
 /**
+ * WO-683 (mirror of src/config/portaudio-output.js): Caspar's PortAudio settings are global, so a server
+ * drives one PortAudio device — the first enabled PortAudio row (missing type = PortAudio).
+ * @param {unknown} audioOutputs
+ * @returns {string} that row's id, '' when there is none
+ */
+export function portAudioOutputId(audioOutputs) {
+	for (const out of Array.isArray(audioOutputs) ? audioOutputs : []) {
+		if (!out || typeof out !== 'object' || out.enabled === false || out.enabled === 'false') continue
+		if (String(out.type || 'portaudio').toLowerCase() === 'system-audio') continue
+		const id = String(out.id || '').trim()
+		if (id) return id
+	}
+	return ''
+}
+
+/**
  * Widest PortAudio consumer layout cabled to each main destination's PGM feed.
  * @param {object} [settings]
  * @returns {Record<number, string>}
@@ -39,6 +55,7 @@ export function cabledPortAudioLayoutsByMain(settings) {
 	const audioOutputs = Array.isArray(settings?.audioOutputs) ? settings.audioOutputs : []
 	const destinations = destinationsFromSettings(settings)
 	const edges = Array.isArray(settings?.deviceGraph?.edges) ? settings.deviceGraph.edges : []
+	const paId = portAudioOutputId(audioOutputs)
 
 	for (const out of audioOutputs) {
 		if (!out || typeof out !== 'object') continue
@@ -46,7 +63,7 @@ export function cabledPortAudioLayoutsByMain(settings) {
 		const consumerType = String(out.type || 'portaudio').toLowerCase()
 		if (consumerType === 'system-audio') continue
 		const id = String(out.id || '').trim()
-		if (!id) continue
+		if (!id || id !== paId) continue
 
 		const edge = edges.find((e) => String(e.sinkId) === id)
 		if (!edge) continue

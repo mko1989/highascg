@@ -28,6 +28,7 @@ const FILES = [
 	'tools/smoke/smoke-cg-orphan-sweep-occupied-only.test.js',
 	'tools/smoke/smoke-no-duplicate-standard-video-mode.test.js',
 	'tools/smoke/smoke-no-root-portaudio-without-consumers.test.js',
+	'tools/smoke/smoke-wo683-single-portaudio.test.js',
 	'tools/smoke/smoke-screen-consumer-placement.test.js',
 	'tools/smoke/smoke-project-fps-network.test.js',
 	'tools/smoke/smoke-edid-parse.test.js',

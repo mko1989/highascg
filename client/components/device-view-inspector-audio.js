@@ -9,6 +9,7 @@ import {
 	portAudioLayoutOptionsForDevice,
 } from '../lib/audio-channel-layouts.js'
 import { attachMathInput } from '../lib/math-input.js'
+import { portAudioOutputId } from '../lib/program-audio-layouts.js'
 
 function selectedDeviceMaxChannels(deviceSel, lastPayload) {
 	const val = String(deviceSel?.value || '').trim()
@@ -43,9 +44,25 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 
 	const nameIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'text', placeholder: 'Output label', value: String(existing?.label || conn?.label || '') })
 
+	/* WO-683: Caspar's PortAudio settings are global — one PortAudio device per server. Another row
+	 * holding it removes the PortAudio choice here; a row still saved as PortAudio is skipped on Apply. */
+	const paId = portAudioOutputId(audioOutputsList)
+	const paOwner = paId && paId !== String(conn.id || '') ? audioOutputsList.find((x) => String(x?.id || '') === paId) : null
+	const savedType = String(existing?.type || 'portaudio')
 	const typeSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
-	typeSel.innerHTML = '<option value="portaudio">PortAudio (multi-ch)</option><option value="system-audio">System Audio (stereo monitor)</option>'
-	typeSel.value = String(existing?.type || 'portaudio')
+	typeSel.innerHTML = paOwner
+		? '<option value="system-audio">System Audio (stereo monitor)</option>'
+		: '<option value="portaudio">PortAudio (multi-ch)</option><option value="system-audio">System Audio (stereo monitor)</option>'
+	typeSel.value = paOwner ? 'system-audio' : savedType
+	const paNote = paOwner
+		? Object.assign(document.createElement('p'), {
+			className: 'device-view__note small',
+			style: 'margin:0;opacity:.75',
+			textContent: savedType === 'system-audio'
+				? `PortAudio is used by "${paOwner.label || paId}" — Caspar drives one PortAudio device per server.`
+				: `⚠ Saved as PortAudio, but "${paOwner.label || paId}" already has it — this output is skipped on Apply. Pick System Audio or remove it.`,
+		})
+		: null
 
 	// Device picker from live enumeration
 	const deviceSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
@@ -157,8 +174,9 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	if (monitorChk.checked && typeSel.value !== 'system-audio') typeSel.value = 'system-audio'
 
 	const hostApiSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
-	hostApiSel.innerHTML = '<option value="auto">Auto Host API</option><option value="ASIO">ASIO</option><option value="ALSA">ALSA</option><option value="CoreAudio">CoreAudio</option><option value="WASAPI">WASAPI</option>'
-	hostApiSel.value = String(existing?.hostApi || 'auto')
+	// WO-683: the Linux build resolves ALSA and JACK only (auto = ALSA, then JACK).
+	hostApiSel.innerHTML = '<option value="auto">Auto Host API (ALSA, then JACK)</option><option value="ALSA">ALSA</option><option value="JACK">JACK</option>'
+	hostApiSel.value = ['auto', 'ALSA', 'JACK'].includes(String(existing?.hostApi || '')) ? String(existing.hostApi) : 'auto'
 	hostApiSel.addEventListener('change', () => void save())
 
 	const bufferIn = Object.assign(document.createElement('input'), { className: 'device-view__destinations-type', type: 'number', min: '1', placeholder: 'Buffer frames (e.g. 128)', value: String(existing?.bufferFrames ?? 128) })
@@ -243,6 +261,7 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 	wrapCtl.append(
 		nameIn,
 		typeSel,
+		...(paNote ? [paNote] : []),
 		deviceSel,
 		manualDevIn,
 		monitorLab,

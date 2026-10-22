@@ -3,6 +3,7 @@
 const { getChannelMap } = require('./routing')
 const { destinationAudioLayoutsByMain, destinationsFromConfig } = require('./screen-destinations')
 const { normalizeProgramLayout, maxProgramLayout } = require('./audio-channel-layouts')
+const { portAudioOutputId } = require('./portaudio-output')
 
 /**
  * Widest PortAudio consumer layout cabled to each main destination's PGM feed.
@@ -14,6 +15,7 @@ function cabledPortAudioLayoutsByMain(config) {
 	const audioOutputs = Array.isArray(config?.audioOutputs) ? config.audioOutputs : []
 	const destinations = destinationsFromConfig(config || {})
 	const edges = Array.isArray(config?.deviceGraph?.edges) ? config.deviceGraph.edges : []
+	const paId = portAudioOutputId(audioOutputs)
 
 	for (const out of audioOutputs) {
 		if (!out || typeof out !== 'object') continue
@@ -21,7 +23,8 @@ function cabledPortAudioLayoutsByMain(config) {
 		const consumerType = String(out.type || 'portaudio').toLowerCase()
 		if (consumerType === 'system-audio') continue
 		const id = String(out.id || '').trim()
-		if (!id) continue
+		// WO-683: only the server's one PortAudio output becomes a consumer.
+		if (!id || id !== paId) continue
 
 		const edge = edges.find((e) => String(e.sinkId) === id)
 		if (!edge) continue

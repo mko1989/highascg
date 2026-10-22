@@ -19,6 +19,7 @@ const { normalizeDeviceGraph } = require('../config/device-graph')
 const { mergeSystemDisplaySettings, pickOscForPersistence, SYSTEM_DISPLAY_KEYS } = require('./settings-os')
 const { normalizeEditorDefaults } = require('../config/editor-defaults')
 const { resolveEffectiveProgramLayout } = require('../config/program-audio-layouts')
+const { normalizeHostApi } = require('../config/portaudio-output')
 const { normalizeNetworkSettings } = require('../config/network-settings')
 const { normalizeProjectFps, applyProjectFpsToInheritedOutputs, resolveProjectFps } = require('../config/project-fps')
 const { getSatellitePreviewClient } = require('../companion/satellite-preview-client')
@@ -357,7 +358,7 @@ async function handlePost(path, body, ctx) {
 				// WO-406: 'monitor' marks the headphone/solo bus (monitor-bus.js resolver).
 				if (String(x.role || '').toLowerCase() === 'monitor') out.role = 'monitor'
 				if (type === 'portaudio') {
-					out.hostApi = String(x.hostApi || 'auto').trim() || 'auto'
+					out.hostApi = normalizeHostApi(x.hostApi)
 					const buf = parseInt(String(x.bufferFrames ?? 128), 10)
 					const lat = parseInt(String(x.latencyMs ?? 40), 10)
 					const fifo = parseInt(String(x.fifoMs ?? 50), 10)
