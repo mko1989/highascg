@@ -95,5 +95,7 @@ Setup, once:
       1. Drag the Live / deck splitter smaller: the windows shrink.
       2. Move a window: Auto turns off.
       3. A second screen gets a second column.
+- [ ] **WO-671:** with Auto on, click a PGM / PRV window (no drag): Auto stays on. Drag the Live / deck splitter:
+      the windows follow.
 - [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
       Inspector title is white.

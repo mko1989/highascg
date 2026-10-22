@@ -33,6 +33,7 @@ const MSG_S := 4.0
 const TIMES_H := 64.0  # WO-658: Auto leaves this much under a window for the Times rows (big row + bar + two small)
 const OUTSIDE := Color("#161b24")  # the preview area beside the canvas — not reachable, so not black like the canvas
 const CANVAS_EDGE := Color(1, 1, 1, 0.22)
+const DRAG_SLOP_PX := 4.0  # a press that moves less than this is a click, not a move (does not turn Auto off)
 
 var role := "opgui"
 var cells: Array = []  # compose cells (server shape), drawn in order
@@ -407,9 +408,11 @@ func _gui_input(e: InputEvent) -> void:
 				_drag = {"i": hit[0], "mode": hit[1], "corner": hit[2], "start": _picture(hit[0]), "at": mb.position}
 				accept_event()
 		elif not _drag.is_empty():
+			var moved: bool = _drag.get("moved", false)
 			_drag = {}
-			_manual()
-			_post()
+			if moved:  # a plain click (select, focus) must not silently turn Auto off — owner 22.10
+				_manual()
+				_post()
 			accept_event()
 		return
 	var mm := e as InputEventMouseMotion
@@ -421,6 +424,9 @@ func _gui_input(e: InputEvent) -> void:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if hit[1] == "remove" else Control.CURSOR_MOVE if c == Vector2i.ZERO else \
 			(Control.CURSOR_FDIAGSIZE if c.x == c.y else Control.CURSOR_BDIAGSIZE)  # ↘↖ vs ↗↙
 		return
+	if not _drag.get("moved", false) and mm.position.distance_to(_drag.at) < DRAG_SLOP_PX:
+		return
+	_drag.moved = true
 	var d: Vector2 = (mm.position - _drag.at) * (canvas().x / image_rect().size.x)
 	var start: Rect2 = _drag.start
 	var r := TM.moved(start, d, canvas()) if _drag.mode == "move" else TM.resized(start, d, canvas(), _drag.corner)
