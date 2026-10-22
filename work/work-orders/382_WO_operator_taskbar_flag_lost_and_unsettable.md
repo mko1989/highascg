@@ -1,6 +1,8 @@
 # WO-382 — Operator taskbar gone + operator-GUI stacking changed: the WO-317 flag was lost and unrecoverable
 
-**Status: 🟡 Implemented — recurred 10.09.26 (WO-569), re-enabled live + default flipped ON in code so it survives a factory reset this time (offline suite 2406/0/2) — owner: confirm helper-window stacking on the glass. See §5.**
+**Status: DEPRECATED (22.10 — the Firefox kiosk and its X SHAPE holes were deleted in WO-646; its auto-park coordinator kept helper windows off the holes. Successor: WO-646 / the Godot GUI, WO-609.)**
+
+Previous status: 🟡 Implemented — recurred 10.09.26 (WO-569), re-enabled live + default flipped ON in code so it survives a factory reset this time (offline suite 2406/0/2) — owner: confirm helper-window stacking on the glass. See §5.
 
 Owner, 2026-07-29:
 > "there is also a regression with how the operator gui behaves in relation to other windows as

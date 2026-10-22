@@ -1,4 +1,6 @@
-**Status: IMPLEMENTED (2026-09-10, offline suite 2406/0/2, syntax-checked, prettier pre-existing-only) — needs `highascg` service restart + owner on-hardware confirmation**
+**Status: DEPRECATED (22.10 — the Firefox kiosk and its X SHAPE holes were deleted in WO-646; no operator-GUI holes exist to go stale. Successor: WO-646 / the Godot GUI, WO-609.)**
+
+Previous status: IMPLEMENTED (2026-09-10, offline suite 2406/0/2, syntax-checked, prettier pre-existing-only) — needs `highascg` service restart + owner on-hardware confirmation
 
 ## Investigation
 

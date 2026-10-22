@@ -1,6 +1,8 @@
 # WO-389 — "Open window" dropdown hides under the compose preview windows
 
-**Status: DONE (2026-07-30, offline suite 1719/0, client build clean; owner QA pending — needs kiosk reload)**
+**Status: DEPRECATED (22.10 — the Firefox kiosk and its X SHAPE holes were deleted in WO-646; menus paint over Godot video panes. Successor: WO-646 / the Godot GUI, WO-609.)**
+
+Previous status: DONE (2026-07-30, offline suite 1719/0, client build clean; owner QA pending — needs kiosk reload)
 **Source:** owner 30.07.26 — "the open window drop down 'hides' under the compose preview windows"
 
 ## 1. Investigation

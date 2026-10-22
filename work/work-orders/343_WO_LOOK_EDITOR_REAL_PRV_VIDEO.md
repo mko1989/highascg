@@ -4,7 +4,9 @@
 actual preview channel on the casparcg screen consumer while editing layers on a look. i mean in
 the look editor not only in the compose preview."
 
-**Status: IMPLEMENTED 2026-07-26 late; DESIGN-2 UPGRADE 2026-07-28: pointer-drags on preview surfaces now re-open the holes 150ms into the drag (press-time blank kept) — the X implicit pointer grab (button held, press landed on Firefox pixels) keeps delivering motion/release across the hole, so the operator sees REAL video through the drag. Modal/dropdown suppression unchanged. Owner QA: drag layers with PRV watch on; revert = DRAG_REOPEN_MS in operator-gui-interaction-suppress.js. — owner's own design won:** reuse the SAME screen consumer
+**Status: DEPRECATED (22.10 — the Firefox kiosk and its X SHAPE holes were deleted in WO-646; the look editor PRV is a Godot video pane. Successor: WO-646 / the Godot GUI, WO-609.)**
+
+Previous status: IMPLEMENTED 2026-07-26 late; DESIGN-2 UPGRADE 2026-07-28: pointer-drags on preview surfaces now re-open the holes 150ms into the drag (press-time blank kept) — the X implicit pointer grab (button held, press landed on Firefox pixels) keeps delivering motion/release across the hole, so the operator sees REAL video through the drag. Modal/dropdown suppression unchanged. Owner QA: drag layers with PRV watch on; revert = DRAG_REOPEN_MS in operator-gui-interaction-suppress.js. — owner's own design won:** reuse the SAME screen consumer
 under the kiosk. A 'PRV' toggle in the edit bar punches a hole over the edit canvas routed to that
 main's preview channel (new 'lookedit' surface, role prv+mainIndex); the WO-339 edit_chrome ON the
 channel is the "transparent overlay" (Firefox cannot draw over a hole). WATCH mode by design:
