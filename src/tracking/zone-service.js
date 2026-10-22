@@ -23,12 +23,26 @@ function createZoneService(ctx, hub, deps = {}) {
 		const entry = { at, zone: zone.id, name: zone.name, kind, marker, count, action: zone.actions[kind] || '', ok: null, detail: '' }
 		recent.unshift(entry)
 		recent.length = Math.min(recent.length, LOG_MAX)
-		Promise.resolve(runAction(action, ctx, deps)).then((r) => {
+		const run = action?.type === 'presenter' ? runPresenter(marker, kind) : runAction(action, ctx, deps)
+		Promise.resolve(run).then((r) => {
 			entry.ok = r.ok
 			entry.detail = r.detail
 			log(r.ok ? 'info' : 'warn', `[zones] ${zone.name} ${kind} (marker ${marker}, ${count} inside) → ${r.detail}`)
 		})
 	})
+	/** WO-675: zone action `presenter` → the crossing marker's presenter's own enter / exit actions, in order. */
+	async function runPresenter(marker, kind) {
+		const r = ctx?.presenters?.actionsFor(marker, kind)
+		if (!r?.presenter) return { ok: true, detail: `no presenter on marker ${marker}` }
+		const out = []
+		let ok = true
+		for (const a of r.actions) {
+			const x = await runAction(a, ctx, deps)
+			ok = ok && x.ok
+			out.push(x.detail)
+		}
+		return { ok, detail: `${r.name}: ${out.join('; ') || 'no actions'}` }
+	}
 	let lastJson = ''
 	const apply = (project) => {
 		const slice = project?.previs?.tracking?.zones ?? null

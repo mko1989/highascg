@@ -7,12 +7,13 @@ tracks. It knows nothing about stage geometry: the server unprojects feet points
 
 Protocol (JSON lines):
   stdin  {"type": "config", "model": "/abs/x.onnx", "pose_model": "" | "/abs/y-pose.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
-          "grace_ms": 500, "threads": 4, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
+          "grace_ms": 500, "threads": 4, "faces": false, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
   stdout {"type": "ready", "model", "providers", "input"}
          {"type": "tracks", "camera", "frame", "w", "h", "ms", "tracks": [{"tid", "box": [x1, y1, x2, y2] (0–1),
           "score", "age_s", "mask"?, "kps"?}], "mask_size"?}  — once per detection step per camera (an empty list is
           a real "nobody"); a seg model adds WO-665 cut-out masks (seg.py) to live tracks; a pose_model adds WO-667
-          body keypoints (pose.py, a second session on the same frame)
+          body keypoints (pose.py, a second session on the same frame); with "faces" (WO-675) a live track gets
+          "face": [128 floats] (face.py, YuNet + SFace) at most every FACE_EVERY_S and only while a face is visible
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
 Exits when stdin closes (the server went away), so it never outlives its owner.
@@ -31,11 +32,14 @@ sys.path.insert(0, os.path.join(HERE, "..", "hshm-bridge"))
 import detector  # noqa: E402
 import hshm_abi  # noqa: E402
 import pose  # noqa: E402
+import face  # noqa: E402
 
 DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "threads": 4,
-    "cameras": []}
+    "faces": False, "cameras": []}
 STALE_S = 1.0
 IDLE_S = 0.004
+FACE_EVERY_S = 1.0  # WO-675: per track; a face feature costs ~10 ms
+FACES_PER_STEP = 3
 
 
 def emit(obj):
@@ -67,6 +71,7 @@ class Camera:
         self.ino = None
         self.opened = 0.0
         self.det = detector.CameraDetector()
+        self.face_at = {}  # WO-675: tid → when its face was last looked for
         self.last_step = 0.0
         self.last_frame = 0.0
         self.steps = 0
@@ -121,11 +126,41 @@ class Camera:
         return info, pixels
 
 
+def load_faces(models_dir):
+    if not face.models_present(models_dir):
+        emit({"type": "error", "detail": "faces: models missing in %s (fetch-face-models.sh)" % models_dir})
+        return False
+    try:
+        return face.Faces(models_dir)
+    except Exception as e:  # noqa: BLE001 — detection carries on without faces
+        emit({"type": "error", "detail": "faces: %s" % e})
+        return False
+
+
+def attach_faces(faces, cam, tracks, bgr, now):
+    """A live track's face feature, at most every FACE_EVERY_S per track and FACES_PER_STEP per frame."""
+    done = 0
+    for t in tracks:
+        if done >= FACES_PER_STEP:
+            break
+        if t["age_s"] > 0 or now - cam.face_at.get(t["tid"], 0.0) < FACE_EVERY_S:
+            continue
+        cam.face_at[t["tid"]] = now
+        done += 1
+        v = faces.embed_person(bgr, t["box"])
+        if v is not None:
+            t["face"] = [round(float(x), 4) for x in v]
+    live = {t["tid"] for t in tracks}
+    for tid in [k for k in cam.face_at if k not in live]:
+        del cam.face_at[tid]
+
+
 def main():
     q, done = queue.Queue(), threading.Event()
     threading.Thread(target=read_stdin, args=(q, done), daemon=True).start()
     cfg, cams, backend, model = dict(DEFAULTS), {}, None, None
     poser, pose_model = None, ""
+    faces = None  # WO-675: face.Faces once a config asks for faces and the models are there
     last_status = 0.0
     while not done.is_set():
         while not q.empty():
@@ -151,6 +186,10 @@ def main():
                         poser = pose.PoseBackend(pose_model, max(1, int(cfg["threads"]) // 2))
                     except Exception as e:  # noqa: BLE001 — detection carries on without keypoints
                         emit({"type": "error", "detail": "pose model %s: %s" % (pose_model, e)})
+            if cfg["faces"] and faces is None and model:
+                faces = load_faces(os.path.dirname(model))
+            elif not cfg["faces"]:
+                faces = None
         now = time.monotonic()
         worked = False
         for cam in cams.values():
@@ -170,6 +209,8 @@ def main():
                 detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
                 if poser is not None:  # WO-667: body keypoints for the posed dummies
                     pose.attach(tracks, poser.predict(rgb, cfg["confidence"]))
+                if faces:  # WO-675: presenter recognition
+                    attach_faces(faces, cam, tracks, face.bgr_from_bgra(pixels, r.width, r.height, r.stride), now)
             except Exception as e:  # noqa: BLE001 — one bad frame (e.g. a singular Kalman matrix) drops, not the camera
                 emit({"type": "error", "detail": "%s: %s" % (cam.id, e)})
                 continue

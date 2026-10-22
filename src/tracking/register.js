@@ -32,6 +32,10 @@
  * (`joints`: WO-667 17 COCO body joints, src/tracking/pose3d.js, when the sidecar runs a pose model); each
  * camera person the world person it belongs to (`world: id`). With 2+ solved cameras (`fused`) the pin follows
  * world persons (key `w:<id>`), so a person hidden in one camera stays pinned from the other.
+ * Presenters (WO-675, src/tracking/presenters.js + presenter-routes.js): /api/tracking/presenters… (the phone intake
+ *       page, roster, operator assign / release); WS tracking:presenters {presenters, suggestions} on change (≤ 2 Hz).
+ *       While a presenter has a face, the sidecar adds face features (faces never reach a client); a bound presenter
+ *       drives hub marker 65000 + n, and a zone action `presenter` fires that presenter's actions.
  * Verification walk (T10d, src/tracking/verify-walk.js): GET /api/tracking/verify · POST {action: 'start', a: [x,y],
  *       b: [x,y], person?} | {action: 'stop'} | {action: 'reset'} — sampled after every fusion step with a new frame.
  */
@@ -48,6 +52,8 @@ const { DetectPin } = require('./detect-pin')
 const { Fusion } = require('./fusion')
 const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
+const { createPresenters } = require('./presenters')
+const { handlePresenters } = require('./presenter-routes')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
@@ -59,6 +65,8 @@ const FIXTURES_EVENT = 'tracking:fixtures' // WO-615 T5: typed fixtures' axes / 
 const ZONES_EVENT = 'tracking:zones'
 const DETECT_EVENT = 'tracking:detections'
 const DETECT_MS = 66
+const PRESENTERS_EVENT = 'tracking:presenters'
+const PRESENTERS_MS = 500
 
 const hub = new MarkerHub()
 let _timer = null
@@ -79,6 +87,8 @@ const fusion = new Fusion()
 const pose3d = new Pose3D() // WO-667: 3D body joints on the world persons
 const walk = new VerifyWalk()
 let _pinAt = 0
+let _presenters = null
+let _presentersSent = { json: '', at: 0 }
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
@@ -247,7 +257,53 @@ function pick(body) {
 	})
 }
 
-async function handleApi({ method, path, body }) {
+/** WO-675: a face seen by a camera → the person key the operator binds (`w:<id>` once fused, else `camera:tid`). */
+function observeFaces(camera, list) {
+	if (!_presenters || !_detect) return
+	const now = hub.now()
+	const fused = _detect.solvedCameras >= 2
+	const owner = new Map()
+	if (fused) for (const w of fusion.persons(now)) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
+	const out = []
+	for (const f of list) {
+		const wid = owner.get(`${camera}:${f.tid}`)
+		if (fused && wid === undefined) continue
+		out.push({ key: fused ? `w:${wid}` : `${camera}:${f.tid}`, feature: f.feature })
+	}
+	_presenters.observe(out)
+}
+
+/** Where a person key stands on the floor now, or null (then the presenter's marker goes stale). */
+function locate(key) {
+	if (!_detect) return null
+	const now = hub.now()
+	if (key.startsWith('w:')) {
+		const w = fusion.persons(now).find((q) => `w:${q.id}` === key && q.age_s === 0)
+		return w ? { x: w.x, y: w.y } : null
+	}
+	const [cam, tid] = [key.slice(0, key.lastIndexOf(':')), Number(key.slice(key.lastIndexOf(':') + 1))]
+	const p = _detect.frames().find((f) => f.id === cam)?.persons.find((q) => q.tid === tid)
+	return p?.floor ? { x: p.floor[0], y: p.floor[1] } : null
+}
+
+/** Roster + suggestions: ≤ 2 Hz, only on a change; keeps the sidecar's face features on while anyone has a face. */
+function presentersTick() {
+	if (!_presenters) return
+	if (_detect) _detect.setFaces(_presenters.wantsFaces(), observeFaces)
+	_presenters.tick(locate)
+	if (!_ctx || typeof _ctx._wsBroadcast !== 'function') return
+	const now = hub.now()
+	if (now - _presentersSent.at < PRESENTERS_MS) return
+	const snap = _presenters.snapshot()
+	const json = JSON.stringify(snap)
+	if (json === _presentersSent.json) return
+	_presentersSent = { json, at: now }
+	_ctx._wsBroadcast(PRESENTERS_EVENT, snap)
+}
+
+async function handleApi({ method, path, body, req }) {
+	const pr = await handlePresenters(_presenters, { method, path, body, req })
+	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, { module: 'tracking', status: 'markers', markers: hub.markers.size, writes: _writes,
 			stale_after_ms: MARKER_STALE_AFTER_MS, see: 'work/work-orders/616_WO_previs_tracking_openfollow_cameras.md' })
@@ -368,6 +424,7 @@ module.exports = {
 			fixturesTick()
 			zonesTick()
 			detectTick()
+			presentersTick()
 		}, TICK_MS)
 		if (typeof _timer.unref === 'function') _timer.unref()
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
@@ -389,6 +446,9 @@ module.exports = {
 		_detectSent = { json: '', at: 0 }
 		fusion.reset()
 		pose3d.reset()
+		_presenters = createPresenters(ctx, { hub }) // reloads the /tmp roster after a server restart
+		_presentersSent = { json: '', at: 0 }
+		if (ctx) ctx.presenters = _presenters
 	},
 
 	async onShutdown() {
@@ -404,6 +464,8 @@ module.exports = {
 		_detect = null
 		if (_ctx && _ctx.trackingHub === hub) delete _ctx.trackingHub
 		if (_ctx) delete _ctx.fixtureService
+		if (_ctx && _ctx.presenters === _presenters) delete _ctx.presenters
+		_presenters = null
 		_ctx = null
 	},
 }

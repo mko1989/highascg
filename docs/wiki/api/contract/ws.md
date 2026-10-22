@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-82 types.
+83 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -85,6 +85,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `tracking:fixtures` | `src/tracking/register.js` |  |
 | server → clients | `tracking:follow` | `src/tracking/register.js` |  |
 | server → clients | `tracking:markers` | `src/tracking/register.js` |  |
+| server → clients | `tracking:presenters` | `src/tracking/register.js` |  |
 | server → clients | `tracking:zones` | `src/tracking/register.js` |  |
 | server → clients | `usb:attached` | `src/api/routes-usb-ingest.js`, `src/media/usb-drives.js` |  |
 | server → clients | `usb:automounted` | `src/media/usb-automount.js` |  |

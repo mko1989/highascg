@@ -182,7 +182,7 @@ func _on_tracking_changed() -> void:
 	if track_page.is_inside_tree():  # before the Inspector adopts it the page holds no project data (driver reads the project)
 		markers.entry = track_page.entry()
 		markers.set_defs(track_page.data.markers, track_page.data.grid)
-	track_view.markers_mode = track_page.mode in ["markers", "follow", "detect"]
+	track_view.markers_mode = track_page.mode in ["markers", "follow", "detect", "presenters"]  # WO-675: presenter markers on the picture
 	track_view.follow_mode = track_page.mode == "follow"
 	track_view.calibrating = track_view.follow_mode and track_page.follow != null and track_page.follow.calibrating()
 	if track_page.follow != null:

@@ -7,6 +7,7 @@
  *   look:<sceneId>            take that stored look to program (the WO-598 take-look path — no second take path)
  *   look:<sceneId>@preview    stage it on preview instead
  *   companion:<page>/<row>/<col>   press that Companion button (the timeline flag's HTTP press, WO-24 / WO-547)
+ *   presenter                 WO-675: the actions of the presenter whose marker crossed (zone-service.js, presenters.js)
  *   ''                        nothing (the zone still tracks occupancy — OpenFollow's blank destination)
  */
 
@@ -17,11 +18,12 @@ const COMPANION = /^companion:(\d{1,3})\/(\d{1,3})\/(\d{1,3})$/
 function parseAction(text) {
 	const s = String(text ?? '').trim()
 	if (!s) return null
+	if (s === 'presenter') return { type: 'presenter' }
 	let m = LOOK.exec(s)
 	if (m) return { type: 'look', sceneId: m[1], target: m[2] || 'program' }
 	m = COMPANION.exec(s)
 	if (m) return { type: 'companion', page: Number(m[1]), row: Number(m[2]), col: Number(m[3]) }
-	return { type: 'invalid', error: `unknown action "${s}" (look:<id>[@preview] | companion:<page>/<row>/<col>)` }
+	return { type: 'invalid', error: `unknown action "${s}" (look:<id>[@preview] | companion:<page>/<row>/<col> | presenter)` }
 }
 
 /**

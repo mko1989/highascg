@@ -60,6 +60,8 @@ function createDetectService(ctx, deps = {}) {
 	let leased = ''
 	let rev = 0
 	const latest = new Map() // camera id → { at, frame, w, h, ms, persons }
+	let faces = false // WO-675: the sidecar adds face features while a presenter with a face is on the roster
+	let onFaces = null // (cameraId, [{ tid, feature }]) — never stored in `latest`, never broadcast
 	let sidecarCams = {} // camera id → sidecar status { state, detail, fps, ms }
 
 	const wanted = () => !stopped && det.enabled && cams.length > 0
@@ -79,7 +81,7 @@ function createDetectService(ctx, deps = {}) {
 	function sendConfig() {
 		if (!child?.stdin?.writable) return
 		const cfg = { type: 'config', model: modelPath(), pose_model: det.pose_model ? path.join(modelsDir, det.pose_model) : '', confidence: det.confidence, interval_ms: det.interval_ms,
-			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads,
+			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads, faces,
 			cameras: cams.map((c) => ({ id: c.id, path: `/dev/shm/highascg-${c.role}`, masks: c.masks })) }
 		child.stdin.write(JSON.stringify(cfg) + '\n')
 	}
@@ -96,6 +98,8 @@ function createDetectService(ctx, deps = {}) {
 			if (!ce) return
 			latest.set(ce.id, { at: now(), frame: msg.frame, w: msg.w, h: msg.h, ms: msg.ms, maskSize: maskSizeFrom(msg), persons: personsFrom(msg, ce, planeZ) })
 			rev++
+			const seen = Array.isArray(msg.tracks) ? msg.tracks.filter((t) => Array.isArray(t?.face)) : []
+			if (seen.length && typeof onFaces === 'function') onFaces(ce.id, seen.map((t) => ({ tid: Number(t.tid), feature: t.face })))
 		} else if (msg.type === 'status') {
 			sidecarCams = msg.cameras && typeof msg.cameras === 'object' ? msg.cameras : {}
 			if (msg.ready === false) ready = false
@@ -280,6 +284,13 @@ function createDetectService(ctx, deps = {}) {
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
+		/** WO-675: ask the sidecar for face features (resends the config only on a change) and where they go. */
+		setFaces(on, sink) {
+			onFaces = sink || null
+			if (!!on === faces) return
+			faces = !!on
+			sendConfig()
+		},
 		stop() {
 			stopped = true
 			off()

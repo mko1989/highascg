@@ -1,6 +1,6 @@
 # WO-675 — Presenter recognition: backstage photo + name + mic → recognised on stage → automations
 
-**Status: OPEN (22.10, feasibility + owner decisions D1–D4; no code yet)**
+**Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots). Open: P2 body re-ID, live test with real cameras, lower-third action.**
 
 Owner, `next.md` 22.10: *"how possible is it to do this: an audio tech is giving a mic to a presenter backstage he
 takes a photo of him/her full person, sends it to the system, with a note, name and mic number. when that presenter
@@ -73,10 +73,53 @@ The sidecar already runs ONNX Runtime (CUDA when present) and numpy; it has no O
 | P2 | Suggest: OSNet body re-ID in the sidecar, the best roster match shown on the P-tag with a confidence; the operator confirms with one tap (D1) | ~2–3 days |
 | P3 | Face (YuNet + SFace) added to the suggestion, as a tie-breaker between look-alike outfits | ~1–2 days |
 
-## What was done
+## What was done (22.10 — owner: "lets do zoo")
 
-Nothing yet — feasibility only.
+P1 and P3 together, face first (OpenCV Zoo); P2 (OSNet body re-ID) is not started.
+
+**Server (`src/tracking/`)**
+- `presenters.js` (new): the roster in `/tmp/highascg-presenters` (env `HIGHASCG_PRESENTERS_DIR`), dir 0700, files 0600
+  (`roster.json`, `pN.jpg`). Create needs `consent: true`, a name and a JPEG (≤ 6 MB). The photo is embedded in the
+  background (`face_embed.py` in the sidecar venv) → `face: pending | ok | none | unavailable`. Reloaded after a server
+  restart; bindings are dropped (track ids do not survive it). Features never leave the server.
+- Suggestions: SFace cosine ≥ 0.363 (the model's own threshold), ≥ 0.05 clear of the runner-up, ≥ 2 sightings,
+  smoothed 0.35, evidence kept 10 s. Never auto-bound (D1): only `assign` (the operator) binds.
+- A bound presenter drives hub marker `65000 + slot` named "Name (mic N)", source `presenter`.
+- `zone-actions.js` / `zone-service.js`: zone action `presenter` runs the presenter's own `on_enter`
+  (first / additional entry) or `on_exit` (exits) actions; only `look:` and `companion:` are allowed (D4: the mic is a
+  Companion button).
+- `presenter-routes.js` (new): the routes listed in its header; GET adds `intake_urls` (the box's LAN IPv4 addresses).
+  `presenter-intake.html` (new): the phone page (photo, name, mic, note, consent tick; the image is resized to 1280 px).
+- `detect-service.js` / `register.js`: the sidecar config gets `faces` only while some presenter has a face; per-camera
+  face features → `presenters.observe` (keys `w:<id>` when fused, else `camera:tid`); WS `tracking:presenters` ≤ 2 Hz
+  on change.
+
+**Sidecar (`tools/tracking-detect/`)**
+- `face.py` (new): YuNet detect + SFace align/feature (cv2 `FaceDetectorYN` / `FaceRecognizerSF`, both in the venv's
+  opencv 5.0). Person crop = top 45 % of the box, upscaled to 240 px wide; faces under 20 source px are skipped.
+- `sidecar.py`: live tracks get `"face"` (128 floats) at most once a second per track and 3 per frame.
+- `face_embed.py` (new CLI for the intake photo), `fetch-face-models.sh` (new, sha256-pinned; models not committed),
+  `test_face.py` (new).
+
+**Godot (`features/previs/tracking/`)**
+- `presenters_section.gd` (new): Inspector → Camera → **Presenters** mode. Intake URLs to read out, then one row per
+  presenter: photo, "Name · mic N", note, status ("On stage as P3", "Looks like P3 (81 %) — confirm?"), Confirm /
+  Person… picker / Release / Delete, On enter / On exit action fields; Clear all (with a confirm).
+- `presenters_model.gd` (new): the pure helpers (persons to bind, status line), so the headless tests can load them.
+- `tracking_page.gd`: the sixth mode. `previs_tab.gd`: Presenters mode draws the markers on the picture.
 
 ## What was VERIFIED
 
-Desk read of the tracking code (fusion person ids, zone actions, sidecar). Nothing was run.
+- `tools/smoke/smoke-wo675-presenters.test.js` 8/0 (consent, file modes, restart reload, suggestion rules, marker,
+  zone `presenter` → Companion presses, routes, LAN-only URLs, wiring); added to the curated CI list. test:ci: the only
+  failure was the stale WS contract doc (new `tracking:presenters`), regenerated.
+- `test_face.py`: throttle + per-frame budget, BGRA view, small box skipped.
+- Face models on the box: lena vs lena small-in-frame 0.790, lena vs messi 0.127, flipped 0.912; person crop ~10 ms.
+- Sidecar end to end (synthetic HASCGSHM camera, messi ×2.5, yolo26n, faces on): 21 track messages, 3 with faces;
+  similarity to a messi intake 0.930, to lena 0.142.
+- Box server: intake page 200; POST a JPEG → `face: ok`; dir 0700, files 0600; after a restart `intake_urls` =
+  192.168.0.23 + tailscale.
+- Godot 20887/0 (+7 `test_tracking_presenters.gd`), `--check` boot OK. Second client window: the Presenters mode shows
+  the URLs, the photo row and the fields; typing `companion:1/2/3, nope` in On enter saved `["companion:1/2/3"]`.
+- NOT verified: real cameras (the project has none and detection is off), so a live suggestion → Confirm → zone fire
+  is owner QA.
