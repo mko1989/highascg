@@ -7,7 +7,8 @@ extends VBoxContainer
 ## P2b: "Send media" pushes this project's media to it (server cluster-media.js; both servers must have linked each
 ## other); the progress / result line comes from the peer's `media_send` in the snapshot.
 ## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`), a
-## MASTER tag on its card, "Make master" on this server and on every linked one.
+## MASTER tag on its card, "Make master" on this server and on every linked one. P3b: "This client follows the master"
+## (app/cluster_follow.gd).
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -19,7 +20,7 @@ var _views := {}  # peer id → its device-view payload
 var _own := {}  # this server's device-view payload (for the roles)
 var _list: VBoxContainer
 var _self_l: Label
-var _master_row: HBoxContainer
+var _master_row: VBoxContainer
 var _master_l: Label
 var _auto: CheckBox
 var _take: Button
@@ -202,20 +203,27 @@ func _master() -> Dictionary:
 
 
 func _build_master_row() -> void:
-	_master_row = HBoxContainer.new()
+	_master_row = VBoxContainer.new()  # the line, then its controls (one row squeezed the line to "Master: x · ep")
 	_master_l = _small("", ThemeBuilder.TEXT)
-	_master_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_master_l.clip_text = true
+	_master_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_master_row.add_child(_master_l)
+	var controls := HBoxContainer.new()
+	_master_row.add_child(controls)
 	_auto = CheckBox.new()
 	_auto.text = "Auto failover"
 	_auto.tooltip_text = "When the master is unseen for 12 s, the next server takes over (outputs keep playing either way)."
 	_auto.toggled.connect(func(on: bool) -> void: _set_master({"auto": on}))
-	_master_row.add_child(_auto)
+	controls.add_child(_auto)
+	var follow := CheckBox.new()
+	follow.text = "This client follows the master"
+	follow.tooltip_text = "When another server becomes master, or this one is gone, this client reconnects to the master (app/cluster_follow.gd)."
+	follow.set_pressed_no_signal(Config.cluster().follow)
+	follow.toggled.connect(func(on: bool) -> void: Config.save_cluster({"follow": on}))
+	controls.add_child(follow)
 	_take = Button.new()
 	_take.text = "Make this server master"
 	_take.pressed.connect(func() -> void: _confirm_make("self", "This server"))
-	_master_row.add_child(_take)
+	controls.add_child(_take)
 	add_child(_master_row)
 	_make = ConfirmationDialog.new()
 	_make.confirmed.connect(func() -> void: _set_master({"master": _make_id}))

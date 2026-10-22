@@ -14,8 +14,9 @@
  *   GET    /api/cluster/master                 → { claim, ...view }  (P3a, cluster-master.js: peers pull the signed claim)
  *   POST   /api/cluster/master                 ← a linked server's signed claim (accepted only if it beats the one held)
  *   POST   /api/cluster/master/set { master: 'self' | peer id, auto? } → the new view (operator: Make master / failover)
- * GET /api/cluster also carries `master` (the view). Changes broadcast WS `cluster:peers` (the GET body). The service starts on the first call and polls only while
- * the list is not empty.
+ * GET /api/cluster also carries `master` (the view). Changes broadcast WS `cluster:peers` (the GET body).
+ * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
+ * for a client), and polls only while the list is not empty.
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
@@ -129,4 +130,10 @@ function register(routes) {
 	}, opt)
 }
 
-module.exports = { register, clusterOf, masterOf }
+/** At boot: start polling (and failover) when this server has linked servers. */
+function startIfLinked(ctx) {
+	const peers = (ctx.persistence || defaultPersistence).get('clusterPeers')
+	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
+}
+
+module.exports = { register, clusterOf, masterOf, startIfLinked }

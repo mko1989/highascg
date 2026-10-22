@@ -4,7 +4,8 @@
  * WO-670 P3a — the cluster's master, fenced by an epoch (src/cluster/cluster-master.js). Three in-memory servers with
  * real ed25519 device keys and a switchable network: a claim is signed, pushed and pulled; only linked signers and
  * newer claims are taken; auto failover promotes the first online server of the succession after FAILOVER_MS; a
- * returning old master steps down; a split network converges on one master; the routes are registered.
+ * returning old master steps down; a split network converges on one master; the routes are registered; P3b: started
+ * at boot only when servers are linked.
  */
 
 const { describe, it } = require('node:test')
@@ -188,6 +189,12 @@ describe('WO-670 P3a cluster master', () => {
 		assert.equal((await routes.dispatch('POST', '/api/cluster/master', '{}', ctx)).status, 400)
 		const set = await routes.dispatch('POST', '/api/cluster/master/set', JSON.stringify({ master: 'B' }), ctx)
 		assert.equal(JSON.parse(set.body).master_id, 'B')
+		const { startIfLinked } = require('../../src/api/routes-cluster')
+		const idle = { persistence: { get: () => [] } }
+		startIfLinked(idle)
+		assert.equal(idle._cluster, undefined, 'P3b: no linked servers → nothing starts at boot')
+		const index = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', '..', 'index.js'), 'utf8')
+		assert.match(index, /require\('\.\/src\/api\/routes-cluster'\)\.startIfLinked\(appCtx\)/, 'P3b: started at boot')
 		k.nodes.A.forget()
 		assert.equal(k.nodes.A.claim(), null, 'unlinking the last server drops the claim')
 		assert.equal(k.nodes.A.view().epoch, 0)

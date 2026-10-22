@@ -1,7 +1,8 @@
 extends Node
 ## WO-599 — where the HighAsCG server is. Precedence: `-- --server=http://host:4200`, env
-## HIGHASCG_SERVER, then the active A/B hot-backup profile (ui.cfg [connection], WO-608), then the on-box default
-## http://127.0.0.1:4200 (the client runs next to the server).
+## HIGHASCG_SERVER, then the cluster master this client followed (ui.cfg [cluster] origin, WO-670 P3b), then the active
+## A/B hot-backup profile (ui.cfg [connection], WO-608), then the on-box default http://127.0.0.1:4200 (the client runs
+## next to the server).
 
 const Profiles := preload("res://core/connection_profiles_model.gd")
 
@@ -15,7 +16,30 @@ var _profiles := {}
 
 func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
-	origin = resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), Profiles.active_origin(profiles()))
+	var followed := str(cluster().origin)
+	origin = resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), followed if followed != "" else Profiles.active_origin(profiles()))
+
+
+## Where this client goes without the cluster (args / env / A/B profile / default).
+func home_origin() -> String:
+	return resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), Profiles.active_origin(profiles()))
+
+
+## WO-670 P3b — ui.cfg [cluster]: origin (the master followed, "" = none), servers (every server of the cluster, kept
+## for when this one is gone), follow (this client follows the master, default on).
+func cluster() -> Dictionary:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	return {"origin": str(cfg.get_value("cluster", "origin", "")), "servers": PackedStringArray(cfg.get_value("cluster", "servers", PackedStringArray())),
+		"follow": cfg.get_value("cluster", "follow", true) == true}
+
+
+func save_cluster(changes: Dictionary) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	for k in changes:
+		cfg.set_value("cluster", k, changes[k])
+	cfg.save(UI_CFG)
 
 
 ## A/B profiles from ui.cfg (empty when none are set); read once, kept in step by save_profiles().

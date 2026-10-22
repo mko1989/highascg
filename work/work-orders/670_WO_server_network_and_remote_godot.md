@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) DONE 22.10 (offline + box with a stub running the real module); P3b (clients follow the master), P4, P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4, P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -364,6 +364,49 @@ any LAN host write into `media/`. So:
   - unticking "Auto failover" gave epoch 4 with `auto: false` on both.
   - Unlinking fake-b dropped the claim (`claim: null`, journal line).
 - Not proven: two real boxes (owner QA, checklist §F); the network pulled between them.
+
+## P3b — what was done (22.10)
+
+- **Server: the cluster starts at boot** when servers are linked (`routes-cluster.js` `startIfLinked`, called from
+  `index.js` next to the video feed). Before this change, polling, and so failover, began only with the first
+  `/api/cluster` call. That call came from a client opening Devices.
+- **Godot: the client follows the master:**
+  - `app/cluster_follow.gd` (a node under `main.gd`), with its pure rules in `core/cluster_follow_model.gd`.
+  - From every `cluster:peers` snapshot, it remembers all servers of the cluster in ui.cfg `[cluster] servers`. A peer
+    listed as loopback by its server is reached at that server's host.
+  - **Its server names another online server as master** (after a failover or "Make master" there):
+    - a "Master changed" dialog counts down 5 s, then reconnects;
+    - "Reconnect now" skips the wait; "Stay here" stays until the next epoch;
+    - it reconnects only to a server that says `is_master` itself, so two servers naming each other cannot bounce the
+      client.
+  - **Its server is gone for 8 s** (or never answered since start): every 3 s it asks the remembered servers and its
+    home origin (`GET /api/cluster/master`). It reconnects, without a countdown, to the one that is master (highest
+    epoch), or home when no master answers.
+  - The followed origin is ui.cfg `[cluster] origin`. `core/config.gd` puts it after `--server` / `HIGHASCG_SERVER`
+    and before the A/B profile. Picking A/B clears it.
+  - Devices → Servers has "This client follows the master" (default on). The master line now sits on its own row,
+    because the controls had squeezed it to "Master: fake-b · ep".
+- **The reconnect is a client restart**, as the A/B switch already did: every autoload starts on the new origin. The
+  restart now starts the new process BEFORE quitting. Every quit of this client crashes (WO-676), which had silently
+  killed `OS.set_restart_on_exit`, the A/B switch's restart included.
+
+## P3b — what was VERIFIED
+
+- Offline: Godot 20923/0 (+15 `test_cluster_follow.gd`), `--check` OK; server suite below.
+- Box (stub fake-b running the real master module; a second Godot window with no `--server`):
+  - **Make master on the server.** `master/set {master: fake-b}`: the window showed "Master changed — fake-b is now
+    the master. This client reconnects to it in 3 s (http://127.0.0.1:4301)" (screenshot). A new process started at
+    12:09:21 on 127.0.0.1:4301, and `[cluster] origin` was set.
+  - **Master back on this server while the client sat on the stub.** The stub has no WebSocket, so to the client it
+    was gone. 12 s after starting, it probed, found this server as master, and restarted onto it (12:09:33). `origin`
+    went back to "" (home). Screenshot: connected, "Master: this server · epoch 4", with the controls on their own
+    row.
+  - **Boot start.** Made fake-b master, killed it, restarted the node with no client open. At 12:10:22 the journal
+    showed `master this server epoch 6 (failover: fake-b unseen 14 s)`.
+- Cleanup: unlinked fake-b (claim dropped), removed ui.cfg `[cluster]`, killed the stub and the test window.
+- Not proven:
+  - the 5-s countdown when "Stay here" is clicked (code path only);
+  - a client on another machine following two real boxes (owner QA, checklist §F).
 
 ## What was VERIFIED
 

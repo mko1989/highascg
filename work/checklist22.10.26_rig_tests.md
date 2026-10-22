@@ -92,6 +92,9 @@ Setup, once:
 - [ ] **WO-670 P3a: master + failover.** A and B linked both ways. On A: "Make this server master" → both show
       "Master: …" with A. Pull A's network cable: within ~15 s B shows "Master: this server · epoch N+1". Plug A back:
       A shows B as master within ~5 s (it stepped down). Untick "Auto failover", pull B: nobody takes over.
+- [ ] **WO-670 P3b: the client follows.** Godot on a laptop connected to A (master). Pull A's cable: within ~25 s
+      the laptop reconnects to B by itself. On B, "Make master" on A: the laptop shows "Master changed… 5 s" and
+      goes back to A. "Stay here" keeps it on B.
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 

@@ -74,11 +74,20 @@ static func edit(host: Control) -> void:
 ## Store the profile and restart with the same window args minus --server (HIGHASCG_SERVER would still win).
 static func switch_to(host: Node, p: Dictionary) -> void:
 	Config.save_profiles(p)
+	Config.save_cluster({"origin": ""})  # an A/B pick wins over a followed cluster master (WO-670 P3b)
 	if OS.get_environment("HIGHASCG_SERVER") != "":
 		Kit.confirm(host, "HIGHASCG_SERVER is set for this client and overrides A/B hosts — unset it to switch.",
 			func() -> void: pass)
 		return
+	restart(host)
+
+
+## Restart this client with its window args minus --server: the autoloads start over on the stored origin. The new
+## process is started BEFORE quitting: this client crashes on its way out (glibc "corrupted size vs. prev_size",
+## WO-676), which killed OS.set_restart_on_exit's restart.
+static func restart(host: Node) -> void:
 	var args := PackedStringArray(["--path", ProjectSettings.globalize_path("res://"), "--"])
 	args.append_array(Profiles.restart_user_args(OS.get_cmdline_user_args()))
-	OS.set_restart_on_exit(true, args)
+	if OS.create_process(OS.get_executable_path(), args) <= 0:
+		OS.set_restart_on_exit(true, args)
 	host.get_tree().quit()
