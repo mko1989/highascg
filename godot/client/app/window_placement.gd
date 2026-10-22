@@ -67,4 +67,17 @@ static func apply_scale(choice: float) -> void:
 	cfg.set_value("window", "ui_scale", choice)
 	cfg.save(UI_CFG)
 	var root := (Engine.get_main_loop() as SceneTree).root
-	root.content_scale_factor = ui_scale(DisplayServer.screen_get_size(root.current_screen), choice)
+	fit(root, root.content_scale_mode == Window.CONTENT_SCALE_MODE_DISABLED, choice)
+
+
+## How the UI scales. On the box: one factor from the screen size (1080p → 1×, 4K → 2×). WO-688 off-box (a laptop
+## window of any size, Retina or not): Godot's canvas_items stretch fits the 1080p layout to the window — smaller
+## shrinks it instead of cutting off the right edge — and the factor is only the operator's own choice on top.
+static func fit(w: Window, on_box: bool, override: float) -> void:
+	if on_box:
+		w.content_scale_factor = ui_scale(DisplayServer.screen_get_size(w.current_screen), override)
+		return
+	w.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	w.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	w.content_scale_size = Vector2i(BASELINE)
+	w.content_scale_factor = clampf(override, 0.5, MAX_SCALE) if override > 0.0 else 1.0

@@ -39,3 +39,20 @@ func test_live_rect() -> void:
 	t.eq(P.live_rect(plan, [{"name": "DP-6", "x": 5}]), plan, "an unknown output keeps the plan")
 	t.eq(P.live_rect(plan, null), plan, "no outputs answer keeps the plan")
 	t.eq(P.live_rect(null, outs), null, "no rect stays none")
+
+
+func test_off_box_window_fits_the_layout() -> void:  # WO-688: a laptop window narrower than 1920 cut off the right edge
+	var w := Window.new()
+	P.fit(w, false, 0.0)
+	t.eq(w.content_scale_mode, Window.CONTENT_SCALE_MODE_CANVAS_ITEMS, "off-box: the layout stretches to the window")
+	t.eq(w.content_scale_aspect, Window.CONTENT_SCALE_ASPECT_EXPAND, "expand: the longer side gets more room, nothing is cut")
+	t.eq(w.content_scale_size, Vector2i(1920, 1080), "fitted from the 1080p layout")
+	t.eq(w.content_scale_factor, 1.0, "auto: the stretch alone")
+	P.fit(w, false, 1.25)
+	t.eq(w.content_scale_factor, 1.25, "the operator's UI-scale choice on top")
+	var b := Window.new()
+	P.fit(b, true, 1.5)
+	t.eq(b.content_scale_mode, Window.CONTENT_SCALE_MODE_DISABLED, "on the box: no stretch (unchanged)")
+	t.eq(b.content_scale_factor, 1.5, "on the box: the factor as before")
+	w.free()
+	b.free()

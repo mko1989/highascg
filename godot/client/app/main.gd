@@ -465,7 +465,7 @@ func _apply_window_args() -> void:
 		elif res.ok and ScreenModel.should_auto_open(rect, null, screens.size()):
 			fresh = true
 	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
-	w.content_scale_factor = Placement.ui_scale(DisplayServer.screen_get_size(w.current_screen), override)
+	Placement.fit(w, Platform.is_local_origin(Config.origin), override)
 	if Config.args.has("fullscreen"):
 		w.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
 	_screen_question(fresh)
