@@ -29,6 +29,16 @@ client to the server"*
   and follows window resizes. `apply_scale` (Settings → UI scale) goes through `fit` too (stretch mode on = off-box).
 - `app/main.gd`: `Placement.fit(w, Platform.is_local_origin(Config.origin), override)`.
 
+- Owner, 22.10: the Mac is a **Mac Pro 2020 (Intel, AMD GPU)**. Godot's Metal driver is for Apple Silicon; an Intel Mac
+  runs Forward+ on Vulkan through MoltenVK already, so `--rendering-driver vulkan` is not a different path there. The
+  next test is the Compatibility renderer (OpenGL): `--rendering-method gl_compatibility`. The video textures have an
+  ImageTexture fallback for it (`video/shm_texture.gd:4`).
+- The A/B hosts editor (`app/connection_menu.gd` `edit`) is a ConfirmationDialog too, so it may draw the same noise.
+- **Found while checking the connect path:** `connection_menu.gd` `restart` relaunched with `--path <res://>`. An
+  exported client has its project inside the binary / .pck, so after "Reconnect" the restarted client would look for a
+  project folder that does not exist. Exported builds (`OS.has_feature("template")`) now relaunch with the user args
+  only.
+
 ## What was VERIFIED (22.10)
 
 - Godot `tests/run_tests.gd` 21062 passed, 0 failed (+7 in `test_off_box_window_fits_the_layout`); `--check` OK.
@@ -43,4 +53,5 @@ line (`--ui-scale` below 1 already works in that build):
 
     "<where it was unzipped>/HighAsCG Operator.app/Contents/MacOS/HighAsCG Operator" --rendering-driver vulkan -- --server=http://192.168.0.23:4200 --ui-scale=0.85
 
-If the dialog draws correctly on Vulkan, the macOS preset / project gets `driver.macos = vulkan`.
+If the dialog draws correctly on Vulkan, the macOS preset / project gets `driver.macos = vulkan`. (Superseded for the
+owner's Intel Mac Pro: it is on MoltenVK already; test `--rendering-method gl_compatibility` instead.)

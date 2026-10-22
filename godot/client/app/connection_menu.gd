@@ -85,7 +85,8 @@ static func switch_to(host: Node, p: Dictionary) -> void:
 ## Restart this client with its window args minus --server: the autoloads start over on the stored origin. The new
 ## process is started BEFORE quitting, so a crash on the way out can never cost the restart (it did: WO-676).
 static func restart(host: Node) -> void:
-	var args := PackedStringArray(["--path", ProjectSettings.globalize_path("res://"), "--"])
+	# WO-688: an exported client (Mac / Windows) carries its project inside; --path there points at no project.
+	var args := PackedStringArray(["--"] if OS.has_feature("template") else ["--path", ProjectSettings.globalize_path("res://"), "--"])
 	args.append_array(Profiles.restart_user_args(OS.get_cmdline_user_args()))
 	if OS.create_process(OS.get_executable_path(), args) <= 0:
 		OS.set_restart_on_exit(true, args)
