@@ -83,8 +83,7 @@ static func switch_to(host: Node, p: Dictionary) -> void:
 
 
 ## Restart this client with its window args minus --server: the autoloads start over on the stored origin. The new
-## process is started BEFORE quitting: this client crashes on its way out (glibc "corrupted size vs. prev_size",
-## WO-676), which killed OS.set_restart_on_exit's restart.
+## process is started BEFORE quitting, so a crash on the way out can never cost the restart (it did: WO-676).
 static func restart(host: Node) -> void:
 	var args := PackedStringArray(["--path", ProjectSettings.globalize_path("res://"), "--"])
 	args.append_array(Profiles.restart_user_args(OS.get_cmdline_user_args()))

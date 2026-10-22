@@ -89,9 +89,15 @@ static func apply_broadcast(d: Variant) -> bool:
 	return true
 
 
-## fn(keys: Array) after a load (["loaded"]) or another client's change ([key]).
+## fn(keys: Array) after a load (["loaded"]) or another client's change ([key]). A listener bound to a node must
+## unlisten() when that node leaves the tree: a lambda left in this static array outlives its node at quit and the
+## engine aborted with glibc "corrupted size vs. prev_size in fastbins" on EVERY client exit (WO-676).
 static func listen(fn: Callable) -> void:
 	_listeners.append(fn)
+
+
+static func unlisten(fn: Callable) -> void:
+	_listeners.erase(fn)
 
 
 static func _emit(keys: Array) -> void:
