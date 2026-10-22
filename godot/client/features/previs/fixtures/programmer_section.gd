@@ -8,6 +8,7 @@ extends VBoxContainer
 
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const P := preload("res://features/previs/fixtures/programmer_model.gd")
+const Auto := preload("res://features/previs/fixtures/auto_groups_model.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
@@ -17,6 +18,7 @@ var merged := {}
 var _typed: Array = []  # typed patch entries, list order
 var _list: ItemList
 var _groups: MenuButton
+var _auto: Array = [[], []]  # WO-680: [by position, by address], worked out when the menu opens
 var _controls: VBoxContainer
 var _status: Label
 var _name_dialog: ConfirmationDialog
@@ -302,6 +304,16 @@ func _fill_groups() -> void:
 		p.add_item("%s (%d)" % [groups[i].name, (groups[i].ids as Array).size()], i)
 	if not groups.is_empty():
 		p.add_separator()
+	_auto = [Auto.by_position(_typed), Auto.by_address(_typed)]  # WO-680
+	for k in 2:
+		if not (_auto[k] as Array).is_empty():
+			var sub := PopupMenu.new()
+			for i in (_auto[k] as Array).size():
+				sub.add_item("%s (%d)" % [_auto[k][i].name, (_auto[k][i].ids as Array).size()], 3000 + k * 1000 + i)
+			sub.id_pressed.connect(_on_group)
+			p.add_submenu_node_item(["By position", "By address"][k], sub)
+	if not _typed.is_empty():
+		p.add_separator()
 	p.add_item("Save selection as group…", 1000)
 	p.set_item_disabled(p.item_count - 1, sel.ids.is_empty())
 	if not groups.is_empty():
@@ -318,6 +330,11 @@ func _on_group(id: int) -> void:
 		_name.text = ""
 		_name_dialog.popup_centered(Vector2i(320, 90))
 		_name.grab_focus()
+	elif id >= 3000:
+		var k := floori((id - 3000) / 1000.0)
+		var i := (id - 3000) % 1000
+		if k < _auto.size() and i < (_auto[k] as Array).size():
+			sel.set_ids(_auto[k][i].ids)
 	elif id >= 2000 and id - 2000 < s.groups.size():
 		s.groups = P.drop_group(s.groups, s.groups[id - 2000].name)
 		_persist(s)
