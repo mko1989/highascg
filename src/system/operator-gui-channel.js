@@ -22,7 +22,6 @@ const { getChannelMap } = require('../config/routing')
 const {
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
-	DEFAULT_GUI_URL,
 	operatorGuiDestination,
 	resolveOperatorGuiChannel,
 	resolveOperatorGuiMonitorRect,
@@ -355,7 +354,7 @@ function clearOperatorGuiLayout(ctx) {
 async function ensureOperatorGuiChannel(ctx) {
 	const resolved = resolveOperatorGuiChannel(ctx.config)
 	if (!resolved) return { skipped: true }
-	const { ch, guiUrl } = resolved
+	const { ch } = resolved
 	// WO-410: a (re)connect may face a FRESH caspar with an empty stage — the skip-unchanged
 	// cache describes the previous instance, so forget it or the re-apply skips every PLAY.
 	lastAppliedRouteByChannel.delete(ch)
@@ -418,7 +417,7 @@ async function ensureOperatorGuiChannel(ctx) {
 	} catch (e) {
 		ctx.log?.('warn', `operator-gui: rects-wanted broadcast failed: ${e?.message || e}`)
 	}
-	return { ch, guiUrl }
+	return { ch }
 }
 
 /** Test-only: reset module-level apply/debounce state between smoke test cases. */
@@ -434,7 +433,6 @@ function resetOperatorGuiStateForTests() {
 }
 
 module.exports = {
-	DEFAULT_GUI_URL,
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
 	APPLY_DEBOUNCE_MS,

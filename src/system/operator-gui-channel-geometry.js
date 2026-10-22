@@ -19,7 +19,6 @@ const ROUTE_LAYER_MAX = 49
 /** WO-592: media-inspector preview — a clip LOADed straight onto the GUI channel (no route), on a
  * fixed layer above the route range so compose-cell churn never re-numbers (and restarts) it. */
 const MEDIA_PREVIEW_LAYER = 50
-const DEFAULT_GUI_URL = 'http://127.0.0.1:4200/?operatorGui=1'
 
 /**
  * @param {object} config
@@ -32,7 +31,7 @@ function operatorGuiDestination(config) {
 
 /**
  * @param {object} config
- * @returns {{ ch: number, dest: object, guiUrl: string }|null}
+ * @returns {{ ch: number, dest: object }|null}
  */
 function resolveOperatorGuiChannel(config) {
 	const dest = operatorGuiDestination(config)
@@ -40,7 +39,7 @@ function resolveOperatorGuiChannel(config) {
 	const map = getChannelMap(config)
 	const ch = map.operatorGuiCh
 	if (ch == null) return null
-	return { ch, dest, guiUrl: String(dest.guiUrl || DEFAULT_GUI_URL) }
+	return { ch, dest }
 }
 
 function clampFraction(v) {
@@ -313,7 +312,6 @@ module.exports = {
 	ROUTE_LAYER_START,
 	ROUTE_LAYER_MAX,
 	MEDIA_PREVIEW_LAYER,
-	DEFAULT_GUI_URL,
 	operatorGuiDestination,
 	resolveOperatorGuiChannel,
 	resolveOperatorGuiMonitorRect,

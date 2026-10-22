@@ -142,15 +142,13 @@ function normalizeDestination(d) {
 		base.artnet = normalizeArtnetFixtureArray(d.artnet)
 	}
 	if (mode === 'operator_gui') {
-		// WO-255: fullscreen Firefox web-UI URL (?operatorGui=1 self-identifies the client bundle,
-		// see client/lib/operator-gui-mode.js — the legacy ?cefOperator param is still accepted for
-		// back-compat) + optional explicit physical GPU port (1-4). When physicalPort is unset, the
-		// runtime orchestrator/generator fall back to resolveOperatorMonitorPort()
-		// (src/utils/operator-monitor-resolve.js).
-		base.guiUrl = String(d.guiUrl || '').trim() || 'http://127.0.0.1:4200/?operatorGui=1'
+		// Optional explicit physical GPU port (1-4). When unset, the runtime orchestrator/generator fall
+		// back to resolveOperatorMonitorPort() (src/utils/operator-monitor-resolve.js). The kiosk's
+		// `guiUrl` is gone with the kiosk (WO-664): a saved one is dropped on the next normalize.
 		const pp = parseInt(String(d.physicalPort ?? ''), 10)
 		if (Number.isFinite(pp) && pp >= 1 && pp <= 4) base.physicalPort = pp
-		// WO-264: auto-launch the Firefox GUI at boot (default true; only an explicit false disables).
+		// WO-264: auto-launch the operator GUI at boot (default true; only an explicit false disables).
+		// No reader since the kiosk went; kept for the Godot client's autostart (WO-609 T2 / WO-645).
 		base.autoLaunch = d.autoLaunch !== false
 		// WO-325: headless operator GUI. When true the generator emits its Caspar channel WITHOUT a
 		// physical <screen> consumer and port resolution short-circuits to null (never borrows the

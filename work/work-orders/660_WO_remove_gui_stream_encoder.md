@@ -38,4 +38,5 @@ with only the hq thumbnails"). Supersedes the server half of WO-319's Live previ
 ## Not done
 
 - Dead kiosk fields `guiUrl` / `autoLaunch` are still normalized in `screen-destinations.js` and
-  `device-view-crud.js` (saved configs round-trip); no reader remains.
+  `device-view-crud.js` (saved configs round-trip); no reader remains. → `guiUrl` removed in
+  [WO-664](./664_WO_drop_kiosk_gui_url.md); `autoLaunch` kept for the Godot autostart.

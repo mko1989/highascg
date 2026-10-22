@@ -19,7 +19,7 @@ const path = require('path')
 
 const { handleAddDestination, handleUpdateDestination } = require('../../src/api/device-view-crud')
 
-describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/physicalPort patch merge', () => {
+describe('WO-243 T243.1: device-view CRUD single-instance validation + operator_gui patch merge', () => {
 	function mockCtx(initialConfig) {
 		const config = initialConfig
 		return {
@@ -31,13 +31,14 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		}
 	}
 
-	it('handleAddDestination creates an operator_gui destination with default guiUrl', () => {
+	it('handleAddDestination creates an operator_gui destination (no kiosk guiUrl, WO-664)', () => {
 		const ctx = mockCtx({ screenDestinations: { version: 1, destinations: [] } })
 		const res = handleAddDestination({ addDestination: { type: 'operator_gui', mainScreenIndex: 0 } }, ctx)
 		assert.equal(res.ok, true)
 		const d = res.screenDestinations.destinations.find((x) => x.id === res.addedId)
 		assert.equal(d.mode, 'operator_gui')
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1')
+		assert.equal('guiUrl' in d, false)
+		assert.equal(d.autoLaunch, true)
 	})
 
 	it('handleAddDestination rejects a second operator_gui destination', () => {
@@ -63,18 +64,19 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		assert.ok(res.error)
 	})
 
-	it('handleUpdateDestination merges a guiUrl/physicalPort patch without clobbering the other field', () => {
+	it('handleUpdateDestination merges a physicalPort patch without clobbering autoLaunch; drops a saved guiUrl', () => {
 		const ctx = mockCtx({
 			screenDestinations: {
 				version: 1,
-				destinations: [{ id: 'og1', mainScreenIndex: 0, mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?cefOperator=1', physicalPort: 2 }],
+				destinations: [{ id: 'og1', mainScreenIndex: 0, mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?cefOperator=1', physicalPort: 2, autoLaunch: false }],
 			},
 		})
-		const res = handleUpdateDestination({ updateDestination: { id: 'og1', guiUrl: 'http://127.0.0.1:4200/?cefOperator=1&debug=1' } }, ctx)
+		const res = handleUpdateDestination({ updateDestination: { id: 'og1', physicalPort: 3 } }, ctx)
 		assert.equal(res.ok, true)
 		const d = res.screenDestinations.destinations[0]
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1&debug=1', 'patched field applied')
-		assert.equal(d.physicalPort, 2, 'sibling field preserved, not clobbered')
+		assert.equal(d.physicalPort, 3, 'patched field applied')
+		assert.equal(d.autoLaunch, false, 'sibling field preserved, not clobbered')
+		assert.equal('guiUrl' in d, false, 'WO-664: a saved kiosk URL is dropped')
 	})
 
 	it('handleUpdateDestination honours autoLaunch:false on patch (todos22 "can\'t uncheck autostart gui")', () => {
@@ -88,7 +90,7 @@ describe('WO-243 T243.1: device-view CRUD single-instance validation + guiUrl/ph
 		assert.equal(res.ok, true)
 		const d = res.screenDestinations.destinations[0]
 		assert.equal(d.autoLaunch, false, 'explicit autoLaunch:false must stick — the merge used to drop it and the box re-checked the box')
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1', 'untouched fields preserved')
+		assert.equal(d.mode, 'operator_gui', 'untouched fields preserved')
 	})
 
 	it('handleUpdateDestination preserves autoLaunch when the patch omits it, and honours headless (WO-325)', () => {

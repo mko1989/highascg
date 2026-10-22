@@ -21,8 +21,8 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 		version: 1,
 		destinations: [
 			// WO-264 T264.3: fresh default = one screen with the operator GUI. No physicalPort —
-			// WO-246's resolveOperatorMonitorPort auto-selects the lone connected display; guiUrl
-			// and autoLaunch:true come from normalizeScreenDestinations' operator_gui defaults.
+			// WO-246's resolveOperatorMonitorPort auto-selects the lone connected display;
+			// autoLaunch:true comes from normalizeScreenDestinations' operator_gui defaults.
 			{
 				id: 'dst_operator_gui',
 				label: 'Operator GUI',

@@ -50,7 +50,7 @@ function baseAppConfig() {
 }
 
 describe('WO-243/255 T243.1: operator_gui destination model (screen-destinations.js)', () => {
-	it('normalizeDestination fills operator_gui defaults (guiUrl, a real video mode)', () => {
+	it('normalizeDestination fills operator_gui defaults (a real video mode, no kiosk guiUrl)', () => {
 		const d = normalizeDestination({ id: 'og1', label: 'Operator GUI', mode: 'operator_gui' })
 		assert.equal(d.mode, 'operator_gui')
 		/* WO-486 supersedes WO-243 here: an operator GUI is an ordinary monitor, so it defaults to a
@@ -58,7 +58,8 @@ describe('WO-243/255 T243.1: operator_gui destination model (screen-destinations
 		 * comes from its fixtures — is custom by default. An operator monitor no shipped mode
 		 * describes (2560x1080) still resolves to custom, covered below. */
 		assert.equal(d.videoMode, '1080p5000', 'operator_gui defaults to a standard mode')
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1', 'WO-255: default guiUrl switched from ?cefOperator to ?operatorGui')
+		assert.equal('guiUrl' in d, false, 'WO-664: the kiosk URL went with the kiosk')
+		assert.equal(d.autoLaunch, true, 'autoLaunch stays (Godot autostart, WO-645)')
 		assert.equal(d.physicalPort, undefined, 'no physicalPort by default -> falls back to resolveOperatorMonitorPort() at runtime')
 	})
 
@@ -70,9 +71,9 @@ describe('WO-243/255 T243.1: operator_gui destination model (screen-destinations
 		assert.equal(std.videoMode, '1080p5000', 'an explicit custom that IS a shipped mode resolves to it')
 	})
 
-	it('accepts an explicit guiUrl and a valid physicalPort (1-4)', () => {
+	it('accepts a valid physicalPort (1-4); a saved guiUrl is dropped (WO-664)', () => {
 		const d = normalizeDestination({ id: 'og2', mode: 'operator_gui', guiUrl: 'http://127.0.0.1:4200/?operatorGui=1&x=2', physicalPort: 3 })
-		assert.equal(d.guiUrl, 'http://127.0.0.1:4200/?operatorGui=1&x=2')
+		assert.equal('guiUrl' in d, false)
 		assert.equal(d.physicalPort, 3)
 	})
 
@@ -249,7 +250,7 @@ describe('WO-243 T243.2: layout endpoint pure logic (src/system/operator-gui-cha
 		assert.equal(resolveOperatorGuiChannel(app), null)
 	})
 
-	it('resolveOperatorGuiChannel resolves ch + guiUrl when a destination exists', () => {
+	it('resolveOperatorGuiChannel resolves ch + dest when a destination exists', () => {
 		const app = clone(defaults)
 		app.screenDestinations = {
 			version: 1,
@@ -261,7 +262,8 @@ describe('WO-243 T243.2: layout endpoint pure logic (src/system/operator-gui-cha
 		const resolved = resolveOperatorGuiChannel(app)
 		assert.ok(resolved)
 		assert.ok(Number.isFinite(resolved.ch))
-		assert.equal(resolved.guiUrl, 'http://127.0.0.1:4200/?cefOperator=1')
+		assert.equal(resolved.dest.id, 'og1')
+		assert.equal('guiUrl' in resolved, false)
 	})
 
 	it('applyOperatorGuiLayout / clearOperatorGuiLayout resolve with {skipped:true} when no destination exists', async () => {

@@ -118,7 +118,7 @@ function handleAddDestination(j, ctx) {
 		inheritsProjectFps: j.addDestination.inheritsProjectFps !== false,
 		stream: { type: 'rtmp', source: 'program_1', url: '', key: '', quality: 'medium' },
 		...(mode === 'pixelmap' ? { artnet: j.addDestination.artnet && typeof j.addDestination.artnet === 'object' ? j.addDestination.artnet : {} } : {}),
-		...(mode === 'operator_gui' ? { guiUrl: j.addDestination.guiUrl, physicalPort: j.addDestination.physicalPort } : {}),
+		...(mode === 'operator_gui' ? { physicalPort: j.addDestination.physicalPort } : {}),
 	})
 	const next = normalizeScreenDestinations(top)
 	ctx.config.screenDestinations = next
@@ -183,10 +183,9 @@ function handleUpdateDestination(j, ctx) {
 		...(nextMode === 'pixelmap' || d0.mode === 'pixelmap'
 			? { artnet: { ...(d0.artnet || {}), ...(p.artnet && typeof p.artnet === 'object' ? p.artnet : {}) } }
 			: {}),
-		// WO-243: guiUrl/physicalPort single-field edits should not clobber each other.
+		// WO-243: operator_gui single-field edits should not clobber each other.
 		...(nextMode === 'operator_gui' || d0.mode === 'operator_gui'
 			? {
-				guiUrl: p.guiUrl != null ? String(p.guiUrl) : d0.guiUrl,
 				// physicalPort: explicit null = "clear back to Auto"; key absent = keep current.
 				physicalPort:
 					'physicalPort' in p ? (p.physicalPort == null ? undefined : p.physicalPort) : d0.physicalPort,
