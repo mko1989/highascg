@@ -187,7 +187,7 @@ describe('WO-675 wiring', () => {
 		assert.match(src, /threads: det\.threads, faces,/)
 		assert.match(src, /onFaces\(ce\.id, seen\.map/)
 		const reg = fs.readFileSync(path.join(ROOT, 'src/tracking/register.js'), 'utf8')
-		assert.match(reg, /_detect\.setFaces\(_presenters\.wantsFaces\(\), observeFaces\)/)
+		assert.match(reg, /_detect\.setFaces\(_presenters\.wantsFaces\(\), observeFaces, _presenters\.wantsBodies\(\)\)/)
 		assert.match(reg, /ctx\.presenters = _presenters/)
 	})
 

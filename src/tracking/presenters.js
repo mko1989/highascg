@@ -12,7 +12,8 @@
  * Faces: tools/tracking-detect/face_embed.py (OpenCV Zoo YuNet + SFace) gives each intake photo a 128-d unit
  * feature; the detection sidecar sends features of the persons on stage (`observe`). Cosine similarity, smoothed per
  * (person, presenter); a suggestion needs SUGGEST_MIN (SFace's published 0.363 same-person threshold) and a margin
- * over the next presenter.
+ * over the next presenter. Bodies (P2): the same photo's whole-body feature (youtureid, 768-d) for wide shots where
+ * faces are too small; face and body evidence are fused in presenter-match.js.
  */
 
 const fs = require('fs')
@@ -20,16 +21,13 @@ const path = require('path')
 const os = require('os')
 const childProcess = require('child_process')
 const { parseAction } = require('./zone-actions')
+const { createMatcher, unit, KINDS } = require('./presenter-match')
 
 const DIR = process.env.HIGHASCG_PRESENTERS_DIR || path.join(os.tmpdir(), 'highascg-presenters')
 const MARKER_BASE = 65000 // presenter n drives hub marker MARKER_BASE + n (hub ids are 1…65535)
 const MAX_PRESENTERS = 200
 const MAX_PHOTO_BYTES = 6 * 1024 * 1024
-const SUGGEST_MIN = 0.363
-const SUGGEST_MARGIN = 0.05
-const SUGGEST_SEEN = 2 // face observations before a suggestion shows
-const EVIDENCE_TTL_MS = 10000
-const SMOOTH = 0.35 // weight of a new observation
+const SUGGEST_MIN = KINDS.face.min
 const TEXT_MAX = { name: 64, mic: 16, note: 280 }
 const ACTIONS_MAX = 8
 
@@ -44,22 +42,10 @@ function cleanActions(v) {
 	}).slice(0, ACTIONS_MAX)
 }
 
-function dot(a, b) {
-	let s = 0
-	for (let i = 0; i < a.length && i < b.length; i++) s += a[i] * b[i]
-	return s
-}
-
-function unit(v) {
-	if (!Array.isArray(v) || v.length < 32 || !v.every((x) => Number.isFinite(Number(x)))) return null
-	const f = v.map(Number)
-	const n = Math.sqrt(dot(f, f))
-	return n > 0 ? f.map((x) => x / n) : null
-}
-
 /**
  * @param {object} ctx  server ctx (log)
- * @param {{ hub?, dir?, now?, embed?: (photoPath) => Promise<{ok, feature?, detail?}>, onChange?: () => void }} deps
+ * @param {{ hub?, dir?, now?, embed?: (photoPath) => Promise<{ok, feature?, detail?, body?: {ok, feature?, detail?}}>,
+ *   onChange?: () => void }} deps
  */
 function createPresenters(ctx, deps = {}) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
@@ -67,8 +53,8 @@ function createPresenters(ctx, deps = {}) {
 	const now = deps.now || Date.now
 	const hub = deps.hub || null
 	const embed = deps.embed || defaultEmbed
-	const roster = new Map() // id → presenter (with `face`: unit feature | null)
-	const evidence = new Map() // person key → Map(presenter id → { s, n, at })
+	const roster = new Map() // id → presenter (with `face` / `body`: unit feature | null)
+	const matcher = createMatcher(now)
 	let rev = 0
 	const changed = () => {
 		rev++
@@ -95,7 +81,7 @@ function createPresenters(ctx, deps = {}) {
 		try {
 			const j = JSON.parse(fs.readFileSync(path.join(dir, 'roster.json'), 'utf8'))
 			for (const p of Array.isArray(j?.presenters) ? j.presenters : []) {
-				if (p && typeof p.id === 'string' && /^p\d+$/.test(p.id)) roster.set(p.id, { ...p, person: null, face: unit(p.face) })
+				if (p && typeof p.id === 'string' && /^p\d+$/.test(p.id)) roster.set(p.id, { ...p, person: null, face: unit(p.face), body: unit(p.body) })
 			}
 		} catch (_) {
 			/* none yet (or wiped by a reboot) */
@@ -110,10 +96,10 @@ function createPresenters(ctx, deps = {}) {
 
 	const photoPath = (id) => path.join(dir, `${id}.jpg`)
 
-	/** Public shape (no face feature: 128 floats per presenter are server business). */
+	/** Public shape (no features: 128 + 768 floats per presenter are server business). */
 	function view(p) {
 		return { id: p.id, name: p.name, mic: p.mic, note: p.note, created: p.created, marker: MARKER_BASE + p.slot,
-			face: p.face_status, person: p.person, on_enter: p.on_enter, on_exit: p.on_exit }
+			face: p.face_status, body: p.body_status || 'unavailable', person: p.person, on_enter: p.on_enter, on_exit: p.on_exit }
 	}
 
 	/** {name, mic, note, consent, photo: base64 JPEG (data URL ok)} → { status, body } */
@@ -131,7 +117,7 @@ function createPresenters(ctx, deps = {}) {
 		ensureDir()
 		fs.writeFileSync(photoPath(id), jpg, { mode: 0o600 })
 		const p = { id, slot, name, mic: clip(data.mic, TEXT_MAX.mic), note: clip(data.note, TEXT_MAX.note), created: now(),
-			consent_at: now(), face_status: 'pending', face: null, person: null, on_enter: [], on_exit: [] }
+			consent_at: now(), face_status: 'pending', face: null, body_status: 'pending', body: null, person: null, on_enter: [], on_exit: [] }
 		roster.set(id, p)
 		changed()
 		log('info', `[presenters] ${id} "${name}" mic ${p.mic || '—'} added`)
@@ -140,6 +126,9 @@ function createPresenters(ctx, deps = {}) {
 			p.face = r?.ok ? unit(r.feature) : null
 			p.face_status = p.face ? 'ok' : r?.ok === false && r.detail === 'no face' ? 'none' : 'unavailable'
 			if (!p.face) log('warn', `[presenters] ${id}: no face feature (${r?.detail || 'unknown'})`)
+			p.body = r?.body?.ok ? unit(r.body.feature) : null
+			p.body_status = p.body ? 'ok' : r?.body?.ok === false && r.body.detail === 'no person' ? 'none' : 'unavailable'
+			if (!p.body) log('warn', `[presenters] ${id}: no body feature (${r?.body?.detail || 'unknown'})`)
 			changed()
 		})
 		return { status: 201, body: { presenter: view(p) } }
@@ -162,7 +151,7 @@ function createPresenters(ctx, deps = {}) {
 		if (!p) return false
 		roster.delete(id)
 		if (hub) hub.remove(MARKER_BASE + p.slot)
-		for (const ev of evidence.values()) ev.delete(id)
+		matcher.forget(id)
 		try {
 			fs.unlinkSync(photoPath(id))
 		} catch (_) {
@@ -192,41 +181,15 @@ function createPresenters(ctx, deps = {}) {
 		return { status: 200, body: { presenter: view(p) } }
 	}
 
-	/** Face features seen on stage: [{ key, feature }]. Smooths the similarity to every presenter with a face. */
-	function observe(list) {
-		const t = now()
-		for (const o of Array.isArray(list) ? list : []) {
-			const f = unit(o?.feature)
-			if (!f || !o.key) continue
-			let ev = evidence.get(o.key)
-			if (!ev) evidence.set(o.key, (ev = new Map()))
-			for (const p of roster.values()) {
-				if (!p.face) continue
-				const sim = dot(f, p.face)
-				const e = ev.get(p.id)
-				ev.set(p.id, e ? { s: e.s + (sim - e.s) * SMOOTH, n: e.n + 1, at: t } : { s: sim, n: 1, at: t })
-			}
-		}
+	/** Features seen on stage, `kind` 'face' | 'body': [{ key, feature }] (presenter-match.js smooths them). */
+	function observe(list, kind = 'face') {
+		matcher.observe(kind, list, [...roster.values()])
 	}
 
-	/** [{ presenter, key, score }]: per person its best presenter, when clear of the threshold and the runner-up. */
+	/** [{ presenter, key, score, via }]: per person its best presenter when clear (presenter-match.js), never a pair the
+	 * operator already confirmed. */
 	function suggestions() {
-		const t = now()
-		const out = []
-		for (const [key, ev] of evidence) {
-			const fresh = [...ev.entries()].filter(([pid, e]) => t - e.at <= EVIDENCE_TTL_MS && roster.has(pid))
-			fresh.sort((a, b) => b[1].s - a[1].s)
-			if (!fresh.length) {
-				evidence.delete(key)
-				continue
-			}
-			const [pid, best] = fresh[0]
-			const second = fresh[1]?.[1].s ?? -1
-			const p = roster.get(pid)
-			if (!p || p.person === key || best.n < SUGGEST_SEEN || best.s < SUGGEST_MIN || best.s - second < SUGGEST_MARGIN) continue
-			out.push({ presenter: pid, key, score: Math.round(best.s * 1000) / 1000 })
-		}
-		return out.sort((a, b) => b.score - a.score)
+		return matcher.suggestions((pid) => roster.has(pid), (pid, key) => roster.get(pid)?.person === key)
 	}
 
 	/** Bound presenters' markers follow their person: `locate(key)` → {x, y} | null (lost: the marker goes stale). */
@@ -253,7 +216,7 @@ function createPresenters(ctx, deps = {}) {
 
 	function clear() {
 		for (const id of [...roster.keys()]) remove(id)
-		evidence.clear()
+		matcher.clear()
 	}
 
 	load()
@@ -265,6 +228,7 @@ function createPresenters(ctx, deps = {}) {
 		list: () => [...roster.values()].sort((a, b) => a.slot - b.slot).map(view),
 		snapshot: () => ({ presenters: [...roster.values()].sort((a, b) => a.slot - b.slot).map(view), suggestions: suggestions() }),
 		wantsFaces: () => [...roster.values()].some((p) => p.face),
+		wantsBodies: () => [...roster.values()].some((p) => p.body),
 		photo: (id) => (roster.has(id) ? fs.readFileSync(photoPath(id)) : null),
 		create,
 		update,
@@ -279,7 +243,18 @@ function createPresenters(ctx, deps = {}) {
 	}
 }
 
-/** Intake photo → face feature via the tracking venv (tools/tracking-detect/face_embed.py). */
+/** The YOLO the intake photo's person box comes from: the plain detector if there, else any non-pose one. */
+function intakeDetector(models) {
+	try {
+		const list = fs.readdirSync(models).filter((f) => /^yolo.*\.onnx$/.test(f) && !f.includes('-pose')).sort()
+		const pick = list.includes('yolo26n.onnx') ? 'yolo26n.onnx' : list[0]
+		return pick ? path.join(models, pick) : ''
+	} catch (_) {
+		return ''
+	}
+}
+
+/** Intake photo → face + body features via the tracking venv (tools/tracking-detect/face_embed.py). */
 function defaultEmbed(photo) {
 	const DATA = path.join(os.homedir(), '.local', 'share', 'highascg')
 	const python = process.env.HIGHASCG_TRACKING_PYTHON || path.join(DATA, 'tracking-venv', 'bin', 'python')
@@ -287,7 +262,8 @@ function defaultEmbed(photo) {
 	const script = path.join(__dirname, '..', '..', 'tools', 'tracking-detect', 'face_embed.py')
 	return new Promise((resolve) => {
 		if (!fs.existsSync(python)) return resolve({ ok: false, detail: `no Python at ${python}` })
-		childProcess.execFile(python, [script, photo, models], { timeout: 30000, maxBuffer: 1 << 20 }, (err, stdout) => {
+		const args = [script, photo, models, intakeDetector(models)].filter(Boolean)
+		childProcess.execFile(python, args, { timeout: 30000, maxBuffer: 1 << 20 }, (err, stdout) => {
 			try {
 				resolve(JSON.parse(String(stdout).trim().split('\n').pop()))
 			} catch (_) {

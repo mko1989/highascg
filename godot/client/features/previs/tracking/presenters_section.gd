@@ -1,7 +1,7 @@
 extends VBoxContainer
 ## WO-675 — Presenters section of the tracking Inspector page (Presenters mode): the roster the audio tech fills from
-## the phone (photo, name, mic, note — server src/tracking/presenters.js, kept in /tmp), the face suggestions, and
-## the operator's binding. The faces only SUGGEST; nothing is bound until the operator confirms (owner D1).
+## the phone (photo, name, mic, note — server src/tracking/presenters.js, kept in /tmp), the face / body suggestions,
+## and the operator's binding. Recognition only SUGGESTS; nothing is bound until the operator confirms (owner D1).
 ## A bound presenter drives the hub marker "Name (mic N)"; a zone whose action is `presenter` fires the presenter's
 ## own On enter / On exit actions (look:<id>[@preview], companion:<page>/<row>/<col> — the mic, owner D4).
 ## Live data: WS `tracking:presenters`; the persons to bind come from the marker driver's last tracking:detections.
@@ -32,7 +32,7 @@ func _ready() -> void:
 	_note = Label.new()
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.modulate = Color(1, 1, 1, 0.7)
-	_note.text = "Faces only suggest: confirm each match. On stage, a zone with the action \"presenter\" fires that presenter's actions. Photos live in /tmp and are gone after a reboot."
+	_note.text = "Face and body recognition only suggest: confirm each match. On stage, a zone with the action \"presenter\" fires that presenter's actions. Photos live in /tmp and are gone after a reboot."
 	add_child(_note)
 	_list = VBoxContainer.new()
 	_list.add_theme_constant_override("separation", 10)

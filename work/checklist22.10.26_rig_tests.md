@@ -129,5 +129,8 @@ Setup, once:
 - [ ] **WO-675 round 2:** on the phone type `http://<box>:4200/intake` (short address) → the intake page. After
       sending one person (with a note, e.g. their role): select a lower-third layer in a look → Inspector →
       "Presenters (backstage list)" → tap the name: Title = name, Subtitle = the note.
+- [ ] **WO-675 P2 (body):** at intake take a WHOLE-BODY photo. Previs → Camera → Presenters shows "Not on stage"
+      (or "· body only" if the face was hidden). Walk into a WIDE camera shot: within ~3 s "Looks like P… by body
+      (NN %) — confirm?". Two people in similar clothes: no suggestion. Close-up: "by face + body".
 - [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
       Inspector title is white.

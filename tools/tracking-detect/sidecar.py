@@ -7,13 +7,15 @@ tracks. It knows nothing about stage geometry: the server unprojects feet points
 
 Protocol (JSON lines):
   stdin  {"type": "config", "model": "/abs/x.onnx", "pose_model": "" | "/abs/y-pose.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
-          "grace_ms": 500, "threads": 4, "faces": false, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
+          "grace_ms": 500, "threads": 4, "faces": false, "bodies": false, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
   stdout {"type": "ready", "model", "providers", "input"}
          {"type": "tracks", "camera", "frame", "w", "h", "ms", "tracks": [{"tid", "box": [x1, y1, x2, y2] (0–1),
           "score", "age_s", "mask"?, "kps"?}], "mask_size"?}  — once per detection step per camera (an empty list is
           a real "nobody"); a seg model adds WO-665 cut-out masks (seg.py) to live tracks; a pose_model adds WO-667
           body keypoints (pose.py, a second session on the same frame); with "faces" (WO-675) a live track gets
-          "face": [128 floats] (face.py, YuNet + SFace) at most every FACE_EVERY_S and only while a face is visible
+          "face": [128 floats] (face.py, YuNet + SFace) at most every FACE_EVERY_S and only while a face is visible;
+          with "bodies" (WO-675 P2) "body": [768 floats] (body.py, youtureid) at most every BODY_EVERY_S, never for a
+          box another person covers
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
 Exits when stdin closes (the server went away), so it never outlives its owner.
@@ -26,6 +28,8 @@ import sys
 import threading
 import time
 
+import numpy as np
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "hshm-bridge"))
 
@@ -33,13 +37,16 @@ import detector  # noqa: E402
 import hshm_abi  # noqa: E402
 import pose  # noqa: E402
 import face  # noqa: E402
+import body  # noqa: E402
 
 DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "threads": 4,
-    "faces": False, "cameras": []}
+    "faces": False, "bodies": False, "cameras": []}
 STALE_S = 1.0
 IDLE_S = 0.004
 FACE_EVERY_S = 1.0  # WO-675: per track; a face feature costs ~10 ms
 FACES_PER_STEP = 3
+BODY_EVERY_S = 1.0  # WO-675 P2: per track; ~8 ms each, one batched forward pass per frame
+BODIES_PER_STEP = 4
 
 
 def emit(obj):
@@ -72,6 +79,7 @@ class Camera:
         self.opened = 0.0
         self.det = detector.CameraDetector()
         self.face_at = {}  # WO-675: tid → when its face was last looked for
+        self.body_at = {}  # WO-675 P2: tid → when its body feature was last taken
         self.last_step = 0.0
         self.last_frame = 0.0
         self.steps = 0
@@ -137,6 +145,43 @@ def load_faces(models_dir):
         return False
 
 
+def load_bodies(models_dir):
+    if not body.models_present(models_dir):
+        emit({"type": "error", "detail": "bodies: model missing in %s (fetch-face-models.sh)" % models_dir})
+        return False
+    try:
+        return body.Bodies(models_dir)
+    except Exception as e:  # noqa: BLE001 — detection carries on without body features
+        emit({"type": "error", "detail": "bodies: %s" % e})
+        return False
+
+
+def attach_bodies(bodies, cam, tracks, bgr, now):
+    """A live track's body feature, at most every BODY_EVERY_S per track and BODIES_PER_STEP per frame; a box that
+    another live box covers is skipped (its crop is two people)."""
+    live = [t for t in tracks if t["age_s"] == 0]
+    picked, crops = [], []
+    for t in live:
+        if len(picked) >= BODIES_PER_STEP:
+            break
+        if now - cam.body_at.get(t["tid"], 0.0) < BODY_EVERY_S:
+            continue
+        if body.overlapped(t["box"], [o["box"] for o in live if o is not t]):
+            continue
+        c = body.crop(bgr, t["box"])
+        if c is None:
+            continue
+        cam.body_at[t["tid"]] = now
+        picked.append(t)
+        crops.append(np.ascontiguousarray(c))
+    for t, v in zip(picked, bodies.embed_crops(crops) if crops else []):
+        if v is not None:
+            t["body"] = [round(float(x), 4) for x in v]
+    ids = {t["tid"] for t in tracks}
+    for tid in [k for k in cam.body_at if k not in ids]:
+        del cam.body_at[tid]
+
+
 def attach_faces(faces, cam, tracks, bgr, now):
     """A live track's face feature, at most every FACE_EVERY_S per track and FACES_PER_STEP per frame."""
     done = 0
@@ -161,6 +206,7 @@ def main():
     cfg, cams, backend, model = dict(DEFAULTS), {}, None, None
     poser, pose_model = None, ""
     faces = None  # WO-675: face.Faces once a config asks for faces and the models are there
+    bodies = None  # WO-675 P2: body.Bodies, likewise
     last_status = 0.0
     while not done.is_set():
         while not q.empty():
@@ -190,6 +236,10 @@ def main():
                 faces = load_faces(os.path.dirname(model))
             elif not cfg["faces"]:
                 faces = None
+            if cfg["bodies"] and bodies is None and model:
+                bodies = load_bodies(os.path.dirname(model))
+            elif not cfg["bodies"]:
+                bodies = None
         now = time.monotonic()
         worked = False
         for cam in cams.values():
@@ -209,8 +259,12 @@ def main():
                 detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
                 if poser is not None:  # WO-667: body keypoints for the posed dummies
                     pose.attach(tracks, poser.predict(rgb, cfg["confidence"]))
-                if faces:  # WO-675: presenter recognition
-                    attach_faces(faces, cam, tracks, face.bgr_from_bgra(pixels, r.width, r.height, r.stride), now)
+                if faces or bodies:  # WO-675: presenter recognition
+                    bgr = face.bgr_from_bgra(pixels, r.width, r.height, r.stride)
+                    if faces:
+                        attach_faces(faces, cam, tracks, bgr, now)
+                    if bodies:
+                        attach_bodies(bodies, cam, tracks, bgr, now)
             except Exception as e:  # noqa: BLE001 — one bad frame (e.g. a singular Kalman matrix) drops, not the camera
                 emit({"type": "error", "detail": "%s: %s" % (cam.id, e)})
                 continue

@@ -1,6 +1,6 @@
 # WO-675 — Presenter recognition: backstage photo + name + mic → recognised on stage → automations
 
-**Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots); round 2 DONE 22.10: short `/intake` address + presenter picks in the lower-third inspector (box screenshots). Open: P2 body re-ID (owner: the main signal — wide shots), live test with real cameras.**
+**Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots); round 2 DONE 22.10: short `/intake` address + presenter picks in the lower-third inspector (box screenshots). P2 body re-ID DONE 22.10 (youtureid + grey-world, fused with faces; smoke 9/0, test_body.py, Godot 20946/0, box: intake body feature + sidecar on a synthetic camera 0.784 vs 0.152). Open: live test with real cameras; owner decision on the research-trained weights (P2 section).**
 
 Owner, `next.md` 22.10: *"how possible is it to do this: an audio tech is giving a mic to a presenter backstage he
 takes a photo of him/her full person, sends it to the system, with a note, name and mic number. when that presenter
@@ -173,3 +173,84 @@ are gonna be wide shots, thats why the backstage tech is taking a whole body sho
     The test roster was then cleared.
 - Owner QA: open the intake on a phone at `http://<box>:4200/intake`, send one person; then a look with a lower third
   → Inspector → tap the name.
+
+## P2 — body recognition for wide shots (22.10)
+
+Owner: "recognizing by body too is what i want because the camera shots that overview stage are gonna be wide
+shots, thats why the backstage tech is taking a whole body shot."
+
+### Investigation
+
+- Model: OpenCV Zoo `person_reid_youtu_2021nov.onnx` (`models/person_reid_youtureid`). Input 1×3×256×128,
+  BGR→RGB, /255, ImageNet mean/std; output 768 floats (`[N, 768, 1, 1]`, batches work). It runs in the sidecar's
+  existing cv2.dnn: 9.5 ms for one crop, 158 ms for 21 (~7.5 ms each) on the box CPU.
+- **License caveat for the owner.** The zoo folder says "All files in this directory are licensed under Apache 2.0".
+  But the model's upstream (ReID-Team/ReID_extra_testdata, linked from the zoo README) says it was trained on
+  Market-1501, DukeMTMC-reID and MSMT17. Those datasets are research-only, and Duke was withdrawn. This is the same
+  category as SFace, which was trained on research face data. It is not a blocker for the code, but it is a decision
+  for the owner before HighAsCG ships for sale.
+- Accuracy, measured on 21 Duke gallery crops (8 people):
+  - same person: min 0.661, different people: max 0.494;
+  - with grey-world white balance on every crop: 0.590 and 0.458.
+  - The balance costs a little separation, but it makes the feature follow the clothes, not the light.
+  - It is needed because the phone photo and the stage camera never share a tint.
+  - The feature held at 16 px crop width.
+  - The test data is not clean: the model may have been trained on Duke, so these numbers are optimistic.
+- Intake photo: the tech takes a whole-body shot. The person box comes from the tracking YOLO run on the photo. If
+  no YOLO model is present, it is estimated from the face (3.4 face widths wide, down to the bottom of the photo).
+  The rest of the photo is background and would swamp the feature.
+
+### What was done
+
+- `tools/tracking-detect/body.py` (new): `Bodies` (cv2.dnn), `grey_world`, `crop` (person box; under 48 px tall
+  gives nothing), `embed_crops` (one forward pass for a list), `overlapped` (a box another box covers >30 %),
+  `box_from_face`.
+- `fetch-face-models.sh`: + `person_reid_youtu_2021nov.onnx`, sha256-pinned (`0579…580d`, 107 MB).
+- `sidecar.py`: a `bodies` config flag. `attach_bodies` gives a live track a `body` (768 floats) at most every
+  `BODY_EVERY_S` (1 s) per track, `BODIES_PER_STEP` (4) per frame, in one batch. A box another person covers is
+  skipped, because its crop is two people.
+- `face_embed.py`: optional third argument, the YOLO model. The output gains `body: {ok, feature, box, via:
+  detector|face}` or `{ok: false, detail: 'no person'|…}`. The face result is unchanged.
+- `src/tracking/presenter-match.js` (new): the evidence and suggestion logic, moved out of `presenters.js` and
+  extended to two kinds:
+  - face: 0.363 / margin 0.05 / 2 sightings, as before;
+  - body: 0.5 / margin 0.08 / 3 sightings;
+  - fusion rules:
+    - face and body agree → `via: 'face+body'`;
+    - they disagree → no suggestion;
+    - body only → `'body'`, unless a clearly seen face (2+ sightings) scores that presenter under 0.15;
+  - one suggestion per presenter, the best one; a face-backed suggestion outranks body only.
+- `presenters.js`:
+  - `body` / `body_status` per presenter (persisted in the /tmp roster, owner D2);
+  - `observe(list, kind)` and `wantsBodies()`;
+  - `defaultEmbed` passes `yolo26n.onnx` (else the first non-pose YOLO in the models dir).
+- `detect-service.js`: `bodies` in the sidecar config; `body` features go to the same sink with kind `'body'`, never
+  into frames, status or WS. `setFaces(on, sink, bodiesOn)`.
+- `register.js`: `observeFaces(camera, list, kind)`. The sidecar runs bodies while any presenter has a body feature.
+- Godot `presenters_model.gd` `status_of`:
+  - "Looks like P4 by body (60 %) — confirm?" / "by face + body";
+  - "Not on stage · body only" / "· face only";
+  - "Reading the photo…";
+  - "No face or person found in the photo".
+  - The section note now says face and body recognition only suggest (D1 unchanged).
+
+### What was VERIFIED
+
+- Offline:
+  - `smoke-wo675-bodies` 9/0 (new, curated list): the fusion rules, TTL, body status/persistence, detect-service
+    forwarding (both kinds to the sink, none in status) and the source wiring;
+  - `smoke-wo675-presenters` 8/0;
+  - `test_body.py` 3/0 and `test_face.py` 3/0 in the venv;
+  - Godot 20946/0 (+8 `status_of` cases).
+- Box:
+  - Intake: a synthetic portrait photo (a Duke crop scaled to 600×1200 on a plain background, no face) was posted
+    to the live server → `face: none, body: ok` 0.4 s later. The YOLO box found was [0.23, 0.30, 0.78, 0.80].
+    Without a detector and without a face → `no person`. The probe presenter was then deleted.
+  - Sidecar, standalone: a synthetic 1920×1080 shm camera (hshm_abi.Writer) with two people 200×480 px. One was
+    another shot of the intake person, the other a stranger. Run with `bodies: true`:
+    - both tracks got a body once per second;
+    - similarity to the intake feature: 0.784 for the intake person, 0.152 for the stranger (threshold 0.5);
+    - detection + bodies step: median 18.5 ms.
+  - Detection is off on this box, so the live sidecar → server path was not run here. It is covered offline.
+- Owner QA (real cameras): take a whole-body photo at intake. A presenter seen small in a wide shot should get
+  "Looks like P… by body" within ~3 s. Two people in similar clothes should give no suggestion (the margin).

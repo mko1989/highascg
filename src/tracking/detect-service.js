@@ -61,7 +61,8 @@ function createDetectService(ctx, deps = {}) {
 	let rev = 0
 	const latest = new Map() // camera id → { at, frame, w, h, ms, persons }
 	let faces = false // WO-675: the sidecar adds face features while a presenter with a face is on the roster
-	let onFaces = null // (cameraId, [{ tid, feature }]) — never stored in `latest`, never broadcast
+	let bodies = false // WO-675 P2: …and body features while a presenter with a body feature is
+	let onFaces = null // (cameraId, [{ tid, feature }], 'face' | 'body') — never stored in `latest`, never broadcast
 	let sidecarCams = {} // camera id → sidecar status { state, detail, fps, ms }
 
 	const wanted = () => !stopped && det.enabled && cams.length > 0
@@ -81,7 +82,7 @@ function createDetectService(ctx, deps = {}) {
 	function sendConfig() {
 		if (!child?.stdin?.writable) return
 		const cfg = { type: 'config', model: modelPath(), pose_model: det.pose_model ? path.join(modelsDir, det.pose_model) : '', confidence: det.confidence, interval_ms: det.interval_ms,
-			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads, faces,
+			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads, faces, bodies,
 			cameras: cams.map((c) => ({ id: c.id, path: `/dev/shm/highascg-${c.role}`, masks: c.masks })) }
 		child.stdin.write(JSON.stringify(cfg) + '\n')
 	}
@@ -100,6 +101,8 @@ function createDetectService(ctx, deps = {}) {
 			rev++
 			const seen = Array.isArray(msg.tracks) ? msg.tracks.filter((t) => Array.isArray(t?.face)) : []
 			if (seen.length && typeof onFaces === 'function') onFaces(ce.id, seen.map((t) => ({ tid: Number(t.tid), feature: t.face })))
+			const shapes = Array.isArray(msg.tracks) ? msg.tracks.filter((t) => Array.isArray(t?.body)) : []
+			if (shapes.length && typeof onFaces === 'function') onFaces(ce.id, shapes.map((t) => ({ tid: Number(t.tid), feature: t.body })), 'body')
 		} else if (msg.type === 'status') {
 			sidecarCams = msg.cameras && typeof msg.cameras === 'object' ? msg.cameras : {}
 			if (msg.ready === false) ready = false
@@ -284,11 +287,12 @@ function createDetectService(ctx, deps = {}) {
 		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
-		/** WO-675: ask the sidecar for face features (resends the config only on a change) and where they go. */
-		setFaces(on, sink) {
+		/** WO-675: ask the sidecar for face (and P2 body) features — resends the config only on a change — and where they go. */
+		setFaces(on, sink, bodiesOn = false) {
 			onFaces = sink || null
-			if (!!on === faces) return
+			if (!!on === faces && !!bodiesOn === bodies) return
 			faces = !!on
+			bodies = !!bodiesOn
 			sendConfig()
 		},
 		stop() {

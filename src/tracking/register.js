@@ -257,8 +257,9 @@ function pick(body) {
 	})
 }
 
-/** WO-675: a face seen by a camera → the person key the operator binds (`w:<id>` once fused, else `camera:tid`). */
-function observeFaces(camera, list) {
+/** WO-675: a face (P2: or body) seen by a camera → the person key the operator binds (`w:<id>` once fused, else
+ * `camera:tid`). */
+function observeFaces(camera, list, kind = 'face') {
 	if (!_presenters || !_detect) return
 	const now = hub.now()
 	const fused = _detect.solvedCameras >= 2
@@ -270,7 +271,7 @@ function observeFaces(camera, list) {
 		if (fused && wid === undefined) continue
 		out.push({ key: fused ? `w:${wid}` : `${camera}:${f.tid}`, feature: f.feature })
 	}
-	_presenters.observe(out)
+	_presenters.observe(out, kind)
 }
 
 /** Where a person key stands on the floor now, or null (then the presenter's marker goes stale). */
@@ -286,10 +287,10 @@ function locate(key) {
 	return p?.floor ? { x: p.floor[0], y: p.floor[1] } : null
 }
 
-/** Roster + suggestions: ≤ 2 Hz, only on a change; keeps the sidecar's face features on while anyone has a face. */
+/** Roster + suggestions: ≤ 2 Hz, only on a change; keeps the sidecar's face (body) features on while anyone has one. */
 function presentersTick() {
 	if (!_presenters) return
-	if (_detect) _detect.setFaces(_presenters.wantsFaces(), observeFaces)
+	if (_detect) _detect.setFaces(_presenters.wantsFaces(), observeFaces, _presenters.wantsBodies())
 	_presenters.tick(locate)
 	if (!_ctx || typeof _ctx._wsBroadcast !== 'function') return
 	const now = hub.now()
