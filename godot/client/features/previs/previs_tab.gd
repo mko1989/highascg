@@ -53,6 +53,7 @@ var markers: MarkerDriver
 var coverage: Coverage3D
 var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
 var cards := preload("res://features/previs/tracking/person_cards.gd").new()  # WO-665 cut-out cards
+var aim_drag := preload("res://features/previs/fixtures/aim_drag.gd").new()  # WO-679 right-drag a head
 var _coverage_cb: CheckBox
 var _coverage_note: Label
 var _side: Control  # the 3D mode Inspector page; parked hidden here until the Inspector adopts it
@@ -85,6 +86,7 @@ func _ready() -> void:
 	stage.add_child(coverage)
 	stage.add_child(fixtures3d)
 	fixtures3d.follow(mvr)  # WO-678: heads take their MVR layer's colour
+	aim_drag.post = func(b: Dictionary) -> Dictionary: return await Api.post_json("/api/fixtures/program/aim", b)
 	stage.add_child(cards)
 	_svc.gui_input.connect(_on_3d_input)
 	_coverage_note = Label.new()
@@ -260,7 +262,10 @@ var _press_at := Vector2.INF
 
 
 ## 3D: orbit as before; a click without drag picks a fixture (WO-615 T6 programmer), else the object under it.
+## Right-drag on a head points the selection at the floor (WO-679).
 func _on_3d_input(e: InputEvent) -> void:
+	if aim_drag.input(e, stage.camera(), fixtures3d):
+		return
 	stage.handle_input(e)
 	var mb := e as InputEventMouseButton
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:

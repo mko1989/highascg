@@ -233,6 +233,16 @@ func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
 		if floor_hit != null:
 			sel.aim_at.emit([floor_hit.x, -floor_hit.z, 0.0])
 		return floor_hit != null
+	var best := hit(cam, pos)
+	if best != "":
+		sel.pick(best, add)
+	return best != ""
+
+
+## The fixture whose body is nearest under the mouse, or "".
+func hit(cam: Camera3D, pos: Vector2) -> String:
+	var from := cam.project_ray_origin(pos)
+	var dir := cam.project_ray_normal(pos)
 	var best := ""
 	var near := INF
 	for id in _fx:
@@ -242,9 +252,7 @@ func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
 		if hit != null and from.distance_to(root.global_transform * (hit as Vector3)) < near:
 			near = from.distance_to(root.global_transform * (hit as Vector3))
 			best = id
-	if best != "":
-		sel.pick(best, add)
-	return best != ""
+	return best
 
 
 func _mesh(type_id: String, key: String) -> Node3D:

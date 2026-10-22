@@ -72,6 +72,7 @@ func _ready() -> void:
 	_flush.timeout.connect(_send)
 	add_child(_flush)
 	sel.changed.connect(_on_selection)
+	sel.aimed.connect(_on_selection)  # WO-679: after a right-drag aim
 	sel.aim_at.connect(_aim)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _fill_list())
 	_fill_list()

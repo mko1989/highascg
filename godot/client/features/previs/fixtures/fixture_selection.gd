@@ -5,6 +5,7 @@ extends RefCounted
 
 signal changed
 signal aim_at(psn: Array)  # [x, y, z] metres, PSN frame (x stage left, y upstage, z up)
+signal aimed  # WO-679: a right-drag aim ended (aim_drag.gd)
 
 static var _one: RefCounted = null
 

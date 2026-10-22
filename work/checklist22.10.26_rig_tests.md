@@ -45,6 +45,8 @@ Setup, once:
       see-through walls).
 - [ ] **WO-678:** Previs → heads without a GDTF colour are black. Click a head: its MVR layer row lights up. Colour
   that layer (e.g. "5. Sharpy Plus") → those heads take it; a fixture-type Body colour still wins.
+- [ ] **WO-679:** Previs 3D → right-click a head, hold and move: the beam follows the mouse across the floor; with
+  several heads selected, right-drag one of them aims the group. Left-drag still orbits.
 - [ ] **WO-643:** re-import a newer version of the same MVR. Confirm the prompt; the scene stays where it was, and
       there is no second set of heads.
 
