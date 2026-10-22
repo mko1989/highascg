@@ -314,7 +314,6 @@ module.exports = {
 	fanoutAmcpPayload,
 	setClusterFanoutSink,
 	setClusterFollowerCheck,
-	isClusterFollower,
 	DEFAULT_ALLOW,
 	DEFAULT_DENY,
 }

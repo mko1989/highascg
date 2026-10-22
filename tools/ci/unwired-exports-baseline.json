@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 633,
+	"count": 629,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -468,11 +468,9 @@
 		"src/replication/amcp-fanout.js: DEFAULT_DENY",
 		"src/replication/amcp-fanout.js: fanoutAmcpPayload",
 		"src/replication/amcp-fanout.js: isAmcpFanoutTransportMode",
-		"src/replication/amcp-fanout.js: parseAmcpCommandChannel",
 		"src/replication/follower-caspar-output.js: repairFollowerDecklinkOutput",
 		"src/replication/follower-machine-profile.js: loadLocalMachineProfile",
 		"src/replication/follower-machine-profile.js: scheduleFollowerDeviceViewCasparSync",
-		"src/replication/peer-client.js: FAILOVER_MS",
 		"src/replication/peer-client.js: PING_BACKOFF_MAX_MS",
 		"src/replication/peer-client.js: REQUEST_TIMEOUT_MS",
 		"src/replication/playhead-export.js: exportLayersFromOsc",
@@ -507,8 +505,6 @@
 		"src/replication/show-revision-reconcile.js: SHOW_REVISION_RECONCILE_MIN_MS",
 		"src/replication/show-revision-reconcile.js: maybeReconcileShowRevisionFromPing",
 		"src/replication/show-revision-reconcile.js: noteFollowerAppliedShowRevision",
-		"src/replication/sync-project-media-rsync.js: buildProjectMediaRsyncPlan",
-		"src/replication/sync-project-media-rsync.js: runProjectMediaRsync",
 		"src/replication/syncthing-client.js: ensureRemoteDevice",
 		"src/replication/syncthing-client.js: ensureSharedFolder",
 		"src/replication/syncthing-client.js: getSyncthingConfig",
