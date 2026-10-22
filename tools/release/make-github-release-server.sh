@@ -5,11 +5,13 @@
 #   npm run release:github-server
 #   npm run release:github-server:dry
 #   ./tools/release/make-github-release-server.sh [--dry-run] [--replace] [--tag NAME] [--no-bump-package]
-#                                                  [--latest] [--no-starter-zips]
+#                                                  [--latest] [--no-starter-zips] [--no-godot-clients]
 #
 # --latest            publish as a full release marked Latest (default: prerelease)
 # --no-starter-zips   skip the HIGHASCGEXF / HIGHASCGDAT starter layout zips (default: attach both,
 #                     rebuilt from the repo so the release never ships a stale snapshot)
+# --no-godot-clients  skip the Godot operator GUI builds (default: export Linux / Windows / macOS with
+#                     godot/export-client.sh and attach them, WO-686; needs the export templates)
 #
 set -euo pipefail
 
@@ -25,6 +27,7 @@ OUT_DIR=""
 ZIP_EXCLUDE_NODE_MODULES=0
 BUMP_PACKAGE=1
 STARTER_ZIPS=1
+GODOT_CLIENTS=1
 BUILD_STAMP_FILE=""
 NOTES=""
 
@@ -56,6 +59,7 @@ while [[ $# -gt 0 ]]; do
 	--no-bump-package) BUMP_PACKAGE=0 ;;
 	--latest) export RELEASE_LIB_LATEST=1 ;;
 	--no-starter-zips) STARTER_ZIPS=0 ;;
+	--no-godot-clients) GODOT_CLIENTS=0 ;;
 	*)
 		echo "Unknown option: $1" >&2
 		usage 1
@@ -134,6 +138,20 @@ build_server_archive
 NM_NOTE="Includes **node_modules**."
 [[ "$ZIP_EXCLUDE_NODE_MODULES" -eq 1 ]] && NM_NOTE="**node_modules** omitted — run \`npm ci\` after extract."
 
+CLIENTS_NOTE=""
+if [[ "$GODOT_CLIENTS" -eq 1 ]]; then
+	CLIENTS_NOTE="**Operator GUI on another computer** (Godot client, same version as the server):
+
+| Asset | Run |
+|-------|-----|
+| \`highascg-operator_${STAMP}_windows-x86_64.zip\` | Unzip, run \`HighAsCG-Operator.exe\` (unsigned: SmartScreen → More info → Run anyway) |
+| \`highascg-operator_${STAMP}_macos-universal.zip\` | Unzip, right-click \`HighAsCG Operator.app\` → Open the first time (ad-hoc signed, not notarized) |
+| \`highascg-operator_${STAMP}_linux-x86_64.tar.gz\` | \`tar -xzf …\`, run \`./HighAsCG-Operator.x86_64\` |
+
+First start: right-click the connection eye (top right) → A/B hosts → the server's IP, or start with \`-- --server=http://<playout-ip>:4200\`. Pictures come over the network (JPEG feed).
+"
+fi
+
 NOTES="$(mktemp)"
 
 cat >"$NOTES" <<EOF
@@ -147,6 +165,7 @@ Unified playout stack for sticks (**\`drop-update/\`** on \`HIGHASCGEXF\`): API 
 | \`HIGHASCGEXF-starter-layout.zip\` | Unzip at the **root of the \`HIGHASCGEXF\`** partition (operator stick) |
 | \`HIGHASCGDAT-starter-layout.zip\` | Unzip at the **root of the \`HIGHASCGDAT\`** bridge volume |
 
+${CLIENTS_NOTE}
 Stick prep (Ventoy + a reserved exFAT partition at the end): [\`docs/STICK_QUICK_START.md\`](docs/STICK_QUICK_START.md)
 
 ${NM_NOTE}
@@ -185,6 +204,23 @@ if [[ "$STARTER_ZIPS" -eq 1 ]]; then
 			echo "ERROR: ${z} missing after pack — refusing to publish a release without it" >&2
 			exit 1
 		fi
+	done
+fi
+
+# WO-686: the Godot operator GUI for other computers, exported from this tree.
+if [[ "$GODOT_CLIENTS" -eq 1 ]]; then
+	echo "==> Godot operator clients"
+	bash "${REPO_ROOT}/godot/export-client.sh"
+	EXP="${REPO_ROOT}/godot/export"
+	CL="${DIST}/highascg-operator_${STAMP}"
+	rm -f "${CL}"_*
+	(cd "${EXP}/windows" && zip -q -9 "${CL}_windows-x86_64.zip" HighAsCG-Operator.exe)
+	cp "${EXP}/macos/HighAsCG-Operator.zip" "${CL}_macos-universal.zip"
+	tar -C "${EXP}/linux" -czf "${CL}_linux-x86_64.tar.gz" HighAsCG-Operator.x86_64
+	for a in "${CL}_windows-x86_64.zip" "${CL}_macos-universal.zip" "${CL}_linux-x86_64.tar.gz"; do
+		release_lib_check_asset_size "$(basename "$a")" "$a"
+		ASSETS+=("$a")
+		echo "    $(basename "$a") ($(du -h "$a" | cut -f1))"
 	done
 fi
 

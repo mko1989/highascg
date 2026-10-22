@@ -99,6 +99,23 @@ archive_common_server_tar_excludes() {
 	if [[ "${RELEASE_SERVER_ONLY:-0}" == "1" ]]; then
 		_ex+=(--exclude=./dist-web)
 	fi
+	# WO-687: per-machine secrets and state in config/ never go into a (public) release. The 10.2026 releases built
+	# on the box shipped its ed25519 device key and TLS key. No "./" prefix: members are passed as "config", so
+	# "./config/…" patterns never match (nor do the "./" excludes above).
+	_ex+=(
+		--exclude=config/certs
+		--exclude=config/nginx
+		--exclude=config/device-identity.json
+		--exclude=config/hardware-identity.json
+		--exclude=config/replication-local-identity.json
+		--exclude=config/tailscale.json
+		--exclude=config/audio_capture.json
+		--exclude=config/casparcg.config
+		--exclude='config/casparcg copy.config'
+		--exclude='config/casparcg.config.bak.*'
+		--exclude=config/casparcg.config.tmp
+		--exclude='config/*.corrupt-*'
+	)
 }
 
 # Omit client/ dev tree when shipping a built dist-web/.
