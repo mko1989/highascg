@@ -5,7 +5,7 @@ extends RefCounted
 ## R/B swapped (diagnostics only).
 
 var texture: Texture2D
-var kind := "none"  # "rd-bgra" | "image-fallback"
+var kind := "none"  # "rd-bgra" | "rd-rgba" (WO-670 JPEG feed) | "image-fallback"
 var upload_ms := 0.0
 var width := 0
 var height := 0
@@ -13,6 +13,7 @@ var height := 0
 var _rd: RenderingDevice
 var _rid := RID()
 var _image: Image
+var _format := RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM
 
 
 func _init() -> void:
@@ -38,10 +39,27 @@ func update(data: PackedByteArray, w: int, h: int) -> void:
 	if _rd == null:
 		_update_image(data, w, h)
 		return
-	if w != width or h != height:
+	_rd_update(data, w, h, RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM)
+
+
+## WO-670 P1: RGBA8 frames (the remote JPEG feed, decoded by Image). Same Texture2D object; the RD texture is
+## recreated in RGBA when the source switches. The image fallback is RGBA already, so colours are right there too.
+func update_rgba(data: PackedByteArray, w: int, h: int) -> void:
+	if data.size() < w * h * 4:
+		return
+	if _rd == null:
+		_update_image(data, w, h)
+		return
+	_rd_update(data, w, h, RenderingDevice.DATA_FORMAT_R8G8B8A8_UNORM)
+
+
+func _rd_update(data: PackedByteArray, w: int, h: int, format: int) -> void:
+	if w != width or h != height or format != _format:
 		width = w
 		height = h
-		RenderingServer.call_on_render_thread(_create.bind(w, h, data))
+		_format = format
+		kind = "rd-rgba" if format == RenderingDevice.DATA_FORMAT_R8G8B8A8_UNORM else "rd-bgra"
+		RenderingServer.call_on_render_thread(_create.bind(w, h, data, format))
 	else:
 		RenderingServer.call_on_render_thread(_upload.bind(data))
 
@@ -54,10 +72,11 @@ func update_native(src: RefCounted) -> void:
 	var h: int = src.call("get_height")
 	if w <= 0 or h <= 0:
 		return
-	if w != width or h != height:
+	if w != width or h != height or _format != RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM:
 		width = w
 		height = h
-		RenderingServer.call_on_render_thread(_create.bind(w, h, PackedByteArray()))
+		_format = RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM
+		RenderingServer.call_on_render_thread(_create.bind(w, h, PackedByteArray(), _format))
 	RenderingServer.call_on_render_thread(_upload_native.bind(src))
 
 
@@ -68,11 +87,11 @@ func _upload_native(src: RefCounted) -> void:
 	upload_ms = src.call("get_upload_ms")
 
 
-func _create(w: int, h: int, data: PackedByteArray) -> void:
+func _create(w: int, h: int, data: PackedByteArray, format: int) -> void:
 	if _rid.is_valid():
 		_rd.free_rid(_rid)
 	var fmt := RDTextureFormat.new()
-	fmt.format = RenderingDevice.DATA_FORMAT_B8G8R8A8_UNORM
+	fmt.format = format
 	fmt.width = w
 	fmt.height = h
 	fmt.usage_bits = (

@@ -4,11 +4,14 @@ extends Node
 ## previs) alive only while leased: this node POSTs /api/video-surfaces/lease every LEASE_EVERY_S with the
 ## runtime roles the UI currently draws (TTL 15 s server-side → a crashed client releases on-air channels).
 ## Uses the hshm GDExtension when installed (godot/extensions/hshm/build.sh), else the GDScript reader.
+## WO-670 P1: when the server is on another machine (or `--video=feed`) there is no /dev/shm to read — every role's
+## reader is then a video_feed.gd RoleReader fed by one JPEG WebSocket; textures, holders and leases are unchanged.
 
 const ShmReader := preload("res://video/shm_reader.gd")
 const ShmNative := preload("res://video/shm_native.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
 const SurfaceHolders := preload("res://video/surface_holders.gd")
+const VideoFeed := preload("res://video/video_feed.gd")
 const LEASE_EVERY_S := 5.0
 
 var client_id := "godot-%d-%d" % [OS.get_process_id(), Time.get_unix_time_from_system()]
@@ -17,9 +20,12 @@ var leasing := false
 var _surfaces := {}  # role -> { reader, tex, native, path }
 var holders := SurfaceHolders.new()  # WO-617: only held roles are polled, uploaded and leased
 var _timer: Timer
+var feed: VideoFeed = null  # WO-670 P1: set when pictures come over the network
 
 
 func _ready() -> void:
+	if VideoFeed.wanted(Config.origin, Config.args):
+		feed = VideoFeed.new(VideoFeed.url_for(Config.origin, Config.args))
 	_timer = Timer.new()
 	_timer.wait_time = LEASE_EVERY_S
 	_timer.timeout.connect(_renew)
@@ -50,7 +56,7 @@ func reader(role: String) -> Variant:
 
 
 func is_native() -> bool:
-	return ShmNative.available()
+	return feed == null and ShmNative.available()
 
 
 ## Drop `owner`'s hold on a role; with no holders left it stops being read and its lease lapses
@@ -70,8 +76,8 @@ func is_held(role: String) -> bool:
 func _ensure(role: String) -> Dictionary:
 	if not _surfaces.has(role):
 		var path := path_for(role)
-		var native := ShmNative.available()
-		var r: Variant = ShmNative.new(path) if native else ShmReader.new(path)
+		var native := is_native()
+		var r: Variant = feed.reader(role) if feed != null else (ShmNative.new(path) if native else ShmReader.new(path))
 		_surfaces[role] = {"reader": r, "tex": ShmTexture.new(), "native": native, "path": path}
 	return _surfaces[role]
 
@@ -101,6 +107,8 @@ func _apply_descriptors(list: Variant) -> void:
 		if d is Dictionary:
 			descriptors[str((d as Dictionary).get("role", ""))] = d
 	# A surface whose announced path changed (e.g. operator shmName edited) is reopened.
+	if feed != null:
+		return  # the feed reads by role on the server; no local path to reopen
 	for role in _surfaces.keys():
 		var want := path_for(role)
 		if want != str(_surfaces[role].path):
@@ -111,12 +119,16 @@ func _apply_descriptors(list: Variant) -> void:
 
 
 func _process(_delta: float) -> void:
+	if feed != null:
+		feed.pump(holders.roles())
 	for role in holders.roles():
 		var s: Dictionary = _ensure(role)
 		var r: Variant = s.reader
 		if r.poll():
 			if s.native:
 				s.tex.update_native(r.src)
+			elif feed != null:
+				s.tex.update_rgba(r.frame, r.width, r.height)
 			else:
 				s.tex.update(r.frame, r.width, r.height)
 

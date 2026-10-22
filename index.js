@@ -311,6 +311,7 @@ function main() {
 		appCtx.onFirstWebSocketClient = (ctx) => notifyWebSocketClientConnected(ctx)
 		const wsHandle = attachWebSocketServer(httpServer, appCtx, { log: m => logger.info(m), stateBroadcastIntervalMs: wsBroadcastMs })
 		appCtx._getWsLogLineStats = typeof wsHandle.getLogLineStats === 'function' ? () => wsHandle.getLogLineStats() : null
+		appCtx._videoFeed = require('./src/system/video-feed').attachVideoFeed(httpServer, appCtx, { log: m => logger.info(m) }) // WO-670 P1: JPEG pictures for remote clients
 
 		startReplicationService(appCtx, {
 			clients: wsHandle.clients,

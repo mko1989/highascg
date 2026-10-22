@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — decisions answered 22.10; P1 (remote video) under way**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2–P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -161,6 +161,57 @@ Owner, `next.md` 22.10:
 3. **P3 master / epoch / failover:** promote, demote on return, client reconnect.
 4. **P4 per-destination fan-out:** backup and extension, derived from cables.
 5. **P5 two-box hardware acceptance.**
+
+## P1 — what was done (22.10)
+
+**Server: `GET ws://<box>:4200/api/video-feed`.** Client sends `{"roles":[…]}` (the set it draws now); the server sends
+binary `[u8 n][role][JPEG]`.
+- `src/system/video-feed.js` — its own `httpServer.on('upgrade')` listener (`ws-server.js` is at the 500-line cap and
+  leaves other paths alone), same `isOriginAllowed` / `checkWebSocketAuth` as `/api/ws`; attached in `index.js` next to
+  `attachWebSocketServer`.
+  - Roles validated `/^[A-Za-z0-9_-]{1,32}$/` → `/dev/shm/highascg-<role>` (role = shm name, as in `video-surfaces.js`).
+  - A role several clients want is encoded once, at the largest width / fps and best quality asked.
+  - A client with ≥ 2 MB unsent skips frames instead of queueing latency.
+  - The worker thread exists only while someone watches; when the last role goes it gets `{type:'stop'}`, closes its
+    ffmpegs and exits (a bare `terminate()` left ffmpeg running until its stdin closed).
+- `src/system/video-feed-worker.js` — one encoder per wanted role, JPEGs transferred back to the main thread.
+- `src/system/video-feed-encoder.js` — polls the segment at `fps` (`readLatestFrame(…, { into })` reuses one buffer),
+  packs stride padding, feeds ONE long-lived ffmpeg (raw BGRA → `scale=min(width,iw)` → MJPEG) with one frame in
+  flight; a size change restarts ffmpeg.
+  - **`-threads 1` on decoder and encoder is load-bearing.** With frame threading ffmpeg 6.1 holds every frame until
+    the next one arrives, and one-in-flight pacing then waits forever (measured: first JPEG after write 2 without,
+    after write 1 with). The first real-ffmpeg test hung exactly this way.
+- `src/tracking/hshm-read.js` — `into` option (caller buffer for the pixels).
+
+**Godot.**
+- `video/video_feed.gd` — one WebSocketPeer, reconnect with the `core/ws.gd` backoff; `RoleReader` has the
+  `shm_reader.gd` face (`poll` / `signal_lost` / `width` / `height` / `frame`), decodes only the newest JPEG
+  (`Image.load_jpg_from_buffer` → RGBA8).
+- `video/video_surfaces.gd` — feed when the origin host is not loopback; `--video=feed` / `--video=shm` force it
+  (`--video-width=`, `--video-fps=`). Holders, leases and the Texture2D objects are unchanged, so no panel changed.
+- `video/shm_texture.gd` — `update_rgba()`: same Texture2D, RD texture recreated as R8G8B8A8 when the source format
+  switches (the shm paths stay BGRA8).
+
+**Not done in P1:** Windows / macOS export presets (nothing to test them on here); JPEG decode runs on the main thread
+(≈ 3 ms per 960 px frame; move to `WorkerThreadPool` if many roles are watched remotely).
+
+## P1 — what was VERIFIED
+
+- `tools/smoke/smoke-wo670-video-feed.test.js` 9/0: param clamps, ffmpeg args, splitter across chunks, `into` reads,
+  one-in-flight + size-change restart + stride packing, framing, merge of several clients, worker lifecycle and slow
+  client skip, and a REAL ffmpeg round-trip from a HASCGSHM segment (64×36 stays 64×36; skipped when ffmpeg is
+  missing). Added to the curated list.
+- `npm run test:ci` 2763 tests, 2761 pass, 0 fail; lint 214 warnings (cap 216); prettier, max-lines, unwired-exports
+  clean.
+- Godot `--test` 20847/0 (`tests/test_video_feed.gd`: wanted/URL rules, frame parse, real JPEG decode keeps red red,
+  RGBA texture path); `--check` boot OK.
+- **Box, live:**
+  - A node WS client on `opgui`: first frame 133 ms after connect, 960×540, 15.3 fps, ≈ 12 KB/frame (≈ 1.5 Mbit/s).
+    The JPEG showed the operator channel's PGM/PRV with correct colours.
+  - ffmpeg gone within 100 ms of the client leaving.
+  - A second Godot instance with `--video=feed`: Live tab shows live PGM / PRV pictures (`video_native:false`,
+    holds `opgui`).
+- **Owner QA:** the Godot GUI on a laptop with `--server=http://<box>:4200` (checklist 22.10 section F).
 
 ## What was VERIFIED
 

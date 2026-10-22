@@ -3,7 +3,8 @@
 /**
  * WO-616 T13b — one still from a HASCGSHM v1 video surface (caspar/modules/shm/hshm_abi.h; Python mirror
  * tools/hshm-bridge/hshm_abi.py). Positional reads, no mmap: the server grabs a single frame now and then (beam-spot
- * detection), never a stream — streams stay with the sidecar and the Godot `hshm` GDExtension. The slot's seqlock is
+ * detection) — and the WO-670 video feed polls it 10–25×/s from a worker thread for remote clients; on-box streams
+ * stay with the sidecar and the Godot `hshm` GDExtension. The slot's seqlock is
  * read before and after the pixels, so a frame the writer lapped mid-read is reported, never returned.
  */
 
@@ -31,9 +32,10 @@ function readFully(fsImpl, fd, buf, pos) {
 
 /**
  * → { state: 'frame', seq, width, height, stride, pixels (BGRA premultiplied) } or { state: 'missing' | 'invalid' |
- * 'none' | 'lapped', error? }. `since`: a seq already seen — that frame again reads as 'none'.
+ * 'none' | 'lapped', error? }. `since`: a seq already seen — that frame again reads as 'none'. `into`: a Buffer to
+ * read the pixels into when it is big enough (WO-670 video feed reads 15×/s; `pixels` is then a view of it).
  */
-function readLatestFrame(file, { since = 0, fsImpl = fs } = {}) {
+function readLatestFrame(file, { since = 0, fsImpl = fs, into = null } = {}) {
 	let fd
 	try {
 		fd = fsImpl.openSync(file, 'r')
@@ -57,7 +59,7 @@ function readLatestFrame(file, { since = 0, fsImpl = fs } = {}) {
 		const s = Buffer.alloc(8)
 		const seqOk = () => readFully(fsImpl, fd, s, base) && s.readBigUInt64LE(0) === BigInt(2 * seq)
 		if (!seqOk()) return { state: 'lapped' }
-		const pixels = Buffer.alloc(stride * height)
+		const pixels = into && into.length >= stride * height ? into.subarray(0, stride * height) : Buffer.alloc(stride * height)
 		if (!readFully(fsImpl, fd, pixels, base + SLOT_HEADER_SIZE)) return { state: 'invalid' }
 		if (!seqOk()) return { state: 'lapped' }
 		return { state: 'frame', seq, width, height, stride, pixels }

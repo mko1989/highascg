@@ -7,7 +7,7 @@ How to use it:
 - Do its checks. Tick each box, or write a word next to it: "ok", "no: …", or "skip".
 - Tell the session. It flips the matching `OPEN_ISSUES.md` rows.
 
-This file covers WO-633 … WO-669. Older checks up to WO-632 are in
+This file covers WO-633 … WO-670. Older checks up to WO-632 are in
 [checklist20.10.26_owner_checks.md](./checklist20.10.26_owner_checks.md). Its section 1 has the tracking / follow / PSN /
 lighting checks (WO-615, 616, 624, 630, 631, 632). Do those in the same session as section A or B below.
 
@@ -78,6 +78,10 @@ Setup, once:
       preview offers Canvas / Caspar JPEG only.
 - [ ] **WO-661:** web Templates tab: Templates / Lower thirds / Shaders groups, ⚠ tooltip on shaders. After turning
       GPU on + a Caspar restart, the ⚠ disappears.
+
+- [ ] **WO-670 P1: Godot GUI on a laptop.** Run the Godot client on another machine with
+      `--server=http://<box-ip>:4200`. The Live tab shows live PGM / PRV pictures (about 15 fps, ¼ s behind is
+      normal). Tell the session the laptop's OS: Windows / macOS export presets are the next step.
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 
