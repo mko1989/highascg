@@ -74,7 +74,9 @@ describe('WO-670 P2 cluster peers', () => {
 		assert.equal(r.body.peer.online, true)
 		assert.equal(r.body.peer.program_channels, 2)
 		assert.equal(r.body.peer.media_parity, 'same')
-		assert.deepEqual(store.m.get('clusterPeers'), [{ id: 'boxB', host: '10.0.0.6', port: 4200, name: 'boxB', added_at: store.m.get('clusterPeers')[0].added_at }])
+		assert.deepEqual(store.m.get('clusterPeers'), [{ id: 'boxB', host: '10.0.0.6', port: 4200, name: 'boxB', added_at: store.m.get('clusterPeers')[0].added_at, device_key: '' }])
+		assert.equal(r.body.peer.device_key, undefined, 'the key stays on the server; the view says identity: false')
+		assert.equal(r.body.peer.identity, false)
 		assert.equal(snaps.at(-1).peers.length, 1, 'onChange carries the new list')
 		assert.equal(snaps.at(-1).self.id, 'boxA')
 		assert.equal((await c.add({ address: '10.0.0.6' })).status, 200, 'adding again updates, no duplicate')
@@ -147,5 +149,100 @@ describe('WO-670 P2 cluster peers', () => {
 		assert.equal((await routes.dispatch('GET', '/api/cluster/peers/boxZ/device-view', '', ctx)).status, 404)
 		const router = fs.readFileSync(path.join(ROOT, 'src/api/router.js'), 'utf8')
 		assert.match(router, /require\('\.\/routes-cluster'\)\.register\(routes\)/)
+	})
+})
+
+describe('WO-670 P2b send media (trust = both linked, signed SSH key)', () => {
+	const crypto = require('node:crypto')
+	const { acceptSshKey, sendMedia, fingerprint, canonical } = require('../../src/cluster/cluster-media')
+	const pair = () => {
+		const k = crypto.generateKeyPairSync('ed25519')
+		return { pub: k.publicKey.export({ type: 'spki', format: 'pem' }), priv: k.privateKey }
+	}
+	const A = pair()
+	const B = pair()
+	const signA = (msg) => crypto.sign(null, Buffer.from(msg), A.priv).toString('base64')
+	const verify = (pem, msg, sig) => {
+		try {
+			return crypto.verify(null, Buffer.from(msg), crypto.createPublicKey(pem), Buffer.from(sig, 'base64'))
+		} catch {
+			return false
+		}
+	}
+	const SSH = 'ssh-ed25519 ' + 'A'.repeat(68) + ' highascg-replication@boxA'
+
+	it('linking records the device key; a cloned identity is refused', async () => {
+		const net = fakeNet({ '10.0.0.6:4200/api/replication/ping': pingOf(), '10.0.0.6:4200/api/cluster/identity': { device_key: B.pub },
+			'10.0.0.7:4200/api/replication/ping': pingOf({ selfId: 'clone', instanceId: 'iX' }), '10.0.0.7:4200/api/cluster/identity': { device_key: A.pub } })
+		const store = memStore()
+		const c = createCluster({ persistence: store, selfPing: async () => SELF, fetchJson: net.fetchJson, selfKey: A.pub })
+		const r = await c.add({ address: '10.0.0.6' })
+		assert.equal(r.body.peer.identity, true)
+		assert.equal(store.m.get('clusterPeers')[0].device_key, B.pub.trim())
+		assert.equal(c.byDeviceKey(B.pub).id, 'boxB')
+		assert.equal(c.byDeviceKey(A.pub), null)
+		const clone = await c.add({ address: '10.0.0.7' })
+		c.stop()
+		assert.equal(clone.status, 409)
+		assert.match(clone.body.error, /cloned install/)
+	})
+
+	it('the receiver installs the key only for a linked sender, signed, for itself, fresh', () => {
+		let t = 1_000_000
+		const installed = []
+		const cluster = { byDeviceKey: (pem) => (pem === A.pub ? { id: 'boxA', device_key: A.pub } : null) }
+		const deps = { cluster, selfKey: B.pub, verify, now: () => t, install: (key, o) => (installed.push([key, o.fromHost]), { ok: true }) }
+		const req = (o = {}) => {
+			const b = { from_key: A.pub, to: fingerprint(B.pub), ssh_public_key: SSH, ts: t, ...o }
+			return { ...b, sig: o.sig ?? signA(canonical(b)) }
+		}
+		assert.equal(acceptSshKey(req({ from_key: B.pub }), '10.0.0.5', deps).status, 403, 'not linked here')
+		assert.equal(acceptSshKey(req({ to: fingerprint(A.pub) }), '10.0.0.5', deps).status, 400, 'meant for another server')
+		assert.equal(acceptSshKey(req({ ts: t - 120000 }), '10.0.0.5', deps).status, 400, 'stale')
+		assert.equal(acceptSshKey(req({ ssh_public_key: 'rm -rf /' }), '10.0.0.5', deps).status, 400, 'not a key')
+		const forged = req()
+		forged.ssh_public_key = 'ssh-ed25519 ' + 'B'.repeat(68)
+		assert.equal(acceptSshKey(forged, '10.0.0.5', deps).status, 403, 'signature does not cover a swapped key')
+		assert.equal(installed.length, 0, 'nothing installed by any refused request')
+		const ok = acceptSshKey(req(), '::ffff:10.0.0.5', deps)
+		assert.equal(ok.status, 200)
+		assert.deepEqual(installed, [[SSH, '10.0.0.5']], 'installed, from= the caller')
+	})
+
+	it('the sender: trust first, then rsync push with progress; unlinked receiver → clear message', async () => {
+		const states = []
+		const peer = { id: 'boxB', name: 'boxB', host: '10.0.0.6', port: 4200, device_key: B.pub }
+		let send = null
+		const cluster = { saved: (id) => (id === 'boxB' ? peer : null), mediaSend: () => send, setMediaSend: (_id, s) => ((send = s), states.push(s.state)), poll: async () => {} }
+		let reply = { ok: true, status: 200, json: { ok: true } }
+		const posts = []
+		const pushes = []
+		const deps = {
+			cluster, selfKey: A.pub, sign: signA, sshKey: () => SSH, now: () => 5,
+			post: async (h, p, path, body) => (posts.push([h, path, body]), reply),
+			project: async () => ({ name: 'show' }),
+			plan: () => ({ slug: 'show', relPaths: ['media/projects/show/'] }),
+			rsync: async (dir, host, rel, o) => (pushes.push([dir, host, rel]), o.onProgress({ percent: 50 }), { ok: true, files: 1 }),
+		}
+		assert.equal((await sendMedia('nope', deps)).status, 404)
+		reply = { ok: false, status: 403, json: { error: 'not linked here' } }
+		const refused = await sendMedia('boxB', deps)
+		assert.equal(refused.status, 409)
+		assert.match(refused.body.error, /has not linked this server/)
+		assert.equal(pushes.length, 0, 'no rsync without the receiver\'s trust')
+		const body = posts[0][2]
+		assert.ok(verify(A.pub, canonical(body), body.sig), 'the key request is signed by this device')
+		assert.equal(body.to, fingerprint(B.pub))
+		reply = { ok: true, status: 200, json: { ok: true } }
+		const r = await sendMedia('boxB', deps)
+		assert.equal(r.status, 202)
+		await new Promise((res) => setImmediate(res))
+		assert.deepEqual(pushes, [['push', '10.0.0.6', ['media/projects/show/']]])
+		assert.deepEqual(states, ['sending', 'sending', 'done'])
+		send = { state: 'sending' }
+		assert.equal((await sendMedia('boxB', deps)).status, 409, 'one send at a time')
+		send = null
+		peer.device_key = ''
+		assert.equal((await sendMedia('boxB', deps)).status, 400, 'linked before P2b: relink')
 	})
 })

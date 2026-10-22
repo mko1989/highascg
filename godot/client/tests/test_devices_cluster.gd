@@ -33,3 +33,13 @@ func test_facts_line() -> void:
 	var p := {"host": "10.0.0.6", "port": 4200, "version": "2026.05.20", "role": "standalone", "program_channels": 2, "media_parity": "differs", "online": true}
 	t.eq(M.facts(p), "10.0.0.6:4200 · 2026.05.20 · standalone · 2 program ch · media differs", "online")
 	t.eq(M.facts({"host": "b", "port": 4300, "online": false, "error": "ECONNREFUSED"}), "b:4300 · media ? · offline: ECONNREFUSED", "offline")
+
+
+func test_send_line() -> void:
+	t.eq(M.send_line({}, ""), "", "never sent")
+	t.eq(M.send_line({"media_send": {"state": "sending", "percent": 40}}, ""), "Sending media… 40 %", "progress")
+	t.eq(M.send_line({"media_send": {"state": "done", "files": 3}}, ""), "Media sent (3 paths).", "done")
+	t.eq(M.send_line({"media_send": {"state": "failed", "error": "SSH auth failed"}}, ""), "Media send failed: SSH auth failed", "failed")
+	t.eq(M.send_line({"media_send": {"state": "done", "files": 1}}, "B has not linked this server"), "B has not linked this server", "a refusal wins")
+	t.ok(M.sending({"media_send": {"state": "sending"}}), "sending")
+	t.ok(not M.sending({}), "idle")

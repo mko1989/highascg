@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) DONE 22.10 (offline + box with stub peers); P2b (Send media), P3–P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3–P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -257,6 +257,47 @@ a peer: it reads `/api/replication/ping` and `/api/device-view`, both open GETs 
   peers → the list scrolls. Dialog: a dead address shows "no HighAsCG server at 127.0.0.1:4309"; a live one links and
   closes the dialog; ✕ + Enter unlinks. Peers and stubs removed afterwards.
 - NOT verified: a real second box (none on the LAN), so "extension" and "media differs" were only seen in tests.
+
+## P2b — what was done (22.10)
+
+**Trust = both servers linked each other** (each keeps its own list, answer 2). The hot-backup SSH exchange
+(`exchangeReplicationSshWithPeer`) needs a paired peer, and installing a key on anyone's say-so over HTTP would let
+any LAN host write into `media/`. So:
+- Linking records the peer's **device public key** (`GET /api/cluster/identity`, ed25519 from
+  `config/device-identity.json`). The operator's link is the trust decision (trust on first use). A peer with the SAME
+  device key but another process is refused as a cloned install (409, with the fix: delete `device-identity.json` on
+  one). `instanceId` is random per process, so it cannot be the trust anchor.
+- `src/cluster/cluster-media.js` (new):
+  - **Sender** (`POST /api/cluster/peers/:id/send-media`): POSTs `{from_key, to (receiver key fingerprint),
+    ssh_public_key, ts}` + ed25519 signature to the receiver's `/api/cluster/ssh-key`; on 403 → 409 "B has not linked
+    this server: on B, Devices → Servers → + → this server, then Send again". Then the existing
+    `buildProjectMediaRsyncPlan` + `runProjectMediaRsync('push', …)` (rsync over SSH, replication key), in the
+    background: 202, progress in the peer's `media_send` {state sending | done | failed, percent, files, error} → WS.
+    One send per peer at a time.
+  - **Receiver** (`POST /api/cluster/ssh-key`): the sender's device key must belong to a server linked HERE, `to` must
+    be this server's fingerprint, `ts` within 60 s, the key a plain ssh public key, and the signature valid over all
+    four fields. Then the existing `installPeerAuthorizedKey` = forced command `highascg-replication-ssh`
+    (`rsync --server` into media/ and template/ only), `from=` the caller's address.
+- Peers linked before P2b have no recorded key → Send says "unlink and link it again".
+- Godot `cluster_panel.gd`: "Send media" per online server, a line under the name (progress %, "Media sent (N
+  paths)", red refusal / failure text). `cluster_model.gd`: `send_line` / `sending` / `send_failed`.
+- `tools/dev/fake-cluster-peer.js`: own ed25519 identity, the REAL `acceptSshKey` with the real server as its linked
+  peer, key written to `--trust-file` (never `~/.ssh/authorized_keys`); `--trust=none` = has not linked us.
+
+## P2b — what was VERIFIED
+
+- Smoke 8/0 (+3): link records the key, clone refused; receiver refuses unlinked / other target / stale / non-key /
+  swapped key under a valid signature and installs nothing, installs with `from=` on a valid request (real ed25519
+  keys); sender signs, stops on 403 with the message, runs rsync only after trust, progress → done, one at a time,
+  relink hint.
+- Godot 20901/0 (+7 `test_send_line`), `--check` OK.
+- Box, server restarted: identity endpoint (fingerprint e7cb256dd250bfa6). Stub fake-b linked (identity true) →
+  `send-media` 202 → the stub accepted the signed key (trust file: `from="127.0.0.1" ssh-ed25519 AAAAC3…IIzA…`, this
+  box's replication key) → REAL rsync: journal `[replication] rsync push 3/3 path(s) → 127.0.0.1`, state done. The
+  "Send media" button in a second Godot window did it again (journal 11:50:53). Stub fake-c `--trust=none`: 409 and
+  the red line "fake-c has not linked this server: on fake-c, Devices → Servers → + → this server, then Send again."
+- The rsync landed on this box's own media folder (same paths, nothing changed); the forced-command wrapper on a real
+  receiver is the existing hot-backup one, not re-tested here. Real two-box send = owner QA.
 
 ## What was VERIFIED
 

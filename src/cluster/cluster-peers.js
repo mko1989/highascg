@@ -10,6 +10,7 @@
  * A peer is any HighAsCG node answering /api/replication/ping (appId `highascg`); this server itself (same
  * instanceId) is refused. Peers are polled every POLL_MS while the list is not empty; their device view is cached
  * DEVICE_VIEW_MS. onChange(snapshot) fires when what the clients see changed (→ WS `cluster:peers`).
+ * P2b: linking also records the peer's device public key (GET /api/cluster/identity) — what cluster-media.js trusts.
  */
 
 const http = require('http')
@@ -43,6 +44,30 @@ function getJson(host, port, path, timeout = TIMEOUT_MS) {
 	})
 }
 
+/** POST JSON → { ok, status, json } (never throws). */
+function postJson(host, port, path, body, timeout = 5000) {
+	return new Promise((resolve) => {
+		const data = Buffer.from(JSON.stringify(body))
+		const req = http.request({ host, port, path, method: 'POST', timeout,
+			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json' } }, (res) => {
+			const chunks = []
+			res.on('data', (c) => chunks.push(c))
+			res.on('end', () => {
+				let json
+				try {
+					json = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+				} catch {
+					json = null
+				}
+				resolve({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode, json })
+			})
+		})
+		req.on('timeout', () => req.destroy(new Error('timeout')))
+		req.on('error', (e) => resolve({ ok: false, status: 0, json: null, error: e.message }))
+		req.end(data)
+	})
+}
+
 /** "host", "host:port" → { host, port } | null. */
 function parseAddress(raw, defPort = 4200) {
 	const s = String(raw || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
@@ -73,21 +98,21 @@ function subnetHosts(nets = os.networkInterfaces()) {
 
 /**
  * @param {{ persistence: { get: Function, set: Function }, selfPing: () => Promise<object|null>, fetchJson?: Function,
- *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[] }} opts
+ *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[], selfKey?: string }} opts
  */
 function createCluster(opts) {
 	const fetchJson = opts.fetchJson || getJson
 	const now = opts.now || Date.now
 	const hosts = opts.hosts || subnetHosts
 	const store = opts.persistence
-	/** id → { saved: {id, host, port, name, added_at}, live: {...}, view: {at, data} } */
+	/** id → { saved: {id, host, port, name, added_at, device_key}, live: {...}, view: {at, data}, send: {...} | null } */
 	const peers = new Map()
 	let self = null
 	let timer = null
 	let lastSig = ''
 
 	for (const p of Array.isArray(store.get(STORE_KEY)) ? store.get(STORE_KEY) : []) {
-		if (p && typeof p.id === 'string' && parseAddress(`${p.host}:${p.port}`)) peers.set(p.id, { saved: p, live: { online: null }, view: null })
+		if (p && typeof p.id === 'string' && parseAddress(`${p.host}:${p.port}`)) peers.set(p.id, { saved: p, live: { online: null }, view: null, send: null })
 	}
 
 	const save = () => store.set(STORE_KEY, [...peers.values()].map((p) => p.saved))
@@ -108,8 +133,10 @@ function createCluster(opts) {
 
 	function view(p) {
 		const media = p.live.media
+		const { device_key: key, ...saved } = p.saved
 		return {
-			...p.saved,
+			...saved,
+			identity: !!key,
 			online: p.live.online,
 			last_seen: p.live.last_seen || null,
 			hostname: p.live.hostname || '',
@@ -120,6 +147,7 @@ function createCluster(opts) {
 			media: media ? { slug: media.slug, files: media.files } : null,
 			media_parity: mediaParity(self?.projectMedia, media),
 			error: p.live.error || '',
+			media_send: p.send,
 		}
 	}
 
@@ -182,11 +210,16 @@ function createCluster(opts) {
 		if (!r.ok || r.json?.appId !== 'highascg') return { status: 404, body: { error: `no HighAsCG server at ${addr.host}:${addr.port}` } }
 		await refreshSelf()
 		if (self?.instanceId && r.json.instanceId === self.instanceId) return { status: 400, body: { error: 'that is this server' } }
+		const ident = await fetchJson(addr.host, addr.port, '/api/cluster/identity')
+		const deviceKey = ident.ok && typeof ident.json?.device_key === 'string' ? ident.json.device_key.trim() : ''
+		if (deviceKey && opts.selfKey && deviceKey === opts.selfKey.trim()) {
+			return { status: 409, body: { error: 'that server has the same device identity as this one (a cloned install): delete config/device-identity.json on one of them and restart it' } }
+		}
 		const id = String(r.json.selfId || r.json.hostname || `${addr.host}:${addr.port}`).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 64)
 		const prev = peers.get(id)
 		const saved = { id, host: addr.host, port: addr.port, name: String(raw?.name || prev?.saved.name || r.json.hostname || id).slice(0, 64),
-			added_at: prev?.saved.added_at || now() }
-		peers.set(id, { saved, live: liveFrom(r.json), view: null })
+			added_at: prev?.saved.added_at || now(), device_key: deviceKey }
+		peers.set(id, { saved, live: liveFrom(r.json), view: null, send: prev?.send || null })
 		save()
 		schedule()
 		changed()
@@ -225,7 +258,18 @@ function createCluster(opts) {
 		return found.filter(Boolean)
 	}
 
-	return { snapshot, poll, add, remove, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size }
+	const saved = (id) => peers.get(id)?.saved || null
+	const byDeviceKey = (pem) => (pem ? [...peers.values()].find((p) => p.saved.device_key && p.saved.device_key === pem.trim())?.saved || null : null)
+	const mediaSend = (id) => peers.get(id)?.send || null
+	function setMediaSend(id, state) {
+		const p = peers.get(id)
+		if (!p) return
+		p.send = state
+		changed()
+	}
+
+	return { snapshot, poll, add, remove, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
+		saved, byDeviceKey, mediaSend, setMediaSend }
 }
 
-module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, STORE_KEY, POLL_MS }
+module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, postJson, STORE_KEY, POLL_MS }

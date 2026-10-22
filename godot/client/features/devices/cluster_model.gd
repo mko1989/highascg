@@ -56,3 +56,28 @@ static func facts(p: Dictionary) -> String:
 	if p.get("online") == false and str(p.get("error", "")) != "":
 		bits.append("offline: " + str(p.error))
 	return " · ".join(PackedStringArray(bits))
+
+
+static func sending(p: Dictionary) -> bool:
+	return p.get("media_send") is Dictionary and str(p.media_send.get("state", "")) == "sending"
+
+
+static func send_failed(p: Dictionary) -> bool:
+	return p.get("media_send") is Dictionary and str(p.media_send.get("state", "")) == "failed"
+
+
+## The line under a server's name about the last Send media (refusal from this click wins).
+static func send_line(p: Dictionary, refused: String) -> String:
+	if refused != "":
+		return refused
+	var s: Variant = p.get("media_send")
+	if not s is Dictionary:
+		return ""
+	match str(s.get("state", "")):
+		"sending":
+			return "Sending media… %d %%" % int(s.get("percent", 0))
+		"done":
+			return "Media sent (%d path%s)." % [int(s.get("files", 0)), "" if int(s.get("files", 0)) == 1 else "s"]
+		"failed":
+			return "Media send failed: " + str(s.get("error", ""))
+	return ""

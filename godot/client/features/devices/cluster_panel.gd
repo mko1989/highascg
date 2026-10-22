@@ -4,6 +4,8 @@ extends VBoxContainer
 ## shows its state (online, version, role, program channels, media against this project), the role it plays for each
 ## shared destination (cluster_model.gd: cabled on both → backup, only there → extension) and its own rear panel and
 ## cables, read-only: each server keeps its own wiring (owner, WO-670 answer 2). Nothing here drives a peer yet (P3/P4).
+## P2b: "Send media" pushes this project's media to it (server cluster-media.js; both servers must have linked each
+## other); the progress / result line comes from the peer's `media_send` in the snapshot.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -21,6 +23,7 @@ var _found: VBoxContainer
 var _add_status: Label
 var _remove: ConfirmationDialog
 var _remove_id := ""
+var _send_err := {}  # peer id → why the last Send was refused (cleared by the next Send)
 var _sig := ""
 
 
@@ -109,6 +112,12 @@ func _card(p: Dictionary) -> Control:
 	facts.clip_text = true
 	facts.tooltip_text = facts.text
 	top.add_child(facts)
+	var send := Button.new()
+	send.text = "Send media"
+	send.disabled = p.get("online") != true or M.sending(p)
+	send.tooltip_text = "Copy this project's media to %s now (rsync). Both servers must have linked each other." % str(p.get("name", id))
+	send.pressed.connect(func() -> void: _send(id))
+	top.add_child(send)
 	var x := Button.new()
 	x.text = "✕"
 	x.flat = true
@@ -119,6 +128,11 @@ func _card(p: Dictionary) -> Control:
 		_remove.popup_centered())
 	top.add_child(x)
 	v.add_child(top)
+	var line := M.send_line(p, str(_send_err.get(id, "")))
+	if line != "":
+		var sl := _small(line, ThemeBuilder.ERROR if M.send_failed(p) or _send_err.has(id) else ThemeBuilder.TEXT)
+		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(sl)
 	var body := VBoxContainer.new()
 	v.add_child(body)
 	body.add_child(_small("Loading its devices…" if p.get("online") != false else "Offline: its devices are not shown.", ThemeBuilder.TEXT_MUTED))
@@ -149,6 +163,15 @@ func _fill(id: String, body: VBoxContainer) -> void:
 	_freeze(rear)
 	for c in m.cables:
 		body.add_child(_small("• " + str(c.label), ThemeBuilder.TEXT_MUTED))
+
+
+func _send(id: String) -> void:
+	_send_err.erase(id)
+	var r: Dictionary = await Api.post_json("/api/cluster/peers/%s/send-media" % id.uri_encode(), {})
+	if not r.ok:
+		_send_err[id] = str(r.get("error", "")) if str(r.get("error", "")) != "" else "Send failed (HTTP %d)" % int(r.get("status", 0))
+	_sig = ""
+	_render()
 
 
 ## Read-only: no buttons, no clicks (the peer's wiring is edited on the peer).

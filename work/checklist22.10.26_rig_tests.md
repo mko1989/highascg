@@ -86,6 +86,9 @@ Setup, once:
       Scan the network (or type B's address) → Link. B shows green with its version, "media ✓ / differs", its own
       rear panel and cables, and per destination "backup" (cabled on both) or "extension" (only on B). Pull B's
       network: within ~5 s it turns red "offline"; plug back: green. ✕ unlinks it (B is untouched).
+- [ ] **WO-670 P2b: Send media.** On A press "Send media" on B's card before B has linked A: red "B has not
+      linked this server…". On B link A, then Send again on A: "Sending media… %" → "Media sent", and B's card turns
+      "media ✓" (may take ~30 s for B's media signature to refresh).
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 
