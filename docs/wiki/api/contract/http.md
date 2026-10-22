@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-459 routes.
+464 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -56,6 +56,11 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/channels/*` | registry | `src/api/router.js` |
 | GET | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
 | POST | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
+| GET | `/api/cluster` | registry | `src/api/routes-cluster.js` |
+| POST | `/api/cluster/peers` | registry | `src/api/routes-cluster.js` |
+| DELETE | `/api/cluster/peers/:id` | registry | `src/api/routes-cluster.js` |
+| GET | `/api/cluster/peers/:id/device-view` | registry | `src/api/routes-cluster.js` |
+| POST | `/api/cluster/scan` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/companion` | registry | `src/api/router.js` |
 | POST | `/api/companion` | registry | `src/api/router.js` |
 | GET | `/api/companion/*` | registry | `src/api/router.js` |
@@ -482,6 +487,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-auth.js` |  |
 | `src/api/routes-caspar-config.js` | Generated CasparCG configuration: preview XML, download, apply on same host (write + RESTART). |
 | `src/api/routes-client-prefs.js` | WO-598 D — operator setup that used to live in ONE client's storage (web localStorage, Godot ui.cfg), kept on the node so every client sees the same thing: GET  |
+| `src/api/routes-cluster.js` | WO-670 P2 — the linked servers (src/cluster/cluster-peers.js), shown in the Devices view: GET    /api/cluster                        → { self, peers: [{ id, hos |
 | `src/api/routes-companion-preview.js` | WO-450 round 3: the passive client is disconnected whenever idle (or when its one reconnect attempt raced a Companion restart), so its "cannot reach" hint lied  |
 | `src/api/routes-companion.js` | Companion integration routes (hot-backup control plane + WO-75 preview). |
 | `src/api/routes-compose-preview.js` |  |

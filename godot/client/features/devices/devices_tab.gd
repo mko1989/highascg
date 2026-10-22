@@ -38,6 +38,7 @@ const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
 const Toolbar := preload("res://features/devices/devices_toolbar.gd")
 const MatrixView := preload("res://features/devices/matrix_view.gd")
+const ClusterPanel := preload("res://features/devices/cluster_panel.gd")  # WO-670 P2: linked servers
 const NodePanel := preload("res://features/devices/node_panel.gd")
 const NV := preload("res://features/devices/node_view_model.gd")
 const CablesList := preload("res://features/devices/cables_list.gd")
@@ -200,6 +201,7 @@ func _ready() -> void:
 	_list.select.connect(func(id: String) -> void: _gesture.select_edge(id))
 	_list.remove.connect(func(id: String) -> void: _gesture.remove_edge(id))
 	right.add_child(_list)
+	right.add_child(ClusterPanel.new())
 	_cables = CableLayer.new()
 	add_child(_cables)
 	_cables.loops = Toolbar.saved_loops()  # WO-674: remembered per client

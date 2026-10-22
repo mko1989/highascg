@@ -82,6 +82,10 @@ Setup, once:
 - [ ] **WO-670 P1: Godot GUI on a laptop.** Run the Godot client on another machine with
       `--server=http://<box-ip>:4200`. The Live tab shows live PGM / PRV pictures (about 15 fps, ¼ s behind is
       normal). Tell the session the laptop's OS: Windows / macOS export presets are the next step.
+- [ ] **WO-670 P2a: link a second server.** On box B (any HighAsCG, headless is fine): Devices → Servers → + →
+      Scan the network (or type B's address) → Link. B shows green with its version, "media ✓ / differs", its own
+      rear panel and cables, and per destination "backup" (cabled on both) or "extension" (only on B). Pull B's
+      network: within ~5 s it turns red "offline"; plug back: green. ✕ unlinks it (B is untouched).
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 

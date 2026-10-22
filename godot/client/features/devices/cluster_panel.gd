@@ -1,0 +1,232 @@
+extends VBoxContainer
+## WO-670 P2 — "Servers" under the cables list: the servers this one is linked with (server src/cluster/, GET
+## /api/cluster, WS `cluster:peers`). "+" adds one by address or from a scan of this box's network. Each linked server
+## shows its state (online, version, role, program channels, media against this project), the role it plays for each
+## shared destination (cluster_model.gd: cabled on both → backup, only there → extension) and its own rear panel and
+## cables, read-only: each server keeps its own wiring (owner, WO-670 answer 2). Nothing here drives a peer yet (P3/P4).
+
+const M := preload("res://features/devices/cluster_model.gd")
+const Model := preload("res://features/devices/devices_model.gd")
+const RearPanel := preload("res://features/devices/rear_panel.gd")
+const ThemeBuilder := preload("res://app/theme_builder.gd")
+
+var _snap := {}
+var _views := {}  # peer id → its device-view payload
+var _own := {}  # this server's device-view payload (for the roles)
+var _list: VBoxContainer
+var _self_l: Label
+var _add: ConfirmationDialog
+var _addr: LineEdit
+var _found: VBoxContainer
+var _add_status: Label
+var _remove: ConfirmationDialog
+var _remove_id := ""
+var _sig := ""
+
+
+func _ready() -> void:
+	add_theme_constant_override("separation", 8)
+	var head := HBoxContainer.new()
+	head.add_child(_small("SERVERS", ThemeBuilder.TEXT_MUTED))
+	var plus := Button.new()
+	plus.text = "+"
+	plus.flat = true
+	plus.tooltip_text = "Link another HighAsCG server (backup or more screens)"
+	plus.pressed.connect(_open_add)
+	head.add_child(plus)
+	_self_l = _small("", ThemeBuilder.TEXT_MUTED)
+	_self_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	head.add_child(_self_l)
+	add_child(head)
+	size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(scroll)
+	_list = VBoxContainer.new()
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list.add_theme_constant_override("separation", 12)
+	scroll.add_child(_list)
+	_build_add()
+	_remove = ConfirmationDialog.new()
+	_remove.confirmed.connect(func() -> void:
+		await Api.delete_json("/api/cluster/peers/" + _remove_id.uri_encode())
+		reload())
+	add_child(_remove)
+	Ws.on("cluster:peers", func(d: Variant) -> void:
+		if d is Dictionary:
+			_snap = d
+			if is_visible_in_tree():
+				_render())
+	visibility_changed.connect(func() -> void:
+		if is_visible_in_tree():
+			reload())
+
+
+func reload() -> void:
+	var r: Dictionary = await Api.get_json("/api/cluster")
+	if r.ok and r.data is Dictionary:
+		_snap = r.data
+	_views = {}
+	var own: Dictionary = await Api.get_json("/api/device-view")
+	_own = own.data if own.ok and own.data is Dictionary else {}
+	_sig = ""
+	_render()
+
+
+func _render() -> void:
+	var sig := JSON.stringify(_snap)
+	if sig == _sig:
+		return
+	_sig = sig
+	var me: Dictionary = _snap.get("self", {}) if _snap.get("self") is Dictionary else {}
+	_self_l.text = "This server: %s · %s" % [str(me.get("hostname", "?")), str(me.get("version", ""))] if not me.is_empty() else ""
+	for c in _list.get_children():
+		c.queue_free()
+	var peers: Array = _snap.get("peers", [])
+	if peers.is_empty():
+		_list.add_child(_small("No linked servers. Click + to add one (a backup, or a server for more screens).", ThemeBuilder.TEXT_MUTED))
+	for p in peers:
+		if p is Dictionary:
+			_list.add_child(_card(p))
+
+
+func _card(p: Dictionary) -> Control:
+	var id := str(p.id)
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1))
+	var v := VBoxContainer.new()
+	card.add_child(v)
+	var top := HBoxContainer.new()
+	var dot := _small("●", ThemeBuilder.SUCCESS if p.get("online") == true else ThemeBuilder.ERROR if p.get("online") == false else ThemeBuilder.TEXT_MUTED)
+	top.add_child(dot)
+	var name_l := Label.new()
+	name_l.text = str(p.get("name", id))
+	top.add_child(name_l)
+	var facts := _small(M.facts(p), ThemeBuilder.WARN if p.get("media_parity") == "differs" else ThemeBuilder.TEXT_MUTED)
+	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	facts.clip_text = true
+	facts.tooltip_text = facts.text
+	top.add_child(facts)
+	var x := Button.new()
+	x.text = "✕"
+	x.flat = true
+	x.tooltip_text = "Unlink this server (its own setup is untouched)"
+	x.pressed.connect(func() -> void:
+		_remove_id = id
+		_remove.dialog_text = "Unlink %s? Its own setup stays as it is." % str(p.get("name", id))
+		_remove.popup_centered())
+	top.add_child(x)
+	v.add_child(top)
+	var body := VBoxContainer.new()
+	v.add_child(body)
+	body.add_child(_small("Loading its devices…" if p.get("online") != false else "Offline: its devices are not shown.", ThemeBuilder.TEXT_MUTED))
+	if p.get("online") != false:
+		_fill(id, body)
+	return card
+
+
+## The peer's own rear panel + cables, read-only, and what it does for the shared destinations.
+func _fill(id: String, body: VBoxContainer) -> void:
+	if not _views.has(id):
+		var r: Dictionary = await Api.get_json("/api/cluster/peers/%s/device-view" % id.uri_encode())
+		_views[id] = r.data if r.ok and r.data is Dictionary else {"error": str(r.get("error", "no data"))}
+	if not is_instance_valid(body):
+		return
+	for c in body.get_children():
+		c.queue_free()
+	var view: Dictionary = _views[id]
+	if view.has("error"):
+		body.add_child(_small("Devices unavailable: " + str(view.error), ThemeBuilder.ERROR))
+		return
+	var m := Model.build(view)
+	body.add_child(_small("Roles (from its cables): " + M.roles_text(M.roles(_own, view)), ThemeBuilder.TEXT))
+	var rear := RearPanel.new()
+	body.add_child(rear)
+	rear.show_slots(m.slots)
+	rear.set_process_input(false)
+	_freeze(rear)
+	for c in m.cables:
+		body.add_child(_small("• " + str(c.label), ThemeBuilder.TEXT_MUTED))
+
+
+## Read-only: no buttons, no clicks (the peer's wiring is edited on the peer).
+static func _freeze(n: Node) -> void:
+	for c in n.get_children():
+		if c is BaseButton:
+			(c as BaseButton).visible = false
+		elif c is Control:
+			(c as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_freeze(c)
+
+
+func _build_add() -> void:
+	_add = ConfirmationDialog.new()
+	_add.title = "Link a server"
+	_add.ok_button_text = "Link"
+	_add.min_size = Vector2i(460, 0)
+	var v := VBoxContainer.new()
+	_addr = LineEdit.new()
+	_addr.placeholder_text = "address, e.g. 192.168.0.40 or box-b.local:4200"
+	_addr.text_submitted.connect(func(_t: String) -> void: _link(_addr.text))
+	v.add_child(_addr)
+	var scan := Button.new()
+	scan.text = "Scan the network"
+	scan.pressed.connect(_scan)
+	v.add_child(scan)
+	_found = VBoxContainer.new()
+	v.add_child(_found)
+	_add_status = _small("", ThemeBuilder.TEXT_MUTED)
+	_add_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_add_status)
+	_add.add_child(v)
+	_add.get_ok_button().pressed.connect(func() -> void: _link(_addr.text))
+	_add.dialog_hide_on_ok = false
+	add_child(_add)
+
+
+func _open_add() -> void:
+	_addr.text = ""
+	_add_status.text = ""
+	for c in _found.get_children():
+		c.queue_free()
+	_add.popup_centered()
+	_addr.grab_focus()
+
+
+func _scan() -> void:
+	_add_status.text = "Scanning…"
+	for c in _found.get_children():
+		c.queue_free()
+	var r: Dictionary = await Api.post_json("/api/cluster/scan", {})
+	var found: Array = r.data.get("found", []) if r.ok and r.data is Dictionary else []
+	_add_status.text = "Found %d server(s)." % found.size() if r.ok else "Scan failed: %s" % str(r.get("error", ""))
+	for f in found:
+		var b := Button.new()
+		b.text = "%s  (%s · %s)" % [str(f.hostname), str(f.host), str(f.version)]
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.pressed.connect(func() -> void: _link("%s:%d" % [str(f.host), int(f.port)]))
+		_found.add_child(b)
+
+
+func _link(address: String) -> void:
+	if address.strip_edges() == "":
+		_add_status.text = "Enter an address or scan."
+		return
+	_add_status.text = "Linking %s…" % address
+	var r: Dictionary = await Api.post_json("/api/cluster/peers", {"address": address.strip_edges()})
+	if not r.ok:
+		var err: String = str(r.data.get("error", "")) if r.data is Dictionary else str(r.get("error", ""))
+		_add_status.text = err if err != "" else "Could not link %s." % address
+		return
+	_add.hide()
+	reload()
+
+
+func _small(text: String, color: Color) -> Label:
+	var l := Label.new()
+	l.text = text
+	l.add_theme_font_size_override("font_size", 12)
+	l.add_theme_color_override("font_color", color)
+	return l

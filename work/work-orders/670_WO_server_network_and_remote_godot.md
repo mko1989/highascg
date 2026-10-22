@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2–P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) DONE 22.10 (offline + box with stub peers); P2b (Send media), P3–P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -212,6 +212,51 @@ binary `[u8 n][role][JPEG]`.
   - A second Godot instance with `--video=feed`: Live tab shows live PGM / PRV pictures (`video_native:false`,
     holds `opgui`).
 - **Owner QA:** the Godot GUI on a laptop with `--server=http://<box>:4200` (checklist 22.10 section F).
+
+## P2a — what was done (22.10)
+
+P2 split: **P2a** = link servers and show them (this); **P2b** = the "Send media" button (rsync to a linked server)
+and the signed handshake, which only matter once a link can change something on the peer (P3/P4). P2a never writes to
+a peer: it reads `/api/replication/ping` and `/api/device-view`, both open GETs already.
+
+**Server**
+- `src/cluster/cluster-peers.js` (new): the peer list, device-local in the node's persistence file (`clusterPeers`;
+  `.highascg-state.json` is git- and Syncthing-ignored, and a temp file under `node --test`). A peer must answer the
+  ping as `appId: highascg` with another `instanceId` (this server is refused). Polled every 5 s while the list is not
+  empty: online, version, role, leader epoch, program channels, project media. Media parity = this server's project
+  media slug + signature against the peer's: `same | differs | other-show | unknown`. An offline peer keeps its last
+  known facts plus the error. The peer's device view is cached 15 s. Scan = every private /24 of this box on :4200
+  (350 ms timeout, ~0.4 s), skipping itself and linked servers.
+- `src/api/routes-cluster.js` (new): `GET /api/cluster`, `POST /api/cluster/scan`, `POST /api/cluster/peers
+  {address}`, `DELETE /api/cluster/peers/:id`, `GET /api/cluster/peers/:id/device-view`; WS `cluster:peers` on change
+  (`last_seen` alone is not a change). Registered in `router.js`.
+- `tools/dev/fake-cluster-peer.js` (new): a stub second server (ping + a copy of this box's device view) for testing
+  with one box.
+
+**Godot**
+- `features/devices/cluster_panel.gd` (new): "SERVERS +" under the cables list, scrolling in the rest of the column.
+  "+" → Link a server (address or Scan the network; errors inline). Per server: ● online / offline, name, facts line
+  (orange when media differs), ✕ unlink (confirm), "Roles (from its cables)", its own rear panel built by
+  `devices_model.gd` from its device view and frozen read-only (buttons hidden, input off), its cables as text.
+- `features/devices/cluster_model.gd` (new): the pure part: destinations cabled in a payload, the per-destination role
+  (cabled here and there → backup, only there → extension), the facts line.
+- `devices_tab.gd`: +2 lines (preload, add the panel).
+
+## P2a — what was VERIFIED
+
+- `tools/smoke/smoke-wo670-cluster.test.js` 5/0: address parsing, media parity, private-/24 hosts; add refuses a
+  non-HighAsCG answer, silence and itself, persists device-local, re-add updates; reload from persistence, offline
+  keeps facts, parity follows the peer; device view through a REAL HTTP stub peer, cached then refetched; scan skips
+  self; routes through the registry. Added to the curated list.
+- Godot 20894/0 (+7 `test_devices_cluster.gd`), `--check` boot OK.
+- Box (server restarted): `GET /api/cluster` self = highascg7580; adding 192.168.0.23 → "that is this server"; scan
+  0.37 s, nothing else on the LAN. Stub peers on :4301/:4302/:4303: linked (201, media same), device view proxied,
+  persisted in `.highascg-state.json`.
+- Second Godot window, Devices: fake-b card green with facts, "Operator GUI: backup · PGM/PRV 1: backup", its rear panel
+  read-only and its cables. Stub killed → red "offline: connect ECONNREFUSED" within one poll, live over WS. Two
+  peers → the list scrolls. Dialog: a dead address shows "no HighAsCG server at 127.0.0.1:4309"; a live one links and
+  closes the dialog; ✕ + Enter unlinks. Peers and stubs removed afterwards.
+- NOT verified: a real second box (none on the LAN), so "extension" and "media differs" were only seen in tests.
 
 ## What was VERIFIED
 
