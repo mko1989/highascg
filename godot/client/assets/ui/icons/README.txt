@@ -11,6 +11,7 @@ eye / eye_off (WO-647 previs layer visibility) are hand-drawn: an almond outline
 outline struck through.
 copy (WO-656 look card duplicate) is hand-drawn: two offset rounded squares, the front one hollow.
 clock (WO-659 Live 2D Times toggle) is a plain circle with two hands. cube_face / cube (WO-659 Live 2D / 3D toggle) are
-one square (2D: one side of the cube) and an isometric hexagon with its three visible faces (3D).
+a box with "2D" drawn inside it as strokes (WO-668: the plain square read as a stop button; Godot's SVG
+loader draws no <text>) and an isometric hexagon with its three visible faces (3D). The toggle uses them at 22 px.
 warning (WO-661 Shaders group / rows while Caspar runs without GPU) is a hand-drawn amber triangle with a black "!" —
 coloured on purpose (not white), so set it on Tree items, not on Buttons that tint their icons.

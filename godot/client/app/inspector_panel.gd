@@ -27,7 +27,7 @@ func _ready() -> void:
 	add_child(col)
 	_title = Label.new()
 	_title.text = "Inspector"
-	_title.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
+	_title.add_theme_color_override("font_color", ThemeBuilder.TEXT)  # WO-668: white — blue read as a link
 	col.add_child(_title)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED

@@ -222,7 +222,7 @@ func set_view(v: String, save := true) -> void:
 	var is3d := view == "3d"
 	var b3 := _view_btns["3d"] as Button
 	b3.set_pressed_no_signal(is3d)
-	b3.icon = Icons.texture("cube" if is3d else "cube_face")  # WO-659: one side = 2D, three sides = 3D
+	b3.icon = Icons.texture("cube" if is3d else "cube_face", 22)  # WO-659: "2D" in a box / three sides = 3D (WO-668: 22 px so "2D" reads)
 	(_view_btns["fit"] as Button).visible = is3d
 	(_view_btns["lights"] as Button).visible = is3d
 	(_view_btns["times"] as Button).visible = not is3d
