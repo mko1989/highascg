@@ -239,6 +239,21 @@ func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
 	return best != ""
 
 
+## WO-679: the fixture whose body centre shows nearest `pos`, within `px` screen pixels, or "".
+func near(cam: Camera3D, pos: Vector2, px: float) -> String:
+	var best := ""
+	var d := px
+	for id in _fx:
+		var o: Vector3 = (_fx[id].root as Node3D).global_transform * (_fx[id].box as AABB).get_center()
+		if cam.is_position_behind(o):
+			continue
+		var s := cam.unproject_position(o).distance_to(pos)
+		if s < d:
+			d = s
+			best = id
+	return best
+
+
 ## The fixture whose body is nearest under the mouse, or "".
 func hit(cam: Camera3D, pos: Vector2) -> String:
 	var from := cam.project_ray_origin(pos)

@@ -14,6 +14,9 @@ class Rig:
 	func hit(_cam: Camera3D, _pos: Vector2) -> String:
 		return under
 
+	func near(_cam: Camera3D, _pos: Vector2, _px: float) -> String:
+		return ""
+
 
 func _button(pressed: bool, index := MOUSE_BUTTON_RIGHT) -> InputEventMouseButton:
 	var e := InputEventMouseButton.new()
@@ -41,6 +44,10 @@ func test_right_press_on_a_head_selects_and_drags() -> void:
 	rig.under = "c"
 	d.input(_button(true), null, rig)
 	t.eq(d.sel.ids, ["c"], "a head outside the selection selects it alone")
+	d.input(_button(false), null, rig)
+	rig.under = ""
+	t.eq(d.input(_button(true), null, rig), true, "with a selection, a press on the floor aims it and drags")
+	t.eq(d.sel.ids, ["c"], "… keeping the selection")
 
 
 func test_one_request_in_flight_newest_target_wins() -> void:

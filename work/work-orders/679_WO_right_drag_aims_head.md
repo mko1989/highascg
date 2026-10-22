@@ -32,6 +32,26 @@ Owner, 22.10: *"do a right click for pointing a head allow for holding down butt
 - `tests/test_aim_drag.gd`: press, miss, left button, keep / replace the selection, release → `aimed`, newest target
   wins while busy.
 
+## Follow-up 22.10 — "the right mouse click doesnt work on previs"
+
+- The owner's attempt left only a "Point at" left-click result (status "Pointed 1 at -2.8 / 8.1 m"). Only one head
+  had its dimmer up.
+- On the owner's own camera view, an xdotool right-drag on that head worked: the spot landed on the cursor and the
+  sliders followed (−62° / 64°).
+- Likely causes:
+  - a right-press beside a head's small body box (truss heads are a few pixels from the default view) fell through
+    to the stage;
+  - a dark head (dimmer 0) was dragged: it turned, but showed no beam.
+- Made forgiving:
+  - `fixtures_3d.gd` `near(cam, pos, px)`: a head counts within `NEAR_PX` = 28 px of its body centre on screen
+    (right-drag only; the left click keeps the exact hit);
+  - with a selection, a right press on the floor aims it there at once and the drag continues;
+  - a press with nothing selected and no head near is still left to the stage.
+- Verified:
+  - Godot 20964 / 0;
+  - box after relaunch, default Fit view: a right-drag starting on a truss head (`mvr-f565…`) aimed it (Pan
+    −143° / Tilt −46°); a right press on the floor moved it again (−148° / −61°); test head released.
+
 ## What was VERIFIED
 
 - Godot tests 20962 / 0, the 500-line limit is clean.
