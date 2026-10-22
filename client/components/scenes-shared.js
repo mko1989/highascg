@@ -11,7 +11,7 @@ import {
 	getLiveLayerPlayheadFrames,
 	playSeekFramesForRelativeToPrevious,
 } from '../lib/layer-playhead-resolve.js'
-import { isLowerThirdSource, resolveLayerLowerThirdCgData, resolveLayerLowerThirdConfig, buildLowerThirdCasparCgData } from '../lib/lower-third-cg-data.js'
+import { isLowerThirdSource, isStudioLowerThirdSource, resolveLayerLowerThirdCgData, resolveLayerLowerThirdConfig, buildLowerThirdCasparCgData } from '../lib/lower-third-cg-data.js'
 import { parseRouteValue } from '../lib/input-channels.js'
 import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 
@@ -338,7 +338,8 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 			row.templateData = JSON.parse(JSON.stringify(l.templateData))
 		} else if (l.source?.type === 'template' && l.source?.data && typeof l.source.data === 'object') {
 			row.cgData = JSON.parse(JSON.stringify(l.source.data))
-		} else if (isLowerThirdSource(l.source)) {
+		} else if (isLowerThirdSource(l.source) && !isStudioLowerThirdSource(l.source)) {
+			// WO-663: a studio export with no operator text keeps none — the server takes it with its baked values
 			row.cgData = { data: {}, style: {} }
 		}
 		return row

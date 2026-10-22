@@ -34,6 +34,7 @@ const STUDIO_LT_DIR = path.join(__dirname, '..', '..', 'template', 'studio')
 /** Directory holding custom font files for templates. */
 const FONTS_DIR = path.join(__dirname, '..', '..', 'template', 'fonts')
 const busboy = require('busboy')
+const { studioLtDefaults } = require('../cg-studio/studio-lt-defaults')
 
 /** Canonical template list (id → display name). */
 const TEMPLATE_CATALOG = {
@@ -82,6 +83,8 @@ function listStudioTemplates() {
 				casparPath: 'studio/' + id,
 				category: 'studio',
 				available: true,
+				// WO-663: the export's baked text + look — what the inspector opens with and a take without text plays
+				defaults: studioLtDefaults(id),
 			}
 		})
 		.sort((a, b) => a.name.localeCompare(b.name))

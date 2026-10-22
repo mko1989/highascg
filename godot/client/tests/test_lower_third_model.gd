@@ -26,6 +26,12 @@ func test_source_detection_and_template_id() -> void:
 	t.eq(LT.template_id("lower-thirds/lt-classic-box"), "lt-classic-box", "id")
 	t.eq(LT.template_id("LOWER_THIRDS\\LT-Bar"), "lt-bar", "lower-cased")
 	t.eq(LT.template_id("templates/x"), "", "none")
+	t.ok(LT.is_lower_third({"value": "studio/lt-gradient-wave-marcin"}), "studio/lt- is a lower third")
+	t.ok(LT.is_studio({"value": "studio/lt-gradient-wave-marcin"}), "studio/lt- is studio")
+	t.ok(LT.is_lower_third({"value": "STUDIO\\LT-X"}), "studio backslash + case")
+	t.ok(not LT.is_studio({"value": "lower-thirds/lt-classic-box"}), "lower-thirds is not studio")
+	t.ok(not LT.is_studio({"value": "mystudio/lt-x"}), "mystudio is not studio")
+	t.eq(LT.template_id("studio/lt-gradient-wave-marcin"), "lt-gradient-wave-marcin", "studio id")
 
 
 func test_patch_keeps_source() -> void:

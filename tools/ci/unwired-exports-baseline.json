@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 634,
+	"count": 633,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -397,7 +397,6 @@
 		"src/engine/scene-exit-layers.js: fadeExitLayerOpacities",
 		"src/engine/scene-exit-layers.js: physicalLookLayerBank",
 		"src/engine/scene-exit-layers.js: runExitLayersStopAndClear",
-		"src/engine/scene-look-kind.js: isLowerThirdSourceValue",
 		"src/engine/scene-native-fill.js: nativeFillNorm",
 		"src/engine/scene-play-seek.js: elapsedFramesFromPlayback",
 		"src/engine/scene-play-seek.js: getActiveTimelineForTake",

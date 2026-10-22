@@ -21,6 +21,18 @@ import { fetchLowerThirdTemplates } from './inspector-lower-third-templates.js'
 import { appendLowerThirdRoster } from './inspector-lower-third-roster.js'
 import { attachMathInput } from '../lib/math-input.js'
 
+/** Input id → config key, for filling the fields in after the group is built (WO-663 studio defaults). */
+const LT_FIELD_IDS = [
+	['lt-title', 'title'],
+	['lt-subtitle', 'subtitle'],
+	['lt-title-size', 'titleFontSize'],
+	['lt-subtitle-size', 'subtitleFontSize'],
+	['lt-position', 'position'],
+	['lt-primary-color', 'primaryColor'],
+	['lt-text-color', 'textColor'],
+	['lt-display-sec', 'displayDurationSec'],
+]
+
 
 /**
  * @param {HTMLElement} root
@@ -34,7 +46,8 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 	let cgUpdateInFlight = false
 	let cgUpdateQueued = false
 
-	const cfg = resolveLayerLowerThirdConfig(layer) || { ...DEFAULT_LOWER_THIRD_CONFIG }
+	const stored = resolveLayerLowerThirdConfig(layer)
+	const cfg = stored || { ...DEFAULT_LOWER_THIRD_CONFIG }
 
 	const grp = document.createElement('div')
 	grp.className = 'inspector-group inspector-lower-third-group'
@@ -50,6 +63,15 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 		const found = templates.find((t) => t.id === derivedTemplateId)
 		const nameSpan = tplField.querySelector('#lt-template-name')
 		if (nameSpan) nameSpan.textContent = found ? found.name : derivedTemplateId || '(none)'
+		// WO-663: a studio export with no config yet opens with its baked text + look (the first edit stores them)
+		const editedMeanwhile = sceneState.getScene(sceneId)?.layers?.[layerIndex]?.source?.lowerThirdConfig
+		if (!stored && !editedMeanwhile && found?.defaults) {
+			Object.assign(cfg, found.defaults)
+			for (const [id, k] of LT_FIELD_IDS) {
+				const el = grp.querySelector('#' + id)
+				if (el && cfg[k] != null) el.value = String(cfg[k])
+			}
+		}
 	})
 
 	const titleField = document.createElement('div')

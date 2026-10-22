@@ -19,6 +19,7 @@ const path = require('path')
 const { pathToFileURL } = require('url')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { REPO_ROOT } = require('../repo-paths')
+const { studioLtDefaults } = require('../cg-studio/studio-lt-defaults')
 
 let _lib = null
 async function ltLib() {
@@ -50,6 +51,9 @@ async function handleSceneLowerThird(body, ctx, deps = {}) {
 	const lib = await ltLib()
 	if (!layer || !lib.isLowerThirdSource(layer.source)) return out(404, { ok: false, error: `layer ${ln} is not a lower third` })
 	const templateId = lib.deriveTemplateId(layer.source.value)
+	// WO-663: a studio export with no operator config opens and plays with its baked text + look
+	const studio = lib.isStudioLowerThirdSource(layer.source) ? (deps.studioLtDefaults || studioLtDefaults)(templateId) : null
+	const stored = lib.resolveLayerLowerThirdConfig(layer) || (studio ? { ...lib.DEFAULT_LOWER_THIRD_CONFIG, ...studio } : null)
 
 	if (action === 'resolve') {
 		const lt = deps.lowerThirds || require('./routes-lower-thirds')
@@ -58,7 +62,7 @@ async function handleSceneLowerThird(body, ctx, deps = {}) {
 		const found = templates.find((t) => t.id === templateId)
 		return out(200, {
 			ok: true,
-			config: lib.resolveLayerLowerThirdConfig(layer),
+			config: stored,
 			templateId,
 			templateName: found ? found.name : templateId || '(none)',
 			fonts: lib.LOWER_THIRD_FONT_OPTIONS.map((f) => ({ id: f.id, label: f.label })),
@@ -73,7 +77,7 @@ async function handleSceneLowerThird(body, ctx, deps = {}) {
 	const channel = editBusChannel(map, mainIdx)
 	if (!channel) return out(200, { ok: false, reason: 'no_channel', mainIdx })
 	const routing = { channel, layer: ln, templateHostLayer: 1 }
-	const config = { ...lib.DEFAULT_LOWER_THIRD_CONFIG, ...(b.config && typeof b.config === 'object' ? b.config : lib.resolveLayerLowerThirdConfig(layer)) }
+	const config = { ...lib.DEFAULT_LOWER_THIRD_CONFIG, ...(b.config && typeof b.config === 'object' ? b.config : stored) }
 	const payload = lib.buildLowerThirdApiPayload(config, routing)
 	const post = deps.post || ((p, pb) => require('./routes-lower-thirds').handlePost(p, pb, ctx))
 	const sent = []

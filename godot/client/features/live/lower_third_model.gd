@@ -17,7 +17,15 @@ static func is_lower_third(source: Variant) -> bool:
 	if not (source is Dictionary) or str(source.get("value", "")) == "":
 		return false
 	var v := str(source.value).to_lower().replace("\\", "/")
-	return v.contains("lower-thirds/lt-") or v.contains("lower_thirds/lt-")
+	return v.contains("lower-thirds/lt-") or v.contains("lower_thirds/lt-") or is_studio(source)
+
+
+## isStudioLowerThirdSource (WO-663): a CG Studio export, studio/lt-*
+static func is_studio(source: Variant) -> bool:
+	if not (source is Dictionary) or str(source.get("value", "")) == "":
+		return false
+	var v := str(source.value).to_lower().replace("\\", "/")
+	return v.begins_with("studio/lt-") or v.contains("/studio/lt-")
 
 
 ## deriveTemplateId: first /lt-[\w-]+/i, lower-cased.

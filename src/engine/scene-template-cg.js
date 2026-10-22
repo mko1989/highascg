@@ -9,6 +9,7 @@
 const { param } = require('../caspar/amcp-utils')
 const { isTemplateClip } = require('../state/playback-tracker-media')
 const { resolveTemplateCgHostLayer, channelMapFromCtx, TEMPLATE_CG_OVERLAY_LAYER_BASE } = require('./cg-routing')
+const { studioLtDefaults } = require('../cg-studio/studio-lt-defaults')
 
 /**
  * WO-207: Track per-channel Sets of added template CG host layers.
@@ -65,6 +66,19 @@ const DEFAULT_LT_CG_DATA = JSON.stringify({
 	style: { textColor: '#ffffff', primaryColor: 'lightblue', position: 'left' },
 })
 
+/**
+ * WO-663 — a CG Studio export with no operator text plays what it was exported with. lt-engine never reads the
+ * baked HTML back (a play with no data shows "Name / Title"), so send the baked text and style as its CG data.
+ * @param {string} key lower-cased Caspar path `studio/lt-…`
+ * @returns {string | null}
+ */
+function studioLtCgData(key) {
+	const d = studioLtDefaults(key)
+	if (!d) return null
+	const { title, subtitle, ...style } = d
+	return JSON.stringify({ data: { title, subtitle }, style })
+}
+
 const DEFAULT_CG_DATA_BY_TEMPLATE = {
 	'casparcg-guide-html-template-master/html/lower-third.1': JSON.stringify({
 		data: { title: 'Title', subtitle: 'Subtitle' },
@@ -97,7 +111,7 @@ function extractTemplateCgData(layer, cgName) {
 	if (raw == null || raw === '') {
 		const key = String(cgName || '').toLowerCase()
 		if (DEFAULT_CG_DATA_BY_TEMPLATE[key]) return DEFAULT_CG_DATA_BY_TEMPLATE[key]
-		if (key.startsWith('studio/lt-')) return DEFAULT_LT_CG_DATA
+		if (key.startsWith('studio/lt-')) return studioLtCgData(key) || DEFAULT_LT_CG_DATA
 		return '{}'
 	}
 	if (typeof raw === 'string') return raw

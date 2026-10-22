@@ -71,7 +71,18 @@ function parsePositiveNumber(value, fallback) {
 export function isLowerThirdSource(source) {
 	if (!source?.value) return false
 	const v = String(source.value).toLowerCase().replace(/\\/g, '/')
-	return v.includes('lower-thirds/lt-') || v.includes('lower_thirds/lt-')
+	return v.includes('lower-thirds/lt-') || v.includes('lower_thirds/lt-') || isStudioLowerThirdSource(source)
+}
+
+/**
+ * WO-663 — a CG Studio export (`studio/lt-*`). With no operator config it carries its own baked text and look,
+ * so the resolvers below return null for it instead of the blank defaults (the server fills the baked values in).
+ * @param {object|null|undefined} source
+ * @returns {boolean}
+ */
+export function isStudioLowerThirdSource(source) {
+	if (!source?.value) return false
+	return /(^|\/)studio\/lt-/.test(String(source.value).toLowerCase().replace(/\\/g, '/'))
 }
 
 /**
@@ -325,9 +336,10 @@ export function resolveLayerLowerThirdConfig(layer) {
 		return { ...DEFAULT_LOWER_THIRD_CONFIG, ...src.lowerThirdConfig }
 	}
 	const cg = resolveLayerLowerThirdCgData(layer)
-	if (!cg) return isLowerThirdSource(src) ? { ...DEFAULT_LOWER_THIRD_CONFIG } : null
+	const blank = isLowerThirdSource(src) && !isStudioLowerThirdSource(src) ? { ...DEFAULT_LOWER_THIRD_CONFIG } : null
+	if (!cg) return blank
 	if (cgDataHasLowerThirdEditorContent(cg)) return lowerThirdConfigFromCgData(cg)
-	return isLowerThirdSource(src) ? { ...DEFAULT_LOWER_THIRD_CONFIG } : null
+	return blank
 }
 
 /**
@@ -348,7 +360,7 @@ export function resolveLayerLowerThirdCgData(layer) {
 	if (src.lowerThirdConfig && typeof src.lowerThirdConfig === 'object') {
 		return buildLowerThirdCgData(src.lowerThirdConfig)
 	}
-	if (isLowerThirdSource(src)) {
+	if (isLowerThirdSource(src) && !isStudioLowerThirdSource(src)) {
 		return buildLowerThirdCgData(src.lowerThirdConfig || {})
 	}
 	return null

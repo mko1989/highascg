@@ -37,7 +37,7 @@ const NON_CG_SOURCE_TYPES = new Set([
 function isLowerThirdSourceValue(source) {
 	if (!source?.value) return false
 	const v = String(source.value).toLowerCase().replace(/\\/g, '/')
-	return v.includes('lower-thirds/lt-') || v.includes('lower_thirds/lt-') || /^lt-[a-z0-9-]+$/i.test(v)
+	return v.includes('lower-thirds/lt-') || v.includes('lower_thirds/lt-') || v.includes('studio/lt-') || /^lt-[a-z0-9-]+$/i.test(v)
 }
 
 /**

@@ -94,7 +94,8 @@ function buildLayerRow(l, h) {
 		row.templateData = clone(l.templateData)
 	} else if (l.source?.type === 'template' && l.source?.data && typeof l.source.data === 'object') {
 		row.cgData = clone(l.source.data)
-	} else if (h.lt.isLowerThirdSource(l.source)) {
+	} else if (h.lt.isLowerThirdSource(l.source) && !h.lt.isStudioLowerThirdSource(l.source)) {
+		// WO-663: a studio export with no operator text keeps none — the server takes it with its baked values
 		row.cgData = { data: {}, style: {} }
 	}
 	return row
