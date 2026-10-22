@@ -1,75 +1,68 @@
 extends Node3D
-## WO-665 — research step 1, cut-out cards: each tracked person stands in the 3D previs as a card showing their live
-## picture from the camera that sees them best, background removed by the sidecar's seg mask (yolo26n-seg), at
-## their fused floor position, as tall as they measure, turned to face the viewer (about the vertical only, so they
-## stay upright). Maths in person_cards_model.gd. Video comes from VideoSurfaces, held only while cards are shown.
+## Tracked people in the 3D previs, at their fused floor position and measured height. The toolbar picker chooses:
+## - WO-665 (research step 1) cut-outs: a card with the live picture from the camera that sees them best, background
+##   removed by the sidecar's seg mask (yolo26n-seg), turned to face the viewer about the vertical only;
+## - WO-666 (step 2) dummies: a mannequin painted by projective texturing from up to 3 solved cameras
+##   (person_dummy.gdshader), its front turned toward the best camera.
+## Maths in person_cards_model.gd / person_dummy_model.gd. Video comes from VideoSurfaces, held only while drawn.
 
 const M := preload("res://features/previs/tracking/person_cards_model.gd")
+const PD := preload("res://features/previs/tracking/person_dummy_model.gd")
+const DummyMesh := preload("res://features/previs/tracking/person_dummy_mesh.gd")
 const C := preload("res://features/previs/tracking/camera_model.gd")
-const SHADER := preload("res://features/previs/tracking/person_card.gdshader")
+const CARD_SHADER := preload("res://features/previs/tracking/person_card.gdshader")
+const DUMMY_SHADER := preload("res://features/previs/tracking/person_dummy.gdshader")
 const TrackingModel := preload("res://features/previs/tracking/tracking_model.gd")
 const UI_CFG := "user://ui.cfg"
+const STYLES := ["off", "cards", "dummies"]  # picker item index → style; ui.cfg [previs] people
 
-var toggle := CheckBox.new()  # the toolbar's "Cut-outs"; persisted in ui.cfg [previs] cutouts
+var picker := OptionButton.new()  # the toolbar's "People" choice
+var style := "off"
 var _shown := false
 var _on := false
 var _cams: Array = []
-var _cards := {}  # world id → {node: MeshInstance3D, mat, mask_tex, role}
+var _cards := {}  # world id → {node: MeshInstance3D, mat, style, roles [], masks {cam_id: ImageTexture}}
 var _held := {}  # role → true
+var _probe_tex: Texture2D  # dev probe: stands in for every camera's video
 
 
 func _ready() -> void:
-	toggle.text = "Cut-outs"
-	toggle.tooltip_text = "Tracked people as cut-out cards on the stage: each one's live picture from the camera that sees them best."
+	for label in ["People: off", "People: cut-outs", "People: dummies"]:
+		picker.add_item(label)
+	picker.tooltip_text = "Tracked people on the stage. Cut-outs: each one's live picture from the camera that sees them best. Dummies: a mannequin painted from every solved camera that sees them."
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
-	toggle.set_pressed_no_signal(cfg.get_value("previs", "cutouts", false) == true)
-	toggle.toggled.connect(func(on: bool) -> void:
+	var saved: Variant = cfg.get_value("previs", "people", "cards" if cfg.get_value("previs", "cutouts", false) == true else "off")
+	set_style(str(saved))
+	picker.item_selected.connect(func(i: int) -> void:
+		set_style(STYLES[i])
 		var c := ConfigFile.new()
 		c.load(UI_CFG)
-		c.set_value("previs", "cutouts", on)
-		c.save(UI_CFG)
-		_apply())
+		c.set_value("previs", "people", style)
+		c.save(UI_CFG))
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _load_cams())
 	_load_cams()
-	if Config.args.has("probe-cutouts"):  # dev: --probe-cutouts=<dir> (WO-665)
+	if Config.args.has("probe-cutouts"):  # dev: --probe-cutouts=<dir>[:dummies] (WO-665 / WO-666)
 		_probe(str(Config.args["probe-cutouts"]))
 
 
-## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}]}, from a real seg run) drawn
-## as one camera's view of a 1.8 m person at the stage origin; saves the 3D view to <dir>/render.png after 2 s.
-func _probe(dir: String) -> void:
-	var inp: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir + "/persons.json"))
-	var tex := ImageTexture.create_from_image(Image.load_from_file(dir + "/frame.png"))
-	toggle.set_pressed_no_signal(true)
-	var ps := []
-	for i in inp.persons.size():
-		ps.append({"tid": i + 1, "box": inp.persons[i].box, "age_s": 0.0, "mask": inp.persons[i].mask})
-	var snap := {"cameras": [{"id": "p", "role": "probe", "stale": false, "mask_size": inp.mask_size, "persons": ps}],
-		"world": {"plane_z": 0.0, "persons": [{"id": 1, "x": 0.0, "y": 0.0, "height": 1.8, "keys": ["p:1"]}]}}
-	var tick := Timer.new()
-	tick.wait_time = 0.2
-	tick.timeout.connect(func() -> void:
-		_apply()
-		_cams = [{"id": "p", "role": "probe", "raster": inp.raster, "cam": {}}]
-		set_detections(snap)
-		for e in _cards.values():
-			e.mat.set_shader_parameter("video", tex))
-	add_child(tick)
-	tick.start()
-	get_tree().create_timer(2.0).timeout.connect(func() -> void:
-		get_viewport().get_texture().get_image().save_png(dir + "/render.png"))
+## "off" | "cards" | "dummies" (anything else → off).
+func set_style(s: String) -> void:
+	style = s if s in STYLES else "off"
+	picker.select(STYLES.find(style))
+	_clear()
+	_apply()
 
 
-## The 3D view is up (the tab is shown in 3D mode). Cards draw only while shown AND toggled on; off releases video.
+## The 3D view is up (the tab is shown in 3D mode). People draw only while shown and not off; off releases video.
 func set_shown(shown: bool) -> void:
 	_shown = shown
-	toggle.visible = shown
+	picker.visible = shown
 	_apply()
 
 
 func _apply() -> void:
-	_on = _shown and toggle.button_pressed
+	_on = _shown and style != "off"
 	visible = _on
 	if not _on:
 		_clear()
@@ -86,8 +79,17 @@ func set_detections(snap: Variant) -> void:
 		return
 	var seen := {}
 	for c in M.cards(snap, _cams):
+		if style == "dummies" and c.views.is_empty():
+			continue  # no solved camera sees them: nothing to paint with
 		seen[c.id] = true
-		_place(c)
+		var e: Dictionary = _cards.get(c.id, {})
+		if e.is_empty():
+			e = _new_entry()
+			_cards[c.id] = e
+		if style == "dummies":
+			_place_dummy(e, c)
+		else:
+			_place_card(e, c)
 	for id in _cards.keys():
 		if not seen.has(id):
 			(_cards[id].node as Node).queue_free()
@@ -95,40 +97,97 @@ func set_detections(snap: Variant) -> void:
 	_hold_roles()
 
 
-func _place(c: Dictionary) -> void:
-	var e: Dictionary = _cards.get(c.id, {})
-	if e.is_empty():
-		var mi := MeshInstance3D.new()
+func _new_entry() -> Dictionary:
+	var mi := MeshInstance3D.new()
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var mat := ShaderMaterial.new()
+	if style == "dummies":
+		mi.mesh = DummyMesh.mesh()
+		mat.shader = DUMMY_SHADER
+	else:
 		mi.mesh = QuadMesh.new()
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		var mat := ShaderMaterial.new()
-		mat.shader = SHADER
-		mi.material_override = mat
-		add_child(mi)
-		e = {"node": mi, "mat": mat, "mask_tex": null, "role": ""}
-		_cards[c.id] = e
+		mat.shader = CARD_SHADER
+	mi.material_override = mat
+	add_child(mi)
+	return {"node": mi, "mat": mat, "roles": [], "masks": {}}
+
+
+func _place_card(e: Dictionary, c: Dictionary) -> void:
 	var mi: MeshInstance3D = e.node
 	(mi.mesh as QuadMesh).size = Vector2(c.width, c.height)
-	var feet := C.psn_to_godot(c.feet)
-	mi.position = feet + Vector3(0, c.height / 2.0, 0)
+	mi.position = C.psn_to_godot(c.feet) + Vector3(0, c.height / 2.0, 0)
 	var mat: ShaderMaterial = e.mat
 	var b: Array = c.box
 	mat.set_shader_parameter("box", Vector4(b[0], b[1], b[2], b[3]))
-	if e.role != c.role:
-		e.role = c.role
-		mat.set_shader_parameter("video", VideoSurfaces.texture(c.role))
-	var img := M.mask_image(c.mask, c.mask_size)
-	if img != null:  # a coasting track brings none: keep the last mask
-		if e.mask_tex == null or (e.mask_tex as ImageTexture).get_size() != Vector2(img.get_size()):
-			e.mask_tex = ImageTexture.create_from_image(img)
-			mat.set_shader_parameter("mask", e.mask_tex)
+	if e.roles != [c.role]:
+		e.roles = [c.role]
+		mat.set_shader_parameter("video", _video(c.role))
+	var tex: Variant = _mask_tex(e, c.cam_id, c.mask, c.mask_size)
+	mat.set_shader_parameter("mask", tex)
+	mat.set_shader_parameter("has_mask", tex != null)
+
+
+func _place_dummy(e: Dictionary, c: Dictionary) -> void:
+	var mi: MeshInstance3D = e.node
+	var feet := C.psn_to_godot(c.feet)
+	var us := []
+	for v in c.views:
+		us.append(PD.cam_uniforms(v.ce))
+	mi.transform = Transform3D(Basis(Vector3.UP, PD.face_yaw(feet, us[0].pos)).scaled(Vector3.ONE * c.height), feet)
+	var mat: ShaderMaterial = e.mat
+	var roles := []
+	var rot := []
+	var pos := []
+	var lens := []
+	var raster := []
+	var box := []
+	var has_mask := []
+	for i in PD.MAX_VIEWS:
+		var on: bool = i < c.views.size()
+		var v: Dictionary = c.views[i] if on else {}
+		var u: Dictionary = us[i] if on else {}
+		rot.append(u.get("rot", Basis()))
+		pos.append(u.get("pos", Vector3.ZERO))
+		lens.append(u.get("lens", Vector4(1, 1, 0, 0)))
+		raster.append(u.get("raster", Vector2(1, 1)))
+		var b: Array = v.get("box", [0, 0, 1, 1])
+		box.append(Vector4(b[0], b[1], b[2], b[3]))
+		var tex: Variant = _mask_tex(e, v.cam_id, v.mask, v.mask_size) if on else null
+		mat.set_shader_parameter("mask%d" % i, tex)
+		has_mask.append(tex != null)
+		roles.append(v.get("role", ""))
+	if e.roles != roles:
+		e.roles = roles
+		for i in PD.MAX_VIEWS:
+			mat.set_shader_parameter("video%d" % i, _video(roles[i]) if roles[i] != "" else null)
+	mat.set_shader_parameter("n_cams", c.views.size())
+	mat.set_shader_parameter("rot", rot)
+	mat.set_shader_parameter("pos", pos)
+	mat.set_shader_parameter("lens", lens)
+	mat.set_shader_parameter("raster", raster)
+	mat.set_shader_parameter("box", box)
+	mat.set_shader_parameter("has_mask", has_mask)
+
+
+## This person's mask from one camera as a texture; a coasting track brings none, so the last one is kept.
+func _mask_tex(e: Dictionary, cam_id: String, b64: String, size: Variant) -> Variant:
+	var img := M.mask_image(b64, size)
+	var tex: Variant = e.masks.get(cam_id)
+	if img != null:
+		if tex == null or (tex as ImageTexture).get_size() != Vector2(img.get_size()):
+			tex = ImageTexture.create_from_image(img)
+			e.masks[cam_id] = tex
 		else:
-			(e.mask_tex as ImageTexture).update(img)
-	mat.set_shader_parameter("has_mask", e.mask_tex != null)
+			(tex as ImageTexture).update(img)
+	return tex
+
+
+func _video(role: String) -> Texture2D:
+	return _probe_tex if _probe_tex != null else VideoSurfaces.texture(role)
 
 
 func _process(_delta: float) -> void:
-	if not _on or _cards.is_empty():
+	if not _on or style != "cards" or _cards.is_empty():
 		return
 	var cam := get_viewport().get_camera_3d()
 	if cam == null:
@@ -144,8 +203,9 @@ func _process(_delta: float) -> void:
 func _hold_roles() -> void:
 	var want := {}
 	for e in _cards.values():
-		if e.role != "":
-			want[e.role] = true
+		for r in e.roles:
+			if r != "" and _probe_tex == null:
+				want[r] = true
 	for r in want:
 		if not _held.has(r):
 			VideoSurfaces.acquire(r, self)
@@ -165,3 +225,43 @@ func _clear() -> void:
 
 func _exit_tree() -> void:
 	VideoSurfaces.release_all(self)
+
+
+## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}]}, from a real seg run) as
+## one solved camera 8 m downstage; the person stands where that camera's box puts them, as tall as it measures.
+## Saves the 3D view from the camera's side (<dir>/render.png, 3 s) and from behind (render_back.png, 4 s).
+func _probe(arg: String) -> void:
+	var dir := arg.get_slice(":", 0)
+	var inp: Variant = JSON.parse_string(FileAccess.get_file_as_string(dir + "/persons.json"))
+	_probe_tex = ImageTexture.create_from_image(Image.load_from_file(dir + "/frame.png"))
+	var w := float(inp.raster[0])
+	var h := float(inp.raster[1])
+	var cam := C.camera(0.0, -8.0, 1.6, -4.0, 0.0, 0.0, 50.0)
+	var b: Array = inp.persons[0].box
+	var feet: Array = C.unproject(cam, [[(b[0] + b[2]) / 2.0 * w, b[3] * h]], w, h)[0]
+	var ce := {"id": "p", "role": "probe", "raster": [w, h], "cam": cam}
+	var height := M.estimate_height(ce, b, [feet[0], feet[1], 0.0])
+	var snap := {"cameras": [{"id": "p", "role": "probe", "stale": false, "mask_size": inp.mask_size,
+		"persons": [{"tid": 1, "box": b, "age_s": 0.0, "mask": inp.persons[0].mask}]}],
+		"world": {"plane_z": 0.0, "persons": [{"id": 1, "x": feet[0], "y": feet[1], "height": height, "keys": ["p:1"]}]}}
+	print("[probe-cutouts] feet ", feet, " height ", height)
+	set_style("dummies" if arg.ends_with(":dummies") else "cards")
+	var tick := Timer.new()
+	tick.wait_time = 0.2
+	tick.timeout.connect(func() -> void:
+		_cams = [ce]
+		set_detections(snap))
+	add_child(tick)
+	tick.start()
+	var g := C.psn_to_godot(feet)
+	var stage: Variant = get_parent()
+	var around := AABB(g - Vector3(0.6, 0, 0.6), Vector3(1.2, height, 1.2))
+	get_tree().create_timer(2.0).timeout.connect(func() -> void:  # after the stage's own fit on model load
+		if stage.has_method("frame_box"):
+			stage.frame_box(around, 0.3))
+	get_tree().create_timer(3.0).timeout.connect(func() -> void:
+		get_viewport().get_texture().get_image().save_png(dir + "/render.png")
+		if stage.has_method("frame_box"):
+			stage.frame_box(around, 2.4))
+	get_tree().create_timer(4.0).timeout.connect(func() -> void:
+		get_viewport().get_texture().get_image().save_png(dir + "/render_back.png"))

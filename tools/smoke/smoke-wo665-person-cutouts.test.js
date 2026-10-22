@@ -91,14 +91,23 @@ describe('WO-665 person cut-out cards', () => {
 		assert.equal('mask_size' in svc.snapshot().cameras[0], false)
 	})
 
-	it('Godot: the card layer sits on the 3D stage, fed by detections, toggled from the toolbar', () => {
+	it('Godot: the people layer (cut-outs / WO-666 dummies) sits on the 3D stage, fed by detections, picked from the toolbar', () => {
 		const tab = fs.readFileSync(path.join(ROOT, 'godot/client/features/previs/previs_tab.gd'), 'utf8')
 		assert.match(tab, /var cards := preload\("res:\/\/features\/previs\/tracking\/person_cards\.gd"\)\.new\(\)/)
 		assert.match(tab, /stage\.add_child\(cards\)/)
 		assert.match(tab, /cards\.set_detections\(markers\.detections\)/)
 		assert.match(tab, /cards\.set_shown\(is3d and shown\)/)
-		assert.match(tab, /bar\.add_child\(cards\.toggle\)/)
+		assert.match(tab, /bar\.add_child\(cards\.picker\)/)
 		const cards = fs.readFileSync(path.join(ROOT, 'godot/client/features/previs/tracking/person_cards.gd'), 'utf8')
 		assert.match(cards, /VideoSurfaces\.release_all\(self\)/, 'video is released when the cards go off')
+		// WO-666: the same layer draws textured dummies; the picker replaced the Cut-outs checkbox (old ui.cfg migrates)
+		assert.match(cards, /const STYLES := \["off", "cards", "dummies"\]/)
+		assert.match(cards, /"cards" if cfg\.get_value\("previs", "cutouts", false\) == true else "off"/)
+		const shader = fs.readFileSync(path.join(ROOT, 'godot/client/features/previs/tracking/person_dummy.gdshader'), 'utf8')
+		const model = fs.readFileSync(path.join(ROOT, 'godot/client/features/previs/tracking/person_dummy_model.gd'), 'utf8')
+		// the shader's projection is the tested GDScript twin, line for line
+		assert.match(shader, /vec2 uv = vec2\(\(\(lens\[i\]\.x \/ lens\[i\]\.y\) \* \(v\.x \/ -v\.z\) \+ 1\.0\) \/ 2\.0, \(1\.0 - lens\[i\]\.x \* \(v\.y \/ -v\.z\)\) \/ 2\.0\);/)
+		assert.match(model, /var uv := Vector2\(\(\(lens\.x \/ lens\.y\) \* \(v\.x \/ -v\.z\) \+ 1\.0\) \/ 2\.0, \(1\.0 - lens\.x \* \(v\.y \/ -v\.z\)\) \/ 2\.0\)/)
+		assert.match(shader, /return 0\.5 \+ \(uv - 0\.5\) \* \(1\.0 \+ lens\[i\]\.z \* r2 \+ lens\[i\]\.w \* r2 \* r2\);/)
 	})
 })

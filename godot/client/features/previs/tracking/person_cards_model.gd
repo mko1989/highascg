@@ -8,6 +8,7 @@ extends RefCounted
 ## plus the tracking cameras (tracking_model.normalize(...).cameras: {id, role, raster [w,h], cam {...}}).
 
 const C := preload("res://features/previs/tracking/camera_model.gd")
+const PD := preload("res://features/previs/tracking/person_dummy_model.gd")
 
 const DEFAULT_HEIGHT := 1.75  # m — a card whose height can't be measured (no solved camera, ray misses)
 const MIN_HEIGHT := 0.4
@@ -15,7 +16,8 @@ const MAX_HEIGHT := 2.6
 
 
 ## One card per world person a camera currently sees: {id, cam_id, role, box, mask, mask_size, feet [x,y,z] PSN,
-## height, width (m)}. `cams` = normalized tracking cameras.
+## height, width (m), views (WO-666: the solved cameras that paint their dummy, person_dummy_model.views_for)}.
+## `cams` = normalized tracking cameras.
 static func cards(snap: Variant, cams: Array) -> Array:
 	var out := []
 	if not (snap is Dictionary) or not (snap.get("world") is Dictionary):
@@ -44,7 +46,7 @@ static func cards(snap: Variant, cams: Array) -> Array:
 		var bh: float = maxf((float(box[3]) - float(box[1])) * float(raster[1]), 1e-6)
 		out.append({"id": int(wp.id), "cam_id": str(v.cam.id), "role": str(v.cam.get("role", ce.role)), "box": box,
 			"mask": str(v.person.get("mask", "")), "mask_size": v.cam.get("mask_size", []), "feet": feet,
-			"height": h, "width": h * bw / bh})
+			"height": h, "width": h * bw / bh, "views": PD.views_for(wp, views, by_id)})
 	return out
 
 

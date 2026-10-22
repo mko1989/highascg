@@ -79,7 +79,7 @@ From [WO-616](../../work/work-orders/616_WO_previs_tracking_openfollow_cameras.m
 
 - **WO-A** step 1: segmentation mask in the sidecar, `PersonCard` in the previs, a toggle in the 3D toolbar. → built as WO-665.
 - **WO-B** step 2: mannequin asset, the projective shader with per-camera depth maps, colour-match controls on each
-  camera object.
+  camera object. → built as WO-666 (procedural mannequin, N·V instead of depth maps; depth maps and colour match deferred).
 - **WO-C** step 3: pose model, 3D triangulation, rigged mannequin.
 
 Each one ends with a box check on the two real DeckLink cameras (the WO-616 rig).

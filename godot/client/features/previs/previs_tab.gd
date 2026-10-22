@@ -386,7 +386,7 @@ func _build_toolbar() -> Control:
 		_refresh_coverage()
 		_save_ui())
 	bar.add_child(_coverage_cb)
-	bar.add_child(cards.toggle)
+	bar.add_child(cards.picker)
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
