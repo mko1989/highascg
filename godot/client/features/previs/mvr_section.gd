@@ -25,6 +25,7 @@ const PaneKit := preload("res://features/settings/pane_kit.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
+signal objects_picked  ## WO-682: a 3D click selected MVR objects (selected_uuids) — the Position card follows
 
 var scene: MvrScene
 var _pick: OptionButton
@@ -315,7 +316,13 @@ func _set_layer_shown(name: String, shown: bool) -> void:
 
 ## WO-634: a 3D click that hit no fixture / stage object → maybe an MVR wall. → whether it hit one.
 func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
-	return _screens.click(cam, at, add)
+	var hit := _screens.click(cam, at, add)
+	if hit:
+		objects_picked.emit()
+	return hit
+
+
+func selected_uuids() -> Array: return _screen_uuids
 
 
 func _on_loaded(info: Dictionary) -> void:

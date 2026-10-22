@@ -189,17 +189,11 @@ func _array_dialog() -> void:
 	dlg.popup_centered()
 
 
-## Public (keyboard): move the selection by a delta in metres, or turn it.
-func nudge(delta: Vector3) -> void:
+## WO-682: put the selection at a stage-frame position and yaw (the Position card, a 3D drag, the arrow / Q / E keys).
+func place(pos: Vector3, yaw: float) -> void:
 	_edit(func(x: Dictionary) -> void:
-		x.position = [snappedf(float(x.position[0]) + delta.x, 0.001), snappedf(float(x.position[1]) + delta.y, 0.001), snappedf(float(x.position[2]) + delta.z, 0.001)])
-	_build_inspector()
-
-
-func turn(yaw_deg: float) -> void:
-	_edit(func(x: Dictionary) -> void:
-		var y := float(x.rotation[1]) + yaw_deg
-		x.rotation = [x.rotation[0], wrapf(snappedf(y, 0.5), -180.0, 180.0), x.rotation[2]])
+		x.position = [snappedf(pos.x, 0.001), snappedf(pos.y, 0.001), snappedf(pos.z, 0.001)]
+		x.rotation = [x.rotation[0], wrapf(snappedf(yaw, 0.01), -180.0, 180.0), x.rotation[2]])
 	_build_inspector()
 
 

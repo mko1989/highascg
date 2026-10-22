@@ -77,7 +77,8 @@ func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
 			refresh()
 			return true
 	var uuids := W.cluster(scene.cluster_items(), uuid)
-	var wall := {"uuids": uuids, "frame": W.wall_frame(scene.wall_boxes(uuids), scene.to_stage(cam.global_position))}
+	var toward: Vector3 = scene.to_stage(cam.global_position)
+	var wall := {"uuids": uuids, "frame": W.wall_frame(scene.wall_boxes(uuids), toward), "toward": toward}
 	_sel = _sel + [wall] if add else [wall]
 	refresh()
 	return true
@@ -93,6 +94,10 @@ func clear(forget := false) -> void:
 
 func refresh() -> void:
 	if scene != null:
+		for s in _sel:  # WO-682: a moved object's frame follows it
+			var boxes: Array = scene.wall_boxes(s.uuids)
+			if not boxes.is_empty():
+				s.frame = W.wall_frame(boxes, s.toward)
 		scene.mark(_sel.map(func(s: Dictionary) -> Dictionary: return s.frame))
 	var parts := _sel.map(func(s: Dictionary) -> String:
 		var f: Dictionary = s.frame

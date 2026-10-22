@@ -9,6 +9,7 @@ extends Node3D
 const M := preload("res://features/previs/mvr_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
+const MoveModel := preload("res://features/previs/move/move_model.gd")
 
 signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
 signal loaded(info: Dictionary)  ## {} when cleared; else {name, objects, fixtures, parts, meshes, failed, report} or {error}
@@ -25,6 +26,7 @@ var _patched := {}  # WO-615 T10: uuid (lower case) → true — the live patch 
 var fixture_uuids: Array = []  ## uuids (lower case) of the scene's fixtures, for Unpatch
 var _gone := {}  # WO-634: uuid → true — objects an LED screen replaced (project.previs.mvr.hidden_objects)
 var _marks: Array = []  # WO-634: selection boxes (top level, stage frame)
+var _moved := {}  # WO-682: uuid → its node transform (project.previs.mvr.moved; none = where the file put it)
 
 
 func show_scene(id: String) -> void:
@@ -75,6 +77,7 @@ func show_scene(id: String) -> void:
 		var keys: Array = o.get("parts", []).map(func(p: Dictionary) -> String: return str(p.get("mesh", "")))
 		keys.sort()
 		node.set_meta("model", ",".join(keys))  # WO-634: same model = same parts (one LED panel type)
+		node.transform = _moved.get(node.get_meta("uuid"), Transform3D.IDENTITY)
 		add_child(node)
 		_show(node)
 		if o.has("fixture"):
@@ -294,7 +297,18 @@ func configure(c: Dictionary) -> void:
 	set_hidden_layers(c.get("hidden_layers", []) if c.get("hidden_layers") is Array else [])
 	set_hidden_objects(c.get("hidden_objects", []) if c.get("hidden_objects") is Array else [])
 	set_layer_colors(Tint.colors(c, "layer_colors"))
+	set_moved(c.get("moved", {}) if c.get("moved") is Dictionary else {})
 	show_scene(str(c.get("id", "")))
+
+
+## WO-682 — objects the operator moved: uuid → 12 floats (move_model.gd xf_to_array), in the scene's own frame.
+func set_moved(d: Dictionary) -> void:
+	_moved = {}
+	for u in d:
+		_moved[str(u).to_lower()] = MoveModel.array_to_xf(d[u])
+	for c in get_children():
+		if c is Node3D and c.has_meta("uuid"):
+			(c as Node3D).transform = _moved.get(c.get_meta("uuid"), Transform3D.IDENTITY)
 
 
 func set_place(place: Dictionary) -> void:

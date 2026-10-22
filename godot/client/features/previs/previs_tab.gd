@@ -54,9 +54,12 @@ var coverage: Coverage3D
 var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
 var cards := preload("res://features/previs/tracking/person_cards.gd").new()  # WO-665 cut-out cards
 var aim_drag := preload("res://features/previs/fixtures/aim_drag.gd").new()  # WO-679 right-drag a head
+var mover := preload("res://features/previs/move/move_targets.gd").new()  # WO-682 what the Position card / a drag moves
+var move_drag := preload("res://features/previs/move/move_drag.gd").new()  # WO-682 left-drag the selection
 var _coverage_cb: CheckBox
 var _coverage_note: Label
 var _side: Control  # the 3D mode Inspector page; parked hidden here until the Inspector adopts it
+var _position := preload("res://features/previs/move/position_card.gd").new()  # WO-682
 
 
 func _ready() -> void:
@@ -165,6 +168,9 @@ func _ready() -> void:
 		if info.has("parts") and builder.objects.is_empty():
 			stage.frame_box(mvr.bounds()))
 	mvr_section.bind(mvr)
+	mover.bind(fixtures3d, fixtures3d.sel, mvr, mvr_section, stage_panel, builder)
+	move_drag.targets = mover
+	_position.bind(mover)
 	if Config.args.has("probe-stage-add"):  # dev: --probe-stage-add=<menu id> (0 LED, 1 TV, 2 projection)
 		get_tree().create_timer(3.0).timeout.connect(func() -> void: stage_panel._on_add(int(Config.args["probe-stage-add"])))
 	_glb_role = str(Config.args.get("previs-source", "opgui"))
@@ -262,16 +268,18 @@ var _press_at := Vector2.INF
 
 
 ## 3D: orbit as before; a click without drag picks a fixture (WO-615 T6 programmer), else the object under it.
-## Right-drag on a head points the selection at the floor (WO-679).
+## Right-drag on a head points the selection at the floor (WO-679); left-drag on the selection moves it (WO-682).
 func _on_3d_input(e: InputEvent) -> void:
 	if aim_drag.input(e, stage.camera(), fixtures3d):
 		return
-	stage.handle_input(e)
 	var mb := e as InputEventMouseButton
-	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
-		if mb.pressed:
-			_press_at = mb.position
-		elif mb.position.distance_to(_press_at) < 4.0 and not fixtures3d.click(stage.camera(), mb.position, mb.shift_pressed or mb.ctrl_pressed):
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+		_press_at = mb.position
+	if move_drag.input(e, stage.camera()):
+		return
+	stage.handle_input(e)
+	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+		if mb.position.distance_to(_press_at) < 4.0 and not fixtures3d.click(stage.camera(), mb.position, mb.shift_pressed or mb.ctrl_pressed):
 			var id := builder.pick(stage.camera(), mb.position)
 			if id != "":
 				stage_panel.select(id)
@@ -280,8 +288,8 @@ func _on_3d_input(e: InputEvent) -> void:
 
 
 ## Keys while the previs is shown (text fields consume their own keys first):
-## Delete remove · Ctrl+D duplicate · arrows nudge 5 cm (shift 50 cm; X/Z)
-## · Q/E turn 5° (shift 15°) · F fit.
+## Delete remove · Ctrl+D duplicate (stage objects) · arrows / Page Up / Down / Q / E move the selection (WO-682,
+## move_drag.gd key) · F fit.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or not is_visible_in_tree():
@@ -289,25 +297,15 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if markers.driving and k.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
 		get_viewport().set_input_as_handled()  # the marker driver reads the arrows (held), not the stage nudge
 		return
-	var step := 0.5 if k.shift_pressed else 0.05
+	if move_drag.key(k):
+		get_viewport().set_input_as_handled()
+		return
 	var handled := true
 	match k.keycode:
 		KEY_DELETE, KEY_BACKSPACE:
 			stage_panel.delete_selected()
 		KEY_D when k.ctrl_pressed:
 			stage_panel.duplicate_selected()
-		KEY_LEFT:
-			stage_panel.nudge(Vector3(-step, 0, 0))
-		KEY_RIGHT:
-			stage_panel.nudge(Vector3(step, 0, 0))
-		KEY_UP:
-			stage_panel.nudge(Vector3(0, 0, -step))
-		KEY_DOWN:
-			stage_panel.nudge(Vector3(0, 0, step))
-		KEY_Q:
-			stage_panel.turn(15.0 if k.shift_pressed else 5.0)
-		KEY_E:
-			stage_panel.turn(-15.0 if k.shift_pressed else -5.0)
 		KEY_F:
 			track_view.fit()
 			stage.frame_box(_fit_box(), builder.front_yaw())
@@ -458,6 +456,8 @@ func _on_model_loaded(meshes: Array) -> void:
 func _build_panel() -> Control:
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 8)
+	_position.fold = Fold.new("Position", [_position])
+	v.add_child(_position.fold)
 	stage_panel = StagePanel.new()
 	v.add_child(Fold.new("Stage", [stage_panel]))
 	mvr_section = MvrSection.new()

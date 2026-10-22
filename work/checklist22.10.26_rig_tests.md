@@ -53,6 +53,9 @@ Setup, once:
   "— no MVR scene —": the dialog names the fixtures and walls it takes; OK → heads and wall gone (Cancel keeps
   them). Pick the scene again → it re-patches. Remove → same, plus the scene leaves the box. In 3D, ctrl- or
   shift-click heads adds them; ctrl-click again drops one.
+- [ ] **WO-682:** Previs → click a head, a truss tower or the LED wall → Inspector **Position** shows X / Y / Z / Yaw.
+  Drag it in 3D (press ON it; shift = up / down), type a value in the card, try arrows / Page Up / Q. Relaunch → an
+  MVR object stays moved. (A head on a moved truss does not follow — move both.)
 - [ ] **WO-643:** re-import a newer version of the same MVR. Confirm the prompt; the scene stays where it was, and
       there is no second set of heads.
 

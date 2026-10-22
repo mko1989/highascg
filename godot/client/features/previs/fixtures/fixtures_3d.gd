@@ -254,6 +254,12 @@ func near(cam: Camera3D, pos: Vector2, px: float) -> String:
 	return best
 
 
+## WO-682: show head `id` at `pose` while it is dragged (the save rebuilds it from the patch).
+func preview_pose(id: String, pose: Dictionary) -> void:
+	if _fx.has(id):
+		(_fx[id].root as Node3D).transform = F.pose_xform(pose)
+
+
 ## The fixture whose body is nearest under the mouse, or "".
 func hit(cam: Camera3D, pos: Vector2) -> String:
 	var from := cam.project_ray_origin(pos)
