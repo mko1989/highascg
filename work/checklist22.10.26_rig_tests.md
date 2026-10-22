@@ -126,5 +126,8 @@ Setup, once:
 - [ ] **WO-675:** Previs → Camera → Presenters: open one of the URLs on a phone, take a photo, name + mic, tick
       consent, Send. The presenter appears with the photo. Walk into a camera: "Looks like P… — confirm?" → Confirm.
       Give a zone the action `presenter` and the presenter On enter `companion:<page>/<row>/<col>`: walking in presses it.
+- [ ] **WO-675 round 2:** on the phone type `http://<box>:4200/intake` (short address) → the intake page. After
+      sending one person (with a note, e.g. their role): select a lower-third layer in a look → Inspector →
+      "Presenters (backstage list)" → tap the name: Title = name, Subtitle = the note.
 - [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
       Inspector title is white.

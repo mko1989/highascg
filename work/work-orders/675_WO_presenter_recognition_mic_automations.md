@@ -1,6 +1,6 @@
 # WO-675 — Presenter recognition: backstage photo + name + mic → recognised on stage → automations
 
-**Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots). Open: P2 body re-ID, live test with real cameras, lower-third action.**
+**Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots); round 2 DONE 22.10: short `/intake` address + presenter picks in the lower-third inspector (box screenshots). Open: P2 body re-ID (owner: the main signal — wide shots), live test with real cameras.**
 
 Owner, `next.md` 22.10: *"how possible is it to do this: an audio tech is giving a mic to a presenter backstage he
 takes a photo of him/her full person, sends it to the system, with a note, name and mic number. when that presenter
@@ -123,3 +123,53 @@ P1 and P3 together, face first (OpenCV Zoo); P2 (OSNet body re-ID) is not starte
   the URLs, the photo row and the fields; typing `companion:1/2/3, nope` in On enter saved `["companion:1/2/3"]`.
 - NOT verified: real cameras (the project has none and detection is off), so a live suggestion → Confirm → zone fire
   is owner QA.
+
+## Round 2 — owner answers (22.10)
+
+Owner: *"phone intake how is done? should be a simple page on the network. lower third action should be look up of
+the presenters list if avaible. recognizing by body too is what i want because the camera shots that overview stage
+are gonna be wide shots, thats why the backstage tech is taking a whole body shot."*
+
+### Investigation
+
+- The intake already was a plain page served by the box, but at a long address:
+  `http://<box>:4200/api/tracking/presenters/intake`. That is hard to type on a phone.
+- The page posts to `./`, so it must stay under `/api/tracking/presenters/`. A rewrite at a short path would break the
+  POST; a redirect keeps it working.
+- The lower-third inspector (`lower_third_section.gd`) already has a spreadsheet "Data sheet" whose rows fill Title /
+  Subtitle (`row_picked`). The backstage roster is a second source for the same two fields.
+- `Ws` (core/ws.gd) has `on()` but no `off()`. The lower-third section is rebuilt on every layer selection, so a WS
+  subscription there would leave handlers on freed nodes (the WO-676 kind of crash). The section reads the roster
+  when it builds instead.
+- Body re-ID licenses (web research, 22.10, by a subagent; the dataset terms are from its memory and unverified): no
+  re-ID checkpoint has a clean commercial chain. OSNet, FastReID, SOLIDER, CLIP-ReID and TransReID have MIT / Apache
+  code, but their weights are trained on Market-1501 / MSMT17 / Duke / CUHK03 (research-only or withdrawn). The one
+  exception is the **OpenCV Zoo `person_reid_youtureid`**: its directory says "All files in this directory are
+  licensed under Apache 2.0", it ships as ONNX, and it runs in the sidecar's opencv. Its training data is undisclosed.
+  First choice for P2, from the same zoo as the face models.
+
+### What was done
+
+- `src/server/http-server.js`: `GET /intake` (and `/intake/`) → 302 to the intake page. It sits before the API and
+  headless checks, so it works on a headless server too. `presenter-routes.js` `intake_urls` now list the short
+  `http://<lan-ip>:4200/intake` (the Inspector → Camera → Presenters URLs).
+- Godot `features/live/lt_presenters_model.gd` (new): roster → picks `{label "Name · mic N · on stage", title = name,
+  subtitle = the tech's note}`. Presenters on stage come first, then intake order; blank names are skipped.
+- `lower_third_section.gd`: when the roster has names, "Presenters (backstage list)" shows one button per presenter
+  under Title / Subtitle. A click fills both fields and queues the CG update, exactly like a Data sheet row (the same
+  `pick` callable now serves both). With no roster, nothing shows.
+- `app/main.gd`: dev flag `--probe-lt` opens the section on a fake layer in a dialog (no look in the test project has
+  a lower third).
+
+### What was VERIFIED
+
+- Offline: `smoke-wo675-presenters` 8/0 (now asserts the short URL and the redirect); test:ci 2798 / 0 fail; Godot
+  20939/0 (+7 `test_lt_presenters_model.gd`), `--check` OK. Lint is 214 warnings; no file over 500 lines.
+- Box:
+  - `curl http://192.168.0.23:4200/intake` → `302 → /api/tracking/presenters/intake`, then `200 text/html`. `GET
+    /api/tracking/presenters` → `intake_urls: ["http://192.168.0.23:4200/intake", "http://100.101.245.97:4200/intake"]`.
+  - With two test presenters posted (Anna Nowak · mic 3 · "CEO, Acme"; Bob Smith · mic 5 · "Host"), `--probe-lt`
+    showed both buttons (screenshot). Clicking Anna filled Title "Anna Nowak" and Subtitle "CEO, Acme" (screenshot).
+    The test roster was then cleared.
+- Owner QA: open the intake on a phone at `http://<box>:4200/intake`, send one person; then a look with a lower third
+  → Inspector → tap the name.

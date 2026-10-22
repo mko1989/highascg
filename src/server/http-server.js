@@ -327,7 +327,10 @@ function startHttpServer(options) {
 				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPathForRouting)
 
 
-			if (isApi) {
+			if (reqPathForRouting === '/intake' || reqPathForRouting === '/intake/') {
+				// WO-675: the short address the audio tech types on a phone → the presenter intake page.
+				result = { status: 302, headers: { Location: '/api/tracking/presenters/intake', 'Cache-Control': 'no-store' }, body: '' }
+			} else if (isApi) {
 				// Pass path including ?query so router can parse query params consistently.
 				const qIdx = rawPath.indexOf('?')
 				const qs = qIdx >= 0 ? rawPath.slice(qIdx) : ''

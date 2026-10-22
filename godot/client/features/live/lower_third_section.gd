@@ -4,12 +4,15 @@ extends VBoxContainer
 ## persistLocalConfig) and queues one CG UPDATE 450 ms later; ▶ Play flushes it, then animates in — or out when
 ## already playing on this layer; Delete removes the CG. Config resolution + actions: POST /api/scene/lower-third.
 ## The data sheet (roster) sits under Title/Subtitle like the web (lt_roster_section.gd).
+## WO-675: when the backstage presenter list has names, one button per presenter sits under Title/Subtitle
+## (lt_presenters_model.gd): Title = name, Subtitle = the tech's note. Loaded with the section (no WS: Ws has no off()).
 
 signal patch(p: Dictionary)
 
 const LT := preload("res://features/live/lower_third_model.gd")
 const P := preload("res://features/live/pip_model.gd")
 const RosterSection := preload("res://features/live/lt_roster_section.gd")
+const Presenters := preload("res://features/live/lt_presenters_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NUMS := [["titleFontSize", "Title px", 8, 200, 1], ["subtitleFontSize", "Sub px", 8, 120, 1],
 	["renderScale", "Scale %", 25, 300, 5], ["displayDurationSec", "Hold s", 0, 3600, 0.5]]
@@ -82,16 +85,31 @@ func _build() -> void:
 		le.text_changed.connect(func(t: String) -> void: _change({field: t}))
 		g.add_child(le)
 		lines[field] = le
+	var pick := func(title: String, subtitle: String) -> void:
+		(lines.title as LineEdit).text = title
+		(lines.subtitle as LineEdit).text = subtitle
+		_change({"title": title, "subtitle": subtitle})
+	var who: Dictionary = await Api.get_json("/api/tracking/presenters")
+	if key != _key:
+		return
+	var picks := Presenters.picks(who.data if who.ok else null)
+	if not picks.is_empty():
+		add_child(_muted("Presenters (backstage list)"))
+		var flow := HFlowContainer.new()
+		for p in picks:
+			var b := Button.new()
+			b.text = p.label
+			b.tooltip_text = "Title: %s\nSubtitle: %s" % [p.title, p.subtitle if p.subtitle != "" else "(empty — no note)"]
+			b.pressed.connect(pick.bind(p.title, p.subtitle))
+			flow.add_child(b)
+		add_child(flow)
 	var roster := RosterSection.new()
 	roster.setup((_layer.source as Dictionary).get("lowerThirdRoster"))
 	roster.roster_changed.connect(func(r: Dictionary) -> void:
 		var src: Dictionary = (_layer.source as Dictionary).duplicate(true)
 		src["lowerThirdRoster"] = r
 		patch.emit({"source": src}))
-	roster.row_picked.connect(func(title: String, subtitle: String) -> void:  # web applyRowToEditor
-		(lines.title as LineEdit).text = title
-		(lines.subtitle as LineEdit).text = subtitle
-		_change({"title": title, "subtitle": subtitle}))
+	roster.row_picked.connect(pick)  # web applyRowToEditor
 	add_child(roster)
 	g = GridContainer.new()
 	g.columns = 2

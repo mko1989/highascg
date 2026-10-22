@@ -35,7 +35,7 @@ function parse(body) {
 function intakeUrls(port, nets = os.networkInterfaces()) {
 	const out = []
 	for (const list of Object.values(nets || {})) {
-		for (const a of list || []) if ((a.family === 'IPv4' || a.family === 4) && !a.internal) out.push(`http://${a.address}:${port}${BASE}/intake`)
+		for (const a of list || []) if ((a.family === 'IPv4' || a.family === 4) && !a.internal) out.push(`http://${a.address}:${port}/intake`)
 	}
 	return out
 }

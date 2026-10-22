@@ -67,6 +67,13 @@ func _ready() -> void:
 		hw_reconcile.run({"prompt": true, "severity": "hard", "sameMachine": false, "projectName": "Probe show",
 			"items": [{"section": "Device graph", "message": "Connector count differs (3 in project vs 1 live).", "severity": "hard"},
 				{"section": "Screen destinations", "message": "Destination count differs (2 saved vs 1 live).", "severity": "soft"}]})
+	if Config.args.has("probe-lt"):  # dev: the lower-third inspector on a fake layer (WO-675 presenter picks)
+		var dlg := AcceptDialog.new()
+		var sec: Node = preload("res://features/live/lower_third_section.gd").new()
+		dlg.add_child(sec)
+		add_child(dlg)
+		dlg.popup_centered(Vector2i(700, 600))
+		sec.show_layer("probe", 0, {"layerNumber": 99, "source": {"type": "template", "value": "lower-thirds/lt-classic-box"}})
 	if Config.args.has("probe-snapshot-load"):  # dev: the Load device snapshot dialog (its entry is WO-608's)
 		shell.tabs.get_node("Devices").snapshots.open_load()
 	if Config.args.has("probe-edit"):  # dev: --probe-edit=<sceneId> opens the look editor (WO-600 F)

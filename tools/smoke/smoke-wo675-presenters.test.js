@@ -161,7 +161,9 @@ describe('WO-675 presenter routes', () => {
 		assert.equal(list.intake_path, '/api/tracking/presenters/intake')
 		assert.ok(Array.isArray(list.intake_urls))
 		const nets = { lo: [{ family: 'IPv4', address: '127.0.0.1', internal: true }], eth0: [{ family: 'IPv4', address: '10.0.0.5', internal: false }, { family: 'IPv6', address: 'fe80::1', internal: false }] }
-		assert.deepEqual(intakeUrls(4200, nets), ['http://10.0.0.5:4200/api/tracking/presenters/intake'], 'LAN IPv4 only')
+		assert.deepEqual(intakeUrls(4200, nets), ['http://10.0.0.5:4200/intake'], 'LAN IPv4 only, the short address')
+		const http = fs.readFileSync(path.join(__dirname, '../../src/server/http-server.js'), 'utf8')
+		assert.match(http, /reqPathForRouting === '\/intake'[\s\S]{0,200}Location: '\/api\/tracking\/presenters\/intake'/, '/intake redirects to the page (its "./" POST stays under the API)')
 		const photo = await call(p, 'GET', '/api/tracking/presenters/p1/photo')
 		assert.equal(photo.headers['Content-Type'], 'image/jpeg')
 		assert.equal(photo.body[0], 0xff)
