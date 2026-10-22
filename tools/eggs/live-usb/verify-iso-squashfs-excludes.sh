@@ -146,13 +146,22 @@ fi
 for needle in \
 	'home/casparcg/highascg/.git' \
 	'usr/lib/penguins-eggs' \
-	'home/casparcg/.antigravity-ide-server'; do
+	'home/casparcg/.antigravity-ide-server' \
+	'home/casparcg/.highascg/gdtf-share.json' \
+	'home/casparcg/highascg/godot/extensions/hshm/build'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"
 	else
 		ok "absent: ${needle}"
 	fi
 done
+
+# WO-669: the operator GUI is the Godot binary under ~/.local (a blanket .local/* exclude used to drop it).
+if squash_has_path 'home/casparcg/.local/opt/godot/godot'; then
+	ok "present: home/casparcg/.local/opt/godot/godot (operator GUI)"
+else
+	bad "missing ~/.local/opt/godot/godot — fresh installs get no operator GUI (check .local lines in exclude.list)"
+fi
 
 # WO-433: headers ship, but driver SOURCE trees must not (fragments mask them).
 if squash_grep_list '^squashfs-root/usr/src/(nvidia|blackmagic)'; then

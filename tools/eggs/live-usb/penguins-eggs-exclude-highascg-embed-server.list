@@ -176,8 +176,19 @@ home/casparcg/.gemini
 home/casparcg/.gemini/*
 home/casparcg/.vscode-server
 home/casparcg/.vscode-server/*
-home/casparcg/.local
-home/casparcg/.local/*
+# WO-669: ~/.local is dropped piece by piece, NOT whole — ~/.local/opt/godot/godot is the operator GUI binary
+# (scripts/setup/09-openbox-autostart.sh launches it); a blanket .local/* left fresh installs with no GUI.
+home/casparcg/.local/bin
+home/casparcg/.local/bin/*
+home/casparcg/.local/lib
+home/casparcg/.local/lib/*
+home/casparcg/.local/state
+home/casparcg/.local/state/*
+# share/: Claude Code, Godot editor data, tracking venv + models (provisioned by tools/tracking-detect/, owner call)
+home/casparcg/.local/share/*
+# the Godot download archive (the binary beside it ships)
+home/casparcg/.local/opt/godot/dl
+home/casparcg/.local/opt/godot/dl/*
 home/casparcg/.ssh
 home/casparcg/.ssh/*
 home/casparcg/.npm
@@ -261,3 +272,44 @@ home/casparcg/.local/share/keyrings/*
 # GUI-uploaded Blackmagic packages (WO-427) — 2 GB and EULA-bound, never redistributable.
 home/casparcg/highascg/vendor
 home/casparcg/highascg/vendor/*
+
+# WO-669: box-local state, credentials and dev leftovers found by the 22.10 ISO review.
+# ~/.highascg: the GDTF Share login is a personal credential; cache / log / run are refetched or rewritten at boot
+# (the log and run DIRS stay: autostart redirects into ~/.highascg/log/godot-client.log).
+home/casparcg/.highascg/gdtf-share.json
+home/casparcg/.highascg/firefox-operator-alt1
+home/casparcg/.highascg/firefox-operator-alt1/*
+home/casparcg/.highascg/cache
+home/casparcg/.highascg/cache/*
+home/casparcg/.highascg/log/*
+home/casparcg/.highascg/run/*
+home/casparcg/.config/Ultralytics
+home/casparcg/.config/Ultralytics/*
+home/casparcg/.config/google-chrome-for-testing
+home/casparcg/.config/google-chrome-for-testing/*
+home/casparcg/.config/zoom
+home/casparcg/.config/zoom/*
+home/casparcg/.config/zoom.conf
+home/casparcg/.dotnet
+home/casparcg/.dotnet/*
+home/casparcg/.copilot
+home/casparcg/.copilot/*
+home/casparcg/.Xauthority
+home/casparcg/.xsession-errors
+home/casparcg/.lesshst
+home/casparcg/.wget-hsts
+home/casparcg/.sudo_as_admin_successful
+home/casparcg/*.png
+home/casparcg/*.log
+home/casparcg/package-lock.json
+home/casparcg/procprobe.gd
+home/casparcg/rates.jsonl
+home/casparcg/0x200014
+home/casparcg/highascg-wiki-map
+home/casparcg/highascg-wiki-map/*
+home/casparcg/bridge
+home/casparcg/bridge/*
+# Caspar rollback binaries (dev-box only; bin/casparcg ships) and the hshm GDExtension build tree (bin/ ships)
+home/casparcg/highascg/bin/casparcg.*
+home/casparcg/highascg/godot/extensions/hshm/build
+home/casparcg/highascg/godot/extensions/hshm/build/*

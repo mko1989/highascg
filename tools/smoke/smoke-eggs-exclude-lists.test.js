@@ -22,7 +22,10 @@ const path = require('path')
 const REPO_ROOT = path.resolve(__dirname, '../..')
 
 const FRAGMENT_EXCLUDES = path.join(REPO_ROOT, 'tools/eggs/live-usb/penguins-eggs-exclude-highascg-fragment.list')
-const EMBED_SERVER_EXCLUDES = path.join(REPO_ROOT, 'tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list')
+const EMBED_SERVER_EXCLUDES = path.join(
+	REPO_ROOT,
+	'tools/eggs/live-usb/penguins-eggs-exclude-highascg-embed-server.list'
+)
 
 // Parse a penguins-eggs exclude list (# comments, blank lines ignored)
 const parseExcludeList = (filePath) => {
@@ -36,14 +39,8 @@ const parseExcludeList = (filePath) => {
 describe('WO-273: penguins-eggs exclude lists', () => {
 	it('fragment list excludes all scripts/* and tools/* (full tarball, exFAT drop-update load-bearing)', () => {
 		const excludes = parseExcludeList(FRAGMENT_EXCLUDES)
-		assert.ok(
-			excludes.includes('home/casparcg/highascg/scripts'),
-			'fragment list must exclude scripts/',
-		)
-		assert.ok(
-			excludes.includes('home/casparcg/highascg/tools'),
-			'fragment list must exclude tools/',
-		)
+		assert.ok(excludes.includes('home/casparcg/highascg/scripts'), 'fragment list must exclude scripts/')
+		assert.ok(excludes.includes('home/casparcg/highascg/tools'), 'fragment list must exclude tools/')
 	})
 
 	it('embed-server list does NOT exclude tools/runtime (runtime critical: operator-shape-overlay.py spawned by server)', () => {
@@ -70,7 +67,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 			const hasDeadEntry = excludes.includes('home/casparcg/highascg/tools/restore')
 			assert.ok(
 				!hasDeadEntry,
-				'penguins-eggs-exclude-highascg-embed-server.list must not include tools/restore (does not exist)',
+				'penguins-eggs-exclude-highascg-embed-server.list must not include tools/restore (does not exist)'
 			)
 		})
 	})
@@ -81,10 +78,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 		DEV_TOOLS.forEach((toolDir) => {
 			it(`tools/${toolDir} exists and should be excluded from embed-server`, () => {
 				const toolPath = path.join(REPO_ROOT, 'tools', toolDir)
-				assert.ok(
-					fs.existsSync(toolPath),
-					`tools/${toolDir} must exist (dev-only, should be excluded)`,
-				)
+				assert.ok(fs.existsSync(toolPath), `tools/${toolDir} must exist (dev-only, should be excluded)`)
 			})
 
 			it(`tools/${toolDir} must be excluded from embed-server ISO`, () => {
@@ -92,7 +86,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 				const hasExclude = excludes.includes(`home/casparcg/highascg/tools/${toolDir}`)
 				assert.ok(
 					hasExclude,
-					`penguins-eggs-exclude-highascg-embed-server.list must exclude tools/${toolDir} (dev-only, per WO-273 bucket)`,
+					`penguins-eggs-exclude-highascg-embed-server.list must exclude tools/${toolDir} (dev-only, per WO-273 bucket)`
 				)
 			})
 		})
@@ -101,10 +95,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 	describe('Deprecated scripts excluded from embed-server (contradiction #3)', () => {
 		it('scripts/deprecated exists and contains stale runtime files that should not ship on exFAT update', () => {
 			const deprecatedPath = path.join(REPO_ROOT, 'scripts/deprecated')
-			assert.ok(
-				fs.existsSync(deprecatedPath),
-				'scripts/deprecated must exist (archive of moved/dead scripts)',
-			)
+			assert.ok(fs.existsSync(deprecatedPath), 'scripts/deprecated must exist (archive of moved/dead scripts)')
 		})
 
 		it('embed-server list must exclude scripts/deprecated to prevent bloat on exFAT update payload', () => {
@@ -112,7 +103,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 			const hasExclude = excludes.includes('home/casparcg/highascg/scripts/deprecated')
 			assert.ok(
 				hasExclude,
-				'penguins-eggs-exclude-highascg-embed-server.list must exclude scripts/deprecated (WO-273 finding 5)',
+				'penguins-eggs-exclude-highascg-embed-server.list must exclude scripts/deprecated (WO-273 finding 5)'
 			)
 		})
 	})
@@ -124,8 +115,16 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 		const BLOAT_EXCLUDES = [
 			{ pattern: 'home/casparcg/caspar-build', measuredMiB: 3328, why: 'CasparCG build tree; runtime is bin/ + lib/' },
 			{ pattern: 'usr/include/boost', measuredMiB: 183, why: 'CasparCG compile-time headers only' },
-			{ pattern: 'home/casparcg/.highascg/firefox-operator', measuredMiB: 182, why: 'operator browser profile; launcher mkdir -p recreates it' },
-			{ pattern: 'home/casparcg/.highascg/cloud-browser-profile', measuredMiB: 55, why: 'cloud browser profile; regenerated' },
+			{
+				pattern: 'home/casparcg/.highascg/firefox-operator',
+				measuredMiB: 182,
+				why: 'operator browser profile; launcher mkdir -p recreates it',
+			},
+			{
+				pattern: 'home/casparcg/.highascg/cloud-browser-profile',
+				measuredMiB: 55,
+				why: 'cloud browser profile; regenerated',
+			},
 			{ pattern: 'var/crash', measuredMiB: 79, why: 'crash dumps must never ship' },
 		]
 
@@ -140,11 +139,11 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 					const excludes = parseExcludeList(file)
 					assert.ok(
 						excludes.includes(pattern),
-						`${name} list must exclude ${pattern}: ${why} (${measuredMiB}MiB in the 5.9GB ISO)`,
+						`${name} list must exclude ${pattern}: ${why} (${measuredMiB}MiB in the 5.9GB ISO)`
 					)
 					assert.ok(
 						excludes.includes(`${pattern}/*`),
-						`${name} list must also exclude ${pattern}/* (eggs needs the dir AND its contents)`,
+						`${name} list must also exclude ${pattern}/* (eggs needs the dir AND its contents)`
 					)
 				})
 			})
@@ -157,11 +156,11 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 				assert.ok(
 					excludes.includes('var/cache/*'),
 					`${name} list must contain a standalone "var/cache/*" line — the upstream template's ` +
-						'"var/cache/* var/lib/aide/*" is two patterns on one line and matches nothing (407MiB of apt cache shipped)',
+						'"var/cache/* var/lib/aide/*" is two patterns on one line and matches nothing (407MiB of apt cache shipped)'
 				)
 				assert.ok(
 					excludes.includes('var/lib/aide/*'),
-					`${name} list must contain a standalone "var/lib/aide/*" line (same malformed upstream line)`,
+					`${name} list must contain a standalone "var/lib/aide/*" line (same malformed upstream line)`
 				)
 			})
 
@@ -172,7 +171,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 					malformed,
 					[],
 					`exclude patterns must be one-per-line; mksquashfs -ef treats a space-separated line as ` +
-						`a single literal pattern that matches nothing. Offenders: ${JSON.stringify(malformed)}`,
+						`a single literal pattern that matches nothing. Offenders: ${JSON.stringify(malformed)}`
 				)
 			})
 		})
@@ -206,11 +205,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 				}
 			}
 			roots.forEach((r) => walk(path.join(REPO_ROOT, r)))
-			assert.deepEqual(
-				hits,
-				[],
-				`~/caspar-build is excluded from the ISO but is referenced by: ${hits.join(', ')}`,
-			)
+			assert.deepEqual(hits, [], `~/caspar-build is excluded from the ISO but is referenced by: ${hits.join(', ')}`)
 		})
 	})
 
@@ -229,4 +224,53 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 			})
 		})
 	})
+})
+
+describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credentials and leftovers', () => {
+	// mksquashfs -wildcards: `*` stays within one path segment; excluding a directory drops everything below it.
+	const rx = (pat) =>
+		new RegExp(
+			'^' +
+				pat
+					.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+					.replace(/\*/g, '[^/]*')
+					.replace(/\?/g, '[^/]') +
+				'$'
+		)
+	const excluded = (pats, p) => {
+		const parts = p.split('/')
+		return parts.some((_, i) => pats.some((re) => re.test(parts.slice(0, i + 1).join('/'))))
+	}
+	for (const [name, file] of [
+		['embed-server', EMBED_SERVER_EXCLUDES],
+		['fragment', FRAGMENT_EXCLUDES],
+	]) {
+		const pats = parseExcludeList(file).map(rx)
+		it(`${name}: ~/.local/opt/godot/godot ships (operator GUI), its download archive does not`, () => {
+			assert.equal(excluded(pats, 'home/casparcg/.local/opt/godot/godot'), false)
+			assert.equal(excluded(pats, 'home/casparcg/.local/opt/godot/dl/godot.zip'), true)
+			assert.equal(excluded(pats, 'home/casparcg/.local/share/claude/x'), true)
+			assert.equal(excluded(pats, 'home/casparcg/.local/bin/claude'), true)
+		})
+		it(`${name}: GDTF Share login, caches and dev build trees stay off the ISO; their runtime dirs stay`, () => {
+			for (const p of [
+				'home/casparcg/.highascg/gdtf-share.json',
+				'home/casparcg/.highascg/cache/list.json',
+				'home/casparcg/.highascg/log/godot-client.log',
+				'home/casparcg/.highascg/run/caspar-screens-ready',
+				'home/casparcg/highascg/bin/casparcg.prev',
+				'home/casparcg/highascg/godot/extensions/hshm/build/CMakeCache.txt',
+				'home/casparcg/bridge/media',
+			])
+				assert.equal(excluded(pats, p), true, p)
+			for (const p of [
+				'home/casparcg/.highascg/log',
+				'home/casparcg/.highascg/run',
+				'home/casparcg/highascg/bin/casparcg',
+				'home/casparcg/highascg/godot/extensions/hshm/bin/libhshm.so',
+				'home/casparcg/.config/openbox/rc.xml',
+			])
+				assert.equal(excluded(pats, p), false, p)
+		})
+	}
 })
