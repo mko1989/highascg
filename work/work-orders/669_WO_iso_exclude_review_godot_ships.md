@@ -177,3 +177,42 @@ Owner:
   run: swap active but excluded, two bridge mounts, cuda-drivers, two IDE servers on the host.
 - Negative case: appending `home/casparcg/.config/companion` still fails the audit.
 - Not yet run: the owner's re-run of the build. The squashfs verifier checks the module after produce.
+
+## Round 4 (22.10): first produce with these lists
+
+### Investigation
+
+- The ISO is `highascg-nvidia-595_amd64_2026-10-22_1832.iso`: 7058 MB, checksum OK. `verify-iso-squashfs-excludes.sh` passed,
+  with one warning: the squashfs is 6516 MiB.
+- Compared per directory against the Sep 3 squashfs (extracted with `xorriso -osirrox`):
+  - +3254 MiB `home/casparcg/iso-backup`: the session's protective copy of the Sep 3 ISO. Eggs runs `rm -rf /home/eggs/mnt`
+    at the start of produce, so the copy was moved out of the nest, into `/home/casparcg`. The embed clone takes all of home.
+  - The rest (+745 MiB raw) is expected: the Godot binary (+140, this WO), `usr/lib/python3` +202, snapd +190, system
+    libs +149, nmap.
+- Contents confirmed in the squashfs:
+  - the Godot binary, the hshm addon `godot/client/addons/hshm/bin/libhshm…so`, `bin/casparcg`, `node_modules`,
+    `dist-web`;
+  - Companion + `modules/highpass-highascg` (no `v5.0` DB, no `machid`);
+  - the highascg + companion units enabled; the Openbox autostart launches Godot;
+  - nvidia 595 dkms modules for 6.8.0-117; `BUILD_STAMP` 2026-10-22_182737;
+  - factory `screen_destinations.json` = `videoOutput: shm`, `shmName: opgui`, no `guiUrl` (WO-684).
+- `docs/` is excluded, so `docs/DEFAULT_LOGINS.md` does not ship. README.md (with its "Default login" section) does.
+- Host after the build:
+  - same boot; no mounts under /home/eggs; `/bin` and `/sbin` intact;
+  - hostname back to `highascg7580`; swap and bridge mounts back; node restarted; Caspar and Godot running.
+  - **Companion stayed stopped.** The squashfs step stops it, and nothing in the script started it again.
+  - `config/replication-local-identity.json` was rewritten by root at 18:38 when the hostname was set back (0644 root).
+
+### What was done
+
+- Both fragments exclude `home/casparcg/iso-backup{,/*}` and `home/casparcg/*.iso`.
+  The single `*` does not reach `highascg/config/casparcg.config.iso`.
+- `verify-iso-squashfs-excludes.sh` fails on any `.iso` under `home/` except that config.
+- `build-highascg-egg.sh` starts `companion.service` again after the remount step, when it is enabled.
+- Smoke: the backup ISO and a stray `~/x.iso` are excluded; `casparcg.config.iso` is kept.
+
+### What was VERIFIED
+
+- Smoke 39/0.
+- The new guard fails today's squashfs (it names `iso-backup/…1533.iso`) and passes the Sep 3 one.
+- Scratch merge + audit copy still pass (6 warnings).

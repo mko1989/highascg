@@ -267,6 +267,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/highascg/bin/casparcg.prev',
 				'home/casparcg/highascg/godot/extensions/hshm/build/CMakeCache.txt',
 				'home/casparcg/bridge/media',
+				'home/casparcg/iso-backup/highascg-nvidia-595_amd64_2026-09-03_1533.iso',
+				'home/casparcg/old.iso',
 			])
 				assert.equal(excluded(pats, p), true, p)
 			for (const p of [
@@ -277,6 +279,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/.config/openbox/rc.xml',
 				// the audit and the squashfs verifier require the HighAsCG Companion module on the ISO
 				'home/casparcg/.config/companion/modules/highpass-highascg/main.js',
+				// a Caspar config, not a disk image — the home/casparcg/*.iso exclude must not reach it
+				'home/casparcg/highascg/config/casparcg.config.iso',
 				// owner 22.10: the shared GDTF Share login ships (docs/DEFAULT_LOGINS.md); sshd's config stays
 				'home/casparcg/.highascg/gdtf-share.json',
 				'etc/ssh/sshd_config',

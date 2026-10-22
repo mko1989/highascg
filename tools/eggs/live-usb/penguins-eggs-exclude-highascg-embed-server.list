@@ -309,6 +309,10 @@ home/casparcg/highascg-wiki-map
 home/casparcg/highascg-wiki-map/*
 home/casparcg/bridge
 home/casparcg/bridge/*
+# Disk images in home (22.10: the ~/iso-backup copy of the previous ISO rode into the squashfs, +3.2 GB)
+home/casparcg/iso-backup
+home/casparcg/iso-backup/*
+home/casparcg/*.iso
 # Caspar rollback binaries (dev-box only; bin/casparcg ships) and the hshm GDExtension build tree (bin/ ships)
 home/casparcg/highascg/bin/casparcg.*
 home/casparcg/highascg/godot/extensions/hshm/build

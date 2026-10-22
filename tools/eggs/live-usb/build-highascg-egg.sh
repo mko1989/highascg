@@ -193,6 +193,12 @@ bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null 
 	echo "WARN: remount/sync skipped — run: sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" >&2
 }
 
+# The squashfs step above stops companion.service; nothing started it again (22.10, Companion stayed down after a build).
+if systemctl is-enabled --quiet companion.service 2>/dev/null; then
+	echo "==> Restart Companion (stopped for the squashfs)"
+	systemctl start companion.service || echo "WARN: companion.service did not start — sudo systemctl start companion" >&2
+fi
+
 # WO-465: install-iso-defaults.sh runs `npm prune --omit=dev --omit=optional` so the squashfs
 # carries production deps only. That prune outlives the build, and the repo's own gates then die
 # with `Cannot find module 'acorn'`. Safe to restore here: eggs produce has already cloned the

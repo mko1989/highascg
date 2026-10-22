@@ -133,6 +133,18 @@ else
 	ok "no home/casparcg/highascg/projects/${PROJECTS_TRASH_DIR} in squashfs"
 fi
 
+# 22.10: a backup of the previous ISO in ~/iso-backup rode into the squashfs (+3.2 GB).
+# config/casparcg.config.iso is a Caspar config, not a disk image.
+set +o pipefail
+iso_leak="$(unsquashfs -l "$SQ" home 2>/dev/null | grep -E '^squashfs-root/home/.*\.iso$' \
+	| grep -vE '^squashfs-root/home/casparcg/highascg/config/casparcg\.config\.iso$' | head -1)"
+set -o pipefail
+if [[ -n "$iso_leak" ]]; then
+	bad "disk image in squashfs: ${iso_leak#squashfs-root/} — move it out of /home/casparcg or exclude it"
+else
+	ok "no disk images (.iso) under home/ in squashfs"
+fi
+
 # WO-168 T168.4/T168.6 — config/*.bak* and "casparcg copy.config"-style duplicates.
 if squash_grep_list '^squashfs-root/home/casparcg/highascg/config/[^/]*(\.bak(\.[0-9]+)?|copy\.config)$' 'home/casparcg/highascg/config'; then
 	bad "config/*.bak* or *copy*.config is in squashfs — build-host config backups leaked (WO-168 T168.4); check exclude fragment merge and factory reset"

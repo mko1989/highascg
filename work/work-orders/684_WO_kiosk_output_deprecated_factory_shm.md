@@ -52,3 +52,5 @@ Owner, 22.10: *"We can mark the whole kiosk gui as deprecated so it won't come b
 - `test:ci` 2812 pass, 1 fail = the box-only display probe `smoke-wo308-pointer-confine-split.test.js:34` (see WO-683); lint 0 errors.
 - Not run: a real factory reset on this box (it resets the owner's live config). The next eggs ISO is the end-to-end
   check: a box installed from it must boot to the Godot GUI with `videoOutput: shm`.
+- 22.10 ISO (`…2026-10-22_1832.iso`): the squashfs's `config/screen_destinations.json` has `dst_operator_gui`
+  with `videoOutput: shm`, `shmName: opgui`, `1080p5000` and no `guiUrl`. A box booted from it is the remaining check.

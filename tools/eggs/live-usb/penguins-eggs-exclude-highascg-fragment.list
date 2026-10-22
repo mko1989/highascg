@@ -131,6 +131,10 @@ home/casparcg/companion-module-dev
 home/casparcg/companion-module-dev/*
 home/casparcg/bridge
 home/casparcg/bridge/*
+# Disk images in home (22.10: the ~/iso-backup copy of the previous ISO rode into the squashfs, +3.2 GB)
+home/casparcg/iso-backup
+home/casparcg/iso-backup/*
+home/casparcg/*.iso
 home/casparcg/companion
 home/casparcg/companion/*
 home/casparcg/highascg-backup-box.tgz
