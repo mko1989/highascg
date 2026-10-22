@@ -26,6 +26,7 @@ const { handleGet } = require('./routes-replication-get')
 const { acceptSshKey, sendMedia, fingerprint } = require('../cluster/cluster-media')
 const { postJson, getJson } = require('../cluster/cluster-peers')
 const { createMaster } = require('../cluster/cluster-master')
+const { createClusterFanout } = require('../cluster/cluster-fanout')
 const identity = require('../system/device-identity')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
@@ -38,7 +39,10 @@ function clusterOf(ctx) {
 		selfKey: identity.getDevicePublicKeyPem(),
 		onChange: () => broadcast(ctx),
 	})
-	ctx._cluster.afterPoll(() => masterOf(ctx).tick())
+	ctx._cluster.afterPoll(async () => {
+		await masterOf(ctx).tick()
+		await fanoutOf(ctx).refresh()
+	})
 	ctx._cluster.start().catch(() => {})
 	return ctx._cluster
 }
@@ -59,8 +63,40 @@ function masterOf(ctx) {
 	return ctx._clusterMaster
 }
 
-/** GET /api/cluster body = WS `cluster:peers`. */
-const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view() })
+/** P4a: while this server is master, its takes go to every linked server where the destination is cabled. */
+function fanoutOf(ctx) {
+	if (ctx._clusterFanout) return ctx._clusterFanout
+	const { PeerCasparConnection } = require('../replication/peer-caspar-connection')
+	const { getReplicationConfig } = require('../config/replication-config')
+	const { normalizeScreenDestinations } = require('../config/screen-destinations')
+	const { buildChannelMap } = require('../config/channel-map-from-ctx')
+	ctx._clusterFanout = createClusterFanout({
+		isMaster: () => masterOf(ctx).view().is_master === true,
+		pairEnabled: () => !!getReplicationConfig(ctx.config).enabled,
+		members: () => clusterOf(ctx).snapshot().peers.filter((p) => p.online),
+		peerView: async (id) => {
+			const r = await clusterOf(ctx).deviceView(id)
+			return r.status === 200 ? r.body : null
+		},
+		ownView: async () => ({
+			screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
+			live: { caspar: { channelMap: buildChannelMap(ctx) } },
+		}),
+		connect: (host, port) => {
+			const c = new PeerCasparConnection({ log: ctx.log })
+			c.connect(host, port)
+			return c
+		},
+		log: ctx.log,
+		onChange: () => broadcast(ctx),
+	})
+	require('../replication/amcp-fanout').setClusterFanoutSink((payload) => ctx._clusterFanout.send(payload))
+	return ctx._clusterFanout
+}
+
+/** GET /api/cluster body = WS `cluster:peers` (+ `fanout`: P4a forwarding status per server). */
+const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
+	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} } })
 
 function broadcast(ctx) {
 	if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', full(ctx))
@@ -136,4 +172,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, startIfLinked }

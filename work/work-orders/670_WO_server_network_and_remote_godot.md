@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4, P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4a (the master forwards takes per destination) DONE 22.10 (offline + box with a stub fake Caspar); P4b (catch-up on join, local takes on non-masters), P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -407,6 +407,90 @@ any LAN host write into `media/`. So:
 - Not proven:
   - the 5-s countdown when "Stay here" is clicked (code path only);
   - a client on another machine following two real boxes (owner QA, checklist §F).
+
+## P4a — Investigation (22.10)
+
+- **Channels follow the shared destination list, not the cables.** Mains are numbered 1..n in screen order
+  (`routing-map.js:226-254`: `pgm = ch++; prv = previewEnabled ? ch++ : null`). The screen count is
+  `max(1, maxMainScreenIndex+1, graph usage)` (`routing-map.js:99-103`). Cabling only picks the outputs inside a
+  channel. So the master already plays every destination on its own Caspar, cabled there or not. The fan-out only
+  has to forward, per destination, to the servers where that destination is cabled.
+- **Takes pick the channel by screen index** (`routes-scene-take-look.js:34-37`: `programCh =
+  map.programChannels[mainIdx]`). Two boxes whose destination lists differ in order therefore use different channel
+  numbers for the same destination. Lines must be translated through the destination id.
+- **The existing fan-out** (`src/replication/amcp-fanout.js`) is the hot-backup pair's. It has a single peer, sends
+  lines unchanged with the same channel numbers, and is gated on the pair (leader role, `peerCaspar`). All sends pass
+  through two choke points:
+  - `fanoutSingleCommand`, from `amcp-client-transport.js:103` and `:244`;
+  - `fanoutBatchPayload`, from `amcp-batch.js:325`.
+- **A peer's own `/api/device-view` has everything needed:**
+  - `screenDestinations.destinations[]` gives `{id, mode, mainScreenIndex}`;
+  - `live.caspar` gives `{host, port, channelMap}`. The host is as the peer sees it (127.0.0.1), so the master uses
+    the peer's address with that port;
+  - `graph` gives the cables. "Cabled" means a `destination_in` connector, with `externalRef` set to the destination
+    id, is the `sourceId` of an edge with a sink: the same rule as Godot `cluster_model.gd` `cabled()`.
+
+## P4a — what was done (22.10)
+
+- **`src/cluster/cluster-fanout.js`** (new): pure helpers plus a forwarder.
+  - `mainChannels(view)` maps each main-bus destination id to its `{pgm, prv}` channels on that box. Multiview,
+    stream and operator GUI destinations are left out.
+  - `cabledIds(view)` lists the destinations cabled there. `channelPlan(own, peer)` maps master channel → peer channel
+    for each destination cabled on the peer. That one rule covers both link kinds: a destination cabled on both boxes
+    is backed up, one cabled only on the peer is extended there.
+  - `rewriteLine` applies the same allow-list as the pair (`shouldFanOutCommand`), swaps the channel, and translates
+    `route://N` when N is mapped. A line whose channel is not mapped is not sent.
+  - `createClusterFanout` keeps one `PeerCasparConnection` per online linked server. The Caspar is the peer's address
+    plus its device view's port; a loopback host is the peer's own address. The plan refreshes after each cluster
+    poll (5 s; device views are cached 15 s), with a busy guard. Batches go out as one batch of the lines that apply.
+    It is active only while this server is master and `replication.enabled` is off: with the pair on, both fan-outs
+    would drive the same Caspar twice. It broadcasts only when something other than the sent counters changes.
+- **`src/replication/amcp-fanout.js`**: `setClusterFanoutSink(fn)`. `fanoutSingleCommand` and `fanoutBatchPayload`
+  hand every payload to the sink first, inside a try (a cluster error never breaks a local take). Every send path
+  is covered without touching the transports.
+- **`src/api/routes-cluster.js`**: `fanoutOf(ctx)` builds it (own view = `normalizeScreenDestinations` plus
+  `buildChannelMap(ctx)`, the same sources as `/api/device-view`). The poll hook is now master `tick()`, then
+  fan-out `refresh()`. `GET /api/cluster` and WS `cluster:peers` carry `fanout: {active, peers: {id: {caspar,
+  connected, sent, error, destinations: [{id, label, pgm: [master, peer], prv}]}}}`.
+- **`tools/dev/fake-cluster-peer.js`**:
+  - `--amcp-port=N`: a fake Caspar that prints every line and answers 202, reported as the stub's Caspar;
+  - `--cabled=dst_a,…`: keep only those destinations' cables;
+  - `--offset=N`: shift the stub's channel numbers, so the translation shows.
+- Not in P4a (→ P4b):
+  - catching a server up on what is already on air when it joins or reconnects;
+  - blocking local PGM takes on a server that is not master;
+  - showing the forwarding state in the Godot Servers cards. The data is in the snapshot; no UI yet.
+
+## P4a — what was VERIFIED
+
+- Offline: `tools/smoke/smoke-wo670-cluster-fanout.test.js` 5/0. It covers:
+  - the plan between two boxes with differently ordered lists (master 3→1, 4→2, 1→3; no preview on the peer → master
+    ch 2 stays local; the operator GUI is never forwarded; an edge with no sink is not a cable);
+  - the line rewrite, `route://` included, plus deny-list and unmapped lines;
+  - the forwarder (the loopback host becomes the peer host, lines and batches translated, sent counters, no broadcast
+    on counters alone);
+  - off when not master or with the pair on; peers that leave are dropped; stepping down closes the connections;
+  - the sink receiving single and batch sends, and a throwing sink not breaking the send.
+  The WO-670 smokes are 20/0 together; the full `test:ci` is 2791 tests, 0 fail. Lint is 214 warnings (cap 216), no
+  file is over 500 lines, and the API contract has 470 routes (none new).
+- Box (stub fake-b with `--amcp-port=5261 --offset=10`, linked, this box made master, epoch 1):
+  - **Plan.** `fanout.peers.fake-b` showed `caspar 127.0.0.1:5261, connected, destinations [{dst_mvi3swp8_1 "PGM/PRV
+    1", pgm [1, 11], prv [2, 12]}]`. The journal showed `master: forwarding takes to the linked servers` and `fake-b:
+    forwarding to its Caspar 127.0.0.1:5261`.
+  - **Forwarding.** `POST /api/amcp/raw-batch [MIXER 1-299 OPACITY 1, MIXER 2-299 OPACITY 1]` and `POST /api/clear
+    {1, 299}` ran locally (202), and the stub printed `MIXER 11-299 OPACITY 1`, `MIXER 12-299 OPACITY 1`, `CLEAR
+    11-299`; `sent` was 3.
+  - **Uncabled.** The stub was restarted with `--cabled=dst_none`. `error: "no shared destination is cabled there"`,
+    destinations `[]`, and a `CLEAR` reached the stub 0 times.
+  - **Step down.** `master/set {self}` on the stub (epoch 2). The journal showed `stepped down: fake-b is master` and
+    then `not forwarding takes`, and `fanout` became `{active: false, peers: {}}`.
+  - Side effect, which confirms P3b again: the open Godot GUI followed the stub when it became master, and went home
+    by itself once the stub was killed (ui.cfg `[cluster] origin` was "" again, new pid running).
+- Cleanup: unlinked fake-b and killed the stub.
+- Not proven:
+  - a real second Caspar playing the forwarded take;
+  - a real scene take, as opposed to the raw AMCP routes. The take uses the same `amcp-batch.js` path;
+  - two real boxes (P5, owner QA).
 
 ## What was VERIFIED
 

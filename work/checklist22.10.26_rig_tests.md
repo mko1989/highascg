@@ -95,6 +95,9 @@ Setup, once:
 - [ ] **WO-670 P3b: the client follows.** Godot on a laptop connected to A (master). Pull A's cable: within ~25 s
       the laptop reconnects to B by itself. On B, "Make master" on A: the laptop shows "Master changed… 5 s" and
       goes back to A. "Stay here" keeps it on B.
+- [ ] **WO-670 P4a: takes reach the other box.** A master, B linked both ways, `replication.enabled` off on both.
+      Cable the same destination on both (backup): take a look on A, and B's output shows the same look within a
+      frame or two. Uncable it on A only (extension): the take still shows on B. Uncable it on B: B stops following.
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 

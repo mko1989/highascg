@@ -6,6 +6,21 @@ const { getReplicationConfig } = require('../config/replication-config')
 let _runtime = null
 /** @type {object|null} */
 let _ctx = null
+/** WO-670 P4a: the cluster master's per-destination fan-out (src/cluster/cluster-fanout.js) sees every payload too. */
+let _clusterSink = null
+
+function setClusterFanoutSink(fn) {
+	_clusterSink = typeof fn === 'function' ? fn : null
+}
+
+function toCluster(payload) {
+	if (!_clusterSink) return
+	try {
+		_clusterSink(payload)
+	} catch {
+		/* the cluster never breaks a local take */
+	}
+}
 
 const DEFAULT_ALLOW = new Set([
 	'PLAY',
@@ -240,6 +255,7 @@ function fanoutAmcpPayload(payload) {
  * @param {string} cmd
  */
 function fanoutSingleCommand(cmd) {
+	toCluster(cmd)
 	fanoutAmcpPayload(cmd)
 }
 
@@ -247,6 +263,7 @@ function fanoutSingleCommand(cmd) {
  * @param {string} batchPayload — full BEGIN…COMMIT wire payload
  */
 function fanoutBatchPayload(batchPayload) {
+	toCluster(batchPayload)
 	if (!isAmcpFanoutMirrorActive()) return
 	const peer = _runtime?.peerCasparConnection
 	if (!peer?.isConnected) {
@@ -280,6 +297,7 @@ module.exports = {
 	fanoutSingleCommand,
 	fanoutBatchPayload,
 	fanoutAmcpPayload,
+	setClusterFanoutSink,
 	DEFAULT_ALLOW,
 	DEFAULT_DENY,
 }

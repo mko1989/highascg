@@ -352,6 +352,7 @@ const FILES = [
 	'tools/smoke/smoke-wo670-video-feed.test.js',
 	'tools/smoke/smoke-wo670-cluster.test.js',
 	'tools/smoke/smoke-wo670-cluster-master.test.js',
+	'tools/smoke/smoke-wo670-cluster-fanout.test.js',
 	'tools/smoke/smoke-wo675-presenters.test.js',
 	'tools/smoke/smoke-wo599-operator-screen.test.js',
 	'tools/smoke/smoke-wo638-boot-screen-assignment.test.js',

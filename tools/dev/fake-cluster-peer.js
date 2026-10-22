@@ -10,6 +10,10 @@
  * P3a: the REAL cluster-master.js with the real server as its one linked peer (polled every 5 s), its claim kept in
  * --state-file (default a temp file, so a restarted stub comes back with its old epoch). POST /api/cluster/master/set
  * {master:'self'} makes the stub the master; kill it to watch the real server fail over.
+ * P4a: --amcp-port=N runs a fake Caspar (prints every line it gets, answers 202) and reports it as the stub's Caspar in
+ * its device view, so the real server, as master, forwards its takes there. --cabled=dst_a,dst_b keeps only those
+ * destinations' cables (default: the real server's cables); --offset=N shifts the stub's channel numbers by N (to see
+ * the translation).
  *   node tools/dev/fake-cluster-peer.js [--port=4301] [--name=fake-b] [--from=http://127.0.0.1:4200] [--trust-file=…]
  *   [--trust=none]  (it has NOT linked the real server: Send media must be refused)
  * Then Devices → Servers → + → 127.0.0.1:4301.
@@ -18,6 +22,7 @@
 const crypto = require('crypto')
 const fs = require('fs')
 const http = require('http')
+const net = require('net')
 const os = require('os')
 const path = require('path')
 const { acceptSshKey } = require('../../src/cluster/cluster-media')
@@ -54,6 +59,30 @@ const get = (p) => new Promise((resolve, reject) => {
 ;(async () => {
 	const ping = await get('/api/replication/ping')
 	const view = await get('/api/device-view')
+	const amcpPort = Number(arg('amcp-port', '0'))
+	if (amcpPort) {
+		net.createServer((sock) => {
+			let buf = ''
+			sock.on('data', (d) => {
+				buf += d.toString('utf8')
+				const lines = buf.split('\r\n')
+				buf = lines.pop()
+				for (const l of lines) if (l) console.log(`AMCP ${l}`), sock.write('202 OK\r\n')
+			})
+			sock.on('error', () => {})
+		}).listen(amcpPort, '0.0.0.0', () => console.log(`fake Caspar on :${amcpPort}`))
+		const off = Number(arg('offset', '0'))
+		const cm = view.live?.caspar?.channelMap || {}
+		const shift = (a) => (a || []).map((c) => (c ? c + off : c))
+		view.live = { ...view.live, caspar: { ...view.live?.caspar, host: '127.0.0.1', port: amcpPort, connected: true,
+			channelMap: { ...cm, programChannels: shift(cm.programChannels), previewChannels: shift(cm.previewChannels) } } }
+	}
+	const cabled = arg('cabled', '')
+	if (cabled && view.graph) {
+		const keep = new Set(cabled.split(','))
+		const dest = new Map((view.graph.connectors || []).filter((c) => c.kind === 'destination_in').map((c) => [c.id, c.externalRef]))
+		view.graph.edges = (view.graph.edges || []).filter((e) => !dest.has(e.sourceId) || keep.has(dest.get(e.sourceId)))
+	}
 	const linked = (await get('/api/cluster/identity')).device_key.trim()  // the real server is this stub's one linked peer
 	const trusted = arg('trust', 'linked') !== 'none'
 	const real = { id: 'real', host: from.hostname, port: Number(from.port || 80), name: ping.hostname || 'real', device_key: linked }
