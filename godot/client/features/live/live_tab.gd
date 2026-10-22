@@ -150,6 +150,7 @@ func _ready() -> void:
 	cfg.load(UI_CFG)
 	var lit := bool(cfg.get_value("live", "lights", true))
 	(_view_btns["lights"] as Button).set_pressed_no_signal(lit)
+	(_view_btns["lights"] as Button).icon = Icons.texture("bulb_on" if lit else "bulb_off", 22)
 	stage3d.set_lights(lit)
 	tiles.times = bool(cfg.get_value("live", "times", false))
 	(_view_btns["times"] as Button).set_pressed_no_signal(tiles.times)
@@ -181,11 +182,15 @@ func _view_switch() -> Control:
 	fit.pressed.connect(func() -> void: stage3d.fit())
 	row.add_child(fit)
 	_view_btns["fit"] = fit
-	var lights := Button.new()
-	lights.text = "Lights"
+	var lights := Button.new()  # WO-673: a bulb, lit while the beams render
 	lights.toggle_mode = true
+	lights.focus_mode = Control.FOCUS_NONE
 	lights.tooltip_text = "Render the light beams (the heads stay either way)"
+	for c in ["icon_pressed_color", "icon_hover_pressed_color"]:
+		lights.add_theme_color_override(c, Color.WHITE)  # keep the lit bulb yellow, not theme-tinted
+	lights.icon = Icons.texture("bulb_on", 22)
 	lights.toggled.connect(func(on: bool) -> void:
+		lights.icon = Icons.texture("bulb_on" if on else "bulb_off", 22)
 		stage3d.set_lights(on)
 		_save_ui("lights", on))
 	row.add_child(lights)

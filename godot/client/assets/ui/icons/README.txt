@@ -15,3 +15,5 @@ a box with "2D" drawn inside it as strokes (WO-668: the plain square read as a s
 loader draws no <text>) and an isometric hexagon with its three visible faces (3D). The toggle uses them at 22 px.
 warning (WO-661 Shaders group / rows while Caspar runs without GPU) is a hand-drawn amber triangle with a black "!" —
 coloured on purpose (not white), so set it on Tree items, not on Buttons that tint their icons.
+bulb_on / bulb_off (WO-673 Live 3D light-beams toggle) are hand-drawn: a yellow bulb with rays (beams render) and the
+same bulb as a white outline (off). bulb_on is coloured on purpose; the toggle overrides the pressed icon tint to white.
