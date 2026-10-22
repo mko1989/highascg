@@ -89,6 +89,9 @@ Setup, once:
 - [ ] **WO-670 P2b: Send media.** On A press "Send media" on B's card before B has linked A: red "B has not
       linked this server…". On B link A, then Send again on A: "Sending media… %" → "Media sent", and B's card turns
       "media ✓" (may take ~30 s for B's media signature to refresh).
+- [ ] **WO-670 P3a: master + failover.** A and B linked both ways. On A: "Make this server master" → both show
+      "Master: …" with A. Pull A's network cable: within ~15 s B shows "Master: this server · epoch N+1". Plug A back:
+      A shows B as master within ~5 s (it stepped down). Untick "Auto failover", pull B: nobody takes over.
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 

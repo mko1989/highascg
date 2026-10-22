@@ -140,10 +140,11 @@ describe('WO-670 P2 cluster peers', () => {
 		const routes = new RouteRegistry()
 		require('../../src/api/routes-cluster').register(routes)
 		const c = createCluster({ persistence: memStore(), selfPing: async () => SELF, fetchJson: fakeNet({}).fetchJson })
-		const ctx = { _cluster: c }
+		const ctx = { _cluster: c, _clusterMaster: { view: () => ({ epoch: 0, master: '' }) } }
 		const get = await routes.dispatch('GET', '/api/cluster', '', ctx)
 		assert.equal(get.status, 200)
 		assert.equal(JSON.parse(get.body).self.id, 'boxA')
+		assert.equal(JSON.parse(get.body).master.epoch, 0, 'P3a: the master view rides along')
 		assert.equal((await routes.dispatch('POST', '/api/cluster/peers', JSON.stringify({ address: '10.0.0.99' }), ctx)).status, 404)
 		assert.equal((await routes.dispatch('DELETE', '/api/cluster/peers/boxZ', '', ctx)).status, 404)
 		assert.equal((await routes.dispatch('GET', '/api/cluster/peers/boxZ/device-view', '', ctx)).status, 404)

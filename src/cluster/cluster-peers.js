@@ -11,6 +11,7 @@
  * instanceId) is refused. Peers are polled every POLL_MS while the list is not empty; their device view is cached
  * DEVICE_VIEW_MS. onChange(snapshot) fires when what the clients see changed (→ WS `cluster:peers`).
  * P2b: linking also records the peer's device public key (GET /api/cluster/identity) — what cluster-media.js trusts.
+ * P3a: afterPoll(fn) runs fn after every poll (cluster-master.js pulls claims and checks failover there).
  */
 
 const http = require('http')
@@ -182,10 +183,12 @@ function createCluster(opts) {
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
 	}
 
+	const pollHooks = []
 	async function poll() {
 		await refreshSelf()
 		await Promise.all([...peers.values()].map(pollOne))
 		changed()
+		for (const fn of pollHooks) Promise.resolve().then(fn).catch(() => {})
 	}
 
 	function schedule() {
@@ -259,6 +262,7 @@ function createCluster(opts) {
 	}
 
 	const saved = (id) => peers.get(id)?.saved || null
+	const list = () => [...peers.values()].map((p) => p.saved)
 	const byDeviceKey = (pem) => (pem ? [...peers.values()].find((p) => p.saved.device_key && p.saved.device_key === pem.trim())?.saved || null : null)
 	const mediaSend = (id) => peers.get(id)?.send || null
 	function setMediaSend(id, state) {
@@ -269,7 +273,7 @@ function createCluster(opts) {
 	}
 
 	return { snapshot, poll, add, remove, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
-		saved, byDeviceKey, mediaSend, setMediaSend }
+		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn) }
 }
 
 module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, postJson, STORE_KEY, POLL_MS }

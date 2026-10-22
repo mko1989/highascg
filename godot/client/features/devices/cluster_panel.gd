@@ -6,6 +6,8 @@ extends VBoxContainer
 ## cables, read-only: each server keeps its own wiring (owner, WO-670 answer 2). Nothing here drives a peer yet (P3/P4).
 ## P2b: "Send media" pushes this project's media to it (server cluster-media.js; both servers must have linked each
 ## other); the progress / result line comes from the peer's `media_send` in the snapshot.
+## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`), a
+## MASTER tag on its card, "Make master" on this server and on every linked one.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -17,6 +19,12 @@ var _views := {}  # peer id → its device-view payload
 var _own := {}  # this server's device-view payload (for the roles)
 var _list: VBoxContainer
 var _self_l: Label
+var _master_row: HBoxContainer
+var _master_l: Label
+var _auto: CheckBox
+var _take: Button
+var _make: ConfirmationDialog
+var _make_id := ""
 var _add: ConfirmationDialog
 var _addr: LineEdit
 var _found: VBoxContainer
@@ -42,6 +50,7 @@ func _ready() -> void:
 	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	head.add_child(_self_l)
 	add_child(head)
+	_build_master_row()
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -85,6 +94,12 @@ func _render() -> void:
 	_sig = sig
 	var me: Dictionary = _snap.get("self", {}) if _snap.get("self") is Dictionary else {}
 	_self_l.text = "This server: %s · %s" % [str(me.get("hostname", "?")), str(me.get("version", ""))] if not me.is_empty() else ""
+	var ms: Dictionary = _master()
+	_master_row.visible = not _snap.get("peers", []).is_empty()
+	_master_l.text = M.master_line(ms)
+	_auto.set_pressed_no_signal(ms.get("auto", true) == true)
+	_auto.disabled = int(ms.get("epoch", 0)) <= 0
+	_take.visible = ms.get("is_master") != true
 	for c in _list.get_children():
 		c.queue_free()
 	var peers: Array = _snap.get("peers", [])
@@ -107,6 +122,8 @@ func _card(p: Dictionary) -> Control:
 	var name_l := Label.new()
 	name_l.text = str(p.get("name", id))
 	top.add_child(name_l)
+	if M.is_master(_master(), id):
+		top.add_child(_small("MASTER", ThemeBuilder.ACCENT))
 	var facts := _small(M.facts(p), ThemeBuilder.WARN if p.get("media_parity") == "differs" else ThemeBuilder.TEXT_MUTED)
 	facts.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	facts.clip_text = true
@@ -118,6 +135,12 @@ func _card(p: Dictionary) -> Control:
 	send.tooltip_text = "Copy this project's media to %s now (rsync). Both servers must have linked each other." % str(p.get("name", id))
 	send.pressed.connect(func() -> void: _send(id))
 	top.add_child(send)
+	if not M.is_master(_master(), id) and p.get("online") == true and p.get("identity") == true:
+		var mk := Button.new()
+		mk.text = "Make master"
+		mk.tooltip_text = "%s runs the show from now on (every linked server is told)." % str(p.get("name", id))
+		mk.pressed.connect(func() -> void: _confirm_make(id, str(p.get("name", id))))
+		top.add_child(mk)
 	var x := Button.new()
 	x.text = "✕"
 	x.flat = true
@@ -172,6 +195,46 @@ func _send(id: String) -> void:
 		_send_err[id] = str(r.get("error", "")) if str(r.get("error", "")) != "" else "Send failed (HTTP %d)" % int(r.get("status", 0))
 	_sig = ""
 	_render()
+
+
+func _master() -> Dictionary:
+	return _snap.get("master", {}) if _snap.get("master") is Dictionary else {}
+
+
+func _build_master_row() -> void:
+	_master_row = HBoxContainer.new()
+	_master_l = _small("", ThemeBuilder.TEXT)
+	_master_l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_master_l.clip_text = true
+	_master_row.add_child(_master_l)
+	_auto = CheckBox.new()
+	_auto.text = "Auto failover"
+	_auto.tooltip_text = "When the master is unseen for 12 s, the next server takes over (outputs keep playing either way)."
+	_auto.toggled.connect(func(on: bool) -> void: _set_master({"auto": on}))
+	_master_row.add_child(_auto)
+	_take = Button.new()
+	_take.text = "Make this server master"
+	_take.pressed.connect(func() -> void: _confirm_make("self", "This server"))
+	_master_row.add_child(_take)
+	add_child(_master_row)
+	_make = ConfirmationDialog.new()
+	_make.confirmed.connect(func() -> void: _set_master({"master": _make_id}))
+	add_child(_make)
+
+
+func _confirm_make(id: String, name: String) -> void:
+	_make_id = id
+	_make.dialog_text = "%s becomes the master: it runs the show, and every linked server follows it." % name
+	_make.popup_centered()
+
+
+func _set_master(body: Dictionary) -> void:
+	var r: Dictionary = await Api.post_json("/api/cluster/master/set", body)
+	if not r.ok:
+		var d: Variant = r.get("data")
+		_master_l.text = "Master not changed: " + (str(d.get("error", "")) if d is Dictionary else str(r.get("error", "")))
+		return
+	reload()
 
 
 ## Read-only: no buttons, no clicks (the peer's wiring is edited on the peer).

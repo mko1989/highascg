@@ -43,3 +43,14 @@ func test_send_line() -> void:
 	t.eq(M.send_line({"media_send": {"state": "done", "files": 1}}, "B has not linked this server"), "B has not linked this server", "a refusal wins")
 	t.ok(M.sending({"media_send": {"state": "sending"}}), "sending")
 	t.ok(not M.sending({}), "idle")
+
+
+func test_master_line() -> void:
+	t.eq(M.master_line({"epoch": 0}), "No master yet: Make master on the server that runs the show.", "none yet")
+	t.eq(M.master_line({"epoch": 3, "is_master": true, "auto": true}), "Master: this server · epoch 3 · auto failover", "this one")
+	var m := {"epoch": 2, "master": "bb", "master_id": "boxB", "auto": false, "succession": [{"key_id": "bb", "id": "boxB", "name": "Box B"}]}
+	t.eq(M.master_line(m), "Master: Box B · epoch 2 · failover by hand", "a peer")
+	t.eq(M.master_line({"epoch": 2, "master": "cc", "succession": []}), "Master: a server not linked here · epoch 2 · failover by hand", "unknown")
+	t.ok(M.is_master(m, "boxB"), "card badge")
+	t.ok(not M.is_master(m, "boxC"), "not that one")
+	t.ok(not M.is_master({"epoch": 0, "master_id": ""}, ""), "no master → no badge")

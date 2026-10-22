@@ -11,7 +11,10 @@
  *   POST   /api/cluster/peers/:id/send-media   → 202; progress in the peer's `media_send` (P2b, cluster-media.js)
  *   GET    /api/cluster/identity               → { id, hostname, device_key, fingerprint }  (public: what a linker records)
  *   POST   /api/cluster/ssh-key                ← a linked server's signed SSH key, before it sends media (cluster-media.js)
- * Changes broadcast WS `cluster:peers` (the GET body). The service starts on the first call and polls only while
+ *   GET    /api/cluster/master                 → { claim, ...view }  (P3a, cluster-master.js: peers pull the signed claim)
+ *   POST   /api/cluster/master                 ← a linked server's signed claim (accepted only if it beats the one held)
+ *   POST   /api/cluster/master/set { master: 'self' | peer id, auto? } → the new view (operator: Make master / failover)
+ * GET /api/cluster also carries `master` (the view). Changes broadcast WS `cluster:peers` (the GET body). The service starts on the first call and polls only while
  * the list is not empty.
  */
 
@@ -20,7 +23,8 @@ const defaultPersistence = require('../utils/persistence')
 const { createCluster } = require('../cluster/cluster-peers')
 const { handleGet } = require('./routes-replication-get')
 const { acceptSshKey, sendMedia, fingerprint } = require('../cluster/cluster-media')
-const { postJson } = require('../cluster/cluster-peers')
+const { postJson, getJson } = require('../cluster/cluster-peers')
+const { createMaster } = require('../cluster/cluster-master')
 const identity = require('../system/device-identity')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
@@ -31,12 +35,34 @@ function clusterOf(ctx) {
 		persistence: ctx.persistence || defaultPersistence,
 		selfPing: async () => JSON.parse((await handleGet('/api/replication/ping', ctx, null)).body),
 		selfKey: identity.getDevicePublicKeyPem(),
-		onChange: (snap) => {
-			if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', snap)
-		},
+		onChange: () => broadcast(ctx),
 	})
+	ctx._cluster.afterPoll(() => masterOf(ctx).tick())
 	ctx._cluster.start().catch(() => {})
 	return ctx._cluster
+}
+
+function masterOf(ctx) {
+	if (ctx._clusterMaster) return ctx._clusterMaster
+	ctx._clusterMaster = createMaster({
+		cluster: clusterOf(ctx),
+		persistence: ctx.persistence || defaultPersistence,
+		selfKey: identity.getDevicePublicKeyPem(),
+		sign: identity.signMessage,
+		verify: identity.verifyMessage,
+		fetchJson: getJson,
+		post: postJson,
+		log: ctx.log,
+		onChange: () => broadcast(ctx),
+	})
+	return ctx._clusterMaster
+}
+
+/** GET /api/cluster body = WS `cluster:peers`. */
+const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view() })
+
+function broadcast(ctx) {
+	if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', full(ctx))
 }
 
 /** The real senders / installers (tests drive cluster-media.js with stubs). */
@@ -63,7 +89,7 @@ function register(routes) {
 	routes.get('/api/cluster', async ({ ctx }) => {
 		const c = clusterOf(ctx)
 		await c.poll()
-		return reply(200, c.snapshot())
+		return reply(200, full(ctx))
 	}, opt)
 	routes.post('/api/cluster/scan', async ({ ctx }) => reply(200, { found: await clusterOf(ctx).scan() }), opt)
 	routes.post('/api/cluster/peers', async ({ body, ctx }) => {
@@ -72,6 +98,7 @@ function register(routes) {
 	}, opt)
 	routes.delete('/api/cluster/peers/:id', ({ ctx, params }) => {
 		const ok = clusterOf(ctx).remove(params.id)
+		if (ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget()
 		return reply(ok ? 200 : 404, ok ? { ok } : { error: 'no such server' })
 	}, opt)
 	routes.post('/api/cluster/peers/:id/send-media', async ({ ctx, params }) => {
@@ -87,10 +114,19 @@ function register(routes) {
 		const r = acceptSshKey(parseBody(body), req?.socket?.remoteAddress, mediaDeps(ctx))
 		return reply(r.status, r.body)
 	}, opt)
+	routes.get('/api/cluster/master', ({ ctx }) => reply(200, { claim: masterOf(ctx).claim(), ...masterOf(ctx).view() }), opt)
+	routes.post('/api/cluster/master', ({ ctx, body }) => {
+		const r = masterOf(ctx).accept(parseBody(body))
+		return reply(r.status, r.body)
+	}, opt)
+	routes.post('/api/cluster/master/set', async ({ ctx, body }) => {
+		const r = await masterOf(ctx).set(parseBody(body))
+		return reply(r.status, r.body)
+	}, opt)
 	routes.get('/api/cluster/peers/:id/device-view', async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).deviceView(params.id)
 		return reply(r.status, r.body)
 	}, opt)
 }
 
-module.exports = { register, clusterOf }
+module.exports = { register, clusterOf, masterOf }

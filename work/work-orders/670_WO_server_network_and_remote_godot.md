@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3–P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) DONE 22.10 (offline + box with a stub running the real module); P3b (clients follow the master), P4, P5 open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -298,6 +298,72 @@ any LAN host write into `media/`. So:
   the red line "fake-c has not linked this server: on fake-c, Devices → Servers → + → this server, then Send again."
 - The rsync landed on this box's own media folder (same paths, nothing changed); the forced-command wrapper on a real
   receiver is the existing hot-backup one, not re-tested here. Real two-box send = owner QA.
+
+## P3a — Investigation (22.10)
+
+- The hot-backup pair already has an epoch: `src/replication/promote.js` (`promoteToLeader` = `leaderEpoch + 1`,
+  `leaderYield`, `demoteToFollower` when the peer's epoch is higher, `peer-client.js:210`) and auto-promote on a lost
+  peer (`peer-client.js:243–258`, FAILOVER_MS 5 s). It is one peer only (`replication.peer`), token-authenticated,
+  and its role also follows the operator WS count (`role-state.js:55`). It runs the AMCP fan-out, live-state mirror and
+  playhead sync, ≈45 files. Generalising it to N peers in place would touch all of that while it is the only
+  hardware-proven path, so the cluster master is a separate, small module. P4 decides how the fan-out follows it.
+
+## P3a — what was done (22.10)
+
+- `src/cluster/cluster-master.js` (new). The master is named by a signed CLAIM
+  `{epoch, master, succession, auto, by, ts, sig}`:
+  - `master` and `succession` are device-key fingerprints;
+  - `by` is the signer's device key, and the signature is ed25519 over every field.
+- Any server of the cluster may sign a claim ("Make master" on any of them). A server takes a claim only when:
+  - the signer is itself or a server ITS operator linked (trust = links, as in P2b);
+  - the claim beats the one it holds: a higher epoch, or the same epoch with the lower master fingerprint. Two halves
+    of a split network that each promoted converge on one master when they meet.
+- Claims travel both ways:
+  - pushed: `POST /api/cluster/master` to every linked server when a claim is made;
+  - pulled: `GET /api/cluster/master` from every online linked server after each cluster poll (5 s,
+    `cluster.afterPoll`).
+  - So an old master that comes back sees the higher epoch and steps down (journal: `stepped down: X is master`).
+- **Auto failover** (`auto` lives in the claim, so it is one setting for the whole cluster; default on):
+  - when the master has been unseen for 12 s (`FAILOVER_MS`, counted from this process's start at the earliest), the
+    first server of the succession still seen online claims epoch + 1, and the others wait for its claim;
+  - outputs never depend on the master's process.
+- `POST /api/cluster/master/set {master: 'self' | peer id, auto?}` is the operator's control; every change is a new
+  epoch. The claim is stored in the persistence file (`clusterMaster`, device-local), and unlinking the last server
+  drops it.
+- `GET /api/cluster` and WS `cluster:peers` carry `master`:
+  `{epoch, master, master_id ('self' | peer id), is_master, auto, succession [{key_id, id, name}]}`.
+- Godot `cluster_panel.gd` / `cluster_model.gd`:
+  - under SERVERS, the line "Master: … · epoch N · auto failover", plus an "Auto failover" checkbox and "Make this
+    server master";
+  - a MASTER tag on the master's card, and "Make master" on the other online cards, both behind a confirm.
+- `tools/dev/fake-cluster-peer.js`: runs the REAL module, with the real server as its one linked peer. Its claim and
+  key are kept in `--state-file`, so a restarted stub comes back with its old epoch.
+- **P3a decides and shows who the master is. Nothing yet follows it:**
+  - clients reconnecting to the master is P3b;
+  - fan-out from the master is P4;
+  - the hot-backup pair's own leader / epoch is untouched.
+
+## P3a — what was VERIFIED
+
+- Offline:
+  - smoke `smoke-wo670-cluster-master.test.js` 7/0: three servers with real keys on a switchable network;
+  - covers ordering, push to all, refusals (unlinked signer, tampered, malformed, older), failover after the window
+    only by the first online successor, an old master's step-down, auto off, split-brain convergence, routes and
+    forget;
+  - P2 smoke 8/0; Godot 20908/0 (+7 `test_master_line`); `--check` OK.
+- Box (server restarted, stub fake-b on :4301):
+  - `master/set {master: fake-b}`: both sides at epoch 1, the stub `is_master`.
+  - **Failover:** killed the stub at 11:59:38. The real server became master at 11:59:49, epoch 2 (journal
+    `master this server epoch 2 (failover: fake-b unseen 15 s)`).
+  - **Step-down:** restarted the stub with its stored epoch-1 claim. It started as master, and after one tick it logged
+    `stepped down: highascg7580 is master (epoch 2, from highascg7580)`. The real server stayed at epoch 2.
+- Second Godot window, Devices:
+  - the line "Master: this server · epoch 2 · auto failover";
+  - "Make master" on fake-b → confirm → OK: fake-b MASTER at epoch 3 on both sides, and "Make this server master"
+    appeared;
+  - unticking "Auto failover" gave epoch 4 with `auto: false` on both.
+  - Unlinking fake-b dropped the claim (`claim: null`, journal line).
+- Not proven: two real boxes (owner QA, checklist §F); the network pulled between them.
 
 ## What was VERIFIED
 

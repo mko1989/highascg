@@ -81,3 +81,23 @@ static func send_line(p: Dictionary, refused: String) -> String:
 		"failed":
 			return "Media send failed: " + str(s.get("error", ""))
 	return ""
+
+
+## P3a — the master line under the SERVERS header (server cluster-master.js view: epoch, master_id, is_master, auto,
+## succession [{key_id, id, name}]).
+static func master_line(m: Dictionary) -> String:
+	if int(m.get("epoch", 0)) <= 0:
+		return "No master yet: Make master on the server that runs the show."
+	var who := "this server" if m.get("is_master") == true else master_name(m)
+	return "Master: %s · epoch %d · %s" % [who, int(m.epoch), "auto failover" if m.get("auto") == true else "failover by hand"]
+
+
+static func master_name(m: Dictionary) -> String:
+	for s in m.get("succession", []):
+		if s is Dictionary and str(s.get("key_id", "")) == str(m.get("master", "")):
+			return str(s.get("name", ""))
+	return "a server not linked here"
+
+
+static func is_master(m: Dictionary, peer_id: String) -> bool:
+	return int(m.get("epoch", 0)) > 0 and str(m.get("master_id", "")) == peer_id
