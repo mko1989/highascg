@@ -149,6 +149,8 @@ config/nginx/
 .godot/
 godot/**/export/
 godot/**/build/
+# WO-686: Godot 4.4+ writes a .uid next to every script on import/export; the client never tracked them
+godot/client/**/*.uid
 # WO-596: hshm GDExtension binaries are built per machine (godot/extensions/hshm/build.sh)
 godot/extensions/*/bin/
 godot/extensions/*/build/

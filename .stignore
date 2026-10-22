@@ -86,3 +86,9 @@ Thumbs.db
 
 // WO-596: per-machine GDExtension build trees (binaries already skipped via "bin")
 /godot/extensions/hshm/build
+
+// WO-686: Godot client exports (godot/export-client.sh) — per machine, hundreds of MB.
+// MIRROR THIS LINE ON THE MAC (.stignore does not sync).
+/godot/export
+// WO-686: Godot's per-script .uid files (written on import / export, not tracked)
+/godot/client/**/*.uid

@@ -20,8 +20,7 @@ const DOT := 5            # running-app dot under an icon (WO-628, macOS style)
 static func wanted(origin: String, args: Dictionary) -> bool:
 	if args.has("dock"):
 		return str(args["dock"]) not in ["0", "false", "off", "no"]
-	var host := origin.trim_prefix("http://").trim_prefix("https://").get_slice("/", 0).get_slice(":", 0)
-	return host in ["127.0.0.1", "localhost", "::1", "[::1]"]
+	return preload("res://core/platform.gd").is_local_origin(origin)
 
 
 ## Expanded size for `n` buttons plus separators.

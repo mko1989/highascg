@@ -192,7 +192,7 @@ binary `[u8 n][role][JPEG]`.
 - `video/shm_texture.gd` — `update_rgba()`: same Texture2D, RD texture recreated as R8G8B8A8 when the source format
   switches (the shm paths stay BGRA8).
 
-**Not done in P1:** Windows / macOS export presets (nothing to test them on here); JPEG decode runs on the main thread
+**Not done in P1:** Windows / macOS export presets (nothing to test them on here; done 22.10 in [WO-686](./686_WO_godot_client_multi_platform.md)); JPEG decode runs on the main thread
 (≈ 3 ms per 960 px frame; move to `WorkerThreadPool` if many roles are watched remotely).
 
 ## P1 — what was VERIFIED

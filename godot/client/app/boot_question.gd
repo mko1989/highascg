@@ -8,11 +8,14 @@ extends Node
 
 const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 const ScreenModel := preload("res://app/operator_screen_model.gd")
+const Platform := preload("res://core/platform.gd")
 
 signal said(line: String)
 
 
 func ask(fresh: bool) -> void:
+	if not Platform.is_local_origin(Config.origin):  # WO-686: the answers re-lay the BOX's screens
+		return
 	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
 	if not r.ok or not r.data is Dictionary:
 		return

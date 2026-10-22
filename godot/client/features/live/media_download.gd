@@ -42,7 +42,7 @@ func ask(id: String, origin: String) -> void:
 	dlg.file_mode = FileDialog.FILE_MODE_SAVE_FILE
 	dlg.access = FileDialog.ACCESS_FILESYSTEM
 	dlg.title = "Download to this computer"
-	dlg.current_dir = downloads_dir(OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS), OS.get_environment("HOME"))
+	dlg.current_dir = downloads_dir(OS.get_system_dir(OS.SYSTEM_DIR_DOWNLOADS), preload("res://core/platform.gd").home_dir())
 	dlg.current_file = id.get_file()
 	dlg.size = Vector2i(760, 480)
 	dlg.file_selected.connect(func(path: String) -> void:

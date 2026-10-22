@@ -170,7 +170,7 @@ func _pick_file(saving: bool) -> void:
 	dlg.file_mode = FileDialog.FILE_MODE_SAVE_FILE if saving else FileDialog.FILE_MODE_OPEN_FILE
 	dlg.filters = PackedStringArray(["*.json ; Project JSON"])
 	dlg.title = "Save project to file" if saving else "Load project from file"
-	dlg.current_dir = OS.get_environment("HOME")
+	dlg.current_dir = preload("res://core/platform.gd").home_dir()  # WO-686: Windows has no $HOME
 	if saving:
 		dlg.current_file = str(Store.project.get("name", "project")).replace(" ", "_") + ".json"
 	dlg.size = Vector2i(760, 480)

@@ -6,6 +6,7 @@ extends RefCounted
 
 const NetUtil := preload("res://core/net_util.gd")
 const ConfigScript := preload("res://core/config.gd")
+const Platform := preload("res://core/platform.gd")
 const LOST_AFTER_MS := 2000
 const INBOUND_BUFFER := 16 * 1024 * 1024
 
@@ -113,9 +114,7 @@ static func parse_frame(pkt: PackedByteArray) -> Array:
 static func wanted(origin: String, args: Dictionary) -> bool:
 	if args.has("video"):
 		return str(args["video"]) == "feed"
-	var host := origin.trim_prefix("http://").trim_prefix("https://").get_slice("/", 0)
-	host = host.get_slice("]", 0).trim_prefix("[") if host.begins_with("[") else host.get_slice(":", 0)
-	return not (host in ["127.0.0.1", "localhost", "::1"])
+	return not Platform.is_local_origin(origin)
 
 
 ## ws(s)://host:port/api/video-feed?width=…&fps=… (`--video-width=`, `--video-fps=`; the server clamps).

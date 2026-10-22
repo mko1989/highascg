@@ -55,8 +55,7 @@ func _pick_files() -> void:
 	dlg.file_mode = FileDialog.FILE_MODE_OPEN_FILES
 	dlg.access = FileDialog.ACCESS_FILESYSTEM
 	dlg.title = "Add media files"
-	var home := OS.get_environment("HOME")
-	dlg.current_dir = home.path_join("Downloads") if DirAccess.dir_exists_absolute(home.path_join("Downloads")) else home
+	dlg.current_dir = preload("res://core/platform.gd").start_dir()  # WO-686: Windows has no $HOME
 	dlg.files_selected.connect(func(paths: PackedStringArray) -> void:
 		dlg.queue_free()
 		files_chosen.emit(paths))

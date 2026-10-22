@@ -463,7 +463,7 @@ func _gui_input(event: InputEvent) -> void:
 		elif mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
 			grab_focus()
 			var px := to_raster(mb.position)
-			if mb.ctrl_pressed:
+			if mb.is_command_or_control_pressed():
 				var i := O.nearest(_pts, px, 16.0 / _scale())
 				if i >= 0:
 					picked.emit(str(_pts[i].id))

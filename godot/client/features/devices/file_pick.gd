@@ -24,9 +24,7 @@ static func _run(host: Node, mode: FileDialog.FileMode, title: String, file_name
 	dlg.access = FileDialog.ACCESS_FILESYSTEM
 	dlg.title = title
 	dlg.filters = PackedStringArray(filters)
-	var home := OS.get_environment("HOME")
-	var dl := home.path_join("Downloads")
-	dlg.current_dir = dl if DirAccess.dir_exists_absolute(dl) else home
+	dlg.current_dir = preload("res://core/platform.gd").start_dir()  # WO-686: Windows has no $HOME
 	if file_name != "":
 		dlg.current_file = file_name
 	var w := _Wait.new()

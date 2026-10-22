@@ -6,6 +6,7 @@ extends Control
 const NetUtil := preload("res://core/net_util.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Placement := preload("res://app/window_placement.gd")
+const Platform := preload("res://core/platform.gd")
 const BootQuestion := preload("res://app/boot_question.gd")
 const ScreenModel := preload("res://app/operator_screen_model.gd")
 const Shell := preload("res://app/shell.gd")
@@ -450,7 +451,7 @@ func _apply_window_args() -> void:
 	var fresh := false
 	if Config.args.has("screen"):
 		w.current_screen = int(Config.args["screen"])
-	else:
+	elif Platform.is_local_origin(Config.origin):  # WO-686: off-box the box's operator monitor is not one of ours
 		var res: Dictionary = await Api.get_json("/api/system/operator-display")
 		var screens := []
 		for i in DisplayServer.get_screen_count():
