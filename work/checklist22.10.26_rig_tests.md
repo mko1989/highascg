@@ -101,5 +101,7 @@ Setup, once:
       splitter or resize the window: the cables swing and settle within about 1 s.
 - [ ] **WO-673:** Live 3D: the Lights toggle is a bulb. Lit yellow = beams on; click it: white outline, beams off,
       heads stay.
+- [ ] **WO-674:** Devices → Cable loops: step through 0 1 2 4 8 16 32 chaos. Chaos is a tangle between the ports,
+      never over a button. Restart the client: the slider keeps its value.
 - [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
       Inspector title is white.

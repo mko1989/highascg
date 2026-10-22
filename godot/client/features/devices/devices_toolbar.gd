@@ -18,6 +18,8 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const SnapshotDialogs := preload("res://features/devices/snapshot_dialogs.gd")
 const PREFS := "user://devices.cfg"
 const APPLY := "Apply Caspar config (restart)"
+const CableModel := preload("res://features/devices/cable_model.gd")
+const LOOP_STEPS := [0, 1, 2, 4, 8, 16, 32, CableModel.CHAOS]  # WO-674: the slider's stops; the last is "chaos"
 
 var cancel_btn: Button
 var apply_btn: Button
@@ -39,17 +41,23 @@ func _init() -> void:
 	_loops.add_child(_label("Cable loops", ThemeBuilder.TEXT_MUTED, 13))
 	var s := HSlider.new()
 	s.min_value = 0
-	s.max_value = 2
+	s.max_value = LOOP_STEPS.size() - 1
 	s.step = 1
-	s.custom_minimum_size = Vector2(70, 0)
+	s.value = saved_loop_step()  # before the connect: the tab reads saved_loops() itself
+	s.custom_minimum_size = Vector2(110, 0)
 	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	s.focus_mode = Control.FOCUS_NONE
 	_loops.add_child(s)
-	var value := _label("0", ThemeBuilder.TEXT, 13)
+	var value := _label(loop_label(int(s.value)), ThemeBuilder.TEXT, 13)
+	value.custom_minimum_size.x = 40  # "chaos" must not shift the row
 	_loops.add_child(value)
 	s.value_changed.connect(func(x: float) -> void:
-		value.text = str(int(x))
-		loops_changed.emit(int(x)))
+		value.text = loop_label(int(x))
+		var cfg := ConfigFile.new()
+		cfg.load(PREFS)
+		cfg.set_value("view", "loops", int(x))
+		cfg.save(PREFS)
+		loops_changed.emit(LOOP_STEPS[int(x)]))
 	_simple = _check("Node view", "Compact node layout and straight cable lines on the rear panel.", saved_simple())
 	_simple.toggled.connect(func(on: bool) -> void: _pick(_matrix, on))
 	_matrix = _check("Matrix view", "Dense Dante-style routing matrix.", saved_view() == "matrix")
@@ -126,6 +134,21 @@ func sync(g: Node) -> void:
 static func saved_view() -> String:
 	var cfg := ConfigFile.new()
 	return str(cfg.get_value("view", "mode", "")) if cfg.load(PREFS) == OK else ""
+
+
+## WO-674: the slider stop remembered in devices.cfg [view] loops (an index into LOOP_STEPS).
+static func saved_loop_step() -> int:
+	var cfg := ConfigFile.new()
+	return clampi(int(cfg.get_value("view", "loops", 0)), 0, LOOP_STEPS.size() - 1) if cfg.load(PREFS) == OK else 0
+
+
+static func saved_loops() -> int:
+	return LOOP_STEPS[saved_loop_step()]
+
+
+static func loop_label(step: int) -> String:
+	var v: int = LOOP_STEPS[clampi(step, 0, LOOP_STEPS.size() - 1)]
+	return "chaos" if v == CableModel.CHAOS else str(v)
 
 
 static func saved_simple() -> bool:

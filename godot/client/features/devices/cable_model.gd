@@ -15,6 +15,7 @@ const COLORS := [
 	"#1E90FF", "#FF8C00",
 ]
 const NO_ID_COLOR := "#94a3b8"
+const CHAOS := -1  # WO-674: the "chaos" step of the Cable loops slider — not loops but a total cable mess
 const BOOT_DROP := 16.0  # straight plug boot below each port
 const STEPS_PER_LOOP := 36
 const GRAVITY := 0.85
@@ -123,7 +124,11 @@ static func path(x1: float, y1: float, x2: float, y2: float, loops: int, seed: i
 
 
 ## Where the coils sit (the "Cable loops" setting; fewer on short runs): [{t along the run, r, side ±1}], t ascending.
+## 1 and 2 are the web's; WO-674 adds 4 … 32 (spread evenly with jitter, smaller the more there are, at most one per
+## LOOP_SPACING px of run) and CHAOS (6–40 loops of any size anywhere).
 static func loop_specs(loops: int, dist: float, seed: int) -> Array:
+	if loops > 2 or loops == CHAOS:
+		return _many_loops(loops, dist, seed)
 	var actual := 0
 	if loops == 1 and dist >= 90.0:
 		actual = 1
@@ -137,6 +142,22 @@ static func loop_specs(loops: int, dist: float, seed: int) -> Array:
 	var out := []
 	for li in ts.size():
 		out.append({"t": ts[li], "r": 20.0 + srand(li + 42, seed) * 12.0, "side": 1.0 if srand(li + 101, seed) > 0.5 else -1.0})
+	return out
+
+
+const LOOP_SPACING := 22.0
+
+
+static func _many_loops(loops: int, dist: float, seed: int) -> Array:
+	var chaos := loops == CHAOS
+	var n := clampi(floori(dist / 20.0), 6, 40) if chaos else mini(loops, floori(dist / LOOP_SPACING))
+	var rmax := clampf(dist / maxf(1.0, n) * 0.6, 8.0, 26.0)
+	var out := []
+	for li in n:
+		var t := srand(li + 11, seed) * 0.9 + 0.05 if chaos else (li + 0.5) / n + (srand(li + 11, seed) - 0.5) * 0.5 / n
+		var r := 6.0 + srand(li + 42, seed) * 28.0 if chaos else rmax * (0.7 + 0.3 * srand(li + 42, seed))
+		out.append({"t": clampf(t, 0.04, 0.96), "r": r, "side": 1.0 if srand(li + 101, seed) > 0.5 else -1.0})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.t < b.t)
 	return out
 
 

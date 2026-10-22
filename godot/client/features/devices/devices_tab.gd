@@ -202,6 +202,7 @@ func _ready() -> void:
 	right.add_child(_list)
 	_cables = CableLayer.new()
 	add_child(_cables)
+	_cables.loops = Toolbar.saved_loops()  # WO-674: remembered per client
 	_bar.loops_changed.connect(func(n: int) -> void: _cables.loops = n)
 	_bar.view_changed.connect(func(_m: String) -> void:
 		_show_mode()

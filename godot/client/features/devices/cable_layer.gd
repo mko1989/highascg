@@ -59,6 +59,7 @@ var _built := {}  # cable id → {key, pts, color, ends} (Node view)
 var _ropes := {}  # cable id → cable_rope.gd (rear panel, WO-672)
 var _ends := {}  # cable id → [from, to] (local), as of the last anchor change
 var _sig := ""
+var _keepout := []  # Rect2 (local): the controls a chaos tangle stays off
 
 
 func _ready() -> void:
@@ -110,6 +111,7 @@ func _process(_delta: float) -> void:
 				_ropes.erase(id)
 		if simple:
 			_build_simple()
+		_keepout = _controls() if loops == CableModel.CHAOS else []
 		queue_redraw()
 	if simple:
 		return
@@ -121,11 +123,37 @@ func _process(_delta: float) -> void:
 			r = CableRope.make(e[0], e[1], loops, CableModel.seed_of(id))
 			_ropes[id] = r
 		r.pin(e[0], e[1])
+		if r.keepout != _keepout:
+			r.keepout = _keepout
+			r.wake()
 		if not r.asleep():
 			r.step()
 			awake = true
 	if awake:
 		queue_redraw()
+
+
+## WO-674: chaos may tangle anywhere but over a control (owner: "it cant be over any actual buttons") — the visible
+## buttons, sliders and fields of the tab, in local coordinates with a 3 px margin. Refreshed with the anchors.
+func _controls() -> Array:
+	var out := []
+	var view := Rect2(Vector2.ZERO, size)
+	var inv := get_global_transform().affine_inverse()
+	var todo: Array[Node] = [get_parent()]
+	while not todo.is_empty():
+		var n: Node = todo.pop_back()
+		if n == self or (n is CanvasItem and not n.visible):
+			continue
+		if (n is BaseButton or n is Range or n is LineEdit) and n.is_visible_in_tree():
+			var r: Rect2 = (inv * (n as Control).get_global_rect()).grow(3.0)
+			if r.intersects(view):
+				out.append(r)
+			continue
+		todo.append_array(n.get_children())
+	var far := 10000.0  # and fenced inside the tab: the tab bar and the panels beside it are controls too
+	out.append_array([Rect2(-far, -far, size.x + 2.0 * far, far), Rect2(-far, size.y, size.x + 2.0 * far, far),
+		Rect2(-far, 0.0, far, size.y), Rect2(size.x, 0.0, far, size.y)])
+	return out
 
 
 func _fans() -> Dictionary:

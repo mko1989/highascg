@@ -9,6 +9,10 @@ extends RefCounted
 ## rope: each loop drops below the cable, stretched by gravity, crosses itself where it meets the run, and swings when
 ## the cable moves. (Coils as constrained rings were tried first: under the run's tension they crumple into kinks.)
 ## A rope that has stopped moving sleeps (no cost) until its ends move again. Pure: tests drive step() headless.
+## WO-674: 4 … 32 loops come from CableModel.loop_specs too. CHAOS is a total cable mess with no gravity (owner: "should
+## disregard the gravity and just make a mess in between connections"): the run is laid as a tangle that doubles back
+## on itself between the two ports, its lengths taken from that tangle so it holds its shape, with loops of any size
+## curled every which way. Moving an end still drags the tangle along.
 
 const CableModel := preload("res://features/devices/cable_model.gd")
 
@@ -25,11 +29,16 @@ const SWING_PUSH := 0.012  # how much the cable's sideways acceleration kicks a 
 const SWING_DAMP := 0.93
 const SLEEP_EPS := 0.03  # px (or rad × 100) per step
 const SLEEP_STEPS := 40
+const CHAOS_BEND := 0.3  # the tangle holds its shape
+const CHAOS_WAVES := 3  # summed waves per axis that lay the tangle
+const CHAOS_AMP := 60.0  # px: how far the tangle strays from the straight line at most
 
 var loops := 0
 var x := PackedFloat32Array()
 var y := PackedFloat32Array()
-var coils := []  # [{i: rope index it hangs from, r, side, angle, spin, vx}]
+var coils := []  # [{i: rope index it hangs from, r, side, angle, spin, vx, rest (hanging angle), stretch}]
+var keepout := []  # Rect2s no point or loop may sit in (the layer passes the tab's controls in chaos)
+var _gravity := GRAVITY
 var _ox := PackedFloat32Array()
 var _oy := PackedFloat32Array()
 var _cons := []  # [i, j, rest, stiffness]
@@ -47,25 +56,65 @@ static func make(a: Vector2, b: Vector2, loop_count: int, seed: int) -> RefCount
 
 func _init_rope(a: Vector2, b: Vector2, loop_count: int, seed: int) -> void:
 	loops = loop_count
+	var chaos := loop_count == CableModel.CHAOS
 	var p := CableModel.path(a.x, a.y, b.x, b.y, 0, seed)
 	for v in p.x:
 		x.append(v)
 	for v in p.y:
 		y.append(v)
+	if chaos:
+		_tangle(seed)
+		_gravity = 0.0
 	_ox = x.duplicate()
 	_oy = y.duplicate()
 	_a = a
 	_b = b
 	_span0 = maxf(1.0, _boot_span())
 	var n := x.size() - 1
+	var slack := 1.0 if chaos else SLACK  # chaos: the tangle's own lengths are the rest shape
 	for hop in [1, 2]:
 		for i in maxi(0, n + 1 - hop):
-			var rest := Vector2(x[i + hop] - x[i], y[i + hop] - y[i]).length() * SLACK
-			_cons.append([i, i + hop, rest, 1.0 if hop == 1 else BEND])
+			var rest := Vector2(x[i + hop] - x[i], y[i + hop] - y[i]).length() * slack
+			_cons.append([i, i + hop, rest, 1.0 if hop == 1 else (CHAOS_BEND if chaos else BEND)])
 	# The run from boot (index 1) to boot (n − 1) carries the coils at the web's positions and sizes.
+	var li := 0
 	for sp in CableModel.loop_specs(loop_count, _span0, seed):
 		var i := clampi(1 + roundi(float(sp.t) * (n - 2)), 2, n - 2)
-		coils.append({"i": i, "r": float(sp.r), "side": float(sp.side), "angle": 0.0, "spin": 0.0, "vx": 0.0})
+		var rest_angle := (CableModel.srand(li + 300, seed) - 0.5) * TAU if chaos else 0.0
+		var stretch := 0.7 + CableModel.srand(li + 700, seed) * 0.6 if chaos else LOOP_STRETCH
+		coils.append({"i": i, "r": float(sp.r), "side": float(sp.side), "angle": rest_angle, "spin": 0.0, "vx": 0.0,
+			"rest": rest_angle, "stretch": stretch})
+		li += 1
+
+
+## Lay boot → boot as a tangle: a straight run 3× denser than the hanging one (the tangle stretches it), then
+## summed waves across AND along it (the along-run ones make it double back and cross itself), fading out at both
+## boots, scaled to the span.
+func _tangle(seed: int) -> void:
+	var n := x.size() - 1
+	var a := Vector2(x[1], y[1])
+	var d := Vector2(x[n - 1], y[n - 1]) - a
+	var span := maxf(1.0, d.length())
+	var along := d / span
+	var across := Vector2(-along.y, along.x)
+	var amp := clampf(span * 0.14, 18.0, CHAOS_AMP)
+	var m := maxi(30, (n - 2) * 3)
+	var port_b := Vector2(x[n], y[n])
+	x.resize(2)
+	y.resize(2)
+	for i in range(1, m + 1):
+		var u := float(i) / m
+		var w_across := 0.0
+		var w_along := 0.0
+		for k in CHAOS_WAVES:
+			var f := 1.5 + CableModel.srand(k + 20, seed) * 4.0
+			w_across += sin(TAU * f * u + CableModel.srand(k + 40, seed) * TAU) / (k + 1)
+			w_along += sin(TAU * f * 1.7 * u + CableModel.srand(k + 60, seed) * TAU) / (k + 1)
+		var q := a + d * u + (across * w_across + along * w_along * 0.9) * amp * sin(PI * u)
+		x.append(q.x)
+		y.append(q.y)
+	x.append(port_b.x)
+	y.append(port_b.y)
 
 
 func _boot_span() -> float:
@@ -74,6 +123,10 @@ func _boot_span() -> float:
 
 func asleep() -> bool:
 	return _still >= SLEEP_STEPS
+
+
+func wake() -> void:
+	_still = 0
 
 
 ## Move the plugged ends to the ports' current positions (wakes the rope when they moved).
@@ -93,7 +146,7 @@ func step() -> void:
 	var s := maxf(1.0, _boot_span()) / _span0
 	for i in range(2, n - 1):
 		var vx := (x[i] - _ox[i]) * DAMPING
-		var vy := (y[i] - _oy[i]) * DAMPING + GRAVITY
+		var vy := (y[i] - _oy[i]) * DAMPING + _gravity
 		_ox[i] = x[i]
 		_oy[i] = y[i]
 		x[i] += vx
@@ -123,6 +176,8 @@ func step() -> void:
 				x[j] -= dx * f * 2.0
 				y[j] -= dy * f * 2.0
 	_pin_ends(n)
+	if not keepout.is_empty():
+		_push_out(n)
 	var moved := 0.0
 	for i in range(2, n - 1):
 		moved = maxf(moved, absf(x[i] - _ox[i]) + absf(y[i] - _oy[i]))
@@ -131,10 +186,37 @@ func step() -> void:
 		var vx: float = x[i] - _ox[i]
 		var push: float = (vx - float(c.vx)) * SWING_PUSH  # sideways acceleration of the hanging point
 		c.vx = vx
-		c.spin = (float(c.spin) - SWING_K * sin(float(c.angle)) - push) * SWING_DAMP
+		c.spin = (float(c.spin) - SWING_K * sin(float(c.angle) - float(c.rest)) - push) * SWING_DAMP
 		c.angle = float(c.angle) + float(c.spin)
 		moved = maxf(moved, absf(float(c.spin)) * 100.0)
 	_still = _still + 1 if moved < SLEEP_EPS else 0
+
+
+## Move each free point that sits in a keep-out rect to its nearest edge, without bounce.
+func _push_out(n: int) -> void:
+	for i in range(2, n - 1):
+		var p := Vector2(x[i], y[i])
+		for r: Rect2 in keepout:
+			if not r.has_point(p):
+				continue
+			var to_l := p.x - r.position.x
+			var to_r := r.end.x - p.x
+			var to_t := p.y - r.position.y
+			var to_b := r.end.y - p.y
+			var m := minf(minf(to_l, to_r), minf(to_t, to_b))
+			if m == to_l:
+				p.x = r.position.x - 0.01  # has_point() counts the near edges as inside
+			elif m == to_r:
+				p.x = r.end.x
+			elif m == to_t:
+				p.y = r.position.y - 0.01
+			else:
+				p.y = r.end.y
+		if p.x != x[i] or p.y != y[i]:
+			x[i] = p.x
+			y[i] = p.y
+			_ox[i] = p.x
+			_oy[i] = p.y
 
 
 func _pin_ends(n: int) -> void:
@@ -161,8 +243,18 @@ func points() -> PackedVector2Array:
 		var p := Vector2(x[i], y[i])
 		out.append(p)
 		if at.has(i):
-			out.append_array(loop_points(p, at[i]))
+			var lp := loop_points(p, at[i])
+			if not _hits_keepout(lp):
+				out.append_array(lp)
 	return out
+
+
+func _hits_keepout(pts: PackedVector2Array) -> bool:
+	for r: Rect2 in keepout:
+		for q in pts:
+			if r.has_point(q):
+				return true
+	return false
 
 
 ## One hanging loop from `top`: an ellipse below it (taller than wide), started and ended LOOP_CROSS past the top on
@@ -170,12 +262,12 @@ func points() -> PackedVector2Array:
 static func loop_points(top: Vector2, c: Dictionary) -> PackedVector2Array:
 	var r: float = c.r
 	var side: float = c.side
+	var k_y: float = c.get("stretch", LOOP_STRETCH)
 	var rot := Transform2D(float(c.angle), Vector2.ZERO)
-	var centre := Vector2(0.0, r * LOOP_STRETCH)
+	var centre := Vector2(0.0, r * k_y)
 	var out := PackedVector2Array()
 	for k in LOOP_STEPS + 1:
 		var a := -PI / 2.0 - side * LOOP_CROSS + side * (TAU + 2.0 * LOOP_CROSS) * k / LOOP_STEPS
-		var q := centre + Vector2(cos(a) * r, sin(a) * r * LOOP_STRETCH)
-		out.append(top + rot * q)
+		out.append(top + rot * (centre + Vector2(cos(a) * r, sin(a) * r * k_y)))
 	out.append(top)
 	return out
