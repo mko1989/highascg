@@ -145,3 +145,35 @@ Owner:
    for every new box, or exclude for a clean Companion?
 3. **SSH host keys:** not checked whether eggs regenerates `/etc/ssh/ssh_host_*` per install. If not, every clone
    shares host keys.
+
+## Round 3 (22.10): round 2's Companion exclude failed the clone audit
+
+### Investigation
+
+- The owner's first produce stopped in `build-highascg-egg.sh` at the clone audit, before `eggs produce`:
+  `Audit FAILED (1 error(s), 6 warning(s))`.
+- Reproduced without root: a copy of `audit-eggs-clone-host.sh` run against a scratch `exclude.list` built from the
+  template plus the same two merges that prepare does (embed-server `--replace`, then DeckLink). Same counts.
+- The error: `exclude.list omits .config/companion but HIGHASCG_ISO_EMBED_COMPANION=1`. Round 2 excluded the whole
+  `~/.config/companion`, and the HighAsCG module ships in that folder (`modules/highpass-highascg/main.js`), which
+  `verify-iso-squashfs-excludes.sh` also requires. Had the build gone through, new boxes would have had Companion
+  without the HighAsCG module.
+- The "clean" part is `v5.0/` (`db.sqlite`: buttons and connections; `cache.sqlite`; `backups/`), plus `machid`, which
+  is this box's id and Companion makes a new one. `modules/` (1.8 MB), `udev-rules/`, `surfaces/` and `README.txt`
+  are not this box's state.
+
+### What was done
+
+- Both fragments: `home/casparcg/.config/companion{,/*}` → `.config/companion/v5.0{,/*}` + `.config/companion/machid`.
+- `audit-eggs-clone-host.sh`: fails only when the folder itself, `/*`, or `modules/` is excluded. It no longer
+  fires on any line under the folder.
+- `verify-iso-squashfs-excludes.sh`: requires `v5.0` and `machid` absent, not the whole folder.
+- Smoke: `v5.0/db.sqlite` and `machid` are excluded; `modules/highpass-highascg/main.js` ships.
+
+### What was VERIFIED
+
+- `smoke-eggs-exclude-lists.test.js` 39/0.
+- Scratch merge + audit copy: `Audit passed (6 warning(s))`. The 6 warnings are the same non-fatal set as the owner's
+  run: swap active but excluded, two bridge mounts, cuda-drivers, two IDE servers on the host.
+- Negative case: appending `home/casparcg/.config/companion` still fails the audit.
+- Not yet run: the owner's re-run of the build. The squashfs verifier checks the module after produce.

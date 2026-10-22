@@ -254,7 +254,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 		})
 		it(`${name}: caches, host keys, TLS key, Companion DB and dev build trees stay off the ISO; runtime dirs and the GDTF login stay`, () => {
 			for (const p of [
-				'home/casparcg/.config/companion/db.sqlite',
+				'home/casparcg/.config/companion/v5.0/db.sqlite',
+				'home/casparcg/.config/companion/machid',
 				'home/casparcg/.gitconfig',
 				'home/casparcg/highascg/config/certs/highascg-key.pem',
 				'home/casparcg/highascg/config/security.json.corrupt-2026-09-04T12-10-27-977Z',
@@ -274,6 +275,8 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/highascg/bin/casparcg',
 				'home/casparcg/highascg/godot/extensions/hshm/bin/libhshm.so',
 				'home/casparcg/.config/openbox/rc.xml',
+				// the audit and the squashfs verifier require the HighAsCG Companion module on the ISO
+				'home/casparcg/.config/companion/modules/highpass-highascg/main.js',
 				// owner 22.10: the shared GDTF Share login ships (docs/DEFAULT_LOGINS.md); sshd's config stays
 				'home/casparcg/.highascg/gdtf-share.json',
 				'etc/ssh/sshd_config',

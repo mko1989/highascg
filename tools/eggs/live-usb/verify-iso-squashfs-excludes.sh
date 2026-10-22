@@ -149,7 +149,8 @@ for needle in \
 	'home/casparcg/.antigravity-ide-server' \
 	'home/casparcg/highascg/config/certs/highascg-key.pem' \
 	'etc/ssh/ssh_host_ed25519_key' \
-	'home/casparcg/.config/companion' \
+	'home/casparcg/.config/companion/v5.0' \
+	'home/casparcg/.config/companion/machid' \
 	'home/casparcg/highascg/godot/extensions/hshm/build'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"

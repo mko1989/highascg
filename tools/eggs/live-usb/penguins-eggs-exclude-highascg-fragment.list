@@ -298,8 +298,11 @@ home/casparcg/highascg/godot/extensions/hshm/build
 home/casparcg/highascg/godot/extensions/hshm/build/*
 
 # WO-669 round 2 (owner 22.10: "clean" Companion; no secrets or logins on the ISO except the documented defaults).
-home/casparcg/.config/companion
-home/casparcg/.config/companion/*
+# The Companion DB (buttons, connections) and machine id stay off; modules/ (highpass-highascg) must ship —
+# audit-eggs-clone-host.sh fails the build when the whole .config/companion is excluded (22.10).
+home/casparcg/.config/companion/v5.0
+home/casparcg/.config/companion/v5.0/*
+home/casparcg/.config/companion/machid
 home/casparcg/.gitconfig
 # this box's self-signed TLS key (SANs = this box's IPs); highascg-https-proxy.js makes a fresh one on first start
 home/casparcg/highascg/config/certs/*

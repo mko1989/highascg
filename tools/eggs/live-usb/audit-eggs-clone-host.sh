@@ -189,8 +189,9 @@ if [[ "$EMBED_COMPANION" == "1" ]]; then
 	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/companion(/|$)' "$EXCLUDE"; then
 		fail "exclude.list omits /home/casparcg/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
-	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion(/|$)' "$EXCLUDE"; then
-		fail "exclude.list omits .config/companion but HIGHASCG_ISO_EMBED_COMPANION=1"
+	# The DB (v5.0/) and machid may be excluded (WO-669 "clean" Companion); the folder itself and modules/ may not.
+	if [[ -f "$EXCLUDE" ]] && grep -qE '^home/casparcg/\.config/companion(/\*?|/modules(/.*)?)?$' "$EXCLUDE"; then
+		fail "exclude.list omits .config/companion (or its modules/) but HIGHASCG_ISO_EMBED_COMPANION=1"
 	fi
 else
 	ok "HIGHASCG_ISO_EMBED_COMPANION=0 — skipping Companion clone checks"
