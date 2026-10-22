@@ -26,8 +26,9 @@ loading."*
 - New `features/previs/fixtures/auto_groups_model.gd` (pure):
   - `by_position`: per type, single-link rows: same mount, (upstage, height) within `ROW_GAP` = 1.2 m. So a truss
     line, a floor line, a ladder and a gapped FOH line are each one row.
-  - Each row is ordered stage right → stage left; in one column, top first, then downstage first.
-  - A row of 4 or more also gives its "SR" / "SL" halves. A type in several rows also gets "· all", row after row.
+  - Each row is ordered left → right as the audience sees it (= stage right → stage left); in one column, top first,
+    then downstage first.
+  - A row of 4 or more also gives its "L" / "R" halves (audience view, owner 22.10). A type in several rows also gets "· all", row after row.
   - Type names come from the fixture names without their numbers ("Sharpy Plus 101" → "Sharpy Plus").
     Row labels are "floor" or the height ("6.2 m").
   - `by_address`: one group per universe ("Art-Net 5", "sACN 12"), in address order.
@@ -47,12 +48,12 @@ loading."*
 - Godot tests 20975 / 0; 500-line limit clean.
 - Live patch dump (52 fixtures): 27 position groups, e.g.:
   - Sharpy Plus · 6.2 m (7) and · floor (5);
-  - Robin 600 LEDWash+ · 6.2 m SR / SL (4 / 4);
-  - Pixel Line IP SR 1021–1024 and SL 1025–1028, which match the owner's "pixele" groups;
+  - Robin 600 LEDWash+ · 6.2 m L / R (4 / 4);
+  - Pixel Line IP L 1021–1024 and R 1025–1028, which match the owner's "pixele" groups;
   - Focus Profile 401–408 as one row.
 - Live patch dump, by address: 6 universe groups (Art-Net 1 = 13, 2 = 8, 3 = 15, 5 = 8, 8 = 4, 9 = 4).
 - Box GUI relaunched:
   - Groups ▾ shows pixele r, pixele l and front, then By position ▸ / By address ▸;
   - By position lists all 27;
   - "Sharpy Plus · floor (5)" selected the five stage-front Sharpys (yellow boxes in 3D).
-- Owner QA: whether SR / SL (stage right / left) reads right for you, or should be audience L / R.
+- Owner 22.10: halves named for the audience view (L / R), not SR / SL; renamed, tests re-run (20975 / 0).

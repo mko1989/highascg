@@ -2,8 +2,8 @@ extends RefCounted
 ## WO-680 — automatic fixture groups, worked out from the patch every time the Groups menu opens (never stored: a
 ## re-patch cannot leave them stale, and the operator's own groups stay as they are).
 ## By position: per fixture type, the rows its fixtures hang in — same mount, chained within ROW_GAP in (upstage,
-## height), so a truss line, a floor line or a vertical ladder is one row — each in stage-right → stage-left order;
-## a row of HALVES_MIN or more also splits into its stage-right / stage-left half; a type in several rows also gets
+## height), so a truss line, a floor line or a vertical ladder is one row — each left → right as the audience sees it
+## (owner 22.10: audience view; = stage right → stage left); a row of HALVES_MIN or more also splits into its L / R half; a type in several rows also gets
 ## "· all" (row after row). By address: one group per universe,
 ## in address order. PSN frame: x stage left, y upstage, z up.
 
@@ -100,7 +100,7 @@ static func _row_label(row: Array) -> String:
 	return "floor" if row[0].pose.hang == "floor" else "%.1f m" % _mean_z(row)
 
 
-## Stage right → stage left (PSN x up); within a column top first, then downstage first.
+## Audience left → right (PSN x up: x is stage left = audience right); within a column top first, then downstage.
 static func _ordered(list: Array) -> Array:
 	var l := list.duplicate()
 	l.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
@@ -119,9 +119,9 @@ static func _halves(row: Array, label: String) -> Array:
 	if hi - lo < 1.0:
 		return []
 	var mid := (lo + hi) / 2.0
-	var sr := row.filter(func(f: Dictionary) -> bool: return f.pose.x < mid)
-	var sl := row.filter(func(f: Dictionary) -> bool: return f.pose.x >= mid)
-	return [{"name": "%s SR" % label, "ids": _ordered(sr)}, {"name": "%s SL" % label, "ids": _ordered(sl)}]
+	var l := row.filter(func(f: Dictionary) -> bool: return f.pose.x < mid)
+	var r := row.filter(func(f: Dictionary) -> bool: return f.pose.x >= mid)
+	return [{"name": "%s L" % label, "ids": _ordered(l)}, {"name": "%s R" % label, "ids": _ordered(r)}]
 
 
 static func _unique_names(groups: Array) -> Array:

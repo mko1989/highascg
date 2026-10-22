@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-680 — auto_groups_model.gd on a cut of the owner's Pabianice patch: rows per type (truss / floor / a ladder of
-## Pixel Lines / a gapped FOH line), stage-right → stage-left order, SR / SL halves, one group per universe.
+## Pixel Lines / a gapped FOH line), audience left → right, L / R halves, one group per universe.
 
 const A := preload("res://features/previs/fixtures/auto_groups_model.gd")
 var t
@@ -35,15 +35,15 @@ func _named(groups: Array) -> Dictionary:
 
 func test_rows_per_type_ordered_with_halves() -> void:
 	var g := _named(A.by_position(_patch()))
-	t.eq(g.keys(), ["Focus Profile", "Focus Profile SR", "Focus Profile SL", "Pixel Line IP", "Pixel Line IP SR",
-		"Pixel Line IP SL", "Sharpy Plus · all", "Sharpy Plus · 6.2 m", "Sharpy Plus · floor"], "names, types A–Z, highest row first")
-	t.eq(g["Sharpy Plus · 6.2 m"], ["Sharpy Plus 101", "Sharpy Plus 102", "Sharpy Plus 103"], "stage right → stage left")
+	t.eq(g.keys(), ["Focus Profile", "Focus Profile L", "Focus Profile R", "Pixel Line IP", "Pixel Line IP L",
+		"Pixel Line IP R", "Sharpy Plus · all", "Sharpy Plus · 6.2 m", "Sharpy Plus · floor"], "names, types A–Z, highest row first")
+	t.eq(g["Sharpy Plus · 6.2 m"], ["Sharpy Plus 101", "Sharpy Plus 102", "Sharpy Plus 103"], "audience left → right")
 	t.eq(g["Sharpy Plus · floor"], ["Sharpy Plus 111", "Sharpy Plus 112"], "floor mount is its own row; 2 → no halves")
 	t.eq(g["Sharpy Plus · all"], ["Sharpy Plus 101", "Sharpy Plus 102", "Sharpy Plus 103", "Sharpy Plus 111",
 		"Sharpy Plus 112"], "a type in several rows gets an 'all', row after row")
 	t.eq((g["Focus Profile"] as Array).size(), 8, "a gapped FOH line stays one row")
-	t.eq(g["Focus Profile SR"], ["Focus Profile 401", "Focus Profile 402", "Focus Profile 403", "Focus Profile 404"])
-	t.eq(g["Pixel Line IP SR"], ["Pixel Line IP 1021", "Pixel Line IP 1022", "Pixel Line IP 1023", "Pixel Line IP 1024"],
+	t.eq(g["Focus Profile L"], ["Focus Profile 401", "Focus Profile 402", "Focus Profile 403", "Focus Profile 404"])
+	t.eq(g["Pixel Line IP L"], ["Pixel Line IP 1021", "Pixel Line IP 1022", "Pixel Line IP 1023", "Pixel Line IP 1024"],
 		"a ladder is one row; top first within a column")
 
 
