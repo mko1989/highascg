@@ -216,3 +216,21 @@ Owner:
 - Smoke 39/0.
 - The new guard fails today's squashfs (it names `iso-backup/…1533.iso`) and passes the Sep 3 one.
 - Scratch merge + audit copy still pass (6 warnings).
+
+### Round 4 rebuild VERIFIED (22.10, `highascg-nvidia-595_amd64_2026-10-22_1924.iso`)
+
+- 3684 MB ISO, checksum OK; squashfs 3300 MiB (9323 MiB raw).
+- `verify-iso-squashfs-excludes.sh` passed with no warnings. That includes the new disk-image guard.
+- Per-directory diff against the first build: the only change over 5 MiB is −3254 MiB `iso-backup`.
+- Contents re-checked:
+  - Godot + hshm addon, `bin/casparcg`, node_modules, dist-web, README;
+  - Companion + module (no DB / machid), GDTF login, no SSH host keys;
+  - all highascg / companion / casparcg-server units enabled;
+  - nvidia 595 dkms for 6.8.0-117, Calamares;
+  - factory operator destination = shm/opgui (WO-684); WO-683 `portaudio-output.js` present.
+- Host: Companion restarted by the build itself (19:29:12; the round 4 fix). Hostname, swap, bridge mounts, node,
+  Caspar, Godot and `/bin` / `/sbin` were all as before.
+- `config/replication-local-identity.json` is root-owned again: root rewrites it when the hostname is set back.
+  `highascg-fix-config-permissions.service` chowns `config/` at every boot.
+- The rebuild ran in the same boot as the first produce, without the reboot the docs ask for. The bind-mount guard
+  found nothing left behind, and the host came through intact.
