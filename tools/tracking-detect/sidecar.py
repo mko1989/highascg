@@ -6,12 +6,13 @@ detection + ByteTrack per camera (detector.py, OpenFollow port) at most every `i
 tracks. It knows nothing about stage geometry: the server unprojects feet points with the solved camera.
 
 Protocol (JSON lines):
-  stdin  {"type": "config", "model": "/abs/x.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
+  stdin  {"type": "config", "model": "/abs/x.onnx", "pose_model": "" | "/abs/y-pose.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
           "grace_ms": 500, "threads": 4, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
   stdout {"type": "ready", "model", "providers", "input"}
          {"type": "tracks", "camera", "frame", "w", "h", "ms", "tracks": [{"tid", "box": [x1, y1, x2, y2] (0–1),
-          "score", "age_s", "mask"?}], "mask_size"?}  — once per detection step per camera (an empty list is a real
-          "nobody"); a seg model adds WO-665 cut-out masks (seg.py) to live tracks
+          "score", "age_s", "mask"?, "kps"?}], "mask_size"?}  — once per detection step per camera (an empty list is
+          a real "nobody"); a seg model adds WO-665 cut-out masks (seg.py) to live tracks; a pose_model adds WO-667
+          body keypoints (pose.py, a second session on the same frame)
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
 Exits when stdin closes (the server went away), so it never outlives its owner.
@@ -29,8 +30,9 @@ sys.path.insert(0, os.path.join(HERE, "..", "hshm-bridge"))
 
 import detector  # noqa: E402
 import hshm_abi  # noqa: E402
+import pose  # noqa: E402
 
-DEFAULTS = {"model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "threads": 4,
+DEFAULTS = {"model": "", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10, "grace_ms": 500, "threads": 4,
     "cameras": []}
 STALE_S = 1.0
 IDLE_S = 0.004
@@ -123,6 +125,7 @@ def main():
     q, done = queue.Queue(), threading.Event()
     threading.Thread(target=read_stdin, args=(q, done), daemon=True).start()
     cfg, cams, backend, model = dict(DEFAULTS), {}, None, None
+    poser, pose_model = None, ""
     last_status = 0.0
     while not done.is_set():
         while not q.empty():
@@ -141,6 +144,13 @@ def main():
                 except Exception as e:  # noqa: BLE001 — a bad model must not kill the loop; the server shows it
                     backend = None
                     emit({"type": "error", "detail": "model %s: %s" % (model, e)})
+            if cfg["pose_model"] != pose_model:
+                pose_model, poser = cfg["pose_model"], None
+                if pose_model:
+                    try:
+                        poser = pose.PoseBackend(pose_model, max(1, int(cfg["threads"]) // 2))
+                    except Exception as e:  # noqa: BLE001 — detection carries on without keypoints
+                        emit({"type": "error", "detail": "pose model %s: %s" % (pose_model, e)})
         now = time.monotonic()
         worked = False
         for cam in cams.values():
@@ -158,6 +168,8 @@ def main():
                     max(cfg["max_persons"] * 3, detector.RAW_CAP))
                 tracks = cam.det.step(detector.filter_masks(raw, cam.masks), now, cfg)
                 detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
+                if poser is not None:  # WO-667: body keypoints for the posed dummies
+                    pose.attach(tracks, poser.predict(rgb, cfg["confidence"]))
             except Exception as e:  # noqa: BLE001 — one bad frame (e.g. a singular Kalman matrix) drops, not the camera
                 emit({"type": "error", "detail": "%s: %s" % (cam.id, e)})
                 continue

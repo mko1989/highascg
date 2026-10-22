@@ -28,7 +28,8 @@
  * carries `driven: true` — the client stops heartbeating it (never inferred from `source`: a dead anchor leaves
  * source 'detect' on a marker nobody drives, and the operator must be able to take it back).
  * Fusion (T10, src/tracking/fusion.js) steps every tick on each watched camera's latest frame: tracking:detections
- * carries `world: {fused, plane_z, persons:[{id,x,y,vx,vy,height,source,cameras,keys,score,area,age_s,marker?}]}`; each
+ * carries `world: {fused, plane_z, persons:[{id,x,y,vx,vy,height,source,cameras,keys,score,area,age_s,marker?,joints?}]}`
+ * (`joints`: WO-667 17 COCO body joints, src/tracking/pose3d.js, when the sidecar runs a pose model); each
  * camera person the world person it belongs to (`world: id`). With 2+ solved cameras (`fused`) the pin follows
  * world persons (key `w:<id>`), so a person hidden in one camera stays pinned from the other.
  * Verification walk (T10d, src/tracking/verify-walk.js): GET /api/tracking/verify · POST {action: 'start', a: [x,y],
@@ -45,6 +46,7 @@ const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
 const { Fusion } = require('./fusion')
+const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
@@ -74,6 +76,7 @@ let _detect = null
 let _detectSent = { json: '', at: 0 }
 const pin = new DetectPin()
 const fusion = new Fusion()
+const pose3d = new Pose3D() // WO-667: 3D body joints on the world persons
 const walk = new VerifyWalk()
 let _pinAt = 0
 
@@ -120,6 +123,7 @@ function pinTick() {
 	_pinAt = now
 	const cfg = _detect.config
 	const stepped = cfg.enabled && fusion.step({ cams: _detect.frames(), now, planeZ: _detect.planeZ })
+	if (stepped) pose3d.update(fusion.persons(now), _detect.frames(), now)
 	if (!cfg.enabled) fusion.reset()
 	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
 	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
@@ -182,7 +186,7 @@ function zonesTick() {
  */
 function withPins(snap, now = hub.now()) {
 	const att = pin.attached()
-	const world = fusion.persons(now)
+	const world = pose3d.decorate(fusion.persons(now), now)
 	const owner = new Map()
 	for (const w of world) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
 	for (const c of snap.cameras) {
@@ -384,6 +388,7 @@ module.exports = {
 		_detect = createDetectService(ctx)
 		_detectSent = { json: '', at: 0 }
 		fusion.reset()
+		pose3d.reset()
 	},
 
 	async onShutdown() {

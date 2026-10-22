@@ -78,7 +78,7 @@ function createDetectService(ctx, deps = {}) {
 
 	function sendConfig() {
 		if (!child?.stdin?.writable) return
-		const cfg = { type: 'config', model: modelPath(), confidence: det.confidence, interval_ms: det.interval_ms,
+		const cfg = { type: 'config', model: modelPath(), pose_model: det.pose_model ? path.join(modelsDir, det.pose_model) : '', confidence: det.confidence, interval_ms: det.interval_ms,
 			max_persons: det.max_persons, grace_ms: det.grace_ms, threads: det.threads,
 			cameras: cams.map((c) => ({ id: c.id, path: `/dev/shm/highascg-${c.role}`, masks: c.masks })) }
 		child.stdin.write(JSON.stringify(cfg) + '\n')

@@ -348,6 +348,7 @@ const FILES = [
 	'tools/smoke/smoke-wo616-about.test.js',
 	'tools/smoke/smoke-wo616-beam-spot.test.js',
 	'tools/smoke/smoke-wo665-person-cutouts.test.js',
+	'tools/smoke/smoke-wo667-posed-dummies.test.js',
 	'tools/smoke/smoke-wo599-operator-screen.test.js',
 	'tools/smoke/smoke-wo638-boot-screen-assignment.test.js',
 	'tools/smoke/smoke-wo645-startup-mode.test.js',

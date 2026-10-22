@@ -3,12 +3,15 @@ extends Node3D
 ## - WO-665 (research step 1) cut-outs: a card with the live picture from the camera that sees them best, background
 ##   removed by the sidecar's seg mask (yolo26n-seg), turned to face the viewer about the vertical only;
 ## - WO-666 (step 2) dummies: a mannequin painted by projective texturing from up to 3 solved cameras
-##   (person_dummy.gdshader), its front turned toward the best camera.
+##   (person_dummy.gdshader), its front turned toward the best camera; WO-667 (step 3) when the world person carries
+##   body joints (a pose model runs), the mannequin is posed instead: ellipsoids between the joints
+##   (person_pose_model.gd), every part painted by the same material.
 ## Maths in person_cards_model.gd / person_dummy_model.gd. Video comes from VideoSurfaces, held only while drawn.
 
 const M := preload("res://features/previs/tracking/person_cards_model.gd")
 const PD := preload("res://features/previs/tracking/person_dummy_model.gd")
 const DummyMesh := preload("res://features/previs/tracking/person_dummy_mesh.gd")
+const PP := preload("res://features/previs/tracking/person_pose_model.gd")
 const C := preload("res://features/previs/tracking/camera_model.gd")
 const CARD_SHADER := preload("res://features/previs/tracking/person_card.gdshader")
 const DUMMY_SHADER := preload("res://features/previs/tracking/person_dummy.gdshader")
@@ -21,7 +24,8 @@ var style := "off"
 var _shown := false
 var _on := false
 var _cams: Array = []
-var _cards := {}  # world id → {node: MeshInstance3D, mat, style, roles [], masks {cam_id: ImageTexture}}
+var _cards := {}  # world id → {node (cards: the quad; dummies: a body Node3D), mat, roles [], masks {cam_id: ImageTexture}}
+var _unit_sphere := SphereMesh.new()  # posed parts: radius 0.5, stretched per part
 var _held := {}  # role → true
 var _probe_tex: Texture2D  # dev probe: stands in for every camera's video
 
@@ -98,18 +102,25 @@ func set_detections(snap: Variant) -> void:
 
 
 func _new_entry() -> Dictionary:
-	var mi := MeshInstance3D.new()
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var mat := ShaderMaterial.new()
 	if style == "dummies":
-		mi.mesh = DummyMesh.mesh()
 		mat.shader = DUMMY_SHADER
-	else:
-		mi.mesh = QuadMesh.new()
-		mat.shader = CARD_SHADER
-	mi.material_override = mat
+		var body := Node3D.new()  # identity: the static mannequin and the posed parts are placed in stage space
+		body.add_child(_mesh_instance(DummyMesh.mesh(), mat))
+		add_child(body)
+		return {"node": body, "mat": mat, "roles": [], "masks": {}, "parts": []}
+	mat.shader = CARD_SHADER
+	var mi := _mesh_instance(QuadMesh.new(), mat)
 	add_child(mi)
 	return {"node": mi, "mat": mat, "roles": [], "masks": {}}
+
+
+func _mesh_instance(mesh: Mesh, mat: Material) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	mi.mesh = mesh
+	mi.material_override = mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return mi
 
 
 func _place_card(e: Dictionary, c: Dictionary) -> void:
@@ -128,12 +139,24 @@ func _place_card(e: Dictionary, c: Dictionary) -> void:
 
 
 func _place_dummy(e: Dictionary, c: Dictionary) -> void:
-	var mi: MeshInstance3D = e.node
+	var body: Node3D = e.node
 	var feet := C.psn_to_godot(c.feet)
 	var us := []
 	for v in c.views:
 		us.append(PD.cam_uniforms(v.ce))
-	mi.transform = Transform3D(Basis(Vector3.UP, PD.face_yaw(feet, us[0].pos)).scaled(Vector3.ONE * c.height), feet)
+	var still: MeshInstance3D = body.get_child(0)
+	var ps := PP.parts(c.joints, c.height) if PP.usable(c.joints) else []
+	still.visible = ps.is_empty()
+	still.transform = Transform3D(Basis(Vector3.UP, PD.face_yaw(feet, us[0].pos)).scaled(Vector3.ONE * c.height), feet)
+	var parts: Array = e.parts
+	while parts.size() < ps.size():
+		var mi := _mesh_instance(_unit_sphere, e.mat)
+		body.add_child(mi)
+		parts.append(mi)
+	for i in parts.size():
+		(parts[i] as MeshInstance3D).visible = i < ps.size()
+		if i < ps.size():
+			(parts[i] as MeshInstance3D).transform = ps[i].xf
 	var mat: ShaderMaterial = e.mat
 	var roles := []
 	var rot := []
@@ -227,7 +250,7 @@ func _exit_tree() -> void:
 	VideoSurfaces.release_all(self)
 
 
-## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}]}, from a real seg run) as
+## Dev probe: <dir>/frame.png + persons.json ({raster, mask_size, persons [{box, mask}], joints?}, from a real run) as
 ## one solved camera 8 m downstage; the person stands where that camera's box puts them, as tall as it measures.
 ## Saves the 3D view from the camera's side (<dir>/render.png, 3 s) and from behind (render_back.png, 4 s).
 func _probe(arg: String) -> void:
@@ -243,7 +266,8 @@ func _probe(arg: String) -> void:
 	var height := M.estimate_height(ce, b, [feet[0], feet[1], 0.0])
 	var snap := {"cameras": [{"id": "p", "role": "probe", "stale": false, "mask_size": inp.mask_size,
 		"persons": [{"tid": 1, "box": b, "age_s": 0.0, "mask": inp.persons[0].mask}]}],
-		"world": {"plane_z": 0.0, "persons": [{"id": 1, "x": feet[0], "y": feet[1], "height": height, "keys": ["p:1"]}]}}
+		"world": {"plane_z": 0.0, "persons": [{"id": 1, "x": feet[0], "y": feet[1], "height": height, "keys": ["p:1"],
+			"joints": inp.get("joints")}]}}  # WO-667: persons.json may carry pose3d joints for the same camera
 	print("[probe-cutouts] feet ", feet, " height ", height)
 	set_style("dummies" if arg.ends_with(":dummies") else "cards")
 	var tick := Timer.new()

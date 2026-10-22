@@ -16,7 +16,8 @@ const MAX_HEIGHT := 2.6
 
 
 ## One card per world person a camera currently sees: {id, cam_id, role, box, mask, mask_size, feet [x,y,z] PSN,
-## height, width (m), views (WO-666: the solved cameras that paint their dummy, person_dummy_model.views_for)}.
+## height, width (m), views (WO-666: the solved cameras that paint their dummy, person_dummy_model.views_for),
+## joints (WO-667: 17 PSN body joints | null, src/tracking/pose3d.js)}.
 ## `cams` = normalized tracking cameras.
 static func cards(snap: Variant, cams: Array) -> Array:
 	var out := []
@@ -46,7 +47,8 @@ static func cards(snap: Variant, cams: Array) -> Array:
 		var bh: float = maxf((float(box[3]) - float(box[1])) * float(raster[1]), 1e-6)
 		out.append({"id": int(wp.id), "cam_id": str(v.cam.id), "role": str(v.cam.get("role", ce.role)), "box": box,
 			"mask": str(v.person.get("mask", "")), "mask_size": v.cam.get("mask_size", []), "feet": feet,
-			"height": h, "width": h * bw / bh, "views": PD.views_for(wp, views, by_id)})
+			"height": h, "width": h * bw / bh, "views": PD.views_for(wp, views, by_id),
+			"joints": wp.get("joints")})
 	return out
 
 

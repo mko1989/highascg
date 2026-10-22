@@ -78,7 +78,7 @@ after(() => services.forEach((s) => s.stop()))
 describe('WO-616 T9 person detection', () => {
 	it('normalizeDetection: defaults, clamps, model names, masks', () => {
 		assert.deepEqual(normalizeDetection(null), {
-			enabled: false, model: 'yolo26n.onnx', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500, threads: 4,
+			enabled: false, model: 'yolo26n.onnx', pose_model: '', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500, threads: 4,
 			pin_mode: 'assist', pin_marker_id: 1, pin_point: 'top', smoothing: 0.15, prediction: 8, assist_radius_m: 1, assist_strength: 0.5,
 			cameras: {},
 		})

@@ -22,6 +22,7 @@ var _master: CheckButton
 var _cam: CheckBox
 var _state: Label
 var _model: OptionButton
+var _pose: OptionButton  # WO-667: Off + the installed *pose* models
 var _pin: OptionButton
 var _target: OptionButton
 var _point: OptionButton
@@ -62,6 +63,10 @@ func _ready() -> void:
 	_model = OptionButton.new()
 	_model.item_selected.connect(func(i: int) -> void: _set_key("model", _model.get_item_text(i)))
 	_pair(g, "Model", _model)
+	_pose = OptionButton.new()
+	_pose.tooltip_text = "Body keypoints for the posed dummies in Previs 3D (People: dummies). A second model per frame: about twice the CPU."
+	_pose.item_selected.connect(func(i: int) -> void: _set_key("pose_model", "" if i == 0 else _pose.get_item_text(i)))
+	_pair(g, "Body pose", _pose)
 	_num(g, "Confidence", "confidence", 0.05, "")
 	_num(g, "Every", "interval_ms", 1, "ms")
 	_num(g, "Max persons", "max_persons", 1, "")
@@ -118,6 +123,14 @@ func refresh() -> void:
 	for m in models:
 		_model.add_item(m)
 	_model.select(models.find(data.model))
+	_pose.clear()
+	_pose.add_item("Off")
+	var poses := _models.filter(func(m: String) -> bool: return m.contains("pose"))
+	if data.pose_model != "" and not poses.has(data.pose_model):
+		poses.append(data.pose_model)
+	for m in poses:
+		_pose.add_item(m)
+	_pose.select(poses.find(data.pose_model) + 1 if data.pose_model != "" else 0)
 	_pin.select(D.PIN_MODES.find(data.pin_mode))
 	_target.clear()
 	var defs: Array = driver.defs if driver != null else []

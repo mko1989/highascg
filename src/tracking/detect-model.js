@@ -5,7 +5,7 @@
  * cameras the sidecar watches, and sidecar pixel tracks → stage floor points.
  *
  * Slice (client-owned with the rest of previs.tracking; every field optional):
- *   { enabled: false, model: 'yolo26n.onnx', confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500,
+ *   { enabled: false, model: 'yolo26n.onnx', pose_model: '' (WO-667: off, or a pose model file), confidence: 0.2, interval_ms: 67, max_persons: 10, grace_ms: 500,
  *     threads: 4, pin_mode: 'assist', pin_marker_id: 1, pin_point: 'top', smoothing: 0.15, prediction: 8,
  *     assist_radius_m: 1, assist_strength: 0.5,
  *     cameras: { <camera id>: { enabled: true, masks_enabled: false, masks: [{ enabled, vertices: [[x, y] 0–1, …] }] } } }
@@ -26,6 +26,7 @@ const { pixelToFloor } = require('./camera-model')
 const DETECTION_DEFAULTS = Object.freeze({
 	enabled: false,
 	model: 'yolo26n.onnx',
+	pose_model: '',
 	confidence: 0.2,
 	interval_ms: 67,
 	max_persons: 10,
@@ -77,6 +78,8 @@ function normalizeDetection(src) {
 	out.max_persons = Math.round(out.max_persons)
 	out.threads = Math.round(out.threads)
 	out.pin_marker_id = Math.round(out.pin_marker_id)
+	const pm = String(s.pose_model || '')
+	out.pose_model = MODEL_RE.test(pm) && !pm.includes('..') ? pm : '' // WO-667: '' = no body keypoints
 	out.pin_mode = PIN_MODES.includes(s.pin_mode) ? s.pin_mode : DETECTION_DEFAULTS.pin_mode
 	out.pin_point = s.pin_point === 'bottom' ? 'bottom' : 'top'
 	out.cameras = {}
@@ -128,6 +131,12 @@ function boxToFloor(box, camEntry, planeZ = 0) {
 
 const MASK_RE = /^[A-Za-z0-9+/]{4,4096}={0,2}$/
 
+/** WO-667: a track's 17 × [x, y, v] COCO keypoints (tools/tracking-detect/pose.py), all within 0–1, or null. */
+function kpsFrom(t) {
+	const k = t?.kps
+	return Array.isArray(k) && k.length === 51 && k.every((v) => typeof v === 'number' && v >= 0 && v <= 1) ? k : null
+}
+
 /** WO-665: `[w, h]` of the sidecar's mask grid, or null (a detection-only model sends none). */
 function maskSizeFrom(msg) {
 	const s = msg?.mask_size
@@ -147,6 +156,7 @@ function personsFrom(msg, camEntry, planeZ = 0) {
 			floor: boxToFloor(t.box, camEntry, planeZ),
 			// WO-665: a seg model's cut-out mask (base64 bit grid inside the box, tools/tracking-detect/seg.py)
 			...(typeof t.mask === 'string' && MASK_RE.test(t.mask) ? { mask: t.mask } : {}),
+			...(kpsFrom(t) ? { kps: t.kps } : {}), // WO-667: body keypoints from the sidecar's pose model
 		})
 	}
 	return out

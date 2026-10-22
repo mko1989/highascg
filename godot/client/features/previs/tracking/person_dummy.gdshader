@@ -26,7 +26,7 @@ varying vec3 world_nrm;
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	world_nrm = normalize(mat3(MODEL_MATRIX) * NORMAL);
+	world_nrm = normalize(MODEL_NORMAL_MATRIX * NORMAL);  // WO-667: posed parts are non-uniformly scaled
 }
 
 // 0..1 raster position of p in camera i (pinhole + k1/k2), or (-1, -1) at / behind it.

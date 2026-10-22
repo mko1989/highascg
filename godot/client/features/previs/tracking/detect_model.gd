@@ -5,7 +5,7 @@ extends RefCounted
 ## by a later client are not dropped by this one.
 
 const DEFAULTS := {
-	"enabled": false, "model": "yolo26n.onnx", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
+	"enabled": false, "model": "yolo26n.onnx", "pose_model": "", "confidence": 0.2, "interval_ms": 67, "max_persons": 10,
 	"grace_ms": 500, "threads": 4, "pin_mode": "assist", "pin_marker_id": 1, "pin_point": "top",
 	"smoothing": 0.15, "prediction": 8, "assist_radius_m": 1.0, "assist_strength": 0.5,
 }
@@ -27,6 +27,8 @@ static func normalize(src: Variant) -> Dictionary:
 	var re := RegEx.create_from_string(MODEL_RE)
 	var model := str(out.get("model", ""))
 	out["model"] = model if re.search(model) != null and not model.contains("..") else DEFAULTS.model
+	var pm := str(out.get("pose_model", ""))
+	out["pose_model"] = pm if re.search(pm) != null and not pm.contains("..") else ""  # WO-667: "" = no body pose
 	for k in LIMITS:
 		var v: Variant = out.get(k)
 		var lim: Array = LIMITS[k]
