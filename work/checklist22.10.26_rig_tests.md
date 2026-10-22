@@ -98,6 +98,10 @@ Setup, once:
 - [ ] **WO-670 P4a: takes reach the other box.** A master, B linked both ways, `replication.enabled` off on both.
       Cable the same destination on both (backup): take a look on A, and B's output shows the same look within a
       frame or two. Uncable it on A only (extension): the take still shows on B. Uncable it on B: B stops following.
+- [ ] **WO-670 P4b: B catches up, B's own takes wait.** With a look on air on A, restart B's Caspar (or unplug
+      B's network for 10 s): B shows A's look again (clips restart from the top). Devices → Servers on A: B's card
+      says "Takes forwarded: … caught up". Open a client on B with "follows the master" off: the panel says "PGM here is
+      driven by the master"; a take there changes PRV only.
 
 ## G. At the desk, no special setup (Godot GUI on the box, a scratch look)
 

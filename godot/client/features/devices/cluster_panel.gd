@@ -8,7 +8,9 @@ extends VBoxContainer
 ## other); the progress / result line comes from the peer's `media_send` in the snapshot.
 ## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`), a
 ## MASTER tag on its card, "Make master" on this server and on every linked one. P3b: "This client follows the master"
-## (app/cluster_follow.gd).
+## (app/cluster_follow.gd). P4: on each card while this server is master, which destinations its takes are forwarded
+## to there (channel translation, sent count, catch-up), or why not; on a server that is not master, a note that its
+## PGM follows the master.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -22,6 +24,7 @@ var _list: VBoxContainer
 var _self_l: Label
 var _master_row: VBoxContainer
 var _master_l: Label
+var _follow_l: Label
 var _auto: CheckBox
 var _take: Button
 var _make: ConfirmationDialog
@@ -98,6 +101,8 @@ func _render() -> void:
 	var ms: Dictionary = _master()
 	_master_row.visible = not _snap.get("peers", []).is_empty()
 	_master_l.text = M.master_line(ms)
+	_follow_l.text = M.follow_note(_snap)
+	_follow_l.visible = _follow_l.text != ""
 	_auto.set_pressed_no_signal(ms.get("auto", true) == true)
 	_auto.disabled = int(ms.get("epoch", 0)) <= 0
 	_take.visible = ms.get("is_master") != true
@@ -157,6 +162,11 @@ func _card(p: Dictionary) -> Control:
 		var sl := _small(line, ThemeBuilder.ERROR if M.send_failed(p) or _send_err.has(id) else ThemeBuilder.TEXT)
 		sl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(sl)
+	var fl := M.fanout_line(_snap, id)
+	if fl != "":
+		var fan := _small(fl, ThemeBuilder.ERROR if M.is_fanout_error(fl) else ThemeBuilder.TEXT_MUTED)
+		fan.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(fan)
 	var body := VBoxContainer.new()
 	v.add_child(body)
 	body.add_child(_small("Loading its devices…" if p.get("online") != false else "Offline: its devices are not shown.", ThemeBuilder.TEXT_MUTED))
@@ -207,6 +217,10 @@ func _build_master_row() -> void:
 	_master_l = _small("", ThemeBuilder.TEXT)
 	_master_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_master_row.add_child(_master_l)
+	_follow_l = _small("", ThemeBuilder.WARN)
+	_follow_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_follow_l.visible = false
+	_master_row.add_child(_follow_l)
 	var controls := HBoxContainer.new()
 	_master_row.add_child(controls)
 	_auto = CheckBox.new()

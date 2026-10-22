@@ -62,6 +62,10 @@ module.exports = {
 								`[replication] skip local PGM AMCP (leader fan-out drives air): ${redactAmcpCommandForLog(trimmed)}`,
 							)
 						}
+						// WO-670 P4b: nothing was sent, so no reply comes — drop this waiter, or it swallows the
+						// next reply with the same verb (a following PRV `CLEAR` timed out on the box).
+						const waiting = self.response_callback[key]
+						if (waiting && waiting.indexOf(cb) !== -1) waiting.splice(waiting.indexOf(cb), 1)
 						if (!settled) {
 							settled = true
 							resolveP({ ok: true, skipped: true, data: '202 OK' })

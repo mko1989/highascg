@@ -54,3 +54,21 @@ func test_master_line() -> void:
 	t.ok(M.is_master(m, "boxB"), "card badge")
 	t.ok(not M.is_master(m, "boxC"), "not that one")
 	t.ok(not M.is_master({"epoch": 0, "master_id": ""}, ""), "no master → no badge")
+
+
+func test_fanout_line() -> void:
+	var snap := {"fanout": {"active": true, "peers": {
+		"b": {"caspar": "10.0.0.2:5250", "connected": true, "sent": 7, "error": "", "caught_up": {"lines": 4},
+			"destinations": [{"id": "d1", "label": "PGM/PRV 1", "pgm": [1, 11], "prv": [2, 12]}, {"id": "d2", "label": "LED", "pgm": [3, 1], "prv": null}]},
+		"c": {"caspar": "10.0.0.3:5250", "connected": false, "sent": 0, "error": "", "destinations": []},
+		"d": {"caspar": "10.0.0.4:5250", "connected": true, "sent": 0, "error": "no shared destination is cabled there", "destinations": []}}}}
+	t.eq(M.fanout_line(snap, "b"), "Takes forwarded: PGM/PRV 1 (ch 1→11, 2→12), LED (ch 3→1) · 7 sent · caught up (4 lines)", "forwarding")
+	t.eq(M.fanout_line(snap, "c"), "Takes not forwarded: its Caspar 10.0.0.3:5250 does not answer", "not connected")
+	t.eq(M.fanout_line(snap, "d"), "Takes not forwarded: no shared destination is cabled there", "uncabled")
+	t.ok(M.is_fanout_error(M.fanout_line(snap, "d")), "error colour")
+	t.eq(M.fanout_line(snap, "x"), "", "unknown server")
+	snap.fanout.peers.b.caught_up = {"lines": 0}
+	t.eq(M.fanout_line(snap, "b"), "Takes forwarded: PGM/PRV 1 (ch 1→11, 2→12), LED (ch 3→1) · 7 sent", "nothing to catch up → no mention")
+	t.eq(M.fanout_line({"fanout": {"active": false, "peers": {}}}, "b"), "", "not master → no line")
+	t.eq(M.follow_note({"follows_master": true}), "PGM here is driven by the master: local PGM takes are skipped (PRV still works).", "follower")
+	t.eq(M.follow_note({}), "", "not a follower")

@@ -27,6 +27,7 @@ const { acceptSshKey, sendMedia, fingerprint } = require('../cluster/cluster-med
 const { postJson, getJson } = require('../cluster/cluster-peers')
 const { createMaster } = require('../cluster/cluster-master')
 const { createClusterFanout } = require('../cluster/cluster-fanout')
+const { createAirJournal } = require('../cluster/cluster-air-journal')
 const identity = require('../system/device-identity')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
@@ -63,6 +64,22 @@ function masterOf(ctx) {
 	return ctx._clusterMaster
 }
 
+/**
+ * P4b: what this server has on air, recorded from boot (a server linked later is caught up on it). Every AMCP send
+ * reaches it through the amcp-fanout sink; once the cluster runs, the fan-out records and forwards.
+ */
+function airJournalOf(ctx) {
+	if (ctx._airJournal) return ctx._airJournal
+	const fan = require('../replication/amcp-fanout')
+	const { payloadLines } = require('../cluster/cluster-fanout')
+	ctx._airJournal = createAirJournal()
+	fan.setClusterFanoutSink((payload) => {
+		if (ctx._clusterFanout) return ctx._clusterFanout.send(payload)
+		for (const l of payloadLines(payload)) if (fan.shouldFanOutCommand(l)) ctx._airJournal.record(l)
+	})
+	return ctx._airJournal
+}
+
 /** P4a: while this server is master, its takes go to every linked server where the destination is cabled. */
 function fanoutOf(ctx) {
 	if (ctx._clusterFanout) return ctx._clusterFanout
@@ -82,21 +99,31 @@ function fanoutOf(ctx) {
 			screenDestinations: normalizeScreenDestinations(ctx.config?.screenDestinations),
 			live: { caspar: { channelMap: buildChannelMap(ctx) } },
 		}),
-		connect: (host, port) => {
-			const c = new PeerCasparConnection({ log: ctx.log })
+		connect: (host, port, onConnected) => {
+			const c = new PeerCasparConnection({ log: ctx.log, onConnected })
 			c.connect(host, port)
 			return c
 		},
+		journal: airJournalOf(ctx),
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
 	})
-	require('../replication/amcp-fanout').setClusterFanoutSink((payload) => ctx._clusterFanout.send(payload))
+	require('../replication/amcp-fanout').setClusterFollowerCheck(() => followsMaster(ctx))
 	return ctx._clusterFanout
+}
+
+/** P4b: another server is master and online, so its fan-out drives this server's PGM: local PGM takes are skipped. */
+function followsMaster(ctx) {
+	const v = masterOf(ctx).view()
+	if (v.is_master || !v.master_id || !(v.epoch > 0)) return false
+	if (require('../config/replication-config').getReplicationConfig(ctx.config).enabled) return false
+	return clusterOf(ctx).snapshot().peers.some((p) => p.id === v.master_id && p.online)
 }
 
 /** GET /api/cluster body = WS `cluster:peers` (+ `fanout`: P4a forwarding status per server). */
 const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
-	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} } })
+	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} },
+	follows_master: ctx._clusterMaster ? followsMaster(ctx) : false })
 
 function broadcast(ctx) {
 	if (typeof ctx._wsBroadcast === 'function') ctx._wsBroadcast('cluster:peers', full(ctx))
@@ -166,10 +193,11 @@ function register(routes) {
 	}, opt)
 }
 
-/** At boot: start polling (and failover) when this server has linked servers. */
+/** At boot: record what goes on air (P4b); start polling (and failover) when this server has linked servers. */
 function startIfLinked(ctx) {
+	airJournalOf(ctx)
 	const peers = (ctx.persistence || defaultPersistence).get('clusterPeers')
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, startIfLinked }

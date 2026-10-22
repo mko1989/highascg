@@ -11,6 +11,8 @@ class PeerCasparConnection {
 	 */
 	constructor(opts = {}) {
 		this._log = typeof opts.log === 'function' ? opts.log : () => {}
+		/** WO-670 P4b: the cluster master replays what is on air on every (re)connect. */
+		this._onConnected = typeof opts.onConnected === 'function' ? opts.onConnected : null
 		/** @type {TcpClient|null} */
 		this._tcp = null
 		this._host = ''
@@ -62,6 +64,11 @@ class PeerCasparConnection {
 			this.lastError = ''
 			this._refusedLogged = false
 			this._log('info', `[replication] peer Caspar AMCP connected ${this._host}:${this._port}`)
+			try {
+				this._onConnected?.()
+			} catch {
+				/* never breaks the connection */
+			}
 		})
 		this._tcp.on('disconnected', () => {
 			this.connected = false

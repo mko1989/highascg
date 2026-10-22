@@ -14,10 +14,15 @@
  *
  * Active only while this server is the cluster master (cluster-master.js) and the hot-backup pair is off (that pair
  * has its own fan-out; both would drive the same Caspar twice). Plans refresh after each cluster poll (5 s; device
- * views cached 15 s). Not yet: catching a server up on what is already on air when it joins (P4b).
+ * views cached 15 s).
+ *
+ * P4b catch-up: everything this server sends is also kept in an air journal (cluster-air-journal.js). When a server's
+ * Caspar connects (first time or again) or a destination gets newly cabled there, the journal of those channels is
+ * replayed to it, translated, before any new line.
  */
 
 const { shouldFanOutCommand, parseAmcpCommandChannel } = require('../replication/amcp-fanout')
+const { createAirJournal } = require('./cluster-air-journal')
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1'])
 
@@ -90,11 +95,13 @@ function payloadLines(payload) {
 /**
  * @param {{ isMaster: () => boolean, pairEnabled: () => boolean, members: () => Array<{ id, host, name }>,
  *   peerView: (id: string) => Promise<object|null>, ownView: () => Promise<object|null>,
- *   connect: (host: string, port: number) => object, log?: Function, onChange?: Function }} deps
+ *   connect: (host: string, port: number, onConnected: Function) => object, journal?: object, log?: Function,
+ *   onChange?: Function }} deps
  */
 function createClusterFanout(deps) {
-	/** id → { host, port, conn, plan, sent, error } */
+	/** id → { id, host, port, conn, plan, sent, error, synced: Set<master channel>, caught_up } */
 	const targets = new Map()
+	const journal = deps.journal || createAirJournal()
 	let active = false
 	let lastSig = ''
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
@@ -148,12 +155,19 @@ function createClusterFanout(deps) {
 			let t = targets.get(m.id)
 			if (!t || t.host !== host || t.port !== port) {
 				drop(m.id)
-				t = { host, port, conn: deps.connect(host, port), sent: 0, error: '' }
+				const fresh = { id: m.id, host, port, sent: 0, error: '', synced: new Set(), caught_up: null }
+				fresh.conn = deps.connect(host, port, () => {
+					fresh.synced.clear()
+					catchUp(fresh)
+				})
+				t = fresh
 				targets.set(m.id, t)
 				log('info', `${m.name}: forwarding to its Caspar ${host}:${port}`)
 			}
 			t.plan = plan
 			t.error = plan.destinations.length ? '' : 'no shared destination is cabled there'
+			for (const ch of [...t.synced]) if (!plan.map.has(ch)) t.synced.delete(ch)
+			catchUp(t)
 		}
 		changed()
 	}
@@ -166,22 +180,36 @@ function createClusterFanout(deps) {
 		deps.onChange?.()
 	}
 
+	/** Replays what is on air on the channels that server has not been given yet. */
+	function catchUp(t) {
+		if (!active || targets.get(t.id) !== t || !t.plan || !t.conn?.isConnected) return
+		const todo = [...t.plan.map.keys()].filter((ch) => !t.synced.has(ch))
+		if (!todo.length) return
+		const out = journal.replay(new Set(todo)).map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
+		for (let i = 0; i < out.length; i += 50) t.conn.enqueueBatchLines(out.slice(i, i + 50))
+		for (const ch of todo) t.synced.add(ch)
+		t.sent += out.length
+		t.caught_up = { at: Date.now(), lines: out.length }
+		log('info', `${t.id}: caught up on channels ${todo.join(', ')} (${out.length} lines)`)
+	}
+
 	/** amcp-fanout.js hook: every command / batch this server sent to its own Caspar. */
 	function send(payload) {
-		if (!active) return
 		const lines = payloadLines(payload)
 		if (!lines.length) return
-		for (const t of targets.values()) {
+		for (const t of active ? targets.values() : []) {
 			if (!t.plan?.map.size || !t.conn?.isConnected) continue
+			catchUp(t) // the journal without these lines, so they land on the rebuilt state
 			const out = lines.map((l) => rewriteLine(l, t.plan.map)).filter(Boolean)
 			if (!out.length) continue
 			if (out.length === 1) t.conn.enqueueSend(out[0])
 			else t.conn.enqueueBatchLines(out)
 			t.sent += out.length
 		}
+		for (const l of lines) if (shouldFanOutCommand(l)) journal.record(l)
 	}
 
-	/** For the snapshot: { active, peers: { id: { caspar, connected, sent, error, destinations } } } */
+	/** For the snapshot: { active, peers: { id: { caspar, connected, sent, error, destinations, caught_up } } } */
 	function status() {
 		const peers = {}
 		for (const [id, t] of targets) {
@@ -191,6 +219,7 @@ function createClusterFanout(deps) {
 				sent: t.sent,
 				error: t.error || '',
 				destinations: t.plan?.destinations || [],
+				caught_up: t.caught_up,
 			}
 		}
 		return { active, peers }
@@ -201,7 +230,7 @@ function createClusterFanout(deps) {
 		for (const id of [...targets.keys()]) drop(id)
 	}
 
-	return { refresh, send, status, stop }
+	return { refresh, send, status, stop, journal }
 }
 
 module.exports = { createClusterFanout, channelPlan, mainChannels, cabledIds, rewriteLine, payloadLines }

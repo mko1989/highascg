@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4a (the master forwards takes per destination) DONE 22.10 (offline + box with a stub fake Caspar); P4b (catch-up on join, local takes on non-masters), P5 open**
+**Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4a (the master forwards takes per destination) + P4b (catch-up on join, PGM block on followers, Servers card status) DONE 22.10 (offline + box with a stub fake Caspar); P5 (two-box hardware) open**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -491,6 +491,92 @@ any LAN host write into `media/`. So:
   - a real second Caspar playing the forwarded take;
   - a real scene take, as opposed to the raw AMCP routes. The take uses the same `amcp-batch.js` path;
   - two real boxes (P5, owner QA).
+
+## P4b — Investigation (22.10)
+
+- **The pair's catch-up does not fit.** `replication-reconcile.js` `catchUpLiveStateFromLeader` has the follower pull
+  the leader's live intent and re-take the look locally (`mirror-apply.js`). In the cluster, the master writes
+  straight to the other box's Caspar, so that box's node never takes anything. The master itself has to rebuild the
+  air on a Caspar that (re)connects.
+- **The pair's local-PGM block is reusable.** `amcp-fanout.js` `shouldFollowerSkipLocalPgmAmcp` gates every local
+  path:
+  - the scene take (`routes-scene-take.js:216`);
+  - the audio-only take and the project route;
+  - batches (`amcp-batch.js:183`);
+  - single commands (`amcp-client-transport.js:57`).
+  It skips program channels only; preview stays free.
+- **A bug in that skip path, found on the box.** A skipped single command resolved its promise, but its waiter stayed
+  queued in `response_callback[verb]` (pushed at `amcp-client-transport.js:49-50`). The next reply with the same verb
+  went to that dead waiter, so the next real command timed out. On the box: PGM `CLEAR 1-299` skipped, then PRV
+  `CLEAR 2-299` → `AMCP response timeout: CLEAR 2-299`. The same happens to a hot-backup follower today.
+
+## P4b — what was done (22.10)
+
+- **`src/cluster/cluster-air-journal.js`** (new): what is on air, kept per channel-layer as the AMCP lines that put it
+  there:
+  - producer: a PLAY / LOAD with a clip starts over; LOADBG + bare PLAY compact to the last pair; PAUSE / RESUME /
+    CALL are kept in order; STOP / CLEAR empty it;
+  - the last MIXER line per property (DEFER stripped; queries ignored); MIXER … CLEAR empties it;
+  - CG lines since the last CG CLEAR;
+  - channel-level MIXER per property.
+  `replay(channels)` returns the lines that rebuild those channels.
+- **`cluster-fanout.js`:**
+  - every line this server sends is recorded after it is forwarded;
+  - when a server's Caspar connects (first time or again; new `PeerCasparConnection` option `onConnected`) or a
+    destination gets newly cabled there, `catchUp` replays the journal of the channels that server has not had yet,
+    translated, in batches of 50, before any new line;
+  - status carries `caught_up {at, lines}`.
+- **`routes-cluster.js`:**
+  - `airJournalOf(ctx)`: the journal starts at boot (`startIfLinked`), so a server linked later gets what went on air
+    before. The cluster itself still starts only with linked servers;
+  - `followsMaster(ctx)`: another server is master, it is online, and the hot-backup pair is off. It is registered
+    in `amcp-fanout.js` `setClusterFollowerCheck`, so `shouldFollowerSkipLocalPgmAmcp` also skips local PGM takes on
+    a cluster follower. A throwing check counts as "not a follower";
+  - `GET /api/cluster` / WS carry `follows_master`.
+- **`amcp-client-transport.js`:** the skip path drops its waiter (the bug above).
+- **Godot:**
+  - `cluster_model.gd` `fanout_line`: each card shows, while this server is master, "Takes forwarded: PGM/PRV 1 (ch
+    1→11, 2→12) · N sent · caught up (N lines)", or "Takes not forwarded: …" in red;
+  - `follow_note`: under the master line, on a follower, "PGM here is driven by the master: local PGM takes are
+    skipped (PRV still works)."
+- Not done:
+  - replayed clips start from their first frame (no SEEK to the master's position);
+  - after a failover, the new master's journal holds only what it sent itself. While it was a follower, its PGM came
+    from the old master, so a third server joining then gets no PGM history;
+  - AMCP sent before `startIfLinked` at boot is not journaled.
+
+## P4b — what was VERIFIED
+
+- Offline:
+  - `tools/smoke/smoke-wo670-cluster-catchup.test.js` 7/0. It covers:
+    - the journal: producer/mixer/CG per layer, compaction, the resets;
+    - catch-up: on connect before new lines; a new line is sent once, not replayed too; full replay after a
+      reconnect; a destination cabled later is caught up once;
+    - `followsMaster`: only an online other master, and not with the pair;
+    - the follower gate: PGM only, a throwing check is ignored, the source-pinned call sites;
+    - the waiter-leak regression. **That test fails without the transport fix** (`no stale waiter`) and passes
+      with it.
+  - The WO-670 smokes are 27/0. `test:ci` is 2798 tests, 0 fail. Godot 20932/0 (+9 in `test_devices_cluster.gd`),
+    `--check` OK. Lint is 214 warnings, no file over 500 lines, 470 routes.
+- Box (stub fake-b, `--amcp-port=5261 --offset=10`):
+  - **Catch-up of what went on air before linking.** After a restart, sent `PLAY 1-299 "#00000000"`, `MIXER 1-299
+    OPACITY 0.7`, `MIXER 2-299 OPACITY 0.9`, then linked fake-b and made this box master. The stub received one batch
+    (`BEGIN`, `PLAY 11-299 "#00000000"`, `MIXER 11-299 OPACITY 0.7`, `MIXER 12-299 OPACITY 0.9`, `COMMIT`). Journal:
+    `fake-b: caught up on channels 1, 2 (3 lines)`.
+  - **Reconnect.** Killed the stub, sent `MIXER 1-299 OPACITY 0.6`, restarted the stub. The journal showed
+    `ECONNREFUSED`, then `connected`, then `caught up … (3 lines)`, and the stub got the batch with `OPACITY 0.6`.
+  - **Follower.** `master/set {self}` on the stub, then `follows_master: true`:
+    - PGM `CLEAR 1-299` → `{"skipped": true}`, not sent;
+    - before the fix, the following PRV `CLEAR 2-299` timed out;
+    - after the fix and a restart, PGM / PRV / PGM / PRV each answered in 5-8 ms (`skipped` / `202 CLEAR OK`).
+  - **Card.** Screenshot of a second Godot window on Devices: "Takes forwarded: PGM/PRV 1 (ch 1→11, 2→12) · 0 sent ·
+    caught up (0 lines)". "caught up (0 lines)" is now hidden.
+  - The main GUI followed the stub while it was master and came home by itself afterwards (P3b).
+- Cleanup: unlinked fake-b, killed the stub and the test window.
+- Not proven:
+  - the follower note on screen (Godot test only);
+  - a real second Caspar rebuilding a look from the replay;
+  - two real boxes (P5).
 
 ## What was VERIFIED
 

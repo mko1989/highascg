@@ -101,3 +101,39 @@ static func master_name(m: Dictionary) -> String:
 
 static func is_master(m: Dictionary, peer_id: String) -> bool:
 	return int(m.get("epoch", 0)) > 0 and str(m.get("master_id", "")) == peer_id
+
+
+## P4a/b — the line on a server's card while this server is master (server cluster-fanout.js status: fanout.peers[id] =
+## {caspar, connected, sent, error, destinations [{label, pgm: [mine, theirs], prv}], caught_up {lines}}).
+static func fanout_line(snap: Dictionary, peer_id: String) -> String:
+	var f: Dictionary = snap.get("fanout", {}) if snap.get("fanout") is Dictionary else {}
+	var peers: Dictionary = f.get("peers", {}) if f.get("peers") is Dictionary else {}
+	if f.get("active") != true or not peers.get(peer_id) is Dictionary:
+		return ""
+	var p: Dictionary = peers[peer_id]
+	if str(p.get("error", "")) != "":
+		return "Takes not forwarded: " + str(p.error)
+	if p.get("connected") != true:
+		return "Takes not forwarded: its Caspar %s does not answer" % str(p.get("caspar", ""))
+	var bits := PackedStringArray()
+	for d in p.get("destinations", []):
+		if d is Dictionary:
+			var chs := "ch %d→%d" % [int(d.pgm[0]), int(d.pgm[1])]
+			if d.get("prv") is Array:
+				chs += ", %d→%d" % [int(d.prv[0]), int(d.prv[1])]
+			bits.append("%s (%s)" % [str(d.get("label", d.get("id", ""))), chs])
+	var line := "Takes forwarded: " + ", ".join(bits) + " · %d sent" % int(p.get("sent", 0))
+	if p.get("caught_up") is Dictionary and int(p.caught_up.get("lines", 0)) > 0:
+		line += " · caught up (%d lines)" % int(p.caught_up.get("lines", 0))
+	return line
+
+
+static func is_fanout_error(line: String) -> bool:
+	return line.begins_with("Takes not forwarded")
+
+
+## P4b — under the master line on a server that is not master: its PGM follows the master.
+static func follow_note(snap: Dictionary) -> String:
+	if snap.get("follows_master") == true:
+		return "PGM here is driven by the master: local PGM takes are skipped (PRV still works)."
+	return ""

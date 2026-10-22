@@ -13,6 +13,21 @@ function setClusterFanoutSink(fn) {
 	_clusterSink = typeof fn === 'function' ? fn : null
 }
 
+/** WO-670 P4b: true while another online server is the cluster master (its fan-out drives this server's PGM). */
+let _clusterFollower = null
+
+function setClusterFollowerCheck(fn) {
+	_clusterFollower = typeof fn === 'function' ? fn : null
+}
+
+function isClusterFollower() {
+	try {
+		return !!_clusterFollower?.()
+	} catch {
+		return false
+	}
+}
+
 function toCluster(payload) {
 	if (!_clusterSink) return
 	try {
@@ -209,7 +224,7 @@ function shouldBlockLocalPgmAmcpCommand(ctx, cmd) {
  */
 function shouldFollowerSkipLocalPgmAmcp(ctx, channel, opts = {}) {
 	if (opts.previewOnly) return false
-	if (!isAmcpFanoutReceiveBox(ctx)) return false
+	if (!isAmcpFanoutReceiveBox(ctx) && !isClusterFollower()) return false
 	return isProgramOutputChannel(ctx, channel)
 }
 
@@ -298,6 +313,8 @@ module.exports = {
 	fanoutBatchPayload,
 	fanoutAmcpPayload,
 	setClusterFanoutSink,
+	setClusterFollowerCheck,
+	isClusterFollower,
 	DEFAULT_ALLOW,
 	DEFAULT_DENY,
 }
