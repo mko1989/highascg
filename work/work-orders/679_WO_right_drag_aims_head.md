@@ -1,6 +1,6 @@
 # WO-679 — Previs: right-click a head, hold and move to point the light
 
-**Status: DONE (22.10, Godot 20962/0; box: right-drag on a Sharpy swung its beam right then left across the floor)**
+**Status: DONE (22.10, Godot 20962/0; box: right-drag on a Sharpy swung its beam right then left across the floor; owner QA passed 22.10: "2 and 3 are good")**
 
 Owner, 22.10: *"do a right click for pointing a head allow for holding down button and moving the light."*
 

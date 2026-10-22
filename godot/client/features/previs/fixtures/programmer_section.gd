@@ -1,5 +1,5 @@
 extends VBoxContainer
-## WO-615 T6 — the previs Programmer: select typed fixtures (this list, a click in the 3D view, shift-click adds;
+## WO-615 T6 — the previs Programmer: select typed fixtures (this list, a click in the 3D view, ctrl / shift-click adds;
 ## saved groups) and set what they have — intensity, colour (RGB / CMY mixing or the nearest wheel slot; wheel
 ## swatches), CTO, pan / tilt or Point at (then click the stage floor: the server aims through the follow IK), zoom,
 ## gobo (wheel thumbnails). Values go to POST /api/fixtures/program (coalesced to 20 Hz); Release hands the channels

@@ -108,7 +108,7 @@ func _ready() -> void:
 	add_child(out)
 	_usage = _label()
 	_status = _label()
-	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, shift-click adds"
+	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, ctrl / shift-click adds"
 	add_child(Programmer.new())
 	_confirm_on = ConfirmationDialog.new()
 	_confirm_on.dialog_text = ("Start DMX output? The universes checked under Send ▾ go out at 44 Hz with every " +

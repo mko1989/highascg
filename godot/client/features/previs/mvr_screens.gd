@@ -12,7 +12,7 @@ const S := preload("res://features/previs/stage_objects.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 
-const HINT := "Click an LED wall in the 3D view to map a screen onto it (ctrl-click adds walls fed by the same output)."
+const HINT := "Click an LED wall in the 3D view to map a screen onto it (ctrl / shift-click adds walls fed by the same output)."
 
 var scene: Node3D  # mvr_scene.gd
 var _sel: Array = []  # [{uuids, frame}]
@@ -83,8 +83,11 @@ func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
 	return true
 
 
-func clear() -> void:
+## forget: the scene changed — the last Map's note goes too (WO-681).
+func clear(forget := false) -> void:
 	_sel = []
+	if forget:
+		_note = ""
 	refresh()
 
 
@@ -172,6 +175,8 @@ func _map() -> void:
 		if W.fit_note(t.canvas, raster) == "":
 			r = t
 			break
+	for o in r.objects:
+		o["mvr"] = str(_mvr().get("id", ""))  # WO-681: the walls go when the scene does
 	var previs: Dictionary = Store.project.get("previs", {}) if Store.project.get("previs") is Dictionary else {}
 	previs["stage"] = {"version": 1, "objects": _stage_objects() + r.objects}
 	Store.project["previs"] = previs

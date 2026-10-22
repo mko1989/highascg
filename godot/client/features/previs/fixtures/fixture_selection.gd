@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-615 T6 — the programmer's fixture selection, one per client (`shared()`): the previs 3D view picks into it
-## (click a fixture, shift-click adds / removes) and, while "Point at" is on, turns a floor click into `aim_at`;
+## (click a fixture, ctrl- or shift-click adds / removes, WO-681) and, while "Point at" is on, turns a floor click into `aim_at`;
 ## the Programmer section lists, edits and sends for it.
 
 signal changed

@@ -1,7 +1,7 @@
 # WO-680 — Programmer: automatic fixture groups by position and address
 
 **Status: DONE (22.10, Godot 20975/0; box: Groups ▾ → By position / By address on Pabianice, "Sharpy Plus · floor"
-selected the 5 stage-front Sharpys)**
+selected the 5 stage-front Sharpys; owner QA passed 22.10: "2 and 3 are good")**
 
 Owner, 22.10: *"in fixture groups id like premade automatic default groups based on address and position in mvr while
 loading."*

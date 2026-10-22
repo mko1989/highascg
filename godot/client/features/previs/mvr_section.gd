@@ -31,6 +31,7 @@ var _pick: OptionButton
 var _remove_btn: Button
 var _status: Label
 var _confirm: ConfirmationDialog
+var _after := Callable()  # what _confirm's OK does: Remove, or leave the scene (WO-681)
 var _last := ""
 var _patch_btn: Button
 var _typed := {}  # scene ids whose GDTF types were loaded this session (WO-636)
@@ -87,7 +88,8 @@ func _ready() -> void:
 	_status.text = M.summary({})
 	add_child(_status)
 	_confirm = ConfirmationDialog.new()
-	_confirm.confirmed.connect(_remove)
+	_confirm.confirmed.connect(func() -> void: _after.call())
+	_confirm.canceled.connect(func() -> void: _select(str(_cfg().get("id", ""))))
 	add_child(_confirm)
 	var place := HBoxContainer.new()
 	for spec in [["x", "X ", -500, 500, "Stage left (m)"], ["y", "Y ", -500, 500, "Upstage (m)"], ["z", "Z ", -50, 200, "Up (m)"],
@@ -188,11 +190,37 @@ func _select(id: String) -> void:
 
 func _on_pick(i: int) -> void:
 	var id := str(_pick.get_item_metadata(i))
-	_save({} if id == "" else {"id": id, "name": _pick.get_item_text(i).get_slice("  (", 0), "hidden_layers": []})
+	var c := {} if id == "" else {"id": id, "name": _pick.get_item_text(i).get_slice("  (", 0), "hidden_layers": []}
+	var n := _content()
+	if id == str(_cfg().get("id", "")) or n[0] + n[1] == 0:
+		_save(c)
+		return
+	_after = func() -> void:
+		_drop()
+		_save(c)
+	_confirm.dialog_text = "Stop showing \"%s\"? This project loses %s (showing it again re-patches them)." % [
+		_cfg().get("name", ""), M.content_text(n)]
+	_confirm.popup_centered()
+
+
+## WO-681: what the shown scene brought ([fixtures, walls]); _drop takes it out of the project.
+func _content() -> Array:
+	return M.drop_scene(Store.project.duplicate(true), str(_cfg().get("id", "")), scene.fixture_uuids if scene else [])
+
+
+func _drop() -> void:
+	var id := str(_cfg().get("id", ""))
+	_typed.erase(id)  # shown again → its GDTFs load and it patches afresh
+	var n := M.drop_scene(Store.project, id, scene.fixture_uuids if scene else [])
+	if n[0] + n[1] > 0:
+		ProjectSync.mark_dirty(true)
+		Store.project_changed.emit(Store.project)
 
 
 func _save(c: Dictionary) -> void:
 	var previs: Dictionary = Store.project.get("previs", {}) if Store.project.get("previs") is Dictionary else {}
+	if str(c.get("id", "")) != str(_cfg().get("id", "")):
+		_screens.clear(true)
 	if c.is_empty():
 		previs.erase("mvr")
 	else:
@@ -238,30 +266,17 @@ func _upload(path: String) -> void:
 
 
 func _export() -> void:
-	var name := str(Store.project.get("name", "stage")).validate_filename().replace(" ", "_")
-	var path: String = await FilePick.save_path(self, "Export the stage as MVR", (name if name != "" else "stage") + ".mvr", ["*.mvr ; MVR scene"])
-	if path == "":
-		return
-	if not path.to_lower().ends_with(".mvr"):
-		path += ".mvr"
-	_status.text = "Exporting…"
-	ProjectSync.flush()  # the server builds it from the saved project: let the latest stage edit land first
-	while ProjectSync.in_flight:
-		await get_tree().process_frame
-	var res: Dictionary = await Api.get_bytes("/api/stage/mvr-export")
-	if not res.ok:
-		var body: Variant = JSON.parse_string((res.bytes as PackedByteArray).get_string_from_utf8())
-		_status.text = "Export failed: %s" % (body.get("error", res.error) if body is Dictionary else res.error)
-		return
-	var err := FilePick.write_bytes(path, res.bytes)
-	_status.text = ("Exported the stage to %s" % path) if err == "" else "Export failed: %s" % err
+	await preload("res://features/previs/mvr_export.gd").run(self, _status)
 
 
 func _ask_remove() -> void:
 	var id := str(_pick.get_item_metadata(_pick.selected)) if _pick.selected >= 0 else ""
 	if id == "":
 		return
-	_confirm.dialog_text = "Remove the MVR scene \"%s\" from this box? Projects that show it lose it." % _cfg().get("name", id)
+	var what := M.content_text(_content()) if str(_cfg().get("id", "")) == id else ""
+	_after = _remove
+	_confirm.dialog_text = "Remove the MVR scene \"%s\" from this box? Projects that show it lose it.%s" % [
+		_cfg().get("name", id), "" if what == "" else "\nThis project also loses %s." % what]
 	_confirm.popup_centered()
 
 
@@ -269,6 +284,7 @@ func _remove() -> void:
 	var id := str(_pick.get_item_metadata(_pick.selected))
 	await Api.delete_json("/api/stage/mvr/" + id)
 	if str(_cfg().get("id", "")) == id:
+		_drop()
 		_save({})
 	await refresh_list()
 

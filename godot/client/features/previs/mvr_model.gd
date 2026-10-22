@@ -209,6 +209,34 @@ static func unpatch(patch: Array, uuids: Array) -> Array:
 	return patch.filter(func(f: Variant) -> bool: return not (f is Dictionary and gone.has(str(f.get("id", "")))))
 
 
+## WO-681: a scene going off takes what it brought — its patched fixtures (`uuids`) and the LED walls mapped from it
+## (stage objects tagged `mvr: id`, mvr_screens.gd). Changes `project` in place. → [fixtures removed, walls removed]
+static func drop_scene(project: Dictionary, id: String, uuids: Array) -> Array:
+	var fx: Dictionary = project.get("fixtures") if project.get("fixtures") is Dictionary else {}
+	var patch: Array = fx.get("patch") if fx.get("patch") is Array else []
+	var kept := unpatch(patch, uuids)
+	var previs: Dictionary = project.get("previs") if project.get("previs") is Dictionary else {}
+	var st: Dictionary = previs.get("stage") if previs.get("stage") is Dictionary else {}
+	var objs: Array = st.get("objects") if st.get("objects") is Array else []
+	var left := objs.filter(func(o: Variant) -> bool: return id == "" or not (o is Dictionary and str(o.get("mvr", "")) == id))
+	var out := [patch.size() - kept.size(), objs.size() - left.size()]
+	if out[0] > 0:
+		fx["patch"] = kept
+	if out[1] > 0:
+		st["objects"] = left
+	return out
+
+
+## [fixtures, walls] → "its 52 patched fixtures and 3 LED walls mapped from it" (empty parts left out).
+static func content_text(n: Array) -> String:
+	var parts := []
+	if n[0] > 0:
+		parts.append("%d patched fixture%s" % [n[0], "" if n[0] == 1 else "s"])
+	if n[1] > 0:
+		parts.append("%d LED wall%s mapped from it" % [n[1], "" if n[1] == 1 else "s"])
+	return "its " + " and ".join(parts) if not parts.is_empty() else ""
+
+
 ## The patch reply → the section's status line.
 static func patch_summary(res: Dictionary) -> String:
 	var fx: Array = res.get("fixtures", []) if res.get("fixtures") is Array else []

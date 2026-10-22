@@ -271,7 +271,7 @@ func _on_3d_input(e: InputEvent) -> void:
 	if mb != null and mb.button_index == MOUSE_BUTTON_LEFT:
 		if mb.pressed:
 			_press_at = mb.position
-		elif mb.position.distance_to(_press_at) < 4.0 and not fixtures3d.click(stage.camera(), mb.position, mb.shift_pressed):
+		elif mb.position.distance_to(_press_at) < 4.0 and not fixtures3d.click(stage.camera(), mb.position, mb.shift_pressed or mb.ctrl_pressed):
 			var id := builder.pick(stage.camera(), mb.position)
 			if id != "":
 				stage_panel.select(id)

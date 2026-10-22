@@ -45,10 +45,14 @@ Setup, once:
       see-through walls).
 - [ ] **WO-678:** Previs → heads without a GDTF colour are black. Click a head: its MVR layer row lights up. Colour
   that layer (e.g. "5. Sharpy Plus") → those heads take it; a fixture-type Body colour still wins.
-- [ ] **WO-679:** Previs 3D → right-click a head, hold and move: the beam follows the mouse across the floor; with
+- [x] **WO-679:** *(owner: good, 22.10)* Previs 3D → right-click a head, hold and move: the beam follows the mouse across the floor; with
   several heads selected, right-drag one of them aims the group. Left-drag still orbits.
-- [ ] **WO-680:** Programmer → Groups ▾ → By position / By address: rows per fixture type (audience L / R halves, · all)
+- [x] **WO-680:** *(owner: good, 22.10)* Programmer → Groups ▾ → By position / By address: rows per fixture type (audience L / R halves, · all)
   and one group per universe. Pick one → those heads select in 3D. Your own groups are still listed first.
+- [ ] **WO-681:** full path: Previs → MVR scene → Import… a .mvr → it patches; map a wall (Map). Pick
+  "— no MVR scene —": the dialog names the fixtures and walls it takes; OK → heads and wall gone (Cancel keeps
+  them). Pick the scene again → it re-patches. Remove → same, plus the scene leaves the box. In 3D, ctrl- or
+  shift-click heads adds them; ctrl-click again drops one.
 - [ ] **WO-643:** re-import a newer version of the same MVR. Confirm the prompt; the scene stays where it was, and
       there is no second set of heads.
 
