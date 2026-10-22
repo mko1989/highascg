@@ -1,7 +1,7 @@
 # WO-669 — ISO exclude review: the Godot GUI binary was excluded; credentials and dev leftovers now are
 
-**Status: DONE in repo (22.10, list simulation + smoke 39/0 + test:ci 2752/0); proven on the next `eggs produce` by
-`verify-iso-squashfs-excludes.sh`**
+**Status: DONE in repo (22.10, two rounds; list simulation + smoke 39/0 + test:ci); proven on the next `eggs produce`
+by `verify-iso-squashfs-excludes.sh` — owner 22.10: "we are not doing the iso yet. just a prepare for later"**
 
 Owner, 22.10: *"lets also review the iso production and eggs excluded list and make sure nothing not needed is not
 making it to the iso."*
@@ -72,7 +72,71 @@ making it to the iso."*
 - Smoke 39/0; `npm run test:ci` 2752/0; `format:check` clean; `bash -n` on the verifier.
 - Not run: `eggs produce` (needs sudo and a stick session). The squashfs verifier proves it on the next produce.
 
-## Owner decisions (not done)
+## Round 2 — owner answers, 22.10
+
+Owner:
+1. Tracking venv + models: *"lets wait for qc with this"*. They stay excluded until the rig QA (checklist 22.10 §A).
+2. Companion: *"clean"*.
+3. SSH host keys: *"yes and if there are no secrets and logins shiped. one exception, i think we should ship with the
+   gdtf login … the login password itself are not real secrets."*
+4. *"user and password of the server itself cant be secrets they need to be out in the open with a note to change them
+   yourselfs with a small how to in terminal. user casparcg password highascg"*
+
+### Investigation
+
+- **SSH host keys ship as-is.** penguins-eggs `edit-live-fs.js` edits `sshd_config` (PasswordAuthentication) but never
+  touches `/etc/ssh/ssh_host_*`. Neither the template nor the fragments exclude them, and no setup script regenerates
+  them. So every clone would share this box's host identity (keys dated 07.06).
+- **No users step in the installer.** The Calamares `sequence` (`/etc/calamares/settings.conf`) has no `users` page,
+  and `removeuser` deletes only `live`. The installed system keeps the build box's `casparcg` account and password
+  hash, so "casparcg / highascg" holds only if that is the build box's password at produce time.
+  - The password was not tested from this session: an attempt to validate it with `sudo -S -v` was blocked by the
+    permission classifier.
+- **The live session account** is from `/etc/penguins-eggs.d/eggs.yaml`: `live` / `evolution`, root `evolution`,
+  `ssh_pass: false`.
+- **Shipped config holding secrets, after the factory reset.** `write-iso-default-config.js` deletes `config/*.json`
+  (security, replication, tailscale and identity files go). It leaves:
+  - `config/*.json.corrupt-*` (14 old copies from 04.09, including `security.json.corrupt-…`);
+  - `config/casparcg.config.tmp`;
+  - `config/certs/highascg-key.pem`, the HTTPS proxy's TLS private key with this box's IPs as SANs.
+    `tools/runtime/highascg-https-proxy.js:55-61` regenerates it when it is missing.
+- **Dotfiles that ship were scanned** for token / secret / password strings: `.bashrc`, `.profile`, `.xsession`,
+  audio rc files, `/etc/environment`, `~/.config/{highascg,openbox,xfce4,Thunar,Blackmagic Design}`. None found.
+  - `~/.gitconfig` holds only the `gh` credential helper (the token is in `~/.config/gh`, already excluded) and the
+    owner's git identity.
+- **Already excluded:** `~/.ssh`, `~/.config/gh`, `~/.config/syncthing`, Tailscale state, `.private/` (API token),
+  `.env`, keyrings, `~/.claude*`.
+
+### What was done
+
+- **Both fragments:**
+  - `gdtf-share.json` ships again; a comment records why;
+  - excluded: `~/.config/companion`, `~/.gitconfig`, `config/certs/*`, `config/*.corrupt-*`, `config/*.tmp`,
+    `etc/ssh/ssh_host_*`.
+- **`systemd/ssh.service.d-05-host-keys.conf.example`** (`ExecStartPre=/usr/bin/ssh-keygen -A`) is installed by
+  `prepare-eggs-clone-with-exfat.sh`. Each live boot and each install makes its own keys the first time sshd starts;
+  `-A` creates only missing keys.
+- **`prepare-eggs-clone-with-exfat.sh`** warns when `casparcg`'s hash is not `crypt("highascg")`. Perl's `crypt`
+  handles the box's yescrypt `$y$` hashes (checked with a known salt).
+- **`docs/DEFAULT_LOGINS.md`** (new):
+  - the three logins in the open;
+  - what does not ship;
+  - `passwd` how-to;
+  - the `curl` to set your own GDTF Share account;
+  - notes for the ISO builder.
+- **Links to it:** a "Default login" section in `README.md`, and step 5 in `docs/CALAMARES_INSTALL_TO_DISK.md`. Step 3
+  there also now describes the WO-645 start-up window instead of the old autostart.
+- **Smoke:** `gdtf-share.json` must ship; host keys, the TLS key, a `.corrupt` copy, the Companion DB and `.gitconfig`
+  must not.
+- **Squashfs verifier:** requires the host key, the TLS key and the Companion config to be absent.
+
+### What was VERIFIED
+
+- Smoke 39/0 (cases above, matched the mksquashfs way); `bash -n` on both scripts; perl yescrypt check.
+- Not run: `eggs produce`, the prepare script (needs root), and sshd starting without keys. All three are proven on the
+  next produce by the verifier and the checklist §D.
+
+## Owner decisions (round 1, answered above)
 
 1. **Tracking detection on fresh installs.** The venv (306 MB) and models (69 MB) under `~/.local/share/highascg` are
    still excluded. Without them, detection on a new box needs `tools/tracking-detect/setup-venv.sh` +

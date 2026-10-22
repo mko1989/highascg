@@ -142,6 +142,24 @@ if [[ -f "$LIVE_BOOT_DROPIN" ]]; then
 	echo "  installed 20-live-boot.conf (faster AMCP settle + startup testcard)"
 fi
 
+# WO-669: the ISO ships without SSH host keys (exclude list); sshd makes its own on first start.
+SSH_KEYS_DROPIN="${HERE}/systemd/ssh.service.d-05-host-keys.conf.example"
+if [[ -f "$SSH_KEYS_DROPIN" ]]; then
+	install -d /etc/systemd/system/ssh.service.d
+	install -m 0644 "$SSH_KEYS_DROPIN" /etc/systemd/system/ssh.service.d/05-host-keys.conf
+	echo "  installed ssh 05-host-keys.conf (per-install SSH host keys)"
+fi
+
+# WO-669: Calamares has no users step — the installed system keeps the build box's casparcg account, so its password
+# must be the documented default (docs/DEFAULT_LOGINS.md). Warn only: the build box owner may be mid-change.
+_pw_hash="$(getent shadow casparcg | cut -d: -f2)"
+if [[ -n "$_pw_hash" ]] && perl -e 'exit(crypt($ARGV[0], $ARGV[1]) eq $ARGV[1] ? 0 : 1)' highascg "$_pw_hash"; then
+	echo "  casparcg password is the documented default"
+else
+	echo "  WARNING: casparcg's password is not the documented default (highascg) — clones would ship it." >&2
+	echo "           Set it before eggs produce: sudo passwd casparcg   (docs/DEFAULT_LOGINS.md)" >&2
+fi
+
 API_AUTH_DROPIN="${HERE}/systemd/highascg.service.d-25-api-auth.conf.example"
 if [[ "${HIGHASCG_EGG_ENFORCE_AUTH:-0}" == "1" ]] && [[ -f "$API_AUTH_DROPIN" ]]; then
 	install -d /etc/systemd/system/highascg.service.d

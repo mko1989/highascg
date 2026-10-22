@@ -226,7 +226,7 @@ describe('WO-273: penguins-eggs exclude lists', () => {
 	})
 })
 
-describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credentials and leftovers', () => {
+describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credentials and leftovers (GDTF login ships)', () => {
 	// mksquashfs -wildcards: `*` stays within one path segment; excluding a directory drops everything below it.
 	const rx = (pat) =>
 		new RegExp(
@@ -252,9 +252,14 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 			assert.equal(excluded(pats, 'home/casparcg/.local/share/claude/x'), true)
 			assert.equal(excluded(pats, 'home/casparcg/.local/bin/claude'), true)
 		})
-		it(`${name}: GDTF Share login, caches and dev build trees stay off the ISO; their runtime dirs stay`, () => {
+		it(`${name}: caches, host keys, TLS key, Companion DB and dev build trees stay off the ISO; runtime dirs and the GDTF login stay`, () => {
 			for (const p of [
-				'home/casparcg/.highascg/gdtf-share.json',
+				'home/casparcg/.config/companion/db.sqlite',
+				'home/casparcg/.gitconfig',
+				'home/casparcg/highascg/config/certs/highascg-key.pem',
+				'home/casparcg/highascg/config/security.json.corrupt-2026-09-04T12-10-27-977Z',
+				'etc/ssh/ssh_host_ed25519_key',
+				'etc/ssh/ssh_host_rsa_key.pub',
 				'home/casparcg/.highascg/cache/list.json',
 				'home/casparcg/.highascg/log/godot-client.log',
 				'home/casparcg/.highascg/run/caspar-screens-ready',
@@ -269,6 +274,10 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/highascg/bin/casparcg',
 				'home/casparcg/highascg/godot/extensions/hshm/bin/libhshm.so',
 				'home/casparcg/.config/openbox/rc.xml',
+				// owner 22.10: the shared GDTF Share login ships (docs/DEFAULT_LOGINS.md); sshd's config stays
+				'home/casparcg/.highascg/gdtf-share.json',
+				'etc/ssh/sshd_config',
+				'home/casparcg/highascg/config/certs',
 			])
 				assert.equal(excluded(pats, p), false, p)
 		})

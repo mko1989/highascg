@@ -1,0 +1,5 @@
+# WO-669 — installed as /etc/systemd/system/ssh.service.d/05-host-keys.conf by prepare-eggs-clone-with-exfat.sh.
+# The ISO ships without /etc/ssh/ssh_host_* (exclude list), so each live boot and each install makes its own host
+# keys the first time sshd starts. `ssh-keygen -A` only creates keys that are missing: a no-op afterwards.
+[Service]
+ExecStartPre=/usr/bin/ssh-keygen -A

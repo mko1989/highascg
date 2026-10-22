@@ -274,9 +274,9 @@ home/casparcg/highascg/vendor
 home/casparcg/highascg/vendor/*
 
 # WO-669: box-local state, credentials and dev leftovers found by the 22.10 ISO review.
-# ~/.highascg: the GDTF Share login is a personal credential; cache / log / run are refetched or rewritten at boot
-# (the log and run DIRS stay: autostart redirects into ~/.highascg/log/godot-client.log).
-home/casparcg/.highascg/gdtf-share.json
+# ~/.highascg: cache / log / run are refetched or rewritten at boot (the log and run DIRS stay: autostart redirects
+# into ~/.highascg/log/godot-client.log). gdtf-share.json SHIPS on purpose (owner 22.10: one shared box account so
+# every install gets GDTF Share without its own login; not a real secret — docs/DEFAULT_LOGINS.md).
 home/casparcg/.highascg/firefox-operator-alt1
 home/casparcg/.highascg/firefox-operator-alt1/*
 home/casparcg/.highascg/cache
@@ -313,3 +313,16 @@ home/casparcg/bridge/*
 home/casparcg/highascg/bin/casparcg.*
 home/casparcg/highascg/godot/extensions/hshm/build
 home/casparcg/highascg/godot/extensions/hshm/build/*
+
+# WO-669 round 2 (owner 22.10: "clean" Companion; no secrets or logins on the ISO except the documented defaults).
+home/casparcg/.config/companion
+home/casparcg/.config/companion/*
+home/casparcg/.gitconfig
+# this box's self-signed TLS key (SANs = this box's IPs); highascg-https-proxy.js makes a fresh one on first start
+home/casparcg/highascg/config/certs/*
+home/casparcg/highascg/config/*.corrupt-*
+home/casparcg/highascg/config/*.tmp
+# SSH host keys: eggs copies them as-is, so every clone would share one host identity. The ssh.service drop-in
+# (systemd/ssh.service.d-05-host-keys.conf.example, installed by prepare-eggs-clone-with-exfat.sh) runs
+# `ssh-keygen -A`, which creates only the missing keys, before sshd starts.
+etc/ssh/ssh_host_*

@@ -136,8 +136,11 @@ Choose **none** unless you have a specific reason to add swap.
 
 1. Remove the USB stick when prompted.
 2. Boot from internal disk (UEFI boot order: internal SSD/NVMe first).
-3. First boot: nodm → Openbox → HighAsCG on `:4200`, Caspar via systemd.
+3. First boot: nodm → Openbox → a "Start operator here / Run headless" window on each screen; Caspar starts once
+   you answer (autostart is an opt-in under Settings → Start-up, WO-645). HighAsCG serves `:4200`.
 4. Operator exFAT on the **stick** (`HIGHASCGEXF`) is optional for updates; internal playout does not require the stick.
+5. The login is `casparcg` / `highascg` (public). Open a terminal and run `passwd` to change it — see
+   [DEFAULT_LOGINS.md](./DEFAULT_LOGINS.md).
 
 ---
 

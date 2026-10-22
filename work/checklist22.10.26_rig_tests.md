@@ -59,10 +59,10 @@ Setup, once:
       `present: home/casparcg/.local/opt/godot/godot`, with no `bad` lines.
 - [ ] Install the stick on a spare machine. "Start operator here" opens the Godot GUI. Before WO-669 the GUI binary
       was not on the ISO.
-- [ ] Decide:
-      1. Ship the tracking venv + models (+375 MB) on the ISO, or install them by hand when needed?
-      2. Ship the dev box's Companion database as starter buttons, or a clean Companion?
-- [ ] Session can check (say "go"): does eggs give every install its own SSH host keys?
+- [ ] Before the produce, `passwd` on the build box must be `highascg`. The prepare script warns otherwise.
+- [ ] On the installed machine, `ssh casparcg@<ip>` works and the host key differs from the build box's
+      (`ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on both).
+- [ ] After section A passes: decide whether to ship the tracking venv + models (+375 MB).
 
 ## E. Audio on air (a live-audio input routed)
 

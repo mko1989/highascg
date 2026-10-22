@@ -12,6 +12,11 @@
 
 ---
 
+## 🔑 Default login
+
+Boxes built from the ISO log in as **`casparcg` / `highascg`** (desktop, terminal, SSH, sudo). It is public, so **change
+it on your box with `passwd`**. All default logins and how to change them: [docs/DEFAULT_LOGINS.md](docs/DEFAULT_LOGINS.md).
+
 ## 📌 Overview
 
 **HighAsCG** is a **single repository** for modular, unified development: the **operator UI** (`client/`), the **Node API bridge** (`src/`), and playout tooling all live here and run together on the **Ubuntu playout machine**.
