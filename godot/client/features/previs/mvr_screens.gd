@@ -56,6 +56,7 @@ func _ready() -> void:
 	_restore.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_restore.pressed.connect(func() -> void: _save_hidden([]))
 	add_child(_restore)
+	Settings.changed.connect(func() -> void: if _row.visible: _fill_dests())
 	refresh()
 
 
@@ -79,6 +80,8 @@ func click(cam: Camera3D, at: Vector2, add: bool) -> bool:
 	var uuids := W.cluster(scene.cluster_items(), uuid)
 	var toward: Vector3 = scene.to_stage(cam.global_position)
 	var wall := {"uuids": uuids, "frame": W.wall_frame(scene.wall_boxes(uuids), toward), "toward": toward}
+	if _sel.is_empty():
+		Settings.load_from_server()  # WO-685: a destination added since (web or Devices) — refills via Settings.changed
 	_sel = _sel + [wall] if add else [wall]
 	refresh()
 	return true

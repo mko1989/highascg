@@ -50,6 +50,7 @@ func _ready() -> void:
 	_add.text = "Add ▾"
 	_add.flat = false
 	_add.about_to_popup.connect(_fill_add_menu)
+	visibility_changed.connect(func() -> void: if is_visible_in_tree(): Settings.load_from_server())  # WO-685: fresh destinations
 	_add.get_popup().id_pressed.connect(_on_add)
 	row.add_child(_add)
 	for spec in [["Duplicate", _duplicate], ["Array…", _array_dialog], ["Delete", _delete]]:

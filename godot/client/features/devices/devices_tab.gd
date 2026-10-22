@@ -123,8 +123,9 @@ func _ready() -> void:
 	_dests.status.connect(_set_status)
 	_dests.refresh_requested.connect(refresh)
 	_dests.add_live_input.connect(live_inputs.open)
-	_dests.changed.connect(func() -> void:
+	_dests.changed.connect(func() -> void:  # WO-685: previs reads destinations from Settings, not this payload
 		_gesture.set_dirty(true)
+		await Settings.load_from_server()
 		refresh())
 	_dests.selected.connect(func(id: String) -> void:
 		if id != "":
