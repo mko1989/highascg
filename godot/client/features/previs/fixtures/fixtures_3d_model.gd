@@ -7,6 +7,8 @@ extends RefCounted
 ## frame follow-ik.js aims in (yaw 0 = upstage, clockwise seen from above: Godot rotation −yaw about Y).
 ## Axes: Pan turns about the node's Godot Y (GDTF Z), Tilt about its X, by the decoded degrees.
 
+const Tint := preload("res://features/previs/model_tint.gd")
+
 const MAX_LIGHTS := 64  ## SpotLight3D budget over the whole rig; further beams (and Glow beams) draw cone + lens only
 const CONE_LENGTH := 12.0  ## metres
 const CONE_ALPHA := 0.16
@@ -83,3 +85,12 @@ static func floor_hit(from: Vector3, dir: Vector3) -> Variant:
 		return null
 	var t := -from.y / dir.y
 	return from + dir * t if t > 0.0 else null
+
+
+## WO-678 — a head's body colour: its type's (WO-641) wins; else the colour of the MVR layer it was patched from
+## (fixture id `mvr-<uuid>`, `layer_of(uuid)` → layer name); else null (the model's own materials).
+static func head_color(id: String, type: String, type_colors: Dictionary, layer_colors: Dictionary, layer_of: Callable) -> Variant:
+	var c: Variant = Tint.parse(type_colors.get(type))
+	if c == null and id.begins_with("mvr-"):
+		c = Tint.parse(layer_colors.get(layer_of.call(id.trim_prefix("mvr-"))))
+	return c

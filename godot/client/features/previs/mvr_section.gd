@@ -18,6 +18,7 @@ const M := preload("res://features/previs/mvr_model.gd")
 const MvrScreens := preload("res://features/previs/mvr_screens.gd")
 const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
+const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
 const PaneKit := preload("res://features/settings/pane_kit.gd")
@@ -42,6 +43,7 @@ var _place := {}  # "x" / "y" / "z" / "yaw" → SpinBox
 var _fit_on_load := false
 var _screens: MvrScreens
 var _colors := ColorRows.new()  # WO-641: a colour per layer
+var _screen_uuids: Array = []  # WO-647: what the screens tool has selected
 
 
 func bind(s: MvrScene) -> void:
@@ -110,7 +112,10 @@ func _ready() -> void:
 	place.add_child(fit)
 	add_child(place)
 	_screens = MvrScreens.new()
-	_screens.selection_changed.connect(func(uuids: Array) -> void: _colors.highlight([] if scene == null else M.layers_of(uuids, scene.layer_of)))
+	_screens.selection_changed.connect(func(uuids: Array) -> void:
+		_screen_uuids = uuids
+		_light_layers())
+	Sel.shared().changed.connect(_light_layers)
 	_screens.scene = scene
 	add_child(_screens)
 	var prow := HBoxContainer.new()
@@ -461,3 +466,11 @@ func _set_place(p: Dictionary) -> void:
 		var s := _fixtures_slice()
 		s.patch = M.replace_patch(s.patch, scene.fixture_uuids, old, M.place_of(c))
 		_persist_fixtures(s)
+
+
+## WO-647 / WO-678: light the layer rows of the selected objects and of the selected heads patched from this scene.
+func _light_layers() -> void:
+	if scene == null:
+		_colors.highlight([])
+		return
+	_colors.highlight(M.layers_of(_screen_uuids + M.fixture_uuids(Sel.shared().ids), scene.layer_of))

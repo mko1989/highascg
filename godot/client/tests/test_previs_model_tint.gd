@@ -85,3 +85,16 @@ func test_layer_rows_eyes_and_highlight() -> void:  # WO-647
 	rows.free()
 	plain.free()
 	t.eq(MvrModel.layers_of(["a", "b", "c"], func(u: String) -> String: return {"a": "Truss", "b": "Truss", "c": ""}[u]), ["Truss", ""])
+
+
+## WO-678 — a patched head takes its MVR layer's colour unless its type has a Body colour; picking it lights its layer.
+func test_heads_follow_their_layer() -> void:
+	const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
+	t.eq(MvrModel.fixture_uuids(["mvr-ab12", "hand-1", "mvr-cd34"]), ["ab12", "cd34"], "only fixtures patched from the MVR")
+	var layer_of := func(u: String) -> String: return {"ab12": "Sharpy", "cd34": "Robin"}.get(u, "")
+	var layers := {"Sharpy": "#000000"}
+	t.eq([F.head_color("mvr-ab12", "T1", {}, layers, layer_of), F.head_color("mvr-cd34", "T2", {}, layers, layer_of),
+		F.head_color("hand-1", "T1", {}, layers, layer_of)], [Color.BLACK, null, null], "the layer's colour, MVR heads only")
+	var types := {"T1": "#ff0000"}
+	t.eq([F.head_color("mvr-ab12", "T1", types, layers, layer_of), F.head_color("hand-1", "T1", types, layers, layer_of)],
+		[Color.RED, Color.RED], "the type's Body colour wins")

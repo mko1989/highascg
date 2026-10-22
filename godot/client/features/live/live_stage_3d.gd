@@ -101,5 +101,6 @@ func _apply() -> void:
 		rig = Fixtures3D.new()
 		rig.beams_on = lights
 		stage.add_child(rig)
+		rig.follow(mvr)  # WO-678
 		Store.project_changed.connect(func(_p: Dictionary) -> void: _reload_mvr())
 		_reload_mvr()

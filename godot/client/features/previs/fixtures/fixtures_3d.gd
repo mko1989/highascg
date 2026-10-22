@@ -28,6 +28,8 @@ void fragment() {
 """ % F.CONE_ALPHA
 
 var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
+var _layer_colors := {}  # WO-678: MVR layer → "#rrggbb"; a head patched from an MVR object takes its layer's colour
+var layer_of := func(_uuid: String) -> String: return ""  ## WO-678: mvr_scene.layer_of (set by previs_tab.gd)
 var _key := ""
 var _gen := 0
 var _rigs := {}  # "typeId|mode" → rig Dictionary (or {} = failed)
@@ -73,8 +75,9 @@ func _on_project(project: Variant) -> void:
 	var cols := Tint.colors((project as Dictionary).get("previs") if project is Dictionary else null, "fixture_colors")
 	if cols != _colors:  # WO-641: a type's body colour
 		_colors = cols.duplicate()
-		for id in _fx:
-			Tint.apply(_fx[id].root, Tint.parse(_colors.get(_fx[id].get("type", ""))))
+		retint()
+	var mvr: Variant = (project as Dictionary).get("previs", {}).get("mvr") if project is Dictionary and (project as Dictionary).get("previs") is Dictionary else null
+	set_layer_colors(Tint.colors(mvr, "layer_colors"))
 	var list := F.typed((project as Dictionary).get("fixtures") if project is Dictionary else null)
 	var key := JSON.stringify(list.map(func(f: Dictionary) -> Array:
 		return [f.get("id"), F.rig_key(f), f.get("pose"), f.get("enabled", true)]))
@@ -154,8 +157,8 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 	parts.mark = _mark(parts.box)
 	root.add_child(parts.mark)
 	parts.type = str(f.typeId)
-	Tint.apply(root, Tint.parse(_colors.get(parts.type)))  # WO-641
 	_fx[str(f.id)] = parts
+	Tint.apply(root, color_of(str(f.id)))  # WO-641 / WO-678
 
 
 ## The fixture's body (not its cones) in its own frame, at rest — what a click hits.
@@ -188,6 +191,31 @@ func _mark(box: AABB) -> MeshInstance3D:
 	mi.visible = false
 	mi.set_meta("no_tint", true)
 	return mi
+
+
+## WO-678: the type's body colour wins; else the colour of the MVR layer the head was patched from (id `mvr-<uuid>`).
+func color_of(id: String) -> Variant:
+	return F.head_color(id, str(_fx.get(id, {}).get("type", "")), _colors, _layer_colors, layer_of)
+
+
+## WO-678: take layer names from this MVR scene and follow its layer colours (previews too) and reloads.
+func follow(scene: Node) -> void:
+	layer_of = scene.layer_of
+	scene.layer_colors_changed.connect(set_layer_colors)
+	scene.loaded.connect(func(_info: Dictionary) -> void: retint())
+	retint()
+
+
+func retint() -> void:
+	for id in _fx:
+		Tint.apply(_fx[id].root, color_of(id))
+
+
+func set_layer_colors(cols: Dictionary) -> void:
+	if cols == _layer_colors:
+		return
+	_layer_colors = cols.duplicate()
+	retint()
 
 
 func _show_selection() -> void:

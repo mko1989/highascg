@@ -43,6 +43,8 @@ Setup, once:
 - [ ] **WO-641:** Fixtures → pick a type → Body colour. The heads on the live rig previs take that colour.
 - [ ] **WO-677:** Previs → MVR Layers → colour "Default Layer". Models stay solid from every side (no hollow,
       see-through walls).
+- [ ] **WO-678:** Previs → heads without a GDTF colour are black. Click a head: its MVR layer row lights up. Colour
+  that layer (e.g. "5. Sharpy Plus") → those heads take it; a fixture-type Body colour still wins.
 - [ ] **WO-643:** re-import a newer version of the same MVR. Confirm the prompt; the scene stays where it was, and
       there is no second set of heads.
 

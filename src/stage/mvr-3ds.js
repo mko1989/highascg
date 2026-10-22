@@ -9,6 +9,14 @@
 
 const { writeGlb } = require('./glb-write')
 
+/** WO-678: a fixture body the GDTF gives no colour is black (owner 22.10). */
+const FIXTURE_BODY = [0.01, 0.01, 0.01, 1]
+
+/** No material, or a neutral light grey / white one: GDTF Builder writes every 3DS part as #FAFAFA, not a colour. */
+function unspecified(c) {
+	return !c || (Math.abs(c[0] - c[1]) < 0.02 && Math.abs(c[1] - c[2]) < 0.02 && c[0] >= 0.6)
+}
+
 function cstring(buf, at, end) {
 	let i = at
 	while (i < end && buf[i] !== 0) i++
@@ -92,7 +100,8 @@ function parse3ds(buf) {
 }
 
 /** 3DS bytes → GLB bytes (glTF frame: x, z, −y; mm → m). One primitive per material group. */
-function threeDsToGlb(buf) {
+/** opts.fixtureBody (fixture type models): unspecified colours → FIXTURE_BODY instead of glb-write's grey. */
+function threeDsToGlb(buf, opts = {}) {
 	const { objects, materials } = parse3ds(buf)
 	const meshes = []
 	for (const o of objects) {
@@ -117,7 +126,8 @@ function threeDsToGlb(buf) {
 			const indices = new Uint32Array(g.faces.length * 3)
 			g.faces.forEach((f, i) => indices.set(o.faces.subarray(f * 3, f * 3 + 3), i * 3))
 			if (indices.some((v) => v >= nv)) continue
-			primitives.push({ positions, indices, color: g.color || undefined })
+			const color = opts.fixtureBody && unspecified(g.color) ? FIXTURE_BODY : g.color
+			primitives.push({ positions, indices, color: color || undefined })
 		}
 		meshes.push({ name: o.name || 'mesh', primitives })
 	}
@@ -125,4 +135,4 @@ function threeDsToGlb(buf) {
 	return writeGlb(meshes)
 }
 
-module.exports = { parse3ds, threeDsToGlb }
+module.exports = { parse3ds, threeDsToGlb, FIXTURE_BODY }

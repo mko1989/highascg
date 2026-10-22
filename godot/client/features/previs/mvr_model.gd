@@ -196,6 +196,11 @@ static func merge_patch(patch: Array, incoming: Array) -> Array:
 	return out
 
 
+## WO-678: the MVR object uuids of patched fixture ids (`mvr-<uuid>`; hand-patched fixtures have none).
+static func fixture_uuids(ids: Array) -> Array:
+	return ids.filter(func(i: Variant) -> bool: return str(i).begins_with("mvr-")).map(func(i: Variant) -> String: return str(i).trim_prefix("mvr-"))
+
+
 ## The patch without this scene's fixtures (uuids lower case, mvr_scene.fixture_uuids).
 static func unpatch(patch: Array, uuids: Array) -> Array:
 	var gone := {}

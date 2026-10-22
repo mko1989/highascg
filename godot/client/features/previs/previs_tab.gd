@@ -84,6 +84,7 @@ func _ready() -> void:
 	coverage = Coverage3D.new()
 	stage.add_child(coverage)
 	stage.add_child(fixtures3d)
+	fixtures3d.follow(mvr)  # WO-678: heads take their MVR layer's colour
 	stage.add_child(cards)
 	_svc.gui_input.connect(_on_3d_input)
 	_coverage_note = Label.new()

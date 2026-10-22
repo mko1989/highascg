@@ -11,7 +11,9 @@ const assert = require('node:assert')
 const zlib = require('zlib')
 const { Readable } = require('stream')
 const { mvrMatrix, gdtfMatrix, toGodot, IDENTITY } = require('../../src/stage/mvr-math')
-const { threeDsToGlb } = require('../../src/stage/mvr-3ds')
+const fs = require('fs')
+const path = require('path')
+const { threeDsToGlb, FIXTURE_BODY } = require('../../src/stage/mvr-3ds')
 const { writeGlb, readGlb, embedGlbImages } = require('../../src/stage/glb-write')
 const store = require('../../src/stage/mvr-store')
 const { RouteRegistry } = require('../../src/api/route-registry')
@@ -56,7 +58,7 @@ function zip(files) {
 }
 
 /** A 3DS file: one object, one triangle (mm, Z-up), material "red". */
-function tiny3ds() {
+function tiny3ds(rgb = [255, 0, 0], use = 'red') {
 	const ch = (id, ...body) => {
 		const b = Buffer.concat(body)
 		const h = Buffer.alloc(6)
@@ -66,9 +68,9 @@ function tiny3ds() {
 	}
 	const u16 = (...v) => Buffer.from(new Uint16Array(v).buffer)
 	const f32 = (...v) => Buffer.from(new Float32Array(v).buffer)
-	const mat = ch(0xafff, ch(0xa000, Buffer.from('red\0')), ch(0xa020, ch(0x0011, Buffer.from([255, 0, 0]))))
+	const mat = ch(0xafff, ch(0xa000, Buffer.from('red\0')), ch(0xa020, ch(0x0011, Buffer.from(rgb))))
 	const verts = ch(0x4110, u16(3), f32(0, 0, 0, 1000, 0, 0, 0, 0, 1800))
-	const faces = ch(0x4120, u16(1, 0, 1, 2, 0), ch(0x4130, Buffer.from('red\0'), u16(1, 0)))
+	const faces = ch(0x4120, u16(1, 0, 1, 2, 0), ch(0x4130, Buffer.from(use + '\0'), u16(1, 0)))
 	return ch(0x4d4d, ch(0x3d3d, mat, ch(0x4000, Buffer.from('person\0'), ch(0x4100, verts, faces))))
 }
 
@@ -119,6 +121,7 @@ function writeGlbJson(json, bin) {
 }
 
 const origin = (x) => x.slice(9, 12)
+const read = (rel) => fs.readFileSync(path.join(__dirname, '..', '..', rel), 'utf8')
 
 test('transforms: MVR mm Z-up → Godot m Y-up; GDTF row matrices', () => {
 	assert.deepStrictEqual(toGodot(IDENTITY), [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0])
@@ -134,6 +137,17 @@ test('3DS → GLB: mm Z-up → m Y-up, material colour kept', () => {
 	assert.deepStrictEqual([...v].map((x) => Math.round(x * 1000) / 1000 + 0), [0, 0, 0, 1, 0, 0, 0, 1.8, 0])
 	assert.deepStrictEqual(json.materials[0].pbrMetallicRoughness.baseColorFactor, [1, 0, 0, 1])
 	assert.throws(() => threeDsToGlb(Buffer.from('nope')), /not a 3DS/)
+})
+
+test('WO-678: a fixture body the GDTF gives no colour is black; MVR set pieces keep theirs', () => {
+	const base = (buf, opts) => readGlb(threeDsToGlb(buf, opts)).json.materials[0].pbrMetallicRoughness.baseColorFactor
+	const fx = { fixtureBody: true }
+	assert.deepStrictEqual(base(tiny3ds(), fx), [1, 0, 0, 1], 'a real colour stays')
+	assert.deepStrictEqual(base(tiny3ds([250, 250, 250]), fx), FIXTURE_BODY, "GDTF Builder's #FAFAFA placeholder")
+	assert.deepStrictEqual(base(tiny3ds([255, 0, 0], 'none'), fx), FIXTURE_BODY, 'no material at all')
+	assert.deepStrictEqual(base(tiny3ds([60, 60, 60]), fx).slice(0, 3).map((x) => Math.round(x * 100)), [24, 24, 24], 'a dark grey is a choice')
+	assert.notDeepStrictEqual(base(tiny3ds([250, 250, 250])), FIXTURE_BODY, 'MVR scene meshes are untouched')
+	assert.match(read('src/api/routes-fixture-types.js'), /threeDsToGlb\(buf, \{ fixtureBody: true \}\)/)
 })
 
 test('external image URIs: embedded from the archive, or every texture dropped when one is missing', async () => {

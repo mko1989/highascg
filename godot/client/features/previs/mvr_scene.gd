@@ -10,6 +10,7 @@ const M := preload("res://features/previs/mvr_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 
+signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
 signal loaded(info: Dictionary)  ## {} when cleared; else {name, objects, fixtures, parts, meshes, failed, report} or {error}
 
 var scene_id := ""
@@ -160,6 +161,7 @@ func set_layer_colors(cols: Dictionary) -> void:
 	for c in get_children():
 		if c.has_meta("layer"):
 			Tint.apply(c, Tint.parse(_layer_colors.get(c.get_meta("layer"))))
+	layer_colors_changed.emit(_layer_colors)
 
 
 func set_hidden_layers(names: Array) -> void:

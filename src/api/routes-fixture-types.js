@@ -57,7 +57,7 @@ async function handleGet(p, query) {
 		if (!buf) return reply(404, { error: 'no such model in the fixture type' })
 		let glb = buf
 		try {
-			if (!/\.glb$/i.test(file)) glb = threeDsToGlb(buf)
+			if (!/\.glb$/i.test(file)) glb = threeDsToGlb(buf, { fixtureBody: true }) // WO-678: unspecified body → black
 		} catch (e) {
 			return reply(422, { error: `model conversion failed: ${e.message}` })
 		}
