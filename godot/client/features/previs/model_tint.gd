@@ -49,6 +49,9 @@ static func apply(root: Node, color: Variant) -> void:
 			var mat := StandardMaterial3D.new()
 			mat.albedo_color = color
 			mat.roughness = 0.8
+			# Like the model's own GLB materials (glb-write.js doubleSided): many MVR/3DS meshes are wound inside out, and a
+			# one-sided override shows only their inner walls (owner 22.10, WO-677).
+			mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 			mi.material_override = mat
 		elif mi.has_meta(TINT_ORIG):
 			mi.material_override = mi.get_meta(TINT_ORIG)[0]

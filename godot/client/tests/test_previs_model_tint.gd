@@ -34,6 +34,7 @@ func test_apply_and_restore() -> void:
 	body.add_child(lens)
 	Tint.apply(root, Color(0, 0, 1))
 	t.eq((body.material_override as StandardMaterial3D).albedo_color, Color(0, 0, 1), "tinted")
+	t.eq((body.material_override as StandardMaterial3D).cull_mode, BaseMaterial3D.CULL_DISABLED, "two-sided like the GLB's own (WO-677)")
 	t.ok(body.material_override != plain.material_override, "each mesh its own material (Glow bodies light theirs)")
 	t.eq(lens.material_override, lmat, "no_tint left alone")
 	Tint.apply(root, Color(0, 1, 0))
