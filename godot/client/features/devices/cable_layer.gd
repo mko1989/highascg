@@ -1,9 +1,9 @@
 extends Control
 ## WO-605 slice 1 — the cable overlay (web renderCableOverlay): one hanging cable per graph edge from its source
-## anchor to its sink anchor, in the edge's hash colour, over the whole Devices tab. Click-through. Rebuilds a
-## cable only when its endpoints or the loop count change (web getOrBuild cache), and only once the anchors have
-## been still for SETTLE_MS — while they move (splitter drag, resize) the last build is warped onto them. Polls
-## anchors each frame because cards and sockets move with layout, not through signals.
+## anchor to its sink anchor, in the edge's hash colour, over the whole Devices tab. Click-through. Polls anchors
+## each frame because cards and sockets move with layout, not through signals.
+## WO-672: each rear-panel cable is a live Verlet rope (cable_rope.gd) stepped once per frame while awake — it swings
+## and settles when its ports move instead of the web's one-shot solve; a new loop count re-lays the ropes.
 ## Slice 2c: `selected_id` thickens a cable like hover, `hidden_id` hides the cable whose end is held (re-grab), and
 ## while `ghost_from` is set a dashed straight ghost runs from that anchor to `pointer` (web --ghost, dasharray 5 4).
 ## `hit()` is the click hit-test the tab uses, since the layer itself stays click-through.
@@ -12,7 +12,7 @@ extends Control
 ## the ghost as a dashed curve.
 
 const CableModel := preload("res://features/devices/cable_model.gd")
-const SETTLE_MS := 150
+const CableRope := preload("res://features/devices/cable_rope.gd")
 const GHOST := Color("#58a6ff")
 const HIT_PX := 6.0
 
@@ -55,10 +55,10 @@ var pointer := Vector2.ZERO:  # local
 		if ghost_from != "":
 			queue_redraw()
 
-var _built := {}  # cable id → {key, pts, color, ends}
+var _built := {}  # cable id → {key, pts, color, ends} (Node view)
+var _ropes := {}  # cable id → cable_rope.gd (rear panel, WO-672)
 var _ends := {}  # cable id → [from, to] (local), as of the last anchor change
 var _sig := ""
-var _settle_at := 0
 
 
 func _ready() -> void:
@@ -99,32 +99,33 @@ func _process(_delta: float) -> void:
 		ends[c.id] = [p1, p2]
 		parts.append("%s:%.1f,%.1f,%.1f,%.1f" % [c.id, p1.x, p1.y, p2.x, p2.y])
 	var sig := "|".join(parts)
-	var now := Time.get_ticks_msec()
 	if sig != _sig:
 		_sig = sig
 		_ends = ends
-		_settle_at = now + SETTLE_MS
 		for id in _built.keys():
 			if not ends.has(id):
 				_built.erase(id)
+		for id in _ropes.keys():
+			if not ends.has(id):
+				_ropes.erase(id)
 		if simple:
 			_build_simple()
 		queue_redraw()
-	if simple or now < _settle_at:
+	if simple:
 		return
-	# Settled: rebuild ONE stale cable per frame (a GDScript build costs ~35–75 ms).
-	for c in cables:
-		if not _ends.has(c.id):
-			continue
-		var e: Array = _ends[c.id]
-		var key := "%.1f,%.1f,%.1f,%.1f,%d" % [e[0].x, e[0].y, e[1].x, e[1].y, loops]
-		var old: Variant = _built.get(c.id)
-		if old is Dictionary and old.key == key:
-			continue
-		_built[c.id] = {"key": key, "color": CableModel.color(c.id), "ends": e,
-			"pts": CableModel.build(e[0].x, e[0].y, e[1].x, e[1].y, loops, CableModel.seed_of(c.id))}
+	var awake := false
+	for id in _ends:
+		var e: Array = _ends[id]
+		var r: RefCounted = _ropes.get(id)
+		if r == null or r.loops != loops:
+			r = CableRope.make(e[0], e[1], loops, CableModel.seed_of(id))
+			_ropes[id] = r
+		r.pin(e[0], e[1])
+		if not r.asleep():
+			r.step()
+			awake = true
+	if awake:
 		queue_redraw()
-		return
 
 
 func _fans() -> Dictionary:
@@ -141,23 +142,15 @@ func _build_simple() -> void:
 				"pts": CableModel.bezier(CableModel.simple_curve(edge, e[0], e[1], fans))}
 
 
-## The cable as drawn now: its last build, its ends shifted onto the current anchors (a linear blend along the
-## rope) until the settled rebuild replaces it; a straight run before the first build.
+## The cable as drawn now: the rope (rear panel) or the fanned Bézier (Node view); a straight run before either exists.
 func _shape(id: String) -> PackedVector2Array:
-	var e: Array = _ends[id]
+	if not simple and _ropes.has(id):
+		return (_ropes[id] as RefCounted).points()
 	var b: Variant = _built.get(id)
-	if not b is Dictionary:
-		return PackedVector2Array([e[0], e[1]])
-	var pts: PackedVector2Array = b.pts
-	var d1: Vector2 = e[0] - b.ends[0]
-	var d2: Vector2 = e[1] - b.ends[1]
-	if d1 == Vector2.ZERO and d2 == Vector2.ZERO:
-		return pts
-	var out := PackedVector2Array()
-	var last := maxf(1.0, pts.size() - 1.0)
-	for i in pts.size():
-		out.append(pts[i] + d1.lerp(d2, i / last))
-	return out
+	if b is Dictionary:
+		return b.pts
+	var e: Array = _ends[id]
+	return PackedVector2Array([e[0], e[1]])
 
 
 ## The visible cable under `local` (within HIT_PX of its drawn polyline), nearest first; "" when none.

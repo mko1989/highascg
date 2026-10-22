@@ -97,5 +97,7 @@ Setup, once:
       3. A second screen gets a second column.
 - [ ] **WO-671:** with Auto on, click a PGM / PRV window (no drag): Auto stays on. Drag the Live / deck splitter:
       the windows follow.
+- [ ] **WO-672:** Devices → Cable loops 1 / 2: the cables hang in curves and the loops hang below them. Drag the
+      splitter or resize the window: the cables swing and settle within about 1 s.
 - [ ] **WO-668:** the Live 2D button shows "2D" in a box; switching 3D ↔ 2D doesn't change its size. The
       Inspector title is white.

@@ -61,6 +61,13 @@ static func srand(n: float, seed: float) -> float:
 
 ## Cable from port (x1, y1) to port (x2, y2); loops 0–2 = the "Cable loops" setting. Returns the polyline.
 static func build(x1: float, y1: float, x2: float, y2: float, loops: int, seed: int) -> PackedVector2Array:
+	var p := path(x1, y1, x2, y2, loops, seed)
+	return _relax(p.x, p.y, p.loop, x1, y1, x2, y2)
+
+
+## The unrelaxed rope: straight runs plus coil circles, port → boot → … → boot → port. {x, y, loop (1 = coil point)}.
+## WO-672: the live rope (cable_rope.gd) starts from this too.
+static func path(x1: float, y1: float, x2: float, y2: float, loops: int, seed: int) -> Dictionary:
 	var mx1 := x1
 	var my1 := y1 + BOOT_DROP
 	var mx2 := x2
@@ -68,21 +75,15 @@ static func build(x1: float, y1: float, x2: float, y2: float, loops: int, seed: 
 	var dist := Vector2(mx2 - mx1, my2 - my1).length()
 	if dist == 0.0:
 		dist = 1.0
-	var actual := 0
-	if loops == 1 and dist >= 90.0:
-		actual = 1
-	elif loops == 2:
-		actual = 2 if dist >= 120.0 else (1 if dist >= 70.0 else 0)
 	var n_base := maxi(28, floori(dist / 10.0))
 
 	var wx := PackedFloat64Array([mx1])
 	var wy := PackedFloat64Array([my1])
 	var wl := PackedByteArray([0])
+	var specs := loop_specs(loops, dist, seed)
 	var loop_ts: Array[float] = []
-	for li in actual:
-		var base := 0.5 if actual == 1 else (0.35 if li == 0 else 0.65)
-		loop_ts.append(base - 0.1 + srand(li + 11, seed) * 0.2)
-	loop_ts.sort()
+	for sp in specs:
+		loop_ts.append(sp.t)
 	var c_dx := (mx2 - mx1) / dist
 	var c_dy := (my2 - my1) / dist
 	var prev_t := 0.0
@@ -94,8 +95,8 @@ static func build(x1: float, y1: float, x2: float, y2: float, loops: int, seed: 
 			wx.append(mx1 + (mx2 - mx1) * st)
 			wy.append(my1 + (my2 - my1) * st)
 			wl.append(0)
-		var r := 20.0 + srand(li + 42, seed) * 12.0
-		var side := 1.0 if srand(li + 101, seed) > 0.5 else -1.0
+		var r: float = specs[li].r
+		var side: float = specs[li].side
 		var cx := mx1 + (mx2 - mx1) * t + (-c_dy * side * r)
 		var cy := my1 + (my2 - my1) * t + (c_dx * side * r)
 		var a0 := atan2(my1 + (my2 - my1) * t - cy, mx1 + (mx2 - mx1) * t - cx)
@@ -118,7 +119,25 @@ static func build(x1: float, y1: float, x2: float, y2: float, loops: int, seed: 
 	wx.append(x2)
 	wy.append(y2)
 	wl.append(0)
-	return _relax(wx, wy, wl, x1, y1, x2, y2)
+	return {"x": wx, "y": wy, "loop": wl}
+
+
+## Where the coils sit (the "Cable loops" setting; fewer on short runs): [{t along the run, r, side ±1}], t ascending.
+static func loop_specs(loops: int, dist: float, seed: int) -> Array:
+	var actual := 0
+	if loops == 1 and dist >= 90.0:
+		actual = 1
+	elif loops == 2:
+		actual = 2 if dist >= 120.0 else (1 if dist >= 70.0 else 0)
+	var ts: Array[float] = []
+	for li in actual:
+		var base := 0.5 if actual == 1 else (0.35 if li == 0 else 0.65)
+		ts.append(base - 0.1 + srand(li + 11, seed) * 0.2)
+	ts.sort()
+	var out := []
+	for li in ts.size():
+		out.append({"t": ts[li], "r": 20.0 + srand(li + 42, seed) * 12.0, "side": 1.0 if srand(li + 101, seed) > 0.5 else -1.0})
+	return out
 
 
 ## Verlet relaxation: gravity on the hanging interior, exact rest lengths for 1-, 2- and 3-hop constraints (stiff on
