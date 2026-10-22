@@ -1,6 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
-**Status: OPEN — plan, waiting for the owner's answers to the four decisions below (22.10)**
+**Status: IN PROGRESS — decisions answered 22.10; P1 (remote video) under way**
 
 Owner, `next.md` 22.10:
 - *"the godot client can be multiplatform if im not mistaken? and to make it work we'd just need to get the operator
@@ -93,6 +93,74 @@ Owner, `next.md` 22.10:
    rsync)?
 4. **Sync.** Without genlock / timecode between boxes, takes on two servers land within a few frames, not frame-exact.
    That is fine for a backup; is it fine for an extension, i.e. one show across screens on two boxes?
+
+## Owner answers, 22.10
+
+1. *"yes but we need a way to change masters if the one fails seemlessly. also in most cases the master would be running
+   its own client and connecting to second box for backup and/or additional screens. but we need to prepare for more."*
+2. *"we need to get creative here, whats the best approach, i think each server should keep their own devices view
+   connections as they may differe as well as peers just for safe keeping. and the project including
+   media/looks/timelines should be shared."*
+3. *"i think i want is as a button still as i think the spread of media should be at user chosen time."*
+4. *"sync we get as close as possible. its not meant to be used as one single large screen from two servers, as that
+   would never work without hardware sync."*
+
+## Design (from the answers)
+
+**A cluster = servers sharing one project.**
+
+- **Shared, the same on every member:** the project document (looks, timelines, destinations, routing, settings that
+  belong to the show), carried by revision.
+  - The media list is shared too. The media FILES move only on the operator's button (answer 3), and each server shows
+    what it is missing.
+- **Device-local, never copied:** the Devices view wiring (device graph, outputs, cables, `casparcg.config`). Each
+  server's hardware differs (answer 2).
+- **Device-local, kept by every member:** its own copy of the peer list (ids, addresses, priority, last seen).
+  - "Peers just for safe keeping": any survivor knows the whole cluster, and a returning box can find it again.
+
+**A destination's role follows each server's own cables. Nothing extra is set.**
+
+- A destination is shared. Which outputs it reaches is decided in each server's own Devices view:
+  - cabled on the master and on B → B is that destination's **backup** (B plays the same, fan-out);
+  - cabled only on B → B is its **extension** (B plays it, driven through the master);
+  - cabled nowhere → it isn't played.
+- So a box with fewer outputs simply backs up fewer destinations.
+
+**The master and seamless failover.**
+
+- One master at a time. It holds the authoritative project, runs the takes, and forwards AMCP for linked destinations.
+  Usually it is the box with the operator's own client (answer 1).
+- **Epoch fencing.** The master's claim carries an epoch number. Every member accepts project pushes and AMCP only
+  from the highest epoch it has seen. A box that comes back with an old epoch demotes itself, so there is no split
+  brain. This finishes WO-54 T4.3 / WO-65 D4.
+- **When the master dies:**
+  - every Caspar keeps playing what it had, because outputs never depend on the master's process;
+  - the next server by peer-list priority promotes itself after a timeout (or on an operator click, set per cluster);
+  - clients hold the whole peer list and reconnect to the new master by themselves (the Godot connection profiles grow
+    from A/B to N).
+  - Destinations that were the dead master's own extensions go dark unless another server backs them up. That is what
+    backup links are for.
+- **More than two boxes:** nothing above assumes a pair. Fan-out goes per destination to whichever servers are cabled
+  to it.
+
+**Sync, best effort (answer 4).**
+
+- AMCP fan-out at the same instant, plus playhead correction (WO-65).
+- Cross-box take timing is measured and shown, never promised frame-exact. A single canvas spanning two boxes is out
+  of scope.
+
+## Phase order (unchanged, now with the design)
+
+1. **P1 remote video.**
+2. **P2 cluster + peers in Devices:**
+   - add / scan;
+   - handshake;
+   - per-server peer lists;
+   - each server's outputs read from it;
+   - media parity badges + "Send media" button.
+3. **P3 master / epoch / failover:** promote, demote on return, client reconnect.
+4. **P4 per-destination fan-out:** backup and extension, derived from cables.
+5. **P5 two-box hardware acceptance.**
 
 ## What was VERIFIED
 
