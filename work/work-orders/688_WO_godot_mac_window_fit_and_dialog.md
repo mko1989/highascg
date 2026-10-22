@@ -1,6 +1,6 @@
 # WO-688 — Godot client on the Mac: the layout overflows the window; "Link a server" dialog draws garbage
 
-**Status: IN PROGRESS — window fit DONE (22.10, Godot tests + a 1440×860 off-box window on the box); dialog garbage OPEN (owner test of the Vulkan driver)**
+**Status: IN PROGRESS — window fit + exported restart DONE and released (client prerelease `client_2026-10-22_221506`); dialog noise on the Intel Mac OPEN (owner test: `--rendering-method gl_compatibility`)**
 
 Owner, 22.10 (release `2026-10-22_214247` client on a Mac, screenshot): *"first it seems the gui not scaling to the
 window. second this is the modal for adding a server from devices tab. unless there is another way to connect the
@@ -55,3 +55,15 @@ line (`--ui-scale` below 1 already works in that build):
 
 If the dialog draws correctly on Vulkan, the macOS preset / project gets `driver.macos = vulkan`. (Superseded for the
 owner's Intel Mac Pro: it is on MoltenVK already; test `--rendering-method gl_compatibility` instead.)
+
+## Client prerelease (22.10)
+
+Owner: *"make a new client build and make a prerelease on github with them"*.
+- https://github.com/mko1989/highascg/releases/tag/client_2026-10-22_221506 — prerelease, tag at 07c90e42, built in a
+  clean `git worktree` of that commit with `godot/export-client.sh`. Assets: Windows zip 39.8 MB, macOS universal zip
+  62.4 MB, Linux tar.gz 30.4 MB, `SHA256SUMS.txt`. Notes name the server release it pairs with
+  (`2026-10-22_214247`), the two fixes, how to connect, and the macOS dialog workaround to try.
+- Verified from the downloaded assets: checksums OK; the Linux client connects to `http://192.168.0.23:4200`
+  (settings ok, WS connected) and, in a 1280×760 window on the box, shows the whole layout (screenshot); the macOS zip
+  holds the app binary and its .pck.
+- Dialog noise on the owner's Intel Mac Pro: still open (Compatibility renderer test pending).
