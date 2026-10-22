@@ -18,7 +18,7 @@ const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
-const { normalizeDetection, detectCameras, personsFrom } = require('./detect-model')
+const { normalizeDetection, detectCameras, personsFrom, maskSizeFrom } = require('./detect-model')
 const { onProjectChanged } = require('../engine/project-events')
 
 const LEASE_ID = 'tracking-detect'
@@ -94,7 +94,7 @@ function createDetectService(ctx, deps = {}) {
 		} else if (msg.type === 'tracks') {
 			const ce = cams.find((c) => c.id === msg.camera)
 			if (!ce) return
-			latest.set(ce.id, { at: now(), frame: msg.frame, w: msg.w, h: msg.h, ms: msg.ms, persons: personsFrom(msg, ce, planeZ) })
+			latest.set(ce.id, { at: now(), frame: msg.frame, w: msg.w, h: msg.h, ms: msg.ms, maskSize: maskSizeFrom(msg), persons: personsFrom(msg, ce, planeZ) })
 			rev++
 		} else if (msg.type === 'status') {
 			sidecarCams = msg.cameras && typeof msg.cameras === 'object' ? msg.cameras : {}
@@ -232,7 +232,9 @@ function createDetectService(ctx, deps = {}) {
 			cameras: cams.map((c) => {
 				const l = latest.get(c.id)
 				const fresh = !!l && t - l.at <= STALE_MS
-				return { id: c.id, role: c.role, frame: l?.frame ?? null, stale: !fresh, persons: fresh ? l.persons : [] }
+				const cam = { id: c.id, role: c.role, frame: l?.frame ?? null, stale: !fresh, persons: fresh ? l.persons : [] }
+				if (fresh && l.maskSize) cam.mask_size = l.maskSize // WO-665: the persons carry cut-out masks
+				return cam
 			}),
 		}
 	}

@@ -26,7 +26,8 @@ From [WO-616](../../work/work-orders/616_WO_previs_tracking_openfollow_cameras.m
 2. **Calibrated cameras.** Each camera has a solved pose, field of view and lens distortion (k1, k2). The box
    measured 0.71 px RMS. That is the projector matrix projective texturing needs, so this is the hardest part, and it is done.
 3. **Where the person is.** YOLO detection, ByteTrack and two-camera fusion give a world position per person
-   (WS `world` block, the P-tags in the 3D view).
+   (WS `world` block). Correction (WO-665): the P-tags are drawn only in the 2D Camera view (`tracking_view.gd`);
+   before WO-665 the 3D view drew no persons at all.
 4. **A real 3D engine.** Godot does projective texturing in an ordinary spatial shader; the RTX PRO 4000 (24 GB) has
    plenty of headroom for 2–3 camera textures at 1080p.
 
@@ -76,7 +77,7 @@ From [WO-616](../../work/work-orders/616_WO_previs_tracking_openfollow_cameras.m
 
 ## Suggested work order split (if you want it)
 
-- **WO-A** step 1: segmentation mask in the sidecar, `PersonCard` in the previs, a toggle in the 3D toolbar.
+- **WO-A** step 1: segmentation mask in the sidecar, `PersonCard` in the previs, a toggle in the 3D toolbar. → built as WO-665.
 - **WO-B** step 2: mannequin asset, the projective shader with per-camera depth maps, colour-match controls on each
   camera object.
 - **WO-C** step 3: pose model, 3D triangulation, rigged mannequin.

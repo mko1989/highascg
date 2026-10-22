@@ -19,6 +19,7 @@ import cv2
 import numpy as np
 
 import bytetrack
+import seg
 
 PAD = 114
 NMS_IOU = 0.45
@@ -42,17 +43,28 @@ class Backend:
         inp = self.session.get_inputs()[0]
         self.input_name = inp.name
         self.output_name = self.session.get_outputs()[0].name
+        # WO-665: a seg model (yolo26n-seg) also yields mask prototypes; its rows end in that many coefficients
+        self.nm = seg.seg_outputs(self.session)
+        self.outputs = [o.name for o in self.session.get_outputs()[:2 if self.nm else 1]]
+        self.last_seg = None
         shape = inp.shape
         ok = len(shape) >= 4 and all(isinstance(v, int) and v > 0 for v in shape[2:4])
         self.size = max(shape[2], shape[3]) if ok else 640
         self.providers = self.session.get_providers()
 
     def predict(self, rgb, floor, cap):
-        """rgb: preprocessed HxWx3 uint8 → [(x1, y1, x2, y2, score)] normalised, score ≥ floor."""
+        """rgb: preprocessed HxWx3 uint8 → [(x1, y1, x2, y2, score)] normalised, score ≥ floor. A seg model appends
+        each row's mask coefficients as element 5 and keeps what seg.attach needs in last_seg."""
         tensor, scale, pad = letterbox(rgb, self.size)
         x = np.expand_dims(np.transpose(tensor.astype(np.float32) / 255.0, (2, 0, 1)), 0)
-        pred = prepare(self.session.run([self.output_name], {self.input_name: x})[0])
-        return decode(pred, floor, cap, scale, pad, rgb.shape[1], rgb.shape[0])
+        outs = self.session.run(self.outputs, {self.input_name: x})
+        pred = prepare(outs[0])
+        fw, fh = rgb.shape[1], rgb.shape[0]
+        if not self.nm or pred.shape[1] <= self.nm + 4:
+            self.last_seg = None
+            return decode(pred, floor, cap, scale, pad, fw, fh)
+        self.last_seg = (np.asarray(outs[1])[0], self.size, scale, pad, fw, fh)
+        return decode(pred[:, :-self.nm], floor, cap, scale, pad, fw, fh, pred[:, -self.nm:])
 
 
 def letterbox(img, size):
@@ -90,17 +102,19 @@ def nms(boxes, scores, iou):
     return keep
 
 
-def decode(pred, floor, cap, scale, pad, fw, fh):
+def decode(pred, floor, cap, scale, pad, fw, fh, coefs=None):
     if pred.size == 0 or pred.shape[1] <= 4:
         return []
     scores = pred[:, 4]
     if pred.shape[1] == 6:  # end-to-end head: already de-duplicated — person class only, no second NMS
         m = (scores >= floor) & (np.rint(pred[:, 5]) == 0)
         boxes, scores = pred[m, :4].astype(np.float32), scores[m]
+        coefs = coefs[m] if coefs is not None else None
         order = list(np.argsort(-scores))
     else:  # [cx, cy, w, h, class scores…]: column 4 is "person"
         m = scores >= floor
         b, scores = pred[m, :4], scores[m]
+        coefs = coefs[m] if coefs is not None else None
         boxes = np.stack([b[:, 0] - b[:, 2] / 2, b[:, 1] - b[:, 3] / 2, b[:, 0] + b[:, 2] / 2, b[:, 1] + b[:, 3] / 2], 1)
         order = nms(boxes, scores, NMS_IOU) if len(scores) else []
     s = max(scale, 1e-6)
@@ -112,7 +126,8 @@ def decode(pred, floor, cap, scale, pad, fw, fh):
         y1 = float(np.clip((y1 - pad[1]) / s, 0, fh))
         y2 = float(np.clip((y2 - pad[1]) / s, 0, fh))
         if x2 > x1 and y2 > y1:
-            out.append((x1 / fw, y1 / fh, x2 / fw, y2 / fh, float(scores[i])))
+            row = (x1 / fw, y1 / fh, x2 / fw, y2 / fh, float(scores[i]))
+            out.append(row + (coefs[i],) if coefs is not None else row)
             if len(out) >= cap:
                 break
     return out

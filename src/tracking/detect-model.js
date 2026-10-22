@@ -126,6 +126,14 @@ function boxToFloor(box, camEntry, planeZ = 0) {
 	return p ? p.map((v) => Math.round(v * 1000) / 1000) : null
 }
 
+const MASK_RE = /^[A-Za-z0-9+/]{4,4096}={0,2}$/
+
+/** WO-665: `[w, h]` of the sidecar's mask grid, or null (a detection-only model sends none). */
+function maskSizeFrom(msg) {
+	const s = msg?.mask_size
+	return Array.isArray(s) && s.length === 2 && s.every((v) => Number.isInteger(v) && v > 0 && v <= 256) ? [s[0], s[1]] : null
+}
+
 /** One sidecar `tracks` message → the persons list a client / the pinning engine sees. */
 function personsFrom(msg, camEntry, planeZ = 0) {
 	const out = []
@@ -137,9 +145,11 @@ function personsFrom(msg, camEntry, planeZ = 0) {
 			score: Number(t.score) || 0,
 			age_s: Number(t.age_s) || 0,
 			floor: boxToFloor(t.box, camEntry, planeZ),
+			// WO-665: a seg model's cut-out mask (base64 bit grid inside the box, tools/tracking-detect/seg.py)
+			...(typeof t.mask === 'string' && MASK_RE.test(t.mask) ? { mask: t.mask } : {}),
 		})
 	}
 	return out
 }
 
-module.exports = { DETECTION_DEFAULTS, normalizeDetection, detectCameras, boxPoint, boxToFloor, personsFrom }
+module.exports = { DETECTION_DEFAULTS, normalizeDetection, detectCameras, boxPoint, boxToFloor, personsFrom, maskSizeFrom }

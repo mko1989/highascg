@@ -52,6 +52,7 @@ var track_page: TrackingPage
 var markers: MarkerDriver
 var coverage: Coverage3D
 var fixtures3d := preload("res://features/previs/fixtures/fixtures_3d.gd").new()  # WO-615 T5 GDTF fixtures
+var cards := preload("res://features/previs/tracking/person_cards.gd").new()  # WO-665 cut-out cards
 var _coverage_cb: CheckBox
 var _coverage_note: Label
 var _side: Control  # the 3D mode Inspector page; parked hidden here until the Inspector adopts it
@@ -83,6 +84,7 @@ func _ready() -> void:
 	coverage = Coverage3D.new()
 	stage.add_child(coverage)
 	stage.add_child(fixtures3d)
+	stage.add_child(cards)
 	_svc.gui_input.connect(_on_3d_input)
 	_coverage_note = Label.new()
 	_coverage_note.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
@@ -121,6 +123,7 @@ func _ready() -> void:
 		_push_zones())
 	markers.detected.connect(func() -> void:
 		track_view.set_detections(markers.detections)
+		cards.set_detections(markers.detections)
 		if track_page.detect != null:
 			track_page.detect.refresh_status())
 	track_view.grab.connect(func(px: Vector2) -> void:
@@ -342,6 +345,7 @@ func _apply_mode() -> void:
 		VideoSurfaces.release(_glb_role, self)
 	var iscam := mode == "camera"
 	_coverage_cb.visible = is3d
+	cards.set_shown(is3d and shown)
 	_refresh_coverage()
 	track_view.visible = iscam
 	track_view.set_on(iscam and shown)
@@ -382,6 +386,7 @@ func _build_toolbar() -> Control:
 		_refresh_coverage()
 		_save_ui())
 	bar.add_child(_coverage_cb)
+	bar.add_child(cards.toggle)
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))

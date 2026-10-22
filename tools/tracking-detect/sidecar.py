@@ -10,7 +10,8 @@ Protocol (JSON lines):
           "grace_ms": 500, "threads": 4, "cameras": [{"id": "cam_1", "path": "/dev/shm/highascg-ch1", "masks": []}]}
   stdout {"type": "ready", "model", "providers", "input"}
          {"type": "tracks", "camera", "frame", "w", "h", "ms", "tracks": [{"tid", "box": [x1, y1, x2, y2] (0–1),
-          "score", "age_s"}]}     — once per detection step per camera (an empty list is a real "nobody")
+          "score", "age_s", "mask"?}], "mask_size"?}  — once per detection step per camera (an empty list is a real
+          "nobody"); a seg model adds WO-665 cut-out masks (seg.py) to live tracks
          {"type": "status", "cameras": {id: {"state": "ok" | "waiting" | "stale", "detail", "fps", "ms"}}}  — 1 Hz
          {"type": "error", "detail"}
 Exits when stdin closes (the server went away), so it never outlives its owner.
@@ -156,6 +157,7 @@ def main():
                 raw = backend.predict(rgb, min(detector.bytetrack.LOW_DETECTION_THRESHOLD, cfg["confidence"]),
                     max(cfg["max_persons"] * 3, detector.RAW_CAP))
                 tracks = cam.det.step(detector.filter_masks(raw, cam.masks), now, cfg)
+                detector.seg.attach(tracks, raw, backend.last_seg)  # WO-665: cut-out masks (seg models only)
             except Exception as e:  # noqa: BLE001 — one bad frame (e.g. a singular Kalman matrix) drops, not the camera
                 emit({"type": "error", "detail": "%s: %s" % (cam.id, e)})
                 continue
@@ -163,8 +165,11 @@ def main():
             cam.last_step = now
             cam.steps += 1
             worked = True
-            emit({"type": "tracks", "camera": cam.id, "frame": info["frame_number"], "w": r.width, "h": r.height,
-                "ms": round(cam.ms, 1), "tracks": tracks})
+            msg = {"type": "tracks", "camera": cam.id, "frame": info["frame_number"], "w": r.width, "h": r.height,
+                "ms": round(cam.ms, 1), "tracks": tracks}
+            if backend.last_seg is not None:
+                msg["mask_size"] = [detector.seg.MASK_W, detector.seg.MASK_H]
+            emit(msg)
         if now - last_status >= 1.0:
             st = {}
             for cam in cams.values():
