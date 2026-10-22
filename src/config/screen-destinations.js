@@ -154,10 +154,11 @@ function normalizeDestination(d) {
 		// physical <screen> consumer and port resolution short-circuits to null (never borrows the
 		// multiview's port). Default false = physical output.
 		base.headless = d.headless === true
-		// WO-597: how the operator channel reaches the operator surface. 'screen' (default, today) =
-		// Caspar <screen> consumer under the Firefox kiosk; 'shm' = the Caspar shm frame consumer
-		// (WO-594, needs the next Caspar build) read by the native Godot client (WO-593) — no window,
-		// no kiosk. shmName = the segment /dev/shm/highascg-<shmName>.
+		// WO-597: how the operator channel reaches the operator surface. 'shm' = the Caspar shm frame
+		// consumer (WO-594) read by the Godot GUI (WO-593); shmName = the segment /dev/shm/highascg-<shmName>.
+		// 'screen' = a Caspar <screen> window — the Firefox kiosk's output, DEPRECATED with the kiosk
+		// (WO-646 / WO-684). A missing value still reads as 'screen' so a show box on a Caspar build without
+		// the shm consumer never flips; the factory starter writes 'shm' explicitly (WO-684).
 		base.videoOutput = d.videoOutput === 'shm' ? 'shm' : 'screen'
 		base.shmName = /^[a-z0-9_-]{1,32}$/i.test(String(d.shmName || '')) ? String(d.shmName) : 'opgui'
 	}

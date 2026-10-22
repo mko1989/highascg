@@ -217,13 +217,31 @@ test('createNewProject keeps the machine operator-GUI video output (native clien
 	}
 })
 
-test('createNewProject on a kiosk box stays on the factory screen output', () => {
+test('createNewProject seeds the Godot shm output, never the deprecated kiosk screen (WO-684)', () => {
 	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-screen-'))
 	try {
 		const ctx = makeCtx(mediaRoot)
 		createNewProject(ctx)
 		const op = (ctx.config.screenDestinations?.destinations || []).find((x) => x.mode === 'operator_gui')
-		assert.equal(op.videoOutput, 'screen')
+		assert.equal(op.videoOutput, 'shm', 'the factory starter writes shm — a reset must not bring the kiosk-era window back')
+		assert.equal(op.shmName, 'opgui')
+	} finally {
+		fs.rmSync(mediaRoot, { recursive: true, force: true })
+	}
+})
+
+test('createNewProject keeps an explicitly saved screen output (box on a Caspar build without shm)', () => {
+	const mediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'hacg-new-project-keep-screen-'))
+	try {
+		const ctx = makeCtx(mediaRoot)
+		ctx.config.screenDestinations = {
+			version: 1,
+			destinations: [{ id: 'dst_operator_gui', label: 'Operator GUI', mainScreenIndex: 0, mode: 'operator_gui',
+				videoOutput: 'screen' }],
+		}
+		createNewProject(ctx)
+		const op = (ctx.config.screenDestinations?.destinations || []).find((x) => x.mode === 'operator_gui')
+		assert.equal(op.videoOutput, 'screen', 'how the box shows the operator GUI is the box\'s, not the show\'s')
 	} finally {
 		fs.rmSync(mediaRoot, { recursive: true, force: true })
 	}

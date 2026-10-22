@@ -23,6 +23,8 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 			// WO-264 T264.3: fresh default = one screen with the operator GUI. No physicalPort —
 			// WO-246's resolveOperatorMonitorPort auto-selects the lone connected display;
 			// autoLaunch:true comes from normalizeScreenDestinations' operator_gui defaults.
+			// WO-684: the Godot GUI owns the operator monitor through the shm surface. 'screen' was the Firefox
+			// kiosk's output (deleted in WO-646) and is DEPRECATED; a reset / New project / fresh ISO never seeds it.
 			{
 				id: 'dst_operator_gui',
 				label: 'Operator GUI',
@@ -32,6 +34,8 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 				height: 1080,
 				fps: 50,
 				edidLabel: '',
+				videoOutput: 'shm',
+				shmName: 'opgui',
 			},
 		],
 		edidNotes: '',

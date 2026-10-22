@@ -61,19 +61,19 @@ function copyLiveGpuTopology(cfg) {
 
 /**
  * How this machine shows the operator GUI is a property of the box, not of a show: 'shm' means the native Godot client
- * (installed per machine, WO-593) owns the operator monitor and the Firefox kiosk is never started. A New project
- * keeps the live operator destination's videoOutput / shmName instead of the factory 'screen' (which brought the kiosk
- * back on the next apply). Factory reset and the ISO still seed 'screen' — the ISO carries no Godot client (WO-609).
+ * (WO-593) owns the operator monitor. A New project keeps the live operator destination's videoOutput / shmName.
+ * WO-684: the factory starter (reset, New project on a fresh box, the ISO) seeds 'shm'; the Godot GUI ships in the ISO
+ * since WO-669. 'screen' is the deprecated kiosk-era output and is kept only on a box that saved it explicitly.
  * @param {object} hardwareConfig the starter config (mutated)
  * @param {object} cfg live config
  */
 function keepOperatorVideoOutput(hardwareConfig, cfg) {
 	const live = (cfg?.screenDestinations?.destinations || []).find((d) => d?.mode === 'operator_gui')
 	const dests = hardwareConfig?.screenDestinations?.destinations || []
-	if (live?.videoOutput !== 'shm') return
+	if (live?.videoOutput !== 'shm' && live?.videoOutput !== 'screen') return
 	for (const d of dests) {
 		if (d?.mode !== 'operator_gui') continue
-		d.videoOutput = 'shm'
+		d.videoOutput = live.videoOutput
 		d.shmName = live.shmName || d.shmName
 	}
 }
