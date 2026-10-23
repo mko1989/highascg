@@ -7,6 +7,7 @@ const { loadExfatSyncMapFromDisk } = require('./exfat-sync-map')
 const { getExfatMountStatus } = require('./exfat-sync-status')
 const { walkRelativeFiles, copyFilePreserveTimes } = require('./exfat-sync-fs')
 const { exportSecretsToPrivateDir } = require('./private-secrets-export')
+const { isBootStick } = require('./boot-stick')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
 const PRIVATE_HOST_ROOT = path.join(REPO_ROOT, '.private')
@@ -170,6 +171,12 @@ async function runPrivateVolumeSync(opts = {}) {
 		if (!mount.mounted) {
 			log('info', `[private-sync] ${key}: not mounted at ${vol.mount}`)
 			results.push({ id: key, mount: vol.mount, mounted: false, copied: 0, skipped: 0 })
+			continue
+		}
+		// WO-697: per-machine pairing (Tailscale / Syncthing) never lands on a stick this box did not boot from
+		if (key === 'usb' && !isBootStick(vol.mount)) {
+			log('info', `[private-sync] usb: not this box's boot stick — skip`)
+			results.push({ id: key, mount: vol.mount, mounted: true, copied: 0, skipped: 0, foreign: true })
 			continue
 		}
 		const volDir = volumePrivateDir(vol.mount, machineId)

@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-482 routes.
+485 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -425,6 +425,9 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/system/staged` | registry | `src/api/router.js` |
 | GET | `/api/system/staged/*` | registry | `src/api/router.js` |
 | POST | `/api/system/staged/*` | registry | `src/api/router.js` |
+| GET | `/api/system/stick` | registry | `src/api/router.js`, `src/api/routes-exfat-sync.js` |
+| POST | `/api/system/stick/load` | registry | `src/api/router.js` |
+| POST | `/api/system/stick/save` | registry | `src/api/router.js`, `src/api/routes-exfat-sync.js` |
 | * | `/api/system/time` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/time` | registry | `src/api/router.js` |
 | POST | `/api/system/time` | registry | `src/api/router.js` |
@@ -515,6 +518,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-device-snapshot.js` | WO-49 — Device-wide snapshot: build envelope, apply validated snapshot. |
 | `src/api/routes-device-view.js` | Device View API Routes. |
 | `src/api/routes-dmx-monitor.js` | WO-693 — DMX viewer (src/artnet/dmx-monitor.js). |
+| `src/api/routes-exfat-sync.js` | WO-47: exFAT sync map status (view configured folders) + optional dry-run / run. |
 | `src/api/routes-fixture-dmx.js` | WO-615 T3/T4 — the fixture DMX engine (src/fixtures/follow-engine.js, via ctx.fixtureService): GET    /api/fixtures/dmx                         → { dmx (master, |
 | `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
 | `src/api/routes-gdtf-share.js` | WO-637 — GDTF Share (src/fixtures/gdtf-share.js): GET  /api/fixtures/share/account               → { user, set }  (the password is never returned) POST /api/fix |

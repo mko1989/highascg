@@ -68,6 +68,8 @@ DECKLINK_INSTALL_SH_DST=/usr/local/lib/highascg/decklink-install-from-exfat.sh
 DECKLINK_INSTALL_LIB_DST=/usr/local/lib/highascg/decklink-install-lib.sh
 SYSTEM_TIME_SH_DST=/usr/local/lib/highascg/highascg-set-system-time.sh
 NETWORK_APPLY_SH_DST=/usr/local/lib/highascg/highascg-exfat-network-apply.sh
+BOOT_STICK_LIB_SRC="${REPO_ROOT}/scripts/exfat/highascg-boot-stick.sh" # WO-697: sourced by network-apply + server-update
+BOOT_STICK_LIB_DST=/usr/local/lib/highascg/highascg-boot-stick.sh
 decklink_install_svc="highascg-decklink-install.service"
 network_apply_svc="highascg-exfat-network-apply.service"
 BOOT_EXCLUDE_SRC="${REPO_ROOT}/config/bootstrap-rsync-excludes.txt"
@@ -95,6 +97,7 @@ install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/
 [[ -f "$DECKLINK_INSTALL_SH_SRC" ]] && install -m 0755 -o root -g root "$DECKLINK_INSTALL_SH_SRC" "$DECKLINK_INSTALL_SH_DST"
 [[ -f "$SYSTEM_TIME_SH_SRC" ]] && install -m 0755 -o root -g root "$SYSTEM_TIME_SH_SRC" "$SYSTEM_TIME_SH_DST"
 [[ -f "$NETWORK_APPLY_SH_SRC" ]] && install -m 0755 -o root -g root "$NETWORK_APPLY_SH_SRC" "$NETWORK_APPLY_SH_DST"
+[[ -f "$BOOT_STICK_LIB_SRC" ]] && install -m 0644 -o root -g root "$BOOT_STICK_LIB_SRC" "$BOOT_STICK_LIB_DST"
 if [[ -f "$UDEV_RULE_SRC" ]]; then
 	install -m 0644 -o root -g root "$UDEV_RULE_SRC" "$UDEV_RULE_DST"
 	echo "installed ${UDEV_RULE_DST}"

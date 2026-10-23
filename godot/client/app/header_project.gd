@@ -11,6 +11,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const UiIcons := preload("res://app/ui_icons.gd")
 const HeaderModel := preload("res://app/header_model.gd")
 const LoadDialog := preload("res://app/project_load_dialog.gd")
+const StickDialog := preload("res://app/stick_dialog.gd")
 
 const NOTICE_S := 6.0
 
@@ -65,6 +66,11 @@ func _ready() -> void:
 	_load.chosen.connect(load_slug)
 	_load.file_requested.connect(_pick_file.bind(false))
 	add_child(_load)
+	var stick := StickDialog.new()  # WO-697: save to / load from a stick this box did not boot from
+	stick.chosen.connect(load_slug)
+	stick.said.connect(say)
+	_load.stick_requested.connect(stick.open)
+	add_child(stick)
 	_new_confirm = ConfirmationDialog.new()
 	_new_confirm.title = "New project"
 	_new_confirm.dialog_text = "Start a fresh project? Unsaved changes will be lost. Screen destinations reset to one PGM."

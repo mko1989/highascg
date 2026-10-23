@@ -6,6 +6,7 @@ const { execFileSync } = require('child_process')
 const { loadExfatSyncMapFromDisk } = require('../system/exfat-sync-map')
 const { copyFilePreserveTimes } = require('../system/exfat-sync-fs')
 const { shouldAllowExfatPullShowData } = require('../replication/replication-show-authority')
+const { isBootStick } = require('../system/boot-stick')
 // Lazy: project-store requires this module back — a top-level require creates a require cycle
 // (project-store's exports are incomplete when read from here at load time; Node floods
 // "Accessing non-existent property ... inside circular dependency" per project file scanned).
@@ -33,6 +34,14 @@ function isVolumeMountedSync(mountPath) {
 	} catch {
 		return false
 	}
+}
+
+/**
+ * WO-697: the stick's projects join the catalog and follow every save only when the box booted from that stick;
+ * another HighAsCG stick is a drive the operator saves to / loads from by hand (src/system/stick-transfer.js).
+ */
+function usbAutoSync(roots) {
+	return !!(roots.usb && isVolumeMountedSync(roots.usb) && isBootStick(roots.usb))
 }
 
 /**
@@ -240,7 +249,7 @@ function listProjectsFromVolumes() {
 	const roots = getProjectRoots()
 	/** @type {ProjectCatalogEntry[][]} */
 	const lists = []
-	const usbMounted = !!(roots.usb && isVolumeMountedSync(roots.usb))
+	const usbMounted = usbAutoSync(roots)
 	const bridgeMounted = !!(roots.bridge && isVolumeMountedSync(roots.bridge))
 
 	if (usbMounted && roots.usb) {
@@ -335,7 +344,7 @@ function pushProjectSlugToVolumes(slug, opts = {}) {
 	let usb = false
 	let bridge = false
 
-	if (roots.usb && isVolumeMountedSync(roots.usb)) {
+	if (usbAutoSync(roots)) {
 		const usbDir = volumeProjectsDir(roots.usb)
 		if (copyIfExists(localFile, path.join(usbDir, `${s}.json`))) usb = true
 		if (copyIfExists(localAutosave, path.join(usbDir, AUTOSAVE_SUBDIR, `${s}.json`))) usb = true
@@ -359,7 +368,7 @@ function pushProjectSlugToVolumes(slug, opts = {}) {
 function pullProjectSlugFromUsbIfNewer(slug) {
 	if (!shouldAllowExfatPullShowData()) return false
 	const roots = getProjectRoots()
-	if (!roots.usb || !isVolumeMountedSync(roots.usb)) return false
+	if (!usbAutoSync(roots)) return false
 	const s = String(slug || '').trim()
 	if (!s) return false
 	const usbFile = path.join(volumeProjectsDir(roots.usb), `${s}.json`)
@@ -379,7 +388,7 @@ function pullAutosaveSlugFromVolumesIfNewer(slug) {
 	const localFile = path.join(roots.local, AUTOSAVE_SUBDIR, `${s}.json`)
 	/** @type {string[]} */
 	const sources = []
-	if (roots.usb && isVolumeMountedSync(roots.usb)) {
+	if (usbAutoSync(roots)) {
 		sources.push(path.join(volumeProjectsDir(roots.usb), AUTOSAVE_SUBDIR, `${s}.json`))
 	}
 	if (roots.bridge && isVolumeMountedSync(roots.bridge)) {
@@ -417,4 +426,5 @@ module.exports = {
 	pullProjectSlugFromUsbIfNewer,
 	pullAutosaveSlugFromVolumesIfNewer,
 	copyIfSrcNewer,
+	usbAutoSync,
 }

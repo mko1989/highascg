@@ -27,6 +27,18 @@ func test_project_rows() -> void:
 	t.eq(H.saved_label(""), "", "no savedAt")
 
 
+func test_stick_offer_and_rows() -> void:  # WO-697
+	var vols := func(m: Variant, b: Variant) -> Dictionary: return {"volumes": {"usb": {"mounted": m, "bootStick": b}}}
+	t.eq(H.offers_stick(vols.call(true, false)), true, "a stick this box did not boot from")
+	t.eq(H.offers_stick(vols.call(true, true)), false, "the boot stick syncs on its own")
+	t.eq(H.offers_stick(vols.call(false, false)), false, "no stick")
+	t.eq(H.offers_stick({"projects": []}), false, "older server without volumes")
+	var rows := H.stick_rows({"projects": [{"slug": "gig", "name": "", "savedAt": "2026-10-20T18:00:00Z", "onBox": true},
+		{"slug": "a", "name": "A"}, {"name": "no slug"}, "junk"]})
+	t.eq(rows.map(func(r: Dictionary) -> Array: return [r.slug, r.name, r.on_box]), [["gig", "gig", true], ["a", "A", false]], "slug rows, name falls back")
+	t.eq(H.stick_rows({"mounted": false}), [], "no projects key")
+
+
 func test_load_reply() -> void:
 	var reply := {"version": 3, "name": "npcc", "_activation": {"slug": "npcc", "restartRequired": false}, "_recoveredFromAutosave": true}
 	t.eq(H.loaded_project(reply), {"version": 3, "name": "npcc"}, "bookkeeping keys stripped")

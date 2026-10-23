@@ -41,6 +41,27 @@ static func project_rows(data: Variant) -> Array:
 	return out
 
 
+## WO-697: show "USB stick…" in the Load dialog — a HighAsCG stick is plugged in that this box did not boot from (the
+## box syncs with its boot stick on its own; any other stick is saved to / loaded from by hand).
+static func offers_stick(list_data: Variant) -> bool:
+	if not (list_data is Dictionary) or not ((list_data as Dictionary).get("volumes") is Dictionary):
+		return false
+	var usb: Variant = list_data.volumes.get("usb")
+	return usb is Dictionary and usb.get("mounted") == true and usb.get("bootStick") != true
+
+
+## GET /api/system/stick → rows for the stick dialog: [{slug, name, saved, on_box}], server order (newest first).
+static func stick_rows(data: Variant) -> Array:
+	var out: Array = []
+	if not (data is Dictionary) or not ((data as Dictionary).get("projects") is Array):
+		return out
+	for p in (data as Dictionary)["projects"]:
+		if p is Dictionary and str(p.get("slug", "")) != "":
+			var name := str(p.get("name", "")) if str(p.get("name", "")) != "" else str(p.slug)
+			out.append({"slug": str(p.slug), "name": name, "saved": saved_label(str(p.get("savedAt", ""))), "on_box": p.get("onBox") == true})
+	return out
+
+
 ## "2026-10-20T20:18:19.789Z" → "2026-10-20 20:18" (UTC → local via the system bias).
 static func saved_label(iso: String) -> String:
 	if iso.length() < 16:

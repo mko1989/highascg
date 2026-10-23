@@ -127,6 +127,9 @@ routes.post('/api/replication', ({ path, body, ctx, req }) => routesReplication.
 // Exfat Sync
 routes.get('/api/system/exfat-sync', ({ path, ctx }) => routesExfatSync.handleGet(path, ctx), { requireCaspar: false })
 routes.post('/api/system/exfat-sync/run', ({ path, body, ctx }) => routesExfatSync.handlePost(path, body, ctx), { requireCaspar: false })
+routes.get('/api/system/stick', ({ path, ctx }) => routesExfatSync.handleGet(path, ctx), { requireCaspar: false })
+routes.post('/api/system/stick/save', ({ path, body, ctx }) => routesExfatSync.handleStickPost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/system/stick/load', ({ path, body, ctx }) => routesExfatSync.handleStickPost(path, body, ctx), { requireCaspar: false })
 
 // Private sync
 routes.get('/api/private-sync/*', ({ path, ctx }) => routesPrivateSync.handleGet(path, ctx), { requireCaspar: false })

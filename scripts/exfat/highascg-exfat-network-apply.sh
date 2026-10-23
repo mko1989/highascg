@@ -61,6 +61,14 @@ if ! mountpoint -q "$EXFAT_MP" 2>/dev/null; then
 	exit 0
 fi
 
+# WO-697: only the stick this box booted from is applied automatically — any other stick is just a drive.
+BOOT_STICK_LIB="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/highascg-boot-stick.sh"
+# shellcheck source=highascg-boot-stick.sh
+if [[ ! -f "$BOOT_STICK_LIB" ]] || ! source "$BOOT_STICK_LIB" || ! highascg_exfat_is_boot_stick "$EXFAT_MP"; then
+	log "skip: ${EXFAT_MP} is not the stick this box booted from — its network.conf is not applied (WO-697)"
+	exit 0
+fi
+
 if [[ ! -f "$CONF" ]]; then
 	log "skip: no ${CONF}"
 	rm -f "$STATE_FILE" "$SOURCE_FILE" 2>/dev/null || true

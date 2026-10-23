@@ -7,6 +7,7 @@ const projectStore = require('../engine/project-store')
 const { maskProjectStreamCredentials } = require('../engine/project-stream-credentials')
 const { getProjectMediaRelId, getProjectMediaRoot } = require('../media/project-media-root')
 const { retireSlugWithReplication } = require('./routes-data-project-slug')
+const { isBootStick } = require('../system/boot-stick')
 
 async function loadProjectMerged(_ctx) {
 	return loadFullProject()
@@ -40,6 +41,7 @@ async function handleProjectList(ctx) {
 				usb: {
 					mount: roots.usb,
 					mounted: !!(roots.usb && isVolumeMountedSync(roots.usb)),
+					bootStick: !!roots.usb && isBootStick(roots.usb), // WO-697: else save / load by hand only
 				},
 				bridge: {
 					mount: roots.bridge,

@@ -24,6 +24,12 @@ const {
 } = require('./exfat-sync-fs')
 const { getExfatMountStatus, getExfatSyncDashboard } = require('./exfat-sync-status')
 const { shouldSyncShowDataPairFromExfat } = require('../replication/replication-show-authority')
+const { isBootStick } = require('./boot-stick')
+
+/** WO-697: a USB pair syncs on its own only with the stick this box booted from; any other stick is just a drive. */
+function foreignStick(p, exfatRoot) {
+	return p.volume === 'usb' && !isBootStick(exfatRoot)
+}
 
 /** @type {Map<string, { mounted: boolean, source?: string, fstype?: string, target: string }>} */
 const mountCache = new Map()
@@ -65,6 +71,9 @@ async function pushProjectConfigToExfat(opts) {
 	const want = opts?.pairIds?.length
 		? new Set(opts.pairIds.map((x) => String(x)))
 		: null
+	// WO-697 manual "Save to stick": the operator's explicit push, also to a stick this box did not boot from
+	const manual = !!opts?.manual
+	let foreign = false
 
 	let copied = 0
 	let skipped = 0
@@ -74,10 +83,16 @@ async function pushProjectConfigToExfat(opts) {
 	for (const p of loaded.map.pairs) {
 		if (!pairPushOnSave(p, loaded.map)) continue
 		if (want && !want.has(p.id)) continue
+		if (opts?.volume && p.volume !== opts.volume) continue
 
 		const exfatRoot = resolvePairExfatRoot(loaded.map, p)
 		const mount = await volumeMountStatus(exfatRoot)
 		if (!mount.mounted) {
+			skipped += 1
+			continue
+		}
+		if (!manual && foreignStick(p, exfatRoot)) {
+			foreign = true
 			skipped += 1
 			continue
 		}
@@ -137,6 +152,7 @@ async function pushProjectConfigToExfat(opts) {
 		}
 	}
 
+	if (foreign) log('info', '[exfat-sync] USB stick is not the one this box booted from — no automatic push (WO-697)')
 	log('info', `[exfat-sync] push to volume(s) copied=${copied} skipped=${skipped}`)
 	return { copied, skipped, errors }
 }
@@ -150,6 +166,10 @@ async function syncOnePair(p, map, opts) {
 	const mount = await volumeMountStatus(exfatRoot)
 	if (!mount.mounted) {
 		log('info', `[exfat-sync] ${id}: volume ${p.volume} not mounted at ${exfatRoot} — skip`)
+		return { copied: 0, skipped: 1, errors: [] }
+	}
+	if (foreignStick(p, exfatRoot)) {
+		log('info', `[exfat-sync] ${id}: the stick at ${exfatRoot} is not this box's boot stick — not synced (WO-697)`)
 		return { copied: 0, skipped: 1, errors: [] }
 	}
 

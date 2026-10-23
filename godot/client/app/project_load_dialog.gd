@@ -1,13 +1,16 @@
 extends ConfirmationDialog
 ## WO-608 header — web load-project-modal.js: the server's project files (GET /api/project/list), the active one
-## preselected; Load activates the pick on the server, "From file…" imports a .json from this computer.
+## preselected; Load activates the pick on the server, "From file…" imports a .json from this computer, "USB stick…"
+## (WO-697, only for a HighAsCG stick this box did not boot from) saves to / loads from it (app/stick_dialog.gd).
 
 const HeaderModel := preload("res://app/header_model.gd")
 
 signal chosen(slug: String)
 signal file_requested
+signal stick_requested
 
 var list: Tree
+var _stick_btn: Button
 
 
 func _init() -> void:
@@ -27,10 +30,14 @@ func _init() -> void:
 	list.item_activated.connect(_confirm)
 	add_child(list)
 	add_button("From file…", true, "file")
+	_stick_btn = add_button("USB stick…", true, "stick")
+	_stick_btn.visible = false
 	custom_action.connect(func(a: StringName) -> void:
+		hide()
 		if a == &"file":
-			hide()
-			file_requested.emit())
+			file_requested.emit()
+		elif a == &"stick":
+			stick_requested.emit())
 	confirmed.connect(_confirm)
 
 
@@ -41,6 +48,7 @@ func open() -> void:
 	if not res.ok:
 		_line("Could not load the project list: " + str(res.error))
 		return
+	_stick_btn.visible = HeaderModel.offers_stick(res.data)
 	show_rows(HeaderModel.project_rows(res.data))
 
 

@@ -77,4 +77,4 @@ machine on 192.168.0.64 user casparcg password highascg"*
 
 - .64 itself still runs the old client: Caspar starts there once the launcher is answered (restart the GUI) — the next
   ISO carries the fix.
-- Owner decision (finding 2).
+- Finding 2: owner decided 23.10 — automatic only with the boot stick, otherwise by hand → [WO-697](./697_WO_stick_sync_only_when_booted_from_it.md) (done).
