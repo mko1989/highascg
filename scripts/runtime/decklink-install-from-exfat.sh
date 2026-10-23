@@ -83,6 +83,7 @@ fi
 
 if decklink_install_vendor_pair "$DECKLINK_VENDOR_MAIN_DEB" "$DECKLINK_VENDOR_GUI_DEB" "${DECKLINK_EXTRACT_TMPDIR:-}"; then
 	log "ok: installed Desktop Video ${DECKLINK_VENDOR_VERSION}"
+	log "dkms cache (WO-704): ${DECKLINK_DKMS_CACHE_RESTORED:-0} module tree(s) restored from the stick"
 	exit 0
 fi
 

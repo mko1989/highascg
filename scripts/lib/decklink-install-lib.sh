@@ -203,7 +203,13 @@ decklink_install_vendor_pair() {
 	local gui_deb="${2:-}"
 	local extract_dir="${3:-}"
 	[[ -f "$main_deb" ]] || return 1
-	decklink_ensure_dkms_prereqs || return 1
+	local ver krel
+	ver="$(decklink_deb_version_from_basename "$(basename "$main_deb")" || true)"
+	krel="$(uname -r)"
+	# WO-704: a full cache hit needs no headers (`dkms install` of a built tree only copies + depmods)
+	if ! decklink_dkms_cache_restore "$ver" "$krel"; then
+		decklink_ensure_dkms_prereqs || return 1
+	fi
 	if [[ -n "$gui_deb" && -f "$gui_deb" ]]; then
 		DEBIAN_FRONTEND=noninteractive dpkg -i "$main_deb" "$gui_deb" || {
 			DEBIAN_FRONTEND=noninteractive apt-get install -f -y
@@ -218,6 +224,11 @@ decklink_install_vendor_pair() {
 	decklink_rebuild_blackmagic_dkms || true
 	modprobe blackmagic_io 2>/dev/null || true
 	modprobe blackmagic 2>/dev/null || true
+	if [[ "$DECKLINK_DKMS_CACHE_RESTORED" -gt 0 ]] && ! decklink_modules_loaded; then
+		decklink_dkms_cache_rebuild "$krel" && { decklink_dkms_cache_save "$ver" "$krel" 1 || true; }
+	elif decklink_modules_loaded; then
+		decklink_dkms_cache_save "$ver" "$krel" || true
+	fi
 	# Clean up temporary extraction directory if provided
 	[[ -z "$extract_dir" || ! -d "$extract_dir" ]] || rm -rf "$extract_dir"
 	return 0
@@ -288,3 +299,7 @@ decklink_rebuild_blackmagic_dkms() {
 		dkms install -m "$mod" -v "$ver" -k "$krel" 2>/dev/null || true
 	done
 }
+
+# WO-704: per-kernel DKMS build cache on the stick (restore before dpkg, save after a load).
+# shellcheck source=decklink-dkms-cache-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/decklink-dkms-cache-lib.sh"

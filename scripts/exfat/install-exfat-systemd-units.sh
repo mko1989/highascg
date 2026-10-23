@@ -51,6 +51,7 @@ BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-boot.sh"
 BRIDGE_BOOT_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-bridge-boot.sh"
 DECKLINK_INSTALL_SH_SRC="${REPO_ROOT}/scripts/runtime/decklink-install-from-exfat.sh"
 DECKLINK_INSTALL_LIB_SRC="${REPO_ROOT}/scripts/lib/decklink-install-lib.sh"
+DECKLINK_CACHE_LIB_SRC="${REPO_ROOT}/scripts/lib/decklink-dkms-cache-lib.sh" # WO-704: sourced by the lib
 SYSTEM_TIME_SH_SRC="${REPO_ROOT}/scripts/runtime/highascg-set-system-time.sh"
 NETWORK_APPLY_SH_SRC="${REPO_ROOT}/scripts/exfat/highascg-exfat-network-apply.sh"
 SEED_LAYOUT_SH="${REPO_ROOT}/tools/eggs/live-usb/seed-exfat-operator-layout.sh"
@@ -66,6 +67,7 @@ BOOT_SH_DST=/usr/local/lib/highascg/highascg-exfat-boot.sh
 BRIDGE_BOOT_SH_DST=/usr/local/lib/highascg/highascg-bridge-boot.sh
 DECKLINK_INSTALL_SH_DST=/usr/local/lib/highascg/decklink-install-from-exfat.sh
 DECKLINK_INSTALL_LIB_DST=/usr/local/lib/highascg/decklink-install-lib.sh
+DECKLINK_CACHE_LIB_DST=/usr/local/lib/highascg/decklink-dkms-cache-lib.sh
 SYSTEM_TIME_SH_DST=/usr/local/lib/highascg/highascg-set-system-time.sh
 NETWORK_APPLY_SH_DST=/usr/local/lib/highascg/highascg-exfat-network-apply.sh
 BOOT_STICK_LIB_SRC="${REPO_ROOT}/scripts/exfat/highascg-boot-stick.sh" # WO-697: sourced by network-apply + server-update
@@ -94,6 +96,7 @@ install -d -m 0755 -o "$USER_CASPAR" -g "$GNAME" /var/cache/highascg/updates 2>/
 [[ -f "$BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BOOT_SH_SRC" "$BOOT_SH_DST"
 [[ -f "$BRIDGE_BOOT_SH_SRC" ]] && install -m 0755 -o root -g root "$BRIDGE_BOOT_SH_SRC" "$BRIDGE_BOOT_SH_DST"
 [[ -f "$DECKLINK_INSTALL_LIB_SRC" ]] && install -m 0644 -o root -g root "$DECKLINK_INSTALL_LIB_SRC" "$DECKLINK_INSTALL_LIB_DST"
+[[ -f "$DECKLINK_CACHE_LIB_SRC" ]] && install -m 0644 -o root -g root "$DECKLINK_CACHE_LIB_SRC" "$DECKLINK_CACHE_LIB_DST"
 [[ -f "$DECKLINK_INSTALL_SH_SRC" ]] && install -m 0755 -o root -g root "$DECKLINK_INSTALL_SH_SRC" "$DECKLINK_INSTALL_SH_DST"
 [[ -f "$SYSTEM_TIME_SH_SRC" ]] && install -m 0755 -o root -g root "$SYSTEM_TIME_SH_SRC" "$SYSTEM_TIME_SH_DST"
 [[ -f "$NETWORK_APPLY_SH_SRC" ]] && install -m 0755 -o root -g root "$NETWORK_APPLY_SH_SRC" "$NETWORK_APPLY_SH_DST"
@@ -226,6 +229,7 @@ echo "  ${NETWORK_APPLY_SH_DST}"
 echo "  /etc/systemd/system/${decklink_install_svc}"
 echo "  ${DECKLINK_INSTALL_SH_DST}"
 echo "  ${DECKLINK_INSTALL_LIB_DST}"
+echo "  ${DECKLINK_CACHE_LIB_DST}"
 echo "  ${SYSTEM_TIME_SH_DST}"
 echo "  /etc/systemd/system/${arrive_svc}"
 # WO-188: sudoers entry for DeckLink install (via Web UI password-gated POST)
