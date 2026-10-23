@@ -17,6 +17,7 @@
  *   chainOf(rig)                 → [{ xf, axis }] root → the first beam under both a pan and a tilt axis, or null
  *   beamOf(chain, pose, pan, tilt) → { origin, dir } in PSN (x stage left, y upstage, z up)
  *   aimFixture(fx, target, prev) → { pan, tilt } commanded, or null — the chain IK when fx.gdtf.chain, else aim()
+ *                                (the chain IK honours the patch's calibrated `offset`, WO-700 R3)
  */
 
 const { aim } = require('./follow-ik')
@@ -174,8 +175,10 @@ function aimChain(fx, target, prev) {
 	const chain = fx.gdtf.chain
 	const pa = fileAxis(pf, fx.pan)
 	const ta = fileAxis(tf, fx.tilt)
-	const p0 = toPhys(pf, pa, prev.pan)
-	const t0 = toPhys(tf, ta, prev.tilt)
+	const op = Number(fx.offset?.pan) || 0 // WO-700 R3: the real head points at its sent angle + offset
+	const ot = Number(fx.offset?.tilt) || 0
+	const p0 = toPhys(pf, pa, prev.pan) + op
+	const t0 = toPhys(tf, ta, prev.tilt) + ot
 	const sols = []
 	for (const [p, t] of [[p0, t0], [p0 + 180, -t0]]) {
 		const s = refine(chain, fx.pose, target, p, t)
@@ -198,9 +201,9 @@ function aimChain(fx, target, prev) {
 	let best = null
 	let cost = Infinity
 	for (const s of sols) {
-		const t = ((((s.t + 180) % 360) + 360) % 360) - 180
+		const t = ((((s.t + 180) % 360) + 360) % 360) - 180 - ot
 		if (!inside(tf, t)) continue
-		const base = s.p - 360 * Math.round(s.p / 360)
+		const base = s.p - op - 360 * Math.round((s.p - op) / 360)
 		for (let k = -3; k <= 3; k++) {
 			const p = base + 360 * k
 			if (!inside(pf, p)) continue

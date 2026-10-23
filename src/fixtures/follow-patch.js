@@ -14,6 +14,7 @@
  *     patch: [{ id, name, enabled, protocol: "artnet" | "sacn", universe (Art-Net port-address 0–32767 | sACN
  *               1–63999), address 1–512, dest "a.b.c.d[:port]" ("" with sACN = the universe's multicast group),
  *               typeId, mode (WO-615 T3: a GDTF type from gdtf-store.js — pan / tilt / channels come from it), pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
+ *               offset? { pan, tilt } ° (WO-700 R3: calibrated, added to a typed head's angles in the previs / IK),
  *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left), pitch / roll °
  *                      (WO-615 T10: a tilted / side mount from MVR — GDTF fixtures only; the generic profile ignores them) },
  *               fixed "ch=value, …" (shutter / dimmer / colour held open), follow (marker id, 0 = none),
@@ -58,6 +59,8 @@ function normalizeFixture(f, i) {
 	const pose = o.pose && typeof o.pose === 'object' ? o.pose : {}
 	const sacn = o.protocol === 'sacn'
 	const dest = typeof o.dest === 'string' ? o.dest.trim() : ''
+	const off = o.offset && typeof o.offset === 'object' ? o.offset : {}
+	const offset = { pan: num(off.pan, 0, -180, 180), tilt: num(off.tilt, 0, -180, 180) }
 	return {
 		id: String(o.id || `fx${i + 1}`),
 		name: String(o.name || `Fixture ${i + 1}`),
@@ -76,6 +79,8 @@ function normalizeFixture(f, i) {
 		fixed: String(o.fixed ?? ''),
 		follow: int(o.follow, 0, 0, 65535),
 		aim_z: num(o.aim_z, 1, -5, 10),
+		// WO-700 R3: the calibrated pan / tilt offset (°) — the real beam is where the file's angle + offset points
+		...(offset.pan || offset.tilt ? { offset } : {}),
 	}
 }
 

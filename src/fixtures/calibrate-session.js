@@ -7,49 +7,43 @@
  *   {action: 'start', id}                      park the head where it is aimed (follow-engine hold)
  *   {action: 'start', id, hold: false}         WO-700: leave the head alone (Lighting → Calibrate heads): the real
  *                                              beam is aimed by the Programmer or the console; nothing is sent
- *                                              for the session; each point takes the pan / tilt the head is getting
+ *                                              for the session; each point takes the angles the head is getting
  *                                              (`frame(fx)`: the console's input in visualiser mode, else ours) and
- *                                              every point already moves the solved pose (prior = the pose at start)
+ *                                              solves the pan / tilt offset (R3: the head never moves) — from 1 point
  *   {action: 'jog', id, pan?, tilt?, dpan?, dtilt?}  absolute and / or relative commanded degrees
  *   {action: 'point', id, marker}              the beam spot is where `marker` stands → one (pan, tilt) ↔ point pair
  *   {action: 'point', id, at: [x, y, z]}       … or the floor spot the operator clicked in a camera picture
  *                                              (WO-630 F1: no marker to place first; PSN metres)
  *   {action: 'undo', id}                       drop the last pair
  *   {action: 'end', id}                        release the head (it follows its marker again)
- * Each reply carries the session and, from 3 pairs, the solved pose (calibrate-solve.js). The pose is applied by
- * the client: `project.fixtures` is a client-owned slice the server cannot write (CLIENT_OWNED_SLICES).
+ * Each reply carries the session and, from 3 pairs, the solved pose (calibrate-solve.js) — a live session the solved
+ * offset and the one it started from (`offset0`). Either is applied by the client: `project.fixtures` is a client-owned slice the server cannot write (CLIENT_OWNED_SLICES).
  */
 
-const { solveFixturePose } = require('./calibrate-solve')
-const { axisDeg } = require('./follow-ik')
-const { axisFn, beamOf, fileAxis, toPhys } = require('./gdtf-ik')
+const { solveFixturePose, solveOffsets } = require('./calibrate-solve')
+const { axisFn, beamOf } = require('./gdtf-ik')
 
 /**
- * WO-700: how a live session reads and models fixture fx. A typed head with an Axis chain is modelled as the previs
- * draws it (gdtf-ik.js beamOf, the file's sense — so the solved pose puts the digital beam on the mark); anything
- * else in the follow engine's commanded degrees (follow-ik.js, both pan senses).
+ * WO-700: a live session's head — a typed head with an Axis chain, modelled as the previs draws it (gdtf-ik.js
+ * beamOf at the angles sent + the offset). null for anything else (nothing to calibrate it against).
  */
 function liveModel(fx) {
-	const pf = axisFn(fx, 'Pan')
-	const tf = axisFn(fx, 'Tilt')
-	const chain = fx.gdtf?.chain && pf && tf ? fx.gdtf.chain : null
-	const pan = chain ? { ...fx.pan, ...fileAxis(pf, fx.pan) } : fx.pan
-	const tilt = chain ? { ...fx.tilt, ...fileAxis(tf, fx.tilt) } : fx.tilt
+	const chain = fx.gdtf?.chain
+	const axes = ['Pan', 'Tilt'].map((a) =>
+		fx.gdtf?.channels.find((c) => (c.functions[c.initial] || c.functions[0])?.attribute === a)
+	)
+	if (!chain || !fx.pose || axes.some((c) => !c) || !axisFn(fx, 'Pan') || !axisFn(fx, 'Tilt')) return null
+	/** The physical angle channel c is at in `buf` (as gdtf-visual.js decodes its initial function). */
+	const phys = (c, buf) => {
+		const f = c.functions[c.initial] || c.functions[0]
+		let dmx = 0
+		for (const o of c.offsets) dmx = dmx * 256 + (buf[fx.address - 2 + o] ?? 0)
+		const t = f.to === f.from ? 0 : Math.max(0, Math.min(1, (dmx - f.from) / (f.to - f.from)))
+		return f.physFrom + t * (f.physTo - f.physFrom)
+	}
 	return {
-		/** The pan / tilt in fx's bytes of `buf`, or null. */
-		read(buf) {
-			if (!buf || !fx.moving) return null
-			const at = (ch) => buf[fx.address - 2 + ch] ?? 0
-			const deg = (ax) => axisDeg(ax, [at(ax.ch), ax.fine ? at(ax.fine) : 0])
-			return { pan: deg(pan), tilt: deg(tilt), inv: chain ? null : fx.pan.invert }
-		},
-		solveOpts: chain
-			? {
-					forward: (pose, p, t) => beamOf(chain, pose, toPhys(pf, pan, p), toPhys(tf, tilt, t)),
-					senses: [1],
-					extra: { pitch: fx.pose.pitch, roll: fx.pose.roll },
-				}
-			: {},
+		read: (buf) => (buf ? { pan: phys(axes[0], buf), tilt: phys(axes[1], buf), inv: null } : null),
+		forward: (pan, tilt) => beamOf(chain, fx.pose, pan, tilt),
 	}
 }
 
@@ -64,19 +58,19 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 		// a pair taken before Invert pan was flipped meant the mirrored pan: re-read it in today's sense
 		// (a live point read in the file's sense, inv null, does not depend on the patch's flip)
 		const pts = s.points.map((p) => ({ ...p, pan: p.inv === null || p.inv === fx.pan.invert ? p.pan : -p.pan }))
-		const opts = s.live ? { ...liveModel(fx).solveOpts, prior: s.pose0 } : {}
+		const lm = s.live ? liveModel(fx) : null
 		return {
 			id,
 			name: fx.name,
 			pan: s.pan,
 			tilt: s.tilt,
 			live: !!s.live,
-			pose0: s.pose0 || null,
+			offset0: s.offset0 || null,
 			points: pts,
 			hang: fx.pose.hang,
 			output_enabled: engine.isLive(fx),
 			problem: fx.problem || fx.noSend || null,
-			solve: solveFixturePose(pts, { ...opts, hang: fx.pose.hang }),
+			solve: lm ? solveOffsets(pts, lm.forward) : solveFixturePose(pts, { hang: fx.pose.hang }),
 		}
 	}
 
@@ -91,10 +85,12 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 		const action = data?.action
 		if (action === 'start') {
 			if (data.hold === false) {
+				const lm = liveModel(fx)
+				if (!lm) return { status: 409, body: { error: `${fx.name} has no GDTF pan / tilt head to calibrate` } }
 				engine.release(id) // a camera-mode session on the same head handed over
-				const a = liveModel(fx).read(frame(fx)) || engine.aimOf(id)
-				const pose0 = s?.pose0 || { x: fx.pose.x, y: fx.pose.y, z: fx.pose.z, yaw: fx.pose.yaw || 0 }
-				sessions.set(id, { pan: a.pan, tilt: a.tilt, points: s?.live ? s.points : [], live: true, pose0 })
+				const a = lm.read(frame(fx)) || { pan: 0, tilt: 0 }
+				const offset0 = s?.offset0 || { pan: fx.offset?.pan || 0, tilt: fx.offset?.tilt || 0 }
+				sessions.set(id, { pan: a.pan, tilt: a.tilt, points: s?.live ? s.points : [], live: true, offset0 })
 				return { status: 200, body: view(id) }
 			}
 			const a = s || engine.aimOf(id)
@@ -129,7 +125,7 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 			if (!m) return { status: 404, body: { error: `no marker ${data.marker} — place one on the beam spot` } }
 			// a stale marker still stands where the operator dropped it — its position is all a pair needs
 			if (s.live) {
-				const a = liveModel(fx).read(frame(fx))
+				const a = liveModel(fx)?.read(frame(fx))
 				if (!a) {
 					return {
 						status: 409,

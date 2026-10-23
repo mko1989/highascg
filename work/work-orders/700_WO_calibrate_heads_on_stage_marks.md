@@ -1,8 +1,8 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
-**Status: DONE (2026-10-23, R2 below: smoke-wo700 8/8 + wo624/wo630 10/10, test:ci 2856/2859 (known pointer-confine),
-Godot 21158/0; no-hold session probed over the API on the box's Focus Profile 1 (reads its DMX, sends nothing, a mark
-it is not on is refused); fold order checked in a second client — owner QA: calibrate one head on 3–4 marks)**
+**Status: DONE (2026-10-23, R3 below: smoke-wo700 11/11 + wo624/wo630/wo615-follow-ik, test:ci 2859/2862 (known
+pointer-confine), Godot 21182/0; live API probe on Focus Profile 1 returns an offset, nothing sent or written; R2's
+pose-moving solve is SUPERSEDED by R3 — owner QA: calibrate one head on 1–4 marks)**
 
 Owner, 23.10: *"how to calibrate the heads? it should be done by pointing the lights at markers in real life than
 clicking this position of pan tilt is this marker and it calibrates"*
@@ -50,6 +50,9 @@ clicking this position of pan tilt is this marker and it calibrates"*
 
 ## R2 — calibrate with the Programmer's controls, the digital head corrected per point (23.10)
 
+> **R2's solve is superseded by R3** (it moved the head — the owner's next test). Its controls, fold place, frame
+> source and "applies per point" stay; the partial pose solve (prior, reach / floor / mark guards) was removed.
+
 Owner, 23.10: *"the calibrate has different controls than the programer. calibrate should be just above programer."*
 → *"rather just below the programer."* → *"calibrating the light should work light that. point the real light at the
 real marker on stage. click calibrate, which doesnt output artnet but moves the digital beam to light at the marker.
@@ -95,3 +98,44 @@ the position pan/tilt of the digital gets corrected each calibration point is ad
   its DMX, the far floor spot is refused (rms 92°, warning), nothing written to the project.
 - Second client: "Calibrate heads" directly under the Programmer's All / None / Release row.
 - NOT verified: a real head on real marks — owner QA.
+
+## R3 — correct where the beam points, never the head (23.10)
+
+Owner, 23.10 (testing R2): *"calibrating the beam bu beam is on mark makes the fixture it self change position rather
+then changing where the beam points."*
+
+### Investigation
+
+- R2 solved the head's pose (x, y, z, yaw) from the points and applied it per point, so the fixture body moved.
+  Box: Focus Profile 1's patch pose had gone from (−2.5, −6, 2, yaw 0) to (−2.33, −5.67, 3.21, yaw 4.05).
+- The previs turns a typed head's axis nodes by the server's decode (`gdtf-visual.js` `decodeVisual` → axes, applied
+  in `fixtures_3d.gd:349`); right-drag / Point at aim through `gdtf-features.js` `aimValues` → `gdtf-ik.js`
+  `aimFixture`. A pan / tilt offset in those two places changes where the digital beam points without touching the
+  pose — what a console's head calibration does.
+
+### What was done
+
+- Patch entry `offset {pan, tilt}` (°, ±180; only stored when non-zero): `follow-patch.js`, Godot `normalize_fixture`.
+- `decodeVisual(plan, buf, address, offset)` adds it to the Pan / Tilt axes (`follow-service.js` passes `fx.offset`);
+  `aimChain` solves the geometric angle and sends angle − offset, so Point at / right-drag land the real beam.
+- `calibrate-solve.js` `solveOffsets(pts, forward)`: least squares over (pan, tilt) offset (15° seed grid + LM, the
+  generic `lm()` now shared with the pose solve); one point is enough; the smallest of the mirrored equal fits wins;
+  warnings when marks disagree (rms > 2°) or the tilt offset exceeds 45° (wrong hang / beam not on the mark).
+  The R2 prior / partial pose machinery was removed (restored `solveFixturePose` to its pre-R2 form + `lm`).
+- `calibrate-session.js`: a live session needs a typed head with an Axis chain (else 409); points store the physical
+  angles decoded from the frame like the previs; the solve is `solveOffsets`; `offset0` is the offset at start.
+  `axisDeg` (R2) removed from follow-ik.js.
+- Client: `apply_solve` with `offset` writes only the offset (none when 0); `_follow_points` applies per point and
+  restores `offset0` when undone to no points; summary "N points · beam offset pan … tilt … (fit …)".
+- Box data: Focus Profile 1's pose restored to (−2.5, −6, 2, yaw 0) via `POST /api/project/autosave` (rev 118 → 119;
+  the doc before is in the session scratchpad).
+
+### Verified
+
+- `smoke-wo700` 11/11: one mark recovers a real offset (20°, −6°) to 0.1° from the Programmer bytes (`writeGdtf` of
+  `aimValues` with the true offset), no pose in the solve, nothing sent, jog 409, no-chain head 409, no frame 409;
+  four marks → every mark within 5 cm; disagreeing marks / a 127° tilt warn; patch keeps / clamps / omits the
+  offset; `decodeVisual` shifts pan +20 / tilt −6; `aimValues` with the offset puts the real beam within 2 cm.
+  wo624 / wo630 / wo615-follow-ik unchanged. Godot: summary, apply (pose untouched, 0 → no key), normalize.
+- Box: API start / point / end on Focus Profile 1 → reads (1.06°, −0.53°), returns `{offset}` only; patch unchanged.
+- NOT verified: a real head on real marks — owner QA (restart the GUI first: the running one has the R2 client).

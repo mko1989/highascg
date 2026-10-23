@@ -48,6 +48,11 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 		"fixed": str(o.get("fixed", "")), "follow": int(_num(o.get("follow"), 0, 0, 65535)),
 		"aim_z": _num(o.get("aim_z"), 1, -5, 10),
 	}
+	var off: Dictionary = o.get("offset") if o.get("offset") is Dictionary else {}
+	var op := _num(off.get("pan"), 0, -180, 180)
+	var ot := _num(off.get("tilt"), 0, -180, 180)
+	if op != 0.0 or ot != 0.0:  # WO-700 R3: the calibrated pan / tilt offset (follow-patch.js), only when set
+		out["offset"] = {"pan": op, "tilt": ot}
 	if o.get("manual_patch") == true:  # WO-695: the operator re-patched it — an MVR re-patch keeps mode / address
 		out["manual_patch"] = true
 	return out
@@ -224,6 +229,12 @@ static func apply_solve(fx: Dictionary, solve: Dictionary) -> Dictionary:
 	var out := fx.duplicate(true)
 	if solve.get("ok") != true:
 		return out
+	if solve.get("offset") is Dictionary:  # WO-700 R3: a Lighting session corrects where the beam points, not the head
+		var o: Dictionary = solve.offset
+		out.offset = {"pan": float(o.pan), "tilt": float(o.tilt)}
+		if out.offset.pan == 0.0 and out.offset.tilt == 0.0:
+			out.erase("offset")
+		return out
 	var p: Dictionary = solve.pose
 	for k in ["x", "y", "z", "yaw"]:
 		out.pose[k] = float(p[k])
@@ -238,13 +249,12 @@ static func calib_summary(sess: Dictionary) -> String:
 	var s: Dictionary = sess.get("solve", {}) if sess.get("solve") is Dictionary else {}
 	if s.get("ok") != true:
 		var need := int(s.get("need", 3 - n))
-		var why := "\n" + str(s.warning) if s.get("warning") is String and str(s.warning) != "" else ""  # WO-700
-		return "%d point%s — %d more to solve.%s" % [n, "" if n == 1 else "s", need, why]
+		return "%d point%s — %d more to solve." % [n, "" if n == 1 else "s", need]
+	if s.get("offset") is Dictionary:  # WO-700 R3
+		var line := "%d point%s · beam offset pan %+.1f°  tilt %+.1f° (fit %.2f°)" % [n, "" if n == 1 else "s",
+			float(s.offset.pan), float(s.offset.tilt), float(s.get("rms_deg", 0.0))]
+		return line + ("\n" + str(s.warning) if s.get("warning") is String and str(s.warning) != "" else "")
 	var p: Dictionary = s.pose
-	if s.get("partial") == true:  # WO-700: nearest the patch that fits the points so far
-		return "%d point%s — digital head moved onto %s → X %.2f  Y %.2f  Z %.2f  yaw %.1f°\n%d more mark%s for a full solve." % [
-			n, "" if n == 1 else "s", "it" if n == 1 else "them", float(p.x), float(p.y), float(p.z), float(p.yaw),
-			int(s.get("need", 0)), "" if int(s.get("need", 0)) == 1 else "s"]
 	var txt := "%d points · fit %.2f° RMS (max %.2f°) → X %.2f  Y %.2f  Z %.2f  yaw %.1f°" % [n, float(s.rms_deg),
 		float(s.max_deg), float(p.x), float(p.y), float(p.z), float(p.yaw)]
 	if s.get("flip_pan") == true:

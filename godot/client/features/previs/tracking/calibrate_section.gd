@@ -42,7 +42,7 @@ func _ready() -> void:
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Aim the real beam onto a stage mark (the Programmer above or your console), pick that mark and press Beam is on — one point per mark. Nothing is sent: each point moves the digital head so its beam lands on the marks so far. 3+ marks spread over the stage (4+ is better)." if lighting
+	var how := _muted("Aim the real beam onto a stage mark (the Programmer above or your console), pick that mark and press Beam is on — one point per mark. Nothing is sent: each point corrects where the digital beam points (pan / tilt offset) so it lands on the marks — the head stays where it is patched. 3+ marks spread over the stage (4+ is better)." if lighting
 		else "Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage.")
 	_box.add_child(how)
 	if not lighting:
@@ -163,16 +163,17 @@ func _act(body: Dictionary) -> void:
 		_follow_points(res.data)
 
 
-## WO-700 (owner 23.10: "the position pan/tilt of the digital gets corrected each calibration point is added"): every
-## point moves the patched head at once — no Apply; undone to no points, it goes back where the session started.
+## WO-700 (owner 23.10: "the position pan/tilt of the digital gets corrected each calibration point is added"; R3:
+## "…rather then changing where the beam points"): every point sets the head's pan / tilt offset at once — the head
+## stays put, its digital beam turns onto the marks; no Apply; undone to no points, the offset it started with.
 func _follow_points(sess: Variant) -> void:
 	if not sess is Dictionary:
 		return
 	var solve: Variant = sess.get("solve")
 	if solve is Dictionary and solve.get("ok") == true:
 		apply_requested.emit(solve)
-	elif (sess.get("points", []) as Array).is_empty() and sess.get("pose0") is Dictionary:
-		apply_requested.emit({"ok": true, "pose": sess.pose0})
+	elif (sess.get("points", []) as Array).is_empty() and sess.get("offset0") is Dictionary:
+		apply_requested.emit({"ok": true, "offset": sess.offset0})
 
 
 func refresh() -> void:
