@@ -18,6 +18,8 @@ const FollowSection := preload("res://features/previs/tracking/follow_section.gd
 const ZonesSection := preload("res://features/previs/tracking/zones_section.gd")
 const DetectSection := preload("res://features/previs/tracking/detect_section.gd")
 const PresentersSection := preload("res://features/previs/tracking/presenters_section.gd")  # WO-675
+const PtzSection := preload("res://features/previs/tracking/ptz_section.gd")  # WO-711
+const GhostRow := preload("res://features/previs/tracking/ghost_row.gd")
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
@@ -39,10 +41,10 @@ var follow: FollowSection
 var zones: ZonesSection
 var detect: DetectSection
 var presenters: PresentersSection
+var ptz: PtzSection  # WO-711: PTZ cameras that follow (Follow mode)
 var ghost_on := false
 var ghost_opacity := 0.6
-var _ghost_cb: CheckBox
-var _ghost_sl: HSlider
+var _ghost: GhostRow
 var driver: Node  # marker_driver.gd (previs_tab)
 var cam_idx := 0
 var active := ""
@@ -84,26 +86,12 @@ func _ready() -> void:
 		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		modes.add_child(b)
 	add_child(modes)
-	var gr := HBoxContainer.new()
-	_ghost_cb = CheckBox.new()
-	_ghost_cb.text = "3D stage overlay"
-	_ghost_cb.tooltip_text = "The previs stage through this camera's solved pose and lens — LED-wall edges must sit on the real walls."
-	_ghost_cb.toggled.connect(func(on: bool) -> void:
+	_ghost = GhostRow.new()
+	_ghost.changed.connect(func(on: bool, op: float) -> void:
 		ghost_on = on
-		ghost_changed.emit(ghost_on, ghost_opacity))
-	gr.add_child(_ghost_cb)
-	_ghost_sl = HSlider.new()
-	_ghost_sl.min_value = 0.05
-	_ghost_sl.max_value = 1.0
-	_ghost_sl.step = 0.05
-	_ghost_sl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_ghost_sl.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	_ghost_sl.tooltip_text = "Overlay opacity"
-	_ghost_sl.value_changed.connect(func(v: float) -> void:
-		ghost_opacity = v
-		ghost_changed.emit(ghost_on, ghost_opacity))
-	gr.add_child(_ghost_sl)
-	add_child(gr)
+		ghost_opacity = op
+		ghost_changed.emit(on, op))
+	add_child(_ghost)
 	set_ghost(ghost_on, ghost_opacity)
 	markers = MarkersSection.new()
 	markers.driver = driver
@@ -116,6 +104,12 @@ func _ready() -> void:
 	follow.driver = driver
 	follow.visible = false
 	add_child(follow)
+	ptz = PtzSection.new()
+	ptz.visible = false
+	ptz.edit.connect(func(list: Array) -> void:
+		data["ptz"] = list
+		_persist())
+	add_child(ptz)
 	zones = ZonesSection.new()
 	zones.driver = driver
 	zones.visible = false
@@ -203,9 +197,8 @@ func _ready() -> void:
 func set_ghost(on: bool, opacity: float) -> void:
 	ghost_on = on
 	ghost_opacity = opacity
-	if _ghost_cb != null:
-		_ghost_cb.set_pressed_no_signal(on)
-		_ghost_sl.set_value_no_signal(opacity)
+	if _ghost != null:
+		_ghost.set_state(on, opacity)
 
 
 func set_mode(m: String) -> void:
@@ -410,6 +403,8 @@ func _sync() -> void:
 	_body.visible = not ce.is_empty() and mode == "calibrate"
 	markers.visible = mode == "markers"
 	follow.visible = mode == "follow"
+	ptz.visible = mode == "follow"
+	ptz.set_cameras(data.get("ptz"))
 	zones.visible = mode == "zones"
 	zones.set_zones(data.get("zones"))
 	detect.visible = mode == "detect"
