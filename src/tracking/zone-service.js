@@ -5,6 +5,8 @@
  * in at 10 Hz (OpenFollow's default eval rate), `project.previs.tracking.zones` from the active project (at boot,
  * then on every project write via project-events), each transition's action (zone-actions.js) out.
  * The engine runs whether or not a client is open, like the follow engine.
+ * WO-712 R1: with this server's `zones` duty off (src/cluster/server-duties.js, `deps.duties`) occupancy is still evaluated
+ * and shown, and each transition is still logged in `recent`, but no action runs (detail says so).
  */
 
 const { ZoneEngine } = require('./zone-engine')
@@ -16,6 +18,8 @@ const LOG_MAX = 20
 
 function createZoneService(ctx, hub, deps = {}) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
+	const duties = deps.duties || require('../cluster/server-duties')
+	const actionsOn = () => duties.has('zones')
 	const recent = [] // newest first: { at, zone, kind, marker, count, action, ok, detail }
 	let parsed = new Map() // zone id → { kind → parsed action }
 	const engine = new ZoneEngine(({ zone, kind, marker, count, at }) => {
@@ -23,6 +27,10 @@ function createZoneService(ctx, hub, deps = {}) {
 		const entry = { at, zone: zone.id, name: zone.name, kind, marker, count, action: zone.actions[kind] || '', ok: null, detail: '' }
 		recent.unshift(entry)
 		recent.length = Math.min(recent.length, LOG_MAX)
+		if (!actionsOn()) {
+			entry.detail = 'not run: zone actions are off for this server (its Devices settings)'
+			return
+		}
 		const run = action?.type === 'presenter' ? runPresenter(marker, kind) : runAction(action, ctx, deps)
 		Promise.resolve(run).then((r) => {
 			entry.ok = r.ok
@@ -75,8 +83,8 @@ function createZoneService(ctx, hub, deps = {}) {
 		engine,
 		tick,
 		/** WS `tracking:zones` / GET: occupancy only, so it changes only on a transition. */
-		snapshot: () => ({ enabled: engine.config.enabled, zones: engine.states() }),
-		status: () => ({ enabled: engine.config.enabled, eval_hz: Math.round(1000 / EVAL_MS), debounce_ms: engine.config.debounce_ms,
+		snapshot: () => ({ enabled: engine.config.enabled, ...(actionsOn() ? {} : { actions_off: true }), zones: engine.states() }),
+		status: () => ({ enabled: engine.config.enabled, actions_off: !actionsOn(), eval_hz: Math.round(1000 / EVAL_MS), debounce_ms: engine.config.debounce_ms,
 			hysteresis: engine.config.hysteresis, zones: engine.states(), recent }),
 		stop() {
 			off()

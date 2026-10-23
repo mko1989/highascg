@@ -389,7 +389,7 @@ describe('WO-711 wiring — the director drives the PTZ service (auto-ptz.js)', 
 		const src = read('src/tracking/register.js')
 		assert.match(src, /const autoPtz = createAutoPtz\(auto\)/)
 		assert.match(src, /autoPtz\.tick\(hub\.now\(\)\)/)
-		assert.match(src, /autoPtz\.boot\(ctx\)/)
+		assert.match(src, /autoPtz\.boot\(ctx, \{ allowed: \(\) => duties\.has\('ptz'\) \}\)/)
 		assert.match(src, /autoPtz\.stop\(\)/)
 	})
 

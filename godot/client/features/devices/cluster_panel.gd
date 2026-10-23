@@ -16,6 +16,7 @@ const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const DutiesBlock := preload("res://features/devices/server_duties_block.gd")
 
 var _snap := {}
 var _views := {}  # peer id → its device-view payload
@@ -54,6 +55,7 @@ func _ready() -> void:
 	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	head.add_child(_self_l)
 	add_child(head)
+	add_child(DutiesBlock.new())  # WO-712 R1: this server's own ticks, above the linked ones
 	_build_master_row()
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
@@ -157,6 +159,9 @@ func _card(p: Dictionary) -> Control:
 		_remove.popup_centered())
 	top.add_child(x)
 	v.add_child(top)
+	var does := M.does_text(p.get("duties"))  # WO-712 R1: its ticks, read-only (set in its own Devices view)
+	if does != "":
+		v.add_child(_small(does, ThemeBuilder.TEXT_MUTED))
 	var line := M.send_line(p, str(_send_err.get(id, "")))
 	if line != "":
 		var sl := _small(line, ThemeBuilder.ERROR if M.send_failed(p) or _send_err.has(id) else ThemeBuilder.TEXT)

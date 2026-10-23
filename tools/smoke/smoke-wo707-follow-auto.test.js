@@ -86,7 +86,7 @@ describe('WO-707 Follow → Auto', () => {
 	it('wiring: register runs it for heads following Auto; the Follow list offers it', () => {
 		const reg = fs.readFileSync(path.join(__dirname, '../../src/tracking/register.js'), 'utf8')
 		// WO-708: the multi-person director (auto-director.js) now owns the step and works out the Auto pool itself.
-		assert.match(reg, /const fixtures = _follow\?\.engine\?\.fixtures \|\| \[\]/)
+		assert.match(reg, /const fixtures = duties\.has\('auto'\) \? _follow\?\.engine\?\.fixtures \|\| \[\] : \[\]/)
 		assert.match(
 			reg,
 			/auto\.step\(\{ cfg, available: _detect\.available, persons, hub, planeZ: _detect\.planeZ, now, dt, fixtures \}\)/

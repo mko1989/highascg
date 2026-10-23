@@ -5,6 +5,19 @@ extends RefCounted
 
 const PARITY := {"same": "media ✓", "differs": "media differs", "other-show": "other show", "unknown": "media ?"}
 
+## WO-712 R1 — what a server can be set to do (server src/cluster/server-duties.js names). `label` is the tick box in
+## "This server does"; `short` is its word in a linked server's "Does:" line. The first six are what the line lists;
+## `accept_remote` is a different kind of tick and is worded separately. Not "Roles": that is backup / extension above.
+const DUTIES := [
+	{"id": "detection", "label": "Detection", "short": "Detection", "tip": "Run the person-detection sidecar on this server's cameras."},
+	{"id": "zones", "label": "Zones & automations", "short": "Zones", "tip": "Fire zone actions (look, Companion, presenter) on this server. Occupancy is still shown when off."},
+	{"id": "auto", "label": "Auto follow", "short": "Auto follow", "tip": "Run the Auto director (who each light and camera follows) on this server."},
+	{"id": "lighting", "label": "Lighting out (DMX / PSN)", "short": "Lighting out", "tip": "Transmit Art-Net, sACN and PSN from this server. Off: the previs beams still move, nothing leaves the box."},
+	{"id": "ptz", "label": "PTZ out", "short": "PTZ out", "tip": "Send VISCA to the PTZ cameras from this server."},
+	{"id": "presenters", "label": "Presenter intake", "short": "Presenters", "tip": "Take new presenters (the phone page) on this server."},
+	{"id": "accept_remote", "label": "Accept remote actions", "short": "Accepts remote", "tip": "Let a linked server press things on this one, like a local operator. Used from the next release."},
+]
+
 
 ## destination id → its label, for every destination cabled in this device-view payload.
 static func cabled(payload: Dictionary) -> Dictionary:
@@ -56,6 +69,25 @@ static func facts(p: Dictionary) -> String:
 	if p.get("online") == false and str(p.get("error", "")) != "":
 		bits.append("offline: " + str(p.error))
 	return " · ".join(PackedStringArray(bits))
+
+
+## WO-712 R1 — the one line on a linked server's card from its ping `duties` ("" when it sent none: an older server).
+static func does_text(duties: Variant) -> String:
+	if not duties is Dictionary:
+		return ""
+	var on := PackedStringArray()
+	var all := true
+	for d in DUTIES:
+		if d.id == "accept_remote":
+			continue
+		if duties.get(d.id, true) == true:
+			on.append(str(d.short))
+		else:
+			all = false
+	var text := "Does: everything" if all else "Does: " + (" · ".join(on) if not on.is_empty() else "nothing")
+	if duties.get("accept_remote", true) != true:
+		text += " · refuses remote actions"
+	return text
 
 
 static func sending(p: Dictionary) -> bool:

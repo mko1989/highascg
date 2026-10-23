@@ -11,6 +11,8 @@
  *   DELETE /api/tracking/presenters/<id>
  *   POST   /api/tracking/presenters/<id>/assign    { key }  (the operator's confirmation, owner D1)
  *   POST   /api/tracking/presenters/<id>/release
+ * WO-712 R1: with this server's `presenters` duty off (src/cluster/server-duties.js) the phone page and POST (new intake)
+ * answer 409 with a plain message; the roster, its GET and the operator's edit / assign / release stay.
  */
 
 const fs = require('fs')
@@ -21,6 +23,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const BASE = '/api/tracking/presenters'
 const INTAKE = path.join(__dirname, 'presenter-intake.html')
 
+const INTAKE_OFF = 'Presenter intake is off on this server (its Devices settings: "Presenter intake"). Use the server that takes presenters.'
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
 function parse(body) {
@@ -41,19 +44,22 @@ function intakeUrls(port, nets = os.networkInterfaces()) {
 }
 
 /** → a response, or null when the path is not a presenter route. */
-async function handlePresenters(presenters, { method, path: rawPath, body, req }) {
+async function handlePresenters(presenters, { method, path: rawPath, body, req, duties = require('../cluster/server-duties') }) {
 	const p = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath
 	if (p !== BASE && !p.startsWith(BASE + '/')) return null
 	if (!presenters) return reply(503, { error: 'presenter roster not running' })
+	const intakeOff = () => reply(409, { error: INTAKE_OFF })
 	if (p === BASE + '/intake' && method === 'GET') {
+		if (!duties.has('presenters')) return intakeOff()
 		return { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }, body: fs.readFileSync(INTAKE, 'utf8') }
 	}
 	if (p === BASE) {
 		if (method === 'GET') {
 			const port = req?.socket?.localPort || Number(process.env.PORT) || 4200
-			return reply(200, { ...presenters.snapshot(), intake_path: BASE + '/intake', intake_urls: intakeUrls(port) })
+			return reply(200, { ...presenters.snapshot(), intake_enabled: duties.has('presenters'), intake_path: BASE + '/intake', intake_urls: intakeUrls(port) })
 		}
 		if (method === 'POST') {
+			if (!duties.has('presenters')) return intakeOff()
 			const { data, error } = parse(body)
 			if (error) return error
 			const r = await presenters.create(data)

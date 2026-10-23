@@ -12,6 +12,8 @@
  * Runtime outside the repo (Syncthing, AGPL weights): HIGHASCG_TRACKING_PYTHON (default
  * ~/.local/share/highascg/tracking-venv/bin/python, tools/tracking-detect/setup-venv.sh) and
  * HIGHASCG_TRACKING_MODELS (default ~/.local/share/highascg/models, tools/tracking-detect/export-models.sh).
+ * WO-712 R1: with this server's `detection` duty off (src/cluster/server-duties.js, `deps.duties`) wanted() is false — the
+ * sidecar stops (or never starts), the lease is dropped, and status explains why (`off_by_duties`, `error`).
  */
 
 const childProcess = require('child_process')
@@ -41,6 +43,9 @@ function createDetectService(ctx, deps = {}) {
 			return []
 		}
 	})
+	const duties = deps.duties || require('../cluster/server-duties')
+	const dutyOn = () => duties.has('detection')
+	const DUTY_OFF = 'detection is off for this server (its Devices settings)'
 	const python = deps.python || process.env.HIGHASCG_TRACKING_PYTHON || path.join(DATA, 'tracking-venv', 'bin', 'python')
 	const modelsDir = deps.modelsDir || process.env.HIGHASCG_TRACKING_MODELS || path.join(DATA, 'models')
 	const lease = deps.lease || ((roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(LEASE_ID, roles))
@@ -65,7 +70,7 @@ function createDetectService(ctx, deps = {}) {
 	let onFaces = null // (cameraId, [{ tid, feature }], 'face' | 'body') — never stored in `latest`, never broadcast
 	let sidecarCams = {} // camera id → sidecar status { state, detail, fps, ms }
 
-	const wanted = () => !stopped && det.enabled && cams.length > 0
+	const wanted = () => !stopped && dutyOn() && det.enabled && cams.length > 0
 	const modelPath = () => path.join(modelsDir, det.model)
 
 	function renewLease() {
@@ -193,6 +198,20 @@ function createDetectService(ctx, deps = {}) {
 		}
 	}
 
+	/** The duty was ticked or cleared: stop the sidecar now, or start it again. */
+	function onDuty() {
+		if (stopped) return
+		if (!wanted()) {
+			halt()
+			error = ''
+		} else if (!child) {
+			backoff = BACKOFF_MIN_MS
+			start()
+		}
+		rev++
+		renewLease()
+	}
+
 	let lastJson = ''
 	const apply = (project) => {
 		const tracking = project?.previs?.tracking
@@ -224,6 +243,7 @@ function createDetectService(ctx, deps = {}) {
 		}
 	}
 	const off = onProjectChanged(apply)
+	const offDuties = duties.onChange?.(onDuty) || (() => {})
 	if (deps.autostart !== false) {
 		leaseTimer = setInterval(renewLease, LEASE_MS)
 		if (typeof leaseTimer.unref === 'function') leaseTimer.unref()
@@ -234,8 +254,9 @@ function createDetectService(ctx, deps = {}) {
 		const t = now()
 		return {
 			enabled: det.enabled,
+			off_by_duties: !dutyOn(),
 			running: !!child && ready,
-			error: det.enabled ? error : '',
+			error: !det.enabled ? '' : dutyOn() ? error : DUTY_OFF,
 			cameras: cams.map((c) => {
 				const l = latest.get(c.id)
 				const fresh = !!l && t - l.at <= STALE_MS
@@ -284,7 +305,7 @@ function createDetectService(ctx, deps = {}) {
 		get solvedCameras() {
 			return cams.filter((c) => c.cam).length
 		},
-		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error,
+		status: () => ({ ...snapshot(), config: det, model: det.model, models: listModels(), models_dir: modelsDir, python, providers, error: det.enabled && !dutyOn() ? DUTY_OFF : error,
 			pid: child?.pid ?? null, sidecar: sidecarCams }),
 		_handle: handle,
 		/** WO-675: ask the sidecar for face (and P2 body) features — resends the config only on a change — and where they go. */
@@ -298,6 +319,7 @@ function createDetectService(ctx, deps = {}) {
 		stop() {
 			stopped = true
 			off()
+			offDuties()
 			if (leaseTimer) clearInterval(leaseTimer)
 			leaseTimer = null
 			halt()

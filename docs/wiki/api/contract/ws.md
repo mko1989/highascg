@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-84 types.
+86 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -77,10 +77,12 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `project_sync` | `src/api/routes-data-project-sync.js` |  |
 | server → clients | `record_stopped` | `src/api/routes-streaming-channel-log.js` |  |
 | server → clients | `replication_status` | `src/replication/replication-ui-notify.js` |  |
+| server → clients | `server:duties` | `src/api/routes-server-duties.js` |  |
 | server → clients | `state` | `src/api/get-state.js`, `src/server/ws-server.js` |  |
 | server → clients | `streaming_channel` | `src/api/routes-streaming-channel-log.js` |  |
 | server → clients | `timeline.playback` | `index.js` |  |
 | server → clients | `timeline.tick` | `src/engine/timeline-playback-runtime.js` |  |
+| server → clients | `tracking:auto` | `src/tracking/auto-routes.js` |  |
 | server → clients | `tracking:detections` | `src/tracking/register.js` |  |
 | server → clients | `tracking:error` | `src/tracking/register.js` |  |
 | server → clients | `tracking:fixtures` | `src/tracking/register.js` |  |

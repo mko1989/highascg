@@ -72,3 +72,20 @@ func test_fanout_line() -> void:
 	t.eq(M.fanout_line({"fanout": {"active": false, "peers": {}}}, "b"), "", "not master → no line")
 	t.eq(M.follow_note({"follows_master": true}), "PGM here is driven by the master: local PGM takes are skipped (PRV still works).", "follower")
 	t.eq(M.follow_note({}), "", "not a follower")
+
+
+func test_does_text_lists_a_linked_servers_ticks() -> void:  # WO-712 R1
+	var all := {"detection": true, "zones": true, "auto": true, "lighting": true, "ptz": true, "presenters": true, "accept_remote": true}
+	t.eq(M.does_text(all), "Does: everything", "all on")
+	t.eq(M.does_text(null), "", "an older server sent no duties")
+	var tracking := all.duplicate()
+	for k in ["zones", "auto", "ptz", "presenters"]:
+		tracking[k] = false
+	t.eq(M.does_text(tracking), "Does: Detection · Lighting out", "listed in the pick-list order")
+	var none := {"detection": false, "zones": false, "auto": false, "lighting": false, "ptz": false, "presenters": false}
+	t.eq(M.does_text(none), "Does: nothing", "all six off")
+	var locked := all.duplicate()
+	locked["accept_remote"] = false
+	t.eq(M.does_text(locked), "Does: everything · refuses remote actions", "the D3 lock is worded apart")
+	t.eq(M.does_text({"lighting": false}), "Does: Detection · Zones · Auto follow · PTZ out · Presenters", "missing keys default to on")
+	t.ok(not str(M.does_text(all)).contains("Roles"), "never the word Roles")

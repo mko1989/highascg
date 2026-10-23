@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-485 routes.
+491 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -324,6 +324,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/selection` | handler | `src/api/router-dispatch.js` |
 | GET | `/api/server` | registry | `src/api/router.js` |
 | GET | `/api/server/*` | registry | `src/api/router.js` |
+| GET | `/api/server/duties` | registry | `src/api/routes-server-duties.js` |
+| POST | `/api/server/duties` | registry | `src/api/routes-server-duties.js` |
 | GET | `/api/settings` | registry | `src/api/router.js` |
 | POST | `/api/settings` | registry | `src/api/router.js` |
 | POST | `/api/settings/apply-os` | registry | `src/api/router.js` |
@@ -460,6 +462,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/timers/list` | registry | `src/api/router.js` |
 | POST | `/api/timers/unassign` | registry | `src/api/router.js` |
 | POST | `/api/timers/visible` | registry | `src/api/router.js` |
+| GET | `/api/tracking/auto` | handler | `src/tracking/auto-routes.js` |
+| POST | `/api/tracking/auto/home` | handler | `src/tracking/auto-routes.js` |
+| POST | `/api/tracking/auto/pin` | handler | `src/tracking/auto-routes.js` |
+| POST | `/api/tracking/auto/slot` | handler | `src/tracking/auto-routes.js` |
 | * | `/api/tracking/detect/pick` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/detections` | handler | `src/tracking/register.js` |
 | * | `/api/tracking/fixtures` | handler | `src/tracking/register.js` |
@@ -537,6 +543,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-replication-get.js` | optional |
 | `src/api/routes-replication-post.js` | optional |
 | `src/api/routes-scene.js` |  |
+| `src/api/routes-server-duties.js` | WO-712 R1 — this server's duties (src/cluster/server-duties.js), set in its own Devices view: GET  /api/server/duties                → { detection, zones, auto, |
 | `src/api/routes-settings.js` | Settings API Router. |
 | `src/api/routes-shader-live.js` | WO-606 — Shader Live endpoints (the node owns the working copy; client/components/shader-live-editor.js did all of this in the browser): GET  /api/shader-live   |
 | `src/api/routes-shaders.js` | WO-266 — Shader FX library routes. |
@@ -557,4 +564,5 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/previs/register.js` | Previs module registration (WO-17 / WO-30). |
 | `src/server/auth.js` |  |
 | `src/server/ws-server.js` | WebSocket server on the same HTTP port (upgrade `/api/ws`, `/ws`, and Companion-style `/instance/<id>/api/ws`). |
+| `src/tracking/auto-routes.js` | WO-708 / WO-709 — HTTP + WS of the Auto director (auto-director.js), wired from register.js. |
 | `src/tracking/register.js` | Tracking module registration (WO-616; WO-19 / WO-30 boundaries). |

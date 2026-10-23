@@ -4,7 +4,7 @@
  * WO-711 — PTZ camera follow over VISCA. The director (WO-708) decides where each camera points; this service turns
  * that into VISCA datagrams.
  *
- *   createPtzService({ log, send?, now? }) -> { configure(project), step(now, targetOf), status(), cameras(), close() }
+ *   createPtzService({ log, send?, now?, allowed? }) -> { configure(project), step(now, targetOf), status(), cameras(), close() }
  *   targetOf(camId) -> { x, y, z } (PSN m, the floor point to aim at) | 'home' | null (leave the camera alone)
  *
  * Per enabled camera: at most 10 Hz, no resend while the aim moved < 0.3 degrees, Home sent once on entering 'home'
@@ -13,6 +13,9 @@
  * get the Sony RESET before their first command (and again after the host / port changes). A bad host / port leaves
  * an error in status(); nothing throws. One UDP socket, created lazily, closed by close().
  * `send(host, port, buf, protocol)` is injectable (tests); the default sends through the socket.
+ * WO-712 R1: `allowed()` (default always true) is this server's `ptz` duty. While it is false step() sends nothing and
+ * forgets each camera's aim, so the first step after it turns true sends the aim again; status rows carry
+ * `blocked_by_server: true`.
  */
 
 const dgram = require('dgram')
@@ -23,7 +26,7 @@ const MIN_INTERVAL_MS = 100
 const DEADBAND_DEG = 0.3
 const HOST_RE = /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/
 
-function createPtzService({ log = () => {}, send, now = Date.now } = {}) {
+function createPtzService({ log = () => {}, send, now = Date.now, allowed = () => true } = {}) {
 	let cams = []
 	let lastSig = ''
 	let sock = null
@@ -108,6 +111,11 @@ function createPtzService({ log = () => {}, send, now = Date.now } = {}) {
 
 	function step(t = now(), targetOf = () => null) {
 		if (closed) return
+		if (!allowed()) {
+			for (const r of rt.values())
+				Object.assign(r, { state: 'idle', sentAt: null, pan: null, tilt: null, zoomSent: false })
+			return
+		}
 		for (const c of cams) {
 			if (!c.enabled) continue
 			const r = rt.get(c.id)
@@ -172,6 +180,7 @@ function createPtzService({ log = () => {}, send, now = Date.now } = {}) {
 				tilt: r.tilt,
 				last_sent_ms_ago: r.sentAt === null ? null : Math.max(0, t - r.sentAt),
 				error: r.error,
+				...(allowed() ? {} : { blocked_by_server: true }),
 			}
 		})
 	}

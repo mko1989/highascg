@@ -10,6 +10,8 @@
  * WO-615 T4: typed fixtures resolve their GDTF mode through gdtf-store.js (reload() after an import / delete);
  * sACN goes out through the same socket and is refused on the box's own input universe when it would land here
  * (multicast, or unicast to a local address on :5568).
+ * WO-712 R1: with this server's `lighting` duty off (src/cluster/server-duties.js) nothing is transmitted — Art-Net, sACN and
+ * PSN all stop at the sender — while the engine keeps computing aims, so the previs beams and status still work.
  */
 
 const os = require('os')
@@ -88,8 +90,12 @@ const isMulticast = (host) => {
 	return first >= 224 && first <= 239
 }
 
-function createFollowService(ctx, hub) {
+/** @param {{ duties?: { has: (name: string) => boolean, onChange?: Function } }} [deps] WO-712: defaults to this server's own duties */
+function createFollowService(ctx, hub, deps = {}) {
 	const log = typeof ctx?.log === 'function' ? ctx.log.bind(ctx) : () => {}
+	const duties = deps.duties || require('../cluster/server-duties')
+	const lightingOn = () => duties.has('lighting')
+	let blocked = 0 // datagrams the engine built that the lighting duty kept off the wire
 	const sender = new ArtnetSender({ log })
 	const psn = new PsnSender({ hub, log })
 	const consoleFrames = new ConsoleFrames({ log })
@@ -101,7 +107,10 @@ function createFollowService(ctx, hub) {
 	const engine = new FollowEngine({
 		hub,
 		consoleFrames,
-		send: (to, packet) => sender.send(to, packet),
+		send: (to, packet) => {
+			if (lightingOn()) return sender.send(to, packet)
+			blocked++
+		},
 		isSelfLoop: (to, universe, protocol) =>
 			protocol === 'sacn'
 				? sacnReachesSelf(to) && inputUniverse(ctx) === universe
@@ -128,7 +137,7 @@ function createFollowService(ctx, hub) {
 		engine.configure(slice)
 		sender.setInterface(engine.dmx.iface) // WO-698
 		looks = normalizeLooks(slice?.looks, cleanValue)
-		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
+		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
 		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
 		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.some((f) => f.protocol === 'artnet'))
@@ -153,6 +162,11 @@ function createFollowService(ctx, hub) {
 		log('warn', '[follow] initial project load: ' + (e?.message || e))
 	}
 	const off = onProjectChanged(apply)
+	// the duty changed: PSN starts / stops at once; Art-Net / sACN resume with the engine's own 1 s refresh
+	const offDuties =
+		duties.onChange?.(() =>
+			psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
+		) || (() => {})
 	engine.start()
 	return {
 		engine,
@@ -171,6 +185,8 @@ function createFollowService(ctx, hub) {
 			...engine.status(),
 			packets_sent: sender.sent,
 			send_errors: sender.errors,
+			output_blocked: lightingOn() ? null : 'server-duties', // WO-712: this server's settings keep DMX / PSN off the wire
+			packets_blocked: blocked,
 			psn: { ...psn.status(), interfaces: ipv4Addresses() },
 			console: consoleFrames.status(),
 		}),
@@ -179,6 +195,7 @@ function createFollowService(ctx, hub) {
 			const s = engine.status()
 			return {
 				output_enabled: s.output_enabled,
+				output_blocked: lightingOn() ? null : 'server-duties',
 				protocol: s.protocol,
 				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) => ({
 					id,
@@ -246,6 +263,7 @@ function createFollowService(ctx, hub) {
 		input: () => ({ visualise: engine.dmx.visualise, artnet: consoleFrames.status(), sacn: sacnIn.status() }),
 		stop() {
 			off()
+			offDuties()
 			sacnIn.stop()
 			engine.stop()
 			sender.close()

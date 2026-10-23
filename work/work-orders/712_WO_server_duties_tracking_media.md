@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); implementation next (R1 after WO-708 lands — it shares register.js)**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) implemented + offline-verified 23.10.26, owner QA pending; R2–R5 open (R1 leaves `auto` and the PTZ `allowed` wiring to the lead)**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -141,3 +141,49 @@ Nothing yet: investigation and design only.
 ## What was VERIFIED
 
 The investigation claims above. The lead re-ran the greps for project sync and for role checks in tracking / follow.
+
+## R1 — what was done
+
+The pick-list of what THIS server does, and one gate per service on its own tick. Every tick defaults to on, so a
+single box behaves exactly as before.
+
+- **`src/cluster/server-duties.js`** (new): `has(name)`, `get()`, `set(patch)`, `onChange(fn)`; `createServerDuties({persistence})` for tests.
+  - Names: `detection`, `zones`, `auto`, `lighting`, `ptz`, `presenters`, `accept_remote` (D3, default on).
+  - Stored device-local under `serverDuties` in the node persistence file, like `clusterPeers` (never in the project: two servers
+    share a project, not their duties). `set` rejects an unknown name or a non-boolean with `.status = 400` and changes nothing.
+  - **`playout` is left out of R1**: it has no gate yet, and a tick that does nothing is not shipped (owner's minimalism). It is added when playout gets a gate.
+  - Test isolation is `utils/persistence.js`'s own: under `node --test` (`NODE_TEST_CONTEXT`) it writes a scratch file in the OS temp dir, never `.highascg-state.json`.
+- **API** (`src/api/routes-server-duties.js`, registered on the cluster line of `router.js:488`; router.js is at the 500-line limit, so no new line):
+  - `GET /api/server/duties` → `{detection, zones, auto, lighting, ptz, presenters, accept_remote}` (booleans).
+  - `POST /api/server/duties {patch:{lighting:false}}` → the saved object, plus WS `server:duties` with the same object. 400 `{error}` for an unknown name / non-boolean.
+  - `GET /api/replication/ping` carries `duties` (`routes-replication-get.js:100`).
+  - `cluster-peers.js`: `liveFrom` keeps the peer's `duties` (`:131`), the peer view and `self` carry it, so `/api/cluster` has `peers[].duties` and `self.duties` (`null` from an older server that sends none).
+- **Gates**, each with `deps.duties` (same interface as the module) defaulting to this server's own duties, so they are live without wiring:
+  - `lighting` — `follow-service.js:97-112`: the engine's `send` is wrapped, so it still computes aims (previs beams, `status()`) but no Art-Net / sACN datagram reaches the socket (counted in `packets_blocked`). PSN is configured `enabled && lighting` (`:140`) and re-configured on the duty change (`:168`). Status and the WS snapshot carry `output_blocked: 'server-duties' | null` (`:188`, `:198`). `follow-engine.js` is untouched.
+  - `detection` — `detect-service.js:73`: `wanted()` includes the duty, so the sidecar never starts / is stopped (SIGTERM) on the change event (`onDuty`, `:202`), the lease is dropped. Snapshot / status: `off_by_duties`, and `error` explains why.
+  - `zones` — `zone-service.js:22,30`: occupancy is still evaluated and shown; each transition is logged in `recent` with `detail` "not run: zone actions are off for this server" and no action runs. `status().actions_off`; the snapshot gets `actions_off: true` only while off.
+  - `presenters` — `presenter-routes.js:26,53,62`: the phone page (`GET .../intake`) and new intake (`POST /api/tracking/presenters`) answer 409 with a plain message; roster GET (`intake_enabled`), operator edit / assign / release stay. `handlePresenters` takes an optional `duties`.
+  - `ptz` — `ptz-service.js:29,114`: `createPtzService({allowed})`, default `() => true`; while false `step()` sends nothing and forgets each camera's aim (so it resends on resume); status rows get `blocked_by_server: true`. **The lead wires `allowed: () => duties.has('ptz')` where the service is created.**
+  - `auto` — NOT gated here (it lives in `auto-*.js` / `register.js`, which WO-708 is editing). The flag is `require('../cluster/server-duties').has('auto')`; **the lead wires it into the director** (a director that is off should hold, not aim lights / PTZ). Likewise `accept_remote` has no reader until R2.
+- **Godot**: `features/devices/server_duties_block.gd` (new, "THIS SERVER DOES": seven tick boxes, top of the SERVERS panel, POSTs the one changed key, follows `server:duties`); `cluster_model.gd` gets `DUTIES` + `does_text()` and `cluster_panel.gd` shows "Does: Detection · Lighting out" read-only on each linked server's card. The word "Roles" is not used (it means backup / extension there).
+
+Why gate inside the services rather than at the sinks: the double-output hazard (two boxes, one patch) is closed whatever the project holds, and the engine / director keep their state, so a box with lighting off still previews.
+
+Known edges: the calibrate session (`calibrate-session.js`) reports `output_enabled` from `engine.isLive`, so while lighting is off it can say "live" for a head nothing is driving. Art-Net / sACN resume within the engine's 1 s refresh after lighting is ticked back on (PSN at once).
+
+## R1 — what was VERIFIED
+
+- `node --test tools/smoke/smoke-wo712-server-duties.test.js`: 12 tests, 12 pass (defaults all on and no playout; set / validate / notify; shared instance writes the scratch file and leaves `.highascg-state.json` untouched; routes + `server:duties` broadcast + 400s; ping `duties`; cluster snapshot `peers[].duties` / `self.duties` / `null`; lighting off → 0 packets while `status()` still aims, back on → sends, PSN configure follows; detection off → no spawn / SIGTERM on tick-off / status text; zones off → no action but occupancy; ptz `allowed` false → 0 sends, true → sends; presenters off → 409 and roster stays; auto flag).
+- Existing smokes that pin these files, all still green: wo616-follow-artnet 8, wo700-calibrate 14, wo698-dmx-nic 4, wo695-repatch 4, wo670-cluster 8, wo675-presenters 8, wo616-zones 11, wo665-cutouts 5, wo675-bodies 9, wo616-detect 9, wo711-ptz 25, wo667 7.
+- Godot: `run-client.sh --check` boot OK; headless suite 21320 passed, 0 failed (includes `test_does_text_lists_a_linked_servers_ticks` in `test_devices_cluster.gd`).
+- eslint clean on every touched JS file; prettier clean on the new files and the two touched files that were already prettier-clean (follow-service, ptz-service); `check-max-file-lines` 0 over; `check-unwired-exports` no new orphan. `npm run test:ci`: 2925 tests, 2922 pass, 1 fail (the known WO-308 pointer-confine test, `smoke-wo308-pointer-confine-split`); the new smoke is not in that curated list yet.
+- Not run on the box: no server restart, no GUI relaunch, no packets to a real network (the sender is stubbed; the PSN `configure` is stubbed so no multicast socket opens).
+
+**Owner QA** (after the lead restarts the server and relaunches the GUI; the smoke `smoke-wo712-server-duties.test.js` still needs adding to `tools/ci/run-offline-tests.js`):
+1. Devices tab, SERVERS panel: "THIS SERVER DOES" shows seven ticks, all on. Untick Lighting out: `GET /api/server/duties` shows `lighting:false`, the DMX monitor / `tcpdump` on a test universe goes quiet, the previs beams still move, `GET /api/tracking/follow` status shows `output_blocked: "server-duties"`. Tick it back: output resumes within ~1 s.
+2. Untick Detection: the sidecar process ends (`pgrep -f tracking-detect/sidecar.py`) and the detection status says it is off for this server.
+3. Untick Zones: walking into a zone logs the transition in the zone list but runs no look / Companion press.
+4. Untick Presenter intake: the phone page and a new presenter answer "Presenter intake is off on this server".
+5. Restart the server: the ticks are kept. With a linked server, its card shows "Does: ..." matching its own Devices view within ~5 s (the next cluster poll).
+6. PTZ and Auto: nothing to see until the lead wires `allowed` and the director.
+

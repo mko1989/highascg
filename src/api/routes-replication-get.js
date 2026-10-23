@@ -97,6 +97,7 @@ async function handleGet(path, ctx, req) {
 				channelMap,
 				instanceId: rt?.instanceId || null,
 				projectMedia,
+				duties: require('../cluster/server-duties').get(), // WO-712 R1: what this server does (linked servers show it)
 				activeShowSlug,
 				activeShowRevision,
 				activeShowSavedAt,

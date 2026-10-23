@@ -54,6 +54,7 @@ const { DetectPin } = require('./detect-pin')
 const { createAutoDirector } = require('./auto-director')
 const { handleAuto, createAutoBroadcast, followProject, reply } = require('./auto-routes')
 const { createAutoPtz } = require('./auto-ptz')
+const duties = require('../cluster/server-duties') // WO-712 R1: this server's pick-list
 const { Fusion } = require('./fusion')
 const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
@@ -143,7 +144,7 @@ function pinTick() {
 	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
 	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
 	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
-	const fixtures = _follow?.engine?.fixtures || []
+	const fixtures = duties.has('auto') ? _follow?.engine?.fixtures || [] : [] // WO-712: Auto off → no pool
 	auto.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt, fixtures })
 }
 
@@ -445,7 +446,7 @@ module.exports = {
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
 		_follow.engine.resolveAuto = auto.resolveAuto // WO-708: Auto heads split across people / go home (WO-709)
 		followProject(auto, ctx) // the grid rectangle (home points) from project.previs.tracking.grid
-		autoPtz.boot(ctx)
+		autoPtz.boot(ctx, { allowed: () => duties.has('ptz') })
 		_calib = createCalibration({ engine: _follow.engine, hub, frame: _follow.liveFrame }) // WO-700 frame
 		_spot = createSpotFinder({
 			calib: _calib,

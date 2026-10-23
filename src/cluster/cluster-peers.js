@@ -128,6 +128,7 @@ function createCluster(opts) {
 			epoch: Number(ping.leaderEpoch) || 0,
 			program_channels: Array.isArray(ping.channelMap?.programChannels) ? ping.channelMap.programChannels.length : null,
 			media: ping.projectMedia ? { slug: ping.projectMedia.slug, files: ping.projectMedia.fileCount, signature: ping.projectMedia.signature } : null,
+			duties: ping.duties && typeof ping.duties === 'object' ? ping.duties : null, // WO-712 R1: what that server does (null = older server)
 			error: '',
 		}
 	}
@@ -147,6 +148,7 @@ function createCluster(opts) {
 			program_channels: p.live.program_channels ?? null,
 			media: media ? { slug: media.slug, files: media.files } : null,
 			media_parity: mediaParity(self?.projectMedia, media),
+			duties: p.live.duties ?? null,
 			error: p.live.error || '',
 			media_send: p.send,
 		}
@@ -156,7 +158,7 @@ function createCluster(opts) {
 		const s = self || {}
 		return {
 			self: { id: s.selfId || '', hostname: s.hostname || '', version: s.appVersion || '', role: s.role || '', epoch: s.leaderEpoch ?? null,
-				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null },
+				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null },
 			peers: [...peers.values()].map(view),
 		}
 	}
