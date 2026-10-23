@@ -304,6 +304,8 @@ That module is required only when `ctx._clusterMaster` exists.
 
 ## R2 — what was VERIFIED
 
+- **Live on the box (23.10, server pid 1394494 after restart with e369efe5):** `POST /api/cluster/call {}` → 400 `malformed call`; a well-formed call from an unknown fingerprint → 403 `not linked here` (the route is reachable through the router and auth; this box has no linked peer, so no accepted call yet). `/api/server/duties` and `/api/tracking/auto` still answer.
+
 - `node --test tools/smoke/smoke-wo712-cluster-call.test.js`: **17 tests, 17 pass**. Two or three in-process servers
   with test ed25519 keys (`crypto.generateKeyPairSync`). It never reads or writes the box's `config/device-identity.json`
   or the persistence file: the instances are injected, and the router test presets `ctx._clusterCall`.
