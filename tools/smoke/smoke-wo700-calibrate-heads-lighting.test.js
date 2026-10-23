@@ -14,6 +14,7 @@
  * calibration never moves the head.
  * R7 (owner 23.10: "…correctly for first 2 marks then it starts to drift"): each mark is pinned (beam-offset.js
  * offset_map), so the beam is exact on every mark and earlier marks never drift; the trim is set by hand.
+ * WO-703: Preset marks — the tracking grid's 9 floor spots (the camera calibration's) as marks.
  */
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
@@ -355,6 +356,17 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.match(fold, /"offset": \{"pan": 0, "tilt": 0\}, "map": \[\]/)
 		const model = GD('features/previs/tracking/follow_model.gd')
 		assert.match(model, /out\["offset_map"\] = pins/, 'normalize_fixture keeps the pins')
+	})
+
+	it('WO-703 preset marks: grid corners, edge middles, dead centre (source pins)', () => {
+		const model = GD('features/previs/tracking/follow_model.gd')
+		assert.match(model, /\["DSR", x0 - hw, y0\], \["DSC", x0, y0\], \["DSL", x0 \+ hw, y0\]/)
+		assert.match(model, /\["Centre", x0, ym\]/)
+		assert.match(model, /if names\.has\(sp\[0\]\):\n\t\t\tcontinue/, 'a measured preset name is kept')
+		const fold = GD('features/previs/fixtures/calibrate_fold.gd')
+		assert.match(fold, /preset\.pressed\.connect\(_add_presets\)/)
+		assert.match(fold, /s\.marks = F\.preset_marks\(grid, s\.marks\)/)
+		assert.match(fold, /T\.normalize\(\(pv as Dictionary\)\.get\("tracking"\)/, 'the camera calibration grid')
 	})
 
 	it('the Lighting fold wires marks, the floor pick and the session (source pins)', () => {

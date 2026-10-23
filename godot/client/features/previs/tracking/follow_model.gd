@@ -101,6 +101,33 @@ static func normalize(slice: Variant) -> Dictionary:
 
 ## WO-700 fixtures.marks — stage marks a head is calibrated on: [{id (1…), name, x, y, z}] in PSN metres (x stage
 ## left, y upstage, z up), within 500 m (the server's calibrate `at` limit); ids unique, junk dropped.
+## WO-703 (owner 23.10: "prebuilt marks similar to what the camera calibration has. but just 6 8 points around the
+## stage and dead center"): the tracking grid's 4 corners, 4 edge middles and dead centre (PSN, the floor points the
+## camera calibration uses — tracking_model.gd grid_corners; stage left = +X, downstage = −Y), clockwise from DSR.
+## Appended to `marks` under their names; a name already there is left as it is (it may have been measured).
+static func preset_marks(grid: Dictionary, marks: Array) -> Array:
+	var hw: float = float(grid.width) / 2.0
+	var x0: float = float(grid.x_offset)
+	var ym: float = float(grid.y_offset)
+	var y0: float = ym - float(grid.depth) / 2.0
+	var y1: float = ym + float(grid.depth) / 2.0
+	var spots := [["DSR", x0 - hw, y0], ["DSC", x0, y0], ["DSL", x0 + hw, y0], ["SL", x0 + hw, ym], ["USL", x0 + hw, y1],
+		["USC", x0, y1], ["USR", x0 - hw, y1], ["SR", x0 - hw, ym], ["Centre", x0, ym]]
+	var out := normalize_marks(marks)
+	var names := {}
+	var id := 0
+	for m in out:
+		names[str(m.name)] = true
+		id = maxi(id, int(m.id))
+	for sp in spots:
+		if names.has(sp[0]):
+			continue
+		id += 1
+		out.append({"id": id, "name": sp[0], "x": snappedf(sp[1], 0.001), "y": snappedf(sp[2], 0.001),
+			"z": float(grid.z_offset)})
+	return out
+
+
 static func normalize_marks(raw: Variant) -> Array:
 	var out := []
 	var used := {}

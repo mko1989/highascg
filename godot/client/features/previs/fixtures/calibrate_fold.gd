@@ -11,6 +11,7 @@ const F := preload("res://features/previs/tracking/follow_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const T := preload("res://features/previs/tracking/tracking_model.gd")
 
 var sel: RefCounted = Sel.shared()
 var _list: ItemList
@@ -49,6 +50,11 @@ func _ready() -> void:
 		sel.mark_pick = on
 		_place.text = "Click the floor…" if on else "Place mark")
 	row.add_child(_place)
+	var preset := Button.new()
+	preset.text = "Preset marks"
+	preset.tooltip_text = "The tracking grid's corners, edge middles and dead centre (Tracking → grid)"
+	preset.pressed.connect(_add_presets)
+	row.add_child(preset)
 	_remove = Button.new()
 	_remove.text = "Remove mark"
 	_remove.pressed.connect(_remove_mark)
@@ -162,6 +168,16 @@ func _add_mark(psn: Array) -> void:
 		id = maxi(id, int(m.id) + 1)
 	s.marks.append({"id": id, "name": "Mark %d" % id, "x": snappedf(psn[0], 0.01), "y": snappedf(psn[1], 0.01), "z": 0.0})
 	_picked = id
+	_persist(s)
+
+
+## WO-703: the 9 floor spots the camera calibration uses — grid corners, edge middles, dead centre; names already
+## there are kept (they may have been measured).
+func _add_presets() -> void:
+	var pv: Variant = Store.project.get("previs")
+	var grid: Dictionary = T.normalize((pv as Dictionary).get("tracking") if pv is Dictionary else null).grid
+	var s := _slice()
+	s.marks = F.preset_marks(grid, s.marks)
 	_persist(s)
 
 

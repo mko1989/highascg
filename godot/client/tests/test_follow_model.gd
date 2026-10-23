@@ -153,3 +153,20 @@ func test_stage_marks_normalize() -> void:
 		{"id": 1, "name": "Mark 1", "x": 0.0, "y": -2.25, "z": 0.0}])
 	t.eq(F.normalize({}).marks, [], "no marks by default")
 	t.eq(F.normalize({"marks": m}).marks, m, "a save keeps them")
+
+
+func test_preset_marks_follow_the_tracking_grid() -> void:
+	# WO-703: the default grid (10 × 6 m, centre Y 3) → corners, edge middles and dead centre, clockwise from DSR
+	var g := {"width": 10.0, "depth": 6.0, "x_offset": 0.0, "y_offset": 3.0, "z_offset": 0.0}
+	var m := F.preset_marks(g, [])
+	t.eq(m.map(func(x: Dictionary) -> String: return x.name), ["DSR", "DSC", "DSL", "SL", "USL", "USC", "USR", "SR", "Centre"])
+	t.eq([m[0].x, m[0].y, m[4].x, m[4].y, m[8].x, m[8].y], [-5.0, 0.0, 5.0, 6.0, 0.0, 3.0])
+	t.eq(m.map(func(x: Dictionary) -> int: return x.id), [1, 2, 3, 4, 5, 6, 7, 8, 9])
+	# a measured mark under a preset name is kept; other marks stay; new ids follow the highest
+	var mine := [{"id": 7, "name": "Centre", "x": 0.2, "y": 2.9, "z": 0}, {"id": 3, "name": "Tape", "x": 1, "y": 1, "z": 0}]
+	var again := F.preset_marks(g, mine)
+	t.eq(again.size(), 10)
+	t.eq([again[0].name, again[0].x, again[1].name, again[2].id], ["Centre", 0.2, "Tape", 8])
+	t.eq(F.preset_marks(g, again).size(), 10, "pressing again adds nothing")
+	t.eq(F.preset_marks({"width": 4.0, "depth": 2.0, "x_offset": 1.0, "y_offset": 0.0, "z_offset": 0.5}, [])[2],
+		{"id": 3, "name": "DSL", "x": 3.0, "y": -1.0, "z": 0.5})
