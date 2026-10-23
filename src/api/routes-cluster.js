@@ -14,6 +14,8 @@
  *   GET    /api/cluster/master                 → { claim, ...view }  (P3a, cluster-master.js: peers pull the signed claim)
  *   POST   /api/cluster/master                 ← a linked server's signed claim (accepted only if it beats the one held)
  *   POST   /api/cluster/master/set { master: 'self' | peer id, auto? } → the new view (operator: Make master / failover)
+ *   POST   /api/cluster/call                   ← a linked server's signed action (WO-712 R2, cluster-call.js; open while
+ *                                                  enforceAuth is on: the signature is the auth, auth.js)
  * GET /api/cluster also carries `master` (the view). Changes broadcast WS `cluster:peers` (the GET body).
  * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
  * for a client), and polls only while the list is not empty.
@@ -28,6 +30,8 @@ const { postJson, getJson } = require('../cluster/cluster-peers')
 const { createMaster } = require('../cluster/cluster-master')
 const { createClusterFanout } = require('../cluster/cluster-fanout')
 const { createAirJournal } = require('../cluster/cluster-air-journal')
+const { createClusterCall } = require('../cluster/cluster-call')
+const { createCallActions } = require('../cluster/cluster-call-actions')
 const identity = require('../system/device-identity')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
@@ -120,6 +124,26 @@ function followsMaster(ctx) {
 	return clusterOf(ctx).snapshot().peers.some((p) => p.id === v.master_id && p.online)
 }
 
+/** WO-712 R2: follower check that never starts the cluster service (a box that never ran it follows no one). */
+const isClusterFollower = (ctx) => !!ctx?._clusterMaster && followsMaster(ctx)
+
+/** WO-712 R2: signed calls to / from linked servers; the receiver runs the allow-list (cluster-call-actions.js). */
+function callOf(ctx) {
+	if (ctx._clusterCall) return ctx._clusterCall
+	ctx._clusterCall = createClusterCall({
+		cluster: clusterOf(ctx),
+		selfKey: identity.getDevicePublicKeyPem(),
+		sign: identity.signMessage,
+		verify: identity.verifyMessage,
+		post: postJson,
+		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
+		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
+		actions: createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }),
+		log: ctx.log,
+	})
+	return ctx._clusterCall
+}
+
 /** GET /api/cluster body = WS `cluster:peers` (+ `fanout`: P4a forwarding status per server). */
 const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
 	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} },
@@ -187,6 +211,10 @@ function register(routes) {
 		const r = await masterOf(ctx).set(parseBody(body))
 		return reply(r.status, r.body)
 	}, opt)
+	routes.post('/api/cluster/call', async ({ ctx, body }) => {
+		const r = await callOf(ctx).handle(parseBody(body))
+		return reply(r.status, r.body)
+	}, opt)
 	routes.get('/api/cluster/peers/:id/device-view', async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).deviceView(params.id)
 		return reply(r.status, r.body)
@@ -200,4 +228,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, startIfLinked }

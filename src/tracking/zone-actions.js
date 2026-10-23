@@ -4,7 +4,8 @@
  * WO-616 T7 — what a trigger-zone transition fires. OpenFollow sends one OSC address per transition; this box has
  * no outbound OSC (PSN / OSC output dropped by the owner, T6), so a zone's four slots name an action instead:
  *
- *   look:<sceneId>            take that stored look to program (the WO-598 take-look path — no second take path)
+ *   look:<sceneId>            take that stored look to program (the WO-598 take-look path — no second take path);
+ *                             on a cluster follower the master takes it (WO-712 R2 signed `look.take`, cluster-call.js)
  *   look:<sceneId>@preview    stage it on preview instead
  *   companion:<page>/<row>/<col>   press that Companion button (the timeline flag's HTTP press, WO-24 / WO-547)
  *   presenter                 WO-675: the actions of the presenter whose marker crossed (zone-service.js, presenters.js)
@@ -29,13 +30,19 @@ function parseAction(text) {
 /**
  * Run one parsed action. → Promise<{ ok, detail }>; never throws.
  * @param {object} ctx  server ctx (config, log …)
- * @param {{ takeLook?: Function, fetch?: Function }} [deps]  test seams
+ * @param {{ takeLook?: Function, fetch?: Function, cluster?: object }} [deps]  test seams (cluster: routes-cluster.js)
  */
 async function runAction(action, ctx, deps = {}) {
 	try {
 		if (!action) return { ok: true, detail: 'none' }
 		if (action.type === 'invalid') return { ok: false, detail: action.error }
 		if (action.type === 'look') {
+			const cluster = deps.cluster || (ctx?._clusterMaster ? require('../api/routes-cluster') : null)
+			if (action.target !== 'preview' && cluster?.isClusterFollower(ctx)) {
+				// WO-712 R2: a follower's own PGM take is skipped (the master's fan-out drives air): the master takes it.
+				const r = await cluster.callOf(ctx).callMaster('look.take', { sceneId: action.sceneId, target: 'program' })
+				return { ok: !!r.ok, detail: `look ${action.sceneId} → master${r.ok ? '' : ` (${r.status} ${r.json?.error || r.error || ''})`}` }
+			}
 			const take = deps.takeLook || require('../api/routes-scene-take-look').handleTakeLook
 			const r = await take({ sceneId: action.sceneId, target: action.target }, ctx)
 			const ok = !r || !r.status || r.status < 400

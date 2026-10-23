@@ -137,6 +137,8 @@ function isPublicApiPath(method, apiPath) {
 	if (m === 'GET' && p === '/api/auth/status') return true
 	if (m === 'POST' && (p === '/api/auth/login' || p === '/api/auth/logout')) return true
 	if (m === 'GET' && p === '/api/ping') return true
+	// WO-712 R2: a linked server's call carries its own ed25519 signature, checked by the route (cluster-call.js).
+	if (m === 'POST' && p === '/api/cluster/call') return true
 	return false
 }
 

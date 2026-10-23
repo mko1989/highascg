@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2–R5 open**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2 (signed cluster call + impose) DONE 23.10.26 offline (17-test smoke, real router), two-box QA pending; R3–R5 open**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -203,3 +203,151 @@ Known edges: the calibrate session (`calibrate-session.js`) reports `output_enab
   - Devices → SERVERS → "THIS SERVER DOES": untick **Lighting out**, and the DMX viewer / node shows no Art-Net from
     this box while the previs beams still move. Tick it back on.
   - The panel layout (2 columns) has not been looked at on screen.
+
+## R2 — what was done
+
+One signed "call another linked server" primitive, and the short allow-list a linked server may run here (owner D3:
+a remote action counts as this server's own operator pressing it; the last press wins; `accept_remote` locks it out).
+
+**Found before building.**
+- The signing helpers are already shared: `fingerprint` (`cluster-media.js:23`) and `signMessage` / `verifyMessage`
+  (`device-identity.js`), used by both the master claim and the ssh-key hand-off. Each scheme keeps only its own
+  canonical text. So nothing was factored out: `cluster-call.js` reuses the same two, and gets its own text.
+- The router matches in registration order (`route-registry.js` `dispatch`). Probed on the loaded router: no POST wildcard
+  ahead of `routes-cluster` matches `/api/cluster/call`. The smoke pins that.
+- `router-dispatch.js:52` runs `checkHttpAuth` before every route. `isPublicApiPath` (`auth.js:134`) is the only
+  bypass (`/api/ping`, the login routes).
+
+**`src/cluster/cluster-call.js`** (new). `createClusterCall(deps)` returns `{ call(peerId, action, args), callMaster(action, args), handle(body), me }`.
+- Wire: `POST /api/cluster/call { action, args, from, to, ts, nonce, sig }`.
+  - `from` / `to`: the device-key fingerprints of the sender and of the receiver.
+  - `ts`: the sender's clock, in ms.
+  - `nonce`: 16 random bytes, as 32 hex characters.
+  - `sig`: ed25519 with the device key, base64, over
+    `JSON.stringify(['highascg-call-1', action, from, to, ts, nonce, stableJson(args)])`.
+  - `stableJson` is JSON with the object keys sorted. So the text is the same on both ends whatever order the args
+    were built in.
+  - The `highascg-call-1` tag keeps the text apart from the claim and ssh-key texts.
+- The receiver checks these in order:
+  1. Shape (400 "malformed call"). `args` must be an object.
+  2. The sender: `from` must be the fingerprint of a `device_key` in **this** server's peer list. Otherwise 403
+     "not linked here".
+  3. `to` must be this server's fingerprint. Otherwise 400 "call is for another server".
+  4. `|now − ts| ≤ 60 s`. Otherwise 400 "stale call".
+  5. The nonce must not have been seen in the last 120 s. Otherwise 409 "replayed call".
+  6. The signature must verify against that peer's recorded key. Otherwise 403 "bad signature".
+  7. The nonce is recorded only now, so an unsigned flood cannot push real nonces out. The store is a Map bounded at
+     4096 entries; the oldest go first, and anything older than 120 s is dropped on each call.
+  8. `accept_remote` must be on (`server-duties.js`). Otherwise 403 "this server refuses remote actions".
+  9. The action must be on the allow-list (an own-property lookup, so `constructor` is refused). Otherwise 400
+     `unknown action "…"`.
+  10. Then the action runs, and the server logs `[cluster] remote <action> from <peer name>` once.
+- `callMaster` sends to the master's peer id (`masterOf(ctx).view().master_id`). It answers 409 when this server is
+  master or there is none.
+
+**`src/cluster/cluster-call-actions.js`** (new). `createCallActions(ctx, { callMaster, isFollower })` is the allow-list.
+Each action goes through the local route's own code:
+- `look.take { sceneId, target? }` → `routes-scene-take-look.handleTakeLook`.
+  - On a cluster follower, a program take is not run locally, because the follower PGM skip
+    (`routes-scene-take.js:216`) would drop it. It goes to the master by `callMaster('look.take', {…, relayed: true})`,
+    and the master's answer is returned.
+  - A `relayed` take is never handed on again (a guard against ping-pong while two servers disagree about the master).
+  - `preview` stays local.
+- `tracking.auto.pin` / `tracking.auto.slot` / `tracking.auto.home` → `auto-routes.handleAuto(ctx.trackingAuto,
+  POST /api/tracking/auto/<op>)`. The answer is 503 "auto director not running" when the tracking module is off.
+- `fixtures.look { id, fade_ms? }` → `routes-fixture-dmx.handleRecallLook` on `ctx.fixtureService`, so it has the same
+  clamp, 404 and 400. The answer is 503 without the engine.
+- `companion.press { page, row, column }` → `zone-actions.runAction({type:'companion', …})`, the same press as the
+  zone action. Each value must be an integer from 0 to 999, else 400.
+
+**`src/api/routes-cluster.js`**.
+- `callOf(ctx)` builds the instance: the real peer list, device key and `postJson`; `acceptsRemote` =
+  `server-duties.has('accept_remote')`.
+- `isClusterFollower(ctx)` = `!!ctx._clusterMaster && followsMaster(ctx)`. It never starts the cluster service, so a
+  box that never ran it follows no one.
+- `POST /api/cluster/call` is registered in `register()`. router.js is untouched (it stays at 500 lines).
+
+**`src/server/auth.js`**. `isPublicApiPath` gains exactly `POST /api/cluster/call` (an exact match).
+- The route's own signature is the auth there. So a linked peer can reach it while `enforceAuth` is on.
+- Nothing else of the cluster API opens. GET, `/api/cluster/call/x`, `/api/cluster/master` and `/ssh-key` still need
+  the token.
+- Known gap, unchanged: with `enforceAuth` on, the peer **polling** (`/api/replication/ping`, `/api/cluster/master`,
+  the device-view proxy) still carries no token. A cluster with auth on still does not work end to end; only the call
+  path does.
+
+**`src/tracking/register.js`**. One line in `onBoot`:
+`Object.assign(ctx, { trackingHub: hub, trackingAuto: auto })`, so the call reaches the director. It stays at 488 lines.
+
+**`src/tracking/zone-actions.js`**. A `look:` action that is not `@preview` checks `routes-cluster.isClusterFollower(ctx)`.
+That module is required only when `ctx._clusterMaster` exists.
+- On a follower, the action sends `look.take` to the master through `callOf(ctx).callMaster`. The zone detail reads
+  `look <id> → master`, or the master's refusal, e.g. `(403 this server refuses remote actions)`.
+- A standalone box, the master, or a follower whose master is offline runs `handleTakeLook` exactly as before.
+
+**`docs/wiki/api/contract/http.md`** is regenerated (`node tools/dev/gen-api-contract.js`), because the route is new.
+
+### Security model, in plain words
+- **What is trusted:** only the device keys of the servers that **this** server's operator linked (Devices → Servers
+  → +). This is trust on first use, the same as for the master claim and Send media. A call signed by any other key,
+  or naming another receiver, is refused. Linking a server here means trusting it to press these six things.
+- **Replay:**
+  - A call is good for 60 s around the receiver's clock, so the two clocks must agree within a minute.
+  - Every nonce is remembered for 120 s, which covers the whole window a replay could pass the time check in.
+  - A call captured on the LAN cannot be replayed, or redirected to another server: `to` is signed.
+- **Not secret:** the body is plain HTTP. A listener on the LAN sees which action was pressed, but cannot forge or
+  change one.
+- **`accept_remote`:** each server's own tick (Devices → THIS SERVER DOES, default on). Off → every remote call gets
+  403 "this server refuses remote actions". It applies on the server that receives the call. A follower relaying a take
+  checks its own tick, and the master then checks its tick too.
+- **What a peer can do:** only the six allow-listed actions, each with the local route's own validation. There is no
+  AMCP, no config and no project write.
+
+## R2 — what was VERIFIED
+
+- `node --test tools/smoke/smoke-wo712-cluster-call.test.js`: **17 tests, 17 pass**. Two or three in-process servers
+  with test ed25519 keys (`crypto.generateKeyPairSync`). It never reads or writes the box's `config/device-identity.json`
+  or the persistence file: the instances are injected, and the router test presets `ctx._clusterCall`.
+  - A signed call is accepted and logs `[cluster] remote ping from srv-A`.
+  - The signed text: key order does not matter, and every field matters.
+  - Rejections: unlinked sender (also through `call()`); wrong `to`; ts ±60 s + 1 ms (exactly 60 s passes); a
+    replayed nonce, still refused 60 s later and refused as stale after 180 s; a bad signature, a foreign key, and args
+    changed after signing (a refused forgery does not burn the real nonce); accept_remote off; unknown action and
+    `constructor`; malformed nonce, array args, null body.
+  - `callMaster` reaches the master, and answers 409 without one.
+  - The allow-list is exactly six actions, and each reaches its stub:
+    - `handleTakeLook` (program and preview);
+    - the follower relay, with `relayed` stopping a second hop;
+    - the director's pin / slot / home, and 503 when it is off;
+    - the recall route (fade clamp, 404, 400, 503);
+    - the Companion press, and 400.
+  - End to end, A's `look.take` lands on B's `handleTakeLook`.
+  - A follower's zone `look:` goes to the master through the **real** `routes-cluster` `isClusterFollower` + `callOf`
+    on the ctx. `@preview` stays local, and the master's refusal shows in the zone detail. Standalone, master, and a
+    follower whose master is offline all take locally.
+  - **Through the real router:** `require('src/api/router').routeRequest('POST', '/api/cluster/call', …)` with
+    `security.enforceAuth: true` gives 200. A bad `to` gives 400 (from the route, not from auth). `POST
+    /api/cluster/master` and `GET /api/cluster/call` give 401. The first registry route matching POST
+    `/api/cluster/call` is that route.
+- The smokes on the touched files are still green: wo670 × 5 + wo712 server-duties + api-auth + the tracking /
+  fixtures smokes that read register.js / zone-actions.js (wo616 zones / marker-hub / follow-artnet / beam-spot, wo624
+  ×2, wo675 ×2, wo667, wo707, wo708, wo711, wo700, wo615 ×8): **253 tests, 253 pass**. smoke-wo598-api-contract: 3/3
+  after the regeneration.
+- Gates:
+  - eslint is clean on every touched file.
+  - prettier is clean on the three new files and on register.js. routes-cluster.js, auth.js and zone-actions.js were
+    already not prettier-clean at HEAD, so they were left unformatted to keep the diff small.
+  - `check-max-file-lines`: 0 over.
+  - `check-unwired-exports`: no new orphan.
+  - `check-require-integrity`: no unresolved require. It fails only on this box's 6 Syncthing sync-conflict files under
+    `projects/_autosave`.
+- `npm run -s test:ci`: **2967 tests, 2964 pass, 1 fail**. The one failure is the known WO-308 pointer-confine test
+  (`'auto' (default) reproduces the pre-WO-308 rule exactly`). The new smoke is not in the curated list yet (the lead adds it).
+- **Not verified (owner QA):** real two-box traffic.
+  - Not tested yet:
+    - a call between two boxes over the LAN;
+    - a tracking box's zone `look:` taken by the media master;
+    - `accept_remote` off on a real box;
+    - a remote call with `enforceAuth` on;
+    - the `[cluster] remote …` journal line.
+  - Nothing was sent off 127.0.0.1, the server was not restarted, and no GUI exposes a sender yet. R3's overlay buttons
+    will call `call()`.

@@ -425,7 +425,7 @@ module.exports = {
 
 	onBoot(ctx) {
 		_ctx = ctx
-		if (ctx) ctx.trackingHub = hub
+		if (ctx) Object.assign(ctx, { trackingHub: hub, trackingAuto: auto }) // WO-712 R2: cluster calls reach the director
 		if (_timer) clearInterval(_timer)
 		_timer = setInterval(() => {
 			pinTick()
