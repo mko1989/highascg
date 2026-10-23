@@ -216,6 +216,10 @@ usr/NX
 usr/NX/*
 etc/NX
 etc/NX/*
+# WO-702: … and its systemd unit + enable link — with usr/NX gone, a shipped nxserver.service restart-looped into
+# a failed unit on every live boot (.64). Merged-usr: the unit lives at usr/lib/… (/lib is a symlink).
+usr/lib/systemd/system/nxserver.service
+etc/systemd/system/multi-user.target.wants/nxserver.service
 home/casparcg/.nx
 home/casparcg/.nx/*
 # Zoom user identity (opt/zoom binaries excluded separately)

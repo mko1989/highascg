@@ -10,7 +10,7 @@ set -euo pipefail
 IFACE="${1:-}"
 
 iface_allowed() {
-	[[ "${1:-}" =~ ^(eth|enp|eno)[0-9]+$ ]]
+	[[ "${1:-}" =~ ^(eth[0-9]+|en[a-z0-9]+)$ ]]
 }
 
 pick_iface() {

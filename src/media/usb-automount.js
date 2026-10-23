@@ -25,6 +25,13 @@
  * touches /run/highascg/usb-automount-inhibit; while it exists no mount is attempted.
  * unmask-exfat-systemd.sh removes it; /run is tmpfs so a crashed flash run can leave
  * it at worst until reboot.
+ *
+ * Held partitions (WO-702): a device with entries in /sys/class/block/<name>/holders is
+ * claimed by device-mapper (Ventoy's ISO map on the boot stick, LVM, LUKS) and opened
+ * O_EXCL — udisks can never mount it. WO-463 skips such partitions when lsblk lists the
+ * holder as a child, but the .64 live boot (22.10 ISO) still retried /dev/sda1 every 5 min
+ * all day ("already mounted or mount point busy" + kernel "Can't open blockdev"), so the
+ * poller now asks sysfs directly and skips the device, logging it once.
  */
 'use strict'
 
@@ -38,12 +45,22 @@ const RETRY_BASE_MS = 30 * 1000
 const RETRY_MAX_MS = 5 * 60 * 1000
 const POLKIT_RETRY_MS = 10 * 60 * 1000
 
+/** Names in /sys/class/block/<dev>/holders (dm-0 …); [] when none or unreadable. */
+function sysfsHolders(blockDevice) {
+	try {
+		return fs.readdirSync(`/sys/class/block/${String(blockDevice).replace(/^\/dev\//, '')}/holders`)
+	} catch {
+		return []
+	}
+}
+
 /**
  * @param {object} ctx app context (reads ctx.config.usbIngest, uses ctx._wsBroadcast)
  * @param {{ intervalMs?: number, log?: (m: string) => void, logError?: (m: string) => void,
  *   listCandidates?: () => Promise<Array<{ blockDevice: string, label?: string, fsType?: string }>>,
  *   listMounted?: () => Promise<Array<{ device?: string }>>,
  *   mount?: (dev: string) => Promise<{ ok: boolean, mountpoint?: string|null, message?: string, needsPolkit?: boolean }>,
+ *   holdersOf?: (dev: string) => string[],
  *   inhibitFile?: string, force?: boolean }} [options] non-default fields exist for offline tests
  * @returns {() => void} stop function
  */
@@ -55,6 +72,9 @@ function startUsbAutoMount(ctx, options = {}) {
 	const mount = options.mount || usbDrives.mountUsbBlockDevice
 	const log = options.log || (() => {})
 	const logError = options.logError || log
+	const holdersOf = options.holdersOf || sysfsHolders
+	/** devices already logged as held — one line per plug, not per tick */
+	const heldLogged = new Set()
 
 	const inhibitFile = options.inhibitFile ?? INHIBIT_FILE
 
@@ -92,6 +112,7 @@ function startUsbAutoMount(ctx, options = {}) {
 			const present = new Set(candidates.map((c) => c.blockDevice))
 			for (const d of mounted) if (d && d.device) present.add(d.device)
 			for (const key of [...state.keys()]) if (!present.has(key)) state.delete(key)
+			for (const key of [...heldLogged]) if (!present.has(key)) heldLogged.delete(key)
 
 			for (const c of candidates) {
 				if (stopped) break
@@ -99,6 +120,14 @@ function startUsbAutoMount(ctx, options = {}) {
 				const st = state.get(c.blockDevice)
 				const now = Date.now()
 				if (st && (st.done || now < st.nextRetryAt)) continue
+				const holders = holdersOf(c.blockDevice)
+				if (holders.length) {
+					if (!heldLogged.has(c.blockDevice)) {
+						heldLogged.add(c.blockDevice)
+						log(`USB auto-mount: skip ${c.blockDevice} — held by ${holders.join(', ')} (device-mapper: boot stick / LVM / LUKS)`)
+					}
+					continue
+				}
 				// Claim before the async mount so an overlapping tick can't double-mount.
 				state.set(c.blockDevice, { done: false, attempts: st?.attempts || 0, nextRetryAt: Infinity })
 				const res = await mount(c.blockDevice)
@@ -135,4 +164,4 @@ function startUsbAutoMount(ctx, options = {}) {
 	}
 }
 
-module.exports = { startUsbAutoMount }
+module.exports = { startUsbAutoMount, sysfsHolders }

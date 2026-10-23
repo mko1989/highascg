@@ -15,6 +15,9 @@ STATE_FILE="${STATE_DIR}/last-exfat-network.hash"
 SOURCE_FILE="${STATE_DIR}/network-config-source"
 APPLY_SCRIPT=/usr/local/lib/highascg/highascg-network-apply.sh
 LOG=/var/log/highascg/exfat-network-apply.log
+SYS_NET="${HIGHASCG_SYS_CLASS_NET:-/sys/class/net}"
+# WO-702: at boot the cabled NIC may not have its carrier yet (.64: enp5s0 came up after this ran, eno2 was picked)
+CARRIER_WAIT_S="${HIGHASCG_CARRIER_WAIT_S:-10}"
 
 BOOT=0
 FORCE=0
@@ -27,8 +30,12 @@ log() {
 	logger -t highascg-exfat-network -- "$*" 2>/dev/null || true
 }
 
+# WO-702: an `if`, not `[[ … ]] && log` — as a function's last statement that returned 1 when not verbose, and under
+# `set -e` the call killed the script right after "apply:" (the .64 live boot: unit failed, network.conf never applied).
 vlog() {
-	[[ "$VERBOSE" -eq 1 ]] && log "$@"
+	if [[ "$VERBOSE" -eq 1 ]]; then
+		log "$@"
+	fi
 }
 
 usage() {
@@ -130,8 +137,10 @@ MODE="${CFG[mode]:-dhcp}"
 MODE="$(echo "$MODE" | tr '[:upper:]' '[:lower:]')"
 IFACE="${CFG[interface]:-}"
 
+# WO-702: the same rule as src/config/network-settings.js IFACE_RE — the old ^(eth|enp|eno)[0-9]+$ rejected every
+# predictable PCI name (enp5s0 on .64), so the boot apply could only ever pick eno2 there
 iface_allowed() {
-	[[ "${1:-}" =~ ^(eth|enp|eno)[0-9]+$ ]]
+	[[ "${1:-}" =~ ^(eth[0-9]+|en[a-z0-9]+)$ ]]
 }
 
 pick_iface() {
@@ -140,17 +149,23 @@ pick_iface() {
 		echo "$IFACE"
 		return 0
 	fi
-	local name carrier
-	for p in /sys/class/net/*; do
-		name="$(basename "$p")"
-		iface_allowed "$name" || continue
-		carrier="$(cat "$p/carrier" 2>/dev/null || echo 0)"
-		if [[ "$carrier" == "1" ]]; then
-			echo "$name"
-			return 0
-		fi
+	local name carrier p waited=0
+	# a NIC with a carrier wins; none yet → poll up to CARRIER_WAIT_S before falling back to the first allowed name
+	while :; do
+		for p in "$SYS_NET"/*; do
+			name="$(basename "$p")"
+			iface_allowed "$name" || continue
+			carrier="$(cat "$p/carrier" 2>/dev/null || echo 0)"
+			if [[ "$carrier" == "1" ]]; then
+				echo "$name"
+				return 0
+			fi
+		done
+		((waited < CARRIER_WAIT_S)) || break
+		sleep 1
+		waited=$((waited + 1))
 	done
-	for p in /sys/class/net/*; do
+	for p in "$SYS_NET"/*; do
 		name="$(basename "$p")"
 		iface_allowed "$name" && {
 			echo "$name"

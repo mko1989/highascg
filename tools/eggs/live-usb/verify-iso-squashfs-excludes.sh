@@ -163,7 +163,10 @@ for needle in \
 	'etc/ssh/ssh_host_ed25519_key' \
 	'home/casparcg/.config/companion/v5.0' \
 	'home/casparcg/.config/companion/machid' \
-	'home/casparcg/highascg/godot/extensions/hshm/build'; do
+	'home/casparcg/highascg/godot/extensions/hshm/build' \
+	'usr/NX' \
+	'usr/lib/systemd/system/nxserver.service' \
+	'etc/systemd/system/multi-user.target.wants/nxserver.service'; do
 	if squash_has_tree "$needle"; then
 		bad "unexpected path in squashfs: ${needle}"
 	else

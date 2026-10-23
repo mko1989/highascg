@@ -202,29 +202,45 @@ function isLegacyHighascgHostname(hostname) {
 /**
  * @param {string} hostname
  * @param {(level: string, msg: string) => void} [log]
+ * @param {{ exec?: typeof execFileSync, isRoot?: boolean, current?: string, writeEtcHostname?: (name: string) => void }} [deps]
+ *   test seams (default: the real execFileSync / uid / os.hostname / /etc/hostname)
  * @returns {{ ok: boolean, applied: boolean, hostname: string, error?: string }}
  */
-function applySystemHostname(hostname, log) {
+function applySystemHostname(hostname, log, deps = {}) {
+	const exec = deps.exec || execFileSync
+	const isRoot = deps.isRoot ?? (typeof process.getuid === 'function' && process.getuid() === 0)
+	const writeEtcHostname = deps.writeEtcHostname || ((name) => fs.writeFileSync('/etc/hostname', `${name}\n`))
 	const target = String(hostname || '').trim()
-	if (!target) return { ok: false, applied: false, hostname: os.hostname(), error: 'empty hostname' }
-	const current = os.hostname()
+	const current = deps.current ?? os.hostname()
+	if (!target) return { ok: false, applied: false, hostname: current, error: 'empty hostname' }
 	if (current === target) return { ok: true, applied: false, hostname: current }
 
 	/* Third attempt is the one that works unprivileged: `sudo -n hostnamectl` is NOT in the
 	 * allowlist and never will be — scripts/setup/12-passwordless-sudo.sh grants exact command
 	 * paths only (WO-97: no NOPASSWD wildcards), and set-hostname needs a per-box argument. The
-	 * installed helper derives the same MAC-based highascg#### name itself and runs as root, so
-	 * granting that one path costs no extra surface. It re-enters this function AS ROOT, where the
-	 * first attempt succeeds — no recursion back into sudo. */
-	const attempts = [
-		() => execFileSync('hostnamectl', ['set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
-		() => execFileSync('sudo', ['-n', 'hostnamectl', 'set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
-		() =>
-			execFileSync('sudo', ['-n', '/usr/local/lib/highascg/highascg-apply-hardware-hostname.sh'], {
-				encoding: 'utf8',
-				timeout: 20000,
-			}),
-	]
+	 * installed helper derives the same MAC-based highascg#### name itself and runs as root.
+	 * WO-702: AS ROOT the sudo attempts are never made. The old comment promised "the first
+	 * attempt succeeds — no recursion", but at boot hostnamectl has no D-Bus yet ("Failed to
+	 * connect to bus"), so root fell through to sudo → the helper → node → sudo … (179 sudo
+	 * runs in 20 s on the .64 live boot until spawnSync ETIMEDOUT). Root instead sets the kernel
+	 * name and /etc/hostname directly, which needs no bus. */
+	const attempts = isRoot
+		? [
+				() => exec('hostnamectl', ['set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
+				() => {
+					exec('hostname', [target], { encoding: 'utf8', timeout: 5000 })
+					writeEtcHostname(target)
+				},
+			]
+		: [
+				() => exec('hostnamectl', ['set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
+				() => exec('sudo', ['-n', 'hostnamectl', 'set-hostname', target], { encoding: 'utf8', timeout: 10000 }),
+				() =>
+					exec('sudo', ['-n', '/usr/local/lib/highascg/highascg-apply-hardware-hostname.sh'], {
+						encoding: 'utf8',
+						timeout: 20000,
+					}),
+			]
 
 	for (const run of attempts) {
 		try {
@@ -241,7 +257,7 @@ function applySystemHostname(hostname, log) {
 		ok: false,
 		applied: false,
 		hostname: current,
-		error: 'hostnamectl failed (needs root or passwordless sudo)',
+		error: isRoot ? 'hostnamectl and hostname both failed as root' : 'hostnamectl failed (needs root or passwordless sudo)',
 	}
 }
 

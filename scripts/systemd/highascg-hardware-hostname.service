@@ -2,7 +2,10 @@
 Description=HighAsCG hardware hostname (highascg#### from MAC)
 Documentation=file:/usr/share/doc/highascg-wo47/EXFAT_DATA_ZERO_TOUCH.md
 DefaultDependencies=no
-After=systemd-udev-settle.service network-pre.target
+# WO-702: hostnamectl needs D-Bus (systemd-hostnamed is bus-activated); without it the .64 live boot logged
+# "Failed to connect to bus" and the apply looped through sudo for 20 s
+Wants=dbus.socket
+After=systemd-udev-settle.service network-pre.target dbus.socket dbus.service
 Before=highascg.service tailscaled.service
 ConditionPathExists=/home/casparcg/highascg/package.json
 
