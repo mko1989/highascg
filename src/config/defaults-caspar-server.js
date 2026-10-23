@@ -9,7 +9,8 @@ function casparScreenDefaults(n, ndiName) {
 		[`${p}windowed`]: true,
 		/** Off by default since todos06.08.26: with CASPAR_GL_SYNC_DISPLAY (WO-407/444) doing the
 		 * frame pacing, consumer vsync only adds competing waits — owner verified GL sync +
-		 * vsync off is perfect. History: docs/reference/screen-consumer-vsync-nvidia.md */
+		 * vsync off is perfect. History: docs/reference/screen-consumer-vsync-nvidia.md
+		 * WO-716: no longer read — the generator always writes vsync off (SCREEN_VSYNC_XML). */
 		[`${p}vsync`]: false,
 		[`${p}borderless`]: true,
 		/** PGM screen consumers stack above desktop chrome by default (owner default, todos19.07.26). */
@@ -60,7 +61,7 @@ function casparServerDefaults() {
 		multiview_decklink_keyer: 'default',
 		multiview_mode: '1080p5000',
 		multiview_windowed: true,
-		multiview_vsync: true,
+		multiview_vsync: false, // WO-716: ignored, the generator always writes vsync off
 		multiview_borderless: true,
 		multiview_always_on_top: true,
 		multiview_aspect_ratio: '',

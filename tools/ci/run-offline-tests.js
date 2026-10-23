@@ -390,6 +390,7 @@ const FILES = [
 	'tools/smoke/smoke-wo712-exchange.test.js',
 	'tools/smoke/smoke-wo712-air-rules.test.js',
 	'tools/smoke/smoke-wo715-osc-bundle-once.test.js',
+	'tools/smoke/smoke-wo716-vsync-off-gpu-texture-every-screen.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

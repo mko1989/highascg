@@ -18,7 +18,7 @@ const GU := preload("res://features/devices/gpu_output_ui.gd")
 const MI := preload("res://core/math_input.gd")
 const GLE := preload("res://features/devices/gpu_layout_editor.gd")
 const BASE_CHECKS := [["fullscreen", "Fullscreen", "Run in fullscreen mode"], ["windowed", "Windowed", "Run in windowed mode"],
-	["border", "Border", "Show window border"], ["vsync", "V-sync", "Sync with monitor refresh rate"]]
+	["border", "Border", "Show window border"]]  # no V-sync: always off (WO-716); ui.vsync only round-trips the saved key
 ## LineEdit field → [placeholder, min, decimals] (decimals < 0 = plain text, no math commit)
 const INPUTS := {"custom_w": ["Width", 64.0, 0], "custom_h": ["Height", 64.0, 0], "custom_fps": ["Frame rate", 1.0, 2],
 	"os_w": ["Width", 64.0, 0], "os_h": ["Height", 64.0, 0], "os_fps": ["Hz", 1.0, 2],

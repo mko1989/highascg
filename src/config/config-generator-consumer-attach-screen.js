@@ -13,6 +13,7 @@ const {
 	buildPortAudioConsumerXml,
 } = require('./config-generator-builders')
 const { casparBoolEnabled } = require('./config-generator-utils')
+const { SCREEN_VSYNC_XML, SCREEN_GPU_TEXTURE_XML } = require('./config-generator-screen-xml')
 const { buildRtmpFfmpegConsumersForChannel } = require('./rtmp-output')
 /* WO-507: which DeckLink slots are bound as INPUTS — never emit an output consumer on one. */
 const { resolveDecklinkInputSlots } = require('./decklink-input-slots')
@@ -78,8 +79,7 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		? String(config[`screen_${n}_stretch`])
 		: 'none'
 	const windowed = casparBoolEnabled(config[`screen_${n}_windowed`], true)
-	/* Unset must agree with casparScreenDefaults(): vsync OFF (GL sync paces frames, WO-407/444). */
-	const vsync = casparBoolEnabled(config[`screen_${n}_vsync`], false)
+	/* No vsync here: it is always off, never read from screen_N_vsync (WO-716, SCREEN_VSYNC_XML). */
 	// PGM default is on: an unset key must agree with casparScreenDefaults() and with the
 	// Device View checkbox, which also renders unset as on.
 	const alwaysOnTop = casparBoolEnabled(config[`screen_${n}_always_on_top`], true)
@@ -94,7 +94,6 @@ function buildScreenPairChannels(config, routeMap, ctx) {
 		dims,
 		stretch,
 		windowed,
-		vsync,
 		alwaysOnTop,
 		borderless,
 	})
@@ -226,9 +225,10 @@ function buildScreenPairChannels(config, routeMap, ctx) {
                     <width>${dims.width}</width><height>${dims.height}</height>
                     <stretch>${stretch}</stretch>
                     <windowed>${windowed}</windowed>
-                    <vsync>${vsync}</vsync>
+                    ${SCREEN_VSYNC_XML}
                     <always-on-top>${alwaysOnTop}</always-on-top>
                     <borderless>${borderless}</borderless>
+                    ${SCREEN_GPU_TEXTURE_XML}
                 </screen>`
 	const prvXml = `${channelXmlComment(`Caspar channel ${prvChNum}: Screen ${n} preview output (PRV)${prvScreenEnabled ? ' — physical PRV head (WO-364)' : ''}`)}        <channel>
             <video-mode>${dims.modeId}</video-mode>

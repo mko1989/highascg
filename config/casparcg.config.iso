@@ -19,7 +19,7 @@
                     <stretch>none</stretch>
                     <windowed>true</windowed>
                     <key-only>false</key-only>
-                    <vsync>true</vsync>
+                    <vsync>false</vsync>
                     <borderless>true</borderless>
                     <interactive>false</interactive>
                     <always-on-top>false</always-on-top>
@@ -29,6 +29,7 @@
                     <colour-space>RGB</colour-space>
                     <force-linear-filter>true</force-linear-filter>
                     <high-bitdepth>false</high-bitdepth>
+                    <gpu-texture>true</gpu-texture>
                 </screen>
             </consumers>
             <mixer>

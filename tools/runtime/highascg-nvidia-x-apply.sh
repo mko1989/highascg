@@ -4,7 +4,8 @@
 # Verified vsync stack for Caspar screen consumers on NVIDIA:
 #   - Sync to VBlank OFF (driver must not double-sync with Caspar consumer vsync)
 #   - Force Composition Pipeline ON for every connected output (MetaMode)
-#   - Caspar <vsync>true</vsync> on screen consumers
+#   - Caspar <vsync>false</vsync> + <gpu-texture>true</gpu-texture> on every screen consumer
+#     (WO-716; pacing is GL sync, WO-407/444 — consumer vsync spun a core in the swap wait, WO-715)
 #
 # xrandr resets CurrentMetaMode and clears ForceCompositionPipeline; this script
 # must run after apply-layout.sh (and retries until MetaMode is populated).

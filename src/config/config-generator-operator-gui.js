@@ -2,6 +2,7 @@
 
 const { channelXmlComment } = require('./config-generator-xml-comments')
 const { escapeXml } = require('./config-generator-builders')
+const { SCREEN_VSYNC_XML, SCREEN_GPU_TEXTURE_XML } = require('./config-generator-screen-xml')
 const { resolveOperatorMonitorPort } = require('../utils/operator-monitor-resolve')
 const { resolveLayoutRectForOperatorPort } = require('../utils/x-display-session-layout')
 
@@ -85,7 +86,7 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 		`<width>${dims.width}</width><height>${dims.height}</height>`,
 		`<stretch>none</stretch>`,
 		`<windowed>true</windowed>`,
-		`<vsync>true</vsync>`,
+		SCREEN_VSYNC_XML, // WO-716: always off, like every other screen consumer
 		// WO-263 (inverts WO-255): this consumer stacks BELOW the fullscreen Firefox GUI, which
 		// stays on top and takes all clicks. The shape helper punches HOLES in FIREFOX at the
 		// preview rects so this window shows through. always-on-top MUST be false — video-on-top
@@ -96,7 +97,7 @@ function buildOperatorGuiChannel(config, dest, dims, ctx, casparChannelNum) {
 		/* WO-502: same forced-on gpu-texture as every other screen/multiview consumer — this is a
 		 * real CasparCG GL window (stacked below the Firefox kiosk, WO-263) subject to the exact same
 		 * single-shared-GL-thread cost as any other screen consumer. */
-		`<gpu-texture>true</gpu-texture>`,
+		SCREEN_GPU_TEXTURE_XML,
 	].join('\n                    ')
 
 	const ch = casparChannelNum != null && Number.isFinite(Number(casparChannelNum)) ? Number(casparChannelNum) : '?'

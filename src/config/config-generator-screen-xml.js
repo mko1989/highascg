@@ -3,6 +3,17 @@
 const { escapeXml, isCustomLiveProfile, casparBoolEnabled, readMultiviewSetting } = require('./config-generator-utils')
 
 /**
+ * WO-716 (owner 23.10.26: "vsync should always be off, gpu-texture enabled per channel"): every Caspar
+ * `<screen>` consumer this generator writes — PGM, PRV head, multiview, operator GUI, both build profiles —
+ * carries these two lines, and neither is a setting. Vsync on made NVIDIA spin-wait in glXSwapBuffers on the
+ * consumer thread (78 % of a core per consumer, WO-715 A/B); frame pacing comes from GL sync (WO-407/444).
+ * `screen_N_vsync` / `multiview_vsync` may still sit in saved settings: they are ignored.
+ */
+const SCREEN_VSYNC_XML = '<vsync>false</vsync>'
+/** WO-502: bind the mixer's GPU texture instead of a per-frame host round trip — see the PGM function. */
+const SCREEN_GPU_TEXTURE_XML = '<gpu-texture>true</gpu-texture>'
+
+/**
  * PR #1718: optional `<aspect-ratio>`, `<enable-mipmaps>` inside `<screen>` (custom build only).
  * @param {Record<string, unknown>} config
  * @param {number} screenIdx1
@@ -23,7 +34,7 @@ function buildScreenConsumerExtrasXml(config, screenIdx1) {
  * Inner XML for PGM `<screen>` (device, geometry, flags). Custom build uses extended tag order and PR #1718 fields.
  * @param {Record<string, unknown>} config
  * @param {number} n - 1-based screen index
- * @param {{ nextDevice: number, posX: number, posY: number, dims: { width: number, height: number }, stretch: string, windowed: boolean, vsync: boolean, alwaysOnTop: boolean, borderless: boolean }} ctx
+ * @param {{ nextDevice: number, posX: number, posY: number, dims: { width: number, height: number }, stretch: string, windowed: boolean, alwaysOnTop: boolean, borderless: boolean }} ctx
  * @returns {string}
  */
 function buildProgramScreenConsumerInnerXml(config, n, ctx) {
@@ -34,7 +45,6 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 		dims,
 		stretch,
 		windowed,
-		vsync,
 		alwaysOnTop,
 		borderless,
 	} = ctx
@@ -45,9 +55,10 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 			`<width>${dims.width}</width><height>${dims.height}</height>`,
 			`<stretch>${stretch}</stretch>`,
 			`<windowed>${windowed}</windowed>`,
-			`<vsync>${vsync}</vsync>`,
+			SCREEN_VSYNC_XML,
 			`<always-on-top>${alwaysOnTop}</always-on-top>`,
 			`<borderless>${borderless}</borderless>`,
+			SCREEN_GPU_TEXTURE_XML,
 		].join('\n                    ')
 	}
 	const extras = buildScreenConsumerExtrasXml(config, n)
@@ -63,7 +74,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 		`<stretch>${stretch}</stretch>`,
 		`<windowed>${windowed}</windowed>`,
 		`<key-only>${keyOnly}</key-only>`,
-		`<vsync>${vsync}</vsync>`,
+		SCREEN_VSYNC_XML,
 		`<borderless>${borderless}</borderless>`,
 		`<interactive>${interactive}</interactive>`,
 		`<always-on-top>${alwaysOnTop}</always-on-top>`,
@@ -82,7 +93,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
 	 * Owner measured on the box: 93.6 % -> 100.3 % of realtime and GPU 100 % -> 75 %, with all seven
 	 * channels still running. Owner decision 21.09.2026: no known downside on this box, so it is
 	 * forced on rather than exposed as a toggle. */
-	lines.push('<gpu-texture>true</gpu-texture>')
+	lines.push(SCREEN_GPU_TEXTURE_XML)
 	return lines.join('\n                    ')
 }
 
@@ -90,7 +101,7 @@ function buildProgramScreenConsumerInnerXml(config, n, ctx) {
  * Inner XML for multiview `<screen>` — matches {@link buildProgramScreenConsumerInnerXml} for `custom_live`
  * (aspect-ratio, mipmaps, colour-space, …) using `multiview_*` keys.
  * @param {Record<string, unknown>} config
- * @param {{ nextDevice: number, posX: number, posY: number, dims: { width: number, height: number }, stretch: string, windowed: boolean, vsync: boolean, alwaysOnTop: boolean, borderless: boolean }} ctx
+ * @param {{ nextDevice: number, posX: number, posY: number, dims: { width: number, height: number }, stretch: string, windowed: boolean, alwaysOnTop: boolean, borderless: boolean }} ctx
  * @returns {string}
  */
 function buildMultiviewScreenConsumerInnerXml(config, ctx) {
@@ -102,7 +113,6 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 		dims,
 		stretch,
 		windowed,
-		vsync,
 		alwaysOnTop,
 		borderless,
 	} = ctx
@@ -114,9 +124,10 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 			`<width>${dims.width}</width><height>${dims.height}</height>`,
 			`<stretch>${stretch}</stretch>`,
 			`<windowed>${windowed}</windowed>`,
-			`<vsync>${vsync}</vsync>`,
+			SCREEN_VSYNC_XML,
 			`<always-on-top>${alwaysOnTop}</always-on-top>`,
 			`<borderless>${borderless}</borderless>`,
+			SCREEN_GPU_TEXTURE_XML,
 		].join('\n                    ')
 	}
 	const ar = String(config[`multiview_${idx}_aspect_ratio`] || config.multiview_aspect_ratio || '').trim()
@@ -142,7 +153,7 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 		`<stretch>${stretch}</stretch>`,
 		`<windowed>${windowed}</windowed>`,
 		`<key-only>${keyOnly}</key-only>`,
-		`<vsync>${vsync}</vsync>`,
+		SCREEN_VSYNC_XML,
 		`<borderless>${borderless}</borderless>`,
 		`<interactive>${interactive}</interactive>`,
 		`<always-on-top>${alwaysOnTop}</always-on-top>`,
@@ -154,7 +165,7 @@ function buildMultiviewScreenConsumerInnerXml(config, ctx) {
 	lines.push(`<force-linear-filter>${forceLinear ? 'true' : 'false'}</force-linear-filter>`)
 	lines.push(`<high-bitdepth>${highBitdepth ? 'true' : 'false'}</high-bitdepth>`)
 	/* WO-502: same forced-on gpu-texture as the program screen consumer — see that function. */
-	lines.push('<gpu-texture>true</gpu-texture>')
+	lines.push(SCREEN_GPU_TEXTURE_XML)
 	return lines.join('\n                    ')
 }
 
@@ -162,4 +173,6 @@ module.exports = {
 	buildScreenConsumerExtrasXml,
 	buildProgramScreenConsumerInnerXml,
 	buildMultiviewScreenConsumerInnerXml,
+	SCREEN_VSYNC_XML,
+	SCREEN_GPU_TEXTURE_XML,
 }

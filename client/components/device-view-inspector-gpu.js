@@ -138,10 +138,8 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 	const borderIn = Object.assign(document.createElement('input'), { type: 'checkbox' })
 	borderIn.checked = !borderlessOn
 	borderCk.append(borderIn, document.createTextNode('Border'))
-	const vsyncCk = Object.assign(document.createElement('label'), { className: 'device-view__cablemode', title: 'Sync with monitor refresh rate' })
-	const vsyncIn = Object.assign(document.createElement('input'), { type: 'checkbox' })
-	vsyncIn.checked = !!vsyncOn
-	vsyncCk.append(vsyncIn, document.createTextNode('V-sync'))
+	// WO-716: no V-sync control — the generator always writes vsync off. This only round-trips the saved key.
+	const vsyncIn = { checked: !!vsyncOn }
 
 	// Advanced screen consumer controls
 	const stretchSel = Object.assign(document.createElement('select'), { className: 'device-view__destinations-type' })
@@ -343,7 +341,6 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		saveCasparSettings()
 	})
 	borderIn.addEventListener('change', saveCasparSettings)
-	vsyncIn.addEventListener('change', saveCasparSettings)
 
 	const edidIn = Object.assign(document.createElement('input'), {
 		className: 'device-view__destinations-type',
@@ -392,7 +389,7 @@ export function renderGpuOutControls(h, conn, { currentSettings, lastPayload, st
 		return ckWrap
 	}
 	minimalToggleRow.append(
-		mkSmallCk(fullscreenCk), mkSmallCk(windowedCk), mkSmallCk(borderCk), mkSmallCk(vsyncCk),
+		mkSmallCk(fullscreenCk), mkSmallCk(windowedCk), mkSmallCk(borderCk),
 		mkSmallCk(keyOnlyCk), mkSmallCk(aotCk),
 		mkSmallCk(operatorMonitorCk), pointerConfineSel, mkSmallCk(interactiveCk), mkSmallCk(nvidiaSyncCk),
 		mkSmallCk(sbsKeyCk), mkSmallCk(forceLinearCk), mkSmallCk(mipmapsCk), mkSmallCk(highBitdepthCk),

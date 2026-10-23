@@ -48,7 +48,6 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 	
 	// Multiview screen flags: per-index, then PGM screen 1 for window chrome, then global multiview_*.
 	const windowed = readMultiviewWindowChromeFlag(config, n, 'windowed', true)
-	const vsync = casparBoolEnabled(readMultiviewSetting(config, n, 'vsync'), true)
 	const alwaysOnTop = casparBoolEnabled(readMultiviewSetting(config, n, 'always_on_top'), false)
 	const borderless = readMultiviewWindowChromeFlag(config, n, 'borderless', true)
 	
@@ -63,7 +62,6 @@ function buildMultiviewChannel(config, routeMap, ctx) {
 		dims,
 		stretch,
 		windowed,
-		vsync,
 		alwaysOnTop,
 		borderless,
 	})

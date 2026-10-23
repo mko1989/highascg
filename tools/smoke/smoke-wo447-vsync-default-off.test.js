@@ -5,8 +5,8 @@
  *
  * With CASPAR_GL_SYNC_DISPLAY pacing frames (WO-407→444), consumer vsync on top adds a
  * competing wait; the owner verified GL sync + vsync off is perfect. An UNSET
- * screen_N_vsync must resolve to false in every place that supplies a default, while an
- * explicit true (owner override) must survive untouched.
+ * screen_N_vsync must resolve to false in every place that supplies a default. (WO-716: an explicit
+ * true no longer survives either — see smoke-wo716-vsync-off-gpu-texture-every-screen.test.js.)
  */
 
 const test = require('node:test')
@@ -32,12 +32,13 @@ test('WO-447: client SCREEN_CONSUMER_DEFAULTS has vsync false', () => {
 	assert.match(m[1], /vsync: false/, 'unset keys must render as vsync off in the client')
 })
 
-test('WO-447: generator emits <vsync>false</vsync> for an unset key, keeps explicit true', () => {
+test('WO-447/716: generator emits <vsync>false</vsync> for an unset key AND for an explicit true', () => {
 	const { buildScreenPairChannels } = require('../../src/config/config-generator-consumer-attach-screen.js')
 	const routeMap = { programCh: () => 1, previewCh: () => 2, programChannels: [1], previewChannels: [2] }
 	const ctx = { n: 1, dims: { width: 1920, height: 1080 }, cumulativeX: 0, nextDevice: 1 }
 	const unset = JSON.stringify(buildScreenPairChannels({}, routeMap, ctx))
 	assert.match(unset, /vsync>false</, 'unset screen_1_vsync must generate vsync false')
 	const explicit = JSON.stringify(buildScreenPairChannels({ screen_1_vsync: true }, routeMap, ctx))
-	assert.match(explicit, /vsync>true</, 'an explicit vsync true must be respected')
+	/* WO-716 (owner 23.10.26) supersedes the WO-447 "explicit true survives" rule: vsync is always off. */
+	assert.doesNotMatch(explicit, /vsync>true</, 'an explicit vsync true is ignored (WO-716)')
 })

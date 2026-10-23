@@ -1,5 +1,11 @@
 # Screen consumer vsync (NVIDIA)
 
+> **WO-716 (23.10.26, owner): consumer vsync is ALWAYS off and `gpu-texture` always on, on every
+> `<screen>` consumer HighAsCG writes (PGM, PRV head, multiview, operator GUI, ISO template). Neither
+> is a setting any more; `screen_N_vsync` / `multiview_vsync` are ignored and the V-sync checkbox is
+> gone. With driver 595, a vsync-on consumer spin-waits in `glXSwapBuffers` (~78 % of a core, WO-715).
+> The Caspar rows below are history.
+
 > **SUPERSEDED for the consumer-vsync row (06.08.26, todos06.08 / WO-447):** with
 > `CASPAR_GL_SYNC_DISPLAY=<PGM connector>` active (WO-407→444), the owner verified **GL sync +
 > consumer vsync OFF is perfect** — consumer vsync on top only adds a competing wait. The
