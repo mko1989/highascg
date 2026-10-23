@@ -1,9 +1,9 @@
-# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-706)
+# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-707)
 
 Owner, 23.10: *"continue until all todays notes and wos are ready and tested. for my checks"*
 
 Today's notes: `next.md` (ISO on .64, Caspar, project, dock, MVR walls) and the session requests. Every WO below is
-committed, pushed (CI green up to WO-706; WO-705's run was queued at writing) and tested offline. The boxes are what
+committed, pushed (CI green up to WO-706, WO-707 just pushed; WO-705's run was queued at writing) and tested offline. The boxes are what
 only you can see: real hardware, the next ISO, or how it feels.
 
 How to use it:
@@ -50,7 +50,7 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
       3. Each pinned mark should stay exact, and the beam should not drift on the other side.
       - Fine-tune by hand with **Beam offset** Pan / Tilt.
       - If the summary says "the head is probably not where it is patched", check its X / Y in the patch.
-- [ ] **WO-700, question:** Focus Profile 2 — should it go back to (2.5, −6) with its offset removed? Answer yes / no.
+- [x] **WO-700, question:** Focus Profile 2 — answered 23.10: both focus are at the right place; left as is.
 - [ ] **WO-695:** select both Focus Profiles → Patch → Basic Mode 36ch → Apply.
       - To drive the real heads, patch them on a universe other than the box's lighting input (for example U1), and
         tick that universe under Send ▾.
@@ -61,6 +61,11 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
 
 ## C. Cameras + people on stage
 
+- [ ] **WO-707: Follow → Auto.**
+      1. Select a head (Follow mode) → Follow: **Auto — the tracked person**.
+      2. Detection → **Person detection** on; the fixture output on.
+      3. Walk into view of cam_1 / cam_2: the head follows you. Step out: it holds where you were.
+      - Your own marker (Tracking → Markers → Add marker, pin mode Replace / Assist) still works the same.
 - [ ] **WO-701:** cut-outs keep one camera per person. They switch only after another camera has had a better view
       for 2.5 s, so there's no flicker when someone turns.
 

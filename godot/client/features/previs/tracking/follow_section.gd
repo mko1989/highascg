@@ -237,7 +237,8 @@ func refresh() -> void:
 		_fixed.text = fx.fixed
 	_follow.clear()
 	_follow.add_item("— none —", 0)
-	var ids := [0]
+	_follow.add_item("Auto — the tracked person", F.AUTO_MARKER)  # WO-707: needs Person detection on
+	var ids := [0, F.AUTO_MARKER]
 	for d in (driver.defs if driver != null else []):
 		_follow.add_item(str(d.name), int(d.id))
 		ids.append(int(d.id))
@@ -276,6 +277,8 @@ static func _at(fx: Dictionary, path: String) -> Variant:
 func _marker_name(id: int) -> String:
 	if id == 0:
 		return "nothing"
+	if id == F.AUTO_MARKER:
+		return "Auto"
 	for d in (driver.defs if driver != null else []):
 		if int(d.id) == id:
 			return str(d.name)

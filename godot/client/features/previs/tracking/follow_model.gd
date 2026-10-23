@@ -12,6 +12,8 @@ extends RefCounted
 const DEFAULT_DEST := "255.255.255.255"
 const PORT_ADDRESS_MAX := 32767
 const SACN_UNIVERSE_MAX := 63999
+## WO-707: Follow → Auto — the server's own marker for the detected person (src/tracking/auto-follow.js)
+const AUTO_MARKER := 64999
 
 
 static func _num(v: Variant, d: float, lo: float, hi: float) -> float:

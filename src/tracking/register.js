@@ -49,6 +49,7 @@ const { createSpotFinder, LEASE_ID: SPOT_LEASE_ID } = require('../fixtures/calib
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
+const { createAutoFollow, AUTO_MARKER_ID } = require('./auto-follow')
 const { Fusion } = require('./fusion')
 const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
@@ -83,6 +84,7 @@ let _zonesSent = ''
 let _detect = null
 let _detectSent = { json: '', at: 0 }
 const pin = new DetectPin()
+const autoFollow = createAutoFollow() // WO-707: Follow → Auto
 const fusion = new Fusion()
 const pose3d = new Pose3D() // WO-667: 3D body joints on the world persons
 const walk = new VerifyWalk()
@@ -138,21 +140,21 @@ function pinTick() {
 	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
 	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
 	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
+	const wanted = !!_follow?.engine?.fixtures?.some((f) => f.follow === AUTO_MARKER_ID)
+	autoFollow.step({ cfg, wanted, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
 }
 
 /** Fused world persons in the pin's person shape (detect-pin.js T10b). */
 function worldPersons(now) {
-	return fusion
-		.persons(now)
-		.map((w) => ({
-			key: `w:${w.id}`,
-			camera: 'world',
-			tid: w.id,
-			world: [w.x, w.y],
-			score: w.score,
-			age_s: w.age_s,
-			area: w.area,
-		}))
+	return fusion.persons(now).map((w) => ({
+		key: `w:${w.id}`,
+		camera: 'world',
+		tid: w.id,
+		world: [w.x, w.y],
+		score: w.score,
+		age_s: w.age_s,
+		area: w.area,
+	}))
 }
 
 /** Broadcast when a write landed, the stale set changed, or the heartbeat is due (never for an empty, idle hub). */
@@ -205,7 +207,7 @@ function zonesTick() {
  * service's own lists stay clean.
  */
 function withPins(snap, now = hub.now()) {
-	const att = pin.attached()
+	const att = { ...autoFollow.attached(), ...pin.attached() } // the operator's own pin wins a shared person
 	const world = pose3d.decorate(fusion.persons(now), now)
 	const owner = new Map()
 	for (const w of world) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
