@@ -1,7 +1,8 @@
 # WO-696 — 22.10 ISO test boot on a second machine (192.168.0.64): host's project, Caspar never started, no SSH
 
-**Status: IN PROGRESS (2026-10-23) — 3 causes found (evidence below); SSH fix + Caspar-gate fix in the repo (gate fix
-reproduced + verified on the dev box); stick adoption: owner decision**
+**Status: DONE in repo (2026-10-23) — 3 causes found (evidence below); SSH fix + Caspar-gate fix in the repo (gate fix
+reproduced + verified on the dev box); stick adoption decided → WO-697 (done). Follow-ups from the same boot: WO-702
+(live-boot defects), WO-704 (DKMS once per kernel), WO-705 (empty dock). Proven only on the next ISO boot**
 
 Owner, `next.md` 23.10: *"ive ran an iso built yesterday and first issues i saw where. project loaded in highascg was a
 project i was running on the host machine. casparcg did not start at all. the gui started. you can connect to that
