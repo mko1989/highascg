@@ -12,7 +12,7 @@ Fallback for when the Web-UI updater cannot run. Substitute the tag/stamp of the
 ```bash
 cd /tmp && rm -rf hacg-new && mkdir hacg-new
 
-curl -fL -o hacg.tgz https://github.com/mko1989/highascg/releases/download/2026-08-13_151414/highascg-server_2026-08-13T151414Z.tar.gz
+curl -fL -o hacg.tgz https://github.com/mko1989/highascg/releases/download/2026-10-22_214247/highascg-server_2026-10-22T214247Z.tar.gz
 
 tar -xzf hacg.tgz -C hacg-new
 

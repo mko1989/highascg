@@ -1,6 +1,6 @@
 # WO-687 — Release: server tarball + Godot clients; stop shipping the box's secrets in public releases
 
-**Status: DONE (22.10, release `2026-10-22_214247` published from a clean checkout of 00c994cf; assets downloaded back and checked). OPEN for the owner: the older releases that carry the box's keys (delete them / rotate the keys).**
+**Status: DONE (22.10, release `2026-10-22_214247` published from a clean checkout of 00c994cf; assets downloaded back and checked). Old releases DELETED 23.10 (owner: "just remove the releases, theyre deprecated either way"; no key rotation — owner: "nobody has any keys").**
 
 Owner, 22.10: *"Push and make a release with server tar ball and clients for multi platform."*
 
@@ -59,3 +59,17 @@ Owner, 22.10: *"Push and make a release with server tar ball and clients for mul
   `certs/highascg-key.pem`). The repo is public. Options: delete those releases' server tarballs, and rotate the
   device key (`config/device-identity.json`, used to sign replication handshakes) and the TLS cert. Not done: deleting
   releases and rotating keys are owner calls (rotation also needs the peer boxes to re-pair).
+
+
+## Old releases deleted (2026-10-23)
+
+Owner, 23.10: *"no, its fine. nobody has any keys. just remove the releases, theyre deprecated either way."* — no key
+rotation. A partial scan before the decision (streamed `tar -t` of each asset) had found `config/device-identity.json`,
+`config/certs/highascg-key.pem` and `config/tailscale.json` in every server tarball checked from 2026-09-03 to 2026-10-04.
+
+- `gh release delete` on 71 of 76 releases (tags kept — source only, the secrets were never tracked). Kept:
+  `2026-10-22_214247` + `client_2026-10-22_221506` (clean, this WO), `v.142` (CEF binary) and `v1.4.0` (scanner .deb)
+  — both downloaded by `scripts/lib/install-config.sh` — and `v2.6.0` (Caspar build, no app config).
+- `tools/ci/HOW_TO_UPDATE_HIGHASCG.md` pointed at the deleted `2026-08-13_151414` tarball → now `2026-10-22_214247`
+  (URL checked: HTTP 200).
+- Verified: `gh release list` shows exactly the 5 kept releases.
