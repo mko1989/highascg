@@ -74,20 +74,9 @@ class OscListener {
 			}
 		})
 
-		udpPort.on('bundle', (bundle) => {
-			try {
-				if (bundle.packets) {
-					for (const p of bundle.packets) {
-						if (p.address) {
-							this._record(p.address)
-							this._oscState.handleOscMessage(p)
-						}
-					}
-				}
-			} catch (e) {
-				this._log('debug', 'OSC bundle error: ' + (e?.message || e))
-			}
-		})
+		// WO-715: no 'bundle' handler. osc.js fireBundleEvents (osc-transports.js:32-37) emits 'bundle' AND then
+		// 'message' for every packet inside it (nested bundles too), so handling both ran every message twice —
+		// Caspar sends one bundle per channel per frame, i.e. ALL of its OSC.
 
 		udpPort.on('error', (err) => {
 			this._log('warn', 'OSC UDP: ' + (err?.message || err))
