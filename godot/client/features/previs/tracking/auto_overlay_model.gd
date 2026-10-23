@@ -3,6 +3,7 @@ extends RefCounted
 ## (GET /api/tracking/auto, WO-708/709):
 ##   { pool:[fixture ids], persons:[{key, slot, name?, heads:[ids], lost}], slots:[{slot, key, heads, ptz:[cam ids]}],
 ##     home:{active, after_s, idle_s, forced}, ptz:[{id, name, enabled}] }
+## WO-712 R3: a snapshot another linked server sent (cluster-exchange.js) also carries source {id, name}.
 ## NOTE: Godot's JSON turns every number into float — ids are compared through id_key(), counts cast with int().
 
 const SLOTS := 9
@@ -148,6 +149,32 @@ static func home_text(home: Variant) -> String:
 ## The after_s stepper (3…600, steps of 5).
 static func step_after(n: float, dir: int) -> int:
 	return clampi(int(roundf(n)) + dir * AFTER_STEP, AFTER_MIN, AFTER_MAX)
+
+
+## WO-712 R3: the server a snapshot came from ({} = this one).
+static func source_of(data: Variant) -> Dictionary:
+	return data.get("source") if data is Dictionary and data.get("source") is Dictionary else {}
+
+
+## "/api/tracking/auto/pin" → the call action "tracking.auto.pin" (src/cluster/cluster-call-actions.js).
+static func remote_action(path: String) -> String:
+	return path.trim_prefix("/api/").replace("/", ".")
+
+
+## A press → {path, body}: this server's route, or — on another server's snapshot — POST /api/cluster/send, which signs
+## it as this server and runs it there like its own operator's press (R2).
+static func press(data: Variant, path: String, body: Dictionary) -> Dictionary:
+	var src := source_of(data)
+	if src.is_empty():
+		return {"path": path, "body": body}
+	return {"path": "/api/cluster/send", "body": {"peer": str(src.get("id", "")), "action": remote_action(path), "args": body}}
+
+
+## First look: GET /api/tracking/auto, unless this server does not do Auto (off_by_duties) or runs no director (503 /
+## 404 with the tracking module off) — then GET /api/cluster/exchange, the server that does.
+static func needs_exchange(local: Dictionary) -> bool:
+	var d: Variant = local.get("data")
+	return not (bool(local.get("ok", false)) and d is Dictionary and not bool((d as Dictionary).get("off_by_duties", false)))
 
 
 static func _arr(v: Variant) -> Array:

@@ -10,6 +10,8 @@
  * The receiver takes it only when: the sender's key is in ITS peer list (trust = links, as for the master claim);
  * `to` is its own fingerprint; |now - ts| ≤ 60 s; the nonce was not seen in the last 120 s; the signature verifies;
  * its `accept_remote` duty is on. Then the action runs through the allow-list (`actions`, cluster-call-actions.js).
+ * WO-712 R3: `info` is a second list for information a linked server hands over (cluster-exchange.js): signed and
+ * checked the same way, but not locked out by `accept_remote` (it presses nothing) and not logged per call (≤ 5 Hz).
  * The signature IS the auth: /api/cluster/call is the one cluster path open while `enforceAuth` is on (auth.js).
  */
 
@@ -49,7 +51,8 @@ const callText = (b) =>
 /**
  * @param {{ cluster: { saved: Function, list: Function }, selfKey: string, sign: Function, verify: Function,
  *   post: Function, actions: Record<string, (args: object, from: object) => Promise<{status:number, body:object}>>,
- *   acceptsRemote: () => boolean, masterId: () => string, now?: () => number, log?: Function }} deps
+ *   info?: Record<string, Function>, acceptsRemote: () => boolean, masterId: () => string, now?: () => number,
+ *   log?: Function }} deps
  */
 function createClusterCall(deps) {
 	const now = deps.now || Date.now
@@ -65,8 +68,8 @@ function createClusterCall(deps) {
 		}
 	}
 
-	/** Sender: sign and POST to a linked server → { ok, status, json, error? } (never throws). */
-	async function call(peerId, action, args = {}) {
+	/** Sender: sign and POST to a linked server → { ok, status, json, error? } (never throws). `quiet`: the caller logs. */
+	async function call(peerId, action, args = {}, { quiet = false } = {}) {
 		const peer = deps.cluster.saved(String(peerId || ''))
 		if (!peer) return { ok: false, status: 404, json: { error: 'no such server' } }
 		if (!peer.device_key)
@@ -84,7 +87,8 @@ function createClusterCall(deps) {
 			nonce: crypto.randomBytes(16).toString('hex'),
 		}
 		const r = await deps.post(peer.host, peer.port, '/api/cluster/call', { ...req, sig: deps.sign(callText(req)) })
-		if (!r.ok) log('warn', `${peer.name}: ${action} refused (${r.json?.error || r.error || 'HTTP ' + r.status})`)
+		if (!r.ok && !quiet)
+			log('warn', `${peer.name}: ${action} refused (${r.json?.error || r.error || 'HTTP ' + r.status})`)
 		return r
 	}
 
@@ -112,12 +116,18 @@ function createClusterCall(deps) {
 		if (seen.has(b.nonce)) return fail(409, 'replayed call')
 		if (!deps.verify(peer.device_key, callText(b), b.sig)) return fail(403, 'bad signature')
 		seen.set(b.nonce, t) // only signed calls take a slot: an outsider cannot flush the window
+		const info = deps.info && Object.prototype.hasOwnProperty.call(deps.info, b.action) ? deps.info[b.action] : null
+		if (info) return run(info, b, peer)
 		if (!deps.acceptsRemote()) return fail(403, 'this server refuses remote actions')
-		const run = Object.prototype.hasOwnProperty.call(deps.actions, b.action) ? deps.actions[b.action] : null
-		if (!run) return fail(400, `unknown action "${b.action}"`)
+		const fn = Object.prototype.hasOwnProperty.call(deps.actions, b.action) ? deps.actions[b.action] : null
+		if (!fn) return fail(400, `unknown action "${b.action}"`)
 		log('info', `remote ${b.action} from ${peer.name}`)
+		return run(fn, b, peer)
+	}
+
+	async function run(fn, b, peer) {
 		try {
-			return await run(b.args || {}, peer)
+			return await fn(b.args || {}, peer)
 		} catch (e) {
 			return fail(500, String(e?.message || e))
 		}

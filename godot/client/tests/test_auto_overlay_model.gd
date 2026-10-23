@@ -88,3 +88,21 @@ func test_signature_stable_across_updates() -> void:
 	t.eq(M.signature(a), M.signature(b), "pins/heads/home changes do not rebuild rows")
 	b.persons.append({"key": "w:9", "slot": 0})
 	t.ok(M.signature(a) != M.signature(b), "a new person rebuilds")
+
+
+func test_another_servers_snapshot_presses_go_there() -> void:  # WO-712 R3
+	var d := _data()
+	t.eq(M.press(d, "/api/tracking/auto/pin", {"key": "w:3", "slot": 0}), {"path": "/api/tracking/auto/pin", "body": {"key": "w:3", "slot": 0}}, "local: this server's route")
+	d["source"] = {"id": "p1", "name": "tracking box"}
+	t.eq(M.source_of(d).get("name"), "tracking box")
+	t.eq(M.press(d, "/api/tracking/auto/slot", {"slot": 2, "heads": 3}),
+		{"path": "/api/cluster/send", "body": {"peer": "p1", "action": "tracking.auto.slot", "args": {"slot": 2, "heads": 3}}}, "remote: signed send to that server")
+	t.eq(M.remote_action("/api/tracking/auto/home"), "tracking.auto.home")
+	t.ok(M.source_of(null).is_empty())
+
+
+func test_first_look_from_the_exchange_when_auto_is_not_ours() -> void:  # WO-712 R3
+	t.ok(not M.needs_exchange({"ok": true, "data": _data()}), "this server does Auto")
+	t.ok(M.needs_exchange({"ok": true, "data": {"persons": [], "pool": [], "off_by_duties": true}}), "Auto off here")
+	t.ok(M.needs_exchange({"ok": false, "status": 503, "data": {"error": "auto director not running"}}), "no director here")
+	t.ok(M.needs_exchange({"ok": false, "status": 404, "data": null}), "tracking module off")

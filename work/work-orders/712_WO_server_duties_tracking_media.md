@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2 (signed cluster call + impose) DONE 23.10.26 offline (17-test smoke, real router), two-box QA pending; R3–R5 open**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2 (signed cluster call + impose) DONE 23.10.26 offline (17-test smoke, real router), two-box QA pending; R3a (exchange tracking → media: the overlay shows and drives the tracking box) DONE 23.10.26 offline + live routes, two-box QA pending; R3b (air state media → tracking), R4, R5 open**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -353,3 +353,87 @@ That module is required only when `ctx._clusterMaster` exists.
     - the `[cluster] remote …` journal line.
   - Nothing was sent off 127.0.0.1, the server was not restarted, and no GUI exposes a sender yet. R3's overlay buttons
     will call `call()`.
+
+## R3a — exchange, tracking → media: what was done
+
+The tracking server's Auto snapshot reaches the linked servers that do not do Auto, and their overlay (WO-710) shows
+and drives it.
+
+**Found before building.**
+- `handle()` in `cluster-call.js` logs `[cluster] remote <action> from <peer>` on every call and gates every call on
+  `accept_remote`. A 5 Hz information stream must do neither: it would flood the journal, and `accept_remote` locks
+  out *presses*, not *seeing* the other server's state.
+- The local `tracking:auto` broadcast is on-change only (`auto-routes.js` `createAutoBroadcast`). So the exchange
+  needs its own heartbeat, or a receiver cannot tell a quiet server from a gone one.
+- A server with the `auto` duty off still runs its director (with `fixtures: []`, R1 wiring, `register.js:147`), so its
+  overlay would show local people with pins that drive nothing, and would flip-flop with a remote snapshot.
+- `ptz_section.gd:126` reads `tracking:auto` `ptz` rows as this server's cameras. A remote snapshot must not reach it.
+
+**`src/cluster/cluster-exchange.js`** (new). `createExchange({peers, has, call, broadcast, now?, log?})` →
+`{offer, receive, expire, latest, view, info}`.
+- One topic now: `tracking.auto` → call action `exchange.tracking_auto`, duty `auto`, WS `tracking:auto`.
+- Sender `offer(topic, data)` on every look (≤ 5 Hz):
+  - only when this server has the duty;
+  - only to peers that are online and whose ping duties say `auto: false` (an older server, `duties: null`, gets
+    nothing);
+  - when the data changed, or every 5 s (heartbeat);
+  - one call per peer in flight; while it is, only the newest data waits (the middle ones are dropped);
+  - a refused send is retried at the next heartbeat, not at 5 Hz. A refusal is logged once
+    (`[cluster] exchange exchange.tracking_auto → <peer>: <why>`), and once more when the peer takes it again.
+- Receiver `receive` (on the call's `info` list):
+  - 400 when `data` is not an object; 409 "this server does auto itself" when it has the duty;
+  - keeps the newest per source, and re-broadcasts WS `tracking:auto` with `source: {id, name}` only when it changed;
+  - a source silent for 15 s is dropped and re-broadcast once as `{persons: [], pool: [], source, gone: true}`, so the
+    overlay hides.
+
+**`src/cluster/cluster-call.js`.**
+- `deps.info`: a second allow-list. Its actions pass every signature / replay / clock check, but are not locked out by
+  `accept_remote` and get no journal line per call.
+- `call(peer, action, args, {quiet})`: quiet leaves the refusal log to the caller (the exchange logs state changes).
+
+**`src/api/routes-cluster.js`.**
+- `exchangeOf(ctx)`; the call gets `info: exchangeOf(ctx).info`.
+- `POST /api/cluster/send {peer, action, args}`: this server's operator presses an action on a linked server; this
+  server signs it (R2). It is NOT public: it needs the normal auth (401 with `enforceAuth` on). It answers the peer's
+  status and body (404 "no such server", 502 when there is no answer).
+- `GET /api/cluster/exchange` → `{'tracking.auto': snapshot+source | null, sources: [{topic, source, age_ms}]}`.
+
+**`src/tracking/auto-routes.js`.**
+- Without the `auto` duty: GET `/api/tracking/auto` answers `OFF` = `{persons: [], pool: [], off_by_duties: true}`, and
+  the WS sends `OFF` once when the duty goes off (then nothing until it is back on).
+- With it: each look is also offered to the exchange, only while servers are linked (`ctx._cluster`); the cluster
+  service is never started from here.
+
+**Godot.**
+- `auto_overlay_model.gd`: `source_of`, `remote_action` ("/api/tracking/auto/pin" → "tracking.auto.pin"), `press`
+  (local route, or `POST /api/cluster/send` for a sourced snapshot), `needs_exchange` (first look).
+- `auto_overlay.gd`: the first look falls back to `GET /api/cluster/exchange` when the local answer is `off_by_duties`,
+  503 or 404; the chip names the source server ("▾ Track 2 · tracking box"); every press goes through `M.press`.
+- `ptz_section.gd`: ignores a `tracking:auto` that has a `source`.
+
+## R3a — what was VERIFIED
+
+- `node --test tools/smoke/smoke-wo712-exchange.test.js`: **14 tests, 14 pass**. Two in-process servers with test
+  ed25519 keys over the real signed call:
+  - sender targets (online + `auto: false` only); no offer without the duty;
+  - on change + heartbeat, not 5 Hz; one in flight, newest wins;
+  - refusal logged once, recovery once;
+  - receiver re-broadcast tagged, once per change, no journal line; `accept_remote` off still receives but still
+    refuses an action (403); 409 / 400; 15 s expiry → one `gone` broadcast;
+  - `auto-routes` OFF on GET and once on WS, back on → the snapshot; offered only with `ctx._cluster`;
+  - the real router: `/api/cluster/exchange` and `/api/cluster/send` reach their routes; send → the peer's pin action;
+    unknown peer 404; both 401 with `enforceAuth` on;
+  - source-text pins on the wiring (routes-cluster `info`, auto-routes `offer`, ptz_section, overlay `M.press`).
+- Smokes on the touched files still green: wo670 ×5, wo707–wo713: **154 / 154**. `npm run test:ci`: **3022 tests, 3019
+  pass, 1 fail** (the known WO-308 pointer-confine test); the new smoke is in the curated list.
+- Godot: 21382 passed, 0 failed (+2: `test_another_servers_snapshot_presses_go_there`,
+  `test_first_look_from_the_exchange_when_auto_is_not_ours`); `run-client.sh --check` OK.
+- eslint clean; prettier clean on the new files, cluster-call.js and auto-routes.js; `check-max-file-lines` 0 over;
+  `check-unwired-exports` no new orphan; API contract regenerated.
+- **Live on the box** (server restarted, pid 203303): `GET /api/cluster/exchange` → `{"tracking.auto":null,"sources":[]}`;
+  `POST /api/cluster/send` to an unknown peer → 404 `no such server`; `POST /api/cluster/call {}` → 400 still.
+  Duty Auto off (`POST /api/server/duties {patch:{auto:false}}`) → `GET /api/tracking/auto` =
+  `{"persons":[],"pool":[],"off_by_duties":true}`; back on → the director snapshot. Left on (all seven ticks true).
+- **Not verified (owner QA, needs two boxes):** the overlay on the media box showing the tracking box's people
+  (chip "· <server>"), a pin / heads / PTZ / Home press from the media box landing on the tracking box, the overlay
+  hiding 15 s after the tracking box goes away.

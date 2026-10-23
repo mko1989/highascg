@@ -123,7 +123,7 @@ func reload_status() -> void:
 
 
 func _on_ws(type: String, data: Variant) -> void:
-	if type == "tracking:auto" and data is Dictionary:
+	if type == "tracking:auto" and data is Dictionary and not (data as Dictionary).has("source"):  # WO-712 R3: not ours
 		_adopt_status((data as Dictionary).get("ptz"))
 
 

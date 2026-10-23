@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-493 routes.
+495 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -59,6 +59,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/cluster` | registry | `src/api/routes-cluster.js` |
 | * | `/api/cluster/call` | handler | `src/server/auth.js` |
 | POST | `/api/cluster/call` | registry | `src/api/routes-cluster.js` |
+| GET | `/api/cluster/exchange` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/cluster/identity` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/cluster/master` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/master` | registry | `src/api/routes-cluster.js` |
@@ -68,6 +69,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/cluster/peers/:id/device-view` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/peers/:id/send-media` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/scan` | registry | `src/api/routes-cluster.js` |
+| POST | `/api/cluster/send` | registry | `src/api/routes-cluster.js` |
 | POST | `/api/cluster/ssh-key` | registry | `src/api/routes-cluster.js` |
 | GET | `/api/companion` | registry | `src/api/router.js` |
 | POST | `/api/companion` | registry | `src/api/router.js` |

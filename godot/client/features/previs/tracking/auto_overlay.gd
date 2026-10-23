@@ -5,6 +5,8 @@ extends PanelContainer
 ## detected person: label, pin 1–9 (click the active pin to unpin), and once pinned the quick sets — head count
 ## (− N +, 0 = share) and one chip per PTZ camera. Footer: home state, Home now, after_s. Fed by WS `tracking:auto`
 ## (≤ 5 Hz); the first look comes from GET /api/tracking/auto. Rows are rebuilt only when the person set changes.
+## WO-712 R3: on a server without the Auto duty it shows the linked server that does it (its snapshot arrives tagged
+## `source`); the chip names that server, and every press goes there (M.press → POST /api/cluster/send).
 
 const M := preload("res://features/previs/tracking/auto_overlay_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -83,6 +85,10 @@ func adopt(d: Dictionary) -> void:
 ## First look (404 until the server has WO-708 — then silently nothing).
 func _fetch() -> void:
 	var r: Dictionary = await Api.get_json("/api/tracking/auto")
+	if M.needs_exchange(r):  # WO-712 R3: Auto is another server's job here
+		var x: Dictionary = await Api.get_json("/api/cluster/exchange")
+		if x.ok and x.data is Dictionary and x.data.get("tracking.auto") is Dictionary:
+			r = {"ok": true, "data": x.data.get("tracking.auto")}
 	if r.ok and r.data is Dictionary:
 		adopt(r.data)
 
@@ -114,6 +120,9 @@ func _apply() -> void:
 	var chip := "%s Track %d" % ["▸" if collapsed else "▾", rows.size()]
 	if collapsed and _home().get("active") == true:
 		chip += " · home"
+	var src := M.source_of(data)
+	if not src.is_empty():
+		chip += " · %s" % str(src.get("name", src.get("id", "")))
 	_chip.text = chip
 	_body.visible = not collapsed
 	_home_lbl.text = M.home_text(_home())
@@ -275,7 +284,8 @@ func _step_after(dir: int) -> void:
 
 
 func _post(path: String, body: Dictionary) -> void:
-	var r: Dictionary = await Api.post_json(path, body)
+	var p := M.press(data, path, body)  # WO-712 R3: another server's people → the press goes to that server
+	var r: Dictionary = await Api.post_json(str(p.path), p.body)
 	if r.ok:
 		return
 	_status.text = str(r.get("reason", "")) if str(r.get("reason", "")) != "" else str(r.get("error", "failed"))
