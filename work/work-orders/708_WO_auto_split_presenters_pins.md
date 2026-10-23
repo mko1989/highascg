@@ -202,3 +202,15 @@ GET /api/tracking/auto → { pool: [fixture ids], primary: 64999,
 - Two people splitting the fronts was not tried (nobody on stage) → owner QA.
 - GUI relaunched: the overlay shows top-right in Previs → 3D ("Track 0 · no one detected · home · Home now · after −
   10s +"). Screenshot: scratchpad `gui-712.png`.
+
+## Follow-up 23.10.26: one person gets every front
+
+Owner: *"if there is one person on stage the person should be followed by all fronts in auto mode and only split it
+when more people are on stage."*
+- **Already true before this change:** one person → the whole pool. A second person needed JOIN_S (0.4 s) in view
+  before a split.
+- **Gap:** a lone person **pinned with a count** got only that count. The rest held or went home.
+- **Fix:** `auto-split.js splitHeads` treats a lane that is alone as "share", so it takes the whole pool. The count
+  applies only once 2+ people are followed.
+- **Tests:** smoke-wo708 19/19 with a new test (pinned alone with heads 1 → all 4; a 2nd person → the count applies).
+  The old "no share person → leftovers unassigned" check now uses two pinned people.

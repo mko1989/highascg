@@ -142,6 +142,22 @@ describe('WO-708 Auto split', () => {
 		assert.equal(r.target('h4').id, PIN_BASE + 1)
 	})
 
+	it('one person alone gets every front even when pinned with a count; the count applies once a 2nd person is on', () => {
+		// owner 23.10: "if there is one person on stage the person should be followed by all fronts in auto mode and only
+		// split it when more people are on stage"
+		const r = rig()
+		const one = [person(2.5, 3, 2)]
+		r.hold(one, 1)
+		assert.equal(r.dir.pin({ key: 'w:2', slot: 1 }).status, 200)
+		assert.equal(r.dir.slot({ slot: 1, heads: 1 }).status, 200)
+		r.hold(one, 0.2)
+		assert.deepEqual(r.heads('w:2').sort(), ['h1', 'h2', 'h3', 'h4'], 'alone: all four, the count of 1 waits')
+		const both = [person(-2, 3, 1), person(2.5, 3, 2)]
+		r.hold(both, 1)
+		assert.deepEqual(r.heads('w:2'), ['h4'], 'a 2nd person: the pinned count applies')
+		assert.deepEqual(r.heads('w:1'), ['h1', 'h2', 'h3'])
+	})
+
 	it('share + explicit mix, counts capped in slot order by what is left', () => {
 		const pool = truss(6).map((f, i) => ({ ...f, pose: { x: i, y: 0 } }))
 		const lanes = [
@@ -157,8 +173,16 @@ describe('WO-708 Auto split', () => {
 		const capped = splitHeads({ pool, lanes: [{ ...lanes[0], heads: 5 }, { ...lanes[1], heads: 4 }, lanes[2]] })
 		const cnt = (m) => [...capped.values()].filter((v) => v === m).length
 		assert.deepEqual([cnt(1), cnt(2), cnt(3)], [5, 1, 0], 'slot 1 first, slot 2 capped, nothing left to share')
-		const none = splitHeads({ pool, lanes: [{ ...lanes[0], heads: 2 }] })
-		assert.equal(none.size, 2, 'no share person: the leftover heads are unassigned (hold / home)')
+		const none = splitHeads({
+			pool,
+			lanes: [
+				{ ...lanes[0], heads: 2 },
+				{ ...lanes[1], heads: 1 },
+			],
+		})
+		assert.equal(none.size, 3, '2+ people, no share person: the leftover heads are unassigned (hold / home)')
+		const alone = splitHeads({ pool, lanes: [{ ...lanes[0], heads: 2 }] })
+		assert.equal(alone.size, 6, 'one person alone: every head, whatever the count (owner 23.10)')
 	})
 
 	it('sticky: position jitter (even crossing over) never re-splits', () => {

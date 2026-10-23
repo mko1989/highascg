@@ -4,7 +4,7 @@
  * WO-708 / WO-709 — the pure maths of the Auto director (auto-director.js): which pool head follows which person, and
  * where the heads go home.
  *
- * splitHeads — explicit slots (heads n ≥ 1) take their n nearest heads first, counts capped in slot order by what is
+ * splitHeads — one lane alone takes the whole pool (its count applies only once 2+ people are followed); explicit slots (heads n ≥ 1) take their n nearest heads first, counts capped in slot order by what is
  *   left; the rest is split evenly among the "share" lanes (heads 0), the remainder to the nearest. One Hungarian
  *   (hungarian.js) per stage, each lane repeated as many times as it gets heads. A head that already follows a lane
  *   costs STAY_M less to keep it (hysteresis: when the split recomputes, heads only move where they must).
@@ -45,7 +45,10 @@ const dist = (a, b) => (a && b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : 0)
  *           slot order, then the unpinned A1…A9); heads: the slot's count (0 = share); prev: fixture id → marker.
  * @returns {Map<number, number>} fixture id → marker id (heads left out hold / go home).
  */
-function splitHeads({ pool, lanes, prev = new Map() }) {
+function splitHeads({ pool, lanes: all, prev = new Map() }) {
+	// Owner 23.10: "if there is one person on stage the person should be followed by all fronts in auto mode and only
+	// split it when more people are on stage" — a lone lane takes the whole pool whatever its pinned count.
+	const lanes = all.length === 1 ? [{ ...all[0], heads: 0 }] : all
 	const out = new Map()
 	let left = pool.slice()
 	const solve = (cols, cost) => {
