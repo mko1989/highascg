@@ -152,6 +152,9 @@ class OscWatch(threading.Thread):
         self.s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+        # Caspar's OSC is several datagrams per frame; the default buffer drops some while Python is busy and a lost
+        # datagram reads as a frame-counter skip (first PGM run: 71 "skips", none tied to an ADD / REMOVE)
+        self.s.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 8 << 20)
         self.s.bind(('0.0.0.0', OSC_PORT))
         self.s.settimeout(0.2)
 

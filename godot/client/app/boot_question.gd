@@ -16,7 +16,17 @@ signal said(line: String)
 func ask(fresh: bool) -> void:
 	if not Platform.is_local_origin(Config.origin):  # WO-686: the answers re-lay the BOX's screens
 		return
+	# WO-696: the session can start this client before the server listens; one failed GET used to skip the launcher
+	# for good while the gate (no backstop) held Caspar. Keep asking until the server answers at all (status 0 = no
+	# transport); an HTTP answer, also an error, is final.
 	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
+	var waited := false
+	while int(r.get("status", 0)) == 0 and is_inside_tree():
+		if not waited:
+			said.emit("waiting for the server to ask the start-up question…")
+			waited = true
+		await get_tree().create_timer(2.0).timeout
+		r = await Api.get_json("/api/system/operator-screen")
 	if not r.ok or not r.data is Dictionary:
 		return
 	var boot: Variant = r.data.get("boot")

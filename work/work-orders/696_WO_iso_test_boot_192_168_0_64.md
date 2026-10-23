@@ -1,7 +1,7 @@
 # WO-696 — 22.10 ISO test boot on a second machine (192.168.0.64): host's project, Caspar never started, no SSH
 
-**Status: IN PROGRESS (2026-10-23) — 3 causes found (evidence below); SSH fix in the repo; Caspar gate: needs the client
-log from .64; stick adoption: owner decision**
+**Status: IN PROGRESS (2026-10-23) — 3 causes found (evidence below); SSH fix + Caspar-gate fix in the repo (gate fix
+reproduced + verified on the dev box); stick adoption: owner decision**
 
 Owner, `next.md` 23.10: *"ive ran an iso built yesterday and first issues i saw where. project loaded in highascg was a
 project i was running on the host machine. casparcg did not start at all. the gui started. you can connect to that
@@ -45,6 +45,12 @@ machine on 192.168.0.64 user casparcg password highascg"*
   rather than nothing") — **and the gate stays held**. `operator_screen_picker.gd:45–60` returns false when the
   outputs GET fails or when native sub-windows are refused. Which branch ran on .64 needs `~/.highascg/log/godot-client.log`
   there (SSH down — finding 1). Either way the GUI must never come up while the gate it should answer stays closed.
+- **Root cause (SSH restored by the owner, read-only login, 11:33):** .64 `~/.highascg/log/godot-client.log`:
+  `settings FAILED` / `state transport error 2` / `project transport error 2 (0 looks)` / `ws connected` — the session
+  autostart started the client BEFORE node listened on :4200. `boot_question.gd` `ask()` made ONE
+  `GET /api/system/operator-screen`; it failed (no transport) and `ask()` returned silently — no launcher, no
+  "show the GUI" branch either, the window simply stayed up. `~/.highascg/run/caspar-screens-hold` still present,
+  `caspar-screens-ready` absent, no casparcg process; one screen (HDMI-0). The WS reconnect never re-asks.
 
 ## What was done
 
@@ -53,14 +59,22 @@ machine on 192.168.0.64 user casparcg password highascg"*
   new copy installed (root): `sudo install -m 0644 ~/highascg/tools/eggs/live-usb/systemd/ssh.service.d-05-host-keys.conf.example /etc/systemd/system/ssh.service.d/05-host-keys.conf && sudo systemctl daemon-reload`
   before the next produce (or `prepare-eggs-clone-with-exfat.sh` reinstalls it).
 
+- `godot/client/app/boot_question.gd` `ask()`: while the GET has no transport (`status 0`) it logs
+  "waiting for the server to ask the start-up question…" once and re-asks every 2 s; any HTTP answer (also an error)
+  is final, as before. Retrying on transport only, not on every non-ok, so an old server without the route does not
+  spin. Pinned in `smoke-wo696-ssh-host-keys-dropin.test.js` (2nd test).
+
 ## Verified
 
 - smoke-wo696 1/1; `systemd-analyze verify` of `ssh.service` + the new drop-in: clean.
-- NOT verified: SSH on a live boot (needs the next ISO); findings 2 and 3 not fixed yet.
+- Finding 3 repro on the dev box: a 2nd client `--server=http://127.0.0.1:4299` with nothing listening logged the same
+  three failures as .64, then the waiting line; a stub server brought up on :4299 6 s later got
+  `GET /api/system/operator-screen` 1 s after it started (11:34:17). The old code never asked again. Godot suite
+  21146/0, `run-client.sh --check` boot OK, smoke-wo696 2/2.
+- NOT verified: SSH and the gate on a live boot (needs the next ISO); finding 2 not fixed yet.
 
 ## Open
 
-- Owner: on .64, `sudo ssh-keygen -A && sudo systemctl reset-failed ssh.service ssh.socket && sudo systemctl restart ssh.socket`
-  restores SSH there now, then the client log can be read.
+- .64 itself still runs the old client: Caspar starts there once the launcher is answered (restart the GUI) — the next
+  ISO carries the fix.
 - Owner decision (finding 2).
-- Finding 3 fix after the .64 client log.

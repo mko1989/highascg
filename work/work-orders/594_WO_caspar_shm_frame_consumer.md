@@ -289,3 +289,18 @@ Box now has 5 channels: 1 PGM 3072×1024, 2 PRV 3072×1024, 3 opgui 1080p50 (con
 | ADD / REMOVE on PGM ch1 | next (tool ready) |
 
 Next: streaming-load (`MOVNTDQA`) + streaming-store copy for the coherent-mapped source, rebuild v2, swap, re-run `cpu`.
+
+### ADD / REMOVE on PGM (2026-10-23)
+
+`wo594_acceptance.py addremove --channel 1 --cycles 20` (ch1 PGM 3072×1024, index 749, 1 s on / 1 s off): **PASS** —
+baseline 1998 ticks, max spacing 40.0 ms, 2 ticks > 1.5 frames, 3 counter skips; during 20 × ADD / REMOVE 2001 ticks,
+max spacing 20.4 ms, 0 late ticks, 0 skips; 0 Caspar log warnings / errors. The first run read "CHECK" (16 late, 71
+skips): the tool's default UDP buffer was dropping OSC datagrams — a per-event trace with an 8 MB buffer showed one
+skip in 16 ADD / REMOVE events, 360 ms after a REMOVE and together with a tick gap (a lost bundle, not a dropped
+frame). The tool now sets SO_RCVBUF 8 MB.
+
+CPU, cold-source bench (12 rotating source buffers, out of L3 — what the readback buffer really is): 1080p memcpy
+0.69 ms (3.4 % of a core at 50 fps), streaming stores 0.55 ms (2.7 %); 3072×1024 1.10 ms (5.5 %) vs 0.80 ms (4.0 %).
+The measured 7 % worker thread on a 1080p channel is about twice the bare copy — next: profile the worker (perf) before
+changing the copy.
+
