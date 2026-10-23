@@ -1,7 +1,8 @@
 # WO-692 — Network: every NIC (also down ones) from Devices, a Settings → Network tab, Wi-Fi
 
-**Status: IN PROGRESS — server + helper DONE (23.10, smokes 10/10, endpoints probed on the box); Godot UI next; the new
-helper needs the owner's one-time `sudo install` (below)**
+**Status: DONE pending owner step (23.10) — server, helper and Godot UI box-verified (Settings → Network, Devices server
+page, a live re-apply on eno2). Wi-Fi scan / join and the networkd hand-over need the owner's one-time `sudo install` of
+the helper (below), then owner QA of a join.**
 
 Owner, 23.10: *"I should be able to set/change IP of all nic on the machine, also currently down ones from the devices
 tab. And also add a network tab in settings. Also wifi is not enabled/installed at all."*
@@ -101,3 +102,46 @@ sudo install -m 755 ~/highascg/tools/runtime/highascg-network-apply.sh /usr/loca
     the install above.
 - Not run on the box: a real apply / join. It needs the new helper installed, and applying on eno1 would cut this
   session.
+
+## Godot UI (23.10)
+
+### What was done
+
+- `godot/client/features/settings/network_model.gd` (pure):
+  - a NIC card: title with `(primary)`; status "link up / no cable · addresses · DHCP / static / not set up yet";
+  - static fields from the saved profile, else from the address the port has now;
+  - the apply body with IPv4 / prefix / gateway / DNS validation;
+  - "the GUI reaches the server through this port";
+  - Wi-Fi rows and the status line.
+- `godot/client/features/settings/network_pane.gd`:
+  - one card per Ethernet port (down ones included) with DHCP / static and "Apply to <port>"; it asks first when the
+    GUI talks to the server through that port;
+  - Wi-Fi: on / off, Scan, Disconnect, a network list (✓ joined, signal, security), password and Join (Enter or a
+    double-click joins too);
+  - refreshes when shown and after each action;
+  - the label | field grid keeps it narrow enough for the Inspector column.
+- Settings → **Network** tab (`settings_tab.gd`).
+- Devices → server page (click the rear-panel background):
+  - `server_page_model.gd` `items(…, network_panel := true)` replaces the web's one-interface block with a `network`
+    item;
+  - `server_controls.gd` renders the same pane and keeps that one node across the 3 s re-renders, so a field being
+    typed survives;
+  - the golden replay of the web page (`test_devices_server_page.gd`) still calls the default and is unchanged.
+
+### What was VERIFIED
+
+- Godot suite: 21126 passed, 0 failed (`test_network_model.gd`: ipv4, up / DHCP / primary card, down never-set-up card,
+  down saved-static card, apply bodies, origin port, Wi-Fi rows / lines).
+- Box, second client instance (screenshots in the session scratchpad: `net2.png`, `dev4.png`):
+  - Settings → Network shows eno1 (primary, DHCP, 192.168.0.23/24) and eno2 (static 2.0.0.13/8 + the networkd DHCP
+    192.168.0.59/24, the double-manager issue above), and the Wi-Fi list (7 networks).
+  - The Devices server page shows the same in the Inspector. Its first version overflowed the column (a 4-column field
+    row); now it fits, as label | field rows.
+- Live apply through the API (the button's request): `eno2` static 2.0.0.13/8 with the *old* installed helper:
+  - `ok`, `primary: false`;
+  - `config.network` before = after (primaryInterface eno1, dhcp);
+  - eno2 re-activated with 2.0.0.13/8 (NM's re-activation also dropped the stray networkd address for now; networkd
+    can add it back at its next lease until the new helper's hand-over is installed).
+- Owner QA after the `sudo install`:
+  - Scan / Join a network;
+  - set up a port without a cable, then plug it in.

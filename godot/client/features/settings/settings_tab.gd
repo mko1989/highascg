@@ -17,6 +17,7 @@ const SystemPane := preload("res://features/settings/system_pane.gd")
 const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
 const VariablesPane := preload("res://features/settings/variables_pane.gd")
 const LiveAudioPane := preload("res://features/settings/live_audio_pane.gd")
+const NetworkPane := preload("res://features/settings/network_pane.gd")
 
 signal logs_requested
 
@@ -51,6 +52,7 @@ func _ready() -> void:
 	Panes.media(_pane("Media / USB"))
 	_pane("Updates").add_child(UpdatesPane.new())
 	_pane("System").add_child(SystemPane.new())
+	_pane("Network").add_child(NetworkPane.new())  # WO-692
 	_pane("DeckLink").add_child(DecklinkPane.new())
 	_bundle = Button.new()
 	_bundle.text = "Save support bundle…"

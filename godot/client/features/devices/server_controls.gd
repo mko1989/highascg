@@ -12,6 +12,7 @@ signal dirty()
 const M := preload("res://features/devices/server_page_model.gd")
 const Flow := preload("res://features/devices/server_flow.gd")
 const POLL_S := 3.0
+const NetworkPane := preload("res://features/settings/network_pane.gd")
 
 var page := VBoxContainer.new()
 var is_open := false
@@ -20,6 +21,7 @@ var _io: _Io
 var _timer := Timer.new()
 var _shown: Array = []
 var _status_set := false  # the running action set the status line (its toasts stay off it)
+var _net: Control  # WO-692: kept across re-renders (the 3 s poll must not wipe a field being typed)
 
 
 class _Io:
@@ -98,7 +100,7 @@ func close() -> void:
 func _render() -> void:
 	if not is_open:
 		return
-	var items := M.items(flow.s, flow.clock.call())
+	var items := M.items(flow.s, flow.clock.call(), true)
 	if items == _shown:
 		return
 	_shown = items
@@ -107,7 +109,8 @@ func _render() -> void:
 	var caret: int = focus.caret_column if refocus != null else 0
 	for ch in page.get_children():
 		page.remove_child(ch)
-		ch.queue_free()
+		if ch != _net:
+			ch.queue_free()
 	var group := ButtonGroup.new()
 	for it in items:
 		var n := _item(it, group)
@@ -119,6 +122,10 @@ func _render() -> void:
 
 func _item(it: Dictionary, group: ButtonGroup) -> Control:
 	match it.t:
+		"network":
+			if _net == null:
+				_net = NetworkPane.new()
+			return _net
 		"title", "summary":
 			return _title(it.text)
 		"heading":

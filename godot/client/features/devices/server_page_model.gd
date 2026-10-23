@@ -196,7 +196,9 @@ static func buttons(s: Dictionary) -> Array:
 
 # ---------------------------------------------------------------- items
 
-static func items(s: Dictionary, now: float) -> Array:
+## `network_panel`: the client draws the WO-692 Network panel (every NIC + Wi-Fi) in place of the web's one-interface
+## block; the golden replay of the web page keeps the default.
+static func items(s: Dictionary, now: float, network_panel := false) -> Array:
 	var live := R.d(s.payload.get("live"))
 	var host := R.d(live.get("host"))
 	var caspar := R.d(live.get("caspar"))
@@ -208,16 +210,20 @@ static func items(s: Dictionary, now: float) -> Array:
 		{"t": "select", "key": "fps", "value": s.fps, "options": STANDARD_FPS.map(func(f: float) -> Array: return [O.js(f), O.js(f) + " fps"]), "disabled": false},
 		{"t": "small", "text": FPS_HINT}, {"t": "button", "text": "Save project frame rate", "disabled": false},
 		{"t": "heading", "text": "Templates (CEF)"}, {"t": "check", "key": "cef", "text": CEF_TEXT, "checked": s.cef, "disabled": false},
-		{"t": "small", "text": CEF_HINT}, {"t": "heading", "text": "Network"}, {"t": "small", "text": s.net_text},
-		{"t": "caption", "text": "Ethernet interface"},
-		{"t": "select", "key": "iface", "value": s.iface, "options": s.iface_opts, "disabled": false},
-		{"t": "radio", "key": "net_dhcp", "text": "Auto (DHCP)", "checked": s.net_mode == "dhcp", "disabled": false},
-		{"t": "radio", "key": "net_static", "text": "Manual (static)", "checked": s.net_mode == "static", "disabled": false}]
-	if s.net_mode == "static":
-		for f in [["IPv4 address", "ip"], ["Prefix length", "prefix"], ["Gateway", "gateway"], ["DNS", "dns"]]:
-			out.append({"t": "caption", "text": f[0]})
-			out.append({"t": "input", "key": f[1], "value": s[f[1]]})
-	out.append({"t": "button", "text": "Apply network", "disabled": false})
+		{"t": "small", "text": CEF_HINT}]
+	if network_panel:
+		out.append({"t": "network"})
+	else:
+		out.append_array([{"t": "heading", "text": "Network"}, {"t": "small", "text": s.net_text},
+			{"t": "caption", "text": "Ethernet interface"},
+			{"t": "select", "key": "iface", "value": s.iface, "options": s.iface_opts, "disabled": false},
+			{"t": "radio", "key": "net_dhcp", "text": "Auto (DHCP)", "checked": s.net_mode == "dhcp", "disabled": false},
+			{"t": "radio", "key": "net_static", "text": "Manual (static)", "checked": s.net_mode == "static", "disabled": false}])
+		if s.net_mode == "static":
+			for f in [["IPv4 address", "ip"], ["Prefix length", "prefix"], ["Gateway", "gateway"], ["DNS", "dns"]]:
+				out.append({"t": "caption", "text": f[0]})
+				out.append({"t": "input", "key": f[1], "value": s[f[1]]})
+		out.append({"t": "button", "text": "Apply network", "disabled": false})
 	out.append({"t": "heading", "text": "Hot backup"})
 	out.append({"t": "small", "text": s.rep_line})
 	if s.pair != "":
