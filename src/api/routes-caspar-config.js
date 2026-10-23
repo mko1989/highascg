@@ -12,6 +12,7 @@ const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-gener
 const { getStandardModeChoices } = require('../config/config-modes')
 const { applyFullServerConfig } = require('../utils/full-config-apply')
 const { atomicWriteFile } = require('../utils/atomic-file-write')
+const { enforceScreenConsumerPolicy } = require('../config/screen-consumer-policy')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 
 /**
@@ -114,7 +115,13 @@ async function writeCasparConfigToDiskUnserialized(ctx, opts = {}) {
 	apiLog(ctx, 'info', `[Caspar config] Writing casparcg.config → ${filePath}`)
 	const oneShot = typeof opts.xml === 'string' ? opts.xml.trim() : ''
 	const persistedOverride = String(ctx.config?.casparServer?.casparConfigOverride || '').trim()
-	const xml = oneShot || persistedOverride || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	const rawXml = oneShot || persistedOverride || buildConfigXml(buildCasparGeneratorFlatConfig(ctx.config))
+	// WO-717: hand-written XML (editor one-shot, saved override) gets the screen-consumer policy too — vsync
+	// off, gpu-texture on. A no-op on generated XML, which already carries it.
+	const { xml, changed: policyChanged } = enforceScreenConsumerPolicy(rawXml)
+	if (policyChanged) {
+		apiLog(ctx, 'info', '[Caspar config] Screen consumers set to vsync off + gpu-texture on (WO-717 policy)')
+	}
 	if (oneShot) {
 		apiLog(ctx, 'info', '[Caspar config] Using one-shot XML from config editor (not saved in settings)')
 	} else if (persistedOverride) {

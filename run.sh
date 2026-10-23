@@ -91,6 +91,11 @@ should_relaunch() {
 
 run_caspar() {
 	source_caspar_env
+	# WO-717: every <screen> consumer launches with vsync off + gpu-texture on, whoever wrote the config
+	# (generator, ISO template copy, stick restore, project bundle, hand edit). Best-effort: never blocks.
+	if command -v node >/dev/null 2>&1 && [ -f "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" ]; then
+		caspar_supervisor_log "$(node "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" "$CONFIG_PATH" 2>&1 | tail -n 1)"
+	fi
 	# WO-508: the flock at the top guards against a second run.sh, NOT against a second casparcg.
 	# A binary started outside the supervisor — by hand, or a survivor of a previous boot — was never
 	# noticed, and this launched a second MAIN alongside it. Two mains cannot coexist: they fight for

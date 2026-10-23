@@ -3,15 +3,12 @@
 const { escapeXml, isCustomLiveProfile, casparBoolEnabled, readMultiviewSetting } = require('./config-generator-utils')
 
 /**
- * WO-716 (owner 23.10.26: "vsync should always be off, gpu-texture enabled per channel"): every Caspar
- * `<screen>` consumer this generator writes — PGM, PRV head, multiview, operator GUI, both build profiles —
- * carries these two lines, and neither is a setting. Vsync on made NVIDIA spin-wait in glXSwapBuffers on the
- * consumer thread (78 % of a core per consumer, WO-715 A/B); frame pacing comes from GL sync (WO-407/444).
- * `screen_N_vsync` / `multiview_vsync` may still sit in saved settings: they are ignored.
+ * WO-716: every Caspar `<screen>` consumer this generator writes — PGM, PRV head, multiview, operator GUI,
+ * both build profiles — carries these two lines, and neither is a setting (`screen_N_vsync` /
+ * `multiview_vsync` may still sit in saved settings: they are ignored). The policy and its reasons live in
+ * screen-consumer-policy.js, which also enforces it on XML the generator did not write (WO-717).
  */
-const SCREEN_VSYNC_XML = '<vsync>false</vsync>'
-/** WO-502: bind the mixer's GPU texture instead of a per-frame host round trip — see the PGM function. */
-const SCREEN_GPU_TEXTURE_XML = '<gpu-texture>true</gpu-texture>'
+const { SCREEN_VSYNC_XML, SCREEN_GPU_TEXTURE_XML } = require('./screen-consumer-policy')
 
 /**
  * PR #1718: optional `<aspect-ratio>`, `<enable-mipmaps>` inside `<screen>` (custom build only).

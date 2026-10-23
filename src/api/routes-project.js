@@ -197,7 +197,9 @@ async function handleApplyBundle(body, ctx) {
 				await fs.promises.mkdir(path.dirname(filePath), { recursive: true }).catch(() => {})
 				// WO-161 T161.1: atomic (tmp + rename) so bundle apply can't leave a torn casparcg.config.
 				const { atomicWriteFile } = require('../utils/atomic-file-write')
-				await atomicWriteFile(filePath, payload.casparcgConfig, 'utf8')
+				// WO-717: a bundle's stored XML may predate the screen-consumer policy (vsync off, gpu-texture on).
+				const { enforceScreenConsumerPolicy } = require('../config/screen-consumer-policy')
+				await atomicWriteFile(filePath, enforceScreenConsumerPolicy(payload.casparcgConfig).xml, 'utf8')
 			} catch (e) {
 				console.warn('[Sync] Failed to write caspar config:', e.message)
 			}
