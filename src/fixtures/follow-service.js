@@ -131,7 +131,7 @@ function createFollowService(ctx, hub) {
 		sacnIn.configure(vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe), engine.dmx.sacn_port)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
 		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol})`)
-		for (const f of engine.fixtures) if (f.problem) log('warn', `[follow] ${f.name}: ${f.problem}`)
+		for (const f of engine.fixtures) if (f.problem || f.noSend) log('warn', `[follow] ${f.name}: ${f.problem || `not sent — ${f.noSend}`}`)
 	}
 	try {
 		const { loadFullProject } = require('../engine/project-scenes')

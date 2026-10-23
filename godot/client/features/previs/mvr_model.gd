@@ -172,7 +172,8 @@ static func patched_uuids(patch: Variant) -> Dictionary:
 
 
 ## The server's entries merged into the patch: a re-patch refreshes address / type / mode / pose from the file but keeps
-## what the operator set on the fixture since (follow, fixed channels, aim height, enabled, pan / tilt invert, name).
+## what the operator set on the fixture since (follow, fixed channels, aim height, enabled, pan / tilt invert, name) —
+## and, once re-patched by hand (WO-695 `manual_patch`), its type / mode / protocol / universe / address / dest.
 static func merge_patch(patch: Array, incoming: Array) -> Array:
 	var by_id := {}
 	for f in incoming:
@@ -185,7 +186,10 @@ static func merge_patch(patch: Array, incoming: Array) -> Array:
 			out.append(f)
 			continue
 		var fx: Dictionary = (by_id[id] as Dictionary).duplicate(true)
-		for k in ["follow", "fixed", "aim_z", "enabled", "pan", "tilt", "name"]:
+		var keep := ["follow", "fixed", "aim_z", "enabled", "pan", "tilt", "name"]
+		if (f as Dictionary).get("manual_patch") == true:  # WO-695: the operator's mode / address win over the file's
+			keep.append_array(["typeId", "mode", "protocol", "universe", "address", "dest", "manual_patch"])
+		for k in keep:
 			if (f as Dictionary).has(k):
 				fx[k] = f[k]
 		out.append(fx)

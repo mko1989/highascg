@@ -45,7 +45,7 @@ function usage(engine) {
 		const row = out.get(k)
 		const slots = fx.slots.length ? fx.slots : [fx.address - 1]
 		row.fixtures.push({ id: fx.id, name: fx.name, address: fx.address, from: Math.min(...slots) + 1,
-			to: Math.max(...slots) + 1, channels: fx.slots.length, problem: fx.problem })
+			to: Math.max(...slots) + 1, channels: fx.slots.length, problem: fx.problem || fx.noSend || null })
 		if (!fx.problem && fx.enabled) row.used += fx.slots.length
 	}
 	return [...out.values()].sort((a, b) => a.protocol.localeCompare(b.protocol) || a.universe - b.universe)

@@ -31,7 +31,7 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 	var sacn: bool = o.get("protocol") == "sacn"
 	var type_id := str(o.get("typeId", ""))
 	var hex := RegEx.create_from_string("^[0-9a-f]{12}$")
-	return {
+	var out := {
 		"id": str(o.get("id", "")) if str(o.get("id", "")) != "" else "fx%d" % (i + 1),
 		"name": str(o.get("name", "")) if str(o.get("name", "")) != "" else "Fixture %d" % (i + 1),
 		"enabled": o.get("enabled") != false, "protocol": "sacn" if sacn else "artnet",
@@ -48,6 +48,9 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 		"fixed": str(o.get("fixed", "")), "follow": int(_num(o.get("follow"), 0, 0, 65535)),
 		"aim_z": _num(o.get("aim_z"), 1, -5, 10),
 	}
+	if o.get("manual_patch") == true:  # WO-695: the operator re-patched it — an MVR re-patch keeps mode / address
+		out["manual_patch"] = true
+	return out
 
 
 static func normalize(slice: Variant) -> Dictionary:

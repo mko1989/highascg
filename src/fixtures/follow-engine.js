@@ -75,8 +75,11 @@ class FollowEngine {
 		const p = normalizePatch(slice, { resolveMode: this._resolveMode })
 		const reads = new Set(p.through.enabled ? p.fixtures.filter((f) => f.protocol === 'artnet').map((f) => f.universe + p.through.offset) : [])
 		for (const fx of p.fixtures) {
+			// WO-695: a self-loop only keeps the universe off the wire — the frame is still built, so the previs beams and
+			// the programmer work (it used to be a `problem`, which also dropped the fixture from tick() and visual()).
+			fx.noSend = null
 			if (!fx.problem && fx.to && this._isSelfLoop(fx.to, fx.universe, fx.protocol)) {
-				fx.problem = `would loop into this box's ${fx.protocol === 'sacn' ? 'sACN' : 'Art-Net'} input (universe ${fx.universe})`
+				fx.noSend = `would loop into this box's ${fx.protocol === 'sacn' ? 'sACN' : 'Art-Net'} input (universe ${fx.universe})`
 			}
 			if (!fx.problem && fx.to && fx.protocol === 'artnet' && reads.has(fx.universe) && this._reachesSelf(fx.to)) {
 				fx.problem = `read-through would read its own output (universe ${fx.universe}) — set an input offset`
@@ -98,7 +101,12 @@ class FollowEngine {
 		const keys = new Set(out.map((f) => this._key(f)))
 		const typed = new Set(out.filter((f) => f.gdtf).map((f) => this._key(f)))
 		for (const k of [...this._uni.keys()]) if (!keys.has(k)) this._uni.delete(k)
-		for (const [k, u] of this._uni) u.typed = typed.has(k)
+		const muted = new Set(out.filter((f) => f.noSend).map((f) => this._key(f)))
+		for (const [k, u] of this._uni) {
+			u.typed = typed.has(k)
+			u.noSend = muted.has(k)
+		}
+		this._muted = muted
 		this._typed = typed
 		const isOn = `${this.enabled}|${this.protocol}|${this.dmx.enabled}|${this.dmx.visualise}|${[...this.dmx.universes]}`
 		if (isOn !== wasOn) for (const u of this._uni.values()) u.last = null // send at once
@@ -149,6 +157,7 @@ class FollowEngine {
 
 	/** Whether universe u may be transmitted right now (see the header). */
 	_live(u) {
+		if (u.noSend) return false // WO-695: lands on this box's own input
 		if (u.typed && this.dmx.visualise) return false // WO-615 T7: the console drives these — never send what we show
 		if (this.dmx.enabled && this.dmx.universes.has(`${u.protocol}:${u.universe}`)) return true
 		return !u.typed && u.protocol === 'artnet' && this.enabled && this.protocol === 'artnet'
@@ -236,7 +245,7 @@ class FollowEngine {
 			let u = this._uni.get(key)
 			if (!u) {
 				u = { to: fx.to, protocol: fx.protocol, universe: fx.universe, typed: Boolean(this._typed?.has(key)),
-					buf: new Uint8Array(512), last: null, at: 0, seq: 0, packets: 0 }
+					buf: new Uint8Array(512), last: null, at: 0, seq: 0, packets: 0, noSend: Boolean(this._muted?.has(key)) }
 				if (cf) u.buf.set(cf)
 				this._uni.set(key, u)
 			}
@@ -282,12 +291,12 @@ class FollowEngine {
 				const pa = fx.universe + this.through.offset
 				const cons = !this.consoleFrames ? null : this.consoleFrames.frame(pa, now) ? 'live'
 					: this.consoleFrames.last?.(pa) ? 'held' : 'none'
-				return { id: fx.id, name: fx.name, follow: fx.follow, enabled: fx.enabled, problem: fx.problem,
+				return { id: fx.id, name: fx.name, follow: fx.follow, enabled: fx.enabled, problem: fx.problem || fx.noSend || null,
 					protocol: fx.protocol, typeId: fx.typeId, mode: fx.mode, moving: fx.moving,
 					slots: fx.slots.length, programmed: this._values.has(fx.id),
 					through: !this.through.enabled ? null : w <= 0 ? 'console' : w >= 1 ? 'tracking' : 'fading',
 					console: this.through.enabled ? cons : null,
-					state: fx.problem ? 'not output' : a.state, pan: Math.round(a.pan * 100) / 100,
+					state: fx.problem || fx.noSend ? 'not output' : a.state, pan: Math.round(a.pan * 100) / 100,
 					tilt: Math.round(a.tilt * 100) / 100, universe: fx.universe, address: fx.address, dest: fx.dest }
 			}),
 			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes],

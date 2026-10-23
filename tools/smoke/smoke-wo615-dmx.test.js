@@ -210,8 +210,12 @@ test('engine: sACN onto the box’s own input universe is refused', async () => 
 			{ id: 'b', protocol: 'sacn', universe: 2 },
 		],
 	})
-	assert.match(e.fixtures[0].problem, /loop into this box's sACN input \(universe 1\)/)
-	assert.strictEqual(e.fixtures[1].problem, null)
+	// WO-695: refused on the WIRE only (noSend) — the frame is still built, so the previs beams + programmer work.
+	assert.match(e.fixtures[0].noSend, /loop into this box's sACN input \(universe 1\)/)
+	assert.strictEqual(e.fixtures[0].problem, null)
+	assert.strictEqual(e.fixtures[1].noSend, null)
+	assert.match(e.status().fixtures[0].problem, /loop into this box/, 'the operator still sees why it is not sent')
+	assert.strictEqual(e.status().fixtures[0].state, 'not output')
 })
 
 test('routes: usage map, frame, programmer', async () => {

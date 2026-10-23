@@ -17,6 +17,7 @@ const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
+const PatchEdit := preload("res://features/previs/fixtures/patch_edit_section.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -36,6 +37,7 @@ var _replace: Button
 var _replace_dlg: ConfirmationDialog
 var _last := ""
 var _body := ColorRows.new()  # WO-641: the selected type's body colour
+var _patch_edit := PatchEdit.new()  # WO-695: re-patch the selected heads
 
 
 func _ready() -> void:
@@ -116,6 +118,7 @@ func _ready() -> void:
 	add_child(vrow)
 	_usage = _label()
 	_status = _label()
+	add_child(_patch_edit)
 	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, ctrl / shift-click adds"
 	add_child(Programmer.new())
 	_confirm_on = ConfirmationDialog.new()
@@ -181,6 +184,7 @@ func _maybe_reload() -> void:
 func refresh_types() -> void:
 	var res: Dictionary = await Api.get_json("/api/fixtures/types")
 	types = res.data.get("types", []) if res.ok and res.data is Dictionary else []
+	_patch_edit.types = types
 	var keep := str(_type.get_item_metadata(_type.selected)) if _type.selected >= 0 else ""
 	_type.clear()
 	if types.is_empty():
