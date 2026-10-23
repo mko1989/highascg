@@ -204,7 +204,7 @@ func type_into(c: Control, text: String, submit := true) -> String:
 
 
 ## Open an OptionButton by clicking it, then pick the item whose text is `label` from its popup.
-func choose(ob: OptionButton, label: String, exact := true) -> String:
+func choose(ob: OptionButton, label: String, exact := true, while_open := Callable()) -> String:
 	if ob == null:
 		return "option button not found"
 	var idx := -1
@@ -228,6 +228,11 @@ func choose(ob: OptionButton, label: String, exact := true) -> String:
 	if not is_instance_valid(ob) or not is_instance_valid(pm) or not pm.visible:
 		_button(_at, MOUSE_BUTTON_LEFT, false, false)
 		return "%s: the popup never opened (or a reload replaced the page)" % label
+	if while_open.is_valid():  # something that happens while the list is open (a reload pushed by the server…)
+		await while_open.call()
+		if not is_instance_valid(ob) or not is_instance_valid(pm) or not pm.visible:
+			_button(_at, MOUSE_BUTTON_LEFT, false, false)
+			return "%s: the open list was closed / freed by what happened while it was open" % label
 	pm.index_pressed.emit(idx)  # what a click on the popup row does (the popup is a Window, not a Control)
 	pm.hide()
 	_button(_at, MOUSE_BUTTON_LEFT, false, false)

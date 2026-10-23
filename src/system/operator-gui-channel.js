@@ -47,6 +47,21 @@ const lastMaxLayerByChannel = new Map()
 const applyChains = new Map()
 /** Per-channel debounce timer handle (server-side coalescing, T243.2). */
 const debounceTimers = new Map()
+/**
+ * WO-720: per-channel callers whose debounced apply has not fired yet. A newer report (or a clear)
+ * cancels the older timer — its callers then settle with the newer apply's outcome instead of
+ * hanging forever (an HTTP request that never answered pinned a Godot Api thread and hung quit).
+ */
+const debounceWaiters = new Map()
+
+function settleWaitersWith(ch, next) {
+	const waiters = debounceWaiters.get(ch) || []
+	debounceWaiters.delete(ch)
+	next.then(
+		(r) => waiters.forEach((w) => w.resolve(r)),
+		(e) => waiters.forEach((w) => w.reject(e)),
+	)
+}
 
 /**
  * Boot-window shrink guard (2026-07-19 bug: "after highascg restart the operator gui starts with a
@@ -285,11 +300,14 @@ function applyOperatorGuiLayout(ctx, cells, opts = {}) {
 	return new Promise((resolve, reject) => {
 		const existing = debounceTimers.get(ch)
 		if (existing) clearTimeout(existing)
+		const waiters = debounceWaiters.get(ch) || []
+		waiters.push({ resolve, reject })
+		debounceWaiters.set(ch, waiters)
 		const timer = setTimeout(() => {
 			debounceTimers.delete(ch)
 			const chain = applyChains.get(ch) || Promise.resolve()
 			const next = chain.then(() => _doApplyOperatorGuiLayout(ctx, ch, cells, opts))
-			next.then(resolve, reject)
+			settleWaitersWith(ch, next)
 			applyChains.set(ch, next.catch(() => {}))
 		}, APPLY_DEBOUNCE_MS)
 		debounceTimers.set(ch, timer)
@@ -332,6 +350,7 @@ function clearOperatorGuiLayout(ctx) {
 	}
 	const chain = applyChains.get(ch) || Promise.resolve()
 	const next = chain.then(() => _doApplyOperatorGuiLayout(ctx, ch, []))
+	settleWaitersWith(ch, next)
 	applyChains.set(ch, next.catch(() => {}))
 	return next
 }
@@ -427,6 +446,7 @@ function resetOperatorGuiStateForTests() {
 	applyChains.clear()
 	for (const t of debounceTimers.values()) clearTimeout(t)
 	debounceTimers.clear()
+	debounceWaiters.clear()
 	bootShrinkGuard = null
 	lastClientIntentByChannel.clear()
 	atlasMode.resetAtlasStateForTests()

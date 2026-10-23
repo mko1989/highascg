@@ -267,13 +267,15 @@ function resolveLayoutRectForOperatorPort(config, layout, portN) {
  *            barriers around; see startPointerConfine's own 'no_operator_monitor' failure path).
  *   'auto' (default, or any unrecognized value) — byte-identical to the pre-WO-308 behavior.
  * @param {object} config
+ * @param {{ displays?: any[], connectors?: any[] }} [hw] — resolveOperatorMonitorPort's hardware (tests pin it; the box
+ *   probes, and a lone connected display resolves as the operator monitor — WO-246)
  * @returns {{ desired: boolean, reason: string }}
  */
-function evaluateOperatorPointerConfineDesire(config) {
+function evaluateOperatorPointerConfineDesire(config, hw) {
 	const mode = String(config?.operatorTools?.pointerConfine || 'auto').trim().toLowerCase()
 	if (mode === 'off') return { desired: false, reason: 'pointerConfine_off' }
 	if (mode === 'on') return { desired: true, reason: 'pointerConfine_on' }
-	const port = resolveOperatorMonitorPort(config).port
+	const port = resolveOperatorMonitorPort(config, hw).port
 	if (port != null) return { desired: true, reason: `operator_monitor_port_${port}` }
 	if (config?.operatorTools?.pointerConfineMultiview === true) {
 		return { desired: true, reason: 'pointerConfineMultiview' }

@@ -77,12 +77,20 @@ class AmcpSimulated extends EventEmitter {
 		return path.resolve(__dirname, '..', '..')
 	}
 
-	/** Channel plan straight from the config generator — same XML a real Apply writes. */
+	/**
+	 * Channel plan straight from the config generator — same XML a real Apply writes. Memoised on the
+	 * config's JSON (WO-720): the 200 ms sim OSC tick asks for channel modes, and a full generator run
+	 * (two layout plans + their log lines) five times a second flooded the log for nothing.
+	 */
 	_configXml() {
 		try {
+			const sig = JSON.stringify(this._config)
+			if (this._xmlCache?.sig === sig) return this._xmlCache.xml
 			const { buildConfigXml } = require('../config/config-generator')
 			const { buildCasparGeneratorFlatConfig } = require('../config/build-caspar-generator-config')
-			return buildConfigXml(buildCasparGeneratorFlatConfig(this._config))
+			const xml = buildConfigXml(buildCasparGeneratorFlatConfig(this._config))
+			this._xmlCache = { sig, xml }
+			return xml
 		} catch (e) {
 			return '<?xml version="1.0" encoding="utf-8"?>\n<configuration>\n  <channels>\n    <channel>\n      <video-mode>1080p5000</video-mode>\n    </channel>\n  </channels>\n</configuration>'
 		}

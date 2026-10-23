@@ -25,6 +25,7 @@ var _vals := {}  # summary key → value Label
 var _size_fields: Array[LineEdit] = []  # width, height, fps
 var _vm: OptionButton
 var _custom_for := ""  # dest id whose select the operator set to Custom (WO-639)
+var _pending: Array = []  # [entry, payload, settings] of a reload held while a select's list is open (WO-720)
 
 
 func _init() -> void:
@@ -32,7 +33,16 @@ func _init() -> void:
 
 
 ## Rebuild for `entry` (devices_model build().destinations[i]); `payload` is the device-view snapshot.
+## WO-720: a reload while one of the page's selects has its list open would free the select under the pointer (the
+## pick goes nowhere) — the rebuild waits for the list to close; a pick that writes drops it (its own reload follows).
 func show_destination(entry: Dictionary, payload: Dictionary, settings: Variant) -> void:
+	var open := _open_select()
+	if open != null:
+		_pending = [entry, payload, settings]
+		if not open.get_popup().popup_hide.is_connected(_flush_pending):
+			open.get_popup().popup_hide.connect(_flush_pending, CONNECT_ONE_SHOT | CONNECT_DEFERRED)
+		return
+	_pending = []
 	var focus := _focused_index()
 	for c in get_children():
 		remove_child(c)
@@ -197,7 +207,20 @@ func _operator_fields() -> void:
 
 
 func _send(body: Dictionary) -> void:
+	_pending = []
 	patch.emit(dest_id, body)
+
+
+func _open_select() -> OptionButton:
+	for ob in find_children("*", "OptionButton", true, false):
+		if (ob as OptionButton).get_popup().visible:
+			return ob
+	return null
+
+
+func _flush_pending() -> void:
+	if not _pending.is_empty() and is_inside_tree():
+		show_destination(_pending[0], _pending[1], _pending[2])
 
 
 func _int(v: Variant) -> int:
@@ -298,7 +321,13 @@ func _select(options: Array, value: String, tip: String, on_change: Callable) ->
 		ob.set_item_metadata(i, options[i][0])
 		if options[i][0] == value:
 			ob.select(i)
-	ob.item_selected.connect(func(i: int) -> void: on_change.call(str(ob.get_item_metadata(i))))
+	# WO-720: OptionButton emits item_selected for the row that was already chosen too — that re-sent the same value
+	# (a write, a reload, a rebuilt page). The index at the list's opening is the one a pick must differ from.
+	ob.get_popup().about_to_popup.connect(func() -> void: ob.set_meta("was", ob.selected))
+	ob.item_selected.connect(func(i: int) -> void:
+		if ob.has_meta("was") and int(ob.get_meta("was")) == i:
+			return
+		on_change.call(str(ob.get_item_metadata(i))))
 	return ob
 
 

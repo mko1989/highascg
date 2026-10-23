@@ -135,6 +135,21 @@ async function handleGet(path, ctx, query, req) {
 }
 
 /**
+ * WO-720: a screen added / removed / re-moded here changes the channel map (screen count, PRV / PGM channels,
+ * resolutions) but nothing told the clients — the Godot Store kept the old map until an unrelated settings save or a
+ * Caspar INFO CONFIG change pushed one (same class as WO-506's rename). Announce it like settings-post does.
+ * @param {object} ctx
+ */
+function announceChannelMap(ctx) {
+	if (typeof ctx._wsBroadcast !== 'function') return
+	try {
+		ctx._wsBroadcast('change', { path: 'channelMap', value: require('../config/channel-map-from-ctx').buildChannelMap(ctx) })
+	} catch (_) {
+		/* a broadcast failure must not fail the edit itself */
+	}
+}
+
+/**
  * @param {string} body
  * @param {object} ctx
  */
@@ -264,6 +279,7 @@ async function handlePost(body, ctx) {
 		}
 	}
 
+	if (res && !res.error && (j.addDestination || j.updateDestination || j.removeDestination)) announceChannelMap(ctx)
 	if (res) {
 		if (res.error) return { status: Number(res.status) >= 400 && Number(res.status) < 600 ? Number(res.status) : 400, headers: JSON_HEADERS, body: jsonBody(res) }
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(res) }

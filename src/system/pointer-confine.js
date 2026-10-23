@@ -26,7 +26,12 @@ const {
 	displaySessionEnv,
 } = require('../utils/x-display-session')
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
-const { isSandbox } = require('../bootstrap/sandbox')
+const sandbox = require('../bootstrap/sandbox')
+
+/* WO-720: a `node --test` file process (NODE_TEST_CONTEXT) is as foreign to the operator's display as a sandbox.
+ * Offline smokes POST settings → syncOperatorPointerConfine → stopPointerConfine's pattern pkill, which killed the
+ * LIVE box's barrier daemon on every `npm run test:ci` run there (the server's watchdog then restarted it). */
+const isSandbox = () => sandbox.isSandbox() || Boolean(process.env.NODE_TEST_CONTEXT)
 
 const execFileAsync = promisify(execFile)
 

@@ -139,6 +139,10 @@ run it before a release / after GUI work.
   `kill(-pid)`), a client alive 20 s after DONE is killed and reported `HANG` (exit ≠ 0) instead of hiding in a
   timeout. With `--video=feed` (no local shm mapping) the full run quits normally — the hang lives in the
   local-shm reader path at shutdown (not root-caused; the kiosk client quits rarely — follow-up if it ever shows).
+  **Root-caused and fixed in [WO-720](./720_WO_bugs_found_by_gui_e2e.md) (A):** the shm path opens a media preview
+  that reports its layout twice; the server's debounce never answered the superseded POST, and quit joined the
+  Godot HTTPRequest thread stuck in `recv()`. The app-side notes above (reload under an open select, Store channel
+  map not refreshed) and the box-only WO-308 smoke failure are fixed there too.
 - **Scenario independence:** 03 alone failed ("no channel") — it lived off 02's screen. It now has a setup step (the
   Devices panel's own `add("pgm_prv")` when the server map has no PRV) and reads channels from the server's
   `/api/settings` channelMap (the client Store's copy is only refreshed by some broadcasts). 02's custom-size fields

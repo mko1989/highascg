@@ -32,18 +32,21 @@ describe('evaluateOperatorPointerConfineDesire — the reason a decision was mad
 	})
 
 	it("'auto' (default) reproduces the pre-WO-308 rule exactly, with a reason attached", () => {
+		// No hardware: on a box with one connected display that display IS the operator monitor (WO-246), so a
+		// probed run answers operator_monitor_port_N for every case here (WO-720 — failed on the playout box only).
+		const NO_HW = { displays: [], connectors: [] }
 		const withPort = { casparServer: { screen_3_operator_monitor: true } }
-		const v1 = evaluateOperatorPointerConfineDesire(withPort)
+		const v1 = evaluateOperatorPointerConfineDesire(withPort, NO_HW)
 		assert.equal(v1.desired, true)
 		assert.equal(v1.reason, 'operator_monitor_port_3')
 
 		const multiviewOnly = { operatorTools: { pointerConfineMultiview: true } }
-		const v2 = evaluateOperatorPointerConfineDesire(multiviewOnly)
+		const v2 = evaluateOperatorPointerConfineDesire(multiviewOnly, NO_HW)
 		assert.equal(v2.desired, true)
 		assert.equal(v2.reason, 'pointerConfineMultiview')
 
 		const nothing = {}
-		const v3 = evaluateOperatorPointerConfineDesire(nothing)
+		const v3 = evaluateOperatorPointerConfineDesire(nothing, NO_HW)
 		assert.equal(v3.desired, false)
 		assert.equal(v3.reason, 'no_operator_monitor_and_multiview_off')
 	})

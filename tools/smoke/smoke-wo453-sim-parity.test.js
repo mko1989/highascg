@@ -115,6 +115,19 @@ describe('WO-453 sim parity', () => {
 		}
 	})
 
+	it('WO-720: channel modes reuse the generated plan until the config changes (no generator run per OSC tick)', () => {
+		const amcp = makeOfflineAmcp()
+		const sim = amcp._simulated
+		sim.channelModes()
+		const cached = sim._xmlCache
+		assert.ok(cached && typeof cached.xml === 'string')
+		sim.channelModes()
+		assert.equal(sim._xmlCache, cached, 'an unchanged config reuses the generated XML')
+		sim._config.casparServer.screen_1_mode = '720p5000'
+		sim.channelModes()
+		assert.notEqual(sim._xmlCache, cached, 'a config edit regenerates')
+	})
+
 	it('source guards: index.js constructs ConnectionManager unconditionally and forces offline under --no-caspar', () => {
 		const src = fs.readFileSync(path.join(ROOT, 'index.js'), 'utf8')
 		assert.match(src, /if \(cli\.noCaspar\) process\.env\.HIGHASCG_OFFLINE_MODE = '1'/, '--no-caspar must force offline_mode')

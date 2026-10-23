@@ -100,6 +100,17 @@ func run() -> void:
 				(ui.field("Video mode", "OptionButton") as OptionButton).text if ui.field("Video mode", "OptionButton") else "?"]
 		return ""
 	)
+	# WO-720: a device-view reload (another write, a WS push) used to rebuild the page under an open list.
+	await step("A reload while the list is open keeps the pick", func() -> String:
+		var why: String = await _open(pgm)
+		if why == "":
+			why = await ui.choose(ui.field("Video mode", "OptionButton"), "1080p2500", true, func() -> void:
+				await ui.root.shell.tabs.get_node("Devices").refresh())
+		if why != "":
+			return why
+		return await await_api("/api/device-view", func(d: Variant) -> bool: return str(_dest(d, pgm).get("videoMode")) == "1080p2500",
+			"1080p2500 not stored after a reload during the pick")
+	)
 	await step("Add PGM-only screen", func() -> String:
 		only = await _add("PGM only", "pgm_only")
 		return _why
@@ -127,7 +138,7 @@ func run() -> void:
 		var xml := str(r.get("data", ""))
 		if r.get("data") is Dictionary:
 			xml = JSON.stringify(r.data)
-		return expect(xml.contains("1080p5000") and xml.contains("720"), "generated config lacks the modes: " + xml.left(300))
+		return expect(xml.contains("1080p2500") and xml.contains("720"), "generated config lacks the modes: " + xml.left(300))
 	)
 	await step("Remove the PGM-only screen", func() -> String:
 		var why: String = await _open(only)
