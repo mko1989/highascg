@@ -1,7 +1,7 @@
 # WO-711 — PTZ cameras follow tracked people over VISCA
 
-**Status: IN PROGRESS (23.10.26: server driver + Godot setup section written and tested offline; NOT wired into
-register.js yet (the session lead does that with WO-708); NO real PTZ camera was tested, owner QA needed)**
+**Status: DONE offline (23.10.26: server driver + Godot setup section, smoke 27/27, wired to the WO-708 director by the
+lead via src/tracking/auto-ptz.js; UDP loopback only — NO real PTZ camera was tested, owner QA needed)**
 
 Owner, 23.10 (verbatim, shared contract for WO-708 … WO-711):
 > "… the same for, if there are any cameras that are meant to be tracked by this, send visca and/or other ptz controls.
@@ -115,3 +115,15 @@ stays the single decider (this service has no idea who a person is); the section
 - Wiring (lead): `createPtzService` + `configure` on project change + `step(now, director.ptzTargetOf)` at ~10 Hz +
   `ptz` in `GET /api/tracking/auto` / `tracking:auto` + `close()` on shutdown. Add the smoke to the curated list in
   `tools/ci/run-offline-tests.js`.
+
+## Wiring (lead, 23.10.26)
+- `src/tracking/auto-ptz.js` (new) creates the service at tracking boot. It configures it from the project (at boot and
+  on every change), hands it to the director (`setPtz`, so `ptz: [...]` appears in `/api/tracking/auto`), and calls
+  `step(now, director.ptzTargetOf)` on every 33 ms tracking tick. The service rate-limits to 10 Hz per camera itself.
+- `allowed: () => duties.has('ptz')` is WO-712 R1's "PTZ out" tick.
+- register.js: boot, tick and stop, 3 lines.
+- smoke-wo711: 27/27 (+2 wiring tests).
+- Live: `ptz: []` (no cameras configured on this box). Server restart clean.
+- Unverified default: the tilt `units_per_deg` default is 14.4, the same as pan. From PTZOptics' published ranges
+  (tilt −30°…90° ≈ 0xFE70…0x04B0) the lead expects ≈ 13.3. Neither figure is confirmed against a camera, so check it in
+  camera QA and edit per camera.

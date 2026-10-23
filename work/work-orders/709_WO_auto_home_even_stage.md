@@ -1,6 +1,6 @@
 # WO-709 — Auto follow: home position (the stage lit evenly) after nobody is seen
 
-**Status: DONE server side (23.10.26: smoke-wo709 9/9, smoke-wo708 18/18, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe + owner QA pending — lead)**
+**Status: DONE server side (23.10.26: smoke-wo709 9/9, smoke-wo708 18/18, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe 23.10 by the lead (API + home on the box, overlay in the GUI); owner QA: two people on stage)**
 
 Owner, 23.10.26: *"after a while with no person detected the fronts should reset to a home position which is lighting
 the stage evenly."*
@@ -81,3 +81,13 @@ scratchpad `wo708-contract.md`.
   1. Fronts on Auto, then walk off stage. After 10 s the fronts spread evenly over the stage rectangle, with no beams
      crossing.
   2. Walk back on: they pick you up at once.
+
+### Live box (23.10.26, lead)
+- After the restart, `home.idle_s` counted 8 → 13 → 18 with cam_1 / cam_2 detecting nobody.
+- `home.active` went true at 10 s.
+- `GET /api/tracking/follow`: both Focus Profiles in state **home**, at pan −2.89° / −10.36°, tilt ≈105°.
+- The grid is 6 × 3 m centred (0, 3), so 2 heads → points (−1.5, 3) and (1.5, 3). Profile 1 (x −2.5) takes the left
+  point and Profile 2 (x +2.5) the right, so the beams don't cross. The pans are not mirror images because of the
+  per-head WO-700 beam offsets.
+- Art-Net output was on (`artnet`).
+- Seeing the stage lit evenly = owner QA.

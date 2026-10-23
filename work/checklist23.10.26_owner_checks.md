@@ -1,9 +1,9 @@
-# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-707)
+# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-712)
 
 Owner, 23.10: *"continue until all todays notes and wos are ready and tested. for my checks"*
 
 Today's notes: `next.md` (ISO on .64, Caspar, project, dock, MVR walls) and the session requests. Every WO below is
-committed, pushed (CI green up to WO-706, WO-707 just pushed; WO-705's run was queued at writing) and tested offline. The boxes are what
+committed, pushed (CI green up to WO-707; WO-708 … 712 pushed 23.10 afternoon; WO-705's run was queued at writing) and tested offline. The boxes are what
 only you can see: real hardware, the next ISO, or how it feels.
 
 How to use it:
@@ -66,6 +66,23 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
       2. Detection → **Person detection** on; the fixture output on.
       3. Walk into view of cam_1 / cam_2: the head follows you. Step out: it holds where you were.
       - Your own marker (Tracking → Markers → Add marker, pin mode Replace / Assist) still works the same.
+- [ ] **WO-708: two or more people on Auto.**
+      1. Two people in view: the Auto heads split half / half, each head taking the person nearest to it.
+      2. The overlay (top-right in Live and Previs) lists both. Pin one as **1**, then press **+**: that person gets
+         exactly that many heads, and the rest go to the other.
+      3. **−** back to **share** restores the even split. A short drop-out (under 3 s) doesn't move any head.
+- [ ] **WO-709: home.**
+      1. Everyone leaves: after 10 s the Auto heads spread over the stage grid (on this box: (−1.5, 3) and (1.5, 3)).
+         Does that light the stage evenly enough?
+      2. **Home now** sends them there at once. The **after** − / + changes the 10 s.
+- [ ] **WO-710: the overlay.** Small enough? Is the corner right in Live and in Previs? Does it ever cover something
+      you need?
+- [ ] **WO-711: a real PTZ camera** (none on this box).
+      1. Tracking → Follow → **PTZ cameras**: add it with protocol (VISCA UDP :1259 for PTZOptics / Lumens, VISCA over
+         IP :52381 for Sony / BirdDog), host, pose and **Enabled**.
+      2. Pin a person and tick its PTZ chip in the overlay, or tick **Auto** on the camera: it follows.
+      3. Check the pan sign and the tilt scale (`units_per_deg`, 14.4 default; tilt may need ≈ 13.3).
+      4. It goes to home / preset with the lights.
 - [ ] **WO-701:** cut-outs keep one camera per person. They switch only after another camera has had a better view
       for 2.5 s, so there's no flicker when someone turns.
 
@@ -73,6 +90,12 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
 
 - [ ] **WO-692:** Settings → Network: Scan, then Join a Wi-Fi network. Set up a port with no cable, then plug the cable
       in: it comes up with those settings.
+
+## D2. Two servers (WO-712 R1)
+
+- [ ] Devices → SERVERS → **THIS SERVER DOES**: untick **Lighting out**. The DMX viewer / nodes show no Art-Net from this
+      box, while the previs beams still move. Tick it back on.
+- [ ] Is the two-column layout readable? Does any label clip?
 
 ## E. Next ISO build + live boot on .64 (WO-696, 697, 702, 704, 705)
 

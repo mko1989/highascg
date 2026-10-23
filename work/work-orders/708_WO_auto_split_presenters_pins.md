@@ -1,6 +1,6 @@
 # WO-708 — Auto follow: split the fronts across several people, pins 1–9
 
-**Status: DONE server side (23.10.26: smoke-wo708 18/18, wo709 9/9, wo707 6/6, related smokes 160/160, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe + owner QA pending — lead)**
+**Status: DONE server side (23.10.26: smoke-wo708 18/18, wo709 9/9, wo707 6/6, related smokes 160/160, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe 23.10 by the lead (API + home on the box, overlay in the GUI); owner QA: two people on stage)**
 
 Owner, 23.10.26: *"ok, so it worked quite nicely for first tests. second thing is more than one presenter on auto it
 should split the lights so they follow half front lights one presenter the other the second and so on. […] if they
@@ -195,3 +195,10 @@ GET /api/tracking/auto → { pool: [fixture ids], primary: 64999,
   1. Put the fronts on Follow → **Auto**, and two people on stage: each gets half of the fronts, the nearest ones.
   2. Pin one of them as 1 with 1 head: they keep exactly one head, and the other person gets the rest.
   3. One person walks off: their heads hold for 3 s, then go to the person who is left.
+
+### Live box (23.10.26, lead, server pid 1367233)
+- `GET /api/tracking/auto` → `pool` = both Focus Profiles (the owner set both to Auto), 9 slots, `ptz: []`, nobody in
+  view.
+- Two people splitting the fronts was not tried (nobody on stage) → owner QA.
+- GUI relaunched: the overlay shows top-right in Previs → 3D ("Track 0 · no one detected · home · Home now · after −
+  10s +"). Screenshot: scratchpad `gui-712.png`.

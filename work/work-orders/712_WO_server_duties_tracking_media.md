@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) implemented + offline-verified 23.10.26, owner QA pending; R2–R5 open (R1 leaves `auto` and the PTZ `allowed` wiring to the lead)**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2–R5 open**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -187,3 +187,19 @@ Known edges: the calibrate session (`calibrate-session.js`) reports `output_enab
 5. Restart the server: the ticks are kept. With a linked server, its card shows "Does: ..." matching its own Devices view within ~5 s (the next cluster poll).
 6. PTZ and Auto: nothing to see until the lead wires `allowed` and the director.
 
+### R1 — lead wiring + live box (23.10.26)
+- **Wiring.**
+  - `auto` duty: register.js pinTick passes `fixtures: []` to the director when it is off, so there is no Auto pool,
+    the lanes leave the hub, and the heads hold.
+  - `ptz` duty: `autoPtz.boot(ctx, { allowed: () => duties.has('ptz') })`.
+  - smoke-wo707's wiring pin was repointed to the new line.
+- **Bug found on the box.** `GET /api/server/duties` answered 404. The router matches in registration order, and
+  Caspar's `routes.get('/api/server/*')` (router.js:452) came before the duties routes, which were registered at :488.
+  - Fix: register the duties routes on the line ahead of `/api/server`. router.js stays at 500 lines.
+  - smoke-wo712 now asserts that order; the lead checked that the assertion fails on the old router.
+  - After the restart: `/api/server/duties` → all seven true, `/api/server` (Caspar state) still answers, and
+    `/api/cluster` `self.duties` is present.
+- **Owner QA.**
+  - Devices → SERVERS → "THIS SERVER DOES": untick **Lighting out**, and the DMX viewer / node shows no Art-Net from
+    this box while the previs beams still move. Tick it back on.
+  - The panel layout (2 columns) has not been looked at on screen.
