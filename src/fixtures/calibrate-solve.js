@@ -291,7 +291,7 @@ function solveOffsets(pts, forward, opts = {}) {
 		errors_deg: errs.map(r2),
 		place,
 		warning: place
-			? `The marks do not agree on one offset — the head is not where it is patched: they fit it at X ${place.x}  Y ${place.y}. Measure it, or Move head there.`
+			? `The marks do not agree on one offset — the head is not where it is patched: the marks put it near X ${place.x}  Y ${place.y} — check its position in the patch.`
 			: rms > 2
 				? 'The marks do not agree on one offset — check where the head is patched (position, hang) and that the beam was on each mark.'
 				: Math.abs(wrap(pick.q[1])) > 45
@@ -303,8 +303,8 @@ function solveOffsets(pts, forward, opts = {}) {
 /**
  * WO-700 R4 (owner 23.10: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt") — when no single offset
  * fits, the head is not where it is patched: one offset then turns the beam onto the marks on one side and misses the
- * other side. With 3+ marks, solve its floor position (x, y; height, yaw and hang kept) together with the offset.
- * Offered only when it fits clearly better — the operator applies it (the head never moves by itself, R3).
+ * other side. With 3+ marks, find the floor position (x, y; height, yaw and hang kept) the marks put the head at —
+ * a hint in the warning only (R6, owner: "the calibration cant move the position of the fixture in 3d enviroment").
  */
 function solvePlace(pose, q0, resid, rays, rms) {
 	const at = (q) => ({ ...pose, x: q[0], y: q[1] })

@@ -1,9 +1,9 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
-**Status: DONE (2026-10-23, R5 below: smoke-wo700 11/11 (R3's two duplicated tests removed) + wo624, test:ci
+**Status: DONE (2026-10-23, R6 below — the calibration never moves the head; R4's Move head removed: smoke-wo700 11/11 (R3's two duplicated tests removed) + wo624, test:ci
 2858/2859 (known pointer-confine), Godot 21185/0, run-client --check OK; the owner's 4 + 3 live points re-solved
-offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: measure Focus Profile 1, or Move head, then re-check
-marks 2 / 3)**
+offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: calibrate Focus Profile 1 again; if marks 2 / 3 still
+miss, check its patched position by hand)**
 
 Owner, 23.10: *"how to calibrate the heads? it should be done by pointing the lights at markers in real life than
 clicking this position of pan tilt is this marker and it calibrates"*
@@ -141,7 +141,7 @@ then changing where the beam points."*
 - Box: API start / point / end on Focus Profile 1 → reads (1.06°, −0.53°), returns `{offset}` only; patch unchanged.
 - NOT verified: a real head on real marks — owner QA (restart the GUI first: the running one has the R2 client).
 
-## R4 — one offset cannot fix a head patched in the wrong spot (23.10)
+## R4 — one offset cannot fix a head patched in the wrong spot (23.10) — Move head SUPERSEDED by R6
 
 Owner: "yes it has offset but the offset is calculated wrong" → "mark 1 and 4 calibrated position correctly but 2
 and 3 didnt point to the actual marks on the 3d."
@@ -215,3 +215,15 @@ Owner: "the focus 1 now seems to be reacted like its been repositioned / 2nd is 
 
 - `smoke-wo700` 11/11; the new R5 test (a misplaced head, 1..3 marks, every solve |pan|, |tilt| < 45°) fails on the
   R4 solver (2 marks → −176.65°, −61.26°) and passes now. The owner's 2 live points → (12.18°, −8.35°); 4 old → same as R4.
+
+## R6 — the calibration never moves the head (23.10)
+
+Owner: "the calibration cant move the position of the fixture in 3d enviroment, just make it point the beam at the mark."
+
+- R4's "Move head to X Y" button and `apply_solve`'s `place` branch removed (`calibrate_section.gd`,
+  `follow_model.gd`): a Lighting calibration only ever writes the pan / tilt offset (least squares over the marks).
+- `place` stays in the server solve as a hint: the warning reads "…the head is not where it is patched: the marks
+  put it near X … Y … — check its position in the patch." That way the operator knows why one offset misses some
+  marks; any change to the position is done by hand in the patch.
+- Verified: smoke-wo700 11/11 (R4 test now pins the hint wording); Godot 21184/0 (a solve with `place` keeps the
+  pose, sets only the offset); `run-client.sh --check` OK.

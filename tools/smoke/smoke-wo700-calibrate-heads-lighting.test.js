@@ -10,7 +10,8 @@
  * points"): the solve is the head's pan / tilt offset, never its pose — from one mark the previs's beam (gdtf-ik.js
  * chain, test-spot.xml) lands where the real one does; decodeVisual draws with it and Point at aims with it.
  * R4 (owner 23.10: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): from 3 marks that no single
- * offset fits, the solve offers where the head stands (x, y + offset) for the operator's Move head.
+ * offset fits, the warning names where the marks put the head (`place`, x, y + offset); R6: a hint only — the
+ * calibration never moves the head.
  */
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
@@ -165,7 +166,7 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.equal(r.solve.warning, null)
 	})
 
-	it('R4: a head patched in the wrong spot — the marks offer where it stands; Move head lands every mark', async () => {
+	it('R4: a head patched in the wrong spot — the warning names where the marks put it (a hint, R6)', async () => {
 		// live 23.10 (owner: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): the real head stood
 		// ~2 m from its patch; one offset turned the beam onto the marks on one side only
 		const REAL = { ...POSE, x: 2.5, y: -1.5 }
@@ -182,7 +183,7 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		const { place } = r.solve
 		assert.ok(Math.hypot(place.x - REAL.x, place.y - REAL.y) < 0.05, JSON.stringify(place))
 		assert.ok(Math.abs(place.offset.pan - REAL_OFFSET.pan) < 0.5 && Math.abs(place.offset.tilt - REAL_OFFSET.tilt) < 0.5)
-		assert.match(r.solve.warning, /not where it is patched/)
+		assert.match(r.solve.warning, /not where it is patched.*check its position in the patch/)
 		const moved = { ...fx, pose: { ...fx.pose, x: place.x, y: place.y } }
 		for (const [k, p] of r.points.entries())
 			assert.ok(miss(moved, p.pan, p.tilt, place.offset, MARKS[k]) < 0.05, `mark ${k + 1}`)

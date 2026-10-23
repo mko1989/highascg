@@ -234,9 +234,6 @@ static func apply_solve(fx: Dictionary, solve: Dictionary) -> Dictionary:
 		out.offset = {"pan": float(o.pan), "tilt": float(o.tilt)}
 		if out.offset.pan == 0.0 and out.offset.tilt == 0.0:
 			out.erase("offset")
-		if solve.get("place") is Dictionary:  # R4: Move head — where the marks put it (height, yaw, hang kept)
-			out.pose.x = float(solve.place.x)
-			out.pose.y = float(solve.place.y)
 		return out
 	var p: Dictionary = solve.pose
 	for k in ["x", "y", "z", "yaw"]:
@@ -256,9 +253,6 @@ static func calib_summary(sess: Dictionary) -> String:
 	if s.get("offset") is Dictionary:  # WO-700 R3
 		var line := "%d point%s · beam offset pan %+.1f°  tilt %+.1f° (fit %.2f°)" % [n, "" if n == 1 else "s",
 			float(s.offset.pan), float(s.offset.tilt), float(s.get("rms_deg", 0.0))]
-		if s.get("place") is Dictionary:
-			line += "\nMoved there it fits %.2f° (beam offset pan %+.1f°  tilt %+.1f°)." % [float(s.place.rms_deg),
-				float(s.place.offset.pan), float(s.place.offset.tilt)]
 		return line + ("\n" + str(s.warning) if s.get("warning") is String and str(s.warning) != "" else "")
 	var p: Dictionary = s.pose
 	var txt := "%d points · fit %.2f° RMS (max %.2f°) → X %.2f  Y %.2f  Z %.2f  yaw %.1f°" % [n, float(s.rms_deg),
