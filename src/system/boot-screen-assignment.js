@@ -465,6 +465,7 @@ function startBootScreenGate(ctx, deps = {}) {
 
 module.exports = {
 	STATE_KEY,
+	bootId,
 	HOLD_FILE,
 	startupMode,
 	TIMEOUT_S,

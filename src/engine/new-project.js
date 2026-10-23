@@ -79,6 +79,41 @@ function keepOperatorVideoOutput(hardwareConfig, cfg) {
 }
 
 /**
+ * WO-718 (owner 23.10): the operator monitor chosen at the boot prompt (WO-638) or with the picker is a property of the
+ * box, so a New project comes up with it already cabled in Devices — dst_in_<operator dest> → gpu_p<port-1> — plus
+ * the WO-412 flags that cable implies (operator_monitor one-hot, that jack not always-on-top, interactive). The
+ * factory graph has no connectors, so the live gpu_out rows (hardware, like the WO-579 topology) come along.
+ * Port: the live flag (the boot answer's durable form), else this boot's boot-screen record. Neither → no cable.
+ * @param {object} hardwareConfig the starter config (replaced fields, returned)
+ * @param {object} cfg live config
+ * @param {object} persistence
+ * @returns {object} hardwareConfig, cabled when a port is known
+ */
+function seedOperatorMonitorCable(hardwareConfig, cfg, persistence) {
+	const { resolveFlagPort } = require('../utils/operator-monitor-resolve')
+	const picker = require('../system/operator-monitor-picker')
+	let port = resolveFlagPort(cfg || {})
+	if (!port) {
+		const boot = require('../system/boot-screen-assignment')
+		const rec = persistence?.get?.(boot.STATE_KEY)
+		if (rec?.bootId && rec.bootId === boot.bootId() && Number.isInteger(rec.port)) port = rec.port
+	}
+	if (!port || port > picker.MAX_OPERATOR_PORT) return hardwareConfig
+	const graph = hardwareConfig.deviceGraph || {}
+	const have = new Set((graph.connectors || []).map((c) => c?.id))
+	const gpuRows = (cfg?.deviceGraph?.connectors || []).filter((c) => c?.kind === 'gpu_out' && !have.has(c.id))
+	const withGpu = {
+		...hardwareConfig,
+		deviceGraph: { ...graph, connectors: [...(graph.connectors || []), ...JSON.parse(JSON.stringify(gpuRows))] },
+	}
+	const next = picker.applyOperatorMonitorChoice(withGpu, port)
+	if (!(next.deviceGraph?.edges || []).some((e) => e?.sinkId === `gpu_p${port - 1}`)) return hardwareConfig
+	next.casparServer[`screen_${port}_always_on_top`] = false
+	next.casparServer[`screen_${port}_interactive`] = true
+	return next
+}
+
+/**
  * Apply starter routing and persist empty Untitled project.
  * @param {object} ctx
  * @returns {{ project: object, slug: string }}
@@ -115,7 +150,7 @@ function createNewProject(ctx) {
 		/* optional */
 	}
 
-	const { hardwareConfig } = buildStarterHardwareConfig(persistence)
+	let { hardwareConfig } = buildStarterHardwareConfig(persistence)
 
 	/* The GPU bracket map (gpuPhysicalTopology) is a property of THIS machine's card, not of a show:
 	 * the factory config carries the generic `__generic__` rows (defaults-core.js resolves them with
@@ -127,6 +162,7 @@ function createNewProject(ctx) {
 	if (liveTopology) hardwareConfig.gpuPhysicalTopology = liveTopology
 	else delete hardwareConfig.gpuPhysicalTopology
 	keepOperatorVideoOutput(hardwareConfig, ctx.configManager.get())
+	hardwareConfig = seedOperatorMonitorCable(hardwareConfig, ctx.configManager.get(), persistence)
 
 	if (!applyHardwareConfigToCtx(ctx, hardwareConfig)) {
 		throw new Error('Failed to apply starter hardware configuration')

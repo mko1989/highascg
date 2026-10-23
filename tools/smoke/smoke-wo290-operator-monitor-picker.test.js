@@ -239,16 +239,27 @@ describe('WO-290 persistence shape', () => {
 		assert.equal(before.deviceGraph.edges.length, 2)
 	})
 
-	it('missing connectors or no operator_gui destination: flag persists, graph untouched', () => {
+	it('missing GPU jack or no operator_gui destination: flag persists, graph untouched', () => {
 		const g = { connectors: [{ id: 'gpu_p1' }], edges: [{ id: 'keep', sourceId: 'x', sinkId: 'y' }] }
 		const noDest = applyOperatorMonitorChoice({ deviceGraph: g }, 2)
 		assert.deepEqual(noDest.deviceGraph.edges, g.edges)
-		const noConn = applyOperatorMonitorChoice(
+		const noJack = applyOperatorMonitorChoice(
+			{ screenDestinations: { destinations: [{ id: 'dst_op_1', mode: 'operator_gui' }] }, deviceGraph: g },
+			3,
+		)
+		assert.deepEqual(noJack.deviceGraph.edges, g.edges)
+		assert.equal(noJack.casparServer.screen_3_operator_monitor, true)
+	})
+
+	it('WO-718: a missing destination input row is added, so the choice still shows as a cable', () => {
+		const g = { connectors: [{ id: 'gpu_p1' }], edges: [{ id: 'keep', sourceId: 'x', sinkId: 'y' }] }
+		const next = applyOperatorMonitorChoice(
 			{ screenDestinations: { destinations: [{ id: 'dst_op_1', mode: 'operator_gui' }] }, deviceGraph: g },
 			2,
 		)
-		assert.deepEqual(noConn.deviceGraph.edges, g.edges)
-		assert.equal(noConn.casparServer.screen_2_operator_monitor, true)
+		assert.deepEqual(next.deviceGraph.edges, [...g.edges, { id: 'e_dst_in_dst_op_1_gpu_p1', sourceId: 'dst_in_dst_op_1', sinkId: 'gpu_p1' }])
+		assert.equal(next.deviceGraph.connectors.find((c) => c.id === 'dst_in_dst_op_1')?.kind, 'destination_in')
+		assert.equal(g.connectors.length, 1, 'input untouched')
 	})
 })
 

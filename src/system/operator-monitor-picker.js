@@ -33,6 +33,7 @@ const { spawn } = require('child_process')
 const { REPO_ROOT } = require('../repo-paths')
 const { resolveOperatorMonitorRect, pointerInRect } = require('../utils/x-display-session-layout')
 const { resolveFlagPort } = require('../utils/operator-monitor-resolve')
+const { DEST_DEVICE_ID } = require('../config/device-graph-constants')
 const { displaySessionEnv } = require('../utils/x-display-session-runtime')
 
 const PICKER_SCRIPT = path.join(REPO_ROOT, 'tools/runtime/operator-monitor-picker.py')
@@ -279,9 +280,11 @@ function applyOperatorMonitorChoice(config, port) {
  * Wires the operator_gui destination's input connector (`dst_in_<destId>`) to the picked GPU
  * jack (`gpu_p<port-1>` — flag port is 1-based, jack ids are slotOrder) in config.deviceGraph.
  * Any prior cable on either endpoint is replaced (one monitor, one jack — mirrors the physical
- * reality of the click). Never invents connectors: if either endpoint is missing from the graph
- * (fresh box before the boot hardware sync), the flag alone still drives the launcher and this
- * returns the config unchanged.
+ * reality of the click). The GPU jack is hardware and is never invented: when `gpu_p<port-1>` is
+ * missing (fresh box before the boot hardware sync), the flag alone still drives the launcher and
+ * this returns the config unchanged. The destination's own input row IS added when missing (WO-718):
+ * a factory / New-project graph has none, and the boot sync only adds hardware rows, so without it the
+ * boot answer never showed as a cable — same row shape as device-graph-suggest.js.
  * @param {object} config
  * @param {number} port 1-based GPU port index
  * @returns {object}
@@ -296,15 +299,26 @@ function wireOperatorGuiGraphEdge(config, port) {
 	const srcId = `dst_in_${dest.id}`
 	const gpuId = `gpu_p${port - 1}`
 	const connectors = Array.isArray(graph.connectors) ? graph.connectors : []
-	const hasSrc = connectors.some((c) => String(c?.id || '') === srcId)
 	const hasGpu = connectors.some((c) => String(c?.id || '') === gpuId)
-	if (!hasSrc || !hasGpu) return config
+	if (!hasGpu) return config
+	const nextGraph = { ...graph }
+	if (!connectors.some((c) => String(c?.id || '') === srcId)) {
+		const devices = Array.isArray(graph.devices) ? graph.devices : []
+		if (!devices.some((d) => d?.id === DEST_DEVICE_ID)) {
+			nextGraph.devices = [...devices, { id: DEST_DEVICE_ID, role: 'destinations', label: 'Screen destinations' }]
+		}
+		nextGraph.connectors = [
+			...connectors,
+			{ id: srcId, deviceId: DEST_DEVICE_ID, kind: 'destination_in', label: String(dest.label || dest.id).slice(0, 120), externalRef: dest.id },
+		]
+	}
 	const edges = Array.isArray(graph.edges) ? graph.edges : []
 	const nextEdges = edges.filter(
 		(e) => String(e?.sourceId || '') !== srcId && String(e?.sinkId || '') !== gpuId,
 	)
 	nextEdges.push({ id: `e_${srcId}_${gpuId}`, sourceId: srcId, sinkId: gpuId })
-	return { ...config, deviceGraph: { ...graph, edges: nextEdges } }
+	nextGraph.edges = nextEdges
+	return { ...config, deviceGraph: nextGraph }
 }
 
 /**
