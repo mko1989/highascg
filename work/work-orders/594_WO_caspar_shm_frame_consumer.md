@@ -270,3 +270,22 @@ smoke ran on ch1 (`ADD 5-740` correctly answers 400 here — no ch5).
 | 1 h soak (21.10, `opgui`, build v2, Godot client reading alongside) | **fps PASS, gaps 8 vs 0** — 3600 s, 179 990 frames (180 000 expected), fps 50.00, lapped 0, torn 0, latency p50 2.61 / p95 3.71 ms; 8 skipped seqs (the python probe polling late, once per ~7.5 min on average — `lapped 0` means no slot was overwritten under it). `writer_dropped` read **169** at the end and stayed 169 through a 60 s probe right after; Caspar had been up since 20.10 17:43, so the soak cannot place them |
 | 1 h soak #2 (21.10 04:23–05:23, per-2 s-window counters) | **PASS for the transport** — 179 998 frames, fps 50.00, lapped 0, torn 0, p50 2.63 / p95 3.77 ms; `writer_dropped` 169 in all 1800 windows → **the writer dropped nothing in the hour** (the 169 predate both soaks); 3 skipped seqs, all in ONE 2 s window ~34 min in (one ~60 ms stall of the python probe). Reader-side gaps are the probe's scheduling, not the segment's; the Godot client reads natively |
 | ADD/REMOVE on an on-air PGM, channel frame-time delta | not run (maintenance window) |
+
+## Acceptance re-run (2026-10-23) — owner: "prepare the wo-594 tests then test it"
+
+Tool: `tools/hshm-bridge/wo594_acceptance.py` (index 749 = diagnostics, never a leased role; always REMOVEs).
+`cpu` alternates off / on windows and measures the Caspar process AND the consumer's own worker thread (the task
+that appears on ADD) — the thread is the direct cost; the 17.10 process-only numbers swung 63–72 % and hid it.
+`addremove` cycles ADD / REMOVE on a channel while reading Caspar's OSC copy (:6250): tick spacing and the other
+consumers' frame counters vs an equal quiet baseline, plus the Caspar log. (Caspar 2.5.1 sends no profiler OSC.)
+
+Box now has 5 channels: 1 PGM 3072×1024, 2 PRV 3072×1024, 3 opgui 1080p50 (config shm 740), 4 / 5 DeckLink inputs
+1080p50 (leased shm 751 / 752).
+
+| Check | Result |
+|-------|--------|
+| CPU, ch5 1080p50, 6 × 10 s off / on | worker thread **6.98 % of a core** (6.6–7.3); process 92.7 → 102.8 % (**+10.1 %**) → ~3 % lands outside the copy (the readback the consumer makes the channel do) — **FAIL vs < 3 %** |
+| memcpy bound (C bench into a 3-slot /dev/shm mapping, hot source) | 1080p 0.47 ms = 2.3 %; streaming stores 0.23 ms = 1.2 %. 3072×1024: 4.4 % / 2.0 %. In Caspar the copy takes ~1.4 ms: the source is the readback buffer (`accelerator/ogl/util/buffer.cpp:55`, `GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_MAP_READ_BIT`), freshly DMA'd → cold or uncached reads dominate |
+| ADD / REMOVE on PGM ch1 | next (tool ready) |
+
+Next: streaming-load (`MOVNTDQA`) + streaming-store copy for the coherent-mapped source, rebuild v2, swap, re-run `cpu`.
