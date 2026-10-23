@@ -91,11 +91,16 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
 - [ ] **WO-692:** Settings → Network: Scan, then Join a Wi-Fi network. Set up a port with no cable, then plug the cable
       in: it comes up with those settings.
 
-## D2. Two servers (WO-712 R1)
+## D2. Two servers (WO-712 R1, R2)
 
 - [ ] Devices → SERVERS → **THIS SERVER DOES**: untick **Lighting out**. The DMX viewer / nodes show no Art-Net from this
       box, while the previs beams still move. Tick it back on.
 - [ ] Is the two-column layout readable? Does any label clip?
+- [ ] (WO-712 R2, needs two linked boxes, both on this build) Make the media box master. On the tracking box, set a
+      zone to `look:<a look>` and walk into it. The **media box** takes the look to program, and the tracking box's zone
+      detail reads `look … → master`.
+- [ ] On the media box, untick **Accept remote** and repeat. Nothing is taken, and the zone detail shows `403 this server
+      refuses remote actions`. Tick it back on.
 
 ## E. Next ISO build + live boot on .64 (WO-696, 697, 702, 704, 705)
 
