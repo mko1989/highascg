@@ -11,6 +11,10 @@ Owner, `next.md` 22.10:
   extension for other screen destinations for instance but controlled from a single client. the second server could
   even run in headless mode then."*
 
+> **23.10.26 correction ([WO-712](./712_WO_server_duties_tracking_media.md) investigation):** the Design's *shared project
+> document carried by revision* was never implemented — no phase P1–P4b pushes the project between cluster members (only
+> Send media + take forwarding). It is WO-712 R5 / a WO of its own.
+
 ## Investigation
 
 ### Godot GUI on another machine
