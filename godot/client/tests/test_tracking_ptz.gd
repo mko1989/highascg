@@ -83,3 +83,38 @@ func test_status_line() -> void:
 	t.eq(P.status_line({"state": "idle"}), "idle")
 	t.eq(P.status_line({"state": "following", "pan": 12.34, "tilt": -5.0}), "following  12.3° / -5.0°")
 	t.eq(P.status_line({"state": "error", "error": "no host"}), "error  — no host")
+
+
+## WO-713 R2 — offset_map normalizes like ptz-model.js (smoke-wo713-ptz-calibrate.test.js has the same cases).
+func test_offset_map_normalize() -> void:
+	var good := {"pan": 1.0, "tilt": 2.0, "dpan": 3.0, "dtilt": 4.0}
+	t.eq(P.normalize_camera({}).offset_map, [])
+	var c := P.normalize_camera({"offset_map": [good, {"pan": 1, "tilt": 2, "dpan": 3}, {"pan": null, "tilt": 2, "dpan": 3, "dtilt": 4},
+		{"pan": true, "tilt": 2, "dpan": 3, "dtilt": 4}, {"pan": "x", "tilt": 2, "dpan": 3, "dtilt": 4},
+		{"pan": "5", "tilt": 2, "dpan": 3, "dtilt": 4}, {"pan": 1e9, "tilt": -1e9, "dpan": 999, "dtilt": -999}, "junk", null]})
+	t.eq(c.offset_map.size(), 3, "four real numbers or the pin goes")
+	t.eq(c.offset_map[0], good)
+	t.eq(c.offset_map[1].pan, 5.0, "numeric strings read like the server")
+	t.eq(c.offset_map[2], {"pan": 720.0, "tilt": -360.0, "dpan": 180.0, "dtilt": -180.0}, "clamped")
+	var many := []
+	for i in 50:
+		many.append({"pan": i, "tilt": 0, "dpan": 0, "dtilt": 0})
+	var kept: Array = P.normalize_camera({"offset_map": many}).offset_map
+	t.eq(kept.size(), P.MAX_PINS)
+	t.eq(kept[-1].pan, 49.0, "newest last")
+	t.eq(P.normalize_camera({"offset_map": "nope"}).offset_map, [])
+
+
+func test_aim_lands_on_the_pinned_angles() -> void:
+	var base := P.normalize_camera({"pose": {"x": 0, "y": -8, "z": 2.5, "yaw": 0}})
+	var tg := {"x": 3.0, "y": 2.0, "z": 0.0}
+	var g := P.geom_angles(base, tg)
+	t.eq(P.aim_angles(base, tg).pan, g.pan, "no pins: the geometry")
+	var c := P.normalize_camera({"pose": base.pose, "offset_map": [{"pan": g.pan, "tilt": g.tilt, "dpan": 2.25, "dtilt": -1.5},
+		{"pan": -30, "tilt": -10, "dpan": -4, "dtilt": 3}]})
+	var a := P.aim_angles(c, tg)
+	t.eq(a.pan, g.pan + 2.25)
+	t.eq(a.tilt, g.tilt - 1.5)
+	var wide := P.normalize_camera({"pan": {"min": -5, "max": 5}, "offset_map": [{"pan": 0, "tilt": -9, "dpan": 20, "dtilt": 0}]})
+	var w := P.aim_angles(wide, {"x": 0.0, "y": 0.0, "z": 0.0})
+	t.eq([w.pan, w.clamped], [5.0, true], "still clamped to the range")

@@ -16,6 +16,10 @@
  * WO-712 R1: `allowed()` (default always true) is this server's `ptz` duty. While it is false step() sends nothing and
  * forgets each camera's aim, so the first step after it turns true sends the aim again; status rows carry
  * `blocked_by_server: true`.
+ * WO-713 R2 calibration hold: hold(id, patch) parks a camera on the operator's angles ({ pan, tilt, zoom }, degrees in
+ * the camera frame, as aimAngles gives them): step() sends those instead of the director's target and never asks
+ * targetOf for that camera. A hold lasts HOLD_TTL_MS from its last hold() call (a lost client lets go); release(id)
+ * ends it; holdOf(id) reads it. Held cameras report state 'calibrating'. Sessions / points live in ptz-calibrate.js.
  */
 
 const dgram = require('dgram')
@@ -24,6 +28,7 @@ const { normalizeList, aimAngles, toUnits } = require('./ptz-model')
 
 const MIN_INTERVAL_MS = 100
 const DEADBAND_DEG = 0.3
+const HOLD_TTL_MS = 60000
 const HOST_RE = /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/
 
 function createPtzService({ log = () => {}, send, now = Date.now, allowed = () => true } = {}) {
@@ -44,6 +49,9 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		zoomSent: false,
 		error: null,
 	})
+
+	/** @type {Map<string, { pan: number|null, tilt: number|null, zoom: number|null, until: number }>} calibration holds */
+	const holds = new Map()
 
 	const transportSig = (c) => `${c.protocol}|${c.host}|${c.port}|${c.address}`
 
@@ -92,6 +100,70 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		}
 	}
 
+	/** The live hold of camera id at time t (an expired one is dropped; the fixed zoom is re-armed). */
+	function heldAt(id, t) {
+		const h = holds.get(id)
+		if (!h) return null
+		if (t < h.until) return h
+		holds.delete(id)
+		const r = rt.get(id)
+		if (r) Object.assign(r, { zoomSent: false, heldZoom: null })
+		return null
+	}
+
+	/** Why camera c cannot be driven (null when it can). */
+	function unusable(c) {
+		return !c.enabled ? `${c.name} is not enabled — tick Enabled first` : problem(c)
+	}
+
+	/**
+	 * Park camera id on operator angles (merged into the hold it has; a new hold starts from the angles last sent, or
+	 * none). -> { ok: true, hold } | { ok: false, status: 404 | 409, error }
+	 */
+	function hold(id, patch = {}) {
+		const t = now()
+		const c = cams.find((k) => k.id === id)
+		if (!c) return { ok: false, status: 404, error: `no PTZ camera "${id}"` }
+		const bad = unusable(c)
+		if (bad) return { ok: false, status: 409, error: bad }
+		const r = rt.get(c.id)
+		const h = heldAt(id, t) || { pan: r.pan, tilt: r.tilt, zoom: null, until: 0 }
+		for (const k of ['pan', 'tilt', 'zoom']) if (patch[k] !== undefined) h[k] = patch[k]
+		h.until = t + HOLD_TTL_MS
+		holds.set(id, h)
+		return { ok: true, hold: { pan: h.pan, tilt: h.tilt, zoom: h.zoom, ttl_ms: HOLD_TTL_MS } }
+	}
+
+	function release(id) {
+		const had = holds.delete(id)
+		const r = rt.get(id)
+		if (had && r) Object.assign(r, { zoomSent: false, heldZoom: null })
+		return had
+	}
+
+	function holdOf(id) {
+		const t = now()
+		const h = heldAt(id, t)
+		return h ? { pan: h.pan, tilt: h.tilt, zoom: h.zoom, ttl_ms: Math.max(0, h.until - t) } : null
+	}
+
+	/** One tick of a held camera: the operator's angles at ≤ 10 Hz with the same deadband, a zoom change at once. */
+	function holdStep(c, r, h, t) {
+		if (h.zoom !== null && h.zoom !== r.heldZoom && emit(c, r, visca.zoomDirect(c.address, h.zoom))) r.heldZoom = h.zoom
+		if (h.pan === null || h.tilt === null) return
+		if (r.sentAt !== null && t - r.sentAt < MIN_INTERVAL_MS) return
+		const pan = Math.max(c.pan.min, Math.min(c.pan.max, h.pan))
+		const tilt = Math.max(c.tilt.min, Math.min(c.tilt.max, h.tilt))
+		if (r.state === 'following' && r.pan !== null) {
+			if (Math.abs(pan - r.pan) < DEADBAND_DEG && Math.abs(tilt - r.tilt) < DEADBAND_DEG) return
+		}
+		if (
+			!emit(c, r, visca.panTiltAbsolute(c.address, toUnits(c.pan, pan), toUnits(c.tilt, tilt), c.speed.pan, c.speed.tilt))
+		)
+			return
+		Object.assign(r, { state: 'following', sentAt: t, pan, tilt, error: null })
+	}
+
 	function configure(project) {
 		const list = project?.previs?.tracking?.ptz
 		const sig = JSON.stringify(list ?? null)
@@ -100,6 +172,7 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		cams = normalizeList(list)
 		const ids = new Set(cams.map((c) => c.id))
 		for (const id of [...rt.keys()]) if (!ids.has(id)) rt.delete(id)
+		for (const id of [...holds.keys()]) if (!ids.has(id)) holds.delete(id)
 		for (const c of cams) {
 			const r = rt.get(c.id)
 			if (!r) rt.set(c.id, Object.assign(fresh(), { sig: transportSig(c) }))
@@ -113,7 +186,7 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		if (closed) return
 		if (!allowed()) {
 			for (const r of rt.values())
-				Object.assign(r, { state: 'idle', sentAt: null, pan: null, tilt: null, zoomSent: false })
+				Object.assign(r, { state: 'idle', sentAt: null, pan: null, tilt: null, zoomSent: false, heldZoom: null })
 			return
 		}
 		for (const c of cams) {
@@ -125,6 +198,11 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 				continue
 			}
 			if (r.error && !r.error.startsWith('send:')) r.error = null
+			const held = heldAt(c.id, t)
+			if (held) {
+				holdStep(c, r, held, t)
+				continue
+			}
 			let target = null
 			try {
 				target = targetOf(c.id)
@@ -165,6 +243,12 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		}
 	}
 
+	/** The normalized config of camera id (a copy), or null. */
+	const camera = (id) => {
+		const c = cams.find((k) => k.id === id)
+		return c ? JSON.parse(JSON.stringify(c)) : null
+	}
+
 	const cameras = () => cams.map((c) => ({ id: c.id, name: c.name, enabled: c.enabled, auto: c.auto }))
 
 	function status() {
@@ -175,7 +259,13 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 				id: c.id,
 				name: c.name,
 				enabled: c.enabled,
-				state: !c.enabled ? 'disabled' : r.error && r.state === 'idle' ? 'error' : r.state,
+				state: !c.enabled
+					? 'disabled'
+					: holds.has(c.id) && t < holds.get(c.id).until
+						? 'calibrating'
+						: r.error && r.state === 'idle'
+							? 'error'
+							: r.state,
 				pan: r.pan,
 				tilt: r.tilt,
 				last_sent_ms_ago: r.sentAt === null ? null : Math.max(0, t - r.sentAt),
@@ -197,7 +287,7 @@ function createPtzService({ log = () => {}, send, now = Date.now, allowed = () =
 		}
 	}
 
-	return { configure, step, status, cameras, close }
+	return { configure, step, status, cameras, camera, hold, release, holdOf, close }
 }
 
-module.exports = { createPtzService, MIN_INTERVAL_MS, DEADBAND_DEG }
+module.exports = { createPtzService, MIN_INTERVAL_MS, DEADBAND_DEG, HOLD_TTL_MS }

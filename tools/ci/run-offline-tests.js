@@ -387,6 +387,7 @@ const FILES = [
 	'tools/smoke/smoke-wo711-ptz-visca.test.js',
 	'tools/smoke/smoke-wo712-server-duties.test.js',
 	'tools/smoke/smoke-wo712-cluster-call.test.js',
+	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',
 	'tools/smoke/smoke-wo612-mvr-export.test.js',
 	'tools/smoke/smoke-wo615-gdtf.test.js',

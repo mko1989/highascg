@@ -7,6 +7,7 @@ extends RefCounted
 const PROTOCOLS := ["visca-udp", "visca-ip"]
 const PROTOCOL_LABELS := {"visca-udp": "VISCA raw UDP (PTZOptics, Lumens)", "visca-ip": "VISCA over IP (Sony)"}
 const DEFAULT_PORTS := {"visca-udp": 1259, "visca-ip": 52381}
+const MAX_PINS := 32  # WO-713 R2: offset_map pins per camera
 
 
 ## Only a real `true` (JS `=== true`): 1, "true" are not.
@@ -41,6 +42,47 @@ static func _axis(src: Variant, lo: float, hi: float, upd: float) -> Dictionary:
 	return {"min": a, "max": b, "units_per_deg": _num(o.get("units_per_deg"), upd, 0.01, 1000.0), "invert": _yes(o.get("invert"))}
 
 
+## WO-713 R2: offset_map [{pan, tilt, dpan, dtilt}] — a pin needs four real numbers (int / float / numeric string; null,
+## boolean, missing drop it), clamped like beam-offset.js normalizeMap; at most MAX_PINS, newest last.
+static func normalize_pins(raw: Variant) -> Array:
+	var out: Array = []
+	if not raw is Array:
+		return out
+	for p in raw:
+		if not p is Dictionary:
+			continue
+		var ok := true
+		var v := {}
+		for k in ["pan", "tilt", "dpan", "dtilt"]:
+			var x: Variant = (p as Dictionary).get(k)
+			ok = ok and (x is int or x is float or (x is String and (x as String).strip_edges().is_valid_float()))
+			if ok:
+				var f := float(x) if not x is String else float((x as String).strip_edges())
+				ok = not is_nan(f) and not is_inf(f)
+				v[k] = f
+		if ok:
+			out.append({"pan": clampf(v.pan, -720.0, 720.0), "tilt": clampf(v.tilt, -360.0, 360.0),
+				"dpan": clampf(v.dpan, -180.0, 180.0), "dtilt": clampf(v.dtilt, -180.0, 180.0)})
+	return out.slice(maxi(0, out.size() - MAX_PINS))
+
+
+## beam-offset.js blend: inverse distance² of the pins in (pan, tilt) space; exact on a pin; {0, 0} without pins.
+static func blend(pins: Array, pan: float, tilt: float) -> Dictionary:
+	if pins.is_empty():
+		return {"pan": 0.0, "tilt": 0.0}
+	var w := 0.0
+	var dp := 0.0
+	var dt := 0.0
+	for p in pins:
+		var d2 := (float(p.pan) - pan) ** 2 + (float(p.tilt) - tilt) ** 2
+		if d2 < 1e-12:
+			return {"pan": float(p.dpan), "tilt": float(p.dtilt)}
+		w += 1.0 / d2
+		dp += float(p.dpan) / d2
+		dt += float(p.dtilt) / d2
+	return {"pan": dp / w, "tilt": dt / w}
+
+
 static func normalize_camera(src: Variant, i := 0) -> Dictionary:
 	var o: Dictionary = src if src is Dictionary else {}
 	var pose: Dictionary = o.get("pose") if o.get("pose") is Dictionary else {}
@@ -71,6 +113,7 @@ static func normalize_camera(src: Variant, i := 0) -> Dictionary:
 		"aim_z": _num(o.get("aim_z"), 1.4, -5.0, 10.0),
 		"home": {"preset": _int(home.get("preset"), 0, 0, 127)},
 		"zoom": zoom,
+		"offset_map": normalize_pins(o.get("offset_map")),
 	}
 
 
@@ -105,15 +148,23 @@ static func wrap180(d: float) -> float:
 	return 180.0 if r == -180.0 else r
 
 
-## {pan, tilt, clamped}: degrees (+ right / + up) pointing the camera at target {x, y, z} (aim_z added), clamped to its ranges.
-static func aim_angles(cam: Dictionary, target: Dictionary) -> Dictionary:
+## {pan, tilt}: the pure geometry (unclamped, pan wrapped) pointing the camera at target {x, y, z} (aim_z added).
+static func geom_angles(cam: Dictionary, target: Dictionary) -> Dictionary:
 	var dx := float(target.x) - float(cam.pose.x)
 	var dy := float(target.y) - float(cam.pose.y)
 	var dz := float(target.z) + float(cam.aim_z) - float(cam.pose.z)
 	var horiz := sqrt(dx * dx + dy * dy)
 	var bearing: float = float(cam.pose.yaw) if horiz < 1e-6 else rad_to_deg(atan2(dx, dy))
-	var pan_want := wrap180(bearing - float(cam.pose.yaw))
-	var tilt_want := rad_to_deg(atan2(dz, horiz)) - float(cam.pose.pitch)
+	return {"pan": wrap180(bearing - float(cam.pose.yaw)), "tilt": rad_to_deg(atan2(dz, horiz)) - float(cam.pose.pitch)}
+
+
+## {pan, tilt, clamped}: degrees (+ right / + up) pointing the camera at target {x, y, z} (aim_z added): the geometry
+## plus the offset_map blend at those geometric angles, clamped to the ranges.
+static func aim_angles(cam: Dictionary, target: Dictionary) -> Dictionary:
+	var g := geom_angles(cam, target)
+	var o := blend(cam.get("offset_map", []), g.pan, g.tilt)
+	var pan_want: float = g.pan + o.pan
+	var tilt_want: float = g.tilt + o.tilt
 	var pan := clampf(pan_want, cam.pan.min, cam.pan.max)
 	var tilt := clampf(tilt_want, cam.tilt.min, cam.tilt.max)
 	return {"pan": pan, "tilt": tilt, "clamped": pan != pan_want or tilt != tilt_want}

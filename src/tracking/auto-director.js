@@ -392,6 +392,11 @@ function createAutoDirector(deps = {}) {
 		setPtz(svc) {
 			ptz = svc || null
 		},
+		/** WO-713 R2: the PTZ service (calibration holds) and the hub's marker by id, for the calibrate routes. */
+		get ptzService() {
+			return ptz
+		},
+		markerOf: (id) => hub?.markers.get(id),
 		get file() {
 			return file
 		},

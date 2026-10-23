@@ -8,6 +8,7 @@ signal edit(list: Array)
 
 const P := preload("res://features/previs/tracking/ptz_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const CalFold := preload("res://features/previs/tracking/ptz_calibrate_fold.gd")  # WO-713 R2
 
 ## [label, path, min, max, step]
 const FIELDS := [["Port", "port", 1, 65535, 1], ["Camera address (1-7)", "address", 1, 7, 1],
@@ -35,6 +36,7 @@ var _host: LineEdit
 var _spins := {}
 var _checks := {}
 var _state: Label
+var _cal: CalFold
 var _confirm_del: ConfirmationDialog
 
 
@@ -91,6 +93,9 @@ func _ready() -> void:
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_state)
+	_cal = CalFold.new()
+	_cal.done.connect(_on_calibrated)
+	add_child(_cal)
 	Ws.message.connect(_on_ws)
 	Ws.connected.connect(reload_status)
 	visibility_changed.connect(func() -> void:
@@ -173,6 +178,15 @@ func _add() -> void:
 	_commit()
 
 
+## The calibration fold's Done: its session's pins become that camera's offset_map (same save path as any edit).
+func _on_calibrated(cam_id: String, pins: Array) -> void:
+	for i in cams.size():
+		if cams[i].id == cam_id:
+			cams[i].offset_map = P.normalize_pins(pins)
+			_commit()
+			return
+
+
 func _delete() -> void:
 	if sel < cams.size():
 		cams.remove_at(sel)
@@ -188,6 +202,7 @@ func refresh() -> void:
 	for c in cams:
 		_list.add_item("%s%s" % [c.name, "" if c.enabled else " (off)"])
 	_form.visible = not cams.is_empty()
+	_cal.set_camera({} if cams.is_empty() else cams[sel])
 	if cams.is_empty():
 		_show_state()
 		return

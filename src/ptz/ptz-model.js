@@ -13,7 +13,10 @@
  *           tilt: { min, max, units_per_deg, invert },  (-30…90, 14.4)
  *           speed: { pan 1-24 (12), tilt 1-20 (10) },
  *           aim_z (1.4 m above the floor point), home: { preset 0-127 (0 = the VISCA Home command) },
- *           zoom: null | 0…65535 (a fixed zoom position, sent when following starts) }]
+ *           zoom: null | 0…65535 (a fixed zoom position, sent when following starts),
+ *           offset_map: [{ pan, tilt, dpan, dtilt }] (WO-713 R2: "camera is on the person at <mark>" pins — at those
+ *             geometric angles the camera needs dpan / dtilt more; blended by inverse distance² in pan / tilt space,
+ *             beam-offset.js blend; at most 32, newest last; written by the client) }]
  *
  * Defaults match a PTZOptics unit: pan ±170° = ±2448 units and tilt −30…+90° at the same 14.4 units / degree
  * (derived, not read off a camera — see WO-711). Sony BRC / EVI units use other scales; the operator edits
@@ -22,6 +25,9 @@
  */
 
 const { PROTOCOLS, DEFAULT_PORTS } = require('./visca')
+const { normalizeMap, blend } = require('../fixtures/beam-offset')
+
+const MAX_PINS = 32
 
 const DEG = 180 / Math.PI
 
@@ -37,6 +43,14 @@ function axis(a, min, max, upd) {
 	let hi = num(o.max, max, -360, 360)
 	if (lo > hi) [lo, hi] = [hi, lo]
 	return { min: lo, max: hi, units_per_deg: num(o.units_per_deg, upd, 0.01, 1000), invert: o.invert === true }
+}
+
+/** offset_map -> the pins kept: each needs four real numbers (a missing / null / boolean one drops the pin), clamped. */
+function normalizePins(raw) {
+	if (!Array.isArray(raw)) return []
+	const real = (v) => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && Number.isFinite(Number(v))
+	const ok = raw.filter((p) => p && typeof p === 'object' && ['pan', 'tilt', 'dpan', 'dtilt'].every((k) => real(p[k])))
+	return normalizeMap(ok).slice(-MAX_PINS)
 }
 
 function normalizeCamera(raw, i = 0) {
@@ -68,6 +82,7 @@ function normalizeCamera(raw, i = 0) {
 		aim_z: num(o.aim_z, 1.4, -5, 10),
 		home: { preset: int(home.preset, 0, 0, 127) },
 		zoom,
+		offset_map: normalizePins(o.offset_map),
 	}
 }
 
@@ -94,19 +109,28 @@ function wrap180(d) {
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
 
 /**
- * Pan / tilt degrees (camera frame, + right / + up) that point the camera at a stage point, clamped to its ranges.
- * target = { x, y, z } PSN metres (z = the floor point; aim_z is added). `clamped` is true when a range cut the aim.
- * A target straight above / below the camera keeps pan 0.
+ * The pure geometry: pan / tilt degrees (camera frame, + right / + up, unclamped, pan wrapped) that point the camera
+ * at target { x, y, z } PSN metres (the floor point; aim_z is added). Straight above / below keeps pan 0.
  */
-function aimAngles(cam, target) {
+function geomAngles(cam, target) {
 	const dx = Number(target.x) - cam.pose.x
 	const dy = Number(target.y) - cam.pose.y
 	const dz = Number(target.z) + cam.aim_z - cam.pose.z
 	const horiz = Math.hypot(dx, dy)
 	// yaw 0 faces +Y (upstage), 90 faces +X (stage left): bearing = atan2(dx, dy), clockwise seen from above.
 	const bearing = horiz < 1e-6 ? cam.pose.yaw : Math.atan2(dx, dy) * DEG
-	const panWant = wrap180(bearing - cam.pose.yaw)
-	const tiltWant = Math.atan2(dz, horiz) * DEG - cam.pose.pitch
+	return { pan: wrap180(bearing - cam.pose.yaw), tilt: Math.atan2(dz, horiz) * DEG - cam.pose.pitch }
+}
+
+/**
+ * Pan / tilt degrees to send for a stage point: geomAngles + the offset_map blend at those geometric angles (WO-713
+ * R2; exact on a pin), then clamped to the camera's ranges. `clamped` is true when a range cut the aim.
+ */
+function aimAngles(cam, target) {
+	const g = geomAngles(cam, target)
+	const o = blend(cam.offset_map || [], g.pan, g.tilt)
+	const panWant = g.pan + o.pan
+	const tiltWant = g.tilt + o.tilt
 	const pan = clamp(panWant, cam.pan.min, cam.pan.max)
 	const tilt = clamp(tiltWant, cam.tilt.min, cam.tilt.max)
 	return { pan, tilt, clamped: pan !== panWant || tilt !== tiltWant }
@@ -118,4 +142,4 @@ function toUnits(axisCfg, deg) {
 	return clamp(u === 0 ? 0 : u, -32768, 32767)
 }
 
-module.exports = { normalizeCamera, normalizeList, aimAngles, toUnits, wrap180 }
+module.exports = { normalizeCamera, normalizeList, normalizePins, geomAngles, aimAngles, toUnits, wrap180, MAX_PINS }

@@ -6,12 +6,29 @@
  *   POST /api/tracking/auto/pin  { key, slot }          slot 1–9 pins the person, 0 unpins
  *   POST /api/tracking/auto/slot { slot, heads?, ptz? } heads 0 = share; ptz = camera ids
  *   POST /api/tracking/auto/home { after_s?, now? }
+ *   GET  /api/tracking/ptz/calibrate        → { sessions: [...] } open PTZ calibrations (WO-713 R2)
+ *   POST /api/tracking/ptz/calibrate { action: start|jog|point|undo|clear|end, id, ... }  see src/ptz/ptz-calibrate.js
  * Every POST answers with the new snapshot. WS `tracking:auto` = the snapshot, ≤ 5 Hz and only when it changed.
  */
+
+const { createPtzCalibrate } = require('../ptz/ptz-calibrate')
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const AUTO_EVENT = 'tracking:auto'
 const AUTO_MS = 200
+
+const CAL_PATH = '/api/tracking/ptz/calibrate'
+const calibrators = new WeakMap() // ptz service → its calibration sessions
+
+/** WO-713 R2: the calibration sessions of the director's current PTZ service (null without one). */
+function calibratorOf(director) {
+	const svc = director?.ptzService
+	if (!svc) return null
+	if (!calibrators.has(svc)) {
+		calibrators.set(svc, createPtzCalibrate({ ptz: svc, markerOf: (id) => director.markerOf(id) }))
+	}
+	return calibrators.get(svc)
+}
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
@@ -23,6 +40,10 @@ function handleAuto(director, { method, path, body }) {
 }
 
 function handleGet(director, path) {
+	if (path === CAL_PATH) {
+		const cal = calibratorOf(director)
+		return cal ? reply(200, { sessions: cal.list() }) : reply(503, { error: 'PTZ service not running' })
+	}
 	if (path === '/api/tracking/auto') {
 		return director ? reply(200, director.snapshot()) : reply(503, { error: 'auto director not running' })
 	}
@@ -31,11 +52,14 @@ function handleGet(director, path) {
 
 function handlePost(director, path, body) {
 	let op = null
-	if (path === '/api/tracking/auto/pin') op = 'pin'
+	if (path === CAL_PATH) op = 'calibrate'
+	else if (path === '/api/tracking/auto/pin') op = 'pin'
 	else if (path === '/api/tracking/auto/slot') op = 'slot'
 	else if (path === '/api/tracking/auto/home') op = 'home'
 	if (!op) return null
 	if (!director) return reply(503, { error: 'auto director not running' })
+	const cal = op === 'calibrate' ? calibratorOf(director) : null
+	if (op === 'calibrate' && !cal) return reply(503, { error: 'PTZ service not running' })
 	let data
 	try {
 		data = JSON.parse(body || '{}')
@@ -44,7 +68,7 @@ function handlePost(director, path, body) {
 	}
 	if (!data || typeof data !== 'object' || Array.isArray(data))
 		return reply(400, { error: 'body must be a JSON object' })
-	const r = director[op](data)
+	const r = cal ? cal.handle(data) : director[op](data)
 	return reply(r.status, r.body)
 }
 
