@@ -213,14 +213,4 @@ function buildWifiStatus(deps = {}) {
 	}
 }
 
-module.exports = {
-	isWifiIface,
-	splitTerse,
-	parseIpAddr,
-	parseNmDevices,
-	parseNmProfiles,
-	parseProfileIpv4,
-	parseWifiList,
-	listNetworkInterfaces,
-	buildWifiStatus,
-}
+module.exports = { isWifiIface, listNetworkInterfaces, buildWifiStatus }

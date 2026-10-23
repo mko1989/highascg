@@ -71,8 +71,6 @@ function decodeSacnDiscovery(buf) {
 }
 
 module.exports = {
-	OP_POLL,
-	OP_POLL_REPLY,
 	SACN_DISCOVERY_UNIVERSE,
 	SACN_DISCOVERY_GROUP,
 	encodeArtPoll,
