@@ -7,10 +7,14 @@
  * The engine runs whether or not a client is open, like the follow engine.
  * WO-712 R1: with this server's `zones` duty off (src/cluster/server-duties.js, `deps.duties`) occupancy is still evaluated
  * and shown, and each transition is still logged in `recent`, but no action runs (detail says so).
+ * WO-712 R4: it also runs the "on air" rules (air-rules.js, `zones.on_air`), under the same duty. `onAir(source, looks)`
+ * is fed by this server's takes and a linked playout server's air state (src/cluster/air-state.js); it is reachable as
+ * `ctx.zoneService` while the tracking module runs.
  */
 
 const { ZoneEngine } = require('./zone-engine')
 const { parseAction, runAction } = require('./zone-actions')
+const { createAirRules } = require('./air-rules')
 const { onProjectChanged } = require('../engine/project-events')
 
 const EVAL_MS = 100
@@ -51,6 +55,12 @@ function createZoneService(ctx, hub, deps = {}) {
 		}
 		return { ok, detail: `${r.name}: ${out.join('; ') || 'no actions'}` }
 	}
+	const air = createAirRules({ parse: parseAction, run: (a) => runAction(a, ctx, deps), allowed: actionsOn, log, now: deps.now })
+	try {
+		air.update('self', (deps.programLooks || require('../cluster/air-state').programLooks)(ctx)) // seed: on air at start fires nothing
+	} catch (e) {
+		log('warn', '[on-air] seed: ' + (e?.message || e))
+	}
 	let lastJson = ''
 	const apply = (project) => {
 		const slice = project?.previs?.tracking?.zones ?? null
@@ -62,6 +72,10 @@ function createZoneService(ctx, hub, deps = {}) {
 		log('info', `[zones] ${engine.config.list.length} zone(s), engine ${engine.config.enabled ? 'ON' : 'off'}`)
 		for (const z of engine.config.list) {
 			for (const [k, a] of Object.entries(parsed.get(z.id))) if (a?.type === 'invalid') log('warn', `[zones] ${z.name} ${k}: ${a.error}`)
+		}
+		for (const r of air.configure(slice?.on_air)) {
+			const a = parseAction(r.do)
+			if (a?.type === 'invalid' || a?.type === 'presenter') log('warn', `[on-air] ${r.when || r.id}: ${a.error || 'presenter needs a marker'}`)
 		}
 	}
 	if (deps.project !== undefined) apply(deps.project)
@@ -79,19 +93,24 @@ function createZoneService(ctx, hub, deps = {}) {
 		timer = setInterval(tick, EVAL_MS)
 		if (typeof timer.unref === 'function') timer.unref()
 	}
-	return {
+	const service = {
 		engine,
 		tick,
+		onAir: (source, looks) => air.update(source, looks),
 		/** WS `tracking:zones` / GET: occupancy only, so it changes only on a transition. */
 		snapshot: () => ({ enabled: engine.config.enabled, ...(actionsOn() ? {} : { actions_off: true }), zones: engine.states() }),
 		status: () => ({ enabled: engine.config.enabled, actions_off: !actionsOn(), eval_hz: Math.round(1000 / EVAL_MS), debounce_ms: engine.config.debounce_ms,
-			hysteresis: engine.config.hysteresis, zones: engine.states(), recent }),
+			hysteresis: engine.config.hysteresis, zones: engine.states(), recent,
+			on_air: { rules: air.rules().length, now: air.onAir(), recent: air.recent() } }),
 		stop() {
 			off()
 			if (timer) clearInterval(timer)
 			timer = null
+			if (ctx?.zoneService === service) delete ctx.zoneService
 		},
 	}
+	if (ctx) ctx.zoneService = service
+	return service
 }
 
 module.exports = { createZoneService, EVAL_MS }

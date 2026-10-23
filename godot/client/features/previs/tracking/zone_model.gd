@@ -3,13 +3,16 @@ extends RefCounted
 ## normalizeZones and zone-actions.js parseAction. The server engine evaluates them (OpenFollow zones port); this
 ## client draws and edits them. Pure.
 ##   {enabled (master, default off), debounce_ms 200, hysteresis 0.05 m, list: [{id, name, color, vertices [[x, y]]
-##    (PSN floor metres), enabled, triggered_by [marker ids] (empty = every marker), actions {kind: text}}]}
+##    (PSN floor metres), enabled, triggered_by [marker ids] (empty = every marker), actions {kind: text}}],
+##    on_air: [{id, when, do, enabled}] (WO-712 R4, src/tracking/air-rules.js: "when look X goes on air → do Y")}
 
 const KINDS := ["first_entry", "additional_entry", "partial_exit", "final_exit"]
 const KIND_LABELS := {"first_entry": "First entry", "additional_entry": "Additional entry",
 	"partial_exit": "Partial exit", "final_exit": "Final exit"}
 const COLORS := ["#4fc3f7", "#ffb300", "#ab47bc", "#66bb6a", "#ef5350", "#26c6da"]
-const ACTION_HINT := "look:<id> · look:<id>@preview · companion:<page>/<row>/<col> · blank = nothing"
+const ACTION_HINT := "look:<id> · look:<id>@preview · companion:<page>/<row>/<col> · presenter · auto:home · fixtures:<look id> · blank = nothing"
+const AIR_HINT := "look:<id> · look:<id>@preview · companion:<page>/<row>/<col> · auto:home · fixtures:<look id>"
+const MAX_AIR_RULES := 64
 
 
 static func _num(v: Variant, d: float, lo: float, hi: float) -> float:
@@ -45,7 +48,35 @@ static func normalize(src: Variant) -> Dictionary:
 			"color": col if Color.html_is_valid(col) else COLORS[i % COLORS.size()],
 			"vertices": verts, "enabled": r.get("enabled") != false, "triggered_by": trig, "actions": actions})
 	return {"enabled": z.get("enabled") == true, "debounce_ms": _num(z.get("debounce_ms"), 200.0, 0.0, 60000.0),
-		"hysteresis": _num(z.get("hysteresis"), 0.05, 0.0, 10.0), "list": list}
+		"hysteresis": _num(z.get("hysteresis"), 0.05, 0.0, 10.0), "list": list, "on_air": normalize_air(z.get("on_air"))}
+
+
+## The "on air" rules, as air-rules.js normalizeAirRules: unique ids (blank / taken → "airN"), trimmed text, ≤ 64.
+static func normalize_air(raw: Variant) -> Array:
+	var out := []
+	var used := {}
+	for r in (raw as Array).slice(0, MAX_AIR_RULES) if raw is Array else []:
+		if not r is Dictionary:
+			continue
+		var id := str(r.get("id", "")).strip_edges() if r.get("id") != null else ""
+		var n := out.size() + 1
+		while id == "" or used.has(id):
+			id = "air%d" % n
+			n += 1
+		used[id] = true
+		out.append({"id": id, "when": str(r.get("when", "")).strip_edges() if r.get("when") != null else "",
+			"do": str(r.get("do", "")).strip_edges() if r.get("do") != null else "", "enabled": r.get("enabled") != false})
+	return out
+
+
+static func new_air_rule(rules: Array) -> Dictionary:
+	var used := {}
+	for r in rules:
+		used[str(r.id)] = true
+	var n := 1
+	while used.has("air%d" % n):
+		n += 1
+	return {"id": "air%d" % n, "when": "", "do": "", "enabled": true}
 
 
 ## A new zone: lowest free "zoneN" id, the next colour, no shape yet (the operator clicks it on the floor).
@@ -64,13 +95,17 @@ static func new_zone(list: Array) -> Dictionary:
 
 
 ## "" if the action text is valid (or blank), else why not — the same grammar as zone-actions.js parseAction.
-static func action_error(text: String) -> String:
+## `presenter` needs a crossing marker, so an "on air" rule (`air`) cannot use it.
+static func action_error(text: String, air := false) -> String:
 	var s := text.strip_edges()
 	if s == "":
 		return ""
+	if s == "presenter":
+		return "presenter needs a marker crossing a zone" if air else ""
 	var look := RegEx.create_from_string("^look:[^@\\s]+(@(program|preview))?$")
 	var comp := RegEx.create_from_string("^companion:\\d{1,3}/\\d{1,3}/\\d{1,3}$")
-	if look.search(s) != null or comp.search(s) != null:
+	var fix := RegEx.create_from_string("^fixtures:\\S+$")
+	if look.search(s) != null or comp.search(s) != null or fix.search(s) != null or s == "auto:home":
 		return ""
 	return "unknown action \"%s\"" % s
 

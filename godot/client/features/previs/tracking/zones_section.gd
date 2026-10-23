@@ -3,10 +3,12 @@ extends VBoxContainer
 ## project.previs.tracking.zones, persisted by tracking_page through `edit`). The server engine (src/tracking/
 ## zone-*.js, OpenFollow zones port) fires each zone's action per transition; the master starts off and asks before
 ## it arms. Shape: Draw, then click floor points in the camera view (tracking_page.click → add_point). Live
-## occupancy comes from the server (`tracking:zones`, via the marker driver).
+## occupancy comes from the server (`tracking:zones`, via the marker driver). WO-712 R4: the "On air" rules below
+## (air_rules_block.gd) live in the same slice (`on_air`).
 
 const Z := preload("res://features/previs/tracking/zone_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const AirRules := preload("res://features/previs/tracking/air_rules_block.gd")
 
 signal edit(zones: Dictionary)  # new zones slice → persist
 signal drawing_changed
@@ -28,6 +30,7 @@ var _draw_btn: Button
 var _state: Label
 var _confirm_on: ConfirmationDialog
 var _confirm_del: ConfirmationDialog
+var _air: VBoxContainer
 
 
 func _ready() -> void:
@@ -93,6 +96,12 @@ func _ready() -> void:
 	_state.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_state.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(_state)
+	add_child(HSeparator.new())
+	_air = AirRules.new()
+	_air.changed.connect(func(list: Array) -> void:
+		data.on_air = list
+		_persist())
+	add_child(_air)
 	refresh()
 
 
@@ -200,6 +209,7 @@ func refresh() -> void:
 		var who := "inside: " + ", ".join((o.occupants as Array).map(func(i: Variant) -> String: return _marker_name(int(i)))) if o.get("occupied") == true else "empty"
 		_list.add_item("%s · %d pts · %s%s" % [z.name, z.vertices.size(), who, "" if z.enabled else " · off"])
 		_list.set_item_custom_fg_color(_list.item_count - 1, Color(z.color) if o.get("occupied") == true else ThemeBuilder.TEXT_MUTED)
+	_air.set_rules(data.on_air)
 	_form.visible = not data.list.is_empty()
 	_draw_btn.disabled = data.list.is_empty()
 	if data.list.is_empty():

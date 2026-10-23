@@ -9,12 +9,16 @@
  *                   to every online linked server whose duties say `auto: false`. The receiver re-broadcasts it as WS
  *                   `tracking:auto` tagged `source: { id, name }`, so its overlay (WO-710) shows the tracking server's
  *                   people, and the overlay's buttons go back over R2 (POST /api/cluster/send).
+ *   air             R3b: what is on program (`{ program: [{ channel, sceneId, name }] }`, src/cluster/air-state.js).
+ *                   From a server without the `zones` duty to every online linked server that has it; the receiver
+ *                   runs its "on air" rules on it (R4, `onData` → zone-service `onAir`) and broadcasts WS `cluster:air`.
  *
  * Sender: `offer(topic, data)` on every look (≤ 5 Hz). It sends when the data changed, and every HEARTBEAT_MS anyway,
  * so a receiver can tell a quiet server from a gone one. One call per peer is in flight; while it is, only the newest
  * data waits. A peer that refuses is logged once (and once more when it takes calls again).
  * Receiver: `receive(topic, data, peer)` keeps the newest per source and re-broadcasts it when it changed. A source
- * not heard from for EXPIRE_MS is dropped, re-broadcast empty once (`gone: true`), so the overlay hides.
+ * not heard from for EXPIRE_MS is dropped, re-broadcast empty once (`gone: true`), so the overlay hides; `onData`
+ * hears every new data and that empty one.
  */
 
 const HEARTBEAT_MS = 5000
@@ -23,16 +27,27 @@ const EXPIRE_MS = 15000
 const TOPICS = {
 	'tracking.auto': {
 		action: 'exchange.tracking_auto',
-		duty: 'auto',
 		ws: 'tracking:auto',
 		empty: { persons: [], pool: [] },
+		sends: (has) => has('auto'),
+		wants: (d) => d.auto === false,
+		refuses: (has) => (has('auto') ? 'this server does auto itself' : ''),
+	},
+	air: {
+		action: 'exchange.air',
+		ws: 'cluster:air',
+		empty: { program: [] },
+		sends: (has) => !has('zones'),
+		wants: (d) => d.zones === true,
+		refuses: (has) => (has('zones') ? '' : 'zone actions are off on this server'),
 	},
 }
 
 /**
  * @param {{ peers: () => Array<{id:string, name:string, online:boolean|null, duties:object|null}>,
  *   has: (duty: string) => boolean, call: Function, broadcast: (type: string, data: object) => void,
- *   now?: () => number, log?: Function }} deps
+ *   onData?: (topic: string, data: object, source: {id: string, name: string}) => void, now?: () => number,
+ *   log?: Function }} deps
  */
 function createExchange(deps) {
 	const now = deps.now || Date.now
@@ -40,12 +55,12 @@ function createExchange(deps) {
 	const inbox = new Map() // `${topic}|${peer id}` → { topic, data, json, at, source }
 	let timer = null
 
-	const targets = (t) => deps.peers().filter((p) => p.online && p.duties && p.duties[t.duty] === false)
+	const targets = (t) => deps.peers().filter((p) => p.online && p.duties && t.wants(p.duties))
 
 	/** Sender → how many peers a call was started (or queued) for. */
 	function offer(topic, data) {
 		const t = TOPICS[topic]
-		if (!t || !deps.has(t.duty) || !data || typeof data !== 'object') return 0
+		if (!t || !t.sends(deps.has) || !data || typeof data !== 'object') return 0
 		const json = JSON.stringify(data)
 		let n = 0
 		for (const p of targets(t)) {
@@ -80,13 +95,17 @@ function createExchange(deps) {
 		if (!data || typeof data !== 'object' || Array.isArray(data)) {
 			return { status: 400, body: { error: 'data must be an object' } }
 		}
-		if (deps.has(t.duty)) return { status: 409, body: { error: `this server does ${t.duty} itself` } }
+		const no = t.refuses(deps.has)
+		if (no) return { status: 409, body: { error: no } }
 		const k = `${topic}|${peer.id}`
 		const json = JSON.stringify(data)
 		const prev = inbox.get(k)
 		const source = { id: peer.id, name: peer.name }
 		inbox.set(k, { topic, data, json, at: now(), source })
-		if (!prev || prev.json !== json) deps.broadcast(t.ws, { ...data, source })
+		if (!prev || prev.json !== json) {
+			deps.broadcast(t.ws, { ...data, source })
+			deps.onData?.(topic, data, source)
+		}
 		if (!timer) {
 			timer = setInterval(expire, HEARTBEAT_MS)
 			timer.unref?.()
@@ -99,7 +118,9 @@ function createExchange(deps) {
 		for (const [k, m] of inbox) {
 			if (t0 - m.at <= EXPIRE_MS) continue
 			inbox.delete(k)
-			deps.broadcast(TOPICS[m.topic].ws, { ...TOPICS[m.topic].empty, source: m.source, gone: true })
+			const t = TOPICS[m.topic]
+			deps.broadcast(t.ws, { ...t.empty, source: m.source, gone: true })
+			deps.onData?.(m.topic, { ...t.empty }, m.source)
 		}
 	}
 

@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2 (signed cluster call + impose) DONE 23.10.26 offline (17-test smoke, real router), two-box QA pending; R3a (exchange tracking → media: the overlay shows and drives the tracking box) DONE 23.10.26 offline + live routes, two-box QA pending; R3b (air state media → tracking), R4, R5 open**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); R1 (duty gates) DONE 23.10.26 (offline + box: API live after a router-order fix; `auto` + PTZ `allowed` wired by the lead); owner QA pending; R2 (signed cluster call + impose) DONE 23.10.26 offline (17-test smoke, real router), two-box QA pending; R3a (exchange tracking → media: the overlay shows and drives the tracking box) DONE 23.10.26 offline + live routes, two-box QA pending; R3b (air state media → tracking) + R4 ("on air" rules) DONE 23.10.26 offline + live single-box probe, two-box QA pending; R5 (shared project) open**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -437,3 +437,104 @@ and drives it.
 - **Not verified (owner QA, needs two boxes):** the overlay on the media box showing the tracking box's people
   (chip "· <server>"), a pin / heads / PTZ / Home press from the media box landing on the tracking box, the overlay
   hiding 15 s after the tracking box goes away.
+
+## R3b + R4 — air state media → tracking, and "on air" rules: investigation
+
+- **Where "a look went on air" is visible.** Every live change ends in `broadcastSceneLive(ctx)`
+  (`src/state/live-scene-state.js:146`): takes, the timeline, FTB, mirror-apply on a follower and invalidations all
+  call it (12 call sites). `onProgramChange` (`live-scene-state.js:55`) is a single slot that
+  `replication-service.js:107` already holds, so it cannot be reused.
+- **The live store is not only program.** `liveScenesByProgramChannel` also holds preview takes
+  (`routes-scene-preview.js:61`, `routes-scene-preview-push.js:147`).
+- **A box with no screens.** On this box `channelMap.screenCount` is 0 and `programChannels` is `[]`. A take on
+  channel 1 logs `channel 1 not in routing programChannels — using direct-program path`. So "program" cannot mean
+  `programChannels` only. The first version did filter that way, and the live probe below caught it.
+- **Grammar.** The zone actions (`zone-actions.js`) had `look:` / `companion:` / `presenter`. The design's "Auto home /
+  fixtures look Y" had no action. The Godot `action_error` did not know `presenter` either, so a WO-675 zone showed
+  it as an error.
+
+## R3b + R4 — what was done
+
+- `src/cluster/cluster-exchange.js`: each topic now has its own `sends(has)` / `wants(peerDuties)` /
+  `refuses(has)` rule instead of one `duty`, plus an `onData(topic, data, source)` hook. It fires once per change
+  and once, empty, on expiry.
+  - New topic `air` (`exchange.air`, WS `cluster:air`, `{ program: [{ channel, sceneId, name }] }`).
+  - It goes from a server **without** the `zones` duty to online peers **with** it.
+  - A receiver without `zones` answers 409 `zone actions are off on this server`.
+- New `src/cluster/air-state.js`:
+  - `programLooks(ctx)` returns every live channel except a preview bus (`previewChannels` and
+    `switcherBus1Channels`). A shared preview bus that is also program counts as program.
+  - `airChanged(ctx)` feeds `ctx.zoneService.onAir('self', …)`. It offers `air` only while `ctx._cluster` exists, so
+    it never starts the cluster service.
+  - It is called from `broadcastSceneLive` in a `try` block, and from the cluster `afterPoll`, which is the exchange's
+    heartbeat.
+- `src/api/routes-cluster.js`: the exchange's `onData` feeds `air` into `ctx.zoneService.onAir('peer:<id>', program)`.
+- New `src/tracking/air-rules.js`, the rules engine:
+  - The rules are `zones.on_air: [{ id, when, do, enabled }]`, at most 64.
+  - `when` is a look id, or a look name matched ignoring case. Until R5 the other server's ids are not this one's, so
+    names are what match across two projects.
+  - A rule fires when its look **newly** appears on air, on any source.
+  - A source's first update only records what is on air, so a restart or a newly linked server fires nothing.
+  - Loop guard: a look that a rule's own `look:` take put on air fires no rules for 3 s, so two rules cannot
+    ping-pong.
+  - Blank, invalid or `presenter` actions are skipped; the zone service warns about them when the project loads.
+  - With the `zones` duty off, nothing runs and `recent` records `not run`.
+- `src/tracking/zone-service.js`:
+  - builds the rules and configures them on every project change;
+  - seeds `self` from the live state at start;
+  - exposes `onAir` and sets `ctx.zoneService`;
+  - `GET /api/tracking/zones` gains `on_air: { rules, now, recent }`.
+- `src/tracking/zone-actions.js`: two new actions, for both zones and rules:
+  - `auto:home` runs the Auto director's Home now;
+  - `fixtures:<look id>` recalls that look's stored fixture state, as `POST /api/fixtures/looks/recall` does.
+- Godot:
+  - `zone_model.gd`: `normalize` keeps `on_air` (`normalize_air`, `new_air_rule`). `action_error` accepts
+    `presenter` (zones only), `auto:home` and `fixtures:<id>`.
+  - New `air_rules_block.gd`: the "On air → do" rows (look, action, enabled, ×) and "Add rule", at the bottom of the
+    Zones section.
+  - `zones_section.gd` persists the rows as part of the zones slice. `tracking_page.gd` was not touched; it is at 495
+    lines.
+
+## R3b + R4 — what was VERIFIED
+
+- `node --test tools/smoke/smoke-wo712-air-rules.test.js`: **14 / 14** (added to the curated list). It covers:
+  - normalize;
+  - the grammar;
+  - firing by id or by name ignoring case, once while the look stays on air, and again after it goes off and on;
+  - the first update only seeds;
+  - disabled, blank and invalid rules fire nothing; duty off logs `not run`;
+  - the loop guard and its expiry;
+  - `runAction` with the auto / fixture engines missing and present;
+  - `programLooks` skips the preview bus and keeps a direct-program channel;
+  - the zone service seeds and then fires, with Companion over a stubbed fetch; duty off;
+  - `airChanged` without a cluster;
+  - the `air` exchange: direction, once per change, heartbeat, 15 s expiry handed to `onData` empty, 409 without
+    zones;
+  - source pins on the wiring.
+- `smoke-wo712-exchange`: 14 / 14. Its view assertion now includes `air: null`.
+- `npm run test:ci`: **3036 tests, 3033 pass, 1 fail**. The failure is the known WO-308 pointer-confine test.
+- Godot: **21395 passed, 0 failed** (+1 test, plus new assertions in `test_action_error_grammar`).
+  `run-client.sh --check`: boot OK.
+- Gates: eslint 0 errors; prettier clean on the new files; `check-max-file-lines` 0 over; `check-unwired-exports` no
+  new orphan; API contract unchanged (wo598 smoke 3 / 3).
+- **Live on the box** (two server restarts, now pid 218105):
+  1. I added a probe rule `{when: "airprobe", do: "fixtures:air-probe-none"}` through `POST /api/project/autosave`.
+     `GET /api/tracking/zones` → `on_air.rules: 1`.
+  2. I took a black colour look "AirProbe" on channel 1 with the first build. Nothing fired, because channel 1 is not
+     in `programChannels` on this box. This is the bug the investigation above describes; I fixed `programLooks`.
+  3. After the restart: `on_air.now = {self: ["air-probe"]}`, `recent: []`. The look that was already on air at start
+     did not fire.
+  4. I took "Other", then "AirProbe". The rule fired: journal
+     `[on-air] AirProbe on air (self) → fixtures air-probe-none (404 look air-probe-none stores no fixture state)`.
+     That is the matching by name ignoring case, plus the real fixture service answering for an unknown look.
+  5. `GET /api/cluster/exchange` → `{"tracking.auto":null,"air":null,"sources":[]}`.
+- **Cleanup:**
+  - `AMCP CLEAR 1-10` was sent.
+  - The probe rule was removed: the project now has `previs.tracking.zones = {enabled:false, list:[], on_air:[]}`.
+  - Before-probe copy: `/tmp/claude-1000/-home-casparcg/3ac03fb8-d548-4479-8790-2deea7005945/scratchpad/new_project_1.before-air-probe.json`.
+  - The live store still names `air-probe` on channel 1 until the next take or reconcile. No route clears a
+    non-program channel.
+- **Not verified (owner QA, needs two boxes):**
+  - a take on the media box firing a rule on the tracking box (the `air` exchange over the real signed call);
+  - the tracking box's rule actions after the media box goes away for 15 s;
+  - the Godot "On air → do" rows by hand: add, edit, delete, and the error colour.

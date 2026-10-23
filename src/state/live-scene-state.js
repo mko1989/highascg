@@ -162,6 +162,11 @@ function broadcastSceneLive(ctx, opts = {}) {
 	} catch {
 		/* companion bridge optional */
 	}
+	try {
+		require('../cluster/air-state').airChanged(ctx) // WO-712 R4: "on air" rules here + the `air` exchange
+	} catch (e) {
+		ctx.log?.('warn', '[on-air] ' + (e?.message || e))
+	}
 }
 
 /**

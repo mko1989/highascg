@@ -213,7 +213,7 @@ describe('WO-712 R3 exchange: receiver', () => {
 			{ persons: [], pool: [], source: { id: 'T', name: 'srv-T' }, gone: true },
 		])
 		assert.equal(s.M.ex.latest('tracking.auto'), null)
-		assert.deepEqual(s.M.ex.view(), { 'tracking.auto': null, sources: [] })
+		assert.deepEqual(s.M.ex.view(), { 'tracking.auto': null, air: null, sources: [] })
 	})
 
 	it('GET view lists the current source with its age', async () => {

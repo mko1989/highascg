@@ -40,6 +40,28 @@ func test_action_error_grammar() -> void:
 	t.ok(Z.action_error("/osc/addr") != "", "osc path is not an action")
 	t.ok(Z.action_error("look:") != "", "look needs an id")
 	t.ok(Z.action_error("companion:1/2") != "", "companion needs three parts")
+	t.eq(Z.action_error("presenter"), "", "WO-675 presenter on a zone")
+	t.eq(Z.action_error("auto:home"), "", "WO-712 R4 auto:home")
+	t.eq(Z.action_error("fixtures:look-2"), "", "WO-712 R4 fixtures:<look id>")
+	t.ok(Z.action_error("fixtures:") != "", "fixtures needs a look id")
+	t.ok(Z.action_error("auto:away") != "", "only auto:home")
+
+
+## WO-712 R4 — "on air" rules, as src/tracking/air-rules.js normalizeAirRules.
+func test_on_air_rules_normalize_and_grammar() -> void:
+	t.eq(Z.normalize(null).on_air, [], "no rules")
+	var n := Z.normalize({"on_air": [{"id": "x", "when": " Intro ", "do": "auto:home"}, "junk",
+		{"id": "x", "when": "look-3", "do": "", "enabled": false}, {"when": "a"}]})
+	t.eq(n.on_air.map(func(r: Dictionary) -> String: return r.id), ["x", "air2", "air3"], "taken / blank id → airN")
+	t.eq([n.on_air[0].when, n.on_air[0].do, n.on_air[0].enabled], ["Intro", "auto:home", true], "trimmed, on by default")
+	t.eq(n.on_air[1].enabled, false, "kept off")
+	var many := []
+	for i in 70:
+		many.append({"when": "l%d" % i})
+	t.eq(Z.normalize_air(many).size(), Z.MAX_AIR_RULES, "64 rules at most")
+	t.eq(Z.new_air_rule([{"id": "air1"}]), {"id": "air2", "when": "", "do": "", "enabled": true}, "lowest free id")
+	t.ok(Z.action_error("presenter", true) != "", "a rule has no crossing marker")
+	t.eq(Z.action_error("fixtures:look-2", true), "", "fixtures in a rule")
 
 
 func test_parse_ids_and_loop3() -> void:

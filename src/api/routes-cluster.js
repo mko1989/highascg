@@ -51,6 +51,7 @@ function clusterOf(ctx) {
 	ctx._cluster.afterPoll(async () => {
 		await masterOf(ctx).tick()
 		await fanoutOf(ctx).refresh()
+		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
 	})
 	ctx._cluster.start().catch(() => {})
 	return ctx._cluster
@@ -158,6 +159,7 @@ function exchangeOf(ctx) {
 		has: (d) => duties.has(d),
 		call: (id, action, args, o) => callOf(ctx).call(id, action, args, o),
 		broadcast: (type, data) => typeof ctx._wsBroadcast === 'function' && ctx._wsBroadcast(type, data),
+		onData: (topic, data, source) => topic === 'air' && ctx.zoneService?.onAir(`peer:${source.id}`, data.program),
 		log: ctx.log,
 	})
 	return ctx._clusterExchange
