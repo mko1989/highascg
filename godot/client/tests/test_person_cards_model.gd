@@ -51,6 +51,52 @@ func test_best_view_largest_live_box_wins() -> void:
 	t.eq(M.best_view({"keys": ["z:1"]}, views, by_id), {}, "no camera sees them → {}")
 
 
+## WO-701: COCO joints of someone at (x, y) facing `dir` (plan, unit): shoulders / hips across their front.
+func _joints(x: float, y: float, dir: Vector2) -> Array:
+	var left := Vector2(-dir.y, dir.x)  # a quarter anticlockwise of the front
+	var j := []
+	j.resize(17)
+	for pair in [[5, 6, 1.45], [11, 12, 0.95]]:
+		j[pair[0]] = [x + 0.2 * left.x, y + 0.2 * left.y, pair[2]]
+		j[pair[1]] = [x - 0.2 * left.x, y - 0.2 * left.y, pair[2]]
+	return j
+
+
+func test_facing_from_shoulders_and_hips() -> void:
+	for d in [Vector2(0, -1), Vector2(1, 0), Vector2(-0.6, 0.8)]:
+		t.ok(M.facing(_joints(1.0, 2.0, d)).distance_to(d) < 1e-6, "faces %s" % d)
+	t.eq(M.facing(null), Vector2.ZERO, "no pose → ZERO")
+	var half := _joints(0, 0, Vector2(0, -1))
+	half[11] = null
+	t.eq(M.facing(half), Vector2.ZERO, "a missing hip → ZERO")
+
+
+func test_ranked_views_prefer_the_camera_they_face() -> void:
+	var front := C.camera(0.0, -10.0, 5.0, -20.0)  # downstage, looking upstage
+	var back := C.camera(0.0, 10.0, 5.0, -20.0, 180.0)  # upstage, looking downstage
+	var by_id := {"f": _cam("f", "ch1", front), "b": _cam("b", "ch2", back)}
+	var views := {"f:1": {"cam": {"id": "f"}, "person": {"box": [0.4, 0.3, 0.45, 0.6], "age_s": 0.0}},
+		"b:1": {"cam": {"id": "b"}, "person": {"box": [0.4, 0.2, 0.47, 0.7], "age_s": 0.0}}}
+	var wp := {"x": 0.0, "y": 0.0, "keys": ["f:1", "b:1"]}
+	t.eq(str(M.best_view(wp, views, by_id).cam.id), "b", "no pose: the bigger picture")
+	wp.joints = _joints(0, 0, Vector2(0, -1))
+	t.eq(str(M.best_view(wp, views, by_id).cam.id), "f", "facing downstage: the camera in front, though smaller")
+	wp.joints = _joints(0, 0, Vector2(0, 1))
+	t.eq(str(M.best_view(wp, views, by_id).cam.id), "b", "turned round: the upstage camera")
+
+
+func test_sticky_camera_waits_before_cutting() -> void:
+	var st := {}
+	t.eq(M.sticky(st, ["a", "b"], 0.0), "a", "first sight: the best at once")
+	t.eq(M.sticky(st, ["b", "a"], 1.0), "a", "b better for a moment: stay")
+	t.eq(M.sticky(st, ["a", "b"], 1.5), "a", "a back on top: b's run is broken")
+	t.eq(M.sticky(st, ["b", "a"], 2.0), "a")
+	t.eq(M.sticky(st, ["b", "a"], 2.0 + M.SWITCH_HOLD_S - 0.1), "a", "not yet %.1f s" % M.SWITCH_HOLD_S)
+	t.eq(M.sticky(st, ["b", "a"], 2.0 + M.SWITCH_HOLD_S), "b", "b best for %.1f s without a break: cut" % M.SWITCH_HOLD_S)
+	t.eq(M.sticky(st, ["c"], 6.0), "c", "the shown camera lost them: cut at once")
+	t.eq(M.sticky(st, [], 7.0), "", "nobody sees them")
+
+
 func test_cards_from_a_snapshot() -> void:
 	var cam := C.camera(0.0, -10.0, 5.0, -20.0)
 	var box := _box(cam, 0.5, 1.0, 1.8)
@@ -69,6 +115,18 @@ func test_cards_from_a_snapshot() -> void:
 	snap.world.persons[0].height = 9.0
 	t.eq(M.cards(snap, [_cam("a", "ch1", cam)])[0].height, M.MAX_HEIGHT, "a fused height is used, clamped")
 	t.eq(M.cards(null, []), [], "no snapshot → no cards")
+	# WO-701: with a clock the camera is sticky per world person
+	var cam2 := C.camera(3.0, -9.0, 5.0, -20.0)
+	snap.world.persons[0].height = null
+	snap.cameras.append({"id": "b", "role": "ch2", "stale": false, "persons": [{"tid": 4, "box": [0.1, 0.0, 0.9, 1.0], "age_s": 0.0}]})
+	snap.world.persons[0].keys = ["a:3"]
+	var pick := {}
+	var both := [_cam("a", "ch1", cam), _cam("b", "ch2", cam2)]
+	t.eq(M.cards(snap, both, pick, 10.0)[0].cam_id, "a", "only a sees them")
+	snap.world.persons[0].keys = ["a:3", "b:4"]
+	t.eq(M.cards(snap, both, pick, 10.5)[0].cam_id, "a", "b's bigger picture has to wait")
+	t.eq(M.cards(snap, both, pick, 10.5 + M.SWITCH_HOLD_S)[0].cam_id, "b", "… and then takes over")
+	t.eq(M.cards(snap, both)[0].cam_id, "b", "no clock: this snapshot's best")
 
 
 func test_mask_image_decodes_bits_msb_first() -> void:

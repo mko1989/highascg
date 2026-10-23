@@ -10,6 +10,10 @@ extends RefCounted
 const C := preload("res://features/previs/tracking/camera_model.gd")
 const PD := preload("res://features/previs/tracking/person_dummy_model.gd")
 
+## WO-701 (owner 23.10: "it should keep on a camera and only change a camera after the subject is facing the other
+## camera for at least a 2 3 sec"): another camera must stay the better view this long before a cut-out cuts to it.
+const SWITCH_HOLD_S := 2.5
+const BACK_WEIGHT := 0.25  # a solved camera behind the person (pose known) counts a quarter of its picture
 const DEFAULT_HEIGHT := 1.75  # m — a card whose height can't be measured (no solved camera, ray misses)
 const MIN_HEIGHT := 0.4
 const MAX_HEIGHT := 2.6
@@ -18,8 +22,9 @@ const MAX_HEIGHT := 2.6
 ## One card per world person a camera currently sees: {id, cam_id, role, box, mask, mask_size, feet [x,y,z] PSN,
 ## height, width (m), views (WO-666: the solved cameras that paint their dummy, person_dummy_model.views_for),
 ## joints (WO-667: 17 PSN body joints | null, src/tracking/pose3d.js)}.
-## `cams` = normalized tracking cameras.
-static func cards(snap: Variant, cams: Array) -> Array:
+## `cams` = normalized tracking cameras. With `now` (seconds) the camera is sticky per person (WO-701): `pick`
+## {world id: memory} is the caller's, kept between snapshots; without it the best view of this snapshot.
+static func cards(snap: Variant, cams: Array, pick := {}, now := NAN) -> Array:
 	var out := []
 	if not (snap is Dictionary) or not (snap.get("world") is Dictionary):
 		return out
@@ -34,9 +39,15 @@ static func cards(snap: Variant, cams: Array) -> Array:
 			views["%s:%s" % [c.id, int(p.get("tid", -1))]] = {"cam": c, "person": p}
 	var plane_z := float(snap.world.get("plane_z", 0.0))
 	for wp in snap.world.get("persons", []):
-		var v := best_view(wp, views, by_id)
-		if v.is_empty():
+		var ranked := ranked_views(wp, views, by_id)
+		if ranked.is_empty():
 			continue
+		var v: Dictionary = ranked[0]
+		if not is_nan(now):
+			var ids := ranked.map(func(r: Dictionary) -> String: return str(r.cam.id))
+			if not pick.has(int(wp.id)):
+				pick[int(wp.id)] = {}
+			v = ranked[ids.find(sticky(pick[int(wp.id)], ids, now))]
 		var ce: Dictionary = by_id[str(v.cam.id)]
 		var box: Array = v.person.box
 		var feet := [float(wp.x), float(wp.y), plane_z]
@@ -52,11 +63,18 @@ static func cards(snap: Variant, cams: Array) -> Array:
 	return out
 
 
-## The camera with the largest live (age_s 0) picture of the person, in raster pixels; a live view beats a coasting
-## one. {} when no camera sees them.
+## The view a cut-out shows best (ranked_views' first), {} when no camera sees them.
 static func best_view(wp: Dictionary, views: Dictionary, by_id: Dictionary) -> Dictionary:
-	var best := {}
-	var best_score := -1.0
+	var r := ranked_views(wp, views, by_id)
+	return r[0] if not r.is_empty() else {}
+
+
+## Every view of the person, best first: the picture's size in raster pixels, a coasting view (age_s > 0) × 0.25, and
+## (WO-701) when their body pose is known, × how squarely they face that camera — BACK_WEIGHT … 1 from behind to
+## straight on (an unsolved camera, whose place is unknown, sits halfway).
+static func ranked_views(wp: Dictionary, views: Dictionary, by_id: Dictionary) -> Array:
+	var f := facing(wp.get("joints"))
+	var scored := []
 	for k in wp.get("keys", []):
 		var v: Variant = views.get(str(k))
 		if v == null or not by_id.has(str(v.cam.id)):
@@ -64,13 +82,56 @@ static func best_view(wp: Dictionary, views: Dictionary, by_id: Dictionary) -> D
 		var box: Variant = v.person.get("box")
 		if not (box is Array) or (box as Array).size() < 4:
 			continue
-		var raster: Array = by_id[str(v.cam.id)].raster
+		var ce: Dictionary = by_id[str(v.cam.id)]
+		var raster: Array = ce.raster
 		var area := (float(box[2]) - float(box[0])) * float(raster[0]) * (float(box[3]) - float(box[1])) * float(raster[1])
 		var score := area * (1.0 if float(v.person.get("age_s", 0.0)) == 0.0 else 0.25)
-		if score > best_score:
-			best_score = score
-			best = v
-	return best
+		if f != Vector2.ZERO:
+			var cam: Dictionary = ce.get("cam", {})
+			var to := Vector2(float(cam.get("pos_x", 0.0)) - float(wp.get("x", 0.0)), float(cam.get("pos_y", 0.0)) - float(wp.get("y", 0.0)))
+			var front := 0.5
+			if C.valid_view(cam, float(raster[0]), float(raster[1])) and to.length() > 1e-3:
+				front = maxf(0.0, f.dot(to.normalized()))
+			score *= BACK_WEIGHT + (1.0 - BACK_WEIGHT) * front
+		scored.append([score, scored.size(), v])
+	scored.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return scored.map(func(e: Array) -> Dictionary: return e[2])
+
+
+## WO-701: which way a person faces on the floor (unit, PSN x / y) from their shoulders and hips (COCO 5 / 6, 11 / 12:
+## left minus right, turned a quarter clockwise — facing the audience, left is +x, front is −y); ZERO without them.
+static func facing(joints: Variant) -> Vector2:
+	if not (joints is Array) or (joints as Array).size() != 17:
+		return Vector2.ZERO
+	for j in [5, 6, 11, 12]:
+		if not (joints[j] is Array) or (joints[j] as Array).size() < 2:
+			return Vector2.ZERO
+	var a := Vector2(float(joints[5][0]) - float(joints[6][0]) + float(joints[11][0]) - float(joints[12][0]),
+		float(joints[5][1]) - float(joints[6][1]) + float(joints[11][1]) - float(joints[12][1]))
+	return Vector2(a.y, -a.x).normalized() if a.length() > 1e-3 else Vector2.ZERO
+
+
+## WO-701: the camera a person's cut-out shows. `st` {cam, rival, since} is that person's memory (updated here),
+## `ranked` their cameras best first, `now` seconds. The shown camera stays while it still sees them; another one
+## takes over only after being the best for SWITCH_HOLD_S without a break. First sight, or the shown camera lost
+## them: the best, at once.
+static func sticky(st: Dictionary, ranked: Array, now: float) -> String:
+	if ranked.is_empty():
+		return ""
+	var best := str(ranked[0])
+	var cur := str(st.get("cam", ""))
+	if cur == "" or not ranked.has(cur):
+		st.merge({"cam": best, "rival": "", "since": now}, true)
+		return best
+	if best == cur:
+		st.rival = ""
+	elif str(st.get("rival", "")) != best:
+		st.rival = best
+		st.since = now
+	elif now - float(st.since) >= SWITCH_HOLD_S:
+		st.cam = best
+		st.rival = ""
+	return str(st.cam)
 
 
 ## Height of the box top above the feet: the camera ray through the (undistorted) top-centre pixel, at the point

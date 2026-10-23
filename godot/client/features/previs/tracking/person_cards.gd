@@ -24,6 +24,7 @@ var style := "off"
 var _shown := false
 var _on := false
 var _cams: Array = []
+var _pick := {}  # WO-701: world id → the cut-out's sticky camera memory (person_cards_model.sticky)
 var _cards := {}  # world id → {node (cards: the quad; dummies: a body Node3D), mat, roles [], masks {cam_id: ImageTexture}}
 var _unit_sphere := SphereMesh.new()  # posed parts: radius 0.5, stretched per part
 var _held := {}  # role → true
@@ -82,7 +83,7 @@ func set_detections(snap: Variant) -> void:
 	if not _on:
 		return
 	var seen := {}
-	for c in M.cards(snap, _cams):
+	for c in M.cards(snap, _cams, _pick, Time.get_ticks_msec() / 1000.0):  # WO-701 sticky camera
 		if style == "dummies" and c.views.is_empty():
 			continue  # no solved camera sees them: nothing to paint with
 		seen[c.id] = true
@@ -98,6 +99,9 @@ func set_detections(snap: Variant) -> void:
 		if not seen.has(id):
 			(_cards[id].node as Node).queue_free()
 			_cards.erase(id)
+	for id in _pick.keys():
+		if not seen.has(id):
+			_pick.erase(id)
 	_hold_roles()
 
 
@@ -242,6 +246,7 @@ func _clear() -> void:
 	for e in _cards.values():
 		(e.node as Node).queue_free()
 	_cards.clear()
+	_pick.clear()
 	VideoSurfaces.release_all(self)
 	_held.clear()
 
