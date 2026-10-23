@@ -1,6 +1,6 @@
 # WO-712 — Server duties: a tracking box and a media box that exchange, react and impose
 
-**Status: OPEN (23.10.26) — investigation + design written; owner decisions D1–D3 below; nothing implemented yet**
+**Status: OPEN (23.10.26) — investigation + design written; owner answered D1–D3 (23.10, below); implementation next (R1 after WO-708 lands — it shares register.js)**
 
 Owner, `next.md` 23.10: *"per multiple devices/servers interoperability config. id like this to work in a way that
 different servers are sometimes treated as tracking system mostly while the other is handling media mostly. but they
@@ -111,6 +111,28 @@ fencing, and the device-local slices are kept. See D2.
 - **D3.** When the other box "imposes" (e.g. the media box pins a person or homes the fronts), does it act exactly
   like a local operator press, with the last press winning? Or can a box lock its duty against remote changes?
   *Recommended: act like a local press, and add a per-box "accept remote" tick on its card (default on).*
+
+## Owner answers, 23.10
+
+- **D1:** *"id like it to be more custom from the get go. meaning users pick and choose what each server does by
+  configuring it in its devices, but both work on the same project and interact with each other."*
+  - So there is **no fixed two/three-duty split**. Each server gets a pick-list of **what this server does**,
+    set in **its own Devices view** (device-local, like its cables).
+  - A single box ticks everything (today's behaviour). The pick-list:
+    - **Playout**: its destinations, by cables, as today.
+    - **Detection**: cameras → sidecar.
+    - **Zones & automations**.
+    - **Auto follow** (the director).
+    - **Lighting out**: DMX / PSN.
+    - **PTZ out**: VISCA.
+    - **Presenter intake**.
+  - The R1 gates hang off these ticks, one by one. R2/R3 route each action to the server that ticks the matching item.
+  - The servers' Devices views show each linked server's ticks read-only, as they already do for its rear panel.
+- **D2:** *Duties first, shared project next.* R1–R4 work without the shared project. R5 (the shared project document,
+  the missing WO-670 piece) follows as its own WO. The owner's "both work on the same project" makes it required, not
+  optional.
+- **D3:** *Like a local press, lockable.* A remote action counts as this server's own operator pressing it, and the
+  last press wins. Each server gets an **accept remote** tick (default on).
 
 ## What was done
 
