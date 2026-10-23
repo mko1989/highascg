@@ -20,7 +20,7 @@ const { launchBrowserSource } = require('../system/browser-source-session')
 const { ensureBrowserCaptureBridge } = require('../capture/browser-capture-bridge')
 
 function isTestContext() {
-	return !!process.env.NODE_TEST_CONTEXT
+	return !!process.env.NODE_TEST_CONTEXT || require('../bootstrap/sandbox').isSandbox() // WO-719: no real Firefox on :0
 }
 
 /**

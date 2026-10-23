@@ -6,6 +6,7 @@ const os = require('os')
 const path = require('path')
 const { execFileSync } = require('child_process')
 const { REPO_ROOT } = require('../repo-paths')
+const { isSandbox } = require('../bootstrap/sandbox')
 const { isAllowedEthernetIface } = require('../config/network-settings')
 const { listEthernetInterfaces } = require('./network-inventory')
 
@@ -187,6 +188,7 @@ function getHardwareIdentity(opts = {}) {
 		return _cached
 	}
 
+	if (isSandbox()) return (_cached = { ...derived, hostname: os.hostname() }) // WO-719: no write to the live config/
 	writeHardwareIdentityFile(derived)
 	return _cached
 }
@@ -266,6 +268,7 @@ function applySystemHostname(hostname, log, deps = {}) {
  * @returns {{ identity: object, hostnameApplied: boolean, hostnameError?: string }}
  */
 function ensureHardwareHostname(ctx) {
+	if (isSandbox()) return { identity: getHardwareIdentity(), hostnameApplied: false } // WO-719: never hostnamectl
 	const log = typeof ctx?.log === 'function' ? ctx.log : null
 	const identity = getHardwareIdentity({ networkCfg: ctx?.config?.network, refresh: true })
 	const current = os.hostname()

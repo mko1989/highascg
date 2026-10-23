@@ -54,7 +54,8 @@ function wantedSurfaces(clients) {
  */
 function createVideoFeed(deps = {}) {
 	const log = deps.log || (() => {})
-	const pathFor = deps.pathFor || ((role) => `/dev/shm/highascg-${role}`)
+	const sandboxShm = require('../bootstrap/sandbox').isSandbox() ? path.join(process.cwd(), 'shm') : '/dev/shm' // WO-719: never the live segments
+	const pathFor = deps.pathFor || ((role) => `${sandboxShm}/highascg-${role}`)
 	const makeWorker =
 		deps.makeWorker || (() => new (require('worker_threads').Worker)(path.join(__dirname, 'video-feed-worker.js')))
 	/** @type {Map<any, { roles: Set<string>, params: object }>} ws → subscription */

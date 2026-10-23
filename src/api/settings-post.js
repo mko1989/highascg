@@ -106,7 +106,9 @@ async function handlePost(path, body, ctx) {
 	if (settings.local_media_path !== undefined) {
 		const newPath = String(settings.local_media_path).trim()
 		const oldPath = cfg.local_media_path || ''
-		if (newPath !== oldPath) {
+		if (newPath !== oldPath && require('../bootstrap/sandbox').isSandbox()) {
+			cfg.local_media_path = newPath // WO-719: never re-point the LIVE media symlink from a sandbox
+		} else if (newPath !== oldPath) {
 			cfg.local_media_path = newPath
 			try {
 				const mediaLink = '/home/casparcg/highascg/media'

@@ -61,6 +61,8 @@ function resolveRoleChannel(role, map) {
 }
 
 function segmentFor(role) {
+	// WO-719: a sandbox instance shares /dev/shm with the live Caspar — announce a path inside its own root instead
+	if (require('../bootstrap/sandbox').isSandbox()) return { shm: `/highascg-${role}`, path: require('path').join(process.cwd(), 'shm', `highascg-${role}`) }
 	return { shm: `/highascg-${role}`, path: `/dev/shm/highascg-${role}` }
 }
 

@@ -44,6 +44,8 @@ func _ready() -> void:
 		return {"gpuLayout": GpuLayout.local(), "decklinkRearOrder": DeckOrder.local(), "hardwarePolicy": HardwareReconcile.local_policy()})
 	Ws.start()
 	VideoSurfaces.start()
+	if Config.args.has("e2e"):  # WO-719: GUI end-to-end scenarios (sandbox server only — tools/e2e/run-gui-e2e.js)
+		add_child(load("res://e2e/e2e_runner.gd").new())
 	if Config.args.has("probe-take"):  # dev: --probe-take=<sceneId>[:program]
 		var parts := str(Config.args["probe-take"]).split(":")
 		var live_tab: Node = shell.tabs.get_node("Live")

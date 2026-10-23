@@ -26,6 +26,7 @@ const {
 	displaySessionEnv,
 } = require('../utils/x-display-session')
 const { calculateLayoutPositions } = require('../utils/os-layout-calculator')
+const { isSandbox } = require('../bootstrap/sandbox')
 
 const execFileAsync = promisify(execFile)
 
@@ -192,6 +193,7 @@ function stopBarrierProc(env) {
  *   itself, and starting it here first would race that stop).
  */
 function stopPointerConfine(opts = {}) {
+	if (isSandbox()) return // WO-719: the pkills would hit the LIVE server's barrier daemon / unclutter
 	const env = displaySessionEnv()
 	activeConfineKey = null
 	activeConfineRect = null
@@ -299,6 +301,7 @@ async function tryPythonXgrabConfine(config, rect, env, log, opts, layout) {
  *   8 s watchdog recheck (WO-397: takes the X-free fast path; never set by transition callers)
  */
 async function startPointerConfine(config, opts = {}) {
+	if (isSandbox()) return { ok: false, reason: 'sandbox instance (WO-719)' }
 	const verdict = evaluateOperatorPointerConfineDesire(config)
 	if (!verdict.desired) {
 		opts.log?.('info', `[Pointer confine] SKIP — ${verdict.reason}`)
@@ -369,6 +372,7 @@ async function startPointerConfine(config, opts = {}) {
  * @param {{ log?: Function }} [opts]
  */
 function syncOperatorPointerConfine(config, opts = {}) {
+	if (isSandbox()) return { ok: true, enabled: false, reason: 'sandbox instance (WO-719)' }
 	const verdict = evaluateOperatorPointerConfineDesire(config)
 	// WO-308: one line per decision, mirroring WO-290's RUN/SKIP verdict style. startPointerConfine
 	// logs its OWN skip below when desired — logging here too would just be the same reason twice

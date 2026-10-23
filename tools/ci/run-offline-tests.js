@@ -393,6 +393,7 @@ const FILES = [
 	'tools/smoke/smoke-wo716-vsync-off-gpu-texture-every-screen.test.js',
 	'tools/smoke/smoke-wo717-screen-consumer-policy-enforced.test.js',
 	'tools/smoke/smoke-wo718-new-project-operator-cable.test.js',
+	'tools/smoke/smoke-wo719-sandbox-guards.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

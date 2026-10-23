@@ -73,6 +73,7 @@ function consumerTitlePattern(channel) {
  * @returns {Promise<{ moved: number, alreadyCorrect: number, missing: number }>}
  */
 async function placeScreenConsumers(ctx = {}) {
+	if (require('../bootstrap/sandbox').isSandbox()) return { placed: 0, missing: 0, skipped: 'sandbox' } // WO-719: the live :0
 	const log = typeof ctx.log === 'function' ? ctx.log : () => {}
 	const exec = ctx.execFileImpl || execFileAsync
 	const result = { moved: 0, alreadyCorrect: 0, missing: 0 }

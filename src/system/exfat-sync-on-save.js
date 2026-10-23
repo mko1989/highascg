@@ -7,6 +7,7 @@ let inFlight = false
 
 function exfatSyncOnSaveEnabled() {
 	if (process.platform !== 'linux') return false
+	if (require('../bootstrap/sandbox').isSandbox()) return false // WO-719: would push/pull the LIVE config + projects
 	const v = String(process.env.HIGHASCG_EXFAT_SYNC_ON_SAVE ?? '1').trim().toLowerCase()
 	return v !== '0' && v !== 'false' && v !== 'no'
 }

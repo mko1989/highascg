@@ -17,7 +17,10 @@ const path = require('path')
 const crypto = require('crypto')
 const { getMediaIngestBasePath } = require('./local-media-paths')
 
-const DEFAULT_DIR = path.join(__dirname, '..', '..', 'data', 'media-library')
+const { isSandbox } = require('../bootstrap/sandbox')
+
+// WO-719: a sandbox instance keeps its registry under its own cwd (the sandbox root), never the live repo data/
+const DEFAULT_DIR = isSandbox() ? path.join(process.cwd(), 'data', 'media-library') : path.join(__dirname, '..', '..', 'data', 'media-library')
 let registryDir = DEFAULT_DIR
 /** @type {{ version: number, items: Record<string, object> } | null} */
 let cache = null

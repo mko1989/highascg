@@ -7,7 +7,11 @@ const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 const { getReplicationConfig, normalizeReplicationConfig } = require('../config/replication-config')
 
-const LOCAL_IDENTITY_PATH = path.join(REPO_ROOT, 'config', 'replication-local-identity.json')
+const { isSandbox } = require('../bootstrap/sandbox')
+// WO-719: a sandbox instance keeps its identity next to its own config, never in the live repo config/
+const LOCAL_IDENTITY_PATH = isSandbox() && process.env.HIGHASCG_CONFIG_PATH
+	? path.join(path.dirname(path.resolve(process.env.HIGHASCG_CONFIG_PATH)), 'replication-local-identity.json')
+	: path.join(REPO_ROOT, 'config', 'replication-local-identity.json')
 
 /**
  * @returns {string|null}

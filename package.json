@@ -25,6 +25,7 @@
 		"format:write:ci": "npx prettier --write tools/ci eslint.config.js .prettierrc.json",
 		"test:ci": "node tools/ci/run-offline-tests.js",
 		"test:ci:full": "node tools/ci/run-offline-tests-full.js",
+		"test:e2e:gui": "node tools/e2e/run-gui-e2e.js",
 		"ci:local": "bash scripts/ci/run-local-ci.sh",
 		"exfat-sync": "node tools/runtime/exfat-sync-cli.js",
 		"map:generate": "node tools/map/generate-map-data.js",

@@ -31,6 +31,7 @@ function projectsRoot() {
 
 /** Bridge / USB project pushes and pulls touch real mounted volumes — never from a test process. */
 function volumeSyncAllowed() {
+	if (require('../bootstrap/sandbox').isSandbox()) return false // WO-719: the WO-718 leak path (bridge → live projects/)
 	return !underTestRunner() || process.env.HIGHASCG_TEST_ALLOW_VOLUMES === '1'
 }
 

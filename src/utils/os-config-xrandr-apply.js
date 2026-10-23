@@ -45,6 +45,10 @@ function readXrandrApplyRetryDelayMs(config) {
  * Applies X11 screen positioning using xrandr or nvidia-settings.
  */
 async function applyX11Layout(config, opts = {}) {
+	if (require('../bootstrap/sandbox').isSandbox()) {
+		logger.info('[OS-Config] applyX11Layout skipped — sandbox instance (WO-719)')
+		return { ok: false, skipped: 'sandbox' }
+	}
 	const live = opts.live !== false
 	const persist = opts.persist !== false
 	logger.info(`[OS-Config] applyX11Layout start live=${live} persist=${persist}`)
