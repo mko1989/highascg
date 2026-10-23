@@ -115,6 +115,20 @@ driver's `texture_update`); plan B (zero-copy) only if the box misses budget.
 
 Not verified: Linux build (box/CI), RTX/Vulkan numbers, threaded render model.
 
+## Tests (2026-10-23)
+
+- `godot/client/tests/test_shm_reader.gd` + `shm_fake_writer.gd` (a writer for ABI v1 into a regular file, as
+  `open_path()` does). They cover `video/shm_reader.gd`: geometry, each frame read once, gaps, the writer's drop
+  counter, mid-write and lapped slots, slot index ≥ 3, the writer re-initialising, a restart with a new
+  generation and size, signal loss and segment sizes. The same segments then go to the native HshmSource
+  (`shm_native.gd`). CI has no extension binary, so that part only checks that the adapter reports it
+  unavailable. On the box it runs for real.
+- The tests found that the GDScript reader accepted segments the native reader refuses: pixel format ≠ 1,
+  slot count ≠ 3, or a file too short for its geometry. `_open` now refuses them too (`segment_size()` =
+  `hshm_segment_size`).
+- The C++ seqlock test (`caspar/modules/shm/tests`) and the Python bridge→probe round trip already ran in CI
+  (`ci.yml`).
+
 ## Earlier notes
 
 Nothing yet. API presence verified on 4.6.3 (probe); versions verified by `git ls-remote`.

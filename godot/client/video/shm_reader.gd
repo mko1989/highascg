@@ -7,12 +7,17 @@ const MAGIC := "HASCGSHM"
 const ABI_VERSION := 1
 const SLOTS := 3
 const SLOT_HEADER_SIZE := 4096
+const HEADER_SIZE := 4096
+const PAGE := 4096
+const PIXEL_FORMAT_BGRA8_PREMULT := 1
 const OFF_ABI_VERSION := 8
 const OFF_WIDTH := 16
 const OFF_HEIGHT := 20
 const OFF_STRIDE := 24
+const OFF_PIXEL_FORMAT := 28
 const OFF_FPS_NUM := 32
 const OFF_FPS_DEN := 36
+const OFF_SLOT_COUNT := 40
 const OFF_SLOT_OFFSET := 48
 const OFF_GENERATION := 80
 const OFF_LATEST := 96
@@ -128,7 +133,11 @@ func _open() -> bool:
 	var hdr := _read(0, 128)
 	if hdr.size() < 128 or hdr.slice(0, 8).get_string_from_ascii() != MAGIC:
 		return false
-	if hdr.decode_u32(OFF_ABI_VERSION) != ABI_VERSION:
+	# Same refusals as the native reader (caspar/modules/shm/hshm_reader.h open): ABI, pixel format, slot count, and a
+	# file big enough for the geometry it claims (a short one would read garbage slots).
+	if hdr.decode_u32(OFF_ABI_VERSION) != ABI_VERSION or hdr.decode_u32(OFF_PIXEL_FORMAT) != PIXEL_FORMAT_BGRA8_PREMULT:
+		return false
+	if hdr.decode_u32(OFF_SLOT_COUNT) != SLOTS or _length() < segment_size(hdr.decode_u32(OFF_STRIDE), hdr.decode_u32(OFF_HEIGHT)):
 		return false
 	width = hdr.decode_u32(OFF_WIDTH)
 	height = hdr.decode_u32(OFF_HEIGHT)
@@ -143,6 +152,16 @@ func _open() -> bool:
 	_opened = true
 	reopens += 1
 	return true
+
+
+## hshm_abi.h hshm_segment_size: the header page + 3 slots, each its header page + pixels, rounded up to a page.
+static func segment_size(row_stride: int, rows: int) -> int:
+	return HEADER_SIZE + SLOTS * ceili(float(SLOT_HEADER_SIZE + row_stride * rows) / PAGE) * PAGE
+
+
+func _length() -> int:
+	var f := FileAccess.open(path, FileAccess.READ)
+	return f.get_length() if f != null else 0
 
 
 func _close() -> void:
