@@ -70,13 +70,14 @@ static func points(t: Dictionary, ce: Dictionary, objects: Array) -> Array:
 	for p in ce.points:
 		if p.screen != null:
 			clicks[p.id] = Vector2(p.screen[0], p.screen[1])
-	# clicked points whose candidate is gone (object deleted / grid resized) still count and still show
+	# clicked points whose candidate is gone (object deleted / grid resized) still count and still show; a person on
+	# a stage mark (WO-713 R3, person_mark_model.gd) is no candidate — it is not gone
 	var known := {}
 	for p in cands:
 		known[p.id] = true
 	for p in ce.points:
 		if not known.has(p.id) and p.screen != null:
-			cands.append({"id": p.id, "label": "%s (gone)" % p.label, "world": p.world})
+			cands.append({"id": p.id, "label": p.label if str(p.id).begins_with("person:") else "%s (gone)" % p.label, "world": p.world})
 	var px := shown(ce, cands.map(func(p: Dictionary) -> Array: return p.world))
 	var out := []
 	for i in cands.size():

@@ -308,8 +308,9 @@ static func calib_summary(sess: Dictionary) -> String:
 	if s.get("ok") != true:
 		var need := int(s.get("need", 3 - n))
 		return "%d point%s — %d more to solve." % [n, "" if n == 1 else "s", need]
-	if s.has("map"):  # WO-700 R7
-		var line := "%d mark%s pinned — the digital beam is on each." % [n, "" if n == 1 else "s"]
+	if s.has("map"):  # WO-700 R7; WO-713 R1: points taken on a person carry their height above the mark
+		var held: int = (sess.get("points", []) as Array).filter(func(p: Variant) -> bool: return p is Dictionary and p.has("height")).size()
+		var line := "%d mark%s pinned%s — the digital beam is on each." % [n, "" if n == 1 else "s", " (%d on a person)" % held if held > 0 else ""]
 		if float(s.get("rms_deg", 0.0)) > 1.0:
 			line += "\nOne offset would miss them by %.1f° on average: the head is probably not where it is patched." % float(s.rms_deg)
 		return line

@@ -6,12 +6,16 @@ extends VBoxContainer
 ## `lighting`) leaves the head to the Programmer above — the same Pan / Tilt (or right-drag) aims the real beam;
 ## "Beam is on <mark>" pairs the pan / tilt the head is being sent with that mark; from 3 marks the server solves where
 ## the head hangs and Apply pose writes it into the patch.
+## WO-713 R1: "Person on the mark" — someone stands on the mark and the beam is on them: the point is taken at the
+## head's own aim height (aim_z, where following aims), so the pin is right where the head follows; floor and person
+## pins share the head's offset_map. While detection runs, one line says how far the nearest person is from the mark.
 
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const T := preload("res://features/previs/tracking/tracking_model.gd")
+const PM := preload("res://features/previs/tracking/person_mark_model.gd")
 
 var sel: RefCounted = Sel.shared()
 var _list: ItemList
@@ -27,6 +31,10 @@ var _picked := 0  # selected mark id
 var _trim_row: HBoxContainer
 var _trim: Array = []  # SpinBox pan, tilt — the selected head's beam offset (R7 manual trim)
 var _key := ""
+var _person: CheckBox  # WO-713 R1
+var _near: Label  # is a detected person on the picked mark
+var _now := {}  # the picked mark (kept off the 15 Hz detections)
+var _snap := {}  # the last tracking:detections
 
 
 func _ready() -> void:
@@ -87,11 +95,17 @@ func _ready() -> void:
 	_calib.apply_requested.connect(_apply_solve)
 	add_child(_calib)
 	_on_mark = Button.new()
-	_on_mark.pressed.connect(func() -> void:
-		var m := _mark(_picked)
-		if not m.is_empty():
-			_calib.add_floor_point([m.x, m.y, m.z]))
+	_on_mark.pressed.connect(_pin_mark)
 	_calib.add_point_button(_on_mark)
+	_person = CheckBox.new()
+	_person.text = "Person on the mark"
+	_person.tooltip_text = "Someone stands on the mark and the beam is on them: the point is taken at this head's aim height, where following aims"
+	_person.toggled.connect(func(_on: bool) -> void: _fill_button())
+	_near = _muted("")
+	remove_child(_near)
+	_calib.add_below_points(_near)
+	_calib.add_below_points(_person)  # each goes right under the point row: the tick, then its line
+	Ws.message.connect(_on_ws)
 	_calib.refreshed.connect(_fill_button)
 	sel.floor_picked.connect(_add_mark)
 	sel.changed.connect(_on_selection)
@@ -149,8 +163,35 @@ func _fill_edit() -> void:
 
 func _fill_button() -> void:
 	var m := _mark(_picked)
+	_now = m
+	var person := _person != null and _person.button_pressed
 	_on_mark.disabled = m.is_empty()
-	_on_mark.text = "Beam is on %s" % m.name if not m.is_empty() else "Beam is on … (pick a mark above)"
+	_on_mark.text = ("Beam is on the person at %s" if person else "Beam is on %s") % m.name if not m.is_empty() else "Beam is on … (pick a mark above)"
+	_fill_near()
+
+
+func _pin_mark() -> void:
+	var m := _mark(_picked)
+	if m.is_empty():
+		return
+	if _person.button_pressed:
+		_calib.add_floor_point([m.x, m.y, m.z], "aim")  # WO-713 R1: the head's own aim_z above the mark
+	else:
+		_calib.add_floor_point([m.x, m.y, m.z])
+
+
+func _on_ws(type: String, data: Variant) -> void:
+	if type == "tracking:detections" and data is Dictionary:
+		_snap = data
+		if _person.button_pressed and is_visible_in_tree():
+			_fill_near()
+
+
+func _fill_near() -> void:
+	if _near == null:
+		return
+	_near.text = PM.near_line(_snap, _now) if _person.button_pressed else ""
+	_near.visible = _near.text != ""
 
 
 func _on_selection() -> void:

@@ -20,6 +20,7 @@ const DetectSection := preload("res://features/previs/tracking/detect_section.gd
 const PresentersSection := preload("res://features/previs/tracking/presenters_section.gd")  # WO-675
 const PtzSection := preload("res://features/previs/tracking/ptz_section.gd")  # WO-711
 const GhostRow := preload("res://features/previs/tracking/ghost_row.gd")
+const PersonMarkRow := preload("res://features/previs/tracking/person_mark_row.gd")  # WO-713 R3
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
@@ -174,6 +175,7 @@ func _ready() -> void:
 	sr.add_child(_fit_lens)
 	sr.add_child(_button("Solve", solve))
 	_body.add_child(sr)
+	_body.add_child(PersonMarkRow.new(self))  # WO-713 R3: Person is on <mark> → a feet ↔ mark point, then Solve
 	_status = Label.new()
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD
 	_status.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)

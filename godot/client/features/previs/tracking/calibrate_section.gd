@@ -119,10 +119,20 @@ func is_open() -> bool:
 	return _sessions.get(fixture_id) is Dictionary
 
 
+## WO-700: more of the Lighting fold's controls go just under the point row (WO-713 R1: Person on the mark).
+func add_below_points(c: Control) -> void:
+	_box.add_child(c)
+	_box.move_child(c, _point_row.get_index() + 1)
+
+
 ## WO-630 F1: the beam spot the operator clicked in the camera picture (PSN metres) — no marker to place first.
-func add_floor_point(at: Array) -> void:
+## WO-713 R1: `height` (metres, or "aim" = the head's aim_z) — the beam is on a person standing there.
+func add_floor_point(at: Array, height: Variant = null) -> void:
 	if is_open():
-		_act({"action": "point", "at": at})
+		var body := {"action": "point", "at": at}
+		if height != null:
+			body["height"] = height
+		_act(body)
 
 
 func set_fixture(id: String) -> void:

@@ -15,6 +15,9 @@
  *   {action: 'point', id, marker}              the beam spot is where `marker` stands → one (pan, tilt) ↔ point pair
  *   {action: 'point', id, at: [x, y, z]}       … or the floor spot the operator clicked in a camera picture
  *                                              (WO-630 F1: no marker to place first; PSN metres)
+ *   … height: 0–3 | 'aim' | true               WO-713 R1: the beam is on a person standing there — the pair is taken
+ *                                              that many metres above the mark ('aim' / true: the head's own aim_z,
+ *                                              the height it follows at), so the pin lands where following aims
  *   {action: 'undo', id}                       drop the last pair
  *   {action: 'end', id}                        release the head (it follows its marker again)
  * Each reply carries the session and, from 3 pairs, the solved pose (calibrate-solve.js) — a live session the solved
@@ -26,6 +29,17 @@ const { axisFn, beamOf } = require('./gdtf-ik')
 const { addPin, normalizeMap } = require('./beam-offset')
 
 const wrap = (v) => ((((v + 180) % 360) + 360) % 360) - 180
+
+/**
+ * WO-713 R1: metres above the mark a point is taken at — absent / null / '' / false = the floor (0); 'aim' / true =
+ * the head's own follow height (follow-patch.js aim_z); else a number 0–3. undefined when it is none of these.
+ */
+function heightOf(v, fx) {
+	if (v === undefined || v === null || v === '' || v === false) return 0
+	if (v === true || v === 'aim') return Number(fx.aim_z) || 0
+	const h = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN
+	return Number.isFinite(h) && h >= 0 && h <= 3 ? h : undefined
+}
 
 /**
  * WO-700 R7: the pinned marks a live session leaves on the head — the ones it started with, each new point added
@@ -139,10 +153,19 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 			if (at && (at.length !== 3 || !at.every((v) => Number.isFinite(v) && Math.abs(v) <= 500))) {
 				return { status: 400, body: { error: 'at must be [x, y, z] in metres, within 500 m of the origin' } }
 			}
-			const m = at
+			const height = heightOf(data.height, fx)
+			if (height === undefined) {
+				return {
+					status: 400,
+					body: { error: 'height must be metres above the mark (0–3), or "aim" for the head\'s aim height' },
+				}
+			}
+			const mk = at
 				? { x: at[0], y: at[1], z: at[2] }
 				: (hub.list(hub.now()) || []).find((k) => k.id === Number(data.marker))
-			if (!m) return { status: 404, body: { error: `no marker ${data.marker} — place one on the beam spot` } }
+			if (!mk) return { status: 404, body: { error: `no marker ${data.marker} — place one on the beam spot` } }
+			// WO-713 R1: a person on the mark — the beam is on them at `height`, not on the floor ({x, y, z, height?})
+			const m = { x: mk.x, y: mk.y, z: mk.z + height, ...(height ? { height } : {}) }
 			// a stale marker still stands where the operator dropped it — its position is all a pair needs
 			if (s.live) {
 				const a = liveModel(fx)?.read(frame(fx))
@@ -155,7 +178,7 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 				s.pan = a.pan
 				s.tilt = a.tilt
 				// R7: the correction that puts the beam exactly on this mark at these angles, over the trim now
-				const pt = { pan: a.pan, tilt: a.tilt, x: m.x, y: m.y, z: m.z, inv: a.inv }
+				const pt = { pan: a.pan, tilt: a.tilt, ...m, inv: a.inv }
 				const e = solveOffsets([pt], liveModel(fx).forward).offset
 				pt.dpan = wrap(e.pan - (Number(fx.offset?.pan) || 0))
 				pt.dtilt = wrap(e.tilt - (Number(fx.offset?.tilt) || 0))
@@ -163,7 +186,7 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 				return { status: 200, body: view(id) }
 			}
 			Object.assign(s, engine.hold(id, s.pan, s.tilt)) // refresh the hold's TTL
-			s.points.push({ pan: s.pan, tilt: s.tilt, x: m.x, y: m.y, z: m.z, inv: fx.pan.invert })
+			s.points.push({ pan: s.pan, tilt: s.tilt, ...m, inv: fx.pan.invert })
 			return { status: 200, body: view(id) }
 		}
 		if (action === 'undo') {
