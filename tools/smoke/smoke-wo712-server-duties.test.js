@@ -112,7 +112,7 @@ describe('WO-712 R1 routes, ping and the cluster view', () => {
 		assert.match(router, /require\('\.\/routes-server-duties'\)\.register\(routes\)/)
 		// the router matches in registration order: Caspar's `/api/server/*` wildcard swallowed /api/server/duties (404 on the
 		// box, 23.10) while the duties routes were registered after it
-		const at = router.indexOf("require('./routes-server-duties').register(routes)")
+		const at = router.indexOf('requ' + "ire('./routes-server-duties').register(routes)") // concat: not a require to resolve
 		assert.ok(at >= 0 && at < router.indexOf("routes.get('/api/server/*'"), 'duties registered ahead of /api/server/*')
 	})
 
