@@ -7,18 +7,25 @@ const PLUGIN_CATALOG = [
 		id: 'previs',
 		name: 'Previs',
 		moduleName: 'previs',
+		// WO-690: on by default — the Godot client always has the Previs tab, and a factory / stick reset
+		// (eggs produce) left it without its model library and fixture engine. Opt OUT via
+		// `features.previs3d: false`, HIGHASCG_PREVIS=0 or a plugin-store entry.
 		legacyEnabled: (config) => {
 			const envFlag = process.env.HIGHASCG_PREVIS
-			return isTruthy(envFlag) || config?.features?.previs3d === true
+			if (envFlag !== undefined) return isTruthy(envFlag)
+			return config?.features?.previs3d !== false
 		},
 	},
 	{
 		id: 'tracking',
 		name: 'Tracking',
 		moduleName: 'tracking',
+		// WO-690: on by default — it runs the previs fixture engine (Programmer, DMX out, Art-Net input), not only
+		// person tracking; detection itself stays per-project opt-in. Opt OUT via `features.tracking: false`.
 		legacyEnabled: (config) => {
 			const envFlag = process.env.HIGHASCG_TRACKING
-			return isTruthy(envFlag) || config?.features?.tracking === true
+			if (envFlag !== undefined) return isTruthy(envFlag)
+			return config?.features?.tracking !== false
 		},
 	},
 	{

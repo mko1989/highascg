@@ -326,6 +326,7 @@ const FILES = [
 	'tools/smoke/smoke-wo260-browser-display-ui.test.js',
 	'tools/smoke/smoke-wo258-browser-source.test.js',
 	'tools/smoke/smoke-wo265-cg-studio-tab.test.js',
+	'tools/smoke/smoke-wo690-previs-tracking-default-on.test.js',
 	'tools/smoke/smoke-wo266-shader-fx.test.js',
 	'tools/smoke/smoke-wo267-studio-canvas-play.test.js',
 	'tools/smoke/smoke-wo268-shader-cef-continuity.test.js',
