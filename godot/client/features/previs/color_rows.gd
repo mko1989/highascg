@@ -17,15 +17,17 @@ signal visibility_toggled(name: String, shown: bool)  # WO-647
 
 var eyes := false  # WO-647: an eye per row (set before the first fill)
 var _names: Array = []
+var _labels := {}
 var _rows := {}  # name → [ColorPickerButton, reset Button, eye Button | null, row PanelContainer]
 var _lit: Array = []  # highlighted names
 
 
 ## `names` in order; `cols` name → "#rrggbb"; `labels` name → shown text (default: the name); `hidden` names show a
-## closed eye.
-func fill(names: Array, cols: Dictionary, labels := {}, hidden := []) -> void:
-	if names != _names:
+## closed eye; `off` rows have nothing to colour or show (WO-706: a layer the file left empty).
+func fill(names: Array, cols: Dictionary, labels := {}, hidden := [], off := []) -> void:
+	if names != _names or labels != _labels:
 		_names = names.duplicate()
+		_labels = labels.duplicate()
 		_rows = {}
 		for c in get_children():
 			remove_child(c)
@@ -35,9 +37,11 @@ func fill(names: Array, cols: Dictionary, labels := {}, hidden := []) -> void:
 	for n in _rows:
 		var c: Variant = Tint.parse(cols.get(n))
 		(_rows[n][0] as ColorPickerButton).color = c if c is Color else UNSET
-		(_rows[n][1] as Button).disabled = not c is Color
+		(_rows[n][0] as ColorPickerButton).disabled = off.has(n)
+		(_rows[n][1] as Button).disabled = not c is Color or off.has(n)
 		if _rows[n][2] != null:
 			var b := _rows[n][2] as Button
+			b.disabled = off.has(n)
 			b.set_pressed_no_signal(not hidden.has(n))
 			b.icon = Icons.texture("eye" if b.button_pressed else "eye_off")
 	highlight(_lit)

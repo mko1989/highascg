@@ -16,6 +16,7 @@ signal loaded(info: Dictionary)  ## {} when cleared; else {name, objects, fixtur
 
 var scene_id := ""
 var layers: Array = []  ## layer names in file order
+var layer_sizes := {}  ## WO-706: layer name → its objects (0 = the file left the layer empty)
 var _gen := 0  # a newer show_scene() cancels an older one still fetching
 var _hidden := {}
 var _layer_colors := {}  # WO-641
@@ -38,6 +39,7 @@ func show_scene(id: String) -> void:
 	for c in get_children():
 		c.queue_free()
 	layers = []
+	layer_sizes = {}
 	fixture_uuids = []
 	_marks = []  # freed with the other children
 	_screens = []
@@ -72,6 +74,7 @@ func show_scene(id: String) -> void:
 		var node := Node3D.new()
 		node.name = str(o.get("name", "object")).validate_node_name()
 		node.set_meta("layer", str(o.get("layer", "")))
+		layer_sizes[node.get_meta("layer")] = int(layer_sizes.get(node.get_meta("layer"), 0)) + 1
 		node.set_meta("kind", str(o.get("kind", "")))
 		node.set_meta("uuid", str(o.get("uuid", "")).to_lower())
 		var keys: Array = o.get("parts", []).map(func(p: Dictionary) -> String: return str(p.get("mesh", "")))

@@ -34,6 +34,39 @@ static func import_cfg(cur: Dictionary, id: String, name: String) -> Dictionary:
 	return {"id": id, "name": name, "hidden_layers": []}
 
 
+## WO-706 (owner 23.10: "walls in the imported mvr are listed as layers but they cant be turned on. id like them to be
+## turned off by default on import but with the ability to turn them on"): a layer whose name says wall (en / pl / de /
+## fr / es / it word starts) and that holds something starts hidden in a scene new to the project. A layer the file
+## left empty (Capture exports its venue layers' names without their geometry) is shown as such — no eye to promise.
+const WALL_WORDS := ["wall", "ścian", "scian", "wand", "wänd", "mur", "paroi", "pared", "parete"]
+
+
+static func is_wall_layer(name: String) -> bool:
+	var n := name.to_lower()
+	for ch in "_-.,+/()[]:;&":
+		n = n.replace(ch, " ")
+	for word in n.split(" ", false):
+		for w in WALL_WORDS:
+			if word.begins_with(w):
+				return true
+	return false
+
+
+static func wall_layers(layers: Array, sizes: Dictionary) -> Array:
+	return layers.filter(func(l: Variant) -> bool: return int(sizes.get(l, 0)) > 0 and is_wall_layer(str(l)))
+
+
+static func empty_layers(layers: Array, sizes: Dictionary) -> Array:
+	return layers.filter(func(l: Variant) -> bool: return int(sizes.get(l, 0)) == 0)
+
+
+static func layer_labels(layers: Array, sizes: Dictionary) -> Dictionary:
+	var out := {}
+	for l in empty_layers(layers, sizes):
+		out[l] = "%s · empty in the file" % (l if str(l) != "" else "(no layer)")
+	return out
+
+
 ## WO-643 — the scene id the server gives these bytes (src/stage/mvr-store.js importMvr: sha1, 12 hex) and the name
 ## it gives the file, so an import can be checked against the shown scene before the upload.
 static func file_id(bytes: PackedByteArray) -> String:

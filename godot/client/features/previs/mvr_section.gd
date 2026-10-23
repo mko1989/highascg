@@ -10,8 +10,7 @@ extends VBoxContainer
 ## venues can sit metres off to one side, floor below ours). Import fits a scene that is off; patched fixtures move along.
 ## WO-634: click a wall in the 3D view (ctrl adds walls) → Map onto a destination (mvr_screens.gd; project.previs.mvr.hidden_objects).
 
-const Upload := preload("res://core/stream_upload.gd")
-const FilePick := preload("res://features/devices/file_pick.gd")
+const MvrImport := preload("res://features/previs/mvr_import.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const M := preload("res://features/previs/mvr_model.gd")
@@ -21,7 +20,6 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
-const PaneKit := preload("res://features/settings/pane_kit.gd")
 
 signal scene_loaded(info: Dictionary)
 signal types_changed  ## GDTF types were imported (scene shown, or a patch) — the Fixtures section re-lists them
@@ -46,6 +44,7 @@ var _fit_on_load := false
 var _screens: MvrScreens
 var _colors := ColorRows.new()  # WO-641: a colour per layer
 var _screen_uuids: Array = []  # WO-647: what the screens tool has selected
+var _walls_for := ""  # WO-706: the scene new to this project — its wall layers start hidden once it has loaded
 
 
 func bind(s: MvrScene) -> void:
@@ -165,7 +164,7 @@ func _maybe_reload() -> void:
 	for k in _place:
 		(_place[k] as SpinBox).set_value_no_signal(p[k])
 	scene.configure(c)
-	_colors.fill(scene.layers, Tint.colors(c, "layer_colors"), {}, _hidden_layers())
+	_fill_layers()
 	_screens.refresh()
 
 
@@ -192,6 +191,10 @@ func _select(id: String) -> void:
 func _on_pick(i: int) -> void:
 	var id := str(_pick.get_item_metadata(i))
 	var c := {} if id == "" else {"id": id, "name": _pick.get_item_text(i).get_slice("  (", 0), "hidden_layers": []}
+	_walls_for = id
+	if id != "" and id == str(_cfg().get("id", "")):  # the shown scene again: no load follows
+		c["hidden_layers"] = M.wall_layers(scene.layers, scene.layer_sizes)
+		_walls_for = ""
 	var n := _content()
 	if id == str(_cfg().get("id", "")) or n[0] + n[1] == 0:
 		_save(c)
@@ -233,36 +236,13 @@ func _save(c: Dictionary) -> void:
 
 
 func _import() -> void:
-	var path: String = await FilePick.open_path(self, "Import an MVR scene", ["*.mvr ; MVR scene"])
-	if path == "":
-		return
-	# WO-643: the same file again is said, not re-imported; a new version of the shown scene is asked first.
-	var check := M.import_check(_cfg(), M.file_id(FileAccess.get_file_as_bytes(path)), M.file_name(path))
-	if check[0] == "same":
-		var d := AcceptDialog.new()
-		d.title = "Already imported"
-		d.dialog_text = check[1]
-		d.visibility_changed.connect(func() -> void:
-			if not d.visible:
-				d.queue_free())
-		add_child(d)
-		d.popup_centered()
-	elif check[0] == "version":
-		PaneKit.confirm(self, check[1], _upload.bind(path))
-	else:
-		_upload(path)
+	MvrImport.run(self, _cfg(), _status, _imported)
 
 
-func _upload(path: String) -> void:
-	_status.text = "Uploading %s…" % path.get_file()
-	var res: Dictionary = await Upload.upload(Config.origin, "/api/stage/mvr", path, func(sent: int, total: int) -> void:
-		_status.text = "Uploading %s… %d%%" % [path.get_file(), int(100.0 * sent / maxf(1.0, total))])
-	if not res.ok or not (res.data is Dictionary):
-		_status.text = "Import failed: %s" % (res.data.get("error", res.error) if res.data is Dictionary else res.error)
-		return
+func _imported(c: Dictionary, fresh: bool) -> void:
 	await refresh_list()
-	var c := M.import_cfg(_cfg(), str(res.data.id), str(res.data.name))
 	_fit_on_load = not c.has("place")  # WO-643: a re-import keeps the scene where it was
+	_walls_for = str(c.id) if fresh else ""
 	_save(c)
 
 
@@ -303,15 +283,25 @@ func _set_layer_color(layer: String, c: Variant) -> void:
 
 ## WO-647: a layer row's eye.
 func _set_layer_shown(name: String, shown: bool) -> void:
-	var c := _cfg().duplicate(true)
-	if c.is_empty():
-		return
-	var hidden: Array = c.get("hidden_layers", []) if c.get("hidden_layers") is Array else []
+	var hidden := _hidden_layers().duplicate()
 	hidden.erase(name)
 	if not shown:
 		hidden.append(name)
-	c["hidden_layers"] = hidden
-	_save(c)
+	_set_hidden_layers(hidden)
+
+
+func _set_hidden_layers(hidden: Array) -> void:
+	var c := _cfg().duplicate(true)
+	if not c.is_empty():
+		c["hidden_layers"] = hidden
+		_save(c)
+
+
+## WO-706: layers the file left empty say so, with nothing to colour or show.
+func _fill_layers() -> void:
+	var sizes := scene.layer_sizes
+	_colors.fill(scene.layers, Tint.colors(_cfg(), "layer_colors"), M.layer_labels(scene.layers, sizes), _hidden_layers(),
+		M.empty_layers(scene.layers, sizes))
 
 
 ## WO-634: a 3D click that hit no fixture / stage object → maybe an MVR wall. → whether it hit one.
@@ -329,7 +319,12 @@ func _on_loaded(info: Dictionary) -> void:
 	_screens.clear()
 	_patch_status.text = ""
 	_sync_patch_ui()
-	_colors.fill(scene.layers, Tint.colors(_cfg(), "layer_colors"), {}, _hidden_layers())
+	if _walls_for != "" and _walls_for == str(_cfg().get("id", "")):
+		var walls := M.wall_layers(scene.layers, scene.layer_sizes)
+		_walls_for = ""
+		if not walls.is_empty():
+			_set_hidden_layers(walls)
+	_fill_layers()
 	_remove_btn.disabled = info.is_empty()  # {} = no scene picked
 	_info = info
 	_status.text = M.summary(info)
