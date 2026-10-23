@@ -10,6 +10,7 @@ const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const P := preload("res://features/previs/fixtures/programmer_model.gd")
 const Auto := preload("res://features/previs/fixtures/auto_groups_model.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
+const FM := preload("res://features/previs/fixtures/fixtures_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var sel: RefCounted = Sel.shared()
@@ -23,6 +24,8 @@ var _controls: VBoxContainer
 var _status: Label
 var _name_dialog: ConfirmationDialog
 var _name: LineEdit
+var _confirm_del: ConfirmationDialog
+var _del_ids: Array = []  # what the open Delete dialog names (a selection change meanwhile does not retarget it)
 var _pending := {}  # JSON of ids → [ids, values], merged until the next flush
 var _flush: Timer
 var _thumbs := {}  # "typeId|media" → Texture2D (null = none)
@@ -41,7 +44,8 @@ func _ready() -> void:
 	add_child(_list)
 	var row := HBoxContainer.new()
 	for spec in [["All", func() -> void: sel.set_ids(_typed.map(func(f: Dictionary) -> String: return f.id))],
-			["None", func() -> void: sel.set_ids([])], ["Release", _release.bind(false)], ["Release all", _release.bind(true)]]:
+			["None", func() -> void: sel.set_ids([])], ["Release", _release.bind(false)], ["Release all", _release.bind(true)],
+			["Delete", _ask_delete]]:
 		var b := Button.new()
 		b.text = spec[0]
 		b.pressed.connect(spec[1])
@@ -68,6 +72,9 @@ func _ready() -> void:
 	_name_dialog.register_text_enter(_name)
 	_name_dialog.confirmed.connect(_save_group)
 	add_child(_name_dialog)
+	_confirm_del = ConfirmationDialog.new()
+	_confirm_del.confirmed.connect(_delete)
+	add_child(_confirm_del)
 	_flush = Timer.new()
 	_flush.one_shot = true
 	_flush.wait_time = 0.05
@@ -76,6 +83,7 @@ func _ready() -> void:
 	sel.changed.connect(_on_selection)
 	sel.aimed.connect(_on_selection)  # WO-679: after a right-drag aim
 	sel.aim_at.connect(_aim)
+	sel.delete_requested.connect(_ask_delete)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _fill_list())
 	_fill_list()
 	_on_selection()
@@ -166,6 +174,33 @@ func _release(all: bool) -> void:
 			await Api.delete_json("/api/fixtures/program?id=" + str(id).uri_encode())
 	_status.text = "Released %s — channels back to their defaults." % ("all fixtures" if all else "the selection")
 	_on_selection()
+
+
+## WO-691: the selected heads out of the patch (asks first). Their programmer values are released on the server.
+func _ask_delete() -> void:
+	var ids: Array = sel.ids.duplicate()
+	if ids.is_empty():
+		_status.text = "Select fixtures to delete (click them in the 3D view or in the list)."
+		return
+	_del_ids = ids
+	var names: Array = _typed.filter(func(f: Dictionary) -> bool: return ids.has(f.id)).map(func(f: Dictionary) -> String: return f.name)
+	_confirm_del.dialog_text = "Delete %s from the patch?" % (("\"%s\"" % names[0]) if ids.size() == 1 and names.size() == 1
+		else "%d fixtures" % ids.size())
+	_confirm_del.popup_centered()
+
+
+func _delete() -> void:
+	var ids: Array = _del_ids
+	_del_ids = []
+	var n := FM.delete_fixtures(Store.project, ids)
+	if n == 0:
+		return
+	sel.set_ids(sel.ids.filter(func(id: String) -> bool: return not ids.has(id)))
+	ProjectSync.mark_dirty(true)
+	Store.project_changed.emit(Store.project)
+	for id in ids:
+		Api.delete_json("/api/fixtures/program?id=" + str(id).uri_encode())
+	_status.text = "Deleted %d fixture%s." % [n, "" if n == 1 else "s"]
 
 
 func _aim(psn: Array) -> void:

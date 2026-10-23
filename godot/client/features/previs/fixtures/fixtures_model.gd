@@ -125,3 +125,26 @@ static func toggle_universe(dmx: Dictionary, key: String, on: bool) -> Dictionar
 	elif not on:
 		d.universes.erase(key)
 	return d
+
+
+## WO-691: delete patched fixtures `ids` from `project` (in place). Deleting the last fixture an MVR scene brought marks
+## the scene unpatched (project.previs.mvr.unpatched, as Unpatch does) so the next load does not patch it again.
+## → how many were removed.
+static func delete_fixtures(project: Dictionary, ids: Array) -> int:
+	var fx: Dictionary = project.get("fixtures") if project.get("fixtures") is Dictionary else {}
+	var patch: Array = fx.get("patch") if fx.get("patch") is Array else []
+	var gone := {}
+	for id in ids:
+		gone[str(id)] = true
+	var kept := patch.filter(func(f: Variant) -> bool: return not (f is Dictionary and gone.has(str(f.get("id", "")))))
+	var removed := patch.size() - kept.size()
+	if removed == 0:
+		return 0
+	fx["patch"] = kept
+	project["fixtures"] = fx
+	var mvr_left := kept.any(func(f: Variant) -> bool: return f is Dictionary and str(f.get("id", "")).begins_with("mvr-"))
+	var mvr_gone := ids.any(func(id: Variant) -> bool: return str(id).begins_with("mvr-"))
+	var previs: Variant = project.get("previs")
+	if mvr_gone and not mvr_left and previs is Dictionary and (previs as Dictionary).get("mvr") is Dictionary:
+		previs.mvr["unpatched"] = true
+	return removed

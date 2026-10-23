@@ -6,6 +6,7 @@ extends RefCounted
 signal changed
 signal aim_at(psn: Array)  # [x, y, z] metres, PSN frame (x stage left, y upstage, z up)
 signal aimed  # WO-679: a right-drag aim ended (aim_drag.gd)
+signal delete_requested  # WO-691: Delete / Backspace in the previs while heads are the selection → the Programmer asks
 
 static var _one: RefCounted = null
 

@@ -288,8 +288,8 @@ func _on_3d_input(e: InputEvent) -> void:
 
 
 ## Keys while the previs is shown (text fields consume their own keys first):
-## Delete remove · Ctrl+D duplicate (stage objects) · arrows / Page Up / Down / Q / E move the selection (WO-682,
-## move_drag.gd key) · F fit.
+## Delete remove (selected heads: the Programmer asks, WO-691) · Ctrl+D duplicate (stage objects) · arrows / Page Up /
+## Down / Q / E move the selection (WO-682, move_drag.gd key) · F fit.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or not is_visible_in_tree():
@@ -302,8 +302,11 @@ func _unhandled_key_input(event: InputEvent) -> void:
 		return
 	var handled := true
 	match k.keycode:
-		KEY_DELETE, KEY_BACKSPACE:
-			stage_panel.delete_selected()
+		KEY_DELETE, KEY_BACKSPACE:  # WO-691: the heads when they are the selection, else the stage object
+			if mover.active() == "heads":
+				mover.sel.delete_requested.emit()
+			else:
+				stage_panel.delete_selected()
 		KEY_D when k.is_command_or_control_pressed():  # ⌘D on macOS (WO-686)
 			stage_panel.duplicate_selected()
 		KEY_F:

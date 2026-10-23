@@ -57,3 +57,18 @@ func test_input_lines_while_visualising() -> void:
 		"fresh source shown; a stale one reads as no input")
 	t.eq(M.input_lines(unis, {"visualise": false}), PackedStringArray(), "nothing while not visualising")
 	t.eq(M.input_lines(unis, null), PackedStringArray())
+
+
+func test_delete_fixtures() -> void:
+	var p := {"fixtures": {"patch": [{"id": "fx1"}, {"id": "mvr-a"}, {"id": "mvr-b"}, {"id": "fx2"}], "dmx": {}},
+		"previs": {"mvr": {"id": "s1"}}}
+	t.eq(M.delete_fixtures(p, ["fx1", "nope"]), 1, "unknown ids are ignored")
+	t.eq(p.fixtures.patch.map(func(f: Dictionary) -> String: return f.id), ["mvr-a", "mvr-b", "fx2"])
+	t.eq(M.delete_fixtures(p, ["mvr-a"]), 1)
+	t.eq(p.previs.mvr.has("unpatched"), false, "an MVR fixture is left → the scene stays patched")
+	t.eq(M.delete_fixtures(p, ["mvr-b"]), 1)
+	t.eq(p.previs.mvr.get("unpatched"), true, "the scene's last fixture gone → no re-patch on the next load")
+	t.eq(M.delete_fixtures(p, []), 0)
+	t.eq(p.fixtures.dmx, {}, "the rest of the slice is kept")
+	var bare := {}
+	t.eq(M.delete_fixtures(bare, ["x"]), 0, "no fixtures slice → nothing to do")
