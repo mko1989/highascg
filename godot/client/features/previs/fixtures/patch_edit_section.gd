@@ -22,9 +22,6 @@ var _note: Label
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 4)
-	var head := Label.new()
-	head.text = "Patch (selected heads)"
-	add_child(head)
 	_what = _muted()
 	_mode = OptionButton.new()
 	_mode.fit_to_longest_item = false

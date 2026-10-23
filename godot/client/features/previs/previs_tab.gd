@@ -466,7 +466,10 @@ func _build_panel() -> Control:
 	mvr_section = MvrSection.new()
 	v.add_child(Fold.new("MVR scene", [mvr_section]))
 	var fixtures_section := FixturesSection.new()
-	v.add_child(Fold.new("Fixtures", [fixtures_section]))
+	var inset := MarginContainer.new()  # WO-699: its own folds sit under "Lighting"
+	inset.add_theme_constant_override("margin_left", 12)
+	inset.add_child(fixtures_section)
+	v.add_child(Fold.new("Lighting", [inset]))
 	mvr_section.types_changed.connect(fixtures_section.refresh_types)  # WO-615 T10: a patch imports GDTF types
 	_models = ItemList.new()
 	_models.custom_minimum_size.y = 120

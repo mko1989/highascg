@@ -5,6 +5,8 @@ extends VBoxContainer
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
 ## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Art-Net / sACN input (T7, renamed WO-641) lets the
 ## console's input drive the previs instead (and sends nothing on those universes). The Programmer (T6) sits below.
+## WO-699: in four folds — Add fixtures (type, mode, universe), Selected heads — patch, DMX output (on, universes,
+## NIC, console input, viewer, usage), Programmer.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -18,6 +20,7 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
 const PatchEdit := preload("res://features/previs/fixtures/patch_edit_section.gd")
+const Fold := preload("res://features/previs/fold_section.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -43,11 +46,15 @@ var _patch_edit := PatchEdit.new()  # WO-695: re-patch the selected heads
 
 
 func _ready() -> void:
+	# WO-699: four folds in working order — add heads, re-patch the selected ones, send, program
 	add_theme_constant_override("separation", 6)
+	var kit := VBoxContainer.new()
+	kit.add_theme_constant_override("separation", 6)
 	_type = OptionButton.new()
 	_type.fit_to_longest_item = false
+	_type.tooltip_text = "Fixture type (GDTF) — the one Add places, Body colour tints and Remove / Replace act on"
 	_type.item_selected.connect(func(_i: int) -> void: _fill_modes())
-	add_child(_type)
+	kit.add_child(_type)
 	var row := HBoxContainer.new()
 	for spec in [["Import GDTF…", _import], ["Remove", _ask_remove]]:
 		var b := Button.new()
@@ -59,14 +66,15 @@ func _ready() -> void:
 	_replace.tooltip_text = "This type is an MVR placeholder (no model, dimmer channels) — use the real GDTF instead"
 	_replace.pressed.connect(func() -> void: _replace_dlg.open(types, M.find_type(types, _type_id())))
 	row.add_child(_replace)
-	add_child(row)
+	kit.add_child(row)
 	_body.previewed.connect(func(id: String, c: Color) -> void: _set_body(id, c, false))
 	_body.changed.connect(func(id: String, c: Variant) -> void: _set_body(id, c, true))
-	add_child(_body)
+	kit.add_child(_body)
 	_mode = OptionButton.new()
 	_mode.fit_to_longest_item = false
+	_mode.tooltip_text = "DMX mode (channel layout) of the heads Add places"
 	_mode.item_selected.connect(_on_mode)
-	add_child(_mode)
+	kit.add_child(_mode)
 	var add := HBoxContainer.new()
 	_proto = OptionButton.new()
 	_proto.add_item("Art-Net")
@@ -83,10 +91,18 @@ func _ready() -> void:
 	add.add_child(_count)
 	var b_add := Button.new()
 	b_add.text = "Add"
+	b_add.tooltip_text = "Add this many heads of the type and mode at the next free addresses of the universe"
 	b_add.pressed.connect(_add)
 	add.add_child(b_add)
-	add_child(add)
-	var out := HBoxContainer.new()
+	kit.add_child(add)
+	_status = _label(kit)
+	add_child(Fold.new("Add fixtures", [kit]))
+	var picked := Fold.new("Selected heads — patch", [_patch_edit])  # WO-695; shown while heads are selected
+	_patch_edit.visibility_changed.connect(func() -> void: picked.visible = _patch_edit.visible)
+	add_child(picked)
+	var out := VBoxContainer.new()
+	out.add_theme_constant_override("separation", 6)
+	var on_row := HBoxContainer.new()
 	_master = CheckButton.new()
 	_master.text = "DMX output"
 	_master.toggled.connect(func(on: bool) -> void:
@@ -95,7 +111,7 @@ func _ready() -> void:
 			_confirm_on.popup_centered()
 		else:
 			_set_dmx({"enabled": false}))
-	out.add_child(_master)
+	on_row.add_child(_master)
 	_send = MenuButton.new()
 	_send.text = "Send ▾"
 	_send.flat = false
@@ -103,35 +119,39 @@ func _ready() -> void:
 	_send.about_to_popup.connect(_fill_send)
 	_send.get_popup().hide_on_checkable_item_selection = false
 	_send.get_popup().index_pressed.connect(_toggle_send)
-	out.add_child(_send)
+	on_row.add_child(_send)
+	out.add_child(on_row)
+	var via_row := HBoxContainer.new()
+	var via_l := Label.new()
+	via_l.text = "Out via"
+	via_row.add_child(via_l)
+	_via = OptionButton.new()  # WO-698
+	_via.fit_to_longest_item = false
+	_via.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_via.tooltip_text = ("The network card the DMX output leaves by (Art-Net broadcast / sACN multicast) — the OS " +
+		"default route is usually the office LAN, not the lighting network")
+	_via.item_selected.connect(func(i: int) -> void: _set_dmx({"iface": str(_via.get_item_metadata(i))}))
+	via_row.add_child(_via)
+	out.add_child(via_row)
+	var net_row := HBoxContainer.new()
 	_visualise = CheckButton.new()
 	_visualise.text = "Art-Net / sACN input"
 	_visualise.tooltip_text = ("A lighting console's Art-Net / sACN on the patched universes drives the previs " +
 		"fixtures; the box sends nothing on those universes meanwhile")
 	_visualise.toggled.connect(func(on: bool) -> void: _set_dmx({"visualise": on}))
-	out.add_child(_visualise)
-	add_child(out)
+	net_row.add_child(_visualise)
 	var viewer := Button.new()  # WO-693
 	viewer.text = "DMX viewer…"
 	viewer.tooltip_text = "Art-Net nodes / sACN sources on the network and one universe's 512 channels, live"
 	viewer.pressed.connect(_open_viewer)
-	var vrow := HBoxContainer.new()
-	vrow.add_child(viewer)
-	_via = OptionButton.new()  # WO-698
-	_via.fit_to_longest_item = false
-	_via.tooltip_text = ("The network card the DMX output leaves by (Art-Net broadcast / sACN multicast) — the OS " +
-		"default route is usually the office LAN, not the lighting network")
-	_via.item_selected.connect(func(i: int) -> void: _set_dmx({"iface": str(_via.get_item_metadata(i))}))
-	var via_l := Label.new()
-	via_l.text = "Out via"
-	vrow.add_child(via_l)
-	vrow.add_child(_via)
-	add_child(vrow)
-	_usage = _label()
-	_status = _label()
-	add_child(_patch_edit)
-	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, ctrl / shift-click adds"
-	add_child(Programmer.new())
+	net_row.add_child(viewer)
+	out.add_child(net_row)
+	_usage = _label(out)
+	add_child(Fold.new("DMX output", [out]))
+	var prog := VBoxContainer.new()
+	_label(prog).text = "Click fixtures in the 3D view; ctrl / shift-click adds"
+	prog.add_child(Programmer.new())  # WO-615 T6
+	add_child(Fold.new("Programmer", [prog]))
 	_confirm_on = ConfirmationDialog.new()
 	_confirm_on.dialog_text = ("Start DMX output? The universes checked under Send ▾ go out at 44 Hz with every " +
 		"patched fixture at its programmer value or GDTF default.")
@@ -166,11 +186,11 @@ func _spin(lo: int, hi: int, tip: String) -> SpinBox:
 	return s
 
 
-func _label() -> Label:
+func _label(parent: Control) -> Label:
 	var l := Label.new()
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	add_child(l)
+	parent.add_child(l)
 	return l
 
 
