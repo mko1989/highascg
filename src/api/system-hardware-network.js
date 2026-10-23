@@ -6,6 +6,7 @@ const { execFileSync } = require('child_process')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { normalizeNetworkSettings, isAllowedEthernetIface, isValidIpv4 } = require('../config/network-settings')
 const { buildNetworkStatus } = require('../system/network-inventory')
+const { listNetworkInterfaces } = require('../system/network-interfaces')
 
 const APPLY_SCRIPT = '/usr/local/lib/highascg/highascg-network-apply.sh'
 const RESET_SCRIPT = '/usr/local/lib/highascg/highascg-network-reset.sh'
@@ -30,7 +31,7 @@ function handleNetworkGet(ctx) {
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody(buildNetworkStatus(networkCfg)),
+		body: jsonBody({ ...buildNetworkStatus(networkCfg), nics: listNetworkInterfaces() }),
 	}
 }
 
@@ -44,15 +45,21 @@ function handleNetworkApplyPost(body, ctx) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid JSON body' }) }
 	}
 	const prev = normalizeNetworkSettings(ctx.config?.network, ctx.config?.network)
+	// WO-692: any NIC can be set up (also an unplugged one). Only the primary interface's settings live in
+	// config.network (hardware identity, the exFAT network.conf and the splash IP follow it); setting up another
+	// port neither moves the primary nor mixes the primary's static values into it — NetworkManager keeps its profile.
+	const asked = String(b.interface ?? b.primaryInterface ?? prev.primaryInterface ?? '').trim()
+	const isPrimary = !prev.primaryInterface || asked === prev.primaryInterface || b.makePrimary === true
+	const base = isPrimary ? prev : normalizeNetworkSettings({}, {})
 	const network = normalizeNetworkSettings(
 		{
-			primaryInterface: b.interface ?? b.primaryInterface ?? prev.primaryInterface,
-			mode: b.mode ?? prev.mode,
-			static: { ...prev.static, ...(b.static && typeof b.static === 'object' ? b.static : {}) },
+			primaryInterface: asked,
+			mode: b.mode ?? base.mode,
+			static: { ...base.static, ...(b.static && typeof b.static === 'object' ? b.static : {}) },
 		},
-		prev,
+		base,
 	)
-	const iface = network.primaryInterface
+	const iface = isAllowedEthernetIface(asked) ? asked : ''
 	if (!iface || !isAllowedEthernetIface(iface)) {
 		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Invalid or missing Ethernet interface' }) }
 	}
@@ -109,21 +116,22 @@ function handleNetworkApplyPost(body, ctx) {
 		}
 	}
 
-	recordNetworkConfigSource('ui')
-
-	if (ctx.config) {
-		ctx.config.network = network
-		if (ctx.configManager) {
-			const cur = ctx.configManager.get()
-			ctx.configManager.save({ ...cur, network })
+	if (isPrimary) {
+		recordNetworkConfigSource('ui')
+		if (ctx.config) {
+			ctx.config.network = network
+			if (ctx.configManager) {
+				const cur = ctx.configManager.get()
+				ctx.configManager.save({ ...cur, network })
+			}
 		}
 	}
 
-	const status = buildNetworkStatus(network)
+	const status = buildNetworkStatus(isPrimary ? network : prev)
 	return {
 		status: 200,
 		headers: JSON_HEADERS,
-		body: jsonBody({ ok: true, log, ...status }),
+		body: jsonBody({ ok: true, log, primary: isPrimary, ...status, nics: listNetworkInterfaces() }),
 	}
 }
 

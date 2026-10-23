@@ -34,6 +34,7 @@ async function hardwareHandleGet(p, ctx, query) {
 	if (p === '/api/system/time') return handleSystemTimeGet(ctx)
 	if (p === '/api/system/xrandr-layout') return handleXrandrLayoutGet(ctx)
 	if (p === '/api/system/network') return handleNetworkGet(ctx)
+	if (p === '/api/system/network/wifi') return require('./system-network-wifi').handleWifiGet()
 	if (p === '/api/system/operator-display') return operatorDisplayGet(ctx)
 	if (p === '/api/system/operator-helper-icon') {
 		const { handleOperatorHelperIconGet } = require('./system-hardware-gui')
@@ -65,6 +66,7 @@ async function hardwareHandlePost(p, body, ctx) {
 	if (p === '/api/system/network/apply') return handleNetworkApplyPost(body, ctx)
 	if (p === '/api/system/network/reset') return handleNetworkResetPost(body, ctx)
 	if (p === '/api/system/network/refresh-splash-ip') return handleNetworkRefreshSplashIpPost(body, ctx)
+	if (p.startsWith('/api/system/network/wifi/')) return require('./system-network-wifi').handleWifiPost(p, body) // WO-692
 	if (p === '/api/system/decklink/install') return handleDecklinkInstallPost(body, ctx)
 
 	return null
