@@ -3,11 +3,10 @@ extends HSplitContainer
 ## screen meshes, camera presets). WO-617: the 3D SubViewport renders only while shown, and video surfaces are held
 ## only by what is visible (VideoSurfaces refcount). WO-621: the 2D front / plan views are gone (owner: "in the previs
 ## i dont need 2d, that was a misunderstanding") — 3D is the stage view. WO-616: a 2nd mode, Camera — a tracking camera's picture with the stage drawn through its solved camera; its
-## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's
-## markers (marker_driver → server hub) and draws them on the picture. T12: the 3D stage through the solved camera
+## settings and calibration live on an Inspector page (WO-608 R2). T5b: its Markers mode drives the operator's markers (marker_driver → server hub). T12: the 3D stage through the solved camera
 ## as an optional ghost overlay (camera_overlay.gd). T10c: 3D mode's "Tracking cameras" toggle shows each tracking
 ## camera's frustum + footprint and the grid's coverage (coverage_3d.gd), with a one-line verdict under the view.
-## WO-640: 3D mode's stage / MVR / fixtures / models column is an Inspector page too (`_side`), not a second column.
+## WO-640: 3D mode's stage / MVR / fixtures / models column is an Inspector page too (`_side`). WO-710: Auto tracking overlay.
 
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -100,6 +99,7 @@ func _ready() -> void:
 	_coverage_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_coverage_note.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	stack.add_child(_coverage_note)
+	stack.add_child(preload("res://features/previs/tracking/auto_overlay.gd").new())  # WO-710
 	track_view = TrackingView.new()
 	track_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	stack.add_child(track_view)

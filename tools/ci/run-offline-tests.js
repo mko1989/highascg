@@ -381,6 +381,7 @@ const FILES = [
 	'tools/smoke/smoke-wo705-dock-loads-when-server-up.test.js',
 	'tools/smoke/smoke-wo706-mvr-wall-layers.test.js',
 	'tools/smoke/smoke-wo707-follow-auto.test.js',
+	'tools/smoke/smoke-wo710-tracking-overlay.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',
 	'tools/smoke/smoke-wo612-mvr-export.test.js',
 	'tools/smoke/smoke-wo615-gdtf.test.js',

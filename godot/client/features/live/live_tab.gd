@@ -17,6 +17,7 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
 const ComposeTiles := preload("res://features/live/compose_tiles.gd")
 const ShaderLivePanel := preload("res://features/live/shader_live_panel.gd")
+const AutoOverlay := preload("res://features/previs/tracking/auto_overlay.gd")
 const UI_CFG := "user://ui.cfg"
 
 var _video: TextureRect
@@ -70,6 +71,7 @@ func _ready() -> void:
 	stage3d.visible = false
 	stack.add_child(stage3d)
 	stack.add_child(_view_switch())
+	stack.add_child(AutoOverlay.new())  # WO-710: Auto tracking quick sets, top-right
 	stack.gui_input.connect(func(e: InputEvent) -> void:  # a wheel off the windows pans too
 		if view == "standard" and tiles.wheel(e as InputEventMouseButton):
 			stack.accept_event())
