@@ -238,8 +238,13 @@ static func calib_summary(sess: Dictionary) -> String:
 	var s: Dictionary = sess.get("solve", {}) if sess.get("solve") is Dictionary else {}
 	if s.get("ok") != true:
 		var need := int(s.get("need", 3 - n))
-		return "%d point%s — %d more to solve." % [n, "" if n == 1 else "s", need]
+		var why := "\n" + str(s.warning) if s.get("warning") is String and str(s.warning) != "" else ""  # WO-700
+		return "%d point%s — %d more to solve.%s" % [n, "" if n == 1 else "s", need, why]
 	var p: Dictionary = s.pose
+	if s.get("partial") == true:  # WO-700: nearest the patch that fits the points so far
+		return "%d point%s — digital head moved onto %s → X %.2f  Y %.2f  Z %.2f  yaw %.1f°\n%d more mark%s for a full solve." % [
+			n, "" if n == 1 else "s", "it" if n == 1 else "them", float(p.x), float(p.y), float(p.z), float(p.yaw),
+			int(s.get("need", 0)), "" if int(s.get("need", 0)) == 1 else "s"]
 	var txt := "%d points · fit %.2f° RMS (max %.2f°) → X %.2f  Y %.2f  Z %.2f  yaw %.1f°" % [n, float(s.rms_deg),
 		float(s.max_deg), float(p.x), float(p.y), float(p.z), float(p.yaw)]
 	if s.get("flip_pan") == true:

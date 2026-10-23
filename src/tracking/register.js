@@ -142,7 +142,17 @@ function pinTick() {
 
 /** Fused world persons in the pin's person shape (detect-pin.js T10b). */
 function worldPersons(now) {
-	return fusion.persons(now).map((w) => ({ key: `w:${w.id}`, camera: 'world', tid: w.id, world: [w.x, w.y], score: w.score, age_s: w.age_s, area: w.area }))
+	return fusion
+		.persons(now)
+		.map((w) => ({
+			key: `w:${w.id}`,
+			camera: 'world',
+			tid: w.id,
+			world: [w.x, w.y],
+			score: w.score,
+			age_s: w.age_s,
+			area: w.area,
+		}))
 }
 
 /** Broadcast when a write landed, the stale set changed, or the heartbeat is due (never for an empty, idle hub). */
@@ -210,7 +220,11 @@ function withPins(snap, now = hub.now()) {
 			return q
 		})
 	}
-	snap.world = { fused: !!_detect && _detect.solvedCameras >= 2, plane_z: _detect ? _detect.planeZ : 0, persons: world.map((w) => (att[`w:${w.id}`] !== undefined ? { ...w, marker: att[`w:${w.id}`] } : w)) }
+	snap.world = {
+		fused: !!_detect && _detect.solvedCameras >= 2,
+		plane_z: _detect ? _detect.planeZ : 0,
+		persons: world.map((w) => (att[`w:${w.id}`] !== undefined ? { ...w, marker: att[`w:${w.id}`] } : w)),
+	}
 	return snap
 }
 
@@ -283,7 +297,10 @@ function locate(key) {
 		return w ? { x: w.x, y: w.y } : null
 	}
 	const [cam, tid] = [key.slice(0, key.lastIndexOf(':')), Number(key.slice(key.lastIndexOf(':') + 1))]
-	const p = _detect.frames().find((f) => f.id === cam)?.persons.find((q) => q.tid === tid)
+	const p = _detect
+		.frames()
+		.find((f) => f.id === cam)
+		?.persons.find((q) => q.tid === tid)
 	return p?.floor ? { x: p.floor[0], y: p.floor[1] } : null
 }
 
@@ -306,8 +323,14 @@ async function handleApi({ method, path, body, req }) {
 	const pr = await handlePresenters(_presenters, { method, path, body, req })
 	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
-		return reply(200, { module: 'tracking', status: 'markers', markers: hub.markers.size, writes: _writes,
-			stale_after_ms: MARKER_STALE_AFTER_MS, see: 'work/work-orders/616_WO_previs_tracking_openfollow_cameras.md' })
+		return reply(200, {
+			module: 'tracking',
+			status: 'markers',
+			markers: hub.markers.size,
+			writes: _writes,
+			stale_after_ms: MARKER_STALE_AFTER_MS,
+			see: 'work/work-orders/616_WO_previs_tracking_openfollow_cameras.md',
+		})
 	}
 	if (method === 'GET' && path === '/api/tracking/follow') {
 		return _follow ? reply(200, _follow.status()) : reply(503, { error: 'follow engine not running' })
@@ -433,7 +456,7 @@ module.exports = {
 		_follow = createFollowService(ctx, hub)
 		_fixturesSent = ''
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
-		_calib = createCalibration({ engine: _follow.engine, hub })
+		_calib = createCalibration({ engine: _follow.engine, hub, frame: _follow.liveFrame }) // WO-700 frame
 		_spot = createSpotFinder({
 			calib: _calib,
 			project: () => require('../engine/project-scenes').loadFullProject(),

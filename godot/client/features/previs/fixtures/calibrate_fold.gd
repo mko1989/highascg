@@ -3,8 +3,9 @@ extends VBoxContainer
 ## than clicking this position of pan tilt is this marker and it calibrates"). Stage marks are real spots on the floor
 ## (tape, a grid corner) stored in project.fixtures.marks (PSN metres): Place mark drops one where the 3D floor is
 ## clicked, X / Y / Z take the measured values. For the one selected head the WO-624 E3 session (calibrate_section.gd,
-## camera tools off) jogs the real beam; "Beam is on <mark>" pairs the head's pan / tilt with that mark; from 3 marks
-## the server solves where the head hangs and Apply pose writes it into the patch.
+## `lighting`) leaves the head to the Programmer above — the same Pan / Tilt (or right-drag) aims the real beam;
+## "Beam is on <mark>" pairs the pan / tilt the head is being sent with that mark; from 3 marks the server solves where
+## the head hangs and Apply pose writes it into the patch.
 
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
@@ -73,7 +74,7 @@ func _ready() -> void:
 		_xyz.append(sb)
 	add_child(_edit)
 	_head = _muted("")
-	_calib.camera_tools = false
+	_calib.lighting = true
 	_calib.apply_requested.connect(_apply_solve)
 	add_child(_calib)
 	_on_mark = Button.new()
@@ -81,7 +82,7 @@ func _ready() -> void:
 		var m := _mark(_picked)
 		if not m.is_empty():
 			_calib.add_floor_point([m.x, m.y, m.z]))
-	add_child(_on_mark)
+	_calib.add_point_button(_on_mark)
 	_calib.refreshed.connect(_fill_button)
 	sel.floor_picked.connect(_add_mark)
 	sel.changed.connect(_on_selection)
@@ -137,7 +138,6 @@ func _fill_edit() -> void:
 
 func _fill_button() -> void:
 	var m := _mark(_picked)
-	_on_mark.visible = _calib.is_open()
 	_on_mark.disabled = m.is_empty()
 	_on_mark.text = "Beam is on %s" % m.name if not m.is_empty() else "Beam is on … (pick a mark above)"
 

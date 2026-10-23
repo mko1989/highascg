@@ -55,7 +55,10 @@ function aim(fx, target, prev = { pan: 0, tilt: 0 }) {
 	const tr = fx.tilt.range / 2 + 1e-9
 	let best = null
 	let cost = Infinity
-	for (const [p, t] of [[p0, t0], [p0 + 180, -t0]]) {
+	for (const [p, t] of [
+		[p0, t0],
+		[p0 + 180, -t0],
+	]) {
 		for (let k = -3; k <= 3; k++) {
 			const pk = p + 360 * k
 			if (Math.abs(pk) > pr || Math.abs(t) > tr) continue
@@ -78,6 +81,13 @@ function axisBytes(ax, deg) {
 	return [v >> 8, v & 0xff]
 }
 
+/** WO-700: axisBytes backwards — the commanded degrees the coarse (+ fine) byte(s) on the wire mean. */
+function axisDeg(ax, bytes) {
+	let n = ax.fine ? ((bytes[0] << 8) | bytes[1]) / 65535 : bytes[0] / 255
+	if (ax.invert) n = 1 - n
+	return n * ax.range - ax.range / 2
+}
+
 /**
  * Write one fixture into a 512-byte universe: pan / tilt (+ fine) and its fixed channels.
  * @param {Uint8Array} buf @param {object} fx normalized (follow-patch) @param {{ pan, tilt } | null} pt @param {Array} fixed
@@ -90,11 +100,14 @@ function writeFixture(buf, fx, pt, fixed) {
 	}
 	for (const c of fixed) put(c.ch, c.value)
 	if (!pt) return // WO-615: a typed fixture that is not aimed keeps its GDTF / programmer pan / tilt
-	for (const [ax, deg] of [[fx.pan, pt.pan], [fx.tilt, pt.tilt]]) {
+	for (const [ax, deg] of [
+		[fx.pan, pt.pan],
+		[fx.tilt, pt.tilt],
+	]) {
 		const b = axisBytes(ax, deg)
 		put(ax.ch, b[0])
 		if (ax.fine) put(ax.fine, b[1])
 	}
 }
 
-module.exports = { aim, beam, axisBytes, writeFixture, frame }
+module.exports = { aim, beam, axisBytes, axisDeg, writeFixture, frame }

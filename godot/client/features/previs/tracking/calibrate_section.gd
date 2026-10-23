@@ -15,7 +15,7 @@ signal refreshed  ## WO-700: after every redraw (a session started / ended / got
 var driver: Node  # marker_driver.gd: the selected marker is the one dropped on the spot
 var fixture_id := ""
 var camera_id := ""  # the camera on screen: WO-616 T13b Find beam spot looks through it
-var camera_tools := true  ## false = Lighting → Calibrate heads (WO-700): points come from stage marks, not markers / pictures
+var lighting := false  ## WO-700 Lighting → Calibrate heads: the Programmer / console aims the head (no jog rows, no hold), points come from stage marks and apply at once
 var _refs := {}  # camera id → a beam-off reference is held by the server
 var _spot := ""
 var _find: Button
@@ -30,29 +30,32 @@ var _apply: Button
 var _summary: Label
 var _note: Label
 var _err := ""
+var _point_row: HBoxContainer  # Add point / Undo point
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 4)
-	_start = _button("Calibrate position…", func() -> void: _act({"action": "start"}))
+	_start = _button("Calibrate position…", func() -> void: _act({"action": "start", "hold": false} if lighting else {"action": "start"}))
 	_start.tooltip_text = "Jog the head onto floor spots and drop a marker on each — the server solves where it hangs."
 	add_child(_start)
 	_note = _muted("")
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage." if camera_tools
-		else "Jog the real beam onto a stage mark, pick that mark below and press Beam is on — one point per mark. 3+ marks spread over the stage (4+ is better), then Apply pose.")
+	var how := _muted("Aim the real beam onto a stage mark (the Programmer above or your console), pick that mark and press Beam is on — one point per mark. Nothing is sent: each point moves the digital head so its beam lands on the marks so far. 3+ marks spread over the stage (4+ is better)." if lighting
+		else "Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage.")
 	_box.add_child(how)
-	_pan = _axis_row("Pan °", "pan", "dpan")
-	_tilt = _axis_row("Tilt °", "tilt", "dtilt")
+	if not lighting:
+		_pan = _axis_row("Pan °", "pan", "dpan")
+		_tilt = _axis_row("Tilt °", "tilt", "dtilt")
 	var row := HBoxContainer.new()
-	if camera_tools:
+	if not lighting:
 		_add = _button("Add point", func() -> void: _act({"action": "point", "marker": int(driver.selected) if driver != null else 0}))
 		row.add_child(_add)
 	row.add_child(_button("Undo point", func() -> void: _act({"action": "undo"})))
 	_box.add_child(row)
-	if camera_tools:
+	_point_row = row
+	if not lighting:
 		row = HBoxContainer.new()
 		_find = _button("Find beam spot", func() -> void: _spot_act("find"))
 		_find.tooltip_text = "The server looks for the beam in this camera's picture and adds it as a point."
@@ -65,6 +68,7 @@ func _ready() -> void:
 	_box.add_child(_summary)
 	row = HBoxContainer.new()
 	_apply = _button("Apply pose", _apply_current)
+	_apply.visible = not lighting  # WO-700: each point applies itself
 	row.add_child(_apply)
 	row.add_child(_button("Done", func() -> void: _act({"action": "end"})))
 	_box.add_child(row)
@@ -97,6 +101,12 @@ func _apply_current() -> void:
 	refresh()
 	if cur is Dictionary and cur.get("solve") is Dictionary and cur.solve.get("ok") == true:
 		apply_requested.emit(cur.solve)
+
+
+## WO-700: the Lighting fold's "Beam is on <mark>" goes first in the Undo point row.
+func add_point_button(b: Button) -> void:
+	_point_row.add_child(b)
+	_point_row.move_child(b, 0)
 
 
 ## Is the shown fixture being calibrated (a camera click then means "the beam is here")?
@@ -149,6 +159,20 @@ func _act(body: Dictionary) -> void:
 		else:
 			_sessions[id] = res.data
 	refresh()
+	if lighting and res.ok and str(body.get("action")) in ["point", "undo"]:
+		_follow_points(res.data)
+
+
+## WO-700 (owner 23.10: "the position pan/tilt of the digital gets corrected each calibration point is added"): every
+## point moves the patched head at once — no Apply; undone to no points, it goes back where the session started.
+func _follow_points(sess: Variant) -> void:
+	if not sess is Dictionary:
+		return
+	var solve: Variant = sess.get("solve")
+	if solve is Dictionary and solve.get("ok") == true:
+		apply_requested.emit(solve)
+	elif (sess.get("points", []) as Array).is_empty() and sess.get("pose0") is Dictionary:
+		apply_requested.emit({"ok": true, "pose": sess.pose0})
 
 
 func refresh() -> void:
@@ -163,11 +187,11 @@ func refresh() -> void:
 	if not on:
 		refreshed.emit()
 		return
-	if not _pan.get_line_edit().has_focus():
-		_pan.set_value_no_signal(float(s.pan))
-	if not _tilt.get_line_edit().has_focus():
-		_tilt.set_value_no_signal(float(s.tilt))
-	if camera_tools:
+	if not lighting:
+		if not _pan.get_line_edit().has_focus():
+			_pan.set_value_no_signal(float(s.pan))
+		if not _tilt.get_line_edit().has_focus():
+			_tilt.set_value_no_signal(float(s.tilt))
 		var marker := int(driver.selected) if driver != null else 0
 		_add.disabled = marker == 0
 		_add.text = "Add point at %s" % _marker_name(marker) if marker != 0 else "Add point (select a marker)"

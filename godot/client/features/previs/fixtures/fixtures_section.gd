@@ -5,8 +5,8 @@ extends VBoxContainer
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
 ## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Art-Net / sACN input (T7, renamed WO-641) lets the
 ## console's input drive the previs instead (and sends nothing on those universes). The Programmer (T6) sits below.
-## WO-699: in folds — Add fixtures (type, mode, universe), Selected heads — patch, Calibrate heads (WO-700), DMX output
-## (on, universes, NIC, console input, viewer, usage), Programmer.
+## WO-699: in folds — Add fixtures (type, mode, universe), Selected heads — patch, DMX output (on, universes, NIC,
+## console input, viewer, usage), Programmer, Calibrate heads (WO-700).
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -101,7 +101,6 @@ func _ready() -> void:
 	var picked := Fold.new("Selected heads — patch", [_patch_edit])  # WO-695; shown while heads are selected
 	_patch_edit.visibility_changed.connect(func() -> void: picked.visible = _patch_edit.visible)
 	add_child(picked)
-	add_child(Fold.new("Calibrate heads", [CalibrateFold.new()]))  # WO-700
 	var out := VBoxContainer.new()
 	out.add_theme_constant_override("separation", 6)
 	var on_row := HBoxContainer.new()
@@ -154,6 +153,7 @@ func _ready() -> void:
 	_label(prog).text = "Click fixtures in the 3D view; ctrl / shift-click adds"
 	prog.add_child(Programmer.new())  # WO-615 T6
 	add_child(Fold.new("Programmer", [prog]))
+	add_child(Fold.new("Calibrate heads", [CalibrateFold.new()]))  # WO-700: aimed with the Programmer above it
 	_confirm_on = ConfirmationDialog.new()
 	_confirm_on.dialog_text = ("Start DMX output? The universes checked under Send ▾ go out at 44 Hz with every " +
 		"patched fixture at its programmer value or GDTF default.")

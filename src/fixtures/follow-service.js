@@ -51,7 +51,8 @@ function localTargets() {
 function ipv4Addresses() {
 	const out = []
 	for (const [name, list] of Object.entries(os.networkInterfaces())) {
-		for (const a of list || []) if ((a.family === 'IPv4' || a.family === 4) && !a.internal) out.push({ name, address: a.address })
+		for (const a of list || [])
+			if ((a.family === 'IPv4' || a.family === 4) && !a.internal) out.push({ name, address: a.address })
 	}
 	return out
 }
@@ -94,14 +95,16 @@ function createFollowService(ctx, hub) {
 	const sacnIn = new SacnFrames({ log }) // WO-615 T7 visualiser input
 	let targets = localTargets()
 	const reachesSelf = (to) => to.port === ARTNET_PORT && (to.host.startsWith('127.') || targets.has(to.host))
-	const sacnReachesSelf = (to) => isMulticast(to.host) || (to.port === SACN_PORT && (to.host.startsWith('127.') || targets.has(to.host)))
+	const sacnReachesSelf = (to) =>
+		isMulticast(to.host) || (to.port === SACN_PORT && (to.host.startsWith('127.') || targets.has(to.host)))
 	const engine = new FollowEngine({
 		hub,
 		consoleFrames,
 		send: (to, packet) => sender.send(to, packet),
-		isSelfLoop: (to, universe, protocol) => protocol === 'sacn'
-			? sacnReachesSelf(to) && inputUniverse(ctx) === universe
-			: reachesSelf(to) && inputPortAddress(ctx) === universe,
+		isSelfLoop: (to, universe, protocol) =>
+			protocol === 'sacn'
+				? sacnReachesSelf(to) && inputUniverse(ctx) === universe
+				: reachesSelf(to) && inputPortAddress(ctx) === universe,
 		reachesSelf,
 		resolveMode: (typeId, mode) => {
 			try {
@@ -127,12 +130,20 @@ function createFollowService(ctx, hub) {
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
 		const vis = engine.dmx.visualise ? engine.fixtures.filter((f) => f.gdtf && f.enabled) : []
-		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.some((f) => f.protocol === 'artnet')) consoleFrames.start()
+		if ((engine.through.enabled && engine.protocol === 'artnet') || vis.some((f) => f.protocol === 'artnet'))
+			consoleFrames.start()
 		else consoleFrames.stop()
-		sacnIn.configure(vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe), engine.dmx.sacn_port)
+		sacnIn.configure(
+			vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe),
+			engine.dmx.sacn_port
+		)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
-		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol}) via ${engine.dmx.iface || 'OS default route'}`)
-		for (const f of engine.fixtures) if (f.problem || f.noSend) log('warn', `[follow] ${f.name}: ${f.problem || `not sent — ${f.noSend}`}`)
+		log(
+			'info',
+			`[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol}) via ${engine.dmx.iface || 'OS default route'}`
+		)
+		for (const f of engine.fixtures)
+			if (f.problem || f.noSend) log('warn', `[follow] ${f.name}: ${f.problem || `not sent — ${f.noSend}`}`)
 	}
 	try {
 		const { loadFullProject } = require('../engine/project-scenes')
@@ -155,14 +166,29 @@ function createFollowService(ctx, hub) {
 		},
 		sender,
 		psn,
-		status: () => ({ ...engine.status(), packets_sent: sender.sent, send_errors: sender.errors, psn: { ...psn.status(), interfaces: ipv4Addresses() },
-			console: consoleFrames.status() }),
+		status: () => ({
+			...engine.status(),
+			packets_sent: sender.sent,
+			send_errors: sender.errors,
+			psn: { ...psn.status(), interfaces: ipv4Addresses() },
+			console: consoleFrames.status(),
+		}),
 		/** What clients draw (WS `tracking:follow`): no counters, so it only changes when an aim / state does. */
 		snapshot: () => {
 			const s = engine.status()
-			return { output_enabled: s.output_enabled, protocol: s.protocol,
-				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) =>
-					({ id, state, pan, tilt, problem, through, console })) }
+			return {
+				output_enabled: s.output_enabled,
+				protocol: s.protocol,
+				fixtures: s.fixtures.map(({ id, state, pan, tilt, problem, through, console }) => ({
+					id,
+					state,
+					pan,
+					tilt,
+					problem,
+					through,
+					console,
+				})),
+			}
 		},
 		/**
 		 * WO-615 T5 (WS `tracking:fixtures`): every outputtable typed fixture's axes / beams, decoded from its bytes —
@@ -179,6 +205,13 @@ function createFollowService(ctx, hub) {
 			}
 			return { fixtures }
 		},
+		/** WO-700: the bytes fx's real head gets — the console's (visualiser mode), else ours while sent — or null. */
+		liveFrame: (fx) =>
+			engine.dmx.visualise && fx.gdtf
+				? inputFrame(fx, { artnet: consoleFrames, sacn: sacnIn })
+				: engine.isLive(fx)
+					? engine.frameOf(fx)
+					: null,
 		/** WO-615 T6: what the programmer can set on each typed fixture of `ids` (all when omitted). */
 		features: (ids) => {
 			const out = {}
@@ -201,7 +234,8 @@ function createFollowService(ctx, hub) {
 			return { aimed, unreachable }
 		},
 		/** WO-615 T8: { lookId: { fixtures: n } } — looks that carry fixture states. */
-		looks: () => Object.fromEntries(Object.entries(looks).map(([id, e]) => [id, { fixtures: Object.keys(e.values).length }])),
+		looks: () =>
+			Object.fromEntries(Object.entries(looks).map(([id, e]) => [id, { fixtures: Object.keys(e.values).length }])),
 		/**
 		 * WO-615 T8: the programmer becomes look `lookId`'s stored state (typed fixtures it does not list are released),
 		 * crossfading over `ms`. → { fixtures, fade_ms } or null when the look carries no fixture state.

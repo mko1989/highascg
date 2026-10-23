@@ -19,9 +19,21 @@ const { createCalibration } = require('../../src/fixtures/calibrate-session')
 const { MarkerHub } = require('../../src/tracking/marker-hub')
 
 const ROOT = path.join(__dirname, '../..')
-const SPOTS = [[0, 0, 0], [4, 1, 0], [-3, 3, 0], [2, 6, 0], [5, 4, 0]]
+const SPOTS = [
+	[0, 0, 0],
+	[4, 1, 0],
+	[-3, 3, 0],
+	[2, 6, 0],
+	[5, 4, 0],
+]
 /** Deterministic ±0.2° "operator jog" error. */
-const JITTER = [[0.2, -0.1], [-0.15, 0.2], [0.1, 0.05], [-0.2, -0.2], [0.05, 0.15]]
+const JITTER = [
+	[0.2, -0.1],
+	[-0.15, 0.2],
+	[0.1, 0.05],
+	[-0.2, -0.2],
+	[0.05, 0.15],
+]
 
 function pairs(pose, { flipPan = false, spots = SPOTS } = {}) {
 	const fx = { pose, pan: { range: 540 }, tilt: { range: 270 } }
@@ -36,7 +48,7 @@ const near = (a, b, tol, msg) => assert.ok(Math.abs(a - b) <= tol, `${msg}: ${a}
 const yawDiff = (a, b) => Math.abs(((a - b + 540) % 360) - 180)
 
 describe('WO-624 E3 solveFixturePose', () => {
-	it('recovers a hung head\'s position and yaw from 5 jogged spots (±0.2° operator error)', () => {
+	it("recovers a hung head's position and yaw from 5 jogged spots (±0.2° operator error)", () => {
 		const truth = { x: 3, y: 5, z: 7, yaw: 30, hang: 'truss' }
 		const r = solveFixturePose(pairs(truth), { hang: 'truss' })
 		assert.equal(r.ok, true)
@@ -78,8 +90,16 @@ describe('WO-624 E3 solveFixturePose', () => {
 	})
 
 	it('fewer than 3 pairs → how many more; spots on one line → warning', () => {
-		assert.deepEqual(solveFixturePose(pairs({ x: 0, y: 0, z: 6, yaw: 0, hang: 'truss' }).slice(0, 1)), { ok: false, need: 2 })
-		const line = [[0, 0, 0], [2, 2, 0], [4, 4, 0], [6, 6, 0]]
+		assert.deepEqual(solveFixturePose(pairs({ x: 0, y: 0, z: 6, yaw: 0, hang: 'truss' }).slice(0, 1)), {
+			ok: false,
+			need: 2,
+		})
+		const line = [
+			[0, 0, 0],
+			[2, 2, 0],
+			[4, 4, 0],
+			[6, 6, 0],
+		]
 		const r = solveFixturePose(pairs({ x: 3, y: -4, z: 6, yaw: 0, hang: 'truss' }, { spots: line }), { hang: 'truss' })
 		assert.match(r.warning, /one line/)
 	})
@@ -92,8 +112,19 @@ describe('WO-624 E3 calibration session over the real follow engine', () => {
 		const sent = []
 		const engine = new FollowEngine({ hub, now: () => t.ms, send: (to, pkt) => sent.push(pkt) })
 		// the patch is wrong on purpose: the head really hangs at (3, 5, 7) facing yaw 30
-		engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [{ id: 'fx1', name: 'Spot L', follow: 1, address: 1,
-			dest: '10.0.0.50', pose: { x: 0, y: 0, z: 6, hang: 'truss', yaw: 0 } }] })
+		engine.configure({
+			output: { enabled: true, protocol: 'artnet' },
+			patch: [
+				{
+					id: 'fx1',
+					name: 'Spot L',
+					follow: 1,
+					address: 1,
+					dest: '10.0.0.50',
+					pose: { x: 0, y: 0, z: 6, hang: 'truss', yaw: 0 },
+				},
+			],
+		})
 		hub.set({ id: 1, x: 1, y: 1, z: 0 })
 		return { t, hub, engine, sent, cal: createCalibration({ engine, hub }) }
 	}
@@ -122,10 +153,16 @@ describe('WO-624 E3 calibration session over the real follow engine', () => {
 		near(res.body.solve.pose.z, 7, 0.1, 'z')
 		// the operator applies a pose with Invert pan flipped: the pairs taken before are re-read mirrored
 		const flipped = JSON.parse(JSON.stringify(r.engine.fixtures[0]))
-		r.engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [{ ...flipped, pan: { ...flipped.pan, invert: true } }] })
+		r.engine.configure({
+			output: { enabled: true, protocol: 'artnet' },
+			patch: [{ ...flipped, pan: { ...flipped.pan, invert: true } }],
+		})
 		const before = res.body.points.map((p) => p.pan)
 		res = r.cal.handle({ action: 'undo', id: 'fx1' })
-		assert.deepEqual(res.body.points.map((p) => p.pan), before.slice(0, 4).map((p) => -p))
+		assert.deepEqual(
+			res.body.points.map((p) => p.pan),
+			before.slice(0, 4).map((p) => -p)
+		)
 		assert.equal(res.body.solve.flip_pan, true, 'mirrored pairs now ask to flip back')
 		r.engine.configure({ output: { enabled: true, protocol: 'artnet' }, patch: [flipped] })
 		r.cal.handle({ action: 'jog', id: 'fx1', pan: pairs(truth).at(-1).pan })
@@ -161,6 +198,6 @@ describe('WO-624 E3 route', () => {
 	it('/api/tracking/follow/calibrate is served by the tracking module', () => {
 		const src = fs.readFileSync(path.join(ROOT, 'src/tracking/register.js'), 'utf8')
 		assert.match(src, /path === '\/api\/tracking\/follow\/calibrate'/)
-		assert.match(src, /_calib = createCalibration\(\{ engine: _follow\.engine, hub \}\)/)
+		assert.match(src, /_calib = createCalibration\(\{ engine: _follow\.engine, hub, frame: _follow\.liveFrame \}\)/)
 	})
 })

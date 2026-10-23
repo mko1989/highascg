@@ -111,6 +111,11 @@ func test_calibration_solve_applies_pose_and_pan_flip() -> void:
 	t.ok(line.begins_with("4 points · fit 0.12° RMS (max 0.20°) → X 3.00  Y 5.00  Z 7.01  yaw 30.1°"), line)
 	t.ok(line.contains("Invert pan"), line)
 	t.eq(F.calib_summary({"points": [{}], "solve": {"ok": false, "need": 2}}), "1 point — 2 more to solve.")
+	# WO-700: a Lighting session moves the head from the first point
+	var part := {"ok": true, "partial": true, "need": 2, "pose": {"x": 1.0, "y": 0.5, "z": 6.0, "yaw": 12.0}, "flip_pan": false}
+	t.eq(F.calib_summary({"points": [{}], "solve": part}),
+		"1 point — digital head moved onto it → X 1.00  Y 0.50  Z 6.00  yaw 12.0°\n2 more marks for a full solve.")
+	t.eq(F.apply_solve(fx, part).pose.yaw, 12.0, "a partial solve applies too")
 	# WO-616 T13b: the beam spot the server found
 	t.eq(F.spot_line({"at": [1.5, 2.04, 0], "px": [1012.4, 655.9], "contrast": 180, "reference": true}),
 		"Beam spot at X 1.50  Y 2.04 (pixel 1012, 655 · contrast 180 · vs reference)")
