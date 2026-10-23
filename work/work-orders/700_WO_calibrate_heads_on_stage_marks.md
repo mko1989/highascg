@@ -1,8 +1,9 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
-**Status: DONE (2026-10-23, R3 below: smoke-wo700 11/11 + wo624/wo630/wo615-follow-ik, test:ci 2859/2862 (known
-pointer-confine), Godot 21182/0; live API probe on Focus Profile 1 returns an offset, nothing sent or written; R2's
-pose-moving solve is SUPERSEDED by R3 — owner QA: calibrate one head on 1–4 marks)**
+**Status: DONE (2026-10-23, R4 below: smoke-wo700 10/10 (R3's two duplicated tests removed) + wo624, test:ci
+2858/2859 (known pointer-confine), Godot 21185/0, run-client --check OK; the owner's 4 + 3 live points re-solved
+offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: measure Focus Profile 1, or Move head, then re-check
+marks 2 / 3)**
 
 Owner, 23.10: *"how to calibrate the heads? it should be done by pointing the lights at markers in real life than
 clicking this position of pan tilt is this marker and it calibrates"*
@@ -139,3 +140,54 @@ then changing where the beam points."*
   wo624 / wo630 / wo615-follow-ik unchanged. Godot: summary, apply (pose untouched, 0 → no key), normalize.
 - Box: API start / point / end on Focus Profile 1 → reads (1.06°, −0.53°), returns `{offset}` only; patch unchanged.
 - NOT verified: a real head on real marks — owner QA (restart the GUI first: the running one has the R2 client).
+
+## R4 — one offset cannot fix a head patched in the wrong spot (23.10)
+
+Owner: "yes it has offset but the offset is calculated wrong" → "mark 1 and 4 calibrated position correctly but 2
+and 3 didnt point to the actual marks on the 3d."
+
+### Investigation
+
+The solve was not miscalculated; the offset-only model cannot fit these points. The owner's 4 live points on Focus
+Profile 1 (patched floor, X −2.5 Y −6 Z 2; read pan / tilt → mark):
+(33.51, 111.65) → Mark 4 (3.03, 1.68); (23.89, 107.54) → Mark 1 (2.97, 4.52); (−18.69, 114.06) → Mark 3
+(−2.93, 1.70); (−13.03, 108.49) → Mark 2 (−2.87, 4.64).
+
+- The calibration read equals the previs decode of the same frame (checked), so it is not a read / decode mismatch.
+- Best single offset at the patched spot: (+8.06°, −7.1°), rms 5.46° (per mark 5.9 / 4.5 / 7.4 / 3.1). Changing only
+  the height does not help (z 2..6 → rms 5.5..4.9).
+- The left / right pan spread is 52° observed against 39° from the patched spot: the real head is closer to the
+  marks and more central than patched. Fits (session scratchpad `an/fit.js`):
+  - x, y + offset (z 2, yaw / hang kept): **X −1.04 Y −4.21, offset (+1.0°, −4.1°), rms 0.28°** (every mark < 0.4°);
+  - x, y, z, yaw with no offset: X −0.93 Y −4.26 Z 2.62 yaw 0.3, rms 0.77°;
+  - offset + pan / tilt scale at the patched spot: scales 0.77 / 0.79 with a 16° tilt offset, rms 1.23° (a GDTF
+    range error would be needed on both axes; much less plausible);
+  - pose + tilt offset with z free: z 28 m (nonsense).
+- A single offset on a misplaced head lines up the marks on one side and misses the other, which is what the owner saw.
+- The owner's next live session (3 points, incl. two new marks near the centre line, saved in
+  `an/session-r3-live.json`): offset-only rms 3.17°; x, y + offset X −2.46 Y −4.08 rms 1.06°. All 7 points
+  together: X −1.39 Y −4.15, rms 1.62° (one centre mark 3.7°). **Y ≈ −4.1..−4.2 is consistent; X is less certain**
+  (3 points with 4 unknowns).
+
+### What was done
+
+- `calibrate-solve.js` `solveOffsets(pts, forward, {pose})`: from 3+ marks with an offset fit worse than 1° RMS,
+  `solvePlace` fits the head's floor position (x, y; height, yaw, hang kept) together with the offset (LM from the
+  patched spot ± 2 m). It is returned as `place {x, y, offset, rms_deg}` only when it at least halves the RMS and
+  stays within 10 m of the patch; the warning then names the spot. `forward(pan, tilt, pose = fx.pose)`
+  (calibrate-session.js) evaluates the chain from a trial pose.
+- The head never moves by itself (R3 stays): the client's `_apply` button, hidden in Lighting, appears only with a
+  `place` as "Move head to X … Y …"; it applies `{offset: place.offset, place}`, so `apply_solve` sets pose x / y and
+  the offset that goes with them. Summary line adds "Moved there it fits …". How-to text mentions it.
+- Why not solve z / yaw too: with 3–4 marks they trade off against x / y / the offsets (z 28 m fits); the height is
+  measurable and yaw is the pan offset.
+
+### Verified
+
+- `smoke-wo700` 10/10, including R4: a head truly at (2.5, −1.5) patched at (1, 0), real offset (20°, −6°), 4 marks
+  → rms > 1°, no pose, `place` within 5 cm and the offset within 0.5°, every mark within 5 cm from there; a
+  session patched at that spot solves rms < 0.2° with no place and no warning. wo624 7/7.
+- Owner's 4 points: place X −1.04 Y −4.21, then offset (1.05°, −4.07°), rms 0.28° with no further place (9 ms).
+- Godot 21185/0 (apply_solve with place moves x / y only, keeps z / yaw / hang; summary line); run-client --check OK.
+- Gates: max-file-lines 0, unwired-exports no new, lint 0 errors, format:check, `index.js --no-http`, npm audit OK.
+- NOT verified: Move head on the rig. Owner QA: measure the real head (or Move head), then check marks 2 / 3.

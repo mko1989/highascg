@@ -9,6 +9,8 @@
  * R3 (owner 23.10: "beam is on mark makes the fixture it self change position rather then changing where the beam
  * points"): the solve is the head's pan / tilt offset, never its pose — from one mark the previs's beam (gdtf-ik.js
  * chain, test-spot.xml) lands where the real one does; decodeVisual draws with it and Point at aims with it.
+ * R4 (owner 23.10: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): from 3 marks that no single
+ * offset fits, the solve offers where the head stands (x, y + offset) for the operator's Move head.
  */
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
@@ -123,22 +125,6 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.deepEqual([r.body.points[0].x, r.body.points[0].y, r.body.points[0].z], [1.5, 2.36, 0])
 	})
 
-	it('output_enabled follows the head universe (DMX master), not only the follow output', () => {
-		const on = rig(true)
-		assert.equal(on.engine.isLive(on.engine.fixtures[0]), true)
-		assert.equal(on.cal.handle({ action: 'start', id: 'fx1' }).body.output_enabled, true)
-		const off = rig(false)
-		assert.equal(off.cal.handle({ action: 'start', id: 'fx1' }).body.output_enabled, false)
-	})
-
-	it('a stage mark is a calibrate point at its position', () => {
-		const { cal } = rig(true)
-		cal.handle({ action: 'start', id: 'fx1' })
-		const r = cal.handle({ action: 'point', id: 'fx1', at: [1.5, 2.36, 0] })
-		assert.equal(r.status, 200)
-		assert.deepEqual([r.body.points[0].x, r.body.points[0].y, r.body.points[0].z], [1.5, 2.36, 0])
-	})
-
 	it('a head without a GDTF pan / tilt chain has no live calibration', () => {
 		const { cal } = rig(true)
 		assert.equal(cal.handle({ action: 'start', id: 'fx1', hold: false }).status, 409)
@@ -177,6 +163,37 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		for (const [k, p] of r.points.entries())
 			assert.ok(miss(fx, p.pan, p.tilt, r.solve.offset, MARKS[k]) < 0.05, `mark ${k + 1}`)
 		assert.equal(r.solve.warning, null)
+	})
+
+	it('R4: a head patched in the wrong spot — the marks offer where it stands; Move head lands every mark', async () => {
+		// live 23.10 (owner: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): the real head stood
+		// ~2 m from its patch; one offset turned the beam onto the marks on one side only
+		const REAL = { ...POSE, x: 2.5, y: -1.5 }
+		const real = (await typed(REAL)).fx
+		const { fx, buf, cal } = await typed(POSE)
+		cal.handle({ action: 'start', id: 'h', hold: false })
+		let r = null
+		for (const mark of MARKS) {
+			writeGdtf(buf, fx, aimValues({ ...real, offset: REAL_OFFSET }, mark))
+			r = cal.handle({ action: 'point', id: 'h', at: mark }).body
+		}
+		assert.ok(r.solve.rms_deg > 1, 'no single offset fits')
+		assert.equal(r.solve.pose, undefined, 'the head is not moved by itself')
+		const { place } = r.solve
+		assert.ok(Math.hypot(place.x - REAL.x, place.y - REAL.y) < 0.05, JSON.stringify(place))
+		assert.ok(Math.abs(place.offset.pan - REAL_OFFSET.pan) < 0.5 && Math.abs(place.offset.tilt - REAL_OFFSET.tilt) < 0.5)
+		assert.match(r.solve.warning, /not where it is patched/)
+		const moved = { ...fx, pose: { ...fx.pose, x: place.x, y: place.y } }
+		for (const [k, p] of r.points.entries())
+			assert.ok(miss(moved, p.pan, p.tilt, place.offset, MARKS[k]) < 0.05, `mark ${k + 1}`)
+		// moved there, the session solves a plain offset again — no further move offered
+		const again = await typed({ ...POSE, x: place.x, y: place.y })
+		again.cal.handle({ action: 'start', id: 'h', hold: false })
+		for (const mark of MARKS) {
+			writeGdtf(again.buf, again.fx, aimValues({ ...real, offset: REAL_OFFSET }, mark))
+			r = again.cal.handle({ action: 'point', id: 'h', at: mark }).body
+		}
+		assert.ok(r.solve.rms_deg < 0.2 && r.solve.place === null && r.solve.warning === null, JSON.stringify(r.solve))
 	})
 
 	it('a live point with no DMX for the head is refused', async () => {

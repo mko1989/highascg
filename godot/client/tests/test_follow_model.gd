@@ -118,6 +118,13 @@ func test_calibration_solve_applies_pose_and_pan_flip() -> void:
 	t.eq(moved.offset, {"pan": 20.0, "tilt": -6.5})
 	t.eq(moved.pose, fx.pose, "the head stays where it is patched")
 	t.eq(F.apply_solve(moved, {"ok": true, "offset": {"pan": 0, "tilt": 0}}).has("offset"), false, "back to none")
+	# WO-700 R4: Move head — the marks fit the head elsewhere; x, y move, height / yaw / hang stay
+	var place := {"x": -1.04, "y": -4.21, "offset": {"pan": 1.03, "tilt": -4.07}, "rms_deg": 0.28}
+	var there := F.apply_solve(fx, {"ok": true, "offset": place.offset, "place": place})
+	t.eq([there.pose.x, there.pose.y, there.pose.z, there.pose.yaw, there.pose.hang], [-1.04, -4.21, 6.0, 0.0, "floor"])
+	t.eq(there.offset, {"pan": 1.03, "tilt": -4.07})
+	var far := F.calib_summary({"points": [{}, {}, {}], "solve": off.merged({"rms_deg": 5.46, "place": place})})
+	t.ok(far.contains("Moved there it fits 0.28° (beam offset pan +1.0°  tilt -4.1°)."), far)
 	t.eq(F.normalize_fixture({"offset": {"pan": 20, "tilt": -6.5}}, 0).offset, {"pan": 20.0, "tilt": -6.5})
 	t.eq(F.normalize_fixture({"offset": {"pan": 0, "tilt": 0}}, 0).has("offset"), false, "no offset → no key")
 	# WO-616 T13b: the beam spot the server found

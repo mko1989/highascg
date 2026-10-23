@@ -21,6 +21,10 @@ const DEG = 180 / Math.PI
 const MIN_POINTS = 3
 /** The mirrored pan sense must beat the configured one by this factor before Invert pan is suggested. */
 const FLIP_MARGIN = 2
+/** WO-700 R4: an offset fit worse than this (RMS °) from 3+ marks asks whether the head stands elsewhere. */
+const PLACE_ABOVE_DEG = 1
+/** … within this far of where it is patched (m): further means the marks or the hang are wrong, not the spot. */
+const PLACE_MAX_M = 10
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -236,18 +240,21 @@ function solveFixturePose(pts, opts = {}) {
  *
  * @param {{ pan: number, tilt: number, x: number, y: number, z: number }[]} pts pan / tilt = the angles sent
  *   (physical degrees), x, y, z the mark (PSN m)
- * @param {(pan: number, tilt: number) => { origin: number[], dir: number[] }} forward the head's beam at those angles
- * @returns {{ ok: false, need: 1 } | { ok: true, offset: { pan, tilt }, rms_deg, max_deg, errors_deg, warning }}
+ * @param {(pan: number, tilt: number, pose?: object) => { origin: number[], dir: number[] }} forward the head's beam
+ *   at those angles (from `pose`, default where it is patched)
+ * @param {{ pose?: { x: number, y: number } }} [opts] the patched pose: lets R4 test whether the head stands elsewhere
+ * @returns {{ ok: false, need: 1 } | { ok: true, offset: { pan, tilt }, rms_deg, max_deg, errors_deg, warning,
+ *   place: { x, y, offset: { pan, tilt }, rms_deg } | null }}
  */
-function solveOffsets(pts, forward) {
+function solveOffsets(pts, forward, opts = {}) {
 	const list = (Array.isArray(pts) ? pts : []).filter((p) => [p?.pan, p?.tilt, p?.x, p?.y, p?.z].every(Number.isFinite))
 	if (!list.length) return { ok: false, need: 1 }
-	const rays = (q) =>
+	const rays = (q, pose) =>
 		list.map((p) => {
-			const { origin, dir } = forward(p.pan + q[0], p.tilt + q[1])
+			const { origin, dir } = forward(p.pan + q[0], p.tilt + q[1], pose)
 			return { b: unit(dir), d: unit(sub([p.x, p.y, p.z], origin)) }
 		})
-	const resid = (q) => rays(q).flatMap(({ b, d }) => [b[0] - d[0], b[1] - d[1], b[2] - d[2]])
+	const resid = (q, pose) => rays(q, pose).flatMap(({ b, d }) => [b[0] - d[0], b[1] - d[1], b[2] - d[2]])
 	const seeds = []
 	for (let op = -180; op < 180; op += 15) for (let ot = -165; ot <= 165; ot += 15) seeds.push([op, ot])
 	const fits = seeds
@@ -263,18 +270,56 @@ function solveOffsets(pts, forward) {
 	const errs = rays(pick.q).map(({ b, d }) => Math.acos(Math.max(-1, Math.min(1, dot(b, d)))) * DEG)
 	const rms = Math.sqrt(errs.reduce((s, e) => s + e * e, 0) / errs.length)
 	const r2 = (v) => Math.round(v * 100) / 100
+	const place =
+		rms > PLACE_ABOVE_DEG && list.length >= MIN_POINTS && opts.pose
+			? solvePlace(opts.pose, pick.q, resid, rays, rms)
+			: null
 	return {
 		ok: true,
 		offset: { pan: r2(wrap(pick.q[0])), tilt: r2(wrap(pick.q[1])) },
 		rms_deg: r2(rms),
 		max_deg: r2(Math.max(...errs)),
 		errors_deg: errs.map(r2),
-		warning:
-			rms > 2
+		place,
+		warning: place
+			? `The marks do not agree on one offset — the head is not where it is patched: they fit it at X ${place.x}  Y ${place.y}. Measure it, or Move head there.`
+			: rms > 2
 				? 'The marks do not agree on one offset — check where the head is patched (position, hang) and that the beam was on each mark.'
 				: Math.abs(wrap(pick.q[1])) > 45
 					? 'A large tilt offset — is the hang (truss / floor) right, and was the real beam on the mark?'
 					: null,
+	}
+}
+
+/**
+ * WO-700 R4 (owner 23.10: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt") — when no single offset
+ * fits, the head is not where it is patched: one offset then turns the beam onto the marks on one side and misses the
+ * other side. With 3+ marks, solve its floor position (x, y; height, yaw and hang kept) together with the offset.
+ * Offered only when it fits clearly better — the operator applies it (the head never moves by itself, R3).
+ */
+function solvePlace(pose, q0, resid, rays, rms) {
+	const at = (q) => ({ ...pose, x: q[0], y: q[1] })
+	let best = null
+	for (const [dx, dy] of [
+		[0, 0],
+		[2, 0],
+		[-2, 0],
+		[0, 2],
+		[0, -2],
+	]) {
+		const f = lm([pose.x + dx, pose.y + dy, q0[0], q0[1]], (q) => resid(q.slice(2), at(q)), [1e-4, 1e-4, 1e-4, 1e-4])
+		if (!best || f.c < best.c) best = f
+	}
+	const errs = rays(best.q.slice(2), at(best.q)).map(({ b, d }) => Math.acos(Math.max(-1, Math.min(1, dot(b, d)))) * DEG)
+	const fit = Math.sqrt(errs.reduce((s, e) => s + e * e, 0) / errs.length)
+	if (!(fit < rms / 2) || Math.hypot(best.q[0] - pose.x, best.q[1] - pose.y) > PLACE_MAX_M) return null
+	const r2 = (v) => Math.round(v * 100) / 100
+	const wrap = (v) => ((((v + 180) % 360) + 360) % 360) - 180
+	return {
+		x: r2(best.q[0]),
+		y: r2(best.q[1]),
+		offset: { pan: r2(wrap(best.q[2])), tilt: r2(wrap(best.q[3])) },
+		rms_deg: r2(fit),
 	}
 }
 

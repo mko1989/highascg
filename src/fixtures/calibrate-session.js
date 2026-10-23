@@ -43,7 +43,7 @@ function liveModel(fx) {
 	}
 	return {
 		read: (buf) => (buf ? { pan: phys(axes[0], buf), tilt: phys(axes[1], buf), inv: null } : null),
-		forward: (pan, tilt) => beamOf(chain, fx.pose, pan, tilt),
+		forward: (pan, tilt, pose = fx.pose) => beamOf(chain, pose, pan, tilt),
 	}
 }
 
@@ -70,7 +70,7 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 			hang: fx.pose.hang,
 			output_enabled: engine.isLive(fx),
 			problem: fx.problem || fx.noSend || null,
-			solve: lm ? solveOffsets(pts, lm.forward) : solveFixturePose(pts, { hang: fx.pose.hang }),
+			solve: lm ? solveOffsets(pts, lm.forward, { pose: fx.pose }) : solveFixturePose(pts, { hang: fx.pose.hang }),
 		}
 	}
 

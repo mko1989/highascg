@@ -42,7 +42,7 @@ func _ready() -> void:
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Aim the real beam onto a stage mark (the Programmer above or your console), pick that mark and press Beam is on — one point per mark. Nothing is sent: each point corrects where the digital beam points (pan / tilt offset) so it lands on the marks — the head stays where it is patched. 3+ marks spread over the stage (4+ is better)." if lighting
+	var how := _muted("Aim the real beam onto a stage mark (the Programmer above or your console), pick that mark and press Beam is on — one point per mark. Nothing is sent: each point corrects where the digital beam points (pan / tilt offset) so it lands on the marks — the head stays where it is patched. 3+ marks spread over the stage (4+ is better): if they only fit with the head standing elsewhere, Move head offers that spot."  if lighting
 		else "Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage.")
 	_box.add_child(how)
 	if not lighting:
@@ -68,7 +68,7 @@ func _ready() -> void:
 	_box.add_child(_summary)
 	row = HBoxContainer.new()
 	_apply = _button("Apply pose", _apply_current)
-	_apply.visible = not lighting  # WO-700: each point applies itself
+	_apply.visible = not lighting  # WO-700: each point applies itself; R4 shows it to move a misplaced head
 	row.add_child(_apply)
 	row.add_child(_button("Done", func() -> void: _act({"action": "end"})))
 	_box.add_child(row)
@@ -100,7 +100,10 @@ func _apply_current() -> void:
 	_err = "" if cur is Dictionary else "The calibration was ended elsewhere."
 	refresh()
 	if cur is Dictionary and cur.get("solve") is Dictionary and cur.solve.get("ok") == true:
-		apply_requested.emit(cur.solve)
+		var place: Variant = cur.solve.get("place") if lighting else null
+		if lighting and not place is Dictionary:
+			return
+		apply_requested.emit({"ok": true, "offset": place.offset, "place": place} if lighting else cur.solve)
 
 
 ## WO-700: the Lighting fold's "Beam is on <mark>" goes first in the Undo point row.
@@ -209,6 +212,11 @@ func refresh() -> void:
 		txt += "\n" + _err
 	_summary.text = txt
 	_apply.disabled = not (s.get("solve") is Dictionary and s.solve.get("ok") == true)
+	if lighting:  # WO-700 R4: the marks fit the head elsewhere — the operator moves it (it never moves by itself)
+		var place: Variant = s.solve.get("place") if s.get("solve") is Dictionary else null
+		_apply.visible = place is Dictionary
+		if place is Dictionary:
+			_apply.text = "Move head to X %.2f  Y %.2f" % [float(place.x), float(place.y)]
 	refreshed.emit()
 
 
