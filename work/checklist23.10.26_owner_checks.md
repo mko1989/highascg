@@ -1,4 +1,4 @@
-# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-712)
+# Checklist 23.10.26 — owner checks for today's work orders (WO-690 … WO-713)
 
 Owner, 23.10: *"continue until all todays notes and wos are ready and tested. for my checks"*
 
@@ -83,6 +83,15 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
       2. Pin a person and tick its PTZ chip in the overlay, or tick **Auto** on the camera: it follows.
       3. Check the pan sign and the tilt scale (`units_per_deg`, 14.4 default; tilt may need ≈ 13.3).
       4. It goes to home / preset with the lights.
+- [ ] **WO-713: calibrate on a person standing on a mark.**
+      1. **Heads:** Lighting → Calibrate heads. Tick **Person on the mark**, and stand someone on a mark: the line under
+         it reads "Person … m off ‹mark›". Aim the head at their chest with the console, then press **Beam is on the
+         person at ‹mark›**. After two or three marks, follow them: is the beam on the body, at the far side too?
+      2. **PTZ camera** (needs one): PTZ cameras → the calibrate fold. Pick the mark, jog until the person is centred,
+         press **Camera is on the person at ‹mark›**, and repeat on a few marks. Then press **Done**. Does following
+         keep them centred?
+      3. **Tracking camera:** Tracking → the camera → under Solve, pick the mark with the person alone in the picture,
+         then press **Person is on ‹mark›**. Is the solve better than before, and does the marker sit under their feet?
 - [ ] **WO-701:** cut-outs keep one camera per person. They switch only after another camera has had a better view
       for 2.5 s, so there's no flicker when someone turns.
 
