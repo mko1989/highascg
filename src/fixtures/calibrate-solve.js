@@ -25,6 +25,8 @@ const FLIP_MARGIN = 2
 const PLACE_ABOVE_DEG = 1
 /** … within this far of where it is patched (m): further means the marks or the hang are wrong, not the spot. */
 const PLACE_MAX_M = 10
+/** WO-700 R5: a mirrored offset (pan + 180, tilt flipped) must fit this much better (RMS °) to beat a small one. */
+const MIRROR_TOL_DEG = 1
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
@@ -262,11 +264,18 @@ function solveOffsets(pts, forward, opts = {}) {
 		.sort((a, b) => a.c - b.c)
 		.slice(0, 8)
 		.map((s) => lm(s.q, resid, [1e-4, 1e-4]))
-	// the same beam is reached with pan + 180 and the tilt mirrored: the smallest correction wins among equal fits
+	// the same beam is reached with pan + 180 and the tilt mirrored: the smallest correction wins among near-equal
+	// fits. Near, not equal: the lens sits off the tilt axis, so the mirror fits marks that disagree a little better
+	// or worse — live 23.10 two marks 3° apart picked (−168°, +139°) and the digital head was drawn flipped over
 	const wrap = (v) => ((((v + 180) % 360) + 360) % 360) - 180
-	const best = Math.min(...fits.map((f) => f.c))
+	const rmsOf = (q) => {
+		const e = rays(q).map(({ b, d }) => Math.acos(Math.max(-1, Math.min(1, dot(b, d)))) * DEG)
+		return Math.sqrt(e.reduce((s, x) => s + x * x, 0) / e.length)
+	}
+	fits.forEach((f) => (f.rms = rmsOf(f.q)))
+	const best = Math.min(...fits.map((f) => f.rms))
 	const size = (f) => Math.abs(wrap(f.q[0])) + Math.abs(wrap(f.q[1]))
-	const pick = fits.filter((f) => f.c <= best + 1e-8).sort((a, b) => size(a) - size(b))[0]
+	const pick = fits.filter((f) => f.rms <= best + MIRROR_TOL_DEG).sort((a, b) => size(a) - size(b))[0]
 	const errs = rays(pick.q).map(({ b, d }) => Math.acos(Math.max(-1, Math.min(1, dot(b, d)))) * DEG)
 	const rms = Math.sqrt(errs.reduce((s, e) => s + e * e, 0) / errs.length)
 	const r2 = (v) => Math.round(v * 100) / 100

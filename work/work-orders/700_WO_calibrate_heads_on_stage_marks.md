@@ -1,6 +1,6 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
-**Status: DONE (2026-10-23, R4 below: smoke-wo700 10/10 (R3's two duplicated tests removed) + wo624, test:ci
+**Status: DONE (2026-10-23, R5 below: smoke-wo700 11/11 (R3's two duplicated tests removed) + wo624, test:ci
 2858/2859 (known pointer-confine), Godot 21185/0, run-client --check OK; the owner's 4 + 3 live points re-solved
 offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: measure Focus Profile 1, or Move head, then re-check
 marks 2 / 3)**
@@ -191,3 +191,27 @@ Profile 1 (patched floor, X −2.5 Y −6 Z 2; read pan / tilt → mark):
 - Godot 21185/0 (apply_solve with place moves x / y only, keeps z / yaw / hang; summary line); run-client --check OK.
 - Gates: max-file-lines 0, unwired-exports no new, lint 0 errors, format:check, `index.js --no-http`, npm audit OK.
 - NOT verified: Move head on the rig. Owner QA: measure the real head (or Move head), then check marks 2 / 3.
+
+## R5 — the solve picked the flipped-over mirror (23.10)
+
+Owner: "the focus 1 now seems to be reacted like its been repositioned / 2nd is ok".
+
+### Investigation
+
+- Patch after the owner's next session (2 points, Mark 6 + Mark 3, 3.2° apart): Focus Profile 1 `offset` = pan −167.83°,
+  tilt +139.15° (rms 3.18°). That is the mirror of the small offset (pan + 180, tilt flipped about the head): nearly
+  the same beams, but the previs draws the yoke turned round and the head flipped over → "repositioned".
+- `solveOffsets` preferred the smallest correction only among fits equal to 1e-8 in cost. The lens sits off the tilt
+  axis, so the mirror is not an exact twin: with marks that disagree it fit 0.06° better (3.18° vs 3.24°) and won.
+
+### What was done
+
+- `calibrate-solve.js`: the tie-break compares RMS degrees, `MIRROR_TOL_DEG = 1` — a larger correction must fit
+  at least 1° better to beat a small one.
+- Box data: Focus Profile 1 offset (−167.83, 139.15) → (12.18, −8.35), the fixed solve of the same 2 points,
+  via `POST /api/project/autosave`.
+
+### Verified
+
+- `smoke-wo700` 11/11; the new R5 test (a misplaced head, 1..3 marks, every solve |pan|, |tilt| < 45°) fails on the
+  R4 solver (2 marks → −176.65°, −61.26°) and passes now. The owner's 2 live points → (12.18°, −8.35°); 4 old → same as R4.

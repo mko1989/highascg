@@ -196,6 +196,25 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.ok(r.solve.rms_deg < 0.2 && r.solve.place === null && r.solve.warning === null, JSON.stringify(r.solve))
 	})
 
+	it('R5: marks that disagree a little keep the small offset, not the flipped-over mirror', async () => {
+		// live 23.10: two marks 3° apart solved (−168°, +139°) — the same beams, the digital head drawn upside down
+		const off = (await typed({ ...POSE, x: 2.5, y: -1.5 })).fx
+		const { fx, buf, cal } = await typed(POSE)
+		cal.handle({ action: 'start', id: 'h', hold: false })
+		for (const [n, pose] of [
+			[0, 0],
+			[1, 1],
+			[2, 2],
+		].map(([k]) => [k, MARKS[k]])) {
+			writeGdtf(buf, fx, aimValues({ ...(n ? off : fx), offset: REAL_OFFSET }, pose))
+			const { solve } = cal.handle({ action: 'point', id: 'h', at: pose }).body
+			assert.ok(
+				Math.abs(solve.offset.pan) < 45 && Math.abs(solve.offset.tilt) < 45,
+				`${n + 1} marks ${JSON.stringify(solve)}`
+			)
+		}
+	})
+
 	it('a live point with no DMX for the head is refused', async () => {
 		const { engine } = await typed(POSE)
 		const cal = createCalibration({ engine, hub: { list: () => [], now: () => 0 }, frame: () => null })
