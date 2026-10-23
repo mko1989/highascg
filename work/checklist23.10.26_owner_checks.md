@@ -99,7 +99,7 @@ sudo bash ~/highascg/scripts/exfat/install-exfat-systemd-units.sh
 - [ ] (WO-712 R2, needs two linked boxes, both on this build) Make the media box master. On the tracking box, set a
       zone to `look:<a look>` and walk into it. The **media box** takes the look to program, and the tracking box's zone
       detail reads `look … → master`.
-- [ ] On the media box, untick **Accept remote** and repeat. Nothing is taken, and the zone detail shows `403 this server
+- [ ] On the media box, untick **Accept remote actions** and repeat. Nothing is taken, and the zone detail shows `403 this server
       refuses remote actions`. Tick it back on.
 
 ## E. Next ISO build + live boot on .64 (WO-696, 697, 702, 704, 705)

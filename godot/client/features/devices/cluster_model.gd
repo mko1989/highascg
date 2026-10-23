@@ -15,7 +15,7 @@ const DUTIES := [
 	{"id": "lighting", "label": "Lighting out (DMX / PSN)", "short": "Lighting out", "tip": "Transmit Art-Net, sACN and PSN from this server. Off: the previs beams still move, nothing leaves the box."},
 	{"id": "ptz", "label": "PTZ out", "short": "PTZ out", "tip": "Send VISCA to the PTZ cameras from this server."},
 	{"id": "presenters", "label": "Presenter intake", "short": "Presenters", "tip": "Take new presenters (the phone page) on this server."},
-	{"id": "accept_remote", "label": "Accept remote actions", "short": "Accepts remote", "tip": "Let a linked server press things on this one, like a local operator. Used from the next release."},
+	{"id": "accept_remote", "label": "Accept remote actions", "short": "Accepts remote", "tip": "Let a linked server press things on this one, like a local operator. Remote presses are refused while off (WO-712 R2)."},
 ]
 
 
