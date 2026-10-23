@@ -28,6 +28,8 @@ var _panel: PanelContainer
 var _bubble: Window  # the hovered app's name above its icon (macOS dock style)
 var _bubble_label: Label
 var _dots := {}  # action → the running dot under its button
+var _loaded := false  # WO-705: the app list is in the dock (once)
+var _loading := false
 
 
 func _init() -> void:
@@ -86,6 +88,7 @@ func _ready() -> void:
 	set_expanded(false)
 	show()
 	_load()
+	Ws.connected.connect(_load)  # WO-705: the GUI can be up minutes before the server (live ISO boot) — load once it is
 
 
 ## The pointer is over the dock or its list: stay open.
@@ -99,10 +102,17 @@ func _release() -> void:
 
 
 func _load() -> void:
+	if _loaded or _loading:
+		return
+	_loading = true
 	var res: Dictionary = await Api.get_json("/api/system/dock")
+	_loading = false
+	if _loaded:
+		return
 	if not res.ok or not (res.data is Dictionary):
 		notice.emit({"text": "Dock: could not load the app list — " + str(res.error), "tone": "error"})
 		return
+	_loaded = true
 	var sep := VSeparator.new()
 	row.add_child(sep)
 	for p in res.data.get("pinned", []):

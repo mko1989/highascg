@@ -378,6 +378,7 @@ const FILES = [
 	'tools/smoke/smoke-wo700-calibrate-heads-lighting.test.js',
 	'tools/smoke/smoke-wo702-iso-live-boot-defects.test.js',
 	'tools/smoke/smoke-wo704-decklink-dkms-cache.test.js',
+	'tools/smoke/smoke-wo705-dock-loads-when-server-up.test.js',
 	'tools/smoke/smoke-wo706-mvr-wall-layers.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',
 	'tools/smoke/smoke-wo612-mvr-export.test.js',
