@@ -24,6 +24,9 @@
  * go out as E1.31 (sacn.js), multicast unless the patch names a unicast destination.
  * WO-615 T7: while `fixtures.dmx.visualise` is on, no typed universe is sent at all (the console drives them).
  * WO-615 T9: a typed head follows through its own GDTF axis chain (gdtf-ik.js aimFixture), the generic model otherwise.
+ * WO-708 / WO-709: `resolveAuto(fx, marks)` (set by the tracking module: src/tracking/auto-director.js) picks the
+ * target of a head on Auto (follow AUTO_MARKER_ID) — its person's lane marker, or a home point (`home: true`, state
+ * 'home') — instead of the hub marker 64999. Unset, Auto is the plain marker lookup (WO-707).
  */
 
 const { encodeArtDmx } = require('./artdmx')
@@ -34,6 +37,7 @@ const { consoleAim, blendFixture } = require('./follow-through')
 const { writeGdtf, cleanValue, normalizeDmx } = require('./gdtf-patch')
 const { encodeE131, boxCid } = require('./sacn')
 const { snapshotChannels, blendChannels } = require('./fixture-looks')
+const { AUTO_MARKER_ID } = require('../tracking/auto-follow')
 
 const TICK_MS = Math.round(1000 / 44)
 const REFRESH_MS = 1000
@@ -68,6 +72,8 @@ class FollowEngine {
 		this._hold = new Map() // fixture id → { pan, tilt, until } (WO-624 E3 calibration jog)
 		this._uni = new Map() // "host:port|universe" → { to, universe, buf, last: Buffer|null, at, seq, packets }
 		this._timer = null
+		/** @type {null | ((fx: object, marks: Map<number, object>) => object | null)} WO-708: the Auto director's hook */
+		this.resolveAuto = null
 	}
 
 	/** project.fixtures slice → patch (keeps each fixture's last aim, so a re-patch does not snap heads). */
@@ -229,7 +235,8 @@ class FollowEngine {
 			let prev = this._aim.get(fx.id) || { pan: 0, tilt: 0, state: 'centre' }
 			if (cf && !this._w.get(fx.id)) prev = { ...consoleAim(fx, cf), state: prev.state } // track from the console's aim
 			let next
-			const m = fx.follow ? marks.get(fx.follow) : null
+			const auto = fx.follow === AUTO_MARKER_ID && this.resolveAuto // WO-708: the director picks an Auto head's target
+			const m = auto ? this.resolveAuto(fx, marks) : fx.follow ? marks.get(fx.follow) : null
 			const h = this._hold.get(fx.id)
 			if (h && now > h.until) this._hold.delete(fx.id)
 			if (h && now <= h.until) next = { pan: h.pan, tilt: h.tilt, state: 'calibrating' }
@@ -238,10 +245,11 @@ class FollowEngine {
 			else if (m.stale) next = { ...prev, state: 'holding (stale)' }
 			else {
 				const pt = aimFixture(fx, [m.x, m.y, m.z + fx.aim_z], prev) // T9: a typed head's own axis chain
-				next = pt ? { ...pt, state: 'following' } : { ...prev, state: 'out of range' }
+				next = pt ? { ...pt, state: m.home ? 'home' : 'following' } : { ...prev, state: 'out of range' }
 			}
 			this._aim.set(fx.id, next)
-			const tracking = next.state === 'calibrating' || (next.state === 'following' && Number(m?.status ?? 1) > 0)
+			const aiming = next.state === 'following' || next.state === 'home'
+			const tracking = next.state === 'calibrating' || (aiming && Number(m?.status ?? 1) > 0)
 			const w0 = this._w.get(fx.id) || 0
 			const step = thru && thru.fade_s > 0 ? dt / thru.fade_s : 1
 			// No console frame yet = the aim alone is on the wire (w 1), so the console appearing fades in, never snaps.

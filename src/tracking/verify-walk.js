@@ -147,6 +147,26 @@ class VerifyWalk {
 			result: this.result,
 		}
 	}
+
+	/** GET / POST /api/tracking/verify {action: start | stop | reset} (moved out of register.js, WO-708). → { status, body } | null */
+	handle(method, body, now) {
+		if (method === 'GET') return { status: 200, body: this.status(now) }
+		if (method !== 'POST') return null
+		let data
+		try {
+			data = JSON.parse(body || '{}')
+		} catch {
+			return { status: 400, body: { error: 'body must be JSON' } }
+		}
+		if (data.action === 'start') {
+			const r = this.start(data, now)
+			return { status: r.ok ? 200 : 400, body: r.ok ? this.status(now) : r }
+		}
+		if (data.action === 'stop') this.stop(now)
+		else if (data.action === 'reset') this.reset()
+		else return { status: 400, body: { error: 'action must be start | stop | reset' } }
+		return { status: 200, body: this.status(now) }
+	}
 }
 
 module.exports = { VerifyWalk, segDist, stats, START_GATE_M, MIN_LENGTH_M, MAX_S, BINS, MIN_SAMPLES }

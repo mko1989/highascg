@@ -85,8 +85,14 @@ describe('WO-707 Follow → Auto', () => {
 
 	it('wiring: register runs it for heads following Auto; the Follow list offers it', () => {
 		const reg = fs.readFileSync(path.join(__dirname, '../../src/tracking/register.js'), 'utf8')
-		assert.match(reg, /const wanted = !!_follow\?\.engine\?\.fixtures\?\.some\(\(f\) => f\.follow === AUTO_MARKER_ID\)/)
-		assert.match(reg, /autoFollow\.step\(\{ cfg, wanted, available: _detect\.available, persons, hub/)
+		// WO-708: the multi-person director (auto-director.js) now owns the step and works out the Auto pool itself.
+		assert.match(reg, /const fixtures = _follow\?\.engine\?\.fixtures \|\| \[\]/)
+		assert.match(
+			reg,
+			/auto\.step\(\{ cfg, available: _detect\.available, persons, hub, planeZ: _detect\.planeZ, now, dt, fixtures \}\)/
+		)
+		const dir = fs.readFileSync(path.join(__dirname, '../../src/tracking/auto-director.js'), 'utf8')
+		assert.match(dir, /pool = \(fixtures \|\| \[\]\)\.filter\(\(f\) => f\.follow === AUTO_MARKER_ID\)/)
 		const gd = (rel) => fs.readFileSync(path.join(__dirname, '../../godot/client/features/previs/tracking', rel), 'utf8')
 		assert.match(gd('follow_model.gd'), new RegExp(`const AUTO_MARKER := ${AUTO_MARKER_ID}\\n`))
 		assert.match(gd('follow_section.gd'), /_follow\.add_item\("Auto — the tracked person", F\.AUTO_MARKER\)/)

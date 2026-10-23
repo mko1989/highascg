@@ -379,3 +379,30 @@ describe('WO-711 real UDP round trip on 127.0.0.1', () => {
 		l.close()
 	})
 })
+
+describe('WO-711 wiring — the director drives the PTZ service (auto-ptz.js)', () => {
+	const fs = require('fs')
+	const path = require('path')
+	const read = (p) => fs.readFileSync(path.join(__dirname, '../../', p), 'utf8')
+
+	it('register.js boots, ticks and stops it next to the director', () => {
+		const src = read('src/tracking/register.js')
+		assert.match(src, /const autoPtz = createAutoPtz\(auto\)/)
+		assert.match(src, /autoPtz\.tick\(hub\.now\(\)\)/)
+		assert.match(src, /autoPtz\.boot\(ctx\)/)
+		assert.match(src, /autoPtz\.stop\(\)/)
+	})
+
+	it('hands the service to the director and asks ptzTargetOf every tick', () => {
+		const { createAutoPtz } = require('../../src/tracking/auto-ptz')
+		const asked = []
+		let set = 'unset'
+		const director = { setPtz: (s) => (set = s), ptzTargetOf: (id) => (asked.push(id), null) }
+		const ap = createAutoPtz(director)
+		ap.boot({ log() {} })
+		assert.ok(set && typeof set.cameras === 'function', 'director got the service')
+		ap.tick(Date.now()) // no cameras configured on a test box → nothing asked, nothing sent
+		ap.stop()
+		assert.equal(set, null, 'stop detaches it')
+	})
+})

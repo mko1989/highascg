@@ -38,6 +38,8 @@
  *       drives hub marker 65000 + n, and a zone action `presenter` fires that presenter's actions.
  * Verification walk (T10d, src/tracking/verify-walk.js): GET /api/tracking/verify · POST {action: 'start', a: [x,y],
  *       b: [x,y], person?} | {action: 'stop'} | {action: 'reset'} — sampled after every fusion step with a new frame.
+ * Auto director (WO-708 / WO-709, src/tracking/auto-director.js + auto-routes.js): heads on Follow → Auto split across
+ *       the detected people (pins 1–9), home after nobody is seen; /api/tracking/auto… and WS tracking:auto (≤ 5 Hz).
  */
 
 'use strict'
@@ -49,14 +51,15 @@ const { createSpotFinder, LEASE_ID: SPOT_LEASE_ID } = require('../fixtures/calib
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
-const { createAutoFollow, AUTO_MARKER_ID } = require('./auto-follow')
+const { createAutoDirector } = require('./auto-director')
+const { handleAuto, createAutoBroadcast, followProject, reply } = require('./auto-routes')
+const { createAutoPtz } = require('./auto-ptz')
 const { Fusion } = require('./fusion')
 const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
 const { createPresenters } = require('./presenters')
 const { handlePresenters } = require('./presenter-routes')
 
-const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const TICK_MS = 33
 const HEARTBEAT_MS = 1000
 const WS_EVENT = 'tracking:markers'
@@ -84,15 +87,15 @@ let _zonesSent = ''
 let _detect = null
 let _detectSent = { json: '', at: 0 }
 const pin = new DetectPin()
-const autoFollow = createAutoFollow() // WO-707: Follow → Auto
+const auto = createAutoDirector({ names: () => _presenters?.list() || [] }) // WO-707 / WO-708: Follow → Auto
+const autoPtz = createAutoPtz(auto) // WO-711: PTZ cameras follow the director's people
+const autoWs = createAutoBroadcast()
 const fusion = new Fusion()
 const pose3d = new Pose3D() // WO-667: 3D body joints on the world persons
 const walk = new VerifyWalk()
 let _pinAt = 0
 let _presenters = null
 let _presentersSent = { json: '', at: 0 }
-
-const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
 /** One marker or {markers: [...]} → { accepted, errors[] } */
 function apply(data, source) {
@@ -140,8 +143,8 @@ function pinTick() {
 	if (stepped && walk.run) walk.sample(withPins(_detect.snapshot(), now), now)
 	const persons = _detect.solvedCameras >= 2 ? worldPersons(now) : _detect.persons()
 	pin.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
-	const wanted = !!_follow?.engine?.fixtures?.some((f) => f.follow === AUTO_MARKER_ID)
-	autoFollow.step({ cfg, wanted, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt })
+	const fixtures = _follow?.engine?.fixtures || []
+	auto.step({ cfg, available: _detect.available, persons, hub, planeZ: _detect.planeZ, now, dt, fixtures })
 }
 
 /** Fused world persons in the pin's person shape (detect-pin.js T10b). */
@@ -207,7 +210,7 @@ function zonesTick() {
  * service's own lists stay clean.
  */
 function withPins(snap, now = hub.now()) {
-	const att = { ...autoFollow.attached(), ...pin.attached() } // the operator's own pin wins a shared person
+	const att = { ...auto.attached(), ...pin.attached() } // the operator's own pin wins a shared person
 	const world = pose3d.decorate(fusion.persons(now), now)
 	const owner = new Map()
 	for (const w of world) if (w.age_s === 0) for (const k of w.keys) owner.set(k, w.id)
@@ -322,7 +325,8 @@ function presentersTick() {
 }
 
 async function handleApi({ method, path, body, req }) {
-	const pr = await handlePresenters(_presenters, { method, path, body, req })
+	const pr =
+		(await handlePresenters(_presenters, { method, path, body, req })) || handleAuto(auto, { method, path, body })
 	if (pr) return pr
 	if (method === 'GET' && path === '/api/tracking/stats') {
 		return reply(200, {
@@ -347,29 +351,8 @@ async function handleApi({ method, path, body, req }) {
 		return _detect ? reply(200, withPins(_detect.status())) : reply(503, { error: 'detection service not running' })
 	}
 	if (path === '/api/tracking/verify') {
-		if (method === 'GET') return reply(200, walk.status(hub.now()))
-		if (method === 'POST') {
-			let data
-			try {
-				data = JSON.parse(body || '{}')
-			} catch {
-				return reply(400, { error: 'body must be JSON' })
-			}
-			const now = hub.now()
-			if (data.action === 'start') {
-				const r = walk.start(data, now)
-				return reply(r.ok ? 200 : 400, r.ok ? walk.status(now) : r)
-			}
-			if (data.action === 'stop') {
-				walk.stop(now)
-				return reply(200, walk.status(now))
-			}
-			if (data.action === 'reset') {
-				walk.reset()
-				return reply(200, walk.status(now))
-			}
-			return reply(400, { error: 'action must be start | stop | reset' })
-		}
+		const r = walk.handle(method, body, hub.now())
+		if (r) return reply(r.status, r.body)
 	}
 	if (method === 'POST' && path === '/api/tracking/detect/pick') return pick(body)
 	if (method === 'POST' && path === '/api/tracking/follow/calibrate/spot') {
@@ -451,6 +434,8 @@ module.exports = {
 			zonesTick()
 			detectTick()
 			presentersTick()
+			autoWs.tick(auto, _ctx, hub.now())
+			autoPtz.tick(hub.now())
 		}, TICK_MS)
 		if (typeof _timer.unref === 'function') _timer.unref()
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
@@ -458,6 +443,9 @@ module.exports = {
 		_follow = createFollowService(ctx, hub)
 		_fixturesSent = ''
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
+		_follow.engine.resolveAuto = auto.resolveAuto // WO-708: Auto heads split across people / go home (WO-709)
+		followProject(auto, ctx) // the grid rectangle (home points) from project.previs.tracking.grid
+		autoPtz.boot(ctx)
 		_calib = createCalibration({ engine: _follow.engine, hub, frame: _follow.liveFrame }) // WO-700 frame
 		_spot = createSpotFinder({
 			calib: _calib,
@@ -482,6 +470,8 @@ module.exports = {
 		_timer = null
 		if (_follow) _follow.stop()
 		_follow = null
+		followProject(auto, null)
+		autoPtz.stop()
 		_calib = null
 		_spot = null
 		if (_zones) _zones.stop()
