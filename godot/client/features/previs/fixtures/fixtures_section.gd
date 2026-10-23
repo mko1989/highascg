@@ -5,8 +5,8 @@ extends VBoxContainer
 ## Tracking → Follow list edits each one), see every universe's usage (GET /api/fixtures/dmx) and drive the DMX
 ## master `fixtures.dmx` (off by default, asks first) with the universes it sends; Art-Net / sACN input (T7, renamed WO-641) lets the
 ## console's input drive the previs instead (and sends nothing on those universes). The Programmer (T6) sits below.
-## WO-699: in four folds — Add fixtures (type, mode, universe), Selected heads — patch, DMX output (on, universes,
-## NIC, console input, viewer, usage), Programmer.
+## WO-699: in folds — Add fixtures (type, mode, universe), Selected heads — patch, Calibrate heads (WO-700), DMX output
+## (on, universes, NIC, console input, viewer, usage), Programmer.
 
 const Upload := preload("res://core/stream_upload.gd")
 const FilePick := preload("res://features/devices/file_pick.gd")
@@ -21,6 +21,7 @@ const ColorRows := preload("res://features/previs/color_rows.gd")
 const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
 const PatchEdit := preload("res://features/previs/fixtures/patch_edit_section.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
+const CalibrateFold := preload("res://features/previs/fixtures/calibrate_fold.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -100,6 +101,7 @@ func _ready() -> void:
 	var picked := Fold.new("Selected heads — patch", [_patch_edit])  # WO-695; shown while heads are selected
 	_patch_edit.visibility_changed.connect(func() -> void: picked.visible = _patch_edit.visible)
 	add_child(picked)
+	add_child(Fold.new("Calibrate heads", [CalibrateFold.new()]))  # WO-700
 	var out := VBoxContainer.new()
 	out.add_theme_constant_override("separation", 6)
 	var on_row := HBoxContainer.new()

@@ -69,7 +69,29 @@ static func normalize(slice: Variant) -> Dictionary:
 		"protocol": "artnet" if o.get("protocol") == "artnet" else "psn", "psn": normalize_psn(o.get("psn")),
 		"through": normalize_through(o.get("through"))}, "dmx": normalize_dmx(s.get("dmx")), "patch": out,
 		"groups": preload("res://features/previs/fixtures/programmer_model.gd").normalize_groups(s.get("groups")),
-		"looks": preload("res://features/previs/fixtures/look_fixtures_model.gd").normalize_looks(s.get("looks"))}
+		"looks": preload("res://features/previs/fixtures/look_fixtures_model.gd").normalize_looks(s.get("looks")),
+		"marks": normalize_marks(s.get("marks"))}
+
+
+## WO-700 fixtures.marks — stage marks a head is calibrated on: [{id (1…), name, x, y, z}] in PSN metres (x stage
+## left, y upstage, z up), within 500 m (the server's calibrate `at` limit); ids unique, junk dropped.
+static func normalize_marks(raw: Variant) -> Array:
+	var out := []
+	var used := {}
+	for m in (raw if raw is Array else []):
+		if not m is Dictionary:
+			continue
+		var p := []
+		for k in ["x", "y", "z"]:
+			var v: Variant = m.get(k, 0.0)
+			p.append(clampf(float(v), -500.0, 500.0) if v is int or v is float else 0.0)
+		var id := int(m.get("id", 0)) if m.get("id") is int or m.get("id") is float else 0
+		while id < 1 or used.has(id):
+			id = maxi(id, 0) + 1
+		used[id] = true
+		var name := str(m.get("name", "")).strip_edges().left(40)
+		out.append({"id": id, "name": name if name != "" else "Mark %d" % id, "x": p[0], "y": p[1], "z": p[2]})
+	return out
 
 
 ## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated;

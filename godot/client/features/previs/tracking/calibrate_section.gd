@@ -10,10 +10,12 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NUDGES := [-5.0, -1.0, 1.0, 5.0]  # fine steps: the spin box arrows (0.1°)
 
 signal apply_requested(solve: Dictionary)
+signal refreshed  ## WO-700: after every redraw (a session started / ended / got a point)
 
 var driver: Node  # marker_driver.gd: the selected marker is the one dropped on the spot
 var fixture_id := ""
 var camera_id := ""  # the camera on screen: WO-616 T13b Find beam spot looks through it
+var camera_tools := true  ## false = Lighting → Calibrate heads (WO-700): points come from stage marks, not markers / pictures
 var _refs := {}  # camera id → a beam-off reference is held by the server
 var _spot := ""
 var _find: Button
@@ -39,23 +41,26 @@ func _ready() -> void:
 	add_child(_note)
 	_box = VBoxContainer.new()
 	add_child(_box)
-	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage.")
+	var how := _muted("Jog the beam onto a floor spot you can see in the camera view, then click the spot in the picture (or Find beam spot, or drop the selected marker on it and Add point) — that adds the point. 4+ spots spread over the stage." if camera_tools
+		else "Jog the real beam onto a stage mark, pick that mark below and press Beam is on — one point per mark. 3+ marks spread over the stage (4+ is better), then Apply pose.")
 	_box.add_child(how)
 	_pan = _axis_row("Pan °", "pan", "dpan")
 	_tilt = _axis_row("Tilt °", "tilt", "dtilt")
 	var row := HBoxContainer.new()
-	_add = _button("Add point", func() -> void: _act({"action": "point", "marker": int(driver.selected) if driver != null else 0}))
-	row.add_child(_add)
+	if camera_tools:
+		_add = _button("Add point", func() -> void: _act({"action": "point", "marker": int(driver.selected) if driver != null else 0}))
+		row.add_child(_add)
 	row.add_child(_button("Undo point", func() -> void: _act({"action": "undo"})))
 	_box.add_child(row)
-	row = HBoxContainer.new()
-	_find = _button("Find beam spot", func() -> void: _spot_act("find"))
-	_find.tooltip_text = "The server looks for the beam in this camera's picture and adds it as a point."
-	row.add_child(_find)
-	_ref = _button("Beam-off reference", func() -> void: _spot_act("clear" if _refs.get(camera_id) == true else "reference"))
-	_ref.tooltip_text = "Take the picture with the beam off (or aimed off stage): later finds only look at what got brighter — LED walls and lit scenery drop out."
-	row.add_child(_ref)
-	_box.add_child(row)
+	if camera_tools:
+		row = HBoxContainer.new()
+		_find = _button("Find beam spot", func() -> void: _spot_act("find"))
+		_find.tooltip_text = "The server looks for the beam in this camera's picture and adds it as a point."
+		row.add_child(_find)
+		_ref = _button("Beam-off reference", func() -> void: _spot_act("clear" if _refs.get(camera_id) == true else "reference"))
+		_ref.tooltip_text = "Take the picture with the beam off (or aimed off stage): later finds only look at what got brighter — LED walls and lit scenery drop out."
+		row.add_child(_ref)
+		_box.add_child(row)
 	_summary = _muted("")
 	_box.add_child(_summary)
 	row = HBoxContainer.new()
@@ -156,27 +161,30 @@ func refresh() -> void:
 	_note.text = _err
 	_note.visible = not on and _err != ""
 	if not on:
+		refreshed.emit()
 		return
 	if not _pan.get_line_edit().has_focus():
 		_pan.set_value_no_signal(float(s.pan))
 	if not _tilt.get_line_edit().has_focus():
 		_tilt.set_value_no_signal(float(s.tilt))
-	var marker := int(driver.selected) if driver != null else 0
-	_add.disabled = marker == 0
-	_add.text = "Add point at %s" % _marker_name(marker) if marker != 0 else "Add point (select a marker)"
-	_find.disabled = camera_id == ""
-	_find.text = "Find beam spot" if camera_id != "" else "Find beam spot (no camera)"
-	_ref.disabled = camera_id == ""
-	_ref.text = "Clear reference" if _refs.get(camera_id) == true else "Beam-off reference"
+	if camera_tools:
+		var marker := int(driver.selected) if driver != null else 0
+		_add.disabled = marker == 0
+		_add.text = "Add point at %s" % _marker_name(marker) if marker != 0 else "Add point (select a marker)"
+		_find.disabled = camera_id == ""
+		_find.text = "Find beam spot" if camera_id != "" else "Find beam spot (no camera)"
+		_ref.disabled = camera_id == ""
+		_ref.text = "Clear reference" if _refs.get(camera_id) == true else "Beam-off reference"
 	var txt := F.calib_summary(s)
 	if _spot != "":
 		txt += "\n" + _spot
 	if s.get("output_enabled") != true:
-		txt = "Art-Net output is off — the head will not move.\n" + txt
+		txt = "DMX output is off for this head's universe — the head will not move.\n" + txt
 	if _err != "":
 		txt += "\n" + _err
 	_summary.text = txt
 	_apply.disabled = not (s.get("solve") is Dictionary and s.solve.get("ok") == true)
+	refreshed.emit()
 
 
 func _marker_name(id: int) -> String:

@@ -228,6 +228,11 @@ func _show_selection() -> void:
 func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
 	var from := cam.project_ray_origin(pos)
 	var dir := cam.project_ray_normal(pos)
+	if sel.mark_pick:  # WO-700
+		var at: Variant = F.floor_hit(from, dir)
+		if at != null:
+			sel.floor_picked.emit([at.x, -at.z, 0.0])
+		return at != null
 	if sel.point_at and not sel.ids.is_empty():
 		var floor_hit: Variant = F.floor_hit(from, dir)
 		if floor_hit != null:

@@ -88,6 +88,7 @@ func _ready() -> void:
 	coverage = Coverage3D.new()
 	stage.add_child(coverage)
 	stage.add_child(fixtures3d)
+	stage.add_child(preload("res://features/previs/fixtures/calib_marks_3d.gd").new())  # WO-700 stage marks
 	fixtures3d.follow(mvr)  # WO-678: heads take their MVR layer's colour
 	aim_drag.post = func(b: Dictionary) -> Dictionary: return await Api.post_json("/api/fixtures/program/aim", b)
 	stage.add_child(cards)

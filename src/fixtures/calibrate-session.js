@@ -27,7 +27,7 @@ function createCalibration({ engine, hub }) {
 		// a pair taken before Invert pan was flipped meant the mirrored pan: re-read it in today's sense
 		const pts = s.points.map((p) => ({ ...p, pan: p.inv === fx.pan.invert ? p.pan : -p.pan }))
 		return { id, name: fx.name, pan: s.pan, tilt: s.tilt, points: pts, hang: fx.pose.hang,
-			output_enabled: engine.enabled, problem: fx.problem || fx.noSend || null,
+			output_enabled: engine.isLive(fx), problem: fx.problem || fx.noSend || null,
 			solve: solveFixturePose(pts, { hang: fx.pose.hang }) }
 	}
 

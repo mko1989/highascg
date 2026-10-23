@@ -6,12 +6,14 @@ extends RefCounted
 signal changed
 signal aim_at(psn: Array)  # [x, y, z] metres, PSN frame (x stage left, y upstage, z up)
 signal aimed  # WO-679: a right-drag aim ended (aim_drag.gd)
+signal floor_picked(psn: Array)  # WO-700: a floor click while mark_pick is on (a calibration mark goes there)
 signal delete_requested  # WO-691: Delete / Backspace in the previs while heads are the selection → the Programmer asks
 
 static var _one: RefCounted = null
 
 var ids: Array = []  # fixture ids, in pick order
 var point_at := false
+var mark_pick := false  # WO-700: the next floor click places a stage mark (calibrate_fold.gd)
 
 
 static func shared() -> RefCounted:

@@ -163,6 +163,12 @@ class FollowEngine {
 		return !u.typed && u.protocol === 'artnet' && this.enabled && this.protocol === 'artnet'
 	}
 
+	/** WO-700: whether fixture `fx`'s universe goes on the wire now (the follow output or the DMX master sends it). */
+	isLive(fx) {
+		const u = fx?.to ? this._uni.get(this._key(fx)) : null
+		return u ? this._live(u) : this.enabled
+	}
+
 	/** Park fixture `id` at pan / tilt (commanded degrees, clamped to its ranges). → the held aim, or null. */
 	hold(id, pan, tilt) {
 		const fx = this.fixtures.find((f) => f.id === id)

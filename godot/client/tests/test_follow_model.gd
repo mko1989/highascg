@@ -116,3 +116,14 @@ func test_calibration_solve_applies_pose_and_pan_flip() -> void:
 		"Beam spot at X 1.50  Y 2.04 (pixel 1012, 655 · contrast 180 · vs reference)")
 	t.eq(F.spot_line({"ok": false, "peak": 60}), "", "no floor point → no line")
 	t.eq(F.spot_line(null), "")
+
+
+func test_stage_marks_normalize() -> void:
+	# WO-700: calibration stage marks — ids unique and positive, names default, positions clamped, junk dropped
+	var m := F.normalize_marks([{"id": 2, "name": " DS centre ", "x": 0, "y": 1.5}, {"id": 2, "x": 900, "z": "no"},
+		"junk", {"name": "", "y": -2.25}])
+	t.eq(m, [{"id": 2, "name": "DS centre", "x": 0.0, "y": 1.5, "z": 0.0},
+		{"id": 3, "name": "Mark 3", "x": 500.0, "y": 0.0, "z": 0.0},
+		{"id": 1, "name": "Mark 1", "x": 0.0, "y": -2.25, "z": 0.0}])
+	t.eq(F.normalize({}).marks, [], "no marks by default")
+	t.eq(F.normalize({"marks": m}).marks, m, "a save keeps them")
