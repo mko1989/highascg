@@ -70,6 +70,38 @@ static func apply_scale(choice: float) -> void:
 	fit(root, root.content_scale_mode == Window.CONTENT_SCALE_MODE_DISABLED, choice)
 
 
+## WO-714 (next.md 23.10: "the gui should start in a fullscreen mode without the system top bar") — how the window
+## opens. On the box: borderless + maximized, the whole screen with no Openbox title bar (a 1920×1080 window plus the
+## 19 px frame was too big, so Openbox maximized it WITH the frame). Maximized, not WM fullscreen: the window stays in
+## Openbox's normal layer, so apps the dock (WO-628) opens stack over it as usual, and the dock's "bring HighAsCG
+## back" already restores MAXIMIZED. --fullscreen keeps exclusive fullscreen; --windowed and off-box clients (WO-688:
+## a laptop window) keep the window manager's frame.
+static func window_mode(args: Dictionary, on_box: bool) -> Dictionary:
+	if args.has("fullscreen"):
+		return {"mode": Window.MODE_EXCLUSIVE_FULLSCREEN, "borderless": false}
+	if on_box and not args.has("windowed"):
+		return {"mode": Window.MODE_MAXIMIZED, "borderless": true}
+	return {}
+
+
+static func apply_mode(w: Window, args: Dictionary, on_box: bool) -> void:
+	var m := window_mode(args, on_box)
+	if m.is_empty():
+		return
+	w.borderless = bool(m.borderless)  # before maximizing: the frame Openbox would keep is part of the work area fit
+	w.mode = int(m.mode)
+
+
+## Move a maximized window to another screen: un-maximize, move, maximize again (it stays sized to the old screen).
+static func move_to_screen(w: Window, i: int) -> void:
+	var was := w.mode
+	if was == Window.MODE_MAXIMIZED:
+		w.mode = Window.MODE_WINDOWED
+	w.current_screen = i
+	if was == Window.MODE_MAXIMIZED:
+		w.mode = Window.MODE_MAXIMIZED
+
+
 ## How the UI scales. On the box: one factor from the screen size (1080p → 1×, 4K → 2×). WO-688 off-box (a laptop
 ## window of any size, Retina or not): Godot's canvas_items stretch fits the 1080p layout to the window — smaller
 ## shrinks it instead of cutting off the right edge — and the factor is only the operator's own choice on top.

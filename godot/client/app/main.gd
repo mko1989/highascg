@@ -466,8 +466,7 @@ func _apply_window_args() -> void:
 			fresh = true
 	var override := float(Config.args.get("ui-scale", Placement.saved_scale()))
 	Placement.fit(w, Platform.is_local_origin(Config.origin), override)
-	if Config.args.has("fullscreen"):
-		w.mode = Window.MODE_EXCLUSIVE_FULLSCREEN
+	Placement.apply_mode(w, Config.args, Platform.is_local_origin(Config.origin))  # WO-714: no title bar on the box
 	_screen_question(fresh)
 
 

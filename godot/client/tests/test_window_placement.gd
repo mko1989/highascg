@@ -56,3 +56,13 @@ func test_off_box_window_fits_the_layout() -> void:  # WO-688: a laptop window n
 	t.eq(b.content_scale_factor, 1.5, "on the box: the factor as before")
 	w.free()
 	b.free()
+
+
+func test_window_mode_no_title_bar_on_the_box() -> void:  # WO-714: "fullscreen mode without the system top bar"
+	var m := P.window_mode({}, true)
+	t.eq(m.get("mode"), Window.MODE_MAXIMIZED, "on the box: the whole screen")
+	t.eq(m.get("borderless"), true, "no Openbox title bar")
+	t.ok(P.window_mode({}, false).is_empty(), "off-box (WO-688 laptop window): the window manager's frame stays")
+	t.ok(P.window_mode({"windowed": "1"}, true).is_empty(), "--windowed opts out on the box")
+	t.eq(P.window_mode({"fullscreen": "1"}, false).get("mode"), Window.MODE_EXCLUSIVE_FULLSCREEN, "--fullscreen as before")
+	t.eq(P.window_mode({"fullscreen": "1", "windowed": "1"}, true).get("mode"), Window.MODE_EXCLUSIVE_FULLSCREEN, "--fullscreen wins")

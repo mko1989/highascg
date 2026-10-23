@@ -222,7 +222,7 @@ func _pick(i: int, output: String, how := "") -> void:
 		return
 	var main := get_tree().root
 	if i >= 0 and main.current_screen != i:
-		main.current_screen = i
+		Placement.move_to_screen(main, i)  # WO-714: a maximized window would keep the old screen's size
 	if i >= 0:
 		main.content_scale_factor = Placement.ui_scale(DisplayServer.screen_get_size(i), Placement.saved_scale())
 	_close({"ok": true, "name": output, "screen": i})
