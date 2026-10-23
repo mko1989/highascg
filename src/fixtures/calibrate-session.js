@@ -9,7 +9,8 @@
  *                                              beam is aimed by the Programmer or the console; nothing is sent
  *                                              for the session; each point takes the angles the head is getting
  *                                              (`frame(fx)`: the console's input in visualiser mode, else ours) and
- *                                              solves the pan / tilt offset (R3: the head never moves) — from 1 point
+ *                                              solves the pan / tilt offset (R3: the head never moves) — from 1 point;
+ *                                              R7: each point pins its mark exactly (beam-offset.js offset_map)
  *   {action: 'jog', id, pan?, tilt?, dpan?, dtilt?}  absolute and / or relative commanded degrees
  *   {action: 'point', id, marker}              the beam spot is where `marker` stands → one (pan, tilt) ↔ point pair
  *   {action: 'point', id, at: [x, y, z]}       … or the floor spot the operator clicked in a camera picture
@@ -22,6 +23,23 @@
 
 const { solveFixturePose, solveOffsets } = require('./calibrate-solve')
 const { axisFn, beamOf } = require('./gdtf-ik')
+const { addPin, normalizeMap } = require('./beam-offset')
+
+const wrap = (v) => ((((v + 180) % 360) + 360) % 360) - 180
+
+/**
+ * WO-700 R7: the pinned marks a live session leaves on the head — the ones it started with, each new point added
+ * (beam-offset.js addPin: the same mark again replaces its pin). The solve carries the whole list (the client writes
+ * it into the patch) and, for the Inspector, how far one constant offset would miss (solveOffsets) — the hint that
+ * the head is patched in the wrong spot.
+ */
+function liveSolve(s, pts, lm, fx) {
+	if (!pts.length) return { ok: false, need: 1 }
+	let map = s.map0
+	for (const p of pts) map = addPin(map, { pan: p.pan, tilt: p.tilt, dpan: p.dpan, dtilt: p.dtilt })
+	const one = solveOffsets(pts, lm.forward, { pose: fx.pose })
+	return { ok: true, map, pinned: pts.length, rms_deg: one.rms_deg, warning: one.warning }
+}
 
 /**
  * WO-700: a live session's head — a typed head with an Axis chain, modelled as the previs draws it (gdtf-ik.js
@@ -66,11 +84,12 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 			tilt: s.tilt,
 			live: !!s.live,
 			offset0: s.offset0 || null,
+			map0: s.live ? s.map0 : null,
 			points: pts,
 			hang: fx.pose.hang,
 			output_enabled: engine.isLive(fx),
 			problem: fx.problem || fx.noSend || null,
-			solve: lm ? solveOffsets(pts, lm.forward, { pose: fx.pose }) : solveFixturePose(pts, { hang: fx.pose.hang }),
+			solve: lm ? liveSolve(s, pts, lm, fx) : solveFixturePose(pts, { hang: fx.pose.hang }),
 		}
 	}
 
@@ -90,7 +109,8 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 				engine.release(id) // a camera-mode session on the same head handed over
 				const a = lm.read(frame(fx)) || { pan: 0, tilt: 0 }
 				const offset0 = s?.offset0 || { pan: fx.offset?.pan || 0, tilt: fx.offset?.tilt || 0 }
-				sessions.set(id, { pan: a.pan, tilt: a.tilt, points: s?.live ? s.points : [], live: true, offset0 })
+				const map0 = s?.live ? s.map0 : normalizeMap(fx.offset_map)
+				sessions.set(id, { pan: a.pan, tilt: a.tilt, points: s?.live ? s.points : [], live: true, offset0, map0 })
 				return { status: 200, body: view(id) }
 			}
 			const a = s || engine.aimOf(id)
@@ -134,7 +154,12 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 				}
 				s.pan = a.pan
 				s.tilt = a.tilt
-				s.points.push({ pan: a.pan, tilt: a.tilt, x: m.x, y: m.y, z: m.z, inv: a.inv })
+				// R7: the correction that puts the beam exactly on this mark at these angles, over the trim now
+				const pt = { pan: a.pan, tilt: a.tilt, x: m.x, y: m.y, z: m.z, inv: a.inv }
+				const e = solveOffsets([pt], liveModel(fx).forward).offset
+				pt.dpan = wrap(e.pan - (Number(fx.offset?.pan) || 0))
+				pt.dtilt = wrap(e.tilt - (Number(fx.offset?.tilt) || 0))
+				s.points.push(pt)
 				return { status: 200, body: view(id) }
 			}
 			Object.assign(s, engine.hold(id, s.pan, s.tilt)) // refresh the hold's TTL

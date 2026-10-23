@@ -1,6 +1,6 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
-**Status: DONE (2026-10-23, R6 below — the calibration never moves the head; R4's Move head removed: smoke-wo700 11/11 (R3's two duplicated tests removed) + wo624, test:ci
+**Status: DONE (2026-10-23, R7 below — each mark pinned exactly + a manual beam offset; smoke-wo700 13/13 (R3's two duplicated tests removed) + wo624, test:ci
 2858/2859 (known pointer-confine), Godot 21185/0, run-client --check OK; the owner's 4 + 3 live points re-solved
 offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: calibrate Focus Profile 1 again; if marks 2 / 3 still
 miss, check its patched position by hand)**
@@ -227,3 +227,48 @@ Owner: "the calibration cant move the position of the fixture in 3d enviroment, 
   marks; any change to the position is done by hand in the patch.
 - Verified: smoke-wo700 11/11 (R4 test now pins the hint wording); Godot 21184/0 (a solve with `place` keeps the
   pose, sets only the offset); `run-client.sh --check` OK.
+
+## R7 — pin every mark; the beam offset by hand (23.10)
+
+Owner: "it needs to give the user the ability to position the digital 3d light beam adjusting the pan tilt offset
+without moving the artnet fixture. now when i tell it that its pointing at the mark it adjusts position of the beam
+correctly for first 2 marks then it starts to drift especially on the other side of the stage. ive added multiple
+points because adding a point moved the 3d beam closer to the mark i wanted to calibrate to."
+
+### Investigation
+
+- R3–R6 solved ONE least-squares offset over all marks. With the head patched ~2 m off (R4: Focus Profile 1's
+  marks fit X −1.0 Y −4.2, not −2.5 / −6), no constant offset lands on every mark, and the compromise moves with
+  each mark added. The marks added first look right until the far side pulls the fit away ("drift"), and adding
+  the same mark again only weights the fit towards it.
+- The owner's 4 points re-run with pins (scratchpad `an/r7.js`, real Focus chain): after each pin, every pinned
+  mark is within 4 mm on the floor (before: 1.3–2.5 m off on the marks not yet pinned); halfway between marks 3 / 4
+  the beam lands 0.22 m from the midpoint; `sentFor` returns the read angles to 1e-4°.
+
+### What was done
+
+- `src/fixtures/beam-offset.js` (new): `offset` = the operator's trim; `offset_map` = pins `{pan, tilt, dpan,
+  dtilt}` (physical angles + correction over the trim); `offsetAt(fx, pan, tilt)` = trim + inverse-distance²
+  blend of the pins (exact on a pin, nearest wins); `sentFor` inverts it (damped fixed point, best step kept);
+  `addPin` replaces a pin within 1°; `normalizeMap` clamps / keeps ≤ 64.
+- `gdtf-visual.js` `decodeVisual(…, offset)` also takes `offset(pan, tilt)`; `follow-service.js` passes
+  `offsetAt(fx, …)`. `gdtf-ik.js` `aimChain` sends `sentFor(geometric)` (constant offset → the R3 formula).
+- `calibrate-session.js`: each live point stores the exact one-point correction over the trim (`dpan`, `dtilt`);
+  the solve is `{map: map0 + pins, pinned, rms_deg, warning}` — the one-offset fit only as the "patched in the
+  wrong spot" hint. `map0` = the pins at start (undo to none restores them).
+- Patch: `offset_map` kept by `follow-patch.js` and Godot `normalize_fixture` (`normalize_offset_map`).
+- Client: `apply_solve` with `map` writes only the pins; summary "N marks pinned — the digital beam is on each"
+  (+ the one-offset miss when > 1°). Calibrate heads → **Beam offset Pan / Tilt** spin boxes (the trim, live,
+  nothing sent) and **Clear** (ends the session, drops trim + pins). How-to text updated.
+
+### Verified
+
+- smoke-wo700 13/13: one mark → one pin at the real offset (0.1°), no pose / offset in the solve, nothing sent;
+  4 marks → each within 5 cm; a head patched 2 m off → after every mark all marks so far within 5 cm, rms hint
+  warns, Point at with the pins matches the real head's angles (0.05°), the same mark replaces its pin; pins stay
+  small (no mirror); pin unit tests (normalize / exact / nearest / replace / sentFor / decode function / patch).
+  test:ci 2874/2875 (known pointer-confine). Godot 21190/0; run-client --check OK; lint 0 errors, format, lines.
+- Incident: the owner's GUI relaunched at 13:40 mid-edit and loaded a follow_model.gd that did not compile
+  ("Nonexistent function 'normalize'") → marks could not be placed, programmer gobos gone; GUI relaunched 13:44 on
+  the finished files, 0 script errors.
+- NOT verified: on the rig — owner QA: Clear Focus Profile 1, pin 4+ marks incl. the far side.

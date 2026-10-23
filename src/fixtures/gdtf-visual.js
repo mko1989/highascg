@@ -6,7 +6,8 @@
  *
  *   compileVisual(type, mode, rig)  once per type + mode: every beam's scope = the channels on the beam or one of its
  *                                   ancestors in the rig (gdtf-rig.js), nearest geometry first.
- *   decodeVisual(plan, buf, address, offset?) → { axes: { nodeId: degrees (+ the patch's pan / tilt offset) }, beams: { nodeId: { i 0–1, c [r, g, b] 0–1 sRGB,
+ *   decodeVisual(plan, buf, address, offset?) → { axes: { nodeId: degrees (+ the patch's pan / tilt offset, or
+ *                                   offset(pan, tilt) — WO-700 R7) }, beams: { nodeId: { i 0–1, c [r, g, b] 0–1 sRGB,
  *                                   zoom degrees, gobo? "wheel/slot media" } } }
  *
  * A channel's live function is the one whose DMX range holds the value and whose mode master (another channel of the
@@ -99,12 +100,16 @@ function decodeVisual(plan, buf, address = 1, offset = null) {
 		return { v, f: liveFunction(c, v, masterValue) }
 	}
 	const axes = {}
+	const angles = []
 	for (const c of plan.axes) {
 		const { v, f } = live(c)
-		// WO-700 R3: the head's calibrated offset — the previs turns it where the real one points
-		const off = Number((f?.attribute === 'Pan' ? offset?.pan : offset?.tilt) || 0)
-		if (f && (f.attribute === 'Pan' || f.attribute === 'Tilt')) axes[c.geometry] = r3(phys(f, v) + off)
+		if (f && (f.attribute === 'Pan' || f.attribute === 'Tilt')) angles.push({ c, a: f.attribute, deg: phys(f, v) })
 	}
+	// WO-700 R3 / R7: the head's calibrated offset — the previs turns it where the real one points. A function gets
+	// the head's physical (pan, tilt) (beam-offset.js offsetAt: trim + pinned marks); an object is a constant.
+	const at = (a) => angles.find((x) => x.a === a)?.deg ?? 0
+	const off = typeof offset === 'function' ? offset(at('Pan'), at('Tilt')) : offset
+	for (const { c, a, deg } of angles) axes[c.geometry] = r3(deg + Number((a === 'Pan' ? off?.pan : off?.tilt) || 0))
 	const beams = {}
 	for (const b of plan.beams) {
 		let dim = 1

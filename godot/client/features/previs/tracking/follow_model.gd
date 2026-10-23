@@ -24,6 +24,24 @@ static func _axis(a: Variant, ch: int, fine: int, range_deg: float) -> Dictionar
 		"range": _num(o.get("range"), range_deg, 1, 1080), "invert": o.get("invert") == true}
 
 
+## WO-700 R7: a head's pinned marks (beam-offset.js normalizeMap) — finite, clamped, at most 64, newest last.
+static func normalize_offset_map(raw: Variant) -> Array:
+	var out: Array = []
+	if not raw is Array:
+		return out
+	for p in raw:
+		if not p is Dictionary:
+			continue
+		var ok := true
+		for k in ["pan", "tilt", "dpan", "dtilt"]:
+			var v: Variant = p.get(k)
+			ok = ok and (v is int or v is float) and is_finite(float(v))
+		if ok:
+			out.append({"pan": clampf(float(p.pan), -720, 720), "tilt": clampf(float(p.tilt), -360, 360),
+				"dpan": clampf(float(p.dpan), -180, 180), "dtilt": clampf(float(p.dtilt), -180, 180)})
+	return out.slice(maxi(0, out.size() - 64))
+
+
 static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 	var o: Dictionary = f if f is Dictionary else {}
 	var pose: Dictionary = o.get("pose") if o.get("pose") is Dictionary else {}
@@ -53,6 +71,9 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 	var ot := _num(off.get("tilt"), 0, -180, 180)
 	if op != 0.0 or ot != 0.0:  # WO-700 R3: the calibrated pan / tilt offset (follow-patch.js), only when set
 		out["offset"] = {"pan": op, "tilt": ot}
+	var pins := normalize_offset_map(o.get("offset_map"))
+	if not pins.is_empty():  # WO-700 R7: pinned marks (beam-offset.js), only when set
+		out["offset_map"] = pins
 	if o.get("manual_patch") == true:  # WO-695: the operator re-patched it — an MVR re-patch keeps mode / address
 		out["manual_patch"] = true
 	return out
@@ -229,6 +250,14 @@ static func apply_solve(fx: Dictionary, solve: Dictionary) -> Dictionary:
 	var out := fx.duplicate(true)
 	if solve.get("ok") != true:
 		return out
+	if solve.has("map"):  # WO-700 R7: a Lighting session pins its marks; the trim (offset) stays the operator's
+		var pins := normalize_offset_map(solve.map)
+		if pins.is_empty():
+			out.erase("offset_map")
+		else:
+			out.offset_map = pins
+		if not solve.get("offset") is Dictionary:
+			return out
 	if solve.get("offset") is Dictionary:  # WO-700 R3: a Lighting session corrects where the beam points, not the head
 		var o: Dictionary = solve.offset
 		out.offset = {"pan": float(o.pan), "tilt": float(o.tilt)}
@@ -250,6 +279,11 @@ static func calib_summary(sess: Dictionary) -> String:
 	if s.get("ok") != true:
 		var need := int(s.get("need", 3 - n))
 		return "%d point%s — %d more to solve." % [n, "" if n == 1 else "s", need]
+	if s.has("map"):  # WO-700 R7
+		var line := "%d mark%s pinned — the digital beam is on each." % [n, "" if n == 1 else "s"]
+		if float(s.get("rms_deg", 0.0)) > 1.0:
+			line += "\nOne offset would miss them by %.1f° on average: the head is probably not where it is patched." % float(s.rms_deg)
+		return line
 	if s.get("offset") is Dictionary:  # WO-700 R3
 		var line := "%d point%s · beam offset pan %+.1f°  tilt %+.1f° (fit %.2f°)" % [n, "" if n == 1 else "s",
 			float(s.offset.pan), float(s.offset.tilt), float(s.get("rms_deg", 0.0))]

@@ -23,6 +23,8 @@ var _head: Label
 var _calib := Calibrate.new()
 var _on_mark: Button
 var _picked := 0  # selected mark id
+var _trim_row: HBoxContainer
+var _trim: Array = []  # SpinBox pan, tilt — the selected head's beam offset (R7 manual trim)
 var _key := ""
 
 
@@ -74,6 +76,7 @@ func _ready() -> void:
 		_xyz.append(sb)
 	add_child(_edit)
 	_head = _muted("")
+	_build_trim()
 	_calib.lighting = true
 	_calib.apply_requested.connect(_apply_solve)
 	add_child(_calib)
@@ -86,7 +89,9 @@ func _ready() -> void:
 	_calib.refreshed.connect(_fill_button)
 	sel.floor_picked.connect(_add_mark)
 	sel.changed.connect(_on_selection)
-	Store.project_changed.connect(func(_p: Dictionary) -> void: _fill())
+	Store.project_changed.connect(func(_p: Dictionary) -> void:
+		_fill()
+		_fill_trim())
 	_fill()
 	_on_selection()
 
@@ -146,6 +151,7 @@ func _on_selection() -> void:
 	_calib.set_fixture(str(sel.ids[0]) if sel.ids.size() == 1 else "")
 	_head.text = "" if sel.ids.size() == 1 else "Select one head (click it in the 3D view) to calibrate where it hangs."
 	_head.visible = _head.text != ""
+	_fill_trim()
 
 
 func _add_mark(psn: Array) -> void:
@@ -186,6 +192,76 @@ func _apply_solve(solve: Dictionary) -> void:
 			s.patch[i] = F.apply_solve(s.patch[i], solve)
 			_persist(s)
 			return
+
+
+## WO-700 R7 (owner 23.10: "give the user the ability to position the digital 3d light beam adjusting the pan tilt
+## offset without moving the artnet fixture"): the selected head's beam offset by hand — only the previs beam turns
+## (nothing is sent; Point at aims with it). Clear drops the offset and every pinned mark.
+func _build_trim() -> void:
+	_trim_row = HBoxContainer.new()
+	var l := Label.new()
+	l.text = "Beam offset"
+	_trim_row.add_child(l)
+	for axis in ["Pan", "Tilt"]:
+		var sb := SpinBox.new()
+		sb.min_value = -180
+		sb.max_value = 180
+		sb.step = 0.1
+		sb.prefix = axis
+		sb.suffix = "°"
+		sb.select_all_on_focus = true
+		sb.custom_minimum_size.x = 104
+		sb.tooltip_text = "Turns only the digital beam — the real head is not sent anything"
+		sb.value_changed.connect(func(_v: float) -> void: _store_trim())
+		_trim_row.add_child(sb)
+		_trim.append(sb)
+	var clear := Button.new()
+	clear.text = "Clear"
+	clear.tooltip_text = "Drop this head's beam offset and every mark pinned on it"
+	clear.pressed.connect(_clear_calibration)
+	_trim_row.add_child(clear)
+	add_child(_trim_row)
+
+
+func _patch_index() -> int:
+	var s := _slice()
+	for i in s.patch.size():
+		if s.patch[i].id == _calib.fixture_id:
+			return i
+	return -1
+
+
+func _fill_trim() -> void:
+	var i := _patch_index()
+	_trim_row.visible = i >= 0
+	if i < 0:
+		return
+	var off: Dictionary = _slice().patch[i].get("offset", {})
+	for k in 2:
+		if not (_trim[k] as SpinBox).get_line_edit().has_focus():
+			(_trim[k] as SpinBox).set_value_no_signal(float(off.get(["pan", "tilt"][k], 0.0)))
+
+
+func _store_trim() -> void:
+	var i := _patch_index()
+	if i < 0:
+		return
+	var s := _slice()
+	var o := {"pan": snappedf((_trim[0] as SpinBox).value, 0.01), "tilt": snappedf((_trim[1] as SpinBox).value, 0.01)}
+	s.patch[i] = F.apply_solve(s.patch[i], {"ok": true, "offset": o})
+	if JSON.stringify(s.patch[i]) != JSON.stringify(_slice().patch[i]):
+		_persist(s)
+
+
+func _clear_calibration() -> void:
+	var i := _patch_index()
+	if i < 0:
+		return
+	if _calib.is_open():
+		_calib.end()  # an open session would put its starting pins back with the next point
+	var s := _slice()
+	s.patch[i] = F.apply_solve(s.patch[i], {"ok": true, "offset": {"pan": 0, "tilt": 0}, "map": []})
+	_persist(s)
 
 
 func _persist(s: Dictionary) -> void:

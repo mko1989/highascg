@@ -12,6 +12,8 @@
  * R4 (owner 23.10: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): from 3 marks that no single
  * offset fits, the warning names where the marks put the head (`place`, x, y + offset); R6: a hint only — the
  * calibration never moves the head.
+ * R7 (owner 23.10: "…correctly for first 2 marks then it starts to drift"): each mark is pinned (beam-offset.js
+ * offset_map), so the beam is exact on every mark and earlier marks never drift; the trim is set by hand.
  */
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
@@ -22,6 +24,7 @@ const { FollowEngine } = require('../../src/fixtures/follow-engine')
 const { MarkerHub } = require('../../src/tracking/marker-hub')
 const { createCalibration } = require('../../src/fixtures/calibrate-session')
 const { solveOffsets } = require('../../src/fixtures/calibrate-solve')
+const { offsetAt, sentFor, addPin, normalizeMap, MAX_PINS } = require('../../src/fixtures/beam-offset')
 const { parseDescription } = require('../../src/fixtures/gdtf-parse')
 const { buildRig } = require('../../src/fixtures/gdtf-rig')
 const { chainOf, beamOf } = require('../../src/fixtures/gdtf-ik')
@@ -78,6 +81,11 @@ function miss(fx, pan, tilt, off, mark) {
 	return Math.hypot(...w.map((v, i) => v - along * dir[i]))
 }
 
+/** Distance (m) from `mark` to fx's beam drawn at physical pan / tilt + its trim + pinned marks (beam-offset.js). */
+function missAt(fx, pan, tilt, mark) {
+	return miss(fx, pan, tilt, offsetAt(fx, pan, tilt), mark)
+}
+
 const POSE = { x: 1, y: 0, z: 6, hang: 'truss', yaw: 0 }
 const REAL_OFFSET = { pan: 20, tilt: -6 } // how the real head sits against its patch (yoke turned, tilt off)
 const MARKS = [
@@ -131,11 +139,11 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.equal(cal.handle({ action: 'start', id: 'fx1', hold: false }).status, 409)
 	})
 
-	it('one mark: the offset the real head has, the head not moved, nothing sent, no jog', async () => {
+	it('one mark: pinned — the beam on the mark at the real offset, the head not moved, nothing sent, no jog', async () => {
 		const { fx, buf, cal, sent, engine } = await typed(POSE)
 		const r0 = cal.handle({ action: 'start', id: 'h', hold: false })
 		assert.equal(r0.status, 200)
-		assert.deepEqual(r0.body.offset0, { pan: 0, tilt: 0 })
+		assert.deepEqual(r0.body.map0, [])
 		assert.notEqual(engine.aimOf('h').state, 'calibrating')
 		assert.equal(cal.handle({ action: 'jog', id: 'h', dpan: 5 }).status, 409)
 		// the operator aims the real head onto the mark (Programmer values, as written to the wire)
@@ -147,13 +155,18 @@ describe('WO-700 calibrate heads from Lighting', () => {
 			'read the angles sent'
 		)
 		assert.equal(r.solve.ok, true)
-		assert.ok(Math.abs(r.solve.offset.pan - REAL_OFFSET.pan) < 0.1, JSON.stringify(r.solve))
-		assert.ok(Math.abs(r.solve.offset.tilt - REAL_OFFSET.tilt) < 0.1, JSON.stringify(r.solve))
+		assert.equal(r.solve.map.length, 1)
+		const pin = r.solve.map[0]
+		assert.ok(
+			Math.abs(pin.dpan - REAL_OFFSET.pan) < 0.1 && Math.abs(pin.dtilt - REAL_OFFSET.tilt) < 0.1,
+			JSON.stringify(pin)
+		)
 		assert.equal(r.solve.pose, undefined, 'no pose: the head stays where it is patched')
+		assert.equal(r.solve.offset, undefined, 'the trim stays the operator')
 		assert.equal(sent(), 0, 'calibrating sends no DMX')
 	})
 
-	it('more marks: least squares; the digital beam lands on every mark', async () => {
+	it('more marks: each pinned; the digital beam lands on every mark', async () => {
 		const { fx, buf, cal } = await typed(POSE)
 		cal.handle({ action: 'start', id: 'h', hold: false })
 		let r = null
@@ -161,59 +174,64 @@ describe('WO-700 calibrate heads from Lighting', () => {
 			writeGdtf(buf, fx, aimValues({ ...fx, offset: REAL_OFFSET }, mark))
 			r = cal.handle({ action: 'point', id: 'h', at: mark }).body
 		}
-		for (const [k, p] of r.points.entries())
-			assert.ok(miss(fx, p.pan, p.tilt, r.solve.offset, MARKS[k]) < 0.05, `mark ${k + 1}`)
+		const pinned = { ...fx, offset_map: r.solve.map }
+		for (const [k, p] of r.points.entries()) assert.ok(missAt(pinned, p.pan, p.tilt, MARKS[k]) < 0.05, `mark ${k + 1}`)
 		assert.equal(r.solve.warning, null)
+		assert.equal(cal.handle({ action: 'undo', id: 'h' }).body.solve.map.length, 3)
 	})
 
-	it('R4: a head patched in the wrong spot — the warning names where the marks put it (a hint, R6)', async () => {
-		// live 23.10 (owner: "mark 1 and 4 calibrated position correctly but 2 and 3 didnt"): the real head stood
-		// ~2 m from its patch; one offset turned the beam onto the marks on one side only
+	it('R7: a head patched in the wrong spot — every mark still exact, earlier marks never drift; the hint warns', async () => {
+		// live 23.10 (owner: "it adjusts position of the beam correctly for first 2 marks then it starts to drift
+		// especially on the other side of the stage"): the real head stood ~2 m from its patch; one least-squares
+		// offset moved with every mark added
 		const REAL = { ...POSE, x: 2.5, y: -1.5 }
 		const real = (await typed(REAL)).fx
 		const { fx, buf, cal } = await typed(POSE)
 		cal.handle({ action: 'start', id: 'h', hold: false })
 		let r = null
-		for (const mark of MARKS) {
+		for (const [n, mark] of MARKS.entries()) {
 			writeGdtf(buf, fx, aimValues({ ...real, offset: REAL_OFFSET }, mark))
 			r = cal.handle({ action: 'point', id: 'h', at: mark }).body
+			const pinned = { ...fx, offset_map: r.solve.map }
+			for (let k = 0; k <= n; k++) {
+				const p = r.points[k]
+				assert.ok(missAt(pinned, p.pan, p.tilt, MARKS[k]) < 0.05, `after ${n + 1} marks, mark ${k + 1}`)
+			}
 		}
+		assert.equal(r.solve.pose, undefined, 'the head is not moved')
 		assert.ok(r.solve.rms_deg > 1, 'no single offset fits')
-		assert.equal(r.solve.pose, undefined, 'the head is not moved by itself')
-		const { place } = r.solve
-		assert.ok(Math.hypot(place.x - REAL.x, place.y - REAL.y) < 0.05, JSON.stringify(place))
-		assert.ok(Math.abs(place.offset.pan - REAL_OFFSET.pan) < 0.5 && Math.abs(place.offset.tilt - REAL_OFFSET.tilt) < 0.5)
 		assert.match(r.solve.warning, /not where it is patched.*check its position in the patch/)
-		const moved = { ...fx, pose: { ...fx.pose, x: place.x, y: place.y } }
-		for (const [k, p] of r.points.entries())
-			assert.ok(miss(moved, p.pan, p.tilt, place.offset, MARKS[k]) < 0.05, `mark ${k + 1}`)
-		// moved there, the session solves a plain offset again — no further move offered
-		const again = await typed({ ...POSE, x: place.x, y: place.y })
-		again.cal.handle({ action: 'start', id: 'h', hold: false })
-		for (const mark of MARKS) {
-			writeGdtf(again.buf, again.fx, aimValues({ ...real, offset: REAL_OFFSET }, mark))
-			r = again.cal.handle({ action: 'point', id: 'h', at: mark }).body
+		// Point at (aimValues) with the pins drives the real head onto each mark: the inverse of the drawing
+		const pinned = { ...fx, offset_map: r.solve.map }
+		for (const [k, mark] of MARKS.entries()) {
+			const v = aimValues(pinned, mark)
+			const rv = aimValues({ ...real, offset: REAL_OFFSET }, mark)
+			assert.ok(Math.abs(v.Pan - rv.Pan) < 0.05 && Math.abs(v.Tilt - rv.Tilt) < 0.05, `aim mark ${k + 1}`)
 		}
-		assert.ok(r.solve.rms_deg < 0.2 && r.solve.place === null && r.solve.warning === null, JSON.stringify(r.solve))
+		// the same mark again replaces its pin
+		writeGdtf(buf, fx, aimValues({ ...real, offset: REAL_OFFSET }, MARKS[0]))
+		assert.equal(cal.handle({ action: 'point', id: 'h', at: MARKS[0] }).body.solve.map.length, MARKS.length)
 	})
 
-	it('R5: marks that disagree a little keep the small offset, not the flipped-over mirror', async () => {
+	it('R5: pins keep the small correction, not the flipped-over mirror', async () => {
 		// live 23.10: two marks 3° apart solved (−168°, +139°) — the same beams, the digital head drawn upside down
 		const off = (await typed({ ...POSE, x: 2.5, y: -1.5 })).fx
 		const { fx, buf, cal } = await typed(POSE)
 		cal.handle({ action: 'start', id: 'h', hold: false })
-		for (const [n, pose] of [
-			[0, 0],
-			[1, 1],
-			[2, 2],
-		].map(([k]) => [k, MARKS[k]])) {
-			writeGdtf(buf, fx, aimValues({ ...(n ? off : fx), offset: REAL_OFFSET }, pose))
-			const { solve } = cal.handle({ action: 'point', id: 'h', at: pose }).body
-			assert.ok(
-				Math.abs(solve.offset.pan) < 45 && Math.abs(solve.offset.tilt) < 45,
-				`${n + 1} marks ${JSON.stringify(solve)}`
-			)
+		for (const n of [0, 1, 2]) {
+			writeGdtf(buf, fx, aimValues({ ...(n ? off : fx), offset: REAL_OFFSET }, MARKS[n]))
+			const { solve } = cal.handle({ action: 'point', id: 'h', at: MARKS[n] }).body
+			for (const pin of solve.map) assert.ok(Math.abs(pin.dpan) < 45 && Math.abs(pin.dtilt) < 45, JSON.stringify(pin))
 		}
+		// the diagnostic one-offset solve keeps the small one too
+		const forward = (p, t) => beamOf(fx.gdtf.chain, fx.pose, p, t)
+		const pts = []
+		for (const n of [0, 1]) {
+			writeGdtf(buf, fx, aimValues({ ...(n ? off : fx), offset: REAL_OFFSET }, MARKS[n]))
+			pts.push(cal.handle({ action: 'point', id: 'h', at: MARKS[n] }).body.points.at(-1))
+		}
+		const o = solveOffsets(pts, forward).offset
+		assert.ok(Math.abs(o.pan) < 45 && Math.abs(o.tilt) < 45, JSON.stringify(o))
 	})
 
 	it('a live point with no DMX for the head is refused', async () => {
@@ -273,6 +291,70 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		assert.deepEqual(deltas, [-6, 20], 'pan + 20, tilt − 6')
 		const v = aimValues(fx, [0, 3, 0]) // fx carries the offset: the real head (sent + offset) hits the target
 		assert.ok(miss(fx, v.Pan, v.Tilt, REAL_OFFSET, [0, 3, 0]) < 0.02)
+	})
+
+	it('R7 pins: kept in the patch, exact on a pin, nearest wins, the same mark replaces, sentFor inverts', async () => {
+		const pins = [
+			{ pan: 10, tilt: 100, dpan: 2, dtilt: -1 },
+			{ pan: -30, tilt: 110, dpan: -4, dtilt: 3 },
+		]
+		assert.deepEqual(normalizeFixture({ offset_map: pins }, 0).offset_map, pins)
+		assert.equal(normalizeFixture({ offset_map: [] }, 0).offset_map, undefined, 'no pins → no key')
+		assert.deepEqual(
+			normalizeMap([
+				{ pan: 1, tilt: 2, dpan: 999, dtilt: 'x' },
+				{ pan: 1, tilt: 2, dpan: 400, dtilt: 0 },
+			]),
+			[{ pan: 1, tilt: 2, dpan: 180, dtilt: 0 }]
+		)
+		assert.equal(
+			normalizeMap(Array.from({ length: 80 }, (_, i) => ({ pan: i, tilt: 0, dpan: 0, dtilt: 0 }))).length,
+			MAX_PINS
+		)
+		const fx = { offset: { pan: 1, tilt: 1 }, offset_map: pins }
+		assert.deepEqual(offsetAt(fx, 10, 100), { pan: 3, tilt: 0 }, 'exact on a pin, over the trim')
+		const near = offsetAt(fx, 9, 100)
+		assert.ok(Math.abs(near.pan - 3) < 0.1 && Math.abs(near.tilt) < 0.1, 'the nearest pin wins')
+		assert.deepEqual(offsetAt({}, 5, 5), { pan: 0, tilt: 0 })
+		assert.equal(addPin(pins, { pan: 10.5, tilt: 100.2, dpan: 9, dtilt: 9 }).length, 2, 'the same mark replaces')
+		assert.equal(addPin(pins, { pan: 50, tilt: 100, dpan: 9, dtilt: 9 }).length, 3)
+		for (const [p, t] of [
+			[0, 105],
+			[-20, 108],
+			[40, 90],
+		]) {
+			const s = sentFor(fx, p, t)
+			const e = offsetAt(fx, s.pan, s.tilt)
+			assert.ok(Math.abs(s.pan + e.pan - p) < 1e-4 && Math.abs(s.tilt + e.tilt - t) < 1e-4, `sentFor ${p} ${t}`)
+		}
+		// the previs decode takes the correction as a function of the head's physical angles
+		const { t, fx: head, buf } = await typed(POSE)
+		const mode = t.modes.find((m) => m.name === 'Standard')
+		const plan = compileVisual(t, mode, buildRig(t, mode))
+		writeGdtf(buf, head, { Pan: 30, Tilt: 40 })
+		const seen = []
+		const axes = decodeVisual(plan, buf, 1, (p, tl) => (seen.push([p, tl]), { pan: 5, tilt: -2 })).axes
+		const plain = decodeVisual(plan, buf, 1).axes
+		assert.equal(seen.length, 1)
+		assert.deepEqual(seen[0].map(Math.round), [30, 40], 'called with physical pan, tilt')
+		assert.deepEqual(
+			Object.keys(plain)
+				.map((k) => Math.round((axes[k] - plain[k]) * 100) / 100)
+				.sort((a, b) => a - b),
+			[-2, 5]
+		)
+		// the service draws every typed head through offsetAt
+		const svc = fs.readFileSync(path.join(__dirname, '../../src/fixtures/follow-service.js'), 'utf8')
+		assert.match(svc, /decodeVisual\(v\.plan, buf, fx\.address, \(p, t\) => offsetAt\(fx, p, t\)\)/)
+	})
+
+	it('R7 fold: the beam offset by hand and Clear (source pins)', () => {
+		const fold = GD('features/previs/fixtures/calibrate_fold.gd')
+		assert.match(fold, /l\.text = "Beam offset"/)
+		assert.match(fold, /F\.apply_solve\(s\.patch\[i\], \{"ok": true, "offset": o\}\)/)
+		assert.match(fold, /"offset": \{"pan": 0, "tilt": 0\}, "map": \[\]/)
+		const model = GD('features/previs/tracking/follow_model.gd')
+		assert.match(model, /out\["offset_map"\] = pins/, 'normalize_fixture keeps the pins')
 	})
 
 	it('the Lighting fold wires marks, the floor pick and the session (source pins)', () => {

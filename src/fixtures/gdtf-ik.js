@@ -21,6 +21,7 @@
  */
 
 const { aim } = require('./follow-ik')
+const { offsetAt, sentFor } = require('./beam-offset')
 
 const RAD = Math.PI / 180
 
@@ -175,10 +176,12 @@ function aimChain(fx, target, prev) {
 	const chain = fx.gdtf.chain
 	const pa = fileAxis(pf, fx.pan)
 	const ta = fileAxis(tf, fx.tilt)
-	const op = Number(fx.offset?.pan) || 0 // WO-700 R3: the real head points at its sent angle + offset
-	const ot = Number(fx.offset?.tilt) || 0
-	const p0 = toPhys(pf, pa, prev.pan) + op
-	const t0 = toPhys(tf, ta, prev.tilt) + ot
+	// WO-700 R3 / R7: the real head points at its sent angle + the calibrated correction there (beam-offset.js)
+	const sp = toPhys(pf, pa, prev.pan)
+	const st = toPhys(tf, ta, prev.tilt)
+	const e0 = offsetAt(fx, sp, st)
+	const p0 = sp + e0.pan
+	const t0 = st + e0.tilt
 	const sols = []
 	for (const [p, t] of [[p0, t0], [p0 + 180, -t0]]) {
 		const s = refine(chain, fx.pose, target, p, t)
@@ -201,12 +204,11 @@ function aimChain(fx, target, prev) {
 	let best = null
 	let cost = Infinity
 	for (const s of sols) {
-		const t = ((((s.t + 180) % 360) + 360) % 360) - 180 - ot
-		if (!inside(tf, t)) continue
-		const base = s.p - op - 360 * Math.round((s.p - op) / 360)
+		const gt = ((((s.t + 180) % 360) + 360) % 360) - 180
+		const base = s.p - e0.pan - 360 * Math.round((s.p - e0.pan) / 360)
 		for (let k = -3; k <= 3; k++) {
-			const p = base + 360 * k
-			if (!inside(pf, p)) continue
+			const { pan: p, tilt: t } = sentFor(fx, base + e0.pan + 360 * k, gt)
+			if (!inside(tf, t) || !inside(pf, p)) continue
 			const cand = { pan: toDeg(pf, pa, p), tilt: toDeg(tf, ta, t) }
 			const c = Math.abs(cand.pan - prev.pan) + Math.abs(cand.tilt - prev.tilt)
 			if (c < cost) {

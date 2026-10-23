@@ -20,6 +20,7 @@ const { ConsoleFrames } = require('./follow-through')
 const { onProjectChanged } = require('../engine/project-events')
 const gdtfStore = require('./gdtf-store')
 const { decodeVisual } = require('./gdtf-visual')
+const { offsetAt } = require('./beam-offset')
 const { features, aimValues } = require('./gdtf-features')
 const { SacnFrames, inputFrame } = require('./dmx-input')
 const { normalizeLooks, recallInto } = require('./fixture-looks')
@@ -201,7 +202,7 @@ function createFollowService(ctx, hub) {
 				if (!fx.gdtf || !fx.enabled || fx.problem) continue
 				const v = gdtfStore.visual(fx.typeId, fx.mode)
 				const buf = engine.dmx.visualise ? inputFrame(fx, inputs) : engine.frameOf(fx)
-				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address, fx.offset) })
+				if (v && buf) fixtures.push({ id: fx.id, ...decodeVisual(v.plan, buf, fx.address, (p, t) => offsetAt(fx, p, t)) })
 			}
 			return { fixtures }
 		},

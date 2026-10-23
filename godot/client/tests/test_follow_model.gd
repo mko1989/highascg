@@ -124,6 +124,17 @@ func test_calibration_solve_applies_pose_and_pan_flip() -> void:
 	var kept := F.apply_solve(fx, off.merged({"place": place}))
 	t.eq(kept.pose, fx.pose, "never the position")
 	t.eq(kept.offset, {"pan": 20.0, "tilt": -6.5})
+	# WO-700 R7: a Lighting session pins its marks — only offset_map changes, the trim and the pose stay
+	var pins := [{"pan": 10, "tilt": 100, "dpan": 2, "dtilt": -1}]
+	var pinned := F.apply_solve(moved, {"ok": true, "map": pins, "pinned": 1, "rms_deg": 0.0})
+	t.eq(pinned.offset_map, [{"pan": 10.0, "tilt": 100.0, "dpan": 2.0, "dtilt": -1.0}])
+	t.eq([pinned.offset, pinned.pose], [moved.offset, fx.pose], "trim and position untouched")
+	t.eq(F.apply_solve(pinned, {"ok": true, "map": []}).has("offset_map"), false, "no pins → no key")
+	var cleared := F.apply_solve(pinned, {"ok": true, "offset": {"pan": 0, "tilt": 0}, "map": []})
+	t.eq([cleared.has("offset"), cleared.has("offset_map")], [false, false], "Clear drops both")
+	t.eq(F.normalize_fixture({"offset_map": pins + [{"pan": "x"}]}, 0).offset_map.size(), 1, "kept, junk dropped")
+	t.eq(F.calib_summary({"points": [{}, {}], "solve": {"ok": true, "map": pins, "rms_deg": 3.2}}),
+		"2 marks pinned — the digital beam is on each.\nOne offset would miss them by 3.2° on average: the head is probably not where it is patched.")
 	t.eq(F.normalize_fixture({"offset": {"pan": 20, "tilt": -6.5}}, 0).offset, {"pan": 20.0, "tilt": -6.5})
 	t.eq(F.normalize_fixture({"offset": {"pan": 0, "tilt": 0}}, 0).has("offset"), false, "no offset → no key")
 	# WO-616 T13b: the beam spot the server found

@@ -15,6 +15,7 @@
  *               1–63999), address 1–512, dest "a.b.c.d[:port]" ("" with sACN = the universe's multicast group),
  *               typeId, mode (WO-615 T3: a GDTF type from gdtf-store.js — pan / tilt / channels come from it), pan / tilt { ch (1-based offset), fine (0 = 8-bit), range °, invert },
  *               offset? { pan, tilt } ° (WO-700 R3: calibrated, added to a typed head's angles in the previs / IK),
+ *               offset_map? [{ pan, tilt, dpan, dtilt }] (WO-700 R7: pinned marks on top — beam-offset.js),
  *               pose { x, y, z (PSN m), hang "truss" | "floor", yaw ° (0 = upstage, 90 = stage left), pitch / roll °
  *                      (WO-615 T10: a tilted / side mount from MVR — GDTF fixtures only; the generic profile ignores them) },
  *               fixed "ch=value, …" (shutter / dimmer / colour held open), follow (marker id, 0 = none),
@@ -25,6 +26,7 @@ const { parseDest, MAX_PORT_ADDRESS } = require('./artdmx')
 const { normalizeThrough } = require('./follow-through')
 const { sacnDest, MAX_UNIVERSE } = require('./sacn')
 const { applyType, gdtfFootprint, normalizeDmx } = require('./gdtf-patch')
+const { normalizeMap } = require('./beam-offset')
 
 const DEFAULT_DEST = '255.255.255.255'
 const PROTOCOLS = ['psn', 'artnet']
@@ -61,6 +63,7 @@ function normalizeFixture(f, i) {
 	const dest = typeof o.dest === 'string' ? o.dest.trim() : ''
 	const off = o.offset && typeof o.offset === 'object' ? o.offset : {}
 	const offset = { pan: num(off.pan, 0, -180, 180), tilt: num(off.tilt, 0, -180, 180) }
+	const map = normalizeMap(o.offset_map)
 	return {
 		id: String(o.id || `fx${i + 1}`),
 		name: String(o.name || `Fixture ${i + 1}`),
@@ -81,6 +84,7 @@ function normalizeFixture(f, i) {
 		aim_z: num(o.aim_z, 1, -5, 10),
 		// WO-700 R3: the calibrated pan / tilt offset (°) — the real beam is where the file's angle + offset points
 		...(offset.pan || offset.tilt ? { offset } : {}),
+		...(map.length ? { offset_map: map } : {}),
 	}
 }
 
