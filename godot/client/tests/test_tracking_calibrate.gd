@@ -107,3 +107,15 @@ func test_grid_and_corners() -> void:
 	var pts := T.candidate_points({"grid": g}, [tv])
 	t.eq(pts.size(), 4 + 28 + 4)
 	t.eq(pts[0].id, "grid:DSR")
+
+
+func test_source_options_only_real_surfaces() -> void:  # WO-694
+	var d := {"opgui": {"channel": 3}, "prv1": {"channel": 2}, "pgm1": {"channel": 1}, "pgm2": {"channel": null},
+		"in2": {"channel": 5}, "in1": {"channel": 4}}
+	var o := T.source_options(d, "in1")
+	t.eq(o.map(func(x: Array) -> String: return x[0]), ["in1", "in2", "pgm1", "prv1"], "inputs, then PGM / PRV; no placeholders")
+	t.eq(o[0][1], "SDI input 1  (channel 4)", "label")
+	var gone := T.source_options(d, "in3")
+	t.eq(gone[-1], ["in3", "SDI input 3 — not available"], "a camera's missing source stays, marked")
+	t.eq(T.source_options({}, "in1"), [["in1", "SDI input 1 — not available"]], "no descriptors yet")
+	t.eq(T.source_label("prv2"), "Preview 2", "prv label")

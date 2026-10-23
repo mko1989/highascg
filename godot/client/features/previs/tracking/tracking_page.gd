@@ -21,7 +21,6 @@ const PresentersSection := preload("res://features/previs/tracking/presenters_se
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
-const ROLES := ["in1", "in2", "in3", "in4", "ch1", "ch2", "ch3", "ch4", "pgm1", "prv1", "pgm2", "prv2"]
 ## [label, key, min, max, step]
 const POSE := [["X m (stage left +)", "pos_x", -200, 200, 0.01], ["Y m (upstage +)", "pos_y", -200, 200, 0.01],
 	["Z m (height)", "pos_z", -20, 100, 0.01], ["Pitch °", "pitch", -89, 89, 0.1], ["Yaw °", "yaw", -180, 180, 0.1],
@@ -150,7 +149,7 @@ func _ready() -> void:
 	_name.focus_exited.connect(func() -> void: _edit(func(c: Dictionary) -> void: c.name = _name.text))
 	_pair(g, "Name", _name)
 	_role = OptionButton.new()
-	_role.item_selected.connect(func(i: int) -> void: _edit(func(c: Dictionary) -> void: c.role = _role.get_item_text(i)))
+	_role.item_selected.connect(func(i: int) -> void: _edit(func(c: Dictionary) -> void: c.role = str(_role.get_item_metadata(i))))
 	_pair(g, "Source", _role)
 	_rw = _spin(16, 16384, 1)
 	_rw.value_changed.connect(func(v: float) -> void: _edit(func(c: Dictionary) -> void: c.raster[0] = int(v)))
@@ -195,6 +194,7 @@ func _ready() -> void:
 		_pair(gg, f[0], sb)
 	_body.add_child(gg)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
+	VideoSurfaces.sources_changed.connect(_sync)  # WO-694: the Source list fills once the server announced it
 	_maybe_reload()
 	_sync()
 
@@ -405,7 +405,7 @@ func _sync() -> void:
 		return
 	_cams.clear()
 	for c in data.cameras:
-		_cams.add_item("%s · %s" % [c.name, c.role])
+		_cams.add_item("%s · %s" % [c.name, T.source_label(str(c.role))])
 	var ce := entry()
 	_body.visible = not ce.is_empty() and mode == "calibrate"
 	markers.visible = mode == "markers"
@@ -425,12 +425,11 @@ func _sync() -> void:
 	if not _name.has_focus():
 		_name.text = ce.name
 	_role.clear()
-	var roles: Array = ROLES.duplicate()
-	if not roles.has(ce.role):
-		roles.append(ce.role)
-	for r in roles:
-		_role.add_item(r)
-	_role.select(roles.find(ce.role))
+	var opts := T.source_options(VideoSurfaces.descriptors, str(ce.role))  # WO-694: real sources, not a fixed list
+	for o in opts:
+		_role.add_item(o[1])
+		_role.set_item_metadata(_role.item_count - 1, o[0])
+	_role.select(opts.map(func(o: Array) -> String: return o[0]).find(ce.role))
 	_rw.set_value_no_signal(ce.raster[0])
 	_rh.set_value_no_signal(ce.raster[1])
 	for k in _pose:

@@ -189,3 +189,31 @@ static func set_point(cam_entry: Dictionary, pid: String, label: String, world: 
 
 static func clicked(cam_entry: Dictionary) -> Array:
 	return (cam_entry.points as Array).filter(func(p: Dictionary) -> bool: return p.screen != null)
+
+
+## WO-694: a camera source's name for people — inN "SDI input N", pgmN / prvN "Program N" / "Preview N", chN "Channel N".
+static func source_label(role: String) -> String:
+	for p in [["in", "SDI input "], ["pgm", "Program "], ["prv", "Preview "], ["ch", "Channel "]]:
+		if role.begins_with(p[0]) and role.substr(p[0].length()).is_valid_int():
+			return p[1] + role.substr(p[0].length())
+	return role
+
+
+## WO-694: the Source picker — only the surfaces the server reports with a Caspar channel (GET /api/video-surfaces;
+## DeckLink inputs that exist, the screens' PGM / PRV), inputs first. The camera's own source stays listed, marked,
+## when it is gone. → [[role, label], …]
+static func source_options(descriptors: Dictionary, current: String) -> Array:
+	var rank := func(r: String) -> int:  # inputs, then each screen's PGM before its PRV, then bare channels
+		for p in [["in", 0, 0], ["pgm", 1, 0], ["prv", 1, 1], ["ch", 2, 0]]:
+			if r.begins_with(p[0]) and r.substr(p[0].length()).is_valid_int():
+				return p[1] * 1000 + int(r.substr(p[0].length())) * 2 + p[2]
+		return 9999
+	var roles := descriptors.keys().filter(func(r: Variant) -> bool:
+		var d: Variant = descriptors[r]
+		return d is Dictionary and d.get("channel") != null and int(rank.call(str(r))) < 9999)
+	roles.sort_custom(func(a: Variant, b: Variant) -> bool: return int(rank.call(str(a))) < int(rank.call(str(b))))
+	var out := roles.map(func(r: Variant) -> Array:
+		return [str(r), "%s  (channel %d)" % [source_label(str(r)), int(descriptors[r].channel)]])
+	if current != "" and not roles.has(current):
+		out.append([current, "%s — not available" % source_label(current)])
+	return out

@@ -14,6 +14,8 @@ const SurfaceHolders := preload("res://video/surface_holders.gd")
 const VideoFeed := preload("res://video/video_feed.gd")
 const LEASE_EVERY_S := 5.0
 
+signal sources_changed  # WO-694: the roles that have a Caspar channel changed (pickers rebuild)
+
 var client_id := "godot-%d-%d" % [OS.get_process_id(), Time.get_unix_time_from_system()]
 var descriptors := {}  # role -> server descriptor (path, channel, active, …)
 var leasing := false
@@ -103,9 +105,12 @@ func _renew() -> void:
 func _apply_descriptors(list: Variant) -> void:
 	if not (list is Array):
 		return
+	var before := _channels()
 	for d in list:
 		if d is Dictionary:
 			descriptors[str((d as Dictionary).get("role", ""))] = d
+	if _channels() != before:
+		sources_changed.emit()
 	# A surface whose announced path changed (e.g. operator shmName edited) is reopened.
 	if feed != null:
 		return  # the feed reads by role on the server; no local path to reopen
@@ -131,6 +136,13 @@ func _process(_delta: float) -> void:
 				s.tex.update_rgba(r.frame, r.width, r.height)
 			else:
 				s.tex.update(r.frame, r.width, r.height)
+
+
+func _channels() -> Dictionary:
+	var out := {}
+	for r in descriptors:
+		out[r] = descriptors[r].get("channel") if descriptors[r] is Dictionary else null
+	return out
 
 
 static func segment_path(surface: String) -> String:
