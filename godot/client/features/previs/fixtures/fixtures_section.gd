@@ -16,6 +16,7 @@ const Replace := preload("res://features/previs/fixtures/replace_type_dialog.gd"
 const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
+const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
 
 var types: Array = []  # /api/fixtures/types summaries
 var usage: Array = []  # /api/fixtures/dmx universes
@@ -106,6 +107,13 @@ func _ready() -> void:
 	_visualise.toggled.connect(func(on: bool) -> void: _set_dmx({"visualise": on}))
 	out.add_child(_visualise)
 	add_child(out)
+	var viewer := Button.new()  # WO-693
+	viewer.text = "DMX viewer…"
+	viewer.tooltip_text = "Art-Net nodes / sACN sources on the network and one universe's 512 channels, live"
+	viewer.pressed.connect(_open_viewer)
+	var vrow := HBoxContainer.new()
+	vrow.add_child(viewer)
+	add_child(vrow)
 	_usage = _label()
 	_status = _label()
 	_label().text = "Programmer (WO-615 T6) — click fixtures in the 3D view, ctrl / shift-click adds"
@@ -317,6 +325,15 @@ func _import() -> void:
 		if str(_type.get_item_metadata(i)) == str(res.data.id):
 			_type.select(i)
 	_fill_modes()
+
+
+func _open_viewer() -> void:
+	var w := get_node_or_null("DmxMonitor") as AcceptDialog
+	if w == null:
+		w = DmxMonitor.new()
+		w.name = "DmxMonitor"
+		add_child(w)
+	w.call("open")
 
 
 func _ask_remove() -> void:

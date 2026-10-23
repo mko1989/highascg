@@ -32,5 +32,6 @@ function ownerChanged(delta) {
 }
 
 const owned = () => owners > 0
+const count = () => owners // WO-693: the DMX viewer owns :6454 while nothing else does, and yields when another opens
 
-module.exports = { publish, subscribe, ownerChanged, owned }
+module.exports = { publish, subscribe, ownerChanged, owned, count }

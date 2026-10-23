@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-470 routes.
+482 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -99,6 +99,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/device-view/gpu-map-debug` | registry | `src/api/router.js` |
 | GET | `/api/device-view/snapshot` | registry | `src/api/router.js`, `src/api/routes-device-view.js` |
 | POST | `/api/device-view/snapshot` | registry | `src/api/router.js` |
+| GET | `/api/dmx-monitor` | registry | `src/api/routes-dmx-monitor.js` |
+| POST | `/api/dmx-monitor/poll` | registry | `src/api/routes-dmx-monitor.js` |
 | * | `/api/export` | handler | `src/cg-studio/routes.js` |
 | GET | `/api/fixtures/dmx` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/dmx/frame` | registry | `src/api/routes-fixture-dmx.js` |
@@ -392,6 +394,16 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/system/network/refresh-splash-ip` | registry | `src/api/router.js` |
 | * | `/api/system/network/reset` | handler | `src/api/routes-system-hardware.js` |
 | POST | `/api/system/network/reset` | registry | `src/api/router.js` |
+| * | `/api/system/network/wifi` | handler | `src/api/routes-system-hardware.js` |
+| GET | `/api/system/network/wifi` | registry | `src/api/router.js` |
+| * | `/api/system/network/wifi/connect` | handler | `src/api/system-network-wifi.js` |
+| POST | `/api/system/network/wifi/connect` | registry | `src/api/router.js` |
+| * | `/api/system/network/wifi/disconnect` | handler | `src/api/system-network-wifi.js` |
+| POST | `/api/system/network/wifi/disconnect` | registry | `src/api/router.js` |
+| * | `/api/system/network/wifi/radio` | handler | `src/api/system-network-wifi.js` |
+| POST | `/api/system/network/wifi/radio` | registry | `src/api/router.js` |
+| * | `/api/system/network/wifi/scan` | handler | `src/api/system-network-wifi.js` |
+| POST | `/api/system/network/wifi/scan` | registry | `src/api/router.js` |
 | * | `/api/system/operator-display` | handler | `src/api/routes-system-hardware.js` |
 | GET | `/api/system/operator-display` | registry | `src/api/router.js` |
 | * | `/api/system/operator-helper-icon` | handler | `src/api/routes-system-hardware.js` |
@@ -502,6 +514,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-data-project-handlers.js` | WO-329: broadcast the STAMPED project so other clients pick up the new rev. |
 | `src/api/routes-device-snapshot.js` | WO-49 — Device-wide snapshot: build envelope, apply validated snapshot. |
 | `src/api/routes-device-view.js` | Device View API Routes. |
+| `src/api/routes-dmx-monitor.js` | WO-693 — DMX viewer (src/artnet/dmx-monitor.js). |
 | `src/api/routes-fixture-dmx.js` | WO-615 T3/T4 — the fixture DMX engine (src/fixtures/follow-engine.js, via ctx.fixtureService): GET    /api/fixtures/dmx                         → { dmx (master, |
 | `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
 | `src/api/routes-gdtf-share.js` | WO-637 — GDTF Share (src/fixtures/gdtf-share.js): GET  /api/fixtures/share/account               → { user, set }  (the password is never returned) POST /api/fix |
@@ -534,6 +547,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-usb-ingest.js` | USB media ingest REST API (WO-29). |
 | `src/api/routes-v4l2-input.js` |  |
 | `src/api/routes-virtual-camera.js` |  |
+| `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |
 | `src/cg-studio/routes.js` | CG Studio HTTP handlers (runs on Electron launcher, not playout server). |
 | `src/previs/register.js` | Previs module registration (WO-17 / WO-30). |
