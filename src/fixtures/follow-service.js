@@ -122,6 +122,7 @@ function createFollowService(ctx, hub) {
 		lastJson = json
 		targets = localTargets()
 		engine.configure(slice)
+		sender.setInterface(engine.dmx.iface) // WO-698
 		looks = normalizeLooks(slice?.looks, cleanValue)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
@@ -130,7 +131,7 @@ function createFollowService(ctx, hub) {
 		else consoleFrames.stop()
 		sacnIn.configure(vis.filter((f) => f.protocol === 'sacn').map((f) => f.universe), engine.dmx.sacn_port)
 		const ok = engine.fixtures.filter((f) => !f.problem).length
-		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol})`)
+		log('info', `[follow] patch: ${engine.fixtures.length} fixture(s), ${ok} outputtable, output ${engine.enabled ? 'ON' : 'off'} (${engine.protocol}) via ${engine.dmx.iface || 'OS default route'}`)
 		for (const f of engine.fixtures) if (f.problem || f.noSend) log('warn', `[follow] ${f.name}: ${f.problem || `not sent — ${f.noSend}`}`)
 	}
 	try {

@@ -300,7 +300,7 @@ class FollowEngine {
 					tilt: Math.round(a.tilt * 100) / 100, universe: fx.universe, address: fx.address, dest: fx.dest }
 			}),
 			dmx: { enabled: this.dmx.enabled, priority: this.dmx.priority, universes: [...this.dmx.universes],
-				visualise: this.dmx.visualise, sacn_port: this.dmx.sacn_port },
+				visualise: this.dmx.visualise, sacn_port: this.dmx.sacn_port, iface: this.dmx.iface },
 			universes: [...this._uni.values()].map((u) => ({ protocol: u.protocol, dest: `${u.to.host}:${u.to.port}`,
 				universe: u.universe, typed: u.typed, live: this._live(u), packets: u.packets,
 				last_sent_ms_ago: u.at ? now - u.at : null })),

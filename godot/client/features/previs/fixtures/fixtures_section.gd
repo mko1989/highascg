@@ -37,6 +37,8 @@ var _replace: Button
 var _replace_dlg: ConfirmationDialog
 var _last := ""
 var _body := ColorRows.new()  # WO-641: the selected type's body colour
+var _via: OptionButton  # WO-698 the NIC the DMX output leaves by
+var _ifaces: Array = []  # [{name, address}]
 var _patch_edit := PatchEdit.new()  # WO-695: re-patch the selected heads
 
 
@@ -115,6 +117,15 @@ func _ready() -> void:
 	viewer.pressed.connect(_open_viewer)
 	var vrow := HBoxContainer.new()
 	vrow.add_child(viewer)
+	_via = OptionButton.new()  # WO-698
+	_via.fit_to_longest_item = false
+	_via.tooltip_text = ("The network card the DMX output leaves by (Art-Net broadcast / sACN multicast) — the OS " +
+		"default route is usually the office LAN, not the lighting network")
+	_via.item_selected.connect(func(i: int) -> void: _set_dmx({"iface": str(_via.get_item_metadata(i))}))
+	var via_l := Label.new()
+	via_l.text = "Out via"
+	vrow.add_child(via_l)
+	vrow.add_child(_via)
 	add_child(vrow)
 	_usage = _label()
 	_status = _label()
@@ -178,6 +189,7 @@ func _maybe_reload() -> void:
 	_last = js
 	_master.set_pressed_no_signal(_dmx().enabled)
 	_visualise.set_pressed_no_signal(_dmx().visualise)
+	refresh_ifaces()  # fills _via
 	refresh_usage()
 
 
@@ -225,6 +237,33 @@ func _on_mode(_i: int) -> void:
 func _mode_warning() -> String:
 	var m := M.find_mode(types, _type_id(), str(_mode.get_item_metadata(_mode.selected)) if _mode.selected >= 0 else "")
 	return "; ".join(m.get("warnings", [])) if m.get("warnings") is Array else ""
+
+
+## WO-698: this box's IPv4 addresses (GET /api/tracking/follow psn.interfaces) for "Out via".
+func refresh_ifaces() -> void:
+	var res: Dictionary = await Api.get_json("/api/tracking/follow")
+	var psn: Variant = res.data.get("psn") if res.ok and res.data is Dictionary else null
+	_ifaces = psn.get("interfaces") if psn is Dictionary and psn.get("interfaces") is Array else []
+	_fill_via()
+
+
+func _fill_via() -> void:
+	var cur := str(_dmx().iface)
+	_via.clear()
+	_via.add_item("OS default route")
+	_via.set_item_metadata(0, "")
+	for i in _ifaces:
+		_via.add_item("%s  %s" % [i.name, i.address])
+		_via.set_item_metadata(_via.item_count - 1, str(i.address))
+	var at := 0
+	for i in _via.item_count:
+		if str(_via.get_item_metadata(i)) == cur:
+			at = i
+	if cur != "" and at == 0:
+		_via.add_item("%s (not on this box — default route)" % cur)
+		_via.set_item_metadata(_via.item_count - 1, cur)
+		at = _via.item_count - 1
+	_via.select(at)
 
 
 func refresh_usage() -> void:

@@ -52,7 +52,11 @@ function parseDest(dest) {
 	return port >= 1 && port <= 65535 ? { host: m[1], port } : null
 }
 
-/** One ephemeral, broadcast-enabled UDP socket; never binds :6454. */
+/**
+ * One ephemeral, broadcast-enabled UDP socket; never binds :6454. WO-698: `setInterface(ip)` binds it to one of this
+ * box's IPv4 addresses — the kernel then sends 255.255.255.255 and sACN multicast out of THAT NIC instead of the
+ * default route's (eno1 here, while the lighting network is eno2 2.0.0.0/8). '' = OS default.
+ */
 class ArtnetSender {
 	constructor({ log } = {}) {
 		this._log = typeof log === 'function' ? log : () => {}
@@ -60,6 +64,15 @@ class ArtnetSender {
 		this._ready = null
 		this.sent = 0
 		this.errors = 0
+		this.iface = ''
+	}
+
+	/** '' = the OS default route; else an IPv4 of this box (a missing address falls back to the default, logged). */
+	setInterface(ip) {
+		const want = typeof ip === 'string' && net.isIPv4(ip.trim()) ? ip.trim() : ''
+		if (want === this.iface) return
+		this.iface = want
+		this.close()
 	}
 
 	_open() {
@@ -69,10 +82,26 @@ class ArtnetSender {
 			this.errors++
 			this._log('warn', '[follow] Art-Net socket: ' + (e?.message || e))
 		})
+		const sock = this._sock
+		const iface = this.iface
 		this._ready = new Promise((resolve) => {
-			this._sock.bind(0, () => {
+			const fail = (e) => {
+				// the chosen address is not on this box (NIC unplugged, another box's project): send via the default
+				this._log('warn', `[follow] DMX output interface ${iface}: ${e?.message || e} — using the OS default route`)
+				this._sock = null
+				this._ready = null
+				this.iface = ''
 				try {
-					this._sock.setBroadcast(true)
+					sock.close()
+				} catch (_) {}
+				resolve(this._open())
+			}
+			if (iface) sock.once('error', fail)
+			sock.bind({ port: 0, address: iface || undefined }, () => {
+				sock.removeListener('error', fail)
+				try {
+					sock.setBroadcast(true)
+					if (iface) sock.setMulticastInterface(iface)
 				} catch (_) {
 					/* unicast still works */
 				}

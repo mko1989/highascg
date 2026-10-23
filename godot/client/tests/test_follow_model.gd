@@ -59,11 +59,13 @@ func test_typed_and_sacn_fixtures_survive_a_save() -> void:
 		"patch": [{"id": "s", "protocol": "sacn", "universe": 0, "typeId": "0123456789ab", "mode": "Standard"},
 		{"id": "a", "typeId": "../etc", "universe": 4}]})
 	t.eq(d.dmx, {"enabled": true, "priority": 200, "universes": ["sacn:1", "artnet:3"],
-		"visualise": false, "sacn_port": 5568})
-	t.eq(F.normalize({}).dmx, {"enabled": false, "priority": 100, "universes": [], "visualise": false, "sacn_port": 5568},
+		"visualise": false, "sacn_port": 5568, "iface": ""})
+	t.eq(F.normalize({}).dmx, {"enabled": false, "priority": 100, "universes": [], "visualise": false, "sacn_port": 5568, "iface": ""},
 		"DMX master off, not visualising by default")
 	t.eq(F.normalize_dmx({"visualise": true, "sacn_port": 5569}).sacn_port, 5569)
 	t.eq([F.normalize_dmx({"sacn_port": 80}).sacn_port, F.normalize_dmx({"sacn_port": 5568.5}).sacn_port], [5568, 5568])
+	t.eq([F.normalize_dmx({"iface": " 2.0.0.13 "}).iface, F.normalize_dmx({"iface": "eno2"}).iface], ["2.0.0.13", ""],
+		"WO-698: the output NIC is one of the box's IPv4 addresses, else the OS default route")
 	var s: Dictionary = d.patch[0]
 	t.eq([s.protocol, s.universe, s.dest, s.typeId, s.mode], ["sacn", 1, "", "0123456789ab", "Standard"],
 		"sACN from universe 1, multicast dest, type kept")

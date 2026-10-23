@@ -73,7 +73,7 @@ static func normalize(slice: Variant) -> Dictionary:
 
 
 ## WO-615 T4 fixtures.dmx — twin of gdtf-patch.js normalizeDmx (the universes list is kept in order, deduplicated;
-## T7 visualise = the console's DMX drives the previs, sACN input port).
+## T7 visualise = the console's DMX drives the previs, sACN input port; WO-698 iface = the NIC the output leaves by).
 static func normalize_dmx(raw: Variant) -> Dictionary:
 	var o: Dictionary = raw if raw is Dictionary else {}
 	var pr: Variant = o.get("priority")
@@ -90,9 +90,11 @@ static func normalize_dmx(raw: Variant) -> Dictionary:
 			unis.append(key)
 	var port: Variant = o.get("sacn_port")
 	var port_ok := (port is int or port is float) and float(port) == floorf(float(port)) and float(port) >= 1024 and float(port) <= 65535
+	var iface := str(o.get("iface", "")).strip_edges()
 	return {"enabled": o.get("enabled") == true,
 		"priority": clampi(roundi(float(pr)), 0, 200) if pr is int or pr is float else 100, "universes": unis,
-		"visualise": o.get("visualise") == true, "sacn_port": int(port) if port_ok else 5568}
+		"visualise": o.get("visualise") == true, "sacn_port": int(port) if port_ok else 5568,
+		"iface": iface if iface.is_valid_ip_address() and iface.count(".") == 3 else ""}  # WO-698 the NIC out
 
 
 ## WO-632 output.through — twin of follow-through.js normalizeThrough (read the console's Art-Net first).
