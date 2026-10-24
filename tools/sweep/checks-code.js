@@ -48,7 +48,9 @@ module.exports = [
 				const cl = newestMtime(['godot/client'], { ext: /\.(gd|tscn|tres|cfg|godot)$/ })
 				if (cl.ms > kioskStartMs) {
 					status = 'warn'
-					out.push(`kiosk started ${fmtTime(kioskStartMs)}, ${cl.file} changed ${fmtTime(cl.ms)}: reload it (F5)`)
+					out.push(
+						`kiosk started ${fmtTime(kioskStartMs)}, ${cl.file} changed ${fmtTime(cl.ms)}: restart the operator client (it runs the scripts it started with)`
+					)
 				}
 				if (cl.future) out.push(`${cl.future} client file(s) dated in the future (clock was set back) — not compared`)
 			}

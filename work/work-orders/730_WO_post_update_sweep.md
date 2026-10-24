@@ -1,7 +1,7 @@
 # WO-730 — Post-update sweep: one command (and an automatic run) that checks the whole box after an update
 
-**Status: IN PROGRESS (24.10.26) — sweep runs green-or-explained on this box, smoke 10/10, gates green; the
-automatic run after a restart is verified below once the server restarts on this commit.**
+**Status: DONE (24.10.26) — sweep green-or-explained on this box; the server's own run after restarting on
+1eb47065 logged 23 pass / 4 warn / 0 fail and GET /api/system/update/sweep served it; smoke 10/10; gates green.**
 
 Owner, 24.10: *"id like to have a sweep check so after each update it can be run and check the full integrity and
 compatibility of the whole app/system"*
@@ -76,6 +76,14 @@ the same way by hand, over SSH, or from the updater.
 - Clean-export gates: repo-integrity, max-lines, unwired-exports, boot, lint (214), format:check all pass.
   `test:ci` 3143 tests. The contract-doc failure was fixed by regenerating; it passes 3/3 after. WO-498 fails only
   in the export (no `.git`) and passes 8/8 in the checkout.
+
+- **Automatic run, live:** `kill -TERM` of the server → journal
+  `[sweep] new code 2026-10-23_194203+1eb47065eeab: sweep in 120 s`, then 2 min 18 s later
+  `[sweep] after update …: 23 pass, 4 warn, 0 fail — GET /api/system/update/sweep`. The route returned that report
+  (`auto: true`, same codeId). The `verify-*.sh` scripts pass under systemd, without a tty.
+- The run also showed that the godot kiosk has **no F5 reload**. CLAUDE.md's deploy loop still says F5 (web-kiosk
+  era). The client restarts by spawning itself (connection_menu.gd); the running kiosk's parent is init. The sweep's
+  advice now says "restart the operator client".
 
 ## Open
 
