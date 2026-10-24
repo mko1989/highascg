@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 629,
+	"count": 625,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -254,7 +254,6 @@
 		"src/api/media-catalog.js: isHiddenThumbnailBucket",
 		"src/api/routes-streaming-channel-rtmp.js: stopStreamingStatusPoll",
 		"src/api/routes-streaming-channel-shared.js: cabledAudioOutputLayoutForMain",
-		"src/api/routes-system-setup.js: detectCalamaresStatus",
 		"src/api/routes-system-setup.js: detectCasparServiceStatus",
 		"src/api/routes-system-setup.js: parseCasparControlOutput",
 		"src/api/routes-system-setup.js: readDisplayMode",
@@ -391,8 +390,6 @@
 		"src/engine/project-stream-credentials.js: configStreamOutputIds",
 		"src/engine/project-stream-credentials.js: projectHasCredential",
 		"src/engine/project-volume-sync.js: PROJECTS_SUBDIR",
-		"src/engine/project-volume-sync.js: scanProjectsDir",
-		"src/engine/project-volume-sync.js: volumeProjectsDir",
 		"src/engine/scene-exit-layers.js: collectOccupiedLookLayersOnChannel",
 		"src/engine/scene-exit-layers.js: fadeExitLayerOpacities",
 		"src/engine/scene-exit-layers.js: physicalLookLayerBank",
@@ -544,7 +541,6 @@
 		"src/system/browser-source-session.js: stopBrowserSource",
 		"src/system/cef-cdp-client.js: VK_CODE",
 		"src/system/cef-cdp-client.js: vkCodeForKey",
-		"src/system/device-identity.js: DEVICE_IDENTITY_PATH",
 		"src/system/device-identity.js: readDeviceIdentityFile",
 		"src/system/exfat-sync-map.js: DEFAULT_PROJECT_ROOT_PREFIX",
 		"src/system/exfat-sync-map.js: DEFAULT_VOLUMES",

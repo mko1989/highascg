@@ -150,8 +150,6 @@ const sharedOf = () => shared || (shared = createServerDuties({ persistence: req
 module.exports = {
 	STORE_KEY,
 	NAMES,
-	SETTABLE,
-	validatePatch,
 	createServerDuties,
 	has: (name) => sharedOf().has(name),
 	get: () => sharedOf().get(),
