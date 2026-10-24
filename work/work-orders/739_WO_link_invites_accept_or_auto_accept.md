@@ -1,8 +1,9 @@
 # WO-739 — Linking servers: the other server accepts an invite, unless it auto-accepts
 
-**Status: IN PROGRESS (24.10.26) — built and tested offline (smoke 8/8, WO-725 e2e 14/14 on three real sandbox
-servers through the accept route, Godot 21533/0). Not live yet: needs a server restart on each box (owner) and the
-next release on .4. Owner-QA: link from one box, accept on the other.**
+**Status: DONE (24.10.26) — offline suite (smoke 8/8, WO-725 e2e 14/14, Godot 21533/0) and live on .4 (release
+2026-10-24T195734Z): a new server's link waited as `pending`, .4 listed the invite, its kiosk showed the card and
+"Devices (1 invite)", and both Decline paths (API and kiosk button) worked. This box runs the old code until the owner
+restarts its server; the Accept button itself is owner-QA.**
 
 Owner, 24.10: *"there also needs to be an accept path for connecting servers together, unless the server had
 autoaccept master invites in the inspector of device.."*
@@ -105,5 +106,25 @@ autoaccept master invites in the inspector of device.."*
 - Clean export: repo-integrity OK, max-lines 0 over, unwired-exports no new, boot OK, format OK, `test:ci` 3194 tests
   3190 pass, 3 skipped, 1 fail (WO-498, export-only). Lint 214 warnings (cap 216).
 
-Not yet proven live: both boxes need a server restart, which is the owner's call on this box. .4 gets it with the
-next release. Both boxes are already linked both ways, so nothing changes for them until a new link is made.
+### Live on .4 (24.10, release 2026-10-24T195734Z)
+
+.4 was updated through `/api/system/update/apply`, with its config backed up first (`~/config-backup-before-195734Z`,
+md5 unchanged after the update). For the inviter I used a throwaway sandbox server on this box, published on
+192.168.0.23 through a TCP relay. .4 checks that a HighAsCG server answers at the inviter's address before it records
+an invite: the first try without the relay was refused with `no HighAsCG server at 192.168.0.23:<port>`, which is
+right.
+
+1. Sandbox → .4 link: `201 {"ok":false,"error":"waiting for highascg5867 to accept","pending":true}`.
+2. .4 `/api/cluster`: `invites [{"host":"192.168.0.23","name":"highascg7580",…}]`, `auto_accept false`. The existing
+   link with this box (highascg7580) and .4's master role were unchanged.
+3. API decline: `POST /api/cluster/invites/:id/decline` → `200 {"ok":true,"told":true}`; invites 0 afterwards.
+4. Kiosk, restarted with 0 SCRIPT ERROR. While an invite was held for 30 s, the tab bar on Live read
+   "Devices (1 invite)". The Devices page showed "highascg7580 (192.168.0.23) asks to link with this server." with
+   Accept / Decline. A click on **Decline** cleared it: invites 0, the card gone, the server list back. The script's
+   own decline afterwards got `404 no such invite`, which shows the click had already done it.
+5. The kiosk was left on the Live tab.
+
+Each run leaves a tombstone on .4 for its throwaway sandbox fingerprint. It is harmless and expires after 30 days.
+
+Not proven live: **Accept** from the kiosk. I did not want to link a throwaway server into .4's cluster; the accept
+route itself is covered by e2e 14/14. This box runs the WO-739 code only after the owner restarts its server.
