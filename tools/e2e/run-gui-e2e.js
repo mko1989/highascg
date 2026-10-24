@@ -9,6 +9,7 @@
  *   node tools/e2e/run-gui-e2e.js                         # every scenario
  *   node tools/e2e/run-gui-e2e.js --e2e=01_new_project,02_outputs
  *   node tools/e2e/run-gui-e2e.js --out=/path/report-dir --keep   # keep the sandbox root for inspection
+ *   node tools/e2e/run-gui-e2e.js --e2e=06_xr_walk --xr            # WO-741: the client walks the previs (-- --xr)
  *
  * Output: <out>/results.json, <out>/report.md, <out>/shots/NN_<scenario>_<step>.png, <out>/sandbox/server.log,
  * <out>/godot.log. Exit code = failed steps (0 = all green).
@@ -51,6 +52,7 @@ async function main() {
 		const godotArgs = ['--rendering-driver', 'opengl3', '--path', path.join(REPO_ROOT, 'godot/client'), '--',
 			`--server=${sb.url}`, `--e2e=${scenarios}`, `--e2e-out=${path.join(out, 'shots')}`, '--windowed',
 			'--video=feed'] // pictures over the sandbox's WebSocket feed: the client never maps the live box's /dev/shm
+		if (arg('xr')) godotArgs.push('--xr') // WO-741 (detachable): walk the previs, scenario 06_xr_walk
 		const xvfb = ['-a', '-s', '-screen 0 1920x1080x24', godot, ...godotArgs]
 		const log = fs.openSync(path.join(out, 'godot.log'), 'w')
 		const child = spawn('xvfb-run', xvfb, {

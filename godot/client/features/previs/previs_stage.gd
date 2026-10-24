@@ -20,6 +20,7 @@ var _dist := 12.0
 var _target := Vector3(0, 2.2, 0)
 var _orbiting := false
 var _fly_tween: Tween
+var walk: Node3D  # WO-741 (detachable): features/previs/xr/xr_walk.gd, only with the client flag -- --xr
 
 
 func _ready() -> void:
@@ -53,6 +54,8 @@ func _ready() -> void:
 	add_child(_cam)
 	_cam.current = true
 	_update_camera()
+	if Config.args.has("xr"):  # WO-741
+		walk = load("res://features/previs/xr/xr_walk.gd").attach(self)
 
 
 func load_glb_bytes(bytes: PackedByteArray) -> bool:
@@ -117,6 +120,8 @@ static func led_material(tex: Texture2D) -> StandardMaterial3D:
 
 
 func handle_input(event: InputEvent) -> void:
+	if walk != null and walk.handle_input(event):  # WO-741
+		return
 	var mb := event as InputEventMouseButton
 	if mb != null:
 		if mb.button_index == MOUSE_BUTTON_LEFT:
@@ -142,7 +147,7 @@ func _update_camera() -> void:
 
 
 func camera() -> Camera3D:
-	return _cam
+	return walk.camera() if walk != null else _cam  # WO-741
 
 
 ## Aim the orbit camera at a world box (stage builder objects, WO-614). `yaw` (radians, NAN = keep) sets the side
