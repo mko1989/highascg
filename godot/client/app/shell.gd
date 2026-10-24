@@ -108,7 +108,14 @@ func _ready() -> void:
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
 	add_child(perf)
-	if DockModel.wanted(Config.origin, Config.args):  # WO-628 — bottom-centre app dock on the box's own screen
+	_add_dock()
+
+
+## WO-628 — bottom-centre app dock on the box's own screen. WO-735: decided on the box's own server, so a server box
+## whose client follows another server keeps its dock.
+func _add_dock() -> void:
+	await DevicesTarget.wait()
+	if DockModel.wanted(DevicesTarget.origin(), Config.args):
 		var dock := OperatorDock.new()
 		dock.notice.connect(header_project.say)
 		add_child(dock)

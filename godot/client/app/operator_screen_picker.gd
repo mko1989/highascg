@@ -12,6 +12,7 @@ extends Node
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Placement := preload("res://app/window_placement.gd")
 const M := preload("res://app/operator_screen_model.gd")
+const ApiScript := preload("res://core/api.gd")
 
 const TIMEOUT_S := 60.0
 const PANEL := Vector2i(560, 220)
@@ -24,6 +25,7 @@ var _embed_was := true
 var _boot := {}  # WO-638: non-empty in boot mode ({timeoutS, defaultName})
 var _counts: Array[Label] = []
 var _busy := false  # a pick is on its way — a second click / the timer must not post again
+var api: ApiScript = null  # WO-735: the box's own server (boot_question sets it); else the connected one
 
 
 func is_open() -> bool:
@@ -35,7 +37,7 @@ func open_boot(boot: Dictionary) -> bool:
 	if is_open():
 		return true
 	_boot = boot.duplicate()
-	var prep: Dictionary = await Api.post_json("/api/system/operator-screen", {"boot": "prepare"})
+	var prep: Dictionary = await _api().post_json("/api/system/operator-screen", {"boot": "prepare"})
 	if prep.ok and prep.data is Dictionary and prep.data.get("spread", false):
 		await get_tree().create_timer(1.0).timeout  # let the RandR change reach DisplayServer
 	return await open()
@@ -45,7 +47,7 @@ func open_boot(boot: Dictionary) -> bool:
 func open() -> bool:
 	if is_open():
 		return true
-	var res: Dictionary = await Api.get_json("/api/system/operator-screen")
+	var res: Dictionary = await _api().get_json("/api/system/operator-screen")
 	if not res.ok or not res.data is Dictionary:
 		finished.emit({"ok": false, "error": "could not list the outputs"})
 		return false
@@ -58,7 +60,7 @@ func open() -> bool:
 	if root.gui_embed_subwindows:
 		finished.emit({"ok": false, "error": "close the open dialog first"})
 		return false
-	Api.post_json("/api/system/operator-screen", {"prompt": true})  # the pointer confine would keep the click away
+	_api().post_json("/api/system/operator-screen", {"prompt": true})  # the pointer confine would keep the click away
 	_outputs = res.data.get("outputs", [])
 	var matched := M.match_outputs(_outputs, screens)
 	for i in screens.size():
@@ -198,13 +200,13 @@ func _pick(i: int, output: String, how := "") -> void:
 	_busy = true
 	var res: Dictionary
 	if _boot.is_empty():
-		res = await Api.post_json("/api/system/operator-screen", {"name": output})
+		res = await _api().post_json("/api/system/operator-screen", {"name": output})
 	else:
 		var b := {"boot": "resolve", "how": how}
 		if output != "":
 			b["name"] = output
 		_timer.paused = true
-		res = await Api.post_json("/api/system/operator-screen", b)
+		res = await _api().post_json("/api/system/operator-screen", b)
 		if res.ok and how == "headless":
 			_close({"ok": true, "headless": true, "name": str(res.data.get("name", "")) if res.data is Dictionary else ""})
 			return
@@ -212,7 +214,7 @@ func _pick(i: int, output: String, how := "") -> void:
 			# The server re-laid X out before answering: screen indices may have moved — find the output by name.
 			output = str(res.data.get("name", output))
 			await get_tree().create_timer(1.0).timeout
-			var fresh: Dictionary = await Api.get_json("/api/system/operator-screen")
+			var fresh: Dictionary = await _api().get_json("/api/system/operator-screen")
 			if fresh.ok and fresh.data is Dictionary:
 				_outputs = fresh.data.get("outputs", _outputs)
 			i = _screen_of(output)
@@ -246,7 +248,7 @@ func _close(result: Dictionary) -> void:
 	if not is_open():
 		return
 	if not result.ok:
-		Api.post_json("/api/system/operator-screen", {"prompt": false})  # confine again (a pick does it server-side)
+		_api().post_json("/api/system/operator-screen", {"prompt": false})  # confine again (a pick does it server-side)
 	for w in _windows:
 		w.hide()  # hidden before the embed flag goes back — Godot refuses the change while a child window shows
 		w.queue_free()
@@ -259,3 +261,7 @@ func _close(result: Dictionary) -> void:
 		_timer = null
 	get_tree().root.gui_embed_subwindows = _embed_was
 	finished.emit(result)
+
+
+func _api() -> ApiScript:
+	return api if api else Api

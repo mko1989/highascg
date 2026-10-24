@@ -105,7 +105,7 @@ func _load() -> void:
 	if _loaded or _loading:
 		return
 	_loading = true
-	var res: Dictionary = await Api.get_json("/api/system/dock")
+	var res: Dictionary = await DevicesTarget.api.get_json("/api/system/dock")
 	_loading = false
 	if _loaded:
 		return
@@ -166,7 +166,7 @@ func _show_running(data: Variant) -> void:
 
 
 func _refresh_running() -> void:
-	var res: Dictionary = await Api.get_json("/api/system/dock")
+	var res: Dictionary = await DevicesTarget.api.get_json("/api/system/dock")
 	if res.ok:
 		_show_running(res.data)
 
@@ -224,7 +224,7 @@ func _button(tip: String) -> Button:
 
 
 func _icon_into(b: Button, action: String) -> void:
-	var r: Dictionary = await Api.get_bytes(D.icon_path(action))
+	var r: Dictionary = await DevicesTarget.api.get_bytes(D.icon_path(action))
 	var img := D.decode_icon(r.bytes, D.ICON * 2) if r.ok else null
 	if img != null and is_instance_valid(b):
 		b.icon = ImageTexture.create_from_image(img)
@@ -246,7 +246,7 @@ func _open_more() -> void:
 func launch(action: String, b: Button) -> void:
 	if b != null:
 		b.modulate = Color(1, 1, 1, 0.45)  # pressed feedback until the server answers
-	var res: Dictionary = await NuclearGate.post(self, "/api/system/dock/launch", {"action": action})
+	var res: Dictionary = await NuclearGate.post(self, "/api/system/dock/launch", {"action": action}, DevicesTarget.api)
 	if b != null and is_instance_valid(b):
 		b.modulate = Color.WHITE
 	print("[client] dock %s → %s %s" % [action, res.status, res.error])

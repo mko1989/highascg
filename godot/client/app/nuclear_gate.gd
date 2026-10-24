@@ -4,6 +4,7 @@ extends RefCounted
 ## kept in memory for this client session (the web keeps it in the Settings → Nuclear field).
 
 const N := preload("res://app/nuclear_model.gd")
+const ApiScript := preload("res://core/api.gd")
 
 static var _password := ""
 
@@ -13,17 +14,19 @@ class _Ask:
 	signal done(pw: String)
 
 
-static func post(host: Node, path: String, body: Dictionary) -> Dictionary:
+## `api`: the server to ask (WO-735: the box's own one for the dock and updates); default the connected server.
+static func post(host: Node, path: String, body: Dictionary, api: ApiScript = null) -> Dictionary:
+	var to: ApiScript = api if api else Api
 	var b := body.duplicate()
 	if _password != "":
 		b["password"] = _password
-	var res: Dictionary = await Api.post_json(path, b)
+	var res: Dictionary = await to.post_json(path, b)
 	while N.needs_password(res):
 		var pw: String = await _ask(host, b.has("password"))
 		if pw == "":
 			return res
 		b["password"] = pw
-		res = await Api.post_json(path, b)
+		res = await to.post_json(path, b)
 		if not N.needs_password(res):
 			_password = pw
 	return res

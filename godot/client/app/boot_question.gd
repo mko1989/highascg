@@ -8,25 +8,26 @@ extends Node
 
 const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 const ScreenModel := preload("res://app/operator_screen_model.gd")
-const Platform := preload("res://core/platform.gd")
 
 signal said(line: String)
 
 
 func ask(fresh: bool) -> void:
-	if not Platform.is_local_origin(Config.origin):  # WO-686: the answers re-lay the BOX's screens
+	await DevicesTarget.wait()
+	if not DevicesTarget.on_box():  # WO-686: the answers re-lay the BOX's screens (WO-735: also while following)
 		return
+	var api := DevicesTarget.api
 	# WO-696: the session can start this client before the server listens; one failed GET used to skip the launcher
 	# for good while the gate (no backstop) held Caspar. Keep asking until the server answers at all (status 0 = no
 	# transport); an HTTP answer, also an error, is final.
-	var r: Dictionary = await Api.get_json("/api/system/operator-screen")
+	var r: Dictionary = await api.get_json("/api/system/operator-screen")
 	var waited := false
 	while int(r.get("status", 0)) == 0 and is_inside_tree():
 		if not waited:
 			said.emit("waiting for the server to ask the start-up question…")
 			waited = true
 		await get_tree().create_timer(2.0).timeout
-		r = await Api.get_json("/api/system/operator-screen")
+		r = await api.get_json("/api/system/operator-screen")
 	if not r.ok or not r.data is Dictionary:
 		return
 	var boot: Variant = r.data.get("boot")
@@ -43,6 +44,7 @@ func ask(fresh: bool) -> void:
 	if launcher:
 		w.mode = Window.MODE_MINIMIZED
 	var picker := ScreenPicker.new()
+	picker.api = api
 	add_child(picker)
 	picker.finished.connect(func(res: Dictionary) -> void:
 		said.emit("operator screen: %s" % res.get("name", res.get("error", "")))

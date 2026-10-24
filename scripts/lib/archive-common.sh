@@ -27,6 +27,8 @@ archive_common_server_tar_members() {
 		template
 		scripts
 		tools/runtime
+		godot/client
+		godot/GODOT_VERSION
 	)
 	if [[ "${RELEASE_SERVER_ONLY:-0}" != "1" ]]; then
 		_out+=(dist-web)
@@ -115,6 +117,14 @@ archive_common_server_tar_excludes() {
 		--exclude='config/casparcg.config.bak.*'
 		--exclude=config/casparcg.config.tmp
 		--exclude='config/*.corrupt-*'
+	)
+	# WO-735: the box's kiosk runs the Godot client from source (godot/client/run-client.sh), so an update carries it;
+	# its import cache, exports and per-import .uid files are regenerated per machine (.gitignore).
+	_ex+=(
+		--exclude=godot/client/.godot
+		--exclude=godot/client/export
+		--exclude=godot/client/build
+		--exclude='godot/client/*.uid'
 	)
 }
 

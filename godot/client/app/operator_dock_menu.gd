@@ -66,7 +66,7 @@ func fill(apps: Array) -> void:
 
 
 func _icon_into(b: Button, action: String) -> void:
-	var r: Dictionary = await Api.get_bytes(D.icon_path(action))
+	var r: Dictionary = await DevicesTarget.api.get_bytes(D.icon_path(action))
 	var img := D.decode_icon(r.bytes, D.MENU_ICON * 2) if r.ok else null
 	if img != null and is_instance_valid(b):
 		b.icon = ImageTexture.create_from_image(img)

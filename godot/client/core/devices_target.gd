@@ -10,8 +10,10 @@ signal resolved
 const DTM := preload("res://core/devices_target_model.gd")
 const SettingsScript := preload("res://core/settings_state.gd")
 const ApiScript := preload("res://core/api.gd")
+const Platform := preload("res://core/platform.gd")
 const STATE_KEYS := ["channelMap", "configComparison", "hostOperatorFullscreen", "templates"]
 const POLL_S := 3.0  # the home server's WS events do not reach this client: its views are polled instead
+const BOOT_WAIT_S := 90.0  # WO-735: at boot this client can start before the box's server listens (WO-696)
 
 var remote := false  # true = the Devices tab works on this machine, not on the connected server
 var is_resolved := false
@@ -45,6 +47,11 @@ func _resolve() -> void:
 		probe.origin_override = h
 		add_child(probe)
 		var r: Dictionary = await probe.get_json("/api/replication/ping")
+		var waited := 0.0
+		while int(r.get("status", 0)) == 0 and waited < BOOT_WAIT_S:
+			await get_tree().create_timer(2.0).timeout
+			waited += 2.0
+			r = await probe.get_json("/api/replication/ping")
 		probe.queue_free()
 		answers = r.ok and r.data is Dictionary and str(r.data.get("appId", "")) == "highascg"
 	home = DTM.pick(Config.origin, h, answers)
@@ -68,6 +75,12 @@ func wait() -> void:
 ## The origin Caspar-side URLs are built from (host live webpages).
 func origin() -> String:
 	return home if remote else Config.origin
+
+
+## WO-735: this client runs on a server box and `api` reaches that box's own server — the box-local features (the
+## start-up question, the dock) work, also while the client follows another server.
+func on_box() -> bool:
+	return Platform.is_local_origin(origin())
 
 
 ## Store values the Devices tab reads: the connected server's, or this machine's last /api/state.

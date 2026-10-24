@@ -62,8 +62,8 @@ func _ready() -> void:
 
 func refresh(force: bool) -> void:
 	_check.text = "Loading…"
-	var ver: Dictionary = await Api.get_json("/api/system/version")
-	var chk: Dictionary = await Api.get_json("/api/system/update/check" + ("?force=1" if force else ""))
+	var ver: Dictionary = await DevicesTarget.api.get_json("/api/system/version")
+	var chk: Dictionary = await DevicesTarget.api.get_json("/api/system/update/check" + ("?force=1" if force else ""))
 	var v: Dictionary = ver.data if ver.ok and ver.data is Dictionary else {}
 	_stamp.text = U.stamp(v) if ver.ok else "(version unavailable: %s)" % str(ver.error)
 	_volumes.text = U.volumes(v)
@@ -71,7 +71,7 @@ func refresh(force: bool) -> void:
 	_check.text = U.check_line(c)
 	_check.tooltip_text = str(c.get("releaseUrl", ""))
 	_apply.disabled = not U.can_apply(c) or not _poll.is_stopped()
-	var st: Dictionary = await Api.get_json("/api/system/update/status")
+	var st: Dictionary = await DevicesTarget.api.get_json("/api/system/update/status")
 	if st.ok and st.data is Dictionary and (st.data.get("active") == true or (st.data.get("done") == true and st.data.get("log") is Array)):
 		_show_log(st.data)
 		if st.data.get("active") == true:
@@ -82,7 +82,7 @@ func _install() -> void:
 	_apply.disabled = true
 	_log.visible = true
 	_log.text = "Starting update…"
-	var res: Dictionary = await NuclearGate.post(self, "/api/system/update/apply", {"confirm": true})
+	var res: Dictionary = await NuclearGate.post(self, "/api/system/update/apply", {"confirm": true}, DevicesTarget.api)
 	if not res.ok:
 		_log.text = "Update not started: %s" % str(res.error)
 		_apply.disabled = false
@@ -91,7 +91,7 @@ func _install() -> void:
 
 
 func _poll_status() -> void:
-	var st: Dictionary = await Api.get_json("/api/system/update/status")
+	var st: Dictionary = await DevicesTarget.api.get_json("/api/system/update/status")
 	if not st.ok or not (st.data is Dictionary):
 		_log.text += "\n" + str(st.error)  # the server restarts at the end of an install; keep polling
 		return
