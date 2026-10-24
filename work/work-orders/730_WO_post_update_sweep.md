@@ -85,6 +85,10 @@ the same way by hand, over SSH, or from the updater.
   era). The client restarts by spawning itself (connection_menu.gd); the running kiosk's parent is init. The sweep's
   advice now says "restart the operator client".
 
+- CI (1eb47065, 287aa53f) failed the fixture run: the GitHub runner has no ALSA mixer, so
+  `/api/audio/alsa-mixer` answers **501** "not available on this host". 501 is a deliberate answer, so it is no
+  longer counted as a crash (other 5xx and timeouts still fail).
+
 ## Open
 
 - Run on .4 after it is updated to this commit.

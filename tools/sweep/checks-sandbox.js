@@ -34,7 +34,7 @@ function projectSlugs(dir) {
 module.exports = [
 	{
 		id: 'sandbox.routes',
-		name: 'every GET route answers on a sandbox (no 5xx, no timeout)',
+		name: 'every GET route answers on a sandbox (no 5xx but 501, no timeout)',
 		heavy: true,
 		async run({ sandbox }) {
 			const sb = await sandbox()
@@ -45,7 +45,8 @@ module.exports = [
 			for (const p of routes) {
 				const r = await sb.get(p, 20000)
 				tally[r.status] = (tally[r.status] || 0) + 1
-				if (r.status === 0 || r.status >= 500)
+				// 501 = "not on this host" (e.g. no ALSA mixer in CI) is an answer, not a crash
+				if (r.status === 0 || (r.status >= 500 && r.status !== 501))
 					bad.push(`${p} → ${r.status || r.error} ${String(r.data?.error || r.text || '').slice(0, 100)}`)
 			}
 			const counts = Object.entries(tally)
