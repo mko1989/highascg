@@ -1,7 +1,9 @@
 # WO-737 — An update meant for .4 landed on the master and reset its config; "error 2" across the GUI
 
-**Status: IN PROGRESS (24.10.26) — config restored on the box and proven; fixes + tests done; .4 updated to
-2026-10-24T183220Z with its config intact; part 2 (release lacks client/lib) fixed, .4's update to it pending.**
+**Status: DONE (24.10.26 — verified on .4: release 2026-10-24T190133Z installed through the GUI path, config
+byte-identical to the backup, scene routes 200, post-update self-check 24 pass / 0 fail; this box's config restored
+and proven; smoke 5/5, test:ci green, CI green). Owner-QA: the Updates pane's "Waiting for the server to restart…"
+on the next real update.**
 
 Owner, 24.10: *"on the .4 downloading extracting then error 2 (with something else in the error) check the whole gui
 for that error as ive seen it in couple places."*
@@ -186,3 +188,18 @@ Done:
   It dynamically imports every module in the server's client/lib closure from there.
 
 Verified: smoke 5/5. With the member removed, test 4 fails with .4's exact error.
+
+Verified on .4 (release 2026-10-24T190133Z, CI run 40123097356 green):
+- The fixed apply was installed first, the config backed up (`~/config-backup-before-190133Z`), and the update ran
+  through `POST /api/system/update/apply`.
+- `diff -rq` against the backup: identical.
+- `client/` now holds `lib` + `package.json`.
+- `/api/scene/layer-options` and `/api/scene/effect-registry` return 200. The self-check is 24 pass / 0 fail
+  (`sandbox.routes` passes now).
+- The kiosk was restarted onto the new client: `ws connected`.
+
+Left as is:
+- This box's installed apply script is still the old one: refreshing it needs sudo, and the box runs from git. The
+  Node guard (`startApplyJob` refuses a git checkout) already covers the GUI path here.
+- .4 still lists 11 Syncthing conflict copies and one DeckLink warning (`system.decklink`, no DeckLink channels
+  configured there).
