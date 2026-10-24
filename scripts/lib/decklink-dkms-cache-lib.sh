@@ -29,7 +29,9 @@ decklink_dkms_cache_root() {
 		return 0
 	fi
 	local mp
-	for mp in /home/casparcg/exfat /home/casparcg/bridge; do
+	# DECKLINK_DKMS_CACHE_MOUNTS: test seam like DECKLINK_DKMS_TREE — the "no stick" smoke found the operator's real
+	# stick whenever one was plugged into the box running the suite (WO-721).
+	for mp in ${DECKLINK_DKMS_CACHE_MOUNTS:-/home/casparcg/exfat /home/casparcg/bridge}; do
 		if mountpoint -q "$mp" 2>/dev/null; then
 			printf '%s' "${mp}/decklink/dkms-cache"
 			return 0

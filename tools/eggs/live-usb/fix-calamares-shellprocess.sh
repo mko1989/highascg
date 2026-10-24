@@ -102,25 +102,47 @@ SETTINGS="${ROOT}/etc/calamares/settings.conf"
 [[ -n "$ROOT" ]] || SETTINGS=/etc/calamares/settings.conf
 if [[ ! -f "$SETTINGS" ]]; then
 	echo "WARN: ${SETTINGS} not found — cannot schedule shellprocess@release_bridge" >&2
-elif grep -q 'shellprocess@release_bridge' "$SETTINGS"; then
-	echo "==> settings.conf already runs shellprocess@release_bridge"
 else
-	awk '
-		/^[[:space:]]*-[[:space:]]*exec:[[:space:]]*$/ { in_exec = 1 }
-		{
-			if (in_exec && !done && $0 ~ /^[[:space:]]*-[[:space:]]*partition[[:space:]]*$/) {
-				indent = $0
-				sub(/-.*/, "", indent)
-				print indent "- shellprocess@release_bridge"
+	# WO-721: Calamares maps `shellprocess@release_bridge` to shellprocess@release_bridge.conf ONLY through an
+	# `instances:` entry — without one it loads the default shellprocess.conf (absent) and runs the step with
+	# no script. WO-481 inserted the sequence line alone, so the release was an empty job on every ISO since.
+	if grep -Eq '^[[:space:]]*-[[:space:]]*id:[[:space:]]*release_bridge[[:space:]]*$' "$SETTINGS"; then
+		echo "==> settings.conf already declares the release_bridge instance"
+	elif grep -Eq '^instances:[[:space:]]*$' "$SETTINGS"; then
+		awk '
+			{ print }
+			/^instances:[[:space:]]*$/ && !done {
+				print "  - id: release_bridge"
+				print "    module: shellprocess"
+				print "    config: shellprocess@release_bridge.conf"
 				done = 1
 			}
-			print
-		}
-	' "$SETTINGS" >"${SETTINGS}.tmp" && mv "${SETTINGS}.tmp" "$SETTINGS"
-	if grep -q 'shellprocess@release_bridge' "$SETTINGS"; then
-		echo "==> settings.conf: shellprocess@release_bridge inserted before partition"
+		' "$SETTINGS" >"${SETTINGS}.tmp" && mv "${SETTINGS}.tmp" "$SETTINGS"
+		echo "==> settings.conf: release_bridge instance declared"
 	else
-		echo "WARN: no 'exec:' / '- partition' anchor in ${SETTINGS} — release step NOT scheduled" >&2
+		echo "WARN: no 'instances:' key in ${SETTINGS} — shellprocess@release_bridge would run without its config" >&2
+	fi
+	# The sequence entry, anchored to its own line (the instance's `config:` line also names the file).
+	if grep -Eq '^[[:space:]]*-[[:space:]]*shellprocess@release_bridge[[:space:]]*$' "$SETTINGS"; then
+		echo "==> settings.conf already runs shellprocess@release_bridge"
+	else
+		awk '
+			/^[[:space:]]*-[[:space:]]*exec:[[:space:]]*$/ { in_exec = 1 }
+			{
+				if (in_exec && !done && $0 ~ /^[[:space:]]*-[[:space:]]*partition[[:space:]]*$/) {
+					indent = $0
+					sub(/-.*/, "", indent)
+					print indent "- shellprocess@release_bridge"
+					done = 1
+				}
+				print
+			}
+		' "$SETTINGS" >"${SETTINGS}.tmp" && mv "${SETTINGS}.tmp" "$SETTINGS"
+		if grep -Eq '^[[:space:]]*-[[:space:]]*shellprocess@release_bridge[[:space:]]*$' "$SETTINGS"; then
+			echo "==> settings.conf: shellprocess@release_bridge inserted before partition"
+		else
+			echo "WARN: no 'exec:' / '- partition' anchor in ${SETTINGS} — release step NOT scheduled" >&2
+		fi
 	fi
 fi
 

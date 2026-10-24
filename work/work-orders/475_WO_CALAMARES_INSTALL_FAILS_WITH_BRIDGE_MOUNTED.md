@@ -4,6 +4,11 @@
 `bash -n` clean) — owner QA: the next reinstall must get past partitioning with HIGHASCGDAT
 present, and `~/bridge` must be back after the installer closes**
 
+> **24.10.26 — [WO-721](./721_WO_install_to_disk_greyed_on_live_iso.md):** the WO-481 half (Calamares' own
+> `shellprocess@release_bridge` step) never ran its script. settings.conf scheduled it without declaring the
+> instance, so Calamares logged "No script given for ShellProcessJob". Only launches through `launch-calamares.sh`
+> were protected. Fixed and build-gated in WO-721.
+
 ## 1. Investigation
 
 Owner 11.08: *"i just had an issue while reinstalling thru calamares, the bridge partition was still

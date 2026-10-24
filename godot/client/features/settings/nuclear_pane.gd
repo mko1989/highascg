@@ -26,6 +26,7 @@ const CASPAR := [
 var _status: Label
 var _caspar: Label
 var _install: Button
+var _install_why: Label
 var _confirm: ConfirmationDialog
 var _pending: Array = []
 
@@ -40,6 +41,7 @@ func _ready() -> void:
 	_install = row.get_child(0)
 	_install.disabled = true
 	add_child(row)
+	_install_why = _note("")
 	_heading("CasparCG playout")
 	_caspar = _note("Caspar status: unknown")
 	add_child(_buttons(CASPAR))
@@ -57,15 +59,21 @@ func refresh() -> void:
 	var r: Dictionary = await Api.get_json("/api/system/setup")
 	if not r.ok or not (r.data is Dictionary):
 		_caspar.text = "Caspar status: unavailable"
+		# WO-721: an unanswered status check must not lock the installer — the launch route re-checks every
+		# precondition and answers with the reason.
+		_install.disabled = false
+		_install_why.text = "Couldn't check the installer (%s) — you can still try." % str(r.error if r.error != "" else r.status)
 		return
 	var cs: Dictionary = r.data.get("casparService", {}) if r.data.get("casparService") is Dictionary else {}
 	_caspar.text = "Caspar scanner: %s · server: %s%s" % [str(cs.get("scanner", "?")), str(cs.get("server", "?")),
 		" (stopped — autorestart off)" if cs.get("inhibited") == true else ""]
 	var cal: Dictionary = r.data.get("calamares", {}) if r.data.get("calamares") is Dictionary else {}
 	_install.disabled = not (cal.get("installed") == true and cal.get("sudoLaunchAvailable") != false)
-	_install.tooltip_text = ("Calamares not installed on this system" if cal.get("installed") != true
+	# WO-721: the reason is on screen, not only in a tooltip a kiosk operator has to hover to find.
+	_install_why.text = ("Calamares not installed on this system" if cal.get("installed") != true
 		else ("Passwordless sudo for Calamares not configured — run: sudo bash scripts/setup/12-passwordless-sudo.sh"
 			if cal.get("sudoLaunchAvailable") == false else ""))
+	_install.tooltip_text = _install_why.text
 
 
 func _buttons(specs: Array) -> HBoxContainer:

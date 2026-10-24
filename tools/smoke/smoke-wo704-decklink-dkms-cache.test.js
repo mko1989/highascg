@@ -167,7 +167,14 @@ test('corrupt, truncated, empty and other-version caches fall back to the compil
 	fs.rmSync(path.join(box.tree, 'blackmagic-io'), { recursive: true })
 	assert.match(sh(box, `decklink_dkms_cache_restore ${V} ${K} || echo "n=$DECKLINK_DKMS_CACHE_RESTORED"`), /n=0/)
 	// no stick mounted at all → miss, no output dir
-	assert.match(sh(box, `decklink_dkms_cache_restore ${V} ${K} || echo miss`, { DECKLINK_DKMS_CACHE_ROOT: '' }), /miss/)
+	// (the mount list points nowhere: a stick plugged into the box running the suite must not count — WO-721)
+	assert.match(
+		sh(box, `decklink_dkms_cache_restore ${V} ${K} || echo miss`, {
+			DECKLINK_DKMS_CACHE_ROOT: '',
+			DECKLINK_DKMS_CACHE_MOUNTS: path.join(box.dir, 'no-stick-here'),
+		}),
+		/miss/
+	)
 })
 
 test('restore never overwrites a version DKMS already holds', () => {

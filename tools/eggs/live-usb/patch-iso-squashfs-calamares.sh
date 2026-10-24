@@ -76,3 +76,14 @@ else
 	echo "ERROR: squashfs still unpatched after rebuild" >&2
 	exit 1
 fi
+
+# WO-721: the release step only runs WITH its config when settings.conf declares the instance — WO-481 shipped the
+# sequence line alone and Calamares logged "No script given for ShellProcessJob shellprocess@release_bridge".
+SQ_SETTINGS="$(unsquashfs -cat "$SQ" etc/calamares/settings.conf 2>/dev/null || true)"
+if grep -Eq '^[[:space:]]*-[[:space:]]*id:[[:space:]]*release_bridge[[:space:]]*$' <<<"$SQ_SETTINGS" \
+	&& grep -Eq '^[[:space:]]*-[[:space:]]*shellprocess@release_bridge[[:space:]]*$' <<<"$SQ_SETTINGS"; then
+	echo "OK: squashfs settings.conf declares + schedules shellprocess@release_bridge"
+else
+	echo "ERROR: squashfs settings.conf does not declare AND schedule shellprocess@release_bridge (WO-721)" >&2
+	exit 1
+fi

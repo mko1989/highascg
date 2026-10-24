@@ -68,16 +68,9 @@ function isExecutable(bin) {
  */
 function detectCalamaresStatus() {
 	const calamaresInstalled = isExecutable(CALAMARES_BIN) || Boolean(execSyncSafe('command -v calamares'))
-	const eggsAvailable = isExecutable(EGGS_BIN)
-	let eggsCalamares = false
-	if (eggsAvailable) {
-		try {
-			execFileSync(EGGS_BIN, ['calamares', '--help'], { stdio: 'ignore', timeout: 8000 })
-			eggsCalamares = true
-		} catch {
-			eggsCalamares = false
-		}
-	}
+	/* WO-721: was `eggs calamares --help` (a Node CLI, up to 8 s cold off a live USB) inside a synchronous GET the
+	 * client abandons at 15 s — leaving "Install to disk" grey with no reason. No client reads the result. */
+	const eggsCalamares = isExecutable(EGGS_BIN)
 	const launchable = calamaresInstalled || eggsCalamares
 	const sudoLaunchAvailable = calamaresInstalled && calamaresSudoLaunchAvailable()
 	return {
@@ -263,8 +256,10 @@ function parseCasparControlOutput(text) {
 function calamaresSudoLaunchAvailable() {
 	if (!isExecutable(LAUNCH_CALAMARES)) return false
 	try {
-		const out = execFileSync('sudo', ['-n', '-l'], { encoding: 'utf8', timeout: 4000 })
-		return out.includes('launch-calamares.sh')
+		// WO-721: ask sudo about THIS command (exit 0 = allowed) instead of grepping the whole listing for its name,
+		// which reads an alias / broader rule as "not configured".
+		execFileSync('sudo', ['-n', '-l', LAUNCH_CALAMARES], { stdio: 'ignore', timeout: 4000 })
+		return true
 	} catch {
 		return false
 	}
