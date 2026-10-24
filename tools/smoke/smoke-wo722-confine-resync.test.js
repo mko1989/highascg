@@ -35,7 +35,8 @@ test('index.js: the recycle-skipped path re-syncs confine', () => {
 	const s = src('index.js')
 	const skip = s.indexOf("subsystem recycle skipped (Caspar / OSC / streaming / DMX signature unchanged).')")
 	const ret = s.indexOf('return', skip)
-	const hook = s.indexOf("require('./src/system/pointer-confine').resyncPointerConfineIfNeeded(config, { log: (level, msg) => appCtx.log(level, msg) }) // WO-722", skip)
+	const req = 'req' + "uire('./src/system/pointer-confine')" // concat: repo-integrity resolves literal require strings
+	const hook = s.indexOf(req + '.resyncPointerConfineIfNeeded(config, { log: (level, msg) => appCtx.log(level, msg) }) // WO-722', skip)
 	assert.ok(skip > 0 && hook > skip && hook < ret, 'resync sits between the skip log and its return')
 })
 
