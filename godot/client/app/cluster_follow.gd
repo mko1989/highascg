@@ -4,6 +4,8 @@ extends Node
 ## [cluster] origin (core/config.gd), the switch is a client restart like the A/B one (app/connection_menu.gd).
 ## - Its server says another server is master (`cluster:peers`, e.g. after a failover or Make master there): a dialog
 ##   counts down COUNTDOWN_S and reconnects; "Stay here" keeps this server until the next master change.
+## - It followed a master away from home and that server leaves the cluster (unlinked, or home no longer linked to
+##   it, WO-726): the same dialog counts down and takes it home.
 ## - Its server is gone for DOWN_MS: every PROBE_S it asks the remembered servers (GET /api/cluster/master) and
 ##   reconnects to the one that is master, or back home when no master answers (no countdown: nothing is left here).
 ## Off with Devices → Servers → "This client follows the master".
@@ -23,6 +25,8 @@ var _dialog: ConfirmationDialog
 var _left := 0
 var _target := ""
 var _target_name := ""
+var _target_home := false  # WO-726: the countdown goes home (the follow is over), not to a master
+var _stay_home := false
 
 
 func _ready() -> void:
@@ -49,7 +53,9 @@ func _ready() -> void:
 	_dialog.ok_button_text = "Reconnect now"
 	_dialog.cancel_button_text = "Stay here"
 	_dialog.confirmed.connect(func() -> void: _follow(_target))
-	_dialog.canceled.connect(func() -> void: _target = "")
+	_dialog.canceled.connect(func() -> void:
+		_stay_home = _stay_home or _target_home
+		_target = "")
 	add_child(_dialog)
 	_fetch()
 
@@ -68,13 +74,24 @@ func _on_snap(d: Variant) -> void:
 		Config.save_cluster({"servers": servers})
 	if not Config.cluster().follow:
 		return
+	var home := Config.home_origin()
+	if Config.cluster().origin != "" and F.follow_over(d, Config.origin, home, IP.get_local_addresses()):
+		if not _stay_home and not _dialog.visible:
+			_countdown(home, "", true)
+		return
 	var target := F.master_origin(Config.origin, d)
 	var epoch := int(d.get("master", {}).get("epoch", 0)) if d.get("master") is Dictionary else 0
 	if target == "" or epoch == _stay_epoch or _dialog.visible:
 		return
 	_stay_epoch = epoch
+	_countdown(target, F.master_name(d), false)
+
+
+func _countdown(target: String, who: String, home: bool) -> void:
 	_target = target
-	_target_name = F.master_name(d)
+	_target_name = who
+	_target_home = home
+	_dialog.title = "Back to this server" if home else "Master changed"
 	_left = COUNTDOWN_S
 	_update_text()
 	_dialog.popup_centered()
@@ -92,6 +109,9 @@ func _on_countdown() -> void:
 
 
 func _update_text() -> void:
+	if _target_home:
+		_dialog.dialog_text = "The server this client followed is no longer linked to its own.\nBack to %s in %d s." % [_target, _left]
+		return
 	_dialog.dialog_text = "%s is now the master.\nThis client reconnects to it in %d s (%s)." % [_target_name, _left, _target]
 
 
@@ -131,6 +151,13 @@ func _probe(origin: String) -> Dictionary:
 ## Only to a server that says it is master itself (two servers naming each other would bounce the client).
 func _follow(origin: String) -> void:
 	var p := await _probe(origin)
+	if _target_home:
+		if p.ok:
+			print("[cluster] the follow is over (unlinked): back to ", origin)
+			_switch(origin)
+		else:
+			print("[cluster] not going back to ", origin, ": it does not answer")
+		return
 	if p.ok and p.data is Dictionary and p.data.get("is_master") == true:
 		_switch(origin)
 	else:

@@ -58,3 +58,18 @@ func test_resolve_target_keeps_the_on_box_client_home() -> void:
 	t.eq(F.resolve_target("", home, mine), "", "nothing")
 	t.eq(F.port_of("https://box.local/x"), 443, "https default port")
 	t.eq(F.port_of("http://[::1]:4201"), 4201, "IPv6 port")
+
+
+func test_follow_over_when_unlinked_or_home_dropped() -> void:
+	var home := "http://127.0.0.1:4200"
+	var mine := PackedStringArray(["192.168.0.4"])
+	var there := "http://192.168.0.23:4200"
+	var linked := {"master": {"epoch": 3, "master_id": "self"}, "peers": [{"id": "box4", "host": "192.168.0.4", "port": 4200}]}
+	t.eq(F.follow_over(linked, there, home, mine), false, "still linked to home: keep following")
+	t.eq(F.follow_over({"master": {"epoch": 0}, "peers": []}, there, home, mine), true, "unlinked (WO-726): back home")
+	t.eq(F.follow_over({"peers": []}, there, home, mine), true, "no master at all")
+	var other := {"master": {"epoch": 4, "master_id": "self"}, "peers": [{"id": "c", "host": "192.168.0.9", "port": 4200}]}
+	t.eq(F.follow_over(other, there, home, mine), true, "a cluster without home")
+	t.eq(F.follow_over({"master": {"epoch": 0}}, home, home, mine), false, "already home")
+	var remote_home := "http://192.168.0.4:4200"  # a laptop whose profile server is .4
+	t.eq(F.follow_over(linked, there, remote_home, PackedStringArray()), false, "remote client: its server still linked")

@@ -94,3 +94,18 @@ static func pick(probes: Array, home := "") -> String:
 			if p is Dictionary and str(p.get("origin", "")) == home and p.get("ok") == true:
 				return home
 	return best
+
+
+## WO-726: this client followed a master to another server, and that server is no longer in a cluster with this
+## client's home — unlinked (no master, epoch 0) or none of its linked servers is home — so the follow is over. A
+## kiosk that followed the master during WO-724's tests stayed on the other box after the unlink, driving it.
+static func follow_over(snap: Dictionary, current: String, home: String, local_addrs: PackedStringArray) -> bool:
+	if current == home:
+		return false
+	var m: Variant = snap.get("master")
+	if not m is Dictionary or int(m.get("epoch", 0)) <= 0:
+		return true
+	for p in snap.get("peers", []):
+		if p is Dictionary and resolve_target(peer_origin(current, p), home, local_addrs) == home:
+			return false
+	return true
