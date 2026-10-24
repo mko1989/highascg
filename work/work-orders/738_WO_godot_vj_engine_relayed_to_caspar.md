@@ -1,6 +1,7 @@
 # WO-738 — VJing in Godot, relayed to CasparCG (instead of the current shader work)
 
-**Status: OPEN (24.10.26) — research answer written; owner chose path C (shared memory), §7. Nothing built yet.**
+**Status: OPEN (24.10.26) — research answer written; owner chose path C (shared memory), §7; screen-consumer overlay
+analysed and rejected for show content (§8); game / ROM source noted for the future (§9). Nothing built yet.**
 
 Owner 24.10: "lets add this https://godotengine.org/asset-library/asset/4506 for the future. answer in a new md file
 on the server WHAT CAN BE DONE IN GODOT AND RELAYED TO CASPARCG FOR VJing instead of the current shader work"
@@ -134,6 +135,73 @@ Godot at the channel rate (`Engine.max_fps`). Later, Godot can be paced from Cas
   3. Server and client glue: the source in the Live tab, a lease (as for the surfaces), and teardown when the writer
      dies.
 - A separate WO is to be opened when the work starts (after WO-739, the link-accept path).
+
+## 8. Owner question (24.10): Godot over Caspar's screen consumer with transparency — better than shared memory?
+
+> "investigate how possible is it to display godot's output over casparcg screen consumer with transparency and
+> would it be any better than shared memory"
+
+The idea: a borderless Godot window with a transparent background, stacked above the Caspar screen consumer's window
+on the same output head, so X blends the two on screen and Caspar never sees Godot's picture.
+
+**Possible? Only in two weak forms on these boxes.**
+- **No real alpha without a compositor.** Both boxes run bare openbox (box probes 24.10: `openbox` and nothing else;
+  the X Composite extension is present but no compositing manager uses it).
+  - Without a compositor X doesn't blend per-pixel alpha between windows: Godot's `transparent_bg` window simply
+    covers the Caspar window. Godot only supports per-pixel window transparency on X11 with a compositor.
+  - A compositor (picom) puts every output head, the on-air ones included, through its own present path. WO-149 §6
+    already rejected exactly this ("Route D") for vsync, tearing and latency risk on the playout GPU.
+- **1-bit cut-outs work without a compositor.** WO-255 proved shaped override-redirect windows on this box, with the
+  X SHAPE extension and an empty input region. That gives hard-edged holes (pixel in or out): no soft edges, no
+  semi-transparency, no glows or particles fading out.
+  - For animated content the shape would have to be rebuilt every frame from the alpha channel: a rectangle list per
+    frame, on the CPU, with flicker between shape and content updates. That's not practical for VJ material.
+- **Stacking against Caspar's always-on-top screen consumers** is already fragile (WO-638: prompts and popups over
+  Caspar). An overlay that must stay above an on-air window adds another stacking contract to the kiosk.
+
+**Better than shared memory? No, except for one cost it saves.**
+
+| | Screen-consumer overlay | Shared-memory producer (§7) |
+|---|---|---|
+| CPU / GPU copy | **none** (Godot draws straight to the screen) | readback + ~1.4 ms copy per 1080p frame at each end |
+| Latency | **lowest** (no hop through Caspar) | +1 frame or less |
+| Real alpha | only with a compositor in the on-air path (rejected, WO-149) | **yes** (BGRA in the ring) |
+| On DeckLink / NDI / recording / streams | **no**: it never enters Caspar | **yes**: an ordinary Caspar layer |
+| PGM / PRV, multiview, previews, the Live tab | **no** | **yes** |
+| Caspar mixing (transitions, MIXER, keying, looks) | **no** | **yes** |
+| Frame timing | two unlocked renderers presenting to one screen | Caspar's channel clock (newest frame per tick) |
+| Outputs it can cover | only GPU heads on the same box | every consumer of the channel |
+| Failure on air | a Godot hitch or crash shows directly on the output | Caspar keeps the last frame or drops the layer |
+
+Verdict:
+- The overlay only fits an operator-only, screen-only effect where nothing has to be recorded, sent or mixed.
+- For show content, shared memory wins on everything except the copy cost. WO-594 measured that cost at about 0.4 %
+  of this 28-core machine per 1080p50 source.
+- §7 stands.
+
+## 9. Future development (owner 24.10): a game / ROM source
+
+> "also note as future development. a small (if possible) either rom reader for old nintendo consoles, or something
+> similar that can be opened in a new window for the operator but become a source to use to display on the outputs."
+
+- **How:** a libretro core hosted in Godot through a GDExtension.
+  - libretro is the plug-in API RetroArch uses. One core per console: NES, SNES, Game Boy, Mega Drive and so on.
+  - Each core is a single shared library with a small C API: load the game, run one frame, then video/audio
+    callbacks and input polling.
+  - The host draws the core's frame into a texture in its own operator window and maps a gamepad or keyboard to the
+    core's input.
+- **To the outputs:** the same shm writer as the Godot VJ path, published into a HASCGSHM ring that the §7 Caspar
+  producer plays. With a generic producer, that's one more writer.
+  - Upscale before publishing, nearest-neighbour or a CRT shader, since Caspar would otherwise smooth a 256×240 frame.
+  - Or let Caspar scale it with MIXER.
+- **Audio is the open part.** The ring carries video only. Game audio needs its own way into Caspar (an audio track
+  in the ring ABI, or a JACK / PortAudio input on the channel), or stays on the operator's speakers.
+- **Licences to check before shipping any core:**
+  - most cores are GPL (fine as separate libraries, sources offered);
+  - some are non-commercial only (snes9x, for one), which matters on a box used for paid shows;
+  - ROMs are the operator's own files; nothing is bundled.
+- **Size:** small once §7 exists. The GDExtension host is a few hundred lines; the libretro API is about 30 calls.
+- Not started. Depends on §7 (the shm producer) and on the Godot writer that §7's build order step 2 makes.
 
 ## What was done
 
