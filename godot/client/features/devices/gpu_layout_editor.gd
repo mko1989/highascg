@@ -21,7 +21,7 @@ class Io:
 	var reload_fn: Callable
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		return await Api.post_json(path, body)
+		return await DevicesTarget.api.post_json(path, body)
 
 	func confirm(text: String) -> bool:
 		return await confirm_fn.call(text)

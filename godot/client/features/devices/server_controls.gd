@@ -38,12 +38,12 @@ class _Io:
 		return {"ok": r.ok, "data": r.data, "error": err}
 
 	func get_json(path: String) -> Dictionary:
-		return _web(await Api.get_json(path))
+		return _web(await DevicesTarget.api.get_json(path))
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		var r := _web(await Api.post_json(path, body))
+		var r := _web(await DevicesTarget.api.post_json(path, body))
 		if r.ok and path == "/api/settings":
-			await Settings.load_from_server()
+			await DevicesTarget.settings.load_from_server()
 		return r
 
 	func confirm(text: String) -> bool:
@@ -125,6 +125,7 @@ func _item(it: Dictionary, group: ButtonGroup) -> Control:
 		"network":
 			if _net == null:
 				_net = NetworkPane.new()
+				_net.api = DevicesTarget.api
 			return _net
 		"title", "summary":
 			return _title(it.text)

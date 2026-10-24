@@ -40,10 +40,10 @@ class _Io:
 		return {"ok": r.ok, "data": r.data, "error": err}
 
 	func get_json(path: String) -> Dictionary:
-		return _web(await Api.get_json(path))
+		return _web(await DevicesTarget.api.get_json(path))
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		return _web(await Api.post_json(path, body))
+		return _web(await DevicesTarget.api.post_json(path, body))
 
 	func confirm(text: String) -> bool:
 		return await c._confirm(text, "OK")

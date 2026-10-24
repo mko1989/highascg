@@ -7,7 +7,9 @@ extends VBoxContainer
 const Kit := preload("res://features/settings/pane_kit.gd")
 const M := preload("res://features/settings/network_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const ApiScript := preload("res://core/api.gd")
 
+var api: ApiScript = null  # WO-732 P3a: the Devices server page sets the server it shows; null = Api
 var _status: Label
 var _cards: VBoxContainer
 var _wifi_line: Label
@@ -63,7 +65,7 @@ func _ready() -> void:
 
 func refresh() -> void:
 	_loaded_at = Time.get_ticks_msec()
-	var net: Dictionary = await Api.get_json("/api/system/network")
+	var net: Dictionary = await _api().get_json("/api/system/network")
 	if not is_inside_tree():
 		return
 	if not net.ok:
@@ -71,7 +73,7 @@ func refresh() -> void:
 	else:
 		_status.text = ""
 		_fill_cards(net.data)
-	var w: Dictionary = await Api.get_json("/api/system/network/wifi")
+	var w: Dictionary = await _api().get_json("/api/system/network/wifi")
 	if is_inside_tree():
 		_fill_wifi(w.data if w.ok and w.data is Dictionary else {"available": false})
 
@@ -153,7 +155,7 @@ func _apply(body: Dictionary, res: Label, b: Button) -> void:
 	_busy = true
 	b.disabled = true
 	_say(res, "Applying…", true)
-	var r: Dictionary = await Api.post_json("/api/system/network/apply", body)
+	var r: Dictionary = await _api().post_json("/api/system/network/apply", body)
 	_busy = false
 	if not is_instance_valid(res):
 		return
@@ -198,7 +200,7 @@ func _run(path: String, body: Dictionary, busy: String) -> void:
 		return
 	_busy = true
 	_wifi_line.text = busy
-	var r: Dictionary = await Api.post_json(path, body)
+	var r: Dictionary = await _api().post_json(path, body)
 	_busy = false
 	if not is_inside_tree():
 		return
@@ -219,3 +221,7 @@ static func _err(r: Dictionary) -> String:
 func _say(l: Label, text: String, ok: bool) -> void:
 	l.text = text
 	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED if ok else ThemeBuilder.WARN)
+
+
+func _api() -> ApiScript:
+	return api if api else Api

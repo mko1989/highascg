@@ -118,7 +118,7 @@ func show_model(m: Dictionary, payload: Dictionary, anchors: Dictionary) -> void
 	if selected_id != "" and not _entries.has(selected_id):
 		deselect()
 	elif selected_id != "":
-		_page.show_destination(_entries[selected_id], _payload, Settings.settings)
+		_page.show_destination(_entries[selected_id], _payload, DevicesTarget.settings.settings)
 
 
 func has(id: String) -> bool:
@@ -129,7 +129,7 @@ func select(id: String) -> void:
 	if not _entries.has(id):
 		return
 	selected_id = id
-	_page.show_destination(_entries[id], _payload, Settings.settings)
+	_page.show_destination(_entries[id], _payload, DevicesTarget.settings.settings)
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(_page)
 	_highlight()
@@ -159,12 +159,12 @@ func add(type: String) -> void:
 	var dests: Array = DM.R.a(DM.R.d(_payload.get("screenDestinations")).get("destinations"))
 	var req := DM.add_request(dests, type)
 	_busy = true
-	var r: Dictionary = await Api.post_json("/api/device-view", {"addDestination": req.body})
-	if r.ok and req.screen >= 1 and Settings.is_loaded:
-		var seed := DM.seed_patch(req.screen, Settings.settings)
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/device-view", {"addDestination": req.body})
+	if r.ok and req.screen >= 1 and DevicesTarget.settings.is_loaded:
+		var seed := DM.seed_patch(req.screen, DevicesTarget.settings.settings)
 		if not seed.is_empty():
-			await Api.post_json("/api/settings", seed)
-			await Settings.load_from_server()
+			await DevicesTarget.api.post_json("/api/settings", seed)
+			await DevicesTarget.settings.load_from_server()
 	_busy = false
 	_done(r, "Add destination")
 
@@ -172,11 +172,11 @@ func add(type: String) -> void:
 func _patch(id: String, body: Dictionary) -> void:
 	var b := body.duplicate()
 	b.id = id
-	_done(await Api.post_json("/api/device-view", {"updateDestination": b}), "Update destination")
+	_done(await DevicesTarget.api.post_json("/api/device-view", {"updateDestination": b}), "Update destination")
 
 
 func _remove(id: String) -> void:
-	var r: Dictionary = await Api.post_json("/api/device-view", {"removeDestination": {"id": id}})
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/device-view", {"removeDestination": {"id": id}})
 	if r.ok:
 		deselect()
 	_done(r, "Remove destination")
@@ -211,7 +211,7 @@ func _show_band(payload: Dictionary) -> void:
 	for c in _band.get_children():
 		_band.remove_child(c)
 		c.queue_free()
-	var live_cm: Variant = Store.get_value("channelMap")
+	var live_cm: Variant = DevicesTarget.value("channelMap")
 	var rows := LI.band_rows(payload, live_cm)
 	if rows.is_empty():
 		_band.add_child(_note(LI.BAND_HOSTS_NOTE if not LI.H.host_destinations(payload, live_cm).is_empty() else LI.BAND_EMPTY_NOTE))

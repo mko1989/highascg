@@ -68,25 +68,39 @@ func _ready() -> void:
 	_build_add()
 	_remove = ConfirmationDialog.new()
 	_remove.confirmed.connect(func() -> void:
-		await Api.delete_json("/api/cluster/peers/" + _remove_id.uri_encode())
+		await DevicesTarget.api.delete_json("/api/cluster/peers/" + _remove_id.uri_encode())
 		reload())
 	add_child(_remove)
 	Ws.on("cluster:peers", func(d: Variant) -> void:
-		if d is Dictionary:
+		if d is Dictionary and not DevicesTarget.remote:  # remote: that is the followed server's view, not this machine's
 			_snap = d
 			if is_visible_in_tree():
 				_render())
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
 			reload())
+	var poll := Timer.new()  # WO-732 P3a: this machine's server pushes nothing to a client that follows another
+	poll.wait_time = DevicesTarget.POLL_S
+	poll.timeout.connect(func() -> void:
+		if DevicesTarget.remote and is_visible_in_tree():
+			_poll())
+	add_child(poll)
+	poll.start()
+
+
+func _poll() -> void:
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster")
+	if r.ok and r.data is Dictionary:
+		_snap = r.data
+		_render()
 
 
 func reload() -> void:
-	var r: Dictionary = await Api.get_json("/api/cluster")
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster")
 	if r.ok and r.data is Dictionary:
 		_snap = r.data
 	_views = {}
-	var own: Dictionary = await Api.get_json("/api/device-view")
+	var own: Dictionary = await DevicesTarget.api.get_json("/api/device-view")
 	_own = own.data if own.ok and own.data is Dictionary else {}
 	_sig = ""
 	_render()
@@ -189,7 +203,7 @@ func _card(p: Dictionary) -> Control:
 ## The peer's own rear panel + cables, read-only, and what it does for the shared destinations.
 func _fill(id: String, body: VBoxContainer) -> void:
 	if not _views.has(id):
-		var r: Dictionary = await Api.get_json("/api/cluster/peers/%s/device-view" % id.uri_encode())
+		var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster/peers/%s/device-view" % id.uri_encode())
 		_views[id] = r.data if r.ok and r.data is Dictionary else {"error": str(r.get("error", "no data"))}
 	if not is_instance_valid(body):
 		return
@@ -212,7 +226,7 @@ func _fill(id: String, body: VBoxContainer) -> void:
 
 func _send(id: String) -> void:
 	_send_err.erase(id)
-	var r: Dictionary = await Api.post_json("/api/cluster/peers/%s/send-media" % id.uri_encode(), {})
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/cluster/peers/%s/send-media" % id.uri_encode(), {})
 	if not r.ok:
 		_send_err[id] = str(r.get("error", "")) if str(r.get("error", "")) != "" else "Send failed (HTTP %d)" % int(r.get("status", 0))
 	_sig = ""
@@ -248,7 +262,7 @@ func _build_master_row() -> void:
 	_accept = CheckBox.new()
 	_accept.text = "Linked servers may press here"
 	_accept.tooltip_text = "A linked server's presses (look takes, pins, fixture looks, Companion) count as this server's own. Off: refused."
-	_accept.toggled.connect(func(on: bool) -> void: Api.post_json("/api/server/duties", {"patch": {"accept_remote": on}}))
+	_accept.toggled.connect(func(on: bool) -> void: DevicesTarget.api.post_json("/api/server/duties", {"patch": {"accept_remote": on}}))
 	controls.add_child(_accept)
 	_take = Button.new()
 	_take.text = "Make this server master"
@@ -267,7 +281,7 @@ func _confirm_make(id: String, name: String) -> void:
 
 
 func _set_master(body: Dictionary) -> void:
-	var r: Dictionary = await Api.post_json("/api/cluster/master/set", body)
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/cluster/master/set", body)
 	if not r.ok:
 		var d: Variant = r.get("data")
 		_master_l.text = "Master not changed: " + (str(d.get("error", "")) if d is Dictionary else str(r.get("error", "")))
@@ -323,7 +337,7 @@ func _scan() -> void:
 	_add_status.text = "Scanning…"
 	for c in _found.get_children():
 		c.queue_free()
-	var r: Dictionary = await Api.post_json("/api/cluster/scan", {})
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/cluster/scan", {})
 	var found: Array = r.data.get("found", []) if r.ok and r.data is Dictionary else []
 	_add_status.text = "Found %d server(s)." % found.size() if r.ok else "Scan failed: %s" % str(r.get("error", ""))
 	for f in found:
@@ -339,7 +353,7 @@ func _link(address: String) -> void:
 		_add_status.text = "Enter an address or scan."
 		return
 	_add_status.text = "Linking %s…" % address
-	var r: Dictionary = await Api.post_json("/api/cluster/peers", {"address": address.strip_edges()})
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/cluster/peers", {"address": address.strip_edges()})
 	if not r.ok:
 		var err: String = str(r.data.get("error", "")) if r.data is Dictionary else str(r.get("error", ""))
 		_add_status.text = err if err != "" else "Could not link %s." % address

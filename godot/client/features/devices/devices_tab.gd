@@ -125,7 +125,7 @@ func _ready() -> void:
 	_dests.add_live_input.connect(live_inputs.open)
 	_dests.changed.connect(func() -> void:  # WO-685: previs reads destinations from Settings, not this payload
 		_gesture.set_dirty(true)
-		await Settings.load_from_server()
+		await DevicesTarget.settings.load_from_server()
 		refresh())
 	_dests.selected.connect(func(id: String) -> void:
 		if id != "":
@@ -274,9 +274,10 @@ func refresh() -> void:
 		_reload_again = true
 		return
 	_loading = true
-	if not Settings.is_loaded:
-		await Settings.load_from_server()
-	var r: Dictionary = await Api.get_json("/api/device-view")
+	await DevicesTarget.refresh_state()  # WO-732 P3a: decided first; this machine's channel map when it follows another
+	if not DevicesTarget.settings.is_loaded:
+		await DevicesTarget.settings.load_from_server()
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/device-view")
 	_loading = false
 	if _reload_again:
 		_reload_again = false
@@ -292,8 +293,8 @@ func refresh() -> void:
 	_gesture.payload = r.data
 	if _gesture.selected_edge != "" and _gesture.edge(_gesture.selected_edge).is_empty():
 		_gesture.selected_edge = ""
-	var payload := H.merge_settings(r.data, Settings.settings if Settings.is_loaded else null)
-	show_model(Model.build(payload, Store.get_value("channelMap"), Store.get_value("configComparison"),
+	var payload := H.merge_settings(r.data, DevicesTarget.settings.settings if DevicesTarget.settings.is_loaded else null)
+	show_model(Model.build(payload, DevicesTarget.value("channelMap"), DevicesTarget.value("configComparison"),
 		RearPanel.DO.saved(), Model.GL.saved()), payload)
 
 
@@ -303,7 +304,7 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 	_dests.show_model(m, payload, anchors)
 	_maps.show_nodes(payload, anchors, _mapc.node_id)
 	if _matrix.visible:
-		_matrix.show_payload(payload, Store.get_value("channelMap"))
+		_matrix.show_payload(payload, DevicesTarget.value("channelMap"))
 	if _nodes.visible:
 		_nodes.show_sections(NV.sections(m.slots, payload))
 		anchors.merge(_nodes.anchors)
@@ -320,9 +321,9 @@ func show_model(m: Dictionary, payload: Dictionary) -> void:
 			if conn.is_empty():
 				_close_port()
 			else:
-				page.show_connector(conn, payload, Settings.settings)
+				page.show_connector(conn, payload, DevicesTarget.settings.settings)
 	if _server.is_open:
-		_server.show_server(payload, Settings.settings)
+		_server.show_server(payload, DevicesTarget.settings.settings)
 	if _mapc.node_id != "":
 		if _mapc.G.find_node(payload.get("graph"), _mapc.node_id).is_empty():
 			_close_port()
@@ -349,7 +350,7 @@ func _open_port(id: String) -> bool:
 		return false
 	_dests.deselect()
 	_close_port()
-	page.show_connector(conn, _payload, Settings.settings)
+	page.show_connector(conn, _payload, DevicesTarget.settings.settings)
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(page.page)
 	_sync()
@@ -386,7 +387,7 @@ func _open_mapping(id: String) -> void:
 func _open_server() -> void:
 	_dests.deselect()
 	_close_port()
-	_server.show_server(_payload, Settings.settings)
+	_server.show_server(_payload, DevicesTarget.settings.settings)
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(_server.page)
 

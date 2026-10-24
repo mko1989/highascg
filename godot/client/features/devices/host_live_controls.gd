@@ -37,7 +37,7 @@ func _webpage(src: Dictionary) -> Control:
 	var use_tpl := _check("Template", HS.is_template_url(saved, origin), "Play a template from this box instead of a URL")
 	box.add_child(use_tpl)
 	var url := _line(saved, "https://example.com/")  # prefilled with the saved page even under Template, as the web
-	var tpl := _select(HS.template_options(Store.get_value("templates")), HS.template_name(saved, origin))
+	var tpl := _select(HS.template_options(DevicesTarget.value("templates")), HS.template_name(saved, origin))
 	url.visible = not use_tpl.button_pressed
 	tpl.visible = use_tpl.button_pressed
 	use_tpl.toggled.connect(func(on: bool) -> void:
@@ -49,12 +49,12 @@ func _webpage(src: Dictionary) -> Control:
 		if _busy:
 			return
 		var r := HS.webpage_request(src, use_tpl.button_pressed, str(tpl.get_selected_metadata()) if tpl.selected >= 0 else "",
-			url.text, Config.origin)
+			url.text, DevicesTarget.origin())
 		if r.has("error"):
 			status.emit(r.error, false)
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/host-live/webpage", r.body)
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/host-live/webpage", r.body)
 		_busy = false
 		var err := _reply_error(res)
 		if err != "":
@@ -76,9 +76,9 @@ func _webpage(src: Dictionary) -> Control:
 
 ## Sources saved by the web carry the literal 127.0.0.1 prefix even when this client reaches the box by another origin.
 static func _origin_for(saved: String) -> String:
-	if HS.is_template_url(saved, Config.origin):
-		return Config.origin
-	return DEFAULT_ORIGIN if HS.is_template_url(saved, DEFAULT_ORIGIN) else Config.origin
+	if HS.is_template_url(saved, DevicesTarget.origin()):
+		return DevicesTarget.origin()
+	return DEFAULT_ORIGIN if HS.is_template_url(saved, DEFAULT_ORIGIN) else DevicesTarget.origin()
 
 
 # ---------------------------------------------------------------- NDI host
@@ -100,7 +100,7 @@ func _ndi(src: Dictionary) -> Control:
 			status.emit(r.error, false)
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/host-live/ndi", r.body)
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/host-live/ndi", r.body)
 		_busy = false
 		var err := _reply_error(res)
 		if err != "":
@@ -111,7 +111,7 @@ func _ndi(src: Dictionary) -> Control:
 		reload.emit(false)
 	name.text_submitted.connect(func(_t: String) -> void: send.call("update"))
 	var discover := func() -> void:
-		var res: Dictionary = await Api.get_json("/api/ndi/list")
+		var res: Dictionary = await DevicesTarget.api.get_json("/api/ndi/list")
 		var err := _reply_error(res)
 		if err != "":
 			status.emit(err, false)
@@ -157,7 +157,7 @@ func _browser(src: Dictionary) -> Control:
 			status.emit(r.error, false)
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/host-live/browser", r.body)
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/host-live/browser", r.body)
 		_busy = false
 		var err := _reply_error(res)
 		if err != "":
@@ -178,7 +178,7 @@ func _browser(src: Dictionary) -> Control:
 		if _busy:
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/host-live/browser/interact", HS.interact_body(src))
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/host-live/browser/interact", HS.interact_body(src))
 		_busy = false
 		if not res.ok:
 			status.emit(_error(res), false)
@@ -203,7 +203,7 @@ func _remove_live(src: Dictionary, dest: Dictionary, text: String, fallback: Str
 		var yes: bool = await _confirm("Remove \"%s\" from Live sources?" % _label_of(src, dest, fallback))
 		if not yes:
 			return
-		var plan := HS.remove_live_plan(src, Store.get_value("hostOperatorFullscreen"))
+		var plan := HS.remove_live_plan(src, DevicesTarget.value("hostOperatorFullscreen"))
 		if plan.has("error"):
 			status.emit(plan.error, false)
 			return
@@ -227,18 +227,18 @@ func _remove_decklink(src: Dictionary, dest: Dictionary, payload: Dictionary, sl
 		if not yes:
 			return
 		_busy = true
-		await Settings.load_from_server()
-		var prev := HS.decklink_count(Settings.settings)
-		var dvr: Dictionary = await Api.get_json("/api/device-view")
+		await DevicesTarget.settings.load_from_server()
+		var prev := HS.decklink_count(DevicesTarget.settings.settings)
+		var dvr: Dictionary = await DevicesTarget.api.get_json("/api/device-view")
 		var dv: Dictionary = dvr.data if dvr.ok and dvr.data is Dictionary else payload
-		var cm := H.channel_map(dv, Store.get_value("channelMap"))
+		var cm := H.channel_map(dv, DevicesTarget.value("channelMap"))
 		var plan := HS.decklink_remove_plan(dv, slot, H.R.s(src.get("connectorId")), H.R.s(src.get("value")), str(dest.get("id", "")), cm)
 		var r: Dictionary = await _run(plan.requests)
 		if not r.ok:
 			_busy = false
 			status.emit("Remove failed: " + r.error, false)
 			return
-		await Settings.load_from_server()
-		await _run(HS.decklink_remove_tail(prev, HS.decklink_count(Settings.settings), plan.dest_id))
+		await DevicesTarget.settings.load_from_server()
+		await _run(HS.decklink_remove_tail(prev, HS.decklink_count(DevicesTarget.settings.settings), plan.dest_id))
 		_busy = false
 		removed.emit())

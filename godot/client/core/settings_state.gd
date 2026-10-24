@@ -9,10 +9,12 @@ signal changed
 signal saved(ok: bool, info: Dictionary)  # info: the server's {sideEffects, warnings} or {error}
 
 const NetUtil := preload("res://core/net_util.gd")
+const ApiScript := preload("res://core/api.gd")
 const Payload := preload("res://core/settings_payload.gd")
 
 const SAVE_DEBOUNCE_S := 0.6
 
+var api: ApiScript = null  # WO-732 P3a: core/devices_target.gd's copy reads another server; null = Api
 var settings: Dictionary = {}
 var is_loaded := false
 var _save_timer: Timer
@@ -28,7 +30,7 @@ func _ready() -> void:
 
 
 func load_from_server() -> bool:
-	var res: Dictionary = await Api.get_json("/api/settings")
+	var res: Dictionary = await _api().get_json("/api/settings")
 	if not res.ok or not (res.data is Dictionary):
 		return false
 	var fresh: Dictionary = res.data
@@ -61,7 +63,7 @@ func _flush() -> void:
 	var body := Payload.build(settings, keys)
 	if body.is_empty():
 		return
-	var res: Dictionary = await Api.post_json("/api/settings", body)
+	var res: Dictionary = await _api().post_json("/api/settings", body)
 	if not res.ok:
 		for k in keys:
 			_dirty[k] = true  # retried with the next change
@@ -71,3 +73,7 @@ func _flush() -> void:
 	saved.emit(true, res.data if res.data is Dictionary else {})
 	if _dirty.is_empty() and _save_timer.is_stopped():
 		await load_from_server()  # the server's normalised values (web settingsState.load after a save)
+
+
+func _api() -> ApiScript:
+	return api if api else Api

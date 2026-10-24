@@ -114,7 +114,7 @@ func _start_prewarm() -> void:
 
 
 func _warm() -> void:
-	Api.get_json("/api/device-view/snapshot")  # fire-and-forget: only warms the server's live-hardware cache
+	DevicesTarget.api.get_json("/api/device-view/snapshot")  # fire-and-forget: only warms the server's live-hardware cache
 
 
 ## WO-278 (B): with a cable selected, clicking one of its ends lifts that end; the far end becomes the anchor.
@@ -177,22 +177,22 @@ func _complete(target: String) -> void:
 	if half == "prv" and src.begins_with("dst_in_"):
 		await _set_output_layer(_edge_between(src, sink), 2)
 	var sink_conn := R.connector_by_id(payload, sink)
-	if R.s(sink_conn.get("kind")) == "gpu_out" and Settings.is_loaded:
-		var w := Seed.gpu_sink_writes(payload, R.d(Settings.settings.get("casparServer")), src, sink, half)
+	if R.s(sink_conn.get("kind")) == "gpu_out" and DevicesTarget.settings.is_loaded:
+		var w := Seed.gpu_sink_writes(payload, R.d(DevicesTarget.settings.settings.get("casparServer")), src, sink, half)
 		if not w.settings.is_empty():
 			await _post_settings(w.settings)
 		if not w.connector.is_empty():
 			await _post({"updateConnector": {"id": sink, "patch": w.connector}})
 	_set_busy(false)
 	_clear()
-	if R.sink_needs_restart(sink_conn, R.dedicated_streaming(Settings.settings)):
+	if R.sink_needs_restart(sink_conn, R.dedicated_streaming(DevicesTarget.settings.settings)):
 		set_dirty(true)
 	reload_requested.emit()
 
 
 ## ensureCableConnectorsInSavedGraph: write minimal rows for cable ends the saved graph lacks.
 func _preflight(src: String, sink: String) -> String:
-	var p := Seed.preflight(payload, Settings.settings, [src, sink])
+	var p := Seed.preflight(payload, DevicesTarget.settings.settings, [src, sink])
 	if p.added.is_empty():
 		return ""
 	var r := await _post({"deviceGraph": p.graph})
@@ -204,10 +204,10 @@ func _preflight(src: String, sink: String) -> String:
 
 ## recoverDeviceGraphForCable: persist the GPU bracket topology, re-read, preflight again.
 func _recover(src: String, sink: String) -> String:
-	var topo := R.topology(payload, Settings.settings)
+	var topo := R.topology(payload, DevicesTarget.settings.settings)
 	if not topo.is_empty():
-		await Api.post_json("/api/settings", {"gpuPhysicalTopology": topo})
-	var fresh := await Api.get_json("/api/device-view")
+		await DevicesTarget.api.post_json("/api/settings", {"gpuPhysicalTopology": topo})
+	var fresh := await DevicesTarget.api.get_json("/api/device-view")
 	if fresh.ok and fresh.data is Dictionary:
 		payload = fresh.data
 		payload.gpuPhysicalTopology = topo
@@ -248,7 +248,7 @@ func _commit_regrab(target: String) -> void:
 		await _restore_layer(layer, R.s(plan.sourceId), R.s(plan.sinkId))
 		if selected_edge == R.s(plan.removeEdgeId):
 			selected_edge = ""
-		if R.sink_needs_restart(R.connector_by_id(payload, R.s(plan.sinkId)), R.dedicated_streaming(Settings.settings)):
+		if R.sink_needs_restart(R.connector_by_id(payload, R.s(plan.sinkId)), R.dedicated_streaming(DevicesTarget.settings.settings)):
 			set_dirty(true)
 		status.emit("Cable moved to " + R.friendly_label(payload, R.s(plan.sinkId)), true)
 	else:
@@ -352,7 +352,7 @@ func apply_caspar() -> void:
 	applying = true
 	_set_busy(true)
 	status.emit("Applying Caspar config — restarting Caspar…", true)
-	var r := await Api.post_json("/api/caspar-config/apply", {"force": true})
+	var r := await DevicesTarget.api.post_json("/api/caspar-config/apply", {"force": true})
 	applying = false
 	_set_busy(false)
 	if not r.ok:
@@ -380,7 +380,7 @@ func set_dirty(v: bool) -> void:
 
 ## pushUndo: skipped unless both the graph and settings.screenDestinations are known (web parity).
 func _push_undo() -> void:
-	var sd: Variant = Settings.settings.get("screenDestinations") if Settings.is_loaded else null
+	var sd: Variant = DevicesTarget.settings.settings.get("screenDestinations") if DevicesTarget.settings.is_loaded else null
 	if not payload.get("graph") is Dictionary or sd == null:
 		return
 	_undo.append({"graph": payload.graph.duplicate(true), "screenDestinations": (sd as Dictionary).duplicate(true)
@@ -390,12 +390,12 @@ func _push_undo() -> void:
 
 
 func _post(body: Dictionary) -> Dictionary:
-	return await Api.post_json("/api/device-view", body)
+	return await DevicesTarget.api.post_json("/api/device-view", body)
 
 
 func _post_settings(patch: Dictionary) -> Dictionary:
-	var r := await Api.post_json("/api/settings", patch)
-	await Settings.load_from_server()
+	var r := await DevicesTarget.api.post_json("/api/settings", patch)
+	await DevicesTarget.settings.load_from_server()
 	return r
 
 

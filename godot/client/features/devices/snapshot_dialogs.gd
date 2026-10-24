@@ -44,10 +44,10 @@ class _Io:
 		return {"ok": r.ok, "data": r.data, "error": err}
 
 	func get_json(path: String) -> Dictionary:
-		return _web(await Api.get_json(path))
+		return _web(await DevicesTarget.api.get_json(path))
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		return _web(await Api.post_json(path, body))
+		return _web(await DevicesTarget.api.post_json(path, body))
 
 	func status(text: String, ok: bool) -> void:
 		c.status.emit(text, ok)
@@ -62,7 +62,7 @@ class _Io:
 		return await c._write(file_name, text)
 
 	func applied() -> void:
-		await Settings.load_from_server()
+		await DevicesTarget.settings.load_from_server()
 		c.applied.emit()
 
 

@@ -27,7 +27,7 @@ func _run(requests: Array) -> Dictionary:
 		if req[0] == "DIRTY":
 			dirty = true
 			continue
-		var r: Dictionary = await Api.post_json(req[1], req[2])
+		var r: Dictionary = await DevicesTarget.api.post_json(req[1], req[2])
 		if not r.ok and req.size() < 4:
 			return {"ok": false, "error": _error(r), "dirty": dirty}
 	return {"ok": true, "error": "", "dirty": dirty}
@@ -178,7 +178,7 @@ func _decklink(src: Dictionary, payload: Dictionary, settings: Variant, slot: in
 		if body.is_empty() or _busy:
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/host-live/decklink", body)
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/host-live/decklink", body)
 		_busy = false
 		var err := _reply_error(res)
 		if err != "":
@@ -215,7 +215,7 @@ func _label_control(payload: Dictionary, cid: String, fallback: String) -> Contr
 		if label == st.custom:
 			return
 		_busy = true
-		var res: Dictionary = await Api.post_json("/api/sources/label", {"sourceId": cid, "label": label})
+		var res: Dictionary = await DevicesTarget.api.post_json("/api/sources/label", {"sourceId": cid, "label": label})
 		_busy = false
 		var err := _reply_error(res)
 		if err != "":

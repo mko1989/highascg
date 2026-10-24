@@ -10,16 +10,16 @@ var on_tab := Callable()  # (name)
 
 
 func get_json(path: String) -> Dictionary:
-	return await Api.get_json(path)
+	return await DevicesTarget.api.get_json(path)
 
 
 func post_json(path: String, body: Variant) -> Dictionary:
-	return await Api.post_json(path, body)
+	return await DevicesTarget.api.post_json(path, body)
 
 
 func load_settings() -> Dictionary:
-	await Settings.load_from_server()
-	return Settings.settings
+	await DevicesTarget.settings.load_from_server()
+	return DevicesTarget.settings.settings
 
 
 func status(text: String, kind: String) -> void:

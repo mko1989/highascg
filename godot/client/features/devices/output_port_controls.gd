@@ -82,11 +82,11 @@ func _fetch_live() -> void:
 	if kind == "audio_out":
 		if VA.audio_needs_refresh(_payload):
 			for path in VA.REFRESH_REQUESTS:
-				await Api.get_json(path)
+				await DevicesTarget.api.get_json(path)
 			if seq == _seq:
 				status.emit(VA.REFRESHED, true)
 		return
-	var r: Dictionary = await Api.get_json("/api/virtual-camera/status" if kind == "v4l2_out" else "/api/streaming-channel")
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/virtual-camera/status" if kind == "v4l2_out" else "/api/streaming-channel")
 	if seq != _seq or not r.ok or not r.data is Dictionary:
 		return
 	_live = r.data if kind == "v4l2_out" else O.R.d(r.data.get("rtmp" if kind == "stream_out" else "record")).get("logs")
@@ -242,7 +242,7 @@ func _write(plan: Dictionary, fail_prefix: String, b: Button = null) -> void:
 		b.disabled = true
 	var r := await _run(plan.requests)
 	if plan.requests.any(func(q: Array) -> bool: return q.size() > 1 and q[1] == "/api/settings"):
-		await Settings.load_from_server()
+		await DevicesTarget.settings.load_from_server()
 	_busy = false
 	if is_instance_valid(b):
 		b.disabled = false
@@ -263,7 +263,7 @@ func _start_vcam(b: Button) -> void:
 	_busy = true
 	b.disabled = true
 	status.emit("Starting virtual camera…", true)
-	var r: Dictionary = await Api.post_json("/api/virtual-camera/start", VA.vcam_body(_conn, ui))
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/virtual-camera/start", VA.vcam_body(_conn, ui))
 	_busy = false
 	if is_instance_valid(b):
 		b.disabled = false
@@ -277,5 +277,5 @@ func _start_vcam(b: Button) -> void:
 
 ## The rear panel's "+": a new numbered stream / record / audio output, or the virtual cam shown again.
 func add_output(add_kind: String) -> void:
-	var plan := O.add_plan(add_kind, Settings.settings)
+	var plan := O.add_plan(add_kind, DevicesTarget.settings.settings)
 	await _write(plan, "")

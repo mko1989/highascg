@@ -27,7 +27,7 @@ func build(role: String, dest: Dictionary, ch: Variant, entry: Dictionary) -> Di
 
 func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 	var box := _section()
-	var cs := H.R.d(H.R.d(Settings.settings).get("casparServer"))
+	var cs := H.R.d(H.R.d(DevicesTarget.settings.settings).get("casparServer"))
 	var ui := IS.read_live_audio(cs)
 	var cur := {"device": ui.slots[slot - 1]}  # lambdas copy captured values; a Dictionary stays shared
 	var fft_slot: int = IS._int(cs.get("audio_fft_source_slot"), 0)
@@ -65,7 +65,7 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 	var settle := func(ok: bool, msg: String, revert: Callable) -> void:
 		if ok:
 			status.emit(msg, true)
-			await Settings.load_from_server()
+			await DevicesTarget.settings.load_from_server()
 		else:
 			status.emit(msg, false)
 			revert.call()
@@ -97,7 +97,7 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 					sel.select(k)))
 	refresh.pressed.connect(func() -> void:
 		refresh.disabled = true
-		var r: Dictionary = await Api.get_json("/api/audio/devices?refresh=1")
+		var r: Dictionary = await DevicesTarget.api.get_json("/api/audio/devices?refresh=1")
 		refresh.disabled = false
 		if r.ok:
 			fill.call(H.R.d(r.data).get("devices"))
@@ -109,7 +109,7 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 			return
 		_busy = true
 		start.disabled = true
-		var r: Dictionary = await Api.post_json("/api/audio/inputs/start", IS.start_body("live_audio", slot))
+		var r: Dictionary = await DevicesTarget.api.post_json("/api/audio/inputs/start", IS.start_body("live_audio", slot))
 		start.disabled = false
 		_busy = false
 		var err := _error(r) if not r.ok else IS.start_error(r.data)
@@ -125,10 +125,10 @@ func _live_audio(slot: int, ch: Variant, layer: Variant) -> Control:
 
 ## The two initial GETs (status, devices) once the block is in the tree.
 func _boot(show_status: Callable, fill: Callable) -> void:
-	var s: Dictionary = await Api.get_json("/api/audio/live-inputs")
+	var s: Dictionary = await DevicesTarget.api.get_json("/api/audio/live-inputs")
 	if s.ok:
 		show_status.call(H.R.d(s.data).get("status"))
-	var d: Dictionary = await Api.get_json("/api/audio/devices")
+	var d: Dictionary = await DevicesTarget.api.get_json("/api/audio/devices")
 	if d.ok:
 		fill.call(H.R.d(d.data).get("devices"))
 
@@ -143,16 +143,16 @@ func _remove_input(slot: int, kind: String) -> Control:
 		if not yes:
 			return
 		_busy = true
-		await Settings.load_from_server()
-		var cs: Variant = H.R.d(Settings.settings).get("casparServer")
-		var cm: Dictionary = H.R.d(Store.get_value("channelMap"))
+		await DevicesTarget.settings.load_from_server()
+		var cs: Variant = H.R.d(DevicesTarget.settings.settings).get("casparServer")
+		var cm: Dictionary = H.R.d(DevicesTarget.value("channelMap"))
 		var plan := IS.live_audio_remove_plan(cs, cm, slot) if audio else IS.v4l2_remove_plan(cs, cm, slot)
 		var r: Dictionary = await _run(plan.requests)
 		if not r.ok:
 			_busy = false
 			status.emit("Remove failed: " + r.error, false)
 			return
-		await Settings.load_from_server()
+		await DevicesTarget.settings.load_from_server()
 		_busy = false
 		if not audio:
 			status.emit("USB video slot %d removed." % slot, true)

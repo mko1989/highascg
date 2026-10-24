@@ -35,14 +35,14 @@ class _Io:
 		return {"ok": r.ok, "data": r.data, "error": err}
 
 	func get_json(path: String) -> Dictionary:
-		return _web(await Api.get_json(path))
+		return _web(await DevicesTarget.api.get_json(path))
 
 	func post_json(path: String, body: Variant) -> Dictionary:
-		return _web(await Api.post_json(path, body))
+		return _web(await DevicesTarget.api.post_json(path, body))
 
 	func load_settings() -> Dictionary:
-		await Settings.load_from_server()
-		return Settings.settings
+		await DevicesTarget.settings.load_from_server()
+		return DevicesTarget.settings.settings
 
 	func dirty() -> void:
 		c.dirty.emit()
@@ -63,8 +63,8 @@ func open(kind := "decklink") -> void:
 	if is_open():
 		_dlg.queue_free()
 	_build(kind)
-	_flow = Flow.new(Settings.settings, {"channelMap": Store.get_value("channelMap"),
-		"configComparison": Store.get_value("configComparison"), "templates": Store.get_value("templates")}, _Io.new(self))
+	_flow = Flow.new(DevicesTarget.settings.settings, {"channelMap": DevicesTarget.value("channelMap"),
+		"configComparison": DevicesTarget.value("configComparison"), "templates": DevicesTarget.value("templates")}, _Io.new(self))
 	_render()
 	_dlg.popup_centered(Vector2i(560, 0))
 	await _flow.start(kind)

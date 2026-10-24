@@ -185,7 +185,7 @@ func _write(patch: Dictionary, ok_text: String) -> void:
 	if _saving:
 		return
 	_saving = true
-	var res: Dictionary = await Api.post_json("/api/device-view", {"updateConnector": {"id": conn_id, "patch": {"caspar": patch}}})
+	var res: Dictionary = await DevicesTarget.api.post_json("/api/device-view", {"updateConnector": {"id": conn_id, "patch": {"caspar": patch}}})
 	_saving = false
 	if not res.ok:
 		status.emit("Save failed: " + _error(res), false)
@@ -202,17 +202,17 @@ func _start(b: Button) -> void:
 	_busy = true
 	b.disabled = true
 	var v := DI.view(_conn, _payload, _settings)
-	await Settings.load_from_server()
-	var prev := DI.HS.decklink_count(Settings.settings)
+	await DevicesTarget.settings.load_from_server()
+	var prev := DI.HS.decklink_count(DevicesTarget.settings.settings)
 	var dv := await _device_view()
 	var prep := DI.add_prepare(dv, maxi(1, v.dev if v.dev != 0 else v.slot), v.slot)
 	var r: Dictionary = {"ok": false, "error": prep.get("error", "")}
 	if not prep.has("error"):
 		r = await _run(prep.requests)
 	if r.ok:
-		await Settings.load_from_server()
+		await DevicesTarget.settings.load_from_server()
 		var dv2 := await _device_view()
-		var fin := DI.add_finish(prep, prev, DI.HS.decklink_count(Settings.settings), dv2, Settings.settings)
+		var fin := DI.add_finish(prep, prev, DI.HS.decklink_count(DevicesTarget.settings.settings), dv2, DevicesTarget.settings.settings)
 		r = await _run(fin.requests)
 		if r.ok:
 			if fin.restart or fin.pending or r.dirty:
@@ -234,15 +234,15 @@ func _stop(b: Button) -> void:
 	b.disabled = true
 	var v := DI.view(_conn, _payload, _settings)
 	var a := DI.stop_args(_conn, v)
-	await Settings.load_from_server()
-	var prev := DI.HS.decklink_count(Settings.settings)
+	await DevicesTarget.settings.load_from_server()
+	var prev := DI.HS.decklink_count(DevicesTarget.settings.settings)
 	var dv := await _device_view()
 	var cm: Variant = DP.R.d(DP.R.d(dv.get("live")).get("caspar")).get("channelMap")
 	var plan := DI.HS.decklink_remove_plan(dv, a[0], a[1], a[2], "", cm if cm is Dictionary else {})
 	var r: Dictionary = await _run(plan.requests)
 	if r.ok:
-		await Settings.load_from_server()
-		var tail: Dictionary = await _run(DI.HS.decklink_remove_tail(prev, DI.HS.decklink_count(Settings.settings), plan.dest_id))
+		await DevicesTarget.settings.load_from_server()
+		var tail: Dictionary = await _run(DI.HS.decklink_remove_tail(prev, DI.HS.decklink_count(DevicesTarget.settings.settings), plan.dest_id))
 		if tail.dirty:
 			dirty.emit()
 		status.emit(DI.stop_status(v), true)
@@ -256,5 +256,5 @@ func _stop(b: Button) -> void:
 
 ## A fresh GET /api/device-view (the page's payload when that fails).
 func _device_view() -> Dictionary:
-	var r: Dictionary = await Api.get_json("/api/device-view")
+	var r: Dictionary = await DevicesTarget.api.get_json("/api/device-view")
 	return r.data if r.ok and r.data is Dictionary else _payload

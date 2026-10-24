@@ -131,11 +131,11 @@ func rear_action(what: String, a: String, b: String, payload: Dictionary) -> voi
 
 ## Opening a jack whose consumer keys were never written seeds them (web), then reloads so the page reads them back.
 func _seed(patch: Dictionary) -> void:
-	var r: Dictionary = await Api.post_json("/api/settings", patch)
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/settings", patch)
 	if not r.ok:
 		status.emit("GPU port defaults: " + _error(r), false)
 		return
-	await Settings.load_from_server()
+	await DevicesTarget.settings.load_from_server()
 	reload.emit(false)
 
 
@@ -317,7 +317,7 @@ func _save(kind: String) -> void:
 	while true:
 		_again.erase(kind)
 		var body := _body(kind)
-		var r: Dictionary = await Api.post_json("/api/settings", body)
+		var r: Dictionary = await DevicesTarget.api.post_json("/api/settings", body)
 		var err := _reply_error(r)
 		ok = err == ""
 		if not ok:
@@ -333,7 +333,7 @@ func _save(kind: String) -> void:
 		if kind == "caspar":
 			status.emit(GO.save_status(ui, _env.cst), true)
 		dirty.emit()
-	await Settings.load_from_server()
+	await DevicesTarget.settings.load_from_server()
 
 
 func _body(kind: String) -> Dictionary:
@@ -349,12 +349,12 @@ func _reset() -> void:
 	var n: int = _env.cst.port_n
 	if not await _confirm("Are you sure you want to reset all settings for GPU port %d?" % n, "Reset"):
 		return
-	var r: Dictionary = await Api.post_json("/api/settings", GO.reset_patch(_env.cst))
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/settings", GO.reset_patch(_env.cst))
 	var err := _reply_error(r)
 	if err != "":
 		status.emit("Reset failed: " + err, false)
 		return
-	await Settings.load_from_server()
+	await DevicesTarget.settings.load_from_server()
 	status.emit("Settings for GPU port %d cleared" % n, true)
 	reload.emit(false)
 
@@ -367,7 +367,7 @@ func _refresh_preview() -> void:
 	_w.tier.text = ""
 	_preview_text(["Loading timings…"])
 	var dims := GP.preview_dims(ui, _env.mst, _env.cs, _env.settings, _env.cst.screen_n)
-	var r: Dictionary = await Api.get_json(GP.preview_query(dims, str(ui.timing)))
+	var r: Dictionary = await DevicesTarget.api.get_json(GP.preview_query(dims, str(ui.timing)))
 	if my != _seq or not is_instance_valid(_w.get("tier")):
 		return
 	var out := GP.preview_lines(r.data if r.ok else {"ok": false, "error": _error(r)})
