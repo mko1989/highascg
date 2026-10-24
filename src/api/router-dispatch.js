@@ -22,6 +22,7 @@ const routesPipOverlay = require('./routes-pip-overlay')
 const routesMedia = require('./routes-media')
 const routesPlugins = require('./routes-plugins')
 const moduleRegistry = require('../module-registry')
+const showTimers = require('../show-timers/show-timers-routes')
 const { checkHttpAuth } = require('../server/auth')
 
 /**
@@ -68,6 +69,10 @@ function makeRouteRequest(routes) {
 				return { status: 500, headers: JSON_HEADERS, body: jsonBody({ ok: false, error: msg }) }
 			}
 		}
+
+		// WO-734: the show timers the served pages (intake, audio dashboard) display
+		const st = await showTimers.handle(method, p, ctx)
+		if (st) return st
 
 		// Module hook handled explicitly before standard routes
 		const mr = await moduleRegistry.handleApi(method, p, body, ctx, req, query)

@@ -27,6 +27,7 @@
 </head>
 <body>
 <h1>Presenter</h1>
+<div id="show-timers"></div>
 <form id="f">
 	<label for="file">Photo (the whole person)</label>
 	<div class="photo" id="shot" role="button" tabindex="0">Tap to take a photo</div>
@@ -92,5 +93,6 @@ $('f').onsubmit = async (e) => {
 	ready()
 }
 </script>
+<script src="/api/show-timers/widget.js"></script>
 </body>
 </html>
