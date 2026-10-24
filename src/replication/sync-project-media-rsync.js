@@ -38,6 +38,37 @@ function rsyncSshOpts() {
 }
 
 /**
+ * rsync argv for one planned path (repo-relative, `media/…` or `template/…`; a trailing `/` = a directory's contents).
+ *
+ * A push names only `<remoteRoot>/media/` (or `template/`) on the remote side and carries the rest in the file list
+ * (`--relative` from the `/./` anchor): the remote command line is what the receiver's forced command
+ * (tools/runtime/highascg-replication-ssh.sh) splits on spaces and checks, so a folder like "Tlo Orange Ball/" failed
+ * there as "disallowed path token: Orange\\" (WO-724, live Send media 24.10). A pull still names the remote path.
+ * @param {'push'|'pull'} direction
+ * @param {string} rel
+ * @param {{ remote: string, remoteRoot: string, sshCommand: string }} o  remote = "user@host:"
+ */
+function rsyncArgs(direction, rel, o) {
+	const isDir = rel.endsWith('/')
+	const relNorm = rel.replace(/\\/g, '/')
+	const args = ['-avz', '--mkpath', '-e', o.sshCommand]
+	const slash = relNorm.indexOf('/')
+	const top = slash > 0 ? relNorm.slice(0, slash) : ''
+	const rest = slash > 0 ? relNorm.slice(slash + 1) : ''
+	if (direction === 'push' && top && rest && rest !== '/') {
+		args.push('--relative', `${top}/./${rest}`, `${o.remote}${path.posix.join(o.remoteRoot, top)}/`)
+	} else if (direction === 'push') {
+		// Trailing slash on source = contents only — target must be the full remote directory.
+		args.push(relNorm, `${o.remote}${path.posix.join(o.remoteRoot, isDir ? relNorm : path.posix.dirname(relNorm))}${isDir ? '' : '/'}`)
+	} else if (isDir) {
+		args.push(`${o.remote}${path.posix.join(o.remoteRoot, relNorm)}`, `./${relNorm}`)
+	} else {
+		args.push(`${o.remote}${path.posix.join(o.remoteRoot, relNorm)}`, `./${path.posix.dirname(relNorm)}/`)
+	}
+	return args
+}
+
+/**
  * @param {string} err
  * @param {{ direction?: string, peerHost?: string }} ctx
  */
@@ -144,30 +175,7 @@ async function runProjectMediaRsync(direction, peerHost, relPaths, opts = {}) {
 			})
 		}
 
-		const isDir = rel.endsWith('/')
-		const relNorm = rel.replace(/\\/g, '/')
-		/** @type {string[]} */
-		const args = ['-avz', '--mkpath', '-e', sshCommand]
-
-		if (direction === 'push') {
-			if (isDir) {
-				// Trailing slash on source = contents only — target must be the full remote directory.
-				const remoteDir = `${user}@${peerHost}:${path.posix.join(remoteRoot, relNorm)}`
-				args.push(relNorm, remoteDir)
-			} else {
-				const parent = path.posix.dirname(relNorm)
-				const remoteParent = `${user}@${peerHost}:${path.posix.join(remoteRoot, parent)}/`
-				args.push(relNorm, remoteParent)
-			}
-		} else if (isDir) {
-			const remoteDir = `${user}@${peerHost}:${path.posix.join(remoteRoot, relNorm)}`
-			args.push(remoteDir, `./${relNorm}`)
-		} else {
-			const remoteFile = `${user}@${peerHost}:${path.posix.join(remoteRoot, relNorm)}`
-			const parent = path.posix.dirname(relNorm)
-			args.push(remoteFile, `./${parent}/`)
-		}
-
+		const args = rsyncArgs(direction, rel, { remote: `${user}@${peerHost}:`, remoteRoot, sshCommand })
 		const out = await runRsync(REPO_ROOT, args, { log: opts.log })
 		if (out.ok) {
 			transferred += 1
@@ -345,6 +353,7 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 
 module.exports = {
 	buildProjectMediaRsyncPlan,
+	rsyncArgs,
 	rsyncProjectMediaToPeer,
 	runProjectMediaRsync,
 }

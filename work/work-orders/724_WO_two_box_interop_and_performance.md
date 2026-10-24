@@ -1,0 +1,121 @@
+# WO-724 — Two real servers: interoperability and performance, together and one by one
+
+**Status: IN PROGRESS (24.10.26) — single-box benchmarks + two-box link / master / signed calls / Send media done;
+Send media fix (names with spaces) DONE and proven live; failover drill, load-while-linked and teardown next.**
+
+Owner, 24.10: *"You can restart now. Dev machine in the shop. Continue running multiple tests to check interoperability
+and performance of both servers and one by one."* — this box (192.168.0.23, `highascg7580`) is a dev machine in the
+shop from today, so the live :4200 server may be linked to the second box (192.168.0.4, `highascg5867`) for these tests
+(the WO-723 test had to use a sandbox).
+
+Builds: this box = `main` (WO-723 + this WO). .4 = the 23.10 ISO (`BUILD_STAMP 2026-10-23_194203`): WO-670 P1–P4b and
+WO-712 R1–R4, not WO-723. .4 cannot be updated from here (SSH refused, no Syncthing, the last GitHub release is older
+than its build), so **every two-box result below is mixed-version**.
+
+Hardware: this box i7-14700KF (28 threads), 64 GB, RTX PRO 4000 Blackwell; .4 i9-10900 (20 threads), 32 GB, RTX 2080
+SUPER. LAN round trip 13 ms (first) / ≈1 ms (keep-alive).
+
+## Investigation
+
+### Found before the tests
+- **The pointer confine was off since the 07:55 New project (WO-722).** Server restart 12:48 (owner OK): back in 7 s,
+  journal `[Pointer confine] XFixes barriers on DP-5 @ 0,0 1920x1080`, helper `confine-pointer-barriers.py DP-5` running.
+- **This box's Caspar ran the ISO factory config since the 23.10 19:41 ISO build.** The running Caspar (PID 292986,
+  started 23.10 19:41:32) logged a 1-channel 720p50 windowed-screen config; HighAsCG expected 5 channels and got
+  `PLAY 4-1 DECKLINK 1` / `PLAY 5-2 DECKLINK 2` → ERROR every 20 s, and `/dev/shm/highascg-opgui` did not exist (the
+  operator GUI picture and the remote feed were dead). Cause, from the journal + `build-highascg-egg.sh`:
+  `reset-iso-operator-config.sh:42` copies `config/casparcg.config.iso` over the live `config/casparcg.config`; the
+  npm step's pause/restore restarts `casparcg-server` at 19:41:30 on that file; the real config only comes back at the
+  end (`highascg-exfat-remount-sync.sh`, mtime preserved) and nothing restarts Caspar after it. **Every ISO build
+  leaves the build host on the factory Caspar config until the next Caspar restart.** Fixed now by the app's own
+  `POST /api/caspar-config/apply {force:true}` (12:55): 5 channels up, `shm[opgui|1920x1080] publishing`, 0 AMCP
+  errors after. The build script itself is not changed yet (see Open).
+- **Clocks.** Both boxes run with NTP off and read ≈2 h ahead of real UTC (this box `Etc/UTC` 12:50 vs
+  `Date:` 10:49 GMT from the web; .4 `Europe/Warsaw` 14:50). Between them: **.4 = this box − 17.17 s** (5 ping
+  samples, ±1 ms). Signed cluster calls allow ±60 s (`cluster-call.js:114`, `cluster-media.js:19`), so this works
+  today, but with NTP off the boxes drift and past 60 s every signed call fails ("stale call (check both clocks)").
+  WO-723's "newer `at` wins" is Lamport-safe for causal changes (`set` uses `max(now, at + 1)` after a merge).
+
+### Single box (each measured from this box; read-only GETs, 200 sequential + 200 at 10 concurrent, keep-alive)
+
+| route | .4 seq p50 / p95 | .4 10-conc p50 / rps | here seq p50 / p95 | here 10-conc p50 / rps |
+|---|---|---|---|---|
+| `/api/replication/ping` | 1.1 / 1.3 ms | 4.5 ms / 2198 | 1.3 / 1.8 ms | 6.7 ms / 1504 |
+| `/api/cluster/identity` | 0.3 / 0.3 | 0.5 / 14286 | 0.1 / 0.2 | 0.6 / 14286 |
+| `/api/device-view` | 1.2 / 1.3 | 6.8 / 1325 | 0.6 / 1.0 | 5.5 / 1709 |
+| `/api/video-surfaces` | 0.3 / 0.4 | 1.1 / 7692 | 0.1 / 0.3 | 0.7 / 12500 |
+| `/api/system/version` | 10.7 / 11.3 | 102 / **96** | 17.5 / 20.5 | 174 / **58** |
+| `/api/state` | 10.6 / 11.3 | 101 / **97** | 24.6 / 27.5 | 232 / **42** |
+
+0 errors in 4800 requests. **`/api/system/version` and `/api/state` block the event loop**: `getVersionInfo`
+(`server-update.js:106`) runs three synchronous child processes per call (`mountpoint` ×2, `apply.sh
+--print-retain-mode`; 8.8 ms measured in-process), `/api/state` serializes 40–114 KB. Neither is a hot path (Settings
+→ Updates; client load / reconnect / seq gap) → recorded, not changed.
+
+Remote video feed (`ws /api/video-feed`, opgui 960 px): .4 14.7 fps @15 / 24.6 fps @25, first frame 116–170 ms, 5 KB
+frames, gap p95 42 ms @25. Here (after the Caspar fix) 14.8 / 24.8 fps, first frame 98–129 ms, 9 KB frames. Server
+RSS +190 MB while a feed runs; **no leak**: 6 open/close cycles → .4 324→370→331→…→332 MB, here 468→…→288 MB.
+HighAsCG CPU under the 10-concurrent GET load: 55–58 % of one core on both; Caspar idle here 4 % (75 % once the real
+5-channel config ran), .4 30 %.
+
+### Two boxes (this box ↔ .4, live :4200 on both)
+
+- **Link** both ways (`POST /api/cluster/peers`): 201 in 37 ms / 6 ms, both online in 79 ms. Fingerprints: here
+  `87f0da5337ca6e2d`, .4 `1166d54ccd133944`. Both record the other's `added_at` 17 s apart (the clock skew).
+- **WO-723 sender choice:** Auto = lowest fingerprint without tracking / master → lighting + PTZ on .4, artnet_in on
+  every server; `cluster.senders` refused by .4 (`unknown action`), logged once, shown `(not in sync)`.
+- **Master:** `POST /api/cluster/master/set {master:'self', auto:true}` → epoch 1; .4 shows it **26 ms** later and
+  `follows_master: true`. Auto then moves lighting + PTZ here (Auto = master). **Mixed-version hazard, now concrete:**
+  .4's 23.10 build keeps its own R1 `lighting` tick on, so with a fixture patch on both, both would transmit. Two
+  boxes on this code agree; until .4 is updated, untick lighting / PTZ on .4.
+- **Take forwarding (P4a):** active, this box connected to .4's Caspar (192.168.0.4:5250), sent 0, `"no shared
+  destination is cabled there"`. Both projects have a "PGM/PRV 1" destination but with different ids
+  (`dst_mvi3swp8_1` / `dst_mvm43woy_1`) and neither box cables it; forwarding matches by destination id, and the
+  project is not shared between linked servers (WO-712 R5 open). **Two independently made projects can never
+  forward takes.** A real extension / backup take needs the same project on .4 plus a cable there (owner decision).
+- **Signed calls (R2)**, `look.take` of a look that does not exist (whole signed path, no air effect), 50 each way:
+  here → .4 p50 11.9 / p95 12.5 / max 13.7 ms; .4 → here p50 18.8 / p95 21.6 / max 35.7 ms; 404 "look … not found";
+  a non-allow-listed action → 400 `unknown action "system.shutdown"`. Mixed versions interoperate.
+- **Exchange (R3):** empty on both — no box has cameras / detection, both have zones on, so neither tracking data nor
+  the air heartbeat is due. Needs a camera on one box to test.
+- **Master survives a restart:** this server restarted (SIGTERM, systemd, ≈7 s) while master; .4 polled every 0.5 s and
+  kept `highascg7580 epoch 1` throughout (failover timeout `FAILOVER_MS` 12 s, `cluster-master.js:27`).
+- **Send media (P2b) failed on names with spaces** — see below.
+
+### Send media: names with spaces
+`POST /api/cluster/peers/highascg5867/send-media` (project godot_test, 3 paths) → `failed`:
+`media/projects/npcc/Tlo Orange Ball/BAZA 2.mp4: highascg-replication-ssh: disallowed path token: Orange\`. Paths 1–2
+went through. rsync 3.2.7 (≥ 3.2.4) backslash-escapes the remote path on the remote command line
+(`…/Tlo\ Orange\ Ball/`); the receiver's forced command `tools/runtime/highascg-replication-ssh.sh:69` splits that
+line with `read -r` on spaces and rejects the token `Orange\`. Every push of a project whose media or template path
+holds a space (or `&`, `;`, `|`) fails, on every box.
+
+## What was done
+
+- `src/replication/sync-project-media-rsync.js`: new pure `rsyncArgs(direction, rel, o)` builds each path's argv. A
+  **push** now names only `<remoteRoot>/media/` (or `template/`) on the remote side and carries the rest in rsync's
+  file list (`--relative` + a `/./` anchor: `media/./projects/npcc/Tlo Orange Ball/BAZA 2.mp4` → `…/media/`), so the
+  remote command line holds no name at all. Same files at the same places as before (directories: contents into the
+  same folder). Pulls keep naming the remote path (unchanged; a pull of a spaced path still fails — Open).
+- **Why not the wrapper:** making the forced command parse rsync's escapes (split without `-r`, check metacharacters
+  outside escapes) was the first attempt and was **blocked as weakening a security control**; it is reverted
+  (`git diff` empty). The sender-side change needs no receiver change, so it also works into .4's 23.10 wrapper, and
+  the wrapper keeps checking every remote path it is given.
+- `tools/smoke/smoke-wo724-media-send-paths.test.js` (new, in FILES): real rsync through the real wrapper, with a fake
+  `ssh` that hands the command over as sshd does (`SSH_ORIGINAL_COMMAND` = the joined words), into a scratch root:
+  spaced folder + file, a project folder with `&` / `(1)` / a spaced sub-folder, a template, the wrapper still refusing
+  a destination outside media/template, and the old argv reproducing the box error (`disallowed path token: Orange`).
+
+## What was VERIFIED
+
+- Smoke 6/6. `xvfb-run -a npm run test:ci` 3087 tests, 3085 pass, 0 fail, 2 skipped; repo-integrity, max-lines,
+  unwired-exports, `--no-http` boot, lint, format:check all green (clean export).
+- **Live:** this server restarted onto the change; Send media to .4 (old wrapper) → `done`, 3/3 paths, 2.1 s
+  (`[replication] rsync push 3/3 path(s) → 192.168.0.4`); .4's `GET /api/media` lists
+  `projects/npcc/Tlo Orange Ball/BAZA 2.mp4` at 99685797 bytes (the source size).
+
+## Open
+- `build-highascg-egg.sh`: restart `casparcg-server` after the config comes back (or never restart it mid-build).
+- A pull of a spaced path still fails at the wrapper (hot-backup pair `connect-pair.js:256`); needs the wrapper to
+  understand rsync's escapes — a security-reviewed change, owner decision.
+- Clock drift with NTP off: show each peer's clock offset (ping `serverTimeMs`) on the Servers card, warn past 30 s.
