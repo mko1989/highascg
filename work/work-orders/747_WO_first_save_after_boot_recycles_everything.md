@@ -1,6 +1,6 @@
 # WO-747 — The first settings save after every boot reloads every subsystem (AMCP reconnect + routing)
 
-**Status: IN PROGRESS (24.10.26) — found while verifying WO-722 on .4; investigated, reproduced offline, fix below.**
+**Status: DONE (24.10.26: smoke + sandbox probe; live on .4 after release 214554Z: the first save after boot skipped the reload)**
 
 ## Investigation
 
@@ -46,4 +46,10 @@
 - **Sandbox probe after the fix:** the boot-time change, Loop always on, then off → three `recycle skipped`, no
   `Reloading subsystems`. A covered key (`periodic_sync_interval_sec: 17`) → `Reloading subsystems...` as before.
 - Gates: repo-integrity, max-lines, unwired, boot, format; test:ci 3199 pass / 1 fail (WO-498, export-only). Lint 214.
-- Live on .4: pending the next release (the same Loop always toggle right after the update).
+- **Live on .4.** Release 214554Z (cf836104) was installed from .4's kiosk Updates pane; `highascg` active 23:47:20.
+  The same toggle as at 23:35, Loop always on then off, as the first saves after that boot:
+  - 23:47:44 `Saved modular config` → `subsystem recycle skipped`, and 23:47:47 the same. No `Reloading
+    subsystems`, no v4l2-bridge / compose-preview teardown. At 23:35, on the old code, the first save logged
+    `Reloading subsystems...` and tore those down.
+  - On boot, `[Pointer confine] RUN — operator_monitor_port_2` + barriers on HDMI-0 (helper PID 144129, still
+    running after the saves). Caspar running. `editor_defaults.json` `loopAlways: false`, as before.
