@@ -67,6 +67,8 @@ release_lib_create_prerelease() {
 	shift 4
 	local -a kind=(--prerelease)
 	[[ "${RELEASE_LIB_LATEST:-0}" == "1" ]] && kind=(--latest)
+	# WO-736: CI tags the commit it tested (RELEASE_TARGET=$GITHUB_SHA), not whatever main points at by then.
+	[[ -n "${RELEASE_TARGET:-}" ]] && kind+=(--target "$RELEASE_TARGET")
 	(cd "$repo_root" &&
 		gh release create "$tag" \
 			"${kind[@]}" \

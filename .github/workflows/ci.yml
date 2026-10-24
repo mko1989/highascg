@@ -121,3 +121,41 @@ jobs:
           size=$(du -sk dist-web | cut -f1)
           echo "dist-web: ${size} KB"
           test "$size" -ge 100
+
+  # WO-736 — every push to main that passes all three jobs above becomes a server prerelease, so a second server
+  # updates from Settings → Updates (the updater picks the newest release carrying a highascg-server_*.tar.gz).
+  # The tarball carries godot/client, which the box's kiosk runs. The desktop operator builds (export templates,
+  # minutes of exporting) stay in the manual release (`npm run release:github-server`). Only the newest 10 automatic
+  # prereleases are kept.
+  release:
+    needs: [verify, godot, build-client]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    concurrency:
+      group: release-main
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TARGET: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies (shipped in the tarball)
+        run: npm ci --include=optional
+
+      - name: Client build
+        run: npm run build:client
+
+      - name: Server prerelease
+        run: bash tools/release/make-github-release-server.sh --no-godot-clients
+
+      - name: Keep the newest 10 automatic prereleases
+        run: bash tools/release/prune-auto-releases.sh 10
