@@ -1,7 +1,11 @@
 # WO-738 — VJing in Godot, relayed to CasparCG (instead of the current shader work)
 
-**Status: OPEN (24.10.26) — research answer written; owner chose path C (shared memory), §7; screen-consumer overlay
-analysed and rejected for show content (§8); game / ROM source noted for the future (§9). Nothing built yet.**
+**Status: DONE (24.10.26) as research. The owner chose path C (shared memory, §7). The screen-consumer overlay was
+analysed and rejected for show content (§8). The game / ROM source is §9. The built path lives in the successors,
+each detachable and each with its own proof: [WO-742](./742_WO_caspar_shm_producer.md) (Caspar shm producer),
+[WO-743](./743_WO_godot_shm_writer.md) (Godot writer), [WO-744](./744_WO_shm_ring_live_source.md) (Live-tab source),
+[WO-745](./745_WO_retro_game_source_libretro.md) (libretro game source). On air needs the WO-742 Caspar binary
+(owner). The VJ engine itself (shader / particle scenes, §5) is not built.**
 
 Owner 24.10: "lets add this https://godotengine.org/asset-library/asset/4506 for the future. answer in a new md file
 on the server WHAT CAN BE DONE IN GODOT AND RELAYED TO CASPARCG FOR VJing instead of the current shader work"

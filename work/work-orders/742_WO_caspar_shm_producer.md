@@ -1,9 +1,10 @@
 # WO-742 — Caspar `shm` producer: play a shared-memory ring written by another process (WO-738 step 1)
 
-**Status: IN PROGRESS (24.10.26) — producer built into a Caspar binary and proven end to end in a throwaway Caspar
-instance (`tools/e2e/caspar-shm-producer.sh`: PASS). Not deployed to any box. Deploying it means swapping the
-Caspar binary (a Caspar restart), which is the owner's call. Future development: **detachable** (see "How to
-remove").**
+**Status: DONE (24.10.26) as detachable future development. The producer is built into a Caspar binary and proven
+end to end in a throwaway Caspar instance (`tools/e2e/caspar-shm-producer.sh`: PASS). WO-743 (Godot writer) and WO-744
+(Live-tab take, exact pixels) are proven through it. WO-745 (game source) writes the same ring and is listed as a
+source, but was not played through Caspar. **Not deployed:** going
+on air means swapping the box's Caspar binary (a Caspar restart), which is the owner's call. See "How to remove".**
 
 Parent: [WO-738 §7](./738_WO_godot_vj_engine_relayed_to_caspar.md). Owner, 24.10: *"definitly shared memory. if it
 needs to be built so be it. i think it will be useful for future window grabbing from virtual screens"*. Owner,
