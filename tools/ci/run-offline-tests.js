@@ -403,6 +403,7 @@ const FILES = [
 	'tools/smoke/smoke-wo724-build-restarts-caspar.test.js',
 	'tools/smoke/smoke-wo725-cluster-e2e.test.js',
 	'tools/smoke/smoke-wo728-box-checks.test.js',
+	'tools/smoke/smoke-wo730-sweep.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',
@@ -470,19 +471,12 @@ const FILES = [
 
 console.log(`[test:ci] running ${FILES.length} curated offline test file(s)`)
 
-const dupCheck = spawnSync(process.execPath, [path.join(__dirname, 'check-dom-escape-duplicates.js')], {
-	cwd: REPO_ROOT,
-	stdio: 'inherit',
-})
-if (dupCheck.status !== 0) process.exit(dupCheck.status === null ? 1 : dupCheck.status)
-
-// WO-383: a temporal-dead-zone read renders a TypeError instead of the page it is on — cheap to
-// catch statically, expensive to find on the glass.
-const tdzCheck = spawnSync(process.execPath, [path.join(__dirname, 'check-tdz-reads.js')], {
-	cwd: REPO_ROOT,
-	stdio: 'inherit',
-})
-if (tdzCheck.status !== 0) process.exit(tdzCheck.status === null ? 1 : tdzCheck.status)
+// WO-383 (check-tdz-reads): a temporal-dead-zone read renders a TypeError instead of the page it is
+// on — cheap to catch statically, expensive to find on the glass.
+for (const check of ['check-dom-escape-duplicates.js', 'check-tdz-reads.js']) {
+	const r = spawnSync(process.execPath, [path.join(__dirname, check)], { cwd: REPO_ROOT, stdio: 'inherit' })
+	if (r.status !== 0) process.exit(r.status === null ? 1 : r.status)
+}
 
 const result = spawnSync(process.execPath, ['--test', ...FILES], {
 	cwd: REPO_ROOT,

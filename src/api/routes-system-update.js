@@ -25,6 +25,11 @@ async function handleGet(path, ctx, query) {
 	if (path === '/api/system/update/status') {
 		return { status: 200, headers: JSON_HEADERS, body: jsonBody(getApplyStatus()) }
 	}
+	// WO-730: the last post-update sweep (tools/sweep/run-sweep.js)
+	if (path === '/api/system/update/sweep') {
+		const rep = require('../system/sweep-after-update').lastReport()
+		return rep ? { status: 200, headers: JSON_HEADERS, body: jsonBody(rep) } : { status: 404, headers: JSON_HEADERS, body: jsonBody({ error: 'no sweep has run yet' }) }
+	}
 	return null
 }
 

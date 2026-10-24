@@ -314,6 +314,7 @@ function main() {
 		appCtx._videoFeed = require('./src/system/video-feed').attachVideoFeed(httpServer, appCtx, { log: m => logger.info(m) }) // WO-670 P1: JPEG pictures for remote clients
 		require('./src/api/routes-cluster').startIfLinked(appCtx) // WO-670 P3b: failover runs without a client
 
+		require('./src/system/sweep-after-update').startSweepAfterUpdate(appCtx) // WO-730: once per update
 		startReplicationService(appCtx, {
 			clients: wsHandle.clients,
 			getOperatorWsCount: () => wsHandle.clients.size,

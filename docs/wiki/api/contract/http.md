@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-497 routes.
+498 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -444,6 +444,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/system/update/apply` | registry | `src/api/router.js` |
 | GET | `/api/system/update/check` | handler | `src/api/routes-system-update.js` |
 | GET | `/api/system/update/status` | handler | `src/api/routes-system-update.js` |
+| GET | `/api/system/update/sweep` | handler | `src/api/routes-system-update.js` |
 | GET | `/api/system/v4l2-devices` | registry | `src/api/router.js`, `src/api/routes-v4l2-input.js` |
 | GET | `/api/system/version` | registry | `src/api/router.js`, `src/api/routes-system-update.js` |
 | * | `/api/system/xrandr-layout` | handler | `src/api/routes-system-hardware.js` |
