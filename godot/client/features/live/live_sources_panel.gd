@@ -18,6 +18,7 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
 const Drop := preload("res://features/devices/decklink_drop_flow.gd")
 const DropIo := preload("res://features/devices/decklink_drop_io.gd")
+const Shm := preload("res://features/live/shm_sources_model.gd")  # WO-744
 const STATE_KEYS := ["*", "channelMap", "extraLiveSources", "decklinkInputsStatus", "liveAudioInputsStatus", "v4l2InputsStatus"]
 const THUMB := Vector2(48, 27)
 
@@ -27,6 +28,7 @@ var _scroll: ScrollContainer
 var _connectors: Array = []
 var _audio: Variant = null  # GET /api/audio/live-inputs
 var _v4l2: Variant = null   # GET /api/v4l2-inputs
+var _shm: Variant = null    # GET /api/shm/sources (WO-744)
 var _key := ""
 var _thumbs := {}  # channel → Texture2D (null while fetching / when the fetch failed)
 var _highlight := ""  # connector id of a DeckLink just dropped here
@@ -72,6 +74,8 @@ func reload() -> void:
 	_audio = a.data if a.ok else null
 	var v: Dictionary = await Api.get_json("/api/v4l2-inputs")
 	_v4l2 = v.data if v.ok else null
+	var sh: Dictionary = await Api.get_json("/api/shm/sources")  # WO-744
+	_shm = sh.data if sh.ok else null
 	_thumbs.clear()
 	_key = ""
 	_rebuild()
@@ -79,7 +83,7 @@ func reload() -> void:
 
 func _rows() -> Array:
 	var cm: Variant = M.effective_cm(Settings.settings.get("channelMap"), Store.get_value("channelMap"))
-	return M.sources(cm, _connectors, _audio, _v4l2, Store.get_value("extraLiveSources", []))
+	return M.sources(cm, _connectors, _audio, _v4l2, Store.get_value("extraLiveSources", [])) + Shm.rows(_shm)  # WO-744
 
 
 func _rebuild() -> void:
@@ -89,7 +93,8 @@ func _rebuild() -> void:
 	var status := {"decklink": Store.get_value("decklinkInputsStatus"), "audio": Store.get_value("liveAudioInputsStatus"),
 		"v4l2": Store.get_value("v4l2InputsStatus")}
 	var view := rows.map(func(s: Dictionary) -> Array:
-		return [s.get("value"), s.get("label"), M.meta(s), M.slot_message(s, status), M.thumb_channel(s), s.get("connectorId")])
+		return [s.get("value"), s.get("label"), M.meta(s) + Shm.meta_suffix(s), M.slot_message(s, status) + Shm.warning(s),
+			M.thumb_channel(s), s.get("connectorId")])
 	var key := JSON.stringify([view, _highlight])
 	if key == _key:
 		return

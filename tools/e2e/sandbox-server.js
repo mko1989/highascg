@@ -61,9 +61,10 @@ function writeFixtureMedia(mediaDir) {
 }
 
 /**
- * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object }} opts
+ * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number } }} opts
  *   media: false skips the ffmpeg fixture clips (WO-725 cluster runs, CI has no ffmpeg); config: extra top-level
- *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked).
+ *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked); caspar: a THROWAWAY Caspar
+ *   instance to drive instead of the simulated one (WO-744 tools/e2e/shm-source-take.js) — never the box's own.
  */
 async function startSandbox(opts) {
 	const root = path.resolve(opts.root)
@@ -94,6 +95,7 @@ async function startSandbox(opts) {
 			replication: { enabled: false },
 			security: { enforceAuth: false, exposeToNetwork: false },
 			server: { httpPort: port, bindAddress: '127.0.0.1' },
+			...(opts.caspar ? { offline_mode: false, caspar: { host: opts.caspar.host, port: opts.caspar.port } } : {}),
 			...opts.config,
 		}, null, 2))
 	}
@@ -128,7 +130,7 @@ async function startSandbox(opts) {
 		DISPLAY: '',
 	}
 	const out = fs.openSync(path.join(root, 'server.log'), 'a')
-	const child = spawn(process.execPath, [path.join(REPO_ROOT, 'index.js'), '--no-caspar', '--port', String(port), '--bind', '127.0.0.1'], {
+	const child = spawn(process.execPath, [path.join(REPO_ROOT, 'index.js'), ...(opts.caspar ? [] : ['--no-caspar']), '--port', String(port), '--bind', '127.0.0.1'], {
 		cwd: root,
 		env,
 		stdio: ['ignore', out, out],

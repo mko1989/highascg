@@ -25,6 +25,7 @@ function normalizeCasparMediaPath(id) {
 		.replace(/\\/g, '/')
 		.normalize('NFC')
 	if (/^route:/i.test(s)) return s
+	if (/^shm:\/\//i.test(s)) return s // WO-744: keep the "//" (collapsing it turned shm://vj into SHM:/VJ)
 	return s.replace(/\/+/g, '/').replace(/^\/+/, '')
 }
 
@@ -123,6 +124,7 @@ function isPassthroughAmcpClip(id) {
 	if (/^\[HTML\]/i.test(s)) return true
 	if (/^https?:\/\//i.test(s)) return true
 	if (/^ndi:\/\//i.test(s)) return true
+	if (/^shm:\/\//i.test(s)) return true // WO-744
 	if (/^CASPARCG-/i.test(s)) return true
 	return false
 }

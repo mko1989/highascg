@@ -404,6 +404,7 @@ module.exports = [
 	'tools/smoke/smoke-wo736-ci-release.test.js',
 	'tools/smoke/smoke-wo737-update-keeps-box-config.test.js',
 	'tools/smoke/smoke-wo739-link-invites.test.js',
+	'tools/smoke/smoke-wo744-shm-sources.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

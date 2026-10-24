@@ -23,6 +23,7 @@ const routesMedia = require('./routes-media')
 const routesPlugins = require('./routes-plugins')
 const moduleRegistry = require('../module-registry')
 const showTimers = require('../show-timers/show-timers-routes')
+const shmSources = require('./routes-shm-sources') // WO-744
 const { checkHttpAuth } = require('../server/auth')
 
 /**
@@ -73,6 +74,8 @@ function makeRouteRequest(routes) {
 		// WO-734: the show timers the served pages (intake, audio dashboard) display
 		const st = await showTimers.handle(method, p, ctx)
 		if (st) return st
+		const shm = shmSources.handle(method, p, ctx) // WO-744: shm rings other processes write → Live-tab sources
+		if (shm) return shm
 
 		// Module hook handled explicitly before standard routes
 		const mr = await moduleRegistry.handleApi(method, p, body, ctx, req, query)

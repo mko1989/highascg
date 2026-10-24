@@ -242,6 +242,7 @@ const CINF_RESOLUTION_CACHE_TTL_MS = 30000
 async function fetchCinfResolutionFromAmcp(self, clipValue) {
 	if (!clipValue || !self?.amcp?.query?.cinf) return null
 	if (String(clipValue).trim().toLowerCase().startsWith('route://')) return null
+	if (/^shm:\/\//i.test(String(clipValue).trim())) return null // WO-744: a live ring, not a media file
 	if (isTemplateClip(clipValue, self)) return null
 	try {
 		const cinfId = resolveCasparCinfMediaId(clipValue, self)

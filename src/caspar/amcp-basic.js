@@ -33,6 +33,7 @@ class AmcpBasic {
 	_isComplexClip(clip, plan) {
 		if (!clip) return false
 		if (clip.startsWith('[HTML]') || clip.startsWith('ndi://') || clip.startsWith('route://')) return true
+		if (clip.startsWith('shm://')) return true // WO-744
 		if (plan && plan.transition === 'STING') return true
 		return false
 	}

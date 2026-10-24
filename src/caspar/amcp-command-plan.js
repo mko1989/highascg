@@ -30,6 +30,8 @@ function serializeClipCommandPlan(plan) {
 			cmd += ' [HTML] ' + param(clip.substring(7))
 		} else if (clip.startsWith('ndi://')) {
 			cmd += ' ' + clip
+		} else if (/^shm:\/\/[A-Za-z0-9_-]+$/.test(clip)) {
+			cmd += ' SHM NAME ' + clip.slice(6) // WO-744: a ring another process writes (WO-742 Caspar shm producer)
 		} else if (clip.startsWith('http://') || clip.startsWith('https://')) {
 			const ext = clip.split('?')[0].split('.').pop().toLowerCase()
 			const videoExts = ['mp4', 'm4v', 'mov', 'avi', 'mkv', 'webm', 'm3u8', 'ts']
