@@ -133,8 +133,9 @@ class DmxBorderReceiverBase {
 		return artnetScreenIndex(dmx || this.appCtx.config?.dmx || {})
 	}
 
+	/** WO-723: off too while the lighting input is chosen to be received by another linked server (server-senders.js). */
 	_isMasterDmxEnabled() {
-		return this.appCtx.config?.dmx?.artnetInputEnabled !== false
+		return this.appCtx.config?.dmx?.artnetInputEnabled !== false && require('../cluster/server-duties').has('artnet_in')
 	}
 
 	_effectiveListen() {

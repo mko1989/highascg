@@ -37,6 +37,8 @@ const { createClusterCall } = require('../cluster/cluster-call')
 const { createCallActions } = require('../cluster/cluster-call-actions')
 const { createExchange } = require('../cluster/cluster-exchange')
 const identity = require('../system/device-identity')
+const duties = require('../cluster/server-duties')
+const { createSendersSync } = require('../cluster/server-senders')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
 
@@ -52,9 +54,37 @@ function clusterOf(ctx) {
 		await masterOf(ctx).tick()
 		await fanoutOf(ctx).refresh()
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
+		duties.refresh() // WO-723: who does what follows the peers' pings
+		await sendersSyncOf(ctx).tick()
+		ctx._dutiesBroadcast?.() // a server that refused the choices shows it (deduped: nothing new, nothing sent)
 	})
+	require('./routes-server-duties').bindBroadcast(ctx)
+	duties.provide({ cluster: () => dutiesView(ctx) })
 	ctx._cluster.start().catch(() => {})
 	return ctx._cluster
+}
+
+/** WO-723: what server-duties resolves against — this server, the linked ones (by fingerprint) and the master. */
+function dutiesView(ctx) {
+	const snap = ctx._cluster.snapshot()
+	const refused = (id) => (ctx._sendersSync ? ctx._sendersSync.refused(id) : '') // it did not take the choices
+	const peers = snap.peers.map((p) => ({ id: p.id, fp: p.fp, name: p.name, online: p.online === true, duties: p.duties, refused: refused(p.id) }))
+	const self = { fp: fingerprint(identity.getDevicePublicKeyPem()), name: snap.self.hostname || 'this server' }
+	const m = ctx._clusterMaster ? ctx._clusterMaster.view() : null
+	const master = m?.is_master ? self.fp : peers.find((p) => p.id === m?.master_id)?.fp || ''
+	return { self, peers, master }
+}
+
+/** WO-723: the sender choices reach every online linked server (server-senders.js). */
+function sendersSyncOf(ctx) {
+	if (ctx._sendersSync) return ctx._sendersSync
+	ctx._sendersSync = createSendersSync({
+		peers: () => clusterOf(ctx).snapshot().peers,
+		get: () => duties.senders().get(),
+		call: (id, action, args, o) => callOf(ctx).call(id, action, args, o),
+		log: ctx.log,
+	})
+	return ctx._sendersSync
 }
 
 function masterOf(ctx) {
@@ -143,17 +173,24 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: exchangeOf(ctx).info,
+		info: { ...exchangeOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
 		actions: createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }),
 		log: ctx.log,
 	})
 	return ctx._clusterCall
 }
 
+/** WO-723: a linked server's sender choices (info action `cluster.senders`): per kind, the newer one wins. */
+function sendersReceived(ctx, args) {
+	if (!args.senders || typeof args.senders !== 'object') return { status: 400, body: { error: 'senders must be an object' } }
+	const changed = duties.senders().merge(args.senders)
+	if (changed) sendersSyncOf(ctx).tick().catch(() => {}) // a third linked server hears it too
+	return { status: 200, body: { ok: true, changed, senders: duties.senders().get() } }
+}
+
 /** WO-712 R3: what this server knows goes to the linked servers that do not do it (cluster-exchange.js). */
 function exchangeOf(ctx) {
 	if (ctx._clusterExchange) return ctx._clusterExchange
-	const duties = require('../cluster/server-duties')
 	ctx._clusterExchange = createExchange({
 		peers: () => clusterOf(ctx).snapshot().peers,
 		has: (d) => duties.has(d),
@@ -255,4 +292,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, exchangeOf, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, exchangeOf, sendersSyncOf, sendersReceived, startIfLinked }

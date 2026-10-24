@@ -74,18 +74,42 @@ func test_fanout_line() -> void:
 	t.eq(M.follow_note({}), "", "not a follower")
 
 
-func test_does_text_lists_a_linked_servers_ticks() -> void:  # WO-712 R1
-	var all := {"detection": true, "zones": true, "auto": true, "lighting": true, "ptz": true, "presenters": true, "accept_remote": true}
-	t.eq(M.does_text(all), "Does: everything", "all on")
-	t.eq(M.does_text(null), "", "an older server sent no duties")
-	var tracking := all.duplicate()
-	for k in ["zones", "auto", "ptz", "presenters"]:
-		tracking[k] = false
-	t.eq(M.does_text(tracking), "Does: Detection · Lighting out", "listed in the pick-list order")
-	var none := {"detection": false, "zones": false, "auto": false, "lighting": false, "ptz": false, "presenters": false}
-	t.eq(M.does_text(none), "Does: nothing", "all six off")
-	var locked := all.duplicate()
+func test_does_text_says_what_a_linked_server_resolves_to() -> void:  # WO-723 (was R1 ticks)
+	var media := {"tracking": false, "detection": false, "zones": false, "auto": false, "presenters": false,
+		"lighting": false, "ptz": false, "artnet_in": true, "accept_remote": true}
+	t.eq(M.does_text(media), "", "a media-only server: nothing to say (its destinations are listed above)")
+	var tracker := media.duplicate()
+	for k in ["tracking", "lighting", "ptz"]:
+		tracker[k] = true
+	t.eq(M.does_text(tracker), "Does: tracking · lights out · PTZ out", "what it resolves to")
+	var locked := tracker.duplicate()
 	locked["accept_remote"] = false
-	t.eq(M.does_text(locked), "Does: everything · refuses remote actions", "the D3 lock is worded apart")
-	t.eq(M.does_text({"lighting": false}), "Does: Detection · Zones · Auto follow · PTZ out · Presenters", "missing keys default to on")
-	t.ok(not str(M.does_text(all)).contains("Roles"), "never the word Roles")
+	t.eq(M.does_text(locked), "Does: tracking · lights out · PTZ out · refuses remote actions", "the D3 lock")
+	t.eq(M.does_text(null), "", "an older server sent no duties")
+	t.eq(M.does_text({"detection": true, "lighting": true}), "", "an older server's R1 ticks are not what it does")
+	t.ok(not str(M.does_text(tracker)).contains("Roles"), "never the word Roles")
+
+
+func test_sender_items_auto_first_then_every_server() -> void:  # WO-723
+	var view := {"servers": [{"fp": "aaaa", "name": "media", "self": true, "online": true},
+		{"fp": "bbbb", "name": "tracker", "self": false, "online": true}, {"fp": "cccc", "name": "spare", "self": false, "online": false}],
+		"senders": {"lighting": {"by": "", "auto_name": "tracker"}, "ptz": {"by": "cccc", "auto_name": "tracker"},
+			"artnet_in": {"by": "", "auto_name": "*"}}}
+	t.eq(M.sender_items(view, "lighting").map(func(i: Dictionary) -> String: return i.text),
+		["Auto — tracker", "media (this server)", "tracker", "spare (offline)"], "Auto names who it picks")
+	t.eq(M.sender_items(view, "lighting").map(func(i: Dictionary) -> String: return i.by), ["", "aaaa", "bbbb", "cccc"])
+	t.eq(M.sender_index(view, "lighting"), 0, "Auto")
+	t.eq(M.sender_index(view, "ptz"), 3, "the chosen server, offline or not")
+	t.eq(M.sender_items(view, "artnet_in")[0].text, "Auto — every server", "the lighting input: every server")
+	t.eq(M.sender_items({"servers": [{"fp": "aaaa", "name": "solo", "self": true}], "senders": {}}, "lighting"), [], "one box: no picker")
+	t.eq(M.sender_items({"servers": []}, "ptz"), [], "unlinked: no picker")
+	t.eq(M.sender_items(null, "ptz"), [], "no answer: no picker")
+	var old := view.duplicate(true)
+	old.servers[1]["refused"] = "unknown action \"cluster.senders\""
+	var it: Dictionary = M.sender_items(old, "lighting")[2]
+	t.eq(it.text, "tracker (not in sync)", "an older server that refused the choice")
+	t.ok(str(it.tip).contains("unknown action"), "the reason is the item's tooltip")
+	t.eq(M.sender_items(view, "lighting")[2].tip, "", "in sync: no tooltip")
+	var gone := view.duplicate(true)
+	gone.senders.lighting.by = "dddd"
+	t.eq(M.sender_index(gone, "lighting"), 0, "a server no longer listed → Auto")

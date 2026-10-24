@@ -9,6 +9,7 @@ signal edit(list: Array)
 const P := preload("res://features/previs/tracking/ptz_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const CalFold := preload("res://features/previs/tracking/ptz_calibrate_fold.gd")  # WO-713 R2
+const SenderPicker := preload("res://features/devices/sender_picker.gd")
 
 ## [label, path, min, max, step]
 const FIELDS := [["Port", "port", 1, 65535, 1], ["Camera address (1-7)", "address", 1, 7, 1],
@@ -46,6 +47,7 @@ func _ready() -> void:
 	h.text = "PTZ cameras (WO-711)"
 	h.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 	add_child(h)
+	add_child(SenderPicker.make("ptz", "Sent by"))  # WO-723: which linked server sends VISCA (hidden on one box)
 	var row := HBoxContainer.new()
 	_list = OptionButton.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL

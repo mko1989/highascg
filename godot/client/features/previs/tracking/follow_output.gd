@@ -6,6 +6,7 @@ extends VBoxContainer
 
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const SenderPicker := preload("res://features/devices/sender_picker.gd")
 const PROTOCOLS := [["psn", "PosiStageNet → console (MA3 / MagicQ aim)"], ["artnet", "Art-Net backup (this box aims)"]]
 const AXES := [["stage", "Stage frame: X stage left · Y upstage · Z up"], ["y_up", "Y up: x · height · −upstage (PSN text)"]]
 
@@ -32,6 +33,7 @@ func _ready() -> void:
 	add_theme_constant_override("separation", 4)
 	_proto = _options(PROTOCOLS, func(i: int) -> void: _emit("protocol", PROTOCOLS[i][0]))
 	add_child(_proto)
+	add_child(SenderPicker.make("lighting", "Sent by"))  # WO-723: which linked server transmits (hidden on one box)
 	_grid = GridContainer.new()
 	_grid.columns = 2
 	add_child(_grid)

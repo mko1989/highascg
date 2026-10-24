@@ -7,15 +7,17 @@ signal edit(patch: Dictionary)
 
 const A := preload("res://features/live/border_artnet_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const SenderPicker := preload("res://features/devices/sender_picker.gd")
 
 static var _details_open := false  # web dmxDetailsOpen: survives re-renders, closed at load
 
 var _dialog: FileDialog
+var _picker: HBoxContainer  # WO-723: kept across re-renders (a desk re-renders this every 150 ms; one fetch, not one each)
 
 
 func build(gb: Dictionary) -> void:
 	for c in get_children():
-		if c != _dialog:
+		if c != _dialog and c != _picker:
 			c.queue_free()
 	var title := Label.new()
 	title.text = "Lighting input (Art-Net/sACN)"
@@ -25,6 +27,10 @@ func build(gb: Dictionary) -> void:
 	listen.button_pressed = gb.get("artnetListenEnabled") == true
 	listen.toggled.connect(func(on: bool) -> void: edit.emit({"artnetListenEnabled": on}))
 	add_child(listen)
+	if _picker == null:
+		_picker = SenderPicker.make("artnet_in", "Received by")  # only shown while servers are linked
+		add_child(_picker)
+	move_child(_picker, -1)
 	var patch: Dictionary = gb.get("artnetPatch", {}) if gb.get("artnetPatch") is Dictionary else {}
 	var start := int(patch.get("startChannel", 1)) if int(patch.get("startChannel", 1)) > 0 else 1
 	var tog := Button.new()

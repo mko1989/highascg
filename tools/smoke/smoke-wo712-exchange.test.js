@@ -236,18 +236,22 @@ describe('WO-712 R3 auto routes on a server without the auto duty', () => {
 		const ws = []
 		const ctx = { _wsBroadcast: (t, d) => ws.push([t, d]) }
 		const b = createAutoBroadcast()
+		// WO-723: `auto` is resolved, not set — off while an online linked server does tracking and this one does not
+		const peers = [{ id: 'T', fp: 'b'.repeat(16), name: 'T', online: true, duties: { tracking: true } }]
+		const linked = (on) => duties.provide({ tracking: () => false, cluster: () => ({ self: { fp: 'a'.repeat(16), name: 'M' }, peers: on ? peers : [], master: '' }) })
 		try {
-			duties.set({ auto: false })
+			linked(true)
+			assert.equal(duties.has('auto'), false)
 			assert.deepEqual(JSON.parse(handleAuto(director, { method: 'GET', path: '/api/tracking/auto' }).body), OFF)
 			b.tick(director, ctx, 1000)
 			b.tick(director, ctx, 1400)
 			assert.deepEqual(ws, [['tracking:auto', OFF]])
-			duties.set({ auto: true })
+			linked(false)
 			b.tick(director, ctx, 1800)
 			assert.deepEqual(ws.at(-1), ['tracking:auto', SNAP])
 			assert.deepEqual(JSON.parse(handleAuto(director, { method: 'GET', path: '/api/tracking/auto' }).body), SNAP)
 		} finally {
-			duties.set({ auto: true })
+			duties.provide({ cluster: () => null })
 		}
 	})
 
@@ -287,7 +291,7 @@ describe('WO-712 R3 routes', () => {
 	})
 
 	it("wiring: the call gets the exchange info list; auto-routes offers each look; PTZ setup ignores another server's snapshot", () => {
-		assert.match(read('src/api/routes-cluster.js'), /info: exchangeOf\(ctx\)\.info,/)
+		assert.match(read('src/api/routes-cluster.js'), /info: \{ \.\.\.exchangeOf\(ctx\)\.info, 'cluster\.senders': \(args\) => sendersReceived\(ctx, args\) \},/)
 		assert.match(
 			read('src/tracking/auto-routes.js'),
 			/if \(ctx\._cluster\) require\('\.\.\/api\/routes-cluster'\)\.exchangeOf\(ctx\)\.offer\('tracking\.auto', snap\)/

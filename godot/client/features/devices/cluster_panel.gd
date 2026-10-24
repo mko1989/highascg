@@ -16,7 +16,6 @@ const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
-const DutiesBlock := preload("res://features/devices/server_duties_block.gd")
 
 var _snap := {}
 var _views := {}  # peer id → its device-view payload
@@ -27,6 +26,7 @@ var _master_row: VBoxContainer
 var _master_l: Label
 var _follow_l: Label
 var _auto: CheckBox
+var _accept: CheckBox  # WO-712 D3 / WO-723: the one setting left of the R1 ticks
 var _take: Button
 var _make: ConfirmationDialog
 var _make_id := ""
@@ -55,7 +55,6 @@ func _ready() -> void:
 	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	head.add_child(_self_l)
 	add_child(head)
-	add_child(DutiesBlock.new())  # WO-712 R1: this server's own ticks, above the linked ones
 	_build_master_row()
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
@@ -108,6 +107,8 @@ func _render() -> void:
 	_auto.set_pressed_no_signal(ms.get("auto", true) == true)
 	_auto.disabled = int(ms.get("epoch", 0)) <= 0
 	_take.visible = ms.get("is_master") != true
+	var own_duties: Variant = me.get("duties")
+	_accept.set_pressed_no_signal(not (own_duties is Dictionary) or own_duties.get("accept_remote", true) == true)
 	for c in _list.get_children():
 		c.queue_free()
 	var peers: Array = _snap.get("peers", [])
@@ -159,7 +160,7 @@ func _card(p: Dictionary) -> Control:
 		_remove.popup_centered())
 	top.add_child(x)
 	v.add_child(top)
-	var does := M.does_text(p.get("duties"))  # WO-712 R1: its ticks, read-only (set in its own Devices view)
+	var does := M.does_text(p.get("duties"))  # WO-723: what its config and the links resolve it to
 	if does != "":
 		v.add_child(_small(does, ThemeBuilder.TEXT_MUTED))
 	var line := M.send_line(p, str(_send_err.get(id, "")))
@@ -239,6 +240,11 @@ func _build_master_row() -> void:
 	follow.set_pressed_no_signal(Config.cluster().follow)
 	follow.toggled.connect(func(on: bool) -> void: Config.save_cluster({"follow": on}))
 	controls.add_child(follow)
+	_accept = CheckBox.new()
+	_accept.text = "Linked servers may press here"
+	_accept.tooltip_text = "A linked server's presses (look takes, pins, fixture looks, Companion) count as this server's own. Off: refused."
+	_accept.toggled.connect(func(on: bool) -> void: Api.post_json("/api/server/duties", {"patch": {"accept_remote": on}}))
+	controls.add_child(_accept)
 	_take = Button.new()
 	_take.text = "Make this server master"
 	_take.pressed.connect(func() -> void: _confirm_make("self", "This server"))

@@ -5,8 +5,9 @@
  * in at 10 Hz (OpenFollow's default eval rate), `project.previs.tracking.zones` from the active project (at boot,
  * then on every project write via project-events), each transition's action (zone-actions.js) out.
  * The engine runs whether or not a client is open, like the follow engine.
- * WO-712 R1: with this server's `zones` duty off (src/cluster/server-duties.js, `deps.duties`) occupancy is still evaluated
- * and shown, and each transition is still logged in `recent`, but no action runs (detail says so).
+ * WO-712 R1 / WO-723: with this server's `zones` duty resolved off (a linked server does tracking;
+ * src/cluster/server-duties.js, `deps.duties`) occupancy is still evaluated and shown, and each transition is still
+ * logged in `recent`, but no action runs (detail says so).
  * WO-712 R4: it also runs the "on air" rules (air-rules.js, `zones.on_air`), under the same duty. `onAir(source, looks)`
  * is fed by this server's takes and a linked playout server's air state (src/cluster/air-state.js); it is reachable as
  * `ctx.zoneService` while the tracking module runs.
@@ -32,7 +33,7 @@ function createZoneService(ctx, hub, deps = {}) {
 		recent.unshift(entry)
 		recent.length = Math.min(recent.length, LOG_MAX)
 		if (!actionsOn()) {
-			entry.detail = 'not run: zone actions are off for this server (its Devices settings)'
+			entry.detail = 'not run: zone actions are off on this server (a linked server does tracking)'
 			return
 		}
 		const run = action?.type === 'presenter' ? runPresenter(marker, kind) : runAction(action, ctx, deps)

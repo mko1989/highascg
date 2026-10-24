@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-495 routes.
+497 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -330,6 +330,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/server/*` | registry | `src/api/router.js` |
 | GET | `/api/server/duties` | registry | `src/api/routes-server-duties.js` |
 | POST | `/api/server/duties` | registry | `src/api/routes-server-duties.js` |
+| GET | `/api/server/senders` | registry | `src/api/routes-server-duties.js` |
+| POST | `/api/server/senders` | registry | `src/api/routes-server-duties.js` |
 | GET | `/api/settings` | registry | `src/api/router.js` |
 | POST | `/api/settings` | registry | `src/api/router.js` |
 | POST | `/api/settings/apply-os` | registry | `src/api/router.js` |
@@ -547,7 +549,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-replication-get.js` | optional |
 | `src/api/routes-replication-post.js` | optional |
 | `src/api/routes-scene.js` |  |
-| `src/api/routes-server-duties.js` | WO-712 R1 — this server's duties (src/cluster/server-duties.js), set in its own Devices view: GET  /api/server/duties                → { detection, zones, auto, |
+| `src/api/routes-server-duties.js` | WO-723 — this server's duties, resolved from its config and the linked servers (src/cluster/server-duties.js), and the "which server sends / receives" choice (s |
 | `src/api/routes-settings.js` | Settings API Router. |
 | `src/api/routes-shader-live.js` | WO-606 — Shader Live endpoints (the node owns the working copy; client/components/shader-live-editor.js did all of this in the browser): GET  /api/shader-live   |
 | `src/api/routes-shaders.js` | WO-266 — Shader FX library routes. |

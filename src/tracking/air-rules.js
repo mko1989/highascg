@@ -2,7 +2,7 @@
 
 /**
  * WO-712 R4 — react: "when look X goes on air → do Y", the zone actions the other way round. The rules sit next to the
- * zones (`project.previs.tracking.zones.on_air`, Zones section) and run where the `zones` duty is ticked
+ * zones (`project.previs.tracking.zones.on_air`, Zones section) and run where the `zones` duty resolves on (WO-723)
  * (zone-service.js), on this server's own takes and on the air state a linked playout server sends (R3b, `air` topic in
  * cluster-exchange.js).
  *

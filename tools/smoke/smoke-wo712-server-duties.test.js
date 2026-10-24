@@ -1,113 +1,45 @@
 'use strict'
 
 /**
- * WO-712 R1 — server duties: a device-local pick-list of what this server does, and each tracking / lighting
- * service gating its own tick on it. Defaults all on; set validates; the shared instance never touches the real
- * state file under node --test; lighting off → no packet leaves while the engine still aims; detection off →
- * wanted() false; zones off → no action; ptz not allowed → nothing sent; presenters off → intake refused;
+ * WO-712 R1 — each tracking / lighting service gates itself on `duties.has(name)`: lighting off → no packet leaves
+ * while the engine still aims; zones off → no action; ptz not allowed → nothing sent; presenters off → intake refused;
  * ping and the cluster peer view carry the duties.
+ * WO-723 replaced R1's stored ticks with a resolution (server-duties.js: config + the linked servers + the sender
+ * choice; tested in smoke-wo723-duties-from-config). The gates are unchanged, so they are driven here by a fake whose
+ * duties the test flips, and detection is no longer a gate at all (its config check IS what `tracking` resolves from).
  */
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 
 const duties = require('../../src/cluster/server-duties')
 const { createCluster } = require('../../src/cluster/cluster-peers')
-const { RouteRegistry } = require('../../src/api/route-registry')
 const { emitProjectChanged } = require('../../src/engine/project-events')
 
-const ALL = ['detection', 'zones', 'auto', 'lighting', 'ptz', 'presenters', 'accept_remote']
-const memStore = (init) => {
-	const m = new Map(init ? [['serverDuties', init]] : [])
-	return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), m }
-}
-const mk = (init) => {
-	const store = memStore(init)
-	return { store, d: duties.createServerDuties({ persistence: store }) }
+const ALL = duties.NAMES
+/** A resolved-duties stand-in (`init` = the duties resolved off); `d.set` flips them as a resolution change would. */
+const mk = (init = {}) => {
+	let state = { ...Object.fromEntries(ALL.map((n) => [n, true])), ...init }
+	const subs = new Set()
+	const d = {
+		has: (n) => state[n] === true,
+		get: () => ({ ...state }),
+		onChange: (fn) => (subs.add(fn), () => subs.delete(fn)),
+		set(patch) {
+			const prev = state
+			state = { ...state, ...patch }
+			for (const fn of [...subs]) fn({ ...state }, prev)
+			return { ...state }
+		},
+	}
+	return { d }
 }
 const tick = () => new Promise((r) => setImmediate(r))
 
-describe('WO-712 R1 server-duties module', () => {
-	it('defaults: every duty on, no playout', () => {
-		const { d, store } = mk()
-		assert.deepEqual(duties.NAMES, ALL)
-		assert.deepEqual(d.get(), Object.fromEntries(ALL.map((n) => [n, true])))
-		assert.ok(ALL.every((n) => d.has(n)))
-		assert.equal(d.has('playout'), false, 'playout is not a duty in R1')
-		assert.equal(store.m.has('serverDuties'), false, 'nothing is written until a change')
-	})
-
-	it('set validates names and booleans, saves, and notifies once per real change', () => {
-		const { d, store } = mk({ lighting: false, junk: 1, zones: 'no' })
-		assert.equal(d.has('lighting'), false, 'a stored false is kept')
-		assert.equal(d.has('zones'), true, 'a non-boolean stored value falls back to true')
-		const seen = []
-		const off = d.onChange((next, prev) => seen.push([next.ptz, prev.ptz]))
-		for (const bad of [null, [], 'x', {}, { nope: true }, { ptz: 'false' }, { ptz: 0 }, { ptz: false, nope: true }]) {
-			assert.throws(
-				() => d.set(bad),
-				(e) => e.status === 400,
-				JSON.stringify(bad)
-			)
-		}
-		assert.equal(d.has('ptz'), true, 'a refused patch changes nothing (not even its valid keys)')
-		assert.equal(seen.length, 0)
-		const saved = d.set({ ptz: false })
-		assert.equal(saved.ptz, false)
-		assert.equal(saved.lighting, false)
-		assert.deepEqual(store.m.get('serverDuties'), saved)
-		d.set({ ptz: false })
-		assert.deepEqual(seen, [[false, true]], 'a no-op patch does not notify')
-		off()
-		d.set({ ptz: true })
-		assert.equal(seen.length, 1, 'unsubscribed')
-	})
-
-	it('the shared instance is test-isolated: the real state file is untouched', () => {
-		assert.ok(process.env.NODE_TEST_CONTEXT, 'run with node --test')
-		const real = path.join(__dirname, '..', '..', '.highascg-state.json')
-		const before = fs.existsSync(real) ? fs.statSync(real).mtimeMs : null
-		const persistence = require('../../src/utils/persistence')
-		duties.set({ accept_remote: false })
-		persistence.flushSync()
-		const scratch = path.join(os.tmpdir(), `highascg-state-test-${process.pid}.json`)
-		assert.equal(JSON.parse(fs.readFileSync(scratch, 'utf8')).serverDuties.accept_remote, false)
-		assert.equal(fs.existsSync(real) ? fs.statSync(real).mtimeMs : null, before)
-		duties.set({ accept_remote: true })
-		persistence.flushSync()
-		fs.rmSync(scratch, { force: true })
-	})
-})
-
 describe('WO-712 R1 routes, ping and the cluster view', () => {
-	it('GET / POST /api/server/duties; POST broadcasts server:duties; bad patch is 400', async () => {
-		const routes = new RouteRegistry()
-		require('../../src/api/routes-server-duties').register(routes)
-		const sent = []
-		const ctx = { _wsBroadcast: (type, body) => sent.push([type, body]) }
-		const get = await routes.dispatch('GET', '/api/server/duties', '', ctx)
-		assert.equal(get.status, 200)
-		assert.deepEqual(JSON.parse(get.body), Object.fromEntries(ALL.map((n) => [n, true])))
-		const post = await routes.dispatch(
-			'POST',
-			'/api/server/duties',
-			JSON.stringify({ patch: { presenters: false } }),
-			ctx
-		)
-		assert.equal(post.status, 200)
-		assert.equal(JSON.parse(post.body).presenters, false)
-		assert.deepEqual(sent, [['server:duties', JSON.parse(post.body)]])
-		assert.equal(JSON.parse((await routes.dispatch('GET', '/api/server/duties', '', ctx)).body).presenters, false)
-		for (const body of ['{}', JSON.stringify({ patch: { nope: true } }), JSON.stringify({ patch: { ptz: 'x' } })]) {
-			const r = await routes.dispatch('POST', '/api/server/duties', body, ctx)
-			assert.equal(r.status, 400, body)
-			assert.ok(JSON.parse(r.body).error)
-		}
-		assert.equal(sent.length, 1, 'a refused patch broadcasts nothing')
-		duties.set({ presenters: true })
+	it('the duties routes stay registered ahead of Caspar\'s /api/server/* wildcard', () => {
 		const router = fs.readFileSync(path.join(__dirname, '../../src/api/router.js'), 'utf8')
 		assert.match(router, /require\('\.\/routes-server-duties'\)\.register\(routes\)/)
 		// the router matches in registration order: Caspar's `/api/server/*` wildcard swallowed /api/server/duties (404 on the
@@ -118,14 +50,15 @@ describe('WO-712 R1 routes, ping and the cluster view', () => {
 
 	it('/api/replication/ping carries duties', async () => {
 		const { handleGet } = require('../../src/api/routes-replication-get')
-		duties.set({ zones: false })
+		duties.set({ accept_remote: false })
 		try {
 			const r = await handleGet('/api/replication/ping', { config: {} }, null)
 			const body = JSON.parse(r.body)
-			assert.equal(body.duties.zones, false)
-			assert.equal(body.duties.lighting, true)
+			assert.equal(body.duties.accept_remote, false)
+			assert.equal(body.duties.lighting, true, 'a single box resolves everything on')
+			assert.equal(typeof body.duties.tracking, 'boolean', 'WO-723: peers read `tracking`')
 		} finally {
-			duties.set({ zones: true })
+			duties.set({ accept_remote: true })
 		}
 	})
 
@@ -229,7 +162,7 @@ describe('WO-712 R1 gates', () => {
 		}
 	})
 
-	it('detection off: wanted() is false (sidecar not spawned, stopped when ticked off), status says why', async () => {
+	it('WO-723: detection has no duty gate — it runs on its config and offers that check as `tracking`', async () => {
 		const { createDetectService } = require('../../src/tracking/detect-service')
 		const CAM = { pos_x: 0, pos_y: -10, pos_z: 5, pitch: -20, yaw: 0, roll: 0, fov: 60, lens_k1: 0, lens_k2: 0 }
 		const project = {
@@ -268,27 +201,28 @@ describe('WO-712 R1 gates', () => {
 					duties: d,
 				}
 			)
-		const off = mk({ detection: false })
-		const a = mkSvc(off.d)
+		const provided = []
+		let refreshed = 0
+		const d = { ...mk({ detection: false, tracking: false }).d, provide: (p) => void provided.push(p), refresh: () => void refreshed++ }
+		const a = mkSvc(d)
 		try {
-			assert.equal(spawned.length, 0, 'duty off at boot: no sidecar')
+			assert.equal(spawned.length, 1, 'a resolved-off `detection` no longer stops it: the config wants it')
 			const st = a.status()
-			assert.equal(st.off_by_duties, true)
-			assert.match(st.error, /detection is off for this server/)
-			assert.equal(a.snapshot().running, false)
-			off.d.set({ detection: true })
-			assert.equal(spawned.length, 1, 'ticked on: the sidecar starts')
-			assert.equal(a.status().off_by_duties, false)
-			off.d.set({ detection: false })
-			assert.deepEqual(killed, ['SIGTERM'], 'ticked off: the sidecar stops')
+			assert.equal('off_by_duties' in a.snapshot(), false)
+			assert.doesNotMatch(String(st.error), /off for this server/)
+			assert.equal(provided.length, 1)
+			assert.equal(provided[0].tracking(), true, '`tracking` = detection on + a camera')
+			assert.ok(refreshed >= 1, 'a project change re-resolves the duties')
 		} finally {
 			a.stop()
 		}
-		const on = mkSvc(mk().d)
+		assert.equal(provided[0].tracking(), false, 'a stopped service does no tracking')
+		const none = mkSvc({ ...mk().d, provide: (p) => void provided.push(p) })
 		try {
-			assert.equal(spawned.length, 2, 'control: the default duty starts the sidecar')
+			none.stop()
+			assert.equal(spawned.length, 2)
 		} finally {
-			on.stop()
+			none.stop()
 		}
 	})
 
@@ -338,7 +272,7 @@ describe('WO-712 R1 gates', () => {
 		assert.equal(off.snap.zones[0].occupied, true, 'occupancy still shown')
 		assert.equal(off.snap.actions_off, true)
 		assert.equal(off.st.recent[0].kind, 'first_entry')
-		assert.match(off.st.recent[0].detail, /zone actions are off for this server/)
+		assert.match(off.st.recent[0].detail, /zone actions are off on this server \(a linked server does tracking\)/)
 	})
 
 	it('ptz not allowed: step() sends nothing; allowed again, it sends', () => {

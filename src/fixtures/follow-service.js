@@ -10,8 +10,9 @@
  * WO-615 T4: typed fixtures resolve their GDTF mode through gdtf-store.js (reload() after an import / delete);
  * sACN goes out through the same socket and is refused on the box's own input universe when it would land here
  * (multicast, or unicast to a local address on :5568).
- * WO-712 R1: with this server's `lighting` duty off (src/cluster/server-duties.js) nothing is transmitted — Art-Net, sACN and
- * PSN all stop at the sender — while the engine keeps computing aims, so the previs beams and status still work.
+ * WO-712 R1 / WO-723: while another linked server is the one that sends lighting (`lighting` resolved off by
+ * src/cluster/server-duties.js from the "Sent by" choice) nothing is transmitted — Art-Net, sACN and PSN all stop at
+ * the sender — while the engine keeps computing aims, so the previs beams and status still work.
  */
 
 const os = require('os')
@@ -185,7 +186,7 @@ function createFollowService(ctx, hub, deps = {}) {
 			...engine.status(),
 			packets_sent: sender.sent,
 			send_errors: sender.errors,
-			output_blocked: lightingOn() ? null : 'server-duties', // WO-712: this server's settings keep DMX / PSN off the wire
+			output_blocked: lightingOn() ? null : 'server-duties', // WO-723: another linked server sends (Tracking → Follow "Sent by")
 			packets_blocked: blocked,
 			psn: { ...psn.status(), interfaces: ipv4Addresses() },
 			console: consoleFrames.status(),

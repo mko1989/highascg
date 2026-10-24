@@ -139,6 +139,7 @@ function createCluster(opts) {
 		return {
 			...saved,
 			identity: !!key,
+			fp: key ? require('./cluster-media').fingerprint(key) : '', // WO-723: the id a sender choice names
 			online: p.live.online,
 			last_seen: p.live.last_seen || null,
 			hostname: p.live.hostname || '',

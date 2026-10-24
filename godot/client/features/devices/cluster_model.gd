@@ -5,18 +5,9 @@ extends RefCounted
 
 const PARITY := {"same": "media ✓", "differs": "media differs", "other-show": "other show", "unknown": "media ?"}
 
-## WO-712 R1 — what a server can be set to do (server src/cluster/server-duties.js names). `label` is the tick box in
-## "This server does"; `short` is its word in a linked server's "Does:" line. The first six are what the line lists;
-## `accept_remote` is a different kind of tick and is worded separately. Not "Roles": that is backup / extension above.
-const DUTIES := [
-	{"id": "detection", "label": "Detection", "short": "Detection", "tip": "Run the person-detection sidecar on this server's cameras."},
-	{"id": "zones", "label": "Zones & automations", "short": "Zones", "tip": "Fire zone actions (look, Companion, presenter) on this server. Occupancy is still shown when off."},
-	{"id": "auto", "label": "Auto follow", "short": "Auto follow", "tip": "Run the Auto director (who each light and camera follows) on this server."},
-	{"id": "lighting", "label": "Lighting out (DMX / PSN)", "short": "Lighting out", "tip": "Transmit Art-Net, sACN and PSN from this server. Off: the previs beams still move, nothing leaves the box."},
-	{"id": "ptz", "label": "PTZ out", "short": "PTZ out", "tip": "Send VISCA to the PTZ cameras from this server."},
-	{"id": "presenters", "label": "Presenter intake", "short": "Presenters", "tip": "Take new presenters (the phone page) on this server."},
-	{"id": "accept_remote", "label": "Accept remote actions", "short": "Accepts remote", "tip": "Let a linked server press things on this one, like a local operator. Remote presses are refused while off (WO-712 R2)."},
-]
+## WO-723 — what a linked server's "Does:" line names, from its ping `duties` (resolved from its config and the links
+## by server src/cluster/server-duties.js — never ticked). Media is not listed: that is the destinations above.
+const DOES := [["tracking", "tracking"], ["lighting", "lights out"], ["ptz", "PTZ out"]]
 
 
 ## destination id → its label, for every destination cabled in this device-view payload.
@@ -71,23 +62,58 @@ static func facts(p: Dictionary) -> String:
 	return " · ".join(PackedStringArray(bits))
 
 
-## WO-712 R1 — the one line on a linked server's card from its ping `duties` ("" when it sent none: an older server).
+## WO-723 — the one line on a linked server's card ("" from an older server: its duties carry no `tracking`, they
+## were WO-712 R1 ticks, not what it does).
 static func does_text(duties: Variant) -> String:
-	if not duties is Dictionary:
+	if not duties is Dictionary or not (duties as Dictionary).has("tracking"):
 		return ""
-	var on := PackedStringArray()
-	var all := true
-	for d in DUTIES:
-		if d.id == "accept_remote":
-			continue
-		if duties.get(d.id, true) == true:
-			on.append(str(d.short))
-		else:
-			all = false
-	var text := "Does: everything" if all else "Does: " + (" · ".join(on) if not on.is_empty() else "nothing")
+	var bits := PackedStringArray()
+	for d in DOES:
+		if duties.get(d[0]) == true:
+			bits.append(str(d[1]))
 	if duties.get("accept_remote", true) != true:
-		text += " · refuses remote actions"
-	return text
+		bits.append("refuses remote actions")
+	return "" if bits.is_empty() else "Does: " + " · ".join(bits)
+
+
+## WO-723 — the "Sent by" / "Received by" items (sender_picker.gd) from GET /api/server/senders: [{text, by, tip}],
+## Auto first (naming who Auto picks now), then every server. A server that refused the choices (an older version
+## keeps its own settings) says "not in sync". [] while no server is linked: the picker hides.
+static func sender_items(view: Variant, kind: String) -> Array:
+	var servers: Array = view.get("servers", []) if view is Dictionary and view.get("servers") is Array else []
+	if servers.size() < 2:
+		return []
+	var s := sender_of(view, kind)
+	var auto_name := str(s.get("auto_name", ""))
+	var items := [{"text": "Auto — every server" if auto_name == "*" else ("Auto — " + auto_name if auto_name != "" else "Auto"), "by": "", "tip": ""}]
+	for srv in servers:
+		if srv is Dictionary and str(srv.get("fp", "")) != "":
+			var t := str(srv.get("name", ""))
+			var tip := ""
+			if srv.get("self") == true:
+				t += " (this server)"
+			elif srv.get("online") != true:
+				t += " (offline)"
+			elif str(srv.get("refused", "")) != "":
+				t += " (not in sync)"
+				tip = "It did not take this choice (%s). An older HighAsCG keeps its own settings: update it." % str(srv.refused)
+			items.append({"text": t, "by": str(srv.fp), "tip": tip})
+	return items
+
+
+static func sender_of(view: Variant, kind: String) -> Dictionary:
+	var all: Variant = view.get("senders") if view is Dictionary else null
+	return all.get(kind) if all is Dictionary and all.get(kind) is Dictionary else {}
+
+
+## The item the choice is on (Auto when it names a server that is not listed).
+static func sender_index(view: Variant, kind: String) -> int:
+	var by := str(sender_of(view, kind).get("by", ""))
+	var items := sender_items(view, kind)
+	for i in items.size():
+		if str(items[i].by) == by:
+			return i
+	return 0
 
 
 static func sending(p: Dictionary) -> bool:

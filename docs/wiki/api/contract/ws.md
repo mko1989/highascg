@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-86 types.
+87 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -78,6 +78,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `record_stopped` | `src/api/routes-streaming-channel-log.js` |  |
 | server → clients | `replication_status` | `src/replication/replication-ui-notify.js` |  |
 | server → clients | `server:duties` | `src/api/routes-server-duties.js` |  |
+| server → clients | `server:senders` | `src/api/routes-server-duties.js` |  |
 | server → clients | `state` | `src/api/get-state.js`, `src/server/ws-server.js` |  |
 | server → clients | `streaming_channel` | `src/api/routes-streaming-channel-log.js` |  |
 | server → clients | `timeline.playback` | `index.js` |  |

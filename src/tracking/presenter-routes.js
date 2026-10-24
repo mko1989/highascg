@@ -11,8 +11,9 @@
  *   DELETE /api/tracking/presenters/<id>
  *   POST   /api/tracking/presenters/<id>/assign    { key }  (the operator's confirmation, owner D1)
  *   POST   /api/tracking/presenters/<id>/release
- * WO-712 R1: with this server's `presenters` duty off (src/cluster/server-duties.js) the phone page and POST (new intake)
- * answer 409 with a plain message; the roster, its GET and the operator's edit / assign / release stay.
+ * WO-712 R1 / WO-723: with this server's `presenters` duty resolved off (a linked server does tracking;
+ * src/cluster/server-duties.js) the phone page and POST (new intake) answer 409 with a plain message; the roster, its
+ * GET and the operator's edit / assign / release stay.
  */
 
 const fs = require('fs')
@@ -23,7 +24,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
 const BASE = '/api/tracking/presenters'
 const INTAKE = path.join(__dirname, 'presenter-intake.html')
 
-const INTAKE_OFF = 'Presenter intake is off on this server (its Devices settings: "Presenter intake"). Use the server that takes presenters.'
+const INTAKE_OFF = 'Presenter intake is off on this server: a linked server does tracking (WO-723). Use that server.'
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: JSON.stringify(obj) })
 
 function parse(body) {
