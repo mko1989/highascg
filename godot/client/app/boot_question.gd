@@ -16,7 +16,7 @@ func ask(fresh: bool) -> void:
 	await DevicesTarget.wait()
 	if not DevicesTarget.on_box():  # WO-686: the answers re-lay the BOX's screens (WO-735: also while following)
 		return
-	var api := DevicesTarget.api
+	var api := DevicesTarget.box_api
 	# WO-696: the session can start this client before the server listens; one failed GET used to skip the launcher
 	# for good while the gate (no backstop) held Caspar. Keep asking until the server answers at all (status 0 = no
 	# transport); an HTTP answer, also an error, is final.

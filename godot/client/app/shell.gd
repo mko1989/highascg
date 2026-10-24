@@ -117,7 +117,7 @@ func _ready() -> void:
 ## whose client follows another server keeps its dock.
 func _add_dock() -> void:
 	await DevicesTarget.wait()
-	if DockModel.wanted(DevicesTarget.origin(), Config.args):
+	if DockModel.wanted(DevicesTarget.box_origin(), Config.args):
 		var dock := OperatorDock.new()
 		dock.notice.connect(header_project.say)
 		add_child(dock)
@@ -211,7 +211,7 @@ func _watch_invites(devices: Control) -> void:
 		if not DevicesTarget.remote:  # following another server: its WS is not this machine's
 			title.call(d))
 	Ws.connected.connect(func() -> void:
-		var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster")
+		var r: Dictionary = await DevicesTarget.box_api.get_json("/api/cluster")
 		if r.ok:
 			title.call(r.data))
 

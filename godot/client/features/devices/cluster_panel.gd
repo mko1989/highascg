@@ -13,11 +13,14 @@ extends VBoxContainer
 ## PGM follows the master.
 ## WO-739: a server asking to link with this one shows on top as an invite (Accept / Decline). A server this one linked
 ## that has not accepted yet says so on its card. Auto-accept is on the Devices server page.
+## WO-732 P3b: "Edit" on a card points the whole Devices tab at that server (core/devices_target.gd edit_peer): its
+## rear panel, cables, destinations and Apply, sent straight to it. "Back to this machine" returns.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const DTM := preload("res://core/devices_target_model.gd")
 
 var _snap := {}
 var _views := {}  # peer id → its device-view payload
@@ -40,6 +43,8 @@ var _remove: ConfirmationDialog
 var _remove_id := ""
 var _send_err := {}  # peer id → why the last Send was refused (cleared by the next Send)
 var _inv_err := {}  # WO-739: invite id → why Accept / Decline failed
+var _back: Button  # WO-732 P3b
+var _edit_err := ""
 var _sig := ""
 
 
@@ -58,6 +63,11 @@ func _ready() -> void:
 	_self_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	head.add_child(_self_l)
 	add_child(head)
+	_back = Button.new()  # WO-732 P3b: only while the tab edits a linked server
+	_back.visible = false
+	_back.pressed.connect(func() -> void: DevicesTarget.stop_editing())
+	add_child(_back)
+	DevicesTarget.target_changed.connect(reload)
 	_build_master_row()
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var scroll := ScrollContainer.new()  # the rest of the column's height: more servers scroll, the window never grows
@@ -75,7 +85,7 @@ func _ready() -> void:
 		reload())
 	add_child(_remove)
 	Ws.on("cluster:peers", func(d: Variant) -> void:
-		if d is Dictionary and not DevicesTarget.remote:  # remote: that is the followed server's view, not this machine's
+		if d is Dictionary and not DevicesTarget.polled():  # that is the connected server's view, not the target's
 			_snap = d
 			if is_visible_in_tree():
 				_render())
@@ -85,7 +95,7 @@ func _ready() -> void:
 	var poll := Timer.new()  # WO-732 P3a: this machine's server pushes nothing to a client that follows another
 	poll.wait_time = DevicesTarget.POLL_S
 	poll.timeout.connect(func() -> void:
-		if DevicesTarget.remote and is_visible_in_tree():
+		if DevicesTarget.polled() and is_visible_in_tree():
 			_poll())
 	add_child(poll)
 	poll.start()
@@ -115,7 +125,10 @@ func _render() -> void:
 		return
 	_sig = sig
 	var me: Dictionary = _snap.get("self", {}) if _snap.get("self") is Dictionary else {}
-	_self_l.text = "This server: %s · %s" % [str(me.get("hostname", "?")), str(me.get("version", ""))] if not me.is_empty() else ""
+	_self_l.text = "%s: %s · %s" % ["Editing" if DevicesTarget.editing != "" else "This server", str(me.get("hostname", "?")),
+		str(me.get("version", ""))] if not me.is_empty() else ""
+	_back.visible = DevicesTarget.editing != ""
+	_back.text = "◀ Back to this machine (now editing %s)" % DevicesTarget.editing_name
 	var ms: Dictionary = _master()
 	_master_row.visible = not _snap.get("peers", []).is_empty()
 	_master_l.text = M.master_line(ms)
@@ -133,6 +146,8 @@ func _render() -> void:
 		if inv is Dictionary:
 			_list.add_child(_invite(inv))
 	var peers: Array = _snap.get("peers", [])
+	if _edit_err != "":
+		_list.add_child(_small(_edit_err, ThemeBuilder.ERROR))
 	if peers.is_empty() and invites.is_empty():
 		_list.add_child(_small("No linked servers. Click + to add one (a backup, or a server for more screens).", ThemeBuilder.TEXT_MUTED))
 	for p in peers:
@@ -165,6 +180,17 @@ func _card(p: Dictionary) -> Control:
 	send.tooltip_text = "Copy this project's media to %s now (rsync)." % str(p.get("name", id))
 	send.pressed.connect(func() -> void: _send(id))
 	top.add_child(send)
+	var at := DTM.peer_origin(p)
+	if at != "" and p.get("online") == true:  # WO-732 P3b
+		var ed := Button.new()
+		ed.text = "Edit"
+		ed.tooltip_text = "Work on %s's rear panel, cables and destinations from here" % str(p.get("name", id))
+		ed.pressed.connect(func() -> void:
+			_edit_err = await DevicesTarget.edit_peer(at, str(p.get("name", id)))
+			if _edit_err != "":
+				_sig = ""
+				_render())
+		top.add_child(ed)
 	if not M.is_master(_master(), id) and p.get("online") == true and p.get("identity") == true:
 		var mk := Button.new()
 		mk.text = "Make master"

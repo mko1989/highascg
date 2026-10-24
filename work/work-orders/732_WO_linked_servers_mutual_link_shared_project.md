@@ -1,6 +1,6 @@
 # WO-732 — Linked servers that work as one: mutual link, one shared project, cable the other server from here
 
-**Status: IN PROGRESS — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P3a (Devices shows this machine) DONE 24.10.26 (Godot tests + live: this box's kiosk unchanged, a client following .4 showed this machine on top); P2, P3b open.**
+**Status: DONE (24.10.26; P2 moved to WO-746) — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P3a (Devices shows this machine) DONE 24.10.26 (Godot tests + live: this box's kiosk unchanged, a client following .4 showed this machine on top); P3b (edit any linked server from here) DONE 24.10.26 (Godot tests + live Edit / Back on .4 from a client following .4); P2 (shared project) → [WO-746](./746_WO_shared_project_across_linked_servers.md): it replaces the show on both boxes, so the owner says when.**
 
 Owner, 24.10: *"i cant establish a meaningful connection between servers and connect screen destinations etc. my
 thinking is that when connected they both show up in each other's devices and can have connections made etc."*
@@ -226,3 +226,66 @@ the very objects used before.
     that display.
   - Seeing it there = owner QA, or the next session once the upgrade is done.
 - Not done: other servers' cards stay read-only (P3b: edit any linked server from here).
+
+## P3b — edit any linked server from here (24.10)
+
+### Investigation
+
+- Each server's Devices data (`/api/device-view`, `/api/device-graph`, cables, destinations, Apply) is the ordinary
+  HTTP API on port 4200. The same calls a client connected to that server makes work from here, so no new server
+  route and no signed call are needed. The plan's "signed call" (P3) would have duplicated every Devices route.
+- WO-732 P3a already sends every Devices request through `DevicesTarget.api` / `settings` / `value()`. Pointing those at
+  another server points the whole tab at it.
+- Pointing **all** of `DevicesTarget` at the peer would be wrong. It also serves box-local features that must stay on
+  this machine:
+  - `updates_pane.gd` (an install would go to the peer);
+  - `operator_dock.gd` / `operator_dock_menu.gd` (the dock window lives on this box's X);
+  - `boot_question.gd` (start-up question);
+  - `shell.gd:120` (dock wanted);
+  - `shell.gd:214` (cluster invite check).
+- A pending cable gesture (selected edge, undo, restart flag) belongs to the server it was drawn on. Kept across a
+  switch, an undo would land on the other server.
+
+### What was done
+
+- `core/devices_target.gd`:
+  - `box_api` / `box_origin()` = the old `api` / `origin()` (this machine). `api`, `settings`, `value()` and `origin()`
+    return the edited server's while `editing != ""`.
+  - `edit_peer(origin, name)`:
+    - probes `/api/replication/ping` (appId `highascg`), so a peer this client cannot reach says so on the card and
+      nothing switches;
+    - then creates its own ApiClient and Settings copy, prints `[devices] editing …` and emits `target_changed`.
+  - `stop_editing()` frees them and emits `target_changed`.
+  - `polled()`: the edited server's WS does not reach this client, so its views are polled (as P3a's remote case).
+- `core/devices_target_model.gd`: `peer_origin(peer)` → `http://host:port` from a cluster peer (default 4200, IPv6
+  bracketed, "" for an empty or malformed host).
+- Box-local files repointed to `box_api` / `box_origin()`: the 4 files above and `shell.gd` lines 120 and 214.
+- `features/devices/cluster_panel.gd`:
+  - an **Edit** button on each online peer card with a known origin;
+  - the self label reads `Editing: <name>` while editing;
+  - a **◀ Back to this machine (now editing X)** button;
+  - reloads on `target_changed`.
+- `features/devices/devices_tab.gd`: on `target_changed`, `_gesture.forget()` then `refresh()`.
+  `cable_gesture.gd` `forget()` drops the selection, the undo and the restart flag.
+
+### What was VERIFIED
+
+- Godot 21632 passed, 0 failed. `test_devices_target.gd`:
+  - `test_edit_linked_server`: `peer_origin` rules; `api` / `origin()` follow `editing`, `box_api` / `box_origin()` do
+    not; Back restores.
+  - A source pin: the box-local files contain neither `DevicesTarget.api` nor `DevicesTarget.origin()`. Mutation:
+    `updates_pane.gd` back to `DevicesTarget.api` → the pin fails (restored).
+- `--check` boot OK.
+- **Live:** a second client on this box under Xvfb (`:377`, own user dir), following .4. This is the hardest case: the
+  connected server, this machine and the edited server are three different targets.
+  - Devices tab: this machine on top (`This server: highascg7580`, Operator GUI → DP-5), .4's card with **Edit**.
+  - **Edit** → log `[devices] editing highascg5867 (http://192.168.0.4:4200)`. The tab showed .4's rear panel and
+    cable (Operator GUI → HDMI-0), `Editing: highascg5867 · 2026-10-24T195734Z` and the Back button. Its server list
+    showed this box (`highascg7580`) with its own Edit.
+  - **Back** → this machine again (DP-5 cable, `This server: highascg7580`).
+  - No SCRIPT ERROR in the log.
+  - No cable was changed on .4 (its show is live), so a cable drawn while editing is owner QA. It uses the same calls
+    as a client connected to .4.
+- Not done: **P2 (one shared project pushed to every linked server)**, now [WO-746](./746_WO_shared_project_across_linked_servers.md). It would replace the show on the live box and
+  on .4, so the owner decides whether and when. Until then destinations still differ per server, but each one can now
+  be cabled from any client.

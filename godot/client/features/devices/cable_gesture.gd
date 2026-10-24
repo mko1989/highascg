@@ -100,6 +100,15 @@ func cancel() -> bool:
 	return true
 
 
+## WO-732 P3b: the Devices tab switched server — an open gesture, the selection, undo and the restart flag belong to
+## the server they were made on.
+func forget() -> void:
+	selected_edge = ""
+	_undo.clear()
+	restart_dirty = false
+	_clear()
+
+
 func _clear() -> void:
 	source_id = ""
 	source_half = ""

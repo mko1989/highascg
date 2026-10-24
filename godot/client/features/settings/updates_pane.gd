@@ -64,8 +64,8 @@ func _ready() -> void:
 
 func refresh(force: bool) -> void:
 	_check.text = "Loading…"
-	var ver: Dictionary = await DevicesTarget.api.get_json("/api/system/version")
-	var chk: Dictionary = await DevicesTarget.api.get_json("/api/system/update/check" + ("?force=1" if force else ""))
+	var ver: Dictionary = await DevicesTarget.box_api.get_json("/api/system/version")
+	var chk: Dictionary = await DevicesTarget.box_api.get_json("/api/system/update/check" + ("?force=1" if force else ""))
 	var v: Dictionary = ver.data if ver.ok and ver.data is Dictionary else {}
 	_stamp.text = U.stamp(v) if ver.ok else "(version unavailable: %s)" % str(ver.error)
 	_volumes.text = U.volumes(v)
@@ -73,7 +73,7 @@ func refresh(force: bool) -> void:
 	_check.text = U.check_line(c)
 	_check.tooltip_text = str(c.get("releaseUrl", ""))
 	_apply.disabled = not U.can_apply(c) or not _poll.is_stopped()
-	var st: Dictionary = await DevicesTarget.api.get_json("/api/system/update/status")
+	var st: Dictionary = await DevicesTarget.box_api.get_json("/api/system/update/status")
 	if st.ok and st.data is Dictionary and (st.data.get("active") == true or (st.data.get("done") == true and st.data.get("log") is Array)):
 		_show_log(st.data)
 		if st.data.get("active") == true:
@@ -84,7 +84,7 @@ func _install() -> void:
 	_apply.disabled = true
 	_log.visible = true
 	_log.text = "Starting update…"
-	var res: Dictionary = await NuclearGate.post(self, "/api/system/update/apply", {"confirm": true}, DevicesTarget.api)
+	var res: Dictionary = await NuclearGate.post(self, "/api/system/update/apply", {"confirm": true}, DevicesTarget.box_api)
 	if not res.ok:
 		_log.text = "Update not started: %s" % str(res.error)
 		_apply.disabled = false
@@ -95,7 +95,7 @@ func _install() -> void:
 ## The install hands off to a unit that stops and restarts this server ("detached"): keep polling through the gap
 ## and refresh once the new server answers (it has no job of its own), rather than asking a server that is going away.
 func _poll_status() -> void:
-	var st: Dictionary = await DevicesTarget.api.get_json("/api/system/update/status")
+	var st: Dictionary = await DevicesTarget.box_api.get_json("/api/system/update/status")
 	if _restart_polls >= 0:
 		_restart_polls += 1
 		match U.restart_step(st, _restart_polls * _poll.wait_time, RESTART_WAIT_S):
