@@ -201,7 +201,7 @@ Verdict:
   - some are non-commercial only (snes9x, for one), which matters on a box used for paid shows;
   - ROMs are the operator's own files; nothing is bundled.
 - **Size:** small once §7 exists. The GDExtension host is a few hundred lines; the libretro API is about 30 calls.
-- Not started. Depends on §7 (the shm producer) and on the Godot writer that §7's build order step 2 makes.
+- Built later the same day as [WO-745](./745_WO_retro_game_source_libretro.md) (detachable), on top of WO-742/743/744.
 
 ## What was done
 

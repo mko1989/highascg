@@ -1,0 +1,15 @@
+; WO-745 — RetroHost (a libretro core in Godot: godot/retro/, the operator's game window). Installed into
+; godot/retro/addons/retrohost/ by godot/retro/install.sh; built per machine, not committed.
+[configuration]
+
+entry_symbol = "retrohost_library_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+
+linux.debug.x86_64 = "res://addons/retrohost/bin/libretrohost.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/retrohost/bin/libretrohost.linux.template_release.x86_64.so"
+macos.debug.x86_64 = "res://addons/retrohost/bin/libretrohost.macos.template_debug.x86_64.dylib"
+macos.release.x86_64 = "res://addons/retrohost/bin/libretrohost.macos.template_release.x86_64.dylib"
+macos.debug.arm64 = "res://addons/retrohost/bin/libretrohost.macos.template_debug.arm64.dylib"
+macos.release.arm64 = "res://addons/retrohost/bin/libretrohost.macos.template_release.arm64.dylib"

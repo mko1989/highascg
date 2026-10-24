@@ -86,6 +86,8 @@ Thumbs.db
 
 // WO-596: per-machine GDExtension build trees (binaries already skipped via "bin")
 /godot/extensions/hshm/build
+// WO-745: per-machine builds copied into the retro project by godot/retro/install.sh
+/godot/retro/addons
 
 // WO-686: Godot client exports (godot/export-client.sh) — per machine, hundreds of MB.
 // MIRROR THIS LINE ON THE MAC (.stignore does not sync).

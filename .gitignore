@@ -155,3 +155,6 @@ godot/client/**/*.uid
 godot/extensions/*/bin/
 godot/extensions/*/build/
 godot/**/addons/hshm/bin/
+# WO-745: godot/retro/install.sh copies the per-machine RetroHost + HshmSink builds into the retro project
+godot/retro/addons/
+godot/retro/**/*.uid

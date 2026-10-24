@@ -61,3 +61,27 @@ if(HSHM_SINK)
         target_link_libraries(hshm_sink PRIVATE rt)
     endif()
 endif()
+
+# WO-745 — RetroHost (a libretro core inside Godot, godot/retro/) as its OWN library. libretro.h (MIT, ~7800 lines) is
+# fetched into the build tree from a pinned RetroArch tag and checked by hash, not vendored. Remove this block and
+# src/retro/ to detach it.
+option(HSHM_RETRO "Build libretrohost (WO-745)" ON)
+if(HSHM_RETRO)
+    set(RETRO_H "${CMAKE_BINARY_DIR}/retro_include/libretro.h")
+    if(NOT EXISTS "${RETRO_H}")
+        file(DOWNLOAD "https://raw.githubusercontent.com/libretro/RetroArch/v1.19.1/libretro-common/include/libretro.h"
+            "${RETRO_H}" EXPECTED_HASH SHA256=a508b75e5deddd01272bb702b7a52239afefe50b861f544eb64eb11e91fab5fb TLS_VERIFY ON)
+    endif()
+    add_library(retrohost SHARED src/retro/retro_host.cpp src/retro/retro_host.h src/retro/retro_register.cpp)
+    target_include_directories(retrohost PRIVATE src/retro "${CMAKE_BINARY_DIR}/retro_include")
+    target_link_libraries(retrohost PRIVATE godot-cpp ${CMAKE_DL_LIBS})
+    set_target_properties(retrohost PROPERTIES
+        CXX_STANDARD 17
+        CXX_EXTENSIONS OFF
+        CXX_VISIBILITY_PRESET hidden
+        POSITION_INDEPENDENT_CODE ON
+        PREFIX "lib"
+        OUTPUT_NAME "retrohost${GODOTCPP_SUFFIX}"
+        LIBRARY_OUTPUT_DIRECTORY "$<1:${CMAKE_CURRENT_SOURCE_DIR}/bin>"
+        RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_CURRENT_SOURCE_DIR}/bin>")
+endif()
