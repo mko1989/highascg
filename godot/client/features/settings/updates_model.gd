@@ -45,6 +45,14 @@ static func status_log(st: Dictionary) -> String:
 	return "\n".join(lines)
 
 
+## WO-737 — polling while the server restarts after a detached install: "back" once a server with no job of its own
+## answers (the new process), "gave_up" past the wait, otherwise "wait" (the old one still answering, or none at all).
+static func restart_step(st: Dictionary, waited_s: float, limit_s: float) -> String:
+	if st.get("ok") == true and st.get("data") is Dictionary and (st.data as Dictionary).get("phase") == null:
+		return "back"
+	return "gave_up" if waited_s > limit_s else "wait"
+
+
 static func _or_dash(v: Variant) -> String:
 	return "—" if _s(v) == "" else str(v)
 

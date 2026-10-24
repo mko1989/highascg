@@ -66,6 +66,9 @@ func test_api_parse_response() -> void:
 	t.eq(empty.data, null)
 	var transport := NetUtil.parse_response(HTTPRequest.RESULT_CANT_CONNECT, 0, PackedByteArray())
 	t.ok(not transport.ok)
+	t.eq(transport.error, "server not reachable (restarting or offline)")  # WO-737: words, not "transport error 2"
+	t.eq(NetUtil.transport_error(HTTPRequest.RESULT_TIMEOUT), "server did not answer in time")
+	t.eq(NetUtil.transport_error(HTTPRequest.RESULT_BODY_SIZE_LIMIT_EXCEEDED), "network error (HTTP request result %d)" % HTTPRequest.RESULT_BODY_SIZE_LIMIT_EXCEEDED)
 
 
 func test_settings_deep_merge() -> void:

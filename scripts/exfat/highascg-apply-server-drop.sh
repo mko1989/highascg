@@ -163,6 +163,11 @@ apply_server_drop() {
 		log "refusing to apply invalid drop at ${src}/"
 		return 1
 	fi
+	# WO-737: a git checkout (the development box) is updated with git; a drop would land on its working tree.
+	if [[ -e "${dest}/.git" ]]; then
+		log "refusing: ${dest}/ is a git checkout — update it with git"
+		return 1
+	fi
 
 	local src_stamp
 	src_stamp="$(read_build_stamp "$src" 2>/dev/null || date -u +%Y%m%dT%H%M%SZ)"
@@ -192,7 +197,12 @@ apply_server_drop() {
 	rsync "${xtra[@]}" -rlptgoD --delete "${src%/}/" "${staging%/}/"
 	log "merge ${staging}/ → ${dest}/ (no --delete — preserves bin/, lib/, …)"
 	mkdir -p "$dest"
-	rsync "${xtra[@]}" -rlptgoD "${staging%/}/" "${dest%/}/"
+	# WO-737: config/*.json is the box's own setup (destinations, device graph, Caspar settings). A drop's copies are
+	# factory files: they fill in a file the box does not have yet and never replace one it has.
+	rsync "${xtra[@]}" --exclude='/config/*.json' -rlptgoD "${staging%/}/" "${dest%/}/"
+	if [[ -d "${staging}/config" ]]; then
+		rsync -rlptgoD --ignore-existing --include='*.json' --exclude='*' "${staging%/}/config/" "${dest%/}/config/"
+	fi
 	rm -rf "$staging"
 	chown -R "${user_name}:${grp}" "${dest%/}" || true
 

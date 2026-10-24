@@ -59,6 +59,19 @@ func test_attachment_name() -> void:
 	t.eq(M.attachment_name(PackedStringArray(), "x.zip"), "x.zip")
 
 
+## WO-737 — after a detached install the pane waits through the restart: the old server (job "detached") and no
+## server at all are "wait"; the new server (no job) is "back"; past the limit, "gave_up".
+func test_updates_restart_wait() -> void:
+	var U := preload("res://features/settings/updates_model.gd")
+	var old := {"ok": true, "data": {"active": false, "phase": "detached", "ok": true}}
+	var down := {"ok": false, "status": 0, "data": null, "error": "server not reachable (restarting or offline)"}
+	var fresh := {"ok": true, "data": {"active": false}}
+	t.eq(U.restart_step(old, 3.0, 180), "wait")
+	t.eq(U.restart_step(down, 30.0, 180), "wait")
+	t.eq(U.restart_step(fresh, 45.0, 180), "back")
+	t.eq(U.restart_step(down, 181.5, 180), "gave_up")
+
+
 func test_updates_texts() -> void:
 	var U := preload("res://features/settings/updates_model.gd")
 	var ver := {"buildStamp": "2026.05.20", "retainDrop": true, "volumes": {"usb": {"mounted": false},

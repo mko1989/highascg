@@ -11,10 +11,22 @@ static func reconnect_delay_ms(attempt: int, base_ms := 1000, max_ms := 30000, j
 	return exp_ms + jitter
 
 
+## WO-737 — a failed HTTPRequest in words; the bare "transport error 2" told the operator nothing.
+static func transport_error(result: int) -> String:
+	match result:
+		HTTPRequest.RESULT_CANT_CONNECT, HTTPRequest.RESULT_CONNECTION_ERROR, HTTPRequest.RESULT_NO_RESPONSE:
+			return "server not reachable (restarting or offline)"
+		HTTPRequest.RESULT_CANT_RESOLVE:
+			return "server address not found"
+		HTTPRequest.RESULT_TIMEOUT:
+			return "server did not answer in time"
+	return "network error (HTTP request result %d)" % result
+
+
 ## HTTPRequest result → { ok, status, data, error, reason } (client/lib/api-client.js error shape).
 static func parse_response(result: int, status: int, body: PackedByteArray) -> Dictionary:
 	if result != HTTPRequest.RESULT_SUCCESS:
-		return {"ok": false, "status": status, "data": null, "error": "transport error %d" % result, "reason": ""}
+		return {"ok": false, "status": status, "data": null, "error": transport_error(result), "reason": ""}
 	var data: Variant = null
 	var text := body.get_string_from_utf8()
 	if text.strip_edges() != "":

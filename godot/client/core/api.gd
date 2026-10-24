@@ -88,7 +88,8 @@ func get_bytes(path: String) -> Dictionary:
 	_release(r)
 	var status: int = res[1]
 	var ok: bool = res[0] == HTTPRequest.RESULT_SUCCESS and status >= 200 and status < 300
-	return {"ok": ok, "status": status, "bytes": res[3], "headers": res[2], "error": "" if ok else "HTTP %d" % status}
+	var error := "" if ok else ("HTTP %d" % status if res[0] == HTTPRequest.RESULT_SUCCESS else NetUtil.transport_error(res[0]))
+	return {"ok": ok, "status": status, "bytes": res[3], "headers": res[2], "error": error}
 
 
 func _release(r: HTTPRequest) -> void:

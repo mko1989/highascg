@@ -380,6 +380,11 @@ async function startApplyJob(opts = {}) {
 	if (applyJob && !applyJob.done) {
 		throw new Error('Update already in progress')
 	}
+	// WO-737: a git checkout (the development box) is updated with git. A release drop lands on its working tree and
+	// `npm ci --omit=dev` strips its dev tools — the 24.10 update of the dev box went that way.
+	if (fs.existsSync(path.join(REPO_ROOT, '.git'))) {
+		throw new Error('This server runs from a git checkout — update it with git, not from a release.')
+	}
 	const check = await checkForUpdate({ force: true })
 	const assetUrl = String(opts.assetUrl || check.assetUrl || '').trim()
 	const assetName = String(opts.assetName || check.assetName || '').trim()

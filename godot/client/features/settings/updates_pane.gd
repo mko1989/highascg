@@ -6,6 +6,7 @@ extends VBoxContainer
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const U := preload("res://features/settings/updates_model.gd")
 const NuclearGate := preload("res://app/nuclear_gate.gd")
+const RESTART_WAIT_S := 180
 
 var _stamp: Label
 var _volumes: Label
@@ -14,6 +15,7 @@ var _apply: Button
 var _log: TextEdit
 var _poll: Timer
 var _confirm: ConfirmationDialog
+var _restart_polls := -1  ## WO-737: polls since the install handed off and this server went down to restart; -1 = not
 
 
 func _ready() -> void:
@@ -90,12 +92,32 @@ func _install() -> void:
 	_poll.start()
 
 
+## The install hands off to a unit that stops and restarts this server ("detached"): keep polling through the gap
+## and refresh once the new server answers (it has no job of its own), rather than asking a server that is going away.
 func _poll_status() -> void:
 	var st: Dictionary = await DevicesTarget.api.get_json("/api/system/update/status")
+	if _restart_polls >= 0:
+		_restart_polls += 1
+		match U.restart_step(st, _restart_polls * _poll.wait_time, RESTART_WAIT_S):
+			"back":
+				_restart_polls = -1
+				_poll.stop()
+				_log.text += "\nServer is back."
+				refresh(true)
+			"gave_up":
+				_restart_polls = -1
+				_poll.stop()
+				_log.text += "\nThe server has not come back after %d s: %s" % [RESTART_WAIT_S, str(st.get("error", ""))]
+				_apply.disabled = false
+		return
 	if not st.ok or not (st.data is Dictionary):
-		_log.text += "\n" + str(st.error)  # the server restarts at the end of an install; keep polling
+		_log.text += "\n" + str(st.error)
 		return
 	_show_log(st.data)
+	if st.data.get("phase") == "detached":
+		_restart_polls = 0
+		_log.text += "\nWaiting for the server to restart…"
+		return
 	if st.data.get("active") != true:
 		_poll.stop()
 		if st.data.get("ok") == true:
