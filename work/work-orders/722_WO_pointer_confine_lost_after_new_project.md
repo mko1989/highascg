@@ -1,7 +1,8 @@
 # WO-722 — Pointer confine is lost after a New project and never comes back
 
-**Status: IN PROGRESS (24.10.26) — root cause proven from the journal and fixed in code (offline smokes). Live proof
-pending: this box needs a server restart (owner) and a New project; .4 gets it through the update (see VERIFIED).**
+**Status: DONE (24.10.26: offline smokes + live on .4 after release 212858Z — confine starts on the restart and an
+unrelated save leaves it alone) — replaying the New-project sequence itself = owner QA (this box after its server
+restart, or .4).**
 
 Found while working WO-721. Nobody reported it; the mouse is simply no longer held on the operator monitor.
 
@@ -84,3 +85,14 @@ Found while working WO-721. Nobody reported it; the mouse is simply no longer he
   - under `node --test` the resync runs nothing (WO-720).
 - With the existing confine smokes (WO-720, WO-397, WO-308, geometry-follow): 28/28.
 - Gates: see the commit. Live: pending (below).
+- **Live on .4** (release 212858Z installed from .4's kiosk at 23:35, WO-735):
+  - The restart: `[Pointer confine] RUN — operator_monitor_port_2`, then `XFixes barriers on HDMI-0 @ 0,0 1920x1080`.
+    The helper `confine-pointer-barriers.py HDMI-0` was running (PID 137779).
+  - An unrelated save, twice (Settings → Defaults → Loop always on, then off). 23:35:53: `subsystem recycle skipped`
+    and **no** confine line; the helper was still PID 137779. The resync stays quiet when nothing changed and the
+    last start worked.
+  - The first of those saves (23:35:50) took the full reload path, which was a separate bug, now
+    [WO-747](./747_WO_first_save_after_boot_recycles_everything.md). Its confine sync was a no-op too (same helper PID).
+- Not replayed live: New project (no operator cable) → load a project with the cable. That is the path the fix
+  changes. Its logic is the smoke's first case; seeing it on the box = owner QA. It would replace the show on either
+  box.

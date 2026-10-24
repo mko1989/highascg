@@ -1,6 +1,6 @@
 # WO-735 — A server box whose kiosk follows the master: start-up question, dock and Updates work on the box itself; releases carry the Godot client
 
-**Status: IN PROGRESS — code, Godot tests 21510/0, live dock check and release `2026-10-24_174730` done (.4 sees it); owner's first .4 update from a client pointed at .4 pending**
+**Status: DONE (24.10.26, live on .4: its own kiosk's Settings → Updates installed release 212858Z on .4 itself; the dock and Caspar came up on 195734Z) — the follower-mode start-up question after a reboot = owner QA**
 
 Owner, 24.10, after the .4 upgrade to Ubuntu 26.04: *"lets run full tests to see if its any different"*, then *"the dock
 didn't show up on the .4"* and *"create a realese so the .4 can be upgraded via github from client"*.
@@ -72,3 +72,14 @@ on a follower box. That is the wider "Settings on a follower" question and is le
 - Pending owner: the first update of .4 from a client **connected to .4**. .4's running kiosk is still the old client,
   so its own Updates pane would target the master. After the update, restart .4's kiosk (or reboot). Expected: the
   launcher appears, Caspar starts on the answer, the dock appears.
+- **24.10, 23:34, the update from .4's own kiosk** (this was the open step). Driven with xdotool on .4 `:0`; config
+  backed up first (`~/backups/config-pre-update-20261024-230728.tgz` on .4).
+  - Settings → Updates showed **.4's** version (`2026-10-24T195734Z`), not the master's, and offered `212858Z`.
+  - Install latest release → confirm → `HIGHASCG_UPDATE_DETACHED unit=highascg-update-20261024T213509Z`. The log
+    ends `web UI update complete`. `highascg` was active again at 23:35:12 and `/api/replication/ping` reports
+    `appVersion 2026-10-24T212858Z`.
+  - Caspar running, the kiosk alive. The release also delivered WO-722, WO-732 P3b, WO-741 and WO-747 (cf836104 is
+    in the next one).
+  - The dock and the box-local start-up wiring were already seen live on 195734Z (dock window present, Caspar
+    started).
+- Owner QA: the start-up question on a reboot while .4's kiosk follows the master.
