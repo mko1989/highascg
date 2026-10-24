@@ -39,9 +39,14 @@ sequence:
 
 /** Run fix-calamares-shellprocess.sh for real on a temp root (only its "must be root" guard is cut). */
 function runFix(rootDir) {
-	const src = read('tools/eggs/live-usb/fix-calamares-shellprocess.sh').replace(/^\[\[ "\$\(id -u\)" -eq 0 \]\] \|\| \{\n[\s\S]*?\n\}\n/m, '')
-	assert.ok(!src.includes('id -u'), 'the root guard is the only thing removed')
-	// stdin script: BASH_SOURCE is empty, so HERE resolves to the cwd — the real helper directory.
+	const HERE = 'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
+	const src = read('tools/eggs/live-usb/fix-calamares-shellprocess.sh')
+		.replace(/^\[\[ "\$\(id -u\)" -eq 0 \]\] \|\| \{\n[\s\S]*?\n\}\n/m, '')
+		.replace(HERE, 'HERE="$(pwd)"')
+	assert.ok(!src.includes('id -u'), 'the root guard is removed')
+	// stdin script: HERE is the cwd — the real helper directory. Bash 5.3 (Ubuntu 26.04) treats BASH_SOURCE[0] of a
+	// stdin script as unbound under set -u (5.2 gave ""), so the HERE line is pinned to the cwd explicitly.
+	assert.ok(src.includes('HERE="$(pwd)"'), 'the HERE line was found')
 	return cp.execFileSync('bash', ['-s'], { cwd: LIVE_USB, input: src, encoding: 'utf8', env: { ...process.env, HIGHASCG_CALAMARES_ROOT: rootDir } })
 }
 
