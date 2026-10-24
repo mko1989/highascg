@@ -18,7 +18,8 @@ fi
 # The OpenXR loader's own lookup order: XR_RUNTIME_JSON, then the user's config, then the system's.
 runtime() {
 	local f
-	for f in "${XR_RUNTIME_JSON:-}" "${XDG_CONFIG_HOME:-$HOME/.config}/openxr/1/active_runtime.json" /etc/xdg/openxr/1/active_runtime.json; do
+	for f in "${XR_RUNTIME_JSON:-}" "${XDG_CONFIG_HOME:-$HOME/.config}/openxr/1/active_runtime.json" /etc/xdg/openxr/1/active_runtime.json \
+		/etc/openxr/1/active_runtime.json; do
 		if [[ -n "$f" && -r "$f" ]]; then echo "$f"; return 0; fi
 	done
 	return 1

@@ -5,7 +5,7 @@ Previs at 1:1 and programs through the walk camera / a controller ray. Proven wi
 e2e in the sandbox (`run-gui-e2e.js --e2e=06_xr_walk --xr`: 4/4). The OpenXR (headset) path is built but untested:
 no headset or runtime on any box. Step 3 (the Programmer panel inside VR) and step 4 are not built. See "How to
 remove". 24.10: the Meta Quest path through WiVRn is ready to test (`godot/client/run-xr.sh`,
-`help/vr-walk.md`); WiVRn is not installed yet, the owner chooses the computer.**
+`help/vr-walk.md`); WiVRn 26.9 installed and running on .4 (published on the LAN); headset = owner.**
 
 Owner, 24.10: *"write it down for future. allow walking into the mvr scene and programing from vr. mostly for lights
 preprogramming."*
@@ -160,7 +160,17 @@ enabled and it'll show up in the headset. So I will be able to test VR with the 
 - `godot/client/help/vr-walk.md` (new): the owner's setup guide. Install (26.04 PPA / 24.04 Flathub), the Quest app,
   connect over Wi-Fi or USB, `run-xr.sh`, the controls, the desktop fallback, troubleshooting, and "not while on air".
   It uses the WO-740 Markdown subset (commands as inline code: the renderer has no code blocks).
-- WiVRn itself is **not installed**: which computer to use is the owner's call (see below).
+- **WiVRn on .4** (owner's choice, 24.10):
+  - `ppa:lvra/wivrn` added. The binaries are `wivrn-server` + `wivrn-dashboard` 26.9-0ubuntu2, not `wivrn` as the
+    Launchpad page says. A dry run first: 26 new packages (Qt / KDE libs), 0 upgraded, 0 removed, no driver or
+    kernel change.
+  - `systemctl --user enable --now wivrn` for casparcg.
+  - The packaged user unit failed under systemd 259: `Failed to drop capabilities: Operation not permitted`, status
+    218/CAPABILITIES. Its `ProtectClock` / `ProtectKernelLogs` / `ProtectKernelModules` make systemd drop
+    capabilities, which a user manager may not do. Drop-in `~/.config/systemd/user/wivrn.service.d/highascg-wo741.conf`
+    sets those three to false (the other hardening stays).
+  - No firewall on .4 (no ufw, no nft drop / reject rules); avahi was already running.
+  - `help/vr-walk.md`: the real package names, the service, the drop-in, and pairing (`wivrnctl pair` prints a PIN).
 
 ### What was VERIFIED
 
@@ -175,7 +185,14 @@ enabled and it'll show up in the headset. So I will be able to test VR with the 
   - First run (with `--xr-mode on` regardless): the modal above, which is why the launcher now passes `off`.
   - Second run: no alert. The client opened on Previs with the walk camera at eye height, restarted itself to follow
     the master (.4) and came back on Previs with `--xr`. Stopped by PID.
-- **Not verified:** the headset itself. It needs WiVRn installed, a connected Quest, and the owner wearing it.
+- **.4 WiVRn:** `systemctl --user is-active wivrn` → active. Journal: `WiVRn 26.9 starting`, `To pair a new headset
+  use PIN code: …`, `Service published: highascg5867`. `wivrn-server` listens on `*:9757`.
+  - From this box, a raw mDNS PTR query for `_wivrn._tcp.local` was answered by 192.168.0.4 naming highascg5867, so a
+    Quest on this LAN will list it.
+  - `wivrnctl pair -d 1` printed `PIN: …`; `list-paired`: no paired headset yet.
+  - `run-xr.sh` finds .4's Godot (`~/.local/opt/godot/godot`). It reaches .4 with the next server update.
+- **Not verified:** the headset itself. It needs the Quest app (same version, 26.9), pairing, and the owner wearing
+  it.
 
 ## How to remove (owner decision at the end)
 
@@ -187,7 +204,9 @@ enabled and it'll show up in the headset. So I will be able to test VR with the 
 - Delete `godot/client/run-xr.sh` and `godot/client/help/vr-walk.md`. Remove `"vr-walk"` from `TOPICS` in
   `godot/client/tests/test_help_pages.gd`, and the 3 lines (`var xr` … `args = …`) marked WO-741 in
   `godot/client/app/connection_menu.gd` `restart()`.
-- No server, `project.godot` or data changes to undo. WiVRn, if installed, is removed with its package manager.
+- No server, `project.godot` or data changes to undo. WiVRn on .4: `systemctl --user disable --now wivrn`, delete
+  `~/.config/systemd/user/wivrn.service.d/`, `sudo apt purge wivrn-server wivrn-dashboard && sudo apt autoremove`,
+  `sudo add-apt-repository --remove ppa:lvra/wivrn`.
 
 ## What was VERIFIED
 

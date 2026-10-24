@@ -14,7 +14,12 @@ The server and the headset app must be the **same WiVRn version**.
 - **Ubuntu 26.04** (the PPA):
 
   - `sudo add-apt-repository ppa:lvra/wivrn`
-  - `sudo apt update && sudo apt install wivrn`
+  - `sudo apt update && sudo apt install wivrn-server wivrn-dashboard`
+  - `systemctl --user enable --now wivrn` (starts the server now and at every login)
+  - If it fails with "Failed to drop capabilities", the packaged service is too strict for systemd 259: put a file
+    `~/.config/systemd/user/wivrn.service.d/override.conf` with `[Service]`, `ProtectClock=false`,
+    `ProtectKernelLogs=false` and `ProtectKernelModules=false` on separate lines, then
+    `systemctl --user daemon-reload && systemctl --user restart wivrn`.
 
 - **Ubuntu 24.04** (Flathub, the PPA has no 24.04 build):
 
@@ -36,7 +41,9 @@ The server and the headset app must be the **same WiVRn version**.
 
 ## 3. Connect
 
-1. Start WiVRn on the computer (the **WiVRn** app, or `wivrn-server`).
+1. Start WiVRn on the computer (the **WiVRn** app, or `wivrn-server`; already running where it was enabled above).
+   The first time, the Quest asks for a **PIN**: run `wivrnctl pair` on the computer and type the PIN it prints
+   (it allows a new headset for a few minutes; the WiVRn dashboard shows it too).
 2. **Wi-Fi:** a fast 5 GHz / 6 GHz network, the computer on a cable to the same router. On the Quest open WiVRn
    and press **Connect** next to the computer.
 3. **USB** (steadier, no Wi-Fi needed): switch the Quest's Wi-Fi off, plug the cable in, then on the computer:
