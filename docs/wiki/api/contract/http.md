@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-498 routes.
+500 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -349,6 +349,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | DELETE | `/api/shaders/*` | registry | `src/api/router.js` |
 | GET | `/api/shaders/*` | registry | `src/api/router.js` |
 | POST | `/api/shaders/import` | registry | `src/api/router.js`, `src/api/routes-shaders.js` |
+| * | `/api/show-timers` | handler | `src/show-timers/show-timers-routes.js` |
+| * | `/api/show-timers/widget.js` | handler | `src/show-timers/show-timers-routes.js` |
 | POST | `/api/sources/label` | registry | `src/api/router.js` |
 | GET | `/api/stage/mvr` | registry | `src/api/routes-stage-mvr.js` |
 | POST | `/api/stage/mvr` | registry | `src/api/routes-stage-mvr.js` |
@@ -571,5 +573,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/previs/register.js` | Previs module registration (WO-17 / WO-30). |
 | `src/server/auth.js` |  |
 | `src/server/ws-server.js` | WebSocket server on the same HTTP port (upgrade `/api/ws`, `/ws`, and Companion-style `/instance/<id>/api/ws`). |
+| `src/show-timers/show-timers-routes.js` | WO-734 — `GET /api/show-timers` (the timers as JSON) and `GET /api/show-timers/widget.js` (the strip the served pages include: `<div id="show-timers"></div><scr |
 | `src/tracking/auto-routes.js` | WO-708 / WO-709 — HTTP + WS of the Auto director (auto-director.js), wired from register.js. |
 | `src/tracking/register.js` | Tracking module registration (WO-616; WO-19 / WO-30 boundaries). |
