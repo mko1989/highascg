@@ -40,3 +40,24 @@ set_target_properties(hshm PROPERTIES
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(hshm PRIVATE rt)
 endif()
+
+# WO-743 — HshmSink (Godot → ring writer) as its OWN library: the live libhshm above is never rebuilt for it.
+# Remove this block and src/sink/ to detach it.
+option(HSHM_SINK "Build libhshm_sink (WO-743)" ON)
+if(HSHM_SINK)
+    add_library(hshm_sink SHARED src/sink/hshm_sink.cpp src/sink/hshm_sink.h src/sink/sink_register.cpp)
+    target_include_directories(hshm_sink PRIVATE src/sink "${CMAKE_CURRENT_SOURCE_DIR}/../../../caspar/modules/shm")
+    target_link_libraries(hshm_sink PRIVATE godot-cpp)
+    set_target_properties(hshm_sink PROPERTIES
+        CXX_STANDARD 17
+        CXX_EXTENSIONS OFF
+        CXX_VISIBILITY_PRESET hidden
+        POSITION_INDEPENDENT_CODE ON
+        PREFIX "lib"
+        OUTPUT_NAME "hshm_sink${GODOTCPP_SUFFIX}"
+        LIBRARY_OUTPUT_DIRECTORY "$<1:${CMAKE_CURRENT_SOURCE_DIR}/bin>"
+        RUNTIME_OUTPUT_DIRECTORY "$<1:${CMAKE_CURRENT_SOURCE_DIR}/bin>")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        target_link_libraries(hshm_sink PRIVATE rt)
+    endif()
+endif()

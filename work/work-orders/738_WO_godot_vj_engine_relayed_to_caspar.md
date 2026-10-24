@@ -216,3 +216,8 @@ Verdict:
 
 Nothing runs yet; nothing to verify. Two claims are unverified and marked so above: `texture_get_data_async` on 4.7,
 and alpha through Caspar's NDI producer.
+
+Later the same day: step 1 is [WO-742](./742_WO_caspar_shm_producer.md) (the Caspar producer) and step 2 is
+[WO-743](./743_WO_godot_shm_writer.md) (the Godot writer). WO-743 measured `texture_get_data_async` working on 4.7.2
+(Forward+) and premultiplied alpha arriving exactly at a Caspar channel's output through shm, so the NDI alpha question
+no longer matters for this path.
