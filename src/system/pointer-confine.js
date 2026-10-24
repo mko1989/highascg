@@ -60,6 +60,14 @@ let activeConfineRect = null
 let watchConfig = null
 /** @type {{ log?: Function } | null} */
 let watchOpts = null
+/** WO-722: the verdict key of the last sync ('' = not wanted), its start still running, its start failed. */
+let lastSyncKey = null
+let startInFlight = false
+let lastSyncFailed = false
+/** @type {NodeJS.Timeout | null} */
+let noRectRetry = null
+const NO_RECT_RETRIES = 3
+const NO_RECT_RETRY_MS = 3000
 
 function envTruthy(name) {
 	const v = String(process.env[name] || '').trim().toLowerCase()
@@ -382,9 +390,25 @@ function syncOperatorPointerConfine(config, opts = {}) {
 	// WO-308: one line per decision, mirroring WO-290's RUN/SKIP verdict style. startPointerConfine
 	// logs its OWN skip below when desired — logging here too would just be the same reason twice
 	// for the enabled case, so this line covers the disabled case only.
+	lastSyncKey = verdict.desired ? String(verdict.reason) : ''
 	if (verdict.desired) {
+		startInFlight = true
 		void startPointerConfine(config, opts).then((r) => {
-			if (!r.ok) stopPointerConfine()
+			startInFlight = false
+			lastSyncFailed = !r.ok
+			if (r.ok) return
+			stopPointerConfine()
+			/* WO-722: no rect yet is often a reload mid-way (a project's hardware config lands right after) —
+			 * look again a few times instead of staying unconfined until the next restart. */
+			const left = opts.noRectRetriesLeft ?? NO_RECT_RETRIES
+			if (r.reason === 'no_operator_monitor' && left > 0) {
+				if (noRectRetry) clearTimeout(noRectRetry)
+				noRectRetry = setTimeout(() => {
+					noRectRetry = null
+					syncOperatorPointerConfine(config, { ...opts, noRectRetriesLeft: left - 1 })
+				}, NO_RECT_RETRY_MS)
+				noRectRetry.unref?.()
+			}
 		})
 		return { ok: true, enabled: true, starting: true, reason: verdict.reason }
 	}
@@ -393,10 +417,39 @@ function syncOperatorPointerConfine(config, opts = {}) {
 	return { ok: true, enabled: false, reason: verdict.reason }
 }
 
+/**
+ * WO-722 — does a config change that skipped the subsystem recycle need a confine sync? Yes when the wanted verdict
+ * changed, or confine is wanted and the last sync could not start it (a New project's reload synced on a config without
+ * the operator cable; the project loads that brought it skipped the recycle, so nothing looked again). Not for a
+ * deliberate stop (the operator-monitor prompt releases confine, WO-638), and not otherwise: a sync recomputes the
+ * layout through xrandr (WO-397), and most config saves have nothing to do with confine.
+ * @param {{ desired: boolean, reason?: string }} verdict
+ * @param {string | null} lastKey
+ * @param {boolean} lastFailed
+ */
+function confineResyncNeeded(verdict, lastKey, lastFailed) {
+	const key = verdict.desired ? String(verdict.reason) : ''
+	return key !== lastKey || (verdict.desired && lastFailed)
+}
+
+/**
+ * WO-722: index.js calls this on a config change whose subsystem recycle was skipped. → whether it synced.
+ * @param {object} config
+ * @param {{ log?: Function }} [opts]
+ */
+function resyncPointerConfineIfNeeded(config, opts = {}) {
+	if (isSandbox() || startInFlight) return false
+	if (!confineResyncNeeded(evaluateOperatorPointerConfineDesire(config), lastSyncKey, lastSyncFailed)) return false
+	syncOperatorPointerConfine(config, opts)
+	return true
+}
+
 module.exports = {
 	UNCLUTTER_IDLE_SEC,
 	startPointerConfine,
 	stopPointerConfine,
 	isPointerConfineActive,
 	syncOperatorPointerConfine,
+	confineResyncNeeded,
+	resyncPointerConfineIfNeeded,
 }

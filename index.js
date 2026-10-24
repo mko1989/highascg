@@ -248,6 +248,7 @@ function main() {
 			if (!forceReload && subsystemReloadSig !== null && nextSig === subsystemReloadSig) {
 				logger.info('[Config] Applied file change; subsystem recycle skipped (Caspar / OSC / streaming / DMX signature unchanged).')
 				if (appCtx._composePreviewLifecycle) appCtx._composePreviewLifecycle.onConfigChange()
+				require('./src/system/pointer-confine').resyncPointerConfineIfNeeded(config, { log: (level, msg) => appCtx.log(level, msg) }) // WO-722
 				return
 			}
 			subsystemReloadSig = nextSig
