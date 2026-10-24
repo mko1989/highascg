@@ -330,6 +330,9 @@ function startHttpServer(options) {
 			if (reqPathForRouting === '/intake' || reqPathForRouting === '/intake/') {
 				// WO-675: the short address the audio tech types on a phone → the presenter intake page.
 				result = { status: 302, headers: { Location: '/api/tracking/presenters/intake', 'Cache-Control': 'no-store' }, body: '' }
+			} else if (reqPathForRouting === '/audio' || reqPathForRouting === '/audio/') {
+				// WO-731: the audio operator's sister page (presenter cards, desk, Accept).
+				result = { status: 302, headers: { Location: '/api/tracking/presenters/audio', 'Cache-Control': 'no-store' }, body: '' }
 			} else if (isApi) {
 				// Pass path including ?query so router can parse query params consistently.
 				const qIdx = rawPath.indexOf('?')

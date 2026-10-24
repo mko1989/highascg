@@ -1,0 +1,482 @@
+<!doctype html>
+<!-- WO-731 — the audio operator's sister page to the presenter intake: the backstage roster as cards, desk link, mic → channel, Accept. -->
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Presenter audio</title>
+		<style>
+			:root {
+				--bg: #0d1117;
+				--card: #161b22;
+				--fg: #e6edf3;
+				--dim: #8b949e;
+				--line: #30363d;
+				--accent: #58a6ff;
+				--ok: #3fb950;
+				--bad: #f85149;
+				--warn: #d29922;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				padding: 16px;
+				background: var(--bg);
+				color: var(--fg);
+				font:
+					15px/1.4 system-ui,
+					sans-serif;
+			}
+			header {
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				margin-bottom: 12px;
+			}
+			h1 {
+				font-size: 20px;
+				margin: 0;
+			}
+			h2 {
+				font-size: 13px;
+				margin: 20px 0 8px;
+				color: var(--dim);
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+			}
+			.chip {
+				padding: 3px 10px;
+				border-radius: 999px;
+				font-size: 13px;
+				background: var(--card);
+				border: 1px solid var(--line);
+				color: var(--dim);
+			}
+			.chip.ok {
+				color: var(--ok);
+				border-color: var(--ok);
+			}
+			.chip.error {
+				color: var(--bad);
+				border-color: var(--bad);
+			}
+			.row {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				align-items: end;
+			}
+			label {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				color: var(--dim);
+				font-size: 13px;
+			}
+			input,
+			select {
+				padding: 8px;
+				font: inherit;
+				color: var(--fg);
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 6px;
+			}
+			input.ip {
+				width: 160px;
+			}
+			input.num {
+				width: 90px;
+			}
+			button {
+				padding: 8px 14px;
+				font: inherit;
+				font-weight: 600;
+				color: #fff;
+				background: var(--accent);
+				border: 0;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+			button.quiet {
+				color: var(--fg);
+				background: var(--card);
+				border: 1px solid var(--line);
+				font-weight: 400;
+			}
+			button:disabled {
+				opacity: 0.4;
+				cursor: default;
+			}
+			.mics {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+				gap: 6px;
+			}
+			.mic {
+				display: flex;
+				align-items: center;
+				gap: 8px;
+				padding: 6px 8px;
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 6px;
+			}
+			.mic b {
+				min-width: 64px;
+			}
+			.mic select {
+				flex: 1;
+				min-width: 0;
+			}
+			.cards {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+				gap: 10px;
+			}
+			.card {
+				display: flex;
+				flex-direction: column;
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				overflow: hidden;
+			}
+			.card.done {
+				border-color: var(--ok);
+			}
+			.card.failed {
+				border-color: var(--bad);
+			}
+			.card img {
+				width: 100%;
+				aspect-ratio: 3 / 4;
+				object-fit: cover;
+				background: #0b0f14;
+			}
+			.card .body {
+				display: flex;
+				flex-direction: column;
+				gap: 4px;
+				padding: 10px;
+				flex: 1;
+			}
+			.card .name {
+				font-weight: 600;
+				font-size: 16px;
+			}
+			.card .meta {
+				color: var(--dim);
+				font-size: 13px;
+			}
+			.card .note {
+				font-size: 13px;
+				white-space: pre-wrap;
+			}
+			.card .res {
+				font-size: 13px;
+				min-height: 1.3em;
+			}
+			.card .res.ok {
+				color: var(--ok);
+			}
+			.card .res.bad {
+				color: var(--bad);
+			}
+			.card button {
+				margin-top: auto;
+			}
+			.empty {
+				color: var(--dim);
+			}
+			#msg {
+				min-height: 1.3em;
+				margin-top: 6px;
+				font-size: 13px;
+				color: var(--bad);
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>Presenter audio</h1>
+			<span id="status" class="chip">…</span>
+		</header>
+
+		<h2>Desk</h2>
+		<div class="row">
+			<label
+				>Desk<select id="model">
+					<option value="">— choose —</option>
+				</select></label
+			>
+			<label
+				>IP address<input
+					id="host"
+					class="ip"
+					type="text"
+					inputmode="decimal"
+					autocomplete="off"
+					placeholder="192.168.0.50"
+			/></label>
+			<label>Port<input id="port" class="num" type="number" min="1" max="65535" placeholder="auto" /></label>
+			<label id="midiwrap" hidden>MIDI channel<input id="midi" class="num" type="number" min="1" max="16" /></label>
+			<label>Fader at least (dB)<input id="threshold" class="num" type="number" step="0.5" /></label>
+			<button id="save">Connect</button>
+		</div>
+		<div id="msg"></div>
+
+		<h2>Mics → desk channels</h2>
+		<div id="mics" class="mics"></div>
+		<div class="row" style="margin-top: 8px">
+			<input id="newmic" class="num" type="text" maxlength="16" placeholder="mic #" /><button id="addmic" class="quiet">
+				Add mic</button
+			><button id="names" class="quiet">Read channel names</button>
+		</div>
+
+		<h2>Presenters</h2>
+		<div id="cards" class="cards"></div>
+
+		<script>
+			const $ = (id) => document.getElementById(id)
+			const API = '/api/tracking/presenters'
+			let desk = null,
+				roster = [],
+				names = {},
+				extraMics = new Set(),
+				editing = false
+
+			async function call(method, url, body) {
+				const r = await fetch(url, {
+					method,
+					headers: body ? { 'Content-Type': 'application/json' } : {},
+					body: body ? JSON.stringify(body) : undefined,
+				})
+				const j = await r.json().catch(() => ({}))
+				if (!r.ok) throw Object.assign(new Error(j.error || `HTTP ${r.status}`), { body: j })
+				return j
+			}
+			const el = (tag, props = {}, ...kids) => {
+				const e = Object.assign(document.createElement(tag), props)
+				e.append(...kids)
+				return e
+			}
+			const say = (t) => {
+				$('msg').textContent = t || ''
+			}
+			const inputs = () => (desk ? desk.models.find((m) => m.id === desk.settings.model)?.inputs || 0 : 0)
+
+			function renderDesk() {
+				const s = desk.settings,
+					st = desk.status
+				$('status').textContent =
+					st.state === 'ok'
+						? `Desk OK · ${st.detail}`
+						: st.state === 'error'
+							? `Desk: ${st.detail}`
+							: st.state === 'connecting'
+								? 'Connecting…'
+								: 'No desk'
+				$('status').className = 'chip ' + st.state
+				if (editing) return
+				if ($('model').options.length === 1)
+					for (const m of desk.models) $('model').append(el('option', { value: m.id, textContent: m.label }))
+				$('model').value = s.model
+				$('host').value = s.host
+				$('port').value = s.port || ''
+				$('port').placeholder = desk.models.find((m) => m.id === s.model)?.port || 'auto'
+				$('threshold').value = s.threshold_db
+				$('midi').value = s.midi_channel
+				showMidi(s.model)
+			}
+			const showMidi = (model) => {
+				$('midiwrap').hidden = !desk.models.find((m) => m.id === model)?.midi
+			}
+
+			function micList() {
+				const set = new Set([
+					...Object.keys(desk.settings.mics),
+					...roster.map((p) => String(p.mic || '').trim()).filter(Boolean),
+					...extraMics,
+				])
+				return [...set].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+			}
+
+			function renderMics() {
+				const box = $('mics'),
+					n = inputs()
+				if (document.activeElement?.closest?.('#mics')) return
+				box.replaceChildren()
+				const mics = micList()
+				if (!mics.length)
+					return box.append(el('div', { className: 'empty', textContent: 'Mic numbers from the intake show up here.' }))
+				for (const mic of mics) {
+					const sel = el('select', {}, el('option', { value: '', textContent: '— channel —' }))
+					for (let ch = 1; ch <= (n || 128); ch++)
+						sel.append(el('option', { value: ch, textContent: names[ch] ? `${ch} · ${names[ch]}` : `${ch}` }))
+					sel.value = desk.settings.mics[mic] || ''
+					sel.onchange = async () => {
+						const mics2 = { ...desk.settings.mics }
+						if (sel.value) mics2[mic] = Number(sel.value)
+						else delete mics2[mic]
+						try {
+							desk = await call('POST', `${API}/audio/desk`, { mics: mics2 })
+							say('')
+							render()
+						} catch (e) {
+							say(e.message)
+						}
+					}
+					box.append(el('div', { className: 'mic' }, el('b', { textContent: `Mic ${mic}` }), sel))
+				}
+			}
+
+			function renderCards() {
+				const box = $('cards')
+				box.replaceChildren()
+				if (!roster.length)
+					return box.append(
+						el('div', {
+							className: 'empty',
+							textContent: `No presenters yet — the backstage tech sends them from ${location.host}/intake.`,
+						})
+					)
+				for (const p of roster) {
+					const a = desk.accepted[p.id]?.created === p.created ? desk.accepted[p.id] : null, // a reused slot id is someone new
+						mic = String(p.mic || '').trim(),
+						ch = desk.settings.mics[mic]
+					const res = el('div', { className: 'res' + (a ? (a.ok ? ' ok' : ' bad') : '') })
+					if (a)
+						res.textContent = a.ok
+							? `Accepted ${new Date(a.at).toLocaleTimeString()} · ch ${a.channel}: ${a.did.join(', ')}`
+							: `Not accepted: ${a.error}`
+					const btn = el('button', { textContent: a?.ok ? 'Accept again' : 'Accept', disabled: !ch })
+					btn.title = !mic
+						? 'No mic number'
+						: !ch
+							? `Match mic ${mic} to a channel first`
+							: `Channel ${ch}: on, fader at least ${desk.settings.threshold_db} dB`
+					btn.onclick = async () => {
+						btn.disabled = true
+						try {
+							await call('POST', `${API}/${p.id}/accept`)
+						} catch (e) {
+							say(e.message)
+						}
+						await refresh()
+					}
+					box.append(
+						el(
+							'div',
+							{ className: 'card' + (a ? (a.ok ? ' done' : ' failed') : '') },
+							el('img', { src: `${API}/${p.id}/photo`, alt: p.name, loading: 'lazy' }),
+							el(
+								'div',
+								{ className: 'body' },
+								el('div', { className: 'name', textContent: p.name }),
+								el('div', {
+									className: 'meta',
+									textContent: mic
+										? `Mic ${mic}${ch ? ` → ch ${ch}${names[ch] ? ' · ' + names[ch] : ''}` : ' · no channel'}`
+										: 'No mic number',
+								}),
+								p.note ? el('div', { className: 'note', textContent: p.note }) : '',
+								res,
+								btn
+							)
+						)
+					)
+				}
+			}
+
+			function render() {
+				renderDesk()
+				renderMics()
+				renderCards()
+			}
+
+			async function refresh() {
+				try {
+					const [d, r] = await Promise.all([call('GET', `${API}/audio/desk`), call('GET', API)])
+					const ids =
+						roster.map((p) => p.id + p.mic).join() +
+						JSON.stringify(desk?.accepted) +
+						JSON.stringify(desk?.settings) +
+						JSON.stringify(desk?.status)
+					desk = d
+					roster = r.presenters || []
+					if (
+						ids !==
+						roster.map((p) => p.id + p.mic).join() +
+							JSON.stringify(d.accepted) +
+							JSON.stringify(d.settings) +
+							JSON.stringify(d.status)
+					)
+						render()
+				} catch (e) {
+					say(e.message)
+				}
+			}
+
+			async function readNames() {
+				try {
+					const j = await call('GET', `${API}/audio/channels`)
+					names = Object.fromEntries(j.channels.filter((c) => c.name).map((c) => [c.channel, c.name]))
+					say('')
+					render()
+				} catch (e) {
+					say('Channel names: ' + e.message)
+				}
+			}
+
+			for (const id of ['model', 'host', 'port', 'midi', 'threshold']) {
+				$(id).addEventListener('focus', () => {
+					editing = true
+				})
+				$(id).addEventListener('input', () => {
+					editing = true
+				})
+			}
+			$('model').onchange = () => {
+				$('port').placeholder = desk.models.find((m) => m.id === $('model').value)?.port || 'auto'
+				showMidi($('model').value)
+			}
+			$('save').onclick = async () => {
+				try {
+					desk = await call('POST', `${API}/audio/desk`, {
+						model: $('model').value,
+						host: $('host').value.trim(),
+						port: Number($('port').value) || 0,
+						midi_channel: Number($('midi').value) || 1,
+						threshold_db: Number($('threshold').value),
+					})
+					editing = false
+					say('')
+					render()
+					setTimeout(async () => {
+						await refresh()
+						if (desk.status.state === 'ok') readNames()
+					}, 1500)
+				} catch (e) {
+					say(e.message)
+				}
+			}
+			$('addmic').onclick = () => {
+				const m = $('newmic').value.trim()
+				if (m) {
+					extraMics.add(m)
+					$('newmic').value = ''
+					renderMics()
+				}
+			}
+			$('names').onclick = readNames
+
+			refresh().then(() => {
+				if (desk?.status.state === 'ok') readNames()
+			})
+			setInterval(refresh, 2000)
+		</script>
+	</body>
+</html>

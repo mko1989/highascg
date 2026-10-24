@@ -60,6 +60,8 @@ const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
 const { createPresenters } = require('./presenters')
 const { handlePresenters } = require('./presenter-routes')
+const { createDeskService } = require('../audio-desk/desk-service')
+const { handleAudioDesk } = require('../audio-desk/audio-routes')
 
 const TICK_MS = 33
 const HEARTBEAT_MS = 1000
@@ -96,6 +98,7 @@ const pose3d = new Pose3D() // WO-667: 3D body joints on the world persons
 const walk = new VerifyWalk()
 let _pinAt = 0
 let _presenters = null
+let _desk = null // WO-731: the audio operator's desk link (Accept → mic channel on)
 let _presentersSent = { json: '', at: 0 }
 
 /** One marker or {markers: [...]} → { accepted, errors[] } */
@@ -326,6 +329,8 @@ function presentersTick() {
 }
 
 async function handleApi({ method, path, body, req }) {
+	const audio = await handleAudioDesk(_desk, _presenters, { method, path, body }) // WO-731, before the presenter routes
+	if (audio) return audio
 	const pr =
 		(await handlePresenters(_presenters, { method, path, body, req })) || handleAuto(auto, { method, path, body })
 	if (pr) return pr
@@ -464,6 +469,8 @@ module.exports = {
 		_presenters = createPresenters(ctx, { hub }) // reloads the /tmp roster after a server restart
 		_presentersSent = { json: '', at: 0 }
 		if (ctx) ctx.presenters = _presenters
+		if (_desk) _desk.stop()
+		_desk = createDeskService(ctx)
 	},
 
 	async onShutdown() {
@@ -483,6 +490,8 @@ module.exports = {
 		if (_ctx) delete _ctx.fixtureService
 		if (_ctx && _ctx.presenters === _presenters) delete _ctx.presenters
 		_presenters = null
+		if (_desk) _desk.stop()
+		_desk = null
 		_ctx = null
 	},
 }
