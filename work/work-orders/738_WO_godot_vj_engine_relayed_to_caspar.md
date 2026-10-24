@@ -1,6 +1,6 @@
 # WO-738 — VJing in Godot, relayed to CasparCG (instead of the current shader work)
 
-**Status: OPEN (24.10.26) — research answer written; nothing built. Next step is the owner's pick of a phase (§5).**
+**Status: OPEN (24.10.26) — research answer written; owner chose path C (shared memory), §7. Nothing built yet.**
 
 Owner 24.10: "lets add this https://godotengine.org/asset-library/asset/4506 for the future. answer in a new md file
 on the server WHAT CAN BE DONE IN GODOT AND RELAYED TO CASPARCG FOR VJing instead of the current shader work"
@@ -115,6 +115,25 @@ Godot at the channel rate (`Engine.max_fps`). Later, Godot can be paced from Cas
 - **Catch:** its event sheets are edited in the Godot *editor* (a bottom panel) and saved as `.tres`. Operators run an
   exported or kiosk client and never the editor. The likely use is its runtime with an in-app sheet editor of our own.
   Re-evaluate when a Godot VJ process (P1) exists. Not installed.
+
+## 7. Owner decision (24.10)
+
+> "definitly shared memory. if it needs to be built so be it. i think it will be useful for future window grabbing
+> from virtual screens"
+
+- **Path C is the plan**: a Caspar `shm` producer that plays a HASCGSHM ring written by another process. It mirrors
+  the WO-594 consumer and reuses `hshm_abi.h` and `hshm_writer.h`. NDI (B) is no longer the first step.
+- **The producer stays generic, not Godot-specific.** Any writer feeds it the same way: the Godot VJ process, or
+  later a window or virtual-screen grabber (XShm or XComposite capture of an X screen or window, written into the
+  ring). The ring carries its size, format and frame sequence in its header, so the producer never needs to know who
+  writes.
+- Build order:
+  1. The Caspar producer: `PLAY 1-10 SHM NAME <role>`, newest frame per tick, BGRA with straight or premultiplied
+     alpha flagged in the header. Rebuild through the WO-613 path, with an offline test from a C writer.
+  2. A Godot writer: a GDExtension next to `hshm` that does the readback and publishes into the ring.
+  3. Server and client glue: the source in the Live tab, a lease (as for the surfaces), and teardown when the writer
+     dies.
+- A separate WO is to be opened when the work starts (after WO-739, the link-accept path).
 
 ## What was done
 
