@@ -191,7 +191,9 @@ apply_server_drop() {
 	mkdir -p "$staging_parent"
 	local staging="${staging_parent}/${src_stamp}"
 	rm -rf "$staging"
-	local xtra=()
+	# WO-737: src/ imports client/lib at runtime, so a drop's client/lib must land even where the installed excludes
+	# (refreshed only by the install script) still list /client/. Rules here come first and win.
+	local xtra=(--include='/client/' --include='/client/lib/***' --exclude='/client/*')
 	[[ -f "$excludes" ]] && xtra+=(--exclude-from="$excludes")
 	log "rsync ${src}/ → ${staging}/"
 	rsync "${xtra[@]}" -rlptgoD --delete "${src%/}/" "${staging%/}/"

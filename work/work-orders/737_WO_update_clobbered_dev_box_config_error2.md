@@ -1,7 +1,7 @@
 # WO-737 — An update meant for .4 landed on the master and reset its config; "error 2" across the GUI
 
-**Status: IN PROGRESS (24.10.26) — config restored on the box and proven; fixes + tests done; .4's first update
-pending (its installed apply script is replaced first, see below).**
+**Status: IN PROGRESS (24.10.26) — config restored on the box and proven; fixes + tests done; .4 updated to
+2026-10-24T183220Z with its config intact; part 2 (release lacks client/lib) fixed, .4's update to it pending.**
 
 Owner, 24.10: *"on the .4 downloading extracting then error 2 (with something else in the error) check the whole gui
 for that error as ive seen it in couple places."*
@@ -97,5 +97,74 @@ That path persists the files and doesn't restart Caspar. `projects/godot_test.js
 - Godot `--check` boot OK; `--test` 21517 passed / 0 failed (+7 assertions: transport words, the restart wait).
 - Gates on a clean export: repo integrity OK, 0 files over 500 lines, no new unwired exports, `--no-http` boot OK,
   Prettier clean, ESLint 0 errors / 214 warnings; `test:ci` result is recorded in the commit message.
+- .4 prepared (24.10, over SSH): `/usr/local/lib/highascg/highascg-apply-server-drop.sh` replaced with the WO-737
+  copy (`grep -c WO-737` = 2), so .4's first update keeps its own `config/*.json`. .4 has no `.git`, so the new
+  refusal doesn't touch it.
+- Not yet live on this box: `server-update.js`'s guard needs a server restart (left to the owner). Until then, Install
+  pressed on .4's *old* kiosk would update this box again; update .4 from its own web UI (http://192.168.0.4:4200).
 - Owner-QA: on .4, after its update, Settings → Updates shows "Waiting for the server to restart…" then "Server is
   back." instead of "transport error 2".
+
+## Part 2 — comparing the two boxes after .4's Ubuntu 26.04 / kernel / NVIDIA upgrade (owner, 24.10: "compare the two servers to check if there are any regresions with updating ubuntu, nvidia, kernel etc.")
+
+### Investigation
+
+The same read-only snapshot on both boxes (`boxprobe.sh` in the session scratchpad), plus each box's post-update
+self-check (`GET /api/system/update/sweep`).
+
+| | this box (.23) | .4 |
+|---|---|---|
+| OS / kernel | Ubuntu 24.04.4, 6.8.0-117 | Ubuntu 26.04.1, 7.0.0-38 |
+| GPU / driver | RTX PRO 4000 Blackwell, 595.71.05 open | RTX 2080 SUPER, 615.71.09 server-open |
+| DeckLink | desktopvideo 16.2a1, `blackmagic_io` loaded | 16.4a1, loaded |
+| Node / ffmpeg CLI | 24.18.0 / 6.1.1 | 24.22.1 / 8.0.1 |
+| Caspar binary | md5 d5dee499…, no missing libs | same binary; `ldd` misses `libcef.so` (run.sh supplies `lib/`; Caspar runs) |
+| Godot | 4.7.2 | 4.7.2 |
+| Kernel log | exFAT dirty-volume notices, 2× `task sync blocked > 122 s` (USB stick sync), ACPI `_DSM` noise | UCSI i2c timeouts on the 2080's USB-C controller, nothing playout-related |
+| Xorg | xkb option warnings | the same + `NVIDIA: Failed to request fliplock` (GeForce, no framelock: harmless) |
+
+Findings:
+
+1. **A regression, from packaging, not from the OS: releases don't ship `client/lib`.** 14 server code paths import
+   `client/lib/*.js` at runtime (scene take payloads `scene-take-payload.js`, take-look transition presets, new layer,
+   look presets, preview push, lower thirds, audio cross-screen, project assets/hardware checks, the shader live
+   session). `archive-common.sh` excluded `client/`, and the update excludes listed `/client/`. .4 is installed from
+   releases and has no `client/` at all. Its sweep shows `/api/scene/layer-options` and `/api/scene/effect-registry` →
+   502 `Cannot find module …/client/lib/program-audio-layouts.js`. The take paths fail the same way when used. Their
+   transitive closure is 33 files, all inside `client/lib` (1.6 MB).
+2. **A false alarm on both boxes: "blackmagic module not loaded".** `tools/startup/verify-decklink.sh:78` ran
+   `lsmod | grep -q blackmagic` under `set -o pipefail`. grep -q exits at the first match, lsmod then dies on SIGPIPE,
+   and the pipeline counts as failed. `lsmod` shows `blackmagic_io` on both boxes.
+3. Not regressions, recorded so nobody chases them:
+   - .4's Caspar log has 5 boost::asio `remote_endpoint: Transport endpoint is not connected` exceptions, each right
+     after an AMCP client disconnects mid-reply. Same binary as here; Caspar keeps running.
+   - .4's watchdog killed a Caspar at 20:12 that had been held 2463 s by the start-up question (WO-645 `ask` mode).
+     Expected.
+   - This box: `PLAY 6-1 DECKLINK 1` / `PLAY 7-2 DECKLINK 2` → `COMMAND_UNKNOWN_DATA` since 17:56. PGM/PRV 2 was
+     created at 17:52 and Caspar not regenerated, so the server's channel plan has the DeckLink inputs on 6/7 while
+     Caspar runs 5 channels. Present before the update (818 occurrences 17:56–20:09).
+   - The massive DeckLink A/V-sync drift warnings (≈16k/day) are on this box (the 8K Pro inputs), not on .4.
+   - **The master role moved to .4** (epoch 4, auto failover at 20:12:04, "highascg7580 unseen 13 s"), while this box
+     restarted for the update. Auto mode doesn't move it back. This box's kiosk now follows .4, and .4's kiosk
+     correctly stays home. .4 has no destinations of its own.
+
+### What was done
+
+- `scripts/lib/archive-common.sh`: `client/lib` joins the server tarball members. The `--exclude=./client` never
+  matches a member passed as `client/lib`, as the WO-687 comment explains for `config`.
+- `scripts/exfat/highascg-apply-server-drop.sh`: its own rules come before the installed excludes:
+  `--include=/client/ --include=/client/lib/*** --exclude=/client/*`. The installed
+  `/etc/highascg/server-update-rsync-excludes.txt` is refreshed only by the install script, and every box still lists
+  `/client/` there.
+- `tools/startup/verify-decklink.sh`: reads `/proc/modules`.
+
+### Verified
+
+- `smoke-wo737-update-keeps-box-config.test.js`, now 5 tests:
+  - the apply carries `client/lib`, not `client/assets`;
+  - `client/lib` is a tarball member, the real tar rules keep every server-imported `client/lib` module, and their
+    closure stays inside `client/lib`.
+  Both of those fail without the change.
+- `verify-decklink.sh` live on this box: `WARN: blackmagic module not loaded` before, `OK: kernel module loaded:
+  blackmagic_io` after.
+- rsync rule check: `client/lib/a.js` lands, `client/assets` doesn't, `src/client/` is unaffected.

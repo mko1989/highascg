@@ -75,8 +75,10 @@ else
 	warn "desktopvideo-gui not installed — Caspar decklink I/O may still work; Settings Setup button needs GUI package"
 fi
 
-if lsmod 2>/dev/null | grep -q blackmagic; then
-	ok "kernel module loaded: $(lsmod | awk '/blackmagic/{print $1}' | tr '\n' ' ')"
+# WO-737: /proc/modules, not `lsmod | grep -q` — under pipefail grep -q quits at the first match, lsmod dies on
+# SIGPIPE and the pipeline "fails": a loaded module was reported missing on every box.
+if grep -q '^blackmagic' /proc/modules 2>/dev/null; then
+	ok "kernel module loaded: $(awk '/^blackmagic/{print $1}' /proc/modules | tr '\n' ' ')"
 elif [[ "$HW" -eq 1 ]] && dpkg-query -W desktopvideo &>/dev/null; then
 	warn "blackmagic module not loaded — try: sudo modprobe blackmagic_io"
 fi

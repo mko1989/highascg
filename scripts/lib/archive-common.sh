@@ -15,7 +15,8 @@ archive_common_repo_root() {
 	(cd "$(dirname "$script")/.." && pwd)
 }
 
-# Explicit members for server GitHub tarball (built UI, no client/ sources).
+# Explicit members for server GitHub tarball (built UI, no client/ sources but client/lib: WO-737, src/ imports those
+# shared modules at runtime — scene takes, transition presets, lower thirds, new layers…).
 archive_common_server_tar_members() {
 	local -n _out=$1
 	_out=(
@@ -29,6 +30,7 @@ archive_common_server_tar_members() {
 		tools/runtime
 		godot/client
 		godot/GODOT_VERSION
+		client/lib
 	)
 	if [[ "${RELEASE_SERVER_ONLY:-0}" != "1" ]]; then
 		_out+=(dist-web)
