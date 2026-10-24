@@ -61,7 +61,9 @@ function writeFixtureMedia(mediaDir) {
 }
 
 /**
- * @param {{ root: string, port?: number, log?: (s: string) => void }} opts
+ * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object }} opts
+ *   media: false skips the ffmpeg fixture clips (WO-725 cluster runs, CI has no ffmpeg); config: extra top-level
+ *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked).
  */
 async function startSandbox(opts) {
 	const root = path.resolve(opts.root)
@@ -75,7 +77,7 @@ async function startSandbox(opts) {
 		run: path.join(root, 'run'),
 	}
 	for (const d of Object.values(dirs)) fs.mkdirSync(d, { recursive: true })
-	writeFixtureMedia(dirs.media)
+	if (opts.media !== false) writeFixtureMedia(dirs.media)
 	// Fresh-box config: one file of overrides; ConfigManager fills everything else from the factory defaults.
 	// Every path / port that defaults to the live box is pointed into the root (see the WO-719 isolation table).
 	const configFile = path.join(root, 'highascg.config.json')
@@ -92,6 +94,7 @@ async function startSandbox(opts) {
 			replication: { enabled: false },
 			security: { enforceAuth: false, exposeToNetwork: false },
 			server: { httpPort: port, bindAddress: '127.0.0.1' },
+			...opts.config,
 		}, null, 2))
 	}
 	const exfatMap = path.join(root, 'exfat-sync.json')

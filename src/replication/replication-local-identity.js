@@ -61,7 +61,8 @@ function writeLocalIdentityFile(selfId) {
  * @returns {string}
  */
 function getOrCreateLocalReplicationSelfId(ctx, opts = {}) {
-	const hwHostname = getHardwareHostnameSelfId()
+	// WO-725: a sandbox is not this machine — its id is its own (config / file), never the live box's hostname
+	const hwHostname = isSandbox() ? null : getHardwareHostnameSelfId()
 	if (hwHostname) {
 		const file = readLocalIdentityFile()
 		if (file?.selfId === hwHostname) return hwHostname

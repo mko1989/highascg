@@ -38,6 +38,7 @@ const { createCallActions } = require('../cluster/cluster-call-actions')
 const { createExchange } = require('../cluster/cluster-exchange')
 const identity = require('../system/device-identity')
 const duties = require('../cluster/server-duties')
+const { isSandbox } = require('../bootstrap/sandbox')
 const { createSendersSync } = require('../cluster/server-senders')
 
 const reply = (status, obj) => ({ status, headers: JSON_HEADERS, body: jsonBody(obj) })
@@ -127,7 +128,8 @@ function fanoutOf(ctx) {
 	const { normalizeScreenDestinations } = require('../config/screen-destinations')
 	const { buildChannelMap } = require('../config/channel-map-from-ctx')
 	ctx._clusterFanout = createClusterFanout({
-		isMaster: () => masterOf(ctx).view().is_master === true,
+		// WO-725: a sandbox never forwards — its peers' Caspar is this box's live one (127.0.0.1:5250)
+		isMaster: () => !isSandbox() && masterOf(ctx).view().is_master === true,
 		pairEnabled: () => !!getReplicationConfig(ctx.config).enabled,
 		members: () => clusterOf(ctx).snapshot().peers.filter((p) => p.online),
 		peerView: async (id) => {
