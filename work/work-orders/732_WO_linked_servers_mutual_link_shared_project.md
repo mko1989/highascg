@@ -1,6 +1,6 @@
 # WO-732 — Linked servers that work as one: mutual link, one shared project, cable the other server from here
 
-**Status: IN PROGRESS — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P2, P3 open (see the owner's follow-up below).**
+**Status: IN PROGRESS — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P3a (Devices shows this machine) DONE 24.10.26 (Godot tests + live: this box's kiosk unchanged, a client following .4 showed this machine on top); P2, P3b open.**
 
 Owner, 24.10: *"i cant establish a meaningful connection between servers and connect screen destinations etc. my
 thinking is that when connected they both show up in each other's devices and can have connections made etc."*
@@ -148,3 +148,81 @@ Live, this box (192.168.0.23) ↔ .4 (192.168.0.4):
 - .4's kiosk still runs its old Godot client. The one-way line shows once it restarts. The client restarts itself
   when its server restarts (connection_menu.gd); not checked on .4's screen.
 
+## P3a — Devices shows this machine first (24.10)
+
+Owner, 24.10: *"on the second / follower server the master is on top and that server is at the bottom, kind of weird,
+always the local machine should be at the top."*
+
+### Investigation
+
+- Screenshot of .4's screen: its kiosk is connected to **this box** (`This server: highascg7580` in Devices →
+  Servers). This is WO-670 P3b by design: the client follows the master (owner answer 1, 22.10: the client connects
+  to one main server). So the top of Devices (destinations, rear panel, cables) is the master's. .4 is one of the
+  master's linked servers, shown read-only under it.
+- The Devices tab only ever talks to the connected server:
+  - ~60 `Api.` calls across 17 files in `features/devices/`;
+  - ~50 `Settings.` uses (the `settings_state.gd` autoload: casparServer, screenDestinations, streaming), with 21
+    `load_from_server` calls;
+  - `Store.get_value` for `channelMap`, `configComparison`, `templates`, `hostOperatorFullscreen`;
+  - WS events `cluster:peers`, `gpu_topology_changed`, `log_line`.
+  So a client that follows another server cannot show or edit its own machine at all.
+- The client already knows its own machine: `Config.home_origin()` (WO-726; the profile origin without the
+  followed master, `http://127.0.0.1:4200` on a box).
+- A laptop's default profile is also `127.0.0.1:4200`, with no server behind it. "Home is local" alone is not
+  enough: the home must answer as HighAsCG.
+- `/api/state` carries `channelMap`, `configComparison`, `templates` and `hostOperatorFullscreen` in one answer.
+- The project uses no `class_name`: there is no editor class cache, and a new class name fails to parse. Types go
+  through preloaded scripts.
+
+### What was done
+
+- `core/devices_target.gd` (new autoload `DevicesTarget`):
+  - Decides once at start whose devices the tab works on. It is the home server when this client runs on a box
+    with its own server (local origin, `/api/replication/ping` answers `appId: highascg`) and is connected to
+    another server. Otherwise it is the connected server.
+  - `api`: the global `Api` when it is the connected server. When it is the home server, its own ApiClient with the
+    home origin. Requests made before the decision wait (`held`), so nothing lands on the wrong server.
+  - `settings`: the global `Settings`, or its own `settings_state.gd` copy that reads and saves through that client.
+  - `value(key)` (the Store keys above) and `refresh_state()` (one `/api/state` from home before each Devices load).
+  - `origin()`: host-live webpage URLs are built from it.
+  - Pure rule in `core/devices_target_model.gd` `pick` (tests run without autoloads).
+- `core/api.gd`: `origin_override`, `held` / `open()`, `base()`. `core/settings_state.gd`: an injectable `api`.
+- `features/devices/*`: every `Api.` → `DevicesTarget.api.`, `Settings.` → `DevicesTarget.settings.`, the four Store
+  keys → `DevicesTarget.value`, `Config.origin` → `DevicesTarget.origin()`.
+  - The sender picker keeps the global `Api`: sender choices are the same on every linked server
+    (`cluster.senders`), and Previs uses it too.
+- `cluster_panel.gd`: with a home target, the followed server's `cluster:peers` push is ignored (that is its view,
+  not this machine's), and `/api/cluster` is polled every 3 s instead.
+- `devices_tab.gd`: `refresh()` awaits `DevicesTarget.refresh_state()` first.
+- `features/settings/network_pane.gd`: an injectable `api`. The Devices server page passes the target.
+
+Why not reorder the cards only: the local machine on top but read-only, with the master's panel editable under it,
+would be the same confusion upside down. Why not stop kiosks following the master: owner answer 1 (one main server),
+and before P2 the kiosk would run a different project.
+
+For this box's own kiosk (home = connected) nothing changes: the target is the global `Api` / `Settings` / `Store`,
+the very objects used before.
+
+### What was VERIFIED
+
+- Godot 21498 passed, 0 failed, including `test_devices_target.gd`:
+  - the `pick` rule: following from a server box → home; connected home, no server at home, a home that is not this
+    machine → the connected server;
+  - a source pin: no direct `Api.` / `Settings.` left in `features/devices` except the sender picker. Mutation: one
+    `Api.` put back in `snapshot_dialogs.gd` → the pin fails.
+- `--check` boot OK. Smokes that read Devices files (WO-623, WO-716, WO-723): 25/25.
+- **Live, this box** (kiosk restarted, home = connected): Devices exactly as before: its own panel and cable on top,
+  `This server: highascg7580`, .4 listed below. Journal line `[devices] …` absent, as it should be.
+- **Live, the follower case:** a second client on this box under Xvfb, with its own user dir, set to follow .4
+  (ui.cfg `[cluster] origin = http://192.168.0.4:4200`, follow off so it stays there).
+  - Log: `[devices] this client follows http://192.168.0.4:4200: the Devices tab works on this machine
+    (http://127.0.0.1:4200)`.
+  - The client ran .4's project (`New project 1`, .4's media folders), yet Devices showed **this machine** on top
+    (`This server: highascg7580`, its rear panel and Operator GUI cable, editable) with .4 under it. That is the
+    mirror of .4's kiosk.
+- **.4** got b16d368f (WO-724 drop update), and its kiosk was restarted. Log: `[devices] this client follows
+  http://192.168.0.23:4200: the Devices tab works on this machine`.
+  - The screen was not clicked: .4 was in the middle of the owner's `do-release-upgrade` to 26.04 in an xterm on
+    that display.
+  - Seeing it there = owner QA, or the next session once the upgrade is done.
+- Not done: other servers' cards stay read-only (P3b: edit any linked server from here).
