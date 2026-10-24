@@ -138,6 +138,13 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
   `core/config.gd` `_init` (a LAN-address origin already saved, like this kiosk's, heals at start). A remote client
   (home not loopback) and another port on this machine (another server) are left as they are.
 
+- **ISO build leaves Caspar on the real config:** `tools/eggs/live-usb/build-highascg-egg.sh` now runs
+  `systemctl try-restart casparcg-server.service` right after `highascg-exfat-remount-sync.sh` has synced the real
+  config back (the file returns with its old mtime, Oct 22 21:53, so nothing watching it noticed). `try-restart`
+  restarts only a running Caspar; a failure warns, never fails the finished build. Smoke
+  `smoke-wo724-build-restarts-caspar.test.js` (in FILES) pins it after the factory-config reset and the sync, and
+  before the WO-462 completion sidecar.
+
 ## What was VERIFIED
 
 - Smoke 6/6. `xvfb-run -a npm run test:ci` 3087 tests, 3085 pass, 0 fail, 2 skipped; repo-integrity, max-lines,
@@ -151,13 +158,15 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
   `origin="http://192.168.0.23:4200"` → `[client] server http://127.0.0.1:4200`, no `/api/video-feed` upgrade, a shm
   lease on `pgm1`. Then failover run 2 + failback: `following the master: http://192.168.0.4:4200 →
   http://127.0.0.1:4200`, `ui.cfg` origin `""`, no feed.
+- Build script: `bash -n` clean; smoke 4/4 + the other build smokes (WO-462/464/465, build stamp) 22/22;
+  `test:ci` 3091 tests, 3089 pass, 0 fail, 2 skipped. **Not run on a real ISO build** (owner QA on the next build:
+  journal `casparcg-server` restarted after `Remount bridge/USB`, then `PLAY 4-1 DECKLINK` with no ERROR).
 - CI: 6af5c6d9 green; 329919d1 first run's verify step hung after the suite printed `fail 0` (runner, past its 15-min
   timeout) → cancelled + re-run → green.
 
 ## Open
 - .4 runs the 23.10 ISO: update it to `main` (WO-723 sender choice; until then untick lighting / PTZ on .4 when linked).
 - P4a take forwarding needs the same project on .4 and a destination cabled there (owner decision, WO-712 R5).
-- `build-highascg-egg.sh`: restart `casparcg-server` after the config comes back (or never restart it mid-build).
 - A pull of a spaced path still fails at the wrapper (hot-backup pair `connect-pair.js:256`); needs the wrapper to
   understand rsync's escapes — a security-reviewed change, owner decision.
 - Clock drift with NTP off: show each peer's clock offset (ping `serverTimeMs`) on the Servers card, warn past 30 s.

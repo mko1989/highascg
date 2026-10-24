@@ -193,6 +193,12 @@ bash "${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" casparcg 2>/dev/null 
 	echo "WARN: remount/sync skipped — run: sudo bash ${REPO_ROOT}/scripts/highascg-exfat-remount-sync.sh" >&2
 }
 
+# WO-724: reset-iso-operator-config.sh put the factory casparcg.config in place and the npm step's
+# pause/restore restarted Caspar on it; the sync above brings the real config back, so restart Caspar
+# onto it (23.10: the build host ran the 1-channel factory config until the next Caspar restart).
+echo "==> Restart Caspar on the restored config"
+systemctl try-restart casparcg-server.service || echo "WARN: casparcg-server did not restart — sudo systemctl restart casparcg-server" >&2
+
 # The squashfs step above stops companion.service; nothing started it again (22.10, Companion stayed down after a build).
 if systemctl is-enabled --quiet companion.service 2>/dev/null; then
 	echo "==> Restart Companion (stopped for the squashfs)"
