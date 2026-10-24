@@ -71,3 +71,13 @@ static func tab_box(bg: Color, underline: Color) -> StyleBoxFlat:
 	sb.content_margin_left = 16
 	sb.content_margin_right = 16
 	return sb
+
+
+## A full-height divider line between side-by-side groups (2 px, BORDER colour: visible on BG_DARK).
+static func vline() -> ColorRect:
+	var r := ColorRect.new()
+	r.color = BORDER
+	r.custom_minimum_size.x = 2
+	r.size_flags_vertical = Control.SIZE_FILL
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r

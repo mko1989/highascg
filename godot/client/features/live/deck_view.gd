@@ -64,6 +64,8 @@ func rebuild() -> void:
 	for main in DeckModel.screen_count(cm):
 		_main_for_card = main
 		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
+		if main > 0:  # a line between screens: their cards would otherwise run together
+			_columns.add_child(ThemeBuilder.vline())
 		_columns.add_child(_column(DeckModel.screen_label(cm, main), DeckModel.scenes_for_main(scenes, main), bus, main, cm))
 
 

@@ -136,7 +136,11 @@ func _build_header() -> Control:
 	row.add_theme_constant_override("separation", 14)
 	bar.add_child(row)
 	var logo := TextureRect.new()
-	logo.texture = ConnectionEye.load_png("res://assets/ui/logo.png")
+	var logo_img := Image.new()
+	logo_img.load_png_from_buffer(FileAccess.get_file_as_bytes("res://assets/ui/logo.png"))
+	var fit_logo := func() -> void: logo.texture = sized_logo(logo_img, logo.size, logo.get_window())
+	logo.resized.connect(fit_logo)
+	logo.ready.connect(func() -> void: logo.get_window().size_changed.connect(fit_logo))  # UI scale is set after boot
 	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	logo.custom_minimum_size = Vector2(26, 32)
@@ -203,3 +207,14 @@ func _refresh_eye() -> void:
 		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
 			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])
 
+
+## The 72×96 bunny drawn at ~24×32 through a plain bilinear sample skipped pixels: its thin white outline broke into
+## dots. Resample once, Lanczos, to the exact pixels it covers (UI scale included); a resize does it again.
+static func sized_logo(img: Image, box: Vector2, win: Window) -> Texture2D:
+	if img.is_empty() or box.y < 1.0:
+		return null
+	var k := win.content_scale_factor if win else 1.0
+	var h := maxi(1, roundi(minf(box.y, box.x * img.get_height() / img.get_width()) * k))
+	var out := img.duplicate() as Image
+	out.resize(maxi(1, roundi(h * float(img.get_width()) / img.get_height())), h, Image.INTERPOLATE_LANCZOS)
+	return ImageTexture.create_from_image(out)
