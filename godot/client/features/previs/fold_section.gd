@@ -1,8 +1,10 @@
 extends VBoxContainer
 ## WO-640 — one collapsible section of the previs Inspector page: a "▾ Title" row folds its content. The open state
 ## is remembered per title in user://ui.cfg [previs_folds] (a per-viewer convenience; nothing saved = open).
+## WO-740: a `help` topic puts a "?" at the right of the title row that opens that help page (help_dialog.gd).
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const HelpDialog := preload("res://app/help_dialog.gd")
 const UI_CFG := "user://ui.cfg"
 
 var title := ""
@@ -10,13 +12,13 @@ var content := VBoxContainer.new()
 var _toggle := Button.new()
 
 
-func _init(t: String = "", parts: Array = []) -> void:
+func _init(t: String = "", parts: Array = [], help := "") -> void:
 	title = t
 	_toggle.flat = true
 	_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_toggle.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	_toggle.pressed.connect(func() -> void: set_open(not content.visible, true))
-	add_child(_toggle)
+	add_child(_toggle if help == "" else HelpDialog.beside(_toggle, help))
 	content.add_theme_constant_override("separation", 6)
 	add_child(content)
 	for p in parts:

@@ -23,6 +23,7 @@ const GhostRow := preload("res://features/previs/tracking/ghost_row.gd")
 const PersonMarkRow := preload("res://features/previs/tracking/person_mark_row.gd")  # WO-713 R3
 const MI := preload("res://features/previs/tracking/marker_input.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const HelpDialog := preload("res://app/help_dialog.gd")  # WO-740
 
 ## [label, key, min, max, step]
 const POSE := [["X m (stage left +)", "pos_x", -200, 200, 0.01], ["Y m (upstage +)", "pos_y", -200, 200, 0.01],
@@ -159,7 +160,7 @@ func _ready() -> void:
 		_pose[key] = sb
 		_pair(g, f[0], sb)
 	_body.add_child(g)
-	_body.add_child(_heading("Calibration points"))
+	_body.add_child(HelpDialog.beside(_heading("Calibration points"), "calibrate-cameras"))
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 260
 	_list.item_selected.connect(func(i: int) -> void: pick(str(_ids[i])))

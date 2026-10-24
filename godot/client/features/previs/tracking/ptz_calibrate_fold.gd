@@ -12,6 +12,7 @@ signal done(cam_id: String, pins: Array)
 const P := preload("res://features/previs/tracking/ptz_model.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const HelpDialog := preload("res://app/help_dialog.gd")  # WO-740
 
 const URL := "/api/tracking/ptz/calibrate"
 const COARSE := 5.0
@@ -36,7 +37,7 @@ func _ready() -> void:
 	_toggle.toggle_mode = true
 	_toggle.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	_toggle.toggled.connect(_set_open)
-	add_child(_toggle)
+	add_child(HelpDialog.beside(_toggle, "calibrate-ptz"))
 	_body = VBoxContainer.new()
 	_body.visible = false
 	add_child(_body)

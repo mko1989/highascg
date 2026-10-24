@@ -153,7 +153,7 @@ func _ready() -> void:
 	_label(prog).text = "Click fixtures in the 3D view; ctrl / shift-click adds"
 	prog.add_child(Programmer.new())  # WO-615 T6
 	add_child(Fold.new("Programmer", [prog]))
-	add_child(Fold.new("Calibrate heads", [CalibrateFold.new()]))  # WO-700: aimed with the Programmer above it
+	add_child(Fold.new("Calibrate heads", [CalibrateFold.new()], "calibrate-heads"))  # WO-700: aimed with the Programmer above it
 	_confirm_on = ConfirmationDialog.new()
 	_confirm_on.dialog_text = ("Start DMX output? The universes checked under Send ▾ go out at 44 Hz with every " +
 		"patched fixture at its programmer value or GDTF default.")

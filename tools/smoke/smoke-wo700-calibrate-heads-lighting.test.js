@@ -379,7 +379,7 @@ describe('WO-700 calibrate heads from Lighting', () => {
 		// owner 23.10: just below the Programmer that aims the head
 		assert.match(
 			GD('features/previs/fixtures/fixtures_section.gd'),
-			/add_child\(Fold\.new\("Programmer", \[prog\]\)\)\n\tadd_child\(Fold\.new\("Calibrate heads", \[CalibrateFold\.new\(\)\]\)\)/
+			/add_child\(Fold\.new\("Programmer", \[prog\]\)\)\n\tadd_child\(Fold\.new\("Calibrate heads", \[CalibrateFold\.new\(\)\], "calibrate-heads"\)\)/ // WO-740: + its help page
 		)
 		const sec = GD('features/previs/tracking/calibrate_section.gd')
 		assert.match(sec, /\{"action": "start", "hold": false\} if lighting/)
