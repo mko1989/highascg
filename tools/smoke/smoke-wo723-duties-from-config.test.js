@@ -274,7 +274,7 @@ describe('WO-723 routes and wiring', () => {
 		const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo723-id-'))
 		try {
 			const file = path.join(dir, 'device-identity.json')
-			const out = cp.execFileSync(process.execPath, ['-e', "const i=require('./src/system/device-identity'); i.getDevicePublicKeyPem(); console.log(i.DEVICE_IDENTITY_PATH)"], {
+			const out = cp.execFileSync(process.execPath, ['-e', `const i=require(${JSON.stringify(path.join(ROOT, 'src/system/device-identity.js'))}); i.getDevicePublicKeyPem(); console.log(i.DEVICE_IDENTITY_PATH)`], {
 				cwd: ROOT,
 				env: { ...process.env, HIGHASCG_DEVICE_IDENTITY_PATH: file },
 				encoding: 'utf8',
