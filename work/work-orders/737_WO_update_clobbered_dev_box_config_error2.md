@@ -168,3 +168,21 @@ Findings:
 - `verify-decklink.sh` live on this box: `WARN: blackmagic module not loaded` before, `OK: kernel module loaded:
   blackmagic_io` after.
 - rsync rule check: `client/lib/a.js` lands, `client/assets` doesn't, `src/client/` is unaffected.
+
+### Live on .4, and a second gap: client/lib is ES modules
+
+The fixed apply was installed on .4 first, its config was backed up (`~/config-backup-before-185006Z`), and .4 was
+updated to release 2026-10-24T185006Z (CI run 40122198739: verify, build-client, godot and release all green).
+- The config came through byte-identical (`diff -rq` against the backup: no difference; mtime still 20:12:23).
+- `client/lib` arrived (238 files).
+- The scene routes still answered 502, with a new error: `Cannot use import statement outside a module`. The files
+  are ES modules, and Node only treats them as such because of `client/package.json` (`"type": "module"`). The root
+  `package.json` says `commonjs`. The test had checked that the files were in the tarball, but never imported them.
+
+Done:
+- `client/package.json` joins the tarball members.
+- The apply adds `--include=/client/package.json`.
+- Test 4 now rebuilds what a release box has: the root package.json plus the client files from the real tar rules.
+  It dynamically imports every module in the server's client/lib closure from there.
+
+Verified: smoke 5/5. With the member removed, test 4 fails with .4's exact error.

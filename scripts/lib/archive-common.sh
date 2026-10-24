@@ -31,6 +31,7 @@ archive_common_server_tar_members() {
 		godot/client
 		godot/GODOT_VERSION
 		client/lib
+		client/package.json
 	)
 	if [[ "${RELEASE_SERVER_ONLY:-0}" != "1" ]]; then
 		_out+=(dist-web)

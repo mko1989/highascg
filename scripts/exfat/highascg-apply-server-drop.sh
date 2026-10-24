@@ -191,9 +191,10 @@ apply_server_drop() {
 	mkdir -p "$staging_parent"
 	local staging="${staging_parent}/${src_stamp}"
 	rm -rf "$staging"
-	# WO-737: src/ imports client/lib at runtime, so a drop's client/lib must land even where the installed excludes
-	# (refreshed only by the install script) still list /client/. Rules here come first and win.
-	local xtra=(--include='/client/' --include='/client/lib/***' --exclude='/client/*')
+	# WO-737: src/ imports client/lib at runtime (ES modules: client/package.json says "type": "module"), so a drop's
+	# client/lib and that marker must land even where the installed excludes (refreshed only by the install script)
+	# still list /client/. Rules here come first and win.
+	local xtra=(--include='/client/' --include='/client/package.json' --include='/client/lib/***' --exclude='/client/*')
 	[[ -f "$excludes" ]] && xtra+=(--exclude-from="$excludes")
 	log "rsync ${src}/ → ${staging}/"
 	rsync "${xtra[@]}" -rlptgoD --delete "${src%/}/" "${staging%/}/"

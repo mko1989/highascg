@@ -33,6 +33,7 @@ test('an update keeps the box config, adds new factory files and still updates c
 	write(path.join(drop, 'config/server-update-rsync-excludes.txt'), 'new excludes, longer\n')
 	write(path.join(drop, 'src/config/screen-destinations.js'), '// new code, longer\n')
 	write(path.join(drop, 'client/lib/transition-presets.js'), 'export const x = 1\n')
+	write(path.join(drop, 'client/package.json'), '{"type":"module"}\n')
 	write(path.join(drop, 'client/assets/big.png'), 'png')
 
 	write(path.join(dest, 'config/screen_destinations.json'), '{"box":"PGM/PRV 1"}\n')
@@ -51,6 +52,7 @@ test('an update keeps the box config, adds new factory files and still updates c
 	assert.equal(read(path.join(dest, 'src/config/screen-destinations.js')), '// new code, longer\n', 'src/config is code, not box config')
 	assert.equal(read(path.join(dest, 'BUILD_STAMP')).trim(), '2026-10-24T200000Z')
 	assert.ok(fs.existsSync(path.join(dest, 'client/lib/transition-presets.js')), 'client/lib lands despite the /client/ exclude')
+	assert.ok(fs.existsSync(path.join(dest, 'client/package.json')), 'the "type": "module" marker lands with it')
 	assert.ok(!fs.existsSync(path.join(dest, 'client/assets')), 'the rest of client/ stays out')
 })
 
@@ -115,15 +117,23 @@ function serverClientLibClosure() {
 	return [...seen]
 }
 
-test('the server tarball ships client/lib, and all src/ needs from client/ is inside it', () => {
+test('the server tarball ships client/lib, and src/ can import all it needs from the shipped files alone', () => {
 	const closure = serverClientLibClosure()
 	assert.ok(closure.includes('client/lib/transition-presets.js') && closure.includes('client/lib/program-audio-layouts.js'))
 	assert.deepEqual(closure.filter((f) => !f.startsWith('client/lib/')), [], 'a server-imported module reaches outside client/lib')
 	const sh = (script) => execFileSync('bash', ['-c', `source scripts/lib/archive-common.sh; ${script}`], { cwd: REPO, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
-	assert.ok(sh('m=(); archive_common_server_tar_members m; printf "%s\\n" "${m[@]}"').split('\n').includes('client/lib'))
-	const listed = sh('a=(-C "$PWD" -c); archive_common_server_tar_excludes a; archive_common_bulk_tar_excludes a; tar "${a[@]}" client/lib | tar -t')
-	const missing = closure.filter((f) => !listed.includes(`${f}\n`))
+	const members = sh('m=(); archive_common_server_tar_members m; printf "%s\\n" "${m[@]}"').split('\n')
+	assert.ok(members.includes('client/lib') && members.includes('client/package.json'))
+	// What a release box gets: the repo package.json ("type": "commonjs") plus the shipped client/ files, nothing else.
+	const box = fs.mkdtempSync(path.join(os.tmpdir(), 'wo737-pkg-'))
+	fs.copyFileSync(path.join(REPO, 'package.json'), path.join(box, 'package.json'))
+	sh(`a=(-C "$PWD" -c); archive_common_server_tar_excludes a; archive_common_bulk_tar_excludes a; tar "\${a[@]}" client/lib client/package.json | tar -x -C '${box}'`)
+	const missing = closure.filter((f) => !fs.existsSync(path.join(box, f)))
 	assert.deepEqual(missing, [], 'server-imported client/lib modules missing from the tarball')
+	const imp = closure.map((f) => `import(${JSON.stringify(path.join(box, f))})`).join(',')
+	const out = execFileSync(process.execPath, ['-e', `Promise.all([${imp}]).then(() => console.log('ok'), (e) => console.log(e.message))`], { cwd: box, encoding: 'utf8' })
+	assert.equal(out.trim(), 'ok', 'the shipped client/lib does not import')
+	fs.rmSync(box, { recursive: true, force: true })
 })
 
 test('verify-decklink reads /proc/modules (lsmod | grep -q under pipefail reported a loaded module missing)', () => {
