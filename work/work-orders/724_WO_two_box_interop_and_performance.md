@@ -164,8 +164,18 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
 - CI: 6af5c6d9 green; 329919d1 first run's verify step hung after the suite printed `fail 0` (runner, past its 15-min
   timeout) → cancelled + re-run → green.
 
+## .4 updated to `main` (24.10, after the owner gave the SSH login)
+- SSH as `casparcg` with the password works (no sudo). .4 is a disk install without a git checkout. Code copied the way
+  a drop-update applies it: `git archive 4c267126` → `rsync -ac` with `config/server-update-rsync-excludes.txt`, plus
+  `/config/` (all of .4's own settings kept), `/dist-web/` and `template/shaders/sh-test.html` excluded; 243 files,
+  every replaced file kept in `~/highascg-pre-update-20261024-145147/` (46 files) on .4; `~/highascg/.updated-from`
+  names the commit. `package.json` differs only by a script, so no npm install. `BUILD_STAMP` stays the ISO's.
+- highascg restarted (SIGTERM, systemd): up in 6.5 s, the same two boot warnings as its 10:00 start (no ArtNet border,
+  previs without three), no new errors; it now answers WO-723's `/api/server/senders`. The WO-725 live run passed on it.
+- **.4's kiosk still runs the old client code** (restarting the operator GUI on .4 was refused by the session's
+  permission check); a reboot of .4 or a kiosk restart there picks it up.
+
 ## Open
-- .4 runs the 23.10 ISO: update it to `main` (WO-723 sender choice; until then untick lighting / PTZ on .4 when linked).
 - P4a take forwarding needs the same project on .4 and a destination cabled there (owner decision, WO-712 R5).
 - A pull of a spaced path still fails at the wrapper (hot-backup pair `connect-pair.js:256`); needs the wrapper to
   understand rsync's escapes — a security-reviewed change, owner decision.
