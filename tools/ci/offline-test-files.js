@@ -406,6 +406,7 @@ module.exports = [
 	'tools/smoke/smoke-wo739-link-invites.test.js',
 	'tools/smoke/smoke-wo744-shm-sources.test.js',
 	'tools/smoke/smoke-wo722-confine-resync.test.js',
+	'tools/smoke/smoke-wo747-boot-seeded-recycle-sig.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

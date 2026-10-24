@@ -236,8 +236,8 @@ function main() {
 		})
 		if (!config.streaming.enabled) void enqueueStreaming(async () => await stopStreamingSubsystem())
 
-		/** Subsystem recycle hash — null until first config change after boot. */
-		let subsystemReloadSig = null
+		/** Subsystem recycle hash — WO-747: seeded with what boot applied (null made the first save after boot recycle everything). */
+		let subsystemReloadSig = hashSubsystemReload(config)
 
 		configManager.on('change', () => {
 			syncRuntimeConfigFromManager()
