@@ -1,6 +1,6 @@
 # WO-732 — Linked servers that work as one: mutual link, one shared project, cable the other server from here
 
-**Status: IN PROGRESS — investigation written (24.10.26); P1 (mutual link) done offline, live check on both boxes next; P2, P3 open.**
+**Status: IN PROGRESS — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P2, P3 open (see the owner's follow-up below).**
 
 Owner, 24.10: *"i cant establish a meaningful connection between servers and connect screen destinations etc. my
 thinking is that when connected they both show up in each other's devices and can have connections made etc."*
@@ -118,7 +118,7 @@ Why the plain `POST /api/cluster/peers` and not a new signed endpoint: the recei
 trust yet. With `enforceAuth` off that route is already open, so no trust is added. With it on, the link-back fails
 **visibly** (one-way line) rather than silently trusting any key on the LAN.
 
-## P1 — what was VERIFIED (offline)
+## P1 — what was VERIFIED
 
 - WO-732 smoke 9/9. Mutation check: without the repair in `poll` 3 tests fail; without the race tombstone 1 fails.
 - WO-725 3-sandbox smoke 14/14: real HTTP, real `localAddressTo` + `httpPort`, link once / unlink once.
@@ -126,3 +126,25 @@ trust yet. With `enforceAuth` off that route is already open, so no trust is add
 - Godot 21492/0 (+5 `test_link_line_only_when_one_way`), `--check` boot OK.
 - Clean export: `test:ci` 3170 tests, 3166 pass, 3 skipped, 1 fail (WO-498, export-only). Lint 214 warnings,
   max-lines, unwired-exports, repo-integrity, boot, contract unchanged.
+
+Live, this box (192.168.0.23) ↔ .4 (192.168.0.4):
+- **This box restarted on e4c07993 with .4 still on 4c267126 (older: no `clusterLinked`).**
+  - The repair asked .4 once. Journal `[cluster] highascg5867 did not list this server: linked back` at 18:26:03,
+    3 s after start.
+  - .4 then listed `highascg7580 @ 192.168.0.23`, online, and **followed the master** (`master highascg7580 epoch 1,
+    follows: true`).
+  - Signed calls now travel: `POST /api/cluster/send look.take` → .4 answers 404 "look … not found", the action's own
+    answer. Before: 403 "not linked here".
+- **.4 put on e4c07993** the WO-724 way:
+  - `git archive` → `rsync -ac` with `config/server-update-rsync-excludes.txt` + `/config/`, `/dist-web/`,
+    `template/shaders/sh-test.html` excluded. 45 files (26 new incl. WO-730/731, 19 changed).
+  - Replaced files are kept in `~/highascg-pre-update-<ts>/` on .4; `.updated-from` names the commit.
+    `package.json` is identical, so no npm install.
+  - Up in 7 s. Both sides `linked_back: true`; .4's ping `clusterLinked: ['87f0da5337ca6e2d']` (this box).
+- **Round trip from .4's side:**
+  - `DELETE` on .4 → 200 in 13 ms, `link_back ok`, both lists empty, master epoch 0 on both.
+  - `POST` link on .4 → `link_back ok`, both list each other, `linked_back: true` on both.
+  - Master put back as it was (`master/set self, auto`): this box epoch 1, .4 follows.
+- .4's kiosk still runs its old Godot client. The one-way line shows once it restarts. The client restarts itself
+  when its server restarts (connection_menu.gd); not checked on .4's screen.
+
