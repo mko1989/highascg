@@ -1,7 +1,8 @@
 # WO-724 — Two real servers: interoperability and performance, together and one by one
 
-**Status: IN PROGRESS (24.10.26) — single-box benchmarks + two-box link / master / signed calls / Send media done;
-Send media fix (names with spaces) DONE and proven live; failover drill, load-while-linked and teardown next.**
+**Status: IN PROGRESS (24.10.26) — single-box benchmarks + two-box link / master / signed calls / Send media / failover
+done; fixes DONE and proven live: Send media with spaces, kiosk stays home after a failover; load-while-linked and
+teardown next.**
 
 Owner, 24.10: *"You can restart now. Dev machine in the shop. Continue running multiple tests to check interoperability
 and performance of both servers and one by one."* — this box (192.168.0.23, `highascg7580`) is a dev machine in the
@@ -81,6 +82,21 @@ HighAsCG CPU under the 10-concurrent GET load: 55–58 % of one core on both; Ca
 - **Master survives a restart:** this server restarted (SIGTERM, systemd, ≈7 s) while master; .4 polled every 0.5 s and
   kept `highascg7580 epoch 1` throughout (failover timeout `FAILOVER_MS` 12 s, `cluster-master.js:27`).
 - **Send media (P2b) failed on names with spaces** — see below.
+- **Failover drill (P3a/P3b), twice:** this server frozen (SIGSTOP 25 s, Caspar keeps playing) while master.
+  Run 1: .4 master (epoch 2) at **+12.8 s**; on SIGCONT this box followed .4 **0.3 s** later (epoch fencing, never two
+  masters). Run 2: +11.8 s (epoch 4), stand-down 0.1 s. Failback (`master/set self`): .4 shows the new epoch in 23 ms.
+  The kiosk client followed both ways (`[cluster] following the master: … → http://192.168.0.4:4200`, ≈7 s after
+  the stand-down, a client restart). Cosmetic: the follow dialog popped while a Devices confirmation was open
+  (Godot "parent window already has another exclusive child"); it still followed.
+- **Kiosk came back to its own box under the LAN address** (run 1 failback): `[cluster] following the master:
+  http://192.168.0.4:4200 → http://192.168.0.23:4200`, saved as `ui.cfg [cluster] origin`. The client counts only
+  loopback as local (`platform.gd:11` `is_local_origin`), so the operator monitor then drew its own box over the JPEG
+  feed (960 px / 15 fps; journal `Upgrade … /api/video-feed`) instead of shared memory, and a later DHCP change would
+  have left the kiosk pointed at a dead address. Cause: `.4` lists this box by its LAN IP, and `cluster_follow.gd`
+  `_switch` treats "home" only as the exact loopback origin.
+- **Idle cost while linked:** this server 2.6–5 % of a core (vs 2.1–2.6 % alone; the 5 s cluster poll). .4 went from
+  2.8 % to ≈11 % while it was master **with this box's kiosk as a remote client** — that is the JPEG feed encode for a
+  remote GUI (P1), not the link.
 
 ### Send media: names with spaces
 `POST /api/cluster/peers/highascg5867/send-media` (project godot_test, 3 paths) → `failed`:
@@ -106,6 +122,12 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
   spaced folder + file, a project folder with `&` / `(1)` / a spaced sub-folder, a template, the wrapper still refusing
   a destination outside media/template, and the old argv reproducing the box error (`disallowed path token: Orange`).
 
+- **Kiosk stays home (Godot):** `core/cluster_follow_model.gd` `resolve_target(origin, home, local_addrs)` (+ `port_of`):
+  an origin that is this machine under one of its own addresses, on home's port, while home is loopback → home.
+  Used in `app/cluster_follow.gd` `_switch` (every follow, both the snapshot and the probe path) and in
+  `core/config.gd` `_init` (a LAN-address origin already saved, like this kiosk's, heals at start). A remote client
+  (home not loopback) and another port on this machine (another server) are left as they are.
+
 ## What was VERIFIED
 
 - Smoke 6/6. `xvfb-run -a npm run test:ci` 3087 tests, 3085 pass, 0 fail, 2 skipped; repo-integrity, max-lines,
@@ -113,6 +135,12 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
 - **Live:** this server restarted onto the change; Send media to .4 (old wrapper) → `done`, 3/3 paths, 2.1 s
   (`[replication] rsync push 3/3 path(s) → 192.168.0.4`); .4's `GET /api/media` lists
   `projects/npcc/Tlo Orange Ball/BAZA 2.mp4` at 99685797 bytes (the source size).
+
+- Godot units 21481 passed / 0 failed (+8 `test_resolve_target_keeps_the_on_box_client_home`).
+- **Live, kiosk:** restarted as openbox does (`run-client.sh --autostart` on :0) with the saved
+  `origin="http://192.168.0.23:4200"` → `[client] server http://127.0.0.1:4200`, no `/api/video-feed` upgrade, a shm
+  lease on `pgm1`. Then failover run 2 + failback: `following the master: http://192.168.0.4:4200 →
+  http://127.0.0.1:4200`, `ui.cfg` origin `""`, no feed.
 
 ## Open
 - `build-highascg-egg.sh`: restart `casparcg-server` after the config comes back (or never restart it mid-build).

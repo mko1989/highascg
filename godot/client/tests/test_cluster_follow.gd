@@ -45,3 +45,16 @@ func test_pick() -> void:
 	t.eq(F.pick(probes), "http://c:4200", "the master with the highest epoch")
 	t.eq(F.pick(probes.slice(0, 1) + probes.slice(3), "http://a:4200"), "http://a:4200", "no master → home if it answers")
 	t.eq(F.pick(probes.slice(3), "http://d:4200"), "", "home silent → nothing")
+
+
+func test_resolve_target_keeps_the_on_box_client_home() -> void:
+	var home := "http://127.0.0.1:4200"
+	var mine := PackedStringArray(["192.168.0.23", "100.64.1.2"])
+	t.eq(F.resolve_target("http://192.168.0.23:4200", home, mine), home, "own LAN address → home (WO-724)")
+	t.eq(F.resolve_target("http://100.64.1.2:4200", home, mine), home, "any own address")
+	t.eq(F.resolve_target("http://192.168.0.4:4200", home, mine), "http://192.168.0.4:4200", "another box: follow it")
+	t.eq(F.resolve_target("http://192.168.0.23:4290", home, mine), "http://192.168.0.23:4290", "another port here = another server")
+	t.eq(F.resolve_target("http://192.168.0.23:4200", "http://10.0.0.5:4200", mine), "http://192.168.0.23:4200", "a remote client: as is")
+	t.eq(F.resolve_target("", home, mine), "", "nothing")
+	t.eq(F.port_of("https://box.local/x"), 443, "https default port")
+	t.eq(F.port_of("http://[::1]:4201"), 4201, "IPv6 port")

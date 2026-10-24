@@ -5,6 +5,7 @@ extends Node
 ## next to the server).
 
 const Profiles := preload("res://core/connection_profiles_model.gd")
+const Follow := preload("res://core/cluster_follow_model.gd")
 
 const DEFAULT_ORIGIN := "http://127.0.0.1:4200"
 const UI_CFG := "user://ui.cfg"
@@ -17,6 +18,8 @@ var _profiles := {}
 func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
 	var followed := str(cluster().origin)
+	if followed != "" and Follow.resolve_target(followed, home_origin(), IP.get_local_addresses()) == home_origin():
+		followed = ""  # WO-724: this machine under its LAN address — home (loopback, shared memory)
 	origin = resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), followed if followed != "" else Profiles.active_origin(profiles()))
 
 

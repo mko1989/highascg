@@ -26,6 +26,27 @@ static func peer_origin(current: String, peer: Dictionary) -> String:
 	return "http://%s:%d" % [host, int(peer.get("port", 4200))]
 
 
+static func port_of(origin: String) -> int:
+	var s := origin
+	for p in ["http://", "https://"]:
+		if s.begins_with(p):
+			s = s.substr(p.length())
+	s = s.get_slice("/", 0)
+	var tail := s.get_slice("]", 1) if s.begins_with("[") else s
+	return int(tail.get_slice(":", 1)) if tail.count(":") == 1 else (443 if origin.begins_with("https://") else 80)
+
+
+## The origin to go to: `home` when `origin` is this machine under one of its own addresses (its LAN IP as a linked
+## server lists it) and home is loopback — the on-box client keeps 127.0.0.1 and shared-memory pictures. WO-724: a
+## real failover round trip left the kiosk on http://<own LAN IP>:4200, i.e. on the JPEG feed of its own box.
+static func resolve_target(origin: String, home: String, local_addrs: PackedStringArray) -> String:
+	if origin == "" or not host_of(home) in ["127.0.0.1", "localhost", "::1"]:
+		return origin
+	if host_of(origin) in ["127.0.0.1", "localhost", "::1"] or (host_of(origin) in local_addrs and port_of(origin) == port_of(home)):
+		return home
+	return origin
+
+
 ## This server + every linked one (the list kept for when this server is gone).
 static func servers(current: String, snap: Dictionary) -> PackedStringArray:
 	var out := PackedStringArray([current])

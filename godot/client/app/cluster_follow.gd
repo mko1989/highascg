@@ -137,7 +137,8 @@ func _follow(origin: String) -> void:
 		print("[cluster] not following ", origin, ": it does not say it is master")
 
 
-func _switch(origin: String) -> void:
+func _switch(to: String) -> void:
+	var origin := F.resolve_target(to, Config.home_origin(), IP.get_local_addresses())
 	if origin == "" or origin == Config.origin:
 		return
 	if OS.get_environment("HIGHASCG_SERVER") != "":
