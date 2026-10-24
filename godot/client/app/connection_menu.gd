@@ -88,6 +88,9 @@ static func restart(host: Node) -> void:
 	# WO-688: an exported client (Mac / Windows) carries its project inside; --path there points at no project.
 	var args := PackedStringArray(["--"] if OS.has_feature("template") else ["--path", ProjectSettings.globalize_path("res://"), "--"])
 	args.append_array(Profiles.restart_user_args(OS.get_cmdline_user_args()))
+	var xr := XRServer.find_interface("OpenXR")
+	if xr != null and xr.is_initialized():  # WO-741: a client in a headset restarts in it (get_cmdline_args drops --xr-mode)
+		args = PackedStringArray(["--xr-mode", "on"]) + args
 	if OS.create_process(OS.get_executable_path(), args) <= 0:
 		OS.set_restart_on_exit(true, args)
 	host.get_tree().quit()

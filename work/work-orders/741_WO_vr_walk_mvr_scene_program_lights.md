@@ -4,7 +4,8 @@
 Previs at 1:1 and programs through the walk camera / a controller ray. Proven without a headset: Godot tests and a GUI
 e2e in the sandbox (`run-gui-e2e.js --e2e=06_xr_walk --xr`: 4/4). The OpenXR (headset) path is built but untested:
 no headset or runtime on any box. Step 3 (the Programmer panel inside VR) and step 4 are not built. See "How to
-remove".**
+remove". 24.10: the Meta Quest path through WiVRn is ready to test (`godot/client/run-xr.sh`,
+`help/vr-walk.md`); WiVRn is not installed yet, the owner chooses the computer.**
 
 Owner, 24.10: *"write it down for future. allow walking into the mvr scene and programing from vr. mostly for lights
 preprogramming."*
@@ -118,6 +119,64 @@ step. The headset only adds the controller ray, mapped onto the same calls.
   DMX leaves the box only while the Fixtures DMX output is on. **Owner decision:** whether a VR session should force
   blind.
 
+## Meta Quest through WiVRn (24.10, owner)
+
+Owner, 24.10: *"WiVRn is your best bet on Linux. Install the WiVRn server on Ubuntu and the WiVRn app on the Quest,
+connect them over fast Wi-Fi or USB, and WiVRn becomes the OpenXR runtime. Then launch your Godot project with OpenXR
+enabled and it'll show up in the headset. So I will be able to test VR with the meta quest."*
+
+### Investigation
+
+- **Install routes** (WiVRn README, Launchpad, 24.10):
+  - The PPA `ppa:lvra/wivrn` (package `wivrn`, 26.9) builds **only for 26.04**. .4 is on 26.04.1 (RTX 2080 SUPER,
+    avahi running), so the PPA works there.
+  - This box is on 24.04.4 (RTX PRO 4000): Flathub `io.github.wivrn.wivrn`, and `flatpak` is not installed.
+    Both routes need sudo, which this session has on .4 only.
+  - The server and the Quest app must be the same WiVRn version.
+  - Wi-Fi needs avahi plus 5353/udp and 9757 tcp+udp. USB uses `adb reverse tcp:9757 tcp:9757` and then starts the
+    app with a `wivrn+tcp://localhost` intent.
+  - WiVRn's README says NVIDIA (NVENC) works but is "not properly optimized".
+- **WiVRn registers itself as the OpenXR runtime only while a headset is connected**, and reverts afterwards. Godot
+  starts OpenXR only at launch, so the client must start **after** the Quest connects.
+- **`--xr-mode on` with no runtime blocks.** Godot 4.7.2 stops at a modal OS alert, "OpenXR was requested but failed
+  to start … Godot will start in normal mode", until someone presses OK. Seen live on Xvfb `:378`.
+- **The client's own restart dropped the headset.** `connection_menu.gd` `restart()` (A/B switch, and
+  `cluster_follow.gd:176` when following the master) rebuilt its arguments from `get_cmdline_user_args()` only.
+  `OS.get_cmdline_args()` does not contain `--xr-mode` (probe: `godot --xr-mode off -s a.gd -- --xr` →
+  `ARGS ["-s","a.gd"]`). A client in a headset that restarts to follow the master would come back on the desktop.
+- `run-client.sh` puts everything after `--`, so it cannot pass an engine flag.
+
+### What was done
+
+- `godot/client/run-xr.sh` (new): the client in a headset.
+  - Waits up to `XR_WAIT_S` (120 s) for an active runtime, using the loader's order: `XR_RUNTIME_JSON`,
+    `~/.config/openxr/1/active_runtime.json`, `/etc/xdg/openxr/1/active_runtime.json`. Then exports
+    `XR_RUNTIME_JSON` and runs `godot --xr-mode on -- --xr --windowed --tab=1`.
+  - With no runtime it uses `--xr-mode off`: the desktop walk, never the modal.
+  - Uses its own Godot user dir (`XDG_DATA_HOME=~/.local/share/highascg-xr`), so the kiosk's window, profiles and
+    follow setting are untouched. Only `XDG_DATA_HOME` is changed: the OpenXR loader reads `XDG_CONFIG_HOME`.
+- `godot/client/app/connection_menu.gd` `restart()`: one line marked WO-741. When OpenXR is initialised, the new
+  process gets `--xr-mode on`.
+- `godot/client/help/vr-walk.md` (new): the owner's setup guide. Install (26.04 PPA / 24.04 Flathub), the Quest app,
+  connect over Wi-Fi or USB, `run-xr.sh`, the controls, the desktop fallback, troubleshooting, and "not while on air".
+  It uses the WO-740 Markdown subset (commands as inline code: the renderer has no code blocks).
+- WiVRn itself is **not installed**: which computer to use is the owner's call (see below).
+
+### What was VERIFIED
+
+- Godot 21639 passed, 0 failed:
+  - `test_xr_walk.gd` `test_headset_launch`: the launcher's exec line, on only with a runtime, its runtime and user
+    dir, the restart line, and the help page title;
+  - `test_help_pages.gd`: `vr-walk` loads and its links resolve.
+  - Mutation: the restart line deleted → `test_headset_launch` fails (restored).
+- `--check` boot OK.
+- **Live on Xvfb `:378`** (no runtime installed): `run-xr.sh` printed the wait, then "no OpenXR runtime — starting
+  the desktop walk".
+  - First run (with `--xr-mode on` regardless): the modal above, which is why the launcher now passes `off`.
+  - Second run: no alert. The client opened on Previs with the walk camera at eye height, restarted itself to follow
+    the master (.4) and came back on Previs with `--xr`. Stopped by PID.
+- **Not verified:** the headset itself. It needs WiVRn installed, a connected Quest, and the owner wearing it.
+
 ## How to remove (owner decision at the end)
 
 - Delete `godot/client/features/previs/xr/`, `godot/client/tests/test_xr_walk.gd` and
@@ -125,7 +184,10 @@ step. The headset only adds the controller ray, mapped onto the same calls.
 - Remove the 4 lines marked `WO-741` in `godot/client/features/previs/previs_stage.gd`. `camera()` goes back to
   `return _cam`.
 - Remove the line marked `WO-741` in `tools/e2e/run-gui-e2e.js`, and its usage line in the header comment.
-- No server, `project.godot` or data changes to undo.
+- Delete `godot/client/run-xr.sh` and `godot/client/help/vr-walk.md`. Remove `"vr-walk"` from `TOPICS` in
+  `godot/client/tests/test_help_pages.gd`, and the 3 lines (`var xr` … `args = …`) marked WO-741 in
+  `godot/client/app/connection_menu.gd` `restart()`.
+- No server, `project.godot` or data changes to undo. WiVRn, if installed, is removed with its package manager.
 
 ## What was VERIFIED
 

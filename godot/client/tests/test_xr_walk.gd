@@ -4,6 +4,7 @@ extends RefCounted
 
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
 const XrWalk := preload("res://features/previs/xr/xr_walk.gd")
+const HelpDialog := preload("res://app/help_dialog.gd")
 var t
 
 
@@ -79,6 +80,20 @@ func test_stage_hook() -> void:
 	t.eq(src.count("WO-741"), 4, "previs_stage.gd: exactly the 4 marked hook lines (How to remove, WO-741)")
 	t.ok(src.contains("if Config.args.has(\"xr\"):  # WO-741"), "only with the client flag -- --xr")
 	t.ok(src.contains("return walk.camera() if walk != null else _cam  # WO-741"), "picking goes through the walk camera")
+
+
+func test_headset_launch() -> void:
+	var sh := FileAccess.get_file_as_string("res://run-xr.sh")
+	t.ok(sh.contains("exec \"$GODOT\" --path \"$HERE\" --xr-mode \"$xr_mode\" -- --xr --windowed --tab=1 \"$@\""),
+		"run-xr.sh: the XR mode (an engine flag, before --), the walk, the Previs tab")
+	t.ok(sh.contains("xr_mode=off\n") and sh.contains("\txr_mode=on\n"),
+		"on only with a runtime: without one Godot blocks on a modal alert")
+	t.ok(sh.contains("export XR_RUNTIME_JSON=\"$rt\"") and sh.contains("export XDG_DATA_HOME="),
+		"the runtime WiVRn registered, and a user dir of its own (the kiosk's settings untouched)")
+	var cm := FileAccess.get_file_as_string("res://app/connection_menu.gd")
+	t.ok(cm.contains("args = PackedStringArray([\"--xr-mode\", \"on\"]) + args"),
+		"a restart (A/B switch, following the master) keeps the headset: get_cmdline_args drops --xr-mode")
+	t.eq(HelpDialog.MD.title(HelpDialog.load_md("vr-walk")), "Walk the stage in VR (Meta Quest)", "help/vr-walk.md")
 
 
 func _fake_tab() -> GDScript:
