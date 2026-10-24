@@ -80,6 +80,7 @@ test('the e2e launcher always sets the switch and keeps the instance off the liv
 		'HOME: dirs.home',
 		"'--no-caspar'",
 		"bindAddress: '127.0.0.1'",
+		"HIGHASCG_DEVICE_IDENTITY_PATH: path.join(root, 'device-identity.json')", // WO-723: never the live box's cluster key
 	]) assert.ok(s.includes(needle), needle)
 	// the Godot client takes its pictures over the sandbox's feed, never by mapping the live /dev/shm segments
 	assert.ok(src('tools/e2e/run-gui-e2e.js').includes("'--video=feed'"), '--video=feed')

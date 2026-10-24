@@ -5,7 +5,10 @@ const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 
-const DEVICE_IDENTITY_PATH = path.join(REPO_ROOT, 'config', 'device-identity.json')
+/** WO-723: HIGHASCG_DEVICE_IDENTITY_PATH overrides it (the WO-719 sandbox: never sign with the live box's key). */
+const DEVICE_IDENTITY_PATH = process.env.HIGHASCG_DEVICE_IDENTITY_PATH
+	? path.resolve(process.env.HIGHASCG_DEVICE_IDENTITY_PATH)
+	: path.join(REPO_ROOT, 'config', 'device-identity.json')
 
 /** @type {{ publicKeyPem: string, privateKeyPem: string, createdAt: string } | null} */
 let _cached = null

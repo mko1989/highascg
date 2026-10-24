@@ -103,6 +103,7 @@ async function startSandbox(opts) {
 		HIGHASCG_CONFIG_PATH: configFile,
 		HIGHASCG_PROJECTS_DIR: dirs.projects,
 		HIGHASCG_STATE_FILE: path.join(root, 'state.json'),
+		HIGHASCG_DEVICE_IDENTITY_PATH: path.join(root, 'device-identity.json'), // WO-723: its own cluster key
 		HIGHASCG_EXFAT_SYNC_ON_SAVE: '0',
 		HIGHASCG_EXFAT_SYNC_MAP: exfatMap,
 		HIGHASCG_SYSTEM_INVENTORY_PATH: path.join(root, 'inventory.json'),
