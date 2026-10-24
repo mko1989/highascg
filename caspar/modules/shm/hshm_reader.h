@@ -127,6 +127,19 @@ class reader
         return ::stat(path_.c_str(), &st) != 0 || static_cast<uint64_t>(st.st_ino) != inode_;
     }
 
+    /* WO-742: true when a frame newer than the last one poll() returned is published (one atomic load), so a
+     * reader that copies into a freshly allocated buffer (the Caspar shm producer) allocates only when needed. */
+    bool has_new() const
+    {
+        if (!base_)
+            return false;
+        const uint64_t latest = hshm_load_acquire(&hdr()->latest);
+        return latest != 0 && latest != last_latest_;
+    }
+
+    /* WO-742: the writer's CLOCK_MONOTONIC at its last publish (0 = never) — signal-lost checks. */
+    uint64_t heartbeat_ns() const { return base_ ? __atomic_load_n(&hdr()->heartbeat_ns, __ATOMIC_RELAXED) : 0; }
+
     uint64_t dropped_by_writer() const { return base_ ? __atomic_load_n(&hdr()->dropped, __ATOMIC_RELAXED) : 0; }
     uint32_t width() const { return width_; }
     uint32_t height() const { return height_; }
