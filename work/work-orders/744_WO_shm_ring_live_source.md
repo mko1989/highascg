@@ -3,7 +3,8 @@
 **Status: DONE (24.10.26) as future development, detachable (see "How to remove"). Proven on the operator path by
 `tools/e2e/shm-source-take.js` (PASS): a ring writer, then `/api/shm/sources`, then a look TAKE on a sandbox server
 driving a throwaway real Caspar, then the writer's exact pixels on the channel. Smoke 3/3, Godot 21587/0, clean-export
-`test:ci` green. On-air use needs the WO-742 Caspar binary (owner) and this box's server restart (owner).**
+`test:ci` green. 25.10: the WO-742 binary is deployed and this box's server restarted; the live
+`GET /api/shm/sources` answers `{"ok":true,"sources":[]}` (no writer running). Owner QA: a real ring on a look.**
 
 Parent: [WO-738 §7](./738_WO_godot_vj_engine_relayed_to_caspar.md) build order step 3. Producer:
 [WO-742](./742_WO_caspar_shm_producer.md). Writer: [WO-743](./743_WO_godot_shm_writer.md). Owner, 24.10 (/loop):

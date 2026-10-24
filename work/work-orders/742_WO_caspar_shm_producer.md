@@ -3,8 +3,9 @@
 **Status: DONE (24.10.26) as detachable future development. The producer is built into a Caspar binary and proven
 end to end in a throwaway Caspar instance (`tools/e2e/caspar-shm-producer.sh`: PASS). WO-743 (Godot writer) and WO-744
 (Live-tab take, exact pixels) are proven through it. WO-745 (game source) writes the same ring and is listed as a
-source, but was not played through Caspar. **Not deployed:** going
-on air means swapping the box's Caspar binary (a Caspar restart), which is the owner's call. See "How to remove".**
+source, but was not played through Caspar. **Deployed 25.10.26 00:12 on the owner's word** (*"Do the binary deploy the
+restarts etc."*): the box's Caspar runs this binary (md5 b2bb40f5) and `PLAY … SHM NAME` was proven live (§ Deployed).
+See "How to remove".**
 
 Parent: [WO-738 §7](./738_WO_godot_vj_engine_relayed_to_caspar.md). Owner, 24.10: *"definitly shared memory. if it
 needs to be built so be it. i think it will be useful for future window grabbing from virtual screens"*. Owner,
@@ -66,7 +67,9 @@ the consumer is in production (opgui).
 - Remove the lines marked `WO-742` in `shm.cpp` (2) and the two `producer/` lines plus the `source_group` line in
   `CMakeLists.txt`.
 - `has_new()` / `heartbeat_ns()` in `hshm_reader.h` can stay; they are harmless and unused.
-- In the Caspar tree, `git checkout highascg-build-v2` and rebuild. The deployed binary never had it.
+- In the Caspar tree, `git checkout highascg-build-v2` and rebuild.
+- The deployed binary: `mv -f bin/casparcg.pre-wo742-20261025-001150 bin/casparcg` (the binary before, md5 d5dee499),
+  then Settings → Apply Caspar config (restart). `bin/` is box-local (gitignored + stignored).
 
 ## What was VERIFIED
 
@@ -83,3 +86,23 @@ the consumer is in production (opgui).
 - Not done: running on a show channel or under real load. Deployment = a Caspar binary swap (the WO-613 maintenance
   window rule), which is the owner's call. The Godot writer (WO-738 step 2) and server glue (step 3) follow in their
   own WOs.
+
+## Deployed (25.10.26, this box)
+
+- Swap: `bin/casparcg` backed up to `bin/casparcg.pre-wo742-20261025-001150` (d5dee499), the build-v2 binary copied in
+  and renamed over it (the running Caspar kept its inode). `LD_LIBRARY_PATH=lib ldd`: 0 missing.
+- Restart order: node server (`kill -TERM` MainPID → up in 7 s, confine RUN + XFixes barriers on DP-5), then
+  `POST /api/caspar-config/apply` → `restartSent/reconnected/layoutApplied: true`; new Caspar PID 2114640,
+  `/proc/<pid>/exe` md5 **b2bb40f5**. The same Apply moved Caspar onto the generated layout the server already expected
+  (PGM/PRV 2 = ch 3/4, opgui ch 5, DeckLink inputs ch 6/7): AMCP `INFO` lists 7 channels; the old server had been
+  sending `PLAY 6-1 / 7-2 DECKLINK` into a 5-channel Caspar (COMMAND_UNKNOWN_DATA) — now "already open on 6-1 / 7-2".
+- Caspar log: `shm[opgui|1920x1080] publishing … Initialized`; `/dev/shm/highascg-opgui` changes frame to frame. The
+  one `[error]` (boost `basic_socket_acceptor::local_endpoint` on RESTART) is the old binary exiting and is in every
+  daily log since 20.10.
+- Live producer: test writer `hshm_pattern write wo742live 640 360` → `PLAY 4-900 SHM NAME wo742live → 202 PLAY OK`,
+  Caspar log `shm_producer[wo742live] reading 640x360`; `CLEAR 4-900 → 202`, `Destroyed.`; writer killed, ring removed.
+  PRV 2 (ch 4) has no output cabled, so nothing reached a screen.
+- PGM 1 was empty before the Apply and after; PRV 1 (2-10, 2-11) came back.
+- Kiosk restarted the way the client restarts itself (new process with the same args, then `TERM` the old PID — no F5
+  on the Godot kiosk, WO-730): boot OK, reconnected to the master it follows.
+- Not done: .4 (Ubuntu 26.04) still runs its own Caspar; this binary was built on 24.04 and is not copied there.
