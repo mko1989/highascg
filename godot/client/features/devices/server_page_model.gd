@@ -13,6 +13,8 @@ const R := preload("res://features/devices/cable_rules.gd")
 const STANDARD_FPS := [23.98, 24.0, 25.0, 29.97, 30.0, 50.0, 59.94, 60.0]
 const MODES := [["standalone", "Standalone"], ["leader", "Leader (available for followers)"], ["follower", "Follower"]]
 const CEF_TEXT := "Enable GPU in CEF templates (WebGL / Shader FX)"
+const AUTO_ACCEPT_TEXT := "Auto-accept master invites"  # WO-739
+const AUTO_ACCEPT_HINT := "Off: a server asking to link with this one waits in Devices → Servers until you accept it. On: it is linked at once."
 const CEF_HINT := "Needed for shader templates on the CG path. Takes effect on Caspar config apply + restart. Turn off if other channels stutter or tear."
 const FPS_HINT := "Output video modes inherit this rate until you change them per connector."
 const WIRING_NOTE := "Screen destinations sync from the leader (channel ids must match). Wiring, cables, and Caspar consumers stay local — cable outputs on this box after connect, then Regenerate Caspar from Device View."
@@ -65,7 +67,7 @@ static func init_state(settings: Variant, payload: Variant, intent: String) -> D
 		"dns": F.t(O.or_([dns[0] if not dns.is_empty() else null, ""])),
 		"rep": null, "rep_line": "Loading replication status…", "pair": "", "conn": null, "out_warn": "", "wiring": false,
 		"mode": intent if intent in ["standalone", "leader", "follower"] else "standalone", "intent": intent,
-		"leader_opts": [], "leader": "", "synced": false}
+		"leader_opts": [], "leader": "", "synced": false, "auto_accept": null}
 
 
 # ---------------------------------------------------------------- network
@@ -197,7 +199,7 @@ static func buttons(s: Dictionary) -> Array:
 # ---------------------------------------------------------------- items
 
 ## `network_panel`: the client draws the WO-692 Network panel (every NIC + Wi-Fi) in place of the web's one-interface
-## block; the golden replay of the web page keeps the default.
+## block, after its WO-739 "Linked servers" block (auto-accept); the golden replay of the web page keeps the default.
 static func items(s: Dictionary, now: float, network_panel := false) -> Array:
 	var live := R.d(s.payload.get("live"))
 	var host := R.d(live.get("host"))
@@ -212,6 +214,8 @@ static func items(s: Dictionary, now: float, network_panel := false) -> Array:
 		{"t": "heading", "text": "Templates (CEF)"}, {"t": "check", "key": "cef", "text": CEF_TEXT, "checked": s.cef, "disabled": false},
 		{"t": "small", "text": CEF_HINT}]
 	if network_panel:
+		out.append_array([{"t": "heading", "text": "Linked servers"}, {"t": "check", "key": "auto_accept", "text": AUTO_ACCEPT_TEXT,
+			"checked": s.get("auto_accept") == true, "disabled": s.get("auto_accept") == null}, {"t": "small", "text": AUTO_ACCEPT_HINT}])
 		out.append({"t": "network"})
 	else:
 		out.append_array([{"t": "heading", "text": "Network"}, {"t": "small", "text": s.net_text},

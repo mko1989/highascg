@@ -3,6 +3,7 @@ extends VBoxContainer
 ## columns — Sources (full height, shared by every tab — R1), the workspace tabs, and the Inspector (always on the
 ## right, content follows the selection — R2).
 
+const ClusterModel := preload("res://features/devices/cluster_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LiveTab := preload("res://features/live/live_tab.gd")
 const PrevisTab := preload("res://features/previs/previs_tab.gd")
@@ -81,6 +82,7 @@ func _ready() -> void:
 	devices.name = "Devices"
 	tabs.add_child(devices)
 	sources.caspar_changed.connect(devices.mark_restart_dirty)  # WO-605 slice 12: a DeckLink dropped on Sources
+	_watch_invites(devices)
 	sources.connector_dropped.connect(devices.refresh)
 	audio.caspar_changed.connect(devices.mark_restart_dirty)
 	audio.inspect_destination.connect(func(id: String) -> void:  # WO-604: a live-audio strip → its host-channel page
@@ -202,6 +204,18 @@ func _open_logs() -> void:
 
 
 ## Connection eye: WS + Caspar link (state.caspar.connection, like client/components/connection-eye.js).
+## WO-739: a server asking to link with this machine's server shows on the Devices tab, so it is seen from every tab.
+func _watch_invites(devices: Control) -> void:
+	var title := func(snap: Variant) -> void: tabs.set_tab_title(tabs.get_tab_idx_from_control(devices), ClusterModel.devices_title(snap))
+	Ws.on("cluster:peers", func(d: Variant) -> void:
+		if not DevicesTarget.remote:  # following another server: its WS is not this machine's
+			title.call(d))
+	Ws.connected.connect(func() -> void:
+		var r: Dictionary = await DevicesTarget.api.get_json("/api/cluster")
+		if r.ok:
+			title.call(r.data))
+
+
 func _refresh_eye() -> void:
 	if _eye == null:
 		return

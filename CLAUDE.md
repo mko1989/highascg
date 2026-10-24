@@ -44,7 +44,7 @@ deprecate the WO yourself — a dead end recorded honestly saves the next sessio
 - **Smoke tests grep source text.** Many smokes `readFileSync` production files and pin exact
   lines (WO acceptance guards). Refactors must repoint the reads (concat pattern for require
   strings), never weaken assertions. New test files must be added to the curated FILES list in
-  `tools/ci/run-offline-tests.js`.
+  `tools/ci/offline-test-files.js` (run by `tools/ci/run-offline-tests.js`).
 - **500-line file limit**, CI-enforced (`node tools/ci/check-max-file-lines.js`). Split, don't cram.
 - **Deploy loop:** client → `npm run build:client` then `DISPLAY=:0 xdotool key F5` (kiosk
   reload). Server → `kill -TERM $(systemctl show -p MainPID --value highascg)` (systemd

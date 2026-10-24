@@ -164,7 +164,11 @@ func _item(it: Dictionary, group: ButtonGroup) -> Control:
 		"check":
 			var cb := _check(it.text, it.checked)
 			cb.disabled = it.disabled
-			cb.toggled.connect(func(on: bool) -> void: _act(func() -> void: await flow.set_cef(on)))
+			cb.toggled.connect(func(on: bool) -> void: _act(func() -> void:
+				if it.key == "auto_accept":  # WO-739
+					await flow.set_auto_accept(on)
+				else:
+					await flow.set_cef(on)))
 			return cb
 		"radio":
 			var rb := _check(it.text, it.checked)

@@ -70,19 +70,28 @@ const steps = [
 		},
 	},
 	{
-		name: 'link every pair once: the other server links back (WO-732)',
+		name: 'link every pair once: the other server accepts the invite (WO-732, WO-739)',
 		async run({ nodes }) {
 			const ms = []
+			let accepted = 0
 			for (const [i, a] of nodes.entries())
 				for (const b of nodes.slice(i + 1)) {
 					const r = await a.post('/api/cluster/peers', { address: b.address })
 					assert.ok(r.status === 201 || r.status === 200, `${a.id} → ${b.id}: ${r.status} ${JSON.stringify(r.data)}`)
 					assert.equal(r.data.peer.id, b.id, `${a.id} lists ${b.address} under its own id`)
-					assert.equal(r.data.link_back?.ok, true, `${b.id} linked ${a.id} back: ${JSON.stringify(r.data.link_back)}`)
+					if (r.data.link_back?.pending) {
+						// WO-739: an invite there (no auto-accept) — its operator accepts
+						const inv = (await b.get('/api/cluster')).data?.invites || []
+						assert.ok(inv.some((x) => x.id === a.id), `${b.id} shows ${a.id}'s invite: ${JSON.stringify(inv)}`)
+						const acc = await b.post(`/api/cluster/invites/${encodeURIComponent(a.id)}/accept`, {})
+						assert.ok(acc.status === 201 || acc.status === 200, `${b.id} accepts ${a.id}: ${acc.status} ${JSON.stringify(acc.data)}`)
+						assert.equal(acc.data.link_back?.ok, true, `${a.id} already lists ${b.id}: ${JSON.stringify(acc.data.link_back)}`)
+						accepted++
+					} else assert.equal(r.data.link_back?.ok, true, `${b.id} linked ${a.id} back: ${JSON.stringify(r.data.link_back)}`)
 					ms.push(r.ms)
 				}
 			const online = await waitFor('every server sees every other online', () => allLinkedOnline(nodes), 10000)
-			return { links: ms.length, linkMsMax: +Math.max(...ms).toFixed(1), allOnlineMs: online.ms }
+			return { links: ms.length, accepted, linkMsMax: +Math.max(...ms).toFixed(1), allOnlineMs: online.ms }
 		},
 	},
 	{

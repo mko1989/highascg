@@ -11,6 +11,8 @@ extends VBoxContainer
 ## (app/cluster_follow.gd). P4: on each card while this server is master, which destinations its takes are forwarded
 ## to there (channel translation, sent count, catch-up), or why not; on a server that is not master, a note that its
 ## PGM follows the master.
+## WO-739: a server asking to link with this one shows on top as an invite (Accept / Decline). A server this one linked
+## that has not accepted yet says so on its card. Auto-accept is on the Devices server page.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -37,6 +39,7 @@ var _add_status: Label
 var _remove: ConfirmationDialog
 var _remove_id := ""
 var _send_err := {}  # peer id → why the last Send was refused (cleared by the next Send)
+var _inv_err := {}  # WO-739: invite id → why Accept / Decline failed
 var _sig := ""
 
 
@@ -125,8 +128,12 @@ func _render() -> void:
 	_accept.set_pressed_no_signal(not (own_duties is Dictionary) or own_duties.get("accept_remote", true) == true)
 	for c in _list.get_children():
 		c.queue_free()
+	var invites: Array = _snap.get("invites", []) if _snap.get("invites") is Array else []
+	for inv in invites:
+		if inv is Dictionary:
+			_list.add_child(_invite(inv))
 	var peers: Array = _snap.get("peers", [])
-	if peers.is_empty():
+	if peers.is_empty() and invites.is_empty():
 		_list.add_child(_small("No linked servers. Click + to add one (a backup, or a server for more screens).", ThemeBuilder.TEXT_MUTED))
 	for p in peers:
 		if p is Dictionary:
@@ -177,9 +184,9 @@ func _card(p: Dictionary) -> Control:
 	var does := M.does_text(p.get("duties"))  # WO-723: what its config and the links resolve it to
 	if does != "":
 		v.add_child(_small(does, ThemeBuilder.TEXT_MUTED))
-	var ll := M.link_line(p)  # WO-732: the other server does not list this one
+	var ll := M.link_line(p)  # WO-732: the other server does not list this one (WO-739: or has not accepted yet)
 	if ll != "":
-		var lk := _small(ll, ThemeBuilder.WARN)
+		var lk := _small(ll, ThemeBuilder.TEXT_MUTED if p.get("link_pending") == true else ThemeBuilder.WARN)
 		lk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(lk)
 	var line := M.send_line(p, str(_send_err.get(id, "")))
@@ -198,6 +205,42 @@ func _card(p: Dictionary) -> Control:
 	if p.get("online") != false:
 		_fill(id, body)
 	return card
+
+
+## WO-739 — a server asking to link with this one: Accept links it (both ways), Decline drops its side there too.
+func _invite(inv: Dictionary) -> Control:
+	var id := str(inv.get("id", ""))
+	var card := PanelContainer.new()
+	card.add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.ACCENT, 1))
+	var v := VBoxContainer.new()
+	card.add_child(v)
+	var top := HBoxContainer.new()
+	var l := Label.new()
+	l.text = M.invite_line(inv)
+	l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	top.add_child(l)
+	for act in [["Accept", "accept", "Link %s with this server (it shows in each other's Devices)"], ["Decline", "decline", "Do not link: %s drops this server too"]]:
+		var b := Button.new()
+		b.text = act[0]
+		b.tooltip_text = act[2] % str(inv.get("name", id))
+		b.pressed.connect(func() -> void: _answer(id, act[1]))
+		top.add_child(b)
+	v.add_child(top)
+	if _inv_err.has(id):
+		var e := _small(str(_inv_err[id]), ThemeBuilder.ERROR)
+		e.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(e)
+	return card
+
+
+func _answer(id: String, act: String) -> void:
+	var r: Dictionary = await DevicesTarget.api.post_json("/api/cluster/invites/%s/accept" % id.uri_encode() if act == "accept" else "/api/cluster/invites/%s/decline" % id.uri_encode(), {})
+	if r.ok:
+		_inv_err.erase(id)
+	else:
+		_inv_err[id] = str(r.error)
+	reload()
 
 
 ## The peer's own rear panel + cables, read-only, and what it does for the shared destinations.

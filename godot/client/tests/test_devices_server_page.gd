@@ -199,3 +199,52 @@ func test_formatters() -> void:
 	t.eq(M.normalize_fps("23.976"), 23.98, "nearest standard rate")
 	t.eq(M.normalize_fps("abc"), 50.0, "garbage → 50")
 	t.eq(F.paired_title({"role": "x", "self": {"hardwareId": 7}}, "leader"), "Paired with highascg0007", "hardware-id label")
+
+
+class AutoIo:  # WO-739
+	extends RefCounted
+	var posts := []
+	var cluster: Variant = {"self": {"auto_accept": false}}
+	var post_ok := true
+	var status_text := ""
+
+	func get_json(path: String) -> Dictionary:
+		return {"ok": cluster != null, "data": cluster if path == "/api/cluster" else {}, "error": "" if cluster != null else "HTTP 404"}
+
+	func post_json(path: String, body: Variant) -> Dictionary:
+		posts.append([path, body])
+		return {"ok": post_ok, "data": {}, "error": "" if post_ok else "HTTP 400: nope"}
+
+	func changed() -> void:
+		pass
+
+	func status(text: String, _ok: bool) -> void:
+		status_text = text
+
+	func toast(_text: String, _type: String) -> void:
+		pass
+
+
+func _auto_item(flow: Variant) -> Dictionary:
+	for it in M.items(flow.s, 0.0, true):
+		if it.get("key") == "auto_accept":
+			return it
+	return {}
+
+
+func test_auto_accept_master_invites() -> void:  # WO-739
+	var io := AutoIo.new()
+	var flow: Variant = FLOW.new({}, {}, io, "standalone")
+	t.eq(_auto_item(flow).get("disabled"), true, "unknown until /api/cluster answered")
+	t.ok(M.items(flow.s, 0.0).all(func(it: Dictionary) -> bool: return it.get("key") != "auto_accept"), "not in the web page replay")
+	await flow.refresh_cluster()
+	t.eq([_auto_item(flow).text, _auto_item(flow).checked, _auto_item(flow).disabled], ["Auto-accept master invites", false, false], "off by default")
+	await flow.set_auto_accept(true)
+	t.eq(io.posts, [["/api/cluster/auto-accept", {"on": true}]], "saved on the server")
+	t.eq(_auto_item(flow).checked, true, "ticked")
+	io.post_ok = false
+	await flow.set_auto_accept(false)
+	t.eq(_auto_item(flow).checked, true, "a refused save puts the tick back")
+	io.cluster = null
+	await flow.refresh_cluster()
+	t.eq(_auto_item(flow).disabled, true, "an older server (no cluster answer): disabled")

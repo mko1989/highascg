@@ -8,6 +8,11 @@
  *   POST   /api/cluster/peers { address }      → 201 { peer, link_back: { ok, error } }  (host or host:port; must answer
  *                                                  as HighAsCG; WO-732: that server links this one back. `link_back:
  *                                                  false` = a server linking back: no call back, 409 when unlinked here)
+ *                                                  WO-739: a link-back is answered 202 { pending } (an invite here) unless
+ *                                                  this server auto-accepts; the linker's `link_back.pending` is then true
+ *   POST   /api/cluster/invites/:id/accept     → as POST /api/cluster/peers (WO-739: this operator links the inviter)
+ *   POST   /api/cluster/invites/:id/decline    → { ok, told }  (that server drops its side now, or at its next repair)
+ *   POST   /api/cluster/auto-accept { on }     → { auto_accept }  (WO-739, device-local; GET /api/cluster self.auto_accept)
  *   DELETE /api/cluster/peers/:id[?link_back=0] → { ok, link_back?: { ok, error } }  (WO-732: unlinked there too)
  *   GET    /api/cluster/peers/:id/device-view  → that server's own /api/device-view (cached 15 s)
  *   POST   /api/cluster/peers/:id/send-media   → 202; progress in the peer's `media_send` (P2b, cluster-media.js)
@@ -21,7 +26,8 @@
  *   POST   /api/cluster/send { peer, action, args } → that server's answer (WO-712 R3: this server's operator presses
  *                                                  an action there, signed by this server; needs the normal auth)
  *   GET    /api/cluster/exchange              → { 'tracking.auto': snapshot+source | null, sources: [...] } (R3)
- * GET /api/cluster also carries `master` (the view). Changes broadcast WS `cluster:peers` (the GET body).
+ * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
+ * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
  * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
  * for a client), and polls only while the list is not empty.
  */
@@ -29,6 +35,7 @@
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const defaultPersistence = require('../utils/persistence')
 const { createCluster } = require('../cluster/cluster-peers')
+const { createInvites } = require('../cluster/cluster-invites')
 const { handleGet } = require('./routes-replication-get')
 const { acceptSshKey, sendMedia, fingerprint } = require('../cluster/cluster-media')
 const { postJson, getJson } = require('../cluster/cluster-peers')
@@ -52,6 +59,7 @@ function clusterOf(ctx) {
 		selfPing: async () => JSON.parse((await handleGet('/api/replication/ping', ctx, null)).body),
 		selfKey: identity.getDevicePublicKeyPem(),
 		selfPort: () => ctx.config?.server?.httpPort, // WO-732: the address a peer links back to
+		invites: createInvites({ persistence: ctx.persistence || defaultPersistence }), // WO-739
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
 	})
@@ -247,6 +255,19 @@ function register(routes) {
 	routes.post('/api/cluster/peers', async ({ body, ctx }) => {
 		const r = await clusterOf(ctx).add(parseBody(body))
 		return reply(r.status, r.body)
+	}, opt)
+	routes.post('/api/cluster/invites/:id/accept', async ({ ctx, params }) => {
+		const r = await clusterOf(ctx).accept(params.id)
+		return reply(r.status, r.body)
+	}, opt)
+	routes.post('/api/cluster/invites/:id/decline', async ({ ctx, params }) => {
+		const r = await clusterOf(ctx).decline(params.id)
+		return reply(r.status, r.body)
+	}, opt)
+	routes.post('/api/cluster/auto-accept', ({ ctx, body }) => {
+		const on = parseBody(body)?.on
+		if (typeof on !== 'boolean') return reply(400, { error: 'on must be true or false' })
+		return reply(200, clusterOf(ctx).setAutoAccept(on))
 	}, opt)
 	routes.delete('/api/cluster/peers/:id', async ({ ctx, params, query }) => {
 		// WO-732: unlinks there too; `?link_back=0` = that server is the one unlinking

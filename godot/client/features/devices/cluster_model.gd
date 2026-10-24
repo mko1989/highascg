@@ -65,10 +65,24 @@ static func facts(p: Dictionary) -> String:
 ## WO-732 — "" while the link holds both ways (or nothing is known yet); else why that server does not list this one
 ## (the server keeps asking it again, src/cluster/cluster-peers.js heal()).
 static func link_line(p: Dictionary) -> String:
+	if p.get("link_pending") == true:  # WO-739: an invite there, not a refusal
+		return "Waiting for %s to accept the link (Devices → Servers there)." % str(p.get("name", "it"))
 	if p.get("linked_back") != false:
 		return ""
 	var why := str(p.get("link_back_error", ""))
 	return "One-way: %s does not list this server%s." % [str(p.get("name", "it")), " (%s)" % why if why != "" else ", asking it again"]
+
+
+## WO-739 — an invite card: who asks to link, from where.
+static func invite_line(inv: Dictionary) -> String:
+	var host := str(inv.get("host", ""))
+	return "%s%s asks to link with this server." % [str(inv.get("name", inv.get("id", "A server"))), " (%s)" % host if host != "" else ""]
+
+
+## WO-739 — the Devices tab title: a pending invite shows on it, so it is seen from every tab.
+static func devices_title(snap: Variant) -> String:
+	var n: int = (snap.invites as Array).size() if snap is Dictionary and snap.get("invites") is Array else 0
+	return "Devices" if n == 0 else "Devices (%d invite%s)" % [n, "" if n == 1 else "s"]
 
 
 ## WO-723 — the one line on a linked server's card ("" from an older server: its duties carry no `tracking`, they

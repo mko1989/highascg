@@ -47,6 +47,7 @@ func start() -> void:
 	if s.intent == "follower" and not H.truthy(R.d(s.rep).get("enabled")):
 		await scan(true)
 	await refresh_network()
+	await refresh_cluster()
 
 
 func refresh_status() -> void:
@@ -66,6 +67,24 @@ func refresh_network() -> void:
 	else:
 		s.net_text = "Network status unavailable: " + str(r.error)
 	io.changed()
+
+
+## WO-739: whether this server links a server asking for it at once (GET /api/cluster self.auto_accept).
+func refresh_cluster() -> void:
+	var r: Dictionary = await io.get_json("/api/cluster")
+	var me: Variant = _data(r).get("self")
+	s.auto_accept = me.get("auto_accept") == true if r.ok and me is Dictionary else null
+	io.changed()
+
+
+func set_auto_accept(on: bool) -> void:
+	s.auto_accept = on
+	var r: Dictionary = await io.post_json("/api/cluster/auto-accept", {"on": on})
+	if not r.ok:
+		s.auto_accept = not on
+		_fail(r)
+		return
+	io.status("Invites from other servers are %s" % ("linked at once" if on else "accepted in Devices → Servers"), true)
 
 
 func save_fps() -> void:

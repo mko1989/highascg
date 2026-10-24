@@ -16,6 +16,10 @@
  * it does not ask again); unlinking unlinks there too. A poll that finds the peer not listing this server (its ping
  * `clusterLinked`) repairs the link, at most every HEAL_MS. An unlink the peer did not confirm leaves a tombstone
  * (`clusterUnlinked`): that server's repair is answered 409 `unlinked` and it drops its side instead.
+ * WO-739: with `opts.invites` (cluster-invites.js) a link-back is an invite until this server's operator accepts or
+ * declines it (answered 202 `pending`), unless this server auto-accepts. The inviter shows "waiting to accept" and its
+ * repair renews the invite. A declined server is tombstoned like an unconfirmed unlink: its repair drops its side and
+ * its link-backs are refused until this server links it.
  */
 
 const http = require('http')
@@ -144,6 +148,7 @@ function createCluster(opts) {
 	const now = opts.now || Date.now
 	const hosts = opts.hosts || subnetHosts
 	const store = opts.persistence
+	const invites = opts.invites || null // WO-739 (null = WO-732: a link-back links at once)
 	const { fingerprint } = require('./cluster-media')
 	const selfFp = opts.selfKey ? fingerprint(opts.selfKey) : ''
 	const log = (lvl, msg) => opts.log?.(lvl, `[cluster] ${msg}`)
@@ -208,6 +213,7 @@ function createCluster(opts) {
 			media_send: p.send,
 			linked_back: linkedBack(p),
 			link_back_error: linkedBack(p) === true ? '' : p.back?.error || '',
+			link_pending: linkedBack(p) !== true && p.back?.pending === true, // WO-739: waiting for that server's accept
 		}
 	}
 
@@ -215,14 +221,16 @@ function createCluster(opts) {
 		const s = self || {}
 		return {
 			self: { id: s.selfId || '', hostname: s.hostname || '', version: s.appVersion || '', role: s.role || '', epoch: s.leaderEpoch ?? null,
-				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null },
+				media: s.projectMedia ? { slug: s.projectMedia.slug, files: s.projectMedia.fileCount } : null, duties: s.duties ?? null,
+				auto_accept: invites ? invites.autoAccept() : true },
 			peers: [...peers.values()].map(view),
+			invites: invites ? invites.list() : [],
 		}
 	}
 
 	function changed() {
 		const snap = snapshot()
-		const sig = JSON.stringify(snap, (k, v) => (k === 'last_seen' ? undefined : v))
+		const sig = JSON.stringify(snap, (k, v) => (k === 'last_seen' || k === 'asked_at' ? undefined : v))
 		if (sig === lastSig) return
 		lastSig = sig
 		opts.onChange?.(snap)
@@ -242,7 +250,7 @@ function createCluster(opts) {
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
 	}
 
-	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked } (recorded in p.back). */
+	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked, pending } (recorded in p.back). */
 	async function linkBack(p) {
 		const local = await localAddress(p.saved.host, p.saved.port)
 		const port = Number(opts.selfPort?.()) || 4200
@@ -251,10 +259,11 @@ function createCluster(opts) {
 		else {
 			const res = await request('POST', p.saved.host, p.saved.port, '/api/cluster/peers', { address: `${local}:${port}`, link_back: false })
 			const why = res.json?.error || res.error || `HTTP ${res.status}`
-			r = { ok: res.ok, status: res.status, unlinked: res.status === 409 && res.json?.unlinked === true,
-				error: res.ok ? '' : res.status === 401 || res.status === 403 ? `it needs sign-in: link this server there (${why})` : why }
+			const pending = res.status === 202 && res.json?.pending === true // WO-739: an invite there
+			r = { ok: res.ok && !pending, status: res.status, unlinked: res.status === 409 && res.json?.unlinked === true, pending,
+				error: pending ? `waiting for ${p.saved.name} to accept` : res.ok ? '' : res.status === 401 || res.status === 403 ? `it needs sign-in: link this server there (${why})` : why }
 		}
-		p.back = { ok: r.ok, error: r.error, at: now() }
+		p.back = { ok: r.ok, error: r.error, at: now(), pending: r.pending === true }
 		return r
 	}
 
@@ -263,12 +272,14 @@ function createCluster(opts) {
 		if (!selfFp || p.live.online !== true || linkedBack(p) === true) return
 		if (!Array.isArray(p.live.linked) && p.back) return // an older server: asked once (its add has no repair)
 		if (p.back && now() - p.back.at < HEAL_MS) return
+		const wasPending = p.back?.pending === true
 		const r = await linkBack(p)
 		const justLinked = p.saved.linked_at && now() - p.saved.linked_at < 2 * HEAL_MS // an operator link stays; its repair runs again later
 		if (r.unlinked && !justLinked) {
 			log('info', `${p.saved.name} unlinked this server: unlinked here too`)
 			remove(p.saved.id)
 		} else if (r.ok) log('info', `${p.saved.name} did not list this server: linked back`)
+		else if (r.pending) !wasPending && log('info', `${p.saved.name}: invited, waiting for its operator to accept`)
 		else log('warn', `${p.saved.name}: link back refused (${r.error})`)
 	}
 
@@ -310,10 +321,18 @@ function createCluster(opts) {
 		}
 		// WO-732: a link-back (`link_back: false`) from a server unlinked here while it was unreachable is refused
 		const fromServer = raw?.link_back === false
-		if (fromServer && tombstoned(deviceKey)) return { status: 409, body: { error: 'this server unlinked yours: link it from here to link again', unlinked: true } }
+		if (fromServer && tombstoned(deviceKey)) return { status: 409, body: { error: 'this server unlinked (or declined) yours: link it from here to link again', unlinked: true } }
 		if (!fromServer && tombstoned(deviceKey)) setTombstones(tombstones().filter((t) => t.fp !== fingerprint(deviceKey)))
 		const id = idFromPing(r.json, `${addr.host}:${addr.port}`)
 		const prev = peers.get(id)
+		if (fromServer && !prev && invites && !invites.autoAccept()) {
+			const name = String(r.json.hostname || id).slice(0, 64)
+			if (invites.record({ id, fp: deviceKey ? fingerprint(deviceKey) : '', host: addr.host, port: addr.port, name, version: String(r.json.appVersion || ''), device_key: deviceKey }))
+				log('info', `${name} asks to link with this server: waiting for the operator to accept`)
+			changed()
+			return { status: 202, body: { pending: true, error: `waiting for ${self?.hostname || 'that server'} to accept` } }
+		}
+		invites?.drop(id, deviceKey ? fingerprint(deviceKey) : '')
 		const saved = { id, host: addr.host, port: addr.port, name: String(raw?.name || prev?.saved.name || r.json.hostname || id).slice(0, 64),
 			added_at: prev?.saved.added_at || now(), device_key: deviceKey, linked_at: fromServer ? prev?.saved.linked_at || 0 : now() }
 		peers.set(id, { saved, live: liveFrom(r.json), view: null, send: prev?.send || null, back: fromServer ? { ok: true, error: '', at: now() } : null })
@@ -322,8 +341,9 @@ function createCluster(opts) {
 		const body = { peer: null }
 		if (!fromServer) {
 			const back = await linkBack(peers.get(id))
-			body.link_back = { ok: back.ok, error: back.error }
-			if (!back.ok) log('warn', `${saved.name}: link back refused (${back.error})`)
+			body.link_back = { ok: back.ok, error: back.error, ...(back.pending ? { pending: true } : {}) }
+			if (back.pending) log('info', `${saved.name}: invited, waiting for its operator to accept`)
+			else if (!back.ok) log('warn', `${saved.name}: link back refused (${back.error})`)
 		}
 		changed()
 		body.peer = view(peers.get(id))
@@ -357,6 +377,33 @@ function createCluster(opts) {
 		const error = ok ? '' : r.json?.error || r.error || `HTTP ${r.status}`
 		if (!ok) log('warn', `${p.saved.name}: unlink there failed (${error}); it will drop this server when it is back`)
 		return { ok: true, link_back: { ok, error } }
+	}
+
+	/** WO-739: this operator accepts an invite = links that server (which then lists this one: it asked). */
+	async function accept(key) {
+		const inv = invites?.take(String(key || ''))
+		if (!inv) return { status: 404, body: { error: 'no such invite (it may have lapsed: ask that server to link again)' } }
+		log('info', `${inv.name}: invite accepted`)
+		return add({ address: `${inv.host}:${inv.port}` })
+	}
+
+	/** WO-739: declined = that server drops its side now, or at its next repair (refused like an unlink here). */
+	async function decline(key) {
+		const inv = invites?.take(String(key || ''))
+		if (!inv) return { status: 404, body: { error: 'no such invite' } }
+		tombstone(inv.device_key, TOMBSTONE_MS)
+		changed()
+		await refreshSelf()
+		const me = idFromPing(self, '')
+		const r = me ? await request('DELETE', inv.host, inv.port, `/api/cluster/peers/${encodeURIComponent(me)}?link_back=0`) : { ok: false, status: 0 }
+		log('info', `${inv.name}: invite declined${r.ok || r.status === 404 ? '' : ' (it drops this server at its next repair)'}`)
+		return { status: 200, body: { ok: true, told: r.ok || r.status === 404 } }
+	}
+
+	function setAutoAccept(on) {
+		invites?.setAutoAccept(on === true)
+		changed()
+		return { auto_accept: invites ? invites.autoAccept() : true }
 	}
 
 	/** The peer's own Devices view (its wiring: never copied, only shown). */
@@ -394,7 +441,7 @@ function createCluster(opts) {
 		changed()
 	}
 
-	return { snapshot, poll, add, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
+	return { snapshot, poll, add, accept, decline, setAutoAccept, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
 		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn) }
 }
 

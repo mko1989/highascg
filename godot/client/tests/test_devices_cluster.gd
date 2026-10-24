@@ -43,6 +43,22 @@ func test_link_line_only_when_one_way() -> void:
 	t.eq(M.link_line({"name": "B", "linked_back": false, "link_back_error": "it needs sign-in"}), "One-way: B does not list this server (it needs sign-in).", "refused")
 
 
+func test_link_line_waits_for_an_invite() -> void:  # WO-739
+	t.eq(M.link_line({"name": "B", "linked_back": false, "link_pending": true, "link_back_error": "waiting for B to accept"}),
+		"Waiting for B to accept the link (Devices → Servers there).", "an invite there, not a refusal")
+	t.eq(M.link_line({"name": "B", "linked_back": true, "link_pending": false}), "", "accepted")
+
+
+func test_invite_line_and_devices_title() -> void:  # WO-739
+	t.eq(M.invite_line({"id": "boxA", "name": "highascg5867", "host": "192.168.0.4"}), "highascg5867 (192.168.0.4) asks to link with this server.", "who and where")
+	t.eq(M.invite_line({"id": "boxA"}), "boxA asks to link with this server.", "no name / host")
+	t.eq(M.devices_title({"invites": []}), "Devices", "none")
+	t.eq(M.devices_title({"invites": [{"id": "a"}]}), "Devices (1 invite)", "one")
+	t.eq(M.devices_title({"invites": [{"id": "a"}, {"id": "b"}]}), "Devices (2 invites)", "two")
+	t.eq(M.devices_title({"peers": []}), "Devices", "an older server (no invites)")
+	t.eq(M.devices_title(null), "Devices", "no snapshot")
+
+
 func test_send_line() -> void:
 	t.eq(M.send_line({}, ""), "", "never sent")
 	t.eq(M.send_line({"media_send": {"state": "sending", "percent": 40}}, ""), "Sending media… 40 %", "progress")
