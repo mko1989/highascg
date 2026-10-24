@@ -196,6 +196,15 @@ apply_server_drop() {
 	rm -rf "$staging"
 	chown -R "${user_name}:${grp}" "${dest%/}" || true
 
+	# WO-727: the replication forced command runs from a root copy that only install-replication-ssh-wrapper.sh
+	# wrote, so a fixed wrapper reached ~/highascg but never sshd. Refresh it where it is installed (opt-in kept).
+	local wrapper_dst="${HIGHASCG_REPLICATION_SSH_WRAPPER:-/usr/local/bin/highascg-replication-ssh}"
+	if [[ "$EUID" -eq 0 && -f "$wrapper_dst" && -f "${dest}/tools/runtime/highascg-replication-ssh.sh" ]] &&
+		! cmp -s "${dest}/tools/runtime/highascg-replication-ssh.sh" "$wrapper_dst"; then
+		install -m 0755 -o root -g root "${dest}/tools/runtime/highascg-replication-ssh.sh" "$wrapper_dst" &&
+			log "refreshed ${wrapper_dst}" || log "WARN: ${wrapper_dst} refresh failed"
+	fi
+
 	if [[ ! -x "${dest}/bin/casparcg" ]]; then
 		log "WARN: ${dest}/bin/casparcg missing — restore from ISO/install (not in server drops)"
 	fi

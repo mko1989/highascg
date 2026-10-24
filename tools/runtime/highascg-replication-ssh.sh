@@ -19,8 +19,9 @@ case "$cmd" in
 	*) die "forbidden command (rsync --server only)" ;;
 esac
 
+# A newline (or a backslash-newline continuation) never belongs in an rsync command line.
 case "$cmd" in
-	*\;*|*\|*|*\&*|*\`*|*\$*\(*|*\<*|*$'\n'*) die "forbidden metacharacters" ;;
+	*$'\n'*|*$'\r'*) die "forbidden metacharacters" ;;
 esac
 
 case "$cmd" in
@@ -65,8 +66,55 @@ validate_token() {
 	die "disallowed path token: $tok"
 }
 
-IFS=' ' read -r -a argv <<<"$cmd"
+# Split the command line into words the way sshd's shell would for what rsync sends: rsync >= 3.2.4 backslash-escapes
+# every special character of a remote path ("Tlo\ Orange\ Ball/BAZA\ 2.mp4", WO-724), so an escaped character is a
+# literal part of its word and an unescaped space ends a word. Unescaped shell metacharacters and quotes are refused
+# as before; nothing here is ever evaluated by a shell (rsync is exec'd with the words), so an ESCAPED one is just a
+# character of a file name. Option words may not contain escapes at all (options stay exactly what they were); path
+# words are checked below on their real (unescaped) text.
+argv=()
+escaped=()
+split_words() {
+	local s="$1" w="" c i n=${#1} have=0 esc=0
+	for ((i = 0; i < n; i++)); do
+		c="${s:i:1}"
+		case "$c" in
+			\\)
+				((i + 1 < n)) || die "trailing backslash"
+				i=$((i + 1))
+				w+="${s:i:1}"
+				have=1
+				esc=1
+				;;
+			' ')
+				if ((have)); then
+					argv+=("$w")
+					escaped+=("$esc")
+				fi
+				w=""
+				have=0
+				esc=0
+				;;
+			\;|\||\&|\`|\$|\<|\>|\(|\)|\'|\"|$'\t') die "forbidden metacharacters" ;;
+			*)
+				w+="$c"
+				have=1
+				;;
+		esac
+	done
+	if ((have)); then
+		argv+=("$w")
+		escaped+=("$esc")
+	fi
+}
+split_words "$cmd"
+[[ "${argv[0]:-}" == "rsync" && "${argv[1]:-}" == "--server" ]] || die "forbidden command (rsync --server only)"
 for ((i = 2; i < ${#argv[@]}; i++)); do
+	if [[ "${argv[i]}" == -* && "${escaped[i]}" == 1 ]]; then
+		die "escaped characters in an option: ${argv[i]}"
+	fi
+	# again on the real text: "\.\." is no ".." on the command line, but it is one in the word
+	[[ "${argv[i]}" == *..* ]] && die "path traversal not allowed"
 	validate_token "${argv[i]}"
 done
 

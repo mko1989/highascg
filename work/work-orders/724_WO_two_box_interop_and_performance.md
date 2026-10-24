@@ -177,6 +177,7 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
 
 ## Open
 - P4a take forwarding needs the same project on .4 and a destination cabled there (owner decision, WO-712 R5).
-- A pull of a spaced path still fails at the wrapper (hot-backup pair `connect-pair.js:256`); needs the wrapper to
-  understand rsync's escapes — a security-reviewed change, owner decision.
-- Clock drift with NTP off: show each peer's clock offset (ping `serverTimeMs`) on the Servers card, warn past 30 s.
+- ~~A pull of a spaced path still fails at the wrapper~~ → fixed in WO-727 (wrapper understands rsync's escapes,
+  installed on .4; updates now refresh the installed copy).
+- ~~Clocks 17 s apart, NTP off~~ → NTP on for both (WO-727, offset ≈2 ms). Still worth having: each peer's clock
+  offset (ping `serverTimeMs`) on the Servers card, warn past 30 s.
