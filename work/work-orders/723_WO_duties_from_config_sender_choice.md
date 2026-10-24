@@ -148,6 +148,9 @@ its own R1 ticks and does not follow the choice; the picker shows it as "(not in
   4xx retry cadence, routes 400s, identity override, block removed); wo712 smokes repointed to the resolved duties.
 - Godot units (`tests/run_tests.gd`): 21473 passed, 0 failed (new `does_text` + `sender_items` cases).
 - lint 0 errors, `check-max-file-lines` 0 over 500, API contract docs regenerated.
+- GitHub CI green on `3a29bdf1` (verify + build-client + godot). Two pushes before it were red on gates `test:ci`
+  does not run: `check-require-integrity` (the identity smoke's child `-e` string read as a relative require → now an
+  absolute path) and `check-unwired-exports` (`validatePatch` / `SETTABLE` exported but unused → dropped).
 
 **Live two-box (sandbox `HIGHASCG_SANDBOX=1` on 192.168.0.23:4290 ↔ .4 `highascg5867`; the live :4200 never linked)**
 - Fingerprints: sandbox `ef4808054f790cce` (its own key, not the live box's `87f0da5337ca6e2d`), .4 `1166d54ccd133944`.
