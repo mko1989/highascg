@@ -293,6 +293,7 @@ function persistProject(ctx, project, opts = {}) {
 		}
 		persistSceneDeckForCtx(ctx)
 	}
+	ctx._clusterShow?.written() // WO-746: every write of the show reaches the shared show (it ignores the ones it makes)
 	return { ok: true, slug, rev: projectRevOf(stamped), project: stamped }
 }
 

@@ -98,6 +98,20 @@ func test_fanout_line() -> void:
 	t.eq(M.follow_note({}), "", "not a follower")
 
 
+func test_show_line() -> void:  # WO-746
+	t.eq(M.show_line({"on": false}), "", "off: no line")
+	t.eq(M.show_line(null), "", "older server: no line")
+	t.eq(M.show_line({"on": true, "blocked": "hot-backup pair"}), "Show not shared: this server is in a hot-backup pair.", "blocked")
+	t.eq(M.show_line({"on": true, "role": "master", "peers": {"b": {"in_sync": true}}}), "Show shared from here · every server in step", "master")
+	t.eq(M.show_line({"on": true, "role": "master", "peers": {"b": {"in_sync": false}, "c": {"in_sync": true}}}), "Show shared from here · 1 server(s) not in step", "master, one behind")
+	t.eq(M.show_line({"on": true, "role": "follower", "in_sync": true}), "Show shared from the master · in step", "follower")
+	t.eq(M.show_line({"on": true, "role": "follower", "pending": true}), "Show shared from the master · sending your edit", "edit on its way")
+	t.eq(M.show_line({"on": true, "role": "alone"}), "Show sharing on · waiting for a master", "no master")
+	var c := {"on": true, "role": "follower", "in_sync": true, "conflict": {"count": 2, "file": "projects/_cluster/x.conflict-1.json"}}
+	t.eq(M.show_line(c), "Show shared from the master · in step · 2 item(s) edited on two servers at once: the master's kept, this server's saved as projects/_cluster/x.conflict-1.json", "conflict")
+	t.ok(M.show_warns(c) and M.show_warns({"caspar_apply": true}) and not M.show_warns({"on": true, "role": "master"}), "warns only when the operator must act")
+
+
 func test_does_text_says_what_a_linked_server_resolves_to() -> void:  # WO-723 (was R1 ticks)
 	var media := {"tracking": false, "detection": false, "zones": false, "auto": false, "presenters": false,
 		"lighting": false, "ptz": false, "artnet_in": true, "accept_remote": true}

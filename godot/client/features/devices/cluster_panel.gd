@@ -21,6 +21,7 @@ const Model := preload("res://features/devices/devices_model.gd")
 const RearPanel := preload("res://features/devices/rear_panel.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const DTM := preload("res://core/devices_target_model.gd")
+const Kit := preload("res://features/settings/pane_kit.gd")
 
 var _snap := {}
 var _views := {}  # peer id → its device-view payload
@@ -32,6 +33,8 @@ var _master_l: Label
 var _follow_l: Label
 var _auto: CheckBox
 var _accept: CheckBox  # WO-712 D3 / WO-723: the one setting left of the R1 ticks
+var _share: CheckBox  # WO-746: this server takes / gives the shared show
+var _show_l: Label
 var _take: Button
 var _make: ConfirmationDialog
 var _make_id := ""
@@ -139,6 +142,11 @@ func _render() -> void:
 	_take.visible = ms.get("is_master") != true
 	var own_duties: Variant = me.get("duties")
 	_accept.set_pressed_no_signal(not (own_duties is Dictionary) or own_duties.get("accept_remote", true) == true)
+	var sh: Variant = _snap.get("show")
+	_share.set_pressed_no_signal(sh is Dictionary and sh.get("on") == true)
+	_show_l.text = M.show_line(sh)
+	_show_l.visible = _show_l.text != ""
+	_show_l.add_theme_color_override("font_color", ThemeBuilder.WARN if M.show_warns(sh) else ThemeBuilder.TEXT_MUTED)
 	for c in _list.get_children():
 		c.queue_free()
 	var invites: Array = _snap.get("invites", []) if _snap.get("invites") is Array else []
@@ -315,6 +323,10 @@ func _build_master_row() -> void:
 	_follow_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_follow_l.visible = false
 	_master_row.add_child(_follow_l)
+	_show_l = _small("", ThemeBuilder.TEXT_MUTED)
+	_show_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_show_l.visible = false
+	_master_row.add_child(_show_l)
 	var controls := HBoxContainer.new()
 	_master_row.add_child(controls)
 	_auto = CheckBox.new()
@@ -333,6 +345,11 @@ func _build_master_row() -> void:
 	_accept.tooltip_text = "A linked server's presses (look takes, pins, fixture looks, Companion) count as this server's own. Off: refused."
 	_accept.toggled.connect(func(on: bool) -> void: DevicesTarget.api.post_json("/api/server/duties", {"patch": {"accept_remote": on}}))
 	controls.add_child(_accept)
+	_share = CheckBox.new()
+	_share.text = "Share the show"
+	_share.tooltip_text = "One show on every linked server that has this on: the master's. Edits made here go to the master."
+	_share.toggled.connect(_set_share)
+	controls.add_child(_share)
 	_take = Button.new()
 	_take.text = "Make this server master"
 	_take.pressed.connect(func() -> void: _confirm_make("self", "This server"))
@@ -341,6 +358,19 @@ func _build_master_row() -> void:
 	_make = ConfirmationDialog.new()
 	_make.confirmed.connect(func() -> void: _set_master({"master": _make_id}))
 	add_child(_make)
+
+
+## WO-746: switching on replaces this server's show with the master's, so it asks first; the poll shows the result.
+func _set_share(on: bool) -> void:
+	_share.set_pressed_no_signal(not on)
+	var send := func() -> void:
+		await DevicesTarget.api.post_json("/api/cluster/show", {"on": on})
+		_poll()
+	if not on:
+		send.call()
+		return
+	Kit.confirm(self, "This server takes the master's show and keeps it in step.\nIts own project is saved first "
+		+ "(projects/_cluster/). Caspar is not restarted.", send)
 
 
 func _confirm_make(id: String, name: String) -> void:

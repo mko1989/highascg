@@ -218,3 +218,38 @@ static func follow_note(snap: Dictionary) -> String:
 	if snap.get("follows_master") == true:
 		return "PGM here is driven by the master: local PGM takes are skipped (PRV still works)."
 	return ""
+
+
+## WO-746: the shared-show line under the master line ("" while this server does not share the show).
+static func show_line(s: Variant) -> String:
+	if not (s is Dictionary) or s.get("on") != true:
+		return ""
+	if str(s.get("blocked", "")) != "":
+		return "Show not shared: this server is in a hot-backup pair."
+	var parts: Array[String] = []
+	match str(s.get("role", "")):
+		"master":
+			var behind := 0
+			var peers: Dictionary = s.get("peers", {}) if s.get("peers") is Dictionary else {}
+			for id in peers:
+				if peers[id] is Dictionary and peers[id].get("in_sync") != true:
+					behind += 1
+			parts.append("Show shared from here · " + ("%d server(s) not in step" % behind if behind else "every server in step"))
+		"follower":
+			parts.append("Show shared from the master · " + ("sending your edit" if s.get("pending") == true
+				else "in step" if s.get("in_sync") == true else "catching up"))
+		_:
+			parts.append("Show sharing on · waiting for a master")
+	if s.get("caspar_apply") == true:
+		parts.append("Caspar layout differs from the show: Apply Caspar config (restart) when off air")
+	var c: Variant = s.get("conflict")
+	if c is Dictionary:
+		var kept := (", this server's saved as %s" % c.file) if str(c.get("file", "")) != "" else ""
+		parts.append(("Edit refused (%s)%s" % [c.error, kept]) if str(c.get("error", "")) != ""
+			else "%d item(s) edited on two servers at once: the master's kept%s" % [int(c.get("count", 0)), kept])
+	return " · ".join(parts)
+
+
+## WO-746: the line is a warning (not muted) when something needs the operator.
+static func show_warns(s: Variant) -> bool:
+	return s is Dictionary and (s.get("conflict") is Dictionary or s.get("caspar_apply") == true or str(s.get("blocked", "")) != "")

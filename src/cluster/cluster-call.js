@@ -68,8 +68,9 @@ function createClusterCall(deps) {
 		}
 	}
 
-	/** Sender: sign and POST to a linked server → { ok, status, json, error? } (never throws). `quiet`: the caller logs. */
-	async function call(peerId, action, args = {}, { quiet = false } = {}) {
+	/** Sender: sign and POST to a linked server → { ok, status, json, error? } (never throws). `quiet`: the caller logs;
+	 * `timeoutMs`: longer than the post default for a big body (WO-746: a whole show). */
+	async function call(peerId, action, args = {}, { quiet = false, timeoutMs } = {}) {
 		const peer = deps.cluster.saved(String(peerId || ''))
 		if (!peer) return { ok: false, status: 404, json: { error: 'no such server' } }
 		if (!peer.device_key)
@@ -86,17 +87,17 @@ function createClusterCall(deps) {
 			ts: now(),
 			nonce: crypto.randomBytes(16).toString('hex'),
 		}
-		const r = await deps.post(peer.host, peer.port, '/api/cluster/call', { ...req, sig: deps.sign(callText(req)) })
+		const r = await deps.post(peer.host, peer.port, '/api/cluster/call', { ...req, sig: deps.sign(callText(req)) }, timeoutMs)
 		if (!r.ok && !quiet)
 			log('warn', `${peer.name}: ${action} refused (${r.json?.error || r.error || 'HTTP ' + r.status})`)
 		return r
 	}
 
 	/** Sender: the same, to the cluster's master (when another server is master). */
-	async function callMaster(action, args) {
+	async function callMaster(action, args, opts) {
 		const id = deps.masterId()
 		if (!id) return { ok: false, status: 409, json: { error: 'no other server is master' } }
-		return call(id, action, args)
+		return call(id, action, args, opts)
 	}
 
 	/** Receiver: POST /api/cluster/call → { status, body }. */

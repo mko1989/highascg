@@ -26,6 +26,7 @@
  *   POST   /api/cluster/send { peer, action, args } → that server's answer (WO-712 R3: this server's operator presses
  *                                                  an action there, signed by this server; needs the normal auth)
  *   GET    /api/cluster/exchange              → { 'tracking.auto': snapshot+source | null, sources: [...] } (R3)
+ *   POST   /api/cluster/show { on }            → the shared-show view (WO-746, device-local; GET /api/cluster `show`)
  * GET /api/cluster also carries `master` (the view) and `invites` (WO-739: [{ id, fp, host, port, name, version,
  * first_at, asked_at }]). Changes broadcast WS `cluster:peers` (the GET body).
  * The service starts on the first call, or at boot when servers are linked (P3b `startIfLinked`: failover never waits
@@ -45,6 +46,8 @@ const { createAirJournal } = require('../cluster/cluster-air-journal')
 const { createClusterCall } = require('../cluster/cluster-call')
 const { createCallActions } = require('../cluster/cluster-call-actions')
 const { createExchange } = require('../cluster/cluster-exchange')
+const { createSharedShow } = require('../cluster/shared-show')
+const { sharedShowDeps } = require('../cluster/shared-show-ctx')
 const identity = require('../system/device-identity')
 const duties = require('../cluster/server-duties')
 const { isSandbox } = require('../bootstrap/sandbox')
@@ -65,6 +68,7 @@ function clusterOf(ctx) {
 	})
 	ctx._cluster.afterPoll(async () => {
 		await masterOf(ctx).tick()
+		await showOf(ctx).tick() // WO-746: the master catches every server up; a follower's waiting edit goes again
 		await fanoutOf(ctx).refresh()
 		require('../cluster/air-state').airChanged(ctx) // WO-712 R3b: the `air` heartbeat
 		duties.refresh() // WO-723: who does what follows the peers' pings
@@ -187,11 +191,17 @@ function callOf(ctx) {
 		post: postJson,
 		masterId: () => (masterOf(ctx).view().is_master ? '' : masterOf(ctx).view().master_id),
 		acceptsRemote: () => require('../cluster/server-duties').has('accept_remote'),
-		info: { ...exchangeOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
-		actions: createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }),
+		info: { ...exchangeOf(ctx).info, ...showOf(ctx).info, 'cluster.senders': (args) => sendersReceived(ctx, args) },
+		actions: { ...createCallActions(ctx, { callMaster: (a, args) => callOf(ctx).callMaster(a, args), isFollower: () => isClusterFollower(ctx) }), ...showOf(ctx).actions },
 		log: ctx.log,
 	})
 	return ctx._clusterCall
+}
+
+/** WO-746: one show on the linked servers that switched sharing on (shared-show.js); persistProject calls `written`. */
+function showOf(ctx) {
+	if (!ctx._clusterShow) ctx._clusterShow = createSharedShow(sharedShowDeps(ctx, { master: () => masterOf(ctx), cluster: () => clusterOf(ctx), call: () => callOf(ctx) }))
+	return ctx._clusterShow
 }
 
 /** WO-723: a linked server's sender choices (info action `cluster.senders`): per kind, the newer one wins. */
@@ -218,7 +228,7 @@ function exchangeOf(ctx) {
 
 /** GET /api/cluster body = WS `cluster:peers` (+ `fanout`: P4a forwarding status per server). */
 const full = (ctx) => ({ ...clusterOf(ctx).snapshot(), master: masterOf(ctx).view(),
-	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} },
+	fanout: ctx._clusterFanout ? ctx._clusterFanout.status() : { active: false, peers: {} }, show: showOf(ctx).view(),
 	follows_master: ctx._clusterMaster ? followsMaster(ctx) : false })
 
 function broadcast(ctx) {
@@ -307,6 +317,13 @@ function register(routes) {
 		return reply(r.status || 502, r.json && typeof r.json === 'object' ? r.json : { error: r.error || 'no answer' })
 	}, opt)
 	routes.get('/api/cluster/exchange', ({ ctx }) => reply(200, exchangeOf(ctx).view()), opt)
+	routes.post('/api/cluster/show', ({ ctx, body }) => {
+		const on = parseBody(body)?.on
+		if (typeof on !== 'boolean') return reply(400, { error: 'on must be true or false' })
+		const v = showOf(ctx).setOn(on)
+		broadcast(ctx)
+		return reply(200, v)
+	}, opt)
 	routes.get('/api/cluster/peers/:id/device-view', async ({ ctx, params }) => {
 		const r = await clusterOf(ctx).deviceView(params.id)
 		return reply(r.status, r.body)
@@ -320,4 +337,4 @@ function startIfLinked(ctx) {
 	if (Array.isArray(peers) && peers.length) clusterOf(ctx)
 }
 
-module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, exchangeOf, sendersSyncOf, sendersReceived, startIfLinked }
+module.exports = { register, clusterOf, masterOf, fanoutOf, followsMaster, isClusterFollower, callOf, exchangeOf, showOf, sendersSyncOf, sendersReceived, startIfLinked }

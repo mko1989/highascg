@@ -77,6 +77,10 @@ Thumbs.db
 // deleting anything under it, or peers will push the dirs right back.
 /projects/_trash
 
+// WO-746: a server's own project kept when it took the shared show (before-share / conflict / refused / diverged) —
+// box-local by design. MIRROR THIS ON THE MAC (.stignore does not sync).
+/projects/_cluster
+
 // WO-427: GUI-uploaded DeckLink driver packages — box-local, peers must not sync them
 /vendor
 

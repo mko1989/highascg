@@ -245,7 +245,7 @@ describe('WO-723 routes and wiring', () => {
 		assert.equal(duties.senders().get().ptz.by, B)
 		duties.senders().set('ptz', '')
 		const rc = read('src/api/routes-cluster.js')
-		assert.match(rc, /info: \{ \.\.\.exchangeOf\(ctx\)\.info, 'cluster\.senders': \(args\) => sendersReceived\(ctx, args\) \},/)
+		assert.match(rc, /info: \{ \.\.\.exchangeOf\(ctx\)\.info, \.\.\.showOf\(ctx\)\.info, 'cluster\.senders': \(args\) => sendersReceived\(ctx, args\) \},/) // WO-746 added the shared show's info list
 		assert.match(rc, /duties\.refresh\(\) \/\/ WO-723: who does what follows the peers' pings\n\t\tawait sendersSyncOf\(ctx\)\.tick\(\)/)
 		assert.match(rc, /duties\.provide\(\{ cluster: \(\) => dutiesView\(ctx\) \}\)/)
 		assert.match(rc, /duties: p\.duties, refused: refused\(p\.id\) \}/, 'a refusal reaches the picker')

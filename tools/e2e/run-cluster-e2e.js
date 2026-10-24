@@ -8,6 +8,7 @@
  *   node tools/e2e/run-cluster-e2e.js                     # 3 throwaway sandbox servers on this box (every step)
  *   node tools/e2e/run-cluster-e2e.js --servers=2
  *   node tools/e2e/run-cluster-e2e.js --live=192.168.0.23:4200,192.168.0.4:4200 --yes
+ *   node tools/e2e/run-cluster-e2e.js --scenario=show     # WO-746 shared show, several operators (sandbox only)
  *
  * --live drives REAL servers: they must not be linked to anything yet. While it runs they link, every one is master
  * in turn (a follower skips its local PGM takes, kiosks follow the master), and at the end they are unlinked and
@@ -22,6 +23,7 @@ const os = require('os')
 const path = require('path')
 const { startSandboxNodes, liveNodes } = require('./cluster-nodes')
 const { runScenario } = require('./cluster-scenario')
+const { runShowScenario } = require('./shared-show-scenario')
 
 const arg = (k, d) => {
 	const hit = process.argv.find((a) => a === `--${k}` || a.startsWith(`--${k}=`))
@@ -65,6 +67,8 @@ async function main() {
 	const out = path.resolve(arg('out', path.join(os.tmpdir(), 'highascg-cluster-e2e', stamp)))
 	fs.mkdirSync(out, { recursive: true })
 	const live = arg('live', '')
+	const scenario = arg('scenario', 'cluster')
+	if (live && scenario === 'show') throw new Error('--scenario=show replaces every server\'s show: sandbox servers only')
 	let nodes
 	let senders = null
 	if (live) {
@@ -83,7 +87,7 @@ async function main() {
 	}
 	let results
 	try {
-		results = await runScenario(nodes, {
+		results = await (scenario === 'show' ? runShowScenario : runScenario)(nodes, {
 			benchN: Number(arg('bench', '100')) || 100,
 			onStep: (r) => console.log(`[cluster-e2e] ${r.status.toUpperCase().padEnd(4)} ${r.step}${r.ms !== undefined ? ` (${r.ms} ms)` : ''}${r.error ? ` — ${r.error}` : ''}`),
 		})
