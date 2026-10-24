@@ -1,8 +1,7 @@
 # WO-724 — Two real servers: interoperability and performance, together and one by one
 
-**Status: IN PROGRESS (24.10.26) — single-box benchmarks + two-box link / master / signed calls / Send media / failover
-done; fixes DONE and proven live: Send media with spaces, kiosk stays home after a failover; load-while-linked and
-teardown next.**
+**Status: DONE (24.10.26) — single-box and two-box test pass run live on both boxes; two fixes proven live (Send media
+with spaces, kiosk stays home after a failover) + offline suites and CI green; link torn down. Follow-ups under Open.**
 
 Owner, 24.10: *"You can restart now. Dev machine in the shop. Continue running multiple tests to check interoperability
 and performance of both servers and one by one."* — this box (192.168.0.23, `highascg7580`) is a dev machine in the
@@ -96,7 +95,18 @@ HighAsCG CPU under the 10-concurrent GET load: 55–58 % of one core on both; Ca
   `_switch` treats "home" only as the exact loopback origin.
 - **Idle cost while linked:** this server 2.6–5 % of a core (vs 2.1–2.6 % alone; the 5 s cluster poll). .4 went from
   2.8 % to ≈11 % while it was master **with this box's kiosk as a remote client** — that is the JPEG feed encode for a
-  remote GUI (P1), not the link.
+  remote GUI (P1), not the link. Re-sampled with the kiosk home (3 samples each): .4 HighAsCG 0–5 %, Caspar 30–35 %;
+  this server 11–25 % (the kiosk is now its local client), Caspar 72–75 %.
+- **Load while linked:** the same benchmark against both boxes **at the same time** (both clients run on this box),
+  linked, this box master. Cheap routes unchanged (ping 1.1 / 1.3 ms seq p50, identity, device-view, video-surfaces
+  within noise); the two blocking routes 25–60 % slower (.4 version 10.7→15.7 ms, state 10.6→14.0; here version
+  17.5→27.6, state 24.6→30.7 seq p50); feeds unchanged (14.8–14.9 / 24.7–24.9 fps); 0 errors. HighAsCG at 53 % (.4)
+  / 62 % (here) of a core under load. The link held: each side read its peer `online: true` once a second throughout
+  (29 of 31 samples on both; in 2 the read of .4's `/api/cluster` itself took > 2 s, during its concurrent
+  `/api/state` burst; the event-loop blocking above, not the link).
+- **Teardown:** `DELETE /api/cluster/peers/…` on both → both `peers: []`, master epoch 0 / none. The kiosk stayed on
+  `127.0.0.1` (`ui.cfg` origin `""`). Media sent to .4 for the test is still there (`projects/godot_test`,
+  `projects/npcc/Tlo Orange Ball/BAZA 2.mp4`, ≈100 MB).
 
 ### Send media: names with spaces
 `POST /api/cluster/peers/highascg5867/send-media` (project godot_test, 3 paths) → `failed`:
@@ -141,8 +151,12 @@ holds a space (or `&`, `;`, `|`) fails, on every box.
   `origin="http://192.168.0.23:4200"` → `[client] server http://127.0.0.1:4200`, no `/api/video-feed` upgrade, a shm
   lease on `pgm1`. Then failover run 2 + failback: `following the master: http://192.168.0.4:4200 →
   http://127.0.0.1:4200`, `ui.cfg` origin `""`, no feed.
+- CI: 6af5c6d9 green; 329919d1 first run's verify step hung after the suite printed `fail 0` (runner, past its 15-min
+  timeout) → cancelled + re-run → green.
 
 ## Open
+- .4 runs the 23.10 ISO: update it to `main` (WO-723 sender choice; until then untick lighting / PTZ on .4 when linked).
+- P4a take forwarding needs the same project on .4 and a destination cabled there (owner decision, WO-712 R5).
 - `build-highascg-egg.sh`: restart `casparcg-server` after the config comes back (or never restart it mid-build).
 - A pull of a spaced path still fails at the wrapper (hot-backup pair `connect-pair.js:256`); needs the wrapper to
   understand rsync's escapes — a security-reviewed change, owner decision.
