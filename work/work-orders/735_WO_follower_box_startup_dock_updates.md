@@ -1,6 +1,6 @@
 # WO-735 — A server box whose kiosk follows the master: start-up question, dock and Updates work on the box itself; releases carry the Godot client
 
-**Status: IN PROGRESS — code + Godot tests 21510/0 + live dock check done; release and owner's .4 GitHub update pending**
+**Status: IN PROGRESS — code, Godot tests 21510/0, live dock check and release `2026-10-24_174730` done (.4 sees it); owner's first .4 update from a client pointed at .4 pending**
 
 Owner, 24.10, after the .4 upgrade to Ubuntu 26.04: *"lets run full tests to see if its any different"*, then *"the dock
 didn't show up on the .4"* and *"create a realese so the .4 can be upgraded via github from client"*.
@@ -62,5 +62,13 @@ on a follower box. That is the wider "Settings on a follower" question and is le
   Devices tab works on this machine (http://127.0.0.1:4200)`. Resting the pointer at the bottom edge reveals the dock
   with this machine's apps (HighAsCG, Firefox, …, ⋯). The old code gave this client no dock (origin .4).
 - This box's kiosk was restarted (home, not following): the `HighAsCG dock` window exists, so nothing changed for it.
-- Pending: the release, and .4 updated from the client via GitHub. Then expected: the launcher appears on .4, Caspar
-  starts on the answer, and the dock appears.
+- Release `2026-10-24_174730` (built the WO-687 way, from a clean worktree of 4d36313b): server tarball 50.0 MB, 9901
+  entries, 631 of them `godot/client/`, no `.godot`/`.uid`, no secrets. The three operator builds are attached.
+  `.4` `/api/system/update/check` → `updateAvailable: true`. Since WO-736, every green push makes such a release.
+- Full suite on .4 (Ubuntu 26.04, a throwaway copy of HEAD with its own `npm ci`): 3168 pass / 3 fail. The failures
+  were the known export-only wo498, and two smoke-wo721 cases: bash 5.3 treats `BASH_SOURCE[0]` of a stdin script as
+  unbound under `set -u`. That is a harness artifact (the real script always runs from a file) and was fixed in the
+  smoke (dc6da8ea): 5/5 on bash 5.2 here and on 5.3 on .4. Godot on .4: `--check` OK, `--test` 21493 / 0.
+- Pending owner: the first update of .4 from a client **connected to .4**. .4's running kiosk is still the old client,
+  so its own Updates pane would target the master. After the update, restart .4's kiosk (or reboot). Expected: the
+  launcher appears, Caspar starts on the answer, the dock appears.

@@ -1,6 +1,6 @@
 # WO-736 — CI: every green push to main becomes a server release the second server updates from
 
-**Status: IN PROGRESS — workflow + smoke 3/3; first automatic release pending (this commit's own push)**
+**Status: DONE (24.10.26) — smoke 3/3; CI run 40118333157 green in all four jobs; its release `2026-10-24_175927` is tagged at the pushed SHA b82c482a and .4 reports it as the available update.**
 
 Owner, 24.10: *"id like to install automations on github actions, so each push gets a test for integrity and run
 build release there, if possible. right now the development is quick and i want to be able to update second server
@@ -40,5 +40,12 @@ easily."*
 
 - Smoke 3/3; `smoke-wo367-wiring-gates` 9/9 and `smoke-release-package-bump` 1/1 (both read ci.yml / the release
   scripts) still pass.
-- Pending: this commit's push runs the job. Expected: a prerelease tagged at the pushed SHA, with the server tarball
-  + starter zips, which .4's `/api/system/update/check` reports as available.
+- First run (push of b82c482a, CI run 40118333157): verify, godot, build-client and release all succeeded. The log
+  shows `Release: …/releases/tag/2026-10-24_175927` and `automatic server prereleases: 1 (keeping 10)`.
+- `git ls-remote` puts tag `2026-10-24_175927` on b82c482a, the tested commit. It is a prerelease with
+  `highascg-server_2026-10-24T175927Z.tar.gz` (49.9 MB) and both starter zips.
+- Downloaded back: 9901 entries, the same as the hand-built WO-735 release. They include 631 `godot/client/` files,
+  `dist-web/`, `node_modules/` with the serialport linux-x64 prebuilds, no `.godot/` or `.uid` files, and no
+  identity, cert or tailscale config.
+- `.4` `GET /api/system/update/check?force=1` → `latest 2026-10-24T175927Z, updateAvailable: true`.
+- Note: a docs-only push also makes a release. That is harmless (the newest 10 are kept) and keeps the rule simple.
