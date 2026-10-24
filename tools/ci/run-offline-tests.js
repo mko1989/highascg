@@ -402,6 +402,7 @@ const FILES = [
 	'tools/smoke/smoke-wo724-media-send-paths.test.js',
 	'tools/smoke/smoke-wo724-build-restarts-caspar.test.js',
 	'tools/smoke/smoke-wo725-cluster-e2e.test.js',
+	'tools/smoke/smoke-wo728-box-checks.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

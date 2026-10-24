@@ -49,6 +49,14 @@ function startReplicationService(ctx, wsInfo = {}) {
 	} catch {
 		/* optional */
 	}
+	// WO-729: a sandbox shares this user's ~/.ssh — it never rewrites the box's authorized_keys
+	if (!require('../bootstrap/sandbox').isSandbox()) {
+		try {
+			require('./replication-ssh-setup').restrictPlainReplicationKeys(undefined, { log: ctx.log })
+		} catch (e) {
+			if (typeof ctx.log === 'function') ctx.log('warn', `[replication] restrict replication SSH keys: ${e?.message || e}`)
+		}
+	}
 	const repl = getReplicationConfig(ctx.config)
 	const roleState = new RoleState()
 	roleState.configure({ enabled: repl.enabled, role: repl.role })

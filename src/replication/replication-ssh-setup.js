@@ -137,6 +137,38 @@ function upsertPeerAuthorizedKey(authPath, publicKeyLine, opts = {}) {
 }
 
 /**
+ * WO-729: replication keys added before WO-78 — by the old setup script or ssh-copy-id — sit in authorized_keys with
+ * no options: a full shell as casparcg for whoever holds the key. Every use of the key is rsync (Send media, pulls,
+ * the probe), so each one is bound to the forced command. Keys that already have options, and other keys, are kept.
+ * @param {string} [authPath]
+ * @param {{ log?: (level: string, msg: string) => void }} [opts]
+ */
+function restrictPlainReplicationKeys(authPath = path.join(os.homedir(), '.ssh', 'authorized_keys'), opts = {}) {
+	if (!fs.existsSync(authPath)) return { ok: true, restricted: 0 }
+	let restricted = 0
+	const next = fs
+		.readFileSync(authPath, 'utf8')
+		.split('\n')
+		.map((raw) => {
+			const t = raw.trim()
+			if (!/^(ssh-|ecdsa-)/.test(t) || !/\shighascg-replication@/.test(t)) return raw
+			const entry = buildForcedCommandAuthorizedKeysEntry(t)
+			if (!entry) return raw
+			restricted++
+			return entry
+		})
+	if (!restricted) return { ok: true, restricted: 0 }
+	const backup = `${authPath}.pre-wo729`
+	if (!fs.existsSync(backup)) fs.copyFileSync(authPath, backup)
+	fs.writeFileSync(authPath, next.join('\n'), { mode: 0o600 })
+	fs.chmodSync(authPath, 0o600)
+	if (typeof opts.log === 'function') {
+		opts.log('warn', `[replication] ${restricted} replication SSH key(s) had a full shell — now rsync-only (backup ${backup})`)
+	}
+	return { ok: true, restricted }
+}
+
+/**
  * @param {string} [forKeyPath]
  */
 function ensureSshDir(forKeyPath) {
@@ -362,6 +394,7 @@ module.exports = {
 	ensureReplicationSshKey,
 	resolveReplicationSshIdentityPath,
 	installPeerAuthorizedKey,
+	restrictPlainReplicationKeys,
 	ensurePeerAuthorizedKeyFromConfig,
 	persistPeerSshPublicKey,
 	prepareReplicationSshForPairing,

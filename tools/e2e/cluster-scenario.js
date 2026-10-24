@@ -14,6 +14,7 @@ const { waitFor, clusterView } = require('./cluster-nodes')
 const { benchNode } = require('./cluster-bench')
 
 const FAILOVER_MS = 12000
+const CLOCK_MAX_MS = 5000
 const pct = (a, p) => +a[Math.min(a.length - 1, Math.floor((p / 100) * a.length))].toFixed(1)
 
 /** Every node's view, in node order (null = did not answer). */
@@ -50,6 +51,22 @@ const steps = [
 				assert.equal(errors, 0, `${n.id}: ${errors} failed requests`)
 			}
 			return out
+		},
+	},
+	{
+		// WO-728: .4 and this box ran 17 s apart with NTP off (WO-724); signed calls refuse past ±60 s
+		name: `clocks: every server within ${CLOCK_MAX_MS / 1000} s of the others`,
+		async run({ nodes }) {
+			const off = {}
+			for (const n of nodes) {
+				const t0 = Date.now()
+				const r = await n.get('/api/replication/ping')
+				assert.equal(typeof r.data?.serverTimeMs, 'number', `${n.id}: no serverTimeMs`)
+				off[n.id] = Math.round(r.data.serverTimeMs - (t0 + Date.now()) / 2)
+			}
+			const spread = Math.max(...Object.values(off)) - Math.min(...Object.values(off))
+			assert.ok(spread <= CLOCK_MAX_MS, `clocks ${spread} ms apart (${JSON.stringify(off)}): turn NTP on (Settings → System → System time)`)
+			return { offsetMs: off, spreadMs: spread }
 		},
 	},
 	{

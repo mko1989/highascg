@@ -39,19 +39,8 @@ ensure_key() {
 }
 
 install_self_in_authorized_keys() {
-	mkdir -p "$HOME/.ssh"
-	chmod 700 "$HOME/.ssh"
-	touch "$HOME/.ssh/authorized_keys"
-	chmod 600 "$HOME/.ssh/authorized_keys"
-	local pub="${KEY}.pub"
-	local line
-	line="$(cat "$pub")"
-	if grep -qF "$line" "$HOME/.ssh/authorized_keys" 2>/dev/null; then
-		echo "==> Local pubkey already in authorized_keys"
-	else
-		echo "$line" >>"$HOME/.ssh/authorized_keys"
-		echo "==> Added local replication pubkey to ~/.ssh/authorized_keys"
-	fi
+	# WO-729: through installPeerAuthorizedKey — rsync-only (forced command), never a plain key with a shell
+	install_peer_key_file "${KEY}.pub" ""
 }
 
 install_peer_key_file() {
@@ -92,8 +81,12 @@ EOF
 
 copy_id_to_peer() {
 	local peer="$1"
-	echo "==> ssh-copy-id to ${REPL_USER}@${peer} (enter peer password once if prompted)"
-	ssh-copy-id -i "${KEY}.pub" -o StrictHostKeyChecking=accept-new "${REPL_USER}@${peer}"
+	# WO-729: not ssh-copy-id — that leaves the key on the peer with a full shell. The peer's own script installs it
+	# rsync-only (forced command); the peer password is asked once.
+	echo "==> install ${KEY}.pub on ${REPL_USER}@${peer} (rsync-only; enter peer password once if prompted)"
+	ssh -o StrictHostKeyChecking=accept-new "${REPL_USER}@${peer}" \
+		'f=$(mktemp) && cat >"$f" && bash ~/highascg/scripts/replication/setup-replication-ssh.sh --install-peer-key "$f"; s=$?; rm -f "$f"; exit $s' \
+		<"${KEY}.pub"
 }
 
 test_peer() {

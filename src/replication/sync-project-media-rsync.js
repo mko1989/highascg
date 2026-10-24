@@ -354,6 +354,7 @@ async function rsyncProjectMediaToPeer(ctx, project, opts = {}) {
 module.exports = {
 	buildProjectMediaRsyncPlan,
 	rsyncArgs,
+	rsyncSshOpts,
 	rsyncProjectMediaToPeer,
 	runProjectMediaRsync,
 }
