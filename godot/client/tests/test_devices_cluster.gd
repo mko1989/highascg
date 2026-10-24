@@ -35,6 +35,14 @@ func test_facts_line() -> void:
 	t.eq(M.facts({"host": "b", "port": 4300, "online": false, "error": "ECONNREFUSED"}), "b:4300 · media ? · offline: ECONNREFUSED", "offline")
 
 
+func test_link_line_only_when_one_way() -> void:
+	t.eq(M.link_line({"name": "B", "linked_back": true}), "", "both ways")
+	t.eq(M.link_line({"name": "B", "linked_back": null}), "", "not known yet / older server")
+	t.eq(M.link_line({"name": "B"}), "", "field missing (older server)")
+	t.eq(M.link_line({"name": "B", "linked_back": false}), "One-way: B does not list this server, asking it again.", "no reason yet")
+	t.eq(M.link_line({"name": "B", "linked_back": false, "link_back_error": "it needs sign-in"}), "One-way: B does not list this server (it needs sign-in).", "refused")
+
+
 func test_send_line() -> void:
 	t.eq(M.send_line({}, ""), "", "never sent")
 	t.eq(M.send_line({"media_send": {"state": "sending", "percent": 40}}, ""), "Sending media… 40 %", "progress")

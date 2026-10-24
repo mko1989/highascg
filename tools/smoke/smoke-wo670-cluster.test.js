@@ -62,7 +62,8 @@ describe('WO-670 P2 cluster peers', () => {
 			'10.0.0.23:4200/api/replication/ping': pingOf({ instanceId: 'iA' }) })
 		const store = memStore()
 		const snaps = []
-		const c = createCluster({ persistence: store, selfPing: async () => SELF, fetchJson: net.fetchJson, onChange: (s) => snaps.push(s) })
+		const c = createCluster({ persistence: store, selfPing: async () => SELF, fetchJson: net.fetchJson, onChange: (s) => snaps.push(s),
+			localAddress: async () => '' }) // WO-732: the link-back finds no route (smoke-wo732 covers it)
 		assert.equal((await c.add({ address: 'nope nope' })).status, 400)
 		assert.equal((await c.add({ address: '10.0.0.7' })).status, 404, 'answers, but not as HighAsCG')
 		assert.equal((await c.add({ address: '10.0.0.9' })).status, 404, 'nobody there')
@@ -74,7 +75,9 @@ describe('WO-670 P2 cluster peers', () => {
 		assert.equal(r.body.peer.online, true)
 		assert.equal(r.body.peer.program_channels, 2)
 		assert.equal(r.body.peer.media_parity, 'same')
-		assert.deepEqual(store.m.get('clusterPeers'), [{ id: 'boxB', host: '10.0.0.6', port: 4200, name: 'boxB', added_at: store.m.get('clusterPeers')[0].added_at, device_key: '' }])
+		const linkedAt = store.m.get('clusterPeers')[0].linked_at
+		assert.ok(linkedAt > 0, 'WO-732: an operator link records when')
+		assert.deepEqual(store.m.get('clusterPeers'), [{ id: 'boxB', host: '10.0.0.6', port: 4200, name: 'boxB', added_at: store.m.get('clusterPeers')[0].added_at, device_key: '', linked_at: linkedAt }])
 		assert.equal(r.body.peer.device_key, undefined, 'the key stays on the server; the view says identity: false')
 		assert.equal(r.body.peer.identity, false)
 		assert.equal(snaps.at(-1).peers.length, 1, 'onChange carries the new list')

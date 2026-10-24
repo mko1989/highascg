@@ -98,6 +98,7 @@ async function handleGet(path, ctx, req) {
 				instanceId: rt?.instanceId || null,
 				projectMedia,
 				duties: require('../cluster/server-duties').get(), // WO-712 R1: what this server does (linked servers show it)
+				clusterLinked: require('../cluster/cluster-peers').linkedFingerprints(ctx.persistence || require('../utils/persistence')), // WO-732
 				activeShowSlug,
 				activeShowRevision,
 				activeShowSavedAt,

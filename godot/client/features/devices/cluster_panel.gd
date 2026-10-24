@@ -141,7 +141,7 @@ func _card(p: Dictionary) -> Control:
 	var send := Button.new()
 	send.text = "Send media"
 	send.disabled = p.get("online") != true or M.sending(p)
-	send.tooltip_text = "Copy this project's media to %s now (rsync). Both servers must have linked each other." % str(p.get("name", id))
+	send.tooltip_text = "Copy this project's media to %s now (rsync)." % str(p.get("name", id))
 	send.pressed.connect(func() -> void: _send(id))
 	top.add_child(send)
 	if not M.is_master(_master(), id) and p.get("online") == true and p.get("identity") == true:
@@ -163,6 +163,11 @@ func _card(p: Dictionary) -> Control:
 	var does := M.does_text(p.get("duties"))  # WO-723: what its config and the links resolve it to
 	if does != "":
 		v.add_child(_small(does, ThemeBuilder.TEXT_MUTED))
+	var ll := M.link_line(p)  # WO-732: the other server does not list this one
+	if ll != "":
+		var lk := _small(ll, ThemeBuilder.WARN)
+		lk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(lk)
 	var line := M.send_line(p, str(_send_err.get(id, "")))
 	if line != "":
 		var sl := _small(line, ThemeBuilder.ERROR if M.send_failed(p) or _send_err.has(id) else ThemeBuilder.TEXT)

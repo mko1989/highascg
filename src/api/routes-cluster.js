@@ -5,8 +5,10 @@
  *   GET    /api/cluster                        → { self, peers: [{ id, host, port, name, online, version, role, epoch,
  *                                                  program_channels, media, media_parity, error }] }
  *   POST   /api/cluster/scan                   → { found: [{ host, port, hostname, version, role }] }  (this box's /24s)
- *   POST   /api/cluster/peers { address }      → 201 { peer }   (host or host:port; must answer as HighAsCG)
- *   DELETE /api/cluster/peers/:id              → { ok }
+ *   POST   /api/cluster/peers { address }      → 201 { peer, link_back: { ok, error } }  (host or host:port; must answer
+ *                                                  as HighAsCG; WO-732: that server links this one back. `link_back:
+ *                                                  false` = a server linking back: no call back, 409 when unlinked here)
+ *   DELETE /api/cluster/peers/:id[?link_back=0] → { ok, link_back?: { ok, error } }  (WO-732: unlinked there too)
  *   GET    /api/cluster/peers/:id/device-view  → that server's own /api/device-view (cached 15 s)
  *   POST   /api/cluster/peers/:id/send-media   → 202; progress in the peer's `media_send` (P2b, cluster-media.js)
  *   GET    /api/cluster/identity               → { id, hostname, device_key, fingerprint }  (public: what a linker records)
@@ -49,6 +51,8 @@ function clusterOf(ctx) {
 		persistence: ctx.persistence || defaultPersistence,
 		selfPing: async () => JSON.parse((await handleGet('/api/replication/ping', ctx, null)).body),
 		selfKey: identity.getDevicePublicKeyPem(),
+		selfPort: () => ctx.config?.server?.httpPort, // WO-732: the address a peer links back to
+		log: ctx.log,
 		onChange: () => broadcast(ctx),
 	})
 	ctx._cluster.afterPoll(async () => {
@@ -244,10 +248,11 @@ function register(routes) {
 		const r = await clusterOf(ctx).add(parseBody(body))
 		return reply(r.status, r.body)
 	}, opt)
-	routes.delete('/api/cluster/peers/:id', ({ ctx, params }) => {
-		const ok = clusterOf(ctx).remove(params.id)
-		if (ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget()
-		return reply(ok ? 200 : 404, ok ? { ok } : { error: 'no such server' })
+	routes.delete('/api/cluster/peers/:id', async ({ ctx, params, query }) => {
+		// WO-732: unlinks there too; `?link_back=0` = that server is the one unlinking
+		const r = await clusterOf(ctx).unlink(params.id, { linkBack: String(query?.link_back ?? '') !== '0' })
+		if (r.ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget()
+		return reply(r.ok ? 200 : 404, r.ok ? r : { error: 'no such server' })
 	}, opt)
 	routes.post('/api/cluster/peers/:id/send-media', async ({ ctx, params }) => {
 		const r = await sendMedia(params.id, mediaDeps(ctx))

@@ -12,17 +12,25 @@
  * DEVICE_VIEW_MS. onChange(snapshot) fires when what the clients see changed (→ WS `cluster:peers`).
  * P2b: linking also records the peer's device public key (GET /api/cluster/identity) — what cluster-media.js trusts.
  * P3a: afterPoll(fn) runs fn after every poll (cluster-master.js pulls claims and checks failover there).
+ * WO-732 P1: one link, both sides. Linking a server asks it to link this one back (`link_back: false` on that call, so
+ * it does not ask again); unlinking unlinks there too. A poll that finds the peer not listing this server (its ping
+ * `clusterLinked`) repairs the link, at most every HEAL_MS. An unlink the peer did not confirm leaves a tombstone
+ * (`clusterUnlinked`): that server's repair is answered 409 `unlinked` and it drops its side instead.
  */
 
 const http = require('http')
+const net = require('net')
 const os = require('os')
 
 const STORE_KEY = 'clusterPeers'
+const TOMBSTONE_KEY = 'clusterUnlinked'
 const POLL_MS = 5000
 const DEVICE_VIEW_MS = 15000
 const TIMEOUT_MS = 1500
 const SCAN_TIMEOUT_MS = 350
 const MAX_PEERS = 16
+const HEAL_MS = 60000
+const TOMBSTONE_MS = 30 * 24 * 3600 * 1000
 
 /** GET http://host:port/path → { ok, status, json } (never throws). */
 function getJson(host, port, path, timeout = TIMEOUT_MS) {
@@ -46,10 +54,13 @@ function getJson(host, port, path, timeout = TIMEOUT_MS) {
 }
 
 /** POST JSON → { ok, status, json } (never throws). */
-function postJson(host, port, path, body, timeout = 5000) {
+const postJson = (host, port, path, body, timeout = 5000) => requestJson('POST', host, port, path, body, timeout)
+
+/** method + JSON body → { ok, status, json } (never throws). */
+function requestJson(method, host, port, path, body, timeout = 5000) {
 	return new Promise((resolve) => {
-		const data = Buffer.from(JSON.stringify(body))
-		const req = http.request({ host, port, path, method: 'POST', timeout,
+		const data = Buffer.from(body === undefined ? '' : JSON.stringify(body))
+		const req = http.request({ host, port, path, method, timeout,
 			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json' } }, (res) => {
 			const chunks = []
 			res.on('data', (c) => chunks.push(c))
@@ -67,6 +78,30 @@ function postJson(host, port, path, body, timeout = 5000) {
 		req.on('error', (e) => resolve({ ok: false, status: 0, json: null, error: e.message }))
 		req.end(data)
 	})
+}
+
+/** WO-732: this box's own address on the route to host:port ('' when unreachable) — what the peer links back to. */
+function localAddressTo(host, port, timeout = TIMEOUT_MS) {
+	return new Promise((resolve) => {
+		const s = net.connect({ host, port })
+		const done = (v) => {
+			s.destroy()
+			resolve(v)
+		}
+		s.setTimeout(timeout, () => done(''))
+		s.on('connect', () => done(String(s.localAddress || '').replace(/^::ffff:/, '')))
+		s.on('error', () => done(''))
+	})
+}
+
+/** The id a server lists another one under, from that one's ping (add() and the link-back's unlink agree on it). */
+const idFromPing = (ping, fallback) => String(ping?.selfId || ping?.hostname || fallback || '').replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 64)
+
+/** WO-732: the fingerprints of the servers linked here (this server's ping `clusterLinked`). */
+function linkedFingerprints(store) {
+	const list = store?.get(STORE_KEY)
+	const { fingerprint } = require('./cluster-media')
+	return (Array.isArray(list) ? list : []).filter((p) => p?.device_key).map((p) => fingerprint(p.device_key))
 }
 
 /** "host", "host:port" → { host, port } | null. */
@@ -99,24 +134,35 @@ function subnetHosts(nets = os.networkInterfaces()) {
 
 /**
  * @param {{ persistence: { get: Function, set: Function }, selfPing: () => Promise<object|null>, fetchJson?: Function,
- *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[], selfKey?: string }} opts
+ *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[], selfKey?: string,
+ *   selfPort?: () => number, request?: Function, localAddress?: Function, log?: Function }} opts
  */
 function createCluster(opts) {
 	const fetchJson = opts.fetchJson || getJson
+	const request = opts.request || requestJson
+	const localAddress = opts.localAddress || localAddressTo
 	const now = opts.now || Date.now
 	const hosts = opts.hosts || subnetHosts
 	const store = opts.persistence
-	/** id → { saved: {id, host, port, name, added_at, device_key}, live: {...}, view: {at, data}, send: {...} | null } */
+	const { fingerprint } = require('./cluster-media')
+	const selfFp = opts.selfKey ? fingerprint(opts.selfKey) : ''
+	const log = (lvl, msg) => opts.log?.(lvl, `[cluster] ${msg}`)
+	/** id → { saved: {id, host, port, name, added_at, device_key}, live: {...}, view: {at, data}, send: {...} | null,
+	 *   back: { ok: bool|null, error, at } (WO-732: did it take the link back) } */
 	const peers = new Map()
 	let self = null
 	let timer = null
 	let lastSig = ''
 
 	for (const p of Array.isArray(store.get(STORE_KEY)) ? store.get(STORE_KEY) : []) {
-		if (p && typeof p.id === 'string' && parseAddress(`${p.host}:${p.port}`)) peers.set(p.id, { saved: p, live: { online: null }, view: null, send: null })
+		if (p && typeof p.id === 'string' && parseAddress(`${p.host}:${p.port}`)) peers.set(p.id, { saved: p, live: { online: null }, view: null, send: null, back: null })
 	}
 
 	const save = () => store.set(STORE_KEY, [...peers.values()].map((p) => p.saved))
+	const tombstones = () => (Array.isArray(store.get(TOMBSTONE_KEY)) ? store.get(TOMBSTONE_KEY) : []).filter((t) => t && now() < t.until)
+	const tombstoned = (key) => !!key && tombstones().some((t) => t.fp === fingerprint(key))
+	const setTombstones = (list) => store.set(TOMBSTONE_KEY, list.slice(-32))
+	const tombstone = (key, ms) => key && setTombstones([...tombstones().filter((t) => t.fp !== fingerprint(key)), { fp: fingerprint(key), until: now() + ms }])
 
 	function liveFrom(ping) {
 		return {
@@ -129,8 +175,16 @@ function createCluster(opts) {
 			program_channels: Array.isArray(ping.channelMap?.programChannels) ? ping.channelMap.programChannels.length : null,
 			media: ping.projectMedia ? { slug: ping.projectMedia.slug, files: ping.projectMedia.fileCount, signature: ping.projectMedia.signature } : null,
 			duties: ping.duties && typeof ping.duties === 'object' ? ping.duties : null, // WO-712 R1: what that server does (null = older server)
+			linked: Array.isArray(ping.clusterLinked) ? ping.clusterLinked.map(String) : null, // WO-732 (null = older server)
 			error: '',
 		}
+	}
+
+	/** WO-732: true / false = that server does / does not list this one; null = unknown (older server, offline). */
+	function linkedBack(p) {
+		if (p.live.online !== true || !selfFp) return null
+		if (Array.isArray(p.live.linked)) return p.live.linked.includes(selfFp)
+		return p.back?.ok ?? null
 	}
 
 	function view(p) {
@@ -152,6 +206,8 @@ function createCluster(opts) {
 			duties: p.live.duties ?? null,
 			error: p.live.error || '',
 			media_send: p.send,
+			linked_back: linkedBack(p),
+			link_back_error: linkedBack(p) === true ? '' : p.back?.error || '',
 		}
 	}
 
@@ -186,10 +242,41 @@ function createCluster(opts) {
 		else p.live = { ...p.live, online: false, error: r.error || (r.status ? `HTTP ${r.status}` : 'no answer') }
 	}
 
+	/** WO-732: ask that server to link this one back → { ok, status, error, unlinked } (recorded in p.back). */
+	async function linkBack(p) {
+		const local = await localAddress(p.saved.host, p.saved.port)
+		const port = Number(opts.selfPort?.()) || 4200
+		let r
+		if (!local || local.includes(':')) r = { ok: false, status: 0, error: local ? `no IPv4 route to ${p.saved.host}` : `${p.saved.host}:${p.saved.port} unreachable` }
+		else {
+			const res = await request('POST', p.saved.host, p.saved.port, '/api/cluster/peers', { address: `${local}:${port}`, link_back: false })
+			const why = res.json?.error || res.error || `HTTP ${res.status}`
+			r = { ok: res.ok, status: res.status, unlinked: res.status === 409 && res.json?.unlinked === true,
+				error: res.ok ? '' : res.status === 401 || res.status === 403 ? `it needs sign-in: link this server there (${why})` : why }
+		}
+		p.back = { ok: r.ok, error: r.error, at: now() }
+		return r
+	}
+
+	/** WO-732: a peer that does not list this server (or an older one never asked) is asked again, at most every HEAL_MS. */
+	async function heal(p) {
+		if (!selfFp || p.live.online !== true || linkedBack(p) === true) return
+		if (!Array.isArray(p.live.linked) && p.back) return // an older server: asked once (its add has no repair)
+		if (p.back && now() - p.back.at < HEAL_MS) return
+		const r = await linkBack(p)
+		const justLinked = p.saved.linked_at && now() - p.saved.linked_at < 2 * HEAL_MS // an operator link stays; its repair runs again later
+		if (r.unlinked && !justLinked) {
+			log('info', `${p.saved.name} unlinked this server: unlinked here too`)
+			remove(p.saved.id)
+		} else if (r.ok) log('info', `${p.saved.name} did not list this server: linked back`)
+		else log('warn', `${p.saved.name}: link back refused (${r.error})`)
+	}
+
 	const pollHooks = []
 	async function poll() {
 		await refreshSelf()
 		await Promise.all([...peers.values()].map(pollOne))
+		await Promise.all([...peers.values()].map(heal))
 		changed()
 		for (const fn of pollHooks) Promise.resolve().then(fn).catch(() => {})
 	}
@@ -221,15 +308,26 @@ function createCluster(opts) {
 		if (deviceKey && opts.selfKey && deviceKey === opts.selfKey.trim()) {
 			return { status: 409, body: { error: 'that server has the same device identity as this one (a cloned install): delete config/device-identity.json on one of them and restart it' } }
 		}
-		const id = String(r.json.selfId || r.json.hostname || `${addr.host}:${addr.port}`).replace(/[^A-Za-z0-9_.-]/g, '_').slice(0, 64)
+		// WO-732: a link-back (`link_back: false`) from a server unlinked here while it was unreachable is refused
+		const fromServer = raw?.link_back === false
+		if (fromServer && tombstoned(deviceKey)) return { status: 409, body: { error: 'this server unlinked yours: link it from here to link again', unlinked: true } }
+		if (!fromServer && tombstoned(deviceKey)) setTombstones(tombstones().filter((t) => t.fp !== fingerprint(deviceKey)))
+		const id = idFromPing(r.json, `${addr.host}:${addr.port}`)
 		const prev = peers.get(id)
 		const saved = { id, host: addr.host, port: addr.port, name: String(raw?.name || prev?.saved.name || r.json.hostname || id).slice(0, 64),
-			added_at: prev?.saved.added_at || now(), device_key: deviceKey }
-		peers.set(id, { saved, live: liveFrom(r.json), view: null, send: prev?.send || null })
+			added_at: prev?.saved.added_at || now(), device_key: deviceKey, linked_at: fromServer ? prev?.saved.linked_at || 0 : now() }
+		peers.set(id, { saved, live: liveFrom(r.json), view: null, send: prev?.send || null, back: fromServer ? { ok: true, error: '', at: now() } : null })
 		save()
 		schedule()
+		const body = { peer: null }
+		if (!fromServer) {
+			const back = await linkBack(peers.get(id))
+			body.link_back = { ok: back.ok, error: back.error }
+			if (!back.ok) log('warn', `${saved.name}: link back refused (${back.error})`)
+		}
 		changed()
-		return { status: prev ? 200 : 201, body: { peer: view(peers.get(id)) } }
+		body.peer = view(peers.get(id))
+		return { status: prev ? 200 : 201, body }
 	}
 
 	function remove(id) {
@@ -238,6 +336,27 @@ function createCluster(opts) {
 		if (peers.size === 0) stop()
 		changed()
 		return true
+	}
+
+	/**
+	 * WO-732: unlink here and there (`linkBack: false` = the other server is unlinking, do not call it back). When that
+	 * server does not confirm, its key is tombstoned so its repair drops its side instead of linking again.
+	 * → { ok, link_back?: { ok, error } }
+	 */
+	async function unlink(id, { linkBack: back = true } = {}) {
+		const p = peers.get(id)
+		if (!p) return { ok: false }
+		if (!back) return { ok: remove(id) }
+		await refreshSelf() // before removing: the gap where its repair could link again stays one request long
+		const me = idFromPing(self, '')
+		tombstone(p.saved.device_key, 2 * HEAL_MS) // and a repair racing the DELETE is refused, not taken
+		remove(id)
+		const r = me ? await request('DELETE', p.saved.host, p.saved.port, `/api/cluster/peers/${encodeURIComponent(me)}?link_back=0`) : { ok: false, status: 0, error: 'this server has no id' }
+		const ok = r.ok || r.status === 404 // 404: it did not list this server
+		if (!ok) tombstone(p.saved.device_key, TOMBSTONE_MS)
+		const error = ok ? '' : r.json?.error || r.error || `HTTP ${r.status}`
+		if (!ok) log('warn', `${p.saved.name}: unlink there failed (${error}); it will drop this server when it is back`)
+		return { ok: true, link_back: { ok, error } }
 	}
 
 	/** The peer's own Devices view (its wiring: never copied, only shown). */
@@ -275,8 +394,9 @@ function createCluster(opts) {
 		changed()
 	}
 
-	return { snapshot, poll, add, remove, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
+	return { snapshot, poll, add, remove, unlink, deviceView, scan, stop, start: () => (schedule(), poll()), size: () => peers.size,
 		saved, list, byDeviceKey, mediaSend, setMediaSend, afterPoll: (fn) => pollHooks.push(fn) }
 }
 
-module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, postJson, STORE_KEY, POLL_MS }
+module.exports = { createCluster, parseAddress, mediaParity, subnetHosts, getJson, postJson, requestJson, localAddressTo, linkedFingerprints,
+	STORE_KEY, TOMBSTONE_KEY, POLL_MS, HEAL_MS }

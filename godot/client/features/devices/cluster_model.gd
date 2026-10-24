@@ -62,6 +62,15 @@ static func facts(p: Dictionary) -> String:
 	return " · ".join(PackedStringArray(bits))
 
 
+## WO-732 — "" while the link holds both ways (or nothing is known yet); else why that server does not list this one
+## (the server keeps asking it again, src/cluster/cluster-peers.js heal()).
+static func link_line(p: Dictionary) -> String:
+	if p.get("linked_back") != false:
+		return ""
+	var why := str(p.get("link_back_error", ""))
+	return "One-way: %s does not list this server%s." % [str(p.get("name", "it")), " (%s)" % why if why != "" else ", asking it again"]
+
+
 ## WO-723 — the one line on a linked server's card ("" from an older server: its duties carry no `tracking`, they
 ## were WO-712 R1 ticks, not what it does).
 static func does_text(duties: Variant) -> String:

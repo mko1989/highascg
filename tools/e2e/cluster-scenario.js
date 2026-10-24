@@ -70,15 +70,15 @@ const steps = [
 		},
 	},
 	{
-		name: 'link every pair both ways',
+		name: 'link every pair once: the other server links back (WO-732)',
 		async run({ nodes }) {
 			const ms = []
-			for (const a of nodes)
-				for (const b of nodes) {
-					if (a === b) continue
+			for (const [i, a] of nodes.entries())
+				for (const b of nodes.slice(i + 1)) {
 					const r = await a.post('/api/cluster/peers', { address: b.address })
 					assert.ok(r.status === 201 || r.status === 200, `${a.id} → ${b.id}: ${r.status} ${JSON.stringify(r.data)}`)
 					assert.equal(r.data.peer.id, b.id, `${a.id} lists ${b.address} under its own id`)
+					assert.equal(r.data.link_back?.ok, true, `${b.id} linked ${a.id} back: ${JSON.stringify(r.data.link_back)}`)
 					ms.push(r.ms)
 				}
 			const online = await waitFor('every server sees every other online', () => allLinkedOnline(nodes), 10000)
@@ -232,13 +232,13 @@ const steps = [
 		},
 	},
 	{
-		name: 'unlink: no peers, no master',
+		name: 'unlink each pair once: both sides drop it (WO-732), no master',
 		async run({ nodes }) {
-			for (const a of nodes)
-				for (const b of nodes) {
-					if (a === b) continue
+			for (const [i, a] of nodes.entries())
+				for (const b of nodes.slice(i + 1)) {
 					const r = await a.del(`/api/cluster/peers/${encodeURIComponent(b.id)}`)
 					assert.equal(r.status, 200, `${a.id} drops ${b.id}: ${r.status}`)
+					assert.equal(r.data.link_back?.ok, true, `${b.id} dropped ${a.id} too: ${JSON.stringify(r.data.link_back)}`)
 				}
 			const vs = await views(nodes)
 			vs.forEach((v, i) => {
