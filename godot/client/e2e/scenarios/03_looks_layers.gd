@@ -108,3 +108,53 @@ func run() -> void:
 			return why
 		return await _playing(await _channel("programChannels"), CLIP)
 	)
+	# WO-762 — a dropped clip names its look; a duplicate goes to the end; a card dragged onto another moves before it
+	await step("The dropped clip's look is named after the file", func() -> String:
+		return await await_api("/api/project", func(d: Variant) -> bool:
+			return str(_looks(d)[0].get("name", "")).to_lower() == CLIP, "the deck-drop look is not named %s" % CLIP)
+	)
+	await step("+ adds a second look; Duplicate puts the copy last", func() -> String:
+		var why: String = await ui.click(ui.button("New look — or drop a media file here / on empty deck space"))
+		if why != "":
+			return why
+		if await ui.await_control("BaseButton", "Close") != null:
+			await ui.click(ui.button("Close"))
+		if not await ui.wait_for(func() -> bool: return _cards().size() == 2, 8.0):
+			return "no second card"
+		why = await ui.click(ui.find("BaseButton", "Duplicate look", _cards()[0]))
+		if why != "":
+			return why
+		return await await_api("/api/project", func(d: Variant) -> bool:
+			var n := _looks(d).map(func(l: Dictionary) -> String: return str(l.get("name", "")))
+			return n.size() == 3 and str(n[2]).ends_with("(copy)") and str(n[1]).begins_with("Look"), "the copy is not last")
+	)
+	await step("Drag the last card onto the first moves it first", func() -> String:
+		if not await ui.wait_for(func() -> bool: return _cards().size() == 3, 8.0):
+			return "deck does not show 3 cards"
+		var c := _cards()
+		var why: String = await ui.drag(c[2], _name_label(c[0]))  # left of the card's centre = before it
+		if why != "":
+			return why
+		return await await_api("/api/project", func(d: Variant) -> bool:
+			var n := _looks(d).map(func(l: Dictionary) -> String: return str(l.get("name", "")))
+			return n.size() == 3 and str(n[0]).ends_with("(copy)"), "the dragged card did not move first")
+	)
+	await step("Drag the first card onto + moves it last", func() -> String:
+		var why: String = await ui.drag(_cards()[0], ui.button("New look — or drop a media file here / on empty deck space"))
+		if why != "":
+			return why
+		return await await_api("/api/project", func(d: Variant) -> bool:
+			var n := _looks(d).map(func(l: Dictionary) -> String: return str(l.get("name", "")))
+			return n.size() == 3 and str(n[2]).ends_with("(copy)") and str(n[0]).to_lower() == CLIP, "the card did not move last")
+	)
+
+
+## The deck's look cards, in deck order.
+func _cards() -> Array:
+	return ui.all("PanelContainer").filter(func(c: Control) -> bool:
+		return not c.is_queued_for_deletion() and c.tooltip_text.begins_with("Click: stage on PRV"))
+
+
+func _name_label(card: Control) -> Control:
+	var ls: Array = ui.all("Label", card)
+	return ls[0] if not ls.is_empty() else card

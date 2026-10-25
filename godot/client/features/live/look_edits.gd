@@ -52,9 +52,24 @@ static func duplicate_look(root: Dictionary, scene_id: String, new_id: String) -
 			var dupe: Dictionary = (scenes[i] as Dictionary).duplicate(true)
 			dupe["id"] = new_id
 			dupe["name"] = copy_name(scenes, str(scenes[i].get("name", "")))
-			scenes.insert(i + 1, dupe)
+			scenes.append(dupe)  # WO-762 (owner 25.10): the copy goes to the end of the deck, not next to the original
 			return dupe
 	return {}
+
+
+## WO-762 — deck drag-reorder (web scene-state.js reorderScene): `scene_id` moves before `target_id`, or after it when
+## `after`; `target_id` "" = to the end. False when nothing moved (unknown id, dropped on itself / where it already is).
+static func move_look(root: Dictionary, scene_id: String, target_id: String, after := false) -> bool:
+	var scenes: Array = root.get("scenes", []) if root.get("scenes") is Array else []
+	var ids := scenes.map(func(s: Variant) -> String: return str((s as Dictionary).get("id", "")) if s is Dictionary else "")
+	var from := ids.find(scene_id)
+	if from < 0 or scene_id == target_id or (target_id != "" and ids.find(target_id) < 0):
+		return false
+	var item: Variant = scenes.pop_at(from)
+	ids.remove_at(from)
+	var to := scenes.size() if target_id == "" else ids.find(target_id) + (1 if after else 0)
+	scenes.insert(to, item)
+	return to != from
 
 
 static func copy_name(scenes: Array, base_name: String) -> String:

@@ -44,6 +44,15 @@ describe('WO-623 new-look — the look the web deck "+" / blank-space drop creat
 		assert.deepEqual(layer.fill, { x: (3840 - 1280) / 2 / 3840, y: (1080 - 720) / 2 / 1080, scaleX: 1280 / 3840, scaleY: 720 / 1080 }, 'main 1 is 3840×1080')
 		assert.deepEqual(r.contentResolution, { w: 1280, h: 720 })
 	})
+	it('WO-762: a media drop names the look after the file — no folder, no extension; other sources keep Look N+1', async () => {
+		const { mediaLookName } = require('../../src/api/routes-scene-new-look')
+		assert.equal(parse(await handleNewLook({ mainIdx: 1, source: { type: 'media', value: 'projects/show/KV LOOP.mp4' } }, {}, deps())).look.name, 'KV LOOP')
+		assert.equal(mediaLookName({ type: 'media', value: 'CLIPS/A' }), 'A', 'a Caspar id has no extension')
+		assert.equal(mediaLookName({ type: 'media', value: 'Intro v1.2' }), 'Intro v1.2', 'a one-char tail is not an extension')
+		assert.equal(mediaLookName({ type: 'media', value: 'win\\dir\\Logo.png' }), 'Logo')
+		assert.equal(mediaLookName({ type: 'template', value: 'lower-thirds/lt.html' }), '')
+		assert.equal(mediaLookName(null), '')
+	})
 	it('the live deck count wins over the stored project (snapshots arrive before the 750 ms disk write)', async () => {
 		const ctx = { sceneDeck: { sceneSnapshots: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }] } }
 		assert.equal(parse(await handleNewLook({ mainIdx: 0 }, ctx, deps())).look.name, 'Look 5')

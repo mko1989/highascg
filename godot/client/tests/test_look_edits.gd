@@ -66,9 +66,26 @@ func test_duplicate_look_wo656() -> void:
 	var root := {"scenes": [{"id": "a", "name": "Intro", "mainScope": "0", "layers": [{"layerNumber": 10, "fill": {"x": 0.1}}]},
 		{"id": "b", "name": "Intro (copy)"}]}
 	var d := E.duplicate_look(root, "a", "z")
-	t.eq(root.scenes.map(func(s: Dictionary) -> String: return s.id), ["a", "z", "b"], "the copy sits right after the original")
+	t.eq(root.scenes.map(func(s: Dictionary) -> String: return s.id), ["a", "b", "z"], "WO-762: the copy goes to the end")
 	t.eq([d.id, d.name, d.mainScope], ["z", "Intro (copy 2)", "0"], "fresh id, next free copy name, same scope")
 	d.layers[0].fill.x = 0.9
 	t.eq(root.scenes[0].layers[0].fill.x, 0.1, "deep copy: editing the copy leaves the original")
 	t.eq(E.duplicate_look(root, "nope", "y"), {}, "unknown look → nothing")
 	t.eq(E.copy_name([], "  "), "Look (copy)", "blank name → Look (copy)")
+
+
+func test_move_look_wo762() -> void:
+	var ids := func(r: Dictionary) -> Array: return r.scenes.map(func(s: Dictionary) -> String: return s.id)
+	var r := {"scenes": [{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "d"}]}
+	t.eq(E.move_look(r, "d", "b"), true, "moved")
+	t.eq(ids.call(r), ["a", "d", "b", "c"], "d before b")
+	t.eq(E.move_look(r, "a", "c", true), true, "a after c")
+	t.eq(ids.call(r), ["d", "b", "c", "a"], "a after c")
+	t.eq(E.move_look(r, "d", ""), true, "to the end")
+	t.eq(ids.call(r), ["b", "c", "a", "d"], "d last")
+	t.eq(E.move_look(r, "d", ""), false, "already last")
+	t.eq(E.move_look(r, "b", "c"), false, "already right before c")
+	t.eq(E.move_look(r, "b", "b"), false, "onto itself")
+	t.eq(E.move_look(r, "x", "b"), false, "unknown look")
+	t.eq(E.move_look(r, "b", "x"), false, "unknown target")
+	t.eq(ids.call(r), ["b", "c", "a", "d"], "refusals leave the order")

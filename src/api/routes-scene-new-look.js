@@ -12,10 +12,20 @@
  *
  * `count` is the server's live deck (scene_deck_sync snapshots), else the stored project; the global default
  * transition is the stored project's `scenes.globalDefaultTransition`.
+ *
+ * WO-762 (owner 25.10): a look made from a dropped media file is named after the file, no folder, no extension
+ * ("projects/show/KV LOOP.mp4" → "KV LOOP"); other sources and "+" keep `Look N+1`.
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { libs, buildLayerForSource } = require('./routes-scene-new-layer')
+
+/** @param {{ type?: unknown, value?: unknown } | null} src */
+function mediaLookName(src) {
+	if (!src || String(src.type || '') !== 'media') return ''
+	const file = String(src.value || '').split(/[\\/]/).pop() || ''
+	return file.replace(/\.[A-Za-z0-9]{2,5}$/, '').trim()
+}
 
 function out(status, payload) {
 	return { status, headers: JSON_HEADERS, body: jsonBody(payload) }
@@ -43,7 +53,7 @@ async function handleNewLook(body, ctx, deps = {}) {
 	const { helpers } = await libs()
 	const look = helpers.migrateScene({
 		id: helpers.newId(),
-		name: `Look ${count + 1}`,
+		name: mediaLookName(src) || `Look ${count + 1}`,
 		layers: [],
 		mainScope,
 		defaultTransition: { ...helpers.defaultTransition(), ...global },
@@ -58,4 +68,4 @@ async function handleNewLook(body, ctx, deps = {}) {
 	return out(200, { ok: true, look, mainIdx, contentResolution })
 }
 
-module.exports = { handleNewLook }
+module.exports = { handleNewLook, mediaLookName }

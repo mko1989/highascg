@@ -325,6 +325,7 @@ func _move(p: Vector2, mask: int) -> void:
 	m.screen_relative = m.relative
 	m.button_mask = mask
 	_last = p
+	Input.warp_mouse(p)  # WO-762: drop positions read the real pointer (the hidden Xvfb one), not the pushed event
 	vp().push_input(m, true)
 
 

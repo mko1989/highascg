@@ -7,6 +7,7 @@ const DeckModel := preload("res://features/live/deck_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const T := preload("res://features/live/transitions.gd")
 const E := preload("res://features/live/look_edits.gd")
+const Reorder := preload("res://features/live/deck_reorder.gd")
 const TimerView := preload("res://features/live/pgm_timer_view.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
@@ -24,6 +25,7 @@ signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the edito
 var _columns: HBoxContainer
 var _dirty := true
 var _main_for_card := 0
+var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
 var osc_mirror: Node  # WO-600 O: set by the live tab before the first rebuild
 
 
@@ -136,13 +138,18 @@ func _add_tile(main: int) -> Control:
 
 
 ## Same sources the look editor takes (web isDraggableLayerSourcePayload: never an effect); timers never make a look.
-func _can_drop_new(_at: Vector2, data: Variant, _main: int) -> bool:
+func _can_drop_new(_at: Vector2, data: Variant, main: int) -> bool:
+	if Reorder.is_reorder(data, main):  # WO-762: a card dropped on blank space / "+" moves to the end
+		return true
 	if not (data is Dictionary) or str((data as Dictionary).get("value", "")) == "":
 		return false
 	return not (str((data as Dictionary).get("type", "")) in ["effect", "timer"])
 
 
 func _drop_new(_at: Vector2, data: Variant, main: int) -> void:
+	if Reorder.is_reorder(data, main):
+		Reorder.to_end(data, _scenes_root, _commit_looks)
+		return
 	create_look(main, data)
 
 
@@ -184,6 +191,7 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.tooltip_text = "Click: stage on PRV · Double-click: TAKE to PGM · Right-click: rename / transition"
 	card.gui_input.connect(_on_card_input.bind(id, _main_for_card))
+	Reorder.wire(card, id, _main_for_card, str(scene.get("name", "")), _scenes_root, _commit_looks)  # WO-762
 	var v := VBoxContainer.new()
 	card.add_child(v)
 	var thumb := LookThumb.new()  # WO-608 R5: looks show as thumbnails
@@ -255,9 +263,20 @@ func _on_card_input(event: InputEvent, scene_id: String, main: int) -> void:
 	if mb != null and mb.pressed and mb.button_index == MOUSE_BUTTON_RIGHT:
 		_card_menu(scene_id, main)
 		return
-	if mb == null or not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+	if mb == null or mb.button_index != MOUSE_BUTTON_LEFT:
 		return
-	await request_take(scene_id, main, "program" if mb.double_click else "preview")
+	if mb.pressed:  # WO-762: stage on release, so dragging a card to reorder it does not put it on PRV
+		_press_id = "" if mb.double_click else scene_id
+		if mb.double_click:
+			await request_take(scene_id, main, "program")
+	elif _press_id == scene_id:
+		_press_id = ""
+		await request_take(scene_id, main, "preview")
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DRAG_BEGIN:
+		_press_id = ""
 
 
 func request_take(scene_id: String, main: int, target: String) -> Dictionary:
