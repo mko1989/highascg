@@ -40,17 +40,34 @@ const CASPAR_NOISE = [
 	/^\s*\[error\]\s*$/,
 ]
 
-/** Journal lines of one unit since it started → { errors: [distinct text], count }. */
-function unitErrors(name, re, noise = []) {
+/** Journal lines of one unit since it (or `startedMs`, a process inside it, when later) started → { errors: [distinct
+ * text], count }. */
+function unitErrors(name, re, noise = [], startedMs = 0) {
 	const u = unit(name)
 	if (!u || !u.startedMs) return null
-	const r = sh('journalctl', ['-u', name, '--since', `@${Math.floor(u.startedMs / 1000)}`, '-o', 'cat', '--no-pager'], {
+	const since = Math.max(u.startedMs, startedMs)
+	const r = sh('journalctl', ['-u', name, '--since', `@${Math.floor(since / 1000)}`, '-o', 'cat', '--no-pager'], {
 		timeoutMs: 60000,
 	})
 	const stamp = /^\[\d{4}-\d\d-\d\d [\d:.]+\]\s*/ // Caspar prefixes its own time
 	const lines = r.out.split('\n').filter((l) => re.test(l) && !noise.some((n) => n.test(l.replace(stamp, ''))))
 	const distinct = [...new Set(lines.map((l) => l.replace(/^\[[^\]]*\]\s*(\(HACG\)\s*)?/, '').slice(0, 200)))]
-	return { count: lines.length, errors: distinct, since: u.startedMs }
+	return { count: lines.length, errors: distinct, since }
+}
+
+/** The running casparcg server (run with a .config) → pid, or undefined. */
+function casparPid() {
+	return sh('pgrep', ['-x', 'casparcg'])
+		.out.trim()
+		.split('\n')
+		.map(Number)
+		.find((p) => {
+			try {
+				return fs.readFileSync(`/proc/${p}/cmdline`, 'utf8').includes('.config')
+			} catch {
+				return false
+			}
+		})
 }
 
 /** Godot finds its binary the way run-client.sh does. */
@@ -128,17 +145,7 @@ module.exports = [
 		name: 'Caspar runs the config file on disk (restarted after it changed)',
 		async run() {
 			const cfg = path.join(REPO, 'config/casparcg.config')
-			const pid = sh('pgrep', ['-x', 'casparcg'])
-				.out.trim()
-				.split('\n')
-				.map(Number)
-				.find((p) => {
-					try {
-						return fs.readFileSync(`/proc/${p}/cmdline`, 'utf8').includes('.config')
-					} catch {
-						return false
-					}
-				})
+			const pid = casparPid()
 			if (!pid || !fs.existsSync(cfg)) return { status: 'skip', summary: 'no Caspar process / config here' }
 			const started = processStartMs(pid)
 			const changed = fs.statSync(cfg).mtimeMs
@@ -155,7 +162,9 @@ module.exports = [
 		name: 'no errors in the server / Caspar / kiosk logs since they started',
 		async run({ kioskStartMs }) {
 			const srv = unitErrors('highascg', /\[error\]|Unhandled|TypeError|ReferenceError/)
-			const cas = unitErrors('casparcg-server', /\[error\]|\[fatal\]/, CASPAR_NOISE)
+			// run.sh relaunches Caspar inside the unit (AMCP RESTART, a crash): only errors of the running casparcg count
+			const pid = casparPid()
+			const cas = unitErrors('casparcg-server', /\[error\]|\[fatal\]/, CASPAR_NOISE, pid ? processStartMs(pid) : 0)
 			const klog = path.join(os.homedir(), '.local/share/godot/app_userdata/HighAsCG Operator/logs/godot.log')
 			let kio = null
 			if (fs.existsSync(klog) && kioskStartMs)

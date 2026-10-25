@@ -44,7 +44,7 @@ function server(url) {
 	}
 }
 
-/** The operator kiosk (not a headless check run): → { pid, startMs } or {}. */
+/** The operator kiosk (not a headless check run, not the VR client — WO-773 sweep fix): → { pid, startMs } or {}. */
 function kiosk() {
 	for (const pid of sh('pgrep', ['-x', 'godot']).out.trim().split('\n').filter(Boolean).map(Number)) {
 		let cmd
@@ -53,7 +53,7 @@ function kiosk() {
 		} catch {
 			continue
 		}
-		if (cmd.includes('godot/client') && !cmd.includes('--headless')) return { pid, startMs: processStartMs(pid) }
+		if (cmd.includes('godot/client') && !cmd.includes('--headless') && !cmd.includes('--xr-mode')) return { pid, startMs: processStartMs(pid) }
 	}
 	return {}
 }
