@@ -17,6 +17,8 @@ archive_common_repo_root() {
 
 # Explicit members for server GitHub tarball (built UI, no client/ sources but client/lib: WO-737, src/ imports those
 # shared modules at runtime — scene takes, transition presets, lower thirds, new layers…).
+# WO-749: plus the post-update sweep and what it runs (tools/sweep, the tools/startup verifiers, the sandbox, the
+# replication check, the require check) — the server runs it after every update; without them a box kept a stale copy.
 archive_common_server_tar_members() {
 	local -n _out=$1
 	_out=(
@@ -28,6 +30,11 @@ archive_common_server_tar_members() {
 		template
 		scripts
 		tools/runtime
+		tools/sweep
+		tools/startup
+		tools/e2e/sandbox-server.js
+		tools/e2e/replication-check.js
+		tools/ci/check-require-integrity.js
 		godot/client
 		godot/GODOT_VERSION
 		client/lib
