@@ -1,6 +1,6 @@
 # WO-753 — Two-box test campaign (standalone / linked / each master / refusals / failover) + is Ubuntu 26.04 / NVIDIA 615 safe for the dev box
 
-**Status: IN PROGRESS (25.10.26)**
+**Status: DONE (25.10.26) — every row of the matrix run on the boxes (A1–A10, B1–B11); B12 live is the owner's call (WO-746). Verdict below. Found and fixed: four test-hermeticity bugs, the media-copy check wording, WO-754.**
 
 Owner, 25.10: *"i want you to run all sorts of tests on both these machines. both when they are connected, or
 standalone, one is master than the other, what happens on refusal etc etc. i also want you to run more comperative
@@ -35,7 +35,7 @@ WO-735 (suite on .4 after the 26.04 upgrade), WO-737 part 2 (first OS comparison
 | B9 | follower restart / master restart (< 12 s, no failover) | server restarts | — |
 | B10 | split network (both claim), heal → epoch fencing | iptables on .4 with a timed undo | link |
 | B11 | media send between boxes | cluster media | — |
-| B12 | WO-746 shared show between the real boxes | backups first, then on → edits → off | projects (backed up) |
+| B12 | WO-746 shared show between the real boxes | sandboxed on both boxes (10/10 each); live switch-on left to the owner (WO-746: "both are on-air") | — |
 
 ## Investigation
 
@@ -125,6 +125,17 @@ Will they stay? Checked on .4:
     copied nothing.
 - The media copy check from .4 then passes 5/5, so media now moves both ways.
 
+### A6 — GPU and host helpers, both boxes (25.10 11:05, read-only)
+
+| | .23 | .4 |
+|---|---|---|
+| NVIDIA Xid faults since boot | 0 | 0 |
+| Python / pointer-confine helper | 3.12.3, running | 3.14.4, running |
+| ffmpeg CLI (thumbnails, compose preview) | 6.1.1, 0 spawn errors | 8.0.1, 0 spawn errors |
+| server `[error]` lines since boot | 2263, all `PLAY 6-1 / 7-2 DECKLINK` COMMAND_UNKNOWN_DATA from 24.10 17:00 to 25.10 00:11, ended by the WO-742 Caspar (WO-742:98) | 0 |
+
+Render health under load is A8's A/B (same CPU, 0 dropped frames, same pixels).
+
 ### A8 — Caspar still builds on 26.04, and the native build plays the same (25.10 10:15–10:25, `~/wo753-caspar` on .4)
 
 - Our fork (`~/caspar-build/src-v2`, branch `wo742-shm-producer`) on 26.04's toolchain: gcc 15, cmake 4.2.3,
@@ -159,6 +170,23 @@ Will they stay? Checked on .4:
     stores no `streamingChannel` and inherited one). A project load does not reset it. Owner question, not a fault.
 - First Caspar pass: 0 / 30, all from the harness reading AMCP's `200 INFO OK` status line as a channel ("200:INFO").
   The channel lists themselves matched in all 30.
+
+### A9 — cold boot of .4 on 26.04 (25.10 10:47, `systemctl reboot`, .4 was master)
+
+- Cluster during the reboot (`c753/a9.log`): .4 unreachable at 2.5 s → **.23 promoted at 16.1 s** (epoch 8) → .4's
+  server answered at 47.2 s, already following .23@8. A reboot of the master is a clean failover.
+- Boot: kernel 7.0.0-38 (GRUB default 0), 36.0 s to graphical (35.1 s the boot before), **no failed units**. NVIDIA
+  615.71.09 loaded (P3); `blackmagic_io` loaded, io0–3 present; highascg, casparcg-server and casparcg-scanner
+  active; Xorg, openbox and the Godot kiosk running. Kernel errors only the known 2080 USB-C UCSI i2c timeouts.
+- **Caspar did not start by itself, by design:** .4 has `startup.mode: ask` (WO-645, the default). The launcher is
+  shown on every screen and Caspar is held until a person answers (`GET /api/system/operator-screen` → `boot
+  {pending, mode: ask, launcher, defaultName: HDMI-0}`). It was answered the way the owner did on 24.10 20:12
+  (`{boot: resolve, name: HDMI-0}`, logged "clicked"; no cables moved). AMCP was up 18 s later.
+- **Found: the AMCP watchdog killed the Caspar the answer released**, 0.3 s after it started ("AMCP down for 304s
+  with casparcg still running — killing hung process"); systemd relaunched it 10 s later. The same kill happened on
+  24.10 at 20:12. Not 26.04-specific: a watchdog timing bug, **WO-754**.
+- After the boot, the sweep on .4: **28 pass, 2 warn, 0 fail** (warns: the June sync-conflict copies, build stamps);
+  Caspar logged no errors after its start.
 
 ### B1–B10 — the cluster, sandboxed on each box and live between the real boxes (25.10 10:36–10:46)
 
@@ -211,6 +239,27 @@ The 26.04 box is slower only by its CPU; every step and decision behaves the sam
 - End state equals the start state except the epoch (7, it only grows): linked, .4 master (auto), senders Auto → .4,
   shared show off, auto-accept off, `accept_remote` on, no invites.
 
+## Verdict — is Ubuntu 26.04 / kernel 7 / NVIDIA 615 safe for the dev box?
+
+**Yes, with four steps.** On .4, every suite, every project setup, the cluster (sandboxed and live), Caspar (release
+binary and a native 26.04 build), DeckLink and a cold boot behave exactly as on the 24.04 dev box. The only defects
+found were in our tests and one watchdog timing bug (WO-754); neither is caused by the OS.
+
+1. **DeckLink:** .4 runs desktopvideo **16.4a1** on kernel 7; the dev box has 16.2a1, which is untested on kernel 7.
+   Install 16.4 with the upgrade (WO-704's per-kernel DKMS cache keeps later boots quick).
+2. **NVIDIA:** .4's 2080 SUPER (Turing) runs 615.71.09 server-open with 0 Xid faults. The dev box's RTX PRO 4000
+   Blackwell needs the open modules too; 615-open supports it, but it is unproven on that card here. After the
+   upgrade check `nvidia-smi` and run the sweep. Keep 6.8.0-117 in GRUB as the fallback, as .4 does.
+3. **Caspar:** the release binary keeps running on the 24.04 libraries that `do-release-upgrade` leaves behind (A2;
+   autoremove and full-upgrade remove none). For a binary that needs nothing left over, build the fork with commit
+   `24db35cca` (one CMake line; same pixels and CPU, A8). Expect ffmpeg 8's harmless "Changing video frame
+   properties" line per video in Caspar's log.
+4. **The start-up launcher:** with `startup.mode: ask`, Caspar waits for a person after every boot (by design). Until
+   WO-754 is deployed, an answer given more than 2 minutes after boot costs one needless Caspar restart (about 13 s).
+
+Unchanged by the OS: Node 24, Godot 4.7.2 (21639 / 0 on both), Python helpers (3.14 runs the pointer-confine helper),
+the ffmpeg CLI, Xorg and openbox, the cluster timings (only CPU-bound differences).
+
 ## What was done
 
 - `tools/smoke/smoke-wo573-…-separate-binding.test.js`: stubs `getDisplaysXrandrDetailed` / `getGpuConnectorInventory`
@@ -257,3 +306,21 @@ The 26.04 box is slower only by its CPU; every step and decision behaves the sam
   the config's; no `[error]` lines; no `wo753-caspar-*` dir or `wo753m-*` shm left.
 - Matrix smoke 5 / 5 on .23 and on .4 (26.04). Gates: test:ci 3244 pass / 1 fail (WO-498, export-only), format,
   unwired exports, boot OK; lint 214 warnings.
+- Project matrix on .4 (26.04, RTX 2080 SUPER 8 GB), 29 distinct setups from 61 project files: **29 / 29 pass three
+  times**: server only, the release Caspar, and the native 26.04 Caspar build (`~/wo753-caspar/nb`), including the two
+  16384x2160 PGM+PRV projects. No temp dir or shm left behind.
+- End state (11:07): linked, **.4 master again** (epoch 9, auto; it was 4, and the epoch only grows), senders Auto → .4,
+  shared show off, auto-accept off, `accept_remote` on, no invites. .23 runs WO-754 (server restarted; .4 did not
+  fail over). .4 runs its release files unchanged (watchdog md5 = release).
+- Cleanup: `~/wo753-suite` and the Caspar build tree on .4 removed. Kept: `~/wo753-caspar/nb/bin/casparcg`, the native
+  26.04 Caspar (9.5 MB; `nb/lib` → `~/highascg/lib`). .23's `authorized_keys` keeps .4's forced, rsync-only media key
+  from B11 (backup `c753/authorized_keys.23.before`).
+
+## Owner questions
+
+1. Switch the shared show on between the real boxes (WO-746)? It replaces the follower's show; it passes 10/10 on both OSes
+   in the sandbox.
+2. A project with no streaming setting keeps the previous project's on load (seen in the matrix with `tra`). Should a
+   load reset it?
+3. After a declined invite, the inviter keeps a one-sided entry, shown online, until the other side links back (by
+   WO-739's design). Is that clear enough in Devices?
