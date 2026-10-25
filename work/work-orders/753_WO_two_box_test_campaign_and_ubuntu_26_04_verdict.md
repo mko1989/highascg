@@ -85,6 +85,22 @@ Will they stay? Checked on .4:
 - Found on both: **every suite run left 28 temp dirs** (`/tmp/wo702-*`, `wo704-*`, `wo708-*`, `wo709-*`):
   1497 on .23 (64 MB), 56 on .4 (two runs; `/tmp` is RAM there).
 
+### A5 — sweep on .23 (`run-sweep.js --peers`, 10:10): 25 pass / 4 warn / 1 fail
+
+- The FAIL — "kiosk 6 error lines since it started" (JSON parse, PNG decode, `get_node()` outside the tree) — were
+  **my own headless Godot test run**, not the kiosk. The backtraces are `res://tests/*`.
+  - Godot's test runner and `run-client.sh --check` use the same user dir as the kiosk
+    (`~/.local/share/godot/app_userdata/HighAsCG Operator`, same project name).
+  - At start Godot copies `godot.log` to a dated file, then truncates and rewrites it. The running kiosk (PID 3132075)
+    still holds fd 3 on that same `godot.log` inode. So its live log was truncated under it, and the sweep then read
+    the tests' errors as the kiosk's.
+  - `--check` boots the real app, which saves `ui.cfg`: on .4, my 10:05 boot check rewrote the kiosk's `ui.cfg`
+    (mtime 10:05:38). Its content still reads right (servers .4 + .23, origin home).
+  - The sweep's own client check was already isolated (`XDG_DATA_HOME`, `checks-app.js:213`); the documented manual
+    commands were not.
+- WARNs, all known: no DeckLink .deb on the sticks; build stamps differ (dev box vs release); the two sudo helpers.
+- Cluster: the signed call to .4 took 18 ms; media copy to and from .4 passed 5/5; .4's clock is +74 ms.
+
 ## What was done
 
 - `tools/smoke/smoke-wo573-…-separate-binding.test.js`: stubs `getDisplaysXrandrDetailed` / `getGpuConnectorInventory`
@@ -92,9 +108,19 @@ Will they stay? Checked on .4:
   checks the planner, not the machine it runs on.
 - `smoke-wo702`, `smoke-wo704`, `smoke-wo708`, `smoke-wo709`: remove their temp dirs in an `after` hook. The leaked
   dirs were deleted on both boxes.
+- `godot/client/run-client.sh`: `--test` and `--check` run with a throwaway `XDG_DATA_HOME` (removed on exit);
+  `--test` no longer `exec`s, so the trap runs, and it still exits with Godot's code. Use `run-client.sh --test`, not
+  a bare `godot --script res://tests/run_tests.gd`, on a kiosk box. CI calls Godot directly on a runner with no
+  kiosk, so it is unaffected.
+- `tools/smoke/smoke-wo753-client-test-modes-isolated.test.js` (new, in FILES): a stand-in Godot records its
+  `XDG_DATA_HOME`. Both modes get a fresh dir that exists while Godot runs and is gone afterwards; `--test` passes on
+  the exit code.
 
 ## What was VERIFIED
 
 - wo573 on .4: 1 pass / 2 fail before, 3 / 0 after; 3 / 0 on .23.
 - wo702/704/708/709: 48 / 48, `/tmp/wo70*` count unchanged by a run (it grew by 28 per run before).
 - Lint 214 warnings (cap 216); no file over 500 lines.
+- run-client: the smoke passes 3 / 3; against the old script 1 / 3 (both "own user://" cases fail). Live on this box:
+  the kiosk's `godot.log` md5 was the same before and after `run-client.sh --check` (boot OK) and `--test`
+  (21656 / 0); no `highascg-client-*` dir was left.

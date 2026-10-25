@@ -18,8 +18,15 @@ if [[ -f "$HERE/addons/hshm/hshm.gdextension" ]]; then
 	mkdir -p "$HERE/.godot"
 	echo "res://addons/hshm/hshm.gdextension" > "$HERE/.godot/extension_list.cfg"
 fi
+# --test / --check get their own user:// (WO-753): on a kiosk box they otherwise share the kiosk's, truncating its live
+# godot.log under it and saving their ui.cfg over the kiosk's.
+if [[ "${1:-}" == "--test" || "${1:-}" == "--check" ]]; then
+	XDG_DATA_HOME="$(mktemp -d "${TMPDIR:-/tmp}/highascg-client-${1#--}-XXXXXX")"
+	export XDG_DATA_HOME
+	trap 'rm -rf "$XDG_DATA_HOME"' EXIT
+fi
 if [[ "${1:-}" == "--test" ]]; then
-	exec "$GODOT" --headless --path "$HERE" --script res://tests/run_tests.gd
+	"$GODOT" --headless --path "$HERE" --script res://tests/run_tests.gd && exit 0 || exit $?
 fi
 # --check: boot the real app headless for a few seconds (all autoloads + every UI scene script compile and
 # _ready runs); exit 1 on any script/parse error. The unit runner (--test) never loads the UI scripts.
