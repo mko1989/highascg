@@ -37,6 +37,8 @@ deprecate the WO yourself — a dead end recorded honestly saves the next sessio
 
 ## Non-negotiables
 
+- **`RULES.md` holds the owner's project rules** (input-field behaviour, …). Every change follows them;
+  add a rule there when the owner states one.
 - **Verify, then say so.** Fixes are proven on the box (this is the production machine) or via
   the offline suite — and the WO records which.
 - **Commit each verified unit immediately.** Small commits, real messages. Push triggers CI
