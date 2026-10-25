@@ -66,7 +66,7 @@ function waitForHttp(port, timeoutMs = 60000) {
  */
 function stopProcess(child) {
 	return new Promise((resolve) => {
-		if (!child || child.killed) return resolve()
+		if (!child || child.killed || child.exitCode !== null) return resolve() // an exited child never emits 'exit' again
 		child.once('exit', () => resolve())
 		child.kill('SIGTERM')
 		setTimeout(() => {
@@ -85,6 +85,7 @@ test(
 	async () => {
 	const port = 18000 + Math.floor(Math.random() * 1000)
 	let child = startHighascg(port)
+	let client = null
 	try {
 		await waitForHttp(port)
 
@@ -94,7 +95,7 @@ test(
 
 		let connectCount = 0
 		let gotState = false
-		const client = new WsClient({
+		client = new WsClient({
 			url,
 			reconnectInterval: 150,
 			maxReconnectInterval: 400,
@@ -136,12 +137,13 @@ test(
 				}
 			}
 			client.on('connect', onConnect)
+			onConnect() // the 150–400 ms reconnect often lands while waitForHttp is still polling
 		})
 
 		assert.ok(connectCount >= 2, `expected reconnect, connectCount=${connectCount}`)
 		assert.equal(client.connected, true)
-		client.close()
 	} finally {
+		client?.close() // a failed run must not leave the reconnect timer holding the test process open
 		await stopProcess(child)
 	}
 },
