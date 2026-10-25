@@ -51,3 +51,11 @@ Every component of the final binary, mapped to its source. Keep current through 
 - Toolchain: system cmake + ninja, gcc, Release, `-j24`, `USE_SYSTEM_CEF=OFF`, CEF from v1's download cache (pinned sha256 `2a03fa6b…`).
 - Output: `bin/casparcg` reports `2.5.1 886998cc1 Stable` (9.2 MB). Rollbacks on the box: `casparcg.253c16c` (v1), `casparcg.v1-shm`, `casparcg.prev`.
 - Source: `~/caspar-build/src-v2` (worktree of `src-tree`), bundle `~/Downloads/caspar-build-kit/highascg-build-v2.bundle`.
+- Later commits on branch `wo742-shm-producer` (same worktree, local, not pushed):
+  - `1174120ce` — the `shm` producer, `PLAY <ch>-<layer> SHM NAME <name>` ([WO-742](../work/work-orders/742_WO_caspar_shm_producer.md)); the binary in
+    `bin/casparcg` since 25.10 (md5 `b2bb40f5`; its version string still says `886998cc1`; previous
+    kept as `casparcg.pre-wo742-20261025-001150`).
+  - `24db35cca` — **needed to build on Ubuntu 26.04**: `CMakeModules/Bootstrap_Linux.cmake` no longer asks Boost for the
+    `system` component (header-only since 1.69; Boost 1.89+ ships no `boost_system` config, so configure failed on
+    26.04's Boost 1.90). The same tree still builds on 24.04 / Boost 1.83. On 26.04 the binary links ffmpeg 8, Boost
+    1.90, SFML 3 and ICU 78 only; same pixels and CPU as the 24.04 build ([WO-753](../work/work-orders/753_WO_two_box_test_campaign_and_ubuntu_26_04_verdict.md) A8).
