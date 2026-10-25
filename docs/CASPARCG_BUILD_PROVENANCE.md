@@ -59,3 +59,36 @@ Every component of the final binary, mapped to its source. Keep current through 
     `system` component (header-only since 1.69; Boost 1.89+ ships no `boost_system` config, so configure failed on
     26.04's Boost 1.90). The same tree still builds on 24.04 / Boost 1.83. On 26.04 the binary links ffmpeg 8, Boost
     1.90, SFML 3 and ICU 78 only; same pixels and CPU as the 24.04 build ([WO-753](../work/work-orders/753_WO_two_box_test_campaign_and_ubuntu_26_04_verdict.md) A8).
+
+---
+
+## Build record — native Ubuntu 26.04 (2026-10-25, dev box after its 24.04 → 26.04 upgrade)
+
+- **Why a rebuild was needed:** the upgrade's "Remove obsolete packages?" step (`/var/log/dist-upgrade/main.log`, 15:51)
+  purged the 24.04 libraries the deployed binary was linked against (`libavcodec60` … ffmpeg 6.1, SFML 2.6,
+  `libboost-chrono1.83.0t64`), so `casparcg-server` failed with `libavcodec.so.60: cannot open shared object file`
+  (exit 127). The same applies to every rollback binary. .4 kept these packages through its upgrade (WO-753 A2), so
+  its 24.04 binary still runs; **a fresh 26.04 install has none of them.**
+- **Stopgap (kept for the rollbacks):** the 71 noble `.so` files (ffmpeg 6 + codec deps, SFML 2.6, boost-chrono,
+  ICU 74, libxml2 …) were extracted from 24.04 `.deb`s into `~/highascg/lib` (`run.sh`'s `LD_LIBRARY_PATH`;
+  git- and Syncthing-ignored). List: `lib/NOBLE-COMPAT-MANIFEST.txt`; the debs: `~/highascg-noble-compat-debs/`.
+  None shares a soname with a 26.04 system library. Delete them once no 24.04-built binary is kept as a rollback.
+- **Source:** `~/caspar-build/src-v2`, branch `wo742-shm-producer`, HEAD `24db35cca`, unchanged. No SFML 3 or
+  ffmpeg 8 porting was needed (Caspar's CMake already takes SFML 3; WO-753 A8).
+- **Build deps the upgrade removed** (reinstall before building):
+  `sudo apt install libboost-all-dev libicu-dev libatk1.0-dev libatspi2.0-dev libatk-bridge2.0-dev`.
+  `libicu-dev` came in implicitly with Boost on 24.04; without it only the final link fails (`cannot find -licuuc`).
+- **Toolchain:** gcc 15.2, cmake 4.2.3, ninja, Release, `USE_SYSTEM_CEF=OFF`, CEF from v1's download cache (pinned
+  sha256 `2a03fa6b…`, unchanged; the built `libcef.so` is byte-identical to `highascg/lib/libcef.so`).
+  Recipe: `~/caspar-build/build-26.sh` (checks the deps, builds into `~/caspar-build/build-26`, logs to
+  `build-26.log`, prints unresolved libs). `build-v2` is left alone as the 24.04 build dir.
+  gcc 15 adds ~65 warnings (mostly C++20 `[=]` implicit-`this` deprecations); none are errors.
+- **Output:** `bin/casparcg` reports `2.5.1 24db35cca Stable` (9.9 MB, md5 `b5a82b9c`), deployed 2026-10-25 17:33
+  (cp → `.new` → `mv -f` → AMCP `RESTART` → node restart). Links only 26.04 libraries: ffmpeg 8 (`libavcodec.so.62`),
+  Boost 1.90, SFML 3.0, ICU 78. Previous binary kept as `bin/casparcg.pre-26build` (md5 `b2bb40f5`, the 24.04
+  WO-742 build; it needs the noble libs above).
+- **After the swap:** all 7 channels `PLAYING`, media restore `PLAY OK`. ffmpeg 8 logs "Changing video frame properties
+  on the fly is not supported by all filters" on each open; cosmetic (WO-753 A8). `PLAY … DECKLINK` failed with
+  `Check syntax` because of the desktopvideo 16.2a1 → 16.4a1 driver update done the same day, not because of this build:
+  the cards report `PLEASE_UPDATE` (firmware 0x65, driver wants 0x66) until they are flashed with
+  `BlackmagicFirmwareUpdater update <n>` and the box is power-cycled.
