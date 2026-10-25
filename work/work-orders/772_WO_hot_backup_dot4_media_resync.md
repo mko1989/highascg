@@ -1,6 +1,6 @@
 # WO-772 — .4 as this box's hot backup (cluster link + shared show + cabled PGM/PRV 1); a backup that gets its media late stayed black
 
-**Status: IN PROGRESS (25.10) — linked and forwarding live (both Caspars play the same clip after a take); fix offline-verified (smoke 3/3 + WO-670 fan-out 12/12, test:ci 3360/0); failover round + soak below**
+**Status: DONE (25.10) — linked and forwarding live; late-media fix proven live (CLEAR → Send media → .4 plays again); failover by freezing the master proven (.4 took over at epoch 2, both Caspars kept playing, handback at epoch 3); test:ci 3360/0, Godot 21801/0, cluster e2e live 9/3 skip/0, sandbox 10/10 + 12/12. PGM audio on both boxes → WO-773**
 
 Owner 25.10:
 > back up my config on this machine. connect with server .4 and make it a hot backup. run tests to see if everything
@@ -57,3 +57,27 @@ Owner 25.10:
   12/12. test:ci 3360/0, eslint 0 errors, 500-line 0 over, `check-require-integrity` OK.
 - Live (before the fix): link, master, shared show in sync, identical Caspar layouts, forwarded take plays on both.
 - See "Live rounds" below for the post-deploy checks.
+
+## Live rounds (25.10, after the fix was deployed)
+
+- **Late media → resync:** `CLEAR 1` on .4, then Send media → the fan-out replayed 16 journal lines to .4 only and its
+  ch1 played KV LOOP.mp4 again. The replay restarts the clip from 0 (no seek) — the backup's playhead is then up to
+  the clip age behind the master's; good enough for a black-avoiding backup, noted, not fixed.
+- **Failover:** this box's node frozen with `SIGSTOP` for 20 s (timed `SIGCONT`). .4 became master at epoch 2 within
+  ~10 s and its fan-out went active; both Caspars kept playing throughout (Caspar is a separate process). On resume
+  this box saw the higher epoch and stepped down (fencing — no split brain). `POST /api/cluster/master/set
+  {master:'self',auto:true}` here → master again at epoch 3, .4 next in succession. A node restart (< 12 s) caused
+  no failover, as designed.
+- **Known limit:** the air journal is in memory — a master node restart forgets it, so a backup that joins (or gets
+  media) after that catches up only from the next take.
+- **Playout:** Look 2 → PGM and Look 4 → PRV taken here: the same files play on both boxes, playheads within 0.04 s
+  (AMCP `INFO 1`/`INFO 2` on 127.0.0.1 and 192.168.0.4).
+- **Tests:** live cluster e2e (`run-cluster-e2e.js --live`) 9 pass / 3 skip / 0 fail before linking; sandbox
+  `--scenario=show` 10/10; `--servers=3` 12/12; `run-sweep.js --peers` 24 pass / 6 warn / 0 fail (warns: the sweep's
+  kiosk check takes the VR client for the kiosk, root helpers differ, DeckLink deb missing, disk space, .4 on an older
+  highascg build, Caspar error lines — the last one was the PortAudio failure, WO-773).
+- **Backups:** `~/backups/highascg-config-20261025-215730.tar.gz` (0600: config/, projects/ minus _trash,
+  .highascg-state.json, casparcg.config, .private, ~/.highascg/{audio-desk,gdtf-share}.json, ~/.config/wivrn,
+  ~/.config/systemd/user); .4's state before linking in `~/backups/dot4-before-hotbackup-20261025-220146/`; .4's own
+  project kept on .4 as `projects/_cluster/untitled.before-share-20261025T210012.json`.
+
