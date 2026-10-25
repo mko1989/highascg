@@ -193,6 +193,19 @@ function createClusterFanout(deps) {
 		log('info', `${t.id}: caught up on channels ${todo.join(', ')} (${out.length} lines)`)
 	}
 
+	/**
+	 * WO-772: replay the whole journal to one server again — after media reached it (cluster-media.js). Its first
+	 * catch-up ran while its files were missing, so every PLAY failed there and the backup stayed black until the next
+	 * take. Channels not cabled there are untouched.
+	 */
+	function resync(id) {
+		const t = targets.get(id)
+		if (!t) return false
+		t.synced.clear()
+		catchUp(t)
+		return true
+	}
+
 	/** amcp-fanout.js hook: every command / batch this server sent to its own Caspar. */
 	function send(payload) {
 		const lines = payloadLines(payload)
@@ -230,7 +243,7 @@ function createClusterFanout(deps) {
 		for (const id of [...targets.keys()]) drop(id)
 	}
 
-	return { refresh, send, status, stop, journal }
+	return { refresh, send, resync, status, stop, journal }
 }
 
 module.exports = { createClusterFanout, channelPlan, mainChannels, cabledIds, rewriteLine, payloadLines }

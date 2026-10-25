@@ -495,6 +495,6 @@ module.exports = [
 	'tools/smoke/smoke-stream-output-project-sync.test.js',
 	'tools/smoke/smoke-wo160b-pgm-only-lbg.test.js',
 	'tools/smoke/smoke-wo172-device-view-sync.test.js',
-	'tools/smoke/smoke-wo770-vr-session.test.js',
 	'tools/smoke/smoke-system-time.test.js', // WO-756: safe to gate now that timedatectl is stubbed
+	...require('./offline-test-files-2'), // this list hit the 500-line limit (WO-772)
 ]

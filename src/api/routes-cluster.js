@@ -250,6 +250,7 @@ function mediaDeps(ctx) {
 		project: () => require('../engine/project-scenes').loadFullProject(),
 		plan: (project) => rsync.buildProjectMediaRsyncPlan(ctx, project),
 		rsync: rsync.runProjectMediaRsync,
+		onSent: (id) => ctx._clusterFanout?.resync(id),
 		log: ctx.log,
 	}
 }

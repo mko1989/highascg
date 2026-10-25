@@ -49,7 +49,8 @@ function acceptSshKey(body, remoteAddress, deps) {
  * Sender side: POST /api/cluster/peers/:id/send-media → 202, then progress on the peer's `media_send` in the cluster
  * snapshot (WS `cluster:peers`).
  * @param {{ cluster: object, selfKey: string, sign: Function, sshKey: () => string, post: Function,
- *   project: () => Promise<object>, plan: Function, rsync: Function, log?: Function, now?: () => number }} deps
+ *   project: () => Promise<object>, plan: Function, rsync: Function, onSent?: (id: string) => void, log?: Function,
+ *   now?: () => number }} deps  onSent: the files are there (WO-772: the fan-out replays the show to it)
  */
 async function sendMedia(id, deps) {
 	const now = deps.now || Date.now
@@ -79,6 +80,7 @@ async function sendMedia(id, deps) {
 		deps.cluster.setMediaSend(id, out.ok
 			? { state: 'done', percent: 100, files: out.files, at: now() }
 			: { state: 'failed', error: String(out.hint || out.error || 'rsync failed').slice(0, 400), at: now() })
+		if (out.ok) deps.onSent?.(id) // WO-772: the master plays its show there again, now with the files
 		deps.cluster.poll().catch(() => {})
 	})().catch((e) => deps.cluster.setMediaSend(id, { state: 'failed', error: e.message, at: now() }))
 	return { status: 202, body: { ok: true, paths: plan.relPaths.length, slug: plan.slug || '' } }
