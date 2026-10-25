@@ -5,12 +5,14 @@
  * client/components/inspector-layer-playlist.js mutations; the client sends its current layer and one op and stores
  * the returned patch (looks stay client-owned: deck sync / autosave).
  *
- * Ops: mode {mode} · add {items} · move {from, to} · remove {index} · item {index, duration?, loop?, fadeOut?} ·
+ * Ops: mode {mode} · add {items} · add_empty {at?} · move {from, to} · remove {index} · item {index, duration?, loop?, fadeOut?} ·
  *      settings {advance?, loop?, transition?, fadeFrames?} · timeless {secs}
  * WO-766: `fadeOut` (↘ fade down when done) and `loop` exclude each other — setting one clears the other.
+ * WO-768: `add_empty` inserts an empty item (engine/playlist-empty.js); the layer's `source` skips empty items.
  */
 
 const { isTimelessPlaylistItem } = require('./scene-take-lbg-playlist')
+const { EMPTY_TYPE, EMPTY_VALUE, EMPTY_LABEL, firstRealItem } = require('./playlist-empty')
 
 const TRANSITION_TYPES = ['MIX', 'CUT', 'SLIDE', 'WIPE']
 const IMAGE_RE = /\.(png|jpg|jpeg|gif|bmp|webp)$/i
@@ -52,7 +54,9 @@ function itemFromSource(src, playlist, now) {
 	return item
 }
 
-const sourceOf = (it) => ({ type: it.type, value: it.value, label: it.label })
+const sourceOf = (it) => (it ? { type: it.type, value: it.value, label: it.label } : null)
+/* WO-768: the layer's source is its first real item — an empty item is never a source */
+const sourceOfList = (list) => sourceOf(firstRealItem(list))
 
 /**
  * Pure. @returns {{ patch: object, playlistChanged: boolean } | { error: string }}
@@ -74,7 +78,7 @@ function planPlaylistEdit(layer, op, args = {}, now = Date.now()) {
 				if (isTimelessPlaylistItem(seeded)) seeded.duration = timelessSecsOf(list)
 				patch.playlist = [seeded]
 			}
-			if (mode === 'single' && list.length > 0) patch.source = sourceOf(list[0])
+			if (mode === 'single' && firstRealItem(list)) patch.source = sourceOfList(list)
 			return { patch, playlistChanged: !!patch.playlist }
 		}
 		case 'add': {
@@ -82,8 +86,15 @@ function planPlaylistEdit(layer, op, args = {}, now = Date.now()) {
 			if (!srcs.length) return { error: 'nothing droppable (a source needs a value; effects are not items)' }
 			const added = srcs.map((s) => itemFromSource(s, list, now))
 			const patch = { playlist: [...list, ...added] }
-			if (list.length === 0) patch.source = sourceOf(added[0])
+			if (!firstRealItem(list)) patch.source = sourceOf(added[0])
 			return { patch, playlistChanged: true }
+		}
+		/* WO-768: an empty item at `at` (default: the end) — Next transitions the layer to nothing */
+		case 'add_empty': {
+			const at = args.at == null ? list.length : parseInt(args.at, 10)
+			if (!Number.isFinite(at) || at < 0 || at > list.length) return { error: 'at out of range' }
+			const item = { id: newItemId(now), type: EMPTY_TYPE, value: EMPTY_VALUE, label: EMPTY_LABEL, duration: timelessSecsOf(list) }
+			return { patch: { playlist: [...list.slice(0, at), item, ...list.slice(at)] }, playlistChanged: true }
 		}
 		case 'move': {
 			const from = idx(args.from)
@@ -94,14 +105,14 @@ function planPlaylistEdit(layer, op, args = {}, now = Date.now()) {
 			const [moved] = next.splice(from, 1)
 			next.splice(to, 0, moved)
 			const patch = { playlist: next }
-			if (from === 0 || to === 0) patch.source = sourceOf(next[0])
+			if (from === 0 || to === 0 || firstRealItem(list) !== firstRealItem(next)) patch.source = sourceOfList(next)
 			return { patch, playlistChanged: true }
 		}
 		case 'remove': {
 			const i = idx(args.index)
 			if (i < 0) return { error: 'index out of range' }
 			const next = list.filter((_, k) => k !== i)
-			return { patch: { playlist: next, source: next.length ? sourceOf(next[0]) : null }, playlistChanged: true }
+			return { patch: { playlist: next, source: sourceOfList(next) }, playlistChanged: true }
 		}
 		case 'item': {
 			const i = idx(args.index)

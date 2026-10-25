@@ -11,7 +11,7 @@
  *   null  — not a judgeable media value (templates/shaders, route://, live, html, color, placeholders) or no list
  */
 
-const NON_MEDIA_RE = /^(route:\/\/|\[html\]|https?:\/\/|decklink|live|color|#)/i
+const NON_MEDIA_RE = /^(route:\/\/|\[html\]|https?:\/\/|decklink|live|color|#|empty$)/i // WO-768: the empty playlist item
 const TEMPLATE_PATH_RE = /(^|\/)(shaders|lower-thirds|lower_thirds|studio|countdown|loop-io|html)\//i
 
 function norm(v) {

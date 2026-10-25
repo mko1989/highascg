@@ -213,7 +213,7 @@ function getProjectMediaResolveCandidates(config, filename, store) {
 function normalizeSourceRef(source, slug, config) {
 	if (!source || typeof source !== 'object' || !slug) return
 	const t = String(source.type || 'media').toLowerCase()
-	if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live') return
+	if (t === 'template' || t === 'html' || t === 'timeline' || t === 'effect' || t === 'live' || t === 'empty') return // WO-768
 	const value = String(source.value || '').trim()
 	if (!value || /^(https?|rtsp|rtmp|srt|udp|ndi|alsa|decklink|route):/i.test(value)) return
 	source.value = normalizeMediaIdForProject(value, slug, config)

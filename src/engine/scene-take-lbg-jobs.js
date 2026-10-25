@@ -7,6 +7,7 @@ const { diffCasparLayerPlan } = require('../caspar/amcp-layer-diff-plan')
 const { sceneLayerRotationMixerLines, fillForSceneLayerRotationAnchor } = require('./scene-layer-rotation-amcp')
 const { pipOverlaysFromLayer } = require('./pip-overlay')
 const { buildSceneTemplateCgSpec } = require('./scene-template-cg')
+const { isEmptyPlaylistItem } = require('./playlist-empty')
 const {
 	clipPath,
 	resolveSceneClipForAmcp,
@@ -134,9 +135,11 @@ async function buildTakeJobs(opts) {
 			clip = '[HTML] black'
 		}
 		if (!clip) continue
-		clip = resolveSceneClipForAmcp(clip, self)
+		/* WO-768: a take onto an empty item loads bare EMPTY with the take's transition (no CG, AF, SEEK, LENGTH) */
+		const startsEmpty = layer.sourceMode === 'list' && isEmptyPlaylistItem(layer.playlist?.[playlistStartIdx])
+		clip = startsEmpty ? 'EMPTY' : resolveSceneClipForAmcp(clip, self)
 
-		const templateCg = buildSceneTemplateCgSpec(layer, clip, self)
+		const templateCg = startsEmpty ? null : buildSceneTemplateCgSpec(layer, clip, self)
 
 		const cur = currentMap.get(layer.layerNumber)
 		const hasOutgoingOnAir = layerHasContent(cur)
@@ -215,7 +218,7 @@ async function buildTakeJobs(opts) {
 		}
 		/* WO-766 (owner 25.10): Manual Next no longer forces LOOP (was WO-224 T224.6) — an item without its own Loop
 		 * plays once and holds its last frame until Next; a ↘ item plays once and fades out at its end. */
-		if (layer.sourceMode === 'list' && require('./scene-take-lbg-playlist').fadesOut(layer.playlist?.[playlistStartIdx])) {
+		if (startsEmpty || (layer.sourceMode === 'list' && require('./scene-take-lbg-playlist').fadesOut(layer.playlist?.[playlistStartIdx]))) {
 			isLoop = false
 		}
 		const loadOpts = { loop: isLoop }
@@ -247,6 +250,7 @@ async function buildTakeJobs(opts) {
 			const lengthFrames = outFrames - (seekFrames != null ? inFrames : 0)
 			if (outFrames > startFrames && lengthFrames > 0) loadOpts.length = lengthFrames
 		}
+		if (startsEmpty) for (const k of ['audioFilter', 'seek', 'in', 'length']) delete loadOpts[k]
 		const baseType = isMerge ? baseTypeStripAnimateSuffix(globalT.type) : globalT.type
 
 		// Bank A/B crossfade uses paired MIXER OPACITY — not LOADBG MIX. Everything else (plain MIX/WIPE

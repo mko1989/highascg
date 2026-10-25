@@ -9,6 +9,7 @@ const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-tra
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
 const { resolvePlaylistStartIndex } = require('./scene-take-playlist-start')
 const { isFadeOutPlaylistItem, queuePlaylistFadeOut, scheduleFadeEndAdvance } = require('./playlist-fade-out')
+const { isEmptyPlaylistItem, EMPTY_VALUE } = require('./playlist-empty')
 
 /* Owner request 2026-07-26: templates/shaders/graphics in a playlist never advanced — advance was
  * OSC file/time-driven (media only) with a wall-clock timer for IMAGES only. "Timeless" now means
@@ -156,6 +157,8 @@ function handlePlaylistOscUpdate(self, snapshot) {
 							const prevPlaying = self.playlistOscPrevPlayingPath[pKey]
 							self.playlistActiveIndices = self.playlistActiveIndices || {}
 							const lastIdx = self.playlistActiveIndices[pKey] ?? 0
+							/* WO-768: an empty item is on air — Caspar keeps the last clip's file fields, which would match back to it */
+							if (isEmptyPlaylistItem(layer.playlist[lastIdx])) continue
 							const itemIdx = resolvePlaylistPlayingIndex(layer.playlist, playingFile, lastIdx, prevPlaying)
 							self.playlistOscPrevPlayingPath[pKey] = playingFile
 
@@ -205,11 +208,12 @@ function handlePlaylistOscUpdate(self, snapshot) {
 								}
 							}
 
-							/* WO-766: after a ↘ item faded out, move on by its remaining time (OSC keeps the old file fields). */
-							if (itemIdx >= 0 && fadesOut(layer.playlist[itemIdx]) && layer.playlist.length > 1) {
+							/* WO-766: after a ↘ item faded out, move on by its remaining time (OSC keeps the old file fields).
+							 * WO-768: same for a clip whose AUTO preload is an empty item — the empty item then takes over. */
+							const afterIdx = itemIdx + 1 < layer.playlist.length ? itemIdx + 1 : layer.playlistLoop !== false ? 0 : -1
+							if (itemIdx >= 0 && layer.playlist.length > 1 && (fadesOut(layer.playlist[itemIdx]) || isEmptyPlaylistItem(layer.playlist[afterIdx]))) {
 								scheduleFadeEndAdvance(self, pKey, itemIdx, elapsed, duration, () => {
-									const n = itemIdx + 1 < layer.playlist.length ? itemIdx + 1 : layer.playlistLoop !== false ? 0 : -1
-									if (n >= 0) triggerPlaylistAdvance(self, channel, pLayer, scene, layer, n)
+									if (afterIdx >= 0) triggerPlaylistAdvance(self, channel, pLayer, scene, layer, afterIdx)
 								})
 							}
 							// T211.5: Stall watchdog for imperfect media (video stream ends before container duration).
@@ -296,7 +300,7 @@ function queueNextPlaylistItem(self, channel, pLayer, layer, nextIdx) {
 	if (typeof self.log === 'function') {
 		self.log('info', `[Playlist] Preloading next item ${nextIdx} (${nextItem.value}) on ${channel}-${pLayer} with AUTO`)
 	}
-	const clip = resolveSceneClipForAmcp(nextItem.value, self)
+	const clip = isEmptyPlaylistItem(nextItem) ? EMPTY_VALUE : resolveSceneClipForAmcp(nextItem.value, self)
 	self.amcp.loadbg(channel, pLayer, clip, loadOpts).catch((err) => {
 		if (typeof self.log === 'function') {
 			self.log('warn', `[Playlist] Preload failed on ${channel}-${pLayer}: ${err?.message || err}`)
@@ -385,7 +389,7 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 				await new Promise((r) => setTimeout(r, warm))
 				await self.amcp.play(channel, pLayer)
 			} else {
-				const clip = resolveSceneClipForAmcp(nextItem.value, self)
+				const clip = isEmptyPlaylistItem(nextItem) ? EMPTY_VALUE : resolveSceneClipForAmcp(nextItem.value, self)
 				await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
 				await self.amcp.play(channel, pLayer)
 				if (fadesOut(nextItem)) await queuePlaylistFadeOut(self, channel, pLayer, layer)

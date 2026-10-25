@@ -16,7 +16,7 @@ function addSourceRef(source, media, templates) {
 		templates.add(value.replace(/\.html$/i, ''))
 		return
 	}
-	if (t === 'timeline' || t === 'effect' || t === 'live') return
+	if (t === 'timeline' || t === 'effect' || t === 'live' || t === 'empty') return // WO-768: the empty playlist item
 	if (SKIP_VALUE_RE.test(value)) return
 	if (t === 'media' || t === 'file' || !t) media.add(value)
 }

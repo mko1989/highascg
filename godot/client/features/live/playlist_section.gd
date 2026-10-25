@@ -7,6 +7,7 @@ extends VBoxContainer
 ## WO-766: per item ↘ (fade down when done: plays once, fades out over "↘ Fade frames", default half the channel
 ## rate); a double-click on a row picks that item and Next steps — on program it plays, otherwise the preview moves
 ## (and a take starts there). ▸ marks the item the server reports as current.
+## WO-768: "+ Empty" adds an empty item — playing it transitions the layer to nothing (Next, then Next plays on).
 
 signal patch(p: Dictionary)
 
@@ -73,6 +74,11 @@ func _ready() -> void:
 	_tree.button_clicked.connect(func(it: TreeItem, _c: int, _id: int, _b: int) -> void: _edit("remove", {"index": it.get_index()}))
 	_tree.set_drag_forwarding(_row_drag, _tree_can_drop, _tree_drop)
 	_list_box.add_child(_tree)
+	var add_empty := Button.new()
+	add_empty.text = "+ Empty"
+	add_empty.tooltip_text = "Add an empty item after the selected row (or at the end) — playing it transitions this layer to nothing"
+	add_empty.pressed.connect(_on_add_empty)
+	_list_box.add_child(add_empty)
 	var g := GridContainer.new()
 	g.columns = 2
 	_list_box.add_child(g)
@@ -169,6 +175,9 @@ func _render(rows: Array, shows_next: bool, timeless_secs: float, current := -1)
 		it.set_tooltip_text(0, str(r.get("value", "")))
 		if r.get("missing", false):
 			it.set_custom_color(0, ThemeBuilder.ERROR)
+		elif r.get("empty", false):
+			it.set_custom_color(0, ThemeBuilder.TEXT_MUTED)
+			it.set_tooltip_text(0, "Empty: the layer transitions to nothing")
 		if r.get("timeless", false):
 			it.set_cell_mode(1, TreeItem.CELL_MODE_RANGE)
 			it.set_range_config(1, 1, 86400, 1)
@@ -208,6 +217,12 @@ func _on_edited() -> void:
 
 func _add(data: Variant) -> void:
 	_edit("add", {"items": data})
+
+
+## WO-768: an empty item after the selected row (else at the end).
+func _on_add_empty() -> void:
+	var sel := _tree.get_selected()
+	_edit("add_empty", {"at": sel.get_index() + 1} if sel != null else {})
 
 
 func _row_drag(at: Vector2) -> Variant:

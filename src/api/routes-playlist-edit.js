@@ -3,7 +3,7 @@
 /**
  * WO-603 slice 6 — the look-layer playlist editor's API (web inspector-layer-playlist.js mutations, decided in node):
  *   POST /api/playlist/edit { sceneId, layer, op, ...args } → { ok, patch, rows, showsNext, timelessSecs, patched }
- *     op = mode | add | move | remove | item | settings | timeless (engine/playlist-edit.js) | describe (rows only).
+ *     op = mode | add | add_empty (WO-768) | move | remove | item | settings | timeless (engine/playlist-edit.js) | describe (rows only).
  *     The client sends the layer it holds (its edits may not be deck-synced yet) and stores `patch` on it; when the
  *     playlist changed and the look is live, the running engine's copy is patched too (web pushLivePlaylistUpdate).
  *   POST /api/playlist/edit/next { sceneId, layerNumber } → the inspector's Next ▶ on the program channel where that
@@ -22,6 +22,7 @@ const { clipMissing } = require('../media/media-exists')
 const { buildDurationIndex, mediaDurationMs, formatClipDuration } = require('../media/media-duration')
 const { mediaIndexFor, patchLivePlaylist } = require('./routes-playlist-panel')
 const { defaultFadeFrames } = require('../engine/playlist-fade-out')
+const { isEmptyPlaylistItem, EMPTY_LABEL } = require('../engine/playlist-empty')
 
 const out = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -46,12 +47,14 @@ function describeRows(playlist, ctx) {
 		const value = String(it?.value || '')
 		const name = String(it?.label || value).replace(/\\/g, '/').split('/').filter(Boolean).pop() || value
 		const timeless = isTimelessPlaylistItem(it)
+		const empty = isEmptyPlaylistItem(it) // WO-768
 		return {
 			id: it?.id ?? null,
-			name,
+			name: empty ? EMPTY_LABEL : name,
 			value,
 			timeless,
-			missing: clipMissing(value, media) === true,
+			empty,
+			missing: !empty && clipMissing(value, media) === true,
 			duration: timeless ? (Number(it?.duration) > 0 ? Number(it.duration) : timelessSecsOf(playlist)) : null,
 			length: timeless ? '' : formatClipDuration(mediaDurationMs(value, durations)),
 			loop: it?.loop === true,
