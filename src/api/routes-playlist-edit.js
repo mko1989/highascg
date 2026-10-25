@@ -8,6 +8,10 @@
  *     playlist changed and the look is live, the running engine's copy is patched too (web pushLivePlaylistUpdate).
  *   POST /api/playlist/edit/next { sceneId, layerNumber } → the inspector's Next ▶ on the program channel where that
  *     look is live (the web resolved the channel in the browser, inspector-layer-playlist.js:366-372).
+ *     WO-766 (owner 25.10: "it doesnt let me change the item on the list when its not on program. ridicules, thats
+ *     what the preview is for"): not on program → step_preview (the start item moves, a PRV recall re-stages it).
+ *   POST /api/playlist/edit/pick { sceneId, layerNumber, index } → the row picked in the inspector: goto on program,
+ *     else set_start (re-stages PRV, and the take starts there — WO-347 / WO-581).
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
@@ -17,6 +21,7 @@ const { isTimelessPlaylistItem } = require('../engine/scene-take-lbg-playlist')
 const { clipMissing } = require('../media/media-exists')
 const { buildDurationIndex, mediaDurationMs, formatClipDuration } = require('../media/media-duration')
 const { mediaIndexFor, patchLivePlaylist } = require('./routes-playlist-panel')
+const { defaultFadeFrames } = require('../engine/playlist-fade-out')
 
 const out = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -50,6 +55,7 @@ function describeRows(playlist, ctx) {
 			duration: timeless ? (Number(it?.duration) > 0 ? Number(it.duration) : timelessSecsOf(playlist)) : null,
 			length: timeless ? '' : formatClipDuration(mediaDurationMs(value, durations)),
 			loop: it?.loop === true,
+			fadeOut: it?.fadeOut === true && !timeless,
 		}
 	})
 }
@@ -79,6 +85,8 @@ async function handleEdit(body, ctx) {
 		rows: describeRows(next.playlist, ctx),
 		showsNext: showsNext(next),
 		timelessSecs: timelessSecsOf(next.playlist),
+		fadeFramesDefault: defaultFadeFrames(programFps(ctx, sceneId)),
+		currentIndex: sceneId && Number.isFinite(layerNumber) ? currentIndex(ctx, sceneId, layerNumber) : 0,
 		patched,
 		...(touched !== undefined ? { touched } : {}),
 	})
@@ -100,14 +108,48 @@ function liveProgramChannel(ctx, sceneId) {
 	return null
 }
 
+/** The frame rate the look plays at: its program channel, else the first program channel (Caspar's own rate). */
+function programFps(ctx, sceneId) {
+	const { resolveChannelFramerateForMixerTween } = require('../engine/scene-transition')
+	let ch = liveProgramChannel(ctx, sceneId)
+	if (ch == null) {
+		try {
+			ch = ctx.state?.getState?.()?.channelMap?.programChannels?.[0] ?? 1
+		} catch {
+			ch = 1
+		}
+	}
+	return resolveChannelFramerateForMixerTween(ctx, ch)
+}
+
+/** The item the inspector marks: playing on program, else the start item (what PRV shows and a take starts on). */
+function currentIndex(ctx, sceneId, layerNumber) {
+	const ch = liveProgramChannel(ctx, sceneId)
+	if (ch != null) return (ctx.playlistActiveIndices || {})[require('../engine/scene-take-lbg-playlist').playlistRuntimeKey(ch, sceneId, layerNumber)] ?? 0
+	return (ctx.playlistStartIndices || {})[`${sceneId}-${layerNumber}`] ?? 0
+}
+
+const control = (body, ctx) => require('./routes-playlist').handlePost('/api/playlist/control', body, ctx)
+
 async function handleNext(body, ctx) {
 	const b = parseBody(body) || {}
 	const sceneId = String(b.sceneId || '').trim()
 	const layerNumber = parseInt(b.layerNumber, 10)
 	if (!sceneId || !Number.isFinite(layerNumber)) return out(400, { ok: false, error: 'sceneId and layerNumber required' })
 	const channel = liveProgramChannel(ctx, sceneId)
-	if (channel == null) return out(409, { ok: false, error: 'This look is not on program — Next works while it plays.' })
+	if (channel == null) return control({ action: 'step_preview', sceneId, layerNumber, direction: 'next' }, ctx)
 	return require('./routes-playlist').handlePost('/api/playlist/next', { channel, layerNumber }, ctx)
 }
 
-module.exports = { describeRows, liveProgramChannel, handleEdit, handleNext }
+async function handlePick(body, ctx) {
+	const b = parseBody(body) || {}
+	const sceneId = String(b.sceneId || '').trim()
+	const layerNumber = parseInt(b.layerNumber, 10)
+	const index = parseInt(b.index, 10)
+	if (!sceneId || !Number.isFinite(layerNumber) || !(index >= 0)) return out(400, { ok: false, error: 'sceneId, layerNumber and index required' })
+	const channel = liveProgramChannel(ctx, sceneId)
+	if (channel == null) return control({ action: 'set_start', sceneId, layerNumber, index }, ctx)
+	return control({ action: 'goto', channel, layerNumber, index }, ctx)
+}
+
+module.exports = { describeRows, liveProgramChannel, handleEdit, handleNext, handlePick }

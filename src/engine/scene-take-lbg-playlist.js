@@ -4,10 +4,11 @@
 
 'use strict'
 
-const { pathsMatch, normPath } = require('../state/live-scene-reconcile')
+const { resolvePlaylistPlayingIndex } = require('./playlist-path-match')
 const { normalizeProgramLayerBank, physicalProgramLayer } = require('./scene-transition')
 const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
 const { resolvePlaylistStartIndex } = require('./scene-take-playlist-start')
+const { isFadeOutPlaylistItem, queuePlaylistFadeOut, scheduleFadeEndAdvance } = require('./playlist-fade-out')
 
 /* Owner request 2026-07-26: templates/shaders/graphics in a playlist never advanced — advance was
  * OSC file/time-driven (media only) with a wall-clock timer for IMAGES only. "Timeless" now means
@@ -28,6 +29,8 @@ function isTimelessPlaylistItem(item) {
 function isLoopedPlaylistItem(item) {
 	return !!item && item.loop === true
 }
+/* WO-766 ↘: a timed clip that fades out at its end (a still has no end to fade at). */
+const fadesOut = (item) => isFadeOutPlaylistItem(item) && !isTimelessPlaylistItem(item)
 
 /* todos27.07.26 ROOT CAUSE of "preview played the old version": every piece of playlist runtime
  * state was keyed `${sceneId}-${layerNumber}` with NO channel — the same look live on PGM and
@@ -57,7 +60,7 @@ function clearChannelPlaylistState(self, channel) {
 	for (const key of Object.keys(self.playlistImageTimers || {})) {
 		if (key.startsWith(prefix)) clearPlaylistImageTimer(self, key)
 	}
-	for (const bag of [self.playlistActiveIndices, self.playlistOscPrevPlayingPath]) {
+	for (const bag of [self.playlistActiveIndices, self.playlistOscPrevPlayingPath, self.playlistFadeEndArmed]) {
 		if (!bag) continue
 		for (const key of Object.keys(bag)) {
 			if (key.startsWith(prefix)) delete bag[key]
@@ -67,9 +70,9 @@ function clearChannelPlaylistState(self, channel) {
 
 function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 	clearChannelPlaylistState(self, channel)
-	if (!isPlaylistChannelEligible(self, channel)) return
+	const runs = isPlaylistChannelEligible(self, channel)
 	// Register the global OSC playlist handler on self.oscState exactly once!
-	if (self.oscState && !self._playlistOscBound) {
+	if (runs && self.oscState && !self._playlistOscBound) {
 		self._playlistOscBound = true
 		self.oscState.on('change', (snapshot) => {
 			handlePlaylistOscUpdate(self, snapshot)
@@ -86,6 +89,9 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 			 * WO-371 PRV step) — arm the chain from THAT item. Replaces the old 400 ms post-take
 			 * hop, which put item 0 on air first with item 0's timer/preload already armed. */
 			const startIdx = resolvePlaylistStartIndex(self, incoming.id, layer)
+			/* WO-766: a ↘ start item fades at its end on PRV too — a fade is not an advance (WO-371 C). */
+			if (fadesOut(layer.playlist[startIdx])) void queuePlaylistFadeOut(self, channel, job.pLayer, layer)
+			if (!runs) continue
 			self.playlistActiveIndices[pKey] = startIdx
 			if (layer.playlistAdvance === 'auto') {
 				self.playlistOscPrevPlayingPath = self.playlistOscPrevPlayingPath || {}
@@ -100,6 +106,8 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 						/* held on air — nothing to arm */
 					} else if (isTimelessPlaylistItem(firstItem)) {
 						schedulePlaylistImageTimer(self, channel, job.pLayer, incoming, layer, startIdx)
+					} else if (fadesOut(firstItem)) {
+						/* the fade holds the AUTO slot; the OSC pass moves on at the clip's end */
 					} else {
 						// Video: preload the following item as LOADBG AUTO
 						let nextIdx = startIdx + 1
@@ -110,64 +118,6 @@ function setupLayerPlaylists(self, channel, incoming, takeJobs) {
 			}
 		}
 	}
-}
-
-/**
- * Score how well a playlist entry path matches Caspar's foreground path (OSC / INFO).
- * Used so two different files with the same basename do not collapse to the same index.
- */
-/* Owner 2026-10-03 ("sponsorzy" looped 2-3): OSC names are extension-less (…/VIDEOS SPONSORS/4), so
- * `4.mp4` fell to pathsMatch's substring test and "4" hit "Raben START 40 SEK…" (item 0). Compare
- * extension-less paths on a `/` boundary first; strip only media extensions ("07.2026" is a name). */
-const PLAYLIST_ITEM_EXT_RE = /\.(mp4|mov|mkv|avi|webm|mxf|m2ts?|ts|mpg|mpeg|m4v|mp3|wav|m4a|aac|flac|ogg|png|jpe?g|gif|bmp|webp|tga|tiff?|html?)$/i
-const stripPlaylistItemExt = (p) => p.replace(PLAYLIST_ITEM_EXT_RE, '')
-
-function scorePlaylistPathMatch(expected, playingFile) {
-	const e = normPath(expected || '')
-	const a = normPath(playingFile || '')
-	if (!e || !a) return -1
-	if (e === a) return 100000
-	const eBare = stripPlaylistItemExt(e)
-	const aBare = stripPlaylistItemExt(a)
-	if (eBare === aBare) return 90000
-	if (aBare.endsWith(`/${eBare}`) || eBare.endsWith(`/${aBare}`)) return 85000 + Math.min(eBare.length, aBare.length)
-	if (a.endsWith(e) || e.endsWith(a)) return 80000 + Math.min(e.length, a.length)
-	if (pathsMatch(expected, playingFile)) return 1000 + Math.min(e.length, a.length)
-	if (sameFileName(expected, playingFile)) return 100 + Math.min(e.length, a.length)
-	return -1
-}
-
-/**
- * @param {object[]} playlist
- * @param {string} playingFile - path or name from Caspar OSC
- * @param {number} lastIdx - last known playlist index for this layer
- * @param {string | undefined} prevPlayingFile - foreground file from previous OSC sample for this layer
- */
-function resolvePlaylistPlayingIndex(playlist, playingFile, lastIdx, prevPlayingFile) {
-	if (!playingFile || !Array.isArray(playlist) || playlist.length === 0) return -1
-	const scores = playlist.map((item) => scorePlaylistPathMatch(item?.value, playingFile))
-	let best = -1
-	for (const s of scores) {
-		if (s > best) best = s
-	}
-	if (best < 0) return -1
-	/** @type {number[]} */
-	const cand = []
-	for (let i = 0; i < scores.length; i++) {
-		if (scores[i] === best) cand.push(i)
-	}
-	if (cand.length === 1) return cand[0]
-	const li = Number(lastIdx) || 0
-	const prevOk = prevPlayingFile != null && String(prevPlayingFile).trim().length > 0
-	const changed = prevOk && normPath(prevPlayingFile) !== normPath(playingFile)
-	if (changed) {
-		const next = (li + 1) % playlist.length
-		if (cand.includes(next)) return next
-		if (cand.includes(li)) return li
-		return cand[0]
-	}
-	if (cand.includes(li)) return li
-	return cand[0]
 }
 
 function handlePlaylistOscUpdate(self, snapshot) {
@@ -237,6 +187,8 @@ function handlePlaylistOscUpdate(self, snapshot) {
 										/* looped item: hold here until Next */
 									} else if (isTimelessPlaylistItem(currentItem)) {
 										schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, itemIdx)
+									} else if (fadesOut(currentItem)) {
+										void queuePlaylistFadeOut(self, channel, pLayer, layer)
 									} else {
 										// Video: preload the next item (with loop wrapping)
 										let nextIdx = itemIdx + 1
@@ -253,9 +205,16 @@ function handlePlaylistOscUpdate(self, snapshot) {
 								}
 							}
 
+							/* WO-766: after a ↘ item faded out, move on by its remaining time (OSC keeps the old file fields). */
+							if (itemIdx >= 0 && fadesOut(layer.playlist[itemIdx]) && layer.playlist.length > 1) {
+								scheduleFadeEndAdvance(self, pKey, itemIdx, elapsed, duration, () => {
+									const n = itemIdx + 1 < layer.playlist.length ? itemIdx + 1 : layer.playlistLoop !== false ? 0 : -1
+									if (n >= 0) triggerPlaylistAdvance(self, channel, pLayer, scene, layer, n)
+								})
+							}
 							// T211.5: Stall watchdog for imperfect media (video stream ends before container duration).
 							// Track elapsed time progress; if near-end and frozen >2s, force-promote next item.
-							if (layer.playlist.length > 1 && !isLoopedPlaylistItem(layer.playlist[itemIdx]) && typeof elapsed === 'number' && typeof duration === 'number' && duration > 0) {
+							if (layer.playlist.length > 1 && !isLoopedPlaylistItem(layer.playlist[itemIdx]) && !fadesOut(layer.playlist[itemIdx]) && typeof elapsed === 'number' && typeof duration === 'number' && duration > 0) {
 								self.playlistElapsedTracking = self.playlistElapsedTracking || {}
 								self.playlistWatchdogFiredFor = self.playlistWatchdogFiredFor || {}
 
@@ -397,9 +356,8 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 	const nextItem = layer.playlist[nextIdx]
 	const transition = layer.playlistTransition || { type: 'MIX', duration: 12 }
 
-	const loadOpts = {
-		loop: layer.playlistAdvance === 'manual' || isLoopedPlaylistItem(nextItem)
-	}
+	/* WO-766 (owner 25.10): Manual Next no longer loops every item (WO-224 T224.6) — only the item's own Loop does. */
+	const loadOpts = { loop: isLoopedPlaylistItem(nextItem) }
 	if (transition.type && String(transition.type).toUpperCase() !== 'CUT') {
 		loadOpts.transition = transition.type
 		loadOpts.duration = transition.duration
@@ -430,12 +388,14 @@ function stagePlaylistItem(self, channel, pLayer, scene, layer, nextIdx) {
 				const clip = resolveSceneClipForAmcp(nextItem.value, self)
 				await self.amcp.loadbg(channel, pLayer, clip, loadOpts)
 				await self.amcp.play(channel, pLayer)
+				if (fadesOut(nextItem)) await queuePlaylistFadeOut(self, channel, pLayer, layer)
 			}
 
 			// Update index state immediately so that it triggers correctly on next update
 			const pKey = playlistRuntimeKey(channel, scene.id, layer.layerNumber)
 			self.playlistActiveIndices = self.playlistActiveIndices || {}
 			self.playlistActiveIndices[pKey] = nextIdx
+			if (self.playlistFadeEndArmed) delete self.playlistFadeEndArmed[pKey]
 			return true
 		} catch (err) {
 			if (typeof self.log === 'function') {
@@ -451,7 +411,8 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 		if (!staged) return
 		// Setup next advancement
 		const nextItem = layer.playlist[nextIdx]
-		if (isLoopedPlaylistItem(nextItem)) return
+		/* manual: the operator advances; a ↘ item's fade is already queued by stagePlaylistItem */
+		if (isLoopedPlaylistItem(nextItem) || layer.playlistAdvance === 'manual' || fadesOut(nextItem)) return
 		if (isTimelessPlaylistItem(nextItem)) {
 			schedulePlaylistImageTimer(self, channel, pLayer, scene, layer, nextIdx)
 		} else {
@@ -466,16 +427,6 @@ function triggerPlaylistAdvance(self, channel, pLayer, scene, layer, nextIdx) {
 			}
 		}
 	})
-}
-
-function sameFileName(a, b) {
-	if (!a || !b) return false
-	const clean = (s) => {
-		const parts = String(s).toLowerCase().replace(/\\/g, '/').split('/')
-		const base = parts[parts.length - 1]
-		return base.replace(/\.[^/.]+$/, '')
-	}
-	return clean(a) === clean(b)
 }
 
 /**
@@ -497,4 +448,4 @@ function shouldForceAdvance(state) {
 
 module.exports = {
 	playlistRuntimeKey, resolvePlaylistPlayingIndex, isTimelessPlaylistItem,
-	clearChannelPlaylistState, setupLayerPlaylists, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance, stagePlaylistItem }
+	clearChannelPlaylistState, setupLayerPlaylists, fadesOut, shouldForceAdvance, handlePlaylistOscUpdate, triggerPlaylistAdvance, stagePlaylistItem }

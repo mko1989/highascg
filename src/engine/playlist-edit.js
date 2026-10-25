@@ -5,8 +5,9 @@
  * client/components/inspector-layer-playlist.js mutations; the client sends its current layer and one op and stores
  * the returned patch (looks stay client-owned: deck sync / autosave).
  *
- * Ops: mode {mode} · add {items} · move {from, to} · remove {index} · item {index, duration?, loop?} ·
- *      settings {advance?, loop?, transition?} · timeless {secs}
+ * Ops: mode {mode} · add {items} · move {from, to} · remove {index} · item {index, duration?, loop?, fadeOut?} ·
+ *      settings {advance?, loop?, transition?, fadeFrames?} · timeless {secs}
+ * WO-766: `fadeOut` (↘ fade down when done) and `loop` exclude each other — setting one clears the other.
  */
 
 const { isTimelessPlaylistItem } = require('./scene-take-lbg-playlist')
@@ -110,7 +111,17 @@ function planPlaylistEdit(layer, op, args = {}, now = Date.now()) {
 				if (!isTimelessPlaylistItem(it)) return { error: 'timed media carries its own length' }
 				it.duration = Math.min(86400, Math.max(1, Math.round(Number(args.duration)) || timelessSecsOf(list)))
 			}
-			if (args.loop !== undefined) it.loop = args.loop === true
+			if (args.loop !== undefined) {
+				it.loop = args.loop === true
+				if (it.loop) delete it.fadeOut
+			}
+			if (args.fadeOut !== undefined) {
+				if (args.fadeOut === true && isTimelessPlaylistItem(it)) return { error: 'only a clip with a length can fade out at its end' }
+				if (args.fadeOut === true) {
+					it.fadeOut = true
+					it.loop = false
+				} else delete it.fadeOut
+			}
 			return { patch: { playlist: list.map((x, k) => (k === i ? it : x)) }, playlistChanged: true }
 		}
 		case 'settings': {
@@ -130,6 +141,11 @@ function planPlaylistEdit(layer, op, args = {}, now = Date.now()) {
 				}
 				if (args.transition.duration !== undefined) t.duration = Math.max(0, Math.round(Number(args.transition.duration) || 0))
 				patch.playlistTransition = t
+			}
+			/* WO-766: ↘ fade length in channel frames; 0 / null = half the channel's frame rate */
+			if (args.fadeFrames !== undefined) {
+				const f = Math.round(Number(args.fadeFrames) || 0)
+				patch.playlistFadeFrames = f > 0 ? Math.min(250, f) : null
 			}
 			return { patch, playlistChanged: false }
 		}

@@ -213,9 +213,10 @@ async function buildTakeJobs(opts) {
 		if (layer.sourceMode === 'list' && Array.isArray(layer.playlist) && layer.playlist[playlistStartIdx]?.loop === true) {
 			isLoop = true
 		}
-		// WO-224 T224.6: Manual-advance playlists loop each item until operator advances
-		if (layer.sourceMode === 'list' && layer.playlistAdvance === 'manual') {
-			isLoop = true
+		/* WO-766 (owner 25.10): Manual Next no longer forces LOOP (was WO-224 T224.6) — an item without its own Loop
+		 * plays once and holds its last frame until Next; a ↘ item plays once and fades out at its end. */
+		if (layer.sourceMode === 'list' && require('./scene-take-lbg-playlist').fadesOut(layer.playlist?.[playlistStartIdx])) {
+			isLoop = false
 		}
 		const loadOpts = { loop: isLoop }
 		if (af) loadOpts.audioFilter = af

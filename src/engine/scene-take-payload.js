@@ -77,6 +77,7 @@ function buildLayerRow(l, h) {
 		playlistTransition: l.playlistTransition ? { ...l.playlistTransition } : { type: 'MIX', duration: 12, tween: 'linear' },
 		playlistLoop: l.playlistLoop !== false,
 		playlistAdvance: l.playlistAdvance || 'auto',
+		...(Number(l.playlistFadeFrames) > 0 ? { playlistFadeFrames: Number(l.playlistFadeFrames) } : {}), // WO-766 ↘
 		...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious' ? { startBehaviour: l.startBehaviour } : {}),
 		...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),
 		...(l.trimOutMs != null ? { trimOutMs: l.trimOutMs } : {}),

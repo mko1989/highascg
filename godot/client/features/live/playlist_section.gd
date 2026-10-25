@@ -4,6 +4,9 @@ extends VBoxContainer
 ## one or several media at once (multi-select drag), Advance / Loop List / Transition / Timeless "Apply to all" and
 ## Next ▶ (manual advance or a held item). Every change is planned by POST /api/playlist/edit — the server also
 ## pushes it into the running engine when the look is live; this section stores the returned patch (`patch`).
+## WO-766: per item ↘ (fade down when done: plays once, fades out over "↘ Fade frames", default half the channel
+## rate); a double-click on a row picks that item and Next steps — on program it plays, otherwise the preview moves
+## (and a take starts there). ▸ marks the item the server reports as current.
 
 signal patch(p: Dictionary)
 
@@ -24,6 +27,8 @@ var _advance: OptionButton
 var _loop: CheckBox
 var _tr_type: OptionButton
 var _tr_frames: SpinBox
+var _fade_frames: SpinBox
+var _fade_default := 25
 var _secs: SpinBox
 var _next: Button
 var _status: Label
@@ -55,16 +60,16 @@ func _ready() -> void:
 	_drop.set_drag_forwarding(Callable(), func(_at: Vector2, d: Variant) -> bool: return M.droppable(d), func(_at: Vector2, d: Variant) -> void: _add(d))
 	_list_box.add_child(_drop)
 	_tree = Tree.new()
-	_tree.columns = 3
+	_tree.columns = 4
 	_tree.hide_root = true
 	_tree.select_mode = Tree.SELECT_ROW
 	_tree.custom_minimum_size.y = 150
 	_tree.set_column_expand(0, true)
-	_tree.set_column_expand(1, false)
-	_tree.set_column_custom_minimum_width(1, 84)
-	_tree.set_column_expand(2, false)
-	_tree.set_column_custom_minimum_width(2, 96)
+	for c in [[1, 84], [2, 72], [3, 64]]:
+		_tree.set_column_expand(c[0], false)
+		_tree.set_column_custom_minimum_width(c[0], c[1])
 	_tree.item_edited.connect(_on_edited)
+	_tree.item_activated.connect(func() -> void: _pick(_tree.get_selected()))
 	_tree.button_clicked.connect(func(it: TreeItem, _c: int, _id: int, _b: int) -> void: _edit("remove", {"index": it.get_index()}))
 	_tree.set_drag_forwarding(_row_drag, _tree_can_drop, _tree_drop)
 	_list_box.add_child(_tree)
@@ -80,6 +85,9 @@ func _ready() -> void:
 	_row(g, "Transition Type", _tr_type)
 	_tr_frames = _spin(0, 250, func(v: float) -> void: _edit("settings", {"transition": {"duration": int(v)}}))
 	_row(g, "Transition Frames", _tr_frames)
+	_fade_frames = _spin(1, 250, func(v: float) -> void: _edit("settings", {"fadeFrames": int(v)}))
+	_fade_frames.tooltip_text = "Frames a ↘ item fades out over at its end (default: half the channel's frame rate)"
+	_row(g, "↘ Fade frames", _fade_frames)
 	var tl := HBoxContainer.new()
 	_secs = _spin(1, 86400, Callable())
 	_secs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -93,7 +101,7 @@ func _ready() -> void:
 	_next = Button.new()
 	_next.text = "Next"
 	_next.icon = Icons.texture("next")
-	_next.tooltip_text = "Advance this playlist on program (manual advance, or an item that holds with its own loop)"
+	_next.tooltip_text = "Next item — plays it on program; otherwise moves the preview (a take starts there). Double-click a row to pick one"
 	_next.pressed.connect(_on_next)
 	_list_box.add_child(_next)
 	_status = Label.new()
@@ -119,6 +127,7 @@ func show_layer(look_id: String, layer: Dictionary) -> void:
 	var t: Dictionary = layer.get("playlistTransition", {}) if layer.get("playlistTransition") is Dictionary else {}
 	_tr_type.select(M.index_of(M.TRANSITIONS, str(t.get("type", "MIX"))))
 	_tr_frames.value = float(t.get("duration", 12))
+	_fade_frames.value = _fade_set(layer) if _fade_set(layer) > 0 else _fade_default
 	_syncing = false
 	var key := JSON.stringify(layer.get("playlist", []))
 	if is_list and key != _described:
@@ -142,18 +151,21 @@ func _edit(op: String, args := {}) -> void:
 	var next := _layer.duplicate()
 	next.merge(p, true)
 	_described = JSON.stringify(next.get("playlist", []))
-	_render(d.get("rows", []), bool(d.get("showsNext", false)), float(d.get("timelessSecs", 20)))
+	_fade_default = int(d.get("fadeFramesDefault", _fade_default))
+	if not _fade_frames.get_line_edit().has_focus() and _fade_set(next) <= 0:
+		_fade_frames.set_value_no_signal(_fade_default)
+	_render(d.get("rows", []), bool(d.get("showsNext", false)), float(d.get("timelessSecs", 20)), int(d.get("currentIndex", -1)))
 	if not p.is_empty():
 		patch.emit(p)
 
 
-func _render(rows: Array, shows_next: bool, timeless_secs: float) -> void:
+func _render(rows: Array, shows_next: bool, timeless_secs: float, current := -1) -> void:
 	_rows = rows
 	_tree.clear()
 	var root := _tree.create_item()
 	for r in rows:
 		var it := _tree.create_item(root)
-		it.set_text(0, M.row_name(r))
+		it.set_text(0, ("▸ " if it.get_index() == current else "") + M.row_name(r))
 		it.set_tooltip_text(0, str(r.get("value", "")))
 		if r.get("missing", false):
 			it.set_custom_color(0, ThemeBuilder.ERROR)
@@ -172,7 +184,13 @@ func _render(rows: Array, shows_next: bool, timeless_secs: float) -> void:
 		it.set_checked(2, r.get("loop", false))
 		it.set_editable(2, true)
 		it.set_tooltip_text(2, "This item repeats and holds the playlist until Next")
-		it.add_button(2, Icons.texture("close", 12), 0, false, "Remove from the playlist")
+		if not r.get("timeless", false):  # a still has no end to fade at
+			it.set_cell_mode(3, TreeItem.CELL_MODE_CHECK)
+			it.set_text(3, "↘")
+			it.set_checked(3, r.get("fadeOut", false))
+			it.set_editable(3, true)
+			it.set_tooltip_text(3, "Fade down when done: plays once and fades out at its end")
+		it.add_button(3, Icons.texture("close", 12), 0, false, "Remove from the playlist")
 	_next.visible = shows_next
 	if not _secs.get_line_edit().has_focus():
 		_secs.set_value_no_signal(timeless_secs)
@@ -185,6 +203,7 @@ func _on_edited() -> void:
 	match _tree.get_edited_column():
 		1: _edit("item", {"index": it.get_index(), "duration": it.get_range(1)})
 		2: _edit("item", {"index": it.get_index(), "loop": it.is_checked(2)})
+		3: _edit("item", {"index": it.get_index(), "fadeOut": it.is_checked(3)})
 
 
 func _add(data: Variant) -> void:
@@ -219,11 +238,30 @@ func _tree_drop(at: Vector2, d: Variant) -> void:
 
 
 func _on_next() -> void:
-	var res: Dictionary = await Api.post_json("/api/playlist/edit/next", {"sceneId": scene_id, "layerNumber": int(_layer.get("layerNumber", 0))})
+	_transport("/api/playlist/edit/next", {})
+
+
+func _pick(it: TreeItem) -> void:
+	if it != null:
+		_transport("/api/playlist/edit/pick", {"index": it.get_index()})
+
+
+## Next / pick: the server decides program (play it) or preview (move the start item, re-stage PRV); ▸ follows.
+func _transport(path: String, args: Dictionary) -> void:
+	var body := {"sceneId": scene_id, "layerNumber": int(_layer.get("layerNumber", 0))}
+	body.merge(args)
+	var res: Dictionary = await Api.post_json(path, body)
 	var d: Variant = res.get("data")
 	_status.visible = not res.get("ok", false)
 	if _status.visible:
-		_status.text = str((d as Dictionary).get("error", res.get("error", "Next failed"))) if d is Dictionary else str(res.get("error", "Next failed"))
+		_status.text = str((d as Dictionary).get("error", res.get("error", "failed"))) if d is Dictionary else str(res.get("error", "failed"))
+	else:
+		_edit("describe")
+
+
+## The layer's own ↘ length (0 = not set: the server's default, half the channel rate).
+static func _fade_set(l: Dictionary) -> int:
+	return int(l.get("playlistFadeFrames")) if l.get("playlistFadeFrames") is float or l.get("playlistFadeFrames") is int else 0
 
 
 func _row(g: GridContainer, label: String, c: Control) -> void:

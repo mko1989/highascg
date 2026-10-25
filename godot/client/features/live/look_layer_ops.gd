@@ -48,3 +48,15 @@ static func layer_name(src: Dictionary) -> String:
 		return label
 	var seg := str(src.get("value", "")).replace("\\", "/").split("/", false)
 	return seg[seg.size() - 1] if not seg.is_empty() else str(src.get("value", ""))
+
+
+## WO-766 (owner 25.10: "add a layer to a look by draging media onto the layers list"): the sources a drop onto the
+## compose frame or the layer list adds, one layer each — a single source or a multi-select drag ({type:"multi"}),
+## never an effect or a playlist row (web isDraggableLayerSourcePayload).
+static func drop_sources(data: Variant) -> Array:
+	if not data is Dictionary:
+		return []
+	var d: Dictionary = data
+	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
+	return items.filter(func(s: Variant) -> bool: return s is Dictionary and str(s.get("value", "")) != "" \
+		and str(s.get("type", "")) != "effect" and not s.has("playlist_row"))

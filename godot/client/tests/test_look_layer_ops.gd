@@ -40,3 +40,12 @@ func test_mirror_uses_the_shown_width_and_crop() -> void:
 func test_layer_name() -> void:
 	t.eq(O.layer_name({"type": "media", "value": "PROJECTS/A/clip.mov"}), "clip.mov", "media → file name")
 	t.eq(O.layer_name({"type": "route", "value": "route://5-2", "label": "DeckLink 2"}), "DeckLink 2", "live → label")
+
+
+func test_drop_sources_wo766() -> void:
+	var one := {"type": "media", "value": "kategoria/01.mp4"}
+	t.eq(O.drop_sources(one), [one], "one media → one layer")
+	var multi := {"type": "multi", "items": [one, {"type": "effect", "value": "blur"}, {"type": "media", "value": ""}, {"type": "image", "value": "a.png"}]}
+	t.eq(O.drop_sources(multi).size(), 2, "a multi drag adds every media, never an effect or an empty source")
+	t.eq(O.drop_sources({"playlist_row": 2}), [], "a playlist row reorder is not a layer")
+	t.eq(O.drop_sources("x"), [], "not a payload")

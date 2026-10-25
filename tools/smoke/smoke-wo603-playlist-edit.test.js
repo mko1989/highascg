@@ -153,9 +153,10 @@ describe('WO-603 POST /api/playlist/edit + /edit/next', () => {
 		await liveSceneState.clearChannel(1)
 	})
 
-	it('Next resolves the program channel where the look is live; 409 when it is not', async () => {
+	it('Next resolves the program channel where the look is live; off program it steps the preview (WO-766)', async () => {
 		const r = await routes.handleNext({ sceneId: 'L', layerNumber: 10 }, ctx)
-		assert.equal(r.status, 409)
+		assert.notEqual(r.status, 409, 'WO-766: never refused off program')
+		assert.match(JSON.parse(r.body).error, /No playlist on that look\/layer/, 'went to step_preview (no project look here)')
 		await liveSceneState.setChannel(2, { sceneId: 'L', scene: { id: 'L', layers: [] } })
 		assert.equal(routes.liveProgramChannel(ctx, 'L'), null, 'a PRV recall (default map: ch2) is not live')
 		await liveSceneState.setChannel(1, { sceneId: 'L', scene: { id: 'L', layers: [] } })

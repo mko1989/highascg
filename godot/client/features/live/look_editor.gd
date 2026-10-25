@@ -98,6 +98,7 @@ func _ready() -> void:
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 90
 	_list.item_selected.connect(func(i: int) -> void: _select(i))
+	_list.set_drag_forwarding(Callable(), _can_drop, _drop)  # WO-766: media dropped on the layer list adds layers too
 	add_child(_list)
 	_geo = Geometry.new()  # WO-621 N2: canvas px + aspect lock (was raw 0–1 fill fields)
 	_geo.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
@@ -391,13 +392,12 @@ func _hold(on: bool) -> void:
 
 
 ## --- WO-600 K: drop media from the Sources panel → server builds the layer (web rules) → append + push.
-func _can_drop(_at: Vector2, data: Variant) -> bool:
-	return data is Dictionary and str((data as Dictionary).get("value", "")) != "" and scene_id != "" \
-		and str((data as Dictionary).get("type", "")) != "effect"  # web isDraggableLayerSourcePayload: never a layer
+func _can_drop(_at: Vector2, data: Variant) -> bool: return scene_id != "" and not Ops.drop_sources(data).is_empty()
 
 
 func _drop(_at: Vector2, data: Variant) -> void:
-	add_layer_from_source(data)
+	for src in Ops.drop_sources(data):  # one layer per source, in drag order; a refusal stops the rest
+		if not await add_layer_from_source(src): return
 
 
 func add_layer_from_source(src: Dictionary) -> bool:

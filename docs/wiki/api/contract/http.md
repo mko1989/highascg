@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-504 routes.
+505 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -238,6 +238,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/playlist/control` | registry | `src/api/router.js`, `src/api/routes-playlist.js` |
 | POST | `/api/playlist/edit` | registry | `src/api/router.js` |
 | POST | `/api/playlist/edit/next` | registry | `src/api/router.js` |
+| POST | `/api/playlist/edit/pick` | registry | `src/api/router.js` |
 | POST | `/api/playlist/next` | registry | `src/api/router.js` |
 | GET | `/api/playlist/state` | registry | `src/api/router.js` |
 | POST | `/api/plugins/add` | handler | `src/api/routes-plugins.js` |
