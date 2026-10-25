@@ -4,9 +4,11 @@
 
 'use strict'
 
-const { describe, it } = require('node:test')
+const { describe, it, after } = require('node:test')
 const assert = require('node:assert')
 const { execSync, spawnSync } = require('child_process')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 // Test the parser from system-time.js
@@ -71,11 +73,18 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 
 	describe('wrapper script validation', () => {
 		const scriptPath = path.join(__dirname, '../../scripts/runtime/highascg-set-system-time.sh')
+		// a timedatectl stub first on PATH: run as root, the valid-args cases reach the real `set-ntp false` +
+		// `set-time 2026-07-14` and would turn NTP off and jump the clock (review 2026-08-03 finding 6, WO-756)
+		const stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'timedatectl-stub-'))
+		fs.writeFileSync(path.join(stubDir, 'timedatectl'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+		after(() => fs.rmSync(stubDir, { recursive: true, force: true }))
+		const STUB_ENV = { ...process.env, PATH: `${stubDir}${path.delimiter}${process.env.PATH}` }
 
 		it('rejects invalid date format', () => {
 			const result = spawnSync('bash', [scriptPath, 'set', '2026/07/14', '10:27:20'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should exit with code 2 for invalid args')
 			const stderr = String(result.stderr || '')
@@ -86,6 +95,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-07-14', '10'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should exit with code 2 for invalid args')
 			const stderr = String(result.stderr || '')
@@ -98,6 +108,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-07-14', '10:27:60'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			const stderr = String(result.stderr || '')
 			assert(!stderr.includes('Invalid time'), 'Should accept HH:MM:SS format')
@@ -107,6 +118,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'ntp', 'maybe'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should exit with code 2 for invalid mode')
 		})
@@ -115,6 +127,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'invalid'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should exit with code 2 for unknown command')
 		})
@@ -123,6 +136,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-7-14', '10:27:20'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should reject date without leading zeros')
 		})
@@ -131,6 +145,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-07-14', '9:27:20'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should reject time without leading zeros')
 		})
@@ -141,6 +156,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-07-14', '10:27:20'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			const stderr = String(result.stderr || '')
 			// Should NOT be a validation error
@@ -152,6 +168,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', '2026-07-14', '10:27'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			const stderr = String(result.stderr || '')
 			assert(!stderr.includes('Invalid date'), 'Should accept valid date format')
@@ -163,6 +180,7 @@ RTCTimeUSec=Tue 2026-07-14 06:27:20 EDT`
 			const result = spawnSync('bash', [scriptPath, 'set', 'invalid-date', '10:27:20'], {
 				stdio: 'pipe',
 				timeout: 5000,
+				env: STUB_ENV,
 			})
 			assert.strictEqual(result.status, 2, 'Should exit 2 on validation failure')
 			// Should not attempt timedatectl (no permission denied message)

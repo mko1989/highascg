@@ -491,4 +491,5 @@ module.exports = [
 	'tools/smoke/smoke-stream-output-project-sync.test.js',
 	'tools/smoke/smoke-wo160b-pgm-only-lbg.test.js',
 	'tools/smoke/smoke-wo172-device-view-sync.test.js',
+	'tools/smoke/smoke-system-time.test.js', // WO-756: safe to gate now that timedatectl is stubbed
 ]

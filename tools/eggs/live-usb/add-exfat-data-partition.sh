@@ -48,13 +48,14 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$DEV" ]]; then
-	CONF_PATH="${FLASH_ISO_CONF:-$HERE/flash-iso.conf}"
+	# the conf and its reader moved to legacy-persistence/ (as in finish-operator-stick.sh) — WO-756
+	CONF_PATH="${FLASH_ISO_CONF:-$HERE/legacy-persistence/flash-iso.conf}"
 	if [[ ! -f "$CONF_PATH" ]]; then
-		echo "No device argument and no $CONF_PATH — pass /dev/sdX or copy flash-iso.conf.example." >&2
+		echo "No device argument and no $CONF_PATH — pass /dev/sdX or copy legacy-persistence/flash-iso.conf.example." >&2
 		usage
 	fi
-	# shellcheck source=flash-iso-conf-lib.sh
-	source "${HERE}/flash-iso-conf-lib.sh"
+	# shellcheck source=legacy-persistence/flash-iso-conf-lib.sh
+	source "${HERE}/legacy-persistence/flash-iso-conf-lib.sh"
 	DEV="$(flash_iso_read_device "$CONF_PATH")"
 	echo "Using DEVICE from ${CONF_PATH} → ${DEV}" >&2
 fi

@@ -15,10 +15,11 @@ if (!files.length) {
 
 console.log(`[test:ci:full] running ${files.length} offline test file(s)`)
 const rel = files.map((f) => path.relative(REPO_ROOT, f))
-const result = spawnSync(process.execPath, ['--test', ...rel], {
+// a flag, not an env: node --test never read NODE_TEST_TIMEOUT (WO-756). No --test-force-exit: it drops tests silently
+const testTimeout = `--test-timeout=${process.env.NODE_TEST_TIMEOUT || '120000'}`
+const result = spawnSync(process.execPath, ['--test', testTimeout, ...rel], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',
-	env: { ...process.env, NODE_TEST_TIMEOUT: process.env.NODE_TEST_TIMEOUT || '120000' },
 })
 
 process.exit(result.status === null ? 1 : result.status)

@@ -22,12 +22,14 @@ for (const check of ['check-dom-escape-duplicates.js', 'check-tdz-reads.js']) {
 	if (r.status !== 0) process.exit(r.status === null ? 1 : r.status)
 }
 
-const result = spawnSync(process.execPath, ['--test', ...FILES], {
+// node --test takes the per-test timeout only as a flag; it never read the NODE_TEST_TIMEOUT env this used to set.
+// Not --test-force-exit: it ended files early and silently (3299–3322 tests per run, 0 failures) — WO-756
+const testTimeout = `--test-timeout=${process.env.NODE_TEST_TIMEOUT || '60000'}`
+const result = spawnSync(process.execPath, ['--test', testTimeout, ...FILES], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',
 	env: {
 		...process.env,
-		NODE_TEST_TIMEOUT: process.env.NODE_TEST_TIMEOUT || '60000',
 		/* The WS reconnect smoke spawns a FULL highascg server — never do that from the
 		 * curated gate on a production box (it piles up orphaned servers and can touch the
 		 * live Caspar). Run it explicitly without this env when integration coverage is wanted. */

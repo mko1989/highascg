@@ -3,12 +3,12 @@
 # Safe for the machine that runs penguins-eggs — does not remove node_modules or live config.
 #
 # Usage (repo root):
-#   bash scripts/clean-eggs-dev-host.sh
-#   bash scripts/clean-eggs-dev-host.sh --dry-run
+#   bash scripts/eggs/clean-eggs-dev-host.sh
+#   bash scripts/eggs/clean-eggs-dev-host.sh --dry-run
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)" # scripts/eggs/ → repo root (WO-756)
 cd "$ROOT"
 DRY=0
 [[ "${1:-}" == "--dry-run" ]] && DRY=1
