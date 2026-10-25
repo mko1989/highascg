@@ -92,7 +92,8 @@ async function buildLayerForSource(ctx, scene, src, mainIdxIn, deps = {}) {
 	const { helpers, ed, inputs, stack } = await libs()
 	const n = helpers.nextLayerNumber(scene)
 	if (n < 0) return { status: 409, error: helpers.LOOK_FULL_MESSAGE }
-	const getMap = deps.getChannelMap || (() => require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {})
+	// the config-only map has no programResolutions: without them every fit assumed a 1920×1080 canvas
+	const getMap = deps.getChannelMap || (() => require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx))
 	const map = getMap()
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(mainIdxIn)) ? Math.max(0, Math.floor(Number(mainIdxIn))) : Number.isFinite(scope) ? scope : 0

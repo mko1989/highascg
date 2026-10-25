@@ -71,7 +71,7 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 	const forceCut = target === 'program' && b.forceCut === true
 	let transitionOverride = null
 	if (target === 'program' && !forceCut && b.useGlobalTransition === true) {
-		const fps = deps.fps ?? require('../config/routing').getChannelMap(ctx?.config || {})?.programResolutions?.[0]?.fps ?? 50
+		const fps = deps.fps ?? require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)?.programResolutions?.[0]?.fps ?? 50
 		transitionOverride = await globalTransition(scenes, fps)
 	}
 	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))

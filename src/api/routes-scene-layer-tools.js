@@ -39,7 +39,7 @@ async function handleLayerFit(body, ctx, deps = {}) {
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
 	const layer = (scene.layers || []).find((l) => Number(l?.layerNumber) === ln)
 	if (!layer?.source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
-	const map = deps.getChannelMap ? deps.getChannelMap() : require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
+	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
 	const res = map.programResolutions?.[mainIdx] || map.programResolutions?.[0] || {}
@@ -76,7 +76,7 @@ async function handleLayerReload(body, ctx, deps = {}) {
 	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
 	const layer = (scene?.layers || []).find((l) => Number(l?.layerNumber) === ln)
 	if (!layer?.source?.value) return out(404, { ok: false, error: `layer ${ln} has no source` })
-	const map = deps.getChannelMap ? deps.getChannelMap() : require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}
+	const map = deps.getChannelMap ? deps.getChannelMap() : require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx)
 	const scope = parseInt(String(scene.mainScope ?? ''), 10)
 	const mainIdx = Number.isFinite(Number(b.mainIdx)) ? Math.max(0, Math.floor(Number(b.mainIdx))) : Number.isFinite(scope) ? scope : 0
 	const getStaged = deps.getStaged || ((ch) => require('../state/live-scene-state').getChannel(ch))

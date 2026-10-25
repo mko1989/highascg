@@ -18,6 +18,14 @@ describe('WO-601 layer-fit', () => {
 		assert.deepEqual(P(await handleLayerFit({ sceneId: 'L1', layerNumber: 10 }, {}, fitDeps())).fill, { x: 1 / 6, y: 1 / 6, scaleX: 2 / 3, scaleY: 2 / 3 })
 		assert.deepEqual(P(await handleLayerFit({ sceneId: 'L1', layerNumber: 10, contentFit: 'stretch' }, {}, fitDeps())).fill, { x: 0, y: 0, scaleX: 1, scaleY: 1 })
 	})
+	it('WO-758: no injected map → the live canvas (3840×1792), not the 1920×1080 fallback', async () => {
+		const ctx = { config: {}, state: { getState: () => ({ channelMap: { programResolutions: [{ w: 3840, h: 1792, fps: 25 }] } }) } }
+		const deps = { resolveScene: () => look, mediaResolution: async () => ({ w: 1920, h: 896 }) }
+		const r = P(await handleLayerFit({ sceneId: 'L1', layerNumber: 10, contentFit: 'fill-canvas' }, ctx, deps))
+		assert.deepEqual(r.fill, { x: 0, y: 0, scaleX: 1, scaleY: 1 })
+		const native = P(await handleLayerFit({ sceneId: 'L1', layerNumber: 10, contentFit: 'native' }, ctx, deps))
+		assert.deepEqual(native.fill, { x: 0.25, y: 0.25, scaleX: 0.5, scaleY: 0.5 })
+	})
 	it('unknown resolution → ok:false, fill null (client keeps its fill)', async () => {
 		const r = P(await handleLayerFit({ sceneId: 'L1', layerNumber: 10 }, {}, fitDeps({ mediaResolution: async () => null })))
 		assert.equal(r.ok, false)
