@@ -328,3 +328,4 @@ the ffmpeg CLI, Xorg and openbox, the cluster timings (only CPU-bound difference
   the runner has no ffmpeg (`spawnSync ffmpeg ENOENT`). The matrix now starts its sandbox with `media: false` (the
   sandbox option made for the WO-725 cluster runs). With ffmpeg removed from PATH locally: old line 4 / 1 with the same
   ENOENT, new line 5 / 5.
+- CI green on 136abea5 (verify, godot, build-client), after the ffmpeg fix below.

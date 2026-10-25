@@ -62,3 +62,4 @@ Found by WO-753 (A9: cold boot of .4 on Ubuntu 26.04).
     client disconnected for 156s — nudging reconnect`; exit 143 ×0, AMCP up.
   - .4's file put back afterwards (md5 `ad159d6c…`, the release's); .4 gets the fix with its next update.
 - Deployed on .23 (server restart).
+- CI: the watchdog smoke now runs in the verify job and passes; the red verify on f413a3ba was only WO-753's matrix smoke (`spawnSync ffmpeg ENOENT`), green from 136abea5.
