@@ -383,10 +383,9 @@ func _build_toolbar() -> Control:
 		b.text = spec[1]
 		b.toggle_mode = true
 		b.button_group = group
-		var m: String = spec[0]
-		b.pressed.connect(func() -> void: set_mode(m))
+		b.pressed.connect(set_mode.bind(spec[0]))
 		bar.add_child(b)
-		_mode_btns[m] = b
+		_mode_btns[spec[0]] = b
 	_coverage_cb = CheckBox.new()
 	_coverage_cb.text = "Tracking cameras"
 	_coverage_cb.tooltip_text = "Each tracking camera's view on the stage and where a standing person is seen by one camera or by two or more (fused)."
@@ -399,6 +398,7 @@ func _build_toolbar() -> Control:
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
 	bar.add_child(fit)
+	bar.add_child(preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button())  # WO-770
 	return bar
 
 

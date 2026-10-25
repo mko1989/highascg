@@ -16,7 +16,12 @@ The server and the headset app must be the **same WiVRn version**.
 
   - `sudo add-apt-repository ppa:lvra/wivrn`
   - `sudo apt update && sudo apt install wivrn-server wivrn-dashboard`
-  - `systemctl --user enable --now wivrn` (starts the server now and at every login)
+  - Do **not** enable it at login on a playout box: the HighAsCG GUI starts it for a session (Previs → **VR…**, below)
+    and stops it again when the VR window closes. By hand: `systemctl --user start wivrn` / `stop wivrn`.
+  - The PPA package enables it for every user at login — undo that once: `sudo systemctl --global disable wivrn`.
+  - Without a PipeWire daemon (a Caspar box that owns ALSA) WiVRn crashes at connect unless PipeWire's client parts are
+    there: `sudo apt install --no-install-recommends pipewire-bin libpipewire-0.3-modules` (never the daemon /
+    wireplumber). It then streams video without sound.
   - If it fails with "Failed to drop capabilities", the packaged service is too strict for systemd 259: put a file
     `~/.config/systemd/user/wivrn.service.d/override.conf` with `[Service]`, `ProtectClock=false`,
     `ProtectKernelLogs=false` and `ProtectKernelModules=false` on separate lines, then
@@ -42,9 +47,10 @@ The server and the headset app must be the **same WiVRn version**.
 
 ## 3. Connect
 
-1. Start WiVRn on the computer (the **WiVRn** app, or `wivrn-server`; already running where it was enabled above).
-   The first time, the Quest asks for a **PIN**: run `wivrnctl pair` on the computer and type the PIN it prints
-   (it allows a new headset for a few minutes; the WiVRn dashboard shows it too).
+1. In the operator client: **Previs → VR… → Start VR session**. That starts WiVRn and the VR client (its window shows
+   what the headset sees once it connects). The first time, the dialog shows a **PIN** to type in the Quest (or
+   **Pair a new headset** for another one). **End VR session** closes the VR window and stops WiVRn.
+   Without the GUI: `systemctl --user start wivrn`, `wivrnctl pair`, then `godot/client/run-xr.sh`.
 2. **Wi-Fi:** a fast 5 GHz / 6 GHz network, the computer on a cable to the same router. On the Quest open WiVRn
    and press **Connect** next to the computer.
 3. **USB** (steadier, no Wi-Fi needed): switch the Quest's Wi-Fi off, plug the cable in, then on the computer:

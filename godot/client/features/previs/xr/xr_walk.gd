@@ -26,6 +26,7 @@ var _right: XRController3D
 var _pointer: Camera3D  # on the right controller, never current: its viewport centre is the controller's ray
 var panel: Node3D  # the Programmer on the left wrist (headset only)
 var _ray: MeshInstance3D
+var _mirror: Camera3D  # WO-770: the headset's view on the desktop window (the XR viewport draws nothing there)
 var _scroll_t := 0.0
 var _yaw := 0.0
 var _pitch := 0.0
@@ -95,7 +96,34 @@ func _start_xr() -> bool:
 	_ray = _make_ray()
 	_right.add_child(_ray)
 	_cam.current = true
+	_make_mirror()
 	return true
+
+
+## WO-770 — owner 25.10: "when connected there should be a window that shows whats displayed in vr". With use_xr on,
+## the previs SubViewport renders to the headset only and its desktop container shows black. A second SubViewport on
+## the same World3D, its camera following the headset's every frame (_process), is laid over that container.
+func _make_mirror() -> void:
+	var host := get_viewport().get_parent() as Control  # the previs SubViewportContainer
+	if host == null:
+		return
+	var vp := SubViewport.new()
+	vp.world_3d = get_viewport().find_world_3d()
+	vp.size = Walk.mirror_px(host.size)
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(vp)
+	_mirror = Camera3D.new()
+	_mirror.fov = Walk.MIRROR_FOV
+	vp.add_child(_mirror)
+	_mirror.current = true
+	var tex := TextureRect.new()
+	tex.texture = vp.get_texture()
+	tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	(host.get_parent() if host.get_parent() is Control else host).add_child(tex)  # over the container, in its stack
+	tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	host.resized.connect(func() -> void: vp.size = Walk.mirror_px(host.size))
 
 
 func _make_ray() -> MeshInstance3D:
@@ -157,6 +185,8 @@ func _keys_free() -> bool:
 
 
 func _xr_move(dt: float) -> void:
+	if _mirror != null:
+		_mirror.global_transform = _cam.global_transform
 	_point(dt)
 	var stick := _left.get_vector2(&"primary")
 	if stick.length() > 0.15:

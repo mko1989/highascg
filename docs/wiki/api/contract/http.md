@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-505 routes.
+509 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -515,6 +515,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/virtual-camera/start` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
 | GET | `/api/virtual-camera/status` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
 | POST | `/api/virtual-camera/stop` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
+| POST | `/api/vr/pair` | registry | `src/api/routes-vr.js` |
+| POST | `/api/vr/start` | registry | `src/api/routes-vr.js` |
+| GET | `/api/vr/status` | registry | `src/api/routes-vr.js` |
+| POST | `/api/vr/stop` | registry | `src/api/routes-vr.js` |
 | * | `/api/ws` | handler | `src/server/ws-server.js` |
 
 ## Modules
@@ -572,6 +576,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-usb-ingest.js` | USB media ingest REST API (WO-29). |
 | `src/api/routes-v4l2-input.js` |  |
 | `src/api/routes-virtual-camera.js` |  |
+| `src/api/routes-vr.js` | WO-770 — explicit VR session from the operator GUI (see src/vr/vr-session.js): GET  /api/vr/status → { installed, serverRunning, headsetConnected, sessionRunnin |
 | `src/api/system-network-wifi.js` | WO-692 — Wi-Fi from the GUI: status (radio, adapters, last scan), rescan, connect (WPA passphrase), disconnect, radio on / off. |
 | `src/autofollow/register.js` | Stage auto-follow module registration (WO-31 / WO-30). |
 | `src/cg-studio/routes.js` | CG Studio HTTP handlers (runs on Electron launcher, not playout server). |

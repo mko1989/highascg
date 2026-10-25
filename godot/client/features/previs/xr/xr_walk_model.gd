@@ -57,6 +57,8 @@ static func trigger(hit_id: String, near_id: String, has_sel: bool, from: Vector
 
 ## WO-757: the Programmer panel (xr_panel.gd) — its quad in metres and its pixels (2 per mm, the same aspect).
 const PANEL_SIZE := Vector2(0.30, 0.42)
+const MIRROR_FOV := 90.0  ## WO-770: about the Quest's own field of view
+const MIRROR_MAX := Vector2i(1280, 720)  ## the desktop mirror's render size cap (a third render of the stage)
 const PANEL_PX := Vector2i(600, 840)
 
 
@@ -76,3 +78,11 @@ static func panel_uv(xf: Transform3D, size: Vector2, from: Vector3, dir: Vector3
 	if hold:
 		return uv.clamp(Vector2.ZERO, Vector2.ONE)
 	return uv if uv.x >= 0.0 and uv.x <= 1.0 and uv.y >= 0.0 and uv.y <= 1.0 else null
+
+
+## WO-770: the desktop mirror's render size for a host of `size` px — its aspect, at most MIRROR_MAX, at least 16 px.
+static func mirror_px(size: Vector2) -> Vector2i:
+	if size.x <= 0.0 or size.y <= 0.0:
+		return Vector2i(640, 360)
+	var k := minf(1.0, minf(MIRROR_MAX.x / size.x, MIRROR_MAX.y / size.y))
+	return Vector2i(maxi(16, roundi(size.x * k)), maxi(16, roundi(size.y * k)))
