@@ -37,6 +37,7 @@ const Upload := preload("res://core/stream_upload.gd")
 const Ingest := preload("res://features/live/media_ingest.gd")
 const SelectionBar := preload("res://features/live/media_selection_bar.gd")
 const Ops := preload("res://features/live/media_ops.gd")
+const INFO_FONT := 11
 const ProjectBar := preload("res://features/live/project_media_bar.gd")
 const Download := preload("res://features/live/media_download.gd")
 const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
@@ -44,6 +45,7 @@ const TYPES := {"MOVIE": "media", "STILL": "media", "AUDIO": "media"}
 var _filter: LineEdit
 var _tree: Tree
 var _rows: Array = []
+var _info_w := 0.0  # WO-759: widest quick-look text
 var _fx: Dictionary = {}  # GET /api/scene/effect-registry {effects, categories}
 var inspector: MediaInspector
 var _tabs: TabContainer
@@ -135,6 +137,11 @@ func _ready() -> void:
 	_tree = Tree.new()
 	_tree.hide_root = true
 	_tree.select_mode = Tree.SELECT_MULTI
+	_tree.columns = 2  # WO-759: name | quick look (codec · size · fps · hh:mm:ss)
+	_tree.set_column_expand(1, false)
+	_tree.set_column_clip_content(0, true)
+	_tree.set_column_clip_content(1, true)
+	_tree.resized.connect(_fit_info)
 	_tree.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_tree.set_drag_forwarding(_drag_data, _can_drop, _drop)
 	_tree.gui_input.connect(_tree_input)
@@ -326,6 +333,7 @@ func _build() -> void:
 	var dirs := {"": root}
 	var f := _filter.text.strip_edges().to_lower()
 	_bar.set_selection([], "")
+	_info_w = 0.0
 	for e in Ops.tree_entries(Ops.in_folder(_rows, project_bar.folder) if project_bar.project_only() else _rows, f):
 		var it := _tree.create_item(dirs[e.parent])
 		it.set_text(0, e.label)
@@ -336,10 +344,22 @@ func _build() -> void:
 			continue
 		var r: Dictionary = e.row
 		var id := str(r.get("id", ""))
-		it.set_tooltip_text(0, "%s · %s" % [id, r.get("type", "")])
+		var info := Ops.quick_info(r)
+		it.set_tooltip_text(0, "%s · %s" % [id, info if info != "" else r.get("type", "")])
 		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
-
+		if info != "":
+			it.set_text(1, info)
+			it.set_custom_color(1, ThemeBuilder.TEXT_MUTED)
+			it.set_custom_font_size(1, INFO_FONT)
+			it.set_tooltip_text(1, id)
+			_info_w = maxf(_info_w, _tree.get_theme_font("font").get_string_size(info, HORIZONTAL_ALIGNMENT_LEFT, -1, INFO_FONT).x)
+	_fit_info()
 	_build_effects(root, f)
+
+
+## The quick-look column as wide as its widest text, but names keep at least 55% of a narrow panel.
+func _fit_info() -> void:
+	_tree.set_column_custom_minimum_width(1, int(minf(_info_w + 12.0, _tree.size.x * 0.45)))
 
 
 func _build_effects(root: TreeItem, f: String) -> void:

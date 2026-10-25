@@ -112,3 +112,14 @@ func test_downloads_dir_fallback() -> void:
 	var home := OS.get_environment("HOME")
 	t.eq(D.downloads_dir("/x/Dl", home), "/x/Dl", "a configured XDG dir wins")
 	t.eq(D.downloads_dir(home, home), home.path_join("Downloads") if DirAccess.dir_exists_absolute(home.path_join("Downloads")) else home)
+
+
+func test_quick_info() -> void:
+	t.eq(O.quick_info({"type": "MOVIE", "codec": "hap", "resolution": "3840×1792", "fps": 25, "durationMs": 63320}), "HAP · 3840×1792 · 25 fps · 00:01:03", "movie")
+	t.eq(O.quick_info({"type": "MOVIE", "codec": "prores", "resolution": "1920×1080", "fps": 29.97, "durationMs": 3723000}), "ProRes · 1920×1080 · 29.97 fps · 01:02:03", "prores, fractional fps, hours")
+	t.eq(O.quick_info({"type": "STILL", "codec": "mjpeg", "resolution": "1280×720", "fps": 25}), "JPG · 1280×720", "a still: no fps / duration")
+	t.eq(O.quick_info({"type": "STILL", "codec": "png", "resolution": "4800×2700"}), "PNG · 4800×2700", "png")
+	t.eq(O.quick_info({"type": "MOVIE", "fps": 25}), "25 fps", "unprobed: what is known")
+	t.eq(O.quick_info({"type": "AUDIO", "fps": 25, "durationMs": 192000}), "00:03:12", "audio: no fps")
+	t.eq(O.quick_info({"codec": "dnxhd"}), "DNXHD", "unknown codec upper-cased")
+	t.eq(O.quick_info({}), "", "nothing")

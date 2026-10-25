@@ -157,3 +157,34 @@ static func folder_drop_ids(data: Variant, folder: String) -> Array:
 			ids.append(str(it.value))
 	var movable := ids.any(func(v: String) -> bool: return not v.begins_with(folder + "/") and v != folder)
 	return ids if movable else []
+
+
+## WO-759 — the media tree's quick-look column from the GET /api/media row (server probe fields: codec,
+## resolution, fps, durationMs): "HAP · 3840×1792 · 25 fps · 00:01:03"; a still shows codec + size only.
+const CODEC_LABELS := {"hap": "HAP", "prores": "ProRes", "mjpeg": "JPG", "jpeg": "JPG", "png": "PNG", "notchlc": "NotchLC",
+	"h264": "H.264", "hevc": "H.265", "dvvideo": "DV", "rawvideo": "RAW", "vp9": "VP9", "av1": "AV1", "tiff": "TIFF"}
+
+
+static func quick_info(row: Dictionary) -> String:
+	var parts := PackedStringArray()
+	var codec := str(row.get("codec", "")).strip_edges().to_lower()
+	if codec != "" and codec != "<null>":
+		parts.append(CODEC_LABELS.get(codec, codec.to_upper()))
+	var res := str(row.get("resolution", "")).strip_edges()
+	if res != "" and res != "<null>":
+		parts.append(res)
+	if str(row.get("type", "")) == "STILL":
+		return " · ".join(parts)
+	var fps := float(row.get("fps", 0)) if row.get("fps") != null else 0.0
+	if fps > 0.0 and str(row.get("type", "")) != "AUDIO":
+		parts.append(("%d fps" % int(fps)) if is_equal_approx(fps, roundf(fps)) else ("%.2f fps" % fps))
+	var ms := float(row.get("durationMs", 0)) if row.get("durationMs") != null else 0.0
+	if ms > 0.0:
+		parts.append(hms(ms))
+	return " · ".join(parts)
+
+
+## hh:mm:ss, rounded down to the second (a 63.32 s clip is 00:01:03).
+static func hms(ms: float) -> String:
+	var s := int(floor(ms / 1000.0))
+	return "%02d:%02d:%02d" % [s / 3600, (s / 60) % 60, s % 60]
