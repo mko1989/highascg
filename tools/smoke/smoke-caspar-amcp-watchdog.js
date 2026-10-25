@@ -84,3 +84,24 @@ test('watchdog: nudges client when port is up but tcp client down', async () => 
 	assert.equal(res.action, 'nudge')
 	assert.equal(nudged, 1)
 })
+
+test('watchdog: a Caspar released after a long boot hold is not hung (WO-754)', async () => {
+	// .4, 25.10: launcher unanswered 300 s (no casparcg process), answered → run.sh starts Caspar → killed 0.3 s later
+	const state = createAmcpWatchdogState()
+	let main = false
+	let killed = false
+	const opts = {
+		isTcpConnected: () => false,
+		isPortListening: async () => false,
+		isMainRunning: async () => main,
+		killMain: async () => (killed = true),
+		nudgeReconnect: () => {},
+	}
+	const ctx = { casparConnection: {}, config: {} }
+	for (let t = 0; t <= 300_000; t += 500) assert.equal((await evaluateAmcpWatchdogTick(ctx, state, t, opts)).action, 'wait_runsh')
+	main = true
+	for (let t = 301_500; t < 300_000 + 120_000; t += 500) await evaluateAmcpWatchdogTick(ctx, state, t, opts)
+	assert.equal(killed, false, 'a process younger than recoverMs is booting, not hung')
+	const res = await evaluateAmcpWatchdogTick(ctx, state, 300_000 + 121_000, opts)
+	assert.equal(res.action, 'kill', 'still killed once it has run recoverMs without AMCP')
+})

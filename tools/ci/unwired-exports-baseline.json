@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 625,
+	"count": 624,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -321,7 +321,6 @@
 		"src/config/config-classify.js: SHOW_DESTINATION_SLICES",
 		"src/config/config-classify.js: SHOW_TOP_LEVEL_KEYS",
 		"src/config/config-compare.js: buildModuleChannelExpectation",
-		"src/config/config-reload-signature.js: hashSubsystemReload",
 		"src/config/config-reload-signature.js: pickSubsystemReloadSnapshot",
 		"src/config/decklink-amcp.js: PLAY_DECKLINK_RE",
 		"src/config/decklink-input-slots.js: decklinkInputSlotsFromDeviceGraph",

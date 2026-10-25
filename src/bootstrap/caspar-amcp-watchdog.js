@@ -26,6 +26,7 @@ function parsePositiveInt(name, fallback) {
  * @property {number|null} lastWarnAt
  * @property {number|null} lastNudgeAt
  * @property {number|null} lastRecoveryAt
+ * @property {number|null} lastNoMainAt  last tick with AMCP down and no casparcg process (WO-754)
  */
 
 /** @returns {AmcpWatchdogState} */
@@ -35,6 +36,7 @@ function createAmcpWatchdogState() {
 		lastWarnAt: null,
 		lastNudgeAt: null,
 		lastRecoveryAt: null,
+		lastNoMainAt: null,
 	}
 }
 
@@ -83,6 +85,7 @@ async function evaluateAmcpWatchdogTick(ctx, state, now, opts = {}) {
 	if (tcpUp) {
 		state.downSince = null
 		state.lastWarnAt = null
+		state.lastNoMainAt = null
 		return { action: 'ok', state }
 	}
 
@@ -116,6 +119,7 @@ async function evaluateAmcpWatchdogTick(ctx, state, now, opts = {}) {
 
 	const mainRunning = await isMainRunning(ctx)
 	if (!mainRunning) {
+		state.lastNoMainAt = now
 		if (downMs >= warnMs && (state.lastWarnAt == null || now - state.lastWarnAt >= warnMs)) {
 			state.lastWarnAt = now
 			log(
@@ -126,7 +130,10 @@ async function evaluateAmcpWatchdogTick(ctx, state, now, opts = {}) {
 		return { action: 'wait_runsh', state }
 	}
 
-	if (downMs >= recoverMs) {
+	// WO-754: hung = a process that has run recoverMs without AMCP. Time with no process at all (run.sh held by the
+	// start-up launcher, WO-645) is not a hang: measuring from downSince killed the Caspar the answer had just started.
+	const hungMs = now - Math.max(state.downSince, state.lastNoMainAt ?? -Infinity)
+	if (hungMs >= recoverMs) {
 		if (state.lastRecoveryAt != null && now - state.lastRecoveryAt < recoveryCooldownMs) {
 			return { action: 'cooldown', state }
 		}
@@ -147,7 +154,7 @@ async function evaluateAmcpWatchdogTick(ctx, state, now, opts = {}) {
 		state.lastWarnAt = now
 		log(
 			'warn',
-			`[AMCP-Watchdog] AMCP down for ${Math.round(downMs / 1000)}s (casparcg boot/hung — recovery in ${Math.max(0, Math.round((recoverMs - downMs) / 1000))}s)`
+			`[AMCP-Watchdog] AMCP down for ${Math.round(downMs / 1000)}s (casparcg boot/hung — recovery in ${Math.max(0, Math.round((recoverMs - hungMs) / 1000))}s)`
 		)
 		return { action: 'warn', state }
 	}
