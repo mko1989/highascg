@@ -144,7 +144,10 @@ test('T181.2: PGM-only take with MIX+ANIMATE transition produces PLAY plan with 
 	const takeJob = result.takeJobs[0]
 	assert.ok(takeJob.playPlan, 'playPlan should exist for merge transition')
 	assert.strictEqual(takeJob.playPlan.commandName, 'PLAY', 'playPlan commandName is PLAY')
-	assert.strictEqual(takeJob.playPlan.opts.transition, 'MIX', 'transition type is MIX (ANIMATE suffix stripped)')
-	assert.strictEqual(takeJob.playPlan.opts.duration, 25, 'duration preserved')
-	assert.strictEqual(takeJob.playPlan.opts.tween, 'linear', 'tween preserved')
+	// WO-574: the transition rides the LOADBG and the PLAY is bare (a `PLAY <clip> MIX` re-opens the clip)
+	assert.deepEqual(takeJob.playPlan.opts, {}, 'bare PLAY')
+	assert.strictEqual(takeJob.loadPlan.commandName, 'LOADBG')
+	assert.strictEqual(takeJob.loadPlan.opts.transition, 'MIX', 'transition type is MIX (ANIMATE suffix stripped)')
+	assert.strictEqual(takeJob.loadPlan.opts.duration, 25, 'duration preserved')
+	assert.strictEqual(takeJob.loadPlan.opts.tween, 'linear', 'tween preserved')
 })

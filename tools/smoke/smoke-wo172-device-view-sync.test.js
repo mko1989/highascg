@@ -28,12 +28,16 @@ function mockConfigManager(initial) {
 	}
 }
 
-/** Destination `dst_2` at mainScreenIndex 1 (Screen 2 / "PGM2"), cabled stream_out → `str_1`. */
+/** Destination `dst_2` at mainScreenIndex 1 (Screen 2 / "PGM2"), cabled stream_out → `str_1`. Screen 1 is there,
+ * uncabled: a lone main at index 1 is re-ranked to 0 (screen-destinations.js, the phantom-pair gap fix 90e58e42). */
 function streamOnlyConfig() {
 	return {
 		screenDestinations: {
 			version: 1,
-			destinations: [{ id: 'dst_2', label: 'Screen 2', mainScreenIndex: 1, mode: 'pgm_prv' }],
+			destinations: [
+				{ id: 'dst_1', label: 'Screen 1', mainScreenIndex: 0, mode: 'pgm_prv' },
+				{ id: 'dst_2', label: 'Screen 2', mainScreenIndex: 1, mode: 'pgm_prv' },
+			],
 		},
 		deviceGraph: {
 			version: 1,
@@ -75,7 +79,6 @@ function recordOnlyConfig() {
 /** Same as streamOnlyConfig, plus a decklink_out cable on screen 1 (casparServer-affecting). */
 function streamPlusDecklinkConfig() {
 	const cfg = streamOnlyConfig()
-	cfg.screenDestinations.destinations.push({ id: 'dst_1', label: 'Screen 1', mainScreenIndex: 0, mode: 'pgm_prv' })
 	cfg.deviceGraph.connectors.push(
 		{ id: 'dst_in_1', kind: 'destination_in', externalRef: 'dst_1' },
 		{ id: 'dl_1', kind: 'decklink_out', label: 'DL1', externalRef: '2', caspar: {} },

@@ -11,6 +11,7 @@ const { defaultLogger } = require('../../src/utils/logger')
 const { StateManager } = require('../../src/state/state-manager')
 const { AmcpClient } = require('../../src/caspar/amcp-client')
 const { routeRequest } = require('../../src/api/router')
+const { resolveTemplateCgHostLayer } = require('../../src/engine/cg-routing')
 
 /** @param {AmcpClient} amcp @param {string[]} bucket */
 function captureAmcp(amcp, bucket) {
@@ -128,7 +129,8 @@ describe('AMCP migration offline parity (T7.2)', () => {
 		assert.equal(clear.status, 200)
 		assert.equal(JSON.parse(clear.body).ok, true)
 		assert.ok(captured.some((c) => /COMMIT/.test(c)))
-		assert.ok(captured.some((c) => /^CG\s+1-10\s+CLEAR/.test(c)))
+		// the REST route maps a look layer to its CG overlay host (cg-routing.js normalizeCgRequest): 10 → 700
+		assert.ok(captured.includes(`CG 1-${resolveTemplateCgHostLayer(10)} CLEAR`), captured.join(' | '))
 	})
 
 	it('offline batchSend (sequential) returns ok + responses array', async () => {

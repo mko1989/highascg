@@ -19,7 +19,9 @@ describe('meter-null-consumer', () => {
 	})
 
 	it('uses dedicated consumer index below DMX', () => {
-		assert.equal(METER_NULL_CONSUMER_INDEX, 96)
+		// 720 since 8c0ba811: 96 is the streaming RECORD consumer's index, and an ADD at a taken index replaces it
+		assert.equal(METER_NULL_CONSUMER_INDEX, 720)
+		assert.ok(METER_NULL_CONSUMER_INDEX < require('../../src/sampling/dmx-sampling-ingress').DMX_FILE_CONSUMER_INDEX)
 		assert.ok(METER_UDP_PORT_BASE >= 52000)
 	})
 

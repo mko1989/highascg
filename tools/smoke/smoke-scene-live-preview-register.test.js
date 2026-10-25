@@ -5,7 +5,7 @@ const assert = require('node:assert/strict')
 const { handlePreviewLiveRegister } = require('../../src/api/routes-scene')
 
 describe('handlePreviewLiveRegister', () => {
-	it('registers preview look on mapped PRV channel and broadcasts scene.live', () => {
+	it('registers preview look on mapped PRV channel and broadcasts scene.live', async () => {
 		const liveSceneState = require('../../src/state/live-scene-state')
 		const KEY = liveSceneState.KEY
 		const persistence = require('../../src/utils/persistence')
@@ -32,7 +32,7 @@ describe('handlePreviewLiveRegister', () => {
 			layers: [{ layerNumber: 10, source: { type: 'media', value: 'clip.mp4' } }],
 		}
 
-		const res = handlePreviewLiveRegister(
+		const res = await handlePreviewLiveRegister(
 			JSON.stringify({ sceneId: 'look-edit', mainIndex: 0, incomingScene: scene }),
 			ctx,
 		)

@@ -89,13 +89,16 @@ test('WO-498: the nginx proxy is gone from the repo', () => {
 	 * bridge by exfat-sync, which resurrects `config/nginx/highascg-web-proxy.conf` as an untracked
 	 * stray — it did exactly that mid-session, and a filesystem check failed on a repo that was in
 	 * fact correct. What matters is that the repo no longer SHIPS or installs the proxy. */
-	const tracked = execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8' }).split('\n')
-	assert.equal(tracked.includes('config/nginx/highascg-web-proxy.conf'), false, 'proxy conf must not be tracked')
-	assert.equal(
-		tracked.includes('scripts/runtime/install-highascg-web-proxy.sh'),
-		false,
-		'installer must not be tracked',
-	)
+	let isTracked
+	try {
+		const tracked = execFileSync('git', ['ls-files'], { cwd: REPO, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')
+		isTracked = (rel) => tracked.includes(rel)
+	} catch {
+		// not a git checkout: a `git archive` export (the WO-755 gates) holds exactly the tracked files
+		isTracked = exists
+	}
+	assert.equal(isTracked('config/nginx/highascg-web-proxy.conf'), false, 'proxy conf must not be tracked')
+	assert.equal(isTracked('scripts/runtime/install-highascg-web-proxy.sh'), false, 'installer must not be tracked')
 	assert.equal(exists('scripts/runtime/remove-highascg-web-proxy.sh'), true, 'a remover must be provided')
 })
 

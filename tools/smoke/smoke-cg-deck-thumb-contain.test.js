@@ -4,13 +4,18 @@ const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
 
 describe('WO-110 T110.8 CG deck thumb contain', () => {
-	it('computeContainDestRect letterboxes 16:9 into a square layer rect', async () => {
-		const { computeContainDestRect } = await import('../../client/lib/fill-math.js')
-		const rect = computeContainDestRect(1920, 1080, 10, 20, 100, 100)
-		assert.ok(rect.w <= 100 && rect.h <= 100)
-		assert.ok(Math.abs(rect.w / rect.h - 16 / 9) < 0.01)
-		assert.equal(rect.x, 10)
-		assert.ok(rect.y > 20)
+	it('drawImageContainInRect letterboxes 16:9 into a square layer rect', async () => {
+		// the contain helper the CG deck thumb draws with (cg-only-look-deck-thumb.js); the test used to import a
+		// computeContainDestRect from fill-math.js that never landed
+		const { drawImageContainInRect } = await import('../../client/components/preview-canvas-draw-base.js')
+		const calls = []
+		drawImageContainInRect({ drawImage: (...a) => calls.push(a) }, { naturalWidth: 1920, naturalHeight: 1080 }, 10, 20, 100, 100)
+		assert.equal(calls.length, 1)
+		const [, x, y, w, h] = calls[0]
+		assert.ok(w <= 100 && h <= 100)
+		assert.ok(Math.abs(w / h - 16 / 9) < 0.01)
+		assert.equal(x, 10)
+		assert.ok(y > 20)
 	})
 
 	it('formatModeCreationStatus summarizes created custom modes', async () => {

@@ -169,7 +169,8 @@ test('client effectToAmcpLines matches server look-take and timeline playback bu
 		const takeLines = buildEffectAmcpLines(def.type, params, CL)
 		const playbackLines = buildEffectAmcpLinesPlayback(def.type, params, CL)
 
-		assert.ok(clientLines && clientLines.length === 1, `${def.type}: client lines`)
+		// rotation sends its centre-pivot ANCHOR first (scene-layer-rotation-amcp.js), every other effect one line
+		assert.ok(clientLines && clientLines.length === (def.type === 'rotation' ? 2 : 1), `${def.type}: client lines`)
 		assert.deepEqual(takeLines, clientLines, `${def.type}: look-take vs client`)
 		assert.deepEqual(playbackLines, clientLines, `${def.type}: playback vs client`)
 		assertMixerTarget(clientLines[0])
@@ -202,7 +203,7 @@ test('REST /api/mixer/{command} dispatches AMCP for every effect command', async
 				await loadEffectRegistry().then(({ effectToAmcpLines }) =>
 					effectToAmcpLines(def.type, SAMPLE_PARAMS[def.type], CL),
 				)
-			)[0],
+			).at(-1), // the effect's own command (rotation's pivot ANCHOR precedes it)
 		)
 		const sent = captured.map(normalizeMixerLine).find((c) => /^MIXER\s/i.test(c))
 		assert.ok(sent, `${def.type}: no MIXER line captured`)
@@ -233,7 +234,7 @@ test('REST POST /api/mixer/effect dispatches AMCP for every inspector effectType
 		)
 		assert.equal(res.status, 200, `${def.type}: POST /api/mixer/effect`)
 
-		const expected = normalizeMixerLine(effectToAmcpLines(def.type, SAMPLE_PARAMS[def.type], CL)[0])
+		const expected = normalizeMixerLine(effectToAmcpLines(def.type, SAMPLE_PARAMS[def.type], CL).at(-1))
 		const sent = captured.map(normalizeMixerLine).find((c) => /^MIXER\s/i.test(c))
 		assert.ok(sent, `${def.type}: no MIXER line captured via /effect`)
 		assert.equal(sent, expected, `${def.type}: /effect AMCP must match line builder`)

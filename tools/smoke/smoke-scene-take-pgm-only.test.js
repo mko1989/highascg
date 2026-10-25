@@ -60,14 +60,22 @@ test('normalizeTransitionForPgmOnly keeps +Animate and upgrades plain MIX to MIX
 	})
 })
 
-test('pgm-only take resolves project-scoped basename before LOADBG', async () => {
+test('pgm-only take resolves project-scoped basename before LOADBG', async (t) => {
 	const amcp = mockAmcp()
+	// the clip must be on disk under media/projects/<slug>/ (caspar-cls-id.js clipFileExistsUnderProjectRoot);
+	// a scratch media root, not the box's media/ (whose tetst project is long gone)
+	const fs = require('fs')
+	const path = require('path')
+	const media = fs.mkdtempSync(path.join(require('os').tmpdir(), 'pgm-only-media-'))
+	t.after(() => fs.rmSync(media, { recursive: true, force: true }))
+	fs.mkdirSync(path.join(media, 'projects', 'tetst'), { recursive: true })
+	fs.writeFileSync(path.join(media, 'projects', 'tetst', '02_BUMPER.mp4'), '')
 	const self = {
 		...minimalSelf(),
 		config: {
 			...minimalSelf().config,
 			projectScopedMedia: { enabled: true },
-			local_media_path: require('path').join(__dirname, '../../media'),
+			local_media_path: media,
 		},
 		persistence: { get: (k) => (k === 'web_project_active_slug' ? 'tetst' : null) },
 	}

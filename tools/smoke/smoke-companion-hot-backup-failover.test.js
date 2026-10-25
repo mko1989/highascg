@@ -23,6 +23,10 @@ const COMPANION_ROUTER_URL = path.resolve(
 	__dirname,
 	'../../../companion-module-dev/companion-module-highpass-highascg/src/connection-router.js',
 )
+// the Companion module is a sibling checkout, not part of this repo: a clean clone (CI, an export) has none
+const NO_COMPANION = !require('fs').existsSync(COMPANION_ROUTER_URL) && 'no companion-module-dev checkout beside the repo'
+/** @param {string} name @param {() => Promise<void>} fn */
+const companionTest = (name, fn) => test(name, { skip: NO_COMPANION }, fn)
 
 /** @typedef {'leader_air'|'follower_standby'|'standalone'|'down'} BoxMode */
 
@@ -162,7 +166,7 @@ function createMockCompanionInstance(opts) {
 	}
 }
 
-test('companion stays on main when leader accepts control', async () => {
+companionTest('companion stays on main when leader accepts control', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const port = allocPort()
 	const mocks = await startMockHighAsCGBoxes({
@@ -186,7 +190,7 @@ test('companion stays on main when leader accepts control', async () => {
 	await mocks.close()
 })
 
-test('companion fails over to backup after main unreachable once backup accepts control', async () => {
+companionTest('companion fails over to backup after main unreachable once backup accepts control', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const port = allocPort()
 	const mainKey = `127.0.0.1:${port}`
@@ -225,7 +229,7 @@ test('companion fails over to backup after main unreachable once backup accepts 
 	await mocks.close()
 })
 
-test('companion uses backup when follower went standalone after peer_lost', async () => {
+companionTest('companion uses backup when follower went standalone after peer_lost', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const port = allocPort()
 	const mocks = await startMockHighAsCGBoxes({
@@ -249,7 +253,7 @@ test('companion uses backup when follower went standalone after peer_lost', asyn
 	await mocks.close()
 })
 
-test('companion switches back to main when leader returns', async () => {
+companionTest('companion switches back to main when leader returns', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const port = allocPort()
 	const mainKey = `127.0.0.1:${port}`
@@ -277,7 +281,7 @@ test('companion switches back to main when leader returns', async () => {
 	await mocks.close()
 })
 
-test('main defers to peer — companion fails over to backup', async () => {
+companionTest('main defers to peer — companion fails over to backup', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const port = allocPort()
 	const mocks = await startMockHighAsCGBoxes({
@@ -361,7 +365,7 @@ test('highascg follower disconnectToStandalone after peer_lost (default replicat
 	assert.equal(companion.controlPlaneReason, 'standalone')
 })
 
-test('end-to-end story: leader dies → follower standalone → companion on backup_host', async () => {
+companionTest('end-to-end story: leader dies → follower standalone → companion on backup_host', async () => {
 	const { ConnectionRouter } = await import(`file://${COMPANION_ROUTER_URL}`)
 	const { computeCompanionControlStatus } = require('../../src/api/companion-control-status')
 	const port = allocPort()

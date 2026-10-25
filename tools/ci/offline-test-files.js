@@ -478,4 +478,17 @@ module.exports = [
 	'tools/smoke/smoke-wo381-planned-badge-and-timer-dock.test.js',
 	'tools/smoke/smoke-wo382-operator-tools-flag-settable.test.js',
 	'tools/smoke/smoke-wo383-tdz-gate.test.js',
+	// WO-755: rotted outside the gate (review 2026-08-03 findings 1–4), repointed and brought in
+	'test/api/routes-media-thumb.test.js',
+	'tools/smoke/smoke-amcp-offline-migration.test.js',
+	'tools/smoke/smoke-cg-deck-thumb-contain.test.js',
+	'tools/smoke/smoke-companion-hot-backup-failover.test.js',
+	'tools/smoke/smoke-host-live-caspar-config.test.js',
+	'tools/smoke/smoke-meter-null-consumer.test.js',
+	'tools/smoke/smoke-mixer-effects-catalog.test.js',
+	'tools/smoke/smoke-scene-live-preview-register.test.js',
+	'tools/smoke/smoke-scene-take-pgm-only.test.js',
+	'tools/smoke/smoke-stream-output-project-sync.test.js',
+	'tools/smoke/smoke-wo160b-pgm-only-lbg.test.js',
+	'tools/smoke/smoke-wo172-device-view-sync.test.js',
 ]
