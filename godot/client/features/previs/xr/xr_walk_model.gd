@@ -53,3 +53,26 @@ static func trigger(hit_id: String, near_id: String, has_sel: bool, from: Vector
 		return {"do": "none"}
 	var at: Variant = F.floor_hit(from, dir)
 	return {"do": "aim", "psn": [at.x, -at.z, 0.0]} if at != null else {"do": "none"}
+
+
+## WO-757: the Programmer panel (xr_panel.gd) — its quad in metres and its pixels (2 per mm, the same aspect).
+const PANEL_SIZE := Vector2(0.30, 0.42)
+const PANEL_PX := Vector2i(600, 840)
+
+
+## Where the ray (from, dir) meets a quad (transform `xf`, facing its +Z, `size` metres) as a UV with (0, 0) top left, or
+## null when it misses. `hold` (a drag in progress) keeps following on the quad's plane past its edge, clamped.
+static func panel_uv(xf: Transform3D, size: Vector2, from: Vector3, dir: Vector3, hold := false) -> Variant:
+	var inv := xf.affine_inverse()
+	var o := inv * from
+	var d := inv.basis * dir
+	if absf(d.z) < 1e-6:
+		return null
+	var t := -o.z / d.z
+	if t < 0.0:
+		return null
+	var p := o + d * t
+	var uv := Vector2(p.x / size.x + 0.5, 0.5 - p.y / size.y)
+	if hold:
+		return uv.clamp(Vector2.ZERO, Vector2.ONE)
+	return uv if uv.x >= 0.0 and uv.x <= 1.0 and uv.y >= 0.0 and uv.y <= 1.0 else null

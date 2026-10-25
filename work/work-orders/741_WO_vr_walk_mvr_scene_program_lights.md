@@ -3,7 +3,8 @@
 **Status: DONE (24.10.26) as detachable future development — steps 1–2 built: the client flag `-- --xr` walks the
 Previs at 1:1 and programs through the walk camera / a controller ray. Proven without a headset: Godot tests and a GUI
 e2e in the sandbox (`run-gui-e2e.js --e2e=06_xr_walk --xr`: 4/4). The OpenXR (headset) path is built but untested:
-no headset or runtime on any box. Step 3 (the Programmer panel inside VR) and step 4 are not built. See "How to
+no headset or runtime on any box. Step 3 (the full Programmer on the left wrist) built 25.10 in
+[WO-757](./757_WO_vr_programmer_panel.md); step 4 is not built. See "How to
 remove". 24.10: the Meta Quest path through WiVRn is ready to test (`godot/client/run-xr.sh`,
 `help/vr-walk.md`); WiVRn 26.9 installed and running on .4 (published on the LAN); headset = owner.**
 
@@ -112,7 +113,7 @@ first-person camera reuses every existing tool (select, aim, Point at, the Progr
 step. The headset only adds the controller ray, mapped onto the same calls.
 
 **Not built:**
-- step 3, the Programmer as a panel inside VR (in a headset today you aim and select; the sliders are on the
+- ~~step 3, the Programmer as a panel inside VR~~ — built in WO-757 (25.10). Was: (in a headset today you aim and select; the sliders are on the
   desktop);
 - step 4, house / camera viewpoints;
 - a blind (previs-only) mode. There is none in the server today. Aiming from VR is exactly what a right-drag does:
@@ -204,6 +205,8 @@ enabled and it'll show up in the headset. So I will be able to test VR with the 
 - Delete `godot/client/run-xr.sh` and `godot/client/help/vr-walk.md`. Remove `"vr-walk"` from `TOPICS` in
   `godot/client/tests/test_help_pages.gd`, and the 3 lines (`var xr` … `args = …`) marked WO-741 in
   `godot/client/app/connection_menu.gd` `restart()`.
+- WO-757 (the wrist Programmer): its files are in `xr/`. Optionally drop `var mirror` and its `if not mirror:` in
+  `programmer_section.gd` (harmless when false). `look_fixtures_store.gd` stays: the Live tab's look menu uses it.
 - No server, `project.godot` or data changes to undo. WiVRn on .4: `systemctl --user disable --now wivrn`, delete
   `~/.config/systemd/user/wivrn.service.d/`, `sudo apt purge wivrn-server wivrn-dashboard && sudo apt autoremove`,
   `sudo add-apt-repository --remove ppa:lvra/wivrn`.

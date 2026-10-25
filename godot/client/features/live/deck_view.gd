@@ -11,8 +11,7 @@ const TimerView := preload("res://features/live/pgm_timer_view.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
-const LF := preload("res://features/previs/fixtures/look_fixtures_model.gd")
-const FM := preload("res://features/previs/tracking/follow_model.gd")
+const LFS := preload("res://features/previs/fixtures/look_fixtures_store.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -332,7 +331,7 @@ func _card_menu(scene_id: String, main: int) -> void:
 	pm.add_item("Edit look…", 3)
 	pm.add_separator()
 	pm.add_item("Store fixtures from programmer", 5)
-	var n := LF.count(_fixtures().looks, scene_id)
+	var n := LFS.count(scene_id)
 	if n > 0:
 		pm.add_item("Recall fixtures (%d)" % n, 6)
 		pm.add_item("Clear fixtures", 7)
@@ -361,35 +360,17 @@ func _on_card_menu(id: int, scene_id: String, main: int) -> void:
 	elif id == 5:
 		store_fixtures(scene_id)
 	elif id == 6:
-		var res: Dictionary = await Api.post_json("/api/fixtures/looks/recall", {"lookId": scene_id})
-		action_result.emit("Fixtures recalled" if res.ok else "Recall fixtures: %s" % res.error, res.ok)
+		var r: Dictionary = await LFS.recall(scene_id)
+		action_result.emit(r.msg, r.ok)
 	elif id == 7:
-		_set_fixture_looks(LF.clear(_fixtures().looks, scene_id))
-		action_result.emit("Fixtures cleared from the look", true)
+		var r: Dictionary = LFS.clear(scene_id)
+		action_result.emit(r.msg, r.ok)
 
 
 ## WO-615 T8: the programmer → this look's fixture state (a PGM TAKE of the look crossfades the rig to it).
 func store_fixtures(scene_id: String) -> void:
-	var res: Dictionary = await Api.get_json("/api/fixtures/program")
-	var data: Dictionary = res.data if res.ok and res.data is Dictionary else {}
-	var values: Dictionary = data.get("values") if data.get("values") is Dictionary else {}
-	if values.is_empty():
-		action_result.emit("Programmer is empty — set fixtures in Previs → Programmer first", false)
-		return
-	_set_fixture_looks(LF.store(_fixtures().looks, scene_id, values))
-	action_result.emit("Stored %d fixture(s) in the look" % values.size(), true)
-
-
-func _fixtures() -> Dictionary:
-	return FM.normalize(Store.project.get("fixtures"))
-
-
-func _set_fixture_looks(looks: Dictionary) -> void:
-	var s := _fixtures()
-	s.looks = looks
-	Store.project["fixtures"] = s
-	ProjectSync.mark_dirty(true)
-	Store.project_changed.emit(Store.project)
+	var r: Dictionary = await LFS.store(scene_id)
+	action_result.emit(r.msg, r.ok)
 
 
 func _confirm_delete(scene_id: String) -> void:
@@ -419,8 +400,8 @@ func duplicate_look(scene_id: String) -> String:
 func delete_look(scene_id: String) -> bool:
 	if not E.remove_look(_scenes_root(), scene_id):
 		return false
-	if LF.count(_fixtures().looks, scene_id) > 0:
-		_set_fixture_looks(LF.clear(_fixtures().looks, scene_id))
+	if LFS.count(scene_id) > 0:
+		LFS.clear(scene_id)
 	_commit_looks()
 	look_deleted.emit(scene_id)
 	action_result.emit("Look deleted", true)

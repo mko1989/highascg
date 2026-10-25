@@ -14,6 +14,7 @@ const FM := preload("res://features/previs/fixtures/fixtures_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var sel: RefCounted = Sel.shared()
+var mirror := false  ## WO-757: a second copy (the VR panel) — only the first answers Point at clicks and the Delete key
 var feats := {}  # fixture id → features (selection only)
 var merged := {}
 var _typed: Array = []  # typed patch entries, list order
@@ -82,8 +83,9 @@ func _ready() -> void:
 	add_child(_flush)
 	sel.changed.connect(_on_selection)
 	sel.aimed.connect(_on_selection)  # WO-679: after a right-drag aim
-	sel.aim_at.connect(_aim)
-	sel.delete_requested.connect(_ask_delete)
+	if not mirror:
+		sel.aim_at.connect(_aim)
+		sel.delete_requested.connect(_ask_delete)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _fill_list())
 	_fill_list()
 	_on_selection()

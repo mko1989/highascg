@@ -1,8 +1,9 @@
 # Walk the stage in VR (Meta Quest)
 
 Put on a Meta Quest and stand in the Previs stage at real size: the MVR scene, the heads and their beams, the LED
-screens. Point at a head to select it, point at the floor to aim the selection there. It is the Programmer doing
-the work, so **DMX leaves the box only while Fixtures DMX output is on**: keep it off to preprogram blind.
+screens. Point at a head to select it, point at the floor to aim the selection there, and work the full Programmer on
+your left wrist: intensity, colour, wheels, pan / tilt, zoom, gobos, groups, Release, and Store into a look. It is the
+Programmer doing the work, so **DMX leaves the box only while Fixtures DMX output is on**: keep it off to preprogram blind.
 
 The headset talks to the computer through **WiVRn**: a server on Ubuntu and an app on the Quest. WiVRn becomes the
 OpenXR runtime that HighAsCG renders into, and streams the picture to the Quest over Wi-Fi or USB.
@@ -72,6 +73,15 @@ in the Quest. That window has its own settings, so the kiosk is not touched. Clo
 | Right trigger on the floor | Aim the selected heads at that spot |
 | Left stick | Walk (push fully to go 3x faster) |
 | Right stick left / right | Turn 30° |
+| Left wrist | The Programmer: point at it with the right controller |
+| Right trigger on the Programmer | Click (hold it to drag a slider; grip held adds in the fixture list) |
+| Right stick up / down on the Programmer | Scroll it |
+| Y (left controller) | Hide / show the Programmer |
+
+The Programmer in the headset is the same one as in the Previs tab: selecting a head in the stage selects it on your
+wrist, and the other way round. Under it, pick a look and press **Store** to keep the programmer in that look (a PGM
+TAKE of the look fades the rig to it) or **Recall** to bring the look's fixtures back. Naming a new group needs a
+keyboard: save groups at the desktop.
 
 Walking around in your room moves you on the stage too: 1 m in the room is 1 m on the stage.
 

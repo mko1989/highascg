@@ -3,13 +3,19 @@ extends Node3D
 ## at 1:1 and program lights from inside it. Only with the client flag `-- --xr` (previs_stage.gd, one marked hook).
 ##  - Headset: Godot started with `--xr-mode on` and an OpenXR runtime running → XROrigin3D + XRCamera3D + two
 ##    controllers. Right trigger on a head selects it (grip held adds); on the floor it aims the selection there.
-##    Left stick walks, right stick snap-turns.
+##    Left stick walks, right stick snap-turns. The full Programmer rides the left wrist (xr_panel.gd, WO-757): pointing
+##    at it, the trigger clicks there instead; Y shows / hides it, the right stick up / down scrolls it.
 ##  - No headset: a first-person camera at eye height. WASD walk (shift x3), left-drag look, wheel steps. The previs's
 ##    own mouse picking (click a head, right-drag to aim, Point at) works through this camera unchanged.
 ## What it changes is what the Programmer changes: DMX leaves the box only while the Fixtures DMX output is on.
 
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
 const NEAR_PX := 28.0
+const RAY_M := 4.0  # the drawn ray's length when it points at no panel
+const SCROLL_S := 0.12  # one wheel notch per this while the stick is held
+## The panel on the left controller: above the wrist, tilted to face the eyes (a first guess, tune in the headset).
+const PANEL_UP := Vector3(0.0, 0.12, -0.10)
+const PANEL_TILT := -50.0  # degrees about X
 
 var tab: Object  ## the Previs tab: fixtures3d (hit / near), aim_drag (aim → /api/fixtures/program/aim)
 var xr := false
@@ -18,6 +24,9 @@ var _origin: XROrigin3D
 var _left: XRController3D
 var _right: XRController3D
 var _pointer: Camera3D  # on the right controller, never current: its viewport centre is the controller's ray
+var panel: Node3D  # the Programmer on the left wrist (headset only)
+var _ray: MeshInstance3D
+var _scroll_t := 0.0
 var _yaw := 0.0
 var _pitch := 0.0
 var _looking := false
@@ -72,9 +81,33 @@ func _start_xr() -> bool:
 	_right.add_child(_pointer)
 	_right.button_pressed.connect(func(b: String) -> void:
 		if b == "trigger_click":
-			_trigger(_right.is_button_pressed(&"grip_click")))
+			trigger(true, _right.is_button_pressed(&"grip_click")))
+	_right.button_released.connect(func(b: String) -> void:
+		if b == "trigger_click":
+			trigger(false, false))
+	panel = load("res://features/previs/xr/xr_panel.gd").new()  # loaded here: it needs the app's autoloads (Api, Store)
+	panel.position = PANEL_UP
+	panel.rotation.x = deg_to_rad(PANEL_TILT)
+	_left.add_child(panel)
+	_left.button_pressed.connect(func(b: String) -> void:
+		if b == "by_button":
+			panel.visible = not panel.visible)
+	_ray = _make_ray()
+	_right.add_child(_ray)
 	_cam.current = true
 	return true
+
+
+func _make_ray() -> MeshInstance3D:
+	var m := MeshInstance3D.new()
+	var box := BoxMesh.new()
+	box.size = Vector3(0.002, 0.002, 1.0)
+	m.mesh = box
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.55, 0.85, 1.0)
+	m.material_override = mat
+	return m
 
 
 ## The camera the previs picks through (previs_stage.camera()).
@@ -124,6 +157,7 @@ func _keys_free() -> bool:
 
 
 func _xr_move(dt: float) -> void:
+	_point(dt)
 	var stick := _left.get_vector2(&"primary")
 	if stick.length() > 0.15:
 		var head_yaw := _cam.global_basis.get_euler().y
@@ -131,6 +165,29 @@ func _xr_move(dt: float) -> void:
 	var s := Walk.snap(_origin.rotation.y, _right.get_vector2(&"primary").x, _snap_armed)
 	_origin.rotation.y = s[0]
 	_snap_armed = s[1]
+
+
+## The right controller's ray on the panel (a mouse move there), drawn to the panel or RAY_M; the stick scrolls it.
+func _point(dt: float) -> void:
+	var from := _right.global_position
+	var dir := -_right.global_basis.z
+	var on: bool = panel.point(from, dir)
+	var length := maxf(from.distance_to(panel.hit_at), 0.01) if on else RAY_M
+	_ray.scale = Vector3(1, 1, length)
+	_ray.position = Vector3(0, 0, -length / 2.0)
+	var y := _right.get_vector2(&"primary").y
+	_scroll_t -= dt
+	if on and absf(y) > 0.5 and _scroll_t <= 0.0:
+		panel.scroll(y > 0.0)
+		_scroll_t = SCROLL_S
+
+
+## Trigger down / up: on the panel it clicks (and drags) there, else down picks or aims in the stage.
+func trigger(pressed: bool, add: bool) -> void:
+	if panel != null and (panel.pointed() or not pressed):
+		panel.press(pressed, add)
+	elif pressed:
+		_trigger(add)
 
 
 func _trigger(add: bool) -> void:

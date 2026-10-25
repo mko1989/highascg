@@ -1,14 +1,31 @@
 extends "res://e2e/e2e_scenario.gd"
 ## WO-741 (detachable) — the Previs tab walked at 1:1 with the client flag -- --xr, no headset: the walk camera is the
 ## one the previs renders and picks through, W walks, a left-drag looks, and a right-press on the floor with heads
-## selected aims them (the request the Programmer's Point at sends), through the walk camera.
+## selected aims them (the request the Programmer's Point at sends), through the walk camera. WO-757: the Programmer panel
+## the headset wears on the left wrist, held in front of the walk camera here, works by ray: a trigger on Groups opens
+## its menu inside the panel, Store under it answers.
 ## Runs only with `node tools/e2e/run-gui-e2e.js --xr` (else one step says it was not run).
 
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
+const XrPanel := preload("res://features/previs/xr/xr_panel.gd")
 
 var page: Control  # a member: lambdas capture locals by value
+var panel: Node3D
+
+
+## The trigger on `c` (a control in the panel): the ray from the walk camera through it, down and up through the walk.
+func _ray_click(c: Control) -> void:
+	var uv := c.get_global_rect().get_center() / Vector2(XrPanel.PX)
+	var at: Vector3 = panel.quad.global_transform * Vector3((uv.x - 0.5) * XrPanel.SIZE.x, (0.5 - uv.y) * XrPanel.SIZE.y, 0.0)
+	var from: Vector3 = page.stage.camera().global_position
+	panel.point(from, (at - from).normalized())
+	await ui.frames(1)
+	page.stage.walk.trigger(true, false)
+	await ui.frames(1)
+	page.stage.walk.trigger(false, false)
+	await ui.frames(2)
 
 
 func _hold(code: Key, s: float) -> void:
@@ -79,4 +96,33 @@ func run() -> void:
 		print("[e2e] aim ", JSON.stringify(sent[0]), " camera ", cam.position)
 		return expect(sent[0].ids == ["e2e-head"] and at != null and Vector2(t[0], t[1]).distance_to(Vector2(at.x, -at.z)) < 0.05,
 			"sent %s, expected the floor at %s" % [JSON.stringify(sent[0]), at])
+	)
+	await step("The Programmer panel works by ray", func() -> String:
+		var walk: Node3D = page.stage.walk
+		panel = XrPanel.new()
+		walk.panel = panel
+		walk.add_child(panel)
+		panel.global_transform = page.stage.camera().global_transform * Transform3D(Basis(), Vector3(0, 0, -0.45))
+		await ui.frames(4)
+		var groups: MenuButton = panel.programmer._groups
+		await _ray_click(groups)
+		var opened := groups.get_popup().visible
+		print("[e2e] panel groups menu ", opened, " embedded ", panel.viewport.gui_embed_subwindows)
+		groups.get_popup().hide()
+		var keep: Variant = Store.project.get("scenes")
+		Store.project["scenes"] = {"scenes": [{"id": "e2e-look", "name": "E2E look"}]}
+		Store.project_changed.emit(Store.project)
+		var row: Node = panel.programmer.get_parent().get_child(1)
+		var store: Button = row.get_child(0).get_child(2)
+		row.status.text = ""
+		await ui.frames(2)
+		await _ray_click(store)
+		await ui.sleep(0.5)
+		var said: String = row.status.text
+		var lid: String = row.look_id()
+		print("[e2e] panel store on ", lid, ": ", said)
+		Store.project["scenes"] = keep
+		Store.project_changed.emit(Store.project)
+		return expect(opened and panel.pointed() and lid == "e2e-look" and said.begins_with("Programmer is empty"),
+			"groups menu %s, store said '%s'" % [opened, said])
 	)

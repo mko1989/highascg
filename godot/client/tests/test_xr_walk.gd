@@ -1,6 +1,6 @@
 extends RefCounted
 ## WO-741 — walking the previs (features/previs/xr/): first-person moves, look, snap turn, the trigger's pick / aim,
-## and the one marked hook in previs_stage.gd.
+## and the one marked hook in previs_stage.gd. WO-757: the Programmer panel's ray maths and the trigger's routing.
 
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
 const XrWalk := preload("res://features/previs/xr/xr_walk.gd")
@@ -73,6 +73,49 @@ func test_walk_node_desktop() -> void:
 	t.ok(w._cam.position.z < z0, "wheel up steps forward")
 	t.ok(absf(w._cam.position.y - Walk.EYE) < 1e-5, "at eye height")
 	tab.free()
+
+
+func test_panel_ray() -> void:
+	var at := Transform3D(Basis(), Vector3(0, 1, -1))  # facing +Z, 1 m in front of an eye at the origin's height 1
+	var sz := Vector2(0.3, 0.4)
+	t.eq(Walk.panel_uv(at, sz, Vector3(0, 1, 0), Vector3(0, 0, -1)), Vector2(0.5, 0.5), "straight at it: the middle")
+	var tl: Variant = Walk.panel_uv(at, sz, Vector3(-0.12, 1.16, 0), Vector3(0, 0, -1))
+	t.ok(tl is Vector2 and (tl as Vector2).distance_to(Vector2(0.1, 0.1)) < 1e-5, "(0, 0) is its top left corner")
+	t.eq(Walk.panel_uv(at, sz, Vector3(1, 1, 0), Vector3(0, 0, -1)), null, "beside it: a miss")
+	t.eq(Walk.panel_uv(at, sz, Vector3(0, 1, 0), Vector3(0, 0, 1)), null, "behind the ray: a miss")
+	t.eq(Walk.panel_uv(at, sz, Vector3(0, 1, 0), Vector3(1, 0, 0)), null, "along its plane: a miss")
+	t.eq(Walk.panel_uv(at, sz, Vector3(1, 1, 0), Vector3(0, 0, -1), true), Vector2(1, 0.5), "a drag past the edge clamps")
+	var turned := Transform3D(Basis(Vector3.UP, PI / 2.0), Vector3(-1, 1, 0))  # on the left, facing the eye
+	var uv: Variant = Walk.panel_uv(turned, sz, Vector3(0, 1.1, 0), Vector3(-1, 0, 0))
+	t.ok(uv is Vector2 and (uv as Vector2).distance_to(Vector2(0.5, 0.25)) < 1e-5, "a turned panel: 10 cm up is a quarter down")
+	t.ok(absf(Walk.PANEL_PX.x * Walk.PANEL_SIZE.y - Walk.PANEL_PX.y * Walk.PANEL_SIZE.x) < 1e-3, "pixels keep the quad's aspect")
+
+
+func test_trigger_routing() -> void:
+	var w: Node3D = XrWalk.new()
+	var log: Array = []
+	var p := Node3D.new()
+	var g := GDScript.new()
+	g.source_code = "extends Node3D\nvar on := false\nvar log: Array\nfunc pointed() -> bool: return on\nfunc press(d: bool, c := false) -> void: log.append([d, c])\n"
+	g.reload()
+	p.set_script(g)
+	p.log = log
+	w.panel = p
+	p.on = true
+	w.trigger(true, true)
+	w.trigger(false, false)
+	t.eq(log, [[true, true], [false, false]], "pointing at the panel the trigger clicks there (grip = ctrl), and lets go")
+	log.clear()
+	p.on = false
+	w.trigger(false, false)
+	t.eq(log, [[false, false]], "a release always reaches the panel (it ends a drag that left the panel's edge)")
+	var src := FileAccess.get_file_as_string("res://features/previs/fixtures/programmer_section.gd")
+	t.ok(src.contains("\tif not mirror:\n\t\tsel.aim_at.connect(_aim)\n\t\tsel.delete_requested.connect(_ask_delete)"),
+		"the panel's Programmer is a mirror: one Point at request and one Delete dialog, from the desktop column")
+	var deck := FileAccess.get_file_as_string("res://features/live/deck_view.gd")
+	t.ok(deck.contains("await LFS.store(scene_id)") and not deck.contains("LF.store("), "one Store-to-look for the card and VR")
+	p.free()
+	w.free()
 
 
 func test_stage_hook() -> void:
