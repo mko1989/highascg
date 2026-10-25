@@ -43,7 +43,7 @@ static func snap(yaw: float, x: float, armed: bool) -> Array:
 
 
 ## A trigger along a ray. `hit_id` = the head the ray goes through (else `near_id`, the head centred nearest it);
-## a head → {do: "pick", id, add} (grip held adds, as ctrl-click); no head with a selection → the floor under the ray
+## a head → {do: "pick", id, add} (the left grip held adds, as ctrl-click — WO-774); no head with a selection → the floor under the ray
 ## → {do: "aim", psn} (the server's follow IK, as Point at / a right-drag); else {do: "none"}.
 static func trigger(hit_id: String, near_id: String, has_sel: bool, from: Vector3, dir: Vector3, add := false) -> Dictionary:
 	var id := hit_id if hit_id != "" else near_id
@@ -86,3 +86,169 @@ static func mirror_px(size: Vector2) -> Vector2i:
 		return Vector2i(640, 360)
 	var k := minf(1.0, minf(MIRROR_MAX.x / size.x, MIRROR_MAX.y / size.y))
 	return Vector2i(maxi(16, roundi(size.x * k)), maxi(16, roundi(size.y * k)))
+
+
+## WO-774 — owner 25.10: "In vr add ability to select via dragging a selection box over fixtures." A right trigger
+## pressed off the heads and dragged past BOX_MIN_DEG draws a box between the press ray and the ray now, in the press
+## ray's own view (x right, y up, the horizon level whatever the controller's roll); its release selects the heads
+## whose centres show inside. Angles are radians: Vector2(right of the press ray, above it).
+const BOX_MIN_DEG := 3.0
+const BOX_DIST := 3.0  ## metres: where the drawn box hangs in front of the controller
+const BOX_STEPS := 8  ## segments per drawn edge (an edge at a constant angle is a curve, not a straight line)
+
+
+## The view of a ray `dir`: x right, y up (level with the floor), -z along the ray. Straight down: "up" is upstage.
+static func view_frame(dir: Vector3) -> Basis:
+	var f := dir.normalized()
+	var up := Vector3.UP if absf(f.dot(Vector3.UP)) < 0.99 else Vector3(0, 0, -1)
+	var right := f.cross(up).normalized()
+	return Basis(right, right.cross(f), -f)
+
+
+## `v` seen in `frame` → Vector2(angle right, angle up), or null when it is behind (90° or more off the ray).
+static func view_angles(frame: Basis, v: Vector3) -> Variant:
+	var l := frame.inverse() * v
+	if -l.z <= 1e-6:
+		return null
+	return Vector2(atan2(l.x, -l.z), atan2(l.y, Vector2(l.x, l.z).length()))
+
+
+## Whether the ray has moved far enough from the press (at `a`) to be a box, not a click.
+static func dragged(a: Variant, min_deg := BOX_MIN_DEG) -> bool:
+	return a is Vector2 and maxf(absf(a.x), absf(a.y)) >= deg_to_rad(min_deg)
+
+
+## Whether `p` lies in the box from the press (0, 0) to `corner`, edges included.
+static func in_box(corner: Vector2, p: Vector2) -> bool:
+	return p.x >= minf(0.0, corner.x) and p.x <= maxf(0.0, corner.x) and p.y >= minf(0.0, corner.y) and p.y <= maxf(0.0, corner.y)
+
+
+## The heads (id → {at: world centre, type}) inside the box dragged from ray `dir0` to `dir1`, both from `from`, left
+## to right as the box sees them (then top down) — the order a fan spreads in. `only_type` = the panel's type filter.
+static func box_pick(from: Vector3, dir0: Vector3, dir1: Vector3, heads: Dictionary, only_type := "") -> Array:
+	var frame := view_frame(dir0)
+	var corner: Variant = view_angles(frame, dir1)
+	if corner == null:
+		return []
+	var inside: Array = []
+	for id in heads:
+		var h: Dictionary = heads[id]
+		if only_type != "" and str(h.get("type", "")) != only_type:
+			continue
+		var a: Variant = view_angles(frame, (h.at as Vector3) - from)
+		if a != null and in_box(corner, a):
+			inside.append([a.x, -a.y, str(id)])
+	inside.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0] or (a[0] == b[0] and a[1] < b[1]))
+	return inside.map(func(e: Array) -> String: return e[2])
+
+
+## The drawn box: its outline as a closed line strip of world points BOX_DIST along the rays from `from`.
+static func box_outline(from: Vector3, dir0: Vector3, dir1: Vector3, dist := BOX_DIST) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	var frame := view_frame(dir0)
+	var c: Variant = view_angles(frame, dir1)
+	if c == null:
+		return out
+	var corners := [Vector2.ZERO, Vector2(c.x, 0.0), c, Vector2(0.0, c.y), Vector2.ZERO]
+	for e in 4:
+		for s in BOX_STEPS:
+			out.append(from + frame * _ray_at((corners[e] as Vector2).lerp(corners[e + 1], float(s) / BOX_STEPS)) * dist)
+	out.append(out[0])
+	return out
+
+
+static func _ray_at(a: Vector2) -> Vector3:
+	return Vector3(cos(a.y) * sin(a.x), sin(a.y), -cos(a.y) * cos(a.x))
+
+
+## The selection after a box: it replaces the selection (`add` = the left grip held: adds). An empty box changes
+## nothing — a stray drag in the headset never wipes the selection (None clears it on the panel).
+static func box_select(current: Array, picked: Array, add: bool) -> Array:
+	if picked.is_empty():
+		return current
+	return current + picked.filter(func(id: String) -> bool: return not current.has(id)) if add else picked
+
+
+## WO-774 — owner 25.10: "Then give a drop down to select only by fixture type." The patch's GDTF types: [{id, name,
+## count}] by name; `names` = typeId → "Manufacturer Name" (GET /api/fixtures/types).
+static func patch_types(patch: Array, names: Dictionary) -> Array:
+	var count := {}
+	for f in patch:
+		var t := str(f.get("typeId", ""))
+		if t != "":
+			count[t] = int(count.get(t, 0)) + 1
+	var out: Array = []
+	for t in count:
+		out.append({"id": t, "name": str(names.get(t, "")) if str(names.get(t, "")) != "" else "Type %s" % t.left(6), "count": count[t]})
+	out.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.name < b.name or (a.name == b.name and a.id < b.id))
+	return out
+
+
+## The fixtures of type `type_id`, in patch order.
+static func of_type(patch: Array, type_id: String) -> Array:
+	return patch.filter(func(f: Dictionary) -> bool: return str(f.get("typeId", "")) == type_id).map(
+		func(f: Dictionary) -> String: return str(f.id))
+
+
+## WO-774 — owner 25.10: "the second one should change their fan." The right grip held, the controller moved: pan
+## fans by the sideways move, tilt by the up / down move. A fan spreads a value across the selection in its order:
+## the first fixture moves -spread, the last +spread, the middle stays (fan_k), each from its own value and clamped
+## to its range. FAN_DEAD_M of hand jitter does nothing; then FAN_DEG_PER_M degrees per metre (tune in the headset).
+const FAN_DEG_PER_M := 150.0
+const FAN_DEAD_M := 0.02
+
+
+## Fixture `i` of `n` → its share of the spread, -1 (first) … 0 (middle) … +1 (last).
+static func fan_k(i: int, n: int) -> float:
+	return 0.0 if n <= 1 else 2.0 * i / (n - 1) - 1.0
+
+
+## A hand move (metres) → degrees of spread.
+static func fan_spread(m: float) -> float:
+	return signf(m) * maxf(0.0, absf(m) - FAN_DEAD_M) * FAN_DEG_PER_M
+
+
+## The controller from `p0` to `p1` (room metres), the head turned `head` → Vector2(pan spread, tilt spread) degrees:
+## x along the head's level right, y up.
+static func fan_move(p0: Vector3, p1: Vector3, head: Basis) -> Vector2:
+	var r := Vector3(head.x.x, 0.0, head.x.z)
+	r = r.normalized() if r.length() > 1e-4 else Vector3.RIGHT
+	var d := p1 - p0
+	return Vector2(fan_spread(d.dot(r)), fan_spread(d.y))
+
+
+## What a fan starts from, in selection order: [{id, Pan: [value, lo, hi], Tilt: [...]}] for the fixtures that have
+## pan or tilt. `feats` = GET /api/fixtures/program/features (pan / tilt {from, to, at}), `values` = GET
+## /api/fixtures/program (physical degrees as programmed; unprogrammed = the channel's GDTF default `at`).
+static func fan_bases(ids: Array, feats: Dictionary, values: Dictionary) -> Array:
+	var out: Array = []
+	for id in ids:
+		var f: Dictionary = feats.get(id) if feats.get(id) is Dictionary else {}
+		var v: Dictionary = values.get(id) if values.get(id) is Dictionary else {}
+		var b := {"id": str(id)}
+		for spec in [["pan", "Pan"], ["tilt", "Tilt"]]:
+			var r: Variant = f.get(spec[0])
+			if not (r is Dictionary and r.has("from") and r.has("to")):
+				continue
+			var lo := minf(float(r.from), float(r.to))
+			var hi := maxf(float(r.from), float(r.to))
+			var at: Variant = v.get(spec[1])
+			b[spec[1]] = [float(at) if at is float or at is int else float(r.get("at", lo)), lo, hi]
+		if b.size() > 1:
+			out.append(b)
+	return out
+
+
+## The fanned values: id → {Pan, Tilt} (only the `axes` the hand has moved), each base + fan_k × spread, clamped.
+static func fan_values(bases: Array, spread: Vector2, axes: Array = ["Pan", "Tilt"]) -> Dictionary:
+	var out := {}
+	for i in bases.size():
+		var b: Dictionary = bases[i]
+		var v := {}
+		for spec in [["Pan", spread.x], ["Tilt", spread.y]]:
+			if axes.has(spec[0]) and b.has(spec[0]):
+				var r: Array = b[spec[0]]
+				v[spec[0]] = snappedf(clampf(float(r[0]) + fan_k(i, bases.size()) * float(spec[1]), float(r[1]), float(r[2])), 0.01)
+		if not v.is_empty():
+			out[b.id] = v
+	return out

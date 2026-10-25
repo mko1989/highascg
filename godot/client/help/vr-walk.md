@@ -75,12 +75,14 @@ in the Quest. That window has its own settings, so the kiosk is not touched. Clo
 
 | Control | What it does |
 |---|---|
-| Right trigger on a head | Select it (grip held: add to the selection) |
-| Right trigger on the floor | Aim the selected heads at that spot |
+| Right trigger on a head | Select it (left grip held: add to the selection) |
+| Right trigger on the floor, let go | Aim the selected heads at that spot |
+| Right trigger held off the heads, drag | Draw a box: on release it selects the heads inside (left grip held: adds) |
+| Right grip held, move the controller | Fan the selection: sideways spreads pan, up / down spreads tilt |
 | Left stick | Walk (push fully to go 3x faster) |
 | Right stick left / right | Turn 30° |
 | Left wrist | The Programmer: point at it with the right controller |
-| Right trigger on the Programmer | Click (hold it to drag a slider; grip held adds in the fixture list) |
+| Right trigger on the Programmer | Click (hold it to drag a slider; left grip held adds in the fixture list) |
 | Right stick up / down on the Programmer | Scroll it |
 | Y (left controller) | Hide / show the Programmer |
 
@@ -88,6 +90,13 @@ The Programmer in the headset is the same one as in the Previs tab: selecting a 
 wrist, and the other way round. Under it, pick a look and press **Store** to keep the programmer in that look (a PGM
 TAKE of the look fades the rig to it) or **Recall** to bring the look's fixtures back. Naming a new group needs a
 keyboard: save groups at the desktop.
+
+**Type** at the top of the Programmer limits what the controller picks to one fixture type: the box and the trigger
+on a head then take only heads of that type, and **Select** selects all of them. **All types** picks any head.
+
+**Fan** spreads the selected heads apart in the order they were selected (a box selects left to right as you see
+it): the first and the last move the opposite ways, the middle one stays. It starts from where the heads point now,
+so aim them at a spot first, then fan them out from it. Let go of the grip and they stay.
 
 Walking around in your room moves you on the stage too: 1 m in the room is 1 m on the stage.
 

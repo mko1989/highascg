@@ -257,11 +257,14 @@ func click(cam: Camera3D, pos: Vector2, add: bool) -> bool:
 	return best != ""
 
 
-## WO-679: the fixture whose body centre shows nearest `pos`, within `px` screen pixels, or "".
-func near(cam: Camera3D, pos: Vector2, px: float) -> String:
+## WO-679: the fixture whose body centre shows nearest `pos`, within `px` screen pixels, or "". WO-774: `only_type`
+## (a GDTF type id) skips heads of other types (the VR panel's type filter).
+func near(cam: Camera3D, pos: Vector2, px: float, only_type := "") -> String:
 	var best := ""
 	var d := px
 	for id in _fx:
+		if only_type != "" and str(_fx[id].type) != only_type:
+			continue
 		var o: Vector3 = (_fx[id].root as Node3D).global_transform * (_fx[id].box as AABB).get_center()
 		if cam.is_position_behind(o):
 			continue
@@ -272,21 +275,31 @@ func near(cam: Camera3D, pos: Vector2, px: float) -> String:
 	return best
 
 
+## WO-774: every shown head's body centre (world) and GDTF type id — what a VR box select picks from.
+func heads() -> Dictionary:
+	var out := {}
+	for id in _fx:
+		var root := _fx[id].root as Node3D
+		if root.visible:
+			out[id] = {"at": root.global_transform * (_fx[id].box as AABB).get_center(), "type": str(_fx[id].type)}
+	return out
+
+
 ## WO-682: show head `id` at `pose` while it is dragged (the save rebuilds it from the patch).
 func preview_pose(id: String, pose: Dictionary) -> void:
 	if _fx.has(id):
 		(_fx[id].root as Node3D).transform = F.pose_xform(pose)
 
 
-## The fixture whose body is nearest under the mouse, or "".
-func hit(cam: Camera3D, pos: Vector2) -> String:
+## The fixture whose body is nearest under the mouse, or "" (WO-774: of type `only_type` when given).
+func hit(cam: Camera3D, pos: Vector2, only_type := "") -> String:
 	var from := cam.project_ray_origin(pos)
 	var dir := cam.project_ray_normal(pos)
 	var best := ""
 	var near := INF
 	for id in _fx:
 		var root := _fx[id].root as Node3D
-		if not root.visible:
+		if not root.visible or (only_type != "" and str(_fx[id].type) != only_type):
 			continue
 		var inv := root.global_transform.affine_inverse()
 		var hit: Variant = (_fx[id].box as AABB).intersects_ray(inv * from, inv.basis * dir)

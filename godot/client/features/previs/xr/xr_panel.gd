@@ -2,12 +2,14 @@ extends Node3D
 ## WO-757 (detachable, WO-741 step 3) — the full Programmer inside the headset: programmer_section.gd itself (list,
 ## All / None, Release, Delete, groups, intensity, colour, wheels, CTO, pan / tilt, Point at, zoom, gobos) and under it
 ## Store / Recall to a look (xr_looks_row.gd), drawn into a SubViewport on a quad and worked with the right controller's
-## ray (xr_walk.gd): pointing moves the mouse, the trigger clicks (held: drags a slider), grip held = ctrl (adds in the
-## list), the right stick scrolls. Its popups (colour picker, Groups menu, dialogs) are embedded, so they draw on the
-## quad too. One shared selection (fixture_selection.gd): picking a head in the stage selects it here.
+## ray (xr_walk.gd): pointing moves the mouse, the trigger clicks (held: drags a slider), the left grip held = ctrl
+## (adds in the list; WO-774: it was the right grip, which now fans), the right stick scrolls. Its popups (colour picker,
+## Groups menu, dialogs) are embedded, so they draw on the quad too. One shared selection (fixture_selection.gd):
+## picking a head in the stage selects it here. WO-774: above it the type filter (xr_type_row.gd).
 
 const Programmer := preload("res://features/previs/fixtures/programmer_section.gd")
 const LooksRow := preload("res://features/previs/xr/xr_looks_row.gd")
+const TypeRow := preload("res://features/previs/xr/xr_type_row.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Walk := preload("res://features/previs/xr/xr_walk_model.gd")
 const SIZE := Walk.PANEL_SIZE
@@ -15,6 +17,7 @@ const PX := Walk.PANEL_PX
 
 var viewport: SubViewport
 var programmer: VBoxContainer
+var types: HBoxContainer  # WO-774: the type filter
 var quad: MeshInstance3D
 var hit_at := Vector3.ZERO  # where the ray last met the panel (world)
 var _at := Vector2(-1, -1)  # last pointed pixel (-1 = off the panel)
@@ -38,6 +41,8 @@ func _ready() -> void:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_theme_constant_override("separation", 10)
 	scroll.add_child(box)
+	types = TypeRow.new()
+	box.add_child(types)
 	programmer = Programmer.new()
 	programmer.mirror = true
 	box.add_child(programmer)
@@ -87,7 +92,12 @@ func pointed() -> bool:
 	return _at.x >= 0.0
 
 
-## Trigger (left button) or another button, at the pointed pixel; `ctrl` = grip held.
+## WO-774: the GDTF type the controller picks (box and trigger), "" = all.
+func type_filter() -> String:
+	return types.type_id() if types != null else ""
+
+
+## Trigger (left button) or another button, at the pointed pixel; `ctrl` = the left grip held.
 func press(pressed: bool, ctrl := false, button := MOUSE_BUTTON_LEFT) -> void:
 	if pressed and not pointed():
 		return

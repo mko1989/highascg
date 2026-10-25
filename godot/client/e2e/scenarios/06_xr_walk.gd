@@ -112,7 +112,7 @@ func run() -> void:
 		var keep: Variant = Store.project.get("scenes")
 		Store.project["scenes"] = {"scenes": [{"id": "e2e-look", "name": "E2E look"}]}
 		Store.project_changed.emit(Store.project)
-		var row: Node = panel.programmer.get_parent().get_child(1)
+		var row: Node = panel.programmer.get_parent().get_child(panel.programmer.get_index() + 1)  # WO-774: the type row is above
 		var store: Button = row.get_child(0).get_child(2)
 		row.status.text = ""
 		await ui.frames(2)
