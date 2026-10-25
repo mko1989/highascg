@@ -201,6 +201,7 @@ func _render(rows: Array, shows_next: bool, timeless_secs: float, current := -1)
 			it.set_tooltip_text(3, "Fade down when done: plays once and fades out at its end")
 		it.add_button(3, Icons.texture("close", 12), 0, false, "Remove from the playlist")
 	_next.visible = shows_next
+	_drop.visible = rows.is_empty()  # owner 25.10: the hint goes once there are items — the list itself takes drops
 	if not _secs.get_line_edit().has_focus():
 		_secs.set_value_no_signal(timeless_secs)
 

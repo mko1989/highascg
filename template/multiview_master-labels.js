@@ -1,6 +1,6 @@
 		function collectLayerLines(cell, resolvedChNum, screenIdx, chNum, isPgm) {
 			const rows = [];
-			const activeScenes = getActiveScenes();
+			const activeScenes = getActiveScenes(isPgm, chNum);
 			for (const scene of activeScenes) {
 				if (!Array.isArray(scene.layers)) continue;
 				for (const layer of scene.layers) {
@@ -20,7 +20,7 @@
 							}
 						}
 					}
-					if (lookScreenIdx !== screenIdx) continue;
+					if (isPgm && lookScreenIdx !== screenIdx) continue; // a PRV channel is its screen's own
 					// PGM: bank-mapped physical; PRV has no banks — logical = physical (WO-195.4)
 					const bank = programLayerBankByChannel?.[String(chNum)] || 'a';
 					const pLayer = isPgm && bank === 'b' ? num + 100 : num;

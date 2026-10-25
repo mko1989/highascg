@@ -111,7 +111,13 @@
 		}
 
 
-		function getActiveScenes() {
+		/* WO-769 (owner 25.10: "no timers on preview screen for prv channels"): a PRV cell shows the look staged on THAT
+		 * preview channel — it used to read the PGM look's layers against the PRV channel's OSC. */
+		function getActiveScenes(isPgm, chNum) {
+			if (isPgm === false) {
+				const prv = sceneLive[String(chNum)] || sceneLive[chNum];
+				return prv?.scene ? [prv.scene] : [];
+			}
 			const list = [];
 			if (channelMap && Array.isArray(channelMap.programChannels)) {
 				channelMap.programChannels.forEach((chNum) => {
