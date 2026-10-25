@@ -7,6 +7,7 @@
 
 const { get } = require('./sweep-util')
 const { runReplicationCheck } = require('../e2e/replication-check')
+const { resolveReplicationSshIdentityPath } = require('../../src/replication/replication-ssh-setup')
 
 const CLOCK_WARN_MS = 5000
 const CLOCK_FAIL_MS = 60000 // signed calls refuse past ±60 s (cluster-call.js)
@@ -92,6 +93,8 @@ module.exports = [
 		async run({ cluster }) {
 			const peers = peersOf(cluster)
 			if (!peers.length) return { status: 'skip', summary: 'not linked to another server' }
+			// WO-753: the key is made and handed over by the first Send media; until then every ssh is refused
+			if (!resolveReplicationSshIdentityPath()) return { status: 'warn', summary: 'no media key on this box yet: the first Send media (Devices → Servers) makes it and hands it over' }
 			const bad = []
 			const ok = []
 			for (const p of peers) {

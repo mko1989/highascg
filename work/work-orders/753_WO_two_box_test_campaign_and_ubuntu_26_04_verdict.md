@@ -101,6 +101,29 @@ Will they stay? Checked on .4:
 - WARNs, all known: no DeckLink .deb on the sticks; build stamps differ (dev box vs release); the two sudo helpers.
 - Cluster: the signed call to .4 took 18 ms; media copy to and from .4 passed 5/5; .4's clock is +74 ms.
 
+### A5 — sweep on .4 (`run-sweep.js --peers`, 10:13): 27 pass / 2 warn / 1 fail
+
+- Every system/app/sandbox check passes on 26.04: services, GPU driver answers (615.71.09), ports, sudoers, Caspar
+  autostart, **DeckLink driver + cards 8 ok**, 16 live routes in 146 ms, Caspar 2.5.1 with 1 channel aligned, no
+  errors in the server, Caspar or kiosk logs, kiosk connected, client compiles, 94 sandbox routes, 56 projects load.
+- WARNs: the June sync-conflict copies (owner); build stamps differ.
+- **FAIL: media copy .4 → .23, `Permission denied (publickey,password)`.** The other direction passes 5/5.
+  - .4 has **no replication key at all** (`~/.ssh` held only `authorized_keys`, `known_hosts`, `agent/`).
+  - By design (WO-670 P2b, `cluster-media.js`) the key is made (`ensureReplicationSshKey`) and handed to the receiver
+    on the first **Send media**. Until then the box cannot send, but nothing is broken. So the check's FAIL, worded
+    as a forced-command problem, was misleading.
+
+### B11 — Send media .4 → .23, live (10:14)
+
+- `POST 192.168.0.4:4200/api/cluster/peers/highascg7580/send-media` → 202 `{paths: 1, slug: testy_2}`.
+  - .4 made its key.
+  - .23's `authorized_keys` gained one line: `from="192.168.0.4",command="/usr/local/bin/highascg-replication-ssh",
+    no-port-forwarding,…`. That is a rsync-only key, accepted only from .4. The file was backed up first
+    (`c753/authorized_keys.23.before` in the session scratchpad).
+  - The send finished: `{state: done, percent: 100, files: 1}`. The file was already identical on .23, so rsync
+    copied nothing.
+- The media copy check from .4 then passes 5/5, so media now moves both ways.
+
 ## What was done
 
 - `tools/smoke/smoke-wo573-…-separate-binding.test.js`: stubs `getDisplaysXrandrDetailed` / `getGpuConnectorInventory`
@@ -115,6 +138,9 @@ Will they stay? Checked on .4:
 - `tools/smoke/smoke-wo753-client-test-modes-isolated.test.js` (new, in FILES): a stand-in Godot records its
   `XDG_DATA_HOME`. Both modes get a fresh dir that exists while Godot runs and is gone afterwards; `--test` passes on
   the exit code.
+- `tools/sweep/checks-cluster.js` `cluster.media-copy`: on a box with no media key yet (`resolveReplicationSshIdentityPath()`
+  empty) it is a WARN naming the button ("the first Send media (Devices → Servers) makes it and hands it over"), with
+  no ssh attempt. `smoke-wo730-sweep` gained that case.
 
 ## What was VERIFIED
 
@@ -124,3 +150,5 @@ Will they stay? Checked on .4:
 - run-client: the smoke passes 3 / 3; against the old script 1 / 3 (both "own user://" cases fail). Live on this box:
   the kiosk's `godot.log` md5 was the same before and after `run-client.sh --check` (boot OK) and `--test`
   (21656 / 0); no `highascg-client-*` dir was left.
+- media-copy check: with `HIGHASCG_REPL_SSH_KEY=/nonexistent/key` → WARN with the new text; with the real key → PASS
+  5/5 (.23 → .4). wo730 + wo749 smokes 12 / 12.

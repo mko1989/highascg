@@ -41,6 +41,20 @@ describe('WO-730 sweep rules', () => {
 		assert.deepEqual(plainReplicationKeys(text), ['ssh-ed25519 AAAA1 highascg-replication@box-a'])
 	})
 
+	it('media copy on a box that never sent media: a warning that names the button, no ssh (WO-753)', async () => {
+		const check = require('../sweep/checks-cluster').find((c) => c.id === 'cluster.media-copy')
+		const prev = process.env.HIGHASCG_REPL_SSH_KEY
+		process.env.HIGHASCG_REPL_SSH_KEY = path.join(tmp, 'no-such-key')
+		try {
+			const r = await check.run({ cluster: { peers: [{ id: 'peer', host: '192.0.2.1' }] } })
+			assert.equal(r.status, 'warn')
+			assert.match(r.summary, /Send media/)
+		} finally {
+			if (prev === undefined) delete process.env.HIGHASCG_REPL_SSH_KEY
+			else process.env.HIGHASCG_REPL_SSH_KEY = prev
+		}
+	})
+
 	it('Caspar socket bookkeeping is noise, a real error is not', () => {
 		const noise = (l) => CASPAR_NOISE.some((n) => n.test(l))
 		for (const l of [
