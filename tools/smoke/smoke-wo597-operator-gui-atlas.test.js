@@ -149,6 +149,28 @@ describe('WO-597 §D atlas mode — apply path', () => {
 		assert.deepEqual(calls, [], 'the same report again: zero AMCP')
 	})
 
+	it('WO-763: a cell coming or going (the media inspector) never moves the other slots', async () => {
+		const { ctx, calls } = makeCtx('shm')
+		const tiles = [cell('pgm_1', 0.38, 0.17, 0.2286, 0.19), cell('prv_1', 0.38, 0.51, 0.2286, 0.19, { role: 'prv' })]
+		const media = { id: 'media-preview', role: 'media', surface: 'mediainspector', rect: { x: 0.25, y: 0.42, w: 0.5, h: 0.54 }, srcW: 3840, srcH: 1792 }
+		const before = (await post(ctx, { atlas: true, cells: tiles })).atlas.slots
+		const withMedia = (await post(ctx, { atlas: true, cells: [...tiles, media] })).atlas.slots
+		assert.deepEqual([withMedia.pgm_1, withMedia.prv_1], [before.pgm_1, before.prv_1], 'adding the media cell keeps PGM / PRV')
+		assert.ok(withMedia['media-preview'], 'the media cell got a slot')
+		const px = (r) => ({ x: r.x * 1920, y: r.y * 1080, w: r.w * 1920, h: r.h * 1080 })
+		const [a, b, m] = [px(withMedia.pgm_1), px(withMedia.prv_1), px(withMedia['media-preview'])]
+		for (const o of [a, b]) assert.ok(m.x >= o.x + o.w || o.x >= m.x + m.w || m.y >= o.y + o.h || o.y >= m.y + m.h, 'no overlap')
+		const after = (await post(ctx, { atlas: true, cells: tiles })).atlas.slots
+		assert.deepEqual([after.pgm_1, after.prv_1], [before.pgm_1, before.prv_1], 'removing it keeps them too')
+		const again = (await post(ctx, { atlas: true, cells: [...tiles, media] })).atlas.slots
+		assert.deepEqual(again, withMedia, 'the next file lands in the same media slot')
+		calls.length = 0
+		await post(ctx, { atlas: true, cells: [...tiles, media] })
+		assert.deepEqual(calls, [], 'the same report again: zero AMCP')
+		const big = (await post(ctx, { atlas: true, cells: [tiles[0], cell('prv_1', 0, 0, 0.4, 0.33, { role: 'prv' }), media] })).atlas.slots
+		assert.deepEqual([big.pgm_1, big['media-preview']], [withMedia.pgm_1, withMedia['media-preview']], 'a > 25 % resize moves only that cell')
+	})
+
 	it('persists the REPORTED cells, not the atlas rewrite, and GET returns the slots', async () => {
 		const { ctx, store } = makeCtx('shm')
 		await post(ctx, { atlas: true, cells: [cell('pgm_1', 0.5, 0.5, 0.3, 0.3)] })

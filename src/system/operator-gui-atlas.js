@@ -94,6 +94,40 @@ function packShelves(items, W, H) {
 	return { slots: new Map(), scale: 0 }
 }
 
+function overlaps(a, b) {
+	return a.x < b.x + b.w + GUTTER_PX && b.x < a.x + a.w + GUTTER_PX && a.y < b.y + b.h + GUTTER_PX && b.y < a.y + a.h + GUTTER_PX
+}
+
+/**
+ * WO-763 — place `items` ({key, w, h} px) in the space the `taken` slots leave free, top-left first, without moving a
+ * taken slot (scaled down to 0.5 at most when they do not fit at their size).
+ * @returns {Map<string, {x:number,y:number,w:number,h:number}>|null} null when one does not fit — the caller re-packs
+ */
+function placeIntoFree(items, taken, W, H) {
+	const occupied = [...taken.values()]
+	const out = new Map()
+	for (const it of [...items].sort((a, b) => b.h - a.h || a.key.localeCompare(b.key))) {
+		let best = null
+		for (let scale = 1; !best && scale >= 0.5; scale *= 0.9) {
+			const w = Math.max(MIN_SLOT_PX, Math.min(W, Math.round(it.w * scale)))
+			const h = Math.max(MIN_SLOT_PX, Math.min(H, Math.round(it.h * scale)))
+			const xs = [0, ...occupied.map((o) => o.x + o.w + GUTTER_PX)]
+			const ys = [0, ...occupied.map((o) => o.y + o.h + GUTTER_PX)]
+			for (const y of ys) {
+				for (const x of xs) {
+					const r = { x, y, w, h }
+					if (x + w > W || y + h > H || occupied.some((o) => overlaps(r, o))) continue
+					if (!best || y < best.y || (y === best.y && x < best.x)) best = r
+				}
+			}
+		}
+		if (!best) return null
+		occupied.push(best)
+		out.set(it.key, best)
+	}
+	return out
+}
+
 function withinHysteresis(prev, next) {
 	if (!prev) return false
 	const r = (a, b) => (b > 0 ? a / b : Infinity)
@@ -120,11 +154,20 @@ function atlasLayout(ctx, ch, cells, want) {
 	})
 	const st = state.get(ch) || {}
 	const ids = items.map((it) => it.key).sort().join('|')
-	const keep =
-		st.slots && st.ids === ids && st.dims === `${dims.width}x${dims.height}` && items.every((it) => withinHysteresis(st.needed.get(it.key), it))
-	let slots = st.slots
-	let needed = st.needed
-	if (!keep) {
+	// WO-763: cells that stay (same canvas, within hysteresis) keep their slot; only new / resized cells are placed,
+	// into the free space. A full re-pack moved EVERY slot whenever a cell came or went — the media inspector's cell
+	// on each file click — and the client's tile crops switched frames before Caspar's did: PGM/PRV flickered.
+	const sameCanvas = !!st.slots && st.dims === `${dims.width}x${dims.height}`
+	const stay = sameCanvas ? items.filter((it) => st.slots.has(it.key) && withinHysteresis(st.needed.get(it.key), it)) : []
+	const fresh = items.filter((it) => !stay.includes(it))
+	const keep = sameCanvas && st.ids === ids && fresh.length === 0
+	let slots = sameCanvas ? new Map(stay.map((it) => [it.key, st.slots.get(it.key)])) : null
+	let needed = sameCanvas ? new Map(stay.map((it) => [it.key, st.needed.get(it.key)])) : null
+	const placed = slots && fresh.length ? placeIntoFree(fresh, slots, dims.width, dims.height) : null
+	if (placed) {
+		for (const [k, v] of placed) slots.set(k, v)
+		for (const it of fresh) needed.set(it.key, { w: it.w, h: it.h })
+	} else if (!sameCanvas || fresh.length) {
 		slots = packShelves(items, dims.width, dims.height).slots
 		needed = new Map(items.map((it) => [it.key, { w: it.w, h: it.h }]))
 	}
