@@ -18,8 +18,8 @@ var _profiles := {}
 func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
 	var followed := str(cluster().origin)
-	if followed != "" and Follow.resolve_target(followed, home_origin(), IP.get_local_addresses()) == home_origin():
-		followed = ""  # WO-724: this machine under its LAN address — home (loopback, shared memory)
+	if followed != "" and (Follow.on_box(home_origin()) or Follow.resolve_target(followed, home_origin(), IP.get_local_addresses()) == home_origin()):
+		followed = ""  # on a server box: its own server, always; WO-724: this machine under its LAN address
 	origin = resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), followed if followed != "" else Profiles.active_origin(profiles()))
 
 

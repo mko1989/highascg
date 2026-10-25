@@ -30,7 +30,11 @@ var _stay_home := false
 
 
 func _ready() -> void:
-	_down_since = 0 if Ws.is_open else Time.get_ticks_msec()  # a server that never answers counts as gone too
+	if F.on_box(Config.home_origin()):  # owner 25.10: an on-box client stays on its own server
+		if Config.cluster().origin != "":
+			Config.save_cluster({"origin": ""})
+		return
+	_down_since =0 if Ws.is_open else Time.get_ticks_msec()  # a server that never answers counts as gone too
 	Ws.on("cluster:peers", _on_snap)
 	Ws.connected.connect(func() -> void:
 		_down_since = 0

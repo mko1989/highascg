@@ -73,3 +73,11 @@ func test_follow_over_when_unlinked_or_home_dropped() -> void:
 	t.eq(F.follow_over({"master": {"epoch": 0}}, home, home, mine), false, "already home")
 	var remote_home := "http://192.168.0.4:4200"  # a laptop whose profile server is .4
 	t.eq(F.follow_over(linked, there, remote_home, PackedStringArray()), false, "remote client: its server still linked")
+
+
+func test_on_box_never_follows() -> void:
+	t.eq(F.on_box("http://127.0.0.1:4200"), true, "loopback home = a client on a server box")
+	t.eq(F.on_box("http://localhost:4200"), true, "localhost")
+	t.eq(F.on_box("http://[::1]:4200"), true, "ipv6 loopback")
+	t.eq(F.on_box("http://192.168.0.4:4200"), false, "a remote home follows the master")
+	t.eq(F.on_box(""), false, "no home")

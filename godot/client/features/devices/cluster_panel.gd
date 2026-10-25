@@ -338,6 +338,7 @@ func _build_master_row() -> void:
 	follow.text = "This client follows the master"
 	follow.tooltip_text = "When another server becomes master, or this one is gone, this client reconnects to the master (app/cluster_follow.gd)."
 	follow.set_pressed_no_signal(Config.cluster().follow)
+	follow.visible = not preload("res://core/cluster_follow_model.gd").on_box(Config.home_origin())  # on-box: never follows
 	follow.toggled.connect(func(on: bool) -> void: Config.save_cluster({"follow": on}))
 	controls.add_child(follow)
 	_accept = CheckBox.new()

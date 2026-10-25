@@ -36,6 +36,13 @@ static func port_of(origin: String) -> int:
 	return int(tail.get_slice(":", 1)) if tail.count(":") == 1 else (443 if origin.begins_with("https://") else 80)
 
 
+## Owner 25.10: a client on a server box (home = loopback) stays on that box's server. It never follows a master
+## away, and a followed origin left in ui.cfg is dropped: after an unlink the on-box client sat on the other server
+## with nothing saying so, its Devices tab still editing this box (WO-732). Following is for clients with no server.
+static func on_box(home: String) -> bool:
+	return preload("res://core/platform.gd").is_local_origin(home)
+
+
 ## The origin to go to: `home` when `origin` is this machine under one of its own addresses (its LAN IP as a linked
 ## server lists it) and home is loopback — the on-box client keeps 127.0.0.1 and shared-memory pictures. WO-724: a
 ## real failover round trip left the kiosk on http://<own LAN IP>:4200, i.e. on the JPEG feed of its own box.

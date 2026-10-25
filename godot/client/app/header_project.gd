@@ -37,7 +37,16 @@ func _ready() -> void:
 	name_edit.text_submitted.connect(func(_t: String) -> void: _commit_name())
 	name_edit.focus_exited.connect(_commit_name)
 	add_child(name_edit)
-	save_btn = UiIcons.button("save", "Save project to the server (right-click: save to a file)", 16)
+	# WO-751: the show belongs to the server this client is on; say so when that is another machine
+	var on_host := preload("res://core/cluster_follow_model.gd").host_of(Config.origin)
+	var away := Label.new()
+	away.text = "on " + on_host
+	away.tooltip_text = "This client is connected to the server at %s: this show is that server's" % Config.origin
+	away.add_theme_color_override("font_color", ThemeBuilder.WARN)
+	away.mouse_filter = Control.MOUSE_FILTER_PASS
+	away.visible = not preload("res://core/cluster_follow_model.gd").on_box(Config.origin)
+	add_child(away)
+	save_btn =UiIcons.button("save", "Save project to the server (right-click: save to a file)", 16)
 	save_btn.pressed.connect(save)
 	save_btn.gui_input.connect(_rmb.bind("save"))
 	add_child(save_btn)
