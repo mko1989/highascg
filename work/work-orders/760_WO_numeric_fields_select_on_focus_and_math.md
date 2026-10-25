@@ -1,6 +1,6 @@
 # WO-760 — Fields select their value on focus; number fields evaluate + - * /
 
-**Status: IN PROGRESS (25.10) — built + headless-verified; owner GUI relaunch + QA pending**
+**Status: DONE (25.10 — Godot 21744/0 + headless SceneTree check; owner client relaunched 19:41; real Tab/click = owner QA)**
 
 Owner 25.10: "i type in width, then tab to height and the current value should be selected so when i type in something
 else it changes. also ... does input boxes with number values support math (+ - * /) ? because they should." Both are

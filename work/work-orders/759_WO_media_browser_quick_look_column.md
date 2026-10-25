@@ -1,6 +1,6 @@
 # WO-759 — Media browser quick-look info: codec · resolution · fps · duration
 
-**Status: IN PROGRESS (25.10) — built + Xvfb render-verified; owner GUI relaunch pending**
+**Status: DONE (25.10 — Godot 21681/0, Xvfb render; owner client relaunched 19:41, boot clean; owner QA)**
 
 Owner 25.10: "in media browser we need quick look info about files ... codec hap, prores, jpg, png. resolution
 (3840x1792), framerate, duration (hh:mm:ss)."
@@ -36,4 +36,4 @@ Owner 25.10: "in media browser we need quick look info about files ... codec hap
   expanded for the shot: rows show `HAP · 3840×1344 · 50 f…`, `ProRes · 3840×1344 · …`, `H.264 · 1728×1084 · …`,
   `PNG · 4800×2700`.
 - At the default 280 px Sources width the info is clipped after the fps. Widening the Sources split shows all of it.
-- Owner QA after a client relaunch.
+- Owner client relaunched 25.10 19:41 (`[client] ws connected`, no script errors); the :0 screenshot shows the tree with folder names unclipped. Owner QA.

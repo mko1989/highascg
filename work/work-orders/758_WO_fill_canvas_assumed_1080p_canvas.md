@@ -1,6 +1,6 @@
 # WO-758 — Content sizing "fill canvas" does not fill the canvas
 
-**Status: IN PROGRESS (25.10) — fixed + offline-verified; live check after a node restart pending**
+**Status: DONE (25.10 — smokes 24/0; live after node restart: layer-fit on the 3840×1792 canvas returns 0,0,1,1 for native, where it gave 2×1.659 before; owner QA on a non-canvas-sized clip)**
 
 Owner 25.10: "when using for a layer in a look content sizing = fill canvas, it does not fill the canvas. math is wrong somewhere."
 
@@ -29,5 +29,9 @@ Owner 25.10: "when using for a layer in a look content sizing = fill canvas, it 
 ## What was VERIFIED
 
 - Smokes `smoke-wo601-layer-tools`, `smoke-wo600-new-layer` and `smoke-wo601-look-preset-recall`: 24 pass / 0 fail.
-- Live: pending a node restart (owner's call while they work). Then `POST /api/scene/layer-fit` with fill-canvas on
-  INTRO_v3 (1920×896) should return 0,0,1,1. Owner QA: set fill canvas on a layer and see it fill PGM.
+- Live, 25.10 19:40 after `kill -TERM` of node (systemd restarted it in 7 s). `/api/state` canvas is
+  `3840×1792 @50`. `POST /api/scene/layer-fit` on both looks (KV LOOP.mp4 and LOOP czysty.mov, both 3840×1792) in all five
+  modes returns `{0,0,1,1}`, `contentResolution 3840×1792`. Before the fix, native on the same clip gave
+  `scaleX 2, scaleY 1.659`. The Godot inspector takes its fit from this route (`layer_inspector.gd:147,230`,
+  `look_editor_fit.gd`).
+- Owner QA: fill canvas on a clip that is not canvas-sized (e.g. INTRO_v3 1920×896) fills PGM.
