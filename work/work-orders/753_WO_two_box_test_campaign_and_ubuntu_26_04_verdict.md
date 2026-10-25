@@ -160,6 +160,57 @@ Will they stay? Checked on .4:
 - First Caspar pass: 0 / 30, all from the harness reading AMCP's `200 INFO OK` status line as a channel ("200:INFO").
   The channel lists themselves matched in all 30.
 
+### B1–B10 — the cluster, sandboxed on each box and live between the real boxes (25.10 10:36–10:46)
+
+**Sandbox, three throwaway servers, every step** (`run-cluster-e2e.js`, plus `--scenario=show`), same code on both:
+
+| | .23 (24.04) | .4 (26.04) |
+|---|---|---|
+| cluster steps | 12 / 12 pass | 12 / 12 pass |
+| shared show (WO-746) | 10 / 10 pass | 10 / 10 pass |
+| `/api/replication/ping` alone, seq p50 / conc rps | 0.4 ms / 3030 | 0.7 ms / 1887 |
+| signed call p50 | 0.6–0.9 ms | 1.0 ms |
+| master restart → back / agree | 618 ms / 4 ms | 923 ms / 8 ms |
+| failover: promoted / old master stands down | 14.3 s / 32 ms | 14.3 s / 44 ms |
+
+The 26.04 box is slower only by its CPU; every step and decision behaves the same.
+
+**Live, the real servers** (unlinked first; the starting state was saved to `c753/cluster-before-*.json`):
+- `run-cluster-e2e --live=192.168.0.23:4200,192.168.0.4:4200`: **9 pass, 3 skipped (sandbox-only freeze / restarts),
+  0 fail.** Each server alone and then linked, about 8 s of API timing each with 0 errors; clocks 36 ms apart; link with
+  invite accepted; refusals for itself and for a non-HighAsCG address; master .23@1 → .4@2 → .23@3, every view agreeing
+  within 2–4 ms; signed look takes p50 16 ms both ways (LAN), allow-list held; sender choice and Auto = master;
+  unlink. One DELETE on .23 also unlinked .4 (`link_back.ok`, WO-732).
+- Refusals by hand (`c753/b7*.js`):
+  - With auto-accept off, a link gives `201 link_back.pending` and an invite on .4. **Decline** gives `{ok, told:true}`;
+    both sides drop the link within 3 s.
+  - Re-linking from .23 after the decline: .4 refuses ("this server unlinked (or declined) yours: link it from here
+    to link again"). That is by design: WO-739 tombstones a declined inviter for 30 days. Meanwhile .23 keeps its
+    one-sided entry, shown online, until .4 links back. Linking from .4 repaired it.
+    - The two master views then differed (.23 held an epoch-2 claim made while one-sided, .4 its own epoch 1) and
+      **converged in under 5 s** to epoch 2.
+  - On the mutual link:
+    - `accept_remote` off on .4 → `403 this server refuses remote actions`; back on, the call reaches .4.
+    - An action off the allow-list → `400 unknown action`.
+    - Forged calls: bad signature → 403; stale `ts` → 400; unknown sender → 403; addressed to another server → 400;
+      malformed → 400.
+    - A replayed older master claim → `409 older than the claim held here` at both boxes.
+- B9 restarts (`c753/watch.js`, 500 ms polling of both master views):
+  - Follower (.23) restarted: down 6.6 s, came back knowing `.4@5` from its own store; .4 stayed master.
+  - Master (.4) restarted: unreachable about 0.6 s; **no failover**, epoch unchanged.
+- B8 real failover: `systemctl stop highascg` on .4 for 30 s (Caspar is its own unit; PID 39155 untouched).
+  - **.23 promoted 12.6 s after .4 went down** (`master this server epoch 6 (failover: highascg5867 unseen 13 s)`) and
+    started forwarding takes to .4's Caspar.
+  - .4 started up and stepped down 1.7 s later (`stepped down: highascg7580 is master (epoch 6)`); it never re-claimed
+    with its old epoch.
+- B10 split network: on .4, iptables dropped port 4200 to and from .23 for 40 s (ssh open, plus a separate safety undo).
+  - .4 promoted itself 13.8 s after the cut (epoch 7), so both were master for about 26 s, as a split must allow.
+  - **About 1 s after the heal, .23 stepped down** to epoch 7; no operator needed. All four rules were gone afterwards.
+  - Observation: only port 4200 was cut, so .23 (still master) could keep forwarding takes to .4's Caspar over 5250
+    while .4 drove it too. Nothing was taken during the window, and a real cable cut blocks both. Recorded, not changed.
+- End state equals the start state except the epoch (7, it only grows): linked, .4 master (auto), senders Auto → .4,
+  shared show off, auto-accept off, `accept_remote` on, no invites.
+
 ## What was done
 
 - `tools/smoke/smoke-wo573-…-separate-binding.test.js`: stubs `getDisplaysXrandrDetailed` / `getGpuConnectorInventory`
