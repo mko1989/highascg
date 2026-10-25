@@ -53,7 +53,8 @@ function kiosk() {
 		} catch {
 			continue
 		}
-		if (cmd.includes('godot/client') && !cmd.includes('--headless') && !cmd.includes('--xr-mode')) return { pid, startMs: processStartMs(pid) }
+		if (cmd.includes('godot/client') && !cmd.includes('--headless') && !cmd.includes('--xr-mode'))
+			return { pid, startMs: processStartMs(pid) }
 	}
 	return {}
 }
