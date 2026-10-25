@@ -28,7 +28,7 @@ func _ready() -> void:
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(viewport)
 	var panel := PanelContainer.new()
-	panel.theme = get_tree().root.theme if get_tree().root.theme != null else ThemeBuilder.build()  # a SubViewport stops theme inheritance
+	panel.theme = _theme()
 	panel.size = Vector2(PX)
 	viewport.add_child(panel)
 	var scroll := ScrollContainer.new()
@@ -52,6 +52,18 @@ func _ready() -> void:
 	mat.albedo_texture = viewport.get_texture()
 	quad.material_override = mat
 	add_child(quad)
+
+
+## The app theme (a SubViewport stops theme inheritance) with the list's selected rows in accent: the default
+## unfocused highlight is a faint grey that does not show through the headset lenses (WO-771: a head picked in the
+## stage looked unselected in the list).
+func _theme() -> Theme:
+	var root_theme := get_tree().root.theme
+	var t: Theme = root_theme.duplicate() if root_theme != null else ThemeBuilder.build()
+	var lit := ThemeBuilder.box(ThemeBuilder.ACCENT.darkened(0.35), ThemeBuilder.ACCENT, 1)
+	for style in ["selected", "selected_focus"]:
+		t.set_stylebox(style, "ItemList", lit)
+	return t
 
 
 ## The ray this frame → a mouse move on the panel; whether it points at the panel (the trigger then clicks here, not

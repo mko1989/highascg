@@ -12,6 +12,7 @@ const Auto := preload("res://features/previs/fixtures/auto_groups_model.gd")
 const F := preload("res://features/previs/tracking/follow_model.gd")
 const FM := preload("res://features/previs/fixtures/fixtures_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const GroupsView := preload("res://features/previs/fixtures/programmer_groups_view.gd")
 
 var sel: RefCounted = Sel.shared()
 var mirror := false  ## WO-757: a second copy (the VR panel) — only the first answers Point at clicks and the Delete key
@@ -19,6 +20,7 @@ var feats := {}  # fixture id → features (selection only)
 var merged := {}
 var _typed: Array = []  # typed patch entries, list order
 var _list: ItemList
+var _view: Tree  # WO-771: the same selection as groups (programmer_groups_view.gd), shown instead of _list
 var _groups: MenuButton
 var _auto: Array = [[], []]  # WO-680: [by position, by address], worked out when the menu opens
 var _controls: VBoxContainer
@@ -36,6 +38,7 @@ var _gen := 0
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
+	add_child(_view_switch())
 	_list = ItemList.new()
 	_list.select_mode = ItemList.SELECT_MULTI
 	_list.custom_minimum_size.y = 110
@@ -43,6 +46,11 @@ func _ready() -> void:
 	_list.multi_selected.connect(func(_i: int, _on: bool) -> void:
 		sel.set_ids(Array(_list.get_selected_items()).map(func(i: int) -> String: return str(_list.get_item_metadata(i)))))
 	add_child(_list)
+	_view = GroupsView.new()
+	_view.custom_minimum_size.y = 220
+	_view.visible = false
+	_view.picked.connect(_on_view_pick)
+	add_child(_view)
 	var row := HBoxContainer.new()
 	for spec in [["All", func() -> void: sel.set_ids(_typed.map(func(f: Dictionary) -> String: return f.id))],
 			["None", func() -> void: sel.set_ids([])], ["Release", _release.bind(false)], ["Release all", _release.bind(true)],
@@ -100,6 +108,8 @@ func _fill_list() -> void:
 	_typed = s.patch.filter(func(f: Dictionary) -> bool: return str(f.typeId) != "")
 	var key := JSON.stringify(_typed.map(func(f: Dictionary) -> Array: return [f.id, f.name, f.universe, f.address]))
 	if key == _patch_key:
+		if _fill_view():  # saved groups changed (WO-771)
+			_view.mark(sel.ids)
 		return
 	_patch_key = key
 	_list.clear()
@@ -108,16 +118,56 @@ func _fill_list() -> void:
 		_list.set_item_metadata(_list.item_count - 1, f.id)
 	var known := _typed.map(func(f: Dictionary) -> String: return f.id)
 	sel.set_ids(sel.ids.filter(func(id: String) -> bool: return known.has(id)))  # patch removals leave the selection
+	_fill_view()
 	_mark_list()
 	_status.text = "No typed fixtures — patch a GDTF type above." if _typed.is_empty() else ""
 
 
 func _mark_list() -> void:
+	var last := -1
 	for i in _list.item_count:
-		if sel.ids.has(str(_list.get_item_metadata(i))):
+		var id := str(_list.get_item_metadata(i))
+		if sel.ids.has(id):
 			_list.select(i, false)
+			if id == str(sel.ids.back()):
+				last = i
 		else:
 			_list.deselect(i)
+	if last >= 0:  # WO-771: a head picked in the stage shows in the list (select() made it current)
+		_list.select(last, false)
+		_list.ensure_current_is_visible()
+	if _view.visible:
+		_view.mark(sel.ids)
+
+
+## WO-771 — "Fixtures | Groups": which list the selection is made in.
+func _view_switch() -> HBoxContainer:
+	var bar := HBoxContainer.new()
+	var group := ButtonGroup.new()
+	for groups in [false, true]:
+		var b := Button.new()
+		b.text = "Groups" if groups else "Fixtures"
+		b.toggle_mode = true
+		b.button_pressed = not groups
+		b.button_group = group
+		b.pressed.connect(func() -> void:
+			_list.visible = not groups
+			_view.visible = groups
+			_fill_view()
+			_mark_list())
+		bar.add_child(b)
+	return bar
+
+
+func _fill_view() -> bool:
+	return _view != null and _view.visible and _view.fill(_typed, [["", _slice().groups], ["By position", Auto.by_position(_typed)], ["By address", Auto.by_address(_typed)]])
+
+
+func _on_view_pick(ids: Array, add: bool, group: bool) -> void:
+	if group:
+		sel.set_ids(sel.ids + ids if add else ids)
+	elif not ids.is_empty():
+		sel.pick(str(ids[0]), add)
 
 
 func _type_of() -> Dictionary:
