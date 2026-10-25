@@ -159,7 +159,14 @@ async function startSandbox(opts) {
 		})
 	if (!up) {
 		await stop()
-		throw new Error(`sandbox server did not come up on ${url} — see ${path.join(root, 'server.log')}`)
+		// WO-752: the log's tail in the message — a test's cleanup removes the root, and the reason went with it
+		let tail = ''
+		try {
+			tail = fs.readFileSync(path.join(root, 'server.log'), 'utf8').trim().split('\n').slice(-12).join('\n')
+		} catch {
+			/* no log */
+		}
+		throw new Error(`sandbox server did not come up on ${url} (exit ${child.exitCode}) — see ${path.join(root, 'server.log')}${tail ? `\n${tail}` : ''}`)
 	}
 	log(`sandbox server ${url} (pid ${child.pid}, root ${root})`)
 	return { url, port, root, dirs, pid: child.pid, stop }

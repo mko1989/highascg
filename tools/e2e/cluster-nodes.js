@@ -69,7 +69,9 @@ async function clusterView(node, timeoutMs = 3000) {
 async function startSandboxNodes(root, ids, opts = {}) {
 	const start = (id, port) =>
 		startSandbox({ root: path.join(root, id), port, media: false, config: { replication: { enabled: false, selfId: id } }, log: opts.log })
-	return Promise.all(
+	// WO-752: one sandbox failing must not leak the others — their processes kept the test process (and test:ci)
+	// alive for hours; the caller never got `nodes` to stop.
+	const settled = await Promise.allSettled(
 		ids.map(async (id) => {
 			const node = { id, kind: 'sandbox' }
 			const attach = (sb) => Object.assign(node, { sb, url: sb.url, address: `127.0.0.1:${sb.port}`, pid: sb.pid }, api(node))
@@ -84,6 +86,12 @@ async function startSandboxNodes(root, ids, opts = {}) {
 			return node
 		}),
 	)
+	const failed = settled.find((r) => r.status === 'rejected')
+	if (failed) {
+		await Promise.all(settled.filter((r) => r.status === 'fulfilled').map((r) => r.value.stop()))
+		throw failed.reason
+	}
+	return settled.map((r) => r.value)
 }
 
 /** Real servers: their id is whatever they report (selfId or hostname), read before any step. */
