@@ -1,6 +1,6 @@
 # WO-746 — One shared project across linked servers (WO-732 P2 = WO-712 R5 = the WO-670 piece never built)
 
-**Status: IN PROGRESS — BUILT, OFF (25.10.26). Proven offline (merge 9, gates 19, e2e smoke 6, `run-cluster-e2e --scenario=show` 10/10 on three sandbox servers) and deployed on this box with sharing off (live `GET /api/cluster` → `show.on: false`; the Devices toggle asks before switching on, Cancel leaves it off). Switching it on, on both boxes, is the owner's call (both are on-air). Detachable: see "How to remove".**
+**Status: IN PROGRESS — BUILT, OFF (25.10.26). Proven offline (merge 9, gates 19, e2e smoke 6, `run-cluster-e2e --scenario=show` 10/10 on three sandbox servers) and deployed on both boxes with sharing off (live `GET /api/cluster` → `show.on: false`; the Devices toggle asks before switching on, Cancel leaves it off). Switching it on, on both boxes, is the owner's call (both are on-air). Detachable: see "How to remove".**
 
 ## Investigation
 
@@ -109,8 +109,9 @@ is a named test.
   `GET /api/cluster` → `"show": {"on": false, "role": "off", …}`; `POST /api/cluster/show {"on":"yes"}` → 400;
   Devices → Servers shows "Share the show" unchecked and no status line; clicking it opens the confirm, Cancel
   leaves it unchecked, `show.on` still false, nothing posted.
-- **Not verified (owner QA):** sharing switched on between the two real boxes (.4 also needs this release
-  first: it has no `show.push` / `show.propose` yet — until then this box, if switched on, just keeps its own show).
+- .4 on this release (25.10 08:57, owner's kiosk update `2026-10-24T225552Z`): `GET 192.168.0.4:4200/api/cluster`
+  → `show: {on: false, role: off, …}`; `src/cluster/shared-show*.js` present.
+- **Not verified (owner QA):** sharing switched on between the two real boxes.
 
 ## How to remove (detachable)
 

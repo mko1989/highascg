@@ -50,7 +50,25 @@ static func status_log(st: Dictionary) -> String:
 static func restart_step(st: Dictionary, waited_s: float, limit_s: float) -> String:
 	if st.get("ok") == true and st.get("data") is Dictionary and (st.data as Dictionary).get("phase") == null:
 		return "back"
+	if st.get("ok") == true and st.get("data") is Dictionary and (st.data as Dictionary).get("active") == true:
+		return "running"  # WO-748: one dropped poll mid-download — the old server is still installing
 	return "gave_up" if waited_s > limit_s else "wait"
+
+
+## WO-748 — a status poll after the install was accepted, before the restart wait: the old server can stop within a
+## second of the hand-off, before any 1.5 s poll sees "detached" (.4, 25.10). So no answer means "restarting", and a
+## server with no job (no phase) is the new process: "back" — never shown as a log ("Phase: ?").
+static func install_step(st: Dictionary) -> String:
+	if st.get("ok") != true or not (st.get("data") is Dictionary):
+		return "restarting"
+	var d: Dictionary = st.data
+	if d.get("phase") == null:
+		return "back"
+	if d.get("phase") == "detached":
+		return "restarting"
+	if d.get("active") == true:
+		return "running"
+	return "done" if d.get("ok") == true else "failed"
 
 
 static func _or_dash(v: Variant) -> String:

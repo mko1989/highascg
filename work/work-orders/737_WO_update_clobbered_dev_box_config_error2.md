@@ -3,7 +3,8 @@
 **Status: DONE (24.10.26 — verified on .4: release 2026-10-24T190133Z installed through the GUI path, config
 byte-identical to the backup, scene routes 200, post-update self-check 24 pass / 0 fail; this box's config restored
 and proven; smoke 5/5, test:ci green, CI green). Owner-QA: the Updates pane's "Waiting for the server to restart…"
-on the next real update.**
+on the next real update.** → 25.10: that QA failed on .4 ("Phase: ?" after a successful update: the old server stopped
+before a poll saw `detached`) — fixed in WO-748.
 
 Owner, 24.10: *"on the .4 downloading extracting then error 2 (with something else in the error) check the whole gui
 for that error as ive seen it in couple places."*

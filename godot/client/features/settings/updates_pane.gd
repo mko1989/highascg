@@ -104,25 +104,29 @@ func _poll_status() -> void:
 				_poll.stop()
 				_log.text += "\nServer is back."
 				refresh(true)
+			"running":
+				_restart_polls = -1
+				_show_log(st.data)
 			"gave_up":
 				_restart_polls = -1
 				_poll.stop()
 				_log.text += "\nThe server has not come back after %d s: %s" % [RESTART_WAIT_S, str(st.get("error", ""))]
 				_apply.disabled = false
 		return
-	if not st.ok or not (st.data is Dictionary):
-		_log.text += "\n" + str(st.error)
-		return
-	_show_log(st.data)
-	if st.data.get("phase") == "detached":
-		_restart_polls = 0
-		_log.text += "\nWaiting for the server to restart…"
-		return
-	if st.data.get("active") != true:
-		_poll.stop()
-		if st.data.get("ok") == true:
+	var step := U.install_step(st)
+	if step != "back" and st.ok and st.data is Dictionary:
+		_show_log(st.data)
+	match step:
+		"restarting":
+			_restart_polls = 0
+			_log.text += "\nWaiting for the server to restart…"
+		"back", "done":
+			_poll.stop()
+			if step == "back":
+				_log.text += "\nServer is back."
 			refresh(true)
-		else:
+		"failed":
+			_poll.stop()
 			_apply.disabled = false
 
 

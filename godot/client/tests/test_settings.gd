@@ -70,6 +70,19 @@ func test_updates_restart_wait() -> void:
 	t.eq(U.restart_step(down, 30.0, 180), "wait")
 	t.eq(U.restart_step(fresh, 45.0, 180), "back")
 	t.eq(U.restart_step(down, 181.5, 180), "gave_up")
+	t.eq(U.restart_step({"ok": true, "data": {"active": true, "phase": "extract"}}, 6.0, 180), "running", "WO-748: a dropped poll mid-install")
+
+
+## WO-748 — before the restart wait: the old server gone before a poll saw "detached" is "restarting", and the new
+## server (no job) is "back" at once, not "Phase: ?" + Install enabled again (.4, 25.10).
+func test_updates_install_step() -> void:
+	var U := preload("res://features/settings/updates_model.gd")
+	t.eq(U.install_step({"ok": true, "data": {"active": true, "phase": "download"}}), "running")
+	t.eq(U.install_step({"ok": true, "data": {"active": false, "phase": "detached", "done": true, "ok": true}}), "restarting")
+	t.eq(U.install_step({"ok": false, "status": 0, "data": null, "error": "server not reachable"}), "restarting", "old server already gone")
+	t.eq(U.install_step({"ok": true, "data": {"active": false}}), "back", "the new server answered first")
+	t.eq(U.install_step({"ok": true, "data": {"active": false, "phase": "done", "ok": true}}), "done")
+	t.eq(U.install_step({"ok": true, "data": {"active": false, "phase": "error", "ok": false, "error": "x"}}), "failed")
 
 
 func test_updates_texts() -> void:
