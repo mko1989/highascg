@@ -327,7 +327,7 @@ func _build_master_row() -> void:
 	_show_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_show_l.visible = false
 	_master_row.add_child(_show_l)
-	var controls := HBoxContainer.new()
+	var controls := HFlowContainer.new()  # wraps on a narrow window: a fixed row widened the Devices tab past the screen (the top bar's eyes went off-screen)
 	_master_row.add_child(controls)
 	_auto = CheckBox.new()
 	_auto.text = "Auto failover"
