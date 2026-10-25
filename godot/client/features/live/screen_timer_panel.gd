@@ -12,6 +12,7 @@ const C := preload("res://features/live/countdown_model.gd")
 const P := preload("res://features/live/pip_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
+const NumericField := preload("res://core/numeric_field.gd")
 
 var screen_idx := 0
 var screen_label := ""
@@ -191,7 +192,7 @@ func _settings(g: GridContainer, box: VBoxContainer, rec: Dictionary, cfg: Dicti
 	var pxr := HBoxContainer.new()
 	var px: Array[LineEdit] = []
 	for k in ["posX", "posY"]:
-		var le := LineEdit.new()
+		var le := NumericField.math_line(LineEdit.new())  # px values take + - * / ( ) (RULES.md); blank clears
 		le.text = str(cfg.get(k, ""))
 		le.placeholder_text = "%s px" % k.right(1)
 		le.tooltip_text = "X and Y together override the preset — clear both to go back to it"

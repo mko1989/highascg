@@ -10,6 +10,8 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const M := preload("res://features/devices/live_input_model.gd")
 const Flow := preload("res://features/devices/live_input_flow.gd")
 const SR := preload("res://features/devices/stream_record_model.gd")
+const NumericField := preload("res://core/numeric_field.gd")
+const NUMERIC := ["browser-display-width", "browser-display-height", "browser-display-fps", "v4l2-fps"]
 
 signal dirty  ## Caspar restart-dirty
 signal added  ## web onAdded: the Devices tab reloads
@@ -300,6 +302,10 @@ func _select(id: String, parent: Control) -> OptionButton:
 
 func _line(id: String, parent: Control, hint: String) -> LineEdit:
 	var e := LineEdit.new()
+	if id in NUMERIC:  # RULES.md: number fields take + - * / ( ); the maths rewrite is state too (text_changed doesn't fire for it)
+		NumericField.math_line(e, true, 0.0, INF, func(t: String) -> void:
+			if not _syncing:
+				_flow.set_field(id, t))
 	e.placeholder_text = hint
 	e.text_changed.connect(func(t: String) -> void:
 		if not _syncing:

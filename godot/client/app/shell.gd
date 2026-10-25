@@ -27,6 +27,7 @@ const HeaderTools := preload("res://app/header_tools.gd")
 const HeaderStatus := preload("res://app/header_status.gd")
 const OperatorDock := preload("res://app/operator_dock.gd")
 const DockModel := preload("res://app/operator_dock_model.gd")
+const NumericField := preload("res://core/numeric_field.gd")
 
 var _eye: ConnectionEye
 var _logs: LogsDialog
@@ -43,6 +44,7 @@ var _perf_btn: Button
 
 
 func _ready() -> void:
+	NumericField.install(get_tree())  # RULES.md: focus selects the value; number fields take + - * / ( )
 	add_theme_constant_override("separation", 0)
 	add_child(_build_header())
 	osc = OscMirror.new()  # one OSC mirror for the whole client (deck timers, media preview position)
