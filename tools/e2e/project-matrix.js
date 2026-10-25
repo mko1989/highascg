@@ -191,7 +191,7 @@ async function runMatrix({ projectsDir = path.join(REPO, 'projects'), all = fals
 	const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo753-matrix-'))
 	fs.mkdirSync(path.join(root, 'projects'))
 	for (const p of picks) fs.copyFileSync(path.join(projectsDir, `${p.slug}.json`), path.join(root, 'projects', `${p.slug}.json`))
-	const sb = await startSandbox({ root })
+	const sb = await startSandbox({ root, media: false }) // no fixture clips: CI has no ffmpeg
 	const call = async (method, p, body) => {
 		const r = await fetch(sb.url + p, { method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body) })
 		const text = await r.text()

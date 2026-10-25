@@ -324,3 +324,7 @@ the ffmpeg CLI, Xorg and openbox, the cluster timings (only CPU-bound difference
    load reset it?
 3. After a declined invite, the inviter keeps a one-sided entry, shown online, until the other side links back (by
    WO-739's design). Is that clear enough in Devices?
+- CI went red on 76af1433 and 4b8e81a4 (verify, 3238 / 1): the matrix smoke's sandbox wrote ffmpeg fixture clips, and
+  the runner has no ffmpeg (`spawnSync ffmpeg ENOENT`). The matrix now starts its sandbox with `media: false` (the
+  sandbox option made for the WO-725 cluster runs). With ffmpeg removed from PATH locally: old line 4 / 1 with the same
+  ENOENT, new line 5 / 5.
