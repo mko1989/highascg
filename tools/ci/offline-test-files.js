@@ -413,6 +413,7 @@ module.exports = [
 	'tools/smoke/smoke-wo749-release-ships-sweep.test.js',
 	'tools/smoke/smoke-wo752-sandbox-start-failure-no-leak.test.js',
 	'tools/smoke/smoke-wo753-client-test-modes-isolated.test.js',
+	'tools/smoke/smoke-wo753-project-matrix.test.js',
 	'tools/smoke/smoke-wo713-ptz-calibrate.test.js',
 	'tools/smoke/smoke-wo713-person-on-mark.test.js',
 	'tools/smoke/smoke-wo612-mvr-import.test.js',

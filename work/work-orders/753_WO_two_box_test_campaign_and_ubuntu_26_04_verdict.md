@@ -21,7 +21,8 @@ WO-735 (suite on .4 after the 26.04 upgrade), WO-737 part 2 (first OS comparison
 | A5 | post-update sweep, both | `run-sweep.js --peers` | nothing |
 | A6 | GPU / Caspar render health | Caspar profiler / log, `nvidia-smi`, a load run | .4 only |
 | A7 | DeckLink on kernel 7 | driver, devices, Caspar consumer/producer | nothing |
-| A8 | can the dev box still BUILD Caspar after 26.04 | configure the Caspar tree on .4 | nothing |
+| A8 | can the dev box still BUILD Caspar after 26.04 | build the fork on .4, A/B against the release binary | .4 CPU |
+| A10 | every project's screen-destination setup, server + real Caspar | `tools/e2e/project-matrix.js` on both boxes, both binaries on .4 | nothing (sandbox + headless Caspar) |
 | A9 | cold boot on 26.04 | reboot .4 (owner gave full authority on .4) | .4 |
 | B1 | each server alone (unlinked): API timing | `run-cluster-e2e --live` step 1 | unlink |
 | B2 | link / invite accepted / link refusals | `--live` | link |
@@ -124,6 +125,41 @@ Will they stay? Checked on .4:
     copied nothing.
 - The media copy check from .4 then passes 5/5, so media now moves both ways.
 
+### A8 — Caspar still builds on 26.04, and the native build plays the same (25.10 10:15–10:25, `~/wo753-caspar` on .4)
+
+- Our fork (`~/caspar-build/src-v2`, branch `wo742-shm-producer`) on 26.04's toolchain: gcc 15, cmake 4.2.3,
+  ffmpeg 8 (`libavcodec62`), Boost 1.90, SFML 3, ICU 78.
+- **One change needed:** `CMakeModules/Bootstrap_Linux.cmake:33` asked Boost for the `system` component. Boost 1.90 no
+  longer ships `boost_system` as a library (it has been header-only since 1.69), so configure failed. With `system`
+  dropped from `COMPONENTS`, configure and build pass with no other change. Caspar's CMake already handles SFML 3.
+  - Fork commit `24db35cca` (local, not pushed). The same patch builds on 24.04 / Boost 1.83 (this box,
+    146/146 targets, `build_rc=0`), so one tree builds on both.
+- The new binary links only 26.04 libraries (`ldd`: avcodec 62, boost 1.90, SFML 3; nothing missing besides
+  `libcef.so`, which comes from `lib/` as with the release binary).
+- A/B on .4, the 26.04 build vs the release binary (24.04 build on the orphaned libraries). Each ran headless with a
+  shm consumer and its own ports, playing HAP + H.264 + PNG on one 1080p50 channel:
+  - CPU (utime+stime from `/proc`) over 10 s: 55.1 vs 56.4 CPU-seconds; RSS 2.87 vs 3.03 GB; `<dropped>0` on both.
+  - PRINT of the same three moments: identical average luma (YAVG 110.629 / 44.655 / 169.052 on both).
+  - HTML (CEF), shm and the DeckLink 8K Pro (desktopvideo 16.4a1 on kernel 7) worked from the new binary.
+- **ffmpeg 8 difference:** on each video open, ffmpeg 8 logs "Changing video frame properties on the fly is not
+  supported by all filters" (the colour space reads "unknown" until the first frame). It is cosmetic: the frames
+  match. Caspar's log is noisier on a native 26.04 build.
+- Both test Caspars were stopped by exact PID; the live Caspar (PID 39155) was untouched.
+
+### A10 — every screen-destination setup through the server and the real Caspar (owner, mid-campaign: *"Weave into tests different projects with different screen destinations setups etc"*)
+
+- Survey: 56 projects on each box carry **29 distinct destination setups**: operator GUI only; pgm_prv from 1280x768
+  to 16384x2160; pgm_only 1080p / 2160p; multiview 1080p / 2160p; up to 8 channels with DeckLink inputs, audio and
+  streams. The setups are the same on both boxes except `godot_test` (.23 has an extra 1080p pgm_prv).
+- First server-side pass: 24 pass / 6 "channel N used twice". **All six were the check's mistake, not the server's.**
+  A stream attaches to an existing channel by design: the `program_N` / `channel_N` picked, or `casparChannel`
+  (`routing-map.js` `resolveStreamOutputCasparChannel`, WO-378). `llkk` streams the DeckLink input channel (channel_4).
+  The stream now only has to exist in the config.
+  - Found on the way: the sandbox keeps the previous project's streaming setting when a project has none (`tra`
+    stores no `streamingChannel` and inherited one). A project load does not reset it. Owner question, not a fault.
+- First Caspar pass: 0 / 30, all from the harness reading AMCP's `200 INFO OK` status line as a channel ("200:INFO").
+  The channel lists themselves matched in all 30.
+
 ## What was done
 
 - `tools/smoke/smoke-wo573-…-separate-binding.test.js`: stubs `getDisplaysXrandrDetailed` / `getGpuConnectorInventory`
@@ -142,6 +178,19 @@ Will they stay? Checked on .4:
   empty) it is a WARN naming the button ("the first Send media (Devices → Servers) makes it and hands it over"), with
   no ssh attempt. `smoke-wo730-sweep` gained that case.
 
+- `tools/e2e/project-matrix.js` (new): one project per distinct setup (`--all` for every project). For each:
+  - load it with its hardware on a throwaway sandbox server (`POST /api/project/load {applyHardware:true}`);
+  - check the channel map against the destinations: one PGM per pgm_prv / pgm_only, one PRV per pgm_prv, one channel
+    per multiview, no channel used twice (the stream excepted, see A10), nothing past the end;
+  - check the generated casparcg.config: every custom mode defined, every PGM at its destination's size;
+  - with `--caspar=<binary>`, run that Caspar headless on the generated config. Screen, DeckLink and NDI consumers are
+    dropped, shm is renamed, OSC clients are removed and it gets its own ports. Its AMCP `INFO` must list the same
+    channels and modes, and its log must have no `[error]`. It is stopped by its own PID; temp dir and shm are removed.
+- `tools/smoke/smoke-wo753-project-matrix.test.js` (new, in FILES): the rules on hand-made maps (a stream sharing the
+  PGM passes; missing, duplicate and past-the-end channels, an undefined mode and a wrong PGM size are each caught),
+  the headless rewrite, and a real sandbox run on three synthetic setups (5760x1728 pgm_prv; 1080p + 2160p pgm_only
+  + multiview; GUI only), with no Caspar needed in CI.
+
 ## What was VERIFIED
 
 - wo573 on .4: 1 pass / 2 fail before, 3 / 0 after; 3 / 0 on .23.
@@ -152,3 +201,8 @@ Will they stay? Checked on .4:
   (21656 / 0); no `highascg-client-*` dir was left.
 - media-copy check: with `HIGHASCG_REPL_SSH_KEY=/nonexistent/key` → WARN with the new text; with the real key → PASS
   5/5 (.23 → .4). wo730 + wo749 smokes 12 / 12.
+- Project matrix on .23, the release Caspar (`bin/casparcg`, beside the live one): **30 / 30 setups pass**. Each ran
+  the generated config, from 1 channel (GUI only) to 8, up to 16384x2160 PGM+PRV. Caspar's channels and modes equal
+  the config's; no `[error]` lines; no `wo753-caspar-*` dir or `wo753m-*` shm left.
+- Matrix smoke 5 / 5 on .23 and on .4 (26.04). Gates: test:ci 3244 pass / 1 fail (WO-498, export-only), format,
+  unwired exports, boot OK; lint 214 warnings.
