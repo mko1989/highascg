@@ -5,7 +5,7 @@
  * NoMachine's unit shipped without NoMachine (failed unit every boot); USB auto-mount retried the device-mapper-held
  * Ventoy boot partition all day.
  */
-const { describe, it } = require('node:test')
+const { describe, it, after } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const os = require('os')
@@ -39,6 +39,7 @@ function bash(script, env = {}) {
 
 describe('WO-702 exfat network apply', () => {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'wo702-'))
+	after(() => fs.rmSync(tmp, { recursive: true, force: true }))
 	const fns = netFns(['log', 'vlog', 'iface_allowed', 'pick_iface'])
 	const pre = `LOG=${tmp}/apply.log\nIFACE=""\n${fns}\n`
 

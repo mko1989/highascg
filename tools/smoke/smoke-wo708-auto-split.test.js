@@ -5,7 +5,7 @@
  * one marker per followed person (A1…A9 = 64999…, Pin k = 64980 + k) and splits the Auto pool across them: explicit
  * slot counts first, the rest shared evenly, nearest heads, sticky, re-split LOST_S after someone leaves.
  */
-const { describe, it } = require('node:test')
+const { describe, it, after } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('fs')
 const os = require('os')
@@ -22,7 +22,13 @@ const { FollowEngine } = require('../../src/fixtures/follow-engine')
 const { project } = require('../../src/tracking/camera-model')
 
 const ROOT = path.join(__dirname, '../..')
-const tmpFile = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wo708-')), 'tracking-auto.json')
+const tmpDirs = []
+const tmpFile = () => {
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo708-'))
+	tmpDirs.push(dir)
+	return path.join(dir, 'tracking-auto.json')
+}
+after(() => tmpDirs.forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })))
 const person = (x, y, id) => ({
 	key: `w:${id}`,
 	camera: 'world',

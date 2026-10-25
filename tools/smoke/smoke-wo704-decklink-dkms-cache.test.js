@@ -21,8 +21,12 @@ const K = '6.8.0-117-generic'
 const V = '16.2a1'
 const MODS = ['blackmagic', 'blackmagic-io']
 
+const sandboxDirs = []
+test.after(() => sandboxDirs.forEach((dir) => fs.rmSync(dir, { recursive: true, force: true })))
+
 function sandbox() {
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo704-'))
+	sandboxDirs.push(dir)
 	const box = {
 		dir,
 		tree: path.join(dir, 'dkms'),

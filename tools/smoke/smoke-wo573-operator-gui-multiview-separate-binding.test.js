@@ -16,6 +16,11 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
+// WO-753: plan on a fixed GPU, not the host's. The planner checks each port name against live xrandr, and on a box
+// with no DP-6 (.4's RTX 2080) it moves the head to a port that box has. Stubbed before the planner loads them.
+const hardwareInfo = require('../../src/utils/hardware-info')
+hardwareInfo.getDisplaysXrandrDetailed = () => ({ displays: ['DP-0', 'DP-5', 'DP-6'].map((name) => ({ name, connected: true })) })
+hardwareInfo.getGpuConnectorInventory = () => []
 const { calculateLayoutPositions } = require('../../src/utils/os-layout-calculator')
 
 const HOST = 'caspar_host'
