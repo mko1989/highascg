@@ -10,6 +10,7 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const unzipper = require('unzipper')
+const { fixGlbUnits } = require('./glb-units')
 const { projectsRoot } = require('../engine/projects-root')
 const { parseScene } = require('./mvr-scene')
 const { gdtfParts } = require('./mvr-gdtf')
@@ -173,7 +174,9 @@ async function mesh(id, key) {
 		const outer = cut > 0 ? map.get(m[2].slice(0, cut)) : null
 		if (outer) {
 			const inner = await members(await unzipper.Open.buffer(await outer.buffer()))
-			if (inner.has(m[2].slice(cut + 1))) out = await asGlb(inner, m[2].slice(cut + 1))
+			const member = m[2].slice(cut + 1)
+			if (inner.has(member)) out = await asGlb(inner, member)
+			if (out && /\.glb$/i.test(member)) out = fixGlbUnits(out).glb // WO-767: a mm fixture mesh (no body is > 20 m)
 		}
 	}
 	if (out) {

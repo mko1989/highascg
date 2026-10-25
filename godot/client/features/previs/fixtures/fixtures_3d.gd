@@ -30,6 +30,8 @@ void fragment() {
 var _colors := {}  # WO-641: typeId → "#rrggbb" (project.previs.fixture_colors)
 var _layer_colors := {}  # WO-678: MVR layer → "#rrggbb"; a head patched from an MVR object takes its layer's colour
 var layer_of := func(_uuid: String) -> String: return ""  ## WO-678: mvr_scene.layer_of (set by previs_tab.gd)
+var _hidden_layers := {}  # WO-767: MVR layers whose eye is off — their patched heads are hidden and never picked
+const BODY_MAX_M := 10.0  # WO-767: a mesh larger than any fixture body (a mm model) never widens the pick box
 var _key := ""
 var _gen := 0
 var _rigs := {}  # "typeId|mode" → rig Dictionary (or {} = failed)
@@ -159,6 +161,7 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 	parts.type = str(f.typeId)
 	_fx[str(f.id)] = parts
 	Tint.apply(root, color_of(str(f.id)))  # WO-641 / WO-678
+	root.visible = not _hidden_layers.has(layer_of.call(str(f.id).trim_prefix("mvr-")))  # WO-767
 
 
 ## The fixture's body (not its cones) in its own frame, at rest — what a click hits.
@@ -167,8 +170,9 @@ func _body_box(root: Node3D) -> AABB:
 	var box := AABB(Vector3(-0.15, -0.15, -0.15), Vector3(0.3, 0.3, 0.3))
 	for mi in root.find_children("*", "MeshInstance3D", true, false):
 		var m := mi as MeshInstance3D
-		if m.mesh != _cone:
-			box = box.merge(inv * m.global_transform * m.get_aabb())
+		var b := inv * m.global_transform * m.get_aabb()
+		if m.mesh != _cone and b.get_longest_axis_size() <= BODY_MAX_M:
+			box = box.merge(b)
 	return box
 
 
@@ -202,8 +206,17 @@ func color_of(id: String) -> Variant:
 func follow(scene: Node) -> void:
 	layer_of = scene.layer_of
 	scene.layer_colors_changed.connect(set_layer_colors)
+	scene.hidden_layers_changed.connect(set_hidden_layers)
 	scene.loaded.connect(func(_info: Dictionary) -> void: retint())
+	_hidden_layers = scene.hidden_layers().duplicate()
 	retint()
+
+
+## WO-767: the MVR Layers eye hides the heads patched from that layer too (they replace its static models).
+func set_hidden_layers(hidden: Dictionary) -> void:
+	_hidden_layers = hidden.duplicate()
+	for id in _fx:
+		(_fx[id].root as Node3D).visible = not _hidden_layers.has(layer_of.call(str(id).trim_prefix("mvr-")))
 
 
 func retint() -> void:
@@ -273,6 +286,8 @@ func hit(cam: Camera3D, pos: Vector2) -> String:
 	var near := INF
 	for id in _fx:
 		var root := _fx[id].root as Node3D
+		if not root.visible:
+			continue
 		var inv := root.global_transform.affine_inverse()
 		var hit: Variant = (_fx[id].box as AABB).intersects_ray(inv * from, inv.basis * dir)
 		if hit != null and from.distance_to(root.global_transform * (hit as Vector3)) < near:

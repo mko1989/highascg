@@ -12,6 +12,7 @@ const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
 const MoveModel := preload("res://features/previs/move/move_model.gd")
 
 signal layer_colors_changed(cols: Dictionary)  ## WO-678: the patched heads (fixtures_3d.gd) follow their layer
+signal hidden_layers_changed(hidden: Dictionary)  ## WO-767: …and its eye (layer name → true)
 signal loaded(info: Dictionary)  ## {} when cleared; else {name, objects, fixtures, parts, meshes, failed, report} or {error}
 
 var scene_id := ""
@@ -176,6 +177,10 @@ func set_hidden_layers(names: Array) -> void:
 		_hidden[str(n)] = true
 	for c in get_children():
 		_show(c as Node3D)
+	hidden_layers_changed.emit(_hidden)
+
+
+func hidden_layers() -> Dictionary: return _hidden
 
 
 ## WO-615 T10 — fixtures patched from this scene are drawn by the live rig (fixtures_3d.gd): hide their static model.

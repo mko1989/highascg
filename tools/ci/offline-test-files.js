@@ -52,6 +52,7 @@ module.exports = [
 	'tools/smoke/smoke-wo597-video-surfaces.test.js',
 	'tools/smoke/smoke-wo597-operator-gui-atlas.test.js',
 	'tools/smoke/smoke-wo766-playlist-fade-preview.test.js',
+	'tools/smoke/smoke-wo767-glb-mm-units.test.js',
 	'tools/smoke/smoke-wo598-take-payload-parity.test.js',
 	'tools/smoke/smoke-wo598-preview-push.test.js',
 	'tools/smoke/smoke-wo598-deck-sync-persist-race.test.js',

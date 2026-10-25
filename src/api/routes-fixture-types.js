@@ -8,7 +8,8 @@
  *   GET    /api/fixtures/types/<id>/mode?name=<m>    → { name, geometry, breaks, footprint, channels[], warnings }
  *   GET    /api/fixtures/types/<id>/file?path=<p>    → an archive member (wheel image, model)
  *   GET    /api/fixtures/types/<id>/rig?mode=<m>     → WO-615 T5 previs rig: { mode, footprint, nodes[], meshes[] }
- *   GET    /api/fixtures/types/<id>/model?path=<p>   → a rig mesh as GLB (models/3ds/* converted, as WO-612)
+ *   GET    /api/fixtures/types/<id>/model?path=<p>   → a rig mesh as GLB (models/3ds/* converted, as WO-612; a .glb in
+ *          mm — ~1000× its declared Model size — is scaled to metres, WO-767)
  *   DELETE /api/fixtures/types/<id>
  *   POST   /api/fixtures/types/<id>/replace {to, modes{from: to}} → WO-633: use type <to> for <id> from now on (box-level
  *          alias, gdtf-aliases.js; the MVR patch resolves it) → the summary with `replacedBy`
@@ -20,6 +21,7 @@ const path = require('path')
 const store = require('../fixtures/gdtf-store')
 const aliases = require('../fixtures/gdtf-aliases')
 const { threeDsToGlb } = require('../stage/mvr-3ds')
+const { fixGlbUnits } = require('../stage/glb-units')
 const { readUpload } = require('./routes-stage-mvr')
 const { JSON_HEADERS, jsonBody } = require('./response')
 
@@ -55,9 +57,10 @@ async function handleGet(p, query) {
 		if (!/^models\/(gltf\/[^/]+\.glb|3ds\/[^/]+\.3ds)$/i.test(file)) return reply(400, { error: 'not a rig mesh path' })
 		const buf = await store.member(m[1], file)
 		if (!buf) return reply(404, { error: 'no such model in the fixture type' })
-		let glb = buf
+		let glb
 		try {
 			if (!/\.glb$/i.test(file)) glb = threeDsToGlb(buf, { fixtureBody: true }) // WO-678: unspecified body → black
+			else glb = fixGlbUnits(buf, declaredSize(m[1], file)).glb
 		} catch (e) {
 			return reply(422, { error: `model conversion failed: ${e.message}` })
 		}
@@ -72,6 +75,17 @@ async function handleGet(p, query) {
 	}
 	const d = store.describe(m[1])
 	return d ? reply(200, d) : reply(404, { error: 'no such fixture type' })
+}
+
+/** WO-767: the largest declared side (m) of the GDTF Model whose File is this mesh, or 0 (unknown). */
+function declaredSize(id, file) {
+	const stem = path.basename(file).replace(/\.[^.]+$/, '').toLowerCase()
+	let best = 0
+	for (const mdl of Object.values(store.describe(id)?.models || {})) {
+		if (String(mdl?.file || '').toLowerCase() !== stem || !Array.isArray(mdl.size)) continue
+		best = Math.max(best, ...mdl.size.map((v) => Number(v) || 0))
+	}
+	return best
 }
 
 /** WO-633: both types stored, every mode named exists on its side; an empty mode map is allowed (nothing paired). */
