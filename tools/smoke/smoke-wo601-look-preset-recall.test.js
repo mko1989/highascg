@@ -44,9 +44,11 @@ describe('WO-601 POST /api/scene/look-preset/recall', () => {
 		const r = rig(two)
 		const res = await handleLookPresetRecall({ id: 'p1' }, {}, r.deps)
 		assert.equal(res.status, 200)
+		const group = r.calls[0].takeGroup // WO-782: one take group, so both screens' PLAYs go out in one batch
+		assert.equal(group.size, 2)
 		assert.deepEqual(r.calls, [
-			{ sceneId: 'a', mainIdx: 0, target: 'preview', forceCut: false },
-			{ sceneId: 'b', mainIdx: 1, target: 'preview', forceCut: false },
+			{ sceneId: 'a', mainIdx: 0, target: 'preview', forceCut: false, takeGroup: group },
+			{ sceneId: 'b', mainIdx: 1, target: 'preview', forceCut: false, takeGroup: group },
 		])
 		assert.equal(json(res).ok, true)
 	})

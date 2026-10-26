@@ -70,6 +70,9 @@ Parents: [WO-601](./601_WO_godot_port_inspector.md) §Look presets (Godot page +
   - PRV: `handlePreviewLiveClear` (the deck's blank-click clear).
   - PGM: `/api/ftb`, with 0.5 s at the channel rate, or 0 frames for Cut (the deck FTB path).
   - Looks still recall together (WO-150 batch).
+- *Superseded by [WO-782](./782_WO_look_preset_recall_one_play_batch.md):* the PGM empty-destination path no longer
+  calls `/api/ftb`. That path faded the screen's PRV too and turned a Cut into 25 frames. The fade now rides the
+  recall's single PLAY batch.
 - Presets stay **references** to looks, not frozen copies (see Investigation): look edits reach the preset, and the
   deck's TAKE takes what was recalled.
 - `app/main.gd`: the probe hooks are now one table (500-line cap), plus the new `--probe-e2-presets=<png prefix>`

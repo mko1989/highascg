@@ -17,12 +17,22 @@ function bad(status, error) {
 }
 
 /**
+ * `takeGroup` ({id, size}, WO-782): this take is one screen of a multi-screen recall — passed on to the take engine,
+ * whose barrier sends every screen's final PLAY batch together (WO-574). A take that bails out here never reached the
+ * engine, so its group slot is released at once (the other screens must not wait out the barrier timeout).
  * @param {unknown} body
  * @param {object} ctx
  * @param {{ resolveSceneById?: Function, getChannelMap?: Function, take?: Function, withBorder?: Function }} [deps]
  */
 async function handleTakeLook(body, ctx, deps = {}) {
 	const b = parseBody(body)
+	const res = await takeLook(b, ctx, deps)
+	if (res.status >= 400 && !res.handedToTake) require('../engine/take-sync-barrier').joinTakeGroup(b.takeGroup)?.leave()
+	delete res.handedToTake
+	return res
+}
+
+async function takeLook(b, ctx, deps) {
 	const sceneId = String(b.sceneId || '').trim()
 	if (!sceneId) return bad(400, 'sceneId required')
 	const { resolveLiveSceneById } = require('../engine/project-scenes-transform')
@@ -63,9 +73,10 @@ async function handleTakeLook(body, ctx, deps = {}) {
 		useServerLive: true,
 		incomingScene,
 		...(target === 'preview' ? { target: 'preview' } : {}),
+		...(b.takeGroup ? { takeGroup: b.takeGroup } : {}),
 	}
 	const take = deps.take || require('./routes-scene-take').handleSceneTake
-	return take(takeBody, ctx)
+	return { ...(await take(takeBody, ctx)), handedToTake: true }
 }
 
 module.exports = { handleTakeLook }

@@ -202,6 +202,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				skipLayerVisualEquality: true,
 				banklessTake: true,
 				restrictTimelineToPreview: true, // WO-549: a preview-only take must never claim program
+				playSync: sync, // WO-782: a preset recall to PRV — every screen's PLAY batch goes out together
 			})
 			if (inc && typeof inc === 'object' && inc.id) {
 				/* WO-341: MUST be awaited — setChannel serializes its write into a later microtask;

@@ -4,8 +4,9 @@
  * WO-601 — POST /api/scene/look-preset/recall { id, target?: 'preview'|'program', forceCut?, useGlobalTransition? }
  *
  * Recall a look preset (a named screen → look bookmark, `scenes.lookPresets`, client-owned like the rest of the deck):
- * every item goes through the take-look path for its own screen, all at once (WO-150 B150.6: screens take together,
- * not one after another's transition). `useGlobalTransition` (program, not a cut) replaces each look's own transition
+ * every item goes through the take-look path for its own screen, all at once (WO-150 B150.6). WO-782: the items form
+ * one take group (WO-574 barrier) — each screen preps on its own, then every screen's final PLAY / fade lines go out
+ * in ONE AMCP batch; an empty destination's fade to black rides the same batch. `useGlobalTransition` (program, not a cut) replaces each look's own transition
  * with the deck default, as the web preset card's "Take (global)" does (B150.5). Web: scenes-editor-logic.js
  * runLookRecall. Saving / overwriting / deleting a preset is a deck edit and travels with the deck sync.
  */
@@ -77,12 +78,20 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 		transitionOverride = await globalTransition(scenes, fps)
 	}
 	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))
-	const clearDest = deps.clearDestination || ((m, t, cut) => clearDestination(ctx, m, t, cut))
+	const clearDest = deps.clearDestination || ((m, t, cut, group) => clearDestination(ctx, m, t, cut, group))
+	const takeGroup = items.length > 1 ? { id: `preset-${id}-${Date.now()}`, size: items.length } : null
 	const results = await Promise.all(
 		items.map(async (it) => {
 			const res = it.empty
-				? await clearDest(it.mainIdx, target, forceCut)
-				: await takeLook({ sceneId: it.sceneId, mainIdx: it.mainIdx, target, forceCut, ...(transitionOverride ? { transitionOverride } : {}) })
+				? await clearDest(it.mainIdx, target, forceCut, takeGroup)
+				: await takeLook({
+						sceneId: it.sceneId,
+						mainIdx: it.mainIdx,
+						target,
+						forceCut,
+						...(transitionOverride ? { transitionOverride } : {}),
+						...(takeGroup ? { takeGroup } : {}),
+					})
 			let err = null
 			if (res?.status >= 400) {
 				try {
@@ -99,14 +108,52 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 }
 
 /**
- * WO-781: an empty destination of the preset — PRV recall clears that screen's PRV (the deck's blank click), PGM
- * recall fades it to black like the deck's FTB (0.5 s at the screen's fps; a cut is 0 frames).
+ * WO-781: an empty destination of the preset. PRV recall clears that screen's PRV (the deck's blank click) once the
+ * group is released. PGM recall fades the screen's program to black (0.5 s at its fps; a cut is 0 frames) — WO-782:
+ * the fade lines are handed to the take group, so they start in the same batch as the other screens' PLAYs; the
+ * channel is cleared after the fade. The screen's PRV is left alone (only the recalled bus changes).
  */
-async function clearDestination(ctx, mainIdx, target, cut) {
-	if (target === 'preview') return require('./routes-scene').handlePreviewLiveClear({ mainIndex: mainIdx }, ctx)
-	const map = require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)
-	const fps = map?.programResolutions?.[mainIdx]?.fps ?? 50
-	return require('./routes-ftb').handlePost('/api/ftb', { screenIdx: mainIdx, durationFrames: cut ? 0 : Math.round(0.5 * fps), framerate: fps }, ctx)
+async function clearDestination(ctx, mainIdx, target, cut, takeGroup) {
+	const { withTakeGroup } = require('../engine/take-sync-barrier')
+	if (target === 'preview') {
+		return withTakeGroup(takeGroup, async (sync) => {
+			await sync?.arrive()
+			return require('./routes-scene').handlePreviewLiveClear({ mainIndex: mainIdx }, ctx)
+		})
+	}
+	return withTakeGroup(takeGroup, (sync) => fadeProgramToBlack(ctx, mainIdx, cut, sync))
 }
 
-module.exports = { handleLookPresetRecall, recallItems }
+async function fadeProgramToBlack(ctx, mainIdx, cut, sync) {
+	const map = require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)
+	const ch = Number(map?.programChannels?.[mainIdx])
+	if (!Number.isFinite(ch) || ch <= 0 || !ctx?.amcp) return out(400, { ok: false, error: `no program channel for main ${mainIdx}` })
+	const fps = map?.programResolutions?.[mainIdx]?.fps ?? 50
+	const frames = cut ? 0 : Math.round(0.5 * fps)
+	const ftb = require('./routes-ftb')
+	const pb = ftb.shouldStopTimelineForFtb(ctx, mainIdx) ? ctx.timelineEngine?.getPlayback?.() : null
+	if (pb?.timelineId) {
+		try {
+			ctx.timelineEngine.stop(pb.timelineId, { skipAmcp: true })
+		} catch {}
+	}
+	const { collectLayersToFadeOnChannel } = require('../engine/ftb-pgm-prv')
+	const block = collectLayersToFadeOnChannel(ctx, ch).map((L) => `MIXER ${ch}-${L} OPACITY 0 ${frames} linear DEFER`)
+	try {
+		if (sync) await sync.arrive({ amcp: ctx.amcp, channel: ch, leadingCommit: false, block, trailingCommit: true })
+		else {
+			if (block.length) await ctx.amcp.batchSendChunked(block, { skipMixerPreCommit: true })
+			await ctx.amcp.mixerCommit(ch)
+		}
+		await new Promise((r) => setTimeout(r, Math.ceil((frames / fps) * 1000) + 200))
+		await require('../engine/caspar-channel-clear').clearCasparChannel(ctx.amcp, ch, ctx)
+	} catch (e) {
+		return out(502, { ok: false, error: e?.message || String(e) })
+	}
+	const liveSceneState = require('../state/live-scene-state')
+	await liveSceneState.clearChannel(ch)
+	liveSceneState.broadcastSceneLive(ctx)
+	return out(200, { ok: true, channel: ch, durationFrames: frames })
+}
+
+module.exports = { handleLookPresetRecall, recallItems, clearDestination }

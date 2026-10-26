@@ -146,7 +146,10 @@ test('wiring: client tags batched POSTs, server hands the group to the PGM take,
 
 	const route = read('src/api/routes-scene-take.js')
 	assert.match(route, /withTakeGroup\(parseBody\(body\)\?\.takeGroup/)
-	assert.equal((route.match(/playSync: sync/g) || []).length, 2, 'PGM take + direct-program take only (never PRV staging)')
+	// WO-782: + the preview-only take (a preset recall to PRV is that request's own take). Never the PRV staging /
+	// exchange calls inside a program take — those carry deferTimelinePlay / protectedTimelineId, not the group.
+	assert.equal((route.match(/playSync: sync/g) || []).length, 3, 'PGM take + direct-program take + preview-only take')
+	assert.match(route, /restrictTimelineToPreview: true, \/\/ WO-549[^\n]*\n\t+playSync: sync, \/\/ WO-782/)
 
 	assert.match(read('src/engine/scene-take-lbg.js'), /playSync: opts\.playSync \|\| null/)
 
