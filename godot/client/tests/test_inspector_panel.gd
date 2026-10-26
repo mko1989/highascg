@@ -49,3 +49,22 @@ func test_releasing_a_hidden_page_changes_nothing() -> void:
 	p.release(a[1])
 	t.ok(p.showing(a[2]), "the shown page stays")
 	p.free()
+
+
+## WO-783 — the column's tabs: a new tab does not take the column over, a tab click shows its pane, and a new
+## selection (present) brings the Inspector tab back.
+func test_tabs_and_selection() -> void:
+	var a := _panel()
+	var p: Control = a[0]
+	var presets := VBoxContainer.new()
+	p.add_tab("Look presets", presets)
+	t.eq(p.tab_shown(), 0, "the Inspector tab stays shown")
+	t.eq(p._tabs.size(), 2, "Inspector + Look presets")
+	p.show_tab(1)
+	t.eq(p.tab_shown(), 1, "Look presets shown")
+	t.ok(presets.is_visible_in_tree() or not p.is_inside_tree(), "its pane is the visible one")
+	t.ok(not p._panes[0].visible, "the Inspector pane is hidden")
+	p.present(a[1])
+	t.eq(p.tab_shown(), 0, "a selection brings the Inspector back")
+	t.ok(p.showing(a[1]), "with its page")
+	p.free()

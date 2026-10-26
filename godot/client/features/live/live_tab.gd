@@ -12,7 +12,6 @@ const LookEditor := preload("res://features/live/look_editor.gd")
 const ScreenTimerPanel := preload("res://features/live/screen_timer_panel.gd")
 const GlobalBorderPanel := preload("res://features/live/global_border_panel.gd")
 const LookPresetPage := preload("res://features/live/look_preset_page.gd")
-const LookPresetStrip := preload("res://features/live/look_preset_strip.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const LiveStage3D := preload("res://features/live/live_stage_3d.gd")
@@ -28,8 +27,7 @@ var editor: LookEditor
 var timers: ScreenTimerPanel
 var border: GlobalBorderPanel
 var presets: LookPresetPage
-var preset_strip: LookPresetStrip  # WO-781: preset cards in the card section
-var _show_btns := {}  # WO-781: deck toolbar "Looks" / "Presets" toggles
+var _show_btns := {}  # WO-781: deck toolbar "Looks" toggle (WO-783: presets moved to the right column's tab)
 var _action: Label
 var osc: Node  # the shell's OscMirror (set before _ready)
 var stage3d: LiveStage3D
@@ -90,8 +88,6 @@ func _ready() -> void:
 		add_child(osc)
 	var bar := _transition_toolbar()
 	bottom.add_child(bar)
-	preset_strip = LookPresetStrip.new()
-	bottom.add_child(preset_strip)
 	tiles.osc = osc
 	osc.updated.connect(func() -> void:
 		if tiles.times and tiles.is_visible_in_tree():
@@ -112,8 +108,7 @@ func _ready() -> void:
 	inner.add_child(editor)
 	editor.visibility_changed.connect(func() -> void:  # WO-621 N5: an open editor is the only thing at the bottom
 		for c in [_action, bar, deck]:
-			c.visible = not editor.visible
-		preset_strip.visible = not editor.visible and _show_btns["presets"].button_pressed)
+			c.visible = not editor.visible)
 	shader_live = ShaderLivePanel.new()
 	shader_live.visible = false
 	shader_live.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -124,22 +119,19 @@ func _ready() -> void:
 	shader_live.visibility_changed.connect(func() -> void:
 		inner.visible = not shader_live.visible
 		for c in [_action, bar]:
-			c.visible = not shader_live.visible and not editor.visible
-		preset_strip.visible = not shader_live.visible and not editor.visible and _show_btns["presets"].button_pressed)
+			c.visible = not shader_live.visible and not editor.visible)
 	timers = ScreenTimerPanel.new()  # R2: screen timers / border are Inspector pages, not tab panels
 	timers.visible = false
 	add_child(timers)
 	border = GlobalBorderPanel.new()
 	border.visible = false
 	add_child(border)
-	presets = LookPresetPage.new()
-	presets.visible = false
+	presets = LookPresetPage.new()  # WO-783: the right column's "Look presets" tab, beside the Inspector
 	presets.editing_cb = func() -> String: return editor.scene_id if editor.visible else ""
-	add_child(presets)
-	preset_strip.page = presets
-	preset_strip.manage_requested.connect(func() -> void:
-		InspectorPanel.current.present(presets)
-		presets.open())
+	if is_instance_valid(InspectorPanel.current):
+		InspectorPanel.current.add_tab("Look presets", presets)
+	else:
+		add_child(presets)
 	presets.said.connect(func(text: String, ok: bool) -> void: deck.action_result.emit(text, ok))
 	deck.edit_requested.connect(func(id: String, m: int) -> void: editor.open(id, m))
 	editor.take_requested.connect(func(id: String, m: int) -> void: deck.request_take(id, m, "program"))
@@ -312,12 +304,12 @@ func _transition_toolbar() -> Control:
 	shl.tooltip_text = "Edit the shaders on air live — every value rides onto the running output (also: click the logo)"
 	shl.pressed.connect(func() -> void: toggle_shader_live(true))
 	bar.add_child(shl)
-	for k in ["looks", "presets"]:  # WO-781: show / hide each kind of card in the card section
+	for k in ["looks"]:  # WO-781: show / hide the look cards in the card section (presets: the right column's tab)
 		var b := Button.new()
-		b.text = {"looks": "Looks", "presets": "Presets"}[k]
+		b.text = "Looks"
 		b.toggle_mode = true
 		b.button_pressed = true
-		b.tooltip_text = {"looks": "Show the look cards in each screen's column", "presets": "Show the look preset cards above the screens"}[k]
+		b.tooltip_text = "Show the look cards in each screen's column"
 		b.toggled.connect(func(on: bool) -> void: _set_shown(k, on, true))
 		bar.add_child(b)
 		_show_btns[k] = b
@@ -333,8 +325,6 @@ func _set_shown(kind: String, on: bool, persist: bool) -> void:
 	(_show_btns[kind] as Button).set_pressed_no_signal(on)
 	if kind == "looks":
 		deck.show_looks = on
-	else:
-		preset_strip.visible = on and not editor.visible and not shader_live.visible
 	if persist:
 		var cfg := ConfigFile.new()
 		cfg.load(UI_CFG)

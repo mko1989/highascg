@@ -6,6 +6,7 @@ extends Node
 
 const Destinations := preload("res://features/live/destinations.gd")
 const M := preload("res://features/live/look_preset_model.gd")
+const InspectorPanel := preload("res://app/inspector_panel.gd")
 
 var lt: Node
 var prefix := ""
@@ -24,6 +25,7 @@ func _ready() -> void:
 	for p in page.presets():
 		if str(p.get("id")) in [pgm, prv]:
 			print("[client] e2 probe saved %s: %s" % [p.name, JSON.stringify(p.items)])
+	InspectorPanel.current.show_tab(1)  # WO-783: the right column's "Look presets" tab
 	await _shot(1)
 	_report("before recall")
 	await page.recall(pgm, "program")  # WO-782: every screen's PLAY / fade in one batch (journal "[take-sync] Phase B go")

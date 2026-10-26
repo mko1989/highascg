@@ -1,42 +1,30 @@
 extends VBoxContainer
-## WO-601 — look presets Inspector page (web inspector-panel-presets-modes.js renderLookPresetsMode), opened from the
-## deck toolbar's "Presets" / a preset card's ⚙. Save / Overwrite / Remove edit `project.scenes.lookPresets` and travel
-## with the deck sync (the web does the same); Preview / ▶ / Auto / Cut ask the server to recall (POST
-## /api/scene/look-preset/recall), which takes every screen of the preset at once. WO-781 (E2): a save covers exactly
-## the highlighted destinations (destinations.gd), empty ones included; a recall re-highlights the preset's screens.
+## WO-601 / WO-783 — the right column's "Look presets" tab (web inspector-panel-presets-modes.js
+## renderLookPresetsMode): destinations, save, and the preset cards (look_preset_strip.gd). Save / Overwrite / Remove
+## edit `project.scenes.lookPresets` and travel with the deck sync (the web does the same); a card click / ▶ / Auto /
+## Cut ask the server to recall (POST /api/scene/look-preset/recall), which takes every screen of the preset at once
+## (one PLAY batch, WO-782). WO-781 (E2): a save covers exactly the highlighted destinations (destinations.gd), empty
+## ones included; a recall re-highlights the preset's screens.
 
-signal closed
-signal said(text: String, ok: bool)  # WO-781: the deck's action line shows it (saves from the preset strip)
+signal said(text: String, ok: bool)  # WO-781: the deck's action line shows it
 
 const M := preload("res://features/live/look_preset_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
-const Icons := preload("res://app/ui_icons.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
 const Destinations := preload("res://features/live/destinations.gd")
+const LookPresetStrip := preload("res://features/live/look_preset_strip.gd")
 
 var editing_cb: Callable = func() -> String: return ""  # the look open in the editor ("" = none)
-var _title: Label
 var _dests: Label
 var _save_btns := {}
-var _list: VBoxContainer
+var _list: LookPresetStrip
 var _status: Label
 var _dirty := false
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 6)
-	var head := HBoxContainer.new()
-	_title = Label.new()
-	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head.add_child(_title)
-	var x := Button.new()
-	x.text = "✕"
-	x.pressed.connect(func() -> void:
-		visible = false
-		closed.emit())
-	head.add_child(x)
-	add_child(head)
 	var hint := Label.new()
 	hint.text = "Highlight destinations (click a screen's title in the deck), then save what is on their PRV or PGM. Recall loads exactly those screens — an empty one is cleared."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -53,11 +41,8 @@ func _ready() -> void:
 		save.add_child(b)
 		_save_btns[k] = b
 	add_child(save)
-	var lib := Label.new()
-	lib.text = "Library"
-	lib.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
-	add_child(lib)
-	_list = VBoxContainer.new()
+	_list = LookPresetStrip.new()
+	_list.page = self
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(_list)
 	_status = Label.new()
@@ -68,18 +53,12 @@ func _ready() -> void:
 		if path == "*" or path == "scene.live" or path == "channelMap" or path == Destinations.PATH:
 			_queue())
 	visibility_changed.connect(func() -> void:
-		if visible:
+		if is_visible_in_tree():
 			_render())
 
 
-func open() -> void:
-	_title.text = "Look presets"
-	visible = true
-	_render()
-
-
 func _queue() -> void:
-	if visible and not _dirty:
+	if is_visible_in_tree() and not _dirty:
 		_dirty = true
 		_render.call_deferred()
 
@@ -149,68 +128,13 @@ func _render() -> void:
 		var none := capture(k).is_empty()
 		_save_btns[k].disabled = none
 		_save_btns[k].tooltip_text = ("Highlight destinations first: click a screen's title in the deck" if sel.is_empty() else "Open a look in the editor first") if none else ""
-	for c in _list.get_children():
-		c.queue_free()
-	var list := presets()
-	if list.is_empty():
-		var e := Label.new()
-		e.text = "No look presets yet."
-		e.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-		_list.add_child(e)
-		return
-	var looks := _looks()
-	var bus := true_buses()
-	for p in list:
-		if p is Dictionary:
-			_list.add_child(_card(p, looks, bus))
 
 
-func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
-	var exists := looks.has(str(p.get("sceneId", "")))
-	for it in p.get("items", []):
-		exists = exists or (it is Dictionary and (looks.has(str(it.get("sceneId", ""))) or it.get("empty") == true))
-	var box := VBoxContainer.new()
-	var row := HBoxContainer.new()
-	var label := Label.new()
-	label.text = str(p.get("name", ""))
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.clip_text = true
-	if M.loaded_on_prv(p, bus):
-		label.add_theme_color_override("font_color", ThemeBuilder.SUCCESS)
-		label.tooltip_text = "On PRV now"
-	row.add_child(label)
-	var play := Icons.button("play", "Play: take to PGM with each look's own transition", 14)
-	play.disabled = not exists
-	play.pressed.connect(func() -> void: recall(str(p.id), "program"))
-	row.add_child(play)
-	box.add_child(row)
-	var meta := Label.new()
-	meta.text = "%s · %s" % [M.source_label(str(p.get("sourceKind", ""))), M.dest_line(p, looks)] if (p.get("items", []) as Array).size() > 0 else M.meta_line(p, exists)
-	meta.clip_text = true
-	meta.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	box.add_child(meta)
-	var acts := HFlowContainer.new()
-	var pid := str(p.get("id", ""))
-	for spec in [["Preview", "Load every screen's look onto its PRV", func() -> void: recall(pid, "preview")],
-			["Auto", "Take to PGM with the deck's default transition", func() -> void: recall(pid, "program", false, true)],
-			["Cut", "Cut to PGM", func() -> void: recall(pid, "program", true)],
-			["Overwrite", "Replace with what is on %s now" % M.source_label(str(p.get("sourceKind", ""))), func() -> void: _confirm_overwrite(p)]]:
-		var b := Button.new()
-		b.text = spec[0]
-		b.tooltip_text = spec[1]
-		b.disabled = not exists
-		b.pressed.connect(spec[2])
-		acts.add_child(b)
-	var rm := Button.new()
-	rm.text = "Remove"
-	rm.tooltip_text = "Remove the preset (the look stays on the deck)"
-	rm.pressed.connect(func() -> void: _confirm("Remove look preset \"%s\"? (The look itself stays on the deck.)" % p.get("name", ""), func() -> void:
-		if M.remove(presets(), pid):
-			_commit("Look preset removed.")))
-	acts.add_child(rm)
-	box.add_child(acts)
-	box.add_child(HSeparator.new())
-	return box
+## ⋯ Remove on a card.
+func confirm_remove(p: Dictionary) -> void:
+	_confirm("Remove look preset \"%s\"? (The look itself stays on the deck.)" % p.get("name", ""), func() -> void:
+		if M.remove(presets(), str(p.get("id", ""))):
+			_commit("Look preset removed."))
 
 
 func ask_name(source: String) -> void:

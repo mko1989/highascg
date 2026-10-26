@@ -1,10 +1,7 @@
-extends VBoxContainer
-## WO-781 — look presets as cards in the card section (E2 preset list), above the screen columns. A click loads the
-## preset to PRV, ▶ takes it with each look's own transition, ⚙ opens the Inspector page (Auto / Cut / Overwrite /
-## Remove). "+" saves the highlighted destinations' PRV. Green = on PRV now, red = on PGM. Shown / hidden by the deck
-## toolbar's "Presets". Recall and save go through the page (look_preset_page.gd), which owns the preset list.
-
-signal manage_requested
+extends HFlowContainer
+## WO-781 / WO-783 — the look preset cards of the right column's "Look presets" tab (look_preset_page.gd hosts them;
+## E2 preset list). A click loads the preset to PRV, ▶ takes it with each look's own transition, ⋯ holds Auto / Cut /
+## Overwrite / Remove. Green = on PRV now, red = on PGM. Recall and edits go through the page, which owns the list.
 
 const M := preload("res://features/live/look_preset_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -13,25 +10,12 @@ const Destinations := preload("res://features/live/destinations.gd")
 const CARD_W := 170
 
 var page: Node  # look_preset_page.gd
-var _flow: HFlowContainer
 var _dirty := true
 
 
 func _ready() -> void:
-	add_theme_constant_override("separation", 4)
-	var head := HBoxContainer.new()
-	var l := Label.new()
-	l.text = "Presets"
-	l.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	head.add_child(l)
-	var cog := Icons.button("cog", "Look presets: save from PGM / open look, Auto, Cut, overwrite, remove", 12)
-	cog.pressed.connect(func() -> void: manage_requested.emit())
-	head.add_child(cog)
-	add_child(head)
-	_flow = HFlowContainer.new()
-	_flow.add_theme_constant_override("h_separation", 8)
-	_flow.add_theme_constant_override("v_separation", 8)
-	add_child(_flow)
+	add_theme_constant_override("h_separation", 8)
+	add_theme_constant_override("v_separation", 8)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _dirty = true)
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
 		if path == "*" or path == "scene.live" or path == "channelMap" or path == Destinations.PATH:
@@ -46,14 +30,18 @@ func _process(_delta: float) -> void:
 
 
 func rebuild() -> void:
-	for c in _flow.get_children():
+	for c in get_children():
 		c.queue_free()
 	var looks: Dictionary = page._looks()
 	var bus: Dictionary = page.true_buses()
 	for p in page.presets():
 		if p is Dictionary:
-			_flow.add_child(_card(p, looks, bus))
-	_flow.add_child(_add_tile())
+			add_child(_card(p, looks, bus))
+	if page.presets().is_empty():
+		var e := Label.new()
+		e.text = "No look presets yet."
+		e.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
+		add_child(e)
 
 
 func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
@@ -82,6 +70,7 @@ func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
 	var play := Icons.button("play", "Take to PGM — every destination with its look's own transition", 12)
 	play.pressed.connect(func() -> void: page.recall(id, "program"))
 	row.add_child(play)
+	row.add_child(_menu(p))
 	v.add_child(row)
 	var meta := Label.new()
 	meta.text = M.dest_line(p, looks)
@@ -94,13 +83,23 @@ func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
 	return card
 
 
-func _add_tile() -> Control:
-	var b := Button.new()
-	b.text = "+"
-	b.custom_minimum_size = Vector2(56, 48)
-	b.focus_mode = Control.FOCUS_NONE
-	var none := Destinations.selected().is_empty()
-	b.disabled = none
-	b.tooltip_text = "Highlight destinations first: click a screen's title below" if none else "Save the highlighted destinations' PRV as a look preset"
-	b.pressed.connect(func() -> void: page.ask_name("prv"))
-	return b
+## ⋯ — the rarer actions (the old Inspector page's Library buttons).
+func _menu(p: Dictionary) -> MenuButton:
+	var id := str(p.get("id", ""))
+	var mb := MenuButton.new()
+	mb.text = "⋯"
+	mb.tooltip_text = "Auto / Cut / Overwrite / Remove"
+	var pm := mb.get_popup()
+	pm.add_item("Auto — take with the deck's default transition", 0)
+	pm.add_item("Cut to PGM", 1)
+	pm.add_item("Overwrite with the current %s" % M.source_label(str(p.get("sourceKind", "prv"))), 2)
+	pm.add_separator()
+	pm.add_item("Remove", 3)
+	var acts: Array[Callable] = [
+		func() -> void: page.recall(id, "program", false, true),
+		func() -> void: page.recall(id, "program", true),
+		func() -> void: page._confirm_overwrite(p),
+		func() -> void: page.confirm_remove(p),
+	]
+	pm.id_pressed.connect(func(item: int) -> void: acts[item].call())
+	return mb

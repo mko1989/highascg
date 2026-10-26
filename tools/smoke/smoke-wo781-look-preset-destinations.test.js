@@ -81,7 +81,7 @@ describe('WO-781 empty destinations', () => {
 		])
 	})
 
-	it('Godot: titles toggle destinations, saves keep empty ones, the card section toggles Looks / Presets', () => {
+	it('Godot: titles toggle destinations, saves keep empty ones, Looks toggle, presets in the right column tab', () => {
 		assert.match(read('deck_head.gd'), /dest\.toggled\.connect\(func\(_p: bool\) -> void: Destinations\.toggle\(main\)\)/)
 		assert.match(
 			read('look_preset_page.gd'),
@@ -90,7 +90,8 @@ describe('WO-781 empty destinations', () => {
 		assert.match(read('look_preset_page.gd'), /Destinations\.set_only\(M\.mains_of\(p\)\)/)
 		assert.match(read('look_preset_strip.gd'), /var bus: Dictionary = page\.true_buses\(\)/)
 		const tab = read('live_tab.gd')
-		assert.match(tab, /for k in \["looks", "presets"\]:/)
+		assert.match(tab, /for k in \["looks"\]:/) // WO-783: presets left the card section for the right column's tab
+		assert.match(tab, /InspectorPanel\.current\.add_tab\("Look presets", presets\)/)
 		assert.match(tab, /cfg\.set_value\("live", "show_" \+ kind, on\)/)
 		assert.match(read('deck_view.gd'), /for s in \(looks if show_looks else \[\]\):/)
 	})
