@@ -366,7 +366,7 @@ func _ready() -> void:
 		show.call("removed")
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
 		await shell.tabs.get_node("Live").deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
-	var probes := {"probe-blank-clear": "deck_blank_probe", "probe-e2-presets": "preset_e2_probe", "probe-perf": "perf_probe"}
+	var probes := {"probe-blank-clear": "deck_blank_probe", "probe-e2-presets": "preset_e2_probe", "probe-perf": "perf_probe", "probe-fixture": "fixture_shot_probe"}
 	for pf in probes:  # dev: self-driving GUI probes (WO-777 blank PRV clear =<main>, WO-781 E2 presets =<png prefix>, WO-617)
 		if Config.args.has(pf):
 			add_child(load("res://app/%s.gd" % probes[pf]).new())

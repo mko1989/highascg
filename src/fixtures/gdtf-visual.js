@@ -12,10 +12,14 @@
  *
  * A channel's live function is the one whose DMX range holds the value and whose mode master (another channel of the
  * mode, by name) holds a value in ModeFrom…ModeTo. Intensity = the dimmers in scope multiplied (a pixel's own dimmer
- * × the bar master; a virtual channel reads its default), 0 while a Shutter channel sits on a "Closed" set or
+ * × the bar master), 0 while a Shutter channel sits on a "Closed" set or
  * function; strobes read as open. Colour = additive emitters summed (ColorAdd_*, normalised so the brightest
  * component is 1, its level folded into intensity), else white, then filtered by subtractive CMY and colour-wheel
  * slots (CIE xyY → sRGB chromaticity). A beam with no channel in scope stays dark. Zoom = the Zoom function's physical angle, else the beam's BeamAngle. Pure.
+ *
+ * WO-784: a virtual channel (Offset="", no DMX slot) is left out of every scope. It is the console's own value, folded
+ * into the real channels before they are sent; the wire never carries it. Reading its default kept the MAC Aura PXL,
+ * ELP CL, Pixel Strobe and X-DOT dark (virtual dimmers default 0) and whitened the ACME Pixel Line (virtual W at 255).
  */
 
 const ADD = {
@@ -48,6 +52,7 @@ function cieToRgb([x, y]) {
 function compileVisual(type, mode, rig) {
 	const byGeom = new Map()
 	for (const c of mode.channels) {
+		if (!c.offsets.length) continue // WO-784: virtual — not on the wire
 		if (!byGeom.has(c.geometry)) byGeom.set(c.geometry, [])
 		byGeom.get(c.geometry).push(c)
 	}

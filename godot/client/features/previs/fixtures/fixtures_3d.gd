@@ -473,7 +473,16 @@ func _from_glb(bytes: PackedByteArray) -> Node3D:
 	var state := GLTFState.new()
 	if bytes.is_empty() or doc.append_from_buffer(bytes, "", state) != OK:
 		return null
-	return doc.generate_scene(state) as Node3D
+	var scene := doc.generate_scene(state) as Node3D
+	# WO-784: a glb without materials (Martin's MAC Aura PXL) gets the importer's default white — use the body grey
+	if scene != null and state.get_materials().is_empty():
+		var grey := StandardMaterial3D.new()
+		grey.albedo_color = Color(0.22, 0.22, 0.24)
+		grey.cull_mode = BaseMaterial3D.CULL_DISABLED
+		for mi in scene.find_children("*", "MeshInstance3D", true, false):
+			for s in (mi as MeshInstance3D).get_surface_override_material_count():
+				(mi as MeshInstance3D).set_surface_override_material(s, grey)
+	return scene
 
 
 func _exit_tree() -> void:
