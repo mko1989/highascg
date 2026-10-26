@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # WO-741 (detachable) — the operator client in a VR headset: walk the Previs tab's stage at 1:1 and program lights.
 # Needs an OpenXR runtime that is active: WiVRn with the Quest connected (help/vr-walk.md). Godot starts OpenXR only
-# at launch, so this waits until the runtime is registered (WiVRn does that when the headset connects).
+# at launch, so this waits until the runtime is registered and, for WiVRn, until the headset is connected.
 #   godot/client/run-xr.sh                               # local server
 #   godot/client/run-xr.sh --server=http://192.168.0.4:4200
 #   XR_WAIT_S=0 godot/client/run-xr.sh                    # no wait: no runtime → the desktop walk (WASD)
@@ -31,6 +31,29 @@ if ! rt="$(runtime)" && ((wait_s > 0)); then
 		sleep 1
 		rt="$(runtime)" && break
 	done
+fi
+# WiVRn registers its runtime file when the SERVER starts, not when the headset connects; launching before the
+# headset is there fails OpenXR init (XR_ERROR_RUNTIME_UNAVAILABLE). So also wait for its HeadsetConnected (D-Bus;
+# the node launcher has no session env, hence the default runtime dir).
+headset() {
+	XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" busctl --user get-property io.github.wivrn.Server \
+		/io/github/wivrn/Server io.github.wivrn.Server HeadsetConnected 2>/dev/null | grep -q true
+}
+if [[ -n "${rt:-}" ]] && grep -qi wivrn "$rt" 2>/dev/null && command -v busctl >/dev/null; then
+	if ! headset; then
+		echo "[xr] WiVRn is up — waiting for the headset to connect (${wait_s} s)"
+		connected=0
+		for ((i = 0; i < wait_s; i++)); do
+			sleep 1
+			if headset; then connected=1; break; fi
+		done
+		if ((connected)); then
+			sleep 2 # WiVRn spawns its per-headset server on connect
+		else
+			echo "[xr] the headset did not connect"
+			rt=""
+		fi
+	fi
 fi
 # --xr-mode on only with a runtime: without one Godot stops at a modal "OpenXR was requested but failed to start".
 xr_mode=off
