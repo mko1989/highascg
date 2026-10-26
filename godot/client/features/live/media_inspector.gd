@@ -86,7 +86,10 @@ func _ready() -> void:
 	acts.add_child(del)
 	_lib.add_child(acts)
 	_versions = Versions.new()
-	_versions.changed.connect(func() -> void:  # web reselect(): rescan, reload this file's view
+	_versions.changed.connect(func(new_id: String) -> void:  # web reselect(): rescan, reload this file's view
+		if new_id != id:  # another container → the extension changed (looks were rewritten server-side)
+			_row = _row.duplicate()
+			_row["id"] = new_id
 		library_changed.emit()
 		show_media(_row))
 	_lib.add_child(_versions)

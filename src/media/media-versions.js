@@ -1,7 +1,9 @@
 /**
- * WO-592 B — media version control. A file's PATH never changes across versions (so every look,
+ * WO-592 B — media version control. A file's PATH stays put across versions (so every look,
  * playlist and timeline plays the newest without any rewrite); older versions live outside
  * Caspar's media root in data/media-versions/<entry id>/v<n><ext> (same filesystem → rename, no copy).
+ * A version may be another container (previz .mp4 → show .mov HAP/ProRes): then only the extension
+ * of the path changes and the caller rewrites references (`renamed` in the result).
  *
  * Entry fields (media-library-registry): currentV (number, default 1) and
  *   versions: [{ v, file, size, addedAt, replacedAt }]  — every NON-current version, kept until
@@ -59,29 +61,53 @@ function stash(e, abs, now) {
 }
 
 /**
+ * Where version `file` lives in the media root: the entry's path, with `file`'s extension when it differs.
+ * @returns {{ path: string, abs: string|null, renamed: { from: string, to: string } | null }}
+ */
+function targetFor(config, e, file) {
+	const base = getMediaIngestBasePath(config)
+	const ext = path.extname(e.path)
+	const nextExt = path.extname(file)
+	if (nextExt.toLowerCase() === ext.toLowerCase()) return { path: e.path, abs: resolveSafe(base, e.path), renamed: null }
+	const to = e.path.slice(0, e.path.length - ext.length) + nextExt
+	return { path: to, abs: resolveSafe(base, to), renamed: { from: e.path, to } }
+}
+
+/** A different-extension target must not land on another file. */
+function targetClash(t) {
+	if (!t.abs) return { ok: false, status: 400, error: `invalid path: ${t.path}` }
+	if (t.renamed && fs.existsSync(t.abs)) return { ok: false, status: 409, error: `${t.path} already exists — rename or remove it first` }
+	return null
+}
+
+/**
  * Make `incomingAbs` (a finished upload) the new current version of `mediaPath`.
- * @returns {{ ok: true, entry: object } | { ok: false, status: number, error: string }}
+ * @returns {{ ok: true, entry: object, renamed: { from: string, to: string } | null } | { ok: false, status: number, error: string }}
  */
 function installNewVersion(config, mediaPath, incomingAbs) {
 	const abs = resolveSafe(getMediaIngestBasePath(config), mediaPath)
 	if (!abs || !fs.existsSync(abs)) return { ok: false, status: 404, error: 'file not found' }
 	const e = registry.getEntryByPath(mediaPath)
 	if (!e) return { ok: false, status: 404, error: 'not in media library' }
+	const t = targetFor(config, e, incomingAbs)
+	const clash = targetClash(t)
+	if (clash) return clash
 	const now = Date.now()
 	const v = nextV(e)
 	stash(e, abs, now)
 	try {
-		moveFile(incomingAbs, abs)
+		moveFile(incomingAbs, t.abs)
 	} catch (err) {
 		moveFile(path.join(versionDir(e.id), `v${e.currentV || 1}${path.extname(abs)}`), abs) // put the old one back
 		e.versions = e.versions.filter((x) => x.v !== (e.currentV || 1))
 		return { ok: false, status: 500, error: `could not install new version: ${err?.message || err}` }
 	}
+	e.path = t.path
 	e.currentV = v
 	e.currentAddedAt = now
-	refreshStats(e, abs)
+	refreshStats(e, t.abs)
 	registry.save()
-	return { ok: true, entry: e }
+	return { ok: true, entry: e, renamed: t.renamed }
 }
 
 /** Go back to version `v`; the current file becomes a version. */
@@ -93,17 +119,21 @@ function restoreVersion(config, mediaPath, v) {
 	if (!target) return { ok: false, status: 404, error: `no version v${v}` }
 	const src = path.join(versionDir(e.id), target.file)
 	if (!fs.existsSync(src)) return { ok: false, status: 410, error: `version file missing: ${target.file}` }
+	const t = targetFor(config, e, target.file)
+	const clash = targetClash(t)
+	if (clash) return clash
 	const now = Date.now()
 	const tmp = path.join(versionDir(e.id), `.restoring-${target.file}`)
 	moveFile(src, tmp)
 	if (fs.existsSync(abs)) stash(e, abs, now)
-	moveFile(tmp, abs)
+	moveFile(tmp, t.abs)
 	e.versions = e.versions.filter((x) => x.v !== target.v)
+	e.path = t.path
 	e.currentV = target.v
 	e.currentAddedAt = target.addedAt
-	refreshStats(e, abs)
+	refreshStats(e, t.abs)
 	registry.save()
-	return { ok: true, entry: e }
+	return { ok: true, entry: e, renamed: t.renamed }
 }
 
 /** Purge one old version — final. */

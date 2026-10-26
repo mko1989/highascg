@@ -1,6 +1,7 @@
 /**
  * WO-592 B — media-file inspector "Versions": upload a new version (same path → every look plays
- * it), list every old version, go back to a chosen one, purge one by hand (final).
+ * it), list every old version, go back to a chosen one, purge one by hand (final). A version may be
+ * another container (previz .mp4 → show .mov): the server renames the extension and looks follow.
  */
 import { api, getApiBase } from '../lib/api-client.js'
 import { escapeHtml } from '../lib/dom-escape.js'
@@ -21,8 +22,8 @@ function fmtDate(ms) {
 }
 
 /** Rescan; the Sources panel re-announces the selection, so the inspector reloads preview/waveform/info. */
-function reselect() {
-	window.dispatchEvent(new CustomEvent('media-library-changed', { detail: {} }))
+function reselect(res) {
+	window.dispatchEvent(new CustomEvent('media-library-changed', { detail: res?.renamed ? { renamed: [res.renamed] } : {} }))
 }
 
 /**
@@ -30,12 +31,11 @@ function reselect() {
  * @param {{ id: string, isCurrent: () => boolean }} opts
  */
 export function mountMediaFileVersions(host, { id, isCurrent }) {
-	const ext = (id.match(/\.[^./]+$/) || [''])[0]
 	host.innerHTML = `
 		<div class="media-insp__versions-head">
 			<span>Versions</span>
-			<label class="media-insp__btn media-insp__btn--sm media-insp__upload" title="Replace this file with a new version — looks keep playing it under the same name">
-				New version…<input type="file" accept="${escapeHtml(ext)}" hidden />
+			<label class="media-insp__btn media-insp__btn--sm media-insp__upload" title="Replace this file with a new version (any format, e.g. previz .mp4 → show .mov) — every look plays it">
+				New version…<input type="file" hidden />
 			</label>
 		</div>
 		<div class="media-insp__versions-list">…</div>
@@ -66,20 +66,19 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 
 	const upload = async (file) => {
 		if (!file) return
-		if (!file.name.toLowerCase().endsWith(ext.toLowerCase())) {
-			msg.textContent = `The new version must be a ${ext} file.`
-			return
-		}
-		if (!confirm(`Replace "${id.split('/').pop()}" with "${file.name}"?\n\nEvery look plays the new version. The current one is kept in the version list.`)) return
+		const ext = (s) => (s.match(/\.[^./]+$/) || [''])[0].toLowerCase()
+		const base = id.split('/').pop()
+		const becomes = ext(file.name) !== ext(base) ? `\nThe file becomes "${base.slice(0, base.length - ext(base).length)}${ext(file.name)}".` : ''
+		if (!confirm(`Replace "${base}" with "${file.name}"?\n\nEvery look plays the new version.${becomes} The current one is kept in the version list.`)) return
 		msg.textContent = ''
 		bar.hidden = false
 		const fd = new FormData()
 		fd.append('file', file, file.name)
 		try {
-			await postFormDataWithProgress(`${getApiBase()}/api/media/version/upload?path=${encodeURIComponent(id)}`, fd, (l, t) => {
+			const res = await postFormDataWithProgress(`${getApiBase()}/api/media/version/upload?path=${encodeURIComponent(id)}`, fd, (l, t) => {
 				if (t > 0) bar.firstElementChild.style.width = `${Math.round((l / t) * 100)}%`
 			})
-			reselect()
+			reselect(res)
 		} catch (err) {
 			msg.textContent = err?.message || 'Upload failed — nothing changed'
 		} finally {
@@ -104,8 +103,7 @@ export function mountMediaFileVersions(host, { id, isCurrent }) {
 		msg.textContent = ''
 		try {
 			if (r) {
-				await api.post('/api/media/version/restore', { path: id, v: Number(r) })
-				reselect()
+				reselect(await api.post('/api/media/version/restore', { path: id, v: Number(r) }))
 			} else if (confirm(`Delete version v${p} permanently? This cannot be undone.`)) {
 				await api.post('/api/media/version/purge', { path: id, v: Number(p) })
 				void load()

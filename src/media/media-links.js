@@ -198,6 +198,7 @@ function findMediaUsage(ctx, filePath) {
 
 module.exports = {
 	renameMediaFiles,
+	applyRenamesToProjects,
 	followMediaMoves,
 	scheduleMediaReconcile,
 	findMediaUsage,

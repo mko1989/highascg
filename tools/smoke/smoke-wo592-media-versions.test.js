@@ -2,7 +2,8 @@
 
 /**
  * WO-592 B — media version control: new version keeps the path, old ones are kept until purged,
- * restore swaps (nothing lost), purge/final-delete remove files. Temp dirs only.
+ * restore swaps (nothing lost), purge/final-delete remove files; a version may change the container
+ * (previz .mp4 → show .mov) — only the extension of the path moves. Temp dirs only.
  */
 
 const { describe, it, before, after } = require('node:test')
@@ -83,4 +84,73 @@ describe('WO-592 B media versions', () => {
 		assert.equal(versions.installNewVersion(config, 'clips/nope.mov', '/nonexistent').status, 404)
 		assert.equal(read(), 'THREE')
 	})
+
+	describe('another container (previz .mp4 → show .mov)', () => {
+		const MP4 = 'clips/show.mp4'
+		const MOV = 'clips/show.mov'
+		const at = (p) => path.join(media, p)
+		const stageAs = (p, ext, txt) => {
+			const s = versions.stagingPathFor(registry.getEntryByPath(p).id, ext)
+			fs.mkdirSync(path.dirname(s), { recursive: true })
+			fs.writeFileSync(s, txt)
+			return s
+		}
+		before(() => {
+			fs.writeFileSync(at(MP4), 'PREVIZ')
+			registry.reconcileWithDisk(config)
+		})
+
+		it('a .mov version replaces the .mp4: the path changes extension only, the entry follows', () => {
+			const id = registry.getEntryByPath(MP4).id
+			const r = versions.installNewVersion(config, MP4, stageAs(MP4, '.mov', 'HAP'))
+			assert.ok(r.ok, r.error)
+			assert.deepEqual(r.renamed, { from: MP4, to: MOV })
+			assert.ok(!fs.existsSync(at(MP4)))
+			assert.equal(fs.readFileSync(at(MOV), 'utf8'), 'HAP')
+			assert.equal(registry.getEntryByPath(MOV)?.id, id)
+			assert.equal(registry.getEntryByPath(MP4), null)
+			assert.deepEqual(r.entry.versions.map((v) => v.file), ['v1.mp4'])
+		})
+
+		it('a same-container version reports no rename', () => {
+			const r = versions.installNewVersion(config, MOV, stageAs(MOV, '.mov', 'PRORES'))
+			assert.ok(r.ok, r.error)
+			assert.equal(r.renamed, null)
+			assert.equal(fs.readFileSync(at(MOV), 'utf8'), 'PRORES')
+		})
+
+		it('going back to the .mp4 version moves the path back', () => {
+			const r = versions.restoreVersion(config, MOV, 1)
+			assert.ok(r.ok, r.error)
+			assert.deepEqual(r.renamed, { from: MOV, to: MP4 })
+			assert.equal(fs.readFileSync(at(MP4), 'utf8'), 'PREVIZ')
+			assert.ok(!fs.existsSync(at(MOV)))
+			assert.deepEqual(r.entry.versions.map((v) => v.file).sort(), ['v2.mov', 'v3.mov'])
+		})
+
+		it('refuses to land on another file with that name — nothing moved', () => {
+			fs.writeFileSync(at(MOV), 'SOMEONE ELSE')
+			const staged = stageAs(MP4, '.mov', 'NEW')
+			const r = versions.installNewVersion(config, MP4, staged)
+			assert.equal(r.status, 409)
+			assert.equal(fs.readFileSync(at(MP4), 'utf8'), 'PREVIZ')
+			assert.equal(fs.readFileSync(at(MOV), 'utf8'), 'SOMEONE ELSE')
+			assert.equal(versions.restoreVersion(config, MP4, 2).status, 409)
+			fs.rmSync(staged)
+		})
+
+		it('looks and timelines follow the extension change like a rename', () => {
+			const { rewriteProjectMediaRefs } = require('../../src/media/media-reference-rewrite')
+			const proj = {
+				scenes: { scenes: [{ id: 's1', name: 'Show', layers: [{ source: { type: 'media', value: MP4 } }, { source: { type: 'media', value: 'CLIPS/SHOW' } }] }] },
+				timelines: { timelines: [{ id: 't1', name: 'T', layers: [{ clips: [{ source: { type: 'media', value: MP4 } }] }] }] },
+			}
+			const { project: p, changed } = rewriteProjectMediaRefs(proj, 'demo', [{ from: MP4, to: MOV }], {})
+			assert.equal(changed, 3)
+			assert.equal(p.scenes.scenes[0].layers[0].source.value, MOV)
+			assert.equal(p.scenes.scenes[0].layers[1].source.value, 'CLIPS/SHOW', 'CLS id has no extension — unchanged')
+			assert.equal(p.timelines.timelines[0].layers[0].clips[0].source.value, MOV)
+		})
+	})
 })
+

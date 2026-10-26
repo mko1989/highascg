@@ -1,9 +1,11 @@
 /**
  * WO-592 B — media version control HTTP surface (media-file inspector "Versions").
  *
- *   POST /api/media/version/upload?path=<media id>   multipart, ONE file (same extension) → new current version
+ *   POST /api/media/version/upload?path=<media id>   multipart, ONE file → new current version
  *   POST /api/media/version/restore  { path, v }      go back to an old version (current becomes a version)
  *   POST /api/media/version/purge    { path, v }      delete one old version — final
+ * A version may change the extension (previz .mp4 → show .mov): the path follows and every look,
+ * playlist and timeline is rewritten like a rename; the reply carries `renamed: { from, to }`.
  */
 'use strict'
 
@@ -13,6 +15,7 @@ const busboy = require('busboy')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const registry = require('../media/media-library-registry')
 const versions = require('../media/media-versions')
+const { applyRenamesToProjects } = require('../media/media-links')
 
 const reply = (status, body) => ({ status, headers: JSON_HEADERS, body: jsonBody(body) })
 
@@ -20,7 +23,11 @@ function publicEntry(e) {
 	return { id: e.id, path: e.path, currentV: e.currentV || 1, versions: e.versions || [], defaults: e.defaults || {} }
 }
 
-function afterChange(ctx) {
+async function afterChange(ctx, renamed) {
+	if (renamed) {
+		const rw = await applyRenamesToProjects(ctx, [renamed])
+		ctx.log?.('info', `[media-versions] ${renamed.from} → ${renamed.to}; ${rw.refs} reference(s) in ${rw.projects} project(s) follow`)
+	}
 	if (typeof ctx.runMediaLibraryQueryCycle === 'function') ctx.runMediaLibraryQueryCycle()
 }
 
@@ -34,16 +41,15 @@ function handleVersionUpload(req, ctx, query) {
 	if (!mediaPath || mediaPath.includes('..')) return Promise.resolve(reply(400, { error: 'path required' }))
 	const e = registry.getEntryByPath(mediaPath)
 	if (!e) return Promise.resolve(reply(404, { error: 'not in media library' }))
-	const ext = path.extname(mediaPath).toLowerCase()
 	return new Promise((resolve) => {
 		let staged = null
 		let error = null
 		let writing = null
 		const bb = busboy({ headers: req.headers, defParamCharset: 'utf8', limits: { files: 1 } })
 		bb.on('file', (_name, file, info) => {
-			const incomingExt = path.extname(String(info.filename || '')).toLowerCase()
-			if (incomingExt !== ext) {
-				error = `the new version must be a ${ext} file (got ${incomingExt || 'no extension'})`
+			const ext = path.extname(String(info.filename || '')).toLowerCase()
+			if (!ext) {
+				error = 'the new version needs a file extension'
 				file.resume()
 				return
 			}
@@ -77,23 +83,23 @@ function handleVersionUpload(req, ctx, query) {
 				return resolve(reply(r.status, { error: r.error }))
 			}
 			ctx.log?.('info', `[media-versions] ${mediaPath}: new version v${r.entry.currentV}`)
-			afterChange(ctx)
-			resolve(reply(200, { ok: true, entry: publicEntry(r.entry) }))
+			await afterChange(ctx, r.renamed)
+			resolve(reply(200, { ok: true, entry: publicEntry(r.entry), renamed: r.renamed }))
 		})
 		bb.on('error', (err) => resolve(reply(400, { error: `upload failed: ${err?.message || err}` })))
 		req.pipe(bb)
 	})
 }
 
-function handleVersionRestore(body, ctx) {
+async function handleVersionRestore(body, ctx) {
 	const b = parseBody(body) || {}
 	const p = String(b.path || '').trim()
 	if (!p || p.includes('..')) return reply(400, { error: 'path required' })
 	const r = versions.restoreVersion(ctx.config || {}, p, b.v)
 	if (!r.ok) return reply(r.status, { error: r.error })
 	ctx.log?.('info', `[media-versions] ${p}: restored v${r.entry.currentV}`)
-	afterChange(ctx)
-	return reply(200, { ok: true, entry: publicEntry(r.entry) })
+	await afterChange(ctx, r.renamed)
+	return reply(200, { ok: true, entry: publicEntry(r.entry), renamed: r.renamed })
 }
 
 function handleVersionPurge(body) {
