@@ -206,7 +206,4 @@ module.exports = {
 	parseEld,
 	parseAmixerContents,
 	edidHasAudio,
-	matchConnectors,
-	probeHdmiSinks,
-	sinkLabel,
 }
