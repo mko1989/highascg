@@ -219,8 +219,9 @@ function callSeeks(calls) {
 		await flushAmcp()
 		const seeks = callSeeks(amcpCalls)
 		const plays = amcpCalls.filter((c) => c.type === 'raw' && /PLAY\b/.test(c.cmd))
-		assert.strictEqual(seeks.length, 0, 'playing scrub must not CALL SEEK')
-		assert.ok(plays.length >= 1, 'playing scrub uses STOP+PLAY transport')
+		// WO-787 (was WO-93 "STOP+PLAY"): a ruler drag restarted the producer on every mouse move.
+		assert.deepStrictEqual(seeks.map((c) => c.arg), ['50'], 'playing scrub seeks in place (2000 ms @ 25 fps)')
+		assert.strictEqual(plays.length, 0, 'playing scrub keeps the producer — no STOP + PLAY')
 		eng.stop(tl.id, { skipAmcp: true })
 	}
 

@@ -22,6 +22,8 @@ var _tot: LineEdit
 var _ids: Array = []
 var _pb := {}  # timelineId → {playing, loop, clock {pos, at}}
 var _state_for := ""  # the timeline whose engine state was last read
+var _seeking := false  # a seek request is in flight (WO-787)
+var _seek_next := {}  # {id, ms} sent when it returns
 
 
 func _ready() -> void:
@@ -243,7 +245,9 @@ func stop() -> void:
 	await Api.post_json("/api/timelines/%s/stop" % str(tl.id).uri_encode(), {"force": true})  # the operator's explicit Stop (WO-552)
 
 
-## doSeek: playhead, clock, fields, then the engine.
+## doSeek: playhead, clock, fields, then the engine. WO-787: a ruler drag seeks on every mouse move; one request is in
+## flight at a time and the latest position waits for it (the pool's parallel requests could land out of order and
+## leave the engine short of where the drag stopped).
 func seek(ms: float) -> void:
 	var tl: Dictionary = tab.active()
 	if tl.is_empty():
@@ -251,7 +255,15 @@ func seek(ms: float) -> void:
 	tab.view.set_playhead(ms, true)
 	_pbk(str(tl.id))["clock"] = {"pos": ms, "at": _now()}
 	sync()
-	await Api.post_json("/api/timelines/%s/seek" % str(tl.id).uri_encode(), {"ms": ms})
+	_seek_next = {"id": str(tl.id), "ms": ms}
+	if _seeking:
+		return
+	_seeking = true
+	while not _seek_next.is_empty():
+		var s := _seek_next
+		_seek_next = {}
+		await Api.post_json("/api/timelines/%s/seek" % str(s.id).uri_encode(), {"ms": s.ms})
+	_seeking = false
 
 
 func _toggle_loop() -> void:

@@ -372,6 +372,12 @@ function updateChannelVariablesFromXml(ctx, ch, xmlStr) {
 		if (err) return
 		try {
 			const { framerate: chFr, layers: parsedLayers } = extractChannelInfoFromParsed(result)
+			// WO-787: an empty channel has a framerate too — the per-layer write below never ran for it, so
+			// the timeline's first SEEK onto an empty PRV fell back to the timeline fps (half the playhead at 50p)
+			if (chFr) {
+				if (!ctx.variables) ctx.variables = {}
+				ctx.variables[`channel_${ch}_framerate`] = String(chFr)
+			}
 			const layerData = {}
 			for (let layerIdx = 0; layerIdx < parsedLayers.length; layerIdx++) {
 				const entry = parsedLayers[layerIdx]

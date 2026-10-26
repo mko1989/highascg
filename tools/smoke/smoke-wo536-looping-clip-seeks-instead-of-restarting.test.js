@@ -95,7 +95,7 @@ describe('WO-536: a looping clip is repositioned, not restarted', () => {
 		const r = pauseScrubPlay({ loopAlways: true })
 		assert.deepEqual(r.onPlay, [
 			'STOP 2-210',
-			'PLAY 2-210 "test.mov" LOOP',
+			'PLAY 2-210 "TEST" LOOP', // WO-787: resolved to the CLS id, as looks send it
 			'CALL 2-210 SEEK 100', // 4000 ms @ 25 fps
 		], 'the PLAY carried no position at all, so the clip began at its IN point')
 	})

@@ -91,7 +91,10 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 		assert.equal(sentLines.length, 0, `skipAmcpApply must suppress the reapply, got: ${JSON.stringify(sentLines)}`)
 	})
 
-	it('regression check: WITHOUT skipAmcpApply, the same release call DOES write an unprotected reapply', async () => {
+	// WO-787: the routing change's force reapply no longer restarts a playing clip that stays on its channel (same clip,
+	// same frame → nothing; a moved frame → CALL SEEK), so the pre-WO-556 call shape no longer flashes program either.
+	// skipAmcpApply stays the guard; this check now pins that the root path is quiet too.
+	it('without skipAmcpApply, the same release call writes nothing to the kept program channel (WO-787)', async () => {
 		const { self, eng, sentLines } = makeEngine()
 		await startSceneTimelineLayer(self, self.amcp, 1, { source: { value: 'tl1' } }, {
 			fadeDur: 0,
@@ -101,7 +104,7 @@ describe('WO-556 Bug A: releasing a preview claim must not flash program', () =>
 		eng.setSendTo({ preview: true, program: true, screenIdx: 0 }, 'tl1', { skipAmcpApply: true })
 		sentLines.length = 0
 		eng.setSendTo({ preview: false, program: true, screenIdx: 0 }, 'tl1') // no opts — the pre-fix call shape
-		assert.ok(sentLines.length > 0, 'documents the pre-WO-556 unprotected flash reapply')
+		assert.deepEqual(sentLines, [], 'a playing clip on a kept channel is not re-PLAYed by a routing change')
 	})
 
 	it('the STOP of the dropped preview channel still happens either way (not gated by skipAmcpApply)', async () => {

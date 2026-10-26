@@ -2,6 +2,8 @@
 
 const { clipParamForPlay } = require('../caspar/amcp-utils')
 const { resolveTimelineClipFrame } = require('./scene-play-seek')
+const { resolveSceneClipForAmcp } = require('./scene-take-lbg-helpers')
+const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
 const {
 	buildEffectAmcpLinesPlayback,
 	mixerEffectNeutralLines,
@@ -25,9 +27,20 @@ const {
 function clipTransportMeta(clip, ms, tl, self, opts = {}) {
 	const src = String(clip.source?.value || '')
 	const transport = resolveTimelineClipFrame(clip, ms, tl, self, opts)
+	/* WO-787: `frame` is in timeline frames (tl.fps); Caspar's SEEK counts CHANNEL frames on this build
+	 * (WO-592: a 25p timeline on a 50p channel landed at half the playhead). Comparisons keep `frame`;
+	 * the wire gets `caspFrame`. */
+	const chFps = Math.max(1, resolveChannelFramerateForMixerTween(self, opts.channel, tl?.fps))
+	const caspFrame = Math.round((transport.frame * chFps) / Math.max(1, tl?.fps || 25))
 	return {
 		src,
-		srcQ: clipParamForPlay(src),
+		caspFrame,
+		/* WO-787: a project-scoped clip is stored relative to its project folder ("INTRO.mov" under
+		 * projects/<slug>/); Caspar needs the CLS id the looks resolve to. Lazy: only a PLAY/LOAD reads it
+		 * (a disk check), not every tick. */
+		get srcQ() {
+			return clipParamForPlay(transport.isRoute ? src : resolveSceneClipForAmcp(src, self))
+		},
 		isRoute: transport.isRoute,
 		frame: transport.frame,
 		implicitLoop: transport.implicitLoop,

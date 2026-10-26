@@ -151,7 +151,14 @@ module.exports = {
 						prev.clipId === clip.id &&
 						((prev.implicitLoop ?? false) !== !!meta.implicitLoop ||
 							(prev.loopClip ?? false) !== !!meta.loopClip)
-					const needsFullTransport = transportStale || loopStale || (force && playing)
+					/* WO-787: a seek on a PLAYING timeline used to restart the producer here too (STOP + PLAY SEEK,
+					 * WO-93: "never CALL SEEK (decoder stutter)"). A ruler drag sends one per mouse move, so a 4K
+					 * file was destroyed and reopened every ~30 ms — black between reopens, a picture only where the
+					 * drag paused (owner 26.10: "it makes bigger jumps"). Measured on the box (INTRO.mov, NotchLC
+					 * 3840×1792): CALL SEEK lands in the same 210–420 ms as STOP + PLAY and keeps the last frame up
+					 * meanwhile; a later SEEK overrides a pending one. The same clip now seeks in place, playing or
+					 * paused; a route has no position, so it keeps the re-PLAY. */
+					const needsFullTransport = transportStale || loopStale || (force && playing && meta.isRoute)
 					/* WO-536: `!meta.loopAlways` used to be one of these conditions, so scrubbing a
 					 * paused looping clip sent NOTHING — the picture never moved, `transportSent`
 					 * stayed false, and the `_prevKey` write below kept the pre-scrub frame. That
@@ -167,8 +174,6 @@ module.exports = {
 						prev.frame !== meta.frame &&
 						!meta.isRoute &&
 						(!meta.loopAlways || loopSeekIsSafe(meta))
-					const needsPausedSeek = needsScrubSeek && !playing
-					const needsPlayingScrub = needsScrubSeek && playing
 					let transportSent = false
 					let hasDeferredLines = false // T173.2: track deferred tween
 
@@ -188,7 +193,7 @@ module.exports = {
 							 * paused are the same command here: a looping producer repositions like
 							 * any other, and `loopSeekIsSafe` (already folded into needsScrubSeek)
 							 * keeps us out of the end-of-media window. */
-							self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+							self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
 								this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP scrub) failed: ${_err.message}`)
 							})
 							transportSent = true
@@ -200,18 +205,11 @@ module.exports = {
 							mixerDirty.add(ch)
 							hasDeferredLines = true // T173.2
 						}
-					} else if (needsPausedSeek) {
-						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+					} else if (needsScrubSeek) {
+						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
 							this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} failed: ${_err.message}`)
 						})
 						transportSent = true
-					} else if (needsPlayingScrub) {
-						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing: true, startTransport: true })
-						transportSent = true
-						if (result?.hasDeferredLines) {
-							mixerDirty.add(ch)
-							hasDeferredLines = true // T173.2
-						}
 					}
 
 					if (transportSent && (force || transportStale)) {
@@ -328,7 +326,7 @@ module.exports = {
 			 * source proof and refuses the last ~2 frames, where the producer would hold rather than
 			 * wrap. */
 			if (meta.frame > 0 && loopSeekIsSafe(meta)) {
-				self.amcp.call(ch, caspLayer, 'SEEK', String(meta.frame)).catch(_err => {
+				self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
 					this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP) failed: ${_err.message}`)
 				})
 			}
@@ -376,11 +374,11 @@ module.exports = {
 			lines.push(`PLAY ${cl} ${meta.srcQ}${afSuffix}`)
 		} else if (playing || meta.loopClip) {
 			const loopStr = meta.loopClip || meta.implicitLoop ? ' LOOP' : ''
-			lines.push(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.frame}${afSuffix}`)
+			lines.push(`PLAY ${cl} ${meta.srcQ}${loopStr} SEEK ${meta.caspFrame}${afSuffix}`)
 		} else if (afSuffix) {
-			lines.push(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.frame}${afSuffix}`)
+			lines.push(`PLAY ${cl} ${meta.srcQ} SEEK ${meta.caspFrame}${afSuffix}`)
 		} else {
-			lines.push(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.frame}`)
+			lines.push(`LOAD ${cl} ${meta.srcQ} SEEK ${meta.caspFrame}`)
 		}
 
 		// T173.2: append opacity segment tween if one starts at clip-local 0
