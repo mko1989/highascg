@@ -77,6 +77,8 @@ func refresh() -> void:
 	_row.setup(_take, false)
 	if _cm_seen.is_empty():
 		_cm_seen = cm.duplicate(true)
+	if tab.monitor != null:
+		tab.monitor.follow(st)  # WO-788: the picture follows Dest / PRV / PGM
 
 
 ## The routing the controls show (saved on play).

@@ -28,8 +28,11 @@ const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const EffectsModel := preload("res://features/live/effects_model.gd")
+const Monitor := preload("res://features/timeline/timeline_monitor.gd")
+const UI_CFG := "user://ui.cfg"
 
 var view: TimelineView
+var monitor: Monitor  # WO-788: the live picture of the channel the timeline plays to, above the canvas
 var transport: TimelineTransport
 var dest: TimelineDest
 var _keys := TimelineKeys.new()
@@ -64,7 +67,18 @@ func _ready() -> void:
 	view.layer_selected.connect(_on_layer_selected)
 	view.layers_edited.connect(_layers_commit)
 	view.layer_menu.connect(func(_li: int) -> void: _layer_page.menu())
-	add_child(view)
+	var split := VSplitContainer.new()
+	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	monitor = Monitor.new()
+	split.add_child(monitor)
+	split.add_child(view)
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	split.split_offset = int(cfg.get_value("timeline", "monitor_h", 260))
+	split.dragged.connect(func(at: int) -> void:
+		cfg.set_value("timeline", "monitor_h", at)
+		cfg.save(UI_CFG))
+	add_child(split)
 	_page = ClipInspector.new()
 	_page.patch.connect(_on_patch)
 	_page.remove_requested.connect(_remove_selected)
