@@ -397,8 +397,8 @@ func _build_toolbar() -> Control:
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
-	bar.add_child(fit)
-	bar.add_child(preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button())  # WO-770
+	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
+		bar.add_child(c)  # WO-786 haze, WO-770 VR
 	return bar
 
 

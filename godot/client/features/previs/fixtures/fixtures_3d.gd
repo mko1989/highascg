@@ -11,11 +11,13 @@ const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
+const Haze := preload("res://features/previs/haze.gd")
 
 const CONE_SHADER := """
 shader_type spatial;
 render_mode blend_add, unshaded, cull_disabled, depth_draw_never, shadows_disabled;
 uniform vec4 tint : source_color;
+uniform float haze = 0.0;  // WO-786
 varying float along;
 void vertex() {
 	along = clamp(0.5 - VERTEX.y, 0.0, 1.0);  // 0 at the lens (top of the unit cone), 1 at its far end
@@ -23,7 +25,7 @@ void vertex() {
 void fragment() {
 	float edge = pow(abs(dot(normalize(NORMAL), normalize(VIEW))), 1.5);
 	ALBEDO = tint.rgb;
-	ALPHA = tint.a * (1.0 - along) * (1.0 - along) * edge * %s;
+	ALPHA = tint.a * pow(1.0 - along, 2.0 - 1.2 * haze) * edge * %s * (1.0 + 2.2 * haze);
 }
 """ % F.CONE_ALPHA
 
@@ -46,6 +48,7 @@ var lights := 0
 var gobo_lights := 0
 var sel: RefCounted = Sel.shared()
 var beams_on := true  # WO-649: false = the heads only, no beams / spots / lens glow (Live 3D "Lights")
+var haze := 0.0  # WO-786 (haze.gd): the views' haze level — the world's fog + brighter cones
 
 
 func _ready() -> void:
@@ -62,6 +65,8 @@ func _ready() -> void:
 	Store.project_changed.connect(_on_project)
 	Ws.message.connect(_on_ws)
 	sel.changed.connect(_show_selection)
+	Haze.shared().changed.connect(_set_haze)
+	_set_haze.call_deferred(Haze.shared().level)  # in the tree by then: its world's Environment
 	_on_project(Store.project)
 	var res: Dictionary = await Api.get_json("/api/tracking/fixtures")
 	if res.ok and res.data is Dictionary and _last.is_empty():
@@ -107,7 +112,7 @@ func _rebuild(list: Array) -> void:
 			var b: Dictionary = await Api.get_bytes("/api/fixtures/types/%s/model?path=%s" % [parts[0], str(path).uri_encode()])
 			if gen != _gen:
 				return
-			_meshes[mk] = _from_glb(b.bytes) if b.ok else null
+			_meshes[mk] = F.from_glb(b.bytes) if b.ok else null
 	for c in get_children():
 		c.queue_free()
 	_fx = {}
@@ -380,6 +385,12 @@ func apply(data: Dictionary) -> void:
 			_light(parts.beams[id], beams.get(id, {}) if beams.get(id) is Dictionary else {})
 
 
+func _set_haze(h: float) -> void:
+	haze = h
+	Haze.apply_env(get_world_3d().environment if is_inside_tree() else null, h)
+	apply(_last)
+
+
 ## WO-649 — render the light output or not; the heads and their pan / tilt stay.
 func set_beams(on: bool) -> void:
 	if on == beams_on:
@@ -401,6 +412,7 @@ func _light(p: Dictionary, b: Dictionary) -> void:
 	if p.has("cone"):
 		(p.cone as MeshInstance3D).visible = lit
 		(p.cmat as ShaderMaterial).set_shader_parameter("tint", t)
+		(p.cmat as ShaderMaterial).set_shader_parameter("haze", haze)
 		var s := F.cone_scale(float(b.get("zoom", 25.0)))
 		(p.cone as MeshInstance3D).transform = Transform3D(Basis.from_scale(s), Vector3(0, -s.y * 0.5, 0))
 	if p.has("light"):
@@ -408,6 +420,7 @@ func _light(p: Dictionary, b: Dictionary) -> void:
 		sl.visible = lit
 		sl.light_color = Color(t.r, t.g, t.b)
 		sl.light_energy = t.a * 8.0
+		sl.light_volumetric_fog_energy = 1.0 + 3.0 * haze  # WO-786: the spot lights the haze around its beam
 		sl.spot_angle = clampf(float(b.get("zoom", 25.0)) * 0.5, 0.5, 89.0)
 		var gobo := str(b.get("gobo", ""))
 		if gobo != str(p.get("gobo", "")):
@@ -466,23 +479,6 @@ func bounds() -> AABB:
 		box = b if first else box.merge(b)
 		first = false
 	return box
-
-
-func _from_glb(bytes: PackedByteArray) -> Node3D:
-	var doc := GLTFDocument.new()
-	var state := GLTFState.new()
-	if bytes.is_empty() or doc.append_from_buffer(bytes, "", state) != OK:
-		return null
-	var scene := doc.generate_scene(state) as Node3D
-	# WO-784: a glb without materials (Martin's MAC Aura PXL) gets the importer's default white — use the body grey
-	if scene != null and state.get_materials().is_empty():
-		var grey := StandardMaterial3D.new()
-		grey.albedo_color = Color(0.22, 0.22, 0.24)
-		grey.cull_mode = BaseMaterial3D.CULL_DISABLED
-		for mi in scene.find_children("*", "MeshInstance3D", true, false):
-			for s in (mi as MeshInstance3D).get_surface_override_material_count():
-				(mi as MeshInstance3D).set_surface_override_material(s, grey)
-	return scene
 
 
 func _exit_tree() -> void:

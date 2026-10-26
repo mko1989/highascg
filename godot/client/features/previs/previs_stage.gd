@@ -39,6 +39,7 @@ func _ready() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-50, -30, 0)
 	sun.light_energy = 0.6
+	sun.light_volumetric_fog_energy = 0.0  # WO-786: haze shows the heads' beams, not a lit room
 	add_child(sun)
 	var floor_mi := MeshInstance3D.new()
 	var plane := PlaneMesh.new()

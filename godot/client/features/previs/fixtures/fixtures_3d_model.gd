@@ -94,3 +94,21 @@ static func head_color(id: String, type: String, type_colors: Dictionary, layer_
 	if c == null and id.begins_with("mvr-"):
 		c = Tint.parse(layer_colors.get(layer_of.call(id.trim_prefix("mvr-"))))
 	return c
+
+
+## A GDTF model (glb bytes) as a scene, or null.
+static func from_glb(bytes: PackedByteArray) -> Node3D:
+	var doc := GLTFDocument.new()
+	var state := GLTFState.new()
+	if bytes.is_empty() or doc.append_from_buffer(bytes, "", state) != OK:
+		return null
+	var scene := doc.generate_scene(state) as Node3D
+	# WO-784: a glb without materials (Martin's MAC Aura PXL) gets the importer's default white — use the body grey
+	if scene != null and state.get_materials().is_empty():
+		var grey := StandardMaterial3D.new()
+		grey.albedo_color = Color(0.22, 0.22, 0.24)
+		grey.cull_mode = BaseMaterial3D.CULL_DISABLED
+		for mi in scene.find_children("*", "MeshInstance3D", true, false):
+			for s in (mi as MeshInstance3D).get_surface_override_material_count():
+				(mi as MeshInstance3D).set_surface_override_material(s, grey)
+	return scene
