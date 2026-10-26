@@ -1,7 +1,9 @@
 # WO-776 — VR: "OpenXR was requested but failed to start" — the XR client launched before the headset connected
 
-**Status: IN PROGRESS (26.10) — run-xr.sh fix dry-run verified (3 paths) + live relaunch got a running XR session;
-owner QA = the next Start VR from the GUI with the headset off / connecting late.**
+**Status: DONE (26.10) — the headset wait stays (WiVRn's comp_ipc socket only exists once the headset connects), but
+it was NOT the whole cause: the GUI-launched client also lacked XDG_RUNTIME_DIR and could never reach WiVRn → see
+[WO-780](./780_WO_vr_client_missing_xdg_runtime_dir.md). The live check below ran run-xr.sh from a shell (session env)
+and so missed it.**
 
 Owner, 26.10: "tried running vr session and got an alert, openxr was requested but failed to start".
 

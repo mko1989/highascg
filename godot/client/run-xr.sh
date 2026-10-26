@@ -7,6 +7,12 @@
 #   XR_WAIT_S=0 godot/client/run-xr.sh                    # no wait: no runtime → the desktop walk (WASD)
 # Its own Godot user dir (~/.local/share/highascg-xr): its window, profiles and follow setting never touch the kiosk's.
 set -euo pipefail
+# WO-780: launched by the node service (no user session) these are unset; the OpenXR client then looks for WiVRn's
+# socket in ~/.cache/wivrn/comp_ipc instead of $XDG_RUNTIME_DIR/wivrn/comp_ipc and OpenXR fails to start.
+if [[ -z "${XDG_RUNTIME_DIR:-}" && -d "/run/user/$(id -u)" ]]; then export XDG_RUNTIME_DIR="/run/user/$(id -u)"; fi
+if [[ -z "${DBUS_SESSION_BUS_ADDRESS:-}" && -S "${XDG_RUNTIME_DIR:-}/bus" ]]; then
+	export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+fi
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -z "${GODOT:-}" ]]; then
 	for c in /opt/godot/godot "$HOME/.local/opt/godot/godot" "$(command -v godot 2>/dev/null || true)"; do
@@ -33,10 +39,9 @@ if ! rt="$(runtime)" && ((wait_s > 0)); then
 	done
 fi
 # WiVRn registers its runtime file when the SERVER starts, not when the headset connects; launching before the
-# headset is there fails OpenXR init (XR_ERROR_RUNTIME_UNAVAILABLE). So also wait for its HeadsetConnected (D-Bus;
-# the node launcher has no session env, hence the default runtime dir).
+# headset is there fails OpenXR init (XR_ERROR_RUNTIME_UNAVAILABLE). So also wait for its HeadsetConnected (D-Bus).
 headset() {
-	XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" busctl --user get-property io.github.wivrn.Server \
+	busctl --user get-property io.github.wivrn.Server \
 		/io/github/wivrn/Server io.github.wivrn.Server HeadsetConnected 2>/dev/null | grep -q true
 }
 if [[ -n "${rt:-}" ]] && grep -qi wivrn "$rt" 2>/dev/null && command -v busctl >/dev/null; then

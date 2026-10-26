@@ -113,6 +113,9 @@ test('start: starts wivrn (never enable), waits for D-Bus, pairs only with no ke
 	assert.equal(e.DISPLAY, ':0')
 	assert.equal(e.XAUTHORITY, '/run/user/1000/gdm/Xauthority')
 	assert.equal(e.GODOT, '/home/x/godot')
+	// WO-780: WiVRn's OpenXR socket lives in the user runtime dir; the node service has none of its own
+	assert.equal(e.XDG_RUNTIME_DIR, '/run/user/1000')
+	assert.equal(e.DBUS_SESSION_BUS_ADDRESS, 'unix:path=/run/user/1000/bus')
 	assert.ok(r.vr._watching())
 })
 

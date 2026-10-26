@@ -217,7 +217,9 @@ function createVrSession(deps = {}) {
 	}
 
 	function launchClient() {
-		const env = { ...baseEnv, DISPLAY: ':0', XAUTHORITY: getXAuth(), XR_WAIT_S: '600' }
+		// WO-780: the OpenXR client finds WiVRn's socket under $XDG_RUNTIME_DIR/wivrn/comp_ipc — without the user-session
+		// env it looks in ~/.cache/wivrn and xrCreateInstance fails (XR_ERROR_RUNTIME_UNAVAILABLE)
+		const env = { ...busEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth(), XR_WAIT_S: '600' }
 		if (godotBin && godotExists(godotBin)) env.GODOT = godotBin
 		spawnXr(runXr, { env, cwd: path.dirname(runXr) })
 	}
