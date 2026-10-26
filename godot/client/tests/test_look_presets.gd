@@ -41,3 +41,31 @@ func test_loaded_on_prv() -> void:
 	t.ok(M.loaded_on_prv({"items": [{"mainIdx": 0, "sceneId": "A"}]}, BUSES), "A is on PRV 1")
 	t.ok(not M.loaded_on_prv({"items": [{"mainIdx": 0, "sceneId": "A"}, {"mainIdx": 1, "sceneId": "C"}]}, BUSES), "every item must be")
 	t.ok(M.loaded_on_prv({"sceneId": "A", "targetMain": 0}, BUSES), "legacy single look")
+
+
+## WO-781 — E2 destinations: an empty highlighted screen is saved (recall clears it), PRV = PGM still captures,
+## the card names each destination, and the destination selection toggles / is replaced by a recall.
+func test_e2_destinations() -> void:
+	var items := M.capture_items("prv", [0, 1], BUSES, "", true)
+	t.eq(items[1], {"mainIdx": 1, "sceneId": "", "sourceKind": "prv", "empty": true}, "empty destination kept")
+	t.eq(M.capture_items("editing", [0], BUSES, "", true), [], "no open look is never an empty destination")
+	var p := M.make_preset([], "E", [items[1], items[0]], "e1", 1)
+	t.eq([p.sceneId, p.targetMain], ["A", 0], "legacy fields from the first destination with a look")
+	t.eq(M.dest_line(p, {"A": "Look A"}), "2 — · 1 Look A", "card line: — = empty")
+	t.eq(M.dest_line({"items": [{"mainIdx": 0, "sceneId": "gone"}]}, {}), "1 ?", "deleted look")
+	var same := {0: {"prv": "", "pgm": "B"}}
+	t.eq(M.capture_buses(same, {0: "B"})[0].prv, "B", "deck blanks PRV = PGM; a save still sees B")
+	t.eq(M.capture_buses(BUSES, {})[0].prv, "A", "untouched otherwise")
+	t.ok(M.loaded_on_bus({"items": [{"mainIdx": 0, "sceneId": "B"}, {"mainIdx": 1, "sceneId": "C"}]}, BUSES, "pgm"), "on PGM")
+	t.ok(M.loaded_on_bus({"items": [{"mainIdx": 1, "sceneId": "", "empty": true}]}, BUSES, "prv"), "empty PRV matches an empty destination")
+	var D := preload("res://features/live/destinations.gd")
+	D.set_only([])
+	D.toggle(1)
+	D.toggle(0)
+	t.eq(D.selected(), [0, 1], "sorted")
+	D.toggle(1)
+	t.eq(D.selected(), [0], "toggled off")
+	D.set_only([2, 1])
+	D.prune(2)
+	t.eq(D.selected(), [1], "recall replaces, prune drops screens that went away")
+	D.set_only([])

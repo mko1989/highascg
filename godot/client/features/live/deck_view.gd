@@ -14,13 +14,14 @@ const TransitionRow := preload("res://features/live/transition_row.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
 const LFS := preload("res://features/previs/fixtures/look_fixtures_store.gd")
 const BlankClear := preload("res://features/live/deck_blank_clear.gd")
+const DeckHead := preload("res://features/live/deck_head.gd")
+const Destinations := preload("res://features/live/destinations.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
 signal edit_requested(scene_id: String, main: int)
 signal timers_requested(main: int, label: String)  # WO-601: web per-screen ⏱ → screen-timer inspector
 signal border_requested(main: int, label: String)  # WO-601: global border inspector
-signal presets_requested(main: int, label: String)  # WO-601: look presets inspector
 signal look_deleted(scene_id: String)  # WO-623 B: the live tab closes the editor if it shows this look
 
 var _columns: HBoxContainer
@@ -28,6 +29,10 @@ var _dirty := true
 var _main_for_card := 0
 var _press_id := ""  # the card a left press landed on (WO-762: PRV on release, not on a drag)
 var osc_mirror: Node  # WO-600 O: set by the live tab before the first rebuild
+var show_looks := true:  # WO-781: deck toolbar "Looks" — the columns keep their header, timer and blank space
+	set(v):
+		show_looks = v
+		_dirty = true
 
 
 func _ready() -> void:
@@ -42,7 +47,7 @@ func _ready() -> void:
 
 
 func _on_store_changed(path: String, _v: Variant) -> void:
-	if path == "*" or path.begins_with("scene") or path == "channelMap":
+	if path == "*" or path.begins_with("scene") or path == "channelMap" or path == Destinations.PATH:
 		_dirty = true
 
 
@@ -63,6 +68,7 @@ func rebuild() -> void:
 	for s in scenes:
 		if s is Dictionary:
 			known[str((s as Dictionary).get("id", ""))] = true
+	Destinations.prune(DeckModel.screen_count(cm))
 	for main in DeckModel.screen_count(cm):
 		_main_for_card = main
 		var bus := DeckModel.resolve_bus_look_ids(main, live, cm, known, ps)
@@ -78,37 +84,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.add_theme_constant_override("separation", 8)
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
-	var head_row := HBoxContainer.new()
-	head_row.mouse_filter = Control.MOUSE_FILTER_PASS  # its gaps are blank deck space (BlankClear)
-	var head := Label.new()
-	head.text = "%s  ·  %d looks" % [title, looks.size()]
-	head.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
-	head.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	head_row.add_child(head)
-	var take := Button.new()
-	take.text = "TAKE"
-	take.tooltip_text = "Take the look on PRV to PGM"
-	take.disabled = str(bus.prv) == ""
-	take.pressed.connect(func() -> void: request_take(str(bus.prv), main, "program"))
-	head_row.add_child(take)
-	var ftb := Button.new()
-	ftb.text = "FTB"
-	ftb.tooltip_text = "Fade to black (PGM + PRV), then clear"
-	ftb.pressed.connect(func() -> void: request_ftb(main, cm))
-	head_row.add_child(ftb)
-	var tmr := Icons.button("timer", "Screen timers")
-	tmr.pressed.connect(func() -> void: timers_requested.emit(main, title))
-	head_row.add_child(tmr)
-	var brd := Button.new()
-	brd.text = "Border"
-	brd.tooltip_text = "Global border for this screen"
-	brd.pressed.connect(func() -> void: border_requested.emit(main, title))
-	head_row.add_child(brd)
-	var lp := Button.new()
-	lp.text = "Presets"
-	lp.tooltip_text = "Look presets: bookmark what is on PRV / PGM and recall it"
-	lp.pressed.connect(func() -> void: presets_requested.emit(main, title))
-	head_row.add_child(lp)
+	var head_row := DeckHead.build(self, title, looks.size(), bus, main, cm)  # WO-781: title = destination toggle
 	col.add_child(head_row)
 	var timer := TimerView.new()
 	timer.setup(osc_mirror, main)
@@ -119,7 +95,8 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	grid.mouse_filter = Control.MOUSE_FILTER_PASS
 	grid.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))
 	col.add_child(grid)
-	for s in looks:
+	grid.visible = show_looks
+	for s in (looks if show_looks else []):
 		grid.add_child(_card(s, bus))
 	grid.add_child(_add_tile(main))
 	BlankClear.wire(col, main, cm, action_result.emit)

@@ -1,21 +1,23 @@
 extends VBoxContainer
-## WO-601 — look presets Inspector page (web inspector-panel-presets-modes.js renderLookPresetsMode), opened from a
-## deck column's "Presets". Save / Overwrite / Remove edit `project.scenes.lookPresets` and travel with the deck sync
-## (the web does the same); Preview / ▶ / Auto / Cut ask the server to recall (POST /api/scene/look-preset/recall),
-## which takes every screen of the preset at once.
+## WO-601 — look presets Inspector page (web inspector-panel-presets-modes.js renderLookPresetsMode), opened from the
+## deck toolbar's "Presets" / a preset card's ⚙. Save / Overwrite / Remove edit `project.scenes.lookPresets` and travel
+## with the deck sync (the web does the same); Preview / ▶ / Auto / Cut ask the server to recall (POST
+## /api/scene/look-preset/recall), which takes every screen of the preset at once. WO-781 (E2): a save covers exactly
+## the highlighted destinations (destinations.gd), empty ones included; a recall re-highlights the preset's screens.
 
 signal closed
+signal said(text: String, ok: bool)  # WO-781: the deck's action line shows it (saves from the preset strip)
 
 const M := preload("res://features/live/look_preset_model.gd")
 const DeckModel := preload("res://features/live/deck_model.gd")
 const Icons := preload("res://app/ui_icons.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
+const Destinations := preload("res://features/live/destinations.gd")
 
-var screen_idx := 0
 var editing_cb: Callable = func() -> String: return ""  # the look open in the editor ("" = none)
 var _title: Label
-var _all: CheckBox
+var _dests: Label
 var _save_btns := {}
 var _list: VBoxContainer
 var _status: Label
@@ -36,23 +38,21 @@ func _ready() -> void:
 	head.add_child(x)
 	add_child(head)
 	var hint := Label.new()
-	hint.text = "Bookmarks of which look is on preview, program or open in the editor. Recall puts them back on PRV or takes them live."
+	hint.text = "Highlight destinations (click a screen's title in the deck), then save what is on their PRV or PGM. Recall loads exactly those screens — an empty one is cleared."
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	add_child(hint)
+	_dests = Label.new()
+	_dests.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	add_child(_dests)
 	var save := HBoxContainer.new()
 	for k in ["prv", "pgm", "editing"]:
 		var b := Button.new()
 		b.text = {"prv": "From PRV", "pgm": "From PGM", "editing": "From open look"}[k]
-		b.pressed.connect(_ask_name.bind(k))
+		b.pressed.connect(ask_name.bind(k))
 		save.add_child(b)
 		_save_btns[k] = b
 	add_child(save)
-	_all = CheckBox.new()
-	_all.text = "All screens"
-	_all.tooltip_text = "Save every screen's look in one preset (recall takes them together)"
-	_all.toggled.connect(func(_on: bool) -> void: _render())
-	add_child(_all)
 	var lib := Label.new()
 	lib.text = "Library"
 	lib.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
@@ -65,16 +65,15 @@ func _ready() -> void:
 	add_child(_status)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _queue())
 	Store.changed.connect(func(path: String, _v: Variant) -> void:
-		if path == "*" or path == "scene.live" or path == "channelMap":
+		if path == "*" or path == "scene.live" or path == "channelMap" or path == Destinations.PATH:
 			_queue())
 	visibility_changed.connect(func() -> void:
 		if visible:
 			_render())
 
 
-func open(main: int, label: String) -> void:
-	screen_idx = main
-	_title.text = "Look presets — %s" % label
+func open() -> void:
+	_title.text = "Look presets"
 	visible = true
 	_render()
 
@@ -120,26 +119,36 @@ func buses() -> Dictionary:
 	return out
 
 
-func _mains() -> Array:
-	if _all.visible and _all.button_pressed:
-		return range(DeckModel.screen_count(_cm()))
-	return [screen_idx]
+## What is really on each bus: the deck's buses with a PRV that shows the PGM look not blanked (WO-781) — what a
+## save captures and what a card's PRV / PGM mark compares against.
+func true_buses() -> Dictionary:
+	var live: Dictionary = Store.get_value("scene.live", {}) if Store.get_value("scene.live") is Dictionary else {}
+	var prv_chs: Array = _cm().get("previewChannels", [])
+	var raw := {}
+	for m in DeckModel.screen_count(_cm()):
+		var ch: int = int(prv_chs[m]) if m < prv_chs.size() and prv_chs[m] != null else 0
+		var sid := DeckModel._live_scene_id(live, ch) if ch > 0 else ""
+		if _looks().has(sid):
+			raw[m] = sid
+	return M.capture_buses(buses(), raw)
 
 
 func capture(source: String) -> Array:
 	var ed := str(editing_cb.call())
-	return M.capture_items(source, _mains(), buses(), ed if _looks().has(ed) else "")
+	return M.capture_items(source, Destinations.selected(), true_buses(), ed if _looks().has(ed) else "", true)
 
 
 func _render() -> void:
 	_dirty = false
 	if _list == null:
 		return
-	_all.visible = DeckModel.screen_count(_cm()) > 1
+	var sel := Destinations.selected()
+	_dests.text = "Destinations: %s" % (", ".join(sel.map(func(m: int) -> String: return str(m + 1))) if not sel.is_empty() else "none highlighted")
+	_dests.add_theme_color_override("font_color", ThemeBuilder.ACCENT if not sel.is_empty() else ThemeBuilder.WARN)
 	for k in _save_btns:
 		var none := capture(k).is_empty()
 		_save_btns[k].disabled = none
-		_save_btns[k].tooltip_text = ({"prv": "No look on preview", "pgm": "No look on program", "editing": "Open a look in the editor first"}[k]) if none else ""
+		_save_btns[k].tooltip_text = ("Highlight destinations first: click a screen's title in the deck" if sel.is_empty() else "Open a look in the editor first") if none else ""
 	for c in _list.get_children():
 		c.queue_free()
 	var list := presets()
@@ -150,7 +159,7 @@ func _render() -> void:
 		_list.add_child(e)
 		return
 	var looks := _looks()
-	var bus := buses()
+	var bus := true_buses()
 	for p in list:
 		if p is Dictionary:
 			_list.add_child(_card(p, looks, bus))
@@ -159,7 +168,7 @@ func _render() -> void:
 func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
 	var exists := looks.has(str(p.get("sceneId", "")))
 	for it in p.get("items", []):
-		exists = exists or (it is Dictionary and looks.has(str(it.get("sceneId", ""))))
+		exists = exists or (it is Dictionary and (looks.has(str(it.get("sceneId", ""))) or it.get("empty") == true))
 	var box := VBoxContainer.new()
 	var row := HBoxContainer.new()
 	var label := Label.new()
@@ -176,8 +185,7 @@ func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
 	row.add_child(play)
 	box.add_child(row)
 	var meta := Label.new()
-	var first := str(p.get("sceneId", ""))
-	meta.text = M.meta_line(p, exists) + (("  → “%s”" % looks[first]) if looks.has(first) else "")
+	meta.text = "%s · %s" % [M.source_label(str(p.get("sourceKind", ""))), M.dest_line(p, looks)] if (p.get("items", []) as Array).size() > 0 else M.meta_line(p, exists)
 	meta.clip_text = true
 	meta.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	box.add_child(meta)
@@ -205,7 +213,7 @@ func _card(p: Dictionary, looks: Dictionary, bus: Dictionary) -> Control:
 	return box
 
 
-func _ask_name(source: String) -> void:
+func ask_name(source: String) -> void:
 	var dlg := AcceptDialog.new()
 	dlg.title = "Look preset name (from %s)" % M.source_label(source)
 	var edit := LineEdit.new()
@@ -263,6 +271,9 @@ func _commit(msg: String) -> void:
 
 func recall(id: String, target: String, cut := false, global_transition := false) -> Dictionary:
 	ProjectSync.send_deck_sync(false)  # an unsent preset edit must reach the server's deck first
+	for p in presets():  # E2: recalling a preset makes its screens the highlighted destinations
+		if p is Dictionary and str(p.get("id", "")) == id:
+			Destinations.set_only(M.mains_of(p))
 	var res: Dictionary = await Api.post_json("/api/scene/look-preset/recall", {"id": id, "target": target, "forceCut": cut, "useGlobalTransition": global_transition})
 	var what := "PRV" if target == "preview" else ("CUT" if cut else "TAKE")
 	var bad := []
@@ -278,5 +289,6 @@ func recall(id: String, target: String, cut := false, global_transition := false
 
 
 func _say(text: String, ok: bool) -> void:
+	said.emit(text, ok)
 	_status.text = text
 	_status.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)

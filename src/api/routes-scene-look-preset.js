@@ -22,7 +22,8 @@ function out(status, payload) {
 
 /**
  * Pure (web lookRecallItemsFromPreset): the preset's { mainIdx, sceneId } items whose look still exists; a legacy
- * single-look preset ({ sceneId, targetMain }) is one item. Mains clamp to 0–3 like the web.
+ * single-look preset ({ sceneId, targetMain }) is one item. Mains clamp to 0–3 like the web. WO-781: a destination
+ * saved while empty ({ mainIdx, empty: true }) stays an item — recall leaves it empty again (E2 preset semantics).
  * @param {object} preset
  * @param {(id: string) => boolean} exists
  */
@@ -35,6 +36,7 @@ function recallItems(preset, exists) {
 	for (const it of Array.isArray(preset?.items) ? preset.items : []) {
 		const sid = String(it?.sceneId || '').trim()
 		if (sid && exists(sid)) items.push({ mainIdx: main(it.mainIdx), sceneId: sid })
+		else if (!sid && it?.empty === true) items.push({ mainIdx: main(it.mainIdx), sceneId: '', empty: true })
 	}
 	if (items.length) return items
 	const sid = String(preset?.sceneId || '').trim()
@@ -75,9 +77,12 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 		transitionOverride = await globalTransition(scenes, fps)
 	}
 	const takeLook = deps.takeLook || ((tb) => require('./routes-scene-take-look').handleTakeLook(tb, ctx))
+	const clearDest = deps.clearDestination || ((m, t, cut) => clearDestination(ctx, m, t, cut))
 	const results = await Promise.all(
 		items.map(async (it) => {
-			const res = await takeLook({ sceneId: it.sceneId, mainIdx: it.mainIdx, target, forceCut, ...(transitionOverride ? { transitionOverride } : {}) })
+			const res = it.empty
+				? await clearDest(it.mainIdx, target, forceCut)
+				: await takeLook({ sceneId: it.sceneId, mainIdx: it.mainIdx, target, forceCut, ...(transitionOverride ? { transitionOverride } : {}) })
 			let err = null
 			if (res?.status >= 400) {
 				try {
@@ -91,6 +96,17 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 	)
 	const failed = results.filter((r) => r.error)
 	return out(failed.length === results.length ? 502 : 200, { ok: failed.length === 0, target, items: results })
+}
+
+/**
+ * WO-781: an empty destination of the preset — PRV recall clears that screen's PRV (the deck's blank click), PGM
+ * recall fades it to black like the deck's FTB (0.5 s at the screen's fps; a cut is 0 frames).
+ */
+async function clearDestination(ctx, mainIdx, target, cut) {
+	if (target === 'preview') return require('./routes-scene').handlePreviewLiveClear({ mainIndex: mainIdx }, ctx)
+	const map = require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}) || {}, ctx)
+	const fps = map?.programResolutions?.[mainIdx]?.fps ?? 50
+	return require('./routes-ftb').handlePost('/api/ftb', { screenIdx: mainIdx, durationFrames: cut ? 0 : Math.round(0.5 * fps), framerate: fps }, ctx)
 }
 
 module.exports = { handleLookPresetRecall, recallItems }
