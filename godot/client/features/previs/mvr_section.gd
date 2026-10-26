@@ -373,7 +373,11 @@ func _from_share(types: Array) -> Array:
 		_status.text = _status.text.replace(M.summary(_info), M.summary(M.without_specs(_info, done)))
 		return []
 	_status.text += "\nGDTF Share: looking up %d placeholder fixture type%s…" % [ids.size(), "" if ids.size() == 1 else "s"]
-	var res: Dictionary = await Api.post_json("/api/fixtures/share/resolve", {"ids": ids})
+	var used := {}  # WO-785: the modes this scene patches — matched first
+	for t in types:
+		if ids.has(str(t.id)):
+			used[str(t.id)] = t.get("used", [])
+	var res: Dictionary = await Api.post_json("/api/fixtures/share/resolve", {"ids": ids, "used": used})
 	_status.text = _status.text.get_slice("\nGDTF Share:", 0)
 	var out: Array = res.data.get("results", []) if res.ok and res.data is Dictionary else []
 	var gone := out.filter(func(r: Dictionary) -> bool: return r.get("status", "") == "replaced").map(func(r: Dictionary) -> String: return str(r.id))

@@ -110,7 +110,9 @@ async function handleTypes(ctx, id, deps = {}) {
 	for (const [spec, t] of types) {
 		if (!t || t.error || seen.has(t.id)) continue
 		seen.add(t.id)
-		out.push({ spec, id: t.id, name: t.name, manufacturer: t.manufacturer, placeholder: !!t.placeholder,
+		// WO-785: the modes this scene's fixtures use (GDTF Share matching weighs them first)
+		const used = [...new Set(sc.objects.filter((o) => o.fixture?.spec === spec).map((o) => String(o.fixture.mode || '')).filter(Boolean))]
+		out.push({ spec, id: t.id, name: t.name, manufacturer: t.manufacturer, placeholder: !!t.placeholder, used,
 			...(t.replacedBy ? { replacedBy: t.replacedBy.to } : {}) })
 	}
 	return reply(200, { types: out, missing: [...types].filter(([, t]) => !t || t.error).map(([spec]) => spec) })

@@ -4,9 +4,9 @@
  * WO-637 — GDTF Share (src/fixtures/gdtf-share.js):
  *   GET  /api/fixtures/share/account               → { user, set }  (the password is never returned)
  *   POST /api/fixtures/share/account {user, password} → store it (box-local, 0600)
- *   POST /api/fixtures/share/resolve {ids?}        → each placeholder without an alias → the real GDTF downloaded,
+ *   POST /api/fixtures/share/resolve {ids?, used?}  → each placeholder without an alias → the real GDTF downloaded,
  *        stored and aliased (modes paired by footprint) → { results: [{ id, status, to?, modes?, candidates? }],
- *        offline?, error? }
+ *        offline?, error? }. WO-785: used {id: [mode names the scene patches]} weighs those modes first.
  */
 
 const share = require('../fixtures/gdtf-share')
@@ -17,7 +17,8 @@ const reply = (status, o) => ({ status, headers: JSON_HEADERS, body: jsonBody(o)
 async function handleResolve(body, ctx, deps = {}) {
 	const b = parseBody(body) || {}
 	try {
-		const out = await share.resolve(Array.isArray(b.ids) ? b.ids : [], deps)
+		const used = b.used && typeof b.used === 'object' && !Array.isArray(b.used) ? b.used : {}
+		const out = await share.resolve(Array.isArray(b.ids) ? b.ids : [], deps, used)
 		if (out.results.some((r) => r.status === 'replaced')) ctx?.fixtureService?.reload?.()
 		return reply(200, out)
 	} catch (e) {

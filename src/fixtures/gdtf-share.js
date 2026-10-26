@@ -15,7 +15,7 @@ const os = require('os')
 const path = require('path')
 const store = require('./gdtf-store')
 const aliases = require('./gdtf-aliases')
-const { rank, pairModes } = require('./gdtf-share-match')
+const { rank, loose, pairModes } = require('./gdtf-share-match')
 
 const API = 'https://gdtf-share.com/apis/public'
 const LIST_MAX_AGE_MS = 24 * 3600 * 1000
@@ -92,9 +92,11 @@ async function download(f, rid) {
 /**
  * Every placeholder among `ids` (all stored placeholders when empty) that has no alias yet → its real type.
  * → [{ id, name, manufacturer, status: 'replaced' | 'choose' | 'none' | 'error', to?, modes?, rid?, candidates?, error? }]
- * @param {string[]} ids  @param {{ fetch?: Function, now?: number }} [deps]
+ * WO-785: `used` { id: [mode names the scene patches] } weighs those modes first; 'none' carries looser candidates
+ * (another maker's upload, a sibling model) to offer.
+ * @param {string[]} ids  @param {{ fetch?: Function, now?: number }} [deps]  @param {Record<string, string[]>} [used]
  */
-async function resolve(ids, deps = {}) {
+async function resolve(ids, deps = {}, used = {}) {
 	const f = deps.fetch || fetch
 	const want = new Set((ids || []).map(String))
 	const stubs = store.list().filter((t) => t.placeholder && !t.replacedBy && (!want.size || want.has(t.id)))
@@ -103,10 +105,11 @@ async function resolve(ids, deps = {}) {
 	const { list: all, error: listError } = await list(f, deps.now)
 	const results = []
 	for (const s of stubs) {
-		const r = rank(s, all)
+		const r = rank(s, all, 5, Array.isArray(used?.[s.id]) ? used[s.id].map(String) : [])
 		const base = { id: s.id, name: s.name, manufacturer: s.manufacturer }
 		if (!r.best) {
-			results.push({ ...base, status: 'none' })
+			const offer = loose(s, all)
+			results.push(offer.length ? { ...base, status: 'none', candidates: offer } : { ...base, status: 'none' })
 			continue
 		}
 		if (!r.sure) {
