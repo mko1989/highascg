@@ -144,7 +144,10 @@ static func audio_devices(payload: Dictionary, type: String, existing: Dictionar
 			var n: Variant = dd.get("maxOutputChannels")
 			var ch := " · %sch" % O.js(n) if (n is float or n is int) and n > 0 else ""
 			var desc := " — %s" % O.js(dd.description) if H.truthy(dd.get("description")) else ""
-			opts.append([v, "%s%s%s" % [O.js(O.or_([dd.get("name"), "?"])), ch, desc]])
+			if H.truthy(dd.get("label")):  # WO-779: HDMI/DP sink — "HDMI 0 → DP-4 · P80 (DisplayPort, 8 ch)"
+				opts.append([v, O.js(dd.label)])
+			else:
+				opts.append([v, "%s%s%s" % [O.js(O.or_([dd.get("name"), "?"])), ch, desc]])
 			hit = cur == (O.js(dd.id) if dd.get("id") != null else "") or cur == O.js(O.or_([dd.get("name"), ""]))
 		if hit:
 			value = v  # a later `selected` option wins, as in the DOM

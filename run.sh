@@ -96,6 +96,8 @@ run_caspar() {
 	if command -v node >/dev/null 2>&1 && [ -f "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" ]; then
 		caspar_supervisor_log "$(node "$CASPAR_ROOT/tools/runtime/enforce-screen-consumer-policy.js" "$CONFIG_PATH" 2>&1 | tail -n 1)"
 	fi
+	# WO-779: HDMI/DP audio is muted at the card until something switches IEC958 on (no PulseAudio here).
+	caspar_supervisor_log "$(sh "$CASPAR_ROOT/tools/runtime/unmute-hdmi-audio.sh" 2>&1 | tail -n 1)"
 	# WO-508: the flock at the top guards against a second run.sh, NOT against a second casparcg.
 	# A binary started outside the supervisor — by hand, or a survivor of a previous boot — was never
 	# noticed, and this launched a second MAIN alongside it. Two mains cannot coexist: they fight for

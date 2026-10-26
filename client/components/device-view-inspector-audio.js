@@ -110,7 +110,8 @@ export function renderAudioOutControls(h, conn, { currentSettings, lastPayload, 
 				opt.value = String(d?.id ?? d?.name ?? '')
 				const ch = Number(d?.maxOutputChannels) > 0 ? ` · ${d.maxOutputChannels}ch` : ''
 				const desc = d?.description ? ` — ${d.description}` : ''
-				opt.textContent = `${d?.name || '?'}${ch}${desc}`
+				// WO-779: HDMI/DP sinks carry a label naming what is plugged in ("HDMI 0 → DP-4 · P80 (DisplayPort, 8 ch)")
+				opt.textContent = d?.label ? String(d.label) : `${d?.name || '?'}${ch}${desc}`
 				const currentVal = String(existing?.deviceName || '')
 				const idStr = d?.id !== undefined && d?.id !== null ? String(d.id) : ''
 				if (currentVal === idStr || currentVal === String(d?.name || '')) opt.selected = true

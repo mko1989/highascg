@@ -6,6 +6,7 @@
 
 const path = require('path')
 const { execFileSync } = require('child_process')
+const { annotateHdmiSinks } = require('./hdmi-sinks')
 
 const CACHE_TTL_MS = 30000
 /** @type {{ at: number, payload: object } | null} */
@@ -360,6 +361,7 @@ function listPortAudioDevices(opts = {}) {
 			})
 		}
 
+		mapped = annotateHdmiSinks(mapped)
 		const payload = {
 			devices: mapped,
 			refreshedAt: new Date().toISOString(),

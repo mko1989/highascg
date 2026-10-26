@@ -1,4 +1,8 @@
 'use strict'
 
 /** The curated offline CI test bundle, continued (offline-test-files.js reached the 500-line limit). New files here. */
-module.exports = ['tools/smoke/smoke-wo770-vr-session.test.js', 'tools/smoke/smoke-wo772-media-sent-resync.test.js']
+module.exports = [
+	'tools/smoke/smoke-wo770-vr-session.test.js',
+	'tools/smoke/smoke-wo772-media-sent-resync.test.js',
+	'tools/smoke/smoke-wo779-hdmi-sinks.test.js',
+]
