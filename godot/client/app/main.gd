@@ -48,8 +48,7 @@ func _ready() -> void:
 		add_child(load("res://e2e/e2e_runner.gd").new())
 	if Config.args.has("probe-take"):  # dev: --probe-take=<sceneId>[:program]
 		var parts := str(Config.args["probe-take"]).split(":")
-		var live_tab: Node = shell.tabs.get_node("Live")
-		await live_tab.deck.request_take(parts[0], 0, "program" if parts.size() > 1 else "preview")
+		await shell.tabs.get_node("Live").deck.request_take(parts[0], 0, "program" if parts.size() > 1 else "preview")
 	if Config.args.has("probe-rename"):  # dev: --probe-rename=<sceneId>:<new name>
 		var kv := str(Config.args["probe-rename"]).split(":", true, 1)
 		if not Ws.is_open:
@@ -366,8 +365,9 @@ func _ready() -> void:
 		await bpa.send({"clear": true}, true, true)
 		show.call("removed")
 	if Config.args.has("probe-ftb"):  # dev: --probe-ftb=<main>
-		var lt: Node = shell.tabs.get_node("Live")
-		await lt.deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
+		await shell.tabs.get_node("Live").deck.request_ftb(int(Config.args["probe-ftb"]), Store.get_value("channelMap", {}))
+	if Config.args.has("probe-blank-clear"):  # dev: --probe-blank-clear=<main> → card click stages PRV, blank click clears it
+		add_child(preload("res://app/deck_blank_probe.gd").new())
 	if Config.args.has("probe-perf"):  # dev: render-time probe (WO-617)
 		add_child(preload("res://app/perf_probe.gd").new())
 	if Config.args.has("quit-after"):

@@ -13,6 +13,7 @@ const Icons := preload("res://app/ui_icons.gd")
 const TransitionRow := preload("res://features/live/transition_row.gd")
 const LookThumb := preload("res://features/live/look_thumb.gd")
 const LFS := preload("res://features/previs/fixtures/look_fixtures_store.gd")
+const BlankClear := preload("res://features/live/deck_blank_clear.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -78,6 +79,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	col.mouse_filter = Control.MOUSE_FILTER_PASS
 	col.set_drag_forwarding(Callable(), _can_drop_new.bind(main), _drop_new.bind(main))  # WO-623 B: blank deck space
 	var head_row := HBoxContainer.new()
+	head_row.mouse_filter = Control.MOUSE_FILTER_PASS  # its gaps are blank deck space (BlankClear)
 	var head := Label.new()
 	head.text = "%s  ·  %d looks" % [title, looks.size()]
 	head.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
@@ -120,6 +122,7 @@ func _column(title: String, looks: Array, bus: Dictionary, main: int, cm: Dictio
 	for s in looks:
 		grid.add_child(_card(s, bus))
 	grid.add_child(_add_tile(main))
+	BlankClear.wire(col, main, cm, action_result.emit)
 	return col
 
 
