@@ -35,6 +35,10 @@ const WAIT_MAX_MS = 10 * 60 * 1000
 const WAIT_POLL_MS = 1000
 const POLL_MS = 250
 const STOP_WAIT_MS = 5000
+// --show: WayVR's anchor starts at the play-space origin (floor level) and only moves in front of the head on a
+// show / hide; without it the MagicQ panel spawns under the operator's feet (owner 27.10: "does not show up").
+// --no-autostart: WayVR's own app autostart (set up in its dashboard) would start a second MagicQ.
+const WAYVR_ARGS = ['--openxr', '--headless', '--show', '--no-autostart', '--wait']
 
 /** Newest WayVR AppImage in `dir` (by name: WayVR-v26.8.0 sorts before WayVR-v26.10.0 numerically). */
 function findWayvr(dir, readdir) {
@@ -207,7 +211,7 @@ function createDeskPanel(deps = {}) {
 			return fail('MagicQ is already running on the desktop — close it first (one MagicQ per box)')
 		if (!byKind(list, 'wayvr').length) {
 			const env = { ...sessionEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth() }
-			spawn(wayvr, ['--openxr', '--headless', '--wait'], { env, cwd: path.dirname(wayvr) }, 'wayvr.log')
+			spawn(wayvr, WAYVR_ARGS, { env, cwd: path.dirname(wayvr) }, 'wayvr.log')
 		}
 		const sat = byKind(procScan(), 'satellite')[0]
 		if (sat) launchMagicq(sat.display)

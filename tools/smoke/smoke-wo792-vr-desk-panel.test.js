@@ -78,7 +78,7 @@ test('start: WayVR headless with the session env, then MagicQ on its X display (
 	assert.equal(spawns.length, 2)
 	const [w, m] = spawns
 	assert.equal(w.file, '/w/WayVR-v26.8.0-x86_64.AppImage')
-	assert.deepEqual(w.args, ['--openxr', '--headless', '--wait'])
+	assert.deepEqual(w.args, ['--openxr', '--headless', '--show', '--no-autostart', '--wait'])
 	assert.equal(w.env.XDG_RUNTIME_DIR, '/run/user/1000')
 	assert.equal(w.env.DBUS_SESSION_BUS_ADDRESS, 'unix:path=/run/user/1000/bus')
 	assert.equal(w.env.DISPLAY, ':0')

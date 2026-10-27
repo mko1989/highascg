@@ -171,3 +171,41 @@ Parents:
 - **Not yet seen with this code:** MagicQ opening in the headset through the dialog. That's the owner's QA: connect the
   headset; MagicQ should appear by itself while the wait is pending, or VR… → "MagicQ in VR".
 - Earlier by hand (same launch line): the owner confirmed the standalone MagicQ window panel is good.
+
+## Fix, 27.10: the panel spawned under the operator's feet (owner: "the magicq in the vr does not show up")
+
+**Investigation**
+- Box state was all good:
+  - `GET /api/vr/status` desk: `wayvrRunning`, `display ":20"`, `magicqRunning`.
+  - On :20 MagicQ's `SELECT` dialog (794×190) was `IsViewable`, and WayVR logged "Toplevel surface count changed: 1".
+- WayVR IPC confirmed it:
+  - Abstract socket `@/tmp/wayvr_ipc.sock`; u32 BE length + JSON, protocol 4. WayVR only serves it while rendering,
+    i.e. with the headset on.
+  - `WvrWindowList` → `{size_x: 794, size_y: 190, visible: true}`.
+  - `WlxInputState` → `hmd_pos [0.14, 1.50, -0.25]`.
+- **Cause: the anchor.** WayVR's `app.anchor` starts as IDENTITY (source v26.8.0 `wayvr/src/state.rs:206`), and
+  only `show_hide` moves it to `hmd * (0,0,-1)` (`windowing/manager.rs:1102-1105`).
+  - Anchored panels sit at `anchor * (0, 0, z)` (`overlays/wayvr.rs:116`, `windowing/window.rs:164`). Until the first
+    show / hide, that is the play-space origin at floor height: under the operator's feet.
+  - The headset test that worked ran WayVR with `--show`, which queues a ShowHide 1 s after start
+    (`backend/openxr/mod.rs:86-92`). The built-in launch had dropped it.
+- **Second fault: WayVR's own autostart.** In the headset the owner added MagicQ to WayVR's Apps autostart
+  (`~/.config/wayvr/conf.d/zz-saved-config.json5`, `autostart_apps`, env `QT_QPA_PLATFORM=wayland`). MagicQ's Qt is
+  xcb only, so every such launch died: "Sending SIGTERM (graceful exit) to process … runmagicq.sh" at 13:46:09,
+  13:46:27, 13:46:57 and 13:48:25. Had it worked, it would have been a second MagicQ.
+
+**What was done**
+- `src/vr/vr-desk-panel.js`: WayVR now starts with `WAYVR_ARGS = --openxr --headless --show --no-autostart --wait`.
+  - `--show` puts the anchor (and the MagicQ panel) 1 m in front of the headset once the runtime is up.
+  - `--no-autostart` skips WayVR's own app autostart.
+- `tools/smoke/smoke-wo792-vr-desk-panel.test.js`: the args assertion follows.
+
+**Verified**
+- Smoke test 6/6, ESLint and Prettier clean.
+- Server restarted (programmer snapshot of 38 fixtures restored identical); desk stop → start.
+  - The WayVR argv carries `--show --no-autostart`.
+  - MagicQ is on :20 and its toplevel was created.
+  - No autostart SIGTERM in the log.
+- Owner QA in the headset.
+- If the headset was lying elsewhere when WayVR started, the panel sits 1 m in front of that spot. Show / hide twice
+  (the menu button) brings it back in front.
