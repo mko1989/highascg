@@ -262,7 +262,7 @@ func _xr_move(dt: float) -> void:
 func _point(dt: float) -> void:
 	var from := _right.global_position
 	var dir := -_right.global_basis.z
-	var on: bool = panel.point(from, dir)
+	var on: bool = panel.point(from, dir, dt)
 	var length := maxf(from.distance_to(panel.hit_at), 0.01) if on else RAY_M
 	_ray.scale = Vector3(1, 1, length)
 	_ray.position = Vector3(0, 0, -length / 2.0)

@@ -144,3 +144,21 @@ func _fake_tab() -> GDScript:
 	g.source_code = "extends Control\nvar fixtures3d = null\nvar aim_drag = null\n"
 	g.reload()
 	return g
+
+
+## Owner 27.10: "the programmer tablet in vr is too sensitive. it needs smoothing." — the panel pointer's One-Euro
+## filter: a still hand's tremor is cut hard, a sweep follows with little lag, a fresh state starts where the ray is.
+func test_pointer_smoothing() -> void:
+	var st := {}
+	t.eq(Walk.euro(st, Vector2(300, 400), 1.0 / 72.0), Vector2(300, 400), "the first sample is taken as is")
+	var worst := 0.0
+	for i in 144:  # 2 s of ±4 px tremor at 72 Hz around (300, 400)
+		var p := Walk.euro(st, Vector2(300, 400) + Vector2(4, -4) * (1.0 if i % 2 == 0 else -1.0), 1.0 / 72.0)
+		worst = maxf(worst, p.distance_to(Vector2(300, 400)))
+	t.ok(worst < 1.0, "±4 px tremor moves the pointer under 1 px (%.2f)" % worst)
+	var sweep := {}
+	var p := Vector2.ZERO
+	for i in 37:  # 0.5 s sweep at 600 px/s along x
+		p = Walk.euro(sweep, Vector2(i * 600.0 / 72.0, 0), 1.0 / 72.0)
+	t.ok(absf(p.x - 300.0) < 40.0, "a 600 px/s sweep lags under 40 px (%.1f behind)" % (300.0 - p.x))
+	t.ok(Walk.PRESS_SLOP_PX > 4.0 and Walk.PRESS_SLOP_PX < 20.0, "the press slop is a small move, not a drag")

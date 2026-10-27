@@ -80,6 +80,36 @@ static func panel_uv(xf: Transform3D, size: Vector2, from: Vector3, dir: Vector3
 	return uv if uv.x >= 0.0 and uv.x <= 1.0 and uv.y >= 0.0 and uv.y <= 1.0 else null
 
 
+## Owner 27.10: "the programmer tablet in vr is too sensitive. it needs smoothing." The ray's panel pixel goes through
+## a One-Euro filter (Casiez et al. 2012): its cut-off rises with the pointer's speed, so a still hand's tremor is
+## smoothed hard (EURO_MIN_HZ) and a quick sweep follows with little lag (EURO_BETA per px/s). Pixels of PANEL_PX.
+const EURO_MIN_HZ := 1.0
+const EURO_BETA := 0.004
+const EURO_D_HZ := 1.0
+## A trigger press holds the pointer where it was (pulling the trigger twitches the controller) until the smoothed ray
+## moves PRESS_SLOP_PX away: a click lands where it was aimed, a deliberate drag still drags.
+const PRESS_SLOP_PX := 10.0
+
+
+static func _euro_a(hz: float, dt: float) -> float:
+	var tau := 1.0 / (TAU * hz)
+	return 1.0 / (1.0 + tau / maxf(dt, 1e-4))
+
+
+## One step of the filter: `st` keeps its state ({} = start again, e.g. the ray came back onto the panel).
+static func euro(st: Dictionary, x: Vector2, dt: float) -> Vector2:
+	if not st.has("x"):
+		st.x = x
+		st.dx = Vector2.ZERO
+		return x
+	var prev: Vector2 = st.x
+	var dx: Vector2 = (st.dx as Vector2).lerp((x - prev) / maxf(dt, 1e-4), _euro_a(EURO_D_HZ, dt))
+	var out: Vector2 = prev.lerp(x, _euro_a(EURO_MIN_HZ + EURO_BETA * dx.length(), dt))
+	st.dx = dx
+	st.x = out
+	return out
+
+
 ## WO-770: the desktop mirror's render size for a host of `size` px — its aspect, at most MIRROR_MAX, at least 16 px.
 static func mirror_px(size: Vector2) -> Vector2i:
 	if size.x <= 0.0 or size.y <= 0.0:

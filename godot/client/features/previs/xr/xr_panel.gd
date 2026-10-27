@@ -22,6 +22,8 @@ var quad: MeshInstance3D
 var hit_at := Vector3.ZERO  # where the ray last met the panel (world)
 var _at := Vector2(-1, -1)  # last pointed pixel (-1 = off the panel)
 var _mask := 0
+var _euro := {}  # the pointer's smoothing (Walk.euro); emptied when the ray leaves the panel
+var _press_at := Vector2(-1, -1)  # where the trigger went down: the pointer stays there within PRESS_SLOP_PX
 
 
 func _ready() -> void:
@@ -72,14 +74,22 @@ func _theme() -> Theme:
 
 
 ## The ray this frame → a mouse move on the panel; whether it points at the panel (the trigger then clicks here, not
-## in the stage). Off the panel with nothing held, the pointer leaves it.
-func point(from: Vector3, dir: Vector3) -> bool:
+## in the stage). Off the panel with nothing held, the pointer leaves it. The pixel is smoothed (Walk.euro, owner 27.10:
+## "too sensitive") and, while the trigger is held, kept at the press point until the ray moves PRESS_SLOP_PX away.
+func point(from: Vector3, dir: Vector3, dt := 1.0 / 72.0) -> bool:
 	var uv: Variant = Walk.panel_uv(quad.global_transform, SIZE, from, dir, _mask != 0) if is_visible_in_tree() else null
 	if uv == null:
 		_at = Vector2(-1, -1)
+		_euro = {}
 		return false
-	var px: Vector2 = (uv as Vector2) * Vector2(PX)
-	hit_at = quad.global_transform * Vector3((uv.x - 0.5) * SIZE.x, (0.5 - uv.y) * SIZE.y, 0.0)
+	var px: Vector2 = Walk.euro(_euro, (uv as Vector2) * Vector2(PX), dt).clamp(Vector2.ZERO, Vector2(PX))
+	if _press_at.x >= 0.0:
+		if px.distance_to(_press_at) < Walk.PRESS_SLOP_PX:
+			px = _press_at
+		else:
+			_press_at = Vector2(-1, -1)  # a real drag: follow from here on
+	var at_uv := px / Vector2(PX)
+	hit_at = quad.global_transform * Vector3((at_uv.x - 0.5) * SIZE.x, (0.5 - at_uv.y) * SIZE.y, 0.0)
 	if px != _at:
 		var e := InputEventMouseMotion.new()
 		e.relative = px - _at if _at.x >= 0.0 else Vector2.ZERO
@@ -111,6 +121,7 @@ func press(pressed: bool, ctrl := false, button := MOUSE_BUTTON_LEFT) -> void:
 	e.ctrl_pressed = ctrl
 	if held:
 		_mask = _mask | bit if pressed else _mask & ~bit
+		_press_at = _at if pressed else Vector2(-1, -1)
 	_push(e)
 
 
