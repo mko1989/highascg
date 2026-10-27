@@ -54,7 +54,7 @@ func test_desk_panel_wo792() -> void:
 	t.eq([v.desk_text, v.desk_path], ["Close MagicQ in VR", "/api/vr/desk/stop"], "on: closes it")
 	v = M.view(_s({"desk": {"available": true, "pending": true}}))
 	t.eq(v.desk_path, "/api/vr/desk/stop", "waiting for the headset: Close cancels")
-	t.ok(str(v.detail).contains("once it is connected"), "and the detail says MagicQ is waiting")
+	t.ok(str(v.detail).contains("once you have the headset on"), "and the detail says MagicQ is waiting")
 	t.ok(not M.view(_s({"serverRunning": false, "clientRunning": false, "desk": desk})).desk, "no session: no toggle")
 	t.ok(not M.view(_s({"desk": {"available": false}})).desk, "not installed: no toggle")
 	t.ok(not M.view(_s({})).desk, "an older server without `desk`: no toggle")

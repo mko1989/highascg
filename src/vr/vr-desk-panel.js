@@ -10,17 +10,22 @@
  * On the operator's desktop nothing changes (no window on DP-0 / DP-4).
  *
  * WayVR only gets that far once OpenXR is up: while no headset is connected WiVRn has no active_runtime.json and
- * `--wait` keeps WayVR waiting. So Start launches MagicQ as soon as the X display appears — at once, or from a
- * background wait (`pending`, up to WAIT_MAX_MS) that End / Close cancels.
+ * `--wait` keeps WayVR waiting. So Start waits in the background (`pending`, up to WAIT_MAX_MS; End / Close cancels)
+ * for the X display AND for WayVR to answer its IPC (src/vr/wayvr-ipc.js) — it only does while the operator wears the
+ * headset and WayVR renders. Then, on a fresh WayVR, it summons the overlays (show / hide puts WayVR's anchor 1 m in
+ * front of the head; until then anchored panels sit at the play-space origin, under the operator's feet) and only
+ * then opens MagicQ, so its panel spawns in view. Afterwards it checks over IPC that WayVR shows the window: a WayVR
+ * that stops answering (27.10 it froze as MagicQ's window arrived mid presence-change) surfaces as `error`.
  *
  * MagicQ is started detached in its own process group; the group id is kept in ~/.highascg/run/vr-desk.json so a
- * node restart can still stop it. Stop: that group's MagicQ gets SIGTERM first (it saves its show), then WayVR. A
- * MagicQ the operator runs on the desktop is another group: never stopped, and Start refuses a second one.
+ * node restart can still stop it. Stop: that group's MagicQ gets SIGTERM first (it saves its show), then WayVR —
+ * SIGKILL to WayVR's process group (satellite + Xwayland) if it ignores the TERM (a frozen WayVR does). A MagicQ the
+ * operator runs on the desktop is another group: never stopped, and Start refuses a second one.
  *
  * Licensing (ChamSys manual): MagicQ PC without ChamSys hardware runs in Demo Mode — fine for the panel; PSN input
  * and the ChamSys remote protocol need a MagicQ interface / Wing (WO-793).
  *
- * `createDeskPanel(deps)` takes injectable spawn / procScan / kill / fs / timers for the smoke test.
+ * `createDeskPanel(deps)` takes injectable spawn / procScan / kill / fs / timers / ipc for the smoke test.
  */
 
 const fs = require('fs')
@@ -35,10 +40,12 @@ const WAIT_MAX_MS = 10 * 60 * 1000
 const WAIT_POLL_MS = 1000
 const POLL_MS = 250
 const STOP_WAIT_MS = 5000
-// --show: WayVR's anchor starts at the play-space origin (floor level) and only moves in front of the head on a
-// show / hide; without it the MagicQ panel spawns under the operator's feet (owner 27.10: "does not show up").
 // --no-autostart: WayVR's own app autostart (set up in its dashboard) would start a second MagicQ.
-const WAYVR_ARGS = ['--openxr', '--headless', '--show', '--no-autostart', '--wait']
+// No --show: it fires 1 s after start, blind, while the headset may sit on the desk; the launch summons instead.
+const WAYVR_ARGS = ['--openxr', '--headless', '--no-autostart', '--wait']
+const IPC_TIMEOUT_MS = 2000
+const SUMMON_SETTLE_MS = 1000
+const PANEL_CHECK_MS = 15000
 
 /** Newest WayVR AppImage in `dir` (by name: WayVR-v26.8.0 sorts before WayVR-v26.10.0 numerically). */
 function findWayvr(dir, readdir) {
@@ -129,8 +136,10 @@ function createDeskPanel(deps = {}) {
 	const getXAuth = deps.getXAuthority || (() => require('../utils/hardware-info').getXAuthority())
 	const wayvrDir = deps.wayvrDir || WAYVR_DIR
 	const magicqRun = deps.magicqRun || MAGICQ_RUN
+	const ipc = deps.ipc || require('./wayvr-ipc')
 
 	let pending = null // the background wait's token while MagicQ waits for WayVR's X display
+	let gen = 0 // bumped by stop(): a panel check still running for a stopped MagicQ reports nothing
 	let pendingDone = Promise.resolve()
 	let lastError = ''
 
@@ -179,23 +188,54 @@ function createDeskPanel(deps = {}) {
 		if (child && child.pid) writeState({ pgid: child.pid, display })
 	}
 
-	/** Background: launch MagicQ once WayVR's X display is up (the headset connected), unless cancelled. */
-	async function waitAndLaunch(token) {
+	const answers = async (fn) => {
+		try {
+			return await fn({ timeoutMs: IPC_TIMEOUT_MS })
+		} catch {
+			return null
+		}
+	}
+
+	/**
+	 * Background, unless cancelled: once WayVR's X display is up and WayVR answers in the headset, summon the
+	 * overlays (fresh WayVR only — show / hide is a toggle), open MagicQ, then check WayVR shows its window.
+	 */
+	async function waitAndLaunch(token, fresh) {
 		const t0 = now()
+		let sat = null
 		while (pending === token) {
-			const sat = byKind(procScan(), 'satellite')[0]
-			if (sat) {
-				pending = null
-				launchMagicq(sat.display)
-				return
-			}
+			sat = byKind(procScan(), 'satellite')[0]
+			if (sat && (await answers(ipc.inputState)) && pending === token) break
 			if (now() - t0 >= WAIT_MAX_MS) {
 				pending = null
-				lastError = 'WayVR started no X display — is the headset connected, and the xwayland package installed?'
+				lastError = sat
+					? 'WayVR did not show in the headset — put the headset on, or Close MagicQ in VR and try again'
+					: 'WayVR started no X display — is the headset connected, and the xwayland package installed?'
 				return
 			}
 			await sleep(WAIT_POLL_MS)
 		}
+		if (pending !== token) return
+		if (fresh) {
+			await answers(ipc.showHide)
+			await sleep(SUMMON_SETTLE_MS)
+			if (pending !== token) return
+		}
+		pending = null
+		launchMagicq(sat.display)
+		const mine = gen
+		const t1 = now()
+		let answered = false
+		while (now() - t1 < PANEL_CHECK_MS) {
+			await sleep(WAIT_POLL_MS)
+			const wins = await answers(ipc.windowList)
+			if (wins && wins.length) return
+			answered = answered || !!wins
+		}
+		if (mine !== gen) return
+		lastError = answered
+			? 'WayVR shows no MagicQ window — Close MagicQ in VR, then open it again'
+			: 'WayVR stopped answering as MagicQ opened — Close MagicQ in VR, then open it again'
 	}
 
 	/** @param {{ serverRunning?: boolean }} [ctx] */
@@ -209,20 +249,17 @@ function createDeskPanel(deps = {}) {
 		if (ourMagicq(list).length || pending) return { ok: true, ...status() }
 		if (byKind(list, 'magicq').length)
 			return fail('MagicQ is already running on the desktop — close it first (one MagicQ per box)')
-		if (!byKind(list, 'wayvr').length) {
+		const fresh = !byKind(list, 'wayvr').length
+		if (fresh) {
 			const env = { ...sessionEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth() }
 			spawn(wayvr, WAYVR_ARGS, { env, cwd: path.dirname(wayvr) }, 'wayvr.log')
 		}
-		const sat = byKind(procScan(), 'satellite')[0]
-		if (sat) launchMagicq(sat.display)
-		else {
-			const token = {}
-			pending = token
-			pendingDone = waitAndLaunch(token).catch((e) => {
-				pending = null
-				lastError = e.message || String(e)
-			})
-		}
+		const token = {}
+		pending = token
+		pendingDone = waitAndLaunch(token, fresh).catch((e) => {
+			if (pending === token) pending = null
+			lastError = e.message || String(e)
+		})
 		return { ok: true, ...status() }
 	}
 
@@ -239,17 +276,27 @@ function createDeskPanel(deps = {}) {
 		}
 	}
 
-	/** Our MagicQ first (TERM → it saves; KILL after STOP_WAIT_MS), then WayVR (its X display goes with it). */
+	/** TERM, wait up to STOP_WAIT_MS for `left()` to empty, then KILL what is left. */
+	async function termThenKill(procs, left, killOne) {
+		for (const p of procs) signal(p.pid, 'SIGTERM')
+		const t0 = now()
+		while (left().length && now() - t0 < STOP_WAIT_MS) await sleep(POLL_MS)
+		for (const p of left()) killOne(p)
+	}
+
+	/**
+	 * Our MagicQ first (TERM → it saves), then WayVR (its X display goes with it). A WayVR that ignores the TERM
+	 * (frozen) is KILLed with its process group (satellite, Xwayland) when it leads one — ours always does (detached).
+	 */
 	async function stop() {
 		pending = null
+		gen++
 		const pgid = savedPgid()
 		const ours = () => (pgid ? byKind(procScan(), 'magicq').filter((p) => p.pgid === pgid) : [])
-		for (const p of ours()) signal(p.pid, 'SIGTERM')
-		const t0 = now()
-		while (ours().length && now() - t0 < STOP_WAIT_MS) await sleep(POLL_MS)
-		for (const p of ours()) signal(p.pid, 'SIGKILL')
+		await termThenKill(ours(), ours, (p) => signal(p.pid, 'SIGKILL'))
 		writeState(null)
-		for (const p of byKind(procScan(), 'wayvr')) signal(p.pid, 'SIGTERM')
+		const wayvrs = () => byKind(procScan(), 'wayvr')
+		await termThenKill(wayvrs(), wayvrs, (p) => signal(p.pgid === p.pid ? -p.pgid : p.pid, 'SIGKILL'))
 		lastError = ''
 		return { ok: true, ...status() }
 	}

@@ -48,7 +48,7 @@ static func view(s: Dictionary) -> Dictionary:
 		var on: bool = desk.get("magicqRunning", false) or desk.get("pending", false)
 		v.desk = true
 		if desk.get("pending", false):
-			v.detail = (v.detail + "\n" if v.detail != "" else "") + "MagicQ opens in the headset once it is connected."
+			v.detail = (v.detail + "\n" if v.detail != "" else "") + "MagicQ opens in front of you once you have the headset on."
 		v.desk_text = "Close MagicQ in VR" if on else "MagicQ in VR"
 		v.desk_path = "/api/vr/desk/stop" if on else "/api/vr/desk/start"
 	var err := str(s.get("error", ""))

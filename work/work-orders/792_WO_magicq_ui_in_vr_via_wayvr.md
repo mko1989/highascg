@@ -209,3 +209,47 @@ Parents:
 - Owner QA in the headset.
 - If the headset was lying elsewhere when WayVR started, the panel sits 1 m in front of that spot. Show / hide twice
   (the menu button) brings it back in front.
+
+## Fix 2, 27.10: `--show` was not enough, and WayVR froze (owner: "magicq fails to show up … the wristwatch … just says the application started")
+
+**Investigation**
+- **13:56 run (`--show`).** The owner wore the headset 13:58:45–14:00:10 (WiVRn "user presence") and WayVR was
+  rendering, but the panel was not in view. `--show` fires 1 s after start, while the headset sits idle, so the
+  anchor came from that stale head pose.
+- **Watch launches.** The owner launched MagicQ from the watch's Apps. WayVR started it in Wayland mode, which died
+  ("Sending SIGTERM … runmagicq.sh", 13:59:48). That is the "application started" toast with nothing after it.
+- **14:00:24 run: WayVR froze.**
+  - The owner restarted. MagicQ's window arrived at 14:00:30.88, during a presence flap (false 14:00:29 → true
+    14:00:31). WayVR then logged nothing, not even its "IPD changed" stream, while WiVRn showed the owner in the
+    headset until 14:02:17.
+  - Its main thread sat in `unix_stream_data_wait`, with unread data queued from xwayland-satellite (916 B) and
+    D-Bus (348 B). No stack: `ptrace_scope` = 1.
+  - "Close MagicQ in VR" TERMed MagicQ, but the frozen WayVR ignored its TERM. "MagicQ in VR" at 14:02:10 then
+    launched MagicQ into the dead display.
+  - I killed the group by hand (`kill -KILL -- -1638247`).
+
+**What was done**
+- `src/vr/wayvr-ipc.js` (new): a WayVR IPC client with `inputState`, `windowList` and `showHide`. WayVR serves IPC
+  only from its render loop, so an answer means the operator is in the headset and WayVR is alive.
+- `src/vr/vr-desk-panel.js`:
+  - WayVR args are now `--openxr --headless --no-autostart --wait` (no `--show`).
+  - Start always waits in the background until the X display exists and WayVR answers `inputState`.
+  - On a fresh WayVR it then sends `WlxShowHide`, which anchors the panel 1 m in front of the head, waits 1 s, and
+    opens MagicQ. A WayVR that is already up gets no show / hide, because it is a toggle.
+  - For 15 s it then checks `windowList`. If there is no window, or no answer, the error says so and tells the
+    operator to close and reopen.
+  - Stop: when WayVR ignores TERM for 5 s, SIGKILL goes to its process group (satellite, Xwayland).
+- `vr_session_model.gd`: the pending text is now "MagicQ opens in front of you once you have the headset on."
+
+**Verified**
+- Smoke tests 9/9:
+  - rig: launch order inputState → showHide → MagicQ → windowList;
+  - headset off: no MagicQ;
+  - a WayVR already up gets no toggle;
+  - no-panel error;
+  - a frozen WayVR is group-KILLed;
+  - real `wayvr-ipc` framing against a fake server, plus timeout on silence.
+- Godot suite 21901 / 0.
+- Server restarted (programmer: 38 fixtures restored identical); desk started → `pending: true` (headset off).
+- Owner QA in the headset. Whether WayVR freezes again when MagicQ's window arrives while it is rendering is still
+  open: the panel check reports it, and Close now recovers.

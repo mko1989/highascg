@@ -9,8 +9,16 @@ const { createVrSession } = require('../../src/vr/vr-session')
 
 function rig(opts = {}) {
 	const st = { procs: opts.procs ? [...opts.procs] : [], state: opts.state ?? null, t: 0, nextPid: 500 }
+	st.inHeadset = opts.inHeadset ?? true // WayVR answers its IPC only while it renders in the headset
+	st.windows = opts.windows ?? 1
 	const spawns = []
 	const kills = []
+	const ipcSent = []
+	const ipcCall = (name, value) => async () => {
+		ipcSent.push(name)
+		if (!st.inHeadset) throw new Error('WayVR did not answer')
+		return value()
+	}
 	const desk = createDeskPanel({
 		uid: 1000,
 		env: { PATH: '/usr/bin', WAYLAND_DISPLAY: 'wayland-0', XAUTHORITY: '/x' },
@@ -30,7 +38,8 @@ function rig(opts = {}) {
 		},
 		kill: (pid, sig) => {
 			kills.push([pid, sig])
-			st.procs = st.procs.filter((p) => p.pid !== pid)
+			if (st.frozen && sig === 'SIGTERM' && st.procs.some((p) => p.pid === pid && p.kind === 'wayvr')) return
+			st.procs = st.procs.filter((p) => (pid < 0 ? p.pgid !== -pid : p.pid !== pid))
 		},
 		readState: () => {
 			if (!st.state) throw new Error('ENOENT')
@@ -43,8 +52,15 @@ function rig(opts = {}) {
 			st.t += 250
 		},
 		now: () => st.t,
+		ipc: {
+			inputState: ipcCall('inputState', () => ({ hmd_pos: [0, 1.6, 0] })),
+			showHide: ipcCall('showHide', () => []),
+			windowList: ipcCall('windowList', () =>
+				st.procs.some((p) => p.kind === 'magicq') ? Array(st.windows).fill({ visible: true }) : []
+			),
+		},
 	})
-	return { desk, st, spawns, kills }
+	return { desk, st, spawns, kills, ipcSent }
 }
 
 test('argv classification, process group, newest AppImage', () => {
@@ -71,14 +87,16 @@ test('argv classification, process group, newest AppImage', () => {
 	)
 })
 
-test('start: WayVR headless with the session env, then MagicQ on its X display (xcb, no Wayland)', async () => {
-	const { desk, st, spawns } = rig()
+test('start: WayVR headless with the session env; in the headset: summon, then MagicQ on its X display (xcb)', async () => {
+	const { desk, st, spawns, ipcSent } = rig()
 	const r = await desk.start({ serverRunning: true })
 	assert.equal(r.ok, true, r.error)
+	assert.equal(r.pending, true, 'MagicQ waits for WayVR to answer in the headset')
+	await desk._settled()
 	assert.equal(spawns.length, 2)
 	const [w, m] = spawns
 	assert.equal(w.file, '/w/WayVR-v26.8.0-x86_64.AppImage')
-	assert.deepEqual(w.args, ['--openxr', '--headless', '--show', '--no-autostart', '--wait'])
+	assert.deepEqual(w.args, ['--openxr', '--headless', '--no-autostart', '--wait'])
 	assert.equal(w.env.XDG_RUNTIME_DIR, '/run/user/1000')
 	assert.equal(w.env.DBUS_SESSION_BUS_ADDRESS, 'unix:path=/run/user/1000/bus')
 	assert.equal(w.env.DISPLAY, ':0')
@@ -89,11 +107,47 @@ test('start: WayVR headless with the session env, then MagicQ on its X display (
 	assert.equal(m.env.WAYLAND_DISPLAY, undefined)
 	assert.equal(m.env.XAUTHORITY, undefined)
 	assert.deepEqual(st.state, { pgid: 501, display: ':20' })
-	assert.equal(r.magicqRunning, true)
-	assert.equal(r.display, ':20')
+	assert.deepEqual(ipcSent, ['inputState', 'showHide', 'windowList'], 'summoned before MagicQ, panel checked after')
+	const s = desk.status()
+	assert.equal(s.magicqRunning, true)
+	assert.equal(s.display, ':20')
+	assert.equal(s.error, '')
 	const again = await desk.start({ serverRunning: true })
 	assert.equal(again.ok, true)
+	await desk._settled()
 	assert.equal(spawns.length, 2, 'a second Start launches nothing')
+})
+
+test('headset off: no MagicQ until WayVR answers; a WayVR already up is not toggled; no panel → error', async () => {
+	const off = rig({ inHeadset: false })
+	await off.desk.start({ serverRunning: true })
+	assert.equal(off.desk.status().pending, true)
+	off.st.t = 9 * 60 * 1000
+	off.st.inHeadset = true
+	await off.desk._settled()
+	assert.equal(off.spawns.length, 2, 'opened once WayVR answered')
+
+	const up = rig({
+		procs: [
+			{ pid: 40, pgid: 40, kind: 'wayvr' },
+			{ pid: 41, pgid: 40, kind: 'satellite', display: ':20' },
+		],
+	})
+	await up.desk.start({ serverRunning: true })
+	await up.desk._settled()
+	assert.equal(up.spawns.length, 1, 'MagicQ only')
+	assert.ok(!up.ipcSent.includes('showHide'), 'show / hide is a toggle: only on a fresh WayVR')
+
+	const never = rig({ inHeadset: false })
+	await never.desk.start({ serverRunning: true })
+	await never.desk._settled()
+	assert.match(never.desk.status().error, /did not show in the headset/)
+	assert.equal(never.spawns.length, 1)
+
+	const noPanel = rig({ windows: 0 })
+	await noPanel.desk.start({ serverRunning: true })
+	await noPanel.desk._settled()
+	assert.match(noPanel.desk.status().error, /shows no MagicQ window/)
 })
 
 test('start refuses: no VR session, nothing installed, a desktop MagicQ, no X display', async () => {
@@ -150,6 +204,24 @@ test('stop: our MagicQ first, then WayVR; a desktop MagicQ is left alone', async
 	])
 	assert.equal(st.state, null)
 	assert.deepEqual(st.procs, [{ pid: 77, pgid: 70, kind: 'magicq' }])
+})
+
+test('stop: a frozen WayVR ignores TERM → its process group (satellite, Xwayland) is KILLed', async () => {
+	const { desk, st, kills } = rig()
+	st.frozen = true
+	st.procs.push(
+		{ pid: 600, pgid: 600, kind: 'wayvr' },
+		{ pid: 601, pgid: 600, kind: 'wayvr' },
+		{ pid: 602, pgid: 600, kind: 'satellite', display: ':20' }
+	)
+	await desk.stop()
+	assert.deepEqual(kills.slice(-4), [
+		[600, 'SIGTERM'],
+		[601, 'SIGTERM'],
+		[-600, 'SIGKILL'],
+		[601, 'SIGKILL'], // already gone with the group: ESRCH, ignored
+	])
+	assert.deepEqual(st.procs, [])
 })
 
 test('VR session: status carries the desk, End and the exit watcher stop it before WiVRn', async () => {
@@ -210,4 +282,55 @@ test('VR session: status carries the desk, End and the exit watcher stop it befo
 	const plain = createVrSession({ exec, procScan: () => [], installed: () => true })
 	assert.equal((await plain.status()).desk, undefined, 'only the box instance has a desk panel')
 	assert.equal((await plain.deskStart()).ok, false)
+})
+
+test('wayvr-ipc: u32 BE + JSON framing, handshake first, answers matched; silence → timeout', async () => {
+	const net = require('net')
+	const wv = require('../../src/vr/wayvr-ipc')
+	const path = `\0highascg-smoke-wayvr-${process.pid}`
+	const got = []
+	const server = net.createServer((c) => {
+		let buf = Buffer.alloc(0)
+		const send = (o) => {
+			const b = Buffer.from(JSON.stringify(o))
+			const h = Buffer.alloc(4)
+			h.writeUInt32BE(b.length)
+			c.write(Buffer.concat([h, b]))
+		}
+		c.on('data', (d) => {
+			buf = Buffer.concat([buf, d])
+			while (buf.length >= 4 && buf.length >= 4 + buf.readUInt32BE(0)) {
+				const msg = JSON.parse(buf.subarray(4, 4 + buf.readUInt32BE(0)).toString())
+				buf = buf.subarray(4 + buf.readUInt32BE(0))
+				got.push(msg)
+				if (msg.Handshake) send({ HandshakeSuccess: { runtime: 'wayvr-server' } })
+				if (msg.WlxInputState !== undefined) send({ WlxInputStateResponse: [msg.WlxInputState, { hmd_pos: [0, 1.5, 0] }] })
+				if (msg.WvrWindowList !== undefined)
+					send({ WvrWindowListResponse: [msg.WvrWindowList, { list: [{ size_x: 794, size_y: 190, visible: true }] }] })
+			}
+		})
+	})
+	await new Promise((r) => server.listen(path, r))
+	const connect = () => net.createConnection({ path })
+	try {
+		assert.deepEqual((await wv.inputState({ connect })).hmd_pos, [0, 1.5, 0])
+		assert.equal((await wv.windowList({ connect }))[0].size_x, 794)
+		await wv.showHide({ connect })
+		await new Promise((r) => setTimeout(r, 50))
+		assert.deepEqual(got[0], { Handshake: { protocol_version: 4, magic: 'wayvr_ipc', client_name: 'highascg' } })
+		assert.ok(got.includes('WlxShowHide'), 'unit variant goes as a bare string')
+	} finally {
+		server.close()
+	}
+	const mute = net.createServer(() => {})
+	const mutePath = `${path}-mute`
+	await new Promise((r) => mute.listen(mutePath, r))
+	try {
+		await assert.rejects(
+			wv.inputState({ connect: () => net.createConnection({ path: mutePath }), timeoutMs: 100 }),
+			/did not answer/
+		)
+	} finally {
+		mute.close()
+	}
 })
