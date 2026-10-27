@@ -1,6 +1,6 @@
 # WO-788 — Live picture in the timeline editor
 
-**Status: DONE (26.10 — Godot tests + boot check; off-screen render of the Timeline tab showing the owner's timeline on PRV at the playhead; owner QA = relaunch the client)**
+**Status: DEPRECATED (27.10 — owner wanted the Live preview itself, with 2D / 3D; the monitor was removed. Successor: [WO-789](./789_WO_timeline_uses_live_preview.md))**
 
 Owner, 26.10 (after WO-787):
 > there is no live preview in timeline editor...

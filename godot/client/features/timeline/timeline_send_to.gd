@@ -102,10 +102,3 @@ static func take_body(t: Dictionary, fps: float, screen_idx: Variant) -> Diction
 	var tw := str(t.get("tween", ""))
 	return {"transition": ty if ty != "" else "MIX", "duration": T.resolve_duration(clampi(int(t.get("duration", 0)), 0, 120), fps),
 		"tween": tw if tw != "" else "linear", "screenIdx": screen_idx}
-
-
-## WO-788: the surface role the timeline editor's monitor shows for a routing — PRV of the Dest screen (all screens →
-## the first), PGM when the timeline goes to program only.
-static func monitor_role(st: Dictionary) -> String:
-	var screen := int(st.screenIdx) + 1 if st.get("screenIdx") != null else 1
-	return ("pgm%d" if st.get("program") == true and st.get("preview") != true else "prv%d") % screen

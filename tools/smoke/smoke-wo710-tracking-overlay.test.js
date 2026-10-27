@@ -14,8 +14,13 @@ const OVERLAY = 'features/previs/tracking/auto_overlay.gd'
 
 describe('WO-710 tracking overlay wiring', () => {
 	it('both host views instance the overlay', () => {
-		assert.match(read('features/live/live_tab.gd'), /AutoOverlay\.new\(\)/)
-		assert.match(read('features/live/live_tab.gd'), /preload\("res:\/\/features\/previs\/tracking\/auto_overlay\.gd"\)/)
+		// WO-789: the Live preview (live_preview.gd) owns the overlay; the Live and Timeline tabs host that one preview
+		assert.match(read('features/live/live_preview.gd'), /AutoOverlay\.new\(\)/)
+		assert.match(
+			read('features/live/live_preview.gd'),
+			/preload\("res:\/\/features\/previs\/tracking\/auto_overlay\.gd"\)/
+		)
+		assert.match(read('features/live/live_tab.gd'), /preview = LivePreview\.new\(\)\n\tpreview\.host\(_video_panel\)/)
 		assert.match(
 			read('features/previs/previs_tab.gd'),
 			/preload\("res:\/\/features\/previs\/tracking\/auto_overlay\.gd"\)\.new\(\)/
@@ -52,6 +57,7 @@ describe('WO-710 tracking overlay wiring', () => {
 			'features/previs/tracking/auto_overlay_model.gd',
 			'features/previs/previs_tab.gd',
 			'features/live/live_tab.gd',
+			'features/live/live_preview.gd',
 		]) {
 			assert.ok(read(f).split('\n').length <= 501, f)
 		}

@@ -34,11 +34,3 @@ func test_screens_fps_take() -> void:
 		{"transition": "PUSH", "duration": 120, "tween": "easeout", "screenIdx": null}, "frames clamp to 120")
 	t.eq(S.take_body({"type": "", "duration": 12, "tween": ""}, 25.0, 1),
 		{"transition": "MIX", "duration": 13, "tween": "linear", "screenIdx": 1}, "12 = auto")
-
-
-## WO-788: the timeline editor's monitor follows the routing.
-func test_monitor_role() -> void:
-	t.eq(S.monitor_role({"preview": true, "program": false, "screenIdx": 0}), "prv1", "PRV of screen 1")
-	t.eq(S.monitor_role({"preview": true, "program": true, "screenIdx": 1}), "prv2", "on both: the preview shows the edit")
-	t.eq(S.monitor_role({"preview": false, "program": true, "screenIdx": 1}), "pgm2", "program only: PGM")
-	t.eq(S.monitor_role({"preview": false, "program": false, "screenIdx": null}), "prv1", "all screens / unrouted: PRV 1")

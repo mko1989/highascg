@@ -10,4 +10,5 @@ module.exports = [
 	'tools/smoke/smoke-wo784-virtual-channels-not-on-wire.test.js',
 	'tools/smoke/smoke-wo785-gdtf-share-recognition.test.js',
 	'tools/smoke/smoke-wo787-timeline-preview-and-scrub.test.js',
+	'tools/smoke/smoke-wo789-timeline-live-preview.test.js',
 ]

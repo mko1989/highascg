@@ -45,9 +45,9 @@ func _ready() -> void:
 			fit())
 	svc.gui_input.connect(stage.handle_input)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _reload())
-	visibility_changed.connect(_apply)
+	visibility_changed.connect(sync_shown)
 	_reload()
-	_apply()
+	sync_shown()
 
 
 func _reload() -> void:
@@ -92,7 +92,9 @@ func fit() -> void:
 	stage.frame_box(b, builder.front_yaw())
 
 
-func _apply() -> void:
+## Render and hold the view only while it is shown — also called after a reparent (live_preview.gd host), which does
+## not signal visibility.
+func sync_shown() -> void:
 	var shown := is_visible_in_tree()
 	_sv.render_target_update_mode = SubViewport.UPDATE_WHEN_VISIBLE if shown else SubViewport.UPDATE_DISABLED
 	builder.set_live(shown)

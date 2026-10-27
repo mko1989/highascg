@@ -28,11 +28,12 @@ const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const EffectsModel := preload("res://features/live/effects_model.gd")
-const Monitor := preload("res://features/timeline/timeline_monitor.gd")
+const LivePreview := preload("res://features/live/live_preview.gd")
+const ThemeBuilder := preload("res://app/theme_builder.gd")
 const UI_CFG := "user://ui.cfg"
 
 var view: TimelineView
-var monitor: Monitor  # WO-788: the live picture of the channel the timeline plays to, above the canvas
+var preview_slot: PanelContainer  # WO-789: the Live preview (2D / 3D) is borrowed into this while the tab shows
 var transport: TimelineTransport
 var dest: TimelineDest
 var _keys := TimelineKeys.new()
@@ -69,14 +70,18 @@ func _ready() -> void:
 	view.layer_menu.connect(func(_li: int) -> void: _layer_page.menu())
 	var split := VSplitContainer.new()
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	monitor = Monitor.new()
-	split.add_child(monitor)
+	preview_slot = PanelContainer.new()
+	preview_slot.custom_minimum_size.y = 120
+	preview_slot.add_theme_stylebox_override("panel", ThemeBuilder.box(Color.BLACK, ThemeBuilder.BORDER, 0, 0))
+	split.add_child(preview_slot)
+	visibility_changed.connect(_borrow_preview)
+	_borrow_preview.call_deferred()
 	split.add_child(view)
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
-	split.split_offset = int(cfg.get_value("timeline", "monitor_h", 260))
+	split.split_offset = int(cfg.get_value("timeline", "preview_h", 480))
 	split.dragged.connect(func(at: int) -> void:
-		cfg.set_value("timeline", "monitor_h", at)
+		cfg.set_value("timeline", "preview_h", at)
 		cfg.save(UI_CFG))
 	add_child(split)
 	_page = ClipInspector.new()
@@ -98,6 +103,12 @@ func _ready() -> void:
 	add_child(_throttle)
 	Store.project_changed.connect(func(_p: Dictionary) -> void: refresh())
 	refresh()
+
+
+## WO-789 — the Live tab's preview, moved here while this tab is shown (the Live tab takes it back when shown).
+func _borrow_preview() -> void:
+	if is_visible_in_tree() and is_instance_valid(LivePreview.current):
+		LivePreview.current.host(preview_slot)
 
 
 func root() -> Dictionary:
