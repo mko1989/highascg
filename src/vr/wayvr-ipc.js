@@ -4,9 +4,10 @@
  * WO-792 — a minimal client for WayVR's IPC (wayvr-ipc v26.8.0, protocol 4): abstract unix socket
  * `@/tmp/wayvr_ipc.sock`, every packet a u32 big-endian length + JSON (serde's externally tagged enums).
  *
- * WayVR serves the socket from its render loop, so it only answers while the headset shows WayVR (worn, session
- * running); otherwise a connection waits unanswered — `request` times out. That makes an answer the signal that the
- * operator is in the headset and WayVR is alive.
+ * WayVR serves the socket from its render loop: while its session is not visible (headset asleep or disconnected, or
+ * WayVR frozen) a connection waits unanswered and `request` times out. An answer does NOT mean someone wears the
+ * headset — right after start WayVR renders with the headset lying on the desk (27.10); vr-desk-panel.js checks that
+ * the head pose moves.
  */
 
 const net = require('net')

@@ -1,6 +1,6 @@
 # WO-792 — Program lights in VR: the MagicQ UI as a panel in the headset (MagicQ PC + WayVR)
 
-**Status: IN PROGRESS (27.10) — MagicQ runs as its own WayVR window panel in the headset (owner: "good"); next: VR Start / End
+**Status: IN PROGRESS (27.10, Fix 3: summons only once the head moves) — MagicQ runs as its own WayVR window panel in the headset (owner: "good"); next: VR Start / End
 wires it in**
 
 Owner, 27.10:
@@ -253,3 +253,30 @@ Parents:
 - Server restarted (programmer: 38 fixtures restored identical); desk started → `pending: true` (headset off).
 - Owner QA in the headset. Whether WayVR freezes again when MagicQ's window arrives while it is rendering is still
   open: the panel check reports it, and Close now recovers.
+
+## Fix 3, 27.10: an IPC answer does not mean the headset is worn
+
+**Investigation**
+- Fix 2 was deployed at 14:12:19. WayVR answered `inputState` at 14:12:20, but WiVRn had logged "user presence
+  changed to false" at 14:06:38 and never back to true. So right after start, WayVR renders and answers with the
+  headset lying on the desk.
+- Fix 2 therefore summoned the panel (`WlxShowHide`) at once: 1 m in front of the idle headset, not the operator.
+  Fix 2's claim that "an answer means the operator is in the headset" is wrong.
+- WiVRn's presence shows only in its journal. Its D-Bus properties (HeadsetConnected, SessionRunning) have no
+  presence flag, so the server cannot ask WiVRn.
+
+**What was done**
+- `src/vr/vr-desk-panel.js` `worn()`: samples `hmd_pos` over IPC 4 × 400 ms. The headset counts as worn once the
+  pose moves more than 4 mm from the first sample. A worn head always sways by more than that; a tracked headset
+  lying still stays under 1 mm. The wait loop summons and opens MagicQ only after `worn()`.
+- Header comments in `vr-desk-panel.js` and `wayvr-ipc.js` corrected.
+- `src/vr/vr-session.js`: prettier formatting only.
+
+**Verified**
+- Smoke tests 9/9; the VR smokes together 19/19.
+  - The rig sways the head 5 mm per sample when worn.
+  - A new case: the headset lies on the desk (static pose) → stays pending with no MagicQ; it opens once the head
+    moves.
+- Server restarted (programmer: 38 fixtures restored identical) and the VR client restarted.
+- Desk start with the headset disconnected: `pending: true`, no MagicQ. I stopped the desk afterwards.
+- Owner QA in the headset.

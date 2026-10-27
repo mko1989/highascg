@@ -53,7 +53,8 @@ function rig(opts = {}) {
 		},
 		now: () => st.t,
 		ipc: {
-			inputState: ipcCall('inputState', () => ({ hmd_pos: [0, 1.6, 0] })),
+			// worn: the head sways a few mm between samples; on the desk it is tracked still
+			inputState: ipcCall('inputState', () => ({ hmd_pos: [st.onDesk ? 0 : (st.sway = (st.sway || 0) + 0.005), 1.6, 0] })),
 			showHide: ipcCall('showHide', () => []),
 			windowList: ipcCall('windowList', () =>
 				st.procs.some((p) => p.kind === 'magicq') ? Array(st.windows).fill({ visible: true }) : []
@@ -107,7 +108,11 @@ test('start: WayVR headless with the session env; in the headset: summon, then M
 	assert.equal(m.env.WAYLAND_DISPLAY, undefined)
 	assert.equal(m.env.XAUTHORITY, undefined)
 	assert.deepEqual(st.state, { pgid: 501, display: ':20' })
-	assert.deepEqual(ipcSent, ['inputState', 'showHide', 'windowList'], 'summoned before MagicQ, panel checked after')
+	assert.deepEqual(
+		ipcSent,
+		['inputState', 'inputState', 'showHide', 'windowList'],
+		'worn (the head moved), summoned before MagicQ, panel checked after'
+	)
 	const s = desk.status()
 	assert.equal(s.magicqRunning, true)
 	assert.equal(s.display, ':20')
@@ -143,6 +148,17 @@ test('headset off: no MagicQ until WayVR answers; a WayVR already up is not togg
 	await never.desk._settled()
 	assert.match(never.desk.status().error, /did not show in the headset/)
 	assert.equal(never.spawns.length, 1)
+
+	// 27.10 14:12:20: WayVR answered right after start with the headset lying on the desk → summon only once worn
+	const desk = rig({ onDesk: true })
+	desk.st.onDesk = true
+	await desk.desk.start({ serverRunning: true })
+	assert.equal(desk.desk.status().pending, true)
+	desk.st.t = 9 * 60 * 1000
+	desk.st.onDesk = false
+	await desk.desk._settled()
+	assert.equal(desk.spawns.length, 2, 'opened once the head moved')
+	assert.ok(desk.ipcSent.indexOf('showHide') > desk.ipcSent.lastIndexOf('inputState') - 2, 'summoned after it was worn')
 
 	const noPanel = rig({ windows: 0 })
 	await noPanel.desk.start({ serverRunning: true })

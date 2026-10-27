@@ -142,7 +142,10 @@ function createVrSession(deps = {}) {
 	/** One get-property call, several props → one JSON object per line, in the order asked. Throws if unreadable. */
 	async function readProps() {
 		const { stdout } = await busctl('--json=short', 'get-property', BUS_NAME, BUS_PATH, BUS_NAME, ...PROPS)
-		const lines = stdout.split('\n').map((l) => l.trim()).filter(Boolean)
+		const lines = stdout
+			.split('\n')
+			.map((l) => l.trim())
+			.filter(Boolean)
 		if (lines.length !== PROPS.length) throw new Error('unexpected D-Bus reply')
 		const v = {}
 		PROPS.forEach((p, i) => {
@@ -162,7 +165,14 @@ function createVrSession(deps = {}) {
 	async function status() {
 		const clients = procScan()
 		const serverRunning = await isServerRunning()
-		let dbus = { headsetConnected: false, sessionRunning: false, pairingEnabled: false, pin: '', systemName: '', paired: [] }
+		let dbus = {
+			headsetConnected: false,
+			sessionRunning: false,
+			pairingEnabled: false,
+			pin: '',
+			systemName: '',
+			paired: [],
+		}
 		if (serverRunning) {
 			try {
 				dbus = await readProps()
@@ -184,7 +194,16 @@ function createVrSession(deps = {}) {
 	}
 
 	async function enablePairing(minutes) {
-		const { stdout } = await busctl('--json=short', 'call', BUS_NAME, BUS_PATH, BUS_NAME, 'EnablePairing', 'i', String(minutes))
+		const { stdout } = await busctl(
+			'--json=short',
+			'call',
+			BUS_NAME,
+			BUS_PATH,
+			BUS_NAME,
+			'EnablePairing',
+			'i',
+			String(minutes)
+		)
 		try {
 			return String(JSON.parse(stdout.trim()).data[0] || '')
 		} catch {
@@ -300,4 +319,8 @@ function createVrSession(deps = {}) {
 	return { status, start, pair, stop, watchTick, deskStart, deskStop, _watching: () => !!watcher }
 }
 
-module.exports = { createVrSession, isXrClientArgv, instance: createVrSession({ desk: require('./vr-desk-panel').instance }) }
+module.exports = {
+	createVrSession,
+	isXrClientArgv,
+	instance: createVrSession({ desk: require('./vr-desk-panel').instance }),
+}

@@ -11,8 +11,8 @@
  *
  * WayVR only gets that far once OpenXR is up: while no headset is connected WiVRn has no active_runtime.json and
  * `--wait` keeps WayVR waiting. So Start waits in the background (`pending`, up to WAIT_MAX_MS; End / Close cancels)
- * for the X display AND for WayVR to answer its IPC (src/vr/wayvr-ipc.js) — it only does while the operator wears the
- * headset and WayVR renders. Then, on a fresh WayVR, it summons the overlays (show / hide puts WayVR's anchor 1 m in
+ * for the X display AND for someone to wear the headset: WayVR answers its IPC (src/vr/wayvr-ipc.js) with a head pose
+ * that moves (worn()). Then, on a fresh WayVR, it summons the overlays (show / hide puts WayVR's anchor 1 m in
  * front of the head; until then anchored panels sit at the play-space origin, under the operator's feet) and only
  * then opens MagicQ, so its panel spawns in view. Afterwards it checks over IPC that WayVR shows the window: a WayVR
  * that stops answering (27.10 it froze as MagicQ's window arrived mid presence-change) surfaces as `error`.
@@ -46,6 +46,12 @@ const WAYVR_ARGS = ['--openxr', '--headless', '--no-autostart', '--wait']
 const IPC_TIMEOUT_MS = 2000
 const SUMMON_SETTLE_MS = 1000
 const PANEL_CHECK_MS = 15000
+// Worn = the head pose moves: a headset lying on the desk is tracked still to well under a millimetre, a worn one
+// sways by several. (WayVR answers its IPC right after start even with nobody in the headset — 27.10 14:12:20,
+// WiVRn's "user presence" false since 14:06:38 — so an answer alone would summon to the desk.)
+const HEAD_SAMPLES = 4
+const HEAD_SAMPLE_MS = 400
+const HEAD_MOVE_M = 0.004
 
 /** Newest WayVR AppImage in `dir` (by name: WayVR-v26.8.0 sorts before WayVR-v26.10.0 numerically). */
 function findWayvr(dir, readdir) {
@@ -196,8 +202,22 @@ function createDeskPanel(deps = {}) {
 		}
 	}
 
+	/** Is someone wearing the headset? WayVR answers and the head pose moves over HEAD_SAMPLES × HEAD_SAMPLE_MS. */
+	async function worn() {
+		let first = null
+		for (let i = 0; i < HEAD_SAMPLES; i++) {
+			if (i) await sleep(HEAD_SAMPLE_MS)
+			const s = await answers(ipc.inputState)
+			const p = s && Array.isArray(s.hmd_pos) ? s.hmd_pos : null
+			if (!p) return false
+			first = first || p
+			if (Math.hypot(p[0] - first[0], p[1] - first[1], p[2] - first[2]) > HEAD_MOVE_M) return true
+		}
+		return false
+	}
+
 	/**
-	 * Background, unless cancelled: once WayVR's X display is up and WayVR answers in the headset, summon the
+	 * Background, unless cancelled: once WayVR's X display is up and someone wears the headset (worn()), summon the
 	 * overlays (fresh WayVR only — show / hide is a toggle), open MagicQ, then check WayVR shows its window.
 	 */
 	async function waitAndLaunch(token, fresh) {
@@ -205,7 +225,7 @@ function createDeskPanel(deps = {}) {
 		let sat = null
 		while (pending === token) {
 			sat = byKind(procScan(), 'satellite')[0]
-			if (sat && (await answers(ipc.inputState)) && pending === token) break
+			if (sat && (await worn()) && pending === token) break
 			if (now() - t0 >= WAIT_MAX_MS) {
 				pending = null
 				lastError = sat
