@@ -1,7 +1,8 @@
 # WO-792 — Program lights in VR: the MagicQ UI as a panel in the headset (MagicQ PC + WayVR)
 
-**Status: IN PROGRESS (27.10, Fix 3: summons only once the head moves) — MagicQ runs as its own WayVR window panel in the headset (owner: "good"); next: VR Start / End
-wires it in**
+**Status: DONE (27.10, owner QA in the headset after Fix 3: "ok. looks good") — MagicQ runs as its own WayVR window
+panel in the headset; VR… → "MagicQ in VR" starts it once the headset is worn. Follow-up: [WO-796](./796_WO_magicq_show_from_highascg_mvr.md)
+(the show MagicQ opens = HighAsCG's rig)**
 
 Owner, 27.10:
 > I need a way to be able to program lights in the VR. Is it possible to display chamsys magicq ui inside the VR?
@@ -279,4 +280,4 @@ Parents:
     moves.
 - Server restarted (programmer: 38 fixtures restored identical) and the VR client restarted.
 - Desk start with the headset disconnected: `pending: true`, no MagicQ. I stopped the desk afterwards.
-- Owner QA in the headset.
+- Owner QA in the headset, 27.10: "ok. looks good."

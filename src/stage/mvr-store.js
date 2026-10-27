@@ -186,4 +186,4 @@ async function mesh(id, key) {
 	return out
 }
 
-module.exports = { importMvr, fixtureScene, list, get, remove, mesh, unitBox }
+module.exports = { importMvr, fixtureScene, list, get, remove, mesh, unitBox, fileOf }

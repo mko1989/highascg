@@ -21,6 +21,9 @@ const { axisBytes } = require('./follow-ik')
 const tap = require('../artnet/artnet-tap')
 
 const STALE_MS = 2500
+// WO-796: a desk on this box (MagicQ PC, WO-792) unicasts here. Its own :6454 socket would take datagrams sent to
+// 127.0.0.1 from ours (the later SO_REUSEADDR bind wins); an exact-address bind wins over every wildcard one.
+const LOCAL_DESK_HOST = '127.0.0.2'
 
 const num = (v, d, lo, hi) => {
 	const n = Number(v)
@@ -66,7 +69,8 @@ function blendFixture(buf, fx, frame, pt, fixed, w) {
 
 /**
  * The console's latest frame per port-address, from the lighting input's socket (artnet-tap). While nothing owns
- * :6454 (Art-Net input off / sACN) it binds its own socket there; it never sends.
+ * :6454 (Art-Net input off / sACN) it binds its own socket there; it never sends. WO-796: plus LOCAL_DESK_HOST:6454
+ * while started, for a desk running on this box.
  */
 class ConsoleFrames {
 	constructor({ log, now, bind = true } = {}) {
@@ -76,6 +80,7 @@ class ConsoleFrames {
 		this.packets = 0
 		this._bind = bind
 		this._sock = null
+		this._local = null
 		this._off = null
 		this._watch = null
 	}
@@ -84,6 +89,7 @@ class ConsoleFrames {
 		if (this._off) return
 		this._off = tap.subscribe((msg, rinfo) => this.feed(msg, rinfo))
 		if (!this._bind) return
+		this._local = this._listen(LOCAL_DESK_HOST, 'local desk socket')
 		const check = () => (tap.owned() ? this._closeOwn() : this._openOwn())
 		check()
 		this._watch = setInterval(check, 2000)
@@ -96,24 +102,33 @@ class ConsoleFrames {
 		if (this._watch) clearInterval(this._watch)
 		this._watch = null
 		this._closeOwn()
+		this._close(this._local)
+		this._local = null
 		this.frames.clear()
+	}
+
+	_listen(host, what) {
+		const s = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+		s.on('error', (e) => this.log('warn', `[follow] ${what}: ${e.message}`))
+		s.on('message', (msg, rinfo) => this.feed(msg, rinfo))
+		s.bind(ARTNET_PORT, host)
+		return s
+	}
+
+	_close(s) {
+		try {
+			s?.close()
+		} catch (_) {}
 	}
 
 	_openOwn() {
 		if (this._sock) return
-		const s = dgram.createSocket({ type: 'udp4', reuseAddr: true })
-		s.on('error', (e) => this.log('warn', '[follow] read-through socket: ' + e.message))
-		s.on('message', (msg, rinfo) => this.feed(msg, rinfo))
-		s.bind(ARTNET_PORT, '0.0.0.0')
-		this._sock = s
+		this._sock = this._listen('0.0.0.0', 'read-through socket')
 		this.log('info', '[follow] read-through: no Art-Net input socket — listening on :6454 itself')
 	}
 
 	_closeOwn() {
-		if (!this._sock) return
-		try {
-			this._sock.close()
-		} catch (_) {}
+		this._close(this._sock)
 		this._sock = null
 	}
 
@@ -141,9 +156,9 @@ class ConsoleFrames {
 	}
 
 	status(now = this.now()) {
-		return { packets: this.packets, own_socket: !!this._sock,
+		return { packets: this.packets, own_socket: !!this._sock, local_desk: this._local ? LOCAL_DESK_HOST : null,
 			universes: [...this.frames].map(([pa, f]) => ({ universe: pa, from: f.from, age_ms: now - f.at })) }
 	}
 }
 
-module.exports = { STALE_MS, normalizeThrough, axisDeg, consoleAim, blendFixture, ConsoleFrames }
+module.exports = { STALE_MS, LOCAL_DESK_HOST, normalizeThrough, axisDeg, consoleAim, blendFixture, ConsoleFrames }

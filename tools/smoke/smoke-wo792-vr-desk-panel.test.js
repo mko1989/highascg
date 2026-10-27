@@ -52,6 +52,7 @@ function rig(opts = {}) {
 			st.t += 250
 		},
 		now: () => st.t,
+		stageMvr: () => (opts.mvr === null ? null : { name: 'MHP Patch Final.mvr' }), // WO-796 (never the real folder)
 		ipc: {
 			// worn: the head sways a few mm between samples; on the desk it is tracked still
 			inputState: ipcCall('inputState', () => ({ hmd_pos: [st.onDesk ? 0 : (st.sway = (st.sway || 0) + 0.005), 1.6, 0] })),
@@ -93,6 +94,7 @@ test('start: WayVR headless with the session env; in the headset: summon, then M
 	const r = await desk.start({ serverRunning: true })
 	assert.equal(r.ok, true, r.error)
 	assert.equal(r.pending, true, 'MagicQ waits for WayVR to answer in the headset')
+	assert.equal(r.mvr, 'MHP Patch Final.mvr', "WO-796: the scene's MVR is in MagicQ's show folder")
 	await desk._settled()
 	assert.equal(spawns.length, 2)
 	const [w, m] = spawns

@@ -144,4 +144,4 @@ function remove(id) {
 	return files.length > 0
 }
 
-module.exports = { importGdtf, ensureGdtf, record, info, list, describe, mode, visual, member, remove, modeWarnings }
+module.exports = { importGdtf, ensureGdtf, record, info, list, describe, mode, visual, member, remove, modeWarnings, fileOf }

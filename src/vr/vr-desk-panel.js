@@ -143,11 +143,13 @@ function createDeskPanel(deps = {}) {
 	const wayvrDir = deps.wayvrDir || WAYVR_DIR
 	const magicqRun = deps.magicqRun || MAGICQ_RUN
 	const ipc = deps.ipc || require('./wayvr-ipc')
+	const stageMvr = deps.stageMvr || require('./magicq-mvr').stageMvrForMagicq
 
 	let pending = null // the background wait's token while MagicQ waits for WayVR's X display
 	let gen = 0 // bumped by stop(): a panel check still running for a stopped MagicQ reports nothing
 	let pendingDone = Promise.resolve()
 	let lastError = ''
+	let mvr = '' // WO-796: the scene's MVR as MagicQ's File Manager lists it
 
 	const sessionEnv = () => ({
 		...baseEnv,
@@ -177,6 +179,7 @@ function createDeskPanel(deps = {}) {
 			magicqRunning: byKind(list, 'magicq').some((p) => p.pgid && p.pgid === savedPgid()),
 			magicqOnDesktop: byKind(list, 'magicq').some((p) => !(p.pgid && p.pgid === savedPgid())),
 			pending: !!pending,
+			mvr,
 			error: lastError,
 		}
 	}
@@ -269,6 +272,11 @@ function createDeskPanel(deps = {}) {
 		if (ourMagicq(list).length || pending) return { ok: true, ...status() }
 		if (byKind(list, 'magicq').length)
 			return fail('MagicQ is already running on the desktop — close it first (one MagicQ per box)')
+		try {
+			mvr = (await stageMvr())?.name || ''
+		} catch {
+			mvr = '' // the rig file is a convenience: MagicQ opens without it
+		}
 		const fresh = !byKind(list, 'wayvr').length
 		if (fresh) {
 			const env = { ...sessionEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth() }
