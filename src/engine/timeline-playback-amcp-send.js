@@ -12,6 +12,7 @@ const {
 } = require('./timeline-playback-helpers')
 const { clipTransportMeta } = require('./timeline-playback-amcp-schedule')
 const { opacitySegmentAtLocalMs, buildDeferredSegmentMixerLines } = require('./timeline-keyframe-mixer')
+const { scrubSeek, cancelScrub } = require('./timeline-scrub-gate')
 
 module.exports = {
 	_logDebug(msg) {
@@ -193,7 +194,7 @@ module.exports = {
 							 * paused are the same command here: a looping producer repositions like
 							 * any other, and `loopSeekIsSafe` (already folded into needsScrubSeek)
 							 * keeps us out of the end-of-media window. */
-							self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
+							scrubSeek(this, ch, caspLayer, meta.caspFrame, meta.chFps, (_err) => {
 								this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} (LOOP scrub) failed: ${_err.message}`)
 							})
 							transportSent = true
@@ -206,7 +207,8 @@ module.exports = {
 							hasDeferredLines = true // T173.2
 						}
 					} else if (needsScrubSeek) {
-						self.amcp.call(ch, caspLayer, 'SEEK', String(meta.caspFrame)).catch(_err => {
+						/* WO-790: paced — one seek per layer in flight, the newest target next (timeline-scrub-gate.js). */
+						scrubSeek(this, ch, caspLayer, meta.caspFrame, meta.chFps, (_err) => {
 							this._logDebug(`SEEK ${ch}-${caspLayer} frame=${meta.frame} failed: ${_err.message}`)
 						})
 						transportSent = true
@@ -265,6 +267,7 @@ module.exports = {
 					if (!channelLines.has(ch)) channelLines.set(ch, lines)
 					lines.push(`STOP ${ch}-${caspLayer}`)
 					mixerDirty.add(ch)
+					cancelScrub(this, ch, caspLayer)
 
 					this._prevKey.set(key, null)
 					for (const pk of this._lastKfValues.keys()) {
@@ -305,6 +308,7 @@ module.exports = {
 		const self = this.self
 		if (!self?.amcp) return { hasDeferredLines: false }
 		const { playing, startTransport } = opts
+		if (startTransport) cancelScrub(this, ch, caspLayer) // WO-790: a waiting scrub seek must not land on the new transport
 
 		if (meta.loopAlways) {
 			if (!startTransport) return { hasDeferredLines: false }

@@ -184,6 +184,8 @@ module.exports = {
 			this._prevKey = new Map()
 			this._lastKfValues.clear()
 			this._lastKfSegment.clear()
+			for (const g of this._scrubGate?.values() || []) clearTimeout(g.timer) // WO-790: no seek after the stop
+			this._scrubGate?.clear()
 			this._airTimelineId = null
 			// A timeline leaving PGM must not stay flagged program:true. Take sets program:true and it
 			// is persisted (project autosave); if it survives the stop, re-activating the Timeline tab

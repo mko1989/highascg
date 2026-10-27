@@ -35,6 +35,7 @@ function clipTransportMeta(clip, ms, tl, self, opts = {}) {
 	return {
 		src,
 		caspFrame,
+		chFps, // WO-790: the scrub gate turns caspFrame back into file seconds (OSC file/time)
 		/* WO-787: a project-scoped clip is stored relative to its project folder ("INTRO.mov" under
 		 * projects/<slug>/); Caspar needs the CLS id the looks resolve to. Lazy: only a PLAY/LOAD reads it
 		 * (a disk check), not every tick. */

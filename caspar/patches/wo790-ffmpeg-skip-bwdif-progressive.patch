@@ -1,0 +1,63 @@
+From 4eab31c0699a2c99f127163e5af9c0e40dc6ba00 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Tue, 27 Oct 2026 09:02:55 +0100
+Subject: [PATCH] =?UTF-8?q?ffmpeg=20producer:=20skip=20bwdif=20for=20progr?=
+ =?UTF-8?q?essive-only=20streams=20=E2=80=94=20HighAsCG=20WO-790?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+bwdif holds every frame back by one even for progressive input under
+deint=interlaced, so the first picture after a seek waited for an extra
+decoded frame (~60 ms on 4K NotchLC). Streams flagged progressive and the
+progressive-only codecs NotchLC / HAP / DXV (field_order unknown) skip it.
+---
+ src/modules/ffmpeg/producer/av_producer.cpp | 25 ++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/src/modules/ffmpeg/producer/av_producer.cpp b/src/modules/ffmpeg/producer/av_producer.cpp
+index 7e5a75bda..a5eb8523d 100644
+--- a/src/modules/ffmpeg/producer/av_producer.cpp
++++ b/src/modules/ffmpeg/producer/av_producer.cpp
+@@ -348,6 +348,29 @@ class Decoder
+     }
+ };
+ 
++// HighAsCG WO-790: bwdif holds every frame back by one (it needs the next field) even for progressive frames under
++// deint=interlaced, so a seek waited for one more decoded frame before its first picture (~60 ms for 4K NotchLC on the
++// dev box). Streams that cannot be interlaced skip it: flagged progressive, or a progressive-only codec (NotchLC / HAP /
++// DXV report field_order "unknown"). Any other video stream (DV, unflagged files, cover art) keeps bwdif.
++static bool video_is_progressive(const AVFormatContext* ic)
++{
++    for (auto n = 0U; n < ic->nb_streams; ++n) {
++        const auto par = ic->streams[n]->codecpar;
++        if (par->codec_type != AVMEDIA_TYPE_VIDEO || par->field_order == AV_FIELD_PROGRESSIVE) {
++            continue;
++        }
++        switch (par->codec_id) {
++            case AV_CODEC_ID_NOTCHLC:
++            case AV_CODEC_ID_HAP:
++            case AV_CODEC_ID_DXV:
++                continue;
++            default:
++                return false;
++        }
++    }
++    return true;
++}
++
+ struct Filter
+ {
+     std::shared_ptr<AVFilterGraph>  graph;
+@@ -373,7 +396,7 @@ struct Filter
+             auto deint = u8(
+                 env::properties().get<std::wstring>(L"configuration.ffmpeg.producer.auto-deinterlace", L"interlaced"));
+ 
+-            if (deint != "none") {
++            if (deint != "none" && !video_is_progressive(input.operator->())) {
+                 filter_spec += (boost::format(",bwdif=mode=send_field:parity=auto:deint=%s") % deint).str();
+             }
+ 
+-- 
+2.53.0
+

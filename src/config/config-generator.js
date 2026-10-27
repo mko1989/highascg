@@ -114,6 +114,8 @@ ${oscXml}
     <amcp><media-server><host>localhost</host><port>8000</port></media-server></amcp>
     <ndi><auto-load>${ndiAutoLoad}</auto-load></ndi>
     <decklink/>
+    <!-- HighAsCG WO-790: decoder threads per file. Caspar's default (0 = one per core) fills that many frame threads before the first picture of a seek (~50 ms on 4K NotchLC); 4 still decodes 4K NotchLC / ProRes / H.264 50p several times faster than real time. -->
+    <ffmpeg><producer><threads>4</threads></producer></ffmpeg>
     <html>
         <enable-gpu>${cefEnableGpu ? 'true' : 'false'}</enable-gpu>${cefDebugPortXml}
     </html>
