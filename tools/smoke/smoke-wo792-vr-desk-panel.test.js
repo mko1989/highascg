@@ -105,7 +105,37 @@ test('start refuses: no VR session, nothing installed, a desktop MagicQ, no X di
 	assert.match(r.error, /already running on the desktop/)
 	assert.equal(r.magicqOnDesktop, true)
 	assert.equal(desktop.spawns.filter((s) => /runmagicq/.test(s.file)).length, 0)
-	assert.match((await rig({ satellite: false }).desk.start({ serverRunning: true })).error, /no X display.*xwayland/)
+})
+
+test('no headset yet: WayVR waits, MagicQ opens once its X display appears; End cancels the wait', async () => {
+	const late = rig({ satellite: false })
+	const r = await late.desk.start({ serverRunning: true })
+	assert.equal(r.ok, true)
+	assert.equal(r.pending, true)
+	assert.equal(late.spawns.length, 1, 'WayVR only, for now')
+	assert.equal((await late.desk.start({ serverRunning: true })).pending, true, 'a second Start waits on the same')
+	late.st.procs.push({ pid: 900, pgid: 500, kind: 'satellite', display: ':21' })
+	await late.desk._settled()
+	assert.equal(late.spawns.length, 2)
+	assert.equal(late.spawns[1].env.DISPLAY, ':21')
+	assert.equal(late.desk.status().pending, false)
+
+	const never = rig({ satellite: false })
+	await never.desk.start({ serverRunning: true })
+	await never.desk._settled()
+	assert.match(never.desk.status().error, /no X display.*headset connected.*xwayland/)
+	assert.equal(never.spawns.length, 1)
+
+	const cancelled = rig({ satellite: false })
+	await cancelled.desk.start({ serverRunning: true })
+	await cancelled.desk.stop()
+	cancelled.st.procs.push({ pid: 900, pgid: 500, kind: 'satellite', display: ':21' })
+	await cancelled.desk._settled()
+	assert.equal(
+		cancelled.spawns.filter((x) => /runmagicq/.test(x.file)).length,
+		0,
+		'stopped before the display came: no MagicQ'
+	)
 })
 
 test('stop: our MagicQ first, then WayVR; a desktop MagicQ is left alone', async () => {

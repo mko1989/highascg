@@ -45,8 +45,10 @@ static func view(s: Dictionary) -> Dictionary:
 	v.end = server or client
 	var desk: Dictionary = s.get("desk") if s.get("desk") is Dictionary else {}
 	if server and desk.get("available", false) and not s.get("starting", false):
-		var on: bool = desk.get("magicqRunning", false)
+		var on: bool = desk.get("magicqRunning", false) or desk.get("pending", false)
 		v.desk = true
+		if desk.get("pending", false):
+			v.detail = (v.detail + "\n" if v.detail != "" else "") + "MagicQ opens in the headset once it is connected."
 		v.desk_text = "Close MagicQ in VR" if on else "MagicQ in VR"
 		v.desk_path = "/api/vr/desk/stop" if on else "/api/vr/desk/start"
 	var err := str(s.get("error", ""))

@@ -9,6 +9,10 @@
  * of its own. MagicQ's bundled Qt is xcb-only, so it runs there: `DISPLAY=:N QT_QPA_PLATFORM=xcb runmagicq.sh`.
  * On the operator's desktop nothing changes (no window on DP-0 / DP-4).
  *
+ * WayVR only gets that far once OpenXR is up: while no headset is connected WiVRn has no active_runtime.json and
+ * `--wait` keeps WayVR waiting. So Start launches MagicQ as soon as the X display appears — at once, or from a
+ * background wait (`pending`, up to WAIT_MAX_MS) that End / Close cancels.
+ *
  * MagicQ is started detached in its own process group; the group id is kept in ~/.highascg/run/vr-desk.json so a
  * node restart can still stop it. Stop: that group's MagicQ gets SIGTERM first (it saves its show), then WayVR. A
  * MagicQ the operator runs on the desktop is another group: never stopped, and Start refuses a second one.
@@ -27,7 +31,8 @@ const WAYVR_DIR = path.join(os.homedir(), '.local/opt/wayvr')
 const MAGICQ_RUN = '/opt/magicq/runmagicq.sh'
 const STATE_FILE = path.join(os.homedir(), '.highascg/run/vr-desk.json')
 const LOG_DIR = path.join(os.homedir(), '.highascg/log')
-const DISPLAY_TIMEOUT_MS = 15000
+const WAIT_MAX_MS = 10 * 60 * 1000
+const WAIT_POLL_MS = 1000
 const POLL_MS = 250
 const STOP_WAIT_MS = 5000
 
@@ -121,7 +126,8 @@ function createDeskPanel(deps = {}) {
 	const wayvrDir = deps.wayvrDir || WAYVR_DIR
 	const magicqRun = deps.magicqRun || MAGICQ_RUN
 
-	let busy = false
+	let pending = null // the background wait's token while MagicQ waits for WayVR's X display
+	let pendingDone = Promise.resolve()
 	let lastError = ''
 
 	const sessionEnv = () => ({
@@ -151,53 +157,69 @@ function createDeskPanel(deps = {}) {
 			display: sat ? sat.display : '',
 			magicqRunning: byKind(list, 'magicq').some((p) => p.pgid && p.pgid === savedPgid()),
 			magicqOnDesktop: byKind(list, 'magicq').some((p) => !(p.pgid && p.pgid === savedPgid())),
-			busy,
+			pending: !!pending,
 			error: lastError,
+		}
+	}
+
+	const ourMagicq = (list) => {
+		const pgid = savedPgid()
+		return byKind(list, 'magicq').filter((p) => pgid && p.pgid === pgid)
+	}
+
+	function launchMagicq(display) {
+		const env = { ...sessionEnv(), DISPLAY: display, QT_QPA_PLATFORM: 'xcb' }
+		delete env.WAYLAND_DISPLAY
+		delete env.XAUTHORITY
+		const child = spawn(magicqRun, [], { env, cwd: path.dirname(magicqRun) }, 'magicq-vr.log')
+		if (child && child.pid) writeState({ pgid: child.pid, display })
+	}
+
+	/** Background: launch MagicQ once WayVR's X display is up (the headset connected), unless cancelled. */
+	async function waitAndLaunch(token) {
+		const t0 = now()
+		while (pending === token) {
+			const sat = byKind(procScan(), 'satellite')[0]
+			if (sat) {
+				pending = null
+				launchMagicq(sat.display)
+				return
+			}
+			if (now() - t0 >= WAIT_MAX_MS) {
+				pending = null
+				lastError = 'WayVR started no X display — is the headset connected, and the xwayland package installed?'
+				return
+			}
+			await sleep(WAIT_POLL_MS)
 		}
 	}
 
 	/** @param {{ serverRunning?: boolean }} [ctx] */
 	async function start(ctx = {}) {
-		if (busy) return { ok: true, ...status() }
 		lastError = ''
 		const wayvr = findWayvr(wayvrDir, readdir)
 		if (!wayvr) return fail(`WayVR is not installed (${wayvrDir}/WayVR-v*-x86_64.AppImage)`)
 		if (!exists(magicqRun)) return fail(`MagicQ is not installed (${magicqRun})`)
 		if (ctx.serverRunning === false) return fail('Start the VR session first')
-		busy = true
-		try {
-			let list = procScan()
-			if (!byKind(list, 'wayvr').length) {
-				const env = { ...sessionEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth() }
-				spawn(wayvr, ['--openxr', '--headless', '--wait'], { env, cwd: path.dirname(wayvr) }, 'wayvr.log')
-			}
-			const t0 = now()
-			let sat = byKind(list, 'satellite')[0]
-			while (!sat) {
-				if (now() - t0 >= DISPLAY_TIMEOUT_MS)
-					throw new Error('WayVR started no X display (is the xwayland package installed?)')
-				await sleep(POLL_MS)
-				list = procScan()
-				sat = byKind(list, 'satellite')[0]
-			}
-			const mq = byKind(list, 'magicq')
-			const pgid = savedPgid()
-			if (mq.some((p) => pgid && p.pgid === pgid)) {
-				busy = false
-				return { ok: true, ...status() }
-			}
-			if (mq.length) throw new Error('MagicQ is already running on the desktop — close it first (one MagicQ per box)')
-			const env = { ...sessionEnv(), DISPLAY: sat.display, QT_QPA_PLATFORM: 'xcb' }
-			delete env.WAYLAND_DISPLAY
-			delete env.XAUTHORITY
-			const child = spawn(magicqRun, [], { env, cwd: path.dirname(magicqRun) }, 'magicq-vr.log')
-			if (child && child.pid) writeState({ pgid: child.pid, display: sat.display })
-			busy = false
-			return { ok: true, ...status() }
-		} catch (e) {
-			busy = false
-			return fail(e.message || String(e))
+		const list = procScan()
+		if (ourMagicq(list).length || pending) return { ok: true, ...status() }
+		if (byKind(list, 'magicq').length)
+			return fail('MagicQ is already running on the desktop — close it first (one MagicQ per box)')
+		if (!byKind(list, 'wayvr').length) {
+			const env = { ...sessionEnv(), DISPLAY: ':0', XAUTHORITY: getXAuth() }
+			spawn(wayvr, ['--openxr', '--headless', '--wait'], { env, cwd: path.dirname(wayvr) }, 'wayvr.log')
 		}
+		const sat = byKind(procScan(), 'satellite')[0]
+		if (sat) launchMagicq(sat.display)
+		else {
+			const token = {}
+			pending = token
+			pendingDone = waitAndLaunch(token).catch((e) => {
+				pending = null
+				lastError = e.message || String(e)
+			})
+		}
+		return { ok: true, ...status() }
 	}
 
 	function fail(msg) {
@@ -215,6 +237,7 @@ function createDeskPanel(deps = {}) {
 
 	/** Our MagicQ first (TERM → it saves; KILL after STOP_WAIT_MS), then WayVR (its X display goes with it). */
 	async function stop() {
+		pending = null
 		const pgid = savedPgid()
 		const ours = () => (pgid ? byKind(procScan(), 'magicq').filter((p) => p.pgid === pgid) : [])
 		for (const p of ours()) signal(p.pid, 'SIGTERM')
@@ -227,7 +250,7 @@ function createDeskPanel(deps = {}) {
 		return { ok: true, ...status() }
 	}
 
-	return { status, start, stop }
+	return { status, start, stop, _settled: () => pendingDone }
 }
 
 module.exports = { createDeskPanel, classify, findWayvr, pgrpOf, instance: createDeskPanel() }
