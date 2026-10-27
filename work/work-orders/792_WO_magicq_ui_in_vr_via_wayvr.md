@@ -1,7 +1,7 @@
 # WO-792 — Program lights in VR: the MagicQ UI as a panel in the headset (MagicQ PC + WayVR)
 
-**Status: IN PROGRESS (27.10) — WayVR v26.8.0 downloaded (sha256 matches the release), not run yet; MagicQ needs a
-ChamSys sign-in to download; waiting on the owner for the MagicQ download / install and the first WayVR run**
+**Status: IN PROGRESS (27.10) — MagicQ 1.9.8.3 installed by the owner and running on :0 (Demo Mode); WayVR v26.8.0
+runs (`--help`); headset test pending: needs a VR session + the owner in the headset**
 
 Owner, 27.10:
 > I need a way to be able to program lights in the VR. Is it possible to display chamsys magicq ui inside the VR?
@@ -71,8 +71,38 @@ Parents:
 
 - `~/.local/opt/wayvr/WayVR-v26.8.0-x86_64.AppImage`, 25 156 088 bytes. Its sha256
   `4b40719a860138cde4b97a5acbe5d5c300e9c7a186ab6bed423be8768e0c0794` matches the GitHub release asset digest.
-  Made executable. Not run: auto mode blocked a downloaded binary, so the owner has to approve it.
+  The first `chmod +x` was part of a command that auto mode blocked, so it never ran. The file stayed non-executable
+  until the second pass.
+- **Owner, 27.10: "ive installed everything"**:
+  - `magicq 1.9.8.3` (`~/Downloads/magicq_ubuntu_v1_9_8_3.deb`, installs to `/opt/magicq`, launcher `runmagicq.sh`);
+  - `libfuse2t64 2.9.9-9build1`.
+- **MagicQ launched** on `:0` (`DISPLAY=:0 XAUTHORITY=~/.Xauthority setsid -f ./runmagicq.sh`, log in the scratchpad):
+  - `mqqt` runs as "MagicQ PC (Demo Mode)", window 1800×920 at 10,35, plus a "SELECT" start-up dialog.
+  - Every library resolves (`ldd`, none missing). The log is only PortAudio ALSA channel-count complaints, harmless.
+- **Ports:**
+  - MagicQ bound UDP **0.0.0.0:6454** (Art-Net) and **6553** (MagicQ network).
+  - :6454 was free before it started: nothing listened (`ss -uln`), so HighAsCG's lighting input is off right now and
+    nothing was starved.
+  - This becomes a conflict as soon as the lighting input or read-through is switched on (see Investigation).
+  - MagicQ ships `run_in_namespace.sh`, which runs an instance in its own network namespace (veth on a `mq-br` bridge,
+    2.0.0.1x0). That is a possible way to give it its own :6454; it needs sudo. To evaluate.
+- **Where the window can live:**
+  - It opened on **DP-4** (3840×1792 at 0,0). DP-4 is covered by Caspar's `Screen consumer [1|3840x1792]` window, so
+    MagicQ sits behind it: not on the program output, but not visible either. Desktop screenshot in the scratchpad.
+  - The operator monitor is **DP-0** (1920×1080 at +3840+0), with the Godot GUI on it.
+- **WayVR limits for this box** (README):
+  - **X11 captures whole screens only, not windows**, and "zero-copy GPU capture is not supported on the general X11
+    desktop" (slower).
+  - DPI scaling and rotated screens break the mouse.
+  - MagicQ's bundled Qt 5 has **only the xcb platform plugin** (`/opt/magicq/plugins/platforms/libqxcb.so`), so it
+    can't run as a Wayland app inside WayVR's own compositor.
+  - So MagicQ must sit on a visible screen, i.e. **DP-0 during a VR session**, and WayVR shows that screen as the
+    panel.
+- **WayVR runs:** `./WayVR-v26.8.0-x86_64.AppImage --help` prints its options (`--openxr`, `--wait`, `--show`, `--replace`,
+  `-l`). With libfuse2 installed the AppImage mounts.
 
 ## Verified
 
-- Nothing run yet.
+- MagicQ PC runs on the box and binds Art-Net. WayVR starts.
+- **Not yet tested:** WayVR in the headset (needs a VR session), the MagicQ panel's readability and ray input, and the
+  MQ500 net session.
