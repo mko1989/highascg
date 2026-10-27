@@ -106,8 +106,15 @@ All in the module repo (not this repo).
   HELP.md.
 - **Not done:**
   - **Not installed.** `~/.config/companion/modules/highpass-highascg` is still 1.0.9 and Companion was not restarted.
-  - **Not committed.** The module repo still carries the uncommitted 1.0.9 work (FTB, global border, playlists) as
-    before; nothing was committed there.
+  - **Committed and pushed 27.10** (owner: "commit and push the module there") to
+    https://github.com/mko1989/companion-module-highpass-highascg, main `42070f5..8b55f63`:
+    - `839660d`: the 1.0.9 work (playlists, global border, FTB, screen timers), built on 23.10 but never committed.
+      It was staged without this WO's edits and its own snapshot was tested: 73/73.
+    - `47086c7`: this WO (1.0.10), 81/81.
+    - `8b55f63`: a merge of GitHub's two web-upload commits of 12.09 (`-s ours`, local tree kept, no force-push).
+      Their source edits were already in local main. The rest was build output (`pkg/`, `*.pyc`,
+      `package-lock.json`, all in `.gitignore`) and `src/tcp.js`, which WO-394 removed on purpose.
+    - The repo has no CI.
 - **Box state left:** PGM shows "zabierz mnie" and PRV shows Intro, from the live test.
 - **Owner QA:**
   - Install 1.0.10 and restart Companion.
