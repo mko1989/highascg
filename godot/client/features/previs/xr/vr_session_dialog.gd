@@ -3,7 +3,8 @@ extends AcceptDialog
 ## pin in the modal"). Start brings up WiVRn and the VR client (POST /api/vr/start), the PIN shows big while pairing is
 ## on, the state follows the headset (GET /api/vr/status, once a second while open), "Pair a new headset" asks WiVRn
 ## for a fresh PIN (/api/vr/pair), "End VR session" closes the VR window and stops WiVRn (/api/vr/stop). The server
-## also stops WiVRn by itself when the VR window is closed.
+## also stops WiVRn by itself when the VR window is closed. WO-792: "MagicQ in VR" opens the desk's UI as its own panel
+## in the headset (/api/vr/desk/start: WayVR + MagicQ); End closes it too.
 
 const M := preload("res://features/previs/xr/vr_session_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -14,6 +15,8 @@ var _detail: Label
 var _start: Button
 var _pair: Button
 var _end: Button
+var _desk: Button
+var _desk_path := ""
 var _poll: Timer
 var _busy := false
 
@@ -43,6 +46,10 @@ func _init() -> void:
 	_start = _button(row, "Start VR session", "/api/vr/start")
 	_pair = _button(row, "Pair a new headset", "/api/vr/pair")
 	_end = _button(row, "End VR session", "/api/vr/stop")
+	_desk = Button.new()
+	_desk.tooltip_text = "The lighting desk's UI (ChamSys MagicQ on this server) as its own panel in the headset."
+	_desk.pressed.connect(func() -> void: _post(_desk_path))
+	row.add_child(_desk)
 	_poll = Timer.new()
 	_poll.wait_time = 1.0
 	_poll.timeout.connect(refresh)
@@ -84,7 +91,8 @@ func refresh() -> void:
 func _post(path: String) -> void:
 	_busy = true
 	_show({"installed": true, "starting": true})
-	_state.text = {"/api/vr/start": "Starting the VR session…", "/api/vr/pair": "Asking WiVRn for a PIN…"}.get(path, "Ending the VR session…")
+	_state.text = {"/api/vr/start": "Starting the VR session…", "/api/vr/pair": "Asking WiVRn for a PIN…",
+		"/api/vr/desk/start": "Opening MagicQ in VR…", "/api/vr/desk/stop": "Closing MagicQ in VR…"}.get(path, "Ending the VR session…")
 	var r: Dictionary = await Api.post_json(path, {})
 	_busy = false
 	if not r.ok:
@@ -104,7 +112,10 @@ func _show(s: Dictionary) -> void:
 	_start.visible = v.start
 	_pair.visible = v.pair
 	_end.visible = v.end
-	for b in [_start, _pair, _end]:
+	_desk.visible = v.desk
+	_desk.text = v.desk_text
+	_desk_path = v.desk_path
+	for b in [_start, _pair, _end, _desk]:
 		b.disabled = _busy
 
 

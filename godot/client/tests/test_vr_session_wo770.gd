@@ -44,6 +44,21 @@ func test_connected_and_errors() -> void:
 	t.ok(not M.view(_s({"starting": true})).pair, "no Pair while starting")
 
 
+func test_desk_panel_wo792() -> void:
+	var desk := {"available": true, "magicqRunning": false, "error": ""}
+	var v := M.view(_s({"desk": desk}))
+	t.ok(v.desk, "WiVRn up + WayVR and MagicQ installed: the MagicQ toggle shows")
+	t.eq([v.desk_text, v.desk_path], ["MagicQ in VR", "/api/vr/desk/start"], "off: opens it")
+	desk.magicqRunning = true
+	v = M.view(_s({"desk": desk}))
+	t.eq([v.desk_text, v.desk_path], ["Close MagicQ in VR", "/api/vr/desk/stop"], "on: closes it")
+	t.ok(not M.view(_s({"serverRunning": false, "clientRunning": false, "desk": desk})).desk, "no session: no toggle")
+	t.ok(not M.view(_s({"desk": {"available": false}})).desk, "not installed: no toggle")
+	t.ok(not M.view(_s({})).desk, "an older server without `desk`: no toggle")
+	desk.error = "MagicQ is already running on the desktop"
+	t.ok(str(M.view(_s({"desk": desk})).detail).ends_with("⚠ MagicQ is already running on the desktop"), "its error shows")
+
+
 func test_mirror_px() -> void:
 	t.eq(Walk.mirror_px(Vector2(1920, 1080)), Vector2i(1280, 720), "capped at 1280×720")
 	t.eq(Walk.mirror_px(Vector2(800, 400)), Vector2i(800, 400), "smaller hosts render 1:1")

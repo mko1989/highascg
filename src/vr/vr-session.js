@@ -12,6 +12,9 @@
  * is read over its D-Bus interface (io.github.wivrn.Server); the paired headsets' public keys (KnownKeys) are
  * never returned — names only.
  *
+ * WO-792: `deps.desk` (vr-desk-panel.js, the MagicQ panel in the headset) is reported in status as `desk`, and End and
+ * the exit watcher stop it before WiVRn. Only the box instance gets it, so tests never touch real processes.
+ *
  * `createVrSession(deps)` takes injectable exec / spawn / procScan / kill / timers so the smoke test runs without
  * systemd or D-Bus. The default export is the instance wired to the real box.
  */
@@ -111,6 +114,7 @@ function createVrSession(deps = {}) {
 	const getXAuth = deps.getXAuthority || (() => require('../utils/hardware-info').getXAuthority())
 	const godotBin = deps.godotBin === undefined ? path.join(os.homedir(), '.local/opt/godot/godot') : deps.godotBin
 	const godotExists = deps.godotExists || ((p) => fs.existsSync(p))
+	const desk = deps.desk || null
 
 	const busEnv = () => ({
 		...baseEnv,
@@ -175,6 +179,7 @@ function createVrSession(deps = {}) {
 			error: lastError,
 		}
 		if (clients.length) st.clientPid = clients[0].pid
+		if (desk) st.desk = desk.status()
 		return st
 	}
 
@@ -199,6 +204,7 @@ function createVrSession(deps = {}) {
 		if (running) clientSeen = true
 		if (running || !(clientSeen || now() - watchStarted >= WATCH_MAX_MS)) return
 		stopWatcher()
+		if (desk) await desk.stop().catch(() => {})
 		try {
 			await sctl('stop', 'wivrn')
 		} catch (e) {
@@ -265,6 +271,7 @@ function createVrSession(deps = {}) {
 
 	async function stop() {
 		stopWatcher()
+		if (desk) await desk.stop().catch(() => {})
 		for (const c of procScan()) {
 			try {
 				kill(c.pid, 'SIGTERM')
@@ -280,7 +287,17 @@ function createVrSession(deps = {}) {
 		return { ok: true, ...(await status()) }
 	}
 
-	return { status, start, pair, stop, watchTick, _watching: () => !!watcher }
+	/** WO-792: the MagicQ panel on / off during a session. */
+	async function deskStart() {
+		if (!desk) return { ok: false, error: 'no desk panel on this server' }
+		return desk.start({ serverRunning: await isServerRunning() })
+	}
+	async function deskStop() {
+		if (!desk) return { ok: false, error: 'no desk panel on this server' }
+		return desk.stop()
+	}
+
+	return { status, start, pair, stop, watchTick, deskStart, deskStop, _watching: () => !!watcher }
 }
 
-module.exports = { createVrSession, isXrClientArgv, instance: createVrSession() }
+module.exports = { createVrSession, isXrClientArgv, instance: createVrSession({ desk: require('./vr-desk-panel').instance }) }

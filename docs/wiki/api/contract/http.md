@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-509 routes.
+511 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -515,6 +515,8 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/virtual-camera/start` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
 | GET | `/api/virtual-camera/status` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
 | POST | `/api/virtual-camera/stop` | registry | `src/api/router.js`, `src/api/routes-virtual-camera.js` |
+| POST | `/api/vr/desk/start` | registry | `src/api/routes-vr.js` |
+| POST | `/api/vr/desk/stop` | registry | `src/api/routes-vr.js` |
 | POST | `/api/vr/pair` | registry | `src/api/routes-vr.js` |
 | POST | `/api/vr/start` | registry | `src/api/routes-vr.js` |
 | GET | `/api/vr/status` | registry | `src/api/routes-vr.js` |

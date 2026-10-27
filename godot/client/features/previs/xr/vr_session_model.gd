@@ -5,9 +5,12 @@ extends RefCounted
 
 
 ## s: the status reply ({installed, serverRunning, headsetConnected, sessionRunning, pairingEnabled, pin, paired,
-## systemName, clientRunning, starting, error}). → {state, pin, detail, start, pair, end}
+## systemName, clientRunning, starting, error, desk?}). → {state, pin, detail, start, pair, end, desk, desk_text,
+## desk_path}. WO-792: `desk` (src/vr/vr-desk-panel.js) — the MagicQ toggle shows while WiVRn runs and both WayVR and
+## MagicQ are installed.
 static func view(s: Dictionary) -> Dictionary:
-	var v := {"state": "", "pin": "", "detail": "", "start": false, "pair": false, "end": false}
+	var v := {"state": "", "pin": "", "detail": "", "start": false, "pair": false, "end": false,
+		"desk": false, "desk_text": "", "desk_path": ""}
 	if not s.get("installed", false):
 		v.state = "WiVRn is not installed on this server"
 		v.detail = "Install wivrn-server (help: VR walk) to stream the Previs stage to a Quest headset."
@@ -40,7 +43,15 @@ static func view(s: Dictionary) -> Dictionary:
 		v.start = not client
 	v.pair = server and not s.get("starting", false)
 	v.end = server or client
+	var desk: Dictionary = s.get("desk") if s.get("desk") is Dictionary else {}
+	if server and desk.get("available", false) and not s.get("starting", false):
+		var on: bool = desk.get("magicqRunning", false)
+		v.desk = true
+		v.desk_text = "Close MagicQ in VR" if on else "MagicQ in VR"
+		v.desk_path = "/api/vr/desk/stop" if on else "/api/vr/desk/start"
 	var err := str(s.get("error", ""))
+	if str(desk.get("error", "")) != "":
+		err = (err + "\n⚠ " if err != "" else "") + str(desk.error)
 	if err != "":
 		v.detail = (v.detail + "\n" if v.detail != "" else "") + "⚠ " + err
 	return v
