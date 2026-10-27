@@ -107,6 +107,9 @@ func _ready() -> void:
 	deck.border_requested.connect(func(m: int, label: String) -> void:
 		InspectorPanel.current.present(border)
 		border.open(m, label))
+	if Config.args.has("border-screen"):  # dev: open the global border page on that screen (render probes, --probe-shot)
+		var bm := int(Config.args["border-screen"])
+		get_tree().create_timer(4.0).timeout.connect(func() -> void: deck.border_requested.emit(bm, "Screen %d" % (bm + 1)))
 	deck.action_result.connect(func(text: String, ok: bool) -> void:
 		_action.text = text
 		_action.add_theme_color_override("font_color", ThemeBuilder.SUCCESS if ok else ThemeBuilder.ERROR)

@@ -49,21 +49,21 @@ func build(gb: Dictionary) -> void:
 	add_child(body)
 	var g := GridContainer.new()
 	g.columns = 2
-	g.add_child(_muted("Protocol"))
+	g.add_child(_cell("Protocol"))
 	var proto := OptionButton.new()
 	proto.add_item("Art-Net")
 	proto.add_item("sACN (E1.31)")
 	proto.select(1 if str(gb.get("lightingProtocol", "")) == "sacn" else 0)
 	proto.item_selected.connect(func(i: int) -> void: edit.emit({"lightingProtocol": "sacn" if i == 1 else "artnet"}))
 	g.add_child(proto)
-	g.add_child(_muted("Start channel"))
+	g.add_child(_cell("Start channel"))
 	var sc := SpinBox.new()
 	sc.min_value = 1
 	sc.max_value = 512
 	sc.value = start
 	sc.value_changed.connect(func(v: float) -> void: edit.emit({"artnetPatch": {"startChannel": int(v)}}))
 	g.add_child(sc)
-	g.add_child(_muted("Universe"))
+	g.add_child(_cell("Universe"))
 	var uni := SpinBox.new()
 	uni.max_value = 16
 	uni.value = int(patch.get("universe", 0))
@@ -75,7 +75,7 @@ func build(gb: Dictionary) -> void:
 	var t := GridContainer.new()
 	t.columns = 3
 	for h in ["Parameter", "DMX ch", "Desk"]:
-		t.add_child(_muted(h))
+		t.add_child(_cell(h))
 	for i in A.COUNT:
 		var l := Label.new()
 		l.text = A.LABELS[i]
@@ -119,6 +119,14 @@ func save_fixture_to(path: String) -> bool:
 		return false
 	f.store_string(r.data)
 	return true
+
+
+## A grid label: no wrap (a wrapping label in a GridContainer collapses to one letter per line, owner 27.10).
+func _cell(text: String) -> Label:
+	var l := _muted(text)
+	l.autowrap_mode = TextServer.AUTOWRAP_OFF
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	return l
 
 
 func _muted(text: String) -> Label:

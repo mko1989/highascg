@@ -16,6 +16,7 @@ const ArtnetSection := preload("res://features/live/border_artnet_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const TYPES := ["border", "shadow", "edge_strip", "glow"]
 const DEBOUNCE_S := 0.11
+const LABEL_W := 120  # grid labels wrap inside this; without a width the column collapses to one letter (owner 27.10)
 
 var screen_idx := 0
 var screen_label := ""
@@ -177,30 +178,27 @@ func _render() -> void:
 		_body.add_child(_btn("Enable global border on this screen", "", func() -> void: send({"enabled": true}, true, true)))
 		return
 	var g := _grid()
-	g.add_child(_muted("Enabled"))
 	var en := CheckBox.new()
 	en.button_pressed = gb.get("enabled") == true
 	en.toggled.connect(func(on: bool) -> void: send({"enabled": on}, true, true))
-	g.add_child(en)
-	g.add_child(_muted("Type"))
+	_pair(g, "Enabled", en)
 	var ty := OptionButton.new()
 	for t in TYPES:
 		ty.add_item(t)
 	ty.select(maxi(0, TYPES.find(str(gb.get("type", "border")))))
 	ty.item_selected.connect(func(i: int) -> void: send({"type": TYPES[i]}, true, true))
-	g.add_child(ty)
-	g.add_child(_muted("Fade (frames)"))
+	_pair(g, "Type", ty)
 	var fd := SpinBox.new()
 	fd.max_value = 250
 	fd.value = float(gb.get("fadeDuration", 25))
 	fd.value_changed.connect(func(v: float) -> void: send({"fadeDuration": int(v)}))
-	g.add_child(fd)
-	g.add_child(_muted("Mirror on PRV"))
+	_pair(g, "Fade (frames)", fd)
 	var mir := CheckBox.new()
 	mir.button_pressed = gb.get("mirrorBorderOnPrv") == true
-	mir.text = "edit on PRV layer 997 (PGM unchanged until off)"
+	mir.text = "Edit on PRV (layer 997)"
+	mir.tooltip_text = "Edits go to PRV layer 997; PGM stays unchanged until this is off."
 	mir.toggled.connect(func(on: bool) -> void: send({"mirrorBorderOnPrv": on}, true, true))
-	g.add_child(mir)
+	_pair(g, "Mirror on PRV", mir)
 	_body.add_child(g)
 	_params(gb)
 	_area(gb)
@@ -227,8 +225,6 @@ func _params(gb: Dictionary) -> void:
 		var key := str(s.key)
 		if key == "side" or (key in ["color2", "colorCycleSec"] and params.get("color2Enabled") != true):
 			continue
-		var l := _muted(F.label_for(s))
-		g.add_child(l)
 		var c := F.control(s, params.get(key) if params.get(key) != null else s.get("default"), func(v: Variant) -> void:
 			shown[key] = v
 			for row in gated:
@@ -236,7 +232,7 @@ func _params(gb: Dictionary) -> void:
 				row[0].visible = vis
 				row[1].visible = vis
 			send({"params": {key: v}}, key == "color2Enabled", key == "color2Enabled"))
-		g.add_child(c)
+		var l := _pair(g, F.label_for(s), c)
 		if s.has("visibleWhen"):
 			gated.append([l, c, s])
 	for row in gated:
@@ -248,12 +244,12 @@ func _params(gb: Dictionary) -> void:
 
 func _area(gb: Dictionary) -> void:
 	var inner: Dictionary = gb.get("inner", {"l": 0, "t": 0, "w": 1, "h": 1}) if gb.get("inner") is Dictionary else {"l": 0, "t": 0, "w": 1, "h": 1}
-	var row := HBoxContainer.new()
-	row.add_child(_muted("Area % (X Y W H — slices override)"))
+	_body.add_child(_muted("Area (% of the screen; slices override it)"))
+	var row := _spin_row()
 	var spins := {}
 	for k in ["l", "t", "w", "h"]:
-		var sp := SpinBox.new()
-		sp.max_value = 100
+		var sp := _spin({"l": "X", "t": "Y", "w": "W", "h": "H"}[k], 100)
+		sp.suffix = "%"
 		sp.value = roundf(float(inner.get(k, 1.0 if k in ["w", "h"] else 0.0)) * 100.0)
 		row.add_child(sp)
 		spins[k] = sp
@@ -274,12 +270,10 @@ func _slices(gb: Dictionary) -> void:
 	if slices.is_empty():
 		_body.add_child(_muted("No slices — full canvas."))
 	for i in slices.size():
-		var row := HBoxContainer.new()
+		var row := _spin_row()
 		for k in ["x", "y", "w", "h"]:
 			var dim: int = res.x if k in ["x", "w"] else res.y
-			var sp := SpinBox.new()
-			sp.max_value = dim
-			sp.prefix = k.to_upper()
+			var sp := _spin(k.to_upper(), dim)
 			sp.value = roundf(float(slices[i].get(k, 1.0 if k in ["w", "h"] else 0.0)) * dim)
 			var key: String = k
 			var idx := i
@@ -322,7 +316,9 @@ func _presets(gb: Dictionary) -> void:
 		var row := HBoxContainer.new()
 		var l := Label.new()
 		l.text = "%d. %s" % [s, found.get("name", "—")]
-		l.custom_minimum_size.x = 140
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.clip_text = true
+		l.tooltip_text = l.text
 		row.add_child(l)
 		var sn := s
 		var rc := _btn("Recall", "", func() -> void: send({"preset": sn}, true, true))
@@ -364,7 +360,36 @@ func _popup(dlg: AcceptDialog) -> void:
 func _grid() -> GridContainer:
 	var g := GridContainer.new()
 	g.columns = 2
+	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	return g
+
+
+## A label + control row: the label wraps inside LABEL_W, the control takes the rest of the width.
+func _pair(g: GridContainer, text: String, c: Control) -> Label:
+	var l := _muted(text)
+	l.custom_minimum_size.x = LABEL_W
+	l.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	c.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN if c is CheckBox else Control.SIZE_EXPAND_FILL  # a box, not a bar
+	c.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	g.add_child(l)
+	g.add_child(c)
+	return l
+
+
+## X / Y / W / H spins share the width evenly, so the row fits the Inspector column at any width.
+func _spin_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return row
+
+
+func _spin(prefix: String, top: float) -> SpinBox:
+	var sp := SpinBox.new()
+	sp.prefix = prefix
+	sp.max_value = top
+	sp.custom_minimum_size.x = 60
+	sp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return sp
 
 
 func _btn(text: String, tip: String, cb: Callable) -> Button:
