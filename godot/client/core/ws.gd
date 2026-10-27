@@ -20,6 +20,7 @@ var _peer: WebSocketPeer
 var _handlers := {}  # type -> Array[Callable]
 var _next_connect_ms := 0
 var _started := false
+var _watches := {}  # WO-797: watch type → {owner instance id: true}; said again on every connect
 
 
 ## Called by the app after the HTTP bootstrap (same order as client/app.js).
@@ -32,6 +33,15 @@ func on(type: String, handler: Callable) -> void:
 	if not _handlers.has(type):
 		_handlers[type] = []
 	(_handlers[type] as Array).append(handler)
+
+
+## WO-797 — hold a server-side watch (`{type, data: {on}}`, e.g. tracking:fixtures_watch) while any owner holds it;
+## the server is told on the first hold and the last release, and again after every reconnect.
+func watch(type: String, owner: Object, on: bool) -> void:
+	var holds: Dictionary = _watches.get(type, {})
+	_watches[type] = holds
+	if NetUtil.hold(holds, owner.get_instance_id(), on):
+		send({"type": type, "data": {"on": not holds.is_empty()}})
 
 
 func send(obj: Dictionary) -> bool:
@@ -53,6 +63,9 @@ func _process(_delta: float) -> void:
 		if not is_open:
 			is_open = true
 			reconnect_attempts = 0
+			for t in _watches:  # WO-797: the server forgot this client's watches with the old socket
+				if not (_watches[t] as Dictionary).is_empty():
+					send({"type": t, "data": {"on": true}})
 			connected.emit()
 			_dispatch("connect", null)
 		while _peer.get_available_packet_count() > 0:

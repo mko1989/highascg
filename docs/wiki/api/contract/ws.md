@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-87 types.
+88 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -46,6 +46,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | client → server | `set` | `src/server/ws-amcp-dispatch.js` | `→ /api/set` |
 | client → server | `stop` | `src/server/ws-amcp-dispatch.js` | `→ /api/stop` |
 | client → server | `swap` | `src/server/ws-amcp-dispatch.js` | `→ /api/swap` |
+| client → server | `tracking:fixtures_watch` | `src/tracking/fixtures-watch.js` |  |
 | client → server | `tracking:marker` | `src/tracking/register.js` |  |
 | server → clients | `amcp_result` | `src/server/ws-server.js` |  |
 | server → clients | `audio_fft` | `src/bootstrap/audio-capture-lifecycle.js` |  |
@@ -86,7 +87,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `tracking:auto` | `src/tracking/auto-routes.js` |  |
 | server → clients | `tracking:detections` | `src/tracking/register.js` |  |
 | server → clients | `tracking:error` | `src/tracking/register.js` |  |
-| server → clients | `tracking:fixtures` | `src/tracking/register.js` |  |
+| server → clients | `tracking:fixtures` | `src/tracking/fixtures-watch.js` |  |
 | server → clients | `tracking:follow` | `src/tracking/register.js` |  |
 | server → clients | `tracking:markers` | `src/tracking/register.js` |  |
 | server → clients | `tracking:presenters` | `src/tracking/register.js` |  |

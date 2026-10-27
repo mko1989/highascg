@@ -5,6 +5,7 @@ module.exports = [
 	'tools/smoke/smoke-wo770-vr-session.test.js',
 	'tools/smoke/smoke-wo792-vr-desk-panel.test.js',
 	'tools/smoke/smoke-wo796-magicq-show.test.js',
+	'tools/smoke/smoke-wo797-fixtures-watch.test.js',
 	'tools/smoke/smoke-wo772-media-sent-resync.test.js',
 	'tools/smoke/smoke-wo779-hdmi-sinks.test.js',
 	'tools/smoke/smoke-wo781-look-preset-destinations.test.js',

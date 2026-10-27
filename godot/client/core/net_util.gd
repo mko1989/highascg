@@ -60,3 +60,14 @@ static func deep_merge(target: Dictionary, src: Dictionary) -> void:
 ## which JSON.parse reads as the same number.
 static func to_json(v: Variant) -> String:
 	return JSON.stringify(v, "", false, true)
+
+
+## WO-797 — `holds` (owner instance id → true) after `id` holds (`on`) or releases a watch; true when "anyone holds it"
+## flipped, i.e. the server must be told.
+static func hold(holds: Dictionary, id: int, on: bool) -> bool:
+	var was := not holds.is_empty()
+	if on:
+		holds[id] = true
+	else:
+		holds.erase(id)
+	return was != (not holds.is_empty())

@@ -15,7 +15,7 @@ const path = require('path')
 
 const ROOT = path.join(__dirname, '../..')
 const OUT = path.join(ROOT, 'docs/wiki/api/contract')
-const IN_FILES = ['src/server/', 'src/tracking/register.js']
+const IN_FILES = ['src/server/', 'src/tracking/register.js', 'src/tracking/fixtures-watch.js'] // WO-797: the previs watch
 const { WS: COMPANION_WS } = require('../../src/companion-bridge/contract')
 const { TYPE_TO_PATH } = require('../../src/server/ws-amcp-dispatch')
 

@@ -1,8 +1,8 @@
 extends Node3D
 ## WO-615 T5 — the patch's GDTF fixtures on the 3D stage: each built from its type's rig (server-instanced geometry,
 ## GET /api/fixtures/types/<id>/rig, meshes from /model as GLB, else a box of the model size), placed by its patch
-## pose, with axes turned and beams lit from the server's decode of the DMX it sends (WS `tracking:fixtures`,
-## first state from GET /api/tracking/fixtures). A beam is an additive cone + an emissive lens, and a shadowless
+## pose, with axes turned and beams lit from the server's decode of the DMX it sends (WS `tracking:fixtures`, sent only
+## while the rig is drawn — WO-797 fixtures_watch.gd; first state from GET /api/tracking/fixtures). A beam is an additive cone + an emissive lens, and a shadowless
 ## SpotLight3D while the light budget lasts (fixtures_3d_model.gd) projecting the beam's gobo wheel slot. Rebuilt only
 ## when typed fixtures or poses change. WO-615 T6: a click picks a fixture into the programmer selection
 ## (fixture_selection.gd; selected bodies get a box) or, while Point at is on, aims the selection at the floor.
@@ -42,6 +42,7 @@ var _gobos := {}  # "typeId|wheel/media" → Texture2D (null = none / failed)
 var _gobo_wait := {}  # key → [SpotLight3D] waiting for that image
 var _fx := {}  # fixture id → {axes: {node id → [Node3D, rest Transform3D, kind]}, beams: {node id → parts}}
 var _last: Dictionary = {}  # last tracking:fixtures payload (re-applied after a rebuild)
+var _watch: Node  # WO-797 fixtures_watch.gd
 var _shader: Shader
 var _cone: CylinderMesh
 var lights := 0
@@ -52,6 +53,8 @@ var haze := 0.0  # WO-786 (haze.gd): the views' haze level — the world's fog +
 
 
 func _ready() -> void:
+	_watch = preload("res://features/previs/fixtures/fixtures_watch.gd").new()  # WO-797: kept across rebuilds
+	add_child(_watch)
 	_shader = Shader.new()
 	_shader.code = CONE_SHADER
 	_cone = CylinderMesh.new()
@@ -114,7 +117,8 @@ func _rebuild(list: Array) -> void:
 				return
 			_meshes[mk] = F.from_glb(b.bytes) if b.ok else null
 	for c in get_children():
-		c.queue_free()
+		if c != _watch:
+			c.queue_free()
 	_fx = {}
 	lights = 0
 	gobo_lights = 0

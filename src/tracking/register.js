@@ -16,6 +16,7 @@
  *         the beam spot in the camera picture, src/fixtures/calibrate-spot.js)
  * WS out: tracking:markers · tracking:follow {output_enabled, fixtures:[{id,state,pan,tilt,problem}]} (≤ 10 Hz on change)
  *   · tracking:fixtures {fixtures:[{id, axes, beams}]} (WO-615 T5, GDTF fixtures decoded from their DMX; ≤ 30 Hz on change)
+ *     — decoded and sent only to clients that watch (WS in `tracking:fixtures_watch {on}`, WO-797 fixtures-watch.js)
  *         · tracking:zones {enabled, zones:[{id,occupied,count,occupants,last_kind}]} (on change)
  * Zones (T7, src/tracking/zone-service.js): GET /api/tracking/zones — occupancy + the last 20 transitions fired.
  * Detection (T9, src/tracking/detect-service.js): GET /api/tracking/detections — sidecar state + latest persons;
@@ -56,6 +57,7 @@ const { handleAuto, createAutoBroadcast, followProject, reply } = require('./aut
 const { createAutoPtz } = require('./auto-ptz')
 const duties = require('../cluster/server-duties') // WO-723: what this server does, resolved from config + the linked servers
 const { Fusion } = require('./fusion')
+const { createFixturesWatch } = require('./fixtures-watch')
 const { Pose3D } = require('./pose3d')
 const { VerifyWalk } = require('./verify-walk')
 const { createPresenters } = require('./presenters')
@@ -68,7 +70,6 @@ const HEARTBEAT_MS = 1000
 const WS_EVENT = 'tracking:markers'
 const FOLLOW_EVENT = 'tracking:follow'
 const FOLLOW_MS = 100
-const FIXTURES_EVENT = 'tracking:fixtures' // WO-615 T5: typed fixtures' axes / beams, ≤ 30 Hz on change
 const ZONES_EVENT = 'tracking:zones'
 const DETECT_EVENT = 'tracking:detections'
 const DETECT_MS = 66
@@ -84,7 +85,7 @@ let _follow = null
 let _calib = null
 let _spot = null
 let _followSent = { json: '', at: 0 }
-let _fixturesSent = ''
+const fixturesWatch = createFixturesWatch() // WO-797: tracking:fixtures only while a client looks
 let _zones = null
 let _zonesSent = ''
 let _detect = null
@@ -188,14 +189,9 @@ function followTick() {
 	_ctx._wsBroadcast(FOLLOW_EVENT, snap)
 }
 
-/** GDTF fixtures for the previs (WO-615 T5): on change, at the 33 ms tick. */
+/** GDTF fixtures for the previs (WO-615 T5): on change, at the 33 ms tick — decoded only while a client looks (WO-797). */
 function fixturesTick() {
-	if (!_follow?.visual || !_ctx || typeof _ctx._wsBroadcast !== 'function') return
-	const snap = _follow.visual()
-	const json = JSON.stringify(snap)
-	if (json === _fixturesSent) return
-	_fixturesSent = json
-	_ctx._wsBroadcast(FIXTURES_EVENT, snap)
+	if (_follow?.visual) fixturesWatch.tick(_follow.visual)
 }
 
 /** Zone occupancy: only when it changed (the engine itself evaluates at 10 Hz). */
@@ -409,8 +405,9 @@ async function handleApi({ method, path, body, req }) {
 	return null
 }
 
-/** Inbound `tracking:marker` {id,x,y,z,name?} | {markers:[…]} from a client (the Godot marker driver). */
+/** Inbound `tracking:marker` {id,x,y,z,name?} | {markers:[…]} from a client (the Godot marker driver); WO-797 watch. */
 function handleWs(msg, { ws }) {
+	if (fixturesWatch.handle(msg, ws)) return true
 	if (msg.type !== 'tracking:marker') return false
 	const r = apply(msg.data, 'operator')
 	if (r.errors.length && ws && typeof ws.send === 'function') {
@@ -447,7 +444,7 @@ module.exports = {
 		if (ctx && typeof ctx.log === 'function') ctx.log('info', '[tracking] marker hub up (WO-616) — tracking:markers')
 		if (_follow) _follow.stop()
 		_follow = createFollowService(ctx, hub)
-		_fixturesSent = ''
+		fixturesWatch.reset()
 		if (ctx) ctx.fixtureService = _follow // WO-615: /api/fixtures/program + type import reload
 		_follow.engine.resolveAuto = auto.resolveAuto // WO-708: Auto heads split across people / go home (WO-709)
 		followProject(auto, ctx) // the grid rectangle (home points) from project.previs.tracking.grid
