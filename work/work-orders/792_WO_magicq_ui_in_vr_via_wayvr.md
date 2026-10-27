@@ -1,7 +1,7 @@
 # WO-792 — Program lights in VR: the MagicQ UI as a panel in the headset (MagicQ PC + WayVR)
 
-**Status: IN PROGRESS (27.10) — MagicQ 1.9.8.3 installed by the owner and running on :0 (Demo Mode); WayVR v26.8.0
-runs (`--help`); headset test pending: needs a VR session + the owner in the headset**
+**Status: IN PROGRESS (27.10) — MagicQ runs as its own WayVR window panel in the headset (owner: "good"); next: VR Start / End
+wires it in**
 
 Owner, 27.10:
 > I need a way to be able to program lights in the VR. Is it possible to display chamsys magicq ui inside the VR?
@@ -106,3 +106,30 @@ Parents:
 - MagicQ PC runs on the box and binds Art-Net. WayVR starts.
 - **Not yet tested:** WayVR in the headset (needs a VR session), the MagicQ panel's readability and ray input, and the
   MQ500 net session.
+
+## Headset test, 27.10 (owner in the headset)
+
+- **Whole-screen panel first:** WayVR (`--openxr --show`) captured DP-0 and DP-4. The owner first saw the HighAsCG GUI:
+  MagicQ's main window is unmapped until its SELECT dialog is answered. After a MagicQ layout change, MagicQ moved its
+  window back to DP-4, behind Caspar's screen consumer, and it disappeared from the panel. The owner asked for a
+  single window.
+- **Ray as mouse:** WayVR logged "Could not create uinput provider". `/dev/uinput` was `root:root 0600`; the user is
+  already in `input`. Owner ran: a udev rule `/etc/udev/rules.d/60-uinput-input.rules`
+  (`KERNEL=="uinput", SUBSYSTEM=="misc", MODE="0660", GROUP="input", OPTIONS+="static_node=uinput"`), then
+  `udevadm control --reload && udevadm trigger --name-match=uinput`. Result: `crw-rw---- root input`, and WayVR logs
+  "Initialized uinput."
+- **Correction to the investigation:** "MagicQ can't be a WayVR app panel (xcb only)" was wrong. WayVR's compositor
+  starts its bundled `xwayland-satellite` (source v26.8.0 `wayvr/src/backend/wayvr/client.rs:101`), so X11 apps get
+  their own panels. It only needs Xwayland: `xwayland-satellite` was `<defunct>` until the owner installed
+  `xwayland` (2:24.1.10-1).
+- **Window panel:**
+  - WayVR restarted: `xwayland-satellite :20` and `Xwayland :20` stay up, with `wayland-20` in `/run/user/1000`.
+  - The desktop MagicQ was closed (TERM; :6454 / :6553 freed).
+  - MagicQ was launched with `DISPLAY=:20 QT_QPA_PLATFORM=xcb runmagicq.sh`, with WAYLAND_DISPLAY and XAUTHORITY
+    unset.
+  - WayVR registered it as an external process ("Toplevel surface count changed: 1").
+  - **Owner: "the standalone magicq window is good. but i dont need the main window and keyboard."** Those were hidden
+    with the watch's overlay toggles; WayVR saves that in `~/.config/wayvr/conf.d/zz-saved-state.json5`. A restart of
+    WayVR kills `:20`, and MagicQ with it.
+- **For VR Start:** launch WayVR with `--headless` (no desktop capture, so no DP-0 / DP-4 panels), then MagicQ on
+  WayVR's X display. VR End stops both.

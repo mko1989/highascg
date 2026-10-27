@@ -132,7 +132,8 @@ func show_output(o: Dictionary) -> void:
 				func(u: Dictionary) -> String: return "U%d from %s (%.1f s)" % [int(u.universe), u.from, float(u.age_ms) / 1000.0])))
 		return
 	_status.text = ("Trackers = markers (id = marker id). On the console: PSN input, map tracker ids to fixtures." +
-		" Calibrate (below) jogs heads over Art-Net — pick the backup while calibrating.")
+		" Calibrate (below) jogs heads over Art-Net — pick the backup while calibrating." +
+		"\nChamSys MagicQ PC / Mac takes PSN only when unlocked by ChamSys hardware (interface, Wing or GeNetix node).")
 	if not server.is_empty():
 		_status.text = "PSN %s → %s:%d · %d packets · %d errors%s\n" % ["ON" if server.get("enabled") else "off",
 			psn.group, int(psn.port), int(server.get("packets_sent", 0)), int(server.get("send_errors", 0)),
