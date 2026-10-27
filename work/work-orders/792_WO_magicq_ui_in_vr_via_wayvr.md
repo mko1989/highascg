@@ -133,3 +133,41 @@ Parents:
     WayVR kills `:20`, and MagicQ with it.
 - **For VR Start:** launch WayVR with `--headless` (no desktop capture, so no DP-0 / DP-4 panels), then MagicQ on
   WayVR's X display. VR End stops both.
+
+## Built in: "MagicQ in VR" in the VR session dialog (27.10, owner: "run magicq window in vr")
+
+- **`src/vr/vr-desk-panel.js`** (new):
+  - Start spawns `WayVR-v*.AppImage --openxr --headless --wait`, with the session env + DISPLAY :0. Headless means no
+    DP-0 / DP-4 panels.
+  - Once `xwayland-satellite :N` exists it starts `runmagicq.sh` on `DISPLAY=:N QT_QPA_PLATFORM=xcb`, with
+    WAYLAND_DISPLAY and XAUTHORITY unset.
+  - MagicQ is a detached process group, and its pgid is kept in `~/.highascg/run/vr-desk.json`. Stop sends our group's
+    `mqqt` SIGTERM (SIGKILL after 5 s), then SIGTERM to WayVR.
+  - A MagicQ the operator runs on the desktop (another group) is never stopped, and Start refuses a second one.
+  - **Found on the box:** with the headset off, WiVRn removes `~/.config/openxr/1/active_runtime.json`. WayVR then
+    waits and there is no X display yet, so the first version failed after 15 s.
+  - Now Start returns `pending` and a background wait (1 s polls, up to 10 min) launches MagicQ when the display
+    appears. End / Close cancels it.
+- **`src/vr/vr-session.js`:** `deps.desk` (only the box instance has it, so tests never touch real processes).
+  `status.desk`; `deskStart` / `deskStop`; End and the exit watcher stop the desk before WiVRn.
+- **`src/api/routes-vr.js`:** `POST /api/vr/desk/start`, `POST /api/vr/desk/stop`. The API contract was regenerated
+  (511 routes).
+- **Godot** (`vr_session_model.gd`, `vr_session_dialog.gd`):
+  - a "MagicQ in VR" / "Close MagicQ in VR" button while WiVRn runs and both programs are installed;
+  - while pending: "MagicQ opens in the headset once it is connected."
+  - Desk errors show in the detail line.
+
+### Verified
+
+- `tools/smoke/smoke-wo792-vr-desk-panel.test.js`: 6 tests, in the curated list, including the late display, the
+  10-minute timeout, a cancel, and a desktop MagicQ left alone. With WO-770's: 16/16.
+- Offline suite: 3400 pass, 0 fail (before the pending change; the two changed files were re-run after it). Godot suite:
+  21901 passed, 0 failed.
+- **Box:**
+  - The node restarted with the new code. The programmer was snapshotted and restored, 38 fixtures identical.
+  - `GET /api/vr/status` shows `desk` (available, WayVR v26.8.0).
+  - `POST /api/vr/desk/start` with the headset off: `ok, pending: true`, and WayVR waits.
+  - The operator GUI was relaunched with no script errors.
+- **Not yet seen with this code:** MagicQ opening in the headset through the dialog. That's the owner's QA: connect the
+  headset; MagicQ should appear by itself while the wait is pending, or VR… → "MagicQ in VR".
+- Earlier by hand (same launch line): the owner confirmed the standalone MagicQ window panel is good.
