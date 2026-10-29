@@ -322,15 +322,8 @@ export function drawTimelineStack(ctx, W, H, opts) {
 		const crop = cropFromLayer(clip)
 		const visRaw = crop ? cropAdjustedRect({ x, y, w, h }, crop) : { x, y, w, h }
 		const vis = { x: visRaw.x, y: visRaw.y, w: Math.max(1, visRaw.w), h: Math.max(1, visRaw.h) }
-		/* WO-326B contentZoom: inflate the DRAW rect around its center; the clip stays on the
-		 * original rect (vis) — same pan-scan the air path gets from FILL×z + CLIP. */
-		const zm = Number(layer.contentZoom)
-		if (Number.isFinite(zm) && zm > 1) {
-			px -= (pw * (zm - 1)) / 2
-			py -= (ph * (zm - 1)) / 2
-			pw *= zm
-			ph *= zm
-		}
+		/* No WO-326B contentZoom here: timeline playback never applies it on air (look takes only). A copy of the
+		 * look-stack block referenced undefined `layer`/`px` and threw every frame (WO-827). */
 		const color = PREVIEW_LAYER_COLORS[li % PREVIEW_LAYER_COLORS.length]
 
 		const drawFn = () => {

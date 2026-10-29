@@ -20,6 +20,12 @@ const autoCreateInFlight = new Set()
 
 export { COUNTDOWN_CG_UPDATE_DEBOUNCE_MS }
 
+/** WO-827: the threshold / font-size inputs called this without it existing (ReferenceError on every keystroke). */
+function readNum(raw, fallback) {
+	const n = parseFloat(String(raw))
+	return Number.isFinite(n) ? n : fallback
+}
+
 export const DEFAULT_COUNTDOWN_CONFIG = {
 	mode: 'duration',
 	durationSec: 300,

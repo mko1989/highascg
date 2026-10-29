@@ -422,7 +422,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 					/* best-effort */
 				}
 				await saveVirtualCameraConfig({ showInDeviceView: false, enabled: false }, { persist: true })
-				const g = lastPayload?.graph ? JSON.parse(JSON.stringify(lastPayload.graph)) : null
+				const g = ctx.lastPayload?.graph ? JSON.parse(JSON.stringify(ctx.lastPayload.graph)) : null
 				if (g) {
 					g.edges = (Array.isArray(g.edges) ? g.edges : []).filter(
 						(e) => String(e.sourceId) !== cid && String(e.sinkId) !== cid,

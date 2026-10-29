@@ -221,6 +221,7 @@ module.exports = [
 	'tools/smoke/smoke-wo576-look-clip-start-point.test.js',
 	'tools/smoke/smoke-wo578-audio-output-autosave.test.js',
 	'tools/smoke/smoke-wo572-audio-only-look.test.js',
+	'tools/smoke/smoke-wo827-web-deck-import-repaint.test.js',
 	'tools/smoke/smoke-wo573-operator-gui-topology-dims-collision.test.js',
 	'tools/smoke/smoke-wo573-operator-gui-multiview-separate-binding.test.js',
 	'tools/smoke/smoke-wo574-multi-screen-take-sync-barrier.test.js',

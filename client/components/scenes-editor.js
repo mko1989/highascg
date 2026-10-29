@@ -388,6 +388,8 @@ export function initScenesEditor(root, stateStore, opts = {}) {
 		scheduleRender() 
 	})
 	sceneState.on('editingChange', scheduleRender); sceneState.on('screenChange', () => { previewPanel.scheduleDraw(); scheduleRender() })
+	// WO-827: a server import (boot, reconnect, project_sync) replaces the looks — without this a fresh browser kept "No looks".
+	sceneState.on('imported', () => { previewPanel.scheduleDraw(); scheduleRender() })
 	document.addEventListener('scenes-refresh-preview', () => {
 		/* WO-187 T187.4: Invalidate template thumb cache on cgData/countdownConfig changes */
 		clearTemplateThumbCache()

@@ -83,6 +83,6 @@ new text and no "ffmpeg -c:v hap" (no node restart).
   manual refresh (q818_boot_fixed.png).
 - Web row (Firefox): the ⚠ shows next to INTRO_notch.mov with the NOTCHLC tag and its tooltip (web2.png,
   q818_web_tip.png).
-- Note (not fixed): the web "Scenes/Looks" tab showed "No looks for Dioda/Proj" (web1.png). It may be a stale dist-web.
+- Note: the web "Scenes/Looks" tab showed "No looks for Dioda/Proj" (web1.png). It was not a stale dist-web: it was a real bug, fixed in WO-827 (the deck never repainted after a server import).
 
 Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

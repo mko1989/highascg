@@ -26,6 +26,7 @@ import { invalidateCompanionFlagThumbs, noteCompanionButtonPreviewUpdate } from 
 import { showAppToast } from './app-toast.js'
 import { applyClientPrefsBroadcast, loadClientPrefs } from './client-prefs.js'
 import { isLayerRecentlyEdited } from './scene-state-layer-logic.js'
+import { refreshSceneLiveFromServer } from './scene-live-sync.js'
 
 /** WO-213: Track previous sceneId per channel to detect PRV rewrites. */
 let prevLiveSceneIdByChannel = {}

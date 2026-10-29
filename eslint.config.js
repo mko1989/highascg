@@ -115,7 +115,7 @@ module.exports = [
 		rules: {
 			'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
 			'no-empty': ['warn', { allowEmptyCatch: true }],
-			'no-undef': 'off',
+			'no-undef': 'error', // WO-827: off hid six ReferenceErrors (compose preview, countdown, timeline rename …)
 			'no-restricted-syntax': [
 				'warn',
 				{
@@ -127,6 +127,11 @@ module.exports = [
 			],
 			...ESLINT_10_RECOMMENDED_OVERRIDES,
 		},
+	},
+	{
+		// Node-side helpers that live under client/tools (operator CLI, server patches): node globals, not browser.
+		files: ['client/tools/operator-desktop/**/*.js', 'client/tools/to-server/**/*.js'],
+		languageOptions: { globals: { ...globals.node } },
 	},
 	{
 		// CG Studio's served UI: plain browser scripts under src/ (same code also synced into
