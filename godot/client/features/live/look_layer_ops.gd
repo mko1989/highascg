@@ -3,6 +3,7 @@ extends RefCounted
 ## WO-657: Mirror copy — a copy of a layer mirrored across the canvas's vertical centre line.
 
 const LR := preload("res://features/live/layer_rect_math.gd")
+const C := preload("res://features/live/compose_math.gd")
 const FIRST := 10  # web scene-state-helpers.js LOOK_LAYER_FIRST / LOOK_LAYER_MAX
 const MAX := 99
 
@@ -60,3 +61,17 @@ static func drop_sources(data: Variant) -> Array:
 	var items: Array = d.items if d.get("type") == "multi" and d.get("items") is Array else [d]
 	return items.filter(func(s: Variant) -> bool: return s is Dictionary and str(s.get("value", "")) != "" \
 		and str(s.get("type", "")) != "effect" and not s.has("playlist_row"))
+
+
+## The topmost layer showing something whose box (`rect_of(layer)`, turned by its rotation about the box centre like
+## Caspar, WO-635) holds `at`; -1 = none. The frame's click-to-select and WO-816's drop-to-exchange share it.
+static func layer_at(layers: Array, rect_of: Callable, at: Vector2) -> int:
+	for i in range(layers.size() - 1, -1, -1):  # topmost first
+		var l: Variant = layers[i]
+		if not (l is Dictionary and l.get("source") is Dictionary and str(l.source.get("value", "")) != ""):
+			continue
+		var r: Rect2 = rect_of.call(l)
+		var deg := float(l.get("rotation", 0.0)) if l.get("rotation") != null else 0.0
+		if r.has_point(C.layer_xform(r, deg).affine_inverse() * at):
+			return i
+	return -1

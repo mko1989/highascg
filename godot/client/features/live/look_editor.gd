@@ -15,6 +15,8 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 const Fit := preload("res://features/live/look_editor_fit.gd")  # WO-653: boxes = what Caspar shows
 const View := preload("res://features/live/look_editor_view.gd")  # WO-654: wheel zoom / middle-drag pan
 const Ops := preload("res://features/live/look_layer_ops.gd")  # WO-657: mirror copy, layer names
+const Drop := preload("res://features/live/look_layer_drop.gd")  # WO-816: Sources drops (exchange on a layer / add)
+const Audio := preload("res://features/live/look_layer_audio.gd")  # WO-817: audio-only layers: not drawn / picked in the frame
 const HANDLE := 8.0
 
 var scene_id := ""
@@ -98,7 +100,7 @@ func _ready() -> void:
 	_list = ItemList.new()
 	_list.custom_minimum_size.y = 90
 	_list.item_selected.connect(func(i: int) -> void: _select(i))
-	_list.set_drag_forwarding(Callable(), _can_drop, _drop)  # WO-766: media dropped on the layer list adds layers too
+	_list.set_drag_forwarding(Callable(), _can_drop, _drop.bind(true))  # WO-766 add / WO-816 exchange on a row
 	add_child(_list)
 	_geo = Geometry.new()  # WO-621 N2: canvas px + aspect lock (was raw 0–1 fill fields)
 	_geo.patch.connect(func(p: Dictionary) -> void: _apply_layer(p))
@@ -212,9 +214,10 @@ func _draw_frame() -> void:
 	var b := _box()
 	_overlay.draw_rect(b, Color(1, 1, 1, 0.25), false, 1.0)
 	var layers := _layers()
+	var lk := look()
 	for i in layers.size():
 		var l: Dictionary = layers[i]
-		if not (l.get("source") is Dictionary) or str(l.source.get("value", "")) == "":
+		if not (l.get("source") is Dictionary) or str(l.source.get("value", "")) == "" or Audio.is_audio_only(l, lk):
 			continue
 		var r := _fill_rect(_shown(l))
 		var sel := i == _sel
@@ -276,7 +279,7 @@ func _frame_input(event: InputEvent) -> void:
 
 func _begin_drag(at: Vector2) -> void:
 	var layers := _layers()
-	if _sel >= 0 and _sel < layers.size():
+	if _sel >= 0 and _sel < layers.size() and not Audio.is_audio_only(layers[_sel], look()):  # no handles drawn → none to grab
 		var r := _fill_rect(_shown(layers[_sel]))
 		var deg := _deg(layers[_sel])
 		var lat := C.layer_xform(r, deg).affine_inverse() * at  # the pointer in the layer's unrotated frame
@@ -292,21 +295,22 @@ func _begin_drag(at: Vector2) -> void:
 			if (hs[k] as Vector2).distance_to(lat) <= HANDLE:
 				_drag = {"start": at, "fill": _shown(layers[_sel]).duplicate(), "edge": k, "deg": deg}
 				return
-	for i in range(layers.size() - 1, -1, -1):  # topmost first
-		var l: Dictionary = layers[i]
-		var fr := _fill_rect(_shown(l))
-		if l.get("source") is Dictionary and str(l.source.get("value", "")) != "" and fr.has_point(C.layer_xform(fr, _deg(l)).affine_inverse() * at):
-			_select(i)
-			_drag = {"start": at, "fill": _shown(l).duplicate(), "edge": ""}
-			return
+	var hit := Audio.pick(layers, look(), func(l: Dictionary) -> Rect2: return _fill_rect(_shown(l)), at)  # only the list selects audio
+	if hit >= 0:
+		_select(hit)
+		_drag = {"start": at, "fill": _shown(layers[hit]).duplicate(), "edge": ""}
+		return
 	_select(-1)
+
+
+func _layer_at(at: Vector2) -> int: return Audio.pick(_layers(), look(), func(l: Dictionary) -> Rect2: return _fill_rect(_shown(l)), at)  # WO-817: a viewer drop never targets an audio-only layer
 
 
 func _others_fills(skip: int) -> Array:
 	var out := []
 	var layers := _layers()
 	for i in layers.size():
-		if i != skip and layers[i].get("fill") is Dictionary:
+		if i != skip and layers[i].get("fill") is Dictionary and not Audio.is_audio_only(layers[i], look()):  # no snap to unseen boxes
 			out.append(_shown(layers[i]))
 	return out
 
@@ -391,28 +395,16 @@ func _hold(on: bool) -> void:
 		VideoSurfaces.release(_role, self)
 
 
-## --- WO-600 K: drop media from the Sources panel → server builds the layer (web rules) → append + push.
+## --- WO-600 K / WO-816: media from the Sources panel (look_layer_drop.gd). On a layer (its frame box, its list row) the
+## first source exchanges that layer's media; the rest (or a drop on blank frame / below the rows) add layers.
 func _can_drop(_at: Vector2, data: Variant) -> bool: return scene_id != "" and not Ops.drop_sources(data).is_empty()
 
 
-func _drop(_at: Vector2, data: Variant) -> void:
-	for src in Ops.drop_sources(data):  # one layer per source, in drag order; a refusal stops the rest
-		if not await add_layer_from_source(src): return
+func _drop(at: Vector2, data: Variant, on_list := false) -> void:
+	await Drop.drop(self, Api, _list.get_item_at_position(at, true) if on_list else _layer_at(at), Ops.drop_sources(data))
 
 
-func add_layer_from_source(src: Dictionary) -> bool:
-	var res: Dictionary = await Api.post_json("/api/scene/new-layer", {"sceneId": scene_id, "mainIdx": main, "source": src})
-	if not res.ok or not (res.data is Dictionary) or not ((res.data as Dictionary).get("layer") is Dictionary):
-		_status.text = "Add layer refused: %s" % res.error
-		return false
-	var lk := look()
-	if not (lk.get("layers") is Array):
-		lk["layers"] = []
-	(lk.layers as Array).append(res.data.layer)
-	_refresh_list()
-	_select((lk.layers as Array).size() - 1)
-	pusher.schedule(scene_id, main)
-	return true
+func add_layer_from_source(src: Dictionary) -> bool: return await Drop.add(self, Api, src)
 
 
 func _remove_layer() -> void:

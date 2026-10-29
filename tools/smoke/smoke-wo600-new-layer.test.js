@@ -108,3 +108,20 @@ describe('WO-622 new-layer — route sources (Godot Sources Live tab) under the 
 		assert.equal(L.opacity, 0)
 	})
 })
+
+describe('WO-816 new-layer — layerNumber = the layer a drop exchanges the media of', () => {
+	const cm = { programChannels: [1], previewChannels: [2], programResolutions: [{ w: 1920, h: 1080 }] }
+	it('builds for that number, also on a full look', async () => {
+		const full = { id: 'L1', layers: Array.from({ length: 90 }, (_, i) => ({ layerNumber: 10 + i })) }
+		const r = parse(await handleNewLayer({ ...body({ type: 'media', value: 'CLIPS/B' }), layerNumber: 12 }, {}, deps({ resolveScene: () => full })))
+		assert.equal(r.ok, true)
+		assert.equal(r.layer.layerNumber, 12)
+		assert.deepEqual(r.layer.source, { type: 'media', value: 'CLIPS/B', label: 'CLIPS/B' })
+	})
+	it('the WO-156 self-route rule checks the exchanged layer, not the next free one', async () => {
+		const rd = deps({ getChannelMap: () => cm, mediaResolution: null })
+		const self = await handleNewLayer({ ...body({ type: 'route', value: 'route://2-12' }), layerNumber: 12 }, {}, rd)
+		assert.equal(self.status, 400)
+		assert.equal((await handleNewLayer({ ...body({ type: 'route', value: 'route://2-11' }), layerNumber: 12 }, {}, rd)).status, 200)
+	})
+})

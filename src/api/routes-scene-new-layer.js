@@ -15,6 +15,8 @@
  * route onto its own channel-layer) with the look-stack channels the web compose resolves (look-stack-amcp-channel.js,
  * active main = mainIdx), and fit to the routed channel's resolution (mixer-fill.js getContentResolution).
  * A `live_audio` source starts at opacity 0 like the web drop.
+ * WO-816: `layerNumber` (optional) = the existing layer a drop EXCHANGES the media of (Godot look_layer_drop.gd): the
+ * layer is built for that number (the WO-156 route rule checks it, a full look is no refusal) instead of the next free one.
  */
 
 const path = require('path')
@@ -78,19 +80,20 @@ async function handleNewLayer(body, ctx, deps = {}) {
 	if (!sceneId || !src || !String(src.value || '').trim()) return out(400, { ok: false, error: 'sceneId and source.value required' })
 	const scene = deps.resolveScene ? deps.resolveScene(sceneId) : require('../engine/project-scenes-transform').resolveLiveSceneById(ctx, sceneId)
 	if (!scene) return out(404, { ok: false, error: `look ${sceneId} not found` })
-	const r = await buildLayerForSource(ctx, scene, src, b.mainIdx, deps)
+	const r = await buildLayerForSource(ctx, scene, src, b.mainIdx, deps, b.layerNumber)
 	if (r.error) return out(r.status, { ok: false, error: r.error })
 	return out(200, { ok: true, layer: r.layer, mainIdx: r.mainIdx, contentResolution: r.contentResolution })
 }
 
 /**
- * The layer `src` becomes on `scene` (shared with WO-623 POST /api/scene/new-look).
+ * The layer `src` becomes on `scene` (shared with WO-623 POST /api/scene/new-look); `layerNumber` = WO-816 exchange target.
  * @returns {Promise<{ layer?: object, mainIdx?: number, contentResolution?: object|null, status?: number, error?: string }>}
  */
-async function buildLayerForSource(ctx, scene, src, mainIdxIn, deps = {}) {
+async function buildLayerForSource(ctx, scene, src, mainIdxIn, deps = {}, layerNumber = null) {
 	const type = String(src.type || 'media')
 	const { helpers, ed, inputs, stack } = await libs()
-	const n = helpers.nextLayerNumber(scene)
+	const want = layerNumber == null || layerNumber === '' ? NaN : Number(layerNumber)
+	const n = Number.isInteger(want) && want > 0 ? want : helpers.nextLayerNumber(scene)
 	if (n < 0) return { status: 409, error: helpers.LOOK_FULL_MESSAGE }
 	// the config-only map has no programResolutions: without them every fit assumed a 1920×1080 canvas
 	const getMap = deps.getChannelMap || (() => require('../engine/scene-take-payload').withProgramResolutions(require('../config/routing').getChannelMap(ctx?.config || {}, ctx?.switcherOutputBusByChannel) || {}, ctx))
