@@ -39,6 +39,7 @@ const IMMEDIATE_KEYS = new Set([
 	'multiviewLayout',
 	'web_project',
 	'web_project_active_slug',
+	'project_hardware_hold', // WO-821: a load without hardware must survive an immediate restart
 	'programLayerBankByChannel',
 	'screenTimers',
 ])

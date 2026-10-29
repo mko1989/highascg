@@ -16,11 +16,8 @@ const {
 	readProjectCredential,
 	maskProjectStreamCredentials,
 } = require('../engine/project-stream-credentials')
-const {
-	injectHardwareConfigToProject,
-	applyHardwareConfigToCtx,
-	hardwareConfigHasOperatorData,
-} = require('../engine/project-hardware-config')
+const { applyHardwareConfigToCtx, hardwareConfigHasOperatorData } = require('../engine/project-hardware-config')
+const { stampProjectHardware, holdProjectHardware, releaseProjectHardware } = require('../engine/project-hardware-hold')
 const { ensureProjectMediaDir } = require('../media/project-media-root')
 const { createNewProject } = require('../engine/new-project')
 const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
@@ -34,11 +31,12 @@ async function handleProject(path, body, ctx) {
 		if (!project || typeof project !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
-		injectHardwareConfigToProject(ctx, project)
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		// WO-821: a project loaded without its hardware keeps its stored slice; captureHardware takes the live rig
+		stampProjectHardware(ctx, project, { slug, prevSlug, existing, capture: b.captureHardware === true })
 		preserveClientOwnedSlices(project, existing) // WO-614: web saves never carry project.previs
 		const allowReplace = b.force === true || b.allowReplace === true
 		const check = validateIncomingProject(project, existing, { allowReplace })
@@ -193,11 +191,14 @@ async function handleProject(path, body, ctx) {
 		// WO-277: adopt the project into the RUNNING system (deck mirror, live-scene prune, artnet,
 		// broadcasts, PRV re-stage + thumb warm). Without this the load only moved the slug pointer
 		// and everything downstream kept serving the previous project until a service restart.
+		// WO-821: a slug load that skips the hardware holds the stored slice (persisted); a bootstrap load ({}) changes nothing
+		if (reqSlug && b.applyHardware !== true) holdProjectHardware(activeSlug, 'load', ctx)
 		const { activateLoadedProject } = require('../engine/project-activate')
 		const activation = await activateLoadedProject(ctx, project, {
 			applyHardware: b.applyHardware === true,
 			broadcastProject: b.broadcastProject === true,
 		})
+		if (b.applyHardware === true) releaseProjectHardware(activeSlug)
 
 		return {
 			status: 200,
@@ -218,6 +219,7 @@ async function handleProject(path, body, ctx) {
 	if (path === '/api/project/new') {
 		try {
 			const { project, slug } = await createNewProject(ctx)
+			releaseProjectHardware(slug) // WO-821: New applies its starter hardware
 			if (ctx.artnetReceiver?.reconfigureFromProject) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {
@@ -298,6 +300,7 @@ async function handleProject(path, body, ctx) {
 				body: jsonBody({ ok: false, error: 'Failed to apply hardwareConfig' }),
 			}
 		}
+		releaseProjectHardware(projectStore.getActiveSlug(persistence)) // WO-821: live is the applied rig again
 		try {
 			const { ensureLiveAudioRouting } = require('../config/routing-setup')
 			void ensureLiveAudioRouting(ctx).catch((e) => {
@@ -360,6 +363,7 @@ async function handleProject(path, body, ctx) {
 		}
 		try {
 			await persistProject(ctx, renamed, { writeAutosave: true })
+			if (releaseProjectHardware(fromSlug)) holdProjectHardware(toSlug, 'rename') // WO-821: the hold moves with it
 			retireSlugWithReplication(ctx, fromSlug, { reason: 'rename', replacementSlug: toSlug })
 		} catch (e) {
 			return {
@@ -380,14 +384,14 @@ async function handleProject(path, body, ctx) {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
 		project = enrichProjectScenesFromLiveDeck(project, ctx)
-		/* Autosave is a background write and must never destroy the stored hardware slice. After a
-		 * factory reset the live config is empty, and an autosave from a still-open browser used to
-		 * stamp that emptiness over a good project (and even recreate one the reset had trashed). */
-		injectHardwareConfigToProject(ctx, project, { preserveWhenEmpty: true })
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		/* Autosave is a background write and must never destroy the stored hardware slice: not with an empty
+		 * (factory-reset) live config (WO-311 / 5d01bca), and not with this box's rig while the project was
+		 * loaded without its hardware (WO-821, project-hardware-hold.js). */
+		stampProjectHardware(ctx, project, { slug, prevSlug, existing, autosave: true })
 		preserveClientOwnedSlices(project, existing) // WO-614: web autosaves never carry project.previs
 		/* WO-311: a factory reset at 11:47:28 correctly trashed projects/tra.json; three seconds
 		 * later a background autosave from the still-open browser RECREATED it as an empty shell.

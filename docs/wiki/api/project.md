@@ -82,6 +82,13 @@ The `project` object is the same envelope the operator UI saves:
 
 Written by the server on `POST /api/project/save` and `POST /api/project/autosave`; restored on `POST /api/project/load` into `highascg.config.json`.
 
+**Hardware hold (WO-821).** `POST /api/project/load` with a `slug` and without `applyHardware: true` puts that
+project on a hold (persisted in `.highascg-state.json` → `project_hardware_hold`, survives restarts). While a
+project is held, save and autosave write its **stored** `hardwareConfig` back unchanged instead of this box's
+live config. The hold ends on an explicit apply: `POST /api/project/load` with `applyHardware: true`,
+`POST /api/project/apply-hardware` (active project), or `POST /api/project/save` with `captureHardware: true`
+(take this box's rig into the show on purpose). A load without `slug` (bootstrap) and a plain save keep it.
+
 | Key | Contents |
 |-----|----------|
 | `version` | `2` |
@@ -217,6 +224,7 @@ curl -s -X POST http://127.0.0.1:4200/api/project/load \
 **404** — `{ "error": "No project stored" }`.
 
 Sets active slug in persistence. Does **not** apply project hardware to the server unless `applyHardware: true`.
+Without `applyHardware: true` an explicit `slug` load holds the project's stored `hardwareConfig` (see *Hardware hold* above).
 
 **Autosave merge:**
 
