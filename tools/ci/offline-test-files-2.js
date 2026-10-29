@@ -47,4 +47,5 @@ module.exports = [
 	'tools/smoke/smoke-wo823-load-from-file-keeps-rig.test.js',
 	'tools/smoke/smoke-wo824-import-keeps-open-project.test.js',
 	'tools/smoke/smoke-wo801-monitor-pair.test.js',
+	'tools/smoke/smoke-wo800-web-layer-levels.test.js',
 ]

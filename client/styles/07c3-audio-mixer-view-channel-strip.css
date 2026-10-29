@@ -140,6 +140,32 @@
 	will-change: height;
 }
 
+/* WO-800: the layer's own level — a thin lane beside the channel bar, out of the flex flow (strip width unchanged),
+   shown only while the layer carries audio. Height / colour set by audio-mixer-meter-loop.js. */
+.audio-mixer-view__meter-lane {
+	position: absolute;
+	left: 9px;
+	top: 0;
+	bottom: 0;
+	width: 3px;
+	background: #090c10;
+	border-radius: 1px;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.audio-mixer-view__meter-lane[hidden] {
+	display: none;
+}
+
+.audio-mixer-view__meter-lane > div {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 0%;
+}
+
 /* Decibel Scale Numbers */
 .audio-mixer-view__scale {
 	display: flex;

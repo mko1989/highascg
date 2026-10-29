@@ -1,6 +1,8 @@
 import { sceneState } from '../lib/scene-state.js'
 import { collectProgramAudioRows, collectLiveInputMeterRows } from '../lib/audio-mixer-rows.js'
 import { createAudioMeterLoop } from '../lib/audio-mixer-meter-loop.js'
+import { createLayerLevelPoller } from '../lib/audio-layer-levels.js'
+import { apiGet } from '../lib/api-client.js'
 import { settingsState } from '../lib/settings-state.js'
 import { renderConsoleMasterStrips } from './audio-mixer-console-masters.js'
 import { renderConsoleLiveInputs } from './audio-mixer-console-live-inputs.js'
@@ -22,6 +24,9 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 	const meterFills = new Map()
 	const meterSmooth = new Map()
 	const meterLayerMeta = new Map()
+	/** WO-800: key → the layer strip's thin lane; levels polled from GET /api/osc/audio-layers while visible. */
+	const laneFills = new Map()
+	const layerPoller = createLayerLevelPoller({ get: apiGet, wanted: () => isViewActive() && laneFills.size > 0 })
 	const meterLoop = createAudioMeterLoop({
 		meterFills,
 		meterLayerMeta,
@@ -29,10 +34,14 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 		stateStore,
 		peakClipColor: '#ef4444',
 		peakNormalColor: '#22c55e',
+		laneFills,
+		layerLevels: layerPoller.data,
 	})
 
 	function renderConsole() {
 		meterLoop.stop()
+		layerPoller.stop()
+		laneFills.clear()
 		meterFills.clear()
 		meterSmooth.clear()
 		meterLayerMeta.clear()
@@ -65,6 +74,7 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 			stateStore,
 			meterFills,
 			meterLayerMeta,
+			laneFills,
 		})
 
 		renderConsoleMasterStrips(mastersListEl, {
@@ -75,13 +85,17 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 		})
 
 		if (meterFills.size) meterLoop.start()
+		if (laneFills.size) layerPoller.start()
 	}
 
 	renderConsole()
 
 	const observer = new MutationObserver(() => {
 		if (isViewActive()) renderConsole()
-		else meterLoop.stop()
+		else {
+			meterLoop.stop()
+			layerPoller.stop()
+		}
 	})
 	if (tabPaneEl) observer.observe(tabPaneEl, { attributes: true, attributeFilter: ['class'] })
 
@@ -116,7 +130,10 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 	})
 
 	return {
-		stop: () => meterLoop.stop(),
+		stop: () => {
+			meterLoop.stop()
+			layerPoller.stop()
+		},
 		unbindState,
 		unbindScene,
 		unbindSceneChange,

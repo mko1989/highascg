@@ -17,6 +17,8 @@ import { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-syn
 import { crossScreenReasonText, parseCrossScreenTargets, validateCrossScreenAudioTarget } from '../lib/audio-cross-screen-routing.js'
 import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
 
+const LANE_TIP = "Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)"
+
 /**
  * @param {HTMLElement} inputsListEl
  * @param {{
@@ -27,11 +29,12 @@ import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
  *   stateStore: import('../lib/state-store.js').StateStore,
  *   meterFills: Map<string, HTMLElement>,
  *   meterLayerMeta: Map<string, object>,
+ *   laneFills?: Map<string, HTMLElement>,
  * }} ctx
  */
 export function renderConsoleInputGroups(
 	inputsListEl,
-	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta },
+	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta, laneFills },
 ) {
 	const inputsByCh = {}
 	for (const r of inputsList) {
@@ -116,9 +119,10 @@ export function renderConsoleInputGroups(
 			strip.innerHTML = `
 				<div class="audio-mixer-view__strip-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}</div>
 				<div class="audio-mixer-view__fader-container">
-					<div class="audio-mixer-view__meter-vertical" aria-hidden="true">
+					<div class="audio-mixer-view__meter-vertical" aria-hidden="true" title="${LANE_TIP}">
 						<div class="audio-mixer-view__meter-fill"></div>
 					</div>
+					<div class="audio-mixer-view__meter-lane" aria-hidden="true" hidden><div></div></div>
 					<div class="audio-mixer-view__scale">
 						<span>+6</span><span>0</span><span>-6</span><span>-12</span><span>-24</span><span>-48</span><span>-∞</span>
 					</div>
@@ -144,6 +148,8 @@ export function renderConsoleInputGroups(
 
 			meterFills.set(r.key, strip.querySelector('.audio-mixer-view__meter-fill'))
 			meterLayerMeta.set(r.key, meterMetaForInputRow(r))
+			// WO-800: the thin lane = this layer's own level; the wide bar stays the channel's.
+			laneFills?.set(r.key, strip.querySelector('.audio-mixer-view__meter-lane'))
 
 			bindCrossScreenButtons(strip, r, { programChannels, channelMap })
 

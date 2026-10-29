@@ -9,6 +9,7 @@ import {
 } from './audio-mixer-peaks.js'
 import { parseBusMeterFillKey } from './audio-mixer-bus-meters.js'
 import { mapLevelToMeter, METER_STATE } from './audio-input-meter-map.js'
+import { readLayerLevel } from './audio-layer-levels.js'
 
 /**
  * @param {{
@@ -19,7 +20,11 @@ import { mapLevelToMeter, METER_STATE } from './audio-input-meter-map.js'
  *   layerFillAxis?: 'width' | 'height',
  *   peakClipColor?: string,
  *   peakNormalColor?: string,
+ *   laneFills?: Map<string, HTMLElement>,
+ *   layerLevels?: () => unknown,
  * }} ctx
+ * WO-800: `laneFills` (key → the strip's thin lane) shows the layer's own level from `layerLevels()` (the last
+ * GET /api/osc/audio-layers); the lane is hidden while the layer is absent there (no audio on it).
  * @returns {{ start: () => void, stop: () => void }}
  */
 export function createAudioMeterLoop(ctx) {
@@ -31,6 +36,8 @@ export function createAudioMeterLoop(ctx) {
 		layerFillAxis = 'height',
 		peakClipColor = 'var(--accent-red)',
 		peakNormalColor = 'var(--accent-green)',
+		laneFills = new Map(),
+		layerLevels = () => null,
 	} = ctx
 
 	/**
@@ -44,6 +51,38 @@ export function createAudioMeterLoop(ctx) {
 
 	/** @type {ReturnType<typeof setInterval> | null} */
 	let timer = null
+
+	/** Smoothed 0…1 for a dBFS level: instant rise, SMOOTH_FALL per tick; −90 and below = 0. */
+	const smooth = (prev, level) => {
+		const aim = level > -90 ? Math.max(0, Math.min(1, (level + 60) / 60)) : 0
+		return aim >= prev ? aim : prev + (aim - prev) * SMOOTH_FALL
+	}
+	const colourFor = (level) => (level > -90 ? (level > -1 ? peakClipColor : peakNormalColor) : '')
+
+	/** WO-800: one lane tick, same scale / ballistics / colours as the bar. */
+	const tickLane = (key, lane, banks, data) => {
+		const r = readLayerLevel(data, key, meterLayerMeta.get(key), banks)
+		const lk = `${key}:lane`
+		if (lane.hidden !== !r.present) lane.hidden = !r.present
+		if (!r.present) {
+			meterSmooth.delete(lk)
+			return
+		}
+		const s = smooth(meterSmooth.get(lk) ?? 0, r.level)
+		meterSmooth.set(lk, s)
+		const fill = /** @type {HTMLElement & { _lastPct?: string, _lastBg?: string }} */ (lane.firstElementChild)
+		if (!fill) return
+		const pct = (s * 100).toFixed(1)
+		if (fill._lastPct !== pct) {
+			fill.style.height = `${pct}%`
+			fill._lastPct = pct
+		}
+		const bg = colourFor(r.level)
+		if (fill._lastBg !== bg) {
+			fill.style.background = bg
+			fill._lastBg = bg
+		}
+	}
 
 	function stop() {
 		if (timer) {
@@ -97,13 +136,7 @@ export function createAudioMeterLoop(ctx) {
 					level = Number.isFinite(chNum) ? readBusPeakDbfs(chNum, vars, oscClient, stateStore) : -99
 				}
 
-				let s = meterSmooth.get(key) ?? 0
-				let aim = 0
-				if (level > -90) {
-					aim = Math.max(0, Math.min(1, (level + 60) / 60))
-				}
-				if (aim >= s) s = aim
-				else s += (aim - s) * SMOOTH_FALL
+				const s = smooth(meterSmooth.get(key) ?? 0, level)
 				meterSmooth.set(key, s)
 				const pct = (s * 100).toFixed(1)
 				if (fill._lastPct !== pct) {
@@ -117,7 +150,7 @@ export function createAudioMeterLoop(ctx) {
 
 				// WO-284 cheapness: only touch style/dataset when the computed value actually
 				// changed — the loop runs every frame for every visible strip.
-				const bg = level > -90 ? (level > -1 ? peakClipColor : peakNormalColor) : ''
+				const bg = colourFor(level)
 				if (fill._lastBg !== bg) {
 					if (bg) fill.style.background = bg
 					else fill.style.removeProperty('background')
@@ -133,6 +166,11 @@ export function createAudioMeterLoop(ctx) {
 					const badge = host?.parentElement?.querySelector?.('[data-input-nosignal]')
 					if (badge) badge.hidden = inputState !== METER_STATE.NO_DATA
 				}
+			}
+			if (laneFills.size) {
+				const banks = stateStore?.getState?.()?.scene?.programLayerBankByChannel
+				const data = layerLevels()
+				for (const [key, lane] of laneFills) tickLane(key, lane, banks, data)
 			}
 		}
 		timer = setInterval(tick, TICK_MS)

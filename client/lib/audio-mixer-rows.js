@@ -44,6 +44,8 @@ export function meterMetaForInputRow(row) {
 		// WO-284: the capture producer's layer on a dedicated input channel — the meter uses it
 		// to tell "input present but quiet" from "no producer at all" (dead/unplugged input).
 		inputLayer: row?.isLiveInput ? (row?.layer ?? null) : null,
+		// WO-800: scene look rows (the only rows with audioScreens) shift to layer + 100 in bank B.
+		lookLayer: Array.isArray(row?.audioScreens),
 	}
 }
 
