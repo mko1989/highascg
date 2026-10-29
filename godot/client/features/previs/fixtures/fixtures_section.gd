@@ -19,6 +19,7 @@ const RM := preload("res://features/previs/fixtures/replace_type_model.gd")
 const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
+const PixelMap := preload("res://features/previs/fixtures/pixel_map_window.gd")
 const PatchEdit := preload("res://features/previs/fixtures/patch_edit_section.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
 const CalibrateFold := preload("res://features/previs/fixtures/calibrate_fold.gd")
@@ -146,6 +147,11 @@ func _ready() -> void:
 	viewer.tooltip_text = "Art-Net nodes / sACN sources on the network and one universe's 512 channels, live"
 	viewer.pressed.connect(_open_viewer)
 	net_row.add_child(viewer)
+	var pixmap := Button.new()  # WO-807 phase 2
+	pixmap.text = "Pixel map…"
+	pixmap.tooltip_text = "Map regions of a channel's output to the pixels of a patched fixture (averaged per region)"
+	pixmap.pressed.connect(_open_window.bind("PixelMap", PixelMap))
+	net_row.add_child(pixmap)
 	out.add_child(net_row)
 	_usage = _label(out)
 	add_child(Fold.new("DMX output", [out]))
@@ -393,10 +399,14 @@ func _import() -> void:
 
 
 func _open_viewer() -> void:
-	var w := get_node_or_null("DmxMonitor") as AcceptDialog
+	_open_window("DmxMonitor", DmxMonitor)
+
+
+func _open_window(node_name: String, script: GDScript) -> void:
+	var w := get_node_or_null(node_name) as AcceptDialog
 	if w == null:
-		w = DmxMonitor.new()
-		w.name = "DmxMonitor"
+		w = script.new()
+		w.name = node_name
 		add_child(w)
 	w.call("open")
 

@@ -1,6 +1,6 @@
 # WO-807 — Region-to-fixture-pixel mapping: average a screen area into one pixel of a lighting fixture
 
-**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (verified by the offline suite, plus live routes, a live average check and an ArtDMX loopback on the box); phase 2 (Godot region editor) open; rig movement is owner QA**
+**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server; the on-screen look is owner QA); rig movement is owner QA**
 
 Owner, 29.10:
 > i mean the ability to map certain parts of for instance output to a led wall and send its color values to a lighting fixture. you can take the current project for instance. id like to map selected on the screen parts of screen to a corresponding pixelline fixture so they would become a kind of extension of the screen. as pixel density irl of led wall to a light fixture per cm/m whatever, there is a huge difference, so this needs to be implemented. for instance we take a 100px wide x 200px tall area of the screen to be mapped to first pixel (channel) of the fixture. here we need an averaging mode where pixels from that are on the screen get averaged into a single pixel.
@@ -191,3 +191,89 @@ Phase 2 (Godot, separate WO after phase 1):
 - The test mappings were removed afterwards; the stored project has no `pixelMappings`, and the lease is released.
 - NOT verified: real fixture movement on the rig. The MHP project has its DMX master off, an empty universe list and
   visualise on, so nothing goes on the wire. This is owner QA. Phase 2 (the Godot region editor) is not started.
+
+## Phase 2 investigation (29.10, Opus)
+
+**1. Preview surface for a channel.** The client draws a Caspar channel through the `VideoSurfaces` autoload
+(`godot/client/video/video_surfaces.gd`): `texture(role)` (`:45`) is a stable Texture2D, `acquire(role, owner)` (`:50`)
+holds and leases it, `release` / `release_all` (`:66`, `:70`) drop the hold (the server REMOVEs the consumer after the
+15 s TTL). Leasable roles are `pgm1-4`, `prv1-4`, `inN` and **`chN` (any channel)** (`video/surface_holders.gd:40`). The
+closest drawing pattern is the previs Camera view, `features/previs/tracking/tracking_view.gd`: hold only while shown
+(`_hold` `:156`, `_exit_tree` `:169`), letterbox the picture into the control (`_scale` `:187`, `_origin` `:192`), map
+view ↔ raster (`to_view` `:196`, `to_raster` `:200`), draw the texture or a "no picture" box (`_draw_back` `:205`). The
+Live tab's preview (`features/live/live_preview.gd:32`, `:193-195`) uses the same acquire/release.
+- The surface the client reads is the same shm surface the server samples (phase 1 `pixel-map-service.js` `roleFor`
+  `:33-39`: pgmN / prvN when the channel is that bus, else chN). The editor uses the same mapping, so the editor and the
+  sampler share one Caspar consumer.
+- The channel raster: `Store.get_value("channelMap")` carries `programChannels`, `previewChannels` and
+  `channelResolutionsByChannel` (read the same way in `features/live/compose_tile_math.gd:90`); on the box
+  `{1: 3840×1792, 2: 3840×1792, 3–5: 1920×1080, 6: 1280×720}`, program [1, 3], preview [2, 4]. This is the map the
+  server validates rects against (`pixel-map-service.js:25-30`), so snapping uses it, not the texture size.
+  `GET /api/video-surfaces` announces pgm1=ch1, prv1=ch2, pgm2=ch3, prv2=ch4 (no width/height until leased).
+
+**2. The fixture list.** `GET /api/fixtures/pixelmap/pixels` (`src/api/routes-pixel-map.js:23-32`) already gives
+exactly what the list needs: per pixel fixture `{id, name, universe, address, problem, pixels: [{pixel, geometry,
+order, slots}]}` (176 fixtures on the box, PixelLine heads 32 pixels). The client's own patch (`follow_model.gd`) has no
+pixel layout (it lives in the server's GDTF parse), so the editor uses this route. The 3D view's selection
+(`features/previs/fixtures/fixture_selection.gd:16-24`, `shared().ids`) preselects the fixture when a pixel head is
+selected.
+
+**3. Where the editor fits.** Previs tab → 3D mode Inspector → "Lighting" fold (`features/previs/previs_tab.gd:469-473`)
+holds `fixtures_section.gd`, whose "DMX output" fold already opens a non-modal window, the DMX viewer
+(`fixtures_section.gd:144-148`, `:395-401` → `dmx_monitor_window.gd`, an AcceptDialog that polls only while visible
+`:87-92`). A region editor needs a large picture, which the Inspector column cannot give, and `previs_tab.gd` is at the
+500-line limit. **Decision:** a "Pixel map…" button beside "DMX viewer…" opens `pixel_map_window.gd` (same pattern):
+the picture with rectangles on the left, the pixel list on the right. No new top-level tab, no change to previs_tab.gd.
+
+**4. Save and errors.** POST replaces the whole list (`routes-pixel-map.js:7`), so the editor sends the stored mappings
+of other fixtures unchanged plus this fixture's rows. `Api.post_json` keeps the parsed body on a 400
+(`core/net_util.gd:27-45`), so `errors[{index, id, error}]` maps back to rows by the posted index. Regions are a
+client view: the stored list has one rect per mapping, so the editor groups equal (channel, rect) pairs into regions;
+a drawn region with no pixel yet lives in the window until it is used (nothing to store server-side).
+
+**5. Number fields.** RULES.md 1-2: `SpinBox.select_all_on_focus = true` (as `fixtures_section.gd:187`); Godot 4.7's
+SpinBox evaluates `+ - * /` expressions on commit. The selected region's x / y / w / h are SpinBoxes.
+
+## What was done (phase 2, 29.10, Opus)
+
+All in `godot/client/features/previs/fixtures/`; no server or JS change; `previs_tab.gd` untouched.
+- `pixel_map_model.gd` (new, 327, pure): channel raster and surface role from `channelMap` (`role_for` = the server's
+  `roleFor`, so editor and sampler share one Caspar consumer); `snap_rect` / `clamp_rect` / `move_rect` / `resize_rect`
+  (whole channel pixels, inside the raster, ≥ 1 × 1); `rect_problem` (the server's rect test); regions = the distinct
+  (channel, rect) pairs of the stored list (`regions_from`, `hit`); `rows_for` (one row per fixture pixel);
+  `build` (the working list after a row edit: other mappings unchanged and in place, new ones appended with unique ids);
+  `move_region` / `drop_region` / `users` (a region is shared by every pixel on it, whichever fixture);
+  `row_errors` (a 400's `errors[index]` → "fixtureId#pixel" via the posted list); `order_options` (auto + the
+  orderings of the pixel's own letters); `live_by_id` (the live route → swatch colours).
+- `pixel_map_view.gd` (new, 203): the channel's live surface (`VideoSurfaces.acquire` only while the window is open,
+  `release_all` on close, like `tracking_view.gd`), letterboxed; drag on empty picture = draw, drag a region = move,
+  the selected region's corner = resize, wheel = zoom at the pointer, right-drag = pan; each region labelled with its
+  id and size in channel pixels, with a corner patch of its live colour.
+- `pixel_map_rows.gd` (new, 133): a row per pixel: number (tooltip: geometry + order), region picker, average | point,
+  colour order, live swatch (tooltip: RGB and whether it is on the wire), the server error under the row.
+- `pixel_map_window.gd` (new, 402): a non-modal window (the DMX viewer pattern): channel and fixture pickers (a pixel
+  head selected in the 3D view is preselected), Reload, the view, the selected region's x / y / w / h SpinBoxes
+  (focus selects, maths on commit: RULES.md), Delete region, the rows, Save (POSTs the whole working list; 400 errors
+  land on their rows, other fixtures' errors are counted in the note), and a 2 Hz poll of `/live` while visible only.
+  Unsaved edits survive closing the window and are dropped by Reload.
+- `fixtures_section.gd` (+10): "Pixel map…" beside "DMX viewer…" (DMX output fold); the two windows share
+  `_open_window`.
+- `godot/client/tests/test_pixel_map_model.gd` (new, 151): 67 assertions.
+
+## Verified (phase 2)
+
+- Godot suite: 22037 passed, 0 failed (the new file: 67 passed). Line limit: 0 files over 500. The two smokes that
+  read `fixtures_section.gd` (WO-698, WO-700): 18/18.
+- Headless probes in a scratch copy of the client (project renamed, so the owner's `user://` is not touched; a
+  probe scene so the autoloads load) against the live server: the window lists 6 channels (ch1 = pgm1, 3840×1792)
+  and 176 pixel fixtures (Pixel Line IP 1042: 32 rows); drawing the same rect twice selects the existing region;
+  mapping pixels 1 and 2 to R1 builds 2 mappings; x = 50 moves both; w = 99999 is clamped to the raster; an invalid
+  list POSTed to the real server got the 400 and the error appeared under pixel 2's row (nothing was stored). A valid
+  Save of pixels 1 + 2 of PixelLine 1042 on a 100 × 200 region of ch1: "Saved 2 mapping(s)", status "channel 1
+  (pgm1): live · 2 mapping(s) sampled", swatches RGB 1,26,78 (average) and 1,25,78 (point) equal to the `/live`
+  values (slots 425–427, 428–430, on_wire false: the MHP DMX master is off). Then both were unmapped and saved: the
+  list is empty again and the project has no `pixelMappings` key. The view's input: a drag at scale 0.25 drew
+  400,200 100 × 200; move, corner resize, a click on empty (no region, deselects) and wheel zoom (the point under the
+  pointer stays) behaved as written.
+- NOT verified: the window's on-screen look and feel in the owner's GUI (not driven; no screenshots), the live picture
+  in the view (headless has no shm texture upload to look at), and a real fixture following a region (DMX master off).
