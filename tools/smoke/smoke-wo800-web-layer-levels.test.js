@@ -169,4 +169,14 @@ describe('WO-800 web per-layer level lane', () => {
 		const rule = css.slice(css.indexOf('.audio-mixer-view__meter-lane {'))
 		assert.match(rule, /position: absolute;[\s\S]*width: 3px;/, 'lane sits out of the flex flow (strip width unchanged)')
 	})
+
+	it('the wide bar of a bank-B look strip reads the physical layer (+100): on-air check and per-layer OSC level', async () => {
+		const { readLayerPeakDbfs } = await import('../../client/lib/audio-mixer-peaks.js')
+		const osc = { channels: { 1: { layers: { 111: { type: 'ffmpeg', speed: 1, audio: { levels: [{ dBFS: -12 }, { dBFS: -15 }] } } } } } }
+		const store = (bank) => ({ getState: () => ({ scene: { programLayerBankByChannel: { 1: bank } } }) })
+		const look = { lookLayer: true }
+		assert.equal(readLayerPeakDbfs(1, 11, osc, store('b'), look, null), -12, 'bank B: logical 11 meters layer 111')
+		assert.equal(readLayerPeakDbfs(1, 11, osc, store('a'), look, null), -99, 'bank A: layer 11 is not playing')
+		assert.equal(readLayerPeakDbfs(1, 11, osc, store('b'), { lookLayer: true, muted: true }, null), -99)
+	})
 })

@@ -385,3 +385,12 @@ Evidence: session scratchpad `live-e2e/` (screenshots were read before they went
 - **Not verified:** real Caspar levels in the web page on the box (the live server is in use by another session; the node route and
   wire were proven in the Caspar pass, and the page reads the same response), the look on the owner's Firefox at the box's
   zoom, `switcher_bus` remap (as in Godot, not followed).
+
+### Web follow-up: bank-B wide bar (29.10, Opus)
+
+Found by the web-display agent: a look-layer strip on a bank-B channel kept its WIDE bar dark while its lane was live
+— `readLayerPeakDbfs` (`client/lib/audio-mixer-peaks.js`) passed the logical layer (11) to `isLayerStripOnAir` and the
+OSC layer lookup, but Caspar plays it on 111. Fixed by mapping through the lane's own `layerLevelTarget` (same meta +
+`scene.programLayerBankByChannel`), so bar and lane agree. `isSoleLiveSceneMediaLayer` keeps the logical number (it
+reads the scene state). Smoke `smoke-wo800-web-layer-levels` +1 case (6/6; fails with the logical layer forced back);
+offline 3638/0; client rebuilt.

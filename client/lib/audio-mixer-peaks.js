@@ -1,5 +1,6 @@
 import { isLayerStripOnAir } from './audio-mixer-meter-eligibility.js'
 import { inputHasAudioData } from './audio-input-meter-map.js'
+import { layerLevelTarget } from './audio-layer-levels.js'
 
 /** @param {import('./state-store.js').StateStore} stateStore */
 function isSoleLiveSceneMediaLayer(stateStore, chNum, layerNum) {
@@ -134,13 +135,16 @@ export function readLayerPeakDbfs(chNum, layerNum, oscClient, stateStore, layerM
 	if (layerMeta?.muted) return -99
 
 	const busLevel = readBusPeakDbfs(chNum, vars, oscClient, stateStore)
-	const onAir = isLayerStripOnAir(chNum, layerNum, oscClient, stateStore, layerMeta)
+	// WO-800: a look row on a bank-B channel plays on layer + 100 — OSC knows only the physical layer
+	const banks = stateStore?.getState?.()?.scene?.programLayerBankByChannel
+	const phys = layerLevelTarget(`pgm:${chNum}:layer:${layerNum}`, layerMeta, banks)?.[1] ?? layerNum
+	const onAir = isLayerStripOnAir(chNum, phys, oscClient, stateStore, layerMeta)
 	const soleLiveMedia = isSoleLiveSceneMediaLayer(stateStore, chNum, layerNum)
 	if (!onAir && !(soleLiveMedia && busLevel > -90)) return -99
 
 	const key = String(chNum)
 	const chState = oscClient?.channels?.[key] ?? oscClient?.channels?.[chNum]
-	const oscLayer = chState?.layers?.[layerNum] ?? chState?.layers?.[String(layerNum)]
+	const oscLayer = chState?.layers?.[phys] ?? chState?.layers?.[String(phys)]
 	const layerPeak = peakDbfsFromLevels(oscLayer?.audio?.levels)
 	if (Number.isFinite(layerPeak)) return layerPeak
 	return busLevel
