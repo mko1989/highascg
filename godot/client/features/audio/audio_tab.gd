@@ -15,6 +15,8 @@ const AR := preload("res://features/audio/audio_rows.gd")
 const AM := preload("res://features/audio/audio_meter_model.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const Strip := preload("res://features/audio/audio_strip.gd")
+const AlsaMixer := preload("res://features/settings/alsa_mixer_panel.gd")
+const Split := preload("res://features/audio/audio_tab_split.gd")
 const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
 const DEBOUNCE_MS := 80
 const EMPTY := "No active program inputs playing audio. Play a scene look with audio/video media to see channel strips here."
@@ -39,6 +41,8 @@ var _inputs: HBoxContainer
 var _masters: HBoxContainer
 var _status: Label
 var _add: LiveInputDialog
+var _alsa: AlsaMixer  # WO-799: the ALSA hardware mixer, docked under the CasparCG mixer
+var _alsa_loaded := false
 
 
 func _ready() -> void:
@@ -46,7 +50,6 @@ func _ready() -> void:
 	var bays := HBoxContainer.new()
 	bays.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	bays.add_theme_constant_override("separation", 8)
-	add_child(bays)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -58,6 +61,8 @@ func _ready() -> void:
 	_masters = HBoxContainer.new()
 	_masters.add_theme_constant_override("separation", 6)
 	bays.add_child(_masters)
+	_alsa = AlsaMixer.new()  # WO-799: bottom pane; the panel loads its card on the first show (_on_visible)
+	add_child(Split.dock(bays, _alsa))
 	var foot := HBoxContainer.new()
 	add_child(foot)
 	_status = Label.new()
@@ -84,6 +89,9 @@ func _ready() -> void:
 func _on_visible() -> void:
 	if not is_visible_in_tree():
 		return
+	if not _alsa_loaded:  # WO-799: first show only; later refreshes are the panel's own Refresh button
+		_alsa_loaded = true
+		_alsa.load_mixer(false)
 	_refresh()
 	var m: Dictionary = await Api.get_json("/api/audio/mixer")
 	if m.ok and m.data is Dictionary:
