@@ -55,6 +55,16 @@ func test_read_level_is_the_loudest_audio_channel() -> void:
 	t.ok(not LL.read({"channels": {}}, {"key": "pgm:1", "ch": 1, "isMaster": true}, {}).present, "master → nothing")
 
 
+func test_entry_older_than_fresh_ms_is_absent() -> void:
+	t.eq(LL.FRESH_MS, 500, "same window as the web lane")
+	var at := func(age: int) -> Dictionary:
+		return {"channels": {"2": {"10": {"nbChannels": 2, "levels": [{"dBFS": -18.0}], "updatedAt": 10000 - age}}}, "updatedAt": 10000}
+	t.ok(LL.read(at.call(480), _scene_row(2, 10), {}).present, "480 ms old: still live")
+	t.ok(not LL.read(at.call(520), _scene_row(2, 10), {}).present, "520 ms old: the clip ended, no frozen level")
+	var no_stamp := {"channels": {"2": {"10": {"levels": [{"dBFS": -18.0}]}}}}
+	t.ok(LL.read(no_stamp, _scene_row(2, 10), {}).present, "no timestamps → present (older nodes)")
+
+
 func test_peak_respects_nb_channels_and_bad_values() -> void:
 	t.eq(LL.peak({"nbChannels": 1, "levels": [{"dBFS": -30.0}, {"dBFS": -3.0}]}), -30.0, "only nbChannels count")
 	t.eq(LL.peak({"levels": [{"dBFS": "x"}, {}, null]}), -99.0, "no numbers → -99")

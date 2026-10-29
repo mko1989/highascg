@@ -11,6 +11,10 @@ const POLL_S := 0.2  # 5 Hz; the meter itself ticks at AM.TICK_S
 const LOOK_MIN := 10  # look layers, bank A (src/engine/look-layer-ranges.js); bank B = +100
 const LOOK_MAX := 99
 const BANK_B_OFFSET := 100
+## An entry older than this (response `updatedAt` − entry `updatedAt`, both the node's clock) counts as absent: the node
+## drops a layer only after osc.staleTimeoutMs (5 s), so an ended clip would hold its last level that long. Web twin:
+## client/lib/audio-layer-levels.js LAYER_LEVELS_FRESH_MS.
+const FRESH_MS := 500
 
 
 ## The physical [channel, layer] a strip row meters, or [] (masters, rows without a layer). Scene look rows (the only
@@ -30,10 +34,17 @@ static func target(row: Dictionary, banks: Variant) -> Array:
 	return [c, l]
 
 
-## The response's entry for one layer, or null (no audio on that layer: the node drops layers Caspar stopped sending).
+## The response's entry for one layer, or null (no audio on that layer: Caspar stopped sending it — absent, or older
+## than FRESH_MS against the response time).
 static func entry(data: Variant, ch: int, ln: int) -> Variant:
 	var e: Variant = AM._dict(AM._dict(AM._dict(data).get("channels")).get(str(ch))).get(str(ln))
-	return e if e is Dictionary else null
+	if not (e is Dictionary):
+		return null
+	var now: Variant = AM._dict(data).get("updatedAt")
+	var at: Variant = e.get("updatedAt")
+	if AM._fin(now) and AM._fin(at) and float(now) - float(at) > FRESH_MS:
+		return null
+	return e
 
 
 ## The layer's level: the loudest audio channel's dBFS (−99 when none is a number), like the channel bus bar's L/R max.

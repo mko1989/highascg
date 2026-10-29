@@ -394,3 +394,10 @@ OSC layer lookup, but Caspar plays it on 111. Fixed by mapping through the lane'
 `scene.programLayerBankByChannel`), so bar and lane agree. `isSoleLiveSceneMediaLayer` keeps the logical number (it
 reads the scene state). Smoke `smoke-wo800-web-layer-levels` +1 case (6/6; fails with the logical layer forced back);
 offline 3638/0; client rebuilt.
+
+### Godot follow-up: 500 ms freshness (29.10, Opus)
+
+The web lane already treated an entry older than 500 ms (response `updatedAt` − entry `updatedAt`) as absent; Godot did
+not, so an ended clip kept its last level for the node's 5 s `osc.staleTimeoutMs`. `features/audio/layer_levels.gd`
+`entry()` now applies the same window (`FRESH_MS := 500`); entries with no timestamps stay present. Godot suite 22813/0
+with the new `test_entry_older_than_fresh_ms_is_absent`; it fails when the window is widened 100×.
