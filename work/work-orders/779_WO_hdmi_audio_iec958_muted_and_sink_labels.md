@@ -70,3 +70,40 @@ Parent: [WO-778](./778_WO_portaudio_8ch_to_switcher_dp4.md) (output moved to the
   `run-client.sh --check` reports boot OK. `npm run build:client` succeeded.
 - Not verified: sound on the switcher. Owner QA is to check the P80's audio meters. Channel 3 should show the LTC; the
   intro clip has no audio.
+
+## Follow-up 29.10 — unmute only the output set in Devices
+
+**Status: IN PROGRESS (29.10, offline-verified; box check after the next Caspar restart is owner QA).**
+
+Owner: "id like for the automation with audio output to just make sure its on when it needs to be according to set
+audio output in devices tab." The per-launch helper turned on every IEC958 switch of every NVIDIA/HDMI card, so
+switches the owner had turned off on purpose came back on at each Caspar start.
+
+### Investigation
+
+- The Devices tab stores outputs in `audioOutputs` → `config/audio_outputs.json` (`config-manager.js:301`,
+  camelToSnake). Box: `audio_1` portaudio `hw:1,3` 8ch, `audio_2` system-audio `sc60mon` (monitor, USB headset).
+- Only the first enabled PortAudio row is Caspar's PortAudio device (`src/config/portaudio-output.js:28`, WO-683); it
+  becomes `<portaudio><device-name>` via `config-generator-audio-xml.js:220/242`.
+- Switch ↔ PCM: `amixer -c 1 controls` on the box lists, per HDMI PCM in PCM order, `HDMI/DP,pcm=D Jack`, then the
+  IEC958 set (index = rank of D), then `ELD device=D`: pcm 3 → numid 5 (index 0), 7 → 11, 8 → 17, 9 → 23.
+
+### What was done
+
+- `src/audio/hdmi-iec958-select.js`: resolves each selected output (PortAudio row + enabled system-audio rows) to
+  card + PCM (`hw:`, `plughw:`, `…(hw:C,D)`, `hw:CARD=,DEV=`, `hdmi:CARD=,DEV=n`). A switch is accepted only if its
+  index equals the rank of the PCM among the card's HDMI jacks and the nearest jack/ELD control created before it
+  belongs to that PCM. Not HDMI/DP, an unknown name, or an inconsistent layout produce a note and no switch.
+- `tools/runtime/selected-hdmi-iec958.js`: read-only CLI (`amixer controls` only) that prints `on <card> <numid> …`
+  / `note …` lines. `tools/runtime/unmute-hdmi-audio.sh` csets only the `on` lines and still prints one summary line.
+  `run.sh` passes `${HIGHASCG_CONFIG_PATH:-$CASPAR_ROOT/config}`.
+
+### Verified
+
+- `tools/smoke/smoke-wo779-iec958-selected-output.test.js` 9/9 (stub amixer via `HIGHASCG_AMIXER`, fixture cards via
+  `HIGHASCG_ASOUND_CARDS`): selecting hw:1,7 sets only numid 11; USB/S-PDIF/no config set nothing. The offline
+  suite passes 3478 with 0 failures and 2 skipped. Lines check and eslint are clean.
+- The helper was run read-only against the live config and printed `on 1 5 0 audio_1:hw:1,3` plus a note for
+  `sc60mon`. The real script was NOT run (dev mode; it changes live audio).
+- Owner QA: after the next Caspar restart, the journal line should read
+  `on: audio_1:hw:1,3 (card 1 numid 5)`, and numids 11/17/23 should keep their state.
