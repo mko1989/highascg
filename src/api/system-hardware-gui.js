@@ -12,6 +12,7 @@ const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const { checkNuclearPassword } = require('./routes-system-setup')
 const { getXAuthority } = require('../utils/hardware-info')
 const { resolveAlsamixer } = require('../audio/alsa-mixer')
+const { resolveTerminalEmulator, terminalArgv } = require('../utils/desktop-app-catalog')
 const { applyNvidiaDisplayPolicy } = require('../utils/nvidia-display-policy')
 const { getMediaIngestBasePath } = require('../media/local-media')
 const { resolveHelperIcon } = require('./operator-helper-icon')
@@ -47,9 +48,14 @@ function spawnGuiDetached(action, opts = {}) {
 	else if (action === 'desktopvideo_setup') bin = resolveDesktopvideoSetup()
 	else if (action === 'desktop_video_updater') bin = resolveBmdUpdater()
 	else if (action === 'alsamixer') {
-		bin = resolveAlsamixer()
+		/* alsamixer is a console program: it needs a terminal window to draw in, the same wrap the app
+		 * catalog gives Terminal=true entries (owner report: the bare spawn opened nothing). */
 		const card = parseInt(String(opts.card ?? 0), 10)
-		if (Number.isFinite(card) && card >= 0) args = ['-c', String(card)]
+		const cmd = [resolveAlsamixer(), ...(Number.isFinite(card) && card >= 0 ? ['-c', String(card)] : [])]
+		const term = resolveTerminalEmulator()
+		if (!term) throw new Error('No terminal emulator installed: alsamixer needs one (x-terminal-emulator or xterm)')
+		bin = term
+		args = terminalArgv(term, 'highascg-alsamixer', 'ALSA mixer', cmd)
 	} else if (action === 'firefox') {
 		const startUrl = String(opts.url || 'about:blank').trim() || 'about:blank'
 		const launcher = resolveOperatorFirefoxLauncher()

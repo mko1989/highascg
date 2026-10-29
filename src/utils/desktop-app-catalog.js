@@ -264,6 +264,7 @@ function listAppsForMenu() {
 module.exports = {
 	...parse,
 	invalidateAppCatalog,
+	resolveTerminalEmulator,
 	terminalArgv,
 	terminalSupportsClass,
 	scanDesktopApps,
