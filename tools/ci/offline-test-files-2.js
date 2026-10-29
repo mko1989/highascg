@@ -30,4 +30,5 @@ module.exports = [
 	'tools/smoke/smoke-wo811-auth-clients.test.js',
 	'tools/smoke/smoke-wo811-template-credentials.test.js',
 	'tools/smoke/smoke-wo811-os-password.test.js',
+	'tools/smoke/smoke-wo818-notchlc-warning.test.js',
 ]

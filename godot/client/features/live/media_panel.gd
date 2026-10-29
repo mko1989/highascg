@@ -347,11 +347,14 @@ func _build() -> void:
 		var info := Ops.quick_info(r)
 		it.set_tooltip_text(0, "%s · %s" % [id, info if info != "" else r.get("type", "")])
 		it.set_metadata(0, {"type": TYPES.get(str(r.get("type", "")), "media"), "value": id, "label": id, "row": r})
+		var notch := Ops.is_notchlc(r)  # WO-818: ⚠ in amber, the CPU-decode warning as the cell tooltip
+		if notch:
+			info = "⚠ " + info if info != "" else "⚠"
 		if info != "":
 			it.set_text(1, info)
-			it.set_custom_color(1, ThemeBuilder.TEXT_MUTED)
+			it.set_custom_color(1, ThemeBuilder.WARN if notch else ThemeBuilder.TEXT_MUTED)
 			it.set_custom_font_size(1, INFO_FONT)
-			it.set_tooltip_text(1, id)
+			it.set_tooltip_text(1, Ops.NOTCHLC_TIP if notch else id)
 			_info_w = maxf(_info_w, _tree.get_theme_font("font").get_string_size(info, HORIZONTAL_ALIGNMENT_LEFT, -1, INFO_FONT).x)
 	_fit_info()
 	_build_effects(root, f)

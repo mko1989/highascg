@@ -184,6 +184,18 @@ static func quick_info(row: Dictionary) -> String:
 	return " · ".join(parts)
 
 
+## WO-818 — NotchLC decodes on the CPU in Caspar (ffmpeg's notchlc decoder): the media tree marks those rows.
+## The probed codec decides; the file name ("…notchlc…") only when nothing was probed.
+const NOTCHLC_TIP := "NotchLC: CasparCG decodes it on the CPU, which costs far more than HAP.\nTranscode it to HAP in HighAsCG before using it on air."
+
+
+static func is_notchlc(row: Dictionary) -> bool:
+	var codec := str(row.get("codec", "")).strip_edges().to_lower() if row.get("codec") != null else ""
+	if codec != "":
+		return codec == "notchlc"
+	return str(row.get("id", row.get("label", ""))).get_file().to_lower().contains("notchlc")
+
+
 ## hh:mm:ss, rounded down to the second (a 63.32 s clip is 00:01:03).
 static func hms(ms: float) -> String:
 	var s := int(floor(ms / 1000.0))

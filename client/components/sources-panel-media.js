@@ -1,6 +1,7 @@
 import { api } from '../lib/api-client.js'
 import { getThumbnailUrl } from '../lib/thumbnail-url.js'
 import { classifyMediaItem } from '../lib/media-ext.js'
+import { isNotchLcMedia, NOTCHLC_WARNING } from '../lib/media-notchlc.js'
 import { createThumbnailErrorHandler } from '../lib/thumbnail-error-handler.js'
 import { escapeHtml, getExtension, formatDuration, formatFps, makeDraggable, attachMediaModifierClick } from './sources-panel-helpers.js'
 
@@ -221,7 +222,7 @@ export function renderMediaBrowser(container, media, filter, onMediaDeleted, opt
 				${thumbHtml}
 				<div class="source-item__media-col">
 					<div class="source-item__media-line1">
-						<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>
+						<span class="source-item__label" title="${escapeHtml(label)}">${escapeHtml(shortLabel)}</span>${isNotchLcMedia(item) ? `<span class="source-item__warn" title="${escapeHtml(NOTCHLC_WARNING)}">⚠</span>` : ''}
 						${duration !== '—' ? `<span class="source-item__duration">${escapeHtml(duration)}</span>` : ''}
 					</div>
 					<div class="source-item__meta-row">${metaParts.join('')}</div>
