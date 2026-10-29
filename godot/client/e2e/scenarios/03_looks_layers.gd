@@ -81,7 +81,8 @@ func run() -> void:
 		if not await ui.wait_for(func() -> bool: return ui.shown(ed._frame), 5.0):
 			return "the look editor did not open after the drop"
 		var tree := _media_tree()
-		var why: String = await ui.drag_from(ui.tree_item_point(tree, ui.tree_item(tree, STILL)), ed._frame)
+		# WO-816: a drop ON the clip's box exchanges its media — drop on blank frame space (top-left) to add a layer
+		var why: String = await ui.drag_from(ui.tree_item_point(tree, ui.tree_item(tree, STILL)), ed._frame, Vector2(0.06, 0.08))
 		if why != "":
 			return why
 		return await await_api("/api/project", func(d: Variant) -> bool:

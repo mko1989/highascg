@@ -282,10 +282,11 @@ func tree_item_point(tree: Tree, it: TreeItem) -> Vector2:
 
 
 ## Drag from a point (e.g. a Tree row) onto a control.
-func drag_from(a: Vector2, to: Control) -> String:
+func drag_from(a: Vector2, to: Control, at := Vector2(0.5, 0.5)) -> String:  # at = drop point as a fraction of `to`
 	if to == null or not shown(to):
 		return "drop target %s is not visible" % _desc(to)
-	var b := screen_rect(to).get_center()
+	var r := screen_rect(to)
+	var b := r.position + r.size * at
 	_move(a, 0)
 	await frames(1)
 	_button(a, MOUSE_BUTTON_LEFT, true, false)
