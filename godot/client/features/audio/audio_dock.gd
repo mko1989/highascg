@@ -1,8 +1,8 @@
 extends VBoxContainer
 ## WO-806 — the Program audio footer section (web audio-mixer-panel.js, the owner's "compact audio mixer"), under
 ## Timers at the bottom of the Inspector on every tab. Masters (one column per PGM / PRV bus, one bar per bus channel,
-## dense past 4 channels — WO-227), then one dense row per audio layer, grouped per program channel (live inputs
-## first): S / M / ■, routing toggles, level bar, fader, dB. The data and every write go through audio_console_ctl.gd,
+## dense past 4 channels — WO-227), then one vertical column per audio layer (audio_dock_row.gd: name, level bar +
+## fader, dB, S / M / ■, routing toggles), flow-wrapped per program channel group (live inputs first). The data and every write go through audio_console_ctl.gd,
 ## the Audio tab's own client, so a move here shows on the tab and back. Meters tick only while open and on screen.
 ## Open / closed is remembered for this session (owner 29.10). The body is height-capped and scrolls.
 
@@ -14,7 +14,7 @@ const DM := preload("res://features/audio/audio_dock_model.gd")
 const Ctl := preload("res://features/audio/audio_console_ctl.gd")
 const Row := preload("res://features/audio/audio_dock_row.gd")
 const Master := preload("res://features/audio/audio_dock_master.gd")
-const MAX_H := 320.0
+const MAX_H := 420.0  # masters + one line of input columns (~200 px each, vertical faders 29.10) without scrolling
 const EMPTY := "No program audio playing."
 
 static var session_open := false
@@ -146,11 +146,15 @@ func rebuild(rows: Array, progs: Array, bars_of: Callable, labels: Dictionary = 
 	for g in DM.groups(rows, progs):
 		var h := _title(g.title)
 		_inputs.add_child(h)
+		var flow := HFlowContainer.new()  # the input columns wrap like the masters (owner 29.10: vertical faders)
+		flow.add_theme_constant_override("h_separation", 3)
+		flow.add_theme_constant_override("v_separation", 4)
+		_inputs.add_child(flow)
 		for r in g.rows:
 			var row := Row.new()
 			row.setup(r, g.dense, progs, labels)
 			ctl.bind(row, r)
-			_inputs.add_child(row)
+			flow.add_child(row)
 	if _inputs.get_child_count() == 0:
 		var e := _title(EMPTY)
 		_inputs.add_child(e)

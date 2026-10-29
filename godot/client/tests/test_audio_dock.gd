@@ -1,13 +1,14 @@
 extends RefCounted
-## WO-806 Program audio dock — the dense row model, the WO-227 dense rule on the compact surface (an 8-channel master
-## fits the 400 px Inspector column; 2–4 channels unchanged), the widths measured on the real controls, and the one
-## write path shared with the Audio tab.
+## WO-806 Program audio dock — the group model, the vertical input columns (owner 29.10), the WO-227 dense rule on
+## the compact surface (an 8-channel master fits the 400 px Inspector column; 2–4 channels unchanged), the widths
+## measured on the real controls, and the one write path shared with the Audio tab.
 
 const DM := preload("res://features/audio/audio_dock_model.gd")
 const Row := preload("res://features/audio/audio_dock_row.gd")
 const Master := preload("res://features/audio/audio_dock_master.gd")
 const Ctl := preload("res://features/audio/audio_console_ctl.gd")
 const AR := preload("res://features/audio/audio_rows.gd")
+const FaderCap := preload("res://features/audio/fader_cap.gd")
 var t
 
 const ROWS := [
@@ -66,15 +67,25 @@ func test_eight_channel_masters_fit_the_column() -> void:
 	m2.free()
 
 
-func test_rows_fit_the_column() -> void:
+## Owner 29.10: inputs are vertical faders like the masters. Each input is a narrow column (VSlider with the console's
+## fader cap, ~110 px tall, no horizontal fader left) and eight of them fit one line of the 400 px Inspector column.
+func test_input_columns_are_vertical_and_fit() -> void:
 	for progs in [[1], [1, 3], [1, 2, 3, 4], [1, 2, 3, 4, 5, 6, 7, 8]]:
 		for r in [ROWS[0], ROWS[3], ROWS[4]]:
 			for dense in [false, true]:
-				var row := Row.new()
-				row.setup(r, dense, progs)
-				var w := row.get_combined_minimum_size().x
-				t.ok(w <= DM.COLUMN_W - 16, "%s with %d screens fits (got %s)" % [r.key, progs.size(), w])
-				row.free()
+				var col := Row.new()
+				col.setup(r, dense, progs)
+				var what := "%s, %d screens, dense %s" % [r.key, progs.size(), dense]
+				t.ok(col.fader is VSlider, "%s: vertical fader" % what)
+				t.ok(col.find_children("*", "HSlider", true, false).is_empty(), "%s: no horizontal fader left" % what)
+				t.eq(col.fader.get_theme_icon("grabber"), FaderCap.grabber(), "%s: the console's fader cap" % what)
+				t.eq(col.fader.custom_minimum_size.x, float(FaderCap.WIDTH), "%s: fader as wide as the cap" % what)
+				t.eq((col.fader.get_parent() as Control).custom_minimum_size.y, float(Row.FADER_H), "%s: fader body height" % what)
+				t.ok(Row.FADER_H >= 100 and Row.FADER_H <= 120, "fader ~110 px tall")
+				var w := col.get_combined_minimum_size().x
+				t.ok(w <= 44.0, "%s: column ≤ 44 px (got %s)" % [what, w])
+				t.ok(8 * w + 7 * 3 <= DM.COLUMN_W - 16 - 12, "%s: eight columns fit one line beside the scroll bar (got %s)" % [what, 8 * w + 21])
+				col.free()
 
 
 func test_row_state() -> void:

@@ -378,3 +378,93 @@ not written to `ui.cfg` like Playlists).
 - **Not verified:** the look on the glass (owner QA), a real timer run through the dock (start / pause / time / eye
   fade — the box has no timer and the probe writes nothing), a fader / mute move in the dock reaching the Audio tab live
   (shared code path is test-proven, not exercised on air), meters moving with real program audio.
+
+## Input faders vertical (29.10, Opus)
+
+Owner, 29.10: *"the compact audio mixer has masters as vertical faders (good) and inputs as horizontal (bad)"*.
+
+### Investigation (before the change, file:line at HEAD 335b030f)
+
+- **Row builder** — `godot/client/features/audio/audio_dock_row.gd` (245 lines), `extends VBoxContainer`, one
+  `setup()` (`:59-143`) that builds a single `HBoxContainer` line (`:64-66`): label 86 px (`LABEL_W :20`, `:67-79`),
+  S / M / ■ (`:80-91`, built by the static `small()` `:147-167`: min 20 px, 4 px side margins), the routing toggles
+  (`:92-109`: inline on the line up to 4 programs, else an `HFlowContainer` second line `:94-97`), a 70 px column
+  (`:110-114`) with the 4 px horizontal `HBar` level (`:37-56`, `:115-118`) over an **`HSlider`** (`var fader: HSlider`
+  `:24`, built `:119-134`), and the dB label 50 px (`DB_W :21`, `:136-141`). Measured in WO-806: 258–350 px × 20 px.
+- **Where the fader value is set** — at build from the row: `fader.value = MM.gain_to_fader(r.v)` (`:126`); from the
+  server / look in `set_gain()` (`:215-221`, skipped while `dragging`, `_syncing` suppresses the emit), which
+  `audio_dock.gd` `_refresh()` calls per row unless the controller has a pending write (`audio_dock.gd:125-126`).
+  `gain()` (`:225-227`) returns the stored value while the fader still shows it, else the fader's position.
+- **Where it is written** — the row only emits: `value_changed → _on_value` (`:127`, `:199-202`) emits
+  `gain_changed(fader_to_gain(p), false)`; `drag_started / drag_ended` (`:128-132`) set `dragging` and emit
+  `gain_changed(gain(), true)` on release; double-click / Ctrl+click (`_on_fader_input :205-211`) → `set_gain(1.0)` +
+  `gain_changed(1.0, true)`. `audio_dock.gd:150-152` `rebuild()` → `ctl.bind(row, r)` →
+  `audio_console_ctl.gd:95` connects `gain_changed` to `gain()` (`:116-130`: live/look layer patch, then
+  `AA.volume_request` at once when final, else the 80 ms debounce flushed by `flush()` `:134-142`, called from
+  `audio_dock.gd:162`). Mute / solo / screens / routes / ■ are the same `bind()` (`:96-106`).
+- **Where rows are laid out** — `audio_dock.gd:57-60` `_inputs` is a `VBoxContainer`; `rebuild()` (`:146-153`) adds per
+  group a title then one row per line. Meters: `audio_dock.gd:177-180` → `row.level.set_level()` /
+  `set_input_state()`; `app/docks_probe.gd:37` reads `row.level.v`.
+- **Masters (the model)** — `audio_dock_master.gd:26-76`: `PanelContainer` (`box(...)`, 3 px margin), centred 10 px
+  label, a 96 px body (`BODY_H :16`) = `meter_bank` + `VSlider` with `FaderCap.grabber()` / `track()` and
+  `custom_minimum_size.x = FaderCap.WIDTH` (26), dB under it. Same gesture code as the row (`:64-70`, `:79-105`).
+- **Not in the dock today** (WO-806 "What was done"): the stereo-pair select, the live-input send policy, START,
+  AUTO MIX, the WO-800 layer lanes — they stay on the Audio tab; nothing to keep in a column.
+- **Tests that pin the horizontal row** — `tests/test_audio_dock.gd` `test_rows_fit_the_column` (`:68-77`, a row's
+  minimum width ≤ 384 for 1/2/4/8 screens); `test_row_state` / `test_one_write_path_with_the_audio_tab` use the row's
+  API (`gain`, `set_gain`, `muted`, `_toggles`, `_solo`, signal connections), which stays. No node smoke reads the
+  dock files.
+- **Width budget** — Inspector 400 px minimum (`app/shell.gd:67`), its panel margin 8 per side
+  (`theme_builder.gd:64`, `inspector_panel.gd:30`) → ~384 px for the dock, minus the dock scroll's vertical bar when
+  it scrolls. Eight columns per line need ≤ ~44 px each with 3–4 px gaps.
+
+### Plan
+
+The row becomes a column (`PanelContainer` like the master): shortened name on top (tooltip = full label), a 110 px
+body = a 4 px vertical level bar + a `VSlider` with `FaderCap` (same handlers, same signals), dB, then S / M (■ on its
+own line for an audio-only look), then the Screens / Ch toggles in a 2-wide grid. Compact buttons (16 px, 2 px
+margins) so the column is ~42 px. `audio_dock.gd` lays each group's columns in an `HFlowContainer` (like the masters).
+Signals, `gain()` / `set_gain()` / `muted()` / `set_solo()` / `set_screens()` / `set_routing()` / `level` unchanged.
+
+### What was done
+
+- `godot/client/features/audio/audio_dock_row.gd` (245 → 261 lines) — the row is now a **column**
+  (`extends PanelContainer`, same panel box as the master): shortened name on top (`clip_text` + ellipsis, centred,
+  tooltip = the full label + "(src n)"), a 110 px body (`FADER_H`) = a 4 px vertical level bar (`VBar`, fills from the
+  bottom; replaces the horizontal `HBar`, still `level` with `set_level()` / `no_signal`) beside a **`VSlider`** with
+  `FaderCap.grabber()` / `track()`, 26 px wide (the master's fader), then the dB, then S / M (■ under them on an
+  audio-only look) in a 2-wide grid, then the Screens / Ch toggles **one per line** with the screen name
+  (`short_label(name, 6)`), because two 16 px buttons per line only fit two letters and the names are what 335b030f
+  put on them. Buttons are 16 px with 2 px margins and `clip_text`, so the column is 42 px in any theme. Every
+  handler is unchanged (`_on_value`, drag start / end, double-click / Ctrl+click → 0 dB, `set_gain`, `gain()`,
+  `muted()`, `set_solo()`, `set_screens()`, `set_routing()`, `set_input_state()`), as are the six signals; the
+  controller binding and every write are untouched (`audio_console_ctl.gd` not changed).
+- `godot/client/features/audio/audio_dock.gd` — each group's columns sit in an `HFlowContainer` (h 3, v 4) under the
+  group title, like the masters; `MAX_H` 320 → 420 so masters + one line of input columns show without scrolling
+  (the dock is not wider: still the Inspector's 384 px content width).
+- `audio_dock_master.gd`, `audio_dock_model.gd`, `fader_cap.gd`, `audio_console_ctl.gd`: not changed.
+- Still not in the dock, as before: stereo-pair select, send policy, START, AUTO MIX, layer lanes (Audio tab only).
+- `tests/test_audio_dock.gd`: `test_rows_fit_the_column` (horizontal row width) replaced by
+  `test_input_columns_are_vertical_and_fit` — for 1/2/4/8 screens × live input / layer / audio-only × dense: the
+  fader is a `VSlider` with the fader cap, no `HSlider` in the column, body 110 px, column ≤ 44 px and eight columns
+  + gaps ≤ 400 − 16 − 12 (scroll bar). `test_row_state` / write-path tests unchanged and green.
+
+### What was verified (29.10)
+
+- Godot suite: **22424 passed, 0 failed** (the brief's baseline 22252; the replaced width test now asserts 8 things
+  per case over 24 cases). `run-client.sh --check`: boot OK. `check-max-file-lines`: 0 over 500 (row 261, dock 190).
+- Headless with the app theme (scratch script, real `ThemeBuilder.build()`): every input column **42 px** wide
+  (live input / layer / audio-only, 1–8 screens); heights 165 (1 screen, no toggles) / 184 (audio-only, live input
+  with 1 route) / 203 (2 screens) / 241 (4) / 317 (8 screens: the toggles are one per line). In a 384 px flow
+  (the Inspector content width): 2 inputs → 1 line, rightmost 87 px; 4 → 1 line, 177 px; **8 → 1 line, 357 px**.
+  Fader 26 × 110. Masters unchanged: 82 / 52 / 52 / 52 px.
+- Box, `--probe-docks` (second headless instance, reads only): masters `pgm:1 8 bars 82px, prv:2/pgm:3/prv:4 2 bars
+  52px`, 5 input rows from the live look, dock **384 × 459** (scroll capped at 420), Inspector 384 px.
+- Rendered on a private Xvfb (:77, second instance, `--probe-docks` opens the dock): the masters look as before, the
+  live input "DeckLink…" is a vertical column (fader with the cap, 0.0 dB, M, route toggles "Dioda" / "Proj"),
+  the PGM 1 group's columns follow in a line under it (`scratchpad/dock_vertical/xvfb_6_inspector.png`).
+- **Not verified:** the dev-mode glass check (restart the owner's client + screenshot) — the running client (started
+  13:50 with `--open-pixel-map`, another agent's, older than this change) was left alone and was still up at 14:22;
+  the relaunch + screenshot is still to do. Note: the dock starts collapsed after a relaunch (session state), so a
+  screenshot without a click shows only the "▸ Program audio" header. Owner's eye on the glass; a fader drag in a
+  column reaching the server live (same handlers and controller as before, test-proven, not exercised on air).

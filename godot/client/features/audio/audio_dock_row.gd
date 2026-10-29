@@ -1,8 +1,11 @@
-extends VBoxContainer
-## WO-806 — one dense row of the Program audio dock (web audio-mixer__bus-layer): label, S / M (■ on an audio-only
-## look), the routing toggles (a look layer's Screens, a live input's Ch routes), a thin level bar over a horizontal
-## fader on the console taper, and the dB. Double-click or Ctrl+click the fader → 0 dB. It only emits — with the same
-## signals as audio_strip.gd — and audio_console_ctl.gd turns that into the same server calls the Audio tab makes.
+extends PanelContainer
+## WO-806 — one input column of the Program audio dock, vertical like a master column (owner 29.10: "masters as
+## vertical faders (good) and inputs as horizontal (bad)"): the name (shortened, the tooltip has the full label), a
+## thin vertical level bar beside a vertical fader with the console's fader cap (fader_cap.gd) on the console taper,
+## the dB, then S / M (■ on an audio-only look, two per line) and the routing toggles (a look layer's Screens, a live
+## input's Ch routes) one per line with the screen name. Double-click or Ctrl+click the fader → 0 dB. ~42 px wide,
+## so the dock's flow fits up to eight per line in the 400 px Inspector column. It only emits — with the same signals as audio_strip.gd — and
+## audio_console_ctl.gd turns that into the same server calls the Audio tab makes.
 
 signal gain_changed(gain: float, final: bool)
 signal solo_pressed(multi: bool)
@@ -17,13 +20,16 @@ const DM := preload("res://features/audio/audio_dock_model.gd")
 const AR := preload("res://features/audio/audio_rows.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const MeterBank := preload("res://features/audio/meter_bank.gd")
-const LABEL_W := 86
-const DB_W := 50
+const FaderCap := preload("res://features/audio/fader_cap.gd")
+const COL_W := 36  # content width: two 16 px buttons + 2 px gap, or level 4 + 2 + fader cap 26 (+ 4 slack)
+const FADER_H := 110
+const LEVEL_W := 4
+const BTN_W := 16
 
 var row: Dictionary
-var fader: HSlider
+var fader: VSlider
 var dragging := false
-var level: HBar
+var level: VBar
 var _val: Label
 var _solo: Button
 var _mute: Button
@@ -34,8 +40,8 @@ var _kind := ""  # "routes" | "screens" | ""
 var _labels := {}  # program channel → screen label (AR.screen_labels)
 
 
-## A 4 px horizontal level bar (web audio-mixer__meter-horizontal), the console's colours.
-class HBar extends Control:
+## A thin vertical level bar filling from the bottom (web audio-mixer__meter), the console's colours.
+class VBar extends Control:
 	var v := 0.0
 	var colour := ""
 	var no_signal := false
@@ -49,9 +55,9 @@ class HBar extends Control:
 
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), MeterBank.BG)
-		var w := clampf(v, 0.0, 1.0) * size.x
-		if w > 0.5 and colour != "":
-			draw_rect(Rect2(0, 0, w, size.y), MeterBank.CLIP if colour == "clip" else MeterBank.OK)
+		var h := clampf(v, 0.0, 1.0) * size.y
+		if h > 0.5 and colour != "":
+			draw_rect(Rect2(0, size.y - h, size.x, h), MeterBank.CLIP if colour == "clip" else MeterBank.OK)
 		if no_signal:
 			draw_rect(Rect2(Vector2.ZERO, size), ThemeBuilder.WARN, false, 1.0)
 
@@ -59,69 +65,44 @@ class HBar extends Control:
 func setup(r: Dictionary, dense: bool, programs: Array, labels: Dictionary = {}) -> void:
 	row = r
 	_labels = labels
-	add_theme_constant_override("separation", 1 if dense else 2)
-	var font := 11 if dense else 12
-	var line := HBoxContainer.new()
-	line.add_theme_constant_override("separation", 3)
-	add_child(line)
+	var sb := ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, ThemeBuilder.BORDER, 1, 4)
+	sb.set_content_margin_all(3)
+	add_theme_stylebox_override("panel", sb)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 1 if dense else 2)
+	col.custom_minimum_size.x = COL_W
+	add_child(col)
 	var lab := Label.new()
-	lab.text = str(r.get("label", "")).trim_prefix("🔊 ") + (" (src %s)" % r.sourceAudioPair if r.get("sourceAudioPair") != null else "")
-	lab.tooltip_text = str(r.get("labelTitle", r.get("label", "")))
+	lab.text = str(r.get("label", "")).trim_prefix("🔊 ")
+	lab.tooltip_text = str(r.get("labelTitle", r.get("label", ""))) + (" (src %s)" % r.sourceAudioPair if r.get("sourceAudioPair") != null else "")
 	lab.mouse_filter = Control.MOUSE_FILTER_PASS
 	lab.clip_text = true
 	lab.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	lab.custom_minimum_size.x = LABEL_W
-	lab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	lab.size_flags_stretch_ratio = 0.8
-	lab.add_theme_font_size_override("font_size", font)
+	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	lab.custom_minimum_size.x = COL_W
+	lab.add_theme_font_size_override("font_size", 9 if dense else 10)
 	if r.get("isAudioOnlyLook", false) == true:
 		lab.add_theme_color_override("font_color", ThemeBuilder.WARN)
-	line.add_child(lab)
-	if r.get("isLiveInput", false) != true:  # the console has no SOLO on live inputs either
-		_solo = small("S", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.WARN, true)
-		_solo.pressed.connect(func() -> void: solo_pressed.emit(Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META)))
-		line.add_child(_solo)
-	_mute = small("M", "Mute", ThemeBuilder.ERROR, true)
-	_mute.button_pressed = r.get("muted", false) == true
-	_mute.pressed.connect(func() -> void: mute_pressed.emit())  # the button has already toggled: muted() = the new state
-	line.add_child(_mute)
-	if r.get("isAudioOnlyLook", false) == true:
-		var stop := small("■", "Stop this audio-only look (the channel's video look stays)", ThemeBuilder.ERROR, false)
-		stop.pressed.connect(func() -> void: stop_pressed.emit())
-		line.add_child(stop)
-	_kind = DM.routing(r, programs)
-	if _kind != "":
-		var box: Container = line if DM.routes_inline(programs) else HFlowContainer.new()
-		if box != line:
-			box.add_theme_constant_override("h_separation", 2)
-			add_child(box)
-		for p in programs:
-			var ch := int(p)
-			var name := str(labels.get(ch, str(ch)))
-			var b := small(AR.short_label(name), "Route this input's audio onto %s (audio-only)" % name if _kind == "routes" else "Checking…", ThemeBuilder.ACCENT, true)
-			b.disabled = _kind == "screens"  # until the server's plan says otherwise
-			b.pressed.connect(func() -> void:
-				if _kind == "routes":
-					route_toggled.emit(ch, b.button_pressed)
-				else:
-					screen_toggled.emit(ch, b.button_pressed))
-			_toggles[ch] = b
-			box.add_child(b)
-	var fv := VBoxContainer.new()
-	fv.add_theme_constant_override("separation", 0)
-	fv.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	fv.alignment = BoxContainer.ALIGNMENT_CENTER
-	fv.custom_minimum_size.x = 70
-	level = HBar.new()
-	level.custom_minimum_size.y = 4
+	col.add_child(lab)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 2)
+	body.alignment = BoxContainer.ALIGNMENT_CENTER
+	body.custom_minimum_size.y = FADER_H
+	col.add_child(body)
+	level = VBar.new()
+	level.custom_minimum_size.x = LEVEL_W
 	level.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	fv.add_child(level)
-	fader = HSlider.new()
+	body.add_child(level)
+	fader = VSlider.new()
 	fader.min_value = 0
 	fader.max_value = 100
 	fader.step = 1
 	fader.scrollable = false  # the wheel scrolls the dock, never a fader
 	fader.focus_mode = Control.FOCUS_NONE
+	fader.add_theme_icon_override("grabber", FaderCap.grabber())
+	fader.add_theme_icon_override("grabber_highlight", FaderCap.grabber(true))
+	fader.add_theme_stylebox_override("slider", FaderCap.track())
+	fader.custom_minimum_size.x = FaderCap.WIDTH
 	fader.tooltip_text = "Volume — double-click / Ctrl+click: 0 dB"
 	fader.value = MM.gain_to_fader(float(r.get("v", 1.0)))
 	fader.value_changed.connect(_on_value)
@@ -131,35 +112,70 @@ func setup(r: Dictionary, dense: bool, programs: Array, labels: Dictionary = {})
 			dragging = false
 			gain_changed.emit(gain(), true))
 	fader.gui_input.connect(_on_fader_input)
-	fv.add_child(fader)
-	line.add_child(fv)
+	body.add_child(fader)
 	_val = Label.new()
-	_val.custom_minimum_size.x = DB_W
-	_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_val.add_theme_font_size_override("font_size", font - 1)
+	_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_val.clip_text = true
+	_val.add_theme_font_size_override("font_size", 9 if dense else 10)
 	_val.text = MM.format_db(float(r.get("v", 1.0)))
-	line.add_child(_val)
+	col.add_child(_val)
+	var grid := _grid()  # S / M, then ■, then the routing toggles: two per line
+	col.add_child(grid)
+	if r.get("isLiveInput", false) != true:  # the console has no SOLO on live inputs either
+		_solo = small("S", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.WARN, true)
+		_solo.pressed.connect(func() -> void: solo_pressed.emit(Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META)))
+		grid.add_child(_solo)
+	_mute = small("M", "Mute", ThemeBuilder.ERROR, true)
+	_mute.button_pressed = r.get("muted", false) == true
+	_mute.pressed.connect(func() -> void: mute_pressed.emit())  # the button has already toggled: muted() = the new state
+	grid.add_child(_mute)
+	if r.get("isAudioOnlyLook", false) == true:
+		var stop := small("■", "Stop this audio-only look (the channel's video look stays)", ThemeBuilder.ERROR, false)
+		stop.pressed.connect(func() -> void: stop_pressed.emit())
+		grid.add_child(stop)
+	_kind = DM.routing(r, programs)
+	if _kind != "":
+		var box := VBoxContainer.new()  # one per line, full column width: the screen names stay readable (335b030f)
+		box.add_theme_constant_override("separation", 2)
+		col.add_child(box)
+		for p in programs:
+			var ch := int(p)
+			var name := str(labels.get(ch, str(ch)))
+			var b := small(AR.short_label(name, 6), "Route this input's audio onto %s (audio-only)" % name if _kind == "routes" else "Checking…", ThemeBuilder.ACCENT, true)
+			b.disabled = _kind == "screens"  # until the server's plan says otherwise
+			b.pressed.connect(func() -> void:
+				if _kind == "routes":
+					route_toggled.emit(ch, b.button_pressed)
+				else:
+					screen_toggled.emit(ch, b.button_pressed))
+			_toggles[ch] = b
+			box.add_child(b)
 	if r.get("isMaster", false) != true:
 		set_screens([], AA.cross_screen_targets(r))
 
 
-## A compact button: small font, 3 px margins (the app theme's 8 px would double the row).
+static func _grid() -> GridContainer:
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 2)
+	g.add_theme_constant_override("v_separation", 2)
+	return g
+
+
+## A compact button: font 10, 2 px margins, 16 px wide (two fit the column side by side).
 static func small(text: String, tip: String, on_colour: Color, toggle: bool) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.tooltip_text = tip
 	b.toggle_mode = toggle
 	b.focus_mode = Control.FOCUS_NONE
-	b.custom_minimum_size = Vector2(20, 0)
+	b.custom_minimum_size = Vector2(BTN_W, 0)
+	b.clip_text = true  # the width is the column's, whatever the font (a glyph wider than 12 px clips, never widens it)
 	b.add_theme_font_size_override("font_size", 10)
 	var base := ThemeBuilder.box(ThemeBuilder.BG_ELEVATED, ThemeBuilder.BORDER, 1, 3)
-	base.set_content_margin_all(3)
-	base.content_margin_left = 4
-	base.content_margin_right = 4
+	base.set_content_margin_all(2)
 	var on := ThemeBuilder.box(on_colour.darkened(0.35), on_colour, 1, 3)
-	on.set_content_margin_all(3)
-	on.content_margin_left = 4
-	on.content_margin_right = 4
+	on.set_content_margin_all(2)
 	for st in ["normal", "hover", "disabled", "focus"]:
 		b.add_theme_stylebox_override(st, base)
 	for st in ["pressed", "hover_pressed"]:
