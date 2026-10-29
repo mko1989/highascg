@@ -15,7 +15,9 @@ const fs = require('fs')
 const { ABI, readFully } = require('../tracking/hshm-read')
 
 const MAX_SAMPLES = 65536
-const MERGE_GAP_PX = 64
+// one pread costs the same (~0.8 µs on the box) up to ~8 KB, so spans up to 1024 px (4 KB) apart are read as one: the
+// edge proposal's 896 strips (8 columns × 1792 rows of 3840) went from 10 675 reads / 6.8 ms to 3 577 / 5.1 ms per frame
+const MERGE_GAP_PX = 1024
 const HEADER_BYTES = 128
 
 /** One region → { x0, y0, step, nx, ny } on a width × height raster (clipped), or null when nothing is left. */

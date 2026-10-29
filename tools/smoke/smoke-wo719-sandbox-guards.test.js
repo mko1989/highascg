@@ -63,6 +63,7 @@ test('every machine-wide side effect checks isSandbox (source pins — see the h
 		['src/media/media-library-registry.js', /isSandbox\(\) \? path\.join\(process\.cwd\(\), 'data', 'media-library'\)/],
 		['src/system/video-surfaces.js', /if \(require\('\.\.\/bootstrap\/sandbox'\)\.isSandbox\(\)\) return \{ shm: `\/highascg-\$\{role\}`, path: require\('path'\)\.join\(process\.cwd\(\), 'shm'/],
 		['src/system/video-feed.js', /isSandbox\(\) \? path\.join\(process\.cwd\(\), 'shm'\) : '\/dev\/shm'/],
+		['src/fixtures/pixel-map-service.js', /require\('\.\.\/system\/video-surfaces'\)\.segmentFor\(role\)\.path/], // WO-807 e2e: never the live /dev/shm
 		['src/replication/replication-local-identity.js', /isSandbox\(\) && process\.env\.HIGHASCG_CONFIG_PATH\n\t\? path\.join\(path\.dirname\(path\.resolve\(process\.env\.HIGHASCG_CONFIG_PATH\)\)/],
 	]
 	for (const [file, re] of pins) assert.match(src(file), re, file)

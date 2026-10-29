@@ -236,5 +236,6 @@ module.exports = {
 	getVideoSurfaceManager,
 	resolveRoleChannel,
 	roleIndex,
+	segmentFor, // WO-807 e2e: the pixel map reads the path a sandbox announces, never the live /dev/shm
 	LEASE_TTL_MS,
 }

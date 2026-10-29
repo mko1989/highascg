@@ -61,10 +61,12 @@ function writeFixtureMedia(mediaDir) {
 }
 
 /**
- * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number } }} opts
+ * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number }, tracking?: boolean }} opts
  *   media: false skips the ffmpeg fixture clips (WO-725 cluster runs, CI has no ffmpeg); config: extra top-level
  *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked); caspar: a THROWAWAY Caspar
  *   instance to drive instead of the simulated one (WO-744 tools/e2e/shm-source-take.js) — never the box's own.
+ *   tracking: true starts the tracking plugin (the fixture engine: patch, DMX out, WO-807 pixel map) — only with a
+ *   project whose DMX goes to loopback (tools/e2e/pixel-map-fixture.js); detection / PTZ / PSN stay off without a project asking.
  */
 async function startSandbox(opts) {
 	const root = path.resolve(opts.root)
@@ -115,7 +117,7 @@ async function startSandbox(opts) {
 		HIGHASCG_OS_LAYOUT_WATCHDOG: '0',
 		HIGHASCG_HEADLESS: 'true',
 		HIGHASCG_NO_STARTUP_LED_TEST: '1',
-		HIGHASCG_TRACKING: '0',
+		HIGHASCG_TRACKING: opts.tracking ? '1' : '0', // WO-807 e2e: the fixture engine (DMX out, pixel map) lives in the tracking plugin
 		HIGHASCG_PREVIS: '0',
 		HIGHASCG_AUTOFOLLOW: '0',
 		HIGHASCG_PRESENTERS_DIR: path.join(root, 'presenters'),

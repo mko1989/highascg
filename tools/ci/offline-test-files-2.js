@@ -24,6 +24,7 @@ module.exports = [
 	'tools/smoke/smoke-wo800-per-layer-audio.test.js',
 	'tools/smoke/smoke-wo807-pixel-map.test.js',
 	'tools/smoke/smoke-wo807-pixel-map-loopback.test.js',
+	'tools/smoke/smoke-wo807-pixel-map-propose.test.js',
 	'tools/smoke/smoke-wo805-supervisor-exit-wait.test.js',
 	'tools/smoke/smoke-wo805-inventory-once.test.js',
 	'tools/smoke/smoke-wo811-auth-server-paths.test.js',

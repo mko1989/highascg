@@ -31,6 +31,7 @@ const { chainOf } = require('./gdtf-ik')
 const { cleanValue } = require('./gdtf-patch')
 const { SACN_PORT } = require('./sacn')
 const { createPixelMapService } = require('./pixel-map-service')
+const { createPixelMapProposalService } = require('./pixel-map-proposal')
 
 function ipv4ToInt(ip) {
 	return ip.split('.').reduce((a, b) => ((a << 8) | Number(b)) >>> 0, 0)
@@ -166,6 +167,8 @@ function createFollowService(ctx, hub, deps = {}) {
 		log('warn', '[follow] initial project load: ' + (e?.message || e))
 	}
 	const off = onProjectChanged(apply)
+	// WO-807: LED wall edge → PixelLine proposal; after `apply` so it reads the patch the change just configured
+	pixelMap.proposal = createPixelMapProposalService(ctx, engine, pixelMap, { log })
 	// the duty changed: PSN starts / stops at once; Art-Net / sACN resume with the engine's own 1 s refresh
 	const offDuties =
 		duties.onChange?.(() =>
@@ -269,6 +272,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		stop() {
 			off()
 			offDuties()
+			pixelMap.proposal.stop()
 			pixelMap.stop()
 			sacnIn.stop()
 			engine.stop()

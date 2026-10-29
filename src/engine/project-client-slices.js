@@ -12,9 +12,12 @@ const CLIENT_OWNED_SLICES = ['previs', 'fixtures']
 /**
  * WO-807 — slices only the SERVER writes (`pixelMappings`: POST /api/fixtures/pixelmap). A client save / autosave never
  * changes them: the stored copy always wins (a Godot autosave posts its whole, possibly stale, project and retries a
- * stale rev with the same content). With no stored copy (Save As to a new name) the client's copy is kept.
+ * stale rev with the same content); a key the stored project lacks is dropped from the incoming one. With no stored
+ * project (Save As to a new name) the client's copy is kept.
+ * `pixelMappingProposal`: the pending LED wall edge proposal (src/fixtures/pixel-map-proposal.js), written by the server
+ * when an MVR / wall binding changes, dropped by accept / dismiss.
  */
-const SERVER_OWNED_SLICES = ['pixelMappings']
+const SERVER_OWNED_SLICES = ['pixelMappings', 'pixelMappingProposal']
 
 /**
  * @param {object} project incoming payload (mutated)
@@ -23,7 +26,11 @@ const SERVER_OWNED_SLICES = ['pixelMappings']
  */
 function preserveClientOwnedSlices(project, existing) {
 	if (!project || typeof project !== 'object' || !existing || typeof existing !== 'object') return []
-	for (const key of SERVER_OWNED_SLICES) if (existing[key] !== undefined) project[key] = existing[key]
+	// the stored copy wins, its absence too: a stale client copy must not bring back a list / proposal the server dropped
+	for (const key of SERVER_OWNED_SLICES) {
+		if (existing[key] !== undefined) project[key] = existing[key]
+		else delete project[key]
+	}
 	const kept = []
 	for (const key of CLIENT_OWNED_SLICES) {
 		if (project[key] === undefined && existing[key] !== undefined) {

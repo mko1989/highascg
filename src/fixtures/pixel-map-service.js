@@ -11,6 +11,8 @@
  *   with the programmer or the GDTF default.
  * No mappings → nothing is leased and a tick costs one check. A channel with no new frame for HOLD_MS (Caspar gone,
  * lease lost) drives its mapped pixels black — the "extension of the screen" goes dark with the screen.
+ * While no mapped head is on the wire and nobody read /live for WATCH_MS, ticks skip the sampling (state "idle"; the
+ * lease stays, so the first frame after the DMX master opens is sampled on the next tick).
  */
 
 const { onProjectChanged } = require('../engine/project-events')
@@ -20,6 +22,9 @@ const { createRegionSampler } = require('./pixel-map-frame')
 const LEASE_ID = 'wo807-pixelmap'
 const LEASE_EVERY_MS = 5000
 const HOLD_MS = 1000
+// sampling idles while no mapped head is on the wire (DMX master off, universe not listed, visualiser) unless a /live
+// reader (the Godot editor's swatches, 2 Hz) asked within WATCH_MS — 896 strips cost ~5 ms per frame on the box
+const WATCH_MS = 5000
 
 /** Default channel map (as video-surfaces.js resolves roles): program / preview lists + the channels Caspar runs. */
 function liveChannelMap(ctx) {
@@ -50,7 +55,9 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	const now = deps.now || (() => Date.now())
 	const channelMap = deps.channelMap || (() => liveChannelMap(ctx))
 	const lease = deps.lease || ((roles) => require('../system/video-surfaces').getVideoSurfaceManager(ctx).lease(LEASE_ID, roles))
-	const surfacePath = deps.surfacePath || ((role) => `/dev/shm/highascg-${role}`)
+	// the segment path the surface manager announces: /dev/shm/highascg-<role>, or <root>/shm/ in a WO-719 sandbox (the
+	// e2e found the sandbox sampling the LIVE Caspar's segment through a hard-coded /dev/shm path)
+	const surfacePath = deps.surfacePath || ((role) => require('../system/video-surfaces').segmentFor(role).path)
 	let mappings = []
 	let resolved = { forFixtures: null, forMappings: null, list: [], byFixture: new Map(), problems: false, sig: '', at: 0 }
 	/** @type {Map<number, { role: string, file: string, sampler: object, ids: string[], since: number, state: string, at: number, width: number, height: number }>} */
@@ -59,7 +66,12 @@ function createPixelMapService(ctx, engine, deps = {}) {
 	let leaseTimer = null
 	let leasedRoles = ''
 	let lastWritten = new Map() // mapping id → [{ slot, value }]
-	const stats = { frames: 0, sampleMs: 0, lastSampleUs: 0 }
+	const stats = { frames: 0, sampleMs: 0, lastSampleUs: 0, idleTicks: 0 }
+	let watchedAt = -Infinity
+	// a head whose universe the engine has not built yet (before its first tick) counts as on the wire
+	const onWire = (fx) => (typeof engine.frameOf === 'function' && !engine.frameOf(fx)) || engine.isLive(fx)
+	const wanted = (t) => t - watchedAt < WATCH_MS || typeof engine.isLive !== 'function' ||
+		[...resolved.byFixture.values()].some((list) => onWire(list[0].fx))
 
 	const resolutionIn = (map) => (ch) => {
 		const r = map?.channelResolutionsByChannel?.[String(ch)]
@@ -142,6 +154,11 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		if (!mappings.length) return
 		resolve()
 		if (!surfaces.size) return
+		if (!wanted(t)) {
+			stats.idleTicks++
+			for (const s of surfaces.values()) s.state = 'idle'
+			return
+		}
 		const t0 = process.hrtime.bigint()
 		for (const s of surfaces.values()) {
 			let res
@@ -184,10 +201,11 @@ function createPixelMapService(ctx, engine, deps = {}) {
 
 	/** GET /api/fixtures/pixelmap/live */
 	function live(t = now()) {
+		watchedAt = t
 		const res = resolve()
 		return {
 			at: t,
-			stats: { frames: stats.frames, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs },
+			stats: { frames: stats.frames, sample_ms_total: Math.round(stats.sampleMs * 10) / 10, last_sample_us: stats.lastSampleUs, idle_ticks: stats.idleTicks },
 			channels: [...surfaces.entries()].map(([ch, s]) => ({ channelNo: ch, role: s.role, state: s.state, width: s.width, height: s.height,
 				age_ms: s.at ? t - s.at : null, mappings: s.ids.length })),
 			mappings: res.list.map((r) => {
@@ -201,12 +219,15 @@ function createPixelMapService(ctx, engine, deps = {}) {
 		}
 	}
 
-	/** POST /api/fixtures/pixelmap: strict check, then persist (the project change reloads us). */
-	async function set(list) {
+	/**
+	 * POST /api/fixtures/pixelmap: strict check, then persist (the project change reloads us). `extra`: other server-owned
+	 * keys written in the same project write (the edge proposal's accept drops `pixelMappingProposal` with it).
+	 */
+	async function set(list, { extra } = {}) {
 		const check = validateMappings(list, { fixtures: engine.fixtures, resolutionOf: resolutionIn(channelMap()) })
 		if (!check.ok) return check
-		const persist = deps.persist || ((ms) => persistToProject(ctx, ms))
-		await persist(check.mappings)
+		const persist = deps.persist || ((ms, ex) => persistToProject(ctx, ms, ex))
+		await persist(check.mappings, extra)
 		load({ pixelMappings: check.mappings })
 		return { ok: true, mappings: view() }
 	}
@@ -243,15 +264,15 @@ function createPixelMapService(ctx, engine, deps = {}) {
 }
 
 /** Write `pixelMappings` into the active project (server-owned key) and tell clients + server consumers. */
-async function persistToProject(ctx, mappings) {
+async function persistToProject(ctx, mappings, extra = {}) {
 	const { loadFullProject, persistProject } = require('../engine/project-scenes')
 	const { scheduleProjectSyncBroadcast } = require('../api/routes-data-project-sync')
 	const project = loadFullProject()
 	if (!project || typeof project !== 'object') throw new Error('no active project')
 	// an empty list drops the key (JSON omits undefined), so clearing leaves the project as it was before any mapping
-	const result = await persistProject(ctx, { ...project, pixelMappings: mappings.length ? mappings : undefined }, { writeAutosave: true })
+	const result = await persistProject(ctx, { ...project, ...extra, pixelMappings: mappings.length ? mappings : undefined }, { writeAutosave: true })
 	if (result?.unchanged !== true) scheduleProjectSyncBroadcast(ctx, result.project)
 	return result
 }
 
-module.exports = { createPixelMapService, roleFor, LEASE_ID, HOLD_MS }
+module.exports = { createPixelMapService, roleFor, liveChannelMap, LEASE_ID, HOLD_MS }

@@ -300,6 +300,36 @@ func drag_from(a: Vector2, to: Control) -> String:
 	return "" if dragging else "no drag started from %s (nothing draggable under the press?)" % a
 
 
+## WO-807: a left-button drag inside one control's own input (drawing a rectangle on a picture — not a GUI
+## drag-and-drop): hit-test `on` at `a`, press, move to `b` in `steps`, release. "" or why it could not start.
+func press_drag(on: Control, a: Vector2, b: Vector2, steps := 12) -> String:
+	if on == null or not shown(on):
+		return "%s is not visible" % _desc(on)
+	_move(a, 0)
+	await frames(1)
+	var hov := on.get_viewport().gui_get_hovered_control()
+	if hov != on and (hov == null or not on.is_ancestor_of(hov)):
+		return "%s is covered by %s at %s" % [_desc(on), _desc(hov), a]
+	_button(a, MOUSE_BUTTON_LEFT, true, false)
+	await frames(1)
+	for i in range(1, steps + 1):
+		_move(a.lerp(b, float(i) / steps), MOUSE_BUTTON_MASK_LEFT)
+		await frames(1)
+	_button(b, MOUSE_BUTTON_LEFT, false, false)
+	await frames(2)
+	return ""
+
+
+## Scroll every ScrollContainer above `c` until it is in view (what the operator's wheel would do).
+func reveal(c: Control) -> void:
+	var p := c.get_parent() if c != null else null
+	while p != null:
+		if p is ScrollContainer:
+			(p as ScrollContainer).ensure_control_visible(c)
+		p = p.get_parent()
+	await frames(3)
+
+
 func shot(label: String) -> String:
 	if shots_dir == "":
 		return ""

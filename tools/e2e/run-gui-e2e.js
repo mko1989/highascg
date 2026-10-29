@@ -10,6 +10,7 @@
  *   node tools/e2e/run-gui-e2e.js --e2e=01_new_project,02_outputs
  *   node tools/e2e/run-gui-e2e.js --out=/path/report-dir --keep   # keep the sandbox root for inspection
  *   node tools/e2e/run-gui-e2e.js --e2e=06_xr_walk --xr            # WO-741: the client walks the previs (-- --xr)
+ *   node tools/e2e/run-gui-e2e.js --e2e=07_pixel_map               # WO-807: + fixture engine, loopback patch, test picture
  *
  * Output: <out>/results.json, <out>/report.md, <out>/shots/NN_<scenario>_<step>.png, <out>/sandbox/server.log,
  * <out>/godot.log. Exit code = failed steps (0 = all green).
@@ -44,7 +45,13 @@ async function main() {
 	fs.mkdirSync(path.join(out, 'shots'), { recursive: true })
 	console.log(`[e2e] out ${out}`)
 
-	const sb = await startSandbox({ root: path.join(out, 'sandbox'), log: (s) => console.log(`[e2e] ${s}`) })
+	// WO-807: 07_pixel_map needs the fixture engine (tracking plugin), a loopback-only copy of the MHP patch and a known
+	// picture on the sandbox's PGM 1 surface (tools/e2e/pixel-map-fixture.js)
+	const pixelMap = scenarios === 'all' || scenarios.split(',').includes('07_pixel_map')
+	const pm = pixelMap ? require('./pixel-map-fixture') : null
+	const root = path.join(out, 'sandbox')
+	const sb = await startSandbox({ root, tracking: pixelMap, config: pm?.sandboxConfig(root), log: (s) => console.log(`[e2e] ${s}`) })
+	const fixtures = pm ? pm.prepare(sb, (s) => console.log(`[e2e] ${s}`)) : null
 	let code
 	try {
 		const userDir = path.join(out, 'godot-user')
@@ -102,6 +109,7 @@ async function main() {
 			code = code || 98
 		}
 	} finally {
+		fixtures?.stop()
 		await sb.stop()
 		if (!arg('keep')) fs.rmSync(path.join(out, 'sandbox', 'media'), { recursive: true, force: true })
 	}

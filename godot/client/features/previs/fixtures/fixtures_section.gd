@@ -20,6 +20,8 @@ const Tint := preload("res://features/previs/model_tint.gd")
 const ColorRows := preload("res://features/previs/color_rows.gd")
 const DmxMonitor := preload("res://features/previs/fixtures/dmx_monitor_window.gd")
 const PixelMap := preload("res://features/previs/fixtures/pixel_map_window.gd")
+const Proposal := preload("res://features/previs/fixtures/pixel_map_proposal_window.gd")
+const PIXMAP_TIP := "Map regions of a channel's output to the pixels of a patched fixture (averaged per region)"
 const PatchEdit := preload("res://features/previs/fixtures/patch_edit_section.gd")
 const Fold := preload("res://features/previs/fold_section.gd")
 const CalibrateFold := preload("res://features/previs/fixtures/calibrate_fold.gd")
@@ -45,6 +47,8 @@ var _body := ColorRows.new()  # WO-641: the selected type's body colour
 var _via: OptionButton  # WO-698 the NIC the DMX output leaves by
 var _ifaces: Array = []  # [{name, address}]
 var _patch_edit := PatchEdit.new()  # WO-695: re-patch the selected heads
+var _pixmap: Button
+var _proposal := Proposal.new()  # WO-807 the automatic proposal's review modal (also feeds _pixmap's tooltip)
 
 
 func _ready() -> void:
@@ -147,11 +151,11 @@ func _ready() -> void:
 	viewer.tooltip_text = "Art-Net nodes / sACN sources on the network and one universe's 512 channels, live"
 	viewer.pressed.connect(_open_viewer)
 	net_row.add_child(viewer)
-	var pixmap := Button.new()  # WO-807 phase 2
-	pixmap.text = "Pixel map…"
-	pixmap.tooltip_text = "Map regions of a channel's output to the pixels of a patched fixture (averaged per region)"
-	pixmap.pressed.connect(_open_window.bind("PixelMap", PixelMap))
-	net_row.add_child(pixmap)
+	_pixmap = Button.new()  # WO-807 phase 2; the automatic proposal's line on top of the tooltip (pixel_map_proposal_*.gd)
+	_pixmap.text = "Pixel map…"
+	_pixmap.tooltip_text = PIXMAP_TIP
+	_pixmap.pressed.connect(_on_pixmap)  # a pending proposal opens its review first (it has "Pixel map…" too)
+	net_row.add_child(_pixmap)
 	out.add_child(net_row)
 	_usage = _label(out)
 	add_child(Fold.new("DMX output", [out]))
@@ -179,9 +183,36 @@ func _ready() -> void:
 			refresh_usage())
 	add_child(poll)
 	poll.start()
+	_proposal.name = "PixelProposal"
+	_proposal.edit_requested.connect(_open_pixel_map)
+	_proposal.saved.connect(func() -> void:  # an open, unedited Pixel map window shows the accepted mappings
+		var w := get_node_or_null("PixelMap")
+		if w != null and w.get("dirty") == false:
+			w.call("reload"))
+	add_child(_proposal)
+	_proposal.attach(_pixmap, PIXMAP_TIP)  # the tooltip line: on start, on hover, on a proposal / mapping / MVR change
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	await refresh_types()
 	_maybe_reload()
+	if Config.args.has("open-pixel-map"):  # --open-pixel-map (with --tab=1): open the Pixel map window on start (WO-807)
+		get_tree().create_timer(4.0).timeout.connect(_open_pixel_map)
+	if Config.args.has("open-pixel-proposal"):  # --open-pixel-proposal (with --tab=1): the proposal modal on start
+		_proposal.state_changed.connect(func(_p: Dictionary) -> void: print("[pixel-proposal] tooltip: ", _pixmap.tooltip_text), CONNECT_ONE_SHOT)
+		get_tree().create_timer(4.0).timeout.connect(_proposal.open)
+
+
+func _open_pixel_map() -> void:
+	_open_window("PixelMap", PixelMap)
+	var w := get_node("PixelMap")
+	if not w.is_connected("proposal_requested", _proposal.open):
+		w.connect("proposal_requested", _proposal.open)
+
+
+func _on_pixmap() -> void:
+	if _proposal.pending():
+		_proposal.open()
+	else:
+		_open_pixel_map()
 
 
 func _spin(lo: int, hi: int, tip: String) -> SpinBox:

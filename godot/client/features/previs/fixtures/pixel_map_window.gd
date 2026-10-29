@@ -14,6 +14,8 @@ const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const POLL_S := 0.5
 
+signal proposal_requested  # "Auto proposal…" (fixtures_section.gd opens the review modal)
+
 var work: Array = []  # the whole mapping list being edited (Save sends it)
 var regions: Array = []  # pixel_map_model.gd regions, shared with the view
 var fixtures: Array = []  # GET /api/fixtures/pixelmap/pixels
@@ -58,6 +60,11 @@ func _init() -> void:
 	reload_b.tooltip_text = "Read the saved mappings again (drops unsaved changes)"
 	reload_b.pressed.connect(reload)
 	bar.add_child(reload_b)
+	var auto_b := Button.new()  # WO-807 the automatic edge proposal's review (pixel_map_proposal_window.gd)
+	auto_b.text = "Auto proposal…"
+	auto_b.tooltip_text = "The mappings the server proposes from the MVR: every pixel fixture on its nearest LED-wall edge"
+	auto_b.pressed.connect(func() -> void: proposal_requested.emit())
+	bar.add_child(auto_b)
 	_status = Label.new()
 	_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_status.clip_text = true
@@ -115,6 +122,9 @@ func _build_side() -> Control:
 	var hint := Label.new()
 	hint.text = "Drag on the picture to draw a region · drag a region to move it, its corner to resize · wheel zoom · right-drag pan"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# WO-807 e2e: without a width the first layout wraps it at 1 px (min height 2021) and the dialog grew to 1560 × 2238
+	# on a 1080p screen — Save and the lower half of the picture off-screen, the window never shrank back
+	hint.custom_minimum_size.x = 560
 	hint.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 	side.add_child(hint)
 	var scroll := ScrollContainer.new()
@@ -141,7 +151,7 @@ func _build_side() -> Control:
 
 ## Show the window; unsaved edits from the last time it was open are kept, else the saved list is read.
 func open() -> void:
-	popup_centered()
+	popup_centered_clamped(Vector2i(1560, 860), 0.94)  # fits a smaller operator screen
 	if dirty:
 		_fill_fixtures(true)
 	else:

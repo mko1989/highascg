@@ -1,6 +1,6 @@
 # WO-807 — Region-to-fixture-pixel mapping: average a screen area into one pixel of a lighting fixture
 
-**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server; the on-screen look is owner QA); rig movement is owner QA**
+**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server); GUI e2e PASSES 29.10 (`07_pixel_map` 9/9 in the sandbox, full run 41/41: operator path → DMX 425–427 = 128/64/100 on 127.0.0.1:6455; it found and fixed a window taller than the screen and a sandbox reading the live /dev/shm); automatic edge proposal BUILT + applied live 29.10 (56 PixelLines → 896 mappings, DMX master off; Godot tooltip/modal pending); rig movement is owner QA**
 
 Owner, 29.10:
 > i mean the ability to map certain parts of for instance output to a led wall and send its color values to a lighting fixture. you can take the current project for instance. id like to map selected on the screen parts of screen to a corresponding pixelline fixture so they would become a kind of extension of the screen. as pixel density irl of led wall to a light fixture per cm/m whatever, there is a huge difference, so this needs to be implemented. for instance we take a 100px wide x 200px tall area of the screen to be mapped to first pixel (channel) of the fixture. here we need an averaging mode where pixels from that are on the screen get averaged into a single pixel.
@@ -277,3 +277,176 @@ All in `godot/client/features/previs/fixtures/`; no server or JS change; `previs
   pointer stays) behaved as written.
 - NOT verified: the window's on-screen look and feel in the owner's GUI (not driven; no screenshots), the live picture
   in the view (headless has no shm texture upload to look at), and a real fixture following a region (DMX master off).
+
+## E2E test (29.10, Opus)
+
+The operator path as a WO-719 GUI end-to-end scenario: `godot/client/e2e/scenarios/07_pixel_map.gd`, run by the
+existing runner in the **sandbox** (throwaway server on a free 127.0.0.1 port, own config and projects, `--no-caspar`,
+`HIGHASCG_SANDBOX=1`; the real Godot client on a hidden Xvfb display with its own `user://`, `--video=feed`). Nothing
+touches the live node (:4200), the live project, config/, the operator's :0 or the pointer.
+
+**Run:**
+```
+node tools/e2e/run-gui-e2e.js --e2e=07_pixel_map --out=/tmp/pixelmap-e2e --keep   # ~1 min; exit code = failed steps
+```
+(`--e2e=all` includes it.) Output: `<out>/report.md` (✅/❌ per step + screenshot link), `results.json`, `shots/`,
+`godot.log`, `sandbox/server.log`.
+
+**Investigation (what the sandbox lacked):**
+- The fixture engine lives in the tracking plugin (`src/tracking/register.js:450`), which the sandbox turned off
+  (`HIGHASCG_TRACKING=0`) → `/api/fixtures/pixelmap` answered "fixture engine not running". Audited before turning it
+  on: no detection / PTZ without project cameras (the MHP project has no `previs.tracking`), PSN only with
+  `fixtures.output.enabled`, the console input (:6454) only with the visualiser or read-through, the auto store /
+  audio desk / presenters already under the scratch HOME / root.
+- **Isolation bug found:** `pixel-map-service.js` read `/dev/shm/highascg-<role>` hard-coded, so a sandbox would have
+  sampled the LIVE Caspar's segment (the WO-719 shm fix covered `video-surfaces.js` and `video-feed.js` only).
+- The simulated Caspar answers INFO CONFIG once, at connect; `channelResolutionsByChannel` (the raster the pixel map
+  validates rects against) comes only from that answer, so a screen added at run time (as 03 does) has a channel
+  number but no raster — POST mappings would be refused.
+- **UI bug found (the e2e's first screenshot):** the Pixel map window opened 1560 × **2238** on a 1080p screen: Save
+  and the lower half of the picture off-screen, and the drag ended outside the window (rect clipped to 112 × 92). Cause
+  (measured on a second instance, frame 0): the hint Label (autowrap) is laid out at width 1 on the first pass →
+  minimum height 2021 → the AcceptDialog (wrap_controls) grew to it and never shrank back.
+
+**What was done:**
+- `src/fixtures/pixel-map-service.js`: the default surface path is `video-surfaces.segmentFor(role).path` (the path the
+  surface manager announces: `/dev/shm/…` on the box, `<root>/shm/…` in a sandbox); `segmentFor` exported. Pinned in
+  `smoke-wo719-sandbox-guards` (4/4).
+- `features/previs/fixtures/pixel_map_window.gd`: the hint label gets `custom_minimum_size.x = 560`;
+  `popup_centered_clamped(1560 × 860, 0.94)` so it also fits a smaller operator screen. Window now 1560 × 860 at 180,110.
+- `tools/e2e/sandbox-server.js`: option `tracking: true` (`HIGHASCG_TRACKING=1`); default unchanged (off).
+- `tools/e2e/pixel-map-fixture.js` (new, 194): the sandbox side — (1) project `e2e_pixel_map` in the sandbox's
+  projects dir = the MHP rig's `fixtures` slice (read from `projects/mhp_harder.json`, never written) with **every
+  head's dest rewritten to 127.0.0.1:6455** (refuses otherwise), DMX master on for `artnet:18` only, visualiser off,
+  PSN output off; the GDTF types it uses copied into the sandbox's `_gdtf`; (2) `sandboxConfig()`: one PGM/PRV screen
+  (1080p50, ch1 = PGM 1, ch2 = PRV 1) seeded before boot; (3) a HASCGSHM v1 writer on `<root>/shm/highascg-pgm1`
+  (10 frames/s, a known pattern: background (20,24,32); x 400–449 / 450–499, y 300–499 = (240,32,0) | (16,96,200);
+  x 1200–1259, y 500–539 = (0,180,90) with a 6 × 6 (255,255,0) marker around 1229,519). The simulated Caspar draws
+  nothing, so this stands in for the channel; the feed shows it to the client, the sampler reads it.
+- `tools/e2e/run-gui-e2e.js`: when `07_pixel_map` (or `all`) is selected, the sandbox starts with `tracking` and the
+  seeded screen, and the fixture runs until the sandbox stops.
+- `godot/client/e2e/e2e_ui.gd` (+30): `press_drag(on, a, b)` (a hit-tested left drag inside one control's own input,
+  not a GUI drag-and-drop) and `reveal(c)` (scroll the ScrollContainers above it, e.g. the Inspector column).
+- `godot/client/e2e/scenarios/07_pixel_map.gd` (new, 390): the steps below. Controls are found by text / tooltip (the
+  rows by the "Pixel N · …" tooltip of their number), every step asserts what the UI shows and what the server stored.
+
+**Steps and assertions** (run 29.10 13:41, **9/9 passed**, 0 SCRIPT ERRORs, client quit normally; the full
+`--e2e=all` run with the seeded screen and the tracking plugin on: **41/41 passed**, exit 0, no HANG, no Xvfb left):
+1. Setup (not under test): channel 1 raster in `/api/settings`; POST `/api/project/load` `e2e_pixel_map`; `/pixels`
+   lists Pixel Line IP 1042 (u18 @421, 32 pixels: 16 RGB + 16 W; pixel 1 slots 425–427); bind 127.0.0.1:6455.
+2. Previs tab → 3D → Inspector → Lighting → DMX output → "Pixel map…" (scrolled into view, hit-tested click) → the
+   window is visible, has the picture view and fits the screen.
+3. Channel picker → "Channel 1 (Program 1) · 1920×1080": the view holds role pgm1 at 1920 × 1080, the pgm1 texture
+   arrives over the feed (960 × 540) and matches the pattern at 4 probes (± 40 for JPEG).
+4. Drag on the picture: R1 drawn as 393,294 112 × 211 (the dragged box, snapped to channel pixels, ± 4); typed x
+   `800/2` (maths, RULES.md 2), y 300, w 100, h 200 → fields 400,300 100 × 200 and the title "R1 · 100 × 200 px at
+   400, 300"; R2 drawn 1194,494 71 × 51 → typed 1200,500 60 × 40.
+5. Fixture picker → "Pixel Line IP 1042 · U18.421 · 32 px": 32 pixel rows shown (= the head's pixels from `/pixels`).
+6. Row 1: region "R1 · 100 × 200 px", average, rgb; row 2: "R2 · 60 × 40 px", point, rgb; row 3 stays "—"; "Save *".
+7. Save → note "Saved 2 mapping(s).", button back to "Save"; GET `/api/fixtures/pixelmap` = the 2 mappings (fixture,
+   pixel, channel 1, rects, modes, colour order rgb).
+8. Live: `/live` both `on_wire: true`; **R1 average: hand calc (128,64,100) = `/live` rgb = the average recomputed in the
+   scenario from the pgm1 segment file (all 20 000 px) = DMX 425/426/427 = 128/64/100 = the swatch = the ArtDMX packet
+   (universe 18, data[424..426]) received on 127.0.0.1:6455; R2 point (centre 1229,519): (255,255,0) everywhere, DMX
+   428/429/430 = 255/255/0.** Swatch tooltip says "on the wire". 41 ArtDMX packets received during the run.
+9. Rows 1 and 2 → "—", Save → "Saved 0 mapping(s).", GET mappings empty, GET `/api/project` has `fixtures` and **no
+   `pixelMappings` key**, `/live` has no mappings and no sampled channel (lease released). Then Close.
+
+Screenshots (Xvfb, from the running sandbox client, after each step) in
+`/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/pixelmap_e2e/shots/` (session
+scratchpad, not kept): 04 the picture with R1 + R2 drawn and the fields, 06 the pixel list mapped, 08 the live swatches
+(row 1 mauve 128,64,100, row 2 yellow) and "channel 1 (pgm1): live · 2 mapping(s) sampled".
+
+Gates: line limit 0 files over 500; eslint clean on the changed JS; smokes wo719 sandbox guards 4/4, wo807 pixel map
+15/15 + loopback 5/5. Live box: node PID unchanged (334887), no request to :4200, `projects/mhp_harder.json` only read.
+
+**NOT verified:** the owner's live GUI (not driven); a real fixture following a region (the live MHP DMX master is
+off; the sandbox sends to loopback only); real Caspar frames in the sandbox (the pattern writer stands in for the
+channel; the live-frame average was checked in phase 1); the 400 error path in this e2e (the row error labels are
+autowrap too and may show the same first-layout growth when they first appear — not exercised).
+
+## Automatic edge proposal (29.10, Opus)
+
+Owner 29.10: map every PixelLine to its closest LED-wall edge, ~50 px inside the picture (overlap fine); automate it —
+when an MVR is loaded and its LED wall is patched to a screen destination, compute the mapping from the fixture's size
+and pixel count and offer it (tooltip → modal with the proposition). This step = the server side + applying it to the
+live project now; the Godot tooltip / modal is a later step by another agent (godot/client untouched here).
+
+**Investigation (file:line):**
+- **LED wall rect:** `project.previs.stage.objects[]` type `led_wall`; `source.role` (pgmN / prvN / chN) names the
+  channel, `source.rect` the wall's part of that channel's raster (x right, y down). Geometry as the previs draws it:
+  `godot/client/features/previs/stage_objects.gd` `pixels()` :82 (panels × panel px), `size_m()` :95 (panels ×
+  panel_mm), `front_rect()` :214 — `position` is the **bottom centre** of the picture, yaw = `rotation[1]` about UP
+  (local x = (cos, 0, −sin)), `_to_world_xz()` :229. Role → channel = `programChannels[N−1]` / `previewChannels[N−1]` /
+  N; raster = `channelResolutionsByChannel` (the inverse of `pixel-map-service.js` roleFor).
+- **Live rig:** 3 walls on pgm1 (ch1 3840 × 1792): led_wall_1 x0 w1024 (4 × 7 m, yaw 10.08), led_wall_2 x1024 w1792
+  (7 × 7 m, yaw 0), led_wall_3 x2816 w1024 (4 × 7 m, yaw −9.96); panels 128 × 256 px at 500 × 1000 mm = 256 px/m.
+  56 Pixel Line IP heads (`Mode11 70DMX`) in 8 vertical columns of 7 one-metre bars (z 0.66…6.66).
+- **Fixture positions:** the patch pose (`follow-patch.js` normalizeFixture :79, PSN metres) → Godot (x, z, −y) as
+  `camera_model.gd` psn_to_godot :33; orientation `gdtf-ik.js` poseXf :61 = `fixtures_3d_model.gd` pose_xform :34.
+  Per pixel: the GDTF rig (`gdtf-store.js` visual :118 → `gdtf-rig.js` buildRig :39) — the PixelLine's RGB cells
+  `Array 109…124` carry Beam children at local x −0.465…+0.465, **pitch 0.062 m**, body 1 m, pose = centre; roll −90
+  → pixel 1 on top. `pixelsOf` gives 32 pixels (1–16 RGB, 17–32 W); only the colour-mixing ones (r,g,b or c,m,y) are
+  proposed — the W cells sit on the same LEDs.
+- **Threshold:** live distances head → nearest edge are 0.06–0.28 m; the gaps between walls are ≥ 1.2 m and a head
+  3 m away is clearly not "at" the wall → default **1.5 m** (option `threshold_m`).
+
+**The rule** (`src/fixtures/pixel-map-propose.js`, pure, 288 lines): per linear pixel fixture (≥ 4 mixing pixels on a
+line within 10 % of the span, span ≥ 5 cm) the nearest edge over all bound walls (3-D distance to the edge segment, in
+the wall's plane frame; pitch/roll/curve of the wall ignored and noted). Beyond the threshold → warning, not mapped.
+- **Spacing 'gdtf':** cell = first→last pixel distance / (n−1) (0.062 m → 15.87 → **16 px**); cells centred on the
+  projection of the fixture's centroid, in the real pixel order along the edge.
+- **'corner' fallback** (no rig positions): foot → nearest corner length shared by the n cells.
+- Rect per pixel: along the edge `round(cell × px/m)`, across **depth 40 px**, **inset 50 px** from the edge on the
+  inside (`left x0+50`, `top y0+50`, `right x0+w−50−40`, `bottom y0+h−50−40`), clamped to the wall rect (off-edge
+  counted). Mapping `{ id: auto-<fx>-<pixel>, enabled, fixtureId, pixel, channelNo, rect, mode: average, colourOrder: auto }`.
+  Options: `inset_px`, `depth_px`, `threshold_m`, `mode`.
+
+**What was done:**
+- `src/fixtures/pixel-map-proposal.js` (new, 232): the service — inputs from the project + engine patch, signature
+  (MVR id + bound walls + linear fixtures' positions), `check()` / `get()` / `accept()` / `dismiss()`; the pending
+  proposal lives in memory and in the project under the **server-owned** key `pixelMappingProposal`
+  (`{ state: pending | accepted | dismissed, sig, at, … }`). Content-based: the same inputs are never proposed twice,
+  a restart neither misses nor repeats one; nothing is applied until accept.
+- **Hook:** `src/fixtures/follow-service.js:171` creates it right after `onProjectChanged(apply)` (so it reads the
+  patch the change just configured); it runs `check()` once at start and on every project change, debounced 500 ms
+  (`pixel-map-proposal.js:130` check, :158 schedule) — not on polls. It needs an MVR (`previs.mvr`), a wall bound to a
+  running channel with a known raster, and a linear pixel fixture.
+- `src/api/routes-pixel-map.js`: `GET /api/fixtures/pixelmap/proposal` (pending one, else fresh; `?inset_px=…` /
+  `fresh=1` recompute; no side effects), `POST …/proposal/accept` (`pixelMap.set` = the POST's validation; keeps other
+  fixtures' mappings unless `replace: true`; records accepted in the same write), `POST …/proposal/dismiss`.
+  API contract regenerated (523 routes).
+- `src/fixtures/pixel-map-service.js`: `set(list, { extra })` (proposal state in the same project write),
+  `liveChannelMap` exported. **CPU:** applying 896 mappings took node ~5 % → ~50 % (sampling ~7 ms/frame at 44 Hz).
+  Now sampling idles while no mapped head is on the wire and `/live` was not read for 5 s (`idle_ticks` in /live; a
+  head whose universe is not built yet counts as on the wire). `pixel-map-frame.js` MERGE_GAP_PX 64 → 1024: 10 675 →
+  3 577 reads, 6.8 → 5.1 ms per frame when active. Node back to ~15–20 % (others' timeline scrubbing included).
+- `src/engine/project-client-slices.js`: `SERVER_OWNED_SLICES = [pixelMappings, pixelMappingProposal]`; the stored copy
+  now wins **including absence** (a client save cannot resurrect a key the server removed); Save As to a new name
+  still keeps the client's copy.
+
+**Verified:**
+- Live (node 484293): proposal `walls 3, mapped 56, out_of_range 0, 896 mappings`, every fixture rule gdtf, 16 px
+  cells, distances 0.064–0.276 m (wall 1 left ×14 / right ×7, wall 2 left ×7 / right ×7, wall 3 left ×7 / right ×14).
+  `?inset_px=80&threshold_m=0.2` → 14 mapped / 42 out of range, x = 80. Accept with `threshold_m 0.01` → 400
+  "nothing to accept…". **Accept `{}` → 200 `{ accepted: 896, kept: 0, fixtures: 56 }`**: GET /api/fixtures/pixelmap
+  896, all `problem: null`, the two px-… test mappings of 1042 replaced; project rev 279 → 280. After the restart:
+  proposal `pending: false, applied: true`, no spurious pending key. **DMX master off** (`fixtures.dmx.enabled false,
+  universes []`), PSN output off.
+- Rects in the pgm1 raster: six vertical 40-px strips 50 px inside each wall boundary — x 50–90, 934–974, 1074–1114,
+  2726–2766, 2866–2906, 3750–3790 (seams at 1024 / 2816), full height in 16-px cells; e.g. 1042 → led_wall_3 left,
+  0.265 m, x 2866 w40, y 1537…1775. The pgm1 frame with the rects drawn: averages follow the content (1042 pixel 1
+  (26,60,173), pixel 16 (0,0,14)). Walls 1 and 3 each have two columns on the same edge → shared strips (owner: overlap OK).
+- Sandbox hook e2e (WO-719 sandbox, 1080p ch1): before the MVR no proposal; autosave with `previs.mvr` + walls →
+  `pending: true`, 56 / 896, key in the project file; a stale client autosave without the key keeps it; accept 200 →
+  key `{ state: accepted }`; journal lines for propose and accept.
+- Tests: `tools/smoke/smoke-wo807-pixel-map-propose.test.js` (new, 20 tests / 3 suites, in
+  `tools/ci/offline-test-files-2.js`): top edge at 0.3 m (16 px, y 50, h 40), 3 m → not mapped, left / right / bottom /
+  rotated wall / corner fallback / clamp / non-linear / nearest of two walls; pending + no repeat + restart + moved
+  wall, dismissed / accepted not re-proposed, accept merge, debounced event hook, server-owned slice, sampling idle +
+  merged spans. Full offline suite **3548 tests, 3546 pass, 0 fail, 2 skipped** (wo811 auth-clients 7/7). Line limit 0
+  over 500; eslint clean; contract `--check` 0.
+
+**NOT verified:** the look on the glass / owner GUI; a real fixture following its strip (DMX master stays off); the
+Godot tooltip + modal (later step, another agent). Caveats: wall pitch / roll / curve ignored; the Caspar shm lease is
+held while mappings exist (~6 % Caspar CPU, phase 1) even when sampling idles.
