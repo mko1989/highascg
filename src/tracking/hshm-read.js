@@ -68,4 +68,4 @@ function readLatestFrame(file, { since = 0, fsImpl = fs, into = null } = {}) {
 	}
 }
 
-module.exports = { readLatestFrame }
+module.exports = { readLatestFrame, readFully, ABI: { MAGIC, ABI_VERSION, SLOTS, SLOT_HEADER_SIZE, OFF_WIDTH, OFF_HEIGHT, OFF_STRIDE, OFF_SLOT_OFFSET, OFF_LATEST } } // WO-807: pixel-map-frame.js reads rows of the same rings

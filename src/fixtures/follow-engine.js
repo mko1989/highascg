@@ -74,6 +74,8 @@ class FollowEngine {
 		this._timer = null
 		/** @type {null | ((fx: object, marks: Map<number, object>) => object | null)} WO-708: the Auto director's hook */
 		this.resolveAuto = null
+		/** @type {null | { sample(now: number): void, write(buf: Uint8Array, fx: object, now: number): void }} WO-807 screen regions → pixels */
+		this.pixelMap = null
 	}
 
 	/** project.fixtures slice → patch (keeps each fixture's last aim, so a re-patch does not snap heads). */
@@ -219,6 +221,7 @@ class FollowEngine {
 		const now = this.now()
 		const dt = this._lastTick ? Math.min(0.5, (now - this._lastTick) / 1000) : 0
 		this._lastTick = now
+		this.pixelMap?.sample(now) // WO-807: average the mapped screen regions of each new channel frame
 		const marks = new Map((this.hub?.list(this.hub.now()) || []).map((m) => [m.id, m]))
 		const thru = this.through.enabled && this.protocol === 'artnet' && this.consoleFrames ? this.through : null
 		const consoleOf = (universe) => {
@@ -274,6 +277,7 @@ class FollowEngine {
 				}
 				writeFixture(u.buf, fx, fx.moving && aimed ? next : null, fx.fixedList)
 			}
+			this.pixelMap?.write(u.buf, fx, now) // WO-807: mapped pixels' colour channels over the head's own
 		}
 		let sent = 0
 		for (const u of this._uni.values()) {

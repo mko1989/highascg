@@ -30,6 +30,7 @@ const { normalizeLooks, recallInto } = require('./fixture-looks')
 const { chainOf } = require('./gdtf-ik')
 const { cleanValue } = require('./gdtf-patch')
 const { SACN_PORT } = require('./sacn')
+const { createPixelMapService } = require('./pixel-map-service')
 
 function ipv4ToInt(ip) {
 	return ip.split('.').reduce((a, b) => ((a << 8) | Number(b)) >>> 0, 0)
@@ -127,6 +128,8 @@ function createFollowService(ctx, hub, deps = {}) {
 			}
 		},
 	})
+	const pixelMap = createPixelMapService(ctx, engine, { log }) // WO-807: screen regions → fixture pixels (project.pixelMappings)
+	engine.pixelMap = pixelMap
 	let lastJson = ''
 	let looks = {} // WO-615 T8: fixtures.looks — fixture states stored per look
 	const apply = (project) => {
@@ -182,6 +185,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		},
 		sender,
 		psn,
+		pixelMap,
 		status: () => ({
 			...engine.status(),
 			packets_sent: sender.sent,
@@ -265,6 +269,7 @@ function createFollowService(ctx, hub, deps = {}) {
 		stop() {
 			off()
 			offDuties()
+			pixelMap.stop()
 			sacnIn.stop()
 			engine.stop()
 			sender.close()

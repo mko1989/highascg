@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-516 routes.
+520 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -117,6 +117,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/fixtures/dmx/frame` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/looks` | registry | `src/api/routes-fixture-dmx.js` |
 | POST | `/api/fixtures/looks/recall` | registry | `src/api/routes-fixture-dmx.js` |
+| GET | `/api/fixtures/pixelmap` | registry | `src/api/routes-pixel-map.js` |
+| POST | `/api/fixtures/pixelmap` | registry | `src/api/routes-pixel-map.js` |
+| GET | `/api/fixtures/pixelmap/live` | registry | `src/api/routes-pixel-map.js` |
+| GET | `/api/fixtures/pixelmap/pixels` | registry | `src/api/routes-pixel-map.js` |
 | DELETE | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
 | POST | `/api/fixtures/program` | registry | `src/api/routes-fixture-dmx.js` |
@@ -563,6 +567,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-osc.js` | REST endpoints for CasparCG OSC aggregate state (UDP listener → {@link OscState}). |
 | `src/api/routes-pgm-layer.js` | WO-803 — each program screen's main layer, for the Companion PGM readback button: GET /api/screens/pgm-layer. |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |
+| `src/api/routes-pixel-map.js` | WO-807 — region-to-fixture-pixel mapping (src/fixtures/pixel-map-service.js, via ctx.fixtureService.pixelMap): GET  /api/fixtures/pixelmap         → { ok, mappi |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |
 | `src/api/routes-plugins.js` |  |
 | `src/api/routes-project-hardware.js` | WO-608 — project hardware reconcile on the node (web lib/project-import-flow.js + project-hardware-apply.js). |

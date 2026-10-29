@@ -9,6 +9,12 @@
  * WO-616 T11: `fixtures` (the follow → Art-Net patch, src/fixtures/follow-patch.js) is Godot-owned too.
  */
 const CLIENT_OWNED_SLICES = ['previs', 'fixtures']
+/**
+ * WO-807 — slices only the SERVER writes (`pixelMappings`: POST /api/fixtures/pixelmap). A client save / autosave never
+ * changes them: the stored copy always wins (a Godot autosave posts its whole, possibly stale, project and retries a
+ * stale rev with the same content). With no stored copy (Save As to a new name) the client's copy is kept.
+ */
+const SERVER_OWNED_SLICES = ['pixelMappings']
 
 /**
  * @param {object} project incoming payload (mutated)
@@ -17,6 +23,7 @@ const CLIENT_OWNED_SLICES = ['previs', 'fixtures']
  */
 function preserveClientOwnedSlices(project, existing) {
 	if (!project || typeof project !== 'object' || !existing || typeof existing !== 'object') return []
+	for (const key of SERVER_OWNED_SLICES) if (existing[key] !== undefined) project[key] = existing[key]
 	const kept = []
 	for (const key of CLIENT_OWNED_SLICES) {
 		if (project[key] === undefined && existing[key] !== undefined) {
@@ -27,4 +34,4 @@ function preserveClientOwnedSlices(project, existing) {
 	return kept
 }
 
-module.exports = { CLIENT_OWNED_SLICES, preserveClientOwnedSlices }
+module.exports = { CLIENT_OWNED_SLICES, SERVER_OWNED_SLICES, preserveClientOwnedSlices }
