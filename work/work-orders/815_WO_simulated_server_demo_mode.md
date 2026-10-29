@@ -199,3 +199,15 @@ The 9 skips are worktree-only (no companion-module-dev checkout beside it, no di
   Playlists / Timers / Program audio footer.
 - Not verified: an operator click-through on the published page (takes etc. were exercised on the local Web build
   earlier, section 3).
+
+## Follow-up 29.10 evening: the demo is the site root
+
+Owner: "The GitHub pages still show docs instead of the Godot client with simulation server."
+- `pages.yml`: the Web export goes to the site root; Jekyll builds into `_site/docs` with `docs/_config.yml`
+  `baseurl: /highascg/docs` (jekyll-github-metadata only fills baseurl when it is unset); `/demo/` is a redirect page to
+  the root; the Project Map stays at `/map/map.html`. README: "Try the demo" → root, Wiki → `/docs/`.
+- Verified live after Pages run 40920456181 (success): `/` 200 `<title>HighAsCG Operator`, `index.wasm` 200, `/demo/` 200
+  redirect page, `/docs/` 200 `HighAsCG documentation`, `/docs/ARCHITECTURE.html` 200, docs CSS
+  `/highascg/docs/assets/css/style.css` 200, `/map/map.html` 200 (`/map/` alone was already 404: the map page is
+  `map.html`). Firefox ESR on a private Xvfb :117, 55 s after load: the demo runs at the root ("Demo show",
+  "DEMO — no server", LED wall 6 looks, Projection 3 looks) — scratchpad `pages_root/root_demo.png`.
