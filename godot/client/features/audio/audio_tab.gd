@@ -106,7 +106,7 @@ func _refresh() -> void:
 	var st := ctl.state()
 	var cm: Dictionary = st.channelMap
 	_rows = ctl.rows(st)
-	var sig := [_programs(cm)]
+	var sig := [_programs(cm), AR.screen_labels(cm)]
 	for r in _rows:
 		var bars := AR.bus_channel_count(Settings.settings, cm, r.ch) if r.get("isMaster", false) == true else 1
 		sig.append([r.key, r.label, r.get("sceneId"), bars, r.get("liveAudioSlot")])
@@ -198,13 +198,13 @@ func _group(title: String, rows: Array, cm: Dictionary) -> Control:
 	strips.add_theme_constant_override("separation", 4)
 	v.add_child(strips)
 	for r in rows:
-		strips.add_child(_strip(r, 1, rows.size() > 4, _programs(cm)))
+		strips.add_child(_strip(r, 1, rows.size() > 4, _programs(cm), AR.screen_labels(cm)))
 	return card
 
 
-func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> Strip:
+func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: Dictionary = {}) -> Strip:
 	var s := Strip.new()
-	s.setup(r, bars, dense, programs)
+	s.setup(r, bars, dense, programs, labels)
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	ctl.bind(s, r)  # fader / solo / mute / routes / send / START / STOP / Screens → the shared write path
 	s.inspect_requested.connect(func() -> void: inspect_destination.emit(

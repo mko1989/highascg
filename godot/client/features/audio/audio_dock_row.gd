@@ -14,6 +14,7 @@ signal stop_pressed
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MM := preload("res://features/live/mixer_math.gd")
 const DM := preload("res://features/audio/audio_dock_model.gd")
+const AR := preload("res://features/audio/audio_rows.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const MeterBank := preload("res://features/audio/meter_bank.gd")
 const LABEL_W := 86
@@ -30,6 +31,7 @@ var _nosig := false
 var _syncing := false
 var _toggles := {}  # program channel → routing toggle
 var _kind := ""  # "routes" | "screens" | ""
+var _labels := {}  # program channel → screen label (AR.screen_labels)
 
 
 ## A 4 px horizontal level bar (web audio-mixer__meter-horizontal), the console's colours.
@@ -54,8 +56,9 @@ class HBar extends Control:
 			draw_rect(Rect2(Vector2.ZERO, size), ThemeBuilder.WARN, false, 1.0)
 
 
-func setup(r: Dictionary, dense: bool, programs: Array) -> void:
+func setup(r: Dictionary, dense: bool, programs: Array, labels: Dictionary = {}) -> void:
 	row = r
+	_labels = labels
 	add_theme_constant_override("separation", 1 if dense else 2)
 	var font := 11 if dense else 12
 	var line := HBoxContainer.new()
@@ -94,7 +97,8 @@ func setup(r: Dictionary, dense: bool, programs: Array) -> void:
 			add_child(box)
 		for p in programs:
 			var ch := int(p)
-			var b := small(str(ch), "Route this input's audio onto program channel %d (audio-only)" % ch if _kind == "routes" else "Checking…", ThemeBuilder.ACCENT, true)
+			var name := str(labels.get(ch, str(ch)))
+			var b := small(AR.short_label(name), "Route this input's audio onto %s (audio-only)" % name if _kind == "routes" else "Checking…", ThemeBuilder.ACCENT, true)
 			b.disabled = _kind == "screens"  # until the server's plan says otherwise
 			b.pressed.connect(func() -> void:
 				if _kind == "routes":
@@ -179,7 +183,7 @@ func set_screens(buttons: Array, targets: Array) -> void:
 		if host:
 			b.add_theme_stylebox_override("disabled", b.get_theme_stylebox("pressed"))
 		b.set_pressed_no_signal(host or targets.has(ch))
-		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to PGM channel %d" % ch if info.get("ok", false) == true
+		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to %s" % str(_labels.get(ch, str(ch))) if info.get("ok", false) == true
 			else str(info.get("reasonText", "Checking…")))
 
 

@@ -23,6 +23,7 @@ const MeterBank := preload("res://features/audio/meter_bank.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const FaderCap := preload("res://features/audio/fader_cap.gd")
 const LL := preload("res://features/audio/layer_levels.gd")
+const AR := preload("res://features/audio/audio_rows.gd")
 const SEND_TEXT := {"afv": "AFV", "always": "ALWAYS", "never": "NEVER"}
 const SEND_TIP := "Audio send — AFV: audio follows video on takes (respects AUTO MIX) · ALWAYS: feeds its routed Ch buses even off-PGM · NEVER: video only"
 const SCALE := [[100.0, "+6"], [83.333, "0"], [66.667, "-6"], [50.0, "-12"], [33.333, "-24"], [16.667, "-48"], [0.0, "-∞"]]
@@ -40,10 +41,12 @@ var _syncing := false
 var _send: OptionButton
 var _routes := {}  # program channel → toggle
 var _screens := {}  # program channel → Screens toggle
+var _labels := {}  # program channel → screen label (AR.screen_labels); the button text and tooltip
 
 
-func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
+func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: Dictionary = {}) -> void:
 	row = r
+	_labels = labels
 	var master: bool = r.get("isMaster", false) == true
 	custom_minimum_size = Vector2(100 + maxi(0, bars - 2) * 9 if master else (64 if dense else 84), 360)
 	add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED if master else ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4))
@@ -163,8 +166,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 		grid.add_theme_constant_override("v_separation", 3)
 		for p in programs:
 			var ch := int(p)
-			var b := _toggle("Ch%d" % ch, "Route this input's audio onto program channel %d (audio-only)" % ch, ThemeBuilder.ACCENT)
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var b := _compact_toggle(AR.short_label(_label_of(ch)), "Route this input's audio onto %s (audio-only)" % _label_of(ch), ThemeBuilder.ACCENT)
 			b.pressed.connect(func() -> void: route_toggled.emit(ch, b.button_pressed))
 			_routes[ch] = b
 			grid.add_child(b)
@@ -181,8 +183,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 		sg.add_theme_constant_override("v_separation", 3)
 		for p in programs:
 			var ch := int(p)
-			var b := _toggle(str(ch), "Checking…", ThemeBuilder.ACCENT)
-			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			var b := _compact_toggle(AR.short_label(_label_of(ch)), "Checking…", ThemeBuilder.ACCENT)
 			b.disabled = true  # until the plan says otherwise
 			b.pressed.connect(func() -> void: screen_toggled.emit(ch, b.button_pressed))
 			_screens[ch] = b
@@ -207,8 +208,13 @@ func set_screens(buttons: Array, targets: Array) -> void:
 		else:
 			b.remove_theme_stylebox_override("disabled")
 		b.set_pressed_no_signal(host or targets.has(ch))
-		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to PGM channel %d" % ch if info.get("ok", false) == true
+		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to %s" % _label_of(ch) if info.get("ok", false) == true
 			else str(info.get("reasonText", "Checking…")))
+
+
+## The PGM screen label for a program channel (its number when the labels dictionary has no entry).
+func _label_of(ch: int) -> String:
+	return str(_labels.get(ch, str(ch)))
 
 
 func _button(text: String, tip: String) -> Button:
@@ -238,6 +244,24 @@ func _toggle(text: String, tip: String, on_colour: Color) -> Button:
 	b.add_theme_font_size_override("font_size", 11)
 	b.add_theme_stylebox_override("pressed", ThemeBuilder.box(on_colour.darkened(0.35), on_colour, 1, 4))
 	b.add_theme_stylebox_override("hover_pressed", ThemeBuilder.box(on_colour.darkened(0.25), on_colour, 1, 4))
+	return b
+
+
+## Route / Screens button: the toggle style of _toggle, at font 10 with tighter padding and a 30 px minimum width so
+## a short label stays tappable (the button flow wraps the row).
+func _compact_toggle(text: String, tip: String, on_colour: Color) -> Button:
+	var b := _toggle(text, tip, on_colour)
+	b.add_theme_font_size_override("font_size", 10)
+	b.custom_minimum_size = Vector2(30, 0)
+	for st in ["normal", "hover", "focus", "disabled", "pressed", "hover_pressed"]:
+		var sb := b.get_theme_stylebox(st)
+		if sb is StyleBoxFlat:
+			var d := (sb as StyleBoxFlat).duplicate() as StyleBoxFlat
+			d.content_margin_left = 3
+			d.content_margin_right = 3
+			d.content_margin_top = 1
+			d.content_margin_bottom = 1
+			b.add_theme_stylebox_override(st, d)
 	return b
 
 

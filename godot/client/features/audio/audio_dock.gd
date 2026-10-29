@@ -110,10 +110,10 @@ func _refresh() -> void:
 	var cm: Dictionary = st.channelMap
 	var progs := Ctl.programs(cm)
 	_rows = ctl.rows(st)
-	var s := DM.shape(_rows, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), progs)
+	var s := JSON.stringify([DM.shape(_rows, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), progs), AR.screen_labels(cm)])
 	if s != _sig:
 		_sig = s
-		rebuild(_rows, progs, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch))
+		rebuild(_rows, progs, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), AR.screen_labels(cm))
 		ctl.fetch_plan(_rows)
 	var solos := ctl.solos()
 	for r in _rows:
@@ -132,7 +132,7 @@ func _refresh() -> void:
 
 
 ## Builds the masters and the rows (headless-testable: `bars_of(row)` = the master's bus channel count).
-func rebuild(rows: Array, progs: Array, bars_of: Callable) -> void:
+func rebuild(rows: Array, progs: Array, bars_of: Callable, labels: Dictionary = {}) -> void:
 	for c in _masters.get_children() + _inputs.get_children():
 		c.get_parent().remove_child(c)
 		c.queue_free()
@@ -148,7 +148,7 @@ func rebuild(rows: Array, progs: Array, bars_of: Callable) -> void:
 		_inputs.add_child(h)
 		for r in g.rows:
 			var row := Row.new()
-			row.setup(r, g.dense, progs)
+			row.setup(r, g.dense, progs, labels)
 			ctl.bind(row, r)
 			_inputs.add_child(row)
 	if _inputs.get_child_count() == 0:

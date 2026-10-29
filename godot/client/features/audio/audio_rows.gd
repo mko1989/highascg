@@ -331,3 +331,37 @@ static func bus_channel_count(settings: Dictionary, cm: Dictionary, program_ch: 
 	if cabled.has(main):
 		layout = _max_layout(layout, cabled[main])
 	return _channels(layout)
+
+
+## The screen label a PGM channel's route / Screens button shows (web client/lib/screen-label.js; mv_layout.gd
+## screen_label): idx = the channel's position in programChannels; screenLabels[idx] when set, else "S<idx+1>".
+## A channel that is not in programChannels shows its number.
+static func screen_label(cm: Dictionary, ch: int) -> String:
+	var progs: Variant = cm.get("programChannels")
+	var idx := -1
+	if progs is Array:
+		for i in progs.size():
+			if int(progs[i]) == ch:
+				idx = i
+				break
+	if idx < 0:
+		return str(ch)
+	var labels: Variant = cm.get("screenLabels")
+	var lab := str(labels[idx]) if (labels is Array and idx < labels.size() and labels[idx] != null) else ""
+	return lab if lab != "" else "S%d" % (idx + 1)
+
+
+## {program channel: screen label} for every program channel of the console (the strips' route buttons).
+static func screen_labels(cm: Dictionary) -> Dictionary:
+	var out := {}
+	var progs: Variant = cm.get("programChannels")
+	if progs is Array:
+		for p in progs:
+			out[int(p)] = screen_label(cm, int(p))
+	return out
+
+
+## Button text for a screen label: longer than max_len characters → truncated with an ellipsis (the full label
+## stays in the button's tooltip).
+static func short_label(label: String, max_len := 8) -> String:
+	return label if label.length() <= max_len else label.substr(0, max_len - 1) + "…"
