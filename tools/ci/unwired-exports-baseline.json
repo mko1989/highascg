@@ -1,6 +1,6 @@
 {
 	"note": "WO-367 ratchet — pre-existing orphan exports. This list may SHRINK, never grow. Regenerate with: node tools/ci/check-unwired-exports.js --update",
-	"count": 624,
+	"count": 622,
 	"entries": [
 		"client/components/cg-only-look-deck-thumb.js: clearCgOnlyLookDeckThumbCache",
 		"client/components/cg-only-look-deck-thumb.js: drawAlphaCheckerboard",
@@ -508,7 +508,6 @@
 		"src/replication/syncthing-client.js: scanFolder",
 		"src/replication/syncthing-client.js: syncthingRequest",
 		"src/server/auth.js: SESSION_COOKIE",
-		"src/server/auth.js: TOKEN_FILE",
 		"src/server/auth.js: ensureApiToken",
 		"src/server/auth.js: getSecurityConfig",
 		"src/server/auth.js: parseCookies",
@@ -574,7 +573,6 @@
 		"src/utils/caspar-restart.js: waitForAmcpTcp",
 		"src/utils/decklink-enum.js: parseDecklinkDevicesFromFfmpegText",
 		"src/utils/edid-parse.js: bufferFromHex",
-		"src/utils/edid-parse.js: decodePnpId",
 		"src/utils/gpu-connector-label.js: formatGpuConnectorLabel",
 		"src/utils/gpu-edid-probe.js: emptyEdidShape",
 		"src/utils/gpu-modetest.js: inferConnectorType",
