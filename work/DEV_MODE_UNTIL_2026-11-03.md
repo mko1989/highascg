@@ -15,5 +15,12 @@ What still holds (from CLAUDE.md and the box memory):
 - Do not drive the pointer or keys on :0 without the owner (the owner shares the pointer live).
 - Do not close the owner's Godot GUI; relaunch instead of closing.
 
+## Verification rule (owner, 29.10)
+
+- After every GUI change made in dev mode: restart the Godot client, bring it to the right tab (launch with
+  `--tab=N`, no pointer clicks), and take a screenshot to verify the change on screen.
+- Restart whatever else is needed to verify end to end (the node, the Caspar binary, the supervisor), for as long as
+  dev mode lasts.
+
 After 3 November 2026 this note is out of date: restore the normal discipline and delete or
 update this file.

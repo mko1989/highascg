@@ -13,13 +13,15 @@ extends VBoxContainer
 ## timeline_transport.gd (and gained rename, to start / end, loop, the time + duration fields, trim, zoom); the
 ## keyboard (timeline_keys.gd): copy / paste, Space, arrows, Enter. Slice 8: the Dest row (timeline_dest.gd): screen,
 ## PRV / PGM posted at once, Take with a transition. Slice 9: effects — Sources' EFFECTS dropped on a clip, the
-## clip page's Mixer Effects group.
+## clip page's Mixer Effects group. WO-810: the transport + Dest controls are one row between the preview and the
+## timeline canvas (timeline_layout.gd).
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
 const TimelineTransport := preload("res://features/timeline/timeline_transport.gd")
 const TimelineDest := preload("res://features/timeline/timeline_dest.gd")
 const TimelineKeys := preload("res://features/timeline/timeline_keys.gd")
+const TimelineLayout := preload("res://features/timeline/timeline_layout.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
 const ClipInspector := preload("res://features/timeline/timeline_clip_inspector.gd")
 const FlagInspector := preload("res://features/timeline/timeline_flag_inspector.gd")
@@ -53,8 +55,6 @@ func _ready() -> void:
 	dest.tab = self
 	transport.edited.connect(_layers_commit)
 	transport.flag_requested.connect(_add_flag)
-	add_child(transport)
-	add_child(dest)
 	_keys.tab = self
 	view = TimelineView.new()
 	view.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -68,15 +68,12 @@ func _ready() -> void:
 	view.layer_selected.connect(_on_layer_selected)
 	view.layers_edited.connect(_layers_commit)
 	view.layer_menu.connect(func(_li: int) -> void: _layer_page.menu())
-	var split := VSplitContainer.new()
-	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	preview_slot = PanelContainer.new()
 	preview_slot.custom_minimum_size.y = 120
 	preview_slot.add_theme_stylebox_override("panel", ThemeBuilder.box(Color.BLACK, ThemeBuilder.BORDER, 0, 0))
-	split.add_child(preview_slot)
 	visibility_changed.connect(_borrow_preview)
 	_borrow_preview.call_deferred()
-	split.add_child(view)
+	var split := TimelineLayout.stack(preview_slot, [transport, dest], view)  # WO-810: preview, controls row, timeline
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	split.split_offset = int(cfg.get_value("timeline", "preview_h", 480))
