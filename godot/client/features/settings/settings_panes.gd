@@ -82,6 +82,27 @@ static func defaults(f: Form, fps: Callable) -> void:
 	picker.finished.connect(func(r: Dictionary) -> void:
 		choose.disabled = false
 		said.text = ("Operator screen: %s." % r.name) if r.ok else ("Nothing changed — %s." % r.get("error", "")))
+	demo_switch(f)
+
+
+## WO-815 — "Simulated server" (ui.cfg [demo] enabled): the client answers itself, without a node or CasparCG (show
+## preparation on any computer). Applies at the next start; "Restart client" does that now.
+static func demo_switch(f: Form) -> void:
+	var restart := Button.new()
+	restart.text = "Restart client"
+	restart.visible = false
+	restart.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	restart.pressed.connect(func() -> void:
+		OS.set_restart_on_exit(true, OS.get_cmdline_args())
+		restart.get_tree().quit())
+	var ob := f.local_option("Simulated server", [[false, "Off — use the server"], [true, "On — demo, no server"]],
+		Config.saved_demo(Config.UI_CFG), func(v: Variant) -> void:
+			Config.save_demo(v == true)
+			restart.visible = (v == true) != Config.demo)
+	ob.disabled = OS.has_feature("web")  # the web build has no server: always a demo
+	f.target.add_child(restart)
+	f.note("Demo mode: looks, takes, faders, timers and pixel maps work on a built-in demo show; nothing reaches a "
+		+ "server or CasparCG. The header then reads \"%s\". Starting the client with --demo does the same." % Config.DEMO_LABEL)
 
 
 static func companion(f: Form, status: Label, check: Button) -> void:

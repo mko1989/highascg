@@ -13,9 +13,12 @@ const AuthModel := preload("res://core/auth_model.gd")
 const Platform := preload("res://core/platform.gd")
 
 const DEFAULT_ORIGIN := "http://127.0.0.1:4200"
+const DEMO_ORIGIN := "http://demo.invalid"  # WO-815: the simulated server — no network address at all
+const DEMO_LABEL := "DEMO — no server"
 const UI_CFG := "user://ui.cfg"
 
 var origin := DEFAULT_ORIGIN
+var demo := false  ## WO-815: Api and Ws answer from core/demo/demo_server.gd, nothing goes on the network
 var args := {}
 var _profiles := {}
 
@@ -25,6 +28,35 @@ func _init() -> void:
 	forget_cluster(UI_CFG)
 	origin = home_origin()
 	_load_password()
+	demo = demo_wanted(args, saved_demo(UI_CFG), OS.has_feature("web"))
+	if demo:
+		origin = DEMO_ORIGIN
+		AuthModel.password = ""  # nothing is sent anywhere
+
+
+## WO-815 — the simulated server (core/demo/demo_server.gd): `-- --demo` (`--demo=0` turns it off), else the Settings
+## switch "Simulated server" (ui.cfg [demo] enabled, default off); the Web export has no server and is always a demo.
+## In a demo the origin is DEMO_ORIGIN (`.invalid` never resolves): the few sockets built from the origin itself
+## (uploads, downloads) fail at once instead of reaching a real box.
+static func demo_wanted(user_args: Dictionary, saved: bool, web: bool) -> bool:
+	if web:
+		return true
+	if user_args.has("demo"):
+		return not (str(user_args["demo"]).to_lower() in ["0", "false", "off", "no"])
+	return saved
+
+
+static func saved_demo(path: String) -> bool:
+	var cfg := ConfigFile.new()
+	return cfg.load(path) == OK and cfg.get_value("demo", "enabled", false) == true
+
+
+## The Settings switch (applies at the next start of the client).
+func save_demo(on: bool) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	cfg.set_value("demo", "enabled", on)
+	cfg.save(UI_CFG)
 
 
 ## Where this client goes (args / env / A/B profile / default) — the only place it ever goes.

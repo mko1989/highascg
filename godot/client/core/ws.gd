@@ -9,6 +9,7 @@ signal message(type: String, data: Variant)
 
 const NetUtil := preload("res://core/net_util.gd")
 const AuthModel := preload("res://core/auth_model.gd")
+const Demo := preload("res://core/demo/demo_server.gd")
 
 const INBOUND_BUFFER := 64 * 1024 * 1024  # `state`/`project_sync` snapshots are multi-KB..MB; default is 64 KB
 const OUTBOUND_BUFFER := 4 * 1024 * 1024
@@ -22,12 +23,19 @@ var _handlers := {}  # type -> Array[Callable]
 var _next_connect_ms := 0
 var _started := false
 var _watches := {}  # WO-797: watch type → {owner instance id: true}; said again on every connect
+var _demo_inbox: Array = []  # WO-815: simulated-server broadcasts, delivered on the next frame like packets
 
 
 ## Called by the app after the HTTP bootstrap (same order as client/app.js).
 func start() -> void:
 	_started = true
 	_next_connect_ms = 0
+	if Config.demo:  # WO-815: no socket — the simulated server "connects" and sends its snapshot
+		Demo.shared().broadcast.connect(func(t: String, d: Variant) -> void: _demo_inbox.append([t, d]))
+		_demo_inbox.append(["state", Demo.shared().snapshot()])
+		is_open = true
+		connected.emit()
+		_dispatch("connect", null)
 
 
 func on(type: String, handler: Callable) -> void:
@@ -46,6 +54,8 @@ func watch(type: String, owner: Object, on: bool) -> void:
 
 
 func send(obj: Dictionary) -> bool:
+	if Config.demo:
+		return Demo.shared().on_ws(obj)
 	if not is_open:
 		return false
 	return _peer.send_text(NetUtil.to_json(obj)) == OK
@@ -53,6 +63,14 @@ func send(obj: Dictionary) -> bool:
 
 func _process(_delta: float) -> void:
 	if not _started:
+		return
+	if Config.demo:
+		for m in _demo_inbox.duplicate():
+			_demo_inbox.pop_front()
+			messages_received += 1
+			var type: String = m[0]
+			message.emit(type, m[1])
+			_dispatch(type, m[1])
 		return
 	if _peer == null:
 		if Time.get_ticks_msec() >= _next_connect_ms:

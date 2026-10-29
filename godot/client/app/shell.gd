@@ -114,6 +114,9 @@ func _ready() -> void:
 	header_tools.badges.devices_requested.connect(func() -> void: tabs.current_tab = tabs.get_tab_idx_from_control(devices))
 	header_status.notice.connect(header_project.say)
 	header_status.setup(osc)
+	if Config.demo:  # WO-815: what the simulated server cannot do says so in the notice line
+		preload("res://core/demo/demo_server.gd").shared().notice.connect(func(t: String) -> void: header_project.say({"text": t, "tone": "warn"}))
+		set_status_line(Config.DEMO_LABEL)
 	_refresh_eye()
 	perf = PerfOverlay.new()  # WO-623 — after the header button exists so its state syncs on boot
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
@@ -230,6 +233,8 @@ func _refresh_eye() -> void:
 	if caspar is Dictionary:
 		caspar_ok = bool((caspar as Dictionary).get("connected", false))
 	var state := "server offline" if not Ws.is_open else ("server ok · Caspar offline" if not caspar_ok else "connected")
+	if Config.demo:  # WO-815
+		state = Config.DEMO_LABEL + " (simulated server)"
 	_eye.set_state(Ws.is_open and caspar_ok, Settings.get_setting("offline_mode", false) == true,
 		"%s\n%s%s%s" % [state, Config.origin, ("\n" + _status) if _status != "" else "",
 			("\n" + Profiles.label(Config.profiles()) + " · right-click for A/B hosts") if Profiles.has_dual(Config.profiles()) else "\nRight-click: A/B hosts"])

@@ -1,0 +1,1 @@
+{"ok":true,"timers":[{"timerId":"timer-show","name":"Show clock","config":{"mode":"duration","durationSec":300},"lastCmd":null,"cmdAt":null,"remainingSec":null,"screens":{"0":{"channel":1,"layer":980,"visible":false,"opacity":1}}}]}

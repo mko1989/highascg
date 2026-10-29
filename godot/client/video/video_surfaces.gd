@@ -26,7 +26,7 @@ var feed: VideoFeed = null  # WO-670 P1: set when pictures come over the network
 
 
 func _ready() -> void:
-	if VideoFeed.wanted(Config.origin, Config.args):
+	if VideoFeed.wanted(Config.origin, Config.args) and not Config.demo:  # WO-815: a demo has no picture source
 		feed = VideoFeed.new(VideoFeed.url_for(Config.origin, Config.args))
 	_timer = Timer.new()
 	_timer.wait_time = LEASE_EVERY_S
@@ -85,6 +85,8 @@ func _ensure(role: String) -> Dictionary:
 
 
 func path_for(role: String) -> String:
+	if Config.demo:  # WO-815: never this box's real Caspar channels — a path no writer ever creates
+		return OS.get_user_data_dir().path_join("demo-no-video").path_join("highascg-%s" % role)
 	var d: Variant = descriptors.get(role)
 	if d is Dictionary and OS.get_name() == "Linux" and str((d as Dictionary).get("path", "")) != "":
 		return str((d as Dictionary)["path"])

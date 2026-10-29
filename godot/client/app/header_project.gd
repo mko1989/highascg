@@ -46,6 +46,9 @@ func _ready() -> void:
 	where.tooltip_text = ("This client is connected to the server on this machine (%s)" if local
 		else "This client is connected to the server at %s: this show is that server's") % Config.origin
 	where.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED if local else ThemeBuilder.WARN)
+	if Config.demo:  # WO-815: the simulated server — nobody may take this for a live box
+		where.text = Config.DEMO_LABEL
+		where.tooltip_text = "Simulated server: no node, no CasparCG. Takes, faders and saves change only this client's copy."
 	where.mouse_filter = Control.MOUSE_FILTER_PASS
 	add_child(where)
 	save_btn =UiIcons.button("save", "Save project to the server (right-click: save to a file)", 16)

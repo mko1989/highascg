@@ -20,6 +20,7 @@ const SKIP_DIRS = new Set([
 	'__pycache__',
 	'.godot', // Godot import cache (per machine)
 	'build', // godot/extensions/*/build (godot-cpp checkout + objects)
+	'web-demo', // WO-815: godot/export/web-demo (gitignored Web export; Godot's generated index.js)
 ])
 
 /* Legacy grandfather list — files that predate the limit and live outside the operator

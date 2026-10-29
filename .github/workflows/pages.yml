@@ -1,3 +1,10 @@
+# WO-815 — the Godot client's Web export in demo mode (simulated server, core/demo/) served under /demo/ of the
+# GitHub Pages site, next to the Jekyll docs and the Project Map. A repository has ONE Pages deployment, so the demo
+# steps live in this one workflow; do not add a second Pages workflow (two deploy jobs overwrite each other's site).
+#
+# Web export notes (godot/client/export_presets.cfg [preset.4] "Web"): single-threaded template
+# (variant/thread_support=false), so no COOP/COEP headers are needed — GitHub Pages cannot send them. The build is
+# always a demo (core/config.gd demo_wanted: OS.has_feature("web")). Size about 41 MB (index.wasm about 40 MB).
 name: Deploy GitHub Pages
 
 on:
@@ -41,6 +48,27 @@ jobs:
           npm run build:map
           sudo mkdir -p _site/map
           sudo cp -r dist-map/* _site/map/
+
+      # WO-815 — same pinned Godot as ci.yml (godot/GODOT_VERSION) + only the Web template out of the export templates.
+      - name: Download pinned Godot + Web export template
+        run: |
+          v="$(cat godot/GODOT_VERSION)"
+          curl -sSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${v}-stable/Godot_v${v}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv "/tmp/godot/Godot_v${v}-stable_linux.x86_64" /tmp/godot/godot
+          curl -sSL -o /tmp/tpl.tpz "https://github.com/godotengine/godot/releases/download/${v}-stable/Godot_v${v}-stable_export_templates.tpz"
+          tdir="$HOME/.local/share/godot/export_templates/${v}.stable"
+          mkdir -p "$tdir"
+          unzip -q -j /tmp/tpl.tpz 'templates/web_nothreads_release.zip' 'templates/version.txt' -d "$tdir"
+
+      - name: Web demo (Godot client, simulated server)
+        run: |
+          /tmp/godot/godot --headless --path godot/client --import || true
+          mkdir -p /tmp/web-demo
+          /tmp/godot/godot --headless --path godot/client --export-release "Web" /tmp/web-demo/index.html
+          test -s /tmp/web-demo/index.wasm && test -s /tmp/web-demo/index.pck
+          sudo mkdir -p _site/demo
+          sudo cp -r /tmp/web-demo/* _site/demo/
 
       - uses: actions/upload-pages-artifact@v3
 

@@ -9,6 +9,7 @@ signal _slot_freed
 const NetUtil := preload("res://core/net_util.gd")
 const AuthModel := preload("res://core/auth_model.gd")
 const AuthPrompt := preload("res://core/auth_prompt.gd")
+const Demo := preload("res://core/demo/demo_server.gd")
 
 const POOL_SIZE := 6
 const TIMEOUT_S := 15.0
@@ -51,6 +52,10 @@ func base() -> String:
 
 ## WO-811: every request carries the shared password (AuthModel.headers); a 401 asks for it once and retries.
 func request(method: int, path: String, body: Variant) -> Dictionary:
+	if Config.demo:  # WO-815: the simulated server answers; nothing goes on the network
+		if is_inside_tree():
+			await get_tree().process_frame
+		return Demo.shared().handle(method, path, body)
 	var res := await _send(method, path, body)
 	while AuthModel.needs_login(res) and await _login():
 		res = await _send(method, path, body)
@@ -88,6 +93,10 @@ func _send(method: int, path: String, body: Variant) -> Dictionary:
 
 ## Binary GET (models, thumbnails, support bundle): { ok, status, bytes, headers, error }.
 func get_bytes(path: String) -> Dictionary:
+	if Config.demo:  # WO-815: no files behind the simulated server (models, thumbnails, bundles)
+		if is_inside_tree():
+			await get_tree().process_frame
+		return {"ok": false, "status": 501, "bytes": PackedByteArray(), "headers": PackedStringArray(), "error": Demo.NOT_IN_DEMO}
 	var res := await _send_bytes(path)
 	while AuthModel.needs_login(res) and await _login():
 		res = await _send_bytes(path)
