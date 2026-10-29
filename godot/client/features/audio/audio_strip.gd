@@ -22,6 +22,7 @@ const MM := preload("res://features/live/mixer_math.gd")
 const MeterBank := preload("res://features/audio/meter_bank.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const FaderCap := preload("res://features/audio/fader_cap.gd")
+const LL := preload("res://features/audio/layer_levels.gd")
 const SEND_TEXT := {"afv": "AFV", "always": "ALWAYS", "never": "NEVER"}
 const SEND_TIP := "Audio send — AFV: audio follows video on takes (respects AUTO MIX) · ALWAYS: feeds its routed Ch buses even off-PGM · NEVER: video only"
 const SCALE := [[100.0, "+6"], [83.333, "0"], [66.667, "-6"], [50.0, "-12"], [33.333, "-24"], [16.667, "-48"], [0.0, "-∞"]]
@@ -75,6 +76,9 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 	meter = MeterBank.new()
 	meter.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	meter.set_count(bars)
+	if not LL.target(r, {}).is_empty():  # WO-800: the layer's own level, a thin lane in the same meter
+		meter.enable_lane()
+		meter.tooltip_text = "Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)"
 	body.add_child(meter)
 	var sc := Control.new()
 	sc.custom_minimum_size.x = 20

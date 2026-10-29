@@ -15,6 +15,7 @@ const AR := preload("res://features/audio/audio_rows.gd")
 const AM := preload("res://features/audio/audio_meter_model.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
 const Strip := preload("res://features/audio/audio_strip.gd")
+const LL := preload("res://features/audio/layer_levels.gd")
 const AlsaMixer := preload("res://features/settings/alsa_mixer_panel.gd")
 const Split := preload("res://features/audio/audio_tab_split.gd")
 const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
@@ -37,6 +38,9 @@ var _metas := {}  # key → meter meta
 var _smooth := {}  # meter key → smoothed 0…1
 var _pending := {}  # key → [due_ms, gain]
 var _tick_acc := 0.0
+var _layer_data := {}  # WO-800: last GET /api/osc/audio-layers (polled while visible)
+var _poll_acc := 0.0
+var _polling := false
 var _inputs: HBoxContainer
 var _masters: HBoxContainer
 var _status: Label
@@ -88,6 +92,7 @@ func _ready() -> void:
 
 func _on_visible() -> void:
 	if not is_visible_in_tree():
+		_layer_data = {}  # never show a level from before the tab was hidden
 		return
 	if not _alsa_loaded:  # WO-799: first show only; later refreshes are the panel's own Refresh button
 		_alsa_loaded = true
@@ -347,12 +352,17 @@ func _process(delta: float) -> void:
 			_pending.erase(k)
 			if s:
 				_send(AA.volume_request(s.row, g))
+	_poll_acc += delta
+	if _poll_acc >= LL.POLL_S and not _polling:
+		_poll_acc = 0.0
+		_poll_layers()
 	_tick_acc += delta
 	if _tick_acc < AM.TICK_S:
 		return
 	_tick_acc = 0.0
 	var ctx := {"osc": osc.channels if osc else {}, "info": Store.get_value("channels"), "live": Store.get_value("scene.live"),
 		"vars": Store.get_value("variables")}
+	var banks: Variant = Store.get_value("scene.programLayerBankByChannel")
 	for key in _strips:
 		var s: Strip = _strips[key]
 		if s.row.get("isMaster", false) == true:  # one meter per program bus channel
@@ -360,6 +370,8 @@ func _process(delta: float) -> void:
 				_meter(ctx, "%s:bus:%d" % [key, i], {}, s, i)
 		else:
 			_meter(ctx, key, _metas.get(key, {}), s, 0)
+			if s.meter.lane_on:
+				_lane(key, s, banks)
 
 
 func _meter(ctx: Dictionary, key: String, meta: Dictionary, s: Strip, bar: int) -> void:
@@ -369,3 +381,25 @@ func _meter(ctx: Dictionary, key: String, meta: Dictionary, s: Strip, bar: int) 
 	s.meter.set_bar(bar, v, AM.colour(r.level))
 	if r.state != "":
 		s.set_input_state(r.state)
+
+
+## WO-800: the layer's own level in the strip's thin lane (same smoothing / colours as the bars; nothing when silent-absent).
+func _lane(key: String, s: Strip, banks: Variant) -> void:
+	var lk := key + ":lane"
+	var t := LL.lane_tick(_smooth.get(lk, 0.0), LL.read(_layer_data, s.row, banks))
+	if t[0] < 0.0:
+		_smooth.erase(lk)
+	else:
+		_smooth[lk] = t[0]
+	s.meter.set_lane(t[0], t[1])
+
+
+## One request at a time; a failed read clears the lanes rather than freezing them.
+func _poll_layers() -> void:
+	if not _strips.values().any(func(s: Strip) -> bool: return s.meter.lane_on):
+		_layer_data = {}
+		return
+	_polling = true
+	var res: Dictionary = await Api.get_json(LL.PATH)
+	_polling = false
+	_layer_data = res.data if res.ok and res.get("data") is Dictionary and is_visible_in_tree() else {}

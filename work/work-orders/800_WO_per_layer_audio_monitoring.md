@@ -1,6 +1,6 @@
 # WO-800 — Per-layer audio monitoring (levels per layer, not per channel)
 
-**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); open: Godot/web per-layer VU display (follow-up), owner commits of both trees.**
+**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); open: web display, owner commits of both trees.**
 
 Owner, 29.10:
 > what are our options to finally get proper audio monitoring per layer? i know caspar is only sending per channel values.
@@ -210,6 +210,80 @@ Probe scripts (scratchpad, session 03d195b7): `osc_sniff.py` (UDP :6250 + AMCP c
    3431 pass, 0 fail, 2 skipped; `check-max-file-lines` 0 over; `check-unwired-exports`, `check-tdz-reads` pass;
    `check-require-integrity` fails only on 11 pre-existing Syncthing `*.sync-conflict-*` files under `projects/` (June).
 
-**Not verified / follow-up:** Godot or web per-layer VU display (nothing renders the new route yet); interlaced
+**Not verified / follow-up (at the time of the Caspar pass):** Godot or web per-layer VU display (nothing renders the new route yet); interlaced
 channels (second field overwrites the state, same as the channel meter; no interlaced channel on the box); the
 route's levels are a 50 Hz sample of the latest tick, not a ballistics meter (WO-604 open item).
+
+## Godot display investigation (29.10, Opus)
+
+**Endpoint on the box (curl, read-only).** `GET /api/osc/audio-layers` →
+`{ channels: { "2": { "10": { nbChannels: 16, levels: [{ dBFS, peak } ×16], updatedAt }, "11": …, "12": … }, "5": { "11": … },
+"6": { "1": … } }, updatedAt }` — channel and layer keys are strings; each layer entry also carries its own `updatedAt`
+(`src/osc/osc-state-audio.js:164-168`). `dBFS` is the current value, `peak` is the node's peak hold (layer 11: dBFS −27.3,
+peak −15.4); silent audio channels read −120. `/api/osc/audio-layers/1` → `{ channels: {} }` (ch 1 had no audible layer).
+Entries older than `osc.staleTimeoutMs` (default 1000 ms) are dropped (`osc-state-audio.js:150-160`), so "absent" = the
+layer contributes no audio.
+
+**Where the console's meters come from today.**
+- `features/live/osc_mirror.gd:12-30` — the shared OSC mirror (`Ws.on("osc")`, snapshots + deltas). The per-layer store is
+  deliberately outside `_channels` (`osc-state-audio.js:119`), so it is **not** in the WS payload: the Godot client must poll.
+- `features/audio/audio_tab.gd:339-371` — the meter loop: 20 Hz (`AM.TICK_S`) while the tab is visible; one bar per strip
+  (`_meter` → `AM.read_key` → `AM.smooth` → `s.meter.set_bar`), one bar per bus channel on a master.
+- `features/audio/audio_meter_model.gd:198-205` `layer_peak`: a layer strip shows the **channel bus** peak while the layer is
+  on air (it first looks for `osc.channels[ch].layers[L].audio.levels`, which the node never fills — `osc-state-layer.js:298`
+  is `file/audio/*` stream info, not levels). So today every layer strip on one channel shows the same summed level.
+- Scale + ballistics: `AM.smooth` (`audio_meter_model.gd:268-270`: −60…0 dBFS → 0…1, instant rise, 0.45 fall per 50 ms tick)
+  and `AM.colour` (`:274-275`: green, red above −1 dBFS). Bars are drawn by `meter_bank.gd:37-51`.
+- Strip layout: `audio_strip.gd:47` (master 100+, dense 64, else 84 px), body = meter (`meter_bank.gd:25`, min 10 px) + scale
+  (20 px) + fader (`FaderCap.WIDTH` 26 px) + 2 × 3 px separation + 2 × 8 px panel margin (`theme_builder.gd:64`) = 78 px — the
+  dense strip is already content-bound at 78 px, the 84 px strip has 6 px spare.
+
+**Layer row → Caspar (channel, layer).** Rows come from `audio_rows.gd`: scene look rows (`_scene_rows`, `:166-194`, key
+`pgm:<ch>:layer:<L>`, `audioScreens` set only here), timeline rows (`:149-163`, L = 210 + idx), live-audio slot rows (`:124-132`),
+the audio-only look (`:133-145`, L = 200), dedicated input rows (`input_rows`, `:243-256`, `ch` = the input channel, `layer`
+= its producer layer). `row.ch` / `row.layer` is the physical pair for all of them **except scene look rows on a PGM channel in
+bank B**: physical = L + 100 for look layers 10–99 (`src/engine/look-layer-ranges.js:9-11`); the bank per channel is
+`scene.programLayerBankByChannel` (on the box `{1:a,2:a,3:a,4:a}`), as `pgm_timer_model.gd:174-186` reads it. The
+live-audio scene row has `hostChannel` set, but its meter belongs on the program channel layer (that is where the routed audio
+is mixed), so the lane uses `row.ch`, not `hostChannel`. Masters have no layer → no lane.
+
+**Decision.** Poll `GET /api/osc/audio-layers` (all channels, one request) every 200 ms while the Audio tab is visible and at
+least one strip has a layer; no WS change (the server side is committed; adding it to the 25 Hz WS snapshot would put 16
+levels × every audible layer into every client's stream). The layer level = the max `dBFS` over the layer's audio channels,
+through `AM.smooth` / `AM.colour` at the existing 20 Hz tick (same scale, same ballistics; a 5 Hz source under a 20 Hz falling
+meter). The display is a thin lane (4 px) inside the strip's existing meter control, so the strip does not get wider; the lane
+is drawn only while the layer is in the response (no audio → nothing, no empty bar). The wide bar keeps its current
+meaning (channel level while the layer is on air) — replacing it was not asked for and is left to the owner.
+Known gaps: `switcher_bus` transition model remaps the PGM channel (`pgm_timer_model.gd:180-183`) — not followed here;
+PRV is bank-less, so preview rows (none exist in the console today) would need no shift.
+
+### Godot display — what was done (29.10, Opus)
+
+- `godot/client/features/audio/layer_levels.gd` (new, 68 lines, static): `target(row, banks)` → physical [ch, layer]
+  (bank B look layers +100; masters / rows without a layer → []), `entry` / `peak` (max `dBFS` over `nbChannels`), `read`
+  → `{present, level}`, `lane_tick(prev, read)` → `[AM.smooth(...) or −1 = hidden, AM.colour(...)]`. `PATH`, `POLL_S` = 0.2.
+- `meter_bank.gd` (78): `enable_lane()` (single-bar banks only) reserves a 3 px lane + 1 px gap on the right inside the same
+  10 px control (no wider strip); `set_lane(v, colour)`; `_draw` paints the lane only when `lane >= 0`. The meter takes a
+  tooltip (mouse PASS) when it has one.
+- `audio_strip.gd` (304): layer strips (any row `LL.target` maps) call `meter.enable_lane()` + tooltip
+  "Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)".
+- `audio_tab.gd` (405): `_poll_layers()` every `LL.POLL_S` from `_process` (which returns early while hidden), one request at
+  a time, skipped when no strip has a lane; a failed read or a hidden tab clears the data. `_lane()` runs in the 20 Hz meter
+  tick next to `_meter()` and keeps its smoothing under `<key>:lane` in `_smooth`. Bank map:
+  `Store.get_value("scene.programLayerBankByChannel")`.
+- Why a lane and not a new widget: the dense strip is already content-bound (78 px, see the investigation); a separate control
+  would widen every layer strip. Why poll: the per-layer store is outside the WS payload by design.
+
+### Godot display — verified (29.10)
+
+- Godot suite (`run-client.sh --test`): 22029 passed, 0 failed (new `tests/test_audio_layer_levels.gd`, 6 tests: row → layer
+  incl. bank B / live-audio host / masters, level from the box's response shape, scale + ballistics = `AM.smooth` / `AM.colour`,
+  lane hidden until audio, no wider meter, poll only while visible).
+- `run-client.sh --check`: boot OK; a second headless boot on the Audio tab (`--tab=3`, 8 s): no script errors.
+- Live data through the real code (scratch probe: `audio_rows.program_rows` over the box's `/api/state` with ch 2 as program,
+  `layer_levels.read` over the live `/api/osc/audio-layers`): `pgm:2` master → no lane; L10 → [2,10] −8.5 dBFS (lane 0.86, ok);
+  L11 → [2,11] −33.1 dBFS (0.45); L12 → present, silent (lane 0). On the box the console's program channels are 1/3 and their
+  looks carry no audio layers right now, so no lane is on screen yet.
+- `check-max-file-lines`: 0 over.
+- **Not verified:** the look on the glass (lane width / legibility at the dense 64→78 px strip), a bank-B take live, the
+  `switcher_bus` remap, the GUI's polling against the server under load. Owner QA.
