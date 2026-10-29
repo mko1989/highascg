@@ -4,7 +4,7 @@ Apply: git -C ~/caspar-build/src-v2 apply <this file>; build: ~/caspar-build/bui
 OSC: /channel/<ch>/mixer/audio/layer/<L>/volume  int32 x audio channels (sample peak, same unit as .../mixer/audio/volume)
 
 diff --git a/src/core/mixer/audio/audio_mixer.cpp b/src/core/mixer/audio/audio_mixer.cpp
-index e5215d410..caa35ff2d 100644
+index e5215d410..bf59218ba 100644
 --- a/src/core/mixer/audio/audio_mixer.cpp
 +++ b/src/core/mixer/audio/audio_mixer.cpp
 @@ -46,6 +46,7 @@ struct audio_item
@@ -48,12 +48,14 @@ index e5215d410..caa35ff2d 100644
          for (auto& item : items) {
              auto ptr       = item.samples.data();
              auto item_size = item.samples.size();
-@@ -168,6 +177,14 @@ struct audio_mixer::impl
+@@ -168,6 +177,16 @@ struct audio_mixer::impl
              // Store current volume for next frame
              next_volumes[item.tag] = item.transform.volume;
  
++            // HighAsCG WO-800: a frame with an empty audio buffer (a stopped/ended producer still visits) adds nothing
++            // to its layer's meter, so the layer drops out of the state instead of holding a level.
 +            double* layer_dst = nullptr;
-+            if (item.layer >= 0) {
++            if (item.layer >= 0 && (item_size > 0 || last_size > 0)) {
 +                auto& buf = layer_mixed[item.layer];
 +                if (buf.empty())
 +                    buf.assign(mixed.size(), 0.0);
@@ -63,7 +65,17 @@ index e5215d410..caa35ff2d 100644
              // Sample collection and volume application loop
              for (auto n = 0; n < dst_size; ++n) {
                  double sample_value = 0.0;
-@@ -202,7 +219,10 @@ struct audio_mixer::impl
+@@ -176,6 +195,9 @@ struct audio_mixer::impl
+                     sample_value = static_cast<double>(last_ptr[n]);
+                 } else if (n < last_size + item_size) {
+                     sample_value = static_cast<double>(ptr[n - last_size]);
++                } else if (item_size == 0) {
++                    // HighAsCG WO-800: nothing to hold — the hold below would read ptr[] out of bounds
++                    sample_value = 0.0;
+                 } else {
+                     // If we run out of samples, hold the last sample value per channel
+                     int channel_pos = n % channels_;
+@@ -202,7 +224,10 @@ struct audio_mixer::impl
                      applied_volume = previous_volume + (item.transform.volume - previous_volume) * position;
                  }
                  
@@ -75,7 +87,7 @@ index e5215d410..caa35ff2d 100644
              }
  
              if (has_variable_cadence_ && item.tag) {
-@@ -259,7 +279,24 @@ struct audio_mixer::impl
+@@ -259,7 +284,24 @@ struct audio_mixer::impl
              graph_->set_tag(diagnostics::tag_severity::WARNING, "audio-clipping");
          }
  
@@ -101,7 +113,7 @@ index e5215d410..caa35ff2d 100644
  
          graph_->set_value("volume",
                            static_cast<double>(*boost::max_element(max)) / std::numeric_limits<int32_t>::max());
-@@ -282,5 +319,6 @@ array<const int32_t> audio_mixer::operator()(const video_format_desc& format_des
+@@ -282,5 +324,6 @@ array<const int32_t> audio_mixer::operator()(const video_format_desc& format_des
      return impl_->mix(format_desc, nb_samples);
  }
  core::monitor::state audio_mixer::state() const { return impl_->state_; }

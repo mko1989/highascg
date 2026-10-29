@@ -1,6 +1,6 @@
 # WO-800 — Per-layer audio monitoring (levels per layer, not per channel)
 
-**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); web display built 29.10 (Audio tab lane, offline suite + sandbox/headless-Firefox screenshots; see "Web display (29.10)"); open: Caspar frozen-level bug for ended/empty layers, owner commits of both trees. · live e2e 29.10: Godot lanes PASS on the glass**
+**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); web display built 29.10 (Audio tab lane, offline suite + sandbox/headless-Firefox screenshots; see "Web display (29.10)"); Caspar frozen-level bug fixed + deployed 29.10 (see "Caspar fix: frozen level"); open: owner commits of both trees. · live e2e 29.10: Godot lanes PASS on the glass**
 
 Owner, 29.10:
 > what are our options to finally get proper audio monitoring per layer? i know caspar is only sending per channel values.
@@ -401,3 +401,33 @@ The web lane already treated an entry older than 500 ms (response `updatedAt` �
 not, so an ended clip kept its last level for the node's 5 s `osc.staleTimeoutMs`. `features/audio/layer_levels.gd`
 `entry()` now applies the same window (`FRESH_MS := 500`); entries with no timestamps stay present. Godot suite 22813/0
 with the new `test_entry_older_than_fresh_ms_is_absent`; it fails when the window is widened 100×.
+
+### Caspar fix: frozen level on audio-less layers (29.10, Opus)
+
+**Investigation.** Live `INFO 2` before the fix: `mixer/audio/layer/audio/layer_10` and `layer_13` both reported
+268369920 (−18.1 dBFS) on every read, while the channel bus showed 313344 (−76.7 dBFS). Layer 10 was `INTRO_HAP.mov`,
+which has a video stream only (`streams_0` fps 25, no audio stream). Cause, in `src/core/mixer/audio/audio_mixer.cpp`
+`mix()`: a producer with no audio still queues an item whose sample buffer is empty (`visit()` only skips a null
+`audio_data()`). With `item_size == 0` the upstream "hold the last sample value" branch computes
+`offset = channel_pos` and reads `ptr[channel_pos]`, out of bounds of an empty buffer. Every frame read the same stale
+memory, so the layer's meter showed a constant level. It went into the channel mix too; two such layers can cancel there,
+which is why the bus stayed low.
+
+**What was done.** Two guards in the same loop (`caspar/patches/wo800-per-layer-audio-meters.patch` regenerated from the
+worktree; the rest of the patch is unchanged):
+- An item with `item_size == 0` contributes 0.0 instead of the out-of-bounds hold. This also fixes the channel mix.
+- A layer gets a meter buffer only when the item has samples (`item_size > 0 || last_size > 0`). A layer with no audio
+  therefore drops out of the state, and so out of `/api/osc/audio-layers`, and its lane hides.
+
+Build `~/caspar-build/build-26.sh` rc=0 → `bin/casparcg` md5 bbe75049. Rollback is `bin/casparcg.pre-wo800-mixfix`
+(edd5c8e7, the NotchLC build it replaced; the only source change since that build is a comment rewording in
+`av_util.cpp`). The swap used AMCP `RESTART`, then a node restart.
+
+**Verified (box).**
+- `INFO 2` after the swap, with the same Intro look (L10 INTRO_HAP, L11 PK BACK TRACK, L12 PK CLICK): no `layer_10` meter
+  at all. L11 matches the bus on every sample (−47.7/−47.5 = bus −47.7/−47.5, −73.4 = −73.4, …), and L12 stays at
+  −121 between clicks.
+- After a take to PGM 1: the same on `INFO 1` over 6 samples. L11 equals the bus throughout (−53.9 → −98.7 → −39.4 dB);
+  there is no L10 entry.
+- Godot Audio tab on the glass (`scratchpad/mixfix/strips3.png`, `crop.png`): L10 INTRO has no lane, the L12 lane jumps
+  on a click (−10 dB), and the wide bars follow the bus.
