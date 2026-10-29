@@ -9,6 +9,7 @@ extends VBoxContainer
 ## the routing state is GET /api/audio/inputs/routing + the `audioInputRouting` change.
 ## Look strips' Screens row (cross-screen audio) is server-planned (POST /api/audio/cross-screen/plan, refetched on
 ## every strip rebuild) and toggled through POST /api/audio/cross-screen; the returned targets land on the look layer.
+## WO-806: the reads and every write live in audio_console_ctl.gd, shared with the Inspector's Program audio dock.
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const AR := preload("res://features/audio/audio_rows.gd")
@@ -19,24 +20,18 @@ const LL := preload("res://features/audio/layer_levels.gd")
 const AlsaMixer := preload("res://features/settings/alsa_mixer_panel.gd")
 const Split := preload("res://features/audio/audio_tab_split.gd")
 const LiveInputDialog := preload("res://features/devices/live_input_dialog.gd")
-const DEBOUNCE_MS := 80
+const Ctl := preload("res://features/audio/audio_console_ctl.gd")
 const EMPTY := "No active program inputs playing audio. Play a scene look with audio/video media to see channel strips here."
 
 signal inspect_destination(id: String)  ## a live-audio strip → its host-channel page in Devices
 signal caspar_changed  ## a live input was added: Devices shows Apply + restart
 
 var osc: Node  # shell's OscMirror
-var _mixer := {}
-var _live_inputs: Variant = null
-var _routing := {}
-var _xplan := {}  # cross-screen plan for the current strips
+var ctl := Ctl.new()  # WO-806: reads + writes, shared code with the Program audio dock
 var _auto_mix: Button
 var _rows: Array = []
 var _sig := ""
-var _strips := {}  # key → Strip
-var _metas := {}  # key → meter meta
 var _smooth := {}  # meter key → smoothed 0…1
-var _pending := {}  # key → [due_ms, gain]
 var _tick_acc := 0.0
 var _layer_data := {}  # WO-800: last GET /api/osc/audio-layers (polled while visible)
 var _poll_acc := 0.0
@@ -82,7 +77,11 @@ func _ready() -> void:
 	plus.tooltip_text = "Add a live audio (ALSA / USB) input. Its device and routing: Settings → Live audio; remove it from its strip."
 	plus.pressed.connect(func() -> void: _add.open("live_audio"))
 	foot.add_child(plus)
-	Store.changed.connect(_on_store)
+	ctl.changed.connect(_refresh)
+	ctl.status.connect(func(t: String) -> void: _status.text = t)
+	Store.changed.connect(func(path: String, value: Variant) -> void:
+		if ctl.on_store(path, value):
+			_refresh())
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _refresh())
 	Settings.changed.connect(_refresh)
 	Settings.loaded.connect(_refresh)
@@ -98,45 +97,15 @@ func _on_visible() -> void:
 		_alsa_loaded = true
 		_alsa.load_mixer(false)
 	_refresh()
-	var m: Dictionary = await Api.get_json("/api/audio/mixer")
-	if m.ok and m.data is Dictionary:
-		_mixer = m.data
-	var li: Dictionary = await Api.get_json("/api/audio/live-inputs")
-	if li.ok:
-		_live_inputs = li.data
-	var ro: Dictionary = await Api.get_json("/api/audio/inputs/routing")
-	if ro.ok and ro.data is Dictionary:
-		_routing = ro.data
-	_refresh()
-
-
-func _on_store(path: String, value: Variant) -> void:
-	if path == "audioMixer" and value is Dictionary:
-		_mixer = value
-	if path == "audioInputRouting" and value is Dictionary:
-		_routing = value
-	if path in ["*", "channelMap", "audioMixer", "audioInputRouting", "timeline.playback"] or path.begins_with("scene"):
-		_refresh()
-
-
-func _state() -> Dictionary:
-	var tl: Variant = Store.project.get("timelines")
-	return {"channelMap": _d(Store.get_value("channelMap")), "live": _d(Store.get_value("scene.live")),
-		"liveAudioOnly": _d(Store.get_value("scene.liveAudioOnly")), "playback": Store.get_value("timeline.playback"),
-		"timelines": tl.get("timelines", []) if tl is Dictionary else [], "mixer": _mixer, "liveInputs": _live_inputs,
-		"casparServer": _d(Settings.get_setting("casparServer", {}))}
-
-
-static func _d(v: Variant) -> Dictionary:
-	return v if v is Dictionary else {}
+	ctl.fetch()  # refreshes again when the reads land
 
 
 func _refresh() -> void:
 	if not is_visible_in_tree():
 		return
-	var st := _state()
+	var st := ctl.state()
 	var cm: Dictionary = st.channelMap
-	_rows = AR.input_rows(cm, _mixer) + AR.program_rows(st)
+	_rows = ctl.rows(st)
 	var sig := [_programs(cm)]
 	for r in _rows:
 		var bars := AR.bus_channel_count(Settings.settings, cm, r.ch) if r.get("isMaster", false) == true else 1
@@ -145,31 +114,30 @@ func _refresh() -> void:
 	if s != _sig:
 		_sig = s
 		_rebuild(cm)
-		_fetch_plan()
-	var solos: Array = _mixer.get("solos", []) if _mixer.get("solos") is Array else []
+		ctl.fetch_plan(_rows)
+	var solos := ctl.solos()
 	for r in _rows:
-		var strip: Strip = _strips.get(r.key)
+		var strip: Strip = ctl.strips.get(r.key)
 		if strip == null:
 			continue
 		strip.row = r
-		_metas[r.key] = AR.meter_meta(r)
-		if not _pending.has(r.key):
+		ctl.metas[r.key] = AR.meter_meta(r)
+		if not ctl.pending(r.key):
 			strip.set_gain(float(r.get("v", 1.0)))
 		strip.set_muted(r.get("muted", false) == true)
 		strip.set_solo(solos.has(r.key))
-		strip.set_routing(AA.routing_entry(_routing, r))
-		strip.set_screens(AA.cross_screen_buttons(_xplan, r), AA.cross_screen_targets(r))
+		strip.set_routing(AA.routing_entry(ctl.routing, r))
+		strip.set_screens(AA.cross_screen_buttons(ctl.xplan, r), AA.cross_screen_targets(r))
 	if _auto_mix:
-		_auto_mix.set_pressed_no_signal(_routing.get("autoMix", true) != false)
+		_auto_mix.set_pressed_no_signal(ctl.routing.get("autoMix", true) != false)
 
 
 func _rebuild(cm: Dictionary) -> void:
 	for c in _inputs.get_children() + _masters.get_children():
 		c.get_parent().remove_child(c)
 		c.queue_free()
-	_strips.clear()
+	ctl.clear()
 	_smooth.clear()
-	_metas.clear()
 	var progs := _programs(cm)
 	_auto_mix = null
 	var live_inputs := _rows.filter(func(r: Dictionary) -> bool: return r.get("isLiveInput", false) == true)
@@ -195,7 +163,7 @@ func _rebuild(cm: Dictionary) -> void:
 
 
 static func _programs(cm: Dictionary) -> Array:
-	return cm.get("programChannels", []) if cm.get("programChannels") is Array and not cm.programChannels.is_empty() else [1]
+	return Ctl.programs(cm)
 
 
 ## Mixer-wide audio-follows-video at TAKE time; deliberately not retroactive (the next take applies it).
@@ -208,7 +176,7 @@ func _auto_mix_button() -> Button:
 	b.tooltip_text = "ON: takes bring AFV inputs' audio with the video. OFF: takes bring live inputs in silent — mix with the strips. Applies from the next take."
 	b.add_theme_stylebox_override("pressed", ThemeBuilder.box(ThemeBuilder.ACCENT.darkened(0.35), ThemeBuilder.ACCENT, 1, 4))
 	b.pressed.connect(func() -> void:
-		var res := await _send(AA.auto_mix_request(b.button_pressed))
+		var res := await ctl.send(AA.auto_mix_request(b.button_pressed))
 		_status.text = ("Auto mix %s — applies from the next take." % ("ON" if b.button_pressed else "OFF")) if res.ok else _status.text)
 	return b
 
@@ -238,120 +206,16 @@ func _strip(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> Stri
 	var s := Strip.new()
 	s.setup(r, bars, dense, programs)
 	s.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	var key: String = r.key
-	s.gain_changed.connect(func(g: float, final: bool) -> void: _on_gain(key, g, final))
-	s.solo_pressed.connect(func(multi: bool) -> void: _on_solo(key, multi))
-	s.mute_pressed.connect(func() -> void: _on_mute(key))
-	s.route_toggled.connect(func(ch: int, on: bool) -> void: _after(await _send(AA.route_request(s.row, ch, on))))
-	s.screen_toggled.connect(func(ch: int, on: bool) -> void: _on_screen(key, ch, on))
-	s.send_selected.connect(func(send: String) -> void: _after(await _send(AA.send_request(s.row, send))))
-	s.start_pressed.connect(func() -> void:
-		var res := await _send(AA.start_request(s.row))
-		if res.ok:
-			_status.text = "%s capture started (%d route(s) restored)." % [str(s.row.label), int(_d(res.get("data")).get("routesRestored", 0))])
-	s.stop_pressed.connect(func() -> void: _send(AA.audio_only_stop_request(s.row)))
+	ctl.bind(s, r)  # fader / solo / mute / routes / send / START / STOP / Screens → the shared write path
 	s.inspect_requested.connect(func() -> void: inspect_destination.emit(
 		AR.HC.destination_id("live_audio_input", s.row.get("hostChannel", s.row.ch), AA.inspect_slot(s.row))))
-	_strips[key] = s
-	_metas[key] = AR.meter_meta(r)
 	return s
-
-
-## Fader: the look's own layer takes the value (web patchLayer on change); the server gets a debounced write while
-## the fader moves and an immediate one on release.
-func _on_gain(key: String, g: float, final: bool) -> void:
-	var s: Strip = _strips.get(key)
-	if s == null:
-		return
-	var r: Dictionary = s.row
-	if not AA.keyed(r):
-		AA.patch_live_layer(Store.get_value("scene.live"), r.ch, r.layer, {"volume": g})
-		if final and AA.patch_look_layer(Store.project, str(r.sceneId), r.layer, {"volume": g}):
-			ProjectSync.deck_changed()
-			ProjectSync.mark_dirty()
-	if final:
-		_pending.erase(key)
-		_send(AA.volume_request(r, g))
-	else:
-		_pending[key] = [Time.get_ticks_msec() + DEBOUNCE_MS, g]
-
-
-func _on_solo(key: String, multi: bool) -> void:
-	var keys := AA.toggle_solo(_mixer.get("solos", []) if _mixer.get("solos") is Array else [], key, multi)
-	for k in _strips:
-		(_strips[k] as Strip).set_solo(keys.has(k))
-	var res := await _send(AA.solo_request(keys))
-	if not res.ok:
-		_refresh()  # back to the server's set
-
-
-func _on_mute(key: String) -> void:
-	var s: Strip = _strips.get(key)
-	if s == null:
-		return
-	var r: Dictionary = s.row
-	var next := s.muted()
-	if not AA.keyed(r):
-		AA.patch_live_layer(Store.get_value("scene.live"), r.ch, r.layer, {"muted": next})
-		if AA.patch_look_layer(Store.project, str(r.sceneId), r.layer, {"muted": next}):
-			ProjectSync.deck_changed()
-			ProjectSync.mark_dirty()
-	_metas[key] = AR.meter_meta(r.merged({"muted": next}, true))
-	_send(AA.mute_request(r, next, s.gain()))
-
-
-func _fetch_plan() -> void:
-	var req := AA.cross_screen_plan_request(_rows)
-	if (req[2].sources as Array).is_empty():
-		_xplan = {}
-		return
-	var res: Dictionary = await Api.post_json(req[1], req[2])
-	_xplan = _d(res.get("data")) if res.ok else {}
-	_refresh()
-
-
-## A Screens toggle: on success the server's target list becomes the look layer's audioScreens (web patchLayer).
-func _on_screen(key: String, ch: int, on: bool) -> void:
-	var s: Strip = _strips.get(key)
-	if s == null:
-		return
-	var r: Dictionary = s.row
-	var res := await _send(AA.cross_screen_request(r, ch, on))
-	if res.ok:
-		var targets: Array = _d(res.get("data")).get("targets", [])
-		AA.patch_live_layer(Store.get_value("scene.live"), r.ch, r.layer, {"audioScreens": targets})
-		if AA.patch_look_layer(Store.project, str(r.sceneId), r.layer, {"audioScreens": targets}):
-			ProjectSync.deck_changed()
-			ProjectSync.mark_dirty()
-		r.audioScreens = targets
-	elif str(_d(res.get("data")).get("reasonText", "")) != "":
-		_status.text = str(res.data.reasonText)
-	_refresh()
-
-
-## A refused routing call puts the toggles back on the server's state.
-func _after(res: Dictionary) -> void:
-	if not res.ok:
-		_refresh()
-
-
-func _send(req: Array) -> Dictionary:
-	var res: Dictionary = await Api.post_json(req[1], req[2])
-	_status.text = "" if res.ok else "%s failed: %s" % [req[1], res.get("error", res.get("status"))]
-	return res
 
 
 func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
-	var now := Time.get_ticks_msec()
-	for k in _pending.keys():
-		if now >= _pending[k][0]:
-			var s: Strip = _strips.get(k)
-			var g: float = _pending[k][1]
-			_pending.erase(k)
-			if s:
-				_send(AA.volume_request(s.row, g))
+	ctl.flush()
 	_poll_acc += delta
 	if _poll_acc >= LL.POLL_S and not _polling:
 		_poll_acc = 0.0
@@ -363,13 +227,13 @@ func _process(delta: float) -> void:
 	var ctx := {"osc": osc.channels if osc else {}, "info": Store.get_value("channels"), "live": Store.get_value("scene.live"),
 		"vars": Store.get_value("variables")}
 	var banks: Variant = Store.get_value("scene.programLayerBankByChannel")
-	for key in _strips:
-		var s: Strip = _strips[key]
+	for key in ctl.strips:
+		var s: Strip = ctl.strips[key]
 		if s.row.get("isMaster", false) == true:  # one meter per program bus channel
 			for i in s.meter.levels.size():
 				_meter(ctx, "%s:bus:%d" % [key, i], {}, s, i)
 		else:
-			_meter(ctx, key, _metas.get(key, {}), s, 0)
+			_meter(ctx, key, ctl.metas.get(key, {}), s, 0)
 			if s.meter.lane_on:
 				_lane(key, s, banks)
 
@@ -396,7 +260,7 @@ func _lane(key: String, s: Strip, banks: Variant) -> void:
 
 ## One request at a time; a failed read clears the lanes rather than freezing them.
 func _poll_layers() -> void:
-	if not _strips.values().any(func(s: Strip) -> bool: return s.meter.lane_on):
+	if not ctl.strips.values().any(func(s: Strip) -> bool: return s.meter.lane_on):
 		_layer_data = {}
 		return
 	_polling = true

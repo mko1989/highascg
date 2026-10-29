@@ -8,11 +8,9 @@ extends VBoxContainer
 signal closed
 
 const T := preload("res://features/live/screen_timer_model.gd")
-const C := preload("res://features/live/countdown_model.gd")
-const P := preload("res://features/live/pip_model.gd")
+const SettingsForm := preload("res://features/live/screen_timer_settings.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
-const NumericField := preload("res://core/numeric_field.gd")
 
 var screen_idx := 0
 var screen_label := ""
@@ -141,78 +139,11 @@ func _section(rec: Dictionary) -> Control:
 		op.tooltip_text = "%d%%" % int(op.value)
 		_visible(id, vis, 0, op.value / 100.0))
 	g.add_child(op)
-	_settings(g, box, rec, cfg)
+	SettingsForm.build(g, box, cfg, true, func(patch: Dictionary) -> void: _apply(rec, patch))  # WO-806: shared form, extended
 	var rm := _btn("Remove from screen", "CG CLEAR on its layer", func() -> void: _confirm_remove(id))
 	box.add_child(rm)
 	box.add_child(HSeparator.new())
 	return box
-
-
-## timer-control-panel-settings-form.js (extended): position + px apply at once, the rest on Save.
-func _settings(g: GridContainer, box: VBoxContainer, rec: Dictionary, cfg: Dictionary) -> void:
-	var w := {}
-	g.add_child(_muted("Duration"))
-	var hms := HBoxContainer.new()
-	var p := C.secs_to_hms(float(cfg.durationSec) if float(cfg.durationSec) > 0 else 300.0)
-	for i in 3:
-		var sp := SpinBox.new()
-		sp.max_value = 99 if i == 0 else 59
-		sp.value = p[i]
-		sp.suffix = ["h", "m", "s"][i]
-		hms.add_child(sp)
-		w[["h", "m", "s"][i]] = sp
-	g.add_child(hms)
-	w["mode"] = _choice(g, "Mode", T.MODES.map(func(m: Array) -> String: return m[1]), T.MODES.map(func(m: Array) -> String: return m[0]).find(str(cfg.mode)))
-	var tl := _muted("Target time")
-	g.add_child(tl)
-	var target := LineEdit.new()
-	target.text = str(cfg.targetTime)
-	target.placeholder_text = "HH:MM:SS"
-	g.add_child(target)
-	var sync_mode := func() -> void:
-		var clock: bool = (w.mode as OptionButton).selected == 1
-		tl.visible = clock
-		target.visible = clock
-	(w.mode as OptionButton).item_selected.connect(func(_i: int) -> void: sync_mode.call())
-	sync_mode.call()
-	w["size"] = _number(g, "Size (vw)", 1, 100, float(cfg.timerFontSize))
-	w["font"] = _choice(g, "Font", T.FONTS.map(func(f: Array) -> String: return f[1]), T.FONTS.map(func(f: Array) -> String: return f[0]).find(str(cfg.timerFontFamily)))
-	for c in [["timerColor", "Color"], ["amberColor", "Amber"], ["redColor", "Red"], ["timerBorderColor", "Border color"]]:
-		g.add_child(_muted(c[1]))
-		var cp := ColorPickerButton.new()
-		cp.edit_alpha = false
-		cp.custom_minimum_size = Vector2(60, 24)
-		cp.color = P.parse_css(str(cfg.get(c[0], T.DEFAULTS[c[0]])))
-		g.add_child(cp)
-		w[c[0]] = cp
-	w["border"] = _number(g, "Border (px)", 0, 20, float(cfg.timerBorderWidth))
-	var pos := _choice(g, "Position", T.POSITIONS, maxi(0, T.POSITIONS.find(str(cfg.position))))
-	pos.item_selected.connect(func(i: int) -> void: _apply(rec, {"position": T.POSITIONS[i]}))
-	g.add_child(_muted("Position px X / Y"))
-	var pxr := HBoxContainer.new()
-	var px: Array[LineEdit] = []
-	for k in ["posX", "posY"]:
-		var le := NumericField.math_line(LineEdit.new())  # px values take + - * / ( ) (RULES.md); blank clears
-		le.text = str(cfg.get(k, ""))
-		le.placeholder_text = "%s px" % k.right(1)
-		le.tooltip_text = "X and Y together override the preset — clear both to go back to it"
-		le.custom_minimum_size.x = 70
-		pxr.add_child(le)
-		px.append(le)
-	var apply_px := func(_t: Variant = null) -> void: _apply(rec, {"posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text)})
-	for le in px:
-		le.text_submitted.connect(apply_px)
-		le.focus_exited.connect(apply_px)
-	g.add_child(pxr)
-	var save := _btn("Save", "Duration, mode, target, size, font, colours, border → every screen this timer is on", func() -> void:
-		var out := {"durationSec": C.hms_to_secs(w.h.value, w.m.value, w.s.value), "mode": T.MODES[(w.mode as OptionButton).selected][0],
-			"targetTime": target.text, "position": T.POSITIONS[pos.selected], "posX": T.px_value(px[0].text), "posY": T.px_value(px[1].text),
-			"timerFontSize": clampi(int((w.size as SpinBox).value), 1, 100), "timerFontFamily": T.FONTS[maxi(0, (w.font as OptionButton).selected)][0],
-			"timerBorderWidth": clampi(int((w.border as SpinBox).value), 0, 20)}
-		for k in ["timerColor", "amberColor", "redColor", "timerBorderColor"]:
-			out[k] = P.to_css((w[k] as ColorPickerButton).color)
-		_apply(rec, out))
-	box.add_child(save)
 
 
 ## saveTimerConfigPatch: the merged config, assigned again on every screen the timer is on.
@@ -253,26 +184,6 @@ func _confirm_remove(id: String) -> void:
 			dlg.queue_free())
 	add_child(dlg)
 	dlg.popup_centered()
-
-
-func _choice(g: GridContainer, label: String, items: Array, sel: int) -> OptionButton:
-	g.add_child(_muted(label))
-	var o := OptionButton.new()
-	for it in items:
-		o.add_item(str(it))
-	o.select(maxi(0, sel))
-	g.add_child(o)
-	return o
-
-
-func _number(g: GridContainer, label: String, lo: float, hi: float, v: float) -> SpinBox:
-	g.add_child(_muted(label))
-	var sp := SpinBox.new()
-	sp.min_value = lo
-	sp.max_value = hi
-	sp.value = v
-	g.add_child(sp)
-	return sp
 
 
 func _btn(text: String, tip: String, cb: Callable) -> Button:

@@ -1,6 +1,6 @@
 # WO-806 — Godot client: bring back the compact audio mixer and the compact timer control
 
-**Status: OPEN (29.10) — investigation written, not started**
+**Status: IN PROGRESS (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only); owner QA on the glass and a real timer run open; G3 and G5 not done**
 
 Owner, 29.10:
 > work order to bring back compact audio mixer and compact timer control
@@ -257,3 +257,124 @@ whoever owns `audio_strip.gd` at that time. Height under the WO-799 split is a s
 - A806.3 On the Audio tab, a group with > 4 strips is measurably narrower than with ≤ 4 (test-proven).
 - A806.4 Godot suite and offline suite 0 fail; `check-max-file-lines` green; the WO-226 / WO-227 / WO-381 smokes
   untouched and green; box probes recorded in this WO; owner QA on the glass.
+
+## Owner answers (29.10)
+
+1. "Compact audio mixer" = the web **Program audio** dock at the bottom of the Inspector (`client/index.html:108-110`,
+   `audio-mixer-panel.js`), like Playlists. Not a compact mode of the Audio tab.
+2. "Compact timer" = the web **Timers** dock (`timer-control-panel.js`) in the same footer. Timers-only control: no
+   create / assign / remove (WO-381); its ⚙ form stays the short one (WO-567).
+3. Both collapse like Playlists; the open / closed state is per session.
+
+## Implementation investigation (29.10, Opus)
+
+Read before coding (no code changed while writing this section).
+
+**Web Program audio dock (what to port).**
+- `client/components/audio-mixer-panel.js:20-33` — toggle "Program audio", body "Masters" + "Inputs"; collapsed by
+  default (`:97-104`, localStorage); rebuilds on channelMap / scene.live / settings changes only while open (`:127-145`);
+  meter loop runs only while open (`:121`).
+- Masters (`audio-mixer-panel-masters.js:25-40`): one 58 px column per PGM / PRV bus (`07b-audio-mixer-modal-shell.css:95-103`)
+  = label, meter bank with `programBusChannelCount` bars, a vertical range fader, dB. No SOLO / MUTE on a master. With 8
+  bus channels the 8 bars do not fit 58 px — the WO-227 complaint; the masters row only `flex-wrap`s (`:85-92`).
+- Live inputs (`audio-mixer-panel-live-inputs.js:36-80`): divider + AUTO MIX, then per input a row with Ch route buttons,
+  send policy, START, meter, fader, mute.
+- Program layers (`audio-mixer-panel-input-layers.js:55-130`): divider "PGM n (ch c) Inputs", then per layer one row:
+  Screens buttons (look layers), label, S / M / ■ (audio-only look), stereo-pair select, then horizontal meter +
+  horizontal fader + dB. Writes: fader → `postAudioVolume` debounced while moving + on change (`:225-262`), mute →
+  `/api/audio/mute` with the current gain (`:180-213`), solo → `/api/audio/solo {keys}` (`:166-178`), look layers patch
+  the look (`sceneState.patchLayer`) — exactly the calls the full console makes.
+
+**Web Timers dock (what to port).** `timer-control-panel.js:86-181`: toggle "Timers", collapsed by default, whole dock
+hidden when the list is empty (`:157`), `GET /api/timers/list` every 1 s while open (`:28,341-350`), readouts tick 4×/s
+(`:315-332`). Row (`:173-268`): name, readout, ⚙; ▶ ⏸ ⟲ → `POST /api/timers/cmd`; Time / Target input
+(`timer-control-panel-inline-time.js:24-129`: `parseTimeText` accepts `SS`, `MM:SS`, `HH:MM:SS`, minutes not clamped;
+Enter / blur commits, Escape and garbage restore; clock mode writes `targetTime`; saves `/api/timers/assign` once per
+assigned screen; no-op when unchanged; disabled when unassigned); one chip per assigned screen (label + eye, eye = fade
+`fadeFrames: 25`, re-read 700 ms later, `:290-300`). Rows are not rebuilt while a field in the dock has focus
+(`:151-160`). ⚙ = `buildTimerSettings` without `extended` (`timer-control-panel-settings-form.js:101-110`): Duration,
+Mode, Target, Size (vw), Position, X / Y px — no font, colours, border. No create / assign / remove (WO-381, `:9-17`).
+
+**Godot pieces to reuse.**
+- Footer: `app/inspector_panel.gd:44-45,116-119` (`add_footer` puts a separator + the section under the scroll);
+  `app/shell.gd:67` mounts Playlists only. Collapse pattern: `features/live/playlists_panel.gd:30-45` (flat toggle
+  button "▸ / ▾ Title" + muted count) and `:98-110` (`set_open`, poll timer started / stopped).
+- Audio write path: today it lives inside the tab — `features/audio/audio_tab.gd:260-341` (`_on_gain` with the 80 ms
+  debounce flushed in `_process` `:348-354`, `_on_solo`, `_on_mute`, `_on_screen`, `_after`, `_send`) plus the data side
+  `:93-131` (`_on_visible` fetches `/api/audio/mixer`, `/api/audio/live-inputs`, `/api/audio/inputs/routing`; `_on_store`;
+  `_state`) and the plan fetch `:303-310`. The request shapes are already pure in `audio_actions.gd` (volume / mute / solo
+  / route / send / stop / cross-screen). To give the dock one write path the tab's half moves into a shared controller
+  (`audio_console_ctl.gd`) that both surfaces bind; a strip only needs `row`, `gain()`, `muted()`, `set_solo()` and the
+  `audio_strip.gd:10-18` signals (`gain_changed(gain, final)`, `solo_pressed(multi)`, `mute_pressed`, `screen_toggled`,
+  `route_toggled`, `stop_pressed`).
+- `audio_strip.gd:48` is a 360 px tall vertical strip (`64 if dense else 84` wide) — too tall for a footer, so the dock
+  row is its own compact control emitting the same signals; it reuses `mixer_math.gd` (taper, dB text),
+  `fader_cap.gd` (the master's vertical fader cap), `meter_bank.gd` (master bars), `audio_meter_model.gd`
+  (`read_key` `:247`, `smooth` `:268`, `colour` `:274`), `audio_rows.gd` (`input_rows` `:243`, `program_rows` `:100`,
+  `bus_channel_count` `:278`, `meter_meta` `:69`).
+- Width budget: `meter_bank.gd:27-33` sizes a bank at 9 px per bar → 8 bars = 72 px + fader cap 26 (`fader_cap.gd:7`)
+  ≈ 100 px per master, 4 masters (2 screens × PGM / PRV) ≈ 420 px > the 400 px column (`shell.gd:65`). Dense rule for
+  the dock: a master with > 4 bus channels draws 5 px bars (8 bars ≈ 48 px → column ≤ 80 px) and the masters flow-wrap.
+- Timers: readout maths `features/live/screen_timer_model.gd:36` (`display_time`, server clock via `serverNowMs`),
+  `:60` (`format`), `:67` (`state` amber / red); the settings form `screen_timer_panel.gd:151-215` is the *extended*
+  one inline — it moves to `screen_timer_settings.gd` with an `extended` flag (web `deps.extended`), the Inspector page
+  keeps `extended = true`. Screen chip label: `deck_model.gd:69` `screen_label` (Godot's "Main n" fallback, matching the
+  deck columns, where the web says "S n"). Timer API: `src/api/routes-screen-timers.js:6-10`, `visible` accepts
+  `fadeFrames` 0-500 (`:223-227`).
+- No server field is missing for either dock; no new endpoint.
+
+## What was done (29.10, Opus)
+
+New footer sections, mounted in `godot/client/app/shell.gd` after Playlists (web order Playlists → Timers → Program
+audio). Both start collapsed and remember open / closed for the running session only (a `static var`, owner 29.10 —
+not written to `ui.cfg` like Playlists).
+
+**Timers (G1 + G2)**
+- `features/live/timers_dock.gd` (267) — header "Timers" + count; body height-capped (280 px) in its own scroll.
+  Open: `GET /api/timers/list` every 1 s, readouts every 250 ms on the server clock (`screen_timer_model.gd`), amber / red.
+  Row: name, readout, ⚙ (cog icon); ▶ ⏸ ⟲ icons → `/api/timers/cmd`; Time / Target field → `/api/timers/assign` once per
+  assigned screen (disabled when unassigned, Escape / garbage restore, unchanged = no write); one chip per screen
+  (`deck_model.gd` `screen_label`, i.e. "Main n" like the deck columns) with an eye icon → `/api/timers/visible`
+  `fadeFrames: 25`, re-read 0.7 s later. Rows rebuild only when the list's shape changes and never while a field in the
+  dock has focus; open ⚙ forms stay open across a rebuild. No create / assign / remove (WO-381). Empty list: the header
+  stays with a muted hint (web hides the dock — owner question 4 was not answered; the visible header is the safer reading).
+- `features/live/timers_dock_model.gd` (120) — pure: `parse_time_text` (web `parseTimeText` + RULES.md maths for a
+  plain expression without ':' — `5*60` → 300), `seconds_to_clock_text`, `time_config_patch`, `time_input_value`,
+  `commit_time`, `screens`, `rows`, `shape`, request bodies.
+- `features/live/screen_timer_settings.gd` (118) — the settings form moved out of `screen_timer_panel.gd` with an
+  `extended` flag (web `deps.extended`). The Inspector page passes `true` (unchanged form), the dock's ⚙ `false`
+  (Duration, Mode, Target, Size, Position, X / Y px — WO-567). `screen_timer_panel.gd` 290 → 201 lines.
+
+**Program audio (G4 + G6)**
+- `features/audio/audio_console_ctl.gd` (207) — the Audio tab's server reads and every write (fader debounce, mute,
+  solo, routes, send, START, STOP, Screens + plan) moved out of `audio_tab.gd` into one controller that both surfaces
+  `bind()` their strips to. Same `audio_actions.gd` requests, same look patches; no new endpoint. `audio_tab.gd`
+  405 → 269 lines, behaviour unchanged. Autoloads are looked up at runtime (`_g()`) so the unit runner can compile it.
+- `features/audio/audio_dock.gd` (186) — header "Program audio"; Masters (flow-wrapping columns) then Inputs (groups
+  "Live inputs", "PGM n (ch c)"); height-capped 320 px scroll; meters at `AM.TICK_S` only while open and on screen.
+- `features/audio/audio_dock_master.gd` (113) — master column: label, `meter_bank.gd` (one bar per bus channel), a
+  vertical fader with the console's `fader_cap.gd`, dB; no solo / mute (web dock).
+- `features/audio/audio_dock_row.gd` (241) — one-line row: label, S / M (■ on audio-only looks), routing toggles (look
+  layer Screens with > 1 program channel, live-input Ch routes; inline up to 4, else a second line), a 4 px level bar
+  over a horizontal fader on the console taper, dB. Same signals as `audio_strip.gd`. Double-click / Ctrl+click → 0 dB.
+- `features/audio/audio_dock_model.gd` (69) — groups, masters, routing kind, the dense rule: > 4 bus channels → 6 px
+  bars (2–4 channels keep meter_bank's 9 px); > 4 rows in a group → tighter rows.
+- Not in the dock (they stay on the Audio tab): stereo-pair select, the live-input send policy, START, AUTO MIX,
+  the WO-800 layer lanes.
+- `app/docks_probe.gd` (50) + one entry in `main.gd`'s probe table (`--probe-docks`, line count unchanged at 499):
+  opens both sections against the live server, reads only, prints what they built.
+
+## What was verified (29.10)
+
+- Godot suite: **22176 passed, 0 failed** (baseline 22037; +139 from `tests/test_audio_dock.gd` and
+  `tests/test_timers_dock_model.gd`: web goldens for the time helpers, WO-381 / WO-567 as tests, the dense rule, widths
+  measured on the real controls, both surfaces bound to the controller, footer order).
+- `run-client.sh --check`: boot OK. `node tools/ci/check-max-file-lines.js`: 0 files over 500.
+- Measured with the app theme (headless): master column 52 px (2 ch), 70 px (4 ch), **82 px (8 ch)**; a layer row
+  258–350 px wide and 20 px high (1–4 screens), 8 screens → routing on a second line, 258 px.
+- Box, `--probe-docks` (second headless instance, owner GUI untouched, reads only): masters
+  `pgm:1 8 bars 82px, prv:2 2 bars 52px, pgm:3 2 bars 52px, prv:4 2 bars 52px` — the box's real 8-channel PGM 1 —
+  0 layer rows (nothing playing), 0 timers on the server.
+- **Not verified:** the look on the glass (owner QA), a real timer run through the dock (start / pause / time / eye
+  fade — the box has no timer and the probe writes nothing), a fader / mute move in the dock reaching the Audio tab live
+  (shared code path is test-proven, not exercised on air), meters moving with real program audio.

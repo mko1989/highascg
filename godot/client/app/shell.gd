@@ -16,6 +16,8 @@ const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const PlaylistsPanel := preload("res://features/live/playlists_panel.gd")
+const TimersDock := preload("res://features/live/timers_dock.gd")
+const AudioDock := preload("res://features/audio/audio_dock.gd")
 const ConnectionEye := preload("res://app/connection_eye.gd")
 const ConnectionMenu := preload("res://app/connection_menu.gd")
 const Profiles := preload("res://core/connection_profiles_model.gd")
@@ -65,6 +67,10 @@ func _ready() -> void:
 	inspector.custom_minimum_size.x = 400
 	right.add_child(inspector)
 	inspector.add_footer(PlaylistsPanel.new())  # WO-603: web Playlists footer panel
+	inspector.add_footer(TimersDock.new())  # WO-806: web Timers dock (the "compact timer")
+	var audio_dock := AudioDock.new()  # WO-806: web Program audio dock (the "compact audio mixer")
+	audio_dock.osc = osc
+	inspector.add_footer(audio_dock)
 	sources.inspector.osc_mirror = osc
 	var live := LiveTab.new()
 	live.name = "Live"
