@@ -158,3 +158,13 @@ func test_viewer_drop_over_audio_only_layer_targets_video_beneath() -> void:
 	t.eq(Audio.pick(layers, {}, rect, Vector2(10, 10)), 0, "video-only point unchanged")
 	layers.pop_at(0)
 	t.eq(Audio.pick(layers, {}, rect, Vector2(75, 75)), -1, "no video under it → none (the drop adds a layer)")
+
+
+## Found in the WO-816 e2e: after Remove layer the Inspector kept the removed layer's values (stale page). Both places
+## that drop the selection must go through _select(-1), which releases the page and clears the fields.
+func test_deselect_releases_the_inspector_page() -> void:
+	var src := FileAccess.get_file_as_string("res://features/live/look_editor.gd")
+	var rm := src.substr(src.find("func _remove_layer()"), 260)
+	t.ok(rm.contains("_refresh_list()\n\t_select(-1)"), "Remove layer releases the Inspector page")
+	var op := src.substr(src.find("\t_hold(true)\n\t_sel = -1"), 120)
+	t.ok(op.contains("_refresh_list()\n\t_select(-1)"), "opening a look drops the previous look's layer page")

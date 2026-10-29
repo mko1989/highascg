@@ -91,3 +91,19 @@ air, drag a clip onto a layer box and onto a row; expect the same layer number w
 - Minor (not fixed): after Remove layer, the inspector still shows the removed L11's values.
 
 Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).
+
+## Follow-up 29.10 — stale Inspector after Remove layer (fixed)
+
+**Investigation.** The e2e run above noted: "after Remove layer the inspector still showed the removed L11's values".
+`look_editor.gd` `_remove_layer()` set `_sel = -1` and rebuilt the list, but never went through `_select(-1)`.
+That is the only path that calls `InspectorPanel.release(_page)` and `_sync_fields()`, so the page and the geometry
+handles kept the removed layer. `open()` had the same gap: opening another look left the previous look's layer page up.
+
+**Done.** Both places now call `_select(-1)` after `_refresh_list()`.
+
+**Verified.**
+- A second client ran windowed on a private Xvfb with `--probe-edit=<KV LOOP 2>`:
+  - L10 selected, then Mirror copy: L11 added, selected and shown in the Inspector;
+  - Remove layer: L11 gone, handles cleared, the Inspector page released (no values).
+- The server project's KV LOOP 2 is back to layers `[10]`.
+- New `test_deselect_releases_the_inspector_page`. Godot suite: 22847 passed, 0 failed.

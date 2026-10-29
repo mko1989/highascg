@@ -144,6 +144,7 @@ func open(look_id: String, main_idx: int) -> void:
 	_hold(true)
 	_sel = -1
 	_refresh_list()
+	_select(-1)  # a previous look's layer must not stay in the Inspector
 	if _layers().any(func(l: Variant) -> bool: return l is Dictionary and (l as Dictionary).get("source") is Dictionary):
 		pusher.schedule(scene_id, main)  # stage it on PRV (re-take or nudge, server decides)
 	else:  # WO-623 B: a new empty look (deck "+") — the web stages nothing; the take route refuses a look with no sources
@@ -414,6 +415,7 @@ func _remove_layer() -> void:
 	layers.remove_at(_sel)
 	_sel = -1
 	_refresh_list()
+	_select(-1)  # releases the Inspector page and clears the fields — else the removed layer's values stayed up
 	pusher.schedule(scene_id, main)
 
 
