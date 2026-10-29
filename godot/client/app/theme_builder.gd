@@ -19,6 +19,8 @@ const RADIUS := 6
 const HEADER_H := 48
 const PANEL_W := 260
 const FONT_PATH := "res://assets/fonts/Rewir-Light.ttf"
+## WO-826: arrows, ▸ ▾, ✓ ✕, ⚠ … that Rewir lacks. The Web export has no system fonts to fall back on (boxes there).
+const SYMBOL_FALLBACK_PATH := "res://assets/fonts/DejaVuSans-ui-symbols.ttf"
 
 
 static func build() -> Theme:
@@ -52,6 +54,11 @@ static func load_font() -> Font:
 		return null
 	var f := FontFile.new()
 	f.data = bytes
+	var sym := FileAccess.get_file_as_bytes(SYMBOL_FALLBACK_PATH)
+	if not sym.is_empty():
+		var fb := FontFile.new()
+		fb.data = sym
+		f.fallbacks = [fb]
 	return f
 
 
