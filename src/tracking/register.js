@@ -49,6 +49,7 @@ const { MarkerHub, MARKER_STALE_AFTER_MS } = require('./marker-hub')
 const { createFollowService } = require('../fixtures/follow-service')
 const { createCalibration } = require('../fixtures/calibrate-session')
 const { createSpotFinder, LEASE_ID: SPOT_LEASE_ID } = require('../fixtures/calibrate-spot')
+const { createRigCalibration } = require('../fixtures/rig-calibrate') // WO-804 …/calibrate/rig
 const { createZoneService } = require('./zone-service')
 const { createDetectService } = require('./detect-service')
 const { DetectPin } = require('./detect-pin')
@@ -84,6 +85,7 @@ let _writes = 0
 let _follow = null
 let _calib = null
 let _spot = null
+let _rig = null
 let _followSent = { json: '', at: 0 }
 const fixturesWatch = createFixturesWatch() // WO-797: tracking:fixtures only while a client looks
 let _zones = null
@@ -368,6 +370,8 @@ async function handleApi({ method, path, body, req }) {
 		const r = await _spot.handle(data)
 		return reply(r.status, r.body)
 	}
+	const rig = path === '/api/tracking/follow/calibrate/rig' && (_rig?.route(method, body) ?? { status: 503, body: { error: 'follow engine not running' } })
+	if (rig) return reply(rig.status, rig.body)
 	if (path === '/api/tracking/follow/calibrate') {
 		if (!_calib) return reply(503, { error: 'follow engine not running' })
 		if (method === 'GET') return reply(200, { sessions: _calib.list() })
@@ -450,6 +454,7 @@ module.exports = {
 		followProject(auto, ctx) // the grid rectangle (home points) from project.previs.tracking.grid
 		autoPtz.boot(ctx, { allowed: () => duties.has('ptz') })
 		_calib = createCalibration({ engine: _follow.engine, hub, frame: _follow.liveFrame }) // WO-700 frame
+		_rig = createRigCalibration({ engine: _follow.engine, calib: _calib, project: () => require('../engine/project-scenes').loadFullProject() })
 		_spot = createSpotFinder({
 			calib: _calib,
 			project: () => require('../engine/project-scenes').loadFullProject(),
@@ -477,7 +482,7 @@ module.exports = {
 		_follow = null
 		followProject(auto, null)
 		autoPtz.stop()
-		_calib = null
+		_calib = _rig = null
 		_spot = null
 		if (_zones) _zones.stop()
 		_zones = null

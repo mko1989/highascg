@@ -170,3 +170,24 @@ func test_preset_marks_follow_the_tracking_grid() -> void:
 	t.eq(F.preset_marks(g, again).size(), 10, "pressing again adds nothing")
 	t.eq(F.preset_marks({"width": 4.0, "depth": 2.0, "x_offset": 1.0, "y_offset": 0.0, "z_offset": 0.5}, [])[2],
 		{"id": 3, "name": "DSL", "x": 3.0, "y": -1.0, "z": 0.5})
+
+
+## WO-804 / WO-764: the rig calibration's poses go into calibrated_pose (export-only) — the patch pose, the trim and the
+## pins stay (WO-700 R6); normalize keeps it (it whitelists keys).
+func test_rig_result_writes_calibrated_pose_only() -> void:
+	var fx := F.normalize_fixture({"id": "a", "pose": {"x": 0, "y": 0, "z": 6}, "offset": {"pan": 2, "tilt": 0}}, 0)
+	var b := F.normalize_fixture({"id": "b", "pose": {"x": 1, "y": 0, "z": 6}}, 1)
+	var heads := [{"id": "a", "source": "measured", "rms_deg": 0.2, "residual_m": 0.031,
+		"pose": {"x": 0.12, "y": -0.05, "z": 5.9, "yaw": 1.5, "pitch": 0, "roll": 0, "hang": "truss"}},
+		{"id": "zz", "source": "inferred", "pose": {"x": 1, "y": 1, "z": 1}}]
+	var out := F.apply_rig([fx, b], heads)
+	t.eq(out[0].calibrated_pose, {"x": 0.12, "y": -0.05, "z": 5.9, "yaw": 1.5, "pitch": 0.0, "roll": 0.0, "hang": "truss",
+		"source": "measured", "residual_m": 0.031, "rms_deg": 0.2})
+	t.eq(out[0].pose, fx.pose, "the patch pose stays (R6)")
+	t.eq(out[0].offset, fx.offset, "the trim stays")
+	t.eq(out[1].has("calibrated_pose"), false, "a head the result doesn't list keeps none")
+	t.eq(fx.has("calibrated_pose"), false, "the input is not touched")
+	t.eq(F.normalize({"patch": out}).patch[0].calibrated_pose, out[0].calibrated_pose, "normalize keeps it")
+	var inferred := F.normalize_calibrated_pose({"x": 1, "y": 2, "z": 3, "source": "?", "residual_m": null})
+	t.eq([inferred.source, inferred.has("residual_m")], ["inferred", false], "unknown residual left out")
+	t.eq(F.normalize_calibrated_pose({"x": 1, "y": "2", "z": 3}), {}, "not a pose")

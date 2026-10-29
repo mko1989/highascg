@@ -78,6 +78,51 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 		out["offset_map"] = pins
 	if o.get("manual_patch") == true:  # WO-695: the operator re-patched it — an MVR re-patch keeps mode / address
 		out["manual_patch"] = true
+	var cp := normalize_calibrated_pose(o.get("calibrated_pose"))
+	if not cp.is_empty():  # WO-804 / WO-764: the desk pose (export-only, never drawn), only when set
+		out["calibrated_pose"] = cp
+	return out
+
+
+## WO-804 / WO-764 — where the head really hangs, for the desk (WO-765 MVR export): {x, y, z, yaw, pitch, roll, hang,
+## source "measured" | "inferred", residual_m?, rms_deg?}. The previs never reads it (WO-700 R6: the patch pose stays).
+## {} when it is not a pose.
+static func normalize_calibrated_pose(raw: Variant) -> Dictionary:
+	if not raw is Dictionary:
+		return {}
+	var d: Dictionary = raw
+	for k in ["x", "y", "z"]:
+		var v: Variant = d.get(k)
+		if not (v is int or v is float) or not is_finite(float(v)):
+			return {}
+	var out := {"x": clampf(float(d.x), -500, 500), "y": clampf(float(d.y), -500, 500), "z": clampf(float(d.z), -50, 200),
+		"yaw": _num(d.get("yaw"), 0, -360, 360), "pitch": _num(d.get("pitch"), 0, -180, 180),
+		"roll": _num(d.get("roll"), 0, -180, 180), "hang": "floor" if d.get("hang") == "floor" else "truss",
+		"source": "measured" if d.get("source") == "measured" else "inferred"}
+	for k in ["residual_m", "rms_deg"]:
+		var v: Variant = d.get(k)
+		if (v is int or v is float) and is_finite(float(v)):
+			out[k] = maxf(0.0, float(v))
+	return out
+
+
+## WO-804 — the rig calibration's result (POST /api/tracking/follow/calibrate/rig → result.heads) written into the
+## patch as each head's calibrated_pose; the patch pose, offset and pins are not touched. Heads it doesn't list keep theirs.
+static func apply_rig(patch: Array, heads: Array) -> Array:
+	var by := {}
+	for h in heads:
+		if h is Dictionary and h.get("pose") is Dictionary:
+			by[str(h.get("id", ""))] = h
+	var out := []
+	for fx in patch:
+		var f: Dictionary = (fx as Dictionary).duplicate(true)
+		var h: Variant = by.get(str(f.get("id", "")))
+		if h is Dictionary:
+			var cp := normalize_calibrated_pose((h.pose as Dictionary).merged({"source": h.get("source"),
+				"residual_m": h.get("residual_m"), "rms_deg": h.get("rms_deg")}))
+			if not cp.is_empty():
+				f["calibrated_pose"] = cp
+		out.append(f)
 	return out
 
 

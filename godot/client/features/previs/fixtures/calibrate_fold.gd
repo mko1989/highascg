@@ -16,6 +16,7 @@ const Calibrate := preload("res://features/previs/tracking/calibrate_section.gd"
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const T := preload("res://features/previs/tracking/tracking_model.gd")
 const PM := preload("res://features/previs/tracking/person_mark_model.gd")
+const RigFold := preload("res://features/previs/fixtures/rig_calibrate_fold.gd")  # WO-804
 
 var sel: RefCounted = Sel.shared()
 var _list: ItemList
@@ -89,6 +90,7 @@ func _ready() -> void:
 		_edit.add_child(sb)
 		_xyz.append(sb)
 	add_child(_edit)
+	add_child(RigFold.new())  # WO-804: the whole rig — a few anchor heads on the marks above, the rest inferred
 	_head = _muted("")
 	_build_trim()
 	_calib.lighting = true

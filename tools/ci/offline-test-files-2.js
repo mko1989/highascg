@@ -18,6 +18,7 @@ module.exports = [
 	'tools/smoke/smoke-wo790-timeline-scrub-pacing.test.js',
 	'tools/smoke/smoke-wo802-node-only-links.test.js',
 	'tools/smoke/smoke-wo803-pgm-layer-readback.test.js',
+	'tools/smoke/smoke-wo804-rig-calibrate.test.js',
 	'tools/smoke/smoke-alsamixer-terminal.test.js',
 	'tools/smoke/smoke-wo800-per-layer-audio.test.js',
 ]

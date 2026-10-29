@@ -21,6 +21,12 @@ calibration and whatever was prepared in the preshow is now calibrated to real w
 - Pose → Matrix: `mvr-patch.js:80 poseFromMatrix` is the import direction (with the hang "floor" turn-over and
   mirrored-matrix handling). The export needs its exact inverse; `mvr-math.js` has the frame transforms.
 
+## Note from WO-804 (29.10)
+
+- `calibrated_pose` now exists on patch heads (WO-804 rig calibration): `source` "measured" | "inferred" and
+  `residual_m` (m, leave-one-out) / `rms_deg` (measured fit). The export should write that flag (e.g. in the AUXData /
+  comment note listing the calibrated heads) so the desk side knows which positions were measured.
+
 ## Plan (to confirm with the owner)
 
 - Preferred approach: **re-write the imported MVR**. Copy the pre-show archive and replace only the `<Matrix>` of every

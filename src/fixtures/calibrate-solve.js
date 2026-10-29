@@ -332,4 +332,58 @@ function solvePlace(pose, q0, resid, rays, rms) {
 	}
 }
 
-module.exports = { solveFixturePose, solveOffsets, MIN_POINTS, errors, spread }
+/**
+ * WO-764 / WO-804 — where a typed head really hangs, from its marks, through its own beam model (the GDTF chain the
+ * live session reads its angles for: calibrate-session.js liveModel forward). Solves x, y, z and yaw by LM from the
+ * patched pose (yaw swept every 15° for the seeds); hang, pitch and roll stay the patch's (WO-764: a hung head and a
+ * floor head explain the same rays). The trim (`offset`) is not applied: the solved pose replaces it.
+ *
+ * @param {{ pan: number, tilt: number, x: number, y: number, z: number }[]} pts physical angles the head was at
+ * @param {(pan: number, tilt: number, pose: object) => { origin: number[], dir: number[] }} forward
+ * @param {{ pose: { x, y, z, yaw, hang?, pitch?, roll? } }} opts the patched pose
+ * @returns {{ ok: false, need: number } | { ok: true, pose, rms_deg, max_deg, errors_deg, spread_m, moved_m, warning }}
+ */
+function solvePoseForward(pts, forward, opts = {}) {
+	const list = (Array.isArray(pts) ? pts : []).filter((p) => [p?.pan, p?.tilt, p?.x, p?.y, p?.z].every(Number.isFinite))
+	if (list.length < MIN_POINTS) return { ok: false, need: MIN_POINTS - list.length }
+	const p0 = opts.pose || {}
+	const at = (q) => ({ ...p0, x: q[0], y: q[1], z: q[2], yaw: q[3] })
+	const rays = (q) =>
+		list.map((p) => {
+			const { origin, dir } = forward(p.pan, p.tilt, at(q))
+			return { b: unit(dir), d: unit(sub([p.x, p.y, p.z], origin)) }
+		})
+	const resid = (q) => rays(q).flatMap(({ b, d }) => [b[0] - d[0], b[1] - d[1], b[2] - d[2]])
+	const start = [Number(p0.x) || 0, Number(p0.y) || 0, Number(p0.z) || 0, Number(p0.yaw) || 0]
+	const seeds = []
+	for (let dy = -180; dy < 180; dy += 15) seeds.push([start[0], start[1], start[2], start[3] + dy])
+	const best = seeds
+		.map((q) => ({ q, c: cost(resid(q)) }))
+		.sort((a, b) => a.c - b.c)
+		.slice(0, 6)
+		.map((s) => lm(s.q, resid, [1e-4, 1e-4, 1e-4, 1e-3]))
+		.reduce((a, b) => (b.c < a.c ? b : a))
+	const errs = rays(best.q).map(({ b, d }) => Math.acos(Math.max(-1, Math.min(1, dot(b, d)))) * DEG)
+	const rms = Math.sqrt(errs.reduce((s, e) => s + e * e, 0) / errs.length)
+	const r2 = (v) => Math.round(v * 100) / 100
+	const r3 = (v) => Math.round(v * 1000) / 1000
+	const sp = spread(list)
+	const moved = Math.hypot(best.q[0] - start[0], best.q[1] - start[1], best.q[2] - start[2])
+	let warning = null
+	if (sp < 0.3) warning = 'The marks lie almost on one line — add one well off that line.'
+	else if (rms > 2) warning = 'Poor fit — check that the beam was on each mark and the head is patched with the right hang.'
+	else if (moved > PLACE_MAX_M) warning = `The marks put this head ${r2(moved)} m from where it is patched — check the marks.`
+	return {
+		ok: true,
+		pose: { x: r3(best.q[0]), y: r3(best.q[1]), z: r3(best.q[2]), yaw: wrapYaw(best.q[3]), pitch: Number(p0.pitch) || 0,
+			roll: Number(p0.roll) || 0, hang: p0.hang === 'floor' ? 'floor' : 'truss' },
+		rms_deg: r2(rms),
+		max_deg: r2(Math.max(...errs)),
+		errors_deg: errs.map(r2),
+		spread_m: r2(sp),
+		moved_m: r2(moved),
+		warning,
+	}
+}
+
+module.exports = { solveFixturePose, solveOffsets, solvePoseForward, MIN_POINTS, errors, spread }

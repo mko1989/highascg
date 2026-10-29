@@ -26,6 +26,14 @@ calibration data (preferebly via mvr) to the desk".
 - Calibrate heads' points are `{pan, tilt, x, y, z}` pairs against `project.fixtures.marks`, so they can feed the
   solver as they are.
 
+## Note from WO-804 (29.10)
+
+- `calibrate-solve.js solvePoseForward(pts, forward, {pose})` now solves x, y, z, yaw through the head's own GDTF
+  model (the live points are physical GDTF angles, so `solveFixturePose`'s generic beam does not fit them). WO-804's rig
+  flow writes `calibrated_pose {x, y, z, yaw, pitch, roll, hang, source, residual_m, rms_deg}` per head
+  (`follow_model.gd apply_rig`, kept by `normalize_fixture`). Still open here: pitch / roll, the per-head Inspector
+  line, Clear dropping it.
+
 ## Plan (to confirm with the owner before building)
 
 - Keep R6: the previs head stays where it is patched, and the pins keep making the 3D beam exact.

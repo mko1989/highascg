@@ -203,4 +203,4 @@ function createCalibration({ engine, hub, frame = (fx) => (engine.isLive(fx) ? e
 	}
 }
 
-module.exports = { createCalibration }
+module.exports = { createCalibration, liveModel }
