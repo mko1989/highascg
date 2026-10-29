@@ -1,3 +1,19 @@
+HighAsCG is a free and opensource media server aimed at live events work built on CasparCG as a media engine, Godot as a client, including OpenFollow, stage previz imported from mvr with lights, VR stage etc.
+
+It's workflow is based on Looks (similar to inputs in vMix), Timelines and Timelines inside Looks.
+It supports custom resolutions, synced outputs on Nvidia Pro cards that support it, Decklink outputs, NDI and others.
+Decklink inputs, NDI in (only Full NDI both ways), streaming, recording multi audio output, etc.
+Made only for Ubuntu.
+Wrote mostly by Claude.
+
+Link to module:
+https://github.com/mko1989/companion-module-highpass-highascg
+
+Link to project:
+https://github.com/mko1989/highascg
+
+The repo has most of the features documented quite thoroughly with work orders inside work folder. Meaning you can point your Claude at it and tell it to change whatever you want and it will probably succeed and you will have your own custom version.
+
 <div align="center">
   <h1>HighAsCG</h1>
   <p><strong>Media server — unified client + server on one Ubuntu host.</strong></p>

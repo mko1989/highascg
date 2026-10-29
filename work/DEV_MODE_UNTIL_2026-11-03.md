@@ -22,5 +22,11 @@ What still holds (from CLAUDE.md and the box memory):
 - Restart whatever else is needed to verify end to end (the node, the Caspar binary, the supervisor), for as long as
   dev mode lasts.
 
+## Testing on the real outputs (owner, 29.10)
+
+- Tests may run on the actual outputs (PGM and PRV, real Caspar channels, real looks), including Caspar restarts,
+  node restarts and clips played on air, for as long as dev mode lasts.
+- Before a test on PGM, say what will go on air and for how long, and leave the owner's PGM content as it was afterwards.
+
 After 3 November 2026 this note is out of date: restore the normal discipline and delete or
 update this file.
