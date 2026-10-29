@@ -1,6 +1,6 @@
 # WO-806 — Godot client: bring back the compact audio mixer and the compact timer control
 
-**Status: IN PROGRESS (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only); owner QA on the glass and a real timer run open; G3 and G5 not done · live e2e 29.10: G1/G2/G4/G6 PASS on the glass incl. a real timer run on PGM**
+**Status: DONE except G3 (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only) · live e2e 29.10: G1/G2/G4/G6 PASS on the glass incl. a real timer run on PGM · G5 fixed 29.10 (dense 86 → 64 px, measured + tested) · only G3 open: an owner decision (own WO if wanted)**
 
 Owner, 29.10:
 > work order to bring back compact audio mixer and compact timer control
@@ -142,7 +142,7 @@ on purpose (2f966861, web, owner rule); the Timers dock itself was kept in the w
 | G2 | Dock ⚙ = compact settings form (Duration, Mode, Target, Size, Position + X/Y px) — WO-567: stays as is | Only the extended form in the Inspector page | never ported |
 | G3 | Look save stores `timersVisibility` from the dock's last list (WO-210 T210.8) | Godot-saved looks never carry it | never ported (side finding — own WO if the owner wants it) |
 | G4 | Program audio dock in the Inspector footer, every tab: masters with per-bus-channel meters, live inputs, per-screen compact layer rows (S/M/■, Screens, stereo pair, fader, meter) | Only the full Audio tab | never ported |
-| G5 | WO-227 dense: >4 strips per screen group → 80 px + horizontal scroll (console only) | Ported in the Audio tab (64 vs 84 px + horizontal scroll), but the strip's content minimum (~68 px now, ~78 px with the in-progress fader cap) probably defeats it | ported, likely ineffective |
+| G5 | WO-227 dense: >4 strips per screen group → 80 px + horizontal scroll (console only) | Ported in the Audio tab (64 vs 84 px + horizontal scroll), but the strip's content minimum (~68 px now, ~78 px with the in-progress fader cap) probably defeats it | ✅ fixed 29.10 (§ G5 below): dense 64 px for real |
 | G6 | — (the dock's 8-bus-channel masters just wrap) | — | WO-227's literal complaint never fixed on the compact surface; to be done right in the Godot dock |
 
 Not a gap: WO-226 T226.5's timer strip inside the mixer (removed on purpose, WO-381 — do not restore).
@@ -478,6 +478,33 @@ Signals, `gain()` / `set_gain()` / `muted()` / `set_solo()` / `set_screens()` / 
   q806_timer_run.png). The timer showed on PGM (full806_timer.png). The eye hid it with a 25-frame fade
   (full806_eye_mid_c.png → full806_eye_off_c.png). The gear opens the compact form (q806_gear.png). The test timer was
   removed afterwards.
-- G3 and G5 are still not done (unchanged).
+- G3 is still not done (owner decision, own WO). G5: done, see below.
 
 Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).
+
+## G5 — dense strips made real (29.10)
+
+**Investigation.** Measured headless, with real `audio_strip.gd` strips in the tree and the client theme:
+`get_combined_minimum_size().x` = **86 px for dense and normal alike**. The 64 px `custom_minimum_size` never won.
+The floor is the body row: meter 18 + scale column 20 (it needs that width for the "+6 … -∞" labels) + fader cap 26
++ 2 × 3 px separation = 70, plus the panel's 8 + 8 px content margin. SOLO and MUTE (41 and 42 px) fit inside that,
+so they were not the limit.
+
+**Done** (`godot/client/features/audio/audio_strip.gd`, non-master strips only, masters never go dense):
+- the scale column becomes 8 px and draws only the marks (labels skipped in `_draw_scale`);
+- body separation is 2 px and the panel's side padding 3 px;
+- SOLO and MUTE become **S** and **M** (the web dock's labels; tooltips keep the words);
+- the name and dB readout use font 10.
+
+**Verified.**
+- Headless measurements: dense is 64 px for a look layer, a DeckLink live input (MUTE, START, send picker, routes)
+  and an audio-only look (STOP). Normal stays 86 px.
+- New `tests/test_audio_strip_dense.gd`:
+  - `dense < normal` and `dense ≤ 64` for those three row types;
+  - S and M with full-word tooltips;
+  - masters keep SOLO.
+- Godot suite: 22845 passed, 0 failed.
+- Visual: real strips rendered windowed (Xvfb) side by side, 2 normal and 5 dense (`g5-strips.png` in the session
+  scratchpad). Dense shows marks without labels, S/M, and a muted strip's M lights red.
+- The owner GUI was relaunched on the Audio tab from this tree. The live project's groups have ≤ 4 strips (the
+  largest look has 4 layers), so they render in normal mode, unchanged.

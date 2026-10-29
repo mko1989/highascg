@@ -47,14 +47,20 @@ var _labels := {}  # program channel → screen label (AR.screen_labels); the bu
 var _acts: VBoxContainer
 var _pair: OptionButton  # WO-801: PRV masters only, while the box has a monitor output
 var _pairs: Array = []
+var _dense := false  # WO-806 G5 (web WO-227): scale marks without labels, S / M, font 10, 3 px side padding
 
 
 func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: Dictionary = {}) -> void:
 	row = r
 	_labels = labels
 	var master: bool = r.get("isMaster", false) == true
+	_dense = dense and not master
 	custom_minimum_size = Vector2(100 + maxi(0, bars - 2) * 9 if master else (64 if dense else 84), 360)
-	add_theme_stylebox_override("panel", ThemeBuilder.box(ThemeBuilder.BG_ELEVATED if master else ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4))
+	var panel := ThemeBuilder.box(ThemeBuilder.BG_ELEVATED if master else ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4)
+	if _dense:
+		panel.content_margin_left = 3
+		panel.content_margin_right = 3
+	add_theme_stylebox_override("panel", panel)
 	var v := VBoxContainer.new()
 	v.add_theme_constant_override("separation", 4)
 	add_child(v)
@@ -70,7 +76,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 	lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lab.clip_text = true
 	lab.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	lab.add_theme_font_size_override("font_size", 12)
+	lab.add_theme_font_size_override("font_size", 10 if _dense else 12)
 	if master:
 		lab.add_theme_color_override("font_color", ThemeBuilder.ACCENT)
 	elif r.get("isAudioOnlyLook", false) == true:
@@ -78,7 +84,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 	v.add_child(lab)
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 3)
+	body.add_theme_constant_override("separation", 2 if _dense else 3)
 	body.alignment = BoxContainer.ALIGNMENT_CENTER
 	v.add_child(body)
 	meter = MeterBank.new()
@@ -89,7 +95,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 		meter.tooltip_text = "Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)"
 	body.add_child(meter)
 	var sc := Control.new()
-	sc.custom_minimum_size.x = 20
+	sc.custom_minimum_size.x = SCALE_ICON_W + 1.0 if _dense else 20.0  # dense: the marks only (the labels need 20)
 	sc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	sc.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	sc.draw.connect(func() -> void: _draw_scale(sc))
@@ -126,7 +132,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 	v.add_child(_nosig)
 	_val = Label.new()
 	_val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_val.add_theme_font_size_override("font_size", 12)
+	_val.add_theme_font_size_override("font_size", 10 if _dense else 12)
 	_val.text = MM.format_db(float(r.get("v", 1.0)))
 	v.add_child(_val)
 	var acts := VBoxContainer.new()
@@ -140,11 +146,11 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 		badge.add_theme_color_override("font_color", ThemeBuilder.WARN if r.get("isPreview", false) == true else ThemeBuilder.ERROR)
 		acts.add_child(badge)
 	if r.get("isLiveInput", false) != true:
-		_solo = _toggle("SOLO", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.WARN)
+		_solo = _toggle("S" if _dense else "SOLO", "Solo to the monitor output (Ctrl+click: add to the solo set)", ThemeBuilder.WARN)
 		_solo.pressed.connect(func() -> void: solo_pressed.emit(Input.is_key_pressed(KEY_CTRL) or Input.is_key_pressed(KEY_META)))
 		acts.add_child(_solo)
 	if not master:
-		_mute = _toggle("MUTE", "Mute", ThemeBuilder.ERROR)
+		_mute = _toggle("M" if _dense else "MUTE", "Mute", ThemeBuilder.ERROR)
 		_mute.button_pressed = r.get("muted", false) == true
 		_mute.pressed.connect(func() -> void: mute_pressed.emit())  # the button has already toggled: muted() = the new state
 		acts.add_child(_mute)
@@ -311,6 +317,8 @@ func _draw_scale(c: Control) -> void:
 		var y: float = grab + (1.0 - m[0] / 100.0) * (c.size.y - 2 * grab)
 		# Fader-style mark: a 2 px bar at the scale point, on the track side; the label sits just left of it.
 		c.draw_rect(Rect2(track_x - SCALE_ICON_W, y - 1.0, SCALE_ICON_W, 2.0), grey)
+		if _dense:
+			continue
 		var text_w: float = font.get_string_size(m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
 		c.draw_string(font, Vector2(track_x - SCALE_ICON_W - 2.0 - text_w, y + 4), m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, grey)
 
