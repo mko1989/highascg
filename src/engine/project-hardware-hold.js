@@ -88,7 +88,6 @@ function stampProjectHardware(ctx, project, o) {
 }
 
 module.exports = {
-	HOLD_KEY,
 	isProjectHardwareHeld,
 	holdProjectHardware,
 	releaseProjectHardware,
