@@ -126,3 +126,13 @@ Drawing the ✕ as two lines would also work but changes the look; caching keeps
 - **Owner-QA (not done):** the GUI on the Live tab with Times on — `top -d 10` before and after applying the patch,
   and the Times rows still ticking under the windows.
 
+
+## Measured after the fix (29.10 20:43, Opus)
+
+The Times fix landed as 6a47eb71. Desktop GUI on :0 (`--autostart --tab=0 --screen=0`, Live tab, Times ON, a clip
+playing on PGM 1, nothing else driving the window), `/proc/<pid>/stat` utime+stime deltas:
+**18.2 % of a core over 30 s, 18.8 % over 60 s** (27.10: ~50 %; 21.10 baseline: ~10 %). Screenshot:
+`/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo798-idle.png`.
+So the regression is down from ~40 points to ~8 points over the 21.10 baseline; the remaining ~8 points are not
+attributed yet (candidates from the investigation above: the per-frame PGM/PRV thumbnail uploads while a clip plays,
+the progress text). Status left IN PROGRESS for that remainder.
