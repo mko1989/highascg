@@ -163,7 +163,8 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		}
 	}
 
-	const layoutRes = await applyX11Layout(ctx.config, { live: false, persist: true })
+	// WO-805: the live call below writes the system inventory; writing it here too cost ~0.5-1 s per Apply.
+	const layoutRes = await applyX11Layout(ctx.config, { live: false, persist: true, skipInventory: true })
 	out.layout.persisted = !!layoutRes.persisted
 	out.layout.preXrandrCommand = layoutRes.xrandrCommand || null
 

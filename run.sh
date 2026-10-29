@@ -137,40 +137,9 @@ run_caspar() {
 	fi
 	"$CASPAR_BIN" "$CONFIG_PATH" "$@" </dev/null &
 	_child=$!
-	_saw_amcp=0
-	_stuck=0
-	# WO-398: the hang detector used to fork ss+grep+sleep EVERY second forever (~260k
-	# forks/day) for a 90 s reaction budget. Healthy steady state now checks every 10 s;
-	# while a stall is being counted (and during boot) it stays at 1 s. `_stuck` counts
-	# SECONDS (the interval just slept), so detection latency stays within CASPAR_HANG_SEC
-	# (+ at most one healthy 10 s window).
-	_poll=1
-	while kill -0 "$_child" 2>/dev/null; do
-		if caspar_amcp_listening; then
-			_saw_amcp=1
-			_stuck=0
-			_poll=10
-		else
-			_stuck=$((_stuck + _poll))
-			_poll=1
-			if [ "$_saw_amcp" -eq 1 ]; then
-				_limit="${CASPAR_HANG_SEC:-90}"
-			else
-				_limit="${CASPAR_BOOT_HANG_SEC:-180}"
-			fi
-			if [ "$_stuck" -ge "$_limit" ]; then
-				caspar_supervisor_log "[run.sh] hang (${_limit}s, amcp_seen=${_saw_amcp}) — stopping"
-				caspar_kill_all_processes TERM
-				sleep 2
-				caspar_kill_all_processes KILL
-				wait "$_child" 2>/dev/null
-				return 5
-			fi
-		fi
-		sleep "$_poll"
-	done
-	wait "$_child" 2>/dev/null
-	return $?
+	# WO-805: wait on the child (exit noticed at once); the WO-398 hang detector (1 s / 10 s polls,
+	# CASPAR_HANG_SEC / CASPAR_BOOT_HANG_SEC, returns 5) runs beside it — see casparcg-supervisor-lib.sh.
+	caspar_wait_child_or_hang "$_child"
 }
 
 # WO-638: the first launch of a boot waits until node has settled which screen is the operator's —
@@ -234,8 +203,10 @@ while :; do
 	if [ -f "$_marker" ] && [ $(($(date +%s) - $(stat -c %Y "$_marker" 2>/dev/null || echo 0))) -le 120 ]; then
 		rm -f "$_marker"
 		CASPAR_SKIP_GRACE_ONCE=1
-		caspar_supervisor_log "[run.sh] operator restart marker — fast relaunch (sleep 1s, grace skipped)"
-		sleep 1
+		# WO-805: no fixed `sleep 1` here — caspar_ensure_fully_stopped above already waited for :5250 to be
+		# free and the tree to be gone, the loop top checks the port again, and Caspar's AMCP acceptor
+		# binds with SO_REUSEADDR (Boost default), so TIME_WAIT cannot block the relaunch.
+		caspar_supervisor_log "[run.sh] operator restart marker — fast relaunch (grace skipped)"
 		continue
 	fi
 

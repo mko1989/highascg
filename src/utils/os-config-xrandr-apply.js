@@ -353,16 +353,20 @@ async function applyX11Layout(config, opts = {}) {
 		logger.warn('[OS-Config] No xrandr outputs to apply')
 	}
 	
-	// Refresh system inventory to capture the new layout state (stores raw xrandr query)
-	try {
-		const { writeSystemInventoryFile } = require('../bootstrap/system-inventory-file')
-		writeSystemInventoryFile((level, msg) => {
-			if (level === 'error') logger.error(msg)
-			else if (level === 'warn') logger.warn(msg)
-			else logger.info(msg)
-		}, config)
-	} catch (e) {
-		logger.warn(`[OS-Config] Failed to refresh system inventory after apply: ${e.message}`)
+	// Refresh system inventory to capture the new layout state (stores raw xrandr query).
+	// WO-805: a persist-only call changed nothing on X — full apply passes skipInventory there and lets
+	// its live call write the one inventory of the Apply.
+	if (opts.skipInventory !== true) {
+		try {
+			const { writeSystemInventoryFile } = require('../bootstrap/system-inventory-file')
+			writeSystemInventoryFile((level, msg) => {
+				if (level === 'error') logger.error(msg)
+				else if (level === 'warn') logger.warn(msg)
+				else logger.info(msg)
+			}, config)
+		} catch (e) {
+			logger.warn(`[OS-Config] Failed to refresh system inventory after apply: ${e.message}`)
+		}
 	}
 
 	logger.info('[OS-Config] applyX11Layout end')

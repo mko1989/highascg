@@ -126,15 +126,17 @@ function writeSystemInventoryFile(log, config, opts) {
 				log,
 			})
 		}
-		let payload = buildPayload(config)
+		// WO-805: built ONCE. The device-graph sync below only changes config.deviceGraph, which no payload
+		// field reads, so the old second buildPayload() after an update re-ran every hardware probe
+		// (~0.5 s, event loop blocked) for identical bytes.
+		const payload = buildPayload(config)
 		if (config && typeof config === 'object') {
-			const dg = ensureDeviceGraphHardwareSyncFromLive({
+			ensureDeviceGraphHardwareSyncFromLive({
 				config,
 				configManager: opts?.configManager || null,
 				payload,
 				log,
 			})
-			if (dg?.updated) payload = buildPayload(config)
 		}
 		const body = JSON.stringify(payload, null, 2) + '\n'
 		fs.writeFileSync(p, body, 'utf8')

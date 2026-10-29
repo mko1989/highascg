@@ -1,6 +1,6 @@
 # WO-805 — Devices tab "Apply Caspar config (restart)" is too slow: where the time goes
 
-**Status: OPEN (29.10) — investigation**
+**Status: IN PROGRESS (29.10) — fixes 1 + 5 (run.sh exit wait, marker sleep) and 3 (inventory once) done and verified (offline suite + stub supervisor tests + live operator restarts: Caspar exit→start 2.8-5.1 s → 0.25 s); NVIDIA ordering, Godot timeout, AMCP poll, custom mode still open; owner Apply QA pending**
 **Source:** owner 29.10: *"verify the apply and restart command stack and waits inside the button in the devices tab.
 it seems to be a bit too slow."*
 **Related:** [WO-440](./440_WO_apply_button_always_restarts_caspar.md) (button always sends `force:true`),
@@ -207,3 +207,106 @@ Nothing in code. Investigation and measurement only (owner asked for findings fi
 - Read-only probe timings on the box (§2.1).
 - NOT verified: any fix; the 6-14 s step-3 outliers; the exact Caspar exit code (inferred 139 from the SIGSEGV + the
   hard-fail branch; the supervisor does not log it on the marker path).
+
+---
+
+## Fix (29.10, Opus)
+
+Scope (owner): §4 fix 1 + fix 5 (run.sh exit detection, marker sleep) and §4 fix 3 (inventory once per Apply).
+NOT in this pass: the NVIDIA policy ordering (§4 fix 4, `x-display-session-runtime.js` / step 3 — separate pass),
+the Godot timeout (fix 2), the AMCP-ready poll (fix 6), the custom mode (fix 7).
+
+### Findings written before the change
+
+**F1 — run.sh sees Caspar's exit up to 10 s late.** `run.sh:147-171`: the hang detector IS the foreground loop
+(`while kill -0 "$_child"; do … sleep "$_poll"; done`), and `_poll=10` once AMCP is up (`:152`). The exit is only
+noticed when the current `sleep 10` (`:170`) returns. Before: exit → noticed 0-10 s later (today ~8.9 s).
+After (planned): the detector moves to a background watcher (`caspar_hang_watch`, same 1 s / 10 s polls, same
+`CASPAR_HANG_SEC` 90 / `CASPAR_BOOT_HANG_SEC` 180 budgets, same TERM → 2 s → KILL), and the foreground does
+`wait "$_child"` — POSIX `wait` returns the moment the child exits (dash included). A hang is reported back
+through a flag file so `run_caspar` still returns 5. The watcher is stopped with TERM; its trap kills its own
+`sleep` so no orphan sleeps stay behind. Fork budget unchanged (one `ss|grep` + one `sleep` per poll, as WO-398).
+The functions go into `tools/runtime/casparcg-supervisor-lib.sh` so a test can source them with a stub child.
+
+**F2 — the marker `sleep 1` is not needed for the port.** `run.sh:237-238`. By the time it runs:
+`caspar_ensure_fully_stopped` (`run.sh:222`, lib `:207-217`) has already waited until `ss -tln` shows no
+listener on :5250 and no Caspar main/CEF process is left (TERM/KILL otherwise); the loop top runs
+`caspar_wait_amcp_port_free` again (`run.sh:202`); `run_caspar` waits up to 5 s for a stray main (`:113-118`).
+TIME_WAIT sockets cannot block the rebind: Caspar's AMCP acceptor is
+`tcp::acceptor(io, tcp::endpoint(tcp::v4(), port))` (`~/caspar-build/src-v2/src/protocol/util/AsyncEventServer.cpp:285`),
+whose Boost constructor defaults `reuse_addr = true` (SO_REUSEADDR). Before: fixed 1.0 s. After: 0 (removed).
+
+**F3 — inventory written twice per Apply.** `full-config-apply.js:166` (`applyX11Layout({live:false, persist:true})`)
+and `:217` (`{live:true}`; `:202` on the nodm path) both reach `os-config-xrandr-apply.js:356-366` →
+`writeSystemInventoryFile`. The persist-only call changes nothing on X, so its inventory is the same as the one the
+live call writes ~0.1 s later. Before: 2 writes per Apply. After (planned): `applyX11Layout(…, {skipInventory:true})`
+on the persist-only call; the live call writes it once. Other callers (`os-layout-watchdog`, `settings-os`,
+`system-hardware-xrandr-layout`, `boot-screen-assignment`) call applyX11Layout once and keep their write.
+
+**F4 — payload built twice in one call.** `system-inventory-file.js:129,137`: when
+`ensureDeviceGraphHardwareSyncFromLive` reports `updated`, `buildPayload(config)` runs again (all hardware probes:
+xrandr, DRM, PortAudio, ALSA, DeckLink log, NIC). The sync only changes `config.deviceGraph`
+(`device-graph-boot-sync.js:45`), and no field of the payload reads `deviceGraph` (grep: `buildPayload` →
+`hardware-info`, `gpu-physical-map`, `gpu-topology-*`, `hardware-identity`, `decklink-enum`, `audio-devices` —
+none reference it; `cm.save` gets a spread copy, `config` itself is not replaced). On the Apply path no configManager
+is passed, so the sync is never persisted and the first applyX11Layout call of every Apply that edited the device
+graph pays the double build. Before: 2 builds. After (planned): 1 build, written as is → same bytes.
+
+Timed on the box BEFORE the change (standalone `writeSystemInventoryFile(log, config)` exactly as the Apply path
+calls it, real hardware, output to a scratch path, config saves stubbed; script
+`scratchpad/wo805/time-inv.js`): single build **466-560 ms**, with the device-graph update (double build)
+**953-1052 ms**. One Apply today = double + single ≈ 1.4 s standalone (journal 29.10: 1.16 + 0.60 = 1.76 s).
+
+### What was done
+
+| file | lines | change |
+|---|---|---|
+| `tools/runtime/casparcg-supervisor-lib.sh` | 305 (+63) | new `caspar_hang_watch` (the WO-398 detector, unchanged logic, run as a background watcher; touches the flag before its TERM → 2 s → KILL sweep; TERM trap kills its own pending `sleep`) and `caspar_wait_child_or_hang` (`wait "$child"` in the foreground; stops the watcher on a normal exit, lets it finish its sweep and returns 5 on a hang; fd 9 closed in the watcher) |
+| `run.sh` | 221 (−29) | `run_caspar`: the foreground `while kill -0 … sleep "$_poll"` loop → `caspar_wait_child_or_hang "$_child"`; marker branch: fixed `sleep 1` removed (F2), log text `fast relaunch (grace skipped)` |
+| `src/utils/os-config-xrandr-apply.js` | 386 | inventory write gated on `opts.skipInventory !== true` |
+| `src/utils/full-config-apply.js` | 320 | persist-only call passes `skipInventory: true` |
+| `src/bootstrap/system-inventory-file.js` | 178 | `buildPayload` once; the post-sync rebuild removed (F4) |
+| `tools/smoke/smoke-wo400-supervisor-cleanup.test.js` | 77 | WO-398 assertions repointed to `caspar_hang_watch` in the lib (same assertions) + run.sh must delegate to it |
+| `tools/smoke/smoke-wo805-supervisor-exit-wait.test.js` | 198 | new, /bin/sh + stub Caspar (node script listening on a free port), temp CASPAR_ROOT |
+| `tools/smoke/smoke-wo805-inventory-once.test.js` | 190 | new, mocked probes, frozen clock, golden bytes |
+| `tools/ci/offline-test-files-2.js` | 29 | both new tests in the curated list |
+
+Why a background watcher and not `trap ':' CHLD` + `sleep & wait`: the watcher keeps the WO-398 loop byte-for-byte
+in logic, the foreground `wait` on one pid is plain POSIX with no signal subtleties, and it is testable by sourcing
+the lib. Cost: one extra `/bin/sh` process per Caspar run; fork rate unchanged.
+
+### What was VERIFIED
+
+- **Offline suite** `node tools/ci/run-offline-tests.js`: **3490 tests, 3488 pass, 0 fail, 2 skipped** (baseline
+  3480 / 3478 / 0; +10 new). `check-max-file-lines`: 0 over 500. `sh -n` run.sh + lib: OK. eslint on the changed JS:
+  no new findings (one pre-existing warning, `readCreateMissingModes` unused). `format:check`: clean.
+- **Supervisor tests (stubs, /bin/sh = dash):** exit at 2.5 s while AMCP is up (watcher in its `sleep 10`) →
+  `caspar_wait_child_or_hang` returns 139 at ~2.6 s, all supervisor `sleep` pids dead afterwards; boot hang
+  (`CASPAR_BOOT_HANG_SEC=2`) → stub killed, returns 5, log `hang (2s, amcp_seen=0)`; AMCP drop after up
+  (`CASPAR_HANG_SEC=2`) → returns 5 after the ≤10 s healthy window (13.1 s), log `amcp_seen=1`; full run.sh with
+  the stub returns with the stub's code at **2.59 s**. **Negative control:** the same e2e test against the
+  pre-change run.sh + lib (`git show HEAD:`) took **11.1 s** and failed.
+- **Inventory tests:** both full-apply paths (canvas fits, nodm) call applyX11Layout twice, only the live call
+  writes; with the device-graph update every probe runs once (old module: twice — same test against the pre-change
+  copy); file bytes equal the golden with and without the update, and the pre-change module produces the same golden.
+- **Inventory on real hardware** (standalone, same call as the Apply path, 4 runs each, after node restart of the
+  code): single build 472-581 ms before and after; device-graph-update case **953-1052 ms before → 472-558 ms
+  after**. All four output files (before/after × update/no update) are identical apart from `collectedAt`
+  (md5 of the rest `8c8d1a9c…`). Per Apply: ≈1.43 s (double + single) → ≈0.5 s (one single), journal-equivalent
+  1.76 s → ~0.6 s. There is no HTTP route on the read side that triggers the write (`GET /api/device-view` only
+  reads the file), so it was timed standalone.
+- **Node** restarted (`kill -TERM`, 12:31): startup wrote the inventory once, API 200, no errors.
+- **Real Caspar, operator-style restart** (marker `/tmp/caspar-operator-restart` + AMCP `RESTART`, i.e. the Apply's
+  step 4 only — no config, display or output change; timed by a 10 ms `/proc` poll, script `scratchpad/wo805/op-restart.js`):
+
+  | supervisor | Caspar exit → new main started | RESTART → AMCP listening again |
+  |---|---|---|
+  | old run.sh (2 runs, 12:31-12:32) | 5094 ms, 2760 ms | 7108 ms, 5215 ms |
+  | new run.sh (3 runs, 12:33, after `systemctl restart casparcg-server`) | **252, 257, 256 ms** | **2221, 2116, 2649 ms** |
+
+  The remaining ~0.25 s is the pre-launch helpers (screen policy node script + HDMI unmute). Watcher seen live as a
+  `/bin/sh run.sh` child of the supervisor with one `sleep 10`; no stray sleeps after the restarts; node reconnected
+  (WO-516 watchdog) and re-applied state each time.
+- **NOT verified:** a full Apply from the Devices tab (not clicked; owner QA) — expected saving ≈ 8-10 s of run.sh
+  wait + ~1 s marker sleep + ~1.2 s inventory on today's 16.1 s trace; a real hung Caspar on the box (covered only
+  by the stub tests); the NVIDIA ordering, Godot timeout, AMCP-ready poll and custom-mode items (not in this pass).

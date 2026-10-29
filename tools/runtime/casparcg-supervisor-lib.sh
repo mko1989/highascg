@@ -203,6 +203,69 @@ caspar_clear_cef_cache() {
 	return 0
 }
 
+# WO-398 hang detector, run BESIDE Caspar since WO-805 (it used to be run.sh's foreground loop, so an
+# exit was only noticed when its 10 s healthy-poll `sleep` ended: 0-10 s, ~8.9 s on the 29.10 Apply).
+# Polls 1 s during boot / while a stall is counted, 10 s while AMCP is up; `_stuck` counts SECONDS.
+# On a hang it touches $2 FIRST (so the waiter knows), then TERM → 2 s → KILL the whole tree.
+# Stopped with TERM by caspar_wait_child_or_hang: the trap kills its own pending sleep so no orphan
+# `sleep 10` outlives it.
+caspar_hang_watch() {
+	_child="$1"
+	_flag="$2"
+	_sl=''
+	trap '[ -n "$_sl" ] && kill "$_sl" 2>/dev/null; exit 0' TERM
+	_saw_amcp=0
+	_stuck=0
+	_poll=1
+	while kill -0 "$_child" 2>/dev/null; do
+		if caspar_amcp_listening; then
+			_saw_amcp=1
+			_stuck=0
+			_poll=10
+		else
+			_stuck=$((_stuck + _poll))
+			_poll=1
+			if [ "$_saw_amcp" -eq 1 ]; then
+				_limit="${CASPAR_HANG_SEC:-90}"
+			else
+				_limit="${CASPAR_BOOT_HANG_SEC:-180}"
+			fi
+			if [ "$_stuck" -ge "$_limit" ]; then
+				: >"$_flag"
+				caspar_supervisor_log "[run.sh] hang (${_limit}s, amcp_seen=${_saw_amcp}) — stopping"
+				caspar_kill_all_processes TERM
+				sleep 2
+				caspar_kill_all_processes KILL
+				return 0
+			fi
+		fi
+		sleep "$_poll" &
+		_sl=$!
+		wait "$_sl"
+		_sl=''
+	done
+}
+
+# WO-805: block on the Caspar child itself — POSIX `wait` returns the moment it exits — while
+# caspar_hang_watch polls beside it. Returns the child's exit code, or 5 when the watcher killed a hang
+# (after letting it finish its TERM/KILL sweep). fd 9 (run.sh's flock) is closed in the watcher.
+caspar_wait_child_or_hang() {
+	_wchild="$1"
+	_wflag="${CASPAR_HANG_FLAG:-${TMPDIR:-/tmp}/caspar-runsh-hang.$$}"
+	rm -f "$_wflag"
+	caspar_hang_watch "$_wchild" "$_wflag" 9>&- &
+	_watch=$!
+	wait "$_wchild" 2>/dev/null
+	_wec=$?
+	[ -f "$_wflag" ] || kill "$_watch" 2>/dev/null
+	wait "$_watch" 2>/dev/null
+	if [ -f "$_wflag" ]; then
+		rm -f "$_wflag"
+		return 5
+	fi
+	return "$_wec"
+}
+
 # Port may be free while the main process is hung mid-RESTART teardown.
 caspar_ensure_fully_stopped() {
 	caspar_wait_amcp_port_free

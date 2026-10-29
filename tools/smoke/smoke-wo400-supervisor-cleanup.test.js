@@ -42,7 +42,10 @@ describe('one crash-damping engine (WO-400)', () => {
 
 describe('hang detector polls cheaply (WO-398)', () => {
 	it('healthy steady state polls every 10 s and _stuck counts seconds', () => {
-		const fn = runSh.slice(runSh.indexOf('run_caspar()'), runSh.indexOf('while :; do'))
+		// WO-805: the detector moved from run.sh's run_caspar() into the lib's caspar_hang_watch(), which
+		// runs beside the child while run_caspar waits on it (caspar_wait_child_or_hang).
+		assert.match(runSh.slice(runSh.indexOf('run_caspar()'), runSh.indexOf('while :; do')), /caspar_wait_child_or_hang "\$_child"/)
+		const fn = lib.slice(lib.indexOf('caspar_hang_watch()'), lib.indexOf('caspar_wait_child_or_hang()'))
 		assert.match(fn, /_poll=10/)
 		assert.match(fn, /_stuck=\$\(\(_stuck \+ _poll\)\)/)
 		assert.match(fn, /sleep "\$_poll"/)
