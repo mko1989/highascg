@@ -184,9 +184,10 @@ static func quick_info(row: Dictionary) -> String:
 	return " · ".join(parts)
 
 
-## WO-818 — NotchLC decodes on the CPU in Caspar (ffmpeg's notchlc decoder): the media tree marks those rows.
+## WO-818 — NotchLC rows are marked in the media tree: stock Caspar decodes them on the CPU (ffmpeg's notchlc decoder);
+## the HighAsCG build decodes them on the GPU (WO-820).
 ## The probed codec decides; the file name ("…notchlc…") only when nothing was probed.
-const NOTCHLC_TIP := "NotchLC: CasparCG decodes it on the CPU, which costs far more than HAP.\nTranscode it to HAP in HighAsCG before using it on air."
+const NOTCHLC_TIP := "NotchLC: the HighAsCG Caspar build decodes it on the GPU. Stock CasparCG decodes it on the CPU, far heavier than HAP.\nOn a stock Caspar, transcode it to HAP in HighAsCG before using it on air."
 
 
 static func is_notchlc(row: Dictionary) -> bool:

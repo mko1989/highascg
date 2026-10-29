@@ -24,5 +24,5 @@ func test_file_name_fallback_only_without_codec() -> void:
 
 func test_tooltip_is_two_lines() -> void:
 	t.eq(O.NOTCHLC_TIP.split("\n").size(), 2, "two lines")
-	t.ok(O.NOTCHLC_TIP.contains("CPU") and O.NOTCHLC_TIP.contains("Transcode it to HAP in HighAsCG"), "says why and what to do")
+	t.ok(O.NOTCHLC_TIP.contains("GPU") and O.NOTCHLC_TIP.contains("CPU") and O.NOTCHLC_TIP.contains("transcode it to HAP in HighAsCG"), "WO-820: GPU here, CPU on stock, what to do there")
 	t.ok(not O.NOTCHLC_TIP.contains("ffmpeg"), "no command line: HighAsCG transcodes to HAP itself")
