@@ -12,7 +12,7 @@ Every HighAsCG box built from the ISO ships with the same logins. They are publi
 Nothing else ships:
 - no SSH host keys (each install makes its own on first start);
 - no SSH user keys;
-- no TLS key (the HTTPS proxy makes a fresh self-signed one);
+- no TLS key (the old :4443 HTTPS proxy is gone, WO-822; a leftover `config/certs/` is excluded from sticks, ISOs and releases);
 - no API token (made on first boot when auth is on, see [SECURITY.md](./SECURITY.md));
 - no Tailscale, Syncthing or GitHub identity;
 - no Companion database.

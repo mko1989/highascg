@@ -4,8 +4,8 @@
  * WO-811 phase 3 — Settings → Nuclear "Change casparcg login password…": POST /api/system/gui-launch {action:'os-password'}
  * opens tools/runtime/os-password.sh (passwd) in a terminal on :0, and only for a request from the box itself
  * (src/api/box-local-request.js). The launch is STUBBED here (child_process.spawn / deps) — nothing runs passwd or
- * opens a window. Also: the wrapper's shell syntax, that it never echoes a password, and the HTTPS proxy stamping
- * X-Forwarded-For so a proxied LAN client is not taken for the box.
+ * opens a window. Also: the wrapper's shell syntax and that it never echoes a password. (The :4443 HTTPS proxy that
+ * stamped X-Forwarded-For was removed in WO-822; the server-side refusal of relayed requests stays, see below.)
  */
 
 const test = require('node:test')
@@ -156,11 +156,12 @@ test('wrapper script: valid sh, runs passwd, never stores or echoes a password',
 	assert.match(code, /Press Enter to close this window/)
 })
 
-test('wiring: gui-launch passes req; window class; the HTTPS proxy stamps X-Forwarded-For', () => {
+test('wiring: gui-launch passes req; window class; relayed requests stay refused with no proxy file involved', () => {
 	assert.match(read('src/api/router.js'), /routes\.post\('\/api\/system\/gui-launch', \(\{ path, body, ctx, req \}\) => routesSystemHardware\.hardwareHandlePost\(path, body, ctx, req\)/)
 	assert.match(read('src/api/routes-system-hardware.js'), /handleGuiLaunchPost\(body, ctx, req\)/)
 	assert.match(read('src/utils/x-display-session-gui-windows.js'), /'os-password': 'highascg-passwd'/)
-	const proxy = read('tools/runtime/highascg-https-proxy.js')
-	assert.match(proxy, /'x-forwarded-for': creq\.socket\.remoteAddress \|\| 'unknown'/)
-	assert.match(proxy, /X-Forwarded-For: \$\{csocket\.remoteAddress \|\| 'unknown'\}/)
+	// WO-822: the proxy is gone; the refusal rules that defended against it live in box-local-request.js and are kept.
+	const guard = read('src/api/box-local-request.js')
+	assert.match(guard, /PROXY_HEADERS = \['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-host'\]/)
+	assert.match(guard, /Number\(port\) !== Number\(sock\.localPort\)/)
 })

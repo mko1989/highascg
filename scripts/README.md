@@ -223,6 +223,7 @@ These are installed by `fix-calamares-shellprocess.sh` into the live-USB squashf
 
 #### `scripts/runtime/` (naming trap — these are **INSTALLERS**, not runtime)
 - `remove-highascg-web-proxy.sh` — remove the old nginx :80 proxy (WO-498; UI is served directly on :4200)
+- `remove-highascg-https-proxy.sh` — remove the old :4443 HTTPS proxy unit (WO-822; `REMOVE_CERTS=1` also deletes its cert, `DRY_RUN=1` prints the plan)
 - `install-network-apply.sh` — network-apply script installer
 - `decklink-install-from-exfat.sh` — DeckLink driver installer
 

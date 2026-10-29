@@ -36,4 +36,5 @@ module.exports = [
 	'tools/smoke/smoke-wo813-web-clip-trim.test.js',
 	'tools/smoke/smoke-wo814-take-order-play-last.test.js',
 	'tools/smoke/smoke-wo818-notchlc-warning.test.js',
+	'tools/smoke/smoke-wo822-no-https-proxy.test.js',
 ]

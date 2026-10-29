@@ -312,7 +312,7 @@ home/casparcg/.config/companion/v5.0
 home/casparcg/.config/companion/v5.0/*
 home/casparcg/.config/companion/machid
 home/casparcg/.gitconfig
-# this box's self-signed TLS key (SANs = this box's IPs); highascg-https-proxy.js makes a fresh one on first start
+# this box's self-signed TLS key (SANs = this box's IPs) left by the removed :4443 HTTPS proxy (WO-822); never ship it
 home/casparcg/highascg/config/certs/*
 home/casparcg/highascg/config/*.corrupt-*
 home/casparcg/highascg/config/*.tmp

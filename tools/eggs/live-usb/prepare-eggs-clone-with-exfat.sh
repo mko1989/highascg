@@ -130,6 +130,13 @@ if [[ -x "${REPO_ROOT}/scripts/runtime/remove-highascg-web-proxy.sh" ]]; then
 	bash "${REPO_ROOT}/scripts/runtime/remove-highascg-web-proxy.sh" || true
 fi
 
+# WO-822: same for the :4443 HTTPS proxy (highascg-https-proxy.service) — an enabled copy on the build host would
+# otherwise be cloned into the ISO. The remover disables + stops + masks it; the cert dir is excluded from the ISO anyway.
+if [[ -x "${REPO_ROOT}/scripts/runtime/remove-highascg-https-proxy.sh" ]]; then
+	echo "==> removing any old :4443 HTTPS proxy unit"
+	bash "${REPO_ROOT}/scripts/runtime/remove-highascg-https-proxy.sh" || true
+fi
+
 if [[ "${SKIP_HIGHASCG_POWER_BUTTON:-0}" != "1" ]]; then
 	echo "==> power button (short=network reset, hold 3s=shutdown)"
 	bash "${REPO_ROOT}/scripts/setup/14-power-button-network-reset.sh"

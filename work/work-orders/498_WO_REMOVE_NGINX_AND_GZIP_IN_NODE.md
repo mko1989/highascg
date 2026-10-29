@@ -80,6 +80,8 @@ Expect `Content-Encoding: gzip` and `Cache-Control: public, max-age=31536000, im
 
 ## 5. Consequence worth stating
 
+> **Update 29.10 — [WO-822](./822_WO_remove_https_proxy.md) removed the `:4443` HTTPS proxy too.** The paragraph below is history.
+
 `docs/SECURITY.md` still notes that HighAsCG does not terminate TLS in-process and suggests a
 front-end proxy for HTTPS. That remains true and is unaffected: the `:4443` HTTPS proxy
 (`tools/runtime/highascg-https-proxy.js`) is a separate Node process and was never nginx. Note the

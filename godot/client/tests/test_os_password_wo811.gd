@@ -19,7 +19,7 @@ func test_only_on_the_box() -> void:
 	t.eq(M.available("http://localhost:4200"), true, "localhost")
 	t.eq(M.available("http://[::1]:4200"), true, "IPv6 loopback")
 	t.eq(M.available("http://10.0.0.5:4200"), false, "another machine's node: disabled")
-	t.eq(M.available("https://192.168.1.20:4443"), false, "through the HTTPS proxy: disabled")
+	t.eq(M.available("https://192.168.1.20:4443"), false, "through a :4443 TLS front proxy: disabled")
 
 
 func test_result_text() -> void:

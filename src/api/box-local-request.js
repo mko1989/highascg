@@ -4,12 +4,14 @@
  * WO-811 phase 3 — "is this request from a client on the box itself?" for actions that only make sense on the box's own
  * screen (:0), e.g. the OS-password terminal (owner 29.10: available only from the box's own screen).
  *
- * A loopback socket alone is NOT enough here (WO-811 1.5 #3): `tools/runtime/highascg-https-proxy.js` forwards every LAN
- * client on :4443 to 127.0.0.1:4200, and Caspar's CEF renders arbitrary web pages from loopback. So all of:
+ * A loopback socket alone is NOT enough here (WO-811 1.5 #3): any TLS/reverse proxy in front of this server (the :4443
+ * HTTPS proxy that WO-811 found, since removed in WO-822; Caddy or Tailscale Serve per docs/SECURITY.md; `ssh -L`) relays
+ * every remote client from 127.0.0.1, and Caspar's CEF renders arbitrary web pages from loopback. The proxy-header and
+ * Host-port rules below are kept as defence in depth for those, not only for the removed proxy. So all of:
  *  1. the TCP peer is loopback (127.0.0.0/8, ::1, ::ffff:127.x) — same test as routes-media-ingest-local.js isLoopback;
- *  2. no proxy header (the HTTPS proxy stamps `X-Forwarded-For`; any `Forwarded` / `X-Real-IP` is refused too);
+ *  2. no proxy header (a proxy stamps `X-Forwarded-For`; `Forwarded` / `X-Real-IP` / `X-Forwarded-Host` are refused too);
  *  3. the Host header (when sent) names a loopback host, and its port, when given, is the port this server accepted the
- *     connection on — a request relayed by the :4443 proxy keeps the client's `Host: <box>:4443`;
+ *     connection on — a request relayed by a proxy on another port (e.g. :4443) keeps the client's `Host: <box>:4443`;
  *  4. a browser `Origin` (when sent) is a loopback origin — a foreign web page (CEF webpage source) carries its own.
  * Godot sends no Origin and `Host: 127.0.0.1:4200`; the web UI opened on the box sends loopback Host + Origin.
  */

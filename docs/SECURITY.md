@@ -53,7 +53,7 @@ Cross-site browser pages cannot drive the API when cookies are `SameSite=Strict`
 
 ## TLS / reverse proxy
 
-HighAsCG does not terminate TLS in-process. Put nginx, Caddy, or Tailscale Serve in front for HTTPS. Set `Secure` on session cookies when the proxy sends `X-Forwarded-Proto: https`.
+HighAsCG does not terminate TLS in-process, and no HTTPS proxy ships with it any more (the :4443 one was removed in WO-822, nginx in WO-498). Put Caddy or Tailscale Serve in front for HTTPS. Set `Secure` on session cookies when the proxy sends `X-Forwarded-Proto: https`.
 
 ## Recovery
 
