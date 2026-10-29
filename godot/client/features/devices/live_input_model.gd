@@ -238,6 +238,11 @@ static func slot_message(k: String, res: Dictionary) -> String:
 	return "%s slot %d added.%s%s" % ["Live audio" if k == "live_audio" else "USB video", res.slot, host, APPLY_MSG if res.restart else ""]
 
 
+## WO-809: a success message that still reports a failed host PLAY / capture start — the dialog stays open on it.
+static func add_warning(text: String) -> bool:
+	return text.contains(" Host PLAY: ") or text.contains(" Capture: ")
+
+
 static func decklink_message(slot: int, fin: Dictionary) -> String:
 	var ch: Variant = fin.host_channel
 	return "DeckLink input slot %d . %s . %s.%s%s" % [slot, "host channel (after apply)" if ch == null else "host channel " + R.s(ch),

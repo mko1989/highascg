@@ -150,6 +150,19 @@ func test_helpers() -> void:
 	t.eq(M.escape_html("<a & 'b'>"), "&lt;a &amp; &#39;b&#39;&gt;", "escapeHtml")
 
 
+## WO-809: which success messages close the dialog at once (clean) and which keep it open (host PLAY / capture failed).
+func test_add_warning() -> void:
+	t.eq(M.add_warning(M.added_message({"hostLivePlay": {"ok": true}})[0]), false, "added + producer started: clean")
+	t.eq(M.add_warning(M.added_message({"pendingApply": true})[0]), false, "added, apply pending: clean")
+	t.eq(M.add_warning(M.added_message({"hostLivePlay": {"ok": false, "error": "404 PLAY FAILED"}})[0]), true, "host PLAY failed")
+	t.eq(M.add_warning(M.slot_message("usb_video", {"slot": 1, "host_channel": 7, "restart": false, "play": {"ok": true}})), false,
+		"capture started: clean")
+	t.eq(M.add_warning(M.slot_message("live_audio", {"slot": 2, "host_channel": 8, "restart": false,
+		"play": {"ok": false, "error": "busy"}})), true, "capture failed")
+	t.eq(M.add_warning(M.decklink_message(1, {"host_channel": 6, "route": "route://6-1", "restart": false, "pending": false})),
+		false, "DeckLink add: clean")
+
+
 ## tests/golden/devices_live_band.json: collectUnlistedLiveSourceRows + the host count that picks the empty note.
 func test_band_rows() -> void:
 	var g: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/golden/devices_live_band.json"))

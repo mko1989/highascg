@@ -22,10 +22,27 @@ func _open_dialog(kind_label: String) -> String:
 	return await ui.choose(kind, kind_label)
 
 
-## The dialog closes itself 1.5 s after a successful add (live_input_dialog.gd _close_later).
-func _await_closed() -> String:
-	var gone: Variant = await ui.wait_for(func() -> bool: return ui.button("Add live source") == null, 5.0)
-	return expect(bool(gone), "Add live input dialog stayed open after a successful add")
+## WO-809: the dialog closes as soon as the add is answered (no fixed 1.5 s hold), so it must be gone well inside
+## CLOSE_MS of the click on the sandbox server. Prints the click → close time and the longest frame in between.
+const CLOSE_MS := 1000
+
+
+func _click_add_and_await_closed() -> String:
+	var why: String = await ui.click(ui.button("Add live source"))
+	if why != "":
+		return why
+	var t0 := Time.get_ticks_msec()
+	var last := [t0, 0]  # last frame tick, longest frame gap
+	var gone: Variant = await ui.wait_for(func() -> bool:
+		var now := Time.get_ticks_msec()
+		last[1] = maxi(last[1], now - last[0])
+		last[0] = now
+		return ui.button("Add live source") == null, 5.0)
+	var ms := Time.get_ticks_msec() - t0
+	print("[e2e] add live source: click → dialog closed %d ms, longest frame %d ms" % [ms, last[1]])
+	if not gone:
+		return "Add live input dialog stayed open after a successful add"
+	return expect(ms < CLOSE_MS, "Add live input dialog took %d ms to close after the click (WO-809)" % ms)
 
 
 func run() -> void:
@@ -35,28 +52,22 @@ func run() -> void:
 		if why == "":
 			why = await ui.type_into(ui.find("LineEdit", "Exact NDI source name"), NDI_NAME, false)
 		if why == "":
-			why = await ui.click(ui.button("Add live source"))
+			why = await _click_add_and_await_closed()
 		if why != "":
 			return why
-		why = await await_api("/api/device-view", func(d: Variant) -> bool:
+		return await await_api("/api/device-view", func(d: Variant) -> bool:
 			return JSON.stringify(_sources(d)).contains(NDI_NAME), "NDI source not in extraLiveSources")
-		if why != "":
-			return why
-		return await _await_closed()
 	)
 	await step("Add a webpage input", func() -> String:
 		var why := await _open_dialog("Web Browser (CG template)")
 		if why == "":
 			why = await ui.type_into(ui.find("LineEdit", "https://..."), WEB_URL, false)
 		if why == "":
-			why = await ui.click(ui.button("Add live source"))
+			why = await _click_add_and_await_closed()
 		if why != "":
 			return why
-		why = await await_api("/api/device-view", func(d: Variant) -> bool:
+		return await await_api("/api/device-view", func(d: Variant) -> bool:
 			return JSON.stringify(_sources(d)).contains("example.com/e2e"), "webpage not in extraLiveSources")
-		if why != "":
-			return why
-		return await _await_closed()
 	)
 	await step("Both show in Sources → Live", func() -> String:
 		var why: String = await ui.pick_tab("Live")

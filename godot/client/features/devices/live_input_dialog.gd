@@ -2,7 +2,9 @@ extends Node
 ## WO-605 slice 11 — the "Add live input" dialog (web live-input-modal.js + -shell.js + -shell-v4l2.js) over
 ## live_input_flow.gd: type, hint, one section per type (DeckLink port + host channel, NDI discover / name,
 ## system browser URL + size, webpage URL / template + CG, ALSA device, V4L2 device + format / fps / audio), then
-## "Add live source" and its status line. A fresh dialog per open, like the web modal; it closes 1.5 s after an add.
+## "Add live source" and its status line. A fresh dialog per open, like the web modal. WO-809: a clean add closes it
+## at once (the web modal holds it 1.5 s) and hands its message to `status`; an error, or an add whose host PLAY /
+## capture failed, keeps it open on that message.
 ## Opened by the Devices "Add live input" band's "+" and the Matrix view's "+ Live input"; the Audio tab's "+" opens it
 ## on Live Audio (WO-604, the web mixer's add-input button).
 
@@ -15,6 +17,7 @@ const NUMERIC := ["browser-display-width", "browser-display-height", "browser-di
 
 signal dirty  ## Caspar restart-dirty
 signal added  ## web onAdded: the Devices tab reloads
+signal status(text: String, ok: bool)  ## WO-809: a clean add's message, for the opener's status line
 
 var _dlg: AcceptDialog
 var _flow: Flow
@@ -50,8 +53,8 @@ class _Io:
 		c.dirty.emit()
 
 	func added() -> void:
+		c._close_if_clean()
 		c.added.emit()
-		c._close_later()
 
 	func changed() -> void:
 		c._render()
@@ -72,11 +75,15 @@ func open(kind := "decklink") -> void:
 	await _flow.start(kind)
 
 
-func _close_later() -> void:
-	var d := _dlg
-	await get_tree().create_timer(1.5).timeout
-	if is_instance_valid(d):
-		d.queue_free()
+## WO-809: the owner felt the old fixed 1.5 s hold after "Add live source" as modal lag. A clean add closes now and
+## passes its message on; a partial failure (M.add_warning) stays on screen, already shown in the status line.
+func _close_if_clean() -> void:
+	var text: String = _flow.s.status
+	if M.add_warning(text) or _dlg == null or not is_instance_valid(_dlg):
+		return
+	_dlg.queue_free()
+	_dlg = null
+	status.emit(text, true)
 
 
 func _build(first_kind: String) -> void:

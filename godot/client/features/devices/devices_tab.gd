@@ -92,6 +92,7 @@ func _ready() -> void:
 	live_inputs = LiveInputDialog.new()
 	add_child(live_inputs)
 	live_inputs.dirty.connect(func() -> void: _gesture.set_dirty(true))
+	live_inputs.status.connect(_set_status)  # WO-809: before `added`, so the reload keeps the add's message
 	live_inputs.added.connect(refresh)
 	_bar = Toolbar.new()
 	v.add_child(_bar)
