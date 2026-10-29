@@ -243,7 +243,10 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				ctx.log('info', `[scene-take] pgm/prv path ch=${channel} prv=${bus1}`)
 			}
 			const previousPgmScene = currentScene
-			const stageOnPreview = b.stageOnPreview !== false
+			/* WO-814 (owner 29.10): the incoming look goes straight to PGM (LOADBG there already prebuffers);
+			 * the old "stage on PRV first" pass is a legacy opt-in (`stageOnPreview: true`) only. */
+			const stageOnPreview = b.stageOnPreview === true
+			const prvShowsIncoming = inc?.id != null && String(liveSceneState.getChannel(bus1)?.sceneId ?? '') === String(inc.id)
 			/* WO-272: edit-on-PGM content pushes re-take the SAME look that is already on air —
 			 * flipping the "previous" (older edit of the same look) onto PRV would clobber whatever
 			 * the operator has staged there. `previewExchange: false` skips the pgm→prv flip-flop;
@@ -298,7 +301,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 					// Caspar reconcile). Without this, the STAGED incoming look stays on PRV —
 					// i.e. PRV shows the exact look that is now on air (WO-150 B150.1). Classic
 					// flip-flop with an empty "previous" means an EMPTY preview.
-					if (!stageOnPreview) return null
+					if (!stageOnPreview && !prvShowsIncoming) return null
 					previewExchangeStarted = true
 					previewExchangePromise = (async () => {
 						try {
@@ -392,13 +395,13 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				self: ctx,
 				skipLayerVisualEquality: true,
 				playSync: sync,
+				/* WO-814: flip-flop the preview once the PGM PLAY batch is committed and acked — never
+				 * before (its PRV commands used to queue in between the PGM LOADBG and the PGM PLAY on
+				 * the shared AMCP connection), and not after the fade + teardown either (WO-150 B150.1). */
+				onProgramPlayCommitted: previewExchange ? startPreviewExchange : null,
 			})
-			// Flip-flop the preview WHILE the program transition runs (different Caspar
-			// channel, independent AMCP). Sequenced after the awaited PGM take, PRV kept
-			// showing the staged incoming look for the entire fade + teardown — the
-			// operator-visible "wrong look on preview after transition" (WO-150 B150.1).
-			if (previewExchange) startPreviewExchange()
 			await pgmTakePromise
+			if (previewExchange) startPreviewExchange() // no-op when the PLAY hook already ran it
 			if (inc && typeof inc === 'object' && inc.id) {
 				await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 			}

@@ -105,7 +105,8 @@ test('Phase B of every screen goes out as ONE merged batch, the last batch sent,
 	await Promise.all([pa, pb])
 	const batches = log.filter((x) => typeof x === 'object')
 	assert.equal(batches.length, 1, 'one BEGIN…COMMIT for both screens')
-	assert.deepEqual(batches[0].batch, ['PLAY 1-10', 'MIXER 1-110 OPACITY 1 25', 'PLAY 2-10'])
+	// WO-814: every screen's mixer lines first, then every PLAY — PLAY is the last command of the batch.
+	assert.deepEqual(batches[0].batch, ['MIXER 1-110 OPACITY 1 25', 'PLAY 1-10', 'PLAY 2-10'])
 	assert.deepEqual(batches[0].opts, { skipMixerPreCommit: true, forceBatch: true })
 	const at = log.indexOf(batches[0])
 	assert.deepEqual(log.slice(0, at).sort(), ['COMMIT 1', 'COMMIT 2'], 'leading commits of both screens first')

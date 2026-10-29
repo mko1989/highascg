@@ -36,7 +36,7 @@ const { resolveActiveTimelineIdToFadeOut, resolveTimelineIdToReleaseFromPreview 
 
 /**
  * @param {object} amcp
- * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, skipLayerVisualEquality?: boolean, banklessTake?: boolean }} opts
+ * @param {{ self: object, channel: number, currentScene: object|null, incomingScene: object, framerate?: number, forceCut?: boolean, onProgramTransitionStarted?: Function, onProgramPlayCommitted?: Function, skipLayerVisualEquality?: boolean, banklessTake?: boolean }} opts
  */
 async function runSceneTakeLbg(amcp, opts) {
 	// WO-156: every take path (API take, preview stage, sync-push, replication) funnels through
@@ -52,6 +52,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		isLayerAnimateTakeTransition,
 	} = require('./scene-transition')
 
+	const takeT0 = Date.now() // WO-814: per-take timing line (see the pipeline's "[scene-take-lbg] timing")
 	const self = opts.self
 	const channel = parseInt(opts.channel, 10)
 	if (!channel || channel < 1) throw new Error('channel required')
@@ -210,6 +211,9 @@ async function runSceneTakeLbg(amcp, opts) {
 	const shouldClearOrphans = (!shouldRunBankCrossfade && takeJobs.length > 0) || (opts.pgmOnly && takeJobs.length > 0)
 	if (shouldClearOrphans) {
 		const incomingPhys = takeJobs.map((j) => j.pLayer)
+		/* WO-814: the on-air look's own layers are exit candidates — the teardown clears them right AFTER the
+		 * PLAY batch. Sweeping them here took PGM to black from this point until the PLAY (every cut take). */
+		for (const [ln, l] of currentMap) if (String(l?.source?.type || '') !== 'timeline') incomingPhys.push(phys(ln, activeBank))
 		/* Owner 27.07 ("routes not consistent — must be rock solid"): visually-equal skipped
 		 * layers are NOT takeJobs, but their producer stays on air — on the current bank now
 		 * and on the target bank after the WO-218 SWAP. The sweep was clearing them on CUT
@@ -365,6 +369,8 @@ async function runSceneTakeLbg(amcp, opts) {
 		fadeWatcher,
 		notifyProgramTransitionStarted,
 		playSync: opts.playSync || null,
+		onProgramPlayCommitted: typeof opts.onProgramPlayCommitted === 'function' ? opts.onProgramPlayCommitted : null,
+		takeT0,
 	})
 	fadeClockStart = fadeClockRef.start
 

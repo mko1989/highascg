@@ -127,6 +127,8 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 		playSync,
 		incoming,
 		timelineFadeInPhys = [],
+		onProgramPlayCommitted = null,
+		takeT0 = Date.now(),
 	} = ctx
 
 	// Stale layers on the off-air bank are cleared immediately so they cannot resurface on the next swap.
@@ -278,6 +280,7 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				await sendPipOverlayLinesSerial(amcp, lines)
 			}
 		}
+		const tPhaseA = Date.now()
 		const shaderWarmupMs = Math.max(0, Math.min(3000, parseInt(process.env.HIGHASCG_SHADER_WARMUP_MS || '600', 10) || 600))
 		const prebufferMs = hasShaderJob
 			? Math.max(needsIncomingFadePreroll ? 180 : 80, shaderWarmupMs)
@@ -365,6 +368,16 @@ async function runSceneTakeLbgAmcpPipeline(amcp, fadeClockRef, ctx) {
 				`[scene-take-lbg] take Phase B (PLAY/crossfade/COMMIT) failed on ch${channel}: ${e?.message || e} — ` +
 					`jobs=${takeJobs.length} crossfadeLines=${crossfadeLines.length} fadeClockStarted=${fadeClockRef.start != null}`,
 			)
+		}
+		// WO-814: one timing line per take (prep = jobs + Phase A, then prebuffer wait, then the acked PLAY batch),
+		// then hand over to the caller (PGM→PRV exchange) — only now, after the PLAY batch is committed.
+		self.log?.('info', `[scene-take-lbg] timing ch${channel}: phaseA-done=${tPhaseA - takeT0}ms play-acked=${Date.now() - takeT0}ms jobs=${takeJobs.length}`)
+		if (typeof onProgramPlayCommitted === 'function') {
+			try {
+				onProgramPlayCommitted()
+			} catch (e) {
+				self.log?.('warn', `[scene-take-lbg] play-committed hook failed: ${e?.message || e}`)
+			}
 		}
 		// WO-582: clear the pending relative seek; the resolve→PLAY-ack time is logged for tuning.
 		const leadMs = settleRelativeSeekLead(self, channel)

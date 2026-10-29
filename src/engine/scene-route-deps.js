@@ -326,11 +326,11 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 		 * source PLAYs (shader + routes look: playPlan is null on template jobs, so sourceLines is
 		 * empty). Dropping it left the incoming shader at the deferred OPACITY 0 forever and the
 		 * outgoing look hard-cutting instead of mixing. */
-		const block = [
+		const block = playLinesLast([
 			...sourceLines,
 			...(sourceLines.length > 0 || routeLines.length > 0 ? suffixAfterSources : []),
 			...routeLines,
-		]
+		])
 		if (block.length === 0) {
 			await opts.playSync?.arrive()
 			if (orderedRoutes.length === 0 && (leadingCommit || commitAfterRoutes)) {
@@ -381,6 +381,18 @@ async function sendStaggeredTakePlays(amcp, channel, takeJobs, linesForJob, opts
 		const tail = isLast && commitAfterRoutes ? [commitLine] : []
 		await sendAmcpLinesSequential([...lines, ...tail], amcp)
 	}
+}
+
+/**
+ * WO-814 (owner 29.10: "play … is the last one"): stable split of a PLAY batch into every non-PLAY line (opacity
+ * holds, crossfade tweens — mixer state is per layer, independent of the producer) followed by every PLAY, each
+ * group in its original order (so route:// PLAYs still follow their source PLAYs). All layers start together.
+ * @param {string[]} lines
+ * @returns {string[]}
+ */
+function playLinesLast(lines) {
+	const isPlay = (l) => /^PLAY\s/i.test(String(l).trim())
+	return [...lines.filter((l) => !isPlay(l)), ...lines.filter(isPlay)]
 }
 
 /**
@@ -438,6 +450,7 @@ module.exports = {
 	orderRouteJobsByDependency,
 	resolveRoutePlayDelays,
 	sendStaggeredTakePlays,
+	playLinesLast,
 	incomingCrossfadeOpacityLine,
 	crossfadeSuffixLinesForStaggeredRoutes,
 }

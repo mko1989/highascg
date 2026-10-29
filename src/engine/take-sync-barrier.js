@@ -45,8 +45,9 @@ async function sendMergedPlans(plans) {
 	const t0 = Date.now()
 	if (typeof log === 'function') log('info', `[take-sync] Phase B go: ch ${plans.map((p) => p.channel).join('+')} (${plans.length} screen(s), ${plans.reduce((n, p) => n + p.block.length, 0)} lines)`)
 	if (leading.length) await Promise.all(leading.map((ch) => amcp.mixerCommit(ch)))
+	// WO-814: every screen's mixer lines first, then every screen's PLAYs — PLAY is the last command of the batch.
 	await amcp.batchSendChunked(
-		plans.flatMap((p) => p.block),
+		require('./scene-route-deps').playLinesLast(plans.flatMap((p) => p.block)),
 		{ skipMixerPreCommit: true, forceBatch: true }
 	)
 	if (trailing.length) await Promise.all(trailing.map((ch) => amcp.mixerCommit(ch)))
