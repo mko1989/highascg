@@ -21,7 +21,7 @@ const { stampProjectHardware, holdProjectHardware, releaseProjectHardware } = re
 const { ensureProjectMediaDir } = require('../media/project-media-root')
 const { createNewProject } = require('../engine/new-project')
 const { scheduleProjectSyncBroadcast } = require('./routes-data-project-sync')
-const { retireSlugWithReplication } = require('./routes-data-project-slug')
+const { retireSlugWithReplication, previousSlugKind, retireRenamedSlug } = require('./routes-data-project-slug')
 const { loadProjectMerged } = require('./routes-data-project-read')
 
 async function handleProject(path, body, ctx) {
@@ -38,7 +38,9 @@ async function handleProject(path, body, ctx) {
 		// WO-821: a project loaded without its hardware keeps its stored slice; captureHardware takes the live rig.
 		// WO-823: keepPayloadHardware (load from file) writes the file's own rig as given
 		const keepPayload = b.keepPayloadHardware === true
-		stampProjectHardware(ctx, project, { slug, prevSlug, existing, capture: b.captureHardware === true, keepPayload })
+		const prevKind = previousSlugKind(prevSlug, slug, project, { imported: keepPayload }) // WO-824
+		const renamedFrom = prevKind === 'rename' ? prevSlug : null // only a rename carries the previous slug's hold
+		stampProjectHardware(ctx, project, { slug, prevSlug: renamedFrom, existing, capture: b.captureHardware === true, keepPayload })
 		preserveClientOwnedSlices(project, existing) // WO-614: web saves never carry project.previs
 		const allowReplace = b.force === true || b.allowReplace === true
 		const check = validateIncomingProject(project, existing, { allowReplace })
@@ -75,15 +77,7 @@ async function handleProject(path, body, ctx) {
 				body: jsonBody({ error: 'Project save failed', detail: e?.message || String(e) }),
 			}
 		}
-		if (prevSlug && prevSlug !== slug) {
-			try {
-				retireSlugWithReplication(ctx, prevSlug, { reason: 'rename', replacementSlug: slug })
-			} catch (e) {
-				if (typeof ctx.log === 'function') {
-					ctx.log('warn', `[project] retire previous slug ${prevSlug}: ${e?.message || e}`)
-				}
-			}
-		}
+		retireRenamedSlug(ctx, prevSlug, slug, prevKind) // WO-824: an import / another show keeps the open show
 		ensureProjectMediaDir(ctx.config, slug)
 		if (ctx.artnetReceiver?.reconfigureFromProject) {
 			ctx.artnetReceiver.reconfigureFromProject(project)
@@ -385,15 +379,19 @@ async function handleProject(path, body, ctx) {
 		if (!project || typeof project !== 'object') {
 			return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'Missing project' }) }
 		}
+		const payload = project
 		project = enrichProjectScenesFromLiveDeck(project, ctx)
 		projectStore.migrateLegacySingleProject(persistence)
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
+		/* WO-824: judge the client's payload — the enriched copy carries the live deck, which still holds the open
+		 * show until the importing client's deck sync lands. */
+		const prevKind = previousSlugKind(prevSlug, slug, payload)
 		/* Autosave is a background write and must never destroy the stored hardware slice: not with an empty
 		 * (factory-reset) live config (WO-311 / 5d01bca), and not with this box's rig while the project was
 		 * loaded without its hardware (WO-821, project-hardware-hold.js). */
-		stampProjectHardware(ctx, project, { slug, prevSlug, existing, autosave: true })
+		stampProjectHardware(ctx, project, { slug, prevSlug: prevKind === 'rename' ? prevSlug : null, existing, autosave: true })
 		preserveClientOwnedSlices(project, existing) // WO-614: web autosaves never carry project.previs
 		/* WO-311: a factory reset at 11:47:28 correctly trashed projects/tra.json; three seconds
 		 * later a background autosave from the still-open browser RECREATED it as an empty shell.
@@ -448,15 +446,7 @@ async function handleProject(path, body, ctx) {
 		}
 		try {
 			const result = await persistProject(ctx, project, { writeAutosave: true })
-			if (prevSlug && prevSlug !== slug) {
-				try {
-					retireSlugWithReplication(ctx, prevSlug, { reason: 'rename', replacementSlug: slug })
-				} catch (e) {
-					if (typeof ctx.log === 'function') {
-						ctx.log('warn', `[project] retire previous slug ${prevSlug}: ${e?.message || e}`)
-					}
-				}
-			}
+			retireRenamedSlug(ctx, prevSlug, slug, prevKind) // WO-824: only a rename retires the previous slug
 			if (ctx.artnetReceiver?.reconfigureFromProject) {
 				ctx.artnetReceiver.reconfigureFromProject(project)
 			} else if (ctx.artnetReceiver) {

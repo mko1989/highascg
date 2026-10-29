@@ -58,7 +58,6 @@ function releaseProjectHardware(slug) {
 function stampProjectHardware(ctx, project, o) {
 	const { slug, prevSlug, existing } = o
 	if (o.keepPayload === true && o.capture !== true) {
-		if (prevSlug && prevSlug !== slug) releaseProjectHardware(prevSlug) // the previous slug is retired by the same save
 		if (typeof ctx?.log === 'function') {
 			ctx.log('info', `[project] save kept the file's own hardwareConfig for "${slug}" (import, WO-823)`)
 		}

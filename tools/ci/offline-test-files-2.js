@@ -39,4 +39,5 @@ module.exports = [
 	'tools/smoke/smoke-wo822-no-https-proxy.test.js',
 	'tools/smoke/smoke-wo821-hardware-hold.test.js',
 	'tools/smoke/smoke-wo823-load-from-file-keeps-rig.test.js',
+	'tools/smoke/smoke-wo824-import-keeps-open-project.test.js',
 ]
