@@ -35,8 +35,10 @@ async function handleProject(path, body, ctx) {
 		const slug = projectStore.projectSlugFromName(project.name)
 		const prevSlug = projectStore.getActiveSlug(persistence)
 		const existing = projectStore.readProjectFile(slug)
-		// WO-821: a project loaded without its hardware keeps its stored slice; captureHardware takes the live rig
-		stampProjectHardware(ctx, project, { slug, prevSlug, existing, capture: b.captureHardware === true })
+		// WO-821: a project loaded without its hardware keeps its stored slice; captureHardware takes the live rig.
+		// WO-823: keepPayloadHardware (load from file) writes the file's own rig as given
+		const keepPayload = b.keepPayloadHardware === true
+		stampProjectHardware(ctx, project, { slug, prevSlug, existing, capture: b.captureHardware === true, keepPayload })
 		preserveClientOwnedSlices(project, existing) // WO-614: web saves never carry project.previs
 		const allowReplace = b.force === true || b.allowReplace === true
 		const check = validateIncomingProject(project, existing, { allowReplace })

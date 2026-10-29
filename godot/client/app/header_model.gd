@@ -103,6 +103,13 @@ static func parse_project_file(text: String) -> Dictionary:
 	return {"project": v}
 
 
+## POST /api/project/save body for "Load from file" (WO-823). `keepPayloadHardware` makes the server store the file's
+## OWN hardwareConfig; without it the save stamps this box's live rig over it and the following applyHardware load
+## would apply the wrong rig. Only the import path sends it: a normal save must keep the hardware hold (WO-821).
+static func file_import_body(project: Dictionary) -> Dictionary:
+	return {"project": project, "allowReplace": true, "keepPayloadHardware": true}
+
+
 ## Godot has no project-name slug rule of its own — the server's (project-store.js projectSlugFromName) decides;
 ## the client only refuses an empty name.
 static func clean_name(text: String) -> String:

@@ -89,6 +89,11 @@ live config. The hold ends on an explicit apply: `POST /api/project/load` with `
 `POST /api/project/apply-hardware` (active project), or `POST /api/project/save` with `captureHardware: true`
 (take this box's rig into the show on purpose). A load without `slug` (bootstrap) and a plain save keep it.
 
+**Import (WO-823).** `POST /api/project/save` with `keepPayloadHardware: true` stores the payload's **own**
+`hardwareConfig` as given (no live stamp, no hold substitution). It is for importing a project file (Godot
+"Load from file"): save the file with this flag, then `POST /api/project/load` with `applyHardware: true`, so the
+file's screens and destinations are what the box runs. Do not send it on a normal save.
+
 | Key | Contents |
 |-----|----------|
 | `version` | `2` |

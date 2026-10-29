@@ -53,3 +53,16 @@ func test_project_file() -> void:
 	t.eq(H.parse_project_file("{oops").has("error"), true, "not JSON")
 	t.eq(H.parse_project_file('{"version": 3}').project.name, "Untitled", "nameless file gets the default name")
 	t.eq(H.clean_name("  Show A  "), "Show A", "trimmed")
+
+
+func test_file_import_body() -> void:
+	# WO-823: load-from-file must ask the server to keep the file's own rig, and replace a same-named project.
+	var hw := {"version": 2, "screenDestinations": {"destinations": [{"id": "show_dst"}]}}
+	var proj := {"name": "Show", "hardwareConfig": hw}
+	var b: Dictionary = H.file_import_body(proj)
+	t.eq(b.get("keepPayloadHardware"), true, "keeps the file's hardwareConfig")
+	t.eq(b.get("allowReplace"), true, "replaces a same-named project")
+	t.eq(b.get("captureHardware", false), false, "never takes this box's rig")
+	t.eq((b.project as Dictionary).hardwareConfig, hw, "the file's rig travels untouched")
+	var parsed := H.parse_project_file(JSON.stringify(proj))
+	t.eq(H.file_import_body(parsed.project).project.hardwareConfig.screenDestinations.destinations[0].id, "show_dst", "survives the file parse")

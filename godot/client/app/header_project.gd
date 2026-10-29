@@ -224,7 +224,7 @@ func _load_file(path: String) -> void:
 	if parsed.has("error"):
 		say(HeaderModel.notice("error", str(parsed.error), ""))
 		return
-	var res: Dictionary = await Api.post_json("/api/project/save", {"project": parsed.project, "allowReplace": true})
+	var res: Dictionary = await Api.post_json("/api/project/save", HeaderModel.file_import_body(parsed.project))
 	if not res.ok:
 		say(HeaderModel.notice("error", "Load from file failed: " + str(res.error), ""))
 		return

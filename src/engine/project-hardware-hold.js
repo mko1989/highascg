@@ -50,11 +50,20 @@ function releaseProjectHardware(slug) {
  * Set `project.hardwareConfig` for a save/autosave about to be written to `slug`.
  * @param {object} ctx
  * @param {object} project incoming payload (mutated)
- * @param {{ slug: string, prevSlug?: string|null, existing?: object|null, autosave?: boolean, capture?: boolean }} o
- * @returns {'held' | 'live'}
+ * @param {{ slug: string, prevSlug?: string|null, existing?: object|null, autosave?: boolean, capture?: boolean, keepPayload?: boolean }} o
+ *   `keepPayload` (WO-823, import / load-from-file only): the payload's own `hardwareConfig` is written as given.
+ *   It beats the hold and the live stamp, because the payload IS the show being brought in, not this box.
+ * @returns {'held' | 'live' | 'payload'}
  */
 function stampProjectHardware(ctx, project, o) {
 	const { slug, prevSlug, existing } = o
+	if (o.keepPayload === true && o.capture !== true) {
+		if (prevSlug && prevSlug !== slug) releaseProjectHardware(prevSlug) // the previous slug is retired by the same save
+		if (typeof ctx?.log === 'function') {
+			ctx.log('info', `[project] save kept the file's own hardwareConfig for "${slug}" (import, WO-823)`)
+		}
+		return 'payload'
+	}
 	if (o.capture === true) {
 		releaseProjectHardware(slug)
 		if (prevSlug) releaseProjectHardware(prevSlug)
