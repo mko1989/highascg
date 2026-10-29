@@ -10,11 +10,11 @@ const M := preload("res://features/settings/alsa_mixer_model.gd")
 const SYSTEM := preload("res://features/settings/system_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FaderCap := preload("res://features/audio/fader_cap.gd")
-const STRIP_W := 64.0
+const STRIP_W := 48.0
 const FADER_H := 110.0
-const CAP_W := 32.0  # the 26 px fader cap plus a small margin
+const CAP_W := 26.0  # the 26 px fader cap (fader_cap.gd WIDTH)
 const FONT_SIZE := 10  # name, value and mute text in a strip
-const MUTE_W := 28.0
+const MUTE_W := 24.0
 const STRIP_GAP := 6  # strip-to-strip gap (h and v)
 const STRIP_PAD := 4  # inner padding of a strip panel
 
