@@ -77,6 +77,14 @@ function handleGet(p, ctx) {
 		}
 	}
 
+	// WO-800: per-layer audio levels (HighAsCG Caspar build, `/channel/N/mixer/audio/layer/L/volume`).
+	const layerAudioM = p.match(/^\/api\/osc\/audio-layers(?:\/(\d+))?$/)
+	if (layerAudioM) {
+		const only = layerAudioM[1] != null ? parseInt(layerAudioM[1], 10) : undefined
+		const channels = typeof ctx.oscState.getLayerAudioLevels === 'function' ? ctx.oscState.getLayerAudioLevels(only) : {}
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ channels, updatedAt: snap.updatedAt }) }
+	}
+
 	const layerM = p.match(/^\/api\/osc\/layer\/(\d+)\/(\d+)$/)
 	if (layerM) {
 		const ch = parseInt(layerM[1], 10)

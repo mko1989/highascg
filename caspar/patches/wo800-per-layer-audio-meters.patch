@@ -1,0 +1,230 @@
+HighAsCG WO-800 option A: per-layer audio level meters in the Caspar mixer.
+Base: src-v2 4eab31c06 (wo742-shm-producer). Uncommitted in the caspar-build worktree on 29.10 (owner commits).
+Apply: git -C ~/caspar-build/src-v2 apply <this file>; build: ~/caspar-build/build-26.sh
+OSC: /channel/<ch>/mixer/audio/layer/<L>/volume  int32 x audio channels (sample peak, same unit as .../mixer/audio/volume)
+
+diff --git a/src/core/mixer/audio/audio_mixer.cpp b/src/core/mixer/audio/audio_mixer.cpp
+index e5215d410..caa35ff2d 100644
+--- a/src/core/mixer/audio/audio_mixer.cpp
++++ b/src/core/mixer/audio/audio_mixer.cpp
+@@ -46,6 +46,7 @@ struct audio_item
+     const void*          tag = nullptr;
+     audio_transform      transform;
+     array<const int32_t> samples;
++    int                  layer = -1; // HighAsCG WO-800: stage layer index, -1 = not metered per layer
+ };
+ 
+ using audio_buffer_ps = std::vector<double>;
+@@ -65,6 +66,7 @@ struct audio_mixer::impl
+     bool                                        has_variable_cadence_{false};
+     std::vector<int32_t>                        silence_buffer_;
+     int                                         channels_{0};
++    int                                         current_layer_{-1}; // HighAsCG WO-800
+ 
+     impl(spl::shared_ptr<diagnostics::graph> graph)
+         : graph_(std::move(graph))
+@@ -88,9 +90,12 @@ struct audio_mixer::impl
+         if (transform_stack_.top().volume < 0.002 || !frame.audio_data())
+             return;
+ 
+-        items_.push_back(std::move(audio_item{frame.stream_tag(), transform_stack_.top(), frame.audio_data()}));
++        items_.push_back(
++            std::move(audio_item{frame.stream_tag(), transform_stack_.top(), frame.audio_data(), current_layer_}));
+     }
+ 
++    void begin_layer(int layer) { current_layer_ = layer; }
++
+     void pop() { transform_stack_.pop(); }
+ 
+     void set_master_volume(float volume) { master_volume_ = volume; }
+@@ -136,6 +141,10 @@ struct audio_mixer::impl
+         std::map<const void*, std::vector<int32_t>> next_audio_streams;
+         std::map<const void*, double> next_volumes;
+ 
++        // HighAsCG WO-800: per-layer sum of the same scaled samples that go into `mixed`. Only layers that
++        // queued audio this frame get a buffer (and later a state key).
++        std::map<int, std::vector<double>> layer_mixed;
++
+         for (auto& item : items) {
+             auto ptr       = item.samples.data();
+             auto item_size = item.samples.size();
+@@ -168,6 +177,14 @@ struct audio_mixer::impl
+             // Store current volume for next frame
+             next_volumes[item.tag] = item.transform.volume;
+ 
++            double* layer_dst = nullptr;
++            if (item.layer >= 0) {
++                auto& buf = layer_mixed[item.layer];
++                if (buf.empty())
++                    buf.assign(mixed.size(), 0.0);
++                layer_dst = buf.data();
++            }
++
+             // Sample collection and volume application loop
+             for (auto n = 0; n < dst_size; ++n) {
+                 double sample_value = 0.0;
+@@ -202,7 +219,10 @@ struct audio_mixer::impl
+                     applied_volume = previous_volume + (item.transform.volume - previous_volume) * position;
+                 }
+                 
+-                mixed[n] += sample_value * applied_volume;
++                const double scaled = sample_value * applied_volume;
++                mixed[n] += scaled;
++                if (layer_dst)
++                    layer_dst[n] += scaled;
+             }
+ 
+             if (has_variable_cadence_ && item.tag) {
+@@ -259,7 +279,24 @@ struct audio_mixer::impl
+             graph_->set_tag(diagnostics::tag_severity::WARNING, "audio-clipping");
+         }
+ 
+-        state_["volume"] = std::move(max);
++        // HighAsCG WO-800: rebuild the state each mix so a layer that stops contributing audio drops out.
++        // Per layer: same peak as the channel (x master volume, clamped to int32, per audio channel max |sample|).
++        // OSC: /channel/<ch>/mixer/audio/layer/<L>/volume, int32 x channels; the channel `volume` key is unchanged.
++        monitor::state state;
++        state["volume"] = max;
++        for (const auto& lm : layer_mixed) {
++            auto layer_max = std::vector<int32_t>(channels_, 0);
++            const auto& buf = lm.second;
++            for (size_t n = 0; n < buf.size(); n += channels_) {
++                for (int ch = 0; ch < channels_; ++ch) {
++                    const double v = std::min(std::abs(buf[n + ch] * master_volume),
++                                              static_cast<double>(std::numeric_limits<int32_t>::max()));
++                    layer_max[ch]  = std::max(layer_max[ch], static_cast<int32_t>(v));
++                }
++            }
++            state["layer"][lm.first]["volume"] = layer_max;
++        }
++        state_ = state;
+ 
+         graph_->set_value("volume",
+                           static_cast<double>(*boost::max_element(max)) / std::numeric_limits<int32_t>::max());
+@@ -282,5 +319,6 @@ array<const int32_t> audio_mixer::operator()(const video_format_desc& format_des
+     return impl_->mix(format_desc, nb_samples);
+ }
+ core::monitor::state audio_mixer::state() const { return impl_->state_; }
++void                 audio_mixer::begin_layer(int layer) { impl_->begin_layer(layer); }
+ 
+ }} // namespace caspar::core
+diff --git a/src/core/mixer/audio/audio_mixer.h b/src/core/mixer/audio/audio_mixer.h
+index 4a7bbe81b..a89cf0a81 100644
+--- a/src/core/mixer/audio/audio_mixer.h
++++ b/src/core/mixer/audio/audio_mixer.h
+@@ -49,6 +49,9 @@ class audio_mixer final : public frame_visitor
+     float                get_master_volume();
+     core::monitor::state state() const;
+ 
++    // HighAsCG WO-800: audio visited until the next call belongs to stage layer `layer` (-1 = none).
++    void begin_layer(int layer);
++
+     void push(const struct frame_transform& transform) override;
+     void visit(const class const_frame& frame) override;
+     void pop() override;
+diff --git a/src/core/mixer/mixer.cpp b/src/core/mixer/mixer.cpp
+index 59fe4c9b6..05741ac51 100644
+--- a/src/core/mixer/mixer.cpp
++++ b/src/core/mixer/mixer.cpp
+@@ -60,17 +60,25 @@ struct mixer::impl
+     {
+     }
+ 
+-    const_frame operator()(std::vector<draw_frame> frames, const video_format_desc& format_desc, int nb_samples)
++    const_frame operator()(std::vector<draw_frame>  frames,
++                           const video_format_desc& format_desc,
++                           int                      nb_samples,
++                           const std::vector<int>&  layers)
+     {
+         image_mixer_->update_aspect_ratio(static_cast<double>(format_desc.square_width) /
+                                           static_cast<double>(format_desc.square_height));
+ 
+-        for (auto& frame : frames) {
++        for (size_t i = 0; i < frames.size(); ++i) {
++            auto& frame = frames[i];
++            // HighAsCG WO-800: tag this layer's audio items with its layer index (-1 = unknown, not metered).
++            audio_mixer_.begin_layer(i < layers.size() ? layers[i] : -1);
+             frame.accept(audio_mixer_);
+             frame.transform().image_transform.layer_depth = 1;
+             frame.accept(*image_mixer_);
+         }
+ 
++        audio_mixer_.begin_layer(-1);
++
+         auto result  = image_mixer_->render(format_desc);
+         auto audio   = audio_mixer_(format_desc, nb_samples);
+ 
+@@ -114,9 +122,12 @@ mixer::mixer(int channel_index, spl::shared_ptr<diagnostics::graph> graph, spl::
+ }
+ void        mixer::set_master_volume(float volume) { impl_->set_master_volume(volume); }
+ float       mixer::get_master_volume() { return impl_->get_master_volume(); }
+-const_frame mixer::operator()(std::vector<draw_frame> frames, const video_format_desc& format_desc, int nb_samples)
++const_frame mixer::operator()(std::vector<draw_frame>  frames,
++                              const video_format_desc& format_desc,
++                              int                      nb_samples,
++                              const std::vector<int>&  layers)
+ {
+-    return (*impl_)(std::move(frames), format_desc, nb_samples);
++    return (*impl_)(std::move(frames), format_desc, nb_samples, layers);
+ }
+ mutable_frame mixer::create_frame(const void* tag, const pixel_format_desc& desc)
+ {
+diff --git a/src/core/mixer/mixer.h b/src/core/mixer/mixer.h
+index 75e49ef45..2ca162e51 100644
+--- a/src/core/mixer/mixer.h
++++ b/src/core/mixer/mixer.h
+@@ -43,7 +43,11 @@ class mixer final
+                    spl::shared_ptr<caspar::diagnostics::graph> graph,
+                    spl::shared_ptr<image_mixer>                image_mixer);
+ 
+-    const_frame operator()(std::vector<draw_frame> frames, const video_format_desc& format_desc, int nb_samples);
++    // HighAsCG WO-800: `layers` = layer index per entry of `frames` (per-layer audio meters); may be empty.
++    const_frame operator()(std::vector<draw_frame>  frames,
++                           const video_format_desc& format_desc,
++                           int                      nb_samples,
++                           const std::vector<int>&  layers = {});
+ 
+     void  set_master_volume(float volume);
+     float get_master_volume();
+diff --git a/src/core/producer/stage.cpp b/src/core/producer/stage.cpp
+index 2c984dbfc..d37cfadb1 100644
+--- a/src/core/producer/stage.cpp
++++ b/src/core/producer/stage.cpp
+@@ -200,6 +200,7 @@ struct stage::impl : public std::enable_shared_from_this<impl>
+                 }
+ 
+                 for (auto& p : frames) {
++                    result.layers.push_back(p.first);
+                     result.frames.push_back(p.second.foreground1);
+                     if (is_interlaced)
+                         result.frames2.push_back(p.second.foreground2);
+diff --git a/src/core/producer/stage.h b/src/core/producer/stage.h
+index 2edfcff6b..8c5a44f55 100644
+--- a/src/core/producer/stage.h
++++ b/src/core/producer/stage.h
+@@ -60,6 +60,7 @@ struct stage_frames
+     int                     nb_samples;
+     std::vector<draw_frame> frames;
+     std::vector<draw_frame> frames2;
++    std::vector<int>        layers; // HighAsCG WO-800: layer index of each entry in frames/frames2
+ };
+ 
+ /**
+diff --git a/src/core/video_channel.cpp b/src/core/video_channel.cpp
+index 4643f7496..2500ccc04 100644
+--- a/src/core/video_channel.cpp
++++ b/src/core/video_channel.cpp
+@@ -160,11 +160,11 @@ struct video_channel::impl final
+                     // Mix
+                     caspar::timer mix_timer;
+                     auto          mixed_frame =
+-                        has_consumers ? mixer_(stage_frames.frames, stage_frames.format_desc, stage_frames.nb_samples)
++                        has_consumers ? mixer_(stage_frames.frames, stage_frames.format_desc, stage_frames.nb_samples, stage_frames.layers)
+                                                : const_frame{};
+                     auto mixed_frame2 =
+                         has_consumers && stage_frames.format_desc.field_count == 2
+-                            ? mixer_(stage_frames.frames2, stage_frames.format_desc, stage_frames.nb_samples)
++                            ? mixer_(stage_frames.frames2, stage_frames.format_desc, stage_frames.nb_samples, stage_frames.layers)
+                             : const_frame{};
+                     graph_->set_value("mix-time", mix_timer.elapsed() * format_desc.hz * 0.5);
+ 

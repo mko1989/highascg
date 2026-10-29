@@ -37,6 +37,8 @@ const audioMethods = {
 	 * silent channel the same dBFS repeats every tick and must not keep the channel dirty.
 	 */
 	_routeMixerAudio(ch, sub, vals) {
+		const lm = sub.match(/^layer\/(\d+)\/volume$/)
+		if (lm) return this._routeLayerAudio(ch, parseInt(lm[1], 10), vals)
 		const c = this._ensureChannel(ch)
 		if (sub === 'nb_channels') {
 			const n = Math.max(0, parseInt(String(vals[0]), 10) || 0)
@@ -109,6 +111,65 @@ const audioMethods = {
 			return changed
 		}
 		return false
+	},
+
+	/**
+	 * WO-800: `/channel/N/mixer/audio/layer/L/volume` (HighAsCG Caspar build) — int32 sample peak per audio channel
+	 * of ONE stage layer, same unit as the channel `volume`. Kept outside `_channels` so the WS/`/api/state` payload
+	 * is unchanged; read via {@link getLayerAudioLevels}. Never dirties the channel (returns false).
+	 */
+	_routeLayerAudio(ch, layer, vals) {
+		if (!Number.isFinite(ch) || !Number.isFinite(layer) || vals.length === 0) return false
+		if (!this._layerAudio) this._layerAudio = {}
+		const byLayer = this._layerAudio[ch] || (this._layerAudio[ch] = {})
+		const entry = byLayer[layer] || (byLayer[layer] = { nbChannels: 0, levels: [], _lastUpdateAt: 0 })
+		const ca = this._channels[ch]?.audio
+		const cap = ca?._nbChannelsFromOsc && ca.nbChannels > 0 ? ca.nbChannels : vals.length
+		const n = Math.min(vals.length, cap)
+		const now = Date.now()
+		entry.nbChannels = n
+		entry._lastUpdateAt = now
+		if (entry.levels.length > n) entry.levels.length = n
+		for (let i = 0; i < n; i++) {
+			const db = intMeterSampleToDbfs(vals[i])
+			const slot = entry.levels[i] || (entry.levels[i] = { dBFS: -120, peak: -120, peakAge: 0 })
+			slot.dBFS = db
+			if (!Number.isFinite(slot.peak) || db > slot.peak || now - slot.peakAge > this._config.peakHoldMs) {
+				slot.peak = db
+				slot.peakAge = now
+			}
+		}
+		return false
+	},
+
+	/**
+	 * WO-800: per-layer audio levels, `{ [ch]: { [layer]: { nbChannels, levels: [{ dBFS, peak }], updatedAt } } }`.
+	 * Caspar only sends a layer while it contributes audio, so entries older than `staleTimeoutMs` are dropped.
+	 * @param {number} [onlyCh]
+	 */
+	getLayerAudioLevels(onlyCh, now = Date.now()) {
+		const staleMs = Number.isFinite(this._config.staleTimeoutMs) && this._config.staleTimeoutMs > 0 ? this._config.staleTimeoutMs : 1000
+		const out = {}
+		for (const chKey of Object.keys(this._layerAudio || {})) {
+			const byLayer = this._layerAudio[chKey]
+			for (const lKey of Object.keys(byLayer)) {
+				if (now - byLayer[lKey]._lastUpdateAt > staleMs) delete byLayer[lKey]
+			}
+			if (Object.keys(byLayer).length === 0) {
+				delete this._layerAudio[chKey]
+				continue
+			}
+			if (onlyCh != null && Number(chKey) !== Number(onlyCh)) continue
+			out[chKey] = {}
+			for (const [lKey, e] of Object.entries(byLayer)) {
+				out[chKey][lKey] = {
+					nbChannels: e.nbChannels,
+					levels: e.levels.map((s) => ({ dBFS: s.dBFS, peak: s.peak })),
+					updatedAt: e._lastUpdateAt,
+				}
+			}
+		}
+		return out
 	},
 
 	/** Reset mixer levels when Caspar stops sending fresh OSC (avoids frozen VU after CLEAR / lost consumer). */

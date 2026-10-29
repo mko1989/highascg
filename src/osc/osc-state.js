@@ -45,6 +45,8 @@ class OscState extends EventEmitter {
 		this._emitTimer = null
 		/** @type {Set<number>} */
 		this._dirtyChannels = new Set()
+		/** WO-800: per-layer audio meters `{ [ch]: { [layer]: … } }` — see osc-state-audio.js `_routeLayerAudio` */
+		this._layerAudio = {}
 	}
 
 	_emptyChannel() {
@@ -283,6 +285,7 @@ class OscState extends EventEmitter {
 
 	clear() {
 		this._channels = {}
+		this._layerAudio = {}
 		this._dirtyChannels.clear()
 		this.emit('change', this.getSnapshot())
 	}
