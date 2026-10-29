@@ -1,6 +1,6 @@
 # WO-801 — PRV audio: monitor individual pairs on headphones (not only the mix-down)
 
-**Status: IN PROGRESS (29.10) — investigated, designed, built offline (server + Godot picker, tests green); live check + owner headphone QA open (see "Live checks for the next round")**
+**Status: DONE (29.10, live e2e on the box) (29.10) — investigated, designed, built offline (server + Godot picker, tests green); live check + owner headphone QA open (see "Live checks for the next round") · live e2e 29.10: HP pair picker PASS on ch7 (3+4/1+2/5+6/7+8/Mix, journal ok each, PGM/PRV consumers unchanged); follow-up: ~4 s xrun burst after one switch (7+8, 20:16:35.90)**
 
 Owner, 29.10:
 > prv channel is always 2audio ch due to either possibility of only one multi audio channel or to make it cheaper. but now when previewing a look with multi audio ch i get a mix down and no way to prv via monitor headphones individual audio pairs.
@@ -217,3 +217,32 @@ Read-only first, then one owner-present headphone test. `<mon>` = the node's mon
 7. Restart Caspar with a pair stored: journal `[Audio] monitor pair 3+4 re-applied: ok`, `<port_730>` back.
 8. Listen 2 min on a pair for clicks / dropouts (the ffmpeg ALSA consumer has no sync clock; OAL had one). If it drifts
    or clicks, that is the next issue to file.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** "Audio test 8ch" was staged on PRV 1 (ch2). On the Audio tab, SOLO on the PRV 1 Master puts route://2 on
+the monitor ch7 (SC60 headset = card 2). Then the HP pair picker:
+
+| Pick | Journal `[Audio] monitor pair N on ch 7: ok` | ch7 consumer |
+|---|---|---|
+| 3+4 | 20:16:05.56 | port_730 ffmpeg `pan=stereo\|c0=c2\|c1=c3` |
+| 1+2 | 20:16:26.10 | port_730 |
+| 5+6 | 20:16:31.00 | port_730 |
+| 7+8 | 20:16:35.86 | port_730 |
+| Mix | 20:20:09.83 | port_500 (system-audio) back |
+
+- Each switch is REMOVE → ADD with a gap of about 250 ms. `/proc/asound/card2/pcm0p/sub0/status` stays RUNNING, and its
+  owner is a casparcg thread (Tgid 1195230).
+- The footer reads "Headphones: pair 3+4 only." while 3+4 is picked.
+- The PGM/PRV consumer lists are identical before and after (cons801_pre.txt / cons801_post.txt). Un-soloed afterwards.
+
+### Follow-up — xrun burst after a pair switch (not fixed)
+- **Pair 7+8, 20:16:35.90 → ~20:16:40:** a burst of `ALSA buffer xrun` at about 50/s, lasting about 4 s, right after
+  the switch (journal line 20:16:35.86).
+- **Pair 5+6, 20:16:31.04:** one xrun after the switch.
+- **After that:** 0 xruns over 2 min 10 s (20:16:41 → 20:18:51) on 7+8. The PCM stayed RUNNING
+  (hw_ptr 6321504 / appl_ptr 6321600).
+- **Suspect:** the new ffmpeg consumer opens card 2 before the old one has released its period backlog. Worth a look:
+  pre-fill or a short start-threshold on the new consumer, or a 1-period overlap.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

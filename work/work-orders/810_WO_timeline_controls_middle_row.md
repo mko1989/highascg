@@ -1,7 +1,7 @@
 # WO-810 — Timeline tab: the controls sit between the timeline and the preview
 
-**Status: IN PROGRESS (29.10) — implemented; Godot suite 22202/0, boot check OK, WO-787 / WO-789 smokes 6/6; the look
-on the glass is unverified (owner QA)**
+**Status: DONE (29.10, live e2e on the box) (29.10) — implemented; Godot suite 22202/0, boot check OK, WO-787 / WO-789 smokes 6/6; the look
+on the glass is unverified (owner QA) · live e2e 29.10: PASS on the glass**
 **Source:** owner 29.10: *"in timeline tab move all the controls to the middle between the timeline and preview."*
 **Related:** [WO-602](./602_WO_godot_port_timeline.md) slices 7 / 8 (the transport and Dest rows),
 [WO-787](./787_WO_timeline_preview_and_smooth_scrub.md), [WO-789](./789_WO_timeline_uses_live_preview.md) (the
@@ -70,3 +70,9 @@ Constraints found:
 - **Not verified:** the look on the glass (no GUI launched, no pointer automation). Owner QA: open Timeline, the
   controls row sits between the preview and the timeline; narrow the window and it wraps to two lines; drag the
   divider and restart, the preview height is kept.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** The Timeline tab has its controls row between the timeline and the preview (q810_timeline.png).
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

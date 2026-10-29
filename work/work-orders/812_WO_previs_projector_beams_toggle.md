@@ -1,6 +1,6 @@
 # WO-812 — Previs: hide the projector beam lines
 
-**Status: IN PROGRESS (29.10 — Godot suite 22256/0, boot check OK; owner QA = the "Projector beams" checkbox on the Previs toolbar, look on the glass unverified)**
+**Status: DONE (29.10, live e2e on the box) (29.10 — Godot suite 22256/0, boot check OK; owner QA = the "Projector beams" checkbox on the Previs toolbar, look on the glass unverified) · live e2e 29.10: checkbox PASS on the glass**
 
 Owner, 29.10:
 > there is no way to hide the projector trapezoid (or whatever it's called) in previz. the lines coming from a projector to a projected image.
@@ -31,3 +31,10 @@ Owner, 29.10:
 - `GODOT=~/.local/opt/godot/godot ./run-client.sh --check`: boot OK.
 - `tools/ci/check-max-file-lines.js`: 0 files over 500.
 - NOT verified: how the lines look on the glass / in the live Previs view. Owner QA pending.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** Previs toolbar "Projector beams": OFF hides the beam trapezoids and ON brings them back
+(q812_beams_on_off.png).
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

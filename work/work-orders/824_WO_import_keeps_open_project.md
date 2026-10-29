@@ -1,6 +1,6 @@
 # WO-824 — Opening a show file trashes the project that was open
 
-**Status: DONE (29.10, smoke 6/6 + WO-821 10/10 + WO-823 8/8 + suite 3626/0/2; live check in the deploy round)**
+**Status: DONE (29.10, smoke 6/6 + WO-821 10/10 + WO-823 8/8 + suite 3626/0/2; live check in the deploy round) · live e2e 29.10: PASS on the box (journal line, mhp_harder kept and not trashed, reloaded)**
 
 ## Investigation
 
@@ -53,3 +53,16 @@ In normal operation the deck sync goes out after 100 ms (`client/lib/app-scene-d
   fails the hold test.
 - WO-821 smoke 10/10, WO-823 smoke 8/8 unchanged; offline suite 3626 pass / 0 fail / 2 skipped; 0 files over 500
   lines; eslint clean on the touched files (one pre-existing warning in the load handler).
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** With mhp_harder open, a copy of a project JSON (its `name` changed to `wo824_import_copy`) was opened
+through Godot right-click Load → "Load from file…".
+- Journal at 20:21:35.237: `[project] "wo824_import_copy" imported: the previous project "mhp_harder" stays in the list`.
+- `GET /api/project/list` still had mhp_harder, and it was not in `projects/_trash`.
+- mhp_harder was reloaded at 20:21:56 with 22 looks. ch1 = Intro, ch2 = Intro and ch4 = blackFHD match the start.
+- Cleanup: `DELETE /api/project/wo824_import_copy` (→ _trash) and an rmdir of the empty
+  `media/projects/wo824_import_copy`. The import had also pushed `bridge/projects/wo824_import_copy.json`, which was
+  moved to the scratchpad. The list is back to 57 projects.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

@@ -1,8 +1,8 @@
 # WO-816 — Godot look editor: drop media ON a layer exchanges its media (frame box / layer-list row)
 
-**Status: IMPLEMENTED (29.10 — Godot tests 22718/0, new-layer smoke 14/0, boot check OK, 500-line check OK; live: the
+**Status: DONE (29.10, live e2e on the box) (29.10 — Godot tests 22718/0, new-layer smoke 14/0, boot check OK, 500-line check OK; live: the
 extended route on an off-air look after a node restart; owner client relaunched + screenshot. Owner QA = a real drag
-onto a layer box and onto a row.)**
+onto a layer box and onto a row.) · live e2e 29.10: box drop, row drop and blank drop PASS on the glass**
 
 Owner, 29.10:
 > in godot client i can't exchange media on a layer by drag and dropping it on the layer in the viewer or in the list.
@@ -79,3 +79,15 @@ position; the row behaviour of the web (keep transform) is the simpler, predicta
 Not verified: a real mouse drag on the owner's screen (no pointer automation while the owner works), an exchange
 written to a look (opening the editor stages the look on PRV — not done), anything on air. Owner QA: open a look not on
 air, drag a clip onto a layer box and onto a row; expect the same layer number with the new clip in the same place.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** In the look editor of KV LOOP 2 (off-air, staged on PRV ch2):
+- Dropping BUMPER.mov on the L10 box in the viewer exchanged L10's media. Fill 0,0,3840×1792 and loop were kept
+  (q816_box_drop.png).
+- Dropping KV LOOP 2.mov on the L10 list row exchanged it back (q816_row_drop.png).
+- A drop on blank list space added L11 (q816_blank_drop.png), which was then removed (q816_removed.png).
+- The autosave shows the original L10 restored. No ghost rectangle was left.
+- Minor (not fixed): after Remove layer, the inspector still shows the removed L11's values.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

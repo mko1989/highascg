@@ -1,6 +1,6 @@
 # WO-805 — Devices tab "Apply Caspar config (restart)" is too slow: where the time goes
 
-**Status: IN PROGRESS (29.10) — all §4 items done and verified offline. Fixes 1 + 5 (run.sh exit wait, marker sleep) and 3 (inventory once) were also verified live (Caspar exit→start 2.8-5.1 s → 0.25 s). Fix 2 pass: NVIDIA once after the restart (with the sync output), xdotool without `--sync` (the 5 s outliers), AMCP-ready wake ≤ ~0.2 s, Godot/relay 120/110 s Apply timeout, custom mode tried once per X server (offline suite 3620/0/2, Godot 22809/0, negative control 15/18 fail on HEAD). Owner Apply QA + live timing per the plan at the end are pending**
+**Status: DONE (29.10, live: two Applies measured on the box — AMCP accept→back 52-55 ms, no xdotool stall, NVIDIA deferred once, XVideoSyncToDisplayID = DP-4 after the heredoc fix, 5.16 s click→NVIDIA done; fast-kill race found live and fixed offline with a negative control). Owner eye: PGM blink in the NVIDIA window; decision whether Apply should restore PGM**
 **Source:** owner 29.10: *"verify the apply and restart command stack and waits inside the button in the devices tab.
 it seems to be a bit too slow."*
 **Related:** [WO-440](./440_WO_apply_button_always_restarts_caspar.md) (button always sends `force:true`),
@@ -446,3 +446,62 @@ The 5 s xdotool outliers (4 of 79 Applies) are gone. The button no longer report
    script).
 7. Godot: the button returns to idle with the server's status message, **no timeout toast**, total time noted.
 8. PGM blink / tearing between "AMCP back" and the deferred NVIDIA line (owner eye).
+
+## Live measurement (29.10, live e2e session — two Applies clicked in Godot Devices on :0)
+
+`journalctl -u highascg -u casparcg-server -f -o short-precise` running; node restarted 20:04:36 (pid 1185314) with this
+code. Evidence: scratchpad `live-e2e/j805.txt`, `q805_done.png`, `full805_after*.png`, `full805b_retake.png`.
+
+| Plan item | Apply 1 (20:06:18, first after node start) | Apply 2 (20:10:55, after the fixes below) |
+|---|---|---|
+| 1. click → `POST …/apply` / Step 1 | 19 ms / 20 ms | ~35 ms (click logged 55.020, POST 55.053) |
+| 2. Step 3 → Step 4 | 1.59 s | **0.74 s** |
+| 2. `xdotool mousemove failed` | 0 | 0 |
+| 2. `NVIDIA policy deferred … (WO-805)` | present (19.841) | present (55.827) |
+| 3. custom mode lines | none (planned layout fits the canvas, no mode needed) | none |
+| 4. Caspar `Initialized controllers` → node `AMCP back` | 27.050 → 27.105 = **55 ms** | 58.580 → 58.632 = **52 ms** |
+| 5. `AMCP back` → `NVIDIA … applied (deferred)` | 1.42 s | 1.55 s |
+| 5. `XVideoSyncToDisplayID` after the Apply | **-1 (FAIL, bug 1)** | **4 = DP-4, the ticked port 3** (set to 0 before the click as a marker) |
+| 6. Screen consumer back on ch 1 | yes (INFO 1: port_501 portaudio, port_600 screen, port_741 shm) | yes, same list |
+| 7. Godot status | "Config written; layout applied; Caspar restarted.", no toast | same |
+| Total click → NVIDIA done | **10.36 s** (≈4 s lost to bug 2) | **5.16 s** |
+
+### Bug 1 — XVideoSyncToDisplayID was never set (found live, fixed)
+
+The deferred run did get `HIGHASCG_NVIDIA_SYNC_OUTPUT=DP-4` (`nvidiaPolicyEnv` resolves port 3 → `DP-4` through the
+device graph; checked by running it against the live config). The script then parsed `nvidia-settings -q dpys` with
+`… | python3 - "$_out" <<'PY'`: the heredoc **is** python's stdin, so the pipe was never read, `_dpy` stayed empty and
+`_apply_sync_to_display` returned silently, on every Apply and every boot. Reproduced in bash on the box (`dpy=[]`).
+Fix (`tools/runtime/highascg-nvidia-x-apply.sh`): program in `python3 -c '…' "$_out"`, and match the `[dpy:N]` target
+id instead of the list index in front of it (same on this box, `[4] …[dpy:4] (DP-4)`, not in general).
+Smoke `tools/smoke/smoke-wo805-nvidia-sync-display-id.test.js` (3/3) runs the function against a fake `nvidia-settings`
+(`[4] …[dpy:6] (DP-4)` → assigns 6, an unlisted port assigns nothing, no heredoc feeds the parser).
+
+### Bug 2 — the fast kill killed the relaunched Caspar (found live, fixed)
+
+Apply 1: RESTART 19.843; the old Caspar logged "Successfully shutdown" at 21.179, then SEGV in `exit()` (shared_ptr
+dispose, every exit does this, 30 times in the journal) and was still in the crash handler when the 1 s settle poll ran
+out → `caspar still up — fast kill` (21.297). run.sh (WO-805 fix 1) relaunched at 21.99. `caspar-kill-main.sh`
+(`CASPAR_KILL_FAST=1`) called `caspar_kill_all_processes` twice, TERM then KILL a second later, and **each call lists
+the PIDs again**: the KILL hit the new instance → run.sh exited 137 (not a restart code under systemd) →
+`casparcg-server.service` failed (22.40) → the node "inactive — starting via systemd" (23.455) → second start, AMCP back
+27.105. Before WO-805 the relaunch took 2.8-5.1 s, so the second listing never found a new process (the 4 earlier fast
+kills in 14 days of journal had no exit 137). If the KILL had missed, the following port-free wait would have
+killed the new one after 5 s instead (`caspar_wait_amcp_port_free` kills the tree when `CASPAR_KILL_FAST=1`).
+Fix (`tools/runtime/caspar-kill-main.sh`, fast path only): list main PIDs + their children + CEF once, TERM/KILL that
+snapshot, and skip the port-free wait when a casparcg outside the snapshot (the relaunch) is already up (logged
+"relaunched casparcg already up"). Smoke `tools/smoke/smoke-wo805-fast-kill-spares-relaunch.test.js` (2/2) runs the
+real script against fake casparcg processes (own bin/config path/port): the instance started 0.5 s into the kill
+survives, the old one is gone. **Negative control:** the same test against `git show HEAD:…/caspar-kill-main.sh`
+fails ("the relaunched instance is NOT killed"). Apply 2 needed no fast kill (clean exit 1.2 s after RESTART), so
+the fixed script has not yet run on the live Caspar. The offline test is the proof.
+
+### Observed, not changed
+
+- **PGM is black after every Apply until the operator takes again.** The restart empties Caspar. After both Applies the
+  node re-staged PRV (ch 2 Intro, ch 4 blackFHD) and the operator GUI cells, but not PGM (no code re-plays program
+  after a restart; it may be deliberate, since it avoids putting content on air on its own). Meanwhile Godot's PGM 1
+  tile still labelled "L10 KV LOOP" while INFO 1 had no layers. Re-taking Intro → LED head showed it again
+  (`full805b_retake.png`, INFO 1 layers 110-112). Owner decision whether an Apply should restore PGM.
+- Step 3 → 4 took 1.59 s on the first Apply after the node start vs 0.74 s on the second.
+- 8. (blink/tearing in the NVIDIA window) — owner eye, not judged here.

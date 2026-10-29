@@ -1,6 +1,6 @@
 # WO-806 — Godot client: bring back the compact audio mixer and the compact timer control
 
-**Status: IN PROGRESS (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only); owner QA on the glass and a real timer run open; G3 and G5 not done**
+**Status: IN PROGRESS (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only); owner QA on the glass and a real timer run open; G3 and G5 not done · live e2e 29.10: G1/G2/G4/G6 PASS on the glass incl. a real timer run on PGM**
 
 Owner, 29.10:
 > work order to bring back compact audio mixer and compact timer control
@@ -468,3 +468,16 @@ Signals, `gain()` / `set_gain()` / `muted()` / `set_solo()` / `set_screens()` / 
   the relaunch + screenshot is still to do. Note: the dock starts collapsed after a relaunch (session state), so a
   screenshot without a click shows only the "▸ Program audio" header. Owner's eye on the glass; a fader drag in a
   column reaching the server live (same handlers and controller as before, test-proven, not exercised on air).
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS** (G1/G2/G4/G6).
+- Program audio dock: it scrolls (q806_dock_scrolled.png). Its fader on L11 PK BACK TRACK went to −18.5 dB, and the
+  Audio tab showed the same value (q806_dock_fader.png, q806_audiotab_l11.png). A double-click reset it to 0 dB.
+- Screen timer: a test timer was added on Dioda. 1:30 was typed in the dock, then START and PAUSE (q806_timers2.png,
+  q806_timer_run.png). The timer showed on PGM (full806_timer.png). The eye hid it with a 25-frame fade
+  (full806_eye_mid_c.png → full806_eye_off_c.png). The gear opens the compact form (q806_gear.png). The test timer was
+  removed afterwards.
+- G3 and G5 are still not done (unchanged).
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

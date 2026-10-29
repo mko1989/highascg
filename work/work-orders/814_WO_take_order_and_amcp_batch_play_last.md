@@ -1,6 +1,6 @@
 # WO-814 — Take order: new look straight to PGM, PRV copy after the PGM PLAY; PLAY last in the batch
 
-**Status: DONE (29.10, offline suite + live PRV/PGM takes on ch 1/2, see Verified) — owner QA: a real show take**
+**Status: DONE (29.10, offline suite + live PRV/PGM takes on ch 1/2, see Verified) — owner QA: a real show take · live e2e 29.10: take order PASS on PGM; CUT-with-duration bug fixed (scene-transition.js) and re-verified live**
 
 Builds on WO-259 (two-phase BEGIN…COMMIT take, `take_two_phase_batch`), WO-574/WO-782 (multi-screen PLAY in one
 merged batch), WO-150 B150.1 (PRV flip-flop). Does not repeat them.
@@ -119,3 +119,16 @@ loaded + played on PRV (`LOADBG 2-10 …`, `PLAY 2-10`) before `LOADBG 1-110`.
   PGM/PRV were returned to what they showed before the test (`Look 1` on both; its PNG LOADBG 404s, as before).
 - Owner QA: a show take on PGM with real looks (MIX and CUT, a multi-screen recall) — PRV now shows the previous look
   only after the PGM transition has started.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS, plus a CUT bug found and fixed.**
+- Take order on PGM ch1 with Intro (3 layers, MIX): the Caspar log at 19:50:51 shows the incoming PLAYs last
+  (chg814.txt).
+- **Bug:** a look whose transition is stored as `{CUT, 25}` (the picker's duration kept when the type is CUT) faded for
+  25 frames on frontex. **Fix:** `src/engine/scene-transition.js` `normalizeTransition` gives a CUT duration 0.
+  `tools/smoke/smoke-cut-ignores-picker-duration.test.js` (2 tests) is registered in `tools/ci/offline-test-files-2.js`.
+- **Re-verified live** after the node restart: Intro stored as `{CUT, 12}` (19:51:52, chg814cut.txt) gave no OPACITY
+  tweens, and the old layer was stopped 67 ms after PLAY. Intro was set back to MIX 12.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

@@ -1,7 +1,7 @@
 # WO-809 — "Add live input" modal lags after "Add live source"
 
-**Status: OPEN (29.10) — investigation** · fix built in the Godot dialog, verified offline (Godot suite 22182/0, boot
-check OK, sandbox GUI e2e 3/3 with click → close timed); owner QA on the glass open
+**Status: DONE (29.10, live e2e on the box) (29.10) — investigation** · fix built in the Godot dialog, verified offline (Godot suite 22182/0, boot
+check OK, sandbox GUI e2e 3/3 with click → close timed); owner QA on the glass open · **live e2e 29.10: add live input → dialog closes at once, PASS on the glass**
 **Source:** owner 29.10: *"there is a weird modal lag after clicking add live source in add live input modal."*
 **Related:** [WO-605](./605_WO_godot_port_device_view.md) slice 11 (the dialog, ported from the web modal incl. its
 1.5 s close), [WO-719](./719_WO_gui_e2e_show_creation.md) (GUI e2e, scenario 05_live_inputs),
@@ -77,3 +77,12 @@ Not a server problem: no server change proposed.
   and…" after the reload.
 - **Not verified:** the feel on the owner's glass; a real add on the live box (POST time with Caspar PLAY, the
   DeckLink 7-request path); the Devices `show_model` rebuild cost with the box's full payload.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** On the Devices tab, Add live input → Type NDI → name `E2E_TEST_NDI` → Add. The dialog closed at once:
+the screen recording rec809.mkv shows the close in the frames of q809_close_frames.png, and q809_after.png shows the
+result. The row was then removed (Remove + confirm).
+- Finding (WO-805 area, not fixed): after an add + remove of a live source, the Apply button stays amber.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

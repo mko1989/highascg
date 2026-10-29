@@ -1,6 +1,6 @@
 # WO-817 — Godot look editor: audio-only layers transparent and not pickable in the viewer (list only)
 
-**Status: DONE (29.10, Godot suite 22733/0 + boot check + demo-mode Xvfb render; owner QA owed on the real viewer)**
+**Status: DONE (29.10, Godot suite 22733/0 + boot check + demo-mode Xvfb render; owner QA owed on the real viewer) · live e2e 29.10: PASS on the real viewer**
 
 Owner (29.10): "audio only layers should be transparent in the editor and not pickable in the viewer (the looks
 editor) as it doesnt make sense to select them there. only in the list."
@@ -67,3 +67,11 @@ layer's now-invisible box (`_drop` → `_layer_at`). If that is unwanted, the dr
 **Owner QA owed:** open a look with a .wav layer (e.g. "Intro") in the editor: the wav layers draw nothing and a click
 where they sit selects the video layer under them or deselects; selecting a wav row in the list still opens its
 Inspector (volume, route, trim).
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** In the Intro editor the viewer draws only L10 INTRO_HAP; the .wav layers L11/L12 draw nothing
+(q817_editor.png). A click in the viewer selects L10 under the wavs (q817_viewer_click.png). The L11 wav row still
+selects from the list and opens the inspector (q817_row_click.png).
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

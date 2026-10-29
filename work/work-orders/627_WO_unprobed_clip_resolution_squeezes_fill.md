@@ -52,3 +52,9 @@ casparcg's output." This follows WO-625, which fixed numbered CLS names. This ca
     ffprobe cannot read.
 - Not done, on purpose: PGM (ch1) still shows the 20:01 take's `0 0 1 1`. Looks are not taken to PGM from here. The
   owner's next take of Waves to PGM will use the fixed path.
+
+### Follow-up (29.10, live e2e) — the probe now covers the whole list in one call
+WO-818 on the glass showed that the 120-per-call batch left most rows without a codec at Godot's single boot fetch.
+`enrichMediaListForHttp` now works through the remaining files in batches of 120 within one call, up to
+`PROBE_BUDGET_MS = 3000` (`opts.probeBudgetMs` overrides it). This smoke keeps the two-call case with budget 0 and adds
+the one-call case. Details are in WO-818's live e2e section.

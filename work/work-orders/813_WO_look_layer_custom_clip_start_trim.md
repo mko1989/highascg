@@ -1,11 +1,11 @@
 # WO-813 — Look layer "Clip start point" → Custom: scrub slider on PRV + Trim in / Trim out
 
-**Status: IMPLEMENTED (29.10 — smokes + offline suite + Godot tests + boot check; live: the route and the real client
+**Status: DONE (29.10, live e2e on the box) (29.10 — smokes + offline suite + Godot tests + boot check; live: the route and the real client
 scrubbed PRV 2-10 through the scrub gate; screenshot of the Inspector; owner QA = drag the slider, trim, take).
 29.10 second pass: the Custom option is removed (trim works under both start options; a stored "custom" loads and takes
 as "beginning"), Trim is a collapsible compact row, right-click resets. Third pass: Ctrl / Cmd+click and a ↺ per point
 reset in both clients; the web client has the same compact Trim row and no Custom (dist-web rebuilt) — see the last
-section.**
+section. · live e2e 29.10: trim set/reset + on-air loop 10.88→19.02 PASS on the glass**
 
 Owner, 29.10:
 > in a layers inspector inside a look there is clip start point with a drop down. add there custom, where it opens
@@ -351,3 +351,15 @@ webui. try on my screen."
   gesture there).
 - A take after a reset (server path unchanged: null = no trim, covered by the earlier smokes).
 
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** Look editor of KV LOOP 2, layer L10, Trim section:
+- Dragging the slider scrubs PRV. "Trim in at slider" was set at 10.88 and "Trim out at slider" at 19.04
+  (q813_trim_open.png, q813_set.png).
+- Right-click on Trim in resets it (q813_rclick.png), Ctrl+click on Trim out resets it (q813_ctrl.png), and so does the
+  reset arrow (q813_arrow.png).
+- The look was taken to PGM ch1 with the trim 10.88–19.04 and loop on. The OSC file time on L110 ran from 10.88 to 19.02
+  and wrapped (q813_onair.png, full813_onair.png). The trims were cleared afterwards.
+- UX finding (not fixed): opening Trim widens the inspector by about 48 px, so the editor's TAKE/Close buttons move.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

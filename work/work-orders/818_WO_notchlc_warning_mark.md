@@ -1,6 +1,6 @@
 # WO-818 — ⚠ warning mark next to NotchLC files in the media lists (Godot + web)
 
-**Status: DONE (29.10, Godot suite 22749/0 + smoke 4/4 + offline 3569/0/2 + boot check + Xvfb render of the Godot list; tooltip on hover and the web row on screen are owner QA)**
+**Status: DONE (29.10, Godot suite 22749/0 + smoke 4/4 + offline 3569/0/2 + boot check + Xvfb render of the Godot list; tooltip on hover and the web row on screen are owner QA) · live e2e 29.10: Godot ⚠ missing at boot → /api/media probe-budget fix (media-catalog.js) → PASS at boot; web row + tooltip PASS**
 
 Owner (29.10): "if the difference between playback is so colossal we need a warning sign next to notchLC files with a
 tooltip: caspar cant decode notchLC with gpu, transcode to hap."
@@ -66,3 +66,23 @@ new text and no "ffmpeg -c:v hap" (no node restart).
   boot-time project autosave, like every client start.)
 - **Not verified:** the tooltip on hover (needs the pointer), the web row on screen (bundle checked, not rendered),
   and the owner's eye on both.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**FAIL at first → server bug fixed → PASS.**
+- Godot first showed no codec, so no ⚠, on the NotchLC files (q818_hover.png, q818_zoom_before.png). After a manual
+  refresh the amber "⚠ NotchLC" text and the 2-line GPU tooltip appeared (q818_hover2.png).
+- **Cause:** `/api/media` probed only the first 120 un-tried files per call, and Godot fetches the list once at boot. In
+  this library (414 files, 135 NotchLC) most rows had no codec until later calls.
+- **Fix:** `src/api/media-catalog.js` `enrichMediaListForHttp` now works through the remaining files in batches of 120
+  within one call, up to `PROBE_BUDGET_MS = 3000`. `opts.probeBudgetMs` overrides it for tests. A cold real-library probe
+  took 1414 ms (414 tried, 394 with a codec, 135 NotchLC). `tools/smoke/smoke-wo627-unprobed-clip-resolution.test.js`
+  keeps the 120 → 150 over-two-calls case (budget 0) and adds the one-call case (150 at once). The wo627 and wo497
+  smokes pass 12/12.
+- **Verified live:** after a node restart (19:59) and a Godot relaunch, the ⚠ NotchLC rows are amber at boot without a
+  manual refresh (q818_boot_fixed.png).
+- Web row (Firefox): the ⚠ shows next to INTRO_notch.mov with the NOTCHLC tag and its tooltip (web2.png,
+  q818_web_tip.png).
+- Note (not fixed): the web "Scenes/Looks" tab showed "No looks for Dioda/Proj" (web1.png). It may be a stale dist-web.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

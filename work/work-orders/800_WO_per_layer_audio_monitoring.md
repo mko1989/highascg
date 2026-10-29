@@ -1,6 +1,6 @@
 # WO-800 — Per-layer audio monitoring (levels per layer, not per channel)
 
-**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); open: web display, owner commits of both trees.**
+**Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); web display built 29.10 (Audio tab lane, offline suite + sandbox/headless-Firefox screenshots; see "Web display (29.10)"); open: Caspar frozen-level bug for ended/empty layers, owner commits of both trees. · live e2e 29.10: Godot lanes PASS on the glass**
 
 Owner, 29.10:
 > what are our options to finally get proper audio monitoring per layer? i know caspar is only sending per channel values.
@@ -287,3 +287,101 @@ PRV is bank-less, so preview rows (none exist in the console today) would need n
 - `check-max-file-lines`: 0 over.
 - **Not verified:** the look on the glass (lane width / legibility at the dense 64→78 px strip), a bank-B take live, the
   `switcher_bus` remap, the GUI's polling against the server under load. Owner QA.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**Godot lanes PASS; one bug in Caspar.** The Audio tab draws per-layer lanes with live levels for Intro
+(L10 INTRO_HAP, L11 PK BACK TRACK, L12 PK CLICK) on PGM ch1 (q800_lanes.png).
+- **Finding (Caspar C++, not fixed):** a layer that has ended or is empty keeps showing its last level. The level freezes
+  because of the "hold last sample" branch with `item_size == 0` in `~/caspar-build/src-v2/src/core/mixer/audio/audio_mixer.cpp`
+  (per-layer meter code, about lines 140–235 and 282–297). Suggested fix: skip the layer accumulation when `item_size == 0`.
+- The web display is not built, so it was not checked.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).
+
+## Web display (29.10)
+
+### Investigation (before any code change)
+
+- **Where the web draws the Audio tab's meters.** `client/lib/app-tabs.js:25` → `initAudioMixerView`
+  (`client/components/audio-mixer-view.js`) → `mountAudioMixerViewConsole` (`client/components/audio-mixer-view-console.js:18`).
+  Rows come from `collectProgramAudioRows` (`client/lib/audio-mixer-rows.js`; look rows carry `audioScreens`, `:188`, timeline
+  rows L = 210 + idx, audio-only look L = 200, live-audio slot rows, dedicated inputs keyed `input:<ch>`, `:284`). Layer strips are
+  drawn by `client/components/audio-mixer-console-input-groups.js` (meter markup `:119`, `meterFills.set` `:145`).
+- **One meter loop for everything:** `createAudioMeterLoop` (`client/lib/audio-mixer-meter-loop.js`, created at
+  `audio-mixer-view-console.js:25`): 50 ms interval (`:42`), −60…0 dBFS → 0…1 (`:103`), instant rise, `SMOOTH_FALL = 0.45` per tick
+  (`:43`), green `#22c55e` / red above −1 dBFS (`:120`; the console passes the colours). The Godot `AM.smooth` / `AM.colour` are
+  this same model, so "same scale, same ballistics" means reusing this loop.
+- **What a layer strip shows today:** `readLayerPeakDbfs` (`client/lib/audio-mixer-peaks.js:133`) → the channel bus level while the
+  layer is on air (it first tries `osc.channels[ch].layers[L].audio.levels`, `:144`, which the node never fills) — the same summed
+  level on every layer strip of a channel, as in Godot.
+- **Data:** the per-layer store is outside the WS snapshot (see the Godot section), so the web must poll `GET /api/osc/audio-layers`
+  like Godot. The box now enforces the WO-811 API token (plain `curl` → 401); `apiGet` (`client/lib/api-client.js:19`) sends the
+  session cookie, so the web needs nothing extra. Live read 29.10 (token, read-only): ch 1 is in **bank B** and reports layers
+  `111`/`112` (look layers 11/12 + 100), ch 2 reports `10`/`11`/`12` — the bank shift is live, not theoretical.
+- **Staleness (correction to the Godot section):** `osc.staleTimeoutMs` is **5000** on the box (`config/osc.json:7`,
+  `src/config/defaults-core.js:81`); 1000 is only the fallback in `getLayerAudioLevels`. So when Caspar stops sending a layer, the
+  node keeps returning its last level for up to 5 s. The response's `updatedAt` is the node's `now` (`src/osc/osc-state.js:237`,
+  `src/api/routes-osc.js:85`) and each entry has its own `updatedAt` (same clock), so the client can age entries itself.
+- **Room for a lane.** Strip 98 px − 2 × 10 px padding (`07c3-audio-mixer-view-channel-strip.css:8,12`) = 78 px; dense 80 px
+  (`07c2-audio-mixer-view-console-layout.css:98`) → 60 px. Content: meter 7 px (`07c3:117`) + scale 22 px (`:177`) + fader 18 px
+  (`:190`) + 2 × 6 px gap (`:73`) = 59 px, `justify-content: space-between`. A lane in the flex flow would widen or shift the dense
+  strip; an absolutely placed 3 px lane at x = 9…12 px sits inside the meter→scale gap (≥ 6 px) without moving anything.
+- **Existing web bug seen on the way (not fixed, out of scope):** the wide bar's on-air test `isLayerStripOnAir`
+  (`client/lib/audio-mixer-meter-eligibility.js:69`) looks up the **logical** layer, so in bank B a look layer strip's wide bar
+  stays dark unless it is the only media layer (seen in the sandbox: `bankb/audio-strips.png`, wide bar 0 %, lane live).
+
+### What was done
+
+- `client/lib/audio-layer-levels.js` (new, 123 lines, pure — the web twin of `layer_levels.gd`): `layerLevelTarget(key, meta, banks)`
+  → physical `[ch, layer]` for `pgm:<ch>:layer:<L>` strips only (look rows +100 in bank B; masters and `input:<ch>` strips →
+  none), `layerLevelEntry` / `layerLevelPeak` (max `dBFS` over `nbChannels`), `readLayerLevel` → `{ present, level }`,
+  `createLayerLevelPoller({ get, wanted })` (200 ms, one request at a time, failed read or hidden view → no data, `stop()` drops
+  the last reading). `LAYER_LEVELS_FRESH_MS = 500`: an entry older than that against the response time counts as absent.
+- `client/lib/audio-mixer-meter-loop.js` (181): optional `laneFills` + `layerLevels()`; each tick, after the bars, a lane per
+  layer strip through the **same** `smooth()` / `colourFor()` the bar uses (factored out of the loop, maths unchanged); the
+  lane is `hidden` while the layer is absent, and its smoothing key `<key>:lane` is dropped.
+- `client/lib/audio-mixer-rows.js` (+2): `meterMetaForInputRow` adds `lookLayer` (row has `audioScreens`) for the bank-B shift.
+- `client/components/audio-mixer-console-input-groups.js` (+8): every layer strip gets
+  `<div class="audio-mixer-view__meter-lane" hidden>` after the meter and registers it in `laneFills`; the meter gets the Godot
+  tooltip text ("Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)").
+- `client/components/audio-mixer-view-console.js` (+19): owns `laneFills` and the poller (`wanted` = tab active and a lane exists),
+  starts/stops it with the meter loop on render, tab hide and `stop()`.
+- `client/styles/07c3-audio-mixer-view-channel-strip.css` (+26): the lane — absolute, `left: 9px`, 3 px, meter background,
+  `pointer-events: none` (no pointer handling at all, so nothing for Firefox drag to break).
+- `tools/smoke/smoke-wo800-web-layer-levels.test.js` (new, 5 tests) + one line in `tools/ci/offline-test-files-2.js`.
+- **Same as Godot:** endpoint, 5 Hz poll only while visible, max over `nbChannels`, the bar's scale / ballistics / colours, lane
+  hidden when the layer has no audio, wide bar keeps its meaning, strip width unchanged.
+- **Different from Godot, on purpose:** (1) no lane on dedicated input strips (`input:<ch>`): their wide bar already meters that
+  input's own channel, so the lane would repeat it (minimalism); Godot gives them one. (2) the 500 ms freshness rule above, so a
+  layer Caspar stopped sending disappears in ≤ 0.7 s instead of holding for 5 s — Godot could take the same rule
+  (`layer_levels.gd` `entry()`). It does **not** cover the Caspar frozen-level bug recorded under "Live e2e" (Caspar keeps sending
+  the old value, so the entry stays fresh); that needs the C++ fix.
+- Only the Audio tab console. The inspector's compact mixer (`client/components/audio-mixer-panel*.js`, horizontal meters) has
+  no lane.
+
+### What was verified
+
+- New smoke: 5/5 — strip → channel/layer (bank A/B, look vs fixed layers, masters/inputs none), level from the box's recorded
+  payload (ch 1 bank B `111` = −24.59 dBFS), freshness 480 ms present / 520 ms absent, the **real meter loop** driving fake lanes
+  (−24.59 dBFS → `59.0%` green, −18.06 → `69.9%`, > −1 dBFS → red, present-but-silent → shown at `0.0%`, absent → hidden,
+  0.45 fall per tick, smoothing dropped when the layer leaves), the poller (no request while unwanted, one GET of
+  `/api/osc/audio-layers`, `stop()` and a failed read clear the data), and source guards on the markup / wiring / CSS.
+- Full curated offline suite (`node tools/ci/run-offline-tests.js`): **3639 tests, 3637 pass, 0 fail, 2 skipped**.
+  `check-max-file-lines` 0 over; `check-unwired-exports` no new orphans; `check-tdz-reads` clean; `npm run -s format:check`
+  passes; eslint on the touched files: 0 errors, 2 warnings, both present at HEAD (`audio-mixer-console-input-groups.js` empty-state
+  `innerHTML`, `audio-mixer-meter-loop.js` `busKey`). `npm run build:client` OK.
+- **Rendered, end to end through the node:** WO-719 sandbox server (`tools/e2e/sandbox-server.js`, `--no-caspar`, own port; the
+  live :4200 untouched) + the built `dist-web/` (the sandbox is API-only, so a scratch proxy served `dist-web/` and forwarded
+  `/api` + WS) + headless Firefox 140 ESR over WebDriver BiDi (no display used). A look with L10 `e2e_bars.mp4`, L11/L12
+  `e2e_tone.wav` was taken on ch 1; fake Caspar OSC went to the sandbox's OSC port at 25 Hz: `layer/<10|11 (+100 in bank B)>/volume`
+  (16 × int32; L10 −18 / −18.5 dBFS, L11 −6 ± 3 dBFS), nothing for L12. DOM probe + screenshots:
+  - bank A (layers 10/11): L10 lane `70%` green (= −18 dBFS), L11 `89.3%` → `93.7%`, L12 lane hidden; strip width 98 px.
+  - bank B (layers 110/111): the same lanes on the L10/L11 strips (so the +100 shift works in the real page).
+  - feed stopped: all lanes hidden 2.5 s later (freshness rule; the node still held the entries for its 5 s).
+  - Screenshots (looked at): scratchpad session 03d195b7 `wo800web/banka/audio-view-a.png` (whole page),
+    `wo800web/banka/audio-strips.png` (strips with lanes), `wo800web/banka/audio-strips-silent.png` (after the feed stopped),
+    `wo800web/bankb/audio-strips.png`, `wo800web/audio-strip-L10-zoom.png` (meter + lane at 4×). Script: `wo800web/shot.js`.
+- **Not verified:** real Caspar levels in the web page on the box (the live server is in use by another session; the node route and
+  wire were proven in the Caspar pass, and the page reads the same response), the look on the owner's Firefox at the box's
+  zoom, `switcher_bus` remap (as in Godot, not followed).

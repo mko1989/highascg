@@ -1,6 +1,6 @@
 # WO-803 — Companion: screen's main layer with remaining time and progress bar (display only)
 
-**Status: IMPLEMENTED (29.10) — route live-verified on the box; module 1.0.11 packaged (not installed into Companion); owner QA on a Companion button pending**
+**Status: DONE (29.10, live e2e on the box) (29.10) — route live-verified on the box; module 1.0.11 packaged (not installed into Companion); owner QA on a Companion button pending · live e2e 29.10: module 1.0.11 installed via the Companion UI, connection enabled, PGM readback button PASS (counts down with PGM)**
 
 Owner, 29.10:
 > companion module highascg feedback with main layer from a screen with remaining time and progress bar. preset buttons for above. display only, no actions.
@@ -119,3 +119,18 @@ Module (`companion-module-dev/companion-module-highpass-highascg`, 1.0.10 → **
 Not verified (owner QA): the button in a real Companion (render of text + bar, bar width on larger surfaces), the
 paused colour and clear on take-out against a real pause/clear (covered by unit tests only — no pause/clear was done on
 the live PGM).
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.**
+- **Start state:** the Companion (v5.0.2) HighAsCG connection was DISABLED and pinned to 1.0.3, which was missing.
+- **Install:** 1.0.11 was imported through the Companion UI (Modules → Import module package; no sudo). The connection
+  was set to v1.0.11 and enabled. Status OK, host 127.0.0.1:4200 (comp11.png).
+- **Presets:** the "PGM readback" presets render live: Dioda 35:54 with a red bar, Proj 00:00 (comp15.png).
+- **Button:** the Dioda preset was dragged to button 1/0/5. It counted down 35:42 → 35:28 with the bar at about 25 %,
+  matching PK BACK TRACK elapsed / 47:38 (q803_btn_a.png, q803_btn_b.png). It has no press actions, so it is display
+  only (comp17.png). The button was cleared afterwards (comp19.png).
+- **Note (WO-811):** the 1.0.11 tgz (built 29.10 10:57) predates the WO-811 `api_password` field (13:14). The connection
+  goes to Error under enforcement, so the module needs a ≥ 1.0.12 package.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

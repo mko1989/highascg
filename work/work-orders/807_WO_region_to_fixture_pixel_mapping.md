@@ -1,6 +1,6 @@
 # WO-807 — Region-to-fixture-pixel mapping: average a screen area into one pixel of a lighting fixture
 
-**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server); GUI e2e PASSES 29.10 (`07_pixel_map` 9/9 in the sandbox, full run 41/41: operator path → DMX 425–427 = 128/64/100 on 127.0.0.1:6455; it found and fixed a window taller than the screen and a sandbox reading the live /dev/shm); automatic edge proposal BUILT + applied live 29.10 (56 PixelLines → 896 mappings, DMX master off; Godot tooltip/modal pending); rig movement is owner QA**
+**Status: IN PROGRESS — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server); GUI e2e PASSES 29.10 (`07_pixel_map` 9/9 in the sandbox, full run 41/41: operator path → DMX 425–427 = 128/64/100 on 127.0.0.1:6455; it found and fixed a window taller than the screen and a sandbox reading the live /dev/shm); automatic edge proposal BUILT + applied live 29.10 (56 PixelLines → 896 mappings, DMX master off; Godot tooltip/modal pending); rig movement is owner QA · live e2e 29.10: pixel-map editor + proposal tooltip/modal PASS on the glass**
 
 Owner, 29.10:
 > i mean the ability to map certain parts of for instance output to a led wall and send its color values to a lighting fixture. you can take the current project for instance. id like to map selected on the screen parts of screen to a corresponding pixelline fixture so they would become a kind of extension of the screen. as pixel density irl of led wall to a light fixture per cm/m whatever, there is a huge difference, so this needs to be implemented. for instance we take a 100px wide x 200px tall area of the screen to be mapped to first pixel (channel) of the fixture. here we need an averaging mode where pixels from that are on the screen get averaged into a single pixel.
@@ -450,3 +450,13 @@ the wall's plane frame; pitch/roll/curve of the wall ignored and noted). Beyond 
 **NOT verified:** the look on the glass / owner GUI; a real fixture following its strip (DMX master stays off); the
 Godot tooltip + modal (later step, another agent). Caveats: wall pitch / roll / curve ignored; the Caspar shm lease is
 held while mappings exist (~6 % Caspar CPU, phase 1) even when sampling idles.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** Previs → DMX output fold → Pixel map.
+- The window opens with the mappings (q807_pixmap.png). A test region was drawn (not saved) and deleted (q807_region.png).
+- Auto proposal… opens the modal (q807_modal.png), and the proposal tooltip shows (q807_tooltip.png).
+- Art-Net went to loopback only.
+- Finding (not fixed): the region labels overlap in the pixel-map window.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

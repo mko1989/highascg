@@ -119,3 +119,11 @@ crops 0-384 | 384-1536 | 1536-1920 × 576; real XTEST keys moved Side R +0.10 m 
 (persisted); real 3D click selected "Centre LED"; headless 179/0.
 Bug found + fixed during verification: templates assumed a 2560×768 canvas — on a 1920×1080 PGM the right wall's
 crop started past the picture edge.
+
+### Follow-up (29.10, live e2e) — `operatorCompose` is client-owned too
+Opening the web UI dropped `operatorCompose` from mhp_harder at rev 292, because the web `exportProject` does not list
+it. The key is written by the server (`operator-gui-compose-persist.js`) and round-tripped by Godot.
+`src/engine/project-client-slices.js` now has `CLIENT_OWNED_SLICES = ['previs', 'fixtures', 'operatorCompose']`.
+The new test in `tools/smoke/smoke-wo614-project-client-slices.test.js` checks that a web autosave keeps the stored
+cells and that a client which sends the key wins; the wo614 and wo807-propose smokes pass 26/26. The project was
+repaired with a POST /api/project/autosave carrying the backup's operatorCompose (rev 293, 4 cells).

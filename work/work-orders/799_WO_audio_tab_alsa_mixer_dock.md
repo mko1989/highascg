@@ -1,6 +1,6 @@
 # WO-799 — Audio tab: ALSA hardware mixer docked at the bottom
 
-**Status: IN PROGRESS (29.10) — built and suite green; owner QA on the glass still open**
+**Status: DONE (29.10, live e2e on the box) (29.10) — built and suite green; owner QA on the glass still open · live e2e 29.10: PASS on the glass (amixer 100→46→100 %)**
 
 Owner, 29.10:
 > in the audio tab of the main gui i need alsa mixer in the bottom. so current view gets cut in the middle horizontaly and top is casparcg bottom is alsa.
@@ -54,3 +54,10 @@ CasparCG strips are not cut off in a fixed position.
   (baseline 21917; +13 incl. new `tests/test_audio_tab_split.gd`). `check-max-file-lines.js`: 0 over 500.
 - NOT verified: visual layout at 1920×1080 / 1280×720, divider drag, live ALSA fader, initial split
   position (no split_offset set — top may not start at 60%). Owner QA on the glass.
+
+## Live e2e (29.10, on the glass — real Godot client on :0, real PGM/PRV)
+
+**PASS.** The Audio tab shows the ALSA mixer dock for the onboard card 0. Dragging its Surround fader down moved
+`amixer` from 100 % to 46 %, and dragging it back up returned it to 100 %. Screenshots: q799_audio.png, q799_fader.png.
+
+Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).

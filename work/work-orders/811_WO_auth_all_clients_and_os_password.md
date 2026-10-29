@@ -1,6 +1,6 @@
 # WO-811 — Auth for every client (Godot auto-login, Companion, web UI) + change the casparcg OS password from Nuclear
 
-**Status: IN PROGRESS (29.10) — phases 1 + 2 DONE (offline suite 3504/3504 incl. 14 new, Godot 22237/0, Companion 100/100; live box probed with enforcement OFF). Phase 3 (OS-password button) BUILT, offline-verified (6 smokes, Godot 22252/0); sign-in pages screenshotted on a sandbox and fixed. Template credentials DONE (offline: templates never get the shared password; a node-made template key, the AMCP path refuses the password; 11 new smokes with enforcement ON on a sandbox; suite 3518 pass/0 fail). Open: owner runs the button on :0 (after a node restart) and restarts the HTTPS proxy; a real template under enforcement ON and enforcement ON itself are the owner's steps.**
+**Status: IN PROGRESS (29.10) — phases 1 + 2 DONE (offline suite 3504/3504 incl. 14 new, Godot 22237/0, Companion 100/100; live box probed with enforcement OFF). Phase 3 (OS-password button) BUILT, offline-verified (6 smokes, Godot 22252/0); sign-in pages screenshotted on a sandbox and fixed. Template credentials DONE (offline: templates never get the shared password; a node-made template key, the AMCP path refuses the password; 11 new smokes with enforcement ON on a sandbox; suite 3518 pass/0 fail). Live enforcement test 29.10 (≈3 min 45 s, reverted): Godot auto-login PASS, web sign-in PASS, unauth 401 / WS 401, PGM unaffected; **Companion FAIL — installed module 1.0.11 predates the password field (repackage ≥1.0.12)**; templates not exercised (none on air). Enforcement OFF again, `.private/api-token` kept. Open: Companion package, owner runs the button on :0, a real template under enforcement ON, enforcement ON itself (owner).**
 **Source:** owner 29.10: *"inside nuclear i need an option to change password to casparcg ubuntu user. and add auth for any
 client, godot (default auto-login), companion, webui etc."*
 **Related:** [WO-96](./96_WO_API_WS_AUTHENTICATION.md) (API/WS auth v1 — the code this builds on; its web login was
@@ -608,3 +608,42 @@ enforcement goes on."*
   so follower templates have no WS under enforcement.
 - The server still accepts the shared password as `?token=` (scripts); no template sends it any more.
 - The `http(s)` browser-source mangling above (own WO).
+
+## Live enforcement test (29.10, live e2e session, Opus — timed window, reverted)
+
+A timed test on the live box, approved by the coordinator. `config/security.json` was set to `enforceAuth: true` by hand
+for the test only (not committed), then restored from a byte copy. Every screenshot was read before it went in here.
+Evidence is in the session scratchpad `live-e2e/` (`auth811_pre.txt`, `q811_godot_on.png`, `w811_login.png`,
+`w811_signedin.png`, `c811_on.png`, `c811_off.png`, `q811_godot_off.png`).
+
+**Before:** `/api/auth/status` → `{"enforceAuth":false,"hasToken":false,…}`, `/api/settings` without credentials 200,
+no `.private/api-token`.
+
+**Window ON:** 20:25:15 (node kill -TERM) → 20:28:5x (restore + kill -TERM), **≈ 3 min 45 s**. PGM ch1 kept
+playing the whole time: Intro + PK BACK TRACK + PK CLICK on L110–112, and the PGM timecode advanced from 13:19 to 16:31
+across both node restarts.
+
+| Client | Result (enforcement ON) | Evidence |
+|---|---|---|
+| Server | `/api/auth/status` `{"enforceAuth":true,"hasToken":true,"authenticated":false}`. Without credentials, `/api/settings`, `/api/state`, `/api/media` and `/api/project/list` → 401. A wrong bearer → 401; the file's bearer → 200. WS upgrade on `/api/ws` and `/ws` without credentials → 401. `/login` → 200. An HTML page → 302 `/login?next=…`. `.private/api-token` created `-rw------- casparcg` (65 B). | curl |
+| Godot (:0) | **PASS.** Relaunched under enforcement (`--autostart --tab=0`) and auto-logged in: no prompt, full Live tab, PGM/PRV tiles live, WS `client connected` 20:25:30 / 20:25:37. | q811_godot_on.png |
+| Web UI (Firefox) | **PASS.** `http://127.0.0.1:4200/` shows "Sign in to HighAsCG". The password (typed from the file, never printed) → the UI loaded with project "mhp harder", all four channel tiles and the looks. Two WS connects at 20:27:45. The tab was closed straight after, so it could not autosave. | w811_login.png, w811_signedin.png |
+| Companion (v5.0.2, HighAsCG module 1.0.11) | **FAIL → finding.** The connection went to **Error** and its edit form has **no password field**. The installed `highpass-highascg-1.0.11` contains no `api_password`. The tgz was built 29.10 10:57, and the phase-2 auth change (`src/bridge/auth-headers.js`, `config-fields.js`) is from 13:14 and was never packaged. After the revert the connection went back to **OK** by itself (c811_off.png), so the Error was enforcement. | c811_on.png, c811_off.png |
+| On-air Caspar templates | **Not exercised.** No HTML/CG producer was on air: ch1 = 3 ffmpeg layers, ch5 (opgui) = routes only. 0 journal lines matching ` 401`/`Unauthorized`/`template_key` during the window. | INFO 1/5, journal |
+| Multiview chrome | **N/A.** `multiview_enabled` is false on this box. | — |
+| Godot auth e2e | No GUI e2e scenario exists for auth. The headless `test_auth_wo811.gd` and `test_os_password_wo811.gd` run in the full Godot suite. | — |
+
+**After the revert:** `config/security.json` md5 is `101740e7…` again (the tracked default), and the node was restarted.
+Without credentials, `/api/settings`, `/api/state` and `/api/project/list` → 200 after 12 s, and `/api/auth/status` →
+`{"enforceAuth":false,"hasToken":true,…}`. Godot reconnected by itself (WS 20:29:07) and shows the normal Live tab
+(q811_godot_off.png). Companion is OK. **`.private/api-token` was left in place, as instructed.** Enforcement is **OFF**.
+
+**Test-isolation bug found afterwards (fixed):** once `.private/api-token` existed, three cases in
+`tools/smoke/smoke-api-auth.test.js` failed on the box only, with 401 instead of 200. `getExpectedApiToken` prefers the
+file over the config token the test sets, and CI has no such file. The smoke now sets `HIGHASCG_API_TOKEN_FILE` to a
+temp path before it requires `auth.js`. Before the fix the offline suite gave 3629 pass / 3 fail; after it, 3634 tests,
+3632 pass / 0 fail / 2 skipped.
+
+**Blocker for leaving enforcement ON:** Companion. A module ≥ 1.0.12 has to be packaged from the dev source and
+installed, then the password typed into the connection. Templates under enforcement still need a look with an HTML
+layer taken while enforcement is ON (not covered by this window).
