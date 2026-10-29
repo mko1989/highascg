@@ -68,3 +68,15 @@ func test_tabs_and_selection() -> void:
 	t.eq(p.tab_shown(), 0, "a selection brings the Inspector back")
 	t.ok(p.showing(a[1]), "with its page")
 	p.free()
+
+
+func test_panes_reserve_the_scrollbar_width() -> void:
+	# WO-813 follow-up: content growing taller (Trim opening) showed the scrollbar and widened the column by its width
+	var p: Control = InspectorPanel.new()
+	p._ready()
+	var pane := Control.new()
+	p.add_tab("Probe", pane)
+	var scroll: ScrollContainer = pane.get_parent()
+	t.eq(scroll.vertical_scroll_mode, ScrollContainer.SCROLL_MODE_RESERVE, "scrollbar width always reserved")
+	t.eq(scroll.horizontal_scroll_mode, ScrollContainer.SCROLL_MODE_DISABLED, "no horizontal scroll")
+	p.free()

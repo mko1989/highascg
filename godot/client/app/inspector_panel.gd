@@ -57,6 +57,8 @@ func add_tab(title: String, pane: Control) -> void:
 	_tabs.append(b)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	# the scrollbar's width is always reserved: content that grows taller (Trim opening, WO-813) must not widen the column
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_RESERVE
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	if pane.get_parent() != null:
 		pane.get_parent().remove_child(pane)

@@ -122,6 +122,17 @@ func test_ctrl_click_and_reset_button_share_one_reset() -> void:
 	t.ok(src.contains("Ctrl+click or ↺ to reset to the clip's start") and src.contains("Ctrl+click or ↺ to reset to the clip's end"), "tooltips")
 
 
+## Open, the row must fit the Inspector's value column (probe on the box: 291 px in a 293 px column; it was 352 → the
+## column widened by 44 px and the editor's buttons moved).
+func test_open_row_is_sized_to_fit_the_inspector() -> void:
+	var src := FileAccess.get_file_as_string("res://features/live/clip_trim_section.gd")
+	t.ok(not src.contains("custom_minimum_size.x = 72"), "no fixed 72 px fields")
+	t.eq(src.count("_fit_field(e)"), 1, "both fields sized to the widest timecode")
+	t.ok(src.contains("const FIELD_SAMPLE := \"00:00.00\""), "sample covers clips up to 99 min")
+	t.ok(src.contains("row.add_theme_constant_override(\"separation\", 1)"), "tight row")
+	t.ok(src.contains("b.add_theme_stylebox_override(s, StyleBoxEmpty.new())"), "↺ is just the glyph")
+
+
 func test_parse_typed_point() -> void:
 	t.eq(T.parse_tc("0:01.12", 25.0), 1480.0, "m:ss.ff — .12 is frames")
 	t.eq(T.parse_tc("1:02.00", 25.0), 62000.0, "a minute")

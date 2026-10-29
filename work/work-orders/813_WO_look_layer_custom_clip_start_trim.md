@@ -360,6 +360,28 @@ webui. try on my screen."
   reset arrow (q813_arrow.png).
 - The look was taken to PGM ch1 with the trim 10.88–19.04 and loop on. The OSC file time on L110 ran from 10.88 to 19.02
   and wrapped (q813_onair.png, full813_onair.png). The trims were cleared afterwards.
-- UX finding (not fixed): opening Trim widens the inspector by about 48 px, so the editor's TAKE/Close buttons move.
+- UX finding: opening Trim widened the inspector by about 48 px, so the editor's TAKE/Close buttons moved. **Fixed 29.10**, see below.
 
 Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).
+
+## Follow-up: Trim no longer widens the Inspector (29.10, Opus)
+
+**Investigation.** I extended `--probe-trim` to print the Inspector width and each row element's minimum width. With KV
+LOOP 2 L10 in a second windowed instance, the Inspector was 437 px closed and **481 px** open. The open row needed
+**352 px**: Trim in 60, field 72, ↺ 29, Trim out 70, field 72, ↺ 29, plus 5 gaps × 4. The grid's value column is 293 px.
+After the row fit, 8 px remained (437 → 445). That was the Inspector's ScrollContainer: the taller content brought up the
+vertical scrollbar, whose width the container added to its own minimum.
+
+**What was done.**
+- `clip_trim_section.gd`: the fields are sized to the widest point text in the app theme (`FIELD_SAMPLE "00:00.00"`,
+  65 px) instead of a fixed 72 px. The ↺ buttons are only the glyph (StyleBoxEmpty, accent on hover, 13 px). Row gaps
+  are 1 px. The button labels stay "Trim in" / "Trim out" (the owner's wording). The open row is now 291 px.
+- `app/inspector_panel.gd`: each pane's ScrollContainer uses `SCROLL_MODE_RESERVE`, so the scrollbar width is always
+  reserved. Content that grows taller (any page, not only Trim) no longer changes the column width. The Inspector is
+  445 px from the start (8 px wider than before, and constant).
+
+**Verified.**
+- Probe on the box: closed = **445**, open = **445** (section 293 px, minimum 291).
+- Screenshots in the session scratchpad `trimw/both.png`: the Inspector edge and TAKE/Close sit at the same x closed and
+  open, and `0:40.00` is shown in full.
+- Godot suite 22820/0, with new `test_panes_reserve_the_scrollbar_width` and `test_open_row_is_sized_to_fit_the_inspector`.

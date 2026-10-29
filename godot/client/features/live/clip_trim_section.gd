@@ -21,6 +21,7 @@ const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const RESET_TIP_IN := "Ctrl+click or ↺ to reset to the clip's start"
 const RESET_TIP_OUT := "Ctrl+click or ↺ to reset to the clip's end"
+const FIELD_SAMPLE := "00:00.00"  # the widest point text a field shows (m:ss.ff up to 99 min)
 
 var header := Button.new()  # the grid's label cell: "▸ Trim" / "▾ Trim"
 var _media := TimelineMedia.new()
@@ -67,7 +68,7 @@ func _ready() -> void:
 	_body.add_theme_constant_override("separation", 0)
 	add_child(_body)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 4)
+	row.add_theme_constant_override("separation", 1)  # the open row must fit the Inspector's value column (no widening)
 	_in_btn = _button(row, "Trim in", "Set In to the slider position\n" + RESET_TIP_IN, true)
 	_in_edit = _field(row, true)
 	_reset_btn(row, true)
@@ -75,6 +76,8 @@ func _ready() -> void:
 	_out_edit = _field(row, false)
 	_reset_btn(row, false)
 	_body.add_child(row)
+	for e in [_in_edit, _out_edit]:
+		_fit_field(e)
 	var srow := HBoxContainer.new()
 	_slider = HSlider.new()
 	_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -199,7 +202,12 @@ func _probe(arg: String) -> void:
 			_slider.value = float(arg)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	print("[probe-trim] open=%s header=%s section=%s" % [is_open(), header.size, size])
+	var panel: Node = self  # the Inspector column: its width must not change when Trim opens
+	while panel != null and not (panel.get_script() != null and str(panel.get_script().resource_path).ends_with("inspector_panel.gd")):
+		panel = panel.get_parent()
+	var pw: Variant = (panel as Control).size.x if panel is Control else -1
+	print("[probe-trim] open=%s header=%s section=%s min=%s inspector_w=%s" % [is_open(), header.size, size, get_combined_minimum_size(), pw])
+	print("[probe-trim] row mins: %s" % [_body.get_child(0).get_children().map(func(c: Control) -> int: return int(c.get_combined_minimum_size().x))])
 
 
 func _on_slide(v: float) -> void:
@@ -277,18 +285,26 @@ func _reset_btn(parent: Control, is_in: bool) -> Button:
 	b.text = "↺"
 	b.flat = true
 	b.focus_mode = Control.FOCUS_NONE
+	for s in ["normal", "hover", "pressed", "hover_pressed", "disabled"]:  # just the glyph: no button padding
+		b.add_theme_stylebox_override(s, StyleBoxEmpty.new())
+	b.add_theme_color_override("font_hover_color", ThemeBuilder.ACCENT)
 	b.tooltip_text = RESET_TIP_IN if is_in else RESET_TIP_OUT
 	b.pressed.connect(func() -> void: _reset(is_in))
 	parent.add_child(b)  # enabled with the length unknown too: a reset needs no length
 	return b
 
 
+## As wide as the longest point text (FIELD_SAMPLE) in the app theme, not a fixed 72 px. Needs the field in the tree.
+func _fit_field(e: LineEdit) -> void:
+	var text_w := e.get_theme_font("font").get_string_size(FIELD_SAMPLE, HORIZONTAL_ALIGNMENT_LEFT, -1, e.get_theme_font_size("font_size")).x
+	e.custom_minimum_size.x = ceilf(text_w + e.get_theme_stylebox("normal").get_minimum_size().x)
+
+
 func _field(parent: Control, is_in: bool) -> LineEdit:
 	var e := LineEdit.new()
-	e.custom_minimum_size.x = 72
 	e.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	parent.add_child(e)
 	e.tooltip_text = "%s point — type m:ss.ff or seconds" % ("In" if is_in else "Out")
 	e.text_submitted.connect(func(_t: String) -> void: _commit(is_in))
 	e.focus_exited.connect(func() -> void: _commit(is_in))
-	parent.add_child(e)
 	return e
