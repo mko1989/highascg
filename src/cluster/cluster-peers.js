@@ -27,6 +27,7 @@
 const http = require('http')
 const net = require('net')
 const os = require('os')
+const { outboundAuthHeaders } = require('../server/auth')
 
 const STORE_KEY = 'clusterPeers'
 const TOMBSTONE_KEY = 'clusterUnlinked'
@@ -38,10 +39,12 @@ const MAX_PEERS = 16
 const HEAL_MS = 60000
 const TOMBSTONE_MS = 30 * 24 * 3600 * 1000
 
-/** GET http://host:port/path → { ok, status, json } (never throws). */
-function getJson(host, port, path, timeout = TIMEOUT_MS) {
+/** GET http://host:port/path → { ok, status, json } (never throws). WO-811: carries this node's shared password
+ * (auth.outboundAuthHeaders, none today) — except `{ auth: false }`, the subnet scan, which must not hand it to every host. */
+function getJson(host, port, path, timeout = TIMEOUT_MS, { auth = true } = {}) {
 	return new Promise((resolve) => {
-		const req = http.get({ host, port, path, timeout, headers: { Accept: 'application/json' } }, (res) => {
+		const headers = { Accept: 'application/json', ...(auth ? outboundAuthHeaders() : {}) }
+		const req = http.get({ host, port, path, timeout, headers }, (res) => {
 			const chunks = []
 			res.on('data', (c) => chunks.push(c))
 			res.on('end', () => {
@@ -67,7 +70,7 @@ function requestJson(method, host, port, path, body, timeout = 5000) {
 	return new Promise((resolve) => {
 		const data = Buffer.from(body === undefined ? '' : JSON.stringify(body))
 		const req = http.request({ host, port, path, method, timeout,
-			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json' } }, (res) => {
+			headers: { 'Content-Type': 'application/json', 'Content-Length': data.length, Accept: 'application/json', ...outboundAuthHeaders() } }, (res) => {
 			const chunks = []
 			res.on('data', (c) => chunks.push(c))
 			res.on('end', () => {
@@ -428,7 +431,7 @@ function createCluster(opts) {
 		const linked = new Set([...peers.values()].map((p) => `${p.saved.host}:${p.saved.port}`))
 		const found = await Promise.all(hosts().map(async (host) => {
 			if (linked.has(`${host}:4200`)) return null
-			const r = await fetchJson(host, 4200, '/api/replication/ping', SCAN_TIMEOUT_MS)
+			const r = await fetchJson(host, 4200, '/api/replication/ping', SCAN_TIMEOUT_MS, { auth: false })
 			if (!r.ok || r.json?.appId !== 'highascg' || (self?.instanceId && r.json.instanceId === self.instanceId)) return null
 			return { host, port: 4200, hostname: String(r.json.hostname || host), version: String(r.json.appVersion || ''), role: String(r.json.role || '') }
 		}))

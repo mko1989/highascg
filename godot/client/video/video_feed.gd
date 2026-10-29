@@ -7,6 +7,7 @@ extends RefCounted
 const NetUtil := preload("res://core/net_util.gd")
 const ConfigScript := preload("res://core/config.gd")
 const Platform := preload("res://core/platform.gd")
+const AuthModel := preload("res://core/auth_model.gd")
 const LOST_AFTER_MS := 2000
 const INBOUND_BUFFER := 16 * 1024 * 1024
 
@@ -70,6 +71,7 @@ func pump(roles: Array) -> void:
 		_peer = WebSocketPeer.new()
 		_peer.inbound_buffer_size = INBOUND_BUFFER
 		_sent = ""
+		_peer.handshake_headers = AuthModel.headers()  # WO-811: same password as the Api and /api/ws
 		if _peer.connect_to_url(url) != OK:
 			_retry_later()
 			return

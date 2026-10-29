@@ -9,6 +9,8 @@ extends Node
 ## back to a server this client once followed.
 
 const Profiles := preload("res://core/connection_profiles_model.gd")
+const AuthModel := preload("res://core/auth_model.gd")
+const Platform := preload("res://core/platform.gd")
 
 const DEFAULT_ORIGIN := "http://127.0.0.1:4200"
 const UI_CFG := "user://ui.cfg"
@@ -22,6 +24,7 @@ func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
 	forget_cluster(UI_CFG)
 	origin = home_origin()
+	_load_password()
 
 
 ## Where this client goes (args / env / A/B profile / default) — the only place it ever goes.
@@ -58,6 +61,41 @@ func save_profiles(p: Dictionary) -> void:
 	Profiles.store_cfg(cfg, p)
 	cfg.save(UI_CFG)
 	_profiles = Profiles.load_cfg(cfg)
+
+
+## WO-811 — the shared API password for `origin` (ui.cfg [auth]); on the box, the node's own file when ui.cfg has none.
+var password: String:
+	get:
+		return AuthModel.password
+
+
+func _load_password() -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	AuthModel.password = AuthModel.load_password(cfg, origin)
+	if AuthModel.password == "":
+		adopt_local_password()
+
+
+## On the box (origin is this machine): take the node's password file when it differs from the one in use, and keep it
+## in ui.cfg (owner 29.10: "Godot auto-logs in on the box"). → true when the password changed (worth a retry).
+func adopt_local_password() -> bool:
+	if not Platform.is_local_origin(origin):
+		return false
+	var pw := AuthModel.read_first(AuthModel.local_token_paths(ProjectSettings.globalize_path("res://"), Platform.home_dir()))
+	if pw == "" or pw == AuthModel.password:
+		return false
+	set_password(pw)
+	return true
+
+
+## Use and remember `pw` for this server (the 401 prompt, core/auth_prompt.gd).
+func set_password(pw: String) -> void:
+	var cfg := ConfigFile.new()
+	cfg.load(UI_CFG)
+	AuthModel.store_password(cfg, origin, pw)
+	cfg.save(UI_CFG)
+	AuthModel.password = pw.strip_edges()
 
 
 func ws_url() -> String:

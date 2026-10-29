@@ -313,6 +313,7 @@ const GUI_WINDOW_CLASS = {
 	desktopvideo_setup: 'DesktopVideo',
 	desktop_video_updater: 'DesktopVideo',
 	alsamixer: 'Alsamixer',
+	'os-password': 'highascg-passwd', // WO-811 phase 3: the passwd terminal's private class (terminalArgv)
 	// 'Navigator' is Firefox-ESR's res_NAME for a real browser window on this box. 'Firefox' is the
 	// res_name its DIALOGS use — including the "Close Firefox" profile-lock modal, which we WANT the
 	// lookup to see so it can be raised for the operator to dismiss instead of hiding under the

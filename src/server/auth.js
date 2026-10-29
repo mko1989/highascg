@@ -4,13 +4,22 @@ const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
+const { isTemplateCredentialRequest } = require('./template-credential')
 
 const TOKEN_FILE = path.join(REPO_ROOT, '.private', 'api-token')
+// WO-811: the shared password/token file. `HIGHASCG_API_TOKEN_FILE` points tests (and sandbox servers) elsewhere so they
+// never read or write the box's own file. Kept out of Syncthing by `/.private/api-token` in `.stignore`.
+function tokenFilePath() {
+	const env = String(process.env.HIGHASCG_API_TOKEN_FILE || '').trim()
+	return env || TOKEN_FILE
+}
 const SESSION_COOKIE = 'highascg_session'
 const TOKEN_BYTES = 32
 
 /** @type {boolean | null} */
 let _runtimeEnforceAuth = null
+/** WO-811: the live config, for outbound peer calls made by helpers that have no ctx (cluster-peers getJson …). */
+let _runtimeConfig = null
 
 function truthyEnv(v) {
 	if (v == null) return false
@@ -36,9 +45,10 @@ function isEnforceAuthActive(config) {
 	return sec.enforceAuth
 }
 
-/** @param {{ enforceAuth?: boolean }} opts */
+/** @param {{ enforceAuth?: boolean, config?: object | null }} opts */
 function setAuthRuntime(opts = {}) {
 	if (typeof opts.enforceAuth === 'boolean') _runtimeEnforceAuth = opts.enforceAuth
+	if (opts.config !== undefined) _runtimeConfig = opts.config
 }
 
 function secureCompare(a, b) {
@@ -50,8 +60,9 @@ function secureCompare(a, b) {
 
 function readApiTokenFromFile() {
 	try {
-		if (!fs.existsSync(TOKEN_FILE)) return ''
-		const raw = fs.readFileSync(TOKEN_FILE, 'utf8').trim()
+		const file = tokenFilePath()
+		if (!fs.existsSync(file)) return ''
+		const raw = fs.readFileSync(file, 'utf8').trim()
 		return raw
 	} catch {
 		return ''
@@ -59,9 +70,9 @@ function readApiTokenFromFile() {
 }
 
 function writeApiTokenToFile(token) {
-	const dir = path.dirname(TOKEN_FILE)
-	fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
-	fs.writeFileSync(TOKEN_FILE, `${token}\n`, { mode: 0o600, encoding: 'utf8' })
+	const file = tokenFilePath()
+	fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 })
+	fs.writeFileSync(file, `${token}\n`, { mode: 0o600, encoding: 'utf8' })
 }
 
 /**
@@ -79,7 +90,7 @@ function ensureApiToken(opts) {
 		writeApiTokenToFile(token)
 		log(
 			'warn',
-			`[auth] Generated API token in ${TOKEN_FILE} — run: bash tools/runtime/print-api-token.sh`,
+			`[auth] Generated API token in ${tokenFilePath()} — run: bash tools/runtime/print-api-token.sh`,
 		)
 	}
 	if (token && !readApiTokenFromFile() && sec.apiToken) {
@@ -131,6 +142,29 @@ function extractAuthTokenFromRequest(req) {
 	return ''
 }
 
+/**
+ * WO-811 phase 1: a request URL safe for the journal — the value of every credential-like query parameter
+ * (`token`, `password`, `apiToken`, `auth`, `template_key`) is replaced by `***`. Browser/CEF WebSockets cannot set
+ * headers, so their credential travels in the query; the upgrade log line must not carry it.
+ * @param {string} url
+ */
+function redactUrlForLog(url) {
+	const s = String(url || '')
+	return s.replace(/([?&#](?:token|password|apiToken|auth|template_key)=)[^&#]*/gi, '$1***')
+}
+
+/**
+ * WO-811 phase 2: headers a node sends to ANOTHER HighAsCG node (linked servers, replication). One shared password for
+ * the whole install (owner 29.10): the node sends its own, so two linked boxes with the same password accept each
+ * other once enforcement is on. Empty object when this node has no password (today) — nothing changes on the wire.
+ * @param {object} config
+ * @returns {Record<string, string>}
+ */
+function outboundAuthHeaders(config = _runtimeConfig) {
+	const token = getExpectedApiToken(config)
+	return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 function isPublicApiPath(method, apiPath) {
 	const m = String(method || 'GET').toUpperCase()
 	const p = String(apiPath || '')
@@ -166,8 +200,13 @@ function checkHttpAuth(method, apiPath, req, ctx) {
 	return { ok: true }
 }
 
+/**
+ * WS upgrades (`/api/ws`, `/ws`, `/api/video-feed`). Besides the shared password: the node's own TEMPLATE KEY as
+ * `?template_key=` from the Caspar host (template-credential.js) → `{ ok, template: true }` (read-only socket).
+ */
 function checkWebSocketAuth(req, ctx) {
 	if (!isEnforceAuthActive(ctx?.config)) return { ok: true }
+	if (isTemplateCredentialRequest(req, ctx?.config)) return { ok: true, template: true }
 	const expected = getExpectedApiToken(ctx?.config)
 	if (!expected) return { ok: false, status: 503, error: 'Auth enabled without token' }
 	const provided = extractAuthTokenFromRequest(req)
@@ -240,7 +279,10 @@ function isOriginAllowed(req, config) {
 
 module.exports = {
 	TOKEN_FILE,
+	tokenFilePath,
 	SESSION_COOKIE,
+	redactUrlForLog,
+	outboundAuthHeaders,
 	setAuthRuntime,
 	getSecurityConfig,
 	isEnforceAuthActive,

@@ -160,7 +160,7 @@ routes.post('/api/system/decklink/install', ({ path, body, ctx }) => routesSyste
 // WO-427: multipart — needs the raw req stream (http-server skips body consumption on multipart)
 routes.post('/api/system/decklink/upload', ({ req }) => routesSystemHardware.handleDecklinkUploadPost(req), { requireCaspar: false })
 routes.post('/api/system/gpu-nvidia/apply', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
-routes.post('/api/system/gui-launch', ({ path, body, ctx }) => routesSystemHardware.hardwareHandlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/system/gui-launch', ({ path, body, ctx, req }) => routesSystemHardware.hardwareHandlePost(path, body, ctx, req), { requireCaspar: false })
 routes.get('/api/system/dock', () => routesOperatorDock.handleGet(), { requireCaspar: false }) // WO-628
 routes.post('/api/system/dock/launch', ({ body, ctx }) => routesOperatorDock.handleLaunch(body, ctx), { requireCaspar: false })
 routes.get('/api/led-test-card/settings', ({ ctx }) => routesLedTestControl.handleGet(ctx), { requireCaspar: false }) // WO-629

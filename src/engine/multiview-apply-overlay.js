@@ -130,6 +130,8 @@ async function applyMultiviewOverlay(ctx, ch, overlayLayer, params) {
 				}
 			}
 		}
+		// WO-811: no credential here. The shared password never goes to Caspar; the chrome's WS key (`templateKey`) is
+		// merged into this data by the AMCP send path while enforcement is ON (src/caspar/amcp-template-credential.js).
 		const overlayData = JSON.stringify({ cells, showTimersUnderLabels, timerScale, highlightTopTimer, ...keyed })
 		await loadOverlayTemplate(ctx, ch, overlayLayer, overlayData)
 	} else {

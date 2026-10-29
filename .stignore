@@ -98,3 +98,7 @@ Thumbs.db
 /godot/export
 // WO-686: Godot's per-script .uid files (written on import / export, not tracked)
 /godot/client/**/*.uid
+
+// WO-811 phase 1: the box's API password/token file (src/server/auth.js TOKEN_FILE, 0600). Per box — a peer must neither
+// receive it nor push its own back. The per-host .private/<host>/ folders keep syncing. MIRROR THIS ON THE MAC.
+/.private/api-token

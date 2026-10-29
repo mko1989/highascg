@@ -5,6 +5,7 @@ extends VBoxContainer
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const NuclearGate := preload("res://app/nuclear_gate.gd")
+const OsPw := preload("res://features/settings/os_password_model.gd")
 
 ## [label, path, confirm text ("" = none), refresh Caspar status after]
 const HOST := [
@@ -29,11 +30,14 @@ var _install: Button
 var _install_why: Label
 var _confirm: ConfirmationDialog
 var _pending: Array = []
+var _os_pw: Button
+var _os_pw_status: Label
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 8)
 	add_child(_buttons(HOST))
+	_os_password_row()
 	_heading("Install to disk")
 	_note("Launch the Calamares graphical installer on :0 (needs a connected screen). Use after booting the live USB to "
 		+ "copy HighAsCG onto internal storage.")
@@ -108,6 +112,26 @@ func _run(spec: Array) -> void:
 			get_tree().create_timer(s).timeout.connect(func() -> void:
 				if is_inside_tree():
 					refresh())
+
+
+## WO-811 phase 3: the OS-password terminal on :0 (os_password_model.gd), only from the box's own screen (owner 29.10).
+func _os_password_row() -> void:
+	_heading("Login password")
+	_note(OsPw.NOTE)
+	var row := HBoxContainer.new()
+	_os_pw = Button.new()
+	_os_pw.text = OsPw.LABEL
+	_os_pw.disabled = not OsPw.available(Config.origin)
+	_os_pw.pressed.connect(_change_os_password)
+	row.add_child(_os_pw)
+	add_child(row)
+	_os_pw_status = _note(OsPw.OFF_BOX if _os_pw.disabled else "")
+
+
+func _change_os_password() -> void:
+	_os_pw_status.text = "Opening the terminal on the box screen…"
+	var res: Dictionary = await NuclearGate.post(self, OsPw.PATH, OsPw.request_body())
+	_os_pw_status.text = OsPw.result_text(res)
 
 
 func _heading(text: String) -> void:

@@ -52,9 +52,9 @@ async function hardwareHandleGet(p, ctx, query) {
  * @param {string} body
  * @param {*} ctx
  */
-async function hardwareHandlePost(p, body, ctx) {
+async function hardwareHandlePost(p, body, ctx, req) {
 	if (p === '/api/system/gpu-nvidia/apply') return handleGpuNvidiaApply(body, ctx)
-	if (p === '/api/system/gui-launch') return handleGuiLaunchPost(body, ctx)
+	if (p === '/api/system/gui-launch') return handleGuiLaunchPost(body, ctx, req) // WO-811: req for the os-password local check
 	if (p === '/api/system/pointer-confine') {
 		const { handlePointerConfinePost } = require('./system-hardware-gui')
 		return handlePointerConfinePost(body, ctx)

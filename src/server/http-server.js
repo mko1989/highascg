@@ -13,6 +13,8 @@ const { mergeCors } = require('./cors')
 const { mergeSecurityHeaders } = require('./security-headers')
 const { isHeadlessMode } = require('./headless-mode')
 const { readRequestBody } = require('./http-body')
+const { redactUrlForLog } = require('./auth')
+const { LOGIN_PATH, loginPageHtml } = require('./login-page')
 const zlib = require('zlib')
 
 const MIME = {
@@ -327,7 +329,10 @@ function startHttpServer(options) {
 				/^\/instance\/[^/]+\/api(\/.*)?$/.test(reqPathForRouting)
 
 
-			if (reqPathForRouting === '/intake' || reqPathForRouting === '/intake/') {
+			if (reqPathForRouting === LOGIN_PATH) {
+				// WO-811: the sign-in page for served browser pages (src/server/login-page.js) — static, no secret.
+				result = { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }, body: loginPageHtml() }
+			} else if (reqPathForRouting === '/intake' || reqPathForRouting === '/intake/') {
 				// WO-675: the short address the audio tech types on a phone → the presenter intake page.
 				result = { status: 302, headers: { Location: '/api/tracking/presenters/intake', 'Cache-Control': 'no-store' }, body: '' }
 			} else if (reqPathForRouting === '/audio' || reqPathForRouting === '/audio/') {
@@ -388,7 +393,8 @@ function startHttpServer(options) {
 		const url = String(req.url || '')
 		const isReplWs = url.startsWith('/api/replication/ws')
 		if (!isReplWs) {
-			log(`[HTTP Server Upgrade] Event fired for path: ${req.url}`)
+			// WO-811: browser/CEF sockets carry the credential as ?token= — never into the journal.
+			log(`[HTTP Server Upgrade] Event fired for path: ${redactUrlForLog(req.url)}`)
 		}
 		try {
 			if (typeof routeUpgrade !== 'function') return

@@ -14,6 +14,7 @@ const { swallow } = require('../utils/swallow')
  * `socket.send`/`sendRaw`/`fanoutSingleCommand` stay on the untouched `trimmed`, since Caspar and
  * a replication follower both need the real secret to work. */
 const { redactAmcpCommandForLog } = require('../streaming/stream-secret-redact')
+const { prepareAmcpLine, carriesSharedPassword, passwordRefusal } = require('./amcp-template-credential')
 
 module.exports = {
 	/**
@@ -23,7 +24,9 @@ module.exports = {
 	 */
 	_sendPrepare(cmd, responseKey) {
 		const self = this._context
-		const trimmed = cmd.trim()
+		// WO-811: the template key goes in (enforcement ON), the shared password never goes out.
+		const prep = prepareAmcpLine(cmd.trim(), self?.config)
+		const trimmed = prep.error ? cmd.trim().split(/\s+/)[0] : prep.line
 		const key = (responseKey || trimmed.split(/\s+/)[0]).toUpperCase()
 		const timeoutMs = resolveSendTimeoutMs(trimmed)
 
@@ -53,6 +56,7 @@ module.exports = {
 		const execute = () => {
 			try {
 				if (settled) return p
+				if (prep.error) throw prep.error
 				try {
 					const { shouldBlockLocalPgmAmcpCommand } = require('../replication/amcp-fanout')
 					if (shouldBlockLocalPgmAmcpCommand(self, trimmed)) {
@@ -211,6 +215,10 @@ module.exports = {
 
 		if (this.isOffline) {
 			return this._simulated.send(originalCmdString)
+		}
+		// WO-811: the library path serializes `params` itself — check both for the shared password.
+		if (carriesSharedPassword(`${trimmed} ${JSON.stringify(params ?? null)}`, self?.config)) {
+			return Promise.reject(passwordRefusal())
 		}
 
 		if (!self.socket || !self.socket.isConnected) {

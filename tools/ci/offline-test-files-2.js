@@ -26,4 +26,8 @@ module.exports = [
 	'tools/smoke/smoke-wo807-pixel-map-loopback.test.js',
 	'tools/smoke/smoke-wo805-supervisor-exit-wait.test.js',
 	'tools/smoke/smoke-wo805-inventory-once.test.js',
+	'tools/smoke/smoke-wo811-auth-server-paths.test.js',
+	'tools/smoke/smoke-wo811-auth-clients.test.js',
+	'tools/smoke/smoke-wo811-template-credentials.test.js',
+	'tools/smoke/smoke-wo811-os-password.test.js',
 ]

@@ -13,12 +13,23 @@
 		let highlightTopTimer = true;
 
 		// WS connection
+		function wsAuthQuery() {
+			/* WO-811: CEF WebSockets cannot send headers. The node hands this template its own short-lived TEMPLATE KEY
+			 * (never the shared password): `templateKey` in the CG data, or `#template_key=` on its URL. It is accepted on
+			 * the WS only, from the Caspar host only, read-only, and only while the node enforces auth. None → the URL of before. */
+			try {
+				const t = window.__HIGHASCG_TEMPLATE_KEY__ || new URLSearchParams(String(location.hash || '').slice(1)).get('template_key') || '';
+				return t ? '?template_key=' + encodeURIComponent(t) : '';
+			} catch (e) {
+				return '';
+			}
+		}
 		function connect() {
 			const host = window.location.hostname || '127.0.0.1';
 			const port = window.location.port || '4200';
 			const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 			
-			ws = new WebSocket(proto + '//' + host + ':' + port + '/api/ws');
+			ws = new WebSocket(proto + '//' + host + ':' + port + '/api/ws' + wsAuthQuery());
 			
 			ws.onopen = () => {
 				console.log('Multiview overlay connected to live WS');
@@ -417,6 +428,7 @@
 				return; 
 			}
 
+			if (data && data.templateKey) window.__HIGHASCG_TEMPLATE_KEY__ = String(data.templateKey); /* WO-811 template key */
 			const cells = data?.cells || [];
 			cellsConfig = cells;
 			showTimersUnderLabels = !!data?.showTimersUnderLabels;

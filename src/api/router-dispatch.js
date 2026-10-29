@@ -25,6 +25,7 @@ const moduleRegistry = require('../module-registry')
 const showTimers = require('../show-timers/show-timers-routes')
 const shmSources = require('./routes-shm-sources') // WO-744
 const { checkHttpAuth } = require('../server/auth')
+const { wantsHtml, loginRedirect } = require('../server/login-page')
 
 /**
  * Build the route request entry point bound to a RouteRegistry.
@@ -52,6 +53,8 @@ function makeRouteRequest(routes) {
 		}
 
 		const authResult = checkHttpAuth(method, p, req, ctx)
+		// WO-811: a browser opening a gated page (phone intake/audio) goes to the sign-in page, not a bare 401 JSON.
+		if (!authResult.ok && authResult.status === 401 && method === 'GET' && wantsHtml(req)) return loginRedirect(p)
 		if (!authResult.ok) {
 			return {
 				status: authResult.status || 401,

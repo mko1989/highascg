@@ -13,6 +13,7 @@
  */
 
 const http = require('http')
+const { outboundAuthHeaders } = require('../server/auth')
 
 const TIMEOUT_MS = 14000 // under the client's 15 s (core/api.gd TIMEOUT_S): it hears this server name the silent one
 const METHODS = new Set(['GET', 'POST', 'DELETE'])
@@ -52,7 +53,7 @@ function queryText(query) {
 function rawRequest(method, host, port, path, body, timeout = TIMEOUT_MS) {
 	return new Promise((resolve) => {
 		const data = body == null || body === '' ? null : Buffer.from(typeof body === 'string' ? body : JSON.stringify(body))
-		const headers = { Accept: 'application/json' }
+		const headers = { Accept: 'application/json', ...outboundAuthHeaders() } // WO-811: the shared password (none today)
 		if (data) Object.assign(headers, { 'Content-Type': 'application/json', 'Content-Length': data.length })
 		const req = http.request({ host, port, path, method, timeout, headers }, (res) => {
 			const chunks = []

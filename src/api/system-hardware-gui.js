@@ -24,6 +24,10 @@ const {
 	resolveDesktopvideoSetup,
 	resolveBmdUpdater,
 } = require('./system-hardware-gui-resolve')
+const { checkBoxLocalRequest } = require('./box-local-request')
+const { REPO_ROOT } = require('../repo-paths')
+
+const OS_PASSWORD_SCRIPT = path.join(REPO_ROOT, 'tools', 'runtime', 'os-password.sh')
 
 /**
  * @param {string} action
@@ -56,6 +60,14 @@ function spawnGuiDetached(action, opts = {}) {
 		if (!term) throw new Error('No terminal emulator installed: alsamixer needs one (x-terminal-emulator or xterm)')
 		bin = term
 		args = terminalArgv(term, 'highascg-alsamixer', 'ALSA mixer', cmd, { dark: true })
+	} else if (action === 'os-password') {
+		/* WO-811 phase 3: `passwd` as the node's own user (casparcg) in a terminal on :0. Fixed argv, nothing from the
+		 * request; the wrapper waits for Enter so the result stays readable. handleGuiLaunchPost allows this only for a
+		 * request from the box itself (box-local-request.js). */
+		const term = resolveTerminalEmulator()
+		if (!term) throw new Error('No terminal emulator installed: the password change needs one (x-terminal-emulator or xterm)')
+		bin = term
+		args = terminalArgv(term, 'highascg-passwd', 'Change password', ['/bin/sh', OS_PASSWORD_SCRIPT], { dark: true })
 	} else if (action === 'firefox') {
 		const startUrl = String(opts.url || 'about:blank').trim() || 'about:blank'
 		const launcher = resolveOperatorFirefoxLauncher()
@@ -231,7 +243,7 @@ function handleSystemAppsGet() {
  * @param {string} body
  * @param {*} ctx
  */
-async function handleGuiLaunchPost(body, ctx) {
+async function handleGuiLaunchPost(body, ctx, req, deps = {}) {
 	const pw = checkNuclearPassword(body, ctx)
 	if (!pw.ok) return { status: pw.status || 403, headers: JSON_HEADERS, body: jsonBody({ error: pw.error }) }
 
@@ -244,6 +256,7 @@ async function handleGuiLaunchPost(body, ctx) {
 		'alsamixer',
 		'firefox',
 		'file-manager',
+		'os-password',
 	])
 	if (!okActions.includes(/** @type {any} */ (action))) {
 		return {
@@ -252,6 +265,18 @@ async function handleGuiLaunchPost(body, ctx) {
 			body: jsonBody({ error: `Unknown action: ${action}` }),
 		}
 	}
+	// WO-811 phase 3 (owner 29.10): the OS-password terminal only for a client on the box's own screen.
+	if (action === 'os-password') {
+		const local = checkBoxLocalRequest(req)
+		if (!local.ok) {
+			return {
+				status: 403,
+				headers: JSON_HEADERS,
+				body: jsonBody({ error: `Only on the box's own screen (${local.reason}).` }),
+			}
+		}
+	}
+	const spawnGui = typeof deps.spawnGuiDetached === 'function' ? deps.spawnGuiDetached : spawnGuiDetached
 	try {
 		const card = b?.card != null ? parseInt(String(b.card), 10) : 0
 		const log = (level, msg) => {
@@ -277,8 +302,9 @@ async function handleGuiLaunchPost(body, ctx) {
 				}
 			}
 		}
-		const exe = spawnGuiDetached(action, guiOpts)
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe, card: guiOpts.card }) }
+		const exe = spawnGui(action, guiOpts)
+		const note = action === 'os-password' ? 'Terminal opened on the box screen — finish there.' : undefined
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, action, exe, card: guiOpts.card, note }) }
 	} catch (e) {
 		const m = e instanceof Error ? e.message : String(e)
 		return {
@@ -302,4 +328,5 @@ module.exports = {
 	handleOperatorHelperIconGet,
 	handleSystemAppsGet,
 	handlePointerConfinePost,
+	OS_PASSWORD_SCRIPT,
 }

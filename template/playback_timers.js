@@ -1,4 +1,15 @@
 // Setup WebSocket
+function wsAuthQuery() {
+	/* WO-811: CEF WebSockets cannot send headers. The node hands this template its own short-lived TEMPLATE KEY
+	 * (never the shared password): `templateKey` in the CG data, or `#template_key=` on its URL. It is accepted on
+	 * the WS only, from the Caspar host only, read-only, and only while the node enforces auth. None → the URL of before. */
+	try {
+		const t = window.__HIGHASCG_TEMPLATE_KEY__ || new URLSearchParams(String(location.hash || '').slice(1)).get('template_key') || '';
+		return t ? '?template_key=' + encodeURIComponent(t) : '';
+	} catch (e) {
+		return '';
+	}
+}
 const wsUrl = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/api/ws';
 let ws = null;
 let oscState = { channels: {} };
@@ -18,7 +29,7 @@ const dot = document.getElementById('status-dot');
 const txt = document.getElementById('status-text');
 
 function connect() {
-	ws = new WebSocket(wsUrl);
+	ws = new WebSocket(wsUrl + wsAuthQuery());
 	
 	ws.onopen = () => {
 		if (dot) dot.classList.add('connected');

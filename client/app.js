@@ -58,11 +58,15 @@ import * as SceneDeck from './lib/app-scene-deck.js'
 import * as MvSync from './lib/app-multiview-sync.js'
 import { initReplicationUiState } from './lib/replication-ui-state.js'
 import { showAppToast } from './lib/app-toast.js'
+import { ensureAuthGate } from './lib/auth-gate.js'
 import { initDecklinkInputToasts, initLiveInputFailureToasts } from './lib/decklink-input-toast.js'
 import { initMediaExistsIndex } from './lib/media-exists.js'
 import { initMediaDurationIndex } from './lib/media-duration.js'
 
 clearStaleApiOriginOverrideOnPlayoutUi()
+
+/* WO-811: sign in first when the server enforces API auth (no-op while it is off). */
+await ensureAuthGate()
 
 export const stateStore = new StateStore()
 initDecklinkInputToasts(stateStore)

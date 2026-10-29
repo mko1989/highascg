@@ -268,9 +268,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 					socket.destroy()
 					return
 				}
-				wss.handleUpgrade(req, socket, head, (ws) => {
-					wss.emit('connection', ws, req)
-				})
+				// WO-811: a template-key socket (Caspar CEF template) is read-only — see the message gate below.
+				wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', Object.assign(ws, { _hcgTemplate: !!auth.template }), req))
 			} catch (e) {
 				log(`[WS Upgrade] Error: ${e?.message || e}`)
 			}
@@ -317,9 +316,8 @@ function attachWebSocketServer(httpServer, ctx, options = {}) {
 				if (!trimmed) return
 				if (trimmed[0] !== '{' && trimmed[0] !== '[') return
 				const msg = JSON.parse(trimmed)
-				if (typeof ctx.log === 'function') {
-					ctx.log('debug', `[WS] Incoming type=${String(msg.type || 'unknown')} len=${trimmed.length}`)
-				}
+				if (ws._hcgTemplate && msg.type !== 'osc_resync') return // WO-811: template key = receive + resync only
+				if (typeof ctx.log === 'function') ctx.log('debug', `[WS] Incoming type=${String(msg.type || 'unknown')} len=${trimmed.length}`)
 
 				if (msg.type === 'amcp' && msg.cmd) {
 					if (!ctx.amcp) {

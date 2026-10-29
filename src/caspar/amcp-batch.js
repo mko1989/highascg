@@ -163,6 +163,7 @@ function sequentialRaw(lines, client) {
 		.then((responses) => ({ ok: true, okAll: true, batched: false, responses, failures: [] }))
 }
 
+const { prepareAmcpLine, carriesSharedPassword, passwordRefusal } = require('./amcp-template-credential')
 const {
 	isBatchCommitAckLine,
 	parseBatchStatusLine,
@@ -193,7 +194,10 @@ function runBeginCommitBatch(client, lines, options) {
 	} catch {
 		/* replication optional */
 	}
-	const payload = ['BEGIN', ...lines, 'COMMIT'].join('\r\n') + '\r\n'
+	// WO-811: template key in (enforcement ON), shared password never out — same rule as the single-send path.
+	const prepped = lines.map((l) => prepareAmcpLine(String(l).trim(), connection?.config))
+	if (prepped.some((x) => x.error)) return Promise.reject(passwordRefusal())
+	const payload = ['BEGIN', ...prepped.map((x) => x.line), 'COMMIT'].join('\r\n') + '\r\n'
 	/** @type {{ lines: string[], onLine: (line: string) => void, rejectBatch: (err: Error) => void } | null} */
 	let drainRef = null
 	/** @type {((reason?: Error) => void) | null} */
@@ -376,6 +380,8 @@ class AmcpBatch {
 				return Promise.reject(new Error(`batch: disallowed or unsupported command: ${l.slice(0, 100)}`))
 			}
 		}
+		// WO-811: all or nothing — a batch with a line that carries the shared password sends no line at all.
+		if (clean.some((l) => carriesSharedPassword(l, connection?.config))) return Promise.reject(passwordRefusal())
 		const maxCmd = resolveMaxBatchCommands(connection)
 		if (clean.length > maxCmd) {
 			return Promise.reject(new Error(`batch: max ${maxCmd} commands`))
@@ -426,6 +432,7 @@ class AmcpBatch {
 		if (clean.length === 0) {
 			return Promise.resolve({ ok: true, okAll: true, batched: false, responses: [], failures: [] })
 		}
+		if (clean.some((l) => carriesSharedPassword(l, this._client._context?.config))) return Promise.reject(passwordRefusal()) // WO-811
 		const maxCmd = resolveMaxBatchCommands(this._client._context)
 		/** @type {object | null} */
 		let last = null

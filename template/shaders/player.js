@@ -53,6 +53,7 @@
 		 * restart, no black frame). Channels never change here — they stay as exported. */
 		try {
 			const data = typeof raw === 'string' ? JSON.parse(raw) : raw || {}
+			if (data.templateKey) window.__HIGHASCG_TEMPLATE_KEY__ = String(data.templateKey) // WO-811 template key
 			if (!toyRef) return
 			if (data.paused === true) toyRef.pause()
 			else if (data.paused === false) toyRef.play()
@@ -215,13 +216,22 @@
 		try {
 			const base = apiBase()
 			const origin = base || location.origin
-			url = origin.replace(/^http/, 'ws') + '/api/ws'
+			/* WO-811: CEF WebSockets cannot send headers. The node hands this template its own short-lived TEMPLATE KEY
+			 * (never the shared password): `templateKey` in the CG data (update() above) or `#template_key=` on the URL.
+			 * Accepted on the WS only, from the Caspar host only, read-only, only while the node enforces auth. */
+			const tok = window.__HIGHASCG_TEMPLATE_KEY__ || new URLSearchParams(String(location.hash || '').slice(1)).get('template_key') || ''
+			url = origin.replace(/^http/, 'ws') + '/api/ws' + (tok ? '?template_key=' + encodeURIComponent(tok) : '')
 		} catch {
 			return false
 		}
 		const casparCh = String(query.get('ch') || '1')
 		try {
 			const ws = new WebSocket(url)
+			/* WO-811: start() runs before Caspar's first update() delivers the key, so a refused first try (enforcement ON)
+			 * retries with it; with enforcement off this only fires if the node goes away (then it reconnects, as it should). */
+			ws.onclose = () => {
+				if (!THUMB_MODE) setTimeout(initTierB, 2000)
+			}
 			ws.onmessage = (ev) => {
 				try {
 					const msg = JSON.parse(ev.data)

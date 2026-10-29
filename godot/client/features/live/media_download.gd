@@ -78,7 +78,7 @@ func _start(url: String, path: String) -> void:
 	_tick.timeout.connect(func() -> void: line.emit(progress_text(_name, _http.get_downloaded_bytes(), _http.get_body_size())))
 	add_child(_tick)
 	_tick.start()
-	var err := _http.request(url)
+	var err := _http.request(url, preload("res://core/auth_model.gd").headers())  # WO-811: the shared password
 	if err != OK:
 		_finish("✗ Download failed — %s" % error_string(err), false)
 		return

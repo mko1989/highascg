@@ -79,8 +79,11 @@ const tlsOpts = { key: fs.readFileSync(KEY_PATH), cert: fs.readFileSync(CERT_PAT
 
 const server = https.createServer(tlsOpts, (creq, cres) => {
 	// Forward the request verbatim (method, path, headers — Host preserved) to the HTTP app server.
+	// WO-811 phase 3: stamp X-Forwarded-For (overwriting any the client sent) — node sees every proxied client as
+	// 127.0.0.1, and box-only actions (src/api/box-local-request.js) refuse a request that carries it.
+	const headers = { ...creq.headers, 'x-forwarded-for': creq.socket.remoteAddress || 'unknown' }
 	const preq = http.request(
-		{ host: TARGET_HOST, port: TARGET_PORT, method: creq.method, path: creq.url, headers: creq.headers },
+		{ host: TARGET_HOST, port: TARGET_PORT, method: creq.method, path: creq.url, headers },
 		(pres) => {
 			cres.writeHead(pres.statusCode || 502, pres.headers)
 			pres.pipe(cres)
@@ -110,9 +113,10 @@ server.on('upgrade', (creq, csocket, head) => {
 		// Reconstruct the request line + headers exactly, then splice the two sockets together.
 		let raw = `${creq.method} ${creq.url} HTTP/${creq.httpVersion}\r\n`
 		for (let i = 0; i < creq.rawHeaders.length; i += 2) {
+			if (String(creq.rawHeaders[i]).toLowerCase() === 'x-forwarded-for') continue // WO-811: ours only
 			raw += `${creq.rawHeaders[i]}: ${creq.rawHeaders[i + 1]}\r\n`
 		}
-		raw += '\r\n'
+		raw += `X-Forwarded-For: ${csocket.remoteAddress || 'unknown'}\r\n\r\n`
 		psocket.write(raw)
 		if (head && head.length) psocket.write(head)
 		psocket.pipe(csocket)

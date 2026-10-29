@@ -8,6 +8,7 @@ signal disconnected
 signal message(type: String, data: Variant)
 
 const NetUtil := preload("res://core/net_util.gd")
+const AuthModel := preload("res://core/auth_model.gd")
 
 const INBOUND_BUFFER := 64 * 1024 * 1024  # `state`/`project_sync` snapshots are multi-KB..MB; default is 64 KB
 const OUTBOUND_BUFFER := 4 * 1024 * 1024
@@ -86,6 +87,7 @@ func _open() -> void:
 	_peer.inbound_buffer_size = INBOUND_BUFFER
 	_peer.outbound_buffer_size = OUTBOUND_BUFFER
 	_peer.max_queued_packets = 8192
+	_peer.handshake_headers = AuthModel.headers()  # WO-811: the server checks the password on the upgrade
 	var err := _peer.connect_to_url(Config.ws_url())
 	if err != OK:
 		_peer = null

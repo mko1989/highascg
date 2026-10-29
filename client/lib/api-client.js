@@ -5,6 +5,7 @@
 
 import { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
 import { getAppStateStore } from './app-runtime.js'
+import { noteUnauthorized } from './auth-gate.js'
 
 export { getApiBase, getApiOrigin, resolveApiUrl } from './api-origin.js'
 
@@ -34,6 +35,7 @@ export async function apiGet(path) {
 	const url = requestBase() + path
 	const res = await fetch(url, FETCH_CREDENTIALS)
 	if (!res.ok) {
+		if (res.status === 401) noteUnauthorized() /* WO-811: sign in again */
 		let detail = res.statusText
 		let parsed = null
 		try {
@@ -79,6 +81,7 @@ export async function apiPost(path, body = {}) {
 		...FETCH_CREDENTIALS,
 	})
 	if (!res.ok) {
+		if (res.status === 401) noteUnauthorized() /* WO-811: sign in again */
 		let detail = res.statusText
 		let parsed = null
 		try {
@@ -118,6 +121,7 @@ export async function apiPut(path, body = {}) {
 		...FETCH_CREDENTIALS,
 	})
 	if (!res.ok) {
+		if (res.status === 401) noteUnauthorized() /* WO-811: sign in again */
 		let detail = res.statusText
 		let parsed = null
 		try {
@@ -147,6 +151,7 @@ export async function apiDelete(path) {
 	const url = requestBase() + path
 	const res = await fetch(url, { method: 'DELETE', ...FETCH_CREDENTIALS })
 	if (!res.ok) {
+		if (res.status === 401) noteUnauthorized() /* WO-811: sign in again */
 		let detail = res.statusText
 		try {
 			const ct = res.headers.get('content-type') || ''

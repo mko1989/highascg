@@ -69,7 +69,7 @@ function main() {
 	let config
 	const auth = require('./src/server/auth')
 	function applyAuthAndBindPolicy(cfg, cliArgs) {
-		auth.setAuthRuntime({ enforceAuth: auth.isEnforceAuthActive(cfg) })
+		auth.setAuthRuntime({ enforceAuth: auth.isEnforceAuthActive(cfg), config: cfg })
 		auth.ensureApiToken({
 			config: cfg,
 			log: (level, msg) => {

@@ -206,6 +206,7 @@
 				console.error('Multiview master update:', e);
 				return;
 			}
+			if (data && data.templateKey) window.__HIGHASCG_TEMPLATE_KEY__ = String(data.templateKey); /* WO-811 template key */
 			cellsConfig = data?.cells || [];
 			showTimersUnderLabels = !!data?.showTimersUnderLabels;
 			{

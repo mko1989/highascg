@@ -7,6 +7,8 @@ extends Node
 signal _slot_freed
 
 const NetUtil := preload("res://core/net_util.gd")
+const AuthModel := preload("res://core/auth_model.gd")
+const AuthPrompt := preload("res://core/auth_prompt.gd")
 
 const POOL_SIZE := 6
 const TIMEOUT_S := 15.0
@@ -47,11 +49,30 @@ func base() -> String:
 	return Config.origin + ("/api/cluster/peers/%s/relay" % relay_peer.uri_encode() if relay_peer != "" else "")
 
 
+## WO-811: every request carries the shared password (AuthModel.headers); a 401 asks for it once and retries.
 func request(method: int, path: String, body: Variant) -> Dictionary:
+	var res := await _send(method, path, body)
+	while AuthModel.needs_login(res) and await _login():
+		res = await _send(method, path, body)
+	return res
+
+
+## WO-811: after a 401 — the node's own file on the box, else the prompt. → true when there is a new password to try.
+func _login() -> bool:
+	if Config.adopt_local_password():
+		return true
+	var pw: String = await AuthPrompt.ask(self, Config.password != "", Config.origin)
+	if pw == "":
+		return false
+	Config.set_password(pw)
+	return true
+
+
+func _send(method: int, path: String, body: Variant) -> Dictionary:
 	while _free.is_empty():
 		await _slot_freed
 	var r: HTTPRequest = _free.pop_back()
-	var headers := PackedStringArray(["Accept: application/json"])
+	var headers := AuthModel.with_auth(PackedStringArray(["Accept: application/json"]), AuthModel.password)
 	var payload := ""
 	if body != null:
 		headers.append("Content-Type: application/json")
@@ -67,10 +88,17 @@ func request(method: int, path: String, body: Variant) -> Dictionary:
 
 ## Binary GET (models, thumbnails, support bundle): { ok, status, bytes, headers, error }.
 func get_bytes(path: String) -> Dictionary:
+	var res := await _send_bytes(path)
+	while AuthModel.needs_login(res) and await _login():
+		res = await _send_bytes(path)
+	return res
+
+
+func _send_bytes(path: String) -> Dictionary:
 	while _free.is_empty():
 		await _slot_freed
 	var r: HTTPRequest = _free.pop_back()
-	var err := r.request(base() + path)
+	var err := r.request(base() + path, AuthModel.headers())
 	if err != OK:
 		_release(r)
 		return {"ok": false, "status": 0, "bytes": PackedByteArray(), "headers": PackedStringArray(), "error": error_string(err)}

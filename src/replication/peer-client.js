@@ -4,6 +4,7 @@ const http = require('http')
 const { getReplicationConfig } = require('../config/replication-config')
 const { updateClockOffsetFromPing } = require('./sync-clock')
 const { computeBackoffMs } = require('./reconnect-backoff')
+const { outboundAuthHeaders } = require('../server/auth')
 
 const PING_MS = Math.max(500, parseInt(process.env.HIGHASCG_REPL_PING_MS || '2000', 10) || 2000)
 const FAILOVER_MS = Math.max(1000, parseInt(process.env.HIGHASCG_REPL_FAILOVER_MS || '5000', 10) || 5000)
@@ -45,6 +46,7 @@ function peerHttpRequest(peer, path, opts = {}) {
 				headers: {
 					Accept: 'application/json',
 					'X-HighAsCG-Replication-Token': peer.token || '',
+					...outboundAuthHeaders(), // WO-811: checkHttpAuth takes Bearer, not the replication header
 					...(bodyStr
 						? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(bodyStr) }
 						: {}),

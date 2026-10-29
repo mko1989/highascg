@@ -79,10 +79,14 @@ function redactAmcpStreamCommand(command) {
 function redactAmcpCommandForLog(cmd) {
 	const s = String(cmd || '')
 	if (!s) return s
-	return s.replace(/"?((?:rtmps?|srt):\/\/[^\s"]+)"?/gi, (whole, url) => {
-		const redacted = redactStreamUrl(url)
-		return whole.startsWith('"') ? `"${redacted}"` : redacted
-	})
+	return s
+		.replace(/"?((?:rtmps?|srt):\/\/[^\s"]+)"?/gi, (whole, url) => {
+			const redacted = redactStreamUrl(url)
+			return whole.startsWith('"') ? `"${redacted}"` : redacted
+		})
+		// WO-811: the node's template key (CG data `templateKey`, URL `#template_key=`) stays out of the node's own log.
+		.replace(/(templateKey\\*"\s*:\s*\\*")[^"\\]*/g, '$1***')
+		.replace(/([?&#]template_key=)[^&#\s"]*/gi, '$1***')
 }
 
 module.exports = { redactStreamUrl, redactAmcpStreamCommand, redactAmcpCommandForLog }

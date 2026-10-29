@@ -5,6 +5,7 @@ extends RefCounted
 ## "New version…" (POST /api/media/version/upload); reusable for media uploads (WO-603).
 
 const NetUtil := preload("res://core/net_util.gd")
+const AuthModel := preload("res://core/auth_model.gd")
 const CHUNK := 1 << 20
 const CONNECT_TIMEOUT_MS := 5000
 const RESPONSE_TIMEOUT_MS := 120000
@@ -35,9 +36,10 @@ static func multipart_parts(boundary: String, file_name: String, fields := {}) -
 	return {"head": head.to_utf8_buffer(), "tail": ("\r\n--%s--\r\n" % boundary).to_utf8_buffer()}
 
 
-static func request_head(host: String, port: int, path: String, boundary: String, content_length: int) -> PackedByteArray:
-	return ("POST %s HTTP/1.1\r\nHost: %s:%d\r\nAccept: application/json\r\nContent-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [
-		path, host, port, boundary, content_length]).to_utf8_buffer()
+## `auth_line`: WO-811 AuthModel.raw_header_line (the shared password), "" = none.
+static func request_head(host: String, port: int, path: String, boundary: String, content_length: int, auth_line := "") -> PackedByteArray:
+	return ("POST %s HTTP/1.1\r\nHost: %s:%d\r\nAccept: application/json\r\n%sContent-Type: multipart/form-data; boundary=%s\r\nContent-Length: %d\r\nConnection: close\r\n\r\n" % [
+		path, host, port, auth_line, boundary, content_length]).to_utf8_buffer()
 
 
 ## Raw HTTP/1.1 response → {status, body} (chunked transfer decoded). status 0 = unparseable.
@@ -96,7 +98,7 @@ static func upload(origin: String, path: String, file_path: String, progress := 
 		tcp.poll()
 	if tcp.get_status() != StreamPeerTCP.STATUS_CONNECTED:
 		return fail.call("connect timeout")
-	tcp.put_data(request_head(str(hp.host), int(hp.port), path, boundary, total))
+	tcp.put_data(request_head(str(hp.host), int(hp.port), path, boundary, total, AuthModel.raw_header_line(AuthModel.password)))
 	tcp.put_data(mp.head)
 	var sent: int = mp.head.size()
 	while f.get_position() < f.get_length():
