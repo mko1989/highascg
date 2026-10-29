@@ -11,6 +11,14 @@ static func is_local_origin(origin: String) -> bool:
 	return host in ["127.0.0.1", "localhost", "::1"]
 
 
+## The host of an origin ("http://10.0.0.5:4200" → "10.0.0.5", IPv6 kept in brackets) — what the header names.
+static func host_of(origin: String) -> String:
+	var s := origin.trim_prefix("http://").trim_prefix("https://").get_slice("/", 0)
+	if s.begins_with("["):
+		return s.get_slice("]", 0) + "]"
+	return s.get_slice(":", 0)
+
+
 ## The user's home: $HOME (Linux / macOS), %USERPROFILE% (Windows has no HOME), else the Documents folder's parent.
 static func home_dir(home := OS.get_environment("HOME"), profile := OS.get_environment("USERPROFILE")) -> String:
 	if home != "":

@@ -209,9 +209,7 @@ func _open_logs() -> void:
 ## WO-739: a server asking to link with this machine's server shows on the Devices tab, so it is seen from every tab.
 func _watch_invites(devices: Control) -> void:
 	var title := func(snap: Variant) -> void: tabs.set_tab_title(tabs.get_tab_idx_from_control(devices), ClusterModel.devices_title(snap))
-	Ws.on("cluster:peers", func(d: Variant) -> void:
-		if not DevicesTarget.remote:  # following another server: its WS is not this machine's
-			title.call(d))
+	Ws.on("cluster:peers", func(d: Variant) -> void: title.call(d))  # WO-802: the WS is always this machine's server
 	Ws.connected.connect(func() -> void:
 		var r: Dictionary = await DevicesTarget.box_api.get_json("/api/cluster")
 		if r.ok:

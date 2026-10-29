@@ -15,6 +15,8 @@
  *   POST   /api/cluster/auto-accept { on }     → { auto_accept }  (WO-739, device-local; GET /api/cluster self.auto_accept)
  *   DELETE /api/cluster/peers/:id[?link_back=0] → { ok, link_back?: { ok, error } }  (WO-732: unlinked there too)
  *   GET    /api/cluster/peers/:id/device-view  → that server's own /api/device-view (cached 15 s)
+ *   GET|POST|DELETE /api/cluster/peers/:id/relay/<path> → that server's /<path> (WO-802, cluster-relay.js: a client
+ *                                                  edits a linked server through its own node, never directly)
  *   POST   /api/cluster/peers/:id/send-media   → 202; progress in the peer's `media_send` (P2b, cluster-media.js)
  *   GET    /api/cluster/identity               → { id, hostname, device_key, fingerprint }  (public: what a linker records)
  *   POST   /api/cluster/ssh-key                ← a linked server's signed SSH key, before it sends media (cluster-media.js)
@@ -44,6 +46,7 @@ const { createMaster } = require('../cluster/cluster-master')
 const { createClusterFanout } = require('../cluster/cluster-fanout')
 const { createAirJournal } = require('../cluster/cluster-air-journal')
 const { createClusterCall } = require('../cluster/cluster-call')
+const { createRelay } = require('../cluster/cluster-relay')
 const { createCallActions } = require('../cluster/cluster-call-actions')
 const { createExchange } = require('../cluster/cluster-exchange')
 const { createSharedShow } = require('../cluster/shared-show')
@@ -65,6 +68,7 @@ function clusterOf(ctx) {
 		invites: createInvites({ persistence: ctx.persistence || defaultPersistence }), // WO-739
 		log: ctx.log,
 		onChange: () => broadcast(ctx),
+		onRemove: (saved) => removed(ctx, saved), // WO-802
 	})
 	ctx._cluster.afterPoll(async () => {
 		await masterOf(ctx).tick()
@@ -79,6 +83,17 @@ function clusterOf(ctx) {
 	duties.provide({ cluster: () => dutiesView(ctx) })
 	ctx._cluster.start().catch(() => {})
 	return ctx._cluster
+}
+
+/**
+ * WO-802: a linked server left (unlinked here or there, or dropped by the repair). The master claim that named it goes
+ * (cluster-master.js `dropped`), and the fan-out drops its Caspar now: the poll that would refresh it stops when the
+ * list is empty, so a master kept forwarding takes to an unlinked server's Caspar. Shared-show state prunes itself.
+ */
+function removed(ctx, saved) {
+	ctx._clusterMaster?.dropped(saved)
+	ctx._clusterFanout?.refresh().catch(() => {})
+	broadcast(ctx)
 }
 
 /** WO-723: what server-duties resolves against — this server, the linked ones (by fingerprint) and the master. */
@@ -283,7 +298,7 @@ function register(routes) {
 	routes.delete('/api/cluster/peers/:id', async ({ ctx, params, query }) => {
 		// WO-732: unlinks there too; `?link_back=0` = that server is the one unlinking
 		const r = await clusterOf(ctx).unlink(params.id, { linkBack: String(query?.link_back ?? '') !== '0' })
-		if (r.ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget()
+		if (r.ok && clusterOf(ctx).size() === 0) masterOf(ctx).forget() // also done by `removed`: kept for a master not built yet
 		return reply(r.ok ? 200 : 404, r.ok ? r : { error: 'no such server' })
 	}, opt)
 	routes.post('/api/cluster/peers/:id/send-media', async ({ ctx, params }) => {
@@ -329,6 +344,15 @@ function register(routes) {
 		const r = await clusterOf(ctx).deviceView(params.id)
 		return reply(r.status, r.body)
 	}, opt)
+	const relay = ({ method, ctx, params, query, body }) => relayOf(ctx)({ method, id: params.id, tail: params['*'], query, body })
+	routes.get('/api/cluster/peers/:id/relay/*', relay, opt) // WO-802
+	routes.post('/api/cluster/peers/:id/relay/*', relay, opt)
+	routes.delete('/api/cluster/peers/:id/relay/*', relay, opt)
+}
+
+function relayOf(ctx) {
+	if (!ctx._clusterRelay) ctx._clusterRelay = createRelay({ cluster: clusterOf(ctx), log: ctx.log })
+	return ctx._clusterRelay
 }
 
 /** At boot: record what goes on air (P4b); start polling (and failover) when this server has linked servers. */

@@ -17,6 +17,10 @@
  *   FAILOVER_MS, the first server of `succession` that is still seen online (itself included) claims epoch + 1. Every
  *   other survivor waits for that claim. Outputs never depend on the master's process: every Caspar keeps playing.
  *
+ * - WO-802: a claim is held only while its master is this server or a server linked here. Unlinking the master drops
+ *   the claim (`dropped`, run on every removal); a claim naming an unlinked master is neither taken nor kept. The epoch
+ *   seen stays as a floor, so the next claim made here still beats the rest of the cluster's.
+ *
  * Stored device-local in the node's persistence file (`clusterMaster`), next to `clusterPeers`. P3a only decides and
  * shows who the master is; clients following it is P3b, per-destination fan-out from it P4.
  */
@@ -56,6 +60,7 @@ function createMaster(deps) {
 	const me = fingerprint(deps.selfKey)
 	const startedAt = now()
 	let claim = wellFormed(store.get(STORE_KEY)) ? store.get(STORE_KEY) : null
+	let floor = claim?.epoch || 0 // WO-802: the highest epoch seen here, so a claim made after a drop still beats the cluster's
 	const log = (lvl, msg) => deps.log?.(lvl, `[cluster] ${msg}`)
 
 	/** Linked peers with a recorded identity: [{ saved, key_id, online, last_seen }]. */
@@ -79,6 +84,9 @@ function createMaster(deps) {
 		return ''
 	}
 
+	/** WO-802: a master this server can follow — itself or a server linked here (an unlinked one is no master here). */
+	const masterLinked = (c) => c.master === me || members().some((m) => m.key_id === c.master)
+
 	function adopt(c, how) {
 		const was = claim
 		claim = { epoch: c.epoch, master: c.master, succession: c.succession.map(String), auto: !!c.auto, by: c.by, ts: Number(c.ts), sig: c.sig }
@@ -98,6 +106,8 @@ function createMaster(deps) {
 	function accept(body) {
 		const err = valid(body)
 		if (err) return { status: err === 'malformed claim' ? 400 : 403, body: { error: err } }
+		floor = Math.max(floor, body.epoch)
+		if (!masterLinked(body)) return { status: 409, body: { error: 'its master is not linked here' } }
 		if (!beats(body, claim)) {
 			const same = claim && claim.epoch === body.epoch && claim.master === body.master
 			return { status: same ? 200 : 409, body: same ? { ok: true } : { error: 'older than the claim held here', claim: view() } }
@@ -110,7 +120,7 @@ function createMaster(deps) {
 	async function make(masterFp, opts = {}) {
 		const order = [masterFp, me, ...members().map((m) => m.key_id)]
 		const succession = [...new Set(order)].slice(0, MAX_SUCCESSION)
-		const c = { epoch: (claim?.epoch || 0) + 1, master: masterFp, succession, auto: opts.auto ?? claim?.auto ?? true, by: deps.selfKey, ts: now() }
+		const c = { epoch: Math.max(claim?.epoch || 0, floor) + 1, master: masterFp, succession, auto: opts.auto ?? claim?.auto ?? true, by: deps.selfKey, ts: now() }
 		c.sig = deps.sign(claimText(c))
 		adopt(c, opts.reason || 'operator')
 		await Promise.all(members().map((m) => deps.post(m.saved.host, m.saved.port, '/api/cluster/master', c).then((r) => {
@@ -147,11 +157,14 @@ function createMaster(deps) {
 	}
 
 	async function pullAndFailover() {
+		if (claim && !masterLinked(claim)) forget('its master is no longer linked here') // a claim kept from before WO-802
 		const online = members().filter((m) => m.online)
 		for (const m of online) {
 			const r = await deps.fetchJson(m.saved.host, m.saved.port, '/api/cluster/master')
 			const c = r.ok ? r.json?.claim : null
-			if (c && beats(c, claim) && !valid(c)) adopt(c, `from ${m.saved.name}`)
+			if (!c || valid(c)) continue
+			floor = Math.max(floor, c.epoch)
+			if (beats(c, claim) && masterLinked(c)) adopt(c, `from ${m.saved.name}`)
 		}
 		if (!claim?.auto || claim.master === me) return
 		const all = members()
@@ -168,20 +181,34 @@ function createMaster(deps) {
 		const ms = members()
 		const who = (fp) => (fp === me ? { key_id: fp, id: 'self', name: 'this server' } : { key_id: fp, id: ms.find((m) => m.key_id === fp)?.saved.id || '', name: nameOf(fp) })
 		if (!claim) return { epoch: 0, master: '', master_id: '', is_master: false, auto: true, succession: [], key_id: me }
+		// WO-802: the signed succession keeps an unlinked server's fingerprint; it is never picked, and not shown
 		return { epoch: claim.epoch, master: claim.master, master_id: who(claim.master).id, is_master: claim.master === me, auto: claim.auto,
-			succession: claim.succession.map(who), key_id: me }
+			succession: claim.succession.map(who).filter((s) => s.id !== ''), key_id: me }
 	}
 
-	/** The last linked server was unlinked: a server alone has no master. */
-	function forget() {
+	/** The last linked server was unlinked (a server alone has no master), or the master itself was (WO-802). */
+	function forget(why = 'no linked servers left') {
 		if (!claim) return
+		floor = Math.max(floor, claim.epoch)
 		claim = null
 		store.set(STORE_KEY, null)
-		log('info', 'no linked servers left: master claim dropped')
+		log('info', `${why}: master claim dropped`)
 		deps.onChange?.()
 	}
 
-	return { accept, set, tick, view, forget, claim: () => claim, me }
+	/**
+	 * WO-802: a linked server left (cluster-peers.js onRemove). Alone → no master. The master itself left while others
+	 * stay → this server follows no one (its shared show stops proposing to a server it cannot reach, its PGM takes are
+	 * its own again) until a claim whose master is linked here comes, or its operator makes one.
+	 */
+	function dropped(saved) {
+		if (!claim) return
+		if (!deps.cluster.list().length) return forget()
+		const fp = saved?.device_key ? fingerprint(saved.device_key) : ''
+		if (fp && claim.master === fp) forget(`the master (${saved.name || fp}) was unlinked`)
+	}
+
+	return { accept, set, tick, view, forget, dropped, claim: () => claim, me }
 }
 
 module.exports = { createMaster, beats, claimText, wellFormed, FAILOVER_MS, STORE_KEY }

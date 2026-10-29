@@ -7,14 +7,15 @@ extends VBoxContainer
 ## P2b: "Send media" pushes this project's media to it (server cluster-media.js; both servers must have linked each
 ## other); the progress / result line comes from the peer's `media_send` in the snapshot.
 ## P3a: the master line (who runs the show, epoch, auto failover — server cluster-master.js, snapshot `master`), a
-## MASTER tag on its card, "Make master" on this server and on every linked one. P3b: "This client follows the master"
-## (app/cluster_follow.gd). P4: on each card while this server is master, which destinations its takes are forwarded
-## to there (channel translation, sent count, catch-up), or why not; on a server that is not master, a note that its
-## PGM follows the master.
+## MASTER tag on its card, "Make master" on this server and on every linked one. (P3b's "This client follows the
+## master" is gone, WO-802: a client stays on its own server.) P4: on each card while this server is master, which
+## destinations its takes are forwarded to there (channel translation, sent count, catch-up), or why not; on a server
+## that is not master, a note that its PGM follows the master.
 ## WO-739: a server asking to link with this one shows on top as an invite (Accept / Decline). A server this one linked
 ## that has not accepted yet says so on its card. Auto-accept is on the Devices server page.
 ## WO-732 P3b: "Edit" on a card points the whole Devices tab at that server (core/devices_target.gd edit_peer): its
-## rear panel, cables, destinations and Apply, sent straight to it. "Back to this machine" returns.
+## rear panel, cables, destinations and Apply. WO-802: sent through this server's relay, never straight to it. "Back to
+## this machine" returns; an unlink returns by itself and says so.
 
 const M := preload("res://features/devices/cluster_model.gd")
 const Model := preload("res://features/devices/devices_model.gd")
@@ -94,8 +95,10 @@ func _ready() -> void:
 				_render())
 	visibility_changed.connect(func() -> void:
 		if is_visible_in_tree():
-			reload())
-	var poll := Timer.new()  # WO-732 P3a: this machine's server pushes nothing to a client that follows another
+			reload()
+		else:
+			DevicesTarget.ended = "")  # WO-802: the "no longer linked" note is shown once
+	var poll := Timer.new()  # WO-732 P3a: an edited linked server pushes nothing to this client (its WS is not ours)
 	poll.wait_time = DevicesTarget.POLL_S
 	poll.timeout.connect(func() -> void:
 		if DevicesTarget.polled() and is_visible_in_tree():
@@ -156,6 +159,8 @@ func _render() -> void:
 	var peers: Array = _snap.get("peers", [])
 	if _edit_err != "":
 		_list.add_child(_small(_edit_err, ThemeBuilder.ERROR))
+	elif DevicesTarget.ended != "":
+		_list.add_child(_small(DevicesTarget.ended, ThemeBuilder.WARN))
 	if peers.is_empty() and invites.is_empty():
 		_list.add_child(_small("No linked servers. Click + to add one (a backup, or a server for more screens).", ThemeBuilder.TEXT_MUTED))
 	for p in peers:
@@ -188,13 +193,12 @@ func _card(p: Dictionary) -> Control:
 	send.tooltip_text = "Copy this project's media to %s now (rsync)." % str(p.get("name", id))
 	send.pressed.connect(func() -> void: _send(id))
 	top.add_child(send)
-	var at := DTM.peer_origin(p)
-	if at != "" and p.get("online") == true:  # WO-732 P3b
+	if p.get("online") == true:  # WO-732 P3b; WO-802: through this server, by id (the origin only names it in Caspar URLs)
 		var ed := Button.new()
 		ed.text = "Edit"
-		ed.tooltip_text = "Work on %s's rear panel, cables and destinations from here" % str(p.get("name", id))
+		ed.tooltip_text = "Work on %s's rear panel, cables and destinations from here (through this server)" % str(p.get("name", id))
 		ed.pressed.connect(func() -> void:
-			_edit_err = await DevicesTarget.edit_peer(at, str(p.get("name", id)))
+			_edit_err = await DevicesTarget.edit_peer(id, str(p.get("name", id)), DTM.peer_origin(p))
 			if _edit_err != "":
 				_sig = ""
 				_render())
@@ -334,13 +338,6 @@ func _build_master_row() -> void:
 	_auto.tooltip_text = "When the master is unseen for 12 s, the next server takes over (outputs keep playing either way)."
 	_auto.toggled.connect(func(on: bool) -> void: _set_master({"auto": on}))
 	controls.add_child(_auto)
-	var follow := CheckBox.new()
-	follow.text = "This client follows the master"
-	follow.tooltip_text = "When another server becomes master, or this one is gone, this client reconnects to the master (app/cluster_follow.gd)."
-	follow.set_pressed_no_signal(Config.cluster().follow)
-	follow.visible = not preload("res://core/cluster_follow_model.gd").on_box(Config.home_origin())  # on-box: never follows
-	follow.toggled.connect(func(on: bool) -> void: Config.save_cluster({"follow": on}))
-	controls.add_child(follow)
 	_accept = CheckBox.new()
 	_accept.text = "Linked servers may press here"
 	_accept.tooltip_text = "A linked server's presses (look takes, pins, fixture looks, Companion) count as this server's own. Off: refused."

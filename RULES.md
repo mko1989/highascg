@@ -11,3 +11,16 @@ one is a regression, whatever else it fixes. Add a rule here when the owner stat
 2. **Number fields accept maths.** Every field that holds a number evaluates `+ - * /` (and parentheses) when it
    is committed with Enter or by leaving the field: `1920/2` → `960`, `3840-64` → `3776`. Input that is not a valid
    expression leaves the previous value in place. The result is then clamped and rounded like a typed number.
+
+## Linked servers (owner, 29.10, WO-802)
+
+1. **Linking is node ↔ node only.** A link joins two HighAsCG node servers, never a client.
+2. **A Godot client talks only to the node on its own machine** (or the one its operator chose explicitly: `--server`,
+   `HIGHASCG_SERVER`, the A/B host). It never opens a socket or HTTP connection to another machine's node or client on
+   its own, and nothing the cluster says changes where it is connected.
+3. **All cross-machine traffic goes node ↔ node.** The local node relays what its client needs (Devices "Edit" of a
+   linked server: `/api/cluster/peers/:id/relay/…`).
+4. **Unlink restores the local-only state visibly.** No residual remote connection, no stored remote origin a restart
+   goes back to.
+5. **No silent fallback.** The header always shows which server the client is connected to ("local", or amber
+   "on <host>").

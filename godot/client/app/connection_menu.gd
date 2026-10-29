@@ -74,7 +74,6 @@ static func edit(host: Control) -> void:
 ## Store the profile and restart with the same window args minus --server (HIGHASCG_SERVER would still win).
 static func switch_to(host: Node, p: Dictionary) -> void:
 	Config.save_profiles(p)
-	Config.save_cluster({"origin": ""})  # an A/B pick wins over a followed cluster master (WO-670 P3b)
 	if OS.get_environment("HIGHASCG_SERVER") != "":
 		Kit.confirm(host, "HIGHASCG_SERVER is set for this client and overrides A/B hosts — unset it to switch.",
 			func() -> void: pass)

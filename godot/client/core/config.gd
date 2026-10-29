@@ -1,11 +1,14 @@
 extends Node
 ## WO-599 — where the HighAsCG server is. Precedence: `-- --server=http://host:4200`, env
-## HIGHASCG_SERVER, then the cluster master this client followed (ui.cfg [cluster] origin, WO-670 P3b), then the active
-## A/B hot-backup profile (ui.cfg [connection], WO-608), then the on-box default http://127.0.0.1:4200 (the client runs
-## next to the server).
+## HIGHASCG_SERVER, then the active A/B hot-backup profile (ui.cfg [connection], WO-608), then the on-box default
+## http://127.0.0.1:4200 (the client runs next to the server). All of them are chosen by the operator and shown in the
+## header (app/header_project.gd).
+## WO-802 (owner 29.10: "linking only the node servers should link; the godot clients should stay connected to their
+## respective node servers"): nothing the cluster says ever changes it. The WO-670 P3b follow (ui.cfg [cluster] origin
+## / servers / follow) is gone; a [cluster] section left by an older client is erased on start, so a restart never goes
+## back to a server this client once followed.
 
 const Profiles := preload("res://core/connection_profiles_model.gd")
-const Follow := preload("res://core/cluster_follow_model.gd")
 
 const DEFAULT_ORIGIN := "http://127.0.0.1:4200"
 const UI_CFG := "user://ui.cfg"
@@ -17,32 +20,27 @@ var _profiles := {}
 
 func _init() -> void:
 	args = parse_args(OS.get_cmdline_user_args())
-	var followed := str(cluster().origin)
-	if followed != "" and (Follow.on_box(home_origin()) or Follow.resolve_target(followed, home_origin(), IP.get_local_addresses()) == home_origin()):
-		followed = ""  # on a server box: its own server, always; WO-724: this machine under its LAN address
-	origin = resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), followed if followed != "" else Profiles.active_origin(profiles()))
+	forget_cluster(UI_CFG)
+	origin = home_origin()
 
 
-## Where this client goes without the cluster (args / env / A/B profile / default).
+## Where this client goes (args / env / A/B profile / default) — the only place it ever goes.
 func home_origin() -> String:
 	return resolve_origin(args, OS.get_environment("HIGHASCG_SERVER"), Profiles.active_origin(profiles()))
 
 
-## WO-670 P3b — ui.cfg [cluster]: origin (the master followed, "" = none), servers (every server of the cluster, kept
-## for when this one is gone), follow (this client follows the master, default on).
-func cluster() -> Dictionary:
+## WO-802: erase the WO-670 P3b [cluster] section (a followed master's origin, the remembered servers, the follow
+## switch). → true when there was one.
+static func forget_cluster(path: String) -> bool:
 	var cfg := ConfigFile.new()
-	cfg.load(UI_CFG)
-	return {"origin": str(cfg.get_value("cluster", "origin", "")), "servers": PackedStringArray(cfg.get_value("cluster", "servers", PackedStringArray())),
-		"follow": cfg.get_value("cluster", "follow", true) == true}
-
-
-func save_cluster(changes: Dictionary) -> void:
-	var cfg := ConfigFile.new()
-	cfg.load(UI_CFG)
-	for k in changes:
-		cfg.set_value("cluster", k, changes[k])
-	cfg.save(UI_CFG)
+	if cfg.load(path) != OK or not cfg.has_section("cluster"):
+		return false
+	print("[client] WO-802: dropped the old cluster follow state (origin %s, %d remembered servers)" % [
+		str(cfg.get_value("cluster", "origin", "")) if str(cfg.get_value("cluster", "origin", "")) != "" else "none",
+		PackedStringArray(cfg.get_value("cluster", "servers", PackedStringArray())).size()])
+	cfg.erase_section("cluster")
+	cfg.save(path)
+	return true
 
 
 ## A/B profiles from ui.cfg (empty when none are set); read once, kept in step by save_profiles().

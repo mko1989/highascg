@@ -140,6 +140,7 @@ function createShowCluster(names, opts = {}) {
 			const all = pairs.length ? pairs : ns.flatMap((a, i) => ns.slice(i + 1).map((b) => [a, b]))
 			for (const [a, b] of all) links.add(pairKey(a, b))
 		},
+		unlink: (a, b) => links.delete(pairKey(a, b)), // WO-802
 		cut: (a, b) => cuts.add(pairKey(a, b)),
 		heal: () => cuts.clear(),
 		/** Every server in `among` (default all) holds the claim: `name` is master at `epoch` (default: the highest held + 1). */

@@ -14,7 +14,7 @@ const Payload := preload("res://core/settings_payload.gd")
 
 const SAVE_DEBOUNCE_S := 0.6
 
-var api: ApiScript = null  # WO-732 P3a: core/devices_target.gd's copy reads another server; null = Api
+var api: ApiScript = null  # WO-732 P3b / WO-802: core/devices_target.gd's copy reads an edited linked server through this one; null = Api
 var settings: Dictionary = {}
 var is_loaded := false
 var _save_timer: Timer

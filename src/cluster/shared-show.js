@@ -297,13 +297,21 @@ function createSharedShow(deps) {
 
 	/** After each cluster poll: master — catch up every peer (a load, a peer back online); follower — retry an edit. */
 	async function tick() {
+		prune()
 		if (!on()) return
 		if (deps.isMaster()) return pushAll()
 		prime()
 		if (pending && !proposing) return propose()
 	}
 
+	/** WO-802: per-server state is kept only for servers still linked (an unlinked one is neither listed nor pushed to). */
+	function prune() {
+		const ids = new Set((deps.peers() || []).map((p) => p.id))
+		for (const id of [...peerState.keys()]) if (!ids.has(id)) peerState.delete(id)
+	}
+
 	function view() {
+		prune()
 		const s = saved()
 		const m = on() ? mine() : null
 		const role = !on() ? 'off' : deps.isMaster() ? 'master' : follower() ? 'follower' : 'alone'

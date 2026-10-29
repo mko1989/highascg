@@ -1,6 +1,6 @@
 # WO-802 — Linking servers: only node servers link; Godot clients stay on their own node
 
-**Status: OPEN (29.10) — bug report from the owner; investigation not started**
+**Status: IN PROGRESS (29.10) — fix built and verified offline + boot check + live relay probe on this box; owner two-box QA open (see "Fix (29.10, Opus)")**
 
 Owner, 29.10:
 > i also need you to look into linking servers. it is flawed. when linking only the node servers should link the godot clients should stay connected to their respective node servers on their machines and all the communication should happen via node servers. i had a weird situation where even after unlinking i had the godot client connected straight to the second machine and i didnt even know it. i only was made aware when i did a shutdown and the other server shut down.
@@ -113,3 +113,151 @@ Read-only: no code changed, no git state operation. Paths are relative to the re
 - godot/client/app/cluster_follow.gd, app/connection_menu.gd, app/header_project.gd (lines 41-47), app/shell.gd (line 230)
 - src/cluster/cluster-peers.js, cluster-master.js, cluster-fanout.js, cluster-call.js (header only)
 - src/api/routes-cluster.js (header, lines 229-300), src/server/http-server.js (line 205)
+
+## Fix (29.10, Opus)
+
+### Investigation (verified in code before any change; line numbers are the pre-fix files)
+
+Client (Godot):
+
+- **(a) Stored followed origin.** `core/config.gd:20-23` puts ui.cfg `[cluster] origin` ahead of the A/B profile and the
+  default. The only guard is "home is loopback" (`:21`) or "the followed origin is this machine" (`resolve_target`); an
+  off-box client goes straight back to the stored master after a restart. Only `app/cluster_follow.gd:179` (`_switch`)
+  and `app/connection_menu.gd:77` ever write it. Unlink writes nothing on the client. Verified.
+- **(b) "Stay here".** `cluster_follow.gd:29` declares `_stay_home`, `:60-62` sets it on Cancel, `:83` reads it; nothing
+  resets it. One "Stay here" on a "Back to this server" dialog keeps the client on the remote server for the rest of
+  the process. Verified.
+- **(c) Devices "Edit".** `core/devices_target.gd:130-148` `edit_peer()` builds a second `Api` with
+  `origin_override = peer_origin` (`:132`), probes `/api/replication/ping` on the peer and then sends every Devices
+  request (device-view, settings, state, caspar-config/apply, host-live, audio, cluster …) straight to the peer's node.
+  `features/devices/cluster_panel.gd:191-197` takes `peer_origin` from the card (`DTM.peer_origin(p)`). Nothing ends the
+  edit when the peer is unlinked: `stop_editing()` runs only on "Back". Verified.
+- **(d) Remembered servers.** `cluster_follow.gd:76-78` writes `[cluster] servers` whenever a snapshot has more than one
+  server and never prunes. `:131` probes every remembered server directly (`_probe`, `:142-152`: `HTTPRequest` to
+  `<origin>/api/cluster/master`). This box's own ui.cfg still holds
+  `servers=["http://192.168.0.4:4200", "http://192.168.0.23:4200"]` (29.10), written while this box's client was on
+  .4 (`servers()` lists the current origin first) and kept since.
+- **(e) Follow mode = direct client socket.** `_switch` (`:171-180`) writes the master's address as the origin and
+  restarts the client: from then on WS, REST, video feed and uploads all go to the other machine. The down-server
+  probe (`:122-138`) does the same without a dialog. `DevicesTarget._resolve` (`:55-80`) then opens a second Api back to
+  the box's home server, so one client talks to two nodes. All of it breaks rule 2.
+- The owner's actual case (off-box client following, on-box client with an old origin, or "Stay here" pressed): still
+  UNVERIFIED. The client logs on this box no longer hold `[cluster]` lines (rotated); ui.cfg `origin` is "" today.
+
+Node (f), verified by reading `src/cluster/*`:
+
+- **f1. The fan-out keeps forwarding after the last unlink.** `cluster-peers.js:356` stops the poll when the list is empty,
+  and the fan-out is refreshed only from `afterPoll` (`routes-cluster.js:69-77`) or a client's GET /api/cluster
+  (`:262`, which polls). A master whose last peer unlinks it from the other side (`DELETE …?link_back=0`) or is dropped
+  by the repair (`cluster-peers.js:278-280`) keeps `active` and the peer's Caspar connection
+  (`cluster-fanout.js:213`): every take still goes to the unlinked server's Caspar until a client happens to GET
+  /api/cluster.
+- **f2. The master claim outlives the unlink.** `routes-cluster.js:286` drops the claim only when the DELETE route
+  leaves the list empty. The repair removal (`cluster-peers.js:280`) never drops it. With other peers left, a claim
+  that names the unlinked server stays: `cluster-master.js:169-172` shows `master_id ''`, `pullAndFailover` (`:158-159`)
+  never fails over (the master is not a member), and the claim can be re-adopted from a remaining peer (`:154`, no check
+  that its master is linked here).
+- **f3. A shared show on that server then reverts every local edit.** `shared-show.js:59` `follower()` is true for any
+  claim with an epoch that is not this server's. `propose()` calls `callMaster` → `cluster-call.js:98-99` 409 "no other
+  server is master" (no `epoch` in the body) → the "refused" branch (`shared-show.js:222-231`): the edit is saved as a
+  conflict file and the project goes back to the old master's show. Each edit, until restart or relink.
+- **f4. Shared-show per-peer state.** `shared-show.js:49` `peerState` is never pruned; `view()` (`:310`) keeps listing
+  the unlinked server under `show.peers`.
+- Succession: the signed claim's `succession` (`cluster-master.js:112`) keeps the fingerprint (it cannot be edited
+  without re-signing). Failover only picks fingerprints seen online among linked members (`:161-162`), so it is never
+  chosen; only the view listed it (id '').
+
+### Decisions
+
+- **Rule 2 makes following moot.** The client's origin is resolved once from `--server` / `HIGHASCG_SERVER` / the A/B
+  profile / the default, all explicit and shown in the header. The cluster never changes it. `app/cluster_follow.gd`,
+  `core/cluster_follow_model.gd`, the "This client follows the master" box and the `[cluster]` ui.cfg section are
+  removed. A stale `[cluster]` section is erased when the client starts (`Config._init`), so neither a stored origin
+  nor stored servers survive. (a), (b), (d) are closed by removal, not by repair: nothing reads or writes them.
+- **What a client sees of a linked master comes from its own node**, which already relays it: WS / GET `cluster:peers`
+  (master, peers, fan-out, shared show), the master's fan-out on PGM (WO-670 P4), the shared show (WO-746). New: the
+  Devices "Edit" goes through `GET|POST|DELETE /api/cluster/peers/:id/relay/<path>` on the local node
+  (`src/cluster/cluster-relay.js`). The relay only reaches linked servers, refuses `/api/system/*` (power, update,
+  dock: never another machine from this client), `/api/ws` and nested relays, and passes the status and body through.
+- `Api.origin_override` is removed: every `Api` in the client talks to `Config.origin`. `DevicesTarget`'s second
+  "home" Api (WO-732 P3a) is removed with it, since a client is never on another server than its home.
+- The header always says where the client is: "local" (muted) on its own machine, amber "on <host>" otherwise.
+- **Reduced scope, stated:** a client whose node follows a master drives that node. Its PGM takes stay skipped there
+  (follower gate, WO-670 P4b); only zone actions and signed `look.take` already hand a take to the master
+  (`zone-actions.js:48-50`, `cluster-call-actions.js:52-60`). Handing a client's own deck take to the master through
+  its node is a follow-up, not done here. Before, an off-box client followed the master to drive it; now that needs
+  an explicit A/B host (visible in the header).
+
+### What was done (per file)
+
+Node:
+- `src/cluster/cluster-relay.js` (new, 97 lines): `createRelay` — GET/POST/DELETE to a linked server's `/api/…`, status,
+  content type and body passed through, 14 s timeout (under the client's 15 s, so the client hears this server name
+  the silent one: 502 "<name>: no answer"). Refuses: not linked here (404), outside /api/ or `..` (403), `/api/ws`,
+  `/api/system/*`, a relay of a relay (403), other methods (405). No credentials are added (same as the old direct call).
+- `src/api/routes-cluster.js`: the three relay routes; `onRemove` → `removed(ctx, saved)`: master `dropped(saved)`,
+  fan-out `refresh()` now (f1), broadcast. The DELETE route's own `forget()` stays for a master not built yet.
+- `src/cluster/cluster-peers.js`: `opts.onRemove(saved)` from `remove()`, i.e. every removal path (unlink here, unlink
+  there, the repair's drop, f1/f2).
+- `src/cluster/cluster-master.js`: `dropped(saved)` (alone → forget; the master itself left → forget with the reason);
+  a claim whose master is neither this server nor linked here is refused when pushed (409) and not taken when pulled;
+  a claim kept from before (stored) is dropped at the next tick; an epoch `floor` (highest seen / dropped) keeps the
+  next claim made here ahead of the cluster's; the view's succession lists only this server and linked ones (f2, f3).
+- `src/cluster/shared-show.js`: `prune()` of `peerState` to the linked servers on every tick and view (f4).
+
+Client:
+- `core/config.gd`: the origin is `home_origin()` only (`--server` / env / A/B / default). `forget_cluster()` erases
+  ui.cfg `[cluster]` on start and logs it (a, d). `cluster()` / `save_cluster()` removed.
+- `app/cluster_follow.gd`, `core/cluster_follow_model.gd`, `tests/test_cluster_follow.gd` (+ .uid): deleted (b, d, e).
+  `app/main.gd` no longer adds the node; `app/connection_menu.gd` no longer clears the followed origin.
+- `core/api.gd`: `origin_override`, `held`, `open()` removed: every Api talks to `Config.origin`. New `relay_peer`
+  → `base()` = `Config.origin + /api/cluster/peers/<id>/relay` (c).
+- `core/devices_target.gd`: rewritten. No second "home" Api (the client is always home). `edit_peer(id, name, origin)`
+  builds a relayed Api and pings the peer through it; `editing` keeps the peer's listed origin only for Caspar-side
+  URLs. The edit ends by itself when this server's `cluster:peers` no longer lists the peer (`ended` says why) (c).
+- `core/devices_target_model.gd`: `pick` removed, `still_linked` added. `core/platform.gd`: `host_of` moved here.
+- `features/devices/cluster_panel.gd`: "Edit" by id; the "This client follows the master" box removed; the "no longer
+  linked" note shown once. `app/shell.gd`: the invite title no longer checks `DevicesTarget.remote` (gone).
+- `app/header_project.gd`: the server cue is always shown: muted "local", amber "on <host>" (rule 5).
+- `core/settings_state.gd`: comment only.
+
+Rules / docs: `RULES.md` "Linked servers" (the owner's five rules). `docs/wiki/api/contract/http.md` regenerated
+(`node tools/dev/gen-api-contract.js`: +3 relay routes, 515).
+
+Tests: `tools/smoke/smoke-wo802-node-only-links.test.js` (new, 10 tests: relay unit + real HTTP peer + router order;
+master after unlink with three servers; onRemove on all three removal paths; routes wiring; shared show after unlink),
+in `tools/ci/offline-test-files-2.js` (the first list is at 500 lines). Helpers: `tools/smoke/lib/cluster-lan.js`
+passes `onRemove`; `tools/e2e/shared-show-harness.js` gains `unlink(a, b)`. Godot `tests/test_devices_target.gd`: the
+DT.pick test and the old "Edit → edit_peer(at, …)" source pin replaced (that pinned the direct peer origin, which
+rule 2 forbids) by: no `origin_override` / old follow state anywhere in the client, HTTPRequest / WebSocketPeer /
+StreamPeerTCP only in the known Config.origin users, `Api.base()` pinned, `Config._init` pinned, `forget_cluster` on a
+real file, `still_linked`, Edit by id through `relay_peer`, unlink ends the edit, no follow switch.
+
+### Verified (29.10)
+
+- Offline suite `node tools/ci/run-offline-tests.js`: 3429 tests, 3427 pass, 0 fail, 2 skipped. Related cluster smokes
+  alone (wo670 ×5, wo712, wo723, wo725, wo732, wo739, wo746 ×3): 132/0 before the new file was added.
+- `node tools/ci/check-max-file-lines.js`: 0 files over 500.
+- Godot `--script res://tests/run_tests.gd`: 21911 passed, 0 failed (baseline 21930/0: −39 removed follow / pick
+  assertions, +20 new).
+- `godot/client/run-client.sh --check`: boot OK (no script errors).
+- Headless boot with a seeded ui.cfg `[cluster] origin="http://192.0.2.1:4200"` + 2 servers (TEST-NET address, nothing
+  answers there): log `[client] WO-802: dropped the old cluster follow state (origin http://192.0.2.1:4200, 2
+  remembered servers)`, then `[client] server http://127.0.0.1:4200`; the `[cluster]` section was gone from ui.cfg.
+- Box (node restarted with `kill -TERM` MainPID, dev mode): `GET|POST|DELETE /api/cluster/peers/nosuch/relay/…` →
+  404 "no such server (not linked here)" from the relay; `DELETE /api/cluster/peers/nosuch` → 404 "no such server"
+  (the unlink route, not swallowed). Journal clean. This box has no linked servers now, so no relay to a real peer
+  was made (the other machine was not contacted).
+- NOT verified: two real boxes (link, Edit through the relay, unlink from either side, fan-out stops, header cue);
+  the owner's running GUI was not relaunched, so it still runs the old client code until its next start (that start
+  erases this box's stale `[cluster] servers` = .4 / .23).
+
+### Residual gaps
+
+- A client on a follower node drives that node: its own deck PGM takes stay skipped there (WO-670 P4b follower gate);
+  only zone actions and the signed `look.take` hand a take to the master. Handing `/api/scene/take-look` (with mainIdx,
+  transition override, take group) to the master through the node is a follow-up WO.
+- An off-box client (laptop) is on whatever server its operator chose (A/B host or `--server`); it no longer moves to a
+  new master after a failover. The header says where it is.
+- The relay carries no credentials: a peer with `enforceAuth` on answers 401 through it, as it did to the direct call.
+

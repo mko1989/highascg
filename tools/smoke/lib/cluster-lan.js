@@ -66,6 +66,7 @@ function lan() {
 				return ok({ error: 'not found' }, 404)
 			},
 			localAddress: async (h, p) => (reach(h, p) ? host : ''),
+			onRemove: o.onRemove, // WO-802
 		})
 		nodes.set(`${host}:4200`, n)
 		return n

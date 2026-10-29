@@ -36,7 +36,6 @@ func _ready() -> void:
 	hw_reconcile = HardwareReconcile.new()
 	hw_reconcile.shell = shell
 	add_child(hw_reconcile)
-	add_child(preload("res://app/cluster_follow.gd").new())  # WO-670 P3b
 	shell.header_project.loaded.connect(hw_reconcile.check_assets)
 	_wire_ws()
 	await bootstrap()

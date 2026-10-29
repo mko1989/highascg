@@ -20,6 +20,8 @@
  * declines it (answered 202 `pending`), unless this server auto-accepts. The inviter shows "waiting to accept" and its
  * repair renews the invite. A declined server is tombstoned like an unconfirmed unlink: its repair drops its side and
  * its link-backs are refused until this server links it.
+ * WO-802: `opts.onRemove(saved)` runs on every removal (unlink here, unlink there, the repair's drop): routes-cluster.js
+ * ends the master claim, the fan-out target and the shared-show state that named that server.
  */
 
 const http = require('http')
@@ -139,7 +141,8 @@ function subnetHosts(nets = os.networkInterfaces()) {
 /**
  * @param {{ persistence: { get: Function, set: Function }, selfPing: () => Promise<object|null>, fetchJson?: Function,
  *   now?: () => number, onChange?: (snap: object) => void, hosts?: () => string[], selfKey?: string,
- *   selfPort?: () => number, request?: Function, localAddress?: Function, log?: Function }} opts
+ *   selfPort?: () => number, request?: Function, localAddress?: Function, log?: Function,
+ *   onRemove?: (saved: object) => void }} opts
  */
 function createCluster(opts) {
 	const fetchJson = opts.fetchJson || getJson
@@ -351,10 +354,12 @@ function createCluster(opts) {
 	}
 
 	function remove(id) {
+		const gone = peers.get(id)?.saved
 		if (!peers.delete(id)) return false
 		save()
 		if (peers.size === 0) stop()
 		changed()
+		opts.onRemove?.(gone) // WO-802: every way a server leaves (unlink here or there, repair) ends what it was part of
 		return true
 	}
 

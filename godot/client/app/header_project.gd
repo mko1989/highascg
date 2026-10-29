@@ -37,15 +37,17 @@ func _ready() -> void:
 	name_edit.text_submitted.connect(func(_t: String) -> void: _commit_name())
 	name_edit.focus_exited.connect(_commit_name)
 	add_child(name_edit)
-	# WO-751: the show belongs to the server this client is on; say so when that is another machine
-	var on_host := preload("res://core/cluster_follow_model.gd").host_of(Config.origin)
-	var away := Label.new()
-	away.text = "on " + on_host
-	away.tooltip_text = "This client is connected to the server at %s: this show is that server's" % Config.origin
-	away.add_theme_color_override("font_color", ThemeBuilder.WARN)
-	away.mouse_filter = Control.MOUSE_FILTER_PASS
-	away.visible = not preload("res://core/cluster_follow_model.gd").on_box(Config.origin)
-	add_child(away)
+	# WO-751: the show belongs to the server this client is on. WO-802 (owner: "whatever server a client is connected to
+	# is shown at all times"): "local" when that is this machine's own, amber "on <host>" when it is another machine.
+	var platform := preload("res://core/platform.gd")
+	var local := platform.is_local_origin(Config.origin)
+	var where := Label.new()
+	where.text = "local" if local else "on " + platform.host_of(Config.origin)
+	where.tooltip_text = ("This client is connected to the server on this machine (%s)" if local
+		else "This client is connected to the server at %s: this show is that server's") % Config.origin
+	where.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED if local else ThemeBuilder.WARN)
+	where.mouse_filter = Control.MOUSE_FILTER_PASS
+	add_child(where)
 	save_btn =UiIcons.button("save", "Save project to the server (right-click: save to a file)", 16)
 	save_btn.pressed.connect(save)
 	save_btn.gui_input.connect(_rmb.bind("save"))

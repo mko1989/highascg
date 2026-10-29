@@ -5,7 +5,6 @@ extends Node
 ## NOTE: Godot's JSON turns every number into float — compare ids as strings, cast counts with int().
 
 signal _slot_freed
-signal _opened
 
 const NetUtil := preload("res://core/net_util.gd")
 
@@ -13,10 +12,10 @@ const POOL_SIZE := 6
 const TIMEOUT_S := 15.0
 
 var _free: Array[HTTPRequest] = []
-## WO-732 P3a: a second client (core/devices_target.gd) talks to another server. `origin_override` "" = the connected
-## server; while `held`, requests wait for `open()` (its origin is still being decided).
-var origin_override := ""
-var held := false
+## WO-802: every Api talks to Config.origin, this client's own server (WO-732's override to another server is
+## gone). `relay_peer`: the id of a linked server this Api reaches THROUGH that server (GET|POST|DELETE
+## /api/cluster/peers/:id/relay/…, server cluster-relay.js); "" = the server itself. Never a socket to another machine.
+var relay_peer := ""
 
 
 func _ready() -> void:
@@ -44,18 +43,11 @@ func delete_json(path: String) -> Dictionary:
 	return await request(HTTPClient.METHOD_DELETE, path, null)
 
 
-func open() -> void:
-	held = false
-	_opened.emit()
-
-
 func base() -> String:
-	return origin_override if origin_override != "" else Config.origin
+	return Config.origin + ("/api/cluster/peers/%s/relay" % relay_peer.uri_encode() if relay_peer != "" else "")
 
 
 func request(method: int, path: String, body: Variant) -> Dictionary:
-	while held:
-		await _opened
 	while _free.is_empty():
 		await _slot_freed
 	var r: HTTPRequest = _free.pop_back()
@@ -75,8 +67,6 @@ func request(method: int, path: String, body: Variant) -> Dictionary:
 
 ## Binary GET (models, thumbnails, support bundle): { ok, status, bytes, headers, error }.
 func get_bytes(path: String) -> Dictionary:
-	while held:
-		await _opened
 	while _free.is_empty():
 		await _slot_freed
 	var r: HTTPRequest = _free.pop_back()
