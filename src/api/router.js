@@ -419,7 +419,7 @@ routes.post('/api/timers/visible', ({ path, body, ctx }) => routesScreenTimers.h
 routes.post('/api/timers/cmd', ({ path, body, ctx }) => routesScreenTimers.handlePost(path, body, ctx), { requireCaspar: true })
 
 // Screen labels (WO-222) — custom screen names, propagated to all render sites
-routes.post('/api/screens/label', ({ path, body, ctx }) => routesScreens.handlePost(path, body, ctx), { requireCaspar: false })
+routes.post('/api/screens/label', ({ path, body, ctx }) => routesScreens.handlePost(path, body, ctx), { requireCaspar: false }); require('./routes-pgm-layer').register(routes) // WO-803 GET /api/screens/pgm-layer
 /* WO-506: non-screen live sources. Registering the route is the step WO-222 recorded as the
  * recurring failure — the handler is useless without this line. */
 routes.post('/api/sources/label', ({ path, body, ctx }) => routesSources.handlePost(path, body, ctx), { requireCaspar: false })

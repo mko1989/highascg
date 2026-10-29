@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-511 routes.
+512 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -330,6 +330,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/scene/take` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/take-look` | handler | `src/api/routes-scene.js` |
 | POST | `/api/screens/label` | registry | `src/api/router.js` |
+| GET | `/api/screens/pgm-layer` | registry | `src/api/routes-pgm-layer.js` |
 | * | `/api/selection` | handler | `src/api/router-dispatch.js` |
 | GET | `/api/server` | registry | `src/api/router.js` |
 | GET | `/api/server/*` | registry | `src/api/router.js` |
@@ -556,6 +557,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-operator-gui.js` | routes-operator-gui.js — WO-243/255 operator GUI layout endpoints (the compose windows of the operator channel). |
 | `src/api/routes-operator-screen.js` | routes-operator-screen.js — WO-599 T4: server half of the native Godot "Make this the operator screen" picker (the WO-290 python picker re-done in the client). |
 | `src/api/routes-osc.js` | REST endpoints for CasparCG OSC aggregate state (UDP listener → {@link OscState}). |
+| `src/api/routes-pgm-layer.js` | WO-803 — each program screen's main layer, for the Companion PGM readback button: GET /api/screens/pgm-layer. |
 | `src/api/routes-pip-overlay.js` | PIP overlay routes — apply, update, remove HTML-template overlays on PIP layers. |
 | `src/api/routes-playlist.js` | routes-playlist.js — Manual playlist advance API (WO-224). |
 | `src/api/routes-plugins.js` |  |

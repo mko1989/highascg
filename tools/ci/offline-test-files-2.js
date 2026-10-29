@@ -15,4 +15,5 @@ module.exports = [
 	'tools/smoke/smoke-wo787-timeline-preview-and-scrub.test.js',
 	'tools/smoke/smoke-wo789-timeline-live-preview.test.js',
 	'tools/smoke/smoke-wo790-timeline-scrub-pacing.test.js',
+	'tools/smoke/smoke-wo803-pgm-layer-readback.test.js',
 ]
