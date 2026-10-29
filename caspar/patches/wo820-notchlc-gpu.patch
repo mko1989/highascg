@@ -1,0 +1,1035 @@
+# HighAsCG WO-820: NotchLC GPU decode for CasparCG (base: src-v2 4eab31c06 on wo742-shm-producer)
+# Apply in the caspar src tree root: git apply wo820-notchlc-gpu.patch
+diff --git a/src/accelerator/CMakeLists.txt b/src/accelerator/CMakeLists.txt
+index 592dd9425..305a1ef0d 100644
+--- a/src/accelerator/CMakeLists.txt
++++ b/src/accelerator/CMakeLists.txt
+@@ -5,6 +5,7 @@ set(SOURCES
+ 	ogl/image/image_kernel.cpp
+ 	ogl/image/image_mixer.cpp
+ 	ogl/image/image_shader.cpp
++	ogl/image/notchlc_kernel.cpp
+ 
+ 	ogl/util/buffer.cpp
+ 	ogl/util/context.cpp
+@@ -20,6 +21,7 @@ set(HEADERS
+ 	ogl/image/image_kernel.h
+ 	ogl/image/image_mixer.h
+ 	ogl/image/image_shader.h
++	ogl/image/notchlc_kernel.h
+ 
+ 	ogl/util/buffer.h
+ 	ogl/util/context.h
+diff --git a/src/accelerator/ogl/image/image_mixer.cpp b/src/accelerator/ogl/image/image_mixer.cpp
+index e3e6eb5d6..71b2afda2 100644
+--- a/src/accelerator/ogl/image/image_mixer.cpp
++++ b/src/accelerator/ogl/image/image_mixer.cpp
+@@ -21,6 +21,7 @@
+ #include "image_mixer.h"
+ 
+ #include "image_kernel.h"
++#include "notchlc_kernel.h"
+ 
+ #include "../util/buffer.h"
+ #include "../util/device.h"
+@@ -310,7 +311,17 @@ struct image_mixer::impl
+ 
+         auto textures_ptr = std::any_cast<std::shared_ptr<std::vector<future_texture>>>(frame.opaque());
+ 
+-        if (textures_ptr) {
++        // HighAsCG WO-820: a NotchLC payload frame is drawn from its GPU-decoded RGBA texture.
++        if (item.pix_desc.format == core::pixel_format::notchlc) {
++            const auto payload_desc = item.pix_desc;
++            if (!notchlc_decoded_desc(frame.image_data(0), item.pix_desc))
++                return;
++            if (textures_ptr) {
++                item.textures = *textures_ptr;
++            } else {
++                item.textures.emplace_back(notchlc_decode_async(ogl_, frame.image_data(0), payload_desc));
++            }
++        } else if (textures_ptr) {
+             item.textures = *textures_ptr;
+         } else {
+             for (int n = 0; n < static_cast<int>(item.pix_desc.planes.size()); ++n) {
+@@ -362,6 +373,10 @@ struct image_mixer::impl
+                                            return std::any{};
+                                        }
+                                        std::vector<future_texture> textures;
++                                       if (desc.format == core::pixel_format::notchlc) { // HighAsCG WO-820
++                                           textures.emplace_back(notchlc_decode_async(self->ogl_, image_data.at(0), desc));
++                                           return std::make_shared<decltype(textures)>(std::move(textures));
++                                       }
+                                        for (int n = 0; n < static_cast<int>(desc.planes.size()); ++n) {
+                                            textures.emplace_back(self->ogl_->copy_async(image_data[n],
+                                                                                         desc.planes[n].width,
+diff --git a/src/core/frame/pixel_format.h b/src/core/frame/pixel_format.h
+index 08bbfbda0..602fd06e7 100644
+--- a/src/core/frame/pixel_format.h
++++ b/src/core/frame/pixel_format.h
+@@ -42,6 +42,7 @@ enum class pixel_format
+     uyvy,
+     gbrp,  // planar
+     gbrap, // planar
++    notchlc, // HighAsCG WO-820: NotchLC payload plane (core/frame/notchlc.h), decoded on the GPU by the mixer
+     count,
+     invalid,
+ };
+diff --git a/src/modules/ffmpeg/CMakeLists.txt b/src/modules/ffmpeg/CMakeLists.txt
+index 03450e916..ff92b9586 100644
+--- a/src/modules/ffmpeg/CMakeLists.txt
++++ b/src/modules/ffmpeg/CMakeLists.txt
+@@ -15,6 +15,8 @@ set(SOURCES
+ 	util/av_util.h
+ 	util/audio_resampler.cpp
+ 	util/audio_resampler.h
++	util/notchlc_unpack.cpp
++	util/notchlc_unpack.h
+ 	util/av_assert.h
+ 
+ 	ffmpeg.cpp
+diff --git a/src/modules/ffmpeg/producer/av_producer.cpp b/src/modules/ffmpeg/producer/av_producer.cpp
+index a5eb8523d..9a2315008 100644
+--- a/src/modules/ffmpeg/producer/av_producer.cpp
++++ b/src/modules/ffmpeg/producer/av_producer.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include "../util/av_assert.h"
+ #include "../util/av_util.h"
++#include "../util/notchlc_unpack.h"
+ 
+ #include <boost/exception/exception.hpp>
+ #include <boost/format.hpp>
+@@ -24,6 +25,7 @@
+ 
+ #include <core/frame/draw_frame.h>
+ #include <core/frame/frame_factory.h>
++#include <core/frame/notchlc.h>
+ #include <core/monitor/monitor.h>
+ 
+ #ifdef _MSC_VER
+@@ -37,6 +39,8 @@ extern "C" {
+ #include <libavfilter/buffersrc.h>
+ #include <libavformat/avformat.h>
+ #include <libavutil/avutil.h>
++#include <libavutil/buffer.h>
++#include <libavutil/dict.h>
+ #include <libavutil/channel_layout.h>
+ #include <libavutil/error.h>
+ #include <libavutil/opt.h>
+@@ -144,12 +148,58 @@ class Decoder
+ 
+     boost::thread thread;
+ 
++    // HighAsCG WO-820: NotchLC GPU path. The decoder only undoes LZ4/LZF (notchlc_unpack) and hands the filter graph a
++    // GRAY8 "payload" frame (rows of 32-bit words, tagged NOTCHLC_PAYLOAD_TAG); the OpenGL mixer decodes it.
++    bool                          notchlc_gpu_ = false;
++    int                           nlc_width_   = 0;
++    int                           nlc_height_  = 0;
++    size_t                        nlc_bytes_   = 0;
++    std::shared_ptr<AVBufferPool> nlc_pool_;
++    std::shared_ptr<AVPacket>     nlc_pending_;
++    bool                          nlc_eof_    = false;
++    bool                          nlc_warned_ = false;
++
++    int notchlc_receive(AVFrame* f)
++    {
++        if (!nlc_pending_) {
++            return nlc_eof_ ? AVERROR_EOF : AVERROR(EAGAIN);
++        }
++        auto pkt = std::move(nlc_pending_);
++        nlc_pending_.reset();
++
++        f->buf[0] = av_buffer_pool_get(nlc_pool_.get());
++        if (!f->buf[0]) {
++            return AVERROR(ENOMEM);
++        }
++        f->data[0]     = f->buf[0]->data;
++        f->linesize[0] = core::notchlc::row_words * 4;
++        f->width       = ctx->width;
++        f->height      = ctx->height;
++        f->format      = AV_PIX_FMT_GRAY8;
++
++        const char* error = nullptr;
++        if (!notchlc::unpack(pkt->data, pkt->size, nlc_width_, nlc_height_, f->data[0], nlc_bytes_, &error) &&
++            !nlc_warned_) {
++            nlc_warned_ = true;
++            CASPAR_LOG(warning) << L"[ffmpeg] NotchLC GPU path: undecodable frame (" << error
++                                << L"), drawn transparent. Further errors are not logged.";
++        }
++        av_dict_set(&f->metadata, NOTCHLC_PAYLOAD_TAG, "1", 0);
++        f->best_effort_timestamp = pkt->pts != AV_NOPTS_VALUE ? pkt->pts : pkt->dts;
++        f->pts                   = f->best_effort_timestamp;
++        f->duration              = pkt->duration;
++        f->sample_aspect_ratio   = ctx->sample_aspect_ratio;
++        return 0;
++    }
++
+   public:
+     std::shared_ptr<AVCodecContext> ctx;
+ 
+     Decoder() = default;
+ 
+-    explicit Decoder(AVStream* stream)
++    bool notchlc_gpu() const { return notchlc_gpu_; }
++
++    explicit Decoder(AVStream* stream, bool allow_notchlc_gpu = false)
+         : st(stream)
+     {
+         const auto codec = get_decoder(stream->codecpar->codec_id);
+@@ -178,6 +228,25 @@ class Decoder
+ 
+         ctx->pkt_timebase = stream->time_base;
+ 
++        // HighAsCG WO-820: NotchLC is decoded on the GPU unless <ffmpeg><producer><notchlc-gpu>false, a user video
++        // filter is set (allow_notchlc_gpu), or the size is not a multiple of 16 (the CPU path stays for those).
++        if (allow_notchlc_gpu && ctx->codec_id == AV_CODEC_ID_NOTCHLC && ctx->width > 0 && ctx->height > 0 &&
++            ctx->width % 16 == 0 && ctx->height % 16 == 0 &&
++            env::properties().get(L"configuration.ffmpeg.producer.notchlc-gpu", true)) {
++            notchlc_gpu_ = true;
++            nlc_width_   = ctx->width;
++            nlc_height_  = ctx->height;
++            ctx->width   = core::notchlc::row_words * 4;
++            ctx->height  = core::notchlc::plane_rows(nlc_width_, nlc_height_);
++            ctx->pix_fmt = AV_PIX_FMT_GRAY8;
++            nlc_bytes_   = static_cast<size_t>(ctx->width) * ctx->height;
++            nlc_pool_    = std::shared_ptr<AVBufferPool>(
++                av_buffer_pool_init(nlc_bytes_ + AV_INPUT_BUFFER_PADDING_SIZE, nullptr),
++                [](AVBufferPool* p) { av_buffer_pool_uninit(&p); });
++            CASPAR_LOG(debug) << L"[ffmpeg] NotchLC " << nlc_width_ << L"x" << nlc_height_
++                              << L": GPU decode (WO-820), payload plane " << ctx->width << L"x" << ctx->height;
++        }
++
+         if (ctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+             ctx->framerate           = av_guess_frame_rate(nullptr, stream, nullptr);
+             ctx->sample_aspect_ratio = av_guess_sample_aspect_ratio(nullptr, stream, nullptr);
+@@ -192,13 +261,16 @@ class Decoder
+ #endif
+         }
+ 
+-        FF(avcodec_open2(ctx.get(), codec, nullptr));
++        if (!notchlc_gpu_) {
++            FF(avcodec_open2(ctx.get(), codec, nullptr));
++        }
+ 
+         thread = boost::thread([=]() {
+             try {
+                 while (!thread.interruption_requested()) {
+                     auto av_frame = alloc_frame();
+-                    auto ret      = avcodec_receive_frame(ctx.get(), av_frame.get());
++                    auto ret      = notchlc_gpu_ ? notchlc_receive(av_frame.get())
++                                             : avcodec_receive_frame(ctx.get(), av_frame.get());
+ 
+                     if (ret == AVERROR(EAGAIN)) {
+                         std::shared_ptr<AVPacket> packet;
+@@ -208,9 +280,16 @@ class Decoder
+                             packet = std::move(input.front());
+                             input.pop();
+                         }
+-                        FF(avcodec_send_packet(ctx.get(), packet.get()));
++                        if (notchlc_gpu_) {
++                            nlc_eof_     = !packet;
++                            nlc_pending_ = std::move(packet);
++                        } else {
++                            FF(avcodec_send_packet(ctx.get(), packet.get()));
++                        }
+                     } else if (ret == AVERROR_EOF) {
+-                        avcodec_flush_buffers(ctx.get());
++                        if (!notchlc_gpu_) {
++                            avcodec_flush_buffers(ctx.get());
++                        }
+                         av_frame->pts = next_pts;
+                         next_pts      = AV_NOPTS_VALUE;
+                         eof           = true;
+@@ -388,6 +467,8 @@ struct Filter
+            AVMediaType                    media_type,
+            const core::video_format_desc& format_desc)
+     {
++        const bool user_filter = !filter_spec.empty(); // HighAsCG WO-820: no NotchLC GPU path under a user filter
++        bool       notchlc_gpu = false;
+         if (media_type == AVMEDIA_TYPE_VIDEO) {
+             if (filter_spec.empty()) {
+                 filter_spec = "null";
+@@ -551,10 +632,18 @@ struct Filter
+ 
+                 auto it = streams.find(index);
+                 if (it == streams.end()) {
+-                    it = streams.emplace(index, input->streams[index]).first;
++                    it = streams
++                             .emplace(std::piecewise_construct,
++                                      std::forward_as_tuple(index),
++                                      std::forward_as_tuple(input->streams[index],
++                                                            media_type == AVMEDIA_TYPE_VIDEO && !user_filter))
++                             .first;
+                 }
+ 
+                 auto st = it->second.ctx;
++                if (st->codec_type == AVMEDIA_TYPE_VIDEO && it->second.notchlc_gpu()) {
++                    notchlc_gpu = true;
++                }
+ 
+                 if (st->codec_type == AVMEDIA_TYPE_VIDEO) {
+                     auto args = (boost::format("video_size=%dx%d:pix_fmt=%d:time_base=%d/%d") % st->width % st->height %
+@@ -638,12 +727,17 @@ struct Filter
+                                               AV_PIX_FMT_GBRAP,
+                                               AV_PIX_FMT_GBRAP16,
+                                               AV_PIX_FMT_NONE};
++            // HighAsCG WO-820: the NotchLC payload must reach the sink untouched (no format conversion).
++            const AVPixelFormat payload_fmts[] = {AV_PIX_FMT_GRAY8, AV_PIX_FMT_NONE};
++            const auto          sink_fmts      = notchlc_gpu ? payload_fmts : pix_fmts;
++            const auto          sink_fmt_count = notchlc_gpu ? 1 : FF_ARRAY_ELEMS(pix_fmts) - 1;
+ #if LIBAVUTIL_VERSION_MAJOR >= 60 // FFmpeg 8
+             FF(av_opt_set_array(sink, "pixel_formats", AV_OPT_SEARCH_CHILDREN | AV_OPT_ARRAY_REPLACE,
+-                0, FF_ARRAY_ELEMS(pix_fmts) - 1, AV_OPT_TYPE_PIXEL_FMT, pix_fmts)
++                0, sink_fmt_count, AV_OPT_TYPE_PIXEL_FMT, sink_fmts)
+             );
+ #else
+-            FF(av_opt_set_int_list(sink, "pix_fmts", pix_fmts, -1, AV_OPT_SEARCH_CHILDREN));
++            FF(av_opt_set_int_list(sink, "pix_fmts", sink_fmts, -1, AV_OPT_SEARCH_CHILDREN));
++            (void)sink_fmt_count;
+ #endif
+ #ifdef _MSC_VER
+ #pragma warning(pop)
+diff --git a/src/modules/ffmpeg/util/av_util.cpp b/src/modules/ffmpeg/util/av_util.cpp
+index e55c167e2..604b1dc17 100644
+--- a/src/modules/ffmpeg/util/av_util.cpp
++++ b/src/modules/ffmpeg/util/av_util.cpp
+@@ -2,6 +2,7 @@
+ #include "av_assert.h"
+ 
+ #include <common/bit_depth.h>
++#include <core/frame/notchlc.h>
+ 
+ #if defined(_MSC_VER)
+ #pragma warning(push)
+@@ -11,6 +12,7 @@ extern "C" {
+ #include <libavcodec/avcodec.h>
+ #include <libavfilter/avfilter.h>
+ #include <libavutil/channel_layout.h>
++#include <libavutil/dict.h>
+ #include <libavutil/frame.h>
+ #include <libavutil/imgutils.h>
+ #include <libavutil/pixfmt.h>
+@@ -19,6 +21,7 @@ extern "C" {
+ #pragma warning(pop)
+ #endif
+ 
++#include <algorithm>
+ #include <array>
+ #include <tbb/parallel_for.h>
+ #include <tbb/parallel_invoke.h>
+@@ -53,10 +56,24 @@ core::mutable_frame make_frame(void*                            tag,
+ {
+     std::vector<int> data_map; // TODO(perf) when using data_map, avoid uploading duplicate planes
+ 
++    // HighAsCG WO-820: a NotchLC payload frame (GRAY8 rows of 32-bit words, tagged by the decoder) becomes one
++    // notchlc plane of BGRA texels; only the rows in use are copied (the mixer decodes it on the GPU).
++    const bool notchlc_payload =
++        video && video->format == AV_PIX_FMT_GRAY8 && av_dict_get(video->metadata, NOTCHLC_PAYLOAD_TAG, nullptr, 0);
++
+     auto pix_desc =
+-        video ? pixel_format_desc(
+-                    static_cast<AVPixelFormat>(video->format), video->width, video->height, data_map, color_space)
+-              : core::pixel_format_desc(core::pixel_format::invalid);
++        notchlc_payload ? core::pixel_format_desc(core::pixel_format::notchlc)
++        : video         ? pixel_format_desc(
++                      static_cast<AVPixelFormat>(video->format), video->width, video->height, data_map, color_space)
++                        : core::pixel_format_desc(core::pixel_format::invalid);
++    int copy_rows = -1;
++    if (notchlc_payload) {
++        pix_desc.planes.push_back(core::pixel_format_desc::plane(video->width / 4, video->height, 4));
++        const auto used = core::notchlc::read_word(video->data[0], core::notchlc::h_used);
++        copy_rows       = std::clamp(static_cast<int>((used + video->linesize[0] - 1) / video->linesize[0]),
++                               1,
++                               video->height);
++    }
+     pix_desc.is_straight_alpha = is_straight_alpha;
+ 
+     auto frame = frame_factory.create_frame(tag, pix_desc);
+@@ -70,7 +87,7 @@ core::mutable_frame make_frame(void*                            tag,
+                 for (int n = 0; n < static_cast<int>(pix_desc.planes.size()); ++n) {
+                     auto frame_plan_index = data_map.empty() ? n : data_map.at(n);
+ 
+-                    tbb::parallel_for(0, pix_desc.planes[n].height, [&](int y) {
++                    tbb::parallel_for(0, copy_rows > 0 ? copy_rows : pix_desc.planes[n].height, [&](int y) {
+                         std::memcpy(frame.image_data(n).begin() + y * pix_desc.planes[n].linesize,
+                                     video->data[frame_plan_index] + y * video->linesize[frame_plan_index],
+                                     pix_desc.planes[n].linesize);
+@@ -337,6 +354,7 @@ std::shared_ptr<AVFrame> make_av_video_frame(const core::const_frame& frame, con
+         case core::pixel_format::gbrap:
+             // TODO
+             break;
++        case core::pixel_format::notchlc: // HighAsCG WO-820: producer-side only, never a channel frame
+         case core::pixel_format::count:
+         case core::pixel_format::invalid:
+             break;
+diff --git a/src/modules/ffmpeg/util/av_util.h b/src/modules/ffmpeg/util/av_util.h
+index 7203cec48..094bfc65d 100644
+--- a/src/modules/ffmpeg/util/av_util.h
++++ b/src/modules/ffmpeg/util/av_util.h
+@@ -32,6 +32,9 @@ core::pixel_format_desc pixel_format_desc(AVPixelFormat     pix_fmt,
+                                           int               height,
+                                           std::vector<int>& data_map,
+                                           core::color_space color_space = core::color_space::bt709);
++// HighAsCG WO-820: AVFrame metadata key that marks a NotchLC payload frame (see notchlc_unpack.h).
++constexpr const char* NOTCHLC_PAYLOAD_TAG = "highascg_notchlc_payload";
++
+ core::mutable_frame     make_frame(void*                    tag,
+                                    core::frame_factory&     frame_factory,
+                                    std::shared_ptr<AVFrame> video,
+diff --git a/src/core/frame/notchlc.h b/src/core/frame/notchlc.h
+new file mode 100644
+index 000000000..fa6c7277e
+--- /dev/null
++++ b/src/core/frame/notchlc.h
+@@ -0,0 +1,61 @@
++/*
++ * HighAsCG WO-820: NotchLC GPU decode — layout of the payload frame shared by the ffmpeg producer (which fills it on the
++ * CPU: LZ4/LZF only, plus a per-block luma bit-offset table) and the OpenGL mixer (which decodes it in a shader).
++ *
++ * The frame has one plane of 32-bit little-endian words, uploaded as an 8-bit BGRA texture that is
++ * notchlc::row_words texels wide (one texel = one word). Word 0..header_words-1 is the header below, the NotchLC payload
++ * (the bytes after the LZ4/LZF step, starting with its 40-byte header) starts at word header_words, and the luma table
++ * (one word per 4x4 luma block, raster order: absolute bit position of the block's first bit in the plane) follows the
++ * payload at word header[table].
++ */
++
++#pragma once
++
++#include <cstdint>
++#include <cstring>
++
++namespace caspar { namespace core { namespace notchlc {
++
++constexpr uint32_t magic        = 0x434C4E43; // "CNLC"
++constexpr int      row_words    = 1024;       // texels per texture row (4096 bytes)
++constexpr int      header_words = 16;
++
++enum header_field
++{
++    h_magic = 0,
++    h_valid,      // 1 = decodable, 0 = draw transparent
++    h_width,      // picture size
++    h_height,
++    h_payload,    // word index of the NotchLC payload (= header_words)
++    h_size,       // payload bytes
++    h_table,      // word index of the luma block table
++    h_used,       // bytes of the plane in use (header + payload + table)
++    h_y_ctrl,     // byte offsets inside the payload, as notchlc.c computes them
++    h_uv_off,
++    h_uv_data,
++    h_a_ctrl,
++    h_a_data,     // a_data_offset (alpha offsets are relative to uv_data + a_data)
++    h_y_data,
++    h_opaque,
++    h_reserved,
++};
++
++// Bytes of the payload plane for a width x height stream: header + worst-case payload + luma table, whole rows.
++inline int plane_rows(int width, int height)
++{
++    const int64_t payload = static_cast<int64_t>(width) * height * 3 / 2 + 65536;
++    const int64_t table   = static_cast<int64_t>(width / 4) * (height / 4) * 4;
++    const int64_t bytes   = header_words * 4 + payload + table;
++    return static_cast<int>((bytes + row_words * 4 - 1) / (row_words * 4));
++}
++
++inline int64_t max_payload_bytes(int width, int height) { return static_cast<int64_t>(width) * height * 3 / 2 + 65536; }
++
++inline uint32_t read_word(const uint8_t* plane, int index)
++{
++    uint32_t v;
++    std::memcpy(&v, plane + static_cast<size_t>(index) * 4, 4);
++    return v;
++}
++
++}}} // namespace caspar::core::notchlc
+diff --git a/src/modules/ffmpeg/util/notchlc_unpack.h b/src/modules/ffmpeg/util/notchlc_unpack.h
+new file mode 100644
+index 000000000..ad0f0c6ee
+--- /dev/null
++++ b/src/modules/ffmpeg/util/notchlc_unpack.h
+@@ -0,0 +1,24 @@
++/*
++ * HighAsCG WO-820: CPU half of the NotchLC GPU decode. Undoes the outer compression (LZ4 / LZF / stored) of one NotchLC
++ * packet into a payload plane (layout in core/frame/notchlc.h) and builds the luma block bit-offset table; the OpenGL
++ * mixer decodes the blocks and converts to RGB in a shader. Mirrors the checks of FFmpeg 8.0.1 libavcodec/notchlc.c.
++ */
++
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++
++namespace caspar { namespace ffmpeg { namespace notchlc {
++
++// Fills `plane` (`plane_bytes` long, at least header_words*4). Always writes a header; returns false and sets `error`
++// when the packet cannot be decoded (the header is then marked invalid and the mixer draws the frame transparent).
++bool unpack(const uint8_t* packet,
++            int            packet_size,
++            int            width,
++            int            height,
++            uint8_t*       plane,
++            size_t         plane_bytes,
++            const char**   error);
++
++}}} // namespace caspar::ffmpeg::notchlc
+diff --git a/src/modules/ffmpeg/util/notchlc_unpack.cpp b/src/modules/ffmpeg/util/notchlc_unpack.cpp
+new file mode 100644
+index 000000000..e0654c0f3
+--- /dev/null
++++ b/src/modules/ffmpeg/util/notchlc_unpack.cpp
+@@ -0,0 +1,245 @@
++/*
++ * HighAsCG WO-820: CPU half of the NotchLC GPU decode (see notchlc_unpack.h). Format and checks follow FFmpeg 8.0.1
++ * libavcodec/notchlc.c (decode_frame l.469-527, decode_blocks l.154-227) and lzf.c.
++ */
++
++#include "notchlc_unpack.h"
++
++#include <core/frame/notchlc.h>
++
++#include <algorithm>
++#include <climits>
++#include <cstring>
++
++namespace caspar { namespace ffmpeg { namespace notchlc {
++
++namespace nl = core::notchlc;
++
++static inline uint32_t rd32(const uint8_t* p)
++{
++    return static_cast<uint32_t>(p[0]) | static_cast<uint32_t>(p[1]) << 8 | static_cast<uint32_t>(p[2]) << 16 |
++           static_cast<uint32_t>(p[3]) << 24;
++}
++
++static inline void wr32(uint8_t* p, uint32_t v) { std::memcpy(p, &v, 4); }
++
++// LZ4 block format into a flat buffer. Same result as notchlc.c lz4_decompress for valid streams.
++static bool lz4_block(const uint8_t* ip, size_t n, uint8_t* dst, size_t cap, size_t& out)
++{
++    const uint8_t* const iend = ip + n;
++    size_t               op   = 0;
++
++    while (ip < iend) {
++        const unsigned token = *ip++;
++        size_t         lit   = token >> 4;
++        if (lit == 15) {
++            unsigned c;
++            do {
++                if (ip >= iend)
++                    return false;
++                c = *ip++;
++                lit += c;
++            } while (c == 255);
++        }
++        if (lit > static_cast<size_t>(iend - ip) || lit > cap - op)
++            return false;
++        std::memcpy(dst + op, ip, lit);
++        ip += lit;
++        op += lit;
++
++        if (ip >= iend)
++            break; // last sequence: literals only
++
++        if (iend - ip < 2)
++            return false;
++        const size_t off = static_cast<size_t>(ip[0]) | static_cast<size_t>(ip[1]) << 8;
++        ip += 2;
++        if (off == 0 || off > op)
++            return false;
++
++        size_t ml = 4 + (token & 15);
++        if ((token & 15) == 15) {
++            unsigned c;
++            do {
++                if (ip >= iend)
++                    return false;
++                c = *ip++;
++                ml += c;
++            } while (c == 255);
++        }
++        if (ml > cap - op)
++            return false;
++
++        uint8_t*       d = dst + op;
++        const uint8_t* s = d - off;
++        if (off >= ml) {
++            std::memcpy(d, s, ml);
++        } else {
++            for (size_t i = 0; i < ml; ++i)
++                d[i] = s[i];
++        }
++        op += ml;
++    }
++
++    out = op;
++    return true;
++}
++
++// LZF as FFmpeg's ff_lzf_uncompress (loop runs while more than 2 input bytes are left).
++static bool lzf_block(const uint8_t* ip, size_t n, uint8_t* dst, size_t cap, size_t& out)
++{
++    const uint8_t* const iend = ip + n;
++    size_t               op   = 0;
++
++    while (iend - ip > 2) {
++        const unsigned s = *ip++;
++        if (s < 32) {
++            const size_t lit = s + 1;
++            if (lit > static_cast<size_t>(iend - ip) || lit > cap - op)
++                return false;
++            std::memcpy(dst + op, ip, lit);
++            ip += lit;
++            op += lit;
++        } else {
++            size_t l   = 2 + (s >> 5);
++            size_t off = ((s & 0x1f) << 8) + 1;
++            if (l == 7 + 2)
++                l += *ip++;
++            off += *ip++;
++            if (off > op || l > cap - op)
++                return false;
++            for (size_t i = 0; i < l; ++i)
++                dst[op + i] = dst[op - off + i];
++            op += l;
++        }
++    }
++
++    out = op;
++    return true;
++}
++
++bool unpack(const uint8_t* packet,
++            int            packet_size,
++            int            width,
++            int            height,
++            uint8_t*       plane,
++            size_t         plane_bytes,
++            const char**   error)
++{
++    auto fail = [&](const char* msg) {
++        *error = msg;
++        return false;
++    };
++
++    std::memset(plane, 0, nl::header_words * 4);
++    wr32(plane + nl::h_magic * 4, nl::magic);
++    wr32(plane + nl::h_width * 4, static_cast<uint32_t>(width));
++    wr32(plane + nl::h_height * 4, static_cast<uint32_t>(height));
++    wr32(plane + nl::h_payload * 4, nl::header_words);
++
++    if (!packet || packet_size <= 40)
++        return fail("packet too small");
++    if (rd32(packet) != (('N' << 24) | ('L' << 16) | ('C' << 8) | '1'))
++        return fail("bad magic");
++
++    const uint32_t usz    = rd32(packet + 4);
++    const uint32_t format = rd32(packet + 12);
++    if (format > 2)
++        return fail("unknown format");
++
++    const size_t nblk  = static_cast<size_t>((width + 3) / 4) * ((height + 3) / 4);
++    const size_t nb16  = static_cast<size_t>((width + 15) / 16) * ((height + 15) / 16);
++    const size_t avail = plane_bytes - nl::header_words * 4;
++    if (static_cast<int64_t>(usz) > nl::max_payload_bytes(width, height) || usz + 4 + nblk * 4 > avail)
++        return fail("payload larger than the plane");
++
++    uint8_t* const pl  = plane + nl::header_words * 4;
++    const uint8_t* src = packet + 16;
++    const size_t   n   = static_cast<size_t>(packet_size) - 16;
++    size_t         out = 0;
++
++    if (format == 1) {
++        if (n < usz / 255)
++            return fail("lz4 input too short");
++        if (!lz4_block(src, n, pl, usz, out) || out != usz)
++            return fail("lz4 error");
++    } else if (format == 0) {
++        if (!lzf_block(src, n, pl, usz + 4 + nblk * 4, out) || out < usz)
++            return fail("lzf error");
++    } else {
++        if (n < usz)
++            return fail("stored payload short");
++        std::memcpy(pl, src, usz);
++    }
++
++    if (usz < 40)
++        return fail("payload header short");
++
++    // decode_blocks l.164-227
++    const uint32_t tx = rd32(pl), ty = rd32(pl + 4);
++    if (tx != static_cast<uint32_t>(width) || ty != static_cast<uint32_t>(height))
++        return fail("frame size differs from the stream");
++
++    auto off4 = [&](int at, uint32_t& v) {
++        v = rd32(pl + at);
++        if (v >= UINT_MAX / 4)
++            return false;
++        v *= 4;
++        return v < usz;
++    };
++    uint32_t uv_off, y_ctrl, a_ctrl, uv_data, a_data, a_count;
++    if (!off4(8, uv_off) || !off4(12, y_ctrl) || !off4(16, a_ctrl) || !off4(20, uv_data))
++        return fail("bad offsets");
++    const uint32_t y_size = rd32(pl + 24);
++    if (y_size >= UINT_MAX / 4)
++        return fail("bad y size");
++    if (!off4(28, a_data) || !off4(32, a_count))
++        return fail("bad alpha offsets");
++    const uint32_t data_end = rd32(pl + 36);
++    if (data_end > usz || data_end <= y_size)
++        return fail("bad data end");
++    const uint32_t y_data = data_end - y_size;
++    if (y_data <= a_data)
++        return fail("bad y data offset");
++    const bool opaque = (y_data - a_data) == a_ctrl;
++
++    // Bounds the shader relies on.
++    const size_t rows4 = static_cast<size_t>((height + 3) / 4);
++    if (40 + rows4 * 4 > usz || y_ctrl + nblk * 4 > usz || uv_off + nb16 * 4 > usz ||
++        (!opaque && a_ctrl + nb16 * 8 > usz))
++        return fail("tables past the payload");
++
++    // Luma block table: absolute bit position (in the plane) of each 4x4 block's bits.
++    const uint32_t table = nl::header_words + (usz + 3) / 4;
++    uint8_t* const tab   = plane + static_cast<size_t>(table) * 4;
++    const size_t   bpr   = static_cast<size_t>((width + 3) / 4);
++    for (size_t r = 0; r < rows4; ++r) {
++        const uint32_t row_off = rd32(pl + 40 + r * 4);
++        if (static_cast<uint64_t>(y_data) + row_off >= data_end)
++            return fail("bad luma row offset");
++        uint32_t       bit  = (nl::header_words * 4 + y_data + row_off) * 8;
++        const uint8_t* ctrl = pl + y_ctrl + r * bpr * 4;
++        uint8_t*       t    = tab + r * bpr * 4;
++        for (size_t c = 0; c < bpr; ++c) {
++            wr32(t + c * 4, bit);
++            const uint32_t item = rd32(ctrl + c * 4);
++            bit += 4 * (((item >> 24) & 3) + ((item >> 26) & 3) + ((item >> 28) & 3) + ((item >> 30) & 3) + 4);
++        }
++    }
++
++    const uint32_t used = (table + static_cast<uint32_t>(nblk)) * 4;
++    wr32(plane + nl::h_size * 4, usz);
++    wr32(plane + nl::h_table * 4, table);
++    wr32(plane + nl::h_used * 4, used);
++    wr32(plane + nl::h_y_ctrl * 4, y_ctrl);
++    wr32(plane + nl::h_uv_off * 4, uv_off);
++    wr32(plane + nl::h_uv_data * 4, uv_data);
++    wr32(plane + nl::h_a_ctrl * 4, a_ctrl);
++    wr32(plane + nl::h_a_data * 4, a_data);
++    wr32(plane + nl::h_y_data * 4, y_data);
++    wr32(plane + nl::h_opaque * 4, opaque ? 1 : 0);
++    wr32(plane + nl::h_valid * 4, 1);
++    return true;
++}
++
++}}} // namespace caspar::ffmpeg::notchlc
+diff --git a/src/accelerator/ogl/image/notchlc_kernel.h b/src/accelerator/ogl/image/notchlc_kernel.h
+new file mode 100644
+index 000000000..c67e2f410
+--- /dev/null
++++ b/src/accelerator/ogl/image/notchlc_kernel.h
+@@ -0,0 +1,30 @@
++/*
++ * HighAsCG WO-820: GPU half of the NotchLC decode. Turns a payload plane (core/frame/notchlc.h, filled on the CPU by the
++ * ffmpeg producer) into an RGBA16 texture of the picture (channels in natural order, read by the image kernel as bgra like every bgra upload).
++ */
++
++#pragma once
++
++#include <common/array.h>
++#include <common/memory.h>
++
++#include <core/frame/pixel_format.h>
++
++#include <future>
++#include <memory>
++
++namespace caspar { namespace accelerator { namespace ogl {
++
++class device;
++class texture;
++
++// The pixel_format_desc the image kernel must use for the decoded texture of a notchlc frame (bgra, 16 bit, picture
++// size read from the payload header). Returns false when the frame carries no usable header.
++bool notchlc_decoded_desc(const array<const std::uint8_t>& plane, core::pixel_format_desc& desc);
++
++// Uploads the payload plane described by `desc` (a notchlc desc) and decodes it on the GL thread.
++std::shared_future<std::shared_ptr<texture>> notchlc_decode_async(const spl::shared_ptr<device>&   ogl,
++                                                                  const array<const std::uint8_t>& plane,
++                                                                  const core::pixel_format_desc&   desc);
++
++}}} // namespace caspar::accelerator::ogl
+diff --git a/src/accelerator/ogl/image/notchlc_kernel.cpp b/src/accelerator/ogl/image/notchlc_kernel.cpp
+new file mode 100644
+index 000000000..e7a05f18a
+--- /dev/null
++++ b/src/accelerator/ogl/image/notchlc_kernel.cpp
+@@ -0,0 +1,267 @@
++/*
++ * HighAsCG WO-820: GPU half of the NotchLC decode (see notchlc_kernel.h).
++ *
++ * One fragment per output pixel decodes that pixel straight from the payload words, following FFmpeg 8.0.1
++ * libavcodec/notchlc.c decode_blocks (l.245-464): 12-bit luma from 4x4 blocks with 1-4 bits per pixel (bit position from
++ * the CPU-built block table), chroma from 16x16 blocks (one BC1-like endpoint pair, or per 8x8 quadrant, or per 4x4),
++ * alpha from 16x16 blocks. Colour = full-range BT.601 YCbCr -> RGB, which is what swscale applies to this stream on the
++ * CPU path (yuva444p12, colorspace "gbr", fitted on INTRO_v3.mov: WO-820).
++ */
++
++#include "notchlc_kernel.h"
++
++#include "../util/device.h"
++#include "../util/shader.h"
++#include "../util/texture.h"
++
++#include <common/gl/gl_check.h>
++#include <common/log.h>
++
++#include <core/frame/notchlc.h>
++
++#include <GL/glew.h>
++
++namespace caspar { namespace accelerator { namespace ogl {
++
++namespace nl = core::notchlc;
++
++namespace {
++
++const char* const vertex_source = R"GLSL(#version 450
++void main()
++{
++    vec2 p      = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
++    gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
++}
++)GLSL";
++
++const char* const fragment_source = R"GLSL(#version 450
++out vec4 fragColor;
++
++uniform sampler2D payload;
++uniform bool      valid;
++uniform bool      opaque_alpha;
++uniform int       width;
++uniform int       table;
++uniform int       y_ctrl;
++uniform int       uv_off;
++uniform int       uv_data;
++uniform int       a_ctrl;
++uniform int       a_data;
++
++const int BASE = 16; // core::notchlc::header_words
++
++// One texel = one little-endian 32-bit word (uploaded as BGRA 8:8:8:8_REV: byte0 -> b ... byte3 -> a).
++uint word_at(int w)
++{
++    uvec4 b = uvec4(round(texelFetch(payload, ivec2(w & 1023, w >> 10), 0) * 255.0));
++    return b.b | (b.g << 8u) | (b.r << 16u) | (b.a << 24u);
++}
++
++uint pword(uint byte_off) { return word_at(BASE + int(byte_off >> 2u)); }
++
++// LSB-first bit reader (BITSTREAM_READER_LE) over the whole plane.
++uint bits_at(uint bitpos, uint n)
++{
++    int  w = int(bitpos >> 5u);
++    uint s = bitpos & 31u;
++    uint v = word_at(w) >> s;
++    if (s + n > 32u)
++        v |= word_at(w + 1) << (32u - s);
++    return v & ((1u << n) - 1u);
++}
++
++int tdiv3(int n) { return n >= 0 ? n / 3 : -((-n) / 3); } // C division truncates toward zero
++
++int expand8(uint b) { return int((b << 4u) | (b & 15u)); }
++
++ivec2 uv_pair(uint pos, uint idx)
++{
++    uint e   = pword(pos);
++    uint loc = pword(pos + 4u);
++    int  s   = int((loc >> (2u * idx)) & 3u);
++    int  u0  = expand8(e & 255u);
++    int  v0  = expand8((e >> 8u) & 255u);
++    int  u1  = expand8((e >> 16u) & 255u);
++    int  v1  = expand8(e >> 24u);
++    return ivec2(u0 + tdiv3((u1 - u0) * s + 2), v0 + tdiv3((v1 - v0) * s + 2));
++}
++
++void main()
++{
++    if (!valid) {
++        fragColor = vec4(0.0);
++        return;
++    }
++
++    uint x = uint(gl_FragCoord.x);
++    uint y = uint(gl_FragCoord.y); // texture row 0 = picture line 0, as every Caspar upload
++    uint W = uint(width);
++
++    // Luma: 4x4 block control word = y_min:12 y_max:12 then 2 bits (bits-per-pixel - 1) per block row.
++    uint bi   = (y >> 2u) * ((W + 3u) >> 2u) + (x >> 2u);
++    uint item = pword(uint(y_ctrl) + 4u * bi);
++    uint r    = y & 3u;
++    uint pre  = 0u;
++    for (uint k = 0u; k < r; ++k)
++        pre += 4u * (((item >> (24u + 2u * k)) & 3u) + 1u);
++    uint nb    = ((item >> (24u + 2u * r)) & 3u) + 1u;
++    uint v     = bits_at(uint(word_at(table + int(bi))) + pre + (x & 3u) * nb, nb);
++    uint ymin  = item & 4095u;
++    uint ydiff = ((item >> 12u) & 4095u) - ymin;
++    uint div   = (1u << nb) - 1u;
++    int  Y     = clamp(int(ymin + (ydiff * v + div - 1u) / div), 0, 4095);
++
++    // Chroma: 16x16 blocks.
++    uint b16 = (y >> 4u) * ((W + 15u) >> 4u) + (x >> 4u);
++    uint ly  = y & 15u;
++    uint lx  = x & 15u;
++    uint d   = uint(uv_data) + pword(uint(uv_off) + 4u * b16) * 4u;
++    uint hdr = pword(d);
++    uint is8 = hdr & 0xFFFFu;
++    uint esc = hdr >> 16u;
++    ivec2 uv = ivec2(0);
++    if (esc == 0u && is8 == 0u) {
++        uv = uv_pair(d + 4u, (ly >> 2u) * 4u + (lx >> 2u));
++    } else {
++        uint q   = (ly >> 3u) * 2u + (lx >> 3u);
++        uint pos = d + 4u;
++        for (uint k = 0u; k < q; ++k)
++            pos += ((is8 >> k) & 1u) != 0u ? 8u : (esc != 0u ? 32u : 0u);
++        uint qy = ly & 7u;
++        uint qx = lx & 7u;
++        if (((is8 >> q) & 1u) != 0u)
++            uv = uv_pair(pos, (qy >> 1u) * 4u + (qx >> 1u));
++        else if (esc != 0u)
++            uv = uv_pair(pos + 8u * ((qy >> 2u) * 2u + (qx >> 2u)), (qy & 3u) * 4u + (qx & 3u));
++    }
++
++    // Alpha: 16x16 blocks, 2-bit mode + 3-bit index per 4x4 cell.
++    uint A = 4095u;
++    if (!opaque_alpha) {
++        uint m    = pword(uint(a_ctrl) + 8u * b16);
++        uint ao   = pword(uint(a_ctrl) + 8u * b16 + 4u) * 4u + uint(uv_data) + uint(a_data);
++        uint c0   = pword(ao);
++        uint c1   = pword(ao + 4u);
++        uint sub  = (ly >> 2u) * 4u + (lx >> 2u);
++        uint mode = (m >> (2u * sub)) & 3u;
++        uint bp   = 16u + 3u * sub;
++        uint idx  = bp >= 32u ? (c1 >> (bp - 32u)) & 7u
++                              : (bp + 3u > 32u ? ((c0 >> bp) | (c1 << (32u - bp))) & 7u : (c0 >> bp) & 7u);
++        uint a0   = c0 & 255u;
++        uint a1   = (c0 >> 8u) & 255u;
++        A = mode == 1u ? 4095u : (mode == 2u ? ((a0 + (a1 - a0) * idx) << 4u) & 0xFFFFu : 0u);
++    }
++
++    float Yf  = float(Y) / 4095.0;
++    float Cb  = float(uv.x - 2048) / 4095.0;
++    float Cr  = float(uv.y - 2048) / 4095.0;
++    vec3  rgb = clamp(vec3(Yf + 1.402 * Cr, Yf - 0.344136 * Cb - 0.714136 * Cr, Yf + 1.772 * Cb), 0.0, 1.0);
++    // A bgra frame's texture holds the channels in natural order (uploaded as GL_BGRA), so write rgba here and let the
++    // image kernel read the texture as pixel_format::bgra like any other bgra frame (checked on the box: WO-820).
++    fragColor = vec4(rgb, float(min(A, 4095u)) / 4095.0);
++}
++)GLSL";
++
++struct notchlc_program
++{
++    std::unique_ptr<shader> program;
++    GLuint                  vao = 0;
++
++    notchlc_program()
++        : program(new shader(vertex_source, fragment_source))
++    {
++        GL(glGenVertexArrays(1, &vao));
++    }
++    ~notchlc_program() { glDeleteVertexArrays(1, &vao); }
++};
++
++// Created and used on the OpenGL device thread only (there is one device per process).
++notchlc_program& gl_program()
++{
++    static notchlc_program* p = new notchlc_program(); // never freed: lives as long as the GL context
++    return *p;
++}
++
++int hdr(const array<const std::uint8_t>& plane, nl::header_field f) { return static_cast<int>(nl::read_word(plane.data(), f)); }
++
++} // namespace
++
++bool notchlc_decoded_desc(const array<const std::uint8_t>& plane, core::pixel_format_desc& desc)
++{
++    if (plane.size() < nl::header_words * 4 || nl::read_word(plane.data(), nl::h_magic) != nl::magic)
++        return false;
++    const int w = hdr(plane, nl::h_width), h = hdr(plane, nl::h_height);
++    if (w <= 0 || h <= 0)
++        return false;
++    desc        = core::pixel_format_desc(core::pixel_format::bgra);
++    desc.planes = {core::pixel_format_desc::plane(w, h, 4, common::bit_depth::bit16)};
++    return true;
++}
++
++std::shared_future<std::shared_ptr<texture>> notchlc_decode_async(const spl::shared_ptr<device>&   ogl,
++                                                                  const array<const std::uint8_t>& plane,
++                                                                  const core::pixel_format_desc&   desc)
++{
++    const auto& p0 = desc.planes.at(0);
++    auto        payload =
++        ogl->copy_async(plane, p0.width, p0.height, p0.stride, p0.depth).share(); // queued before the decode below
++
++    struct params
++    {
++        bool valid, opaque;
++        int  width, height, table, y_ctrl, uv_off, uv_data, a_ctrl, a_data;
++    } u{};
++    if (plane.size() >= nl::header_words * 4 && nl::read_word(plane.data(), nl::h_magic) == nl::magic) {
++        u.valid   = hdr(plane, nl::h_valid) == 1;
++        u.opaque  = hdr(plane, nl::h_opaque) == 1;
++        u.width   = hdr(plane, nl::h_width);
++        u.height  = hdr(plane, nl::h_height);
++        u.table   = hdr(plane, nl::h_table);
++        u.y_ctrl  = hdr(plane, nl::h_y_ctrl);
++        u.uv_off  = hdr(plane, nl::h_uv_off);
++        u.uv_data = hdr(plane, nl::h_uv_data);
++        u.a_ctrl  = hdr(plane, nl::h_a_ctrl);
++        u.a_data  = hdr(plane, nl::h_a_data);
++    }
++    if (u.width <= 0 || u.height <= 0) {
++        u.valid  = false;
++        u.width  = 16;
++        u.height = 16;
++    }
++
++    return ogl
++        ->dispatch_async([ogl, payload, u]() -> std::shared_ptr<texture> {
++            auto src = payload.get();
++            auto dst = ogl->create_texture(u.width, u.height, 4, common::bit_depth::bit16);
++
++            auto& prog = gl_program();
++            prog.program->use();
++            prog.program->set("payload", 0);
++            prog.program->set("valid", u.valid);
++            prog.program->set("opaque_alpha", u.opaque);
++            prog.program->set("width", u.width);
++            prog.program->set("table", u.table);
++            prog.program->set("y_ctrl", u.y_ctrl);
++            prog.program->set("uv_off", u.uv_off);
++            prog.program->set("uv_data", u.uv_data);
++            prog.program->set("a_ctrl", u.a_ctrl);
++            prog.program->set("a_data", u.a_data);
++
++            src->bind(0);
++            dst->attach();
++            GL(glViewport(0, 0, u.width, u.height));
++            GL(glDisable(GL_BLEND));
++            GL(glDisable(GL_SCISSOR_TEST));
++            GL(glDisable(GL_DEPTH_TEST));
++            GL(glBindVertexArray(prog.vao));
++            GL(glDrawArrays(GL_TRIANGLES, 0, 3));
++            GL(glBindVertexArray(0));
++            GL(glTextureBarrier());
++            src->unbind();
++            return dst;
++        })
++        .share();
++}
++
++}}} // namespace caspar::accelerator::ogl
