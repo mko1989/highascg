@@ -397,8 +397,8 @@ func _build_toolbar() -> Control:
 	var fit := Button.new()
 	fit.text = "Fit"
 	fit.pressed.connect(func() -> void: stage.frame_box(_fit_box(), builder.front_yaw()))
-	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
-		bar.add_child(c)  # WO-786 haze, WO-770 VR
+	for c in [fit, preload("res://features/previs/haze.gd").picker(), preload("res://features/previs/projector_beams.gd").checkbox(), preload("res://features/previs/xr/vr_session_dialog.gd").toolbar_button()]:
+		bar.add_child(c)  # WO-786 haze, projector beams, WO-770 VR
 	return bar
 
 

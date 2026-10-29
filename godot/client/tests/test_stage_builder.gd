@@ -76,3 +76,24 @@ func test_front_yaw_faces_the_pictures() -> void:
 	b.set_objects([])
 	t.ok(is_equal_approx(b.front_yaw(), -0.35), "empty stage → the default view")
 	b.free()
+
+
+func _visible(n: Node) -> int:
+	var c := 0
+	for m in _meshes(n):
+		if (m as Node3D).visible:
+			c += 1
+	return c
+
+
+func test_projector_beams_hide_in_place_and_survive_a_rebuild() -> void:
+	var b := _builder()
+	b.set_objects([S.new_object("projection")])
+	t.eq(_visible(b.node_for("projection_1")), 3, "beams on: screen + projector + frustum")
+	b.set_beams(false)
+	t.eq(_visible(b.node_for("projection_1")), 2, "beams off in place: only the frustum hidden")
+	b.set_objects([S.new_object("projection")])
+	t.eq(_visible(b.node_for("projection_1")), 2, "a rebuild keeps the beams off")
+	b.set_beams(true)
+	t.eq(_visible(b.node_for("projection_1")), 3, "beams back on")
+	b.free()

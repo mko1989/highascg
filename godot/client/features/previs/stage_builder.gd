@@ -5,6 +5,7 @@ extends Node3D
 
 const S := preload("res://features/previs/stage_objects.gd")
 const LED_SHADER := preload("res://features/previs/led_screen.gdshader")
+const Beams := preload("res://features/previs/projector_beams.gd")
 
 var objects: Array = []          # normalised object dicts, in draw order
 var _nodes := {}                 # id -> Node3D
@@ -16,10 +17,14 @@ var live := true                 # WO-617: false = draw without video, hold no s
 var _held := {}                  # role -> true (surfaces this builder holds)
 var selected_id := ""
 var _sel_box: MeshInstance3D
+var show_beams := true           # projector beams (projector_beams.gd): the frustum lines of "projection" objects
+var _beams := {}                 # id -> the projection's frustum MeshInstance3D
 
 
 func _init(tex_provider: Callable = Callable()) -> void:
 	_tex_provider = tex_provider
+	show_beams = Beams.shared().on
+	Beams.shared().changed.connect(set_beams)
 
 
 func set_objects(list: Array) -> void:
@@ -27,6 +32,7 @@ func set_objects(list: Array) -> void:
 		(n as Node).queue_free()
 	_nodes.clear()
 	_mats.clear()
+	_beams.clear()
 	objects = []
 	for o in list:
 		if o is Dictionary:
@@ -60,6 +66,7 @@ func remove(id: String) -> void:
 		(_nodes[id] as Node).queue_free()
 		_nodes.erase(id)
 		_mats.erase(id)
+	_beams.erase(id)
 	sync_holds()
 
 
@@ -170,6 +177,7 @@ func _build(o: Dictionary) -> void:
 	root.visible = o.visible
 	add_child(root)
 	_nodes[o.id] = root
+	_beams.erase(o.id)
 	var mat := ShaderMaterial.new()
 	mat.shader = LED_SHADER
 	_mats[o.id] = mat
@@ -197,8 +205,18 @@ func _build(o: Dictionary) -> void:
 			var body := _box(Vector3(0.45, 0.18, 0.4))
 			body.position = p
 			root.add_child(body)
-			root.add_child(_frustum(p, size))
+			var beam := _frustum(p, size)
+			beam.visible = show_beams
+			_beams[o.id] = beam
+			root.add_child(beam)
 	_apply_source(o)
+
+
+## Projector beams: show or hide every projection's beam lines in place; a rebuild keeps the choice.
+func set_beams(on: bool) -> void:
+	show_beams = on
+	for b in _beams.values():
+		(b as Node3D).visible = on
 
 
 func _apply_source_all(role: String) -> void:
