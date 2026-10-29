@@ -1,6 +1,6 @@
 # WO-822 — Remove the :4443 HTTPS proxy (`highascg-https-proxy`), the way nginx went in WO-498
 
-**Status: DONE in the repo (29.10, offline gate green — see 4); the box step (disable + stop + mask the running unit) is the owner commands in 5 — NOT run, sudo needs an interactive terminal.**
+**Status: DONE (29.10) — repo (offline gate green, see 4) and box: the owner ran the remover at 19:16; verified below (Box verified).**
 
 Owner 29.10: *"The https proxy was deprecated due to some issues I don't remember now."* — then confirmed: remove it the same
 way nginx was removed in [WO-498](./498_WO_REMOVE_NGINX_AND_GZIP_IN_NODE.md).
@@ -139,3 +139,10 @@ needs nothing.
 Browsers on the LAN lose the secure context they got from `https://<box>:4443`. Nothing in the repo still needs one (1.2). If a
 future feature does (WebCodecs, clipboard, `getUserMedia`), the answer is Tailscale Serve (a real certificate, no stale SANs), not
 a hand-rolled proxy in this repo.
+
+## Box verified (29.10, after the owner ran the remover)
+
+- `ss -ltn | grep 4443` → nothing (exit 1); `curl -k https://127.0.0.1:4443/` → no connection (000).
+- `systemctl is-enabled highascg-https-proxy` → `masked` (`/etc/systemd/system/highascg-https-proxy.service` → `/dev/null`,
+  19:16); `is-active` → `inactive`; no `highascg-https-proxy` process.
+- `config/certs/` is gone (REMOVE_CERTS=1). The operator UI `http://127.0.0.1:4200/` → 200.
