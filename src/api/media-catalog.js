@@ -14,6 +14,9 @@ const {
 } = require('../media/local-media')
 const { dedupeMediaList } = require('../utils/media-browser-dedupe')
 
+/** How long one /api/media call keeps starting new ffprobe batches of 120 (the batch in flight always finishes). */
+const PROBE_BUDGET_MS = 3000
+
 function isHiddenThumbnailBucket(id) {
 	const norm = String(id || '').replace(/\\/g, '/').toLowerCase()
 	return norm === 'tb' || norm.startsWith('tb/') || norm === '.tb' || norm.startsWith('.tb/')
@@ -69,7 +72,7 @@ function getTemplateCatalog(ctx) {
  * Probe (bounded) + CINF enrichment — matches legacy `/api/media` body after raw list build.
  * @param {object} ctx
  * @param {object[]} media
- * @param {{ forceFullCinf?: boolean, skipFinalDedupe?: boolean }} [opts] — set **`skipFinalDedupe`** for WS catalog chunks so row count stays aligned with slice offsets.
+ * @param {{ forceFullCinf?: boolean, skipFinalDedupe?: boolean, probeBudgetMs?: number }} [opts] — set **`skipFinalDedupe`** for WS catalog chunks so row count stays aligned with slice offsets; `probeBudgetMs` overrides PROBE_BUDGET_MS (tests).
  * @returns {Promise<object[]>}
  */
 async function enrichMediaListForHttp(ctx, media, opts = {}) {
@@ -77,21 +80,27 @@ async function enrichMediaListForHttp(ctx, media, opts = {}) {
 	if (basePath) {
 		ctx._mediaProbeCache = ctx._mediaProbeCache || {}
 		const tried = (ctx._mediaProbeTried = ctx._mediaProbeTried || new Set())
-		const toProbe = media
-			// Skip ids already probed (WO-497 rule) — else every call re-probed the SAME first 120 and a large library's
-			// later files never got a resolution (owner 20.10: 225 of 345 clips, takes fell back to 16:9).
-			.filter((m) => !m.isDir && !tried.has(m.id) && (!m.resolution || (m.fps == null && m.fps !== 0)))
-			.slice(0, 120)
-		await Promise.all(
-			toProbe.map(async (m) => {
-				const fp = resolveSafe(basePath, m.id)
-				if (fp) {
-					const probed = await probeMedia(fp)
-					tried.add(m.id) // even when empty — "tried, nothing" is an answer too (a playback durationMs-only entry is not)
-					if (Object.keys(probed).length) ctx._mediaProbeCache[m.id] = { ...(ctx._mediaProbeCache[m.id] || {}), ...probed }
-				}
-			}),
-		)
+		// Skip ids already probed (WO-497 rule) — else every call re-probed the SAME first 120 and a large library's
+		// later files never got a resolution (owner 20.10: 225 of 345 clips, takes fell back to 16:9).
+		const pending = media.filter((m) => !m.isDir && !tried.has(m.id) && (!m.resolution || (m.fps == null && m.fps !== 0)))
+		// Live e2e 29.10: the Godot client fetches /api/media once at boot, so after a node restart it showed codec /
+		// resolution (and the WO-818 NotchLC ⚠) for the first 120 files only. Work through the rest in batches of 120
+		// within one call, up to a time budget (≈20 ms per ffprobe here); what is left goes to the next call as before.
+		const budgetMs = opts.probeBudgetMs != null ? opts.probeBudgetMs : PROBE_BUDGET_MS
+		const t0 = Date.now()
+		for (let i = 0; i < pending.length; i += 120) {
+			if (i > 0 && Date.now() - t0 >= budgetMs) break
+			await Promise.all(
+				pending.slice(i, i + 120).map(async (m) => {
+					const fp = resolveSafe(basePath, m.id)
+					if (fp) {
+						const probed = await probeMedia(fp)
+						tried.add(m.id) // even when empty — "tried, nothing" is an answer too (a playback durationMs-only entry is not)
+						if (Object.keys(probed).length) ctx._mediaProbeCache[m.id] = { ...(ctx._mediaProbeCache[m.id] || {}), ...probed }
+					}
+				}),
+			)
+		}
 		media = media.map((m) => ({ ...m, ...(ctx._mediaProbeCache[m.id] || {}) }))
 	}
 	if (!opts.skipFinalDedupe) media = dedupeMediaList(media)

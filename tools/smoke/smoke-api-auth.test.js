@@ -5,6 +5,9 @@ const assert = require('node:assert/strict')
 const fs = require('fs')
 const path = require('path')
 const os = require('os')
+// Live e2e 29.10: never read the box's own `.private/api-token` — once it exists (first start under enforcement), it
+// outranks the config token below and three cases failed with 401 on the box only (CI has no such file).
+process.env.HIGHASCG_API_TOKEN_FILE = path.join(os.tmpdir(), `smoke-api-auth-${process.pid}`, 'api-token')
 const auth = require('../../src/server/auth')
 const { redactObject } = require('../../src/support/redact-settings')
 const { extractZipSafely } = require('../../src/utils/safe-unzip')

@@ -7,8 +7,11 @@
  * autosave erased the whole stage. A write that omits a client-owned key keeps the stored copy;
  * the owning client always sends the key (possibly empty), which is how it edits or clears it.
  * WO-616 T11: `fixtures` (the follow → Art-Net patch, src/fixtures/follow-patch.js) is Godot-owned too.
+ * Live e2e 29.10: `operatorCompose` (the operator-screen PGM/PRV cell layout, written by the server in
+ * src/system/operator-gui-compose-persist.js, round-tripped by Godot) is not in the web export key list either: opening
+ * the web UI once autosaved mhp_harder without it. Same rule — omitted keeps the stored copy.
  */
-const CLIENT_OWNED_SLICES = ['previs', 'fixtures']
+const CLIENT_OWNED_SLICES = ['previs', 'fixtures', 'operatorCompose']
 /**
  * WO-807 — slices only the SERVER writes (`pixelMappings`: POST /api/fixtures/pixelmap). A client save / autosave never
  * changes them: the stored copy always wins (a Godot autosave posts its whole, possibly stale, project and retries a

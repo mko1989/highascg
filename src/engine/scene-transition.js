@@ -162,7 +162,11 @@ function mapTween(tw) {
 function normalizeTransition(t, forceCut) {
 	if (forceCut) return { type: 'CUT', duration: 0, tween: 'linear' }
 	const type = (t && t.type) || 'CUT'
-	const duration = Math.max(0, t && t.duration != null ? Number(t.duration) : 0)
+	/* A CUT is a cut whatever duration the picker left behind: both clients store {type:'CUT', duration:25} when
+	 * the type is switched to CUT, and the take then ran a 25-frame exit fade (live 29.10, frontex Look 3). Same rule
+	 * as scene-take-pgm-only.js and timeline-take.js. */
+	const isCut = String(type).toUpperCase().trim() === 'CUT'
+	const duration = isCut ? 0 : Math.max(0, t && t.duration != null ? Number(t.duration) : 0)
 	const tween = mapTween((t && t.tween) || 'linear')
 	return { type, duration, tween }
 }

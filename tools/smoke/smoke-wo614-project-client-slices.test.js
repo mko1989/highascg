@@ -29,6 +29,16 @@ describe('WO-614 client-owned project slices survive clients that do not know th
 		assert.deepEqual(web.previs, STAGE)
 	})
 
+	it('live e2e 29.10: a web autosave keeps the stored operatorCompose (operator-screen cell layout)', () => {
+		const cells = [{ id: 'pgm_1', role: 'pgm', mainIndex: 0, rect: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 } }]
+		const web = { name: 'Show', scenes: [] }
+		const kept = preserveClientOwnedSlices(web, { name: 'Show', operatorCompose: { cells } })
+		assert.deepEqual(kept, ['operatorCompose'])
+		assert.deepEqual(web.operatorCompose.cells, cells)
+		const godot = { name: 'Show', operatorCompose: { cells: [] } }
+		assert.deepEqual(preserveClientOwnedSlices(godot, { operatorCompose: { cells } }), [], 'a client that sends it wins')
+	})
+
 	it('the owning client can change or clear it (key present wins, even empty)', () => {
 		const godot = { name: 'Show', previs: { stage: { version: 1, objects: [] } } }
 		assert.deepEqual(preserveClientOwnedSlices(godot, { previs: STAGE }), [])

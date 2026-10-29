@@ -83,14 +83,19 @@ describe('WO-627 the media list probe works through the whole library', () => {
 				fs.writeFileSync(path.join(tmp, id), '') // empty → ffprobe fails ({}), which is an answer too
 				media.push({ id })
 			}
+			// probeBudgetMs 0 = one batch of 120 per call (the budget is spent before a second batch starts)
 			const ctx = { config: { local_media_path: tmp }, mediaDetails: {} }
-			await catalog.enrichMediaListForHttp(ctx, media, { skipFinalDedupe: true })
+			await catalog.enrichMediaListForHttp(ctx, media, { skipFinalDedupe: true, probeBudgetMs: 0 })
 			assert.equal(ctx._mediaProbeTried.size, 120)
 			assert.ok(ctx._mediaProbeTried.has('c000.mov') && !ctx._mediaProbeTried.has('c149.mov'))
-			await catalog.enrichMediaListForHttp(ctx, media, { skipFinalDedupe: true })
+			await catalog.enrichMediaListForHttp(ctx, media, { skipFinalDedupe: true, probeBudgetMs: 0 })
 			assert.equal(ctx._mediaProbeTried.size, 150, 'the remaining 30 — the old filter re-picked c000…c119 forever')
 			const rows = await catalog.enrichMediaListForHttp(ctx, media, { skipFinalDedupe: true })
 			assert.ok(rows.every((r) => !('probed' in r)), 'no bookkeeping leaks into /api/media rows')
+			// Live e2e 29.10: a client that fetches once (Godot at boot) gets the whole library probed in that call.
+			const fresh = { config: { local_media_path: tmp }, mediaDetails: {} }
+			await catalog.enrichMediaListForHttp(fresh, media, { skipFinalDedupe: true })
+			assert.equal(fresh._mediaProbeTried.size, 150, 'one call, batches of 120 within the time budget')
 		} finally {
 			fs.rmSync(tmp, { recursive: true, force: true })
 		}

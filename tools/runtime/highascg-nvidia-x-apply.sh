@@ -41,16 +41,18 @@ _apply_sync_to_display() {
 	_out="${HIGHASCG_NVIDIA_SYNC_OUTPUT:-}"
 	[ -n "$_out" ] || return 0
 	command -v python3 >/dev/null 2>&1 || return 0
-	_dpy=$(nvidia-settings -q dpys 2>/dev/null | python3 - "$_out" <<'PY'
+	# Live e2e 29.10: the program goes in -c, NOT a heredoc — `python3 - <<PY` makes the heredoc python's stdin, so
+	# the dpys pipe was never read, _dpy stayed empty and XVideoSyncToDisplayID was never set (-1 after every Apply).
+	# The target id is the [dpy:N] one, not the list index in front of it.
+	_dpy=$(nvidia-settings -q dpys 2>/dev/null | python3 -c '
 import re, sys
 name = sys.argv[1]
 for line in sys.stdin:
-    m = re.search(r"\[(\d+)\].*\(" + re.escape(name) + r"\)", line)
+    m = re.search(r"\[dpy:(\d+)\]\s*\(" + re.escape(name) + r"\)", line)
     if m:
         print(m.group(1))
         break
-PY
-) || true
+' "$_out") || true
 	[ -n "$_dpy" ] || return 0
 	nvidia-settings -a "[screen:0]/XVideoSyncToDisplayID=${_dpy}" 2>/dev/null || true
 	nvidia-settings --save 2>/dev/null || true
