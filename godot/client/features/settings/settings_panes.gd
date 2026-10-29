@@ -7,6 +7,7 @@ const ScreenPicker := preload("res://app/operator_screen_picker.gd")
 const Form := preload("res://features/settings/settings_form.gd")
 const AboutModel := preload("res://features/settings/about_model.gd")
 const T := preload("res://features/live/transitions.gd")
+const ConnectionMenu := preload("res://app/connection_menu.gd")
 
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"],
 	["vertical", "Fill height"], ["stretch", "Stretch"]]
@@ -96,13 +97,29 @@ static func demo_switch(f: Form) -> void:
 		OS.set_restart_on_exit(true, OS.get_cmdline_args())
 		restart.get_tree().quit())
 	var ob := f.local_option("Simulated server", [[false, "Off — use the server"], [true, "On — demo, no server"]],
-		Config.saved_demo(Config.UI_CFG), func(v: Variant) -> void:
+		OS.has_feature("web") or Config.saved_demo(Config.UI_CFG), func(v: Variant) -> void:
 			Config.save_demo(v == true)
 			restart.visible = (v == true) != Config.demo)
 	ob.disabled = OS.has_feature("web")  # the web build has no server: always a demo
 	f.target.add_child(restart)
-	f.note("Demo mode: looks, takes, faders, timers and pixel maps work on a built-in demo show; nothing reaches a "
-		+ "server or CasparCG. The header then reads \"%s\". Starting the client with --demo does the same." % Config.DEMO_LABEL)
+	if Config.demo:  # WO-815 phase 2: the demo lives in memory only — a fresh start is the demo show as shipped
+		var reset := Button.new()
+		reset.text = "Reset demo"
+		reset.tooltip_text = "Start the demo show again from the beginning (every change made in the demo is dropped)"
+		reset.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		reset.pressed.connect(func() -> void: reset_demo(reset))
+		f.target.add_child(reset)
+	f.note("Demo mode: looks, takes, faders, timers, timelines and pixel maps work on a built-in demo show; nothing "
+		+ "reaches a server or CasparCG. The header then reads \"%s\". Starting the client with --demo does the same." % Config.DEMO_LABEL)
+
+
+## WO-815 phase 2 — "Reset demo": the simulated server keeps everything in memory, so starting the client again (its
+## own arguments, --demo included: connection_menu.gd restart) or reloading the page (Web) brings the demo show back.
+static func reset_demo(host: Node) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.location.reload()")
+		return
+	ConnectionMenu.restart(host)
 
 
 static func companion(f: Form, status: Label, check: Button) -> void:

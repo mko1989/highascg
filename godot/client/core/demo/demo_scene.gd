@@ -5,6 +5,8 @@ extends RefCounted
 ## `change scene.live` broadcast follows (src/state/live-scene-state.js broadcastSceneLive, with ws-server.js's seq).
 ## The show document: autosave / save replace the in-memory project; the `scene_deck_sync` socket message replaces its
 ## looks (the node's live deck mirror, routes-data-project-handlers.js enrichProjectScenesFromLiveDeck).
+## Phase 2: the operator channel's compose windows (routes-operator-gui.js GET / POST /api/operator-gui/layout) are kept
+## so demo_video.gd can draw the operator picture; never atlas mode (like a screen surface, the reply has no slots).
 
 
 ## → a result, or null when the path is not one of these.
@@ -24,6 +26,11 @@ static func route(s: RefCounted, verb: String, path: String, b: Variant) -> Vari
 			return clear_bus(s, int(body.get("screenIdx", 0)), "program")
 		["POST", "/api/scene/new-look"]:
 			return new_look(s, body)
+		["GET", "/api/operator-gui/layout"]:
+			return s.reply({"ok": true, "channel": null, "cells": s.op_cells, "atlas": null})
+		["POST", "/api/operator-gui/layout"]:
+			s.op_cells = (body.cells as Array).filter(func(c: Variant) -> bool: return c is Dictionary) if body.get("cells") is Array else []
+			return s.reply({"ok": true, "atlas": null, "demo": true})
 		["POST", "/api/project/autosave"], ["POST", "/api/project/save"]:
 			if not (body.get("project") is Dictionary):
 				return s.refuse(400, "project required")

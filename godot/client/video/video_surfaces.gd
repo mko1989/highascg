@@ -12,6 +12,8 @@ const ShmNative := preload("res://video/shm_native.gd")
 const ShmTexture := preload("res://video/shm_texture.gd")
 const SurfaceHolders := preload("res://video/surface_holders.gd")
 const VideoFeed := preload("res://video/video_feed.gd")
+const Demo := preload("res://core/demo/demo_server.gd")
+const DemoVideo := preload("res://core/demo/demo_video.gd")
 const LEASE_EVERY_S := 5.0
 
 signal sources_changed  # WO-694: the roles that have a Caspar channel changed (pickers rebuild)
@@ -58,7 +60,7 @@ func reader(role: String) -> Variant:
 
 
 func is_native() -> bool:
-	return feed == null and ShmNative.available()
+	return feed == null and not Config.demo and ShmNative.available()
 
 
 ## Drop `owner`'s hold on a role; with no holders left it stops being read and its lease lapses
@@ -79,7 +81,11 @@ func _ensure(role: String) -> Dictionary:
 	if not _surfaces.has(role):
 		var path := path_for(role)
 		var native := is_native()
-		var r: Variant = feed.reader(role) if feed != null else (ShmNative.new(path) if native else ShmReader.new(path))
+		var r: Variant
+		if Config.demo:  # WO-815 phase 2: the look the simulated server has on that bus, as a still
+			r = DemoVideo.new(role, Demo.shared())
+		else:
+			r = feed.reader(role) if feed != null else (ShmNative.new(path) if native else ShmReader.new(path))
 		_surfaces[role] = {"reader": r, "tex": ShmTexture.new(), "native": native, "path": path}
 	return _surfaces[role]
 
@@ -114,8 +120,8 @@ func _apply_descriptors(list: Variant) -> void:
 	if _channels() != before:
 		sources_changed.emit()
 	# A surface whose announced path changed (e.g. operator shmName edited) is reopened.
-	if feed != null:
-		return  # the feed reads by role on the server; no local path to reopen
+	if feed != null or Config.demo:
+		return  # the feed reads by role on the server (a demo draws its stills); no local path to reopen
 	for role in _surfaces.keys():
 		var want := path_for(role)
 		if want != str(_surfaces[role].path):
@@ -134,7 +140,7 @@ func _process(_delta: float) -> void:
 		if r.poll():
 			if s.native:
 				s.tex.update_native(r.src)
-			elif feed != null:
+			elif feed != null or Config.demo:
 				s.tex.update_rgba(r.frame, r.width, r.height)
 			else:
 				s.tex.update(r.frame, r.width, r.height)

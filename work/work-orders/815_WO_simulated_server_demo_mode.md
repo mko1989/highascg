@@ -1,9 +1,11 @@
 # WO-815 — Simulated server ("demo mode") in the Godot client + a static Web demo
 
-**Status: IN PROGRESS (29.10) — phase 1 implemented and offline-verified (Godot 22685/0, of which 135 new; boot OK;
-Web export run in headless Firefox: take / PRV push / fader / mute / timer work). Published 29.10 after WO-811 was
-committed first (see "Publish (29.10, Opus, sequential)"): `.github/workflows/pages.yml` builds the Web demo into /demo/.
-Open: owner eye on the demo, phase 2 items below.**
+**Status: DONE (29.10, phases 1 + 2) — phase 2 (stills per look, timeline playback on the client clock, read-only
+Devices view, "Reset demo") verified by the Godot suite 22969/0 (101 new phase-2 assertions), a desktop demo client on a
+private Xvfb (play / pause / take / stop, PRV push + TAKE change the stills, Devices write refused, Reset restarts with
+--demo) and the local Web export in Firefox ESR (same stills, timeline plays, Devices loads, Reset reloads). Phase 1:
+Godot 22685/0, published 29.10 (see "Publish (29.10, Opus, sequential)"). Not committed yet (phase 2 files are in the
+working tree); owner eye on the demo still welcome.**
 
 Owner 29.10: "demo inside the client especially other systems than linux should have an option to simulate a server,
 should be part of the client. for show preparing. can we somehow fake the server for the static github page?"
@@ -130,10 +132,11 @@ modules, HAP encode.
 **NOT verified:** the owner's eye on the demo; GitHub Pages publishing (draft workflow never run); Windows / macOS
 desktop builds in demo mode (same code path, untested on those OSes).
 
-## Phase 2 (not done)
+## Phase 2 (planned list)
 
 Black previews → a still per look (generated thumbnails in the data set); timeline playback on the client clock;
-Devices tab read-only device-view; web icon font fallback; a "Reset demo" action.
+Devices tab read-only device-view; web icon font fallback; a "Reset demo" action. Built in "Phase 2 (29.10)" at the end
+of this WO; the web icon font fallback was done separately by WO-826.
 
 ## Publish (29.10, Opus)
 
@@ -211,3 +214,113 @@ Owner: "The GitHub pages still show docs instead of the Godot client with simula
   `/highascg/docs/assets/css/style.css` 200, `/map/map.html` 200 (`/map/` alone was already 404: the map page is
   `map.html`). Firefox ESR on a private Xvfb :117, 55 s after load: the demo runs at the root ("Demo show",
   "DEMO — no server", LED wall 6 looks, Projection 3 looks) — scratchpad `pages_root/root_demo.png`.
+
+## Phase 2 (29.10)
+
+### Investigation
+
+- **Why the previews were black.** `video/video_surfaces.gd` builds one reader per role (`pgm1` / `prv1` / … / `chN`,
+  and the operator surface `opgui`) from the server's shm / feed descriptors; the demo answers
+  `/api/video-surfaces` empty, so no reader exists. The Live tab's preview is **not** per-channel: it is the operator
+  surface `opgui` (Caspar's operator channel), whose PGM / PRV windows `features/live/compose_tiles.gd` lays out with
+  `POST /api/operator-gui/layout {cells:[{id, role, mainIndex, rect}], atlas:true}` (src/api/routes-operator-gui.js).
+  A first attempt that only fed `pgmN` / `prvN` left the Live preview purple "NO SIGNAL", which proved that.
+  Role → channel: src/system/video-surfaces.js `resolveRoleChannel` (a PGM-only main has no PRV).
+- **Look cards** fetch `GET /api/thumbnail/<media id>` over `Api.get_bytes` (features/live/look_thumb.gd); in phase 1
+  every `get_bytes` answered 501. Audio media have no thumbnail on a box either ("No preview" on the Opener card,
+  whose layers include wav files, is the box's behaviour).
+- **Timelines.** The node keeps them in src/engine/timeline-engine.js + timeline-playback-runtime.js: one cell per
+  timeline `{position, playing, loop, _t0, _p0}`; `getPlayback` → `{position, playing, loop, timelineId, sendTo}`,
+  broadcast as `timeline.playback` (index.js) on every transport change and `timeline.tick {timelineId, position}`
+  throttled to 165 ms while playing. `normalizeTimelineSendTo`; a paused timeline on air resumes where it stands; stop
+  resets a PGM `sendTo` to PRV-only; take = sendTo PGM-only + play from the current position
+  (src/api/routes-timeline.js, timeline-take.js). PUT creates when missing; POST /api/timelines upserts.
+- **Devices tab** reads `GET /api/device-view` (one big document: live hardware, screen destinations, cables). A
+  capture from this box (`GET 127.0.0.1:4200/api/device-view`, read-only) holds host name, EDID, monitor serials, log
+  and `/dev/` paths, owner device names — it has to be rebuilt, not copied.
+- **Reset.** The demo state lives only in memory (`Demo.shared()`), so a fresh process is the shipped show. Phase 1's
+  "Restart client" uses `OS.set_restart_on_exit(true, OS.get_cmdline_args())`, which drops the user args after `--`
+  (so `--demo` would be lost); `app/connection_menu.gd restart` already keeps them (`Profiles.restart_user_args`).
+
+### What was done (per file, and why)
+
+- **`tools/demo/build-demo-extras.py`** (new, 210 lines) — builds the two new data files from the phase-1 data set and a
+  device-view capture: `python3 tools/demo/build-demo-extras.py --device-view <capture.json>`.
+  - `thumbs.json` (191 kB): one generated 640-wide JPEG per MOVIE / STILL media (gradient + motif + the clip's name,
+    nothing from a real file; aspect of the screen the first look shows it on), base64 in JSON. JSON, not `.jpg`
+    files, because `res://demo/*.json` is already in every export preset's include filter and FileAccess reads it
+    without Godot's importer (a `.jpg` would need `.import` files and an import step in CI / Pages).
+  - `device_view.json` (22 kB): the capture with its destinations mapped onto the demo's by mode + main index (ids and
+    labels replaced), owner device / monitor names neutralised, EDID / monitor identity / log / `/dev/` / `/home/`
+    paths cleared, mode lists trimmed, host `demo`, DeckLink refs = index, audio devices limited to the PortAudio
+    ones, Caspar host 127.0.0.1 with the demo's channel map. Both pass build-demo-data.py's public-safe scan
+    (thumbs: its keys — random base64 happened to contain a banned 3-letter word).
+- **`godot/client/demo/thumbs.json`, `demo/device_view.json`** (new, generated).
+- **`core/demo/demo_video.gd`** (new, 186 lines) — the demo's VideoSurfaces reader, same face as video_feed.gd's
+  RoleReader (`poll / frame / width / height / signal_lost`, RGBA8). A still per look, not video: the look on that
+  channel in `scene.live` composited from the thumbnails with the look cards' own placement
+  (`look_thumb_math.gd sorted_layers / placement`), black when the bus is empty. For `opgui` it composes the operator
+  canvas: every PGM / PRV window of the stored compose layout gets its bus's still at its picture rect
+  (`compose_tile_math.gd fit / to_px / source_aspect`). It redraws only when the bus / layout key changes (take, PRV
+  push, clear, FTB). Reusing the two math files keeps the demo pictures where the real ones would be.
+- **`core/demo/demo_timeline.gd`** (new, 232 lines) — the timeline engine on the client clock: routes GET / POST
+  `/api/timelines`, GET / PUT / DELETE `/:id`, POST play / pause / stop / seek / sendto / loop / take, GET state;
+  cells, resume-on-air, stop → PRV-only, end → loop or stop, `timeline.playback` + `timeline.tick` (165 ms) — the
+  server's shapes, so `timeline_transport.gd` runs unchanged. Seeded from the project's timelines.
+- **`core/demo/demo_server.gd`** — routes `/api/timelines` to demo_timeline (the phase-1 list/get/put in
+  `demo_extras.gd` removed), `GET /api/device-view` from the data set (every write to it stays 501 → read-only),
+  `get_bytes()` (thumbnails → JPEG, the rest 501), `tick()`; the operator-gui layout POST no longer QUIET.
+- **`core/demo/demo_scene.gd`** — GET / POST `/api/operator-gui/layout` keep the compose cells (`op_cells`), answered
+  with `atlas:null` (no atlas in a demo).
+- **`core/demo/demo_extras.gd`** — the phase-1 timelines branch moved out (see above).
+- **`core/api.gd`** — `get_bytes` in demo answers from `Demo.shared().get_bytes()`.
+- **`core/ws.gd`** — the demo branch of `_process` calls `Demo.shared().tick()` once a frame (timeline clock).
+- **`video/video_surfaces.gd`** — in demo, readers are `DemoVideo` instances, `is_native()` false, descriptors ignored,
+  frames uploaded with `update_rgba` like the feed path.
+- **`features/settings/settings_panes.gd`** — "Reset demo" button (only in demo): desktop → `ConnectionMenu.restart`
+  (keeps `--demo`), Web → `window.location.reload()`. The note mentions timelines. On Web the "Simulated server"
+  option now shows "On" (it is disabled there and the Web build is always a demo; it showed "Off" before).
+- **Tests**: `tests/test_demo_phase2.gd` (new, 101 assertions: thumbnails, look still compositing, role channels and
+  sizes, reader follows the bus, operator surface windows, timeline on the clock incl. tick throttle / end / loop,
+  take / stop / create, device view read-only, reset + hooks keep `--demo`); `tests/test_demo_server.gd` adjusted
+  (public-safe scan reads thumbs.json keys only; the quiet boot-write example is now `POST /api/client-prefs`).
+- **Web icon font fallback**: done by WO-826 (DejaVu Sans symbol subset as Rewir's fallback) — nothing here.
+
+Simulated after phase 2 (in addition to phase 1): media thumbnails, PGM / PRV / operator-surface stills, timeline
+playback (play / pause / stop / seek / loop / sendto / take, ticks), operator-gui layout, Devices view (read-only).
+Still "not in demo": live-input / video frames, timeline pictures in PRV / PGM (a playing timeline does not change the
+stills), timeline flags (pause / jump), layer opacity / rotation in stills, models, shaders, tracking, network, cluster,
+streaming, device-view writes.
+
+### What was VERIFIED
+
+- **Godot suite: 22969 passed, 0 failed** (full run after the last change; the 18 ERROR / WARNING lines in the log are
+  the pre-existing ones). `test_demo_phase2.gd` 101 + `test_demo_server.gd` 152 = 253 / 0 in an isolated run.
+  `node tools/ci/check-max-file-lines.js`: 0 files over 500. Headless demo boots on tabs 0 / 2 / 4 / 6: 0 script
+  errors.
+- **Desktop demo client on a private Xvfb :93** (never `:0`; the owner's GUI untouched), screenshots in
+  `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo815/`:
+  - `base_devices.png` — before: Devices "Could not load devices: not in demo".
+  - `p2_live.png` — Live: PGM 1 Opener, PRV 1 Loop A, PGM 2 Projection loop, PRV 2 Song 1 projection stills; look
+    cards with thumbnails. `thumbs_sheet.png` — all generated stills.
+  - `p2_live_prv_push.png` → `p2_live_take.png` — click Loop B: PRV 1 becomes Loop B; TAKE: PGM 1 becomes Loop B.
+  - `p2_timeline_idle.png`, `p2_timeline_play_a.png` / `_b.png` (00:00:04:00 → 00:00:07:03 three seconds later,
+    playhead moves), `p2_timeline_pause_a.png` / `_b.png` (paused at 00:00:21:04, identical pixels 3 s apart),
+    `p2_timeline_take.png` (Take: PGM checked, PRV off, plays on from 21:04 → 23:06), `p2_timeline_stop.png` (00:00,
+    back to PRV-only).
+  - `p2_devices.png` — Devices view loads (Operator GUI / LED wall / Projection, rear panel, 4 cables, no host data);
+    `p2_devices_write.png` — "Reset all cabling" → OK: "not in demo: POST /api/device-view", cables unchanged.
+  - `p2_settings_reset.png` — "Reset demo" button; pressing it (timeline playing) restarted the client with
+    `-- --demo --resolution 1920x1200 --position 0,0 --tab=2` (new pid, args kept) → `p2_after_reset.png`: timeline at
+    00:00, paused, demo show as shipped.
+- **Web export** (preset "Web" → `godot/export/web-demo/`, index.pck 2.99 MB (+0.4 MB: thumbs.json + device_view.json,
+  both found in the pck), index.wasm 39.5 MB), served with `python3 -m http.server 8816 --bind 127.0.0.1`, Firefox ESR
+  with its own profile on a private Xvfb :118: `web_p2_live.png` (stills + card thumbnails, icon glyphs render),
+  `web_p2_timeline.png` / `web_p2_timeline_play.png` (00:00:04:02 after play), `web_p2_devices.png`,
+  `web_p2_settings.png` → Reset demo → the page reloaded (2nd `GET /index.html` in the server log) →
+  `web_p2_after_reset.png` fresh demo.
+- **NOT verified:** the published Pages site with phase 2 (nothing committed / pushed by this run); Windows / macOS
+  builds; the owner's eye.
+- **Known, not changed:** phase 1's "Restart client" (Simulated server switch) still restarts with
+  `OS.get_cmdline_args()` and so drops user args; deliberate enough there (switching the demo off must not keep
+  `--demo`), but a `--tab` / `--resolution` given on the command line is lost too.

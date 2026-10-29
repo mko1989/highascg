@@ -98,10 +98,10 @@ func _send(method: int, path: String, body: Variant, timeout_s := 0.0) -> Dictio
 
 ## Binary GET (models, thumbnails, support bundle): { ok, status, bytes, headers, error }.
 func get_bytes(path: String) -> Dictionary:
-	if Config.demo:  # WO-815: no files behind the simulated server (models, thumbnails, bundles)
+	if Config.demo:  # WO-815: media thumbnails come from the demo data set; models, bundles, … are not in the demo
 		if is_inside_tree():
 			await get_tree().process_frame
-		return {"ok": false, "status": 501, "bytes": PackedByteArray(), "headers": PackedStringArray(), "error": Demo.NOT_IN_DEMO}
+		return Demo.shared().get_bytes(path)
 	var res := await _send_bytes(path)
 	while AuthModel.needs_login(res) and await _login():
 		res = await _send_bytes(path)

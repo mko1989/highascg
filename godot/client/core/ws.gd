@@ -65,6 +65,7 @@ func _process(_delta: float) -> void:
 	if not _started:
 		return
 	if Config.demo:
+		Demo.shared().tick()  # WO-815 phase 2: the simulated server's clock (a playing timeline)
 		for m in _demo_inbox.duplicate():
 			_demo_inbox.pop_front()
 			messages_received += 1

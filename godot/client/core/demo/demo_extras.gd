@@ -1,5 +1,5 @@
 extends RefCounted
-## WO-815 — the simulated server's console mixer, screen timers, pixel map, timelines and fixture reads
+## WO-815 — the simulated server's console mixer, screen timers, pixel map and fixture reads (timelines: demo_timeline.gd)
 ## (core/demo/demo_server.gd routes here). Shapes follow the node:
 ##   mixer   src/audio/mixer-state.js + routes-audio-mixer.js: {gains, muted, solos} keyed by strip key; a change
 ##           broadcasts `change audioMixer`. A look layer's fader carries no key (its volume lives on the look) → ok.
@@ -16,8 +16,6 @@ static func route(s: RefCounted, verb: String, path: String, query: Dictionary, 
 		return _audio(s, verb, path, body)
 	if path.begins_with("/api/timers/"):
 		return _timers(s, verb, path, body)
-	if path.begins_with("/api/timelines"):
-		return _timelines(s, verb, path, body)
 	match [verb, path]:
 		["GET", "/api/fixtures/pixelmap"]:
 			return s.reply({"ok": true, "mappings": s.pixelmap})
@@ -165,25 +163,3 @@ static func save_pixelmap(s: RefCounted, list: Variant) -> Dictionary:
 	s.project["pixelMappings"] = s.pixelmap.duplicate(true)
 	return s.reply({"ok": true, "mappings": s.pixelmap})
 
-
-static func _timelines(s: RefCounted, verb: String, path: String, body: Dictionary) -> Variant:
-	var root: Dictionary = s.project.get("timelines", {}) if s.project.get("timelines") is Dictionary else {}
-	var list: Array = root.get("timelines", [])
-	if path == "/api/timelines":
-		return s.reply(list) if verb == "GET" else null
-	var seg := path.trim_prefix("/api/timelines/").split("/")
-	var id := seg[0].uri_decode()
-	var tl: Dictionary = {}
-	for t in list:
-		if t is Dictionary and str(t.get("id", "")) == id:
-			tl = t
-	if tl.is_empty():
-		return s.refuse(404, "timeline %s not found" % id)
-	if seg.size() == 1 and verb == "GET":
-		return s.reply(tl)
-	if seg.size() == 1 and verb == "PUT":
-		tl.merge(body, true)
-		return s.reply(tl)
-	if seg.size() == 2 and seg[1] == "state" and verb == "GET":
-		return s.reply({"position": 0, "playing": false, "loop": false, "timelineId": id, "sendTo": tl.get("sendTo", {})})
-	return null

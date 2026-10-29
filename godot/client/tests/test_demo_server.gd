@@ -81,7 +81,7 @@ func test_unknown_endpoint_is_not_in_demo() -> void:
 	t.eq(said.size(), 1, "a write says so in the notice line")
 	s.handle(GET, "/api/vr/status", null)
 	t.eq(said.size(), 1, "a GET poll stays quiet")
-	s.handle(POST, "/api/operator-gui/layout", {})
+	s.handle(POST, "/api/client-prefs", {})
 	t.eq(said.size(), 1, "the client's own boot-time writes stay quiet")
 	t.ok(s.unsupported.has("GET /api/vr/status"), "logged")
 
@@ -148,6 +148,9 @@ func test_data_set_is_public_safe() -> void:
 			continue
 		var text := FileAccess.get_file_as_string(Demo.DATA_DIR + "/" + f)
 		total += text.to_utf8_buffer().size()
+		if f == "thumbs.json":  # WO-815 phase 2: base64 image data — its keys are scanned (test_demo_phase2: JPEG payloads)
+			var th: Variant = JSON.parse_string(text)
+			text = ",".join(PackedStringArray((th.get("thumbs", {}) as Dictionary).keys())) if th is Dictionary else ""
 		for m in ip.search_all(text):
 			t.ok(m.get_string() in ["127.0.0.1", "0.0.0.0", "255.255.255.255", "236.10.10.10"], "%s: address %s" % [f, m.get_string()])
 		for w in ["/home/", "mhp", "VISUALE", "projekcja", "dioda", "/dev/", "Bearer"]:
