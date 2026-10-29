@@ -178,6 +178,7 @@ func _draw() -> void:
 		draw_rect(img, ThemeBuilder.BG_ELEVATED)
 		draw_string(font, img.position + Vector2(16, 28), "no picture from %s" % (role if role != "" else "—"),
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 15, ThemeBuilder.TEXT_MUTED)
+	var labels: Array = []  # [view rect, text, colour]; the selected region's first
 	for i in regions.size():
 		var g: Dictionary = regions[i]
 		if int(g.channelNo) != channel:
@@ -188,16 +189,33 @@ func _draw() -> void:
 		if c is Color:
 			draw_rect(Rect2(vr.position, Vector2(minf(vr.size.x, 14.0), minf(vr.size.y, 14.0))), c)
 		draw_rect(vr, ThemeBuilder.ACCENT_HOVER if sel else ThemeBuilder.WARN, false, 2.5 if sel else 1.5)
-		_label(font, vr, "%s  %s" % [g.id, P.size_label(P.to_rect(g))], ThemeBuilder.ACCENT_HOVER if sel else ThemeBuilder.WARN)
+		var l := [vr, "%s  %s" % [g.id, P.size_label(P.to_rect(g))], ThemeBuilder.ACCENT_HOVER if sel else ThemeBuilder.WARN]
 		if sel:
+			labels.push_front(l)
 			draw_rect(Rect2(vr.end - Vector2(HANDLE, HANDLE), Vector2(HANDLE, HANDLE) * 2.0), ThemeBuilder.ACCENT_HOVER)
+		else:
+			labels.append(l)
+	# WO-807: an auto proposal packs hundreds of regions edge to edge — every label drawn made an unreadable smear.
+	# A label that would land on one already drawn is skipped (the selected one always wins; the list names them all).
+	var taken := {}
+	for l in labels:
+		_label(font, l[0], l[1], l[2], taken)
 	if _drag == "draw":
 		var vr := _view_rect(_rect)
 		draw_rect(vr, ThemeBuilder.ACCENT, false, 1.5)
 		_label(font, vr, P.size_label(_rect), ThemeBuilder.ACCENT)
 
 
-func _label(font: Font, vr: Rect2, text: String, col: Color) -> void:
+## `taken` (P.label_cells keys already under a label) makes it skip a label that would overlap one drawn before.
+func _label(font: Font, vr: Rect2, text: String, col: Color, taken = null) -> void:
 	var at := vr.position + Vector2(vr.size.x + 4.0, 13.0) if vr.size.y < 18.0 else vr.position + Vector2(18.0, 14.0)
+	if taken is Dictionary:
+		var box := Rect2(at - Vector2(0.0, 12.0), Vector2(font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x, 15.0))
+		var cells := P.label_cells(box)
+		for k in cells:
+			if taken.has(k):
+				return
+		for k in cells:
+			taken[k] = true
 	draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, 3, ThemeBuilder.BG_DARK)
 	draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, col)

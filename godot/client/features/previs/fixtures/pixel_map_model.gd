@@ -7,6 +7,7 @@ extends RefCounted
 ## colourOrder}. Godot's JSON numbers are floats: everything from the API is cast with int().
 
 const MODES := ["average", "point"]
+const LABEL_CELL := 8.0  # view px grid for the region-label collision check (pixel_map_view.gd)
 
 
 ## Caspar channel → its raster from channelMap.channelResolutionsByChannel (the map the server checks rects against).
@@ -325,3 +326,12 @@ static func region_label(g: Dictionary, ch: int) -> String:
 	if int(g.channelNo) != ch:
 		return "%s · ch %d" % [g.id, int(g.channelNo)]
 	return "%s · %s" % [g.id, size_label(to_rect(g))]
+
+
+## The LABEL_CELL grid cells a label's box covers (Vector2i keys); two labels overlap when they share one.
+static func label_cells(box: Rect2) -> Array:
+	var out: Array = []
+	for y in range(floori(box.position.y / LABEL_CELL), floori(box.end.y / LABEL_CELL) + 1):
+		for x in range(floori(box.position.x / LABEL_CELL), floori(box.end.x / LABEL_CELL) + 1):
+			out.append(Vector2i(x, y))
+	return out

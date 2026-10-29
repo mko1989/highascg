@@ -149,3 +149,16 @@ func test_live_and_fixture_label() -> void:
 	t.eq([by.a1.on_wire, by.a2.color, by.a2.problem], [false, null, "channel 3 is not running in Caspar"])
 	t.eq(P.live_by_id({}), {})
 	t.eq(P.fixture_label(FX), "Pixel Line IP 1042 · U18.421 · 3 px")
+
+
+## WO-807 e2e finding: hundreds of proposal regions edge to edge drew overlapping labels. The view keeps a grid of the
+## cells already under a label and skips a label that would land on one (pixel_map_view.gd _label, P.label_cells).
+func test_label_cells_detect_overlap() -> void:
+	var a: Array = P.label_cells(Rect2(0, 0, 80, 15))
+	t.eq(a.size(), 11 * 2, "80×15 px → 11 columns × 2 rows of 8 px cells")
+	var next: Array = P.label_cells(Rect2(4, 0, 80, 15))  # a region 4 px to the right: same cells
+	t.ok(next.any(func(k: Vector2i) -> bool: return a.has(k)), "a label 4 px over collides")
+	var below: Array = P.label_cells(Rect2(0, 24, 80, 15))
+	t.ok(not below.any(func(k: Vector2i) -> bool: return a.has(k)), "a label one row below is free")
+	var src := FileAccess.get_file_as_string("res://features/previs/fixtures/pixel_map_view.gd")
+	t.ok(src.contains("labels.push_front(l)"), "the selected region's label is placed first, so it always shows")

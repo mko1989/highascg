@@ -460,3 +460,19 @@ held while mappings exist (~6 % Caspar CPU, phase 1) even when sampling idles.
 - Finding (not fixed): the region labels overlap in the pixel-map window.
 
 Evidence: session scratchpad `live-e2e/` (screenshots were read before they went in here; `onair.log` has every click with its epoch).
+
+## Follow-up 29.10 — overlapping region labels (fixed)
+
+**Investigation.** In the e2e screenshot `q807_pixmap.png`, 896 mapped regions sit edge to edge along the wall
+columns. `pixel_map_view.gd` `_draw()` drew a "R### 40 × 16 px" label for every one of them, so each column turned
+into an unreadable yellow smear.
+
+**Done.**
+- `_draw()` collects the labels and places them through a cell grid (`P.label_cells`, 8 px cells, in
+  `pixel_map_model.gd` so tests can load it). A label that would land on cells already taken is skipped.
+- The selected region's label goes first and always shows; the region list still names every region.
+- Outlines and colour swatches are unchanged.
+
+**Verified.**
+- New `test_label_cells_detect_overlap`. Godot suite: 22851 passed, 0 failed.
+- Visual check of the window on the glass is still to do (it gets a second-client screenshot).
