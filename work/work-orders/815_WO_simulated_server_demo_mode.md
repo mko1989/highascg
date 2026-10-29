@@ -324,3 +324,9 @@ streaming, device-view writes.
 - **Known, not changed:** phase 1's "Restart client" (Simulated server switch) still restarts with
   `OS.get_cmdline_args()` and so drops user args; deliberate enough there (switching the demo off must not keep
   `--demo`), but a `--tab` / `--resolution` given on the command line is lost too.
+
+### Phase 2 published (29.10, Opus)
+
+Commit 3d1f28ac pushed; CI and "Deploy GitHub Pages" green. The published https://mko1989.github.io/highascg/index.pck
+(2.96 MB) contains `core/demo/demo_video.gdc`, `core/demo/demo_timeline.gdc`, `demo/thumbs.json` and
+`demo/device_view.json` (checked by downloading the pck).
