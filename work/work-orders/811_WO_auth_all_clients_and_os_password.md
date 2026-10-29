@@ -1,6 +1,6 @@
 # WO-811 — Auth for every client (Godot auto-login, Companion, web UI) + change the casparcg OS password from Nuclear
 
-**Status: IN PROGRESS (29.10) — phases 1 + 2 DONE (offline suite 3504/3504 incl. 14 new, Godot 22237/0, Companion 100/100; live box probed with enforcement OFF). Phase 3 (OS-password button) BUILT, offline-verified (6 smokes, Godot 22252/0); sign-in pages screenshotted on a sandbox and fixed. Template credentials DONE (offline: templates never get the shared password; a node-made template key, the AMCP path refuses the password; 11 new smokes with enforcement ON on a sandbox; suite 3518 pass/0 fail). Live enforcement test 29.10 (≈3 min 45 s, reverted): Godot auto-login PASS, web sign-in PASS, unauth 401 / WS 401, PGM unaffected; **Companion FAIL — installed module 1.0.11 predates the password field (repackage ≥1.0.12)**; templates not exercised (none on air). Enforcement OFF again, `.private/api-token` kept. Open: Companion package, owner runs the button on :0, a real template under enforcement ON, enforcement ON itself (owner).**
+**Status: IN PROGRESS (29.10) — phases 1 + 2 DONE (offline suite 3504/3504 incl. 14 new, Godot 22237/0, Companion 100/100; live box probed with enforcement OFF). Phase 3 (OS-password button) BUILT, offline-verified (6 smokes, Godot 22252/0); sign-in pages screenshotted on a sandbox and fixed. Template credentials DONE (offline: templates never get the shared password; a node-made template key, the AMCP path refuses the password; 11 new smokes with enforcement ON on a sandbox; suite 3518 pass/0 fail). Live enforcement test 29.10 (≈3 min 45 s, reverted): Godot auto-login PASS, web sign-in PASS, unauth 401 / WS 401, PGM unaffected; **Companion FAIL — installed module 1.0.11 predates the password field (repackage ≥1.0.12)**; templates not exercised (none on air). Enforcement OFF again, `.private/api-token` kept. **Companion 1.0.1 retest 29.10 (window ≈59 s, reverted): FAIL again. 1.0.1 has the password field and the password is saved, but the module drops Companion 5's `secrets` argument (`instance.js:107,137` `void secrets`) and reads `config.api_password` (always empty), so WS → 401 and the connection goes to Error. Needs a module fix + 1.0.2.** **Companion 1.0.2 (module `7d656ee`, secrets merged) retest 29.10 (window ≈57 s, reverted): PASS. Connection OK, WS accepted 21:00:03 (≈15 s after the node kill), 0×401, `pgm_1` 41:16→41:02 under enforcement; saved password carried over from 1.0.1. Connection left ENABLED on v1.0.2.** Enforcement is still not proven for every client: templates, phones on a real phone, linked servers and a remote Godot were not exercised (see "Companion 1.0.2 under enforcement"). Open: owner runs the button on :0, a real template under enforcement ON, enforcement ON itself (owner).**
 **Source:** owner 29.10: *"inside nuclear i need an option to change password to casparcg ubuntu user. and add auth for any
 client, godot (default auto-login), companion, webui etc."*
 **Related:** [WO-96](./96_WO_API_WS_AUTHENTICATION.md) (API/WS auth v1 — the code this builds on; its web login was
@@ -647,3 +647,144 @@ temp path before it requires `auth.js`. Before the fix the offline suite gave 36
 **Blocker for leaving enforcement ON:** Companion. A module ≥ 1.0.12 has to be packaged from the dev source and
 installed, then the password typed into the connection. Templates under enforcement still need a look with an HTML
 layer taken while enforcement is ON (not covered by this window).
+
+### Companion 1.0.1 under enforcement (29.10)
+
+**Result: FAIL. The module never sends the password.** The live window was reverted after 59 s. PGM and Godot were
+not affected. Evidence is in the session scratchpad `wo811c/` (`run.log` lists every step with its time). Every
+screenshot was read before it went in here.
+
+**Step 1: import and configure, enforcement OFF. PASS.**
+- 20:44:56: `highpass-highascg-1.0.1.tgz` was imported through the Companion web UI (Modules → Import module package).
+  The browser was Firefox ESR on a private `Xvfb :94`. Nothing on :0 was touched. Companion journal:
+  `Instance/UserModulesManager Installed connection module highpass-highascg v1.0.1`. The store now has
+  `highpass-highascg-1.0.1` next to `-1.0.11` (s08_imported.png, s09_module.png).
+- The connection was changed from 1.0.11 to **v1.0.1** (Change Module Version; the module type was not changed) and
+  enabled at 20:46:17. The edit form now has the **"HighAsCG password"** field (s17_enabled.png). The password was
+  typed from `.private/api-token` with `xdotool type --file -` and saved at 20:46:45 (s18_pw_typed.png). It was never
+  printed. Firefox's "save password" offer was declined, and the profile was deleted afterwards. A read-only check of
+  Companion's `db.sqlite` found the value stored under `instances.value/secrets`. It is 64 characters long and matches
+  the file (the check printed only true or false).
+- Status was OK. The `highascg_pgm_1_*` variables were live: PK CLICK, remaining 12:48 → 12:38 and progress
+  73 → 74 between 20:47:38 and 20:47:48 (s24_pgm1_off_a.png, s25_pgm1_off_b.png).
+
+**Step 2: enforcement window. FAIL for Companion.**
+- **Start:** `config/security.json` md5 `101740e7ce2e7c3c74592f83cce34214` (byte copy `wo811c/security.json.orig`),
+  `git status` clean. Unauthenticated `/api/state` → 200.
+- **ON at 20:48:48.** The previous round's method was used: the live file was replaced with a copy that differs only
+  in `"enforceAuth": true`, then `kill -TERM` on MainPID. At 20:49:00, unauthenticated `/api/state` → **401**, and
+  `/api/auth/status` → `{"enforceAuth":true,"hasToken":true,"authenticated":false}`.
+- **Companion went to Error and did not recover.** At 20:49:16 and 20:49:25 the connection list showed the red
+  warning icon (e03_conns_on.png, e04_conns_on.png). From 20:49:03 to 20:49:13 the PGM variables stayed at
+  `--:--` with an empty clip and progress (e01_vars_on_a.png, e02_vars_on_b.png). Companion journal, every 5 s for
+  the whole window:
+  ```
+  20:48:53 error Instance/Connection/HighAsCG HighAsCG WS error: connect ECONNREFUSED 127.0.0.1:4200   (node restarting)
+  20:49:03 error Instance/Connection/HighAsCG HighAsCG WS error: Unexpected server response: 401
+  20:49:08 … 20:49:43 error … HighAsCG WS error: Unexpected server response: 401   (9 lines)
+  ```
+  Node journal: one `[WS Upgrade] Attempt for path: /api/ws` from Companion every 5 s and never a `client connected`.
+  The only `client connected` in the window (20:49:04.564) does not line up with Companion's 5-s retry, so it is
+  the Godot client.
+- **The credential itself works:** at 20:49:38, curl `GET /api/screens/pgm-layer` with `Authorization: Bearer
+  <the file>` → **200**, and without it → 401.
+- **PGM and Godot:** ch1 kept playing. The Godot Live tab stayed live and auto-logged in, with PK CLICK going from
+  35:50 to 36:59 / 47:38 across both restarts (g0_pre_on.png, g1_during_on.png; read-only x11grab of :0, no input).
+- **REVERT at 20:49:47 (window ≈ 59 s):** the byte copy was put back, md5 `101740e7…` again, then `kill -TERM`. At
+  20:49:58, unauthenticated `/api/state` → **200**, and `/api/auth/status` → `{"enforceAuth":false,…}`. `git status
+  config/security.json` is clean. Companion went back to **OK** by itself (r01_conns_after_revert.png).
+- The node does not log HTTP status codes per request, so "200 for Companion's polls" could not come from the node
+  journal. The proof used instead: `pgm-layer-poller.js:55` (`if (!res.ok) return`) only sets the
+  `highascg_pgm_*` variables from 2xx answers, and Companion logs the WS 401 itself.
+
+**Root cause (module source, not packaging).** Companion 5 / `@companion-module/base` 2.1.0 passes `secret-text`
+config fields in a separate `secrets` object (`base.d.ts:61,70`: `init(config, isFirstInit, secrets)`,
+`configUpdated(config, secrets)`). Companion stored the password there (`instances.value/secrets`, see above). The
+module throws it away and reads the wrong place:
+- `src/instance.js:107` and `:137`: `void secrets;`
+- `src/bridge/auth-headers.js:8-10`: `authHeaders(config)` reads `config.api_password`, which is always empty in
+  Companion 5. With an empty value there is no header, so the request gets a 401.
+- `test/auth-headers.test.js` passed (100/100) because it puts `api_password` into the config object by hand. It
+  never goes through the `secrets` path.
+
+**Fix needed (not done here):** keep `secrets` in `init`/`configUpdated` (for example `this.secrets = secrets ?? {}`)
+and build the header from `this.secrets.api_password`. The cleanest place is `normalizeConnectionConfig`, merging
+`api_password` from secrets so the many `authHeaders(this.instance.config)` callers keep working. Add a test that
+drives `init(config, false, { api_password })` and checks the header. Repackage (1.0.2), import it through the UI,
+and run this window again. (Whether the stored secret carries over to a new module version was not tested.)
+
+**End state:** the HighAsCG connection is on **v1.0.1**, the password is saved in its secrets, and it is
+**Disabled** (Companion journal 20:50:27 `Disable instance HighAsCG`, z01_end_disabled.png), as the owner had it.
+1.0.11 stays installed. Enforcement is **OFF**, `config/security.json` matches the tracked md5, and
+`.private/api-token` was kept. Xvfb :94 and Firefox are stopped.
+
+**Is enforcement proven for every client? No.**
+- Proven under enforcement: server gate (401 / WS 401 / `/login`), Godot auto-login, web sign-in, PGM unaffected.
+- **Failed:** Companion (this section; module fix needed).
+- **Not exercised:** on-air Caspar HTML templates (shader FFT WS tier, `playback_timers.html`; template key path
+  only proven on a sandbox), multiview chrome (`multiview_enabled` false here), phone pages `/intake` and `/audio`
+  (sign-in redirect proven by curl only, never on a phone), linked servers / replication (no peer was linked), the
+  Godot client on a remote machine (the password prompt), and `tools/runtime` scripts plus the HTTPS proxy (out of
+  scope). Leaving enforcement on stays the owner's decision. It would currently break Companion.
+
+### Companion 1.0.2 under enforcement (29.10)
+
+**Result: PASS.** Module 1.0.2 (module commit `7d656ee`: `withSecrets` in `src/bridge/auth-headers.js` merges
+`secrets.api_password` into the config in `init`/`configUpdated`) stays OK under enforcement, and its PGM readback
+keeps updating. The window was ≈ 57 s and was reverted. Evidence is in the session scratchpad `wo811c/` (`run.log`
+"R2" lines). Every screenshot was read before it went in here.
+
+**Before the window (enforcement OFF)**
+- I checked the bundle before importing. `main.js` has `init(e,r,i){this.config=Ut(ei(e,i))…` and
+  `configUpdated(e,r){…this.config=Ut(ei(e,r))`, where `ei` = `secrets.api_password ?? config.api_password`.
+- 20:57:55: `highpass-highascg-1.0.2.tgz` was imported through the Companion UI (Modules → Import module package,
+  private `Xvfb :94`). Companion journal: `Installed connection module highpass-highascg v1.0.2` (t03_sel.png).
+- The connection was changed from v1.0.1 to **v1.0.2** while disabled (t06_ver102.png, t07_ver_saved.png).
+- **The saved password carried over from 1.0.1: true.** A read-only `db.sqlite` check after the version change found
+  `instances.value/secrets` `api_password` set, 64 characters, matching the file. It was not re-entered.
+- Enabled at 20:58:45 (`Module initialized successfully`). Status OK, and the password field shows as filled
+  (t08_enabled.png).
+- Baseline: `pgm_1_remaining` 41:49 → 41:41 and progress 12 → 13 between 20:59:27 and 20:59:36, clip PK CLICK
+  (t11_vars_off_a.png, t12_vars_off_b.png). The owner had restarted the clip since round 1.
+
+**Window**
+- **Start:** `config/security.json` md5 `101740e7ce2e7c3c74592f83cce34214`, same bytes as `security.json.orig`.
+  Unauthenticated `/api/state` → 200.
+- **ON at 20:59:48:** the same method as before (copy that differs only in `"enforceAuth": true`, then `kill -TERM`).
+  At 21:00:00, unauthenticated `/api/state` → **401**, and `/api/auth/status` →
+  `{"enforceAuth":true,"hasToken":true,"authenticated":false}`.
+- **Companion connected right after the node restart.** Its next WS retry after the node came up was accepted:
+  ```
+  20:59:53 / 20:59:58  companion: HighAsCG WS error: connect ECONNREFUSED 127.0.0.1:4200   (node restarting)
+  21:00:03.944 node: [WS Upgrade] Attempt for path: /api/ws
+  21:00:03.945 node: [WS] client connected
+  21:00:03.980 node: [companion] hello instance=UA2t0PNlp23XfFLJvV3FP
+  ```
+  That is ≈ 15 s after the kill and ≈ 3 s after the node first answered. The gap is the module's fixed 5-s retry.
+  There are **0 lines matching `401`/`Unauthorized`** in the Companion journal and in the node journal for the whole
+  window. The other `client connected` lines (21:00:05, 21:00:07, 21:00:30) are the Godot client, which also stayed
+  logged in.
+- **PGM readback kept updating under enforcement:** 41:16 at 21:00:00, then 41:02 at 21:00:14, progress 13 → 14
+  (u01_vars_on.png, u03_vars_on.png). These variables are only set from 2xx answers of `/api/screens/pgm-layer`
+  (`pgm-layer-poller.js` `if (!res.ok) return`), so Companion's authenticated HTTP polls were answered 200.
+- Connection list at 21:00:33: HighAsCG v1.0.2 **OK** (u04_conns_on.png).
+- **PGM and Godot (read-only capture of :0):** ch1 kept playing. A Godot client had look "KV LOOP 2" open in the editor
+  during the window and kept working (g2_pre_on.png, g3_during_on.png). Correction (Opus): that was not the owner. It was
+  the session's own `--probe-edit` probe instances (WO-813 Trim width probe) running at the same time.
+- **REVERT at 21:00:45 (window ≈ 57 s):** the byte copy was put back, md5 `101740e7…`, then `kill -TERM`. At
+  21:00:56, unauthenticated `/api/state` → **200**, and `/api/auth/status` → `{"enforceAuth":false,…}`. `git status
+  config/security.json` is clean. Companion reconnected (`[companion] hello` 21:01:00) and showed OK at 21:01:08
+  (u05_conns_after_revert.png).
+
+**End state:** the HighAsCG connection is **ENABLED on v1.0.2**, the fixed module (coordinator decision after the
+PASS; the owner previously kept it disabled). 1.0.1 and 1.0.11 are still installed. Enforcement is **OFF**,
+`config/security.json` matches the tracked md5, and `.private/api-token` is kept. Xvfb :94 and Firefox are stopped.
+
+**Is enforcement proven for every client? Still no, but Companion is now proven.**
+- Proven live under enforcement: server gate, Godot auto-login, web sign-in, **Companion (module 1.0.2)**, PGM
+  unaffected.
+- **Not exercised:** on-air Caspar HTML templates (shader FFT WS tier, `playback_timers.html`; the template key is
+  only proven on a sandbox), multiview chrome (`multiview_enabled` false), phone pages `/intake` and `/audio` on a
+  real phone (redirect proven by curl only), linked servers / replication (no peer linked), a Godot client on another
+  machine (password prompt), and `tools/runtime` scripts plus the HTTPS proxy (out of scope).
+- Leaving enforcement on stays the owner's decision. Companion is no longer a blocker.
