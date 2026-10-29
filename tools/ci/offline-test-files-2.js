@@ -14,7 +14,10 @@ module.exports = [
 	'tools/smoke/smoke-wo785-gdtf-share-recognition.test.js',
 	'tools/smoke/smoke-wo787-timeline-preview-and-scrub.test.js',
 	'tools/smoke/smoke-wo789-timeline-live-preview.test.js',
+	'tools/smoke/smoke-wo798-times-overlay-redraw.test.js',
 	'tools/smoke/smoke-wo790-timeline-scrub-pacing.test.js',
 	'tools/smoke/smoke-wo802-node-only-links.test.js',
 	'tools/smoke/smoke-wo803-pgm-layer-readback.test.js',
+	'tools/smoke/smoke-alsamixer-terminal.test.js',
+	'tools/smoke/smoke-wo800-per-layer-audio.test.js',
 ]

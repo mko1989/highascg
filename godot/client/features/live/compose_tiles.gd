@@ -52,6 +52,8 @@ var osc: Node  # the live tab's OscMirror; its `updated` redraws while `times` i
 var auto := false  # WO-658: PGM / PRV windows tiled per screen into the visible canvas (live_tab's Auto toggle)
 var _retile_timer: Timer
 var _over: Control  # WO-652: the times paint here, above the atlas crops (children paint over the parent's _draw)
+var _x_line: TextLine  # WO-798: the label strip's ✕, shaped once — the glyph is not in the UI font, so every shape
+var _x_font: Font  # walked the system-font fallback (~1.3 ms each, 4 windows × 25 Hz ≈ 11 % of a core with Times on)
 
 
 func _ready() -> void:
@@ -222,8 +224,7 @@ func _draw() -> void:
 		line.width = maxf(0.0, strip.size.x - 12.0 - CLOSE_W)
 		line.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		line.draw(get_canvas_item(), strip.position + Vector2(6, (LABEL_H - line.get_size().y) / 2.0), Color.WHITE)
-		var x := TextLine.new()
-		x.add_string("✕", font, 11)
+		var x := _close_glyph(font)
 		var xr := _close_rect(r)
 		x.draw(get_canvas_item(), xr.position + (xr.size - x.get_size()) / 2.0, Color(1, 1, 1, 0.85))
 	_over.queue_redraw()
@@ -239,6 +240,21 @@ func _draw() -> void:
 
 ## WO-652: text on the transparent preview under the label strip (owner 21.10: "under the label not on the screen"),
 ## outlined to stay readable; the top running layer big.
+## WO-798: the ✕ TextLine, rebuilt only when the theme font changes.
+func _close_glyph(font: Font) -> TextLine:
+	if _x_line == null or _x_font != font:
+		_x_line = TextLine.new()
+		_x_line.add_string("✕", font, 11)
+		_x_font = font
+	return _x_line
+
+
+## WO-798: OSC ticks repaint only the Times overlay — the windows, labels and crops change with the layout, not the clock.
+func redraw_times() -> void:
+	if _over != null:
+		_over.queue_redraw()
+
+
 func _draw_over() -> void:
 	if not times:
 		return

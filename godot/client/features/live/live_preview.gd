@@ -87,12 +87,13 @@ func host(slot: Control) -> void:
 		tiles.refresh()
 
 
-## The OSC mirror the Times rows read (live_tab's); its `updated` redraws the windows while Times is on.
+## The OSC mirror the Times rows read (live_tab's); its `updated` repaints the Times overlay while Times is on (WO-798:
+## only the overlay — a whole-windows redraw at the OSC rate cost ~11 % of a core).
 func set_osc(osc: Node) -> void:
 	tiles.osc = osc
 	osc.updated.connect(func() -> void:
 		if tiles.times and tiles.is_visible_in_tree():
-			tiles.queue_redraw())
+			tiles.redraw_times())
 
 
 ## WO-621 N6 / WO-649 — one 2D / 3D toggle over the preview (web previs-pgm-3d.js toggle; it names the view shown),
