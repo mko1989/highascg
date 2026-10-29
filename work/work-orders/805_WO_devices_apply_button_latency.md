@@ -1,6 +1,6 @@
 # WO-805 — Devices tab "Apply Caspar config (restart)" is too slow: where the time goes
 
-**Status: IN PROGRESS (29.10) — fixes 1 + 5 (run.sh exit wait, marker sleep) and 3 (inventory once) done and verified (offline suite + stub supervisor tests + live operator restarts: Caspar exit→start 2.8-5.1 s → 0.25 s); NVIDIA ordering, Godot timeout, AMCP poll, custom mode still open; owner Apply QA pending**
+**Status: IN PROGRESS (29.10) — all §4 items done and verified offline. Fixes 1 + 5 (run.sh exit wait, marker sleep) and 3 (inventory once) were also verified live (Caspar exit→start 2.8-5.1 s → 0.25 s). Fix 2 pass: NVIDIA once after the restart (with the sync output), xdotool without `--sync` (the 5 s outliers), AMCP-ready wake ≤ ~0.2 s, Godot/relay 120/110 s Apply timeout, custom mode tried once per X server (offline suite 3620/0/2, Godot 22809/0, negative control 15/18 fail on HEAD). Owner Apply QA + live timing per the plan at the end are pending**
 **Source:** owner 29.10: *"verify the apply and restart command stack and waits inside the button in the devices tab.
 it seems to be a bit too slow."*
 **Related:** [WO-440](./440_WO_apply_button_always_restarts_caspar.md) (button always sends `force:true`),
@@ -310,3 +310,139 @@ the lib. Cost: one extra `/bin/sh` process per Caspar run; fork rate unchanged.
 - **NOT verified:** a full Apply from the Devices tab (not clicked; owner QA) — expected saving ≈ 8-10 s of run.sh
   wait + ~1 s marker sleep + ~1.2 s inventory on today's 16.1 s trace; a real hung Caspar on the box (covered only
   by the stub tests); the NVIDIA ordering, Godot timeout, AMCP-ready poll and custom-mode items (not in this pass).
+
+---
+
+## Fix 2 (29.10, Opus) — NVIDIA ordering, xdotool `--sync`, AMCP-ready wake, Godot timeout, custom mode
+
+Scope (owner): the four items left open by the first pass (§4 fixes 4, 2, 6, 7). Not clicked live: another agent was
+running PGM tests; no node/Caspar restart, no Apply, no touch of the Godot client on :0.
+
+### Findings written before the change
+
+Post-fix-1/3/5 live Applies today (POST → "AMCP back"): 12:42 **4.71 s**, 13:14 **6.12 s**, 13:15 **10.86 s**.
+The 13:14 one, step by step: custom mode (step 2) 0.57 s · live xrandr 0.5 s · inventory 0.55 s · primary + pointer
+0.07 s · **NVIDIA blocking 1.42 s** · RESTART → "waiting" 0.76 s · relaunch → back 2.1 s · (deferred NVIDIA after the
+answer 1.38 s).
+
+**N1 — the NVIDIA policy runs twice per Apply, the first one blocking.** `full-config-apply.js` (HEAD :208 / :222)
+called `applyOperatorDisplaySession`, which ran `applyNvidiaDisplayPolicy` synchronously
+(`x-display-session-runtime.js` HEAD :166-169, `tools/runtime/highascg-nvidia-x-apply.sh`, ~15 `nvidia-settings`
+calls). Then the deferred run after the restart (HEAD :274-282) did it again. Blocking run 1.33-1.58 s since 17.10
+(0.4-0.6 s in September); deferred run 1.0-1.41 s. The pre-restart run cannot stick: the restart's own xrandr/Caspar GL
+init is what the deferred run re-asserts. **Bug found on the way:** the deferred run used the bare
+`displaySessionEnv()` (HEAD :282). It lacked `HIGHASCG_NVIDIA_SYNC_OUTPUT`, so the one run that sticks never set
+XVideoSyncToDisplayID for a ticked "NVIDIA sync to display" port (a read-only query showed -1 with port 3 / DP-4 ticked).
+Also, HEAD gated the deferred run on `preApplied || postApplied` only; a live xrandr call that ran but did not verify
+(it may still have reset MetaMode) got no NVIDIA run at all.
+
+**N2 — `xdotool mousemove --sync` loses exactly 5 s when the pointer is already there.** `--sync` waits for a pointer
+MOTION event; a warp to the current position produces none, so xdotool sits until the 5 s execFile timeout
+(`x-display-session-runtime.js` HEAD :155; also the apply-layout.sh line HEAD :105 and
+`x-display-session-gui-windows.js` HEAD :21). Reproduced on a private Xvfb :97: same position → rc 124 after
+**4006 ms**, any other move ~33 ms. Journal: of the 79 Applies since 03.09, **6 had step 3 over 5 s**. Four were this
+xdotool failure after exactly 5 s (17.10, 21.10, 25.10, 29.10 13:15; the 13:15 Apply came 30 s after a successful
+park, so the pointer was already at the centre). The other two were NVIDIA script retries (4.4-4.5 s). The journal holds
+139 xdotool failures since 01.09 (startup included). WO-337's comment already notes that a second concurrent `--sync`
+loses 5 s. Nothing after the warp reads the pointer position, so `--sync` buys nothing.
+
+**N3 — AMCP-ready noticed 0.44-0.76 s late.** `caspar-restart.js` HEAD :82-129, `waitForAmcpReady` with `pollMs`
+400: the port poll (`ss -tln`) every 400 ms, then on port-up a reconnect nudge followed by a **fixed**
+`sleep(min(pollMs, 800))` (HEAD :107). The client connects within ms of the nudge, but the wait only looks again
+after that sleep. Journal: Caspar "Initialized controllers" → AMCP accept 0.04-0.36 s; accept → node
+"AMCP back" **exactly 0.40 s every time** (12:42, 13:14, 13:15, 10:14); listen → back 0.44-0.76 s.
+
+**N4 — Godot gives up at 15 s while the server is still working.** `godot/client/core/api.gd` HEAD :15
+`TIMEOUT_S := 15.0` is pool-wide. The server's own waits cap near ~100 s (RESTART, kill, 45 s AMCP wait, retry). Before
+fixes 1/3/5, 25 of 88 Applies took over 15 s. The client then reported "no answer" while the server finished the Apply
+fine. The node relay (`cluster-relay.js` HEAD :18, 14 s) has the same cap for a linked server's Apply. There are two
+callers: `features/devices/cable_gesture.gd:364` (Devices Apply) and `features/devices/server_flow.gd:246`
+(hot-backup `apply-device-view-caspar`).
+
+**N5 — the custom mode is re-created on both layout calls of every Apply and always fails on NVIDIA.**
+`os-config-xrandr-apply.js:170` → `xrandr-custom-mode.js` `tryAddXrandrModeFromCvt` (HEAD :187): `cvt` +
+`--newmode` (BadName, the mode already exists) → strip → `--newmode` → `--addmode` (**BadMatch: NVIDIA refuses RandR
+user modes**) → `--delmode` + `--addmode` → null → falls back to the EDID 3840x1792. Per attempt min 30 / median 139 /
+mean 205 / max **804 ms** (n = 36 since 01.10), ×2 per Apply. The strip (HEAD :125) also **switches the live output to
+the first listed WxH** before `--rmmode`. Here that happens to be the current mode. On a rig whose first listed mode
+differs, it is a real modeset of a live output on every Apply. The mode it strips is not even attached: on this box
+`3840x1792_50.00` dangles unattached, while DP-0's EDID already lists 3840x1792@50.
+
+### What was done
+
+| file | lines | change |
+|---|---|---|
+| `src/utils/full-config-apply.js` | 337 | both `applyOperatorDisplaySession` calls pass `skipNvidia: true` (:221, :236); the deferred run is the only NVIDIA run, its env is `xDisplaySession.nvidiaPolicyEnv(ctx.config)` (:297, falls back to `displaySessionEnv()`), and it also runs when the live xrandr command ran unverified (:288 `… \|\| out.layout.postXrandrCommand`). Sandbox guard after the config write (:117, see side finding) |
+| `src/utils/x-display-session-runtime.js` | 216 | `opts.skipNvidia` (:183, logs "deferred until after the Caspar restart (WO-805)"); new exported `nvidiaPolicyEnv(config, env)` (:126) shared by both runs; `--sync` dropped from the xdotool argv (:172) and the apply-layout.sh line (:106) |
+| `src/utils/x-display-session-gui-windows.js` | — | `parkPointerOnOperatorDisplay` without `--sync` (:22) |
+| `src/utils/caspar-amcp-wait.js` | 162 (new) | the AMCP wait helpers moved out of caspar-restart.js (it was at 500 lines). `sleepUntilConnected` (:64) checks the connected property every 25 ms, and both sleeps in `waitForAmcpReady` wake on it (:113, :135). New opts: `portStableMs` (the port-up-but-no-client fallback now also needs the port up this long, so a faster poll cannot shorten that window, :114) and an injectable `isPortListening` (tests) |
+| `src/utils/caspar-restart.js` | 403 | imports + re-exports the helpers (same names); `APPLY_AMCP_POLL_MS = 150`, `APPLY_PORT_STABLE_MS = 2000` (:22-23) passed by `reloadCasparAfterConfigWrite` (:279-280). 2000 ms keeps the old 3 × 400 ms + margin |
+| `src/cluster/cluster-relay.js` | 104 | `LONG_TIMEOUT_MS = 110_000` for `/api/caspar-config/apply` and `/api/replication/apply-device-view-caspar` only (:21-22, :94); other requests keep the 5-argument call / 14 s |
+| `godot/client/core/api_timeouts.gd` | 14 (new) | `TIMEOUT_S` 15, `APPLY_TIMEOUT_S` 120, `request_timeout()`, all without autoload dependencies (preloading `core/api.gd` from a feature script breaks the headless test runner: `Config` is an autoload) |
+| `godot/client/core/api.gd` | 135 | constants from api_timeouts.gd; `post_json` / `request` / `_send` take `timeout_s := 0.0`, `_send` sets `r.timeout = request_timeout(timeout_s)` (:84), and a pooled node goes back to `TIMEOUT_S` on release |
+| `godot/client/features/devices/cable_gesture.gd` | — | Devices Apply POST with `ApiScript.APPLY_TIMEOUT_S` (:366); doc comment updated |
+| `godot/client/features/devices/server_flow.gd`, `server_controls.gd` | — | hot-backup apply POST with `APPLY_TIMEOUT_S` (:248); the `_Io` adapter forwards `timeout_s` |
+| `src/utils/xrandr-custom-mode.js` | 289 | `lastCreateOutcome` per `output\|mode\|timings` (:196). When this process already tried and X still shows that result (`xrandrQueryListsMode` on the caller's `xrandr --query`, :199), there are two cases. If the mode is on the output, it is reused. If it only dangles (`--addmode` was refused before), it is not retried, with an info line. Either way no X call is made (:219-231). A restarted X server has no user modes, so the mode is created again. The strip of an **unattached** mode is `--rmmode` only, with no switch-away modeset and no `--delmode` (:128) |
+| `src/utils/os-config-xrandr-apply.js` | — | passes `queryText: xrandrQueryOut` (:179) |
+| tests | | `tools/smoke/smoke-wo805-amcp-ready-wake.test.js` (6), `smoke-wo805-apply-nvidia-deferred.test.js` (7), `smoke-wo805-custom-mode-once.test.js` (5), all registered in `tools/ci/offline-test-files-2.js`; `godot/client/tests/test_wo805_apply_timeout.gd` (new); `test_devices_server_page.gd` FakeIo records the timeout per path and the replay asserts 120 s for the apply and 0 (default) for every other POST |
+
+**Rejected:** running the NVIDIA policy concurrently with the Caspar restart. It would hide the remaining ~1.4 s, but
+it races Caspar's GL init on the same heads (unknown effect on FCP/MetaMode). Moving it after the answer gets the same
+saving on the button without that risk. Also rejected: a 202 + WS completion for the Apply (more client work; the
+long timeout fixes the false failure).
+
+**Side finding (fixed): sandbox Apply hits the live box.** `HIGHASCG_SANDBOX=1` (tools/e2e) still ran every step
+after the config write against the LIVE display and Caspar: nodm restart, xrandr `--primary`, pointer, NVIDIA on :0,
+the /tmp operator marker, and a fast kill based on `ss` seeing the live :5250. It now returns `step: 'sandbox'` right
+after the write (`full-config-apply.js:117`). That is also why no sandbox e2e timing was run for this pass.
+
+### What was VERIFIED
+
+- **Offline suite** `node tools/ci/run-offline-tests.js`: **3622 tests, 3620 pass, 0 fail, 2 skipped** (baseline at
+  the start of this pass 3575/0/2; +18 new here, the rest from parallel WOs). `check-max-file-lines`: 0 over 500.
+  eslint on all touched JS: 0 errors; the 2 warnings are pre-existing unused imports on untouched lines.
+  `format:check`: clean. `check-unwired-exports`: no new orphans (the 4 listed belong to WO-801/WO-821).
+- **Godot** `run_tests.gd`: **22809 passed, 0 failed** (baseline 22750; includes the new test file and the
+  server-page timeout assertions). The first run caught the autoload problem: preloading `core/api.gd` from
+  server_flow.gd failed to compile under the `-s` runner. That is why `core/api_timeouts.gd` exists. `api.gd` (which
+  the runner never compiles) was compile-checked with `--check-only` on a copy with `Config` stubbed: clean.
+- **Negative control:** the three new smokes run against a `git archive HEAD src` copy fail **15 of 18** (the AMCP
+  file fails to load, the NVIDIA/relay file fails 7/7, custom-mode fails 3/5). The 3 that pass are the "restarted
+  X re-creates" and "no queryText keeps the old path" compatibility cases, which are meant to pass on both.
+- What the smokes prove: AMCP back ≤ one 150 ms poll + the connect after the port comes up; with a 400 ms poll a
+  connect wakes the wait in ~25 ms, where it used to take a fixed 400 ms; the no-client fallback is not earlier than
+  `portStableMs`. Apply order: write → persist → live → display session (skipNvidia) → restart → NVIDIA once with
+  `HIGHASCG_NVIDIA_SYNC_OUTPUT`, on both the canvas-fits and the nodm path. The real `applyOperatorDisplaySession`
+  sends `xdotool mousemove <x> <y>` without `--sync`. Custom mode on a fake NVIDIA X: tried once in 4 runs, no
+  `--output … --mode` on the live output; on an accepting driver it is created once and reused.
+- xdotool: private Xvfb :97 (above), `--sync` same-position 4006 ms (rc 124) vs ~33 ms without `--sync`.
+- **Node live:** another agent restarted highascg at 19:32:58, which loaded this code. API 200, no errors from these
+  files. Its xrandr retry loop ("cannot find mode 5760x1728", 19:33:03-19:33:20) is the OS-watchdog re-applying a
+  loaded project's EDID-source plan (`source=edid` in the log). It does not go through the custom-mode code and is
+  unrelated.
+- **NOT verified:** a full Apply on the box (not clicked: live PGM tests by another agent). Owner QA: after the
+  restart, Force Composition Pipeline now arrives ~1-1.4 s after Caspar is back (deferred only). Watch for a blink or
+  tearing on PGM in that window.
+
+**Expected effect** on the 13:14 trace (6.12 s): −1.42 s NVIDIA, −~0.4 s AMCP wake, −0.57 s custom mode (both calls
+skipped once this node process has tried the mode; the first Apply after a node start pays one attempt) ≈ **~3.7 s**.
+The 5 s xdotool outliers (4 of 79 Applies) are gone. The button no longer reports a timeout on a slow Apply (up to
+120 s).
+
+### Live measurement plan (next round, owner or a session allowed to click Apply)
+
+`journalctl -u highascg -u casparcg-server -f -o short-precise`, click Apply in Devices, then read off:
+
+1. click → `[Full apply] Step 1` (client → server latency).
+2. `Step 3` → `Step 4`: expect ~0.6-0.8 s. There must be **no** `xdotool mousemove failed`, and there must be a
+   `NVIDIA policy deferred until after the Caspar restart (WO-805)` line.
+3. `custom mode … reused (WO-805)` / `… not retried (WO-805)` on the 2nd layout call (and both calls from the 2nd
+   Apply on); no `--newmode failed` spam.
+4. `Step 4 — reload Caspar` → `waiting` → Caspar `Initialized controllers` → AMCP accept → node `AMCP back`:
+   expect accept → back **≤ 0.2 s** (was exactly 0.40 s).
+5. `AMCP back` → `NVIDIA display policy applied (deferred)`: ~1-1.4 s; and check `nvidia-settings -q
+   XVideoSyncToDisplayID` shows the ticked port's display (was -1).
+6. Outputs back: Caspar screen consumer initialized / PGM visible on the LED head (stopwatch or the WO-805 /proc
+   script).
+7. Godot: the button returns to idle with the server's status message, **no timeout toast**, total time noted.
+8. PGM blink / tearing between "AMCP back" and the deferred NVIDIA line (owner eye).

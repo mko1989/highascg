@@ -13,6 +13,7 @@ const F := preload("res://features/devices/replication_format.gd")
 const O := preload("res://features/devices/output_ports_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
+const ApiScript := preload("res://core/api_timeouts.gd")  # WO-805: APPLY_TIMEOUT_S (no autoload deps)
 
 ## sessionStorage 'highascg.replication.inspectorMode': the operator's mode pick survives page rebuilds.
 static var session_intent := ""
@@ -243,7 +244,8 @@ func refresh_connection() -> void:
 
 func apply_caspar() -> void:
 	io.toast("Applying Device View setup and regenerating Caspar…", "info")
-	var r: Dictionary = await io.post_json("/api/replication/apply-device-view-caspar", {})
+	# WO-805: the follower regenerates and restarts Caspar before it answers — far past the default 15 s.
+	var r: Dictionary = await io.post_json("/api/replication/apply-device-view-caspar", {}, ApiScript.APPLY_TIMEOUT_S)
 	if not r.ok:
 		_fail(r)
 		return

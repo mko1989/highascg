@@ -16,6 +16,10 @@ const http = require('http')
 const { outboundAuthHeaders } = require('../server/auth')
 
 const TIMEOUT_MS = 14000 // under the client's 15 s (core/api.gd TIMEOUT_S): it hears this server name the silent one
+/** WO-805: the Caspar Applies restart Caspar (typ. 5-15 s; the server's own waits cap out near ~100 s) — under the client's
+ *  own long timeout for them (core/api.gd APPLY_TIMEOUT_S 120 s), so the relay still answers first. */
+const LONG_TIMEOUT_MS = 110_000
+const LONG_PATHS = /^\/api\/(caspar-config\/apply|replication\/apply-device-view-caspar)(\?|$)/
 const METHODS = new Set(['GET', 'POST', 'DELETE'])
 const MAX_BODY = 8 * 1024 * 1024
 /** Never relayed: [pattern, why] (regexes, so the contract generator does not list them as routes handled here). */
@@ -86,7 +90,9 @@ function createRelay(deps) {
 		if (!peer) return json(404, { error: 'no such server (not linked here)' })
 		const p = relayPath(tail)
 		if (p.error) return json(403, { error: p.error })
-		const r = await request(m, peer.host, peer.port, p.path + queryText(query), m === 'GET' ? undefined : body)
+		const args = [m, peer.host, peer.port, p.path + queryText(query), m === 'GET' ? undefined : body]
+		if (LONG_PATHS.test(p.path)) args.push(LONG_TIMEOUT_MS)
+		const r = await request(...args)
 		if (!r.status) {
 			deps.log?.('warn', `[cluster] relay ${m} ${p.path} → ${peer.name}: ${r.error}`)
 			return json(502, { error: `${peer.name}: no answer (${r.error})` })
@@ -95,4 +101,4 @@ function createRelay(deps) {
 	}
 }
 
-module.exports = { createRelay, relayPath, queryText, rawRequest, TIMEOUT_MS }
+module.exports = { createRelay, relayPath, queryText, rawRequest, TIMEOUT_MS, LONG_TIMEOUT_MS }

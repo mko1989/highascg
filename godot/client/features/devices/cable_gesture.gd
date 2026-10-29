@@ -11,6 +11,7 @@ signal reload_requested
 
 const R := preload("res://features/devices/cable_rules.gd")
 const Seed := preload("res://features/devices/cable_seed.gd")
+const ApiScript := preload("res://core/api_timeouts.gd")  # WO-805: APPLY_TIMEOUT_S (no autoload deps)
 const PREWARM_S := 2.5  # under the server's 3 s xrandr cache TTL (web device-view-snapshot-prewarm.js)
 const UNDO_MAX := 50
 const CANCELLED := "Cable mode cancelled"
@@ -354,14 +355,15 @@ func can_undo() -> bool:
 	return not _undo.is_empty()
 
 
-## Apply always restarts Caspar (WO-440: force); while it runs (~10–20 s) `[Full apply] Step N` log lines are shown.
+## Apply always restarts Caspar (WO-440: force); while it runs `[Full apply] Step N` log lines are shown. WO-805: it
+## answers when Caspar is back (typ. 5-15 s, up to ~100 s on the server's own caps) — its own timeout, not the 15 s one.
 func apply_caspar() -> void:
 	if busy:
 		return
 	applying = true
 	_set_busy(true)
 	status.emit("Applying Caspar config — restarting Caspar…", true)
-	var r := await DevicesTarget.api.post_json("/api/caspar-config/apply", {"force": true})
+	var r := await DevicesTarget.api.post_json("/api/caspar-config/apply", {"force": true}, ApiScript.APPLY_TIMEOUT_S)
 	applying = false
 	_set_busy(false)
 	if not r.ok:

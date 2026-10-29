@@ -100,9 +100,10 @@ function buildOperatorDisplaySessionShellLines(config, layout) {
 			}
 			const cx = rect.x + Math.floor(rect.width / 2)
 			const cy = rect.y + Math.floor(rect.height / 2)
+			// WO-805: no --sync — it waits for a pointer MOTION, so a pointer already at the target never returns.
 			lines.push(
 				'if command -v xdotool >/dev/null 2>&1; then',
-				`  xdotool mousemove --sync ${cx} ${cy} 2>/dev/null || true`,
+				`  xdotool mousemove ${cx} ${cy} 2>/dev/null || true`,
 				'fi',
 			)
 		}
@@ -117,9 +118,22 @@ function buildOperatorDisplaySessionShellLines(config, layout) {
 }
 
 /**
- * Apply operator display session live (after xrandr layout).
+ * Env for the NVIDIA policy script: the X session env plus HIGHASCG_NVIDIA_SYNC_OUTPUT when a port is ticked
+ * "NVIDIA sync to display" (WO-805: the Apply's deferred run needs it too — it used to get the bare env).
  * @param {object} config
- * @param {{ log?: (level: string, msg: string) => void, layout?: object }} [opts]
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+function nvidiaPolicyEnv(config, env = displaySessionEnv()) {
+	const syncOut = resolveNvidiaSyncToDisplayOutput(config)
+	return syncOut ? { ...env, HIGHASCG_NVIDIA_SYNC_OUTPUT: syncOut } : env
+}
+
+/**
+ * Apply operator display session live (after xrandr layout).
+ * `skipNvidia` (WO-805): the Caspar-config Apply runs the NVIDIA policy once, after the Caspar restart
+ * (full-config-apply.js) — the blocking run here cost ~1.4 s of every Apply and was redone after the restart anyway.
+ * @param {object} config
+ * @param {{ log?: (level: string, msg: string) => void, layout?: object, skipNvidia?: boolean }} [opts]
  */
 async function applyOperatorDisplaySession(config, opts = {}) {
 	const log = typeof opts.log === 'function' ? opts.log : () => {}
@@ -152,7 +166,10 @@ async function applyOperatorDisplaySession(config, opts = {}) {
 		const cy = rect.y + Math.floor(rect.height / 2)
 		if (await commandExists('xdotool')) {
 			try {
-				await execFileAsync('xdotool', ['mousemove', '--sync', String(cx), String(cy)], { env, timeout: 5000 })
+				// WO-805: no --sync — with the pointer already at (cx, cy) it waited out the full 5 s timeout
+				// (journal 17-29.10: 4 Applies lost exactly 5 s here; reproduced on a private Xvfb). The warp request
+				// itself is sent before xdotool exits; nothing after this reads the pointer position.
+				await execFileAsync('xdotool', ['mousemove', String(cx), String(cy)], { env, timeout: 5000 })
 				log('info', `[X-Display] Pointer → ${cx},${cy}`)
 			} catch (e) {
 				log('warn', `[X-Display] xdotool mousemove failed: ${e?.message || e}`)
@@ -163,9 +180,10 @@ async function applyOperatorDisplaySession(config, opts = {}) {
 		const { syncOperatorPointerConfine } = require('../system/pointer-confine')
 		syncOperatorPointerConfine(config, { log, layout })
 	}
-	if (await commandExists('nvidia-settings')) {
-		const syncOut = resolveNvidiaSyncToDisplayOutput(config)
-		const policyEnv = syncOut ? { ...env, HIGHASCG_NVIDIA_SYNC_OUTPUT: syncOut } : env
+	if (opts.skipNvidia === true) {
+		log('info', '[X-Display] NVIDIA policy deferred until after the Caspar restart (WO-805)')
+	} else if (await commandExists('nvidia-settings')) {
+		const policyEnv = nvidiaPolicyEnv(config, env)
 		const result = await applyNvidiaDisplayPolicy(policyEnv, { log })
 		if (!result.ok && resolveNvidiaXApplyScript()) {
 			// Script exists but first pass can race empty MetaMode after xrandr — one delayed retry.
@@ -184,6 +202,7 @@ module.exports = {
 	buildConfineCursorShellLines,
 	resolveNvidiaSyncToDisplayOutput,
 	buildOperatorDisplaySessionShellLines,
+	nvidiaPolicyEnv,
 	applyOperatorDisplaySession,
 	parkPointerOnOperatorDisplay,
 	raiseOperatorGuiWindows,

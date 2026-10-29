@@ -12,7 +12,10 @@ const AuthPrompt := preload("res://core/auth_prompt.gd")
 const Demo := preload("res://core/demo/demo_server.gd")
 
 const POOL_SIZE := 6
-const TIMEOUT_S := 15.0
+const Timeouts := preload("res://core/api_timeouts.gd")
+const TIMEOUT_S := Timeouts.TIMEOUT_S
+## WO-805: the Caspar Applies' long timeout (see core/api_timeouts.gd — feature scripts preload that, not this file).
+const APPLY_TIMEOUT_S := Timeouts.APPLY_TIMEOUT_S
 
 var _free: Array[HTTPRequest] = []
 ## WO-802: every Api talks to Config.origin, this client's own server (WO-732's override to another server is
@@ -34,8 +37,9 @@ func get_json(path: String) -> Dictionary:
 	return await request(HTTPClient.METHOD_GET, path, null)
 
 
-func post_json(path: String, body: Variant) -> Dictionary:
-	return await request(HTTPClient.METHOD_POST, path, body)
+## `timeout_s` > 0 overrides TIMEOUT_S for this one request (WO-805: APPLY_TIMEOUT_S for the Caspar Applies).
+func post_json(path: String, body: Variant, timeout_s := 0.0) -> Dictionary:
+	return await request(HTTPClient.METHOD_POST, path, body, timeout_s)
 
 
 func put_json(path: String, body: Variant) -> Dictionary:
@@ -51,14 +55,14 @@ func base() -> String:
 
 
 ## WO-811: every request carries the shared password (AuthModel.headers); a 401 asks for it once and retries.
-func request(method: int, path: String, body: Variant) -> Dictionary:
+func request(method: int, path: String, body: Variant, timeout_s := 0.0) -> Dictionary:
 	if Config.demo:  # WO-815: the simulated server answers; nothing goes on the network
 		if is_inside_tree():
 			await get_tree().process_frame
 		return Demo.shared().handle(method, path, body)
-	var res := await _send(method, path, body)
+	var res := await _send(method, path, body, timeout_s)
 	while AuthModel.needs_login(res) and await _login():
-		res = await _send(method, path, body)
+		res = await _send(method, path, body, timeout_s)
 	return res
 
 
@@ -73,10 +77,11 @@ func _login() -> bool:
 	return true
 
 
-func _send(method: int, path: String, body: Variant) -> Dictionary:
+func _send(method: int, path: String, body: Variant, timeout_s := 0.0) -> Dictionary:
 	while _free.is_empty():
 		await _slot_freed
 	var r: HTTPRequest = _free.pop_back()
+	r.timeout = request_timeout(timeout_s)
 	var headers := AuthModel.with_auth(PackedStringArray(["Accept: application/json"]), AuthModel.password)
 	var payload := ""
 	if body != null:
@@ -119,6 +124,12 @@ func _send_bytes(path: String) -> Dictionary:
 	return {"ok": ok, "status": status, "bytes": res[3], "headers": res[2], "error": error}
 
 
+## WO-805: the timeout one request runs with (pooled nodes are reset to TIMEOUT_S on release).
+static func request_timeout(timeout_s: float) -> float:
+	return Timeouts.request_timeout(timeout_s)
+
+
 func _release(r: HTTPRequest) -> void:
+	r.timeout = TIMEOUT_S
 	_free.append(r)
 	_slot_freed.emit()

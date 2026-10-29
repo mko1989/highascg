@@ -3,7 +3,8 @@
 const { applyX11Layout, restartDisplayManager } = require('./os-config')
 const { calculateLayoutPositions } = require('./os-layout-calculator')
 const { waitForDisplayStable } = require('./display-stable-wait')
-const { applyOperatorDisplaySession, displaySessionEnv } = require('./x-display-session')
+const xDisplaySession = require('./x-display-session')
+const { applyOperatorDisplaySession, displaySessionEnv } = xDisplaySession
 const { applyNvidiaDisplayPolicy } = require('./nvidia-display-policy')
 const {
 	reloadCasparAfterConfigWrite,
@@ -18,7 +19,8 @@ const { needsNodmRestartForLayout, verifyXrandrMatchesLayout } = require('./xran
  *   2. Persist apply-layout.sh
  *   3. Apply live xrandr when canvas fits (no nodm)
  *   4. Brief AMCP RESTART, then fast-kill if still up — run.sh relaunches with new config
- *   5. NVIDIA Force Composition Pipeline on all outputs (after restart — xrandr/Caspar clear MetaMode)
+ *   5. NVIDIA Force Composition Pipeline on all outputs — ONCE, after the restart (WO-805: the blocking pre-restart
+ *      run inside the operator display session is skipped here; xrandr in step 3 is what clears MetaMode)
  *
  * Canvas expansion path adds nodm restart, live xrandr after X settles,
  * then stop autostart Caspar (wrong layout window) before relaunch.
@@ -107,6 +109,14 @@ async function applyFullServerConfig(ctx, opts = {}) {
 			caspar: writeResult,
 			message: writeResult.error || 'Failed to write Caspar config',
 		}
+	}
+
+	/* WO-805 (found while timing): a sandbox instance (tools/e2e) runs next to the LIVE server — every step after
+	 * the config write reaches the live box (nodm restart, xrandr --primary / pointer / NVIDIA on :0, the run.sh
+	 * marker in /tmp, and the fast kill, whose `ss` sees the live Caspar on :5250). Write the config and stop. */
+	if (require('../bootstrap/sandbox').isSandbox()) {
+		log('info', '[Full apply] sandbox instance — config written; display, restart and NVIDIA steps skipped (WO-805)')
+		return { ...out, step: 'sandbox', message: 'Config written (sandbox: no display or Caspar restart).' }
 	}
 
 	log('info', '[Full apply] Step 2 — persisting apply-layout.sh')
@@ -208,6 +218,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		await applyOperatorDisplaySession(ctx.config, {
 			layout: calculateLayoutPositions(ctx.config),
 			log,
+			skipNvidia: true, // WO-805: once, deferred, after the restart (below)
 		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
 
 		log('info', '[Full apply] Step 5 — stopping autostart Caspar (wrong layout window)')
@@ -222,6 +233,7 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		await applyOperatorDisplaySession(ctx.config, {
 			layout: calculateLayoutPositions(ctx.config),
 			log,
+			skipNvidia: true, // WO-805: ~1.4 s per Apply; the deferred run below is the one that sticks
 		}).catch((e) => log('warn', `[Full apply] Operator display session: ${e?.message || e}`))
 	}
 
@@ -271,7 +283,9 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		log('warn', '[Full apply] Caspar not connected — config and layout saved; restart Caspar manually')
 	}
 
-	if (out.layout.preApplied || out.layout.postApplied) {
+	// WO-805: the only NVIDIA run of the Apply now — also when the live xrandr call ran but did not verify (it may
+	// still have reset MetaMode); same env as the display session's run, incl. HIGHASCG_NVIDIA_SYNC_OUTPUT.
+	if (out.layout.preApplied || out.layout.postApplied || out.layout.postXrandrCommand) {
 		const nvidiaStep = needsNodm ? 7 : 5
 		log('info', `[Full apply] Step ${nvidiaStep} — NVIDIA Force Composition Pipeline (deferred)`)
 		out.nvidiaDisplay = { applied: true, ok: null, deferred: true }
@@ -279,7 +293,10 @@ async function applyFullServerConfig(ctx, opts = {}) {
 		// Fire-and-forget: run the NVIDIA policy update without blocking HTTP response
 		void (async () => {
 			try {
-				const env = displaySessionEnv()
+				const env =
+					typeof xDisplaySession.nvidiaPolicyEnv === 'function'
+						? xDisplaySession.nvidiaPolicyEnv(ctx.config)
+						: displaySessionEnv()
 				let nvidiaRes = await applyNvidiaDisplayPolicy(env, { log, timeoutMs: 30_000 })
 				if (!nvidiaRes.ok) {
 					log('info', '[Full apply] NVIDIA display policy retry in 6s (MetaMode may lag Caspar restart)')

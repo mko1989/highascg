@@ -21,6 +21,7 @@ class FakeIo:
 	var status_text := ""
 	var status_ok := false
 	var answer := true
+	var timeouts := {}  # WO-805: path → the timeout_s the flow asked for
 
 	func _reply(v: Variant) -> Dictionary:
 		if v is Dictionary and v.has("__throw"):
@@ -38,8 +39,9 @@ class FakeIo:
 				return _reply(srv.net)
 		return _reply({})
 
-	func post_json(path: String, body: Variant) -> Dictionary:
+	func post_json(path: String, body: Variant, timeout_s := 0.0) -> Dictionary:
 		calls.append(["POST", path, body.duplicate(true)])
+		timeouts[path] = timeout_s
 		return _reply(srv.post.get(path, {"ok": true}))
 
 	func confirm(text: String) -> bool:
@@ -138,6 +140,7 @@ func _press(flow: Variant, text: String) -> void:
 func test_pages_replay() -> void:
 	var fx: Dictionary = _golden().fixtures
 	var now := float(fx.now)
+	var applies := 0
 	for c in _golden().cases:
 		var env: Dictionary = c.env
 		var p: Dictionary = fx.payload.duplicate(true)
@@ -184,6 +187,11 @@ func test_pages_replay() -> void:
 			t.eq(io.toasts, a.toasts, what + ": toasts")
 			_check_spec(M.items(flow.s, now), a.spec, what)
 			io.calls.clear()
+		for path in io.timeouts:  # WO-805: only the Caspar apply asks for the long timeout; the rest keep the 15 s
+			var long: bool = path == "/api/replication/apply-device-view-caspar"
+			applies += 1 if long else 0
+			t.eq(io.timeouts[path], 120.0 if long else 0.0, "%s: %s timeout" % [c.name, path])
+	t.ok(applies > 0, "WO-805: a golden case presses the Caspar apply (the long-timeout check ran)")
 
 
 func test_formatters() -> void:

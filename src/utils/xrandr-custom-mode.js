@@ -118,10 +118,19 @@ function pickStripFallbackMode(availableModes) {
 /**
  * Remove an existing mode name from the server so `--newmode` can reuse it (same cvt name, new timings).
  * Switches `output` away from that mode first when possible.
- * @param {{ output: string, modeName: string, env: NodeJS.ProcessEnv, logger?: { warn?: Function, info?: Function }, availableModes?: Set<string> }} p
+ * `attached: false` (WO-805): the mode is not on this output's list (`xrandr --query`) — then the output is not using
+ * it, so neither the switch-away (a modeset of a LIVE output to whatever WxH happens to be listed first) nor the
+ * `--delmode` (BadMatch, every time) is needed; only `--rmmode` of the dangling definition.
+ * @param {{ output: string, modeName: string, env: NodeJS.ProcessEnv, logger?: { warn?: Function, info?: Function }, availableModes?: Set<string>, attached?: boolean }} p
  */
 function stripExistingXrandrModeByName(p) {
 	const { output, modeName, env, logger, availableModes } = p
+	if (p.attached === false) {
+		try {
+			execFileSync('xrandr', ['--display', ':0', '--rmmode', modeName], { env, encoding: 'utf8', maxBuffer: 65536 })
+		} catch (_) {}
+		return
+	}
 	const fallback = pickStripFallbackMode(availableModes)
 	const base = ['--display', ':0', '--output', output]
 	try {
@@ -179,14 +188,53 @@ function computeModelineForWxH({ width, height, refreshHz, env, timingKind, logg
 }
 
 /**
+ * WO-805: outcome of the last create per `output|mode|timings` in this process. One Apply runs applyX11Layout twice
+ * (persist, then live) and each run re-created the mode: ~7 xrandr calls + cvt, 0.03-0.8 s (median 0.14 s), X error
+ * spam, and on NVIDIA (which refuses RandR user modes: `--addmode` BadMatch) a guaranteed failure every time.
+ * @type {Map<string, boolean>} key → created
+ */
+const lastCreateOutcome = new Map()
+
+/** True when `xrandr --query` text lists `modeName` — on an output's list or as an unattached user mode. */
+function xrandrQueryListsMode(queryText, modeName) {
+	const esc = String(modeName).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	return new RegExp(`^\\s+${esc}(\\s|$)`, 'm').test(String(queryText || ''))
+}
+
+/**
  * Create an xrandr mode via `cvt` + `--newmode` + `--addmode` when EDID does not list it.
  * If the mode name already exists (e.g. reapplied layout), switches the output away, `--delmode` / `--rmmode`, then recreates.
- * @param {{ output: string, width: number, height: number, refreshHz: number, env: NodeJS.ProcessEnv, logger?: object, availableModes?: Set<string>, timingKind?: string }} args
+ * `queryText` (WO-805): the `xrandr --query` the caller just ran. When this process already tried the same
+ * output/mode/timings and X still shows that result (mode on the output → reuse it; mode only dangling → `--addmode`
+ * was refused before), the X calls are skipped. A restarted X server has no user modes, so it never matches.
+ * @param {{ output: string, width: number, height: number, refreshHz: number, env: NodeJS.ProcessEnv, logger?: object, availableModes?: Set<string>, timingKind?: string, queryText?: string }} args
  * @returns {string|null} xrandr mode name (e.g. `1920x1080_50.00`) or null on failure
  */
-function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger, availableModes, timingKind }) {
+function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger, availableModes, timingKind, queryText }) {
 	const plan = computeModelineForWxH({ width, height, refreshHz, env, timingKind, logger })
 	if (!plan) return null
+	const { modeName, timings } = plan
+	const key = `${output}|${modeName}|${timings.join(' ')}`
+	const attached = availableModes instanceof Set ? availableModes.has(modeName) : undefined
+	const prev = lastCreateOutcome.get(key)
+	if (prev !== undefined && queryText != null && xrandrQueryListsMode(queryText, modeName)) {
+		if (prev && attached === true) {
+			if (logger && logger.info) logger.info(`[OS-Config] custom mode ${modeName} already on ${output} — reused (WO-805)`)
+			return modeName
+		}
+		if (!prev && attached === false) {
+			if (logger && logger.info) {
+				logger.info(`[OS-Config] custom mode ${modeName}: ${output} refused --addmode before (driver) — not retried (WO-805)`)
+			}
+			return null
+		}
+	}
+	const outcome = createXrandrMode({ output, plan, env, logger, availableModes, attached })
+	lastCreateOutcome.set(key, outcome != null)
+	return outcome
+}
+
+function createXrandrMode({ output, plan, env, logger, availableModes, attached }) {
 	const { modeName, timings } = plan
 	const newmodeArgs = ['--display', ':0', '--newmode', modeName, ...timings]
 	let didReplace = false
@@ -196,7 +244,7 @@ function tryAddXrandrModeFromCvt({ output, width, height, refreshHz, env, logger
 		if (logger && logger.info) {
 			logger.info(`[OS-Config] xrandr --newmode failed for ${modeName} (${e.message}); attempting replace via delmode/rmmode`)
 		}
-		stripExistingXrandrModeByName({ output, modeName, env, logger, availableModes })
+		stripExistingXrandrModeByName({ output, modeName, env, logger, availableModes, attached })
 		didReplace = true
 		try {
 			execFileSync('xrandr', newmodeArgs, { env, encoding: 'utf8', maxBuffer: 65536 })

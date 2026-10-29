@@ -18,7 +18,8 @@ async function parkPointerOnOperatorDisplay(config, opts = {}) {
 	const cx = rect.x + Math.floor(rect.width / 2)
 	const cy = rect.y + Math.floor(rect.height / 2)
 	try {
-		await execFileAsync('xdotool', ['mousemove', '--sync', String(cx), String(cy)], { env, timeout: 5000 })
+		// WO-805: no --sync (a pointer already parked here never "moves" → 5 s timeout, then a false failure)
+		await execFileAsync('xdotool', ['mousemove', String(cx), String(cy)], { env, timeout: 5000 })
 		log('info', `[X-Display] Pointer parked @ ${cx},${cy} (${rect.sysId || 'operator'})`)
 		return true
 	} catch (e) {

@@ -40,8 +40,8 @@ class _Io:
 	func get_json(path: String) -> Dictionary:
 		return _web(await DevicesTarget.api.get_json(path))
 
-	func post_json(path: String, body: Variant) -> Dictionary:
-		var r := _web(await DevicesTarget.api.post_json(path, body))
+	func post_json(path: String, body: Variant, timeout_s := 0.0) -> Dictionary:
+		var r := _web(await DevicesTarget.api.post_json(path, body, timeout_s))
 		if r.ok and path == "/api/settings":
 			await DevicesTarget.settings.load_from_server()
 		return r

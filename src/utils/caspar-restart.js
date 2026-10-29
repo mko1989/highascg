@@ -7,35 +7,20 @@ const path = require('path')
 const { REPO_ROOT } = require('../repo-paths')
 
 const execFileAsync = promisify(execFile)
+/* WO-805: the AMCP up/down waits live in caspar-amcp-wait.js (this file was at the 500-line limit). */
+const {
+	isAmcpPortListening,
+	nudgeCasparConnectionReconnect,
+	isAmcpTcpConnected,
+	waitForAmcpReady,
+	waitForAmcpDisconnect,
+} = require('./caspar-amcp-wait')
 
-const DEFAULT_AMCP_PORT = parseInt(String(process.env.CASPAR_AMCP_PORT || '5250'), 10) || 5250
 const CASPAR_SYSTEMD_CONTROL = '/usr/local/bin/caspar-systemd-control.sh'
 const CASPAR_SERVER_UNIT = 'casparcg-server.service'
-
-function sleep(ms) {
-	return new Promise((r) => setTimeout(r, ms))
-}
-
-async function isAmcpPortListening(port = DEFAULT_AMCP_PORT) {
-	try {
-		const { stdout } = await execFileAsync('ss', ['-tln'], { timeout: 2000, encoding: 'utf8' })
-		const re = new RegExp(`:${port}\\b`)
-		return re.test(String(stdout || ''))
-	} catch {
-		return false
-	}
-}
-
-function nudgeCasparConnectionReconnect(ctx) {
-	const conn = ctx?.casparConnection
-	if (conn && typeof conn.reconnect === 'function') {
-		try {
-			conn.reconnect(conn.host, conn.port)
-		} catch {
-			/* ignore */
-		}
-	}
-}
+/** WO-805: Apply's AMCP-back port poll, and how long the port must be up before a client-less "back" counts. */
+const APPLY_AMCP_POLL_MS = 150
+const APPLY_PORT_STABLE_MS = 2000
 
 /**
  * True when the main casparcg binary for this install is running (excludes CEF helper processes).
@@ -58,92 +43,6 @@ async function isCasparMainProcessRunning(ctx) {
 	} catch {
 		return false
 	}
-}
-
-/**
- * @param {object} ctx
- * @returns {boolean}
- */
-function isAmcpTcpConnected(ctx) {
-	const conn = ctx.casparConnection
-	if (conn && typeof conn.isConnected === 'boolean') return conn.isConnected
-	const sock = ctx.amcp?._context?.socket
-	if (sock && typeof sock.isConnected === 'boolean') return sock.isConnected
-	return !!(conn?.tcp?.isConnected)
-}
-
-/**
- * Wait until AMCP TCP client is up or :5250 is listening (Caspar booted; client may lag).
- * @param {object} ctx
- * @param {number} maxMs
- * @param {number | { pollMs?: number, log?: Function, progressIntervalMs?: number, acceptPortListening?: boolean, portStablePolls?: number }} [pollMsOrOpts]
- * @returns {Promise<boolean>}
- */
-async function waitForAmcpReady(ctx, maxMs, pollMsOrOpts = 400) {
-	const opts =
-		typeof pollMsOrOpts === 'object' && pollMsOrOpts !== null ? pollMsOrOpts : { pollMs: pollMsOrOpts }
-	const pollMs = opts.pollMs ?? 400
-	const log = typeof opts.log === 'function' ? opts.log : null
-	const progressIntervalMs = opts.progressIntervalMs ?? 5000
-	const acceptPortListening = opts.acceptPortListening === true
-	const portStablePolls = Math.max(1, opts.portStablePolls ?? 3)
-
-	const t0 = Date.now()
-	let lastProgress = t0
-	let lastNudge = 0
-	let portUpStreak = 0
-
-	while (Date.now() - t0 < maxMs) {
-		const now = Date.now()
-		if (isAmcpTcpConnected(ctx)) return true
-
-		const portUp = await isAmcpPortListening()
-		if (portUp) {
-			portUpStreak++
-			if (now - lastNudge >= 2000) {
-				nudgeCasparConnectionReconnect(ctx)
-				lastNudge = now
-			}
-			await sleep(Math.min(pollMs, 800))
-			if (isAmcpTcpConnected(ctx)) return true
-			if (acceptPortListening && portUpStreak >= portStablePolls) return true
-		} else {
-			portUpStreak = 0
-		}
-
-		if (log && now - lastProgress >= progressIntervalMs) {
-			const elapsedSec = Math.round((now - t0) / 1000)
-			let mainRunning = false
-			try {
-				mainRunning = await isCasparMainProcessRunning(ctx)
-			} catch {
-				/* ignore */
-			}
-			log(
-				'info',
-				`[Caspar restart] still waiting (${elapsedSec}s) — amcp_port=${portUp ? 'up' : 'down'} caspar=${mainRunning ? 'running' : 'stopped'} client=${isAmcpTcpConnected(ctx) ? 'up' : 'down'}`,
-			)
-			lastProgress = now
-		}
-
-		await sleep(pollMs)
-	}
-	return isAmcpTcpConnected(ctx)
-}
-
-/**
- * @param {object} ctx
- * @param {number} maxMs
- * @param {number} [pollMs]
- */
-async function waitForAmcpDisconnect(ctx, maxMs, pollMs = 250) {
-	if (!isAmcpTcpConnected(ctx)) return true
-	const t0 = Date.now()
-	while (Date.now() - t0 < maxMs) {
-		if (!isAmcpTcpConnected(ctx)) return true
-		await sleep(pollMs)
-	}
-	return !isAmcpTcpConnected(ctx)
 }
 
 function resolveCasparRoot(ctx) {
@@ -371,10 +270,14 @@ async function reloadCasparAfterConfigWrite(ctx, opts = {}) {
 		typeof opts.reconnectMs === 'number' && opts.reconnectMs >= 0
 			? opts.reconnectMs
 			: resolveApplyReconnectWaitMs()
+	/* WO-805: port poll 400 → 150 ms (Caspar listening → client nudged ≤0.17 s instead of ≤0.42 s; one `ss` per
+	 * tick, only while the Apply waits), and the "port up, no client" fallback keeps its old ~2 s window. */
 	const waitOpts = {
 		log,
 		progressIntervalMs: 5000,
 		acceptPortListening: opts.acceptPortListening !== false,
+		pollMs: APPLY_AMCP_POLL_MS,
+		portStableMs: APPLY_PORT_STABLE_MS,
 	}
 
 	if (!ctx?.amcp) {

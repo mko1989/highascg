@@ -176,6 +176,7 @@ async function applyX11Layout(config, opts = {}) {
 						logger,
 						availableModes: avail,
 						timingKind,
+						queryText: xrandrQueryOut, // WO-805: skip the re-create when X still shows the last outcome
 					})
 					if (created) {
 						avail.add(created)
