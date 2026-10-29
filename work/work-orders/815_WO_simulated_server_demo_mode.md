@@ -159,3 +159,43 @@ Devices tab read-only device-view; web icon font fallback; a "Reset demo" action
 - Checks run on the current working tree (all agents' edits): `check-max-file-lines` 0 over 500; offline suite 3571
   tests, 3569 pass, 0 fail, 2 skipped; Godot suite 22749 passed, 0 failed; the draft workflow parses as YAML.
 - No CI / Pages runs (nothing pushed; local main is still 3 commits ahead of origin).
+
+## Publish (29.10, Opus, sequential)
+
+Owner 29.10: "commit and push sequentially". Option (a) above: WO-811 first, then WO-818, then this WO. Each commit was
+tested in a detached temporary worktree at that commit (`git worktree add --detach`, removed afterwards) with the CI
+gates (require integrity, 500-line limit, unwired exports, ESLint ≤ 216 warnings, Prettier), the offline suite under
+`xvfb-run` and the Godot suite + boot check with that worktree's `godot/client`, then pushed (`git push origin main`).
+
+| commit | content | worktree tests |
+|---|---|---|
+| `7b4fa842` | WO-811 auth (phases 1-3 + template credentials). `core/api.gd`, `ws.gd`, `config.gd` staged as **auth-only blobs** (`git hash-object -w` + `update-index --cacheinfo`; the demo lines removed), so the commit has no reference to `core/demo/`. First test found 2 new ESLint warnings (217 > 216) and one unwired export → fixed in the commit (amend) and retested | offline 3520 / 3511 pass / 0 fail / 9 skipped; Godot 22252/0; boot OK |
+| `258e5fad` | WO-818 NotchLC warning, tooltip without the ffmpeg command ("Transcode it to HAP in HighAsCG") | offline 3524 / 3515 / 0 / 9; Godot 22266/0; boot OK |
+| `deb38d56` | this WO: `core/demo/`, `demo/*.json`, `tools/demo/`, the demo hooks in api/ws/config.gd (full working files), settings / header / shell / video_surfaces, Web preset, line-limit skip, `.github/workflows/pages.yml` (the draft moved over it, YAML parsed, header comment updated) | offline 3524 / 3515 / 0 / 9; Godot 22401/0 (+135); boot OK; local Web export of that tree: index.wasm 39.5 MB, index.pck 2.5 MB |
+
+The 9 skips are worktree-only (no companion-module-dev checkout beside it, no dist-web, two CI-only tests). The push of
+`7b4fa842` also carried three earlier local commits (c115e0d1, 335b030f, 24c71734) that were already ahead of origin.
+
+**CI / Pages runs**
+- `7b4fa842`: CI https://github.com/mko1989/highascg/actions/runs/40895044170 — **failure in the `release` job only**
+  (verify, godot, build-client green): "Server prerelease" got `HTTP 403: Resource not accessible by integration` from
+  the GitHub releases API — not a code failure; the same job passed 4 minutes later on `deb38d56`. Pages run
+  https://github.com/mko1989/highascg/actions/runs/40895044261 cancelled (superseded, `cancel-in-progress`).
+- `258e5fad`: CI https://github.com/mko1989/highascg/actions/runs/40895379676 cancelled (pending run superseded by the
+  next push); Pages https://github.com/mko1989/highascg/actions/runs/40895379560 success (old workflow, no demo).
+- `deb38d56`: CI https://github.com/mko1989/highascg/actions/runs/40895716710 **success** (verify, godot, build-client,
+  release → prerelease `Server 2026-10-29T145635Z`); Pages https://github.com/mko1989/highascg/actions/runs/40895716301
+  **success** (Jekyll docs + Project Map + Web demo).
+
+**Live**
+- https://mko1989.github.io/highascg/demo/ → HTTP 200 (`<title>HighAsCG Operator</title>`; `index.wasm`, `index.pck` 200).
+- https://mko1989.github.io/highascg/ → HTTP 200 (`HighAsCG documentation | highascg`).
+- Screenshots in `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/pages_demo/`:
+  `demo_1280x720.png` (`firefox-esr --headless --screenshot`, 1280×720) shows only Godot's loader with "WebGL2 …
+  missing" — headless Firefox here has no GL, not a page fault. `demo_xvfb_1280x720.png` (Firefox ESR, own profile, on a
+  private Xvfb `:116`, never `:0`, 50 s after load) shows the demo running: header "Demo show" + "DEMO — no server",
+  Live tab with PGM 1 / LED wall, PGM 2 / Projection, PRV 1 / PRV 2 (black, no video in a demo), LED wall 6 looks
+  (Opener on PGM, Loop A on PRV, Loop B, Song 1) and Projection 3 looks, Sources "demo" / "EFFECTS", Inspector,
+  Playlists / Timers / Program audio footer.
+- Not verified: an operator click-through on the published page (takes etc. were exercised on the local Web build
+  earlier, section 3).
