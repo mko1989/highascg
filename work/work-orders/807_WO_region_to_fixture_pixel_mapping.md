@@ -475,4 +475,6 @@ into an unreadable yellow smear.
 
 **Verified.**
 - New `test_label_cells_detect_overlap`. Godot suite: 22851 passed, 0 failed.
-- Visual check of the window on the glass is still to do (it gets a second-client screenshot).
+- Visual: a second client (private Xvfb, 1920×1080), Previs → DMX output → Pixel map… on channel 1 with the 896 live
+  mappings. Each column now shows readable "R### 40 × 16 px" labels spaced down the wall; before, the columns were a
+  solid smear (session scratchpad `pm4.png` vs `live-e2e/q807_pixmap.png`).
