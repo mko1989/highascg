@@ -1,7 +1,7 @@
 'use strict'
 
 const EventEmitter = require('events')
-const { isSaneTimingValue, computeRemainingAndProgress } = require('./osc-state-timing')
+const { isSaneTimingValue, computeRemainingAndProgress, applyClipWindow } = require('./osc-state-timing')
 const { layerMethods } = require('./osc-state-layer')
 const { audioMethods } = require('./osc-state-audio')
 
@@ -278,6 +278,7 @@ class OscState extends EventEmitter {
 		if (Number.isFinite(iterationElapsed)) f.elapsed = iterationElapsed /* corrected: modulo/clamp per computeRemainingAndProgress (magnitude, not loop flag) */
 		f.remaining = remaining
 		f.progress = progress
+		applyClipWindow(f) /* WO-813: same trim window as the file/time branch */
 
 		this._dirtyChannels.add(ch)
 		this._scheduleEmit()

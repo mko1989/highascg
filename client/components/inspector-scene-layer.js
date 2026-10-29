@@ -17,7 +17,8 @@ import { getResolutionForScreen } from './inspector-channel-resolution.js'
 import { resolveMainIndexForScene } from '../lib/look-stack-amcp-channel.js'
 import { renderLayerPlaylistGroup } from './inspector-layer-playlist.js'
 import { appendLiveAudioSourceGroup } from './inspector-live-audio-source.js'
-import { appendMediaTransportGroup } from './inspector-media-transport.js'
+import { appendMediaTransportGroup, looksLikeVideoMedia } from './inspector-media-transport.js'
+import { appendClipTrimSection } from './inspector-clip-trim.js'
 import { createStepperInput } from './inspector-common.js'
 
 let activeInteractionAr = null
@@ -262,6 +263,8 @@ export function renderSceneLayerInspector(deps, sel) {
 	const startSel = document.createElement('select')
 	startSel.className = 'inspector-field__select'
 	startSel.setAttribute('aria-label', 'Where this layer\u2019s clip starts when the look is taken')
+	/* WO-813 (owner 29.10): no "Custom" — trim works under both options (the Trim row below). A stored legacy
+	 * "custom" shows as "Start from beginning" and takes as beginning with its trim; it is not rewritten. */
 	startSel.innerHTML =
 		'<option value="beginning">Start from beginning</option>' +
 		'<option value="relativeToPrevious">Relative to the clip playing on this layer</option>'
@@ -282,6 +285,15 @@ export function renderSceneLayerInspector(deps, sel) {
 		'Start from beginning plays the clip from its start (or its trim-in). Relative continues from the frame the clip already playing on this layer has reached.'
 	startWrap.appendChild(startHint)
 	takeGrp.appendChild(startWrap)
+	appendClipTrimSection(takeGrp, {
+		sceneId,
+		layerIndex,
+		layer,
+		scene,
+		sceneState,
+		stateStore,
+		isClip: looksLikeVideoMedia(layer.source) && layer.sourceMode !== 'list',
+	})
 	root.appendChild(takeGrp)
 }
 

@@ -30,5 +30,8 @@ module.exports = [
 	'tools/smoke/smoke-wo811-auth-clients.test.js',
 	'tools/smoke/smoke-wo811-template-credentials.test.js',
 	'tools/smoke/smoke-wo811-os-password.test.js',
+	'tools/smoke/smoke-wo813-look-custom-clip-start.test.js',
+	'tools/smoke/smoke-wo813-trim-out-osc-window.test.js',
+	'tools/smoke/smoke-wo813-web-clip-trim.test.js',
 	'tools/smoke/smoke-wo818-notchlc-warning.test.js',
 ]

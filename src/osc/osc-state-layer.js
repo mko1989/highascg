@@ -1,6 +1,6 @@
 'use strict'
 
-const { isSaneTimingValue, computeRemainingAndProgress } = require('./osc-state-timing')
+const { isSaneTimingValue, computeRemainingAndProgress, applyClipWindow } = require('./osc-state-timing')
 
 /** Clear timing fields so the UI does not show the previous clip’s elapsed when Caspar omits updates (some codecs). */
 function clearOscFileTiming(f) {
@@ -11,6 +11,9 @@ function clearOscFileTiming(f) {
 	delete f.frameElapsed
 	delete f.frameTotal
 	delete f.duration
+	delete f.clipIn
+	delete f.clipLength
+	delete f.outPoint
 }
 
 function producerSignatureFromVals(vals) {
@@ -264,9 +267,19 @@ const layerMethods = {
 			}
 			f.remaining = remaining
 			f.progress = progress
+			applyClipWindow(f) /* WO-813: a trimmed take counts down to its out point (file/clip), not the file end */
 			return (
 				f.elapsed !== prevElapsed || f.duration !== prevDuration || f.remaining !== prevRemaining || f.progress !== prevProgress
 			)
+		} else if (sub === 'clip' && vals.length >= 2) {
+			// Caspar av_producer.cpp:1045 `file/clip` = {start/fps, duration/fps}: the IN / LENGTH window of the take.
+			const inRaw = Number(vals[0])
+			const lenRaw = Number(vals[1])
+			if (!isSaneTimingValue(inRaw) || !isSaneTimingValue(lenRaw)) return false
+			const changed = f.clipIn !== inRaw || f.clipLength !== lenRaw
+			f.clipIn = inRaw
+			f.clipLength = lenRaw
+			return changed
 		} else if (sub === 'frame' && vals.length >= 2) {
 			const fe = parseInt(String(vals[0]), 10)
 			const ft = parseInt(String(vals[1]), 10)

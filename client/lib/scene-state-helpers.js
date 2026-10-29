@@ -157,7 +157,7 @@ export function migrateScene(s) {
 						base.contentFit = l.fillNativeAspect === false ? 'stretch' : 'native'
 					}
 					if (base.aspectLocked == null) base.aspectLocked = true
-					if (base.startBehaviour !== 'relativeToPrevious') base.startBehaviour = 'beginning'
+					if (base.startBehaviour !== 'relativeToPrevious' && base.startBehaviour !== 'custom') base.startBehaviour = 'beginning' // WO-813 custom
 					if (!base.fadeOnEnd || typeof base.fadeOnEnd !== 'object') {
 						base.fadeOnEnd = { enabled: false, frames: 12 }
 					}

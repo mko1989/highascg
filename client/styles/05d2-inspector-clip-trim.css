@@ -1,0 +1,73 @@
+/* WO-813 — the look layer's compact, collapsible Trim row (components/inspector-clip-trim.js), under "Clip start point". */
+.inspector-clip-trim {
+	margin-top: 4px;
+}
+.inspector-clip-trim__head {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	min-width: 0;
+}
+.inspector-clip-trim__toggle {
+	background: none;
+	border: none;
+	padding: 0;
+	color: var(--text-muted);
+	font-size: 0.8rem;
+	cursor: pointer;
+}
+.inspector-clip-trim__toggle:hover {
+	color: var(--text);
+}
+.inspector-clip-trim__summary {
+	font-size: 0.78rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.inspector-clip-trim__row,
+.inspector-clip-trim__srow {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin-top: 4px;
+}
+.inspector-clip-trim__row .scenes-btn {
+	white-space: nowrap;
+}
+.inspector-clip-trim__tc {
+	width: 5.2em;
+	min-width: 0;
+	padding: 2px 4px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	color: var(--text);
+	font-size: 0.78rem;
+	font-variant-numeric: tabular-nums;
+	text-align: center;
+}
+.inspector-clip-trim__reset {
+	background: none;
+	border: none;
+	padding: 0 2px;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+	line-height: 1;
+	cursor: pointer;
+}
+.inspector-clip-trim__reset:hover {
+	color: var(--accent);
+}
+.inspector-clip-trim__slider {
+	flex: 1;
+	min-width: 0;
+}
+.inspector-clip-trim__pos {
+	font-size: 0.72rem;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}

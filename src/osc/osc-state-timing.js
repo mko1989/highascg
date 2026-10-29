@@ -52,8 +52,35 @@ function computeRemainingAndProgress(elapsed, duration, opts = {}) {
 	return { remaining, progress, iterationElapsed: e }
 }
 
+/**
+ * WO-813 trim-out: a take with IN / LENGTH plays only [in, in + length] of the file (Caspar av_producer.cpp:925-945 loops
+ * or holds there). Caspar reports that window as OSC `file/clip` [in s, length s] while `file/time` keeps the FILE
+ * duration, so remaining/progress computed from `file/time` alone ran to the file end (a 9.36 s trim of a 10 s clip
+ * showed −0.66 s at its out point). When the window is narrower than the file, remaining/progress follow the window and
+ * `f.outPoint` (s, file time) is set; `f.elapsed` / `f.duration` stay file-absolute. Untrimmed → `outPoint` removed.
+ * @param {object} f — OSC file state (elapsed, duration, clipIn, clipLength, remaining, progress)
+ */
+function applyClipWindow(f) {
+	if (!f || typeof f !== 'object') return
+	const start = Number(f.clipIn)
+	const len = Number(f.clipLength)
+	const dur = Number(f.duration)
+	const valid = Number.isFinite(start) && start >= 0 && Number.isFinite(len) && len > 0 && Number.isFinite(dur) && dur > 0
+	const end = start + len
+	if (!valid || !(start > 1e-3 || end < dur - 1e-3)) {
+		delete f.outPoint
+		return
+	}
+	f.outPoint = end
+	const e = Number(f.elapsed)
+	if (f.elapsed == null || !Number.isFinite(e)) return
+	f.remaining = Math.max(0, end - e)
+	f.progress = Math.min(1, Math.max(0, (e - start) / len))
+}
+
 module.exports = {
 	isSaneTimingValue,
 	SANE_MAX_SECONDS,
 	computeRemainingAndProgress,
+	applyClipWindow,
 }

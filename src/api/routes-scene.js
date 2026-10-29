@@ -42,6 +42,11 @@ async function handlePost(path, body, ctx) {
 		// WO-601: refit a layer for its content sizing (web reapplyLayerFrameForContentFit) — computed, not stored.
 		return handleLayerFit(body, ctx)
 	}
+	if (path === '/api/scene/layer-scrub') {
+		// WO-813: the "Custom" clip start slider seeks the look's PRV copy through the timeline's paced scrub gate.
+		if (!ctx.amcp) return null
+		return require('./routes-scene-layer-scrub').handleLayerScrub(body, ctx)
+	}
 	if (path === '/api/scene/layer-reload') {
 		// WO-601: HTML template "Reload page" with server-resolved channels + physical layers.
 		if (!ctx.amcp) return null

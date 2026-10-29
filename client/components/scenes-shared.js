@@ -315,7 +315,7 @@ export function buildIncomingScenePayload(scene, seekOpts) {
 			// silently dropped right here on every take/stage.
 			// Same trap: startBehaviour missing here was stripped from the deck look by
 			// applySceneFromTakePayload on every take, so the inspector snapped back to its default.
-			...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious'
+			...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious' || l.startBehaviour === 'custom'
 				? { startBehaviour: l.startBehaviour }
 				: {}),
 			...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),

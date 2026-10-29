@@ -62,6 +62,8 @@ func refresh() -> void:
 	var f: Dictionary = top.state.get("file", {}) if (top.state as Dictionary).get("file") is Dictionary else {}
 	var el := _f(f.get("elapsed"))
 	var dur := _f(f.get("duration"))
+	if not is_nan(_f(f.get("outPoint"))):
+		dur = _f(f.get("outPoint")) # WO-813: a trimmed take ends at its out point (server osc-state-timing applyClipWindow)
 	var rem := _f(f.get("remaining"))
 	var pct := 0.0
 	if not is_nan(_f(f.get("progress"))):

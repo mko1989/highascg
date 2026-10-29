@@ -72,6 +72,10 @@ func _ready() -> void:
 	editor.visibility_changed.connect(func() -> void:  # WO-621 N5: an open editor is the only thing at the bottom
 		for c in [_action, bar, deck]:
 			c.visible = not editor.visible)
+	if Config.args.has("probe-select"):  # dev (WO-813): --probe-select=<layer index> once --probe-edit opened the editor
+		editor.visibility_changed.connect(func() -> void:
+			if editor.visible:
+				editor._select.call_deferred(int(Config.args["probe-select"])), CONNECT_ONE_SHOT)
 	shader_live = ShaderLivePanel.new()
 	shader_live.visible = false
 	shader_live.size_flags_vertical = Control.SIZE_EXPAND_FILL

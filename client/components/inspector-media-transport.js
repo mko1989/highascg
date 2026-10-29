@@ -1,5 +1,6 @@
 /**
- * WO-570 — inspector media transport for a look layer: play/pause, trim in/out, scrub bar.
+ * WO-570 — inspector media transport for a look layer: play/pause and scrub bar. Trim in / out live in the compact
+ * Trim row under "Clip start point" since WO-813 (inspector-clip-trim.js).
  *
  * Live transport only (owner decision 2026-09-10): controls act on the REAL Caspar layer via
  * AMCP PAUSE/RESUME/SEEK, and are only enabled while this layer's look is actually showing on
@@ -16,7 +17,6 @@
 
 import { mediaDurationMs } from '../lib/media-duration.js'
 import { resolveMainIndexForScene, resolveLookStackChannelForBus } from '../lib/look-stack-amcp-channel.js'
-import { createDragInput } from './inspector-common.js'
 import { api } from '../lib/api-client.js'
 
 const TICK_MS = 200
@@ -41,7 +41,7 @@ const IMAGE_EXT_RE = /\.(png|jpe?g|gif|bmp|webp|tiff?|svg)$/i
  * @param {{ type?: string, value?: string } | null | undefined} source
  * @returns {boolean}
  */
-function looksLikeVideoMedia(source) {
+export function looksLikeVideoMedia(source) {
 	if (!source?.value) return false
 	const t = String(source.type || '').toLowerCase()
 	if (NON_VIDEO_SOURCE_TYPES.has(t)) return false
@@ -307,74 +307,7 @@ function buildTransportControls(durationMs, { sceneId, layerIndex, layer, scene,
 	}, TICK_MS)
 	refresh()
 
-	// --- Trim in / out (persisted on the layer — applies to every future take) ---
-	const trimRow = document.createElement('div')
-	trimRow.className = 'inspector-media-transport__trim-row'
-
-	function patchTrim(patch) {
-		sceneState.patchLayer(sceneId, layerIndex, patch)
-	}
-
-	const durationSec = durationMs / 1000
-	const trimIn = createDragInput({
-		label: 'Trim in (s)',
-		value: layer.trimInMs != null ? Number(layer.trimInMs) / 1000 : 0,
-		min: 0,
-		max: durationSec,
-		step: 0.1,
-		decimals: 2,
-		slider: true,
-		onChange: (v) => patchTrim({ trimInMs: v > 0 ? Math.round(v * 1000) : null }),
-	})
-	const trimOut = createDragInput({
-		label: 'Trim out (s)',
-		value: layer.trimOutMs != null ? Number(layer.trimOutMs) / 1000 : durationSec,
-		min: 0,
-		max: durationSec,
-		step: 0.1,
-		decimals: 2,
-		slider: true,
-		onChange: (v) => patchTrim({ trimOutMs: v < durationSec ? Math.round(v * 1000) : null }),
-	})
-	trimRow.appendChild(trimIn.wrap)
-	trimRow.appendChild(trimOut.wrap)
-	grp.appendChild(trimRow)
-
-	const trimBtnRow = document.createElement('div')
-	trimBtnRow.className = 'inspector-media-transport__trim-buttons'
-	const setInBtn = document.createElement('button')
-	setInBtn.type = 'button'
-	setInBtn.className = 'scenes-btn scenes-btn--sm'
-	setInBtn.textContent = 'Set in ← playhead'
-	setInBtn.addEventListener('click', () => {
-		const t = target()
-		const cell = t ? readMatrixCell(stateStore, t) : null
-		if (!cell) return
-		const ms = Math.min(durationMs, cell.elapsedMs)
-		trimIn.setValue(ms / 1000, false)
-		patchTrim({ trimInMs: ms > 0 ? Math.round(ms) : null })
-	})
-	const setOutBtn = document.createElement('button')
-	setOutBtn.type = 'button'
-	setOutBtn.className = 'scenes-btn scenes-btn--sm'
-	setOutBtn.textContent = 'Set out ← playhead'
-	setOutBtn.addEventListener('click', () => {
-		const t = target()
-		const cell = t ? readMatrixCell(stateStore, t) : null
-		if (!cell) return
-		const ms = Math.min(durationMs, cell.elapsedMs)
-		trimOut.setValue(ms / 1000, false)
-		patchTrim({ trimOutMs: ms < durationMs ? Math.round(ms) : null })
-	})
-	trimBtnRow.appendChild(setInBtn)
-	trimBtnRow.appendChild(setOutBtn)
-	grp.appendChild(trimBtnRow)
-
-	grp.appendChild(
-		makeHintParagraph(
-			'Applies on the NEXT take of this layer (with "Start from beginning") — not the currently playing instance.'
-		)
-	)
+	/* Trim in / out moved to the "Look take (playback)" group's compact Trim row (WO-813, inspector-clip-trim.js). */
 
 	return grp
 }

@@ -66,11 +66,13 @@ function clipAtTimelineMs(layer, ms) {
 /**
  * @param {object} layer incoming scene layer
  * @param {object|null} timelineClip active clip when inheriting
- * @returns {'beginning' | 'relativeToPrevious'}
+ * @returns {'beginning' | 'relativeToPrevious'} a legacy 'custom' (WO-813, removed 29.10) loads as 'beginning': its
+ *   trim-in still starts the clip there and its trim-out still ends it (trim works under both options)
  */
 function resolveEffectiveStartBehaviour(layer, timelineClip) {
 	const raw = layer?.startBehaviour
 	if (raw === 'beginning' || raw === 'relativeToPrevious') return raw
+	if (raw === 'custom') return 'beginning'
 	if (timelineClip) return normalizeStartBehaviour(timelineClip.startBehaviour)
 	return 'beginning'
 }

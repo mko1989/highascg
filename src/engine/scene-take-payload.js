@@ -78,7 +78,7 @@ function buildLayerRow(l, h) {
 		playlistLoop: l.playlistLoop !== false,
 		playlistAdvance: l.playlistAdvance || 'auto',
 		...(Number(l.playlistFadeFrames) > 0 ? { playlistFadeFrames: Number(l.playlistFadeFrames) } : {}), // WO-766 ↘
-		...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious' ? { startBehaviour: l.startBehaviour } : {}),
+		...(l.startBehaviour === 'beginning' || l.startBehaviour === 'relativeToPrevious' ? { startBehaviour: l.startBehaviour } : l.startBehaviour === 'custom' ? { startBehaviour: 'beginning' } : {}), // WO-813: a legacy custom takes as beginning (trim kept)
 		...(l.trimInMs != null ? { trimInMs: l.trimInMs } : {}),
 		...(l.trimOutMs != null ? { trimOutMs: l.trimOutMs } : {}),
 	}

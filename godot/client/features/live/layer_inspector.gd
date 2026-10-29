@@ -15,9 +15,10 @@ const LowerThirdSection := preload("res://features/live/lower_third_section.gd")
 const CountdownSection := preload("res://features/live/countdown_section.gd")
 const LayerStyleRow := preload("res://features/live/layer_style_row.gd")
 const PlaylistSection := preload("res://features/live/playlist_section.gd")
+const ClipTrimSection := preload("res://features/live/clip_trim_section.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const FITS := [["native", "Native (1:1 px)"], ["fill-canvas", "Fit canvas"], ["horizontal", "Fill width"], ["vertical", "Fill height"], ["stretch", "Stretch"]]
-const STARTS := [["beginning", "Start from beginning"], ["relativeToPrevious", "Relative to the clip playing on this layer"]]
+const STARTS: Array = preload("res://features/live/clip_trim_model.gd").STARTS  # WO-813: no Custom — trim works under both
 
 var scene_id := ""
 var main := 0
@@ -33,6 +34,7 @@ var _lt: LowerThirdSection
 var _cd: CountdownSection
 var _style: LayerStyleRow
 var _pl: PlaylistSection
+var _trim: ClipTrimSection  # WO-813: the collapsible Trim row (slider + Trim in / out) under the drop-down
 signal status(text: String)
 var _content_key := ""
 var _content := Vector2i.ZERO
@@ -51,6 +53,11 @@ func _ready() -> void:
 	_row(g, "Content sizing", _option("fit", FITS.map(func(o: Array) -> String: return o[1]), _on_fit))
 	_row(g, "Clip start point", _option("start", STARTS.map(func(o: Array) -> String: return o[1]),
 		func(i: int) -> void: _emit({"startBehaviour": STARTS[i][0]})))
+	_trim = ClipTrimSection.new()
+	_trim.patch.connect(func(p: Dictionary) -> void: patch.emit(p))
+	_trim.status.connect(func(t: String) -> void: status.emit(t))
+	g.add_child(_trim.header)  # "▸ Trim" in the label column, the folded summary / compact editor beside it
+	g.add_child(_trim)
 	_row(g, "Loop", _check("loop", func(on: bool) -> void: _emit({"loop": on})))
 	_row(g, "Straight alpha", _check("alpha", func(on: bool) -> void: _emit({"straightAlpha": on})))
 	_row(g, "Rotation °", _spin("rot", -180, 180, 0.5, func(v: float) -> void: _emit({"rotation": v})))
@@ -109,6 +116,8 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary, index := -1) 
 	main = main_idx
 	_layer = layer
 	visible = not layer.is_empty()
+	if layer.is_empty():
+		_trim.forget()  # the next layer shown starts with Trim folded, even the same one
 	if main_changed:
 		await _load_options()
 	_sync()
@@ -175,7 +184,9 @@ func _sync() -> void:
 	_syncing = true
 	var fit := str(_layer.get("contentFit", "native"))
 	(_w.fit as OptionButton).select(maxi(0, FITS.map(func(o: Array) -> String: return o[0]).find(fit)))
-	(_w.start as OptionButton).select(1 if str(_layer.get("startBehaviour", "")) == "relativeToPrevious" else 0)
+	var sb := str(_layer.get("startBehaviour", ""))  # a legacy "custom" (WO-813) shows as "beginning", its trim kept
+	(_w.start as OptionButton).select(maxi(0, STARTS.map(func(o: Array) -> String: return o[0]).find(sb)))
+	_trim.show_layer(scene_id, main, _layer)
 	var src: Dictionary = _layer.get("source", {}) if _layer.get("source") is Dictionary else {}
 	var can_loop := X.supports_loop(str(src.get("value", "")), str(src.get("type", "media")))
 	(_w.loop as CheckBox).disabled = not can_loop
