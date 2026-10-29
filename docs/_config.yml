@@ -1,0 +1,3 @@
+# Jekyll (GitHub Pages) — the site root is the Godot demo client (WO-815, pages.yml); these docs are served at /docs/.
+# jekyll-github-metadata keeps an explicit baseurl, so theme assets and relative_url links resolve under /docs/.
+baseurl: /highascg/docs

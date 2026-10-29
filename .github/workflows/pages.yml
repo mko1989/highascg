@@ -1,5 +1,5 @@
-# WO-815 — the Godot client's Web export in demo mode (simulated server, core/demo/) served under /demo/ of the
-# GitHub Pages site, next to the Jekyll docs and the Project Map. A repository has ONE Pages deployment, so the demo
+# WO-815 — the Godot client's Web export in demo mode (simulated server, core/demo/) served at the root of the
+# GitHub Pages site, with the Jekyll docs under /docs/ and the Project Map under /map/. A repository has ONE Pages deployment, so the demo
 # steps live in this one workflow; do not add a second Pages workflow (two deploy jobs overwrite each other's site).
 #
 # Web export notes (godot/client/export_presets.cfg [preset.4] "Web"): single-threaded template
@@ -29,11 +29,12 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # Owner 29.10: the site root is the Godot demo client; the docs live under /docs/ (docs/_config.yml baseurl).
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:
           source: ./docs
-          destination: ./_site
+          destination: ./_site/docs
 
       - uses: actions/setup-node@v5
         with:
@@ -67,8 +68,10 @@ jobs:
           mkdir -p /tmp/web-demo
           /tmp/godot/godot --headless --path godot/client --export-release "Web" /tmp/web-demo/index.html
           test -s /tmp/web-demo/index.wasm && test -s /tmp/web-demo/index.pck
+          sudo cp -r /tmp/web-demo/* _site/
+          # the demo was first published at /demo/ — keep that link working
           sudo mkdir -p _site/demo
-          sudo cp -r /tmp/web-demo/* _site/demo/
+          printf '<!doctype html><meta charset="utf-8"><title>HighAsCG demo</title><meta http-equiv="refresh" content="0; url=../"><a href="../">HighAsCG demo</a>\n' | sudo tee _site/demo/index.html >/dev/null
 
       - uses: actions/upload-pages-artifact@v3
 

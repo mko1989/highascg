@@ -21,7 +21,8 @@ The repo has most of the features documented quite thoroughly with work orders i
   <p>
     <a href="docs/STICK_QUICK_START.md"><strong>🔌 Stick quick start</strong></a> ·
     <a href="https://highascg.dpdns.org/"><strong>💿 Download the ISO</strong></a> ·
-    <a href="https://mko1989.github.io/highascg/"><strong>📚 Read the Wiki</strong></a> ·
+    <a href="https://mko1989.github.io/highascg/"><strong>▶️ Try the demo</strong></a> ·
+    <a href="https://mko1989.github.io/highascg/docs/"><strong>📚 Read the Wiki</strong></a> ·
     <a href="https://github.com/mko1989/highascg-client"><strong>🖥️ Electron launcher</strong></a> (optional)
   </p>
 </div>
@@ -52,7 +53,8 @@ The Node service on port **4200** serves **both** the REST/WebSocket API and the
 
 - **This repository** — unified client + server; see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 - **highascg-client** — optional Mac/Windows/Linux Electron hub (simulator, multiserver, modules); not the UI source tree.
-- **Documentation** — [Wiki](https://mko1989.github.io/highascg/) · local [`docs/`](docs/).
+- **Documentation** — [Wiki](https://mko1989.github.io/highascg/docs/) · local [`docs/`](docs/).
+- **Demo** — [the Godot client in the browser](https://mko1989.github.io/highascg/) with a simulated server (no box needed).
 
 ---
 
