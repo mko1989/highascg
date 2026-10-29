@@ -21,9 +21,11 @@ const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MM := preload("res://features/live/mixer_math.gd")
 const MeterBank := preload("res://features/audio/meter_bank.gd")
 const AA := preload("res://features/audio/audio_actions.gd")
+const FaderCap := preload("res://features/audio/fader_cap.gd")
 const SEND_TEXT := {"afv": "AFV", "always": "ALWAYS", "never": "NEVER"}
 const SEND_TIP := "Audio send — AFV: audio follows video on takes (respects AUTO MIX) · ALWAYS: feeds its routed Ch buses even off-PGM · NEVER: video only"
 const SCALE := [[100.0, "+6"], [83.333, "0"], [66.667, "-6"], [50.0, "-12"], [33.333, "-24"], [16.667, "-48"], [0.0, "-∞"]]
+const SCALE_ICON_W := 7.0  # width of the fader-mark icon drawn at each scale point, on the track side of the label
 
 var row: Dictionary
 var meter: MeterBank
@@ -86,6 +88,12 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = []) -> void:
 	fader.step = 1
 	fader.scrollable = false  # the wheel scrolls the console, it never moves a fader by accident
 	fader.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Mixer look: a physical fader cap as the grabber, a thin dark track. The cap is wider than the default
+	# grabber, so the slider's minimum width grows to fit it (the track is centred in that width).
+	fader.add_theme_icon_override("grabber", FaderCap.grabber())
+	fader.add_theme_icon_override("grabber_highlight", FaderCap.grabber(true))
+	fader.add_theme_stylebox_override("slider", FaderCap.track())
+	fader.custom_minimum_size.x = FaderCap.WIDTH
 	fader.tooltip_text = "Volume — double-click / Ctrl+click: 0 dB"
 	fader.value = MM.gain_to_fader(float(r.get("v", 1.0)))
 	fader.value_changed.connect(_on_value)
@@ -231,10 +239,15 @@ func _toggle(text: String, tip: String, on_colour: Color) -> Button:
 
 func _draw_scale(c: Control) -> void:
 	var font := c.get_theme_default_font()
-	var grab := 8.0  # VSlider grabber half-height: the track runs between the grabber centres
+	var grab := FaderCap.HEIGHT * 0.5  # VSlider grabber half-height: the track runs between the grabber centres
+	var grey := Color("#8b949e")
+	var track_x: float = c.size.x  # the fader sits to the right of this scale column
 	for m in SCALE:
 		var y: float = grab + (1.0 - m[0] / 100.0) * (c.size.y - 2 * grab)
-		c.draw_string(font, Vector2(0, y + 4), m[1], HORIZONTAL_ALIGNMENT_RIGHT, c.size.x, 9, Color("#8b949e"))
+		# Fader-style mark: a 2 px bar at the scale point, on the track side; the label sits just left of it.
+		c.draw_rect(Rect2(track_x - SCALE_ICON_W, y - 1.0, SCALE_ICON_W, 2.0), grey)
+		var text_w: float = font.get_string_size(m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 9).x
+		c.draw_string(font, Vector2(track_x - SCALE_ICON_W - 2.0 - text_w, y + 4), m[1], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, grey)
 
 
 func _on_value(p: float) -> void:

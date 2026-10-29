@@ -14,6 +14,7 @@ test('alsamixer launch goes through the terminal emulator', () => {
 	assert.match(branch, /resolveTerminalEmulator\(\)/)
 	assert.match(branch, /terminalArgv\(term, 'highascg-alsamixer'/)
 	assert.match(branch, /No terminal emulator installed/)
+	assert.match(branch, /dark: true/)
 })
 
 test('xterm-style emulator: class, title, then -e with the alsamixer card', () => {
@@ -24,4 +25,9 @@ test('xterm-style emulator: class, title, then -e with the alsamixer card', () =
 test('gnome-style emulator gets --class and --title', () => {
 	const argv = terminalArgv('/usr/bin/gnome-terminal', 'highascg-alsamixer', 'ALSA mixer', ['alsamixer'])
 	assert.deepEqual(argv, ['--class=highascg-alsamixer', '--title=ALSA mixer', '--', 'alsamixer'])
+})
+
+test('dark option gives an xterm-style emulator a dark background before -e', () => {
+	const argv = terminalArgv('/usr/bin/lxterm', 'highascg-alsamixer', 'ALSA mixer', ['alsamixer'], { dark: true })
+	assert.deepEqual(argv, ['-class', 'highascg-alsamixer', '-title', 'ALSA mixer', '-bg', '#0d1117', '-fg', '#c9d1d9', '-e', 'alsamixer'])
 })

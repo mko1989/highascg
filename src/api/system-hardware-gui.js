@@ -55,7 +55,7 @@ function spawnGuiDetached(action, opts = {}) {
 		const term = resolveTerminalEmulator()
 		if (!term) throw new Error('No terminal emulator installed: alsamixer needs one (x-terminal-emulator or xterm)')
 		bin = term
-		args = terminalArgv(term, 'highascg-alsamixer', 'ALSA mixer', cmd)
+		args = terminalArgv(term, 'highascg-alsamixer', 'ALSA mixer', cmd, { dark: true })
 	} else if (action === 'firefox') {
 		const startUrl = String(opts.url || 'about:blank').trim() || 'about:blank'
 		const launcher = resolveOperatorFirefoxLauncher()

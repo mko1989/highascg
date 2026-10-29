@@ -5,7 +5,9 @@ extends RefCounted
 ## test runner can build it (tests/test_audio_tab_split.gd). The divider position lives in memory (per session).
 
 const TOP_MIN_HEIGHT := 240.0
-const BOTTOM_MIN_HEIGHT := 160.0
+## A compact ALSA strip (alsa_mixer_panel.gd): name 2 lines ~26 + fader 110 + value ~13 + mute ~21 + 3 gaps x4 = 12
+## + padding 2x4 + border 2 ~= 192 px; rounded up to 200 so one row shows whole.
+const BOTTOM_MIN_HEIGHT := 200.0
 const DIVIDER_PX := 8
 
 

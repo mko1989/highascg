@@ -1,12 +1,22 @@
 extends VBoxContainer
 ## WO-608 — ALSA hardware mixer under Settings → Live audio (web settings-alsa-mixer-panel.js): card + view pickers,
-## a row per control (volume slider + mute, switch, or enum), Refresh, Launch alsamixer on :0.
+## one vertical channel strip per control (name, volume fader + value + mute, or switch, or enum), Refresh, Launch
+## alsamixer on :0. The strips wrap in a flow so many controls never push the width out.
 ## Slider moves post at most every 100 ms and once more on release (web debounceAlsaSet + change).
 
 const NuclearGate := preload("res://app/nuclear_gate.gd")
 const K := preload("res://features/settings/pane_kit.gd")
 const M := preload("res://features/settings/alsa_mixer_model.gd")
 const SYSTEM := preload("res://features/settings/system_model.gd")
+const ThemeBuilder := preload("res://app/theme_builder.gd")
+const FaderCap := preload("res://features/audio/fader_cap.gd")
+const STRIP_W := 64.0
+const FADER_H := 110.0
+const CAP_W := 32.0  # the 26 px fader cap plus a small margin
+const FONT_SIZE := 10  # name, value and mute text in a strip
+const MUTE_W := 28.0
+const STRIP_GAP := 6  # strip-to-strip gap (h and v)
+const STRIP_PAD := 4  # inner padding of a strip panel
 
 var _card := 0
 var _picked := false
@@ -14,7 +24,7 @@ var _payload := {}
 var _cards: OptionButton
 var _view: OptionButton
 var _status: Label
-var _grid: GridContainer
+var _strips: HFlowContainer
 
 
 func _ready() -> void:
@@ -37,10 +47,10 @@ func _ready() -> void:
 	K.button(bar, "Refresh", func() -> void: load_mixer(true))
 	K.button(bar, "Launch alsamixer", _launch)
 	_status = K.note(self, "")
-	_grid = GridContainer.new()
-	_grid.columns = 4
-	_grid.add_theme_constant_override("h_separation", 12)
-	add_child(_grid)
+	_strips = HFlowContainer.new()
+	_strips.add_theme_constant_override("h_separation", STRIP_GAP)
+	_strips.add_theme_constant_override("v_separation", STRIP_GAP)
+	add_child(_strips)
 
 
 func load_mixer(refresh: bool) -> void:
@@ -69,83 +79,109 @@ func load_mixer(refresh: bool) -> void:
 
 
 func _render() -> void:
-	for c in _grid.get_children():
+	for c in _strips.get_children():
 		c.queue_free()
 	var view: String = M.VIEWS[maxi(0, _view.selected)][0]
 	var shown: Array = M.normalize(_payload).controls.filter(func(c: Dictionary) -> bool: return M.matches_view(c, view))
 	if shown.is_empty() and not _payload.is_empty():
 		_status.text = "No %s controls on this card." % view
 	for c in shown:
+		var strip := PanelContainer.new()
+		var box := ThemeBuilder.box(ThemeBuilder.BG_PANEL, ThemeBuilder.BORDER, 1, 4)
+		box.set_content_margin_all(STRIP_PAD)
+		strip.add_theme_stylebox_override("panel", box)
+		_strips.add_child(strip)
+		var v := VBoxContainer.new()
+		v.add_theme_constant_override("separation", STRIP_PAD)
+		strip.add_child(v)
 		var name := Label.new()
 		name.text = str(c.get("name", c.get("id", "Control")))
 		if c.get("channels") is Array:
 			name.tooltip_text = ", ".join(PackedStringArray(c.channels))
 			name.mouse_filter = Control.MOUSE_FILTER_PASS
-		name.custom_minimum_size.x = 200
-		_grid.add_child(name)
+		name.add_theme_font_size_override("font_size", FONT_SIZE)
+		name.custom_minimum_size.x = STRIP_W
+		name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(name)
 		match M.kind(c):
-			"enum": _enum_row(c)
-			"bool": _bool_row(c)
-			_: _volume_row(c)
+			"enum": _enum_strip(v, c)
+			"bool": _bool_strip(v, c)
+			_: _volume_strip(v, c)
 
 
-func _volume_row(c: Dictionary) -> void:
+## Volume column: vertical fader, value, then the mute toggle under it.
+func _volume_strip(v: VBoxContainer, c: Dictionary) -> void:
+	var slider := VSlider.new()
+	slider.min_value = 0
+	slider.max_value = 100
+	slider.step = 1
+	slider.value = M.percent(c)
+	slider.custom_minimum_size = Vector2(CAP_W, FADER_H)
+	slider.add_theme_icon_override("grabber", FaderCap.grabber())
+	slider.add_theme_icon_override("grabber_highlight", FaderCap.grabber(true))
+	slider.add_theme_stylebox_override("slider", FaderCap.track())
+	slider.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	v.add_child(slider)
+	var val := Label.new()
+	val.text = M.value_text(c, M.percent(c))
+	val.add_theme_font_size_override("font_size", FONT_SIZE)
+	val.custom_minimum_size.x = STRIP_W
+	val.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(val)
 	var mute := Button.new()
 	mute.toggle_mode = true
 	mute.button_pressed = c.get("muted", c.get("mute")) == true
 	mute.text = "M" if mute.button_pressed else "—"
 	mute.tooltip_text = "Mute"
-	mute.custom_minimum_size.x = 36
+	mute.add_theme_font_size_override("font_size", FONT_SIZE)
+	mute.custom_minimum_size.x = MUTE_W
+	mute.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	mute.toggled.connect(func(on: bool) -> void:
 		mute.text = "M" if on else "—"
 		_post(c, {"mute": on}))
-	_grid.add_child(mute)
-	var slider := HSlider.new()
-	slider.min_value = 0
-	slider.max_value = 100
-	slider.step = 1
-	slider.value = M.percent(c)
-	slider.custom_minimum_size = Vector2(360, 24)
-	_grid.add_child(slider)
-	var val := Label.new()
-	val.text = M.value_text(c, M.percent(c))
-	_grid.add_child(val)
+	v.add_child(mute)
 	var last := [0]
-	slider.value_changed.connect(func(v: float) -> void:
-		val.text = "%d%%" % int(v)
+	slider.value_changed.connect(func(f: float) -> void:
+		val.text = "%d%%" % int(f)
 		var now := Time.get_ticks_msec()
 		if now - last[0] >= 100:
 			last[0] = now
-			_post(c, {"percent": int(v)}))
+			_post(c, {"percent": int(f)}))
 	slider.drag_ended.connect(func(_changed: bool) -> void: _post(c, {"percent": int(slider.value)}))
 
 
-func _bool_row(c: Dictionary) -> void:
+## Switch column: the check box is the whole control.
+func _bool_strip(v: VBoxContainer, c: Dictionary) -> void:
 	var chk := CheckBox.new()
 	chk.button_pressed = M.switch_on(c)
 	chk.text = "On" if chk.button_pressed else "Off"
+	chk.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	chk.clip_text = true  # no minimum width from the text: the strip sets the width
+	chk.add_theme_font_size_override("font_size", FONT_SIZE)
 	chk.toggled.connect(func(on: bool) -> void:
 		chk.text = "On" if on else "Off"
 		_post(c, {"value": 1 if on else 0}))
-	_grid.add_child(chk)
-	_grid.add_child(Control.new())
-	_grid.add_child(Control.new())
+	v.add_child(chk)
 
 
-func _enum_row(c: Dictionary) -> void:
-	_grid.add_child(Control.new())
+## Enum column: the drop-down sits under the name.
+func _enum_strip(v: VBoxContainer, c: Dictionary) -> void:
 	var ob := OptionButton.new()
 	var cur := str(c.get("item", c.get("value", "")))
 	var items: Array = c.get("items") if c.get("items") is Array else []
 	for it in items:
-		var v := str(it.get("value", it.get("name", ""))) if it is Dictionary else str(it)
-		ob.add_item(str(it.get("label", it.get("name", v))) if it is Dictionary else v)
-		ob.set_item_metadata(ob.item_count - 1, v)
-		if v == cur:
+		var val := str(it.get("value", it.get("name", ""))) if it is Dictionary else str(it)
+		ob.add_item(str(it.get("label", it.get("name", val))) if it is Dictionary else val)
+		ob.set_item_metadata(ob.item_count - 1, val)
+		if val == cur:
 			ob.select(ob.item_count - 1)
+	ob.clip_text = true  # shrink to the strip width; long item names are clipped, not widened
+	ob.fit_to_longest_item = false
+	ob.add_theme_font_size_override("font_size", FONT_SIZE)
 	ob.item_selected.connect(func(i: int) -> void: _post(c, {"item": ob.get_item_metadata(i)}))
-	_grid.add_child(ob)
-	_grid.add_child(Control.new())
+	v.add_child(ob)
 
 
 func _post(c: Dictionary, change: Dictionary) -> void:

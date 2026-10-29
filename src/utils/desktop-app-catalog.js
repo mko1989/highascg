@@ -84,11 +84,14 @@ function terminalClassFor(id) {
  * @param {string} cls private class
  * @param {string} title window title
  * @param {string[]} cmd the console command, argv-style
+ * @param {{dark?: boolean}} [opts] dark: dark background and light text where the emulator takes flags
  * @returns {string[]} emulator arguments
  */
-function terminalArgv(term, cls, title, cmd) {
+function terminalArgv(term, cls, title, cmd, opts = {}) {
 	const base = path.basename(term)
-	if (/^[lu]?xterm$/i.test(base)) return ['-class', cls, '-title', title, '-e', ...cmd]
+	// opts.dark: a dark background with light text (xterm-style emulators take the colours as flags; the GTK ones do not here)
+	const colours = opts.dark ? ['-bg', '#0d1117', '-fg', '#c9d1d9'] : []
+	if (/^[lu]?xterm$/i.test(base)) return ['-class', cls, '-title', title, ...colours, '-e', ...cmd]
 	if (/^(gnome-terminal|xfce4-terminal|mate-terminal|tilix)$/i.test(base))
 		return [`--class=${cls}`, `--title=${title}`, '--', ...cmd]
 	return ['-e', ...cmd]
