@@ -100,6 +100,8 @@ func bind(s: Variant, r: Dictionary) -> void:
 		s.screen_toggled.connect(func(ch: int, on: bool) -> void: screen(key, ch, on))
 	if s.has_signal("route_toggled"):
 		s.route_toggled.connect(func(ch: int, on: bool) -> void: _after(await send(AA.route_request(s.row, ch, on))))
+	if s.has_signal("monitor_pair_selected"):
+		s.monitor_pair_selected.connect(monitor_pair)
 	if s.has_signal("send_selected"):
 		s.send_selected.connect(func(v: String) -> void: _after(await send(AA.send_request(s.row, v))))
 	if s.has_signal("stop_pressed"):
@@ -149,6 +151,23 @@ func solo(key: String, multi: bool) -> void:
 	var res := await send(AA.solo_request(keys))
 	if not res.ok:
 		changed.emit()  # back to the server's set
+
+
+## WO-801: the headphone pair. The server swaps the monitor consumer and broadcasts `audioMixer.monitorPair`; a refused
+## pair (no monitor channel / Caspar config not applied) puts the pickers back on the server's value.
+func monitor_pair(pair: String) -> void:
+	var res := await send(AA.monitor_pair_request(pair))
+	if res.ok:
+		if pair == "mix":
+			mixer.erase("monitorPair")
+		else:
+			mixer["monitorPair"] = pair
+		status.emit("Headphones: %s." % ("full mix" if pair == "mix" else "pair " + pair + " only"))
+	else:
+		var why := str(_d(res.get("data")).get("error", ""))
+		if why != "":
+			status.emit("Headphones: " + why)
+	changed.emit()
 
 
 func mute(key: String) -> void:

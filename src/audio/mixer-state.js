@@ -11,6 +11,7 @@
  */
 
 const persistence = require('../utils/persistence')
+const { normalizeMonitorPair } = require('./monitor-pair')
 
 const STATE_KEY = 'audioMixer'
 const KEY_RE = /^(pgm|prv|input):\d+(:layer:\d+)?$/
@@ -20,7 +21,11 @@ function isMixerKey(key) {
 	return typeof key === 'string' && KEY_RE.test(key)
 }
 
-/** @returns {{ gains: Record<string, number>, muted: Record<string, boolean>, solos: string[] }} */
+/**
+ * WO-801: `monitorPair` = the headphone pair ('1+2' … '15+16') — present only when not the default 'mix', so the
+ * default snapshot keeps its WO-604 shape.
+ * @returns {{ gains: Record<string, number>, muted: Record<string, boolean>, solos: string[], monitorPair?: string }}
+ */
 function snapshot() {
 	const raw = persistence.get(STATE_KEY)
 	const j = raw && typeof raw === 'object' ? raw : {}
@@ -33,7 +38,22 @@ function snapshot() {
 		if (isMixerKey(k) && v === true) muted[k] = true
 	}
 	const solos = Array.isArray(j.solos) ? j.solos.filter(isMixerKey) : []
-	return { gains, muted, solos }
+	const pair = normalizeMonitorPair(j.monitorPair)
+	return pair === 'mix' ? { gains, muted, solos } : { gains, muted, solos, monitorPair: pair }
+}
+
+/** WO-801: the stored headphone pair ('mix' when unset). */
+function monitorPair() {
+	return snapshot().monitorPair || 'mix'
+}
+
+/** @param {string} pair 'mix' | '1+2' … '15+16' */
+function setMonitorPair(ctx, pair) {
+	const s = snapshot()
+	const p = normalizeMonitorPair(pair)
+	if (p === 'mix') delete s.monitorPair
+	else s.monitorPair = p
+	return save(s, ctx)
 }
 
 function save(next, ctx) {
@@ -78,4 +98,4 @@ function soloKeyToTarget(key) {
 	return Number.isFinite(layer) ? { channel, layer } : { channel }
 }
 
-module.exports = { STATE_KEY, isMixerKey, snapshot, setGain, setMuted, setSolos, soloKeyToTarget }
+module.exports = { STATE_KEY, isMixerKey, snapshot, setGain, setMuted, setSolos, soloKeyToTarget, monitorPair, setMonitorPair }

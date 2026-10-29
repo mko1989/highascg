@@ -106,7 +106,7 @@ func _refresh() -> void:
 	var st := ctl.state()
 	var cm: Dictionary = st.channelMap
 	_rows = ctl.rows(st)
-	var sig := [_programs(cm), AR.screen_labels(cm)]
+	var sig := [_programs(cm), AR.screen_labels(cm), cm.get("audioPreviewCh")]
 	for r in _rows:
 		var bars := AR.bus_channel_count(Settings.settings, cm, r.ch) if r.get("isMaster", false) == true else 1
 		sig.append([r.key, r.label, r.get("sceneId"), bars, r.get("liveAudioSlot")])
@@ -126,6 +126,7 @@ func _refresh() -> void:
 			strip.set_gain(float(r.get("v", 1.0)))
 		strip.set_muted(r.get("muted", false) == true)
 		strip.set_solo(solos.has(r.key))
+		strip.set_monitor_pair(AA.monitor_pair(ctl.mixer))
 		strip.set_routing(AA.routing_entry(ctl.routing, r))
 		strip.set_screens(AA.cross_screen_buttons(ctl.xplan, r), AA.cross_screen_targets(r))
 	if _auto_mix:
@@ -158,8 +159,22 @@ func _rebuild(cm: Dictionary) -> void:
 		e.custom_minimum_size.x = 420
 		e.add_theme_color_override("font_color", ThemeBuilder.TEXT_MUTED)
 		_inputs.add_child(e)
+	var pairs := _monitor_pairs(cm, progs)
 	for r in _rows.filter(func(r: Dictionary) -> bool: return r.get("isMaster", false) == true):
-		_masters.add_child(_strip(r, AR.bus_channel_count(Settings.settings, cm, r.ch), false))
+		var m := _strip(r, AR.bus_channel_count(Settings.settings, cm, r.ch), false)
+		_masters.add_child(m)
+		if r.get("isPreview", false) == true:
+			m.enable_monitor_pairs(pairs)  # WO-801: the headphone pair, next to the SOLO that sends PRV there
+
+
+## WO-801: the headphone pair choices — none when the node has no monitor output (channelMap.audioPreviewCh).
+func _monitor_pairs(cm: Dictionary, progs: Array) -> Array:
+	if cm.get("audioPreviewCh") == null:
+		return []
+	var widest := 2
+	for p in progs:
+		widest = maxi(widest, AR.bus_channel_count(Settings.settings, cm, p))
+	return AA.monitor_pairs(widest)
 
 
 static func _programs(cm: Dictionary) -> Array:

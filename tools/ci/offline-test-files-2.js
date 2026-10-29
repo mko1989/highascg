@@ -43,4 +43,5 @@ module.exports = [
 	'tools/smoke/smoke-wo821-hardware-hold.test.js',
 	'tools/smoke/smoke-wo823-load-from-file-keeps-rig.test.js',
 	'tools/smoke/smoke-wo824-import-keeps-open-project.test.js',
+	'tools/smoke/smoke-wo801-monitor-pair.test.js',
 ]

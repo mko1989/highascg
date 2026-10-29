@@ -25,6 +25,7 @@ const { startInputCapture } = require('../audio/live-input-start')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const mixerState = require('../audio/mixer-state')
 const inputRouting = require('../audio/input-audio-routing')
+const { handleMonitorPair } = require('./routes-audio-monitor-pair')
 
 /**
  * Apply an input-strip volume to every live look layer consuming the target via a LAYER route.
@@ -250,6 +251,12 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	if (path === '/api/audio/monitor-source') {
+		// WO-801: { pair } = the headphone pair (mix | 1+2 … 15+16); without a `source` that is all this call does.
+		const bp = parseBody(body)
+		if (bp && typeof bp === 'object' && bp.pair !== undefined) {
+			const r = await handleMonitorPair(ctx, bp)
+			if (bp.source === undefined || r.status !== 200) return r
+		}
 		if (!ctx.amcp) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}

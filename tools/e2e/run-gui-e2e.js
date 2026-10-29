@@ -50,7 +50,11 @@ async function main() {
 	const pixelMap = scenarios === 'all' || scenarios.split(',').includes('07_pixel_map')
 	const pm = pixelMap ? require('./pixel-map-fixture') : null
 	const root = path.join(out, 'sandbox')
-	const sb = await startSandbox({ root, tracking: pixelMap, config: pm?.sandboxConfig(root), log: (s) => console.log(`[e2e] ${s}`) })
+	// WO-801: 08_audio_monitor_pair needs a PRV screen — the same seeded PGM/PRV destination (it turns the headphone
+	// output on itself, after 07: audio preview on at boot left 07's channel list empty in 2 of 3 runs)
+	const monitorPair = scenarios.split(',').includes('08_audio_monitor_pair')
+	const config = pm || monitorPair ? require('./pixel-map-fixture').sandboxConfig(root) : undefined
+	const sb = await startSandbox({ root, tracking: pixelMap, config, log: (s) => console.log(`[e2e] ${s}`) })
 	const fixtures = pm ? pm.prepare(sb, (s) => console.log(`[e2e] ${s}`)) : null
 	let code
 	try {

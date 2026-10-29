@@ -220,6 +220,14 @@ async function setupAllRouting(self) {
 	await ensureAllMeterNullConsumers(self)
 	await repairLiveInputMetersIfStale(self, { force: true, broadcastOsc: true }).catch(() => {})
 	startLiveInputMeterHealthWatch(self)
+	// WO-801: a restarted Caspar has only the config's OpenAL headphone consumer — put a stored pair back.
+	try {
+		const { reassertMonitorPair } = require('../audio/monitor-pair')
+		const r = await reassertMonitorPair(self, require('../audio/mixer-state').monitorPair())
+		if (!r.skipped) self.log(r.ok ? 'info' : 'warn', `[Audio] monitor pair ${r.pair} re-applied: ${r.ok ? 'ok' : r.error}`)
+	} catch (e) {
+		self.log('warn', `[Audio] monitor pair reassert: ${e?.message || e}`)
+	}
 }
 
 /**

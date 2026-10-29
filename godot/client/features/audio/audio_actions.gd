@@ -60,6 +60,29 @@ static func solo_request(keys: Array) -> Array:
 	return ["POST", "/api/audio/solo", {"keys": keys}]
 
 
+## WO-801 — the headphone pair of the monitor output: "mix" (the OpenAL downmix) or one stereo pair of the 16 channels
+## the monitor carries. Server: POST /api/audio/monitor-source {pair}; state: the console's `monitorPair` (absent = mix).
+const MONITOR_PAIRS := ["mix", "1+2", "3+4", "5+6", "7+8", "9+10", "11+12", "13+14", "15+16"]
+
+
+## The picker's choices: Mix + one pair per two bus channels of the widest program bus (at least 4, at most 8 pairs).
+static func monitor_pairs(widest_bus: int) -> Array:
+	return MONITOR_PAIRS.slice(0, 1 + clampi(ceili(widest_bus / 2.0), 4, 8))
+
+
+static func monitor_pair_text(pair: String) -> String:
+	return "HP Mix" if pair == "mix" else "HP " + pair
+
+
+static func monitor_pair(mixer: Dictionary) -> String:
+	var p := str(mixer.get("monitorPair", "mix"))
+	return p if MONITOR_PAIRS.has(p) else "mix"
+
+
+static func monitor_pair_request(pair: String) -> Array:
+	return ["POST", "/api/audio/monitor-source", {"pair": pair}]
+
+
 ## sceneState.patchLayer for the console: the look's layer with this layerNumber takes `patch`. False when the
 ## look or the layer is gone (the look changed under the console).
 static func patch_look_layer(project: Dictionary, scene_id: String, layer_number: Variant, patch: Dictionary) -> bool:

@@ -16,6 +16,7 @@ signal send_selected(send: String)
 signal start_pressed
 signal stop_pressed
 signal inspect_requested  ## a click on a live-audio strip's body (web: "Click to inspect / remove")
+signal monitor_pair_selected(pair: String)  ## WO-801: the PRV master's headphone pair picker
 
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const MM := preload("res://features/live/mixer_math.gd")
@@ -27,6 +28,7 @@ const AR := preload("res://features/audio/audio_rows.gd")
 const SEND_TEXT := {"afv": "AFV", "always": "ALWAYS", "never": "NEVER"}
 const SEND_TIP := "Audio send — AFV: audio follows video on takes (respects AUTO MIX) · ALWAYS: feeds its routed Ch buses even off-PGM · NEVER: video only"
 const SCALE := [[100.0, "+6"], [83.333, "0"], [66.667, "-6"], [50.0, "-12"], [33.333, "-24"], [16.667, "-48"], [0.0, "-∞"]]
+const PAIR_TIP := "Headphones (monitor output): HP Mix = every channel folded to stereo; a pair = only those two channels (e.g. 3+4 of an 8 ch look). Applies to whatever the monitor plays — PRV, or the SOLO set."
 const SCALE_ICON_W := 7.0  # width of the fader-mark icon drawn at each scale point, on the track side of the label
 
 var row: Dictionary
@@ -42,6 +44,9 @@ var _send: OptionButton
 var _routes := {}  # program channel → toggle
 var _screens := {}  # program channel → Screens toggle
 var _labels := {}  # program channel → screen label (AR.screen_labels); the button text and tooltip
+var _acts: VBoxContainer
+var _pair: OptionButton  # WO-801: PRV masters only, while the box has a monitor output
+var _pairs: Array = []
 
 
 func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: Dictionary = {}) -> void:
@@ -127,6 +132,7 @@ func setup(r: Dictionary, bars: int, dense: bool, programs: Array = [], labels: 
 	var acts := VBoxContainer.new()
 	acts.add_theme_constant_override("separation", 3)
 	v.add_child(acts)
+	_acts = acts
 	if master:
 		var badge := Label.new()
 		badge.text = "PRV" if r.get("isPreview", false) == true else "PGM"
@@ -210,6 +216,37 @@ func set_screens(buttons: Array, targets: Array) -> void:
 		b.set_pressed_no_signal(host or targets.has(ch))
 		b.tooltip_text = "Host channel" if host else ("Route this layer's audio to %s" % _label_of(ch) if info.get("ok", false) == true
 			else str(info.get("reasonText", "Checking…")))
+
+
+## WO-801: the headphone pair picker under SOLO (the PRV master's SOLO is what sends PRV to the headphones). `pairs` =
+## AA.monitor_pairs(); the audio tab calls this on PRV masters only, and only when the box has a monitor output.
+func enable_monitor_pairs(pairs: Array) -> void:
+	if _pair or pairs.is_empty():
+		return
+	_pairs = pairs.duplicate()
+	_pair = OptionButton.new()
+	_pair.focus_mode = Control.FOCUS_NONE
+	_pair.tooltip_text = PAIR_TIP
+	_pair.add_theme_font_size_override("font_size", 10)
+	_pair.fit_to_longest_item = false
+	for p in _pairs:
+		_pair.add_item(AA.monitor_pair_text(str(p)))
+	_pair.item_selected.connect(func(i: int) -> void: monitor_pair_selected.emit(str(_pairs[i])))
+	_acts.add_child(_pair)
+
+
+## The server's pair (a pair past this picker's list still shows, so the picker never claims "Mix" falsely).
+func set_monitor_pair(pair: String) -> void:
+	if _pair == null:
+		return
+	if not _pairs.has(pair):
+		_pairs.append(pair)
+		_pair.add_item(AA.monitor_pair_text(pair))
+	_pair.select(_pairs.find(pair))
+
+
+func monitor_pair() -> String:
+	return str(_pairs[_pair.selected]) if _pair and _pair.selected >= 0 else ""
 
 
 ## The PGM screen label for a program channel (its number when the labels dictionary has no entry).

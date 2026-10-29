@@ -60,6 +60,14 @@ static func _audio(s: RefCounted, verb: String, path: String, body: Dictionary) 
 			s.mixer["solos"] = keys
 			s.change("audioMixer", s.mixer)
 			return s.reply({"ok": true, "solos": keys})
+		["POST", "/api/audio/monitor-source"]:  # WO-801: the headphone pair (no Caspar here: the state only)
+			var pair := str(body.get("pair", "mix"))
+			if pair == "mix":
+				s.mixer.erase("monitorPair")
+			else:
+				s.mixer["monitorPair"] = pair
+			s.change("audioMixer", s.mixer)
+			return s.reply({"ok": true, "pair": pair, "demo": true})
 		["GET", "/api/audio/live-inputs"]:
 			return s.reply({"liveAudioInputChannels": [], "liveAudioCount": 0, "configured": {"count": 0, "slots": []},
 				"status": {"enabled": false, "reason": "demo"}})
