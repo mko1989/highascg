@@ -1,6 +1,6 @@
 # WO-820 — NotchLC: native GPU decode in Caspar (spike + build)
 
-**Status: DONE (29.10, verified on the box: bit-exact offline mirror, PRINT frame vs FFmpeg max 1/255, PRV + 54 s PGM run; NotchLC PRV +26 % CPU instead of +404 %) — deployed binary 362fa0bd; patch `caspar/patches/wo820-notchlc-gpu.patch` committed on branch `notchlc` (owner 29.10: separate branch); real-content check on frontex_big in progress**
+**Status: DONE (29.10, verified on the box: bit-exact offline mirror, PRINT vs FFmpeg max 2/255; frontex_big real-content check: 131 NotchLC files in 2 variants, e2e looks on PGM, stress tests; 2 bugs found and fixed — payload cap and GL pool growth) — deployed binary edd5c8e7; patch `caspar/patches/wo820-notchlc-gpu.patch` regenerated (branch `notchlc`, owner 29.10: separate branch)**
 
 Owner (29.10): "content creators favour notch vs hap lately thats why id like the native handling of notchlc."
 Background (performance check 29.10, same session): NotchLC `INTRO_v3.mov` on PRV only ≈ 460 % of a core, PGM+PRV ≈ 918 %
@@ -158,7 +158,127 @@ a clean `git archive HEAD` export, result byte-identical to the built tree).
 - Owner QA: a real show with NotchLC content; a NotchLC clip with mixer transforms/keys; LZF/stored-format files (none
   in media/, handled by the same code as FFmpeg).
 
-**Rollback:** `cd ~/highascg/bin && cp casparcg.pre-wo820 casparcg.new && mv -f casparcg.new casparcg`, then AMCP
+**Rollback:** stock = `casparcg.pre-wo820` (16a73673); earlier WO-820 builds `casparcg.wo820-v1` / `casparcg.wo820-v2`.
+`cd ~/highascg/bin && cp casparcg.pre-wo820 casparcg.new && mv -f casparcg.new casparcg`, then AMCP
 `RESTART` and `kill -TERM $(systemctl show -p MainPID --value highascg)`, re-take the looks. Or keep the binary and set
 `<ffmpeg><producer><notchlc-gpu>false</notchlc-gpu></producer></ffmpeg>` in casparcg.config (CPU path, as stock).
 Follow-up for the owner: the WO-818 ⚠ tooltip ("decodes it on the CPU") is no longer true with this binary.
+
+## Real content check (frontex_big), 29.10 17:00–17:53
+
+Owner (29.10): "check on really content. There is a lot of notchlc content in the frontex project. Run end to end tests."
+Then the addendum: stress the GPU path (stacked layers, L_ on PGM + s_ on PRV, seek/scrub, LOADBG→PLAY, pause/resume, clip
+end, NotchLC+HAP mix, 10+ takes with nvidia-smi, Caspar restart with NotchLC on air). Scripts, data, PRINT frames:
+`/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo820/frontex/` (`survey.tsv`,
+`sizes.tsv`, `onair.log`, `stress/`).
+
+### Investigation
+
+**Survey of `media/projects/frontex_big/NOTCH/` (140 .mov):** 131 NotchLC, 4 HAP (`L_INTRO_HAP`, `s_INTRO_HAP`,
+`WIZYTOWKA_L_1_1_HAP`, `WIZYTOWKA_L_1_2_HAP`), **5 unreadable** ("moov atom not found" — truncated exports):
+`TLA/S_AKT_3_START`, `S_AKT_3_TYTUL_START`, `S_BAZA_START`, `S_BAZA_PUSTY_START`, `S_AKT_1_START`. All NotchLC files are
+30 fps, yuva444p12le with alpha encoded, pcm_s16le audio, LZ4; sizes are multiples of 16 (no odd-size case).
+
+| variant | files | avg / max bitrate | total | max payload (`nlcsizes`) | max packet | unpack (CPU) |
+|---|---|---|---|---|---|---|
+| 1920×2304 (`s_`, `S_`) | 56 | 371 / 636 Mbps | 1634 s | **1.668 B/px** (s_INTRO frame 2250) | 3.0 MB | ≤ 2.9 ms |
+| 5760×1728 (`L_`, TLA) | 75 | 1413 / 1853 Mbps | 1922 s | **1.556 B/px** (L_INTRO frame 2251) | 8.6 MB | ≤ 3.3 ms |
+
+(INTRO_v3, the clip of the first test: 0.844 B/px.) The encoder stores ~0.5 B/px of alpha data where FFmpeg reads 8 bytes
+per 16×16 block, so the payload is not bounded by the format.
+
+**Bug 1 — big frames drawn transparent (found on air, PGM 17:04:53):** log `NotchLC GPU path: undecodable frame (payload
+larger than the plane), drawn transparent`. `notchlc.h` capped the payload at 1.5 B/px + 64 KiB; s_INTRO has 7 frames and
+L_INTRO 4 frames (around 75 s) above it → one transparent frame each, every loop.
+
+**Bug 2 — GL pool growth from per-frame plane heights (found by the 10+ takes test):** the fix for bug 1 sized the plane
+per frame (rows in use, 64-row steps). The GL device (`accelerator/ogl/util/device.cpp:208,230`) pools textures and host
+buffers per exact size and never frees them (only `GL GC`). After 24 takes: `GL INFO` showed **51 different heights** of
+width-1024 (NotchLC) textures = 6.5 GB of pooled device memory; caspar held 18.7 GB GPU memory (nvidia-smi) and 27 GB RSS.
+
+### What was done
+
+- `src/core/frame/notchlc.h`: `max_payload_bytes(w,h)` = 4 B/px + 64 KiB (half of raw yuva444p12; the producer's pooled
+  buffers are only touched as far as each frame's real payload).
+- `src/modules/ffmpeg/util/av_util.cpp` `make_frame`: the notchlc plane holds only the rows in use, rounded up to a
+  **size class** (64 rows, then +25 % steps: 64, 128, 192, 256, 320, 448, 576, 768, 960, 1216, 1536, 1920, 2432, 3072,
+  3840, …), so copy/upload follow the real payload (≤ 25 % extra) and the pools see a handful of sizes.
+- Rebuilt (`build-26.sh` rc 0) → **edd5c8e7**, deployed; previous builds kept as `bin/casparcg.wo820-v1` (362fa0bd, the
+  1.5 B/px build) and `bin/casparcg.wo820-v2` (ad5f37bc, bug 1 fixed, bug 2 present). The patch was regenerated, applied
+  to a clean `git archive HEAD` export and compared file by file with the built tree (identical). A 3-line comment in
+  av_util.cpp was reworded after the edd5c8e7 build (same line count, no code change).
+
+### What was VERIFIED
+
+**Picture vs FFmpeg / vs Caspar's CPU path** (offline mirror = real unpack + C++ copy of the shader; on the box `PRINT` of
+a 1:1 crop over black, PRV ch2):
+
+| clip (variant) | offline Y/U/V/A mismatches | on box GPU vs FFmpeg (mean / max / PSNR) | GPU vs Caspar CPU path |
+|---|---|---|---|
+| L_INTRO 5760×1728 (3, 51.2, 75.03, 101.6 s) | 0 (start, mid, end, 74.9 s +12) | 0.07–0.21 / 2 / 55.0–58.9 dB | max 1, 68.0–74.5 dB |
+| L_OUTRO 5760×1728 (17.5 s) | 0 | 0.32 / 2 / 53.1 dB | max 1, 65.8 dB |
+| BAZA_TLO_BAZA_LOOP 5760×1728 (1, 40, 79.5 s) | 0 | 0.18 / 2 / 55.5 dB | max 1, 68.7 dB |
+| WIZYTOWKA_L_1_1 / _1_2 5760×1728, alpha (0.3–5 s) | 0 | 0.07–0.31 / 2 / 53.2–59.8 dB | max 1, 66.0–72.7 dB |
+| s_INTRO 1920×2304 (3, 51.2, 75.0, 75.1, 101.6 s) | 0 (incl. 74.9 s +12) | 0.08–0.21 / 1 / 54.9–58.9 dB | max 1, 66.5–74.5 dB |
+| S_BAZA_LOOP 1920×2304 (1, 40, 79.5 s) | 0 | 0.23 / 1 / 54.5 dB | max 1, 67.3 dB |
+
+Offline RGB vs swscale max 0.062. The GPU path is consistently a little closer to FFmpeg than Caspar's own CPU path.
+Alpha (WIZYTOWKA over black, in the stack test over other layers) composites the same as the CPU path.
+
+**End to end through HighAsCG looks (frontex_big loaded 17:01 with `POST /api/project/load`, takes with
+`POST /api/scene/take-look`):** Look 4 (L_INTRO, main 1 → ch3) + Look 4 s (s_INTRO, main 0 → ch1), Look 2 (BAZA_TLO,
+ch3), Look 3 (S_BAZA_LOOP, ch1); PRV, then PGM. OSC (UDP :6250) over 150 s on edd's predecessor ad5f37bc: ch1 wrapped
+102.28 → 0 and ch3 79.98 → 0 cleanly, no repeated ticks, media time = wall time; after bug 1 no undecodable warning across
+75 s and both loop points. A NotchLC → NotchLC take logs one `Latency: 0` (one repeated frame of the outgoing clip) — the
+same as any ffmpeg take.
+
+**CPU, GPU path vs stock CPU path (Look 4 pair on PGM, PRV cleared, 30 s):**
+
+| path | caspar CPU | GPU util | GPU W | CPU pkg avg / max |
+|---|---|---|---|---|
+| WO-820 GPU path | **125.8 %** | 28 % | 41.0 | 58.4 / 68 °C |
+| HAP siblings (Look 5 + 6) | 316.4 % | 34 % | 43.1 | 76.8 / 83 °C |
+| stock 16a73673 | **988.8 %** (video-executor 402, av:notchlc 195, workers 357) | 57 % | 52.1 | 85.2 / **92 °C** |
+
+Stock also underflowed: L_INTRO `Latency: 6` at start and ~25 underflows on one NotchLC → NotchLC take, including
+`Latency: 40` (0.8 s freeze); the GPU path: one per take. Other loads (GPU path): base 80.5 %; 2 NotchLC looks on PRV
+141.7 %; 4 NotchLC layers PGM+PRV 210.6 %; 2 HAP PGM + 2 NotchLC PRV 392.8 %.
+
+**Stress (binaries ad5f37bc, then edd5c8e7; picture checks repeated on edd5c8e7 with identical numbers):**
+
+| test | result |
+|---|---|
+| T1: 5 NotchLC layers on PGM ch1 (BAZA_TLO, L_INTRO opacity 0.7, WIZYTOWKA alpha, S_BAZA FILL, s_INTRO FILL+ROTATION 12) | GPU vs CPU path max 2 / 67.2 dB (0.5 s), max 1 / 68.2 dB (5 s); playing: caspar 266 %, GPU 46 %, 70 W, pkg max 66 °C; no mid-play underflow |
+| T6: NotchLC + HAP mixed (L_INTRO, WIZYTOWKA_HAP opacity 0.8, s_INTRO FILL) | max 1, 77.1 dB |
+| T2: PGM ch1 L_INTRO + BAZA_TLO, ch3 Look 4 L_INTRO; PRV ch2 s_INTRO + S_BAZA_LOOP, ch4 s_INTRO (6 NotchLC streams) | caspar 274.5 %, GPU 48 %, 67.7 W, pkg max 70 °C; OSC 30 s on ch1/2/3/4: no repeats, 0 media-vs-wall mismatches; only start `Latency` lines |
+| T3a: 40 `CALL SEEK` in 0.01 s on L_INTRO while playing, then SEEK 2500 + PAUSE | time 50.0 s; picture vs CPU path max 1, 66.3 dB |
+| T3b: `LOADBG … SEEK 1000` → `PLAY` → 2 s → `PAUSE` | time 23.48 s; max 1, 71.5 dB |
+| T4: PAUSE 2 s / RESUME | time frozen 4.46 → 4.46, two PRINTs identical (max 0); resumed +3.5 s after 2 s |
+| T5: WIZYTOWKA_L_1_1 (10.04 s) without LOOP | last frame held at 10.04 s on both paths (same as stock), GPU vs CPU path max 1, 69.5 dB |
+| T7: 24 PGM takes (Look 2 ↔ 4 on ch3, Look 3 ↔ 4 s on ch1, 4 s apart) | no errors; 1 `Latency: 0` per take. ad5f37bc: **bug 2**. edd5c8e7: NotchLC pool heights {960, 1216, 1920, 2432, 3072, 3840}, pooled device 1.86 GB, flat between take 12 and 24 |
+| T7c: 3 NotchLC layers played 12 s then cleared + `GL GC`, ×5 | RSS while playing 7.7–8.3 GB, after clear 4.5–5.3 GB, GPU 1.7–2.2 GB: no growth across cycles (no leak); the RSS above the 1.9 GB fresh start is freed malloc memory kept by glibc |
+| T8: Caspar `RESTART` with Look 4 pair on PGM (also the edd5c8e7 deploy) | back in ~12 s, no NotchLC errors (the boost `local_endpoint` exception at shutdown is pre-existing, also 20.–27.10). HighAsCG re-staged PRV (Look 3 on ch2, Look 10 on ch4) and **cleared the PGM live looks** (`Live scene reconcile … clearing persisted live look`): PGM stays black until the operator takes again — existing HighAsCG behaviour, not NotchLC |
+
+Note for long shows: the GL device's pools never shrink by themselves (stock Caspar); after many different large clips
+`GL GC` (AMCP) returns the memory (measured 8.7 → 1.9 GB GPU).
+
+**What went on air** (`onair.log`): PRV ch2 test frames 16:54–17:01; PGM frontex looks from 17:03:38 (ch3 BAZA_TLO,
+ch1 s_INTRO, then L_INTRO / S_BAZA_LOOP / HAP siblings / stock binary comparison until 17:24); Caspar `RESTART`s 17:09:4x,
+17:20:5x, 17:23:39, 17:37:42 (outputs dropped ~12 s each); PGM ch1 layers 100–105 stress 17:24–17:31 and 17:43–17:50;
+takes 17:34–17:42. Restored 17:51–17:53: project `mhp_harder` (rev 287), Intro look on PGM ch1 and PRV ch2, look
+149fd497 (blackFHD) on PRV ch4, ch3 empty — as at the start.
+
+**Side effect found and undone:** at 17:10:04 (node restart while frontex_big was active) a client autosave rewrote
+`projects/frontex_big.json` and its `_autosave` copy (rev 836 → 837): `/api/project/autosave` injects the box's live
+hardware config (`routes-data-project-handlers.js:386`), so the project's own show hardware (5760×1728 / 1920×2304
+screens, destinations Main/Kolko) was replaced by this box's. Both files were restored from the backups taken before the
+test (md5 3cde5978). Worth knowing before opening a show project on a box with a different hardware config.
+
+**Screenshots** (`…/scratchpad/wo820/frontex/`): `godot_live_pgm.png` (second Godot client on Xvfb, Live tab, Frontex
+Big, PGM 1 L10 S_INTRO and PGM 2 L10 BAZA_TLO — thumbnails visible, video tiles black under software GL),
+`screen0_caspar_pgm1.png` (Caspar screen output, s_INTRO on PGM), `screen0_pgm_notch.png` (whole :0 at that time),
+`screen0_restored.png` (after restore). The owner's client was not restarted (not allowed); it still shows the Frontex
+Big deck after the restore — relaunch it.
+
+**Owner QA:** a real frontex show run (all looks, the operator's own takes and transitions); the 5 truncated
+`*_START.mov` files need re-export; the WO-818 ⚠ tooltip text; relaunch the Godot client (stale deck).

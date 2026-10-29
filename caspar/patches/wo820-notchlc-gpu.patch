@@ -290,7 +290,7 @@ index a5eb8523d..9a2315008 100644
  #ifdef _MSC_VER
  #pragma warning(pop)
 diff --git a/src/modules/ffmpeg/util/av_util.cpp b/src/modules/ffmpeg/util/av_util.cpp
-index e55c167e2..604b1dc17 100644
+index e55c167e2..5028de542 100644
 --- a/src/modules/ffmpeg/util/av_util.cpp
 +++ b/src/modules/ffmpeg/util/av_util.cpp
 @@ -2,6 +2,7 @@
@@ -317,12 +317,14 @@ index e55c167e2..604b1dc17 100644
  #include <array>
  #include <tbb/parallel_for.h>
  #include <tbb/parallel_invoke.h>
-@@ -53,10 +56,24 @@ core::mutable_frame make_frame(void*                            tag,
+@@ -53,10 +56,31 @@ core::mutable_frame make_frame(void*                            tag,
  {
      std::vector<int> data_map; // TODO(perf) when using data_map, avoid uploading duplicate planes
  
 +    // HighAsCG WO-820: a NotchLC payload frame (GRAY8 rows of 32-bit words, tagged by the decoder) becomes one
-+    // notchlc plane of BGRA texels; only the rows in use are copied (the mixer decodes it on the GPU).
++    // notchlc plane of BGRA texels (the mixer decodes it on the GPU). The plane only holds the rows in use (see the size
++    // classes below), so copy and upload follow the frame's real payload size and not the decoder's worst-case
++    // capacity.
 +    const bool notchlc_payload =
 +        video && video->format == AV_PIX_FMT_GRAY8 && av_dict_get(video->metadata, NOTCHLC_PAYLOAD_TAG, nullptr, 0);
 +
@@ -334,27 +336,23 @@ index e55c167e2..604b1dc17 100644
 +        : video         ? pixel_format_desc(
 +                      static_cast<AVPixelFormat>(video->format), video->width, video->height, data_map, color_space)
 +                        : core::pixel_format_desc(core::pixel_format::invalid);
-+    int copy_rows = -1;
 +    if (notchlc_payload) {
-+        pix_desc.planes.push_back(core::pixel_format_desc::plane(video->width / 4, video->height, 4));
-+        const auto used = core::notchlc::read_word(video->data[0], core::notchlc::h_used);
-+        copy_rows       = std::clamp(static_cast<int>((used + video->linesize[0] - 1) / video->linesize[0]),
-+                               1,
-+                               video->height);
++        // The plane only holds the rows in use, rounded up to a size class (64 rows, then +25% steps). The GL device
++        // pools textures and host buffers per exact size and never shrinks them, so a plain 64-row rounding left one
++        // pool per payload size (WO-820 frontex stress: 51 heights, 6.5 GB of pooled textures after 24 takes).
++        constexpr int64_t row_align = 64;
++        const int64_t     used      = core::notchlc::read_word(video->data[0], core::notchlc::h_used);
++        const int64_t     need      = (used + 16 + video->linesize[0] - 1) / video->linesize[0]; // +16: bit reader reads one word ahead
++        int64_t           rows      = row_align;
++        while (rows < need)
++            rows = (rows * 5 / 4 + row_align - 1) / row_align * row_align;
++        pix_desc.planes.push_back(core::pixel_format_desc::plane(
++            video->width / 4, static_cast<int>(std::clamp<int64_t>(rows, 1, video->height)), 4));
 +    }
      pix_desc.is_straight_alpha = is_straight_alpha;
  
      auto frame = frame_factory.create_frame(tag, pix_desc);
-@@ -70,7 +87,7 @@ core::mutable_frame make_frame(void*                            tag,
-                 for (int n = 0; n < static_cast<int>(pix_desc.planes.size()); ++n) {
-                     auto frame_plan_index = data_map.empty() ? n : data_map.at(n);
- 
--                    tbb::parallel_for(0, pix_desc.planes[n].height, [&](int y) {
-+                    tbb::parallel_for(0, copy_rows > 0 ? copy_rows : pix_desc.planes[n].height, [&](int y) {
-                         std::memcpy(frame.image_data(n).begin() + y * pix_desc.planes[n].linesize,
-                                     video->data[frame_plan_index] + y * video->linesize[frame_plan_index],
-                                     pix_desc.planes[n].linesize);
-@@ -337,6 +354,7 @@ std::shared_ptr<AVFrame> make_av_video_frame(const core::const_frame& frame, con
+@@ -337,6 +361,7 @@ std::shared_ptr<AVFrame> make_av_video_frame(const core::const_frame& frame, con
          case core::pixel_format::gbrap:
              // TODO
              break;
@@ -378,10 +376,10 @@ index 7203cec48..094bfc65d 100644
                                     std::shared_ptr<AVFrame> video,
 diff --git a/src/core/frame/notchlc.h b/src/core/frame/notchlc.h
 new file mode 100644
-index 000000000..fa6c7277e
+index 000000000..3a2aebb9f
 --- /dev/null
 +++ b/src/core/frame/notchlc.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,64 @@
 +/*
 + * HighAsCG WO-820: NotchLC GPU decode — layout of the payload frame shared by the ffmpeg producer (which fills it on the
 + * CPU: LZ4/LZF only, plus a per-block luma bit-offset table) and the OpenGL mixer (which decodes it in a shader).
@@ -424,16 +422,19 @@ index 000000000..fa6c7277e
 +    h_reserved,
 +};
 +
-+// Bytes of the payload plane for a width x height stream: header + worst-case payload + luma table, whole rows.
++// Largest NotchLC payload (bytes after LZ4/LZF) the plane accepts. The format does not bound it: FFmpeg reads 8 bytes
++// of alpha per 16x16 block, but the encoder stores far more (Notch content measured up to 1.67 bytes/pixel overall,
++// 0.5 of it alpha: s_INTRO.mov frame 2250, WO-820). 4 bytes/pixel is half of raw yuva444p12; the decoder's buffers are
++// only touched as far as a frame's real payload, and the mixer copies/uploads only the rows in use (av_util make_frame).
++inline int64_t max_payload_bytes(int width, int height) { return static_cast<int64_t>(width) * height * 4 + 65536; }
++
++// Rows of the decoder's payload frame for a width x height stream: header + max payload + luma table, whole rows.
 +inline int plane_rows(int width, int height)
 +{
-+    const int64_t payload = static_cast<int64_t>(width) * height * 3 / 2 + 65536;
-+    const int64_t table   = static_cast<int64_t>(width / 4) * (height / 4) * 4;
-+    const int64_t bytes   = header_words * 4 + payload + table;
++    const int64_t table = static_cast<int64_t>(width / 4) * (height / 4) * 4;
++    const int64_t bytes = header_words * 4 + max_payload_bytes(width, height) + table;
 +    return static_cast<int>((bytes + row_words * 4 - 1) / (row_words * 4));
 +}
-+
-+inline int64_t max_payload_bytes(int width, int height) { return static_cast<int64_t>(width) * height * 3 / 2 + 65536; }
 +
 +inline uint32_t read_word(const uint8_t* plane, int index)
 +{
