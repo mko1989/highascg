@@ -157,6 +157,22 @@ describe('WO-870 P5: iso-read-lib without a mount', () => {
 		)
 		assert.equal(r.stdout, `OA_LIVE|${KREL}`, r.stderr)
 	})
+
+	it('iso_file_size counts a multi-extent member once (xorriso repeats the whole size per extent)', () => {
+		const bin = path.join(tmp, 'xbin')
+		fs.mkdirSync(bin, { recursive: true })
+		/* the real report of the 30.10 build's 8.3 GB squashfs (two extents) */
+		fs.writeFileSync(path.join(bin, 'xorriso'), `#!/bin/sh
+echo "Report layout: xt , Startlba ,   Blocks , Filesize , ISO image path"
+echo "File data lba:  0 ,     9314 ,  2097151 , 8339079168 , '/live/filesystem.squashfs'"
+echo "File data lba:  1 ,  2106465 ,  1974665 , 8339079168 , '/live/filesystem.squashfs'"
+`, { mode: 0o755 })
+		const r = bash(
+			`source "${EGGS}/iso-read-lib.sh"; ISO_READ_TOOL=xorriso; printf '%s|%s' "$(iso_file_size x.iso live/filesystem.squashfs)" "$(iso_file_offset x.iso live/filesystem.squashfs)"`,
+			{ PATH: `${bin}:${process.env.PATH}` },
+		)
+		assert.equal(r.stdout, `8339079168|${9314 * 2048}`, r.stderr)
+	})
 })
 
 describe('WO-870 P5: verifier source needles', () => {

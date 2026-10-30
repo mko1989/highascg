@@ -317,6 +317,10 @@ home/casparcg/bridge/*
 home/casparcg/iso-backup
 home/casparcg/iso-backup/*
 home/casparcg/*.iso
+# 30.10 (WO-870 first full build): a second copy in ~/backup_iso rode in. Any image one folder down, whatever the name
+# (anchored, so coa's space pre-check counts it; "... *.iso" lines it skips). config/casparcg.config.iso is deeper.
+home/casparcg/*/*.iso
+home/casparcg/*/*.img
 # Caspar rollback binaries (dev-box only; bin/casparcg ships) and the hshm GDExtension build tree (bin/ ships)
 home/casparcg/highascg/bin/casparcg.*
 home/casparcg/highascg/godot/extensions/hshm/build

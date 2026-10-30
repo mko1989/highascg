@@ -88,11 +88,12 @@ iso_file_offset() {
 	echo $((lba * 2048))
 }
 
-# Size in bytes of a member (xorriso only).
+# Size in bytes of a member (xorriso only). A member over 4 GiB has several extents, and every extent line repeats the
+# WHOLE file size (column 4) — take it once (30.10: summing reported an 8.3 GB squashfs as 15906 MiB).
 iso_file_size() {
 	[[ "$ISO_READ_TOOL" == xorriso ]] || return 2
 	xorriso -indev "$1" -find "/${2#/}" -exec report_lba -- 2>/dev/null \
-		| awk -F, '/^File data lba:/ { n += $4 + 0 } END { if (n) print n; else exit 1 }'
+		| awk -F, '/^File data lba:/ { s = $4 + 0; if (s > n) n = s } END { if (n) print n; else exit 1 }'
 }
 
 iso_squashfs_cat() {

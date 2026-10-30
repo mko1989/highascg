@@ -269,6 +269,9 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'home/casparcg/bridge/media',
 				'home/casparcg/iso-backup/highascg-nvidia-595_amd64_2026-09-03_1533.iso',
 				'home/casparcg/old.iso',
+				// WO-870 first full build 30.10: an owner copy under another folder name rode in (+3.8 GB)
+				'home/casparcg/backup_iso/highascg-nvidia-595_amd64_2026-10-23_1946.iso',
+				'home/casparcg/Downloads/ubuntu.img',
 			])
 				assert.equal(excluded(pats, p), true, p)
 			for (const p of [

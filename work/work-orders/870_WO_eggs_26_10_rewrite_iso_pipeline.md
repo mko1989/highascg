@@ -779,3 +779,35 @@ dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both
   - `install-eggs-calamares.sh` (new) only ensures the package and checks the config;
   - the full Calamares verify stays in the preflight, after the launcher refresh and `--log-rescue-only`;
   - the order is pinned in `smoke-wo870-calamares-sysinstall.test.js` (now 12).
+
+### Phase 7 — first full build, run 1 (30.10 21:33, run by the owner): FAILED in the exclude verifier
+
+**Investigation.** The build produced `/home/eggs/highascg-nvidia-615-2026-10-30_2133.iso` (8.58 GB). `verify-iso-squashfs-excludes.sh` failed it; re-run by me on that ISO (`scratchpad/verify-excl.out`):
+- `FAIL: disk image in squashfs: home/casparcg/backup_iso/highascg-nvidia-595_amd64_2026-10-23_1946.iso`.
+  - The owner's own backup copy sits in `~/backup_iso` (root-owned, 19:18). It is the same 3.8 GB file as `~/iso-backup/…1946.iso`.
+  - Only the folder name `iso-backup` was excluded (fragment lines `home/casparcg/iso-backup`, `…/*`, `home/casparcg/*.iso`).
+  - The verifier's check (any `home/**.iso` except `config/casparcg.config.iso`) caught it, as it should.
+- `WARN: squashfs is 15906 MiB` was wrong.
+  - `isodir/live/filesystem.squashfs` is 8339079168 B (7953 MiB).
+  - xorriso stores a member over 4 GiB in several extents and prints the WHOLE file size on every extent line (`File data lba: 0 , 9314 , 2097151 , 8339079168` / `1 , 2106465 , 1974665 , 8339079168`). `iso-read-lib.sh` `iso_file_size` summed column 4, so it doubled.
+  - The offset helper was fine: the extents are contiguous (9314 + 2097151 = 2106465).
+- Without the leaked 3.8 GB, the squashfs is about 4.3 GiB, in line with the 23.10 ISO (3.8 GB) plus the 615 driver and kernel headers.
+- Every other verifier line was OK (owner paste + my re-run).
+
+**What was done.**
+- Both exclude fragments (`penguins-eggs-exclude-highascg-fragment.list`, `…-embed-server.list`) gain `home/casparcg/*/*.iso` and `home/casparcg/*/*.img`: any image one folder below home, whatever the folder is called.
+  - They are anchored on purpose. coa's space pre-check (`pkg/planner/exclude-match.go`) skips `... ` lines, and that check counts only what it can match.
+  - `config/casparcg.config.iso` is two folders down, so it is not hit.
+- `iso_file_size` takes column 4 once (the largest), no longer the sum.
+
+**Verified.**
+- Real `mksquashfs -wildcards -ef` (the call coa makes) with the generated `custom.exclude.list` on a temp tree:
+  - excluded: `backup_iso/a.iso`, `iso-backup/b.iso`, `Downloads/c.img`, `top.iso`;
+  - kept: `highascg/config/casparcg.config.iso`, `highascg/keep.txt`.
+- `iso_file_size` on the real ISO gives `8339079168`.
+- Smokes:
+  - `smoke-eggs-exclude-lists` pins the owner's real path and a `Downloads/*.img`, in both embed modes;
+  - `smoke-wo870-phase5-verify` has a new test that replays the real two-extent xorriso report;
+  - eggs/WO-870/WO-417 smokes 128/128.
+
+**Next (owner):** `sudo bash tools/eggs/live-usb/install-eggs-config.sh --apply`, then the full build again. Optional: `~/backup_iso` duplicates `~/iso-backup/…1946.iso` and can go (`sudo rm -r ~/backup_iso`); the new excludes keep it out either way.
