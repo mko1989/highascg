@@ -51,3 +51,18 @@ static func boot_countdown(seconds: int, default_name: String) -> String:
 	if default_name == "":
 		return "Choose the operator screen — %d s" % max(seconds, 0)
 	return "%s becomes the operator screen in %d s" % [default_name, max(seconds, 0)]
+
+
+## WO-868: the boot question answered somewhere else (web UI, API, another client) while the prompts are up — {} while
+## it is still pending or the GET failed, else {headless, name} with name the output now flagged (port), "" if none.
+static func answered_elsewhere(data: Variant) -> Dictionary:
+	if not data is Dictionary or not (data as Dictionary).get("boot") is Dictionary:
+		return {}
+	var boot: Dictionary = data["boot"]
+	if bool(boot.get("pending", true)):
+		return {}
+	var name := ""
+	for o in (data as Dictionary).get("outputs", []):
+		if o is Dictionary and data.get("port") != null and o.get("port") == data.get("port"):
+			name = str(o.get("name", ""))
+	return {"headless": bool(boot.get("headless", false)), "name": name}

@@ -45,3 +45,14 @@ func test_autostart_quits_on_a_headless_boot() -> void:
 	t.eq(P.autostart_quits({"headless": false, "pending": false}, true), false, "an operator boot")
 	t.eq(P.autostart_quits({"launcher": true, "pending": true}, true), false, "the launcher is still up")
 	t.eq(P.autostart_quits(null, true), false, "no answer from the server")
+
+
+func test_answered_elsewhere() -> void:  # WO-868: the launcher closes when the API / web UI answered
+	var outs := [{"name": "DP-4", "port": 3}, {"name": "DP-0", "port": 1}]
+	t.eq(P.answered_elsewhere({"boot": {"pending": true, "launcher": true}, "port": null, "outputs": outs}), {}, "still asking")
+	t.eq(P.answered_elsewhere(null), {}, "the GET failed")
+	t.eq(P.answered_elsewhere({"outputs": outs}), {}, "no boot status")
+	t.eq(P.answered_elsewhere({"boot": {"pending": false, "headless": false}, "port": 3, "outputs": outs}),
+		{"headless": false, "name": "DP-4"}, "answered: the flagged output")
+	t.eq(P.answered_elsewhere({"boot": {"pending": false, "headless": true}, "port": null, "outputs": outs}),
+		{"headless": true, "name": ""}, "run headless")

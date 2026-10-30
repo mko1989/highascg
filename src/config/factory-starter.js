@@ -53,6 +53,11 @@ function buildFactoryModularConfig(defaults, finalizeScreenDestinationsConfig, n
 		config.casparServer.multiview_enabled = false
 		config.casparServer.multiview_screen_consumer = false
 		config.casparServer.multiview_decklink_device = 0
+		// WO-868 (owner 30.10, "I want it on always"): a fresh box starts with the operator GUI as Caspar channel 1 and
+		// its monitor leftmost. Set here, not in defaults: a loaded config is merged over defaults, so a default would flip
+		// an existing legacy box without the switch's project / state renumbering. New project never carries it
+		// (project-hardware-config.js withoutMachineLocalCasparKeys), so the live box keeps its own value.
+		config.casparServer.operator_gui_first = true
 	}
 	const eggEnforce = process.env.HIGHASCG_EGG_ENFORCE_AUTH === '1'
 	config.security = {

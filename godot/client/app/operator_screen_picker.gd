@@ -16,6 +16,7 @@ const ApiScript := preload("res://core/api.gd")
 
 const TIMEOUT_S := 60.0
 const PANEL := Vector2i(560, 220)
+const WATCH_S := 2.0  # boot mode: how often the server is asked whether someone else answered
 
 signal finished(result: Dictionary)  # {ok, name?, screen?, error?}
 
@@ -77,7 +78,29 @@ func open() -> bool:
 		_timer.timeout.connect(func() -> void: _pick(-1, "", "timeout"))
 		add_child(_timer)
 		_timer.start(float(_boot.get("timeoutS", 120)))
+	if not _boot.is_empty():
+		var watch := Timer.new()
+		watch.wait_time = WATCH_S
+		watch.timeout.connect(_watch)
+		_timer.add_child(watch)  # freed with the boot timer in _close
+		watch.start()
 	return true
+
+
+## WO-868: the question answered elsewhere (web UI, API, another client) closes these prompts too — the launcher
+## otherwise stayed up over the running GUI with the main window still minimized.
+func _watch() -> void:
+	if _busy or not is_open():
+		return
+	var res: Dictionary = await _api().get_json("/api/system/operator-screen")
+	var done := M.answered_elsewhere(res.data if res.ok else null)
+	if done.is_empty() or _busy or not is_open():
+		return
+	if done.headless:
+		_close({"ok": true, "headless": true, "name": ""})
+		return
+	_outputs = res.data.get("outputs", _outputs)
+	_settle(_screen_of(str(done.name)), str(done.name))
 
 
 func _launcher() -> bool:
@@ -222,6 +245,11 @@ func _pick(i: int, output: String, how := "") -> void:
 		var err: Variant = res.data.get("error") if res.data is Dictionary else null
 		_close({"ok": false, "error": str(err if err != null else "the server refused %s" % output)})
 		return
+	_settle(i, output)
+
+
+## The answer stands: the main window goes to the operator screen (i, -1 = unknown) and the prompts close.
+func _settle(i: int, output: String) -> void:
 	var main := get_tree().root
 	if i >= 0 and main.current_screen != i:
 		Placement.move_to_screen(main, i)  # WO-714: a maximized window would keep the old screen's size

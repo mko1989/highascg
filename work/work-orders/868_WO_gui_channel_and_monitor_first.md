@@ -1,7 +1,7 @@
 # WO-868 — Operator GUI channel and monitor first everywhere (Caspar channel 1, leftmost X screen, first in lists)
 
 **Area:** engine, os-iso
-**Status: IN PROGRESS (30.10) — implemented, offline + Godot + GUI e2e (sandbox, throwaway Caspar) verified; the switch is NOT turned on on the live box (owner step, §3.4)**
+**Status: DONE (30.10, switched ON live on the box: channels/xrandr/print/simulated boot verified; fresh-box default ON; GUI follows layout changes — §3.5)**
 
 Owner, 30.10: *"also i think it would be easier if the gui channel and gui monitor becomes the first everywhere, so in caspar, in x, etc."*
 
@@ -452,3 +452,56 @@ Not done / left:
   4. Toggle in a no-show window.
   5. Verify on the box: `INFO` ch 1 = 1080p5000 shm; `xrandr` DP-4 +0+0, DP-0 +1920+0; one look and the multiview render; the
      WO-638 simulated boots.
+
+### 3.5 Live switch ON (30.10, owner: "I want it on always")
+Done by me in dev mode (the owner allows any test on the box, PGM config included). The owner steps of §3.4 are superseded.
+
+**The switch.**
+- Server restarted onto the route. `POST /api/system/operator-first {"enable":true,"dryRun":true}` gave no refusals and no
+  warnings, and the same remap as §3.4.
+- Real run (`dryRun:false`): `ok`. Backup at `~/.highascg/backup/wo868-2026-10-30T17-12-06-237Z`.
+  - persistence keys `programLayerBankByChannel`, `liveScenesByProgramChannel` re-keyed; no config slices;
+  - apply: `restartSent`, `reconnected`, `layoutApplied`, `layoutPersisted`; planned canvas 5760x1792.
+
+**Checks after the switch.**
+- `tools/test-agent/caspar channels` → program `[2,4]`, preview `[3,5]`.
+- `INFO` ch 1 = Operator GUI 1080p50 shm.
+- `xrandr`: DP-4 (operator) `+0+0`, DP-0 (Dioda) `+1920+0`.
+- `caspar print` ch 3 (PRV Dioda) renders the look at the full 3840x1792 channel (non-black 0.9999).
+- Evidence: `scratchpad/wo868/switch/` (`dry.json`, `real.json`, `info-before.txt`, `xrandr-before.txt`, `after*.png`).
+
+**Defect found: the GUI did not follow the layout change. Fixed.**
+- Cause: the client placed its window on the operator monitor only at start-up. The xrandr move left the maximized
+  window where DP-4 used to be. The window manager refit it to the LED wall (1920,0 3840x1792), and it drew black.
+- Fix: `godot/client/app/screen_follow.gd`, split out of `main.gd`.
+  - It polls the `DisplayServer` screen rects every 2 s; on a change it runs the same placement again and refits the UI scale.
+  - It uses the screen it chose (`_target`), because `current_screen` still answers the old screen right after a move. The
+    first version left the UI at 2× because of this.
+- Verified live with xrandr in both directions. The window follows DP-4 each time at 1920x1080 and scale 1
+  (`follow-a.png`, `follow-b.png`).
+
+**Simulated boot (WO-638 launcher, `startup.mode ask`).**
+- Procedure: Caspar stopped, outputs stacked, node restarted with `bootScreenAssignment` and `caspar-screens-ready` removed.
+- Caspar stays held until the question is answered. This is by design: launcher mode has no server fallback.
+- `prepare()` spreads stacked outputs in port order (DP-0 first), ignoring operator-first. This layout is temporary: the answer
+  (DP-4) re-lays it operator-first, and Caspar then starts with program `[2,4]`, preview `[3,5]`.
+
+**Defect found: launcher prompts stayed open when the boot was answered elsewhere. Fixed.**
+- When the boot was answered through the API (or the web UI, or another client), the launcher prompts stayed up and the main
+  window stayed minimized (`scratchpad/wo868/boot/after-answer.png`).
+- Fix: in boot mode `operator_screen_picker.gd` asks `GET /api/system/operator-screen` every 2 s (`_watch`).
+  - `operator_screen_model.gd answered_elsewhere()`, pure and with a test, turns the reply into `{headless, name}`.
+  - An answer from elsewhere settles like a click: the main window goes to the flagged output and the prompts close. Run
+    headless closes the client, as the button does.
+- Re-run live: the client started without `--screen`, the two prompts were up (DP-4 and DP-0), and the API answered DP-4. Within
+  one poll the prompts were gone and the main window was restored at 0,0 1920x1080. Caspar started with program `[2,4]`, preview
+  `[3,5]` (`scratchpad/wo868/boot2/after-api-answer.png`).
+
+**Fresh box default.**
+- `buildFactoryModularConfig` sets `casparServer.operator_gui_first = true`, so a fresh box, factory reset or stick starts
+  operator-first.
+- It is not set in `defaults`. A loaded config is merged over the defaults, so a default would flip an existing legacy box
+  without the switch's renumbering.
+- New project still never carries the flag (`withoutMachineLocalCasparKeys`), so the live box keeps its own value.
+- `smoke-wo868-operator-first-golden.test.js`: 8/8. Godot `run_tests.gd`: 23890 passed, 0 failed.
+
