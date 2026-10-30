@@ -126,6 +126,19 @@ func run() -> void:
 				moved = l
 		return expect(RW.layer_screen(moved) == 1, "Dioda B screenIdx is %s (want 1)" % moved.get("screenIdx"))
 	)
+	await step("Scrolled half a row: the + Screen corner stays clear of the layer names", func() -> String:
+		var view = _tab().view
+		view.scroll_y = 14.0  # the top layer's name straddles the ruler line
+		view.queue_redraw()
+		await ui.frames(2)
+		var img: Image = view.get_viewport().get_texture().get_image()
+		var bright := 0  # text pixels in the corner cell outside the button (button: y 4 .. RULER_H - 4)
+		for x in range(2, TM.HEADER_W - 8):  # the playhead triangle at 0 ms reaches 6 px into the cell
+			for y in [1, 2, TM.RULER_H - 3, TM.RULER_H - 2]:
+				if img.get_pixelv(Vector2i(_g(Vector2(x, y)))).get_luminance() > 0.4:
+					bright += 1
+		return expect(bright == 0, "%d bright pixels in the corner around + Screen" % bright)
+	)
 	await step("Devices lists the lighting console", func() -> String:
 		await ui.tab("Devices")
 		var found: Variant = await ui.wait_for(func() -> bool: return ui.find("Label", "MagicQ FOH", null, true) != null, 8.0)

@@ -90,7 +90,10 @@ static func _divider(v: Control, r: Dictionary, y: float, font: Font, names: Dic
 
 
 ## "+ Screen" in the corner above the layer list (the ruler's left cell).
+## The cell is painted first: a scrolled layer's name half above the ruler line would show through it (WO-837 (a)).
 static func _screen_button(v: Control, font: Font) -> void:
+	v.draw_rect(Rect2(0, 0, TM.HEADER_W - 1, TM.RULER_H), Color("#161b22"))
+	v.draw_rect(Rect2(0, TM.RULER_H - 1, TM.HEADER_W - 1, 1), Color("#30363d"))
 	var r := Rect2(6, 4, TM.HEADER_W - 13, TM.RULER_H - 8)
 	v.draw_rect(r, Color("#21262d"))
 	v.draw_rect(r, Color("#30363d"), false, 1.0)

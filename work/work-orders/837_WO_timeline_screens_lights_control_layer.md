@@ -247,3 +247,10 @@ All under `godot/client/`. Layout decisions marked (D) are mine where the Design
 - Follow-ups: (a) while the layer list is scrolled, the "+ Screen" corner button overlaps the top layer's name; (b) the web client
   has no `light` flag type yet, so it would show light flags as unknown flags; (c) phase 3 (live console Test, real MagicQ cue
   on 127.0.0.2) is still to do.
+
+## Follow-up (a) fixed (30.10): "+ Screen" over the top layer's name
+
+The ruler background covered only the track side (`_ruler` draws from `HEADER_W`), so a layer header scrolled half
+under the ruler line drew its name into the corner cell around "+ Screen". `timeline_view_draw.gd _screen_button` now
+paints the cell (and its bottom line) first. e2e `09_timeline_control_lane` has a new step that scrolls 14 px and counts
+bright pixels in the cell outside the button. It found 31 on the old code (FAIL) and 0 with the fix: 6 passed, 0 failed.
