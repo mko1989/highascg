@@ -1,7 +1,7 @@
 # WO-831 — Dead code removal (sweep §6)
 
 **Area:** process
-**Status: OPEN (30.10)**
+**Status: DONE (30.10) — deleted in fb0a007d; the index.js sampling require went with it; the live node restarted on it at 15:57 with no MODULE_NOT_FOUND; gates green (4768 pass, the 2 fails a port clash with a concurrent GUI run, green on re-run)**
 **Source:** REPORT §6 and the per-batch DEAD findings. Owner 30.10: *"delete anything dead."*
 **Related:** WO-807 (deprecated `src/sampling`), WO-495, WO-273.
 
@@ -49,4 +49,9 @@ SWAP/equality-skip branches in `src/engine/scene-take-lbg-*`, Godot test-only mo
 - **OPEN: `index.js` still requires `./src/sampling/dmx-sampling`** (off-limits to this agent), so `node index.js` and `check-require-integrity` fail until the
   coordinator removes `index.js` line 20 (`const { SamplingManager } = ...`), the `; appCtx.samplingManager = new SamplingManager(appCtx)` tail of line 212, and the two
   `if (appCtx.samplingManager) ...updateConfig(config.dmx)...` lines (258, 382). The running node process is unaffected until its next restart. Do not restart before applying it.
-- Not run: `npm run build:client` / a kiosk reload (would swap the live dist-web); the client deletions are import-free (no importers), so the build graph is unchanged.
+- **Closed by the coordinator (30.10):**
+  - the `index.js` sampling lines were removed in the same commit, fb0a007d (11:19);
+  - `dist-web` was rebuilt at 14:01, after the client deletions;
+  - the box's node has run this tree since its 15:57 restart, and the journal has no require errors;
+  - the stale unwired-exports baseline entries were shrunk with `--update` (710 left).
+- Not run at the time: `npm run build:client` / a kiosk reload (would swap the live dist-web); the client deletions are import-free (no importers), so the build graph is unchanged.

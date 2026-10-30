@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (36 open, 120 in progress, 625 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (35 open, 120 in progress, 626 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -834,7 +834,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 454 DONE [process+network] exec-bit pollution: 1039 files committed as 755, 472 more pending; source = exF… → 454_WO_exec_bit_pollution_syncthing_perms.md
 - 467 DONE [process+os-iso] Release tooling: starter zips as assets, and a --latest switch → 467_WO_release_carries_starter_zips_and_latest.md
 - 819 DONE [process] Verify, test and commit the open work of 29.10 (WO-806/807/812/813/814/816/817… → 819_WO_verify_and_commit_today.md
-- 831 OPEN [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
+- 831 DONE [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
 - 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
 
 ## Deprecated (47)
