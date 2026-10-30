@@ -1,0 +1,108 @@
+From 5f99d1fcbdfa509b741a995ab286e1a29b6d4299 Mon Sep 17 00:00:00 2001
+From: C-alcaide <calcaide@tres60.tv>
+Date: Tue, 4 Aug 2026 03:45:02 +0200
+Subject: [PATCH 1/2] fix(mixer): film grain response was driven by a luma with
+ R and B exchanged
+
+This backend carries the pixel through the chain in the mixer native BGR channel
+order, so c.r holds blue. ContrastSaturationBrightness in this same file already
+accounts for it by taking luma_coeff.bgr; apply_film_grain did not, so its
+photographic response curve -- the smoothstep pair that suppresses grain in deep
+shadow and clipped highlight -- was keyed on a luminance with red Rec.709 coefficient
+applied to blue and blue to red.
+
+The effect is that grain lands in the wrong tonal range on saturated colour: a
+saturated blue reads as brighter than it is and a saturated red as darker, so the
+response is misplaced in both directions. Greys are unaffected, R=G=B making the
+exchange a no-op, which is why a grey-ramp check would not show it.
+
+Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
+---
+ src/accelerator/ogl/image/shader.frag | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/accelerator/ogl/image/shader.frag b/src/accelerator/ogl/image/shader.frag
+index 92a5fa9a6..d635308ae 100644
+--- a/src/accelerator/ogl/image/shader.frag
++++ b/src/accelerator/ogl/image/shader.frag
+@@ -666,7 +666,13 @@ vec3 apply_film_grain(vec3 c, vec2 uv, float intensity, float size_val, int fram
+ {
+     vec2  grain_uv = uv * target_size / max(size_val, 0.5);
+     float noise    = grain_hash(grain_uv, frame_seed) * 2.0 - 1.0; // -1..+1
+-    float lum      = dot(c, vec3(0.2126, 0.7152, 0.0722));
++    // dot(c.bgr, ...) -- c is BGR here, since this backend carries the pixel through
++    // the chain in the mixer's native BGR channel order (ContrastSaturationBrightness
++    // above already takes luma_coeff.bgr for the same reason). Unswizzled, the
++    // photographic response curve is driven by a luminance with red's Rec.709
++    // coefficient applied to blue, so grain lands in the wrong tonal range on
++    // saturated colour. Greys are unaffected by the exchange.
++    float lum      = dot(c.bgr, vec3(0.2126, 0.7152, 0.0722));
+     float response = smoothstep(0.0, 0.15, lum) * (1.0 - smoothstep(0.8, 1.0, lum));
+     c += vec3(noise * intensity * response);
+     return c;
+-- 
+2.53.0
+
+
+From a09a40f12a14833c4fc4ec8d5616f8cea39cf807 Mon Sep 17 00:00:00 2001
+From: HighAsCG <mkoqaz13@gmail.com>
+Date: Fri, 30 Oct 2026 15:04:29 +0100
+Subject: [PATCH 2/2] =?UTF-8?q?fix(mixer):=20LENS=20blur=20luma=20on=20BGR?=
+ =?UTF-8?q?=20+=20bounded=20sharpen/grain=20combine=20=E2=80=94=20port=20o?=
+ =?UTF-8?q?f=20CasparCG/server#1762=2062fb8c2bf?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The upstream commit also carries the colour-grading series' grade_limits table (not in 2.5.1),
+so only its two fixes are ported: the lens bokeh weight used Rec.601 on a BGR pixel (red and
+blue exchanged; now Rec.709 on .bgr like the grain fix 5f99d1fcb), and combining transforms
+took sharpen_radius / grain_size from a float test against the default and let the strengths
+grow without bound (now keyed off the effect being on, clamped to the PR's ranges).
+---
+ src/accelerator/ogl/image/shader.frag   |  3 ++-
+ src/accelerator/ogl/util/transforms.cpp | 14 ++++++++------
+ 2 files changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/src/accelerator/ogl/image/shader.frag b/src/accelerator/ogl/image/shader.frag
+index d635308ae..caad57aa9 100644
+--- a/src/accelerator/ogl/image/shader.frag
++++ b/src/accelerator/ogl/image/shader.frag
+@@ -631,7 +631,8 @@ vec4 get_blurred_color(vec2 uv)
+             float theta  = dither_theta + float(i) * 2.39996323;
+             vec2  offset = vec2(cos(theta), sin(theta)) * radius * texelSize;
+             vec4  col    = get_rgba_color(uv + offset);
+-            float lum    = dot(col.rgb, vec3(0.299, 0.587, 0.114));
++            // col is BGR here (see apply_film_grain): Rec.709 on .bgr, the same luma as the grain
++            float lum    = dot(col.bgr, vec3(0.2126, 0.7152, 0.0722));
+             float weight = 1.0 + pow(max(lum - 0.3, 0.0), 3.0) * 15.0;
+             weight      *= mix(0.3, 1.0, t);
+             totalColor  += col * weight;
+diff --git a/src/accelerator/ogl/util/transforms.cpp b/src/accelerator/ogl/util/transforms.cpp
+index e82f0f286..d1fce9c5e 100644
+--- a/src/accelerator/ogl/util/transforms.cpp
++++ b/src/accelerator/ogl/util/transforms.cpp
+@@ -73,12 +73,14 @@ void apply_transform_colour_values(core::image_transform& self, const core::imag
+     if (other.blur.enable) {
+         self.blur = other.blur;
+     }
+-    self.sharpen_amount += other.sharpen_amount;
+-    if (other.sharpen_radius != 1.0)
+-        self.sharpen_radius = other.sharpen_radius;
+-    self.grain_intensity += other.grain_intensity;
+-    if (other.grain_size != 1.0)
+-        self.grain_size = other.grain_size;
++    // Shape parameters come from whichever transform has the effect on (a float test against the default
++    // misreads a tweened 0.9999999), strengths clamp to what one command accepts (CasparCG/server#1762 62fb8c2bf).
++    self.sharpen_amount = std::clamp(self.sharpen_amount + other.sharpen_amount, 0.0, 5.0);
++    if (other.sharpen_amount != 0.0)
++        self.sharpen_radius = std::clamp(other.sharpen_radius, 0.1, 10.0);
++    self.grain_intensity = std::clamp(self.grain_intensity + other.grain_intensity, 0.0, 1.0);
++    if (other.grain_intensity != 0.0)
++        self.grain_size = std::clamp(other.grain_size, 0.5, 10.0);
+ }
+ 
+ bool is_default_perspective(const core::corners& perspective)
+-- 
+2.53.0
+

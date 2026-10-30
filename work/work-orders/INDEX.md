@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-776 live WOs (35 open, 120 in progress, 621 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+777 live WOs (35 open, 120 in progress, 622 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -166,7 +166,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 858 OPEN [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 - 860 DONE [engine+godot-client] Lower-third looks: overlay take over PGM, Scale % that works, the template visi… → 860_WO_lower_third_overlay_looks_scale_prv.md
 
-## amcp — AMCP client and protocol (18)
+## amcp — AMCP client and protocol (19)
 
 - 07 DONE [amcp] Complete AMCP Protocol API Implementation → 07_WO_AMCP_PROTOCOL_API.md
 - 08 DONE [amcp+audio] CasparCG Client Features — OSC status, VU meters, layer/channel status → 08_WO_CASPARCG_CLIENT_FEATURES.md
@@ -186,6 +186,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 618 DONE [amcp+engine] Non-linear tweens were never valid Caspar tween names → 618_WO_caspar_tween_names.md
 - 754 DONE [amcp+os-iso] The AMCP watchdog kills the Caspar the start-up launcher just released → 754_WO_amcp_watchdog_kills_caspar_released_by_boot_launcher.md
 - 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
+- 867 DONE [amcp+os-iso] Caspar build: CasparCG/server#1762 effects (BLUR / SHARPEN / GRAIN) brought up… → 867_WO_caspar_pr1762_effects_fixes.md
 
 ## caspar-build — CasparCG server build and binaries (10)
 
