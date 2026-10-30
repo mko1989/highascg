@@ -560,3 +560,29 @@ config applied, before Phase 3, so the menus are the generic ones. That gives th
 - Dry run 3 with the branding applied: themed `boot/grub/theme.cfg` + 1920×1080 splash in `isodir`.
 - The menus on glass, UEFI and BIOS. `isolinux.theme.cfg` puts the 1920×1080 `splash.png` behind `vesamenu`, as the
   old ISO did; whether vesamenu shows it at that size is a Phase 7 stick check.
+
+### Phase 6 — dry run 3 (30.10, run by the owner)
+
+Run after `install-eggs-config.sh --apply` (`verify-eggs-config.sh`: 7× PASS, incl. `branding/livecd/*`):
+`sudo eggs remaster --clone --anonymous --stop-after copy-kernel-initrd`.
+
+**Result.**
+- 9/9 tasks, "Successes: 9, Errors: 0". Teardown found 17 mounts, and 0 are left under `/home/eggs`.
+- `mkinitramfs` ran in the liveroot chroot for `7.0.0-38-generic`, which equals `uname -r` and `/etc/highascg/pinned-kernel`.
+  Two messages are chroot noise, not failures: `cryptsetup: ERROR: Couldn't resolve device overlay` (the cryptsetup hook
+  cannot map the liveroot's overlay root to a block device) and systemd's "fstab has been modified" hint.
+- `isodir/live/{vmlinuz (17.3 MB), initrd.img (206 MB)}`, both mode 0600 root. The Oct 23 ISO had
+  `initrd.img-6.8.0-117-generic` at 183 MB and `vmlinuz` at 15 MB, and the file names are now unversioned as planned.
+- **Theme on the real run:** `boot/grub/theme.cfg` and `isolinux/isolinux.theme.cfg` are byte-equal to the repo,
+  `splash.png` is ours (1920×1080), and `grub.cfg` has `set theme=/boot/grub/theme.cfg`. Entries read `HIGHASCG NVIDIA 615
+  Live / Live (Plymouth splash) / Safe Mode / Text Mode / Boot from local disk`. 0 `{{{` in either menu,
+  `grub-script-check` OK, `efi.img` still carries the trampoline.
+
+**Calamares, clarified for the owner** (asked 30.10):
+- 26.10 still uses Calamares. What went away is the build-time handling: the `produce` flags and the `/etc/calamares`
+  patching in the squashfs.
+- The ISO ships the `calamares` package. On the stick, `eggs sysinstall calamares` generates the config and starts it.
+- The plan's `installer: krill` default stays until Phase 4 points `launch-calamares.sh` at it (F5).
+
+**Open:** the initrd contents (plymouth theme, nvidia modules, our hooks) need root to read. The owner listing is
+pending.
