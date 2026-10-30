@@ -3,6 +3,7 @@
  */
 
 import { api } from '../lib/api-client.js'
+import { fetchDeviceView } from '../lib/mapping-node-service.js'
 import { markCasparRestartDirty } from '../lib/caspar-restart-hint.js'
 import { decklinkSlotFromConnector } from '../lib/input-channels.js'
 import { addDecklinkInputSlot } from '../lib/decklink-add-input.js'
@@ -44,7 +45,7 @@ export function attachDecklinkDropHandlers(listEl, ctx) {
 		setStatus(`Mapping ${connectorId} as live input…`, 'info')
 		try {
 			await api.post('/api/device-view', { updateConnector: { id: connectorId, patch: { caspar: { ioDirection: 'in' } } } })
-			const payload = await api.get('/api/device-view')
+			const payload = await fetchDeviceView() // WO-844: read-after-write must bypass the 3 s browser cache (WO-436)
 			const connectors = [
 				...(Array.isArray(payload?.graph?.connectors) ? payload.graph.connectors : []),
 				...(Array.isArray(payload?.suggested?.connectors) ? payload.suggested.connectors : []),

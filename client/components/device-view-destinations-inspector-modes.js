@@ -98,9 +98,13 @@ const CASPAR_VIDEO_MODE_ALIASES = {
 	'2160p60': '2160p6000',
 }
 
-function fpsNear(a, b) {
-	return Math.abs(Number(a) - Number(b)) <= 0.06
+/** PAL/NTSC and every `NNNNiRRRR` id are interlaced; WO-844 (4p). */
+export function isInterlacedCasparMode(modeId) {
+	const id = String(modeId || '')
+	return id === 'PAL' || id === 'NTSC' || /^\d+i\d+$/.test(id)
 }
+
+const FPS_TOLERANCE = 0.07
 
 /**
  * Normalize shorthand / legacy Caspar mode ids to canonical STANDARD_VIDEO_MODES entries.
@@ -113,12 +117,14 @@ export function normalizeCasparVideoModeId(raw) {
 	if (id === 'custom') return 'custom'
 	const aliased = CASPAR_VIDEO_MODE_ALIASES[id] || id
 	if (STANDARD_VIDEO_MODES.includes(aliased)) return aliased
-	const px = aliased.match(/^(\d+)\s*x\s*(\d+)p?([\d.]+)?$/i)
+	/* `1920x1080p50`, `1920x1080i50`, `1920x1080@50`; the p/i flag is passed through so `i` stays interlaced. */
+	const px = aliased.match(/^(\d+)\s*x\s*(\d+)\s*([pi@])?\s*([\d.]+)?$/i)
 	if (px) {
 		const w = parseInt(px[1], 10) || 0
 		const h = parseInt(px[2], 10) || 0
-		const fps = px[3] ? parseFloat(px[3]) : NaN
-		const matched = matchCasparVideoModeFromDimensions(w, h, fps)
+		const fps = px[4] ? parseFloat(px[4]) : NaN
+		const flag = px[3] ? px[3].toLowerCase() : ''
+		const matched = matchCasparVideoModeFromDimensions(w, h, fps, flag === 'i' ? true : flag === 'p' ? false : undefined)
 		if (matched) return matched
 		return 'custom'
 	}
@@ -129,19 +135,35 @@ export function normalizeCasparVideoModeId(raw) {
  * @param {number} width
  * @param {number} height
  * @param {number} [fps]
+ * @param {boolean} [interlaced] true = interlaced only, false = progressive only, omitted = progressive first
  * @returns {string | null}
  */
-export function matchCasparVideoModeFromDimensions(width, height, fps) {
+export function matchCasparVideoModeFromDimensions(width, height, fps, interlaced) {
 	const w = Math.max(0, parseInt(String(width), 10) || 0)
 	const h = Math.max(0, parseInt(String(height), 10) || 0)
 	if (w <= 0 || h <= 0) return null
 	const rate = Number.isFinite(Number(fps)) && Number(fps) > 0 ? Number(fps) : null
-	for (const mode of STANDARD_VIDEO_MODES) {
-		const spec = CASPAR_VIDEO_MODE_SPECS[mode]
-		if (!spec) continue
-		if (spec.width === w && spec.height === h && (rate == null || fpsNear(spec.fps, rate))) return mode
+	/* Nearest rate wins: 23.98/24, 29.97/30 and 59.94/60 all sit inside the tolerance of each other, so "first within
+	 * 0.06" made `720p2400` resolve to `720p2398` and 60 Hz depend on float rounding. */
+	const find = (wantInterlaced) => {
+		let best = null
+		let bestDiff = Infinity
+		for (const mode of STANDARD_VIDEO_MODES) {
+			const spec = CASPAR_VIDEO_MODE_SPECS[mode]
+			if (!spec || isInterlacedCasparMode(mode) !== wantInterlaced) continue
+			if (spec.width !== w || spec.height !== h) continue
+			const diff = rate == null ? 0 : Math.abs(spec.fps - rate)
+			if (rate != null && diff > FPS_TOLERANCE) continue
+			if (diff < bestDiff) { best = mode; bestDiff = diff }
+		}
+		return best
 	}
-	return null
+	/* WO-844 (4p): list order used to put 1080i5000 before 1080p5000, so `1920x1080@50` resolved to the INTERLACED mode
+	 * and got saved into the screen consumer. Interlaced is only chosen when asked for (`true`); with no flag the
+	 * progressive mode wins and interlaced is only the fallback for dims that have no progressive twin (NTSC). */
+	if (interlaced === true) return find(true)
+	if (interlaced === false) return find(false)
+	return find(false) || find(true)
 }
 
 /**
@@ -156,12 +178,12 @@ export function casparVideoModeFromDetectedDisplay(display, detectedModes, prefe
 	if (preferredIdx >= 0 && preferredIdx < modes.length) pick = modes[preferredIdx]
 	if (!pick) pick = modes.find((m) => m?.current) || modes[0] || null
 	if (pick?.mode) {
-		const mm = String(pick.mode).match(/^(\d+)x(\d+)$/i)
+		const mm = String(pick.mode).match(/^(\d+)x(\d+)(i)?$/i)
 		if (mm) {
 			const w = parseInt(mm[1], 10)
 			const h = parseInt(mm[2], 10)
 			const fps = parseFloat(String(pick.rate || display?.refreshHz || '')) || NaN
-			const matched = matchCasparVideoModeFromDimensions(w, h, fps)
+			const matched = matchCasparVideoModeFromDimensions(w, h, fps, mm[3] ? true : undefined)
 			if (matched) return { modeId: matched }
 			return {
 				modeId: 'custom',

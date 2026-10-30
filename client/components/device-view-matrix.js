@@ -5,6 +5,7 @@ import { escapeHtml } from '../lib/dom-escape.js'
 import { getAppStateStore } from '../lib/app-runtime.js'
 import { showLiveInputModal } from './live-input-modal.js'
 import { saveVirtualCameraConfig } from '../lib/virtual-camera-state.js'
+import { nextNumberedIndex } from '../lib/next-numbered-id.js'
 
 export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirty, loadCallback, selectKey, selectDestinationById) {
 	matrixHost.innerHTML = ''
@@ -24,7 +25,7 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 	addStreamBtn.onclick = async () => {
 		try {
 			const cur = Array.isArray(payload?.settings?.streamOutputs) ? payload.settings.streamOutputs : []
-			const idx = cur.length + 1
+			const idx = nextNumberedIndex(cur, 'str') // WO-844: max+1, not length+1 (duplicate id after a removal)
 			const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }]
 			await Actions.saveSettingsPatch({ streamOutputs: next })
 			loadCallback()
@@ -37,7 +38,7 @@ export function renderMatrix(matrixHost, payload, pushUndo, setCasparRestartDirt
 	addRecordBtn.onclick = async () => {
 		try {
 			const cur = Array.isArray(payload?.settings?.recordOutputs) ? payload.settings.recordOutputs : []
-			const idx = cur.length + 1
+			const idx = nextNumberedIndex(cur, 'rec')
 			const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, type: 'h264', name: `Rec${idx}`, quality: 'medium' }]
 			await Actions.saveSettingsPatch({ recordOutputs: next })
 			loadCallback()

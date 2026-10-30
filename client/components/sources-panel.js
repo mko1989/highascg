@@ -16,6 +16,7 @@ import { createMediaSelection } from './sources-panel-media-selection.js'
 import { createHapEncode } from './sources-panel-hap-encode.js'
 import { attachDecklinkDropHandlers } from './sources-panel-decklink-drop.js'
 import { showMediaMultiRename } from './media-multi-rename-modal.js'
+import { isTextEntryTarget } from '../lib/keyboard-guard.js'
 
 export function initSourcesPanel(root, stateStore, opts = {}) {
 	const liveConnectorsCache = { current: [] }
@@ -336,8 +337,7 @@ export function initSourcesPanel(root, stateStore, opts = {}) {
 	root.addEventListener('keydown', (e) => {
 		if (currentTab !== 'media' || selectedMedia.size === 0) return
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return
-		const tag = String(e.target?.tagName || '').toLowerCase()
-		if (tag === 'input' || tag === 'textarea' || e.target?.isContentEditable) return
+		if (isTextEntryTarget(e.target)) return // WO-844: shared guard
 		e.preventDefault()
 		void mediaSelection.runMediaDelete()
 	})

@@ -142,7 +142,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 			console.warn('[device-view] gpuPhysicalTopology save failed', e)
 		}
 		if (statusEl) setStatus(statusEl, 'GPU layout saved (topology persisted)', true)
-		if (load) await load()
+		if (load) await load({ forceRefresh: true }) // WO-844
 	}
 
 	const setAllHidden = (hidden) => {
@@ -340,7 +340,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 				console.warn('[device-view] gpuPhysicalTopology save failed', e)
 			}
 			alert('GPU layout loaded from file.')
-			if (load) await load()
+			if (load) await load({ forceRefresh: true }) // WO-844
 		} catch (e) {
 			alert('Invalid GPU layout file: ' + (e?.message || e))
 		}
@@ -362,7 +362,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 			if (statusEl) {
 				setStatus(statusEl, 'GPU layout reset from live data (server discovery unavailable).', true)
 			}
-			if (load) await load()
+			if (load) await load({ forceRefresh: true }) // WO-844
 			return
 		}
 		const currentRows = formatLayoutRows(customGpuItems)
@@ -385,7 +385,7 @@ export function appendGpuLayoutEditorIfEditMode(wrapCtl, { load, lastPayload, st
 		if (statusEl) {
 			setStatus(statusEl, 'GPU layout reset from discovery and saved to server.', true)
 		}
-		if (load) await load()
+		if (load) await load({ forceRefresh: true }) // WO-844
 	}
 
 	editGroup.append(listContainer, unmappedContainer, bulkRow, actionsRow)

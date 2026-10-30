@@ -14,6 +14,7 @@ import { nextMainScreenIndex } from '../lib/screen-destination-index.js'
 import { rafThrottle } from '../lib/raf-throttle.js'
 import * as Actions from './device-view-actions.js'
 import { onClientPrefsChange } from '../lib/client-prefs.js'
+import { shouldIgnoreShortcut } from '../lib/keyboard-guard.js'
 
 export function attachDeviceViewEvents(ctx) {
 	const { refs, state, wrap } = ctx
@@ -202,6 +203,9 @@ export function attachDeviceViewEvents(ctx) {
 			setStatus(statusEl, wasRegrab ? 'Cable re-grab cancelled — connection left as it was.' : 'Cable mode cancelled', true)
 			return
 		}
+		/* WO-844 (4q): Ctrl+Z / Delete only while Device View is the visible tab and focus is not in a text field,
+		 * otherwise typing elsewhere rolled the live device graph back to a stale cabling snapshot. */
+		if (shouldIgnoreShortcut(ev, wrap)) return
 		const isZ = ev.key?.toLowerCase() === 'z'
 		const isUndo = isZ && (ev.ctrlKey || ev.metaKey) && !ev.shiftKey
 		if (isUndo) {
@@ -211,8 +215,6 @@ export function attachDeviceViewEvents(ctx) {
 			return
 		}
 		if ((ev.key === 'Delete' || ev.key === 'Backspace') && state.selectedEdgeId) {
-			const target = ev.target
-			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
 			ev.preventDefault()
 			ev.stopPropagation()
 			void ctx.removeEdge(state.selectedEdgeId)

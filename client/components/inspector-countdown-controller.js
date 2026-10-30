@@ -30,11 +30,6 @@ export function createCountdownFieldController({ grp, cfg, modeSelect, sceneId, 
 	let propagateTimer = null
 	let propagateInFlight = false
 
-	function readNum(raw, fallback) {
-		const n = parseFloat(String(raw))
-		return Number.isFinite(n) ? n : fallback
-	}
-
 	/**
 	 * Same routing as inspector-lower-third.js's getRouting(): the mapped preview/edit bus
 	 * channel for this look's main + the layer's logical layerNumber. `templateHostLayer` is
@@ -58,26 +53,53 @@ export function createCountdownFieldController({ grp, cfg, modeSelect, sceneId, 
 		}
 	}
 
-	function getCurrentConfig() {
-		return {
-			mode: modeSelect.value || cfg.mode,
-			durationSec: readNum(grp.querySelector('#cd-duration')?.value, cfg.durationSec),
-			targetTime: grp.querySelector('#cd-target')?.value ?? cfg.targetTime,
-			format: grp.querySelector('#cd-format')?.value ?? cfg.format,
-			amberThresholdSec: readNum(grp.querySelector('#cd-amber')?.value, cfg.amberThresholdSec),
-			redThresholdSec: readNum(grp.querySelector('#cd-red')?.value, cfg.redThresholdSec),
-			position: grp.querySelector('#cd-position')?.value ?? cfg.position,
-			hideTimer: !!grp.querySelector('#cd-hide-timer')?.checked,
-			timerFontSize: readNum(grp.querySelector('#cd-timer-size')?.value, cfg.timerFontSize),
-			auxFontSize: readNum(grp.querySelector('#cd-aux-size')?.value, cfg.auxFontSize),
-			timerColor: grp.querySelector('#cd-color-normal')?.value ?? cfg.timerColor,
-			amberColor: grp.querySelector('#cd-color-amber')?.value ?? cfg.amberColor,
-			redColor: grp.querySelector('#cd-color-red')?.value ?? cfg.redColor,
-			auxColor: grp.querySelector('#cd-color-aux')?.value ?? cfg.auxColor,
-			auxTop: grp.querySelector('#cd-auxTop')?.value ?? cfg.auxTop,
-			auxMiddle: grp.querySelector('#cd-auxMiddle')?.value ?? cfg.auxMiddle,
-			auxBottom: grp.querySelector('#cd-auxBottom')?.value ?? cfg.auxBottom,
+	/**
+	 * The inspector-rendered fields only (WO-844: NOT a complete config — see getCurrentConfig). A control that does
+	 * not exist (`#cd-duration` is an HMS input, not an id) yields NO key rather than a stale `cfg` copy, so it cannot
+	 * overwrite a newer stored value.
+	 */
+	function readRenderedFields() {
+		const val = (sel) => grp.querySelector(sel)?.value
+		const num = (sel) => {
+			const n = parseFloat(String(val(sel)))
+			return Number.isFinite(n) ? n : undefined
 		}
+		const hide = grp.querySelector('#cd-hide-timer')
+		const out = {
+			mode: modeSelect.value || undefined,
+			durationSec: num('#cd-duration'),
+			targetTime: val('#cd-target'),
+			format: val('#cd-format'),
+			amberThresholdSec: num('#cd-amber'),
+			redThresholdSec: num('#cd-red'),
+			position: val('#cd-position'),
+			hideTimer: hide ? !!hide.checked : undefined,
+			timerFontSize: num('#cd-timer-size'),
+			auxFontSize: num('#cd-aux-size'),
+			timerColor: val('#cd-color-normal'),
+			amberColor: val('#cd-color-amber'),
+			redColor: val('#cd-color-red'),
+			auxColor: val('#cd-color-aux'),
+			auxTop: val('#cd-auxTop'),
+			auxMiddle: val('#cd-auxMiddle'),
+			auxBottom: val('#cd-auxBottom'),
+		}
+		for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k]
+		return out
+	}
+
+	/**
+	 * WO-844: the full countdown config = the stored config (layer + timer instance, so keys this inspector does not
+	 * render — posX/posY, timerFontFamily, border — survive) overlaid with the rendered fields and the just-edited
+	 * `partial`. It used to be the 17 rendered keys only, and persistLocalConfig replaced the layer, cgData and
+	 * timer.config wholesale with it: a Position px edit never persisted (WO-320A) and any font/border set from the
+	 * timer panel was wiped by the next edit here.
+	 */
+	function getCurrentConfig(partial) {
+		const scene = sceneState.getScene(sceneId)
+		const stored = scene?.layers?.[layerIndex]?.source?.countdownConfig
+		const timer = timerId ? sceneState.getTimer(timerId) : null
+		return { ...cfg, ...(stored || {}), ...(timer?.config || {}), ...readRenderedFields(), ...(partial || {}) }
 	}
 
 	/**
@@ -91,7 +113,7 @@ export function createCountdownFieldController({ grp, cfg, modeSelect, sceneId, 
 		Object.assign(cfg, partial)
 		const scene = sceneState.getScene(sceneId)
 		const currentSrc = scene?.layers?.[layerIndex]?.source || src
-		const nextConfig = getCurrentConfig()
+		const nextConfig = getCurrentConfig(partial)
 		sceneState.patchLayer(sceneId, layerIndex, {
 			source: { ...currentSrc, countdownConfig: nextConfig },
 			cgData: { ...nextConfig },
@@ -99,7 +121,7 @@ export function createCountdownFieldController({ grp, cfg, modeSelect, sceneId, 
 		// WO-208 T208.2: update timer instance config and propagate to all bound layers
 		const timer = sceneState.getTimer(timerId)
 		if (timer) {
-			timer.config = { ...nextConfig }
+			timer.config = { ...(timer.config || {}), ...nextConfig }
 			sceneState._save()
 			queueConfigPropagation()
 		}
@@ -125,7 +147,7 @@ export function createCountdownFieldController({ grp, cfg, modeSelect, sceneId, 
 				const bLayer = sceneState.getScene(bSceneId)?.layers?.[bIdx]
 				if (bLayer?.source) {
 					sceneState.patchLayer(bSceneId, bIdx, {
-						source: { ...bLayer.source, countdownConfig: nextConfig },
+						source: { ...bLayer.source, countdownConfig: { ...(bLayer.source.countdownConfig || {}), ...nextConfig } },
 						cgData: { ...nextConfig },
 					})
 				}

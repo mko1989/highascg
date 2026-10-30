@@ -264,7 +264,7 @@ export function renderDecklinkConsumerSettingsControls(h, conn, { lastPayload, s
 			await Actions.updateConnector(conn.id, { caspar: casparPatch })
 			setCasparRestartDirty(true)
 			setStatus(statusEl, 'SDI settings saved.', true)
-			await load()
+			await load({ forceRefresh: true }) // WO-844: cached reload re-rendered the old connector, the next field then re-posted it
 		} catch (e) {
 			setStatus(statusEl, `Save failed: ${e?.message || e}`, false)
 		} finally {
@@ -344,7 +344,7 @@ export function renderDecklinkKeyFillControls(h, conn, { lastPayload, statusEl, 
 			await Actions.updateConnector(conn.id, { caspar: casparPatch })
 			setCasparRestartDirty(true)
 			setStatus(statusEl, enabled ? `Key on port ${kd}.` : 'Fill only.', true)
-			await load()
+			await load({ forceRefresh: true }) // WO-844: cached reload re-rendered the old connector, the next field then re-posted it
 		} catch (e) {
 			setStatus(statusEl, `Save failed: ${e?.message || e}`, false)
 		} finally {

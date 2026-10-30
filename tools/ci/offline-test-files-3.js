@@ -190,6 +190,8 @@ module.exports = [
 	'tools/smoke/smoke-wo837-lighting-consoles.test.js',
 	'tools/smoke/smoke-wo839-number-fields-numbers-only.test.js',
 	'tools/smoke/smoke-wo840-preset-timer-visibility.test.js',
+	'tools/smoke/smoke-wo844-countdown-config-merge.test.js',
+	'tools/smoke/smoke-wo844-web-client-sweep.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

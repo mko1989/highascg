@@ -2,7 +2,7 @@
 
 const { destinationsFromConfig } = require('./screen-destinations')
 const { normalizeDeviceGraph } = require('./device-graph-core')
-const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS, slug } = require('./device-graph-constants')
+const { DEFAULT_DEVICE_ID, DEST_DEVICE_ID, AUTO_CASPAR_KINDS } = require('./device-graph-constants')
 const { normalizeDecklinkIoDirection, DECKLINK_IO_UNASSIGNED } = require('./decklink-io-direction')
 const { normalizeVirtualCameraConfig } = require('../virtual-output/v4l2-bridge-config')
 const { effectiveAlsaCardId } = require('../virtual-output/v4l2-bridge-audio-sink')
@@ -117,14 +117,20 @@ function suggestConnectorsAndDevicesFromLive(live, appConfig) {
 		if (!decklinkDetected) return
 		const devIdx = parseInt(String(device), 10)
 		if (isNaN(devIdx) || devIdx <= 0) return
-		const id = `dlsdi_${slot}`
 		if (seenDecklinkIndices.has(devIdx)) return
+		/* WO-844: ids are slot-based but de-dup is per DEVICE: input slot 2 (dev 2) + output screen 2 (dev 3) were both
+		 * `dlsdi_2` and mergeHardwareSync dropped one. On a clash key the port by device number; skip if taken too. */
+		const clash = connectors.some((c) => c.id === `dlsdi_${slot}`)
+		const portNo = clash ? devIdx : slot
+		const id = `dlsdi_${portNo}`
+		if (clash && connectors.some((c) => c.id === id)) return
+		if (clash) label = `SDI ${devIdx}`
 		seenDecklinkIndices.add(devIdx)
 		connectors.push({
 			id,
 			deviceId: DEFAULT_DEVICE_ID,
 			kind: 'decklink_io',
-			index: slot - 1,
+			index: portNo - 1,
 			label: label || `SDI ${slot}`,
 			externalRef: String(devIdx),
 			...extra

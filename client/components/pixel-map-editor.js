@@ -2,7 +2,7 @@
  * Unified Mapping Editor — visual tool for Video Slicing and DMX Pixel Mapping.
  */
 import { UI_FONT_FAMILY } from '../lib/ui-font.js'
-import { api } from '../lib/api-client.js'
+import { fetchDeviceView } from '../lib/mapping-node-service.js' // WO-844: cache-busted read (WO-436)
 import { mappingState } from '../lib/mapping-state.js'
 import { createPixelMapCanvasController } from './pixel-map-editor-canvas.js'
 
@@ -127,7 +127,7 @@ export function initPixelMapEditor(root, _stateStore) {
 			editor.style.inset = '0'
 		}
 		editor.style.display = 'flex'
-		const payload = await api.get('/api/device-view')
+		const payload = await fetchDeviceView()
 		mappingState.setActiveNode(ev.detail.nodeId, payload)
 		canvasCtrl.fitInContainer()
 		canvasCtrl.draw()
@@ -142,7 +142,7 @@ export function initPixelMapEditor(root, _stateStore) {
 		if (!mappingState.activeNodeId) return
 		if (ev.detail?.nodeId && ev.detail.nodeId !== mappingState.activeNodeId) return
 		try {
-			const payload = await api.get('/api/device-view')
+			const payload = await fetchDeviceView()
 			await mappingState.setActiveNode(mappingState.activeNodeId, payload)
 			canvasCtrl.draw()
 		} catch (e) {

@@ -5,6 +5,7 @@ import { pixelsToNormalized } from '../lib/fill-math.js'
 import { clipPixelRectAtLocalTime, interpClipProp } from '../lib/timeline-clip-interp.js'
 import { getTimelineProgramResolution } from '../lib/timeline-program-canvas.js'
 import { api } from '../lib/api-client.js'
+import { isTextEntryTarget } from '../lib/keyboard-guard.js'
 
 /** Clip keyframe shortcuts — work from timeline canvas or inspector fields. */
 const CLIP_KEYFRAME_KEYS = new Set(['i', 'o', 'p', 's', 'v', 't'])
@@ -111,9 +112,14 @@ function handleTimelineEditorKeydown(e, deps) {
 		getSyncToServer,
 	} = deps
 
-	const inField = !!e.target.closest('input, textarea, select')
+	const inField = isTextEntryTarget(e.target)
 	const mod = (e.ctrlKey || e.metaKey) && !e.altKey
 	const k = e.key.length === 1 ? e.key.toLowerCase() : e.key
+
+	/* WO-844: Ctrl/Cmd+C/V, Space and Shift+Arrow are text editing keys inside a field — copying text out of an
+	 * inspector field copied the selected CLIP, Ctrl+V pasted a clip clone, Space toggled playback. Only the
+	 * keyframe letters (I/O/P/S/V/T) deliberately stay live while typing in the inspector (see below). */
+	if (inField && (e.key === ' ' || (mod && (k === 'c' || k === 'v')) || (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')))) return
 
 	if (mod && k === 'c') {
 		const selectedClip = getSelectedClip()

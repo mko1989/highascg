@@ -8,6 +8,7 @@ import { saveVirtualCameraConfig, stopVirtualCamera } from '../lib/virtual-camer
 import { renderCasparBand } from './device-view-caspar-render.js'
 import { renderCasparBandSimple } from './device-view-caspar-render-simple.js'
 import { renderMappingsBand } from './device-view-mappings-render.js'
+import { nextNumberedIndex } from '../lib/next-numbered-id.js'
 
 function appendSegment(parent, title) {
 	const sec = document.createElement('section')
@@ -39,7 +40,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 			try {
 				/* WO-474: no phantom str_1 — with zero outputs the first Add must create Str1, not Str2. */
 				const cur = Array.isArray(currentSettings?.streamOutputs) ? currentSettings.streamOutputs : [];
-				const idx = cur.length + 1;
+				const idx = nextNumberedIndex(cur, 'str'); // WO-844: max+1, not length+1 (duplicate id after a removal)
 				const next = [...cur, { id: `str_${idx}`, label: `Str${idx}`, enabled: true, type: 'rtmp', name: `Str${idx}`, quality: 'medium', rtmpServerUrl: '', streamKey: '', srtUrl: '' }];
 				await Actions.saveSettingsPatch({ streamOutputs: next });
 				setStatus(statusEl, `Added stream output Str${idx}`, true);
@@ -53,7 +54,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 			try {
 				/* WO-473: no phantom rec_1 — with zero outputs the first Add must create Rec1, not Rec2. */
 				const cur = Array.isArray(currentSettings?.recordOutputs) ? currentSettings.recordOutputs : [];
-				const idx = cur.length + 1;
+				const idx = nextNumberedIndex(cur, 'rec');
 				const next = [...cur, { id: `rec_${idx}`, label: `Rec${idx}`, enabled: true, name: `Rec${idx}`, source: 'program_1', crf: 26 }];
 				await Actions.saveSettingsPatch({ recordOutputs: next });
 				setStatus(statusEl, `Added record output Rec${idx}`, true);
@@ -81,7 +82,7 @@ export function renderBands(mappingPanel, rearPanel, ctx, { currentSettings, sta
 		onAddAudioOutput: async () => {
 			try {
 				const cur = Array.isArray(currentSettings?.audioOutputs) ? currentSettings.audioOutputs : [];
-				const idx = cur.length + 1;
+				const idx = nextNumberedIndex(cur, 'audio');
 				// WO-683: one PortAudio output per server — later ones start as System Audio (OAL).
 				const type = portAudioOutputId(cur) ? 'system-audio' : 'portaudio';
 				const next = [...cur, { id: `audio_${idx}`, label: `Audio ${idx}`, enabled: true, type, deviceName: '', channelLayout: 'stereo' }];

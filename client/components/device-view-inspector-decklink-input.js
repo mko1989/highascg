@@ -62,7 +62,7 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 					else markCasparRestartDirty()
 				}
 				setStatus(statusEl, `Port ${devNum}: unassigned.`, true)
-				await load?.()
+				await load?.({ forceRefresh: true }) // WO-844: bare load() = 5 s cached pre-mutation snapshot (WO-534 class)
 			} catch (e) {
 				setStatus(statusEl, `Failed: ${e?.message || e}`, false)
 				removeBtn.disabled = false
@@ -90,7 +90,7 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 				includeLabel: false,
 				onApplied: async (r) => {
 					setStatus(statusEl, r?.message || `DeckLink updated on ch ${inputEntry.channel}.`, true)
-					await load?.()
+					await load?.({ forceRefresh: true }) // WO-844: bare load() = 5 s cached pre-mutation snapshot (WO-534 class)
 				},
 			})
 		}
@@ -133,7 +133,7 @@ export function renderDecklinkInputSection(inputSection, conn, ctx) {
 					? ' Apply Caspar config and restart if the input does not appear.'
 					: ''
 				setStatus(statusEl, `Port ${devNum} is input on ch ${r.hostChannel}.${applyNote}`, true)
-				await load?.()
+				await load?.({ forceRefresh: true }) // WO-844: bare load() = 5 s cached pre-mutation snapshot (WO-534 class)
 			} catch (e) {
 				setStatus(statusEl, `Failed: ${e?.message || e}`, false)
 				activateBtn.disabled = false

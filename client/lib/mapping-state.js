@@ -227,7 +227,9 @@ export class MappingState {
 		this._saveTimer = setTimeout(async () => {
 			this._saveTimer = null
 			try {
-				const payload = await api.get('/api/device-view')
+				/* WO-844 (WO-436 class): read-modify-write of the whole graph — a plain GET is answered from the browser's
+				 * 3 s cache with a pre-edit graph and the POST below would revert the edit that just landed. */
+				const payload = await MappingNodeService.fetchDeviceView()
 				const graph = payload.graph
 				const node = (graph.devices || []).find(d => d.id === this.activeNodeId)
 				if (node) {

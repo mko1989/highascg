@@ -2,6 +2,7 @@
  * Single source of truth for pixel_mapping device graph mutations (WO-41).
  */
 import { api } from './api-client.js'
+import { nextNumberedIndex } from './next-numbered-id.js'
 
 /** Common Caspar video-mode IDs for mapping output dropdowns */
 export const MAPPING_OUTPUT_VIDEO_MODES = [
@@ -309,7 +310,8 @@ export async function addMappingOutput(nodeId) {
 		const node = findMappingNode(graph, nodeId)
 		if (!node) return { ok: false, error: 'Node not found' }
 		const outputs = Array.isArray(node.settings?.outputs) ? [...node.settings.outputs] : []
-		const nextIdx = outputs.length + 1
+		/* WO-844: max+1 — `outputs.length + 1` re-issued `out_3` after `out_2` was removed (two outputs, one id). */
+		const nextIdx = nextNumberedIndex(outputs, 'out')
 		const outputId = `out_${nextIdx}`
 		outputs.push({ id: outputId, mode: MAPPING_OUTPUT_VIDEO_MODES[0], label: `Output ${nextIdx}` })
 		node.settings = { ...(node.settings || {}), outputs, numOutputs: outputs.length }

@@ -41,7 +41,9 @@ const PLAIN_TO_ANIMATE_TRANSITION = {
 /** Map persisted transition type to current dropdown value (same-layer animate path). */
 export function migrateTransitionTypeToAnimate(t) {
 	return String(t || '')
-		.replace(/\s*\+\s*MERGE\b/gi, '+ ANIMATE')
+		/* WO-844: the leading space must come back — `MIX + MERGE` became `MIX+ ANIMATE`, which is no known type, so
+		 * normalizeTransitionForPgmOnly turned the take into a CUT. */
+		.replace(/\s*\+\s*MERGE\b/gi, ' + ANIMATE')
 		.trim()
 }
 

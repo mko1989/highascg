@@ -1,5 +1,7 @@
 'use strict'
 
+import { isTextEntryTarget } from '../lib/keyboard-guard.js'
+
 function isScenesTabActive() {
 	const tab = document.getElementById('tab-scenes')
 	return !!tab?.classList?.contains('active')
@@ -17,7 +19,7 @@ export function attachScenesEditorKeyboard(deps) {
 		if (e.defaultPrevented) return
 		if (e.ctrlKey || e.metaKey || e.altKey) return
 		if (e.key !== ' ') return
-		if (e.target.closest('input, textarea, select, [contenteditable="true"]')) return
+		if (isTextEntryTarget(e.target)) return
 		e.preventDefault()
 		void deps.globalTakeFromPreview()
 	}

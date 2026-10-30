@@ -9,6 +9,7 @@ import { api } from '../lib/api-client.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { parseRouteValue } from './scenes-shared.js'
 import { attachMathInput } from '../lib/math-input.js'
+import { isTextEntryTarget } from '../lib/keyboard-guard.js'
 import { fitInContainer, toCanvas, getCellAt, cursorForResizeHandle, getResizeHandle, drawMultiviewEditor, applyMultiviewLayout, applyMultiviewAudioFocus, resolveSourceAspectRatio, solveCellDimensions, getCellOverlayType } from './multiview-editor-canvas.js'
 
 /**
@@ -317,10 +318,7 @@ export function initMultiviewEditor(root, stateStore) {
 		const tab = document.querySelector('#tab-multiview')
 		const isActive = tab && tab.classList.contains('active')
 		if (isActive && selectedId && (e.key === 'Backspace' || e.key === 'Delete')) {
-			const activeEl = document.activeElement
-			if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
-				return
-			}
+			if (isTextEntryTarget(e.target) || isTextEntryTarget(document.activeElement)) return // WO-844: shared guard (adds SELECT)
 			e.preventDefault()
 			multiviewState.removeCell(selectedId)
 			selectedId = null
