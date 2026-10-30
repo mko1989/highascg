@@ -2,8 +2,9 @@ extends Node3D
 ## WO-874 scene "Shader": a library shader (the box's Shadertoy library, GET /api/shaders — the same code Caspar's HTML
 ## templates run, WO-266/586) rendered by shadertoy_rd.gd at the canvas size and shown on a quad that fills the stage camera.
 ## As the main scene it is the backdrop (far, opaque); as layer 2 it is added over the other scene (near, additive).
-## speed = the shader's clock (0.3 = real time; integrated, so changes never jump — WO-580), pulse / glow = gain, hue = hue
-## rotation (0.55 = the shader's own colours), amount = opacity, burst = a flash plus a short time surge. spin is not used.
+## speed = the shader's clock (0.3 = real time; integrated, so changes never jump — WO-580), pulse / glow = gain, amount =
+## opacity, burst = a flash plus a short time surge. hue and spin are not used: a shader keeps its own palette (rotating it
+## by the hue parameter recoloured every shader — the graph's valence sits at 0.5 even in silence, WO-874 §1).
 
 const Runner := preload("res://features/visuals/shadertoy_rd.gd")
 const CAM_Z := 14.0  # the stage camera (visuals_stage.gd): at z 14, looking down −z, fov 60
@@ -14,18 +15,13 @@ const SRC := """
 shader_type spatial;
 render_mode unshaded, cull_disabled, fog_disabled, shadows_disabled%s;
 uniform sampler2D tex : filter_linear, repeat_disable;
-uniform float hue_shift;
 uniform float gain = 1.0;
 uniform float flash;
 uniform float opacity = 1.0;
-vec3 hue_rotate(vec3 c, float a) {
-	vec3 k = vec3(0.57735);
-	return c * cos(a) + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - cos(a));
-}
 void fragment() {
 	vec3 c = max(texture(tex, vec2(UV.x, 1.0 - UV.y)).rgb, 0.0);  // Shadertoy rows run bottom-up
 	c = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));  // the shader wrote sRGB; the stage is linear
-	ALBEDO = (max(hue_rotate(c, hue_shift * 6.28318), 0.0) * gain + flash) * opacity;
+	ALBEDO = (c * gain + flash) * opacity;
 }
 """
 
@@ -94,7 +90,6 @@ func step(p: Dictionary, delta: float, burst: bool) -> void:
 	var dist := absf(CAM_Z - _quad.position.z)
 	var h := 2.0 * dist * tan(deg_to_rad(FOV * 0.5))
 	_quad.scale = Vector3(h * size.x / maxf(1.0, size.y), h, 1.0)
-	_mat.set_shader_parameter("hue_shift", float(p.get("hue", 0.55)) - 0.55)
 	# 1 at the defaults, at most ~1.7: shaders are already graded, a bright sky clips white well before 2×
 	_mat.set_shader_parameter("gain", 1.0 + 0.5 * (float(p.get("glow", 0.3)) - 0.3) + 0.4 * (float(p.get("pulse", 0.2)) - 0.2))
 	_mat.set_shader_parameter("flash", _kick * 0.5)

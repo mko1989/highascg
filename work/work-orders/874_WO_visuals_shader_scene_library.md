@@ -50,6 +50,14 @@ Owner, 30.10 (during WO-873): *"Add shaders to the visuals too"*.
      - **Gain mapping.** The first mapping (`(0.4 + 2·glow)·(0.8 + pulse)`) reached 4× when the starter graph drove glow and
        pulse with the music, and bright skies (sh-bg-simple-2d-clouds) clipped white. It is now 1 at the defaults and at most
        about 1.7.
+     - **Hue.** At first `hue` rotated a shader's colours relative to 0.55. A silent side-by-side with Chrome showed every
+       shader turned about a third of a turn (blue skies green, reds magenta), for two reasons:
+       - the project's base Hue is 0.47;
+       - even in silence the live capture keeps sending frames with **valence 0.5**, which the project's graph turns into
+         −0.22 of hue.
+
+       Rotating only "the audio's part" therefore does not work either. Rotating in linear RGB also clipped bright colours to
+       flat magenta with music on. Decision: a shader keeps its own palette, and hue (like spin) does not apply to it.
 
 ## 2. What was done
 
@@ -82,11 +90,11 @@ Owner, 30.10 (during WO-873): *"Add shaders to the visuals too"*.
     without depth test.
   - Parameters:
     - **speed** is the shader's clock, integrated (0.3 = real time; WO-580: no phase jumps);
-    - **hue** rotates hue (0.55 = the shader's own colours);
+    - **hue** is not used: the shader keeps its own palette (see §1);
     - **glow/pulse** set gain;
     - **amount** sets opacity;
     - **burst** gives a flash plus a short clock surge;
-    - **spin** is unused (rotating the quad would show its corners).
+    - **spin** is not used (rotating the quad would show its corners).
   - The shader wrote sRGB, so the display shader converts to the stage's linear space.
 - `visuals_stage.gd`:
   - `"shader"` added to `SCENES`;
@@ -120,6 +128,9 @@ Owner, 30.10 (during WO-873): *"Add shaders to the visuals too"*.
   - the alpha-flagged ones composite on black as intended;
   - sh-chillwave-planet is the library-data issue above;
   - sh-sa-audio-flight-v2-strobes differs only in the moment captured.
+- **Colours:** silent renders of 5 sampled shaders (sh-balatro, sh-bg-perlin-water-noise, sh-bg-sunset-cloud,
+  sh-sa-the-popular-shader-2, sh-solines) were compared side by side with Chrome (`NOTHUMB=1`). Palettes match. The only
+  differences are the moment captured and the stage's bloom on HDR highlights.
 - **Layers:** shots of shader + particles and tunnel + shader (additive) checked by eye. The scene shots from WO-873 are
   unchanged.
 - **Godot suite: 23959 passed, 0 failed.**
