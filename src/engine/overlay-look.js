@@ -143,7 +143,6 @@ async function takeOverlayLook(opts) {
 
 module.exports = {
 	isOverlayLook,
-	overlayHostOfLayer,
 	holdLowerThirdCgData,
 	buildOverlayLookLines,
 	takeOverlayLook,
