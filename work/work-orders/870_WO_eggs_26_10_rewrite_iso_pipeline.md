@@ -363,3 +363,45 @@ sudo apt install ./penguins-eggs_26.10.30+highascg1_amd64.deb
 sudo apt-mark hold penguins-eggs
 eggs version        # expect: [coa] eggs v26.10.30+highascg1 - The "master" of remaster
 ```
+
+### Phase 2 — managed exclude list + custom.yaml (30.10)
+
+**Investigation**
+
+* Installed today (read-only): `/etc/penguins-eggs.d/custom.exclude.list` is the stock 25-line file (docker/containerd, podman/lxc/lxd/machines, snapd; no media line, no `home/eggs`); `/etc/penguins-eggs.d/custom.yaml` is all comments except `remaster.compression.algorithm: "zstd"`, `level: 3`. Both are world-readable, so a non-root verifier works.
+* The coa parser keeps inline comments (only whole-line `#` is skipped) and the liveroot has `/lib /bin /sbin /lib64` as symlinks into `usr/`, so anchored `lib/…` lines need `usr/lib/…` twins (WO-430, 1.3 table). Our fragments mix both: `penguins-eggs-exclude-decklink.list` already carries hand-written twins, the old template items (`lib/live/*`) do not.
+* The branch logic for `iso_prefix` is `build-highascg-egg.sh:22-40` (`HIGHASCG_NVIDIA_DRIVER`, else `highascg_installed_nvidia_branch` from `scripts/lib/nvidia-branch.sh`; currently driver 615.71.09 → `highascg-nvidia-615`).
+* The embed-server fragment is the default ISO mode (`HIGHASCG_ISO_EMBED_SERVER` defaults to 1 in `prepare-eggs-clone-with-exfat.sh:50`); its media line is `penguins-eggs-exclude-highascg-embed-server.list:76` `home/casparcg/highascg/media/*`. `merge-penguins-eggs-exclude-highascg.sh` appends to the legacy `exclude.list` and is left untouched for the legacy engine path; the new route does not use it.
+
+**What was done** (all under `tools/eggs/live-usb/` unless noted)
+
+* `generate-eggs-config.js` (new, 152 lines, pure function of the repo): `exclude [--embed 0|1]` and `yaml --branch NNN` on stdout; also `require()`able (`buildExcludeList`, `buildCustomYaml`). Output order: header (generated / do not edit / source files), stock list, old-template items, `home/eggs` (F8), embed-server fragment (or the WO-47 fragment with `--embed 0`), DeckLink fragment. Inline comments stripped (`cleanLine`, `:34`), leading `/` stripped, duplicates dropped in first-seen order, and `usr/` twin inserted right after every `lib|lib32|lib64|libx32|bin|sbin` line (`MERGED_USR_RE`, `:31`). Section comments are whole-line only. `home/eggs/*` was not added: `home/eggs` as a directory pattern excludes the subtree (mksquashfs leaf match), which is what the F8 text asks for ("the single line `home/eggs`").
+* Vendored fragments (new): `penguins-eggs-exclude-stock-custom.list` (verbatim copy of the installed stock file, so the output never depends on `/etc`) and `penguins-eggs-exclude-old-template.list` (the 1.3 "not covered by the built-ins" items: `*.cache lib/live/* var/lib/live/config/* persistence.conf etc/blkid.tab{,.old} etc/fstab.d/* home/*/.local/share/yay .snapshots/* timeshift var/backups/* var/lib/dhcp/* etc/skel/{.config/Code,.local/share/baloo/*,.ZAP/*}`).
+* `custom.yaml`: `anonymous: true`, `remaster.iso_prefix: highascg-nvidia-<BR>`, `remaster.compression.algorithm: "xz"`; the stock `level: 3` is kept with a comment (zstd-only, ignored by xz); `installer: calamares` stays a comment (not enabled); user/password untouched.
+* `install-eggs-config.sh` (new): default `--out DIR` writes both files (no root). `--apply` installs into `${EGGS_CONF_DIR:-/etc/penguins-eggs.d}`; a file whose bytes already match is left alone (`cmp -s`, `:82`), a differing one is copied to `<file>.bak-<timestamp>` first (`:87`), then `install -m 0644`. Refuses with a message if the directory is not writable. Branch via `--branch`/`HIGHASCG_NVIDIA_DRIVER`/detection; `--embed`/`HIGHASCG_ISO_EMBED_SERVER`.
+* `verify-eggs-config.sh` (new, check-only): regenerates via `install-eggs-config.sh --out`, compares sha256 per file (`:20`, `:27`), prints `PASS|FAIL <file>: <reason>`, exit 1 on any mismatch.
+* `tools/smoke/smoke-wo870-eggs-config.test.js` (new, 13 tests) + one appended line in `tools/ci/offline-test-files-3.js`.
+* Not done here (later phases): wiring the install script into `build-highascg-egg.sh`/`prepare` (Phase 1 `eggs-run-lib.sh`), branding install (Phase 3), the one-time parity check `/tmp/coa/excludes.list` vs old effective list (needs the first dry run).
+
+**Verified**
+
+* `node --test tools/smoke/smoke-wo870-eggs-config.test.js`: 13/13. `node --test tools/smoke/smoke-eggs-exclude-lists.test.js`: 39/39 (unchanged, fragments untouched). `node tools/ci/check-max-file-lines.js`: 0 files over 500. `bash -n` on both scripts clean (also a test).
+* Output: 306 lines, 291 patterns, deterministic (two runs `cmp` equal), contains `home/casparcg/highascg/media/*`, `home/eggs`, 0 inline comments.
+* Measure harness (scratch copy of `measure/main.go` taking a list file; as casparcg, read-only; built-ins + generated list): Phase 2 row **excluded 811.3 GiB, xz ISO estimate 11.9 GiB (need 23.8 GiB vs 40.1 GiB free) PASS; zstd 13.4 GiB (26.9) PASS**; scan 0.60 s. Reference row was 811.2 / 11.9 / PASS; the +0.1 GiB comes from the 15 extra lines below plus normal drift of the live box (rootUsed 849.6 → 849.7 GiB). "Today" row unchanged (18.3 GiB, FAIL as before).
+* Diff vs `measure/excludes.phase2.list` (set compare after cleaning): generated list has 291 unique patterns, the reference 373. Reference-only: 97, all of them Go built-ins (coa adds them itself, so they are intentionally not in the managed file). Generated-only: 15 = the old-template items (`*.cache`, `lib/live/*` + its twin `usr/lib/live/*`, `var/lib/live/config/*`, `persistence.conf`, `etc/blkid.tab`, `etc/blkid.tab.old`, `etc/fstab.d/*`, `home/*/.local/share/yay`, `.snapshots/*`, `timeshift`, `var/backups/*`, `etc/skel/.config/Code`, `etc/skel/.local/share/baloo/*`, `etc/skel/.ZAP/*`). Everything else (stock, `home/eggs`, embed-server, DeckLink) is identical; no twin was missing from the DeckLink/embed fragments except `usr/lib/live/*`.
+* Scratch `--apply` (`EGGS_CONF_DIR` in the scratchpad): first run installed both files and backed up the pre-existing yaml; second run printed `unchanged:` for both and made no backup; `verify-eggs-config.sh` there: PASS/PASS; with `--embed 0`: FAIL exclude list (291 vs 288 patterns), PASS yaml.
+* Verifier against the real `/etc` (expected FAIL, not applied yet):
+
+  ```
+  FAIL custom.exclude.list: installed list has no home/casparcg/highascg/media/* line; sha256 564d4258cd13 != 6c4c8e84c36e
+  FAIL custom.yaml: differs from generated (installed file has no iso_prefix); sha256 7402b7a52660 != 28f0ac631d02
+  ```
+* Not verified: an actual `eggs remaster` reading the file (owner dry run F); the scan as root including `/home/eggs`. (Source-checked on tag v26.10.30: top-level `anonymous` is `Settings.Anonymous`, `coa/pkg/parser/types.go:46`, merged at `parser.go:241` and read by `census/census.go:32` `cfg.Anonymous || cfg.Remaster.Anonymous`.) Old-template items are an addition beyond the three fragments the harness used; drop `penguins-eggs-exclude-old-template.list` from `SOURCES` if the parity check shows a problem.
+
+**Owner commands (apply and check)**
+
+```bash
+cd ~/highascg
+sudo bash tools/eggs/live-usb/install-eggs-config.sh --apply     # backs up the old custom.* with a timestamp
+bash tools/eggs/live-usb/verify-eggs-config.sh                   # expect PASS PASS
+```

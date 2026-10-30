@@ -1,0 +1,31 @@
+# Old eggs.yaml-era exclude.list template (refractasnapshot) — only the lines the
+# new engine's built-in list does NOT cover (WO-870 section 1.3). Everything else of
+# that template (dev/proc/sys/run/tmp/mnt/media, etc/fstab, boot/grub/*, var/log/*,
+# apt caches, ...) is already in the Go built-ins (create-exclude-list.go).
+#
+# Liveroot-relative paths, no leading slash. One pattern per line, whole-line
+# comments only (the new parser does not strip inline comments).
+
+*.cache
+
+# live-session leftovers
+lib/live/*
+var/lib/live/config/*
+persistence.conf
+
+# hardware-dependent files recreated on install
+etc/blkid.tab
+etc/blkid.tab.old
+etc/fstab.d/*
+
+# caches / snapshots / backups
+home/*/.local/share/yay
+.snapshots/*
+timeshift
+var/backups/*
+var/lib/dhcp/*
+
+# skel noise
+etc/skel/.config/Code
+etc/skel/.local/share/baloo/*
+etc/skel/.ZAP/*
