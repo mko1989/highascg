@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (28 open, 121 in progress, 632 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+782 live WOs (29 open, 120 in progress, 633 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -551,7 +551,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
 - 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
 
-## devices-config — Devices tab, settings, config generation (52)
+## devices-config — Devices tab, settings, config generation (53)
 
 - 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
 - 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
@@ -604,7 +604,8 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 821 DONE [devices-config] Autosave stamps this box's hardware config into a project loaded without its ha… → 821_WO_autosave_stamps_box_hardware_into_project.md
 - 823 DONE [devices-config+godot-client] Godot "Load from file" stamps this box's rig over the file's own hardwareConfig → 823_WO_godot_load_from_file_keeps_file_rig.md
 - 824 DONE [devices-config] Opening a show file trashes the project that was open → 824_WO_import_keeps_open_project.md
-- 869 IN PROGRESS [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
+- 869 DONE [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
+- 871 OPEN [devices-config+amcp] Mapping route slices (WO-869 path a): SDI scaling/rotation/warp through a slice… → 871_WO_mapping_route_slices_path_a.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 

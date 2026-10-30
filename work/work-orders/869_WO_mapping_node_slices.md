@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; caps probe done (§7), planner edge fixed; open: path (a) route-slices (§6)**
+**Status: DONE (30.10, v1 = path (b) + SDI placement: smokes, Godot suite + e2e, scratch-Caspar probes, real Dioda head §5.1, caps probe on the live fork + rollback binary §7) — path (a) route-slices moved to WO-871**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -385,7 +385,7 @@ in `scratchpad/wo869live/`.
 
 - **Binary swap: DONE 30.10 17:32** (dev box). `bin/casparcg` = md5 `ab668967…` (the build above); rollback `bin/casparcg.pre-wo869` (`fb955e76…`, the 16:37 build of `e8d457ec6` + the same uncommitted WO-820/800 tree, so the swap adds only `ce7132e50` + `deac375bb`). AMCP `RESTART` → run.sh relaunched it (`/proc/<pid>/exe` md5 checked), then node restarted (Apply check 0). After: the node re-staged the PRV look on ch2, `/api/system/operator-first` + the WO-857 listener (UDP 6290) answer, 0 `[error]` lines in the journal, :0 shows the GUI on DP-4 and the (empty-PGM) Dioda window on DP-0. The live project has no slices yet, so the slice path on real heads is still the open check below.
 - ~~Caps probe~~ — done 30.10 (§7).
-- **Path (a) route-slices** (SDI scaling/rotation and per-slice sources): the planner models it and the budget refusal (Q3), but there is no generator or apply code. It also needs #1814 (crop leak) in the fork.
+- **Path (a) route-slices** → [WO-871](871_WO_mapping_route_slices_path_a.md) (post-v1 under Q2; needs fork #1814; the planner branch exists, generator and apply do not).
 - ~~Real GPU check~~ — done on the box 30.10 (§5.1): gpu-texture on, real DP-0 head, xrandr layout, stacking.
 - **Fork caveat:** an intermittent startup SEGV with two screen windows on one channel on Xvfb, seen with both the old and the new binary (not caused by this change). Watch for it on the box, where the PGM window plus a slice window means two windows when another GPU cable keeps the PGM window on.
 - ~~Channel format change while a window is live~~ — tested 30.10 on the scratch Caspar (Xvfb :169 / 5264, `bin/casparcg` md5 `ab668967…`, `cfg/slices.config` with a 5-slice baseline; `scratchpad/wo869caps/fmt.sh`, `fmt.out`):
