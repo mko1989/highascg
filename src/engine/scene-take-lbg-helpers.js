@@ -1,4 +1,4 @@
-const { sceneLayerRotationMixerLines } = require('./scene-layer-rotation-amcp')
+const { buildEffectAmcpLinesPlayback } = require('./timeline-playback-helpers')
 const { resolveClipForAmcpLoad } = require('../media/caspar-cls-id')
 
 /** Containers/codecs Caspar ffmpeg often plays with an alpha channel (QT Animation, ProRes 4444, VP9, …). */
@@ -20,38 +20,10 @@ const STILL_IMAGE_LOADBG_NO_TRANSITION_EXT = new Set([
 	'dpx',
 ])
 
+/* WO-830b: one builder for look takes, timeline playback and the PRV nudge — the take copy interpolated look JSON
+ * (project import, cluster replication) raw into MIXER lines; the playback builder coerces numbers and quotes strings. */
 function buildEffectAmcpLines(type, params, cl) {
-	const p = params || {}
-	switch (type) {
-		case 'blend_mode':
-			return [`MIXER ${cl} BLEND ${String(p.mode || 'Normal').toUpperCase()}`]
-		case 'brightness':
-			return [`MIXER ${cl} BRIGHTNESS ${p.value ?? 1} 0`]
-		case 'contrast':
-			return [`MIXER ${cl} CONTRAST ${p.value ?? 1} 0`]
-		case 'saturation':
-			return [`MIXER ${cl} SATURATION ${p.value ?? 1} 0`]
-		case 'levels':
-			return [`MIXER ${cl} LEVELS ${p.minIn ?? 0} ${p.maxIn ?? 1} ${p.gamma ?? 1} ${p.minOut ?? 0} ${p.maxOut ?? 1} 0`]
-		case 'chroma_key':
-			return [`MIXER ${cl} CHROMA ${p.key || 'None'} ${p.threshold ?? 0.34} ${p.softness ?? 0.44} ${p.spill ?? 1} ${p.blur ?? 0}`]
-		case 'crop':
-			return [`MIXER ${cl} CROP ${p.left ?? 0} ${p.top ?? 0} ${p.right ?? 1} ${p.bottom ?? 1} 0`]
-		case 'clip_mask':
-			return [`MIXER ${cl} CLIP ${p.left ?? 0} ${p.top ?? 0} ${p.width ?? 1} ${p.height ?? 1} 0`]
-		case 'perspective':
-			return [`MIXER ${cl} PERSPECTIVE ${p.ulX ?? 0} ${p.ulY ?? 0} ${p.urX ?? 1} ${p.urY ?? 0} ${p.lrX ?? 1} ${p.lrY ?? 1} ${p.llX ?? 0} ${p.llY ?? 1} 0`]
-		case 'grid':
-			return [`MIXER ${cl} GRID ${p.resolution ?? 2} 0`]
-		case 'keyer':
-			return [`MIXER ${cl} KEYER ${p.enabled ? 1 : 0}`]
-		case 'rotation':
-			return sceneLayerRotationMixerLines(cl, p.degrees ?? 0)
-		case 'anchor':
-			return [`MIXER ${cl} ANCHOR ${p.x ?? 0} ${p.y ?? 0} 0`]
-		default:
-			return null
-	}
+	return buildEffectAmcpLinesPlayback(type, params, cl)
 }
 
 function clipPath(layer) {
