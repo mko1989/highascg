@@ -1,6 +1,6 @@
 # WO-821 — Autosave stamps this box's hardware config into a project loaded without its hardware
 
-**Status: DONE (29.10, offline smoke 10/10 + suite 3585/0/2 + sandbox e2e across a restart; not deployed live, owner QA pending)**
+**Status: DONE (29.10, offline smoke 10/10 + suite 3585/0/2 + sandbox e2e across a restart) · live e2e 30.10: PASS on the box (save → load without hardware → 2 autosaves → node restart → autosave: stored rig kept every time, live rig untouched; see "Live e2e")**
 
 ## Investigation (what was seen)
 
@@ -169,6 +169,26 @@ release the hold.
   A project that was loaded without its hardware before the deploy is not held.
 - **Owner QA**: load a show without hardware on the live box (API flag) → edit a look → check the project's
   `hardwareConfig` is unchanged → restart node → edit again → check again → Godot Load (applies) → the hold is gone.
+
+## Live e2e (30.10, on the box — live node, no rig applied)
+
+Script: session scratchpad `wo821live/live.py`. It ran against the live node on :4200 with a copy of the open show
+(`mhp_harder`, 22 looks) saved as `wo821_live`, whose first screen destination is labelled `WO821 FILE RIG`. The
+box's own destination is "Operator GUI".
+
+```
+save keepPayloadHardware:true (WO-823)   200 → stored 'WO821 FILE RIG' rev 1      journal: save kept the file's own hardwareConfig (import, WO-823)
+load {slug} (no applyHardware)           200 → stored 'WO821 FILE RIG', live 'Operator GUI'
+                                                                                  journal: "wo821_live" loaded without its hardware … (WO-821)
+autosave (programOutput edit) ×2         changed:true rev 2, 3 → stored 'WO821 FILE RIG'   journal: autosave kept the stored hardwareConfig … ×2
+node restart (pid 2809575)
+autosave after restart                   changed:true rev 4 → stored 'WO821 FILE RIG', live 'Operator GUI'
+```
+
+`mhp_harder` was then reloaded: rev 334 before and after, `hardwareConfig` byte-identical, 22 looks. The test
+project (projects/, _autosave/, and the bridge copy the save pushed) was deleted, and the two hold entries the test
+created (`wo821_live`, plus `mhp_harder` from the reload) were removed during a node restart. The journal shows no
+hold for `mhp_harder` before the test.
 
 ## Follow-ups / open
 

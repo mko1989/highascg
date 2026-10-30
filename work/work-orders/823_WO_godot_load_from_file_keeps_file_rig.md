@@ -1,6 +1,6 @@
 # WO-823 — Godot "Load from file" stamps this box's rig over the file's own hardwareConfig
 
-**Status: DONE (29.10, smoke 8/8 + suite 3595/0/2 + Godot 22755/0 + sandbox e2e; not deployed live, owner QA pending)**
+**Status: DONE (29.10, smoke 8/8 + suite 3595/0/2 + Godot 22755/0 + sandbox e2e) · live e2e 30.10: server contract PASS on the box (`keepPayloadHardware` save stores the file's rig, journal line, survives load + autosave + restart; see WO-821 "Live e2e"). The Godot "Load from file…" click-through was not driven: no pointer automation on :0 while the owner works; the client call site is covered by the headless test**
 
 ## Investigation
 
