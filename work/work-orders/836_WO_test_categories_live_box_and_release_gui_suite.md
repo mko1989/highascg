@@ -298,4 +298,7 @@ bars on PGM 1 / Dioda with "TAKE ok"; `test-agent-pure` smoke 12/12 (incl. the f
 Side effect: run r3's look editor replaced the staged "Intro" look on PRV 1 (preview only).
 LEFTOVERS, owner's call: timelines `ZZ release-test` `tmvv5tqn7zsf` (run c2) and `tmvv60s69nrd` (run c2b). ch4 (Proj PRV) `blackFHD.png`
 was pre-existing and untouched.
+Leftovers removed 30.10 (owner: "You can delete it or not"): `DELETE /api/timelines/<id>` for both, then the project copy via
+`POST /api/project/autosave` (rev 380 → 381; the engine delete does not touch the project's timelines). `mhp_harder` keeps its one
+`Timeline`; `ZZ release-test` is gone from the project, its autosave and `.highascg-state.json`.
 
