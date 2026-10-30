@@ -117,6 +117,19 @@ describe('WO-834 timeline end holds the last frame', () => {
 		assert.ok(pb.position < 1000, `restarted near 0: ${pb.position}`)
 	})
 
+	it('the clients\' seek-to-playhead before Play keeps the hold: Play still starts over (WO-836 card 02)', () => {
+		const { eng } = makeEngine()
+		runToEnd(eng)
+		eng._tick()
+		const held = eng.getPlayback('T').position
+		eng.seek('T', Math.round(held))
+		assert.equal(eng._pbFor('T').endHeld, true, 'a seek onto the held frame is not a move')
+		eng.play('T', Math.round(held))
+		const pb = eng.getPlayback('T')
+		assert.equal(pb.playing, true)
+		assert.ok(pb.position < 1000, `restarted near 0, not resumed at the hold: ${pb.position}`)
+	})
+
 	it('a seek after the hold clears it: Play then resumes from the seek point', () => {
 		const { eng } = makeEngine()
 		runToEnd(eng)

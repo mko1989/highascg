@@ -46,3 +46,19 @@ The owner's answer to D8 ("hold the last frame or black"): hold by default, blac
 - The WO-828 and WO-829 smokes still pass (29/0 together).
 - Godot suite: 23015 passed, 0 failed. `timeline_transport.gd` parses; the only `--check-only` error is the
   `ProjectSync` autoload, which `-s` mode lacks.
+
+## 4. Regression found by the WO-836 test agent (30.10)
+
+Card `wo836d` 02 step 8 (Godot, Play after the hold) resumed at the held frame and held again instead of restarting.
+`timeline_transport.gd toggle_play()` POSTs `/seek {ms: playhead}` before `/play`. The playhead is parked at
+duration − 1 frame, and `seek()` cleared `endHeld` unconditionally
+(`src/engine/timeline-playback-runtime.js`), so `play()` never saw the hold. Its restart test also compared `from`
+against `duration − 1`, which a one-frame-short playhead never reaches.
+
+Fix in `timeline-playback-runtime.js`:
+
+- `seek()` keeps `endHeld` when the target is the paused held position (within 1 ms). Any real move still clears it.
+- `play()` restarts when `from ≥ held position − 1`, not `duration − 1`.
+
+Verified: new smoke case "the clients' seek-to-playhead before Play keeps the hold" passes, and so does the old
+"a seek after the hold clears it" case. All timeline smokes pass 177/0.

@@ -44,7 +44,8 @@ module.exports = {
 			/* WO-834: Play on a timeline holding its end frame starts it over — resuming would run the last frame
 			 * and hold again. Seamless: a clip that is on air at both ends is re-PLAYed without the STOP. */
 			cell.endHeld = false
-			if (prevAir === id && (fromMs == null || fromMs >= tl.duration - 1)) {
+			// the held frame is duration − 1 frame; the clients send that playhead (rounded) as `from`
+			if (prevAir === id && (fromMs == null || fromMs >= Math.min(cell.position ?? tl.duration, tl.duration) - 1)) {
 				fromMs = 0
 				opts = { ...opts, restart: true, seamless: true }
 			}
@@ -265,8 +266,9 @@ module.exports = {
 			return
 		}
 
-		cell.endHeld = false
 		const samePausedPos = !cell.playing && Math.abs((cell.position ?? 0) - pos) < 1
+		// WO-834: the clients seek to the playhead before every Play — a seek onto the held frame keeps the hold
+		if (!(cell.endHeld && samePausedPos)) cell.endHeld = false
 		setCellPosition(cell, pos)
 		if (cell.playing) this._lastTickPositionMs = pos
 		if (samePausedPos) {
