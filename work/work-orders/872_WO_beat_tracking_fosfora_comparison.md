@@ -65,7 +65,21 @@ Their own causal scores (`docs/BENCHMARKS.md`): Ballroom F .549 / Acc1 .689, Har
 **Porting rules.** Ports of fosfora code or constants note it in the file header and get a `THIRD_PARTY_NOTICES` entry at the repo root (MIT, © Kevin Raymond; `licenses/` is a generated symlink). The model JSONs are not copied without their CC-BY track credits.
 
 ## 3. What was done
-- Investigation and proposal (this file). No code yet.
+- Investigation and proposal (this file).
+- **Step 1, benchmark (30.10).**
+  - **Dataset.** Ballroom's MTG mirror refuses downloads (403). I used GTZAN instead, which is also a standard beat-tracking set: 1000 × 30 s, from `huggingface.co/datasets/marsyas/gtzan`, with beat and tempo labels from `github.com/TempoBeatDownbeat/gtzan_tempo_beat`. It lives in `~/datasets/beat`, outside the repo, and is evaluation-only. `home/casparcg/datasets` is now in both ISO exclude fragments, so it never reaches a stick. One file, `jazz.00054.wav`, is GTZAN's known-corrupt clip; the eval reports it and skips it.
+  - **`tools/audio/beat-metrics.js`.** A line-for-line port of mir_eval 0.8.2 `beat.py`: `trim_beats` (5 s), `f_measure` (±70 ms, maximum matching using the same `est ± w` edge test as its searchsorted), `continuity` (CMLc/CMLt/AMLc/AMLt), plus MIREX tempo Acc1/Acc2.
+  - **`tools/audio/eval-beat-tracker.js`.** Decodes each clip to 48 kHz mono and pushes it 512 samples at a time, as live. A beat is timed when the tracker announces it, so scoring is causal.
+    - Split: even clip numbers are **tune**, odd ones **holdout**.
+    - Options: `--jobs` (fork pool; 1000 clips take 11 s at 12 jobs), `--opts`, `--out`, `--baseline` (prints the deltas).
 
 ## 4. What was VERIFIED
+- `beat-metrics.js` against the real mir_eval 0.8.2 (wheel unpacked in the scratchpad, system numpy/scipy): **400 random cases, 0 mismatches, max diff 0**. The cases cover on-beat jitter, off-beat, double and half tempo, random clicks, dropped beats, and one pair exactly 70 ms apart (that edge case was the one difference before the edge-test fix). Seven of them are pinned in `smoke-wo872-beat-metrics.test.js` (curated, 10/10).
+- **Baseline, the WO-662 tracker on all 998 readable GTZAN clips:**
+
+| | F | CMLt | AMLt | Acc1 | Acc2 |
+|---|---|---|---|---|---|
+| WO-662 | .384 | .273 | .524 | .635 | .858 |
+
+  Per genre: hip-hop F .233 with Acc1 .82, so the tempo is right and the phase is wrong. Metal is the best at F .568; classical is the worst at .333 (Acc1 .35).
 - The fosfora constants cited above were checked in the source (`beat.rs:317-319, 646, 657-659, 1716-1718`; `normalizer.rs:9, 22`) and the license files were read. Our side was read at the cited lines.

@@ -308,6 +308,7 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 				'usr/lib/go-1.26/bin/go',
 				'usr/share/go-1.26/src/fmt/print.go',
 				'home/casparcg/go/pkg/mod/x',
+				'home/casparcg/datasets/beat/genres/rock/rock.00003.wav',
 				'var/lib/kdump/initrd.img-7.0.0-38-generic',
 			])
 				assert.equal(excluded(pats, p), true, p)
