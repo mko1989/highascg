@@ -67,6 +67,8 @@ function normalizeAudioCaptureConfig(cfg) {
 		minDb: num(o.minDb, -100),
 		maxDb: num(o.maxDb, -30),
 		staleMs: Math.max(500, num(o.staleMs, 2000)),
+		/** WO-866: per-drum sensitivity 0..1 (POST /api/audio/parts-sensitivity) */
+		partsSensitivity: o.partsSensitivity && typeof o.partsSensitivity === 'object' ? o.partsSensitivity : {},
 	}
 }
 
@@ -130,6 +132,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	const beat = createBeatDetector({ sampleRate: cfg.sampleRate })
 	/** WO-861: drum hits, band levels, tonal, mood and sections on the same samples. */
 	const parts = createAudioParts({ sampleRate: cfg.sampleRate })
+	parts.sensitivity(cfg.partsSensitivity)
 
 	function resolveDevice() {
 		if (cfg.deviceMatch) {
@@ -141,7 +144,10 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		return cfg.device
 	}
 
+	/** WO-866: a recording of the samples the detectors see (`record()`), for tuning against a reference offline. */
+	let rec = null
 	function pushSamples(f32) {
+		if (rec) rec.take(f32)
 		beat.push(f32)
 		parts.push(f32)
 		const n = f32.length
@@ -155,7 +161,10 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		ringFill = Math.min(ring.length, ringFill + n)
 	}
 
+	/** WO-866: a music file on the box replaces the live input while it plays (tests without a player on the input). */
+	let test = null
 	function onPcm(chunk) {
+		if (test) return
 		lastPcmAt = Date.now()
 		staleFrameSent = false
 		const frameBytes = 2 * cfg.channels
@@ -177,7 +186,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				freq: new Uint8Array(cfg.fftSize >> 1),
 				wave: waveformBytes(new Float32Array(0), cfg.fftSize >> 1),
 				rms: 0,
-				device: activeDevice,
+				device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
 				beat: beat.snapshot(),
 				bands: [0, 0, 0],
 				parts: parts.snapshot(),
@@ -191,7 +200,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			freq,
 			wave,
 			rms: rmsOf(ring),
-			device: activeDevice,
+			device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
 			beat: beat.snapshot(),
 			bands: bandsOf(freq, cfg.sampleRate),
 			parts: parts.snapshot(),
@@ -283,6 +292,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 		},
 		stop() {
 			stopped = true
+			if (test) this.testMusic(null)
 			if (emitTimer) clearInterval(emitTimer)
 			emitTimer = null
 			if (retryTimer) clearTimeout(retryTimer)
@@ -304,10 +314,98 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				udpSock = null
 			}
 		},
+		/**
+		 * WO-866: `file` (absolute) decoded in real time (ffmpeg -re, looped) feeds the detectors instead of the live
+		 * input; null stops it and the live input is back. @returns {{ file: string|null }}
+		 */
+		testMusic(file) {
+			if (test) {
+				const p = test.proc
+				test = null
+				try {
+					p.kill('SIGTERM')
+				} catch {
+					/* already gone */
+				}
+			}
+			beat.reset()
+			parts.reset()
+			if (!file) {
+				log('info', '[AudioFFT] test music stopped — back to the live input')
+				return { file: null }
+			}
+			const proc = spawn(
+				'ffmpeg',
+				[
+					'-v',
+					'error',
+					'-re',
+					'-stream_loop',
+					'-1',
+					'-i',
+					file,
+					'-vn',
+					'-ac',
+					'1',
+					'-ar',
+					String(cfg.sampleRate),
+					'-f',
+					's16le',
+					'pipe:1',
+				],
+				{ stdio: ['ignore', 'pipe', 'ignore'] }
+			)
+			const t = { proc, file, pending: Buffer.alloc(0) }
+			test = t
+			proc.stdout.on('data', (chunk) => {
+				if (test !== t) return
+				lastPcmAt = Date.now()
+				staleFrameSent = false
+				const buf = t.pending.length ? Buffer.concat([t.pending, chunk]) : chunk
+				const usable = buf.length - (buf.length % 2)
+				t.pending = buf.subarray(usable)
+				if (usable > 0) pushSamples(pcmS16leToMonoFloats(buf.subarray(0, usable), 1, 1))
+			})
+			proc.on('exit', (code) => {
+				if (test !== t) return
+				test = null
+				log('warn', `[AudioFFT] test music ended (ffmpeg exit ${code}) — back to the live input`)
+			})
+			log('info', `[AudioFFT] test music: ${file} replaces the live input`)
+			return { file }
+		},
+		/** WO-866: per-drum sensitivity, live */
+		sensitivity(map) {
+			parts.sensitivity(map)
+		},
+		get testFile() {
+			return test ? test.file : null
+		},
+		/** @returns {Promise<Float32Array>} the next `seconds` of mono samples (post-gain) the detectors get */
+		record(seconds) {
+			if (rec) return Promise.reject(new Error('a recording is already running'))
+			const want = Math.round(Math.min(120, Math.max(1, Number(seconds) || 10)) * cfg.sampleRate)
+			const buf = new Float32Array(want)
+			let at = 0
+			return new Promise((resolve) => {
+				rec = {
+					take(f32) {
+						const n = Math.min(f32.length, want - at)
+						buf.set(f32.subarray(0, n), at)
+						at += n
+						if (at >= want) {
+							rec = null
+							resolve(buf)
+						}
+					},
+				}
+			})
+		},
+		sampleRate: cfg.sampleRate,
 		getStatus() {
 			return {
 				source: cfg.source,
-				device: activeDevice,
+				device: test ? `file:${test.file.split('/').pop()}` : activeDevice,
 				capturing: !!(proc || udpSock),
 				pcmFresh: Date.now() - lastPcmAt < cfg.staleMs,
 			}

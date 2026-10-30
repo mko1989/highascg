@@ -28,7 +28,19 @@ const GATE_DB = -60
 const HPSS_T = 9 // hops of history for the harmonic median
 const HPSS_F = 8 // ± bins for the percussive median
 const FLUX_FLOOR = 0.5 // band flux below this is no onset (a steady tone's jitter stays < 0.1, a hit > 1)
-const NEAR_PEAK_DB = 24 // a band onset counts only within this of the band's own peak (bleed from another drum is far below)
+// WO-866, scored against MDB Drums (23 annotated mixes, tools/audio/eval-drum-detector.js): the WO-861 rule (k 1.5 × all,
+// NEAR_PEAK 24, plain flux) fired ~2 false kicks per real one. Per-drum thresholds, SuperFlux (±1 bin) and the percussive
+// part for kick / snare (bass notes and vocals are harmonic) took the non-jazz F from 61 / 50 / 72 to 79 / 57 / 77.
+const TUNE = {
+	maxBins: 1,
+	nearPeakDb: 12,
+	perc: ['kick', 'snare'],
+	kick: { k: 3, ratio: 2 },
+	snare: { k: 3.5, ratio: 1.5 },
+	hats: { k: 1.2, ratio: 3 },
+}
+/** Sensitivity 0..1 (0.5 = as tuned) → threshold factor: 0 doubles k, 1 halves it (near-peak range: the inverse). */
+const kOf = (k, sens) => k * 2 ** ((0.5 - Math.max(0, Math.min(1, sens))) * 2)
 // co-fire rules, measured on a synthetic kit (WO-861 §3): a kick's click sits ~44 dB under it in the snare band, a snare
 // hit on a kick 20–22 dB; a snare's noise/body sits ~6 dB under it in the kick band, a kick hit is the loudest band
 const SNARE_UNDER_KICK_DB = 30
@@ -36,7 +48,8 @@ const KICK_UNDER_SNARE_DB = 0
 const SNARE_UNDER_HATS_DB = 12 // a hat sits ~25 dB under itself in the snare band, a snare on a hat ~2 dB above
 
 /** Band-limited flux onset picker: the WO-662 rule (beat-detect.js) per band. */
-function createBandOnset({ fr, k = 1.5, ratio = 1.5, refractoryMs = 100 }) {
+function createBandOnset({ fr, k: k0 = 1.5, ratio = 1.5, refractoryMs = 100 }) {
+	let k = k0
 	const len = Math.round(fr)
 	const ring = new Float64Array(len)
 	let n = 0
@@ -73,6 +86,10 @@ function createBandOnset({ fr, k = 1.5, ratio = 1.5, refractoryMs = 100 }) {
 			let mean = 0
 			for (let j = 0; j < n; j++) mean += ring[j]
 			return n && flux >= FLUX_FLOOR ? flux / Math.max(mean / n, FLUX_FLOOR) : 0
+		},
+		/** WO-866: the operator's sensitivity (0..1, 0.5 = as tuned) */
+		sensitivity(s) {
+			k = kOf(k0, s)
 		},
 		reset() {
 			ring.fill(0)
@@ -117,7 +134,9 @@ function median(a, n) {
 }
 
 /**
- * @param {{ sampleRate?: number }} [opts]
+ * @param {{ sampleRate?: number, tune?: object }} [opts] `tune` (WO-866, eval-drum-detector.js): per drum
+ *   `{ k, ratio, refractoryMs }`, `maxBins` (SuperFlux: each bin against the max of ±maxBins bins one hop back, so
+ *   vibrato and glides are no onset), `nearPeakDb`.
  */
 function createAudioParts(opts = {}) {
 	const sr = opts.sampleRate || 48000
@@ -135,7 +154,20 @@ function createAudioParts(opts = {}) {
 		high: [bin(2000), bin(8000)],
 		tonal: [bin(300), bin(3400)],
 	}
-	const hBins = [B.mid[0], Math.max(B.mid[1], B.tonal[1])] // HPSS range
+	const tIn = opts.tune || {}
+	const tune = {
+		...TUNE,
+		...tIn,
+		kick: { ...TUNE.kick, ...tIn.kick },
+		snare: { ...TUNE.snare, ...tIn.snare },
+		hats: { ...TUNE.hats, ...tIn.hats },
+	}
+	for (const [k, [lo, hi]] of Object.entries(tune.bands || {})) B[k] = [bin(lo), bin(hi)] // eval only
+	const perc = tune.perc || [] // drums whose flux reads the percussive part only (vocals / leads / bass notes are harmonic)
+	const hBins = [
+		Math.min(B.mid[0], ...perc.map((k) => B[k][0])),
+		Math.max(B.mid[1], B.tonal[1], ...perc.map((k) => B[k][1])),
+	] // HPSS range
 	const hN = hBins[1] - hBins[0] + 1
 	const hist = Array.from({ length: hN }, () => new Float64Array(HPSS_T))
 	let histI = 0
@@ -147,6 +179,11 @@ function createAudioParts(opts = {}) {
 	const im = new Float64Array(WIN)
 	const mag = new Float64Array(WIN / 2)
 	const prevLog = new Float64Array(WIN / 2)
+	const prevMax = new Float64Array(WIN / 2)
+	const pmag = new Float64Array(WIN / 2)
+	const prevLogP = new Float64Array(WIN / 2)
+	const maxBins = tune.maxBins || 0
+	const nearDb = { kick: tune.nearPeakDb, snare: tune.nearPeakDb, hats: tune.nearPeakDb } // per drum: sensitivity widens it
 	const input = new Float32Array(WIN)
 	let inFill = 0
 	let sinceHop = 0
@@ -154,9 +191,9 @@ function createAudioParts(opts = {}) {
 	let samples = 0
 
 	const on = {
-		kick: createBandOnset({ fr, refractoryMs: 100 }),
-		snare: createBandOnset({ fr, refractoryMs: 100 }),
-		hats: createBandOnset({ fr, refractoryMs: 50 }),
+		kick: createBandOnset({ fr, refractoryMs: 100, ...tune.kick }),
+		snare: createBandOnset({ fr, refractoryMs: 100, ...tune.snare }),
+		hats: createBandOnset({ fr, refractoryMs: 50, ...tune.hats }),
 		full: createBandOnset({ fr, refractoryMs: 100 }),
 	}
 	const hits = { kick: { n: 0, at: -1e9 }, snare: { n: 0, at: -1e9 }, hats: { n: 0, at: -1e9 } }
@@ -193,7 +230,16 @@ function createAudioParts(opts = {}) {
 	function flux([lo, hi]) {
 		let f = 0
 		for (let b = lo; b <= hi; b++) {
-			const d = Math.log(1 + 100 * mag[b]) - prevLog[b]
+			const d = Math.log(1 + 100 * mag[b]) - prevMax[b]
+			if (d > 0) f += d
+		}
+		return f
+	}
+
+	function fluxP([lo, hi]) {
+		let f = 0
+		for (let b = lo; b <= hi; b++) {
+			const d = Math.log(1 + 100 * pmag[b]) - prevLogP[b]
 			if (d > 0) f += d
 		}
 		return f
@@ -216,7 +262,7 @@ function createAudioParts(opts = {}) {
 		for (const k of DRUMS) {
 			E[k] = eMax(k, h0)
 			// bleed from another drum is far below that band's own peak (in a mix)
-			fired[k] = dHist[k].f[h0] && agc[k].near(NEAR_PEAK_DB, E[k])
+			fired[k] = dHist[k].f[h0] && agc[k].near(nearDb[k], E[k])
 		}
 		// alone, a kick's click and a hat still rise in the snare band, a snare's noise in the kick band: when both fire
 		// (±1 hop), the weaker band must be close enough to be its own hit
@@ -244,24 +290,6 @@ function createAudioParts(opts = {}) {
 		hops++
 		const t = nowMs()
 
-		const fx = {}
-		for (const k of ['kick', 'snare', 'hats', 'full']) fx[k] = gated ? 0 : flux(B[k])
-		fx.snare += gated ? 0 : 0.5 * flux(B.snareBody)
-		for (let b = 0; b < WIN / 2; b++) prevLog[b] = Math.log(1 + 100 * mag[b])
-
-		// decide each drum onset LOOK hops later (21 ms): on the attack hop the band's energy is still climbing
-		const h = hops % HIST
-		for (const k of DRUMS) {
-			const e = sum(mag, B[k], true)
-			agc[k].step(e, gated)
-			dHist[k].e[h] = 10 * Math.log10(e + 1e-20)
-			dHist[k].f[h] = on[k].step(fx[k], t) > 0
-		}
-		if (hops > HIST) decide((hops - LOOK) % HIST, t)
-		const sFull = on.full.step(fx.full, t)
-		if (sFull) dens.onset(t / 1000)
-		tickOnset = Math.max(tickOnset, Math.max(0, Math.min(1, (on.full.rel(fx.full) - 1) / 3)))
-
 		// causal HPSS over the mid/tonal range
 		for (let j = 0; j < hN; j++) hist[j][histI] = mag[hBins[0] + j]
 		histI = (histI + 1) % HPSS_T
@@ -277,6 +305,7 @@ function createAudioParts(opts = {}) {
 			for (let d = -HPSS_F; d <= HPSS_F; d++) win[w++] = mag[Math.max(1, Math.min(WIN / 2 - 1, b + d))]
 			const p = median(win, w)
 			const m = h * h + p * p > 0 ? (h * h) / (h * h + p * p) : 0
+			pmag[b] = (1 - m) * mag[b]
 			if (b >= B.mid[0] && b <= B.mid[1]) hMid += m * mag[b]
 			if (b >= B.tonal[0] && b <= B.tonal[1]) {
 				hTonal += (m * mag[b]) ** 2
@@ -284,6 +313,32 @@ function createAudioParts(opts = {}) {
 			}
 		}
 		tonalRatio = tTonal > 0 ? hTonal / tTonal : 0
+
+		const fx = {}
+		for (const k of ['kick', 'snare', 'hats', 'full']) fx[k] = gated ? 0 : perc.includes(k) ? fluxP(B[k]) : flux(B[k])
+		fx.snare += gated ? 0 : 0.5 * flux(B.snareBody)
+		for (let b = 0; b < WIN / 2; b++) prevLog[b] = Math.log(1 + 100 * mag[b])
+		for (let b = hBins[0]; b <= hBins[1]; b++) prevLogP[b] = Math.log(1 + 100 * pmag[b])
+		for (let b = 0; b < WIN / 2; b++) {
+			let m = prevLog[b]
+			for (let d = 1; d <= maxBins; d++)
+				m = Math.max(m, prevLog[Math.max(0, b - d)], prevLog[Math.min(WIN / 2 - 1, b + d)])
+			prevMax[b] = m
+		}
+
+		// decide each drum onset LOOK hops later (21 ms): on the attack hop the band's energy is still climbing
+		const h = hops % HIST
+		for (const k of DRUMS) {
+			const e = sum(mag, B[k], true)
+			agc[k].step(e, gated)
+			dHist[k].e[h] = 10 * Math.log10(e + 1e-20)
+			dHist[k].f[h] = on[k].step(fx[k], t) > 0
+		}
+		if (hops > HIST) decide((hops - LOOK) % HIST, t)
+		const sFull = on.full.step(fx.full, t)
+		if (sFull) dens.onset(t / 1000)
+		tickOnset = Math.max(tickOnset, Math.max(0, Math.min(1, (on.full.rel(fx.full) - 1) / 3)))
+
 		agc.bass.step(sum(mag, B.bass, true), gated)
 		agc.mid.step(sum(mag, B.mid, true), gated)
 		agc.high.step(sum(mag, B.high, true), gated)
@@ -350,6 +405,14 @@ function createAudioParts(opts = {}) {
 			}
 		},
 		nowMs,
+		/** WO-866: per-drum sensitivity 0..1 (0.5 = as tuned; higher = more hits), e.g. `{ kick: 0.6 }`. */
+		sensitivity(map) {
+			for (const k of DRUMS) {
+				if (!Number.isFinite(map?.[k])) continue
+				on[k].sensitivity(map[k]) // the flux threshold …
+				nearDb[k] = tune.nearPeakDb / kOf(1, map[k]) // … and how far under the band's peak a hit may be (6 / 12 / 24 dB)
+			}
+		},
 		/**
 		 * The buses, 0..1 unless noted. Drum buses: `onset` = a pulse 1 → 0 over 150 ms, `n` = hits so far (a change =
 		 * a new hit; consumers at 30 Hz never miss one), `level` = the band's energy (AGC).
@@ -380,6 +443,8 @@ function createAudioParts(opts = {}) {
 		reset() {
 			input.fill(0)
 			prevLog.fill(0)
+			prevMax.fill(0)
+			prevLogP.fill(0)
 			for (const k in on) on[k].reset()
 			for (const k in agc) agc[k].reset()
 			for (const k in hits) hits[k].at = -1e9 // no pulse frozen on the stale frame

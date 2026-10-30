@@ -87,6 +87,11 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 		})
 		engine.start()
 		appCtx.getAudioCaptureStatus = () => (engine ? engine.getStatus() : null)
+		appCtx.recordAudioCapture = (seconds) =>
+			engine ? engine.record(seconds) : Promise.reject(new Error('no audio capture'))
+		appCtx.audioCaptureRate = cfg.sampleRate
+		appCtx.audioTestMusic = (file) => (engine ? engine.testMusic(file) : null) // WO-866
+		appCtx.audioPartsSensitivity = (map) => engine?.sensitivity(map)
 	}
 
 	function stopAudioCapture() {
