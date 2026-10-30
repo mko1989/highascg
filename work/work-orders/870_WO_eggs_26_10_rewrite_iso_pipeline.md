@@ -433,3 +433,47 @@ bash tools/eggs/live-usb/verify-eggs-config.sh                   # expect PASS P
 * Real probe (read-only, sourcing the lib against the installed eggs): `highascg_eggs_bin` → `/usr/bin/eggs`, `highascg_eggs_flavor` → `new` (via `readlink -f` → `/usr/bin/coa`, no eggs process started), conf dir `/etc/penguins-eggs.d`, nest `/home/eggs`, glob `highascg-nvidia-615-*.iso`.
 * Not verified: any actual `eggs remaster` run (owner dry run F); the scripts themselves (`build-highascg-egg.sh`, clone-only wrapper, sync script against real apt) were not executed, only unit-sourced with stubs and the sync script with mocked dpkg/apt/uname; the INT/TERM trap path with a real signal; `legacy` against a real `eggs-legacy` (not installed).
 * Left for later phases: `flash-stick-common.sh` `find_latest_iso` still globs `_*.iso`, so the end-of-build sidecar/"Done. ISO:" lookup will not find a new-flavor ISO until the Phase 5 glob change (use `highascg_eggs_iso_glob`); `eggs-liveroot-safety.sh` `eggs_liveroot_produce_in_progress` pgrep does not yet match `eggs remaster`/`oa-plan.json`; `pre-produce-preflight.sh` still runs the calamares fixes.
+
+### Phase 6 — dry run 1 (30.10, run by the owner)
+
+Commands: §4 F after `install-eggs-config.sh --apply` (backups `custom.*.bak-20261030-185336`), `verify-eggs-config.sh` PASS/PASS,
+`pre-produce-preflight.sh`, then `sudo eggs remaster --clone --anonymous --stop-after mount-logic` in tmux.
+Copies of `/tmp/coa/{excludes.list,oa-plan.json}` are in `scratchpad/wo870dry/`.
+
+**Result.**
+- **Space check passed:** root used 870326 MiB, excluded 848125 MiB (841 ms), estimated ISO 6882 MiB, 39.91 GiB free.
+  The check needs about 2× the ISO size, roughly 13.4 GiB.
+- **Run:** one task ("Bootstrap ambiente liveroot", `bootstrap-liveroot.sh /home/eggs false clone …`), then the
+  breakpoint.
+- **Teardown happens at a `--stop-after` breakpoint**, against the upstream docs: `[eternit] … Found 16 mount points in
+  /home/eggs` → "Area secured", "Successes: 1, Errors: 0". Afterwards `findmnt -R /home/eggs` printed `clean`, so §1.2
+  item 4 is settled. `/home/eggs/liveroot` is left as a 425 MiB plain directory (the `cp -a /etc /boot` copies), with
+  no mounts.
+
+**Plan settings** (`oa-plan.json`): user `live` / `evolution` (unused in clone, §1.3), installer `krill` (calamares waits for
+Phase 4), xz level 3, `iso_prefix highascg-nvidia-615`. These are as generated.
+
+**The merged list.**
+- 388 unique lines: all 291 of ours (0 missing) plus coa's built-ins.
+- Built-ins worth knowing:
+  - `etc/X11/xorg.conf` and `etc/X11/xorg.conf.d/20-{amd,intel,nvidia,radeon}.conf` (the box has no xorg.conf;
+    our `99-highascg-force-composition.conf` is not matched);
+  - `etc/NetworkManager/system-connections/*`, `etc/fstab`, `etc/machine-id`, `var/lib/apt/lists/*`,
+    `var/log/!(…)`, `media`, `mnt`, `home/*/.cache/*`, `root/.bash_history`.
+- The patterns are anchored at `/` (`exclude-match.go`, mksquashfs `-wildcards` semantics), so the stock-fragment line
+  `*.cache` only matches top-level names.
+
+**Why the estimate beats the Phase 2 harness (12184 → 6882 MiB).**
+- The harness left the `home/eggs` lines out of its walk on purpose. The nest is not empty: `/home/eggs/mnt` is 17 GiB,
+  holding the last ISO `highascg-nvidia-595_amd64_2026-10-23_1946.iso` (3.6 GiB, sha256 `551ff7ec…`) and an old
+  `squashfs-calamares-patch-root`.
+- Reproduced with the patched estimator on the real list (`scratchpad/wo870dry/est`): 847943 MiB excluded with the
+  nest lines, 830766 MiB without.
+- Both agree with coa and the harness within live drift, so the estimate is right and the harness was conservative.
+
+**Not done.** `/etc/sudoers.d/99-eggs-calamares` is still present: §4 D's `rm -i` prompt got an empty answer, which means no.
+Its content is `live ALL=(ALL) SETENV: NOPASSWD: /usr/bin/calamares`.
+
+**Before the first full build (Phase 7).** Copy the Oct 23 ISO out of `/home/eggs/mnt` (only the Sept 3 ISO is in
+`~/iso-backup`). Legacy eggs `rm -rf`'d `mnt`/`liveroot` on produce. Whether `remaster` does too is unverified.
+
