@@ -11,6 +11,7 @@
  */
 
 import { createHmsInput, hmsToSeconds } from '../lib/duration-hms-input.js'
+import { attachMathInput } from '../lib/math-input.js'
 import { DEFAULT_TIMER_CONFIG } from './timer-control-panel-display.js'
 import { saveTimerConfigPatch } from './timer-control-panel-inline-time.js'
 
@@ -94,6 +95,7 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	sizeInput.className = 'timer-control-panel__settings-input'
 	sizeInput.style.cssText = 'width:100%;padding:2px 4px'
 	sizeInput.value = String(config.timerFontSize || DEFAULT_TIMER_CONFIG.timerFontSize)
+	attachMathInput(sizeInput, { decimals: 0 }) // WO-839: numbers / complete maths only, else the previous value
 	containerEl.appendChild(sizeInput)
 
 	// Font + color — WO todos10.09.26: "add font and color settings so the timer can be
@@ -176,6 +178,7 @@ export function buildTimerSettings(containerEl, timer, deps) {
 		borderWidthInput.className = 'timer-control-panel__settings-input'
 		borderWidthInput.style.cssText = 'width:100%;padding:2px 4px'
 		borderWidthInput.value = String(config.timerBorderWidth ?? DEFAULT_TIMER_CONFIG.timerBorderWidth ?? 0)
+		attachMathInput(borderWidthInput, { decimals: 0 })
 		borderWidthWrap.append(borderWidthLab, borderWidthInput)
 		borderRow.appendChild(borderWidthWrap)
 		borderColorInput = colorField(borderRow, 'Border color', config.timerBorderColor || DEFAULT_TIMER_CONFIG.timerBorderColor)
@@ -219,6 +222,9 @@ export function buildTimerSettings(containerEl, timer, deps) {
 	posYInput.title = 'Pixel Y (empty = use preset)'
 	posYInput.style.cssText = 'width:50%;padding:2px 4px'
 	posYInput.value = config.posY ?? ''
+	// WO-839: blank = "use the preset" is a real state here, so px fields keep a blank; anything else is a number or reverts
+	attachMathInput(posXInput, { decimals: 0, allowBlank: true })
+	attachMathInput(posYInput, { decimals: 0, allowBlank: true })
 	pxRow.append(posXInput, posYInput)
 	containerEl.appendChild(pxRow)
 

@@ -31,6 +31,8 @@ static func _tokenize(s: String) -> Array:
 			while i < s.length() and (s[i].is_valid_int() or s[i] == "."):
 				num += s[i]
 				i += 1
+			if num.count(".") > 1:
+				return []  # WO-839: "1.2.3" is not a number; evaluate() reads an empty token list as bad input
 			out.append(_js_float(num))
 		else:
 			out.append(ch)
@@ -95,16 +97,10 @@ static func _factor(st: Dictionary) -> float:
 	return NAN
 
 
-## parseNumberInput: the expression, else parseFloat's numeric prefix, else NAN.
+## parseNumberInput (WO-839): a plain number or a COMPLETE expression, else NAN. No prefix salvage: "100+", "12abc",
+## "42px", "1e3" and "1/0" are all NAN (RULES.md "Input fields" 3).
 static func parse(text: String) -> float:
-	var s := text.strip_edges()
-	if s == "":
-		return NAN
-	var m := evaluate(s)
-	if not is_nan(m):
-		return m
-	var p := RegEx.create_from_string("^[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?").search(s)
-	return p.get_string(0).to_float() if p else NAN
+	return evaluate(text)
 
 
 ## computeMathCommit → {value, text, restored}. `lo` / `hi` may be -INF / INF; `decimals` < 0 = unformatted.

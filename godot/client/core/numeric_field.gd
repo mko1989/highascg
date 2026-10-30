@@ -7,6 +7,11 @@ extends RefCounted
 ## are not SpinBoxes but hold numbers (plain LineEdits) opt into the maths with math_line(). evaluate() / resolve()
 ## are pure. Godot's own SpinBox maths is not enough: it runs the text through Expression (int division: "1/3" = 0;
 ## garbage = 0 instead of the old value; "randi()" is executed), so spin() puts a sanitising step in front of it.
+##
+## WO-839 (RULES.md "Input fields" 3): a commit yields the correct value (a number or a COMPLETE expression, clamped /
+## rounded) or the previous value — never a salvaged prefix, never 0, never an empty field. "100+", "12abc", "42px",
+## "1920/0", "abc" and "" all revert. The one exception is a field that explicitly means "blank = unset / preset"
+## (blank_ok); gibberish still reverts there.
 
 const MI := preload("res://core/math_input.gd")
 
@@ -19,12 +24,12 @@ static func evaluate(text: String) -> Variant:
 
 
 ## The field text a commit leaves behind: the evaluated `text` clamped to lo..hi (rounded when as_int); an invalid
-## expression → `previous`; an empty field stays empty (the caller decides what blank means).
-static func resolve(text: String, previous: String, as_int := false, lo := -INF, hi := INF) -> String:
+## expression → `previous`; an empty field → `previous` too, unless `blank_ok` (blank = unset) where it stays empty.
+static func resolve(text: String, previous: String, as_int := false, lo := -INF, hi := INF, blank_ok := false) -> String:
 	var t := text.strip_edges()
 	if t == "":
-		return text
-	var v: Variant = t.to_float() if t.is_valid_float() else evaluate(t)
+		return "" if blank_ok else previous
+	var v: Variant = evaluate(t)  # also plain numbers; not Godot's is_valid_float (it accepts "1e3", web does not)
 	if v == null:
 		return previous
 	return fmt(clampf(float(v), lo, hi), as_int)
@@ -94,8 +99,6 @@ static func _sanitize(sb: SpinBox) -> void:
 	if sb.suffix != "":
 		t = t.trim_suffix(sb.suffix)
 	t = t.strip_edges()
-	if t.is_valid_float():
-		return  # SpinBox clamps and snaps a plain number itself
 	var v: Variant = evaluate(t)
 	le.text = fmt(sb.value) if v == null else fmt(float(v))
 
@@ -103,13 +106,14 @@ static func _sanitize(sb: SpinBox) -> void:
 ## A plain LineEdit that holds a number: select on focus (install() does that too) + maths on Enter / focus-out.
 ## Call it right after LineEdit.new(), BEFORE the site connects its own commit handlers, so they read the result from
 ## le.text. `on_change(new_text)` runs when the maths rewrote the field (state kept from text_changed needs it).
-static func math_line(le: LineEdit, as_int := true, lo := -INF, hi := INF, on_change := Callable()) -> LineEdit:
+## `blank_ok`: an empty field is a real state ("clear = back to the preset") and stays empty instead of reverting.
+static func math_line(le: LineEdit, as_int := true, lo := -INF, hi := INF, on_change := Callable(), blank_ok := false) -> LineEdit:
 	le.select_all_on_focus = true
 	var prev := [le.text]
 	le.focus_entered.connect(func() -> void: prev[0] = le.text)
 	var fix := func() -> void:
 		var before := le.text
-		le.text = resolve(before, prev[0], as_int, lo, hi)
+		le.text = resolve(before, prev[0], as_int, lo, hi, blank_ok)
 		prev[0] = le.text
 		if le.text != before and on_change.is_valid():
 			on_change.call(le.text)

@@ -23,7 +23,7 @@ const BASE_CHECKS := [["fullscreen", "Fullscreen", "Run in fullscreen mode"], ["
 const INPUTS := {"custom_w": ["Width", 64.0, 0], "custom_h": ["Height", 64.0, 0], "custom_fps": ["Frame rate", 1.0, 2],
 	"os_w": ["Width", 64.0, 0], "os_h": ["Height", 64.0, 0], "os_fps": ["Hz", 1.0, 2],
 	"edid": ["EDID override (optional)", 0.0, -1], "name": ["Screen name (optional)", 0.0, -1],
-	"ar": ["e.g. 16:9 or 1.7778", 0.0, -1], "pos_x": ["X", 0.0, -1], "pos_y": ["Y", 0.0, -1]}
+	"ar": ["e.g. 16:9 or 1.7778", 0.0, -1], "pos_x": ["X", -INF, 0], "pos_y": ["Y", -INF, 0]}  # WO-839: X / Y hold numbers only (the web attaches the math input)
 const OVERRIDE_TIP := "Use Caspar Video mode for layout when cabled to a destination (see WO-40)"
 
 var page := VBoxContainer.new()

@@ -115,6 +115,7 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 	typeSel.value = typeValue
 	const durIn = transitionRow.querySelector(`#${idPrefix}-dur`)
 	durIn.value = String(Math.max(0, Math.round(Number(d.duration) || 0)))
+	let lastDur = Number(durIn.value) // WO-839: gibberish in the duration field reverts to this
 	const tweenSel = transitionRow.querySelector(`#${idPrefix}-tween`)
 	for (const val of TRANSITION_TWEENS) {
 		const o = document.createElement('option')
@@ -127,9 +128,11 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 	tweenSel.value = TRANSITION_TWEENS.includes(twNorm) ? twNorm : 'linear'
 
 	function readAndSave() {
+		const durParsed = parseNumberInput(durIn.value, NaN)
+		if (Number.isNaN(durParsed)) durIn.value = String(lastDur)
 		const raw = {
 			type: typeSel.value || 'CUT',
-			duration: Math.max(0, Math.round(parseNumberInput(durIn.value, 0))),
+			duration: Number.isNaN(durParsed) ? lastDur : Math.max(0, Math.round(durParsed)),
 			tween: tweenSel.value || 'linear',
 		}
 		const next = pgmOnly ? normalizeTransitionForPgmOnly(raw) : {
@@ -141,6 +144,8 @@ export function mountLookTransitionControls(mount, dt, onChange, idPrefix, opts 
 			typeSel.value = next.type
 			durIn.value = String(next.duration)
 		}
+		lastDur = next.duration
+		durIn.value = String(next.duration)
 		onChange(next)
 	}
 	typeSel.addEventListener('change', readAndSave)

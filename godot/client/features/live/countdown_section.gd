@@ -11,6 +11,7 @@ const C := preload("res://features/live/countdown_model.gd")
 const P := preload("res://features/live/pip_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const Icons := preload("res://app/ui_icons.gd")
+const NumericField := preload("res://core/numeric_field.gd")
 
 var _scene_id := ""
 var _main := 0
@@ -121,8 +122,18 @@ func _build() -> void:
 	_option(g, "Position", C.POSITIONS, str(_cfg.position), func(v: String) -> void: _change({"position": v}))
 	for axis in ["posX", "posY"]:
 		var k: String = axis
-		_line(g, "Position px %s" % k.right(1), str(_cfg.get(k, "")), "empty = preset", func(t: String) -> void:
-			_change({k: "" if t.strip_edges() == "" else roundi(t.to_float())}))
+		# WO-839: numbers only. The field commits on Enter / focus-out (math_line rewrites the text first: a number or a
+		# complete expression, else the previous value; blank = back to the preset is a real state here).
+		var le := _line(g, "Position px %s" % k.right(1), str(_cfg.get(k, "")), "empty = preset", Callable())
+		NumericField.math_line(le, true, -INF, INF, Callable(), true)
+		var commit_px := func(_t: Variant = null) -> void:
+			var v: Variant = "" if le.text.strip_edges() == "" else roundi(le.text.to_float())
+			var cur: Variant = _cfg.get(k, "")
+			if (v is int and (cur is int or cur is float) and int(cur) == v) or (v is String and str(cur) == v):
+				return
+			_change({k: v})
+		le.text_submitted.connect(commit_px)
+		le.focus_exited.connect(commit_px)
 	g.add_child(_muted("Hide timer"))
 	var hide := CheckBox.new()
 	hide.text = "show middle aux line instead"

@@ -6,6 +6,7 @@ extends "res://features/devices/host_controls_base.gd"
 ## inspector-source-label.js, device-view-destinations-inspector-host-channel.js. All request shapes come from
 ## host_source_model.gd (golden-tested); this file only wires widgets to them.
 
+const NumericField := preload("res://core/numeric_field.gd")
 const DEFAULT_ORIGIN := "http://127.0.0.1:4200"  # the web hard-codes this template prefix (WO-601 scope note)
 
 
@@ -141,9 +142,10 @@ func _browser(src: Dictionary) -> Control:
 	var url := _line(f.url, "https://example.com/")
 	box.add_child(_field("URL", url))
 	var dims := _row()
-	var w := _line(f.width, "1152")
-	var h := _line(f.height, "648")
-	var fps := _line(f.fps, "25")
+	# WO-839: number fields — a number / complete expression (clamped like the web's inputs) or the previous value
+	var w := NumericField.math_line(_line(f.width, "1152"), true, 160.0, 3840.0)
+	var h := NumericField.math_line(_line(f.height, "648"), true, 120.0, 2160.0)
+	var fps := NumericField.math_line(_line(f.fps, "25"), true, 1.0, 60.0)
 	for spec in [["Width (px)", w], ["Height (px)", h], ["FPS", fps]]:
 		var fld := _field(spec[0], spec[1])
 		fld.size_flags_horizontal = Control.SIZE_EXPAND_FILL

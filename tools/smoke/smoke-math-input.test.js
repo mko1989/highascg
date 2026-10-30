@@ -64,11 +64,20 @@ describe('WO-171 — evaluateMath', () => {
 })
 
 describe('WO-171 — parseNumberInput', () => {
-	it('tries math first, then falls back to plain parseFloat', () => {
+	it('evaluates a plain number or a complete expression', () => {
 		assert.equal(parseNumberInput('1920-256'), 1664)
 		assert.equal(parseNumberInput('42'), 42)
 		assert.equal(parseNumberInput('3.5'), 3.5)
-		assert.equal(parseNumberInput('42px'), 42) // plain parseFloat tail-tolerant
+	})
+
+	it('WO-839: never salvages a leading number — gibberish is the fallback, not a number', () => {
+		for (const bad of ['100+', '1920/', '12abc', '42px', '1920/0', '', '   ', 'abc', '1e3', '1,5', '--', '(1+2', '1+2)', '2**3', '0x10', '1 2', '+', '-', '.', '$5', 'NaN', 'Infinity']) {
+			assert.equal(parseNumberInput(bad, 'prev'), 'prev', `'${bad}' falls back`)
+			assert.ok(Number.isNaN(parseNumberInput(bad)), `'${bad}' is NaN without a fallback`)
+		}
+		for (const [txt, v] of [['100', 100], [' 42 ', 42], ['-5', -5], ['.5', 0.5], ['1920/2', 960], ['(1+2)*3', 9], ['-(2+3)', -5], ['3.5*2', 7], ['0', 0]]) {
+			assert.equal(parseNumberInput(txt, 'prev'), v, `'${txt}' evaluates`)
+		}
 	})
 
 	it('uses the fallback for empty/unparseable input', () => {

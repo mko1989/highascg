@@ -113,6 +113,10 @@ static func reset_out(layer: Dictionary, dur_ms: float, fps: float) -> Dictionar
 	return {"ok": true, "patch": p}
 
 
+static func _digits(q: String) -> bool:
+	return RegEx.create_from_string("^\\d+$").search(q.strip_edges()) != null
+
+
 ## A typed point → ms, or NAN. "m:ss.ff" / "h:mm:ss.ff" read like format_timecode writes them (.ff = frames); a plain
 ## number is seconds and takes + - * / (RULES.md number fields): "1.5" → 1500, "2*3" → 6000.
 static func parse_tc(text: String, fps: float) -> float:
@@ -127,14 +131,14 @@ static func parse_tc(text: String, fps: float) -> float:
 	var frames := 0
 	if last.contains("."):
 		var ff := last.get_slice(".", 1)
-		if not ff.is_valid_int():
+		if not _digits(ff):  # WO-839: digits only (is_valid_int also takes "+3" / "-3")
 			return NAN
 		frames = int(ff)
 		last = last.get_slice(".", 0)
 	parts[parts.size() - 1] = last
 	var sec := 0.0
 	for p in parts:
-		if not (p as String).is_valid_int() or int(p) < 0:
+		if not _digits(p):
 			return NAN
 		sec = sec * 60.0 + float(int(p))
 	return sec * 1000.0 + frame_to_ms(frames, fps)

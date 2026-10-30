@@ -9,6 +9,7 @@ extends "res://features/devices/host_controls_base.gd"
 
 signal dirty()
 
+const NumericField := preload("res://core/numeric_field.gd")
 const O := preload("res://features/devices/output_ports_model.gd")
 const SR := preload("res://features/devices/stream_record_model.gd")
 const VA := preload("res://features/devices/vcam_audio_model.gd")
@@ -148,6 +149,10 @@ func _input_item(it: Dictionary) -> LineEdit:
 	var math: bool = O.MATH.get(kind, {}).has(key)
 	if not math:
 		le.text_changed.connect(func(tx: String) -> void: ui[key] = tx)
+	if kind == "stream_out" and key == "srt_latency":
+		# WO-839: SRT latency (ms) is a number field — a number / complete expression (20–8000, like the save's
+		# clamp) or the previous value; the rewrite is state too (text_changed does not fire for it).
+		NumericField.math_line(le, true, 20.0, 8000.0, func(tx: String) -> void: ui[key] = tx)
 	var commit := func() -> void:
 		if le.text == held.last:
 			return

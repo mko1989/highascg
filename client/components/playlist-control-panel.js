@@ -7,6 +7,7 @@
  */
 
 import { api } from '../lib/api-client.js'
+import { attachMathInput } from '../lib/math-input.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { sceneState } from '../lib/scene-state.js'
 import { isTimelessItem, timelessSecsOf } from '../lib/playlist-timeless.js'
@@ -51,6 +52,7 @@ export function initPlaylistControlPanel(mountEl) {
 	const listSel = el('plp-list')
 	const itemSel = el('plp-item')
 	const timelessInp = el('plp-timeless')
+	if (timelessInp) attachMathInput(timelessInp, { decimals: 0 }) // WO-839
 
 	/** @type {Array<object>} */
 	let playlists = []

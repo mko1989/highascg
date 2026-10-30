@@ -3,6 +3,7 @@
  * WO-260 T260.3: mirrors inspector-webpage-host.js and inspector-ndi-host.js patterns.
  */
 import { api } from '../lib/api-client.js'
+import { attachMathInput } from '../lib/math-input.js'
 import { showAppToast } from '../lib/app-toast.js'
 import { escapeHtml } from '../lib/dom-escape.js'
 import { removeExtraLiveHostSource } from '../lib/extra-live-source-remove.js'
@@ -76,6 +77,8 @@ export function mountBrowserDisplayControls(container, { source, onApplied, _hos
 	const heightInput = section.querySelector('.inspector-browser-display__height')
 	const fpsInput = section.querySelector('.inspector-browser-display__fps')
 	const applyBtn = section.querySelector('.inspector-browser-display__apply')
+	// WO-839: number fields hold a number / complete maths expression, or go back to what they were
+	for (const inp of [widthInput, heightInput, fpsInput]) attachMathInput(inp, { decimals: 0 })
 
 	const runApply = async () => {
 		const url = urlInput.value.trim()

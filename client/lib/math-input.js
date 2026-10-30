@@ -54,6 +54,8 @@ class Parser {
 					num += str[i]
 					i++
 				}
+				// WO-839: "1.2.3" is not a number (it used to read as 1.2)
+				if (num.split('.').length > 2) throw new Error('Malformed number: ' + num)
 				tokens.push({ type: 'NUMBER', value: parseFloat(num) })
 				continue
 			}
@@ -133,9 +135,11 @@ class Parser {
 }
 
 /**
- * Parse inspector input: try math expression first, then plain number.
+ * Parse inspector input: a plain number or a COMPLETE maths expression, nothing else.
+ * WO-839 (RULES.md "Input fields" 3): text is never salvaged — "100+", "1920/", "12abc", "42px", "1920/0" and ""
+ * are all `fallback`, so a commit gives either the correct value or the caller's previous value.
  * @param {string|number|null|undefined} str
- * @param {number} [fallback=NaN] - used when empty or unparseable
+ * @param {number} [fallback=NaN] - used when empty or not a valid number / expression
  * @returns {number}
  */
 export function parseNumberInput(str, fallback = NaN) {
@@ -143,10 +147,11 @@ export function parseNumberInput(str, fallback = NaN) {
 	const s = String(str).trim()
 	if (!s) return fallback
 	const m = evaluateMath(s)
-	if (!isNaN(m)) return m
-	const v = parseFloat(s)
-	return isNaN(v) ? fallback : v
+	return isNaN(m) ? fallback : m
 }
+
+/** A plain decimal number only (allowMath:false fields) — no prefix salvage (WO-839). */
+const strictNumber = (str) => (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(String(str ?? '').trim()) ? Number(String(str).trim()) : NaN)
 
 /**
  * Create a number input with math evaluation and optional drag-to-adjust.
@@ -191,13 +196,13 @@ export function createMathInput(opts) {
 		}
 	}
 
+	// WO-839: the last committed number; gibberish (or an empty field) reverts to it, never to min/0.
+	let lastGood = value != null && value !== '' && Number.isFinite(Number(value)) ? Number(value) : (min !== -Infinity ? min : 0)
+
+	const readNum = () => (allowMath ? parseNumberInput(inp.value, NaN) : strictNumber(inp.value))
 	function parseVal() {
-		if (allowMath) {
-			const v = parseNumberInput(inp.value, NaN)
-			if (!isNaN(v)) return v
-		}
-		const v = parseFloat(inp.value)
-		return isNaN(v) ? (min !== -Infinity ? min : 0) : v
+		const v = readNum()
+		return isNaN(v) ? lastGood : v
 	}
 
 	function formatVal(v) {
@@ -208,6 +213,7 @@ export function createMathInput(opts) {
 	function apply(v) {
 		let n = typeof v === 'number' ? v : parseVal()
 		n = Math.max(min, Math.min(max, n))
+		lastGood = n
 		inp.value = formatVal(n)
 		syncSlider(n)
 		onChange?.(n)
@@ -234,6 +240,7 @@ export function createMathInput(opts) {
 			const dx = (ev.clientX - startX) * dragSensitivity * step * mult
 			startX = ev.clientX
 			startVal = Math.max(min, Math.min(max, startVal + dx))
+			lastGood = startVal
 			inp.value = formatVal(startVal)
 			onChange?.(startVal)
 		}
@@ -245,6 +252,11 @@ export function createMathInput(opts) {
 		document.addEventListener('mouseup', onUp)
 	})
 
+	// Callers may set inp.value directly (re-render from state): resync "previous" to what is on screen at focus.
+	inp.addEventListener('focus', () => {
+		const v = readNum()
+		if (!isNaN(v)) lastGood = v
+	})
 	inp.addEventListener('change', () => apply(parseVal()))
 	inp.addEventListener('blur', () => apply(parseVal()))
 
@@ -255,6 +267,7 @@ export function createMathInput(opts) {
 		const mult = e.shiftKey ? 10 : 1
 		const cur = parseVal()
 		const n = Math.max(min, Math.min(max, cur + dir * step * mult))
+		lastGood = n
 		inp.value = formatVal(n)
 		syncSlider(n)
 		onChange?.(n)
@@ -275,6 +288,7 @@ export function createMathInput(opts) {
 		sliderEl.addEventListener('input', (e) => {
 			const n = Number(e.target.value)
 			if (!Number.isNaN(n)) {
+				lastGood = n
 				inp.value = formatVal(n)
 				onChange?.(n)
 			}
@@ -373,6 +387,12 @@ function ensureGlobalCommitListener() {
 }
 
 function runCommit(el, entry) {
+	// WO-839: allowBlank = the field means "unset / auto" when empty; every other field reverts a blank.
+	if (entry.allowBlank) {
+		const t = el.value.trim()
+		entry.blank = t === '' || (entry.blank && Number.isNaN(parseNumberInput(t, NaN))) // gibberish over a blank → blank
+		if (entry.blank) { el.value = ''; return { value: NaN, text: '', restored: t !== '' } }
+	}
 	const decision = computeMathCommit(el.value, {
 		min: entry.min,
 		max: entry.max,
@@ -401,7 +421,8 @@ function runCommit(el, entry) {
  *   after a real edit is committed so they also pick up the final value.
  *
  * @param {HTMLInputElement} inputEl
- * @param {{min?: number, max?: number, decimals?: number, onCommit?: (value: number) => void}} [opts]
+ * @param {{min?: number, max?: number, decimals?: number, allowBlank?: boolean, onCommit?: (value: number) => void}} [opts]
+ * `allowBlank` (WO-839): the field means "unset / auto" when empty — a blank commit stays blank (onCommit gets NaN).
  * @returns {{ getValue: () => number, commit: () => number, destroy: () => void }|null}
  */
 export function attachMathInput(inputEl, opts = {}) {
@@ -418,9 +439,11 @@ export function attachMathInput(inputEl, opts = {}) {
 	inputEl.type = 'text'
 	if (inputEl.setAttribute) inputEl.setAttribute('inputmode', 'decimal')
 
+	const allowBlank = opts.allowBlank === true
+	const blankNow = allowBlank && String(inputEl.value ?? '').trim() === ''
 	const initial = computeMathCommit(inputEl.value, { min, max, decimals, lastGood: null })
-	inputEl.value = initial.text
-	const entry = { min, max, decimals, lastGood: initial.value }
+	if (!blankNow) inputEl.value = initial.text
+	const entry = { min, max, decimals, allowBlank, blank: blankNow, lastGood: initial.value }
 	attachedMathInputs.set(inputEl, entry)
 	ensureGlobalCommitListener()
 
@@ -431,6 +454,7 @@ export function attachMathInput(inputEl, opts = {}) {
 		// from fresh state, or a linked control like a video-mode preset picker), resync
 		// the last-good cache so a later "restore on garbage" reflects what's on screen
 		// rather than a stale value from before that external write.
+		if (entry.allowBlank) entry.blank = String(inputEl.value).trim() === ''
 		const v = parseNumberInput(inputEl.value, NaN)
 		if (!Number.isNaN(v)) {
 			entry.lastGood = Math.max(entry.min, Math.min(entry.max, v))

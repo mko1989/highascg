@@ -2,6 +2,7 @@
  * Companion page grid picker for timeline companion_press flags (WO-75).
  */
 import { api, getApiBase } from '../lib/api-client.js'
+import { parseNumberInput } from '../lib/math-input.js'
 
 const MODAL_ID = 'companion-button-picker-modal'
 
@@ -231,7 +232,7 @@ export function openCompanionButtonPickerModal(opts = {}) {
 	})
 	modal.querySelector('[data-act="refresh"]')?.addEventListener('click', () => void loadPage())
 	pageInp.addEventListener('change', () => {
-		const n = parseInt(pageInp.value, 10)
+		const n = Math.round(parseNumberInput(pageInp.value, NaN)) // WO-839: "3x" / "" revert, never salvaged
 		if (Number.isFinite(n) && n >= 1) {
 			page = n
 			void loadPage()

@@ -65,6 +65,8 @@ export function appendTimelineClipKeyframes(root, opts) {
 			const disp = displayPxFromStoredNorm(gkf.x, gkf.y, rectAtKf.w, rectAtKf.h, W, H)
 			const xPx = Math.round(disp.x)
 			const yPx = Math.round(disp.y)
+			const xPx0 = xPx
+			const yPx0 = yPx
 			row.innerHTML = `
 				<span class="inspector-field__key">@ ${gkf.time}ms</span>
 				<input type="text" class="inspector-field__input inspector-kf-x" value="${xPx}" placeholder="X" style="width:42px" />
@@ -81,6 +83,9 @@ export function appendTimelineClipKeyframes(root, opts) {
 			const applyPos = () => {
 				const xPx = parseNumberInput(xInp.value, NaN)
 				const yPx = parseNumberInput(yInp.value, NaN)
+				// WO-839: gibberish in a field puts the stored value back in it
+				if (isNaN(xPx)) xInp.value = String(xPx0)
+				if (isNaN(yPx)) yInp.value = String(yPx0)
 				const rectAt = clipPixelRectAtLocalTime(clip, gkf.time, W, H, stateStore, screenIdx)
 				if (!isNaN(xPx) && !isNaN(yPx)) {
 					const norm = storedNormFromDisplayPx(xPx, yPx, rectAt.w, rectAt.h, W, H)
@@ -127,6 +132,7 @@ export function appendTimelineClipKeyframes(root, opts) {
 			const removeBtn = row.querySelector('.inspector-kf-remove')
 			valInp.addEventListener('change', () => {
 				const v = parseNumberInput(valInp.value, NaN)
+				if (isNaN(v)) valInp.value = String(gkf.value) // WO-839: gibberish reverts
 				if (!isNaN(v)) {
 					const clamped = Math.max(scaleDef.min, Math.min(scaleDef.max, v))
 					timelineState.addKeyframe(timelineId, layerIdx, clipId, { time: gkf.time, property: 'scale_x', value: clamped, easing: easeSel.value })
@@ -175,6 +181,7 @@ export function appendTimelineClipKeyframes(root, opts) {
 			const removeBtn = row.querySelector('.inspector-kf-remove')
 			valInp.addEventListener('change', () => {
 				const v = parseNumberInput(valInp.value, NaN)
+				if (isNaN(v)) valInp.value = String(kf.value) // WO-839: gibberish reverts
 				if (!isNaN(v)) {
 					const clamped = Math.max(propDef.min ?? 0, Math.min(propDef.max ?? 1, v))
 					timelineState.addKeyframe(timelineId, layerIdx, clipId, { ...kf, value: clamped })
@@ -242,19 +249,24 @@ export function appendTimelineClipKeyframes(root, opts) {
 	addKfRow.querySelector('#inspector-kf-add').addEventListener('click', () => {
 		const timeInp = addKfRow.querySelector('#inspector-kf-time')
 		const propSel = addKfRow.querySelector('#inspector-kf-property')
-		const time = Math.max(0, Math.min(Math.round(parseNumberInput(timeInp.value, 0)), clip.duration || 0))
+		// WO-839: a field holding anything but a number / complete expression adds nothing (no silent 0 / 1)
+		const timeRaw = parseNumberInput(timeInp.value, NaN)
+		if (Number.isNaN(timeRaw)) return
+		const time = Math.max(0, Math.min(Math.round(timeRaw), clip.duration || 0))
 		const prop = propSel.value
 		if (prop === 'position') {
 			const xInp = addKfRow.querySelector('.inspector-kf-val-x')
 			const yInp = addKfRow.querySelector('.inspector-kf-val-y')
-			const xPx = parseNumberInput(xInp?.value ?? 0, 0)
-			const yPx = parseNumberInput(yInp?.value ?? 0, 0)
+			const xPx = parseNumberInput(xInp?.value ?? 0, NaN)
+			const yPx = parseNumberInput(yInp?.value ?? 0, NaN)
+			if (Number.isNaN(xPx) || Number.isNaN(yPx)) return
 			const rectAt = clipPixelRectAtLocalTime(clip, time, W, H, stateStore, screenIdx)
 			const norm = storedNormFromDisplayPx(xPx, yPx, rectAt.w, rectAt.h, W, H)
 			timelineState.addPositionKeyframe(timelineId, layerIdx, clipId, time, norm.fill_x, norm.fill_y)
 		} else if (prop === 'scale') {
 			const valInp = addKfRow.querySelector('.inspector-kf-val-single')
-			const v = parseNumberInput(valInp?.value ?? 1, 1)
+			const v = parseNumberInput(valInp?.value ?? 1, NaN)
+			if (Number.isNaN(v)) return
 			const clamped = Math.max(0, Math.min(4, v))
 			timelineState.addScaleKeyframe(timelineId, layerIdx, clipId, time, clamped)
 		} else {

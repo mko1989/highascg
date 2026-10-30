@@ -57,7 +57,7 @@ static func build(g: GridContainer, box: Container, cfg: Dictionary, extended: b
 	var pxr := HBoxContainer.new()
 	var px: Array[LineEdit] = []
 	for k in ["posX", "posY"]:
-		var le := NumericField.math_line(LineEdit.new())  # px values take + - * / ( ) (RULES.md); blank clears
+		var le := NumericField.math_line(LineEdit.new(), true, -INF, INF, Callable(), true)  # px values take + - * / ( ) (RULES.md); blank clears (WO-839: blank_ok)
 		le.text = str(cfg.get(k, ""))
 		le.placeholder_text = "%s px" % k.right(1)
 		le.tooltip_text = "X and Y together override the preset — clear both to go back to it"

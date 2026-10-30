@@ -122,18 +122,21 @@ func _select_item(it: Dictionary) -> OptionButton:
 	return ob
 
 
-## Buffer depth: the web saves the raw text on change, then its math commit rewrites the field (1–3, integer).
+## Buffer depth (1–3, integer): the math commit rewrites the field first, then the result is saved when it changed.
 func _depth_input(it: Dictionary) -> LineEdit:
 	var le := _line(it.value, "", "Frames buffered on the DeckLink card (1–3)")
 	var held := {"last": it.value}
 	var commit := func() -> void:
 		if le.text == held.last:
 			return
-		ui.depth = le.text
-		_save_consumer()
+		# WO-839: rewrite first (a number / complete expression clamped 1–3, else the previous value), save the result —
+		# the raw text never goes out, so "2x" can not be saved as 2 nor "abc" as junk.
 		le.text = MI.commit(le.text, 1, 3, 0, float(held.last)).text
+		var changed: bool = le.text != held.last
 		ui.depth = le.text
 		held.last = le.text
+		if changed:
+			_save_consumer()
 	le.text_submitted.connect(func(_t: String) -> void: commit.call())
 	le.focus_exited.connect(commit)
 	_w.depth = le

@@ -114,7 +114,7 @@ static func parse_hms(s: String, current_ms: float, total_ms: Variant) -> Varian
 		return clampf(current_ms + (1.0 if off.get_string(1) == "++" else -1.0) * off.get_string(2).to_int(), 0.0, cap)
 	var n: Array = []
 	for q in t.split(":"):
-		if not q.strip_edges().is_valid_int():
+		if not TM.is_digits(q):  # WO-839: digits only per group
 			return null
 		n.append(q.strip_edges().to_int())
 	var ms: Variant = null

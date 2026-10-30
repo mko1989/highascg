@@ -49,7 +49,7 @@
     ],
     [
       "1.2.3",
-      1.2
+      "NaN"
     ],
     [
       "1/0",
@@ -167,15 +167,15 @@
     ],
     [
       "1.2.3",
-      1.2
+      "NaN"
     ],
     [
       "1/0",
-      1
+      "NaN"
     ],
     [
       "0/0",
-      0
+      "NaN"
     ],
     [
       "5/2",
@@ -187,11 +187,11 @@
     ],
     [
       "1+2)",
-      1
+      "NaN"
     ],
     [
       "1+",
-      1
+      "NaN"
     ],
     [
       "*3",
@@ -207,11 +207,11 @@
     ],
     [
       "12abc",
-      12
+      "NaN"
     ],
     [
       "3e2",
-      300
+      "NaN"
     ],
     [
       ".",
@@ -219,7 +219,7 @@
     ],
     [
       "1 2",
-      1
+      "NaN"
     ],
     [
       "-(4)",
@@ -1178,9 +1178,9 @@
         "lastGood": 1080
       },
       {
-        "value": 64,
-        "text": "64",
-        "restored": false
+        "value": 1080,
+        "text": "1080",
+        "restored": true
       }
     ],
     [
@@ -1191,9 +1191,9 @@
         "lastGood": 50
       },
       {
-        "value": 12,
-        "text": "12.00",
-        "restored": false
+        "value": 50,
+        "text": "50.00",
+        "restored": true
       }
     ],
     [
@@ -1204,9 +1204,9 @@
         "lastGood": 1
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 1,
+        "text": "1",
+        "restored": true
       }
     ],
     [
@@ -1218,9 +1218,9 @@
         "lastGood": 5
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 5,
+        "text": "5",
+        "restored": true
       }
     ],
     [
@@ -1232,9 +1232,9 @@
         "lastGood": 7
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 7,
+        "text": "7",
+        "restored": true
       }
     ],
     [
@@ -1245,9 +1245,9 @@
         "lastGood": 30
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 30,
+        "text": "30",
+        "restored": true
       }
     ],
     [
@@ -1256,9 +1256,9 @@
         "decimals": 0
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 0,
+        "text": "0",
+        "restored": true
       }
     ],
     [
@@ -1268,9 +1268,9 @@
         "decimals": 0
       },
       {
-        "value": 12,
-        "text": "12",
-        "restored": false
+        "value": 1,
+        "text": "1",
+        "restored": true
       }
     ],
     [
@@ -1590,9 +1590,9 @@
         "lastGood": 1080
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 1080,
+        "text": "1080",
+        "restored": true
       }
     ],
     [
@@ -1603,9 +1603,9 @@
         "lastGood": 50
       },
       {
-        "value": 1000,
-        "text": "1000.00",
-        "restored": false
+        "value": 50,
+        "text": "50.00",
+        "restored": true
       }
     ],
     [
@@ -1616,9 +1616,9 @@
         "lastGood": 1
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 1,
+        "text": "1",
+        "restored": true
       }
     ],
     [
@@ -1630,9 +1630,9 @@
         "lastGood": 5
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 5,
+        "text": "5",
+        "restored": true
       }
     ],
     [
@@ -1644,9 +1644,9 @@
         "lastGood": 7
       },
       {
-        "value": 512,
-        "text": "512",
-        "restored": false
+        "value": 7,
+        "text": "7",
+        "restored": true
       }
     ],
     [
@@ -1657,9 +1657,9 @@
         "lastGood": 30
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 30,
+        "text": "30",
+        "restored": true
       }
     ],
     [
@@ -1668,9 +1668,9 @@
         "decimals": 0
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 0,
+        "text": "0",
+        "restored": true
       }
     ],
     [
@@ -1680,9 +1680,9 @@
         "decimals": 0
       },
       {
-        "value": 1000,
-        "text": "1000",
-        "restored": false
+        "value": 1,
+        "text": "1",
+        "restored": true
       }
     ]
   ]

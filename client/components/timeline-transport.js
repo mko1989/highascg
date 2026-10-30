@@ -343,7 +343,11 @@ export function createTimelineTransport(deps) {
 		transportEl.querySelector('#tl-s-pgm')?.addEventListener('change', (e) => { view.sendTo.program = e.target.checked; updateSendTo() })
 		transportEl.querySelector('#tl-take-trans')?.addEventListener('change', (e) => { view.takeTransition.type = e.target.value })
 		transportEl.querySelector('#tl-take-dur')?.addEventListener('change', (e) => {
-			view.takeTransition.duration = Math.max(0, Math.min(120, Math.round(parseNumberInput(e.target.value, 0))))
+			// WO-839: gibberish keeps the previous duration (and puts it back in the field)
+			const d = parseNumberInput(e.target.value, NaN)
+			if (Number.isNaN(d)) { e.target.value = String(view.takeTransition.duration ?? 0); return }
+			view.takeTransition.duration = Math.max(0, Math.min(120, Math.round(d)))
+			e.target.value = String(view.takeTransition.duration)
 		})
 		transportEl.querySelector('#tl-take-tween')?.addEventListener('change', (e) => { view.takeTransition.tween = e.target.value })
 		transportEl.querySelector('#tl-take')?.addEventListener('click', async () => {

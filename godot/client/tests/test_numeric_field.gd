@@ -34,8 +34,20 @@ func test_resolve() -> void:
 	t.eq(NF.resolve("1/0", "42"), "42", "division by zero keeps the previous value")
 	t.eq(NF.resolve("10-50", "5", true, 1.0, 100.0), "1", "clamped to min")
 	t.eq(NF.resolve("10*50", "5", true, 1.0, 100.0), "100", "clamped to max")
-	t.eq(NF.resolve("", "5"), "", "blank stays blank")
+	t.eq(NF.resolve("", "5"), "5", "WO-839: blank reverts")
+	t.eq(NF.resolve("  ", "5"), "5", "WO-839: whitespace reverts")
+	t.eq(NF.resolve("", "5", false, -INF, INF, true), "", "blank_ok: blank stays blank")
+	t.eq(NF.resolve("abc", "5", false, -INF, INF, true), "5", "blank_ok: gibberish still reverts")
 	t.eq(NF.resolve("25", "5"), "25", "plain number")
+
+
+## WO-839: nothing is salvaged — a half expression or trailing text keeps the previous value, not its leading number.
+func test_resolve_never_salvages() -> void:
+	for bad in ["100+", "1920/", "12abc", "42px", "1920/0", "abc", "1e3", "(5", "5)", "--", "1,5", "$5", "1 2", "0x10", "inf", "nan", "-", "."]:
+		t.eq(NF.resolve(bad, "PREV", true), "PREV", "reverts: '%s'" % bad)
+		t.eq(NF.resolve(bad, "PREV", false, 0.0, 100.0), "PREV", "reverts (float, clamped): '%s'" % bad)
+	t.eq(NF.resolve(".5", "9"), "0.5", "leading-dot decimal is a number")
+	t.eq(NF.resolve("5.", "9"), "5", "trailing-dot decimal is a number")
 
 
 func _boxed(sb: SpinBox) -> SpinBox:
@@ -67,6 +79,9 @@ func test_spinbox_maths_and_invalid() -> void:
 	t.eq(sb.value, 10.0, "half an expression keeps the previous value")
 	_typed(sb, "")
 	t.eq(sb.value, 10.0, "blank keeps the previous value")
+	for bad in ["100+", "12abc", "42px", "1920/0", "1e3", "(5", "--"]:
+		_typed(sb, bad)
+		t.eq(sb.value, 10.0, "WO-839: '%s' keeps the previous value" % bad)
 	_typed(sb, "randi()")
 	t.eq(sb.value, 10.0, "function calls are not executed")
 	_typed(sb, "999999*9")
@@ -140,5 +155,24 @@ func test_math_line() -> void:
 	t.eq(le.text, "1920", "invalid reverts")
 	le.text = ""
 	le.focus_exited.emit()
-	t.eq(le.text, "", "blank stays blank")
+	t.eq(le.text, "1920", "WO-839: blank reverts")
+	for bad in ["100+", "1920/", "12abc", "42px", "1920/0"]:
+		le.text = bad
+		le.focus_exited.emit()
+		t.eq(le.text, "1920", "WO-839: '%s' reverts" % bad)
+	le.free()
+
+
+func test_math_line_blank_ok() -> void:
+	var le := LineEdit.new()
+	NF.math_line(le, true, 0.0, 9999.0, Callable(), true)
+	le.text = "40"
+	le.focus_entered.emit()
+	le.text = ""
+	le.focus_exited.emit()
+	t.eq(le.text, "", "blank_ok: cleared stays cleared")
+	le.focus_entered.emit()
+	le.text = "7/x"
+	le.text_submitted.emit("7/x")
+	t.eq(le.text, "", "blank_ok: gibberish reverts to the (blank) previous value")
 	le.free()

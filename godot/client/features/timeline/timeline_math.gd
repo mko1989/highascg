@@ -43,6 +43,12 @@ static func fmt_hms(ms: float) -> String:
 	return "%02d:%02d:%02d:%03d" % [t / 3600000, (t % 3600000) / 60000, (t % 60000) / 1000, t % 1000]
 
 
+## Only 0-9 (after trimming) — String.is_valid_int() also takes a sign, which a timecode group never has.
+static func is_digits(q: String) -> bool:
+	var s := q.strip_edges()
+	return RegEx.create_from_string("^\\d+$").search(s) != null
+
+
 ## parseTcInput: SMPTE (fewer groups allowed), ++N / --N offsets, plain ms; null when invalid.
 static func parse_tc(s: String, current_ms: float, total_ms: Variant, fps := 25) -> Variant:
 	var t := s.strip_edges()
@@ -55,7 +61,7 @@ static func parse_tc(s: String, current_ms: float, total_ms: Variant, fps := 25)
 		return clampf(current_ms + sign * off.get_string(2).to_int(), 0.0, cap)
 	var parts := t.split(":")
 	for q in parts:
-		if not q.strip_edges().is_valid_int():
+		if not is_digits(q):  # WO-839: digits only per group ("1:-5", "+3", "1e3" are gibberish → revert, never salvaged)
 			return null
 	var n: Array = Array(parts).map(func(q: String) -> int: return q.to_int())
 	match n.size():
