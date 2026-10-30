@@ -32,6 +32,7 @@ const InspectorPanel := preload("res://app/inspector_panel.gd")
 const EffectsModel := preload("res://features/live/effects_model.gd")
 const LivePreview := preload("res://features/live/live_preview.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
+const UiCfg := preload("res://core/ui_cfg.gd")
 const UI_CFG := "user://ui.cfg"
 
 var view: TimelineView
@@ -77,9 +78,7 @@ func _ready() -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(UI_CFG)
 	split.split_offset = int(cfg.get_value("timeline", "preview_h", 480))
-	split.dragged.connect(func(at: int) -> void:
-		cfg.set_value("timeline", "preview_h", at)
-		cfg.save(UI_CFG))
+	split.dragged.connect(func(at: int) -> void: UiCfg.save_value("timeline", "preview_h", at))  # WO-843: re-read, then write
 	add_child(split)
 	_page = ClipInspector.new()
 	_page.patch.connect(_on_patch)

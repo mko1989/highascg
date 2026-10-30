@@ -19,11 +19,13 @@ static func default_transition(fps: Variant = null) -> Dictionary:
 	return {"type": "MIX", "duration": duration_for_fps(fps) if fps != null else AUTO_SENTINEL, "tween": "linear"}
 
 
-## Legacy "+ MERGE" spelling → "+ ANIMATE" (same-layer animate path).
+## Legacy "+ MERGE" spelling → " + ANIMATE" (same-layer animate path). WO-843: the replacement carries its own leading
+## space — the pattern eats the whitespace before "+", so "+ ANIMATE" turned "MIX + MERGE" into "MIX+ ANIMATE", a type
+## in no list, which normalize_for_pgm_only then made a CUT (the JS original had the same slip; the old golden pinned it).
 static func migrate_type(t: Variant) -> String:
 	var s := "" if t == null else str(t)
 	var re := RegEx.create_from_string("(?i)\\s*\\+\\s*MERGE\\b")
-	return re.sub(s, "+ ANIMATE", true).strip_edges()
+	return re.sub(s, " + ANIMATE", true).strip_edges()
 
 
 static func normalize_for_pgm_only(t: Variant) -> Dictionary:

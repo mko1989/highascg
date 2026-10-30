@@ -40,16 +40,19 @@ static func applies(layer: Dictionary) -> bool:
 
 
 func show_layer(scene_id: String, main_idx: int, layer: Dictionary) -> void:
+	var shown := applies(layer)
+	var key := "%s|%s|%s" % [scene_id, layer.get("layerNumber", ""), (layer.get("source", {}) as Dictionary).get("value", "") if shown else ""]
+	# WO-843: a pending edit goes to the layer it was typed on — flush BEFORE the target fields change (they used to be
+	# overwritten first, so the old layer's text was POSTed to the newly selected layer).
+	if key != _key and not _timer.is_stopped():
+		_timer.stop()
+		_flush()
 	_scene_id = scene_id
 	_main = main_idx
 	_layer = layer
-	visible = applies(layer)
-	var key := "%s|%s|%s" % [scene_id, layer.get("layerNumber", ""), (layer.get("source", {}) as Dictionary).get("value", "") if visible else ""]
+	visible = shown
 	if key == _key:
 		return  # echo of our own edit — keep the fields (and the caret) as they are
-	if not _timer.is_stopped():
-		_timer.stop()
-		_flush()
 	_key = key
 	for c in get_children():
 		if c != _timer:

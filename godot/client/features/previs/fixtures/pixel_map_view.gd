@@ -25,6 +25,7 @@ var _zoom := 1.0
 var _pan := Vector2.ZERO
 var _drag := ""  # "draw" | "move" | "size" | "pan"
 var _from := Vector2.ZERO  # raster point where the drag began
+var _press_at := Vector2.ZERO  # view point where it began (WO-843: a click is judged by pointer travel, not rect size)
 var _start := Rect2i()
 var _rect := Rect2i()  # the rect being drawn
 
@@ -107,7 +108,7 @@ func _gui_input(e: InputEvent) -> void:
 			if mb.pressed:
 				_press(mb.position)
 			else:
-				_release()
+				_release(mb.position)
 			accept_event()
 		return
 	var mm := e as InputEventMouseMotion
@@ -134,6 +135,7 @@ func _press(at: Vector2) -> void:
 	grab_focus()
 	var p := to_raster(at)
 	_from = p
+	_press_at = at
 	if selected >= 0 and selected < regions.size() and int(regions[selected].channelNo) == channel:
 		var r := _view_rect(P.to_rect(regions[selected]))
 		if at.distance_to(r.end) <= HANDLE * 1.5:
@@ -151,11 +153,11 @@ func _press(at: Vector2) -> void:
 	_rect = P.snap_rect(p, p, raster)
 
 
-func _release() -> void:
+func _release(at: Vector2) -> void:
 	var was := _drag
 	_drag = ""
-	if was == "draw" and (_view_rect(_rect).size.x >= 4.0 or _view_rect(_rect).size.y >= 4.0):
-		drawn.emit(_rect)  # a click without a drag draws nothing
+	if was == "draw" and P.drag_draws(_press_at, at):
+		drawn.emit(_rect)  # a click without a drag draws nothing, at any zoom (WO-843)
 	queue_redraw()
 
 

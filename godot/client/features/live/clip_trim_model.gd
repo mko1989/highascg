@@ -144,6 +144,22 @@ static func parse_tc(text: String, fps: float) -> float:
 	return sec * 1000.0 + frame_to_ms(frames, fps)
 
 
+## WO-843 — what the media inspector's In / Out field commits. `shown` is the text the field was last SET to (not what the
+## user is typing): a commit with the same text changes nothing (a blur without an edit used to re-save the trim, and the
+## shown "0:01.05" was re-read as 1.05 s, drifting it). → {} = nothing to save; {key: null} = cleared; {key: ms} = the
+## point (the text is read with parse_tc, so ".ff" is frames, like the display); {"error": true} = not a time (revert).
+static func field_patch(key: String, text: String, shown: String, fps: float) -> Dictionary:
+	var tx := text.strip_edges()
+	if tx == shown.strip_edges():
+		return {}
+	if tx == "":
+		return {key: null}
+	var ms := parse_tc(tx, fps)
+	if is_nan(ms):
+		return {"error": true}
+	return {key: int(floor(ms + 0.5))}
+
+
 ## The collapsed Trim row: "Full clip" or "in – out".
 static func summary(layer: Dictionary, dur_ms: float, fps: float) -> String:
 	if not has_trim(layer):

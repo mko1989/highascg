@@ -11,6 +11,7 @@ extends HSplitContainer
 const PrevisStage := preload("res://features/previs/previs_stage.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const StageBuilder := preload("res://features/previs/stage_builder.gd")
+const PrevisKeys := preload("res://features/previs/previs_keys.gd")
 const StagePanel := preload("res://features/previs/stage_panel.gd")
 const MvrScene := preload("res://features/previs/mvr_scene.gd")
 const MvrSection := preload("res://features/previs/mvr_section.gd")
@@ -288,9 +289,8 @@ func _on_3d_input(e: InputEvent) -> void:
 				mvr_section.click(stage.camera(), mb.position, mb.shift_pressed or mb.is_command_or_control_pressed())
 
 
-## Keys while the previs is shown (text fields consume their own keys first):
-## Delete remove (selected heads: the Programmer asks, WO-691) · Ctrl+D duplicate (stage objects) · arrows / Page Up /
-## Down / Q / E move the selection (WO-682, move_drag.gd key) · F fit.
+## Keys while the previs is shown (text fields consume their own keys first), the first three in 3D mode only (WO-843):
+## Delete remove (heads: the Programmer asks, WO-691) · Ctrl+D duplicate · arrows / PgUp / PgDn / Q / E move (WO-682) · F fit.
 func _unhandled_key_input(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or not is_visible_in_tree():
@@ -298,17 +298,17 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if markers.driving and k.keycode in [KEY_LEFT, KEY_RIGHT, KEY_UP, KEY_DOWN]:
 		get_viewport().set_input_as_handled()  # the marker driver reads the arrows (held), not the stage nudge
 		return
-	if move_drag.key(k):
+	if PrevisKeys.stage_keys(mode) and move_drag.key(k):  # WO-843: Camera mode must not nudge / delete the hidden selection
 		get_viewport().set_input_as_handled()
 		return
 	var handled := true
 	match k.keycode:
-		KEY_DELETE, KEY_BACKSPACE:  # WO-691: the heads when they are the selection, else the stage object
+		KEY_DELETE, KEY_BACKSPACE when PrevisKeys.stage_keys(mode):  # WO-691: the heads when they are the selection, else the stage object
 			if mover.active() == "heads":
 				mover.sel.delete_requested.emit()
 			else:
 				stage_panel.delete_selected()
-		KEY_D when k.is_command_or_control_pressed():  # ⌘D on macOS (WO-686)
+		KEY_D when PrevisKeys.stage_keys(mode) and k.is_command_or_control_pressed():  # ⌘D on macOS (WO-686)
 			stage_panel.duplicate_selected()
 		KEY_F:
 			track_view.fit()

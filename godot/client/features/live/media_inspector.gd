@@ -7,6 +7,7 @@ extends VBoxContainer
 signal library_changed
 
 const M := preload("res://features/live/media_math.gd")
+const TrimModel := preload("res://features/live/clip_trim_model.gd")
 const Versions := preload("res://features/live/media_versions.gd")
 const Preview := preload("res://features/live/media_preview.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
@@ -102,6 +103,7 @@ func _ready() -> void:
 func show_media(row: Dictionary) -> void:
 	_row = row
 	id = str(row.get("id", ""))
+	_in_lib = false  # WO-843: until this file's library entry answers, a trim edit must not POST against the new id
 	visible = id != ""
 	if id == "":
 		preview.stop_preview()
@@ -151,8 +153,8 @@ func _show_facts(size: int) -> void:
 
 func _sync() -> void:
 	var tc := func(ms: Variant) -> String: return "" if ms == null else M.format_timecode(float(ms) / 1000.0, _fps)
-	_in.text = tc.call(_defaults.get("trimInMs"))
-	_out.text = tc.call(_defaults.get("trimOutMs"))
+	_set_time(_in, tc.call(_defaults.get("trimInMs")))
+	_set_time(_out, tc.call(_defaults.get("trimOutMs")))
 	_mute.set_pressed_no_signal(_defaults.get("muted", false) == true)
 	var n := 0
 	var names := PackedStringArray()
@@ -163,6 +165,12 @@ func _sync() -> void:
 	_wave.queue_redraw()
 
 
+## WO-843: remember the text a field was set to, so a blur or Enter without an edit saves nothing.
+func _set_time(e: LineEdit, txt: String) -> void:
+	e.text = txt
+	e.set_meta("shown", txt)
+
+
 func _time_field(row: HBoxContainer, label: String, ph: String, key: String) -> LineEdit:
 	var l := Label.new()
 	l.text = label
@@ -171,12 +179,15 @@ func _time_field(row: HBoxContainer, label: String, ph: String, key: String) -> 
 	e.placeholder_text = ph
 	e.custom_minimum_size.x = 80
 	var commit := func() -> void:
-		var sec: Variant = M.parse_time_input(e.text)
-		if sec is float and is_nan(sec):
+		# WO-843: "m:ss.ff" is frames (what _sync shows), not decimal seconds; unchanged text saves nothing
+		var patch := TrimModel.field_patch(key, e.text, str(e.get_meta("shown", "")), _fps)
+		if patch.is_empty():
+			return
+		if patch.has("error"):
 			_msg.text = "Use seconds or m:ss.ff"
 			_sync()
 			return
-		_save({key: null if sec == null else int(floor(float(sec) * 1000.0 + 0.5))})
+		_save(patch)
 	e.text_submitted.connect(func(_t: String) -> void: commit.call())
 	e.focus_exited.connect(commit)
 	row.add_child(e)

@@ -187,6 +187,8 @@ static func add_output(graph: Dictionary, id: String) -> Dictionary:
 		return {"ok": false, "error": "Node not found"}
 	var outputs := _outputs(node).duplicate()
 	var n := outputs.size() + 1
+	while outputs.any(func(o: Variant) -> bool: return str(R.d(o).get("id", "")) == "out_%d" % n):
+		n += 1  # WO-843: after a middle output was removed size + 1 is taken (out_1, out_3 → a second out_3)
 	outputs.append({"id": "out_%d" % n, "mode": MODES[0], "label": "Output %d" % n})
 	var st := R.d(node.get("settings")).duplicate()
 	st.outputs = outputs

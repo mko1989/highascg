@@ -62,6 +62,13 @@ static func snap_rect(a: Vector2, b: Vector2, raster: Vector2i) -> Rect2i:
 	return Rect2i(x0, y0, x1 - x0, y1 - y0)
 
 
+## WO-843 — does a drag from `press` to `at` (VIEW pixels) draw a region? A click (travel under `min_px`) draws nothing, at
+## any zoom: judging the snapped rect's size instead let a plain click at zoom ≥ 13× make a 1 × 1 pixel region, because
+## one channel pixel is then ≥ 4 view pixels wide.
+static func drag_draws(press: Vector2, at: Vector2, min_px := 4.0) -> bool:
+	return absf(at.x - press.x) >= min_px or absf(at.y - press.y) >= min_px
+
+
 ## Size clamped to 1…raster, then position so the rect lies inside the raster.
 static func clamp_rect(r: Rect2i, raster: Vector2i) -> Rect2i:
 	var w := clampi(r.size.x, 1, maxi(raster.x, 1))

@@ -44,17 +44,20 @@ func _root() -> Dictionary:
 
 
 func show_layer(scene_id: String, main_idx: int, layer: Dictionary, index: int) -> void:
+	var shown := applies(layer)
+	var key := "%s|%s|%s" % [scene_id, layer.get("layerNumber", ""), (layer.get("source", {}) as Dictionary).get("value", "") if shown else ""]
+	# WO-843: a pending edit goes to the layer it was typed on. The target fields (scene / layer / index) are still the
+	# OLD ones here; they used to be overwritten first, so the old layer's config was POSTed to the newly selected layer.
+	if key != _key and not _debounce.is_stopped():
+		_debounce.stop()
+		_flush()
 	_scene_id = scene_id
 	_main = main_idx
 	_layer = layer
 	_index = index
-	visible = applies(layer)
-	var key := "%s|%s|%s" % [scene_id, layer.get("layerNumber", ""), (layer.get("source", {}) as Dictionary).get("value", "") if visible else ""]
+	visible = shown
 	if key == _key:
 		return  # echo of our own edit
-	if not _debounce.is_stopped():
-		_debounce.stop()
-		_flush()
 	_key = key
 	for c in get_children():
 		if c != _debounce:

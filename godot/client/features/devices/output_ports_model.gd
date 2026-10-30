@@ -219,7 +219,10 @@ static func add_plan(kind: String, settings: Variant) -> Dictionary:
 			"status": "Virtual camera output added"}
 	var key: String = SETTINGS_KEY[kind]
 	var cur := R.a(R.d(settings).get(key))
+	var prefix: String = {"stream_out": "str", "record_out": "rec"}.get(kind, "audio")
 	var i := cur.size() + 1
+	while cur.any(func(r: Variant) -> bool: return js(R.d(r).get("id")) == "%s_%d" % [prefix, i]):
+		i += 1  # WO-843: after a middle row was removed size + 1 is taken (str_1, str_3 → the new row was a second str_3)
 	var row: Dictionary
 	var label: String
 	match kind:
