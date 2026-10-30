@@ -7,6 +7,7 @@
  *   POST /api/fixtures/share/resolve {ids?, used?}  → each placeholder without an alias → the real GDTF downloaded,
  *        stored and aliased (modes paired by footprint) → { results: [{ id, status, to?, modes?, candidates? }],
  *        offline?, error? }. WO-785: used {id: [mode names the scene patches]} weighs those modes first.
+ *   WO-825: /api/fixtures/library/* (routes-gdtf-library.js).
  */
 
 const share = require('../fixtures/gdtf-share')
@@ -36,6 +37,7 @@ function register(routes) {
 		return reply(200, { user: String(b.user).trim(), set: true })
 	}, opt)
 	routes.post('/api/fixtures/share/resolve', ({ body, ctx }) => handleResolve(body, ctx), opt)
+	require('./routes-gdtf-library').register(routes) // WO-825: built-in XML library, per-fixture full fetch, full download
 }
 
 module.exports = { register, handleResolve }

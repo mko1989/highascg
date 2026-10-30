@@ -130,4 +130,5 @@ async function resolve(ids, deps = {}, used = {}) {
 	return listError ? { results, offline: listError } : { results }
 }
 
-module.exports = { account, setAccount, list, resolve, _reset: () => (_cookie = null) }
+// WO-825: `download` + `home` are the library builder's (gdtf-library-build.js / gdtf-share-full.js) way into the account
+module.exports = { account, setAccount, list, download, home, resolve, _reset: () => (_cookie = null) }

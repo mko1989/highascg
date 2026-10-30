@@ -32,6 +32,7 @@ const { cleanValue } = require('./gdtf-patch')
 const { SACN_PORT } = require('./sacn')
 const { createPixelMapService } = require('./pixel-map-service')
 const { createPixelMapProposalService } = require('./pixel-map-proposal')
+const gdtfFull = require('./gdtf-share-full')
 
 function ipv4ToInt(ip) {
 	return ip.split('.').reduce((a, b) => ((a << 8) | Number(b)) >>> 0, 0)
@@ -141,6 +142,10 @@ function createFollowService(ctx, hub, deps = {}) {
 		targets = localTargets()
 		engine.configure(slice)
 		sender.setInterface(engine.dmx.iface) // WO-698
+		// WO-825: a GDTF Share library type in the patch → its full file (models, gobos) fetched in the background and
+		// swapped in under the same id; a library type missing from the store is imported from the built-in XML
+		gdtfFull.adoptPatch(engine.fixtures.map((f) => f.typeId).filter(Boolean), { onChange: () => service.reload(), log })
+			.catch((e) => log('warn', '[follow] gdtf library: ' + (e?.message || e)))
 		looks = normalizeLooks(slice?.looks, cleanValue)
 		psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		// WO-615 T7: visualiser mode reads the console's universes of the typed patch (Art-Net via the shared tap).
@@ -175,7 +180,7 @@ function createFollowService(ctx, hub, deps = {}) {
 			psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		) || (() => {})
 	engine.start()
-	return {
+	const service = {
 		engine,
 		/** Re-resolve the patch (a GDTF type was imported or deleted). */
 		reload() {
@@ -281,6 +286,7 @@ function createFollowService(ctx, hub, deps = {}) {
 			consoleFrames.stop()
 		},
 	}
+	return service
 }
 
 module.exports = { createFollowService, localTargets, inputPortAddress }

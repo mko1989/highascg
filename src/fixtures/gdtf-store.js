@@ -47,21 +47,30 @@ function summary(rec) {
 	}
 	// WO-633: an MVR placeholder (Capture stub / "Dummy -") and the real type it was replaced by
 	if (aliases.isPlaceholder(t)) out.placeholder = true
+	if (rec.share) out.share = rec.share // WO-825: { rid, full } — full false = the library's description-only stub
 	const a = aliases.aliasFor(out, (id) => fs.existsSync(fileOf(id, '.json') || ''), !!out.placeholder)
 	if (a) out.replacedBy = a
 	return out
 }
 
-/** @returns {Promise<object>} the summary */
-async function importGdtf(buf, name) {
+/**
+ * @param {Buffer} buf  @param {string} [name]
+ * @param {{ id?: string, share?: { rid: number, full: boolean } }} [opts]  WO-825: a GDTF Share library type keeps a
+ *   stable `id` (gdtf-library.js typeIdFor) so a project's patch survives the description-only stub being upgraded to
+ *   the full file (models, gobos) in place; `share` marks where it came from.
+ * @returns {Promise<object>} the summary
+ */
+async function importGdtf(buf, name, opts = {}) {
 	const type = await parseGdtf(buf)
-	const id = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12)
+	const id = ID.test(String(opts.id)) ? opts.id : crypto.createHash('sha1').update(buf).digest('hex').slice(0, 12)
 	fs.mkdirSync(dir(), { recursive: true })
 	fs.writeFileSync(fileOf(id, '.gdtf'), buf)
 	const rec = { id, file: String(name || `${type.manufacturer}@${type.name}.gdtf`).slice(0, 160),
 		importedAt: new Date().toISOString(), bytes: buf.length, type }
+	if (opts.share) rec.share = { rid: Number(opts.share.rid), full: opts.share.full === true }
 	fs.writeFileSync(fileOf(id, '.json'), JSON.stringify(rec))
 	_types.set(id, rec)
+	for (const k of [..._rigs.keys()]) if (k.startsWith(`${id}|`)) _rigs.delete(k) // an in-place upgrade changes the rig
 	return summary(rec)
 }
 
