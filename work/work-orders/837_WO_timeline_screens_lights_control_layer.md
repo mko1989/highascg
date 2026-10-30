@@ -1,7 +1,7 @@
 # WO-837 — Timeline: screens, lights layer, control layer (D6)
 
 **Area:** engine, lighting
-**Status: IN PROGRESS (30.10: phases 1–2 done and re-verified; phase 3 live: light flags fired by the live server reach UDP receivers for all three drivers, per-screen routing proven on real Caspar on PRV ch2/ch4. Left: the PGM run of a two-screen timeline (on air, waits for owner approval, script ready, see 3c), and real-console checks, which need console hardware (MagicQ demo mode has no OSC))**
+**Status: DONE (30.10) — phases 1–3; live: light flags reach UDP receivers for all three drivers, per-screen routing proven on real Caspar on PRV ch2/ch4 and (owner-approved) PGM ch1/ch3; behaviour on a real lighting console needs console hardware the box lacks (MagicQ demo mode has no OSC)**
 **Source:** WO-828 D6, owner 30.10: *"ability to add screens to a timeline (should have a divider and seperete layers in the
 list at the bottom) ability to add lights layer (here id like it to be similar to comapnion buttons in timeline, but with a
 choice of console in devices tab, that highascg connects to and ability to choose which cue to go into or move which fader
@@ -351,7 +351,16 @@ No production code changed. Live probes only, all scripts are in the session scr
   - GUI e2e `09_timeline_control_lane`: 6/6. Screenshots are in `…/scratchpad/wo837/e2e09/shots/` (01 shows the
     S1 divider, the 4-row stacked control lane and the red "? gone" chip).
 - **Not verified, and why:**
-  1. **The PGM run** (`ROUTE=pgm node live-prv-probe.js`) is on air, so it waits for owner approval. The PRV run
-     proves the same filter on real Caspar, and the dry run shows the PGM line set is the same on `1-210` / `3-211`.
+  1. ~~The PGM run~~: done 30.10 16:50 with the owner's approval (below).
   2. **Behaviour on a real console.** No console hardware is available, and MagicQ demo mode has no OSC (1c). The Eos
      and MA3 command-line forms are still from documentation only.
+
+### 3d. PGM run (owner-approved, 30.10)
+
+Command: `ROUTE=pgm node live-prv-probe.js` (output in `scratchpad/wo837/live-pgm-probe.out`).
+- Before: `{1:{}, 2:{10,11,12,210 empty}, 3:{}, 4:{10,211 empty}}`.
+- Playing (`state` `playing:true`, `sendTo.program`): `{1:{210:#00000000}, 3:{211:#00000000}}`.
+  - Layer A is on ch1 only and layer B on ch3 only.
+  - ch2 and ch4 did not change.
+- After force stop and delete: 210 on ch1 and 211 on ch3 are empty, and `GET /api/timelines` is `[]`.
+- Nothing visible went to air: the clips were transparent colour.

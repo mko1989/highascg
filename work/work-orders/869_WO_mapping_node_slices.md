@@ -261,3 +261,18 @@ Why not (b) only: it cannot serve SDI and cannot take per-slice sources, and the
 ## 4. Not done / what remains
 
 Nothing is implemented. No code, config or binary was changed; the Caspar tree and the live box were only read (AMCP and API untouched). Upstream material was fetched with `gh` into `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo869/` (outside the repo and outside `~/caspar-build`). INDEX.md and OPEN_ISSUES.md rows are added by the caller.
+
+## Owner decisions (30.10)
+
+- **Q1 editor:** the Inspector holds the slice list and the numeric fields; "Edit slices" opens both canvases in the
+  Devices tab centre.
+- Not answered, so the recommended defaults apply:
+  - Q2 SDI: placement only for v1;
+  - Q3: the planner refuses path (a) over the channel budget and says to use GPU heads;
+  - Q4: the web editor stays working through the migration (read-only slices);
+  - Q5: v1 slices cut from the node's own feed;
+  - Q6: feather per slice;
+  - Q7: 4-corner keystone (grid warp is a separate WO);
+  - Q8: one window per mapping node;
+  - Q9: fork commits on `wo742-shm-producer` (the WO-867 pattern);
+  - Q10: legacy `rotation` values are dropped.

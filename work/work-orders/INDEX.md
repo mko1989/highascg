@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (32 open, 121 in progress, 628 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (31 open, 120 in progress, 630 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -157,7 +157,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 829 DONE [engine] Timeline-in-look follow-up: loop wrap leaves an ended clip on air; on-air rerou… → 829_WO_timeline_wrap_stop_and_onair_reroute.md
 - 833 DONE [engine] On-air engine one-liners (sweep §3e–3i, 3k–3m) → 833_WO_engine_onair_one_liners.md
 - 834 DONE [engine] Timeline end holds the last frame (D8) → 834_WO_timeline_end_holds_last_frame.md
-- 837 IN PROGRESS [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
+- 837 DONE [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
 - 840 DONE [engine+godot-client] Timer visibility lives in look presets (per screen), not in looks → 840_WO_timer_visibility_in_look_presets.md
 - 849 DONE [engine] Work order: Fix A/B bank transitions by layer stacking order → 849_WO_fix_ab_bank_transition_layer_order.md
 - 850 DONE [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
@@ -200,7 +200,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 613 IN PROGRESS [caspar-build] Next CasparCG build: base it on upstream v2.5.1-stable → 613_WO_next_caspar_build_on_v2_5_1.md
 - 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
-- 847 IN PROGRESS [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
+- 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
 
 ## audio — Audio routing, devices, meters (41)
 
@@ -352,7 +352,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 804 IN PROGRESS [lighting] Calibrate the rig together: pick anchor heads, operator places them, the rest i… → 804_WO_calibrate_rig_anchor_heads_infer_rest.md
 - 812 DONE [lighting+godot-client] Previs: hide the projector beam lines → 812_WO_previs_projector_beams_toggle.md
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
-- 857 OPEN [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
+- 857 IN PROGRESS [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
 ## godot-client — Godot client (84)
 

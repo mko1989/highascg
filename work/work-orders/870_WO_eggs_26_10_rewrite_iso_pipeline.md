@@ -314,3 +314,10 @@ Dry runs 2 and 3 (`--stop-after inject-efi-grubcfg`, `--stop-after copy-kernel-i
 10. Does the clone path (`/home` read-only bind) change anything for files written by `reset-iso-operator-config.sh` / `write-iso-default-config.js` (they run before; the squashfs reads the final state) — expected no, to be confirmed by the squashfs listing diff.
 11. Census: `anonymous: true` is set by us; confirm the owner wants that default for shop builds.
 12. Memory notes to update once verified: "eggs produce own rm points" (now `destroy` only), "eggs produce prunes node_modules" (our own `install-iso-defaults.sh`, unchanged), "eggs excludes vs merged-usr" (rule stays; target file renamed to `custom.exclude.list`).
+
+## Owner decisions (30.10)
+
+- **0.2 / Q1 space blocker:** "Need a fix for the eggs ignore so it won't take the media". Route (b), done properly: a
+  local `coa` build whose space estimate subtracts the excluded trees (not a blind skip), offered upstream as a PR.
+- **Q2:** 26.10.30, then `apt-mark hold`.
+- Q3–Q12 are open until the first dry run.

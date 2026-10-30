@@ -45,6 +45,7 @@ Core provisioning sequence: kernel, NVIDIA, NDI, CasparCG, browser, permissions,
 
 **Helpers (in setup/ root):**
 - `check-decklink.sh` — Verify DeckLink card presence
+- `check-cef-caspar.sh` — Which libcef.so Caspar resolves/maps vs the pinned bundle (read-only, WO-848; [docs/install-cef.md](../docs/install-cef.md))
 - `fix-caspar-and-grub.sh` — Recovery: reinstall Caspar libs + GRUB (fast path)
 - `install-exfat-sync-map.sh` — Map exFAT partitions for boot sync
 - `install-tailscale-deb-for-iso.sh` — Tailscale ISO inclusion

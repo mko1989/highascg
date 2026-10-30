@@ -99,55 +99,118 @@ ensure_highascg_caspar_launcher() {
     rm -rf /opt/casparcg-enhanced 2>/dev/null || true
 }
 
-# Pinned CEF: system layout /usr/lib/cef/<ver>/<triplet>/ + playout ~/highascg/lib for run.sh.
-# Overlays Release/* and Resources into lib/ via cp -a — does not wipe libndi.so etc.
+# Pinned CEF → playout ~/highascg/lib (what Caspar loads: run.sh LD_LIBRARY_PATH=lib, and since WO-848
+# the binary's RUNPATH $ORIGIN/../lib). Overlays Release/* + Resources into lib/ via cp -a (libndi.so etc. stay).
+# WO-848: every step is checked (callers use `fn || …`, which turns set -e off in here), the archive goes to a
+# private mktemp dir, and both the archive and its libcef.so must match the pins in install-config.sh before
+# anything in lib/ is touched.
+# /usr/lib/cef/<ver>/<triplet> is NOT on any loader path Caspar uses (WO-848 §1); HIGHASCG_CEF_SYSTEM_LAYOUT
+# picks what is put there: copy (default, as before) | symlink (per-file links into lib/, no 600 MB duplicate)
+# | none.
 install_highascg_cef_binary() {
     local url="${HIGHASCG_CEF_TAR_URL:-${URL_CEF_BINARY_TAR:-}}"
+    local want_tar="${HIGHASCG_CEF_TAR_SHA256:-${CEF_BINARY_SHA256:-}}"
+    local want_lib="${CEF_LIBCEF_SHA256:-}"
     local root="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"
     local lib="${root}/lib"
-    local archive="/tmp/highascg-cef-binary.tar.bz2"
     local cef_ver="${CASPAR_CEF_VERSION:-142.0.17}"
     local triplet="${HIGHASCG_CEF_TRIPLET:-x86_64-linux-gnu}"
     local cef_sys="/usr/lib/cef/${cef_ver}/${triplet}"
-    local extract="/tmp/highascg-cef-extract"
-    local tar_root user="${USER_CASPAR:-casparcg}"
-    local f
+    local layout="${HIGHASCG_CEF_SYSTEM_LAYOUT:-copy}"
+    local user="${USER_CASPAR:-casparcg}"
+    local work archive extract tar_root rel f got
 
     [ -n "$url" ] || return 1
+    case "$layout" in copy | symlink | none) ;; *)
+        echo -e "  ${RED}HIGHASCG_CEF_SYSTEM_LAYOUT=${layout}: use copy, symlink or none${NC}" >&2
+        return 1
+        ;;
+    esac
+    work=$(mktemp -d /tmp/highascg-cef.XXXXXX) || return 1
+    archive="${work}/cef.tar.bz2"
+    extract="${work}/x"
 
     echo -e "${CYAN}→ Downloading pinned CEF binary (${cef_ver})…${NC}"
     if command -v curl >/dev/null 2>&1; then
-        curl -fL --retry 2 -o "$archive" "$url"
+        curl -fL --retry 2 -o "$archive" "$url" || { rm -rf "$work"; return 1; }
     else
-        wget -q -O "$archive" "$url"
+        wget -q -O "$archive" "$url" || { rm -rf "$work"; return 1; }
+    fi
+
+    if [ -n "$want_tar" ]; then
+        got=$(sha256sum "$archive" | cut -d' ' -f1)
+        if [ "$got" != "$want_tar" ]; then
+            echo -e "  ${RED}CEF archive sha256 ${got} != pinned ${want_tar} — lib/ left untouched${NC}" >&2
+            rm -rf "$work"
+            return 1
+        fi
+        echo -e "  ${GREEN}✓${NC} archive sha256 matches the pin"
+    else
+        echo -e "  ${YELLOW}○${NC} no CEF_BINARY_SHA256 pin — archive not verified"
     fi
 
     tar_root=$(tar -tjf "$archive" 2>/dev/null | head -1 | cut -d/ -f1)
     [ -n "$tar_root" ] || {
         echo -e "  ${RED}Invalid CEF archive${NC}" >&2
+        rm -rf "$work"
         return 1
     }
-
-    rm -rf "$extract"
-    mkdir -p "$extract" "$cef_sys" "$lib/locales"
-    tar -xjf "$archive" -C "$extract"
-
-    cp -a "${extract}/${tar_root}/Release/"* "$cef_sys/"
-    cp -a "${extract}/${tar_root}/Release/"* "$lib/"
-    for f in icudtl.dat resources.pak chrome_100_percent.pak chrome_200_percent.pak; do
-        [ -f "${extract}/${tar_root}/Resources/${f}" ] && cp -a "${extract}/${tar_root}/Resources/${f}" "$lib/"
-    done
-    if [ -d "${extract}/${tar_root}/Resources/locales" ]; then
-        cp -a "${extract}/${tar_root}/Resources/locales/"* "$lib/locales/" 2>/dev/null || true
+    mkdir -p "$extract" || { rm -rf "$work"; return 1; }
+    tar -xjf "$archive" -C "$extract" || {
+        echo -e "  ${RED}CEF archive did not extract — lib/ left untouched${NC}" >&2
+        rm -rf "$work"
+        return 1
+    }
+    rel="${extract}/${tar_root}/Release"
+    if [ ! -f "${rel}/libcef.so" ]; then
+        echo -e "  ${RED}No Release/libcef.so in the archive — lib/ left untouched${NC}" >&2
+        rm -rf "$work"
+        return 1
+    fi
+    if [ -n "$want_lib" ]; then
+        got=$(sha256sum "${rel}/libcef.so" | cut -d' ' -f1)
+        if [ "$got" != "$want_lib" ]; then
+            echo -e "  ${RED}libcef.so sha256 ${got} != pinned ${want_lib} — lib/ left untouched${NC}" >&2
+            rm -rf "$work"
+            return 1
+        fi
     fi
 
-    install -d /usr/lib
+    mkdir -p "$lib/locales" || { rm -rf "$work"; return 1; }
+    cp -a "${rel}/"* "$lib/" || { rm -rf "$work"; return 1; }
+    for f in icudtl.dat resources.pak chrome_100_percent.pak chrome_200_percent.pak; do
+        if [ -f "${extract}/${tar_root}/Resources/${f}" ]; then
+            cp -a "${extract}/${tar_root}/Resources/${f}" "$lib/" || { rm -rf "$work"; return 1; }
+        fi
+    done
+    if [ -d "${extract}/${tar_root}/Resources/locales" ]; then
+        cp -a "${extract}/${tar_root}/Resources/locales/"* "$lib/locales/" || { rm -rf "$work"; return 1; }
+    fi
+
+    case "$layout" in
+    copy)
+        mkdir -p "$cef_sys" && cp -a "${rel}/"* "$cef_sys/" || { rm -rf "$work"; return 1; }
+        ;;
+    symlink)
+        mkdir -p "$cef_sys" || { rm -rf "$work"; return 1; }
+        for f in "${rel}/"*; do
+            ln -sfn "${lib}/$(basename "$f")" "${cef_sys}/$(basename "$f")" || { rm -rf "$work"; return 1; }
+        done
+        ;;
+    none) ;;
+    esac
+    rm -rf "$work"
+
     ln -sfn "$lib" "/usr/lib/casparcg-cef-${cef_ver}"
     mkdir -p /etc/highascg
     echo "$cef_ver" >/etc/highascg/cef-version
     chown -R "$user:$user" "$lib" 2>/dev/null || true
     command -v ldconfig >/dev/null 2>&1 && ldconfig
-    echo -e "  ${GREEN}✓${NC} CEF ${cef_ver} → ${cef_sys} and ${lib} (run.sh uses LD_LIBRARY_PATH=lib)"
+    if [ "$layout" = none ]; then
+        echo -e "  ${GREEN}✓${NC} CEF ${cef_ver} → ${lib} (no /usr/lib/cef layout)"
+    else
+        echo -e "  ${GREEN}✓${NC} CEF ${cef_ver} → ${lib} (+ ${layout} at ${cef_sys})"
+    fi
 }
 
 install_highascg_scanner_deb() {
@@ -196,56 +259,5 @@ decklink_report_status() {
     fi
 }
 
-# Copy CasparCG .deb CEF build into the system Chromium CEF layout (/usr/lib/cef/<ver>/…).
-# Otherwise the loader may pick generic distro CEF instead of the Caspar-patched libs.
-# Optional: HIGHASCG_CEF_TRIPLET (e.g. x86_64-linux-gnu) if uname-based guess is wrong.
-sync_caspar_cef_into_system() {
-    local caspar_src cef_ver triplet cef_sys f
-    caspar_src=$(ls -d /usr/lib/casparcg-cef-* 2>/dev/null | sort -V | tail -1)
-    if [ -z "$caspar_src" ] || [ ! -d "$caspar_src" ]; then
-        echo -e "  ${YELLOW}○${NC} No /usr/lib/casparcg-cef-* — skip CEF → system layout sync"
-        return 0
-    fi
-    cef_ver=$(basename "$caspar_src" | sed -n 's/^casparcg-cef-//p')
-    if [ -z "$cef_ver" ]; then
-        echo -e "  ${YELLOW}○${NC} Could not parse CEF version from $caspar_src — skip"
-        return 0
-    fi
-
-    triplet="${HIGHASCG_CEF_TRIPLET:-}"
-    if [ -z "$triplet" ]; then
-        case "$(uname -m)" in
-            x86_64) triplet="x86_64-linux-gnu" ;;
-            aarch64) triplet="aarch64-linux-gnu" ;;
-            *) triplet="$(uname -m)-linux-gnu" ;;
-        esac
-    fi
-
-    cef_sys="/usr/lib/cef/${cef_ver}/${triplet}"
-    if [ ! -d "$cef_sys" ] && [ -d "/usr/lib/cef/${cef_ver}" ]; then
-        cef_sys=$(find "/usr/lib/cef/${cef_ver}" -maxdepth 1 -type d -name '*linux-gnu' 2>/dev/null | head -1)
-    fi
-    if [ -z "$cef_sys" ] || [ ! -d "$cef_sys" ]; then
-        echo -e "  ${YELLOW}○${NC} No system CEF dir for Chromium ${cef_ver} (tried /usr/lib/cef/${cef_ver}/${triplet}) — skip CEF sync (install a package that provides /usr/lib/cef/…)"
-        return 0
-    fi
-
-    echo -e "${CYAN}→ Sync CasparCG-patched CEF into ${cef_sys}${NC}"
-    for f in libcef.so libEGL.so libGLESv2.so v8_context_snapshot.bin; do
-        if [ ! -f "${caspar_src}/${f}" ]; then
-            echo -e "  ${YELLOW}○${NC} Missing ${caspar_src}/${f} — skip this file"
-            continue
-        fi
-        if [ -f "${cef_sys}/${f}" ] && [ ! -f "${cef_sys}/${f}.bak" ]; then
-            cp -a "${cef_sys}/${f}" "${cef_sys}/${f}.bak"
-            echo -e "  ${GREEN}✓${NC} backed up ${f} → ${f}.bak"
-        fi
-        cp -a "${caspar_src}/${f}" "${cef_sys}/${f}"
-        echo -e "  ${GREEN}✓${NC} installed ${f}"
-    done
-    if command -v ldconfig >/dev/null 2>&1; then
-        ldconfig
-        echo -e "  ${GREEN}✓${NC} ldconfig"
-    fi
-    return 0
-}
+# WO-848: sync_caspar_cef_into_system (copy /usr/lib/casparcg-cef-* .deb CEF over /usr/lib/cef/<ver>) was removed:
+# it had no caller (sweep 29.10), no casparcg-cef .deb is installed, and Caspar never loads /usr/lib/cef.

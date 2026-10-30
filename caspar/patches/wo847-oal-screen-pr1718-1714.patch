@@ -1,0 +1,537 @@
+From e4e1e7ef3f1f8126d7d6c90167376f2ac855a5c3 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Fri, 30 Oct 2026 16:21:33 +0100
+Subject: [PATCH 1/3] =?UTF-8?q?fix(oal):=20initialize=20the=20SwrContext?=
+ =?UTF-8?q?=20pointer=20before=20swr=5Falloc=5Fset=5Fopts2=20=E2=80=94=20u?=
+ =?UTF-8?q?pstream=2085fa10952?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+swr_alloc_set_opts2 treats a non-null *ps as an existing context to reuse. The Enhanced OAL
+consumer passed an uninitialized pointer, so whether initialize() crashed depended on stack
+garbage. Reproduced on the HighAsCG box: AMCP "ADD 2 SYSTEM-AUDIO DEVICE_NAME ..." segfaulted in
+av_opt_set_chlayout <- swr_alloc_set_opts2 <- oal_consumer::initialize. Same one-line fix as
+CasparCG/server 85fa10952 (#1714), which 2.5.1 ships but the Enhanced consumer never got.
+HighAsCG WO-847.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7QVXYQA38FT76gLNj
+---
+ src/modules/oal/consumer/oal_consumer.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/modules/oal/consumer/oal_consumer.cpp b/src/modules/oal/consumer/oal_consumer.cpp
+index dfa94f824..c6b62764f 100644
+--- a/src/modules/oal/consumer/oal_consumer.cpp
++++ b/src/modules/oal/consumer/oal_consumer.cpp
+@@ -206,7 +206,7 @@ struct oal_consumer : public core::frame_consumer
+             av_channel_layout_default(&from, format_desc_.audio_channels);
+             av_channel_layout_default(&to, 2); // stereo
+ 
+-            SwrContext* raw;
++            SwrContext* raw = nullptr; // swr_alloc_set_opts2 reuses a non-null *ps (upstream 85fa10952)
+             swr_alloc_set_opts2(&raw,
+                 &to,   AV_SAMPLE_FMT_S16, format_desc_.audio_sample_rate,
+                 &from, AV_SAMPLE_FMT_S32, format_desc_.audio_sample_rate,
+-- 
+2.53.0
+
+
+From 2747aaa47e098915957b0b433db8853d31d1c48f Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Fri, 30 Oct 2026 16:24:23 +0100
+Subject: [PATCH 2/3] =?UTF-8?q?screen:=20aspect=20ratio=20"auto"=20=3D=20t?=
+ =?UTF-8?q?he=20format's=20square=20dimensions,=20W/H=20separator,=20windo?=
+ =?UTF-8?q?w=20viewport=20=E2=80=94=20CasparCG/server#1718=20final=20state?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The Enhanced screen consumer (the source of #1718) fell back to a fixed 16:9 when a consumer had
+neither <aspect-ratio> nor <width>/<height>: AMCP "ADD n SCREEN" on a 1600x400 channel opened a
+711x400 window and squeezed the picture (stock and #1718's last revision derive it from the
+format's square dimensions). Ported from the PR head:
+- aspect_ratio 0.0 = auto; parse_aspect_ratio returns auto for empty/default/invalid input and
+  accepts "W/H" next to "W:H" and decimals;
+- effective_aspect_ratio() feeds uniform/none/uniform_to_fill and the windowed resize lock;
+- a0c5f9c99f: the initial glViewport is the window size, not the channel format.
+Kept from the fork: force-linear-filter, the visibility toggle, the verbose logs, and no
+brightness/saturation (dropped upstream after review). Configs that set <width>/<height> (every
+HighAsCG-generated screen) are unaffected: their aspect is still width/height.
+
+Verified on Xvfb: 1600x400 channel, AMCP ADD and a bare <screen/> open 1600x400 (were 711x400);
+<aspect-ratio>3840/1080</aspect-ratio> opens 1422x400 (was 711x400, "/" unparsed). HighAsCG WO-847.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7QVXYQA38FT76gLNj
+---
+ .../screen/consumer/screen_consumer.cpp       | 82 +++++++++++--------
+ 1 file changed, 46 insertions(+), 36 deletions(-)
+
+diff --git a/src/modules/screen/consumer/screen_consumer.cpp b/src/modules/screen/consumer/screen_consumer.cpp
+index 2f050417e..4608fffaa 100644
+--- a/src/modules/screen/consumer/screen_consumer.cpp
++++ b/src/modules/screen/consumer/screen_consumer.cpp
+@@ -97,7 +97,7 @@ struct configuration
+     bool            high_bitdepth = false;
+     bool            key_only      = false;
+     bool            sbs_key       = false;
+-    double          aspect_ratio  = 1.777; // Default 16:9; supports custom ratios via parse_aspect_ratio()
++    double          aspect_ratio  = 0.0; // 0.0 = auto: the format's square dimensions (stock / #1718 behaviour)
+     bool            force_linear_filter = false;
+     bool            enable_mipmaps      = false;
+     bool            vsync               = false;
+@@ -117,44 +117,44 @@ struct frame
+     GLsync                         fence = nullptr;
+ };
+ 
+-// Aspect ratio accepts either a decimal value (e.g. 1.7778) or a colon-separated ratio (e.g. 16:9, 4:3).
+-// Colon format is supported for backward compatibility with existing config files.
+-// Decimal is the preferred format for custom ratios (e.g. 3.5556 for a 3840x1080 wall).
+-// Falls back to 16:9 on invalid or out-of-range input.
++// Aspect ratio accepts a decimal value (e.g. 3.5556 for a 3840x1080 wall) or a "W:H" / "W/H" ratio
++// (e.g. 16:9, 3840:1080). Empty, "default" or invalid input returns 0.0 = auto: the channel format's
++// square dimensions, as stock CasparCG does (HighAsCG WO-847, from CasparCG/server#1718's final
++// version; the Enhanced fork fell back to a fixed 16:9, which squeezed every non-16:9 channel that
++// had no <width>/<height> or <aspect-ratio>, e.g. AMCP "ADD n SCREEN" on a 3840x1792 LED channel).
+ double parse_aspect_ratio(const std::wstring& aspect_str)
+ {
+     if (aspect_str.empty() || aspect_str == L"default")
+-        return 16.0 / 9.0;
++        return 0.0;
+ 
+-    // Colon-separated format: "16:9", "4:3", or any "W:H" ratio
+-    auto colon_pos = aspect_str.find(L':');
+-    if (colon_pos != std::wstring::npos) {
++    auto sep_pos = aspect_str.find(L':');
++    if (sep_pos == std::wstring::npos)
++        sep_pos = aspect_str.find(L'/');
++    if (sep_pos != std::wstring::npos) {
+         try {
+-            double width  = std::stod(aspect_str.substr(0, colon_pos));
+-            double height = std::stod(aspect_str.substr(colon_pos + 1));
+-            if (height == 0.0) {
+-                CASPAR_LOG(warning) << L"Invalid aspect ratio denominator, using default 16:9";
+-                return 16.0 / 9.0;
++            double width  = std::stod(aspect_str.substr(0, sep_pos));
++            double height = std::stod(aspect_str.substr(sep_pos + 1));
++            if (height <= 0.0 || width <= 0.0) {
++                CASPAR_LOG(warning) << L"Invalid aspect ratio '" << aspect_str << L"', using auto";
++                return 0.0;
+             }
+             return width / height;
+         } catch (...) {
+-            CASPAR_LOG(warning) << L"Failed to parse aspect ratio '" << aspect_str << L"', using default 16:9";
+-            return 16.0 / 9.0;
++            CASPAR_LOG(warning) << L"Failed to parse aspect ratio '" << aspect_str << L"', using auto";
++            return 0.0;
+         }
+     }
+ 
+-    // Decimal format: "1.7778", "3.5556"
+     try {
+         double result = std::stod(aspect_str);
+         if (result < 0.1 || result > 10.0) {
+-            CASPAR_LOG(warning) << L"Aspect ratio " << aspect_str
+-                                << L" out of reasonable range (0.1-10.0), using default 16:9";
+-            return 16.0 / 9.0;
++            CASPAR_LOG(warning) << L"Aspect ratio " << aspect_str << L" out of reasonable range (0.1-10.0), using auto";
++            return 0.0;
+         }
+         return result;
+     } catch (...) {
+-        CASPAR_LOG(warning) << L"Failed to parse aspect ratio '" << aspect_str << L"', using default 16:9";
+-        return 16.0 / 9.0;
++        CASPAR_LOG(warning) << L"Failed to parse aspect ratio '" << aspect_str << L"', using auto";
++        return 0.0;
+     }
+ }
+ 
+@@ -226,9 +226,12 @@ struct screen_consumer
+             CASPAR_LOG(info) << print() << L" Using frame copied to host for rendering.";
+         }
+ 
+-        // Calculate square dimensions based on custom aspect ratio
+-        square_width_  = static_cast<int>(format_desc.height * config_.aspect_ratio);
+-        square_height_ = format_desc.height;
++        // An explicit (or width/height-derived) aspect ratio overrides the format's square dimensions;
++        // auto (0.0) keeps them.
++        if (config_.aspect_ratio > 0.0) {
++            square_width_  = static_cast<int>(format_desc.height * config_.aspect_ratio);
++            square_height_ = format_desc.height;
++        }
+ 
+         frame_buffer_.set_capacity(1);
+ 
+@@ -536,8 +539,8 @@ struct screen_consumer
+ 
+                 GL(glDisable(GL_DEPTH_TEST));
+                 GL(glClearColor(0.0, 0.0, 0.0, 0.0));
+-                GL(glViewport(
+-                    0, 0, config_.sbs_key ? format_desc_.width * 2 : format_desc_.width, format_desc_.height));
++                // #1718 a0c5f9c99f: the window, not the channel format, is the render target.
++                GL(glViewport(0, 0, screen_width_, screen_height_));
+ 
+                 calculate_aspect();
+ 
+@@ -598,9 +601,9 @@ struct screen_consumer
+             if (e.type == sf::Event::Resized) {
+                 // Lock aspect ratio on resize when in windowed mode.
+                 // In fullscreen mode the window size is fixed by the OS/display so this is a no-op.
+-                if (config_.windowed && config_.aspect_ratio > 0.0) {
++                if (config_.windowed) {
+                     unsigned int locked_height =
+-                        static_cast<unsigned int>(e.size.width / config_.aspect_ratio);
++                        static_cast<unsigned int>(e.size.width / effective_aspect_ratio());
+                     if (locked_height != e.size.height) {
+                         window_.setSize(sf::Vector2u(e.size.width, locked_height));
+                     }
+@@ -720,10 +723,18 @@ struct screen_consumer
+         }
+     }
+ 
++    // The configured aspect ratio, or the format's square dimensions when it is auto (0.0).
++    double effective_aspect_ratio() const
++    {
++        if (config_.aspect_ratio > 0.0)
++            return config_.aspect_ratio;
++        return static_cast<double>(square_width_) / static_cast<double>(square_height_);
++    }
++
+     // Aspect ratio calculations using double-based aspect ratio
+     std::pair<float, float> uniform() const
+     {
+-        float aspect = static_cast<float>(config_.sbs_key ? config_.aspect_ratio * 2 : config_.aspect_ratio);
++        float aspect = static_cast<float>(config_.sbs_key ? effective_aspect_ratio() * 2 : effective_aspect_ratio());
+         float width  = std::min(1.0f, static_cast<float>(screen_height_) * aspect / static_cast<float>(screen_width_));
+         float height = static_cast<float>(screen_width_ * width) / static_cast<float>(screen_height_ * aspect);
+ 
+@@ -732,7 +743,7 @@ struct screen_consumer
+ 
+     std::pair<float, float> none() const
+     {
+-        float aspect = static_cast<float>(config_.sbs_key ? config_.aspect_ratio * 2 : config_.aspect_ratio);
++        float aspect = static_cast<float>(config_.sbs_key ? effective_aspect_ratio() * 2 : effective_aspect_ratio());
+         float width  = aspect * static_cast<float>(format_desc_.height) / static_cast<float>(screen_width_);
+         float height = static_cast<float>(format_desc_.height) / static_cast<float>(screen_height_);
+ 
+@@ -743,7 +754,7 @@ struct screen_consumer
+ 
+     std::pair<float, float> uniform_to_fill() const
+     {
+-        float aspect = static_cast<float>(config_.sbs_key ? config_.aspect_ratio * 2 : config_.aspect_ratio);
++        float aspect = static_cast<float>(config_.sbs_key ? effective_aspect_ratio() * 2 : effective_aspect_ratio());
+         float wr     = aspect * static_cast<float>(format_desc_.height) / static_cast<float>(screen_width_);
+         float hr     = static_cast<float>(format_desc_.height) / static_cast<float>(screen_height_);
+         float r_inv  = 1.0f / std::min(wr, hr);
+@@ -1147,7 +1158,7 @@ create_preconfigured_consumer(const boost::property_tree::wptree&
+         config.stretch = screen::stretch::uniform_to_fill;
+     }
+ 
+-    // Aspect ratio: explicit value, calculated from width/height, or default 16:9
++    // Aspect ratio: explicit value, calculated from width/height, or auto (0.0 = format square dimensions)
+     auto aspect_str = ptree.get_optional<std::wstring>(L"aspect-ratio");
+     if (aspect_str) {
+         config.aspect_ratio = parse_aspect_ratio(*aspect_str);
+@@ -1155,15 +1166,14 @@ create_preconfigured_consumer(const boost::property_tree::wptree&
+         config.aspect_ratio = static_cast<double>(config.screen_width) / static_cast<double>(config.screen_height);
+         CASPAR_LOG(info) << L"Calculated aspect ratio " << std::fixed << std::setprecision(3) << config.aspect_ratio
+                          << L" from dimensions " << config.screen_width << L"x" << config.screen_height;
+-    } else {
+-        config.aspect_ratio = 16.0 / 9.0;
+     }
+ 
+     config.force_linear_filter = ptree.get(L"force-linear-filter", false);
+     config.enable_mipmaps      = ptree.get(L"enable-mipmaps", false);
+ 
+     CASPAR_LOG(info) << L"Screen consumer configuration:";
+-    CASPAR_LOG(info) << L"  aspect_ratio: " << config.aspect_ratio;
++    CASPAR_LOG(info) << L"  aspect_ratio: "
++                     << (config.aspect_ratio > 0.0 ? std::to_wstring(config.aspect_ratio) : std::wstring(L"auto (format)"));
+     CASPAR_LOG(info) << L"  force_linear_filter: " << (config.force_linear_filter ? L"true" : L"false");
+     CASPAR_LOG(info) << L"  enable_mipmaps: " << (config.enable_mipmaps ? L"true" : L"false");
+     CASPAR_LOG(info) << L"  gpu_texture: " << (config.gpu_texture ? L"true" : L"false");
+-- 
+2.53.0
+
+
+From e8d457ec6321f2556b999decde033b3cf7a7de71 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Fri, 30 Oct 2026 16:24:23 +0100
+Subject: [PATCH 3/3] =?UTF-8?q?oal:=20one=20device=20+=20context=20per=20o?=
+ =?UTF-8?q?utput=20device,=20selected=20per=20thread=20(ALC=5FEXT=5Fthread?=
+ =?UTF-8?q?=5Flocal=5Fcontext)=20=E2=80=94=20the=20#1714=20device=20half?=
+ =?UTF-8?q?=20for=20the=20Enhanced=20consumer?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Each Enhanced OAL consumer opened its own device and made its context current process-wide
+(alcMakeContextCurrent). With two <system-audio> consumers the last one's context received every
+AL call of both, so neither source gated its channel: on the HighAsCG box two 1080p50 channels
+with system-audio on HDMI 1 / HDMI 2 ran their clips at 2.1x-3.7x real time and teardown hung. A
+second consumer on an already open device failed with "Failed to initialize audio device" (the
+"pre-existing" ADD AUDIO error in HighAsCG WO-613).
+
+Now, as upstream #1714 / 2.5.1 does it:
+- device::open() resolves the configured name exactly as before (space-insensitive match, unknown
+  -> default) and returns a shared device per resolved name (weak_ptr registry under a mutex);
+  consumers on the same device each get their own source on the shared context;
+- every AL entry point (initialize/teardown on the executor, each frame on the channel output
+  thread) selects the context with alcSetThreadContext and releases it afterwards; without the
+  extension it falls back to the old process-wide context with a warning.
+The Enhanced send() flow (deferred future gating the channel on AL_BUFFERS_PROCESSED) is
+unchanged; the OAL choice of WO-613 (Enhanced over #1714) stands.
+
+Verified on the box with a scratch instance (AMCP 5262): two devices 1.00x / 1.00x (old 2.06x /
+2.10x and 3.70x / 3.70x), same device shared 1.00x / 1.00x (old: second consumer failed), AMCP
+ADD (shared) / REMOVE 2-500 / ADD on another device with the clip at 1.00x throughout, clean exit.
+HighAsCG WO-847.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7QVXYQA38FT76gLNj
+---
+ src/modules/oal/consumer/oal_consumer.cpp | 142 ++++++++++++++++++----
+ 1 file changed, 116 insertions(+), 26 deletions(-)
+
+diff --git a/src/modules/oal/consumer/oal_consumer.cpp b/src/modules/oal/consumer/oal_consumer.cpp
+index c6b62764f..874fbee4c 100644
+--- a/src/modules/oal/consumer/oal_consumer.cpp
++++ b/src/modules/oal/consumer/oal_consumer.cpp
+@@ -59,38 +59,105 @@ extern "C" {
+ 
+ #include <atomic>
+ #include <cstdint>
++#include <map>
+ #include <memory>
++#include <mutex>
+ #include <queue>
++#include <string>
+ #include <thread>
+ #include <vector>
+ 
+ #include <AL/al.h>
+ #include <AL/alc.h>
++#define AL_ALEXT_PROTOTYPES
++#include <AL/alext.h>
+ 
+ namespace caspar { namespace oal {
+ 
+ using namespace std::chrono_literals;
+ 
++// One OpenAL device + context per output device, shared by every consumer that resolves to it
++// (HighAsCG WO-847, the device/context half of upstream #1714 that 2.5.1 ships and the Enhanced
++// OAL consumer lacked). Before: each consumer opened its own device and made its context
++// current PROCESS-WIDE with alcMakeContextCurrent, so with two <system-audio> consumers the
++// second one's context received every AL call of the first (same source / buffer names), and a
++// second consumer on an already open ALSA device failed with "Failed to initialize audio device".
++// Now each thread that talks to OpenAL selects the consumer's context with alcSetThreadContext
++// (ALC_EXT_thread_local_context), and consumers on the same device share it with one source each.
+ class device
+ {
+-    ALCdevice*         device_  = nullptr;
+-    ALCcontext*        context_ = nullptr;
+-    const std::wstring device_name_;
++    ALCdevice*  device_       = nullptr;
++    ALCcontext* context_      = nullptr;
++    bool        thread_local_ = false;
++    std::string name_;
++
++    explicit device(const ALCchar* name)
++        : name_(name ? name : "")
++    {
++        device_ = alcOpenDevice(name);
++        if (!device_) CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to initialize audio device."));
++
++        context_ = alcCreateContext(device_, nullptr);
++        if (!context_) {
++            alcCloseDevice(device_);
++            CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to create audio context."));
++        }
++
++        thread_local_ = alcIsExtensionPresent(device_, "ALC_EXT_thread_local_context") == ALC_TRUE;
++        if (!thread_local_) {
++            CASPAR_LOG(warning) << L"OpenAL: ALC_EXT_thread_local_context missing, using the process-wide "
++                                   L"context (only one system-audio device can play)";
++            if (!alcMakeContextCurrent(context_)) {
++                alcDestroyContext(context_);
++                alcCloseDevice(device_);
++                CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to activate audio context."));
++            }
++        }
++    }
++
++    static std::mutex&                                  registry_mutex()
++    {
++        static std::mutex m;
++        return m;
++    }
++    static std::map<std::string, std::weak_ptr<device>>& registry()
++    {
++        static std::map<std::string, std::weak_ptr<device>> r;
++        return r;
++    }
+ 
+   public:
+-    explicit device(std::wstring device_name) : device_name_(std::move(device_name))
++    device(const device&)            = delete;
++    device& operator=(const device&) = delete;
++
++    ~device()
+     {
+-        ALCchar* deviceName = nullptr;
++        if (thread_local_) {
++            if (alcGetThreadContext() == context_)
++                alcSetThreadContext(nullptr);
++        } else if (alcGetCurrentContext() == context_) {
++            alcMakeContextCurrent(nullptr);
++        }
++        if (context_) alcDestroyContext(context_);
++        if (device_)  alcCloseDevice(device_);
++    }
++
++    // Resolve the configured name like before (space-insensitive match against the OpenAL list,
++    // unknown name -> default device) and return the shared device for the resolved name.
++    static std::shared_ptr<device> open(const std::wstring& requested)
++    {
++        std::lock_guard<std::mutex> lock(registry_mutex());
+ 
+-        if (!device_name_.empty()) {
++        const ALCchar* name = nullptr;
++        if (!requested.empty()) {
+             if (alcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT")) {
+                 auto s = alcGetString(nullptr, alcIsExtensionPresent(nullptr, "ALC_ENUMERATE_ALL_EXT")
+                     ? ALC_ALL_DEVICES_SPECIFIER
+                     : ALC_DEVICE_SPECIFIER
+                 );
+-                deviceName = iterate_and_find_device(s, device_name_);
++                name = iterate_and_find_device(s, requested);
+ 
+-                if (deviceName)
++                if (name)
+                     CASPAR_LOG(debug) << L"Found specified OpenAL output device";
+                 else
+                     CASPAR_LOG(warning) << L"Failed to find specified OpenAL output device. Using default device";
+@@ -99,29 +166,41 @@ class device
+             }
+         }
+ 
+-        device_ = alcOpenDevice(deviceName);
+-        if (!device_) CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to initialize audio device."));
+-
+-        context_ = alcCreateContext(device_, nullptr);
+-        if (!context_) CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to create audio context."));
+-
+-        if (!alcMakeContextCurrent(context_))
+-            CASPAR_THROW_EXCEPTION(invalid_operation() << msg_info("Failed to activate audio context."));
++        auto  key    = std::string(name ? name : "");
++        auto& weak   = registry()[key];
++        auto  shared = weak.lock();
++        if (shared) {
++            CASPAR_LOG(info) << L"OpenAL: sharing the already open device "
++                             << (key.empty() ? std::wstring(L"(default)") : u16(key));
++            return shared;
++        }
++        shared = std::shared_ptr<device>(new device(name));
++        weak   = shared;
++        return shared;
+     }
+ 
+-    ~device()
++    // Select this device's context for the calling thread. Every AL call of a consumer runs on its
++    // initialize/teardown executor or on the channel's output thread; both call this first.
++    void activate()
+     {
+-        alcMakeContextCurrent(nullptr);
+-        if (context_) alcDestroyContext(context_);
+-        if (device_)  alcCloseDevice(device_);
++        if (thread_local_) {
++            if (alcGetThreadContext() != context_)
++                alcSetThreadContext(context_);
++        } else if (alcGetCurrentContext() != context_) {
++            alcMakeContextCurrent(context_);
++        }
+     }
+ 
+-    ALCdevice* get() { return device_; }
++    void deactivate()
++    {
++        if (thread_local_ && alcGetThreadContext() == context_)
++            alcSetThreadContext(nullptr);
++    }
+ 
+   private:
+-    static ALCchar* iterate_and_find_device(const char* list, const std::wstring& device_name)
++    static const ALCchar* iterate_and_find_device(const char* list, const std::wstring& device_name)
+     {
+-        ALCchar* result = nullptr;
++        const ALCchar* result = nullptr;
+ 
+         std::string short_device_name = u8(device_name);
+         boost::algorithm::erase_all(short_device_name, " ");
+@@ -131,7 +210,7 @@ class device
+         if (!list) {
+             CASPAR_LOG(info) << L"No device names found";
+         } else {
+-            ALCchar* ptr = (ALCchar*)list;
++            const ALCchar* ptr = list;
+             while (strlen(ptr) > 0) {
+                 CASPAR_LOG(info) << ptr;
+ 
+@@ -157,7 +236,7 @@ struct oal_consumer : public core::frame_consumer
+ 
+     core::video_format_desc format_desc_;
+ 
+-    device              device_;
++    std::shared_ptr<device> device_;
+     ALuint              source_ = 0;
+     std::vector<ALuint> buffers_;
+     std::queue<ALuint>  free_;
+@@ -172,7 +251,7 @@ struct oal_consumer : public core::frame_consumer
+     executor executor_{L"oal_consumer"};
+ 
+   public:
+-    explicit oal_consumer(std::wstring device_name) : device_{std::move(device_name)}
++    explicit oal_consumer(const std::wstring& device_name) : device_{device::open(device_name)}
+     {
+         graph_->set_color("tick-time", diagnostics::color(0.0f, 0.6f, 0.9f));
+         graph_->set_color("dropped-frame", diagnostics::color(0.3f, 0.6f, 0.3f));
+@@ -186,9 +265,11 @@ struct oal_consumer : public core::frame_consumer
+ 
+         executor_.invoke([=, this] {
+             if (source_) {
++                device_->activate();
+                 alSourceStop(source_);
+                 alDeleteSources(1, &source_);
+                 alDeleteBuffers(static_cast<ALsizei>(buffers_.size()), buffers_.data());
++                device_->deactivate();
+             }
+         });
+     }
+@@ -215,6 +296,7 @@ struct oal_consumer : public core::frame_consumer
+             swr_.reset(raw);
+             swr_init(raw);
+ 
++            device_->activate();
+             buffers_.resize(4);
+             alGenBuffers(static_cast<ALsizei>(buffers_.size()), buffers_.data());
+             for (auto buf : buffers_) free_.push(buf);
+@@ -242,6 +324,14 @@ struct oal_consumer : public core::frame_consumer
+         // screen consumer and OAL frame-accurately synchronized with no
+         // additional threads.
+         return std::async(std::launch::deferred, [this, frame = std::move(frame)] {
++            // This consumer's context on this channel's output thread for this frame only (WO-847);
++            // released on return so a channel thread never exits holding it.
++            device_->activate();
++            struct release_context
++            {
++                device& d;
++                ~release_context() { d.deactivate(); }
++            } release{*device_};
+ 
+             // Step 1: reclaim any buffers OpenAL has already finished playing
+             {
+-- 
+2.53.0
+

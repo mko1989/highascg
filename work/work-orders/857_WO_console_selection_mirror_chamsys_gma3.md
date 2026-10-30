@@ -1,7 +1,7 @@
 # WO-857 — Mirror the console's group / head selection in the previs (MagicQ, grandMA3 remote for VR programming)
 
 **Area:** lighting, tracking-vr
-**Status: OPEN — research done (30.10), nothing built; waits on the owner's answers to §3 (is grandMA3 in play and on what hardware; may the passive MagicQ CITP capture run). WO-837 30.10: MagicQ without ChamSys hardware runs in demo mode with no OSC**
+**Status: IN PROGRESS (30.10) — owner chose both consoles: common feed + grandMA3 plugin being built; MagicQ CITP capture test needs the owner at MagicQ**
 
 Owner, 30.10:
 > is it possible to mimic selections of groups from chamsys to the highascg visualizer? should be.
@@ -271,3 +271,10 @@ Order of work: common feed, grandMA3 plugin prototype, MagicQ CITP capture test.
    decides whether the grandMA3 path can show anything on the box.
 2. May I run the passive CITP capture while you press selections in MagicQ, and is it OK to set one universe's Visualiser
    type to "Capture (same pc)" for the test (it changes how that universe is output, and Capture is not installed)?
+
+## Owner decisions (30.10)
+
+- **Consoles: both.**
+  1. Build the common console-selection feed and the grandMA3 Lua plugin path.
+  2. Run the passive MagicQ CITP capture test. It needs the owner clicking selections in MagicQ, so it waits for a
+     session with the owner.

@@ -1,10 +1,21 @@
 # Custom CasparCG server build (PRs #1718–#1720)
 
-HighAsCG can generate `casparcg.config` XML for a **custom** `casparcg-server` binary that includes:
+HighAsCG can generate `casparcg.config` XML for a **custom** CasparCG build. The box's own build (`~/caspar-build/src-v2`,
+deployed as `~/highascg/bin/casparcg`) carries all three: they arrived with the CasparCG_Enhanced base (WO-233/234) and
+are newer there than the PR branches. Upstream closed the three PRs unmerged on 2026-05-31; #1719 was withdrawn for
+#1714, which 2.5.1 ships. Full comparison: [WO-847](../../work/work-orders/847_WO_casparcg_server_prs_1718_1720_consumers_audio.md).
 
-- **PR #1718** — Screen consumer: flexible `aspect-ratio`, `enable-mipmaps`, multi-display spanning (see upstream PR for full behavior). On NVIDIA hosts keep **`<vsync>true</vsync>`** and **Sync to VBlank off** in NVIDIA Settings — [screen-consumer-vsync-nvidia.md](../reference/screen-consumer-vsync-nvidia.md).
-- **PR #1719** — OAL consumer: video-scheduled audio (no extra HighAsCG XML; use stock OpenAL / system-audio paths).
-- **PR #1720** — **PortAudio** consumer: ASIO multi-channel output with configurable `device-name`, `output-channels`, buffer/latency/FIFO, `auto-tune-latency`.
+- **PR #1718** — Screen consumer: `aspect-ratio` (`16:9`, `3840:1080`, `3840/1080` or a decimal; empty = the channel
+  format, since WO-847), `enable-mipmaps`, `borderless` / `always-on-top` / explicit `x`/`y`/`width`/`height` for
+  spanning. The fork also keeps `force-linear-filter`; brightness/saturation were dropped (use MIXER). On NVIDIA hosts
+  keep **`<vsync>true</vsync>`** and **Sync to VBlank off** in NVIDIA Settings — [screen-consumer-vsync-nvidia.md](../reference/screen-consumer-vsync-nvidia.md).
+- **PR #1719** — OAL (`<system-audio>`): the Enhanced consumer gates the channel on OpenAL's playback (deferred future),
+  downmixes to stereo and reads only `<device-name>`. Since WO-847 several `<system-audio>` consumers work side by side
+  (one OpenAL context per device, selected per thread); consumers on the same device share it. 2.5.1's `<delay>` is not
+  in this build (WO-613 decision).
+- **PR #1720** — **PortAudio**: one consumer, settings in the root `<portaudio>` block (`device-name`, `host-api`
+  auto/ALSA/JACK, `output-channels`, `buffer-size-frames`, `latency-compensation-ms`, `fifo-ms`). `auto-tune-latency`
+  is accepted but does nothing in this build: no timing samples are ever collected (WO-847 §1).
 
 ## Settings
 
@@ -35,5 +46,5 @@ The **screen** / **aspect-ratio** / **mipmaps** parts (PR #1718) use a different
 
 ## References
 
-- [WO-07](./WO-07_CasparCG_Server_PRs_1718-1720_Consumers_Audio.md) — upstream integration work order.
+- [WO-847](../../work/work-orders/847_WO_casparcg_server_prs_1718_1720_consumers_audio.md) — PR comparison and the fork commits; [WO-613](../../work/work-orders/613_WO_next_caspar_build_on_v2_5_1.md) — the 2.5.1 build and the OAL decision.
 - GitHub PRs: [#1718](https://github.com/CasparCG/server/pull/1718), [#1719](https://github.com/CasparCG/server/pull/1719), [#1720](https://github.com/CasparCG/server/pull/1720).

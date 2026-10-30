@@ -279,3 +279,17 @@ Needs nothing: destinations, graph, `screen_N_*`, `program_N`/`preview_N` source
 7. **Single flag or two?** Ship channel-first and X-first as separate switches (safer, can sit half-way), or one combined "Operator GUI first" toggle?
 8. **When?** Is there a no-show window for the Caspar restart + `dryRun` first, and do you want the backup directory kept after success?
 9. **Hot-backup pair:** is the follower in use now (both boxes must flip together)?
+
+## Owner decisions (30.10)
+
+- **Q1 numbering:** shift every channel by one: 1 GUI, 2–3 PGM1/PRV1, 4–5 PGM2/PRV2, 6 DeckLink, and so on.
+- **Q2 Screen 1:** Dioda stays Screen 1 / `program_1`. Only the channel numbers and the positions change.
+- **Q7 switches:** one combined "Operator GUI first" switch. It moves the GUI to channel 1 and its monitor to x=0; the LED
+  wall moves to x=1920.
+- Not answered, so the recommended defaults apply:
+  - Q3: the wall moves in X;
+  - Q4: the switch refuses on boxes with `virtual_main_channels` or mapping-fed GPU outputs, and says why;
+  - Q5: every channel reference inside HighAsCG is remapped; outside consumers are listed in the WO;
+  - Q6: the stale `liveScenesByProgramChannel` keys are re-keyed;
+  - Q8: a `dryRun` comes first and the backup directory is kept;
+  - Q9: the follower must flip with it, and the switch warns when a follower is paired.

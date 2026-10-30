@@ -95,5 +95,7 @@ chown -R "${USER_CASPAR}:${USER_CASPAR}" "${PLAYOUT}/lib" 2>/dev/null || true
 echo
 command -v casparcg-scanner &>/dev/null && ok "scanner: $(command -v casparcg-scanner)"
 [[ -f "${PLAYOUT}/lib/libcef.so" ]] && ok "CEF: ${PLAYOUT}/lib/libcef.so"
+# WO-848: which libcef.so the binary resolves / the running Caspar maps (read-only; never fails the install).
+bash "${SETUP_DIR}/check-cef-caspar.sh" --quiet || echo "  note: CEF check reported FAIL — see above" >&2
 echo
 echo "Next: sudo bash ${SETUP_DIR}/09-openbox-autostart.sh"

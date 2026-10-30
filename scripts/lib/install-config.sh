@@ -32,6 +32,11 @@ URL_SCANNER_DEB="https://github.com/mko1989/highascg/releases/download/v1.4.0/ca
 CASPAR_PLAYOUT_ROOT="/home/casparcg/highascg"
 CASPAR_ENHANCED_VERSION="2.6.0"
 CASPAR_CEF_VERSION="142.0.17"
+# WO-848: pins for URL_CEF_BINARY_TAR, checked by install_highascg_cef_binary before lib/ is touched and by
+# scripts/setup/check-cef-caspar.sh. The archive pin is the URL_HASH of the fork's CMake download
+# (src/CMakeModules/Bootstrap_Linux.cmake); libcef.so is the file inside it (= ~/highascg/lib/libcef.so).
+CEF_BINARY_SHA256="2a03fa6b9da0e374fb318903d9502e098ac91ba2ec5be83e96ae076b5aa63cc9"
+CEF_LIBCEF_SHA256="fa0993fab321ee4e35122f6104b1f2c2e3d22b2323f02682a206996e8904ed57"
 SCANNER_PIN_VERSION="1.4.0"
 
 # Colors for terminal output
