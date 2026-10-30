@@ -2,6 +2,12 @@
 
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
+// Hermetic: operator-monitor-resolve and the GPU fallback read the box's real monitors (hardware-info); with real
+// heads connected the port resolves to a live xrandr output instead of the layouts below (DP-4 vs DP-2 on the box).
+// Stubbed before the modules under test load, so their destructured imports take the stubs.
+const hw = require('../../src/utils/hardware-info')
+hw.getDisplayDetails = () => []
+hw.getGpuConnectorInventory = () => []
 const {
 	resolveOperatorDisplayRect,
 	isOperatorPointerConfineDesired,
