@@ -232,9 +232,15 @@ async function handlePost(path, body, ctx) {
 		const { setDefaultAlsaDevice } = require('../audio/audio-devices')
 		const res = setDefaultAlsaDevice(card, device, { scope })
 		if (!res.ok) {
-			apiLog(ctx, 'error', `[Audio] ALSA default write failed (${scope}): ${res.error || 'unknown'}`)
+			// WO-845b: a rejected card/device is the caller's mistake (400); a failed write is ours (500).
+			const status = res.invalid ? 400 : 500
+			apiLog(
+				ctx,
+				status === 400 ? 'warn' : 'error',
+				`[Audio] ALSA default ${status === 400 ? 'rejected' : 'write failed'} (${scope}): ${res.error || 'unknown'}`
+			)
 			return {
-				status: 500,
+				status,
 				headers: JSON_HEADERS,
 				body: jsonBody({
 					ok: false,

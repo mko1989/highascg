@@ -5,26 +5,44 @@ const { portKeyFromPacket, parseArtDmx, readByte } = require('./artnet-packet')
 const { PATCH_CHANNEL_COUNT } = require('./artnet-constants')
 const tap = require('./artnet-tap')
 
-function bindUdpSocket(receiver) {
+/** WO-845b: drop a socket that never made it to 'listening' so the next ensureSocketListening() can retry. */
+function discardSocket(receiver, socket) {
+	if (receiver._socket === socket) receiver._socket = null
 	try {
-		const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+		socket.close()
+	} catch (_) {
+		/* never bound / already closed */
+	}
+}
+
+function bindUdpSocket(receiver) {
+	let socket = null
+	try {
+		socket = dgram.createSocket({ type: 'udp4', reuseAddr: true })
+		const sock = socket
 		let owning = false // counted in artnet-tap while listening
-		socket.on('error', (e) => {
+		sock.on('error', (e) => {
 			receiver.log('error', `[ArtNet] UDP socket error: ${e.message}`)
+			if (!owning) {
+				// bind failed (EADDRINUSE/EACCES…): the socket is dead — release it so a retry can rebind.
+				receiver._bindError = e.message
+				discardSocket(receiver, sock)
+			}
 		})
-		socket.on('close', () => {
+		sock.on('close', () => {
 			if (owning) tap.ownerChanged(-1)
 			owning = false
-			if (receiver._socket === socket) {
+			if (receiver._socket === sock) {
 				receiver._socket = null
 				receiver.log('warn', '[ArtNet] UDP socket closed — will re-bind on next reconfigure if listen is enabled')
 			}
 		})
-		socket.on('message', (msg, rinfo) => onUdpMessage(receiver, msg, rinfo))
-		socket.on('listening', () => {
+		sock.on('message', (msg, rinfo) => onUdpMessage(receiver, msg, rinfo))
+		sock.on('listening', () => {
 			owning = true
+			receiver._bindError = null
 			tap.ownerChanged(1)
-			const addr = socket.address()
+			const addr = sock.address()
 			receiver.log(
 				'info',
 				`[ArtNet] UDP listening on ${addr.address}:${addr.port} ` +
@@ -33,9 +51,11 @@ function bindUdpSocket(receiver) {
 					`→ Caspar PGM ch${receiver._resolveProgramChannel()}`,
 			)
 		})
-		socket.bind(receiver._inputPort, '0.0.0.0')
-		receiver._socket = socket
+		sock.bind(receiver._inputPort, '0.0.0.0')
+		receiver._socket = sock
 	} catch (e) {
+		receiver._bindError = e.message
+		if (socket) discardSocket(receiver, socket)
 		receiver.log('error', `[ArtNet] Failed to start UDP receiver: ${e.message}`)
 	}
 }

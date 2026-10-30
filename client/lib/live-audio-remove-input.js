@@ -34,12 +34,19 @@ export async function removeLiveAudioInputSlot(stateStore, slot) {
 
 	const slots = Array.isArray(prevUi.slots) ? [...prevUi.slots] : Array.from({ length: LIVE_AUDIO_MAX_SLOTS }, () => '')
 	slots[s - 1] = ''
+	// WO-845b: forget this slot's persisted route selection too (null = "never saved" → no key is sent; the
+	// server already neutralises the removed slot's pgm_channels, this just stops the client echoing it).
+	const routeTargets = Array.isArray(prevUi.routeTargets)
+		? [...prevUi.routeTargets]
+		: Array.from({ length: LIVE_AUDIO_MAX_SLOTS }, () => null)
+	routeTargets[s - 1] = null
 	let count = Math.max(0, Math.min(LIVE_AUDIO_MAX_SLOTS, prevUi.count || 0))
 	while (count > 0 && !String(slots[count - 1] || '').trim()) count--
 
 	const nextUi = {
 		...prevUi,
 		slots,
+		routeTargets,
 		count,
 		hostChannelEnabled: count > 0 ? true : prevUi.hostChannelEnabled,
 	}

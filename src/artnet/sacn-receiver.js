@@ -24,6 +24,11 @@ class SacnReceiver extends DmxBorderReceiverBase {
 		return 5568
 	}
 
+	/** sACN universes are 1..63999 (WO-845b: they were clamped to the Art-Net 0..15). */
+	_universeRange() {
+		return [1, 63999]
+	}
+
 	_statsHead(s) {
 		return `rx dmx=${s.dmx}`
 	}
@@ -40,30 +45,71 @@ class SacnReceiver extends DmxBorderReceiverBase {
 		this._ensureListening()
 	}
 
+	/** Seam for tests (the `sacn` Receiver binds a real socket). */
+	_createTransport(opts) {
+		return new SacnReceiverImpl(opts)
+	}
+
+	/** Close the current transport and forget what it was bound to, so the next _ensureListening() rebinds. */
+	_closeTransport() {
+		const old = this._socket
+		this._socket = null
+		this._boundUniverse = null
+		this._boundPort = null
+		if (!old) return
+		try {
+			old.removeAllListeners('packet')
+			old.on('error', () => {}) // a late socket error after close() must not throw
+			old.close()
+		} catch (_) {
+			/* already closed */
+		}
+	}
+
 	_ensureListening() {
 		if (!this._effectiveListen()) return
-		if (this._socket) return
+		if (this._socket) {
+			// WO-845b: the multicast membership is fixed at construction — a universe (or port) change
+			// used to leave the old group joined and the new one never subscribed.
+			if (this._boundUniverse === this._inputUniverse && this._boundPort === this._inputPort) return
+			this.log(
+				'info',
+				`[sACN] Universe ${this._boundUniverse}:${this._boundPort} → ${this._inputUniverse}:${this._inputPort} — re-subscribing`
+			)
+			this._closeTransport()
+		}
 
 		try {
-			this._socket = new SacnReceiverImpl({
+			const transport = this._createTransport({
 				universes: [this._inputUniverse],
 				port: this._inputPort,
 				reuseAddr: true,
 			})
+			this._socket = transport
+			this._boundUniverse = this._inputUniverse
+			this._boundPort = this._inputPort
 
-			this._socket.on('packet', (packet) => {
+			transport.on('packet', (packet) => {
 				this._bumpStat('udp')
 				this._handleSacnPacket(packet)
 			})
 
-			this._socket.on('error', (err) => {
+			transport.on('error', (err) => {
 				this._bumpStat('errors')
 				this._throttledDropLog('sacn-error', `[sACN] Error: ${err?.message || err}`)
+				// A failed bind leaves a dead socket that would block every later retry.
+				if (err?.syscall === 'bind' && this._socket === transport) {
+					this._bindError = err?.message || String(err)
+					this._closeTransport()
+				}
 			})
 
+			this._bindError = null
 			this.log('info', `[sACN] Receiver listening on universe ${this._inputUniverse}, port ${this._inputPort}`)
 		} catch (err) {
 			this._bumpStat('errors')
+			this._bindError = err?.message || String(err)
+			this._closeTransport()
 			this.log('error', `[sACN] Failed to initialize receiver: ${err?.message || err}`)
 		}
 	}

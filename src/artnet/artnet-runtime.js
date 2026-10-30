@@ -6,7 +6,9 @@ const { slotListenEnabled, normalizeChannelMap } = require('./artnet-slot-config
 function applyPatch(receiver, patch, source = 'config') {
 	const net = Math.max(0, Math.min(127, parseInt(patch?.net, 10) || 0))
 	const subnet = Math.max(0, Math.min(15, parseInt(patch?.subnet, 10) || 0))
-	const universe = Math.max(0, Math.min(15, parseInt(patch?.universe, 10) || 0))
+	// WO-845b: Art-Net's universe is the 4-bit low nibble of the port-address (0..15); sACN universes are 1..63999.
+	const [uniMin, uniMax] = typeof receiver._universeRange === 'function' ? receiver._universeRange() : [0, 15]
+	const universe = Math.max(uniMin, Math.min(uniMax, parseInt(patch?.universe, 10) || 0))
 	const startChannel = Math.max(1, Math.min(512, parseInt(patch?.startChannel, 10) || 1))
 	const subuni = (subnet << 4) | (universe & 0x0f)
 	const portKey = (subuni << 8) | (net & 0xff)
@@ -65,6 +67,7 @@ function getInputStatus(receiver) {
 		masterDmxEnabled && !!slot && artnetListenEnabled && receiver._targetConfigured
 	return {
 		listening: !!receiver._socket,
+		bindError: receiver._bindError || null,
 		targetConfigured: receiver._targetConfigured,
 		screenIndex: screenIdx,
 		screenLabel: `main ${screenIdx + 1}`,

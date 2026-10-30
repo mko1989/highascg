@@ -81,6 +81,11 @@ class DmxBorderReceiverBase {
 		this._warnedNoGlobalBorder = new Set()
 	}
 
+	/** WO-845b: [min, max] of `_inputUniverse` for this protocol (Art-Net: the low nibble 0..15; sACN overrides). */
+	_universeRange() {
+		return [0, 15]
+	}
+
 	_resolveProgramChannel() {
 		return resolveProgramChannel(this.appCtx, this._targetScreenIndex)
 	}
@@ -365,6 +370,8 @@ class DmxBorderReceiverBase {
 			} catch (_) {}
 			this._socket = null
 		}
+		this._boundUniverse = null
+		this._boundPort = null
 		this.lastData = null
 		this._lastAppliedKey = null
 		if (this._casparFlushTimer) {

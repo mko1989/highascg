@@ -245,7 +245,7 @@ function setDefaultAlsaDevice(card, device, opts = {}) {
 
 	// WO-845: the route only parseInt()s — NaN / negatives wrote `defaults.pcm.card NaN` into the file.
 	if (!Number.isInteger(card) || !Number.isInteger(device) || card < 0 || device < 0) {
-		return { ok: false, error: 'card and device must be non-negative integers' }
+		return { ok: false, invalid: true, error: 'card and device must be non-negative integers' }
 	}
 	const scope = opts.scope === 'system' ? 'system' : 'user'
 	const content = `defaults.pcm.card ${card}\ndefaults.pcm.device ${device}\ndefaults.ctl.card ${card}\n`

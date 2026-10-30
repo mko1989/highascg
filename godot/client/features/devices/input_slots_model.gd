@@ -182,10 +182,16 @@ static func _shrunk(prev: Dictionary, s: int) -> Dictionary:
 	var next := prev.duplicate()
 	var slots: Array = prev.slots.duplicate()
 	slots[s - 1] = ""
+	# WO-845b: forget the removed slot's persisted route selection too (null = never saved → no key is sent).
+	var targets: Array = R.a(prev.get("routeTargets")).duplicate()
+	while targets.size() < MAX_SLOTS:
+		targets.append(null)
+	targets[s - 1] = null
 	var count := clampi(prev.count, 0, MAX_SLOTS)
 	while count > 0 and _str(slots[count - 1]).strip_edges() == "":
 		count -= 1
 	next.slots = slots
+	next.routeTargets = targets
 	next.count = count
 	return next
 
