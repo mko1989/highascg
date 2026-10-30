@@ -31,3 +31,9 @@ one is a regression, whatever else it fixes. Add a rule here when the owner stat
    goes back to.
 5. **No silent fallback.** The header always shows which server the client is connected to ("local", or amber
    "on <host>").
+
+## Test tooling (owner, 30.10, WO-836)
+
+1. **A Caspar print always returns the full channel.** `tools/test-agent/caspar print` answers for the whole channel
+   frame (an LED canvas bigger than the clip included, transparent surround and all); a `--crop` box is reported
+   beside the full-channel numbers, never instead of them. Card limits are calibrated to the full channel.

@@ -21,6 +21,7 @@ control per line. The driver was already started for you (`ui start`); never sta
 | What can I click? | `tools/test-agent/ui list` | every visible control with its label and where it is on screen. Narrow it: `ui list buttons`, `fields`, `tabs`, `options`, `rows` (media/file lists), `labels` (text on screen), `menu` (an open right-click menu), `--under "<container>"` (a tab title or section heading), `--limit N`. |
 | Is this label on screen? | `ui find "<label>"` | JSON with `matches` (each has `at`: x,y) or an error with the closest labels. |
 | Wait for something to appear | `ui wait_for "<label>" 10` | seconds timeout; `--gone` waits for it to disappear. |
+| It is scrolled out of sight | `ui reveal "<label>"` | scrolls its scroll area (like the wheel) until the first control with that label or tooltip shows; answers that control as `match` (`cx`,`cy` = its centre). `--nth N` picks a later one, `--contains` matches part of the text. Only when a card says so. |
 | Where am I? | `ui state` | current tab, focused control, open dialogs (title, text, buttons) and menus. |
 
 A `ui list` line looks like:
@@ -60,13 +61,16 @@ tools/test-agent/caspar info 1              → what plays on channel 1: [{"laye
 tools/test-agent/caspar info 1-110          → same, filtered to layer 110
 tools/test-agent/caspar print 1             → LIVE ONLY. Caspar photographs channel 1: {"png":"<path>","mean_luma":…,"mean_rgb":[r,g,b],
                                               "nonblack_fraction":…,"mean_alpha":…}  (open the png with Read as well)
-tools/test-agent/caspar print 1 --crop 0,0,960,540     → the same numbers for that box only (x,y,w,h; must lie inside the frame)
+tools/test-agent/caspar print 1 --crop 0,0,960,540     → the full-channel numbers as always, plus "crop": the same numbers for
+                                                        that box only (x,y,w,h; must lie inside the frame)
 tools/test-agent/caspar api /api/timelines  → read-only GET of the node's API, prints the JSON
 ```
 
 - `mean_luma` is the brightness 0–255 (black = 0). `nonblack_fraction` is the share of pixels brighter than 16 (black = 0, a
   full picture = about 1). `mean_alpha`/`alpha_note` describe transparency: if the note says the alpha plane is all zero, say so in
-  your evidence; judge the picture by the PNG you opened, and by the numbers the card names.
+  your evidence; judge the picture by the PNG you opened, and by the numbers the card names. A print always covers the FULL
+  channel (`frame` is its size). `alpha_nonzero_fraction` is the share of pixels that are not transparent: a screen canvas
+  bigger than the clip (an LED wall) is transparent around the picture, and Read shows that as white.
 - Clip names in `caspar info` may be UPPER CASE or carry a folder; compare case-insensitively with "contains".
 - `caspar print` on the sandbox answers `no Caspar in the sandbox` (exit code 2). Steps marked **LIVE-ONLY** in a card are
   then recorded as `SKIPPED (sandbox)`; they do not fail the card.

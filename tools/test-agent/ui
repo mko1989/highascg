@@ -11,7 +11,7 @@
  *   ui type <field> <text> [--no-submit]    ui choose <option> <item>    ui drag <from label> <to label>
  *   ui click_xy X Y [--double|--right]  ui drag_xy X1 Y1 X2 Y2 [--steps N]  ui move X Y  ui scroll X Y up|down [N]
  *   ui type "text"    ui key ctrl+z    ui shot <name>    ui wait <s>    ui wait_for <label> [timeout] [--gone]
- *   ui state    ui find <label>
+ *   ui state    ui find <label>    ui reveal <label> [--contains] [--nth N]
  * Prints one JSON object per command; exit 1 when ok:false.
  */
 
@@ -74,6 +74,10 @@ async function run(argv) {
 		case 'find':
 			need(pos, 1, 'find <label> [--kind K] [--under X] [--contains]')
 			result = await act.ask(st, { cmd: 'find', label: pos[0], kind: flags.kind || '', under: flags.under || '', contains: !!flags.contains })
+			break
+		case 'reveal':
+			need(pos, 1, 'reveal <label> [--contains] [--nth N]')
+			result = await act.ask(st, { cmd: 'reveal', label: pos[0], contains: !!flags.contains, nth: Number(flags.nth || 1) })
 			break
 		case 'tab':
 			need(pos, 1, 'tab <title>')

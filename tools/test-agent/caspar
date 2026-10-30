@@ -73,15 +73,17 @@ async function print(t, pos, flags) {
 	const dest = path.join(outDir, `${n}_ch${channel}.png`)
 	fs.copyFileSync(file, dest)
 	fs.unlinkSync(file) // the scratch print is the test's, not the media library's
-	let img = png.decodePng(fs.readFileSync(dest))
-	const res = { channel, png: dest, frame: `${img.width}x${img.height}` }
+	const img = png.decodePng(fs.readFileSync(dest))
+	const opts = { threshold: flags.threshold != null ? Number(flags.threshold) : 16 }
+	// Owner rule (30.10): a print always answers for the FULL channel; a --crop box is reported beside it, never instead
+	const res = { channel, png: dest, frame: `${img.width}x${img.height}`, ...png.stats(img, opts) }
 	if (crop) {
-		img = png.cropImage(img, crop)
-		res.crop = crop
-		res.crop_png = dest.replace(/\.png$/, `_crop_${crop.x}_${crop.y}_${crop.w}_${crop.h}.png`)
-		fs.writeFileSync(res.crop_png, png.encodePng(img))
+		const part = png.cropImage(img, crop)
+		const cropPng = dest.replace(/\.png$/, `_crop_${crop.x}_${crop.y}_${crop.w}_${crop.h}.png`)
+		fs.writeFileSync(cropPng, png.encodePng(part))
+		res.crop = { box: crop, png: cropPng, ...png.stats(part, opts) }
 	}
-	return { ...res, ...png.stats(img, { threshold: flags.threshold != null ? Number(flags.threshold) : 16 }) }
+	return res
 }
 
 async function info(t, pos) {

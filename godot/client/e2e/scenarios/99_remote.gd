@@ -7,6 +7,7 @@ extends "res://e2e/e2e_scenario.gd"
 ## like a human's hands. Run via `tools/test-agent/ui start` (sandbox or live); ends on `quit`.
 
 const Eyes := preload("res://e2e/e2e_eyes.gd")
+const UI := preload("res://e2e/e2e_ui.gd")
 
 var _eyes: RefCounted
 var _quit := false
@@ -91,6 +92,8 @@ func _dispatch(cmd: String, a: Dictionary) -> Dictionary:
 			return _ok({"count": r.matches.size(), "matches": (r.matches as Array).slice(0, 12)})
 		"wait_for":
 			return await _wait_for(a)
+		"reveal":
+			return await _reveal(a)
 		"state":
 			return _ok(_state())
 		"covered":
@@ -104,7 +107,33 @@ func _dispatch(cmd: String, a: Dictionary) -> Dictionary:
 		"quit":
 			_quit = true
 			return _ok("bye")
-	return _err("unknown command '%s' (ping list find wait_for state covered popups shot quit)" % cmd)
+	return _err("unknown command '%s' (ping list find wait_for reveal state covered popups shot quit)" % cmd)
+
+
+## A control scrolled out of its scroll area (the deck's "+" after many looks) is not on screen, so `list`/`find` miss it.
+## Scroll the areas above the `nth` control (tree order) whose text or tooltip is `label` until it shows — what the
+## operator's wheel would do — and answer where it now is.
+func _reveal(a: Dictionary) -> Dictionary:
+	var label := str(a.get("label", ""))
+	var contains := bool(a.get("contains", false))
+	var hits := []
+	for c in ui.all("Control", null, false):
+		if not (c as Control).is_visible_in_tree():
+			continue
+		for s in [UI.label_of(c), (c as Control).tooltip_text.strip_edges()]:
+			if s != "" and (s == label or (contains and s.contains(label))):
+				hits.append(c)
+				break
+	var nth := maxi(int(a.get("nth", 1)), 1)
+	if hits.size() < nth:
+		return _err("no control labelled '%s' (%d found, even scrolled away)" % [label, hits.size()])
+	var c: Control = hits[nth - 1]
+	await ui.reveal(c)
+	var text := UI.label_of(c)
+	var e: Dictionary = _eyes._entry("button" if c is BaseButton else "control", c, text if text != "" else c.tooltip_text.strip_edges(), ui.screen_rect(c))
+	if e.is_empty():
+		return _err("'%s' is still off screen after scrolling (a collapsed or hidden section?)" % label)
+	return _ok({"count": hits.size(), "match": e})
 
 
 func _wait_for(a: Dictionary) -> Dictionary:
