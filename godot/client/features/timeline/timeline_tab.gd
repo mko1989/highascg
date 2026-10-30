@@ -15,6 +15,8 @@ extends VBoxContainer
 ## PRV / PGM posted at once, Take with a transition. Slice 9: effects — Sources' EFFECTS dropped on a clip, the
 ## clip page's Mixer Effects group. WO-810: the transport + Dest controls are one row between the preview and the
 ## timeline canvas (timeline_layout.gd).
+## WO-837: screen sections ("+ Screen" menu here, the rows in timeline_rows.gd) and light flags (the consoles list
+## is fetched whenever the tab is shown; a console error the engine broadcasts shows in the Dest row's status).
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TimelineView := preload("res://features/timeline/timeline_view.gd")
@@ -27,6 +29,10 @@ const ClipInspector := preload("res://features/timeline/timeline_clip_inspector.
 const FlagInspector := preload("res://features/timeline/timeline_flag_inspector.gd")
 const LayerInspector := preload("res://features/timeline/timeline_layer_inspector.gd")
 const TimelineMedia := preload("res://features/timeline/timeline_media.gd")
+const RW := preload("res://features/timeline/timeline_rows.gd")
+const L := preload("res://features/timeline/timeline_layers.gd")
+const LightFetch := preload("res://features/timeline/timeline_light_fetch.gd")
+const DeckModel := preload("res://features/live/deck_model.gd")
 const F := preload("res://features/timeline/timeline_flags.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
 const EffectsModel := preload("res://features/live/effects_model.gd")
@@ -69,10 +75,18 @@ func _ready() -> void:
 	view.layer_selected.connect(_on_layer_selected)
 	view.layers_edited.connect(_layers_commit)
 	view.layer_menu.connect(func(_li: int) -> void: _layer_page.menu())
+	view.screen_add_requested.connect(_screen_menu)
 	preview_slot = PanelContainer.new()
 	preview_slot.custom_minimum_size.y = 120
 	preview_slot.add_theme_stylebox_override("panel", ThemeBuilder.box(Color.BLACK, ThemeBuilder.BORDER, 0, 0))
 	visibility_changed.connect(_borrow_preview)
+	visibility_changed.connect(func() -> void:
+		if is_visible_in_tree():
+			LightFetch.fetch(view))  # the chips and the light page name the consoles added in Devices
+	Ws.on("lighting.error", _on_light_error)
+	Store.changed.connect(func(path: String, _v: Variant) -> void:
+		if path == "*" or path == "channelMap":
+			_screen_names())
 	_borrow_preview.call_deferred()
 	var split := TimelineLayout.stack(preview_slot, [transport, dest], view)  # WO-810: preview, controls row, timeline
 	var cfg := ConfigFile.new()
@@ -125,6 +139,7 @@ func active() -> Dictionary:
 
 
 func refresh() -> void:
+	_screen_names()
 	view.set_timeline(active())
 	transport.refresh()
 
@@ -180,6 +195,46 @@ func _on_layer_selected(li: int) -> void:
 		return
 	InspectorPanel.current.present(_layer_page)
 	_layer_page.show_layer(active(), li)
+
+
+## "+ Screen": the screens that have no section yet (names from the channel map); a pick adds the empty section.
+func _screen_menu() -> void:
+	var tl := active()
+	if tl.is_empty():
+		return
+	var free := RW.available_screens(tl, DeckModel.screen_count(_cm()))
+	var pm := PopupMenu.new()
+	if free.is_empty():
+		pm.add_item("All screens already have a section", 0)
+		pm.set_item_disabled(0, true)
+	for s in free:
+		pm.add_item(RW.screen_label(view.screen_names, s), 100 + s)
+	pm.id_pressed.connect(func(id: int) -> void:
+		if L.add_screen(tl, id - 100):
+			view.set_timeline(tl)
+			_layers_commit())
+	pm.popup_hide.connect(pm.queue_free)
+	add_child(pm)
+	var at := Vector2i(get_viewport().get_mouse_position())
+	if not get_viewport().gui_embed_subwindows:  # see deck_view.gd _card_menu
+		at += get_window().position
+	pm.popup(Rect2i(at, Vector2i.ZERO))
+
+
+func _cm() -> Dictionary:
+	var cm: Variant = Store.get_value("channelMap", {})
+	return cm if cm is Dictionary else {}
+
+
+func _screen_names() -> void:
+	view.screen_names = RW.screen_names(_cm(), DeckModel.screen_count(_cm()))
+	view.queue_redraw()
+
+
+## WS lighting.error {timelineId, flagId, label, consoleId, error}: a light flag fired and its console did not take it.
+func _on_light_error(d: Variant) -> void:
+	if d is Dictionary:
+		transport.status("Light flag%s: %s" % [" \"%s\"" % str(d.label) if str(d.get("label", "")) != "" else "", str(d.get("error", "console error"))])
 
 
 func _layers_commit() -> void:
@@ -273,7 +328,7 @@ func _remove_selected() -> void:
 
 ## onDropSource: add layers up to the drop row, replace the clip under the drop or add a new one and lay it out
 ## for its content fit on the timeline's program canvas (applyTimelineClipLayoutFromMedia).
-func _on_drop(src: Dictionary, li: int, ms: float) -> void:
+func _on_drop(src: Dictionary, li: int, ms: float, screen := RW.ALL) -> void:
 	var tl := active()
 	if tl.is_empty():
 		return
@@ -284,8 +339,7 @@ func _on_drop(src: Dictionary, li: int, ms: float) -> void:
 	if not is_same(tl, active()):
 		return
 	while (tl.layers as Array).size() <= li:
-		(tl.layers as Array).append({"id": TM.uid(), "name": TE.next_layer_name(tl), "clips": []})
-		TM.ensure_heights(tl)
+		L.add_in_section(tl, screen)  # WO-837: a new layer lands in the section it was dropped on
 	var c := TM.hit_clip(tl, li, ms)
 	if not c.is_empty():
 		TE.replace_clip_source(tl, li, str(c.id), src, dur)

@@ -17,17 +17,22 @@ extends Control
 ## drag trades height with the layer below (Shift: all layers); a double-click on a header or an empty track adds a
 ## layer below (below the last: at the end); right-click on a header asks the tab for the layer menu. Selecting a
 ## layer clears the clip / flag selection and the other way round; the selected header is lit (the web shows none).
+## WO-837: screen sections (timeline_rows.gd — a divider row per screen, "+ Screen" in the corner, a layer dragged across
+## a divider changes its screenIdx), the control lane at the bottom (timeline_lane.gd — companion_press / light flags as
+## stacking chips; select / drag / Delete work on them as on ruler markers), and vertical scroll (wheel over the layer
+## headers or Ctrl + wheel, the thumb on the right edge). The drag gestures moved to timeline_view_drag.gd.
 
 signal seek_requested(ms: float)
 signal clip_selected(li: int, clip_id: String)  # clip_id "" = nothing selected
 signal edited
-signal source_dropped(source: Dictionary, li: int, ms: float)
+signal source_dropped(source: Dictionary, li: int, ms: float, screen: int)  # screen: the section of a new layer (RW.ALL = none)
 signal keyframes_edited
 signal flag_selected(id: String)  # "" = none
 signal flags_edited
 signal layer_selected(li: int)  # -1 = none
 signal layers_edited
 signal layer_menu(li: int)
+signal screen_add_requested  # "+ Screen" pressed: the tab shows the menu of screens not yet in the timeline
 
 const TM := preload("res://features/timeline/timeline_math.gd")
 const TE := preload("res://features/timeline/timeline_edit.gd")
@@ -37,6 +42,10 @@ const F := preload("res://features/timeline/timeline_flags.gd")
 const FD := preload("res://features/timeline/timeline_flag_draw.gd")
 const L := preload("res://features/timeline/timeline_layers.gd")
 const VD := preload("res://features/timeline/timeline_view_draw.gd")
+const DR := preload("res://features/timeline/timeline_view_drag.gd")
+const RW := preload("res://features/timeline/timeline_rows.gd")
+const LN := preload("res://features/timeline/timeline_lane.gd")
+const LF := preload("res://features/timeline/timeline_light.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 
 var tl: Dictionary = {}
@@ -53,6 +62,8 @@ var sel_flag := ""
 var sel_layer := -1
 var last_layer := -1  # the web's selectedLayer: the last layer or clip clicked — the paste target (never cleared)
 var last_clicked := ""  # the web's canvas.dataset.lastClicked: ruler / divider / header / track / clip
+var screen_names := {}  # screen index → label, from the channel map (the tab keeps it current)
+var layers_bottom := 0.0  # where the layer area ends on screen (the control lane starts there); set by the painting
 var _drag := {}
 var _seek_at := 0
 
@@ -61,6 +72,9 @@ func _ready() -> void:
 	clip_contents = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	focus_mode = Control.FOCUS_CLICK
+	resized.connect(func() -> void:
+		_clamp_y()
+		queue_redraw())
 
 
 func set_timeline(t: Dictionary) -> void:
@@ -78,7 +92,22 @@ func set_timeline(t: Dictionary) -> void:
 		last_layer = -1
 		last_clicked = ""
 		fit()
+	_clamp_y()
 	queue_redraw()
+
+
+## The control lane as laid out at the current zoom: {chips: [{flag, x, w, row}], count}.
+func lane() -> Dictionary:
+	return LN.layout(tl, px_per_ms, func(f: Dictionary) -> String: return LF.chip_text(f) if str(f.get("type", "")) == "light" else "")
+
+
+## RW.viewport for the current size: where the lane starts, how far the layers scroll.
+func vp() -> Dictionary:
+	return RW.viewport(tl, size.y, int(lane().count))
+
+
+func _clamp_y() -> void:
+	scroll_y = clampf(scroll_y, 0.0, float(vp().max_scroll)) if not tl.is_empty() else 0.0
 
 
 func fit() -> void:
@@ -124,43 +153,26 @@ func _gui_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.pressed and mb.button_index in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 			var dir := 1 if mb.button_index == MOUSE_BUTTON_WHEEL_UP else -1
-			if mb.shift_pressed or mb.alt_pressed:  # pan
+			if mb.ctrl_pressed or (mb.position.x < TM.HEADER_W and mb.position.y >= TM.RULER_H):  # WO-837: scroll the layers
+				scroll_y = clampf(scroll_y - dir * 48.0, 0.0, float(vp().max_scroll))
+			elif mb.shift_pressed or mb.alt_pressed:  # pan
 				_clamp_scroll(scroll_x - dir * 80.0 / px_per_ms)
 			else:  # zoom around the cursor
 				var at := TM.ms_at(maxf(mb.position.x, TM.HEADER_W), px_per_ms, scroll_x)
 				px_per_ms = TM.zoom(px_per_ms, dir)
 				_clamp_scroll(at - (maxf(mb.position.x, TM.HEADER_W) - TM.HEADER_W) / px_per_ms)
+				_clamp_y()  # the lane's rows depend on the zoom
 			queue_redraw()
 			accept_event()
 		elif mb.button_index == MOUSE_BUTTON_LEFT:
 			if mb.pressed:
-				last_clicked = _zone(mb.position)
-			if mb.pressed and not F.hit(tl, mb.position, _x).is_empty():
-				var f := F.hit(tl, mb.position, _x)
-				select_flag(str(f.id))
-				_drag = {"flag": f, "orig": float(f.get("timeMs", 0))}
-				accept_event()
-			elif mb.pressed and mb.position.y < TM.RULER_H and mb.position.x > TM.HEADER_W:
-				_scrubbing = true
-				_seek_to(mb.position.x)
-				accept_event()
-			elif mb.pressed and mb.position.y >= TM.RULER_H and TM.hit_divider(tl, mb.position.y, scroll_y) >= 0:
-				TM.ensure_heights(tl)
-				_drag = {"div": TM.hit_divider(tl, mb.position.y, scroll_y), "orig": (tl.layerHeights as Array).duplicate(),
-					"y0": mb.position.y, "shift": mb.shift_pressed}
-				accept_event()
-			elif mb.pressed and mb.position.x > TM.HEADER_W:
-				_press_track(mb.position, mb.double_click)
-				accept_event()
-			elif mb.pressed and mb.position.y >= TM.RULER_H:
-				_press_header(mb.position, mb.double_click)
-				accept_event()
-			elif not mb.pressed:
+				_press(mb)
+			else:
 				_scrubbing = false
-				_end_drag()
+				DR.end_drag(self)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT and mb.pressed and mb.position.x < TM.HEADER_W and mb.position.y >= TM.RULER_H:
-			var li := TM.layer_at_y(tl, mb.position.y, scroll_y)
-			if li >= 0 and li < (tl.layers as Array).size():
+			var li := RW.layer_at(tl, mb.position.y, scroll_y)
+			if li >= 0 and li < (tl.layers as Array).size() and mb.position.y < layers_bottom:
 				select_layer(li)
 				layer_menu.emit(li)
 				accept_event()
@@ -170,10 +182,57 @@ func _gui_input(event: InputEvent) -> void:
 			_seek_to(mm.position.x)
 			accept_event()
 		elif not _drag.is_empty():
-			_drag_to(mm.position)
+			DR.drag_to(self, mm.position)
 			accept_event()
 		else:
 			_hover(mm.position)
+
+
+## A left press, first match wins: the scroll thumb, a control-lane chip (or the empty lane), a ruler flag, the "+ Screen"
+## corner, the ruler (seek), a layer-height divider, a track, a header.
+func _press(mb: InputEventMouseButton) -> void:
+	var pos := mb.position
+	var v := vp()
+	last_clicked = _zone(pos)
+	accept_event()
+	var th := RW.thumb(v, float(RW.content_h(tl)), scroll_y)
+	if not th.is_empty() and pos.x >= size.x - RW.SCROLLBAR_W and pos.y >= TM.RULER_H and pos.y < float(v.layers_bottom):
+		var grab: float = pos.y - float(th[0]) if pos.y >= float(th[0]) and pos.y < float(th[0]) + float(th[1]) else float(th[1]) / 2.0
+		_drag = {"vbar": true, "off": grab}
+		DR.drag_to(self, pos)
+		return
+	if pos.y >= float(v.lane_top):
+		_press_lane(pos, float(v.lane_top))
+		return
+	var f := F.hit(tl, pos, _x)
+	if pos.y < TM.RULER_H and pos.x <= TM.HEADER_W:
+		screen_add_requested.emit()
+	elif not f.is_empty():
+		select_flag(str(f.id))
+		_drag = {"flag": f, "orig": float(f.get("timeMs", 0))}
+	elif pos.y < TM.RULER_H:
+		_scrubbing = true
+		_seek_to(pos.x)
+	elif not RW.hit_divider(tl, pos.y, scroll_y).is_empty():
+		TM.ensure_heights(tl)
+		var d := RW.hit_divider(tl, pos.y, scroll_y)
+		_drag = {"div": d[0], "div2": d[1], "orig": (tl.layerHeights as Array).duplicate(), "y0": pos.y, "shift": mb.shift_pressed}
+	elif pos.x > TM.HEADER_W:
+		_press_track(pos, mb.double_click)
+	else:
+		_press_header(pos, mb.double_click)
+
+
+## WO-837: a chip selects its flag and drags it in time; the empty lane clears the selection.
+func _press_lane(pos: Vector2, lane_top: float) -> void:
+	var f := LN.hit(lane(), lane_top, pos, _x)
+	if f.is_empty():
+		select(-1, "")
+		select_flag("")
+		select_layer(-1)
+		return
+	select_flag(str(f.id))
+	_drag = {"flag": f, "orig": float(f.get("timeMs", 0))}
 
 
 ## Delete / Backspace (timeline_keys.gd): the selected flag, else the selected keyframe, else the clip — never a
@@ -239,21 +298,34 @@ func select_layer(li: int) -> void:
 
 
 ## web header mousedown: select + start a layer-move; double-click: insertLayerBelow (the last one when below it).
+## WO-837: a divider row only has its "+" (a new layer in that section) and "x" (drop an empty section).
 func _press_header(pos: Vector2, double: bool) -> void:
 	var n := (tl.layers as Array).size()
-	var li := TM.layer_at_y(tl, pos.y, scroll_y)
-	if double:
+	var row := RW.row_at(tl, pos.y, scroll_y)
+	if not row.is_empty() and row.kind == "divider":
+		match RW.divider_button(pos.x, int(row.screen)):
+			"add":
+				select_layer(L.add_in_section(tl, int(row.screen)))
+				layers_edited.emit()
+			"remove":
+				if L.remove_screen(tl, int(row.screen)):
+					layers_edited.emit()
+		return
+	var li := RW.layer_at(tl, pos.y, scroll_y)
+	if double and li >= 0:
 		select_layer(L.insert_below(tl, mini(li, n - 1)))
 		layers_edited.emit()
 	elif li >= 0 and li < n:
 		select_layer(li)
-		_drag = {"layer": li, "from": li}
+		_drag = {"layer": li, "from": li, "from_screen": RW.layer_screen(tl.layers[li])}
 
 
 func _zone(pos: Vector2) -> String:
 	if pos.y < TM.RULER_H:
 		return "ruler"
-	if TM.hit_divider(tl, pos.y, scroll_y) >= 0:
+	if pos.y >= layers_bottom:
+		return "lane"
+	if not RW.hit_divider(tl, pos.y, scroll_y).is_empty():
 		return "divider"
 	if pos.x < TM.HEADER_W:
 		return "header"
@@ -262,15 +334,18 @@ func _zone(pos: Vector2) -> String:
 
 ## The clip under `pos` → [layer index, clip] or [] (web hitClip over layerAt).
 func _clip_at(pos: Vector2) -> Array:
-	var li := TM.layer_at_y(tl, pos.y, scroll_y)
-	if li >= (tl.layers as Array).size():
+	var li := RW.layer_at(tl, pos.y, scroll_y)
+	if li < 0 or li >= (tl.layers as Array).size():
 		return []
 	var c := TM.hit_clip(tl, li, TM.ms_at(pos.x, px_per_ms, scroll_x))
 	return [] if c.is_empty() else [li, c]
 
 
 func _hover(pos: Vector2) -> void:
-	if pos.y >= TM.RULER_H and TM.hit_divider(tl, pos.y, scroll_y) >= 0:
+	if pos.y >= float(vp().lane_top):  # WO-837: chips are grabbed and dragged in time
+		mouse_default_cursor_shape = Control.CURSOR_HSIZE if not LN.hit(lane(), float(vp().lane_top), pos, _x).is_empty() else Control.CURSOR_ARROW
+		return
+	if pos.y >= TM.RULER_H and not RW.hit_divider(tl, pos.y, scroll_y).is_empty():
 		mouse_default_cursor_shape = Control.CURSOR_VSIZE
 		return
 	if pos.y < TM.RULER_H:
@@ -283,17 +358,21 @@ func _hover(pos: Vector2) -> void:
 
 ## The clip row on screen (web clipRowRect) — keyframes are drawn and hit-tested in it.
 func _row(li: int) -> Vector2:
-	var ty := TM.track_top(tl, li, scroll_y)
+	var ty := RW.top(tl, li, scroll_y)
 	var top := maxf(ty + 4, TM.RULER_H)
-	return Vector2(top, maxf(0.0, minf(ty + TM.layer_h(tl, li) - 4, size.y) - top))
+	return Vector2(top, maxf(0.0, minf(ty + TM.layer_h(tl, li) - 4, layers_bottom) - top))
 
 
 func _press_track(pos: Vector2, double := false) -> void:
 	var hit := _clip_at(pos)
 	if hit.is_empty():
-		var li := TM.layer_at_y(tl, pos.y, scroll_y)
+		var li := RW.layer_at(tl, pos.y, scroll_y)
 		var n := (tl.layers as Array).size()
-		if double:  # web dblclick on an empty track: a layer below it (below the last: at the end)
+		var row := RW.row_at(tl, pos.y, scroll_y)
+		if double and not row.is_empty() and row.kind == "divider":  # WO-837: a new layer in that screen's section
+			select_layer(L.add_in_section(tl, int(row.screen)))
+			layers_edited.emit()
+		elif double and li >= 0:  # web dblclick on an empty track: a layer below it (below the last: at the end)
 			select_layer(L.insert_below(tl, mini(li, n - 1)))
 			layers_edited.emit()
 		elif li >= 0 and li < n:
@@ -325,92 +404,6 @@ func _press_track(pos: Vector2, double := false) -> void:
 		"start": float(c.startTime), "dur": float(c.duration), "now": playhead_ms, "inPoint": int(c.get("inPoint", 0) if c.get("inPoint") != null else 0)}
 
 
-func _drag_to(pos: Vector2) -> void:
-	var ms := TM.ms_at(pos.x, px_per_ms, scroll_x)
-	if _drag.has("div"):
-		tl["layerHeights"] = L.divider_heights(_drag.orig, _drag.div, pos.y - float(_drag.y0), _drag.shift)
-		queue_redraw()
-		return
-	if _drag.has("layer"):  # web layer-move: reorder live as the cursor enters another layer
-		var to := TM.layer_at_y(tl, pos.y, scroll_y)
-		if to >= 0 and to < (tl.layers as Array).size() and to != _drag.layer and L.reorder(tl, _drag.layer, to):
-			_drag["layer"] = to
-			sel_layer = to
-			layer_selected.emit(to)
-			queue_redraw()
-		return
-	if _drag.has("flag"):  # web onMoveFlagTime: clamped to the timeline, no snap
-		F.update(tl, _drag.flag, {"timeMs": clampf(ms, 0.0, float(tl.get("duration", 0)))})
-		queue_redraw()
-		return
-	var c := TE.find_clip(tl, _drag.li, _drag.id)
-	if c.is_empty():
-		return
-	var thr := TE.SNAP_THRESHOLD_PX / px_per_ms
-	if _drag.has("kf"):
-		var abs_ms := TE.snapped_edge(ms, K.snap_candidates(tl, _drag.now, _drag.kf), thr, _drag.now)
-		if K.move(c, _drag.kf, abs_ms - float(c.startTime)):
-			queue_redraw()
-		return
-	var cands := TE.snap_candidates(tl, _drag.now, _drag.li, _drag.id)  # the playhead at press: a resize moves it
-	if _drag.edge == "":
-		var start := TE.snapped_start(float(_drag.start) + ms - float(_drag.orig_ms), float(c.duration), cands, thr, _drag.now)
-		var to_li := TM.layer_at_y(tl, pos.y, scroll_y)
-		if to_li >= 0 and to_li < (tl.layers as Array).size() and to_li != _drag.li:
-			TE.move_clip_to_layer(tl, _drag.id, _drag.li, to_li)
-			_drag["li"] = to_li
-			sel_li = to_li
-			clip_selected.emit(sel_li, sel_id)
-		TE.update_clip(tl, _drag.li, _drag.id, {"startTime": start})
-	else:
-		var ch := TE.resize_changes(_drag.edge, TE.snapped_edge(ms, cands, thr, _drag.now), _drag, float(tl.get("fps", 25)))
-		if not ch.is_empty():
-			TE.update_clip(tl, _drag.li, _drag.id, ch)
-			_scrub_preview(float(c.startTime) if _drag.edge == "left" else float(c.startTime) + float(c.duration))
-	queue_redraw()
-
-
-## onClipResizePreview: the playhead follows the dragged edge; the engine seeks at most every 100 ms.
-func _scrub_preview(ms: float) -> void:
-	playhead_ms = clampf(ms, 0.0, float(tl.get("duration", 0)))
-	var now := Time.get_ticks_msec()
-	if now - _seek_at >= 100:
-		_seek_at = now
-		seek_requested.emit(playhead_ms)
-
-
-func _end_drag() -> void:
-	if _drag.is_empty():
-		return
-	var d := _drag
-	_drag = {}
-	if d.has("flag"):
-		if float(d.flag.get("timeMs", 0)) != float(d.orig):
-			flags_edited.emit()
-		return
-	if d.has("div") or d.has("layer"):
-		if (d.has("div") and tl.layerHeights != d.orig) or (d.has("layer") and d.layer != d.from):
-			layers_edited.emit()
-		return
-	var c := TE.find_clip(tl, d.li, d.id)
-	if c.is_empty():
-		return
-	if d.has("kf"):
-		queue_redraw()
-		if float(d.kf.time) != float(d.orig_time):  # web: commit only when the time changed
-			keyframes_edited.emit()
-		return
-	if _drag_changed(d, c):
-		if d.edge != "":
-			seek_requested.emit(playhead_ms)  # the trailing seek the throttle may have skipped
-		edited.emit()
-
-
-static func _drag_changed(d: Dictionary, c: Dictionary) -> bool:
-	return d.li != d.from_li or float(c.startTime) != float(d.start) or float(c.duration) != float(d.dur) \
-		or int(c.get("inPoint", 0) if c.get("inPoint") != null else 0) != int(d.inPoint)
-
-
 func _remove_kf() -> void:
 	var c := TE.find_clip(tl, sel_li, sel_id)
 	var kf: Dictionary = sel_kf
@@ -428,14 +421,15 @@ func _can_drop_data(at: Vector2, data: Variant) -> bool:
 	if tl.is_empty() or not (data is Dictionary) or str(data.get("value", "")) == "":
 		return false
 	if data.get("type") == "effect":  # web WO-22: an effect lands on the clip under the cursor, nowhere else
-		return not TM.hit_clip(tl, TM.layer_at_y(tl, at.y, scroll_y), TM.ms_at(at.x, px_per_ms, scroll_x)).is_empty()
+		return not TM.hit_clip(tl, RW.layer_at(tl, at.y, scroll_y), TM.ms_at(at.x, px_per_ms, scroll_x)).is_empty()
 	return true
 
 
-## Web drop: ms under the cursor (≥ 0), layer clamped to [0, n] — n means "a new layer below".
+## Web drop: ms under the cursor (≥ 0), layer clamped to [0, n] — n means "a new layer below" (WO-837: in the section
+## of the divider dropped on / of the last row).
 func _drop_data(at: Vector2, data: Variant) -> void:
-	var li := clampi(TM.layer_at_y(tl, at.y, scroll_y), 0, (tl.layers as Array).size())
-	source_dropped.emit(data, li, maxf(0.0, TM.ms_at(at.x, px_per_ms, scroll_x)))
+	var tgt := RW.drop_target(tl, at.y, scroll_y)
+	source_dropped.emit(data, int(tgt.li), maxf(0.0, TM.ms_at(at.x, px_per_ms, scroll_x)), int(tgt.screen))
 
 
 func _seek_to(x: float) -> void:

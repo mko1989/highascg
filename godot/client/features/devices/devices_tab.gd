@@ -100,9 +100,7 @@ func _ready() -> void:
 	_bar.reset_pressed.connect(func() -> void: _confirm.popup_centered())
 	_bar.apply_pressed.connect(_gesture.apply_caspar)
 	_bar.save_pressed.connect(func() -> void: snapshots.open_save(_rear, _cables))
-	_bar.reload_pressed.connect(func() -> void:
-		_sticky = false
-		refresh())
+	_bar.reload_pressed.connect(func() -> void: _sticky = false; refresh())
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 40)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -203,6 +201,7 @@ func _ready() -> void:
 	_list.select.connect(func(id: String) -> void: _gesture.select_edge(id))
 	_list.remove.connect(func(id: String) -> void: _gesture.remove_edge(id))
 	right.add_child(_list)
+	right.add_child(preload("res://features/devices/lighting_consoles_panel.gd").new())  # WO-837: lighting consoles for timeline light cues
 	right.add_child(ClusterPanel.new())
 	_cables = CableLayer.new()
 	add_child(_cables)

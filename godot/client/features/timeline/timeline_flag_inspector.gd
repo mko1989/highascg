@@ -4,6 +4,7 @@ extends VBoxContainer
 ## optional) or another flag; for a Companion button press: the bound button's preview (live — it follows
 ## `companion.buttonPreview`), the preview status, Location ("page row column"), Page / Row / Column and Test press;
 ## then Remove flag. Edits mutate the flag (timeline_flags.gd) and emit `changed`; the tab saves and syncs.
+## WO-837: "Light cue" is a fifth action; its console / action fields are timeline_light_inspector.gd.
 ## Not here yet: the web's "Choose button…" picker modal (a modal port, WO-608) — typing the location does the same.
 
 signal changed
@@ -12,6 +13,8 @@ signal remove_requested
 const F := preload("res://features/timeline/timeline_flags.gd")
 const FD := preload("res://features/timeline/timeline_flag_draw.gd")
 const TM := preload("res://features/timeline/timeline_math.gd")
+const LF := preload("res://features/timeline/timeline_light.gd")
+const LightPage := preload("res://features/timeline/timeline_light_inspector.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const HINT_JUMP := "For “Jump to”, set a time (hh:mm:ss:ms) or pick another flag; time wins if both are set."
 
@@ -27,6 +30,7 @@ var _jump_t: LineEdit
 var _jump_f: OptionButton
 var _jump_ids: Array = []
 var _comp: Control
+var _light: LightPage
 var _prev: Control
 var _status: Label
 var _loc: LineEdit
@@ -57,9 +61,13 @@ func _ready() -> void:
 		_type.add_item(l)
 	_type.item_selected.connect(func(i: int) -> void:
 		_patch({"type": F.TYPES[i]})
+		if F.TYPES[i] == "light" and not LF.ACTIONS.has(str(_flag.get("action", ""))):
+			_patch(LF.action_patch(_flag, "go"))  # a fresh light cue: Go on list 1
 		refresh()
 		if F.TYPES[i] == "companion_press":
-			_load_status())
+			_load_status()
+		elif F.TYPES[i] == "light":
+			_light.show_flag(_flag))
 	_row(g, "Action", _type)
 	_jump = VBoxContainer.new()
 	add_child(_jump)
@@ -76,6 +84,11 @@ func _ready() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_jump.add_child(hint)
 	_build_companion()
+	_light = LightPage.new()
+	_light.patch.connect(func(changes: Dictionary) -> void:
+		_patch(changes)
+		refresh())
+	add_child(_light)
 	var del := Button.new()
 	del.text = "Remove flag"
 	del.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
@@ -136,6 +149,8 @@ func show_flag(tl: Dictionary, f: Dictionary) -> void:
 	refresh()
 	if not is_same(was, f) and str(f.get("type", "")) == "companion_press":
 		_load_status()
+	if str(f.get("type", "")) == "light":
+		_light.show_flag(f)
 
 
 ## Re-read the flag (after a canvas drag) without emitting.
@@ -154,6 +169,9 @@ func refresh() -> void:
 	_type.select(maxi(0, F.TYPES.find(type)))
 	_jump.visible = type == "jump"
 	_comp.visible = type == "companion_press"
+	_light.visible = type == "light"
+	if type == "light":
+		_light.bind(_flag)
 	if not _jump_t.has_focus():
 		_jump_t.text = TM.fmt_hms(float(_flag.jumpTimeMs)) if _flag.get("jumpTimeMs") is float or _flag.get("jumpTimeMs") is int else ""
 	_jump_f.clear()

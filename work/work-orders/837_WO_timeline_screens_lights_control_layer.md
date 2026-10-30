@@ -195,3 +195,54 @@ Parts (design first, then build):
 - Checked against the old behaviour: with `_layerChannels` forced to pass-through, 6 of the 12 layer-screen tests fail (the ones that need the filter).
 - Existing suites: wo555, wo558, wo828, wo829 and wo834 pass (72 tests incl. the new ones), plus the 51 other smoke files that read the edited files or `router.js` (441 pass, 0 fail, one skipped), including wo598 API contract. `check-max-file-lines` reports no file over 500. ESLint is clean on the new files; two pre-existing warnings elsewhere.
 - Not done in phase 1 (phase 3): nothing was sent to a real console or to MagicQ on the box. The OSC forms above are from documentation only, and the Eos/MA3 command-line forms are the least certain.
+
+## 2b. What was done (phase 2, Godot, 30.10)
+
+All under `godot/client/`. Layout decisions marked (D) are mine where the Design left room.
+
+**Pure models (new, unit-tested)**
+- `features/timeline/timeline_rows.gd` (RW): the section/row mapping and the vertical geometry.
+  - Rows: "all screens" layers first, then a divider + that screen's layers for each screen in `tl.screens` (plus any `screenIdx` a layer uses but the list misses). `tl.layers` is not reordered: the list only groups it, so Caspar layer `210 + index` and z-order are untouched.
+  - (D) An "All screens" divider heads the first section as soon as one screen section exists, so a layer can be dragged / added back into it. With no screen section there is no divider and the rows equal the old layer rows.
+  - `top / row_at / layer_at / hit_divider / drop_target` replace `TM.track_top / layer_at_y / hit_divider` in the view (the TM functions stay, golden-tested).
+  - `viewport()`: the lane sits right under the layers while they fit, pinned to the canvas bottom once they do not (layers scroll above it). `thumb / scroll_for_thumb` for the scrollbar. `screen_names` from the channel map (the Dest list's names, "Screen N" fallback).
+- `timeline_lane.gd` (LN): control-lane layout. Chips are `{flag, x (absolute px = ms * zoom), w, row}`; first-fit packing from the bottom row with a 4 px gap, so overlapping chips stack upward and `count` rows make the lane `8 + 32 * count` px tall. Rows depend on zoom only, never on scroll.
+- `timeline_light.gd` (LF): the light flag model: action fields, `action_patch` (a flag carries only its action's fields), `parse_num / parse_fader / parse_level / clean_command` (mirror the server's regexes), `summary`, `chip_text` ("MagicQ FOH · Go 1 / cue 3"), `problem` (what the server would refuse). Kept free of the `Api` autoload so tests load it; the console list is fetched by `timeline_light_fetch.gd`.
+- `timeline_layers.gd`: `set_screen / add_screen / remove_screen (only empty) / add_in_section / drag_over`. `insert_below` now inherits the layer's section, so "a new layer goes into the section it was added from". `divider_heights` takes the lower layer's index (sections interleave the array).
+  - `drag_over(layer, row)`: over another layer = join its section and take its place (the old live reorder); over a divider = join that section at the top. `screenIdx` is erased for "all screens".
+- `timeline_flags.gd`: type `light` ("Light cue", cyan), `CONTROL_TYPES`, `is_control`; `hit()` (ruler) now skips control flags.
+- `features/devices/lighting_console_model.gd`: the Devices form: the record to POST, the server's checks mirrored (name 1-40, host, port 1-65535 with the kind's default, grandMA3 prefix, osc templates as `address` + space-separated args), record <-> form, Test answer line.
+
+**UI**
+- Timeline canvas (`timeline_view.gd`, `_draw.gd`, new `_drag.gd`, `timeline_lane_draw.gd`): section dividers (name from the channel map, "+" = new layer in that section, "x" on an empty section), "+ Screen" in the corner above the list (the tab pops the menu of screens not yet in the timeline), the control lane at the bottom (Companion thumbnail chip as before; light chip = console name + action, red tint when the flag has a problem), a vertical scrollbar thumb. Vertical scroll: wheel over the layer headers, Ctrl + wheel anywhere, or the thumb. The drag code moved to `timeline_view_drag.gd` (timeline_view.gd was at the 500-line limit).
+  - Selection, time drag, Delete, copy/paste, Alt+arrows, the inspector all work on chips unchanged (same `sel_flag`).
+  - A Sources drop on a divider or below the last row makes a new layer in that section (`source_dropped` gained a `screen` argument).
+  - Double-click on a divider's track area adds a layer in that section.
+  - WS `lighting.error` shows in the Dest row's status text.
+- Flag inspector: "Light cue" in the Action list (next to "Companion button press"; that dropdown is where Companion flags are created today, after the Flag button's pause flag). `timeline_light_inspector.gd`: console picker (GET /api/lighting/consoles; a removed console shows "<id> (missing)"), action go / fader / release / command, fields List, Cue (optional), Fader, Level (%), Command. List / cue / level use `NumericField.math_line` (focus selects, maths, gibberish reverts). Fader is a text field validated to `N` or `page.fader` and stored as typed ("2.10" is page 2 fader 10, a number would make it 2.1); gibberish reverts too.
+- Devices: `lighting_consoles_panel.gd`, a "LIGHTING CONSOLES" section in the right column between the cables list and Servers (list, "+", Edit, Test with the answer line, remove with confirm; kind picker; grandMA3 shows the OSC prefix; generic OSC shows the six address-template rows with the placeholder list). Registered with one `preload(...)` line in `devices_tab.gd` (kept at 499 lines by turning the reload lambda into one line).
+
+**WO-843 items**
+- Snap off by one: `timeline_edit.gd snapped_start` treated "edge exactly on a snap point" (distance 0) as "no candidate" (`INF`) and lost to a near miss of the other edge. Now a candidate-found distance (`snap_dist`) is used. `snapped_start(5000, 2003, [0, 5000, 7000], 80, null)` returned 4997, now 5000 (the sweep's case). Also `snapped_start(4997, 2003, …)`: end exactly on 7000 now wins over start 3 ms off 5000 (returned 5000).
+- Vertical scroll: see above.
+
+**Not done / limits**
+- Nothing sent to a console from the client except through the server's own Test route (not clicked in the sandbox run).
+- (D) A lane taller than the canvas minus 60 px of layers just clips at the bottom (no lane scroll).
+- The web client (`client/`) is untouched: it will show `light` flags as unknown-type flags in the ruler.
+
+## 3b. Verified (phase 2)
+
+- Godot unit tests: `godot --headless --path godot/client --script res://tests/run_tests.gd` -> 23407 passed, 0 failed (baseline before the change 23264). New: `test_timeline_rows.gd` (rows/sections/viewport/thumb/drop target/section ops/drag across a divider, incl. heights staying aligned), `test_timeline_lane.gd` (chip stacking, lane growth per row, gap = overlap, zoom unstacks, scroll independence, hit), `test_timeline_light.gd` (flag types, action fields, parsing incl. "2.10", summaries, problems, ruler hit skips control flags), `test_devices_lighting_console.gd` (form -> record, validation, templates round trip, test line). `test_timeline_edit.gd` gained the snap cases (the old result, 4997 / 5000, is from the sweep and from reading the old code; the old code was not re-run).
+- `GODOT=~/.local/opt/godot/godot ./run-client.sh --check` in `godot/client`: boot OK, no script errors. `node tools/ci/check-max-file-lines.js`: 0 files over 500. Source-pin smokes `smoke-wo787` / `smoke-wo789` (timeline files) pass.
+- GUI e2e `node tools/e2e/run-gui-e2e.js --e2e=09_timeline_control_lane` (new scenario, sandboxed Godot under xvfb + sandbox server; POSTs a console to the sandbox): 5 of 5 steps pass: a two-screen timeline with 2 Companion + 4 light flags builds a 4-row lane (screenshot read: dividers "All screens" / "S1" / "Screen 2", chips stacked upward at 2.0-2.9 s, pinned lane with the layers scrolling above and the scrollbar thumb, red-tinted chip for a missing console); a real click on a light chip selects it and the Inspector shows Console / Action / List / Cue; dragging a chip moves its flag later; dragging "Dioda B" (a real press-drag across rows) onto the "Screen 2" divider changes its `screenIdx` to 1 and it heads that section; the Devices tab lists "MagicQ FOH" under LIGHTING CONSOLES with Test / Edit / remove.
+- Owner QA left: the Devices add/edit form and Test button against the live box; real-console behaviour (phase 3).
+
+## Coordinator check of phase 2 (30.10)
+
+- Re-ran on the box: Godot unit suite 23407/0, `check-max-file-lines` 0 over, e2e `09_timeline_control_lane` 5/5. Screenshot 04
+  shows S1 / Screen 2 dividers, the 4-row stacked control lane pinned under the layers, and the red "? gone" chip for a removed
+  console.
+- Follow-ups: (a) while the layer list is scrolled, the "+ Screen" corner button overlaps the top layer's name; (b) the web client
+  has no `light` flag type yet, so it would show light flags as unknown flags; (c) phase 3 (live console Test, real MagicQ cue
+  on 127.0.0.2) is still to do.

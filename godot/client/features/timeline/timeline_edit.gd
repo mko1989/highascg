@@ -26,6 +26,16 @@ static func snap_value(v: float, candidates: Array, threshold: float) -> float:
 	return best
 
 
+## The distance from `v` to the nearest candidate closer than the threshold (0 = exactly on one), INF when none is.
+static func snap_dist(v: float, candidates: Array, threshold: float) -> float:
+	var best := INF
+	for c in candidates:
+		var d := absf(v - float(c))
+		if d < threshold and d < best:
+			best = d
+	return best
+
+
 ## collectTimelineSnapCandidates: 0, the end, the playhead (when known), flags, every other clip's edges.
 static func snap_candidates(tl: Dictionary, now_pointer: Variant, ex_layer := -1, ex_clip := "") -> Array:
 	var out: Array = [0.0, float(tl.get("duration", 0))]
@@ -47,11 +57,13 @@ static func snap_candidates(tl: Dictionary, now_pointer: Variant, ex_layer := -1
 ## resolveSnappedStart: snap whichever clip edge is closer; the playhead pulls from 14/8 × the threshold.
 ## Deliberate fix over the web: there an edge with no candidate in range "snaps" to itself at distance 0 and so always
 ## beats the edge that did find one — clip moves never snap to clips/flags in the browser, only to the playhead.
+## WO-843/837: an edge already exactly on a candidate (distance 0) is a hit, not "no candidate" — it used to read as
+## INF and lose to a 1-80 ms snap of the other edge (start on 5000, end 3 ms off 7000 → moved to 4997).
 static func snapped_start(raw: float, dur: float, candidates: Array, thr: float, now_pointer: Variant) -> float:
 	var s := snap_value(raw, candidates, thr)
 	var e := snap_value(raw + dur, candidates, thr) - dur
-	var ds_snap := absf(s - raw) if s != raw else INF
-	var de_snap := absf(e - raw) if e != raw else INF
+	var ds_snap := snap_dist(raw, candidates, thr)
+	var de_snap := snap_dist(raw + dur, candidates, thr)
 	var out := raw
 	if ds_snap <= de_snap:
 		if ds_snap < thr:

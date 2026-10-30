@@ -22,7 +22,20 @@ static func loc_key(c: Vector3i) -> String:
 	return "%d/%d/%d" % [c.x, c.y, c.z]
 
 
-## The ruler part — drawn after the ruler background.
+## The Companion button chip (WO-837: in the control lane, as the ruler marker was): the 28 px thumbnail, or "P/R/C".
+static func companion_chip(ci: CanvasItem, r: Rect2, f: Dictionary, on: bool, font: Font) -> void:
+	var c := F.coords(f)
+	var tex: Variant = thumb(c, ci)
+	var img := Rect2(r.position + Vector2(1, 0), Vector2(THUMB, THUMB))
+	if tex is Texture2D:
+		ci.draw_texture_rect(tex, img, false)
+	else:
+		ci.draw_rect(img, Color("#21262d"))
+		ci.draw_string(font, Vector2(img.position.x, img.get_center().y + 3), loc_key(c), HORIZONTAL_ALIGNMENT_CENTER, THUMB, 9, Color("#8b949e"))
+	ci.draw_rect(r, SEL if on else F.color("companion_press"), false, 2.0)
+
+
+## The ruler part — standard flags (pause / play / jump) only, drawn after the ruler background.
 static func draw_markers(ci: CanvasItem, tl: Dictionary, x_at: Callable, x_max: float, sel_id: String, font: Font) -> void:
 	for f in F.flags(tl):
 		if not (f is Dictionary):
@@ -30,19 +43,10 @@ static func draw_markers(ci: CanvasItem, tl: Dictionary, x_at: Callable, x_max: 
 		var x: float = x_at.call(float(f.get("timeMs", 0)))
 		if x < TM.HEADER_W - 2 or x > x_max + 2:
 			continue
+		if F.is_control(f):  # WO-837: companion_press / light are chips in the control lane (timeline_lane_draw.gd)
+			continue
 		var col := F.color(f.get("type", "pause"))
 		var on := str(f.get("id", "")) == sel_id
-		if str(f.get("type", "")) == "companion_press":
-			var r := Rect2(x - THUMB / 2, maxf(2.0, TM.RULER_H - THUMB - 4), THUMB, THUMB)
-			var c := F.coords(f)
-			var tex: Variant = thumb(c, ci)
-			if tex is Texture2D:
-				ci.draw_texture_rect(tex, r, false)
-			else:
-				ci.draw_rect(r, Color("#21262d"))
-				ci.draw_string(font, Vector2(r.position.x, r.get_center().y + 3), loc_key(c), HORIZONTAL_ALIGNMENT_CENTER, THUMB, 9, Color("#8b949e"))
-			ci.draw_rect(r, SEL if on else col, false, 2.0)
-			continue
 		ci.draw_line(Vector2(x, 0), Vector2(x, TM.RULER_H - 14), SEL if on else col, 2.0 if on else 1.0)
 		var tri := PackedVector2Array([Vector2(x - 6, TM.RULER_H - 2), Vector2(x + 6, TM.RULER_H - 2), Vector2(x, TM.RULER_H - 13)])
 		ci.draw_colored_polygon(tri, col)

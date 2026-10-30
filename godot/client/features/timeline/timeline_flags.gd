@@ -7,9 +7,12 @@ extends RefCounted
 
 const TE := preload("res://features/timeline/timeline_edit.gd")
 const TM := preload("res://features/timeline/timeline_math.gd")
-const TYPES := ["pause", "play", "jump", "companion_press"]
-const TYPE_LABELS := ["Pause", "Play (resume)", "Jump to", "Companion button press"]
-const COLORS := {"pause": "#f85149", "play": "#3fb950", "jump": "#a371f7", "companion_press": "#f0a030"}
+## WO-837: `light` fires a lighting-console action (timeline_light.gd). companion_press and light are CONTROL flags —
+## they live in the control lane at the bottom of the timeline (timeline_lane.gd); pause / play / jump stay in the ruler.
+const TYPES := ["pause", "play", "jump", "companion_press", "light"]
+const TYPE_LABELS := ["Pause", "Play (resume)", "Jump to", "Companion button press", "Light cue"]
+const COLORS := {"pause": "#f85149", "play": "#3fb950", "jump": "#a371f7", "companion_press": "#f0a030", "light": "#39c5cf"}
+const CONTROL_TYPES := ["companion_press", "light"]
 const HIT_PX := 10.0
 const MAX_COORD := 9999
 
@@ -85,12 +88,18 @@ static func duplicate_at(tl: Dictionary, f: Dictionary, time_ms: float) -> Dicti
 	return n
 
 
-## hitFlag: in the ruler, the first flag within ±10 px (right of the layer headers).
+## WO-837: companion_press / light — drawn and hit in the control lane, not in the ruler.
+static func is_control(f: Variant) -> bool:
+	return f is Dictionary and str(f.get("type", "")) in CONTROL_TYPES
+
+
+## hitFlag: in the ruler, the first STANDARD flag within ±10 px (right of the layer headers); control flags are hit in
+## the lane (timeline_lane.gd hit).
 static func hit(tl: Dictionary, p: Vector2, x_at: Callable) -> Dictionary:
 	if p.y >= TM.RULER_H or p.x < TM.HEADER_W:
 		return {}
 	for f in flags(tl):
-		if f is Dictionary and absf(p.x - float(x_at.call(float(f.get("timeMs", 0))))) <= HIT_PX:
+		if f is Dictionary and not is_control(f) and absf(p.x - float(x_at.call(float(f.get("timeMs", 0))))) <= HIT_PX:
 			return f
 	return {}
 
