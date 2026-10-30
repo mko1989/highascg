@@ -132,7 +132,8 @@
 		if (!audioTexture) return
 		gl.bindTexture(gl.TEXTURE_2D, audioTexture)
 		gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1)
-		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, AUDIO_W, 1, gl.RED, gl.UNSIGNED_BYTE, freqBytes)
+		const freq = smoother && !THUMB_MODE ? smoother.frame(freqBytes, smoothCfg) : freqBytes // WO-875, per rendered frame
+		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, AUDIO_W, 1, gl.RED, gl.UNSIGNED_BYTE, freq)
 		gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 1, AUDIO_W, 1, gl.RED, gl.UNSIGNED_BYTE, waveBytes)
 	}
 
@@ -240,6 +241,7 @@
 						// texture rows (same AnalyserNode byte semantics as tier A).
 						b64ToBytes(msg.data.freq, freqBytes)
 						if (msg.data.wave) b64ToBytes(msg.data.wave, waveBytes)
+						smoothCfg = msg.data.smooth
 						lastFftAt = Date.now()
 						if (beatFeed) beatFeed.onFrame(msg.data)
 						return
@@ -354,6 +356,16 @@
 		document.head.appendChild(el)
 	}
 
+	/* WO-875 — GLava-style spectrum smoothing companion. Missing file → the raw spectrum, as before. */
+	let smoother = null
+	let smoothCfg = null // the node's audioCapture.spectrum, from each WS frame
+	function initSmooth() {
+		const el = document.createElement('script')
+		el.src = 'player-smooth.js'
+		el.onload = () => (smoother = window.__SHADERFX_SMOOTH__ ? window.__SHADERFX_SMOOTH__.create(AUDIO_W) : null)
+		document.head.appendChild(el)
+	}
+
 	// --- wire passes -------------------------------------------------------------------------
 
 	/* todos28.07.26 (owner): "when audio reactive is ticked on a shader audio must be chosen in
@@ -436,6 +448,7 @@
 			// WO-344: no capture device in headless Chrome — asking only delays first paint.
 			if (!THUMB_MODE) void initTierA()
 			if (!THUMB_MODE) initBeat()
+			if (!THUMB_MODE) initSmooth()
 		}
 		if (usesCameraChannel()) {
 			// The companion registers a black 1×1 immediately so the pass compiles and samples

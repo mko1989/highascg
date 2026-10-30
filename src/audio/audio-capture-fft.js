@@ -67,9 +67,25 @@ function normalizeAudioCaptureConfig(cfg) {
 		minDb: num(o.minDb, -100),
 		maxDb: num(o.maxDb, -30),
 		staleMs: Math.max(500, num(o.staleMs, 2000)),
+		/** WO-875: GLava-style smoothing every renderer applies per frame (template/shaders/player-smooth.js, the Godot
+		 * Visuals' spectrum_smooth.gd); sent as `smooth` in each audio_fft frame. `spectrum: false` = the raw spectrum. */
+		spectrum: spectrumSmoothing(o.spectrum),
 		/** WO-866: per-drum sensitivity 0..1 (POST /api/audio/parts-sensitivity) */
 		partsSensitivity: o.partsSensitivity && typeof o.partsSensitivity === 'object' ? o.partsSensitivity : {},
 	}
+}
+
+/**
+ * WO-875: config audioCapture.spectrum → { fall, frames, spread }. The defaults and ranges of
+ * template/shaders/player-smooth.js `params()` (not shipped in the server tarball, so mirrored; the WO-875 smoke pins
+ * the two together).
+ * @param {unknown} s - false (off), or a partial { fall, frames, spread }
+ */
+function spectrumSmoothing(s) {
+	if (s === false) return { fall: 0, frames: 1, spread: 0 }
+	const o = s && typeof s === 'object' ? s : {}
+	const num = (v, fb, lo, hi) => (Number.isFinite(Number(v)) ? Math.max(lo, Math.min(hi, Number(v))) : fb)
+	return { fall: num(o.fall, 200, 0, 5000), frames: Math.round(num(o.frames, 3, 1, 8)), spread: num(o.spread, 0.02, 0, 0.25) }
 }
 
 /**

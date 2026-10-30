@@ -6,7 +6,7 @@ const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "bu
 const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0}
 ## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
 const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"],
-	["shader", "Shader"]]  # WO-874: a library shader, `shader` in the slice
+	["shader", "Shader"], ["spectrum", "Spectrum"]]  # WO-874: a library shader (`shader` in the slice); WO-875 the live spectrum
 ## Bus names the Flow view offers, in menu order. Drum and drop buses are pulses (1 on the hit, decaying); the rest are levels.
 const BUSES := ["kick", "snare", "hats", "kick.level", "snare.level", "hats.level", "bass", "mid", "high", "tonal", "loudness",
 	"onset", "density", "arousal", "valence", "energy", "drop", "beat", "section.build", "section.peak", "section.quiet"]

@@ -10,7 +10,9 @@ const SCENES := {
 	"starfield": preload("res://features/visuals/scenes/starfield.gd"),
 	"tunnel": preload("res://features/visuals/scenes/tunnel.gd"),
 	"shader": preload("res://features/visuals/scenes/shader.gd"),  # WO-874
+	"spectrum": preload("res://features/visuals/scenes/spectrum.gd"),  # WO-875
 }
+const Smooth := preload("res://features/visuals/spectrum_smooth.gd")
 const BURST_ON := 0.5
 const BURST_REARM := 0.3
 const AUDIO_STALE_MS := 1000
@@ -27,6 +29,9 @@ var _shader_cfg: Variant = null
 var shader_error := ""
 var _audio := PackedByteArray()
 var _audio_at := -AUDIO_STALE_MS
+var _smoother := Smooth.new()
+var _smooth_cfg: Variant = null  # WO-875: the node's audioCapture.spectrum, from each frame
+var _shown := PackedByteArray()
 
 
 func _ready() -> void:
@@ -83,7 +88,8 @@ func _apply_shader() -> String:
 	return shader_error
 
 
-## WO-874: an `audio_fft` WS frame → the shader's audio texture (row 0 the 512 FFT bytes, row 1 the wave; player.js's layout).
+## WO-874: an `audio_fft` WS frame → the audio texture the shader and spectrum scenes read (row 0 the 512 FFT bytes, row 1
+## the wave; player.js's layout). WO-875: row 0 is smoothed per rendered frame in _process, like player.js does.
 func audio_frame(d: Variant) -> void:
 	if not d is Dictionary or not d.get("freq") is String:
 		return
@@ -93,7 +99,19 @@ func audio_frame(d: Variant) -> void:
 	for i in 512:
 		_audio[i] = freq[i] if i < freq.size() else 0
 		_audio[512 + i] = wave[i] if i < wave.size() else 128
+	_smooth_cfg = d.get("smooth")
 	_audio_at = Time.get_ticks_msec()
+
+
+## WO-875: this frame's audio for the scenes — the smoothed spectrum (a stale feed falls away under gravity) + the wave.
+func _audio_shown(delta: float) -> PackedByteArray:
+	var live := Time.get_ticks_msec() - _audio_at < AUDIO_STALE_MS and _audio.size() == 1024
+	var raw := _audio.slice(0, 512) if live else PackedByteArray()
+	_shown = _smoother.step(raw, delta, _smooth_cfg).duplicate()
+	_shown.resize(1024)
+	for i in 512:
+		_shown[512 + i] = _audio[512 + i] if live else 128
+	return _shown
 
 
 ## The ids on stage, main first.
@@ -124,10 +142,12 @@ func _process(delta: float) -> void:
 	if burst:
 		_flash = 1.0
 	_flash = maxf(0.0, _flash - delta * 6.0)
-	var live := Time.get_ticks_msec() - _audio_at < AUDIO_STALE_MS
+	var audio := PackedByteArray()
+	if layers.any(func(l: Node3D) -> bool: return l.has_method("set_audio")):
+		audio = _audio_shown(delta)
 	for l in layers:
 		if l.has_method("set_audio"):
-			l.set_audio(_audio if live else PackedByteArray())
+			l.set_audio(audio)
 		l.step(p, delta, burst)
 	var hue := float(p.get("hue", 0.55))
 	var glow := float(p.get("glow", 0.3))

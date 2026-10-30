@@ -340,14 +340,15 @@ func _probe_shots(dir: String) -> void:
 	var r: Dictionary = await _g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
 	scene.set_shader(r.data if r.get("ok") else null)
 	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"],
-			["shader", "particles"], ["tunnel", "shader"]]:
+			["shader", "particles"], ["tunnel", "shader"], ["spectrum", ""], ["spectrum", "shader"], ["tunnel", "spectrum"]]:
 		scene.set_layers(pair[0], pair[1])
 		await get_tree().create_timer(1.0).timeout
 		var gpu := 0.0
 		for i in 30:  # GPU ms of the canvas viewport, mean over 30 frames
 			await get_tree().process_frame
 			gpu += RenderingServer.viewport_get_measured_render_time_gpu(out_vp.get_viewport_rid()) / 30.0
-		scene.fire()
+		if pair[0] != "spectrum":  # WO-875: the spectrum shots show the music, not a burst
+			scene.fire()
 		await get_tree().create_timer(0.25).timeout
 		var shot: String = str(pair[0]) + ("+" + str(pair[1]) if pair[1] != "" else "")
 		var err := out_vp.get_texture().get_image().save_png("%s/%s.png" % [dir, shot])

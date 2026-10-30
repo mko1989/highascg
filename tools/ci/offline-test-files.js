@@ -308,6 +308,7 @@ module.exports = [
 	'tools/smoke/smoke-wo297-idle-top-layer-footer.test.js',
 	'tools/smoke/smoke-wo661-template-categories.test.js',
 	'tools/smoke/smoke-wo662-beat-detect.test.js',
+	'tools/smoke/smoke-wo875-spectrum-smooth.test.js',
 	'tools/smoke/smoke-wo663-studio-lower-thirds.test.js',
 	'tools/smoke/smoke-wo290-operator-monitor-picker.test.js',
 	'tools/smoke/smoke-wo278-cable-regrab.test.js',

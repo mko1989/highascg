@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-785 live WOs (29 open, 120 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+786 live WOs (29 open, 121 in progress, 636 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -202,7 +202,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 DONE [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
 
-## audio — Audio routing, devices, meters (42)
+## audio — Audio routing, devices, meters (43)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -246,6 +246,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 862 DONE [audio+godot-client,web-client] audio mixer shows screen labels; a new live input starts unrouted → 862_WO_audio_mixer_screen_labels_new_input_unrouted.md
 - 866 DONE [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
 - 872 DONE [audio] Beat tracking: compare with fosfora, adopt its grid/tempo/benchmark ideas → 872_WO_beat_tracking_fosfora_comparison.md
+- 875 IN PROGRESS [audio+engine,godot-client] Spectrum smoothing after GLava for every shader + a Spectrum scene in the Visua… → 875_WO_spectrum_smoothing_glava.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 

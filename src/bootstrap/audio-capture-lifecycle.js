@@ -82,6 +82,7 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 					// WO-861: named buses — kick/snare/hats {level, onset, n}, bass/mid/high/tonal, loudness, onset, density,
 					// arousal, valence, energy, section, drop {n, age}
 					parts: frame.parts,
+					smooth: cfg.spectrum, // WO-875: how renderers smooth `freq` per frame
 				})
 			},
 		})
