@@ -82,6 +82,16 @@ bash "${HERE}/ensure-empty-live-usb-dirs.sh"
 echo "==> Companion + highpass-highascg module (clone into squashfs)"
 bash "${REPO_ROOT}/tools/eggs/companion/prepare-companion-for-eggs-clone.sh"
 
+# WO-870: eggs 26.10 reads only /etc/penguins-eggs.d/{custom.yaml,custom.exclude.list,branding/} — package upgrades
+# overwrite them (F2), so they are re-applied from the repo on every prepare, whatever HIGHASCG_ISO_EMBED_CALAMARES says.
+# shellcheck source=eggs-cli-lib.sh
+source "${HERE}/eggs-cli-lib.sh"
+if [[ "$(highascg_eggs_flavor)" == "new" ]]; then
+	echo "==> eggs 26.10 managed config (custom.yaml, custom.exclude.list, boot + installer branding)"
+	HIGHASCG_ISO_EMBED_SERVER="$HIGHASCG_ISO_EMBED_SERVER" bash "${HERE}/install-eggs-config.sh" --apply
+	bash "${HERE}/verify-eggs-config.sh"
+fi
+
 echo "==> Calamares (install-to-disk GUI on live ISO)"
 bash "${HERE}/install-eggs-calamares.sh"
 

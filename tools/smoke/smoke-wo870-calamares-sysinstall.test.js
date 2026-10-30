@@ -75,6 +75,24 @@ describe('WO-870 Phase 4: Calamares branding overlay', () => {
 		}
 	})
 
+	it('prepare-time install (eggs 26.10) checks the config only; the full verify waits for the preflight refreshes', () => {
+		const inst = read('tools/eggs/live-usb/install-eggs-calamares.sh')
+		const start = inst.indexOf('if [[ "$(highascg_eggs_flavor)" == "new" ]]; then')
+		const coa = inst.slice(start, inst.indexOf('\texit 0\n', start))
+		assert.ok(start > 0 && coa.length > 0)
+		assert.match(coa, /\n\tbash "\$\{HERE\}\/verify-eggs-config\.sh"\n/)
+		/* prepare applies the config before this script, outside the HIGHASCG_ISO_EMBED_CALAMARES=0 early exit */
+		const prep = read('tools/eggs/live-usb/prepare-eggs-clone-with-exfat.sh')
+		const iApply = prep.indexOf('bash "${HERE}/install-eggs-config.sh" --apply')
+		assert.ok(iApply > 0 && iApply < prep.indexOf('bash "${HERE}/install-eggs-calamares.sh"'))
+		assert.ok(iApply < prep.indexOf('bash "${HERE}/audit-eggs-clone-host.sh"'), 'the audit compares against the applied list')
+		assert.ok(!/^\s*bash .*verify-calamares-installed\.sh/m.test(coa), 'old launcher + no rescue yet would fail the build')
+		const pre = read('tools/eggs/live-usb/pre-produce-preflight.sh')
+		const iVerify = pre.indexOf('bash "${HERE}/verify-calamares-installed.sh"')
+		assert.ok(pre.indexOf('install -m 0755 "$REPO_LAUNCHER"') < iVerify)
+		assert.ok(pre.indexOf('fix-calamares-shellprocess.sh" --log-rescue-only') < iVerify)
+	})
+
 	it('the legacy /etc/calamares sync never copies the template', () => {
 		assert.match(read('tools/eggs/live-usb/install-eggs-calamares.sh'), /! -name branding\.desc ! -name branding\.desc\.tmpl -exec install/)
 	})

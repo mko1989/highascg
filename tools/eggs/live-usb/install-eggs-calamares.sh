@@ -39,13 +39,15 @@ source "${HERE}/eggs-cli-lib.sh"
 if [[ "$(highascg_eggs_flavor)" == "new" ]]; then
 	# WO-870 Phase 4: eggs 26.10 has no `eggs calamares --install/--theme`; it builds the Calamares config at launch
 	# on the live stick (`eggs sysinstall calamares`) from /etc/penguins-eggs.d, where install-eggs-config.sh puts
-	# our branding overlay. The host only needs the package (remaster refuses without it: custom.yaml installer).
+	# our branding overlay (prepare-eggs-clone-with-exfat.sh applies it just before this script). The host only needs
+	# the package (remaster refuses without it: custom.yaml installer).
 	echo "==> eggs 26.10: Calamares package only (config is generated on the live stick, WO-870 Phase 4)"
 	if ! dpkg-query -W -f='${Status}' calamares 2>/dev/null | grep -qE '(install|hold) ok installed'; then
 		apt-get install -y calamares
 	fi
-	bash "${HERE}/install-eggs-config.sh" --apply
-	bash "${HERE}/verify-calamares-installed.sh"
+	bash "${HERE}/verify-eggs-config.sh"
+	# The full verify-calamares-installed.sh runs in pre-produce-preflight.sh, AFTER it refreshes the launcher (WO-481)
+	# and installs the WO-417 log rescue — here (prepare, line 86) both would still be the old ones and fail the build.
 	exit 0
 fi
 FIX_SRC="${HERE}/fix-calamares-branding.sh"

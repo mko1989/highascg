@@ -765,3 +765,17 @@ Done in a worktree helper (no git operations), then merged, corrected and verifi
 
 **Not verified:** no real eggs 26.10 ISO exists yet; the new-layout checks were proven on synthetic images built from the
 dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both verifiers for real.
+
+**Build-order fix (found re-reading the build path after Phase 5):**
+- **Problem 1:** prepare runs `install-eggs-calamares.sh` (prepare:86) long before the preflight. Phase 4 had that
+  script run the full `verify-calamares-installed.sh`, which would have **failed the build**: the installed launcher still
+  predates WO-870 (the preflight refreshes it later) and the WO-417 rescue is not installed yet.
+- **Problem 2:** the managed config was applied only inside that script, which exits early on
+  `HIGHASCG_ISO_EMBED_CALAMARES=0`. The exclude list would then not have been refreshed, and the prepare audit (which
+  compares against it) would fail.
+- **Fix:**
+  - prepare now applies `install-eggs-config.sh --apply` + `verify-eggs-config.sh` itself on the new flavor, before the
+    Calamares step and the audit;
+  - `install-eggs-calamares.sh` (new) only ensures the package and checks the config;
+  - the full Calamares verify stays in the preflight, after the launcher refresh and `--log-rescue-only`;
+  - the order is pinned in `smoke-wo870-calamares-sysinstall.test.js` (now 12).
