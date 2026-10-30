@@ -1,7 +1,7 @@
 # WO-858 — Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio parts), relayed to CasparCG
 
 **Area:** engine, audio, godot-client
-**Status: OPEN — report written (30.10), owner's 5 audio links + FlowKit asset page evaluated (30.10), nothing built**
+**Status: DONE (30.10) — report delivered and acted on: the owner chose the in-house analysis (WO-861 audio parts buses) and the in-client Visuals tab (WO-863 canvas, Flow, Send to screen; WO-866 drum alignment, sensitivity, Sync) instead of the detached VJ process of §9; §9 P0/P1 stand as reference for a later VJ process**
 
 Owner, 30.10: "has the report about using godot for creating audio reactive visuals been made?"
 

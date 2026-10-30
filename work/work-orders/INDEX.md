@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (35 open, 120 in progress, 626 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (34 open, 120 in progress, 627 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -163,7 +163,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 850 DONE [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
 - 851 DONE [engine+godot-client] Work order: Look presets & layer presets (screen-management programming) → 851_WO_look_and_layer_presets.md
 - 852 DONE [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
-- 858 OPEN [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
+- 858 DONE [engine+audio,godot-client] Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio part… → 858_WO_godot_audio_reactive_visuals_report.md
 - 860 DONE [engine+godot-client] Lower-third looks: overlay take over PGM, Scale % that works, the template visi… → 860_WO_lower_third_overlay_looks_scale_prv.md
 - 868 OPEN [engine+os-iso] Operator GUI channel and monitor first everywhere (Caspar channel 1, leftmost X… → 868_WO_gui_channel_and_monitor_first.md
 

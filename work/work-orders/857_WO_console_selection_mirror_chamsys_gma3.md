@@ -1,7 +1,7 @@
 # WO-857 — Mirror the console's group / head selection in the previs (MagicQ, grandMA3 remote for VR programming)
 
 **Area:** lighting, tracking-vr
-**Status: OPEN — research done (30.10), nothing built**
+**Status: OPEN — research done (30.10), nothing built; waits on the owner's answers to §3 (is grandMA3 in play and on what hardware; may the passive MagicQ CITP capture run). WO-837 30.10: MagicQ without ChamSys hardware runs in demo mode with no OSC**
 
 Owner, 30.10:
 > is it possible to mimic selections of groups from chamsys to the highascg visualizer? should be.
