@@ -811,3 +811,39 @@ dry-run `/home/eggs/isodir` boot files. The first full build (Phase 7) runs both
   - eggs/WO-870/WO-417 smokes 128/128.
 
 **Next (owner):** `sudo bash tools/eggs/live-usb/install-eggs-config.sh --apply`, then the full build again. Optional: `~/backup_iso` duplicates `~/iso-backup/…1946.iso` and can go (`sudo rm -r ~/backup_iso`); the new excludes keep it out either way.
+
+### Phase 7b — ISO trim (30.10, owner: "the ISO is twice the size it should be")
+
+**Investigation.** The failed ISO was not double from the start. Its 8.58 GB was the 3.8 GB backup copy (above) plus about 4.5 GB of real system. I measured real sizes with `du` on the host, because `unsquashfs -lls` counts each hardlink name once (rust-coreutils `usr/lib/cargo/bin/coreutils` lists 1294 MiB but is 14M on disk). Against the 23.10 ISO (3.8 GB), the growth is dev-box weight:
+
+| What | Size |
+|---|---|
+| `/opt/magicq` | 713M |
+| `~/Documents/MagicQ` | 468M |
+| `~/show` | 455M |
+| gcc-16 (libexec 728M + lib 25M) | 753M |
+| gcc-13 (libexec 91M + lib 27M) | 118M |
+| `usr/lib/llvm-21` | 529M |
+| `usr/lib/llvm-18` | 80M |
+| Go (`usr/lib/go-1.26`, `usr/share/go-1.26`, `~/go`) | 77M + 187M + 96M |
+| `var/lib/kdump` crash initrd | 273M |
+| Godot exports windows / macos / macos-intel / web-demo | 107M / 60M / 33M / 43M |
+
+- **Compiler safety.** Kernel `7.0.0-38-generic` was built by gcc 15 (`CONFIG_CC_VERSION_TEXT="x86_64-linux-gnu-gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0"`), and `/usr/bin/gcc` → gcc-15, so DKMS uses gcc-15 and it must ship. The clang/LLVM runtime `.so` files live in `usr/lib/x86_64-linux-gnu`. The `llvm-NN/lib` trees hold symlinks and compile-time pieces only, with no ld.so.conf or RUNPATH users that matter (ROCm `libamd_comgr` aside).
+- **kdump.** `kdump-config` regenerates `/var/lib/kdump/initrd.img-<kver>` from the kernel hook when it is missing (`kdump_create_symlinks`).
+- **Owner choice (AskUserQuestion).** Exclude all four: MagicQ + shows, non-Linux Godot exports, build-only compilers, kdump initrd.
+
+**What was done.**
+- Both fragments gain one anchored block (directory + `/*` twins, all already under `usr/` for merged-usr): MagicQ and its shows, `godot/export/{windows,macos,macos-intel,web-demo}`, gcc 13/16 (`usr/libexec/gcc/…`, `usr/lib/gcc/…`), `usr/lib/llvm-{18,21}`, `usr/lib/go-*`, `usr/share/go-*`, `~/go`, and `var/lib/kdump/*` (the dir stays).
+- `verify-iso-squashfs-excludes.sh` gains two checks:
+  - **Kernel compiler present.** It reads the gcc major from `CONFIG_CC_VERSION_TEXT` in the shipped headers' `.config` and requires `usr/libexec/gcc/x86_64-linux-gnu/<major>/cc1` and `usr/bin/x86_64-linux-gnu-gcc-<major>`. If a later default gcc bump lands on an excluded version, the build fails instead of shipping a stick that cannot build DKMS.
+  - **Dev-box paths absent:** MagicQ, its shows, and the windows and web-demo exports.
+- **Known side effect.** `/var/lib/dpkg/status` ships whole (WO-431 phantom entries), so magicq, gcc-13/16, clang-18/21 and golang still look installed to `dpkg-query` on a clone. `apt install --reinstall <pkg>` restores any of them if a clone ever needs one.
+
+**Verified.**
+- Real `mksquashfs -wildcards -ef` on a temp tree with the fragment list.
+  - Excluded: every trimmed path.
+  - Kept: `gcc/…/15/{cc1,a}`, `usr/lib/x86_64-linux-gnu/libLLVM.so.21`, `godot/export/linux/HighAsCG.x86_64`, `Documents/keep.txt`, `config/casparcg.config.iso`, and the empty `var/lib/kdump`.
+- The verifier's sed reads `15` from the host's real `/usr/src/linux-headers-7.0.0-38-generic/.config`.
+- `smoke-eggs-exclude-lists` (new trim test, both embed modes) and `smoke-wo870-phase5-verify`: 68/68.
+- Expected next ISO: about 4.8 GB minus about 3.7 GB of trim → around 3.3 to 3.6 GB, to be confirmed by the owner's rebuild.

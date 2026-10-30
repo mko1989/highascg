@@ -291,5 +291,36 @@ describe('WO-669: the ISO keeps the Godot GUI binary, drops box-local credential
 			])
 				assert.equal(excluded(pats, p), false, p)
 		})
+		it(`${name}: WO-870 trim — MagicQ, other-OS Godot exports, build-only compilers and the kdump initrd go; the kernel's gcc stays`, () => {
+			for (const p of [
+				'opt/magicq/bin/mqqt',
+				'home/casparcg/Documents/MagicQ/show/test.shw',
+				'home/casparcg/show/x.shw',
+				'home/casparcg/highascg/godot/export/windows/HighAsCG.exe',
+				'home/casparcg/highascg/godot/export/macos/HighAsCG.zip',
+				'home/casparcg/highascg/godot/export/macos-intel/HighAsCG.zip',
+				'home/casparcg/highascg/godot/export/web-demo/index.wasm',
+				'usr/libexec/gcc/x86_64-linux-gnu/16/cc1',
+				'usr/libexec/gcc/x86_64-linux-gnu/13/cc1plus',
+				'usr/lib/gcc/x86_64-linux-gnu/16/libgcc.a',
+				'usr/lib/llvm-21/lib/libclang-cpp.so',
+				'usr/lib/llvm-18/bin/clang',
+				'usr/lib/go-1.26/bin/go',
+				'usr/share/go-1.26/src/fmt/print.go',
+				'home/casparcg/go/pkg/mod/x',
+				'var/lib/kdump/initrd.img-7.0.0-38-generic',
+			])
+				assert.equal(excluded(pats, p), true, p)
+			for (const p of [
+				'usr/libexec/gcc/x86_64-linux-gnu/15/cc1',
+				'usr/lib/gcc/x86_64-linux-gnu/15/libgcc.a',
+				'usr/bin/x86_64-linux-gnu-gcc-15',
+				'usr/lib/x86_64-linux-gnu/libLLVM.so.21.1',
+				'home/casparcg/highascg/godot/export/linux/HighAsCG.x86_64',
+				'var/lib/kdump',
+				'home/casparcg/Documents',
+			])
+				assert.equal(excluded(pats, p), false, p)
+		})
 	}
 })

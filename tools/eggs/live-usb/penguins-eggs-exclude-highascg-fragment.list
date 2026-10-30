@@ -139,6 +139,43 @@ home/casparcg/*.iso
 # (anchored, so coa's space pre-check counts it; "... *.iso" lines it skips). config/casparcg.config.iso is deeper.
 home/casparcg/*/*.iso
 home/casparcg/*/*.img
+# 30.10 (WO-870, owner chose all four): dev-box weight that grew the ISO by ~4 GB since 23.10.
+# MagicQ (test console for the MVR export) and its shows/show files.
+opt/magicq
+opt/magicq/*
+home/casparcg/Documents/MagicQ
+home/casparcg/Documents/MagicQ/*
+home/casparcg/show
+home/casparcg/show/*
+# Godot exports for other OSes (the Linux export stays: the stick runs it).
+home/casparcg/highascg/godot/export/windows
+home/casparcg/highascg/godot/export/windows/*
+home/casparcg/highascg/godot/export/macos
+home/casparcg/highascg/godot/export/macos/*
+home/casparcg/highascg/godot/export/macos-intel
+home/casparcg/highascg/godot/export/macos-intel/*
+home/casparcg/highascg/godot/export/web-demo
+home/casparcg/highascg/godot/export/web-demo/*
+# Build-only compilers. NEVER the kernel's gcc (CONFIG_CC_VERSION_TEXT; 15 on 7.0.0-38): DKMS needs it, and the
+# verifier fails the ISO without it. Clang/LLVM runtime .so files live in usr/lib/x86_64-linux-gnu and stay.
+usr/libexec/gcc/x86_64-linux-gnu/13
+usr/libexec/gcc/x86_64-linux-gnu/13/*
+usr/libexec/gcc/x86_64-linux-gnu/16
+usr/libexec/gcc/x86_64-linux-gnu/16/*
+usr/lib/gcc/x86_64-linux-gnu/13
+usr/lib/gcc/x86_64-linux-gnu/13/*
+usr/lib/gcc/x86_64-linux-gnu/16
+usr/lib/gcc/x86_64-linux-gnu/16/*
+usr/lib/llvm-18
+usr/lib/llvm-18/*
+usr/lib/llvm-21
+usr/lib/llvm-21/*
+usr/lib/go-*
+usr/share/go-*
+home/casparcg/go
+home/casparcg/go/*
+# kdump's crash initrd; kdump-config regenerates it on the next kernel hook (the dir itself stays).
+var/lib/kdump/*
 home/casparcg/companion
 home/casparcg/companion/*
 home/casparcg/highascg-backup-box.tgz

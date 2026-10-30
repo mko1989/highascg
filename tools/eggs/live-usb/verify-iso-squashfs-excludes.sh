@@ -349,6 +349,17 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "linux-headers-${kver} files missing from squashfs (dpkg status may still claim them, WO-433) — remove any usr/src exclude and re-run install-kernel-headers-for-dkms-iso.sh"
 	fi
+	# WO-870 30.10: build-only compilers are excluded by version (gcc 13/16 on 26.04); DKMS builds with the kernel's own
+	# gcc (CONFIG_CC_VERSION_TEXT), so that one must ship whatever the default gcc becomes.
+	ccmaj="$("${UNSQ[@]}" -cat "$SQ" "usr/src/linux-headers-${kver}/.config" 2>/dev/null \
+		| sed -n 's/^CONFIG_CC_VERSION_TEXT=".* \([0-9][0-9]*\)\.[0-9.]*"$/\1/p' | head -1 || true)"
+	if [[ -z "$ccmaj" ]]; then
+		bad "cannot read the kernel's gcc from usr/src/linux-headers-${kver}/.config"
+	elif squash_has_path "usr/libexec/gcc/x86_64-linux-gnu/${ccmaj}/cc1" && squash_has_path "usr/bin/x86_64-linux-gnu-gcc-${ccmaj}"; then
+		ok "present: gcc-${ccmaj} (the kernel's compiler, DKMS)"
+	else
+		bad "gcc-${ccmaj} (the kernel's compiler) missing from squashfs — DKMS cannot build; check the build-only compiler excludes"
+	fi
 	if squash_has_path 'usr/local/bin/caspar-systemd-cleanup.sh'; then
 		ok "present: /usr/local/bin/caspar-systemd-cleanup.sh (orphan caspar cleanup)"
 	else
@@ -404,6 +415,16 @@ if [[ "${HIGHASCG_ISO_FORBID_DECKLINK:-1}" == "1" ]]; then
 else
 	ok "HIGHASCG_ISO_FORBID_DECKLINK=0 — skip DeckLink squashfs absence checks"
 fi
+
+# WO-870 30.10 (owner): dev-box tools and data stay off the ISO — MagicQ and its shows, Godot exports for other OSes.
+for needle in 'opt/magicq' 'home/casparcg/Documents/MagicQ' 'home/casparcg/show' \
+	'home/casparcg/highascg/godot/export/windows' 'home/casparcg/highascg/godot/export/web-demo'; do
+	if squash_has_tree "$needle"; then
+		bad "dev-box path in squashfs: ${needle} — re-apply install-eggs-config.sh (WO-870 excludes)"
+	else
+		ok "absent (dev box): ${needle}"
+	fi
+done
 
 if squash_grep_list '^squashfs-root/usr_[0-9]/'; then
 	bad "squashfs has usr_N duplicate trees (~+1 GiB bloat) — reboot and rerun the full build (never rm /home/eggs)"
