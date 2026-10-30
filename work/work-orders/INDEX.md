@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-768 live WOs (42 open, 118 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+769 live WOs (42 open, 119 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -735,7 +735,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
 - 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
 
-## tracking-vr — Tracking, previs, VR (29)
+## tracking-vr — Tracking, previs, VR (30)
 
 - 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
 - 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
@@ -766,6 +766,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 795 DONE [tracking-vr] VR programmer tablet: smooth the ray pointer → 795_WO_vr_tablet_pointer_smoothing.md
 - 835 DONE [tracking-vr] Presenter photos live in /tmp only → 835_WO_presenter_photos_tmp_only.md
 - 841 DONE [tracking-vr] VR: the second trigger (grip) points the selected heads; the first trigger only… → 841_WO_vr_grip_points_trigger_selects.md
+- 859 IN PROGRESS [tracking-vr+godot-client] VR: the left trigger held adds to the selection, the right stick flies → 859_WO_vr_left_trigger_add_right_stick_fly.md
 
 ## testing-ci — Tests and CI (25)
 
