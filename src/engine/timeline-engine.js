@@ -70,8 +70,19 @@ class TimelineEngine extends EventEmitter {
 		/* WO-829: setSendTo diffs against the STORED routing — storing the new sendTo first made
 		 * routingChanged always false, so moving an on-air timeline off program never STOPped program. */
 		const reroute = updated.sendTo && typeof updated.sendTo === 'object' && this._airTimelineId === id ? updated.sendTo : null
-		if (reroute) updated.sendTo = this.timelines.get(id).sendTo
+		const before = this.timelines.get(id)
+		if (reroute) updated.sendTo = before.sendTo
 		this.timelines.set(id, updated)
+		// WO-829: a deleted layer shifts the rest down — the now-unused top physical layers never get a STOP from the sync
+		const gone = this._airTimelineId === id && Array.isArray(updated.layers) ? (before.layers || []).length : 0
+		for (let li = updated.layers?.length ?? 0; li < gone; li++) {
+			for (const ch of this._channels()) {
+				const caspLayer = this._caspLayer(ch, li)
+				if (!this._prevKey.get(`${ch}-${caspLayer}`)) continue
+				this._prevKey.delete(`${ch}-${caspLayer}`)
+				this.self?.amcp?.stop(ch, caspLayer).catch((e) => this._logDebug(`STOP ${ch}-${caspLayer} failed: ${e.message}`))
+			}
+		}
 		if (reroute) this.setSendTo(reroute, id)
 		this._emitChange()
 		// Clip edits (e.g. audioRoute) must refresh PLAY/LOAD+AF while this timeline is on air.

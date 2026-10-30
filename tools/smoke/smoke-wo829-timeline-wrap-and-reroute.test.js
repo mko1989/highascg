@@ -98,6 +98,29 @@ describe('WO-829 timeline wrap and on-air reroute', () => {
 		assert.ok(sent.includes('MIXER 1-210 OPACITY 1 50 linear DEFER'), sent.join(' | '))
 	})
 
+	it('deleting a layer from the on-air timeline STOPs the physical layer that fell off the top', () => {
+		const { eng, sent } = makeEngine()
+		eng.create({
+			id: 'T',
+			duration: 30000,
+			sendTo: { preview: false, program: true, screenIdx: 0 },
+			layers: [
+				{ id: 'a', clips: [clip('A', 0, 30000)] },
+				{ id: 'b', clips: [clip('B', 0, 30000)] },
+			],
+		})
+		eng.play('T', 1000)
+		sent.length = 0
+		const tl = eng.get('T')
+		eng.update('T', { ...tl, layers: [tl.layers[1]] }) // delete layer a: B moves 1-211 → 1-210
+		const t = transport(sent)
+		assert.ok(t.includes('STOP 1-211'), `top layer STOPped: ${t.join(' | ')}`)
+		assert.ok(
+			t.some((l) => l.startsWith('PLAY 1-210 "B"')),
+			`B re-PLAYed on 1-210: ${t.join(' | ')}`
+		)
+	})
+
 	it('a PUT moving the on-air timeline from program to preview STOPs program and plays preview', () => {
 		const { eng, sent } = makeEngine()
 		eng.create({

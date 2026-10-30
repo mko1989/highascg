@@ -1,6 +1,8 @@
 # WO-829 — Timeline-in-look follow-up: loop wrap leaves an ended clip on air; on-air reroute never STOPs program
 
-**Status: IN PROGRESS (30.10) — 3a and 3b fixed and verified by mock and live wire; 3c, 3d and 3j are open (see §4)**
+**Status: DONE (30.10, smoke 4/4 + offline suite 3670/0 fail + live AMCP wire on PGM ch1) — 3a wrap STOP, 3b on-air
+reroute, 3c mid-clip opacity, 3d channel-frame tweens, 3j deleted-layer STOP. Left as is (§4): ROTATION/ANCHOR/GRID/KEYER
+missing from the neutral reset; a shifted layer re-enters at its In point (`startBehaviour`).**
 **Source:** the 29.10 code sweep (`work/sweep-29.10.2026/REPORT.md` §3, batch 081 `src-engine--part3.md`), run in the
 same owner request as WO-828: "run full tests to see if it's transitioning and playing exactly as explained".
 **Related:** WO-828 (the spec and the seamless wrap D2/D3), WO-555 (setSendTo stops only removed channels), WO-558.
@@ -56,16 +58,74 @@ timeline, so this is a normal operator path.
   - the reroute test: a same-routing PUT sends nothing; PGM→PRV STOPs 1-210 and PLAYs 2-210.
   - Both fail on the old code (checked by swapping the HEAD copies back in: 0/2) and pass on the new code (2/2).
 
+## 1b. Investigation, second pass (3c, 3d, 3j)
+
+### 3c — a mid-clip start faded the clip-local-0 opacity segment in
+
+`_sendClipTransport` always computed the lead tween with `opacitySegmentAtLocalMs(clip, 0, …)`. Mock: a clip with
+opacity keyframes 0→1 (0–1 s), then 1→0 (5–6 s), played from 25 s, got `OPACITY 0 0` followed by `OPACITY 1 25 DEFER`,
+so it faded to full when it should have stayed at 0. Nothing corrected it, because the tick saw the cached start value.
+
+### 3d — keyframe tweens counted timeline frames
+
+`_applyClipMixer` got `fps: tl.fps` (25), and `_sendClipTransport` hard-coded 25. Caspar counts MIXER tween
+durations in CHANNEL frames, the same as SEEK (WO-787), so on the 50p channels every keyframed fade ran at half
+length: a 1 s fade was sent as 25 frames, which is 0.5 s.
+
+### 3j — a layer deleted from an on-air timeline kept playing
+
+`_syncAmcpLayers` walks only `tl.layers`. After a delete the remaining layers shift down one physical layer, and
+the top one, which no longer exists, never gets a STOP.
+
+## 2b. What was done (second commit)
+
+- **`timeline-playback-amcp-send.js`:**
+  - Both `_sendClipTransport` call sites pass `localMs`.
+  - A clip whose transport starts more than 2 ticks (80 ms) past its start gets no lead tween. Its transport batch
+    inits the opacity interpolated at the real position. Entry at the clip start (a tick lands up to ~2 ticks late)
+    keeps the WO-139/528 lead tween unchanged.
+  - Tween durations use `resolveChannelFramerateForMixerTween(self, ch, tl.fps)`, the WO-787 helper.
+- **`timeline-engine.js` `update()`:** when on air, the physical layers above the new layer count that still have a
+  cache entry are STOPped and their entries dropped. A shifted layer whose clip changed is restarted by the existing
+  clip-id staleness check.
+- The smoke gained 3c/3d and 3j cases. The 3j case fails on the previous commit (3 pass / 1 fail) and passes on the
+  new code.
+
 ## 3. Verified
 
-<!-- filled after the live run -->
+- **Offline:**
+  - `smoke-wo829-timeline-wrap-and-reroute` passes 4/4. Its 3a and 3b cases fail on the pre-WO code (0/2).
+  - Full offline suite: 3670 tests, 3668 pass, 0 fail, 2 skipped. No file is over 500 lines, and eslint is clean
+    on the changed files.
+- **Live, PGM ch1:** node was restarted on the new code (PID 2783932 for 3a/3b; restarted again for 3j). The test
+  timeline `wo829tl` was 12 s and looping:
+  - layer A: `KV LOOP 2.mov`, 0–12 s;
+  - layer B: `KV LOOP.mov`, 8–12 s, ending at the timeline end.
+- The timeline was played from 6 s with sendTo program. Caspar log, "Received message":
+  ```
+  07:18:18.352 STOP 1-210 / PLAY 1-210 "…KV LOOP 2" SEEK 300      (6 s × 50p channel frames)
+  07:18:20.354 STOP 1-211 / PLAY 1-211 "…KV LOOP" SEEK 0          (B enters at 8 s)
+  07:18:24.357 PLAY 1-210 "…KV LOOP 2" SEEK 0                     (wrap: seamless, no STOP — WO-828 D2)
+  07:18:24.359 STOP 1-211                                         (wrap: B stopped — 3a)
+  07:18:32.395 STOP 1-211 / PLAY 1-211 "…KV LOOP" SEEK 0          (B enters again)
+  07:18:36.395 PLAY 1-210 … SEEK 0 / 07:18:36.397 STOP 1-211      (second wrap, same)
+  ```
+- **3b:** a PUT of the same timeline with sendTo `{preview:true, program:false}` while it played:
+  - wire: `07:19:01.157 STOP 1-210`, `.160 STOP 1-211`, then `STOP 2-210` and `PLAY 2-210 "…KV LOOP 2" SEEK 36`;
+    preview joined at the current position;
+  - `GET /api/state`: playback still playing, `sendTo` preview-only.
+- **3j:** a 2-layer timeline (both 0–12 s) played on PGM from 1 s, then a PUT without layer A:
+  - wire: `07:21:12.271 STOP 1-211`, then `STOP 1-210` and `PLAY 1-210 "…KV LOOP"`. B moved down to 1-210 and the
+    old top layer was stopped.
+  - B re-entered at `SEEK 0`. That is the clip's `startBehaviour: 'beginning'` rule (scene-play-seek.js:307), which
+    applies to any clip whose transport restarts mid-air. It is existing behaviour, left as is.
+- **Cleanup:** the test timeline was stopped and DELETEd after each run; `grep wo829 projects/*.json` finds nothing.
+- **Not probed:** a picture or luma probe of PGM. The evidence is the wire, because each fault was a missing or
+  extra AMCP command.
 
-## 4. Still open (from the sweep, same area, not fixed here)
+## 4. Left as is (owner call if wanted)
 
-- **3c** `timeline-playback-amcp-send.js:354-404`: the opacity lead tween is computed for clip-local 0 even when the
-  transport starts mid-clip, so a mid-clip start shows OPACITY 1 instead of the keyframed value.
-- **3d** `timeline-playback-amcp-schedule.js:127,252,297` and `amcp-send.js:356`: tween frame counts use the
-  timeline fps (25), but Caspar counts channel frames (50p), so keyframed fades run at half length. The wrap
-  capture above shows it as well: `OPACITY 1 25 linear` for a 1 s fade on a 50p channel.
-- **3j** `timeline-engine.js:78-81`: a layer deleted from an on-air timeline keeps playing.
-  `timeline-playback-helpers.js:14-27`: the neutral reset omits ROTATION, ANCHOR, GRID and KEYER.
+- `timeline-playback-helpers.js:14-27`: the neutral mixer reset omits ROTATION, ANCHOR, GRID and KEYER, so a
+  rotation effect removed from a clip leaves the layer rotated until the next look take. Not on any WO-828 path.
+- A clip that restarts mid-air because of an edit re-enters at its In point (`startBehaviour: 'beginning'`). This
+  is per-clip and existing behaviour, and `relativeToPrevious` is available.
