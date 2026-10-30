@@ -34,7 +34,7 @@ describe('WO-465 build restores dev deps', () => {
 	})
 
 	it('it runs after eggs produce, so nothing restored reaches the ISO', () => {
-		assert.ok(at('eggs produce --nointeractive') < at('npm install --include=optional'))
+		assert.ok(at('highascg_eggs_build_iso "${BASENAME}"') < at('npm install --include=optional'))
 	})
 
 	it('the safe-to-copy sidecar is still the last thing written', () => {

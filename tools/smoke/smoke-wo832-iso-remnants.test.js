@@ -121,6 +121,7 @@ describe('WO-832 4c: kernel pin vs running kernel', () => {
 			HIGHASCG_BOOT_DIR: boot,
 			EGGS_YAML: yaml,
 			HIGHASCG_SKIP_HOST_INITRAMFS: '1',
+			HIGHASCG_EGGS_FLAVOR: 'legacy', // WO-870: these cases pin the legacy eggs.yaml route; `new` is in smoke-wo870-eggs-flavor
 		}
 		return { d, env, log, yaml, pinFile }
 	}

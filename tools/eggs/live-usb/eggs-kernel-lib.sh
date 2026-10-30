@@ -1,6 +1,10 @@
 # Shared kernel selection for eggs build host (source, do not execute).
 # Prefer newest installed linux-image-*-generic, not necessarily the running kernel.
 
+_EGGS_KERNEL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=eggs-cli-lib.sh
+source "${_EGGS_KERNEL_LIB_DIR}/eggs-cli-lib.sh"
+
 highascg_latest_installed_kernel() {
 	dpkg -l 'linux-image-[0-9]*-generic' 2>/dev/null |
 		awk '/^ii/{print $2}' |
@@ -28,6 +32,22 @@ highascg_assert_pin_valid() {
 		|| [[ ! -f "${boot}/vmlinuz-${kver}" || ! -f "${boot}/initrd.img-${kver}" ]]; then
 		echo "ERROR: ${pin_file} pins ${kver}, which is not an installed kernel (running: $(uname -r))." >&2
 		echo "       Stale pin after an OS/kernel upgrade? Fix: echo '$(uname -r)' | sudo tee ${pin_file}" >&2
+		return 1
+	fi
+	return 0
+}
+
+# WO-870: eggs 26.10 (`remaster`) always builds the ISO from the RUNNING kernel (uname -r) and never reads
+# eggs.yaml, so the pin stops being a setting and becomes an assertion: pin == running, hard FAIL otherwise.
+# No pin file = nothing to assert. Usage: highascg_assert_running_is_pin
+highascg_assert_running_is_pin() {
+	local pin_file="${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel}" pin running
+	[[ -f "$pin_file" ]] || return 0
+	pin="$(tr -d '[:space:]' <"$pin_file")"
+	running="$(uname -r)"
+	if [[ "$pin" != "$running" ]]; then
+		echo "ERROR: ${pin_file} pins ${pin} but the box runs ${running}; eggs remaster builds the ISO from the RUNNING kernel." >&2
+		echo "       Boot the pinned kernel, or if ${running} is the one to ship: echo '${running}' | sudo tee ${pin_file}" >&2
 		return 1
 	fi
 	return 0
@@ -79,6 +99,11 @@ highascg_resolve_eggs_kernel() {
 	fi
 
 	if [[ "$KVER" != "$running" ]]; then
+		if [[ "$(highascg_eggs_flavor)" == "new" ]]; then
+			# WO-870: the new eggs ignores ${KVER} and ships the running kernel — a mismatch is a wrong ISO, not a hint.
+			echo "ERROR: running kernel is ${running} but ${KVER} is selected; eggs remaster ships the RUNNING kernel — reboot into ${KVER} first." >&2
+			return 1
+		fi
 		echo "WARN: running kernel is ${running}; eggs ISO will use ${KVER} — reboot before/after build so host and ISO match." >&2
 	fi
 	return 0

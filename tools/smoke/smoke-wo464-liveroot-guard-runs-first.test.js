@@ -37,7 +37,7 @@ describe('WO-464 liveroot guard runs first', () => {
 			['prepare (apt, npm ci, vite, Companion)', 'prepare-eggs-clone-with-exfat.sh'],
 			['the late audit that used to be the only check', 'audit-eggs-clone-host.sh'],
 			// The invocation, not the word — the guard's own comment mentions `eggs produce`.
-			['eggs produce itself', 'eggs produce --nointeractive'],
+			['the eggs ISO step itself', 'highascg_eggs_build_iso "${BASENAME}"'],
 		]) {
 			assert.ok(at(needle) > guard, `guard must run before ${what}`)
 		}

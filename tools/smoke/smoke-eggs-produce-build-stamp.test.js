@@ -28,9 +28,9 @@ test('WO-471: the produce script itself writes BUILD_STAMP, before eggs produce'
 	const src = read(EGG)
 	const lines = src.split('\n')
 	const stampAt = lines.findIndex((l) => l.includes('>"${REPO_ROOT}/BUILD_STAMP"'))
-	const produceAt = lines.findIndex((l) => l.trimStart().startsWith('eggs produce '))
+	const produceAt = lines.findIndex((l) => l.trimStart().startsWith('highascg_eggs_build_iso '))
 	assert.ok(stampAt >= 0, `${EGG} must write BUILD_STAMP itself`)
-	assert.ok(produceAt >= 0, `${EGG} must invoke eggs produce`)
+	assert.ok(produceAt >= 0, `${EGG} must invoke the eggs ISO step (highascg_eggs_build_iso, WO-870)`)
 	assert.ok(
 		stampAt < produceAt,
 		'BUILD_STAMP must be written BEFORE eggs produce clones the filesystem, or it misses the squashfs',

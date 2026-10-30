@@ -16,12 +16,23 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=eggs-kernel-lib.sh
 source "${HERE}/eggs-kernel-lib.sh"
 
+# WO-870: eggs 26.10 never reads eggs.yaml (it always ships the running kernel) — no yaml edits, and the pin
+# becomes a hard assertion (pin == uname -r). The purge logic below is unchanged for both flavors.
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
-[[ -f "$EGGS_YAML" ]] || {
-	echo "Missing $EGGS_YAML" >&2
-	exit 1
-}
+if [[ "$EGGS_FLAVOR" != "new" ]]; then
+	[[ -f "$EGGS_YAML" ]] || {
+		echo "Missing $EGGS_YAML" >&2
+		exit 1
+	}
+fi
 
+if [[ "$EGGS_FLAVOR" == "new" ]]; then
+	highascg_assert_pin_valid && highascg_assert_running_is_pin || {
+		echo "ERROR: kernel pin check failed (see above) — nothing was changed." >&2
+		exit 1
+	}
+fi
 highascg_resolve_eggs_kernel || {
 	echo "ERROR: cannot resolve the eggs kernel (see above) — nothing was changed." >&2
 	exit 1
@@ -39,18 +50,22 @@ for kpkg in "${installed[@]}"; do
 	}
 done
 
-echo "==> eggs.yaml → latest kernel ${KVER} (running: $(uname -r))"
-if grep -q '^vmlinuz:' "$EGGS_YAML"; then
-	sed -i "s|^vmlinuz:.*|vmlinuz: ${VM}|" "$EGGS_YAML"
+if [[ "$EGGS_FLAVOR" == "new" ]]; then
+	echo "==> eggs 26.10: no eggs.yaml edit — the ISO uses the running kernel ${KVER}"
 else
-	echo "vmlinuz: ${VM}" >>"$EGGS_YAML"
+	echo "==> eggs.yaml → latest kernel ${KVER} (running: $(uname -r))"
+	if grep -q '^vmlinuz:' "$EGGS_YAML"; then
+		sed -i "s|^vmlinuz:.*|vmlinuz: ${VM}|" "$EGGS_YAML"
+	else
+		echo "vmlinuz: ${VM}" >>"$EGGS_YAML"
+	fi
+	if grep -q '^initrd_img:' "$EGGS_YAML"; then
+		sed -i "s|^initrd_img:.*|initrd_img: ${IR}|" "$EGGS_YAML"
+	else
+		echo "initrd_img: ${IR}" >>"$EGGS_YAML"
+	fi
+	grep -E '^(vmlinuz|initrd_img):' "$EGGS_YAML"
 fi
-if grep -q '^initrd_img:' "$EGGS_YAML"; then
-	sed -i "s|^initrd_img:.*|initrd_img: ${IR}|" "$EGGS_YAML"
-else
-	echo "initrd_img: ${IR}" >>"$EGGS_YAML"
-fi
-grep -E '^(vmlinuz|initrd_img):' "$EGGS_YAML"
 
 purge_kernel_pkg() {
 	local kpkg="$1"
@@ -91,5 +106,5 @@ if command -v grub-set-default >/dev/null 2>&1 && [[ -f /boot/grub/grub.cfg ]]; 
 fi
 update-grub 2>/dev/null || true
 
-echo "OK: eggs produce will use ${KVER} (only this image package should remain)"
+echo "OK: eggs will use ${KVER} (only this image package should remain)"
 dpkg -l 'linux-image-[0-9]*-generic' 2>/dev/null | awk '/^ii/{print $2, $3}' || true

@@ -45,6 +45,11 @@ BASENAME="${BASENAME:-highascg-nvidia-${BR}}"
 # any of that, so check it here. Effectively: one produce per boot.
 # shellcheck source=eggs-liveroot-safety.sh
 source "${HERE}/eggs-liveroot-safety.sh"
+# WO-870: the eggs CLI differs by flavor (26.10 `remaster` vs legacy `produce`); the ISO step lives in the lib.
+# shellcheck source=eggs-run-lib.sh
+source "${HERE}/eggs-run-lib.sh"
+EGGS_FLAVOR="$(highascg_eggs_flavor)"
+echo "==> penguins-eggs flavor: ${EGGS_FLAVOR} ($(highascg_eggs_bin 2>/dev/null || echo none))"
 _LIVEROOT="$(eggs_liveroot_default)"
 if eggs_liveroot_has_host_bind_mounts "$_LIVEROOT"; then
 	echo "ERROR: a previous eggs produce left LIVE system bind mounts under ${_LIVEROOT}." >&2
@@ -166,10 +171,14 @@ chown --reference="$REPO_ROOT" "${REPO_ROOT}/BUILD_STAMP" 2>/dev/null || true
 echo "==> BUILD_STAMP=${PRODUCE_STAMP}"
 
 echo "==> Build ISO basename=${BASENAME} theme=${THEME_ABS} (single NVIDIA driver ${BR})"
-eggs produce --nointeractive --clone --max --excludes static --basename "${BASENAME}" --theme "${THEME_ABS}"
+highascg_eggs_build_iso "${BASENAME}" "${THEME_ABS}"
 
+# WO-870 Phase 3-5 not landed: the squashfs/mnt-iso post-processing below targets the legacy nest layout
+# (/home/eggs/mnt/iso, mkisofs helper, /etc/calamares) and does not exist after `eggs remaster`.
 echo "==> Patch Calamares in squashfs (eggs produce regenerates /etc/calamares after preflight)"
-if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	echo "     skip: eggs ${EGGS_FLAVOR} — Calamares is generated on the live system (WO-870 Phase 4)"
+elif [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	# Required for install-to-disk: unsquashfs → fix shellprocess → mksquashfs (~5–15 min).
 	bash "${HERE}/patch-iso-squashfs-calamares.sh"
 else
@@ -178,12 +187,22 @@ fi
 
 echo "==> Inject GRUB splash + Plymouth initrd into ISO (eggs makeEfi ordering workaround)"
 # Fresh produce already cloned host /usr into squashfs — skip 25 min squashfs rebuild.
-HIGHASCG_SKIP_SQUASHFS_REFRESH=1 bash "${HERE}/inject-iso-boot-branding.sh"
+if [[ "$EGGS_FLAVOR" == "legacy" ]]; then
+	HIGHASCG_SKIP_SQUASHFS_REFRESH=1 bash "${HERE}/inject-iso-boot-branding.sh"
+else
+	echo "     skip: eggs ${EGGS_FLAVOR} — branding comes from /etc/penguins-eggs.d/branding (WO-870 Phase 3)"
+fi
 
 echo "==> Verify squashfs excludes (no swap file, nvidia-pool, dev trees)"
-bash "${HERE}/verify-iso-squashfs-excludes.sh"
+if [[ "$EGGS_FLAVOR" == "legacy" ]]; then
+	bash "${HERE}/verify-iso-squashfs-excludes.sh"
+else
+	echo "WARN: verify-iso-squashfs-excludes.sh not ported to eggs ${EGGS_FLAVOR} yet (WO-870 Phase 5) — run it by hand on the ISO" >&2
+fi
 
-if [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY:-0}" == "1" ]]; then
+if [[ "$EGGS_FLAVOR" != "legacy" ]]; then
+	echo "WARN: skipping ISO boot branding verify — not ported to eggs ${EGGS_FLAVOR} yet (WO-870 Phase 5)" >&2
+elif [[ "${HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY:-0}" == "1" ]]; then
 	echo "==> Skip ISO boot branding verify (HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1)"
 else
 	echo "==> Verify ISO boot branding (set HIGHASCG_SKIP_ISO_BOOT_BRANDING_VERIFY=1 or FAST=1 to shorten)"
