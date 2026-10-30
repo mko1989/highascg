@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-524 routes.
+532 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -54,6 +54,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/cg/*` | registry | `src/api/router.js` |
 | GET | `/api/channels` | registry | `src/api/router.js` |
 | GET | `/api/channels/*` | registry | `src/api/router.js` |
+| POST | `/api/clear` | handler | `src/api/routes-amcp.js` |
 | GET | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
 | POST | `/api/client-prefs` | registry | `src/api/routes-client-prefs.js` |
 | GET | `/api/cluster` | registry | `src/api/routes-cluster.js` |
@@ -93,14 +94,12 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/compose-preview/refresh` | registry | `src/api/router.js` |
 | GET | `/api/compose-preview/stats` | handler | `src/api/routes-compose-preview.js` |
 | GET | `/api/config` | registry | `src/api/router.js` |
-| POST | `/api/config/apply` | registry | `src/api/router.js`, `src/api/routes-config.js` |
 | POST | `/api/config/reset` | registry | `src/api/router.js`, `src/api/routes-config.js` |
 | GET | `/api/contract/constants` | registry | `src/api/routes-contract.js` |
 | GET | `/api/countdown` | registry | `src/api/router.js` |
 | POST | `/api/countdown` | registry | `src/api/router.js` |
 | GET | `/api/countdown/*` | registry | `src/api/router.js` |
 | POST | `/api/countdown/*` | registry | `src/api/router.js` |
-| POST | `/api/data/*` | registry | `src/api/router.js` |
 | POST | `/api/device-snapshot/apply` | registry | `src/api/router.js` |
 | GET | `/api/device-snapshot/build` | registry | `src/api/router.js`, `src/api/routes-device-snapshot.js` |
 | GET | `/api/device-snapshot/schema` | registry | `src/api/router.js`, `src/api/routes-device-snapshot.js` |
@@ -115,6 +114,14 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | * | `/api/export` | handler | `src/cg-studio/routes.js` |
 | GET | `/api/fixtures/dmx` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/dmx/frame` | registry | `src/api/routes-fixture-dmx.js` |
+| POST | `/api/fixtures/library/build` | registry | `src/api/routes-gdtf-library.js` |
+| POST | `/api/fixtures/library/cancel` | registry | `src/api/routes-gdtf-library.js` |
+| DELETE | `/api/fixtures/library/full` | registry | `src/api/routes-gdtf-library.js` |
+| POST | `/api/fixtures/library/full` | registry | `src/api/routes-gdtf-library.js` |
+| GET | `/api/fixtures/library/search` | registry | `src/api/routes-gdtf-library.js` |
+| GET | `/api/fixtures/library/status` | registry | `src/api/routes-gdtf-library.js` |
+| GET | `/api/fixtures/library/thumb/:rid` | registry | `src/api/routes-gdtf-library.js` |
+| POST | `/api/fixtures/library/use` | registry | `src/api/routes-gdtf-library.js` |
 | GET | `/api/fixtures/looks` | registry | `src/api/routes-fixture-dmx.js` |
 | POST | `/api/fixtures/looks/recall` | registry | `src/api/routes-fixture-dmx.js` |
 | GET | `/api/fixtures/pixelmap` | registry | `src/api/routes-pixel-map.js` |
@@ -160,8 +167,13 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | GET | `/api/ingest/preview` | registry | `src/api/router.js` |
 | POST | `/api/ingest/upload` | registry | `src/api/router.js` |
 | POST | `/api/led-test-card/:op` | registry | `src/api/router.js` |
-| POST | `/api/led-test-card/*` | registry | `src/api/router.js` |
 | GET | `/api/led-test-card/settings` | registry | `src/api/router.js` |
+| DELETE | `/api/lighting/consoles` | registry | `src/api/routes-lighting.js` |
+| GET | `/api/lighting/consoles` | registry | `src/api/routes-lighting.js` |
+| POST | `/api/lighting/consoles` | registry | `src/api/routes-lighting.js` |
+| DELETE | `/api/lighting/consoles/:id` | registry | `src/api/routes-lighting.js` |
+| GET | `/api/lighting/consoles/:id` | registry | `src/api/routes-lighting.js` |
+| POST | `/api/lighting/consoles/:id/test` | registry | `src/api/routes-lighting.js` |
 | DELETE | `/api/local-media/*` | registry | `src/api/router.js` |
 | GET | `/api/local-media/*` | registry | `src/api/router.js` |
 | GET | `/api/logs` | registry | `src/api/router.js` |
@@ -208,7 +220,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/media/version/purge` | registry | `src/api/router.js` |
 | POST | `/api/media/version/restore` | registry | `src/api/router.js` |
 | POST | `/api/media/version/upload` | registry | `src/api/router.js` |
-| POST | `/api/misc/*` | registry | `src/api/router.js` |
 | GET | `/api/mixer` | registry | `src/api/router.js` |
 | GET | `/api/mixer/*` | registry | `src/api/router.js` |
 | POST | `/api/mixer/*` | registry | `src/api/router.js` |
@@ -377,6 +388,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/stage/mvr/*` | registry | `src/api/routes-stage-mvr.js` |
 | GET | `/api/state` | registry | `src/api/router.js` |
 | GET | `/api/state/*` | registry | `src/api/router.js` |
+| POST | `/api/stop` | handler | `src/api/routes-amcp.js` |
 | GET | `/api/streaming-channel` | registry | `src/api/router.js`, `src/api/routes-streaming-channel.js` |
 | POST | `/api/streaming-channel` | registry | `src/api/router.js` |
 | GET | `/api/streaming-channel/*` | registry | `src/api/router.js` |
@@ -448,10 +460,6 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/system/setup/restart-app` | registry | `src/api/router.js`, `src/api/routes-system-setup.js` |
 | POST | `/api/system/setup/restart-window-manager` | registry | `src/api/router.js`, `src/api/routes-system-setup.js` |
 | POST | `/api/system/setup/shutdown` | registry | `src/api/router.js`, `src/api/routes-system-setup.js` |
-| GET | `/api/system/staged` | registry | `src/api/router.js` |
-| POST | `/api/system/staged` | registry | `src/api/router.js` |
-| GET | `/api/system/staged/*` | registry | `src/api/router.js` |
-| POST | `/api/system/staged/*` | registry | `src/api/router.js` |
 | GET | `/api/system/stick` | registry | `src/api/router.js`, `src/api/routes-exfat-sync.js` |
 | POST | `/api/system/stick/load` | registry | `src/api/router.js` |
 | POST | `/api/system/stick/save` | registry | `src/api/router.js`, `src/api/routes-exfat-sync.js` |
@@ -542,6 +550,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 |---|---|
 | `src/api/router-dispatch.js` | Route request dispatch (split from `router.js`). |
 | `src/api/router.js` | Main HTTP API dispatcher (split from companion `api-routes.js`). |
+| `src/api/routes-amcp.js` | Basic AMCP HTTP: batch, play/load/loadbg, pause/resume, stop/clear, call, swap, add/remove, raw, restart, kill. |
 | `src/api/routes-audio-cross-screen.js` | WO-604 — cross-screen audio routing composed on the server (web WO-284 audio-cross-screen-apply.js did the validation + AMCP in the browser): POST /api/audio/cr |
 | `src/api/routes-audio.js` | Audio API — device list (no Caspar), volume (AMCP), routing config. |
 | `src/api/routes-auth.js` |  |
@@ -551,7 +560,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-companion-preview.js` | WO-450 round 3: the passive client is disconnected whenever idle (or when its one reconnect attempt raced a Companion restart), so its "cannot reach" hint lied  |
 | `src/api/routes-companion.js` | Companion integration routes (hot-backup control plane + WO-75 preview). |
 | `src/api/routes-compose-preview.js` |  |
-| `src/api/routes-config.js` | POST /api/config/apply — trigger generated Caspar config deploy + restart (Companion parity). |
+| `src/api/routes-config.js` | POST /api/config/reset — factory reset hook. |
 | `src/api/routes-contract.js` | WO-598 C4 — the layer bands both clients need, from the server modules that own them: GET /api/contract/constants → { version, layers } The web client and the G |
 | `src/api/routes-data-project-handlers.js` | WO-329: broadcast the STAMPED project so other clients pick up the new rev. |
 | `src/api/routes-device-snapshot.js` | WO-49 — Device-wide snapshot: build envelope, apply validated snapshot. |
@@ -560,8 +569,10 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | `src/api/routes-exfat-sync.js` | WO-47: exFAT sync map status (view configured folders) + optional dry-run / run. |
 | `src/api/routes-fixture-dmx.js` | WO-615 T3/T4 — the fixture DMX engine (src/fixtures/follow-engine.js, via ctx.fixtureService): GET    /api/fixtures/dmx                         → { dmx (master, |
 | `src/api/routes-fixture-types.js` | WO-615 T2 — GDTF fixture types (src/fixtures/gdtf-store.js): GET    /api/fixtures/types                       → { types: [summary] }  (name, maker, modes: name  |
+| `src/api/routes-gdtf-library.js` | WO-825 — the GDTF Share library (src/fixtures/gdtf-library.js), registered by routes-gdtf-share.js: GET    /api/fixtures/library/status       → { library: { rea |
 | `src/api/routes-gdtf-share.js` | WO-637 — GDTF Share (src/fixtures/gdtf-share.js): GET  /api/fixtures/share/account               → { user, set }  (the password is never returned) POST /api/fix |
 | `src/api/routes-host-live.js` |  |
+| `src/api/routes-lighting.js` | WO-837 — lighting consoles (Devices tab) for the timeline `light` flags. |
 | `src/api/routes-lower-thirds.js` | routes-lower-thirds.js — CRUD + playback API for lower-third templates. |
 | `src/api/routes-media.js` | GET thumbnails, local-media probe/waveform, POST media refresh. |
 | `src/api/routes-multiview.js` | POST /api/multiview/apply — layout cells + route layers; single full-screen CG chrome template (multiview_master) draws all borders/labels/timers. |

@@ -315,6 +315,7 @@ module.exports = {
 				if (tl && self?.amcp && removedCh.length) {
 					for (let li = 0; li < tl.layers.length; li++) {
 						for (const ch of removedCh) {
+							if (!this._layerChannels(li, [ch], tl).length) continue // WO-837: this layer was never on that screen's channel
 							const caspLayer = this._caspLayer(ch, li)
 							self.amcp.stop(ch, caspLayer).catch((_err) => {
 								if (typeof this.self?.log === 'function') {

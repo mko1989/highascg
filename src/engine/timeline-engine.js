@@ -47,6 +47,8 @@ class TimelineEngine extends EventEmitter {
 			// WO-834: 'hold' (default, absent) parks on the last frame at a non-looping end; 'black' STOPs
 			...(opts?.endBehaviour === 'black' ? { endBehaviour: 'black' } : {}),
 			...(opts?.sendTo && typeof opts.sendTo === 'object' ? { sendTo: opts.sendTo } : {}),
+			// WO-837: screen sections the operator added (survive empty); layers carry their own screenIdx
+			...(Array.isArray(opts?.screens) ? { screens: opts.screens } : {}),
 			layers: opts?.layers || [
 				{ id: uid(), name: 'Layer 1', clips: [] },
 				{ id: uid(), name: 'Layer 2', clips: [] },
@@ -77,12 +79,27 @@ class TimelineEngine extends EventEmitter {
 		this.timelines.set(id, updated)
 		// WO-829: a deleted layer shifts the rest down — the now-unused top physical layers never get a STOP from the sync
 		const gone = this._airTimelineId === id && Array.isArray(updated.layers) ? (before.layers || []).length : 0
+		const stopStale = (ch, li) => {
+			const caspLayer = this._caspLayer(ch, li)
+			if (!this._prevKey.get(`${ch}-${caspLayer}`)) return
+			this._prevKey.delete(`${ch}-${caspLayer}`)
+			for (const m of [this._lastKfValues, this._lastKfSegment]) {
+				for (const pk of [...m.keys()]) if (pk.startsWith(`${ch}-${caspLayer}-`)) m.delete(pk)
+			}
+			this.self?.amcp?.stop(ch, caspLayer).catch((e) => this._logDebug(`STOP ${ch}-${caspLayer} failed: ${e.message}`))
+		}
 		for (let li = updated.layers?.length ?? 0; li < gone; li++) {
-			for (const ch of this._channels()) {
-				const caspLayer = this._caspLayer(ch, li)
-				if (!this._prevKey.get(`${ch}-${caspLayer}`)) continue
-				this._prevKey.delete(`${ch}-${caspLayer}`)
-				this.self?.amcp?.stop(ch, caspLayer).catch((e) => this._logDebug(`STOP ${ch}-${caspLayer} failed: ${e.message}`))
+			for (const ch of this._layerChannels(li, this._channels(), before)) stopStale(ch, li)
+		}
+		/* WO-837: a layer moved to another screen (screenIdx edited while on air) leaves its clip on the channels it
+		 * no longer uses — STOP those; the sync below PLAYs it on the new ones. */
+		if (this._airTimelineId === id && Array.isArray(updated.layers)) {
+			const routed = this._channels()
+			for (let li = 0; li < updated.layers.length; li++) {
+				const was = before.layers?.[li]
+				if (!was || was.id !== updated.layers[li].id) continue
+				const keep = this._layerChannels(li, routed, updated)
+				for (const ch of this._layerChannels(li, routed, before)) if (!keep.includes(ch)) stopStale(ch, li)
 			}
 		}
 		if (reroute) this.setSendTo(reroute, id)

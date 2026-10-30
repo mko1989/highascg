@@ -61,10 +61,10 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `compose.preview` | `src/preview/compose-preview-blocklist.js`, `src/preview/compose-preview-consumer.js`, `src/preview/compose-preview-ffmpeg-jpeg.js` |  |
 | server → clients | `device_view_subscribe_ok` | `src/server/ws-server.js` |  |
 | server → clients | `device_view_unsubscribe_ok` | `src/server/ws-server.js` |  |
-| server → clients | `dmx:colors` | `src/sampling/dmx-sampling.js` |  |
 | server → clients | `error` | `src/server/ws-server.js` |  |
 | server → clients | `global_border_sync` | `src/artnet/artnet-output.js` |  |
 | server → clients | `gpu_topology_changed` | `src/bootstrap/gpu-drm-hotplug-watch.js` |  |
+| server → clients | `lighting.error` | `src/engine/timeline-playback-light.js` |  |
 | server → clients | `live_state` | `src/replication/live-state-feed.js`, `src/server/ws-server.js` |  |
 | server → clients | `log_line` | `index.js` |  |
 | server → clients | `lower-third.state` | `src/api/routes-lower-thirds.js` |  |

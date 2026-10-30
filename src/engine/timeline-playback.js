@@ -15,6 +15,8 @@ const timelinePlaybackAmcpSend = require('./timeline-playback-amcp-send')
 const timelinePlaybackTransportBulk = require('./timeline-playback-transport-bulk')
 const timelinePlaybackAmcpSchedule = require('./timeline-playback-amcp-schedule')
 const timelinePlaybackRuntime = require('./timeline-playback-runtime')
+const timelinePlaybackLayerScreens = require('./timeline-playback-layer-screens') // WO-837
+const timelinePlaybackLight = require('./timeline-playback-light') // WO-837
 
 function createPlaybackCell(position = 0) {
 	const t = Date.now()
@@ -34,6 +36,8 @@ function applyPlaybackMixin(TimelineEngineClass) {
 		...timelinePlaybackAmcpSend,
 		...timelinePlaybackTransportBulk,
 		...timelinePlaybackRuntime,
+		...timelinePlaybackLayerScreens,
+		...timelinePlaybackLight,
 
 		_pbFor(id) {
 			let cell = this._playbackById.get(id)
@@ -285,6 +289,7 @@ function applyPlaybackMixin(TimelineEngineClass) {
 							}
 						})
 					}
+					if (t === 'light') this._dispatchLightFlag(tlId, f) // WO-837
 					return false
 				}
 			}

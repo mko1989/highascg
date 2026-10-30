@@ -42,7 +42,7 @@ module.exports = {
 		for (let li = 0; li < tl.layers.length; li++) {
 			const clip = this._clipAt(tl.layers[li], ms)
 			if (!clip) continue
-			for (const ch of channels) {
+			for (const ch of this._layerChannels(li, channels, tl)) { // WO-837
 				const caspLayer = this._caspLayer(ch, li)
 				const key = `${ch}-${caspLayer}`
 				const prev = this._prevKey.get(key)
@@ -69,7 +69,7 @@ module.exports = {
 		for (let li = 0; li < tl.layers.length; li++) {
 			const clip = this._clipAt(tl.layers[li], ms)
 			if (!clip) continue
-			for (const ch of channels) {
+			for (const ch of this._layerChannels(li, channels, tl)) { // WO-837
 				const caspLayer = this._caspLayer(ch, li)
 				const key = `${ch}-${caspLayer}`
 				const prev = this._prevKey.get(key)
@@ -132,7 +132,7 @@ module.exports = {
 			const layer = tl.layers[li]
 			const clip = this._clipAt(layer, ms)
 
-			for (const ch of channels) {
+			for (const ch of this._layerChannels(li, channels, tl)) { // WO-837: a layer pinned to a screen only uses that screen's channels
 				const caspLayer = this._caspLayer(ch, li)
 				const key = `${ch}-${caspLayer}`
 				const prev = this._prevKey.get(key)

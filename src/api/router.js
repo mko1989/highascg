@@ -474,7 +474,7 @@ routes.delete('/api/timeline/*', ({ method, path, body, ctx }) => routesTimeline
 require('./routes-stage-mvr').register(routes); require('./routes-operator-screen').register(routes); require('./routes-fixture-types').register(routes); require('./routes-fixture-dmx').register(routes) // WO-612 MVR import, WO-599 T4 operator-screen picker, WO-615 GDTF types + DMX engine
 require('./routes-gdtf-share').register(routes); require('./routes-cluster').register(routes) // WO-637 GDTF Share: placeholders → real GDTFs; WO-670 P2 linked servers
 require('./routes-dmx-monitor').register(routes); require('./routes-pixel-map').register(routes) // WO-693 DMX viewer: Art-Net nodes / sACN sources, live universe; WO-807 screen regions → fixture pixels
-require('./routes-shader-live').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes); require('./routes-vr').register(routes) // WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D, WO-770 VR session
+require('./routes-shader-live').register(routes); require('./routes-audio-cross-screen').register(routes); require('./routes-contract').register(routes); require('./routes-client-prefs').register(routes); require('./routes-vr').register(routes); require('./routes-lighting').register(routes) // WO-606 Shader Live, WO-604 cross-screen audio, WO-598 C4 + D, WO-770 VR session, WO-837 lighting consoles
 const routeRequest = require('./router-dispatch').makeRouteRequest(routes)
 
 module.exports = {

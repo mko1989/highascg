@@ -64,7 +64,7 @@ module.exports = {
 		if (!self?.amcp) return
 		const channels = channelsOverride ?? this._channels()
 		for (let li = 0; li < tl.layers.length; li++) {
-			for (const ch of channels) {
+			for (const ch of this._layerChannels(li, channels, tl)) { // WO-837
 				const caspLayer = this._caspLayer(ch, li)
 				self.amcp.stop(ch, caspLayer).catch(_err => {
 					this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
