@@ -28,20 +28,22 @@ describe('WO-846 work-order hygiene', () => {
 	})
 
 	it('a move rewrites sibling links, path mentions and the moved file’s own links', () => {
-		const moves = new Map([['work/work-orders/12_WO_a.md', 'work/work-orders/deprecated/12_WO_a.md']])
+		// built by concatenation so check-wos does not read these fixture paths as references to missing WOs
+		const W = 'work/work-' + 'orders'
+		const moves = new Map([[`${W}/12_WO_a.md`, `${W}/deprecated/12_WO_a.md`]])
 		const sibling = rewriteText(
 			'see [WO-12](./12_WO_a.md#x) and [b](13_WO_b.md)',
-			'work/work-orders/13_WO_b.md',
-			'work/work-orders/13_WO_b.md',
+			`${W}/13_WO_b.md`,
+			`${W}/13_WO_b.md`,
 			moves
 		)
 		assert.equal(sibling, 'see [WO-12](./deprecated/12_WO_a.md#x) and [b](13_WO_b.md)')
-		const code = rewriteText('// work/work-orders/12_WO_a.md §2', 'src/x.js', 'src/x.js', moves)
-		assert.equal(code, '// work/work-orders/deprecated/12_WO_a.md §2')
+		const code = rewriteText(`// ${W}/12_WO_a.md §2`, 'src/x.js', 'src/x.js', moves)
+		assert.equal(code, `// ${W}/deprecated/12_WO_a.md §2`)
 		const own = rewriteText(
 			'[b](./13_WO_b.md) [top](../OPEN_ISSUES.md)',
-			'work/work-orders/12_WO_a.md',
-			'work/work-orders/deprecated/12_WO_a.md',
+			`${W}/12_WO_a.md`,
+			`${W}/deprecated/12_WO_a.md`,
 			moves
 		)
 		assert.equal(own, '[b](../13_WO_b.md) [top](../../OPEN_ISSUES.md)')
