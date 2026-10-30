@@ -6,6 +6,7 @@
 'use strict'
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 const {
 	buildPipOverlayAmcpLines,
 	buildPipOverlayUpdateLines,
@@ -45,7 +46,7 @@ async function handleGetTemplates(ctx) {
  */
 async function handleApply(body, ctx) {
 	const b = parseBody(body)
-	const { channel = 1, layer, overlay, fill } = b
+	const { channel = defaultProgramChannel(ctx), layer, overlay, fill } = b
 	const stackIndex = Number.isFinite(Number(b.stackIndex)) ? Math.max(0, Math.floor(Number(b.stackIndex))) : 0
 	const nextL = b.nextContentLayer
 	const nextContentLayer = nextL == null || nextL === '' ? undefined : Number(nextL)
@@ -73,7 +74,7 @@ async function handleApply(body, ctx) {
  */
 async function handleUpdate(body, ctx) {
 	const b = parseBody(body)
-	const { channel = 1, layer, params, fill } = b
+	const { channel = defaultProgramChannel(ctx), layer, params, fill } = b
 	const overlay =
 		b.overlay && typeof b.overlay === 'object' && b.overlay.type
 			? { ...b.overlay, params: b.overlay.params || {} }
@@ -107,7 +108,7 @@ async function handleUpdate(body, ctx) {
  */
 async function handleRemove(body, ctx) {
 	const b = parseBody(body)
-	const { channel = 1, layer } = b
+	const { channel = defaultProgramChannel(ctx), layer } = b
 	const nextL = b.nextContentLayer
 	const nextContentLayer = nextL == null || nextL === '' ? undefined : Number(nextL)
 	const lines = buildPipOverlayRemoveLines(channel, layer, nextContentLayer)

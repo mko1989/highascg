@@ -1,6 +1,7 @@
 'use strict'
 
 const { getChannelMap } = require('../config/routing')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 const { LOOK_LAYER_MIN } = require('./look-layer-ranges')
 
 /** Caspar host layers for HTML/CG overlays above the look stack (10–199). */
@@ -75,9 +76,9 @@ function channelMapFromCtx(ctx) {
  * Resolve Caspar program channel from explicit `channel` or `mainScreenIndex` / `mainIdx`.
  * @param {object} body
  * @param {object} [ctx]
- * @param {number} [fallbackChannel=1]
+ * @param {number} [fallbackChannel] default PGM Screen 1 (1 unless Operator GUI first — WO-868)
  */
-function resolveCgRequestChannel(body, ctx, fallbackChannel = 1) {
+function resolveCgRequestChannel(body, ctx, fallbackChannel = defaultProgramChannel(ctx)) {
 	const b = body && typeof body === 'object' ? body : {}
 	if (b.channel != null) {
 		const ch = parseInt(b.channel, 10)

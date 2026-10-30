@@ -12,6 +12,7 @@ const {
 	resolveScreenDimsFromTopology,
 } = require('./os-layout-calculator-helpers')
 const { resolveEffectiveOsModeSource } = require('./os-mode-source')
+const { isOperatorGuiFirst } = require('../config/operator-gui-first')
 
 /**
  * @param {object} config
@@ -24,12 +25,18 @@ const { resolveEffectiveOsModeSource } = require('./os-mode-source')
  */
 function computePlacedLayoutResults(config, { allGpuAssignments, mvAssignments, operatorGuiAssignments, prvAssignments, effectiveScreenCount, swap }) {
 	const placements = []
+	/* WO-868: "Operator GUI first" — the operator monitor heads the canvas (x=0), the screens follow to its right.
+	 * Which jack is the operator stays the per-boot / cabled choice (WO-638, WO-412); only the order changes. */
+	const operatorFirst = isOperatorGuiFirst(config)
+	const pushOperatorGui = () =>
+		/* WO-573 follow-up: operator_gui is placed independently of a genuine multiview destination —
+		 * both can be live on separate physical outputs at once, so each gets its own results bucket. */
+		(operatorGuiAssignments || []).forEach((og, idx) => placements.push({ kind: 'operator_gui', n: idx + 1, data: og }))
+	if (operatorFirst) pushOperatorGui()
 	const screens = getHorizontalLayoutOrder(effectiveScreenCount, swap)
 	for (const n of screens) placements.push({ kind: 'screen', n })
 	mvAssignments.forEach((mv, idx) => placements.push({ kind: 'multiview', n: idx + 1, data: mv }))
-	/* WO-573 follow-up: operator_gui is placed independently of a genuine multiview destination —
-	 * both can be live on separate physical outputs at once, so each gets its own results bucket. */
-	;(operatorGuiAssignments || []).forEach((og, idx) => placements.push({ kind: 'operator_gui', n: idx + 1, data: og }))
+	if (!operatorFirst) pushOperatorGui()
 	/* WO-364: PRV heads placed after screens+multiview; keyed by their main's n. */
 	;(prvAssignments || []).forEach((pa) => placements.push({ kind: 'prv', n: pa.n, data: pa }))
 

@@ -167,6 +167,10 @@ func _item(it: Dictionary, group: ButtonGroup) -> Control:
 			cb.toggled.connect(func(on: bool) -> void: _act(func() -> void:
 				if it.key == "auto_accept":  # WO-739
 					await flow.set_auto_accept(on)
+				elif it.key == "operator_first":  # WO-868: a cancelled / refused switch puts the box back
+					await flow.set_operator_first(on)
+					_shown = []
+					_render()
 				else:
 					await flow.set_cef(on)))
 			return cb

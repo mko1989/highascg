@@ -14,6 +14,7 @@ const O := preload("res://features/devices/output_ports_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
 const ApiScript := preload("res://core/api_timeouts.gd")  # WO-805: APPLY_TIMEOUT_S (no autoload deps)
+const OF := preload("res://features/devices/operator_first_model.gd")  # WO-868
 
 ## sessionStorage 'highascg.replication.inspectorMode': the operator's mode pick survives page rebuilds.
 static var session_intent := ""
@@ -44,6 +45,7 @@ static func _data(r: Dictionary) -> Dictionary:
 
 ## Page open: status (then the quiet leader scan a remembered follower intent asks for) and network.
 func start() -> void:
+	await refresh_operator_first()  # WO-868: one cheap GET, first (the leader scan / network reads can take seconds)
 	await refresh_status()
 	if s.intent == "follower" and not H.truthy(R.d(s.rep).get("enabled")):
 		await scan(true)
@@ -86,6 +88,36 @@ func set_auto_accept(on: bool) -> void:
 		_fail(r)
 		return
 	io.status("Invites from other servers are %s" % ("linked at once" if on else "accepted in Devices → Servers"), true)
+
+
+## WO-868: the switch's state (GET; an older server without the route leaves the check disabled).
+func refresh_operator_first() -> void:
+	OF.apply_get(s, await io.get_json(OF.PATH))
+	io.changed()
+
+
+## WO-868: dry run → confirm (what moves, what is rewritten) → the switch (backup, renumber, full apply).
+func set_operator_first(on: bool) -> void:
+	var dry: Dictionary = await io.post_json(OF.PATH, {"enable": on, "dryRun": true})
+	if not dry.ok:
+		_fail(dry, false)
+		return
+	var plan := _data(dry)
+	var block := OF.blocking(plan)
+	if block != "":
+		io.status(block, false)
+		return
+	if not await io.confirm(OF.confirm_text(plan, on)):
+		return
+	io.toast("Switching channels — Caspar restarts…", "info")
+	var r: Dictionary = await io.post_json(OF.PATH, {"enable": on, "dryRun": false, "force": OF.needs_force(plan)}, ApiScript.APPLY_TIMEOUT_S)
+	if not r.ok:
+		_fail(r, false)
+		await refresh_operator_first()
+		return
+	io.status(OF.done_text(_data(r), on), true)
+	await refresh_operator_first()
+	await io.reload()
 
 
 func save_fps() -> void:

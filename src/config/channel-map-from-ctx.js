@@ -104,6 +104,11 @@ function buildChannelMap(ctx) {
 		previewEnabledByMain: Array.isArray(map.previewEnabledByMain) ? map.previewEnabledByMain.slice(0, map.screenCount) : [],
 		multiviewCh: map.multiviewCh,
 		multiviewChannels: Array.isArray(map.multiviewChannels) ? map.multiviewChannels : (map.multiviewCh != null ? [map.multiviewCh] : []),
+		/* WO-868 phase 0: the operator GUI channel, so clients can label "ch 1 = Operator GUI" from data. */
+		operatorGuiEnabled: !!map.operatorGuiEnabled,
+		operatorGuiCh: map.operatorGuiCh ?? null,
+		operatorGuiChannels: Array.isArray(map.operatorGuiChannels) ? map.operatorGuiChannels : [],
+		operatorGuiFirst: map.operatorGuiFirst === true,
 		streamingCh: map.streamingCh,
 		streamingContentLayer: map.streamingContentLayer,
 		inputsCh,

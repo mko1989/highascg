@@ -6,6 +6,10 @@ HighAsCG maps subset functionality of the underlying CasparCG AMCP protocol into
 
 All server responses include standard headers and use the `application/json` format.
 
+> **Channel numbers (WO-868):** the examples use the default numbering, where channel 1 is PGM of Screen 1. With
+> **Operator GUI first** on (Devices → Caspar server page, `casparServer.operator_gui_first`), channel 1 is the operator
+> GUI and every other channel moves up by one (PGM Screen 1 = 2). A request without `channel` still means PGM Screen 1.
+
 ## Table of Contents
 1. [Basic Playback Commands](#1-basic-playback-commands)
 2. [Mixer Commands](#2-mixer-commands)
@@ -182,3 +186,11 @@ Show diagnostic screens or trigger OpenGL Garbage Collection.
 ### `POST /api/raw`
 Arbitrary AMCP payload dispatching.
 - **Body:** `{ "cmd": "PLAY 1-1 AMB LOOP" }`
+
+### `GET /api/system/operator-first`, `POST /api/system/operator-first`
+"Operator GUI first" (WO-868): Caspar channel 1 = the operator GUI, its monitor leftmost, every other channel up by one.
+- **GET:** `{ enabled, refusals, warnings, channels: { before, after } }`
+- **POST body:** `{ "enable": true, "dryRun": true }`. `dryRun` (default `true`) only plans: channel table, remap, the
+  stores it would rewrite, the X layout before/after, refusals and warnings. `"dryRun": false` backs up to
+  `~/.highascg/backup/wo868-<time>/`, renumbers projects / state / settings, sets the flag and runs the full apply
+  (Caspar restart). `"force": true` overrides only the on-air refusal.

@@ -233,6 +233,8 @@ function persistProject(ctx, project, opts = {}) {
 	const persistence = ctx.persistence || require('../utils/persistence')
 	const slug = projectStore.projectSlugFromName(project.name)
 	projectStore.migrateLegacySingleProject(persistence)
+	// WO-868: into this box's channel scheme BEFORE the mirror / deck / broadcast see it (not only the file)
+	project = require('./project-channel-scheme').adaptProjectOnWrite(project)
 	if (opts.authoritativeCredentials !== true) {
 		project = preserveProjectCredentials(project, projectStore.readProjectFile(slug))
 	}

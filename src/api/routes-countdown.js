@@ -152,7 +152,7 @@ function handleGet(p, ctx, _query = {}) {
 			const key = `${logicalLayer}`
 			if (!itemMap.has(key)) {
 				itemMap.set(key, {
-					channel: 1, // Default channel (will be overridden by live state if available)
+					channel: resolveCgRequestChannel({}, ctx), // PGM Screen 1 (WO-868); live state overrides it below
 					layerNumber: logicalLayer,
 					hostLayer: resolveTemplateCgHostLayer(logicalLayer, COUNTDOWN_CG_NAME),
 					sceneId: scene.id || null,

@@ -7,6 +7,8 @@ const { resolveOutputSourceToChannel } = require('./output-source-name')
 const { resolveMonitorBus } = require('./monitor-bus')
 
 const { routingDestinationsFromConfig, screenLabelsFromConfig } = require('./screen-destinations')
+const { allocateMainChannels } = require('./routing-map-mains')
+const { isOperatorGuiFirst } = require('./operator-gui-first')
 
 function readCasparSetting(cfg, key) {
 	if (!cfg || typeof cfg !== 'object') return undefined
@@ -197,69 +199,32 @@ function getChannelMap(config, activeBuses = null) {
 	const inputsEnabled = decklinkInputSlots.length > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled
 	const extraAudioCount = Math.min(4, Math.max(0, parseInt(String(config?.extra_audio_channel_count ?? cs.extra_audio_channel_count ?? 0), 10) || 0))
 
-	const programChannels = []; const previewChannels = []
-	const switcherBus1Channels = []
-	const switcherBusChannels = []
-	// Switcher-bus (3-channel per destination) is retired.
-	// Keep transition model forced to 2-channel PGM/PRV flow.
-	const switcherBusMode = false
-	if (useVirtual) {
-		for (let i = 0; i < screenCount; i++) {
-			const v = virtualMainChannels[i] || {}
-			const pgm = parseInt(v.pgm, 10) || 1
-			// When prv is empty/missing, preview is disabled for this main — do not default to pgm
-			const prvRaw = v.prv != null && String(v.prv).trim() !== '' ? parseInt(v.prv, 10) : null
-			const prv = prvRaw != null && Number.isFinite(prvRaw) && prvRaw >= 1 ? prvRaw : null
-			programChannels.push(pgm)
-			previewChannels.push(previewEnabledByMain[i] && prv != null ? prv : null)
-			switcherBus1Channels.push(prv)
-			switcherBusChannels.push(null)
-		}
-		// Warn about duplicate channel assignments in virtual mode
-		const allAssigned = [...programChannels, ...previewChannels.filter(Boolean)]
-		const seen = new Set()
-		for (const ch of allAssigned) {
-			if (seen.has(ch)) {
-				if (typeof console !== 'undefined') console.warn(`[routing-map] Warning: duplicate channel number ${ch} in virtual main channel assignments`)
-			}
-			seen.add(ch)
-		}
-	} else {
-		let ch = 1
-		for (let i = 0; i < screenCount; i++) {
-			if (switcherBusMode) {
-				const out = ch++
-				if (previewEnabledByMain[i]) {
-					const bus1 = ch++
-					const bus2 = ch++
-					programChannels.push(out)
-					previewChannels.push(bus1)
-					switcherBus1Channels.push(bus1)
-					switcherBusChannels.push(bus2)
-				} else {
-					programChannels.push(out)
-					previewChannels.push(null)
-					switcherBus1Channels.push(null)
-					switcherBusChannels.push(null)
-				}
-			} else {
-				const pgm = ch++
-				const prv = previewEnabledByMain[i] ? ch++ : null
-				programChannels.push(pgm)
-				previewChannels.push(prv)
-				switcherBus1Channels.push(prv)
-				switcherBusChannels.push(null)
-			}
-		}
-	}
-
-	let nextCh = Math.max(0, ...programChannels, ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
 	// WO-414: stored host-live sources PIN their channel (pins never move, WO-377/381), so
 	// dynamic allocation flows AROUND them — the monitor bus landing on the NDI host's pinned
 	// ch5 gave two owners one channel (generator clobbered the NDI block; the mixer metered
 	// monitor-bus audio as "macbook NDI input"). Lazy require: circular with this module.
 	const hostLive = require('./host-live-sources')
 	const pinnedHostChannels = new Set(hostLive.listHostLiveChannelEntries(config).map((e) => e.channel))
+	// WO-243: operator_gui is a dedicated utility channel (CEF web-UI over routed preview holes),
+	// allocated the same way as multiview — never a programChannels[] slot. At most one is expected
+	// (validated in device-view-crud.js), but this mirrors multiview's array shape defensively.
+	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
+	const operatorGuiChannels = []
+	// WO-868: "Operator GUI first" — the GUI takes channel 1 and the mains start right after it (pin-aware).
+	const operatorFirst = !useVirtual && ogDests.length > 0 && isOperatorGuiFirst(config)
+	let firstMainCh = 1
+	if (operatorFirst) {
+		for (let i = 0; i < ogDests.length; i++) {
+			while (pinnedHostChannels.has(firstMainCh)) firstMainCh++
+			operatorGuiChannels.push(firstMainCh++)
+		}
+	}
+	const { programChannels, previewChannels, switcherBus1Channels, switcherBusChannels, switcherBusMode } = allocateMainChannels({
+		useVirtual, virtualMainChannels, screenCount, previewEnabledByMain, firstCh: firstMainCh,
+		isPinned: operatorFirst ? (c) => pinnedHostChannels.has(c) : null,
+	})
+
+	let nextCh = Math.max(0, ...operatorGuiChannels, ...programChannels, ...previewChannels.filter(c => c != null), ...switcherBusChannels.filter(c => c != null)) + 1
 	const allocCh = () => { while (pinnedHostChannels.has(nextCh)) nextCh++; return nextCh++ }
 
 	const mvDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'multiview')
@@ -270,12 +235,7 @@ function getChannelMap(config, activeBuses = null) {
 	}
 	const multiviewCh = multiviewChannels[0] || null
 
-	// WO-243: operator_gui is a dedicated utility channel (CEF web-UI over routed preview holes),
-	// allocated the same way as multiview — never a programChannels[] slot. At most one is expected
-	// (validated in device-view-crud.js), but this mirrors multiview's array shape defensively.
-	const ogDests = (routingDestinationsFromConfig(config) ?? []).filter((d) => d && String(d.mode || '').toLowerCase() === 'operator_gui')
-	const operatorGuiChannels = []
-	if (ogDests.length > 0) {
+	if (!operatorFirst && ogDests.length > 0) {
 		ogDests.forEach(() => operatorGuiChannels.push(allocCh()))
 	}
 	const operatorGuiCh = operatorGuiChannels[0] || null
@@ -414,6 +374,8 @@ function getChannelMap(config, activeBuses = null) {
 		operatorGuiEnabled: operatorGuiChannels.length > 0,
 		operatorGuiCh,
 		operatorGuiChannels,
+		/** WO-868: only present (true) when the GUI owns channel 1 — the off map stays key-for-key the legacy one. */
+		...(operatorFirst ? { operatorGuiFirst: true } : {}),
 		inputsEnabled: effectiveDecklinkInputCount > 0 || liveAudioCount > 0 || v4l2InputCount > 0 || inputsHostChannelEnabled,
 		inputsOnMvr,
 		decklinkInputsHost,

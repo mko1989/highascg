@@ -181,6 +181,7 @@ function main() {
 			},
 		})
 		setSceneLiveBroadcastHooks({ onSceneLiveBroadcast })
+		require('./src/engine/project-channel-scheme').setChannelSchemeConfigSource(() => appCtx.config) // WO-868
 		try {
 			const { ensureHardwareHostname } = require('./src/system/hardware-identity')
 			const hw = ensureHardwareHostname(appCtx)

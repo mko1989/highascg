@@ -196,6 +196,11 @@ function wasProjectSlugRetired(slug) {
  * @param {string} slug
  * @returns {object | null}
  */
+/** WO-868: lazy — project-channel-scheme reaches the routing map, which must not load with the store. */
+function channelScheme() {
+	return require('./project-channel-scheme')
+}
+
 function readProjectFile(slug) {
 	if (!slug || !isSafeProjectSlug(slug)) return null
 	try {
@@ -205,7 +210,7 @@ function readProjectFile(slug) {
 	if (!fs.existsSync(p)) return null
 	try {
 		const project = JSON.parse(fs.readFileSync(p, 'utf8'))
-		return project && typeof project === 'object' ? project : null
+		return project && typeof project === 'object' ? channelScheme().adaptProjectOnRead(project) : null
 	} catch (e) {
 		quarantineCorruptFile(p)
 		console.warn(`[project-store] corrupt project quarantined (${slug}): ${e?.message || e}`)
@@ -240,7 +245,7 @@ function withProjectSlug(project, slug) {
 
 function writeProjectFile(slug, project) {
 	ensureProjectsDir()
-	const payload = withProjectSlug(project, slug)
+	const payload = channelScheme().adaptProjectOnWrite(withProjectSlug(project, slug))
 	const p = projectFilePath(slug)
 	const tmp = p + '.tmp'
 	fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8')
@@ -253,7 +258,7 @@ function writeProjectFile(slug, project) {
  */
 function writeAutosaveFile(slug, project) {
 	if (!slug || !isSafeProjectSlug(slug)) return
-	const payload = withProjectSlug(project, slug)
+	const payload = channelScheme().adaptProjectOnWrite(withProjectSlug(project, slug))
 	const p = autosaveFilePath(slug)
 	const tmp = p + '.tmp'
 	fs.writeFileSync(tmp, JSON.stringify(payload, null, 2), 'utf8')
@@ -275,7 +280,7 @@ function readAutosaveFile(slug) {
 		const project = JSON.parse(fs.readFileSync(p, 'utf8'))
 		if (!project || typeof project !== 'object') return null
 		const fileSlug = String(project.slug || projectSlugFromName(project.name))
-		return fileSlug === slug ? project : null
+		return fileSlug === slug ? channelScheme().adaptProjectOnRead(project) : null
 	} catch {
 		return null
 	}
@@ -288,7 +293,7 @@ function readLegacyAutosaveIfMatches(slug) {
 		const project = JSON.parse(fs.readFileSync(LEGACY_AUTOSAVE_PATH, 'utf8'))
 		if (!project || typeof project !== 'object') return null
 		const fileSlug = String(project.slug || projectSlugFromName(project.name))
-		return fileSlug === slug ? project : null
+		return fileSlug === slug ? channelScheme().adaptProjectOnRead(project) : null
 	} catch {
 		return null
 	}

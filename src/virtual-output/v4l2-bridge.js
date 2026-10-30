@@ -7,6 +7,7 @@ const { resolveV4l2BridgeMode } = require('./v4l2-bridge-args')
 const { resolveV4l2BridgeJpgPath, waitForV4l2BridgeJpgReady } = require('./v4l2-bridge-cache')
 const { ensureVcamKernelModules } = require('./v4l2-kernel-modules')
 const { normalizeVirtualCameraConfig } = require('./v4l2-bridge-config')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 
 /** Serializes start/stop. */
 let _lifecycleChain = Promise.resolve()
@@ -30,6 +31,8 @@ function isVirtualCameraEnabled(config) {
  * @returns {number}
  */
 function resolveVirtualCameraChannel(config) {
+	// WO-868: an unset channel means PGM Screen 1 (channel 1 is the operator GUI while Operator GUI first is on)
+	if (config?.virtualCamera?.channel == null || config.virtualCamera.channel === '') return defaultProgramChannel(config)
 	return normalizeVirtualCameraConfig(config?.virtualCamera).channel
 }
 

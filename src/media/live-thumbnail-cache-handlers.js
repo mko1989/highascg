@@ -7,6 +7,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const { JSON_HEADERS, jsonBody } = require('../api/response')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 const {
 	getLiveThumbnailCacheDir,
 	cachePngPath,
@@ -134,7 +135,7 @@ async function handleLiveThumbnailGet(ctx, channel, query = {}) {
  * @param {object} ctx
  */
 async function handleLiveThumbnailCapturePost(bodyObj, ctx) {
-	const ch = Math.max(1, parseInt(String(bodyObj?.channel ?? bodyObj?.ch ?? 1), 10) || 1)
+	const ch = Math.max(1, parseInt(String(bodyObj?.channel ?? bodyObj?.ch ?? defaultProgramChannel(ctx)), 10) || 1)
 	const force = bodyObj?.force === true || bodyObj?.force === 1 || bodyObj?.force === '1'
 	const r = await captureLiveThumbnailToCache(ctx, ch, { force })
 	const meta = readMeta(ctx.config || {}, ch)
@@ -200,7 +201,7 @@ function readBodyBytes(req, maxBytes) {
  * @param {object} ctx
  */
 async function handleLiveThumbnailUploadPost(req, query, ctx) {
-	const ch = Math.max(1, parseInt(String(query?.channel ?? query?.ch ?? 1), 10) || 1)
+	const ch = Math.max(1, parseInt(String(query?.channel ?? query?.ch ?? defaultProgramChannel(ctx)), 10) || 1)
 	const cfg = ctx.config || {}
 	const fail = (status, error) => ({ status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error }) })
 	if (!req || typeof req.on !== 'function' || req.readableEnded === true || req.destroyed === true) {

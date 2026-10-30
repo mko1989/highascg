@@ -22,6 +22,18 @@ const ROUTING_EXTRA_KEYS = [
 ]
 
 /**
+ * WO-868: "Operator GUI first" is a property of THIS box (its Caspar channel order and X layout), never of a show:
+ * a project neither carries it nor sets / clears it on load.
+ * @param {unknown} cs
+ */
+function withoutMachineLocalCasparKeys(cs) {
+	if (!cs || typeof cs !== 'object' || !Object.prototype.hasOwnProperty.call(cs, 'operator_gui_first')) return cs
+	const { operator_gui_first: _local, ...rest } = cs
+	void _local
+	return rest
+}
+
+/**
  * WO-443: monitor-role audio outputs are BOX-LOCAL hardware (this box's headphone/monitor
  * device — cf. WO-425: the label/device is never a code default), so they must not ride in a
  * project: saving stamped them into every project, and loading imposed one box's monitor
@@ -71,7 +83,7 @@ function buildHardwareConfigFromConfig(cfg, persistence) {
 		deviceGraph: payload.deviceGraph,
 		screenDestinations: payload.screenDestinations,
 		osDisplay,
-		casparServer: cfg.casparServer,
+		casparServer: withoutMachineLocalCasparKeys(cfg.casparServer),
 		multiviewLayout: persistence?.get?.('multiviewLayout') ?? null,
 		/* hostname alone is NOT a machine identity: ensureHardwareHostname() rewrites legacy
 		 * `highascg-nvidia-*` names to the MAC-derived `highascg####`, so every project saved before
@@ -133,7 +145,7 @@ function hardwareConfigToSnapshotPayload(hc) {
 	}
 
 	if (hc.casparServer && typeof hc.casparServer === 'object') {
-		payload.settingsPatches.casparServer = hc.casparServer
+		payload.settingsPatches.casparServer = withoutMachineLocalCasparKeys(hc.casparServer)
 	}
 
 	return payload

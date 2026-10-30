@@ -38,6 +38,8 @@ async function handleProject(path, body, ctx) {
 		// WO-821: a project loaded without its hardware keeps its stored slice; captureHardware takes the live rig.
 		// WO-823: keepPayloadHardware (load from file) writes the file's own rig as given
 		const keepPayload = b.keepPayloadHardware === true
+		// WO-868: a file loaded from disk without a channel-scheme stamp predates "Operator GUI first" — legacy numbers
+		if (keepPayload && project.channelScheme == null) project.channelScheme = 'legacy'
 		const prevKind = previousSlugKind(prevSlug, slug, project, { imported: keepPayload }) // WO-824
 		const renamedFrom = prevKind === 'rename' ? prevSlug : null // only a rename carries the previous slug's hold
 		stampProjectHardware(ctx, project, { slug, prevSlug: renamedFrom, existing, capture: b.captureHardware === true, keepPayload })

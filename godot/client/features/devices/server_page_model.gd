@@ -9,6 +9,7 @@ const F := preload("res://features/devices/replication_format.gd")
 const O := preload("res://features/devices/output_ports_model.gd")
 const H := preload("res://features/devices/host_channels.gd")
 const R := preload("res://features/devices/cable_rules.gd")
+const OF := preload("res://features/devices/operator_first_model.gd")  # WO-868
 
 const STANDARD_FPS := [23.98, 24.0, 25.0, 29.97, 30.0, 50.0, 59.94, 60.0]
 const MODES := [["standalone", "Standalone"], ["leader", "Leader (available for followers)"], ["follower", "Follower"]]
@@ -60,7 +61,7 @@ static func init_state(settings: Variant, payload: Variant, intent: String) -> D
 	var net := R.d(R.d(settings).get("network"))
 	var st := R.d(net.get("static"))
 	var dns := R.a(st.get("dns"))
-	return {"settings": R.d(settings), "payload": R.d(payload), "fps": sel,
+	var s := {"settings": R.d(settings), "payload": R.d(payload), "fps": sel,
 		"cef": O.is_true(R.d(R.d(settings).get("operatorTools")).get("cefEnableGpu")),
 		"net_text": "Loading…", "iface_opts": [], "iface": "", "net_mode": "dhcp", "ip": F.t(O.or_([st.get("address"), ""])),
 		"prefix": F.t(H.coalesce([st.get("prefixLength"), 24])), "gateway": F.t(O.or_([st.get("gateway"), ""])),
@@ -68,6 +69,8 @@ static func init_state(settings: Variant, payload: Variant, intent: String) -> D
 		"rep": null, "rep_line": "Loading replication status…", "pair": "", "conn": null, "out_warn": "", "wiring": false,
 		"mode": intent if intent in ["standalone", "leader", "follower"] else "standalone", "intent": intent,
 		"leader_opts": [], "leader": "", "synced": false, "auto_accept": null}
+	OF.init_state(s)
+	return s
 
 
 # ---------------------------------------------------------------- network
@@ -214,6 +217,7 @@ static func items(s: Dictionary, now: float, network_panel := false) -> Array:
 		{"t": "heading", "text": "Templates (CEF)"}, {"t": "check", "key": "cef", "text": CEF_TEXT, "checked": s.cef, "disabled": false},
 		{"t": "small", "text": CEF_HINT}]
 	if network_panel:
+		out.append_array(OF.items(s))  # WO-868: client only (the web golden replay has no such section)
 		out.append_array([{"t": "heading", "text": "Linked servers"}, {"t": "check", "key": "auto_accept", "text": AUTO_ACCEPT_TEXT,
 			"checked": s.get("auto_accept") == true, "disabled": s.get("auto_accept") == null}, {"t": "small", "text": AUTO_ACCEPT_HINT}])
 		out.append({"t": "network"})

@@ -1,0 +1,91 @@
+{
+ "screenCount": 2,
+ "screenLabels": [
+  "Dioda",
+  "Proj"
+ ],
+ "multiviewEnabled": false,
+ "operatorGuiEnabled": true,
+ "operatorGuiCh": 5,
+ "operatorGuiChannels": [
+  5
+ ],
+ "inputsEnabled": true,
+ "inputsOnMvr": false,
+ "decklinkInputsHost": "dedicated",
+ "decklinkCount": 1,
+ "programChannels": [
+  1,
+  3
+ ],
+ "previewChannels": [
+  2,
+  4
+ ],
+ "playbackChannels": [
+  1,
+  3
+ ],
+ "previewEnabledByMain": [
+  true,
+  true
+ ],
+ "multiviewCh": null,
+ "inputsCh": 6,
+ "audioOnlyChannels": [],
+ "mappingChannels": [],
+ "monitorCh": 8,
+ "switcherBus1Channels": [
+  2,
+  4
+ ],
+ "switcherBusMode": false,
+ "switcherBusChannels": [
+  null,
+  null
+ ],
+ "transitionModel": "dynamic_layer",
+ "streamingCh": null,
+ "streamingDedicatedChannelSlot": false,
+ "streamingAttachToChannel": null,
+ "streamingContentLayer": 10,
+ "inputsHostChannelEnabled": false,
+ "liveAudioCount": 1,
+ "v4l2InputCount": 0,
+ "useVirtual": false,
+ "virtualMainChannels": [],
+ "multiviewChannels": [],
+ "inputChannels": [
+  {
+   "kind": "decklink",
+   "slot": 1,
+   "channel": 6,
+   "layer": 1,
+   "mode": "1080p5000",
+   "route": "route://6-1",
+   "label": "DeckLink 1"
+  },
+  {
+   "kind": "live_audio",
+   "slot": 1,
+   "channel": 7,
+   "layer": 10,
+   "mode": "1080p5000",
+   "route": "route://7",
+   "label": "Live audio 1"
+  }
+ ],
+ "decklinkInputChannels": [
+  6
+ ],
+ "liveAudioInputChannels": [
+  7
+ ],
+ "v4l2InputChannels": [],
+ "decklinkInputMode": "1080p5000",
+ "liveAudioInputMode": "1080p5000",
+ "v4l2InputMode": "1080p5000",
+ "hostLiveChannels": [],
+ "webpageHostChannels": [],
+ "ndiHostChannels": []
+}

@@ -1,0 +1,34 @@
+{
+ "screens": {
+  "1": {
+   "sysId": "DP-0",
+   "x": 0,
+   "y": 0,
+   "width": 3840,
+   "height": 1792,
+   "mode": "3840x1792",
+   "rate": 50,
+   "backend": "xrandr",
+   "screenIndex": 1,
+   "osModeSource": "edid"
+  }
+ },
+ "multiview": {},
+ "operatorGui": {
+  "1": {
+   "sysId": "DP-4",
+   "x": 3840,
+   "y": 0,
+   "width": 1920,
+   "height": 1080,
+   "mode": "1920x1080",
+   "rate": 50,
+   "backend": "xrandr",
+   "screenIndex": null,
+   "osModeSource": "edid"
+  }
+ },
+ "prv": {},
+ "mappingGpuOutputs": [],
+ "mappingGpuBBox": null
+}

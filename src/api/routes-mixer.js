@@ -7,6 +7,7 @@
 
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const { queryLayerContentRes, calcStretchFill } = require('./routes-mixer-stretch')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 const { applyInspectorEffect, updateProjectStateFromSelection } = require('./routes-mixer-inspector')
 
 /**
@@ -69,7 +70,7 @@ async function handleMixer(path, body, ctx) {
 			body: jsonBody({ error: 'mixer/clear: explicit "channel" (integer >= 1) required' }),
 		}
 	}
-	if (channel == null) channel = 1
+	if (channel == null) channel = defaultProgramChannel(ctx) // WO-868
 	let r
 	switch (cmd) {
 		case 'keyer':

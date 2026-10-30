@@ -44,6 +44,7 @@ function applyClearCoalescing(lines, ctx) {
 
 const { JSON_HEADERS, jsonBody, parseBodyStrict } = require('./response')
 const playbackTracker = require('../state/playback-tracker')
+const { defaultProgramChannel } = require('../config/operator-gui-first')
 const { notifyProgramMutationMayInvalidateLive } = require('../state/live-scene-state')
 const { audioRouteToAudioFilter, resolveConfigProgramLayoutForChannel } = require('../engine/audio-route')
 const { coalescePerLayerClearStorm } = require('../caspar/amcp-coalesce-clears')
@@ -93,7 +94,7 @@ async function handlePost(path, body, ctx) {
 		}
 	}
 	const b = parsed.value
-	const { channel = 1, layer } = b
+	const { channel = defaultProgramChannel(ctx), layer } = b // WO-868: PGM Screen 1 (1 unless Operator GUI first)
 	// WO-833 (3m): destructive routes never fall back to the channel-1 default.
 	if ((path === '/api/stop' || path === '/api/clear') && !hasExplicitChannel(b.channel)) {
 		return {

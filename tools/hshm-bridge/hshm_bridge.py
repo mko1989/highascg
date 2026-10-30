@@ -96,7 +96,8 @@ def main():
     ap.add_argument("--width", type=int, default=1920)
     ap.add_argument("--height", type=int, default=1080)
     ap.add_argument("--fps", type=int, default=50)
-    ap.add_argument("--channel", type=int, default=5)
+    ap.add_argument("--channel", type=int, default=5,
+                    help="channel number written into the ring header (operator GUI: 5 legacy, 1 with Operator GUI first, WO-868)")
     ap.add_argument("--source", choices=("pattern", "stdin"), default="pattern")
     ap.add_argument("--duration", type=float, default=0, help="seconds, 0 = until Ctrl+C / EOF")
     ap.add_argument("--keep", action="store_true", help="do not unlink the segment on exit")

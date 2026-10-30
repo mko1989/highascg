@@ -1,7 +1,7 @@
 # WO-868 — Operator GUI channel and monitor first everywhere (Caspar channel 1, leftmost X screen, first in lists)
 
 **Area:** engine, os-iso
-**Status: OPEN (30.10) — investigation + design, not implemented**
+**Status: IN PROGRESS (30.10) — implemented, offline + Godot + GUI e2e (sandbox, throwaway Caspar) verified; the switch is NOT turned on on the live box (owner step, §3.4)**
 
 Owner, 30.10: *"also i think it would be easier if the gui channel and gui monitor becomes the first everywhere, so in caspar, in x, etc."*
 
@@ -195,7 +195,7 @@ reconcile, so the table row above is its migration.
 
 ---
 
-## 2. Proposed design
+## 1.8 Proposed design (before the owner's decisions)
 
 Principle: three **independent, flag-gated** moves, each reversible, shipped in this order. The numbers are never hard-coded: the new order is one pure function of the
 config (same as today), the migration is one pure remap computed from `getChannelMap()` before/after.
@@ -268,7 +268,7 @@ Needs nothing: destinations, graph, `screen_N_*`, `program_N`/`preview_N` source
 
 ---
 
-## 3. Open questions for the owner
+## 1.9 Open questions for the owner
 
 1. **Which numbering?** All following channels shift by one (1 GUI, 2-3 PGM1/PRV1, 4-5 PGM2/PRV2, 6 DeckLink …) — or keep PGM1/PRV1/PGM2/PRV2 and only swap the GUI with channel 1 (GUI 1, PGM1 5, …)? (Recommended: shift all, stable order.)
 2. **Is the GUI "Screen 1"?** Or does Dioda stay Screen 1 / `program_1` and only the channel number and position change? (Recommended: Dioda stays Screen 1.)
@@ -293,3 +293,162 @@ Needs nothing: destinations, graph, `screen_N_*`, `program_N`/`preview_N` source
   - Q6: the stale `liveScenesByProgramChannel` keys are re-keyed;
   - Q8: a `dryRun` comes first and the backup directory is kept;
   - Q9: the follower must flip with it, and the switch warns when a follower is paired.
+
+---
+
+## 2. What was done (30.10)
+
+One machine-local flag, `casparServer.operator_gui_first` (absent = off = the legacy numbering and layout, byte for byte), and one
+backend operation that switches it, so nobody edits the stores by hand. The design followed §1.8, with the owner's decisions: one combined
+switch (channel 1 and x=0 together), every following channel up by one, Dioda stays Screen 1 / `program_1`.
+
+**Flag + numbering**
+- `src/config/operator-gui-first.js` (new): `isOperatorGuiFirst` (nested `casparServer` key, else the flat generator key),
+  `withOperatorGuiFirst` (off deletes the key, so off never adds one anywhere), `channelSchemeFor`, and `defaultProgramChannel(configOrCtx)`:
+  the literal 1 while off, `programChannels[0]` while on.
+- `src/config/routing-map-mains.js` (new): the PGM/PRV allocation moved verbatim out of `routing-map.js` (500-line limit), plus `firstCh` and
+  a pin-skip. `routing-map.js`: host-live pins and operator GUI destinations are worked out before the mains. When the flag is on, an
+  operator GUI destination exists and `!useVirtual`, the GUI channels are allocated from 1 (skipping pins) and the mains start after them,
+  pin-aware. Otherwise the old path runs unchanged. The result carries `operatorGuiFirst: true` only when on.
+- `src/utils/os-layout-calculator-place.js`: when on, the `operator_gui` placements are pushed before the screens, so `cumulativeX` starts
+  at the operator. Jack selection (WO-412 / WO-638) is untouched.
+- `src/config/channel-map-from-ctx.js` (Phase 0.1): the client `channelMap` now carries `operatorGuiEnabled`, `operatorGuiCh` and
+  `operatorGuiChannels` (and `operatorGuiFirst` when on). This is the one intentional change to an existing payload.
+- `src/engine/project-hardware-config.js`: `withoutMachineLocalCasparKeys` strips the flag from a project's `hardwareConfig`, so a project
+  load can neither set it nor clear it.
+
+**Phase 0 literal defaults** (`defaultProgramChannel`)
+- Applied in `routes-amcp.js` (`channel` default), `routes-mixer.js`, `routes-pip-overlay.js` (×3), `routes-countdown.js` (list item
+  default), `engine/cg-routing.js` (`resolveCgRequestChannel` fallback), `media/live-thumbnail-cache-handlers.js` (×2), and
+  `virtual-output/v4l2-bridge.js` (an unset `virtualCamera.channel` means PGM Screen 1).
+- `tools/hshm-bridge/hshm_bridge.py`: the `--channel` help text now explains 5 vs 1. `docs/api-reference.md` has a channel note and the new
+  route.
+
+**Remap + per-project scheme**
+- `src/config/channel-remap.js` (new, pure): a role-identity remap from two channel maps. The roles are pgm i, prv i, opgui i, mv i,
+  in kind+slot, host kind+sourceId, audio i, monitor, and stream. It is applied as ONE simultaneous substitution to:
+  - `route://N[-L]` anywhere;
+  - `channel_<N>` under `source` / `videoSource` / `audioSource`;
+  - the numeric fields `hostChannel` / `inputsChannel` / `thumbnailChannel` / `casparChannel` (number or digit string);
+  - a `v4l2_out` connector's `caspar.channel`.
+
+  Also here: channel-keyed objects are re-keyed, and the config slices are remapped (`extraLiveSources`, `deviceGraph`, `streamingChannel`,
+  `streamOutputs`, `recordOutputs`, `audioRouting`, `virtualCamera.channel`).
+- `src/engine/project-channel-scheme.js` (new): projects carry `channelScheme: 'operator-first-v1'` while the flag is on, and no key while it
+  is off. Each file converts with its OWN rig: the project's `hardwareConfig` laid over the live config, else the live config. A project
+  whose rig has no operator GUI is only stamped.
+  - Hooks in `project-store.js` (read / write of projects and autosaves) and in `project-scenes.js` `persistProject`.
+  - Read: unstamped = legacy. Write: unstamped = the current scheme, because the web client rebuilds its payload without the stamp.
+    `routes-data-project-handlers.js` marks a file import as legacy.
+  - Both hooks are no-ops until `index.js` registers the live config, so offline tools and tests see files unchanged. While off, an
+    unstamped file comes back as the same object.
+
+**The switch**
+- `src/system/operator-first-plan.js` (new): the read-only plan.
+  - Refusals: `no_operator_gui`, `virtual_main_channels`, `mapping_gpu_outputs` (Q4), `config_override`, and `on_air` (PGM layers or a
+    live look on a PGM channel; the only one `force` overrides).
+  - Warnings: `hot_backup` (Q9), `caspar_down`.
+  - Output: the channel table before/after, the remap, per-store counts (config slices, state keys, projects
+    files/stamped/renumbered/references), the X layout before/after, and the outside consumers to check (Q5).
+- `src/system/operator-first-switch.js` (new): plan → refuse / no-op → backup → the rest. The steps after the backup:
+  1. Back up `projects/`, the persistence state and the config into `~/.highascg/backup/wo868-<UTC>/` (kept, Q8; outside the repo, so
+     Syncthing never sees it).
+  2. Rewrite every project + autosave file (atomic write; rev+1 when renumbered, so a stale client gets a 409).
+  3. Persistence: `liveScenesByProgramChannel`, `liveAudioOnlyLooksByChannel` and `programLayerBankByChannel` are re-keyed (Q6), and the
+     `liveDeck` mirror is replaced. `multiviewLayout*` and `scene_deck` are remapped, and `web_project` is converted.
+  4. Config slices + the flag go through `configManager.save`.
+  5. The converted active project is adopted (deck mirror + `project_sync` broadcast).
+  6. The standard full apply runs: `applyCasparConfigToDiskAndRestart(force)`. It is skipped in offline preparation mode, which never
+     writes `casparcg.config`.
+
+  Turning it off runs the same steps toward legacy. The remap is role-based, so on→off is the identity.
+- `src/api/routes-operator-first.js` (new) + `router.js`: `GET /api/system/operator-first` → `{enabled, refusals, warnings, channels}`, and
+  `POST {enable, dryRun = true, force}`.
+
+**Godot UI** (Caspar server page in the Inspector: click the Devices background)
+- `features/devices/operator_first_model.gd` (new, pure) + `server_page_model.gd` / `server_flow.gd` / `server_controls.gd`: one "Channels"
+  heading, one check "Operator GUI first", and one hint line.
+  - On a refusal, or a server without the route, the check is disabled and the line says why.
+  - A toggle runs: dry run → confirm listing the channel moves, the monitor x moves, projects / state / settings, the warnings, and what to
+    check outside HighAsCG → `POST dryRun:false` with the long apply timeout.
+  - On-air is shown in the confirm and sent with `force`.
+  - Shown only on the client page; the web golden replay is unchanged.
+
+Not done / left:
+- The web client has no toggle (Godot only). Its saves keep working through the write hook.
+- The Companion role-based variable alias (§1.8 Phase 0.5) lives in the module repo outside HighAsCG. Hand-made `…_ch<N>_image` overrides
+  are listed in the confirm.
+- `extra-live-source-enrich.js` `resolveLiveSourcePrintTarget` keeps `{channel: 1}` for malformed items (it has no ctx).
+- No WARN log when a pin would have been taken by a main while off: the legacy path is untouched by design (OFF byte-identical).
+
+## 3. What was VERIFIED (30.10)
+
+### 3.1 Golden proofs (OFF byte-identical, ON exact)
+- `tools/smoke/fixtures/wo868/`:
+  - `rig.config.json` is this box's `caspar_server`, `screen_destinations`, `device_graph` and `audio_outputs` on 30.10, reduced to the
+    keys that change the output. It was checked to give the same XML / map / layout as the full config; it holds no secrets.
+  - `off.caspar.xml`, `off.channel-map.json` and `off.layout.json` were captured from the code **before** WO-868. The current code with the
+    flag off is byte-identical to them, and the same holds for the full live config copy.
+  - `on.*` are the reviewed ON outputs:
+    - channel 1 is `<shm><name>opgui</name>`, then PGM1 2 / PRV1 3 / PGM2 4 / PRV2 5;
+    - DeckLink 6, live audio 7 and monitor 8 are unchanged (pins);
+    - DP-4 operator is at x=0, DP-0 at x=1920, and the PGM1 screen consumer `<x>` goes 0 → 1920.
+- `smoke-wo868-operator-first-golden.test.js` (7 tests): the goldens, flag helpers, `defaultProgramChannel` / cg fallback / vcam default,
+  and a no-op without an operator GUI or with virtual mains.
+- `smoke-wo868-channel-remap.test.js` (8): the box remap `{1:2,2:3,3:4,4:5,5:1,6:6,7:7,8:8}`, no 1→2→3 chaining, round trip, only
+  channel references touched, re-keying, config slices, project convert/stamp/back byte-identical, own-rig remap, read/write hooks, and the
+  flag never stored in a project.
+- `smoke-wo868-operator-first-switch.test.js` (4), on a temp projects dir + temp state:
+  - GET, and a dry run that writes nothing;
+  - the refusals;
+  - ON refused while on air, then forced: files renumbered with rev+1, stamp-only files keeping their rev, banks / live looks / multiview
+    re-keyed, backup written;
+  - ON again is a no-op;
+  - OFF: every file equals the original apart from `rev`, and the state is identical.
+- All three are added to `tools/ci/offline-test-files-3.js`.
+
+### 3.2 Suites
+- `node tools/ci/run-offline-tests.js`: **4875 tests, 4870 pass, 0 fail** (5 skipped). An earlier run had 1 flaky timing failure in
+  `smoke-wo570-look-media-transport` (5059 vs 5000 ms under load); it passes 3/3 alone.
+- `node tools/ci/check-max-file-lines.js`: 0 files over 500. `check-unwired-exports`: none from WO-868 (the remaining hits are WO-869 /
+  WO-857 files). eslint on every changed file: no new warnings. `check-require-integrity` fails on 11 `projects/*.sync-conflict-*` files
+  that predate this WO.
+- Godot `run_tests.gd`: **23836 passed, 13 failed**. All 13 are in `test_devices_mapping_slices.gd` (WO-869, being written in parallel); none
+  are in WO-868 code. `test_wo868_operator_first.gd`: 32/32. `test_devices_server_page.gd` (web golden replay) and
+  `test_wo805_apply_timeout.gd` pass.
+
+### 3.3 GUI e2e (`godot/client/e2e/scenarios/15_wo868_operator_first.gd`)
+- Sandbox only (`--no-caspar`, offline mode, so the switch skips the config write):
+  `node tools/e2e/run-gui-e2e.js --e2e=15_wo868_operator_first --out=/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/e2e2` → **10/10**.
+- With a throwaway real Caspar on its own AMCP port and Xvfb, so the full apply writes the sandbox `casparcg.config` (and never restarts
+  anything):
+  `node tools/e2e/run-gui-e2e.js --air --keep --e2e=15_wo868_operator_first --out=/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/e2e3` → **10/10**.
+  - server.log: `[WO-868] Operator GUI first → ON … remap {"1":2,"2":3,"3":1}`, `[Full apply] Step 1 — writing casparcg.config`, `Saved …
+    (3219 bytes)`, then OFF with the inverse remap.
+  - The API after ON: channelMap `operatorGuiCh 1`, `programChannels[0] 2`. The generated config opens with "Caspar channel 1: Operator GUI
+    channel".
+- Screenshots:
+  - `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/e2e3/shots/07_15_wo_868_operator_first_confirm_on.png` (the confirm);
+  - `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/e2e3/shots/10_15_wo_868_operator_first_the_page_shows_it_on.png` (the check on, the status line);
+  - `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/e2e2/shots/07_15_wo_868_operator_first_confirm_on.png`.
+
+### 3.4 Live box (read only: nothing switched, nothing applied, nothing restarted)
+- The running server predates the route (`GET localhost:4200/api/system/operator-first` → HTTP 404), so the dry run ran in-process against
+  fresh copies of the live `config/`, `projects/` and `.highascg-state.json` (`/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo868/live2/dry-on.json`).
+- Result:
+  - refusals: none. Warnings: `caspar_down` (the copy has no AMCP; the live server would be connected).
+  - remap `{1:2,2:3,3:4,4:5,5:1,6:6,7:7,8:8}`; config slices: none.
+  - state: `programLayerBankByChannel` and `liveScenesByProgramChannel` (5 references; the live look sits on channel 4 = PRV Proj → 5).
+  - projects: 128 files, 127 stamped, 10 renumbered (22 references), 1 unreadable. Only 24 of 62 projects have an operator GUI
+    destination in their own rig; the rest are stamp-only.
+  - layout: DP-4 3840 → 0, DP-0 0 → 1920.
+  - channels after: 1 Operator GUI, 2/3 PGM/PRV Dioda, 4/5 PGM/PRV Proj, 6 DeckLink 1, 7 Live audio 1, 8 Monitor.
+- A sim copy was switched ON then OFF with `apply:false`: 118 project files byte-identical, 10 differ only by `rev`, the state is
+  identical, and `caspar_server.json` is identical (flag absent).
+- Owner steps (not done):
+  1. Restart the server so it loads the route.
+  2. Relaunch the client.
+  3. Run the dry run.
+  4. Toggle in a no-show window.
+  5. Verify on the box: `INFO` ch 1 = 1080p5000 shm; `xrandr` DP-4 +0+0, DP-0 +1920+0; one look and the multiview render; the
+     WO-638 simulated boots.
