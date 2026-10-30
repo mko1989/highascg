@@ -6,7 +6,7 @@ extends VSplitContainer
 ## Sync (WO-866, visuals_sync.gd); the page's sensitivity sliders set the box's detectors.
 
 const M := preload("res://features/visuals/visuals_model.gd")
-const Scene := preload("res://features/visuals/visuals_scene.gd")
+const Stage := preload("res://features/visuals/visuals_stage.gd")
 const Flow := preload("res://features/visuals/visuals_flow.gd")
 const Page := preload("res://features/visuals/visuals_page.gd")
 const Sync := preload("res://features/visuals/visuals_sync.gd")
@@ -16,7 +16,7 @@ const AUDIO_STALE_MS := 1000
 
 var slice := {}
 var out_vp: SubViewport
-var scene: Scene
+var scene: Stage
 var flow: Flow
 var page: Page
 var publisher: Publisher
@@ -41,7 +41,7 @@ func _ready() -> void:
 	out_vp.world_3d = world
 	out_vp.size = M.RENDER_SIZES[0]
 	add_child(out_vp)
-	scene = Scene.new()
+	scene = Stage.new()
 	out_vp.add_child(scene)
 	_canvas = TextureRect.new()
 	_canvas.texture = out_vp.get_texture()
@@ -92,6 +92,12 @@ func _ready() -> void:
 		_resize()
 		_store())
 	page.send_toggled.connect(func(on: bool) -> void: send(on))
+	page.scenes_changed.connect(func(main: String, overlay: String) -> void:
+		slice.scene = main
+		slice.overlay = overlay if overlay != main else ""
+		scene.set_layers(slice.scene, slice.overlay)
+		_store())
+	page.burst_pressed.connect(func() -> void: scene.fire())
 	page.sync_changed.connect(func(ms: float) -> void:
 		slice.sync = ms
 		_store())
@@ -115,6 +121,8 @@ func _ready() -> void:
 	_on_shown()
 	if _g("Config") and _g("Config").args.has("probe-visuals-send"):  # dev: --probe-visuals-send=<screen index>:<seconds>
 		_probe_send.call_deferred(str(_g("Config").args["probe-visuals-send"]))
+	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
+		_probe_shots.call_deferred(str(_g("Config").args["probe-visuals-shots"]))
 
 
 func _exit_tree() -> void:
@@ -138,6 +146,7 @@ func _cm() -> Variant:
 func _load() -> void:
 	slice = M.slice_of(_project())
 	flow.set_graph(slice.graph)
+	scene.set_layers(slice.scene, slice.overlay)
 	page.set_state(slice, _cm())
 	_resize()
 	_sync_send_ui("")
@@ -279,3 +288,25 @@ func _probe_send(arg: String) -> void:
 	await get_tree().create_timer(float(p[1]) if p.size() > 1 else 10.0).timeout
 	await send(false)
 	print("[probe-visuals] stopped: ", sending.is_empty())
+
+
+## dev probe (WO-873): each scene (and tunnel + particles) with a burst, the canvas saved as <dir>/<scene>.png, then quit.
+func _probe_shots(dir: String) -> void:
+	await get_tree().create_timer(3.0).timeout
+	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	set_process(true)
+	RenderingServer.viewport_set_measure_render_time(out_vp.get_viewport_rid(), true)
+	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"]]:
+		scene.set_layers(pair[0], pair[1])
+		await get_tree().create_timer(1.0).timeout
+		var gpu := 0.0
+		for i in 30:  # GPU ms of the canvas viewport, mean over 30 frames
+			await get_tree().process_frame
+			gpu += RenderingServer.viewport_get_measured_render_time_gpu(out_vp.get_viewport_rid()) / 30.0
+		scene.fire()
+		await get_tree().create_timer(0.25).timeout
+		var shot: String = str(pair[0]) + ("+" + str(pair[1]) if pair[1] != "" else "")
+		var err := out_vp.get_texture().get_image().save_png("%s/%s.png" % [dir, shot])
+		print("[probe-visuals] shot %s → %s · canvas %dx%d GPU %.2f ms" % [shot, error_string(err), out_vp.size.x, out_vp.size.y, gpu])
+	get_tree().quit()
+

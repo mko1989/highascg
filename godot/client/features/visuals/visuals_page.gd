@@ -10,6 +10,8 @@ signal output_changed(output: Dictionary)
 signal send_toggled(on: bool)
 signal sensitivity_changed(map: Dictionary)
 signal sync_changed(ms: float)
+signal scenes_changed(main: String, overlay: String)
+signal burst_pressed
 
 var _sliders := {}
 var _screen: OptionButton
@@ -22,11 +24,30 @@ var _quiet := false
 var _sens := {}
 var _sync: HSlider
 var _sync_label: Label
+var _scene: OptionButton
+var _overlay: OptionButton
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
 	add_theme_constant_override("separation", 6)
 	add_child(_heading("Visuals"))
+	_scene = OptionButton.new()
+	_scene.tooltip_text = "The visual (WO-873 scene library)"
+	_overlay = OptionButton.new()
+	_overlay.tooltip_text = "A second scene drawn over the first in the same world — e.g. Tunnel + Particles"
+	_overlay.add_item("None")
+	for s in M.SCENES:
+		_scene.add_item(s[1])
+		_overlay.add_item(s[1])
+	_scene.item_selected.connect(func(_i: int) -> void: _emit_scenes())
+	_overlay.item_selected.connect(func(_i: int) -> void: _emit_scenes())
+	add_child(_row("Scene", _scene))
+	add_child(_row("Layer 2", _overlay))
+	var burst := Button.new()
+	burst.text = "Burst"
+	burst.tooltip_text = "Fire the scenes' burst now (Flow: link a hit to the Burst parameter to fire it from the audio)"
+	burst.pressed.connect(func() -> void: burst_pressed.emit())
+	add_child(burst)
 	for p in M.PARAMS:
 		var row := HBoxContainer.new()
 		var l := Label.new()
@@ -88,6 +109,9 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 
 func set_state(slice: Dictionary, cm: Variant) -> void:
 	_quiet = true
+	var ids := M.scene_ids()
+	_scene.select(maxi(0, ids.find(str(slice.get("scene", "rings")))))
+	_overlay.select(ids.find(str(slice.get("overlay", ""))) + 1)
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
 	_screens = M.screens(cm)
@@ -134,6 +158,13 @@ func _emit_params() -> void:
 	for p in M.PARAMS:
 		out[p] = _sliders[p].value
 	params_changed.emit(out)
+
+
+func _emit_scenes() -> void:
+	if _quiet:
+		return
+	var ids := M.scene_ids()
+	scenes_changed.emit(ids[maxi(0, _scene.selected)], ids[_overlay.selected - 1] if _overlay.selected > 0 else "")
 
 
 func _on_sync(v: float) -> void:

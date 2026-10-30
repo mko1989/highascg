@@ -78,6 +78,14 @@ func test_slice_screens_and_bodies() -> void:
 	t.eq(M.render_size(0, 0, 0), M.RENDER_SIZES[0], "unknown screen → the preset")
 	t.eq(M.play_body(3, 1), {"channel": 3, "layer": 1, "clip": "shm://visuals", "loop": false}, "PLAY body → SHM NAME visuals")
 	t.eq(M.stop_body(3, 1), {"channel": 3, "layer": 1}, "STOP body")
+	# WO-873: scene + second layer, the new parameters' defaults in an old project
+	t.eq([s.scene, s.overlay], ["rings", ""], "an old project: rings, no second layer")
+	t.eq(s.params.amount, M.PARAM_DEFAULTS.amount, "a new parameter loads with its default")
+	var two := M.slice_of({"visuals": {"scene": "tunnel", "overlay": "particles"}})
+	t.eq([two.scene, two.overlay], ["tunnel", "particles"], "scene + layer 2 kept")
+	t.eq(M.slice_of({"visuals": {"scene": "tunnel", "overlay": "tunnel"}}).overlay, "", "the same scene twice → no layer 2")
+	t.eq(M.slice_of({"visuals": {"scene": "x", "overlay": "y"}}).scene, "rings", "unknown scene → rings")
+	t.ok(["s1", "p6"] in M.default_graph().links, "starter graph: kick (shaped) → burst")
 
 
 func test_tab_builds_headless() -> void:

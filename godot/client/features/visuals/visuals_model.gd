@@ -2,8 +2,10 @@ extends RefCounted
 ## WO-863 — the Visuals tab's pure half: the WO-861 audio parts as flat 0..1 buses, the Flow graph (WO-858 §6.2 binding table
 ## as nodes: Audio bus → Shape → Parameter), its per-frame evaluation, the scene parameters and the `project.visuals` slice.
 
-const PARAMS := ["pulse", "spin", "hue", "glow", "flash"]
-const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0}
+const PARAMS := ["pulse", "spin", "hue", "glow", "flash", "speed", "amount", "burst"]
+const PARAM_DEFAULTS := {"pulse": 0.2, "spin": 0.15, "hue": 0.55, "glow": 0.3, "flash": 0.0, "speed": 0.3, "amount": 0.5, "burst": 0.0}
+## WO-873 scene library (visuals_stage.gd SCENES): [id, label]. `burst` is the event parameter — its rising edge fires the scenes.
+const SCENES := [["rings", "Rings"], ["particles", "Particles"], ["starfield", "Starfield"], ["tunnel", "Tunnel"]]
 ## Bus names the Flow view offers, in menu order. Drum and drop buses are pulses (1 on the hit, decaying); the rest are levels.
 const BUSES := ["kick", "snare", "hats", "kick.level", "snare.level", "hats.level", "bass", "mid", "high", "tonal", "loudness",
 	"onset", "density", "arousal", "valence", "energy", "drop", "beat", "section.build", "section.peak", "section.quiet"]
@@ -43,7 +45,7 @@ static func buses_of(frame: Variant) -> Dictionary:
 	return out
 
 
-## The starter graph: kick pumps the rings, energy spins them, valence tints, loudness glows, snare flashes.
+## The starter graph: kick pumps the rings and bursts (WO-873), energy spins them, valence tints, loudness glows, snare flashes.
 static func default_graph() -> Dictionary:
 	return {"nodes": [
 		_node("b1", "bus", 20, 20, {"bus": "kick"}), _node("s1", "shape", 240, 20, {"gain": 1.0, "attack": 5, "release": 180}),
@@ -54,7 +56,9 @@ static func default_graph() -> Dictionary:
 		_node("b4", "bus", 20, 400, {"bus": "loudness"}), _node("p4", "param", 470, 400, {"param": "glow"}),
 		_node("b5", "bus", 20, 500, {"bus": "snare"}), _node("s5", "shape", 240, 500, {"gain": 0.8, "attack": 0, "release": 120}),
 		_node("p5", "param", 470, 500, {"param": "flash"}),
-	], "links": [["b1", "s1"], ["s1", "p1"], ["b2", "p2"], ["b3", "s3"], ["s3", "p3"], ["b4", "p4"], ["b5", "s5"], ["s5", "p5"]]}
+		_node("p6", "param", 470, 90, {"param": "burst"}),
+	], "links": [["b1", "s1"], ["s1", "p1"], ["s1", "p6"], ["b2", "p2"], ["b3", "s3"], ["s3", "p3"], ["b4", "p4"], ["b5", "s5"],
+		["s5", "p5"]]}
 
 
 static func _node(id: String, type: String, x: float, y: float, props: Dictionary) -> Dictionary:
@@ -168,16 +172,23 @@ static func params_of(v: Variant) -> Dictionary:
 	return out
 
 
-## `project.visuals` → {graph, params, output: {screen, layer, size}, sync} with every field present. `sync` (WO-866): ms the
-## drum pulses move against the room sound, −300..300 (visuals_sync.gd).
+## `project.visuals` → {graph, params, output: {screen, layer, size}, sync, scene, overlay} with every field present. `sync`
+## (WO-866): ms the drum pulses move against the room sound, −300..300 (visuals_sync.gd). `scene` / `overlay` (WO-873): the main
+## scene and the second layer ("" = none, never the main scene twice).
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
 	var o: Dictionary = d.get("output") if d.get("output") is Dictionary else {}
+	var main := str(d.get("scene", "")) if scene_ids().has(str(d.get("scene", ""))) else "rings"
+	var over := str(d.get("overlay", "")) if scene_ids().has(str(d.get("overlay", ""))) and str(d.get("overlay", "")) != main else ""
 	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")),
 		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
 			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)},
-		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0)}
+		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0), "scene": main, "overlay": over}
+
+
+static func scene_ids() -> Array:
+	return SCENES.map(func(s: Array) -> String: return s[0])
 
 
 ## The screens Send can target: [{label, channel}] from channelMap.programChannels + screenLabels.
