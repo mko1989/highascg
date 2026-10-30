@@ -1,7 +1,7 @@
 # WO-837 — Timeline: screens, lights layer, control layer (D6)
 
 **Area:** engine, lighting
-**Status: OPEN (30.10)**
+**Status: IN PROGRESS (30.10: phases 1–2 done and re-verified; phase 3 live: light flags fired by the live server reach UDP receivers for all three drivers, per-screen routing proven on real Caspar on PRV ch2/ch4. Left: the PGM run of a two-screen timeline (on air, waits for owner approval, script ready, see 3c), and real-console checks, which need console hardware (MagicQ demo mode has no OSC))**
 **Source:** WO-828 D6, owner 30.10: *"ability to add screens to a timeline (should have a divider and seperete layers in the
 list at the bottom) ability to add lights layer (here id like it to be similar to comapnion buttons in timeline, but with a
 choice of console in devices tab, that highascg connects to and ability to choose which cue to go into or move which fader
@@ -269,3 +269,89 @@ canvas drew it as a red pause triangle.
 
 Verified: `tools/smoke/smoke-wo837-web-light-flag.test.js` passes 3/3 (curated), and eslint is clean. The client was
 rebuilt with `npm run build:client`.
+
+## 1c. Investigation for phase 3 (live box, 30.10)
+
+Read-only probes before any live action:
+- **The live node has the phase-1 code.** `highascg.service` started 15:57:27, after the last `src/lighting-console/*` and
+  `src/engine/timeline-playback-light.js` writes (11:14–11:23). `GET :4200/api/lighting/consoles` answers with the
+  four kinds, and the store is empty.
+- **The Caspar channels at probe time** (`INFO`, AMCP :5250; the map comes from `/api/state channelMap`):
+  - ch1 is Dioda PGM (3840×1792) and ch3 is Proj PGM (1080p50). Both are empty but go to the outputs, so they are on air.
+  - ch2 is Dioda PRV, layers 10–12. The owner's PRV content was playing there (`PK BACK TRACK`, `PK CLICK`, `INTRO_HAP`).
+  - ch4 is Proj PRV, layer 10.
+  - ch5 is the operator GUI `shm` consumer, ch6 DeckLink, ch7 live audio (ffmpeg UDP), ch8 system-audio.
+  - The engine held no timelines (`GET /api/timelines` → `[]`, playback `null`). The cluster is `standalone` with no
+    peers and replication is off, so `notifyTimelineReplication` (`src/replication/replication-hooks.js:15-17`) sends
+    nothing.
+- **An unrouted timeline still fires its flags and sends no AMCP.**
+  - `_channelsFor` returns `[]` when neither preview nor program is on (`timeline-playback-amcp-send.js:436`).
+  - The tick still crosses flags (`timeline-playback.js:254-292`). The light flag only checks `_airTimelineId`
+    (`timeline-playback-light.js:27`), and `play()` makes the timeline air (`timeline-playback-runtime.js:33`).
+  - So the light-flag leg can run on the live server without touching Caspar.
+- **Routing a timeline to PRV only touches its own layers.** A mock-AMCP dry run of the PRV probe
+  (`TimelineEngine`, same timeline, `sendTo {preview:true, program:false}`) sends only `2-210` and `4-211` lines:
+  STOP/PLAY/FILL/OPACITY/VOLUME/MIXER×9, then `COMMIT 2`/`COMMIT 4`. On stop it sends `STOP 2-210`, `STOP 4-211`.
+  - Clip source `#00000000`, a fully transparent colour, so the owner's preview picture stays the same.
+  - `play()` has no earlier air timeline to `_stopAll` (`timeline-playback-runtime.js:57-68`).
+  - A non-program timeline needs no `force` to stop (`routes-timeline.js:117-128`).
+  - With `ROUTE=pgm` the dry run sends the same set on `1-210` and `3-211`.
+- **MagicQ OSC is not available in demo mode.** The box's own manual
+  (`/opt/magicq/manual/magicq/manual/magicq_pc.html`, "MagicQ PC / Mac Restrictions (Demo Mode and Core Mode)") lists
+  "Open Sound Control (OSC)" and the "ChamSys Remote Control Protocol (serial, or network)" under **UNLOCKED MODE**
+  only. That mode needs ChamSys hardware (Mini/Compact/Stadium Connect, Compact Wing, a rack dongle, or a GeNetix
+  GN5/GN10 on the network).
+  - The box has none, so MagicQ 1.9.8.3 runs in DEMO MODE and would not act on `/pb/N/go`.
+  - Launching it would also start its Art-Net, unicast to `127.0.0.2:6454` (see the MagicQ setup notes). This session
+    may not touch :6454.
+  - So MagicQ was not started.
+
+## 2c. What was done (phase 3, 30.10)
+
+No production code changed. Live probes only, all scripts are in the session scratchpad (`…/scratchpad/wo837/`):
+- `live-light-probe.js` runs light flags through the LIVE server.
+  - It binds three UDP receivers on `127.0.0.1` (ephemeral ports) and POSTs three consoles (`magicq`, `eos`, `grandma3`)
+    pointing at them.
+  - It POSTs an unrouted, layer-less timeline with 16 `light` flags: go, go-to-cue, fader, release and command per
+    console, plus one flag on a console that does not exist.
+  - It plays the timeline, then stops and deletes it and removes the three consoles. The store and the timeline list
+    are empty again afterwards.
+- `live-prv-probe.js` (`prv-probe-timeline.json`) runs a two-screen timeline through the LIVE server, routed to
+  PREVIEW only.
+  - Layer A has `screenIdx 0` and layer B has `screenIdx 1`. Both clips are `#00000000`.
+  - It creates, plays, reads `INFO 1-4` after 2 s, then stops and deletes the timeline.
+  - `ROUTE=pgm` runs the same probe on PROGRAM with `stop {force:true}`. **It has not been run.** ch1/ch3 are on air,
+    so it waits for owner approval.
+- `dry-run-prv.js` is the mock-AMCP dry run above, with `ROUTE=pgm` also supported.
+
+## 3c. Verified (phase 3, 30.10)
+
+- **Light flags, live server → UDP.** All 16 flags crossed. 17 datagrams arrived, 16 from flags plus the `/test`
+  `/feedback/off`, and each was decoded as OSC. Each fired 60 ms or less after its flag time, which is the tick
+  latency.
+  - magicq: `/pb/1/go i:1`, `/pb/2/3 i:1`, `/pb/4 i:80`, `/pb/1/release i:1`, `/rpc s:"1@100"`.
+  - eos: `/eos/newcmd s:"Cue 1 Go#"`, `/eos/cue/2/3/fire`, `/eos/fader/2/config/10` + `/eos/fader/2/10 f:0.800`,
+    `/eos/newcmd s:"Cue 1 Release#"`, `/eos/newcmd s:"Chan 1 At Full#"`.
+  - grandma3: `/cmd s:"Go+ Sequence 1"`, `/cmd s:"Goto Cue 3 Sequence 2"`, `/Page2/Fader10 i:80`,
+    `/cmd s:"Off Sequence 1"`, `/cmd s:"Go+ Sequence 5"`.
+  - `POST /api/lighting/consoles/wo837-magicq/test` returned `{ok:true, sent:["/feedback/off"], note:"UDP is unacknowledged…"}`.
+  - Journal: for each flag, `[Timeline] playhead crossed light flag "<label>"` then `[lighting] WO837 <kind>: <action> -> <address>`.
+    The missing console logged `[warn] [Timeline] light flag "missing console" -> console wo837-missing: lighting
+    console "wo837-missing" is not configured (Devices > Lighting consoles)` (`console-service.js:71`), and playback
+    ran on to the end.
+  - `INFO 1-4` after the run showed the same layers as before, so Caspar was not touched.
+- **Per-screen routing on real Caspar (PRV).**
+  - Before: `{1:{}, 2:{10,11,12}, 3:{}, 4:{10}}`.
+  - Playing (2 s, `state` `playing:true` at 2031 ms): `{1:{}, 2:{10,11,12,210:#00000000}, 3:{}, 4:{10,211:#00000000}}`.
+    Layer A is on ch2 only and B on ch4 only. PGM was never addressed.
+  - After stop and delete: 210/211 are empty on ch2/ch4, layers 10–12 and 10 are untouched, and `GET /api/timelines` is `[]`.
+- **Regression re-run on the current tree.**
+  - Godot headless suite: 23657 passed, 0 failed.
+  - `node --test tools/smoke/smoke-wo837-*.test.js`: 30/30.
+  - GUI e2e `09_timeline_control_lane`: 6/6. Screenshots are in `…/scratchpad/wo837/e2e09/shots/` (01 shows the
+    S1 divider, the 4-row stacked control lane and the red "? gone" chip).
+- **Not verified, and why:**
+  1. **The PGM run** (`ROUTE=pgm node live-prv-probe.js`) is on air, so it waits for owner approval. The PRV run
+     proves the same filter on real Caspar, and the dry run shows the PGM line set is the same on `1-210` / `3-211`.
+  2. **Behaviour on a real console.** No console hardware is available, and MagicQ demo mode has no OSC (1c). The Eos
+     and MA3 command-line forms are still from documentation only.

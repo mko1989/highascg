@@ -166,14 +166,16 @@ static func params_of(v: Variant) -> Dictionary:
 	return out
 
 
-## `project.visuals` → {graph, params, output: {screen, layer, size}} with every field present.
+## `project.visuals` → {graph, params, output: {screen, layer, size}, sync} with every field present. `sync` (WO-866): ms the
+## drum pulses move against the room sound, −300..300 (visuals_sync.gd).
 static func slice_of(project: Variant) -> Dictionary:
 	var v: Variant = project.get("visuals") if project is Dictionary else null
 	var d: Dictionary = v if v is Dictionary else {}
 	var o: Dictionary = d.get("output") if d.get("output") is Dictionary else {}
 	return {"graph": normalize_graph(d.get("graph")), "params": params_of(d.get("params")),
 		"output": {"screen": maxi(0, int(_num(o.get("screen")))), "layer": clampi(int(_num(o.get("layer", 1))), 1, 9999),
-			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)}}
+			"size": clampi(int(_num(o.get("size"))), 0, RENDER_SIZES.size() - 1)},
+		"sync": clampf(roundf(_num(d.get("sync"))), -300.0, 300.0)}
 
 
 ## The screens Send can target: [{label, channel}] from channelMap.programChannels + screenLabels.

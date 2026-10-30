@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (37 open, 120 in progress, 624 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (36 open, 120 in progress, 625 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -157,7 +157,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 829 DONE [engine] Timeline-in-look follow-up: loop wrap leaves an ended clip on air; on-air rerou… → 829_WO_timeline_wrap_stop_and_onair_reroute.md
 - 833 DONE [engine] On-air engine one-liners (sweep §3e–3i, 3k–3m) → 833_WO_engine_onair_one_liners.md
 - 834 DONE [engine] Timeline end holds the last frame (D8) → 834_WO_timeline_end_holds_last_frame.md
-- 837 OPEN [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
+- 837 IN PROGRESS [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
 - 840 DONE [engine+godot-client] Timer visibility lives in look presets (per screen), not in looks → 840_WO_timer_visibility_in_look_presets.md
 - 849 DONE [engine] Work order: Fix A/B bank transitions by layer stacking order → 849_WO_fix_ab_bank_transition_layer_order.md
 - 850 DONE [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
@@ -244,7 +244,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 801 DONE [audio] PRV audio: monitor individual pairs on headphones (not only the mix-down) → 801_WO_prv_audio_pair_monitor_headphones.md
 - 861 DONE [audio+engine,godot-client] Real-time audio "parts" for live visuals: drum hits, tonal, mood/energy buses f… → 861_WO_realtime_audio_parts_buses.md
 - 862 DONE [audio+godot-client,web-client] audio mixer shows screen labels; a new live input starts unrouted → 862_WO_audio_mixer_screen_labels_new_input_unrouted.md
-- 866 IN PROGRESS [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
+- 866 DONE [audio+godot-client] Drum detection vs real music: measure against annotated drums, better detector,… → 866_WO_drum_detection_alignment.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 

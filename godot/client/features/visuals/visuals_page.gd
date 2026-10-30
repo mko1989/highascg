@@ -1,12 +1,15 @@
 extends VBoxContainer
 ## WO-863 — the Visuals tab's Inspector page: the scene's base parameters (the Flow graph adds the audio on top), and Output —
-## which screen destination, which layer, the render size, and Send (on air through the WO-742/743 shm ring).
+## which screen destination, which layer, the render size, and Send (on air through the WO-742/743 shm ring). Audio (WO-866):
+## per-drum detector sensitivity (the box's `/api/audio/parts-sensitivity`, 0.5 = the measured tuning) and Sync.
 
 const M := preload("res://features/visuals/visuals_model.gd")
 
 signal params_changed(params: Dictionary)
 signal output_changed(output: Dictionary)
 signal send_toggled(on: bool)
+signal sensitivity_changed(map: Dictionary)
+signal sync_changed(ms: float)
 
 var _sliders := {}
 var _screen: OptionButton
@@ -16,6 +19,9 @@ var _send: CheckButton
 var _note: Label
 var _screens := []
 var _quiet := false
+var _sens := {}
+var _sync: HSlider
+var _sync_label: Label
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
@@ -36,6 +42,21 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 		row.add_child(s)
 		_sliders[p] = s
 		add_child(row)
+	add_child(_heading("Audio"))
+	for d in ["kick", "snare", "hats"]:
+		var s := _slider(0.0, 1.0, 0.05, "How easily a %s counts as a hit — left: only clear hits, right: ghost notes too" % d)
+		s.value = 0.5
+		s.value_changed.connect(func(_v: float) -> void: _emit_sens())
+		add_child(_row(d.capitalize(), s))
+		_sens[d] = s
+	_sync = _slider(-300.0, 300.0, 5.0, "Sync — right: delay the pulses; left: fire them early from each drum's steady rhythm (the screens lag the room)")
+	_sync.value_changed.connect(_on_sync)
+	var sync_row := _row("Sync", _sync)
+	_sync_label = Label.new()
+	_sync_label.custom_minimum_size.x = 64
+	_sync_label.text = "+0 ms"
+	sync_row.add_child(_sync_label)
+	add_child(sync_row)
 	add_child(_heading("Output"))
 	_screen = OptionButton.new()
 	_screen.tooltip_text = "Screen destination the visual plays on (its PGM channel)"
@@ -77,6 +98,8 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 		_screen.select(clampi(int(slice.output.screen), 0, _screens.size() - 1))
 	_layer.set_value_no_signal(slice.output.layer)
 	_size.select(int(slice.output.size))
+	_sync.set_value_no_signal(float(slice.get("sync", 0.0)))
+	_sync_label.text = "%+d ms" % int(_sync.value)
 	_quiet = false
 
 
@@ -88,6 +111,15 @@ func set_sending(on: bool, can: bool, note: String) -> void:
 	_note.text = note
 	_screen.disabled = on  # switching screens on air would orphan the layer: stop first
 	_layer.editable = not on
+
+
+## The box's sensitivity (GET /api/audio/parts-sensitivity); an empty map (no box) leaves the sliders.
+func set_sensitivity(map: Dictionary) -> void:
+	_quiet = true
+	for d in _sens:
+		if map.get(d) is float or map.get(d) is int:
+			_sens[d].set_value_no_signal(float(map[d]))
+	_quiet = false
 
 
 func screen_channel() -> int:
@@ -104,9 +136,33 @@ func _emit_params() -> void:
 	params_changed.emit(out)
 
 
+func _on_sync(v: float) -> void:
+	_sync_label.text = "%+d ms" % int(v)
+	if not _quiet:
+		sync_changed.emit(v)
+
+
+func _emit_sens() -> void:
+	if _quiet:
+		return
+	var out := {}
+	for d in _sens:
+		out[d] = _sens[d].value
+	sensitivity_changed.emit(out)
+
+
 func _emit_output() -> void:
 	if not _quiet:
 		output_changed.emit({"screen": maxi(0, _screen.selected), "layer": int(_layer.value), "size": maxi(0, _size.selected)})
+
+
+func _slider(lo: float, hi: float, step: float, tip: String) -> HSlider:
+	var s := HSlider.new()
+	s.min_value = lo
+	s.max_value = hi
+	s.step = step
+	s.tooltip_text = tip
+	return s
 
 
 func _heading(t: String) -> Label:

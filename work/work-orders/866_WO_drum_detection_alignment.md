@@ -1,7 +1,7 @@
 # WO-866 — Drum detection vs real music: measure against annotated drums, better detector, sync and sensitivity sliders
 
 **Area:** audio, godot-client
-**Status: IN PROGRESS (30.10) — detector retuned + measured (MDB Drums), sensitivity + test-music routes live; Godot Sync / Sensitivity sliders next**
+**Status: DONE (30.10) — detector retuned and scored on MDB Drums (kick F 50→64, non-jazz 61→79); sensitivity + test-music routes live on the box; Godot Audio section (per-drum Sensitivity, Sync with prediction) — Godot suite 23686/0, GUI e2e 13_wo866_visuals_audio 3/3**
 
 Owner, 30.10: "the detected snare kick etc doesnt really align with real music. need a slider there or something to align it
 better. or better analyzis model."
@@ -95,6 +95,26 @@ Not chosen:
 - **librosa / madmom as an offline reference.** They are not installable here: no pip, no venv, no Debian package. MDB's
   human annotations are a better reference anyway.
 
+- **Godot Visuals page, Audio section** (`features/visuals/visuals_page.gd`, `visuals_tab.gd`):
+  - Kick / Snare / Hats sensitivity sliders, loaded from `GET /api/audio/parts-sensitivity` when the tab builds and posted
+    (at most every 250 ms while dragging; the last value always goes out). They set the box, not the project: the detectors
+    are one per box.
+  - **Sync** −300..+300 ms, stored in `project.visuals.sync` (the `visuals` slice is client-owned, so the web autosave keeps
+    it), with a ±ms label.
+- **Sync model** (`features/visuals/visuals_sync.gd`, pure):
+  - hit times come from the frames: `n` counts hits and `onset` decays over 150 ms, so a new hit happened
+    (1 − onset) · 150 ms before its frame. That is better than the 33 ms frame grid;
+  - **+sync** delays the drum pulses and every other bus (levels come from the frame sync ms ago);
+  - **−sync** fires each drum's next pulse sync ms before it is due, from its steady period: the median of the last 8
+    intervals, with 3 in 4 (and the last one) within ±15 %. A drum that stops pulses at most 2 more times, and a drum with
+    no steady period (a syncopated kick) plays unshifted. Prediction is the only way to land on the beat, because the chain
+    to the wall lags the room;
+  - the `beat` bus shifts its phase either way (the beat tracker is periodic already);
+  - sync 0 returns the buses untouched.
+
+Not chosen: predicting a syncopated pattern one bar back (from the beat tracker's bpm). That is more state and more ways to
+fire a wrong hit, and kick-on-every-beat and 8th/16th hats, the material the owner's sync complaint is about, are steady.
+
 ## 3. What was VERIFIED
 
 MDB Drums, ±50 ms, F (precision / recall). The "non-jazz" set is 16 rock / pop / disco / funk / punk / reggae mixes; the
@@ -131,9 +151,19 @@ jazz brushes and ghost notes are 1668 of the 2654 annotated snares:
 - Dropped: a "vocal glide is no snare" unit test. Synthetic sung syllables trip both the old and the new detector (a
   syllable *is* an onset), so it proved nothing. The real-music evidence is the MDB table.
 
-## 4. Next (this WO)
+- Godot (`tests/test_visuals_sync.gd`, 8 tests), suite 23686 passed / 0 failed:
+  - hit times back-dated from 30 Hz frames to within 0.01 ms, and an engine reset clears them;
+  - period: steady, jittered, syncopated, too fast;
+  - delay: the hit fires at +200 ms; levels come from the right frame;
+  - prediction: the 2500 ms hit fires at 2400 ms with sync −100, not before; a stopped drum stops; an unsteady drum is
+    unshifted;
+  - beat phase both ways; the slice clamp; the page emits nothing on load and sends all three drums on a drag.
+- GUI e2e `13_wo866_visuals_audio` (sandbox server, private Xvfb, real mouse drags), 3/3:
+  - the Kick slider shows the box's 0.5; a drag to 0.9 reaches `GET /api/audio/parts-sensitivity`, with snare untouched;
+  - a Sync drag to −195 ms shows "-195 ms" and lands in the stored project's `visuals.sync`;
+  - screenshot `scratchpad/wo866/e2e2/shots/02_…png`: the Audio section under the base parameters.
 
-- Godot Visuals page: per-drum Sensitivity sliders (the route above) and a **Sync** slider.
-  - Positive Sync delays the pulses.
-  - Negative Sync fires the pulses early from the drum's own steady period. The chain to the LED wall lags the room
-    sound, so only prediction can make visuals land on the beat.
+## 4. Left for the owner's ear
+
+- Pick a Sync value against the real wall. Neither the e2e nor the box can measure the lag of the LED processor and the
+  room.
