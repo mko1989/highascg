@@ -170,7 +170,11 @@ would do."* So the driver does **real OS-level input**; Godot only supplies the 
   crop bounds, alpha note, AMCP reply parsing, INFO → clips, `caspar print/info` against a fake Caspar + temp media folder, sandbox
   "no Caspar", `:0` refusal). eslint clean on the new files, `check-max-file-lines` 0 over, Godot suite 23407 passed / 0 failed.
 
-### Finding (not fixed — godot/client/features/timeline is another agent's scope)
+### Finding (FIXED 30.10 12:05, e2ac4165, WO-834)
+
+The fix is on the server: a seek onto the held frame keeps the hold, so the client's seek-then-play starts over. Pinned by
+`smoke-wo834-timeline-end-hold` "the clients' seek-to-playhead before Play keeps the hold" (5/5). The node has run it since the
+16:41 restart. Original finding:
 
 WO-834's "Play after the end hold restarts from 0" does not happen from the Godot client. `timeline_transport.gd toggle_play()` POSTs
 `/seek {ms: playhead}` and then `/play {from: playhead}`. The hold parks the playhead at `duration − 1 frame` (e.g. 4746 of 4786 ms);
