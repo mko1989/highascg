@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# WO-870 Phase 2: check-only twin of install-eggs-config.sh. Compares the sha256 of the installed
-# /etc/penguins-eggs.d/{custom.exclude.list,custom.yaml} with freshly generated content.
+# WO-870 Phase 2: check-only twin of install-eggs-config.sh. Compares the sha256 of every installed file under
+# /etc/penguins-eggs.d/ (custom.exclude.list, custom.yaml, branding/livecd/*) with freshly generated content.
 # PASS/FAIL per file with a one-line reason; exit 1 on any mismatch. Runs as non-root (files are world-readable).
 # Same --branch / --embed / env knobs as install-eggs-config.sh; EGGS_CONF_DIR overrides the directory.
 set -uo pipefail
@@ -10,14 +10,15 @@ CONF_DIR="${EGGS_CONF_DIR:-/etc/penguins-eggs.d}"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-if ! bash "${HERE}/install-eggs-config.sh" --out "$TMP" "$@" >"${TMP}/gen.log" 2>&1; then
+if ! bash "${HERE}/install-eggs-config.sh" --out "${TMP}/gen" "$@" >"${TMP}/gen.log" 2>&1; then
 	echo "FAIL generator: $(tail -1 "${TMP}/gen.log")"
 	exit 1
 fi
 
 rc=0
-for f in custom.exclude.list custom.yaml; do
-	want="$(sha256sum "${TMP}/${f}" | cut -d' ' -f1)"
+mapfile -t GENERATED < <(cd "${TMP}/gen" && find . -type f -printf '%P\n' | sort)
+for f in "${GENERATED[@]}"; do
+	want="$(sha256sum "${TMP}/gen/${f}" | cut -d' ' -f1)"
 	have_file="${CONF_DIR}/${f}"
 	if [[ ! -r "$have_file" ]]; then
 		echo "FAIL ${f}: ${have_file} missing or unreadable"
@@ -34,8 +35,10 @@ for f in custom.exclude.list custom.yaml; do
 		if ! grep -qxF 'home/casparcg/highascg/media/*' "$have_file"; then
 			why="installed list has no home/casparcg/highascg/media/* line"
 		else
-			why="differs from generated ($(grep -cv '^[[:space:]]*\(#\|$\)' "$have_file") vs $(grep -cv '^[[:space:]]*\(#\|$\)' "${TMP}/${f}") patterns)"
+			why="differs from generated ($(grep -cv '^[[:space:]]*\(#\|$\)' "$have_file") vs $(grep -cv '^[[:space:]]*\(#\|$\)' "${TMP}/gen/${f}") patterns)"
 		fi
+	elif [[ "$f" == branding/* ]]; then
+		why="differs from the repo theme (highascg-eggs-theme/theme/livecd)"
 	else
 		why="differs from generated (installed iso_prefix: $(sed -n 's/^[[:space:]]*iso_prefix:[[:space:]]*//p' "$have_file" | head -1))"
 		[[ -z "$(sed -n 's/^[[:space:]]*iso_prefix:.*/x/p' "$have_file")" ]] && why="differs from generated (installed file has no iso_prefix)"

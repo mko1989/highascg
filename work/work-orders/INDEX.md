@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (29 open, 120 in progress, 632 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (28 open, 121 in progress, 632 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -679,7 +679,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 848 IN PROGRESS [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
 - 855 DONE [os-iso] Work order: Remove persistence partition workflow (exfat-only) → 855_WO_remove_persistence_partition_workflow_exfat_only.md
 - 856 DONE [os-iso] Work order: Single NVIDIA driver per live ISO (no multi-driver pool) → 856_WO_single_nvidia_driver_per_iso.md
-- 870 OPEN [os-iso] penguins-eggs 26.10 rewrite: produce is gone (remaster), theme/basename/max/cal… → 870_WO_eggs_26_10_rewrite_iso_pipeline.md
+- 870 IN PROGRESS [os-iso] penguins-eggs 26.10 rewrite: produce is gone (remaster), theme/basename/max/cal… → 870_WO_eggs_26_10_rewrite_iso_pipeline.md
 
 ## network — Cluster, replication, Tailscale, auth (39)
 

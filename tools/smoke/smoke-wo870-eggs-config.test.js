@@ -3,6 +3,7 @@
 /**
  * WO-870 Phase 2: the managed penguins-eggs 26.10 config (custom.exclude.list + custom.yaml) is generated from
  * the repo, deterministically, and obeys the coa parser's rules (offline, no root, no eggs/coa).
+ * Phase 3: the boot-menu branding (branding/livecd/) travels with it, and the templates render on coa's menu script.
  */
 
 const { describe, it } = require('node:test')
@@ -13,6 +14,8 @@ const path = require('path')
 const { execFileSync, spawnSync } = require('child_process')
 
 const LIVE_USB = path.resolve(__dirname, '../eggs/live-usb')
+const LIVECD = path.join(LIVE_USB, 'highascg-eggs-theme/theme/livecd')
+const LIVECD_FILES = ['grub.main.cfg', 'isolinux.main.cfg', 'grub.theme.cfg', 'isolinux.theme.cfg', 'splash.png']
 const GEN = path.join(LIVE_USB, 'generate-eggs-config.js')
 const gen = require(GEN)
 
@@ -63,7 +66,9 @@ describe('WO-870 generate-eggs-config: custom.exclude.list', () => {
 	})
 
 	it('every vendored fragment line survives (nothing silently dropped)', () => {
-		for (const f of fs.readdirSync(LIVE_USB).filter((n) => /^penguins-eggs-exclude-(stock-custom|old-template|decklink|highascg-embed-server)\.list$/.test(n))) {
+		for (const f of fs
+			.readdirSync(LIVE_USB)
+			.filter((n) => /^penguins-eggs-exclude-(stock-custom|old-template|decklink|highascg-embed-server)\.list$/.test(n))) {
 			for (const raw of fs.readFileSync(path.join(LIVE_USB, f), 'utf8').split('\n')) {
 				const l = gen.cleanLine(raw)
 				if (l) assert.ok(pats.includes(l), `${f}: ${l} missing from output`)
@@ -101,6 +106,15 @@ describe('WO-870 install-eggs-config.sh / verify-eggs-config.sh', () => {
 			assert.equal(r.status, 0, r.stderr)
 			assert.equal(fs.readFileSync(path.join(dir, 'custom.exclude.list'), 'utf8'), list)
 			assert.equal(fs.readFileSync(path.join(dir, 'custom.yaml'), 'utf8'), gen.buildCustomYaml({ branch: '615' }))
+			for (const f of LIVECD_FILES) {
+				const want = f.endsWith('.main.cfg')
+					? Buffer.from(fs.readFileSync(path.join(LIVECD, f), 'utf8').replaceAll('{{{fullname}}}', 'HIGHASCG NVIDIA 615'))
+					: fs.readFileSync(path.join(LIVECD, f))
+				assert.ok(fs.readFileSync(path.join(dir, 'branding/livecd', f)).equals(want), `branding/livecd/${f}`)
+			}
+			const grubOut = fs.readFileSync(path.join(dir, 'branding/livecd/grub.main.cfg'), 'utf8')
+			assert.match(grubOut, /^menuentry "HIGHASCG NVIDIA 615 Live" \{$/m, 'menus keep the old eggs name')
+			assert.ok(!grubOut.includes('{{{fullname}}}'))
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true })
 		}
@@ -112,7 +126,10 @@ describe('WO-870 install-eggs-config.sh / verify-eggs-config.sh', () => {
 			const conf = { EGGS_CONF_DIR: dir }
 			fs.writeFileSync(path.join(dir, 'custom.yaml'), 'old: 1\n')
 			assert.equal(sh('install-eggs-config.sh', ['--apply'], conf).status, 0)
-			assert.ok(fs.readdirSync(dir).some((n) => n.startsWith('custom.yaml.bak-')), 'previous yaml not backed up')
+			assert.ok(
+				fs.readdirSync(dir).some((n) => n.startsWith('custom.yaml.bak-')),
+				'previous yaml not backed up'
+			)
 			const second = sh('install-eggs-config.sh', ['--apply'], conf)
 			assert.match(second.stdout, /unchanged: .*custom\.exclude\.list/)
 			assert.equal(fs.readdirSync(dir).filter((n) => n.includes('.bak-')).length, 1, 'idempotent run made a backup')
@@ -122,6 +139,9 @@ describe('WO-870 install-eggs-config.sh / verify-eggs-config.sh', () => {
 			assert.equal(bad.status, 1)
 			assert.match(bad.stdout, /FAIL custom\.exclude\.list/)
 			assert.match(bad.stdout, /PASS custom\.yaml/)
+			assert.match(bad.stdout, /PASS branding\/livecd\/grub\.main\.cfg/)
+			fs.rmSync(path.join(dir, 'branding/livecd/splash.png'))
+			assert.match(sh('verify-eggs-config.sh', [], conf).stdout, /FAIL branding\/livecd\/splash\.png: .* missing/)
 		} finally {
 			fs.rmSync(dir, { recursive: true, force: true })
 		}
@@ -132,5 +152,58 @@ describe('WO-870 install-eggs-config.sh / verify-eggs-config.sh', () => {
 			const r = spawnSync('bash', ['-n', path.join(LIVE_USB, s)], { encoding: 'utf8' })
 			assert.equal(r.status, 0, r.stderr)
 		}
+	})
+})
+
+/**
+ * coa 26.10.30 /etc/penguins-eggs.d/scripts/generate-menus.sh renders exactly these placeholders (anything else stays
+ * literal in grub.cfg, F3); {{{kernel_parameters}}} = the plan's BOOT_PARAMS + its BOOT_COMMON + locales=<master LANG>.
+ * Copied from the box's script and dry run 2's rendered menu (30.10) because CI has no eggs install.
+ */
+const RENDERED = ['fullname', 'kernel', 'vmlinuz', 'initrdImg', 'kernel_parameters', 'rmModules']
+const KERNEL_PARAMETERS =
+	'boot=live components cow_spacesize=2G audit=0 splash quiet loglevel=3 systemd.show_status=auto udev.log_priority=3 locales=C.UTF-8'
+/** /usr/share/initramfs-tools/scripts/init-premount/plymouth: the last splash* / nosplash* token wins. */
+const plymouthShows = (cmdline) => {
+	let on = false
+	for (const a of cmdline.split(/\s+/)) {
+		if (a.startsWith('nosplash') || a === 'plymouth.enable=0') on = false
+		else if (a.startsWith('splash')) on = true
+	}
+	return on
+}
+
+describe('WO-870 Phase 3: livecd templates on the coa menu script', () => {
+	const grub = fs.readFileSync(path.join(LIVECD, 'grub.main.cfg'), 'utf8')
+	const isolinux = fs.readFileSync(path.join(LIVECD, 'isolinux.main.cfg'), 'utf8')
+
+	it('all five branding files exist (both *.main.cfg, else the generic menu wins; splash.png, else the default theme)', () => {
+		for (const f of LIVECD_FILES) assert.ok(fs.statSync(path.join(LIVECD, f)).size > 0, f)
+	})
+
+	it('uses only placeholders the script renders (no {{{devicetree}}})', () => {
+		for (const [name, text] of [
+			['grub.main.cfg', grub],
+			['isolinux.main.cfg', isolinux],
+		]) {
+			for (const m of text.matchAll(/\{\{\{(\w+)\}\}\}/g))
+				assert.ok(RENDERED.includes(m[1]), `${name}: {{{${m[1]}}}} is not rendered`)
+		}
+	})
+
+	it('GRUB entries keep their plymouth behaviour once kernel_parameters carries "splash"', () => {
+		const entries = Object.fromEntries(
+			[...grub.matchAll(/menuentry "\{\{\{fullname\}\}\} ([^"]+)" \{[\s\S]*?\n\s*linux (.*)\n/g)].map((m) => [
+				m[1],
+				m[2].replace('{{{kernel_parameters}}}', KERNEL_PARAMETERS),
+			])
+		)
+		assert.deepEqual(Object.fromEntries(Object.entries(entries).map(([k, v]) => [k, plymouthShows(v)])), {
+			Live: false,
+			'Live (Plymouth splash)': true,
+			'Safe Mode': true,
+			'Text Mode': false,
+		})
+		assert.match(entries.Live, /loglevel=7 /, 'the default entry stays verbose (last loglevel wins)')
 	})
 })

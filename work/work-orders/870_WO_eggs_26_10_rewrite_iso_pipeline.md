@@ -1,7 +1,7 @@
 # WO-870 — penguins-eggs 26.10 rewrite: `produce` is gone (`remaster`), theme/basename/max/calamares flags removed — migrate the ISO pipeline
 
 **Area:** os-iso
-**Status: OPEN (30.10) — investigation + migration plan, not implemented; blocks the next ISO build**
+**Status: IN PROGRESS (30.10) — Phases 0.2(b), 1, 2, 3 done offline; dry runs 1-2 clean (owner); next: re-apply config, dry run 3; Phases 4-5 open; blocks the next ISO build**
 **Source:** WO-832 owner host checks 30.10: `eggs produce --help` → `unknown command "produce"`; `eggs` is now v26.10.25, a Go/C rewrite; the verify also reports `missing /etc/calamares`.
 **Related:** WO-832 (post-26.04 remnants; its "unverifiable here" note is resolved by this WO), WO-430 (merged-usr exclude twin lines), WO-431 (phantom dpkg entries / payload gates), WO-464 (liveroot bind-mount guard), WO-462 (torn-ISO copy race), WO-481/WO-475 (Calamares bridge release), WO-148 (installer branding), WO-168 / WO-429 (exclude fragments, credentials), WO-47 (exFAT).
 
@@ -477,3 +477,84 @@ Its content is `live ALL=(ALL) SETENV: NOPASSWD: /usr/bin/calamares`.
 **Before the first full build (Phase 7).** Copy the Oct 23 ISO out of `/home/eggs/mnt` (only the Sept 3 ISO is in
 `~/iso-backup`). Legacy eggs `rm -rf`'d `mnt`/`liveroot` on produce. Whether `remaster` does too is unverified.
 
+
+### Phase 6 — dry run 2 (30.10, run by the owner)
+
+Command: `sudo eggs remaster --clone --anonymous --stop-after inject-efi-grubcfg`. Ran on the patched coa with the Phase 2
+config applied, before Phase 3, so the menus are the generic ones. That gives the baseline for Phase 3.
+
+**Result.**
+- Six tasks ran: bootstrap, `bootloader-copy`, `generate-efi.img`, `boot-assets`, `generate-boot-menus` and
+  `inject-efi-grubcfg`. The log ends "Successes: 6, Errors: 0" and "Breakpoint reached and environment safely
+  unmounted". Teardown again found 16 mounts, and `findmnt` under `/home/eggs` lists 0 afterwards.
+- `/home/eggs/isodir` holds 73 files (19 MiB). `EFI/BOOT/{BOOTX64.EFI,efi.img,grub.cfg}`; `mdir` of `efi.img` shows
+  `::/EFI/BOOT/BOOTX64.EFI` and the injected `grub.cfg`. The trampoline is `search --set=root --label OA_LIVE`,
+  `set prefix=($root)/boot/grub`, `configfile`. `boot/grub/{grub.cfg,splash.png (640x480 stock),font.pf2}`, where
+  `font.pf2` is byte-identical to `/usr/share/grub/unicode.pf2` ("GNU Unifont Regular 16", what our `grub.theme.cfg`
+  names). `isolinux/` has `isolinux.bin`, `isohdpfx.bin`, `vesamenu.c32` and the rest of the `.c32` set.
+- The generic menu has 0 `{{{` and the kernel line is `linux /live/vmlinuz boot=live components cow_spacesize=2G audit=0
+  splash quiet loglevel=3 systemd.show_status=auto udev.log_priority=3 locales=C.UTF-8`, as F4 predicted.
+  `set default=2` sits behind two dummy header entries.
+- `/etc/sudoers.d/99-eggs-calamares` is gone. `/etc/sudoers.d` mtime is 19:15, and the owner's later `rm -i` answered "No such file".
+
+**How coa picks the branding** (read from the box, `/etc/penguins-eggs.d/scripts/generate-menus.sh` and the
+`boot-assets` command in `/tmp/coa/oa-plan.json`):
+- `generate-menus.sh` uses `/etc/penguins-eggs.d/branding/livecd/` when that directory exists, else
+  `branding.default/livecd/`. It renders our templates only when **both** `grub.main.cfg` and `isolinux.main.cfg` are
+  there; otherwise it writes the generic menu.
+- `boot-assets` falls back to `branding.default` for everything (`splash.png`, `grub.theme.cfg` → `boot/grub/theme.cfg`,
+  `isolinux.theme.cfg`) unless `branding/livecd/splash.png` exists.
+- The Calamares overlay (`pkg/sysinstall/setup/branding-desc.go`) applies only when `branding/calamares[/branding]`
+  exists, so a livecd-only `branding/` leaves the installer alone.
+- F4 answered from `/usr/share/initramfs-tools/scripts/init-premount/plymouth`: it loops over `/proc/cmdline` and
+  the **last** `splash*` / `nosplash*` token wins. So `{{{kernel_parameters}}}`' `splash` is overridden by a later
+  `nosplash`. The kernel's `loglevel=` and systemd's `systemd.show_status=` are also last-wins.
+
+### Phase 3 — branding route (30.10)
+
+**What was done**
+- `theme/livecd/grub.main.cfg`:
+  - removed the 4 `{{{devicetree}}}` lines (F3);
+  - the Text Mode entry gets `nosplash`, because `{{{kernel_parameters}}}` now carries `splash` and the entry
+    would otherwise start plymouth where the old ISO did not;
+  - a comment explains the last-token rule.
+  - Live (`… nosplash loglevel=7`), Plymouth and Safe Mode keep their old behaviour without edits. The legacy engine
+    reads the same file; the change is a no-op there.
+- `install-eggs-config.sh`:
+  - also writes `branding/livecd/{grub.main.cfg,isolinux.main.cfg,grub.theme.cfg,isolinux.theme.cfg,splash.png}`,
+    copied from `highascg-eggs-theme/theme/livecd/`;
+  - `--apply` installs them with `install -D` and the same unchanged/backup rule as `custom.*`;
+  - `{{{fullname}}}` is filled in as `HIGHASCG NVIDIA <branch>`. coa renders it from the build host's os-release
+    (`Ubuntu 26.04.1 LTS`), while the Sept ISO's menus read `HIGHASCG NVIDIA 595 Live`.
+  - Why the managed-config script and not `install-eggs-live-grub-theme.sh`: the build already runs
+    install + verify before every eggs call (Phase 1 `eggs-run-lib.sh`), so a package upgrade or a missing file can't
+    silently drop the theme. The old script stays for the legacy flavor.
+- `verify-eggs-config.sh` compares every file the generator writes (`find` over its `--out` dir), with a
+  branding-specific FAIL reason.
+- `smoke-wo870-eggs-config.test.js` grows from 13 to 16 tests:
+  - `--out` writes the 5 files: the theme ones byte-equal to the repo, `*.main.cfg` with only `{{{fullname}}}` filled;
+  - verify PASSes them, then FAILs when `splash.png` is missing;
+  - all 5 theme files exist;
+  - the templates use only the placeholders `generate-menus.sh` renders;
+  - per GRUB entry, the plymouth last-token rule applied to the rendered cmdline gives
+    Live off / Plymouth on / Safe on / Text off, and Live stays `loglevel=7`.
+
+**Verified**
+- `node --test tools/smoke/smoke-wo870-eggs-config.test.js`: 16/16. The flavor, wo832 and exclude-lists smokes: 99/99.
+- Mutation: with the HEAD `grub.main.cfg` the suite fails 2 tests, "`{{{devicetree}}}` is not rendered" and
+  `'Text Mode': true`.
+- **Render on coa's own script.** I copied the box's `generate-menus.sh` with only its branding path changed (`diff`
+  shows nothing else), then ran it on `install-eggs-config.sh --out` output with the plan's real args
+  (`"boot=live components cow_spacesize=2G" 1`):
+  - it printed "Menu di branding generati con successo";
+  - 0 `{{{` in `grub.cfg` and `isolinux.cfg`;
+  - entries read `HIGHASCG NVIDIA 615 Live / Live (Plymouth splash) / Safe Mode / Text Mode / Boot from local disk`;
+  - `linux /live/vmlinuz …`, `initrd /live/initrd.img`;
+  - `grub-script-check` OK.
+- `verify-eggs-config.sh` against the real `/etc`: PASS `custom.*`, FAIL ×5 `branding/livecd/*` missing (expected,
+  not applied yet).
+
+**Not verified (owner run / stick)**
+- Dry run 3 with the branding applied: themed `boot/grub/theme.cfg` + 1920×1080 splash in `isodir`.
+- The menus on glass, UEFI and BIOS. `isolinux.theme.cfg` puts the 1920×1080 `splash.png` behind `vesamenu`, as the
+  old ISO did; whether vesamenu shows it at that size is a Phase 7 stick check.

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # WO-870 Phase 2: generate the managed penguins-eggs 26.10 config from the repo and (optionally) install it.
+# Phase 3: also the boot-menu branding, branding/livecd/ (copied as-is from highascg-eggs-theme/theme/livecd). coa's
+# generate-menus.sh renders our menus only when BOTH *.main.cfg exist there, and boot-assets takes the theme
+# files only when splash.png exists there, so the five files travel together. {{{fullname}}} is filled in here.
 #
-#   bash install-eggs-config.sh --out DIR      # default: write custom.exclude.list + custom.yaml into DIR (no root)
+#   bash install-eggs-config.sh --out DIR      # default: write custom.* + branding/livecd/* into DIR (no root)
 #   sudo bash install-eggs-config.sh --apply   # install into /etc/penguins-eggs.d/ (root; owner runs this)
 #
 # Idempotent: --apply leaves a file alone when it already matches the generated content; otherwise the previous
@@ -19,7 +22,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 GEN="${HERE}/generate-eggs-config.js"
 CONF_DIR="${EGGS_CONF_DIR:-/etc/penguins-eggs.d}"
-FILES=(custom.exclude.list custom.yaml)
+THEME_LIVECD="${HERE}/highascg-eggs-theme/theme/livecd"
+LIVECD=(grub.main.cfg isolinux.main.cfg grub.theme.cfg isolinux.theme.cfg splash.png)
+FILES=(custom.exclude.list custom.yaml "${LIVECD[@]/#/branding/livecd/}")
 
 OUT=""
 APPLY=0
@@ -55,12 +60,17 @@ generate_into() {
 	mkdir -p "$dir"
 	node "$GEN" exclude --embed "$EMBED" >"${dir}/custom.exclude.list"
 	node "$GEN" yaml --branch "$BR" >"${dir}/custom.yaml"
+	mkdir -p "${dir}/branding/livecd"
+	for f in "${LIVECD[@]}"; do cp "${THEME_LIVECD}/${f}" "${dir}/branding/livecd/${f}"; done
+	# coa renders {{{fullname}}} from the build host's os-release ("Ubuntu 26.04.1 LTS"); the menus keep the old
+	# eggs name (basename-derived, "HIGHASCG NVIDIA 595 Live" on the Sept ISO), so it is filled in here.
+	sed -i "s/{{{fullname}}}/HIGHASCG NVIDIA ${BR}/g" "${dir}/branding/livecd/grub.main.cfg" "${dir}/branding/livecd/isolinux.main.cfg"
 }
 
 if [[ "$APPLY" -eq 0 ]]; then
 	[[ -n "$OUT" ]] || { echo "install-eggs-config: give --out DIR (write only) or --apply (install into ${CONF_DIR})" >&2; exit 2; }
 	generate_into "$OUT"
-	echo "Wrote ${OUT}/custom.exclude.list ($(grep -cv '^[[:space:]]*\(#\|$\)' "${OUT}/custom.exclude.list") patterns) and ${OUT}/custom.yaml (branch ${BR}, embed-server=${EMBED})"
+	echo "Wrote ${OUT}/custom.exclude.list ($(grep -cv '^[[:space:]]*\(#\|$\)' "${OUT}/custom.exclude.list") patterns), ${OUT}/custom.yaml (branch ${BR}, embed-server=${EMBED}) and ${OUT}/branding/livecd/ (${#LIVECD[@]} files)"
 	exit 0
 fi
 
@@ -87,7 +97,7 @@ for f in "${FILES[@]}"; do
 		cp -p "$dest" "${dest}.bak-${STAMP}"
 		echo "backup:    ${dest}.bak-${STAMP}"
 	fi
-	install -m 0644 "${TMP}/${f}" "$dest"
+	install -D -m 0644 "${TMP}/${f}" "$dest"
 	echo "installed: ${dest}"
 done
 echo "Next: bash ${HERE}/verify-eggs-config.sh"
