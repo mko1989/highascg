@@ -1,6 +1,6 @@
 /**
  * Post-teardown bookkeeping of a program LBG take: skipped-layer bank SWAP, bank pointer flip,
- * vacated-layer cleanup, opposite-bank orphan sweep, look timer visibility.
+ * vacated-layer cleanup, opposite-bank orphan sweep, preset timer visibility (WO-840).
  * Split out of scene-take-lbg.js (500-line limit) — runs strictly AFTER the teardown wait.
  */
 
@@ -16,7 +16,7 @@ const {
 /**
  * @param {object} amcp
  * @param {{
- *   self: object, channel: number, chKey: string, incoming: object, incomingSceneOpt?: object,
+ *   self: object, channel: number, chKey: string, incoming: object, timersVisibility?: Record<string, boolean>,
  *   takeJobs: object[], mergeMixerExtras: object[], isMergeTransition: boolean, banklessTake: boolean,
  *   skippedVisuallyEqualLayers: object[], phys: (layer: number, bank: string) => number, inactiveBank: string
  * }} c
@@ -27,7 +27,7 @@ async function finalizeTakeBankState(amcp, c) {
 		channel,
 		chKey,
 		incoming,
-		incomingSceneOpt,
+		timersVisibility,
 		takeJobs,
 		mergeMixerExtras,
 		isMergeTransition,
@@ -110,19 +110,19 @@ async function finalizeTakeBankState(amcp, c) {
 		}
 	}
 
-	// WO-210 T210.5: apply timersVisibility map from the look (if present).
+	// WO-840: timer visibility is per SCREEN, so it comes from the look PRESET item that is being recalled (threaded in
+	// as `timersVisibility`), never from the look: a plain take ignores any look-level `timersVisibility` (legacy data).
 	// For each assigned timer on this channel whose timerId is in the map, emit MIXER OPACITY.
 	try {
-		const timersVisibilityMap = incoming?.timersVisibility || incomingSceneOpt?.timersVisibility
-		if (timersVisibilityMap && typeof timersVisibilityMap === 'object') {
+		if (timersVisibility && typeof timersVisibility === 'object') {
 			const { linesForLookVisibility } = require('./screen-timers')
-			const visibilityLines = linesForLookVisibility(channel, timersVisibilityMap)
+			const visibilityLines = linesForLookVisibility(channel, timersVisibility)
 			if (visibilityLines.length > 0) {
 				await amcp.batchSendChunked(visibilityLines, { skipMixerPreCommit: true })
 			}
 		}
 	} catch (e) {
-		self.log?.('warn', `[scene-take-lbg] timersVisibility apply failed: ${e?.message || e}`)
+		self.log?.('warn', `[scene-take-lbg] preset timersVisibility apply failed: ${e?.message || e}`)
 	}
 }
 

@@ -22,7 +22,7 @@
  * - Transport buttons: POST /api/timers/cmd {timerId, cmd: start|pause|reset}
  * - Per-screen chips, fade in/out: POST /api/timers/visible {timerId, screenIdx, visible, fadeFrames}
  * - Setting the time: POST /api/timers/assign {timerId, screenIdx, config} per assigned screen
- * - getScreenTimersSnapshot() exported for T210.8 (look-save integration)
+ * - getScreenTimersSnapshot() exported for look-preset save (WO-840, per-screen visibility)
  */
 
 import { api } from '../lib/api-client.js'
@@ -42,36 +42,28 @@ const FADE_REFRESH_MS = 700
 
 /**
  * Module-level reference to the last fetched timers list and their visibility state.
- * Used by T210.8 (getScreenTimersSnapshot) for look-save integration.
+ * Used by getScreenTimersSnapshot (WO-840) for look-preset save.
  */
 let lastTimersList = []
 let screenTimersSnapshot = {}
 
 /**
- * Get a snapshot of current timer visibility for a look.
- * T210.8: Called when saving a look to snapshot timersVisibility state.
- * Returns the FLAT `{ [timerId]: boolean }` shape that the server's
- * `linesForLookVisibility` (src/engine/screen-timers.js) consumes at take time —
- * a timer counts as visible for the look when it is visible on ANY target screen.
- * @param {object} [scene] — the look being saved (used by the app.js wrapper to derive screens)
- * @param {Array<number>} [screenIndices] — explicit target screen indices
- * @returns {object | null} { [timerId]: boolean } or null if no timers fetched/assigned
+ * Snapshot of ONE screen's timer visibility, for a look PRESET item (WO-840; was the per-look snapshot of WO-210 T210.8
+ * — owner 30.10: timer visibility is per screen, so it is saved in look presets, never in looks).
+ * Returns the FLAT `{ [timerId]: boolean }` shape that the server's `linesForLookVisibility`
+ * (src/engine/screen-timers.js) applies when the preset is recalled: every timer assigned to that screen, with its
+ * current visible flag on THAT screen.
+ * @param {number} screenIdx — the preset item's mainIdx
+ * @returns {object | null} { [timerId]: boolean }, or null if no timers fetched / none assigned to the screen
  */
-export function getScreenTimersSnapshot(scene, screenIndices) {
+export function getScreenTimersSnapshot(screenIdx) {
 	if (lastTimersList.length === 0) return null
-
-	const targets =
-		Array.isArray(screenIndices) && screenIndices.length > 0 ? new Set(screenIndices.map(Number)) : null
 
 	const snapshot = {}
 	for (const timer of lastTimersList) {
-		if (!timer.timerId || !timer.screens) continue
-		for (const [screenIdxStr, screenEntry] of Object.entries(timer.screens)) {
-			const screenIdx = parseInt(screenIdxStr, 10)
-			if (targets && !targets.has(screenIdx)) continue
-			if (!(timer.timerId in snapshot)) snapshot[timer.timerId] = false
-			if (screenEntry.visible) snapshot[timer.timerId] = true
-		}
+		const entry = timer?.screens?.[String(screenIdx)]
+		if (!timer?.timerId || !entry) continue
+		snapshot[timer.timerId] = !!entry.visible
 	}
 
 	return Object.keys(snapshot).length > 0 ? snapshot : null

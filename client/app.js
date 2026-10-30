@@ -328,20 +328,8 @@ async function init() {
 	initTimerControlPanel(stateStore, document.getElementById('panel-inspector-timer-mount'), { getChannelMap: () => stateStore.getState()?.channelMap || {} })
 	initPlaylistControlPanel(document.getElementById('panel-inspector-playlists-mount'))
 	initShaderLiveEditor(stateStore)
-	// WO-210 T210.8: Register timers snapshot function for look-save integration.
-	// Derive the look's target screens from mainScope so the flat {timerId: boolean}
-	// snapshot only reflects timers on screens this look actually drives.
-	sceneState.setTimersSnapshotFn((scene) => {
-		const cm = stateStore.getState()?.channelMap || {}
-		const count = Number(cm.screenCount) || 1
-		const scope = String(scene?.mainScope || 'all')
-		const n = parseInt(scope, 10)
-		const idxs =
-			scope !== 'all' && Number.isFinite(n) && n >= 0 && n < count
-				? [n]
-				: Array.from({ length: count }, (_, i) => i)
-		return getScreenTimersSnapshot(scene, idxs)
-	})
+	// WO-840: look-preset save snapshots each item's SCREEN timer visibility (not the look's — RULES.md "Timers").
+	sceneState.setTimersSnapshotFn((mainIdx) => getScreenTimersSnapshot(mainIdx))
 
 	settingsState.subscribe(s => {
 		applyBrowserMonitorFromSettings(s); const isOffline = !!s.offline_mode

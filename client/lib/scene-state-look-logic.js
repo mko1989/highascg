@@ -55,6 +55,10 @@ export function importLookPresetsFromServer(list) {
 						mainIdx: typeof it.mainIdx === 'number' && it.mainIdx >= 0 ? Math.floor(it.mainIdx) : 0,
 						sceneId: String(it.sceneId),
 						sourceKind: sk(it.sourceKind),
+						// WO-840: the item's per-screen timer visibility survives a server import
+						...(it.timersVisibility && typeof it.timersVisibility === 'object' && !Array.isArray(it.timersVisibility)
+							? { timersVisibility: { ...it.timersVisibility } }
+							: {}),
 					}))
 			}
 			if (p.tandem != null && typeof p.tandem === 'object') o.tandem = p.tandem

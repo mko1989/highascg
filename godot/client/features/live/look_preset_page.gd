@@ -21,6 +21,7 @@ var _save_btns := {}
 var _list: LookPresetStrip
 var _status: Label
 var _dirty := false
+var _timers: Array = []  # WO-840: the server's timer records (/api/timers/list), refreshed before every save
 
 
 func _ready() -> void:
@@ -114,7 +115,14 @@ func true_buses() -> Dictionary:
 
 func capture(source: String) -> Array:
 	var ed := str(editing_cb.call())
-	return M.capture_items(source, Destinations.selected(), true_buses(), ed if _looks().has(ed) else "", true)
+	return M.with_timers(M.capture_items(source, Destinations.selected(), true_buses(), ed if _looks().has(ed) else "", true), _timers)
+
+
+## WO-840: re-read the live timers so a save stores each screen's CURRENT visibility (offline / failed: keep the cache).
+func refresh_timers() -> void:
+	var res: Dictionary = await Api.get_json("/api/timers/list")
+	if res.get("ok", false) and res.get("data") is Dictionary and (res.data as Dictionary).get("timers") is Array:
+		_timers = (res.data as Dictionary).timers
 
 
 func _render() -> void:
@@ -145,6 +153,7 @@ func ask_name(source: String) -> void:
 	dlg.add_child(edit)
 	dlg.register_text_enter(edit)
 	dlg.confirmed.connect(func() -> void:
+		await refresh_timers()
 		save(source, edit.text)
 		dlg.queue_free())
 	dlg.canceled.connect(dlg.queue_free)
@@ -167,6 +176,7 @@ func save(source: String, preset_name: String) -> String:
 func _confirm_overwrite(p: Dictionary) -> void:
 	var src := str(p.get("sourceKind", "prv"))
 	_confirm("Overwrite \"%s\" with the current %s?" % [p.get("name", ""), M.source_label(src)], func() -> void:
+		await refresh_timers()
 		if M.overwrite(p, capture(src), int(Time.get_unix_time_from_system() * 1000)):
 			_commit("Look preset overwritten.")
 		else:

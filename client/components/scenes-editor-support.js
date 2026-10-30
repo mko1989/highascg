@@ -136,7 +136,8 @@ export function createTakeSceneToProgram(deps) {
 	 * both channels' transitions together instead of waiting out screen 1's fade.
 	 * One busy window guards the whole batch (double-click protection preserved).
 	 *
-	 * @param {Array<{ sceneId: string, mainIdx: number }>} entries
+	 * @param {Array<{ sceneId: string, mainIdx: number, timersVisibility?: object }>} entries — WO-840: a preset recall's
+	 *   per-screen timer map rides that screen's POST (the server applies it after the take)
 	 * @param {boolean} forceCut
 	 * @param {{ transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
 	 */
@@ -213,6 +214,7 @@ export function createTakeSceneToProgram(deps) {
 							...incomingSceneForTake,
 							globalBorder: sceneState.getGlobalBorderForScreen(mainIdx),
 						},
+						...(entry.timersVisibility && typeof entry.timersVisibility === 'object' ? { timersVisibility: entry.timersVisibility } : {}),
 					},
 				})
 			}
@@ -304,6 +306,7 @@ export function createTakeSceneToProgram(deps) {
 	 * @param {{ targetMains?: number[], transitionOverride?: { type?: string, duration?: number, tween?: string } }} [takeOpts]
 	 *   `targetMains`: when set (e.g. from a deck column), take only those mains — not armed pills alone.
 	 *   `transitionOverride`: B150.5 — replace the look's own default transition for this take (e.g. deck global default on preset recall).
+	 *   `timersVisibility`: WO-840 — the recalled preset item's per-screen timer map (single-item recall only).
 	 */
 	async function takeSceneToProgram(sceneId, forceCut, takeOpts = {}) {
 		if (takeBusy) return
@@ -337,7 +340,7 @@ export function createTakeSceneToProgram(deps) {
 			return
 		}
 		await takeScenesToProgram(
-			targetMains.map((mainIdx) => ({ sceneId, mainIdx })),
+			targetMains.map((mainIdx) => ({ sceneId, mainIdx, ...(takeOpts?.timersVisibility ? { timersVisibility: takeOpts.timersVisibility } : {}) })),
 			forceCut,
 			{ transitionOverride: takeOpts?.transitionOverride },
 		)

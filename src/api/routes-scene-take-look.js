@@ -11,12 +11,15 @@
  */
 
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { sanitizeVisibilityMap } = require('../engine/timer-visibility-map')
 
 function bad(status, error) {
 	return { status, headers: JSON_HEADERS, body: jsonBody({ ok: false, error }) }
 }
 
 /**
+ * `timersVisibility` (WO-840): the preset item's `{ [timerId]: boolean }` for this screen, applied on the program channel
+ * after the take; a look has none of its own (timers are per screen, RULES.md "Timers").
  * `takeGroup` ({id, size}, WO-782): this take is one screen of a multi-screen recall — passed on to the take engine,
  * whose barrier sends every screen's final PLAY batch together (WO-574). A take that bails out here never reached the
  * engine, so its group slot is released at once (the other screens must not wait out the barrier timeout).
@@ -73,6 +76,8 @@ async function takeLook(b, ctx, deps) {
 		useServerLive: true,
 		incomingScene,
 		...(target === 'preview' ? { target: 'preview' } : {}),
+		// WO-840: a look-preset item's per-screen timer visibility rides the program take (a plain look take sends none).
+		...(target === 'program' && sanitizeVisibilityMap(b.timersVisibility) ? { timersVisibility: sanitizeVisibilityMap(b.timersVisibility) } : {}),
 		...(b.takeGroup ? { takeGroup: b.takeGroup } : {}),
 	}
 	const take = deps.take || require('./routes-scene-take').handleSceneTake

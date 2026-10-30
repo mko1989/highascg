@@ -50,7 +50,8 @@ export function getResolutionForScreen(screenIdx, sceneState, stateStore) {
 /**
  * @param {string | null | undefined} fallbackSceneId - legacy single-id from the recall event
  * @param {object | null | undefined} lookPreset
- * @returns {{ mainIdx: number, sceneId: string }[]}
+ * @returns {{ mainIdx: number, sceneId: string, timersVisibility?: object }[]} — WO-840: `timersVisibility` is the
+ *   item's per-screen timer map, applied by the program take (absent = timers untouched)
  */
 export function lookRecallItemsFromPreset(fallbackSceneId, lookPreset) {
 	const out = []
@@ -61,7 +62,12 @@ export function lookRecallItemsFromPreset(fallbackSceneId, lookPreset) {
 			if (!sid || !sceneState.getScene(sid)) continue
 			const m = Number(it.mainIdx)
 			const mainIdx = Number.isFinite(m) && m >= 0 && m <= 3 ? Math.floor(m) : 0
-			out.push({ mainIdx, sceneId: sid })
+			const tv = it.timersVisibility
+			out.push({
+				mainIdx,
+				sceneId: sid,
+				...(tv && typeof tv === 'object' && !Array.isArray(tv) ? { timersVisibility: tv } : {}),
+			})
 		}
 		if (out.length) return out
 	}
@@ -107,7 +113,7 @@ export async function runLookRecall(sceneId, lookPreset, target, deps) {
 	// own main (multi-main presets carry a different look per screen).
 	if (typeof takeSceneToProgram.batch === 'function') {
 		await takeSceneToProgram.batch(
-			items.map((it) => ({ sceneId: it.sceneId, mainIdx: it.mainIdx })),
+			items.map((it) => ({ sceneId: it.sceneId, mainIdx: it.mainIdx, ...(it.timersVisibility ? { timersVisibility: it.timersVisibility } : {}) })),
 			forceCut,
 			transitionOverride ? { transitionOverride } : {},
 		)
@@ -116,6 +122,7 @@ export async function runLookRecall(sceneId, lookPreset, target, deps) {
 	for (const it of items) {
 		await takeSceneToProgram(it.sceneId, forceCut, {
 			targetMains: [it.mainIdx],
+			...(it.timersVisibility ? { timersVisibility: it.timersVisibility } : {}),
 			...(transitionOverride ? { transitionOverride } : {}),
 		})
 	}

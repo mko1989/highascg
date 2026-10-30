@@ -18,6 +18,7 @@ const { resolveSceneById } = require('../engine/project-scenes')
 const { withScreenGlobalBorderForChannel } = require('../engine/global-border-control')
 const { missingMediaField } = require('./media-index') // WO-603: web warnMissingMediaOnTake, decided in node
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
+const { sanitizeVisibilityMap } = require('../engine/timer-visibility-map') // WO-840
 const { programTakeStarted } = require('../engine/scene-take-program-start') // replication + WO-615 T8 fixtures
 const {
 	stripEphemeralTakeFields,
@@ -139,6 +140,9 @@ async function handleSceneTakeInner(body, ctx, sync) {
 		forceCut: !!b.forceCut,
 		mainScreenIndex: -1,
 	}
+	// WO-840: a look-preset recall carries its item's per-screen timer visibility; only the PROGRAM takes apply it.
+	const presetTimers = sanitizeVisibilityMap(b.timersVisibility)
+	const programTimers = presetTimers ? { timersVisibility: presetTimers } : {}
 	const runTake = async () => {
 		const currentScene = useClientCurrentScene
 			? requestedCurrentScene
@@ -391,6 +395,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 				self: ctx,
 				skipLayerVisualEquality: true,
 				playSync: sync,
+				...programTimers,
 				/* WO-814: flip-flop the preview once the PGM PLAY batch is committed and acked — never
 				 * before (its PRV commands used to queue in between the PGM LOADBG and the PGM PLAY on
 				 * the shared AMCP connection), and not after the fade + teardown either (WO-150 B150.1). */
@@ -419,7 +424,7 @@ async function handleSceneTakeInner(body, ctx, sync) {
 		const takeUpdatedAt = programTakeStarted(ctx, {
 			mainIdx, inc, forceCut: !!b.forceCut, channel, previousId: currentScene?.id, framerate: b.framerate,
 		})
-		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, playSync: sync })
+		await runSceneTakeLbg(ctx.amcp, { ...takeOpts, self: ctx, skipLayerVisualEquality: true, pgmOnly, playSync: sync, ...programTimers })
 		if (inc && typeof inc === 'object' && inc.id) {
 			await liveSceneState.setChannel(channel, liveEntryFromTake(inc, takeUpdatedAt))
 		}

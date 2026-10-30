@@ -432,7 +432,7 @@ function linesForReAdd(channel) {
 }
 
 /**
- * Apply timersVisibility map for a look take: for each assigned timer on the given channel
+ * Apply a look-preset item's timersVisibility map (WO-840): for each assigned timer on the given channel
  * whose timerId is a key in timersVisibility, emit MIXER OPACITY lines and update registry.
  * Timers NOT mentioned in the map are left untouched.
  * Band-guarded: skips entries if layer outside 980-989 range.

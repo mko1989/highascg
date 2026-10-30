@@ -8,12 +8,14 @@
  * one take group (WO-574 barrier) — each screen preps on its own, then every screen's final PLAY / fade lines go out
  * in ONE AMCP batch; an empty destination's fade to black rides the same batch. `useGlobalTransition` (program, not a cut) replaces each look's own transition
  * with the deck default, as the web preset card's "Take (global)" does (B150.5). Web: scenes-editor-logic.js
- * runLookRecall. Saving / overwriting / deleting a preset is a deck edit and travels with the deck sync.
+ * runLookRecall. WO-840: an item's `timersVisibility` ({ [timerId]: boolean }, that screen's timers) is applied on the
+ * item's program channel by its take (PRV recalls leave timers alone). Saving / overwriting / deleting a preset is a deck edit and travels with the deck sync.
  */
 
 const path = require('path')
 const { pathToFileURL } = require('url')
 const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
+const { sanitizeVisibilityMap } = require('../engine/timer-visibility-map')
 
 const REPO_ROOT = path.join(__dirname, '..', '..')
 
@@ -36,8 +38,11 @@ function recallItems(preset, exists) {
 	const items = []
 	for (const it of Array.isArray(preset?.items) ? preset.items : []) {
 		const sid = String(it?.sceneId || '').trim()
-		if (sid && exists(sid)) items.push({ mainIdx: main(it.mainIdx), sceneId: sid })
-		else if (!sid && it?.empty === true) items.push({ mainIdx: main(it.mainIdx), sceneId: '', empty: true })
+		if (sid && exists(sid)) {
+			// WO-840: the item's per-screen timer visibility (absent = timers untouched on recall)
+			const timersVisibility = sanitizeVisibilityMap(it.timersVisibility)
+			items.push({ mainIdx: main(it.mainIdx), sceneId: sid, ...(timersVisibility ? { timersVisibility } : {}) })
+		} else if (!sid && it?.empty === true) items.push({ mainIdx: main(it.mainIdx), sceneId: '', empty: true })
 	}
 	if (items.length) return items
 	const sid = String(preset?.sceneId || '').trim()
@@ -90,6 +95,7 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 						target,
 						forceCut,
 						...(transitionOverride ? { transitionOverride } : {}),
+						...(target === 'program' && it.timersVisibility ? { timersVisibility: it.timersVisibility } : {}),
 						...(takeGroup ? { takeGroup } : {}),
 					})
 			let err = null
@@ -100,7 +106,8 @@ async function handleLookPresetRecall(body, ctx, deps = {}) {
 					err = `HTTP ${res.status}`
 				}
 			}
-			return { ...it, status: res?.status ?? 0, error: err }
+			const { timersVisibility: _tv, ...shown } = it
+			return { ...shown, status: res?.status ?? 0, error: err }
 		}),
 	)
 	const failed = results.filter((r) => r.error)

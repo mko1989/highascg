@@ -448,7 +448,7 @@ async function runSceneTakeLbg(amcp, opts) {
 		channel,
 		chKey,
 		incoming,
-		incomingSceneOpt: opts?.incomingScene,
+		timersVisibility: opts?.timersVisibility, // WO-840: a look-preset recall's per-screen timer map
 		takeJobs,
 		mergeMixerExtras,
 		isMergeTransition,

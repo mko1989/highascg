@@ -42,6 +42,28 @@ static func capture_items(source: String, mains: Array, buses: Dictionary, editi
 	return out
 
 
+## WO-840 — timer visibility is per SCREEN, so it lives in the preset item (owner 30.10, RULES.md "Timers"), not in the
+## look: each item with a look gets `timersVisibility` = { timerId: bool } for the timers assigned to that item's
+## screen (`timers` = the server's /api/timers/list records: screens[str(mainIdx)].visible). A screen with no timers
+## gets no map, so a recall leaves its timers alone. Empty destinations take nothing (no take to apply it on).
+static func with_timers(items: Array, timers: Array) -> Array:
+	for it in items:
+		if not (it is Dictionary) or str(it.get("sceneId", "")) == "":
+			continue
+		var map := {}
+		for t in timers:
+			if not (t is Dictionary) or str(t.get("timerId", "")) == "" or not (t.get("screens") is Dictionary):
+				continue
+			var entry: Variant = (t.screens as Dictionary).get(str(int(it.get("mainIdx", 0))))
+			if entry is Dictionary:
+				map[str(t.timerId)] = bool((entry as Dictionary).get("visible", false))
+		if not map.is_empty():
+			it["timersVisibility"] = map
+		else:
+			it.erase("timersVisibility")
+	return items
+
+
 ## WO-781 — the deck blanks PRV when it shows the PGM look (one card, one mark); a save from PRV wants what is there.
 static func capture_buses(buses: Dictionary, raw_prv: Dictionary) -> Dictionary:
 	var out := {}

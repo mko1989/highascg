@@ -46,6 +46,24 @@ export function sceneStateRemoveLayerPreset(self, presetId) {
 	return true
 }
 
+/**
+ * WO-840: stamp each preset item with its SCREEN's current timer visibility ({ [timerId]: boolean }, owner 30.10:
+ * timers are per screen, so they live in look presets, not looks). An empty destination has no take to apply it on;
+ * an item whose screen has no timers carries no map (recall leaves timers alone).
+ */
+function withTimerVisibility(self, items) {
+	for (const it of items) {
+		if (!it.sceneId || typeof self._timersSnapshotFn !== 'function') continue
+		try {
+			const snap = self._timersSnapshotFn(it.mainIdx)
+			if (snap && typeof snap === 'object') it.timersVisibility = snap
+		} catch (err) {
+			console.warn('[look-preset] timers snapshot failed:', err?.message || err)
+		}
+	}
+	return items
+}
+
 export function sceneStateSaveLookPreset(self, name, sourceKind) {
 	const nameTrim = String(name || '').trim()
 	if (!nameTrim) return null
@@ -60,6 +78,7 @@ export function sceneStateSaveLookPreset(self, name, sourceKind) {
 	})
 
 	if (items.length === 0) return null
+	withTimerVisibility(self, items)
 
 	const id = newId()
 	const legacyFallback = items[0]
@@ -91,6 +110,7 @@ export function sceneStateOverwriteLookPreset(self, presetId) {
 	})
 
 	if (items.length === 0) return false
+	withTimerVisibility(self, items)
 
 	const legacyFallback = items[0]
 	p.items = items
