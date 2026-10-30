@@ -8,7 +8,7 @@ tmux new -s eggs
 
 sudo systemctl stop highascg
 sudo bash tools/eggs/live-usb/stop-and-unmount-wo47-for-eggs-produce.sh
-sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh
+sudo bash tools/eggs/live-usb/build-highascg-egg.sh   # driver branch auto-detected (615 on 26.04); HIGHASCG_NVIDIA_DRIVER=<N> must match it
 sudo systemctl start highascg
 ```
 
@@ -21,8 +21,8 @@ with *"invalid magic number / you need to load the kernel first"*. The build wri
 Then copy to the **Ventoy** partition of the stick, flush, and verify:
 
 ```bash
-cp /home/eggs/highascg-nvidia-595_amd64_*.iso /media/$USER/Ventoy/ && sync
-bash tools/eggs/live-usb/verify-stick-iso.sh /media/$USER/Ventoy/highascg-nvidia-595_amd64_*.iso
+cp /home/eggs/highascg-nvidia-615_amd64_*.iso /media/$USER/Ventoy/ && sync
+bash tools/eggs/live-usb/verify-stick-iso.sh /media/$USER/Ventoy/highascg-nvidia-615_amd64_*.iso
 ```
 
 Preparing the stick itself (Ventoy install with reserved space, plus the `HIGHASCGEXF` data

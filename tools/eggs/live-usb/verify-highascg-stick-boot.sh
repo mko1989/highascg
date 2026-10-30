@@ -94,7 +94,11 @@ else
 	ok "Openbox autostart does not duplicate systemd Caspar (or legacy mode)"
 fi
 
-_run_ct="$(pgrep -cf 'run\.sh' 2>/dev/null || echo 0)"
+# WO-832: `pgrep -cf run\.sh || echo 0` printed "0\n0" on none and counted run.sh's own forked sub-shells as
+# extra supervisors (healthy box = 2 -> false FAIL, which also failed verify-eggs-prepare-host.sh).
+# shellcheck source=../../startup/run-sh-supervisors-lib.sh
+source "${REPO_ROOT}/tools/startup/run-sh-supervisors-lib.sh"
+_run_ct="$(st_count_run_sh_supervisors)"
 if [[ "${_run_ct:-0}" -le 1 ]]; then
 	ok "at most one run.sh supervisor (${_run_ct})"
 else

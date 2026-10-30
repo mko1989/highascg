@@ -48,7 +48,10 @@ initrd_has_nvidia_drm_module() {
 }
 
 BRANDING="${HERE}/branding"
-EGGS_PENGUINS="/usr/lib/penguins-eggs/addons/eggs/theme/livecd/splash.png"
+# WO-832: stock eggs penguin splash lives in /etc/penguins-eggs.d/branding.default on eggs >= 26.10.
+# shellcheck source=eggs-theme-lib.sh
+source "${HERE}/eggs-theme-lib.sh"
+EGGS_PENGUINS="$(highascg_eggs_theme_dir 2>/dev/null || echo /etc/penguins-eggs.d/branding.default)/livecd/splash.png"
 ISO="${1:-}"
 
 if [[ -z "$ISO" ]]; then

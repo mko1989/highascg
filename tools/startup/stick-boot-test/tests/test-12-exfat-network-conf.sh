@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # test-12-exfat-network-conf.sh — WO-95 stick network.conf (read-only)
+# WO-832: this file is SOURCED by run-stick-boot-tests.sh — a bare `exit 0` ended the whole runner before
+# st_summary, so FAILs from earlier tests were never counted into the exit code. Run in a function and
+# `return` instead.
+_st_test_12() {
 st_section "12 exFAT network.conf (WO-95)"
 if ! st_exfat_label_mounted; then
 	st_warn "HIGHASCGEXF not mounted — skip network.conf checks"
-	exit 0
+	return 0
 fi
 if [[ -f "${EXFAT}/network/network.conf" ]]; then
 	st_ok "exFAT/network/network.conf present"
@@ -24,3 +28,5 @@ fi
 if [[ -f /var/lib/highascg/last-exfat-network.hash ]]; then
 	st_ok "exFAT network apply stamp present"
 fi
+}
+_st_test_12

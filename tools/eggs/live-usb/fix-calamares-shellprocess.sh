@@ -212,8 +212,14 @@ if [[ -f "$RESCUE_SRC" && -f "$RESCUE_UNIT_SRC" ]]; then
 fi
 
 if [[ ! -x "${SBIN}/cleanup.sh" ]]; then
-	CLEANUP_SRC="/usr/lib/penguins-eggs/conf/distros/noble/calamares/calamares-modules/cleanup/cleanup.sh"
-	if [[ -f "$CLEANUP_SRC" ]]; then
+	# WO-832: eggs 26.10 keeps the distro tree in /etc/penguins-eggs.d/distros (older: /usr/lib/penguins-eggs/conf/distros).
+	CLEANUP_SRC=""
+	for _cd in /etc/penguins-eggs.d/distros /usr/lib/penguins-eggs/conf/distros; do
+		[[ -f "${_cd}/noble/calamares/calamares-modules/cleanup/cleanup.sh" ]] || continue
+		CLEANUP_SRC="${_cd}/noble/calamares/calamares-modules/cleanup/cleanup.sh"
+		break
+	done
+	if [[ -n "$CLEANUP_SRC" ]]; then
 		install -m 0755 "$CLEANUP_SRC" "${SBIN}/cleanup.sh"
 		echo "==> installed ${SBIN}/cleanup.sh"
 	fi

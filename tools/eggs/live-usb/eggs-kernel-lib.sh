@@ -9,15 +9,54 @@ highascg_latest_installed_kernel() {
 		tail -1
 }
 
+# WO-832: the pin file went stale across the 26.04 upgrade (said 6.8.0-117, box ran 7.0.0-38), so the
+# purge script would have removed the RUNNING kernel and the verify script always failed. A pin is
+# only usable when it is well-formed and names an installed image with its /boot files.
+# Usage: highascg_assert_pin_valid [KVER] — prints the reason + owner fix on stderr, returns 1.
+highascg_assert_pin_valid() {
+	local pin_file="${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel}" kver="${1:-}" boot="${HIGHASCG_BOOT_DIR:-/boot}"
+	if [[ -z "$kver" ]]; then
+		[[ -f "$pin_file" ]] || return 0
+		kver="$(tr -d '[:space:]' <"$pin_file")"
+	fi
+	if [[ ! "$kver" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+-[a-z0-9]+$ ]]; then
+		echo "ERROR: ${pin_file} holds '${kver}' — not a kernel release like $(uname -r)." >&2
+		echo "       Fix: echo '$(uname -r)' | sudo tee ${pin_file}" >&2
+		return 1
+	fi
+	if ! dpkg-query -W -f='${Status}' "linux-image-${kver}" 2>/dev/null | grep -qE '(install|hold) ok installed' \
+		|| [[ ! -f "${boot}/vmlinuz-${kver}" || ! -f "${boot}/initrd.img-${kver}" ]]; then
+		echo "ERROR: ${pin_file} pins ${kver}, which is not an installed kernel (running: $(uname -r))." >&2
+		echo "       Stale pin after an OS/kernel upgrade? Fix: echo '$(uname -r)' | sudo tee ${pin_file}" >&2
+		return 1
+	fi
+	return 0
+}
+
+# Refuse to purge the kernel the box is running right now. Usage: highascg_refuse_purge_running linux-image-X
+highascg_refuse_purge_running() {
+	local kpkg="${1:-}" running
+	running="$(uname -r)"
+	if [[ "$kpkg" == "linux-image-${running}" ]]; then
+		echo "ERROR: refusing to purge ${kpkg} — it is the RUNNING kernel." >&2
+		echo "       Check ${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel} ($(tr -d '[:space:]' <"${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel}" 2>/dev/null || echo missing))" >&2
+		echo "       against 'uname -r' (${running}); fix the pin or reboot into the pinned kernel first." >&2
+		return 1
+	fi
+	return 0
+}
+
 # Sets KVER, VM, IR.
-# /etc/highascg/pinned-kernel wins (playout host must stay on 6.8.0-117).
+# /etc/highascg/pinned-kernel wins (the pin follows whatever the playout host runs — 7.0.0-38 since the
+# 26.04 upgrade; it must name an INSTALLED linux-image, see highascg_assert_pin_valid).
 # HIGHASCG_ENSURE_LATEST_KERNEL=1 installs linux-image-generic only when NOT pinned.
 highascg_resolve_eggs_kernel() {
-	local running pin_file=/etc/highascg/pinned-kernel
+	local running pin_file="${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel}"
 	running="$(uname -r)"
 
 	if [[ -f "$pin_file" ]]; then
 		KVER="$(tr -d '[:space:]' <"$pin_file")"
+		highascg_assert_pin_valid "$KVER" || return 1
 		echo "==> Using pinned kernel from ${pin_file}: ${KVER}" >&2
 	elif [[ "${HIGHASCG_ENSURE_LATEST_KERNEL:-0}" == "1" ]]; then
 		echo "WARN: HIGHASCG_ENSURE_LATEST_KERNEL=1 without ${pin_file} — may pull newest HWE kernel" >&2
@@ -31,8 +70,8 @@ highascg_resolve_eggs_kernel() {
 
 	[[ -n "$KVER" ]] || KVER="$running"
 
-	VM="/boot/vmlinuz-${KVER}"
-	IR="/boot/initrd.img-${KVER}"
+	VM="${HIGHASCG_BOOT_DIR:-/boot}/vmlinuz-${KVER}"
+	IR="${HIGHASCG_BOOT_DIR:-/boot}/initrd.img-${KVER}"
 
 	if [[ ! -f "$VM" || ! -f "$IR" ]]; then
 		echo "Missing ${VM} or ${IR}" >&2
@@ -40,7 +79,7 @@ highascg_resolve_eggs_kernel() {
 	fi
 
 	if [[ "$KVER" != "$running" ]]; then
-		echo "WARN: running kernel is ${running}; eggs ISO will use latest ${KVER} — reboot before/after build so host and ISO match." >&2
+		echo "WARN: running kernel is ${running}; eggs ISO will use ${KVER} — reboot before/after build so host and ISO match." >&2
 	fi
 	return 0
 }

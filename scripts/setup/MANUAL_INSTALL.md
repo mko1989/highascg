@@ -2,6 +2,10 @@
 
 This guide follows the **ordered scripts** in `scripts/setup/`. Each step is idempotent where possible. Run from a clone of the repo as a user with `sudo`.
 
+> **WO-832 (30.10): steps 01-03 below are the Ubuntu 24.04 flow** (kernel 6.8.0-117 pin, CUDA-repo `nvidia-open` 595). On 26.04 they refuse to run
+> (`require_legacy_2404`; override `HIGHASCG_ALLOW_LEGACY_2404=1` for a genuine 24.04 rebuild). 26.04: keep the archive kernel, pin it with
+> `echo "$(uname -r)" | sudo tee /etc/highascg/pinned-kernel`, and install `nvidia-driver-<N>-open` (615 on the reference box).
+
 **Target platform:** Ubuntu 24.04 x86_64 playout box with:
 
 - Kernel **`6.8.0-117-generic`** (pinned — not `linux-image-generic`)

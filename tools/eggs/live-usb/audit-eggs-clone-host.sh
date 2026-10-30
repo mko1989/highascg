@@ -98,9 +98,20 @@ else
 	ok "no /opt/nvidia-pool on host"
 fi
 
-# --- NVIDIA 595 for ISO clone (Blackwell needs open kernel modules) ---
+# --- NVIDIA driver for ISO clone (Blackwell needs open kernel modules) ---
+# WO-832: was "NVIDIA 595" with 03-nvidia-open-595.sh hints. Since the 26.04 upgrade the driver is the Ubuntu
+# archive's nvidia-driver-<N>-open (615 on this box); the CUDA-repo nvidia-open flow is the 24.04 legacy path.
+# shellcheck source=../../../scripts/lib/nvidia-branch.sh
+source "${REPO_ROOT}/scripts/lib/nvidia-branch.sh"
+NV_BR="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
 if dpkg-query -W cuda-drivers &>/dev/null && journalctl -k -b --no-pager 2>/dev/null | grep -q 'requires use of the NVIDIA open kernel modules'; then
-	fail "closed cuda-drivers cannot init Blackwell — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
+	fail "closed cuda-drivers cannot init Blackwell — install the open stack: sudo apt install nvidia-driver-${NV_BR:-<N>}-open"
+elif [[ -n "$NV_BR" ]] && dpkg-query -W "nvidia-driver-${NV_BR}-open" &>/dev/null; then
+	if [[ -r /proc/driver/nvidia/version ]] && grep -q 'Open Kernel Module' /proc/driver/nvidia/version 2>/dev/null; then
+		ok "nvidia-driver-${NV_BR}-open + Open Kernel Module loaded (required for Blackwell)"
+	else
+		warn "nvidia-driver-${NV_BR}-open installed but the open kernel module is not loaded — reboot"
+	fi
 elif dpkg-query -W nvidia-open &>/dev/null || dpkg-query -W nvidia-driver-open &>/dev/null; then
 	if [[ -r /proc/driver/nvidia/version ]] && grep -q 'Open Kernel Module' /proc/driver/nvidia/version 2>/dev/null; then
 		ok "nvidia-open + Open Kernel Module loaded (required for Blackwell)"
@@ -109,14 +120,12 @@ elif dpkg-query -W nvidia-open &>/dev/null || dpkg-query -W nvidia-driver-open &
 	fi
 elif dpkg-query -W cuda-drivers &>/dev/null && dpkg-query -W cuda-keyring &>/dev/null; then
 	ok "cuda-drivers + cuda-keyring (closed — OK only on pre-Blackwell GPUs)"
-elif dpkg-query -W nvidia-driver-595 &>/dev/null && dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null; then
-	warn "Ubuntu nvidia-driver-595 stack — migrate: sudo bash scripts/setup/03-nvidia-open-595.sh"
-elif dpkg-query -W linux-modules-nvidia-595-generic &>/dev/null && ! dpkg-query -W nvidia-driver-595 &>/dev/null; then
-	fail "linux-modules without userspace — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
+elif [[ -n "$NV_BR" ]] && dpkg-query -W "nvidia-driver-${NV_BR}" &>/dev/null; then
+	warn "closed Ubuntu nvidia-driver-${NV_BR} stack — Blackwell needs: sudo apt install nvidia-driver-${NV_BR}-open"
 elif command -v nvidia-smi &>/dev/null; then
-	warn "nvidia-smi present but cuda-drivers not installed — run scripts/setup/03-nvidia-open-595.sh before eggs produce"
+	warn "nvidia-smi present (driver ${NV_BR:-unknown}) but no known driver package matched — check dpkg -l 'nvidia-*' before eggs produce"
 else
-	warn "no NVIDIA driver — run: sudo bash scripts/setup/03-nvidia-open-595.sh"
+	warn "no NVIDIA driver — install one before eggs produce (26.04: sudo apt install nvidia-driver-<N>-open)"
 fi
 if ! command -v aplay &>/dev/null; then
 	warn "alsa-utils missing (aplay) — sudo apt install alsa-utils"

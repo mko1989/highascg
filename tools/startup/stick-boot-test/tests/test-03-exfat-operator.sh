@@ -2,7 +2,10 @@
 # test-03-exfat-operator.sh
 st_section "03 exFAT operator volume"
 if st_exfat_label_mounted; then
-	mp="$(findmnt -n -o TARGET -L HIGHASCGEXF)"
+	# WO-832: `findmnt -L` is not an option (usage error -> empty mp); -S LABEL= is. When the label is not
+	# mounted but ${EXFAT} is a HIGHASCGEXF bind (the lib's fallback), report that path instead of "".
+	mp="$(findmnt -n -o TARGET -S LABEL=HIGHASCGEXF 2>/dev/null | head -1 || true)"
+	[[ -n "$mp" ]] || mp="${EXFAT}"
 	st_ok "HIGHASCGEXF mounted at ${mp}"
 	if mountpoint -q "${EXFAT}" 2>/dev/null; then
 		st_ok "WO-47 path ${EXFAT} is a mountpoint"

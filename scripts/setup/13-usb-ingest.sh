@@ -21,8 +21,10 @@ getent passwd "$USER_CASPAR" >/dev/null 2>&1 || {
 	exit 1
 }
 
-log "udisks2 + policykit"
-DEBIAN_FRONTEND=noninteractive apt-get install -y udisks2 policykit-1
+log "udisks2 + polkit"
+# WO-832: policykit-1 is gone on 26.04 (no candidate); polkitd = daemon + rules.d, pkexec = CLI. 24.04 still
+# has the transitional policykit-1 -> polkitd/pkexec too, so the new names work on both.
+DEBIAN_FRONTEND=noninteractive apt-get install -y udisks2 polkitd pkexec
 
 log "plugdev group for $USER_CASPAR"
 usermod -aG plugdev "$USER_CASPAR" 2>/dev/null || true

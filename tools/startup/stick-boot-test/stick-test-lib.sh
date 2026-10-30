@@ -8,6 +8,9 @@
 : "${ST_VERBOSE:=0}"
 : "${ST_QUICK:=0}"
 
+# shellcheck source=../run-sh-supervisors-lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../run-sh-supervisors-lib.sh"
+
 PLAYOUT="${HIGHASCG_ROOT:-/home/casparcg/highascg}"
 EXFAT="${HIGHASCG_EXFAT_ROOT:-/home/casparcg/exfat}"
 DROP="${EXFAT}/drop-update"
@@ -42,7 +45,7 @@ st_is_live_session() {
 
 st_exfat_label_mounted() {
 	local mp dev
-	mp="$(findmnt -n -o TARGET -L HIGHASCGEXF 2>/dev/null || true)"
+	mp="$(findmnt -n -o TARGET -S LABEL=HIGHASCGEXF 2>/dev/null || true)"
 	if [[ -n "$mp" ]]; then
 		return 0
 	fi

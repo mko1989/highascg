@@ -74,7 +74,7 @@ if [[ -f "$SQ_CHECK" ]]; then
 	if [[ "$sq_mib" -lt 2000 ]]; then
 		echo "ERROR: squashfs is only ${sq_mib} MiB — ISO is broken (need ~3000+ MiB)." >&2
 		echo "       inject cannot fix a truncated live OS. Run full build:" >&2
-		echo "       sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
+		echo "       sudo bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
 		exit 1
 	fi
 fi

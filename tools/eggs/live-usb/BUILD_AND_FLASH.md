@@ -18,7 +18,7 @@
 
 ```bash
 cd ~/highascg
-sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh
+sudo bash tools/eggs/live-usb/build-highascg-egg.sh   # driver branch auto-detected (615 on 26.04)
 # npm run eggs:build
 ```
 
@@ -70,7 +70,7 @@ To publish **`highascg_*.iso`** (Eggs WO‑47 excludes) and **`highascg_<UTC>.ta
    Optional:
 
    ```bash
-   sudo NVIDIA_BRANCHES="535 580 595" BASENAME=highascg bash tools/eggs/live-usb/build-highascg-egg.sh
+   sudo BASENAME=highascg bash tools/eggs/live-usb/build-highascg-egg.sh
    ```
 
 3. **Kernel (one version)** — `build-highascg-egg.sh` runs `sync-eggs-kernel-and-purge-stale.sh` with **`HIGHASCG_ENSURE_LATEST_KERNEL=1`**: installs **`linux-image-generic`**, points **`eggs.yaml`** at the **newest** `linux-image-*-generic`, purges older images. The ISO matches that kernel, not necessarily the kernel you booted before the build. If the script warns that running ≠ latest, **reboot** after the build (or before a long `eggs produce`) so DKMS (NVIDIA, DeckLink) matches.

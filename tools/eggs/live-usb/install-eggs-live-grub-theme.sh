@@ -18,15 +18,22 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 THEME_ROOT="${HERE}/highascg-eggs-theme"
 BRANDING="${HERE}/branding"
 EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
-EGGS_LIVECD="${EGGS_LIVECD:-/usr/lib/penguins-eggs/addons/eggs/theme/livecd}"
-EGGS_THEME="${EGGS_THEME:-/usr/lib/penguins-eggs/addons/eggs/theme}"
+# WO-832: eggs >= 26.10 keeps the stock theme in /etc/penguins-eggs.d/branding.default (older: /usr/lib/penguins-eggs/…).
+# shellcheck source=eggs-theme-lib.sh
+source "${HERE}/eggs-theme-lib.sh"
+if EGGS_THEME="$(highascg_eggs_theme_dir)"; then
+	EGGS_LIVECD="${EGGS_LIVECD:-${EGGS_THEME}/livecd}"
+else
+	EGGS_THEME="${EGGS_THEME:-/etc/penguins-eggs.d/branding.default}"
+	EGGS_LIVECD="${EGGS_LIVECD:-${EGGS_THEME}/livecd}"
+fi
 
 [[ -f "${THEME_ROOT}/theme/livecd/grub.main.cfg" ]] || {
 	echo "Missing ${THEME_ROOT}/theme/livecd/grub.main.cfg" >&2
 	exit 1
 }
 [[ -d "$EGGS_LIVECD" ]] || {
-	echo "penguins-eggs livecd theme not found at $EGGS_LIVECD — install eggs first." >&2
+	echo "penguins-eggs livecd theme not found at $EGGS_LIVECD (also tried /usr/lib/penguins-eggs/addons/eggs/theme) — install eggs first." >&2
 	exit 1
 }
 [[ -f "$EGGS_YAML" ]] || {

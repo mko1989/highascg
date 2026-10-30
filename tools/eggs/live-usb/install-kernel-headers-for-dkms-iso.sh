@@ -24,6 +24,8 @@ highascg_apt_update
 KVER="$(uname -r)"
 if [[ -f /etc/highascg/pinned-kernel ]]; then
 	KVER="$(tr -d '[:space:]' </etc/highascg/pinned-kernel)"
+	# WO-832: a stale pin used to surface as an opaque apt "no such package linux-headers-6.8.0-117-generic".
+	highascg_assert_pin_valid "$KVER" || exit 1
 fi
 
 HDR="linux-headers-${KVER}"

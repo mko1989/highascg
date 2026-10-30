@@ -35,26 +35,38 @@ eggs_liveroot_prereq_check() {
 }
 
 # Print lines: TARGET|SOURCE|FSTYPE (host bind mounts only)
+# WO-832: findmnt runs into a variable first — a failing findmnt inside `< <(…)` was swallowed
+# (empty list = "safe"). Now it returns 1 so callers can fail closed.
 eggs_liveroot_list_host_bind_mounts() {
 	local root="${1%/}"
-	local target source fstype
+	local target source fstype mounts
 
 	eggs_liveroot_prereq_check || return 1
+
+	mounts="$("$FINDMNT" -rn -o TARGET,SOURCE,FSTYPE 2>/dev/null)" || {
+		echo "ERROR: findmnt failed — cannot enumerate mounts under ${root}." >&2
+		return 1
+	}
 
 	while read -r target source fstype _; do
 		[[ -n "$target" && -n "$source" ]] || continue
 		[[ "$target" == "$root" || "$target" == "$root"/* ]] || continue
 		[[ "$source" == "$root" || "$source" == "$root"/* ]] && continue
 		printf '%s|%s|%s\n' "$target" "$source" "$fstype"
-	done < <(
-		"$FINDMNT" -rn -o TARGET,SOURCE,FSTYPE 2>/dev/null |
-			"$AWK" -v r="$root" '$1 == r || index($1, r "/") == 1 { print }'
-	)
+	done < <("$AWK" -v r="$root" '$1 == r || index($1, r "/") == 1 { print }' <<<"$mounts")
 }
 
+# True (0) when host bind mounts exist under ROOT — AND when that cannot be determined (fail closed).
+# WO-832: this used to be `list | grep -q .`; grep -q exits at the first match, the writer then gets
+# SIGPIPE, and under `set -o pipefail` the pipeline reported 141 = "no mounts" exactly when MANY
+# host mounts were bound (the case where `rm -rf liveroot` erases /usr). Capture, then test.
 eggs_liveroot_has_host_bind_mounts() {
-	local root="$1"
-	eggs_liveroot_list_host_bind_mounts "$root" 2>/dev/null | "$GREP" -q .
+	local root="$1" out
+	if ! out="$(eggs_liveroot_list_host_bind_mounts "$root" 2>/dev/null)"; then
+		echo "WARN: cannot enumerate mounts under ${root} — treating as UNSAFE (fail closed)." >&2
+		return 0
+	fi
+	[[ -n "$out" ]]
 }
 
 eggs_liveroot_print_host_bind_mounts() {

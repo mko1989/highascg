@@ -1,28 +1,41 @@
 #!/usr/bin/env bash
-# Build a HighAsCG live ISO with ONE baked NVIDIA driver (535, 580, or 595).
+# Build a HighAsCG live ISO with ONE baked NVIDIA driver (the installed branch, e.g. 615).
 #
-#   sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh
+#   sudo bash tools/eggs/live-usb/build-highascg-egg.sh        # branch auto-detected (HIGHASCG_NVIDIA_DRIVER=615 to be explicit)
 #
 # Does NOT download multi-branch /opt/nvidia-pool debs.
 set -euo pipefail
 
 [[ "$(id -u)" -eq 0 ]] || {
-	echo "Run as root: sudo HIGHASCG_NVIDIA_DRIVER=595 $0" >&2
+	echo "Run as root: sudo $0" >&2
 	exit 1
 }
 
-BR="${HIGHASCG_NVIDIA_DRIVER:-}"
-export HIGHASCG_ISO_FORBID_DECKLINK="${HIGHASCG_ISO_FORBID_DECKLINK:-1}"
-case "$BR" in
-535 | 580 | 595) ;;
-*)
-	echo "Set HIGHASCG_NVIDIA_DRIVER to 535, 580, or 595 (one driver per ISO)." >&2
-	exit 1
-	;;
-esac
-
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
+
+# WO-832: the branch used to be a hard-coded 535|580|595 whitelist — the 26.04 upgrade put the box on 615
+# and the build refused to start. The ISO is a CLONE of this host, so the baked driver IS the installed
+# one: default to it, accept any 3-digit branch, and refuse a stamp that contradicts the host.
+# shellcheck source=../../../scripts/lib/nvidia-branch.sh
+source "${REPO_ROOT}/scripts/lib/nvidia-branch.sh"
+BR="${HIGHASCG_NVIDIA_DRIVER:-}"
+DETECTED_BR="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
+if [[ -z "$BR" && -n "$DETECTED_BR" ]]; then
+	BR="$DETECTED_BR"
+	echo "==> HIGHASCG_NVIDIA_DRIVER unset — using the installed driver branch ${BR}"
+fi
+export HIGHASCG_ISO_FORBID_DECKLINK="${HIGHASCG_ISO_FORBID_DECKLINK:-1}"
+if [[ ! "$BR" =~ ^[0-9]{3}$ ]]; then
+	echo "Set HIGHASCG_NVIDIA_DRIVER to the installed driver branch (e.g. 615; detected: ${DETECTED_BR:-none}) — one driver per ISO." >&2
+	exit 1
+fi
+if [[ -n "$DETECTED_BR" && "$DETECTED_BR" != "$BR" ]]; then
+	echo "ERROR: HIGHASCG_NVIDIA_DRIVER=${BR} but this host runs driver ${DETECTED_BR}; the clone would ship ${DETECTED_BR}" >&2
+	echo "       under a ${BR} stamp. Unset it (auto-detect) or install the ${BR} driver first." >&2
+	exit 1
+fi
+
 export HIGHASCG_NVIDIA_DRIVER="$BR"
 BASENAME="${BASENAME:-highascg-nvidia-${BR}}"
 

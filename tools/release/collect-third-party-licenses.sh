@@ -35,14 +35,33 @@ copy_deb_copyright() {
 	return 1
 }
 
+# WO-832: the candidate list was hard-coded 595/580/535 — on the 26.04 box (driver 615) nothing matched,
+# so the manifest named a driver that was no longer installed. Detect the installed branch instead; the
+# list below is only the fallback shape (newest installed nvidia-driver-N[-open] wins).
+# shellcheck source=../../scripts/lib/nvidia-branch.sh
+source "${REPO_ROOT}/scripts/lib/nvidia-branch.sh"
+
 nvidia_pkg() {
-	for p in nvidia-driver-595-open nvidia-driver-580-open nvidia-driver-535-open \
-		nvidia-driver-595 nvidia-driver-580 nvidia-driver-535 nvidia-open; do
-		if dpkg-query -W "$p" &>/dev/null; then
-			echo "$p"
-			return 0
-		fi
-	done
+	local br p
+	br="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
+	if [[ -n "$br" ]]; then
+		for p in "nvidia-driver-${br}-open" "nvidia-driver-${br}" "nvidia-driver-${br}-server-open" "nvidia-driver-${br}-server"; do
+			if dpkg-query -W "$p" &>/dev/null; then
+				echo "$p"
+				return 0
+			fi
+		done
+	fi
+	# No running module / unknown branch: newest installed nvidia-driver-N[-open], then the CUDA-repo meta.
+	p="$(dpkg-query -W -f='${Package}\n' 'nvidia-driver-[0-9]*' 2>/dev/null | grep -E '^nvidia-driver-[0-9]+(-open)?$' | sort -V | tail -1 || true)"
+	if [[ -n "$p" ]]; then
+		echo "$p"
+		return 0
+	fi
+	if dpkg-query -W nvidia-open &>/dev/null; then
+		echo nvidia-open
+		return 0
+	fi
 	echo ""
 }
 
@@ -60,6 +79,10 @@ if [[ -n "$NV_PKG" ]]; then
 fi
 NV_ISO_STAMP=""
 [[ -f /etc/highascg/nvidia-iso-driver ]] && NV_ISO_STAMP="$(tr -d '\n' </etc/highascg/nvidia-iso-driver)"
+_nv_detected="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
+if [[ -n "$NV_ISO_STAMP" && -n "$_nv_detected" && "$NV_ISO_STAMP" != "$_nv_detected" ]]; then
+	log "WARN: /etc/highascg/nvidia-iso-driver says ${NV_ISO_STAMP} but the installed driver is ${_nv_detected} (build-highascg-egg.sh re-stamps it)"
+fi
 
 # --- Blackmagic ---
 BMD_VER=""

@@ -19,7 +19,10 @@ REPO_ROOT="$(cd "${HERE}/../../.." && pwd)"
 HIGHASCG_ROOT="${HIGHASCG_ROOT:-/home/casparcg/highascg}"
 USER_CASPAR="${USER_CASPAR:-casparcg}"
 EXCLUDE="${EGGS_EXCLUDE_LIST:-/etc/penguins-eggs.d/exclude.list}"
-EGGS_LIVECD="${EGGS_LIVECD:-/usr/lib/penguins-eggs/addons/eggs/theme/livecd}"
+# WO-832: eggs 26.10 moved the theme to /etc/penguins-eggs.d/branding.default
+# shellcheck source=eggs-theme-lib.sh
+source "${HERE}/eggs-theme-lib.sh"
+EGGS_LIVECD="${EGGS_LIVECD:-$(highascg_eggs_theme_dir 2>/dev/null || echo /etc/penguins-eggs.d/branding.default)/livecd}"
 FAIL=0
 
 fail() {
@@ -63,16 +66,24 @@ need_cmd eggs "sudo bash ${REPO_ROOT}/work/setup-boot-branding-phase1.sh"
 [[ -d "$EGGS_LIVECD" ]] && ok "eggs livecd theme ${EGGS_LIVECD}" \
 	|| fail "missing ${EGGS_LIVECD} — install penguins-eggs"
 
+# WO-832: the pin must name an INSTALLED kernel and match the running one. Fix after an OS/kernel upgrade:
+#   echo "$(uname -r)" | sudo tee /etc/highascg/pinned-kernel
+# shellcheck source=eggs-kernel-lib.sh
+source "${HERE}/eggs-kernel-lib.sh"
 if [[ -f /etc/highascg/pinned-kernel ]]; then
-	ok "pinned kernel $(cat /etc/highascg/pinned-kernel)"
+	if highascg_assert_pin_valid; then
+		ok "pinned kernel $(tr -d '[:space:]' </etc/highascg/pinned-kernel) is installed"
+	else
+		fail "pinned kernel $(tr -d '[:space:]' </etc/highascg/pinned-kernel) is not usable (see above)"
+	fi
 else
-	fail "missing /etc/highascg/pinned-kernel — sudo bash ${REPO_ROOT}/scripts/setup/01-kernel-117.sh"
+	fail "missing /etc/highascg/pinned-kernel — echo \"\$(uname -r)\" | sudo tee /etc/highascg/pinned-kernel"
 fi
 
-if [[ "$(uname -r)" == "$(cat /etc/highascg/pinned-kernel 2>/dev/null)" ]]; then
+if [[ "$(uname -r)" == "$(tr -d '[:space:]' </etc/highascg/pinned-kernel 2>/dev/null)" ]]; then
 	ok "running kernel matches pin"
 else
-	fail "running $(uname -r) != pin $(cat /etc/highascg/pinned-kernel 2>/dev/null) — reboot after kernel setup"
+	fail "running $(uname -r) != pin $(tr -d '[:space:]' </etc/highascg/pinned-kernel 2>/dev/null || echo none) — fix the pin (echo \"\$(uname -r)\" | sudo tee /etc/highascg/pinned-kernel) or reboot into the pinned kernel"
 fi
 
 need_pkg exfatprogs "sudo apt install exfatprogs (or run prepare-eggs-clone-with-exfat.sh)"

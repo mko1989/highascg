@@ -11,6 +11,10 @@ source "${SCRIPT_DIR}/lib/common.sh"
 
 require_root
 
+# install-config.sh / install-helpers.sh expect SCRIPT_DIR = repo root. Use SETUP_DIR (lib/common.sh)
+# for sibling setup scripts — WO-832: SCRIPT_DIR here pointed at the repo root, so the 13-* existence test
+# below was always false and the else-branch stopped AND disabled casparcg-server on every run
+# (reinstall-cef.sh, the documented CEF repair, execs this script).
 export SCRIPT_DIR="${REPO_ROOT}"
 # shellcheck source=../install-config.sh
 source "${SCRIPTS_LIB}/install-config.sh"
@@ -59,13 +63,13 @@ elif [[ "${HIGHASCG_FORCE_SCANNER:-0}" == "1" ]] || ! command -v casparcg-scanne
 fi
 
 log "CasparCG systemd units (WO-73 — replace Openbox autostart ownership)"
-if [[ -f "${SCRIPT_DIR}/13-caspar-systemd-units.sh" ]]; then
-	bash "${SCRIPT_DIR}/13-caspar-systemd-units.sh" "$USER_CASPAR" || {
+if [[ -f "${SETUP_DIR}/13-caspar-systemd-units.sh" ]]; then
+	bash "${SETUP_DIR}/13-caspar-systemd-units.sh" "$USER_CASPAR" || {
 		echo "  note: 13-caspar-systemd-units.sh failed (non-fatal on partial install)" >&2
 	}
 else
-	systemctl stop casparcg-server 2>/dev/null || true
-	systemctl disable casparcg-server 2>/dev/null || true
+	# Never stop/disable the live casparcg-server unit just because a helper script is missing.
+	echo "  note: ${SETUP_DIR}/13-caspar-systemd-units.sh missing — casparcg-server unit left untouched" >&2
 fi
 
 if [[ -f "${PLAYOUT}/media/casparcg.config.ftd" && ! -f "${PLAYOUT}/config/casparcg.config" ]]; then
@@ -92,4 +96,4 @@ echo
 command -v casparcg-scanner &>/dev/null && ok "scanner: $(command -v casparcg-scanner)"
 [[ -f "${PLAYOUT}/lib/libcef.so" ]] && ok "CEF: ${PLAYOUT}/lib/libcef.so"
 echo
-echo "Next: sudo bash ${SCRIPT_DIR}/09-openbox-autostart.sh"
+echo "Next: sudo bash ${SETUP_DIR}/09-openbox-autostart.sh"

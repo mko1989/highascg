@@ -21,7 +21,9 @@ else
 	else
 		st_warn "casparcg-server not enabled — legacy run.sh autostart path may be intentional"
 	fi
-	nv_n="$(grep -c 'highascg-nvidia-x-apply' "$as" 2>/dev/null || echo 0)"
+	# WO-832: `grep -c … || echo 0` printed "0" twice when nothing matched ("0\n0" breaks the -le test below).
+	nv_n="$(grep -c 'highascg-nvidia-x-apply' "$as" 2>/dev/null || true)"
+	nv_n="${nv_n:-0}"
 	if [[ "$nv_n" -le 2 ]]; then
 		st_ok "nvidia-x-apply invocations in autostart: ${nv_n}"
 	else

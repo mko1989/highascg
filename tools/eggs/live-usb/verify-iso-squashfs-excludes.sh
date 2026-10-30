@@ -339,7 +339,13 @@ if [[ "${HIGHASCG_ISO_EMBED_CALAMARES:-1}" == "1" ]]; then
 	else
 		bad "missing grub-pc in squashfs — run install-grub-for-calamares-iso.sh before produce"
 	fi
-	kver="$(unsquashfs -cat "$SQ" etc/highascg/pinned-kernel 2>/dev/null | tr -d '[:space:]' || echo '6.8.0-117-generic')"
+	# WO-832: the old `|| echo '6.8.0-117-generic'` never fired (the pipeline's status is tr's) and was a stale
+	# literal anyway — a pin-less squashfs gave kver="" and checked "linux-headers-". Fall back to the host kernel.
+	kver="$(unsquashfs -cat "$SQ" etc/highascg/pinned-kernel 2>/dev/null | tr -d '[:space:]' || true)"
+	if [[ -z "$kver" ]]; then
+		kver="$(uname -r)"
+		echo "WARN: squashfs has no etc/highascg/pinned-kernel — checking headers for the host kernel ${kver}" >&2
+	fi
 	if squash_cat_grep 'var/lib/dpkg/status' "Package: linux-headers-${kver}" 1; then
 		ok "present: linux-headers-${kver} in squashfs (DeckLink/NVIDIA DKMS)"
 	else

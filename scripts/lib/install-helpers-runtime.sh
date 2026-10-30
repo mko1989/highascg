@@ -55,13 +55,20 @@ ask_action() {
     esac
 }
 
-# nvidia-persistenced is a virtual package on Ubuntu 24.04; the daemon ships in nvidia-compute-utils-*
+# nvidia-persistenced is a virtual package on Ubuntu 24.04/26.04; the daemon ships in nvidia-compute-utils-*
 install_nvidia_persistenced_packages() {
 	local br="${HIGHASCG_NVIDIA_DRIVER:-}"
 	local pkg=""
 
+	# WO-832: was a 535|580|595 whitelist (615 fell through to the dpkg glob below by luck). Prefer the
+	# explicit branch, else the installed one, for any 3-digit branch.
+	if [ -z "$br" ] && [ -r "$(dirname "${BASH_SOURCE[0]}")/nvidia-branch.sh" ]; then
+		# shellcheck source=nvidia-branch.sh
+		. "$(dirname "${BASH_SOURCE[0]}")/nvidia-branch.sh"
+		br="$(highascg_installed_nvidia_branch 2>/dev/null || true)"
+	fi
 	case "$br" in
-	535 | 580 | 595) pkg="nvidia-compute-utils-${br}" ;;
+	[0-9][0-9][0-9]) pkg="nvidia-compute-utils-${br}" ;;
 	esac
 
 	if [ -z "$pkg" ]; then

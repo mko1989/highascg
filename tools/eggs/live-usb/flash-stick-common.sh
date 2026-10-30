@@ -297,7 +297,7 @@ usb_prepare_partition_for_mkfs() {
 		while read -r mnt; do
 			[[ -n "$mnt" ]] || continue
 			umount "$mnt" 2>/dev/null || umount -l "$mnt" 2>/dev/null || true
-		done < <(findmnt -rn -o TARGET -L "$label" 2>/dev/null || true)
+		done < <(findmnt -rn -o TARGET -S "LABEL=${label}" 2>/dev/null || true)
 	fi
 	wipefs -a "$part" 2>/dev/null || true
 	udevadm trigger --subsystem-match=block --action=change 2>/dev/null || true

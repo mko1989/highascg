@@ -22,7 +22,22 @@ EGGS_YAML="${EGGS_YAML:-/etc/penguins-eggs.d/eggs.yaml}"
 	exit 1
 }
 
-highascg_resolve_eggs_kernel
+highascg_resolve_eggs_kernel || {
+	echo "ERROR: cannot resolve the eggs kernel (see above) — nothing was changed." >&2
+	exit 1
+}
+
+# WO-832: decide the purge set BEFORE touching eggs.yaml, and never include the running kernel.
+# (A stale pin used to make this purge the kernel the box was booted on.)
+mapfile -t installed < <(dpkg -l 'linux-image-[0-9]*-generic' 2>/dev/null | awk '/^ii/{print $2}' | sort -V)
+keep="linux-image-${KVER}"
+for kpkg in "${installed[@]}"; do
+	[[ "$kpkg" == "$keep" ]] && continue
+	highascg_refuse_purge_running "$kpkg" || {
+		echo "       Nothing was changed." >&2
+		exit 1
+	}
+done
 
 echo "==> eggs.yaml → latest kernel ${KVER} (running: $(uname -r))"
 if grep -q '^vmlinuz:' "$EGGS_YAML"; then
@@ -40,6 +55,7 @@ grep -E '^(vmlinuz|initrd_img):' "$EGGS_YAML"
 purge_kernel_pkg() {
 	local kpkg="$1"
 	[[ -n "$kpkg" ]] || return 0
+	highascg_refuse_purge_running "$kpkg" || return 1
 	echo "==> Purge ${kpkg} (+ headers/modules/tools)"
 	apt-get -y purge "$kpkg" || true
 	local ver="${kpkg#linux-image-}"
@@ -50,9 +66,7 @@ purge_kernel_pkg() {
 		"linux-tools-${ver}" 2>/dev/null || true
 }
 
-mapfile -t installed < <(dpkg -l 'linux-image-[0-9]*-generic' 2>/dev/null | awk '/^ii/{print $2}' | sort -V)
-keep="linux-image-${KVER}"
-if [[ -f /etc/highascg/pinned-kernel ]]; then
+if [[ -f "${HIGHASCG_PIN_FILE:-/etc/highascg/pinned-kernel}" ]]; then
 	echo "==> Pinned kernel — keep ${keep} only"
 fi
 for kpkg in "${installed[@]}"; do

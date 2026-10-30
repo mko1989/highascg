@@ -68,7 +68,7 @@ iso_mib="$(du -m "$ISO" | awk '{print $1}')"
 if [[ "$iso_mib" -lt 1500 ]]; then
 	echo "ERROR: ISO is only ${iso_mib} MiB — expected ~2400–3500 MiB (lean excludes, no nvidia-pool)." >&2
 	echo "       A truncated squashfs cannot boot. Run full build:" >&2
-	echo "       sudo HIGHASCG_NVIDIA_DRIVER=595 bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
+	echo "       sudo bash tools/eggs/live-usb/build-highascg-egg.sh" >&2
 	exit 1
 fi
 

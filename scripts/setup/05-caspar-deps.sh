@@ -15,6 +15,37 @@ require_root
 
 PLAYOUT="${CASPAR_PLAYOUT_ROOT:-/home/casparcg/highascg}"
 
+# WO-832: runtime-lib package names change per Ubuntu release (26.04: no libsfml-*2.6 — SFML is 3.0; Boost 1.90 next
+# to the legacy 1.83 the 24.04 rollback binaries need). Pick the first alternative that has an apt candidate,
+# newest first, instead of hard-coding the 24.04 names and letting one missing package abort the whole install.
+first_candidate() {
+	local p c
+	for p in "$@"; do
+		c="$(apt-cache policy "$p" 2>/dev/null | awk '/Candidate:/{print $2}')"
+		if [[ -n "$c" && "$c" != "(none)" ]]; then
+			echo "$p"
+			return 0
+		fi
+	done
+	return 1
+}
+
+RUNTIME_LIBS=()
+for part in graphics window system; do
+	if pkg="$(first_candidate "libsfml-${part}3.0" "libsfml-${part}2.6" "libsfml-${part}2.6t64")"; then
+		RUNTIME_LIBS+=("$pkg")
+	else
+		echo "  WARN: no apt candidate for libsfml-${part} (3.0 / 2.6) — skipped" >&2
+	fi
+done
+for part in log locale filesystem thread context; do
+	if pkg="$(first_candidate "libboost-${part}1.90.0" "libboost-${part}1.88.0" "libboost-${part}1.83.0")"; then
+		RUNTIME_LIBS+=("$pkg")
+	else
+		echo "  WARN: no apt candidate for libboost-${part} (1.90 / 1.88 / 1.83) — skipped" >&2
+	fi
+done
+
 log "Base packages"
 DEBIAN_FRONTEND=noninteractive apt-get update -y
 DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -23,10 +54,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
 	ffmpeg libdrm2 libdrm-tests v4l-utils \
 	libopengl0 libgl1 libegl1 \
 	libglew2.2 \
-	libsfml-graphics2.6 libsfml-window2.6 libsfml-system2.6 \
+	"${RUNTIME_LIBS[@]}" \
 	libtbb12 \
-	libboost-log1.83.0 libboost-locale1.83.0 libboost-filesystem1.83.0 \
-	libboost-thread1.83.0 libboost-context1.83.0 \
 	libnss3 \
 	libx11-6 libxrandr2 libxinerama1 libxi6 libxcursor1 \
 	avahi-daemon \

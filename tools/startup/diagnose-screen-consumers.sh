@@ -79,7 +79,9 @@ have() { command -v "$1" >/dev/null 2>&1; }
 	have glxinfo && DISPLAY="$DISPLAY" glxinfo -B 2>/dev/null | head -6
 
 	section "7. highascg server view"
-	PORT="$(python3 -c "import json;print(json.load(open('${HOME_CASPAR}/highascg/webui-port.json'))['port'])" 2>/dev/null || echo 4200)"
+	# WO-832: webui-port.json is the Vite DEV-server port (4350), not the highascg API — this section always
+	# curled a closed port. The server listens on config httpPort (default 4200, defaults-core.js).
+	PORT="${HIGHASCG_HTTP_PORT:-4200}"
 	curl -s -m 5 "http://127.0.0.1:${PORT}/api/logs?lines=60&caspar=0" 2>/dev/null \
 		| python3 -c "import json,sys;[print(str(l)[:200]) for l in (json.load(sys.stdin).get('highascg') or [])[-25:]]" 2>/dev/null \
 		|| echo "(highascg API not answering on ${PORT})"

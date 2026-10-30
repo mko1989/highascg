@@ -31,7 +31,9 @@ for u in "${units[@]}"; do
 		st_fail "missing unit ${u}"
 	fi
 done
-failed_n="$(systemctl --failed --no-legend 2>/dev/null | grep -cvE 'snap\.tailscale\.tailscaled|highascg-exfat-boot' || echo 0)"
+# WO-832: `grep -c … || echo 0` printed "0" (grep -c's own output) AND "0" (the echo) when nothing matched, so
+# the -eq test below choked on "0\n0" and a clean box reported a false FAIL. `|| true` keeps grep's single count.
+failed_n="$(systemctl --failed --no-legend 2>/dev/null | grep -cvE 'snap\.tailscale\.tailscaled|highascg-exfat-boot' || true)"
 if [[ "${failed_n:-0}" -eq 0 ]]; then
 	st_ok "no critical failed systemd units"
 else
