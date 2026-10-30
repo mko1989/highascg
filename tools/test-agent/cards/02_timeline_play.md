@@ -33,15 +33,15 @@
 - Expected: `ok:true`; the field `"/" tip="Total duration"` has a value between `00:00:04:00` and `00:00:05:00`.
 - Evidence: the value.
 
-### 5. Play
-- Run: `tools/test-agent/ui click "Play / pause from the playhead (Space)"`, `tools/test-agent/ui wait 1.5`, `tools/test-agent/caspar api /api/timelines/TL/state`, `tools/test-agent/caspar info <PRV>`, `tools/test-agent/ui shot 04_playing`
-- Expected: state has `"playing":true` and `position` between 800 and 3000; `caspar info <PRV>` `playing` has one entry containing `e2e_bars` with `(playing)`.
-- Evidence: shot `04_playing`, the state JSON.
+### 5. Play, then pause about a second later
+- Run as ONE shell command, exactly like this (the timeline is only about 4.5 s long; separate commands are too slow and it would reach its end before the pause): `tools/test-agent/ui click "Play / pause from the playhead (Space)" && tools/test-agent/ui wait 1 && tools/test-agent/caspar api /api/timelines/TL/state && tools/test-agent/ui click "Play / pause from the playhead (Space)"`. Then `tools/test-agent/ui shot 04_paused`.
+- Expected: every part answers `ok:true`; the first click's `label` is `"▶"` and the second click's `label` is `"❚❚"`; the state printed between the two clicks has `"playing":true` and `position` between 300 and 3000.
+- Evidence: shot `04_paused`, the state JSON.
 
-### 6. Pause
-- Run: `tools/test-agent/ui click "Play / pause from the playhead (Space)"`, `tools/test-agent/ui wait 1`, `tools/test-agent/caspar api /api/timelines/TL/state`, `tools/test-agent/caspar info <PRV>`
-- Expected: state `"playing":false` (no `endHeld`); the clip on PRV is `(paused)`; note `position` as **P1** (it must be > 800).
-- Evidence: the state JSON.
+### 6. It is paused
+- Run: `tools/test-agent/ui wait 1`, `tools/test-agent/caspar api /api/timelines/TL/state`, `tools/test-agent/caspar info <PRV>`
+- Expected: state `"playing":false` (no `endHeld`, or `"endHeld":false`); `caspar info <PRV>` `playing` has one entry containing `e2e_bars` with `(paused)`; note `position` as **P1** (it must be > 300 and < 3500).
+- Evidence: the state JSON, the info JSON.
 
 ### 7. Play on to the end: the last frame is held (WO-834)
 - Run: `tools/test-agent/ui click "Play / pause from the playhead (Space)"`, `tools/test-agent/ui wait 5`, `tools/test-agent/caspar api /api/timelines/TL/state`, `tools/test-agent/caspar info <PRV>`, `tools/test-agent/ui shot 05_end`
@@ -49,7 +49,7 @@
 - Evidence: shot `05_end`, the state JSON, the info JSON.
 
 ### 8. Play again after the hold: starts over from the beginning
-- Run: `tools/test-agent/ui click "Play / pause from the playhead (Space)"`, `tools/test-agent/ui wait 1.5`, `tools/test-agent/caspar api /api/timelines/TL/state`, `tools/test-agent/ui shot 06_restart`
+- Run as ONE shell command: `tools/test-agent/ui click "Play / pause from the playhead (Space)" && tools/test-agent/ui wait 1.5 && tools/test-agent/caspar api /api/timelines/TL/state`, then `tools/test-agent/ui shot 06_restart`
 - Expected: state `"playing":true`, no `endHeld`, and `position` below 2500 (it restarted from 0 — it did not resume at the end).
 - Evidence: shot `06_restart`, the state JSON.
 
@@ -69,6 +69,6 @@ Always.
 Steps 1–9 all PASS, Cleanup done.
 
 ## FAIL / UNCLEAR rule
-- **FAIL**: a command worked but its Expected is not met (e.g. step 7 clip disappeared or `endHeld` is missing; step 8 position stays at the end, i.e. Play after the hold does not restart) → expected vs seen + shot, skip the rest, do Cleanup.
+- **FAIL**: a command worked but its Expected is not met (e.g. step 5 the second click's label is `"▶"` — the timeline had already ended —, step 7 clip disappeared or `endHeld` is missing; step 8 position stays at the end, i.e. Play after the hold does not restart) → expected vs seen + shot, skip the rest, do Cleanup.
 - **UNCLEAR**: a label is missing/disabled/covered, `ok:false`, or you cannot find the Layer 1 lane in the shot → README section 4.
 - Never improvise coordinates or labels beyond the rules written in steps 3.

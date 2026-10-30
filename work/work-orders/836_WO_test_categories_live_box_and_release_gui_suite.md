@@ -1,7 +1,7 @@
 # WO-836 — Test categories: offline / live-box, and a GUI release suite with screenshot + PRINT checks
 
 **Area:** testing-ci
-**Status: IN PROGRESS (30.10) — parts 1, 2 and 3 done and verified: offline 4485/4486 (§3), scripted GUI release suite `npm run test:release-gui` 73/73 green twice in a row (§3d); the agent-run live cards (§3c) await their first watched live run**
+**Status: DONE (30.10, offline 4485/4486, scripted GUI release suite 73/73 twice, and the agent-run live cards 01 + 02 PASS on the live box — §3c live run)**
 **Source:** REPORT §7a/7b; owner 30.10: *"id like to have a full suite of tests that i could run before each relese and/or
 pull request that would run a routine test of all/most of the features by literally clicking in gui and verifing by
 screenshots/ casparcg channel prints. so the tests that do actual stuff on the box are needed. but they should be in their
@@ -270,3 +270,32 @@ human-like live run; this is the cheap repeatable one: no agent, no live box.
 `npm run -s test:release-gui -- --out=…/scratchpad/wo836/verify` → `[release-gui] 73/73 steps passed`: sim 63/63 (134 s), air
 10/10 (19 s), exit 0. Air PRINT: PRV luma 98 / nonblack 0.87 after the card click, PGM the same after TAKE, and both black after FTB.
 The run includes the new `13_wo866_visuals_audio`.
+
+### §3c live run — agent-run cards on the live box (30.10, 16:45–17:15, owner-approved "Run both now")
+
+Coordinator per `.claude/skills/release-test/SKILL.md`: fixtures provisioned (all three created, removed again at the end), driver
+`ui start --live` (display :120, port 6299), one Haiku agent per card, sequential; PGM checked free before and after each card.
+Run folder `work/release-reports/2026-10-30/` (`report.md`, two verdicts, 7 MB of shots/prints) stays LOCAL: the shots show the
+customer project, and this repo is public (`work/release-reports/` added to `.gitignore`).
+
+**Result: 01_looks_take PASS 8/8 (run r5), 02_timeline_play PASS 9/9 (run c2b).** No product bug. The earlier runs failed on
+card/driver defects that the sandbox never shows, each diagnosed and fixed before the next run:
+
+| Run | Verdict | Cause | Fix |
+|---|---|---|---|
+| 01 r1 | UNCLEAR, precondition 3 | the live Dioda deck has 13 looks; the deck "+" is below the fold, and `list`/`find` see only on-screen controls | new driver command `ui reveal <label>` (`99_remote.gd` `_reveal`: `ScrollContainer.ensure_control_visible` on the first match in tree order, then answers its screen rect); card 01 drags to reveal's `cx,cy` |
+| 01 r2 | UNCLEAR, precondition 3 | the coordinator's own reveal check left the deck scrolled, so TAKE was out of view; also, after scrolling, `find` lists screen 2's "+" first (higher on screen), so a label drag would make the look on the wrong screen | every deck control (TAKE, "+", the new card, FTB) via `reveal` → `click_xy`; reveal returns the FIRST screen's control |
+| 01 r3 | UNCLEAR, step 3 | the new card's `2 layers · …` line sits below the window edge | step 3 checks the look in `/api/project` (one `e2e_bars`, 2 layers); cleanup also checks PRV (editing a look shows it on PRV) |
+| 01 r4 | FAIL, step 6 | PGM 1 is the 3840x1792 LED canvas; the 1920x1080 bars cover 30.13 % (= `alpha_nonzero_fraction`), so full-frame nonblack 0.256 / luma 27.9 missed the sandbox-sized ≥ 0.85 / 60–190 | **owner rule 30.10 (RULES.md): a Caspar print always returns the full channel** — `caspar print --crop` now reports the box under `crop`, beside the full-channel numbers, never instead; step 6 limits set from the full channel: nonblack ≥ 0.2, alpha_nonzero ≥ 0.2, luma ≥ 15 (black after FTB measured 0 / 0 / 0) |
+| 02 c2 | FAIL, step 6 "pause did not pause" | timing: the timeline is 4.52 s long, and the agent's separate step-5 commands took ~5 s, so the pause click (journal: plays only at 17:02:07 and 17:02:13) landed after the end hold, where ▶ restarts from 0 by design (WO-834) | steps 5 and 8 are one chained shell command; step 5 FAILs if the second click's label is ▶ |
+
+Coordinator checks of the "pause" finding (not taken on the agent's word): on the test client, a clean Stop → Play → 1.5 s → Pause
+paused at 2415 and stayed; edit (total duration) → Trim → Play with a WS logger on `/api/ws` showed `timeline.playback` playing:true and
+no reset, the button stayed ❚❚ for the whole 4.5 s, then the normal endHeld:true event.
+
+Verified after the passing runs: `caspar info` 1–3 `playing:[]`; project back to its 23 looks; screenshot `16_r5_04_pgm` shows the
+bars on PGM 1 / Dioda with "TAKE ok"; `test-agent-pure` smoke 12/12 (incl. the full-channel + `crop` assertion).
+Side effect: run r3's look editor replaced the staged "Intro" look on PRV 1 (preview only).
+LEFTOVERS, owner's call: timelines `ZZ release-test` `tmvv5tqn7zsf` (run c2) and `tmvv60s69nrd` (run c2b). ch4 (Proj PRV) `blackFHD.png`
+was pre-existing and untouched.
+

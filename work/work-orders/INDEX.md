@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (31 open, 120 in progress, 630 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (31 open, 119 in progress, 631 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -806,7 +806,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 755 DONE [testing-ci] test:ci:full green again: 26 rotted tests outside the curated gate repointed an… → 755_WO_full_offline_suite_green_again.md
 - 756 DONE [testing-ci+os-iso] The rest of the 2026-08-03 tools review: the clock-setting test, the eggs clean… → 756_WO_review_tools_findings_6_to_10.md
 - 761 DONE [testing-ci] smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung te… → 761_WO_ws_reconnect_smoke_race_hung_test_ci_full.md
-- 836 IN PROGRESS [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
+- 836 DONE [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
 
 ## process — Docs, wiki, audits, work-order tooling (26)
 
