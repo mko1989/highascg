@@ -413,7 +413,7 @@ async function runSceneTakeLbg(amcp, opts) {
 	// WO-860: an overlay look's templates stay over the new look (a host this look declares is replaced, not kept)
 	if (!banklessTake) {
 		const { pgmOverlayHosts, releasePgmOverlayHosts } = require('./overlay-look')
-		releasePgmOverlayHosts(channel, incomingTemplateHostLayers)
+		releasePgmOverlayHosts(channel, incomingTemplateHostLayers, self)
 		for (const h of pgmOverlayHosts(channel)) incomingTemplateHostLayers.add(h)
 	}
 

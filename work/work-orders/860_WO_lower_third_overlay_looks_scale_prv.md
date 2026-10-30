@@ -1,7 +1,7 @@
 # WO-860 — Lower-third looks: overlay take over PGM, Scale % that works, the template visible in the look editor PRV
 
 **Area:** engine, godot-client
-**Status: DONE (30.10) — smokes 539/0 + wo860 5/0, Godot 23432/0; live on Caspar ch3/ch4 (PRINT frames) and in the Godot look editor (screenshot)**
+**Status: DONE (30.10, 2nd pass §5 same day) — smokes wo860 10/0, Godot 23442/0; live on Caspar ch3/ch4 (PRINT frames), deck ▶/■ and inspector in the Godot client (test-agent screenshots + journal)**
 
 Owner, 30.10:
 > the lower thirds templates and similar only looks should be treated differently than standard looks, they should
@@ -116,10 +116,76 @@ Test look: "Look 23" (`de03131a-…`, project `mhp_harder`), main 2, one layer L
   `LOWER-THIRDS/LT-CLASSIC-BOX` with `style.renderScale`): 100 → the box as designed; 150 → 1.5× and still
   anchored at the left margin / bottom (PRINT frames compared).
 
-## 4. Open
+## 4. Open (first pass — answered by §5)
 
-- No explicit "take the overlay off" control (deck / Companion). Lower thirds leave by their own timer; ask the owner
-  whether held overlays need an off button or a deck marker.
-- A PGM overlay host stays tracked after its lower third has animated out (transparent layer) until replaced — harmless.
+- ~~No explicit "take the overlay off" control~~ → §5 (deck ■, auto take-out).
+- ~~A PGM overlay host stays tracked after its lower third has animated out~~ → §5 (cleared when played out).
 - Not yet tried on the owner's screens: the PGM-only thumbnail backdrop (this box's mains all have PRV; covered by the
   Godot test).
+
+## 5. Second pass — auto take-out, deck stop, hold duration in the inspector
+
+Owner, 30.10 (answering "do you want an off button or an on-air marker?"):
+> it should be taken automatically out once its playedout. add hold duration in the inspector. make the play button
+> change to stop when on screen, hitting it plays out the cg.
+
+### 5.1 Investigation
+
+- The lower-third engine already plays itself out: `template/lower-thirds/lt-engine.js:97-115` `readDisplayDurationSec`
+  (default 10, 0 = hold) + `scheduleDisplayStop` → `CORE.stop()` once the intro is done. `CG STOP` runs the same
+  outro. What stayed behind was the server side: the transparent host on 700 and its `pgmOverlayHosts` entry (§4).
+- **Measured** (Look 23's lines replayed alone on PRV 1 / ch2 layer 700, `PRINT 2` every second, pixels counted against
+  a frame after `CG CLEAR`): 0 px at 1 s, 16.9 k at 2 s, 19.7 k 3→13 s, 3.2 k at 14 s, 38 at 15 s, **0 from 16 s**. So
+  intro ≈ 2 s, outro 13→15 s for a 10 s hold. (Channel 7, 720p, did not render the template at all — not chased; the
+  4K PRINT files must be moved only after Caspar has written them, and one name per second collides.)
+- "Hold duration in the inspector": the field existed ("Hold s", `lower_third_section.gd` NUMS) but was the last row
+  of the Lower third group, below Title px / Sub px / Scale %, itself under the media-only rows (content sizing, clip
+  start, audio, volume, fade, playback mode) — off the bottom of the Inspector on the box's screen (test-agent
+  screenshot). Opening a look in the editor also threw `Nonexistent function 'forget' in base 'Nil'`
+  (`layer_inspector.gd:120`): `show_layer({})` runs on the not-yet-adopted Inspector page, before `_ready` built `_trim`
+  (the known lazy-page pattern), so the open path aborted with a script error every time.
+
+### 5.2 What was done
+
+- `src/engine/overlay-look-live.js` (new): the on-air registry (channel → look → hosts, timer, until) replacing
+  `overlay-look.js`'s host map. `templateHoldSec` reads the hold the way the engine does (active data step > `style` >
+  top level > 10 s; non-lower-third templates = 0), `lookHoldSec` = the longest, 0 if any template holds.
+  `markOverlayLive` arms the take-out at **hold + 7 s** (`LT_IN_OUT_MS`: intro + outro + ~1 s, from the measurement):
+  `CG CLEAR` + `MIXER OPACITY 1 0` on its hosts, `untrackTemplateHosts`, entry dropped. A re-take re-arms; another
+  overlay or a normal look declaring the host takes it over (entry loses the host, dropped when empty).
+  `stopOverlayLook`: `CG ch-host STOP 0` (outro), broadcast, wait `OUTRO_MS` 3 s (outro measured ~2.3 s), then the same
+  clear — unless a later take re-declared the host meanwhile. Every change broadcasts `scene.liveOverlay`
+  (`{pgm channel: [{sceneId, hosts, until}]}`); `get-state.js` serves it under `scene`. In memory only (the WO-207
+  start sweep clears the 700+ band).
+- `overlay-look.js`: `buildOverlayLookLines` also returns per-template holds; `takeOverlayLook` marks PGM overlays live
+  and logs `hold=Ns|until stop`. `pgmOverlayHosts` / `releasePgmOverlayHosts` re-exported from the registry;
+  `scene-take-lbg.js` passes `self` so a takeover broadcasts.
+- `POST /api/scene/overlay/stop {channel|mainIdx, sceneId?}` (`routes-scene.js` → `routes-scene-take-overlay.js
+  handleOverlayLookStop`): answers once the outro has started; no sceneId = every overlay on that PGM.
+- Godot deck: `deck_overlay.gd` (new) — `on_air(scene.liveOverlay, channelMap, main, id)`; `deck_view.gd` shows ■
+  (`assets/ui/icons/stop.svg`, new) instead of ▶ while the card's overlay is on its main's PGM, ■ → `stop_overlay`
+  (POST above, "Play out ok" in the deck status). The deck already rebuilds on any `scene*` change, so ▶ returns with
+  the broadcast.
+- Inspector: "Hold duration" (suffix s, tooltip "…0 = stays until stopped (the deck card's ■)") is now the **first row**
+  of the Lower third group (`lower_third_section.gd` `HOLD`, rows built by `_num`). Web inspector: label "Hold duration
+  (s)" + the same tooltip (position unchanged there). `layer_inspector.gd`: `_trim` null-guard.
+
+### 5.3 Verified
+
+- Offline: `tools/smoke/smoke-wo860-overlay-take-out.test.js` 5/0 (hold precedence, timer with mocked clock: nothing
+  before hold + 7 s, then CLEAR + broadcast `{}`; hold 0 = no timer; takeover; stop = STOP then CLEAR; the route with a
+  raw JSON body by mainIdx; wiring pins) + `smoke-wo860-overlay-looks` 5/0. Godot `test_deck_overlay_wo860` + full
+  suite 23442/0.
+- Live (node restarted; main 2 = PGM ch3, Look 23):
+  - Auto take-out: take 13:05:21.93 `hold=10s` → `ch=3 cleared hosts=700` 13:05:37.93 (then hold + 6 s); after the
+    7 s change: 13:10:27.95 → 13:10:44.95. `scene.liveOverlay` `{}` afterwards.
+  - Deck (test-agent client on Xvfb :120, live server): ▶ on Look 23 → PGM 2 shows "Janusz" over the running video,
+    the card shows ■; ■ → journal `stop ch=3` 13:13:08.79, `cleared` 13:13:11.80; 0.7 s after ■ the card is ▶ again
+    with the outro under way; 4 s later PGM 2 clean. (`wo860_stop_sequence.png` in the session scratchpad.)
+  - First ■ attempt refused "channel or mainIdx required": the router hands handlers the raw JSON text; fixed with
+    `parseBody` (the smoke now passes a string, like the router).
+  - Inspector: Look 23 ⚙ → layer → "Hold duration 10.0 s" right under the group title, no script error in the client
+    log (was 1 per editor open). Typed 4 → project `cgData` 4 everywhere → API take logged `hold=4s`, cleared 11 s
+    later. Restored to 10 through the same field; PGM 2 back on `752c5d0c…`, no overlay on air.
+- Not done: web deck has no ■ (the Godot client is the operator UI; web parity open). PRV overlays are not tracked
+  (staging only, held).

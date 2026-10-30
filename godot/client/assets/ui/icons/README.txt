@@ -17,3 +17,4 @@ warning (WO-661 Shaders group / rows while Caspar runs without GPU) is a hand-dr
 coloured on purpose (not white), so set it on Tree items, not on Buttons that tint their icons.
 bulb_on / bulb_off (WO-673 Live 3D light-beams toggle) are hand-drawn: a yellow bulb with rays (beams render) and the
 same bulb as a white outline (off). bulb_on is coloured on purpose; the toggle overrides the pressed icon tint to white.
+stop (WO-860 deck card: an on-air lower third's play-out) is the plain filled square the web transport uses.

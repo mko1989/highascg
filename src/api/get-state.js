@@ -119,6 +119,7 @@ function getState(ctx, opts = {}) {
 		scene: {
 			live: liveSceneState.getAll(),
 			liveAudioOnly: liveAudioOnlyLookState.getAll(),
+			liveOverlay: require('../engine/overlay-look-live').getAll(),
 			programLayerBankByChannel: ctx.programLayerBankByChannel || {},
 			deck: sceneDeck,
 			...(globalBorders ? { globalBorders } : {}),

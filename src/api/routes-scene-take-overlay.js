@@ -2,14 +2,15 @@
  * WO-860 — take an overlay look (only template CG, src/engine/overlay-look.js). handleSceneTake branches here, like
  * the WO-572 audio-only looks, before the look pipeline: the on-air look, its bank and the screen's live look on PGM
  * are left alone. A preview take stages the overlay over whatever PRV shows and becomes PRV's look, so the next
- * staging diffs it away like any other look.
+ * staging diffs it away like any other look. Stop plays a PGM overlay out (overlay-look-live.js).
  */
 
 'use strict'
 
-const { JSON_HEADERS, jsonBody } = require('./response')
+const { JSON_HEADERS, jsonBody, parseBody } = require('./response')
 const liveSceneState = require('../state/live-scene-state')
 const { takeOverlayLook } = require('../engine/overlay-look')
+const { stopOverlayLook, getAll: getOverlayLive } = require('../engine/overlay-look-live')
 const { shouldFollowerSkipLocalPgmAmcp } = require('../replication/amcp-fanout')
 const { stripEphemeralTakeFields, resolvePreviewChannel, isPreviewTakeTarget, getRouteMap } = require('./routes-scene-shared')
 
@@ -66,4 +67,35 @@ async function handleOverlayLookTake(b, ctx, channel, inc) {
 	}
 }
 
-module.exports = { handleOverlayLookTake }
+/**
+ * POST /api/scene/overlay/stop `{ channel | mainIdx, sceneId? }` — the deck's stop: the overlay plays its outro (CG STOP)
+ * and its hosts are cleared. Without `sceneId` every overlay on that PGM channel goes. Answers once the outro started.
+ * @param {object} body
+ * @param {object} ctx
+ */
+async function handleOverlayLookStop(body, ctx) {
+	const b = parseBody(body) || {} // the router hands the raw JSON text
+	const routeMap = getRouteMap(ctx)
+	let channel = parseInt(String(b.channel ?? ''), 10)
+	if (!Number.isFinite(channel) && Number.isFinite(Number(b.mainIdx))) {
+		channel = Number(routeMap.programChannels?.[Number(b.mainIdx)])
+	}
+	if (!Number.isFinite(channel) || channel < 1) {
+		return { status: 400, headers: JSON_HEADERS, body: jsonBody({ error: 'channel or mainIdx required' }) }
+	}
+	const sceneId = b.sceneId != null && b.sceneId !== '' ? String(b.sceneId) : undefined
+	const live = getOverlayLive()[String(channel)] || []
+	if (!live.some((e) => sceneId == null || e.sceneId === sceneId)) {
+		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, stopped: [], liveOverlay: getOverlayLive() }) }
+	}
+	const done = stopOverlayLook({ amcp: ctx.amcp, self: ctx, channel, sceneId })
+	done.catch((e) => ctx.log?.('warn', `[overlay-look] stop ch=${channel}: ${e?.message || e}`))
+	ctx.log?.('info', `[overlay-look] stop ch=${channel} look=${sceneId ?? '*'}`)
+	return {
+		status: 200,
+		headers: JSON_HEADERS,
+		body: jsonBody({ ok: true, stopped: live.map((e) => e.sceneId).filter((id) => sceneId == null || id === sceneId) }),
+	}
+}
+
+module.exports = { handleOverlayLookTake, handleOverlayLookStop }

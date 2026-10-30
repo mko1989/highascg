@@ -1,7 +1,7 @@
 # WO-858 — Godot as the live-visuals engine: audio analysis → visuals (FlowKit, audio parts), relayed to CasparCG
 
 **Area:** engine, audio, godot-client
-**Status: OPEN — report written (30.10), nothing built**
+**Status: OPEN — report written (30.10), owner's 5 audio links + FlowKit asset page evaluated (30.10), nothing built**
 
 Owner, 30.10: "has the report about using godot for creating audio reactive visuals been made?"
 
@@ -24,7 +24,7 @@ GitHub on 30.10, **[estimate]** my order of magnitude, nothing measured on this 
 |---|---|
 | Can the existing shaders be shown from Godot easily? | **Mostly yes, not "for free".** Two routes (§5): a text translator to a `canvas_item` shader, or a real-GLSL compute wrapper. Neither is proven. P0 gates it on a pass rate over 20 shaders. Lost or re-done: the 6 multi-pass ones (hand-built viewport chains), the beat knobs (re-implemented), the thumbnailer |
 | Where does audio come from? | The server's existing `audio_fft` WS frame (FFT, waveform, RMS, bands, beat). One audio truth. Not Godot's microphone path (§1) |
-| Audio "parts" project | **Not found on the box.** Placeholder in §3. The integration is designed generically as named feature buses, so whichever project it is plugs in as one more source |
+| Audio "parts" project | **Owner sent 5 links (30.10), evaluated in §3.2: none is a Godot audio classifier.** Two are not analysers at all (BarelyMusician = synth, Resonate = playback), one is a Reddit post on Godot 4.3 adaptive *playback* (post itself unread), one is a thin offline librosa script (volume + beat flags), one (music-reactive-lighting) is a Python live+file MIR engine with mood/energy/harmonic-percussive split, in-process only. Use its ideas for `energy`/`mood` buses, not its code as a dependency; kick/snare/vocals "parts" still need our own onsets (§3.3) or stems. Integration stays generic named feature buses |
 | Visual flow programming | FlowKit: MIT, Godot 4.5+, editor-authored `.tres` event sheets, young. Usable for audio→visual rules with a custom provider pack (§4). It is the rules layer, not the render engine |
 | Recommendation | Build it, detached, as a separate Godot "VJ" process. Start with a 3-day P0 with a pass/fail test (§9) |
 
@@ -124,16 +124,42 @@ Godot plays only Theora, so clips stay in Caspar and re-enter as `pgmN`/`chN`/`i
 | Downbeat / bar | no | P2: `n` modulo 4 with a "bar one" tap |
 | Kick / snare / hats / vocals / pads, sections | no | the owner's project, or §3.3 |
 
-### 3.2 The owner's audio-analysis project: not found
+### 3.2 The owner's links (30.10)
 
-Searched, 30.10: `~/Downloads` (listing and zips), `~/bridge`, `~/Documents`, `~/show`, `~/highascg/godot` (client, extensions, retro, spikes,
-`addons/`: only `hshm`), `~/highascg/work` for stem/essentia/aubio/classif/flowkit text, and any `.gd`/`plugin.cfg`/`.gdextension`/`.zip` newer
-than 27.10. Nothing is an audio analyser. `~/Downloads/kategoria` is 21 award-category videos and `~/Downloads/visuale` is two `.mov` files
-(7 zips): media, not code.
+First pass (before the links): `~/Downloads` (listing and zips), `~/bridge`, `~/Documents`, `~/show`, `~/highascg/godot` (client, extensions,
+retro, spikes, `addons/`: only `hshm`), `~/highascg/work` and any `.gd`/`plugin.cfg`/`.gdextension`/`.zip` newer than 27.10 held no audio analyser
+(`~/Downloads/kategoria` and `visuale` are media). The owner then answered the open question with five links. Read on 30.10; nothing was
+installed or run. Labels as above; **[gh]** = GitHub API / raw files, **[doc]** = asset-library page or Godot docs.
 
-> **Owner's project: `<link needed>`.** Please send the GitHub / Asset Library URL (or the path on the box). Questions that decide the
-> integration: is it a Godot addon (GDScript/GDExtension) or an external process? Real time, or offline per file? Which classes does it output?
-> Licence? Until then everything below is generic, and none of it assumes a particular repo.
+**Bottom line: none of the five is a ready "categorise audio into parts" classifier for Godot.** Only #5 analyses audio live and also extracts
+mood/energy; it is Python, in-process, and Windows-only for live capture as shipped.
+
+| Question | 1. BarelyMusician (asset 4958) | 2. Reddit "Adaptive music made simple..." | 3. Resonate (asset 4673) | 4. kessoning/Audio-Offline-Analysis | 5. CanYuzbey/music-reactive-lighting |
+|---|---|---|---|---|---|
+| What it is | Real-time music **generation** engine (oscillator instruments + beat-scheduled performers). Asset page: "generating and playing musical sounds from scratch"; "experimental, may contain bugs" [doc, gh] | **Post not read:** reddit.com refused WebFetch and a web search did not surface it. Title/URL slug only: Godot 4.3's new adaptive-music feature. The class it must mean is `AudioStreamInteractive` ("Audio stream that can playback music interactively, combining clips and a transition table") [doc: [class page](https://docs.godotengine.org/en/stable/classes/class_audiostreaminteractive.html)] | Sound/music **management** addon: pooled `AudioStreamPlayer`s, 2D/3D detection, polyphony, "stemmed music tracks", crossfading; `SoundManager` + `MusicManager` [doc, gh] | Python scripts "for beat detection and sound-reactive animation... offline"; README says explicitly: no real-time analysis. Built to feed Processing / openFrameworks / Stable Diffusion Deforum keyframes [gh] | Python "music-reactive lighting system": MIR pipeline (librosa HPSS, onset, BPM, key, mood) mapped to RGB + brightness for a desktop player UI (pygame / customtkinter) [gh] |
+| Author, repo | anokta, [github.com/anokta/barelymusician](https://github.com/anokta/barelymusician), 52★, created 2018, pushed 30.10.2026 [gh] | r/godot user (unread) | WidgitLabs, [gitlab.com/widgitgaming/godot/resonate](https://gitlab.com/widgitgaming/godot/resonate), 6★, created 12.01.2026, last activity 28.03.2026. Its README links asset **2546** as its Asset Library entry; the owner's link is **4673** [gh, doc] | kessoning, 7★, created 13.05.2023, last push 30.09.2023 [gh] | CanYuzbey, 1★, created 20.01.2026, last push 14.03.2026 [gh] |
+| Licence | MIT [doc, gh] | n/a | MIT [doc, gh] | MIT [gh] | MIT [gh] |
+| Godot version | 4.6 (asset page) [doc] | 4.3+ (class added in the 4.3 cycle; the doc page does not state it, PR #64488 per a web search) | 4.4 on the asset page; README: builds for 4.3+ [doc, gh] | none, not a Godot project (a Processing example only) [gh] | none, not a Godot project [gh] |
+| Language | C++ core, **GDExtension** for Godot; repo also holds C#, JS, 7.6 KB GDScript [gh] | engine feature (resource, no addon) | addon; language not checked (source not read) | Python (librosa 0.8.1, moviepy, numpy 1.21 pinned) + a Processing sketch [gh] | Python 3.12+; numpy 2.4.1, librosa 0.11.0, scikit-learn 1.8.0, pygame, customtkinter, `pyaudiowpatch` (Windows WASAPI loopback) [gh] |
+| Live or offline | **Neither: it analyses nothing.** It makes sound | **Neither: playback.** The docs page has no level, spectrum or beat analysis; beats/bars appear only as transition points [doc] | **Neither: playback.** Stems are tracks to play and fade, not analysed | **Offline only** (whole file to text) [gh] | **Both.** `app.ui.live_player`: WASAPI loopback, ~`1/fps` chunks (`chunk_size = sample_rate/fps`) over a 3 s ring, HPSS on a 4096-sample window each chunk. `app.ui.modern_player`: whole file analysed ahead of time, then played back at 60 fps. Live capture is Windows-only as written [gh] |
+| Features ("parts") | none. (Has an instrument/performer clock a generative scene could use) | none | none (stems = pre-split tracks you supply; it does not separate them) | Per-frame **mean-abs volume** (`audio_to_params.py`: mono, abs, mean per video frame, normalised to the file max, user `--formula` run through `eval`) and **beat flags** (`beat_detection.py`: `librosa.beat.beat_track` onsets). No bands, sections, stems, mood [gh] | Loudness (adaptive-normalised RMS), **harmonic/percussive split** (HPSS; not vocals/drums stems), onset (a simple derivative+RMS proxy, fixed floor/ceiling 0.032/0.045, **not** spectral flux), BPM 60-180 via a resonator bank + inter-onset density check, 3 energy bands, `arousal` and `valence` (heuristic from band "exertion" = energy / rolling mean), key (README: Krumhansl-Schmuckler; the key code was not read, `song_key` defaults to "C Maj"), pulse, a "drop boost" dynamics state (`dynamics.py` not read), a 20-track "memory bank" tuning the mood baselines [gh] |
+| Output format | n/a | n/a | n/a | One text file: `0:(0.31),1:(0.28),...` per frame (Deforum keyframe syntax). `beat_detection.py` writes one `i:(1\|0)` line per entry of `range(len(y))`, i.e. **per audio sample at librosa's load rate, not per video frame** (read from source; not run) [gh] | In-process Python `FrameAnalysis(time_sec, rgb, brightness, bpm, bpm_confidence, arousal, valence, raw_rms, onset, key, debug_data)`. The only "output" module read (`lighting/output.py`) prints RGB to the console. **No OSC/WS/UDP/DMX sender seen** in the file list [gh] |
+| Maturity | active, "experimental" | n/a | small; asset v2.4.1 [doc] | stale since 09.2023, pinned 2021 libs, no tests seen | 1★, 5 months, one test file (`tests/test_color.py`); hand-tuned constants; Windows-first |
+| Fit with WO-858 | **None for analysis.** At most a clock/synth if the VJ ever generates sound; Caspar owns audio, so no | **Not relevant to analysis.** Relevant only if Godot *played* music; WO-738 keeps clips in Caspar | **Not relevant to analysis.** Stem playback is useful only for the stems idea in the recommendation below | Weak. See recommendation | Best of the five as a reference for `energy` / `mood` / harmonic-percussive buses |
+
+How each would meet the design (§1.1 server `audio_fft` frame = the one audio truth, §3.3 named buses, §4 FlowKit):
+
+- **#5 live** would need its `pyaudiowpatch` capture replaced by our s16le/48 kHz PCM (the bridge tee, §1.1) and a sender added; as a *second* consumer of the PCM it hits the "Node owns the UDP port" constraint (§1.2 option B: needs its own tee output). Its HPSS-per-chunk cost on this box is **unmeasured**. Its mapping to buses: `onset` -> `onset`, `arousal` -> `energy`, `valence` -> a new `mood` bus, `bpm`/`bpm_confidence` -> cross-check only (the server beat detector, WO-662, stays the beat truth), harmonic/percussive energy -> `tonal` / `perc` buses. It does **not** produce `kick`, `snare`, `hats` or `vocals`.
+- **#5 file mode / #4** fit the "played-back clip" case (§1.4: media clips have no PCM tap, so there is no live FFT for them). A pre-analysis job would write a **JSON timeline keyed by clip time** (`t`, `bus` values, `beats`), and the VJ process would replay it against the clip's playhead. That adds a new input: the clip position from Caspar, plus sync error; not designed here.
+- **FlowKit rules** consume buses, not these projects: any of them only matters through the bus names and event pulses (`On Onset`, `On Section Change`) in §4.
+
+**Recommendation.**
+
+1. **Do not adopt any of the five as a dependency.** None is a Godot addon with a usable classifier, and #5 (the only live one) is Python, Windows-first, 1★ and has no network output.
+2. **Live shows (DM3): build ourselves**, as §3.3/§9 already say: server exports `onset`, `flux`, 6 bands; Godot shapes them into buses. Borrow from #5 (MIT, keep the notice in the repo-root `THIRD_PARTY_NOTICES`) three **ideas** to implement in JS on the server or in `AudioFeatures`: arousal = `0.5*loudness + 0.4*density + 0.1*onset`; "exertion" = band energy / rolling mean for relative mood; a refractory/strobe debounce (its 120 ms) on flash bindings. Constants there are tuned by its author's music; ours need P0 measurement.
+3. **Played clips: offline pre-analysis is valid** and cheap: a node-spawned Python job (librosa, which #4 and #5 both use; whether it is installed on the box is **not checked**) writing a JSON timeline per media file. Use `librosa.beat.beat_track` / HPSS directly rather than #4's scripts (thin wrapper, sample-rate output quirk, stale pins). #5's `TrackAnalyzer.analyze_file` is the template for a richer one (it already returns a per-frame list). For true parts (`vocals`, drums) the options stay the §3.3 stem separators; a cheaper variant, **untested**: owner-supplied pre-split stems played muted in Godot through per-stem `AudioEffectSpectrumAnalyzer` buses (here Resonate's stem layers or plain `AudioStreamSynchronized` would do the playing), at the price of keeping a second player in sync with Caspar.
+4. **#1, #2, #3: out of scope for WO-858.** #2 and #3 are about *playing* music (adaptive/stem playback), which is not analysis and not what the box does (Caspar plays; Godot is silent video, §2). Revisit #2 only if the owner wants Godot to *score* a show; #1 only if Godot ever generates sound.
+5. Open point for the owner (updates §8 Q1): which "parts" matter most, drums as separate hits (needs our onsets or stems), or mood/energy sections (#5-style)? That decides whether P1's "owner's project" item (2-4 d) is the JS port above or a clip pre-analysis job.
 
 ### 3.3 Generic design: feature buses
 
@@ -155,7 +181,7 @@ Source adapters: (1) built-in, from `audio_fft`; (2) **external process** that r
 the same `audio_fft` envelope (additive fields; `player.js` ignores unknown ones); (3) a Godot addon that writes into the buses directly.
 Rule: heavy analysis lives in a process or the node (one set of numbers), shaping lives in Godot.
 
-Likely candidates, none assumed to be the owner's **[gh, 30.10]**:
+Other candidates, not in the owner's list (§3.2 evaluates those) **[gh, 30.10]**:
 
 | Project | What it gives | Licence / maturity | Fit |
 |---|---|---|---|
@@ -175,6 +201,8 @@ classifier would be a sidecar, not a Godot plugin.
 |---|---|
 | What | Event-sheet visual scripting (Clickteam Fusion / Construct style): rows of events -> conditions -> actions, pure GDScript addon |
 | Licence | MIT |
+| Asset Library (owner link, 30.10) **[doc]** | [asset 4506](https://godotengine.org/asset-library/asset/4506) is **the same project**: "FlowKit: Godot Visual Scripting", author LexianDEV, repo link github.com/LexianDEV/FlowKit, MIT, Godot 4.5, asset version **v1.0**, category Tools, support Community. Only date shown: 2025-11-25 (submission line; no "modified" date listed). Page says node support is still limited, it has an automatic generator for events/conditions/actions, and the author writes it is "probably best not to use this addon for production yet". |
+| Library vs GitHub | The asset-library copy (v1.0, Nov 2025) is **stale against GitHub** (`plugin.cfg` "2.0", push 23.10.2026, re-checked 30.10: 205★, 10 open issues, 0 releases, 0 tags). **Vendor from a pinned GitHub commit, not from the Asset Library.** The "generator for events, conditions and actions" is worth a look when writing the §4 provider pack (not read beyond the page text) |
 | Godot | README: Godot 4.5+, badge says 4.5; `plugin.cfg` version "2.0". **4.7.2 is untested** |
 | Maturity | Created 21.11.2025, 205★, 10 open issues, pushed 23.10.2026 (a refactor week: sheets migrating to a `flowkit_local` folder). **No tags or releases.** README says generative AI helped; it has a GUT test config |
 | Storage | Sheets are `.tres` resources, edited in a Godot **editor** bottom panel |
@@ -301,7 +329,7 @@ The slider stays the base value, so with no audio the scene still shows the oper
 | FlowKit churn | mid-refactor, no releases | pin a commit, vendor it |
 
 ## 8. Questions for the owner
-1. The audio-analysis project: link or path (§3.2). It decides the feature-bus adapter.
+1. ~~The audio-analysis project~~ answered 30.10 with five links (§3.2); none is a classifier. Remaining: which "parts" matter (separate drum hits, vocals, or mood/energy sections), and do you have pre-split stems? That decides the feature-bus adapter (§3.2 recommendation 5).
 2. Source material: a live band through the DM3 (FFT source exists), or played-back tracks (needs the §1.4 audio tap or per-track pre-analysis)?
 3. Is 1080p render with Caspar upscaling acceptable for a 4K canvas?
 4. Retire the HTML shader path only after parity (this report's order), or on a date?
@@ -359,9 +387,16 @@ Research only. Read WO-738, 742, 743, 744, 266, 335, 586, 606, 662; the audio ca
 publisher; the Godot class, shader and preprocessor pages cited; FlowKit's README, `plugin.cfg`, file tree, a provider and the event base
 class through `gh api`; candidate analysers' licences, stars and push dates through `gh api`. Counted the `data/shaders` configs by
 feature. Searched `~/Downloads`, `~/bridge`, `~/Documents`, `~/show` and `~/highascg` for the owner's audio project. No file changed except this WO.
+Later 30.10: evaluated the owner's five links and the FlowKit asset page (§3.2, §4): asset pages 4958, 4673, 4506 by WebFetch; GitHub/GitLab
+metadata via `gh api`/curl; READMEs of kessoning/Audio-Offline-Analysis and CanYuzbey/music-reactive-lighting, `audio_to_params.py`,
+`beat_detection.py`, and in the latter `live_analyzer.py`, `onset.py`, `tempo.py` (first 150 lines), `emotion.py`, `features.py`,
+`output.py`, `FrameAnalysis`; BarelyMusician and Resonate READMEs; the `AudioStreamInteractive` class page. Nothing cloned, installed or run.
 
 ## What was VERIFIED
 - Repo claims: read at the cited lines. FlowKit and analyser facts: read from GitHub on 30.10.
 - Godot docs did not describe: microphone device choice, audio latency, mutable shader globals, or `texelFetch` on that page; marked unverified.
-- Not verified: every GPU and latency figure, the converter pass rate (R1 and R2), FlowKit on 4.7.2, the audio-tap design, and what the
-  owner's audio project is.
+- Not verified: every GPU and latency figure, the converter pass rate (R1 and R2), FlowKit on 4.7.2, the audio-tap design.
+- Link evaluation (§3.2): **the Reddit post (link 2) was not read** (reddit.com blocked the fetch tool; a web search did not find it), so
+  its row rests on the URL slug and the Godot class page. Not read: Resonate's source and language, `dynamics.py`, the key detector and
+  `tempo.py` past line 150 in music-reactive-lighting, Godot's `AudioStreamSynchronized`/`Playlist` pages. Not run: any script. Not
+  checked: whether librosa is installed on the box, HPSS cost per chunk, and the BarelyMusician GDExtension (asset page and README only).

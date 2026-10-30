@@ -145,8 +145,8 @@ export function appendLowerThirdGroup(root, { sceneId, layerIndex, layer, stateS
 			<span class="inspector-lt-metric__label">Scale %</span>
 			<input type="number" class="inspector-lt-num" id="lt-render-scale" min="25" max="300" step="5" value="${escapeAttr(String(cfg.renderScale ?? 100))}" />
 		</label>
-		<label class="inspector-lt-metric">
-			<span class="inspector-lt-metric__label">Hold s</span>
+		<label class="inspector-lt-metric" title="Seconds on screen before it plays out and is taken off automatically. 0 = stays until stopped.">
+			<span class="inspector-lt-metric__label">Hold duration (s)</span>
 			<input type="number" class="inspector-lt-num" id="lt-display-sec" min="0" step="0.5" value="${escapeAttr(String(cfg.displayDurationSec ?? 10))}" />
 		</label>
 	`

@@ -7,7 +7,7 @@ modules' `register(routes)`; `*` = wildcard, the module matches the rest). **han
 module's handler (fallthrough chain in `src/api/router-dispatch.js`); method `*` = any. Bodies and replies: the
 module's JSDoc and the topic pages in `docs/wiki/api/`.
 
-532 routes.
+533 routes.
 
 | Method | Path | How | Module |
 |---|---|---|---|
@@ -348,6 +348,7 @@ module's JSDoc and the topic pages in `docs/wiki/api/`.
 | POST | `/api/scene/lower-third` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/new-layer` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/new-look` | handler | `src/api/routes-scene.js` |
+| POST | `/api/scene/overlay/stop` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/preview-push` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/take` | handler | `src/api/routes-scene.js` |
 | POST | `/api/scene/take-look` | handler | `src/api/routes-scene.js` |

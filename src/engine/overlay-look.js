@@ -5,8 +5,9 @@
  * (owner 30.10: "they should not change the pgm but rather display over it on a cg layer"). A look that also carries
  * a video source is a normal look and takes the normal way.
  *
- * PGM overlay hosts are remembered per channel so a later normal take does not clear them as orphans
- * (scene-take-lbg.js adds them to its incoming-template set); a normal look that declares the same host takes it over.
+ * PGM overlays on air are tracked in overlay-look-live.js: their hosts survive a later normal take (scene-take-lbg.js
+ * adds them to its incoming-template set; a normal look that declares the same host takes it over), they are cleared
+ * once played out (the lower third's hold duration) and the deck's stop button plays them out.
  *
  * Lower thirds animate themselves out after `displayDurationSec`. On a preview bus that only hides what the operator
  * is editing (the look editor shows PRV), so PRV staging holds them (`holdLowerThirdCgData`) — for overlay and
@@ -24,9 +25,7 @@ const {
 } = require('./scene-template-cg')
 const { isShaderCgName, isLowerThirdCgName, TEMPLATE_CG_OVERLAY_LAYER_BASE } = require('./cg-routing')
 const { getResolvedFillForSceneLayer } = require('./scene-native-fill')
-
-/** channel → Map(host layer → overlay look id) @type {Map<number, Map<number, string>>} */
-const _pgmOverlayHosts = new Map()
+const live = require('./overlay-look-live')
 
 /**
  * The CG host an overlay layer plays on, or null when the layer is not overlay template CG.
@@ -82,28 +81,9 @@ function holdLowerThirdCgData(data, cgName) {
 }
 
 /**
- * @param {number} channel
- * @returns {Set<number>} the PGM overlay hosts a normal take must leave alone
- */
-function pgmOverlayHosts(channel) {
-	return new Set(_pgmOverlayHosts.get(Number(channel))?.keys() || [])
-}
-
-/**
- * A normal look that declares one of these hosts replaced the overlay there.
- * @param {number} channel
- * @param {Iterable<number>} hosts
- */
-function releasePgmOverlayHosts(channel, hosts) {
-	const m = _pgmOverlayHosts.get(Number(channel))
-	if (!m) return
-	for (const h of hosts) m.delete(Number(h))
-}
-
-/**
  * Lines that play an overlay look's templates on `channel` (no AMCP is sent).
  * @param {{ channel: number, scene: object, self: object, preview?: boolean, forceCut?: boolean }} opts
- * @returns {Promise<{ lines: string[], hosts: number[] }>}
+ * @returns {Promise<{ lines: string[], hosts: number[], holds: number[] }>} holds: seconds each template stays up (0 = held)
  */
 async function buildOverlayLookLines({ channel, scene, self, preview = false, forceCut = false }) {
 	const t = normalizeTransition(scene?.defaultTransition, forceCut || preview)
@@ -111,6 +91,7 @@ async function buildOverlayLookLines({ channel, scene, self, preview = false, fo
 	const fade = fadeDur > 0 ? { fadeDurFrames: fadeDur, fadeTween: t.tween } : {}  // the look's transition fades the CG host in
 	const lines = []
 	const hosts = []
+	const holds = []
 	const sorted = scene.layers.filter(layerHasContent).sort((a, b) => (a.layerNumber || 0) - (b.layerNumber || 0))
 	for (const layer of sorted) {
 		const spec = buildSceneTemplateCgSpec(layer, layer.source.value, self)
@@ -119,26 +100,28 @@ async function buildOverlayLookLines({ channel, scene, self, preview = false, fo
 		const fill = await getResolvedFillForSceneLayer(self, layer, channel, scene)
 		lines.push(...buildSceneTemplateCgAmcpLines(channel, layer.layerNumber, spec, { ...fade, fill }))
 		hosts.push(resolveTemplateCgHostLayer(layer.layerNumber, spec.cgName))
+		holds.push(live.templateHoldSec(spec.cgName, spec.data))
 	}
-	return { lines, hosts }
+	return { lines, hosts, holds }
 }
 
 /**
- * Play an overlay look on `channel`. On a PGM channel its hosts are remembered (see pgmOverlayHosts).
+ * Play an overlay look on `channel`. On a PGM channel it goes on air (overlay-look-live.js): taken out after its hold.
  * @param {{ amcp: object, channel: number, scene: object, self: object, preview?: boolean, forceCut?: boolean }} opts
  */
 async function takeOverlayLook(opts) {
 	const { amcp, channel, scene, self, preview = false } = opts
-	const { lines, hosts } = await buildOverlayLookLines(opts)
+	const { lines, hosts, holds } = await buildOverlayLookLines(opts)
 	const { sendPipOverlayLinesSerial } = require('./pip-overlay')
 	await sendPipOverlayLinesSerial(amcp, lines)
-	if (!preview) {
-		const ch = Number(channel)
-		if (!_pgmOverlayHosts.has(ch)) _pgmOverlayHosts.set(ch, new Map())
-		for (const h of hosts) _pgmOverlayHosts.get(ch).set(h, String(scene?.id ?? ''))
-	}
-	self?.log?.('info', `[overlay-look] ${preview ? 'PRV' : 'PGM'} ch=${channel} look=${scene?.id} hosts=${hosts.join(',')}`)
-	return { lines, hosts }
+	const holdSec = live.lookHoldSec(holds)
+	if (!preview) live.markOverlayLive({ amcp, self, channel, sceneId: String(scene?.id ?? ''), hosts, holdSec })
+	self?.log?.(
+		'info',
+		`[overlay-look] ${preview ? 'PRV' : 'PGM'} ch=${channel} look=${scene?.id} hosts=${hosts.join(',')}` +
+			(preview ? '' : ` hold=${holdSec > 0 ? `${holdSec}s` : 'until stop'}`),
+	)
+	return { lines, hosts, holds }
 }
 
 module.exports = {
@@ -146,6 +129,6 @@ module.exports = {
 	holdLowerThirdCgData,
 	buildOverlayLookLines,
 	takeOverlayLook,
-	pgmOverlayHosts,
-	releasePgmOverlayHosts,
+	pgmOverlayHosts: live.pgmOverlayHosts,
+	releasePgmOverlayHosts: live.releasePgmOverlayHosts,
 }

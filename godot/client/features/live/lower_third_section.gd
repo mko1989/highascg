@@ -14,8 +14,13 @@ const P := preload("res://features/live/pip_model.gd")
 const RosterSection := preload("res://features/live/lt_roster_section.gd")
 const Presenters := preload("res://features/live/lt_presenters_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
-const NUMS := [["titleFontSize", "Title px", 8, 200, 1], ["subtitleFontSize", "Sub px", 8, 120, 1],
-	["renderScale", "Scale %", 25, 300, 5], ["displayDurationSec", "Hold s", 0, 3600, 0.5]]
+## WO-860: on PGM the lower third plays out after this and its look is taken off (overlay looks: the deck ■ comes back to ▶).
+const HOLD_TIP := "Seconds on screen before it plays out and is taken off automatically.\n0 = stays until stopped (the deck card's ■)."
+## [field, label, min, max, step, suffix, tooltip]
+const NUMS := [["titleFontSize", "Title px", 8, 200, 1, "", ""], ["subtitleFontSize", "Sub px", 8, 120, 1, "", ""],
+	["renderScale", "Scale %", 25, 300, 5, "", ""]]
+## First row of the section (owner 30.10 "add hold duration in the inspector": it sat below the fold, after the sizes).
+const HOLD := ["displayDurationSec", "Hold duration", 0, 3600, 0.5, "s", HOLD_TIP]
 
 var _scene_id := ""
 var _main := 0
@@ -77,6 +82,7 @@ func _build() -> void:
 	var g := GridContainer.new()
 	g.columns = 2
 	add_child(g)
+	_num(g, HOLD)
 	var lines := {}
 	for k in [["title", "Title", "Primary line"], ["subtitle", "Subtitle", "Secondary line"]]:
 		g.add_child(_muted(k[1]))
@@ -124,15 +130,7 @@ func _build() -> void:
 	g.add_child(_muted("Position"))
 	g.add_child(_select(["Left", "Center", "Right"], LT.POSITIONS.find(str(_cfg.position)), func(i: int) -> void: _change({"position": LT.POSITIONS[i]})))
 	for n in NUMS:
-		g.add_child(_muted(n[1]))
-		var sp := SpinBox.new()
-		sp.min_value = n[2]
-		sp.max_value = n[3]
-		sp.step = n[4]
-		sp.value = float(_cfg.get(n[0], LT.DEFAULTS[n[0]]))
-		var field: String = n[0]
-		sp.value_changed.connect(func(v: float) -> void: _change({field: LT._jsv(v)}))
-		g.add_child(sp)
+		_num(g, n)
 	for c in [["textColor", "Text"], ["primaryColor", "Accent"]]:
 		g.add_child(_muted(c[1]))
 		var cp := ColorPickerButton.new()
@@ -188,6 +186,24 @@ func _select(items: Array, sel: int, cb: Callable) -> OptionButton:
 	o.select(maxi(0, sel))
 	o.item_selected.connect(cb)
 	return o
+
+
+## One labelled SpinBox row: n = [field, label, min, max, step, suffix, tooltip].
+func _num(g: GridContainer, n: Array) -> void:
+	var lbl := _muted(n[1])
+	lbl.tooltip_text = n[6]
+	lbl.mouse_filter = Control.MOUSE_FILTER_PASS  # labels ignore the mouse by default: no tooltip
+	g.add_child(lbl)
+	var sp := SpinBox.new()
+	sp.min_value = n[2]
+	sp.max_value = n[3]
+	sp.step = n[4]
+	sp.suffix = n[5]
+	sp.tooltip_text = n[6]
+	sp.value = float(_cfg.get(n[0], LT.DEFAULTS[n[0]]))
+	var field: String = n[0]
+	sp.value_changed.connect(func(v: float) -> void: _change({field: LT._jsv(v)}))
+	g.add_child(sp)
 
 
 func _muted(text: String) -> Label:

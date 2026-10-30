@@ -92,7 +92,7 @@ describe('WO-860 overlay looks', () => {
 	it('the take pipeline wires the protection and the PRV hold', () => {
 		const src = (p) => fs.readFileSync(path.join(__dirname, '../..', p), 'utf8')
 		const lbg = src('src/engine/scene-take-lbg.js')
-		assert.match(lbg, /releasePgmOverlayHosts\(channel, incomingTemplateHostLayers\)/)
+		assert.match(lbg, /releasePgmOverlayHosts\(channel, incomingTemplateHostLayers, self\)/)
 		assert.match(lbg, /for \(const h of pgmOverlayHosts\(channel\)\) incomingTemplateHostLayers\.add\(h\)/)
 		assert.match(lbg, /holdTemplates: banklessTake/)
 		assert.match(src('src/engine/scene-take-lbg-jobs.js'), /if \(templateCg && holdTemplates\) templateCg\.data = holdLowerThirdCgData/)

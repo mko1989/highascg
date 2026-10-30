@@ -64,6 +64,11 @@ async function handlePost(path, body, ctx) {
 		if (!ctx.amcp) return null
 		return handleAudioOnlyLookStop(body, ctx)
 	}
+	if (path === '/api/scene/overlay/stop') {
+		// WO-860: the deck's stop on an on-air overlay look (lower third) — plays it out
+		if (!ctx.amcp) return null
+		return require('./routes-scene-take-overlay').handleOverlayLookStop(body, ctx)
+	}
 	if (path === '/api/scene/live/preview') {
 		return handlePreviewLiveRegister(body, ctx)
 	}

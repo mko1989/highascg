@@ -16,6 +16,7 @@ const LFS := preload("res://features/previs/fixtures/look_fixtures_store.gd")
 const BlankClear := preload("res://features/live/deck_blank_clear.gd")
 const DeckHead := preload("res://features/live/deck_head.gd")
 const Destinations := preload("res://features/live/destinations.gd")
+const DeckOverlay := preload("res://features/live/deck_overlay.gd")
 const CARD_W := 200
 
 signal action_result(text: String, ok: bool)
@@ -211,9 +212,14 @@ func _card(scene: Dictionary, bus: Dictionary) -> Control:
 	var foot := HBoxContainer.new()  # WO-621 N4: web .scenes-card__footer ▶ take · ⚙ edit (CUT left out)
 	foot.add_child(meta)
 	var main := _main_for_card
-	var play := Icons.button("play", "Take live — this look to the screen (PGM)", 12)
-	play.pressed.connect(func() -> void: request_take(id, main, "program"))
-	foot.add_child(play)
+	if DeckOverlay.on_air(Store.get_value(DeckOverlay.PATH), _cm(), main, id):  # WO-860: its lower third is on screen
+		var stop := Icons.button("stop", "Play out — take this lower third off the screen", 12)
+		stop.pressed.connect(func() -> void: stop_overlay(id, main))
+		foot.add_child(stop)
+	else:
+		var play := Icons.button("play", "Take live — this look to the screen (PGM)", 12)
+		play.pressed.connect(func() -> void: request_take(id, main, "program"))
+		foot.add_child(play)
 	var cog := Icons.button("cog", "Edit look", 12)
 	cog.pressed.connect(func() -> void: edit_requested.emit(id, main))
 	foot.add_child(cog)
@@ -270,6 +276,13 @@ func request_take(scene_id: String, main: int, target: String) -> Dictionary:
 	else:
 		action_result.emit("%s refused: %s" % [what, res.error], false)
 	print("[client] take-look %s %s → %s %s" % [target, scene_id, res.status, res.error])
+	return res
+
+
+## WO-860: the card's ■ — the on-air overlay look plays out; ▶ returns with the scene.liveOverlay broadcast.
+func stop_overlay(scene_id: String, main: int) -> Dictionary:
+	var res: Dictionary = await Api.post_json("/api/scene/overlay/stop", DeckOverlay.stop_body(main, scene_id))
+	action_result.emit("Play out ok" if res.ok else "Play out refused: %s" % res.error, res.ok)
 	return res
 
 

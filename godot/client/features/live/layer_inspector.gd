@@ -116,7 +116,7 @@ func show_layer(look_id: String, main_idx: int, layer: Dictionary, index := -1) 
 	main = main_idx
 	_layer = layer
 	visible = not layer.is_empty()
-	if layer.is_empty():
+	if layer.is_empty() and _trim != null:  # null until the Inspector adopts the page (_ready): the editor opens with none
 		_trim.forget()  # the next layer shown starts with Trim folded, even the same one
 	if main_changed:
 		await _load_options()
