@@ -1,7 +1,7 @@
 # WO-830 — LAN hardening: remote crash, injection, secrets (sweep §2, without the auth switch)
 
 **Area:** network
-**Status: IN PROGRESS (30.10) — 830a crash class, 830b injection, 830c secrets DONE offline (new smokes wo830a×3, wo830b, wo830c); root wrapper reinstall + live re-test after node restart pending**
+**Status: IN PROGRESS (30.10) — 830a/b/c done offline and re-tested live on the box after the node restart (§3d); left: the owner's two `sudo install` commands for the root wrapper copies (§2b), which still differ from the repo**
 **Source:** the 29.10 code sweep, `work/sweep-29.10.2026/REPORT.md` §2 (items 1–24). Owner 30.10: *"yes we need better
 auth handling. im putting that off till last … id like it to be hardened"* and *"there are a lot of bugs to fix"*.
 **Related:** WO-811 (the auth switch itself stays there and comes last), REVIEW-2026-08-03, WO-418/419.
@@ -115,3 +115,21 @@ The first is also what `scripts/setup/12-passwordless-sudo.sh` does on setup. Th
 - `node --test tools/smoke/smoke-wo830c-secrets.test.js` (11 tests: payload/autosave pins, stripRedacted, settings POST with/without stored hash, open-redirect table + served script in `vm`, malformed cookie, redaction table, support bundle, SRT 400 through `handlePostRtmp` with mocked AMCP, index.js pin, release guard in a temp git repo) all pass. Repointed (honestly) `smoke-stream-output-ndi-srt` (drop -> refuse) and `smoke-stream-key-redaction` (streamid now masked).
 - Related suites green (96 tests incl. wo261, wo244, wo611, log-record, api-auth, wo619, wo645, wo802...). eslint clean on changed files. Godot headless `run_tests.gd`: 23066 passed, 0 failed; `run-client.sh --check` boot OK.
 - Not verified here: web UI in a browser (needs `npm run build:client` by the coordinator), Godot pane visually.
+
+## 3d. Live re-test on the box (30.10, 16:25; node pid 3932352, restarted 15:57 with these changes)
+
+- **Item 1.** A raw `GET //` WebSocket upgrade to :4200 → `HTTP/1.1 400 Bad Request`.
+- **Item 2.** A 9 MiB frame on `/api/ws`:
+  - the client sees close 1009;
+  - the journal logs `[WS] socket error: Max payload size exceeded`;
+  - node keeps its pid and the API answers 200 afterwards.
+- **Item 3.** Caspar OSC is bound to `127.0.0.1:6251` only (`ss -ulpn`). It was the wildcard before.
+- **Item 7.** `POST /api/screens/label {screenIdx: 1e9}` → 400 `screenIdx must be an integer from 0 to 15`.
+- **Item 19.** A request with a malformed cookie (`%E0%A4%A`) → 200, with no crash.
+- **Items 16–17.** `dist-web` (built 14:01) carries the new Set-password block and the `[REDACTED]` strip.
+- **Not probed live** (offline tests cover them):
+  - 10 caspar-config apply path (a wrong guard would write and apply a Caspar config);
+  - 11 server update; 12 plugins; 13 replication pairing;
+  - the zip, ingest and MVR parsers.
+- **Root copies (§2b):** `cmp` against the installed `/usr/local/lib/highascg/highascg-vcam-modules-up.sh` and
+  `/usr/local/bin/highascg-replication-ssh` → both still differ. The owner's two `sudo install` lines are still pending.
