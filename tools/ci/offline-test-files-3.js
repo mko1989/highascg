@@ -195,6 +195,7 @@ module.exports = [
 	'tools/smoke/smoke-wo842-data-and-config.test.js',
 	'tools/smoke/smoke-wo842-ops-scripts.test.js',
 	'tools/smoke/smoke-wo842-replication.test.js',
+	'tools/smoke/smoke-wo842-last-look-delete.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

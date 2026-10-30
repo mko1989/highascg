@@ -31,6 +31,8 @@ var _last_deck_json := ""
 var _last_deck_at := 0
 var deck_syncs_sent := 0
 var _deck_pending := false
+## WO-842 4h: set when the operator deleted the last look — only then may an empty deck replace the server's
+var deck_emptied_by_delete := false
 
 
 func _ready() -> void:
@@ -59,6 +61,8 @@ func deck_changed() -> void:
 
 func send_deck_sync(force: bool) -> bool:
 	var data := build_deck_payload(Store.project)
+	if deck_emptied_by_delete and (data.get("looks", []) as Array).is_empty():
+		data["allowEmpty"] = true  # WO-842 4h: the server's anti-wipe guard refuses a bare empty deck
 	var json := NetUtil.to_json(data)
 	var now := Time.get_ticks_msec()
 	if not force and json == _last_deck_json and now - _last_deck_at < DECK_ECHO_WINDOW_MS:
@@ -175,5 +179,6 @@ func reset() -> void:
 	_timer.stop()
 	pending = false
 	project_gone = false
+	deck_emptied_by_delete = false
 	_skip_next_sync = false
 	_last_deck_json = ""

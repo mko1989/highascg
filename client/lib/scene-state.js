@@ -36,6 +36,7 @@ export class SceneState {
 		this.activeScreenIndex = 0
 		this.armedScreenIndices = [0]
 		this.scenes = []
+		this.deckEmptiedByDelete = false
 		this.editingSceneId = null
 		this.liveSceneIdByMain = [null, null, null, null]
 		this.liveSceneSnapshotsByMain = [null, null, null, null]
@@ -139,7 +140,7 @@ export class SceneState {
 				}
 			}
 		} catch {}
-		this.scenes = []; this.liveSceneIdByMain = [null, null, null, null]; this.previewSceneIdByMain = [null, null, null, null]
+		this.scenes = []; this.deckEmptiedByDelete = false; this.liveSceneIdByMain = [null, null, null, null]; this.previewSceneIdByMain = [null, null, null, null]
 		this.mainEditorVisible = Persistence.defaultMainEditorVisible()
 		this.mainEditorVisibleScreenCount = 1
 		this.mainEditorVisibilityMigrated = false
@@ -305,6 +306,8 @@ export class SceneState {
 			if (this.previewSceneIdByMain[m] === id) this.previewSceneIdByMain[m] = null
 		}
 		this.lookPresets = this.lookPresets.filter((p) => p.sceneId !== id)
+		// WO-842 4h: the server refuses an empty deck unless the client says it is deliberate (anti-wipe guard)
+		if (!this.scenes.length) this.deckEmptiedByDelete = true
 		this._save()
 	}
 

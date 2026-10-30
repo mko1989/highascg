@@ -401,6 +401,8 @@ func delete_look(scene_id: String) -> bool:
 		return false
 	if LFS.count(scene_id) > 0:
 		LFS.clear(scene_id)
+	if (_scenes_root().get("scenes", []) as Array).is_empty():
+		ProjectSync.deck_emptied_by_delete = true  # WO-842 4h
 	_commit_looks()
 	look_deleted.emit(scene_id)
 	action_result.emit("Look deleted", true)

@@ -102,6 +102,7 @@ export function getCanvasResolutionsEqual(a, b) {
 export function applyPersistedData(state, data) {
 	if (!data || !Array.isArray(data.scenes)) return false
 	state.scenes = data.scenes.map((s) => migrateScene(s))
+	state.deckEmptiedByDelete = false
 	const act = typeof data.activeScreenIndex === 'number' ? data.activeScreenIndex : 0
 	state.liveSceneIdByMain = normalizeMainSceneSlots(data.liveSceneIdByMain)
 	state.previewSceneIdByMain = normalizeMainSceneSlots(data.previewSceneIdByMain)

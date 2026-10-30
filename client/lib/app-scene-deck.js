@@ -14,7 +14,9 @@ export function buildSceneDeckPayload(sceneState) {
 		sceneSnapshots: scenes.map(s => JSON.parse(JSON.stringify(s))),
 		previewSceneId: prv ? String(prv) : null,
 		layerPresets: JSON.parse(JSON.stringify(Array.isArray(sceneState.layerPresets) ? sceneState.layerPresets : [])),
-		lookPresets: JSON.parse(JSON.stringify(Array.isArray(sceneState.lookPresets) ? sceneState.lookPresets : []))
+		lookPresets: JSON.parse(JSON.stringify(Array.isArray(sceneState.lookPresets) ? sceneState.lookPresets : [])),
+		// WO-842 4h: only a user deleting the last look may empty the server deck (a blank/stale tab must not)
+		...(scenes.length === 0 && sceneState.deckEmptiedByDelete === true ? { allowEmpty: true } : {}),
 	}
 }
 
