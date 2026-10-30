@@ -1,5 +1,9 @@
 # WO-86: Device View Routing Matrix
 
+**Area:** web-client, devices-config
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 ## Goal
 Transform the Device View from purely visual node/wire layouts into a professional routing matrix (Dante / Excel style), allowing rapid, dense cross-point assignments.
 

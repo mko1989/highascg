@@ -1,5 +1,6 @@
 # WO-353 — Playlist item rows: minimalism + every trashcan becomes ✕
 
+**Area:** web-client
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 (owner): "the playlist workflow the items
 in the list have teribble spacing. the move dots are huge, then there is some rectangle,
 4characters of the item name, big box for seconds. and big trashcan. minimalizm is the key. the

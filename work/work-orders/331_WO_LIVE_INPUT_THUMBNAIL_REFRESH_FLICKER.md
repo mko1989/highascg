@@ -1,6 +1,7 @@
 # WO-331 — Live-input thumbnails re-fetch on every sources-panel render
 
 **Source:** todos24.07.26 — "Live input seems to periodically refresh it's thumbnail."
+**Area:** media, web-client
 **Status: DONE — implemented 2026-07-24 (commit ecd23c0: passive renders use liveThumbnailCacheBustWindow; force-refresh kept for explicit capture). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 in source). Small, well-bounded client fix.
 

@@ -1,6 +1,6 @@
 # WO-131 — Flow: DeckLink PGM Output
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `decklink:output`, `decklink:input`
 

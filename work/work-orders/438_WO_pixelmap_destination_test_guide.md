@@ -1,5 +1,6 @@
 # WO-438 — Real-world Art-Net test guide for the Pixel Map destination
 
+**Area:** mapping, lighting
 **Status: DONE (2026-08-06 — doc shipped, linked from ARTNET_PIXEL_MAPPING.md; owner QA = follow it for A242.1)**
 
 Owner (todos06.08.26 item 4): "make an md file guide on how is the pixel mapping destination

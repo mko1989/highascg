@@ -1,5 +1,6 @@
 # WO-725 — Cluster autotests: link, master, failover, signed calls, sender choice, timing — sandbox and live
 
+**Area:** testing-ci, network
 **Status: DONE (24.10.26) — `node tools/e2e/run-cluster-e2e.js` green on 2 / 3 / 4 sandbox servers (5 runs) and live on
 this box + .4 (8 pass, 3 sandbox-only skipped, both boxes restored); the 3-server run is in CI (smoke 13/13); two
 sandbox isolation bugs found by it and fixed.**

@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** **Shipped / locked** — verified on NVIDIA multi-head playout box 2026-06-29  
+**Area:** os-iso
+**Status:** DONE — **Shipped / locked** — verified on NVIDIA multi-head playout box 2026-06-29  
 **Priority:** High (operator monitor must confine pointer without breaking multiview / interactive Caspar)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

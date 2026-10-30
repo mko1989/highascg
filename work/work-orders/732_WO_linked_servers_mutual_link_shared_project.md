@@ -1,5 +1,6 @@
 # WO-732 — Linked servers that work as one: mutual link, one shared project, cable the other server from here
 
+**Area:** network
 **Status: DONE (24.10.26; P2 moved to WO-746) — P1 (mutual link) DONE 24.10.26 (offline + live on this box ↔ .4: the half link found live repaired itself, unlink / link round trip from .4); P3a (Devices shows this machine) DONE 24.10.26 (Godot tests + live: this box's kiosk unchanged, a client following .4 showed this machine on top); P3b (edit any linked server from here) DONE 24.10.26 (Godot tests + live Edit / Back on .4 from a client following .4); P2 (shared project) → [WO-746](./746_WO_shared_project_across_linked_servers.md): it replaces the show on both boxes, so the owner says when.**
 
 Owner, 24.10: *"i cant establish a meaningful connection between servers and connect screen destinations etc. my

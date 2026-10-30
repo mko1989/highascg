@@ -1,5 +1,6 @@
 # WO-689 — Godot client crashes on the owner's Mac when the Previs tab opens
 
+**Area:** godot-client
 **Status: OPEN (22.10; does not reproduce on the box; waiting for the Mac crash log / renderer test)**
 
 Owner, 22.10: *"the client crashes when i go into previs"* — *"i meant it crashes on my mac"*. Mac Pro 2020, Intel

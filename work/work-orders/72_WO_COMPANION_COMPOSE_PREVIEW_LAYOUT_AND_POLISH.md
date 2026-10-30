@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
+**Area:** companion
 **Status:** In progress — Phases A, B, C, E implemented (2026-06-28); Phase D deferred  
 **Priority:** Medium (Stream Deck polish + operator control over bandwidth)  
 **Primary repo:** `companion-module-dev/companion-module-highpass-highascg/`  

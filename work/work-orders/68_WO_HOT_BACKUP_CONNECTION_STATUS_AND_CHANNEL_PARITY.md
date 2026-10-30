@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress — v1 shipped 2026-06-27 (refresh API + inspector + channel parity summary); Caspar INFO parity gate deferred  
 **Priority:** High (operators see “connected” after restart but replication is stale; no peer visibility on follower)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

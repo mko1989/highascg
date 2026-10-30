@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20650/0 + --check; box: layer colours set, shown, saved in the project and reset. Owner QA: a fixture type's Body colour on the live rig.**
-
 # WO-641 — Previs model colours (MVR layers, GDTF fixture types); "Visualise console" renamed
+
+**Area:** godot-client
+**Status: DONE (2026-10-21) — Godot --test 20650/0 + --check; box: layer colours set, shown, saved in the project and reset. Owner QA: a fixture type's Body colour on the live rig.**
 
 Owner, 21.10: *"i should be able to change at least colors of the models, some of the heads got black from gdtf but
 most of the scene is default whiteish"*. Also: *"does the previs takes artnet input? it should."* and *"visualise

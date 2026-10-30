@@ -1,5 +1,6 @@
 # WO-478/479/480 — device view: stale after Add, cables ignore the inspector, DeckLink inspector
 
+**Area:** web-client, devices-config
 **Status: DONE (11.08.2026, verified: offline suite 1957/1955 pass/0 fail/2 skip, WO-313 guard
 repointed and strengthened, dist-web rebuilt) — owner QA: all four in the GUI**
 

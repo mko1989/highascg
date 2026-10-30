@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Deferred
+**Area:** engine
+**Status:** OPEN — Deferred
 **Prerequisites:** Backup of `src/api/router.js` exists. (Unified router refactor deferred pending concrete need; current dispatch working.)
 
 ## 1. Objective

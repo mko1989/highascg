@@ -1,8 +1,9 @@
 # WO-411 — Test pattern: resolution repeated in the Output line + bouncing-character bump box (todos03.08 additions)
 
+**Area:** web-client, video-io
 **Status: DONE (2026-08-03 — suite green, service restarted; owner eyeball owed: pop the LED test pattern once)**
 **Priority:** Normal (owner todos03.08.26 lines 11–12, added after WO-408's first fix)
-**Source:** `work/work-orders/todos03.08.26`
+**Source:** `work/archive/todos/todos03.08.26`
 **Related:** WO-408 (first half of the double-resolution fix — the top meta line)
 
 ## 1. Investigation

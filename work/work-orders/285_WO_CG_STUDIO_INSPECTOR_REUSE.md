@@ -1,5 +1,9 @@
 # WO-285 — CG studio should reuse the existing inspector; box size options missing
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "the cg studio should use the existing inspector for its preferences.
 the options are missing size for the boxes. only weigth."
 

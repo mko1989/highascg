@@ -1,9 +1,10 @@
 # WO-201 — Multiview apply-chain deadlock (rejected promise poisons the queue) + compose preview stuck at ~3 fps
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** mapping
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** HIGH (multiview un-applyable until restart; preview fps far below setting)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEWNEW): webui hung while editing multiview; after layout reset the Caspar output still shows the old MV; compose preview ~2-3 fps though set to 25.
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEWNEW): webui hung while editing multiview; after layout reset the Caspar output still shows the old MV; compose preview ~2-3 fps though set to 25.
 **Related:** WO-190 (introduced the chain), WO-156 (apply paths), WO-144/159/198 (compose pipeline).
 
 ---

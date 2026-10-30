@@ -1,9 +1,12 @@
-**Status: IMPLEMENTED (2026-09-12) — Parts A, B, C landed, plus a same-day follow-up ("fill the
+# WO-572 — audio review mixer button width and still image false positive
+
+**Area:** audio, web-client
+**Status: DONE — IMPLEMENTED (2026-09-12) — Parts A, B, C landed, plus a same-day follow-up ("fill the
 gaps") closing 3 of the 4 known v1 gaps Part C shipped with. Offline suite 2434/2436 (2 legitimate
 skips — local-server-spawn tests that always skip under CI=1), client build clean. Not yet
 kiosk-reloaded/service-restarted on the box (live show, owner-QA owed for everything below).**
 
-**Source:** `work/work-orders/todos12.09.26` (owner, verbatim):
+**Source:** `work/archive/todos/todos12.09.26` (owner, verbatim):
 > i need you to do a review and fixing of the audio implementation and settings in highascg.
 > while youre at it in the compact audio mixer in bottom right the routing buttons are stretched
 > to fill width instead of being pretty small.

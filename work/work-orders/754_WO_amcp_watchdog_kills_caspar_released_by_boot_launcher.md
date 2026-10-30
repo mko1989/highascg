@@ -1,5 +1,6 @@
 # WO-754 — The AMCP watchdog kills the Caspar the start-up launcher just released
 
+**Area:** amcp, os-iso
 **Status: DONE (25.10.26) — replay test fails before / passes after; live A/B on .4: release code killed the released Caspar, the fix did not. .4 keeps the release file until the owner updates it.**
 
 Found by WO-753 (A9: cold boot of .4 on Ubuntu 26.04).

@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** video-io, web-client
 **Status:** In progress — Phase A–C shipped 2026-06-29  
 **Priority:** High (operators see empty stream log after go-live; spurious Apply & restart blocks show prep)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

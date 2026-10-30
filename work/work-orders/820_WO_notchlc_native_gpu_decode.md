@@ -1,5 +1,6 @@
 # WO-820 — NotchLC: native GPU decode in Caspar (spike + build)
 
+**Area:** caspar-build, media
 **Status: DONE (29.10, verified on the box: bit-exact offline mirror, PRINT vs FFmpeg max 2/255; frontex_big real-content check: 131 NotchLC files in 2 variants, e2e looks on PGM, stress tests; 2 bugs found and fixed — payload cap and GL pool growth) — deployed binary edd5c8e7; patch `caspar/patches/wo820-notchlc-gpu.patch` regenerated (branch `notchlc`, owner 29.10: separate branch)**
 
 Owner (29.10): "content creators favour notch vs hap lately thats why id like the native handling of notchlc."

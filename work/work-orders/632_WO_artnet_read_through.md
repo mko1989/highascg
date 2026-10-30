@@ -1,6 +1,7 @@
 # WO-632 — Art-Net read-through: the follow backup starts from the console's values
 
-**Status: 🟡 DONE on the box 20.10 (fake console → box → output: pass-through, fade to tracking and back, console
+**Area:** lighting, tracking-vr
+**Status: DONE — 🟡 DONE on the box 20.10 (fake console → box → output: pass-through, fade to tracking and back, console
 loss held; smoke 9/9, Godot tests); owner: patch a real console's universes to the box and run a handover**
 
 Owner note (next.md): "can the artnet value be read before its changed, so it aligns with the console values until it

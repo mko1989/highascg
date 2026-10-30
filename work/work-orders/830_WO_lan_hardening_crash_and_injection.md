@@ -1,5 +1,6 @@
 # WO-830 — LAN hardening: remote crash, injection, secrets (sweep §2, without the auth switch)
 
+**Area:** network
 **Status: IN PROGRESS (30.10) — 830a crash class, 830b injection, 830c secrets DONE offline (new smokes wo830a×3, wo830b, wo830c); root wrapper reinstall + live re-test after node restart pending**
 **Source:** the 29.10 code sweep, `work/sweep-29.10.2026/REPORT.md` §2 (items 1–24). Owner 30.10: *"yes we need better
 auth handling. im putting that off till last … id like it to be hardened"* and *"there are a lot of bugs to fix"*.

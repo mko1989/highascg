@@ -1,5 +1,6 @@
 # WO-350 — UI polish (bars/heights) + timeless duration in the Playlists compact
 
+**Area:** web-client
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 additions (owner, mid-day).
 
 ## Items

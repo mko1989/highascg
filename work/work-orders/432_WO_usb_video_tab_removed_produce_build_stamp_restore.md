@@ -1,5 +1,6 @@
 # WO-432 — Remove Settings→USB video tab; produce writes BUILD_STAMP; produce restores node_modules
 
+**Area:** os-iso, web-client
 **Status: DONE (2026-08-05 — client rebuilt + kiosk reloaded; suite 1835/0/2, lint 0 errors (216 warn), unwired-exports clean; stamp+restore land on the NEXT produce run)**
 
 Owner 05.08 (three asks):

@@ -1,5 +1,9 @@
 # WO-277 — Loading a project doesn't actually load anything
 
+**Area:** devices-config, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "loading a project doesnt realy load anything."
 
 ## Problem

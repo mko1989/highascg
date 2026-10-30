@@ -1,5 +1,6 @@
 # WO-447 — Screen-consumer vsync defaults OFF (GL sync owns frame pacing)
 
+**Area:** devices-config, engine
 **Status: DONE (06.08.26 — defaults flipped, live config healed, smoke added; Caspar picks up screens 2/4 on the owner's next Apply)**
 
 Owner (mid-session, todos06.08 follow-up): *"remove the vsync on as default for screen

@@ -249,7 +249,7 @@ Same as take PIP: sequential + COMMIT — **Fair**; batch CG+mixin lines when no
 | Route | Rating |
 |-------|--------|
 | `/api/amcp/batch` → `batchSendChunked` | **Optimal** |
-| `/api/amcp/raw-batch` | **Poor** if used for >10 lines | O(n) Caspar RT — debug only ([PERF-D4](../work/work-orders/PERFORMANCE_RUN_CHECK_BULLETIN.md)). |
+| `/api/amcp/raw-batch` | **Poor** if used for >10 lines | O(n) Caspar RT — debug only ([PERF-D4](notes/PERFORMANCE_RUN_CHECK_BULLETIN.md)). |
 
 **Overall:** **Good** API design; misuse of raw-batch is the risk.
 
@@ -330,6 +330,6 @@ Record results in a table under this file if you run the test.
 ## Related documents
 
 - [`amcp-revision.md`](./amcp-revision.md) — command stacks (what is sent)  
-- [`work/work-orders/PERFORMANCE_RUN_CHECK_BULLETIN.md`](./work-orders/PERFORMANCE_RUN_CHECK_BULLETIN.md) — PERF-D4, PERF-E1, PERF-D2  
+- [`work/notes/PERFORMANCE_RUN_CHECK_BULLETIN.md`](./notes/PERFORMANCE_RUN_CHECK_BULLETIN.md) — PERF-D4, PERF-E1, PERF-D2  
 - [`work/work-orders/performance/PF-05-operational-footguns.md`](./work-orders/performance/PF-05-operational-footguns.md) — raw-batch misuse  
 - [`docs/reference/amcp-mapping.md`](../docs/reference/amcp-mapping.md) — API surface

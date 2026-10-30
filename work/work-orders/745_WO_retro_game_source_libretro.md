@@ -1,5 +1,6 @@
 # WO-745 — Game source: a libretro core in an operator window, published as a Live-tab source (WO-738 §9)
 
+**Area:** engine, godot-client
 **Status: DONE (24.10.26) as future development, detachable (see "How to remove"). Proven by
 `tools/e2e/retro-source.sh` (PASS): test core, operator window, shm ring, real X key press reaching the core, ring
 listed as a live source. A real NES core (FCEUmm, built from source) ran a blargg test ROM through the same window.

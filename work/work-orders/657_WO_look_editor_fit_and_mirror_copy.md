@@ -1,5 +1,6 @@
 # WO-657 — Look editor: Fit (zoom) and Mirror copy
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, Godot tests 20745/0; box: Fit snaps a 3-notch zoom back; Mirror copy L11 x 961 → L12 x 859)**
 
 Owner 21.10: "fit button, copy with "mirror" image, meaning if the original layer is on the left the layer will be

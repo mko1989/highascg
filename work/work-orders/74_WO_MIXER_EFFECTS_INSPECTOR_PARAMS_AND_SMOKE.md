@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
-**Status:** Phase A–D shipped (2026-06-28) — dashboard clip effects N/A (not implemented in WO-22)  
+**Area:** engine, web-client
+**Status:** DONE — Phase A–D shipped (2026-06-28) — dashboard clip effects N/A (not implemented in WO-22)  
 **Priority:** **High** — effects are in the Sources browser but param edits must reliably reach Caspar on air  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -1,6 +1,7 @@
 # WO-143 — Script reorganization (in place) + CI script-path guard
 
-**Status:** Complete
+**Area:** process, os-iso
+**Status:** DONE — Complete
 **Priority:** Medium
 **Date:** 2026-07-07
 **Depends on:** WO-141 (commits landed on main first).

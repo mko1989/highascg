@@ -1,5 +1,6 @@
 # WO-369 — Checklist27 UI notes: drop the "Back to GUI" button, retune the wall clock
 
+**Area:** web-client
 **Status: DONE (28.07.26 — both items shipped, built and reloaded on the kiosk; clock verified in a screenshot of the running GUI, owner sign-off on legibility owed).**
 
 Source: `work/checklist27.07.26_manual_verify.md`, notes added by the owner on the 28th (file

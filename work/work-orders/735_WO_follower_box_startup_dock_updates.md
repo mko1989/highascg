@@ -1,5 +1,6 @@
 # WO-735 — A server box whose kiosk follows the master: start-up question, dock and Updates work on the box itself; releases carry the Godot client
 
+**Area:** network, godot-client
 **Status: DONE (24.10.26, live on .4: its own kiosk's Settings → Updates installed release 212858Z on .4 itself; the dock and Caspar came up on 195734Z) — the follower-mode start-up question after a reboot = owner QA**
 
 Owner, 24.10, after the .4 upgrade to Ubuntu 26.04: *"lets run full tests to see if its any different"*, then *"the dock

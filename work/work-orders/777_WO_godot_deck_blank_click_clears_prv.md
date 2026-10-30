@@ -1,5 +1,6 @@
 # WO-777 — Godot looks deck: clicking empty deck space clears the screen's PRV
 
+**Area:** godot-client
 **Status: DONE (26.10) — Godot unit tests 21865 / 0, boot check OK, live probe through real viewport mouse events on
 the box (card click → PRV staged, blank click → PRV '' and Caspar ch 2 has no layers).**
 

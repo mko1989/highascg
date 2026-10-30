@@ -1,5 +1,6 @@
 # WO-736 — CI: every green push to main becomes a server release the second server updates from
 
+**Area:** testing-ci
 **Status: DONE (24.10.26) — smoke 3/3; CI run 40118333157 green in all four jobs; its release `2026-10-24_175927` is tagged at the pushed SHA b82c482a and .4 reports it as the available update.**
 
 Owner, 24.10: *"id like to install automations on github actions, so each push gets a test for integrity and run

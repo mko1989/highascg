@@ -1,5 +1,6 @@
 # WO-655 — Server-built takes letterboxed every look from a 1920×1080 canvas
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, smoke 36/0 + full suite 2880/0; box: PRV clip now inside the editor box at x 961)**
 
 Found while verifying WO-654: after WO-653 the L11 box had the right width, but the PRV picture showed the clip

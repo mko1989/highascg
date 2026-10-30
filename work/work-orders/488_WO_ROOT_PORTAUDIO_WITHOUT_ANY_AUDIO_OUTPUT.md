@@ -1,5 +1,6 @@
 # WO-488 — a root `<portaudio>` block on a box with no audio outputs
 
+**Area:** audio, devices-config
 **Status: DONE (11.08.2026, verified: new smoke 4/4, suite 1976/1974 pass/0 fail/2 skip)**
 
 ## 1. Investigation

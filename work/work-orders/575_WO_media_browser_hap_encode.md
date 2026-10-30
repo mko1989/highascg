@@ -1,6 +1,7 @@
-**Status: IMPLEMENTED (2026-09-21) — offline suite 2486 pass / 0 fail / 2 skip incl. 33 new tests (one runs the REAL ffmpeg), client build clean, and the three formats encoded + measured on a real 5 s slice of `s_INTRO`. NOT yet live-verified through the running app: needs `highascg` service restart (server routes) + kiosk reload, then owner QA (V7).**
-
 # WO-575 — Media browser: "Encode to HAP" for selected files
+
+**Area:** media
+**Status: DONE — IMPLEMENTED (2026-09-21) — offline suite 2486 pass / 0 fail / 2 skip incl. 33 new tests (one runs the REAL ffmpeg), client build clean, and the three formats encoded + measured on a real 5 s slice of `s_INTRO`. NOT yet live-verified through the running app: needs `highascg` service restart (server routes) + kiosk reload, then owner QA (V7).**
 
 Owner request (this session): add a HAP encoder to the media browser. User selects one or many
 files, hits **Encode to HAP**; output goes in the **same folder**, **same file name + `_HAP`

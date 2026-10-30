@@ -1,5 +1,6 @@
 # WO-763 — Clicking a media file flickers the PGM/PRV preview tiles with other sources
 
+**Area:** godot-client, media
 **Status: IN PROGRESS (25.10) — fixed + offline-verified (smoke fails on the old allocator); node restart + owner QA pending**
 
 Owner 25.10: "when i click a media file in sources browser its inspector shows up, but the preview screen flickers

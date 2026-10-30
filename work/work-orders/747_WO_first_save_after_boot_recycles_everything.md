@@ -1,5 +1,6 @@
 # WO-747 — The first settings save after every boot reloads every subsystem (AMCP reconnect + routing)
 
+**Area:** devices-config, amcp
 **Status: DONE (24.10.26: smoke + sandbox probe; live on .4 after release 214554Z: the first save after boot skipped the reload)**
 
 ## Investigation

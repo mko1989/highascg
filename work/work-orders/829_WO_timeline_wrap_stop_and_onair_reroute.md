@@ -1,5 +1,6 @@
 # WO-829 — Timeline-in-look follow-up: loop wrap leaves an ended clip on air; on-air reroute never STOPs program
 
+**Area:** engine
 **Status: DONE (30.10, smoke 4/4 + offline suite 3670/0 fail + live AMCP wire on PGM ch1) — 3a wrap STOP, 3b on-air
 reroute, 3c mid-clip opacity, 3d channel-frame tweens, 3j deleted-layer STOP. Left as is (§4): ROTATION/ANCHOR/GRID/KEYER
 missing from the neutral reset; a shifted layer re-enters at its In point (`startBehaviour`).**

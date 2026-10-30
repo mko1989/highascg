@@ -1,8 +1,9 @@
 # WO-408 — todos03.08 UI batch: live-input label bar color, capture-button unification, test-pattern double resolution
 
+**Area:** web-client
 **Status: DONE (2026-08-03 — suite 1781/0/2, built + kiosk reloaded + service restarted; owner eyeball owed on all three)**
 **Priority:** Normal (owner todos03.08.26 items 4–6)
-**Source:** `work/work-orders/todos03.08.26`
+**Source:** `work/archive/todos/todos03.08.26`
 **Related:** WO-323 (source tiles), WO-346/WO-272 (tile capture buttons), WO-80 (custom xrandr modes — why video-mode ids ARE resolutions on this box)
 
 ## 1. Investigation

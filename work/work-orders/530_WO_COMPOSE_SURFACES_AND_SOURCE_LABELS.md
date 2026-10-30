@@ -1,5 +1,6 @@
 # WO-530 — Compose preview holds one editor's arrangement, and DeckLink labels are doubled/stale
 
+**Area:** web-client, video-io
 **Status: DONE in repo (14.08.2026) — 9 smokes, suite 2209 / 2207 pass / 0 fail / 2 skip. Owner QA owed on the kiosk (§5).**
 **Priority:** High (operator-GUI usability; all three hit on every session)
 **Source:** owner 14.08, three reports in one message:

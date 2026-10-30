@@ -1,8 +1,9 @@
 # WO-536 — A clip with **Loop** ticked restarts from frame 0 instead of resuming at the playhead
 
-**Status: FIXED in repo (14.08.2026) — 12 smokes (4 of them verified to fail without the fix), suite 2263 / 2261 pass / 0 fail / 2 skip. Owner QA owed (§8).**
+**Area:** engine
+**Status: DONE — FIXED in repo (14.08.2026) — 12 smokes (4 of them verified to fail without the fix), suite 2263 / 2261 pass / 0 fail / 2 skip. Owner QA owed (§8).**
 **Priority:** High (black frame on air every resume; the clip plays from the wrong point)
-**Source:** `work/work-orders/todos14.08.26`, two reports that turn out to be one bug:
+**Source:** `work/archive/todos/todos14.08.26`, two reports that turn out to be one bug:
 - line 6: *"when pausing a timeline, jumping the playhead somewhere else and hitting play again results in a black frame before it starts playing. it probably sends another seek, even though the seek was already applied when moving the playhead."*
 - line 12: *"i just changed a clip on timeline that was extended to make it loop multiple times and it doesnt start in correct place in regard to timelines playhead."*
 **Related:** WO-449 (`implicitLoop` — the *other* loop kind, which is correct), WO-523 (clip exchange),

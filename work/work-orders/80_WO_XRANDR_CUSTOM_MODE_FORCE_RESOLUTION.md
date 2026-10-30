@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** mapping, devices-config
 **Status:** In progress — Phase A shipped 2026-06-29  
 **Priority:** High (operators cannot reliably force non-EDID resolutions at cold boot)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

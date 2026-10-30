@@ -1,5 +1,6 @@
 # WO-786 — Haze in the 3D views so the beams read
 
+**Area:** lighting
 **Status: DONE (26.10 — Godot tests + boot check, off-screen renders at no / light / thick haze against the live rig; owner QA = the "Haze" picker in the Previs toolbar)**
 
 Owner, 26.10 (during WO-784):

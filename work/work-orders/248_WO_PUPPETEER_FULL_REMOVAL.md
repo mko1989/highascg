@@ -1,6 +1,7 @@
 # WO-248 — Remove the whole puppeteer branch (thumbnails + DOM smokes to raw CDP, dependency purged)
 
-**Status:** UNBLOCKED, pending scheduling (2026-07-16, WO-257). The original blocker — A247.1
+**Area:** media, testing-ci
+**Status:** DONE — UNBLOCKED, pending scheduling (2026-07-16, WO-257). The original blocker — A247.1
 "mario-over-CDP" proof that `cef-cdp-client.js` could carry CEF interactive input — is now MOOT:
 WO-257 removed the CEF interactive bridge outright (repeated production crash-loops), so there is
 no input path left to prove. `cef-cdp-client.js` itself is unaffected and stays (WO-257 kept it

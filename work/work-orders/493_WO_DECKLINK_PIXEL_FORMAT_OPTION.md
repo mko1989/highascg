@@ -1,12 +1,13 @@
 # WO-493 — DeckLink `<pixel-format>`: WO-487's escape hatch was unreachable, 2160p had no way back
 
+**Area:** video-io, web-client
 **Status: DONE (12.08 — 8 new smokes, suite 2003/2001/0, eslint clean; client built + kiosk reloaded) — owner QA: pick YUV on the 2160p output, Apply, confirm picture returns**
 
 Owner 12.08: *"in one of your fixes you removed the yuv colorspace from the decklink output. this was
 necesery for 2160p output. without that option the output does not show up and also blocks the whole
 channel to display anything on any consumer. add this as an option in decklink outputs inspector."*
 
-Attribution, for the record: the removal was **[WO-487](./487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md)**
+Attribution, for the record: the removal was **[WO-487](./deprecated/487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md)**
 (commit `f57b432`, 11.08), not a change from the 12.08 session. That does not make it less of a
 regression — see §2.
 

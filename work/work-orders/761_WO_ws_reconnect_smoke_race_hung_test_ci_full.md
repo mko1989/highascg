@@ -1,5 +1,6 @@
 # WO-761 — smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung test:ci:full
 
+**Area:** testing-ci
 **Status: DONE (25.10, standalone 5/5 after the fix vs 1/3 before; lint clean)**
 
 ## Investigation

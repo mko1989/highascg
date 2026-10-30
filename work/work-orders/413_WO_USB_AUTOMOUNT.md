@@ -1,11 +1,12 @@
 # WO-413 — USB drives auto-mount on plug-in (todos03.08.26 addition)
 
+**Area:** os-iso, media
 **Status: DONE pending owner QA (2026-08-03 — watcher live on the box, polkit authorization
 verified via pkcheck; owner: plug a stick (or two) and watch them appear in USB import)**
 **Priority:** High (owner: "usb drives auto mount doesnt work. its neccesery so operators can
 plug a drive in and import media without going into terminal to mount it. it needs to support
 multiple drives/mounts.")
-**Source:** `work/work-orders/todos03.08.26`
+**Source:** `work/archive/todos/todos03.08.26`
 **Related:** WO-29 (USB media ingest — enumeration, sandboxed browse, streamed copy, eject,
 polkit setup script), `docs/USB_AUTO_MOUNT_UBUNTU.md`
 

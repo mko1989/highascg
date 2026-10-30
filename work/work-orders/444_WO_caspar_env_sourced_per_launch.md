@@ -1,5 +1,6 @@
 # WO-444 — caspar-env sourced once at supervisor start; Apply-time changes never reached Caspar
 
+**Area:** devices-config, os-iso
 **Status: DONE (2026-08-06 — suite 1865/0/2; run.sh replaced atomically. ONE owner command arms it: `sudo systemctl restart casparcg-server` — after that every Apply works)**
 
 Owner: "how can i check if the gl sync is applied?" — checked live, and it was NOT, despite

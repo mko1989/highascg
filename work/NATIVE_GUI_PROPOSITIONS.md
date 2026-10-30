@@ -2,7 +2,7 @@
 
 Options for porting the highascg web UI to a native Ubuntu GUI application.
 
-Requested in `work/work-orders/todos19.07.26`: *"write a new md file in work folder giving me a
+Requested in `work/archive/todos/todos19.07.26`: *"write a new md file in work folder giving me a
 breakdown of options for porting the webui into a native ubuntu gui app. electron is a no go for me."*
 
 Written 2026-07-20. Every number below is measured from this checkout, not estimated. The

@@ -1,6 +1,7 @@
 # WO-249 — 8ch → stereo pair selection for PGM2/streaming + stop the mixer reporting lie
 
-**Status:** Implemented (owner acceptance A249.1 pending)
+**Area:** audio
+**Status:** DONE — Implemented (owner acceptance A249.1 pending)
 **Priority:** HIGH (owner: hears ch 3&4 on the PGM2 stream while the mixer claims otherwise; no way to pick the pair)
 **Owner check:** A249.1
 

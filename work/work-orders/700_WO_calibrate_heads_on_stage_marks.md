@@ -1,5 +1,6 @@
 # WO-700 — calibrate heads from Lighting, on real stage marks
 
+**Area:** lighting, tracking-vr
 **Status: DONE (2026-10-23, R7 below — each mark pinned exactly + a manual beam offset; smoke-wo700 13/13 (R3's two duplicated tests removed; 14/14 with WO-703's pin) + wo624, test:ci
 2858/2859 (known pointer-confine), Godot 21185/0, run-client --check OK; the owner's 4 + 3 live points re-solved
 offline; R2's pose-moving solve is SUPERSEDED by R3 — owner QA: calibrate Focus Profile 1 again; if marks 2 / 3 still

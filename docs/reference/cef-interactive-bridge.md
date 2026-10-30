@@ -5,7 +5,7 @@ orders — the feature it describes no longer exists.
 
 The CEF interactive bridge forwarded operator mouse/keyboard on the multiview (or an interactive
 screen consumer) to embedded CEF HTML via the Chrome DevTools Protocol
-([WO-89](../../work/work-orders/89_WO_CEF_OPERATOR_CONTROL.md), arm/release toggle added in
+([WO-89](../../work/work-orders/deprecated/89_WO_CEF_OPERATOR_CONTROL.md), arm/release toggle added in
 [WO-232](../../work/work-orders/232_WO_MARIO_HTML_PRODUCER.md)). It was removed outright in
 [WO-257](../../work/work-orders/257_WO_REMOVE_CEF_INTERACTIVE.md) after repeated production
 incidents (a `warmInFlight` crash-loop, `zoneTargets` connect-rejection, needle-matching

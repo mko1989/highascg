@@ -1,5 +1,6 @@
 # WO-153 — smoke-ws-restart-reconnect hangs under node --test (flaky harness)
 
+**Area:** testing-ci
 **Status:** Open (diagnosed, not fixed)
 **Priority:** Medium (blocks clean `test:ci` when it strikes; product behavior verified healthy)
 **Date:** 2026-07-08

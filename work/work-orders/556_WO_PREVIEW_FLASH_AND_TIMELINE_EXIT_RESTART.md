@@ -1,6 +1,7 @@
 # WO-556 — previewing another look flashed PGM; leaving a timeline look restarted it mid-transition
 
-**Status: FIXED in repo (03.09.2026), two bugs found in WO-555's own live QA. 19 new smokes (7 in
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026), two bugs found in WO-555's own live QA. 19 new smokes (7 in
 this WO, all regression-proven by removing each fix and confirming the load-bearing test fails).
 Full offline suite 2384/2382/0/2, all green — the only red seen during verification was the
 pre-existing `smoke-wo537` wall-clock flake (confirmed unrelated, passes reliably in isolation, same

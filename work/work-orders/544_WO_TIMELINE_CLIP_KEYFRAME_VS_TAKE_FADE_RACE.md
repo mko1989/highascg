@@ -1,6 +1,7 @@
 # WO-544 — A timeline clip's own opacity keyframes raced the take's crossfade
 
-**Status: FIXED in repo (02.09.2026). 6 smokes (2 verified to fail without the fix), suite
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). 6 smokes (2 verified to fail without the fix), suite
 2301/2299/0/2 → 2307/2305/0/2. Owner QA still owed on real PGM.**
 **Priority:** High (on-air; reported live, right after WO-541 was deployed)
 **Source:** owner 02.09, live QA of WO-541: *"playing from look does not work correctly, it goes

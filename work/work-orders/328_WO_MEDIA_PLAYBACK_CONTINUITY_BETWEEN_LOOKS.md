@@ -1,6 +1,7 @@
 # WO-328 — Layer media must continue playback between looks
 
 **Source:** todos24.07.26 — "Layer media continue playback between looks."
+**Area:** engine
 **Status: OPEN — needs a live repro first.** Written 2026-07-24 from a read-only code
 survey. Important: substantial continuity machinery ALREADY exists — this WO is
 "find which path breaks and close it", not "build continuity".

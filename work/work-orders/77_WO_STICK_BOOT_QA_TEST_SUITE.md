@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phase A shipped (read-only test runner + 10 modules); Phase B–C outstanding  
+**Area:** testing-ci, os-iso
+**Status:** IN PROGRESS — Phase A shipped (read-only test runner + 10 modules); Phase B–C outstanding  
 **Priority:** **High** — gate stick releases without on-stick hotfixes  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -1,5 +1,6 @@
 # WO-673 — Live 3D: the light-beams toggle is a light bulb (lit = on, dark = off)
 
+**Area:** godot-client
 **Status: DONE (22.10, box screenshot; owner QA = checklist 22.10 §G)**
 
 Owner, `next.md` 22.10: *"for the light beams toggle in 3d do a light bulb, illuminated for on, off for off."*

@@ -1,4 +1,7 @@
-**Status: IMPLEMENTED (2026-09-24, New project + project load both keep the map; new smokes fail without the fix / passes with it, smoke-new-project 4/4 + smoke-fresh-box-clean-device-view green) — needs `highascg` restart + owner on-hardware confirmation**
+# WO-579 — new project resets gpu port layout
+
+**Area:** devices-config, engine
+**Status: DONE — IMPLEMENTED (2026-09-24, New project + project load both keep the map; new smokes fail without the fix / passes with it, smoke-new-project 4/4 + smoke-fresh-box-clean-device-view green) — needs `highascg` restart + owner on-hardware confirmation**
 
 ## Investigation
 

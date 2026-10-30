@@ -1,5 +1,6 @@
 # WO-423 — Settings → "Install to disk" stops CasparCG + HighAsCG so only the installer is on screen
 
+**Area:** os-iso
 **Status: DONE in repo (2026-08-04 — smoke green, suite 1823/0/2). NOT yet live on this box: the installed copy `/usr/local/bin/launch-calamares.sh` is root-owned — owner one-liner below. Matters before the next `eggs produce` too (the ISO clones the INSTALLED copy, not the repo).**
 
 Owner 04.08: "when starting the calamares install from the settings modal i want both casparcg

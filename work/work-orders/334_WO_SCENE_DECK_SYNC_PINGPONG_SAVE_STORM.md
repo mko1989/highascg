@@ -2,7 +2,8 @@
 
 **Source:** owner report 2026-07-26 — log flooded with `[project] pushed llkk.json → bridge (/home/casparcg/bridge/projects/)` every ~170 ms.
 
-**Status: fixed (d738cd6), REVISED 2026-07-26 evening after an owner regression report** — the first
+**Area:** engine, web-client
+**Status: DONE — fixed (d738cd6), REVISED 2026-07-26 evening after an owner regression report** — the first
 guards suppressed identical payloads FOREVER (client memo + server per-connection cache written
 before the merge), which silently swallowed a remote laptop's legitimate retries whenever a merge
 was guard-rejected or a send raced a reconnect: "sync … is now blocking most of actions from the

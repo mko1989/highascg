@@ -1,6 +1,7 @@
 # WO-56: DeckLink SDI — custom PGM / ch1 output (OPEN — unresolved)
 
-> **Status:** 🔴 **OPEN / UNRESOLVED** — parked 2026-06-26. Do not treat as fixed on production until items below are verified on hardware.
+**Area:** video-io
+> **Status:** OPEN — 🔴 **OPEN / UNRESOLVED** — parked 2026-06-26. Do not treat as fixed on production until items below are verified on hardware.
 
 **Related:** [WO-55 DeckLink standard resolution inherit](./55_WO_DECKLINK_OUTPUT_STANDARD_RESOLUTION_INHERIT.md), [WO-28 DeckLink I/O](./28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md), [WO-36 PortAudio / DeckLink channel fix](./36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md)
 

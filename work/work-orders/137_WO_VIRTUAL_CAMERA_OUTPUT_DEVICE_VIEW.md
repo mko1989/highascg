@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** video-io, devices-config
 **Status:** In progress (Phase A–C largely complete 2026-07-04; operator sudo install + live validation pending)  
 **Priority:** High — operator validated video in Zoom; productize lab bridge  
 **Parent / context:** [109_WO_VIRTUAL_CAMERA_AND_VIRTUAL_SCREEN_TESTING.md](./109_WO_VIRTUAL_CAMERA_AND_VIRTUAL_SCREEN_TESTING.md), operator testing 2026-07-04
@@ -16,7 +17,7 @@
 - [WO-121](./121_WO_USB_WEBCAM_V4L2_INPUT.md) — **input** side; must exclude loopback output from capture picker
 - [WO-58](./58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md) — JPEG `image2 -update 1` buffer pattern
 - [WO-82](./82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md) — rear panel / simple node layout
-- [WO-132](./132_WO_FLOW_ALSA_AUDIO.md) — ALSA + PortAudio stack (no Pulse)
+- [WO-132](./map/132_WO_FLOW_ALSA_AUDIO.md) — ALSA + PortAudio stack (no Pulse)
 - [WO-97](./97_WO_INJECTION_HARDENING.md) — `modprobe` / sudo discipline
 
 **Existing implementation (lab bridge, 2026-07-04):**

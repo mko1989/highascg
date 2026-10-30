@@ -1,6 +1,7 @@
 # WO-146 — CasparCG state monitor strengthening (health ping, reconcile visibility)
 
-**Status:** Planned
+**Area:** amcp, engine
+**Status:** IN PROGRESS — Planned
 **Priority:** Medium
 **Date:** 2026-07-07
 **Depends on:** WO-141. Parallelizable with WO-144/145/147.

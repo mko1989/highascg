@@ -1,6 +1,7 @@
 # WO-142 — System dependency audit (user-paste workflow)
 
-**Status:** Analysis done (2026-07-07) — awaiting owner actions: Zoom purge (G1), tailscale snap removal (G2); suite gaps G3/G4 handed to WO-143
+**Area:** os-iso, process
+**Status:** IN PROGRESS — Analysis done (2026-07-07) — awaiting owner actions: Zoom purge (G1), tailscale snap removal (G2); suite gaps G3/G4 handed to WO-143
 **Priority:** Medium
 **Date:** 2026-07-07
 **Depends on:** none — can run anytime, in parallel with everything.

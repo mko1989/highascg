@@ -1,5 +1,9 @@
 # Work Order 21: Timeline Layout (Resizable / Collapsible) + Trim Preview Frame + Clip Waveforms
 
+**Area:** web-client, engine
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done
@@ -193,4 +197,4 @@ These are **large, separable** features; implement in phases below. Prefer small
 
 ---
 
-*Work Order created: 2026-04-08 | Parent: [`00_PROJECT_GOAL.md`](./00_PROJECT_GOAL.md) · Architecture index: [`PROJECT_BREAKDOWN.md`](./PROJECT_BREAKDOWN.md) · Related: `05_WO_LIVE_PREVIEW_SETTINGS.md` (preview), `06_WO_AUDIO_PLAYOUT.md` (audio)*
+*Work Order created: 2026-04-08 | Parent: [`00_PROJECT_GOAL.md`](./00_PROJECT_GOAL.md) · Architecture index: [`PROJECT_BREAKDOWN.md`](../notes/PROJECT_BREAKDOWN.md) · Related: `05_WO_LIVE_PREVIEW_SETTINGS.md` (preview), `06_WO_AUDIO_PLAYOUT.md` (audio)*

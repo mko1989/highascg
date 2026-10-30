@@ -1,5 +1,6 @@
 # WO-839 — Number fields take only numbers: gibberish reverts, never salvaged
 
+**Area:** godot-client
 **Status: DONE (30.10) — awaiting coordinator commit + client rebuild**
 **Source:** owner 30.10, answering the "100+" question from the 29.10 sweep (REPORT §7c): *"any number input box should
 "allow" only numbers. changing to either correct version or back to what it was when giberish is typed."*

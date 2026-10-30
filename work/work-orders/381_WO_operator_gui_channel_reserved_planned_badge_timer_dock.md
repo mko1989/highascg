@@ -1,6 +1,7 @@
 # WO-381 — Host channels stuck on "planned", ch 4 collision with the Operator GUI, timers dock
 
-**Status: 🟡 Implemented 29.07.26 in three rounds (server + client live on the box; suite 1684/0/2) — owner eyeball on the dock; Companion needs a module reinstall + restart**
+**Area:** mapping, web-client
+**Status: DONE — 🟡 Implemented 29.07.26 in three rounds (server + client live on the box; suite 1684/0/2) — owner eyeball on the dock; Companion needs a module reinstall + restart**
 
 Owner, 2026-07-29:
 > "i have a setup right now and all the host channels are stuck on planned. when i was adding a host

@@ -1,5 +1,6 @@
 # WO-821 — Autosave stamps this box's hardware config into a project loaded without its hardware
 
+**Area:** devices-config
 **Status: DONE (29.10, offline smoke 10/10 + suite 3585/0/2 + sandbox e2e across a restart) · live e2e 30.10: PASS on the box (save → load without hardware → 2 autosaves → node restart → autosave: stored rig kept every time, live rig untouched; see "Live e2e")**
 
 ## Investigation (what was seen)

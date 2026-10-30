@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete (v2)
+**Area:** engine
+**Status:** DONE — Complete (v2)
 
 **Deferred / follow-up (v2 landed 2026-07-02):** replication tombstones, shared default project template, autosave/live-deck merge, mirror fallback warning, CI smoke wiring.
 **Priority:** High — project persistence is the operator's show data; silent loss/rollback is unacceptable in live production

@@ -1,6 +1,7 @@
 # WO-265 — CG Studio on the playout box: workspace tab in the operator GUI
 
-**Status:** Implemented (owner acceptance A265.1 pending)
+**Area:** web-client
+**Status:** DONE — Implemented (owner acceptance A265.1 pending)
 **Priority:** HIGH (owner request 2026-07-18, todos18.07.26)
 **Depends on:** WO-32 (CG Studio module), WO-263/264 (Firefox holes + kiosk operator GUI), WO-30 (module registry)
 

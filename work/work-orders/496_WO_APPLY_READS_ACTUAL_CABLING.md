@@ -1,5 +1,6 @@
 # WO-496 — Apply Caspar config must emit what is actually cabled
 
+**Area:** devices-config
 **Status: DONE (12.08 — 9 new smokes, suite 2019/2017/0, eslint 0 errors) — NOT deployed: needs a `highascg` restart**
 
 Owner 12.08 (`todos12.08.26`), answering WO-494 §4: *"yes, cabling can change dynamically, but when

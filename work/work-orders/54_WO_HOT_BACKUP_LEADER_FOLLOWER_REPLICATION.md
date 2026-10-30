@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress (server + client core complete 2026-06-27; E2E hardware verification pending)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 **Builds on:**

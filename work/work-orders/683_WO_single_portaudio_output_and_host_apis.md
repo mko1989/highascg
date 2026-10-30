@@ -1,5 +1,6 @@
 # WO-683 — One PortAudio output next to Enhanced OAL: enforce the single device, Linux host APIs, keep cabled OAL
 
+**Area:** audio
 **Status: DONE (22.10, offline smoke 6/0 + Godot 21044/0 + `--check`; box: generator dry run on the live config, node restarted clean, Godot GUI relaunched). Owner QA: a real PortAudio output on a device with a signal (checklist below).**
 
 Owner, 22.10 (after the WO-613 OAL question): *"I'd like to add to the current enhanced oal, an additional single

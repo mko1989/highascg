@@ -1,5 +1,9 @@
 # Work Order 36: Device View — PortAudio pipeline, DeckLink detection, and channel enumeration fixes
 
+**Area:** devices-config, audio
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

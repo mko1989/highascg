@@ -1,5 +1,6 @@
 # WO-773 — PGM audio silent on both boxes: PortAudio aborts its init when no PulseAudio server runs
 
+**Area:** audio
 **Status: IN PROGRESS (25.10) — fixed and proven on this box (portaudio consumer up, ALSA hw:1,3 RUNNING 48 kHz/8 ch);
 .4 waits for one user-level command by the owner (no SSH from here), then an AMCP RESTART from here**
 

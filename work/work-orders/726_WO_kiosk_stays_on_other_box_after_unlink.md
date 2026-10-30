@@ -1,5 +1,6 @@
 # WO-726 — A kiosk that followed the master to another box stayed there after the servers were unlinked
 
+**Area:** network, godot-client
 **Status: DONE (24.10.26 — Godot units + client boot check; live on .4: its kiosk, stuck on this box since WO-724, went
 home by itself on restart)**
 

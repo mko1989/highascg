@@ -1,5 +1,6 @@
 # WO-714 — Operator GUI opens fullscreen, without the title bar
 
+**Area:** godot-client
 **Status: DONE (23.10.26; Godot 21373/0, `run-client.sh --check` OK; box: a second client instance opened borderless,
 1920×1080 at 0,0, frame extents 0 — the running operator client keeps its frame until its next launch/boot = owner QA)**
 

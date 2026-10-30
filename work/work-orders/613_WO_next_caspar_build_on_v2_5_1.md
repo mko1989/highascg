@@ -1,6 +1,7 @@
-**Status: IN PROGRESS (2026-10-17) — `highascg-build-v2` (v2.5.1-stable + every carried patch + WO-594 `shm` + OSC float-endian fix) assembled, built and RUNNING on the shop dev box (`2.5.1 886998cc1 Stable`), functional pass green (see Verified). Remaining: owner soak/QA on real shows (DeckLink A/V sync, audio), decide the OAL choice below, deploy to show machines.**
-
 # WO-613 — Next CasparCG build: base it on upstream **v2.5.1-stable**
+
+**Area:** caspar-build
+**Status: IN PROGRESS (2026-10-17) — `highascg-build-v2` (v2.5.1-stable + every carried patch + WO-594 `shm` + OSC float-endian fix) assembled, built and RUNNING on the shop dev box (`2.5.1 886998cc1 Stable`), functional pass green (see Verified). Remaining: owner soak/QA on real shows (DeckLink A/V sync, audio), decide the OAL choice below, deploy to show machines.**
 
 Owner, 17.10: "add a note for future caspar build to use v2.5.1 which is newer and adds some good fixes."
 

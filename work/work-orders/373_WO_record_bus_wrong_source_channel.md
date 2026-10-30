@@ -1,8 +1,9 @@
 # WO-373 — "I connected PGM2 to the rec output and PGM1 got recorded": same-layer record edges tie-break on edge order, not on the cable you just dropped
 
+**Area:** video-io, mapping
 **Status: DONE (28.07.26 — the §1c model question is settled from code, the mechanism is fixed at both ends, and the reported symptom is reproduced and closed in an offline test. Owner repro no longer blocking; SERVER change, needs a highascg restart.)**
 
-Source: `work/work-orders/todos21.07.26` line 3 — one of the seven items [WO-366](./366_WO_todos21_untriaged_backlog.md)
+Source: `work/archive/todos/todos21.07.26` line 3 — one of the seven items [WO-366](./366_WO_todos21_untriaged_backlog.md)
 found had never been triaged:
 
 > i connected pgm2 to rec output and pgm1 got recorded.

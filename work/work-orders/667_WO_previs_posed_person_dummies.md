@@ -1,5 +1,6 @@
 # WO-667 — Previs: posed dummies from body keypoints (person texturing, step 3)
 
+**Area:** tracking-vr, godot-client
 **Status: DONE (22.10, offline suites + real sidecar run on a fed surface + real-client render probe; owner QA on the rig pending)**
 
 Owner, 22.10: "continue building. i will test it later." This follows WO-665 (cut-out cards) and WO-666 (textured

@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** web-client, media
 **Status:** In progress — Phase A + Phase B foundation shipped 2026-06-29; live cloud upload QA pending  
 **Priority:** Medium–High (operators need filesystem control without SSH; post-show recording handoff is a common field ask)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

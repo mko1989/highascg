@@ -1,5 +1,6 @@
 # WO-842 — Sweep: data loss, replication boot and server-side ops bugs
 
+**Area:** network, devices-config
 **Status: DONE (30.10, offline: 3 new smokes 26 tests + affected suites; nothing probed on the live box, nothing restarted)**
 **Source:** code sweep 29.10 (`work/sweep-29.10.2026/REPORT.md` §4e, 4g–4l, §5 Replication + Ops scripts); owner 30.10
 *"there are a lot of bugs to fix… continue what wasnt finished in the sweep"*.

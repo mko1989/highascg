@@ -1,6 +1,7 @@
 # WO-252 — Feed clip duration from the AMCP INFO supplement into oscState (new binary omits it on OSC)
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
+**Area:** amcp, engine
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** HIGH (feeds MV progress bars/digits, playlist stall watchdog, timer remaining/progress)
 **Owner check:** A252.1
 

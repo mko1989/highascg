@@ -1,5 +1,6 @@
 # WO-704 — DeckLink DKMS: build once per kernel, not every live boot
 
+**Area:** os-iso, video-io
 **Status: DONE in repo (2026-10-23; smoke-wo704 7/7, decklink install smokes 49/49 incl. the new 7, real `dkms add`/`build` skip
 proven on a scratch DKMS tree) — proven on a live ISO boot only: the second boot from the same stick logs
 "restored … (no compile)" and `highascg-decklink-install` takes seconds instead of ~1m53s**

@@ -1,9 +1,10 @@
 # WO-188 — Auto-update systems: close the four gaps (dist-web exclude, DeckLink API/UI/tar.gz, vendor seeding)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** os-iso
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** HIGH for T188.1 (web UI never updates from a USB drop); Medium for the rest
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner): verify drop-update + decklink auto-install for stick-boot and installed systems; web-GUI GitHub update flow.
+**Source:** `work/archive/todos/todos14.07.26` (owner): verify drop-update + decklink auto-install for stick-boot and installed systems; web-GUI GitHub update flow.
 **Related:** WO-66 (boot drop-update + webui update — mostly shipped), WO-92 (DeckLink exFAT vendor install — Phase A/B partial).
 
 ---

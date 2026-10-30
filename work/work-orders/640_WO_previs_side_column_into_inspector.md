@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20634/0 + --check; box: Previs 3D shows one Inspector column with ▾ sections, folding Stage / MVR scene works and is remembered (ui.cfg), both reopened afterwards. Parent: [WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md) R2 (the one Inspector).**
-
 # WO-640 — Previs opened its own inspector column next to the shared Inspector; sections collapsible
+
+**Area:** godot-client
+**Status: DONE (2026-10-21) — Godot --test 20634/0 + --check; box: Previs 3D shows one Inspector column with ▾ sections, folding Stage / MVR scene works and is remembered (ui.cfg), both reopened afterwards. Parent: [WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md) R2 (the one Inspector).**
 
 Owner, 21.10: *"also in previs there is an additional inspector instead of using the already existing
 inspector."* Then: *"in the previs inspector make the sections collapsable."*

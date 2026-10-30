@@ -1,5 +1,9 @@
 # WO-53 — Dedicated channel per live input (isolated VU per input)
 
+**Area:** video-io, audio
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" at the bottom describing what was done.

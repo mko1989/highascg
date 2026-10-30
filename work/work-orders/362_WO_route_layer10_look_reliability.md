@@ -1,9 +1,10 @@
 # WO-362 — Looks with routes to layer 10 "failing to play on most trys" (todos28.07.26 §1)
 
+**Area:** engine, amcp
 **Status: DONE (28.07.26 second pass — real root cause found and fixed after owner rejected first conclusion; visual pixel evidence in §3b)**
 
 Follow-up to [WO-359](./359_WO_route_take_consistency.md) (orphan-sweep keep-set fix) and
-[WO-322](./322_WO_shader_look_band_routing.md) (shader on the look band).
+[WO-322](322_WO_SHADERS_IN_LOOK_COMPOSITE_ON_MEDIA_BAND.md) (shader on the look band).
 
 ## 1. Investigation
 

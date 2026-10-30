@@ -1,5 +1,6 @@
 # WO-711 — PTZ cameras follow tracked people over VISCA
 
+**Area:** tracking-vr, lighting
 **Status: DONE offline (23.10.26: server driver + Godot setup section, smoke 27/27, wired to the WO-708 director by the
 lead via src/tracking/auto-ptz.js; UDP loopback only — NO real PTZ camera was tested, owner QA needed)**
 

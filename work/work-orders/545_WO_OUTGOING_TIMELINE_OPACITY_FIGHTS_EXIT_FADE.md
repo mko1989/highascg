@@ -1,6 +1,7 @@
 # WO-545 — An exiting timeline's own ticking could still fight the take's fade-out during the teardown wait
 
-**Status: FIXED in repo (02.09.2026). 7 smokes (6 verified to fail without the fix), suite
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). 7 smokes (6 verified to fail without the fix), suite
 2307/2305/0/2 → 2314/2312/0/2. Owner QA still owed on real PGM.**
 **Priority:** High (on-air; second distinct root cause found for the same "cut instead of mix"
 report in one session)

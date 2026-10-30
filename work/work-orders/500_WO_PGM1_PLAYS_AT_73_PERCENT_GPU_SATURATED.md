@@ -1,6 +1,7 @@
 # WO-500 — PGM1 plays at 73 % of realtime; GPU saturated; the progress-bar snap-back is the same fault
 
-**Status: ROOT CAUSE CONFIRMED + FIXED IN REPO (12.08.2026 — owner removed the meter-null consumers
+**Area:** engine, video-io
+**Status: DONE — ROOT CAUSE CONFIRMED + FIXED IN REPO (12.08.2026 — owner removed the meter-null consumers
 live; PGM1 went 72.8 % → **99.9 % of realtime** with the DeckLink outputs still attached. Code fix
 landed with 8 new smokes, suite 2047/2045/0, eslint clean. **NOT DEPLOYED** — needs a `highascg`
 service restart, see §10.)**
@@ -10,8 +11,8 @@ the gui playback progress bar kind of jumps back every second or two. the playba
 aprox 80% speed max"*
 **Box:** `highascg0916`, 192.168.0.37 (same machine as the .28 of WO-485/487 — IP reassigned across
 reboots/reinstalls). Build stamp `2026-08-12T164536Z`, so WO-497/498 are live.
-**Supersedes as the active lead:** [WO-487](./487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md) (see §4).
-**Related:** [WO-485](./485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md) (deprecated, but the
+**Supersedes as the active lead:** [WO-487](./deprecated/487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md) (see §4).
+**Related:** [WO-485](./deprecated/485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md) (deprecated, but the
 source of the clock-ownership mechanism), [WO-493](./493_WO_DECKLINK_PIXEL_FORMAT_OPTION.md),
 [WO-497](./497_WO_UI_LOAD_AND_PROBE_CACHE.md) §7 (which handed this thread over),
 [WO-401](./401_WO_MACHINE_PERFORMANCE_RESEARCH_PASS.md) / [WO-405](./405_WO_PERFORMANCE_ROUND_2.md)

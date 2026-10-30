@@ -1,5 +1,6 @@
 # WO-758 — Content sizing "fill canvas" does not fill the canvas
 
+**Area:** engine, mapping
 **Status: DONE (25.10 — smokes 24/0; live after node restart: layer-fit on the 3840×1792 canvas returns 0,0,1,1 for native, where it gave 2×1.659 before; owner QA on a non-canvas-sized clip)**
 
 Owner 25.10: "when using for a layer in a look content sizing = fill canvas, it does not fill the canvas. math is wrong somewhere."

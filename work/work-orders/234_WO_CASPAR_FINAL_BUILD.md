@@ -1,6 +1,7 @@
 # WO-234 — Assemble + build the final (for now) CasparCG for highascg
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending) | **Date:** 2026-07-15
+**Area:** caspar-build
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending) | **Date:** 2026-07-15
 **Owner directives:** Enhanced's audio (PortAudio) work is CRUCIAL — all Enhanced differentiators go in. Re-review the seed PRs code-level (#1762 mixer effects, #1751 Pixel consumer — fair second look, owner sees pixel mapping as a good fit, #1727 stream reconnect). Then build the final version.
 
 ## Merge plan (from WO-233, owner-amended)

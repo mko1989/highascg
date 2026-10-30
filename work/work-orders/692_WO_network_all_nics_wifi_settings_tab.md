@@ -1,5 +1,6 @@
 # WO-692 — Network: every NIC (also down ones) from Devices, a Settings → Network tab, Wi-Fi
 
+**Area:** network
 **Status: DONE pending owner step (23.10) — server, helper and Godot UI box-verified (Settings → Network, Devices server
 page, a live re-apply on eno2). Wi-Fi scan / join and the networkd hand-over need the owner's one-time `sudo install` of
 the helper (below), then owner QA of a join.**

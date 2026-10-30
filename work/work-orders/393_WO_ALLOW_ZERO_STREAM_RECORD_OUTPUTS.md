@@ -1,7 +1,8 @@
 # WO-393 — Allow 0 stream / record outputs
 
+**Area:** video-io, devices-config
 **Status: DONE (2026-07-30 — suite 1737/0/2 incl. new smoke-wo393; live: GET /api/settings returns `streamOutputs: []` on this box's real empty config, `rec_1` intact)**
-**Source:** `work/work-orders/todos30.07.26` §"in highascg it does not allow to have 0 stream or record outputs, which should be possible."
+**Source:** `work/archive/todos/todos30.07.26` §"in highascg it does not allow to have 0 stream or record outputs, which should be possible."
 **Related:** WO-172 (remove-output flow + restart-dirty rules), WO-244 (stream credential preserve-on-save), WO-270 (settings modal sections).
 
 ---

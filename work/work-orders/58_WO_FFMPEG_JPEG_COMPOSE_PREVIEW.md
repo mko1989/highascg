@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
-**Status:** Draft  
+**Area:** engine, web-client
+**Status:** IN PROGRESS — Draft  
 **Priority:** Medium (operator UX / Caspar log hygiene)  
 **Supersedes (partially):** [57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md](./57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md) — `caspar_image` tick mode remains as fallback; **`ffmpeg_jpeg` becomes the recommended default** once validated.  
 **Related:** [21_WO_TIMELINE_INSPECTOR_WAVEFORM.md](./21_WO_TIMELINE_INSPECTOR_WAVEFORM.md) (compose canvas baseline), [27_WO_STREAMING_CHANNEL.md](./27_WO_STREAMING_CHANNEL.md) (Caspar ffmpeg arg conventions)

@@ -1,7 +1,8 @@
 # WO-33a — Device view: data model, persistence, and HTTP API
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** devices-config, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** None (first in chain)
 
 ---

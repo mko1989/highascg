@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress — Phase B + D core shipped (2026-06-27); field sign-off pending  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)  
 **Builds on (required reading):**

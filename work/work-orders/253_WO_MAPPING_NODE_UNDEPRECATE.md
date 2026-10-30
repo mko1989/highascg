@@ -1,5 +1,6 @@
 # WO-253 — Un-deprecate mapping nodes (WO-242 gated the wrong feature) + rename to "Mapping node"
 
+**Area:** mapping
 **Status:** DONE (landed `6e3c24a`; owner eyeball A253.1 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (a wanted feature is currently blocked in the UI)
 **Owner check:** A253.1

@@ -1,5 +1,6 @@
 # WO-461 — Branded GRUB menu: the selected entry is invisible
 
+**Area:** os-iso
 **Status: IN PROGRESS (fixed + guarded 2026-08-10; visible on the next ISO build)**
 
 Owner (todos10.08): *"in the branded grub menu the chosen boot option is invisible as its almost

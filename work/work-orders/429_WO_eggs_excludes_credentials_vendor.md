@@ -1,5 +1,6 @@
 # WO-429 — Produced ISOs must ship no credentials and no vendor driver packages
 
+**Area:** os-iso
 **Status: DONE (2026-08-04 — both exclude fragments + ISO verifier extended; smoke 2/2; suite green. TAKES EFFECT at the next produce; SEE THE TOKEN WARNING below for ISOs already produced.)**
 
 Owner: "make sure the decklink drivers are in eggs excluded. as well as any logins and

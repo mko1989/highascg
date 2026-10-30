@@ -2,7 +2,8 @@
 
 **Program goal:** A self-hosted, infinitely-zoomable interactive web application that maps the entire HighAsCG stack — from Ubuntu OS and hardware at the top, through systemd services, through application modules, down to individual exported JS functions. Click any node to drill deeper; breadcrumb back to any ancestor level.
 
-**Status:** Parent index — child WOs carry task checklists.  
+**Area:** process, web-client
+**Status:** DONE — Parent index — child WOs carry task checklists.  
 **Created:** 2026-06-29  
 **Priority:** Medium (internal tooling / developer experience / onboarding)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
@@ -66,7 +67,7 @@ package.json                       ← 83g — npm run map:generate
 - [ARCHITECTURE.md](../../docs/ARCHITECTURE.md) — connection diagram, repo model, what runs where
 - [MODULES.md](../../docs/MODULES.md) — optional module registry, previs/tracking/autofollow/CG Studio
 - [openbox_autostart.md](../../docs/openbox_autostart.md) — boot chain, X session, Caspar supervisor
-- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — boot orchestrator, config manager
+- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — boot orchestrator, config manager
 
 ---
 

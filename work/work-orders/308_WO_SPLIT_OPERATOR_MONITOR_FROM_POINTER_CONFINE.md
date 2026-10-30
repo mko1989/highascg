@@ -1,5 +1,6 @@
 # WO-308 — Split "operator monitor" from "confine pointer to it"
 
+**Area:** os-iso, devices-config
 **Status: DONE — 2026-07-21.**
 
 Delivered per spec below. `evaluateOperatorPointerConfineDesire(config)` returns `{ desired,

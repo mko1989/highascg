@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; Godot 20718/0, box: the L11 box hugs the clip, Geometry 785, 262, 1528 × 611)**
-
 # WO-653 — Look editor: a layer's box is ~1.7× wider than what Caspar shows
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20718/0, box: the L11 box hugs the clip, Geometry 785, 262, 1528 × 611)**
 
 Owner, 21.10: *"something is still wrong with layer math, gui vs caspar. in caspar it displays correctly yet in gui
 its almost twice as width."*

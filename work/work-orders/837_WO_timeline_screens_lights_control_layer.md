@@ -1,5 +1,6 @@
 # WO-837 — Timeline: screens, lights layer, control layer (D6)
 
+**Area:** engine, lighting
 **Status: OPEN (30.10)**
 **Source:** WO-828 D6, owner 30.10: *"ability to add screens to a timeline (should have a divider and seperete layers in the
 list at the bottom) ability to add lights layer (here id like it to be similar to comapnion buttons in timeline, but with a

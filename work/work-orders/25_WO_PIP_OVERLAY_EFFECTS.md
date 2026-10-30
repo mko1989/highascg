@@ -1,5 +1,9 @@
 # Work Order 25: PIP Overlay Effects — Borders, Shadows & Edge Strips via CasparCG HTML Templates
 
+**Area:** engine
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

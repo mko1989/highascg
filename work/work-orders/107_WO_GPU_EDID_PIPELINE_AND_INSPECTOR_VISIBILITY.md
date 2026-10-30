@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete
+**Area:** devices-config, mapping
+**Status:** DONE — Complete
 **Priority:** High — operators cannot see which monitor/EDID a GPU output actually received; miscabling is diagnosed by trial and error
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md), supersedes/absorbs the EDID parts of [33e_WO_DEVICE_VIEW_EDID_MATCH_AND_APPLY.md](./33e_WO_DEVICE_VIEW_EDID_MATCH_AND_APPLY.md) (draft, never implemented)
 

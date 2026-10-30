@@ -1,6 +1,7 @@
 # WO-169 — Countdown/timer CG template: transparent overlay, inspector-configured, multi-instance, companion-controllable
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine, web-client
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (new feature)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner). Reference implementation: `work/references/show_creator/companion-module-highpass-countdown`.

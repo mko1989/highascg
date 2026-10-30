@@ -1,5 +1,9 @@
 # Work Order 05: Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring
 
+**Area:** web-client, video-io
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

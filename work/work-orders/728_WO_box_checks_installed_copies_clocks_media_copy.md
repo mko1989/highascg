@@ -1,5 +1,6 @@
 # WO-728 — More automated checks: installed root copies, clocks, media copy between servers
 
+**Area:** testing-ci, network
 **Status: DONE (24.10.26) — all three run live on this box + .4 (green after fixes); smoke 11/11 in CI (+ the clock
 step in the 3-sandbox scenario); the first live run found WO-729 (replication keys with a full shell).**
 

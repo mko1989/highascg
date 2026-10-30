@@ -1,5 +1,6 @@
 # WO-454 — exec-bit pollution: 1039 files committed as 755, 472 more pending; source = exFAT perms via Syncthing
 
+**Area:** process, network
 **Status: DONE (2026-08-07 — tree normalized in 8687eec + follow-up, git status clean except runtime files, Syncthing highascg folder ignorePerms=true live-verified via REST. Peers still need the same toggle when next powered on.)**
 
 ## Investigation FIRST

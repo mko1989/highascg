@@ -1,6 +1,7 @@
 # WO-171 — Basic math in all GUI number inputs (e.g. crop right = `1920-256`)
 
-**Status:** Implemented
+**Area:** web-client
+**Status:** DONE — Implemented
 **Priority:** Low-Medium (operator quality-of-life)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner, NEWNEW): "most of the number inputs in the gui should allow for basic math to be done inside that input box. (ex: crop, crop left 256px and right 1920-256)"

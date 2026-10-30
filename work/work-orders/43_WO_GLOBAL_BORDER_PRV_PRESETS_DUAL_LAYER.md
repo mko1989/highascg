@@ -1,5 +1,6 @@
 # WO-43 — Global border: PRV edit bus, PGM dual-layer presets, snapshot sync
 
+**Area:** engine
 **Status:** In progress — Phase A implemented (builders + API, state, preview, inspector, take path). Caspar hardware QA recommended.
 
 **Scope:** Web UI (`inspector-panel-views.js`), client preview AMCP (`scenes-preview-runtime.js`), scene persistence (`scene-state.js`), Caspar command builders (`src/engine/global-border.js`), scene take (`src/engine/scene-take-lbg.js`), HTTP API (`src/api/routes-scene.js`).  

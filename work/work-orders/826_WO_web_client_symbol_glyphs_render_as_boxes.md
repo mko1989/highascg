@@ -1,5 +1,6 @@
 # WO-826 — Web client (Pages demo): arrows, ▸ ▾, ✓ ✕, ⚠ … render as boxes
 
+**Area:** web-client
 **Status: DONE (29.10, Godot suite 22836/0 incl. a coverage guard; local Web export in Firefox ESR shows the glyphs; live
 Pages after the next deploy) — 10 media/emoji glyphs still have no font (listed below)**
 

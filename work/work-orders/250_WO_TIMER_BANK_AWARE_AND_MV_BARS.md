@@ -1,6 +1,7 @@
 # WO-250 — Bank-aware playback timers (web UI "gibberish") + multiview progress bars restored
 
-**Status:** IMPLEMENTED (all T-tasks done; owner acceptance A250.1 on `work/checklist06.08.26_close_all_wos.md`)
+**Area:** web-client, mapping
+**Status:** DONE — IMPLEMENTED (all T-tasks done; owner acceptance A250.1 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (both owner-reported, both display-side; NOT fixed by the pending service restart)
 **Owner check:** A250.1
 

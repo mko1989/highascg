@@ -1,6 +1,6 @@
 # Performance fix roadmaps
 
-Plans derived from **`work/work-orders/PERFORMANCE_RUN_CHECK_BULLETIN.md`**.
+Plans derived from **`work/notes/PERFORMANCE_RUN_CHECK_BULLETIN.md`**.
 
 The PF markdown files describe **problems, direction, and phased work**. This README summarizes what is **already implemented in the HighAsCG tree** (mostly under `src/`, `index.js`, `client/`) and what remains **design-only or lighter**.
 

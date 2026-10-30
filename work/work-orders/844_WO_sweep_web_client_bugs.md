@@ -1,5 +1,6 @@
 # WO-844 — Sweep: web client bugs
 
+**Area:** web-client
 **Status: DONE (30.10, offline smokes; needs `npm run build:client` + browser reload, no live probe)**
 **Source:** code sweep 29.10 (REPORT §4o–4q, §5 Web client, §7c count+1 ids (web side)).
 

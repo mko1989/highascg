@@ -1,9 +1,10 @@
 # WO-542 — Flag jump-time fields showed raw ms; the jump-to-flag dropdown showed "label @ Nms"
 
-**Status: FIXED in repo (02.09.2026). 10 smokes, suite 2282/2280/0/2 → 2292/2290/0/2. Needs a
+**Area:** web-client, companion
+**Status: DONE — FIXED in repo (02.09.2026). 10 smokes, suite 2282/2280/0/2 → 2292/2290/0/2. Needs a
 client rebuild (`npm run build:client` + kiosk F5) before it's visible on the box.**
 **Priority:** Medium (editorial UX, not on-air-breaking)
-**Source:** `work/work-orders/todos14.08.26` lines 8–9: *"flags in timeline should be using
+**Source:** `work/archive/todos/todos14.08.26` lines 8–9: *"flags in timeline should be using
 timecode values of hh:mm:ss:ms and not straight ms as it is now."* / *"also in a jump flag when
 choosing which flag to jump to it should be label - time."*
 

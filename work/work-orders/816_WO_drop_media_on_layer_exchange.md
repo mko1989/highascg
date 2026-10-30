@@ -1,5 +1,6 @@
 # WO-816 — Godot look editor: drop media ON a layer exchanges its media (frame box / layer-list row)
 
+**Area:** godot-client, engine
 **Status: DONE (29.10, live e2e on the box) (29.10 — Godot tests 22718/0, new-layer smoke 14/0, boot check OK, 500-line check OK; live: the
 extended route on an off-air look after a node restart; owner client relaunched + screenshot. Owner QA = a real drag
 onto a layer box and onto a row.) · live e2e 29.10: box drop, row drop and blank drop PASS on the glass**

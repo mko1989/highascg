@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** os-iso
 **Status:** In progress (Phase A–B partial — collector, COMPLIANCE-ISO, install hook, audit)  
 **Priority:** Medium (distribution compliance, operator/support transparency)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

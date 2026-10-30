@@ -1,5 +1,6 @@
 # WO-476 — every fill-only DeckLink output asks the card for an external keyer
 
+**Area:** video-io, caspar-build
 **Status: OPEN (11.08.2026 — diagnosed and proven from source; the fix needs a CasparCG rebuild,
 owner decision pending)**
 

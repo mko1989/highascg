@@ -1,6 +1,7 @@
 # WO-168 — Eggs excludes cleanup + factory defaults: stop shipping device identity, trash, and config cruft in the ISO
 
-**Status:** Implemented (2026-07-13) — code/docs/tests done on this box; ISO not re-produced here (owner-gated, see T168.1 note)
+**Area:** os-iso
+**Status:** DONE — Implemented (2026-07-13) — code/docs/tests done on this box; ISO not re-produced here (owner-gated, see T168.1 note)
 **Priority:** HIGH for T168.1 (device identity/secrets ship in every ISO); Medium for the rest
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "clean up of eggs exclude list… default projects and configs and include only those in the eggs produce build."

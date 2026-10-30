@@ -1,7 +1,8 @@
 # WO-395 — Companion: start/stop the CONFIGURED stream/record outputs, with feedbacks + presets
 
-**Status: IMPLEMENTED (2026-07-30 — server half live-verified on the box; module half tested 40/40, committed 501763d; owner A395.1: Companion restart + desk QA of the Stream & Record presets)**
-**Source:** `work/work-orders/todos30.07.26` §2: "i need simple actions to start and stop (as well as indicate status with feedbacks) recordings and stream. all the actually set ones, no placeholders. with preset buttons"
+**Area:** companion, video-io
+**Status: DONE — IMPLEMENTED (2026-07-30 — server half live-verified on the box; module half tested 40/40, committed 501763d; owner A395.1: Companion restart + desk QA of the Stream & Record presets)**
+**Source:** `work/archive/todos/todos30.07.26` §2: "i need simple actions to start and stop (as well as indicate status with feedbacks) recordings and stream. all the actually set ones, no placeholders. with preset buttons"
 **Module repo:** `/home/casparcg/companion-module-dev/companion-module-highpass-highascg`
 **Related:** WO-170 (added rtmp/record actions with free-text placeholder options — the thing this replaces), WO-244/261/307 (credentials resolve SERVER-side from outputId — exactly what makes placeholder-free actions possible), WO-393 (0 outputs now valid — dropdowns must tolerate an empty catalog), WO-394 (same batch).
 

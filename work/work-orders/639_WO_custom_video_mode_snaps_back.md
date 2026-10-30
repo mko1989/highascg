@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20626/0 (new case fails on the old line); server coercion reproduced with node. Owner QA: pick Custom on a 1080p50 screen in the box client, type a size.**
-
 # WO-639 — Picking "Custom" for a screen destination's video mode jumps straight back
+
+**Area:** devices-config, godot-client
+**Status: DONE (2026-10-21) — Godot --test 20626/0 (new case fails on the old line); server coercion reproduced with node. Owner QA: pick Custom on a 1080p50 screen in the box client, type a size.**
 
 Owner, 21.10: *"it doesnt let me change a screen destination's resolution to custom, jumps back right to what it
 was"*

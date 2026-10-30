@@ -1,5 +1,6 @@
 # WO-779 — HDMI/DP audio muted at the card (IEC958 switches off) + Devices audio list names what is plugged in
 
+**Area:** audio
 **Status: DONE (26.10). Verified: IEC958 switches on, hw:1,3 RUNNING 8 ch 48 kHz, labels live over the API, offline
 suite and Godot tests green. Owner QA: audio on the P80's meters.**
 

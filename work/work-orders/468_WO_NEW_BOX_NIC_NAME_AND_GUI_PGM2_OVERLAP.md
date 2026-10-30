@@ -1,5 +1,6 @@
 # WO-468 — New box: "(no Ethernet found)" and operator GUI duplicated onto the PGM2 monitor
 
+**Area:** os-iso, devices-config
 **Status: IN PROGRESS (2026-08-10 — two root causes fixed and verified offline; owner QA on highascg7579 owed)**
 
 **Source:** owner, 2026-08-10 — fresh install on a new machine (`highascg7579`, 192.168.0.27):

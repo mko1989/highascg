@@ -1,5 +1,6 @@
 # WO-358 — Global border: area rect, glow secondary color cycle, pulse to 0
 
+**Area:** engine
 **Status: DONE (2026-07-27, headless-verified renders)** · Source: owner: "global border needs to
 be displayed inside its set width height (also for slices). add to the glow secondary color and
 time slider for how long the transition from first to second should be, hide it under enable

@@ -1,5 +1,6 @@
 # WO-391 — Intermittent mouse lag on the box
 
+**Area:** os-iso
 **Status: DONE for the poll loop (2026-07-30) — the "barriers leak on NVIDIA" premise was FALSE; it was a barrier corner-endpoint gap. Corners sealed, cursor polling DELETED. The original intermittent-lag report is split out as still-unexplained (§7).**
 
 > **Correction to the first pass of this WO (kept deliberately).** It originally asserted the

@@ -1,5 +1,6 @@
 # WO-356 — Shader Live v3: rect groups, wheel steps, child saves, audition from templates browser
 
+**Area:** engine, web-client
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 batch 6 (owner).
 
 ## Editor UX

@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
+**Area:** web-client, media
 **Status:** In progress (Phase 0–1 implemented 2026-06-27)
 **Priority:** Medium (operator UX — deck reflects what Caspar is actually outputting)  
 **Related:**
@@ -166,7 +167,7 @@ Do **not** poll every deck card independently; reuse the shared `_cache` in `pre
 
 - [ ] **T63.3.1** Manual QA with `composePreview.mode = ffmpeg_jpeg`: cue look to PRV → deck thumb matches compose PRV cell; take to PGM → thumb matches PGM cell; clear bus → legacy thumb returns
 - [ ] **T63.3.2** Compare deck thumb to Companion button image for same look (visual parity)
-- [ ] **T63.3.3** Update [`project_status.md`](./project_status.md) when shipping
+- [ ] **T63.3.3** Update [`project_status.md`](../archive/project_status.md) when shipping
 
 ---
 

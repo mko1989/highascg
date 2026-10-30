@@ -1,5 +1,6 @@
 # WO-705 — Operator dock stays empty when the GUI starts before the server
 
+**Area:** godot-client
 **Status: DONE (23.10.26: smoke-wo705 2/2, boot check OK, box relaunch shows one full dock; the late-server path is
 owner QA on the next ISO boot)**
 

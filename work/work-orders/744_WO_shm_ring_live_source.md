@@ -1,5 +1,6 @@
 # WO-744 — shm rings as Live-tab sources: a look layer `shm://<name>` plays a ring another process writes (WO-738 step 3)
 
+**Area:** engine, video-io
 **Status: DONE (24.10.26) as future development, detachable (see "How to remove"). Proven on the operator path by
 `tools/e2e/shm-source-take.js` (PASS): a ring writer, then `/api/shm/sources`, then a look TAKE on a sandbox server
 driving a throwaway real Caspar, then the writer's exact pixels on the channel. Smoke 3/3, Godot 21587/0, clean-export

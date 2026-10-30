@@ -1,5 +1,6 @@
 # WO-581 — Playlist look taken to PGM always starts on item 1, not the item set in preview
 
+**Area:** engine, amcp
 **Status: DONE (2026-09-28 — offline suite 2518/0/2 + new smoke 4/4; deployed server + client; live PRV probe OK. Owner QA: set an item on a PRV-recalled playlist look, take it, confirm PGM opens on that item)**
 
 Source: owner, 28.09.26:

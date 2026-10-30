@@ -1,5 +1,6 @@
 # WO-755 — `test:ci:full` green again: 26 rotted tests outside the curated gate repointed and brought into CI
 
+**Area:** testing-ci
 **Status: DONE (25.10.26) — full suite on a clean export on .4, isolated from the network: 3958 / 26 fail before,
 3978 pass / 0 fail / 15 skipped after; clean-export gates on .23 green (test:ci 3297 / 0, now including WO-498).**
 

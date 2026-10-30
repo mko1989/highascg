@@ -1,5 +1,6 @@
 # WO-449 — Clip-edge extension mid-play re-sends PLAY … LOOP (blank at file end)
 
+**Area:** engine
 **Status: DONE (06.08.26 — engine fix + smoke; service restart in the day's batch tail)**
 
 Owner (todos06.08 line 13): *"grabbing a clips edge in timeline and extending it does not

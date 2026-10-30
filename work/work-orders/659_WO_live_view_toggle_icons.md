@@ -1,5 +1,6 @@
 # WO-659 — Live view toolbar icons: clock for Times, cube for 2D / 3D
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, `--check` OK; box screenshots: 2D shows □ + clock, 3D shows the 3-face cube)**
 
 Owner 21.10: "a clock icon for the times button in 2d view, for 3d 2d a cube thats either only one side is visible or

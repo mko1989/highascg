@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress (Phase A–D shipped; live QA **T91.C4** pending)  
 **Priority:** High (remote admin reachability; today requires SSH + `sudo tailscale up`)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

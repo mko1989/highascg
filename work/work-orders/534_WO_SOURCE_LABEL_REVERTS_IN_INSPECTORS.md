@@ -1,8 +1,9 @@
 # WO-534 — A renamed DeckLink input reverted to its old name in both inspectors
 
-**Status: FIXED in repo (14.08.2026) — 7 smokes, suite 2235 / 2233 pass / 0 fail / 2 skip. Owner QA owed (§5).**
+**Area:** web-client, video-io
+**Status: DONE — FIXED in repo (14.08.2026) — 7 smokes, suite 2235 / 2233 pass / 0 fail / 2 skip. Owner QA owed (§5).**
 **Priority:** High (looks like data loss on a write that actually succeeded)
-**Source:** `work/work-orders/todos14.08.26` line 14: *"the decklink labels are still not applying
+**Source:** `work/archive/todos/todos14.08.26` line 14: *"the decklink labels are still not applying
 correctly, i just changed a label on decklink4 in host channel, it somehow applyed on the compose
 preview but went back to the previous label in host ch and sdi port inspectors."*
 **Related:** [WO-530](./530_WO_COMPOSE_SURFACES_AND_SOURCE_LABELS.md) (§3 — the compose label bar half,

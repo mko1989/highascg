@@ -2,9 +2,10 @@
 
 **OWNER QA PASSED 04.08 — "i already did reflash and install and it worked": the full 5-phase flash completed with the WO-416 inhibit in place. CLOSED.**
 
+**Area:** os-iso
 **Status: DONE (2026-08-03 — fix options 1+3 implemented; offline suite 1801/2, the 2 reds are the pre-existing WO-415 monitor smokes; live flash re-run remains owner QA)**
 
-## Symptom (owner run log, pasted into `work/work-orders/todos03.08.26`)
+## Symptom (owner run log, pasted into `work/archive/todos/todos03.08.26`)
 
 Build phase (`eggs produce`) completed fine — ISO
 `/home/eggs/mnt/highascg-nvidia-595_amd64_2026-08-03_1259.iso` produced, all Calamares/GRUB

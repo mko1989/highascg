@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete (v1) — enforcement opt-in for dev; enabled on eggs ISO by default
+**Area:** network
+**Status:** DONE — Complete (v1) — enforcement opt-in for dev; enabled on eggs ISO by default
 **Priority:** **Critical** — the entire control plane is unauthenticated and network-reachable
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

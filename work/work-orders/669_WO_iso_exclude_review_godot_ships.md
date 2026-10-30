@@ -1,5 +1,6 @@
 # WO-669 — ISO exclude review: the Godot GUI binary was excluded; credentials and dev leftovers now are
 
+**Area:** os-iso
 **Status: DONE in repo (22.10, two rounds; list simulation + smoke 39/0 + test:ci); proven on the next `eggs produce`
 by `verify-iso-squashfs-excludes.sh` — owner 22.10: "we are not doing the iso yet. just a prepare for later"**
 

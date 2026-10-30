@@ -1,8 +1,9 @@
 # WO-535 — The playhead never pressed a Companion button; the flag inspector showed a stale one
 
-**Status: FIXED in repo (14.08.2026) — 10 smokes, suite 2245 / 2243 pass / 0 fail / 2 skip. Owner QA owed (§6).**
+**Area:** companion, engine
+**Status: DONE — FIXED in repo (14.08.2026) — 10 smokes, suite 2245 / 2243 pass / 0 fail / 2 skip. Owner QA owed (§6).**
 **Priority:** High (the whole point of Companion flags is the playhead firing them)
-**Source:** `work/work-orders/todos14.08.26` lines 8–10:
+**Source:** `work/archive/todos/todos14.08.26` lines 8–10:
 - *"the companion connection is not working correctly, it seems slow, gives many different errors. main use case is to use companion button presses inside the timeline."*
 - *"it displays cannot reach companion satelite, and to check companion settings if its enabled. That is very wrong because the companion sattelite setting CANNOT be turned off."*
 - *"the test press goes thru but the playhead does not trigger a press. also the flag correctly displays the current display of the button, but inside the inspector it shows a stale button display."*

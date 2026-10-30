@@ -1,5 +1,6 @@
 # WO-459 — Calamares installer slideshow still said "Broadcast graphics playout"
 
+**Area:** os-iso
 **Status: IN PROGRESS (repo fixed + guarded 2026-08-10; owner must redeploy branding on the eggs host and re-produce the ISO before it changes on a stick)**
 
 Owner (todos10.08 §1): *"when calamares install is running there are splash screens inside the

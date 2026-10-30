@@ -1,5 +1,6 @@
 # WO-783 — Look presets as a tab of the right-hand column (Inspector | Look presets)
 
+**Area:** godot-client
 **Status: DONE (26.10 — Godot 21884 tests, boot check, off-screen client screenshot of the tab against the live server; owner QA = the tab on the panel)**
 
 Owner, 26.10 (after WO-781 / WO-782):

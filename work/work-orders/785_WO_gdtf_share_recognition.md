@@ -1,5 +1,6 @@
 # WO-785 — Better GDTF Share recognition of MVR heads
 
+**Area:** lighting
 **Status: IN PROGRESS (26.10 — part 1 matcher DONE: smoke + evaluation on the owner's 18 placeholders against the live Share list; part 2 "Replace… lists Share candidates" OPEN)**
 
 Owner, 26.10 (with WO-784):

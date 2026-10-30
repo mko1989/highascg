@@ -1,6 +1,7 @@
 # WO-260 — Browser source v2: client UI (add form, source rows, Interact button)
 
-**Status:** OPEN
+**Area:** web-client, video-io
+**Status:** IN PROGRESS — was: OPEN
 **Priority:** HIGH (completes WO-258 — backend/API fully wired at f63aeeb, zero client surface yet)
 **Owner check:** A260.1
 

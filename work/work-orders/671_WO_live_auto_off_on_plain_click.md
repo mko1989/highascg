@@ -1,5 +1,6 @@
 # WO-671 — Live 2D: compose windows stop following the panel (a plain click turned Auto off)
 
+**Area:** godot-client
 **Status: DONE (22.10, box-verified by an in-client probe; owner QA = checklist 22.10 §G)**
 
 Owner, `next.md` 22.10: *"the windows in standard compose preview do not resize when the whole preview window is

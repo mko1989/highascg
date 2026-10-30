@@ -1,5 +1,6 @@
 # WO-660 — Remove the WO-319 GUI live stream (NVENC → WebCodecs) from the server
 
+**Area:** engine, godot-client
 **Status: DONE (2026-10-21, offline suite 2710/0, gates clean; box: node restarted, `/api/gui-stream/status` 404)**
 
 Follow-up of [WO-646](./646_WO_kiosk_decommission.md) stage C (owner 21.10: the web UI keeps "the compose preview

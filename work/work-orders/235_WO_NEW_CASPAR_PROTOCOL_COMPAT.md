@@ -1,6 +1,7 @@
 # WO-235 — New Caspar (2.6-dev r253c16c) protocol compatibility: OSC timers erratic, playback matrix empty, interactive-display 400
 
-**Status:** Planned | **Date:** 2026-07-15 | **Priority:** CRITICAL (new binary is running on the dev box now)
+**Area:** amcp, caspar-build
+**Status:** IN PROGRESS — Planned | **Date:** 2026-07-15 | **Priority:** CRITICAL (new binary is running on the dev box now)
 **Source:** owner post-swap: "first there is something wrong with osc/variables parsing as the timers in main ui and on mv are freaking out." + "HTTP 400: No interactive operator display configured (multiview or screen consumer)"
 
 ## Evidence so far

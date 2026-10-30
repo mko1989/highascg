@@ -4,7 +4,7 @@
 
 **Related:** [`tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md`](../tools/eggs/live-usb/EXFAT_DATA_ZERO_TOUCH.md), WO‑47 [`docs/WO47_ISO_VS_EXFAT.md`](../docs/WO47_ISO_VS_EXFAT.md), WO‑35 [`work/work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md`](work-orders/35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md), audio [`docs/guides/audio/audio-setup-guide.md`](../docs/guides/audio/audio-setup-guide.md).
 
-> **2026-05 update:** Union **`/ union`** persistence and WO‑38 **`media/drive`** mount were removed — operator sticks use **plain Live + exFAT (`HIGHASCGEXF`) only**. See [`work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md`](work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md).
+> **2026-05 update:** Union **`/ union`** persistence and WO‑38 **`media/drive`** mount were removed — operator sticks use **plain Live + exFAT (`HIGHASCGEXF`) only**. See [`work/work-orders/855_WO_remove_persistence_partition_workflow_exfat_only.md`](work/work-orders/855_WO_remove_persistence_partition_workflow_exfat_only.md).
 
 ---
 

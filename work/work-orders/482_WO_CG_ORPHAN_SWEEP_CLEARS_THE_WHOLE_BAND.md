@@ -1,5 +1,6 @@
 # WO-482 — the CG orphan sweep clears 90 hosts per channel whether or not anything is on them
 
+**Area:** amcp
 **Status: DONE (11.08.2026, verified: new smoke 6/6 incl. a fixture checked against a live INFO
 response, offline suite 1966/1964 pass/0 fail/2 skip)**
 

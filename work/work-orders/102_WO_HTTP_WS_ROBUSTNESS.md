@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete (v1) — HTTP/WS limits landed 2026-07-02; slow-consumer integration test deferred
+**Area:** network
+**Status:** DONE — Complete (v1) — HTTP/WS limits landed 2026-07-02; slow-consumer integration test deferred
 **Priority:** **Medium-High** — memory-exhaustion DoS + WS jank on a 24/7 box
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -1,5 +1,6 @@
 # WO-661 — Templates tab in groups (Templates / Lower thirds / Shaders) + ⚠ on shaders without Caspar GPU
 
+**Area:** godot-client, engine
 **Status: DONE (2026-10-21, offline 2716/0 + Godot 20771/0; box: Godot groups + ⚠ verified; web = owner QA)**
 
 Owner 21.10: "for both webui and Godot categorization of templates system, lower thirds, shaders (shaders should have a

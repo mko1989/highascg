@@ -1,6 +1,7 @@
 # WO-586 — import a large library of audio-reactive shaders (ShaderAmp → 118 `sh-sa-*` shaders)
 
-**Status: IMPLEMENTED 30.09.26. Every shader compiles and renders through the real exported template in headless Chrome, and was imported through `POST /api/shaders` (118/118 ok, library 43 → 161). NOT yet seen on air: whether each one looks right with real program audio on the GPU is owner QA (§4). Licence decision is the owner's (§5).**
+**Area:** engine
+**Status: DONE — IMPLEMENTED 30.09.26. Every shader compiles and renders through the real exported template in headless Chrome, and was imported through `POST /api/shaders` (118/118 ok, library 43 → 161). NOT yet seen on air: whether each one looks right with real program audio on the GPU is owner QA (§4). Licence decision is the owner's (§5).**
 
 Owner, 30.09: *"can you find a large library of audio reactive shaders and add them to the shader
 library in highascg?"*

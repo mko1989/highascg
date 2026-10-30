@@ -1,5 +1,6 @@
 # WO-762 — Look deck: a duplicate goes last; drag cards to reorder; a look made from a media drop is named after the file
 
+**Area:** godot-client, engine
 **Status: DONE (25.10 — Godot 21756/0, smoke-wo623-new-look 6/0, GUI e2e 32/32 incl. 4 new steps; owner relaunch + QA)**
 
 Owner 25.10:

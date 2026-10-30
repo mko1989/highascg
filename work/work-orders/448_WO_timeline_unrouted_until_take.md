@@ -1,5 +1,6 @@
 # WO-448 — Timeline routes NOWHERE on PGM-only screens until Take / look playback
 
+**Area:** engine, web-client
 **Status: DONE (06.08.26 — engine + client + UI fixed, smokes green; client build + service restart in the day's batch tail)**
 
 Owner (todos06.08 follow-up): *"the timeline defaults to be already linked to pgm, meaning

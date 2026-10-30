@@ -1,8 +1,9 @@
 # WO-379 — shader store halves diverged (the 404), and a stacked shader could never be taken off air
 
+**Area:** engine
 **Status: DONE (28.07.26 — the box's 9 broken shaders repaired live and the 404 gone; stack clear implemented. SERVER change: the stack-clear action and the automatic self-heal need a highascg restart.)**
 
-Source: `work/work-orders/todos28.07.26`, owner lines added 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner lines added 28.07:
 
 > there is no way to remove a shader from a pgm stack in shaders editor.
 > sh-mirrors shader fails to load with 404

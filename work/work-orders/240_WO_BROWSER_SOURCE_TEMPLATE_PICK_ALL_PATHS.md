@@ -1,6 +1,7 @@
 # WO-240 — Browser-source template pick missing in the owner's actual flow; browser host channel = keep-open + route + operator-fullscreen with puppeteer input
 
-**Status:** Complete | **Date:** 2026-07-15
+**Area:** web-client, engine
+**Status:** DONE — Complete | **Date:** 2026-07-15
 **Source:** owner: "i cant choose a template in the web browser source. also the point of having a seperate channel for browser is to keep it open in that channel and route it where needed. one of it is showing full screen on operator screen with mouse keyboard routed via pupeteer."
 
 ## Context

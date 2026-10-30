@@ -1,5 +1,6 @@
 # WO-363 — Factory reset lands on JPEG-stream compose preview (todos28.07.26 §2)
 
+**Area:** web-client, devices-config
 **Status: DONE (28.07.26, verified offline — see §3; destructive live reset intentionally NOT run)**
 
 ## 1. Investigation

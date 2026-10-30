@@ -1,5 +1,6 @@
 # WO-684 — Kiosk GUI deprecated for good: factory reset / New project / ISO seed the Godot shm output
 
+**Area:** os-iso, godot-client
 **Status: DONE (22.10, offline smokes + full suite; factory output generated and diffed; live config untouched)**
 
 Owner, 22.10: *"We can mark the whole kiosk gui as deprecated so it won't come back after a factory reset."*

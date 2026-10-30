@@ -1,6 +1,7 @@
 # WO-173 — Timeline playout: schedule-style batched AMCP (clip boundaries + keyframe tweens in DEFER/COMMIT batches)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine, amcp
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (AMCP volume + transition atomicity)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): timeline → AMCP should work like a schedule; e.g. a clip starting at opacity 0 with fade-in gets `OPACITY 1 <frames> DEFER` in its start batch.

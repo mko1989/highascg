@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** web-client, devices-config
 **Status:** In progress — Phase A–C shipped 2026-06-29  
 **Priority:** Medium (UX clarity for dense rigs; default behaviour unchanged)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

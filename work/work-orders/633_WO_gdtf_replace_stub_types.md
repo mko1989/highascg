@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21, offline smoke + Godot unit tests + box test on Pabianice with the real ADJ Focus Profile). Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 found the stubs). Related: [WO-612](./612_WO_previs_mvr_import.md).**
-
 # WO-633 — Replace a stub GDTF (Capture placeholder) with the real fixture file
+
+**Area:** lighting
+**Status: DONE (2026-10-21, offline smoke + Godot unit tests + box test on Pabianice with the real ADJ Focus Profile). Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 found the stubs). Related: [WO-612](./612_WO_previs_mvr_import.md).**
 
 Owner 21.10: "what can we do about the missing gdtf files from the import" → "make work orders for those additions and
 start working on them".

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-17, verified on the shop dev box with a real PGM output on DP-7) — T1–T6 implemented + verified; T7 (MVR round trip) moved to [WO-612](./612_WO_previs_mvr_import.md) where the MVR reader/writer lives. Owner QA: interactive pass on the box. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D views, drag-move).**
-
 # WO-614 — Previs stage builder: standard LED walls, TVs, projection — bound to channels
+
+**Area:** godot-client, mapping
+**Status: DONE (2026-10-17, verified on the shop dev box with a real PGM output on DP-7) — T1–T6 implemented + verified; T7 (MVR round trip) moved to [WO-612](./612_WO_previs_mvr_import.md) where the MVR reader/writer lives. Owner QA: interactive pass on the box. Parent: [WO-607](./607_WO_godot_previs_native_3d.md). Related: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md), [WO-616](./616_WO_previs_tracking_openfollow_cameras.md), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D views, drag-move).**
 
 Owner, 17.10: "id like an easy way to create standard stages in 3d previz. led walls, tvs, projections,
 connected to channels. led walls from a simple panel width heigth px width heigth, quantity."

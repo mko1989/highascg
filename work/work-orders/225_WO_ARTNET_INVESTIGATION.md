@@ -1,6 +1,7 @@
 # WO-225 — Art-Net pixel-mapping redesign: full investigation → multiple follow-up WOs
 
-**Status:** Investigation | **Date:** 2026-07-15
+**Area:** lighting, caspar-build
+**Status:** DONE — Investigation | **Date:** 2026-07-15
 **Source:** owner: "we need to redo the artnet pixel mapping workflow. first of all it looks like casparcg has native artnet consumer. second of all there is something baked in that can do pixel averaging (sws_scale). third there is a improved artnet consumer, that we could build into the extended version of caspar we are using." + "yes artnet needs a full investigation with multiple work orders."
 
 ## Scope (investigation only — output = evidence + a numbered set of draft WOs 226a/b/c… appended here)

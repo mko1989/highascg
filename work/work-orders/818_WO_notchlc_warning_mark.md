@@ -1,5 +1,6 @@
 # WO-818 — ⚠ warning mark next to NotchLC files in the media lists (Godot + web)
 
+**Area:** media
 **Status: DONE (29.10, Godot suite 22749/0 + smoke 4/4 + offline 3569/0/2 + boot check + Xvfb render of the Godot list; tooltip on hover and the web row on screen are owner QA) · live e2e 29.10: Godot ⚠ missing at boot → /api/media probe-budget fix (media-catalog.js) → PASS at boot; web row + tooltip PASS**
 
 Owner (29.10): "if the difference between playback is so colossal we need a warning sign next to notchLC files with a

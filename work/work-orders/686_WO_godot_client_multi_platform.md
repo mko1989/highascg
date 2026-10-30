@@ -1,5 +1,6 @@
 # WO-686 — Godot client ready for Windows / macOS / Linux (a GUI on another machine)
 
+**Area:** godot-client
 **Status: DONE (22.10, Godot `--test` 21055/0 + `--check`; all three exports built on the box; the Linux export run windowed against the box over the LAN). Owner QA: run the Windows .exe and the macOS .app on real machines.**
 
 Owner, 22.10: *"Prepare the Godot client for multi platform."* Follows [WO-670](./670_WO_server_network_and_remote_godot.md),

@@ -1,5 +1,6 @@
 # WO-675 — Presenter recognition: backstage photo + name + mic → recognised on stage → automations
 
+**Area:** tracking-vr
 **Status: IN PROGRESS — P1 + P3 (face) DONE 22.10 (smoke 8/0, test_face.py, Godot 20887/0, box: intake POST → face ok, sidecar end-to-end on a synthetic camera, Inspector screenshots); round 2 DONE 22.10: short `/intake` address + presenter picks in the lower-third inspector (box screenshots). P2 body re-ID DONE 22.10 (youtureid + grey-world, fused with faces; smoke 9/0, test_body.py, Godot 20946/0, box: intake body feature + sidecar on a synthetic camera 0.784 vs 0.152). Open: live test with real cameras; owner decision on the research-trained weights (P2 section).**
 
 Owner, `next.md` 22.10: *"how possible is it to do this: an audio tech is giving a mic to a presenter backstage he

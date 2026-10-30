@@ -1,5 +1,6 @@
 # WO-775 — media versions: a new version may change the container (previz .mp4 → show .mov)
 
+**Area:** media
 **Status: DONE (26.10, bdf862ef) — offline suite 3365 / 0 / 2 skipped, smoke 8 / 8 (4 new), live API round trip on the
 box (mp4 → ProRes mov → back), CI green (run 40316158890).**
 

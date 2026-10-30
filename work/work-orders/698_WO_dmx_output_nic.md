@@ -1,5 +1,6 @@
 # WO-698 — choose the network card the fixture DMX output (Art-Net / sACN) leaves by
 
+**Area:** lighting, network
 **Status: DONE (2026-10-23, smoke-wo698 4/4 + wo615 8/8, Godot 21153/0; egress measured on this box's NIC TX
 counters; live server reports `dmx.iface`; the picker shown in the real client. Owner QA: pick the lighting NIC under
 Previs → Fixtures → Out via and check the nodes / DMX viewer)**

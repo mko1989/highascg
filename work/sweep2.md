@@ -4,7 +4,7 @@
 **Generated:** 2026-06-03  
 **Git HEAD:** `3472dda` — *Fix GPU topology from DRM and protect project saves from stale clients.*  
 **Rule:** Line count **> 500** (strictly greater than 500), counted with `wc -l`.  
-**Prior sweep:** [`work/work-orders/sweep1.md`](work-orders/sweep1.md) (2026-05-18) reported **0** files over 500 under the app-only scan.
+**Prior sweep:** [`work/archive/sweep1.md`](archive/sweep1.md) (2026-05-18) reported **0** files over 500 under the app-only scan.
 
 ## Included extensions
 

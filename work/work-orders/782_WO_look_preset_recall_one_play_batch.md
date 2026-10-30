@@ -1,5 +1,6 @@
 # WO-782 — Look preset recall: every screen's final PLAY in one AMCP batch
 
+**Area:** engine, amcp
 **Status: DONE (26.10 — WO-782 smoke 4/4 + offline suite; live: a 2-screen PGM and a PRV preset recall each logged `[take-sync] Phase B go: ch 1+3` / `ch 2+4` with ONE batch; owner QA = screens start together)**
 
 Owner, 26.10 (after WO-781):

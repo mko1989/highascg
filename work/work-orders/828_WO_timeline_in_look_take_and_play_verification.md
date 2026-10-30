@@ -1,5 +1,6 @@
 # WO-828 — Timeline inside a look: does the take transition and play as the WOs say? (live verification + fixes)
 
+**Area:** engine
 **Status: DONE (30.10, live wire + PGM luma probe + offline suite) — D1, D2, D3, D4, D5, D7, D9 fixed and verified (§5;
 coordinator re-runs §5.1 and §5.3). Normal → normal CUT wire byte-identical (golden smoke). Offline suite 3666 tests /
 3664 pass / 0 fail / 2 skipped. Owner decisions left, not defects of the spec: D6 (one air timeline across screens) and

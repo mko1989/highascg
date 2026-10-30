@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; Godot 20706/0, box: Times on → "L10 BAZA 2 0:17 / 0:20 (−0:02)" under the PGM label, "L10 BAZA 2" under PRV). Owner QA: a multi-layer look and a playlist layer.**
-
 # WO-652 — Live 2D: per-layer media / playlist times under each window (Times toggle)
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20706/0, box: Times on → "L10 BAZA 2 0:17 / 0:20 (−0:02)" under the PGM label, "L10 BAZA 2" under PRV). Owner QA: a multi-layer look and a playlist layer.**
 
 Owner, 21.10:
 - *"there was an additional overlay on the compose preview in kiosk with times on each layer with the top layer

@@ -1,6 +1,7 @@
 # WO-242 — Native pixel-map screens: dedicated channel + improved-artnet consumer per fixture array; JS pixel-mapping deprecated
 
-**Status:** Implemented (T242.1-T242.7 done; A242.1 is an owner action, unchecked) | **Priority:** High | **Date:** 2026-07-15
+**Area:** lighting, mapping
+**Status:** DONE — Implemented (T242.1-T242.7 done; A242.1 is an owner action, unchecked) | **Priority:** High | **Date:** 2026-07-15
 **Source:** owner: "i dont want the js pixelmapping. i want to use native artnet consumer from the improved v. and as an addition be able to create the pixel mapping 'screen'/channel that would then send artnet to arrey of fixtures."
 
 ## Design

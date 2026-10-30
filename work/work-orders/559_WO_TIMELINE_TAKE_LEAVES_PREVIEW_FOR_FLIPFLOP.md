@@ -1,6 +1,7 @@
 # WO-559 — after taking a timeline look, it stayed on preview too, blocking the outgoing look
 
-**Status: FIXED in repo (03.09.2026). 6 new smokes, 5 pre-existing tests across 3 files updated
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026). 6 new smokes, 5 pre-existing tests across 3 files updated
 (their assertions pinned the exact "both channels" behavior this WO deliberately changes — updated
 comments and expectations, not weakened). Full offline suite 2394/2392/0/2, all green. Server
 restarted and live. Owner QA owed.**

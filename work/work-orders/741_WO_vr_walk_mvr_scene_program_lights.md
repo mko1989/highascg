@@ -1,5 +1,6 @@
 # WO-741 — VR: walk into the MVR scene and program lights from inside it (future)
 
+**Area:** tracking-vr, lighting
 **Status: DONE (24.10.26) as detachable future development — steps 1–2 built: the client flag `-- --xr` walks the
 Previs at 1:1 and programs through the walk camera / a controller ray. Proven without a headset: Godot tests and a GUI
 e2e in the sandbox (`run-gui-e2e.js --e2e=06_xr_walk --xr`: 4/4). The OpenXR (headset) path is built but untested:

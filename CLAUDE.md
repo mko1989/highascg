@@ -8,11 +8,14 @@ anything; it encodes the working discipline every session is expected to follow.
 Every non-trivial issue, feature, or investigation gets a work order: `work/work-orders/NNN_WO_<slug>.md`
 (next free NNN) plus a row in `work/OPEN_ISSUES.md` (the queue: `| WO-NNN | summary | link | status |`).
 
-**Before working on ANY issue: search the work orders first.**
+**Before working on ANY issue: search the work-order INDEX first** — one line per WO (number, status, area,
+title, file), generated from the WO headers. It costs a fraction of grepping the WO bodies.
 
 ```
-rg -il "<keyword>" work/work-orders/   # has this been worked on?
-rg -n "<keyword>" work/OPEN_ISSUES.md  # queue status
+rg -i "<keyword>" work/work-orders/INDEX.md               # which WOs touch this? (status + file in the hit)
+rg " (OPEN|IN PROGRESS) \[audio" work/work-orders/INDEX.md  # not-done WOs of one area
+rg -il "<keyword>" work/work-orders/*.md                  # only then the live bodies (deprecated/ is skipped)
+rg -n "<keyword>" work/OPEN_ISSUES.md                     # queue status
 ```
 
 Most "new" issues are follow-ups, regressions of past fixes, or already-diagnosed problems with
@@ -28,12 +31,23 @@ contracts, AMCP escaping, bank layout…) that a fresh reading of the code will 
    the box (journal lines, API responses, screenshots), and what remains owner-QA. Never mark
    done on "should work" — state what was proven and how.
 
-Status line at the top: `**Status: OPEN | IN PROGRESS | DONE (date, how verified) | DEPRECATED (reason, successor)**`.
+Header, right under the `# WO-NNN — title` line:
+
+```
+**Area:** <primary>[, <secondary>…]     (slugs: tools/wo/wo-lib.js AREAS — engine, amcp, audio, godot-client, …)
+**Status: OPEN | IN PROGRESS | DONE (date, how verified) | DEPRECATED (reason; successor WO-NNN)**
+```
+
+After adding or changing a WO header run `node tools/wo/build-index.js`; `node tools/wo/check-wos.js` (a curated
+smoke, so CI) fails on a bad header, a stale INDEX.md or a reference to a missing WO file. Only WOs live in
+`work/work-orders/` (owner todos arrive there too); notes go to `work/notes/`, logs and old todos to `work/archive/`.
 
 **DEPRECATED work orders are NOT a source of truth.** A WO whose approach was reverted,
 superseded, or proved wrong keeps its history but must carry a DEPRECATED status naming the
-reason and the successor WO. Trust the successor, not the corpse. When your own approach dies,
-deprecate the WO yourself — a dead end recorded honestly saves the next session from repeating it.
+reason and the successor WO, and it lives in `work/work-orders/deprecated/` — move it with
+`node tools/wo/wo-move.js <plan.json>` (it rewrites every link and path mention). Trust the successor, not the
+corpse. When your own approach dies, deprecate the WO yourself — a dead end recorded honestly saves the next
+session from repeating it.
 
 ## Non-negotiables
 

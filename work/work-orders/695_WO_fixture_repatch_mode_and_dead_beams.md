@@ -1,5 +1,6 @@
 # WO-695 — Previs fixtures: re-patch a head (mode / universe / address), the operator's patch survives an MVR re-patch, and heads on the box's own input universe still light up
 
+**Area:** lighting
 **Status: DONE (2026-10-23, smoke 4/4 new + wo615/616 15/15, test:ci 2834/2837 (only the known pointer-confine fail + 2 skipped), Godot 21146/0; box: beams + programmer react, 36ch re-patch applied / survived an MVR re-patch / then rolled back to the owner's 40ch state)**
 
 Owner, 23.10: *"cant change patch of a fixture. also its patching automatically with wrong ch layout even when i choose

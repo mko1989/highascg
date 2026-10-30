@@ -1,5 +1,6 @@
 # WO-756 — The rest of the 2026-08-03 tools review: the clock-setting test, the eggs cleaner, the exFAT conf, the inert timeout, local CI
 
+**Area:** testing-ci, os-iso
 **Status: DONE (25.10.26) — the time test run as root on .4 left NTP and the date alone (16 / 0); cleaner and exFAT conf
 proven by dry run; test:ci 3322 / 0, the same count three runs in a row; gates and lint green.**
 

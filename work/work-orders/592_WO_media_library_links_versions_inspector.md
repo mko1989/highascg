@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-04, offline suite + live on the box) — A links, B versions, C inspector, D multi-rename, trim/mute defaults, final delete, mojibake repair. Owner QA: look layer picks up file trim/mute on drop; remote browser view; .stignore mirror on the Mac.** Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
-
 # WO-592 — Media library: stable links, version control, media inspector, multi-rename
+
+**Area:** media
+**Status: DONE (2026-10-04, offline suite + live on the box) — A links, B versions, C inspector, D multi-rename, trim/mute defaults, final delete, mojibake repair. Owner QA: look layer picks up file trim/mute on drop; remote browser view; .stignore mirror on the Mac.** Nothing implemented. Box was on show: no measurements that load the CPU/GPU were run.**
 
 Owner, 04.10: "i need quality of life operations on files, but i also need version control. so i
 think a system where it creates links to the actual files, and any moving, renaming is done to the

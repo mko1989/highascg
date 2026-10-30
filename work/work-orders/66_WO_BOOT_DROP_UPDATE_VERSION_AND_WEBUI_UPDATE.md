@@ -7,14 +7,15 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phases 1–4 shipped (boot retain/consume, API, Web UI updates tab); Phase 5–6 QA on hardware outstanding  
+**Area:** os-iso, network
+**Status:** IN PROGRESS — Phases 1–4 shipped (boot retain/consume, API, Web UI updates tab); Phase 5–6 QA on hardware outstanding  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)  
 **Extends / depends on:**
 - [47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md](./47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md) — exFAT mount, boot sync pipeline
 - [52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md](./52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md) — USB vs bridge volumes, `drop-config/` pairs
 - [39_WO_SETTINGS_SYSTEM_HARDWARE.md](./39_WO_SETTINGS_SYSTEM_HARDWARE.md) — Settings modal, privileged server actions pattern
-- [51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md](./51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md) — `dist-web/` on playout `:4200`
-- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — systemd boot ordering
+- [51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md](./deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md) — `dist-web/` on playout `:4200`
+- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — systemd boot ordering
 
 **Operator docs (update when shipped):**
 - [`docs/EXFAT_SERVER_UPDATE.md`](../../docs/EXFAT_SERVER_UPDATE.md)

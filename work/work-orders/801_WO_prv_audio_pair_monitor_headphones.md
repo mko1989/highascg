@@ -1,5 +1,6 @@
 # WO-801 — PRV audio: monitor individual pairs on headphones (not only the mix-down)
 
+**Area:** audio
 **Status: DONE (29.10, live e2e on the box) (29.10) — investigated, designed, built offline (server + Godot picker, tests green); live check + owner headphone QA open (see "Live checks for the next round") · live e2e 29.10: HP pair picker PASS on ch7 (3+4/1+2/5+6/7+8/Mix, journal ok each, PGM/PRV consumers unchanged); follow-up: ~4 s xrun burst after one switch (7+8, 20:16:35.90)**
 
 Owner, 29.10:

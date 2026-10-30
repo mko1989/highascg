@@ -1,5 +1,6 @@
 # WO-426 — 50 fps hardcoding audit: 60 Hz regions must work end-to-end
 
+**Area:** engine, video-io
 **Status: DONE (2026-08-04 — full-source sweep classified; 2 real defects fixed; smoke green; suite 1826/0/2)**
 
 Owner: "check if nothing is hardcoded to 50fps. im in europe where thats the standard but

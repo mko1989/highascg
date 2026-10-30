@@ -1,5 +1,6 @@
 # WO-492 — AMCP CLEAR chatter on connect/start: what still fires and why
 
+**Area:** amcp
 **Status: DONE (12.08 — investigation, then all three findings fixed on owner go-ahead; 9 new smokes, suite 1995/1993/0, eslint 0 errors) — NOT deployed: needs a `highascg` restart, owner's call on an on-air box**
 
 Owner 12.08: *"investigate amcp chatter. the thing that most stands out to me is a cg clears on

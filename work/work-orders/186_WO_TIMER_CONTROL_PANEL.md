@@ -1,9 +1,10 @@
 # WO-186 — Timer control panel: collapsible bottom-right controller with timer selector; HH/MM/SS inputs; default center
 
-**Status:** Completed
+**Area:** web-client, engine
+**Status:** DONE — Completed
 **Priority:** Medium (operator workflow for the new countdown feature)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner): inspector-only timer controls aren't flexible; want "timer #1"-style instances with a small collapsible display+control panel bottom-right next to the compact audio mixer, a dropdown to pick which timer to control, HH/MM/SS entry instead of seconds, and center as the default position.
+**Source:** `work/archive/todos/todos14.07.26` (owner): inspector-only timer controls aren't flexible; want "timer #1"-style instances with a small collapsible display+control panel bottom-right next to the compact audio mixer, a dropdown to pick which timer to control, HH/MM/SS entry instead of seconds, and center as the default position.
 **Related:** WO-169 (countdown template + inspector + stateless routes — the foundation), WO-170 (companion actions).
 
 ---

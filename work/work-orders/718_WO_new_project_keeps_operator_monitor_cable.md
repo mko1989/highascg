@@ -1,5 +1,6 @@
 # WO-718 — A New project comes up with the operator monitor cabled in Devices
 
+**Area:** devices-config
 **Status: IN PROGRESS (23.10.26). Code done and covered offline: the WO-718 smoke 5/5, plus new-project / WO-290 /
 WO-638 65/65. NOT verified on the box: a live New project replaces the owner's current project, so that check is
 owner QA (see below).**

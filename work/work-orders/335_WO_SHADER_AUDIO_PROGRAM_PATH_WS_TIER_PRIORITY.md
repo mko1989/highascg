@@ -2,6 +2,7 @@
 
 **Source:** owner report 2026-07-26 — "works in the little preview window of the modal, but does not receive audio when on caspar's program."
 
+**Area:** audio, engine
 **Status: DONE 2026-07-26** — core fix live-verified on program; follow-ups all landed same day (51d8a5a: tier-A silent-mic guard, audio iChannelResolution (512,2,1), shader-fx.md rewrite; smokes repointed in fd2f99f batch). Remaining: none. This is the file-form continuation of the WO-333/333b labels already used in code comments (no 333 file exists; do not reuse the number).
 
 ## Root cause (verified live via CDP on Caspar's CEF, port 9222)

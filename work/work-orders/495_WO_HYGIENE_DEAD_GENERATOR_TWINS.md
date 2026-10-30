@@ -1,5 +1,6 @@
 # WO-495 — Hygiene: delete the dead `build-caspar-config-*` generator twins
 
+**Area:** devices-config
 **Status: DONE (12.08 — 3 files / 409 lines removed, suite 2010/2008/0 unchanged, eslint 0 errors)**
 
 Owner 12.08 (`todos12.08.26`): *"do the hygine pass"* — acting on the trap flagged at the end of

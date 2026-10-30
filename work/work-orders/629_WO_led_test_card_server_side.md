@@ -1,5 +1,6 @@
 # WO-629 — LED test card: settings + master switch in node, Godot header switch + dialog (WO-608 header slice 3)
 
+**Area:** mapping, godot-client
 **Status: DONE (20.10 — box: dialog edits stored in node, channel 7 Show on/off, header master off/on/off; smoke 15/15)**
 
 Part of the WO-593 / WO-608 Godot port ("work on filling the top bar like it is in the webui"). Under owner directive D

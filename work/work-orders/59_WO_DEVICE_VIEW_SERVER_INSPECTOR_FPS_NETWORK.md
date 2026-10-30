@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
+**Area:** devices-config, web-client
 **Status:** In progress  
 **Priority:** High (operator rig setup — stale inspector blocks day-one configuration)  
 **Related:** [33_WO_DEVICE_VIEW_INDEX.md](./33_WO_DEVICE_VIEW_INDEX.md), [33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md](./33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md), [33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md](./33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md), [40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md), [55_WO_DECKLINK_OUTPUT_STANDARD_RESOLUTION_INHERIT.md](./55_WO_DECKLINK_OUTPUT_STANDARD_RESOLUTION_INHERIT.md), [docs/HIGHASCG_PASSWORDLESS_SUDO.md](../../docs/HIGHASCG_PASSWORDLESS_SUDO.md)

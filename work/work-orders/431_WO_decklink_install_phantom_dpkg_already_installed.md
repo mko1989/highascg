@@ -1,5 +1,6 @@
 # WO-431 — GUI DeckLink Install says "already installed" on fresh clones (phantom dpkg entry)
 
+**Area:** os-iso, video-io
 **Status: DONE (2026-08-05 — payload-presence gate in the install lib; smoke 6/6; owner one-liner clears the second box, see QA)**
 
 Owner 05.08: "tried installing the decklink drivers but got already installed. on the

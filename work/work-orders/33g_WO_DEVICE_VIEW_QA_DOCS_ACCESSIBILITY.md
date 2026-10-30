@@ -1,7 +1,8 @@
 # WO-33g — Device view: QA, documentation, and accessibility
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** devices-config, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** Complete **33a–33f** to scope for **full** suite; partial runs possible after 33c.
 
 ---

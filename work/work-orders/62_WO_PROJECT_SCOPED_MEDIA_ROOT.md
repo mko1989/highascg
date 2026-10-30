@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** media
 **Status:** In progress (Phase 1–3 complete 2026-06-27; manual field QA pending)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)  
 **Builds on:**

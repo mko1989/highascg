@@ -1,5 +1,6 @@
 # WO-767 — Imported MVR: MAC Aura PXL heads drawn ~1000× too big (GDTF glb in mm), pick boxes swallow every click, Layers eye can't hide them
 
+**Area:** lighting, godot-client
 **Status: IN PROGRESS (25.10) — offline-verified (smoke 4/0, test:ci 3336/0, Godot 21760/0, client boot check); node restart + client relaunch + live look pending**
 
 Owner 25.10:

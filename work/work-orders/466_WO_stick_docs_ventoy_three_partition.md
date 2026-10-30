@@ -1,5 +1,6 @@
 # WO-466 — Stick documentation moved to Ventoy + a reserved exFAT partition at the end
 
+**Area:** os-iso, process
 **Status: DONE in repo (2026-08-10; owner QA: follow the guide once end-to-end on a fresh stick)**
 
 Owner (todos10.08): *"change quickstart guide and any place that references the iso flash to the

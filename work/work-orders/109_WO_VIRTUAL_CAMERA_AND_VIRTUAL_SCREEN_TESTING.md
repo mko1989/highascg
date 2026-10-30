@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Partially superseded by [137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md](./137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md) (2026-07-04) — single virtual cam output, Device View, API, sudo wrapper shipped; multi-output pool + virtual screens remain here.
+**Area:** video-io
+**Status:** IN PROGRESS — Partially superseded by [137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md](./137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md) (2026-07-04) — single virtual cam output, Device View, API, sudo wrapper shipped; multi-output pool + virtual screens remain here.
 **Priority:** Medium — enables Zoom/Teams/WebRTC testing and headless ffmpeg source development without extra hardware
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md), operator request 2026-07-02 (v4l2loopback install blocked by DKMS; desire for first-class HighAsCG sinks)
 

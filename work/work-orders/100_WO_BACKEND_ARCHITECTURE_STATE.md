@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** engine
 **Status:** Done — Phases A–D (2026-07-02)
 **Priority:** **Medium-High** — maintainability/correctness, not an outage; do incrementally
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

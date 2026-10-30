@@ -1,5 +1,9 @@
 # WO-273 — scripts/ and tools/ cleanup and classification
 
+**Area:** process, os-iso
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "i need you to do a thorough clean up on the scripts that are in scripts
 folder and tools. there is so much of it... i cant beleive all of those are necesery for runtime.
 id like the clean up to be moving deprecated into deprecated folder, and leaving/creating set of

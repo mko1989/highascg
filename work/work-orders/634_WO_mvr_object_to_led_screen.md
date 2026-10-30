@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21, Godot unit tests + box test: Pabianice centre wall + 2 totems → 3 LED walls on PGM 1). Parent: [WO-612](./612_WO_previs_mvr_import.md). Related: [WO-614](./614_WO_previs_stage_builder.md) (the LED wall it creates).**
-
 # WO-634 — Make an LED screen from an MVR object (map a destination onto the MVR's wall)
+
+**Area:** mapping, godot-client
+**Status: DONE (2026-10-21, Godot unit tests + box test: Pabianice centre wall + 2 totems → 3 LED walls on PGM 1). Parent: [WO-612](./612_WO_previs_mvr_import.md). Related: [WO-614](./614_WO_previs_stage_builder.md) (the LED wall it creates).**
 
 Owner 21.10: "how can i map the destination on to the mvr led wall?" → "make work orders for those additions and start
 working on them". Then: "what i need for the led walls is also a way to map one screen destination to multiple led

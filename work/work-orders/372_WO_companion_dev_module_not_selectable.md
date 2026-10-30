@@ -1,5 +1,6 @@
 # WO-372 — Companion offers no "dev" module to choose: the dev build and the installed build declare the same id AND the same version
 
+**Area:** companion
 **Status: IN PROGRESS — the collision is fixed and the dev build is now self-identifying (`1.0.5-dev.d20260728t1511` vs installed `1.0.4`). Plan steps 1, 4 and 5 done; steps 2 and 3 need a Companion restart, which is an owner call on a live show-control service — NOT declared done until the picker is observed.**
 
 Source: `work/checklist27.07.26_manual_verify.md` item 40, owner note 28.07 14:26:

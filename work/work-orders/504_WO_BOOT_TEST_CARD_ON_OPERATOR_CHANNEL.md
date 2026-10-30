@@ -1,9 +1,10 @@
 # WO-504 — The boot test card lands on the operator-GUI channel and never leaves
 
+**Area:** engine
 **Status: DONE in repo (13.08.2026 — 4 smokes, suite 2069/2067/0, eslint 0, prettier clean, client rebuilt). NOT deployed — needs a `highascg` restart.**
 **Priority:** Medium-High (every reboot, covers the operator UI)
 **Source:** owner `todos13.08.26`: *"after reboot the operator ch starts with a test card on. then needs me to enable and disable the tick for that screen in test card setup for it to disapper. shouldnt happen at all."*
-**Related:** [WO-243](./243_WO_OPERATOR_GUI_CHANNEL.md) (the operator-GUI channel), [WO-411](./411_WO_TEST_PATTERN_OUTPUT_LINE_AND_BUMP_BOX.md), [WO-492](./492_WO_AMCP_CLEAR_CHATTER_ON_CONNECT.md) §B (layer-999 module split)
+**Related:** [WO-243](deprecated/243_WO_OPERATOR_GUI_CEF_CHANNEL.md) (the operator-GUI channel), [WO-411](./411_WO_TEST_PATTERN_OUTPUT_LINE_AND_BUMP_BOX.md), [WO-492](./492_WO_AMCP_CLEAR_CHATTER_ON_CONNECT.md) §B (layer-999 module split)
 
 ## 1. Root cause
 

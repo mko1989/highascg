@@ -1,5 +1,6 @@
 # WO-766 — Playlist workflow: drop media on the layer list, Manual Next no longer loops, pick / Next on preview, ↘ fade down when done
 
+**Area:** engine, godot-client
 **Status: IN PROGRESS (25.10) — offline-verified (smoke 9/0, test:ci 3332/0, Godot 21760/0, client boot check); node restart + client relaunch + owner QA pending**
 
 Owner 25.10:

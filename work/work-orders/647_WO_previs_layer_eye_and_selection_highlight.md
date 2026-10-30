@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; Godot 20696/0, box: a 3D click lights the layer row, the eye hides / shows the layer and saves it)**
-
 # WO-647 — Previs Layers: an eye per layer, and the 3D selection lights its layer row
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20696/0, box: a 3D click lights the layer row, the eye hides / shows the layer and saves it)**
 
 Owner, 21.10: *"3d previs lacks a highligth of an item selected in 3d to the list in layer colors. next to color
 there should be an eye for hidding the layer."*

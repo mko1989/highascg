@@ -1,5 +1,6 @@
 # WO-805 — Devices tab "Apply Caspar config (restart)" is too slow: where the time goes
 
+**Area:** devices-config
 **Status: DONE (29.10, live: two Applies measured on the box — AMCP accept→back 52-55 ms, no xdotool stall, NVIDIA deferred once, XVideoSyncToDisplayID = DP-4 after the heredoc fix, 5.16 s click→NVIDIA done; fast-kill race found live and fixed offline with a negative control). Owner eye: PGM blink in the NVIDIA window; decision whether Apply should restore PGM**
 **Source:** owner 29.10: *"verify the apply and restart command stack and waits inside the button in the devices tab.
 it seems to be a bit too slow."*

@@ -1,5 +1,6 @@
 # WO-770 — VR session from the GUI: Start / PIN modal / End, WiVRn only while needed, a desktop mirror of the headset
 
+**Area:** tracking-vr
 **Status: IN PROGRESS (25.10) — offline-verified (smoke 10/0, test:ci 3357/0, Godot 21801/0, boot check OK); node restart + client relaunch + owner headset QA pending**
 
 Owner 25.10 (after the first headset session on this box worked):

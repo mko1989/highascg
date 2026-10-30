@@ -1,5 +1,6 @@
 # WO-422 — Batch COMMIT-ack timeout no longer replays the transaction sequentially (review 03.08 engine §3, the last open review item)
 
+**Area:** amcp, engine
 **Status: DONE (2026-08-04 — smoke 2/2, batch neighbor smokes 21/21 total, suite 1820 / 0 fail / 2 skip; server restarted. Live-path change is deliberately minimal: one new refusal branch, all pre-send failure behavior identical)**
 
 ## Investigation

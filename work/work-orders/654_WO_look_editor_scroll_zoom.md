@@ -1,5 +1,6 @@
 # WO-654 — Look editor: scroll to zoom
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, Godot tests 20729/0; box: 3 wheel notches zoom about the pointer, boxes track the PRV picture, 3 back = fit)**
 
 Owner 21.10: "should be able to zoom in and out with a scroll in look's editor."

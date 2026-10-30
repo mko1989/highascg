@@ -1,9 +1,10 @@
 # WO-189 — Settings → System tab: hardware summary display
 
-**Status:** Completed
+**Area:** web-client, devices-config
+**Status:** DONE — Completed
 **Priority:** Medium (operator visibility)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner): "in the system tab of the settings modal do a display of the hardware that is on the system."
+**Source:** `work/archive/todos/todos14.07.26` (owner): "in the system tab of the settings modal do a display of the hardware that is on the system."
 **Related:** WO-39 (settings system hardware), WO-165/182 (host-stats/process stats), WO-33b (host enumeration).
 
 ---

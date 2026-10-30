@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — root cause confirmed; fix not implemented  
+**Area:** network
+**Status:** OPEN — Draft — root cause confirmed; fix not implemented  
 **Priority:** **High** — head-headless rigs on a direct cable (no DHCP) get no usable IPv4 today  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

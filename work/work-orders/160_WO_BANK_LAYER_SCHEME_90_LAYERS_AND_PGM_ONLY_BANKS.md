@@ -1,6 +1,7 @@
 # WO-160 — Bank layer scheme: consecutive numbering from 10 (A=10+, B=110+, timelines=210+) + real A/B banks on PGM-only screens
 
-**Status:** Part B in progress — part A (numbering + bands + migration, T160.1–T160.5) verified 2026-07-13; T160.6 (pgm-only LBG path) done 2026-07-13; T160.7 (hygiene) done 2026-07-13; T160.8 (smokes) in progress
+**Area:** engine
+**Status:** IN PROGRESS — Part B in progress — part A (numbering + bands + migration, T160.1–T160.5) verified 2026-07-13; T160.6 (pgm-only LBG path) done 2026-07-13; T160.7 (hygiene) done 2026-07-13; T160.8 (smokes) in progress
 **Priority:** High (>9 layers silently corrupts banks today; PGM-only screens stuck on +Animate fallback)
 **Date:** 2026-07-13 (scheme revised same day — owner ditched interleaved decades for consecutive step-1)
 **Source:** owner review request 2026-07-13 (bank layers logic review)

@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phase A–C **shipped** (2026-06-27); Phase D–G outstanding — see [65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md](./65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md)  
+**Area:** network
+**Status:** IN PROGRESS — Phase A–C **shipped** (2026-06-27); Phase D–G outstanding — see [65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md](./65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)  
 **Extends / supersedes (in part):**
 - [54_WO_HOT_BACKUP_LEADER_FOLLOWER_REPLICATION.md](./54_WO_HOT_BACKUP_LEADER_FOLLOWER_REPLICATION.md) — pairing, show-data sync, Device View UX, Syncthing staging (**keep**)

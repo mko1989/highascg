@@ -1,5 +1,6 @@
 # WO-626 — main CI red since 03.10; made green before merging godot into main
 
+**Area:** testing-ci
 **Status: DONE (20.10 — every CI step run on a clean `git archive` export of the merge commit; see VERIFIED)**
 
 Owner 20.10: "commit push all the recent work … actually we can merge godot into main, its working out very well."

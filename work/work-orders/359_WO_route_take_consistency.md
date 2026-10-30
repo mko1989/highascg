@@ -1,5 +1,6 @@
 # WO-359 — Route layers rock solid on takes (cut-take sweep was clearing skipped sources)
 
+**Area:** engine, amcp
 **Status: DONE (2026-07-27, live-verified 6-cycle drill on the box)** · Source: owner: "playing a
 look with a layer and then routes of that layer doesn work consistently, probably race conditions
 are wrong due to the routes. this needs to be rock solid."

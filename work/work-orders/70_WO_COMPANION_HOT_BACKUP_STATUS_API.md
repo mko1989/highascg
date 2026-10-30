@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phase A–B shipped (2026-06-28); Companion module consumes API from dev tree  
+**Area:** companion, network
+**Status:** DONE — Phase A–B shipped (2026-06-28); Companion module consumes API from dev tree  
 **Priority:** High (Companion needs replication-aware control-plane hints beyond HTTP reachability)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20670/0 + --check; box: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Z on the Live default transition each restored and saved (rev 57→60, client log names only `scenes`). Owner QA: undo in Previs (MVR place, layer colours, stage objects) and Timeline.**
-
 # WO-642 — Ctrl+Z / Ctrl+Shift+Z everywhere (the show document)
+
+**Area:** godot-client
+**Status: DONE (2026-10-21) — Godot --test 20670/0 + --check; box: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Z on the Live default transition each restored and saved (rev 57→60, client log names only `scenes`). Owner QA: undo in Previs (MVR place, layer colours, stage objects) and Timeline.**
 
 Owner, 21.10: *"there is no control-z, or at least in previs"*, then *"ctrl-z should be everywhere."*
 

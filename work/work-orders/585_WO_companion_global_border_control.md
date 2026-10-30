@@ -1,5 +1,6 @@
 # WO-585 — Global border control from Companion (server endpoint + sceneId-take border fix)
 
+**Area:** companion, engine
 **Status: IN PROGRESS (2026-09-30) — server side DONE (offline suite 2541/0/2, endpoint probed live, non-visual calls only); Companion module actions/feedbacks/presets in `companion-module-highpass-highascg` (uncommitted there, see §2b). Owner QA owed: visible on/off from a Companion button.**
 
 Source: owner — "companion module is missing global borders controls, mainly on/off is needed but others might be nice."

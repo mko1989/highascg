@@ -1,5 +1,6 @@
 # WO-400 — run.sh / supervisor-lib review: ~40 % of the lib is dead, the give-up path never fires
 
+**Area:** os-iso, process
 **Status: DONE (2026-07-30 — owner: "do this now". Cleanup applied per §3, sandbox crash-loop rehearsal proved backoff + inhibit give-up, deployed via `systemctl restart casparcg-server`, Caspar recovered with 8 channels; details §5)**
 **Source:** owner 30.07.26: "do a good review of the run.sh i fear there maybe a lot of unneeded code."
 **Files:** `run.sh` (177 lines), `tools/runtime/casparcg-supervisor-lib.sh` (274 lines), `/etc/systemd/system/casparcg-server.service`, `tools/runtime/caspar-systemd-{control,cleanup}.sh`, `tools/runtime/caspar-kill-main.sh`.

@@ -1,6 +1,7 @@
 # WO-550 — Previewing an unrelated look on PRV could still kill a timeline live on PGM
 
-**Status: FIXED in repo (02.09.2026). 7 smokes (2 verified to fail without the fix), suite
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). 7 smokes (2 verified to fail without the fix), suite
 2337/2335/0/2 → 2344/2342/0/2. Owner QA still owed.**
 **Priority:** Critical (fourth root cause in this session's timeline/look symptom family)
 **Source:** owner 02.09, after WO-549: *"its better but there are still issue coming from

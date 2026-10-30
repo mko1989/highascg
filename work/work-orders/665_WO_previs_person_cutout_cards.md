@@ -1,5 +1,6 @@
 # WO-665 — Previs: tracked people as live cut-out cards (person texturing, step 1)
 
+**Area:** tracking-vr, godot-client
 **Status: DONE (22.10, offline suites + live sidecar run on a fed surface + real-client render probe; owner QA on the rig pending)**
 
 Owner, 22.10: "start" — step 1 of `docs/research/multi-camera-person-texturing.md` (the cut-out card / billboard).

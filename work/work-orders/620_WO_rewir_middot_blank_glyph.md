@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-19, Godot glyph probe + box GUI screenshots; Godot --test 1297/1297; web client woff/ttf patched too, Firefox render-verified).**
-
 # WO-620 — Rewir "·" renders blank: every " · " separator in the Godot client was a gap
+
+**Area:** godot-client
+**Status: DONE (2026-10-19, Godot glyph probe + box GUI screenshots; Godot --test 1297/1297; web client woff/ttf patched too, Firefox render-verified).**
 
 Found during WO-616 T10d. The walk status text "P2 · 58 samples · 4.0 s" showed on the box as "P2   58 samples   4.0 s".
 Related: [WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md) R3 (Rewir is the only font, theme default and

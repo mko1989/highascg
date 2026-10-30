@@ -1,5 +1,9 @@
 # Work Order 30: Previs & Tracking Module — Packaging and Integration
 
+**Area:** tracking-vr, process
+**Status: IN PROGRESS (no status line before WO-846; classified from its content)**
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done
@@ -11,7 +15,7 @@
 
 ## Goal
 
-Package 3D Previs ([WO-17](./17_WO_3D_PREVIS.md)), Person Tracking ([WO-19](./19_WO_PERSON_TRACKING.md)), and Stage Auto-Follow ([WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md)) as an **isolated, detachable feature module** on top of HighAsCG's base build, so that:
+Package 3D Previs ([WO-17](./17_WO_3D_PREVIS.md)), Person Tracking ([WO-19](./deprecated/19_WO_PERSON_TRACKING.md)), and Stage Auto-Follow ([WO-31](./deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md)) as an **isolated, detachable feature module** on top of HighAsCG's base build, so that:
 
 - The **core HighAsCG codebase has zero hard dependency** on any of the previs/tracking code.
 - Deleting the `src/previs/`, `src/tracking/`, `src/autofollow/`, `client/components/previs-*`, `client/components/tracking-*`, and `client/components/autofollow-*` trees leaves the rest of the app booting and working normally.
@@ -186,8 +190,8 @@ The CI produces two installer artifacts: `highascg-base.tar.gz` and `highascg-pr
 ## Sub–work orders
 
 - [**WO-17** — 3D Previs (PGM 2D/3D toggle)](./17_WO_3D_PREVIS.md): the in-PGM-panel 3D viewport, model import, screen-mapping.
-- [**WO-19** — Person Tracking (YOLOv8-Pose + ByteTrack server-side)](./19_WO_PERSON_TRACKING.md): detection, persistent IDs, calibration, WS broadcast.
-- [**WO-31** — Stage Auto-Follow (PTZ / Moving-Heads via Companion)](./31_WO_STAGE_AUTOFOLLOW_PTZ.md): lock-to-person, delta/absolute streaming, zone-exit home-return, per-device calibration.
+- [**WO-19** — Person Tracking (YOLOv8-Pose + ByteTrack server-side)](./deprecated/19_WO_PERSON_TRACKING.md): detection, persistent IDs, calibration, WS broadcast.
+- [**WO-31** — Stage Auto-Follow (PTZ / Moving-Heads via Companion)](./deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md): lock-to-person, delta/absolute streaming, zone-exit home-return, per-device calibration.
 
 All three are gated by this module. If WO-30 feature flag is off, none of them activate and none of their code is required on disk.
 

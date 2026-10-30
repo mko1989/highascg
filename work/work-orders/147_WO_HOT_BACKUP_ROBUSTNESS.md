@@ -1,6 +1,7 @@
 # WO-147 — Hot-backup robustness (single-box hardening + two-box QA runbook)
 
-**Status:** Code complete (2026-07-07) — 21/21 replication smokes green; two-box QA deferred to runbook
+**Area:** network
+**Status:** DONE — Code complete (2026-07-07) — 21/21 replication smokes green; two-box QA deferred to runbook
 **Priority:** High
 **Date:** 2026-07-07
 **Depends on:** WO-141. Parallelizable with WO-144/145/146.
@@ -25,7 +26,7 @@ Known architecture: role-based leader/follower (no election; manual `promote.js`
 - [ ] T147.6 Checkbox hygiene: correct stale/unticked boxes in WO-54/WO-64 per the 2026-07-03 triage note so their status reflects shipped reality.
 
 ### Two-box QA (deliverable document)
-- [ ] T147.7 Write `work/work-orders/HOT_BACKUP_TWO_BOX_QA_RUNBOOK.md` — step-by-step, executable as-is when a second box exists: pairing (WO-78 A78.1–.6, hostname apply, SSH trust), fan-out sync check (60 s drift < 500 ms), failover/promote drill, autosave replication QA (WO-79b A79.1–.4), teardown/unpair. Reference `tools/runtime/replication-pair-qa.sh`.
+- [ ] T147.7 Write `work/notes/HOT_BACKUP_TWO_BOX_QA_RUNBOOK.md` — step-by-step, executable as-is when a second box exists: pairing (WO-78 A78.1–.6, hostname apply, SSH trust), fan-out sync check (60 s drift < 500 ms), failover/promote drill, autosave replication QA (WO-79b A79.1–.4), teardown/unpair. Reference `tools/runtime/replication-pair-qa.sh`.
 
 ## 3. Acceptance criteria
 

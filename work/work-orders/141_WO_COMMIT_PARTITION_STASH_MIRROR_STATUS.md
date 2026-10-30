@@ -1,5 +1,6 @@
 # WO-141 — Commit partitioning, stash resolution, mirror push, status docs
 
+**Area:** process, network
 **Status:** Done except mirror push (2026-07-07) — backup box 192.168.0.25 unreachable/powered off; run `DEPLOY_RSYNC_EXCLUDE='media/.replication-*,**/*.tmp' bash work/run-deploy-mirror-tmux.sh --attach` when it's up, then the remote bootstrap per the script header. Everything else complete: main fast-forwarded to the 6-commit partition + hygiene commits, gates green, stash resolved, status docs updated. Note: `config/*.json` (7 files) is live runtime churn, deliberately uncommitted; `docs/wiki-site` also self-regenerates with timestamps — consider gitignoring both classes (owner decision).
 **Priority:** High (integration step — closes the stabilization)
 **Date:** 2026-07-07
@@ -33,8 +34,8 @@ The Jul 5–7 work (~170 files) lives only in the WIP snapshot; it must land on 
 - [ ] T141.6 Verify on 192.168.0.25 and run `work/bootstrap-remote-after-sync.sh` per the push script's epilogue.
 
 ### Status docs
-- [ ] T141.7 Update `work/work-orders/project_status.md`: rows for WO-122 and new WO-138…148; touch WO-59/60/63 rows if advanced.
-- [ ] T141.8 Append a dated addendum to `work/work-orders/PROJECT_TRIAGE_2026-07-03.md`: TDZ incident + root cause, stabilization branch, WO-122 re-scope, stash disposition, mirror result.
+- [ ] T141.7 Update `work/archive/project_status.md`: rows for WO-122 and new WO-138…148; touch WO-59/60/63 rows if advanced.
+- [ ] T141.8 Append a dated addendum to `work/notes/PROJECT_TRIAGE_2026-07-03.md`: TDZ incident + root cause, stabilization branch, WO-122 re-scope, stash disposition, mirror result.
 
 ## 3. Acceptance criteria
 

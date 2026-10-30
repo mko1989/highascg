@@ -3,7 +3,7 @@
 Godot draws a Caspar channel **from shared memory** inside its own scene, with UI drawn over the
 video, freely placed atlas tiles, and the live texture on a 3D LED wall. Built and verified on the
 dev Mac; this file is the runbook for the box. Results go into
-[WO-595](../../../work/work-orders/595_WO_godot_m0_spike_on_box.md) "What was VERIFIED".
+[WO-595](../../../work/work-orders/deprecated/595_WO_godot_m0_spike_on_box.md) "What was VERIFIED".
 
 ```
 tools/hshm-bridge/   hshm_bridge.py (writer: test pattern or raw frames on stdin), hshm_probe.py (reader/validator)

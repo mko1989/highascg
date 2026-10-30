@@ -1,6 +1,7 @@
 # WO-587 — slow, uncluttered background shaders (29 `sh-bg-*`)
 
-**Status: IMPLEMENTED 30.09.26. 29 backgrounds imported through `POST /api/shaders` (library 161 → 190), each measured slow and calm at t≈2.5 s, +60 s and +300 s and picked by eye from contact sheets. Not yet seen on air (§4). 27/29 are CC BY-NC-SA, so the licence call is the owner's, as in WO-586 §5.**
+**Area:** engine
+**Status: DONE — IMPLEMENTED 30.09.26. 29 backgrounds imported through `POST /api/shaders` (library 161 → 190), each measured slow and calm at t≈2.5 s, +60 s and +300 s and picked by eye from contact sheets. Not yet seen on air (§4). 27/29 are CC BY-NC-SA, so the licence call is the owner's, as in WO-586 §5.**
 
 Owner, 30.09: *"now id like you to find slow moving and not too crowded shaders for use as backgrounds. no need for audio reactivity here."*
 

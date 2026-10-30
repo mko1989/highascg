@@ -1,8 +1,11 @@
+# WO-564 — PHANTOM SCREEN STEALS OPERATOR X POSITION
+
+**Area:** devices-config, mapping
 **Status: IN PROGRESS (root-caused, fixed, verified by reproduction and full offline suite; highascg service restart still owed to take effect live)**
 
 ## Investigation
 
-Owner report (`work/work-orders/todos07.09.26`): after rewiring PGM1's screen output to "nothing"
+Owner report (`work/archive/todos/todos07.09.26`): after rewiring PGM1's screen output to "nothing"
 (disconnecting its GPU-port binding in Device View so only the operator monitor is active), the
 generated `casparcg.config`'s operator-GUI `<screen>` consumer still carried `<x>2048</x>` — PGM1's
 old custom-mode width — instead of `0`, so it no longer displays correctly on the one remaining

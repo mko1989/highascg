@@ -1,6 +1,7 @@
-**Status: IN PROGRESS (2026-10-17) — built INTO Caspar for the first time on the shop dev box (v1+shm, then `highascg-build-v2` = v2.5.1, WO-613) and running there; ADD/REMOVE, probe, reader-stall and restart checks PASS; **CPU target MISSED (+5.2 % of a core at 1080p50 vs < 3 %)**; 1 h soak done 21.10 (writer drops 0 over an hour); on-air ADD/REMOVE (maintenance window) still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
-
 # WO-594 — CasparCG `shm` frame consumer (highascg-build-v1): channel frames → POSIX shared memory
+
+**Area:** caspar-build
+**Status: IN PROGRESS (2026-10-17) — built INTO Caspar for the first time on the shop dev box (v1+shm, then `highascg-build-v2` = v2.5.1, WO-613) and running there; ADD/REMOVE, probe, reader-stall and restart checks PASS; **CPU target MISSED (+5.2 % of a core at 1080p50 vs < 3 %)**; 1 h soak done 21.10 (writer drops 0 over an hour); on-air ADD/REMOVE (maintenance window) still open. Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
 
 Owner, 16–17.10: "keeping the operator screen consumer is a good idea but I'd like the client to be
 built around it not on top of it" → shared-memory approach chosen ("one frame of delay is totally

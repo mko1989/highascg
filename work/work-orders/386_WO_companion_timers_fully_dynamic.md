@@ -1,6 +1,7 @@
 # WO-386 — Companion timers: no placeholder slots, everything dynamic
 
-**Status: 🟡 Implemented 29.07.26 (module tests 34/34, lint clean on touched files) — owner: restart Companion against the dev module**
+**Area:** companion
+**Status: DONE — 🟡 Implemented 29.07.26 (module tests 34/34, lint clean on touched files) — owner: restart Companion against the dev module**
 
 Owner, 2026-07-29:
 > "also in companion i see there are placeholder 8 timers. come one???!!! no place holders.

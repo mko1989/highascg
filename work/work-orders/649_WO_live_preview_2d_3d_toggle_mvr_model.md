@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; Godot 20696/0, box: the toggle switches 2D ↔ 3D, the Live 3D view shows the Pabianice MVR model with the rig, Lights off keeps the heads, both remembered). Owner QA: beams with a live console, the framing.**
-
 # WO-649 — Live preview: one 2D / 3D toggle; the 3D view shows the MVR model, with or without lights
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20696/0, box: the toggle switches 2D ↔ 3D, the Live 3D view shows the Pabianice MVR model with the rig, Lights off keeps the heads, both remembered). Owner QA: beams with a live console, the framing.**
 
 Owner, 21.10: *"the standard 3d should be a toggle 2d/3d in live preview. when the mvr is loaded it should display the
 model, with or without lights."*

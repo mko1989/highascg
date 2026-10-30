@@ -1,6 +1,7 @@
 # WO-631 — PosiStageNet output, raw Art-Net as the backup choice
 
-**Status: 🟡 DONE on the box 20.10 (PSN multicast received + decoded, switch to Art-Net and back, smoke 8/8, Godot tests);
+**Area:** tracking-vr, lighting
+**Status: DONE — 🟡 DONE on the box 20.10 (PSN multicast received + decoded, switch to Art-Net and back, smoke 8/8, Godot tests);
 owner: map the trackers on the grandMA3 / MagicQ and confirm the axes**
 
 Owner 20.10 (after the WO-630 Q1 answer): "add PosiStageNet output then. with a raw artnet as backup choice."

@@ -1,5 +1,6 @@
 # WO-778 — 8 ch PortAudio to the switcher on DP-4: the output pointed at an empty NVIDIA "HDMI 3"
 
+**Area:** audio
 **Status: DONE (26.10, config fix applied on the box; ALSA hw:1,3 RUNNING S32_LE 8 ch 48 kHz) — hearing 8 ch through the
 switcher = owner QA (PGM was empty after the restart).**
 

@@ -3,6 +3,7 @@
 **Source:** owner 2026-07-26 — "better thumbnail capture system for shaders as in most cases it
 shows some borders and a lot of alpha empty space ... in the looks list in looks buttons."
 
+**Area:** media, engine
 **Status: DONE (28.07.26) — the status line was STALE: the content-crop half shipped in `465d071`
 on 27.07. Running the pipeline on the box then exposed a bigger defect the WO had not seen — some
 shader looks produced NO thumbnail at all — which is fixed and proven. One sub-item (synthetic

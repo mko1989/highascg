@@ -1,6 +1,7 @@
 # WO-139 — Looks → timeline Take smoothness (flash race, atomic crossfade, teardown)
 
-**Status: REOPENED 13.08.2026 — A139.2 was never done, and the owner is now reporting the exact failure the un-QA'd path can produce. One fail-dark bug found and fixed (§5, WO-519); the rest of A139.2 still owed.**
+**Area:** engine
+**Status: IN PROGRESS — REOPENED 13.08.2026 — A139.2 was never done, and the owner is now reporting the exact failure the un-QA'd path can produce. One fail-dark bug found and fixed (§5, WO-519); the rest of A139.2 still owed.**
 **Priority:** High (operator-facing on-air quality)
 **Date:** 2026-07-07
 **Depends on:** WO-138 (tree must be stable and gates green first).

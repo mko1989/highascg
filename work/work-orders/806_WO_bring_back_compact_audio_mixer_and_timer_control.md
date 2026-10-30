@@ -1,5 +1,6 @@
 # WO-806 — Godot client: bring back the compact audio mixer and the compact timer control
 
+**Area:** godot-client, audio
 **Status: DONE except G3 (29.10) — G1 / G2 / G4 / G6 implemented (Godot suite 22176 passed / 0 failed, headless box probe read-only) · live e2e 29.10: G1/G2/G4/G6 PASS on the glass incl. a real timer run on PGM · G5 fixed 29.10 (dense 86 → 64 px, measured + tested) · only G3 open: an owner decision (own WO if wanted)**
 
 Owner, 29.10:

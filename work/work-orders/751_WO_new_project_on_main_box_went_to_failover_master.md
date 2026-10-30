@@ -1,5 +1,6 @@
 # WO-751 — "Fresh project on the main machine (.23) didn't wipe the screen destinations": it went to .4, the failover master
 
+**Area:** network, godot-client
 **Status: IN PROGRESS (25.10.26 evening) — owner decided: an on-box client never follows the master (stays on its own server), unlink ends it, the header says when the client is on another server. Built + verified (Godot 21673/0, box relaunch). Open: decision 2 (preferred master after failover) is moot for on-box clients; server-side stale channels (below) not fixed.**
 
 Owner, 25.10: *"i did a fresh project on the main machine (.23) and it didnt wipe the screen destinations..."*

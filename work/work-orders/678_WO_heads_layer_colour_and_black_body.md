@@ -1,5 +1,6 @@
 # WO-678 — Previs: moving heads follow their MVR layer colour, selection highlights the layer, black default body
 
+**Area:** godot-client
 **Status: DONE (22.10, Godot 20950/0, smoke-wo612 6/6; box: heads black, clicking a Sharpy highlights "5. Sharpy Plus")**
 
 Owner, 22.10:

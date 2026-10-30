@@ -1,5 +1,6 @@
 # WO-749 — Releases did not ship the post-update sweep: .4 ran a stale copy after every update
 
+**Area:** os-iso
 **Status: DONE (25.10.26 — smoke 1/1 (fails on the old member list: checked); .4 sweep with the shipped set: 27 pass / 2 warn / 0 fail; this box 25 pass / 4 warn / 0 fail. The next release carries the files; owner-QA: .4's automatic sweep after that update shows no DeckLink "module not loaded" warning.)**
 
 Owner, 25.10: *"run checks on both machines"* (after the WO-748 "Phase: ?" update).

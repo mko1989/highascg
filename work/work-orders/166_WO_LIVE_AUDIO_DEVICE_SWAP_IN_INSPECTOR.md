@@ -1,6 +1,7 @@
 # WO-166 — Live audio input: device change from the inspector (no Caspar restart)
 
-**Status:** Complete
+**Area:** audio
+**Status:** DONE — Complete
 **Priority:** Medium (operator workflow — capability exists but isn't where the operator looks)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "there is no way to change live audio input to a different device, this should be available without restarting casparcg. just stops the play of old hw on the host channel and starts the new one."

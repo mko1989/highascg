@@ -1,5 +1,6 @@
 # WO-424 — GUI update-from-GitHub for installed boxes: the shipped flow was dead end-to-end; un-bricked and live-verified
 
+**Area:** os-iso, network
 **Status: DONE (2026-08-04 — `/api/system/update/check` LIVE-VERIFIED on this box: finds the 2026-06-28 release, `updateAvailable:true` against the 2026.05.20 stamp. Publishing a new release = one owner command, dry-run verified.)**
 
 Owner 04.08: "i need an update system built in. so users can easily update highascg from the

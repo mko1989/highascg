@@ -1,6 +1,7 @@
 # WO-178 — Super-small horizontal sliders under number inputs (borders, crop, size, position)
 
-**Status:** Complete
+**Area:** web-client
+**Status:** DONE — Complete
 **Priority:** Low (operator quality-of-life)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "add super small sliders (horizontal) under number input boxes where it applies. ex: parameters of borders, crop values, size, position etc."

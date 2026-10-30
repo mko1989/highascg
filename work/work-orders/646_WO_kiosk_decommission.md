@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21, offline suite 2757/0, lint/format/lines/exports clean, client built; stages A+B box-verified)**
-
 # WO-646 — Delete the Firefox kiosk operator GUI; two clients remain (web UI, Godot GUI)
+
+**Area:** godot-client, os-iso
+**Status: DONE (2026-10-21, offline suite 2757/0, lint/format/lines/exports clean, client built; stages A+B box-verified)**
 
 Owner, 21.10: *"after that we are doing a clean up. the kiosk deleted and marked as such. there are two clients. one
 for headless and or just remote webui with the compose preview with only the hq thumbnails. second the godot gui."*

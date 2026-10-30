@@ -1,5 +1,6 @@
 # WO-701 — Previs cut-outs: keep a person on one camera; cut only after another has been better for 2.5 s
 
+**Area:** tracking-vr
 **Status: DONE (2026-10-23, Godot 21178/0 (+20: facing, ranking, sticky timeline, cards with a clock), `run-client.sh
 --check` OK; NOT watched live — detection was up on cam_1 / cam_2 but nobody was in frame — owner QA on the rig)**
 

@@ -1,5 +1,6 @@
 # WO-753 — Two-box test campaign (standalone / linked / each master / refusals / failover) + is Ubuntu 26.04 / NVIDIA 615 safe for the dev box
 
+**Area:** testing-ci, network
 **Status: DONE (25.10.26) — every row of the matrix run on the boxes (A1–A10, B1–B11); B12 live is the owner's call (WO-746). Verdict below. Found and fixed: four test-hermeticity bugs, the media-copy check wording, WO-754.**
 
 Owner, 25.10: *"i want you to run all sorts of tests on both these machines. both when they are connected, or

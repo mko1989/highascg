@@ -1,5 +1,6 @@
 # WO-565 — Screen timer "Set time" has no effect while running (stale start anchor)
 
+**Area:** engine, companion
 **Status: DONE (2026-09-09, verified via isolated repro + offline smoke suite — service restart / kiosk reload NOT yet applied, owner to schedule)**
 
 **Source:** owner, 2026-09-09, via Companion module session: "focus on timers that are available

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-18, AMCP-probed + offline smoke + live timeline playback on the shop dev box) — owner-QA: pick a non-linear tween on a look take and on keyframes and check that the curve looks right. Found while porting the timeline keyframes ([WO-602](./602_WO_godot_port_timeline.md)).**
-
 # WO-618 — Non-linear tweens were never valid Caspar tween names
+
+**Area:** amcp, engine
+**Status: DONE (2026-10-18, AMCP-probed + offline smoke + live timeline playback on the shop dev box) — owner-QA: pick a non-linear tween on a look take and on keyframes and check that the curve looks right. Found while porting the timeline keyframes ([WO-602](./602_WO_godot_port_timeline.md)).**
 
 ## Investigation
 

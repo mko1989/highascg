@@ -1,5 +1,6 @@
 # WO-817 — Godot look editor: audio-only layers transparent and not pickable in the viewer (list only)
 
+**Area:** godot-client, audio
 **Status: DONE (29.10, Godot suite 22733/0 + boot check + demo-mode Xvfb render; owner QA owed on the real viewer) · live e2e 29.10: PASS on the real viewer**
 
 Owner (29.10): "audio only layers should be transparent in the editor and not pickable in the viewer (the looks

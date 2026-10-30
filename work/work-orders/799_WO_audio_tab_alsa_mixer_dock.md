@@ -1,5 +1,6 @@
 # WO-799 — Audio tab: ALSA hardware mixer docked at the bottom
 
+**Area:** audio, godot-client
 **Status: DONE (29.10, live e2e on the box) (29.10) — built and suite green; owner QA on the glass still open · live e2e 29.10: PASS on the glass (amixer 100→46→100 %)**
 
 Owner, 29.10:

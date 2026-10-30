@@ -1,8 +1,9 @@
 # WO-375 — "audio reactive" was a flag that bound nothing: four shaders wore the ♪ badge and could not react
 
+**Area:** audio, engine
 **Status: DONE (28.07.26 — measured, fixed in both the store and the runtime, live-verified).**
 
-Source: `work/work-orders/todos28.07.26`, owner line added 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner line added 28.07:
 
 > when audio reactive is ticked on a shader audio must be chosen in image iCh0.
 

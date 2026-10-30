@@ -1,6 +1,7 @@
 # WO-233 — Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events PR cherry-picks
 
-**Status:** Investigation | **Date:** 2026-07-15
+**Area:** caspar-build
+**Status:** DONE — Investigation | **Date:** 2026-07-15
 **Source:** owner (todos15 ***artnet***): rebuild planned; evaluate firecraftgaming/caspar-server `improved-artnet` branch; research beneficial PRs on CasparCG/server (seed: #1762, #1751, #1727; owner will paste more).
 
 ## Questions

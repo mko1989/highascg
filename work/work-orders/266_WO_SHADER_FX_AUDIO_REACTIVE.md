@@ -1,6 +1,7 @@
 # WO-266 — Shader FX: Shadertoy-style shaders on the Caspar output with audio reactivity
 
-**Status:** Implemented (owner acceptance A266.1 pending — GL rendering + audio capture cannot be exercised offline)
+**Area:** audio, web-client
+**Status:** DONE — Implemented (owner acceptance A266.1 pending — GL rendering + audio capture cannot be exercised offline)
 **Priority:** MEDIUM-HIGH (owner request 2026-07-18, todos18.07.26)
 **Depends on:** WO-258/260 (browser_display real-Firefox source — the audio-capable playback path), WO-23/240 (webpage/template play paths), WO-53 (per-input audio meters / OSC levels)
 

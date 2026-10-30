@@ -1,5 +1,6 @@
 # WO-831 — Dead code removal (sweep §6)
 
+**Area:** process
 **Status: OPEN (30.10)**
 **Source:** REPORT §6 and the per-batch DEAD findings. Owner 30.10: *"delete anything dead."*
 **Related:** WO-807 (deprecated `src/sampling`), WO-495, WO-273.

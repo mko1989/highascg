@@ -1,5 +1,6 @@
 # WO-425 — Monitor audio output is a plain "Audio 2" + Monitor tickbox, and fresh systems ship no audio outputs
 
+**Area:** audio, devices-config
 **Status: DONE (2026-08-04 — relabeled + live-verified via /api/settings; factory config proven clean functionally; smoke green; suite 1826/0/2)**
 
 Owner: "i dont like that the second audio output (the monitor one) is called usb audio

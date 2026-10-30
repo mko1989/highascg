@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — no implementation started  
+**Area:** os-iso
+**Status:** OPEN — Draft — no implementation started  
 **Priority:** Medium (operator / lab tooling — enables repeatable backup-sync QA on installed rigs)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

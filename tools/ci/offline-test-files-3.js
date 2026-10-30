@@ -202,6 +202,7 @@ module.exports = [
 	'tools/smoke/smoke-wo845-audio.test.js',
 	'tools/smoke/smoke-wo845-media.test.js',
 	'tools/smoke/smoke-wo845-pointer-barrier-constants.test.js',
+	'tools/smoke/smoke-wo846-work-order-index.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

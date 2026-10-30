@@ -1,5 +1,6 @@
 # WO-662 — Beat detection woven into shader audio reactivity
 
+**Area:** audio, engine
 **Status: DONE (21.10.2026: offline 2730/0 + Godot 20773/0, detector checked on real music, shader runtime checked in headless Chrome, save → store → export checked on the box). Owner QA: a shader on air with the FFT source routed (no FFT source is routed on the box right now).**
 
 Owner, 21.10: *"Add beat detection and a way to weave it into shaders audio reactivity. This is for both webui and Godot"* (the categorisation half of the same message is [WO-661](661_WO_template_categories_shader_gpu_warning.md)).

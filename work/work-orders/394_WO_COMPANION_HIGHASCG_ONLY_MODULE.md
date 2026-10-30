@@ -1,7 +1,8 @@
 # WO-394 — Companion module is a HighAsCG module: drop direct-AMCP surface
 
-**Status: IMPLEMENTED (2026-07-30 — module tests 40/40, lint clean on touched files, committed 501763d in the module repo; owner A394.1: restart Companion, select the 1.0.8 dev module, re-save the connection config — the AMCP port/bridge fields disappear)**
-**Source:** `work/work-orders/todos30.07.26` §1: "the straight amcp commands can be removed. just leave the custom raw amcp send action. this should be treated as a highascg module, not as highascg and casparcg module. so remove the mentions of + casparcg (its already implied) remove the amcp port and bridge enable from config."
+**Area:** companion
+**Status: DONE — IMPLEMENTED (2026-07-30 — module tests 40/40, lint clean on touched files, committed 501763d in the module repo; owner A394.1: restart Companion, select the 1.0.8 dev module, re-save the connection config — the AMCP port/bridge fields disappear)**
+**Source:** `work/archive/todos/todos30.07.26` §1: "the straight amcp commands can be removed. just leave the custom raw amcp send action. this should be treated as a highascg module, not as highascg and casparcg module. so remove the mentions of + casparcg (its already implied) remove the amcp port and bridge enable from config."
 **Module repo:** `/home/casparcg/companion-module-dev/companion-module-highpass-highascg`
 **Related:** WO-170 (parity review — called raw-AMCP passthrough "intentional"; this WO reverses that framing per owner), WO-372/384/386 (recent module work; pre-existing uncommitted packaging residue committed separately first), WO-395 (configured-output streaming actions, same batch).
 

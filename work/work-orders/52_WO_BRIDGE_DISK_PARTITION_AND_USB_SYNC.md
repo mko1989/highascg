@@ -7,9 +7,10 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry  
 > 4. Do NOT delete previous agents' log entries  
 
+**Area:** os-iso, media
 **Status:** In progress (core implementation landed 2026-06-03)  
 **Depends on:** WO-47 (exFAT mount + mtime sync), WO_remove-persistence-partition-workflow_exfat-only  
-**Related:** [`47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md`](./47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md), [`WO_remove-persistence-partition-workflow_exfat-only.md`](./WO_remove-persistence-partition-workflow_exfat-only.md), [`../../docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md), [`../../config/exfat-sync.json`](../../config/exfat-sync.json), [`../../dist/HIGHASCGEXF-starter-layout.zip`](../../dist/HIGHASCGEXF-starter-layout.zip)
+**Related:** [`47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md`](./47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md), [`WO_remove-persistence-partition-workflow_exfat-only.md`](./855_WO_remove_persistence_partition_workflow_exfat_only.md), [`../../docs/WO47_ISO_VS_EXFAT.md`](../../docs/WO47_ISO_VS_EXFAT.md), [`../../config/exfat-sync.json`](../../config/exfat-sync.json), [`../../dist/HIGHASCGEXF-starter-layout.zip`](../../dist/HIGHASCGEXF-starter-layout.zip)
 
 ---
 

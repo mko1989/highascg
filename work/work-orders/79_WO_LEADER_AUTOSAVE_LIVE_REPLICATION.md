@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phase A shipped 2026-06-29 (debounced autosave push); Phase B fallback optional  
+**Area:** network
+**Status:** IN PROGRESS — Phase A shipped 2026-06-29 (debounced autosave push); Phase B fallback optional  
 **Priority:** High (operator expectation: backup tracks leader edits without explicit Save)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; smoke 9/9 + WO-638 19/19, Godot 20689/0; box: simulated boot held Caspar on the launcher, the owner's "Start operator here" on DP-0 released it and restored the GUI there). Owner QA: "Run headless" on the glass, the Settings → Start-up switch. Supersedes WO-609 T2 for the start policy.**
-
 # WO-645 — Start-up: boot to the desktop with "Start operator here / Run headless"; autostart is an opt-in
+
+**Area:** os-iso, godot-client
+**Status: DONE (2026-10-21; smoke 9/9 + WO-638 19/19, Godot 20689/0; box: simulated boot held Caspar on the launcher, the owner's "Start operator here" on DP-0 released it and restored the GUI there). Owner QA: "Run headless" on the glass, the Settings → Start-up switch. Supersedes WO-609 T2 for the start policy.**
 
 Owner, 21.10: *"i think the current autostart of caspar and everything is not the way to go. this should stay as an
 optin in settings to autostart casparcg with or without gui etc. and for normal operation start into desktop on each

@@ -1,9 +1,10 @@
 # WO-181 — PGM-only take HTTP 500 (buildClipCommandPlan) + exit-edit preview-sync HTTP 400
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** HIGH (takes on screen 2 were broken)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner).
+**Source:** `work/archive/todos/todos14.07.26` (owner).
 **Related:** WO-160b (pgm-only via LBG — exposed the latent bug), WO-174 (route regex gap fixed alongside), WO-155/150 (exit-edit preview flows).
 
 ---

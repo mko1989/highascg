@@ -1,12 +1,13 @@
 # WO-554 — a timeline look plays twice, and PRV sometimes gets stuck after
 
-**Status: FIXED in repo (03.09.2026). 8 new smokes (regression test proves the pre-fix mechanism
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026). 8 new smokes (regression test proves the pre-fix mechanism
 directly), full offline suite 2365/2362/1/2 (the 1 fail is a pre-existing, unrelated timing flake
 in `smoke-wo537...`, confirmed to pass reliably in isolation — see §4). Server restarted and live.
 Owner QA still owed — this closes a confirmed WIRE-LEVEL duplicate, but has NOT been confirmed
 against a live capture as the exact mechanism behind report (1)'s wording ("on pgm").**
 **Priority:** Critical — live production visual defect on every look-with-timeline take.
-**Source:** `work/work-orders/todos02.09.26`, still open in the owner's editor the next morning
+**Source:** `work/archive/todos/todos02.09.26`, still open in the owner's editor the next morning
 (03.09) with no corresponding WO in the WO-541→553 chain from the same day:
 1. *"when playing a timeline look it looks on pgm as it is played 2 times one after another. very
    bad look."*

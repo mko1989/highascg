@@ -1,5 +1,9 @@
 # WO-287 — No modal may blur the background
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "NO modal should blur the background making the rest of ui
 unreadable. NONE!"
 

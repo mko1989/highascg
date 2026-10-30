@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Not started  
+**Area:** testing-ci, process
+**Status:** DONE — Not started  
 **Priority:** **Medium** — maintainability, reviewability, agent/CI ergonomics  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md) (restore from git if missing locally)
 
@@ -42,7 +43,7 @@
 | Scripts, templates, launcher, misc client | 7 | [WO-120](./120_WO_SPLIT_SCRIPTS_TEMPLATES_LAUNCHER_OVER_500.md) |
 | CI enforcement | 1 | [WO-121](./121_WO_CI_ENFORCE_500_LINE_LIMIT.md) |
 
-Full line-count table: [LOC_OVER_500_AUDIT.md](./LOC_OVER_500_AUDIT.md)
+Full line-count table: [LOC_OVER_500_AUDIT.md](../archive/LOC_OVER_500_AUDIT.md)
 
 ---
 
@@ -63,7 +64,7 @@ Full line-count table: [LOC_OVER_500_AUDIT.md](./LOC_OVER_500_AUDIT.md)
 - [ ] **T111.0** All sub-WOs linked and audit table current.
 - [ ] **T111.1** Zero files > 500 lines in scoped trees (verify with `node tools/ci/check-max-file-lines.js`).
 - [ ] **T111.2** `npm run test:ci` and `npm run lint` pass after all splits.
-- [ ] **T111.3** Update [LOC_OVER_500_AUDIT.md](./LOC_OVER_500_AUDIT.md) to show **0 violations** or archive it.
+- [ ] **T111.3** Update [LOC_OVER_500_AUDIT.md](../archive/LOC_OVER_500_AUDIT.md) to show **0 violations** or archive it.
 
 ---
 

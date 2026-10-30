@@ -1,5 +1,6 @@
 # WO-484 — a `custom` screen registers a `<video-mode>` that CasparCG already ships
 
+**Area:** devices-config, video-io
 **Status: DONE (11.08.2026, verified: new smoke 4/4, two existing generator guards repointed with
 coverage added, suite 1971/1969 pass/0 fail/2 skip)**
 

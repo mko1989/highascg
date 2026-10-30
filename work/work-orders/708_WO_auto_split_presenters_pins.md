@@ -1,5 +1,6 @@
 # WO-708 — Auto follow: split the fronts across several people, pins 1–9
 
+**Area:** tracking-vr
 **Status: DONE server side (23.10.26: smoke-wo708 18/18, wo709 9/9, wo707 6/6, related smokes 160/160, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe 23.10 by the lead (API + home on the box, overlay in the GUI); owner QA: two people on stage)**
 
 Owner, 23.10.26: *"ok, so it worked quite nicely for first tests. second thing is more than one presenter on auto it

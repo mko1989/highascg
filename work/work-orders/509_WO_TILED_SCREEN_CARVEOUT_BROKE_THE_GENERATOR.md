@@ -1,5 +1,6 @@
 # WO-509 — Generator regression: the tiled-screen carve-out caused BOTH reported faults
 
+**Area:** devices-config, video-io
 **Status: DONE in repo (13.08.2026 — 6 smokes, suite 2086/2084/0, eslint 0, prettier clean). NOT deployed.**
 **Priority:** HIGH (one symptom is two channels on one card — Caspar cannot open it twice)
 **Source:** owner `todos13.08.26`: *"the yuv setting in decklink output doesnt land in the generated caspar config. the config generator doesnt register that a connection has been changed and tries to run two channels on the same decklink outputs. do a thorough investigation into config generator as i see it has regressed."*
@@ -130,7 +131,7 @@ bindings at once, so:
   the rest of the box are fine, which rules out WO-502's ceiling as the cause this time.
 
 **Ruled out — do not re-investigate.** The subregion overrun (two 3840×2160 tiles from a 6144×1536
-canvas) *looks* wrong and is **correct and proven**: [WO-485 §4](./485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md)
+canvas) *looks* wrong and is **correct and proven**: [WO-485 §4](./deprecated/485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md)
 records the owner's tested rig (`config/casparcg copy.config`, 1920-wide regions from a 5120 canvas)
 doing the same thing at full speed. Each region is the size of the card's standard SDI frame; the
 video lands where it lands and the remainder is blank. WO-485 already burned a session on this and

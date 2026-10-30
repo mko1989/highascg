@@ -1,5 +1,6 @@
 # WO-822 — Remove the :4443 HTTPS proxy (`highascg-https-proxy`), the way nginx went in WO-498
 
+**Area:** network
 **Status: DONE (29.10) — repo (offline gate green, see 4) and box: the owner ran the remover at 19:16; verified below (Box verified).**
 
 Owner 29.10: *"The https proxy was deprecated due to some issues I don't remember now."* — then confirmed: remove it the same

@@ -1,5 +1,9 @@
 # WO-289 — Looks editor canvas needs a visible alpha-checkerboard background
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "the canvas (background) in the looks editor is not visibly different
 than the rest of the div. the bg in looks (empty) should be 'alpha checkerboard' with low
 opacity."

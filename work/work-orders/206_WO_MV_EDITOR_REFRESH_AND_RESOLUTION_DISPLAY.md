@@ -1,9 +1,10 @@
 # WO-206 — Multiview editor: changes should reach the output without manual rebuild; correct channel resolutions; timer font notes
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** mapping
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (latest NEWNEWNEW): "changes made on the multiviewer don't refresh unless I reset and rebuild it"; "shows my pgm1 and prv1 as 1920x1080 when they're 3072x1728"; "font on the timers is a bit too big in the output, make it adjustable too."
+**Source:** `work/archive/todos/todos14.07.26` (latest NEWNEWNEW): "changes made on the multiviewer don't refresh unless I reset and rebuild it"; "shows my pgm1 and prv1 as 1920x1080 when they're 3072x1728"; "font on the timers is a bit too big in the output, make it adjustable too."
 **Related:** WO-156 (apply/refresh), WO-190/201 (apply lock + chain — both LIVE since the 12:40 restart), WO-203/204 (timer size — **already adjustable**: multiview editor → "Timer size %", 50-300; verify visibility, see T206.3).
 
 ---

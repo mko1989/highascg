@@ -1,6 +1,7 @@
 # WO-590 — Template layers ignore layer position on PGM; LT page fixed at 1920×1080 on a 3072×1024 channel
 
-**Status: IMPLEMENTED 03.10.26 — offline suite 2555 pass / 1 fail (unrelated, WO-586 shader label) / 2 skip; template probed headless at 3072×1024 and 1920×1080. NOT deployed: needs a highascg restart (owner's call). Owner QA: move/resize a template layer on a live look, check it follows on PGM.**
+**Area:** engine
+**Status: DONE — IMPLEMENTED 03.10.26 — offline suite 2555 pass / 1 fail (unrelated, WO-586 shader label) / 2 skip; template probed headless at 3072×1024 and 1920×1080. NOT deployed: needs a highascg restart (owner's call). Owner QA: move/resize a template layer on a live look, check it follows on PGM.**
 
 Owner, 03.10 (on WO-589's Confetti Center): *"even when center is picked its not centered. also positioning the layer that the template is on does not move the template, so i cant position it exactly where i want."*
 

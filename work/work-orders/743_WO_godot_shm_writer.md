@@ -1,5 +1,6 @@
 # WO-743 — Godot shm writer: a SubViewport published into a ring Caspar plays (WO-738 step 2)
 
+**Area:** godot-client, caspar-build
 **Status: DONE (24.10.26) as future development, detachable (see "How to remove"). Proven end to end by
 `tools/e2e/godot-shm-writer.sh` (PASS): a Godot viewport goes through the ring and the WO-742 Caspar producer to a
 channel's output, with every pixel exact. Godot `--test` 21577/0. Not wired into the client: that is WO-738 step 3.

@@ -1,5 +1,6 @@
 # WO-497 — Measured causes of "the whole thing feels slugish as hell"
 
+**Area:** web-client, network
 **Status: DONE for the two in-repo costs (12.08 — 8 new smokes, suite 2027/2025/0, eslint 0 errors). Two more fixes are ROOT-OWNED nginx config, handed to the owner in §5. NOT deployed — `highascg.service` is stopped.**
 
 Owner 12.08 (`todos12.08.26`): *"there are definitly some performance issues… the whole thing feels
@@ -86,7 +87,7 @@ removing the proxy — it had never compressed anything, for the reason measured
 ## 7. Still open — the *playback* half is a separate thread
 
 The "slower playback" complaint is not findings 1-3. It has its own open item:
-[WO-487](./487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md) — *"🟡 OPEN 11.08 — HYPOTHESIS UNMEASURED"* —
+[WO-487](./deprecated/487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md) — *"🟡 OPEN 11.08 — HYPOTHESIS UNMEASURED"* —
 and WO-485 established that the DeckLink consumer carries the channel's synchronisation clock, so PGM
 ticks at whatever the cards manage. That matches "80%, worse with more DeckLink work, realtime with
 the DeckLink output removed". See also [WO-493](./493_WO_DECKLINK_PIXEL_FORMAT_OPTION.md).

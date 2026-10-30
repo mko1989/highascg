@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete — CI workflow, lint/format tooling, curated test:ci, audit wrapper (2026-07-02)
+**Area:** testing-ci
+**Status:** DONE — Complete — CI workflow, lint/format tooling, curated test:ci, audit wrapper (2026-07-02)
 **Priority:** **High** — no automated gate exists; regressions (untracked deps, sync-conflicts, vuln deps) ship silently
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

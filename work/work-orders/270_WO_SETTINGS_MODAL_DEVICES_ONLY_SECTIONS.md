@@ -1,6 +1,7 @@
 # WO-270 — Settings modal: screen labels + streaming channel move to the Devices tab
 
-**Status:** Implemented (owner acceptance A270.1 pending)
+**Area:** web-client, devices-config
+**Status:** DONE — Implemented (owner acceptance A270.1 pending)
 **Priority:** MEDIUM (owner request 2026-07-18, chat: "in the defaults settings in the settings modal there are screen labels and streaming which should not be there — all of that should be available to set only from devices tab")
 
 ## Ground truth (verified 2026-07-18)

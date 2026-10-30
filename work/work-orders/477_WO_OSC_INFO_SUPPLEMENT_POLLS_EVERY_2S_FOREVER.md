@@ -1,5 +1,6 @@
 # WO-477 — the OSC INFO supplement polls AMCP every 2s forever
 
+**Area:** amcp, engine
 **Status: DONE (11.08.2026, verified: new gate smoke 7/7, offline suite 1957/1955 pass/0 fail/2 skip)
 — owner QA: watch the Caspar log on .28; INFO should appear only when a clip changes**
 

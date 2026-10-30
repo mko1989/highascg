@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete (Phases A–D)  
+**Area:** video-io
+**Status:** DONE — Complete (Phases A–D)  
 **Priority:** High (persistent webpage state, unified live-input architecture)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -16,7 +17,7 @@
 - [WO-48](./48_WO_LAYER_ROUTE_LIVE_SOURCE_REUSE.md) — `route://` as Live source
 - [WO-53](./53_WO_PER_INPUT_AUDIO_METER_CHANNELS.md) — per-input host channels (audio)
 - [WO-86](./86_WO_DEVICE_VIEW_ROUTING_MATRIX.md) — Device View routing matrix
-- [WO-89](./89_WO_CEF_OPERATOR_CONTROL.md) — CEF mouse/keyboard + HTTP API (depends on host registry from this WO)
+- [WO-89](./deprecated/89_WO_CEF_OPERATOR_CONTROL.md) — CEF mouse/keyboard + HTTP API (depends on host registry from this WO)
 
 ---
 
@@ -104,7 +105,7 @@ Same pattern as DeckLink per [WO-28](./28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md).
 2. System routes `route://hostCh-1` to **operator channel** fullscreen (multiview or configured operator consumer layer).
 3. **Take off operator screen:** remove route from operator consumer only — **host channel keeps playing**.
 
-> **CEF mouse/keyboard** when fullscreen is **[WO-89](./89_WO_CEF_OPERATOR_CONTROL.md)** — this WO only owns the **video route** and host-channel registry metadata (`sourceId`, `hostChannel`, `cefNeedle`).
+> **CEF mouse/keyboard** when fullscreen is **[WO-89](./deprecated/89_WO_CEF_OPERATOR_CONTROL.md)** — this WO only owns the **video route** and host-channel registry metadata (`sourceId`, `hostChannel`, `cefNeedle`).
 
 ### 3.3 Device View visibility
 
@@ -148,7 +149,7 @@ Extend live webpage / NDI entries:
 
 NDI analogue: `routeType: "ndi_host"`, `ndiName`, dedicated `hostChannel`.
 
-`cefNeedle` / `interactiveCapable` are consumed by [WO-89](./89_WO_CEF_OPERATOR_CONTROL.md) for CDP targeting.
+`cefNeedle` / `interactiveCapable` are consumed by [WO-89](./deprecated/89_WO_CEF_OPERATOR_CONTROL.md) for CDP targeting.
 
 ### 4.2 Channel map generator
 
@@ -205,7 +206,7 @@ NDI analogue: `routeType: "ndi_host"`, `ndiName`, dedicated `hostChannel`.
 2. **Go fullscreen** routes **video** to operator monitor via `route://`; host channel keeps playing when route is removed.
 3. Removing webpage from operator/PGM **does not CLEAR** host channel; rejoining shows **same page state** (form fields, counters).
 4. NDI and DeckLink inputs follow **host channel only** — no direct PGM `PLAY` in UI or generator.
-5. Host source registry exposes `sourceId`, `hostChannel`, `hostLayer`, `cefNeedle` for [WO-89](./89_WO_CEF_OPERATOR_CONTROL.md).
+5. Host source registry exposes `sourceId`, `hostChannel`, `hostLayer`, `cefNeedle` for [WO-89](./deprecated/89_WO_CEF_OPERATOR_CONTROL.md).
 
 ---
 
@@ -271,7 +272,7 @@ NDI analogue: `routeType: "ndi_host"`, `ndiName`, dedicated `hostChannel`.
 
 **Work Done:**
 - Split host-channel scope out of the former combined WO-88.
-- CEF operator control moved to [WO-89](./89_WO_CEF_OPERATOR_CONTROL.md).
+- CEF operator control moved to [WO-89](./deprecated/89_WO_CEF_OPERATOR_CONTROL.md).
 - Operator fullscreen in this WO is **video route only**; interactive input is WO-89.
 
 **Instructions for Next Agent:** Start **Phase A** (`webpage_host` channel allocation + LOOP PLAY on load). **T88.C4** should expose fullscreen state for WO-89 without implementing CDP there.

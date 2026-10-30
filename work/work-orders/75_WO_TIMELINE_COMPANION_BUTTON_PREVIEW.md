@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
+**Area:** companion, engine
 **Status:** In progress — Phases A–D implemented (2026-06-28); hardware QA with real Companion optional  
 **Priority:** Medium–High (operator UX — pick the right Companion key visually; type coordinates quickly; see keyframes on timeline)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

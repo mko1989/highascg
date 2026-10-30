@@ -1,5 +1,9 @@
 # WO-288 — Generated Caspar config must not emit a custom 1080p50 video mode
 
+**Area:** caspar-build, devices-config
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "in the generated caspar config there is no need to write the
 additional mode for 1080p50, standard video modes are built into caspar and dont need to be
 called."

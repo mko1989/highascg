@@ -1,5 +1,6 @@
 # WO-729 — Replication SSH keys in authorized_keys gave a full shell
 
+**Area:** network
 **Status: DONE (24.10.26) — this box's three plain replication keys restricted on server start (journal line,
 backup kept); replication-check against 127.0.0.1 and .4 5/5 each, shell refused; smoke 5 cases in CI.**
 

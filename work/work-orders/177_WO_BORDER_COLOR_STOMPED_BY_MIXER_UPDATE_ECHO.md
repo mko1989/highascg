@@ -1,6 +1,7 @@
 # WO-177 — Border color changes don't stick: mixer_update WS echo stomps pipOverlays (and friends)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine, web-client
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (edits visibly revert — operator distrust)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "color changes of borders (only observed) doesn't 'stick', get defaulted asap."

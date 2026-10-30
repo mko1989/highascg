@@ -1,5 +1,6 @@
 # WO-418 — Review 2026-08-03 "fix first" rows 1–5: traversal, AMCP injection, crash-on-error, silent take failure, inverted health flag
 
+**Area:** engine, network
 **Status: DONE (2026-08-04 — all five implemented; smoke 3/3 + repointed WO-401 smoke; suite 1806/2, the 2 reds are the WO-415 config drift. Server restarted 04.08 ~10:30 and the live probe passed: `GET /api/project/file/..%2fconfig%2fgeneral` → 404, was serving the file before the fix)**
 
 Owner: "anything still open? if yes do those" → the review wave's own recommendation

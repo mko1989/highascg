@@ -1,5 +1,6 @@
 # WO-688 — Godot client on the Mac: the layout overflows the window; "Link a server" dialog draws garbage
 
+**Area:** godot-client
 **Status: IN PROGRESS — window fit + exported restart DONE and released (client prerelease `client_2026-10-22_221506`); dialog noise on the Intel Mac OPEN (owner test: `--rendering-method gl_compatibility`)**
 
 Owner, 22.10 (release `2026-10-22_214247` client on a Mac, screenshot): *"first it seems the gui not scaling to the

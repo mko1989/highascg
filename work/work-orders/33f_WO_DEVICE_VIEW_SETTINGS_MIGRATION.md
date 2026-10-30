@@ -1,7 +1,8 @@
 # WO-33f — Device view: settings migration, deep links, and deprecation
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** devices-config, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** [33c](./33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md) (minimal); full value after **33d/33e**
 
 ---

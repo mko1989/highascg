@@ -1,5 +1,6 @@
 # WO-798 — Godot client idle CPU: ~50 % of a core on the Live tab (was ~10 %)
 
+**Area:** godot-client
 **Status: IN PROGRESS (29.10) — one cause proven (Live Times: whole-window redraw at the OSC rate + a fallback-font ✕ shaped per draw, ~11–12 % of a core); fix is a patch for the owner to apply (`/home/casparcg/highascg-wo798.patch`); the rest of the 27.10 :0 gap is not measured yet**
 
 Owner, 27.10 (after WO-797): "open wo".

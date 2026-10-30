@@ -1,9 +1,10 @@
 # WO-200 — Math inputs: CSP-safe expression evaluator (new Function is blocked; 48× console violations in device view)
 
-**Status:** Complete
+**Area:** web-client
+**Status:** DONE — Complete
 **Priority:** High (WO-171's math feature silently non-functional; console spam; contributes to devices-tab jank)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEWNEW): CSP `script-src 'self' 'unsafe-inline'` blocks a JavaScript eval ×48 from `device-view-*.js`.
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEWNEW): CSP `script-src 'self' 'unsafe-inline'` blocks a JavaScript eval ×48 from `device-view-*.js`.
 **Related:** WO-171/171-B (math inputs), WO-103 (client hardening — CSP is intentional; do NOT add unsafe-eval).
 
 ---

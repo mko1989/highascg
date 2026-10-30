@@ -721,7 +721,7 @@ After installing on a new machine, run these checks:
 
 ### 9.1 GPU Drivers
 
-Each live ISO is built with **one** NVIDIA branch (**535**, **580**, or **595**). Set **`HIGHASCG_NVIDIA_DRIVER`** on the build host before **`install.sh`** and **`eggs produce`** — see **`work/work-orders/WO_single-nvidia-driver-per-iso.md`**. **`GET /api/system/gpu-nvidia`** shows the baked branch and a GPU recommendation guide; driver switching in Settings was removed.
+Each live ISO is built with **one** NVIDIA branch (**535**, **580**, or **595**). Set **`HIGHASCG_NVIDIA_DRIVER`** on the build host before **`install.sh`** and **`eggs produce`** — see **`work/work-orders/856_WO_single_nvidia_driver_per_iso.md`**. **`GET /api/system/gpu-nvidia`** shows the baked branch and a GPU recommendation guide; driver switching in Settings was removed.
 
 ```bash
 # Check NVIDIA

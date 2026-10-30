@@ -1,5 +1,6 @@
 # WO-351 — Boot monitor picker: calm colors + pick lands as a devices-tab cable
 
+**Area:** os-iso, devices-config
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 (owner):
 "the screen that displays after reboot to choose operator monitor is too bright and colorfull.
 black bg and white text in the middle. also when the monitor is chosen this way it needs to be

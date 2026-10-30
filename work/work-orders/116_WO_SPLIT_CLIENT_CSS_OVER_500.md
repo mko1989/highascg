@@ -3,7 +3,8 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
-**Status:** Complete (T116.0–T116.4)  
+**Area:** web-client
+**Status:** DONE — Complete (T116.0–T116.4)  
 **Priority:** **Medium** (mechanical splits)
 
 **Touches:** `client/styles/*.css`, `client/styles.css` import chain

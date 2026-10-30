@@ -1,5 +1,6 @@
 # WO-437 — Mapping outputs: stale stored dims report 1080p on GPU ports; GL-sync auto blind to mapping-only rigs
 
+**Area:** mapping, devices-config
 **Status: DONE (2026-08-06 — suite 1849/0/2, built + kiosk F5 + highascg restart; live graph healed via API. Caspar picks up the GL-sync var on the owner's next Apply + caspar restart)**
 
 > **CORRECTION (same day, owner escalation → WO-439):** this WO's GL-sync diagnosis was

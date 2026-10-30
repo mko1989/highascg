@@ -205,7 +205,7 @@ Not counted as production code, but **15 markdown files** under `work/` exceed 5
 
 | Lines | File |
 |------:|------|
-| 1,189 | `work/work-orders/PERFORMANCE_RUN_CHECK_BULLETIN.md` |
+| 1,189 | `work/notes/PERFORMANCE_RUN_CHECK_BULLETIN.md` |
 | 1,113 | `work/work-orders/01_WO_ANALYZE_MODULE.md` |
 | 1,075 | `work/WO_CASPARCG_CONNECTION_MIGRATION.md` |
 

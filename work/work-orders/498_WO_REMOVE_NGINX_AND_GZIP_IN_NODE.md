@@ -1,5 +1,6 @@
 # WO-498 — Remove nginx; gzip in the Node server instead
 
+**Area:** network
 **Status: DONE (12.08 — 8 new smokes, suite 2035/2033/0, eslint 0 errors). Root step (stopping/purging nginx on a box) is one command, §4.**
 
 Owner 12.08: *"i see nginx is giving some problems so id like it removed completly. ip with a port

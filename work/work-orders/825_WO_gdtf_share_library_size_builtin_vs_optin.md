@@ -1,5 +1,6 @@
 # WO-825 — GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture)
 
+**Area:** lighting, media
 **Status: IN PROGRESS (30.10) — tooling, server, Settings pane built and mock-tested; terms checked (shipping the library in the ISO is NOT clearly allowed → built on each box instead); full build not run (coordinator/owner decide when; it downloads ~12 GB)**
 
 ## Owner decision (30.10)

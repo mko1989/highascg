@@ -1,5 +1,6 @@
 # WO-703 — Preset stage marks from the tracking grid
 
+**Area:** lighting
 **Status: DONE (23.10.26: Godot 21197/0, smoke-wo700 14/14, boot check OK; button press = owner QA)**
 
 Owner 23.10: "we need a prebuilt marks similar to what the camera calibration has. but just 6 8 points around the

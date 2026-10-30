@@ -1,5 +1,6 @@
 # WO-450 — Companion status tells the truth; button picker works without previews
 
+**Area:** companion, web-client
 **Status: DONE (06.08.26 — probed live against Companion 5.0.2 on the box; client build + service restart in the day's batch tail). OWNER ACTION: enable "Button Subscriptions API" in Companion → Settings for previews.**
 
 Owner (todos06.08 line 15): *"the companion connection gives false connected flag in the

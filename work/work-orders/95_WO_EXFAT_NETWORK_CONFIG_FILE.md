@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network, os-iso
 **Status:** In progress — T95.1–T95.3 shipped (2026-07-03)  
 **Priority:** **Medium** — field operators need IP without Web UI or Device View on first boot  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

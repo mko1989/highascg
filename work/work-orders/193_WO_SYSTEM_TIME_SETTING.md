@@ -1,9 +1,10 @@
 # WO-193 — Settings modal: system time setting (view, NTP toggle, manual set)
 
-**Status:** Complete
+**Area:** web-client, os-iso
+**Status:** DONE — Complete
 **Priority:** Medium (countdown-to-clock-time depends on correct wall clock)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "we need to add a system setting in the settings modal for setting the system time."
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEW): "we need to add a system setting in the settings modal for setting the system time."
 **Related:** WO-189 (System tab), WO-188 (sudoers-via-installer pattern), WO-169/186 (clock-target timers motivate this).
 
 ---

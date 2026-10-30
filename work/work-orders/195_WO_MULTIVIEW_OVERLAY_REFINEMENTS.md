@@ -1,9 +1,10 @@
 # WO-195 — Multiview overlay refinements: hide PIP-decoration rows, L## + filename labels, drop the big top-clip block, fix PRV cells, kill stale rows
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** mapping
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (overlay currently misleads: decoration rows, wrong PRV, stale rows)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, latest NEW block).
+**Source:** `work/archive/todos/todos14.07.26` (owner, latest NEW block).
 **Related:** WO-191 (built the per-layer rows — this refines it), WO-151 (stale skip), WO-160 (bank map).
 
 ---

@@ -1,5 +1,6 @@
 # WO-451 — GPU layout editor: one-step drag works; mismatch banner only on real wiring change
 
+**Area:** devices-config, web-client
 **Status: DONE (06.08.26 — client + server fixed, smokes repointed; build + restart in batch tail)**
 
 Owner (todos06.08 line 26): *"i edited layout of gpu ports so it reflects my actual ports on

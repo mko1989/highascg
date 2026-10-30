@@ -1,8 +1,11 @@
-**Status: IMPLEMENTED (2026-09-10, offline suite 2405/0/2, syntax-checked, prettier pre-existing-only) — needs `highascg` service restart + owner on-hardware confirmation**
+# WO-568 — operator monitor no cursor autohide
+
+**Area:** devices-config, os-iso
+**Status: DONE — IMPLEMENTED (2026-09-10, offline suite 2405/0/2, syntax-checked, prettier pre-existing-only) — needs `highascg` service restart + owner on-hardware confirmation**
 
 ## Investigation
 
-`work/work-orders/todos10.09.26`: "when the operator monitor is set, turn off the cursor auto
+`work/archive/todos/todos10.09.26`: "when the operator monitor is set, turn off the cursor auto
 hide function."
 
 `unclutter -idle 2 -root` hides the mouse cursor after 2s idle, X-server-wide (`-root` — not

@@ -1,9 +1,10 @@
 # WO-202 — Devices tab render performance: progressive render, client/HTTP caching, overlay optimization
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** web-client
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (operator-perceived jank on every tab open)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEWNEW): "the devices tab takes a while to render."
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEWNEW): "the devices tab takes a while to render."
 **Related:** WO-200 (removed the 48 CSP exceptions that added jank), WO-33/59/82 (device view), WO-189 (caching pattern).
 
 ---

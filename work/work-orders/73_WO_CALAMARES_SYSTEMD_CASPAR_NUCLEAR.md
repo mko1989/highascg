@@ -7,12 +7,13 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Phase A–D implemented (2026-06-28) — ISO Calamares hook, systemd Caspar units, Nuclear UI + API  
+**Area:** os-iso
+**Status:** DONE — Phase A–D implemented (2026-06-28) — ISO Calamares hook, systemd Caspar units, Nuclear UI + API  
 **Priority:** **High** — blocks “pro” install-from-live-USB workflow and headless service model  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
 **Builds on (required reading):**
-- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — service integration, headless CLI
+- [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) — service integration, headless CLI
 - [12_WO_PRODUCTION_INSTALLER.md](./12_WO_PRODUCTION_INSTALLER.md) — production install phases, Openbox autostart history
 - [39_WO_SETTINGS_SYSTEM_HARDWARE.md](./39_WO_SETTINGS_SYSTEM_HARDWARE.md) — Nuclear password, `DISPLAY :0` GUI launches
 - [47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md](./47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md) — boot ordering vs `highascg.service`

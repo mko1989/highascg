@@ -1,6 +1,7 @@
-**Status: IN PROGRESS (2026-10-21) — phases 0–5 built and box-verified: the Godot client runs on the shop box over the Caspar `shm` consumer and does everything the web operator client does (per-area parity in WO-600…608, owner ticks in `work/checklist20.10.26_owner_checks.md`); WO-595's GO was taken in practice (the owner said to continue the port on the box, 17.10) without filling its M1–M12 table. Remaining: owner QA on real shows → [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) (package + cut over + delete the kiosk); [WO-610](./610_WO_godot_remote_native_client.md) deferred; [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) GDTF lighting not started. See "Progress (2026-10-21)" at the end.**
-
 # WO-593 — Port the operator client to Godot, built around Caspar channels in shared memory (EPIC)
+
+**Area:** godot-client
+**Status: IN PROGRESS (2026-10-21) — phases 0–5 built and box-verified: the Godot client runs on the shop box over the Caspar `shm` consumer and does everything the web operator client does (per-area parity in WO-600…608, owner ticks in `work/checklist20.10.26_owner_checks.md`); WO-595's GO was taken in practice (the owner said to continue the port on the box, 17.10) without filling its M1–M12 table. Remaining: owner QA on real shows → [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) (package + cut over + delete the kiosk); [WO-610](./deprecated/610_WO_godot_remote_native_client.md) deferred; [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) GDTF lighting not started. See "Progress (2026-10-21)" at the end.**
 
 ## 0. Owner request and decision trail
 
@@ -107,7 +108,7 @@ Web client (stays): remote browsers + fallback (WO-608 D1); same contract, same 
 
 | Phase | WO | Title | Gate / exit |
 |-------|----|-------|-------------|
-| 0 | [595](./595_WO_godot_m0_spike_on_box.md) | M0 spike on the box (step 0 needs no Caspar change) | **GO / NO-GO** (M1–M12) |
+| 0 | [595](./deprecated/595_WO_godot_m0_spike_on_box.md) | M0 spike on the box (step 0 needs no Caspar change) | **GO / NO-GO** (M1–M12) |
 | 0 | [594](./594_WO_caspar_shm_frame_consumer.md) | Caspar `shm` frame consumer | live acceptance table |
 | 0 | [611](./611_WO_web_client_bugs_found_in_godot_inventory.md) | Web-client bugs found in the inventory | independent |
 | 1 | [599](./599_WO_godot_client_foundation.md) | Godot foundation (engine pin, net, state, windows, theme, CI) | boots on box, mirrors state |
@@ -118,7 +119,7 @@ Web client (stays): remote browsers + fallback (WO-608 D1); same contract, same 
 | 4 | [607](./607_WO_godot_previs_native_3d.md) | **Previs native 3D** (the reason for Godot) | PGM on LED mesh ≥ 50 fps |
 | 5 | [601](./601_WO_godot_port_inspector.md) · [602](./602_WO_godot_port_timeline.md) · [603](./603_WO_godot_port_media_and_playlists.md) · [604](./604_WO_godot_port_audio_mixer_meters.md) · [605](./605_WO_godot_port_device_view.md) · [606](./606_WO_godot_port_secondary_panels.md) · [608](./608_WO_godot_port_shell_settings_web_surfaces.md) | Remaining areas (parallelisable) | per-area parity checklists |
 | 6 | [609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) | Package, cut over, delete the kiosk | ≥ 3 real shows without fallback |
-| later | [610](./610_WO_godot_remote_native_client.md) | Remote native client | deferred |
+| later | [610](./deprecated/610_WO_godot_remote_native_client.md) | Remote native client | deferred |
 
 Rule for every phase: the kiosk remains the fallback (one destination toggle, `videoOutput`) until
 WO-609 step 4. Nothing in phases 0–5 removes a working path from the operator.

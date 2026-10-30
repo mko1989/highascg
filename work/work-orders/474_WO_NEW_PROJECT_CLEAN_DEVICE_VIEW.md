@@ -1,5 +1,6 @@
 # WO-474 — a New project opens a clean device view: no audio, stream, record or virtual-cam output
 
+**Area:** devices-config, web-client
 **Status: DONE (11.08.2026, verified: offline suite 1947/1945 pass/0 fail/2 skip, eslint 0 errors,
 0 files over 500 lines, dist-web rebuilt) — owner QA: hit New project and confirm device view is
 empty; then add one of each and confirm they come up Audio 1 / Str1 / Rec1**

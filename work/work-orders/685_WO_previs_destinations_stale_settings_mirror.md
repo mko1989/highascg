@@ -1,5 +1,6 @@
 # WO-685 — Previs "No screen destination" while one exists: the Godot Settings mirror went stale
 
+**Area:** godot-client, mapping
 **Status: DONE (22.10, Godot `--test` 21044/0 + boot check; GUI relaunched on the box). Owner QA: add a destination, map a wall without restarting the GUI.**
 
 Owner, 22.10: *"I tried mapping a led wall in previs to a screen destination that has no consumers, but initializes

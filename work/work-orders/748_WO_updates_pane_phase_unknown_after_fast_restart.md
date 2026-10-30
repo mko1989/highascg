@@ -1,5 +1,6 @@
 # WO-748 — Updates pane says "Phase: ?" after an update that succeeded (follow-up of WO-737)
 
+**Area:** os-iso, godot-client
 **Status: DONE (25.10.26 — offline: Godot 21656 passed / 0 failed, +7 assertions on the exact responses .4 gave; boot check OK. Owner-QA: the next update from a kiosk ends with "Server is back." and the new version, not "Phase: ?".)**
 
 Owner, 25.10: *"on .4 the standard update route fails. with Phase: ?"* … *"or maybe it succeded..."*

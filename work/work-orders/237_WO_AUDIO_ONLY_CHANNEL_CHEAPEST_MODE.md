@@ -1,6 +1,7 @@
 # WO-237 — Audio-only channel must be the cheapest possible video channel (currently generated as 1080p50)
 
-**Status:** Completed | **Date:** 2026-07-15
+**Area:** audio
+**Status:** DONE — Completed | **Date:** 2026-07-15
 **Source:** owner: "Audio only channel was supposed to be the ceapest video channel possible and it gets created with 1080p50"
 
 ## Implementation Summary

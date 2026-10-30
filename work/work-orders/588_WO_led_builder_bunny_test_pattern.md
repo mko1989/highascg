@@ -1,6 +1,7 @@
 # WO-588 — LED test pattern: "Bunny builds the wall" (full LED grid only)
 
-**Status: IMPLEMENTED 03.10.26, round 2 same day (§4: speed setting, darker colours, no white). Rendered and probed in headless Chrome through the real template; offline smoke 10/10; client rebuilt, kiosk reloaded, server restarted. Not yet seen on a real LED wall.**
+**Area:** mapping
+**Status: DONE — IMPLEMENTED 03.10.26, round 2 same day (§4: speed setting, darker colours, no white). Rendered and probed in headless Chrome through the real template; offline smoke 10/10; client rebuilt, kiosk reloaded, server restarted. Not yet seen on a real LED wall.**
 
 Owner, 03.10: *"create a new test card pattern where the main character from the logo highascg bunny is building the test pattern for the led wall. so it should only be available when full led grid is on. by building i mean the character should come into the canvas from outside carrying a led panel and placing it in its place. lets say it starts with gray panels like right now the test pattern has, and the character replaces the panels into another color (red for instance), when he is done with all panels he changes the color to another one."*
 

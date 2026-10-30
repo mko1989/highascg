@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — offline 3079 incl. new smoke, Godot --test 20618/0; box: Pabianice's 5 Capture placeholders → real GDTFs from GDTF Share, 52 fixtures on the real types, models drawn.** Parent: [WO-633](./633_WO_gdtf_replace_stub_types.md) (manual Replace…). Related: [WO-636](./636_WO_mvr_loads_its_gdtf_types.md) (a scene's types load when shown).
-
 # WO-637 — MVR placeholders resolved from GDTF Share automatically
+
+**Area:** lighting
+**Status: DONE (2026-10-21) — offline 3079 incl. new smoke, Godot --test 20618/0; box: Pabianice's 5 Capture placeholders → real GDTFs from GDTF Share, 52 fixtures on the real types, models drawn.** Parent: [WO-633](./633_WO_gdtf_replace_stub_types.md) (manual Replace…). Related: [WO-636](./636_WO_mvr_loads_its_gdtf_types.md) (a scene's types load when shown).
 
 Owner 21.10: "can we somehow automate the mvr import with gdtf share so the fixtures are auto loaded correctly?"
 

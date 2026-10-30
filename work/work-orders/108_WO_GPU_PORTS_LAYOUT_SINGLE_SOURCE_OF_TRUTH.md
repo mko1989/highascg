@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete
+**Area:** devices-config
+**Status:** DONE — Complete
 **Priority:** High — rear-panel layout drives Caspar screen-consumer indices and xrandr application; drift between its three stores mis-routes real outputs
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md), builds on [35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md](./35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md), [40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md)
 

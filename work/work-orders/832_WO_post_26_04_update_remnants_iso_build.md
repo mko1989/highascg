@@ -1,5 +1,6 @@
 # WO-832 — Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names
 
+**Area:** os-iso
 **Status: IN PROGRESS (30.10) — repo fixes done + verified offline; owner sudo commands below pending**
 **Source:** REPORT §4a–4d and §7e. Owner 30.10: *"the kernel pin and the eggs theme path before the next ISO build. that
 and other remnants of pre update should be fixed (nvidia etc)"*.

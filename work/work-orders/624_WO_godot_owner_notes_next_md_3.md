@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-20, E1/E2/E3 box-verified through the API and the Godot GUI; offline suite + Godot suite green) — E1 Live sources become windows in the Standard compose preview (server `POST /api/operator-gui/cell`, `/cell/remove`); E2 pick the tracked person by clicking their box (server `POST /api/tracking/detect/pick`); E3 calibrate follow lights from the camera view (server `/api/tracking/follow/calibrate`, = [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) T13 manual slice). Owner QA: E2 interpretation, E3 on a real head. Follow-ups: web compose tiles → server cells ([WO-598](./598_WO_client_contract_and_thin_client.md)), automatic beam-spot detection (WO-616 T13b). Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
-
 # WO-624 — Godot: owner's next.md notes (round 3)
+
+**Area:** godot-client, tracking-vr
+**Status: DONE (2026-10-20, E1/E2/E3 box-verified through the API and the Godot GUI; offline suite + Godot suite green) — E1 Live sources become windows in the Standard compose preview (server `POST /api/operator-gui/cell`, `/cell/remove`); E2 pick the tracked person by clicking their box (server `POST /api/tracking/detect/pick`); E3 calibrate follow lights from the camera view (server `/api/tracking/follow/calibrate`, = [WO-616](./616_WO_previs_tracking_openfollow_cameras.md) T13 manual slice). Owner QA: E2 interpretation, E3 on a real head. Follow-ups: web compose tiles → server cells ([WO-598](./598_WO_client_contract_and_thin_client.md)), automatic beam-spot detection (WO-616 T13b). Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
 
 Owner, 20.10 (`next.md`, after WO-623):
 

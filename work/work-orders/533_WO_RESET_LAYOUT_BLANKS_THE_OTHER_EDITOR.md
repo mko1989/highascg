@@ -1,8 +1,9 @@
 # WO-533 — "Reset layout" in one editor blanked the other editor's compose preview
 
-**Status: FIXED in repo (14.08.2026) — 6 smokes, suite 2235 / 2233 pass / 0 fail / 2 skip. Owner QA owed (§5).**
+**Area:** web-client
+**Status: DONE — FIXED in repo (14.08.2026) — 6 smokes, suite 2235 / 2233 pass / 0 fail / 2 skip. Owner QA owed (§5).**
 **Priority:** High (destroys the other editor's arrangement, permanently)
-**Source:** `work/work-orders/todos14.08.26` line 4: *"the problem with the compose preview is that
+**Source:** `work/archive/todos/todos14.08.26` line 4: *"the problem with the compose preview is that
 when i hit reset in looks editor to get a standard compose preview it blanks the compose preview in
 timeline editor and vice verse."*
 **Related:** [WO-529](./529_WO_COMPOSE_PREVIEW_RESETS_ON_EDITOR_SWITCH.md) (the same degenerate-canvas

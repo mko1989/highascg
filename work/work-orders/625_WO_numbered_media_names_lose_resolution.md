@@ -1,5 +1,6 @@
 # WO-625 — numbered media names ("4. Tło 4 …") lost their resolution, so locked-aspect layers rendered stretched
 
+**Area:** media, engine
 **Status: DONE (20.10 — box: `MIXER 2-10 FILL` 0 0 1 1 → 0 0 1 0.622 for the same look; offline smoke)**
 
 Owner 20.10: "we seem to have a bug in layer sizing calculations. the gui shows the layer with locked aspect

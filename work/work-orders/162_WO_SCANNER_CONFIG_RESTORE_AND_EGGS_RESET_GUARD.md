@@ -1,5 +1,6 @@
 # WO-162 — Media-scanner config: restore root scanner.config, guard it from eggs factory-reset, recreate-if-missing
 
+**Area:** devices-config, media
 **Status:** Done pending owner sign-off (2026-07-13: scanner config laid down under its REAL name — root `casparcg.config`, not `scanner.config` — scanner service revived and serving CLS on :8000; guard + seeding + safety note retargeted to the correct filename; remaining: A162.1/A162.2 exercise on a real produce/fresh-host run, A162.3 owner confirmation, `test:ci` gate)
 **Priority:** Medium-High (silent single-point-of-failure: nothing recreates the file once removed)
 **Date:** 2026-07-13

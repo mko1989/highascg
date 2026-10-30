@@ -1,12 +1,13 @@
 # WO-789 — The timeline's preview is the Live preview (2D / 3D)
 
+**Area:** engine
 **Status: DONE (27.10 — smokes + offline suite + Godot tests; off-screen renders of the Timeline tab in 2D and 3D and of the Live tab; owner QA = switch tabs in the running client)**
 
 Owner, 27.10 (after WO-788):
 > the preview in timeline should be the same as in live with the option to change to 3d etc.
 
 Parents:
-- [WO-788](./788_WO_timeline_editor_live_monitor.md) (the timeline monitor this replaces);
+- [WO-788](./deprecated/788_WO_timeline_editor_live_monitor.md) (the timeline monitor this replaces);
 - [WO-621](./621_WO_godot_owner_notes_live_looks_previs.md) N1 / N6 (compose windows, the 2D / 3D switch);
 - [WO-649](./649_WO_live_preview_2d_3d_toggle_mvr_model.md) (MVR + rig in the Live 3D view);
 - [WO-658](./658_WO_live_2d_auto_window_layout.md) (Auto);

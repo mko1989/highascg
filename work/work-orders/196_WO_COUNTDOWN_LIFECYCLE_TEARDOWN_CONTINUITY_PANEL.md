@@ -1,9 +1,10 @@
 # WO-196 — Countdown lifecycle: clear CG on look exit, keep state across same-timer transitions, panel lists all project timers
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** High (timer stays on air after transitioning away — on-air wrongness)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, latest NEW block).
+**Source:** `work/archive/todos/todos14.07.26` (owner, latest NEW block).
 **Related:** WO-169 (countdown), WO-186/192 (panel), WO-160b (pgm-only LBG), WO-158-era template CG pipeline.
 
 ---

@@ -1,5 +1,6 @@
 # WO-462 — New ISO won't boot from Ventoy: "invalid magic number / you need to load the kernel first"
 
+**Area:** os-iso
 **Status: IN PROGRESS (root cause CORRECTED in §1b 2026-08-10 — a build/copy race, not an unflushed write; guard landed; owner must recopy the 1221 stick)**
 
 Owner (todos10.08): *"ive built new eggs and it wont start from the stick. it says invalid magic

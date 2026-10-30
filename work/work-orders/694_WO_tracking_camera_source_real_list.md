@@ -1,5 +1,6 @@
 # WO-694 — Previs camera Source dropdown: only the sources that exist, named for people
 
+**Area:** tracking-vr, video-io
 **Status: DONE (2026-10-23, Godot 21131/0; box: the dropdown lists SDI input 1 / 2, Program 1, Preview 1 with their channels)**
 
 Owner, 23.10: *"when choosing a source for camera it seems the drop down is full of placeholders."*

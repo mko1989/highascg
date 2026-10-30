@@ -1,6 +1,7 @@
 # WO-152 — Timeline polish: play-from-inside-a-look transition + keyframe drag-and-drop
 
-**Status:** Planned
+**Area:** engine, web-client
+**Status:** IN PROGRESS — Planned
 **Priority:** High (B152.1 is on-air quality; directly follows WO-139)
 **Date:** 2026-07-07
 **Source:** `work/todos07.07.26` (owner)

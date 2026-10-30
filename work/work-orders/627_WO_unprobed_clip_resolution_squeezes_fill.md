@@ -1,5 +1,6 @@
 # WO-627 — locked-aspect layers still wrong on Caspar: half the library never got a resolution
 
+**Area:** media, engine
 **Status: DONE (20.10 — smoke + box: PRV MIXER FILL 0.7407 0.7407 → 1 0.7407 for the same look; PGM fixes on its next take)**
 
 Owner 20.10: "still something wrong with how layer's width height are calculated versus what is displayed in

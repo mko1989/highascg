@@ -1,6 +1,7 @@
 # WO-506 — Operator-editable labels for ANY live source, on every label bar
 
-**Status: FOUNDATION DONE in repo (13.08.2026 — 12 smokes, suite 2098/2096/0, eslint 0, prettier clean, client rebuilt). NOT deployed. The store, resolver, route, client helpers and the pill transform are in; the per-surface UI sweep and the inspector edit control are NOT — see §5.**
+**Area:** web-client, engine
+**Status: IN PROGRESS — FOUNDATION DONE in repo (13.08.2026 — 12 smokes, suite 2098/2096/0, eslint 0, prettier clean, client rebuilt). NOT deployed. The store, resolver, route, client helpers and the pill transform are in; the per-surface UI sweep and the inspector edit control are NOT — see §5.**
 **Priority:** Medium (operator ergonomics, no on-air risk)
 **Source:** owner `todos13.08.26`: *"labels for any live source (pgm, prv, decklink, ndi etc) that
 can be displayed on the label bar that appears in compose prv, multiview, looks, timelines (for

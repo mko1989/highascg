@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; Godot 20694/0, box: editor TAKE → take-look 200 "TAKE ok"; card ✕ → "Delete look" confirm, Cancel keeps the look)**
-
 # WO-651 — Look editor TAKE button; a ✕ on the look card above the ⚙
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20694/0, box: editor TAKE → take-look 200 "TAKE ok"; card ✕ → "Delete look" confirm, Cancel keeps the look)**
 
 Owner, 21.10: *"there should be a take button on top of the looks editor."* · *"there should be an "x" to remove a
 look. on top of the cog."*

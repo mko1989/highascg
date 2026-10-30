@@ -1,9 +1,10 @@
 # WO-190 — Multiview shows cropped layer without its top crop (main output correct) — diagnostic-first
 
-**Status: CLOSED — NOT REPRODUCED (06.08.26: no recurrence reported since 15.07 across all todos; theory work was exhausted remotely. Re-open with the live capture described below on next sighting.)**
+**Area:** mapping
+**Status: DONE — CLOSED — NOT REPRODUCED (06.08.26: no recurrence reported since 15.07 across all todos; theory work was exhausted remotely. Re-open with the live capture described below on next sighting.)**
 **Priority:** Medium-High (multiview truthfulness)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner).
+**Source:** `work/archive/todos/todos14.07.26` (owner).
 **Related:** WO-158 (crop), WO-156 (multiview apply/reapply/refresh), WO-151 (overlay), WO-191 (overlay timers).
 
 ---

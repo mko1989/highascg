@@ -1,9 +1,10 @@
 # WO-199 — PRV channel receives bank-mapped physical layers (110/111, PIP 624) — preview must stay logical
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** HIGH (editor changes don't appear on PRV; crop/border artifacts on PRV1 ch2)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "changes in the look editor do not move the prv channel… crop and border issue now present only on prv1 ch2… prv screen needs to be treated as such."
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEW): "changes in the look editor do not move the prv channel… crop and border issue now present only on prv1 ch2… prv screen needs to be treated as such."
 **Related:** WO-160 (bank scheme — the mapping that leaked), WO-150 (PRV flip-flop exchange), WO-155/158b (preview push).
 
 ---

@@ -1,5 +1,6 @@
 # WO-458 — Ventoy stick: exFAT data volume never mounts (`~/exfat` absent, EBUSY on the raw partition)
 
+**Area:** os-iso
 **Status: IN PROGRESS (fix + tests landed 2026-08-10; owner QA: reboot a Ventoy stick and confirm `~/exfat` mounts)**
 
 Owner report (2026-08-10): moving stick production from Etcher + trailing exFAT partition

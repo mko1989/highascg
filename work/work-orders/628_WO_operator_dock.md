@@ -1,5 +1,6 @@
 # WO-628 — operator dock: an auto-hiding app dock at the bottom centre of the Godot client
 
+**Area:** godot-client
 **Status: DONE (20.10 — box: rest-to-reveal, launch/focus, ⋯ list launch; smoke 11/11; Godot tests)**
 
 Owner 20.10: "because we are running a normal app with no funny business with windows and cut outs, we can start

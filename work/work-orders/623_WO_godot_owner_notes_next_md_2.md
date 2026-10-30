@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-20, A/B/C/D box-verified; offline suite + Godot suite green) — A (performance overlay), B (new look: deck drop / "+" / delete), C (Sources Templates / Timelines tabs), D (host-channel STOP / CLEAR / PLAY composed on the server: `POST /api/host-live/layer`; the Godot client now sends no raw AMCP at all). Remaining web-only AMCP composition is handed to [WO-598](./598_WO_client_contract_and_thin_client.md). Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
-
 # WO-623 — Godot: owner's next.md notes (round 2)
+
+**Area:** godot-client
+**Status: DONE (2026-10-20, A/B/C/D box-verified; offline suite + Godot suite green) — A (performance overlay), B (new look: deck drop / "+" / delete), C (Sources Templates / Timelines tabs), D (host-channel STOP / CLEAR / PLAY composed on the server: `POST /api/host-live/layer`; the Godot client now sends no raw AMCP at all). Remaining web-only AMCP composition is handed to [WO-598](./598_WO_client_contract_and_thin_client.md). Parent: [WO-593](./593_WO_godot_client_port_epic.md).**
 
 Owner, 20.10 (`next.md`, added after WO-621):
 

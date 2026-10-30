@@ -1,5 +1,6 @@
 # WO-699 — previs Inspector: the lighting controls grouped by job
 
+**Area:** lighting, godot-client
 **Status: DONE (2026-10-23, Godot 21153/0, `run-client.sh --check` OK; checked in a second client instance on the box —
 screenshots below; owner QA: the layout)**
 

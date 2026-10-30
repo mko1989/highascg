@@ -1,5 +1,6 @@
 # WO-838 — Lockscreen (Settings)
 
+**Area:** godot-client
 **Status: DONE (30.10, Xvfb GUI run + Godot unit tests + --check boot; owner QA on the real screen outstanding)**
 **Source:** owner 30.10: *"add setup in settings, lockscreen. it should display locked (by default), logo (changable) and a
 semi transparent bg (changeable), lock any input other than the set key combination (default shift+ctrl+L both for lock

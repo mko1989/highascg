@@ -1,5 +1,6 @@
 # WO-784 — Previs: MAC Aura PXL never lights (virtual dimmers read as 0) and its body draws white (glb without materials)
 
+**Area:** lighting
 **Status: DONE (26.10 — smoke 2/2 (fails without the fix), offline suite, decode sweep of every stored GDTF, off-screen render of an Aura with the owner's programmer values; owner QA = the Auras in their running client after a relaunch)**
 
 Owner, 26.10:

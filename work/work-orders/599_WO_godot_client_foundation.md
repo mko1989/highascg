@@ -1,6 +1,7 @@
-**Status: DONE pending owner check (2026-10-21) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); CI `godot` job green on every push; operator-monitor placement + HiDPI + the native "Make this the operator screen" picker done 2026-10-21 (box-verified); the systemd unit moved to [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) T2; T6 (dev reload + journald log format) is a nicety left open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
-
 # WO-599 — Godot client foundation: project, engine pin, networking, state, theme, windows, CI, dev loop
+
+**Area:** godot-client
+**Status: DONE pending owner check (2026-10-21) — box acceptance PASSED (boot, state mirror, survives server + Caspar restart, native operator picture); CI `godot` job green on every push; operator-monitor placement + HiDPI + the native "Make this the operator screen" picker done 2026-10-21 (box-verified); the systemd unit moved to [WO-609](./609_WO_godot_cutover_packaging_kiosk_decommission.md) T2; T6 (dev reload + journald log format) is a nicety left open. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Starts after WO-595 GO. Everything in WO-600…608 builds on it.**
 
 ## Investigation
 

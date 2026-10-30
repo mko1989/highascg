@@ -1,12 +1,13 @@
 # WO-365 — Matrix view lists the PGM/PRV destination a third time; standard-view cables all anchor on the PGM dot (todos28.07.26 §3)
 
+**Area:** mapping, web-client
 **Status: DONE (28.07.26 — both defects fixed; ghost row proven gone against the live payload, anchor resolution unit-proven; owner eyeball on the cable dots owed).**
 
 Regression follow-up to [WO-364](./364_WO_prv_physical_output_gpu.md) (PRV bus as a first-class
 routable output, commit `71aa5a1`, 28.07 11:46).
 
 Owner report, appended to `todos28.07.26` **after** WO-364 landed (the file's third line is an
-uncommitted addition — `git diff -- work/work-orders/todos28.07.26`):
+uncommitted addition — `git diff -- work/archive/todos/todos28.07.26`):
 
 > in matrix view the prv is listed twice now. and in standard view the cable comes out of pgm
 > node dot instead of the prv one.

@@ -1,5 +1,6 @@
 # WO-827 — Web client: Looks deck says "No looks" after a server import (+ six ReferenceErrors)
 
+**Area:** web-client
 **Status: DONE (29.10.2026, fresh-profile firefox-esr against the box: deck shows the looks; 0 compose errors; offline 3641/0; CI lint 0 errors)**
 
 Found while checking the WO-818 note ("web Scenes/Looks tab showed 'No looks for Dioda/Proj' … may be a stale dist-web").

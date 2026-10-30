@@ -1,9 +1,10 @@
 # WO-580 — Shader Live: speed changes without a phase jump + smooth (gliding) param changes
 
+**Area:** engine
 **Status: OPEN** (2026-09-25; diagnosed on the box during a live show — nothing implemented for
 the real fix. Precursor wheel-apply fix IMPLEMENTED, see §2.1.)
 
-Source: owner, `work/work-orders/todos25.09.26` (on show):
+Source: owner, `work/archive/todos/todos25.09.26` (on show):
 > why does scroll value changes does not register to output in shaders editor. only update after
 > slider click. id also like the changes to happen smoothly and not abruptly.
 

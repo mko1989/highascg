@@ -1,6 +1,7 @@
 # WO-553 — Timeline-in-a-look opacity flash, and the timeline↔look switch that cut instead of mixed
 
-**Status: FIXED in repo (02.09.2026), both halves. Part A (flash) found by re-reading `setSendTo`'s
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026), both halves. Part A (flash) found by re-reading `setSendTo`'s
 own AMCP-apply side effect against a fresh wire-log symptom. Part B (cut) found by tracing a
 pre-existing, self-documenting dead parameter (`outgoingTopIsTimeline`) that was never wired to its
 only caller. 4 smokes across 2 files, all 4 verified to fail without their respective fix (one
@@ -12,8 +13,8 @@ directions.
 between looks and timeline looks. when playing a timeline look some of its layers appear at full
 opacity for a split seccond, before disapearing and then fading in. switching between timeline look
 and normal look results in cut. this needs to follow the same principals as standard looks"*
-**Related:** [WO-528](./528_WO_TIMELINE_TAKE_MIX_INSTEAD_OF_CUT.md) and
-[WO-544](./544_WO_TIMELINE_CLIP_KEYFRAME_VS_TAKE_FADE.md) (the two existing `takeFade` suppression
+**Related:** [WO-528](528_WO_TIMELINE_IN_LOOK_CUTS_AND_DESTABILISES.md) and
+[WO-544](544_WO_TIMELINE_CLIP_KEYFRAME_VS_TAKE_FADE_RACE.md) (the two existing `takeFade` suppression
 paths Part A's bug bypassed entirely — both were working correctly the whole time),
 [WO-546](./546_WO_PREVIEW_EXCHANGE_KILLS_CONCURRENT_TIMELINE_TAKE.md) (the concurrent
 staging+PGM-take call pattern that creates Part A's race window), [WO-549](./549_WO_PREVIEW_ONLY_TIMELINE_ROUTING.md)

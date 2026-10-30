@@ -1,5 +1,6 @@
 # WO-752 — test:ci hung for hours when one sandbox server failed to start
 
+**Area:** testing-ci
 **Status: DONE (25.10.26 — new smoke 1/1, which fails on the old `cluster-nodes.js` ("no sandbox server left running"); smoke-wo725-cluster-e2e 14/14; lint 214.)**
 
 Owner, 25.10: *"its stuck the run before was stuck for a couple hours"*

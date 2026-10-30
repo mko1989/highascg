@@ -1,6 +1,7 @@
 # WO-552 — The generic timeline stop route could take PROGRAM off air as an incidental side effect
 
-**Status: FIXED in repo (02.09.2026). Root cause found via a stack-trace diagnostic (WO-551,
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). Root cause found via a stack-trace diagnostic (WO-551,
 removed once this landed), not by continuing to guess at the server take-orchestration path.
 7 smokes (2 verified to fail without the fix), suite 2344/2342/0/2 → 2351/2349/0/2. Owner QA still
 owed.**
@@ -9,7 +10,7 @@ owed.**
 issue"*, following up on *"sending a look to prv when the timeline look is on pgm results in
 sending the look to pgm, which is very very wrong. the reltionship between prv pgm and timeline in
 looks needs to be fixed and hardend."*
-**Related:** [WO-551](./551_WO_PRV_RECALL_STILL_AFFECTS_PGM.md) (deprecated — the diagnostic step
+**Related:** [WO-551](./deprecated/551_WO_PRV_RECALL_STILL_AFFECTS_PGM.md) (deprecated — the diagnostic step
 that found this), WO-546/548/549/550 (the server-side guard this WO's whole investigation had been
 aimed at — confirmed innocent throughout)
 

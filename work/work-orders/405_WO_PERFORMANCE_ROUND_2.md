@@ -1,8 +1,9 @@
 # WO-405 — Performance round 2 (todos03.08.26 item 1)
 
+**Area:** engine, process
 **Status: IN PROGRESS (2026-08-04 — deploy leg done 03.08; idle baseline captured 04.08 (§4, casparcg 8 %, node 1 % on the post-produce config); caspar-internal pass awaits a real show config)**
 **Priority:** High (owner: "thorough review of the code base… anything beneficial to get the most performance out of the machine")
-**Source:** `work/work-orders/todos03.08.26` item 1
+**Source:** `work/archive/todos/todos03.08.26` item 1
 **Related:** WO-401 (round 1, 2026-07-30 — 15 ranked findings, F1–F9/F12 implemented), WO-398 (run.sh fork loop), WO-399 (v4l2 jpg branch), WO-407 (screen-consumer stutter — the on-glass symptom is tracked there, but candidate causes overlap with caspar-process load)
 
 ## 1. Investigation

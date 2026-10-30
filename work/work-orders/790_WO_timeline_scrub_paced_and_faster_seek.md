@@ -1,5 +1,6 @@
 # WO-790 — Timeline scrub: the channel follows the drag, seeks show sooner
 
+**Area:** engine, amcp
 **Status: DONE (27.10 — smokes + offline suite; live on the box: seek probe on PRV 2-210 and API drags with Caspar
 polled, before and after; owner QA = drag the ruler in the Godot timeline)**
 

@@ -1,5 +1,6 @@
 # WO-489 — Multiview editor blend holes sit 18 px low and eat the label strips
 
+**Area:** mapping, web-client
 **Status: DONE (12.08, measured on the box before/after from a screen capture; smokes 99/99 + hole-rect 5/5, suite 1982/1980/0, eslint 0 errors)**
 
 Owner 12.08: *"the rects in multiview layout editor are all too low and overlap the labels of the

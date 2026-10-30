@@ -1,5 +1,6 @@
 # WO-800 — Per-layer audio monitoring (levels per layer, not per channel)
 
+**Area:** audio
 **Status: IN PROGRESS (29.10) — option A built, deployed on the box and proven on the wire + node route (see "Verified" under Implementation); Godot per-layer lane built + unit-tested (glass look = owner QA); web display built 29.10 (Audio tab lane, offline suite + sandbox/headless-Firefox screenshots; see "Web display (29.10)"); Caspar frozen-level bug fixed + deployed 29.10 (see "Caspar fix: frozen level"); open: owner commits of both trees. · live e2e 29.10: Godot lanes PASS on the glass**
 
 Owner, 29.10:

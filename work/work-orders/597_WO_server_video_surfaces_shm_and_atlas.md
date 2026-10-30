@@ -1,6 +1,7 @@
-**Status: DONE pending owner check (2026-10-21) — A (config `videoOutput`), B/C (runtime surfaces, descriptor + lease API), D (atlas: moves cost zero AMCP, box-verified) and T4 (Video output selector in both clients) implemented. Owner check: see the checklist entry "WO-597 atlas". Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (consumer exists). Needed by: WO-599 (canvas mode), WO-600 (atlas mode), WO-607 (previs sources).**
-
 # WO-597 — Server: "video surfaces" (shm consumers in config + runtime), descriptor API, atlas allocator
+
+**Area:** engine, godot-client
+**Status: DONE pending owner check (2026-10-21) — A (config `videoOutput`), B/C (runtime surfaces, descriptor + lease API), D (atlas: moves cost zero AMCP, box-verified) and T4 (Video output selector in both clients) implemented. Owner check: see the checklist entry "WO-597 atlas". Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (consumer exists). Needed by: WO-599 (canvas mode), WO-600 (atlas mode), WO-607 (previs sources).**
 
 The native client draws Caspar channels from shared memory (WO-594/596). The server must (a) put
 an `shm` consumer on the operator-GUI channel instead of the `<screen>` consumer, (b) add/remove

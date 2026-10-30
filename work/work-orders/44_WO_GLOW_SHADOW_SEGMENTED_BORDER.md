@@ -1,6 +1,7 @@
 # WO-44 — Segmented glow & shadow borders (per-edge splits + ease toward cuts)
 
-**Status:** Draft work order (not implemented)  
+**Area:** engine
+**Status:** OPEN — Draft work order (not implemented)  
 **Scope:** Caspar HTML templates `template/pip_glow.html`, `template/pip_shadow.html`; inspector schema `client/lib/pip-overlay-registry.js`; merged CG defaults `src/engine/pip-overlay-utils.js` (`PIP_OVERLAY_PARAM_DEFAULTS`); global border + PIP overlay AMCP/CG JSON paths (same templates).  
 **Related:** WO-09 / WO-25 (PIP overlays), WO-43 (global border dual-layer / PGM stack).  
 **Note:** `pip_glow.html` today contains an experimental `segmentation` numeric field driving a **repeating conic-gradient mask** on the single `#pip-frame` — **not** the geometry described below. This WO supersedes or refactors that approach after design sign-off.

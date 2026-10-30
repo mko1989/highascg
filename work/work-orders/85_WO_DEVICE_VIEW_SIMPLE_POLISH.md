@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Not started
+**Area:** web-client
+**Status:** OPEN — Not started
 **Prerequisites:** None
 
 ## 1. Objective

@@ -1,5 +1,6 @@
 # WO-750 — In Devices the top bar's connection eyes are gone (the tab was wider than the screen)
 
+**Area:** godot-client
 **Status: DONE (25.10.26 — live on this box's kiosk: Devices tab fits 1920 px, clock + both eyes visible, the Inspector whole; Godot 21656/0, boot check OK.)**
 
 Owner, 25.10: *"in devices there are no connection eyes... in the top bar right side"*

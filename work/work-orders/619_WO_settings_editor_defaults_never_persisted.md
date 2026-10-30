@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-19, offline smoke + box: Godot Settings → Defaults saves survive the reload and a server restart) — owner-QA: change a Defaults-tab value in the browser client, reload, check that it stuck. Found while porting Settings ([WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md)). Two related findings are recorded below and left open.**
-
 # WO-619 — Settings → Defaults never persisted (editor defaults reverted on every save)
+
+**Area:** devices-config, godot-client
+**Status: DONE (2026-10-19, offline smoke + box: Godot Settings → Defaults saves survive the reload and a server restart) — owner-QA: change a Defaults-tab value in the browser client, reload, check that it stuck. Found while porting Settings ([WO-608](./608_WO_godot_port_shell_settings_web_surfaces.md)). Two related findings are recorded below and left open.**
 
 ## Investigation
 

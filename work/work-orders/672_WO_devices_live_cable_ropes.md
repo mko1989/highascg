@@ -1,5 +1,6 @@
 # WO-672 — Devices rear panel: live hanging cables (Verlet ropes) with pendulum loops
 
+**Area:** godot-client
 **Status: DONE (22.10, box screenshots + Godot tests; owner QA = checklist 22.10 §G)**
 
 Owner, `next.md` 22.10: *"i belive that when runnig inside a game engine we can make the cable loops gravity better."*

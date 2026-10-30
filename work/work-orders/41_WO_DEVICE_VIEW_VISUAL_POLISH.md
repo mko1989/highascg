@@ -8,7 +8,8 @@
 > 4. Do **not** delete previous agents’ log entries.
 
 **Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** [WO-35](./35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md) (stable connector IDs), GPU Layout Creator (LocalStorage/Export)
 
 ---

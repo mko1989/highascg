@@ -1,5 +1,6 @@
 # WO-780 — VR still "OpenXR was requested but failed to start": the XR client had no XDG_RUNTIME_DIR
 
+**Area:** tracking-vr
 **Status: DONE (26.10). Verified live: Start VR through `/api/vr/start` with the Quest connected → OpenXR instance on
 WiVRn, `Started native session`. Owner QA: the GUI's Start VR with the headset on.**
 

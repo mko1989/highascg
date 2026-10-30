@@ -1,6 +1,7 @@
 # WO-219 — Timer panel v2: unstyled (CSS never updated), no settings editor, unwired channel map; hard 980-989 band guard
 
-**Status:** Complete
+**Area:** web-client, engine
+**Status:** DONE — Complete
 **Priority:** High (owner: "the timer implementation seems super buggy... the timer settings doesnt appear in the corner")
 **Date:** 2026-07-14
 **Related:** WO-210 (the redesign), WO-217 (the PGM2 blank — NOT timer-caused: the blanking line had merge-fade params `25 linear`; timer visibility lines carry none. Owner's band-safety requirement is enforced here anyway.)

@@ -1,5 +1,9 @@
 # WO-44: Audio Output Routing and Solo System
 
+**Area:** audio
+**Status: OPEN (unverified — no status line before WO-846)**
+
+
 ## Objective
 Enhance the audio routing and output system in HighAsCG to support distinct PortAudio and System Audio consumers, allow targeted channel-to-device mapping via cables, and introduce a flexible "solo" monitoring system in the audio mixer for headphone output.
 

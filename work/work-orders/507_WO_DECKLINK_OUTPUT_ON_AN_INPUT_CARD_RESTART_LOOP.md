@@ -1,5 +1,6 @@
 # WO-507 — An output consumer was emitted on a DeckLink bound as an INPUT → Caspar restart loop
 
+**Area:** video-io, devices-config
 **Status: DONE in repo (13.08.2026 — 5 smokes, suite 2078/2076/0, eslint 0, prettier clean). NOT deployed.**
 **Priority:** HIGH (restart loop = no picture at all)
 **Source:** owner `todos13.08.26`: *"just now wanted to test output of ch1 to two decklinks 1&2, somehow it also tried to open a cosumer on decklink 3 at 2160p50 even though its used as an input in the config. this makes the casparcg go into restart loop."*

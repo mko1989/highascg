@@ -1,5 +1,6 @@
 # WO-814 — Take order: new look straight to PGM, PRV copy after the PGM PLAY; PLAY last in the batch
 
+**Area:** engine, amcp
 **Status: DONE (29.10, offline suite + live PRV/PGM takes on ch 1/2, see Verified) — owner QA: a real show take · live e2e 29.10: take order PASS on PGM; CUT-with-duration bug fixed (scene-transition.js) and re-verified live**
 
 Builds on WO-259 (two-phase BEGIN…COMMIT take, `take_two_phase_batch`), WO-574/WO-782 (multi-screen PLAY in one

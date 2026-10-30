@@ -1,5 +1,6 @@
 # WO-467 — Release tooling: starter zips as assets, and a `--latest` switch
 
+**Area:** process, os-iso
 **Status: DONE (2026-08-10; release `2026-08-10_143258` published and verified on GitHub)**
 
 Owner: *"create and push a fresh latest release to github"* + *"with the starter layouts zips"*.

@@ -3,6 +3,7 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
+**Area:** process
 **Status:** Done  
 **Priority:** **Low–Medium**
 

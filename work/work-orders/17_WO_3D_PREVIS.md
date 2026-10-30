@@ -1,5 +1,9 @@
 # Work Order 17: 3D Previs — Live Video on Imported 3D Stage Models
 
+**Area:** tracking-vr, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done
@@ -13,7 +17,7 @@
 
 Part of the **Previs & Tracking optional module** — see [WO-30](./30_WO_PREVIS_TRACKING_MODULE.md) for packaging, feature flag, and directory boundary. This WO is inert unless `HIGHASCG_PREVIS=1` or `config.features.previs3d === true`. All source lives under `src/previs/`, `client/components/previs-*`, `client/lib/previs-*`, and is deletable as a unit.
 
-Sibling WOs: [WO-19](./19_WO_PERSON_TRACKING.md) (tracking) and [WO-31](./31_WO_STAGE_AUTOFOLLOW_PTZ.md) (PTZ/lighting auto-follow) depend on the 3D stage model and floor plane defined here (zones, calibration).
+Sibling WOs: [WO-19](./deprecated/19_WO_PERSON_TRACKING.md) (tracking) and [WO-31](./deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md) (PTZ/lighting auto-follow) depend on the 3D stage model and floor plane defined here (zones, calibration).
 
 ---
 

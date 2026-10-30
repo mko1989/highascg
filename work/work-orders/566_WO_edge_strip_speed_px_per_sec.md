@@ -1,3 +1,6 @@
+# WO-566 — edge strip speed px per sec
+
+**Area:** engine, web-client
 **Status: DONE (2026-09-10, offline suite 2403/0/2, JSON validity checked, prettier pre-existing-only)**
 
 **Update 2026-09-10 (same day, owner confirmed speed fix): identical bug in `length`, also fixed.**

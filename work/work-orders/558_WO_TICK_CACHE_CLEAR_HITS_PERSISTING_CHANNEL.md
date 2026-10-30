@@ -1,13 +1,14 @@
 # WO-558 — previewing a plain look still restarted program, one tick later
 
-**Status: FIXED in repo (03.09.2026), confirmed against a LIVE wire capture (not just unit tests —
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026), confirmed against a LIVE wire capture (not just unit tests —
 first time this session's timeline chain got that level of proof before shipping). 4 new smokes,
 one directly simulating the real tick timer (the exact gap prior WO-555/556 unit tests missed).
 Full offline suite 2388/2386/0/2, all green. Server restarted and live. Owner QA owed, but this one
 already has stronger evidence than most of today's chain — see §3.**
 **Priority:** Critical — the invariant "a preview action must never touch program" (WO-550, 552,
 555, 556) was STILL being violated after all four of those fixes.
-**Source:** `work/work-orders/todos03.09.26`: *"switching between timeline looks and standard
+**Source:** `work/archive/todos/todos03.09.26`: *"switching between timeline looks and standard
 looks still has a lot of bugs... sending looks on preview has effect on pgm channel which is just
 plain wrong and should never ever happen."*
 **Related:** [WO-555](./555_WO_TIMELINE_PREVIEW_ROUTING_CORRUPTION.md) (introduced this bug while

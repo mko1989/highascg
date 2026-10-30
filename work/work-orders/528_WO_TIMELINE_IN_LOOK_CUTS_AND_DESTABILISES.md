@@ -1,6 +1,7 @@
 # WO-528 — A timeline inside a look cuts instead of mixing, and destabilises later look plays
 
-**Status: FIXED in repo (14.08.2026 — §8), after the owner reported "nothing is fixed with playing timelines". 6 smokes, suite 2209/2207/0. Owner QA on PGM still owed. §2's merge/animate theory is RULED OUT by the owner.**
+**Area:** engine
+**Status: DONE — FIXED in repo (14.08.2026 — §8), after the owner reported "nothing is fixed with playing timelines". 6 smokes, suite 2209/2207/0. Owner QA on PGM still owed. §2's merge/animate theory is RULED OUT by the owner.**
 **Priority:** High (on-air transition quality; owner is hitting it live)
 **Source:** owner 14.08: *"transition between timeline and looks is a cut instead of mix. when a timeline is used inside a look, it just transition seemingly randomly and screwes up subsequent looks plays."*
 **Parent:** [WO-139](./139_WO_TIMELINE_TAKE_SMOOTHNESS.md) — same subject, whose **A139.2 operator QA on real PGM was never run**. This report *is* that QA, arriving 5 weeks late.

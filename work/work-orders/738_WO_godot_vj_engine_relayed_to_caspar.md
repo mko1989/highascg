@@ -1,5 +1,6 @@
 # WO-738 — VJing in Godot, relayed to CasparCG (instead of the current shader work)
 
+**Area:** engine, godot-client
 **Status: DONE (24.10.26) as research. The owner chose path C (shared memory, §7). The screen-consumer overlay was
 analysed and rejected for show content (§8). The game / ROM source is §9. The built path lives in the successors,
 each detachable and each with its own proof: [WO-742](./742_WO_caspar_shm_producer.md) (Caspar shm producer),

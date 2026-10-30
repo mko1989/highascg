@@ -1,5 +1,6 @@
 # WO-241 — Art-Net & pixel-mapping capability docs + production walkthroughs
 
+**Area:** lighting, process
 **Status:** Done (2026-07-15) | **Date:** 2026-07-15
 **Source:** owner: "write for me new artnet and pixel mapping features and possibilities. what can we produce with it and how. create new files with walkthroughs"
 

@@ -1,6 +1,7 @@
 # WO-164 — Live-audio health watchdog: stop the unconditional INFO 6-10 every 15 s (probe on suspicion only)
 
-**Status:** Implemented (pending operator log verification, A164.1)
+**Area:** audio, amcp
+**Status:** DONE — Implemented (pending operator log verification, A164.1)
 **Priority:** Low-Medium (AMCP noise + owner confusion; watchdog itself is correct and wanted)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "there is a INFO 6-10 amcp command going out every 15s WTF???!!!!"

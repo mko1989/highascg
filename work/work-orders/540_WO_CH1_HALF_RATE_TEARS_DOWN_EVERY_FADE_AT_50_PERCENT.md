@@ -1,6 +1,7 @@
 # WO-540 — Channel 1 drifts to half rate at runtime, so every transition on it is torn down mid-fade
 
-**Status: ROOT CAUSE PROVEN by measurement and intervention (§2–§4). §6 option B (verify the real
+**Area:** engine
+**Status: IN PROGRESS — ROOT CAUSE PROVEN by measurement and intervention (§2–§4). §6 option B (verify the real
 opacity before tearing down, instead of trusting the declared framerate) IMPLEMENTED 02.09.2026 —
 see §9. The hardware trigger itself is still the owner's call (§5); live-measured healthy again
 02.09 (ch1 at ~48.8fps, 1024ms/50 frames) after that day's Caspar restart, so §5's watch-and-report

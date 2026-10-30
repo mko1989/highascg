@@ -1,6 +1,7 @@
 # WO-271 — Stale route:// channels after channel-map shifts (MV editor black holes)
 
-**Status:** Implemented (owner acceptance A271.1 pending — needs node restart + client rebuild)
+**Area:** mapping, devices-config
+**Status:** DONE — Implemented (owner acceptance A271.1 pending — needs node restart + client rebuild)
 **Priority:** HIGH (owner report 2026-07-18: "in the multiview editor i cant see the caspar windows underneath the operator gui")
 
 ## Root cause (live-proven 2026-07-18)

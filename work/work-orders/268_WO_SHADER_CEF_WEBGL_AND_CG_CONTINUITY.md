@@ -1,6 +1,7 @@
 # WO-268 — Shader templates crash in Caspar CEF (no WebGL2) + stray CG UPDATE 403
 
-**Status:** Implemented (owner acceptance A268.1 pending — needs config regen + caspar restart)
+**Area:** engine, caspar-build
+**Status:** DONE — Implemented (owner acceptance A268.1 pending — needs config regen + caspar restart)
 **Priority:** HIGH (owner report 2026-07-18, todos18.07.26 — "something wrong with playing the saved shader")
 
 ## Symptoms (owner log 12:41)

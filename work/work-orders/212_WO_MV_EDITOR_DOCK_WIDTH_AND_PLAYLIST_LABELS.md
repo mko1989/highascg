@@ -1,6 +1,7 @@
 # WO-212 — MV editor preview still shows the old 50% timer dock; playlist-aware timer labels (current -> next)
 
-**Status:** Completed
+**Area:** mapping
+**Status:** DONE — Completed
 **Priority:** Medium
 **Date:** 2026-07-14
 **Source:** owner: "the timers in the multiview layout are not reflected as occupying full width" + "when there is a playlist on a layer with autoplay the timers label on mv should show L## filename current -> next filename".

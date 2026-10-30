@@ -1,5 +1,6 @@
 # WO-769 — Multiview PRV cells listed the PGM look's layers (no running times); playlist drop hint never went away
 
+**Area:** mapping, engine
 **Status: IN PROGRESS (25.10) — offline-verified (smoke 4/0 + WO-212/223/250 multiview smokes, test:ci 3347/0, Godot 21760/0, boot check); multiview re-apply + owner QA pending**
 
 Owner 25.10:

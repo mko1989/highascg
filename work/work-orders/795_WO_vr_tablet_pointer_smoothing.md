@@ -1,5 +1,6 @@
 # WO-795 — VR programmer tablet: smooth the ray pointer
 
+**Area:** tracking-vr
 **Status: DONE (27.10, Godot suite 21905 / 0 + filter measurements); owner QA in the headset**
 
 Owner, 27.10:

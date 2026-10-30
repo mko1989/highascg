@@ -1,8 +1,11 @@
-**Status: IMPLEMENTED (2026-09-22, offline suite 2505/2507 / 0 fail / 2 pre-existing skips, new smoke 3/3, max-file-lines clean) — client not rebuilt, needs kiosk reload + owner on-hardware confirmation**
+# WO-578 — audio output save reverts device
+
+**Area:** audio, devices-config
+**Status: DONE — IMPLEMENTED (2026-09-22, offline suite 2505/2507 / 0 fail / 2 pre-existing skips, new smoke 3/3, max-file-lines clean) — client not rebuilt, needs kiosk reload + owner on-hardware confirmation**
 
 ## Investigation
 
-Owner (`work/work-orders/todos22.09.26`): changing the audio output device in the dropdown, then
+Owner (`work/archive/todos/todos22.09.26`): changing the audio output device in the dropdown, then
 clicking "Save audio settings", reverts the dropdown back to the old device — "the procedure needs
 to be done again to actually change and save the audio settings." Also asks for auto-save instead
 of the explicit button, "just like most settings are auto saved."

@@ -1,5 +1,6 @@
 # WO-730 — Post-update sweep: one command (and an automatic run) that checks the whole box after an update
 
+**Area:** os-iso, testing-ci
 **Status: DONE (24.10.26) — sweep green-or-explained on this box; the server's own run after restarting on
 1eb47065 logged 23 pass / 4 warn / 0 fail and GET /api/system/update/sweep served it; smoke 10/10; gates green.**
 

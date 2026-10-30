@@ -1,6 +1,7 @@
 # WO-172 — Streaming/record: device-view source sync broken (streams ch1), restart-flag policy, audio downmix bugs
 
-**Status:** Implemented (pending hardware checks A172.1-A172.3; record call-site follow-up per T172.5/T172.7)
+**Area:** video-io, audio
+**Status:** DONE — Implemented (pending hardware checks A172.1-A172.3; record call-site follow-up per T172.5/T172.7)
 **Priority:** High (streams the wrong program; audio defects on outputs)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): wrong channel streamed despite ch3/PGM2 cabling; orange apply/restart flag inconsistent; "audio is buggy in stream and record."

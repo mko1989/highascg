@@ -1,5 +1,9 @@
 # WO-315 — VERY IMPORTANT: nodm restart on desktop-canvas growth stopped firing
 
+**Area:** os-iso, mapping
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Status (2026-07-26 audit): DONE — the decision inputs were root-caused and fixed 2026-07-21 per this WO; canvas-growth nodm path observed working in the WO-337 measurements (2026-07-24 apply). Verify on the next real canvas-growth apply.**
 
 **Source:** todos21.07.26 — "VERY IMPORTANT — when total resolution of the planned gpu outputs

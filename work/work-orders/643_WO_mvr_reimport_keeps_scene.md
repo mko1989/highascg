@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20670/0 (`test_reimport_keeps_the_scene_settings`); box: the lost place restored (heads back on the trusses, patch unchanged). Owner QA: re-import the MVR — the scene stays where it was.**
-
 # WO-643 — Re-importing the MVR reset the scene to the file's origin and showed a second set of heads
+
+**Area:** godot-client, lighting
+**Status: DONE (2026-10-21) — Godot --test 20670/0 (`test_reimport_keeps_the_scene_settings`); box: the lost place restored (heads back on the trusses, patch unchanged). Owner QA: re-import the MVR — the scene stays where it was.**
 
 Owner, 21.10: *"ive tried reimporting the mvr and it just added the second set of models, and again with wrong
 0,0,0 position. or our 0,0,0 position is wrong."*

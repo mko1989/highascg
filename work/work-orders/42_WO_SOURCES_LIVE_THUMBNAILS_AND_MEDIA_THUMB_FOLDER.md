@@ -8,7 +8,8 @@
 > 4. Do **not** delete previous agents’ log entries.
 
 **Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md) (extra live sources, `thumbnailChannel`); [WO-07 AMCP / API](./07_WO_AMCP_PROTOCOL_API.md) (`PRINT`); media tree behaviour overlaps [WO-29 USB ingest](./29_WO_USB_MEDIA_INGEST.md)  
-**Status:** Draft  
+**Area:** media, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** Caspar `PRINT` path writable under configured media root; existing `GET/POST /api/thumbnail/live/*` and `src/media/live-thumbnail-cache.js`
 
 ---

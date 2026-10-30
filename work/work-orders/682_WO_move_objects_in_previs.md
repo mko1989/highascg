@@ -1,5 +1,6 @@
 # WO-682 — move objects in the 3D previs (drag) and from an Inspector Position card
 
+**Area:** godot-client
 **Status: DONE (22.10, Godot 21034/0 + boot check; box: head drag + card, MVR truss tower drag / keys / card + relaunch
 persistence, LED wall keys + shift-drag + card; owner's layout restored afterwards; owner QA open)**
 

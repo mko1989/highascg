@@ -1,5 +1,6 @@
 # WO-443 — Monitor audio output must not ride in projects
 
+**Area:** audio, devices-config
 **Status: DONE (2026-08-06 — suite 1863/0/2, service restarted; owner QA: save + reload a project, monitor output stays put and is absent from the file)**
 
 Owner (todos06.08.26, 2nd batch): "it seems the monitor audio output is part of default

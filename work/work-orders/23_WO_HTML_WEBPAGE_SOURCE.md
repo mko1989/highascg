@@ -1,5 +1,9 @@
 # Work Order 23: HTML Webpage Source — `client/` static UI
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

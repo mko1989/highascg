@@ -1,5 +1,6 @@
 # WO-774 — VR: box select over fixtures, a fixture-type filter, and the right grip fans pan / tilt
 
+**Area:** tracking-vr, lighting
 **Status: IN PROGRESS (25.10) — offline-verified (Godot 21865 / 0, boot check OK, sandbox GUI e2e of the panel / box
 drawing / type row); headset QA = owner (no OpenXR path can run off the headset).**
 

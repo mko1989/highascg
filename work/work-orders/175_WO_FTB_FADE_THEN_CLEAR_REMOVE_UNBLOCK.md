@@ -1,6 +1,7 @@
 # WO-175 — FTB = fade 0.5 s (project framerate) then full clear; remove the separate Unblock button
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** Medium (operator UX; supersedes the WO-156 T156.3 affordance)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "the unblock button… should be part of fade to black. ftb should fade everything out in 0.5s (counted from the set project framerate), wait for the fade to finish and fire full channel clear. no need for a prompt… ftb has that implied."

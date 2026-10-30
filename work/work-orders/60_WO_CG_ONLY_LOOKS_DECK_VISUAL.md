@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
+**Area:** web-client
 **Status:** In progress  
 **Priority:** Medium (operator UX — distinguish graphics-only looks at a glance)  
 **Related:** [08_WO_CASPARCG_CLIENT_FEATURES.md](./08_WO_CASPARCG_CLIENT_FEATURES.md) (Looks deck), [WO_LOWER_THIRD_TEMPLATES_API.md](../WO_LOWER_THIRD_TEMPLATES_API.md), `src/engine/scene-template-cg.js`, `client/components/scene-list.js`, `client/styles/06a2-scenes-deck-cards.css`

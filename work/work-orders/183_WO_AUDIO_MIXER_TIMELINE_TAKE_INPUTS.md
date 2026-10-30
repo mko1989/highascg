@@ -1,9 +1,10 @@
 # WO-183 — Audio mixer shows the last look's inputs after a timeline take (should show timeline layers)
 
-**Status:** Completed (implementation + validation)
+**Area:** audio
+**Status:** DONE — Completed (implementation + validation)
 **Priority:** Medium-High (mixer misrepresents what's on air)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner): "timeline take with multiple audio clips on different channels — in the audio mixer i have inputs from the last look i played instead of the timeline layers."
+**Source:** `work/archive/todos/todos14.07.26` (owner): "timeline take with multiple audio clips on different channels — in the audio mixer i have inputs from the last look i played instead of the timeline layers."
 **Related:** WO-115 (mixer split), WO-157 (strip hierarchy), WO-173 (timeline playout), `src/engine/timeline-*`.
 
 ---

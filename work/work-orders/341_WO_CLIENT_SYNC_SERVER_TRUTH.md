@@ -4,7 +4,8 @@
 and fixed. both of them are controling same server, both should display live state of the server,
 every new call from wherever becomes the truth. but only actual user interaction."
 
-**Status: kill list IMPLEMENTED 2026-07-27 (items 1–7); item 8 = observe-then-decide.**
+**Area:** web-client, network
+**Status: DONE — kill list IMPLEMENTED 2026-07-27 (items 1–7); item 8 = observe-then-decide.**
 
 ## Kill-list implementation (2026-07-27)
 

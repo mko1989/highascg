@@ -1,6 +1,7 @@
 # WO-258 — Web-browser source v2: real browser on a virtual display, captured into CasparCG
 
-**Status:** IMPLEMENTED (all T-tasks done; WO-257 landed so the spawn-gate is cleared; owner acceptance A258.1 on `work/checklist06.08.26_close_all_wos.md`)
+**Area:** video-io, web-client
+**Status:** DONE — IMPLEMENTED (all T-tasks done; WO-257 landed so the spawn-gate is cleared; owner acceptance A258.1 on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (owner architecture)
 **Owner check:** A258.1
 

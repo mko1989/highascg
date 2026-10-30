@@ -1,6 +1,7 @@
 # WO-538 — CI red: six unwired exports, and four tests the gate was hiding
 
-**Status: FIXED in repo (14.08.2026) — BOTH layers. Gate exits 0; suite green with AND without `dist-web/` (2266 / 2264 pass / 0 fail / 2 skip, and 2263 / 0 fail / 3 skip on a clean tree).**
+**Area:** testing-ci
+**Status: DONE — FIXED in repo (14.08.2026) — BOTH layers. Gate exits 0; suite green with AND without `dist-web/` (2266 / 2264 pass / 0 fail / 2 skip, and 2263 / 0 fail / 3 skip on a clean tree).**
 **Priority:** High (it fails every push, and a standing red hides the next real regression)
 **Source:** found while running the gates for WO-536, then confirmed against GitHub Actions —
 run `31808496051` on `5fb0adc` and the run on `85ea2ad` both failed at the same step.
@@ -140,7 +141,7 @@ here because it belongs to whoever owns the CI layout.
    **A bulk burn-down would be a mistake**, and it is worth saying why rather than just doing it: the
    110 "assigned but never used" are spread over 103 files, and at least some are the *only* trace of
    an unimplemented feature. I audited the 61 with a call on the right-hand side and found one real
-   fault that way — [WO-539](./539_WO_GUI_STREAM_FPS_OPTION_DOES_NOTHING.md), an operator-GUI stream
+   fault that way — [WO-539](./deprecated/539_WO_GUI_STREAM_FPS_OPTION_DOES_NOTHING.md), an operator-GUI stream
    option that is accepted, announced to the browser, and never encoded. Deleting the variable would
    have deleted the evidence.
 

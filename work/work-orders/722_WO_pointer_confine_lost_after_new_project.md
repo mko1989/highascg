@@ -1,5 +1,6 @@
 # WO-722 — Pointer confine is lost after a New project and never comes back
 
+**Area:** devices-config, os-iso
 **Status: DONE (24.10.26: offline smokes + live on .4 after release 212858Z — confine starts on the restart and an
 unrelated save leaves it alone) — replaying the New-project sequence itself = owner QA (this box after its server
 restart, or .4).**

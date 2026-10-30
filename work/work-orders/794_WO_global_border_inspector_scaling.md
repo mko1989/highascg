@@ -1,5 +1,6 @@
 # WO-794 — Global border inspector: layout that holds at the Inspector column's width
 
+**Area:** godot-client
 **Status: DONE (27.10, Xvfb render of the real client at 1920×1080 + Godot suite 21901 / 0 fail); owner QA on the
 operator screen**
 

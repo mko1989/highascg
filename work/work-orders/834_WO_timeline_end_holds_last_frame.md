@@ -1,5 +1,6 @@
 # WO-834 — Timeline end holds the last frame (D8)
 
+**Area:** engine
 **Status: DONE offline (30.10, smoke 4/4, Godot 23015/0) — live wire test on PGM pending the next node restart (batched with the sweep fixes)**
 **Source:** WO-828 D8, owner 30.10: *"the timeline should end on last frame always (unless it was ofcourse set manualy to
 something different), but when timeline end equal clip end then last frame."*

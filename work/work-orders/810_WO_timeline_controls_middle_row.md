@@ -1,5 +1,6 @@
 # WO-810 — Timeline tab: the controls sit between the timeline and the preview
 
+**Area:** godot-client
 **Status: DONE (29.10, live e2e on the box) (29.10) — implemented; Godot suite 22202/0, boot check OK, WO-787 / WO-789 smokes 6/6; the look
 on the glass is unverified (owner QA) · live e2e 29.10: PASS on the glass**
 **Source:** owner 29.10: *"in timeline tab move all the controls to the middle between the timeline and preview."*

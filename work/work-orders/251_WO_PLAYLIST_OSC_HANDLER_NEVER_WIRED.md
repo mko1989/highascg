@@ -1,6 +1,7 @@
 # WO-251 — Playlist OSC advance handler was never subscribed (root cause of "doesn't loop")
 
-**Status:** IMPLEMENTED (orchestrator direct fix, 2026-07-15 evening)
+**Area:** engine
+**Status:** DONE — IMPLEMENTED (orchestrator direct fix, 2026-07-15 evening)
 **Owner check:** A251.1
 
 ## Root cause (proven by git archaeology)

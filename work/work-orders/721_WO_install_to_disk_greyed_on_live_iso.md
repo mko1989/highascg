@@ -1,5 +1,6 @@
 # WO-721 — "Install to disk" greyed out on the live ISO; Calamares' bridge release was a no-op
 
+**Area:** os-iso
 **Status: DONE (24.10.26) in the repo: the WO-721 smoke 5/5 (0/5 on the old code), and the fix script run against
 the shipped ISO's own settings.conf. Reaching a live USB needs a new ISO produce, which is owner QA. The exact
 runtime cause of the grey button in the 24.10 live session is not recoverable (its journal was in RAM); the pane now

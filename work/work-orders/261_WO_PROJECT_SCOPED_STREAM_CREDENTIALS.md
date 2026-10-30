@@ -1,6 +1,7 @@
 # WO-261 — Stream credentials live in the PROJECT and only there
 
-**Status:** IMPLEMENTED (all T-tasks done; owner acceptance A261.1 (rotated key) on `work/checklist06.08.26_close_all_wos.md`)
+**Area:** devices-config, video-io
+**Status:** DONE — IMPLEMENTED (all T-tasks done; owner acceptance A261.1 (rotated key) on `work/checklist06.08.26_close_all_wos.md`)
 **Priority:** HIGH (owner: "youtube key should be saved in project and in it only")
 **Owner check:** A261.1
 

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — Godot --test 20611/0, offline 3073/0; box: Look 1 L10 at 29.5° — frame, label, handles on the picture, edge drag resizes along the layer's width.** Parent: [WO-600](./600_WO_godot_port_live_core.md) (F — Godot look editor).
-
 # WO-635 — Look editor: a rotated layer's frame/handles stay axis-aligned
+
+**Area:** godot-client
+**Status: DONE (2026-10-21) — Godot --test 20611/0, offline 3073/0; box: Look 1 L10 at 29.5° — frame, label, handles on the picture, edge drag resizes along the layer's width.** Parent: [WO-600](./600_WO_godot_port_live_core.md) (F — Godot look editor).
 
 Owner 21.10: "when rotation is applied on a layer in a look, the content rotates but the border from godot doesnt".
 

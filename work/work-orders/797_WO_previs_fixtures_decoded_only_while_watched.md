@@ -1,5 +1,6 @@
 # WO-797 — Decode the previs fixtures only while a client looks
 
+**Area:** lighting
 **Status: DONE (27.10, box: server CPU 41.5 % → 13.3 % with no previs open; watch on/off proven over WS and with a Godot client per tab) — owner QA: Previs tab / Live 3D / headset still show the beams**
 
 Owner, 27.10, asking whether the 3D previs has to be switched off during a show to save resources:

@@ -1,5 +1,9 @@
 # WO-282 — Browser source: real audio in, virtual display, operator control
 
+**Area:** video-io, audio
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "i have a feeling that playing shaders in cef won't let me use it as
 intended. mostly audio might be hard. what we need to work thru is directing a proper audio source
 to the browser. the browser source apart from getting a casparcg host channel should also get a

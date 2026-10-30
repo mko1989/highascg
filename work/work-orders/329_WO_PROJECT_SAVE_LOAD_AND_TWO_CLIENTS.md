@@ -1,5 +1,9 @@
 # WO-329 — Project loading/saving robustness + two clients editing the same project
 
+**Area:** web-client, engine
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos24.07.26 — "Loading saving projects." / "Projects running on two clients."
 
 > **Part A DONE 2026-07-24 (ff3e5f9 + 21f0fdf, verified live).** Server-issued monotonic rev.

@@ -1,5 +1,6 @@
 # WO-707 — Follow → Auto: heads follow the detected person with no marker set-up
 
+**Area:** tracking-vr
 **Status: DONE (23.10.26: smoke-wo707 6/6, offline suite 2893/1 — the known WO-308 failure only, Godot 21223/0, boot
 check OK; owner QA with a person in front of cam_1 / cam_2)**
 

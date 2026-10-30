@@ -1,5 +1,6 @@
 # WO-787 — Timeline: nothing on preview, and scrubbing jumps
 
+**Area:** engine, godot-client
 **Status: DONE (26.10 — smokes + offline suite + Godot tests; live on the box against the owner's timeline on PRV; owner QA = scrub in the Godot timeline tab)**
 
 Owner, 26.10:

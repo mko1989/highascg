@@ -1,5 +1,6 @@
 # WO-512 — Unanchored rsync excludes silently skipped `src/config/` and took the box down
 
+**Area:** os-iso
 **Status: DONE in repo (13.08.2026 — 5 smokes, suite 2106/2104/0, eslint 0, prettier clean). Owner already recovered .37 with the anchored command.**
 **Priority:** HIGH (silent partial updates; this one produced a boot-loop)
 **Source:** owner 13.08 — GUI update failed (WO-511), owner ran the manual procedure, then: *"after manual update it fails to start highascg"*, `Error: Cannot find module '../config/source-labels'`, restart counter 57.

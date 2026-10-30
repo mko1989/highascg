@@ -104,8 +104,8 @@ verified (persistence is Enabled and the unit is enabled at boot).
 
 ## 4. Where the detail lives
 
-- `work/work-orders/copy_todos1.md` — per-item status with commit refs
-- `work/work-orders/todos19.07.26` — your original list, with a short status note under each item
+- `work/archive/logs/copy_todos1.md` — per-item status with commit refs
+- `work/archive/todos/todos19.07.26` — your original list, with a short status note under each item
 - `work/work-orders/281_WO_CASPAR_LOG_AUDIT.md` — why the Caspar log looked like the wild west
   (one powered-off camera; `amcp_batch` was never actually enabled)
 - `work/work-orders/282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md` — why shader audio cannot

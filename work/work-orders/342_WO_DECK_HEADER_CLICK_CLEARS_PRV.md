@@ -2,7 +2,8 @@
 
 **Source:** owner 2026-07-26 — "clicking the top bar of the screen's look's empty space should also clear this screen's prv."
 
-**Status: OPEN.**
+**Area:** web-client
+**Status: DONE — was: OPEN.**
 
 ## Fix direction
 The per-screen deck header (the "S1 [FTB] ⏱" bar rendered by the scene deck column) gets a

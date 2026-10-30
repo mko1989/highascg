@@ -1,5 +1,6 @@
 # WO-733 — Live deck: a line between screens; header bunny resampled to its real size
 
+**Area:** godot-client
 **Status: DONE (24.10.26) — Godot 21492/0 + `--check`; live on this box's kiosk (screenshots before/after).**
 
 Owner, 24.10: *"there is no visible divider between looks cards of different destinations."* and *"the highascg logo

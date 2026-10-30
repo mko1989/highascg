@@ -1,5 +1,6 @@
 # WO-740 — Help pages (Markdown) in a modal: PSN output per lighting desk, calibration guides
 
+**Area:** godot-client, lighting
 **Status: DONE (24.10.26) — four pages behind "?" buttons. Verified by Godot 21574/0 and offline rendering
 screenshots; full gates green. Owner-QA: open each "?" on the kiosk after the next client restart. The MagicQ
 depth-axis note (below) is the owner's decision.**

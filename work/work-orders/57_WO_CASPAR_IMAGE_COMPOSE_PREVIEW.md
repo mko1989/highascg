@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
-**Status:** Draft  
+**Area:** engine, web-client
+**Status:** OPEN — Draft  
 **Priority:** Medium (operator UX / resource efficiency)  
 **Related:** [21_WO_TIMELINE_INSPECTOR_WAVEFORM.md](./21_WO_TIMELINE_INSPECTOR_WAVEFORM.md) (canvas compose stack), [42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md](./42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md) (`PRINT` — **on-demand only**, not compose tick)
 

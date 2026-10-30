@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete (v1) — Zip-Slip, sudoers, xrandr argv, subprocess hardening (2026-07-02)
+**Area:** network
+**Status:** DONE — Complete (v1) — Zip-Slip, sudoers, xrandr argv, subprocess hardening (2026-07-02)
 **Priority:** **High** — three concrete injection/pivot paths; amplified by WO-96 (no auth)
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

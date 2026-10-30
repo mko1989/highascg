@@ -1,6 +1,7 @@
 # WO-145 — Virtual camera stream-mode spike: Caspar STREAM → ffmpeg → /dev/video10
 
-**Status:** Implemented (spike passed; `mode: 'stream'` shipped opt-in, default stays `'jpeg'`; A145.4 Zoom/getUserMedia validation open for owner)
+**Area:** video-io
+**Status:** DONE — Implemented (spike passed; `mode: 'stream'` shipped opt-in, default stays `'jpeg'`; A145.4 Zoom/getUserMedia validation open for owner)
 **Priority:** Medium-high
 **Date:** 2026-07-07
 **Depends on:** WO-141. Parallelizable with WO-144/146/147.

@@ -1,13 +1,14 @@
-**Status: DONE (2026-10-21; Godot 20696/0, box: full-width preview on DP-0, the wheel scrolls the overflow both ways). Owner QA: moving / resizing windows and a dropped Live source on the width-filled canvas.**
-
 # WO-648 — Live "Standard" preview fills the width; the 16:9 canvas overflows top / bottom
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; Godot 20696/0, box: full-width preview on DP-0, the wheel scrolls the overflow both ways). Owner QA: moving / resizing windows and a dropped Live source on the width-filled canvas.**
 
 Owner, 21.10: *"standard live compose preview. i get that its a 16:9 source but it can be displayed from left to
 right of the space instead of being held to height limit. it cant be stratched, just made to over flow the top and
 bottom to fill the width. the windows inside are "free" set either way"*
 
 Related: [WO-621](./621_WO_godot_owner_notes_live_looks_previs.md) N1 (the window outlines / move / resize over this
-preview), [WO-597](./597_WO_godot_operator_canvas_atlas.md) §D (atlas crops).
+preview), [WO-597](597_WO_server_video_surfaces_shm_and_atlas.md) §D (atlas crops).
 
 ## Investigation
 

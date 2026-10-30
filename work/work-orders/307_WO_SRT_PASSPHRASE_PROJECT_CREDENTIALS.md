@@ -1,5 +1,6 @@
 # WO-307 — SRT passphrase via project credentials (encrypted SRT)
 
+**Area:** video-io, network
 **Status: DONE — 2026-07-21, commit 92978c3.**
 
 Delivered per spec below, plus two secret-leak gaps found and fixed while verifying it

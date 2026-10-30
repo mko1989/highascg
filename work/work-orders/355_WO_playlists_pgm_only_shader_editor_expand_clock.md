@@ -1,5 +1,6 @@
 # WO-355 — Playlists run on PGM only; Shader Live editor expansion; wall clock
 
+**Area:** engine, web-client
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 batch 5 (owner, six items).
 
 ## 1. Playlists never run on the preview channel

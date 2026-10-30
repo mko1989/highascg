@@ -1,8 +1,9 @@
 # WO-531 — A take sized its layers with the LOOKS EDITOR's selected screen, not the target screen
 
-**Status: FIXED in repo (14.08.2026) — 5 smokes, suite 2214 / 2212 pass / 0 fail / 2 skip. Owner QA owed (§6).**
+**Area:** engine
+**Status: DONE — FIXED in repo (14.08.2026) — 5 smokes, suite 2214 / 2212 pass / 0 fail / 2 skip. Owner QA owed (§6).**
 **Priority:** High (on-air geometry, every main-play take)
-**Source:** `work/work-orders/todos14.08.26` — *"when hitting the main play button to transition all selected screen destitionations, the transition not always correctly apply position and size of layers set in looks, like it gets it from somewhere else."* Restated 14.08: *"the main play button still applies wrong sizing on layers at least on ch1."*
+**Source:** `work/archive/todos/todos14.08.26` — *"when hitting the main play button to transition all selected screen destitionations, the transition not always correctly apply position and size of layers set in looks, like it gets it from somewhere else."* Restated 14.08: *"the main play button still applies wrong sizing on layers at least on ch1."*
 **Related:** WO-327 (compose preview dest borders at custom res), WO-238, WO-388
 
 ---

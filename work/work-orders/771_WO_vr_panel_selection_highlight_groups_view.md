@@ -1,5 +1,6 @@
 # WO-771 — VR Programmer panel: a stage pick shows in the list; Fixtures | Groups view
 
+**Area:** tracking-vr
 **Status: IN PROGRESS (25.10) — offline-verified (Godot 21801/0, boot check OK); owner headset QA pending**
 
 Owner 25.10 (in the headset):

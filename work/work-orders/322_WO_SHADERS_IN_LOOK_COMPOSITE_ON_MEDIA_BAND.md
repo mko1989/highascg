@@ -1,5 +1,9 @@
 # WO-322 — Shaders dropped into a look must composite on the media band, not the 700+ CG overlay
 
+**Area:** engine, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **IMPLEMENTED 2026-07-25 (commit baf8211) — NOT YET LIVE.** Full (a)+(b)+(c) set per the
 > refined plan below, smoke-wo322 (10 tests) in the curated gate, gate at documented baseline.
 > Activates on the next node restart. The §BLOCKER still stands: the bank-crossfade-vs-CG-producer

@@ -1,5 +1,6 @@
 # WO-436 — Mapping-node inspector values revert on first entry (need several tries to stick)
 
+**Area:** mapping, web-client
 **Status: DONE (2026-08-06 — suite 1844/0/2 incl. new WO-436 smoke, built + kiosk F5; owner QA on feel)**
 
 Owner (todos06.08.26 item 1): "when inputing values into width height src x and others in a

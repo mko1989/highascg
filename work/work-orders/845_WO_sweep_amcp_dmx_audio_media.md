@@ -1,5 +1,6 @@
 # WO-845 — Sweep: AMCP client, Art-Net/sACN, audio and media bugs
 
+**Area:** amcp, lighting
 **Status: DONE (30.10) — offline suite + loopback/Xvfb probes; two follow-ups outside this WO's file scope (see §2 "Needs a change elsewhere")**
 **Source:** code sweep 29.10 (REPORT §4m, §5 AMCP client / Art-Net-sACN / Audio / Media and thumbnails).
 

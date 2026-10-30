@@ -3,7 +3,8 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
-**Status:** Complete (T114.0–T114.4)  
+**Area:** web-client
+**Status:** DONE — Complete (T114.0–T114.4)  
 **Priority:** **High**
 
 **Touches:** `client/components/scenes-*.js`, `client/components/scene-*.js`, `client/components/preview-*.js`, `client/components/sources-panel.js`, `client/lib/scene-state.js`

@@ -1,5 +1,6 @@
 # WO-807 — Region-to-fixture-pixel mapping: average a screen area into one pixel of a lighting fixture
 
+**Area:** mapping, lighting
 **Status: DONE (29.10, all phases built and e2e-verified on the box; only physical rig movement is owner QA) — phase 1 (backend + patch link) DONE 29.10 (offline suite, live routes, a live average check, an ArtDMX loopback); phase 2 (Godot region editor) BUILT 29.10 (Godot suite + headless probes against the live server); GUI e2e PASSES 29.10 (`07_pixel_map` 9/9 in the sandbox, full run 41/41: operator path → DMX 425–427 = 128/64/100 on 127.0.0.1:6455; it found and fixed a window taller than the screen and a sandbox reading the live /dev/shm); automatic edge proposal BUILT + applied live 29.10 (56 PixelLines → 896 mappings, DMX master off; Godot tooltip/modal pending); rig movement is owner QA · live e2e 29.10: pixel-map editor + proposal tooltip/modal PASS on the glass**
 
 Owner, 29.10:

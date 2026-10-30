@@ -1,6 +1,6 @@
 # WO-132 — Flow: ALSA Audio Routing
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `alsa:hdmi`, `alsa:usb`, `alsa:dante`, `alsa:decklink-audio`
 

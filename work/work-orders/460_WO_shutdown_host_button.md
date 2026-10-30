@@ -1,5 +1,6 @@
 # WO-460 — "Shut down host" button in Settings → Danger zone
 
+**Area:** os-iso, web-client
 **Status: IN PROGRESS (implemented + built 2026-08-10; owner must run `12-passwordless-sudo.sh` once per box, then QA the button)**
 
 Owner (todos10.08): *"add in settings modal next to reboot host button a shutdown button."*

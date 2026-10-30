@@ -1,6 +1,7 @@
 # WO-446 — Duplicate-code consolidations (WO-445 §2b follow-ups)
 
-**Status: DONE for items 2.1–2.2 (06.08.26, suite green, service restarted); §2.9 items deferred — owner todos (WO-447..451) took priority mid-session**
+**Area:** process
+**Status: IN PROGRESS — was: DONE for items 2.1–2.2 (06.08.26, suite green, service restarted); §2.9 items deferred — owner todos (WO-447..451) took priority mid-session**
 
 Owner "continue" on WO-445. Each item lands as its own commit, verified before the next.
 Ordering: safest → riskiest; the Caspar config generators go last (load-bearing XML) and

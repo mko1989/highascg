@@ -1,5 +1,6 @@
 # WO-702 — ISO live-boot defects seen on .64 (22.10 build)
 
+**Area:** os-iso
 **Status: DONE in repo (2026-10-23; smoke-wo702 13/13 + test:ci, see Verified) — proven on the next ISO boot only:
 `systemctl --failed` empty, network.conf applied to the cabled NIC, one hostname line, no sda1 mount retries**
 

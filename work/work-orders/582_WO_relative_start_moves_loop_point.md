@@ -1,3 +1,6 @@
+# WO-582 — relative start moves loop point
+
+**Area:** engine, amcp
 **Status: IN PROGRESS (2026-09-28): parts 1 and 2 deployed. Offline suite 2528 / 0 fail / 2 skip. Waiting for the owner's on-air takes, with the OSC sampler measuring the crossfade frame offset.**
 
 Follow-up to [WO-576](576_WO_look_clip_start_point_two_options.md), which made "Relative to the clip

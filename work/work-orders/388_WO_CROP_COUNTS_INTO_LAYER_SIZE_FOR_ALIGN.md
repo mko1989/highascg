@@ -1,11 +1,12 @@
 # WO-388 — Crop counts into the layer's effective size (align/adjust)
 
+**Area:** engine, mapping
 **Status: DONE (2026-07-30, offline suite 1719/0 + 7 new targeted tests; owner QA pending on the box)**
 **Source:** owner 30.07.26 — "i need the crop to be included in the size of the layer, meaning when
 its cropped the layer width and/or height is cropped too, so for instance when i want the layer to
 be adjusted to left, it adjusts including the crop."
 
-**Supersedes [WO-238](./238_WO_ADJUST_FILL_IGNORES_CROP.md)** — which read the same owner request
+**Supersedes [WO-238](./deprecated/238_WO_ADJUST_FILL_IGNORES_CROP.md)** — which read the same owner request
 INVERTED and closed it "code correct, no fix required". See §1.
 
 ## 1. Investigation

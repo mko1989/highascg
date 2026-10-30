@@ -1,5 +1,6 @@
 # WO-354 — Channel-scoped playlist state, shader MIX hops back, shader thumb eligibility, 2 UI fixes
 
+**Area:** engine, web-client
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 batch 4 (owner, five items).
 
 ## 1. "Preview played the old version" — playlist runtime state was channel-less (ROOT CAUSE)

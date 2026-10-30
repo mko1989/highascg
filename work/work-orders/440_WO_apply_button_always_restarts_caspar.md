@@ -1,5 +1,6 @@
 # WO-440 — Apply button ALWAYS restarts Caspar (unchanged-gate blocked env-only changes)
 
+**Area:** devices-config, caspar-build
 **Status: DONE (2026-08-06 — suite 1858/0/2, built + kiosk F5; owner presses Apply once to restart Caspar and arm GL sync)**
 
 Owner (todos06.08.26 item 3): "the apply and restart button should ALWAYS restart caspar.

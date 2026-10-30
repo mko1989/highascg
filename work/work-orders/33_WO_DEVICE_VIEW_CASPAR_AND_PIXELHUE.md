@@ -1,5 +1,9 @@
 # WO-33 (legacy filename) — use the index
 
+**Area:** process
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 This file name is kept for **old links**. The program spec was **split** into:
 
 **→ [33_WO_DEVICE_VIEW_INDEX.md](./33_WO_DEVICE_VIEW_INDEX.md)** (parent + dependency order)

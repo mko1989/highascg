@@ -1,9 +1,10 @@
 # WO-187 — Template thumbnails in the looks editor (wire the existing cg-thumb renderer; poster fallback)
 
-**Status:** Complete
+**Area:** web-client, media
+**Status:** DONE — Complete
 **Priority:** Medium (editor fidelity for template layers)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner): show templates in the looks editor via a snapshot from the template's fully-"shown" state.
+**Source:** `work/archive/todos/todos14.07.26` (owner): show templates in the looks editor via a snapshot from the template's fully-"shown" state.
 **Related:** WO-60 (CG-only looks deck — built the renderer), WO-169 (countdown template), WO-158 (editor layer rendering).
 
 ---

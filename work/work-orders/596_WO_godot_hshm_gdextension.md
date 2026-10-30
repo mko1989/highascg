@@ -1,6 +1,7 @@
-**Status: IN PROGRESS (2026-10-17) — `HshmSource` GDExtension implemented, built (macOS x86_64) and verified on the dev Mac against the bridge; Linux build + box measurements pending. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (`hshm_abi.h`). Needed by: WO-599/600 (operator canvas/atlas), WO-607 (previs PGM 3072×1728).**
-
 # WO-596 — `hshm` GDExtension: shared-memory channel frames → Godot textures
+
+**Area:** godot-client, caspar-build
+**Status: IN PROGRESS (2026-10-17) — `HshmSource` GDExtension implemented, built (macOS x86_64) and verified on the dev Mac against the bridge; Linux build + box measurements pending. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: [WO-594](./594_WO_caspar_shm_frame_consumer.md) (`hshm_abi.h`). Needed by: WO-599/600 (operator canvas/atlas), WO-607 (previs PGM 3072×1728).**
 
 ## Investigation
 

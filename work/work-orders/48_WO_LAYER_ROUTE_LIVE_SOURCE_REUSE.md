@@ -1,5 +1,9 @@
 # Work Order 48: Layer route as reusable Live source (resource saving)
 
+**Area:** engine, video-io
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 ## Objective
 
 Let operators **publish a single playing layer** (e.g. channel 1, layer 10) as a **Caspar route consumer** (`route://channel-layer`) and **reuse that picture** anywhere the product already accepts route sources (other scene layers, multiview cells, second screen), **without** duplicating the same playlist/media fill on multiple layers.

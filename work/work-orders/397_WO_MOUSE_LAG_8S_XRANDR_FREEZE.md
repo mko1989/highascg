@@ -1,5 +1,6 @@
 # WO-397 — Mouse lag ROOT-CAUSED: the 8 s pointer-confine watchdog freezes X ~370 ms per tick via uncached xrandr
 
+**Area:** os-iso
 **Status: DONE (2026-07-30 — fix deployed and probe-verified: 3-min spike count 47 → 6, p99 2.56 ms → 0.34 ms; details §3. Owner: feel-check the mouse)**
 **Source:** owner 30.07.26: "i still these small lags of mouse. it definitly feels like there is something firing in the background that makes the pc lag. i want you to do a thorough reserch into that."
 **Related:** WO-391 (prior investigation — poll loop disproven, §7 left the lag "still unexplained"; §7's candidates 1–2 were already fixed and were NOT it), WO-391c (the xrandr cache whose TTL makes it useless here).

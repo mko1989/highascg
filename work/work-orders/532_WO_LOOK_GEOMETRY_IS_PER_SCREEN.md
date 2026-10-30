@@ -1,6 +1,7 @@
 # WO-532 — A look's geometry followed the selected screen, not the look's own screen
 
-**Status: FIXED in repo (14.08.2026) — 7 smokes, suite 2222 / 2220 pass / 0 fail / 2 skip. Owner QA owed (§6).**
+**Area:** engine
+**Status: DONE — FIXED in repo (14.08.2026) — 7 smokes, suite 2222 / 2220 pass / 0 fail / 2 skip. Owner QA owed (§6).**
 **Priority:** High (silently rewrites stored look geometry)
 **Source:** owner 14.08, after WO-531: *"looks are per screen always so they should act as this."*
 **Related:** [WO-531](./531_WO_LOOK_FILL_WRONG_ON_DIFFERENT_SHAPED_SCREEN.md) (the take payload — the same

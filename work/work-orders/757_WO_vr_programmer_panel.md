@@ -1,5 +1,6 @@
 # WO-757 — The full Programmer inside VR: a wrist panel worked by the controller ray (WO-741 step 3)
 
+**Area:** tracking-vr, lighting
 **Status: DONE (25.10.26) as part of the detachable VR feature — Godot 21668 / 0; GUI e2e in the sandbox
 (`run-gui-e2e.js --e2e=06_xr_walk --xr`) 5 / 5, with a new step: a ray click on the panel opened its Groups menu
 inside the panel and its Store answered. The headset itself is untested: no headset is paired (owner).**

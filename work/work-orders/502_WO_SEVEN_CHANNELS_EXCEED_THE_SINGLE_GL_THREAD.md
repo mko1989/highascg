@@ -1,5 +1,6 @@
 # WO-502 — Every channel runs at ~93 %: seven channels exceed CasparCG's single OpenGL thread
 
+**Area:** engine, caspar-build
 **Status: DONE (21.09.2026 — owner decision: gpu-texture is forced on, never a toggle. See §5d.)**
 **Priority:** High (on-air playback speed; this is the residual after WO-500)
 **Source:** owner 13.08, after deploying WO-500: *"no real difference between mipmaps high bitdepth

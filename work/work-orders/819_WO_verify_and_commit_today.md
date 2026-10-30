@@ -1,5 +1,6 @@
 # WO-819 — Verify, test and commit the open work of 29.10 (WO-806/807/812/813/814/816/817 + docs)
 
+**Area:** process
 **Status: DONE (29.10 — 7 commits on main, every unit tested in a detached worktree at its own commit, CI green,
 live PRV-only probe, GUI screenshots of the relaunched owner client, pixel-map GUI e2e 9/9)**
 

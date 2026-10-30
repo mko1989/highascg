@@ -1,7 +1,7 @@
 # WO-846 — Work-order housekeeping: categorize, index, deprecate
 
-**Status: IN PROGRESS (30.10) — investigation written; classification next**
 **Area:** process
+**Status: DONE (30.10) — 867 files classified, 104 moved with every reference rewritten, check-wos OK + smoke 3/3; follow-ups in §6**
 **Source:** owner 30.10: "make a work order to analyze all work orders, categorize them and do general house keeping with
 them (make a deprecated category too). they are the backbone of this whole project, the idea is for them to be easily
 searchable by ai so good organization minimizes token usage and allows for precision edits."
@@ -46,9 +46,9 @@ The goal is the fewest tokens to find the right WO, plus exact paths for precisi
 3. **Deprecated is a physical category:** `work/work-orders/deprecated/NNN_WO_….md`. A plain `rg` of
    `work/work-orders/*.md` then skips dead approaches by default. Each move rewrites every reference to that file in the
    same commit (`tools/wo/move-wo.js`). A deprecated WO must name its reason and successor in the status line.
-4. **Canonical header** (first lines after the title):
-   `**Status: OPEN | IN PROGRESS | DONE (date, how verified) | DEPRECATED (reason; successor WO-NNN)**`, then
-   `**Area:** …`. Synonyms are normalized: FIXED and IMPLEMENTED become `DONE (…original text…)`, free-form lines are
+4. **Canonical header** (first lines after the title): `**Area:** …`, then
+   `**Status: OPEN | IN PROGRESS | DONE (date, how verified) | DEPRECATED (reason; successor WO-NNN)**`. Area goes
+   ABOVE the status line because ~130 status lines run over several lines inside one bold span. Synonyms are normalized: FIXED and IMPLEMENTED become `DONE (…original text…)`, free-form lines are
    mapped by reading the WO, and the original wording is kept inside the parentheses. Nothing is lost.
 5. **Non-WO files leave the WO folder.** Notes, audits and plans go to `work/notes/`, logs to `work/archive/logs/`.
    Unnumbered old WOs (`WO-07_…`, `WO_fix-…`) get the next free numbers, or go to deprecated if dead.
@@ -82,8 +82,61 @@ The goal is the fewest tokens to find the right WO, plus exact paths for precisi
 
 ## 4. What was done
 
-(pending)
+- **Classification:** six Sonnet agents read the 867 entries (header + targeted `rg` for supersession evidence) into
+  JSON rows. The coordinator then checked every code-based deprecation claim with `rg`/`ls` (WO-11 boot orchestrator
+  gone, WO-89 `cef-interactive-bridge.js` gone, WO-263/318 shape overlay gone, WO-31 → WO-711, WO-208 → WO-210 T210.7,
+  WO-610 → WO-670). One overturned and one added:
+  - The agent proposed the PixelHue plans as stale, then were kept as never-built ideas. The owner ruled
+    on 30.10: "pixelhue ideas are deprecated. it was too much for one gui". They are now deprecated (WO-853, WO-854),
+    and `PIXELFLOW_PROJECT_BREAKDOWN.md` is archived.
+  - WO-318 (no status line, Firefox kiosk SHAPE holes) was deprecated, with successor WO-646.
+- **Tooling** (`tools/wo/`):
+  - `wo-lib.js` handles header parsing, the area taxonomy and the WO list.
+  - `build-index.js` writes `work/work-orders/INDEX.md`.
+  - `wo-move.js` performs moves plus link and path-mention rewriting. Markdown links are re-resolved per file, and
+    a moved file's own links are re-based.
+  - `check-wos.js` is the gate.
+  - The gate runs as the curated smoke `tools/smoke/smoke-wo846-work-order-index.test.js`, which also unit-tests
+    the parser and the rewriter.
+- **Moves** (104, one `git mv` each, references rewritten in 147 files including 5 docs and `godot/spikes/m0/README.md`):
+  - 46 WOs moved to `deprecated/`. 23 had already declared themselves DEPRECATED, and 23 were deprecated on
+    evidence, mostly from the kiosk removal (WO-646) and the gui-stream removal (WO-660).
+  - 10 unnumbered WOs were given numbers: WO-847 to WO-852 and WO-855/856 are live, and the PixelHue pair WO-853/854
+    went to deprecated.
+  - Non-WO files moved out: 29 owner todos to `work/archive/todos/`, 9 logs to `work/archive/logs/`, 6 stale
+    audits/snapshots to `work/archive/`, and 6 runbooks/plans to `work/notes/`.
+  - `map/` and `performance/` stay; they are flow docs, not WOs.
+- **Headers:** 813 files were edited. Each got an `**Area:**` line. A status that was not canonical got the canonical
+  word prefixed, with the original wording kept verbatim after it (`DONE — ROOT CAUSE CONFIRMED + FIXED…`,
+  `DONE — was: OPEN.` where the agent found the old word stale). Files with no status line got one saying so.
+  62 files whose status preceded the H1 now have the title first.
+- **20 references were broken before this WO.**
+  - 17 were links to a guessed file name; they now point to the real file (for example, `528_WO_TIMELINE_TAKE_MIX…`
+    became `528_WO_TIMELINE_IN_LOOK_CUTS…`, and the map flows link `../83_…`).
+  - 2 links in `00_PROJECT_GOAL.md` (WO-03/04) had never been written; they are now unlinked with a note.
+  - 1 (WO-132) is now repointed into `map/`.
+- **`OPEN_ISSUES.md`:** the queue now holds only not-done work. 399 rows whose WO is DONE or DEPRECATED were removed
+  (they are in INDEX.md), leaving 80 rows. In 52 rows the status cell disagreed with the WO's line; those cells now
+  start with the WO's status. The file went from 654 to 260 lines.
+- **CLAUDE.md:** the search recipe is now INDEX-first, the header format includes the Area line, `build-index`/`check-wos`
+  are required after header edits, and deprecation means moving to `deprecated/` with `wo-move.js`.
 
 ## 5. Verified
 
-(pending)
+- `node tools/wo/check-wos.js` → OK. It finds 814 WOs (768 live: 42 open, 119 in progress, 607 done; 46 deprecated),
+  0 header problems, and 0 references to a missing WO file across every tracked text file outside config/.
+- The smoke passes 3/3. The rewriter's unit cases cover a sibling link with an anchor, a code-comment path, and a moved
+  file's own `../` links.
+- Spot-read headers: 500 (multi-line status), 100 (`**Status:** Done —` form), 342 (OPEN → DONE), 289 (no status),
+  deprecated/149, deprecated/290 (status above the H1), 851 (renumbered), deprecated/853 (owner-deprecated), 845.
+- Rewrites outside `work/`: the diffs of `docs/PLAN_SERVER_CLIENT_SPLIT.md`, `docs/reference/cef-interactive-bridge.md`,
+  `docs/ISO_CONTENTS.md` and `godot/spikes/m0/README.md` were read and resolve to the moved files. The wiki was rebuilt.
+
+## 6. Follow-ups
+
+- **8 WOs say OPEN only because they never had a status line:** 34, 44, 45, 93, 849, 850, 851, 852. Each needs a
+  code check (built or not). Several look built: look presets exist (WO-840), and A/B bank transitions are the current
+  take engine.
+- **Low-confidence agent rows** (area or status from the title and first lines only) are listed in the scratchpad
+  rows. Wrong areas are cheap to fix: edit the `**Area:**` line and run `build-index`.
+- **Duplicate numbers 09/33/44/79/121 remain.** The index lists both of each pair.

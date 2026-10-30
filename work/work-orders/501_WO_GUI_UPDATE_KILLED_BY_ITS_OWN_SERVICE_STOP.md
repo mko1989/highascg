@@ -1,5 +1,6 @@
 # WO-501 — The Web-UI update killed itself: the helper runs inside the cgroup it stops
 
+**Area:** os-iso
 **Status: DONE in repo (13.08.2026 — 7 new smokes executing the real script, suite 2055/2053/0,
 eslint 0 errors, prettier clean). NOT DEPLOYED: installed boxes run the copy in
 `/usr/local/lib/highascg/`, which must be refreshed as root — §5.**

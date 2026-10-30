@@ -1,5 +1,6 @@
 # WO-402 — mp4 upload fails: nginx port-80 proxy 413s files > 512 MB (HTML error page)
 
+**Area:** network, media
 **Status: IN PROGRESS (repo fix committed; live nginx reload = owner action, needs sudo password)**
 
 ## Investigation

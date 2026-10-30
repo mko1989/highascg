@@ -110,15 +110,15 @@ Real-time detection and tracking of performers on stage using camera inputs. **P
 |---|----------|---------|
 | 1 | [01_WO_ANALYZE_MODULE.md](./01_WO_ANALYZE_MODULE.md) | Deep analysis of companion-module-casparcg-server |
 | 2 | [02_WO_MIGRATE_TO_HIGHASCG.md](./02_WO_MIGRATE_TO_HIGHASCG.md) | Migration plan with file-by-file mapping |
-| 3 | [03_WO_VERIFY_NODE_APP.md](./03_WO_VERIFY_NODE_APP.md) | Verification & finalization of HighAsCG Node app |
-| 4 | [04_WO_CREATE_COMPANION_MODULE.md](./04_WO_CREATE_COMPANION_MODULE.md) | Build the new bridge Companion module |
+| 3 | [03_WO_VERIFY_NODE_APP.md] (file never written) | Verification & finalization of HighAsCG Node app |
+| 4 | [04_WO_CREATE_COMPANION_MODULE.md] (file never written) | Build the new bridge Companion module |
 | 5 | [05_WO_LIVE_PREVIEW_SETTINGS.md](./05_WO_LIVE_PREVIEW_SETTINGS.md) | Live video preview (go2rtc), settings modal, audio monitoring |
 | 6 | [06_WO_AUDIO_PLAYOUT.md](./06_WO_AUDIO_PLAYOUT.md) | Multi-channel audio playout on Ubuntu (HDMI, USB, Dante/AES67, NDI) |
 | 7 | [07_WO_AMCP_PROTOCOL_API.md](./07_WO_AMCP_PROTOCOL_API.md) | Complete AMCP protocol as API (~79 commands, REST + WS + JS) |
 | 8 | [08_WO_CASPARCG_CLIENT_FEATURES.md](./08_WO_CASPARCG_CLIENT_FEATURES.md) | CasparCG client app features: VU meters (OSC), rundown (skipped), media browser |
 | 9 | [09_WO_OSC_PROTOCOL.md](./09_WO_OSC_PROTOCOL.md) | Complete OSC protocol: real-time audio/playback/profiler, replace AMCP polling |
 | 10 | [10_WO_VARIABLES_AND_REALTIME_STATUS.md](./10_WO_VARIABLES_AND_REALTIME_STATUS.md) | Variables & Real-time Status: searchable explorer, Companion variables |
-| 11 | [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) | Boot Orchestrator: CLI network status, hardware display mapping, TTY banner |
+| 11 | [11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md](./deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md) | Boot Orchestrator: CLI network status, hardware display mapping, TTY banner |
 | 12 | [12_WO_PRODUCTION_INSTALLER.md](./12_WO_PRODUCTION_INSTALLER.md) | Production Installer: Automated bash script, service setup, firewall hardening |
 | 13 | [13_WO_FINAL_POLISH_AND_HARDENING.md](./13_WO_FINAL_POLISH_AND_HARDENING.md) | Final Polish & Hardening: API batching, security restricts, Looks workflow |
 | 14 | [14_WO_OFFLINE_PREPARATION_MODE.md](./14_WO_OFFLINE_PREPARATION_MODE.md) | Offline Preparation Mode: Metadata caching, simulated client, draft sync |
@@ -126,7 +126,7 @@ Real-time detection and tracking of performers on stage using camera inputs. **P
 | 16 | [16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md](./16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md) | Yamaha DM3 Integration: ALSA default, stereo downmix, OSC metering |
 | 17 | [17_WO_3D_PREVIS.md](./17_WO_3D_PREVIS.md) | 3D Previs: Import 3D models, map PGM video textures, orbit camera, presets |
 | 18 | [18_WO_OUTPUT_SLICER.md](./18_WO_OUTPUT_SLICER.md) | Output Slicer: Region mapping for LED wall content placement with rotation |
-| 19 | [19_WO_PERSON_TRACKING.md](./19_WO_PERSON_TRACKING.md) | Person Tracking: MediaPipe (browser) + ONNX/YOLOv8 (server), stage calibration |
+| 19 | [19_WO_PERSON_TRACKING.md](./deprecated/19_WO_PERSON_TRACKING.md) | Person Tracking: MediaPipe (browser) + ONNX/YOLOv8 (server), stage calibration |
 | 20 | [20_WO_VERIFY_NODE_APP.md](./20_WO_VERIFY_NODE_APP.md) | Verify Node App: Post-migration app audit |
 | 21 | [21_WO_TIMELINE_INSPECTOR_WAVEFORM.md](./21_WO_TIMELINE_INSPECTOR_WAVEFORM.md) | Timeline Layout, Trim Preview, Clip Waveforms |
 | 22 | [22_WO_MIXER_EFFECTS.md](./22_WO_MIXER_EFFECTS.md) | Mixer Effects: Effects tab, drag-and-drop, inspector editors (blend, crop, chroma, levels, etc.) |

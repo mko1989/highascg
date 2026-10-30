@@ -1,5 +1,6 @@
 # WO-693 — DMX viewer: Art-Net nodes / sACN sources + a live 512-slot grid
 
+**Area:** lighting
 **Status: DONE (23.10; smoke 5/5, Godot tests 21126/0, box: loopback Art-Net + sACN shown live, ArtPoll found 3 real nodes)**
 
 Owner, 23.10: *"An artnet/scan viewer window would be great."*

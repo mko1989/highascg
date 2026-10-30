@@ -1,5 +1,6 @@
 # Work Order 573: DP-2 (Main/LED wall) ignores configured 5760x1728@50, stays at EDID 1080p60
 
+**Area:** devices-config, mapping
 **Status: IN PROGRESS — root-caused (twice; first diagnosis was incomplete), fix written to config, service restart owed to take effect live**
 
 **Parent / context:** [80_WO_XRANDR_CUSTOM_MODE_FORCE_RESOLUTION.md](./80_WO_XRANDR_CUSTOM_MODE_FORCE_RESOLUTION.md)

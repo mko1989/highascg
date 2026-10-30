@@ -1,10 +1,14 @@
 # WO-281 — CasparCG log audit (logs.19.07.26)
 
+**Area:** amcp, caspar-build
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Question from the owner:** *"so many errors and false calls, just wild west… maybe connected to use batch amcp that was recently enabled. might have screwed some part of amcp."*
 
 **Short answer:** the log is not wild west. It is **one** real fault (a powered-off DeckLink 4) amplified ~40× by CasparCG's stacktrace-per-failure logging, plus benign server-side chatter. **`amcp_batch` did not break anything** — and on this box it is not even the thing that got enabled. Details and evidence below.
 
-Source: `work/work-orders/logs.19.07.26`, 493 lines, covering 21:51:10 → 21:53:10 (2 minutes). Level split: **273 `[error]` / 13 `[warning]` / 206 `[info]`**.
+Source: `work/archive/logs/logs.19.07.26`, 493 lines, covering 21:51:10 → 21:53:10 (2 minutes). Level split: **273 `[error]` / 13 `[warning]` / 206 `[info]`**.
 
 ---
 

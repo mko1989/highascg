@@ -1,5 +1,6 @@
 # WO-309 — Device View hardware probes must stop blocking the event loop
 
+**Area:** devices-config, video-io
 **Status: DONE — 2026-07-21.**
 
 Delivered with a DELIBERATELY NARROWER scope than "ripple through ALL callers":

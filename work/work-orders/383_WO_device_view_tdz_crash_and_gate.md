@@ -1,6 +1,7 @@
 # WO-383 — Devices page rendered a TypeError instead of its contents (my regression), + a gate for the class
 
-**Status: 🟡 Implemented 29.07.26 (fixed, deployed, 8/8 destination cards render live; suite 1690/0/2) — owner: confirm the page**
+**Area:** web-client, testing-ci
+**Status: DONE — 🟡 Implemented 29.07.26 (fixed, deployed, 8/8 destination cards render live; suite 1690/0/2) — owner: confirm the page**
 
 Owner, 2026-07-29:
 > "on the devices page i have cant access lexical declaration p before init"

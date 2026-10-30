@@ -1,6 +1,7 @@
 # WO-546 — The pgm/prv preview-exchange take was killing a timeline the SAME action just started
 
-**Status: FIXED in repo (02.09.2026). Found by reading the real AMCP wire log, not by theory. 8
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). Found by reading the real AMCP wire log, not by theory. 8
 smokes, suite 2314/2312/0/2 → 2322/2320/0/2. Owner QA still owed.**
 **Priority:** Critical (on-air; this is the actual cause of the repeatedly-reported "timeline in a
 look doesn't work" — WO-541/544/545 were real fixes for real, different bugs but did not touch

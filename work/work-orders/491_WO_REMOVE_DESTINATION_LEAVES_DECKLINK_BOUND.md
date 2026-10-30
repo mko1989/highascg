@@ -1,5 +1,6 @@
 # WO-491 — Deleting a destination leaves its DeckLink bound, and the next destination inherits it
 
+**Area:** devices-config, video-io
 **Status: DONE (12.08, reproduced end-to-end then fixed; 4 new smokes, suite 1986/1984/0, eslint 0 errors) — owner QA owed on the live delete**
 
 Split out of [WO-490](./490_WO_REMOVED_DESTINATION_STAYS_UNTIL_NEXT_ADD.md) §1.4, which found this

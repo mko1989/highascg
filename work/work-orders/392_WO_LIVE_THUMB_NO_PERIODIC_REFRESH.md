@@ -1,7 +1,8 @@
 # WO-392 — Live-input thumbnails: kill the periodic (TTL-window) refresh
 
+**Area:** media, web-client
 **Status: DONE (2026-07-30 — offline suite 1734/0/2 + live box probes below; owner visual QA: watch a live tile for >30 s, it must not blink)**
-**Source:** `work/work-orders/todos30.07.26` §"i can see the gui is refreshing thumbnails of live inputs periodicaly which shouldnt happen really."
+**Source:** `work/archive/todos/todos30.07.26` §"i can see the gui is refreshing thumbnails of live inputs periodicaly which shouldnt happen really."
 **Related:** WO-331 (fixed per-render `Date.now()` busting — its diagnosis stands; this WO removes the *remaining, intentional* 30 s refresh it kept), WO-110 (bus-activity invalidation), WO-309/319 (input-capture backoff).
 
 ---

@@ -1,5 +1,6 @@
 # WO-360 — Playout status surfacing: missing media / failed inputs must TELL the operator
 
+**Area:** engine, web-client
 **Status: DONE 2026-07-28 (live-verified) — missing-media marks (rows/panel/deck-card ⚠), pre-take missing toasts, live-input failure toasts, AND per-take AMCP failure plumbing (batch failures → take response → toast; probe-verified: a bogus clip returned both 404 LOADBGs). Route-to-empty detection deferred (needs post-take INFO probing; low value now that WO-359 made routes reliable).** · Source: owner checklist note 27.07 (item 3): "here we enter something that
 hasent been done yet properly, which is status check and message to the user if anything is
 missing or input hasent started properly and failed bring alive pass."

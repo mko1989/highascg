@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Shipped (code + smoke tests 2026-06-29); live QA on booth hardware optional  
+**Area:** engine, devices-config
+**Status:** DONE — Shipped (code + smoke tests 2026-06-29); live QA on booth hardware optional  
 **Priority:** High (operator workflow — wrong project after reboot, spurious hardware modal, unintended Caspar restart on load)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

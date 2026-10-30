@@ -1,5 +1,6 @@
 # WO-430 — "Driver-free" ISOs ship the DeckLink kernel module (merged-usr exclude miss)
 
+**Area:** os-iso, video-io
 **Status: DONE (2026-08-05 — fragment + verifier + smoke green; squashfs-PROVEN same day: the 10:32 produce (`highascg-nvidia-595_amd64_2026-08-05_1032.iso`) passed the full verifier incl. `absent (DeckLink): usr/lib/modules/*/updates/dkms/blackmagic*`)**
 
 Owner 05.08: "on the second machine that i installed the iso just now, again the decklink

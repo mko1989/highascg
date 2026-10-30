@@ -1,6 +1,7 @@
 # WO-548 — Re-taking a look whose timeline was already on air killed its own incoming content
 
-**Status: FIXED in repo (02.09.2026). Found live, minutes after WO-546 deployed, by re-checking the
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). Found live, minutes after WO-546 deployed, by re-checking the
 wire log rather than assuming the fix was complete. 5 smokes (2 verified to fail without the fix),
 suite 2322/2320/0/2 → 2328/2326/0/2 (combined with WO-547 in the same verification pass). Owner QA
 still owed.**

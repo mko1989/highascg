@@ -8,7 +8,8 @@
 > 4. Do **not** delete previous agents’ log entries.
 
 **Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md); hardware settings [WO-39](./39_WO_SETTINGS_SYSTEM_HARDWARE.md); GPU / xrandr binding [WO-40](./40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md)  
-**Status:** Draft  
+**Area:** devices-config
+**Status:** DONE — Draft  
 **Prerequisites:** Working Device View rear panel render (33c+), persisted `DeviceGraph` / settings round-trip (33a, `routes-settings` patterns). WO-39 tabs can remain separate in UI; this WO **aggregates** their effective persisted state into one file.
 
 ---

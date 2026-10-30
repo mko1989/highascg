@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress (T0 smart config complete 2026-06-27; rsync/Tailscale/Syncthing settings not started)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)  
 **Builds on:**

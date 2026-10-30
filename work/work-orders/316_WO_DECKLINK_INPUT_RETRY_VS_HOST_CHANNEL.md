@@ -1,6 +1,7 @@
 # WO-316 — DeckLink input retry loop fails forever when the device is already open
 
-**Status: FIXED 2026-07-21.** See "CORRECTED ROOT CAUSE" below — the live evidence did not
+**Area:** video-io
+**Status: DONE — FIXED 2026-07-21.** See "CORRECTED ROOT CAUSE" below — the live evidence did not
 match the assumption this WO was written on, and the shipped fix is different (and smaller)
 than the one originally proposed here. The original analysis is kept for the record.
 
@@ -53,7 +54,7 @@ channel-layer remains the right answer — but nothing on this box needs it toda
 
 **Source:** todos21.07.26 — "highascg peridically tries to play decklink input, its already
 playing on the host channel and it wont be able to play anywhere else thats why it fails."
-Log evidence: `work/work-orders/todos21.07.26-logs`.
+Log evidence: `work/archive/todos/todos21.07.26-logs`.
 
 ## Verified facts (2026-07-21, live log + source read)
 

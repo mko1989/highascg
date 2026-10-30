@@ -1,4 +1,7 @@
-**Status: IMPLEMENTED (2026-09-22, offline suite 2502/2504 / 0 fail / 2 pre-existing skips, max-file-lines clean, client rebuilt, `highascg` restarted, kiosk reloaded) — owner on-hardware confirmation owed**
+# WO-577 — shader live key controls
+
+**Area:** engine, web-client
+**Status: DONE — IMPLEMENTED (2026-09-22, offline suite 2502/2504 / 0 fail / 2 pre-existing skips, max-file-lines clean, client rebuilt, `highascg` restarted, kiosk reloaded) — owner on-hardware confirmation owed**
 
 ## Investigation
 
@@ -9,7 +12,7 @@ time"). For any real ShaderToy-derived shader this produces dozens of rows — h
 `iResolution` plumbing, texture UV offsets, and multiple independent `iTime * k` speed literals
 all show up as separate sliders with code-derived names (`arg 2`, `col (1,2)`, `if arg`), which
 is the opposite of the "remember minimalism" principle the owner has repeated for this exact
-panel (`work/work-orders/todos27.07.26:65`) and the standing UI rule in `CLAUDE.md`
+panel (`work/archive/todos/todos27.07.26:65`) and the standing UI rule in `CLAUDE.md`
 ("Minimalism is the standing UI principle").
 
 Evidence of the flood, quantified in the new smoke test

@@ -3,7 +3,8 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
-**Status:** Not started  
+**Area:** testing-ci
+**Status:** DONE — Not started  
 **Priority:** **Medium** (after most splits land)
 
 **Touches:** `tools/ci/`, `package.json`, `scripts/ci/run-local-ci.sh`, `.github/workflows/` (if present)
@@ -64,7 +65,7 @@ Only if `.pre-commit` or existing hook pattern exists — do not invent new hook
 - [ ] **T121.1** Add npm scripts `check:file-lines` and `check:file-lines:warn`.
 - [ ] **T121.2** Run warn-only in local CI; confirm it lists current 46 violations.
 - [ ] **T121.3** After WO-112–120 complete, switch to hard fail in `ci:local` / GitHub workflow.
-- [ ] **T121.4** Update [LOC_OVER_500_AUDIT.md](./LOC_OVER_500_AUDIT.md) generation note (optional: script prints audit markdown).
+- [ ] **T121.4** Update [LOC_OVER_500_AUDIT.md](../archive/LOC_OVER_500_AUDIT.md) generation note (optional: script prints audit markdown).
 
 ---
 

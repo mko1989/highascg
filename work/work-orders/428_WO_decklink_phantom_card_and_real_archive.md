@@ -1,5 +1,6 @@
 # WO-428 — Phantom DeckLink card on driverless installs + the tar.gz installer never matched the real Blackmagic archive
 
+**Area:** video-io, os-iso
 **Status: DONE (2026-08-04 — suggest gate live-verified both ways: this box keeps its 4 detected ports, a detected:false snapshot renders zero; the REAL 16.2 archive now extracts (16.2a1 pair found); smoke 3/3; suite 1829/0/2. The staged 16.2 on this box installs after the owner's one-liner below.)**
 
 Owner: "on the freshly installed system on the second machine, that dont have decklink

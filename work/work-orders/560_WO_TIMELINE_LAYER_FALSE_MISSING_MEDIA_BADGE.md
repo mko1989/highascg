@@ -1,6 +1,7 @@
 # WO-560 — a timeline layer was permanently flagged as "missing media"
 
-**Status: FIXED in repo (03.09.2026), root cause confirmed by reading the live project file
+**Area:** engine, web-client
+**Status: DONE — FIXED in repo (03.09.2026), root cause confirmed by reading the live project file
 directly (not guessed). 6 new smokes. Full offline suite 2400/2398/0/2. Client built, server
 restarted, live. Owner QA owed — the badge should simply be gone now.**
 **Priority:** Medium — cosmetic, but persistent and confusing (three separate sessions' worth of

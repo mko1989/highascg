@@ -1,5 +1,6 @@
 # WO-759 — Media browser quick-look info: codec · resolution · fps · duration
 
+**Area:** media, godot-client
 **Status: DONE (25.10 — Godot 21681/0, Xvfb render; owner client relaunched 19:41, boot clean; owner QA)**
 
 Owner 25.10: "in media browser we need quick look info about files ... codec hap, prores, jpg, png. resolution

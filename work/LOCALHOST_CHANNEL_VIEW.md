@@ -1,6 +1,6 @@
 # Displaying a CasparCG channel inside the browser UI — localhost, low latency, low resources
 
-Research document. Requested in `work/work-orders/todos19.07.26`:
+Research document. Requested in `work/archive/todos/todos19.07.26`:
 
 > "prepare a new document in which you try to find a way to display low latency and low
 > rescources casparcg channel in the webbrowser ui on localhost only."

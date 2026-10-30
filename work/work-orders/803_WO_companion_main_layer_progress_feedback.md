@@ -1,5 +1,6 @@
 # WO-803 — Companion: screen's main layer with remaining time and progress bar (display only)
 
+**Area:** companion
 **Status: DONE (29.10, live e2e on the box) (29.10) — route live-verified on the box; module 1.0.11 packaged (not installed into Companion); owner QA on a Companion button pending · live e2e 29.10: module 1.0.11 installed via the Companion UI, connection enabled, PGM readback button PASS (counts down with PGM)**
 
 Owner, 29.10:

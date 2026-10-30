@@ -1,5 +1,6 @@
 # WO-677 — Previs: a layer colour shows MVR models inside out (only the inner walls, see-through)
 
+**Area:** godot-client
 **Status: DONE (22.10, Godot 20947/0; box: before/after screenshots of the owner's "Pabianice Final Patch" MVR)**
 
 Owner, 22.10: *"the imported mvr seems to have inverted model walls when i change color of default layer which covers

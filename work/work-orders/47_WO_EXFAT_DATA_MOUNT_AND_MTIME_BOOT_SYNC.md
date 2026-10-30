@@ -1,5 +1,9 @@
 # Work Order 47: exFAT data volume, fixed mount, and mtime-priority boot sync
 
+**Area:** os-iso, media
+**Status: IN PROGRESS (no status line before WO-846; classified from its content)**
+
+
 > **AGENT COLLABORATION PROTOCOL**  
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done  

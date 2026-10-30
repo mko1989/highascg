@@ -1,5 +1,9 @@
 # Work Order: Timeline Enhancements
 
+**Area:** web-client
+**Status: OPEN (unverified — no status line before WO-846)**
+
+
 ## Overview
 This work order outlines the required enhancements for timeline functionality, focusing on improving the user's ability to label, organize, and manage timeline layers and clips.
 

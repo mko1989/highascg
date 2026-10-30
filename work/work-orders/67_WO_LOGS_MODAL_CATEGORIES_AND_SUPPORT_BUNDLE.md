@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **not** delete previous agents' log entries.
 
-**Status:** Shipped (v1) — live-rig manual QA still recommended (§7)  
+**Area:** web-client
+**Status:** DONE — Shipped (v1) — live-rig manual QA still recommended (§7)  
 **Priority:** High (operator troubleshooting — broken toggles block daily use; uncategorized logs are unusable on busy rigs)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

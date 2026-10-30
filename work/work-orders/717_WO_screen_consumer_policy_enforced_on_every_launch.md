@@ -1,5 +1,6 @@
 # WO-717 — Screen-consumer policy enforced on every Caspar launch, whoever wrote the config
 
+**Area:** devices-config, caspar-build
 **Status: DONE (23.10.26). Verified: the WO-717 smoke 5/5, the WO-716 smoke 6/6, the generator/routing/vsync smokes
 43/43, the run.sh/supervisor smokes 68/68. Box: after `systemctl restart casparcg-server`, the supervisor log has
 the policy line and Caspar is back on 5 channels.**

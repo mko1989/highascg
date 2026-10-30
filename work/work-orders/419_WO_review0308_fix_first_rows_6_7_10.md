@@ -1,5 +1,6 @@
 # WO-419 — Review 2026-08-03 "fix first" rows 6, 7, 10: autosave latches, dead USB-import API, logs-modal leak
 
+**Area:** web-client, media
 **Status: DONE (2026-08-04 — all three implemented; new smoke 3/3; suite 1809/2, reds are the WO-415 config drift. Client rebuilt + kiosk reloaded; server restarted 04.08 and row 7 VERIFIED live: `GET /api/usb/drives` → 200 `{ok:true,...}`, was 404)**
 
 Owner handed back the open-items list from the WO-418 session ("still open after this…"), which

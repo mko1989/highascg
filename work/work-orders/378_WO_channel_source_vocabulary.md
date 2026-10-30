@@ -1,8 +1,9 @@
 # WO-378 — one source vocabulary: `channel_<N>` for channels, `program_<N>` only as a screen label
 
+**Area:** mapping, engine
 **Status: DONE (28.07.26 — server side complete and verified; the client source pickers still do not OFFER host channels, §5. SERVER change: needs a highascg restart.)**
 
-Source: `work/work-orders/todos28.07.26`, owner, 28.07, in response to WO-377's closing note that
+Source: `work/archive/todos/todos28.07.26`, owner, 28.07, in response to WO-377's closing note that
 host channels still could not feed stream/record outputs:
 
 > host channels must be able to feed any and all outputs.

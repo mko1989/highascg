@@ -1,6 +1,7 @@
-**Status: DONE (2026-09-29, offline suite 2526/0/2, lint clean, client built) — not yet eyeballed live**
-
 # WO-583 — Edge strip: live param edits without restarting the animation + alternating strip colors
+
+**Area:** engine, mapping
+**Status: DONE (2026-09-29, offline suite 2526/0/2, lint clean, client built) — not yet eyeballed live**
 
 Owner: "global border for screens. every change to an edge strip global border for instance does a
 restart of the whole animation, this should be possible to do live changes that does not restart the

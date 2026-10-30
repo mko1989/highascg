@@ -1,5 +1,6 @@
 # WO-658 — Live 2D Auto layout: a PGM + PRV window per screen, fitted to the panel
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, Godot tests 20762/0; box: Auto tiled PGM 1 over PRV 1 into the visible preview, Times rows fit between)**
 
 Owner 21.10: "when there are screen destinations they should be layed out on the compose preview they should also

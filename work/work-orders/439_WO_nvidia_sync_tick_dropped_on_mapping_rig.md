@@ -1,5 +1,6 @@
 # WO-439 — "NVIDIA sync to display" tick silently dropped on a mapping-node-only rig
 
+**Area:** devices-config, mapping
 **Status: DONE (2026-08-06 — suite 1853/0/2, service restarted; tick-resolution verified DP-0 against the live merged config. Caspar env var still lands on next Apply + caspar restart)**
 
 Owner escalation on WO-437's report ("GL sync was NOT set"): *"thats why i fucking told you

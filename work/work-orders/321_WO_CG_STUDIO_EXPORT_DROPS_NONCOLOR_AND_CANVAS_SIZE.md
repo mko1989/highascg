@@ -1,5 +1,9 @@
 # WO-321 — CG studio export drops everything except colors; own inspector shrinks the canvas
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Status (2026-07-26 audit): DONE-BUT-NOT-MARKED — Part A full-style export landed in b168f25; Part B (canvas real estate) was layout-note only.**
 
 **Source:** todos22.07.26 — "cg studio export seemed to only export the color changes and

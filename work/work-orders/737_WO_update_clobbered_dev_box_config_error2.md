@@ -1,5 +1,6 @@
 # WO-737 — An update meant for .4 landed on the master and reset its config; "error 2" across the GUI
 
+**Area:** network, os-iso
 **Status: DONE (24.10.26 — verified on .4: release 2026-10-24T190133Z installed through the GUI path, config
 byte-identical to the backup, scene routes 200, post-update self-check 24 pass / 0 fail; this box's config restored
 and proven; smoke 5/5, test:ci green, CI green). Owner-QA: the Updates pane's "Waiting for the server to restart…"

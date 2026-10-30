@@ -1,5 +1,6 @@
 # WO-841 — VR: the second trigger (grip) points the selected heads; the first trigger only selects
 
+**Area:** tracking-vr
 **Status: DONE offline (30.10) — headset QA = owner**
 **Source:** owner 30.10: *"fix for vr. make the pointing of selected heads in the vr world with the second trigger on the
 controller. the first trigger should be only selecting."*

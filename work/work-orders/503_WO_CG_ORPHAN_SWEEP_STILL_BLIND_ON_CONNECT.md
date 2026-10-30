@@ -1,5 +1,6 @@
 # WO-503 — The CG orphan sweep still swept blind on every reconnect; 180 CLEAR lines drowned the log
 
+**Area:** amcp
 **Status: DONE in repo (13.08.2026 — 4 new smokes incl. a regression guard that fails on the blind
 sweep; suite 2061/2059/0, eslint 0, prettier clean). NOT deployed — needs a `highascg` restart.**
 **Priority:** Medium-High (the log is the diagnostic tool for everything else)
@@ -7,7 +8,7 @@ sweep; suite 2061/2059/0, eslint 0, prettier clean). NOT deployed — needs a `h
 13:36:00.143: *"this still happens … making checking logs imposible."*
 **Related:** [WO-482](./482_WO_CG_ORPHAN_SWEEP_CLEARS_THE_WHOLE_BAND.md) (added the XML-aware path),
 [WO-492](./492_WO_AMCP_CLEAR_CHATTER_ON_CONNECT.md) (declared the residual blind path fixed),
-[WO-207](./207_WO_CG_ORPHAN_SWEEP.md) (the sweep itself).
+[WO-207](207_WO_TEMPLATE_CG_ORPHAN_LIFECYCLE.md) (the sweep itself).
 
 ---
 

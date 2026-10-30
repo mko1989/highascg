@@ -1,5 +1,6 @@
 # WO-663 — CG Studio exports are lower thirds (inspector fields, baked text on take)
 
+**Area:** engine, godot-client
 **Status: DONE (22.10.2026: offline 2736/0 + Godot 20779/0; take payload rendered in headless Chrome; box API returns the baked values). Owner QA: drop `STUDIO/LT-GRADIENT-WAVE-MARCIN` on a look and check both inspectors.**
 
 Owner, 22.10, answering "should the inspector recognise studio LT exports?" (the follow-up WO-661 left open): *"yes"*.

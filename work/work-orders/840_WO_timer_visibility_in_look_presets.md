@@ -1,5 +1,6 @@
 # WO-840 — Timer visibility lives in look presets (per screen), not in looks
 
+**Area:** engine, godot-client
 **Status: DONE (30.10, offline-verified: new smoke + Godot test; owner QA on the box pending: save a preset with a timer hidden, recall, watch the timer)**
 **Source:** WO-806 G3; owner 30.10: *"timers should be saved in looks presets as they are per screen not per look."*
 RULES.md "Timers" rule 1.

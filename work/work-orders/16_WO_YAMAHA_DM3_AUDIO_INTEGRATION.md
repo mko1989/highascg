@@ -1,5 +1,9 @@
 # Work Order 16: Yamaha DM3 Audio Integration
 
+**Area:** audio
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > [!IMPORTANT]
 > **AGENT COLLABORATION PROTOCOL**
 > 1. Add dated entries to the **Work Log** in reverse chronological order.

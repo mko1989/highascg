@@ -1,5 +1,6 @@
 # WO-414 — Pinned host channel vs dynamic allocation collision + PGM SOLO (owner follow-up 03.08)
 
+**Area:** audio, mapping
 **Status: DONE (2026-08-03 — live-verified: `oal[6|720p5000]`, ch5 back to the NDI host, route://2 default playing on ch6; suite 1801/0/2. Owner QA: SOLO the PGM strip, confirm the macbook strip meter stays quiet while PRV plays)**
 **Priority:** High (owner: "im not able to solo the pgm channel so i can monitor it. when audio
 was playing on prv it also showed up as meter in macbook ndi input.")

@@ -1,6 +1,7 @@
 # WO-589 — Lower-thirds engine template: "Confetti Center" (screen-centered, confetti on title reveal)
 
-**Status: IMPLEMENTED 03.10.26, round 2 same day (§4: no box, no underline) — rendered in headless Chrome through the real engine (centering, burst, studio hold-in, stop mid-burst, replay all probed); offline suite has one unrelated failure (§3). Server not restarted; owner: look at it on PRV/PGM through Caspar CEF.**
+**Area:** engine
+**Status: DONE — IMPLEMENTED 03.10.26, round 2 same day (§4: no box, no underline) — rendered in headless Chrome through the real engine (centering, burst, studio hold-in, stop mid-burst, replay all probed); offline suite has one unrelated failure (§3). Server not restarted; owner: look at it on PRV/PGM through Caspar CEF.**
 
 Owner, 03.10: *"i need a template based on the lower thirds engine that is centered on the screen and has a confeti animation on the title reveal"*
 

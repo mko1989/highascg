@@ -1,5 +1,6 @@
 # WO-674 — Devices: Cable loops slider 0 · 1 · 2 · 4 · 8 · 16 · 32 · chaos
 
+**Area:** godot-client
 **Status: DONE (22.10, box screenshots 8 / 32 / chaos + Godot tests; owner QA = checklist 22.10 §G)**
 
 Owner 22.10, after WO-672: *"these loops are nice, but i dont know why in your tests the loops go to 2 and then

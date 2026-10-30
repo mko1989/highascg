@@ -1,5 +1,6 @@
 # WO-687 — Release: server tarball + Godot clients; stop shipping the box's secrets in public releases
 
+**Area:** os-iso, process
 **Status: DONE (22.10, release `2026-10-22_214247` published from a clean checkout of 00c994cf; assets downloaded back and checked). Old releases DELETED 23.10 (owner: "just remove the releases, theyre deprecated either way"; no key rotation — owner: "nobody has any keys").**
 
 Owner, 22.10: *"Push and make a release with server tar ball and clients for multi platform."*

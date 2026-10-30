@@ -1,5 +1,6 @@
 # WO-691 — Previs: delete patched fixtures (Delete key + Programmer "Delete")
 
+**Area:** lighting, godot-client
 **Status: DONE (23.10; Godot tests 21126/0, box: added a head, then Delete key → confirm → gone from the saved project)**
 
 Owner, 23.10: *"I can't delete added fixture in previs."*

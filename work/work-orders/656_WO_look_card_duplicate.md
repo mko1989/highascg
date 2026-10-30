@@ -1,5 +1,6 @@
 # WO-656 — Look card: duplicate button
 
+**Area:** godot-client
 **Status: DONE (2026-10-21, Godot tests 20734/0; box: click → "Look 1 (copy)" next to Look 1, 2 layers, in the autosave)**
 
 Owner 21.10: "duplicate button on the look's card is missing".

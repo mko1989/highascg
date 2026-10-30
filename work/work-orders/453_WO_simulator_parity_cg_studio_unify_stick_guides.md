@@ -1,5 +1,6 @@
 # WO-453 — Simulator parity with the real server, CG Studio unification, Mac/Win stick guide overhaul
 
+**Area:** testing-ci, os-iso
 **Status: DONE (2026-08-07 — CI run 31168238103 green in 1m31s on deaf87f incl. the new sim-parity smoke + boot gate; release published: https://github.com/mko1989/highascg/releases/tag/2026-08-07_120130, highascg-server_2026-08-07T120130Z.tar.gz 47 MB. Owner QA remains: run the sim on a prep laptop.)**
 
 Owner (todos07.08.26): make a GitHub release; the standalone client/simulator "wasn't updated for

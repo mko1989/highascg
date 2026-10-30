@@ -1,5 +1,6 @@
 # WO-836 — Test categories: offline / live-box, and a GUI release suite with screenshot + PRINT checks
 
+**Area:** testing-ci
 **Status: IN PROGRESS (30.10) — parts 1 and 2 done and verified (offline 4485/4486, see §3); part 3 (GUI release suite) open**
 **Source:** REPORT §7a/7b; owner 30.10: *"id like to have a full suite of tests that i could run before each relese and/or
 pull request that would run a routine test of all/most of the features by literally clicking in gui and verifing by

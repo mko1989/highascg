@@ -1,8 +1,9 @@
 # WO-380 — paste a Shadertoy share link, get the code layers
 
-**Status: IMPLEMENTED 28.07.26 — everything either side of the network call is built and proven; the fetch itself needs a free Shadertoy API key, because Cloudflare refuses every unauthenticated route (measured). §4.**
+**Area:** engine, network
+**Status: DONE — IMPLEMENTED 28.07.26 — everything either side of the network call is built and proven; the fetch itself needs a free Shadertoy API key, because Cloudflare refuses every unauthenticated route (measured). §4.**
 
-Source: `work/work-orders/todos28.07.26`, owner, 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner, 28.07:
 
 > i noticed there is a share link on shader toy. it should be easy to be able to paste that link and
 > it will fill in all the code layers.

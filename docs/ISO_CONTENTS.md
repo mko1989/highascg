@@ -101,7 +101,7 @@ Stock **`casparcg-server.service`** is **disabled** — Caspar is started from O
 | **Driver on build host** | Set **`HIGHASCG_NVIDIA_DRIVER=535\|580\|595`** before install + `eggs produce` (one branch per ISO) |
 | **`/etc/highascg/nvidia-iso-driver`** | Stamp file baked into the image (e.g. `595`) |
 | **`GET /api/system/gpu-nvidia`** | Read-only status + GPU → branch recommendation (`data/nvidia-driver-guide.json`) |
-| **No** `/opt/nvidia-pool` | Multi-driver pool removed — see **`work/work-orders/WO_single-nvidia-driver-per-iso.md`** |
+| **No** `/opt/nvidia-pool` | Multi-driver pool removed — see **`work/work-orders/856_WO_single_nvidia_driver_per_iso.md`** |
 | **X session** | `__GL_SYNC_TO_VBLANK=0`, `highascg-nvidia-x-apply.sh`, **`nvidia-settings`** |
 | **Screen consumer vsync** | NVIDIA **Sync to VBlank off** + Caspar **screen consumer vsync on** — [reference/screen-consumer-vsync-nvidia.md](reference/screen-consumer-vsync-nvidia.md) |
 

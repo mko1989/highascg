@@ -1,5 +1,6 @@
 # WO-727 — Pulls of names with spaces refused by the forced command; clocks synced
 
+**Area:** network, media
 **Status: DONE (24.10.26) — live: pull of `npcc/Tlo Orange Ball/BAZA 2.mp4` (99.7 MB) and of that folder from .4,
 push of `wo727 push test (1)/a & b.txt` to .4, every refusal re-probed on .4's installed wrapper; smoke 35/35 incl.
 14 refusal cases; test:ci 3121 / 0 fail. This box's installed copy = owner sudo (below).**

@@ -1,5 +1,6 @@
 # WO-824 — Opening a show file trashes the project that was open
 
+**Area:** devices-config
 **Status: DONE (29.10, smoke 6/6 + WO-821 10/10 + WO-823 8/8 + suite 3626/0/2; live check in the deploy round) · live e2e 29.10: PASS on the box (journal line, mhp_harder kept and not trashed, reloaded)**
 
 ## Investigation

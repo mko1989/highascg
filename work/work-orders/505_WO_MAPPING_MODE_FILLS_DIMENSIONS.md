@@ -1,5 +1,6 @@
 # WO-505 — Pixel-mapping output: choosing a resolution did not fill width/height
 
+**Area:** mapping, web-client
 **Status: DONE in repo (13.08.2026 — 4 smokes, suite 2069/2067/0, eslint 0, prettier clean, client rebuilt). NOT deployed to the kiosk — needs a reload.**
 **Priority:** Low-Medium (UI correctness; the panel contradicted what it saved)
 **Source:** owner `todos13.08.26`: *"in pixel mapping node, when in an output a resolution is chosen from a drop down, it should fill width and height with that resolutions w/h."*

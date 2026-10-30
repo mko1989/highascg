@@ -1,5 +1,6 @@
 # WO-706 — MVR wall layers: empty ones say so, wall layers start hidden on import
 
+**Area:** godot-client, lighting
 **Status: DONE (23.10.26: Godot 21223/0, smoke-wo706 3/3, boot check OK; owner QA in the Layers fold of the
 Pabianice scene + any MVR that carries its walls)**
 

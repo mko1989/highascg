@@ -1,5 +1,6 @@
 # WO-731 — Audio operator page: presenter cards from the intake, mic → desk channel matching, Accept drives the desk
 
+**Area:** audio
 **Status: DONE (24.10.26) — offline smokes 18/18 (accept rule, service, routes, and an emulator for each protocol
 family); live on this box against an emulated X32: Accept unmuted and raised a low fader, and left a higher fader
 alone. Owner QA on a real desk is still open (see the end).**

@@ -1,6 +1,7 @@
 # WO-227 — Compact audio mixer: 8-channel screens overflow their space
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending) | **Date:** 2026-07-15
+**Area:** audio, web-client
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending) | **Date:** 2026-07-15
 **Source:** owner: "in the compact audio mixer when a screen has 8ch it doesnt fit in it space"
 
 ## Tasks

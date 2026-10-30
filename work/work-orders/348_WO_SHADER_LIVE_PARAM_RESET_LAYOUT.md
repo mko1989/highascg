@@ -4,6 +4,7 @@
 it needs a revert back to default next to each parameter. list the parameters in two columns,
 the sliders dont have to be this long."
 
+**Area:** engine, web-client
 **Status: DONE 2026-07-27: pristine-copy per-param ↺ revert + Reset all (wholesale source restore, CG UPDATE every pass — the broken-shader recovery), two-column grid, sliders capped 160px.**
 
 ## Fix

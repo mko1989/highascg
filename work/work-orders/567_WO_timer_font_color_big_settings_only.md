@@ -1,7 +1,10 @@
+# WO-567 — timer font color big settings only
+
+**Area:** engine, web-client
 **Status: DONE (2026-09-10, offline suite 2403/0/2, syntax-checked, prettier pre-existing-only)**
 
 **Update 2026-09-10 (same day): border/outline around the timer characters, also added.**
-`work/work-orders/todos10.09.26` follow-up: "timer font with border around characters." Same
+`work/archive/todos/todos10.09.26` follow-up: "timer font with border around characters." Same
 extended-only gating as font/color. Added `timerBorderWidth` (px, default 0 = off — matches the
 pre-existing look exactly) and `timerBorderColor` (default `#000000`) to `DEFAULT_CONFIG` and its
 two client-side mirrors, applied in `countdown-engine.js`'s `render()` via
@@ -18,7 +21,7 @@ now 316 lines (well under the 500-line cap).
 
 ## Investigation
 
-`work/work-orders/todos10.09.26`: "in the timers settings add font and color settings so the
+`work/archive/todos/todos10.09.26`: "in the timers settings add font and color settings so the
 timer can be customized. only in the 'big' settings, the compact ones should stay as is."
 
 Two UI surfaces share one settings form, `client/components/timer-control-panel-settings-form.js`

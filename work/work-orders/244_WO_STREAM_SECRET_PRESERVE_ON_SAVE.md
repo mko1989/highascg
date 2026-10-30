@@ -1,6 +1,7 @@
 # WO-244 — Settings save must not wipe stored stream credentials (preserve-on-empty + mask-on-get)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** devices-config, video-io
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** HIGH (data loss on live box already happened 2026-07-15; also a secret-exposure issue)
 **Owner check:** A244.1
 

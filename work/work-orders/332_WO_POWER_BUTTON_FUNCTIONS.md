@@ -3,7 +3,8 @@
 **Source:** todos24.07.26 — "Power button functions." Owner note 2026-07-24: "the hold 3s
 to poweroff doesnt work. i need to hold it way longer to get the hard power off instead."
 
-**Status: ROOT CAUSE FOUND + FIXED IN REPO 2026-07-24 — AWAITING ROOT INSTALL (needs
+**Area:** os-iso
+**Status: DONE — ROOT CAUSE FOUND + FIXED IN REPO 2026-07-24 — AWAITING ROOT INSTALL (needs
 owner's sudo password).**
 
 ## Root cause of the dead 3s hold (verified live on the box)

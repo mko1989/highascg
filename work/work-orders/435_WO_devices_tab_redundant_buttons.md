@@ -1,5 +1,6 @@
 # WO-435 — Devices tab: remove redundant Refresh / Save snapshot / Load snapshot buttons
 
+**Area:** web-client, devices-config
 **Status: DONE (2026-08-06 — suite 1842/0/2, built + kiosk F5; buttons verified absent from the dist-web device-view chunk)**
 
 Owner (todos06.08.26 item 5): "in the devices tab the buttons refresh (already done on each

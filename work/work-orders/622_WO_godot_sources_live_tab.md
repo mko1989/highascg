@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-20, box-verified: Live tab rows, DeckLink → look editor layer, DeckLink port → Sources lands on the highlighted source; suite 15453/15453, offline smoke 12/12) — Parent: [WO-593](./593_WO_godot_client_port_epic.md). Follows [WO-605](./605_WO_godot_port_device_view.md) slice 12 (DeckLink drop on Sources) and [WO-600](./600_WO_godot_port_live_core.md) K (Sources panel) / "route sources (WO-156 rules server-side)".**
-
 # WO-622 — Godot Sources panel: "Live" tab (live sources draggable into looks)
+
+**Area:** godot-client, media
+**Status: DONE (2026-10-20, box-verified: Live tab rows, DeckLink → look editor layer, DeckLink port → Sources lands on the highlighted source; suite 15453/15453, offline smoke 12/12) — Parent: [WO-593](./593_WO_godot_client_port_epic.md). Follows [WO-605](./605_WO_godot_port_device_view.md) slice 12 (DeckLink drop on Sources) and [WO-600](./600_WO_godot_port_live_core.md) K (Sources panel) / "route sources (WO-156 rules server-side)".**
 
 Owner, 20.10: *"the live sources should be available to use in looks or the compose preview from a tab inside sources
 browser. right now i can see the live source ready at the bottom, but it means nothing does nothing and is in a wrong

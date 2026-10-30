@@ -1,5 +1,9 @@
 # Work Order 46: Layer Playlists (List Workflow)
 
+**Area:** engine, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 ## Objective
 Implement a "list" workflow for individual layers in the scene composer, allowing users to queue multiple media files on a single layer to act as a playlist, complete with auto-advance and transition settings.
 

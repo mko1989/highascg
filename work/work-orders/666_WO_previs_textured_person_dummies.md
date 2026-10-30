@@ -1,5 +1,6 @@
 # WO-666 — Previs: tracked people as mannequins painted from the cameras (person texturing, step 2)
 
+**Area:** tracking-vr, godot-client
 **Status: DONE (22.10, offline suites + real-client render probe; owner QA on the rig pending). Depth maps and colour-match controls deferred (below).**
 
 Owner, 22.10: "Continue" after WO-665 (step 1). This is step 2 of `docs/research/multi-camera-person-texturing.md`:

@@ -1,5 +1,6 @@
 # WO-398 — run.sh hang-detector forks ss+grep+sleep every second, forever
 
+**Area:** os-iso, process
 **Status: DONE (2026-07-30, executed as part of WO-400's supervisor cleanup, owner: "do this now" — healthy-state poll is 10 s seconds-accounted; live fork capture: 5 run.sh forks/32 s, was ~96; hang budget preserved, `ss -tln`)**
 **Source:** WO-397 §1.6 background findings (owner 30.07: "make work orders for fixing the other 2 issues").
 

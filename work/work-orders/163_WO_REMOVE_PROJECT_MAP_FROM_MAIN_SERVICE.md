@@ -1,6 +1,7 @@
 # WO-163 — Remove interactive project map from the main service (GitHub Pages only)
 
-**Status:** Completed (2026-07-13)
+**Area:** process, web-client
+**Status:** DONE — Completed (2026-07-13)
 **Priority:** Low-Medium (hygiene; map was never meant to ship in the operator service)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "gemini added the project map to the main service. that is meant only to be deployed as a github page."

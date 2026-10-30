@@ -1,9 +1,10 @@
 # WO-192 — Timer panel: live time display, duration persistence (no 5-min reset), duration presets
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** web-client
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium-High (the new panel's core display doesn't work)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "the timer display in the small corner control does not display the time. after playing, other set time the setting defaults back to 5min. under the time set add a couple of presets for 5min 10min 15min 20min 25m 30m 45m 60m (should be very small buttons)."
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEW): "the timer display in the small corner control does not display the time. after playing, other set time the setting defaults back to 5min. under the time set add a couple of presets for 5min 10min 15min 20min 25m 30m 45m 60m (should be very small buttons)."
 **Related:** WO-186 (built the panel — both defects trace to its documented shortcuts), WO-169 (countdown routes/template).
 
 ---

@@ -1,5 +1,9 @@
 # WO-286 — Inverted two-finger scroll for laptop touchpads
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "for laptop touchpads we need inverted two finger scroll."
 
 ## Problem

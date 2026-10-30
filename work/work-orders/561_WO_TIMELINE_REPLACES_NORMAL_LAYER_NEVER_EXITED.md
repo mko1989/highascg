@@ -1,11 +1,12 @@
 # WO-561 — the previous look's content kept playing under an incoming timeline
 
-**Status: FIXED in repo (03.09.2026). 4 new smokes (one directly proving the fix is load-bearing by
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026). 4 new smokes (one directly proving the fix is load-bearing by
 reverting it and confirming the assertion fails). Full offline suite 2404/2402/0/2. Server
 restarted, live. Owner QA owed.**
 **Priority:** High — silent stale content sitting on air, invisible until a later, unrelated take
 reveals it.
-**Source:** `work/work-orders/todos03.09.26`: *"when timeline is playing there is still the
+**Source:** `work/archive/todos/todos03.09.26`: *"when timeline is playing there is still the
 previous look playing under it which then surfaces with another take."*
 **Related:** [WO-553](./553_WO_LOOK_TIMELINE_OPACITY_FLASH.md) (established that the timeline band
 sits above both look banks — the fact that makes this bug invisible rather than an obvious visual

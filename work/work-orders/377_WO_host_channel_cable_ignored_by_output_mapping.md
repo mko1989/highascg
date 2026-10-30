@@ -1,8 +1,9 @@
 # WO-377 — a host-channel cable was invisible to the output mapping: the virtual camera stayed on channel 1
 
+**Area:** mapping, video-io
 **Status: DONE (28.07.26 — root cause proven against the owner's own live graph, before/after measured on it, fixed. SERVER change: needs a highascg restart.)**
 
-Source: `work/work-orders/todos28.07.26`, owner lines added 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner lines added 28.07:
 
 > i connected decklink input 4 host channel to a virtual camera output and on the output there is
 > channel 1 output instead of decklink.

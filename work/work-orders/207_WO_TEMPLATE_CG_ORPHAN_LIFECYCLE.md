@@ -1,6 +1,7 @@
 # WO-207 — Template CG orphan lifecycle: tracked adds, startup/reconnect sweep, "take off air" button
 
-**Status:** Implemented
+**Area:** engine
+**Status:** DONE — Implemented
 **Priority:** High (a timer on PGM-only screen 2 was un-removable — stayed on across 8 takes)
 **Date:** 2026-07-14
 **Source:** owner report post-restart: "there is no way to take the timer off screen on pgm only 2. once it's on, it stays on."

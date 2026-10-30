@@ -1,5 +1,6 @@
 # WO-716 — Screen consumers: vsync always off, gpu-texture on every channel
 
+**Area:** video-io, caspar-build
 **Status: DONE (23.10.26). Verified: the WO-716 smoke 6/6, vsync/gpu-texture smokes 34/34, the offline suite
 3041/3044 (1 failure: a live-hardware probe, explained below), Godot 21462/0. Box: channel 1's live consumer was
 re-added with GPU (`gpu_texture true`); Caspar at 3.9 % CPU.**

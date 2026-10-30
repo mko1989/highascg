@@ -1,6 +1,7 @@
-**Status: ✅ Defects #1–#9 fixed (#4/#5 18.10, #1–#3 + #6–#9 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
-
 # WO-611 — Web client defects found during the Godot port inventory
+
+**Area:** web-client
+**Status: DONE — ✅ Defects #1–#9 fixed (#4/#5 18.10, #1–#3 + #6–#9 20.10). "Also noted" dead code / double `'*'` listener left as cleanup. Found while inventorying the web client for [WO-593](./593_WO_godot_client_port_epic.md). The web client stays for remote browsers (WO-608).**
 
 ## Investigation (each confirmed by reading both ends, 2026-10-17, tree = `origin/main` d5521d50)
 

@@ -1,5 +1,6 @@
 # WO-772 — .4 as this box's hot backup (cluster link + shared show + cabled PGM/PRV 1); a backup that gets its media late stayed black
 
+**Area:** network, media
 **Status: DONE (25.10) — linked and forwarding live; late-media fix proven live (CLEAR → Send media → .4 plays again); failover by freezing the master proven (.4 took over at epoch 2, both Caspars kept playing, handback at epoch 3); test:ci 3360/0, Godot 21801/0, cluster e2e live 9/3 skip/0, sandbox 10/10 + 12/12. PGM audio on both boxes → WO-773**
 
 Owner 25.10:

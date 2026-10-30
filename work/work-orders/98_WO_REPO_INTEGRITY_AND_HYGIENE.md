@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** process
 **Status:** In progress — T98.0–T98.5 and T98.7 complete; T98.2 committed in logical batches; T98.6 documented
 **Priority:** **High** — a fresh clone of `main` does not boot
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
@@ -89,7 +90,7 @@ find . -path ./node_modules -prune -o -name '*.bak' -print
 
 ### 3.5 Guardrail
 
-- Add a CI check (see [99_WO_CI_LINT_PIPELINE.md](./99_WO_CI_LINT_PIPELINE.md)) that fails if: any tracked file `require()`s a path that isn't tracked, or any `*.sync-conflict-*` file exists.
+- Add a CI check (see [99_WO_CI_LINT_PIPELINE.md](99_WO_CI_LINT_FORMAT_PIPELINE.md)) that fails if: any tracked file `require()`s a path that isn't tracked, or any `*.sync-conflict-*` file exists.
 
 ---
 

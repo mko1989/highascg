@@ -1,5 +1,6 @@
 # WO-490 — Removing a screen destination leaves it on screen until the next add
 
+**Area:** web-client, mapping
 **Status: DONE (12.08, code + build verified; suite 1982/1980/0, eslint clean) — owner QA owed on the live delete**
 
 Owner 12.08: *"removing a screen destination in devices view, doesnt make the screen dest go away,

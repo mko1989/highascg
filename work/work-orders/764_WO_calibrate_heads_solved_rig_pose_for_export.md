@@ -1,5 +1,6 @@
 # WO-764 — Calibrate heads: solve each head's real pose from its marks (for the desk, never the previs)
 
+**Area:** lighting, tracking-vr
 **Status: OPEN (25.10) — not started; blocks WO-765**
 
 Owner 25.10 (`for_LDs.md`): the LD workflow is pre-show in Capture / HighAsCG from one MVR, then on site "fix the

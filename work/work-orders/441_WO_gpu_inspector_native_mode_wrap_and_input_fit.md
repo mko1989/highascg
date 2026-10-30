@@ -1,5 +1,6 @@
 # WO-441 — GPU inspector: "Native mode" wraps mid-word; custom W/H/FPS boxes overflow the sidebar
 
+**Area:** web-client
 **Status: DONE (2026-08-06 — suite 1858/0/2, built + kiosk F5) — owner eyeball**
 
 Owner (todos06.08.26 items 1-2): "native mode display … always displays the Hz with the z in

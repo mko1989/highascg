@@ -1,5 +1,6 @@
 # WO-499 — A failed Web-UI update left the playout box down
 
+**Area:** os-iso
 **Status: DONE (12.08 — 4 new smokes that execute the real script, suite 2039/2037/0). Installed boxes need the helper refreshed — §5.**
 
 Owner 12.08: *"it seems the update process via gui fails. because it stopped the highascg process and

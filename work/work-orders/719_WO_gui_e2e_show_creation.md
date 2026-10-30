@@ -1,5 +1,6 @@
 # WO-719 — Automated GUI end-to-end checks for building a show (+ sandbox server isolation)
 
+**Area:** testing-ci, godot-client
 **Status: DONE (23.10.26 — full GUI run 26/26 green in the sandbox, live box fingerprint unchanged, offline gates
 below). Remaining owner action: delete the stale branches (commands at the end — the session's permission layer
 blocked branch deletion / push).**

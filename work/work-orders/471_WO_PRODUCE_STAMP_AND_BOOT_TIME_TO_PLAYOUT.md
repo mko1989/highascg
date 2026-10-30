@@ -1,5 +1,6 @@
 # WO-471 — Every produce stamps the ISO; boot stops waiting on absent hardware
 
+**Area:** os-iso, video-io
 **Status: DONE (2026-08-10 — three fixes, verified offline; suite 1942/0/2, eslint 0). Owner QA: one produce + one boot of the resulting ISO.**
 
 **Source:** owner, 2026-08-10, after the highascg7579 install:

@@ -1,6 +1,6 @@
 # WO-134 — Flow: HTTP REST & WebSocket UI State
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `net:http`, `app:highascg-client`
 

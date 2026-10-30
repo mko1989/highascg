@@ -1,5 +1,6 @@
 # WO-715 — Performance check 23.10: OSC handled twice, vsync spin on the ISO screen consumer
 
+**Area:** engine, caspar-build
 **Status: DONE (23.10.26) — OSC fix DONE (smoke 2/2, fails on HEAD; box: 1900 → 951 handled/s = the 950 msg/s
 on the wire); vsync: owner decided D1 → [WO-716](./716_WO_vsync_always_off_gpu_texture_every_screen.md) (always off,
 gpu-texture on every screen); other checks clean**

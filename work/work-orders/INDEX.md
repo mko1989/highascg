@@ -1,0 +1,874 @@
+# Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
+
+768 live WOs (42 open, 118 in progress, 608 done) and 46 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
+not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
+Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
+
+## engine — Looks, takes, timeline, playback (157)
+
+- 02 DONE [engine+amcp] Migrate to HighAsCG Standalone Node.js App → 02_WO_MIGRATE_TO_HIGHASCG.md
+- 10 DONE [engine+companion] Variables & Real-time Status Sync → 10_WO_VARIABLES_AND_REALTIME_STATUS.md
+- 20 DONE [engine+testing-ci] Work Order 03: Verify & Finalize HighAsCG Node.js App → 20_WO_VERIFY_NODE_APP.md
+- 22 DONE [engine+web-client] Mixer Effects — Effects Tab, Drag-and-Drop, Inspector Editors → 22_WO_MIXER_EFFECTS.md
+- 25 DONE [engine] PIP Overlay Effects — Borders, Shadows & Edge Strips via CasparCG HTML Templates → 25_WO_PIP_OVERLAY_EFFECTS.md
+- 26 DONE [engine] Fade Out on Clip End (per Look Layer) → 26_WO_FADE_ON_CLIP_END.md
+- 32 IN PROGRESS [engine+web-client] CG Overlay Studio — Visual HTML Template Editor (detachable module) → 32_WO_CG_OVERLAY_STUDIO_MODULE.md
+- 34 OPEN [engine] Switcher-style bus transition rebuild (3-channel model) → 34_WO_SWITCHER_BUS_TRANSITION_REBUILD.md
+- 43 IN PROGRESS [engine] Global border: PRV edit bus, PGM dual-layer presets, snapshot sync → 43_WO_GLOBAL_BORDER_PRV_PRESETS_DUAL_LAYER.md
+- 44 OPEN [engine] Segmented glow & shadow borders (per-edge splits + ease toward cuts) → 44_WO_GLOW_SHADOW_SEGMENTED_BORDER.md
+- 45 OPEN [engine+mapping] Segmented Global Border (Multi-Slice Support) → 45_WO_SEGMENTED_GLOBAL_BORDER_SLICES.md
+- 46 DONE [engine+web-client] Layer Playlists (List Workflow) → 46_WO_LAYER_PLAYLISTS.md
+- 48 DONE [engine+video-io] Layer route as reusable Live source (resource saving) → 48_WO_LAYER_ROUTE_LIVE_SOURCE_REUSE.md
+- 57 OPEN [engine+web-client] Caspar ADD IMAGE compose preview (tick) — low-footprint live preview → 57_WO_CASPAR_IMAGE_COMPOSE_PREVIEW.md
+- 58 IN PROGRESS [engine+web-client] FFmpeg JPEG compose preview — Caspar writes file directly, no ADD IMAGE tick → 58_WO_FFMPEG_JPEG_COMPOSE_PREVIEW.md
+- 74 DONE [engine+web-client] Mixer effects — inspector live params, AMCP smoke, catalog parity → 74_WO_MIXER_EFFECTS_INSPECTOR_PARAMS_AND_SMOKE.md
+- 76 DONE [engine+devices-config] Project load/autosave correctness, same-machine hardware UX, GPU boot snapshot → 76_WO_PROJECT_LOAD_AUTOSAVE_HARDWARE_GPU_BOOT.md
+- 84 OPEN [engine] Router Refactor: Declarative Route Registry → 84_WO_ROUTER_REFACTOR.md
+- 100 DONE [engine] Backend architecture — appCtx coupling & state consolidation → 100_WO_BACKEND_ARCHITECTURE_STATE.md
+- 101 IN PROGRESS [engine] Backend robustness — error swallowing, persistence durability, shutdown cleanup → 101_WO_BACKEND_ROBUSTNESS.md
+- 106 DONE [engine] Project create/save/load pipeline hardening → 106_WO_PROJECT_PIPELINE_HARDENING.md
+- 117 DONE [engine] Split server API route files over 500 lines → 117_WO_SPLIT_SERVER_API_ROUTES_OVER_500.md
+- 118 DONE [engine] Split server engine & system files over 500 lines → 118_WO_SPLIT_SERVER_ENGINE_AND_SYSTEM_OVER_500.md
+- 119 DONE [engine] Split server config, Caspar, replication & utils over 500 lines → 119_WO_SPLIT_SERVER_CONFIG_AND_CASPAR_OVER_500.md
+- 139 IN PROGRESS [engine] Looks → timeline Take smoothness (flash race, atomic crossfade, teardown) → 139_WO_TIMELINE_TAKE_SMOOTHNESS.md
+- 144 DONE [engine+web-client] Compose-preview defects: per-channel ADD failures + consumer recycle churn → 144_WO_COMPOSE_PREVIEW_DEFECTS.md
+- 150 IN PROGRESS [engine+web-client] Looks & presets operator bug sweep (owner todos 2026-07-07) → 150_WO_LOOKS_PRESETS_OPERATOR_BUGS.md
+- 152 IN PROGRESS [engine+web-client] Timeline polish: play-from-inside-a-look transition + keyframe drag-and-drop → 152_WO_TIMELINE_POLISH_FROM_LOOK_AND_KEYFRAME_DND.md
+- 154 IN PROGRESS [engine+caspar-build] Long looping clip decays to ~50% speed after 2nd/3rd wrap → 154_WO_LONG_LOOP_HALF_SPEED.md
+- 155 DONE [engine+web-client] Looks editor: clip restarts on every param change; edit→PRV mirror; stale PRV t… → 155_WO_LOOKS_EDITOR_CLIP_RESTART_AND_PRV_MIRROR.md
+- 158 DONE [engine+web-client] Looks editor crop: visual handles, pixel values, editor visibility, crop-aware… → 158_WO_LOOKS_CROP_VISUAL_HANDLES_PIXELS_AND_BORDER_AWARENESS.md
+- 159 DONE [engine+web-client] Screen 2 (ch3) black compose preview: stale JPEG served + blocklist state never… → 159_WO_CH3_BLACK_COMPOSE_PREVIEW_STALE_JPEG_AND_BLOCKLIST_UX.md
+- 160 IN PROGRESS [engine] Bank layer scheme: consecutive numbering from 10 (A=10+, B=110+, timelines=210+… → 160_WO_BANK_LAYER_SCHEME_90_LAYERS_AND_PGM_ONLY_BANKS.md
+- 169 DONE [engine+web-client] Countdown/timer CG template: transparent overlay, inspector-configured, multi-i… → 169_WO_COUNTDOWN_TIMER_TEMPLATE.md
+- 173 DONE [engine+amcp] Timeline playout: schedule-style batched AMCP (clip boundaries + keyframe tween… → 173_WO_TIMELINE_SCHEDULE_BATCHED_AMCP.md
+- 175 DONE [engine] FTB = fade 0.5 s (project framerate) then full clear; remove the separate Unblo… → 175_WO_FTB_FADE_THEN_CLEAR_REMOVE_UNBLOCK.md
+- 176 DONE [engine] Current look still wrong on PRV: verify after service restart, then re-investig… → 176_WO_PRV_CURRENT_LOOK_VERIFY_AFTER_RESTART.md
+- 177 DONE [engine+web-client] Border color changes don't stick: mixer_update WS echo stomps pipOverlays (and… → 177_WO_BORDER_COLOR_STOMPED_BY_MIXER_UPDATE_ECHO.md
+- 181 DONE [engine] PGM-only take HTTP 500 (buildClipCommandPlan) + exit-edit preview-sync HTTP 400 → 181_WO_PGM_ONLY_TAKE_500_AND_EXIT_EDIT_400.md
+- 185 DONE [engine] Global play inside the look editor takes to the wrong PGM (uses active screen,… → 185_WO_GLOBAL_PLAY_WRONG_MAIN_IN_EDITOR.md
+- 196 DONE [engine] Countdown lifecycle: clear CG on look exit, keep state across same-timer transi… → 196_WO_COUNTDOWN_LIFECYCLE_TEARDOWN_CONTINUITY_PANEL.md
+- 198 DONE [engine] Compose preview: 404-after-etag race, editor-induced latency (settle over-defer… → 198_WO_COMPOSE_PREVIEW_404_RACE_AND_LATENCY.md
+- 199 DONE [engine] PRV channel receives bank-mapped physical layers (110/111, PIP 624) — preview m… → 199_WO_PRV_BANK_MAPPING_LEAK.md
+- 207 DONE [engine] Template CG orphan lifecycle: tracked adds, startup/reconnect sweep, "take off… → 207_WO_TEMPLATE_CG_ORPHAN_LIFECYCLE.md
+- 209 DONE [engine] PRV exchange still stages on bank-B layers: WO-199's pin was backwards; PRV nee… → 209_WO_PRV_BANKLESS_TAKE_MODE.md
+- 210 IN PROGRESS [engine+web-client] Timer redesign: panel-owned screen timers, opacity on/off (never destroyed), hi… → 210_WO_SCREEN_TIMERS_PANEL_OWNED.md
+- 211 DONE [engine] Playlist converted from single media only loops the first item (LOOP flag leaks… → 211_WO_PLAYLIST_FIRST_ITEM_LOOP_STUCK.md
+- 213 DONE [engine] PRV border/PIP overlays sometimes render with stale settings while editing → 213_WO_PRV_BORDER_STALE_AFTER_EXCHANGE.md
+- 217 DONE [engine] PGM-only merge take fades out the layer it just played into (screen blanks, sti… → 217_WO_PGM_ONLY_SELF_BLANKING_ORPHAN_FADE.md
+- 218 DONE [engine+mapping] Bank drift: visually-equal layers skip re-staging while the bank flips → produc… → 218_WO_BANK_DRIFT_SKIPPED_LAYERS_MIXER_STATE.md
+- 220 DONE [engine] Drop Shadow PIP overlay doesn't render (delivery pipeline verified good; fault… → 220_WO_PIP_SHADOW_NOT_RENDERING.md
+- 224 DONE [engine] Playlist: list-loop doesn't wrap; manual-advance mode has no Next trigger → 224_WO_PLAYLIST_LOOP_WRAP_AND_MANUAL_NEXT.md
+- 232 IN PROGRESS [engine+web-client] Mario game as a transparent-background HTML producer, puppeteer-controlled (CEF… → 232_WO_MARIO_HTML_PRODUCER.md
+- 251 DONE [engine] Playlist OSC advance handler was never subscribed (root cause of "doesn't loop") → 251_WO_PLAYLIST_OSC_HANDLER_NEVER_WIRED.md
+- 259 DONE [engine+amcp] Two-phase batched take: kill the per-command AMCP stagger in transitions → 259_WO_TWO_PHASE_BATCHED_TAKE.md
+- 268 DONE [engine+caspar-build] Shader templates crash in Caspar CEF (no WebGL2) + stray CG UPDATE 403 → 268_WO_SHADER_CEF_WEBGL_AND_CG_CONTINUITY.md
+- 280 DONE [engine+web-client] Caspar JPEG compose preview: backpressure and error handling → 280_WO_JPEG_COMPOSE_PREVIEW_BACKPRESSURE.md
+- 311 DONE [engine+web-client] Autosave must not recreate a project the factory reset trashed → 311_WO_AUTOSAVE_MUST_NOT_RESURRECT.md
+- 320 DONE [engine+web-client] Countdown timer needs pixel-precise position; compact-timer eye icon should fade → 320_WO_TIMER_PIXEL_POSITION_AND_COMPACT_EYE_FADE.md
+- 322 DONE [engine+web-client] Shaders dropped into a look must composite on the media band, not the 700+ CG o… → 322_WO_SHADERS_IN_LOOK_COMPOSITE_ON_MEDIA_BAND.md
+- 326 DONE [engine+web-client] Custom scaling of layers in looks → 326_WO_CUSTOM_LAYER_SCALING_IN_LOOKS.md
+- 328 OPEN [engine] Layer media must continue playback between looks → 328_WO_MEDIA_PLAYBACK_CONTINUITY_BETWEEN_LOOKS.md
+- 334 DONE [engine+web-client] scene_deck_sync ping-pong drives a project save/push storm → 334_WO_SCENE_DECK_SYNC_PINGPONG_SAVE_STORM.md
+- 339 DONE [engine+web-client] look editing on the real PRV channel with layer borders + editing overlays → 339_WO_PRV_EDIT_CHROME_BORDERS_OVERLAYS.md
+- 340 IN PROGRESS [engine+web-client] shader modal: auto-detected tweakable parameters (color pickers, sliders) → 340_WO_SHADER_PARAMS_UI.md
+- 345 DONE [engine+web-client] live shader workflow: shades-bunny toggles a live-shader editor with param rides → 345_WO_SHADER_LIVE_WORKFLOW.md
+- 347 DONE [engine+web-client] Playlists panel lists ALL project playlists; set start item before playout → 347_WO_PLAYLISTS_PANEL_PROJECT_WIDE.md
+- 348 DONE [engine+web-client] Shader Live: per-param revert, reset-all recovery, two-column layout → 348_WO_SHADER_LIVE_PARAM_RESET_LAYOUT.md
+- 354 DONE [engine+web-client] Channel-scoped playlist state, shader MIX hops back, shader thumb eligibility,… → 354_WO_playlist_channel_state_shader_mix_thumbs_ui.md
+- 355 DONE [engine+web-client] Playlists run on PGM only; Shader Live editor expansion; wall clock → 355_WO_playlists_pgm_only_shader_editor_expand_clock.md
+- 356 DONE [engine+web-client] Shader Live v3: rect groups, wheel steps, child saves, audition from templates… → 356_WO_shader_live_v3_children_audition_wheel.md
+- 357 DONE [engine] Shader Live: ▶ take (fixed) + PGM layer stack → 357_WO_shader_live_take_and_pgm_stack.md
+- 358 DONE [engine] Global border: area rect, glow secondary color cycle, pulse to 0 → 358_WO_global_border_area_color2_pulse0.md
+- 359 DONE [engine+amcp] Route layers rock solid on takes (cut-take sweep was clearing skipped sources) → 359_WO_route_take_consistency.md
+- 360 DONE [engine+web-client] Playout status surfacing: missing media / failed inputs must TELL the operator → 360_WO_playout_status_surfacing.md
+- 362 DONE [engine+amcp] Looks with routes to layer 10 "failing to play on most trys" (todos28.07.26 §1) → 362_WO_route_layer10_look_reliability.md
+- 368 DONE [engine+process] template/shaders is box-owned for Syncthing but still tracked by git: permanent… → 368_WO_shader_store_git_ownership.md
+- 370 DONE [engine+media] Playlist rows show the timeless default on media clips instead of each clip's r… → 370_WO_playlist_rows_real_media_durations.md
+- 371 DONE [engine+web-client] "In PRV the playlist stops after the first item": the owner ticked the design a… → 371_WO_prv_playlist_preview_playback.md
+- 374 DONE [engine] "alpha doesnt work on shaders": the page and the context were transparent, the… → 374_WO_shader_alpha_keying.md
+- 379 DONE [engine] shader store halves diverged (the 404), and a stacked shader could never be tak… → 379_WO_shader_store_reconcile_and_stack_clear.md
+- 380 DONE [engine+network] paste a Shadertoy share link, get the code layers → 380_WO_shadertoy_link_import.md
+- 388 DONE [engine+mapping] Crop counts into the layer's effective size (align/adjust) → 388_WO_CROP_COUNTS_INTO_LAYER_SIZE_FOR_ALIGN.md
+- 390 DONE [engine+mapping] "Crop didn't apply on the actual Caspar output" → 390_WO_CROP_NOT_APPLYING_ON_CASPAR_OUTPUT.md
+- 401 IN PROGRESS [engine+process] Machine performance research pass (todos30.07.26) → 401_WO_MACHINE_PERFORMANCE_RESEARCH_PASS.md
+- 403 DONE [engine+web-client] Shader Live editor vs shader playlists: lists only the first item, edits replay… → 403_WO_SHADER_LIVE_PLAYLIST_FOLLOW.md
+- 405 IN PROGRESS [engine+process] Performance round 2 (todos03.08.26 item 1) → 405_WO_PERFORMANCE_ROUND_2.md
+- 418 DONE [engine+network] Review 2026-08-03 "fix first" rows 1–5: traversal, AMCP injection, crash-on-err… → 418_WO_review0308_fix_first_batch.md
+- 426 DONE [engine+video-io] 50 fps hardcoding audit: 60 Hz regions must work end-to-end → 426_WO_no_hardcoded_50fps_audit.md
+- 448 DONE [engine+web-client] Timeline routes NOWHERE on PGM-only screens until Take / look playback → 448_WO_timeline_unrouted_until_take.md
+- 449 DONE [engine] Clip-edge extension mid-play re-sends PLAY … LOOP (blank at file end) → 449_WO_clip_extend_loop_replay.md
+- 500 DONE [engine+video-io] PGM1 plays at 73 % of realtime; GPU saturated; the progress-bar snap-back is th… → 500_WO_PGM1_PLAYS_AT_73_PERCENT_GPU_SATURATED.md
+- 502 DONE [engine+caspar-build] Every channel runs at ~93 %: seven channels exceed CasparCG's single OpenGL thr… → 502_WO_SEVEN_CHANNELS_EXCEED_THE_SINGLE_GL_THREAD.md
+- 504 DONE [engine] The boot test card lands on the operator-GUI channel and never leaves → 504_WO_BOOT_TEST_CARD_ON_OPERATOR_CHANNEL.md
+- 528 DONE [engine] A timeline inside a look cuts instead of mixing, and destabilises later look pl… → 528_WO_TIMELINE_IN_LOOK_CUTS_AND_DESTABILISES.md
+- 531 DONE [engine] A take sized its layers with the LOOKS EDITOR's selected screen, not the target… → 531_WO_LOOK_FILL_WRONG_ON_DIFFERENT_SHAPED_SCREEN.md
+- 532 DONE [engine] A look's geometry followed the selected screen, not the look's own screen → 532_WO_LOOK_GEOMETRY_IS_PER_SCREEN.md
+- 536 DONE [engine] A clip with Loop ticked restarts from frame 0 instead of resuming at the playhe… → 536_WO_LOOPED_CLIP_RESTARTS_INSTEAD_OF_RESUMING.md
+- 537 DONE [engine] A timeline inside a look resumed where it was left; and returning to a look sti… → 537_WO_TIMELINE_IN_A_LOOK_RESUMES_INSTEAD_OF_STARTING.md
+- 540 IN PROGRESS [engine] Channel 1 drifts to half rate at runtime, so every transition on it is torn dow… → 540_WO_CH1_HALF_RATE_TEARS_DOWN_EVERY_FADE_AT_50_PERCENT.md
+- 541 DONE [engine] A look whose only content is a timeline never lit up → 541_WO_TIMELINE_ONLY_LOOK_NEVER_FADES_IN.md
+- 544 DONE [engine] A timeline clip's own opacity keyframes raced the take's crossfade → 544_WO_TIMELINE_CLIP_KEYFRAME_VS_TAKE_FADE_RACE.md
+- 545 DONE [engine] An exiting timeline's own ticking could still fight the take's fade-out during… → 545_WO_OUTGOING_TIMELINE_OPACITY_FIGHTS_EXIT_FADE.md
+- 546 DONE [engine] The pgm/prv preview-exchange take was killing a timeline the SAME action just s… → 546_WO_PREVIEW_EXCHANGE_KILLS_CONCURRENT_TIMELINE_TAKE.md
+- 548 DONE [engine] Re-taking a look whose timeline was already on air killed its own incoming cont… → 548_WO_RETAKE_SAME_TIMELINE_LOOK_KILLED_ITSELF.md
+- 549 DONE [engine] Putting the previous look on preview silently re-took its timeline onto program → 549_WO_PREVIEW_ONLY_TIMELINE_ROUTING.md
+- 550 DONE [engine] Previewing an unrelated look on PRV could still kill a timeline live on PGM → 550_WO_PREVIEW_ONLY_CALL_NEVER_KILLS_PROGRAM.md
+- 552 DONE [engine] The generic timeline stop route could take PROGRAM off air as an incidental sid… → 552_WO_TIMELINE_STOP_ROUTE_NEVER_AFFECTS_PROGRAM.md
+- 553 DONE [engine] Timeline-in-a-look opacity flash, and the timeline↔look switch that cut instead… → 553_WO_LOOK_TIMELINE_OPACITY_FLASH.md
+- 554 DONE [engine] a timeline look plays twice, and PRV sometimes gets stuck after → 554_WO_TIMELINE_LOOK_DOUBLE_PLAY_AND_STUCK_PRV.md
+- 555 DONE [engine] previewing a timeline look could take PROGRAM off the air; PRV never let go of… → 555_WO_TIMELINE_PREVIEW_ROUTING_CORRUPTION.md
+- 556 DONE [engine] previewing another look flashed PGM; leaving a timeline look restarted it mid-t… → 556_WO_PREVIEW_FLASH_AND_TIMELINE_EXIT_RESTART.md
+- 558 DONE [engine] previewing a plain look still restarted program, one tick later → 558_WO_TICK_CACHE_CLEAR_HITS_PERSISTING_CHANNEL.md
+- 559 DONE [engine] after taking a timeline look, it stayed on preview too, blocking the outgoing l… → 559_WO_TIMELINE_TAKE_LEAVES_PREVIEW_FOR_FLIPFLOP.md
+- 560 DONE [engine+web-client] a timeline layer was permanently flagged as "missing media" → 560_WO_TIMELINE_LAYER_FALSE_MISSING_MEDIA_BADGE.md
+- 561 DONE [engine] the previous look's content kept playing under an incoming timeline → 561_WO_TIMELINE_REPLACES_NORMAL_LAYER_NEVER_EXITED.md
+- 565 DONE [engine+companion] Screen timer "Set time" has no effect while running (stale start anchor) → 565_WO_screen_timer_set_time_while_running_stale_anchor.md
+- 566 DONE [engine+web-client] edge strip speed px per sec → 566_WO_edge_strip_speed_px_per_sec.md
+- 567 DONE [engine+web-client] timer font color big settings only → 567_WO_timer_font_color_big_settings_only.md
+- 574 IN PROGRESS [engine+amcp] Multi-screen take (preset ▶ / global take) starts the screens at different times → 574_WO_MULTI_SCREEN_TAKE_SYNC_BARRIER.md
+- 576 DONE [engine+web-client] look clip start point two options → 576_WO_look_clip_start_point_two_options.md
+- 577 DONE [engine+web-client] shader live key controls → 577_WO_shader_live_key_controls.md
+- 580 OPEN [engine] Shader Live: speed changes without a phase jump + smooth (gliding) param changes → 580_WO_shader_live_seamless_speed_and_smooth_params.md
+- 581 DONE [engine+amcp] Playlist look taken to PGM always starts on item 1, not the item set in preview → 581_WO_playlist_take_starts_on_set_item.md
+- 582 IN PROGRESS [engine+amcp] relative start moves loop point → 582_WO_relative_start_moves_loop_point.md
+- 583 DONE [engine+mapping] Edge strip: live param edits without restarting the animation + alternating str… → 583_WO_edge_strip_live_edits_and_alternating_colors.md
+- 586 DONE [engine] import a large library of audio-reactive shaders (ShaderAmp → 118 sh-sa- shader… → 586_WO_audio_reactive_shader_library_import.md
+- 587 DONE [engine] slow, uncluttered background shaders (29 sh-bg-) → 587_WO_background_shaders_slow_uncluttered.md
+- 589 DONE [engine] Lower-thirds engine template: "Confetti Center" (screen-centered, confetti on t… → 589_WO_lt_confetti_center_template.md
+- 590 DONE [engine] Template layers ignore layer position on PGM; LT page fixed at 1920×1080 on a 3… → 590_WO_template_layer_position_and_channel_size.md
+- 597 DONE [engine+godot-client] Server: "video surfaces" (shm consumers in config + runtime), descriptor API, a… → 597_WO_server_video_surfaces_shm_and_atlas.md
+- 660 DONE [engine+godot-client] Remove the WO-319 GUI live stream (NVENC → WebCodecs) from the server → 660_WO_remove_gui_stream_encoder.md
+- 663 DONE [engine+godot-client] CG Studio exports are lower thirds (inspector fields, baked text on take) → 663_WO_studio_lower_thirds_in_inspector.md
+- 715 DONE [engine+caspar-build] Performance check 23.10: OSC handled twice, vsync spin on the ISO screen consum… → 715_WO_performance_check_23_10.md
+- 738 DONE [engine+godot-client] VJing in Godot, relayed to CasparCG (instead of the current shader work) → 738_WO_godot_vj_engine_relayed_to_caspar.md
+- 744 DONE [engine+video-io] shm rings as Live-tab sources: a look layer shm://<name> plays a ring another p… → 744_WO_shm_ring_live_source.md
+- 745 DONE [engine+godot-client] Game source: a libretro core in an operator window, published as a Live-tab sou… → 745_WO_retro_game_source_libretro.md
+- 758 DONE [engine+mapping] Content sizing "fill canvas" does not fill the canvas → 758_WO_fill_canvas_assumed_1080p_canvas.md
+- 766 IN PROGRESS [engine+godot-client] Playlist workflow: drop media on the layer list, Manual Next no longer loops, p… → 766_WO_playlist_preview_pick_manual_no_loop_fade_down.md
+- 768 IN PROGRESS [engine] Playlist: an empty item (transition the layer to nothing, then on to the next c… → 768_WO_playlist_empty_item.md
+- 781 DONE [engine+godot-client] Look presets as on a Barco E2: highlight destinations, save, recall exactly; sh… → 781_WO_look_presets_e2_destinations_and_deck_toggles.md
+- 782 DONE [engine+amcp] Look preset recall: every screen's final PLAY in one AMCP batch → 782_WO_look_preset_recall_one_play_batch.md
+- 787 DONE [engine+godot-client] Timeline: nothing on preview, and scrubbing jumps → 787_WO_timeline_preview_and_smooth_scrub.md
+- 789 DONE [engine] The timeline's preview is the Live preview (2D / 3D) → 789_WO_timeline_uses_live_preview.md
+- 790 DONE [engine+amcp] Timeline scrub: the channel follows the drag, seeks show sooner → 790_WO_timeline_scrub_paced_and_faster_seek.md
+- 813 DONE [engine] Look layer "Clip start point" → Custom: scrub slider on PRV + Trim in / Trim out → 813_WO_look_layer_custom_clip_start_trim.md
+- 814 DONE [engine+amcp] Take order: new look straight to PGM, PRV copy after the PGM PLAY; PLAY last in… → 814_WO_take_order_and_amcp_batch_play_last.md
+- 828 DONE [engine] Timeline inside a look: does the take transition and play as the WOs say? (live… → 828_WO_timeline_in_look_take_and_play_verification.md
+- 829 DONE [engine] Timeline-in-look follow-up: loop wrap leaves an ended clip on air; on-air rerou… → 829_WO_timeline_wrap_stop_and_onair_reroute.md
+- 833 DONE [engine] On-air engine one-liners (sweep §3e–3i, 3k–3m) → 833_WO_engine_onair_one_liners.md
+- 834 DONE [engine] Timeline end holds the last frame (D8) → 834_WO_timeline_end_holds_last_frame.md
+- 837 OPEN [engine+lighting] Timeline: screens, lights layer, control layer (D6) → 837_WO_timeline_screens_lights_control_layer.md
+- 840 DONE [engine+godot-client] Timer visibility lives in look presets (per screen), not in looks → 840_WO_timer_visibility_in_look_presets.md
+- 849 OPEN [engine] Work order: Fix A/B bank transitions by layer stacking order → 849_WO_fix_ab_bank_transition_layer_order.md
+- 850 OPEN [engine] Work order: Fix + Animate transitions (same on-air layer, synced PLAY/FILL, PRV… → 850_WO_fix_animate_transition_same_layer_smooth.md
+- 851 OPEN [engine+godot-client] Work order: Look presets & layer presets (screen-management programming) → 851_WO_look_and_layer_presets.md
+- 852 OPEN [engine+web-client] Work order: Per-main look spaces, global looks, and main selector UI → 852_WO_per_main_looks_and_global_looks.md
+
+## amcp — AMCP client and protocol (18)
+
+- 07 DONE [amcp] Complete AMCP Protocol API Implementation → 07_WO_AMCP_PROTOCOL_API.md
+- 08 DONE [amcp+audio] CasparCG Client Features — OSC status, VU meters, layer/channel status → 08_WO_CASPARCG_CLIENT_FEATURES.md
+- 09 DONE [amcp] Complete OSC Protocol Implementation → 09_WO_OSC_PROTOCOL.md
+- 146 IN PROGRESS [amcp+engine] CasparCG state monitor strengthening (health ping, reconcile visibility) → 146_WO_STATE_MONITOR_STRENGTHENING.md
+- 156 DONE [amcp+mapping] Route self-loop guard, wedged-channel recovery, multiview re-apply after Caspar… → 156_WO_ROUTE_SELF_LOOP_GUARD_AND_MULTIVIEW_RESTART_REAPPLY.md
+- 235 IN PROGRESS [amcp+caspar-build] New Caspar (2.6-dev r253c16c) protocol compatibility: OSC timers erratic, playb… → 235_WO_NEW_CASPAR_PROTOCOL_COMPAT.md
+- 239 DONE [amcp+engine] OSC variables parser still broken AFTER the WO-235 fixes went live → 239_WO_OSC_VARIABLES_RESIDUAL.md
+- 252 DONE [amcp+engine] Feed clip duration from the AMCP INFO supplement into oscState (new binary omit… → 252_WO_INFO_DURATION_SUPPLEMENT_OSCSTATE.md
+- 281 DONE [amcp+caspar-build] CasparCG log audit (logs.19.07.26) → 281_WO_CASPAR_LOG_AUDIT.md
+- 422 DONE [amcp+engine] Batch COMMIT-ack timeout no longer replays the transaction sequentially (review… → 422_WO_batch_commit_timeout_no_sequential_replay.md
+- 477 DONE [amcp+engine] the OSC INFO supplement polls AMCP every 2s forever → 477_WO_OSC_INFO_SUPPLEMENT_POLLS_EVERY_2S_FOREVER.md
+- 482 DONE [amcp] the CG orphan sweep clears 90 hosts per channel whether or not anything is on t… → 482_WO_CG_ORPHAN_SWEEP_CLEARS_THE_WHOLE_BAND.md
+- 492 DONE [amcp] AMCP CLEAR chatter on connect/start: what still fires and why → 492_WO_AMCP_CLEAR_CHATTER_ON_CONNECT.md
+- 503 DONE [amcp] The CG orphan sweep still swept blind on every reconnect; 180 CLEAR lines drown… → 503_WO_CG_ORPHAN_SWEEP_STILL_BLIND_ON_CONNECT.md
+- 562 DONE [amcp+caspar-build] OSC ENDIAN CANARY LOST TO INT FPS → 562_WO_OSC_ENDIAN_CANARY_LOST_TO_INT_FPS.md
+- 618 DONE [amcp+engine] Non-linear tweens were never valid Caspar tween names → 618_WO_caspar_tween_names.md
+- 754 DONE [amcp+os-iso] The AMCP watchdog kills the Caspar the start-up launcher just released → 754_WO_amcp_watchdog_kills_caspar_released_by_boot_launcher.md
+- 845 DONE [amcp+lighting] Sweep: AMCP client, Art-Net/sACN, audio and media bugs → 845_WO_sweep_amcp_dmx_audio_media.md
+
+## caspar-build — CasparCG server build and binaries (10)
+
+- 233 DONE [caspar-build] Caspar rebuild research: CasparCG_Enhanced base + improved-artnet + live-events… → 233_WO_CASPAR_REBUILD_RESEARCH.md
+- 234 DONE [caspar-build] Assemble + build the final (for now) CasparCG for highascg → 234_WO_CASPAR_FINAL_BUILD.md
+- 288 DONE [caspar-build+devices-config] Generated Caspar config must not emit a custom 1080p50 video mode → 288_WO_NO_CUSTOM_1080P50_MODE.md
+- 337 DONE [caspar-build+devices-config] Apply Caspar config: ~18 s wall clock, most of it avoidable → 337_WO_APPLY_CASPAR_CONFIG_SPEEDUP.md
+- 508 DONE [caspar-build+os-iso] Single-instance safeguards for CasparCG: audit + the missing guard → 508_WO_ONLY_ONE_CASPAR_INSTANCE.md
+- 594 IN PROGRESS [caspar-build] CasparCG shm frame consumer (highascg-build-v1): channel frames → POSIX shared… → 594_WO_caspar_shm_frame_consumer.md
+- 613 IN PROGRESS [caspar-build] Next CasparCG build: base it on upstream v2.5.1-stable → 613_WO_next_caspar_build_on_v2_5_1.md
+- 742 DONE [caspar-build+engine] Caspar shm producer: play a shared-memory ring written by another process (WO-7… → 742_WO_caspar_shm_producer.md
+- 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
+- 847 OPEN [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
+
+## audio — Audio routing, devices, meters (38)
+
+- 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
+- 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
+- 44 OPEN [audio] Audio Output Routing and Solo System → 44_WO_AUDIO_OUTPUT_ROUTING_AND_SOLO.md
+- 157 IN PROGRESS [audio+web-client] Audio mixer: screen/channel routing level above stereo-pair routing on input st… → 157_WO_AUDIO_MIXER_SCREEN_THEN_PAIR_ROUTING.md
+- 164 DONE [audio+amcp] Live-audio health watchdog: stop the unconditional INFO 6-10 every 15 s (probe… → 164_WO_LIVE_AUDIO_WATCHDOG_QUIET_INFO_PROBE.md
+- 166 DONE [audio] Live audio input: device change from the inspector (no Caspar restart) → 166_WO_LIVE_AUDIO_DEVICE_SWAP_IN_INSPECTOR.md
+- 174 DONE [audio] Route sources: choose which source audio channels play (e.g. only ch1+2 of an 8… → 174_WO_ROUTE_SOURCE_AUDIO_CHANNEL_PICK.md
+- 183 DONE [audio] Audio mixer shows the last look's inputs after a timeline take (should show tim… → 183_WO_AUDIO_MIXER_TIMELINE_TAKE_INPUTS.md
+- 214 DONE [audio] Timeline audio never appears in the audio mixer (dead channel lookup) → 214_WO_TIMELINE_AUDIO_MIXER_STRIPS_DEAD.md
+- 227 DONE [audio+web-client] Compact audio mixer: 8-channel screens overflow their space → 227_WO_COMPACT_MIXER_8CH_OVERFLOW.md
+- 237 DONE [audio] Audio-only channel must be the cheapest possible video channel (currently gener… → 237_WO_AUDIO_ONLY_CHANNEL_CHEAPEST_MODE.md
+- 249 DONE [audio] 8ch → stereo pair selection for PGM2/streaming + stop the mixer reporting lie → 249_WO_AUDIO_PAIR_SELECT_PGM2.md
+- 266 DONE [audio+web-client] Shader FX: Shadertoy-style shaders on the Caspar output with audio reactivity → 266_WO_SHADER_FX_AUDIO_REACTIVE.md
+- 284 DONE [audio] / WO-293 — Audio mixer: missing DeckLink inputs, VU meters, cross-screen routing → 284_WO_AUDIO_MIXER_INPUTS_VU_ROUTING.md
+- 310 DONE [audio+amcp] One unit on the volume wire (kill the dB/linear double-send) → 310_WO_VOLUME_WIRE_UNITS.md
+- 312 DONE [audio+amcp] Reassert live-input audio-only routes after Caspar restart → 312_WO_REASSERT_AUDIO_ROUTES_ON_RECONNECT.md
+- 335 DONE [audio+engine] shader audio reactivity on the Caspar program path (WS FFT tier priority) → 335_WO_SHADER_AUDIO_PROGRAM_PATH_WS_TIER_PRIORITY.md
+- 336 DONE [audio+web-client] live-audio controls belong in the host-channel inspector → 336_WO_LIVE_AUDIO_HOST_CHANNEL_INSPECTOR_CONTROLS.md
+- 375 DONE [audio+engine] "audio reactive" was a flag that bound nothing: four shaders wore the ♪ badge a… → 375_WO_shader_audio_channel_autobind.md
+- 406 IN PROGRESS [audio] Audio monitoring on a second output + mixer solo, end to end (todos03.08.26 ite… → 406_WO_AUDIO_MONITOR_SECOND_OUTPUT_SOLO.md
+- 409 DONE [audio+web-client] PRV bus strips in the audio mixer (pre-take monitoring) → 409_WO_PRV_MIXER_STRIPS.md
+- 414 DONE [audio+mapping] Pinned host channel vs dynamic allocation collision + PGM SOLO (owner follow-up… → 414_WO_PINNED_HOST_CHANNEL_COLLISION_AND_PGM_SOLO.md
+- 425 DONE [audio+devices-config] Monitor audio output is a plain "Audio 2" + Monitor tickbox, and fresh systems… → 425_WO_monitor_output_generic_label.md
+- 443 DONE [audio+devices-config] Monitor audio output must not ride in projects → 443_WO_monitor_audio_output_not_project_scoped.md
+- 470 DONE [audio+devices-config] This box's SC60 headset is committed as a monitor output and reaches other mach… → 470_WO_SC60_MONITOR_LEAKS_INTO_FRESH_INSTALLS.md
+- 488 DONE [audio+devices-config] a root <portaudio> block on a box with no audio outputs → 488_WO_ROOT_PORTAUDIO_WITHOUT_ANY_AUDIO_OUTPUT.md
+- 571 DONE [audio] live audio pgm leak and alsa mixer ambiguous control → 571_WO_live_audio_pgm_leak_and_alsa_mixer_ambiguous_control.md
+- 572 DONE [audio+web-client] audio review mixer button width and still image false positive → 572_WO_audio_review_mixer_button_width_and_still_image_false_positive.md
+- 578 DONE [audio+devices-config] audio output save reverts device → 578_WO_audio_output_save_reverts_device.md
+- 662 DONE [audio+engine] Beat detection woven into shader audio reactivity → 662_WO_beat_detection_shader_reactivity.md
+- 683 DONE [audio] One PortAudio output next to Enhanced OAL: enforce the single device, Linux hos… → 683_WO_single_portaudio_output_and_host_apis.md
+- 731 DONE [audio] Audio operator page: presenter cards from the intake, mic → desk channel matchi… → 731_WO_audio_operator_page_desk_automation.md
+- 773 IN PROGRESS [audio] PGM audio silent on both boxes: PortAudio aborts its init when no PulseAudio se… → 773_WO_portaudio_init_fails_without_pulse_server.md
+- 778 DONE [audio] 8 ch PortAudio to the switcher on DP-4: the output pointed at an empty NVIDIA "… → 778_WO_portaudio_8ch_to_switcher_dp4.md
+- 779 DONE [audio] HDMI/DP audio muted at the card (IEC958 switches off) + Devices audio list name… → 779_WO_hdmi_audio_iec958_muted_and_sink_labels.md
+- 799 DONE [audio+godot-client] Audio tab: ALSA hardware mixer docked at the bottom → 799_WO_audio_tab_alsa_mixer_dock.md
+- 800 IN PROGRESS [audio] Per-layer audio monitoring (levels per layer, not per channel) → 800_WO_per_layer_audio_monitoring.md
+- 801 DONE [audio] PRV audio: monitor individual pairs on headphones (not only the mix-down) → 801_WO_prv_audio_pair_monitor_headphones.md
+
+## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
+
+- 27 IN PROGRESS [video-io] Streaming Channel and UI Tab → 27_WO_STREAMING_CHANNEL.md
+- 28 DONE [video-io] DeckLink input / output routing → 28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md
+- 53 DONE [video-io+audio] Dedicated channel per live input (isolated VU per input) → 53_WO_PER_INPUT_AUDIO_METER_CHANNELS.md
+- 55 OPEN [video-io] DeckLink SDI output — inherit channel resolution, standard modes only → 55_WO_DECKLINK_OUTPUT_STANDARD_RESOLUTION_INHERIT.md
+- 56 OPEN [video-io] DeckLink SDI — custom PGM / ch1 output (OPEN — unresolved) → 56_WO_DECKLINK_SDI_PGM_CUSTOM_OPEN.md
+- 81 IN PROGRESS [video-io+web-client] Stream/record — no false Apply dirty, live status logs in inspector → 81_WO_STREAM_RECORD_LOGS_AND_NO_RESTART_DIRTY.md
+- 88 DONE [video-io] Host-channel live sources (webpage, NDI, DeckLink) → 88_WO_HOST_CHANNEL_LIVE_SOURCES.md
+- 109 IN PROGRESS [video-io] Virtual camera sink + virtual screen inputs (testing lab) → 109_WO_VIRTUAL_CAMERA_AND_VIRTUAL_SCREEN_TESTING.md
+- 121 IN PROGRESS [video-io] USB webcam / V4L2 video input capture → 121_WO_USB_WEBCAM_V4L2_INPUT.md
+- 137 IN PROGRESS [video-io+devices-config] Virtual camera output — backend hardening + Device View → 137_WO_VIRTUAL_CAMERA_OUTPUT_DEVICE_VIEW.md
+- 145 DONE [video-io] Virtual camera stream-mode spike: Caspar STREAM → ffmpeg → /dev/video10 → 145_WO_VCAM_STREAM_MODE_SPIKE.md
+- 172 DONE [video-io+audio] Streaming/record: device-view source sync broken (streams ch1), restart-flag po… → 172_WO_STREAMING_RECORD_SOURCE_SYNC_FLAGS_AUDIO.md
+- 236 DONE [video-io] DeckLink low-latency mode toggle (per host channel), default OFF (current behav… → 236_WO_DECKLINK_LOW_LATENCY_TOGGLE.md
+- 258 DONE [video-io+web-client] Web-browser source v2: real browser on a virtual display, captured into CasparCG → 258_WO_BROWSER_SOURCE_VIRTUAL_DISPLAY.md
+- 282 DONE [video-io+audio] Browser source: real audio in, virtual display, operator control → 282_WO_BROWSER_SOURCE_AUDIO_AND_VIRTUAL_DISPLAY.md
+- 307 DONE [video-io+network] SRT passphrase via project credentials (encrypted SRT) → 307_WO_SRT_PASSPHRASE_PROJECT_CREDENTIALS.md
+- 316 DONE [video-io] DeckLink input retry loop fails forever when the device is already open → 316_WO_DECKLINK_INPUT_RETRY_VS_HOST_CHANNEL.md
+- 373 DONE [video-io+mapping] "I connected PGM2 to the rec output and PGM1 got recorded": same-layer record e… → 373_WO_record_bus_wrong_source_channel.md
+- 376 DONE [video-io+engine] route the virtual camera into shader channels (Shadertoy's webcam input) → 376_WO_shader_camera_channel.md
+- 393 DONE [video-io+devices-config] Allow 0 stream / record outputs → 393_WO_ALLOW_ZERO_STREAM_RECORD_OUTPUTS.md
+- 396 DONE [video-io+devices-config] Devices view loads in 1–2 s: cold GET /api/device-view burns ~1.7 s on DeckLink… → 396_WO_DEVICE_VIEW_COLD_LOAD_DECKLINK_PROBE.md
+- 399 DONE [video-io] Virtual camera: stream mode is the design now (owner) — jpg flipbook retired to… → 399_WO_VCAM_FFMPEG_STILL_50FPS_BURN.md
+- 427 DONE [video-io+os-iso] DeckLink driver install a normal user can actually do (GUI upload + the dead WO… → 427_WO_decklink_driver_install_ux.md
+- 428 DONE [video-io+os-iso] Phantom DeckLink card on driverless installs + the tar.gz installer never match… → 428_WO_decklink_phantom_card_and_real_archive.md
+- 476 OPEN [video-io+caspar-build] every fill-only DeckLink output asks the card for an external keyer → 476_WO_FILL_ONLY_DECKLINK_STILL_ASKS_FOR_EXTERNAL_KEYER.md
+- 493 DONE [video-io+web-client] DeckLink <pixel-format>: WO-487's escape hatch was unreachable, 2160p had no wa… → 493_WO_DECKLINK_PIXEL_FORMAT_OPTION.md
+- 507 DONE [video-io+devices-config] An output consumer was emitted on a DeckLink bound as an INPUT → Caspar restart… → 507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md
+- 521 OPEN [video-io+engine] Zoom meeting module: per-participant channels, strictly opt-in → 521_WO_ZOOM_MODULE_OPT_IN.md
+- 716 DONE [video-io+caspar-build] Screen consumers: vsync always off, gpu-texture on every channel → 716_WO_vsync_always_off_gpu_texture_every_screen.md
+
+## mapping — Pixel map, screens, multiview, destinations (37)
+
+- 18 IN PROGRESS [mapping] Pixel & Output Mapping — Unified Node-Based System → 18_WO_OUTPUT_SLICER.md
+- 40 IN PROGRESS [mapping+devices-config] Device View — GPU xrandr sync with screen destinations and override → 40_WO_DEVICE_VIEW_GPU_XRANDR_SCREEN_DEST_SYNC.md
+- 40a IN PROGRESS [mapping] (sub of WO-40): Pixel mapping → GPU — what each head “gets”, xrandr, and Caspar… → 40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md
+- 80 IN PROGRESS [mapping+devices-config] xrandr custom mode — force OS output to Web UI WxH×fps → 80_WO_XRANDR_CUSTOM_MODE_FORCE_RESOLUTION.md
+- 151 DONE [mapping+web-client] Multiview timers + window sizing bugs (owner todos 2026-07-07) → 151_WO_MULTIVIEW_TIMERS_AND_SIZING.md
+- 190 DONE [mapping] Multiview shows cropped layer without its top crop (main output correct) — diag… → 190_WO_MULTIVIEW_TOP_CROP_MISMATCH.md
+- 191 DONE [mapping] Multiview overlay: per-layer rows with timers + progress bars (runtime layers o… → 191_WO_MULTIVIEW_PER_LAYER_TIMERS.md
+- 195 DONE [mapping] Multiview overlay refinements: hide PIP-decoration rows, L## + filename labels,… → 195_WO_MULTIVIEW_OVERLAY_REFINEMENTS.md
+- 201 DONE [mapping] Multiview apply-chain deadlock (rejected promise poisons the queue) + compose p… → 201_WO_MV_APPLY_DEADLOCK_AND_COMPOSE_FPS.md
+- 203 DONE [mapping] Adjustable size for the multiview timers → 203_WO_MULTIVIEW_TIMER_SIZE_SETTING.md
+- 204 DONE [mapping] Multiview timer polish round 2: readable highlight on black, ×2 base size, full… → 204_WO_MV_TIMER_POLISH_ROUND2.md
+- 206 DONE [mapping] Multiview editor: changes should reach the output without manual rebuild; corre… → 206_WO_MV_EDITOR_REFRESH_AND_RESOLUTION_DISPLAY.md
+- 212 DONE [mapping] MV editor preview still shows the old 50% timer dock; playlist-aware timer labe… → 212_WO_MV_EDITOR_DOCK_WIDTH_AND_PLAYLIST_LABELS.md
+- 215 DONE [mapping] Multiview cell video scaling wrong when timers dock is enabled (borders look wr… → 215_WO_MV_CELL_SCALING_WITH_TIMERS_DOCK.md
+- 223 DONE [mapping] MV timer rows show "L10 1" for routes; should show the source's friendly label… → 223_WO_MV_ROUTE_ROW_FRIENDLY_LABELS.md
+- 253 DONE [mapping] Un-deprecate mapping nodes (WO-242 gated the wrong feature) + rename to "Mappin… → 253_WO_MAPPING_NODE_UNDEPRECATE.md
+- 271 DONE [mapping+devices-config] Stale route:// channels after channel-map shifts (MV editor black holes) → 271_WO_STALE_ROUTE_CHANNEL_HEAL.md
+- 327 DONE [mapping+web-client] Compose preview screen-dest borders wrong with custom resolutions → 327_WO_COMPOSE_PREVIEW_DEST_BORDERS_CUSTOM_RES.md
+- 364 DONE [mapping+video-io] PRV of a pgm_prv destination cannot be cabled to a GPU connector (todos28 follo… → 364_WO_prv_physical_output_gpu.md
+- 365 DONE [mapping+web-client] Matrix view lists the PGM/PRV destination a third time; standard-view cables al… → 365_WO_matrix_prv_duplicate_row_and_cable_anchor.md
+- 377 DONE [mapping+video-io] a host-channel cable was invisible to the output mapping: the virtual camera st… → 377_WO_host_channel_cable_ignored_by_output_mapping.md
+- 378 DONE [mapping+engine] one source vocabulary: channel_<N> for channels, program_<N> only as a screen l… → 378_WO_channel_source_vocabulary.md
+- 381 DONE [mapping+web-client] Host channels stuck on "planned", ch 4 collision with the Operator GUI, timers… → 381_WO_operator_gui_channel_reserved_planned_badge_timer_dock.md
+- 385 DONE [mapping+web-client] Screen name and destination label were two things, and the second one never sav… → 385_WO_screen_name_is_destination_name.md
+- 410 DONE [mapping+engine] Operator GUI holes empty after a caspar restart (stale skip-unchanged route cac… → 410_WO_OPERATOR_HOLES_EMPTY_AFTER_CASPAR_RESTART.md
+- 436 DONE [mapping+web-client] Mapping-node inspector values revert on first entry (need several tries to stic… → 436_WO_mapping_node_inputs_revert_first_entry.md
+- 437 DONE [mapping+devices-config] Mapping outputs: stale stored dims report 1080p on GPU ports; GL-sync auto blin… → 437_WO_mapping_dims_stale_and_gl_sync_mapping_rig.md
+- 438 DONE [mapping+lighting] Real-world Art-Net test guide for the Pixel Map destination → 438_WO_pixelmap_destination_test_guide.md
+- 489 DONE [mapping+web-client] Multiview editor blend holes sit 18 px low and eat the label strips → 489_WO_MV_BLEND_HOLES_OFFSET_AND_EAT_LABELS.md
+- 494 DONE [mapping+video-io] Deleting a pixel-mapping node leaves its DeckLinks in the Caspar config → 494_WO_REMOVE_MAPPING_NODE_LEAVES_DECKLINK_BOUND.md
+- 505 DONE [mapping+web-client] Pixel-mapping output: choosing a resolution did not fill width/height → 505_WO_MAPPING_MODE_FILLS_DIMENSIONS.md
+- 584 DONE [mapping+lighting] Global border: Art-Net listen is opt-in; DMX patch/mapping collapsed by default → 584_WO_global_border_artnet_opt_in_and_collapsed_mapping.md
+- 588 DONE [mapping] LED test pattern: "Bunny builds the wall" (full LED grid only) → 588_WO_led_builder_bunny_test_pattern.md
+- 629 DONE [mapping+godot-client] LED test card: settings + master switch in node, Godot header switch + dialog (… → 629_WO_led_test_card_server_side.md
+- 634 DONE [mapping+godot-client] Make an LED screen from an MVR object (map a destination onto the MVR's wall) → 634_WO_mvr_object_to_led_screen.md
+- 769 IN PROGRESS [mapping+engine] Multiview PRV cells listed the PGM look's layers (no running times); playlist d… → 769_WO_mv_prv_cells_read_pgm_look_playlist_drop_hint.md
+- 807 DONE [mapping+lighting] Region-to-fixture-pixel mapping: average a screen area into one pixel of a ligh… → 807_WO_region_to_fixture_pixel_mapping.md
+
+## lighting — DMX, Art-Net, sACN, fixtures, consoles (32)
+
+- 09 OPEN [lighting+engine] Global per-screen border effects and Art-Net control → 09_WO_Global_Per_Screen_Border_Effects.md
+- 179 DONE [lighting+mapping] Lighting I/O: Art-Net listener off by default, sACN input option, region-averag… → 179_WO_ARTNET_SACN_DEFAULTS_AND_PIXELMAP_SAMPLING.md
+- 180 OPEN [lighting] GDTF fixture import/export for pixel mapping → 180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md
+- 225 DONE [lighting+caspar-build] Art-Net pixel-mapping redesign: full investigation → multiple follow-up WOs → 225_WO_ARTNET_INVESTIGATION.md
+- 241 DONE [lighting+process] Art-Net & pixel-mapping capability docs + production walkthroughs → 241_WO_ARTNET_PIXELMAP_DOCS.md
+- 242 DONE [lighting+mapping] Native pixel-map screens: dedicated channel + improved-artnet consumer per fixt… → 242_WO_NATIVE_PIXELMAP_SCREENS.md
+- 615 DONE [lighting+godot-client] Previs fixtures: GDTF import, real patch, Art-Net / sACN output, live beams → 615_WO_previs_fixtures_gdtf_patch_dmx_out.md
+- 632 DONE [lighting+tracking-vr] Art-Net read-through: the follow backup starts from the console's values → 632_WO_artnet_read_through.md
+- 633 DONE [lighting] Replace a stub GDTF (Capture placeholder) with the real fixture file → 633_WO_gdtf_replace_stub_types.md
+- 636 DONE [lighting] An MVR scene's GDTF fixture types load with the scene, not only on Patch → 636_WO_mvr_loads_its_gdtf_types.md
+- 637 DONE [lighting] MVR placeholders resolved from GDTF Share automatically → 637_WO_gdtf_share_auto_resolve.md
+- 680 DONE [lighting] Programmer: automatic fixture groups by position and address → 680_WO_auto_fixture_groups.md
+- 681 DONE [lighting+godot-client] MVR scene off takes its fixtures and walls; ctrl / shift multi-select in the 3D… → 681_WO_mvr_scene_off_takes_fixtures_walls.md
+- 691 DONE [lighting+godot-client] Previs: delete patched fixtures (Delete key + Programmer "Delete") → 691_WO_previs_delete_patched_fixtures.md
+- 693 DONE [lighting] DMX viewer: Art-Net nodes / sACN sources + a live 512-slot grid → 693_WO_dmx_viewer_artnet_sacn.md
+- 695 DONE [lighting] Previs fixtures: re-patch a head (mode / universe / address), the operator's pa… → 695_WO_fixture_repatch_mode_and_dead_beams.md
+- 698 DONE [lighting+network] choose the network card the fixture DMX output (Art-Net / sACN) leaves by → 698_WO_dmx_output_nic.md
+- 699 DONE [lighting+godot-client] previs Inspector: the lighting controls grouped by job → 699_WO_previs_lighting_inspector_groups.md
+- 700 DONE [lighting+tracking-vr] calibrate heads from Lighting, on real stage marks → 700_WO_calibrate_heads_on_stage_marks.md
+- 703 DONE [lighting] Preset stage marks from the tracking grid → 703_WO_preset_stage_marks.md
+- 764 OPEN [lighting+tracking-vr] Calibrate heads: solve each head's real pose from its marks (for the desk, neve… → 764_WO_calibrate_heads_solved_rig_pose_for_export.md
+- 765 OPEN [lighting] MVR export of the calibrated rig to the desk (grandMA3 / MagicQ) → 765_WO_mvr_export_calibrated_rig_to_desk.md
+- 767 IN PROGRESS [lighting+godot-client] Imported MVR: MAC Aura PXL heads drawn ~1000× too big (GDTF glb in mm), pick bo… → 767_WO_gdtf_glb_mm_units_heads_huge.md
+- 784 DONE [lighting] Previs: MAC Aura PXL never lights (virtual dimmers read as 0) and its body draw… → 784_WO_previs_virtual_dimmers_and_materialless_glb.md
+- 785 IN PROGRESS [lighting] Better GDTF Share recognition of MVR heads → 785_WO_gdtf_share_recognition.md
+- 786 DONE [lighting] Haze in the 3D views so the beams read → 786_WO_previs_haze.md
+- 793 OPEN [lighting+tracking-vr] Calibrate and aim heads in HighAsCG (VR or desktop), record the result on the C… → 793_WO_aim_from_highascg_record_on_chamsys_desk.md
+- 796 DONE [lighting+tracking-vr] A MagicQ show of the loaded MVR scene, driving the previs from MagicQ in VR → 796_WO_magicq_show_from_highascg_mvr.md
+- 797 DONE [lighting] Decode the previs fixtures only while a client looks → 797_WO_previs_fixtures_decoded_only_while_watched.md
+- 804 IN PROGRESS [lighting] Calibrate the rig together: pick anchor heads, operator places them, the rest i… → 804_WO_calibrate_rig_anchor_heads_infer_rest.md
+- 812 DONE [lighting+godot-client] Previs: hide the projector beam lines → 812_WO_previs_projector_beams_toggle.md
+- 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
+
+## godot-client — Godot client (81)
+
+- 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
+- 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
+- 598 IN PROGRESS [godot-client+engine] Client contract: document it, make it testable, move show logic to the server (… → 598_WO_client_contract_and_thin_client.md
+- 599 DONE [godot-client] Godot client foundation: project, engine pin, networking, state, theme, windows… → 599_WO_godot_client_foundation.md
+- 600 DONE [godot-client] Godot port: live operation core (deck, PRV/PGM, compose tiles, look editor, tak… → 600_WO_godot_port_live_core.md
+- 601 DONE [godot-client] Godot port: inspector (layer / media / effects / PIP / CG / timers / live sourc… → 601_WO_godot_port_inspector.md
+- 602 DONE [godot-client] Godot port: timeline editor (canvas NLE, keyframes, flags, transport) → 602_WO_godot_port_timeline.md
+- 603 DONE [godot-client+media] Godot port: media library operations, ingest/uploads, HAP encode, multi-rename,… → 603_WO_godot_port_media_and_playlists.md
+- 604 DONE [godot-client+audio] Godot port: audio mixer, meters, cross-screen audio routing → 604_WO_godot_port_audio_mixer_meters.md
+- 605 DONE [godot-client+devices-config] Godot port: Device View (rear panel, cables, port bands, destinations, inspecto… → 605_WO_godot_port_device_view.md
+- 606 DONE [godot-client] Godot port: Shader Live/FX, timers, CG/lower thirds, LED test/pixel map/fixture… → 606_WO_godot_port_secondary_panels.md
+- 607 DONE [godot-client+mapping] Previs in Godot: native 3D stage with live channel textures → 607_WO_godot_previs_native_3d.md
+- 608 DONE [godot-client] Godot port: app shell, header, settings, logs, project/load/USB modals, connect… → 608_WO_godot_port_shell_settings_web_surfaces.md
+- 609 IN PROGRESS [godot-client+os-iso] Cutover: package + install the Godot operator client, then decommission the Fir… → 609_WO_godot_cutover_packaging_kiosk_decommission.md
+- 612 DONE [godot-client+lighting] Previs: import MVR scenes (e.g. from Capture) into the Godot stage → 612_WO_previs_mvr_import.md
+- 614 DONE [godot-client+mapping] Previs stage builder: standard LED walls, TVs, projection — bound to channels → 614_WO_previs_stage_builder.md
+- 617 DONE [godot-client] Previs 2D mode (default) + video surfaces only while something shows them → 617_WO_previs_2d_mode_and_surface_refcount.md
+- 620 DONE [godot-client] Rewir "·" renders blank: every " · " separator in the Godot client was a gap → 620_WO_rewir_middot_blank_glyph.md
+- 621 DONE [godot-client] Godot client: owner notes 20.10 (next.md) — Live preview chrome, look editor, l… → 621_WO_godot_owner_notes_live_looks_previs.md
+- 622 DONE [godot-client+media] Godot Sources panel: "Live" tab (live sources draggable into looks) → 622_WO_godot_sources_live_tab.md
+- 623 DONE [godot-client] Godot: owner's next.md notes (round 2) → 623_WO_godot_owner_notes_next_md_2.md
+- 624 DONE [godot-client+tracking-vr] Godot: owner's next.md notes (round 3) → 624_WO_godot_owner_notes_next_md_3.md
+- 628 DONE [godot-client] operator dock: an auto-hiding app dock at the bottom centre of the Godot client → 628_WO_operator_dock.md
+- 635 DONE [godot-client] Look editor: a rotated layer's frame/handles stay axis-aligned → 635_WO_look_editor_rotated_layer_chrome.md
+- 640 DONE [godot-client] Previs opened its own inspector column next to the shared Inspector; sections c… → 640_WO_previs_side_column_into_inspector.md
+- 641 DONE [godot-client] Previs model colours (MVR layers, GDTF fixture types); "Visualise console" rena… → 641_WO_previs_model_colours.md
+- 642 DONE [godot-client] Ctrl+Z / Ctrl+Shift+Z everywhere (the show document) → 642_WO_app_wide_undo.md
+- 643 DONE [godot-client+lighting] Re-importing the MVR reset the scene to the file's origin and showed a second s… → 643_WO_mvr_reimport_keeps_scene.md
+- 646 DONE [godot-client+os-iso] Delete the Firefox kiosk operator GUI; two clients remain (web UI, Godot GUI) → 646_WO_kiosk_decommission.md
+- 647 DONE [godot-client] Previs Layers: an eye per layer, and the 3D selection lights its layer row → 647_WO_previs_layer_eye_and_selection_highlight.md
+- 648 DONE [godot-client] Live "Standard" preview fills the width; the 16:9 canvas overflows top / bottom → 648_WO_live_preview_fills_width.md
+- 649 DONE [godot-client] Live preview: one 2D / 3D toggle; the 3D view shows the MVR model, with or with… → 649_WO_live_preview_2d_3d_toggle_mvr_model.md
+- 650 DONE [godot-client] Look editor: removing the only layer leaves it on PRV until the editor closes → 650_WO_look_editor_last_layer_remove_clears_prv.md
+- 651 DONE [godot-client] Look editor TAKE button; a ✕ on the look card above the ⚙ → 651_WO_look_editor_take_and_card_delete.md
+- 652 DONE [godot-client] Live 2D: per-layer media / playlist times under each window (Times toggle) → 652_WO_live_2d_layer_times.md
+- 653 DONE [godot-client] Look editor: a layer's box is ~1.7× wider than what Caspar shows → 653_WO_look_editor_box_matches_caspar_fit.md
+- 654 DONE [godot-client] Look editor: scroll to zoom → 654_WO_look_editor_scroll_zoom.md
+- 655 DONE [godot-client] Server-built takes letterboxed every look from a 1920×1080 canvas → 655_WO_take_canvas_fallback_1920.md
+- 656 DONE [godot-client] Look card: duplicate button → 656_WO_look_card_duplicate.md
+- 657 DONE [godot-client] Look editor: Fit (zoom) and Mirror copy → 657_WO_look_editor_fit_and_mirror_copy.md
+- 658 DONE [godot-client] Live 2D Auto layout: a PGM + PRV window per screen, fitted to the panel → 658_WO_live_2d_auto_window_layout.md
+- 659 DONE [godot-client] Live view toolbar icons: clock for Times, cube for 2D / 3D → 659_WO_live_view_toggle_icons.md
+- 661 DONE [godot-client+engine] Templates tab in groups (Templates / Lower thirds / Shaders) + ⚠ on shaders wit… → 661_WO_template_categories_shader_gpu_warning.md
+- 664 DONE [godot-client+devices-config] drop the kiosk's guiUrl from operator_gui destinations (keep autoLaunch) → 664_WO_drop_kiosk_gui_url.md
+- 668 DONE [godot-client] Live 2D toggle icon reads "2D"; Inspector title white → 668_WO_live_2d_icon_and_inspector_title.md
+- 671 DONE [godot-client] Live 2D: compose windows stop following the panel (a plain click turned Auto of… → 671_WO_live_auto_off_on_plain_click.md
+- 672 DONE [godot-client] Devices rear panel: live hanging cables (Verlet ropes) with pendulum loops → 672_WO_devices_live_cable_ropes.md
+- 673 DONE [godot-client] Live 3D: the light-beams toggle is a light bulb (lit = on, dark = off) → 673_WO_live_3d_lights_bulb_icon.md
+- 674 DONE [godot-client] Devices: Cable loops slider 0 · 1 · 2 · 4 · 8 · 16 · 32 · chaos → 674_WO_cable_loops_slider_chaos.md
+- 676 DONE [godot-client] Godot client crashes on every quit (glibc "corrupted size vs. prev_size in fast… → 676_WO_godot_client_crashes_on_quit.md
+- 677 DONE [godot-client] Previs: a layer colour shows MVR models inside out (only the inner walls, see-t… → 677_WO_layer_colour_inside_out_walls.md
+- 678 DONE [godot-client] Previs: moving heads follow their MVR layer colour, selection highlights the la… → 678_WO_heads_layer_colour_and_black_body.md
+- 679 DONE [godot-client+lighting] Previs: right-click a head, hold and move to point the light → 679_WO_right_drag_aims_head.md
+- 682 DONE [godot-client] move objects in the 3D previs (drag) and from an Inspector Position card → 682_WO_move_objects_in_previs.md
+- 685 DONE [godot-client+mapping] Previs "No screen destination" while one exists: the Godot Settings mirror went… → 685_WO_previs_destinations_stale_settings_mirror.md
+- 686 DONE [godot-client] Godot client ready for Windows / macOS / Linux (a GUI on another machine) → 686_WO_godot_client_multi_platform.md
+- 688 IN PROGRESS [godot-client] Godot client on the Mac: the layout overflows the window; "Link a server" dialo… → 688_WO_godot_mac_window_fit_and_dialog.md
+- 689 OPEN [godot-client] Godot client crashes on the owner's Mac when the Previs tab opens → 689_WO_godot_mac_previs_crash.md
+- 705 DONE [godot-client] Operator dock stays empty when the GUI starts before the server → 705_WO_dock_empty_until_server_up.md
+- 706 DONE [godot-client+lighting] MVR wall layers: empty ones say so, wall layers start hidden on import → 706_WO_mvr_wall_layers_off_by_default.md
+- 714 DONE [godot-client] Operator GUI opens fullscreen, without the title bar → 714_WO_gui_fullscreen_no_title_bar.md
+- 733 DONE [godot-client] Live deck: a line between screens; header bunny resampled to its real size → 733_WO_deck_screen_divider_header_logo_scaling.md
+- 740 DONE [godot-client+lighting] Help pages (Markdown) in a modal: PSN output per lighting desk, calibration gui… → 740_WO_help_pages_in_a_modal.md
+- 743 DONE [godot-client+caspar-build] Godot shm writer: a SubViewport published into a ring Caspar plays (WO-738 step… → 743_WO_godot_shm_writer.md
+- 750 DONE [godot-client] In Devices the top bar's connection eyes are gone (the tab was wider than the s… → 750_WO_devices_tab_wider_than_screen_eyes_hidden.md
+- 760 DONE [godot-client] Fields select their value on focus; number fields evaluate + -  / → 760_WO_numeric_fields_select_on_focus_and_math.md
+- 762 DONE [godot-client+engine] Look deck: a duplicate goes last; drag cards to reorder; a look made from a med… → 762_WO_look_deck_duplicate_last_reorder_drag_media_named_look.md
+- 763 IN PROGRESS [godot-client+media] Clicking a media file flickers the PGM/PRV preview tiles with other sources → 763_WO_media_click_flickers_pgm_prv_tiles_atlas_repack.md
+- 777 DONE [godot-client] Godot looks deck: clicking empty deck space clears the screen's PRV → 777_WO_godot_deck_blank_click_clears_prv.md
+- 783 DONE [godot-client] Look presets as a tab of the right-hand column (Inspector | Look presets) → 783_WO_look_presets_right_column_tab.md
+- 794 DONE [godot-client] Global border inspector: layout that holds at the Inspector column's width → 794_WO_global_border_inspector_scaling.md
+- 798 IN PROGRESS [godot-client] Godot client idle CPU: ~50 % of a core on the Live tab (was ~10 %) → 798_WO_godot_client_idle_cpu_regression.md
+- 806 DONE [godot-client+audio] Godot client: bring back the compact audio mixer and the compact timer control → 806_WO_bring_back_compact_audio_mixer_and_timer_control.md
+- 809 DONE [godot-client+video-io] "Add live input" modal lags after "Add live source" → 809_WO_add_live_source_modal_lag.md
+- 810 DONE [godot-client] Timeline tab: the controls sit between the timeline and the preview → 810_WO_timeline_controls_middle_row.md
+- 815 DONE [godot-client+web-client] Simulated server ("demo mode") in the Godot client + a static Web demo → 815_WO_simulated_server_demo_mode.md
+- 816 DONE [godot-client+engine] Godot look editor: drop media ON a layer exchanges its media (frame box / layer… → 816_WO_drop_media_on_layer_exchange.md
+- 817 DONE [godot-client+audio] Godot look editor: audio-only layers transparent and not pickable in the viewer… → 817_WO_audio_only_layers_list_only_in_viewer.md
+- 838 DONE [godot-client] Lockscreen (Settings) → 838_WO_lockscreen.md
+- 839 DONE [godot-client] Number fields take only numbers: gibberish reverts, never salvaged → 839_WO_number_fields_numbers_only.md
+- 843 OPEN [godot-client] Sweep: Godot client bugs → 843_WO_sweep_godot_client_bugs.md
+
+## web-client — Web client (82)
+
+- 05 DONE [web-client+video-io] Live Video Preview (go2rtc) + Settings Modal + Audio Monitoring → 05_WO_LIVE_PREVIEW_SETTINGS.md
+- 14 DONE [web-client+devices-config] Offline Preparation Mode → 14_WO_OFFLINE_PREPARATION_MODE.md
+- 21 DONE [web-client+engine] Timeline Layout (Resizable / Collapsible) + Trim Preview Frame + Clip Waveforms → 21_WO_TIMELINE_INSPECTOR_WAVEFORM.md
+- 23 DONE [web-client] HTML Webpage Source — client/ static UI → 23_WO_HTML_WEBPAGE_SOURCE.md
+- 37 DONE [web-client] Simulation Mode Placeholders (Preshow Prep) → 37_WO_SIMULATION_PLACEHOLDERS.md
+- 41 OPEN [web-client] Device View — Visual Polish and Grid Layout → 41_WO_DEVICE_VIEW_VISUAL_POLISH.md
+- 60 IN PROGRESS [web-client] CG-only looks — deck card treatment & alpha checkerboard thumbnails → 60_WO_CG_ONLY_LOOKS_DECK_VISUAL.md
+- 63 IN PROGRESS [web-client+media] Looks deck — live compose preview on deck cards (Companion parity) → 63_WO_LOOKS_DECK_LIVE_COMPOSE_PREVIEW_THUMBS.md
+- 67 DONE [web-client] Logs modal — pane toggles, categorized HighAsCG logging, support bundle export → 67_WO_LOGS_MODAL_CATEGORIES_AND_SUPPORT_BUNDLE.md
+- 79 IN PROGRESS [web-client+media] Dual-pane file browser modal + cloud upload (server browser automation) → 79_WO_DUAL_PANE_FILE_BROWSER_AND_WETRANSFER_PUSH.md
+- 82 IN PROGRESS [web-client+devices-config] Device View — simple wiring mode (rear panel) → 82_WO_DEVICE_VIEW_SIMPLE_WIRING_MODE.md
+- 85 OPEN [web-client] Device View Simple Polish & Performance → 85_WO_DEVICE_VIEW_SIMPLE_POLISH.md
+- 86 DONE [web-client+devices-config] Device View Routing Matrix → 86_WO_DEVICE_VIEW_ROUTING_MATRIX.md
+- 93 OPEN [web-client] Work Order: Timeline Enhancements → 93_WO_TIMELINE_ENHANCEMENTS.md
+- 103 DONE [web-client] Client XSS hardening — shared dom-escape + innerHTML audit → 103_WO_CLIENT_XSS_HARDENING.md
+- 104 DONE [web-client] Client correctness & performance — stateStore global, WS reconnect/timeout, red… → 104_WO_CLIENT_CORRECTNESS_PERF.md
+- 112 DONE [web-client] Split Device View files over 500 lines → 112_WO_SPLIT_DEVICE_VIEW_OVER_500.md
+- 113 DONE [web-client] Split timeline & inspector files over 500 lines → 113_WO_SPLIT_TIMELINE_AND_INSPECTOR_OVER_500.md
+- 114 DONE [web-client] Split scenes, preview & sources files over 500 lines → 114_WO_SPLIT_SCENES_PREVIEW_SOURCES_OVER_500.md
+- 115 DONE [web-client+audio] Split audio mixer files over 500 lines → 115_WO_SPLIT_AUDIO_MIXER_OVER_500.md
+- 116 DONE [web-client] Split client CSS files over 500 lines → 116_WO_SPLIT_CLIENT_CSS_OVER_500.md
+- 165 DONE [web-client] Status eyes hover: per-process usage; remove settings/logs modal backdrop dim+b… → 165_WO_STATUS_EYES_PROCESS_USAGE_AND_MODAL_BACKDROP.md
+- 171 DONE [web-client] Basic math in all GUI number inputs (e.g. crop right = 1920-256) → 171_WO_MATH_IN_ALL_NUMBER_INPUTS.md
+- 178 DONE [web-client] Super-small horizontal sliders under number inputs (borders, crop, size, positi… → 178_WO_MINI_SLIDERS_UNDER_NUMBER_INPUTS.md
+- 182 DONE [web-client] Connection-eye process CPU shows 1400%: normalize multi-core percentages → 182_WO_EYES_CPU_NORMALIZATION.md
+- 186 DONE [web-client+engine] Timer control panel: collapsible bottom-right controller with timer selector; H… → 186_WO_TIMER_CONTROL_PANEL.md
+- 187 DONE [web-client+media] Template thumbnails in the looks editor (wire the existing cg-thumb renderer; p… → 187_WO_TEMPLATE_THUMBNAILS_IN_LOOKS_EDITOR.md
+- 189 DONE [web-client+devices-config] Settings → System tab: hardware summary display → 189_WO_SETTINGS_SYSTEM_HARDWARE_DISPLAY.md
+- 192 DONE [web-client] Timer panel: live time display, duration persistence (no 5-min reset), duration… → 192_WO_TIMER_PANEL_LIVE_DISPLAY_PERSIST_PRESETS.md
+- 193 DONE [web-client+os-iso] Settings modal: system time setting (view, NTP toggle, manual set) → 193_WO_SYSTEM_TIME_SETTING.md
+- 197 DONE [web-client] Connection-eye modal: Logs and Shortcuts as minimal tabs → 197_WO_LOGS_MODAL_TABS.md
+- 200 DONE [web-client] Math inputs: CSP-safe expression evaluator (new Function is blocked; 48× consol… → 200_WO_CSP_SAFE_MATH_EVALUATOR.md
+- 202 DONE [web-client] Devices tab render performance: progressive render, client/HTTP caching, overla… → 202_WO_DEVICES_TAB_RENDER_PERFORMANCE.md
+- 205 DONE [web-client] Timer panel: true mirroring of the running timer (any initiator) + real persist… → 205_WO_TIMER_PANEL_TRUE_MIRROR_AND_PERSIST.md
+- 219 DONE [web-client+engine] Timer panel v2: unstyled (CSS never updated), no settings editor, unwired chann… → 219_WO_TIMER_PANEL_V2_POLISH_AND_BAND_GUARD.md
+- 222 DONE [web-client+devices-config] Canonical screen labels: rename once, propagates everywhere (looks selector, mu… → 222_WO_SCREEN_LABELS_EVERYWHERE.md
+- 226 DONE [web-client+engine] Timer as a per-screen overlay: icon next to screen label/FTB, full inspector (s… → 226_WO_TIMER_SCREEN_OVERLAY_UX.md
+- 240 DONE [web-client+engine] Browser-source template pick missing in the owner's actual flow; browser host c… → 240_WO_BROWSER_SOURCE_TEMPLATE_PICK_ALL_PATHS.md
+- 250 DONE [web-client+mapping] Bank-aware playback timers (web UI "gibberish") + multiview progress bars resto… → 250_WO_TIMER_BANK_AWARE_AND_MV_BARS.md
+- 257 DONE [web-client+engine] Remove the CEF interactive subsystem entirely → 257_WO_REMOVE_CEF_INTERACTIVE.md
+- 260 IN PROGRESS [web-client+video-io] Browser source v2: client UI (add form, source rows, Interact button) → 260_WO_BROWSER_SOURCE_CLIENT_UI.md
+- 265 DONE [web-client] CG Studio on the playout box: workspace tab in the operator GUI → 265_WO_CG_STUDIO_TAB_ON_OPERATOR_GUI.md
+- 267 DONE [web-client] CG Studio: dead Play button, canvas placement, drag-to-position editing → 267_WO_CG_STUDIO_CANVAS_PLAY_DRAG.md
+- 270 DONE [web-client+devices-config] Settings modal: screen labels + streaming channel move to the Devices tab → 270_WO_SETTINGS_MODAL_DEVICES_ONLY_SECTIONS.md
+- 278 DONE [web-client] Cable render performance; re-grab a cable end and reconnect it → 278_WO_CABLE_RENDER_AND_REGRAB.md
+- 285 DONE [web-client] CG studio should reuse the existing inspector; box size options missing → 285_WO_CG_STUDIO_INSPECTOR_REUSE.md
+- 286 DONE [web-client] Inverted two-finger scroll for laptop touchpads → 286_WO_TOUCHPAD_INVERTED_SCROLL.md
+- 287 DONE [web-client] No modal may blur the background → 287_WO_NO_MODAL_BACKDROP_BLUR.md
+- 289 DONE [web-client] Looks editor canvas needs a visible alpha-checkerboard background → 289_WO_LOOKS_EDITOR_CHECKERBOARD_CANVAS.md
+- 313 DONE [web-client] rAF-throttle the cable overlay resize handler (small) → 313_WO_CABLE_OVERLAY_RESIZE_THROTTLE.md
+- 321 DONE [web-client] CG studio export drops everything except colors; own inspector shrinks the canv… → 321_WO_CG_STUDIO_EXPORT_DROPS_NONCOLOR_AND_CANVAS_SIZE.md
+- 329 DONE [web-client+engine] Project loading/saving robustness + two clients editing the same project → 329_WO_PROJECT_SAVE_LOAD_AND_TWO_CLIENTS.md
+- 338 DONE [web-client+mapping] operator GUI edit-latency hardening (web UI ↔ Caspar ↔ punch holes) → 338_WO_OPERATOR_EDIT_LATENCY_HARDENING.md
+- 341 DONE [web-client+network] client sync redesign: server state is the truth, only user interaction writes → 341_WO_CLIENT_SYNC_SERVER_TRUTH.md
+- 342 DONE [web-client] clicking the screen deck header's empty space clears that screen's PRV → 342_WO_DECK_HEADER_CLICK_CLEARS_PRV.md
+- 350 DONE [web-client] UI polish (bars/heights) + timeless duration in the Playlists compact → 350_WO_ui_polish_and_playlist_timeless_compact.md
+- 353 DONE [web-client] Playlist item rows: minimalism + every trashcan becomes ✕ → 353_WO_playlist_rows_minimal_trashcans_x.md
+- 363 DONE [web-client+devices-config] Factory reset lands on JPEG-stream compose preview (todos28.07.26 §2) → 363_WO_factory_reset_compose_preview_default.md
+- 369 DONE [web-client] Checklist27 UI notes: drop the "Back to GUI" button, retune the wall clock → 369_WO_checklist27_ui_notes_batch.md
+- 383 DONE [web-client+testing-ci] Devices page rendered a TypeError instead of its contents (my regression), + a… → 383_WO_device_view_tdz_crash_and_gate.md
+- 408 DONE [web-client] todos03.08 UI batch: live-input label bar color, capture-button unification, te… → 408_WO_TODOS0308_COMPOSE_UI_BATCH.md
+- 411 DONE [web-client+video-io] Test pattern: resolution repeated in the Output line + bouncing-character bump… → 411_WO_TEST_PATTERN_OUTPUT_LINE_AND_BUMP_BOX.md
+- 419 DONE [web-client+media] Review 2026-08-03 "fix first" rows 6, 7, 10: autosave latches, dead USB-import… → 419_WO_review0308_fix_first_rows_6_7_10.md
+- 435 DONE [web-client+devices-config] Devices tab: remove redundant Refresh / Save snapshot / Load snapshot buttons → 435_WO_devices_tab_redundant_buttons.md
+- 441 DONE [web-client] GPU inspector: "Native mode" wraps mid-word; custom W/H/FPS boxes overflow the… → 441_WO_gpu_inspector_native_mode_wrap_and_input_fit.md
+- 442 DONE [web-client+devices-config] Custom W/H boxes showed seeded 1920/1080 fossils beside a 2160p mode → 442_WO_custom_dims_fossil_keys.md
+- 478 DONE [web-client+devices-config] /479/480 — device view: stale after Add, cables ignore the inspector, DeckLink… → 478_WO_DEVICE_VIEW_FOUR_UI_DEFECTS.md
+- 490 DONE [web-client+mapping] Removing a screen destination leaves it on screen until the next add → 490_WO_REMOVED_DESTINATION_STAYS_UNTIL_NEXT_ADD.md
+- 497 DONE [web-client+network] Measured causes of "the whole thing feels slugish as hell" → 497_WO_UI_LOAD_AND_PROBE_CACHE.md
+- 506 IN PROGRESS [web-client+engine] Operator-editable labels for ANY live source, on every label bar → 506_WO_CUSTOM_LABELS_FOR_ANY_LIVE_SOURCE.md
+- 518 IN PROGRESS [web-client+engine] todos13 batch: drag highlight, looks↔timeline transitions, AMCP drag flood, cli… → 518_WO_TODOS13_LOOKS_TIMELINE_BATCH.md
+- 529 DONE [web-client+engine] Switching between the looks editor and the timeline editor resets the compose p… → 529_WO_COMPOSE_PREVIEW_RESETS_ON_EDITOR_SWITCH.md
+- 530 DONE [web-client+video-io] Compose preview holds one editor's arrangement, and DeckLink labels are doubled… → 530_WO_COMPOSE_SURFACES_AND_SOURCE_LABELS.md
+- 533 DONE [web-client] "Reset layout" in one editor blanked the other editor's compose preview → 533_WO_RESET_LAYOUT_BLANKS_THE_OTHER_EDITOR.md
+- 534 DONE [web-client+video-io] A renamed DeckLink input reverted to its old name in both inspectors → 534_WO_SOURCE_LABEL_REVERTS_IN_INSPECTORS.md
+- 542 DONE [web-client+companion] Flag jump-time fields showed raw ms; the jump-to-flag dropdown showed "label @… → 542_WO_FLAG_TIMECODE_AND_JUMP_LABEL_FORMAT.md
+- 563 IN PROGRESS [web-client+engine] LOOK DECK REORDER DND → 563_WO_LOOK_DECK_REORDER_DND.md
+- 570 DONE [web-client+media] look layer media transport trim → 570_WO_look_layer_media_transport_trim.md
+- 611 DONE [web-client] Web client defects found during the Godot port inventory → 611_WO_web_client_bugs_found_in_godot_inventory.md
+- 826 DONE [web-client] Web client (Pages demo): arrows, ▸ ▾, ✓ ✕, ⚠ … render as boxes → 826_WO_web_client_symbol_glyphs_render_as_boxes.md
+- 827 DONE [web-client] Web client: Looks deck says "No looks" after a server import (+ six ReferenceEr… → 827_WO_web_looks_deck_empty_after_import.md
+- 844 DONE [web-client] Sweep: web client bugs → 844_WO_sweep_web_client_bugs.md
+
+## companion — Companion integration (22)
+
+- 01 DONE [companion] Analyze Companion Module (companion-module-casparcg-server) → 01_WO_ANALYZE_MODULE.md
+- 24 DONE [companion] Companion Button Press from Timeline → 24_WO_COMPANION_BUTTON_PRESS.md
+- 70 DONE [companion+network] Companion hot-backup status API → 70_WO_COMPANION_HOT_BACKUP_STATUS_API.md
+- 72 IN PROGRESS [companion] Companion compose preview — label polish, seam-safe quadrant badges, config gat… → 72_WO_COMPANION_COMPOSE_PREVIEW_LAYOUT_AND_POLISH.md
+- 75 IN PROGRESS [companion+engine] Timeline Companion button preview keyframes (Satellite subscribe + HTTP press) → 75_WO_TIMELINE_COMPANION_BUTTON_PREVIEW.md
+- 170 DONE [companion] Companion module API parity: streaming-channel/RTMP/record coverage, multiview… → 170_WO_COMPANION_MODULE_API_PARITY.md
+- 216 DONE [companion] Companion module: stored Wake-on-LAN target (mac/hostname/ip) + fire action → 216_WO_COMPANION_WAKE_ON_LAN.md
+- 330 IN PROGRESS [companion] Companion module: finish, verify on-box, and ship → 330_WO_COMPANION_MODULE_FINISH_AND_SHIP.md
+- 361 IN PROGRESS [companion] Companion module: dev-mode workflow → 361_WO_companion_module_dev_mode.md
+- 372 IN PROGRESS [companion] Companion offers no "dev" module to choose: the dev build and the installed bui… → 372_WO_companion_dev_module_not_selectable.md
+- 384 DONE [companion] Companion: config would not save, preset captions/bus wrong, no timer buttons → 384_WO_companion_config_save_preset_labels_timer_presets.md
+- 386 DONE [companion] Companion timers: no placeholder slots, everything dynamic → 386_WO_companion_timers_fully_dynamic.md
+- 394 DONE [companion] Companion module is a HighAsCG module: drop direct-AMCP surface → 394_WO_COMPANION_HIGHASCG_ONLY_MODULE.md
+- 395 DONE [companion+video-io] Companion: start/stop the CONFIGURED stream/record outputs, with feedbacks + pr… → 395_WO_COMPANION_CONFIGURED_OUTPUT_ACTIONS.md
+- 450 DONE [companion+web-client] Companion status tells the truth; button picker works without previews → 450_WO_companion_status_truth_and_picker.md
+- 535 DONE [companion+engine] The playhead never pressed a Companion button; the flag inspector showed a stal… → 535_WO_COMPANION_PLAYHEAD_PRESS_AND_STALE_PREVIEW.md
+- 543 IN PROGRESS [companion] A companion_press flag's HTTP fallback could fail silently; the crossing itself… → 543_WO_COMPANION_PRESS_FLAG_SILENT_HTTP_FAILURE.md
+- 547 DONE [companion+engine] The playhead's Companion press used a Satellite command that was never real → 547_WO_COMPANION_PRESS_SATELLITE_WAS_WRONG_PROTOCOL.md
+- 585 IN PROGRESS [companion+engine] Global border control from Companion (server endpoint + sceneId-take border fix) → 585_WO_companion_global_border_control.md
+- 734 DONE [companion+web-client] Show timers on the served pages: presentation (OSCPoint via Companion), video i… → 734_WO_show_timers_served_pages.md
+- 791 DONE [companion] Companion: recall look presets to PRV, to PGM, or to PGM with auto take → 791_WO_companion_look_preset_recall.md
+- 803 DONE [companion] Companion: screen's main layer with remaining time and progress bar (display on… → 803_WO_companion_main_layer_progress_feedback.md
+
+## devices-config — Devices tab, settings, config generation (51)
+
+- 33 IN PROGRESS [devices-config+web-client] Device view (program): index & dependency order → 33_WO_DEVICE_VIEW_INDEX.md
+- 33a OPEN [devices-config+web-client] Device view: data model, persistence, and HTTP API → 33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md
+- 33b OPEN [devices-config+web-client] Device view: host & Caspar enumeration (GPU, DeckLink, audio) → 33b_WO_DEVICE_VIEW_HOST_ENUMERATION.md
+- 33c OPEN [devices-config+web-client] Device view: Caspar host backplane (SVG) + entry point + inspector shell → 33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md
+- 33d OPEN [devices-config+web-client] Device view: PixelHue device card, cabling, and layer bind → 33d_WO_DEVICE_VIEW_PIXELHUE_CABLING.md
+- 33e OPEN [devices-config] Device view: EDID / timing match, warn, suggest, and apply flow → 33e_WO_DEVICE_VIEW_EDID_MATCH_AND_APPLY.md
+- 33f OPEN [devices-config+web-client] Device view: settings migration, deep links, and deprecation → 33f_WO_DEVICE_VIEW_SETTINGS_MIGRATION.md
+- 33g OPEN [devices-config+web-client] Device view: QA, documentation, and accessibility → 33g_WO_DEVICE_VIEW_QA_DOCS_ACCESSIBILITY.md
+- 35 IN PROGRESS [devices-config+mapping] GPU physical connector stability and deterministic mapping → 35_WO_GPU_PHYSICAL_CONNECTOR_STABILITY.md
+- 36 DONE [devices-config+audio] Device View — PortAudio pipeline, DeckLink detection, and channel enumeration f… → 36_WO_DEVICE_VIEW_PORTAUDIO_DECKLINK_CHANNEL_FIX.md
+- 39 DONE [devices-config+os-iso] Settings — “system” (NVIDIA) and “decklink” tabs → 39_WO_SETTINGS_SYSTEM_HARDWARE.md
+- 49 DONE [devices-config] Device-wide snapshot (machine profile) — JSON bundle + rear-panel image → 49_WO_DEVICE_WIDE_SNAPSHOT_AND_MACHINE_PROFILE.md
+- 59 IN PROGRESS [devices-config+web-client] Device View — server inspector redo (project frame rate + network) → 59_WO_DEVICE_VIEW_SERVER_INSPECTOR_FPS_NETWORK.md
+- 107 DONE [devices-config+mapping] GPU output EDID pipeline + inspector visibility → 107_WO_GPU_EDID_PIPELINE_AND_INSPECTOR_VISIBILITY.md
+- 108 DONE [devices-config] GPU ports layout — single source of truth → 108_WO_GPU_PORTS_LAYOUT_SINGLE_SOURCE_OF_TRUTH.md
+- 161 IN PROGRESS [devices-config+caspar-build] Config lifecycle hardening: atomic XML writes, stale root config, backup rotati… → 161_WO_CONFIG_LIFECYCLE_ATOMIC_WRITES_STALE_FILES_BACKUPS.md
+- 162 DONE [devices-config+media] Media-scanner config: restore root scanner.config, guard it from eggs factory-r… → 162_WO_SCANNER_CONFIG_RESTORE_AND_EGGS_RESET_GUARD.md
+- 244 DONE [devices-config+video-io] Settings save must not wipe stored stream credentials (preserve-on-empty + mask… → 244_WO_STREAM_SECRET_PRESERVE_ON_SAVE.md
+- 246 DONE [devices-config+web-client] Auto-select operator monitor: single connected display wins, multiple wait for… → 246_WO_OPERATOR_MONITOR_AUTO_SELECT.md
+- 261 DONE [devices-config+video-io] Stream credentials live in the PROJECT and only there → 261_WO_PROJECT_SCOPED_STREAM_CREDENTIALS.md
+- 277 DONE [devices-config+web-client] Loading a project doesn't actually load anything → 277_WO_PROJECT_LOAD_DOES_NOTHING.md
+- 309 DONE [devices-config+video-io] Device View hardware probes must stop blocking the event loop → 309_WO_ASYNC_DEVICE_VIEW_PROBES.md
+- 421 DONE [devices-config+audio] Config durability (review rows 8–9, de-scoped per owner) + monitor-bus fps fall… → 421_WO_config_durability_and_monitor_fps_fallback.md
+- 439 DONE [devices-config+mapping] "NVIDIA sync to display" tick silently dropped on a mapping-node-only rig → 439_WO_nvidia_sync_tick_dropped_on_mapping_rig.md
+- 440 DONE [devices-config+caspar-build] Apply button ALWAYS restarts Caspar (unchanged-gate blocked env-only changes) → 440_WO_apply_button_always_restarts_caspar.md
+- 444 DONE [devices-config+os-iso] caspar-env sourced once at supervisor start; Apply-time changes never reached C… → 444_WO_caspar_env_sourced_per_launch.md
+- 447 DONE [devices-config+engine] Screen-consumer vsync defaults OFF (GL sync owns frame pacing) → 447_WO_vsync_default_off_screen_consumers.md
+- 451 DONE [devices-config+web-client] GPU layout editor: one-step drag works; mismatch banner only on real wiring cha… → 451_WO_gpu_layout_reorder_and_mismatch_banner.md
+- 473 DONE [devices-config+audio] a fresh box still comes up with two audio outputs and a record output → 473_WO_FRESH_BOX_STILL_SHIPS_OUTPUTS_AUDIO_AND_REC.md
+- 474 DONE [devices-config+web-client] a New project opens a clean device view: no audio, stream, record or virtual-ca… → 474_WO_NEW_PROJECT_CLEAN_DEVICE_VIEW.md
+- 483 DONE [devices-config+os-iso] PGM2's screen consumer is placed by Openbox, not by its config → 483_WO_SCREEN_CONSUMER_PLACED_BY_OPENBOX_NOT_CONFIG.md
+- 484 DONE [devices-config+video-io] a custom screen registers a <video-mode> that CasparCG already ships → 484_WO_DUPLICATE_STANDARD_VIDEO_MODE_REGISTERED.md
+- 491 DONE [devices-config+video-io] Deleting a destination leaves its DeckLink bound, and the next destination inhe… → 491_WO_REMOVE_DESTINATION_LEAVES_DECKLINK_BOUND.md
+- 495 DONE [devices-config] Hygiene: delete the dead build-caspar-config- generator twins → 495_WO_HYGIENE_DEAD_GENERATOR_TWINS.md
+- 496 DONE [devices-config] Apply Caspar config must emit what is actually cabled → 496_WO_APPLY_READS_ACTUAL_CABLING.md
+- 509 DONE [devices-config+video-io] Generator regression: the tiled-screen carve-out caused BOTH reported faults → 509_WO_TILED_SCREEN_CARVEOUT_BROKE_THE_GENERATOR.md
+- 515 DONE [devices-config] Apply now warns on impossible layouts; and where the long restart actually goes → 515_WO_APPLY_LAYOUT_GUARD_AND_RESTART_COST.md
+- 564 IN PROGRESS [devices-config+mapping] PHANTOM SCREEN STEALS OPERATOR X POSITION → 564_WO_PHANTOM_SCREEN_STEALS_OPERATOR_X_POSITION.md
+- 568 DONE [devices-config+os-iso] operator monitor no cursor autohide → 568_WO_operator_monitor_no_cursor_autohide.md
+- 573 IN PROGRESS [devices-config+mapping] DP-2 (Main/LED wall) ignores configured 5760x1728@50, stays at EDID 1080p60 → 573_WO_DP2_STUCK_1080P60_MAINSCREENINDEX_SWAP.md
+- 579 DONE [devices-config+engine] new project resets gpu port layout → 579_WO_new_project_resets_gpu_port_layout.md
+- 619 DONE [devices-config+godot-client] Settings → Defaults never persisted (editor defaults reverted on every save) → 619_WO_settings_editor_defaults_never_persisted.md
+- 639 DONE [devices-config+godot-client] Picking "Custom" for a screen destination's video mode jumps straight back → 639_WO_custom_video_mode_snaps_back.md
+- 717 DONE [devices-config+caspar-build] Screen-consumer policy enforced on every Caspar launch, whoever wrote the config → 717_WO_screen_consumer_policy_enforced_on_every_launch.md
+- 718 IN PROGRESS [devices-config] A New project comes up with the operator monitor cabled in Devices → 718_WO_new_project_keeps_operator_monitor_cable.md
+- 722 DONE [devices-config+os-iso] Pointer confine is lost after a New project and never comes back → 722_WO_pointer_confine_lost_after_new_project.md
+- 747 DONE [devices-config+amcp] The first settings save after every boot reloads every subsystem (AMCP reconnec… → 747_WO_first_save_after_boot_recycles_everything.md
+- 805 DONE [devices-config] Devices tab "Apply Caspar config (restart)" is too slow: where the time goes → 805_WO_devices_apply_button_latency.md
+- 821 DONE [devices-config] Autosave stamps this box's hardware config into a project loaded without its ha… → 821_WO_autosave_stamps_box_hardware_into_project.md
+- 823 DONE [devices-config+godot-client] Godot "Load from file" stamps this box's rig over the file's own hardwareConfig → 823_WO_godot_load_from_file_keeps_file_rig.md
+- 824 DONE [devices-config] Opening a show file trashes the project that was open → 824_WO_import_keeps_open_project.md
+
+## os-iso — ISO, sticks, kernel, NVIDIA, boot (71)
+
+- 12 DONE [os-iso] Production Installer (install.sh) → 12_WO_PRODUCTION_INSTALLER.md
+- 47 IN PROGRESS [os-iso+media] exFAT data volume, fixed mount, and mtime-priority boot sync → 47_WO_EXFAT_DATA_MOUNT_AND_MTIME_BOOT_SYNC.md
+- 50 IN PROGRESS [os-iso] Windows & macOS desktop executables — run HighAsCG from exFAT in simulation mode → 50_WO_WINDOWS_MAC_EXFAT_SIMULATION_LAUNCHERS.md
+- 52 IN PROGRESS [os-iso+media] Bridge disk partition (media + configs) vs USB stick (ingest + configs) → 52_WO_BRIDGE_DISK_PARTITION_AND_USB_SYNC.md
+- 66 IN PROGRESS [os-iso+network] Robust boot drop-update/, build stamp, GitHub release check, Web UI update → 66_WO_BOOT_DROP_UPDATE_VERSION_AND_WEBUI_UPDATE.md
+- 69 OPEN [os-iso] Clean-slate full reset (internal wipe, preserve bridge + exFAT) → 69_WO_CLEAN_SLATE_FULL_RESET.md
+- 73 DONE [os-iso] Calamares on ISO, systemd Caspar stack, Nuclear install + Caspar control → 73_WO_CALAMARES_SYSTEMD_CASPAR_NUCLEAR.md
+- 87 DONE [os-iso] Operator monitor pointer confine (Caspar-safe) → 87_WO_OPERATOR_POINTER_CONFINE.md
+- 90 IN PROGRESS [os-iso] ISO third-party licenses folder → 90_WO_ISO_THIRD_PARTY_LICENSES_FOLDER.md
+- 92 IN PROGRESS [os-iso+video-io] DeckLink Desktop Video — exFAT vendor drop + boot/API install (no BMD in ISO) → 92_WO_DECKLINK_EXFAT_VENDOR_INSTALL.md
+- 142 IN PROGRESS [os-iso+process] System dependency audit (user-paste workflow) → 142_WO_SYSTEM_DEPENDENCY_AUDIT.md
+- 148 DONE [os-iso] Boot branding hardening (produce-path gate + Calamares slideshow) → 148_WO_BOOT_BRANDING_HARDENING.md
+- 168 DONE [os-iso] Eggs excludes cleanup + factory defaults: stop shipping device identity, trash,… → 168_WO_EGGS_EXCLUDES_CLEANUP_AND_FACTORY_DEFAULTS.md
+- 188 DONE [os-iso] Auto-update systems: close the four gaps (dist-web exclude, DeckLink API/UI/tar… → 188_WO_UPDATE_SYSTEM_GAPS_DISTWEB_DECKLINK.md
+- 308 DONE [os-iso+devices-config] Split "operator monitor" from "confine pointer to it" → 308_WO_SPLIT_OPERATOR_MONITOR_FROM_POINTER_CONFINE.md
+- 314 IN PROGRESS [os-iso] Laptop: NVIDIA PRIME selection for casparcg-server.service (post-driver) → 314_WO_LAPTOP_NVIDIA_PRIME_SERVICE_ENV.md
+- 315 DONE [os-iso+mapping] VERY IMPORTANT: nodm restart on desktop-canvas growth stopped firing → 315_WO_NODM_RESTART_ON_CANVAS_GROWTH_REGRESSION.md
+- 332 DONE [os-iso] Power button functions → 332_WO_POWER_BUTTON_FUNCTIONS.md
+- 351 DONE [os-iso+devices-config] Boot monitor picker: calm colors + pick lands as a devices-tab cable → 351_WO_monitor_picker_calm_colors_and_graph_cable.md
+- 391 DONE [os-iso] Intermittent mouse lag on the box → 391_WO_MOUSE_LAG_POINTER_CONFINE_WARP_WATCHDOG.md
+- 397 DONE [os-iso] Mouse lag ROOT-CAUSED: the 8 s pointer-confine watchdog freezes X ~370 ms per t… → 397_WO_MOUSE_LAG_8S_XRANDR_FREEZE.md
+- 398 DONE [os-iso+process] run.sh hang-detector forks ss+grep+sleep every second, forever → 398_WO_RUNSH_1HZ_FORK_LOOP.md
+- 400 DONE [os-iso+process] run.sh / supervisor-lib review: ~40 % of the lib is dead, the give-up path neve… → 400_WO_RUNSH_SUPERVISOR_REVIEW.md
+- 407 DONE [os-iso+engine] Screen-consumer micro-stutter while the same channel is smooth in the operator… → 407_WO_SCREEN_CONSUMER_MICRO_STUTTER.md
+- 412 DONE [os-iso+mapping] "NVIDIA sync to display" tick drives caspar GL sync too; operator-GUI cable imp… → 412_WO_SYNC_TICK_DRIVES_CASPAR_AND_OPGUI_CABLE_IMPLIES_MONITOR.md
+- 413 DONE [os-iso+media] USB drives auto-mount on plug-in (todos03.08.26 addition) → 413_WO_USB_AUTOMOUNT.md
+- 415 DONE [os-iso+process] Live box config wiped to defaults during the 12:54 stick-insert stack restart → 415_WO_usb_stick_insert_clobbers_live_config.md
+- 416 DONE [os-iso] build-produce-flash-stick.sh fails at exFAT partitioning: WO-413 USB auto-mount… → 416_WO_usb_automount_fights_flash_script_partitioning.md
+- 417 IN PROGRESS [os-iso] Calamares "failed to install boot loader" on target machine (03.08 ISO); sessio… → 417_WO_calamares_bootloader_install_failed.md
+- 423 DONE [os-iso] Settings → "Install to disk" stops CasparCG + HighAsCG so only the installer is… → 423_WO_calamares_launch_stops_stack.md
+- 424 DONE [os-iso+network] GUI update-from-GitHub for installed boxes: the shipped flow was dead end-to-en… → 424_WO_gui_update_flow_unbricked.md
+- 429 DONE [os-iso] Produced ISOs must ship no credentials and no vendor driver packages → 429_WO_eggs_excludes_credentials_vendor.md
+- 430 DONE [os-iso+video-io] "Driver-free" ISOs ship the DeckLink kernel module (merged-usr exclude miss) → 430_WO_decklink_kernel_module_ships_merged_usr.md
+- 431 DONE [os-iso+video-io] GUI DeckLink Install says "already installed" on fresh clones (phantom dpkg ent… → 431_WO_decklink_install_phantom_dpkg_already_installed.md
+- 432 DONE [os-iso+web-client] Remove Settings→USB video tab; produce writes BUILD_STAMP; produce restores nod… → 432_WO_usb_video_tab_removed_produce_build_stamp_restore.md
+- 433 DONE [os-iso+video-io] DeckLink install fails on clones (usr/src stripped, phantom headers); scan ~/Do… → 433_WO_decklink_install_headers_phantom_downloads_scan.md
+- 434 DONE [os-iso] Stop seeding drop-update/ on embed-server sticks → 434_WO_no_drop_update_seed_on_embed_server_sticks.md
+- 455 DONE [os-iso] GUI update on installed systems: EACCES mkdir /var/cache/highascg/updates → 455_WO_gui_update_eacces_var_cache.md
+- 456 DONE [os-iso] Starter-layout zips: exFAT refresh to canonical tree + first bridge (HIGHASCGDA… → 456_WO_starter_zip_refresh_bridge_zip.md
+- 458 IN PROGRESS [os-iso] Ventoy stick: exFAT data volume never mounts (~/exfat absent, EBUSY on the raw… → 458_WO_ventoy_stick_exfat_never_mounts.md
+- 459 IN PROGRESS [os-iso] Calamares installer slideshow still said "Broadcast graphics playout" → 459_WO_installer_slideshow_says_broadcast.md
+- 460 IN PROGRESS [os-iso+web-client] "Shut down host" button in Settings → Danger zone → 460_WO_shutdown_host_button.md
+- 461 IN PROGRESS [os-iso] Branded GRUB menu: the selected entry is invisible → 461_WO_grub_selected_entry_invisible.md
+- 462 IN PROGRESS [os-iso] New ISO won't boot from Ventoy: "invalid magic number / you need to load the ke… → 462_WO_ventoy_iso_invalid_magic_number.md
+- 463 IN PROGRESS [os-iso+media] USB auto-mount retries the Ventoy boot partition forever (EBUSY loop) → 463_WO_automount_loops_on_ventoy_partition.md
+- 464 IN PROGRESS [os-iso] build-highascg-egg.sh spends ~5 minutes before refusing a second produce → 464_WO_liveroot_guard_fires_after_five_minutes_of_work.md
+- 465 DONE [os-iso] build-highascg-egg.sh leaves the build host without its dev dependencies → 465_WO_build_restores_dev_deps.md
+- 466 DONE [os-iso+process] Stick documentation moved to Ventoy + a reserved exFAT partition at the end → 466_WO_stick_docs_ventoy_three_partition.md
+- 468 IN PROGRESS [os-iso+devices-config] New box: "(no Ethernet found)" and operator GUI duplicated onto the PGM2 monitor → 468_WO_NEW_BOX_NIC_NAME_AND_GUI_PGM2_OVERLAP.md
+- 471 DONE [os-iso+video-io] Every produce stamps the ISO; boot stops waiting on absent hardware → 471_WO_PRODUCE_STAMP_AND_BOOT_TIME_TO_PLAYOUT.md
+- 475 DONE [os-iso] Calamares install fails while the bridge partition is mounted → 475_WO_CALAMARES_INSTALL_FAILS_WITH_BRIDGE_MOUNTED.md
+- 499 DONE [os-iso] A failed Web-UI update left the playout box down → 499_WO_GUI_UPDATE_LEAVES_BOX_DOWN.md
+- 501 DONE [os-iso] The Web-UI update killed itself: the helper runs inside the cgroup it stops → 501_WO_GUI_UPDATE_KILLED_BY_ITS_OWN_SERVICE_STOP.md
+- 512 DONE [os-iso] Unanchored rsync excludes silently skipped src/config/ and took the box down → 512_WO_UNANCHORED_RSYNC_EXCLUDES_SKIP_SOURCE.md
+- 638 DONE [os-iso+devices-config] On every boot: choose which screen is the operator's, the rest become destinati… → 638_WO_boot_monitor_assignment.md
+- 645 DONE [os-iso+godot-client] Start-up: boot to the desktop with "Start operator here / Run headless"; autost… → 645_WO_startup_launcher_autostart_opt_in.md
+- 669 DONE [os-iso] ISO exclude review: the Godot GUI binary was excluded; credentials and dev left… → 669_WO_iso_exclude_review_godot_ships.md
+- 684 DONE [os-iso+godot-client] Kiosk GUI deprecated for good: factory reset / New project / ISO seed the Godot… → 684_WO_kiosk_output_deprecated_factory_shm.md
+- 687 DONE [os-iso+process] Release: server tarball + Godot clients; stop shipping the box's secrets in pub… → 687_WO_release_server_and_godot_clients_no_secrets.md
+- 696 DONE [os-iso+network] 22.10 ISO test boot on a second machine (192.168.0.64): host's project, Caspar… → 696_WO_iso_test_boot_192_168_0_64.md
+- 697 DONE [os-iso] a HighAsCG stick syncs automatically only with the box that booted from it; oth… → 697_WO_stick_sync_only_when_booted_from_it.md
+- 702 DONE [os-iso] ISO live-boot defects seen on .64 (22.10 build) → 702_WO_iso_live_boot_defects_64.md
+- 704 DONE [os-iso+video-io] DeckLink DKMS: build once per kernel, not every live boot → 704_WO_decklink_dkms_cache_per_kernel.md
+- 721 DONE [os-iso] "Install to disk" greyed out on the live ISO; Calamares' bridge release was a n… → 721_WO_install_to_disk_greyed_on_live_iso.md
+- 730 DONE [os-iso+testing-ci] Post-update sweep: one command (and an automatic run) that checks the whole box… → 730_WO_post_update_sweep.md
+- 748 DONE [os-iso+godot-client] Updates pane says "Phase: ?" after an update that succeeded (follow-up of WO-73… → 748_WO_updates_pane_phase_unknown_after_fast_restart.md
+- 749 DONE [os-iso] Releases did not ship the post-update sweep: .4 ran a stale copy after every up… → 749_WO_release_ships_post_update_sweep.md
+- 832 IN PROGRESS [os-iso] Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names → 832_WO_post_26_04_update_remnants_iso_build.md
+- 848 OPEN [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
+- 855 DONE [os-iso] Work order: Remove persistence partition workflow (exfat-only) → 855_WO_remove_persistence_partition_workflow_exfat_only.md
+- 856 DONE [os-iso] Work order: Single NVIDIA driver per live ISO (no multi-driver pool) → 856_WO_single_nvidia_driver_per_iso.md
+
+## network — Cluster, replication, Tailscale, auth (39)
+
+- 13 DONE [network+companion] Final Polish & Security Hardening → 13_WO_FINAL_POLISH_AND_HARDENING.md
+- 15 DONE [network+web-client] Client-Server Preshow Sync & Split Architecture → 15_WO_CLIENT_SERVER_SYNC.md
+- 54 IN PROGRESS [network] Hot backup — leader/follower playout replication → 54_WO_HOT_BACKUP_LEADER_FOLLOWER_REPLICATION.md
+- 61 IN PROGRESS [network] Rsync peer sync + Tailscale / Syncthing settings → 61_WO_RSYNC_PEER_SYNC_AND_NETWORK_SETTINGS.md
+- 64 IN PROGRESS [network] Hot backup extended — AMCP fan-out mirror (WO-54 Phase 3 replacement) → 64_WO_HOT_BACKUP_AMCP_FANOUT.md
+- 65 IN PROGRESS [network] Hot backup expanded² — playhead sync, robustness & failover (WO-64 follow-on) → 65_WO_HOT_BACKUP_ROBUSTNESS_FAILOVER_PLAYHEAD_SYNC.md
+- 68 IN PROGRESS [network] Hot backup connection status, refresh, and channel parity (inspector) → 68_WO_HOT_BACKUP_CONNECTION_STATUS_AND_CHANNEL_PARITY.md
+- 78 IN PROGRESS [network] Replication trust, rsync-only SSH, and hardware hostname → 78_WO_REPLICATION_TRUST_HOSTNAME_AND_RSYNC_SSH.md
+- 79 IN PROGRESS [network] Leader autosave → follower live show sync → 79_WO_LEADER_AUTOSAVE_LIVE_REPLICATION.md
+- 91 IN PROGRESS [network] Tailscale — Settings modal control + operator-monitor login → 91_WO_TAILSCALE_SETTINGS_AND_OPERATOR_UI.md
+- 94 OPEN [network] Ethernet link-local fallback when DHCP is absent → 94_WO_ETHERNET_LINK_LOCAL_FALLBACK.md
+- 95 IN PROGRESS [network+os-iso] exFAT operator network config file (DHCP / static IP) → 95_WO_EXFAT_NETWORK_CONFIG_FILE.md
+- 96 DONE [network] API + WebSocket authentication, loopback bind, CORS/origin lockdown → 96_WO_API_WS_AUTHENTICATION.md
+- 97 DONE [network] Injection hardening — Zip-Slip, sudo wildcards, xrandr shell strings → 97_WO_INJECTION_HARDENING.md
+- 102 DONE [network] HTTP/WS robustness — body size limits, WS maxPayload, broadcast backpressure → 102_WO_HTTP_WS_ROBUSTNESS.md
+- 147 DONE [network] Hot-backup robustness (single-box hardening + two-box QA runbook) → 147_WO_HOT_BACKUP_ROBUSTNESS.md
+- 194 DONE [network+os-iso] Hostname-from-MAC on USB boot: wrapper dies on read-only /var/log before applyi… → 194_WO_HOSTNAME_FROM_MAC_USB_BOOT_FIX.md
+- 402 IN PROGRESS [network+media] mp4 upload fails: nginx port-80 proxy 413s files > 512 MB (HTML error page) → 402_WO_NGINX_413_UPLOAD_LIMIT.md
+- 498 DONE [network] Remove nginx; gzip in the Node server instead → 498_WO_REMOVE_NGINX_AND_GZIP_IN_NODE.md
+- 670 IN PROGRESS [network] Server network in the Devices view (backup / extension) + Godot GUI on another… → 670_WO_server_network_and_remote_godot.md
+- 692 DONE [network] Network: every NIC (also down ones) from Devices, a Settings → Network tab, Wi-… → 692_WO_network_all_nics_wifi_settings_tab.md
+- 712 IN PROGRESS [network+tracking-vr] Server duties: a tracking box and a media box that exchange, react and impose → 712_WO_server_duties_tracking_media.md
+- 723 DONE [network] Server duties come from config; "which server sends" is a choice only where it… → 723_WO_duties_from_config_sender_choice.md
+- 724 DONE [network+testing-ci] Two real servers: interoperability and performance, together and one by one → 724_WO_two_box_interop_and_performance.md
+- 726 DONE [network+godot-client] A kiosk that followed the master to another box stayed there after the servers… → 726_WO_kiosk_stays_on_other_box_after_unlink.md
+- 727 DONE [network+media] Pulls of names with spaces refused by the forced command; clocks synced → 727_WO_pull_names_with_spaces_forced_command.md
+- 729 DONE [network] Replication SSH keys in authorized_keys gave a full shell → 729_WO_replication_keys_with_full_shell.md
+- 732 DONE [network] Linked servers that work as one: mutual link, one shared project, cable the oth… → 732_WO_linked_servers_mutual_link_shared_project.md
+- 735 DONE [network+godot-client] A server box whose kiosk follows the master: start-up question, dock and Update… → 735_WO_follower_box_startup_dock_updates.md
+- 737 DONE [network+os-iso] An update meant for .4 landed on the master and reset its config; "error 2" acr… → 737_WO_update_clobbered_dev_box_config_error2.md
+- 739 DONE [network] Linking servers: the other server accepts an invite, unless it auto-accepts → 739_WO_link_invites_accept_or_auto_accept.md
+- 746 IN PROGRESS [network] One shared project across linked servers (WO-732 P2 = WO-712 R5 = the WO-670 pi… → 746_WO_shared_project_across_linked_servers.md
+- 751 IN PROGRESS [network+godot-client] "Fresh project on the main machine (.23) didn't wipe the screen destinations":… → 751_WO_new_project_on_main_box_went_to_failover_master.md
+- 772 DONE [network+media] .4 as this box's hot backup (cluster link + shared show + cabled PGM/PRV 1); a… → 772_WO_hot_backup_dot4_media_resync.md
+- 802 IN PROGRESS [network] Linking servers: only node servers link; Godot clients stay on their own node → 802_WO_linked_servers_node_only_godot_stays_local.md
+- 811 IN PROGRESS [network] Auth for every client (Godot auto-login, Companion, web UI) + change the caspar… → 811_WO_auth_all_clients_and_os_password.md
+- 822 DONE [network] Remove the :4443 HTTPS proxy (highascg-https-proxy), the way nginx went in WO-4… → 822_WO_remove_https_proxy.md
+- 830 IN PROGRESS [network] LAN hardening: remote crash, injection, secrets (sweep §2, without the auth swi… → 830_WO_lan_hardening_crash_and_injection.md
+- 842 DONE [network+devices-config] Sweep: data loss, replication boot and server-side ops bugs → 842_WO_sweep_data_loss_and_server_ops.md
+
+## media — Media library, thumbnails, ingest, transcode (21)
+
+- 29 DONE [media] USB Drive Media Ingest → 29_WO_USB_MEDIA_INGEST.md
+- 42 OPEN [media+web-client] Sources browser — live thumbnails (channel/layer, wait-for-play) + thumbnail/PR… → 42_WO_SOURCES_LIVE_THUMBNAILS_AND_MEDIA_THUMB_FOLDER.md
+- 62 IN PROGRESS [media] Project-scoped media root (portable show folders) → 62_WO_PROJECT_SCOPED_MEDIA_ROOT.md
+- 71 OPEN [media+web-client] Look PGM playback thumbnail cache (5 s capture, GUI + Companion) → 71_WO_LOOK_PGM_PLAYBACK_THUMBNAIL_CACHE.md
+- 110 IN PROGRESS [media+web-client] Looks canvas thumbnail accuracy + operator stick network (review follow-up) → 110_WO_LOOKS_CANVAS_THUMBNAIL_ACCURACY_AND_OPERATOR_NETWORK.md
+- 167 DONE [media+web-client] Sources refresh while browsing templates: client must re-fetch templates (TLS a… → 167_WO_TEMPLATE_REFRESH_CLIENT_FETCH.md
+- 184 DONE [media] Console spam "Image corrupt or truncated. 1.jpg / 2 1.jpg / 3.jpg" (media thumb… → 184_WO_IMAGE_CORRUPT_TRUNCATED_THUMB_SPAM.md
+- 248 DONE [media+testing-ci] Remove the whole puppeteer branch (thumbnails + DOM smokes to raw CDP, dependen… → 248_WO_PUPPETEER_FULL_REMOVAL.md
+- 331 DONE [media+web-client] Live-input thumbnails re-fetch on every sources-panel render → 331_WO_LIVE_INPUT_THUMBNAIL_REFRESH_FLICKER.md
+- 344 DONE [media+engine] better look-deck thumbnails for shader looks (crop the content, kill the alpha… → 344_WO_SHADER_LOOK_THUMBNAILS.md
+- 392 DONE [media+web-client] Live-input thumbnails: kill the periodic (TTL-window) refresh → 392_WO_LIVE_THUMB_NO_PERIODIC_REFRESH.md
+- 469 DONE [media+web-client] Media browser: the exfat folder shows empty when the same files exist on the br… → 469_WO_MEDIA_BROWSER_DEDUPE_SWALLOWS_DUPLICATE_FOLDER.md
+- 472 DONE [media+web-client] the GUI still empties the exfat folder: the client re-merges what WO-469 un-mer… → 472_WO_GUI_STILL_EMPTIES_EXFAT_FOLDER_CLIENT_MERGE.md
+- 575 DONE [media] Media browser: "Encode to HAP" for selected files → 575_WO_media_browser_hap_encode.md
+- 591 DONE [media+web-client] Media browser: folder drop ingests contents; multi-select drag fills playlists → 591_WO_media_browser_folder_drop_and_multi_drag_playlist.md
+- 592 DONE [media] Media library: stable links, version control, media inspector, multi-rename → 592_WO_media_library_links_versions_inspector.md
+- 625 DONE [media+engine] numbered media names ("4. Tło 4 …") lost their resolution, so locked-aspect lay… → 625_WO_numbered_media_names_lose_resolution.md
+- 627 DONE [media+engine] locked-aspect layers still wrong on Caspar: half the library never got a resolu… → 627_WO_unprobed_clip_resolution_squeezes_fill.md
+- 759 DONE [media+godot-client] Media browser quick-look info: codec · resolution · fps · duration → 759_WO_media_browser_quick_look_column.md
+- 775 DONE [media] media versions: a new version may change the container (previz .mp4 → show .mov) → 775_WO_media_version_container_change.md
+- 818 DONE [media] ⚠ warning mark next to NotchLC files in the media lists (Godot + web) → 818_WO_notchlc_warning_mark.md
+
+## tracking-vr — Tracking, previs, VR (29)
+
+- 17 DONE [tracking-vr+web-client] 3D Previs — Live Video on Imported 3D Stage Models → 17_WO_3D_PREVIS.md
+- 30 IN PROGRESS [tracking-vr+process] Previs & Tracking Module — Packaging and Integration → 30_WO_PREVIS_TRACKING_MODULE.md
+- 616 DONE [tracking-vr+godot-client] Previs tracking: OpenFollow logic, DeckLink/Caspar camera input, two-camera wor… → 616_WO_previs_tracking_openfollow_cameras.md
+- 630 DONE [tracking-vr+lighting] owner notes (next.md, round 4): four answers + click-to-place markers / click c… → 630_WO_godot_owner_notes_next_md_4.md
+- 631 DONE [tracking-vr+lighting] PosiStageNet output, raw Art-Net as the backup choice → 631_WO_psn_output.md
+- 665 DONE [tracking-vr+godot-client] Previs: tracked people as live cut-out cards (person texturing, step 1) → 665_WO_previs_person_cutout_cards.md
+- 666 DONE [tracking-vr+godot-client] Previs: tracked people as mannequins painted from the cameras (person texturing… → 666_WO_previs_textured_person_dummies.md
+- 667 DONE [tracking-vr+godot-client] Previs: posed dummies from body keypoints (person texturing, step 3) → 667_WO_previs_posed_person_dummies.md
+- 675 IN PROGRESS [tracking-vr] Presenter recognition: backstage photo + name + mic → recognised on stage → aut… → 675_WO_presenter_recognition_mic_automations.md
+- 690 DONE [tracking-vr+godot-client] Previs + Tracking server modules on by default ("the programmer is gone") → 690_WO_previs_tracking_default_on.md
+- 694 DONE [tracking-vr+video-io] Previs camera Source dropdown: only the sources that exist, named for people → 694_WO_tracking_camera_source_real_list.md
+- 701 DONE [tracking-vr] Previs cut-outs: keep a person on one camera; cut only after another has been b… → 701_WO_cutout_sticky_camera.md
+- 707 DONE [tracking-vr] Follow → Auto: heads follow the detected person with no marker set-up → 707_WO_follow_auto_tracked_person.md
+- 708 DONE [tracking-vr] Auto follow: split the fronts across several people, pins 1–9 → 708_WO_auto_split_presenters_pins.md
+- 709 DONE [tracking-vr] Auto follow: home position (the stage lit evenly) after nobody is seen → 709_WO_auto_home_even_stage.md
+- 710 DONE [tracking-vr] Auto tracking overlay in the Live tab and the Previs main tab → 710_WO_tracking_overlay_live_previs.md
+- 711 DONE [tracking-vr+lighting] PTZ cameras follow tracked people over VISCA → 711_WO_ptz_camera_follow_visca.md
+- 713 DONE [tracking-vr] Calibrate on a person standing on a mark (heads, PTZ cameras, tracking cameras) → 713_WO_calibrate_person_on_mark.md
+- 741 DONE [tracking-vr+lighting] VR: walk into the MVR scene and program lights from inside it (future) → 741_WO_vr_walk_mvr_scene_program_lights.md
+- 757 DONE [tracking-vr+lighting] The full Programmer inside VR: a wrist panel worked by the controller ray (WO-7… → 757_WO_vr_programmer_panel.md
+- 770 IN PROGRESS [tracking-vr] VR session from the GUI: Start / PIN modal / End, WiVRn only while needed, a de… → 770_WO_vr_session_gui_pin_modal_mirror.md
+- 771 IN PROGRESS [tracking-vr] VR Programmer panel: a stage pick shows in the list; Fixtures | Groups view → 771_WO_vr_panel_selection_highlight_groups_view.md
+- 774 IN PROGRESS [tracking-vr+lighting] VR: box select over fixtures, a fixture-type filter, and the right grip fans pa… → 774_WO_vr_box_select_type_filter_grip_fan.md
+- 776 DONE [tracking-vr] VR: "OpenXR was requested but failed to start" — the XR client launched before… → 776_WO_vr_client_waits_for_headset.md
+- 780 DONE [tracking-vr] VR still "OpenXR was requested but failed to start": the XR client had no XDG_R… → 780_WO_vr_client_missing_xdg_runtime_dir.md
+- 792 DONE [tracking-vr+lighting] Program lights in VR: the MagicQ UI as a panel in the headset (MagicQ PC + WayV… → 792_WO_magicq_ui_in_vr_via_wayvr.md
+- 795 DONE [tracking-vr] VR programmer tablet: smooth the ray pointer → 795_WO_vr_tablet_pointer_smoothing.md
+- 835 DONE [tracking-vr] Presenter photos live in /tmp only → 835_WO_presenter_photos_tmp_only.md
+- 841 DONE [tracking-vr] VR: the second trigger (grip) points the selected heads; the first trigger only… → 841_WO_vr_grip_points_trigger_selects.md
+
+## testing-ci — Tests and CI (25)
+
+- 77 IN PROGRESS [testing-ci+os-iso] Operator USB stick — post-boot QA test suite (read-only) → 77_WO_STICK_BOOT_QA_TEST_SUITE.md
+- 99 DONE [testing-ci] CI, lint, and format pipeline → 99_WO_CI_LINT_FORMAT_PIPELINE.md
+- 105 DONE [testing-ci] Dependency vulnerabilities (ws, xlsx) and audit policy → 105_WO_DEPENDENCY_VULNERABILITIES.md
+- 111 DONE [testing-ci+process] File size limit (500 lines): index, audit, and split plan → 111_WO_FILE_SIZE_500_LIMIT.md
+- 121 DONE [testing-ci] CI: enforce 500-line file size limit → 121_WO_CI_ENFORCE_500_LINE_LIMIT.md
+- 138 DONE [testing-ci] Stabilize working tree: TDZ chunk-cycle fix + verification gates → 138_WO_STABILIZE_TREE_TDZ_CHUNK_CYCLE_AND_GATES.md
+- 153 OPEN [testing-ci] smoke-ws-restart-reconnect hangs under node --test (flaky harness) → 153_WO_FLAKY_WS_RECONNECT_SMOKE.md
+- 349 DONE [testing-ci] CI: make verify green again + real contributor checks → 349_WO_ci_green_and_real_checks.md
+- 367 DONE [testing-ci] CI does not gate lint warnings, and "written but never called" code keeps shipp… → 367_WO_lint_ratchet_and_unwired_code_gate.md
+- 420 DONE [testing-ci] CI red since 30.07: lint ratchet breached, plus two failures it masked (Prettie… → 420_WO_ci_red_since_3007_lint_ratchet_prettier_audit.md
+- 452 DONE [testing-ci+process] Aug 6 Actions red burst (GitHub incident) + commits attributed to a stranger → 452_WO_ci_incident_aug6_and_commit_attribution.md
+- 453 DONE [testing-ci+os-iso] Simulator parity with the real server, CG Studio unification, Mac/Win stick gui… → 453_WO_simulator_parity_cg_studio_unify_stick_guides.md
+- 538 DONE [testing-ci] CI red: six unwired exports, and four tests the gate was hiding → 538_WO_CI_RED_ON_UNWIRED_EXPORTS.md
+- 626 DONE [testing-ci] main CI red since 03.10; made green before merging godot into main → 626_WO_main_ci_green_before_godot_merge.md
+- 719 DONE [testing-ci+godot-client] Automated GUI end-to-end checks for building a show (+ sandbox server isolation) → 719_WO_gui_e2e_show_creation.md
+- 720 DONE [testing-ci] Bugs the WO-719 GUI end-to-end run found → 720_WO_bugs_found_by_gui_e2e.md
+- 725 DONE [testing-ci+network] Cluster autotests: link, master, failover, signed calls, sender choice, timing… → 725_WO_cluster_e2e_autotests.md
+- 728 DONE [testing-ci+network] More automated checks: installed root copies, clocks, media copy between servers → 728_WO_box_checks_installed_copies_clocks_media_copy.md
+- 736 DONE [testing-ci] CI: every green push to main becomes a server release the second server updates… → 736_WO_ci_auto_release_per_push.md
+- 752 DONE [testing-ci] test:ci hung for hours when one sandbox server failed to start → 752_WO_test_ci_hangs_when_a_sandbox_fails_to_start.md
+- 753 DONE [testing-ci+network] Two-box test campaign (standalone / linked / each master / refusals / failover)… → 753_WO_two_box_test_campaign_and_ubuntu_26_04_verdict.md
+- 755 DONE [testing-ci] test:ci:full green again: 26 rotted tests outside the curated gate repointed an… → 755_WO_full_offline_suite_green_again.md
+- 756 DONE [testing-ci+os-iso] The rest of the 2026-08-03 tools review: the clock-setting test, the eggs clean… → 756_WO_review_tools_findings_6_to_10.md
+- 761 DONE [testing-ci] smoke-ws-restart-reconnect: a reconnect race failed it, and the failure hung te… → 761_WO_ws_reconnect_smoke_race_hung_test_ci_full.md
+- 836 IN PROGRESS [testing-ci] Test categories: offline / live-box, and a GUI release suite with screenshot +… → 836_WO_test_categories_live_box_and_release_gui_suite.md
+
+## process — Docs, wiki, audits, work-order tooling (26)
+
+- 33 DONE [process] (legacy filename) — use the index → 33_WO_DEVICE_VIEW_CASPAR_AND_PIXELHUE.md
+- 83 DONE [process+web-client] Interactive Project Architecture Map: index & dependency order → 83_WO_INTERACTIVE_PROJECT_MAP.md
+- 83a DONE [process+web-client] Map data: OS, hardware, kernel, systemd, X11, filesystem (Layer 0–1) → 83a_WO_MAP_DATA_OS_AND_SERVICES.md
+- 83b DONE [process+web-client] Map data: server module scan, AST extraction, route/function inventory (Layer 2… → 83b_WO_MAP_DATA_SERVER_MODULES.md
+- 83c DONE [process+web-client] Map data: client component/lib scan, grouping, work-order cross-references (Lay… → 83c_WO_MAP_DATA_CLIENT_AND_CROSSREFS.md
+- 83d DONE [process+web-client] Map viewer: core navigation, node cards, drill-down, breadcrumbs, metadata side… → 83d_WO_MAP_VIEWER_CORE_NAVIGATION.md
+- 83e DONE [process+web-client] Map viewer: full-text search, pan/zoom, minimap, keyboard navigation → 83e_WO_MAP_VIEWER_SEARCH_AND_ZOOM.md
+- 83f DONE [process+web-client] Map viewer: dependency edges, import graph visualization, flat graph toggle → 83f_WO_MAP_VIEWER_DEPENDENCY_GRAPH.md
+- 83g DONE [process+web-client] Map: hosting, Vite integration, header bar link, build workflow, visual polish,… → 83g_WO_MAP_HOSTING_INTEGRATION_POLISH.md
+- 98 IN PROGRESS [process] Repo integrity — untracked runtime deps, sync-conflict purge, git bloat → 98_WO_REPO_INTEGRITY_AND_HYGIENE.md
+- 120 DONE [process] Split scripts, templates, launcher & logs modal over 500 lines → 120_WO_SPLIT_SCRIPTS_TEMPLATES_LAUNCHER_OVER_500.md
+- 122 IN PROGRESS [process] Split remaining production files over 500 lines (non-map) → 122_WO_SPLIT_REMAINING_PRODUCTION_FILES_OVER_500.md
+- 140 DONE [process] WO-122 completion: finish 2 splits, re-scope the rest, correct the record → 140_WO_122_COMPLETION_AND_RESCOPE.md
+- 141 DONE [process+network] Commit partitioning, stash resolution, mirror push, status docs → 141_WO_COMMIT_PARTITION_STASH_MIRROR_STATUS.md
+- 143 DONE [process+os-iso] Script reorganization (in place) + CI script-path guard → 143_WO_SCRIPT_REORGANIZATION_IN_PLACE.md
+- 163 DONE [process+web-client] Remove interactive project map from the main service (GitHub Pages only) → 163_WO_REMOVE_PROJECT_MAP_FROM_MAIN_SERVICE.md
+- 221 DONE [process+testing-ci] Split all code files exceeding the 500-line limit into smaller modules → 221_WO_SPLIT_OVERSIZED_FILES.md
+- 273 DONE [process+os-iso] scripts/ and tools/ cleanup and classification → 273_WO_SCRIPTS_TOOLS_CLEANUP.md
+- 366 IN PROGRESS [process] todos21.07.26 top block was never triaged: seven owner items with no work order → 366_WO_todos21_untriaged_backlog.md
+- 445 DONE [process+testing-ci] Full-project audit: 500-line violations, dead code, duplicate code → 445_WO_500_LINE_DEAD_DUP_CODE_AUDIT.md
+- 446 IN PROGRESS [process] Duplicate-code consolidations (WO-445 §2b follow-ups) → 446_WO_DUP_CODE_CONSOLIDATIONS.md
+- 454 DONE [process+network] exec-bit pollution: 1039 files committed as 755, 472 more pending; source = exF… → 454_WO_exec_bit_pollution_syncthing_perms.md
+- 467 DONE [process+os-iso] Release tooling: starter zips as assets, and a --latest switch → 467_WO_release_carries_starter_zips_and_latest.md
+- 819 DONE [process] Verify, test and commit the open work of 29.10 (WO-806/807/812/813/814/816/817… → 819_WO_verify_and_commit_today.md
+- 831 OPEN [process] Dead code removal (sweep §6) → 831_WO_dead_code_removal.md
+- 846 DONE [process] Work-order housekeeping: categorize, index, deprecate → 846_WO_work_order_housekeeping_index.md
+
+## Deprecated (46)
+
+- 11 DEPRECATED [os-iso+devices-config] Boot Orchestrator & OS Setup → deprecated/11_WO_BOOT_ORCHESTRATOR_AND_OS_SETUP.md
+- 19 DEPRECATED [tracking-vr] Person Tracking — Stage Performer Detection from Camera Inputs & 3D Previs → deprecated/19_WO_PERSON_TRACKING.md
+- 31 DEPRECATED [tracking-vr+video-io] Stage Auto-Follow — PTZ Cameras & Moving-Heads from Tracking → deprecated/31_WO_STAGE_AUTOFOLLOW_PTZ.md
+- 38 DEPRECATED [os-iso+media] Mount internal disk partition to media folder (live USB) → deprecated/38_WO_MEDIA_PARTITION_MOUNT_LIVE_USB.md
+- 51 DEPRECATED [web-client+network] Decoupling Frontend & Backend Architecture → deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md
+- 89 DEPRECATED [video-io+web-client] CEF operator control (X11 bridge, host-target CDP, HTTP API) → deprecated/89_WO_CEF_OPERATOR_CONTROL.md
+- 149 DEPRECATED [web-client+engine] Operator GUI on live CasparCG output (design exploration) → deprecated/149_WO_OPERATOR_GUI_ON_LIVE_OUTPUT_DESIGN.md
+- 208 DEPRECATED [engine+web-client] Subtimers: using a timer creates a named, reusable instance under the countdown… → deprecated/208_WO_SUBTIMERS_IN_TEMPLATES.md
+- 238 DEPRECATED [engine+web-client] "Adjust to screen" fill must not count crop values in → deprecated/238_WO_ADJUST_FILL_IGNORES_CROP.md
+- 243 DEPRECATED [web-client+engine] Operator GUI channel: CEF web-UI layer over routed preview channels, own screen… → deprecated/243_WO_OPERATOR_GUI_CEF_CHANNEL.md
+- 247 DEPRECATED [web-client] Replace puppeteer with a raw CDP client for CEF interactive input → deprecated/247_WO_RAW_CDP_NO_PUPPETEER.md
+- 254 DEPRECATED [web-client+engine] Operator GUI route holes: aspect-ratio fit + rect re-report after restarts → deprecated/254_WO_OPERATOR_GUI_ASPECT_AND_REPORT.md
+- 255 DEPRECATED [web-client+engine] Operator GUI v2: shaped Caspar video overlay above fullscreen Firefox (CEF rout… → deprecated/255_WO_SHAPED_OVERLAY_FIREFOX_OPERATOR_GUI.md
+- 256 DEPRECATED [web-client+engine] Operator GUI: compose preview becomes a free-tile canvas (multiviewer-style win… → deprecated/256_WO_OPERATOR_COMPOSE_CANVAS_TILES.md
+- 262 DEPRECATED [web-client+engine] Operator GUI: shape helper spawns but never shapes (consumer opaque under Firef… → deprecated/262_WO_SHAPE_FEED_STDIN_DIAGNOSIS.md
+- 263 DEPRECATED [web-client+engine] Invert the operator overlay: punch holes in Firefox, Caspar consumer sits below → deprecated/263_WO_SHAPE_FIREFOX_NOT_CASPAR.md
+- 264 DEPRECATED [web-client+os-iso] Operator GUI auto-start at boot + fresh-system default (one screen with the GUI) → deprecated/264_WO_OPERATOR_GUI_AUTOSTART_AND_FRESH_DEFAULT.md
+- 269 DEPRECATED [web-client] Shape overlay: stop the 5 Hz identical-payload log flood → deprecated/269_WO_SHAPE_OVERLAY_LOG_FLOOD.md
+- 279 DEPRECATED [web-client+os-iso] Operator-GUI Firefox opens on the wrong monitor → deprecated/279_WO_OPERATOR_GUI_MONITOR_PLACEMENT.md
+- 283 DEPRECATED [web-client+os-iso] Operator GUI prevents opening any window on top of it → deprecated/283_WO_OPERATOR_GUI_FOREIGN_WINDOWS.md
+- 290 DEPRECATED [devices-config+os-iso] Opt-in operator-GUI monitor picker for a fresh / factory-reset system → deprecated/290_WO_FRESH_SYSTEM_MONITOR_PICKER.md
+- 306 DEPRECATED [audio+amcp] Media-layer audio routing: unroute from own channel, route to another channel → deprecated/306_WO_MEDIA_LAYER_AUDIO_ROUTING.md
+- 317 DEPRECATED [os-iso] Multiple helper windows + taskbar on the operator monitor, browser stacked UNDE… → deprecated/317_WO_OPERATOR_TASKBAR_MULTI_HELPER_WINDOWS.md
+- 318 DEPRECATED [os-iso+mapping] Punch holes through Firefox still broken on the operator GUI monitor at 2160p50 → deprecated/318_WO_SHAPE_HOLES_BROKEN_AT_2160P50.md
+- 319 DEPRECATED [video-io+web-client] GUI live stream: one composed channel → NVENC → WebSocket → WebCodecs → deprecated/319_WO_GUI_NVENC_STREAM_COMPOSE_CHANNEL.md
+- 323 DEPRECATED [web-client+video-io] Compose preview: add/remove live sources (Decklink, NDI, …) as tiles → deprecated/323_WO_COMPOSE_PREVIEW_ADD_REMOVE_LIVE_SOURCES.md
+- 324 DEPRECATED [os-iso] Operator GUI "stuck together" with the Caspar screen consumer (triage first) → deprecated/324_WO_OPERATOR_GUI_STUCK_TO_CASPAR_CONSUMER.md
+- 325 DEPRECATED [video-io+mapping] Operator GUI as headless stream-only source (multiview owns the port); remote l… → deprecated/325_WO_HEADLESS_OPERATOR_GUI_STREAM_SOURCE_AND_REMOTE_STREAM_ACCESS.md
+- 343 DEPRECATED [web-client+engine] look editor shows the REAL preview channel video (screen consumer) while editing → deprecated/343_WO_LOOK_EDITOR_REAL_PRV_VIDEO.md
+- 346 DEPRECATED [web-client] compose preview toolbar: Reset replaces PRT PGM; per-tile PRT/capture → deprecated/346_WO_COMPOSE_TOOLBAR_RESET_AND_TILE_PRT.md
+- 352 DEPRECATED [os-iso] Taskbar: system icons in circular chips + the raise/recall bug → deprecated/352_WO_taskbar_icons_and_raise_fix.md
+- 382 DEPRECATED [os-iso] Operator taskbar gone + operator-GUI stacking changed: the WO-317 flag was lost… → deprecated/382_WO_operator_taskbar_flag_lost_and_unsettable.md
+- 387 DEPRECATED [os-iso] "Open window" lists what is INSTALLED, not a hard-coded five → deprecated/387_WO_OPERATOR_INSTALLED_APP_LAUNCHER.md
+- 389 DEPRECATED [web-client] "Open window" dropdown hides under the compose preview windows → deprecated/389_WO_OPEN_WINDOW_DROPDOWN_UNDER_VIDEO_HOLES.md
+- 404 DEPRECATED [web-client+mapping] Compose preview "loses signal" during any sources-panel drag (goes black ~1 s) → deprecated/404_WO_COMPOSE_PREVIEW_DRAG_BLACKOUT.md
+- 457 DEPRECATED [os-iso] Windows diskpart "cannot find the file specified" on stick exFAT format; quick-… → deprecated/457_WO_windows_diskpart_exfat_format_error_stick_guide.md
+- 485 DEPRECATED [video-io+mapping] /486 — DeckLink subregions were cut from the SDI mode, not the channel raster → deprecated/485_WO_DECKLINK_TILES_OVERRUN_THE_CHANNEL_RASTER.md
+- 487 DEPRECATED [video-io] we force <pixel-format>yuv</pixel-format> on UHD SDI; Caspar would have chosen… → deprecated/487_WO_FORCED_YUV_PIXEL_FORMAT_ON_UHD_SDI.md
+- 539 DEPRECATED [engine+godot-client] The operator-GUI stream's fps option is accepted, announced to the client, and… → deprecated/539_WO_GUI_STREAM_FPS_OPTION_DOES_NOTHING.md
+- 551 DEPRECATED [engine] Sending a look to PRV still appears to affect PGM despite WO-550 — DEPRECATED → deprecated/551_WO_PRV_RECALL_STILL_AFFECTS_PGM.md
+- 569 DEPRECATED [web-client+os-iso] new project stale operator gui holes → deprecated/569_WO_new_project_stale_operator_gui_holes.md
+- 595 DEPRECATED [godot-client] M0 spike: Godot on the box, video from shared memory, UI over video, 3D previs… → deprecated/595_WO_godot_m0_spike_on_box.md
+- 610 DEPRECATED [godot-client+network] Remote native client (Godot on a Mac/Win/Linux laptop) without shared memory → deprecated/610_WO_godot_remote_native_client.md
+- 788 DEPRECATED [engine] Live picture in the timeline editor → deprecated/788_WO_timeline_editor_live_monitor.md
+- 853 DEPRECATED [companion+mapping] Work order: PixelHue API integration & tandem multi-screen control → deprecated/853_WO_pixelhue_companion_and_tandem_looks.md
+- 854 DEPRECATED [mapping+web-client] Work order: PixelHue API in HighAsCG — Caspar + PixelHue layer mixing in the we… → deprecated/854_WO_pixelhue_highascg_webui_mixing.md

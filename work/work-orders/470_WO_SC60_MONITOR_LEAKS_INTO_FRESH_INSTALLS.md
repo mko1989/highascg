@@ -1,5 +1,6 @@
 # WO-470 — This box's SC60 headset is committed as a monitor output and reaches other machines
 
+**Area:** audio, devices-config
 **Status: DONE (2026-08-10 — committed default blanked, standing CI gate added; suite 1935/0/2). Owner action owed: re-seed the stick/bridge `configs/` copies, which still carry the old entry.**
 
 **Source:** owner, 2026-08-10 — "i fucking told you to not hardcode the sc60 as a monitor. why is it

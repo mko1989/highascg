@@ -1,6 +1,7 @@
 # WO-267 — CG Studio: dead Play button, canvas placement, drag-to-position editing
 
-**Status:** Implemented (owner acceptance A267.1 pending — canvas-offset trigger unverified offline)
+**Area:** web-client
+**Status:** DONE — Implemented (owner acceptance A267.1 pending — canvas-offset trigger unverified offline)
 **Priority:** HIGH (owner report 2026-07-18, todos18.07.26)
 **Depends on:** WO-265 (studio on :4200 / workspace tab)
 

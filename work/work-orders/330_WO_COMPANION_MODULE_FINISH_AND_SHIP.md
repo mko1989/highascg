@@ -1,7 +1,8 @@
 # WO-330 — Companion module: finish, verify on-box, and ship
 
 **Source:** todos24.07.26 — "Companion module."
-**Status: AUDITED ON-BOX 2026-07-24 — one deploy command for the owner, then desk QA.**
+**Area:** companion
+**Status: IN PROGRESS — AUDITED ON-BOX 2026-07-24 — one deploy command for the owner, then desk QA.**
 A HighAsCG Bitfocus Companion module ALREADY EXISTS and has its own work tracking.
 
 ## On-box audit result (2026-07-24, live)

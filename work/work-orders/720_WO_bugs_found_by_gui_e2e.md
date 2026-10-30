@@ -1,5 +1,6 @@
 # WO-720 — Bugs the WO-719 GUI end-to-end run found
 
+**Area:** testing-ci
 **Status: DONE (23.10.26). Proven offline and in the sandbox: two new smokes (2/2 each; both fail without their fix),
 the WO-453 smoke 7/7, the WO-308 smoke 11/11 on the box, a full `test:ci` with a
 logging `pkill` shim (0 host kills, was 24), Godot units 21462/0, a sandbox boot check, and GUI e2e 27/27

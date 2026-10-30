@@ -1,5 +1,6 @@
 # WO-483 — PGM2's screen consumer is placed by Openbox, not by its config
 
+**Area:** devices-config, os-iso
 **Status: DONE (11.08.2026 — measurement taken on the dev box: the move STICKS, so the fix is the
 placement pass; implemented, wired to caspar-connect, and verified live on a real misplaced window)**
 

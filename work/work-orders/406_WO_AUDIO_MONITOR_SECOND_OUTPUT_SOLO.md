@@ -1,8 +1,9 @@
 # WO-406 — Audio monitoring on a second output + mixer solo, end to end (todos03.08.26 item 2)
 
+**Area:** audio
 **Status: IN PROGRESS (2026-08-03 second round — stutter root-caused §6 (25 fps monitor channel chopped the 50 fps route audio) and fixed live: ch5 now 720p5000, `oal[5|720p5000] Initialized.`, route://2 playing; stored output entry flipped to type system-audio. Owner QA = listen + SOLO)**
 **Priority:** High (owner: "a good way to get audio monitoring on a second audio output (system audio) so I can monitor each channel or input by soloing it in the audio mixer")
-**Source:** `work/work-orders/todos03.08.26` item 2
+**Source:** `work/archive/todos/todos03.08.26` item 2
 **Related:** WO-44 (the original spec for exactly this — requirements doc, never carried a status line and was never implemented as a whole), WO-115 (mixer split), WO-157 (screen-then-pair routing), WO-249 (source-pair reporting), WO-16/WO-354-era (DM3 — **hardware is single-open**, so the monitor output must be a different physical device than the DM3 main out)
 
 ## 1. Investigation (what exists vs what's missing)

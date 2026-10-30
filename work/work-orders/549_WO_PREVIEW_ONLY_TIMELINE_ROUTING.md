@@ -1,6 +1,7 @@
 # WO-549 — Putting the previous look on preview silently re-took its timeline onto program
 
-**Status: FIXED in repo (02.09.2026). 9 smokes (7 verified to fail without the fix), suite
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). 9 smokes (7 verified to fail without the fix), suite
 2328/2326/0/2 → 2337/2335/0/2. Owner QA still owed.**
 **Priority:** Critical (same session, third distinct root cause for the timeline/look symptom
 class — this is the one blocking "going back to another look" specifically)

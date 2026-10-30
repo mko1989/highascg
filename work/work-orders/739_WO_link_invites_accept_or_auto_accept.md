@@ -1,5 +1,6 @@
 # WO-739 — Linking servers: the other server accepts an invite, unless it auto-accepts
 
+**Area:** network
 **Status: DONE (24.10.26) — offline suite (smoke 8/8, WO-725 e2e 14/14, Godot 21533/0) and live on .4 (release
 2026-10-24T195734Z): a new server's link waited as `pending`, .4 listed the invite, its kiosk showed the card and
 "Devices (1 invite)", and both Decline paths (API and kiosk button) worked. This box runs the old code until the owner

@@ -8,7 +8,8 @@
 > 4. Do NOT delete previous agents' log entries
 
 **Parent / context:** [WO-33 Device View index](./33_WO_DEVICE_VIEW_INDEX.md); [WO-28 DeckLink I/O routing](./28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md); [WO-40a Pixel map → GPU / DeckLink alignment](./40a_WO_PIXEL_MAP_GPU_XRANDR_CASPAR_ALIGNMENT.md); GPU source inherit pattern in `client/lib/device-view-gpu-source-inherit.js`  
-**Status:** 🔴 **OPEN / UNRESOLVED** (custom PGM ch1 → DeckLink SDI still broken on hardware as of 2026-06-26). See [WO-56 open tracker](./56_WO_DECKLINK_SDI_PGM_CUSTOM_OPEN.md). Pass 1 shipped resolver/UI; pass 2 added explicit SDI format + 1:1 subregion — **not verified fixed**.  
+**Area:** video-io
+**Status:** OPEN — 🔴 **OPEN / UNRESOLVED** (custom PGM ch1 → DeckLink SDI still broken on hardware as of 2026-06-26). See [WO-56 open tracker](./56_WO_DECKLINK_SDI_PGM_CUSTOM_OPEN.md). Pass 1 shipped resolver/UI; pass 2 added explicit SDI format + 1:1 subregion — **not verified fixed**.  
 **Prerequisites:** 33a (device graph + edges), 33c (rear panel + inspector), config generator DeckLink consumers (`config-generator-consumer-attach.js`)
 
 ---

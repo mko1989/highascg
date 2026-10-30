@@ -1,9 +1,10 @@
 # WO-197 — Connection-eye modal: Logs and Shortcuts as minimal tabs
 
-**Status:** Complete
+**Area:** web-client
+**Status:** DONE — Complete
 **Priority:** Low-Medium (UI clarity)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): "the modal that opens when connection eyes are clicked. the logs and shortcuts should be tabs, minimal. changing them should change the view of the modal. now the shortcuts display in a super small bar at the bottom of the logs…"
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEW): "the modal that opens when connection eyes are clicked. the logs and shortcuts should be tabs, minimal. changing them should change the view of the modal. now the shortcuts display in a super small bar at the bottom of the logs…"
 **Related:** WO-67 (logs modal categories), WO-165 (eye tooltip/modal backdrop).
 
 ---

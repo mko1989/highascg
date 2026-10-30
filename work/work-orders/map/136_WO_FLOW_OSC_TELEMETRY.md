@@ -1,6 +1,6 @@
 # WO-136 — Flow: OSC Telemetry
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `caspar:osc:audio`, `caspar:osc:playback`, `net:osc`
 

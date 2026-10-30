@@ -1,5 +1,6 @@
 # WO-709 — Auto follow: home position (the stage lit evenly) after nobody is seen
 
+**Area:** tracking-vr
 **Status: DONE server side (23.10.26: smoke-wo709 9/9, smoke-wo708 18/18, offline suite 2925 / 2922 pass / 1 known WO-308 fail; live-box probe 23.10 by the lead (API + home on the box, overlay in the GUI); owner QA: two people on stage)**
 
 Owner, 23.10.26: *"after a while with no person detected the fronts should reset to a home position which is lighting

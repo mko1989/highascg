@@ -614,4 +614,4 @@ Timeline frames use **pipeline 7**, not LOADBG take.
 - `docs/reference/amcp-mapping.md` — REST ↔ AMCP method map  
 - `docs/reference/amcp-clean-look-fade.md` — fade behaviour notes  
 - `work/work-orders/07_WO_AMCP_PROTOCOL_API.md` — protocol WO history  
-- `work/work-orders/sweep1.md` — module split for scene-take-lbg
+- `work/archive/sweep1.md` — module split for scene-take-lbg

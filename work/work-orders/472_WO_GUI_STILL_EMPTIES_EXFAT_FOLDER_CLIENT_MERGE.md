@@ -1,5 +1,6 @@
 # WO-472 — the GUI still empties the exfat folder: the client re-merges what WO-469 un-merged
 
+**Area:** media, web-client
 **Status: DONE (11.08.2026, verified: repro reproduced + fixed in node against the real client
 module, new smoke registered, offline suite + eslint green) — owner QA: reload the GUI with a
 stick inserted and confirm both folders list their files**

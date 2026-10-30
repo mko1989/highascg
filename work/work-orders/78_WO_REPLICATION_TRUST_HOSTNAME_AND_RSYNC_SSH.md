@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** network
 **Status:** In progress — Phase A–D shipped 2026-07-01; Phase E single-box QA automated  
 **Priority:** High (LAN pairing today grants full `casparcg` shell; poor machine labels)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

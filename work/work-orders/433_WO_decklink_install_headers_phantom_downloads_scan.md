@@ -1,5 +1,6 @@
 # WO-433 — DeckLink install fails on clones (usr/src stripped, phantom headers); scan ~/Downloads
 
+**Area:** os-iso, video-io
 **Status: DONE (2026-08-05 — smoke 4/4, suite green; fragment fix proves out on the next produce; .34 unblock is a one-liner, see QA)**
 
 Owner 05.08: "i dont get why on the installed machine i need to click upload driver package

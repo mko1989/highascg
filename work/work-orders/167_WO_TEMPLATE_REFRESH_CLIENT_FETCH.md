@@ -1,6 +1,7 @@
 # WO-167 — Sources refresh while browsing templates: client must re-fetch templates (TLS already fires server-side)
 
-**Status:** Completed
+**Area:** media, web-client
+**Status:** DONE — Completed
 **Priority:** Low-Medium (stale template list after refresh)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "the refresh button especially when browsing templates should send TLS amcp command."

@@ -1,8 +1,9 @@
 # WO-409 — PRV bus strips in the audio mixer (pre-take monitoring)
 
+**Area:** audio, web-client
 **Status: DONE (2026-08-03 — suite 1781/0/2, built + kiosk reloaded + service restarted; SOLO listening leg is owner-QA-gated on WO-406's Apply+restart)**
 **Priority:** High (owner todos03.08.26: "the prv channels need to appear in audio mixer, so operators can monitor the audio of video before taking it to pgm")
-**Source:** `work/work-orders/todos03.08.26` item 7
+**Source:** `work/archive/todos/todos03.08.26` item 7
 **Related:** WO-406 (monitor/headphone solo bus — PRV SOLO plays onto it), WO-115 (mixer split), WO-284 (audio screens)
 
 ## 1. Investigation

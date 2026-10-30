@@ -1,5 +1,6 @@
 # WO-469 — Media browser: the exfat folder shows empty when the same files exist on the bridge
 
+**Area:** media, web-client
 **Status: DONE (2026-08-10 — root-caused from the live `/api/media` body, fixed, smoke pinned; suite 1935/0/2). Owner QA: reload the GUI on highascg7579 after deploy.**
 
 **Source:** owner, 2026-08-10 on highascg7579 — "still in the gui the exfat (stick) folder is empty

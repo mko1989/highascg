@@ -1,6 +1,7 @@
 # WO-148 — Boot branding hardening (produce-path gate + Calamares slideshow)
 
-**Status:** Implemented — awaiting owner-run acceptance (A148.1–A148.3)
+**Area:** os-iso
+**Status:** DONE — Implemented — awaiting owner-run acceptance (A148.1–A148.3)
 **Priority:** Medium
 **Date:** 2026-07-07
 **Depends on:** WO-143 (eggs wrapper consolidation).

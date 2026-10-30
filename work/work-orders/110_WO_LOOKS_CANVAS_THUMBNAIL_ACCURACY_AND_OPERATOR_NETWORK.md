@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** media, web-client
 **Status:** In progress — Part A T110.1/T110.3/T110.5–T110.7 landed 2026-07-03  
 **Priority:** **High** (looks editor thumbs misrepresent on-air output; stick IP config is operator-blocking in the field)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

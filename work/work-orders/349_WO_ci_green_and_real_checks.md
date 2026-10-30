@@ -1,5 +1,6 @@
 # WO-349 — CI: make `verify` green again + real contributor checks
 
+**Area:** testing-ci
 **Status: DONE (2026-07-27)** · Source: todos27.07.26 ("each time i do git push origin main i get
 mail from github that some action failed" + "implement some actual github actions that do some
 real checks wheter everything works. especialy when there will be others contributing.")

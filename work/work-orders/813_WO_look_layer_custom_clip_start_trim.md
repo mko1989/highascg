@@ -1,5 +1,6 @@
 # WO-813 — Look layer "Clip start point" → Custom: scrub slider on PRV + Trim in / Trim out
 
+**Area:** engine
 **Status: DONE (29.10, live e2e on the box) (29.10 — smokes + offline suite + Godot tests + boot check; live: the route and the real client
 scrubbed PRV 2-10 through the scrub gate; screenshot of the Inspector; owner QA = drag the slider, trim, take).
 29.10 second pass: the Custom option is removed (trim works under both start options; a stored "custom" loads and takes

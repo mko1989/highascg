@@ -1,4 +1,7 @@
-**Status: IMPLEMENTED (2026-09-21, offline suite 2496 tests / 0 fail / 2 skipped, max-file-lines clean, client rebuilt) — needs kiosk reload (F5) + owner on-hardware confirmation**
+# WO-576 — look clip start point two options
+
+**Area:** engine, web-client
+**Status: DONE — IMPLEMENTED (2026-09-21, offline suite 2496 tests / 0 fail / 2 skipped, max-file-lines clean, client rebuilt) — needs kiosk reload (F5) + owner on-hardware confirmation**
 
 ## Investigation
 

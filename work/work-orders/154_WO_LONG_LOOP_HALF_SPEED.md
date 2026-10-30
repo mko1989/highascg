@@ -1,6 +1,7 @@
 # WO-154 — Long looping clip decays to ~50% speed after 2nd/3rd wrap
 
-**Status:** Workaround implemented (opt-in, 2026-07-08) — root cause is CasparCG-internal; live validation pending
+**Area:** engine, caspar-build
+**Status:** IN PROGRESS — Workaround implemented (opt-in, 2026-07-08) — root cause is CasparCG-internal; live validation pending
 **Priority:** High (on-air playback speed)
 **Date:** 2026-07-08
 **Source:** owner report ("long clip in a loop, on second or third loop the playback gets slower, looks like 50%")

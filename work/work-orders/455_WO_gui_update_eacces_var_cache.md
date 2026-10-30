@@ -1,5 +1,6 @@
 # WO-455 — GUI update on installed systems: EACCES mkdir /var/cache/highascg/updates
 
+**Area:** os-iso
 **Status: DONE (2026-08-07, suite 1891/0, CI run 31169663041 green; shipped in release 2026-08-07_122111 — machine 2 needs the one-time dir command below OR this release via stick, see Remains).**
 
 Owner (todos07.08.26 addendum): update on an installed system (second machine) fails —

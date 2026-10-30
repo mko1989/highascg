@@ -1,5 +1,6 @@
 # WO-765 — MVR export of the calibrated rig to the desk (grandMA3 / MagicQ)
 
+**Area:** lighting
 **Status: OPEN (25.10) — not started; needs WO-764's `calibrated_pose`**
 
 Owner 25.10 (`for_LDs.md`): "exporting this calibration data (preferebly via mvr) to the desk. the desk reads the

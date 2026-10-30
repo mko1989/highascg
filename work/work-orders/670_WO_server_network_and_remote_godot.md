@@ -1,5 +1,6 @@
 # WO-670 — Server network in the Devices view (backup / extension) + Godot GUI on another machine
 
+**Area:** network
 **Status: IN PROGRESS — P1 (remote video) DONE 22.10 (offline + box-verified with a second Godot on the feed); P2a (linked servers shown in Devices) + P2b (Send media) DONE 22.10 (offline + box with stub peers, real rsync); P3a (master / epoch / auto failover) + P3b (clients follow the master; failover runs from boot) DONE 22.10 (offline + box with a stub running the real module); P4a (the master forwards takes per destination) + P4b (catch-up on join, PGM block on followers, Servers card status) DONE 22.10 (offline + box with a stub fake Caspar); P5 (two-box hardware) open**
 
 Owner, `next.md` 22.10:

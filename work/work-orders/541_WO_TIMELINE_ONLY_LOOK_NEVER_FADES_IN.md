@@ -1,6 +1,7 @@
 # WO-541 — A look whose only content is a timeline never lit up
 
-**Status: FIXED in repo (02.09.2026). 4 smokes (2 verified to fail without the fix), suite
+**Area:** engine
+**Status: DONE — FIXED in repo (02.09.2026). 4 smokes (2 verified to fail without the fix), suite
 2270/2268/0/2 → 2282/2280/0/2. Owner QA on real PGM still owed.**
 **Priority:** High (on-air; the look silently never appears)
 **Source:** owner 02.09: reported a timeline inside a look "does not play as it should"; follow-up

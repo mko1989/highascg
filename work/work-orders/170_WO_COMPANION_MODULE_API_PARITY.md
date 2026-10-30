@@ -1,6 +1,7 @@
 # WO-170 — Companion module API parity: streaming-channel/RTMP/record coverage, multiview action, dead-code wiring
 
-**Status:** Completed
+**Area:** companion
+**Status:** DONE — Completed
 **Priority:** Medium (operators can't control current streaming/record from Companion)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner): "review the companion module and make sure it hits all the current api endpoints as it hasnt been reviewed in a while." Module: `/home/casparcg/companion-module-dev/companion-module-highpass-highascg`.

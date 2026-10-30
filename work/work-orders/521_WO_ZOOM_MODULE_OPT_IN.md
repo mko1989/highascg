@@ -1,6 +1,7 @@
 # WO-521 — Zoom meeting module: per-participant channels, strictly opt-in
 
-**Status: PLAN ONLY (13.08.2026 — no code written, by owner instruction: *"for now I just want it to be a wo. no actual work put into it."*)**
+**Area:** video-io, engine
+**Status: OPEN — PLAN ONLY (13.08.2026 — no code written, by owner instruction: *"for now I just want it to be a wo. no actual work put into it."*)**
 **Priority:** Medium (new capability, no on-air risk while unbuilt)
 **Source:** owner 13.08: *"tell me if it's possible to use [CoreVideo's] parts to connect to a zoom meeting, send video and audio to the meeting and also receive individual zoom participants"* + *"the work flow I'd like is creating a channel for each zoom feed, for instance I need to have 2 different participants available as well as screen sharing from zoom. so 3 channels that I can choose which participants video appears on which channel"* + *"I want this to be a module that is opt in and installable only when user wants so nothing in highascg depends on it."*
 **Reference:** `work/references/CoreVideo-main` (MIT, github.com/iamfatness/CoreVideo)

@@ -1,5 +1,9 @@
 # Work Order 45: Segmented Global Border (Multi-Slice Support)
 
+**Area:** engine, mapping
+**Status: OPEN (unverified — no status line before WO-846)**
+
+
 ## Objective
 Expand the existing "Global Border" feature to support complex LED wall layouts. Instead of applying a single border to the entire output canvas, users should be able to define multiple "slices" (rectangles). Each slice will receive the same animated border effect independently, allowing for consistent visuals across non-contiguous surfaces like totems and main walls.
 

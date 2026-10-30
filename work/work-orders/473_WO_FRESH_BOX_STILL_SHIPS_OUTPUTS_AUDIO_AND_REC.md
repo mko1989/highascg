@@ -1,5 +1,6 @@
 # WO-473 — a fresh box still comes up with two audio outputs and a record output
 
+**Area:** devices-config, audio
 **Status: DONE (11.08.2026, verified: offline suite 1947/1945 pass/0 fail/2 skip — the two
 standing failures are cleared too, eslint 0 errors, 0 files over 500 lines, dist-web rebuilt)
 — owner QA: next fresh install + one New project**

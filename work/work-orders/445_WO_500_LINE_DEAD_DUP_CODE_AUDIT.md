@@ -1,5 +1,6 @@
 # WO-445 — Full-project audit: 500-line violations, dead code, duplicate code
 
+**Area:** process, testing-ci
 **Status: DONE (06.08.26 — CI un-red fixes + dead-file deletions implemented and verified; duplicate consolidations remain open as follow-ups, see §2b)**
 
 Owner todo (todos06.08.26 line 11): *"i need a full project search, looking for files that are

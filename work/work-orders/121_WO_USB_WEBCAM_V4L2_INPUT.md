@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** video-io
 **Status:** In progress (Phase A + partial B/C shipped 2026-07-04)  
 **Priority:** High — operator hardware (ATEM Mini Pro ISO) connected now; closes gap vs DeckLink / NDI / live-audio inputs  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md), operator request 2026-07-04

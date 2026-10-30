@@ -1,5 +1,6 @@
 # WO-668 — Live 2D toggle icon reads "2D"; Inspector title white
 
+**Area:** godot-client
 **Status: DONE (22.10, Godot 20826/0; box screenshot of both)**
 
 Owner, `next.md` 22.10:

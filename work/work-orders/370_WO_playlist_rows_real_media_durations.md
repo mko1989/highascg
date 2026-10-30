@@ -1,5 +1,6 @@
 # WO-370 — Playlist rows show the timeless default on media clips instead of each clip's real length
 
+**Area:** engine, media
 **Status: DONE (28.07.26 — implemented + offline-proven against the live 133-entry media list; owner eyeball on the glass owed).**
 
 Source: `work/checklist27.07.26_manual_verify.md` item 39, owner note added 28.07 14:26:

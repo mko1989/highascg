@@ -1,6 +1,7 @@
 # WO-547 — The playhead's Companion press used a Satellite command that was never real
 
-**Status: FIXED in repo (02.09.2026). 9 + 11 smokes across two files, suite 2322/2320/0/2 →
+**Area:** companion, engine
+**Status: DONE — FIXED in repo (02.09.2026). 9 + 11 smokes across two files, suite 2322/2320/0/2 →
 2328/2326/0/2. Owner QA still owed.**
 **Priority:** Critical (on-air trigger feature, reported non-functional across this whole session)
 **Source:** owner 02.09: *"the companion button does not get pressed from the timeline playhead

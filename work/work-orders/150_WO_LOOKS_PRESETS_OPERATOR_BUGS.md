@@ -1,6 +1,7 @@
 # WO-150 — Looks & presets operator bug sweep (owner todos 2026-07-07)
 
-**Status:** Planned
+**Area:** engine, web-client
+**Status:** IN PROGRESS — Planned
 **Priority:** High (operator-facing correctness on air)
 **Date:** 2026-07-07
 **Source:** `work/todos07.07.26` (owner)

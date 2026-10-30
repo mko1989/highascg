@@ -1,5 +1,6 @@
 # WO-138 — Stabilize working tree: TDZ chunk-cycle fix + verification gates
 
+**Area:** testing-ci
 **Status:** Done (2026-07-07) — two aspirational smokes carried to WO-139 (see work log)
 **Priority:** Critical (UI is blocked from loading)
 **Date:** 2026-07-07

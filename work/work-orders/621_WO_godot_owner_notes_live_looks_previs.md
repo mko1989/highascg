@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-20, all seven notes box-verified) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock), N6 (Live Standard ↔ 3D switch), N1 (preview window outlines + labels + move/resize) DONE, box-verified — all owner notes done. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
-
 # WO-621 — Godot client: owner notes 20.10 (`next.md`) — Live preview chrome, look editor, look cards, Previs
+
+**Area:** godot-client
+**Status: DONE (2026-10-20, all seven notes box-verified) — N7 (Previs: no 2D, no camera spin), N3 (timer icon), N4 (look-card ▶ / cog), N5 (editor alone at the bottom), N2 (look editor px + aspect lock), N6 (Live Standard ↔ 3D switch), N1 (preview window outlines + labels + move/resize) DONE, box-verified — all owner notes done. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Related: [WO-600](./600_WO_godot_port_live_core.md) (live core: items B/C compose tiles), [WO-617](./617_WO_previs_2d_mode_and_surface_refcount.md) (2D mode — partly reversed here), [WO-607](./607_WO_godot_previs_native_3d.md).**
 
 Owner notes added to `next.md` (20.10), quoted per item:
 

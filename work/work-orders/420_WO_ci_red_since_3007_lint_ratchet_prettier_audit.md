@@ -1,5 +1,6 @@
 # WO-420 — CI red since 30.07: lint ratchet breached, plus two failures it masked (Prettier, npm audit)
 
+**Area:** testing-ci
 **Status: DONE (2026-08-04 — all three gates green locally AND CI run 30891629604 on `fc21b64` completed `success`, the first green main CI since 29.07)**
 
 ## Investigation

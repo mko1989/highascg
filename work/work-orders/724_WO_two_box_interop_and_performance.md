@@ -1,5 +1,6 @@
 # WO-724 — Two real servers: interoperability and performance, together and one by one
 
+**Area:** network, testing-ci
 **Status: DONE (24.10.26) — single-box and two-box test pass run live on both boxes; two fixes proven live (Send media
 with spaces, kiosk stays home after a failover) + offline suites and CI green; link torn down. Follow-ups under Open.**
 

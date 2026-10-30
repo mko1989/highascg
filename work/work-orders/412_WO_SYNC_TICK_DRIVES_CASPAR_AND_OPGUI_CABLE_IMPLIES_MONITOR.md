@@ -1,5 +1,6 @@
 # WO-412 — "NVIDIA sync to display" tick drives caspar GL sync too; operator-GUI cable implies Operator monitor + stacking (todos03.08 follow-ups)
 
+**Area:** os-iso, mapping
 **Status: DONE (2026-08-03 — suite green, built + kiosk F5 + service restarted; both take full effect at the next Apply)**
 **Priority:** High (owner: "the gl sync can be under the same tick box… just sync to this display, changes it in nvidia and caspar" + "connecting operator gui to an output needs to automatically enable operator monitor and disable always on top")
 **Source:** owner conversation 03.08, follow-up to WO-407's auto GL sync

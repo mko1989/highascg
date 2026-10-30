@@ -16,9 +16,9 @@ Source templates in the repo:
 
 - `scripts/install-phase4.sh` (installs helpers + sudoers fragments)
 
-**Removed (2026-05):** WO-38 **`highascg-media-mount`** / **`media/drive`** partition mount — durable config/state/media use **exFAT only** (`HIGHASCGEXF`, WO-47). See **`work/work-orders/WO_remove-persistence-partition-workflow_exfat-only.md`**.
+**Removed (2026-05):** WO-38 **`highascg-media-mount`** / **`media/drive`** partition mount — durable config/state/media use **exFAT only** (`HIGHASCGEXF`, WO-47). See **`work/work-orders/855_WO_remove_persistence_partition_workflow_exfat_only.md`**.
 
-**Removed (2026-05):** Multi-branch **`/opt/nvidia-pool`** and **`nvidia-apply-from-pool`** — one NVIDIA driver per live ISO (`HIGHASCG_NVIDIA_DRIVER=535|580|595`). See **`work/work-orders/WO_single-nvidia-driver-per-iso.md`**.
+**Removed (2026-05):** Multi-branch **`/opt/nvidia-pool`** and **`nvidia-apply-from-pool`** — one NVIDIA driver per live ISO (`HIGHASCG_NVIDIA_DRIVER=535|580|595`). See **`work/work-orders/856_WO_single_nvidia_driver_per_iso.md`**.
 
 
 ### Optional ALSA — **`highascg-asound`** (off by default)

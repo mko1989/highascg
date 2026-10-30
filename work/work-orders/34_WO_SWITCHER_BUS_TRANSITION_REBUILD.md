@@ -1,5 +1,9 @@
 # Work Order 34: Switcher-style bus transition rebuild (3-channel model)
 
+**Area:** engine
+**Status: OPEN (unverified — no status line before WO-846)**
+
+
 > **AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done

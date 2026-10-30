@@ -1,5 +1,6 @@
 # WO-796 — A MagicQ show of the loaded MVR scene, driving the previs from MagicQ in VR
 
+**Area:** lighting, tracking-vr
 **Status: DONE (27.10, MagicQ → previs probed head by head on the box + smokes 49/49 + offline suite); owner QA in the
 headset. Follow-up: 4 conventional types stay dark in the previs (their GDTFs have no Beam geometry, see below)**
 

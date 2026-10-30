@@ -1,5 +1,6 @@
 # WO-697 — a HighAsCG stick syncs automatically only with the box that booted from it; otherwise save / load by hand
 
+**Area:** os-iso
 **Status: DONE (2026-10-23, smoke-wo697 8/8, test:ci 2844/2847 (only the known pointer-confine fail), Godot 21152/0;
 detection proven on .64 (Ventoy live boot → boot stick) and this installed box (never); owner QA: plug a stick into
 an installed box, Load → USB stick…)**

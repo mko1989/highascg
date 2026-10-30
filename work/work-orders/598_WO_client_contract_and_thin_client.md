@@ -1,6 +1,7 @@
-**Status: IN PROGRESS (2026-10-21) — done: C1 take by id + C2 PRV push by id (verified on real Caspar), B golden round trip in both languages, C4 constants endpoint, A generated contract docs + CI guard, D (multiview presets/layouts, GPU rows, DeckLink order, hardware policy on the node); C3 is server-side for the Godot client. Open: switching the web client to C1/C2/C3 (owner QA), optional `project.schema.json`. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
-
 # WO-598 — Client contract: document it, make it testable, move show logic to the server ("thin client")
+
+**Area:** godot-client, engine
+**Status: IN PROGRESS (2026-10-21) — done: C1 take by id + C2 PRV push by id (verified on real Caspar), B golden round trip in both languages, C4 constants endpoint, A generated contract docs + CI guard, D (multiview presets/layouts, GPU rows, DeckLink order, hardware policy on the node); C3 is server-side for the Godot client. Open: switching the web client to C1/C2/C3 (owner QA), optional `project.schema.json`. Parent: [WO-593](./593_WO_godot_client_port_epic.md). PREREQUISITE for every editing feature in the Godot client (WO-600 step 3 onward).**
 
 Two clients (web for remote browsers, Godot on the box) will edit the **same show** at the same
 time. Today the web client is not a thin view: it owns the show document and builds AMCP. Porting

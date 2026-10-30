@@ -1,8 +1,9 @@
 # WO-374 — "alpha doesnt work on shaders": the page and the context were transparent, the SHADER never was
 
+**Area:** engine
 **Status: DONE (28.07.26 — root cause proven from the shader sources, fix live-verified by measuring the alpha plane; owner sign-off on the key threshold owed).**
 
-Source: `work/work-orders/todos28.07.26`, owner line added 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner line added 28.07:
 
 > alpha doesnt work on shaders.
 

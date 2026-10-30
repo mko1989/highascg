@@ -1,9 +1,10 @@
 # WO-508 — Single-instance safeguards for CasparCG: audit + the missing guard
 
+**Area:** caspar-build, os-iso
 **Status: DONE in repo (13.08.2026 — 4 smokes, suite 2078/2076/0). NOT deployed. Live instance count on .37 NOT verified — see §4.**
 **Priority:** High (two mains = card/port contention = restart loop)
 **Source:** owner `todos13.08.26`: *"i want you to double and triple check if there is only one instance of caspar running and there are appropriete safeguards for ensuring only one runs at a time (counting subprocesses of course)."*
-**Related:** [WO-400](./400_WO_RUNSH_SUPERVISOR_REVIEW.md), [WO-398](./398_WO_runsh_fork_loop.md), [WO-407](./407_WO_SCREEN_CONSUMER_MICRO_STUTTER.md) (the pgrep self-match false alarm — measured again here, §3), [WO-507](./507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md) (the other restart-loop cause found the same day).
+**Related:** [WO-400](./400_WO_RUNSH_SUPERVISOR_REVIEW.md), [WO-398](398_WO_RUNSH_1HZ_FORK_LOOP.md), [WO-407](./407_WO_SCREEN_CONSUMER_MICRO_STUTTER.md) (the pgrep self-match false alarm — measured again here, §3), [WO-507](./507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md) (the other restart-loop cause found the same day).
 
 ## 1. Audit — what already protects us
 

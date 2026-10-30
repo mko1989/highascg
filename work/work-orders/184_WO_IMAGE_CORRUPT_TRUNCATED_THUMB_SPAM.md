@@ -1,9 +1,10 @@
 # WO-184 — Console spam "Image corrupt or truncated. 1.jpg / 2 1.jpg / 3.jpg" (media thumbnails)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** media
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** Medium (console noise; suggests partial thumbnail reads)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner). Names look like MEDIA clip thumbnails (clips named "1", "2 1", "3"), not compose chN.jpg files.
+**Source:** `work/archive/todos/todos14.07.26` (owner). Names look like MEDIA clip thumbnails (clips named "1", "2 1", "3"), not compose chN.jpg files.
 **Related:** WO-42 (live thumbnails + media thumb folder), WO-162 (scanner revived 2026-07-13 — mass thumbnail regeneration happened then), WO-159 (compose jpegs — different files, but note we truncate chN.jpg to 0 bytes on blocklist; a 0-byte image load ALSO logs "corrupt or truncated" in Firefox — check both).
 
 ---

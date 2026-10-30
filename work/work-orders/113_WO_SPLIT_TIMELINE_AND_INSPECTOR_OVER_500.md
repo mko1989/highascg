@@ -3,7 +3,8 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
-**Status:** In progress (T113.0–T113.3 done; T113.4 verify)  
+**Area:** web-client
+**Status:** DONE — was: In progress (T113.0–T113.3 done; T113.4 verify)  
 **Priority:** **High** (operator playback path)
 
 **Touches:** `client/components/timeline-*.js`, `client/components/inspector-*.js`, `client/lib/timeline-state.js`

@@ -1,5 +1,6 @@
 # WO-768 — Playlist: an empty item (transition the layer to nothing, then on to the next clip)
 
+**Area:** engine
 **Status: IN PROGRESS (25.10) — offline-verified (smoke 7/0, test:ci 3343/0, Godot 21760/0, client boot check); deployed, owner QA pending**
 
 Owner 25.10:

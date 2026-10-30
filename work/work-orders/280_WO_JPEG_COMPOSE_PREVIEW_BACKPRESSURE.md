@@ -1,5 +1,9 @@
 # WO-280 — Caspar JPEG compose preview: backpressure and error handling
 
+**Area:** engine, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "there is something wrong with the caspar jpeg compose preview. it
 started as default on my laptop and after a while the operator server gui started lagging because
 i had the tab open in the background on my laptop, creating probably something wrong with

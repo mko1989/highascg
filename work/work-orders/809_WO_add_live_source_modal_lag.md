@@ -1,5 +1,6 @@
 # WO-809 — "Add live input" modal lags after "Add live source"
 
+**Area:** godot-client, video-io
 **Status: DONE (29.10, live e2e on the box) (29.10) — investigation** · fix built in the Godot dialog, verified offline (Godot suite 22182/0, boot
 check OK, sandbox GUI e2e 3/3 with click → close timed); owner QA on the glass open · **live e2e 29.10: add live input → dialog closes at once, PASS on the glass**
 **Source:** owner 29.10: *"there is a weird modal lag after clicking add live source in add live input modal."*

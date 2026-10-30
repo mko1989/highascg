@@ -1,9 +1,10 @@
 # WO-198 — Compose preview: 404-after-etag race, editor-induced latency (settle over-deferral), client recovery
 
-**Status:** Implemented (verified by audit 2026-07-17; owner acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (verified by audit 2026-07-17; owner acceptance pending)
 **Priority:** High (preview latency + dead cells on the operator UI)
 **Date:** 2026-07-14
-**Source:** `work/work-orders/todos14.07.26` (owner, NEWNEW): higher jpeg-preview latency than before; `Image corrupt or truncated 1/2/3.jpg` spam; `GET /api/compose-preview/3.jpg?v=<etag> → 404`.
+**Source:** `work/archive/todos/todos14.07.26` (owner, NEWNEW): higher jpeg-preview latency than before; `Image corrupt or truncated 1/2/3.jpg` spam; `GET /api/compose-preview/3.jpg?v=<etag> → 404`.
 **Related:** WO-159 (truncation + gates), WO-155 T155.4 (the settle nudge — partially reverted here), WO-144 (blocklist).
 
 ---

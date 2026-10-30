@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21; smoke 26/0 over the preview-push suites, node restarted clean). Owner QA: remove the only layer of a look in the Godot look editor → PRV goes empty at once.**
-
 # WO-650 — Look editor: removing the only layer leaves it on PRV until the editor closes
+
+**Area:** godot-client
+**Status: DONE (2026-10-21; smoke 26/0 over the preview-push suites, node restarted clean). Owner QA: remove the only layer of a look in the Godot look editor → PRV goes empty at once.**
 
 Owner, 21.10: *"it also doesnt let me delete an only layer in a looks editor. i can click delete but it kindo f stays
 there and lingers till i close the looks editor."*

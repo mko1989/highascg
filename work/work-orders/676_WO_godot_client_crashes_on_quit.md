@@ -1,5 +1,6 @@
 # WO-676 — Godot client crashes on every quit (glibc "corrupted size vs. prev_size in fastbins")
 
+**Area:** godot-client
 **Status: DONE (22.10, root cause found by bisect, box: 3 headless + 1 windowed quit clean, was 100 % crash)**
 
 Found 22.10 while testing WO-670 P3b. The client restart (`OS.set_restart_on_exit` + `quit()`) never restarted: the old

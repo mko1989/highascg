@@ -1,5 +1,6 @@
 # WO-793 — Calibrate and aim heads in HighAsCG (VR or desktop), record the result on the ChamSys desk
 
+**Area:** lighting, tracking-vr
 **Status: OPEN (27.10) — design below; licensing note in the PSN output status done; build waits on the owner's go
 and a test with ChamSys hardware (the remote protocol's value scale is undocumented)**
 

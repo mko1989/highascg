@@ -1,6 +1,6 @@
 # WO-133 — Flow: USB exFAT Configuration Sync
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `usb:exfat-stick`, `svc:exfat-sync`, `svc:exfat-boot`
 

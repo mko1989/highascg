@@ -1,5 +1,6 @@
 # WO-815 — Simulated server ("demo mode") in the Godot client + a static Web demo
 
+**Area:** godot-client, web-client
 **Status: DONE (29.10, phases 1 + 2) — phase 2 (stills per look, timeline playback on the client clock, read-only
 Devices view, "Reset demo") verified by the Godot suite 22969/0 (101 new phase-2 assertions), a desktop demo client on a
 private Xvfb (play / pause / take / stop, PRV push + TAKE change the stills, Devices write refused, Reset restarts with

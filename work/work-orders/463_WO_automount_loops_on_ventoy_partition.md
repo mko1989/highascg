@@ -1,5 +1,6 @@
 # WO-463 — USB auto-mount retries the Ventoy boot partition forever (EBUSY loop)
 
+**Area:** os-iso, media
 **Status: IN PROGRESS (fixed + tested 2026-08-10; owner QA on the next ISO)**
 
 Found in the operator box's journal while diagnosing the boot reported in WO-458/462 (the box was

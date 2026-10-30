@@ -1,6 +1,7 @@
 # WO-151 — Multiview timers + window sizing bugs (owner todos 2026-07-07)
 
-**Status:** Fixed in code — awaiting operator confirmation (A151.1 / A151.2)
+**Area:** mapping, web-client
+**Status:** DONE — Fixed in code — awaiting operator confirmation (A151.1 / A151.2)
 **Priority:** Medium-high
 **Date:** 2026-07-07
 **Source:** `work/todos07.07.26` (owner)

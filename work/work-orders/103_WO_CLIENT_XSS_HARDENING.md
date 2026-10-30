@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete — batches 1–2 + CSP (T103.5) done (2026-07-02)
+**Area:** web-client
+**Status:** DONE — Complete — batches 1–2 + CSP (T103.5) done (2026-07-02)
 **Priority:** **High** — stored XSS plausible from media names / device labels / OSC values
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

@@ -8,7 +8,8 @@
 > 4. Do **NOT** delete previous agents' log entries.
 
 **Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
-**Status:** Not started  
+**Area:** process, web-client
+**Status:** DONE — Not started  
 **Prerequisites:** All prior (83a–83f functional)
 
 ---

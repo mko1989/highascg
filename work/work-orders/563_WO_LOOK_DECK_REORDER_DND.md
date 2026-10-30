@@ -1,8 +1,11 @@
+# WO-563 — LOOK DECK REORDER DND
+
+**Area:** web-client, engine
 **Status: IN PROGRESS (drag-to-reorder implemented and built; owner QA on the live box still needed)**
 
 ## Investigation
 
-Owner ask (`work/work-orders/todos07.09.26`): reorder looks inside a main's look-deck column by
+Owner ask (`work/archive/todos/todos07.09.26`): reorder looks inside a main's look-deck column by
 grabbing one and dragging it to a new spot, with a vertical line showing where it will drop.
 
 Each main's looks render as `.scenes-card` elements inside a `.scenes-deck` CSS grid

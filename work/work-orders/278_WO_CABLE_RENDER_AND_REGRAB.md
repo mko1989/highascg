@@ -1,5 +1,9 @@
 # WO-278 — Cable render performance; re-grab a cable end and reconnect it
 
+**Area:** web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Source:** todos19.07.26 — "the cable render needs performance work. the connections take a while
 to apply, it should also be possible to grab a cable from a connection and connect it somewhere
 else."

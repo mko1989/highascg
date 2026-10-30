@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry
 > 4. Do **not** delete previous agents' log entries
 
-**Status:** Draft — implementation not started  
+**Area:** media, web-client
+**Status:** OPEN — Draft — implementation not started  
 **Priority:** Medium–High (operator UX — deck and Stream Deck show “what this look looks like on air” without live video churn)  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 
@@ -243,7 +244,7 @@ paintDeckThumb (client)
 
 - [ ] **T71.5.1** Failure injection: delete compose JPG mid-wait → no crash, previous cache kept
 - [ ] **T71.5.2** Rapid PGM swaps → no duplicate timers, no file corruption
-- [ ] **T71.5.3** Update [`project_status.md`](./project_status.md) when shipping
+- [ ] **T71.5.3** Update [`project_status.md`](../archive/project_status.md) when shipping
 
 ---
 

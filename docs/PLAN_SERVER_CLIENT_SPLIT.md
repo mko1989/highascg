@@ -7,7 +7,7 @@
 
 **Canonical reference:** [`ARCHITECTURE.md`](ARCHITECTURE.md)
 
-**Related:** [`work/BACKEND_AND_CLIENT_SPLIT.md`](../work/BACKEND_AND_CLIENT_SPLIT.md), WO‑51 [`work/work-orders/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md`](../work/work-orders/51_WO_DECOUPLED_FRONTEND_ARCHITECTURE.md), [`docs/WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`client/tools/electron-launcher/`](../../client/tools/electron-launcher/).
+**Related:** [`work/BACKEND_AND_CLIENT_SPLIT.md`](../work/BACKEND_AND_CLIENT_SPLIT.md), WO‑51 [`work/work-orders/deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md`](../work/work-orders/deprecated/51_WO_DECOUPLED_FRONTEND_BACKEND_ARCHITECTURE.md), [`docs/WO47_ISO_VS_EXFAT.md`](WO47_ISO_VS_EXFAT.md), [`client/tools/electron-launcher/`](../../client/tools/electron-launcher/).
 
 ---
 

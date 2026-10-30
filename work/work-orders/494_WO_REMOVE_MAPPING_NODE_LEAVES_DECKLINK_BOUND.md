@@ -1,5 +1,6 @@
 # WO-494 — Deleting a pixel-mapping node leaves its DeckLinks in the Caspar config
 
+**Area:** mapping, video-io
 **Status: DONE (12.08 — reproduced end-to-end then fixed; 7 new smokes, suite 2010/2008/0, eslint 0 errors; client built + kiosk reloaded) — owner QA owed on the live delete**
 
 Owner 12.08: *"i had a pixelmapping node connected to screen dest 1 and decklink 1 and 2, when i

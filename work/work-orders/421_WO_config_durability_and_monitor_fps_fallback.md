@@ -1,5 +1,6 @@
 # WO-421 — Config durability (review rows 8–9, de-scoped per owner) + monitor-bus fps fallback; suite back to 0-fail
 
+**Area:** devices-config, audio
 **Status: DONE (2026-08-04 — smoke 4/4, WO-237 smoke 4/4, suite 1815 pass / 0 fail / 2 skip — FIRST 0-fail suite since the 03.08 produce run; server restarted to load)**
 
 ## Owner reframe that unblocked this (04.08)

@@ -1,6 +1,7 @@
-**Status: DONE (2026-10-21) — offline 3074/0, Godot --test 20611/0; box: Pabianice shown → 5 types listed, 52 fixtures patched from the file, Unpatch remembered across a relaunch.** Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 MVR patch). Related: [WO-612](./612_WO_previs_mvr_import.md), [WO-633](./633_WO_gdtf_replace_stub_types.md).
-
 # WO-636 — An MVR scene's GDTF fixture types load with the scene, not only on Patch
+
+**Area:** lighting
+**Status: DONE (2026-10-21) — offline 3074/0, Godot --test 20611/0; box: Pabianice shown → 5 types listed, 52 fixtures patched from the file, Unpatch remembered across a relaunch.** Parent: [WO-615](./615_WO_previs_fixtures_gdtf_patch_dmx_out.md) (T10 MVR patch). Related: [WO-612](./612_WO_previs_mvr_import.md), [WO-633](./633_WO_gdtf_replace_stub_types.md).
 
 Owner 21.10: "check why the gdtf fixtures didnt load" (Pabianice shown in Previs, Fixtures section empty), then "the
 mvr at least for pabianice has patched fixtures which should carry over".

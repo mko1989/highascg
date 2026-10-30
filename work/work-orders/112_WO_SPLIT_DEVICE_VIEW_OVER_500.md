@@ -3,6 +3,7 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
+**Area:** web-client
 **Status:** Done — WO-112 complete 2026-07-03  
 **Priority:** **High** (largest client cluster)
 

@@ -1,5 +1,6 @@
 # WO-410 — Operator GUI holes empty after a caspar restart (stale skip-unchanged route cache)
 
+**Area:** mapping, engine
 **Status: DONE (2026-08-03 — fix live-verified: reconnect re-PLAYed 3-10/3-11, producers back on all compose layers; suite 1782/0/2)**
 **Priority:** High (owner 03.08: "the operator gui has no preview from the operator channel")
 **Source:** live regression during the WO-406 apply/restart cycle; latent since WO-243/338

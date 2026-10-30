@@ -1,5 +1,6 @@
 # WO-456 — Starter-layout zips: exFAT refresh to canonical tree + first bridge (HIGHASCGDAT) zip
 
+**Area:** os-iso
 **Status: DONE (2026-08-07 — both zips rebuilt + snapshot-committed, attached to release 2026-08-07_141931: server tarball + HIGHASCGEXF + HIGHASCGDAT zips, CI green.)**
 
 Owner: "make a new github release as well as the new folder layout for usb stick and bridge partition zip".

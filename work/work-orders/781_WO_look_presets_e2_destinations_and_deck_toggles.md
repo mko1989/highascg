@@ -1,5 +1,6 @@
 # WO-781 — Look presets as on a Barco E2: highlight destinations, save, recall exactly; show / hide look cards
 
+**Area:** engine, godot-client
 **Status: DONE (26.10 — Godot 21877 tests, WO-781 smokes, off-screen client probe of highlight → save → recall → clear → hide looks against the live server; owner QA = real E2 workflow)**
 
 Owner, 26.10:
@@ -8,7 +9,7 @@ Owner, 26.10:
 > we also need a way to show or dont show the looks cards in the card section.
 
 Parents: [WO-601](./601_WO_godot_port_inspector.md) §Look presets (Godot page + server recall),
-[WO_look-and-layer-presets](./WO_look-and-layer-presets.md) (original design: "screen-management style", Barco named).
+[WO_look-and-layer-presets](./851_WO_look_and_layer_presets.md) (original design: "screen-management style", Barco named).
 
 ## Investigation
 

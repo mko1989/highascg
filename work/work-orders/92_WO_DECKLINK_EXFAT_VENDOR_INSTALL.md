@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Draft — design + task breakdown  
+**Area:** os-iso, video-io
+**Status:** IN PROGRESS — Draft — design + task breakdown  
 **Priority:** **High** — blocks shipping a redistributable live ISO without embedding Blackmagic Desktop Video  
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

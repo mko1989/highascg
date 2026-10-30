@@ -1,5 +1,6 @@
 # WO-690 — Previs + Tracking server modules on by default ("the programmer is gone")
 
+**Area:** tracking-vr, godot-client
 **Status: DONE (23.10; smoke 3/3, box: both modules load after a restart, Programmer back in the Godot client)**
 
 Owner, 23.10: *"The programer is gone now."*

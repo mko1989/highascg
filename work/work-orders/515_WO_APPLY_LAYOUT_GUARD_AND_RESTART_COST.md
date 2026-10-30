@@ -1,9 +1,10 @@
 # WO-515 — Apply now warns on impossible layouts; and where the long restart actually goes
 
+**Area:** devices-config
 **Status: DONE in repo (13.08.2026 — guard + restart cadence, suite 2127/2125/0, eslint 0, prettier clean, client rebuilt). NOT deployed.**
 **Priority:** High (a silent Apply produced a black operator screen)
 **Source:** owner 13.08: *"add the guard."* and *"check the long restart issue."*
-**Related:** [WO-507](./507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md) (whose warnings were dead — §2), [WO-483](./483_WO_SCREEN_CONSUMER_PLACED_BY_OPENBOX_NOT_CONFIG.md), [WO-243](./243_WO_OPERATOR_GUI_CHANNEL.md)
+**Related:** [WO-507](./507_WO_DECKLINK_OUTPUT_ON_AN_INPUT_CARD_RESTART_LOOP.md) (whose warnings were dead — §2), [WO-483](./483_WO_SCREEN_CONSUMER_PLACED_BY_OPENBOX_NOT_CONFIG.md), [WO-243](deprecated/243_WO_OPERATOR_GUI_CEF_CHANNEL.md)
 
 ## 1. What went wrong, measured on the dev box
 

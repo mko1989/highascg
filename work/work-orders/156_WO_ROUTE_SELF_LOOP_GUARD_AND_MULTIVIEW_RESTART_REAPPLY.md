@@ -1,6 +1,7 @@
 # WO-156 — Route self-loop guard, wedged-channel recovery, multiview re-apply after Caspar restart
 
-**Status:** Implemented (pending on-hardware verification A156.1–A156.3)
+**Area:** amcp, mapping
+**Status:** DONE — Implemented (pending on-hardware verification A156.1–A156.3)
 **Priority:** High (on-air incident required a full CasparCG restart)
 **Date:** 2026-07-13
 **Source:** `work/todos13.07.26` (owner)

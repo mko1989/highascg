@@ -7,7 +7,8 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
-**Status:** Complete — 2026-07-02 (ws/overrides in WO-99; xlsx migrated to exceljs)
+**Area:** testing-ci
+**Status:** DONE — Complete — 2026-07-02 (ws/overrides in WO-99; xlsx migrated to exceljs)
 **Priority:** **Medium** — no known active exploit path in our usage, but high-severity advisories
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)
 

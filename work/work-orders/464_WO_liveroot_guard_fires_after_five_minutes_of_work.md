@@ -1,5 +1,6 @@
 # WO-464 — `build-highascg-egg.sh` spends ~5 minutes before refusing a second produce
 
+**Area:** os-iso
 **Status: IN PROGRESS (early guard landed 2026-08-10; owner: reboot, then re-run the build)**
 
 Owner (todos10.08): *"now eggs produce fails"* — the run ended with:

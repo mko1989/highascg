@@ -1,5 +1,6 @@
 # WO-791 — Companion: recall look presets to PRV, to PGM, or to PGM with auto take
 
+**Area:** companion
 **Status: DONE (27.10 — module tests 81/81, live recalls of the box's presets in all three modes through the module's
 API client; package `highpass-highascg-1.0.10.tgz` built, not installed; owner QA = install the package, then press
 the preset buttons)**

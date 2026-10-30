@@ -1,6 +1,7 @@
-**Status: 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). T5 VideoScreen → live screen bindings DONE (2026-10-21, box-verified). Placement (Capture origins: Place row + Fit, auto-fit on import) DONE 2026-10-21 (box, real Capture file). Open: opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
-
 # WO-612 — Previs: import MVR scenes (e.g. from Capture) into the Godot stage
+
+**Area:** godot-client, lighting
+**Status: DONE — 🟡 Import implemented (2026-10-20) — server-side importer + Godot previs section, verified with 4 real grandMA3 MVR exports on the box. T7 MVR export DONE (2026-10-21, box-verified). T5 VideoScreen → live screen bindings DONE (2026-10-21, box-verified). Placement (Capture origins: Place row + Fit, auto-fit on import) DONE 2026-10-21 (box, real Capture file). Open: opening our export in Capture (owner). Parent: [WO-607](./607_WO_godot_previs_native_3d.md) (Godot previs). Related: [WO-180](./180_WO_GDTF_FIXTURE_IMPORT_EXPORT.md) (GDTF fixtures, research stage).**
 
 Owner, 17.10: "can godot import mvr files from capture or only glb?"
 

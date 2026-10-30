@@ -1,5 +1,6 @@
 # WO-399 — Virtual camera: stream mode is the design now (owner) — jpg flipbook retired to legacy opt-in
 
+**Area:** video-io
 **Status: DONE (2026-07-30 — stream/25 fps live on the box, 25 fps verified on /dev/video10, suite 1750/0/2; honest cost accounting in §3 — total CPU is a wash vs jpg mode, the WIN is real motion + flat cost + knobs)**
 **Source:** WO-397 §1.6 background findings; owner 30.07: "the virtual cam the way its done is not good. we need to package the virtual cam output to a simple lowest performance hungry stream and an ffmpeg subprocess that recives the stream and pipes it into v4l2."
 **Related:** WO-137 (jpg flipbook origin), WO-145 (stream-mode spike — mjpeg/NUT chosen, shipped opt-in; its benchmark is why the default stayed jpeg until now).

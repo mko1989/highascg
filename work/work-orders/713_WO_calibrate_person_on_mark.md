@@ -1,5 +1,6 @@
 # WO-713 — Calibrate on a person standing on a mark (heads, PTZ cameras, tracking cameras)
 
+**Area:** tracking-vr
 **Status: DONE (23.10.26) — R1–R3 built; offline suite + Godot tests green, server routes probed live on the box;
 the GUI paths and real PTZ cameras / people on marks are owner QA (checklist C)**
 

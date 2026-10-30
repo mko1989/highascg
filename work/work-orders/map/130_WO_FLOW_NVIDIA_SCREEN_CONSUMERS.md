@@ -1,6 +1,6 @@
 # WO-130 — Flow: NVIDIA Screen Consumers
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `nvidia:screen-consumers`, `x11:xrandr`, `nvidia:vblank`
 

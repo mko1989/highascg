@@ -1,6 +1,7 @@
 # WO-211 — Playlist converted from single media only loops the first item (LOOP flag leaks into multi-item playlists)
 
-**Status:** Implemented (owner/hardware acceptance pending)
+**Area:** engine
+**Status:** DONE — Implemented (owner/hardware acceptance pending)
 **Priority:** High (playlist playback broken for the convert-media-to-playlist flow)
 **Date:** 2026-07-14
 **Source:** owner: "i changed a single media into a playlist and it doesnt play other items, only loops the first one."

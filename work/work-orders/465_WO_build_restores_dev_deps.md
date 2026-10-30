@@ -1,5 +1,6 @@
 # WO-465 — `build-highascg-egg.sh` leaves the build host without its dev dependencies
 
+**Area:** os-iso
 **Status: DONE in repo (2026-08-10; effective on the owner's next build)**
 
 Owner (todos10.08): *"add npm install --include=optional to the end of the build eggs script"*.

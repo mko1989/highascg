@@ -1,6 +1,7 @@
-**Status: ✅ DONE (2026-10-20) — Shader Live slices 1–2 (node-side working copy + Godot panel, PGM stack, Templates audition) and slice 3 Shader FX editor done; on-air behaviour is an owner check. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
-
 # WO-606 — Godot port: Shader Live/FX, timers, CG/lower thirds, LED test/pixel map/fixtures, variables, streaming/recording/inputs
+
+**Area:** godot-client
+**Status: DONE — ✅ DONE (2026-10-20) — Shader Live slices 1–2 (node-side working copy + Godot panel, PGM stack, Templates audition) and slice 3 Shader FX editor done; on-air behaviour is an owner check. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599, WO-600, WO-601. Can be split per panel when started.**
 
 ## Investigation
 

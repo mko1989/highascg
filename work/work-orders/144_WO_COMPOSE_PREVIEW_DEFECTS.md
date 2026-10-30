@@ -1,6 +1,7 @@
 # WO-144 — Compose-preview defects: per-channel ADD failures + consumer recycle churn
 
-**Status:** Implemented — awaiting restart + live-log verification (A144.2/A144.3)
+**Area:** engine, web-client
+**Status:** DONE — Implemented — awaiting restart + live-log verification (A144.2/A144.3)
 **Priority:** High (visible PGM hitches + broken previews on some channels)
 **Date:** 2026-07-07
 **Depends on:** WO-141 (land on clean main). Parallelizable with WO-145/146/147.

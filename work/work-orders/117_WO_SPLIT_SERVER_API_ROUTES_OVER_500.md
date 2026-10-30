@@ -3,6 +3,7 @@
 > **⚠️ AGENT COLLABORATION PROTOCOL** — see [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)
 
 **Parent:** [WO-111](./111_WO_FILE_SIZE_500_LIMIT.md)  
+**Area:** engine
 **Status:** Done — all five route aggregators split 2026-07-03  
 **Priority:** **High** (clear handler boundaries)
 

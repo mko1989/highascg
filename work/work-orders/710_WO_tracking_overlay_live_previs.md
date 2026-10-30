@@ -1,5 +1,6 @@
 # WO-710 — Auto tracking overlay in the Live tab and the Previs main tab
 
+**Area:** tracking-vr
 **Status: DONE (23.10.26) client side. Verified: Godot model tests, boot check, windowed render probe with fake data, source-text smoke. NOT verified: against the live server (WO-708/709 endpoints not deployed yet), clicking in the real tabs, owner QA.**
 
 Contract: the WO-708..711 shared contract (scratchpad `wo708-contract.md`; API + WS section). Server side is WO-708/709, PTZ is WO-711.

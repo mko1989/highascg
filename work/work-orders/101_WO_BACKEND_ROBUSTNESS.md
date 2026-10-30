@@ -7,6 +7,7 @@
 > 3. Leave clear **Instructions for Next Agent** at the end of their log entry.
 > 4. Do **NOT** delete previous agents' log entries.
 
+**Area:** engine
 **Status:** In progress — global handlers, shutdown, limits landed 2026-07-02; catch sweep deferred
 **Priority:** **High** — silent failures on a live playout server + data-loss window
 **Parent / context:** [00_PROJECT_GOAL.md](./00_PROJECT_GOAL.md)

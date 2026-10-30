@@ -1,6 +1,7 @@
-**Status: DONE (2026-09-29, offline suite 2526/0/2, lint clean) — not yet eyeballed live**
-
 # WO-584 — Global border: Art-Net listen is opt-in; DMX patch/mapping collapsed by default
+
+**Area:** mapping, lighting
+**Status: DONE (2026-09-29, offline suite 2526/0/2, lint clean) — not yet eyeballed live**
 
 Owner: "artnet listener is activated on the global border as default which it shouldnt be, this should
 be an optin option only, as well as the whole dmx channel mapping should be expandable and hidden by

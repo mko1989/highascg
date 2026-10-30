@@ -1,7 +1,8 @@
 # WO-33b — Device view: host & Caspar enumeration (GPU, DeckLink, audio)
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** devices-config, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** [WO-33a](./33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md) (for `GET` response `live` shape)
 
 ---

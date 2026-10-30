@@ -1,3 +1,6 @@
+# WO-562 — OSC ENDIAN CANARY LOST TO INT FPS
+
+**Area:** amcp, caspar-build
 **Status: DONE (2026-09-03, verified live on the box)**
 
 ## Investigation

@@ -1,5 +1,6 @@
 # WO-442 — Custom W/H boxes showed seeded 1920/1080 fossils beside a 2160p mode
 
+**Area:** web-client, devices-config
 **Status: DONE (2026-08-06 — suite 1860/0/2, built + kiosk F5; config healed via settings API)**
 
 Owner (follow-up on WO-441): "those saved values of 1920/1080 are nowhere in my config apart

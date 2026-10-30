@@ -1,5 +1,6 @@
 # WO-367 — CI does not gate lint warnings, and "written but never called" code keeps shipping
 
+**Area:** testing-ci
 **Status: DONE (28.07.26 — all three gates landed and each proven to fail on the regression it exists for).**
 
 ## 1. Investigation

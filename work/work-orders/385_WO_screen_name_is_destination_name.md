@@ -1,6 +1,7 @@
 # WO-385 — Screen name and destination label were two things, and the second one never saved
 
-**Status: 🟡 Implemented 29.07.26 (live: `channelMap.screenLabels` = `["ekran","podglad","record"]`; suite 1690/0/2) — owner: check the Devices inspector**
+**Area:** mapping, web-client
+**Status: DONE — 🟡 Implemented 29.07.26 (live: `channelMap.screenLabels` = `["ekran","podglad","record"]`; suite 1690/0/2) — owner: check the Devices inspector**
 
 Owner, 2026-07-29:
 > "something is wrong with the screen labels in highascg. name and label should be one thing. dont

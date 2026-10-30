@@ -1,5 +1,6 @@
 # WO-427 — DeckLink driver install a normal user can actually do (GUI upload + the dead WO-188 button resurrected)
 
+**Area:** video-io, os-iso
 **Status: DONE in repo, LIVE-verified on the JS side (2026-08-04 — upload endpoint probed: bad name → 400, valid name → staged + `vendorAvailable:true`, cleaned up after; suite 1826/0/2; client rebuilt). Bash-lib half needs the owner's installer re-run below before the boot/stick paths see the local dir.**
 
 Owner: "i need an easy way for users to install the decklink drivers because as far as i know

@@ -1,5 +1,6 @@
 # WO-696 — 22.10 ISO test boot on a second machine (192.168.0.64): host's project, Caspar never started, no SSH
 
+**Area:** os-iso, network
 **Status: DONE in repo (2026-10-23) — 3 causes found (evidence below); SSH fix + Caspar-gate fix in the repo (gate fix
 reproduced + verified on the dev box); stick adoption decided → WO-697 (done). Follow-ups from the same boot: WO-702
 (live-boot defects), WO-704 (DKMS once per kernel), WO-705 (empty dock). Proven only on the next ISO boot**

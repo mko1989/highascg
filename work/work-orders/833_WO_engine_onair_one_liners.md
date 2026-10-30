@@ -1,5 +1,6 @@
 # WO-833 — On-air engine one-liners (sweep §3e–3i, 3k–3m)
 
+**Area:** engine
 **Status: DONE (30.10, offline: 5 new smoke files, each fails on the HEAD code and passes now; no live-box probe — no AMCP/POST was sent to the running box)**
 **Source:** REPORT §3. Owner 30.10: *"there are a lot of bugs to fix"*.
 **Related:** WO-829 (3a–3d, 3j), WO-545, WO-787.

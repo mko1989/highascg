@@ -1,5 +1,6 @@
 # WO-812 — Previs: hide the projector beam lines
 
+**Area:** lighting, godot-client
 **Status: DONE (29.10, live e2e on the box) (29.10 — Godot suite 22256/0, boot check OK; owner QA = the "Projector beams" checkbox on the Previs toolbar, look on the glass unverified) · live e2e 29.10: checkbox PASS on the glass**
 
 Owner, 29.10:

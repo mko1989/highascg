@@ -1,6 +1,7 @@
 # WO-630 — owner notes (next.md, round 4): four answers + click-to-place markers / click calibration
 
-**Status: 🟡 F1 DONE (20.10 — box: Follow click-calibration point + Undo + Done; Markers click-to-place; detection-pin hint);
+**Area:** tracking-vr, lighting
+**Status: DONE — 🟡 F1 DONE (20.10 — box: Follow click-calibration point + Undo + Done; Markers click-to-place; detection-pin hint);
 Q1 → owner chose PSN out + raw Art-Net fallback (WO-631); F2 Art-Net read-through → WO-632; MVR import stays WO-612**
 
 The owner's `next.md` (read-only) ends with four questions and two notes. This work order holds the written answers and the

@@ -1,6 +1,6 @@
 # WO-135 — Flow: AMCP Playout Control
 
-**Parent:** [WO-83 index](./83_WO_INTERACTIVE_PROJECT_MAP.md)  
+**Parent:** [WO-83 index](../83_WO_INTERACTIVE_PROJECT_MAP.md)  
 **Status:** Completed  
 **Nodes:** `net:amcp`, `caspar:amcp:play`, `caspar:amcp:mixer`
 

@@ -1,5 +1,6 @@
 # WO-835 — Presenter photos live in /tmp only
 
+**Area:** tracking-vr
 **Status: DONE (30.10, smoke 22/0 incl. 5 new, Godot 22969/0; live node restart pending) — boot starts empty and wipes leftovers, shutdown wipes, dir outside tmp refused; consent text now true**
 **Source:** REPORT §5 Tracking; owner 30.10: *"they were supposed to be uploaded and used from /tmp meaning they have no
 chance of surviving reboot."*

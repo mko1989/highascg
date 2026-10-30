@@ -1,5 +1,6 @@
 # WO-742 — Caspar `shm` producer: play a shared-memory ring written by another process (WO-738 step 1)
 
+**Area:** caspar-build, engine
 **Status: DONE (24.10.26) as detachable future development. The producer is built into a Caspar binary and proven
 end to end in a throwaway Caspar instance (`tools/e2e/caspar-shm-producer.sh`: PASS). WO-743 (Godot writer) and WO-744
 (Live-tab take, exact pixels) are proven through it. WO-745 (game source) writes the same ring and is listed as a

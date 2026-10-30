@@ -1,5 +1,6 @@
 # WO-434 — Stop seeding drop-update/ on embed-server sticks
 
+**Area:** os-iso
 **Status: DONE (2026-08-05 — gate + stick-QA tolerance + smoke; proves out on the next flash)**
 
 Owner 05.08: "why does it even seed the drop update on a fresh stick, it doesnt make

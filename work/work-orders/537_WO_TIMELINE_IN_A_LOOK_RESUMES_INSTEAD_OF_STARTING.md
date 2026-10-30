@@ -1,8 +1,9 @@
 # WO-537 — A timeline inside a look resumed where it was left; and returning to a look still cuts
 
-**Status: PART 1 FIXED. PART 2 — CLOSED, root cause is [WO-540](./540_WO_CH1_HALF_RATE_TEARS_DOWN_EVERY_FADE_AT_50_PERCENT.md) (channel 1 drifts to half rate, so the teardown STOPs the outgoing content at ~60 % of every fade). §4b's collision guard remains a real, separate defect and stays fixed. 9 smokes, suite 2266 / 2264 pass / 0 fail / 2 skip.**
+**Area:** engine
+**Status: DONE — PART 1 FIXED. PART 2 — CLOSED, root cause is [WO-540](./540_WO_CH1_HALF_RATE_TEARS_DOWN_EVERY_FADE_AT_50_PERCENT.md) (channel 1 drifts to half rate, so the teardown STOPs the outgoing content at ~60 % of every fade). §4b's collision guard remains a real, separate defect and stays fixed. 9 smokes, suite 2266 / 2264 pass / 0 fail / 2 skip.**
 **Priority:** High (on-air; the look plays the wrong part of the timeline)
-**Source:** `work/work-orders/todos14.08.26`
+**Source:** `work/archive/todos/todos14.08.26`
 - line 1: *"hitting take from timeline editor now works correctly, but playing the same timeline from a look (i can drop a timeline from sources browser into looks) down not work properly."*
 - line 2: *"going back to a look from timeline does a cut instead of mix"*
 **Parent:** [WO-528](./528_WO_TIMELINE_IN_LOOK_CUTS_AND_DESTABILISES.md) — line 1 is the follow-up to its §8

@@ -1,6 +1,7 @@
 # WO-543 — A companion_press flag's HTTP fallback could fail silently; the crossing itself was never observable
 
-**Status: PARTIALLY FIXED / INSTRUMENTED (02.09.2026). 9 smokes (3 verified to fail without the
+**Area:** companion
+**Status: IN PROGRESS — PARTIALLY FIXED / INSTRUMENTED (02.09.2026). 9 smokes (3 verified to fail without the
 fix), suite 2292/2290/0/2 → 2301/2299/0/2. The crossing-detection + dispatch mechanism was verified
 correct in every scenario tested — see §1. Owner QA still needed to confirm this against the real
 Companion Satellite/HTTP path; the new logging is there specifically to make that verification

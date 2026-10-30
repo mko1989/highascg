@@ -1,8 +1,9 @@
 # WO-518 — todos13 batch: drag highlight, looks↔timeline transitions, AMCP drag flood, clip copy
 
-**Status: PARTIAL (13.08.2026). §2 blue dashed outline — DONE. §4 looks↔timeline transitions — prior WO found, one fail-dark bug fixed (WO-519, in WO-139 §5). §5 clip exchange fit — DONE (WO-520); the 'extended duration' half is NOT done. §3 AMCP drag flood — cause found, deferred. Suite 2150/2148/0, client rebuilt.**
+**Area:** web-client, engine
+**Status: IN PROGRESS — PARTIAL (13.08.2026). §2 blue dashed outline — DONE. §4 looks↔timeline transitions — prior WO found, one fail-dark bug fixed (WO-519, in WO-139 §5). §5 clip exchange fit — DONE (WO-520); the 'extended duration' half is NOT done. §3 AMCP drag flood — cause found, deferred. Suite 2150/2148/0, client rebuilt.**
 **Source:** owner `todos13.08.26` (new block)
-**Related:** [WO-404](./404_WO_COMPOSE_PREVIEW_DRAG_BLACKOUT.md) (compose preview during drags), [WO-448](./448_WO_timeline_unrouted_until_take.md), [WO-401](./401_WO_MACHINE_PERFORMANCE_RESEARCH_PASS.md) F4 (AMCP send cost)
+**Related:** [WO-404](./deprecated/404_WO_COMPOSE_PREVIEW_DRAG_BLACKOUT.md) (compose preview during drags), [WO-448](./448_WO_timeline_unrouted_until_take.md), [WO-401](./401_WO_MACHINE_PERFORMANCE_RESEARCH_PASS.md) F4 (AMCP send cost)
 
 ---
 

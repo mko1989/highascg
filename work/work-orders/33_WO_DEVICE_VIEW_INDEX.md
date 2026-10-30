@@ -2,7 +2,8 @@
 
 **Program goal:** Visual “back of rack” for **Caspar host** + optional **PixelHue**, click-to-inspect ports, cable graph, EDID/timing awareness, and **Caspar config write + restart** via existing APIs.
 
-**Status:** Parent index — child WOs carry task checklists.  
+**Area:** devices-config, web-client
+**Status:** IN PROGRESS — Parent index — child WOs carry task checklists.  
 **Created:** 2026-04-23 · **Updated:** 2026-05-18 (added WO-48, WO-49)
 
 ---

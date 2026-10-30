@@ -1,5 +1,6 @@
 # WO-529 — Switching between the looks editor and the timeline editor resets the compose preview
 
+**Area:** web-client, engine
 **Status: DONE in repo (14.08.2026) — both faults fixed, 4 new smokes, suite 2194 / 2192 pass / 0 fail / 2 skip. Owner QA owed on the kiosk (§6).**
 **Priority:** High (operator-GUI usability; the owner hits it on every editor switch)
 **Source:** owner 14.08: *"going between looks editor and timeline editor resets the compose preview to either nothing inside of it or just one small rect showing. it should save the set compoose preview for both views."*

@@ -1,6 +1,7 @@
 # WO-236 — DeckLink low-latency mode toggle (per host channel), default OFF (current behavior)
 
-**Status:** Completed | **Date:** 2026-07-15
+**Area:** video-io
+**Status:** DONE — Completed | **Date:** 2026-07-15
 **Source:** owner: "the decklink host channel needs to have a low latency mode enable toggle. default what is now so off."
 **Enabler:** the new 2.6-dev binary supports it (decklink_consumer.cpp:63-72 `set_latency`, config `<latency>low</latency>`; default/normal = today's behavior).
 

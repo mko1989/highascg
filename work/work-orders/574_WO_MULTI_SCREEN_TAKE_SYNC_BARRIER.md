@@ -1,5 +1,6 @@
 # Work Order 574: Multi-screen take (preset ▶ / global take) starts the screens at different times
 
+**Area:** engine, amcp
 **Status: IN PROGRESS — implemented + offline-tested (2454 tests, 0 fail); owner-QA on the real two-screen rig owed (not measured on air)**
 
 **Parent / context:** WO-150 B150.6 (concurrent per-channel take POSTs), WO-259 (two-phase BEGIN…COMMIT take batching)

@@ -1,7 +1,8 @@
 # WO-396 — Devices view loads in 1–2 s: cold GET /api/device-view burns ~1.7 s on DeckLink re-probing
 
+**Area:** video-io, devices-config
 **Status: DONE (2026-07-30 — suite 1745/0/2; live: cold GET 2.47 s → 0.455 s, warm 54 ms, connectors intact via caspar_log; measurements below)**
-**Source:** `work/work-orders/todos30.07.26` §"i need to work on the performance of the devices view tab. it loads between a 1s-2s."
+**Source:** `work/archive/todos/todos30.07.26` §"i need to work on the performance of the devices view tab. it loads between a 1s-2s."
 **Related:** WO-202 (progressive render + ETag/304 — client side, still in place), WO-309 (async device-view probes), WO-391 (xrandr caching — display probe is 388 ms cold, 0 ms warm, left alone).
 
 ---

@@ -1,6 +1,7 @@
 # WO-314 — Laptop: NVIDIA PRIME selection for casparcg-server.service (post-driver)
 
-**Status: BLOCKED ON OWNER/HARDWARE** (secure boot kept the nvidia module unloaded)
+**Area:** os-iso
+**Status: IN PROGRESS — BLOCKED ON OWNER/HARDWARE** (secure boot kept the nvidia module unloaded)
 
 ## Context — measured on highascg4790, 2026-07-21
 Caspar rendered on integrated AMD ("Initialized OpenGL ... Mesa 25.2.8 AMD"), nvidia-smi returned

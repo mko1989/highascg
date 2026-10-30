@@ -1,5 +1,6 @@
 # WO-843 — Sweep: Godot client bugs
 
+**Area:** godot-client
 **Status: OPEN (30.10)**
 **Source:** code sweep 29.10 (REPORT §4f, §5 Godot client, §7c debounce-after-reassign / count+1 ids (Godot side)).
 

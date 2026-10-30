@@ -1,5 +1,6 @@
 # WO-681 — MVR scene off takes its fixtures and walls; ctrl / shift multi-select in the 3D previs
 
+**Area:** lighting, godot-client
 **Status: DONE (22.10, Godot 20988/0; box: none / Remove each took 52 fixtures + 1 mapped wall, Cancel kept them,
 re-pick re-patched 52; ctrl / shift-click selected 3 heads, ctrl-click toggled one off; owner QA: full import path)**
 

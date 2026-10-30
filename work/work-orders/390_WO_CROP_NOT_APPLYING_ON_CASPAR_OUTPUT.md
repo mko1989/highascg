@@ -1,5 +1,6 @@
 # WO-390 — "Crop didn't apply on the actual Caspar output"
 
+**Area:** engine, mapping
 **Status: DONE (06.08.26 — evidence window expired; §4 defect fixed; §3.1 class mitigated. Re-open with the §5 capture on next sighting.)**
 **Source:** owner 30.07.26 — "i had a look made with one of the layers with the crop effect. the crop
 didnt apply on the actual caspar output."

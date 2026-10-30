@@ -1,5 +1,6 @@
 # WO-371 — "In PRV the playlist stops after the first item": the owner ticked the design and then reported it as a bug
 
+**Area:** engine, web-client
 **Status: DONE (2026-08-04 — option C implemented, §6–7: ⏮/⏭ step the PRV render via a schedule-free stage path; smoke 3/3, suite 1818/0/2, deployed both halves. Owner QA: step a playlist look recalled to PRV)**
 
 > Owner, 29.07, on re-reading the options: *"actually it makes sense that it pauses."* — asked which

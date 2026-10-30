@@ -1,5 +1,6 @@
 # WO-213 — PRV border/PIP overlays sometimes render with stale settings while editing
 
+**Area:** engine
 **Status:** Done
 **Priority:** Medium
 **Date:** 2026-07-14

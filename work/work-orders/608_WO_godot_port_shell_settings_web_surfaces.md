@@ -1,6 +1,7 @@
-**Status: ✅ DONE (2026-10-20) — every port-plan step (shell R1–R5, header, all Settings tabs, logs, project / USB modals, hardware reconcile, missing assets, optional modules / CG Studio, connection A/B profiles) ported and box-verified; owner checks in work/checklist20.10.26_owner_checks.md. D1/D2 decided by the owner 17.10; D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
-
 # WO-608 — Godot port: app shell, header, settings, logs, project/load/USB modals, connection, optional modules — and what stays web
+
+**Area:** godot-client
+**Status: DONE — ✅ DONE (2026-10-20) — every port-plan step (shell R1–R5, header, all Settings tabs, logs, project / USB modals, hardware reconcile, missing assets, optional modules / CG Studio, connection A/B profiles) ported and box-verified; owner checks in work/checklist20.10.26_owner_checks.md. D1/D2 decided by the owner 17.10; D3 defaults to the recommendation. Parent: [WO-593](./593_WO_godot_client_port_epic.md). Depends on: WO-599.**
 
 ## Investigation
 

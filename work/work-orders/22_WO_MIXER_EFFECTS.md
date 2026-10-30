@@ -1,5 +1,9 @@
 # Work Order 22: Mixer Effects — Effects Tab, Drag-and-Drop, Inspector Editors
 
+**Area:** engine, web-client
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 > **⚠️ AGENT COLLABORATION PROTOCOL**
 > Every agent that works on this document MUST:
 > 1. Add a dated entry to the "Work Log" section at the bottom documenting what was done
@@ -199,5 +203,5 @@ Extend the existing `applyLayerSettings` / scene-transition / timeline-engine to
 - Future: transition duration/tween UI, visual perspective editor.
 
 ---
-*Work Order created: 2026-04-12 | Parent: [`00_PROJECT_GOAL.md`](./00_PROJECT_GOAL.md) · Architecture index: [`PROJECT_BREAKDOWN.md`](./PROJECT_BREAKDOWN.md) · Related: `08_WO_CASPARCG_CLIENT_FEATURES.md` (client features), `07_WO_AMCP_PROTOCOL_API.md` (AMCP API)*
+*Work Order created: 2026-04-12 | Parent: [`00_PROJECT_GOAL.md`](./00_PROJECT_GOAL.md) · Architecture index: [`PROJECT_BREAKDOWN.md`](../notes/PROJECT_BREAKDOWN.md) · Related: `08_WO_CASPARCG_CLIENT_FEATURES.md` (client features), `07_WO_AMCP_PROTOCOL_API.md` (AMCP API)*
 *Reference: `Client-master/src/Core/Commands/` (official CasparCG Client mixer commands)*

@@ -1,5 +1,6 @@
 # WO-746 — One shared project across linked servers (WO-732 P2 = WO-712 R5 = the WO-670 piece never built)
 
+**Area:** network
 **Status: IN PROGRESS — BUILT, OFF (25.10.26). Proven offline (merge 9, gates 19, e2e smoke 6, `run-cluster-e2e --scenario=show` 10/10 on three sandbox servers) and deployed on both boxes with sharing off (live `GET /api/cluster` → `show.on: false`; the Devices toggle asks before switching on, Cancel leaves it off). Switching it on, on both boxes, is the owner's call (both are on-air). Detachable: see "How to remove".**
 
 ## Investigation

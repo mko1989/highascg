@@ -1,7 +1,8 @@
 # WO-33d — Device view: PixelHue device card, cabling, and layer bind
 
 **Parent:** [WO-33 index](./33_WO_DEVICE_VIEW_INDEX.md)  
-**Status:** Draft  
+**Area:** devices-config, web-client
+**Status:** OPEN — Draft  
 **Prerequisites:** [33a](./33a_WO_DEVICE_VIEW_DATA_MODEL_AND_API.md), [33c](./33c_WO_DEVICE_VIEW_CASPAR_BACKPLANE_UI.md)  
 **Existing code:** `src/pixelhue/client.js`, `src/api/routes-tandem-device.js` (`POST …/bind-input`), `POST /api/pixelhue/*` proxy
 

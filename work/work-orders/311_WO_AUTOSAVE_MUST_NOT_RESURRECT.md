@@ -1,5 +1,6 @@
 # WO-311 — Autosave must not recreate a project the factory reset trashed
 
+**Area:** engine, web-client
 **Status: DONE — implemented 2026-07-21 (commit acf2493: autosave returns 410 project_gone for retired slugs; client gates pushes). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Context — reconstructed from disk timestamps 2026-07-21

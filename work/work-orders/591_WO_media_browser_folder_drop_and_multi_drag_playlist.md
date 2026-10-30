@@ -1,6 +1,7 @@
-**Status: IMPLEMENTED (2026-10-04, commit b7c8962a, offline-verified only) — NOT built/deployed (box on show). Needs `npm run build:client` + kiosk F5 after the show, then owner QA**
-
 # WO-591 — Media browser: folder drop ingests contents; multi-select drag fills playlists
+
+**Area:** media, web-client
+**Status: DONE — IMPLEMENTED (2026-10-04, commit b7c8962a, offline-verified only) — NOT built/deployed (box on show). Needs `npm run build:client` + kiosk F5 after the show, then owner QA**
 
 Owner, 04.10: "i cant drop folders into the media browser. i mean i can but it only creates the
 folder. i should be able to select multiple files and drag and drop them into a playlist."

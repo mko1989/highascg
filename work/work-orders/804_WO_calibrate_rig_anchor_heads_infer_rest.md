@@ -1,5 +1,6 @@
 # WO-804 — Calibrate the rig together: pick anchor heads, operator places them, the rest is inferred
 
+**Area:** lighting
 **Status: IN PROGRESS (29.10, Opus) — built and verified offline (node + Godot suites) and by a live route probe; owner QA on the real rig open; the MVR export itself waits on WO-765**
 
 Owner, 29.10:

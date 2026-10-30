@@ -1,5 +1,9 @@
 # WO-28 — DeckLink input / output routing
 
+**Area:** video-io
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Location:** This work order lives under `work/` as the working copy for design + status. A short pointer also exists in `docs/28_WO_DECKLINK_INPUT_OUTPUT_ROUTING.md` so searches under `docs/` still resolve.
 
 ## Implementation status (HighAsCG)

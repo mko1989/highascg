@@ -1,5 +1,9 @@
 # WO-284 / WO-293 — Audio mixer: missing DeckLink inputs, VU meters, cross-screen routing
 
+**Area:** audio
+**Status: DONE (no status line before WO-846; classified from its content)**
+
+
 **Sources:** todos19.07.26 —
 - (WO-293) "decklink's input audio mixer doesnt show up."
 - (WO-284) "the audio mixer does not show 'vu' meters on the inputs, highascg should be aware which

@@ -1,4 +1,7 @@
-**Status: IMPLEMENTED (2026-09-10, offline suite 2413/0/2, client build clean, syntax-checked, prettier pre-existing-only on touched files, new files prettier-clean) — needs `highascg` service restart + client rebuild/kiosk reload + owner on-hardware confirmation**
+# WO-570 — look layer media transport trim
+
+**Area:** web-client, media
+**Status: DONE — IMPLEMENTED (2026-09-10, offline suite 2413/0/2, client build clean, syntax-checked, prettier pre-existing-only on touched files, new files prettier-clean) — needs `highascg` service restart + client rebuild/kiosk reload + owner on-hardware confirmation**
 
 ## Investigation
 

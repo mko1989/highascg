@@ -1,5 +1,6 @@
 # WO-357 — Shader Live: ▶ take (fixed) + PGM layer stack
 
+**Area:** engine
 **Status: DONE (2026-07-27, endpoint live-validated; on-air land = owner QA)** · Source: owner
 mid-day: "there is still no play button in the shaders editor. id also like to use empty space on
 the right of parameters to be able to stack shaders on layers… click layer 10 to exchange

@@ -1,5 +1,6 @@
 # WO-364 — PRV of a pgm_prv destination cannot be cabled to a GPU connector (todos28 follow-up, owner 28.07)
 
+**Area:** mapping, video-io
 **Status: DONE (28.07.26 — built + verified offline and against the live server; owner presses Apply for the Caspar/X restart)**
 
 Owner: "i tried connecting the prv of screen dest 1 to a gpu connector and it grabs the cable

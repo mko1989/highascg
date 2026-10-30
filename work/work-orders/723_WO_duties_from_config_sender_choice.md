@@ -1,5 +1,6 @@
 # WO-723 — Server duties come from config; "which server sends" is a choice only where it matters
 
+**Area:** network
 **Status: DONE (24.10.26 — offline suite + Godot units + a live two-box test: sandbox ↔ .4; owner QA on two boxes that both run this code)**
 
 Owner, 24.10 (about WO-712 R1's "THIS SERVER DOES" ticks):

@@ -1,5 +1,6 @@
 # WO-802 — Linking servers: only node servers link; Godot clients stay on their own node
 
+**Area:** network
 **Status: IN PROGRESS (29.10) — fix built and verified offline + boot check + live relay probe on this box; owner two-box QA open (see "Fix (29.10, Opus)")**
 
 Owner, 29.10:

@@ -1,8 +1,9 @@
 # WO-376 — route the virtual camera into shader channels (Shadertoy's webcam input)
 
-**Status: IMPLEMENTED 28.07.26 — owner chose option A with an explicit opt-in. Server + client + runtime done and fail-soft proven headless; the LIVE camera image is not yet verified (needs the restart, the tick on, and a browser that can open the device) — §7.**
+**Area:** video-io, engine
+**Status: DONE — IMPLEMENTED 28.07.26 — owner chose option A with an explicit opt-in. Server + client + runtime done and fail-soft proven headless; the LIVE camera image is not yet verified (needs the restart, the tick on, and a browser that can open the device) — §7.**
 
-Source: `work/work-orders/todos28.07.26`, owner line added 28.07:
+Source: `work/archive/todos/todos28.07.26`, owner line added 28.07:
 
 > some shaders allow camera input. make it possible to route the virtual cam output to the shaders.
 

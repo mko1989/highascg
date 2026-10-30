@@ -1,6 +1,7 @@
 # WO-384 — Companion: config would not save, preset captions/bus wrong, no timer buttons
 
-**Status: 🟡 Implemented 29.07.26 (module tests 32/32, lint/format clean) — owner: restart Companion against the dev module and check**
+**Area:** companion
+**Status: DONE — 🟡 Implemented 29.07.26 (module tests 32/32, lint/format clean) — owner: restart Companion against the dev module and check**
 
 Owner, 2026-07-29:
 > "i cant save the config of the module, because i have nothing in the backup ip. even though i

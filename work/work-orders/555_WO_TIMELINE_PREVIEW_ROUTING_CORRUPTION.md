@@ -1,12 +1,13 @@
 # WO-555 — previewing a timeline look could take PROGRAM off the air; PRV never let go of an old timeline
 
-**Status: FIXED in repo (03.09.2026), two bugs. 12 new smokes (regression-proven by reverting the
+**Area:** engine
+**Status: DONE — FIXED in repo (03.09.2026), two bugs. 12 new smokes (regression-proven by reverting the
 fix and confirming the load-bearing tests fail — see §3). Full offline suite 2377/2375/0/2, all
 green (including every prior WO-546..554 timeline test). Server restarted and live. Owner QA
 still owed. Issue 3 (no clean mix, still reported) and the header warning-triangle question are
 NOT resolved by this WO — see §5.**
 **Priority:** Critical — a routine preview click could silently take program off the air.
-**Source:** `work/work-orders/todos02.09.26`, owner live QA of WO-554 the same morning (03.09):
+**Source:** `work/archive/todos/todos02.09.26`, owner live QA of WO-554 the same morning (03.09):
 1. *"the preview is blocked on the timeline look after playing it. so the pgm and prv show the
    same thing until i specificaly click empty space to clear the prv. clicking other looks doesnt
    have an effect."*

@@ -1,5 +1,6 @@
 # WO-475 — Calamares install fails while the bridge partition is mounted
 
+**Area:** os-iso
 **Status: DONE (11.08.2026, verified: offline suite green with a new positional-order gate,
 `bash -n` clean) — owner QA: the next reinstall must get past partitioning with HIGHASCGDAT
 present, and `~/bridge` must be back after the installer closes**

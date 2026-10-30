@@ -1,6 +1,7 @@
 # WO-210 — Timer redesign: panel-owned screen timers, opacity on/off (never destroyed), high layer band, per-look enabled state
 
-**Status:** Wave A Complete (T210.1-T210.4 + SMOKE)
+**Area:** engine, web-client
+**Status:** IN PROGRESS — Wave A Complete (T210.1-T210.4 + SMOKE)
 **Priority:** High (owner: corner panel still doesn't display the actual timer; timers keep getting destroyed/orphaned by the look lifecycle)
 **Date:** 2026-07-14
 **Source:** owner (3 messages, 2026-07-14 ~13:40):

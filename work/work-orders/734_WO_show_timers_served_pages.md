@@ -1,5 +1,6 @@
 # WO-734 — Show timers on the served pages: presentation (OSCPoint via Companion), video inside it, main video
 
+**Area:** companion, web-client
 **Status: DONE (24.10.26) — offline smoke 8/8; live on this box against the real Companion (v5, OSCPoint module 1.4.0) with simulated OSCPoint messages; the strip was screenshotted on both pages. Open: the owner must set the Companion port (8000 → 8001), see below, and do QA with a real presenter laptop.**
 
 Owner, 24.10: *"for all the pages that the server serves, intake, operator dashboard, i need an inteligent timer

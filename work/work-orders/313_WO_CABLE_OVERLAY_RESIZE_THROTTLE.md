@@ -1,5 +1,6 @@
 # WO-313 — rAF-throttle the cable overlay resize handler (small)
 
+**Area:** web-client
 **Status: DONE — implemented 2026-07-21 (commit e14909d: cable overlay resize rAF-throttled (raf-throttle.js)). Status line was stale ("OPEN") until the 2026-07-26 audit.**
 
 ## Context

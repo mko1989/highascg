@@ -1,6 +1,7 @@
 # WO-239 — OSC variables parser still broken AFTER the WO-235 fixes went live
 
-**Status:** Fixed in repo — NEEDS highascg RESTART to activate | **Priority:** HIGH | **Date:** 2026-07-15
+**Area:** amcp, engine
+**Status:** DONE — Fixed in repo — NEEDS highascg RESTART to activate | **Priority:** HIGH | **Date:** 2026-07-15
 **Source:** owner: "still something is broken in the osc variables parser" — VERIFIED REAL: service restarted 12:57 (after the 12:36 WO-235 deploy), so the type-leaf fix is active and something else remains.
 
 ## Which variables are wrong (T239.1 findings)

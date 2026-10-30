@@ -1,11 +1,14 @@
-**Status: IMPLEMENTED (2026-09-11, offline suite 2424/0/2, client build clean, live-verified
+# WO-571 — live audio pgm leak and alsa mixer ambiguous control
+
+**Area:** audio
+**Status: DONE — IMPLEMENTED (2026-09-11, offline suite 2424/0/2, client build clean, live-verified
 GET responses, `highascg` service restarted with owner's go-ahead, kiosk reloaded) — owner-QA
 still owed: actually toggle the per-slot PGM buttons off + Save in the Live Audio Mixer and
 confirm audio drops off PGM; re-test the ALSA mixer sliders/mute on the live capture card.**
 
 ## Investigation
 
-Owner report, `work/work-orders/todos11.09.26`: "i have live audio input set now, its set to NOT
+Owner report, `work/archive/todos/todos11.09.26`: "i have live audio input set now, its set to NOT
 be routed to outputs as it is only used as fft source for shaders. yet it is present on pgm
 outputs... the other problem i had was with alsa mixer settings to make the audio capture
 active... i had errors and had to do it manually thru alsamixer from terminal."

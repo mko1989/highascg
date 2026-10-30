@@ -1,6 +1,7 @@
 # WO-09 — Global per-screen border effects and Art-Net control
 
-**Status:** Draft work order  
+**Area:** lighting, engine
+**Status:** OPEN — Draft work order  
 **Scope:** HighAsCG application (Web GUI / Server logic)  
 **Related context:** We have standard border overlays implemented for PIPs (Picture-in-Picture) in the inspector (see `client/components/inspector-pip-overlay.js` and `pip-overlay-registry.js`). The goal is to reuse these effects as global, per-screen overlays on a high CG layer (e.g., 998) and expose their parameters via Art-Net for external control.
 

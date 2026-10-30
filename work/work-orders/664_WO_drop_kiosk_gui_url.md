@@ -1,5 +1,6 @@
 # WO-664 — drop the kiosk's `guiUrl` from operator_gui destinations (keep `autoLaunch`)
 
+**Area:** godot-client, devices-config
 **Status: DONE (22.10.2026: offline 2736/0; node restarted on the box, operator-GUI layout 200, no errors in the journal).**
 
 Owner, 22.10, on the dead-field question left open by [WO-660](./660_WO_remove_gui_stream_encoder.md) ("delete `guiUrl` / `autoLaunch`?"): *"What you recommend"*. The recommendation: delete `guiUrl`, keep `autoLaunch`.
