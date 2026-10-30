@@ -62,8 +62,12 @@ async function buildTakeJobs(opts) {
 				const fadeDur =
 					forceCut || isMergeTransition || !(globalT?.duration > 0) ? 0 : globalT.duration
 				const { startSceneTimelineLayer } = require('./timeline-take')
+				// WO-828 D9: a CUT over an on-air look holds that look until the timeline's PLAY is acked + 5 frames (the timeline
+				// sits on 210+, above the held look, so the margin is invisible; 2 frames left ~35 ms spare on a 4K HAP clip)
+				const cutHoldMs = fadeDur === 0 && !isMergeTransition && currentMap.size > 0 ? 5000 / (Number(framerate) > 0 ? Number(framerate) : 50) : 0
 				const fadeIn = await startSceneTimelineLayer(self, amcp, channel, layer, {
 					fadeDur,
+					cutHoldMs,
 					screenIdx,
 					startAtCurrentPosition: false,
 					restrictToPreview: restrictTimelineToPreview,

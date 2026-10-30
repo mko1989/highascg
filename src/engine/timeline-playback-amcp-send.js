@@ -321,9 +321,10 @@ module.exports = {
 			if (!seamless) self.amcp.stop(ch, caspLayer).catch(_err => {
 				this._logDebug(`STOP ${ch}-${caspLayer} failed: ${_err.message}`)
 			})
-			self.amcp.raw(cmd).catch(_err => {
+			const sent = self.amcp.raw(cmd).catch(_err => {
 				this._logDebug(`PLAY ${cl} LOOP failed: ${_err.message}`)
 			})
+			this._transportAcks?.push(sent) // WO-828 D9: a CUT take holds the outgoing look until this is acked
 			/* WO-536: this PLAY carried no start position at all, so a looping clip always began at
 			 * its IN point no matter where the timeline playhead was — owner: *"it doesnt start in
 			 * correct place in regard to timelines playhead"*. It must be a SEPARATE `CALL … SEEK`:
@@ -408,9 +409,10 @@ module.exports = {
 		}
 
 		// Send all lines as one batch
-		self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
+		const sent = self.amcp.batchSendChunked(lines, { skipMixerPreCommit: true }).catch(_err => {
 			this._logDebug(`batch transport ${cl} failed: ${_err.message}`)
 		})
+		this._transportAcks?.push(sent) // WO-828 D9
 
 		return { hasDeferredLines }
 	},

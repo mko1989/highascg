@@ -121,7 +121,9 @@ test('WO-528: both take paths declare takeFade, and CUT is excluded', () => {
 	 * there is nothing to suppress and suppressing would be WO-139 T139.1's invisible CUT. WO-537
 	 * added `restart` here (start at 0 rather than resume), which is orthogonal; the assertion is
 	 * narrowed to the guarantee this WO owns rather than to the exact argument list. */
-	const cutBranch = takeSrc.match(/if \(!\(opts\.fadeDur > 0\)\) \{\n\t\teng\.play\(tlId, startPos([^\n]*)\)/)
+	/* WO-828 D9 wrapped the cut branch's play in the transport-ack collection (try/finally), so the play is no
+	 * longer the branch's first line — repointed to the first `eng.play` inside the branch, before its `return`. */
+	const cutBranch = takeSrc.match(/if \(!\(opts\.fadeDur > 0\)\) \{(?:(?!return \[\])[\s\S])*?\n\t+eng\.play\(tlId, startPos([^\n]*)\)/)
 	assert.ok(cutBranch, 'the cut branch still plays directly')
 	assert.doesNotMatch(cutBranch[1], /takeFade/, 'the cut branch must not suppress the engine opacity')
 })

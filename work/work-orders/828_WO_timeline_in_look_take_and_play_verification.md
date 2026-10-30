@@ -1,8 +1,9 @@
 # WO-828 — Timeline inside a look: does the take transition and play as the WOs say? (live verification + fixes)
 
-**Status: IN PROGRESS (30.10) — D1, D2, D3, D4, D5, D7 fixed and verified (offline suite 3659 pass / 0 fail, 247/247
-timeline smokes; live wire + PGM luma probe per fix, §5; independent coordinator re-run 30.10 06:00, §5.1). Open: D9 (new,
-CUT normal → timeline look shows 3 black frames, §3, follow-up in progress), D6 and D8 (owner decisions, §3).**
+**Status: DONE (30.10, live wire + PGM luma probe + offline suite) — D1, D2, D3, D4, D5, D7, D9 fixed and verified (§5;
+coordinator re-runs §5.1 and §5.3). Normal → normal CUT wire byte-identical (golden smoke). Offline suite 3666 tests /
+3664 pass / 0 fail / 2 skipped. Owner decisions left, not defects of the spec: D6 (one air timeline across screens) and
+D8 (end of a non-looping timeline: hold last frame or black), §3. Not probed on glass: the Proj (ch3) picture — wire only.**
 **Source:** owner 29.10: "find either a work order or a note that explains a proper timeline transition and playing a
 timeline from inside a look and run full tests to see if it's transitioning and playing exactly as explained."
 **Related:** WO-139, 152, 528, 537, 540, 541, 544–561, 574, 618, 782, 814 (sources of the spec below).
@@ -160,6 +161,45 @@ Fixed in priority order D1, D2, D7, D5, D3, D4. D6 and D8 were left alone on pur
     - D5 release vs stop;
     - the source pins for the hook await and the teardown reference.
 
+- **D9 (30.10)**: a CUT over an on-air look holds that look until the timeline's PLAY is acked, plus 5 channel frames
+  (first 2; raised to 5 by the coordinator, see below).
+  - `src/engine/timeline-playback-amcp-send.js` l.327, l.415: `_sendClipTransport` pushes the promise of its transport
+    send (the batch, or the loopAlways `raw` PLAY) onto `this._transportAcks` while a caller collects them.
+  - `src/engine/timeline-take.js` l.22 (`holdForTransportAcks`) and l.370–383 (CUT branch): with `opts.cutHoldMs > 0`,
+    the branch collects around `eng.play()`, awaits the acks (capped at 1 s, so a lost reply cannot stall a take), then
+    waits `cutHoldMs`.
+  - `src/engine/scene-take-lbg-jobs.js` l.66: `cutHoldMs = 5 frames` only when `fadeDur === 0`, not a merge transition,
+    and there is an on-air look (`currentMap.size > 0`). A fade take, a merge, an empty channel and the D3 retake (which
+    returns earlier) are untouched.
+  - Why this works: `buildTakeJobs` awaits `startSceneTimelineLayer`, and the teardown that clears the outgoing look runs
+    after `buildTakeJobs`. Holding inside the call delays the clear without a new code path. The normal → normal CUT never
+    reaches this code (no timeline layer).
+  - Why not LOADBG-ahead: it would need a new LOADBG/PLAY split in the engine transport, a much larger change for the
+    same result here.
+  - Measured on the box: Caspar answers `202 PLAY OK` about 11 ms after receiving the PLAY, before the first frame is
+    decoded. The ack alone is not the guard; the frames after it are. The observed clear lands about 95–100 ms after the
+    PLAY (ack, plus 2 frames, plus the take's own awaits). In the D9 failure the first timeline frame reached Caspar
+    about 40 ms after the PLAY, so there is about 50 ms of margin for this 3840×1792 HAP clip. A clip that is slower to
+    open (long-GOP H.264 with a deep SEEK) could still show a frame of black; raise the margin in
+    `scene-take-lbg-jobs.js` if that is ever measured.
+  - **Coordinator change: 2 → 5 frames.** The timeline plays on 210+, above the held outgoing look, so a longer hold is
+    invisible for a full-frame timeline: it only delays the clear of a look that is already covered. 2 frames left about
+    35–50 ms of spare time on one 4K HAP clip; 5 frames (100 ms at 50 fps) covers slower-opening clips at no visible cost.
+    The one case where it shows is a timeline with transparent areas, where the outgoing look stays visible under it
+    for about 100 ms longer, the same as the D4 caveat. Smoke pin and timing assertion updated (ack + 95 ms).
+  - Tests:
+    - New `tools/smoke/smoke-wo828-d9-cut-timeline-hold.test.js` (5 tests), registered in
+      `tools/ci/offline-test-files-2.js`. It drives the real `handleSceneTake` against a recording stub (as smoke-wo814).
+    - Normal → normal CUT, both `forceCut` and a look whose transition is CUT, with and without a timeline engine, equals
+      a golden wire captured from the pre-D9 tree (HEAD 2346492d, `git archive` copy); the HEAD and working-tree captures
+      were also compared byte for byte.
+    - Normal → TL CUT: the outgoing `CG/STOP 1-10` comes ≥ ack + 95 ms after the stub's delayed PLAY ack.
+    - `cutHoldMs` is opt-in and ignored on a fade take.
+    - A source pin on the jobs condition.
+    - The hold tests fail on the HEAD tree (checked), and the golden tests pass on both.
+    - `smoke-wo528-take-opacity-not-slammed.test.js`: the CUT-branch pin is repointed to the first `eng.play` inside the
+      branch, because the play is now wrapped in try/finally. Its guarantee (no `takeFade` on CUT) is unchanged.
+
 ## 3. Decisions
 
 - **D3 (taken here, from WO-537 + WO-548).** A retake of the timeline look already on air on that PGM restarts the
@@ -185,12 +225,11 @@ Fixed in priority order D1, D2, D7, D5, D3, D4. D6 and D8 were left alone on pur
   must be re-PUT). The PGM→PRV exchange then still records a timeline look in `scene.live[prv]` whose timeline is not on
   air, so PRV shows nothing for it (seen 30.10: `scene.live[4] = wo828-tl-proj`, playback null). Engine timelines in
   real projects are loaded from the project, so this may only affect hand-made test timelines.
-- **D9 (new, open, not caused by this WO).** A CUT from a normal look to a timeline look shows 3 black PGM frames
-  (22:30:41.839–.880). The CUT path sends `STOP/PLAY 1-210` and `STOP 1-110` in the same millisecond. The timeline clip's
-  first frame is not decoded yet, and nothing is LOADBG'd ahead. A normal CUT holds the outgoing look until the
-  LOADBG'd PLAY is acked (reference: 0 black). The code involved (the CUT `play()` branch and the CUT exit) is untouched
-  by this WO. Fix candidate: on a CUT, keep the outgoing layers until the timeline's PLAY is acked plus one or two frames,
-  like the normal path. Left for a follow-up, because it changes CUT timing for every timeline look.
+- **D9 (found 29.10, fixed 30.10, §2 / §5.2).** A CUT from a normal look to a timeline look showed 3 black PGM frames
+  (22:30:41.839–.880). The CUT path sent `STOP/PLAY 1-210` and `STOP 1-110` in the same millisecond, before the timeline
+  clip's first frame was decoded, and nothing was LOADBG'd ahead. A normal CUT holds the outgoing look until the LOADBG'd
+  PLAY is acked (reference: 0 black). Fix as the coordinator scoped it: CUT takes into a timeline look only, ack + 2
+  frames. Caveat: the margin, not the ack, is the guard (§2).
 - **Mixed look (step 3), noted.** The mixed look still uses the normal A/B rule for its normal layer. When the incoming
   normal layer lands on the lower bank, the outgoing one fades out under the fading-in timeline. Luma goes 129 → 120.8 →
   124.8, a shallow 6 % U (math: 0.75·K2 + 0.25·L1 at mid-fade), not a black frame. This is unchanged by WO-828. Holding
@@ -230,7 +269,7 @@ Regression steps:
 - 3 (mixed): timeline preset/fade as S1; normal layer via the bank rule; 0 black (the shallow U in §3).
 - 9 (easeboth): `1-210 OPACITY 1 25 easeinoutquad`, no Caspar error, eased monotonic ramp 104 → 124.
 - 10 (CUT normal → TL): `OPACITY 1 0`, STOP/PLAY, no preset/fade. As before, but the probe shows **3 black frames**
-  (D9, §3). A reference CUT normal → normal shows 0.
+  (D9, §3; fixed in §5.2). A reference CUT normal → normal shows 0.
 - 13: `POST /api/timelines/wo828tl/stop` without force while on PGM returns **409**.
 - End state: Dioda ch1 = KV LOOP 2 (layer 10), Proj ch3 = KV LOOP projekcja (`INFO`); playback null.
 
@@ -253,6 +292,48 @@ Independent of the fix agent, same harness (`take.sh` + `lumaprobe.py pgm1`):
   and the `wo828tl` entry that an earlier test autosave had put into `projects/mhp_harder.json` removed via
   `POST /api/project/autosave` (rev 333 → 334); `grep wo828 projects/` → none. Dioda PGM/PRV = KV LOOP 2,
   Proj = KV LOOP projekcja.
+
+### 5.2 D9 verified (30.10, 06:06–06:08, node restarted on the D9 code, PID 2441936)
+
+The fixtures were re-created (`decksync.js add`, PUT `tl.json`) and removed afterwards (`decksync.js remove`, `DELETE
+/api/timelines/wo828tl` → 200, `grep wo828 projects/` → none). Captures: scratchpad `wo828/y_*.txt|tsv`.
+
+| Case | Wire (ch1) | Luma (pgm1) |
+|---|---|---|
+| CUT Loop1 → TL-only, run 1 | `PLAY 1-210 … SEEK 0` at 30.126 (`202 PLAY OK` at .127), `CG 1-110 CLEAR` at .220, `STOP 1-110` at .225 | **0 black**, 104.6 → 123.5 |
+| run 2 | PLAY 54.374, `CG 1-10 CLEAR` 54.475 (+101 ms) | **0 black** |
+| run 3 | PLAY 01.108 (ack .119), `CG 1-110 CLEAR` 01.208 (+100 ms) | **0 black** |
+| run 4 | PLAY 07.836, `CG 1-10 CLEAR` 07.929 (+93 ms) | **0 black** |
+| CUT retake of TL-only | `OPACITY 1 0` + `PLAY 1-210 … SEEK 0`, no STOP (D3 path, no hold) | 0 black, no dip |
+| CUT TL-only → KV LOOP 2 | `LOADBG 1-110`, `PLAY 1-110`, then `STOP 1-210` (+73 ms); PRV keeps the timeline (D5) | 0 black, 120.4 → 124.6 |
+| MIX Loop1 → TL-only (regression) | preset, `STOP/PLAY 1-210`, `OPACITY 1 25` 76 ms after the PLAY (same as §5 x02), poll, then clear | 0 black, 105.5 → 123.5 |
+| MIX TL-only → KV LOOP 2 (regression) | `1-210 OPACITY 0 12 DEFER`, `PLAY 1-110`, poll, `STOP 1-210` | 0 black |
+
+Before the fix (29.10, x10_cut): `STOP 1-110` 2 ms after `PLAY 1-210`, then **3 black frames**.
+
+Gates:
+- `node tools/ci/run-offline-tests.js`: 3666 tests, 3664 pass, 0 fail, 2 skipped.
+- Timeline smoke set: 252/252 across 46 files.
+- `npx eslint . --max-warnings 216 --ignore-pattern 'godot/export/**'`: 0 errors, 215 warnings (exit 0).
+- `check-max-file-lines`: 0 over. `prettier --check tools/ci`: clean.
+
+End state: Dioda PGM ch1 and PRV ch2 = KV LOOP 2 (`scene.live[1]` = `[2]` = 7daf9777…, `INFO`). Proj ch3 = KV LOOP
+projekcja, untouched. Playback null.
+
+### 5.3 Coordinator re-run with the 5-frame margin (30.10, 06:15, node restarted on the final code)
+
+Fixtures re-created and removed again (deck, engine, `grep wo828 projects/` → none). `take.sh` + `lumaprobe.py pgm1`:
+
+| Case | Wire (ch1) | Luma |
+|---|---|---|
+| CUT KV LOOP 2 → TL-only, run 1 | `PLAY 1-210 … SEEK 0` 36.377, `CG 1-110 CLEAR` 36.532 (+155 ms), `STOP 1-110` .539 | 0 black (150 frames), min 119.2 |
+| CUT TL-only → KV LOOP 2 | — | 0 black, min 120.8 |
+| CUT KV LOOP 2 → TL-only, run 2 | `PLAY 1-210` 43.763, `CG 1-10 CLEAR` 43.925 (+162 ms) | 0 black, min 121.6 |
+| CUT TL-only → KV LOOP 2 | — | 0 black, min 120.8 |
+
+Gates on the final tree: offline suite 3666 / 3664 pass / 0 fail / 2 skipped (one earlier full run under load from the
+parallel code sweep had 1 timing flake; the clean re-run passed); eslint 0 errors / 215 warnings; check-max-file-lines
+0 over; prettier (CI scope) clean. End state: Dioda PGM/PRV = KV LOOP 2, Proj = KV LOOP projekcja, playback null.
 
 ## 4. Source map
 

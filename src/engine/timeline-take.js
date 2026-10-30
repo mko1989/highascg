@@ -18,6 +18,14 @@ function waitMs(ms) {
 	return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)))
 }
 
+/** WO-828 D9: wait for the timeline's transport acks (capped — a lost reply must not stall the take), then `marginMs`. */
+async function holdForTransportAcks(acks, marginMs, capMs = 1000) {
+	let timer = null
+	await Promise.race([Promise.all(acks), new Promise((r) => (timer = setTimeout(r, capMs)))])
+	clearTimeout(timer)
+	await waitMs(marginMs)
+}
+
 /**
  * @param {import('../caspar/amcp-client').AmcpClient} amcp
  * @param {number} channel
@@ -360,7 +368,18 @@ async function startSceneTimelineLayer(self, amcp, channel, layer, opts) {
 	 * Take button was unaffected because `playForTake` never resumes. */
 	const restart = !opts.startAtCurrentPosition
 	if (!(opts.fadeDur > 0)) {
-		eng.play(tlId, startPos, { restart })
+		/* WO-828 D9: on a CUT the caller clears the outgoing look right after this returns. The timeline's PLAY
+		 * opens its clip with no LOADBG ahead, so clearing at once showed black until the first frame decoded
+		 * (3 frames at 3840x1792, measured). `cutHoldMs` makes this call wait for the transport ack plus that
+		 * margin first — the normal path's hold (LOADBG acked, then PLAY), timeline edition. */
+		const acks = opts.cutHoldMs > 0 ? [] : null
+		eng._transportAcks = acks
+		try {
+			eng.play(tlId, startPos, { restart })
+		} finally {
+			eng._transportAcks = null
+		}
+		if (acks?.length) await holdForTransportAcks(acks, opts.cutHoldMs)
 		return []
 	}
 	// (the OPACITY 0 0 preset for these layers went out above, before the routing change)
