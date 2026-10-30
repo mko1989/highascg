@@ -26,6 +26,12 @@ func test_groups_and_masters() -> void:
 	t.eq(g.size(), 2, "live inputs + PGM 1 (PGM 2 has no layers)")
 	t.eq(g[0].title, "Live inputs", "live inputs first")
 	t.eq(g[1].title, "PGM 1 (ch 1)", "then per program channel")
+	var cm := {"screenLabels": ["Dioda", "Proj"]}
+	t.eq(DM.groups(ROWS, [1, 3], cm)[1].title, "Dioda PGM (ch 1)", "a labelled screen names its group (owner 30.10)")
+	t.eq(AR.bus_label(cm, 1), "Proj PGM", "labelled master")
+	t.eq(AR.bus_label(cm, 1, true), "Proj PRV", "labelled preview master")
+	t.eq(AR.bus_label({"screenLabels": ["Dioda"]}, 1), "PGM 2 Master", "unlabelled screen keeps the number")
+	t.eq(AR.inputs_title(cm, 0, 1), "Dioda PGM (ch 1) Inputs", "Audio tab group title")
 	t.eq((g[1].rows as Array).map(func(r: Dictionary) -> String: return r.key), ["pgm:1:layer:10", "pgm:1:layer:200"], "layers of ch 1")
 	t.eq(DM.masters(ROWS).map(func(r: Dictionary) -> String: return r.key), ["pgm:1", "prv:2", "pgm:3"], "masters in order")
 	t.eq(DM.master_label(ROWS[1]), "PGM 1", "short master label")

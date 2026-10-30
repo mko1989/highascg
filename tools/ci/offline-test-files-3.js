@@ -210,6 +210,7 @@ module.exports = [
 	'tools/smoke/smoke-wo860-overlay-take-out.test.js',
 	'tools/smoke/smoke-wo861-audio-parts.test.js',
 	'tools/smoke/smoke-wo861-live-audio-single-flight.test.js',
+	'tools/smoke/smoke-wo862-mixer-labels-new-input-unrouted.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

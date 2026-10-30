@@ -191,7 +191,11 @@ async function handlePost(path, body, ctx) {
 			// WO-604 slice 3: a DeckLink / v4l2 strip applies its audio-send policy and route matrix (input-audio-routing.js).
 			const input = mixerState.isMixerKey(b.key) && b.master !== true ? inputRouting.inputForKey(ctx.config, b.key) : null
 			const r = input
-				? await inputRouting.applyInputStrip(ctx, input, { ...b, gain: b.volume, muted: mixerState.snapshot().muted[b.key] === true })
+				? await inputRouting.applyInputStrip(ctx, input, {
+						...b,
+						gain: b.volume,
+						muted: mixerState.snapshot().muted[b.key] === true,
+					})
 				: await applyVolume(ctx, b)
 			// WO-604: a console strip no look owns sends its key — the server keeps the gain.
 			if (mixerState.isMixerKey(b.key)) mixerState.setGain(ctx, b.key, b.volume)
@@ -317,7 +321,11 @@ async function handlePost(path, body, ctx) {
 		}
 		// WO-604: `keys` (console strip keys) → the server keeps the solo set and derives the targets.
 		const keyed = Array.isArray(b.keys)
-		const solos = keyed ? b.keys.filter(mixerState.isMixerKey).map(mixerState.soloKeyToTarget) : Array.isArray(b.solos) ? b.solos : [] // [{ channel, layer }]
+		const solos = keyed
+			? b.keys.filter(mixerState.isMixerKey).map(mixerState.soloKeyToTarget)
+			: Array.isArray(b.solos)
+				? b.solos
+				: [] // [{ channel, layer }]
 		if (!ctx.amcp) {
 			return { status: 503, headers: JSON_HEADERS, body: jsonBody({ error: 'Caspar not connected' }) }
 		}
@@ -465,16 +473,20 @@ async function handlePost(path, body, ctx) {
 			const n = parseInt(String(b.audio_fft_source_slot), 10)
 			cs.audio_fft_source_slot = Number.isFinite(n) && n >= 1 && n <= 8 ? n : 0
 		}
-		// WO-845: a slot the save leaves without a device (removed) keeps no PGM selection — see the module.
-		const clearedPgm = require('../audio/live-audio-slot-prune').clearRemovedSlotPgmRoutes(cs)
-		if (clearedPgm.length) apiLog(ctx, 'info', `[Audio] live-inputs/config: cleared PGM route selection of removed slot(s) ${clearedPgm.join(', ')}`)
+		// WO-845 removed slots keep no PGM selection; WO-862 a newly added slot starts with none — see the module.
+		const pruned = require('../audio/live-audio-slot-prune').pruneSlotPgmRoutes(prevCfg.casparServer, cs, b)
+		for (const line of pruned) apiLog(ctx, 'info', `[Audio] live-inputs/config: ${line}`)
 		ctx.config.casparServer = { ...defaults.casparServer, ...cs }
 		if (ctx.configManager) {
 			ctx.configManager.save({ ...ctx.configManager.get(), casparServer: ctx.config.casparServer })
 		}
 		const { stopDroppedLiveAudioPgmRoutes } = require('../config/routing-setup-live-inputs')
 		const stoppedRoutes = await stopDroppedLiveAudioPgmRoutes(ctx, prevCfg) // WO-604: the server, not the client, STOPs them
-		return { status: 200, headers: JSON_HEADERS, body: jsonBody({ ok: true, casparServer: ctx.config.casparServer, stoppedRoutes }) }
+		return {
+			status: 200,
+			headers: JSON_HEADERS,
+			body: jsonBody({ ok: true, casparServer: ctx.config.casparServer, stoppedRoutes }),
+		}
 	}
 
 	return null

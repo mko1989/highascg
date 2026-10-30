@@ -1,4 +1,5 @@
 import { api } from '../lib/api-client.js'
+import { programInputsTitle } from '../lib/screen-label.js'
 import * as audioMixerState from '../lib/audio-mixer-state.js'
 import { resyncAudioMixer } from '../lib/audio-mixer-server-sync.js'
 import { debounceAsync, postAudioMute, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
@@ -8,13 +9,14 @@ import { sceneState } from '../lib/scene-state.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { meterMetaForInputRow } from '../lib/audio-mixer-rows.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
-import {
-	formatVolumeDb,
-	linearGainToFaderPercent,
-} from '../lib/audio-volume-scale.js'
+import { formatVolumeDb, linearGainToFaderPercent } from '../lib/audio-volume-scale.js'
 import { bindFaderResetGestures, UNITY_LINEAR_GAIN } from '../lib/audio-mixer-fader-bind.js'
 import { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
-import { crossScreenReasonText, parseCrossScreenTargets, validateCrossScreenAudioTarget } from '../lib/audio-cross-screen-routing.js'
+import {
+	crossScreenReasonText,
+	parseCrossScreenTargets,
+	validateCrossScreenAudioTarget,
+} from '../lib/audio-cross-screen-routing.js'
 import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
 
 const LANE_TIP = "Wide bar: the channel's level · thin bar: this layer's own audio (only while it has any)"
@@ -34,7 +36,7 @@ const LANE_TIP = "Wide bar: the channel's level · thin bar: this layer's own au
  */
 export function renderConsoleInputGroups(
 	inputsListEl,
-	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta, laneFills },
+	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta, laneFills }
 ) {
 	const inputsByCh = {}
 	for (const r of inputsList) {
@@ -44,7 +46,7 @@ export function renderConsoleInputGroups(
 
 	const groups = []
 	programChannels.forEach((ch, chIdx) => {
-		groups.push({ ch, title: `PGM ${chIdx + 1} (ch ${ch}) Inputs` })
+		groups.push({ ch, title: programInputsTitle(channelMap, chIdx, ch) })
 	})
 	groups.forEach((g) => {
 		const list = inputsByCh[g.ch] || []
@@ -103,19 +105,23 @@ export function renderConsoleInputGroups(
 					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${check.ok ? `data-cross-screen="${ch}"` : 'disabled'} title="${escapeAttr(title)}">${ch}</button>`
 				})
 				.join('')
-			const screensRowHtml = r.sceneId ? `
+			const screensRowHtml = r.sceneId
+				? `
 				<div class="audio-mixer-view__matrix">
 					<div class="audio-mixer-view__matrix-title">Screens</div>
 					<div class="audio-mixer-view__matrix-buttons">${pgmButtonsHtml}</div>
 				</div>
-			` : ''
+			`
+				: ''
 
-			const matrixHtml = r.sceneId ? `
+			const matrixHtml = r.sceneId
+				? `
 				<div class="audio-mixer-view__matrix">
 					<div class="audio-mixer-view__matrix-title">Stereo pair</div>
 					<div class="audio-mixer-view__matrix-buttons">${matrixButtonsHtml}</div>
 				</div>
-			` : ''
+			`
+				: ''
 			strip.innerHTML = `
 				<div class="audio-mixer-view__strip-label" title="${escapeAttr(labelTitle)}">${escapeHtml(r.label)}</div>
 				<div class="audio-mixer-view__fader-container">

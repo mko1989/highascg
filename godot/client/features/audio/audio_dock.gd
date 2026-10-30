@@ -113,7 +113,7 @@ func _refresh() -> void:
 	var s := JSON.stringify([DM.shape(_rows, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), progs), AR.screen_labels(cm)])
 	if s != _sig:
 		_sig = s
-		rebuild(_rows, progs, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), AR.screen_labels(cm))
+		rebuild(_rows, progs, func(r: Dictionary) -> int: return AR.bus_channel_count(Settings.settings, cm, r.ch), AR.screen_labels(cm), cm)
 		ctl.fetch_plan(_rows)
 	var solos := ctl.solos()
 	for r in _rows:
@@ -132,7 +132,7 @@ func _refresh() -> void:
 
 
 ## Builds the masters and the rows (headless-testable: `bars_of(row)` = the master's bus channel count).
-func rebuild(rows: Array, progs: Array, bars_of: Callable, labels: Dictionary = {}) -> void:
+func rebuild(rows: Array, progs: Array, bars_of: Callable, labels: Dictionary = {}, cm: Dictionary = {}) -> void:
 	for c in _masters.get_children() + _inputs.get_children():
 		c.get_parent().remove_child(c)
 		c.queue_free()
@@ -143,7 +143,7 @@ func rebuild(rows: Array, progs: Array, bars_of: Callable, labels: Dictionary = 
 		m.setup(r, int(bars_of.call(r)))
 		ctl.bind(m, r)
 		_masters.add_child(m)
-	for g in DM.groups(rows, progs):
+	for g in DM.groups(rows, progs, cm):
 		var h := _title(g.title)
 		_inputs.add_child(h)
 		var flow := HFlowContainer.new()  # the input columns wrap like the masters (owner 29.10: vertical faders)

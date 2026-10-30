@@ -1,4 +1,5 @@
 import { sceneState } from '../lib/scene-state.js'
+import { programBusLabel } from '../lib/screen-label.js'
 import { collectProgramAudioRows, collectLiveInputMeterRows } from '../lib/audio-mixer-rows.js'
 import { createAudioMeterLoop } from '../lib/audio-mixer-meter-loop.js'
 import { createLayerLevelPoller } from '../lib/audio-layer-levels.js'
@@ -49,8 +50,8 @@ export function mountAudioMixerViewConsole(stateStore, { root, tabPaneEl, inputs
 		mastersListEl.innerHTML = ''
 
 		const { programChannels, mastersList, inputsList } = collectProgramAudioRows(stateStore, {
-			masterLabel: (_ch, i) => `PGM ${i + 1} Master`,
-			previewLabel: (_ch, i) => `PRV ${i + 1} Master`,
+			masterLabel: (_ch, i) => programBusLabel(stateStore.getState()?.channelMap, i),
+			previewLabel: (_ch, i) => programBusLabel(stateStore.getState()?.channelMap, i, true),
 			labelMax: 14,
 			labelTailChars: 0,
 		})

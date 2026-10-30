@@ -368,14 +368,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true
@@ -628,14 +628,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 0.8,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 0.25,
 					"isMaster": true,
 					"isPreview": true
@@ -894,14 +894,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true
@@ -1104,14 +1104,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true
@@ -1409,14 +1409,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true
@@ -2133,14 +2133,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true
@@ -2479,14 +2479,14 @@
 				{
 					"key": "pgm:1",
 					"ch": 1,
-					"label": "PGM 1 Master",
+					"label": "Main LED (DP-7) PGM",
 					"v": 1,
 					"isMaster": true
 				},
 				{
 					"key": "prv:2",
 					"ch": 2,
-					"label": "PRV 1 Master",
+					"label": "Main LED (DP-7) PRV",
 					"v": 1,
 					"isMaster": true,
 					"isPreview": true

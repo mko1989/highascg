@@ -7,6 +7,7 @@ extends RefCounted
 
 const AA := preload("res://features/audio/audio_actions.gd")
 const R := preload("res://features/devices/cable_rules.gd")
+const AR := preload("res://features/audio/audio_rows.gd")
 const DENSE_BARS := 4  # > 4 bus channels → dense master
 const DENSE_ROWS := 4  # > 4 layers in a group → tighter rows
 const BAR_W := 9  # meter_bank.gd's width per bar
@@ -33,8 +34,9 @@ static func master_label(r: Dictionary) -> String:
 	return str(r.get("label", "")).trim_suffix(" Master")
 
 
-## [{title, rows, dense}]: "Live inputs" (when any), then "PGM n (ch c)" per program channel with layers.
-static func groups(rows: Array, programs: Array) -> Array:
+## [{title, rows, dense}]: "Live inputs" (when any), then "PGM n (ch c)" per program channel with layers —
+## "Dioda PGM (ch c)" for a labelled screen.
+static func groups(rows: Array, programs: Array, cm := {}) -> Array:
 	var out: Array = []
 	var live := rows.filter(func(r: Dictionary) -> bool: return r.get("isLiveInput", false) == true)
 	if not live.is_empty():
@@ -43,7 +45,7 @@ static func groups(rows: Array, programs: Array) -> Array:
 		var list := rows.filter(func(r: Dictionary) -> bool:
 			return r.get("isMaster", false) != true and r.get("isLiveInput", false) != true and float(r.ch) == float(programs[i]))
 		if not list.is_empty():
-			out.append({"title": "PGM %d (ch %s)" % [i + 1, R.s(programs[i])], "rows": list, "dense": list.size() > DENSE_ROWS})
+			out.append({"title": AR.inputs_title(cm, i, programs[i], ""), "rows": list, "dense": list.size() > DENSE_ROWS})
 	return out
 
 

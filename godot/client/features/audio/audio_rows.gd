@@ -107,12 +107,12 @@ static func program_rows(st: Dictionary, label_max := 14, tail := 0) -> Array:
 	for i in progs.size():
 		var ch: Variant = progs[i]
 		var key := "pgm:" + R.s(ch)
-		rows.append({"key": key, "ch": ch, "label": "PGM %d Master" % (i + 1), "v": gain(mixer, key), "isMaster": true})
+		rows.append({"key": key, "ch": ch, "label": bus_label(cm, i), "v": gain(mixer, key), "isMaster": true})
 		var prvs := R.a(cm.get("previewChannels"))
 		var prv: float = HC._js_num(prvs[i]) if i < prvs.size() else NAN
 		if is_finite(prv) and prv > 0:
 			var pk := "prv:" + R.s(prv)
-			rows.append({"key": pk, "ch": prv, "label": "PRV %d Master" % (i + 1), "v": gain(mixer, pk), "isMaster": true, "isPreview": true})
+			rows.append({"key": pk, "ch": prv, "label": bus_label(cm, i, true), "v": gain(mixer, pk), "isMaster": true, "isPreview": true})
 		var tl := _active_timeline(cm, st.get("playback"), R.a(st.get("timelines")), ch)
 		if tl.get("layers") is Array:
 			_timeline_rows(rows, tl.layers, ch, label_max, tail)
@@ -349,6 +349,26 @@ static func screen_label(cm: Dictionary, ch: int) -> String:
 	var labels: Variant = cm.get("screenLabels")
 	var lab := str(labels[idx]) if (labels is Array and idx < labels.size() and labels[idx] != null) else ""
 	return lab if lab != "" else "S%d" % (idx + 1)
+
+
+## A program bus's mixer name (web client/lib/screen-label.js programBusLabel; owner 30.10): the screen's own label +
+## PGM / PRV ("Dioda PGM"), an unlabelled screen "PGM 1 Master" / "PRV 1 Master".
+static func bus_label(cm: Dictionary, idx: int, preview := false) -> String:
+	var own := _own_label(cm, idx)
+	var kind := "PRV" if preview else "PGM"
+	return "%s %s" % [own, kind] if own != "" else "%s %d Master" % [kind, idx + 1]
+
+
+## The program's input group title (web programInputsTitle): "Dioda PGM (ch 1) Inputs", unlabelled "PGM 1 (ch 1) Inputs".
+## `suffix` "" gives the Inspector dock's shorter "Dioda PGM (ch 1)".
+static func inputs_title(cm: Dictionary, idx: int, ch: Variant, suffix := " Inputs") -> String:
+	var own := _own_label(cm, idx)
+	return "%s (ch %s)%s" % ["%s PGM" % own if own != "" else "PGM %d" % (idx + 1), R.s(ch), suffix]
+
+
+static func _own_label(cm: Dictionary, idx: int) -> String:
+	var labels: Variant = cm.get("screenLabels")
+	return str(labels[idx]) if (labels is Array and idx < labels.size() and labels[idx] != null) else ""
 
 
 ## {program channel: screen label} for every program channel of the console (the strips' route buttons).

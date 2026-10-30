@@ -151,7 +151,7 @@ func _rebuild(cm: Dictionary) -> void:
 		var list := _rows.filter(func(r: Dictionary) -> bool:
 			return r.get("isMaster", false) != true and r.get("isLiveInput", false) != true and float(r.ch) == float(progs[i]))
 		if not list.is_empty():
-			_inputs.add_child(_group("PGM %d (ch %s) Inputs" % [i + 1, AR.R.s(progs[i])], list, cm))
+			_inputs.add_child(_group(AR.inputs_title(cm, i, progs[i]), list, cm))
 	if _inputs.get_child_count() == 0:
 		var e := Label.new()
 		e.text = "🎚  " + EMPTY

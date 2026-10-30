@@ -1,4 +1,5 @@
 import { api } from '../lib/api-client.js'
+import { programInputsTitle } from '../lib/screen-label.js'
 import * as audioMixerState from '../lib/audio-mixer-state.js'
 import { resyncAudioMixer } from '../lib/audio-mixer-server-sync.js'
 import { debounceAsync, postAudioMute, postAudioVolume } from '../lib/audio-mixer-volume-api.js'
@@ -8,10 +9,7 @@ import { sceneState } from '../lib/scene-state.js'
 import { showScenesToast } from './scenes-editor-support.js'
 import { meterMetaForInputRow } from '../lib/audio-mixer-rows.js'
 import { escapeHtml, escapeAttr } from '../lib/audio-mixer-ui.js'
-import {
-	formatVolumeDb,
-	linearGainToFaderPercent,
-} from '../lib/audio-volume-scale.js'
+import { formatVolumeDb, linearGainToFaderPercent } from '../lib/audio-volume-scale.js'
 import { bindFaderResetGestures, UNITY_LINEAR_GAIN } from '../lib/audio-mixer-fader-bind.js'
 import { syncFaderUI, syncMuteUI, syncAllSolosUI } from './audio-mixer-panel-sync.js'
 import {
@@ -35,7 +33,7 @@ import { bindCrossScreenButtons } from './audio-mixer-cross-screen-bind.js'
  */
 export function renderInspectorProgramInputLayers(
 	inputsEl,
-	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta },
+	{ programChannels, inputsList, settings, channelMap, stateStore, meterFills, meterLayerMeta }
 ) {
 	const inputsByCh = {}
 	for (const r of inputsList) {
@@ -45,7 +43,7 @@ export function renderInspectorProgramInputLayers(
 
 	const groups = []
 	programChannels.forEach((ch, chIdx) => {
-		groups.push({ ch, title: `PGM ${chIdx + 1} (ch ${ch}) Inputs` })
+		groups.push({ ch, title: programInputsTitle(channelMap, chIdx, ch) })
 	})
 	groups.forEach((g) => {
 		const list = inputsByCh[g.ch] || []
@@ -64,7 +62,7 @@ export function renderInspectorProgramInputLayers(
 			const options = routes
 				.map(
 					(rt) =>
-						`<option value="${escapeAttr(rt.value)}"${rt.value === r.audioRoute ? ' selected' : ''}>${escapeHtml(rt.label)}</option>`,
+						`<option value="${escapeAttr(rt.value)}"${rt.value === r.audioRoute ? ' selected' : ''}>${escapeHtml(rt.label)}</option>`
 				)
 				.join('')
 
@@ -93,14 +91,18 @@ export function renderInspectorProgramInputLayers(
 					return `<button type="button" class="audio-mixer-view__matrix-btn${active ? ' audio-mixer-view__matrix-btn--active' : ''}" ${check.ok ? `data-cross-screen="${ch}"` : 'disabled'} title="${escapeAttr(title)}">${ch}</button>`
 				})
 				.join('')
-			const screensRowHtmlPanel = r.sceneId ? `
+			const screensRowHtmlPanel = r.sceneId
+				? `
 				<div class="audio-mixer-view__matrix" style="margin-bottom: 8px;">
 					<div class="audio-mixer-view__matrix-title">Screens</div>
 					<div class="audio-mixer-view__matrix-buttons">${pgmButtonsHtmlPanel}</div>
 				</div>
-			` : ''
+			`
+				: ''
 
-			const routeHtml = r.sceneId ? `<select class="audio-mixer__route-sel" data-ch="${r.ch}" data-layer="${r.layer}" data-scene="${escapeAttr(r.sceneId)}" aria-label="Stereo pair" title="Audio stereo pair routing destination">${options}</select>` : ''
+			const routeHtml = r.sceneId
+				? `<select class="audio-mixer__route-sel" data-ch="${r.ch}" data-layer="${r.layer}" data-scene="${escapeAttr(r.sceneId)}" aria-label="Stereo pair" title="Audio stereo pair routing destination">${options}</select>`
+				: ''
 			const isSolo = audioMixerState.isSoloed(r.key)
 			const soloHtml = `<button type="button" class="audio-mixer__solo-btn${isSolo ? ' audio-mixer__solo-btn--active' : ''}" data-key="${escapeAttr(r.key)}" title="Solo this layer to monitor">S</button>`
 			const isMuted = !!r.muted
