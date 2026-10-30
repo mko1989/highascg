@@ -32,3 +32,16 @@ for proj in "$REPO/godot/spikes/m0" "$REPO/godot/client"; do
 		echo "res://addons/hshm/hshm.gdextension" >> "$proj/.godot/extension_list.cfg"
 	echo "[hshm] installed into ${proj#$REPO/}/addons/hshm"
 done
+
+# WO-863: the writer (HshmSink) for the client's Visuals tab. Copied beside, then renamed: a cp over a .so a running
+# client has mapped crashes it (WO-743), a rename does not.
+sink="$REPO/godot/client/addons/hshm_sink"
+if [[ -f "$sink/hshm_sink.gdextension" ]]; then
+	mkdir -p "$sink/bin"
+	for so in "$HERE"/bin/libhshm_sink.*; do
+		cp "$so" "$sink/bin/.$(basename "$so").new" && mv -f "$sink/bin/.$(basename "$so").new" "$sink/bin/$(basename "$so")"
+	done
+	grep -qs "res://addons/hshm_sink/hshm_sink.gdextension" "$REPO/godot/client/.godot/extension_list.cfg" ||
+		echo "res://addons/hshm_sink/hshm_sink.gdextension" >> "$REPO/godot/client/.godot/extension_list.cfg"
+	echo "[hshm] sink installed into godot/client/addons/hshm_sink"
+fi

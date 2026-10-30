@@ -12,6 +12,7 @@ const SettingsTab := preload("res://features/settings/settings_tab.gd")
 const DevicesTab := preload("res://features/devices/devices_tab.gd")
 const AudioTab := preload("res://features/audio/audio_tab.gd")
 const MultiviewTab := preload("res://features/multiview/multiview_tab.gd")
+const VisualsTab := preload("res://features/visuals/visuals_tab.gd")
 const MediaPanel := preload("res://features/live/media_panel.gd")
 const OscMirror := preload("res://features/live/osc_mirror.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
@@ -72,16 +73,20 @@ func _ready() -> void:
 	audio_dock.osc = osc
 	inspector.add_footer(audio_dock)
 	sources.inspector.osc_mirror = osc
+	# Owner 30.10 (WO-863): Live, Timeline, Visuals, Previs, Audio, Devices, Multiview (only once one exists), Settings.
 	var live := LiveTab.new()
 	live.name = "Live"
 	live.osc = osc
 	tabs.add_child(live)
-	var previs := PrevisTab.new()
-	previs.name = "Previs"
-	tabs.add_child(previs)
 	var timeline := TimelineTab.new()  # WO-602
 	timeline.name = "Timeline"
 	tabs.add_child(timeline)
+	var visuals := VisualsTab.new()  # WO-863
+	visuals.name = "Visuals"
+	tabs.add_child(visuals)
+	var previs := PrevisTab.new()
+	previs.name = "Previs"
+	tabs.add_child(previs)
 	var audio := AudioTab.new()  # WO-604
 	audio.name = "Audio"
 	audio.osc = osc
@@ -99,13 +104,16 @@ func _ready() -> void:
 	var multiview := MultiviewTab.new()  # WO-600 M
 	multiview.name = "Multiview"
 	tabs.add_child(multiview)
+	_hide_multiview_until_created(multiview)
 	sources.tab_requested.connect(func(n: String) -> void: tabs.current_tab = tabs.get_tab_idx_from_control(tabs.get_node(n.capitalize())))
 	var settings := SettingsTab.new()  # WO-608
 	settings.name = "Settings"
 	settings.logs_requested.connect(_open_logs)
 	tabs.add_child(settings)
-	if Config.args.has("tab"):
-		tabs.current_tab = clampi(int(Config.args["tab"]), 0, tabs.get_tab_count() - 1)
+	if Config.args.has("tab"):  # --tab=N (index) or --tab=Previs (name — survives a reorder)
+		var want := str(Config.args["tab"])
+		var named := tabs.get_node_or_null(NodePath(want.capitalize())) as Control
+		tabs.current_tab = tabs.get_tab_idx_from_control(named) if named else clampi(int(want), 0, tabs.get_tab_count() - 1)
 	Ws.connected.connect(_refresh_eye)
 	Ws.disconnected.connect(_refresh_eye)
 	Store.changed.connect(func(_p: String, _v: Variant) -> void: _refresh_eye())
@@ -122,6 +130,15 @@ func _ready() -> void:
 	perf.toggled.connect(func(on: bool) -> void: _perf_btn.set_pressed_no_signal(on))
 	add_child(perf)
 	_add_dock()
+
+
+## Owner 30.10 (WO-863): the Multiview tab shows only once a multiview exists (channelMap multiview channel, enabled).
+func _hide_multiview_until_created(mv: Control) -> void:
+	var sync := func() -> void: tabs.set_tab_hidden(tabs.get_tab_idx_from_control(mv), not mv.enabled())
+	Store.changed.connect(func(path: String, _v: Variant) -> void:
+		if path == "*" or path == "channelMap":
+			sync.call_deferred())  # after the tab's own channelMap listener
+	sync.call_deferred()
 
 
 ## WO-628 — bottom-centre app dock on the box's own screen. WO-735: decided on the box's own server, so a server box

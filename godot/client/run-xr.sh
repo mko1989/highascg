@@ -71,4 +71,4 @@ else
 fi
 export XDG_DATA_HOME="${HIGHASCG_XR_USER:-$HOME/.local/share/highascg-xr}"
 mkdir -p "$XDG_DATA_HOME"
-exec "$GODOT" --path "$HERE" --xr-mode "$xr_mode" -- --xr --windowed --tab=1 "$@"
+exec "$GODOT" --path "$HERE" --xr-mode "$xr_mode" -- --xr --windowed --tab=Previs "$@"

@@ -194,9 +194,9 @@ func _ready() -> void:
 	Store.project_changed.connect(func(_p: Dictionary) -> void: _maybe_reload())
 	await refresh_types()
 	_maybe_reload()
-	if Config.args.has("open-pixel-map"):  # --open-pixel-map (with --tab=1): open the Pixel map window on start (WO-807)
+	if Config.args.has("open-pixel-map"):  # --open-pixel-map (with --tab=Previs): open the Pixel map window on start (WO-807)
 		get_tree().create_timer(4.0).timeout.connect(_open_pixel_map)
-	if Config.args.has("open-pixel-proposal"):  # --open-pixel-proposal (with --tab=1): the proposal modal on start
+	if Config.args.has("open-pixel-proposal"):  # --open-pixel-proposal (with --tab=Previs): the proposal modal on start
 		_proposal.state_changed.connect(func(_p: Dictionary) -> void: print("[pixel-proposal] tooltip: ", _pixmap.tooltip_text), CONNECT_ONE_SHOT)
 		get_tree().create_timer(4.0).timeout.connect(_proposal.open)
 

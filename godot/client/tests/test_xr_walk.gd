@@ -126,7 +126,7 @@ func test_stage_hook() -> void:
 
 func test_headset_launch() -> void:
 	var sh := FileAccess.get_file_as_string("res://run-xr.sh")
-	t.ok(sh.contains("exec \"$GODOT\" --path \"$HERE\" --xr-mode \"$xr_mode\" -- --xr --windowed --tab=1 \"$@\""),
+	t.ok(sh.contains("exec \"$GODOT\" --path \"$HERE\" --xr-mode \"$xr_mode\" -- --xr --windowed --tab=Previs \"$@\""),
 		"run-xr.sh: the XR mode (an engine flag, before --), the walk, the Previs tab")
 	t.ok(sh.contains("xr_mode=off\n") and sh.contains("\txr_mode=on\n"),
 		"on only with a runtime: without one Godot blocks on a modal alert")

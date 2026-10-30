@@ -1,5 +1,5 @@
 extends Node
-## dev: --probe-fixture=<type id>:<png prefix> (with --tab=1) — WO-784: the orbit camera close on the first patched head
+## dev: --probe-fixture=<type id>:<png prefix> (with --tab=Previs) — WO-784: the orbit camera close on the first patched head
 ## of that GDTF type, from the front and from below, so its body colour and beam glow can be checked off-screen.
 ## Screenshots <prefix>_N.png; _3 = the whole stage (Fit). --probe-haze=<0…1> sets the haze (WO-786) for this run
 ## only (not saved to ui.cfg, which the owner's client shares).

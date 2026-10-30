@@ -10,8 +10,9 @@
  * Live e2e 29.10: `operatorCompose` (the operator-screen PGM/PRV cell layout, written by the server in
  * src/system/operator-gui-compose-persist.js, round-tripped by Godot) is not in the web export key list either: opening
  * the web UI once autosaved mhp_harder without it. Same rule — omitted keeps the stored copy.
+ * WO-863: `visuals` (the Godot Visuals tab: Flow graph, base parameters, output screen/layer) is Godot-owned.
  */
-const CLIENT_OWNED_SLICES = ['previs', 'fixtures', 'operatorCompose']
+const CLIENT_OWNED_SLICES = ['previs', 'fixtures', 'operatorCompose', 'visuals']
 /**
  * WO-807 — slices only the SERVER writes (`pixelMappings`: POST /api/fixtures/pixelmap). A client save / autosave never
  * changes them: the stored copy always wins (a Godot autosave posts its whole, possibly stale, project and retries a

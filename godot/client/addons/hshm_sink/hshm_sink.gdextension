@@ -1,0 +1,15 @@
+; WO-743 — HighAsCG shared-memory WRITER (HshmSink: Godot pixels → a ring Caspar plays, WO-742). Installed
+; into the client for the WO-863 Visuals tab (Send to screen); build: godot/extensions/hshm (WO-743), bin/ not committed.
+[configuration]
+
+entry_symbol = "hshm_sink_library_init"
+compatibility_minimum = "4.6"
+
+[libraries]
+
+linux.debug.x86_64 = "res://addons/hshm_sink/bin/libhshm_sink.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/hshm_sink/bin/libhshm_sink.linux.template_release.x86_64.so"
+macos.debug.x86_64 = "res://addons/hshm_sink/bin/libhshm_sink.macos.template_debug.x86_64.dylib"
+macos.release.x86_64 = "res://addons/hshm_sink/bin/libhshm_sink.macos.template_release.x86_64.dylib"
+macos.debug.arm64 = "res://addons/hshm_sink/bin/libhshm_sink.macos.template_debug.arm64.dylib"
+macos.release.arm64 = "res://addons/hshm_sink/bin/libhshm_sink.macos.template_release.arm64.dylib"

@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-773 live WOs (35 open, 120 in progress, 618 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+774 live WOs (35 open, 120 in progress, 619 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -351,7 +351,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 825 IN PROGRESS [lighting+media] GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture) → 825_WO_gdtf_share_library_size_builtin_vs_optin.md
 - 857 OPEN [lighting+tracking-vr] Mirror the console's group / head selection in the previs (MagicQ, grandMA3 rem… → 857_WO_console_selection_mirror_chamsys_gma3.md
 
-## godot-client — Godot client (81)
+## godot-client — Godot client (82)
 
 - 593 IN PROGRESS [godot-client] Port the operator client to Godot, built around Caspar channels in shared memor… → 593_WO_godot_client_port_epic.md
 - 596 IN PROGRESS [godot-client+caspar-build] hshm GDExtension: shared-memory channel frames → Godot textures → 596_WO_godot_hshm_gdextension.md
@@ -434,6 +434,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 838 DONE [godot-client] Lockscreen (Settings) → 838_WO_lockscreen.md
 - 839 DONE [godot-client] Number fields take only numbers: gibberish reverts, never salvaged → 839_WO_number_fields_numbers_only.md
 - 843 OPEN [godot-client] Sweep: Godot client bugs → 843_WO_sweep_godot_client_bugs.md
+- 863 DONE [godot-client+engine,audio] Visuals tab: audio-reactive canvas, 3D / Flow views, send to a screen destinati… → 863_WO_visuals_tab_canvas_flow_send_to_screen.md
 
 ## web-client — Web client (82)
 

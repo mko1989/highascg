@@ -18,6 +18,11 @@ if [[ -f "$HERE/addons/hshm/hshm.gdextension" ]]; then
 	mkdir -p "$HERE/.godot"
 	echo "res://addons/hshm/hshm.gdextension" > "$HERE/.godot/extension_list.cfg"
 fi
+if [[ -f "$HERE/addons/hshm_sink/bin/libhshm_sink.linux.template_debug.x86_64.so" ]]; then  # WO-863: Visuals → Send
+	mkdir -p "$HERE/.godot"
+	grep -qs "res://addons/hshm_sink/hshm_sink.gdextension" "$HERE/.godot/extension_list.cfg" ||
+		echo "res://addons/hshm_sink/hshm_sink.gdextension" >> "$HERE/.godot/extension_list.cfg"
+fi
 # --test / --check get their own user:// (WO-753): on a kiosk box they otherwise share the kiosk's, truncating its live
 # godot.log under it and saving their ui.cfg over the kiosk's.
 if [[ "${1:-}" == "--test" || "${1:-}" == "--check" ]]; then
