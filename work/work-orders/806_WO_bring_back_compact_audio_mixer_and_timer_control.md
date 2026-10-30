@@ -383,7 +383,12 @@ not written to `ui.cfg` like Playlists).
 
 Owner, 29.10: *"the compact audio mixer has masters as vertical faders (good) and inputs as horizontal (bad)"*.
 
-### Investigation (before the change, file:line at HEAD 335b030f)
+### Owner decision on G3 (30.10)
+
+*"timers should be saved in looks presets as they are per screen not per look."* Timer visibility moves from the
+look to the look preset (one per screen), in both clients. Filed as WO-840. RULES.md "Timers" rule 1.
+
+## Investigation (before the change, file:line at HEAD 335b030f)
 
 - **Row builder** — `godot/client/features/audio/audio_dock_row.gd` (245 lines), `extends VBoxContainer`, one
   `setup()` (`:59-143`) that builds a single `HBoxContainer` line (`:64-66`): label 86 px (`LABEL_W :20`, `:67-79`),

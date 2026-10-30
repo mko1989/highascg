@@ -11,6 +11,13 @@ one is a regression, whatever else it fixes. Add a rule here when the owner stat
 2. **Number fields accept maths.** Every field that holds a number evaluates `+ - * /` (and parentheses) when it
    is committed with Enter or by leaving the field: `1920/2` → `960`, `3840-64` → `3776`. Input that is not a valid
    expression leaves the previous value in place. The result is then clamped and rounded like a typed number.
+3. **Number fields take only numbers (owner, 30.10, WO-839).** Gibberish is never salvaged: `100+`, `1920/`,
+   `12abc` or `42px` revert to the value the field had before. Committing gives either the correct value (a number
+   or a complete expression) or the previous value, nothing in between.
+
+## Timers (owner, 30.10, WO-806 G3)
+
+1. **Timer visibility is per screen, not per look.** It is stored in look presets (one per screen), not in each look.
 
 ## Linked servers (owner, 29.10, WO-802)
 

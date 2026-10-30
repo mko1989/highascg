@@ -1,6 +1,15 @@
 # WO-825 — GDTF Share library: built in (~100 MB?) or an opt-in download (like Capture)
 
-**Status: OPEN (29.10) — sizes measured; owner decision on the shape; GDTF Share redistribution terms not checked yet**
+**Status: OPEN (30.10) — owner decided the shape (below); implementation in progress; GDTF Share redistribution terms not checked yet**
+
+## Owner decision (30.10)
+
+*"lets do the XML plus re-encoded small thumbnails built-in and per model fetch when used in a project. or full model
+library download from settings."*
+
+- Built in: every fixture's description XML plus a re-encoded small thumbnail (~110 MB measured).
+- A fixture's 3D models (and gobos) are fetched from GDTF Share when that fixture is used in a project.
+- Settings offers a full model-library download (the opt-in, like Capture).
 
 Owner (29.10): "Calculate how much would a full gdtf share archive take up space. If it'd be around 100mb it would be
 worth having it built in. Or opt in library download like in capture."
