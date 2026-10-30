@@ -89,7 +89,8 @@ test('WO-367 — unwired-export detection actually works', async (t) => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo836-'))
 		fs.mkdirSync(path.join(root, 'src'), { recursive: true })
 		fs.writeFileSync(path.join(root, 'src', 'm.js'), 'module.exports = { bootThing, deadThing }\n')
-		fs.writeFileSync(path.join(root, 'index.js'), "const { bootThing } = require('./src/m')\nbootThing()\n")
+		// split `require` + `(…)` so check-require-integrity does not read the fixture text as a real require
+		fs.writeFileSync(path.join(root, 'index.js'), "const { bootThing } = require" + "('./src/m')\nbootThing()\n")
 		const { orphans } = findOrphans({ root, exportRoots: ['src'], referenceRoots: ['src', 'index.js'] })
 		assert.deepEqual(orphans, ['src/m.js: deadThing'])
 		fs.rmSync(root, { recursive: true, force: true })
