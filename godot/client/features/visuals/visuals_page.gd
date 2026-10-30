@@ -12,6 +12,7 @@ signal sensitivity_changed(map: Dictionary)
 signal sync_changed(ms: float)
 signal scenes_changed(main: String, overlay: String)
 signal burst_pressed
+signal shader_changed(id: String)
 
 var _sliders := {}
 var _screen: OptionButton
@@ -26,6 +27,11 @@ var _sync: HSlider
 var _sync_label: Label
 var _scene: OptionButton
 var _overlay: OptionButton
+var _shader: OptionButton
+var _shader_row: HBoxContainer
+var _shader_note: Label
+var _shader_ids := []
+var _shader_want := ""
 
 
 func _init() -> void:  # built up front: the tab fills it before the Inspector adopts it
@@ -43,6 +49,19 @@ func _init() -> void:  # built up front: the tab fills it before the Inspector a
 	_overlay.item_selected.connect(func(_i: int) -> void: _emit_scenes())
 	add_child(_row("Scene", _scene))
 	add_child(_row("Layer 2", _overlay))
+	_shader = OptionButton.new()  # WO-874: the box's shader library, filled by set_shaders()
+	_shader.tooltip_text = "The library shader the Shader scene runs (the same shaders Caspar's shader templates play)"
+	_shader.fit_to_longest_item = false
+	_shader.item_selected.connect(func(i: int) -> void:
+		if not _quiet and i >= 0 and i < _shader_ids.size():
+			_shader_want = _shader_ids[i]
+			shader_changed.emit(_shader_want))
+	_shader_row = _row("Shader", _shader)
+	add_child(_shader_row)
+	_shader_note = Label.new()
+	_shader_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_shader_note.modulate = Color(1, 0.75, 0.6, 0.9)
+	add_child(_shader_note)
 	var burst := Button.new()
 	burst.text = "Burst"
 	burst.tooltip_text = "Fire the scenes' burst now (Flow: link a hit to the Burst parameter to fire it from the audio)"
@@ -112,6 +131,10 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	var ids := M.scene_ids()
 	_scene.select(maxi(0, ids.find(str(slice.get("scene", "rings")))))
 	_overlay.select(ids.find(str(slice.get("overlay", ""))) + 1)
+	_shader_want = str(slice.get("shader", ""))
+	_shader.select(_shader_ids.find(_shader_want))
+	_shader_row.visible = "shader" in [slice.get("scene"), slice.get("overlay")]
+	_shader_note.visible = _shader_row.visible
 	for p in M.PARAMS:
 		_sliders[p].set_value_no_signal(float(slice.params[p]))
 	_screens = M.screens(cm)
@@ -125,6 +148,25 @@ func set_state(slice: Dictionary, cm: Variant) -> void:
 	_sync.set_value_no_signal(float(slice.get("sync", 0.0)))
 	_sync_label.text = "%+d ms" % int(_sync.value)
 	_quiet = false
+
+
+## WO-874: the library ({id, name} rows of GET /api/shaders), sorted by name.
+func set_shaders(list: Array) -> void:
+	var rows := list.filter(func(r: Variant) -> bool: return r is Dictionary and r.get("id") is String)
+	rows.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return str(a.get("name", a.id)).naturalnocasecmp_to(str(b.get("name", b.id))) < 0)
+	_quiet = true
+	_shader.clear()
+	_shader_ids = rows.map(func(r: Dictionary) -> String: return r.id)
+	for r in rows:
+		_shader.add_item(str(r.get("name", r.id)))
+	_shader.select(_shader_ids.find(_shader_want))
+	_quiet = false
+
+
+## WO-874: "" when the shader runs, else why not (compile error, not found, no box).
+func set_shader_status(text: String) -> void:
+	_shader_note.text = text
 
 
 func set_sending(on: bool, can: bool, note: String) -> void:
@@ -164,7 +206,11 @@ func _emit_scenes() -> void:
 	if _quiet:
 		return
 	var ids := M.scene_ids()
-	scenes_changed.emit(ids[maxi(0, _scene.selected)], ids[_overlay.selected - 1] if _overlay.selected > 0 else "")
+	var main: String = ids[maxi(0, _scene.selected)]
+	var over: String = ids[_overlay.selected - 1] if _overlay.selected > 0 else ""
+	_shader_row.visible = "shader" in [main, over]
+	_shader_note.visible = _shader_row.visible
+	scenes_changed.emit(main, over)
 
 
 func _on_sync(v: float) -> void:

@@ -33,6 +33,9 @@ var _orbit_cam: Camera3D
 var _orbit := Vector3(0.0, 0.25, 16.0)  # yaw, pitch, distance
 var _view3d: SubViewportContainer
 var _mode := "flow"
+var _shader_list := []  # WO-874: GET /api/shaders rows, fetched once the Shader scene is first used
+var _shader_cfg := {}  # the config on stage
+var _shader_seq := 0
 
 
 func _ready() -> void:
@@ -96,6 +99,11 @@ func _ready() -> void:
 		slice.scene = main
 		slice.overlay = overlay if overlay != main else ""
 		scene.set_layers(slice.scene, slice.overlay)
+		_fetch_shader()
+		_store())
+	page.shader_changed.connect(func(id: String) -> void:
+		slice.shader = id
+		_fetch_shader()
 		_store())
 	page.burst_pressed.connect(func() -> void: scene.fire())
 	page.sync_changed.connect(func(ms: float) -> void:
@@ -107,6 +115,7 @@ func _ready() -> void:
 	if _g("Ws"):
 		_g("Ws").on("audio_fft", func(d: Variant) -> void:
 			_buses = M.buses_of(d)
+			scene.audio_frame(d)
 			_audio_at = Time.get_ticks_msec()
 			Sync.observe(_sync_state, d, _buses, _audio_at))
 	if _g("Store"):
@@ -123,6 +132,8 @@ func _ready() -> void:
 		_probe_send.call_deferred(str(_g("Config").args["probe-visuals-send"]))
 	if _g("Config") and _g("Config").args.has("probe-visuals-shots"):  # dev: --probe-visuals-shots=<dir> (WO-873)
 		_probe_shots.call_deferred(str(_g("Config").args["probe-visuals-shots"]))
+	if _g("Config") and _g("Config").args.has("probe-visuals-shaders"):  # dev: --probe-visuals-shaders=<dir> (WO-874)
+		_probe_shaders.call_deferred(str(_g("Config").args["probe-visuals-shaders"]))
 
 
 func _exit_tree() -> void:
@@ -148,8 +159,38 @@ func _load() -> void:
 	flow.set_graph(slice.graph)
 	scene.set_layers(slice.scene, slice.overlay)
 	page.set_state(slice, _cm())
+	_fetch_shader()
 	_resize()
 	_sync_send_ui("")
+
+
+## WO-874: the Shader scene's code from the box's library (list once, then the picked config); the page shows why it is dark.
+func _fetch_shader() -> void:
+	if not "shader" in [slice.scene, slice.overlay]:
+		return
+	_shader_seq += 1
+	var seq := _shader_seq
+	var api: Variant = _g("DevicesTarget").box_api if _g("DevicesTarget") else null
+	if api == null:
+		page.set_shader_status("No box connection: the shader library lives on the box.")
+		return
+	if _shader_list.is_empty():
+		var l: Dictionary = await api.get_json("/api/shaders")
+		if l.get("ok") and l.get("data") is Dictionary and l.data.get("shaders") is Array:
+			_shader_list = l.data.shaders
+			page.set_shaders(_shader_list)
+	var id := str(slice.shader)
+	if id == "":
+		scene.set_shader(null)
+		page.set_shader_status("Pick a shader.")
+		return
+	if _shader_cfg.get("id") != id:
+		var r: Dictionary = await api.get_json("/api/shaders/" + id.uri_encode())
+		if seq != _shader_seq:
+			return  # a newer pick is on its way
+		_shader_cfg = r.data if r.get("ok") and r.get("data") is Dictionary else {"id": id}
+	var e := scene.set_shader(_shader_cfg)
+	page.set_shader_status("" if e == "" else "Shader: " + e)
 
 
 func _store() -> void:
@@ -296,7 +337,10 @@ func _probe_shots(dir: String) -> void:
 	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	set_process(true)
 	RenderingServer.viewport_set_measure_render_time(out_vp.get_viewport_rid(), true)
-	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"]]:
+	var r: Dictionary = await _g("DevicesTarget").box_api.get_json("/api/shaders/sh-sa-ribbons")  # WO-874 layer shots
+	scene.set_shader(r.data if r.get("ok") else null)
+	for pair in [["rings", ""], ["particles", ""], ["starfield", ""], ["tunnel", ""], ["tunnel", "particles"],
+			["shader", "particles"], ["tunnel", "shader"]]:
 		scene.set_layers(pair[0], pair[1])
 		await get_tree().create_timer(1.0).timeout
 		var gpu := 0.0
@@ -308,5 +352,44 @@ func _probe_shots(dir: String) -> void:
 		var shot: String = str(pair[0]) + ("+" + str(pair[1]) if pair[1] != "" else "")
 		var err := out_vp.get_texture().get_image().save_png("%s/%s.png" % [dir, shot])
 		print("[probe-visuals] shot %s → %s · canvas %dx%d GPU %.2f ms" % [shot, error_string(err), out_vp.size.x, out_vp.size.y, gpu])
+	get_tree().quit()
+
+
+## dev probe (WO-874): every library shader as the main scene for 1 s — compile result, canvas GPU ms (mean of 20 frames),
+## mean brightness — and a 320-wide shot <dir>/<id>.png; then quit.
+func _probe_shaders(dir: String) -> void:
+	await get_tree().create_timer(3.0).timeout
+	out_vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	set_process(true)
+	RenderingServer.viewport_set_measure_render_time(out_vp.get_viewport_rid(), true)
+	slice.scene = "shader"
+	slice.overlay = ""
+	scene.set_layers("shader", "")
+	var api: Variant = _g("DevicesTarget").box_api
+	var l: Dictionary = await api.get_json("/api/shaders")
+	var list: Array = l.data.shaders if l.get("ok") else []
+	print("[probe-shaders] %d shaders, canvas %dx%d" % [list.size(), out_vp.size.x, out_vp.size.y])
+	for row in list:
+		var r: Dictionary = await api.get_json("/api/shaders/" + str(row.id).uri_encode())
+		var e := scene.set_shader(r.data if r.get("ok") else {})
+		await get_tree().create_timer(0.8).timeout
+		var gpu := 0.0
+		for i in 20:
+			await get_tree().process_frame
+			gpu += RenderingServer.viewport_get_measured_render_time_gpu(out_vp.get_viewport_rid()) / 20.0
+		var img := out_vp.get_texture().get_image()
+		img.resize(320, maxi(1, 320 * img.get_height() / img.get_width()))
+		var lum := 0.0
+		for y in range(0, img.get_height(), 4):
+			for x in range(0, img.get_width(), 4):
+				lum += img.get_pixel(x, y).get_luminance()
+		lum /= ceilf(img.get_height() / 4.0) * ceilf(img.get_width() / 4.0)
+		img.save_png("%s/%s.png" % [dir, row.id])
+		var st := 0.0
+		for layer in scene.layers:
+			if layer.has_method("set_shader"):
+				st = float(layer.get("runner").gpu_ms)
+		print("[probe-shaders] %s · %s · canvas GPU %.2f ms · shader GPU %.2f ms · lum %.3f" % [row.id, "OK" if e == "" else e,
+			gpu, st, lum])
 	get_tree().quit()
 

@@ -9,9 +9,11 @@ const SCENES := {
 	"particles": preload("res://features/visuals/scenes/particles.gd"),
 	"starfield": preload("res://features/visuals/scenes/starfield.gd"),
 	"tunnel": preload("res://features/visuals/scenes/tunnel.gd"),
+	"shader": preload("res://features/visuals/scenes/shader.gd"),  # WO-874
 }
 const BURST_ON := 0.5
 const BURST_REARM := 0.3
+const AUDIO_STALE_MS := 1000
 
 var params := {}
 var camera: Camera3D
@@ -21,6 +23,10 @@ var _env: Environment
 var _armed := true
 var _manual := false
 var _flash := 0.0
+var _shader_cfg: Variant = null
+var shader_error := ""
+var _audio := PackedByteArray()
+var _audio_at := -AUDIO_STALE_MS
 
 
 func _ready() -> void:
@@ -55,9 +61,39 @@ func set_layers(main: String, overlay: String) -> void:
 	for id in want:
 		var s: Node3D = SCENES[id].new()
 		s.name = id
+		if s.has_method("set_overlay"):
+			s.set_overlay(not layers.is_empty())
 		add_child(s)
 		layers.append(s)
 	_ids = want
+	_apply_shader()
+
+
+## WO-874: the library shader the Shader scene runs (GET /api/shaders/:id; null = none). Its compile error, or "".
+func set_shader(cfg: Variant) -> String:
+	_shader_cfg = cfg
+	return _apply_shader()
+
+
+func _apply_shader() -> String:
+	shader_error = ""
+	for l in layers:
+		if l.has_method("set_shader"):
+			shader_error = l.set_shader(_shader_cfg) if _shader_cfg != null else "no shader picked"
+	return shader_error
+
+
+## WO-874: an `audio_fft` WS frame → the shader's audio texture (row 0 the 512 FFT bytes, row 1 the wave; player.js's layout).
+func audio_frame(d: Variant) -> void:
+	if not d is Dictionary or not d.get("freq") is String:
+		return
+	var freq := Marshalls.base64_to_raw(d.freq)
+	var wave := Marshalls.base64_to_raw(d.wave) if d.get("wave") is String else PackedByteArray()
+	_audio.resize(1024)
+	for i in 512:
+		_audio[i] = freq[i] if i < freq.size() else 0
+		_audio[512 + i] = wave[i] if i < wave.size() else 128
+	_audio_at = Time.get_ticks_msec()
 
 
 ## The ids on stage, main first.
@@ -88,7 +124,10 @@ func _process(delta: float) -> void:
 	if burst:
 		_flash = 1.0
 	_flash = maxf(0.0, _flash - delta * 6.0)
+	var live := Time.get_ticks_msec() - _audio_at < AUDIO_STALE_MS
 	for l in layers:
+		if l.has_method("set_audio"):
+			l.set_audio(_audio if live else PackedByteArray())
 		l.step(p, delta, burst)
 	var hue := float(p.get("hue", 0.55))
 	var glow := float(p.get("glow", 0.3))

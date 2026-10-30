@@ -86,6 +86,11 @@ func test_slice_screens_and_bodies() -> void:
 	t.eq(M.slice_of({"visuals": {"scene": "tunnel", "overlay": "tunnel"}}).overlay, "", "the same scene twice → no layer 2")
 	t.eq(M.slice_of({"visuals": {"scene": "x", "overlay": "y"}}).scene, "rings", "unknown scene → rings")
 	t.ok(["s1", "p6"] in M.default_graph().links, "starter graph: kick (shaped) → burst")
+	# WO-874: the library shader the Shader scene runs
+	t.eq(s.shader, "", "no shader picked in an old project")
+	t.eq(M.slice_of({"visuals": {"scene": "shader", "shader": "sh-sa-ribbons"}}).shader, "sh-sa-ribbons", "shader id kept")
+	t.eq(M.slice_of({"visuals": {"shader": 7}}).shader, "", "a non-string id → none")
+	t.ok("shader" in M.scene_ids(), "Shader is in the picker")
 
 
 func test_tab_builds_headless() -> void:
