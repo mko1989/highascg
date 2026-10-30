@@ -21,8 +21,10 @@ func _ray_click(c: Control) -> void:
 	var uv := c.get_global_rect().get_center() / Vector2(XrPanel.PX)
 	var at: Vector3 = panel.quad.global_transform * Vector3((uv.x - 0.5) * XrPanel.SIZE.x, (0.5 - uv.y) * XrPanel.SIZE.y, 0.0)
 	var from: Vector3 = page.stage.camera().global_position
-	panel.point(from, (at - from).normalized())
-	await ui.frames(1)
+	var dir := (at - from).normalized()
+	for i in 40:  # WO-795: the pointer is smoothed (Walk.euro), so it eases to a new spot over frames like the headset's every-frame point(); one call left it short of the button
+		panel.point(from, dir)
+		await ui.frames(1)
 	page.stage.walk.trigger(true, false)
 	await ui.frames(1)
 	page.stage.walk.trigger(false, false)
@@ -63,6 +65,7 @@ func run() -> void:
 		var cam: Camera3D = page.stage.camera()
 		var c: Vector2 = ui.screen_rect(page._svc).get_center()
 		ui._move(c, 0)
+		await ui.frames(2)  # e2e_ui._move warps the real pointer (WO-762): that motion (relative = the whole jump from where the pointer was) lands a frame later; pressed first, the look read it as a drag
 		ui._button(c, MOUSE_BUTTON_LEFT, true, false)
 		await ui.frames(1)
 		for i in 10:
