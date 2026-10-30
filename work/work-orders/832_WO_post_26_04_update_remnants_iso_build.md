@@ -1,7 +1,7 @@
 # WO-832 — Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names
 
 **Area:** os-iso
-**Status: IN PROGRESS (30.10) — repo fixes done + verified offline; owner sudo commands below pending**
+**Status: DONE (30.10) — owner ran the sudo commands (kernel pin, theme, NVIDIA 615 ISO driver, X apply script, exfat units) and they checked out; the verify script's false "duplicate supervisors" fixed and dry-run on the box; the ISO build itself moved to WO-870 (eggs 26.10 rewrite)**
 **Source:** REPORT §4a–4d and §7e. Owner 30.10: *"the kernel pin and the eggs theme path before the next ISO build. that
 and other remnants of pre update should be fixed (nvidia etc)"*.
 **Related:** WO-430, WO-431, WO-779, memory: eggs excludes vs merged-usr.

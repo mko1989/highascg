@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (37 open, 121 in progress, 623 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (37 open, 120 in progress, 624 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -675,7 +675,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 730 DONE [os-iso+testing-ci] Post-update sweep: one command (and an automatic run) that checks the whole box… → 730_WO_post_update_sweep.md
 - 748 DONE [os-iso+godot-client] Updates pane says "Phase: ?" after an update that succeeded (follow-up of WO-73… → 748_WO_updates_pane_phase_unknown_after_fast_restart.md
 - 749 DONE [os-iso] Releases did not ship the post-update sweep: .4 ran a stale copy after every up… → 749_WO_release_ships_post_update_sweep.md
-- 832 IN PROGRESS [os-iso] Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names → 832_WO_post_26_04_update_remnants_iso_build.md
+- 832 DONE [os-iso] Post-update remnants: ISO build, kernel pin, NVIDIA, 26.04 package names → 832_WO_post_26_04_update_remnants_iso_build.md
 - 848 OPEN [os-iso+caspar-build] Installation: Caspar-only CEF (block generic, sync, symlinks, loader safety) → 848_WO_install_cef_casparonly_pinning_symlinks.md
 - 855 DONE [os-iso] Work order: Remove persistence partition workflow (exfat-only) → 855_WO_remove_persistence_partition_workflow_exfat_only.md
 - 856 DONE [os-iso] Work order: Single NVIDIA driver per live ISO (no multi-driver pool) → 856_WO_single_nvidia_driver_per_iso.md
