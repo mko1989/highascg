@@ -123,6 +123,13 @@ test('another GPU cable from the destination keeps the PGM window next to the sl
 	assert.deepEqual(screens(pgmConsumers(buildConfigXml(flat))), [1, 41])
 })
 
+test('an output left without slices joins the window (black): the PGM window goes off, one screen consumer', () => {
+	const flat = buildCasparGeneratorFlatConfig(appConfig({ slices: WINDOW_SLICES.filter((x) => x.outputId === 'out_1') }))
+	assert.deepEqual(flat.screen_1_slice_windows.map((w) => [w.x, w.width, w.slices.length]), [[0, 3840, 2]])
+	assert.equal(flat.screen_1_screen_consumer, false)
+	assert.deepEqual(screens(pgmConsumers(buildConfigXml(flat))), [41])
+})
+
 test('no feed into the node → no slice window; stale keys never survive a regenerate', () => {
 	const flat = buildCasparGeneratorFlatConfig(appConfig({ slices: WINDOW_SLICES, cableInput: false }))
 	assert.equal(flat.screen_1_slice_windows, undefined)

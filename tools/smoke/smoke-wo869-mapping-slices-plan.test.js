@@ -33,15 +33,20 @@ describe('WO-869 planner', () => {
 		assert.equal(p.window, null)
 	})
 
-	it('a slice window takes the node\'s other GPU heads that show a slice; SDI and empty heads stay as they are', () => {
+	it('a slice window takes the node\'s other GPU heads, empty ones too (black); SDI stays as it is', () => {
 		const p = Plan.planMappingNode(node({ outputs: outs(4), slices: [
 			slice({ id: 'a', dst: { rect: { x: 0, y: 0, w: 960, h: 540 }, flipH: true } }),
 			slice({ id: 'b', outputId: 'out_2', src: { x: 960, y: 0, w: 960, h: 540 } }),
 			slice({ id: 'c', outputId: 'out_3', src: { x: 0, y: 540, w: 960, h: 540 } }),
 		] }), { sinks: sinks('gpu', 'gpu', 'decklink', 'gpu') })
-		assert.deepEqual(p.outputs.map((o) => o.backend), ['screen-slices', 'screen-slices', 'direct', 'direct'])
+		assert.deepEqual(p.outputs.map((o) => o.backend), ['screen-slices', 'screen-slices', 'direct', 'screen-slices'])
 		assert.equal('direct' in p.outputs[1], false, 'a joined head has no direct placement left')
-		assert.deepEqual(p.window.outputs.map((o) => [o.outputId, o.x]), [['out_1', 0], ['out_2', 1920]])
+		assert.equal('direct' in p.outputs[3], false)
+		/* the empty head joins (WO-869 §6 planner edge): left `direct` it kept the PGM window on over the slice window */
+		assert.deepEqual(p.window.outputs.map((o) => [o.outputId, o.x]), [['out_1', 0], ['out_2', 1920], ['out_4', 5760]])
+		assert.equal(p.window.slices.length, 2, 'it adds no slice of its own')
+		const plain = Plan.planMappingNode(node({ outputs: outs(2), slices: [slice({ id: 'b', outputId: 'out_2' })] }), { sinks: sinks('gpu', 'gpu') })
+		assert.deepEqual(plain.outputs.map((o) => o.backend), ['direct', 'direct'], 'no window → an empty head stays legacy')
 		assert.deepEqual(p.window.slices[1].dst, [[1920, 0], [2880, 0], [2880, 540], [1920, 540]], 'same picture, now drawn by the window')
 	})
 

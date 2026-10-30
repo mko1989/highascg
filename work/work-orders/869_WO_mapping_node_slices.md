@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; caps probe done (§7); open: path (a) route-slices (§6)**
+**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) built; slices verified on the real Dioda head (gpu-texture on, config baseline, live APPLY, Caspar-restart re-apply; §5.1) after two WO-868 interaction fixes; caps probe done (§7), planner edge fixed; open: path (a) route-slices (§6)**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -389,7 +389,8 @@ in `scratchpad/wo869live/`.
 - ~~Real GPU check~~ — done on the box 30.10 (§5.1): gpu-texture on, real DP-0 head, xrandr layout, stacking.
 - **Fork caveat:** an intermittent startup SEGV with two screen windows on one channel on Xvfb, seen with both the old and the new binary (not caused by this change). Watch for it on the box, where the PGM window plus a slice window means two windows when another GPU cable keeps the PGM window on.
 - **Not tested:** a channel format change while a window is live. (Re-apply after a real Caspar restart: done, §5.1.)
-- **Planner edge:** a node with a slice window plus an empty GPU output (no slice) keeps that output `direct`, so the PGM window stays on and may overlap the slice window.
+- ~~Planner edge~~ — fixed 30.10. A GPU output left without slices on a node that has a slice window used to stay `direct` (`direct: null`), so its cable counted as "another GPU head" in `applySliceWindowsToScreens` and the PGM window stayed on, on top of the slice window (two screen consumers on one channel = the SEGV caveat above). The Q8 join in `mapping-slices-plan.js` now takes every `direct` GPU output, so the empty head sits in the window and shows black. A node with no slice window keeps empty heads legacy.
+  - Smokes: the planner case is repinned (`out_4` joins; window 0/1920/5760; still 2 slices; no window → `direct`). New generator case: slices on `out_1` only → one window 3840 wide, `screen_1_screen_consumer` false, PGM `<consumers>` = [41]. It fails on the old rule (5 pass / 1 fail) and passes with the fix. WO-868/869/242 smokes 108/108.
 - **Owner QA:** one pass of the editor against a real two-head wall or LED processor.
 
 ## 7. Caps probe (30.10)

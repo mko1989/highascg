@@ -174,11 +174,12 @@ function planMappingNode(node, opts = {}) {
 		}
 		return { ...row, backend: 'refused', reason: REASONS.NO_SCREEN_SLICES, direct: fallback }
 	})
-	// Q8: once the node has a slice window, its other GPU heads that show a slice join it. Left `direct` they would
-	// need the PGM window spanning the node canvas, which sits on the same heads as the slice window.
+	// Q8: once the node has a slice window, its other GPU heads join it — those that show a slice, and those left
+	// without one (they show black in the window). Left `direct` they would need the PGM window spanning the node
+	// canvas, which sits on the same heads as the slice window (two windows on one channel: the fork SEGV caveat).
 	if (planned.some((r) => r.backend === 'screen-slices')) {
 		planned.forEach((r, i) => {
-			if (r.sink !== 'gpu' || r.backend !== 'direct' || !r.direct) return
+			if (r.sink !== 'gpu' || r.backend !== 'direct') return
 			const { direct, ...rest } = r
 			planned[i] = { ...rest, backend: 'screen-slices' }
 		})
