@@ -111,3 +111,8 @@ the full test cheaply."*
   (one GUI, one PGM, so not in parallel), collects verdicts and evidence into `work/release-reports/<date>/report.md`,
   and hands only FAIL/UNCLEAR cards to a stronger model for triage.
 - The scripted scenarios 01–08 stay as the cheap sandbox smoke (`test:release` gui group).
+- **Owner 30.10, follow-up:** *"i want the full test suite to act as a user, so clicks on screen, doing real tests like a
+  human user would do."* All input is real X input (xdotool on the test instance's Xvfb display): clicks, drags,
+  scrolls, typing, shortcuts. The Godot side only reports what is on screen (labels plus screen coordinates) and takes
+  screenshots. `ui click "Take"` finds the button and then clicks it with the X mouse. Canvases use raw
+  `click_xy`/`drag_xy` chosen from the screenshot. Verification is from the screen and from the air (PRINT/INFO).
