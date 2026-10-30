@@ -217,4 +217,5 @@ module.exports = [
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',
 	'tools/smoke/smoke-wo857-console-selection.test.js',
+	'tools/smoke/smoke-wo870-coa-patch.test.js',
 ]

@@ -1,0 +1,808 @@
+From 0b5e7fa0c5ce94a57c11711c0b8ccc4c7b5b8447 Mon Sep 17 00:00:00 2001
+From: HighAsCG (WO-870)
+Date: Fri, 30 Oct 2026 17:15:00 +0100
+Subject: [PATCH] fix(planner): space estimate measures what the exclude list
+ really leaves out
+
+CheckDiskSpace estimates the squashfs input as statfs("/") used space minus
+estimateExcludedKiB(). That estimate skipped every exclude line containing
+'*' or '!', and for a directory on the root filesystem it added only the
+sizes of its directory entries (a few KiB), so a large excluded tree such as
+home/*/media/* was still counted in full. On a host where that tree dominates
+the root filesystem the pre-check fails with "Not enough space" although the
+real ISO is small; for an excluded mount point it subtracted that other
+filesystem's used space, which is not part of the root figure at all.
+
+The excluded size is now measured: the exclude list is parsed and matched
+the way mksquashfs -wildcards -ef does (process_exclude_file/add_path/
+excluded_match in squashfs-tools 4.7: '/'-separated components, each matched
+with fnmatch(FNM_PATHNAME|FNM_PERIOD|FNM_EXTMATCH), including the extglob
+groups the built-in list uses such as boot/grub/!(themes|unicode.pf2)), and
+the root filesystem is walked along the patterns only. Every excluded entry
+adds st_blocks of itself and its subtree. Symlinks are not followed, other
+filesystems are not entered, hard links count once and an excluded entry is
+not descended again, so nested excludes are not counted twice. "... "
+(non-anchored) lines are left out of the sum, which only keeps the estimate
+on the safe side. The report shows how long the scan took.
+
+The matcher was checked against glibc 2.43 fnmatch(3) with the same flags on
+244,480 pattern/name pairs (curated corpus plus random fuzz): no difference.
+
+Built and measured for HighAsCG WO-870 (730 GiB media tree excluded on the
+root filesystem): estimate 247.8 GiB -> 11.9 GiB (xz); scan 0.87 s.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ coa/pkg/planner/space-check.go        |  148 +++++++++++------
+ coa/pkg/planner/exclude-match.go      |  296 +++++++++++++++++++++++++++++++++
+ coa/pkg/planner/exclude-match_test.go |   99 +++++++++++
+ coa/pkg/planner/space-check_test.go   |  138 +++++++++++++++
+ 4 files changed, 631 insertions(+), 50 deletions(-)
+
+diff --git a/coa/pkg/planner/space-check.go b/coa/pkg/planner/space-check.go
+index 61a1749..b3b7110 100644
+--- a/coa/pkg/planner/space-check.go
++++ b/coa/pkg/planner/space-check.go
+@@ -11,8 +11,11 @@ package planner
+ 
+ import (
+ 	"fmt"
++	"io/fs"
+ 	"os"
++	"path/filepath"
+ 	"strings"
++	"time"
+ 
+ 	"golang.org/x/sys/unix"
+ )
+@@ -29,6 +32,7 @@ var compressionFactors = map[string]uint64{
+ type SpaceReport struct {
+ 	RootUsedKiB     uint64
+ 	ExcludedKiB     uint64
++	ExcludedScan    time.Duration
+ 	CompressedKiB   uint64
+ 	FreeSnapshotKiB uint64
+ 	FreeWorkKiB     uint64
+@@ -49,7 +53,7 @@ func (r SpaceReport) String() string {
+ 	const gib = 1024.0 * 1024.0
+ 	lines := []string{
+ 		fmt.Sprintf("  Root used:        %.1f MiB", float64(r.RootUsedKiB)/mib),
+-		fmt.Sprintf("  Excluded:         %.1f MiB", float64(r.ExcludedKiB)/mib),
++		fmt.Sprintf("  Excluded:         %.1f MiB (measured in %s)", float64(r.ExcludedKiB)/mib, r.ExcludedScan.Round(time.Millisecond)),
+ 		fmt.Sprintf("  Estimated ISO:    %.1f MiB", float64(r.CompressedKiB)/mib),
+ 		fmt.Sprintf("  Free on %s: %.2f GiB", r.SnapshotDir, float64(r.FreeSnapshotKiB)/gib),
+ 	}
+@@ -72,7 +76,9 @@ func CheckDiskSpace(workDir string, snapshotDir string, compression string, excl
+ 		return nil, fmt.Errorf("cannot determine root usage: %w", err)
+ 	}
+ 
++	scanStart := time.Now()
+ 	excludedSize := estimateExcludedKiB(excludeListPath)
++	excludedScan := time.Since(scanStart)
+ 	if excludedSize > rootUsed {
+ 		excludedSize = rootUsed
+ 	}
+@@ -94,6 +100,7 @@ func CheckDiskSpace(workDir string, snapshotDir string, compression string, excl
+ 	return &SpaceReport{
+ 		RootUsedKiB:     rootUsed,
+ 		ExcludedKiB:     excludedSize,
++		ExcludedScan:    excludedScan,
+ 		CompressedKiB:   compressedSize,
+ 		FreeSnapshotKiB: freeSnapshot,
+ 		FreeWorkKiB:     freeWork,
+@@ -133,7 +140,20 @@ func onSameDevice(path1, path2 string) bool {
+ 	return stat1.Fsid == stat2.Fsid
+ }
+ 
++// estimateExcludedKiB returns the on-disk size of what the exclude list keeps
++// out of the squashfs, counted on the root filesystem only (the one whose used
++// space usedSpaceKiB measured).
+ func estimateExcludedKiB(excludeListPath string) uint64 {
++	return measureExcludedKiB("/", excludeListPath)
++}
++
++// measureExcludedKiB walks root along the exclude patterns with the matching
++// rules of `mksquashfs -wildcards` and sums st_blocks of every excluded entry
++// and its subtree. Only directories that a pattern can still reach are read;
++// symlinks are not followed, other filesystems are not entered, hard links are
++// counted once and nested excludes are not counted twice (an excluded entry is
++// not descended for further matches).
++func measureExcludedKiB(root string, excludeListPath string) uint64 {
+ 	if excludeListPath == "" {
+ 		return 0
+ 	}
+@@ -141,64 +161,92 @@ func estimateExcludedKiB(excludeListPath string) uint64 {
+ 	if err != nil {
+ 		return 0
+ 	}
+-
+-	var totalKiB uint64
+-	lines := strings.Split(string(data), "\n")
+-	for _, line := range lines {
+-		line = strings.TrimSpace(line)
+-		if line == "" || strings.HasPrefix(line, "#") {
+-			continue
+-		}
+-		if strings.Contains(line, "*") || strings.Contains(line, "!") {
+-			continue
+-		}
+-		path := "/" + strings.TrimPrefix(line, "/")
+-		info, err := os.Stat(path)
+-		if err != nil {
+-			continue
+-		}
+-		if info.IsDir() {
+-			totalKiB += dirSizeKiB(path)
+-		} else {
+-			totalKiB += uint64(info.Size()) / 1024
+-		}
++	var rootStat unix.Stat_t
++	if unix.Lstat(root, &rootStat) != nil {
++		return 0
++	}
++	var cursors []patternCursor
++	for _, pat := range parseExcludeList(string(data)) {
++		cursors = append(cursors, patternCursor{pat: pat})
+ 	}
+-	return totalKiB
++	m := excludeMeter{dev: uint64(rootStat.Dev), seen: map[[2]uint64]bool{}}
++	m.scan(root, cursors)
++	return m.bytes / 1024
+ }
+ 
+-func dirSizeKiB(path string) uint64 {
+-	var stat unix.Statfs_t
+-	if err := unix.Statfs(path, &stat); err != nil {
+-		return 0
+-	}
+-	blockSize := uint64(stat.Bsize)
+-	totalBytes := stat.Blocks * blockSize
+-	freeBytes := stat.Bfree * blockSize
+-	usedBytes := totalBytes - freeBytes
++// patternCursor is a pattern together with the component to match next.
++type patternCursor struct {
++	pat   excludePattern
++	depth int
++}
+ 
+-	// Se la directory è un mount point separato, il suo spazio usato
+-	// è indipendente dal root e va contato come esclusione
+-	var rootStat unix.Statfs_t
+-	if unix.Statfs("/", &rootStat) != nil {
+-		return 0
+-	}
+-	if stat.Fsid != rootStat.Fsid {
+-		return usedBytes / 1024
+-	}
++type excludeMeter struct {
++	dev   uint64
++	bytes uint64
++	seen  map[[2]uint64]bool
++}
+ 
+-	// Stessa partizione: usiamo una stima conservativa
+-	// basata sulla dimensione tipica di queste directory
+-	entries, err := os.ReadDir(path)
++// scan matches the entries of dir against cursors, like mksquashfs excluded():
++// a match on a pattern's last component excludes the entry, a match on an
++// earlier component carries the pattern into that subdirectory.
++func (m *excludeMeter) scan(dir string, cursors []patternCursor) {
++	entries, err := os.ReadDir(dir)
+ 	if err != nil {
+-		return 0
++		return
+ 	}
+-	var size uint64
+ 	for _, entry := range entries {
+-		info, err := entry.Info()
+-		if err != nil {
++		name := entry.Name()
++		path := filepath.Join(dir, name)
++		excluded := false
++		var next []patternCursor
++		for _, c := range cursors {
++			if !fnmatchExt(c.pat[c.depth], name) {
++				continue
++			}
++			if c.depth == len(c.pat)-1 {
++				excluded = true
++				break
++			}
++			next = append(next, patternCursor{pat: c.pat, depth: c.depth + 1})
++		}
++		if excluded {
++			m.addTree(path)
+ 			continue
+ 		}
+-		size += uint64(info.Size())
++		if len(next) == 0 {
++			continue
++		}
++		var st unix.Stat_t
++		if unix.Lstat(path, &st) != nil || st.Mode&unix.S_IFMT != unix.S_IFDIR || uint64(st.Dev) != m.dev {
++			continue
++		}
++		m.scan(path, next)
+ 	}
+-	return size / 1024
++}
++
++// addTree adds the allocated size of path and, for a directory, its whole
++// subtree on the same filesystem.
++func (m *excludeMeter) addTree(path string) {
++	filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
++		var st unix.Stat_t
++		if err != nil || unix.Lstat(p, &st) != nil {
++			return nil
++		}
++		isDir := st.Mode&unix.S_IFMT == unix.S_IFDIR
++		if uint64(st.Dev) != m.dev {
++			if isDir {
++				return filepath.SkipDir
++			}
++			return nil
++		}
++		if !isDir && uint64(st.Nlink) > 1 {
++			key := [2]uint64{uint64(st.Dev), uint64(st.Ino)}
++			if m.seen[key] {
++				return nil
++			}
++			m.seen[key] = true
++		}
++		m.bytes += uint64(st.Blocks) * 512
++		return nil
++	})
+ }
+diff --git a/coa/pkg/planner/exclude-match.go b/coa/pkg/planner/exclude-match.go
+new file mode 100644
+index 0000000..b073221
+--- /dev/null
++++ b/coa/pkg/planner/exclude-match.go
+@@ -0,0 +1,296 @@
++/*
++ * penguins-eggs - Copyright (C) 2017-2026 Piero Proietti
++ * Author: Piero Proietti <piero.proietti@gmail.com>
++ * https://penguins-eggs.net
++ *
++ * This file is part of penguins-eggs.
++ * Released under the GNU GPL v3 license.
++ */
++
++package planner
++
++import (
++	"strings"
++	"unicode"
++)
++
++// excludePattern is one line of the exclude list split into path components:
++// "var/log/!(journal)" -> ["var" "log" "!(journal)"].
++type excludePattern []string
++
++// parseExcludeList reads an exclude list the way `mksquashfs -wildcards -ef`
++// does (squashfs-tools 4.7, process_exclude_file + add_path): leading
++// whitespace is skipped, '#' lines are comments, one leading '\' is an escape,
++// components are split on '/' and empty components dropped (so a trailing '/'
++// changes nothing). A leading '/' is tolerated like the rest of coa does.
++//
++// "... " (non-anchored) lines are skipped: honouring them needs a walk of the
++// whole filesystem, and not subtracting them only makes the estimate safer.
++func parseExcludeList(data string) []excludePattern {
++	var patterns []excludePattern
++	for _, line := range strings.Split(data, "\n") {
++		line = strings.TrimLeftFunc(line, unicode.IsSpace)
++		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "... ") {
++			continue
++		}
++		line = strings.TrimPrefix(line, "\\")
++		var pat excludePattern
++		for _, comp := range strings.Split(line, "/") {
++			if comp != "" {
++				pat = append(pat, comp)
++			}
++		}
++		if len(pat) > 0 {
++			patterns = append(patterns, pat)
++		}
++	}
++	return patterns
++}
++
++// fnmatchExt reports whether name (one path component) matches pattern like
++// glibc fnmatch(pattern, name, FNM_PATHNAME|FNM_PERIOD|FNM_EXTMATCH), the call
++// mksquashfs makes in excluded_match(): '*', '?', '[...]', '\' escapes and the
++// extglob groups ?(..) *(..) +(..) @(..) !(..). A leading '.' must be matched
++// explicitly ("root/*" does not match "root/.bashrc"; "root/.??*" does).
++func fnmatchExt(pattern, name string) bool {
++	return extMatch([]rune(pattern), []rune(name), true)
++}
++
++// extMatch matches p against all of s; period is true while s starts at the
++// beginning of the name (FNM_PERIOD).
++func extMatch(p, s []rune, period bool) bool {
++	for len(p) > 0 {
++		c := p[0]
++		if len(p) > 1 && p[1] == '(' && strings.ContainsRune("?*+@!", c) {
++			if alts, end := parseGroup(p, 1); end > 0 {
++				return extGroup(c, alts, p[end+1:], s, period)
++			}
++		}
++		switch c {
++		case '*':
++			if period && len(s) > 0 && s[0] == '.' {
++				return false
++			}
++			last := len(s)
++			if len(p) > 2 && p[2] == '(' && strings.ContainsRune("@+!", p[1]) {
++				last-- // like glibc: a group right after '*' never gets the empty tail
++			}
++			for i := 0; i <= last; i++ {
++				if extMatch(p[1:], s[i:], false) {
++					return true
++				}
++			}
++			return false
++		case '?':
++			if len(s) == 0 || (period && s[0] == '.') {
++				return false
++			}
++		case '[':
++			if len(s) == 0 || (period && s[0] == '.') {
++				return false
++			}
++			n, ok := matchBracket(p, s[0])
++			if n < 0 || (n > 0 && !ok) {
++				return false
++			}
++			if n > 0 {
++				p, s, period = p[n:], s[1:], false
++				continue
++			}
++			if s[0] != '[' { // unterminated bracket: a literal '['
++				return false
++			}
++		case '\\':
++			if len(p) == 1 { // a trailing '\' never matches
++				return false
++			}
++			p = p[1:]
++			c = p[0]
++			if len(s) == 0 || s[0] != c {
++				return false
++			}
++		default:
++			if len(s) == 0 || s[0] != c {
++				return false
++			}
++		}
++		p, s, period = p[1:], s[1:], false
++	}
++	return len(s) == 0
++}
++
++// extGroup matches an extglob group (kind is the character before '(')
++// followed by rest against s.
++func extGroup(kind rune, alts [][]rune, rest, s []rune, period bool) bool {
++	anyAlt := func(sub []rune, period bool) bool {
++		for _, a := range alts {
++			if extMatch(a, sub, period) {
++				return true
++			}
++		}
++		return false
++	}
++	switch kind {
++	case '!': // a prefix that matches none of the alternatives, then rest
++		for i := 0; i <= len(s); i++ {
++			if !anyAlt(s[:i], period) && extMatch(rest, s[i:], period && i == 0) {
++				return true
++			}
++		}
++	case '@', '?': // exactly one (or, for '?', zero or one) alternative
++		if kind == '?' && extMatch(rest, s, period) {
++			return true
++		}
++		for _, a := range alts { // glibc matches "<alternative><rest>" as one pattern
++			if extMatch(append(append([]rune{}, a...), rest...), s, period) {
++				return true
++			}
++		}
++	case '+', '*': // one (or, for '*', zero) or more alternatives
++		if extMatch(rest, s, period) && (kind == '*' || anyAlt(nil, period)) {
++			return true
++		}
++		for i := 1; i <= len(s); i++ {
++			if anyAlt(s[:i], period) &&
++				(extMatch(rest, s[i:], false) || extGroup('+', alts, rest, s[i:], false)) {
++				return true
++			}
++		}
++	}
++	return false
++}
++
++// parseGroup splits the extglob group whose '(' is at p[open] into its
++// alternatives and returns the index of the closing ')', or -1 if the group is
++// invalid (the operator is then an ordinary character). Like glibc EXT(): '\'
++// is not special here, a bracket expression is skipped whole and only an
++// operator followed by '(' opens a nested group.
++func parseGroup(p []rune, open int) ([][]rune, int) {
++	var alts [][]rune
++	level, start := 0, open+1
++	for i := open + 1; i < len(p); i++ {
++		switch {
++		case p[i] == '[':
++			i++
++			if i < len(p) && (p[i] == '!' || p[i] == '^') {
++				i++
++			}
++			if i < len(p) && p[i] == ']' {
++				i++
++			}
++			for i < len(p) && p[i] != ']' {
++				i++
++			}
++			if i == len(p) {
++				return nil, -1
++			}
++		case strings.ContainsRune("?*+@!", p[i]) && i+1 < len(p) && p[i+1] == '(':
++			level++
++		case p[i] == ')' || p[i] == '|':
++			if level == 0 {
++				alts = append(alts, p[start:i])
++				start = i + 1
++				if p[i] == ')' {
++					return alts, i
++				}
++			} else if p[i] == ')' {
++				level--
++			}
++		}
++	}
++	return nil, -1
++}
++
++// matchBracket matches ch against the bracket expression starting at p[0]
++// ('['). It returns the length of the expression and whether ch is in the set.
++// For an unterminated expression it returns 0 ('[' is then a literal), or -1
++// when glibc gives up instead: a range or escape cut off by the pattern end.
++func matchBracket(p []rune, ch rune) (int, bool) {
++	i := 1
++	negate := i < len(p) && (p[i] == '!' || p[i] == '^')
++	if negate {
++		i++
++	}
++	matched := false
++	for first := true; i < len(p); first = false {
++		c := p[i]
++		if c == ']' && !first {
++			return i + 1, matched != negate
++		}
++		if c == '[' && i+1 < len(p) && p[i+1] == ':' {
++			if end := strings.Index(string(p[i+2:]), ":]"); end >= 0 {
++				class := string(p[i+2:])[:end]
++				matched = matched || inClass(class, ch)
++				i += 2 + len([]rune(class)) + 2
++				continue
++			}
++		}
++		if c == '[' && i+1 < len(p) && (p[i+1] == '.' || p[i+1] == '=') {
++			// collating symbol [.x.] or equivalence class [=x=]: one character
++			end := strings.Index(string(p[i+2:]), string(p[i+1])+"]")
++			if end < 0 {
++				return -1, false
++			}
++			sym := []rune(string(p[i+2:])[:end])
++			matched = matched || (len(sym) == 1 && sym[0] == ch)
++			i += 2 + len(sym) + 2
++			continue
++		}
++		if c == '\\' {
++			if i+1 == len(p) {
++				return -1, false
++			}
++			i++
++			c = p[i]
++		}
++		if i+1 < len(p) && p[i+1] == '-' && (i+2 == len(p) || p[i+2] != ']') {
++			if i+2 == len(p) {
++				return -1, false
++			}
++			hi := p[i+2]
++			i += 2
++			if hi == '\\' {
++				if i+1 == len(p) {
++					return -1, false
++				}
++				i++
++				hi = p[i]
++			}
++			matched = matched || (c <= ch && ch <= hi)
++		} else {
++			matched = matched || c == ch
++		}
++		i++
++	}
++	return 0, false
++}
++
++func inClass(class string, ch rune) bool {
++	switch class {
++	case "alpha":
++		return unicode.IsLetter(ch)
++	case "digit":
++		return ch >= '0' && ch <= '9'
++	case "alnum":
++		return unicode.IsLetter(ch) || unicode.IsDigit(ch)
++	case "upper":
++		return unicode.IsUpper(ch)
++	case "lower":
++		return unicode.IsLower(ch)
++	case "space":
++		return unicode.IsSpace(ch)
++	case "blank":
++		return ch == ' ' || ch == '\t'
++	case "punct":
++		return unicode.IsPunct(ch) || unicode.IsSymbol(ch)
++	case "xdigit":
++		return strings.ContainsRune("0123456789abcdefABCDEF", ch)
++	case "cntrl":
++		return unicode.IsControl(ch)
++	case "print":
++		return unicode.IsPrint(ch)
++	case "graph":
++		return unicode.IsGraphic(ch) && !unicode.IsSpace(ch)
++	}
++	return false
++}
+diff --git a/coa/pkg/planner/exclude-match_test.go b/coa/pkg/planner/exclude-match_test.go
+new file mode 100644
+index 0000000..a4dbde6
+--- /dev/null
++++ b/coa/pkg/planner/exclude-match_test.go
+@@ -0,0 +1,99 @@
++/*
++ * penguins-eggs - Copyright (C) 2017-2026 Piero Proietti
++ * Author: Piero Proietti <piero.proietti@gmail.com>
++ * https://penguins-eggs.net
++ *
++ * This file is part of penguins-eggs.
++ * Released under the GNU GPL v3 license.
++ */
++
++package planner
++
++import (
++	"reflect"
++	"testing"
++)
++
++func TestFnmatchExt(t *testing.T) {
++	cases := []struct {
++		pattern, name string
++		want          bool
++	}{
++		// plain wildcards, FNM_PERIOD: a leading dot is never matched by a wildcard
++		{"*", "foo", true},
++		{"*", ".bashrc", false},
++		{".??*", ".ab", true},
++		{".??*", ".a", false},
++		{"*.iso", "egg.iso", true},
++		{"*.iso", "egg.img", false},
++		{"*.iso", ".iso", false},
++		{"ssh_host_*", "ssh_host_ed25519_key", true},
++		{"*cryptdisks*", "S01cryptdisks-early", true},
++		{"*-old", "status-old", true},
++		{"**", "anything", true},
++		{"?", "a", true},
++		{"?", ".", false},
++		{"?", "ab", false},
++		// brackets and escapes
++		{"[a-c]x", "bx", true},
++		{"[a-c]x", "dx", false},
++		{"[!a]x", "ax", false},
++		{"[!a]x", "bx", true},
++		{"[]]", "]", true},
++		{"[[:digit:]]*", "5abc", true},
++		{"[[:digit:]]*", "abc", false},
++		{"[unterminated", "[unterminated", true},
++		{"\\*", "*", true},
++		{"\\*", "a", false},
++		// extglob, as used by the built-in list
++		{"!(themes|unicode.pf2)", "grub.cfg", true},
++		{"!(themes|unicode.pf2)", "themes", false},
++		{"!(themes|unicode.pf2)", "unicode.pf2", false},
++		{"!(themes|unicode.pf2)", "themes.bak", true},
++		{"!(apache2|clamav|libvirt|journal|samba)", "syslog", true},
++		{"!(apache2|clamav|libvirt|journal|samba)", "journal", false},
++		{"@(a|b)c", "bc", true},
++		{"@(a|b)c", "cc", false},
++		{"+(ab)", "abab", true},
++		{"+(ab)", "", false},
++		{"*(ab)", "", true},
++		{"*(ab)x", "ababx", true},
++		{"?(x)y", "y", true},
++		{"?(x)y", "xy", true},
++		{"?(x)y", "xxy", false},
++		{"foo.!(bak)", "foo.conf", true},
++		{"foo.!(bak)", "foo.bak", false},
++		// glibc corner cases, checked against fnmatch(3) of glibc 2.43
++		{"*!(x)", "x", false},       // a group right after '*' never gets the empty tail
++		{"+(\\[)", "+(\\[)", false}, // unterminated bracket inside a group: invalid group, literal '+'
++		{"[a-", "[a-", false},       // range cut off by the end of the pattern
++		{"x\\", "x\\", false},       // trailing backslash
++		{"[[.a.]]", "a", true},      // collating symbol
++	}
++	for _, c := range cases {
++		if got := fnmatchExt(c.pattern, c.name); got != c.want {
++			t.Errorf("fnmatchExt(%q, %q) = %v, want %v", c.pattern, c.name, got, c.want)
++		}
++	}
++}
++
++func TestParseExcludeList(t *testing.T) {
++	data := "# comment\n" +
++		"\n" +
++		"  var/lib/docker/\n" +
++		"/etc/fstab\n" +
++		"home//*/.cache/*\n" +
++		"\\#odd name\n" +
++		"... sticky\n" +
++		"boot/grub/!(themes|unicode.pf2)\n"
++	want := []excludePattern{
++		{"var", "lib", "docker"},
++		{"etc", "fstab"},
++		{"home", "*", ".cache", "*"},
++		{"#odd name"},
++		{"boot", "grub", "!(themes|unicode.pf2)"},
++	}
++	if got := parseExcludeList(data); !reflect.DeepEqual(got, want) {
++		t.Fatalf("parseExcludeList:\n got %q\nwant %q", got, want)
++	}
++}
+diff --git a/coa/pkg/planner/space-check_test.go b/coa/pkg/planner/space-check_test.go
+new file mode 100644
+index 0000000..5eadd59
+--- /dev/null
++++ b/coa/pkg/planner/space-check_test.go
+@@ -0,0 +1,138 @@
++/*
++ * penguins-eggs - Copyright (C) 2017-2026 Piero Proietti
++ * Author: Piero Proietti <piero.proietti@gmail.com>
++ * https://penguins-eggs.net
++ *
++ * This file is part of penguins-eggs.
++ * Released under the GNU GPL v3 license.
++ */
++
++package planner
++
++import (
++	"os"
++	"path/filepath"
++	"strings"
++	"testing"
++
++	"golang.org/x/sys/unix"
++)
++
++// writeTree creates files (name -> size in KiB) under root.
++func writeTree(t *testing.T, root string, files map[string]int) {
++	t.Helper()
++	for name, kib := range files {
++		path := filepath.Join(root, name)
++		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
++			t.Fatalf("mkdir: %v", err)
++		}
++		if err := os.WriteFile(path, []byte(strings.Repeat("x", kib*1024)), 0644); err != nil {
++			t.Fatalf("write %s: %v", name, err)
++		}
++	}
++}
++
++// allocatedKiB sums st_blocks of the given paths (relative to root).
++func allocatedKiB(t *testing.T, root string, names ...string) uint64 {
++	t.Helper()
++	var bytes uint64
++	for _, name := range names {
++		var st unix.Stat_t
++		if err := unix.Lstat(filepath.Join(root, name), &st); err != nil {
++			t.Fatalf("lstat %s: %v", name, err)
++		}
++		bytes += uint64(st.Blocks) * 512
++	}
++	return bytes / 1024
++}
++
++func writeList(t *testing.T, lines ...string) string {
++	t.Helper()
++	path := filepath.Join(t.TempDir(), "excludes.list")
++	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0644); err != nil {
++		t.Fatalf("write list: %v", err)
++	}
++	return path
++}
++
++func TestMeasureExcludedKiBWildcards(t *testing.T) {
++	root := t.TempDir()
++	writeTree(t, root, map[string]int{
++		"home/user/media/clip.mov":   512,
++		"home/user/media/.hidden":    64,
++		"home/user/keep.txt":         32,
++		"var/log/syslog":             128,
++		"var/log/journal/system.log": 256,
++		"boot/grub/grub.cfg":         8,
++		"boot/grub/themes/bg.png":    16,
++	})
++	list := writeList(t,
++		"# the media is huge",
++		"home/*/media/*",
++		"var/log/!(apache2|journal)",
++		"boot/grub/!(themes|unicode.pf2)",
++		"does/not/exist",
++	)
++
++	got := measureExcludedKiB(root, list)
++	// media/* skips the dot file (FNM_PERIOD), !(...) keeps journal/ and themes/
++	want := allocatedKiB(t, root, "home/user/media/clip.mov", "var/log/syslog", "boot/grub/grub.cfg")
++	if got != want {
++		t.Fatalf("excluded = %d KiB, want %d KiB", got, want)
++	}
++}
++
++func TestMeasureExcludedKiBWholeTreeCountedOnce(t *testing.T) {
++	root := t.TempDir()
++	writeTree(t, root, map[string]int{
++		"data/a.bin":       100,
++		"data/sub/b.bin":   200,
++		"data/sub/.c.bin":  50,
++		"other/plain.file": 10,
++	})
++	// a hard link inside the same excluded tree must not be counted twice
++	if err := os.Link(filepath.Join(root, "data/a.bin"), filepath.Join(root, "data/sub/a-link.bin")); err != nil {
++		t.Fatalf("link: %v", err)
++	}
++	// a symlink to the big tree is excluded as a link, not followed
++	if err := os.Symlink(filepath.Join(root, "data"), filepath.Join(root, "other/data-link")); err != nil {
++		t.Fatalf("symlink: %v", err)
++	}
++	list := writeList(t,
++		"data/",
++		"data/sub/*", // nested in an excluded tree: no double count
++		"other/data-link",
++		"other/data-link/*",
++	)
++
++	got := measureExcludedKiB(root, list)
++	want := allocatedKiB(t, root, "data", "data/a.bin", "data/sub", "data/sub/b.bin", "data/sub/.c.bin", "other/data-link")
++	if got != want {
++		t.Fatalf("excluded = %d KiB, want %d KiB", got, want)
++	}
++}
++
++func TestMeasureExcludedKiBStaysOnRootFilesystem(t *testing.T) {
++	var rootStat, procStat unix.Stat_t
++	if unix.Lstat("/", &rootStat) != nil || unix.Lstat("/proc/self", &procStat) != nil || rootStat.Dev == procStat.Dev {
++		t.Skip("needs /proc mounted as a separate filesystem")
++	}
++	// proc/* lives on another filesystem: not part of the root used space
++	if got := measureExcludedKiB("/", writeList(t, "proc/*", "proc")); got != 0 {
++		t.Fatalf("excluded = %d KiB on /proc, want 0", got)
++	}
++}
++
++func TestCheckDiskSpaceReportsMeasuredExcludes(t *testing.T) {
++	work := t.TempDir()
++	report, err := CheckDiskSpace(work, work, "xz", writeList(t, "no/such/path/anywhere"))
++	if err != nil {
++		t.Fatalf("CheckDiskSpace: %v", err)
++	}
++	if report.ExcludedKiB != 0 {
++		t.Fatalf("excluded = %d KiB, want 0", report.ExcludedKiB)
++	}
++	if !strings.Contains(report.String(), "Excluded:") || !strings.Contains(report.String(), "measured in") {
++		t.Fatalf("report does not show the measured exclude size:\n%s", report.String())
++	}
++}
+-- 
+2.53.0

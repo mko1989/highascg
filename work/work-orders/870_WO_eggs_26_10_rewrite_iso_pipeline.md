@@ -321,3 +321,45 @@ Dry runs 2 and 3 (`--stop-after inject-efi-grubcfg`, `--stop-after copy-kernel-i
   local `coa` build whose space estimate subtracts the excluded trees (not a blind skip), offered upstream as a PR.
 - **Q2:** 26.10.30, then `apt-mark hold`.
 - Q3–Q12 are open until the first dry run.
+
+### Phase 0.2(b) — patched coa (30.10)
+
+**Investigation** (upstream `pieroproietti/penguins-eggs` tag `v26.10.30` = commit `0b5e7fa0c5ce94a57c11711c0b8ccc4c7b5b8447`, the same version string as the installed `eggs version` → `v26.10.30`; the Go code is `coa/`, module `coa`, built upstream as `cd coa && go build -ldflags "-X 'coa/pkg/cmd.AppVersion=…'" main.go` (`Makefile:36`; `go version -m /usr/bin/coa` shows the same flags, go1.25.0, CGO on)):
+
+* `coa/pkg/cmd/remaster.go:301` writes the list (`GenerateExcludeList`), `:308-310` runs `planner.CheckDiskSpace` unless GitHub Actions, `:314` logs "Space estimate", `:332`/`:338` are the `Not enough space` / `same partition` fatals.
+* `coa/pkg/planner/space-check.go:64` `CheckDiskSpace` = `statfs("/")` used − `estimateExcludedKiB` (`:136`). `:152` skips every line with `*` or `!`; `dirSizeKiB` (`:169`) sums only the directory's entry sizes on the root fs (`:191-203`), and for a directory on another fs subtracts that fs's whole used space (`:185`), which is not part of the root figure.
+* The list is consumed by `coa/pkg/worker/mksquashfs.go:87,93` (`-wildcards -ef`). squashfs-tools 4.7.5 `mksquashfs.c`: `process_exclude_file` (5718: leading whitespace, `#`, one leading `\`), `add_exclude`/`add_path` (5635/5565: `/`-split components, `... ` = non-anchored), `excluded_match` (5663-5672: `fnmatch(FNM_PATHNAME|FNM_PERIOD|FNM_EXTMATCH)`, leaf match excludes the subtree). Built-in extglob lines: `create-exclude-list.go:99` `boot/grub/!(themes|unicode.pf2)`, `:160` `var/log/!(…)`.
+* Our media line is `home/casparcg/highascg/media/*` (embed-server and WO-47 fragments), a `*` line, so it was never subtracted. Also: the **stock** `custom.exclude.list` (all that is installed today) does not exclude the media at all.
+
+**What was done** (patch `scripts/eggs/patches/wo870-coa-space-estimate-honours-excludes.patch`, format-patch style like `caspar/patches/`; 4 files, +631/−50):
+
+* `coa/pkg/planner/exclude-match.go` (new): the list parser with mksquashfs rules, and an fnmatch with `FNM_PATHNAME|FNM_PERIOD|FNM_EXTMATCH` semantics (`* ? [...] \` + `?() *() +() @() !()`, leading-dot rule, glibc quirks). `... ` lines are not subtracted (that keeps the estimate on the safe side and the scan bounded).
+* `space-check.go`: `estimateExcludedKiB` → `measureExcludedKiB("/", list)`. It walks only the directories a pattern can still reach. Each excluded entry adds `st_blocks` of itself and its subtree (`lstat`, no symlink following, same `st_dev` only, hard links once, no descent below an excluded entry, so nested excludes count once). `SpaceReport.ExcludedScan` is added, and the existing line now reads `Excluded: N MiB (measured in 870ms)`.
+* Tests in upstream style: `exclude-match_test.go`, which includes the built-in list's patterns and the glibc corner cases, and `space-check_test.go`, which uses temp trees for wildcards, extglob, the leading dot, a nested exclude, a hard link, a symlink, `/proc` as another fs, and the report line.
+* `scripts/eggs/build-patched-coa.sh` reproduces the build. It clones the tag, refuses anything but the pinned commit, applies the patch, runs the planner tests, builds with the upstream flags as `v26.10.30+highascg1`, and checks the official deb's sha256. It then repacks the deb under fakeroot with only `usr/bin/coa` and `Version:` changed, verifies the file list, control and payload, and prints the owner commands. It never uses sudo. Pinned by `tools/smoke/smoke-wo870-coa-patch.test.js`, which is curated in `tools/ci/offline-test-files-3.js`.
+
+**Verified**
+
+* Go: `go vet` clean; `go test ./pkg/planner/` 8/8 (2 upstream + 6 new). Matcher vs glibc 2.43 `fnmatch(3)` (C helper, same flags): 0 differences on 244,480 pairs (4,480 curated, 240,000 random fuzz).
+* The patch applies to a pristine `git archive` of the tag and reproduces the tree exactly. The build script ran end to end twice (11 s); `coa version` → `[coa] eggs v26.10.30+highascg1`; module deps are identical to the official binary.
+* Measured on this box, read-only, by calling `planner.GenerateExcludeList` (clone mode, list written to the scratchpad) + `planner.CheckDiskSpace` in-process. The harness ran as casparcg, so root-only dirs are unreadable and count as kept. The 5-6 `home/eggs…` lines were not walked (the nest is untouched). Both caveats only make the numbers larger. Root used 849.6 GiB, free 40.2 GiB, same partition (needs 2× ISO):
+
+  | exclude list | old excluded → ISO (xz) | new excluded → ISO (xz / zstd) | 2× ISO vs 40.2 GiB |
+  |---|---|---|---|
+  | today (built-ins + stock `custom.exclude.list`, 112 lines) | 8.0 GiB → 260.9 GiB | 18.2 GiB → 257.7 / 291.0 GiB | FAIL (no media line) |
+  | Phase 2 (+ `home/eggs` + embed-server + DeckLink fragments, 382 lines) | 50.2 GiB → 247.8 GiB | 811.2 GiB → **11.9 / 13.4 GiB** | **PASS** (23.8 / 26.9 GiB) |
+
+  Scan time 0.87 s (Phase 2 list; 0.05 s for today's list). The 11.9 GiB estimate is still above the real squashfs class (old ISO 3.46 GB), since the 31 % factor is generic.
+* **Consequence:** the patch alone does not unblock the dry run. `/etc/penguins-eggs.d/custom.exclude.list` must carry the media line first. That means Phase 2's generated list, or at minimum `home/eggs` and `home/casparcg/highascg/media/*`.
+* Not verified: an actual `eggs remaster` with the patched binary (owner dry run F, after install); the scan as root on the full list including `/home/eggs`; the upstream PR (not filed).
+
+**Owner install** (artefact `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo870/pkg/penguins-eggs_26.10.30+highascg1_amd64.deb`, sha256 `cce86e3ce91d42158cd2d48555ba3283ba1e9fe2efa1ffd3df01eb7775e21d15`. That path is in `/tmp`, so install before a reboot or rebuild with `bash scripts/eggs/build-patched-coa.sh`, which prints the same block for its own output dir):
+
+```bash
+cd /tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo870/pkg
+sha256sum -c penguins-eggs_26.10.30+highascg1_amd64.deb.sha256
+sudo apt-mark unhold penguins-eggs
+sudo apt install ./penguins-eggs_26.10.30+highascg1_amd64.deb
+sudo apt-mark hold penguins-eggs
+eggs version        # expect: [coa] eggs v26.10.30+highascg1 - The "master" of remaster
+```
