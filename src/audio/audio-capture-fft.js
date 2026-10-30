@@ -31,6 +31,7 @@ const { spawn, execFileSync } = require('child_process')
 const dgram = require('dgram')
 const { pcmS16leToMonoFloats, analyserFreqBytes, waveformBytes, rmsOf } = require('./fft')
 const { createBeatDetector, bandsOf } = require('./beat-detect')
+const { createAudioParts } = require('./audio-parts')
 
 const ARECORD_BINS = ['arecord', '/usr/bin/arecord']
 
@@ -44,8 +45,7 @@ function normalizeAudioCaptureConfig(cfg) {
 		const n = Number(v)
 		return Number.isFinite(n) ? n : fb
 	}
-	const enabled =
-		o.enabled === true || env.HIGHASCG_AUDIO_FFT === '1' || env.HIGHASCG_AUDIO_FFT === 'true'
+	const enabled = o.enabled === true || env.HIGHASCG_AUDIO_FFT === '1' || env.HIGHASCG_AUDIO_FFT === 'true'
 	return {
 		enabled,
 		/** 'slot' = UDP PCM tee from a live-audio bridge; 'device' = own arecord capture. */
@@ -105,7 +105,7 @@ function listCaptureDevices() {
  * @param {object} opts
  * @param {ReturnType<typeof normalizeAudioCaptureConfig>} opts.config
  * @param {(level: string, msg: string) => void} opts.log
- * @param {(frame: { freq: Uint8Array, wave: Uint8Array, rms: number, device: string, beat?: object, bands?: number[] }) => void} opts.onFrame
+ * @param {(frame: { freq: Uint8Array, wave: Uint8Array, rms: number, device: string, beat?: object, bands?: number[], parts?: object }) => void} opts.onFrame
  */
 function createAudioCaptureFft({ config, log, onFrame }) {
 	const cfg = config
@@ -128,6 +128,8 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 	let pending = Buffer.alloc(0)
 	/** WO-662: onsets on every sample (≈11 ms hops), not on the 30 Hz frames. */
 	const beat = createBeatDetector({ sampleRate: cfg.sampleRate })
+	/** WO-861: drum hits, band levels, tonal, mood and sections on the same samples. */
+	const parts = createAudioParts({ sampleRate: cfg.sampleRate })
 
 	function resolveDevice() {
 		if (cfg.deviceMatch) {
@@ -141,6 +143,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 
 	function pushSamples(f32) {
 		beat.push(f32)
+		parts.push(f32)
 		const n = f32.length
 		if (n >= ring.length) {
 			ring.set(f32.subarray(n - ring.length))
@@ -169,6 +172,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			staleFrameSent = true
 			smoothState.fill(0)
 			beat.reset()
+			parts.reset()
 			onFrame({
 				freq: new Uint8Array(cfg.fftSize >> 1),
 				wave: waveformBytes(new Float32Array(0), cfg.fftSize >> 1),
@@ -176,13 +180,22 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 				device: activeDevice,
 				beat: beat.snapshot(),
 				bands: [0, 0, 0],
+				parts: parts.snapshot(),
 			})
 			return
 		}
 		if (ringFill < ring.length) return
 		const freq = analyserFreqBytes(ring, smoothState, cfg)
 		const wave = waveformBytes(ring, cfg.fftSize >> 1)
-		onFrame({ freq, wave, rms: rmsOf(ring), device: activeDevice, beat: beat.snapshot(), bands: bandsOf(freq, cfg.sampleRate) })
+		onFrame({
+			freq,
+			wave,
+			rms: rmsOf(ring),
+			device: activeDevice,
+			beat: beat.snapshot(),
+			bands: bandsOf(freq, cfg.sampleRate),
+			parts: parts.snapshot(),
+		})
 	}
 
 	function scheduleRetry(why) {
@@ -206,7 +219,7 @@ function createAudioCaptureFft({ config, log, onFrame }) {
 			p = spawn(
 				ARECORD_BINS[0],
 				['-q', '-D', activeDevice, '-f', 'S16_LE', '-r', String(cfg.sampleRate), '-c', String(cfg.channels), '-t', 'raw'],
-				{ stdio: ['ignore', 'pipe', 'pipe'] },
+				{ stdio: ['ignore', 'pipe', 'pipe'] }
 			)
 		} catch (e) {
 			scheduleRetry(`spawn failed (${e?.message || e})`)

@@ -1,10 +1,7 @@
 'use strict'
 
 const { spawn } = require('child_process')
-const {
-	resolveLiveAudioCaptureBaseUri,
-	parseAlsaHwIdentity,
-} = require('../config/live-audio-input')
+const { resolveLiveAudioCaptureBaseUri, parseAlsaHwIdentity } = require('../config/live-audio-input')
 const { readCasparSetting } = require('../config/routing-map')
 
 /** MPEG-TS ingest per live-audio slot (HighAsCG ffmpeg → Caspar PLAY udp://). */
@@ -13,6 +10,7 @@ const LIVE_AUDIO_BRIDGE_UDP_PORT_BASE = 52200
 const AUDIO_FFT_PCM_UDP_PORT_BASE = 52220
 /** Warmup after bridge (re)start — allow first IDR + SPS/PPS before Caspar PLAY. */
 const BRIDGE_WARMUP_MS = 700
+const BRIDGE_EXIT_WAIT_MS = 1500 // max wait for a replaced ffmpeg to release the ALSA device
 
 /** @type {Map<number, { proc: import('child_process').ChildProcess|null, port: number, device: string, startedAt: number, lastError?: string }>} */
 const _bridges = new Map()
@@ -186,7 +184,7 @@ function buildLiveAudioBridgeFfmpegArgs(cfg, slot, device) {
 			'pcm_s16le',
 			'-f',
 			's16le',
-			`udp://127.0.0.1:${audioFftPcmUdpPort(slot)}?pkt_size=1316`,
+			`udp://127.0.0.1:${audioFftPcmUdpPort(slot)}?pkt_size=1316`
 		)
 	}
 	return args
@@ -253,7 +251,7 @@ function startLiveAudioBridge(ctx, slot, opts = {}) {
 				cur.plugRetried = true
 				ctx?.log?.(
 					'warn',
-					`[live-audio-bridge] slot ${n}: ${cur.device} rejected the capture format — retrying via ${fallback}`,
+					`[live-audio-bridge] slot ${n}: ${cur.device} rejected the capture format — retrying via ${fallback}`
 				)
 				_workingDeviceBySlot.set(n, fallback)
 				startLiveAudioBridge(ctx, n, { deviceOverride: fallback, plugRetried: true })
@@ -297,9 +295,22 @@ function stopAllLiveAudioBridges() {
 async function ensureLiveAudioBridge(ctx, slot, opts = {}) {
 	if (!isLiveAudioBridgeEnabled(ctx?.config)) return false
 	const n = parseInt(String(slot), 10)
-	if (!opts.force) {
-		const entry = _bridges.get(n)
-		if (entry?.proc && entry.proc.exitCode == null && !entry.proc.killed) return true
+	const prev = _bridges.get(n)?.proc
+	const alive = prev && prev.exitCode == null && prev.signalCode == null
+	if (!opts.force && alive && !prev.killed) return true
+	// The ALSA device is single-open: let the old ffmpeg release it before the new one opens it (box 30.10 — an
+	// immediate respawn failed "Device or resource busy").
+	if (alive) {
+		try {
+			prev.kill('SIGTERM')
+		} catch (_) {}
+		await new Promise((r) => {
+			const t = setTimeout(r, BRIDGE_EXIT_WAIT_MS)
+			prev.once('close', () => {
+				clearTimeout(t)
+				r()
+			})
+		})
 	}
 	startLiveAudioBridge(ctx, n)
 	await new Promise((r) => setTimeout(r, BRIDGE_WARMUP_MS))

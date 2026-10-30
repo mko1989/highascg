@@ -41,6 +41,43 @@ outside the tree by tools/tracking-detect/setup-venv.sh and export-models.sh:
   NumPy — https://numpy.org — Copyright NumPy Developers. License: BSD-3-Clause.
 
 ================================================================================
+music-reactive-lighting — https://github.com/CanYuzbey/music-reactive-lighting
+Copyright (c) 2026 CanYuzbey
+License: MIT (text below).
+
+HighAsCG's real-time audio parts (WO-861) port formulas from music-reactive-lighting at commit
+68880191d8c232e92ec7e3a80bbe39941709d749:
+
+  src/audio/audio-mood.js  ← app/mapping/emotion.py (MoodEngine: arousal, valence, glide),
+                             app/audio/loudness.py (AdaptiveNormalizer), app/lighting/dynamics.py (drop event,
+                             minimal mode), app/audio/tempo.py (onset density)
+  src/audio/audio-parts.js ← app/audio/live_analyzer.py (band split; its HPSS is made causal here)
+
+The changes are listed in src/audio/audio-mood.js and work/work-orders/861_WO_realtime_audio_parts_buses.md §1.2.
+
+  MIT License
+
+  Copyright (c) 2026 CanYuzbey
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+================================================================================
 Rewir — https://github.com/warszawskie-kroje/rewir
 Copyright © 2016 Stowarzyszenie Kulturotwórcze Miastodwa
 License: SIL Open Font License 1.1 (https://scripts.sil.org/OFL). No Reserved Font Name is declared.

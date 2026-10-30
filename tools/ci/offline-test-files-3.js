@@ -208,6 +208,8 @@ module.exports = [
 	'tools/smoke/smoke-wo845b-followups.test.js',
 	'tools/smoke/smoke-wo860-overlay-looks.test.js',
 	'tools/smoke/smoke-wo860-overlay-take-out.test.js',
+	'tools/smoke/smoke-wo861-audio-parts.test.js',
+	'tools/smoke/smoke-wo861-live-audio-single-flight.test.js',
 	'tools/smoke/smoke-xrandr-custom-mode.js',
 	'tools/smoke/smoke-xrandr-layout-verify.test.js',
 	'tools/smoke/smoke-xrandr-persist-script.js',

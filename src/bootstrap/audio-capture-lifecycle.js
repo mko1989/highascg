@@ -9,10 +9,7 @@
  * frame is { freq, wave } as base64 (512 bytes each, AnalyserNode byte semantics) + rms.
  */
 
-const {
-	normalizeAudioCaptureConfig,
-	createAudioCaptureFft,
-} = require('../audio/audio-capture-fft')
+const { normalizeAudioCaptureConfig, createAudioCaptureFft } = require('../audio/audio-capture-fft')
 
 /**
  * @param {{ appCtx: object, config: object, logger: { info: Function, warn: Function } }} deps
@@ -31,7 +28,7 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 			for (const slot of listConfiguredLiveAudioSlots(config).slots) {
 				if (parseAlsaHwIdentity(slot.device) === mine) {
 					logger.warn(
-						`[AudioFFT] capture device ${cfg.device} is also live-audio slot ${slot.slot} (${slot.device}) — ALSA hw devices are single-open; use a dsnoop/plug alias or a separate device`,
+						`[AudioFFT] capture device ${cfg.device} is also live-audio slot ${slot.slot} (${slot.device}) — ALSA hw devices are single-open; use a dsnoop/plug alias or a separate device`
 					)
 				}
 			}
@@ -63,7 +60,9 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 			logger.info(`[AudioFFT] source: live-audio slot ${fftSlot} bridge tee`)
 		}
 		if (!cfg.enabled) {
-			logger.info('[AudioFFT] no source routed (live-audio inspector) and config.audioCapture disabled — shaders fall back to OSC-level reactivity')
+			logger.info(
+				'[AudioFFT] no source routed (live-audio inspector) and config.audioCapture disabled — shaders fall back to OSC-level reactivity'
+			)
 			return
 		}
 		if (cfg.source !== 'slot') warnOnLiveAudioClash(cfg)
@@ -80,6 +79,9 @@ function createAudioCaptureLifecycle({ appCtx, config, logger }) {
 					// WO-662: beat {n, age, bpm, conf, phase, level} + bands [bass, mid, high] 0..1
 					beat: frame.beat,
 					bands: frame.bands,
+					// WO-861: named buses — kick/snare/hats {level, onset, n}, bass/mid/high/tonal, loudness, onset, density,
+					// arousal, valence, energy, section, drop {n, age}
+					parts: frame.parts,
 				})
 			},
 		})

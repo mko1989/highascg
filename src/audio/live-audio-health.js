@@ -6,6 +6,7 @@ const { isLiveAudioBridgeEnabled, restartLiveAudioBridge } = require('./live-aud
 
 const DEFAULT_VERIFY_MS = 450
 const DEFAULT_CLEAR_SETTLE_MS = 150
+const VERIFY_GRACE_MS = 2000
 
 function infoHasFfmpegProducer(text) {
 	const t = String(text || '')
@@ -67,12 +68,39 @@ function sleep(ms) {
 }
 
 /**
- * CLEAR → PLAY (with fallbacks) → verify INFO. Used at startup and by the health watchdog.
+ * A fresh UDP bridge takes longer than verifyMs before Caspar's producer time passes 0.15 s (box 30.10: judged dead
+ * at 450 ms, playing a second later) — poll INFO until the grace runs out.
+ */
+async function producerComesUp(ctx, ch, layer, verifyMs, graceMs) {
+	await sleep(verifyMs)
+	const until = Date.now() + graceMs
+	for (;;) {
+		if (await isLiveAlsaProducerHealthy(ctx, ch, layer)) return true
+		if (Date.now() >= until) return false
+		await sleep(300)
+	}
+}
+
+/** slot → the recovery in flight (WO-861 §3: startup routing + meter watchdog raced, killing each other's bridge). */
+const _recovering = new Map()
+
+/**
+ * CLEAR → PLAY (with fallbacks) → verify INFO. Used at startup and by the health watchdog. One recovery per slot at a
+ * time: a second caller gets the running one's result instead of restarting the bridge under it (the ALSA device is
+ * single-open — the second ffmpeg failed "Device or resource busy" and both ended dead, box 30.10).
  * @param {object} ctx
  * @param {{ slot: number, channel: number, layer: number, clip?: string }} slot
- * @param {{ verifyMs?: number, clearSettleMs?: number, log?: boolean }} [opts]
+ * @param {{ verifyMs?: number, verifyGraceMs?: number, clearSettleMs?: number, log?: boolean }} [opts]
  */
-async function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
+function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
+	const key = slot?.slot
+	if (_recovering.has(key)) return _recovering.get(key)
+	const run = recoverLiveAlsaClip(ctx, slot, opts).finally(() => _recovering.delete(key))
+	_recovering.set(key, run)
+	return run
+}
+
+async function recoverLiveAlsaClip(ctx, slot, opts) {
 	if (!ctx?.amcp?.isConnected || !slot) return { ok: false, reason: 'amcp_disconnected' }
 	const ch = slot.channel
 	const layer = slot.layer
@@ -80,7 +108,9 @@ async function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
 
 	const variants =
 		opts.clips ||
-		(slot.clip ? [slot.clip, ...listLiveAudioPlayClipVariants(ctx.config, slot.slot).filter((c) => c !== slot.clip)] : listLiveAudioPlayClipVariants(ctx.config, slot.slot))
+		(slot.clip
+			? [slot.clip, ...listLiveAudioPlayClipVariants(ctx.config, slot.slot).filter((c) => c !== slot.clip)]
+			: listLiveAudioPlayClipVariants(ctx.config, slot.slot))
 	if (!variants.length) return { ok: false, reason: 'no_clips' }
 
 	const cl = `${ch}-${layer}`
@@ -111,8 +141,7 @@ async function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
 			if (log) ctx.log('warn', `[live-audio] slot ${slot.slot} PLAY ${cl} failed (${clipLabel}): ${msg}`)
 			continue
 		}
-		await sleep(verifyMs)
-		if (await isLiveAlsaProducerHealthy(ctx, ch, layer)) {
+		if (await producerComesUp(ctx, ch, layer, verifyMs, opts.verifyGraceMs ?? VERIFY_GRACE_MS)) {
 			if (log) {
 				const note = i > 0 ? ` (fallback ${i + 1}/${variants.length})` : ''
 				ctx.log('info', `[live-audio] slot ${slot.slot} capture running on ${cl}: ${clipLabel}${note}`)
@@ -122,7 +151,7 @@ async function playLiveAlsaClipWithRecovery(ctx, slot, opts = {}) {
 		if (log) {
 			ctx.log(
 				'warn',
-				`[live-audio] slot ${slot.slot} PLAY OK but producer dead on ${clipLabel} — ${i + 1 < variants.length ? 'trying fallback' : 'no fallbacks left'}`,
+				`[live-audio] slot ${slot.slot} PLAY OK but producer dead on ${clipLabel} — ${i + 1 < variants.length ? 'trying fallback' : 'no fallbacks left'}`
 			)
 		}
 	}

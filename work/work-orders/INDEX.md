@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-771 live WOs (35 open, 120 in progress, 616 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+772 live WOs (35 open, 120 in progress, 617 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -200,7 +200,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 820 DONE [caspar-build+media] NotchLC: native GPU decode in Caspar (spike + build) → 820_WO_notchlc_native_gpu_decode.md
 - 847 OPEN [caspar-build+audio] CasparCG Server: Screen / OAL / PortAudio consumer enhancements (PRs #1718–#172… → 847_WO_casparcg_server_prs_1718_1720_consumers_audio.md
 
-## audio — Audio routing, devices, meters (38)
+## audio — Audio routing, devices, meters (39)
 
 - 06 DONE [audio] Multi-Channel Audio Playout Architecture (CasparCG on Ubuntu) → 06_WO_AUDIO_PLAYOUT.md
 - 16 DONE [audio] Yamaha DM3 Audio Integration → 16_WO_YAMAHA_DM3_AUDIO_INTEGRATION.md
@@ -240,6 +240,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 799 DONE [audio+godot-client] Audio tab: ALSA hardware mixer docked at the bottom → 799_WO_audio_tab_alsa_mixer_dock.md
 - 800 IN PROGRESS [audio] Per-layer audio monitoring (levels per layer, not per channel) → 800_WO_per_layer_audio_monitoring.md
 - 801 DONE [audio] PRV audio: monitor individual pairs on headphones (not only the mix-down) → 801_WO_prv_audio_pair_monitor_headphones.md
+- 861 DONE [audio+engine,godot-client] Real-time audio "parts" for live visuals: drum hits, tonal, mood/energy buses f… → 861_WO_realtime_audio_parts_buses.md
 
 ## video-io — DeckLink, NDI, v4l2, virtual camera, recording (29)
 
