@@ -18,6 +18,7 @@ const DecklinkPane := preload("res://features/settings/decklink_pane.gd")
 const VariablesPane := preload("res://features/settings/variables_pane.gd")
 const LiveAudioPane := preload("res://features/settings/live_audio_pane.gd")
 const NetworkPane := preload("res://features/settings/network_pane.gd")
+const LockscreenPane := preload("res://features/settings/lockscreen_pane.gd")
 
 signal logs_requested
 
@@ -65,6 +66,7 @@ func _ready() -> void:
 	_pane("Tailscale").add_child(TailscalePane.new())
 	_pane("Live audio").add_child(LiveAudioPane.new())
 	_pane("Variables").add_child(VariablesPane.new())
+	_pane("Lockscreen").add_child(LockscreenPane.new())  # WO-838
 	var nuclear := _pane("Nuclear")
 	Panes.nuclear(nuclear)
 	nuclear.add_child(NuclearPane.new())
