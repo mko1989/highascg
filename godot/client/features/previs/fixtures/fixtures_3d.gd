@@ -10,6 +10,7 @@ extends Node3D
 const F := preload("res://features/previs/fixtures/fixtures_3d_model.gd")
 const M := preload("res://features/previs/mvr_model.gd")
 const Sel := preload("res://features/previs/fixtures/fixture_selection.gd")
+const Con := preload("res://features/previs/fixtures/console_selection.gd")  # WO-857: the console's own set (cyan marks)
 const Tint := preload("res://features/previs/model_tint.gd")
 const Haze := preload("res://features/previs/haze.gd")
 
@@ -55,6 +56,8 @@ var haze := 0.0  # WO-786 (haze.gd): the views' haze level — the world's fog +
 func _ready() -> void:
 	_watch = preload("res://features/previs/fixtures/fixtures_watch.gd").new()  # WO-797: kept across rebuilds
 	add_child(_watch)
+	_watch.add_child(preload("res://features/previs/fixtures/console_selection_feed.gd").new())  # WO-857: under _watch, a rebuild frees every other child
+	Con.shared().changed.connect(_show_selection)
 	_shader = Shader.new()
 	_shader.code = CONE_SHADER
 	_cone = CylinderMesh.new()
@@ -167,6 +170,8 @@ func _build(f: Dictionary, rig: Dictionary) -> void:
 	parts.box = _body_box(root)
 	parts.mark = _mark(parts.box)
 	root.add_child(parts.mark)
+	parts.cmark = _mark(parts.box, Con.COLOR, 0.04)  # WO-857: a console-selected head
+	root.add_child(parts.cmark)
 	parts.type = str(f.typeId)
 	_fx[str(f.id)] = parts
 	Tint.apply(root, color_of(str(f.id)))  # WO-641 / WO-678
@@ -185,8 +190,9 @@ func _body_box(root: Node3D) -> AABB:
 	return box
 
 
-## Selection mark: the body box's edges, drawn over everything.
-func _mark(box: AABB) -> MeshInstance3D:
+## Selection mark: the body box's edges, drawn over everything (`color`, the box grown by `grow` m).
+func _mark(box: AABB, color := Color(1.0, 0.8, 0.2), grow := 0.0) -> MeshInstance3D:
+	box = box.grow(grow)
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINES)
 	for e in [[0, 1], [1, 3], [3, 2], [2, 0], [4, 5], [5, 7], [7, 6], [6, 4], [0, 4], [1, 5], [2, 6], [3, 7]]:
@@ -196,7 +202,7 @@ func _mark(box: AABB) -> MeshInstance3D:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.no_depth_test = true
-	mat.albedo_color = Color(1.0, 0.8, 0.2)
+	mat.albedo_color = color
 	var mi := MeshInstance3D.new()
 	mi.mesh = im
 	mi.material_override = mat
@@ -243,6 +249,7 @@ func set_layer_colors(cols: Dictionary) -> void:
 func _show_selection() -> void:
 	for id in _fx:
 		(_fx[id].mark as MeshInstance3D).visible = sel.ids.has(id)
+		(_fx[id].cmark as MeshInstance3D).visible = Con.shared().shown().has(id)  # WO-857
 
 
 ## A click (no drag) in the 3D view. Point at on: a floor hit aims the selection there. Else the nearest fixture

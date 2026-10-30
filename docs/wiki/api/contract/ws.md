@@ -5,7 +5,7 @@
 Message types on the node's WebSocket (`/` on the HTTP port; envelope `{ type, data }`). **server → clients** =
 broadcasts and direct sends; **client → server** = types the node acts on. Payloads: the sending / handling module.
 
-88 types.
+89 types.
 
 | Direction | Type | Module | Note |
 |---|---|---|---|
@@ -62,6 +62,7 @@ broadcasts and direct sends; **client → server** = types the node acts on. Pay
 | server → clients | `device_view_subscribe_ok` | `src/server/ws-server.js` |  |
 | server → clients | `device_view_unsubscribe_ok` | `src/server/ws-server.js` |  |
 | server → clients | `error` | `src/server/ws-server.js` |  |
+| server → clients | `fixtures:console_selection` | `src/fixtures/console-selection.js` |  |
 | server → clients | `global_border_sync` | `src/artnet/artnet-output.js` |  |
 | server → clients | `gpu_topology_changed` | `src/bootstrap/gpu-drm-hotplug-watch.js` |  |
 | server → clients | `lighting.error` | `src/engine/timeline-playback-light.js` |  |

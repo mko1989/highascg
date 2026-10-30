@@ -1,7 +1,7 @@
 # WO-857 — Mirror the console's group / head selection in the previs (MagicQ, grandMA3 remote for VR programming)
 
 **Area:** lighting, tracking-vr
-**Status: IN PROGRESS (30.10) — owner chose both consoles: common feed + grandMA3 plugin being built; MagicQ CITP capture test needs the owner at MagicQ**
+**Status: IN PROGRESS (30.10) — common feed + grandMA3 path BUILT and offline-verified (node smokes, Godot tests, GUI e2e with screenshots); open: the plugin on a real grandMA3 (owner) and the MagicQ CITP capture (owner clicking in MagicQ)**
 
 Owner, 30.10:
 > is it possible to mimic selections of groups from chamsys to the highascg visualizer? should be.
@@ -278,3 +278,87 @@ Order of work: common feed, grandMA3 plugin prototype, MagicQ CITP capture test.
   1. Build the common console-selection feed and the grandMA3 Lua plugin path.
   2. Run the passive MagicQ CITP capture test. It needs the owner clicking selections in MagicQ, so it waits for a
      session with the owner.
+
+## 4. What was done (30.10, part 1: common feed + grandMA3)
+
+Server (`src/`):
+- `fixtures/console-fid-map.js` — head number (FixtureID) to patch fixture id, and back. A patch entry `mvr-<uuid>` takes the
+  FixtureID of the scene object with that uuid (the stored scene `projects/_mvr/<id>.json`, `mvr-store.get`); an explicit
+  integer `fid` on a patch entry wins (hand-patched rigs). Unmapped numbers are returned as `unmatched`, never guessed.
+  `fid` is now kept by both patch normalizers (`follow-patch.js` and Godot `follow_model.gd`), only when set.
+- `fixtures/console-selection.js` — the transport-neutral feed `{ source, heads, ids, unmatched, ts }`. Broadcast on the
+  existing WS as `fixtures:console_selection` (change only; a project change re-resolves the last heads). `ctx.consoleSelection`.
+- `fixtures/gma3-selection-listener.js` — UDP listener for the plugin. Default port **6290/udp** (free on the box, checked
+  with `ss -ulpn`), `HIGHASCG_GMA3_SELECTION_PORT` or config `lighting.gma3SelectionPort` (0 / `off` disables), bind
+  `HIGHASCG_GMA3_SELECTION_BIND` / `lighting.gma3SelectionBind` (default 0.0.0.0). Off by default in a sandbox server and under the node
+  test runner. Wire format `HACG-SEL 1 gma3 <seq> <FIDs>` ("101,102,110-115", "-" = empty), stale / garbage dropped.
+- `fixtures/console-selection-boot.js` started by `follow-service.js` (3 lines), so it lives and dies with the fixture service.
+- `lighting-console/gma3-return.js` + `api/routes-console-selection.js` — the return path:
+  `GET|POST /api/fixtures/console-selection` (state / inject), `POST .../send {console, action: select|at|attribute, ids|heads, ...}`
+  types `Fixture a Thru b + c`, `At n`, `Attribute "Pan" At v` into a stored grandMA3 console (WO-837 service) as one OSC `/cmd`
+  message per command, never a bundle. Commands are built from validated numbers / a name pattern only.
+  Registered in `api/router.js`; `docs/wiki/api/contract/http.md` regenerated.
+- `tools/lighting/grandma3/highascg_selection.lua` + `README.md` (install, first-run checks): polls Selection / SelectionCount /
+  SelectionFirst / SelectionNext every 0.1 s, tries `HookObjectChange(Selection())` only to log whether it fires, resolves each
+  patch index with `GetSubfixture(idx).FID`, sends on change plus a keep-alive every 5 s over LuaSocket UDP.
+
+Godot (`godot/client/features/previs/fixtures/`):
+- `console_selection.gd` — the SECOND selection set (`shared()`: ids, heads, unmatched, source, `follow`; persisted ui.cfg
+  `[previs] follow_console`, default off). It never writes `fixture_selection.gd` (WO-774 / WO-841 own that set).
+- `console_selection_feed.gd` — WS + GET at connect / reconnect, a child of the `_watch` node of `fixtures_3d.gd` (a rig rebuild frees
+  every other child).
+- `fixtures_3d.gd` — a second mark per head (`parts.cmark`, cyan `Con.COLOR`, box grown 4 cm so it shows beside the amber own mark).
+- `console_row.gd` in the Programmer: "Follow console selection" toggle, count label (tooltip names unmatched heads), and a "Take"
+  button that copies the console set into the own selection once, on a click. This is the only write to the own selection.
+
+Why: one transport-neutral feed with the console set kept apart, so a MagicQ adapter (CITP) later only calls `set()`.
+
+## 5. What was VERIFIED
+
+- Node smoke `tools/smoke/smoke-wo857-console-selection.test.js` (in `offline-test-files-3.js`): 20 tests, 0 fail — FID map (also against a
+  missing scene), packet format, feed dedupe / project re-resolve / bad input, real UDP listener fed by a sender stub that emulates the
+  plugin (stale seq, garbage, keep-alive, plugin restart, port taken, port config), return path against an OSC receiver stub on
+  127.0.0.1 (exact `/cmd` strings, no `#bundle`, order, 400 / 404 / not-grandMA3), routes, real-router order, Lua source pinned to the wire format.
+  Full offline suite after the change: 4848 tests, 0 fail.
+- Real-box routes on a sandbox server (curl-style, UDP stub in, OSC stub out): GET shows listener counters, UDP `11-13,999` gives
+  3 ids + `unmatched [999]`, POST inject / bad JSON 400, `send` delivered `/cmd "Fixture 121"` and `/cmd "Attribute \"Pan\" At 10"` to the stub.
+- The real MVR path (read only): `mhp_harder` (199 patch entries, scene `projects/_mvr/...`) maps 199 / 199 entries to 199 distinct
+  FixtureIDs; 11 -> "MAC Quantum Profile 11", 121 -> "Vizi Beam CMY 121", 1001, 10301 as the names say.
+- Godot tests: `tests/test_console_selection_wo857.gd` (7 tests: payload parse, change-only emit, follow decides what is shown, summary,
+  never writes the own selection / Take is the one write, row follows the model, patch `fid` survives the slice normalizer). Suite: 23732 passed;
+  4 failures in `test_devices_mapping_slices` belong to the concurrent WO-869 work (functions of its new model not there yet), none to this WO.
+- GUI e2e `14_wo857_console_selection` (`node tools/e2e/run-gui-e2e.js --e2e=14_wo857_console_selection --out=<dir>`), 9 / 9 passed: the scenario plays the plugin
+  (real UDP datagrams to the sandbox listener on 127.0.0.1), the server maps FIDs, the client draws cyan boxes on heads 11-13 only after "Follow console
+  selection" is ticked, an own pick stays amber and untouched while the console set changes, an unpatched number is reported not drawn, Take copies once, `-`
+  clears. Screenshots in `<out>/shots/` (05 = the three console heads, 06 = own amber + console cyan). 07_pixel_map and 11_wo843_sweep still pass
+  (11 failed once at step 3 in a 07+11+14 run, an autosave wait; alone it passes 5 / 5, and 07+11 re-run passes 14 / 14).
+- Lua: **not syntax-checked.** The dev box has no Lua interpreter or `luac` (only `liblua5.4`). `sudo apt install lua5.4` then
+  `luac5.4 -p tools/lighting/grandma3/highascg_selection.lua` (owner: root needed). No hand-rolled checker was written.
+
+## 6. Left
+
+- **Live restart:** the listener starts with the server (via the fixture service), so one `kill -TERM $(systemctl show -p MainPID --value highascg)` is needed
+  to get it; until then the new routes 404 and nothing listens. The box firewall needs `ufw allow 6290/udp` (root, owner) when the console is another machine.
+  Not restarted by this work.
+- **grandMA3, owner at a console / onPC:** the first-run checks in `tools/lighting/grandma3/README.md` — does the poll see the selection, are the numbers FIDs (not patch
+  indexes), does a group give the expanded heads, does `require("socket")` exist on a hardware console, does `HookObjectChange(Selection())` fire.
+  Return path on a console: OSC input with Receive Command = Yes; the multi-range `Fixture a Thru b + c` form and the Pan / Tilt value scale are untested.
+- **MagicQ CITP capture (owner clicking in MagicQ; NOT run, no MagicQ setting changed):** see the procedure below.
+- Not built: a MagicQ adapter (`console-selection.set({source:'magicq', heads})` is all it needs), group names for a head set, a SendOSC fallback for the plugin.
+
+### MagicQ CITP capture — ready-to-run procedure (needs the owner at MagicQ)
+
+Goal: does MagicQ send FPTC `Ptch` / FSEL `Sele` when heads are selected, and does it work in Demo mode? `tcpdump` is not installed on the box
+(and capturing needs root), so the receive-only Node listener `tools/lighting/citp-listen.js` replaces the capture of the multicast part.
+
+1. Owner, in MagicQ (this changes one universe's output type, so it is the owner's call): Setup > View Settings (or the universe's Output
+   settings) > set the Visualiser type of ONE test universe to "Capture (same pc)". Note the old value to restore it afterwards.
+2. On the box (no root): `node tools/lighting/citp-listen.js --seconds=300 --out=/tmp/citp-magicq.log` — joins 239.224.0.180 / 224.0.0.180 on :4809, prints and
+   logs every datagram, sends nothing.
+3. Owner, in MagicQ, during those 5 minutes: select one head, add a second, select a group, deselect all (say aloud which at what time).
+4. Read `/tmp/citp-magicq.log`. What it tells: (a) any `CITP ... layer=PINF code=PLoc` datagram = MagicQ announces itself and its TCP port / name, so the CITP route
+   exists in this mode; (b) nothing = no CITP in Demo mode, stop here (MagicQ then stays on the CREP / unlock route of WO-793, or no selection mirror).
+5. Limit: multicast discovery only. `Ptch` and `Sele` travel over a TCP session MagicQ opens to a peer that announced itself as a visualiser, so seeing them needs a
+   CITP peer that answers (PLoc + a TCP listener that logs bytes) — the next small tool, only if step 4a says MagicQ announces.
+6. Restore the universe's Visualiser type.
+

@@ -56,6 +56,11 @@ function parseFixed(text) {
 	return [...out].map(([ch, value]) => ({ ch, value }))
 }
 
+/** WO-857: an explicit console head number (positive whole number), else 0. */
+function fidOf(v) {
+	return typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 2147483647 ? v : 0
+}
+
 function normalizeFixture(f, i) {
 	const o = f && typeof f === 'object' ? f : {}
 	const pose = o.pose && typeof o.pose === 'object' ? o.pose : {}
@@ -83,6 +88,7 @@ function normalizeFixture(f, i) {
 		follow: int(o.follow, 0, 0, 65535),
 		aim_z: num(o.aim_z, 1, -5, 10),
 		// WO-700 R3: the calibrated pan / tilt offset (°) — the real beam is where the file's angle + offset points
+		...(fidOf(o.fid) ? { fid: fidOf(o.fid) } : {}), // WO-857: the console's head number when it is not the MVR FixtureID
 		...(offset.pan || offset.tilt ? { offset } : {}),
 		...(map.length ? { offset_map: map } : {}),
 	}

@@ -13,6 +13,7 @@ const F := preload("res://features/previs/tracking/follow_model.gd")
 const FM := preload("res://features/previs/fixtures/fixtures_model.gd")
 const ThemeBuilder := preload("res://app/theme_builder.gd")
 const GroupsView := preload("res://features/previs/fixtures/programmer_groups_view.gd")
+const ConsoleRow := preload("res://features/previs/fixtures/console_row.gd")
 
 var sel: RefCounted = Sel.shared()
 var mirror := false  ## WO-757: a second copy (the VR panel) — only the first answers Point at clicks and the Delete key
@@ -66,6 +67,7 @@ func _ready() -> void:
 	_groups.get_popup().id_pressed.connect(_on_group)
 	row.add_child(_groups)
 	add_child(row)
+	add_child(ConsoleRow.new())  # WO-857: follow / take the lighting console's selection
 	_controls = VBoxContainer.new()
 	_controls.add_theme_constant_override("separation", 4)
 	add_child(_controls)

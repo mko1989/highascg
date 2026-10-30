@@ -61,7 +61,7 @@ function writeFixtureMedia(mediaDir) {
 }
 
 /**
- * @param {{ root: string, port?: number, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number }, tracking?: boolean }} opts
+ * @param {{ root: string, port?: number, env?: Record<string, string>, log?: (s: string) => void, media?: boolean, config?: object, caspar?: { host: string, port: number }, tracking?: boolean }} opts
  *   media: false skips the ffmpeg fixture clips (WO-725 cluster runs, CI has no ffmpeg); config: extra top-level
  *   overrides for a fresh root (e.g. `replication.selfId`, the server's id once linked); caspar: a THROWAWAY Caspar
  *   instance to drive instead of the simulated one (WO-744 tools/e2e/shm-source-take.js) — never the box's own.
@@ -127,6 +127,7 @@ async function startSandbox(opts) {
 		CASPAR_SCREEN_GATE_FILE: path.join(dirs.run, 'gate'),
 		CASPAR_SCREEN_HOLD_FILE: path.join(dirs.run, 'hold'),
 		CASPAR_CONFIG_PATH: path.join(root, 'casparcg.config'),
+		...opts.env, // WO-857: extra env of a scenario (a listener port)
 		HOME: dirs.home, // anything still reaching for ~ (bridge, exfat, .highascg, openbox) finds an empty scratch home
 		XAUTHORITY: '/nonexistent', // no X access to the live :0 even if a path slips through
 		DISPLAY: '',

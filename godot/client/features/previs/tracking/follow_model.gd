@@ -76,6 +76,9 @@ static func normalize_fixture(f: Variant, i: int) -> Dictionary:
 	var pins := normalize_offset_map(o.get("offset_map"))
 	if not pins.is_empty():  # WO-700 R7: pinned marks (beam-offset.js), only when set
 		out["offset_map"] = pins
+	var fid: Variant = o.get("fid")
+	if (fid is int or fid is float) and is_finite(float(fid)) and float(fid) >= 1.0 and float(fid) <= 2147483647.0:
+		out["fid"] = int(fid)  # WO-857: the console's head number (FixtureID) when it is not the MVR's; only when set
 	if o.get("manual_patch") == true:  # WO-695: the operator re-patched it — an MVR re-patch keeps mode / address
 		out["manual_patch"] = true
 	var cp := normalize_calibrated_pose(o.get("calibrated_pose"))

@@ -33,6 +33,7 @@ const { SACN_PORT } = require('./sacn')
 const { createPixelMapService } = require('./pixel-map-service')
 const { createPixelMapProposalService } = require('./pixel-map-proposal')
 const gdtfFull = require('./gdtf-share-full')
+const { startConsoleSelection } = require('./console-selection-boot') // WO-857
 
 function ipv4ToInt(ip) {
 	return ip.split('.').reduce((a, b) => ((a << 8) | Number(b)) >>> 0, 0)
@@ -208,6 +209,7 @@ function createFollowService(ctx, hub, deps = {}) {
 			psn.configure({ ...engine.psn, enabled: engine.enabled && engine.protocol === 'psn' && lightingOn() })
 		) || (() => {})
 	engine.start()
+	const consoleSel = startConsoleSelection(ctx, log) // WO-857: console selection feed + the grandMA3 plugin's UDP listener
 	const service = {
 		engine,
 		/** Re-resolve the patch (a GDTF type was imported or deleted). */
@@ -309,6 +311,7 @@ function createFollowService(ctx, hub, deps = {}) {
 			offDuties()
 			pixelMap.proposal.stop()
 			pixelMap.stop()
+			consoleSel.stop()
 			sacnIn.stop()
 			engine.stop()
 			sender.close()
