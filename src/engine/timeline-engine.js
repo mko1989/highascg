@@ -44,6 +44,8 @@ class TimelineEngine extends EventEmitter {
 			duration: opts?.duration || 30000,
 			fps: opts?.fps || 25,
 			flags: Array.isArray(opts?.flags) ? opts.flags : [],
+			// WO-834: 'hold' (default, absent) parks on the last frame at a non-looping end; 'black' STOPs
+			...(opts?.endBehaviour === 'black' ? { endBehaviour: 'black' } : {}),
 			...(opts?.sendTo && typeof opts.sendTo === 'object' ? { sendTo: opts.sendTo } : {}),
 			layers: opts?.layers || [
 				{ id: uid(), name: 'Layer 1', clips: [] },

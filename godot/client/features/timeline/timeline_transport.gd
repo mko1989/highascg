@@ -17,6 +17,7 @@ var pb_last := ""  # timelineId of the latest timeline.playback (the web's state
 var _pick: OptionButton
 var _play: Button
 var _loop: Button
+var _hold: Button  # WO-834: end of a non-looping timeline — on = hold the last frame (default), off = black
 var _cur: LineEdit
 var _tot: LineEdit
 var _ids: Array = []
@@ -49,6 +50,10 @@ func _ready() -> void:
 	_loop = _btn("⟲", "Loop", _toggle_loop)
 	_loop.toggle_mode = true
 	add_child(_loop)
+	_hold = _btn("Hold", "At the end (no loop): hold the last frame. Off: go to black.", func() -> void: pass)
+	_hold.toggle_mode = true
+	_hold.toggled.connect(_toggle_hold)
+	add_child(_hold)
 	_cur = _tc_field("Current time (Enter to focus). ++500 / --500 for jump", _commit_cur)
 	add_child(_cur)
 	var sep := Label.new()
@@ -108,6 +113,8 @@ func sync() -> void:
 	var p := {} if tl.is_empty() else _pbk(str(tl.id))
 	_play.text = "❚❚" if p.get("playing", false) else "▶"
 	_loop.set_pressed_no_signal(p.get("loop", false))
+	_hold.set_pressed_no_signal(str(tl.get("endBehaviour", "hold")) != "black")
+	_hold.disabled = tl.is_empty()
 	var fps := int(tl.get("fps", 25))
 	if not _cur.has_focus():
 		_cur.text = TM.fmt_smpte(tab.view.playhead_ms, fps) if not tl.is_empty() else "--:--:--:--"
@@ -274,6 +281,15 @@ func _toggle_loop() -> void:
 	p["loop"] = not p.loop
 	sync()
 	await Api.post_json("/api/timelines/%s/loop" % str(tl.id).uri_encode(), {"loop": p.loop})
+
+
+## WO-834: stored on the timeline (project data); the engine reads it when a non-looping pass ends.
+func _toggle_hold(on: bool) -> void:
+	var tl: Dictionary = tab.active()
+	if tl.is_empty():
+		return
+	tl["endBehaviour"] = "hold" if on else "black"
+	edited.emit()
 
 
 func _commit_cur() -> void:

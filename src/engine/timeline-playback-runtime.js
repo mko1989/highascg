@@ -40,6 +40,15 @@ module.exports = {
 		}
 		const cell = this._pbFor(id)
 		const prevAir = this._airTimelineId
+		if (cell.endHeld) {
+			/* WO-834: Play on a timeline holding its end frame starts it over — resuming would run the last frame
+			 * and hold again. Seamless: a clip that is on air at both ends is re-PLAYed without the STOP. */
+			cell.endHeld = false
+			if (prevAir === id && (fromMs == null || fromMs >= tl.duration - 1)) {
+				fromMs = 0
+				opts = { ...opts, restart: true, seamless: true }
+			}
+		}
 		const wasPausedResume = prevAir === id && opts?.restart !== true && this._canResumePlayback(id)
 
 		if (this._ticker) clearInterval(this._ticker)
@@ -198,6 +207,7 @@ module.exports = {
 			}
 			this._lastTickPositionMs = undefined
 			const tl = this.timelines.get(id)
+			cell.endHeld = false
 			if (tl && !opts?.skipAmcp) this._stopAll(tl)
 			this._prevKey = new Map()
 			this._lastKfValues.clear()
@@ -255,6 +265,7 @@ module.exports = {
 			return
 		}
 
+		cell.endHeld = false
 		const samePausedPos = !cell.playing && Math.abs((cell.position ?? 0) - pos) < 1
 		setCellPosition(cell, pos)
 		if (cell.playing) this._lastTickPositionMs = pos
@@ -403,7 +414,8 @@ module.exports = {
 				this.play(airId, 0, { seamless: true }) // WO-828 D2: no STOP at the wrap (black frames on PGM)
 				return
 			}
-			this.stop(airId)
+			if (tl.endBehaviour === 'black') this.stop(airId)
+			else this._holdEnd(airId, tl)
 			return
 		}
 		cell.position = ms
@@ -418,6 +430,28 @@ module.exports = {
 			}
 		}
 		this._lastTickPositionMs = ms
+	},
+
+	/**
+	 * WO-834 (WO-828 D8): the end of a non-looping timeline holds its last frame, like a media layer in a look —
+	 * unless the timeline is set to `endBehaviour: 'black'`. The playhead parks one timeline frame before the
+	 * end, so a clip that ends with the timeline is still under it; the paused apply then STOPs layers whose
+	 * clip ended earlier and SEEKs the held ones to that exact frame (the tick lands up to 40 ms late).
+	 */
+	_holdEnd(id, tl) {
+		const cell = this._pbFor(id)
+		if (this._ticker) {
+			clearInterval(this._ticker)
+			this._ticker = null
+		}
+		this._lastTickPositionMs = undefined
+		const last = Math.max(0, tl.duration - 1000 / Math.max(1, Number(tl.fps) || 25))
+		setCellPosition(cell, last)
+		cell.playing = false
+		this._pauseAll()
+		this._applyAt(id, last, true)
+		cell.endHeld = true
+		this._emitPb(id)
 	},
 
 	_nowMs(id) {
