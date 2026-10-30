@@ -1,11 +1,12 @@
 #!/usr/bin/env node
+'use strict'
+require('./live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 /**
  * Smoke test for scene take API.
  * Calls POST /api/scene/take with a valid scene payload.
  *
- * Usage: node tools/smoke-scene-take.js
+ * Usage: node tools/test-live/smoke-scene-take.js
  */
-'use strict'
 
 const http = require('http')
 

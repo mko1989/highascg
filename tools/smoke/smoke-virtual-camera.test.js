@@ -7,6 +7,7 @@ const { validateVirtualCameraConfig } = require('../../src/virtual-output/v4l2-b
 const { alsaLoopbackCardPresent, effectiveAlsaCardId } = require('../../src/virtual-output/v4l2-bridge-audio-sink')
 const { writeVcamModulesConf, VCAM_CONF_PATH } = require('../../src/virtual-output/v4l2-kernel-modules')
 const fs = require('fs')
+const path = require('path')
 
 describe('virtual-camera config', () => {
 	it('defaults enabled false', () => {
@@ -36,8 +37,22 @@ describe('virtual-camera config', () => {
 	})
 
 	it('quotes CARD_LABEL with spaces for shell conf', () => {
-		writeVcamModulesConf({ virtualCamera: { label: 'Virtual cam' } })
-		const body = fs.readFileSync(VCAM_CONF_PATH, 'utf8')
-		assert.match(body, /CARD_LABEL="Virtual cam"/)
+		// WO-836: VCAM_CONF_PATH is the box's root-wrapper input (/run/highascg/vcam-modules.conf) and a fixed const —
+		// capture the write instead of letting the smoke overwrite the live CARD_LABEL.
+		const realWrite = fs.writeFileSync
+		const realMkdir = fs.mkdirSync
+		let written = null
+		fs.mkdirSync = (p, ...a) => (String(p) === path.dirname(VCAM_CONF_PATH) ? undefined : realMkdir.call(fs, p, ...a))
+		fs.writeFileSync = (p, data, ...a) => {
+			if (String(p) !== VCAM_CONF_PATH) return realWrite.call(fs, p, data, ...a)
+			written = String(data)
+		}
+		try {
+			writeVcamModulesConf({ virtualCamera: { label: 'Virtual cam' } })
+		} finally {
+			fs.writeFileSync = realWrite
+			fs.mkdirSync = realMkdir
+		}
+		assert.match(written, /CARD_LABEL="Virtual cam"/)
 	})
 })

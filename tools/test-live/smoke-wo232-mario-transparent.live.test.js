@@ -1,4 +1,6 @@
 'use strict'
+const { liveGuard } = require('./live-guard')
+if (!liveGuard(__filename)) return // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 
 /**
  * WO-232 live spike: does the vendored Mario canvas game (template/mario/index.html) actually

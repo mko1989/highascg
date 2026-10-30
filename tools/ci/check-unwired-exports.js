@@ -39,7 +39,8 @@ const REPO_ROOT = path.join(__dirname, '../..')
 /** Where exports are GATED (an orphan here fails the build). */
 const EXPORT_ROOTS = ['client/components', 'client/lib', 'src']
 /** Where references are LOOKED FOR (everything that can reasonably call into the above). */
-const REFERENCE_ROOTS = ['client', 'src', 'tools', 'template', 'scripts']
+// WO-836: + test/ (its unit tests are real consumers) and the root index.js (the boot entry that requires src/)
+const REFERENCE_ROOTS = ['client', 'src', 'tools', 'template', 'scripts', 'test', 'index.js']
 
 const SKIP_DIR = /(^|\/)(node_modules|dist|dist-web|vendor|assets|fonts|\.git|coverage)(\/|$)/
 const CODE_EXT = /\.(js|cjs|mjs|jsx|ts|html)$/
@@ -49,6 +50,8 @@ const BASELINE_FILE = path.join(__dirname, 'unwired-exports-baseline.json')
 function walk(dir, out = []) {
 	let entries
 	try {
+		// a root may be a single file (index.js)
+		if (fs.statSync(dir).isFile()) return CODE_EXT.test(dir) ? [...out, dir] : out
 		entries = fs.readdirSync(dir, { withFileTypes: true })
 	} catch {
 		return out
@@ -77,14 +80,61 @@ function exportedNames(src) {
 			else if (plain) names.add(plain[1])
 		}
 	}
-	// CommonJS: module.exports = { a, b } / exports.a =
-	const cjsBlock = /module\.exports\s*=\s*\{([\s\S]*?)\n\s*\}/.exec(src)
-	if (cjsBlock) {
-		for (const m of cjsBlock[1].matchAll(/^\s*([A-Za-z_$][\w$]*)\s*[,:]/gm)) names.add(m[1])
-	}
+	// CommonJS: module.exports = { a, b } (one line or many) / exports.a =
+	for (const name of cjsObjectExportNames(src)) names.add(name)
 	for (const m of src.matchAll(/exports\.([A-Za-z_$][\w$]*)\s*=/g)) names.add(m[1])
 	names.delete('default')
 	return names
+}
+
+/**
+ * WO-836: names in every `module.exports = { ... }` literal. The old regex needed a newline before the closing brace, so a
+ * single-line `module.exports = { a, b }` yielded no names at all (413 src files were never gated) and, worse, a multi-line
+ * literal containing a nested `}` was cut at the first one. This walks the braces (strings, comments and nested
+ * brackets skipped) and reads the key of each TOP-LEVEL entry: `a`, `a: expr`, `'a': expr`, `async a() {}`; spreads and
+ * computed keys are ignored.
+ * @param {string} src
+ * @returns {string[]}
+ */
+function cjsObjectExportNames(src) {
+	const out = []
+	const start = /module\.exports\s*=\s*\{/g
+	let m
+	while ((m = start.exec(src))) {
+		let i = m.index + m[0].length
+		let depth = 1
+		let entryStart = i
+		const entries = []
+		const flush = (end) => {
+			const e = src.slice(entryStart, end).trim()
+			if (e) entries.push(e)
+			entryStart = end + 1
+		}
+		while (i < src.length && depth > 0) {
+			const c = src[i]
+			if (c === '"' || c === "'" || c === '`') {
+				for (i++; i < src.length && src[i] !== c; i++) if (src[i] === '\\') i++
+			} else if (c === '/' && src[i + 1] === '/') {
+				while (i < src.length && src[i] !== '\n') i++
+			} else if (c === '/' && src[i + 1] === '*') {
+				const end = src.indexOf('*/', i + 2)
+				i = end < 0 ? src.length : end + 1
+			} else if (c === '{' || c === '(' || c === '[') depth++
+			else if (c === '}' || c === ')' || c === ']') {
+				depth--
+				if (depth === 0) flush(i)
+			} else if (c === ',' && depth === 1) flush(i)
+			i++
+		}
+		for (const e of entries) {
+			const body = e.replace(/^(?:\s*\/\/[^\n]*\n|\s*\/\*[\s\S]*?\*\/)+/, '').trim()
+			if (body.startsWith('...') || body.startsWith('[')) continue
+			const key = /^(?:async\s+|get\s+|set\s+|\*\s*)?(?:([A-Za-z_$][\w$]*)|'([^']+)'|"([^"]+)")\s*(?:[,:(]|$)/.exec(body)
+			const name = key && (key[1] || key[2] || key[3])
+			if (name && /^[A-Za-z_$][\w$]*$/.test(name)) out.push(name)
+		}
+	}
+	return out
 }
 
 /** Every identifier-shaped token in a file — the reference side of the check. */
@@ -200,4 +250,4 @@ function main() {
 
 if (require.main === module) process.exit(main())
 
-module.exports = { findOrphans, exportedNames, BASELINE_FILE }
+module.exports = { findOrphans, exportedNames, cjsObjectExportNames, BASELINE_FILE }

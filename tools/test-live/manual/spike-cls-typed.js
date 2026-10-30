@@ -1,3 +1,5 @@
+'use strict'
+require('../live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 const { CasparCG } = require('casparcg-connection');
 (async () => {
   const ccg = new CasparCG({ host: '127.0.0.1', port: 5250 });

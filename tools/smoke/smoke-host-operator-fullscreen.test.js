@@ -14,7 +14,7 @@ const {
 } = require('../../src/api/host-operator-fullscreen')
 
 function loadProjectConfig(extraLiveSources) {
-	const configDir = process.env.HIGHASCG_CONFIG_PATH || path.join(REPO_ROOT, 'config')
+	const configDir = require('./lib/tmp-config-dir').tmpConfigDir() // WO-836: factory defaults, never the live config/
 	const cm = new ConfigManager(configDir, { info() {}, warn() {}, error() {} })
 	cm.load()
 	const base = cm.get()

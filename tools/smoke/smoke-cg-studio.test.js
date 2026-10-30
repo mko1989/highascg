@@ -78,14 +78,18 @@ describe('cg-studio', () => {
 			data: { title: 'Exported', subtitle: 'From Studio' },
 			style: { primaryColor: '#123456', textColor: '#ffffff', position: 'left' },
 		})
-		assert.equal(result.ok, true)
-		assert.equal(result.casparPath, 'studio/lt-smoke-test-export')
-		assert.ok(fs.existsSync(TEST_EXPORT))
-		const html = fs.readFileSync(TEST_EXPORT, 'utf8')
-		validateExportedHtml(html)
-		assert.match(html, /Exported/)
-		assert.match(html, /\.\.\/lower-thirds\/lt-engine\.js/)
-		fs.unlinkSync(TEST_EXPORT)
+		try {
+			assert.equal(result.ok, true)
+			assert.equal(result.casparPath, 'studio/lt-smoke-test-export')
+			assert.ok(fs.existsSync(TEST_EXPORT))
+			const html = fs.readFileSync(TEST_EXPORT, 'utf8')
+			validateExportedHtml(html)
+			assert.match(html, /Exported/)
+			assert.match(html, /\.\.\/lower-thirds\/lt-engine\.js/)
+		} finally {
+			// WO-836: also on a failed assert — a leftover in template/studio gets committed or synced to peers
+			fs.rmSync(TEST_EXPORT, { force: true })
+		}
 	})
 
 	it('getDefaultPayload includes common style keys', () => {

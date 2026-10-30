@@ -3,6 +3,13 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const Module = require('node:module')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+
+// WO-836: the unmocked tail of applyFullServerConfig runs the real writeCasparGlSyncEnvFile, which writes
+// $HOME/.config/highascg/caspar-env (the live box's Caspar launch env). Point HOME at a temp dir before anything loads.
+process.env.HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'full-config-apply-home-'))
 
 const steps = []
 

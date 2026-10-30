@@ -39,6 +39,8 @@ sequence:
 
 /** Run fix-calamares-shellprocess.sh for real on a temp root (only its "must be root" guard is cut). */
 function runFix(rootDir) {
+	// WO-836: an empty HIGHASCG_CALAMARES_ROOT makes the script edit the real /etc/calamares — refuse anything but a temp dir
+	assert.ok(rootDir && path.resolve(rootDir).startsWith(os.tmpdir()), `refusing to run the fixer on ${rootDir}`)
 	const HERE = 'HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"'
 	const src = read('tools/eggs/live-usb/fix-calamares-shellprocess.sh')
 		.replace(/^\[\[ "\$\(id -u\)" -eq 0 \]\] \|\| \{\n[\s\S]*?\n\}\n/m, '')

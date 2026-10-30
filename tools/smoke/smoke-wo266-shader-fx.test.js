@@ -12,7 +12,8 @@ const fs = require('fs')
 const path = require('path')
 
 const REPO = path.join(__dirname, '../..')
-const store = require('../../src/shaderfx/shader-store')
+// WO-836: the save/delete round-trip writes data/shaders + template/shaders — bind the store to a temp root, never the box's
+const { store, cleanup: cleanupStoreRoot } = require('./lib/shader-store-tmp').loadShaderStoreInTempRoot()
 const { buildShaderTemplateHtml, embedConfigJson } = require('../../src/shaderfx/shader-template-export')
 const routes = require('../../src/api/routes-shaders')
 
@@ -32,6 +33,7 @@ function src(rel) {
 
 after(async () => {
 	await store.deleteShader(TMP_ID)
+	cleanupStoreRoot()
 })
 
 describe('WO-266 T266.1: shader-store normalize', () => {

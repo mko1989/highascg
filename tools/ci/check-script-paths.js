@@ -15,17 +15,19 @@ const { execSync } = require('child_process')
 
 const REPO_ROOT = path.join(__dirname, '../..')
 
-// Patterns to search for script references
-const PATTERNS = [
-	// Shell: bash path/to/script.sh
-	/bash\s+["']?([^"'\s]+\.sh)["']?/g,
-	// Node: path.join(..., 'tools/runtime/...'), path.join(__dirname, '../../tools/...'), etc.
-	/(?:path\.join|__dirname)\s*\(\s*['"][^'"]*['"],\s*['"]([^'"]+\.(?:sh|py|js))["']/g,
-	// systemd ExecStart paths
-	/ExecStart=\s*([^\s]+\.sh)/g,
-	// Direct paths like tools/runtime/xxx.sh or scripts/setup/xxx.sh
-	/(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g,
-]
+/**
+ * WO-836: reduce a source chunk to the text that can actually execute. src/ prose comments cite scripts that were
+ * deleted long ago (tools/runtime/operator-shape-overlay.py, gone since WO-646) — a comment is not a dangling reference.
+ * Whole-line comments go, and a trailing `// ...` tail goes (only when preceded by whitespace, so `http://` survives).
+ * @param {string} text
+ */
+function stripComments(text) {
+	return text
+		.split('\n')
+		.filter((l) => !/^\s*(?:\/\/|\*|\/\*|#)/.test(l))
+		.map((l) => l.replace(/\s\/\/.*$/, ''))
+		.join('\n')
+}
 
 function findScriptReferences() {
 	const refs = new Map()
@@ -38,7 +40,7 @@ function findScriptReferences() {
 				{ cwd: REPO_ROOT, encoding: 'utf8' }
 			)
 			const scripts =
-				output
+				stripComments(output)
 					.split(REPO_ROOT + '/')
 					.join('')
 					.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
@@ -46,7 +48,7 @@ function findScriptReferences() {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('src/')
 			})
-		} catch (e) {
+		} catch {
 			// grep might return non-zero if no matches
 		}
 	}
@@ -55,8 +57,7 @@ function findScriptReferences() {
 	const runsh = path.join(REPO_ROOT, 'run.sh')
 	if (fs.existsSync(runsh)) {
 		try {
-			const content = fs
-				.readFileSync(runsh, 'utf8')
+			const content = stripComments(fs.readFileSync(runsh, 'utf8'))
 				.split(REPO_ROOT + '/')
 				.join('')
 			const scripts = content.match(/(?<![A-Za-z0-9_/-])(?:tools|scripts|work)\/[a-zA-Z0-9_/-]+\.(?:sh|py|js)/g) || []
@@ -64,7 +65,7 @@ function findScriptReferences() {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('run.sh')
 			})
-		} catch (e) {}
+		} catch {}
 	}
 
 	// Search in package.json
@@ -80,7 +81,7 @@ function findScriptReferences() {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('package.json')
 			})
-		} catch (e) {}
+		} catch {}
 	}
 
 	// Search in systemd units
@@ -100,7 +101,7 @@ function findScriptReferences() {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('scripts/systemd/')
 			})
-		} catch (e) {}
+		} catch {}
 	}
 
 	// Search in scripts/exfat for ExecStart writers
@@ -120,7 +121,7 @@ function findScriptReferences() {
 				if (!refs.has(s)) refs.set(s, [])
 				refs.get(s).push('scripts/exfat/')
 			})
-		} catch (e) {}
+		} catch {}
 	}
 
 	return refs
@@ -154,4 +155,6 @@ function main() {
 	process.exit(1)
 }
 
-main()
+if (require.main === module) main()
+
+module.exports = { findScriptReferences, stripComments }

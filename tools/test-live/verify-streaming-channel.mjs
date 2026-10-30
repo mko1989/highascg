@@ -1,9 +1,11 @@
 #!/usr/bin/env node
+import { createRequire } from 'node:module'
+createRequire(import.meta.url)('./live-guard').requireLiveOrExit(import.meta.url)
 /**
  * WO-27 Phase 4 helper: HTTP GET /api/streaming-channel against a running server.
  * (Does not need Caspar for JSON shape — may 503 for AMCP but GET is always 200 for this route.)
  *
- *   node tools/verify-streaming-channel.mjs 4200
+ *   node tools/test-live/verify-streaming-channel.mjs 4200
  */
 import http from 'http'
 

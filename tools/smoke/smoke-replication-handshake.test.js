@@ -6,6 +6,10 @@ const crypto = require('crypto')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+
+// WO-836: ensureDeviceIdentity() mints config/device-identity.json when absent — never let a smoke mint (or read) the live
+// box's cluster/replication signing key. The path is read when device-identity.js loads, so set it before the requires below.
+process.env.HIGHASCG_DEVICE_IDENTITY_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'repl-hs-id-')), 'device-identity.json')
 const {
 	verifyRegisterFollowerRequest,
 	buildLeaderRegisterHandshakeResponse,

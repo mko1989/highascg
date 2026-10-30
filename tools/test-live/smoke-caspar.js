@@ -1,10 +1,12 @@
 #!/usr/bin/env node
+'use strict'
+require('./live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 /**
  * Optional smoke when CasparCG is connected (GET /api/state returns 200).
  * Verifies unknown route → 404 and AMCP passthrough via POST /api/raw.
  *
  * Usage: start HighAsCG with Caspar reachable, then:
- *   node tools/smoke-caspar.js 4200
+ *   node tools/test-live/smoke-caspar.js 4200
  *
  * Exits 0 on success, 1 on failure or if Caspar is not connected (503 on /api/state).
  */

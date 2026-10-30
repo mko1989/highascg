@@ -13,7 +13,7 @@ function mockCtx(repl = {}) {
 			pairId: 'pair-1',
 			selfId: 'box-a',
 			leaderEpoch: 1,
-			peer: { host: '127.0.0.1', port: 4200, token: 'tok' },
+			peer: { host: '127.0.0.1', port: 1, token: 'tok' }, // WO-836: refused fast; never the live API on :4200,
 			followerMode: 'mirror',
 			autoPromote: true,
 			...repl,
@@ -40,7 +40,7 @@ test('promote increments leaderEpoch and forces leader role', async () => {
 	runtime.roleState.configure({ enabled: true, role: 'follower' })
 	runtime.roleState.forceRole('follower')
 
-	const out = await promoteToLeader(ctx, runtime, { reason: 'peer_timeout' })
+	const out = await promoteToLeader(ctx, runtime, { reason: 'peer_timeout', skipYieldNotify: true }) // WO-836: no leader-yield POST to a real host
 	assert.equal(out.ok, true)
 	assert.equal(out.leaderEpoch, 3)
 	assert.equal(runtime.roleState.getRole(), 'leader')

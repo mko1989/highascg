@@ -59,8 +59,16 @@ test('an update keeps the box config, adds new factory files and still updates c
 test('a server running from a git checkout refuses a release update', async () => {
 	const { startApplyJob } = require('../../src/system/server-update')
 	const { REPO_ROOT } = require('../../src/repo-paths')
-	if (!fs.existsSync(path.join(REPO_ROOT, '.git'))) return // a release tree (no .git) is what updates normally
-	await assert.rejects(startApplyJob({ assetUrl: 'https://example.invalid/x.tar.gz' }), /git checkout/)
+	// WO-836: this used to `return` on a release tree (no .git), so the guard went unchecked there. Present the checkout
+	// marker to startApplyJob when the tree has none, so the assertion always runs.
+	const gitDir = path.join(REPO_ROOT, '.git')
+	const realExists = fs.existsSync
+	if (!realExists(gitDir)) fs.existsSync = (p, ...a) => String(p) === gitDir || realExists.call(fs, p, ...a)
+	try {
+		await assert.rejects(startApplyJob({ assetUrl: 'https://example.invalid/x.tar.gz' }), /git checkout/)
+	} finally {
+		fs.existsSync = realExists
+	}
 })
 
 test('the apply refuses a git checkout and leaves it untouched (boot, USB and GUI paths alike)', () => {

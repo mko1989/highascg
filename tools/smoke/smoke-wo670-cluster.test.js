@@ -13,8 +13,12 @@ const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
 
-const { createCluster, parseAddress, mediaParity, subnetHosts, getJson } = require('../../src/cluster/cluster-peers')
+const { createCluster: realCreateCluster, parseAddress, mediaParity, subnetHosts, getJson } = require('../../src/cluster/cluster-peers')
 const { RouteRegistry } = require('../../src/api/route-registry')
+// WO-836: add() links back through the real localAddressTo/requestJson (net.connect + POST to the owner's LAN hosts) unless
+// they are injected — default them to an offline stub so this file never opens a socket to 10.0.0.x.
+const createCluster = (o) =>
+	realCreateCluster({ localAddress: async () => '', request: async () => ({ ok: false, status: 0, error: 'offline test' }), ...o })
 
 const ROOT = path.join(__dirname, '..', '..')
 const SELF = { appId: 'highascg', selfId: 'boxA', hostname: 'boxA', instanceId: 'iA', appVersion: '2026.05.20', role: 'standalone',

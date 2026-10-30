@@ -133,7 +133,7 @@ Clients should merge `sceneLive` into UI state; WebSocket also emits scene live 
 
 ### Minimal program take (cut)
 
-From [`tools/smoke/smoke-scene-take.js`](../../../tools/smoke/smoke-scene-take.js):
+From [`tools/test-live/smoke-scene-take.js`](../../../tools/test-live/smoke-scene-take.js):
 
 ```bash
 curl -s -X POST http://127.0.0.1:4200/api/scene/take \

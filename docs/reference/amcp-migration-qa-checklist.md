@@ -8,7 +8,7 @@ Run on **each playout PC** with CasparCG and HighAsCG on the build that includes
 cd ~/highascg
 npm run test:highascg:migration:all
 npm run test:highascg:air-paths    # batchSendChunked, DEFER batch, reconnect (no PGM check)
-HIGHASCG_AMCP_LEGACY_TRANSPORT=1 node --test tools/smoke/smoke-amcp-legacy-transport.test.js
+HIGHASCG_AMCP_LEGACY_TRANSPORT=1 node --test tools/test-live/smoke-amcp-legacy-transport.test.js
 ```
 
 ## Default transport (`casparcg-connection`)

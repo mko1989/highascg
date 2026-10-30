@@ -1,4 +1,6 @@
 'use strict'
+const { liveGuard } = require('./live-guard')
+if (!liveGuard(__filename)) return // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 
 /**
  * WO-104 T104.7 — server kill/restart WS reconnect + AMCP timeout + multiview tick filter.

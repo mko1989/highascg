@@ -65,6 +65,13 @@ function runHelper(opts) {
 	for (const stub of ['mountpoint', 'chown', 'rsync', 'getent', 'node']) {
 		fs.writeFileSync(path.join(bin, stub), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
 	}
+	// WO-836: the helper's EXFAT_ROOT / BRIDGE_ROOT are hard-coded and `mountpoint` is stubbed to "mounted", so the real
+	// `mkdir -p <root>/drop-update` ran on whatever box executed this. Refuse those two roots, pass everything else through.
+	fs.writeFileSync(
+		path.join(bin, 'mkdir'),
+		'#!/usr/bin/env bash\nfor a in "$@"; do case "$a" in /home/casparcg/exfat*|/home/casparcg/bridge*) exit 0;; esac; done\nexec /usr/bin/mkdir "$@"\n',
+		{ mode: 0o755 },
+	)
 	fs.writeFileSync(path.join(bin, 'install'), '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 })
 	fs.writeFileSync(
 		path.join(bin, 'id'),

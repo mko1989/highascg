@@ -14,6 +14,7 @@ const { stageMvrForMagicq, rewriteScene, absAddress, fileName } = require('../..
 const { buildZipStore } = require('../../src/support/zip-store')
 const { ConsoleFrames, LOCAL_DESK_HOST } = require('../../src/fixtures/follow-through')
 const { ARTNET_PORT } = require('../../src/fixtures/artdmx')
+const { udpPortBusy } = require('./lib/udp-port-busy')
 
 const A = 'b4eee245-5607-4c72-8fa2-d29c8ab1a7c9'
 const B = '0c1d2e3f-0000-4000-8000-000000000002'
@@ -103,7 +104,9 @@ function artDmx(portAddress, level) {
 	return b
 }
 
-test('a desk on this box unicasting to 127.0.0.2 reaches the visualiser, even with another :6454 socket open', async () => {
+// WO-836: ARTNET_PORT is fixed in src, so on the live box (Art-Net input bound on :6454) this would share the port and
+// inject DMX into the lighting input — it only runs where nothing owns :6454 (CI, a box with Art-Net input off).
+test('a desk on this box unicasting to 127.0.0.2 reaches the visualiser, even with another :6454 socket open', { skip: udpPortBusy(ARTNET_PORT) && `UDP :${ARTNET_PORT} is in use on this machine (live Art-Net input) — would inject DMX into it` }, async () => {
 	assert.equal(LOCAL_DESK_HOST, '127.0.0.2')
 	// MagicQ binds 0.0.0.0:6454 after us: a datagram to 127.0.0.1 would go to it, one to 127.0.0.2 comes to us
 	const cf = new ConsoleFrames()

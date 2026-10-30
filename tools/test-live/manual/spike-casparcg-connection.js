@@ -1,4 +1,5 @@
 'use strict'
+require('../live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 // If require() fails, try dynamic import — see ESM note above
 let CasparCG
 try {

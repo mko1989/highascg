@@ -13,6 +13,7 @@ describe('companion satellite preview', () => {
 	/** @type {import('net').Server} */
 	let server
 	let port = 0
+	const hadPreview = fs.existsSync(path.join(CACHE_DIR, '1_0_2.jpg'))
 
 	before(async () => {
 		server = net.createServer((socket) => {
@@ -57,8 +58,10 @@ describe('companion satellite preview', () => {
 		await new Promise((resolve, reject) => {
 			server.close((err) => (err ? reject(err) : resolve()))
 		})
+		// WO-836: CACHE_DIR is the live server's runtime cache (data/companion-button-preview) — remove only the one preview
+		// this test wrote, never the directory (that wiped the box's real Companion button previews).
 		try {
-			fs.rmSync(CACHE_DIR, { recursive: true, force: true })
+			if (!hadPreview) fs.rmSync(path.join(CACHE_DIR, '1_0_2.jpg'), { force: true })
 		} catch {
 			/* ignore */
 		}

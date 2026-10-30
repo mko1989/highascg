@@ -1,8 +1,10 @@
 #!/usr/bin/env node
+'use strict'
+require('./live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 /**
  * HTTP + WebSocket smoke tests against a running HighAsCG server.
  * Start the app first, e.g.: node index.js --port 8090 --no-caspar
- * Then: node tools/http-smoke.js 8090
+ * Then: node tools/test-live/http-smoke.js 8090
  *
  * Flags: `--http-only` — skip WebSocket check.
  * Exits 0 on success, 1 on failure.

@@ -15,7 +15,11 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const duties = require('../../src/cluster/server-duties')
-const { createCluster } = require('../../src/cluster/cluster-peers')
+const { createCluster: realCreateCluster } = require('../../src/cluster/cluster-peers')
+// WO-836: add() links back through the real localAddressTo/requestJson (net.connect + POST to the owner's LAN hosts) unless
+// they are injected — default them to an offline stub so this file never opens a socket to 10.0.0.x.
+const createCluster = (o) =>
+	realCreateCluster({ localAddress: async () => '', request: async () => ({ ok: false, status: 0, error: 'offline test' }), ...o })
 const { emitProjectChanged } = require('../../src/engine/project-events')
 
 const ALL = duties.NAMES

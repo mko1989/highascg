@@ -15,7 +15,10 @@ const { pathToFileURL } = require('node:url')
 const ROOT = path.join(__dirname, '../..')
 const libPromise = import(pathToFileURL(path.join(ROOT, 'client/lib/shader-controls.js')).href)
 const scanPromise = import(pathToFileURL(path.join(ROOT, 'client/lib/shader-param-scan.js')).href)
-const { normalizeShaderConfig, reconcileShaderStore, SHADERS_DATA_DIR } = require('../../src/shaderfx/shader-store.js')
+// WO-836: reconcileShaderStore writes data/shaders + template/shaders — bind the store to a temp copy, never the box's
+const { store: shaderStore, cleanup: cleanupStoreRoot } = require('./lib/shader-store-tmp').loadShaderStoreInTempRoot()
+const { normalizeShaderConfig, reconcileShaderStore, SHADERS_DATA_DIR } = shaderStore
+test.after(cleanupStoreRoot)
 
 const cfgOf = (image, common = '') => ({ common, passes: { image: { source: image } } })
 

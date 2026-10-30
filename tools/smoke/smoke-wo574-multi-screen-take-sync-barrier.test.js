@@ -156,7 +156,12 @@ test('wiring: client tags batched POSTs, server hands the group to the PGM take,
 
 	const pipe = read('src/engine/scene-take-lbg-amcp-pipeline.js')
 	assert.equal((pipe.match(/\bplaySync,\n/g) || []).length >= 3, true, 'crossfade / merge / phased branches pass playSync on')
-	assert.ok(pipe.indexOf('setTimeout(r, prebufferMs)') < pipe.indexOf('Timeline-only / exit-only crossfade'))
+	// WO-836: the pin was stale (production waits via relativeSeekPlayWaitMs(self, channel, prebufferMs) since WO-582), so
+	// indexOf was -1 and `-1 < n` held vacuously. Both anchors must exist; the prebuffer wait comes before the crossfade send.
+	const prebufferAt = pipe.indexOf('setTimeout(r, relativeSeekPlayWaitMs(self, channel, prebufferMs))')
+	const crossfadeAt = pipe.indexOf('Timeline-only / exit-only crossfade')
+	assert.ok(prebufferAt >= 0 && crossfadeAt >= 0, `anchors missing (prebuffer ${prebufferAt}, crossfade ${crossfadeAt})`)
+	assert.ok(prebufferAt < crossfadeAt, 'the prebuffer hold runs before the timeline-only crossfade send')
 
 	const deps = read('src/engine/scene-route-deps.js')
 	assert.match(deps, /opts\.playSync\.arrive\(\{ amcp, channel: ch, leadingCommit, block, trailingCommit \}\)/)

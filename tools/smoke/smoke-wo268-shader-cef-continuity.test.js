@@ -28,7 +28,7 @@ function src(rel) {
 }
 
 function loadFlat() {
-	const cm = new ConfigManager(path.join(REPO, 'config'), { info() {}, warn() {}, error() {} })
+	const cm = new ConfigManager(require('./lib/tmp-config-dir').tmpConfigDir(), { info() {}, warn() {}, error() {} })
 	cm.load()
 	return buildCasparGeneratorFlatConfig(cm.get())
 }

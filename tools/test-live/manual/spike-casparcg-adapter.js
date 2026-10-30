@@ -1,6 +1,7 @@
 'use strict'
+require('../live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 const { CasparCG } = require('casparcg-connection')
-const { AmcpConnectionAdapter } = require('../../src/caspar/amcp-connection-adapter')
+const { AmcpConnectionAdapter } = require('../../../src/caspar/amcp-connection-adapter')
 
 async function runTest() {
   const conn = new CasparCG({

@@ -19,6 +19,7 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
 
 const repoRoot = path.join(__dirname, '..', '..')
@@ -66,13 +67,22 @@ test('WO-344 the cache busts when the shader file changes', () => {
 	const a = hashCgThumbRequest(req)
 	assert.equal(hashCgThumbRequest(req), a, 'hash must be stable while the file is untouched')
 
-	const file = path.join(repoRoot, 'template/shaders', shaders[0])
-	const st = fs.statSync(file)
+	// WO-836: touch a TEMP COPY, never the box-owned template (a crash between the two utimes left the live file +60 s);
+	// the fingerprint resolves its file through the render module's export, which the copy replaces for this test.
+	const render = require('../../src/media/cg-look-thumb-render.js')
+	const realResolve = render.resolveCgTemplateHtmlPath
+	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wo344-'))
+	const file = path.join(tmpDir, shaders[0])
+	fs.copyFileSync(path.join(repoRoot, 'template/shaders', shaders[0]), file)
+	render.resolveCgTemplateHtmlPath = () => file
 	try {
+		const b = hashCgThumbRequest(req)
+		const st = fs.statSync(file)
 		fs.utimesSync(file, st.atime, new Date(st.mtimeMs + 60_000))
-		assert.notEqual(hashCgThumbRequest(req), a, 're-saving a shader must produce a different cache key')
+		assert.notEqual(hashCgThumbRequest(req), b, 're-saving a shader must produce a different cache key')
 	} finally {
-		fs.utimesSync(file, st.atime, st.mtime)
+		render.resolveCgTemplateHtmlPath = realResolve
+		fs.rmSync(tmpDir, { recursive: true, force: true })
 	}
 })
 

@@ -1,4 +1,6 @@
-const { ConnectionManager } = require('../../src/caspar/connection-manager');
+'use strict'
+require('../live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
+const { ConnectionManager } = require('../../../src/caspar/connection-manager');
 (async () => {
   const cm = new ConnectionManager({ host: '127.0.0.1', port: 5250, healthIntervalMs: 500, healthConnectDelayMs: 0 });
   cm.on('status', p => {

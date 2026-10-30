@@ -1,4 +1,6 @@
 'use strict'
+const { liveGuard } = require('./live-guard')
+if (!liveGuard(__filename)) return // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
 
 /**
  * Live HighAsCG HTTP → real AMCP on Caspar (server must be running with Caspar connected).

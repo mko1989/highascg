@@ -1,4 +1,6 @@
-const { ConnectionManager } = require('../../src/caspar/connection-manager');
+'use strict'
+require('../live-guard').requireLiveOrExit(__filename) // WO-836: live-box category — opt-in via HIGHASCG_LIVE_TESTS=1
+const { ConnectionManager } = require('../../../src/caspar/connection-manager');
 const CASPAR_HOST = process.env.HIGHASCG_CASPAR_HOST || process.env.CASPAR_HOST || '127.0.0.1';
 const CASPAR_PORT = parseInt(process.env.HIGHASCG_CASPAR_PORT || process.env.CASPAR_PORT || '5250', 10);
 

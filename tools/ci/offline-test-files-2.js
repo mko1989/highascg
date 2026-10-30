@@ -52,4 +52,5 @@ module.exports = [
 	'tools/smoke/smoke-wo828-timeline-look-take-deviations.test.js',
 	'tools/smoke/smoke-wo828-d9-cut-timeline-hold.test.js',
 	'tools/smoke/smoke-wo829-timeline-wrap-and-reroute.test.js',
+	...require('./offline-test-files-3'), // WO-836: the uncurated-smoke sweep
 ]

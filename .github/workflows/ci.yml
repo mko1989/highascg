@@ -39,6 +39,11 @@ jobs:
       - name: Repo integrity
         run: npm run verify:repo-integrity
 
+      # WO-836: package.json scripts, run.sh, systemd units and src/ spawn paths must point at files that exist
+      # (it exited 1 and ran nowhere until now).
+      - name: Script paths exist
+        run: npm run verify:script-paths
+
       - name: File size limit (500 lines)
         run: node tools/ci/check-max-file-lines.js
 

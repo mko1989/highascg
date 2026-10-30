@@ -7,6 +7,8 @@
  * Full run (slow): npm run test:ci:full
  */
 const { spawnSync } = require('child_process')
+const fs = require('fs')
+const os = require('os')
 const path = require('path')
 
 const REPO_ROOT = path.resolve(__dirname, '../..')
@@ -24,12 +26,17 @@ for (const check of ['check-dom-escape-duplicates.js', 'check-tdz-reads.js']) {
 
 // node --test takes the per-test timeout only as a flag; it never read the NODE_TEST_TIMEOUT env this used to set.
 // Not --test-force-exit: it ended files early and silently (3299–3322 tests per run, 0 failures) — WO-756
+// WO-836: state some modules read from a fixed live path at require time and that have an env override — give every
+// test process a throwaway one so an unguarded caller can never mint the box's cluster key or its presenter roster.
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'highascg-test-ci-'))
 const testTimeout = `--test-timeout=${process.env.NODE_TEST_TIMEOUT || '60000'}`
 const result = spawnSync(process.execPath, ['--test', testTimeout, ...FILES], {
 	cwd: REPO_ROOT,
 	stdio: 'inherit',
 	env: {
 		...process.env,
+		HIGHASCG_DEVICE_IDENTITY_PATH: path.join(scratch, 'device-identity.json'),
+		HIGHASCG_PRESENTERS_DIR: path.join(scratch, 'presenters'),
 		/* The WS reconnect smoke spawns a FULL highascg server — never do that from the
 		 * curated gate on a production box (it piles up orphaned servers and can touch the
 		 * live Caspar). Run it explicitly without this env when integration coverage is wanted. */
@@ -37,4 +44,5 @@ const result = spawnSync(process.execPath, ['--test', testTimeout, ...FILES], {
 	},
 })
 
+fs.rmSync(scratch, { recursive: true, force: true })
 process.exit(result.status === null ? 1 : result.status)

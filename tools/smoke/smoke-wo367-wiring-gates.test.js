@@ -77,6 +77,24 @@ test('WO-367 — unwired-export detection actually works', async (t) => {
 		}
 	})
 
+	await t.test('WO-836: single-line module.exports = { a, b } and nested braces are read', () => {
+		const one = exportedNames('module.exports = { one, two: 2, async three() {}, ...rest }\nconst four = 4')
+		assert.deepEqual([...one].sort(), ['one', 'three', 'two'])
+		// a nested `}` used to cut the old regex short, hiding everything after it
+		const nested = exportedNames("module.exports = {\n\tfirst: { a: 1 },\n\tsecond: function () { return { z: 1 } },\n\t'third': 3,\n\tfourth,\n}")
+		assert.deepEqual([...nested].sort(), ['first', 'fourth', 'second', 'third'])
+	})
+
+	await t.test('WO-836: a single file can be a reference root (index.js)', () => {
+		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo836-'))
+		fs.mkdirSync(path.join(root, 'src'), { recursive: true })
+		fs.writeFileSync(path.join(root, 'src', 'm.js'), 'module.exports = { bootThing, deadThing }\n')
+		fs.writeFileSync(path.join(root, 'index.js'), "const { bootThing } = require('./src/m')\nbootThing()\n")
+		const { orphans } = findOrphans({ root, exportRoots: ['src'], referenceRoots: ['src', 'index.js'] })
+		assert.deepEqual(orphans, ['src/m.js: deadThing'])
+		fs.rmSync(root, { recursive: true, force: true })
+	})
+
 	await t.test('flags an export nothing references, and only that one', () => {
 		const root = fs.mkdtempSync(path.join(os.tmpdir(), 'wo367-'))
 		fs.mkdirSync(path.join(root, 'lib'), { recursive: true })
