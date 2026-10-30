@@ -13,6 +13,8 @@ const Apply = require('./device-view-apply')
 const CRUD = require('./device-view-crud')
 const CRUD_MAPPING = require('./device-view-crud-mapping')
 const { enrichExtraLiveSource, enrichExtraLiveSources } = require('../config/extra-live-source-enrich')
+const { reconcileGraphSlices, withEffectiveSlices } = require('../config/mapping-slices-model')
+const { planAllMappingNodes } = require('../config/mapping-slices-plan')
 
 /**
  * Merge patch into on-disk config and refresh `ctx.config` from ConfigManager (same as `change` listener).
@@ -96,7 +98,7 @@ async function handleGet(path, ctx, query, req) {
 			}),
 		}
 	}
-	const graph = normalizeDeviceGraph(ctx.config?.deviceGraph)
+	const graph = withEffectiveSlices(normalizeDeviceGraph(ctx.config?.deviceGraph)) // WO-869: unsaved nodes show their migration
 	augmentGraphWithSources(graph, live)
 	const { maskDeviceGraphConnectorKeys } = require('../engine/project-stream-credentials')
 	const payload = {
@@ -112,6 +114,7 @@ async function handleGet(path, ctx, query, req) {
 		),
 		audioOutputs: Array.isArray(ctx.config?.audioOutputs) ? ctx.config.audioOutputs : [],
 		mappingTemplates: Array.isArray(ctx.config?.mappingTemplates) ? ctx.config.mappingTemplates : [],
+		mappingSlicePlans: planAllMappingNodes(graph), // WO-869: which backend draws each mapping output
 	}
 
 	// T202.3: Generate ETag from payload JSON hash
@@ -162,6 +165,7 @@ async function handlePost(body, ctx) {
 	// WO-494: dedicated handler so the DeckLinks the node fed are released. It must sit ABOVE the
 	// generic `j.deviceGraph` branch, which only persists and cannot tell a deletion from any edit.
 	else if (j.removeMappingNode) res = CRUD_MAPPING.handleRemoveMappingNode(j, ctx)
+	else if (j.updateMappingSlices) res = await CRUD_MAPPING.handleUpdateMappingSlices(j, ctx) // WO-869
 	else if (j.updateDestination) res = CRUD.handleUpdateDestination(j, ctx)
 	else if (j.removeDestination) res = CRUD.handleRemoveDestination(j, ctx)
 	else if (j.addEdge) res = CRUD.handleAddEdge(j, ctx, await Snapshot.buildLiveSnapshot(ctx))
@@ -169,7 +173,8 @@ async function handlePost(body, ctx) {
 	else if (j.removeAllEdges) res = CRUD.handleRemoveAllEdges(j, ctx)
 	else if (j.updateConnector) res = CRUD.handleUpdateConnector(j, ctx, await Snapshot.buildLiveSnapshot(ctx))
 	else if (j.deviceGraph && typeof j.deviceGraph === 'object') {
-		const next = normalizeDeviceGraph(j.deviceGraph)
+		// WO-869: mapping nodes keep `slices[]` + the legacy `mappings[]` mirror in step (the web editor edits the mirror).
+		const next = reconcileGraphSlices(normalizeDeviceGraph(j.deviceGraph), ctx.config?.deviceGraph, ctx.log)
 		const v = validateDeviceGraph(next)
 		if (!v.ok) res = { error: 'Invalid deviceGraph', details: v.errors }
 		else {

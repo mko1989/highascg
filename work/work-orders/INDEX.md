@@ -1,6 +1,6 @@
 # Work-order index (generated — `node tools/wo/build-index.js`, do not edit)
 
-781 live WOs (30 open, 120 in progress, 631 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
+781 live WOs (29 open, 121 in progress, 631 done) and 47 deprecated. Line: `- <WO> <STATUS> [<area>+<other areas>] <title> → <file>`; paths are
 relative to `work/work-orders/`. Search it instead of the WO files: `rg -i "<keyword>" work/work-orders/INDEX.md`;
 not done: `rg " (OPEN|IN PROGRESS) " work/work-orders/INDEX.md`; one area: `rg "\[audio" …`. Then open the file.
 Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow the successor named in their status.
@@ -604,7 +604,7 @@ Deprecated WOs live in `deprecated/` and are NOT a source of truth — follow th
 - 821 DONE [devices-config] Autosave stamps this box's hardware config into a project loaded without its ha… → 821_WO_autosave_stamps_box_hardware_into_project.md
 - 823 DONE [devices-config+godot-client] Godot "Load from file" stamps this box's rig over the file's own hardwareConfig → 823_WO_godot_load_from_file_keeps_file_rig.md
 - 824 DONE [devices-config] Opening a show file trashes the project that was open → 824_WO_import_keeps_open_project.md
-- 869 OPEN [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
+- 869 IN PROGRESS [devices-config+amcp,godot-client] Mapping node slices: cut a screen destination's output into slices and place th… → 869_WO_mapping_node_slices.md
 
 ## os-iso — ISO, sticks, kernel, NVIDIA, boot (72)
 

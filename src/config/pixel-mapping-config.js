@@ -3,6 +3,7 @@
 const { destinationsFromConfig } = require('./screen-destinations')
 const { resolveOutputPixelSize } = require('../utils/mapping-gpu-os-layout')
 const { resolveDecklinkTileVideoMode } = require('./decklink-output-resolve')
+const { planMappingNode } = require('./mapping-slices-plan')
 
 /**
  * Map pixel_mapping outputs onto the **program channel that feeds the node's input** (see `work/caspar_extended.config`):
@@ -56,8 +57,11 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 
 		const feed = resolvePixelMapFeedToProgramScreen(appConfig, nodeId)
 		const outputs = Array.isArray(node.settings?.outputs) ? node.settings.outputs : []
-		const mappings = Array.isArray(node.settings?.mappings) ? node.settings.mappings : []
 		if (!outputs.length) continue
+		/* WO-869: the slice planner decides what each output shows. A DeckLink output takes one 1:1 slice
+		 * (`direct`: src rect → dest-x/y placement, Q2); several / transformed slices are refused for SDI and
+		 * only their first slice is placed. No slice = the legacy horizontal pack below. */
+		const plan = planMappingNode(node, { graph: dg })
 
 		const nodeOutConns = connectors.filter((c) => c.deviceId === nodeId && c.kind === 'pixel_map_out')
 
@@ -72,13 +76,9 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 				const modeId = String(outDef?.mode || '1080p5000').trim()
 				const { width: specW, height: specH } = resolveOutputPixelSize(outDef)
 
-				const slice = mappings.find((m) => String(m.outputId) === String(outDef?.id || ''))
-				const hasRect =
-					slice?.rect &&
-					Number.isFinite(Number(slice.rect.x)) &&
-					Number.isFinite(Number(slice.rect.y))
-				const tileW = slice?.rect?.w ?? specW
-				const tileH = slice?.rect?.h ?? specH
+				const direct = plan.outputs[idx]?.direct || null
+				const tileW = direct ? direct.src.w : specW
+				const tileH = direct ? direct.src.h : specH
 
 				const conn =
 					nodeOutConns.find((c) => Number(c?.index) === idx) ||
@@ -92,9 +92,9 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 				const devNum = parseInt(String(sink.externalRef || ''), 10)
 				if (!(Number.isFinite(devNum) && devNum > 0)) continue
 
-				const tileSrcX = hasRect ? Number(slice.rect.x) : decklinkPackX
-				const tileSrcY = hasRect ? Number(slice.rect.y) : 0
-				if (!hasRect) decklinkPackX += tileW
+				const tileSrcX = direct ? direct.src.x : decklinkPackX
+				const tileSrcY = direct ? direct.src.y : 0
+				if (!direct) decklinkPackX += tileW
 				const tileFps = Math.max(1, parseFloat(String(outDef?.fps ?? 50)) || 50)
 				const tileVideoMode = resolveDecklinkTileVideoMode({
 					width: tileW,
@@ -107,8 +107,8 @@ function applyPixelMappingProgramScreens(merged, appConfig) {
 					device: devNum,
 					srcX: tileSrcX,
 					srcY: tileSrcY,
-					destX: 0,
-					destY: 0,
+					destX: direct ? direct.destX : 0, // WO-869: the slice's placement in the SDI frame
+					destY: direct ? direct.destY : 0,
 					width: tileW,
 					height: tileH,
 					videoMode: tileVideoMode,

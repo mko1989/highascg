@@ -170,6 +170,14 @@ static func duplicate_node(graph: Dictionary, id: String, now36: String, rand36:
 		var c: Variant = m.duplicate(true) if m is Dictionary else {}
 		c.id = "map_%s_%s" % [now36, rand36.call()]
 		return c)
+	if st.has("slices"):  # WO-869: the copy's outputs are renumbered out_1…; its slices follow by output position
+		var by_pos := {}
+		for i in _outputs(src).size():
+			by_pos[R.s(R.d(_outputs(src)[i]).get("id"))] = defs[i].id
+		st.slices = R.a(st.get("slices")).map(func(sl: Variant) -> Variant:
+			var c: Dictionary = R.d(sl).duplicate(true)
+			c.outputId = by_pos.get(R.s(c.get("outputId")), defs[0].id)
+			return c)
 	node.settings = st
 	var conns := [{"id": new_id + "_in", "deviceId": new_id, "kind": "pixel_map_in", "label": "Input Feed"}]
 	for i in defs.size():
@@ -212,12 +220,15 @@ static func remove_output(graph: Dictionary, id: String, out_id: String) -> Dict
 	var st := R.d(node.get("settings")).duplicate()
 	st.outputs = next
 	st.numOutputs = next.size()
-	st.mappings = R.a(st.get("mappings")).map(func(m: Variant) -> Variant:
+	var moved := func(m: Variant) -> Variant:
 		if R.s(R.d(m).get("outputId")) != out_id:
 			return m
 		var c: Dictionary = m.duplicate()
 		c.outputId = first
-		return c)
+		return c
+	st.mappings = R.a(st.get("mappings")).map(moved)
+	if st.has("slices"):  # WO-869: the node's slices follow the same rule
+		st.slices = R.a(st.get("slices")).map(moved)
 	node.settings = st
 	sync_out_connectors(graph, id)
 	_prune_edges(graph, id, prev)

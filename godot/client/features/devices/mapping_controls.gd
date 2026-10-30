@@ -6,14 +6,19 @@ extends "res://features/devices/host_controls_base.gd"
 ## Text fields commit like the web's `change` (Enter / leaving the field, only when changed); the size and rect fields
 ## are math inputs that evaluate and clamp first (the web commits math after `change` — WO-605 slice 7c notes).
 ## Not ported: "Show Mapping Preview" (the pixel-map editor is outside WO-605).
+## WO-869: the per-output Src fields gave way to the slice section (slice_inspector.gd over slice_flow.gd, mounted
+## before "Actions"); its "Edit slices" asks the Devices tab for the centre canvases (`edit_slices`).
 
 signal dirty()
+signal edit_slices()
 
 const M := preload("res://features/devices/mapping_page_model.gd")
 const G := preload("res://features/devices/mapping_graph.gd")
 const Flow := preload("res://features/devices/mapping_flow.gd")
 const MI := preload("res://core/math_input.gd")
 const R := preload("res://features/devices/cable_rules.gd")
+const SliceFlow := preload("res://features/devices/slice_flow.gd")
+const SliceInspector := preload("res://features/devices/slice_inspector.gd")
 ## Math-input bounds per field: [min, max, decimals] (attachMathInput in the web page).
 const NUM := {"cw": [1, INF, 0], "ch": [1, INF, 0], "cf": [1, INF, 2], "x": [-INF, INF, 0], "y": [-INF, INF, 0],
 	"w": [-INF, INF, 0], "h": [-INF, INF, 0]}
@@ -24,6 +29,8 @@ var node_id := ""
 var flow: Flow
 var _io: _Io
 var _ui := {}  # output index → {mode, cw, ch, cf, x, y, w, h} as the operator left them since the page was shown
+var slices: SliceFlow  # WO-869: the open node's slice list (shared with the centre canvases)
+var _sinsp: SliceInspector
 
 
 class _Io:
@@ -67,6 +74,11 @@ class _Io:
 func _init() -> void:
 	page.add_theme_constant_override("separation", 4)
 	_io = _Io.new(self)
+	slices = SliceFlow.new(_io)
+	_sinsp = SliceInspector.new()
+	add_child(_sinsp)
+	_sinsp.status.connect(func(t: String, ok: bool) -> void: status.emit(t, ok))
+	_sinsp.edit_requested.connect(func() -> void: edit_slices.emit())
 
 
 ## (Re)open on a device-view load — the web re-renders the page from the new graph, dropping unsaved field edits.
@@ -74,6 +86,8 @@ func show_node(payload: Dictionary, id: String) -> void:
 	node_id = id
 	flow = Flow.new(payload, id, _io)
 	_ui = {}
+	slices.load_payload(payload, id, DevicesTarget.value("channelMap"))
+	_sinsp.bind(slices)
 	_render()
 
 
@@ -104,9 +118,12 @@ func _render() -> void:
 	var refocus: Variant = focus.get_meta("key", null) if focus is LineEdit and page.is_ancestor_of(focus) else null
 	for ch in page.get_children():
 		page.remove_child(ch)
-		ch.queue_free()
+		if ch != _sinsp.box:  # the slice section outlives page renders (it re-renders from slice_flow.gd)
+			ch.queue_free()
 	var size_row: HBoxContainer = null  # the custom W / H / FPS fields share a row (the web's 3-column grid)
-	for it in M.items(flow.payload, node_id, _ui):
+	for it in M.items(flow.payload, node_id, _ui, true):
+		if it.t == "heading" and it.text == "Actions":
+			page.add_child(_sinsp.box)
 		var n := _item(it)
 		var field := str(it.get("key", "")).get_slice(".", 1)
 		if field == "cw":

@@ -60,6 +60,8 @@ function buildCasparGeneratorFlatConfig(appConfig) {
 	applyPhysicalPortConsumerFlagsToScreens(merged, appConfig || {})
 	applyNdiStreamOutputsToScreens(merged, appConfig || {})
 	reconcileDecklinkScreenConsumerFlags(merged)
+	// WO-869: slice windows on their PGM channel; a PGM window whose heads all moved into slice windows goes off.
+	require('./config-generator-slice-windows').applySliceWindowsToScreens(merged, appConfig || {})
 	applyDestinationAudioLayoutsToScreens(merged, appConfig || {})
 	applyAudioOutputOverridesToScreens(merged, appConfig || {})
 	merged.rtmp = normalizeRtmpConfig(appConfig && appConfig.rtmp)

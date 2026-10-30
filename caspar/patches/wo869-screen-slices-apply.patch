@@ -1,0 +1,1219 @@
+From ce7132e50aaad67433b75086cdea3e110767c07b Mon Sep 17 00:00:00 2001
+From: Niklas P Andersson <3985238+niklaspandersson@users.noreply.github.com>
+Date: Wed, 18 Jun 2025 18:09:26 +0200
+Subject: [PATCH 1/2] feat(amcp): add APPLY command, similar to CALL but for
+ consumers (#1638)
+
+(cherry picked from commit f7dcc0322a716c396feb05ecaf1fadbdad9ff423)
+---
+ src/core/consumer/frame_consumer.h            |  7 +++--
+ src/core/consumer/frame_consumer_registry.cpp |  8 ++++--
+ src/core/consumer/output.cpp                  | 28 ++++++++++++++++---
+ src/core/consumer/output.h                    |  2 ++
+ src/protocol/amcp/AMCPCommandsImpl.cpp        | 24 ++++++++++++++++
+ 5 files changed, 61 insertions(+), 8 deletions(-)
+
+diff --git a/src/core/consumer/frame_consumer.h b/src/core/consumer/frame_consumer.h
+index 74744dd59..0a7c2cf13 100644
+--- a/src/core/consumer/frame_consumer.h
++++ b/src/core/consumer/frame_consumer.h
+@@ -27,6 +27,7 @@
+ #include <common/bit_depth.h>
+ #include <common/memory.h>
+ 
++#include <common/future.h>
+ #include <core/video_format.h>
+ 
+ #include <boost/property_tree/ptree_fwd.hpp>
+@@ -49,8 +50,10 @@ class frame_consumer
+     frame_consumer() {}
+     virtual ~frame_consumer() {}
+ 
+-    virtual std::future<bool> send(const core::video_field field, const_frame frame)              = 0;
+-    virtual void              initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) = 0;
++    virtual std::future<bool> send(const core::video_field field, const_frame frame) = 0;
++    virtual void
++    initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) = 0;
++    virtual std::future<bool> call(const std::vector<std::wstring>& params) { return caspar::make_ready_future(false); }
+ 
+     virtual core::monitor::state state() const = 0;
+ 
+diff --git a/src/core/consumer/frame_consumer_registry.cpp b/src/core/consumer/frame_consumer_registry.cpp
+index 58a136b15..b73027f2b 100644
+--- a/src/core/consumer/frame_consumer_registry.cpp
++++ b/src/core/consumer/frame_consumer_registry.cpp
+@@ -90,10 +90,12 @@ class destroy_consumer_proxy : public frame_consumer
+     {
+         return consumer_->send(field, std::move(frame));
+     }
+-    void initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) override
++    void
++    initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) override
+     {
+         return consumer_->initialize(format_desc, channel_info, port_index);
+     }
++    std::future<bool>    call(const std::vector<std::wstring>& params) override { return consumer_->call(params); }
+     std::wstring         print() const override { return consumer_->print(); }
+     std::wstring         name() const override { return consumer_->name(); }
+     bool                 has_synchronization_clock() const override { return consumer_->has_synchronization_clock(); }
+@@ -123,11 +125,13 @@ class print_consumer_proxy : public frame_consumer
+     {
+         return consumer_->send(field, std::move(frame));
+     }
+-    void initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) override
++    void
++    initialize(const video_format_desc& format_desc, const core::channel_info& channel_info, int port_index) override
+     {
+         consumer_->initialize(format_desc, channel_info, port_index);
+         CASPAR_LOG(info) << consumer_->print() << L" Initialized.";
+     }
++    std::future<bool>    call(const std::vector<std::wstring>& params) override { return consumer_->call(params); }
+     std::wstring         print() const override { return consumer_->print(); }
+     std::wstring         name() const override { return consumer_->name(); }
+     bool                 has_synchronization_clock() const override { return consumer_->has_synchronization_clock(); }
+diff --git a/src/core/consumer/output.cpp b/src/core/consumer/output.cpp
+index b54c44adc..bafda28fe 100644
+--- a/src/core/consumer/output.cpp
++++ b/src/core/consumer/output.cpp
+@@ -82,6 +82,22 @@ struct output::impl
+ 
+     bool remove(const spl::shared_ptr<frame_consumer>& consumer) { return remove(consumer->index()); }
+ 
++    std::future<bool> call(int index, const std::vector<std::wstring>& params)
++    {
++        std::lock_guard<std::mutex> lock(consumers_mutex_);
++        auto                        it = consumers_.find(index);
++        if (it != consumers_.end()) {
++            try {
++                return it->second->call(params);
++            } catch (...) {
++                CASPAR_LOG_CURRENT_EXCEPTION();
++            }
++        } else {
++            CASPAR_LOG(warning) << print() << L" No consumer found for index " << index << L".";
++        }
++        return caspar::make_ready_future(false);
++    }
++
+     size_t consumer_count()
+     {
+         std::lock_guard<std::mutex> lock(consumers_mutex_);
+@@ -219,10 +235,14 @@ output::output(const spl::shared_ptr<diagnostics::graph>& graph,
+ {
+ }
+ output::~output() {}
+-void   output::add(int index, const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(index, consumer); }
+-void   output::add(const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(consumer); }
+-bool   output::remove(int index) { return impl_->remove(index); }
+-bool   output::remove(const spl::shared_ptr<frame_consumer>& consumer) { return impl_->remove(consumer); }
++void output::add(int index, const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(index, consumer); }
++void output::add(const spl::shared_ptr<frame_consumer>& consumer) { impl_->add(consumer); }
++bool output::remove(int index) { return impl_->remove(index); }
++bool output::remove(const spl::shared_ptr<frame_consumer>& consumer) { return impl_->remove(consumer); }
++std::future<bool> output::call(int index, const std::vector<std::wstring>& params)
++{
++    return impl_->call(index, params);
++}
+ size_t output::consumer_count() const { return impl_->consumer_count(); }
+ void   output::operator()(const const_frame& frame, const const_frame& frame2, const video_format_desc& format_desc)
+ {
+diff --git a/src/core/consumer/output.h b/src/core/consumer/output.h
+index 02af1c36e..292381e72 100644
+--- a/src/core/consumer/output.h
++++ b/src/core/consumer/output.h
+@@ -54,6 +54,8 @@ class output final
+     bool remove(const spl::shared_ptr<frame_consumer>& consumer);
+     bool remove(int index);
+ 
++    std::future<bool> call(int index, const std::vector<std::wstring>& params);
++
+     size_t consumer_count() const;
+ 
+     core::monitor::state state() const;
+diff --git a/src/protocol/amcp/AMCPCommandsImpl.cpp b/src/protocol/amcp/AMCPCommandsImpl.cpp
+index 7ff10dc68..4596623bf 100644
+--- a/src/protocol/amcp/AMCPCommandsImpl.cpp
++++ b/src/protocol/amcp/AMCPCommandsImpl.cpp
+@@ -473,6 +473,29 @@ std::wstring swap_command(command_context& ctx)
+     return L"202 SWAP OK\r\n";
+ }
+ 
++std::future<std::wstring> apply_command(command_context& ctx)
++{
++    const auto result = ctx.channel.raw_channel->output().call(ctx.layer_index(), ctx.parameters).share();
++
++    // TODO: because of std::async deferred timed waiting does not work
++
++    /*auto wait_res = result.wait_for(std::chrono::seconds(2));
++    if (wait_res == std::future_status::timeout)
++    CASPAR_THROW_EXCEPTION(timed_out());*/
++
++    return std::async(std::launch::deferred, [result]() -> std::wstring {
++        bool res = result.get();
++
++        std::wstringstream replyString;
++        if (res)
++            replyString << L"202 APPLY OK\r\n";
++        else
++            replyString << L"403 APPLY FAILED\r\n";
++
++        return replyString.str();
++    });
++}
++
+ std::wstring add_command(command_context& ctx)
+ {
+     replace_placeholders(L"<CLIENT_IP_ADDRESS>", ctx.client->address(), ctx.parameters);
+@@ -1866,6 +1889,7 @@ void register_commands(std::shared_ptr<amcp_command_repository_wrapper>& repo)
+     repo->register_channel_command(L"Basic Commands", L"SWAP", swap_command, 1);
+     repo->register_channel_command(L"Basic Commands", L"ADD", add_command, 1);
+     repo->register_channel_command(L"Basic Commands", L"REMOVE", remove_command, 0);
++    repo->register_channel_command(L"Basic Commands", L"APPLY", apply_command, 1);
+     repo->register_channel_command(L"Basic Commands", L"PRINT", print_command, 0);
+     repo->register_command(L"Basic Commands", L"CLEAR ALL", clear_all_command, 0);
+     repo->register_command(L"Basic Commands", L"LOG LEVEL", log_level_command, 0);
+-- 
+2.53.0
+
+
+From deac375bb11d9373aa7ac74ccc19183862b22d17 Mon Sep 17 00:00:00 2001
+From: HighAsCG Assembly <assembly@highascg.local>
+Date: Fri, 30 Oct 2026 17:03:48 +0100
+Subject: [PATCH 2/2] =?UTF-8?q?screen:=20slices=20=E2=80=94=20N=20source?=
+ =?UTF-8?q?=20rects=20onto=20perspective-correct=20destination=20quads,=20?=
+ =?UTF-8?q?live=20over=20AMCP=20APPLY?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+HighAsCG WO-869 path (b). One <screen> consumer draws up to 64 slices of the
+channel frame onto its window canvas (the configured window size; a resized
+window scales them through the viewport). Slices replace the stretch/fill draw,
+uncovered canvas stays black, slice order is z order. Without slices the old
+draw path runs unchanged (byte-identical output verified).
+
+- slice_geometry.h (no GL): slice {src x y w h, dst ul ur lr ll, opacity,
+  feather l t r b, clip x y w h}; validation (finite, src w/h > 0, src clamped
+  to the raster, convex non-degenerate quad of either winding so mirrored
+  slices work); 6 vertices per slice with per-corner q from the diagonal
+  intersection (as fill_texture_q_for_quad); half-texel source clamp so
+  bilinear filtering never bleeds neighbouring pixels into a slice.
+- Shaders: slice_mode uniform; q-divide of texture and quad-local coords,
+  opacity x smoothstep feather ramps, premultiplied output. The non-slice
+  branch is the old code.
+- Draw: blending (GL_ONE, GL_ONE_MINUS_SRC_ALPHA) only when a slice has
+  opacity < 1 or feather; clipped slices drawn alone under glScissor,
+  unclipped ones batched; culling off.
+- XML: <slices><slice><src/><dst/><opacity/><feather/><clip/></slice></slices>,
+  logged; rejected with sbs-key, key-only, datavideo colour spaces.
+- AMCP (via #1638 call()): APPLY <ch>-<600+device-1> SLICES SET <n> <21
+  numbers per slice> | SLICES CLEAR (SET 0 = CLEAR). 202 on success, 403 on
+  bad input (previous slices stay). The AMCP thread only validates and queues
+  under a mutex; the render thread swaps at the top of its tick. No window
+  recreation. A channel format change keeps the live set.
+- INFO: screen/slices, screen/slice/<n>/src|dst|opacity|feather|clip,
+  screen/dropped_frames, screen/presented_frames.
+- casparcg.config reference block documents <slices> and the APPLY grammar.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01MxpJi7QVXYQA38FT76gLNj
+---
+ src/modules/screen/CMakeLists.txt             |   1 +
+ src/modules/screen/consumer/screen.frag       |  22 +
+ src/modules/screen/consumer/screen.vert       |  12 +
+ .../screen/consumer/screen_consumer.cpp       | 393 +++++++++++++++++-
+ src/modules/screen/consumer/slice_geometry.h  | 279 +++++++++++++
+ src/modules/screen/consumer_screen_fragment.h |  22 +
+ src/modules/screen/consumer_screen_vertex.h   |  14 +-
+ src/shell/casparcg.config                     |  14 +
+ 8 files changed, 754 insertions(+), 3 deletions(-)
+ create mode 100644 src/modules/screen/consumer/slice_geometry.h
+
+diff --git a/src/modules/screen/CMakeLists.txt b/src/modules/screen/CMakeLists.txt
+index 8bbfaae2d..457d58320 100644
+--- a/src/modules/screen/CMakeLists.txt
++++ b/src/modules/screen/CMakeLists.txt
+@@ -4,6 +4,7 @@ project (screen)
+ set(SOURCES
+ 	consumer/screen_consumer.cpp
+ 	consumer/screen_consumer.h
++	consumer/slice_geometry.h
+ 	screen.cpp
+ 	screen.h
+ )
+diff --git a/src/modules/screen/consumer/screen.frag b/src/modules/screen/consumer/screen.frag
+index 5d498ddfb..a46a70df6 100644
+--- a/src/modules/screen/consumer/screen.frag
++++ b/src/modules/screen/consumer/screen.frag
+@@ -12,11 +12,16 @@
+ uniform sampler2D background;
+ 
+ in vec4 TexCoord;
++in vec2 Local;
++flat in vec4 Feather;
++flat in float Opacity;
++flat in vec4 SrcClamp;
+ out vec4 fragColor;
+ 
+ uniform bool key_only;
+ uniform int colour_space;
+ uniform int window_width;
++uniform bool slice_mode;
+ 
+ // rgb=0~255, y=16~235, uv=16~240
+ mat3 rgb2yuv_709 = mat3(0.183f, -0.101f, 0.439f,  0.614f, -0.338f, -0.399f, 0.062f, 0.439f,-0.040f);
+@@ -27,8 +32,25 @@ vec4 dtv_color(vec4 color)
+     return color;
+ }
+ 
++// Slices: smooth ramp from an edge over the feather width (both in quad-local units).
++float feather_ramp(float d, float f)
++{
++    return f > 0.0f ? smoothstep(0.0f, f, d) : 1.0f;
++}
++
+ void main()
+ {
++    if (slice_mode) {
++        // Perspective-correct: texture and quad-local coordinates are pre-multiplied by q.
++        // Clamped to the source rect so bilinear filtering never pulls in pixels from outside it.
++        vec4 color = texture(background, clamp(TexCoord.xy / TexCoord.w, SrcClamp.xy, SrcClamp.zw));
++        vec2 l = Local / TexCoord.w;
++        float a = Opacity * feather_ramp(l.x, Feather.x) * feather_ramp(l.y, Feather.y) *
++                  feather_ramp(1.0f - l.x, Feather.z) * feather_ramp(1.0f - l.y, Feather.w);
++        fragColor = color * a; // premultiplied; blended with GL_ONE, GL_ONE_MINUS_SRC_ALPHA when a < 1
++        return;
++    }
++
+     vec4 color = texture(background, TexCoord.xy);
+     if (key_only)
+         color = vec4(color.aaa, 1);
+diff --git a/src/modules/screen/consumer/screen.vert b/src/modules/screen/consumer/screen.vert
+index c60be2150..75c46c6c4 100644
+--- a/src/modules/screen/consumer/screen.vert
++++ b/src/modules/screen/consumer/screen.vert
+@@ -1,11 +1,23 @@
+ #version 450
+ in vec4 TexCoordIn;
+ in vec2 Position;
++in vec2 LocalIn;    // slices: quad-local coordinates (x q)
++in vec4 FeatherIn;  // slices: feather l t r b in quad-local units
++in float OpacityIn; // slices: opacity
++in vec4 SrcClampIn; // slices: source rect in texture space, inset by half a texel
+ 
+ out vec4 TexCoord;
++out vec2 Local;
++flat out vec4 Feather;
++flat out float Opacity;
++flat out vec4 SrcClamp;
+ 
+ void main()
+ {
+     TexCoord = TexCoordIn;
++    Local = LocalIn;
++    Feather = FeatherIn;
++    Opacity = OpacityIn;
++    SrcClamp = SrcClampIn;
+     gl_Position = vec4(Position, 0, 1);
+ }
+diff --git a/src/modules/screen/consumer/screen_consumer.cpp b/src/modules/screen/consumer/screen_consumer.cpp
+index 4608fffaa..8e3071cc8 100644
+--- a/src/modules/screen/consumer/screen_consumer.cpp
++++ b/src/modules/screen/consumer/screen_consumer.cpp
+@@ -57,6 +57,13 @@
+ #include "../util/x11_util.h"
+ #endif
+ 
++#include "slice_geometry.h"
++
++#include <cmath>
++#include <iomanip>
++#include <mutex>
++#include <sstream>
++
+ #include "consumer_screen_fragment.h"
+ #include "consumer_screen_vertex.h"
+ #include <accelerator/ogl/util/shader.h>
+@@ -106,6 +113,7 @@ struct configuration
+     bool            always_on_top       = false;
+     bool            gpu_texture         = false; // 2.5 feature
+     colour_spaces   colour_space        = colour_spaces::RGB;
++    std::vector<slice> slices; // HighAsCG WO-869: src rect -> dst quad mappings onto the window canvas
+ };
+ 
+ struct frame
+@@ -212,8 +220,27 @@ struct screen_consumer
+     std::atomic<bool> visibility_change_requested_{false};
+     std::atomic<bool> new_visibility_state_{true};
+ 
++    // Slices (HighAsCG WO-869). The canvas is the configured window size; dst corners are canvas pixels, so a
++    // resized window scales them by real/configured through the viewport. AMCP stores pending slices under
++    // the mutex; the render thread swaps them in at the top of its tick (no GL calls off the render thread).
++    int                       canvas_width_  = 0;
++    int                       canvas_height_ = 0;
++    std::mutex                slices_mutex_;
++    std::vector<slice>        pending_slices_;
++    std::atomic<bool>         slices_dirty_{false};
++    std::vector<slice>        active_slices_;
++    std::vector<slice_vertex> slice_vertices_;
++    bool                      slice_blend_ = false;
++
++    // Counters for INFO (screen/dropped_frames, screen/presented_frames).
++    std::atomic<std::int64_t> dropped_frames_{0};
++    std::atomic<std::int64_t> presented_frames_{0};
++
+   public:
+-    screen_consumer(const configuration& config, const core::video_format_desc& format_desc, int channel_index)
++    screen_consumer(const configuration&      config,
++                    const core::video_format_desc& format_desc,
++                    int                       channel_index,
++                    const std::vector<slice>& initial_slices = {})
+         : config_(config)
+         , format_desc_(format_desc)
+         , channel_index_(channel_index)
+@@ -428,6 +455,15 @@ struct screen_consumer
+         CASPAR_LOG(info) << print() << L"   Size: " << screen_width_ << L"x" << screen_height_;
+         CASPAR_LOG(info) << print() << L"   Windowed: " << (config_.windowed ? L"true" : L"false");
+ 
++        canvas_width_  = screen_width_;
++        canvas_height_ = screen_height_;
++        if (!initial_slices.empty()) {
++            std::string error;
++            if (!set_slices(initial_slices, error)) {
++                CASPAR_LOG(error) << print() << L" Slices ignored: " << u16(error);
++            }
++        }
++
+         thread_ = std::thread([this] {
+             try {
+ #if SFML_VERSION_MAJOR >= 3
+@@ -617,8 +653,151 @@ struct screen_consumer
+         return count > 0;
+     }
+ 
++    bool slices_supported() const
++    {
++        return !config_.sbs_key && !config_.key_only && config_.colour_space == configuration::colour_spaces::RGB;
++    }
++
++    // Validates (and clamps) a slice set against the channel raster and queues it for the render thread.
++    // An empty set returns to the normal stretch/fill draw. Called from the AMCP thread or the constructor.
++    bool set_slices(std::vector<slice> slices, std::string& error)
++    {
++        if (!slices_supported()) {
++            error = "slices cannot be combined with sbs-key, key-only or a datavideo colour-space";
++            return false;
++        }
++        if (!validate_slices(slices, format_desc_.width, format_desc_.height, error)) {
++            return false;
++        }
++        std::lock_guard<std::mutex> lock(slices_mutex_);
++        pending_slices_ = std::move(slices);
++        slices_dirty_   = true;
++        return true;
++    }
++
++    // The latest accepted slice set (what the render thread shows from its next tick on).
++    std::vector<slice> requested_slices()
++    {
++        std::lock_guard<std::mutex> lock(slices_mutex_);
++        return pending_slices_;
++    }
++
++    // Render thread, top of every tick.
++    void apply_pending_slices()
++    {
++        if (!slices_dirty_.load()) {
++            return;
++        }
++        {
++            std::lock_guard<std::mutex> lock(slices_mutex_);
++            active_slices_ = pending_slices_;
++            slices_dirty_  = false;
++        }
++        slice_vertices_ = build_slice_vertices(
++            active_slices_, canvas_width_, canvas_height_, format_desc_.width, format_desc_.height);
++        slice_blend_ = slices_need_blend(active_slices_);
++        CASPAR_LOG(info) << print() << L" Slices active: " << active_slices_.size()
++                         << (slice_blend_ ? L" (blending)" : L"");
++    }
++
++    void draw_slices()
++    {
++        GL(glBindBuffer(GL_ARRAY_BUFFER, vbo_));
++        GL(glBufferData(GL_ARRAY_BUFFER,
++                        static_cast<GLsizeiptr>(sizeof(slice_vertex)) * slice_vertices_.size(),
++                        slice_vertices_.data(),
++                        GL_STATIC_DRAW));
++
++        auto stride = static_cast<GLsizei>(sizeof(slice_vertex));
++
++        struct attrib
++        {
++            const char* name;
++            GLint       size;
++            size_t      offset;
++        };
++        const attrib attribs[] = {{"Position", 2, offsetof(slice_vertex, x)},
++                                  {"TexCoordIn", 4, offsetof(slice_vertex, u)},
++                                  {"LocalIn", 2, offsetof(slice_vertex, lu)},
++                                  {"OpacityIn", 1, offsetof(slice_vertex, opacity)},
++                                  {"FeatherIn", 4, offsetof(slice_vertex, feather)},
++                                  {"SrcClampIn", 4, offsetof(slice_vertex, src_clamp)}};
++
++        std::vector<GLint> enabled;
++        for (auto& a : attribs) {
++            auto loc = shader_->get_attrib_location(a.name);
++            if (loc < 0) {
++                continue;
++            }
++            GL(glEnableVertexAttribArray(loc));
++            GL(glVertexAttribPointer(loc, a.size, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<GLvoid*>(a.offset)));
++            enabled.push_back(loc);
++        }
++
++        shader_->set("window_width", screen_width_);
++        shader_->set("key_only", false);
++        shader_->set("slice_mode", true);
++
++        GL(glDisable(GL_CULL_FACE));
++        if (slice_blend_) {
++            GL(glEnable(GL_BLEND));
++            GL(glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA));
++        }
++
++        // Slices without a clip are batched; a clipped slice is drawn on its own under glScissor. The clip is
++        // in canvas pixels, scaled to the real window like dst and flipped to GL's bottom-left origin.
++        const double sx    = static_cast<double>(screen_width_) / canvas_width_;
++        const double sy    = static_cast<double>(screen_height_) / canvas_height_;
++        size_t       first = 0;
++        auto         flush = [&](size_t end) {
++            if (end > first) {
++                GL(glDrawArrays(GL_TRIANGLES, static_cast<GLint>(first * 6), static_cast<GLsizei>((end - first) * 6)));
++            }
++            first = end;
++        };
++        for (size_t n = 0; n < active_slices_.size(); ++n) {
++            const auto& sl = active_slices_[n];
++            if (!sl.has_clip()) {
++                continue;
++            }
++            flush(n);
++            const auto x0 = std::lround(sl.clip[0] * sx);
++            const auto x1 = std::lround((sl.clip[0] + sl.clip[2]) * sx);
++            const auto y0 = std::lround(sl.clip[1] * sy);
++            const auto y1 = std::lround((sl.clip[1] + sl.clip[3]) * sy);
++            first         = n + 1;
++            if (x1 <= x0 || y1 <= y0) {
++                continue; // clip rounds to nothing
++            }
++            GL(glEnable(GL_SCISSOR_TEST));
++            GL(glScissor(static_cast<GLint>(x0),
++                         static_cast<GLint>(screen_height_ - y1),
++                         static_cast<GLsizei>(x1 - x0),
++                         static_cast<GLsizei>(y1 - y0)));
++            GL(glDrawArrays(GL_TRIANGLES, static_cast<GLint>(n * 6), 6));
++            GL(glDisable(GL_SCISSOR_TEST));
++        }
++        flush(active_slices_.size());
++
++        if (slice_blend_) {
++            GL(glDisable(GL_BLEND));
++        }
++        shader_->set("slice_mode", false);
++
++        for (auto loc : enabled) {
++            GL(glDisableVertexAttribArray(loc));
++        }
++
++        GL(glBindTexture(GL_TEXTURE_2D, 0));
++    }
++
+     void draw()
+     {
++        if (!active_slices_.empty()) {
++            draw_slices();
++            return;
++        }
++
+         GL(glBindBuffer(GL_ARRAY_BUFFER, vbo_));
+         GL(glBufferData(GL_ARRAY_BUFFER,
+                         static_cast<GLsizeiptr>(sizeof(core::frame_geometry::coord)) * draw_coords_.size(),
+@@ -660,6 +839,7 @@ struct screen_consumer
+     std::future<bool> send(core::video_field field, const core::const_frame& frame)
+     {
+         if (!frame_buffer_.try_push(frame)) {
++            ++dropped_frames_;
+             graph_->set_tag(diagnostics::tag_severity::WARNING, "dropped-frame");
+         }
+         return make_ready_future(is_running_.load());
+@@ -846,6 +1026,8 @@ struct host_strategy : public display_strategy
+ 
+     virtual void do_tick(screen_consumer* self) override
+     {
++        self->apply_pending_slices();
++
+         if (self->visibility_change_requested_.load()) {
+             bool new_state = self->new_visibility_state_.load();
+             self->window_.setVisible(new_state);
+@@ -917,6 +1099,7 @@ struct host_strategy : public display_strategy
+         }
+ 
+         self->window_.display();
++        ++self->presented_frames_;
+ 
+         std::rotate(self->frames_.begin(), self->frames_.begin() + 1, self->frames_.end());
+ 
+@@ -946,6 +1129,8 @@ struct gpu_strategy : public display_strategy
+ 
+     virtual void do_tick(screen_consumer* self) override
+     {
++        self->apply_pending_slices();
++
+         core::const_frame in_frame;
+ 
+         self->poll();
+@@ -992,6 +1177,7 @@ struct gpu_strategy : public display_strategy
+         }
+ 
+         self->window_.display();
++        ++self->presented_frames_;
+ 
+         std::rotate(self->frames_.begin(), self->frames_.begin() + 1, self->frames_.end());
+ 
+@@ -1000,6 +1186,125 @@ struct gpu_strategy : public display_strategy
+     }
+ };
+ 
++// Parses numbers (wcstod: accepts nan/inf so that the caller can reject them by name).
++bool parse_slice_numbers(const std::vector<std::wstring>& tokens, std::vector<double>& out)
++{
++    out.clear();
++    for (auto& t : tokens) {
++        if (t.empty()) {
++            continue;
++        }
++        wchar_t* end   = nullptr;
++        double   value = std::wcstod(t.c_str(), &end);
++        if (end == t.c_str() || *end != L'\0') {
++            return false;
++        }
++        out.push_back(value);
++    }
++    return true;
++}
++
++// Whitespace-separated list of exactly `expected` finite numbers (XML <src>, <dst>, ...).
++bool parse_slice_text(const std::wstring& text, size_t expected, double* out)
++{
++    std::vector<std::wstring> tokens;
++    auto                      trimmed = boost::trim_copy(text);
++    boost::split(tokens, trimmed, boost::is_any_of(L" \t\r\n,"), boost::token_compress_on);
++    std::vector<double> values;
++    if (!parse_slice_numbers(tokens, values) || values.size() != expected) {
++        return false;
++    }
++    for (size_t n = 0; n < expected; ++n) {
++        if (!std::isfinite(values[n])) {
++            return false;
++        }
++        out[n] = values[n];
++    }
++    return true;
++}
++
++constexpr size_t slice_amcp_values = 21; // src 4, dst 8, opacity 1, feather 4, clip 4
++
++// APPLY <ch>-<index> SLICES SET <n> <21 numbers per slice> | SLICES CLEAR
++bool parse_slices_command(const std::vector<std::wstring>& params, std::vector<slice>& slices, std::string& error)
++{
++    slices.clear();
++    if (params.size() < 2 || !boost::iequals(params.at(0), L"SLICES")) {
++        error = "expected SLICES SET <n> ... or SLICES CLEAR";
++        return false;
++    }
++    if (boost::iequals(params.at(1), L"CLEAR")) {
++        if (params.size() != 2) {
++            error = "SLICES CLEAR takes no arguments";
++            return false;
++        }
++        return true;
++    }
++    if (!boost::iequals(params.at(1), L"SET") || params.size() < 3) {
++        error = "expected SLICES SET <n> ... or SLICES CLEAR";
++        return false;
++    }
++
++    std::vector<double> count;
++    if (!parse_slice_numbers({params.at(2)}, count) || count.size() != 1 || !std::isfinite(count[0]) ||
++        count[0] < 0 || count[0] != std::floor(count[0])) {
++        error = "slice count must be a non-negative integer";
++        return false;
++    }
++    if (count[0] > static_cast<double>(max_slices)) {
++        error = "more than " + std::to_string(max_slices) + " slices";
++        return false;
++    }
++    const auto n = static_cast<size_t>(count[0]);
++
++    std::vector<double> values;
++    if (!parse_slice_numbers(std::vector<std::wstring>(params.begin() + 3, params.end()), values)) {
++        error = "malformed number";
++        return false;
++    }
++    if (values.size() != n * slice_amcp_values) {
++        error = "expected " + std::to_string(n * slice_amcp_values) + " numbers (" +
++                std::to_string(slice_amcp_values) + " per slice), got " + std::to_string(values.size());
++        return false;
++    }
++    for (double v : values) {
++        if (!std::isfinite(v)) {
++            error = "non-finite number";
++            return false;
++        }
++    }
++
++    for (size_t i = 0; i < n; ++i) {
++        const double* v = values.data() + i * slice_amcp_values;
++        slice         sl;
++        std::copy(v, v + 4, sl.src);
++        std::copy(v + 4, v + 12, sl.dst);
++        sl.opacity = static_cast<float>(v[12]);
++        for (int k = 0; k < 4; ++k) {
++            sl.feather[k] = static_cast<float>(v[13 + k]);
++        }
++        std::copy(v + 17, v + 21, sl.clip);
++        slices.push_back(sl);
++    }
++    return true;
++}
++
++std::wstring describe_slice(const slice& s)
++{
++    std::wstringstream str;
++    str << std::fixed << std::setprecision(1) << L"src " << s.src[0] << L" " << s.src[1] << L" " << s.src[2] << L" "
++        << s.src[3] << L" dst";
++    for (double d : s.dst) {
++        str << L" " << d;
++    }
++    str << std::setprecision(2) << L" opacity " << s.opacity << std::setprecision(1) << L" feather " << s.feather[0]
++        << L" " << s.feather[1] << L" " << s.feather[2] << L" " << s.feather[3];
++    if (s.has_clip()) {
++        str << L" clip " << s.clip[0] << L" " << s.clip[1] << L" " << s.clip[2] << L" " << s.clip[3];
++    }
++    return str.str();
++}
++
+ struct screen_consumer_proxy : public core::frame_consumer
+ {
+     const configuration              config_;
+@@ -1015,8 +1320,27 @@ struct screen_consumer_proxy : public core::frame_consumer
+                     const core::channel_info&      channel_info,
+                     int                            port_index) override
+     {
++        // A re-initialize (channel format change) keeps the live slice set, not the config baseline.
++        auto slices = consumer_ ? consumer_->requested_slices() : config_.slices;
+         consumer_.reset();
+-        consumer_ = std::make_unique<screen_consumer>(config_, format_desc, channel_info.index);
++        consumer_ = std::make_unique<screen_consumer>(config_, format_desc, channel_info.index, slices);
++    }
++
++    // AMCP APPLY (CasparCG/server#1638): APPLY <ch>-<index> SLICES SET <n> <21 numbers per slice> | SLICES CLEAR.
++    // Runs on the AMCP thread; it only validates and queues (no GL calls, no window recreation).
++    std::future<bool> call(const std::vector<std::wstring>& params) override
++    {
++        if (!consumer_) {
++            return make_ready_future(false);
++        }
++        std::vector<slice> slices;
++        std::string        error;
++        if (!parse_slices_command(params, slices, error) || !consumer_->set_slices(slices, error)) {
++            CASPAR_LOG(warning) << print() << L" APPLY rejected: " << u16(error);
++            return make_ready_future(false);
++        }
++        CASPAR_LOG(info) << print() << L" APPLY SLICES: " << slices.size() << L" slice(s) queued.";
++        return make_ready_future(true);
+     }
+ 
+     std::future<bool> send(core::video_field field, core::const_frame frame) override
+@@ -1040,6 +1364,20 @@ struct screen_consumer_proxy : public core::frame_consumer
+         state["screen/key_only"]      = config_.key_only;
+         state["screen/always_on_top"] = config_.always_on_top;
+         state["screen/gpu_texture"]   = config_.gpu_texture;
++        if (consumer_) {
++            state["screen/dropped_frames"]   = consumer_->dropped_frames_.load();
++            state["screen/presented_frames"] = consumer_->presented_frames_.load();
++            auto slices            = consumer_->requested_slices();
++            state["screen/slices"] = static_cast<std::int32_t>(slices.size());
++            for (size_t n = 0; n < slices.size(); ++n) {
++                const auto& sl                      = slices[n];
++                state["screen/slice"][n]["src"]     = std::vector<double>(sl.src, sl.src + 4);
++                state["screen/slice"][n]["dst"]     = std::vector<double>(sl.dst, sl.dst + 8);
++                state["screen/slice"][n]["opacity"] = sl.opacity;
++                state["screen/slice"][n]["feather"] = std::vector<float>(sl.feather, sl.feather + 4);
++                state["screen/slice"][n]["clip"]    = std::vector<double>(sl.clip, sl.clip + 4);
++            }
++        }
+         return state;
+     }
+ };
+@@ -1171,6 +1509,53 @@ create_preconfigured_consumer(const boost::property_tree::wptree&
+     config.force_linear_filter = ptree.get(L"force-linear-filter", false);
+     config.enable_mipmaps      = ptree.get(L"enable-mipmaps", false);
+ 
++    // <slices><slice><src>x y w h</src><dst>ulx uly urx ury lrx lry llx lly</dst><opacity>1</opacity>
++    // <feather>l t r b</feather><clip>x y w h</clip></slice>...</slices> (HighAsCG WO-869). A malformed slice
++    // drops the whole set; the raster checks (convex quad, src inside the channel) run at initialize.
++    if (auto slices_tree = ptree.get_child_optional(L"slices")) {
++        std::vector<slice> slices;
++        bool               ok = true;
++        for (auto& xml_slice : *slices_tree) {
++            if (xml_slice.first != L"slice") {
++                continue;
++            }
++            const auto& t          = xml_slice.second;
++            slice       sl;
++            double      opacity    = 1.0;
++            double      feather[4] = {0, 0, 0, 0};
++            if (!parse_slice_text(t.get(L"src", L""), 4, sl.src) || !parse_slice_text(t.get(L"dst", L""), 8, sl.dst) ||
++                (t.get_optional<std::wstring>(L"opacity") && !parse_slice_text(t.get(L"opacity", L""), 1, &opacity)) ||
++                (t.get_optional<std::wstring>(L"feather") && !parse_slice_text(t.get(L"feather", L""), 4, feather)) ||
++                (t.get_optional<std::wstring>(L"clip") && !parse_slice_text(t.get(L"clip", L""), 4, sl.clip))) {
++                CASPAR_LOG(error) << L"Screen consumer: slice " << slices.size()
++                                  << L" is malformed (<src> needs 4 numbers, <dst> 8, <opacity> 1, <feather> 4, "
++                                     L"<clip> 4).";
++                ok = false;
++                break;
++            }
++            sl.opacity = static_cast<float>(opacity);
++            for (int k = 0; k < 4; ++k) {
++                sl.feather[k] = static_cast<float>(feather[k]);
++            }
++            slices.push_back(sl);
++        }
++        if (ok && slices.size() > max_slices) {
++            CASPAR_LOG(error) << L"Screen consumer: more than " << max_slices << L" slices.";
++            ok = false;
++        }
++        if (ok && !slices.empty() &&
++            (config.sbs_key || config.key_only || config.colour_space != configuration::colour_spaces::RGB)) {
++            CASPAR_LOG(error) << L"Screen consumer: <slices> cannot be combined with sbs-key, key-only or a "
++                                 L"datavideo colour-space.";
++            ok = false;
++        }
++        if (ok) {
++            config.slices = std::move(slices);
++        } else {
++            CASPAR_LOG(error) << L"Screen consumer: <slices> ignored.";
++        }
++    }
++
+     CASPAR_LOG(info) << L"Screen consumer configuration:";
+     CASPAR_LOG(info) << L"  aspect_ratio: "
+                      << (config.aspect_ratio > 0.0 ? std::to_wstring(config.aspect_ratio) : std::wstring(L"auto (format)"));
+@@ -1178,6 +1563,10 @@ create_preconfigured_consumer(const boost::property_tree::wptree&
+     CASPAR_LOG(info) << L"  enable_mipmaps: " << (config.enable_mipmaps ? L"true" : L"false");
+     CASPAR_LOG(info) << L"  gpu_texture: " << (config.gpu_texture ? L"true" : L"false");
+     CASPAR_LOG(info) << L"  high_bitdepth: " << (config.high_bitdepth ? L"true" : L"false");
++    CASPAR_LOG(info) << L"  slices: " << config.slices.size();
++    for (size_t n = 0; n < config.slices.size(); ++n) {
++        CASPAR_LOG(info) << L"    slice " << n << L": " << describe_slice(config.slices[n]);
++    }
+ 
+     return spl::make_shared<screen_consumer_proxy>(config);
+ }
+diff --git a/src/modules/screen/consumer/slice_geometry.h b/src/modules/screen/consumer/slice_geometry.h
+new file mode 100644
+index 000000000..7a0d9c7ab
+--- /dev/null
++++ b/src/modules/screen/consumer/slice_geometry.h
+@@ -0,0 +1,279 @@
++/*
++ * Copyright (c) 2026 CasparCG contributors
++ *
++ * This file is part of CasparCG (www.casparcg.com).
++ *
++ * CasparCG is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * CasparCG is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with CasparCG. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++// Screen consumer slices: N (source rectangle -> destination quad) mappings of the channel frame onto the
++// window canvas. Pure geometry, no GL calls, so the same code can serve another renderer later.
++
++#pragma once
++
++#include <algorithm>
++#include <cmath>
++#include <string>
++#include <vector>
++
++namespace caspar { namespace screen {
++
++constexpr std::size_t max_slices = 64;
++
++struct slice
++{
++    double src[4]     = {0, 0, 0, 0};             // x y w h in channel pixels
++    double dst[8]     = {0, 0, 0, 0, 0, 0, 0, 0}; // ul ur lr ll corners (x y each) in window-canvas pixels
++    float  opacity    = 1.0f;                     // 0..1
++    float  feather[4] = {0, 0, 0, 0};             // l t r b in canvas pixels; edges named by dst corners:
++                                                  // l = ul-ll, t = ul-ur, r = ur-lr, b = ll-lr
++    double clip[4]    = {0, 0, 0, 0};             // x y w h in canvas pixels; w or h <= 0 = no clip
++
++    bool has_clip() const { return clip[2] > 0.0 && clip[3] > 0.0; }
++};
++
++// One vertex of a slice triangle. Texture and quad-local coordinates are pre-multiplied by q; the
++// fragment shader divides by q (perspective-correct mapping of the rectangle onto the quad).
++struct slice_vertex
++{
++    float x, y;       // NDC
++    float u, v, r, q; // texture (u*q, v*q, 0, q)
++    float lu, lv;     // quad-local (lu*q, lv*q), 0..1 across the quad
++    float opacity;
++    float feather[4]; // l t r b in quad-local units (fraction of the quad's mean width/height)
++    float src_clamp[4]; // u0 v0 u1 v1: the source rect inset by half a texel (no bleed from neighbours)
++};
++
++inline double slice_cross(double ax, double ay, double bx, double by) { return ax * by - ay * bx; }
++
++// Checks a slice and clamps its source rectangle to the channel raster. Accepts convex quads of either
++// orientation (a flipped slice arrives with the opposite winding); rejects bow-ties, concave and
++// degenerate quads. Returns false with a reason in `error`.
++inline bool validate_slice(slice& s, double raster_w, double raster_h, std::string& error)
++{
++    for (double v : s.src)
++        if (!std::isfinite(v)) {
++            error = "non-finite source value";
++            return false;
++        }
++    for (double v : s.dst)
++        if (!std::isfinite(v)) {
++            error = "non-finite destination value";
++            return false;
++        }
++    for (double v : s.clip)
++        if (!std::isfinite(v)) {
++            error = "non-finite clip value";
++            return false;
++        }
++    if (!std::isfinite(s.opacity)) {
++        error = "non-finite opacity";
++        return false;
++    }
++    for (float f : s.feather)
++        if (!std::isfinite(f)) {
++            error = "non-finite feather";
++            return false;
++        }
++
++    if (s.src[2] <= 0.0 || s.src[3] <= 0.0) {
++        error = "source width/height must be > 0";
++        return false;
++    }
++
++    // Clamp the source rectangle to the raster.
++    double x0 = std::clamp(s.src[0], 0.0, raster_w);
++    double y0 = std::clamp(s.src[1], 0.0, raster_h);
++    double x1 = std::clamp(s.src[0] + s.src[2], 0.0, raster_w);
++    double y1 = std::clamp(s.src[1] + s.src[3], 0.0, raster_h);
++    if (x1 - x0 <= 0.0 || y1 - y0 <= 0.0) {
++        error = "source rectangle lies outside the channel raster";
++        return false;
++    }
++    s.src[0] = x0;
++    s.src[1] = y0;
++    s.src[2] = x1 - x0;
++    s.src[3] = y1 - y0;
++
++    // Convexity: the four turns must share one sign, none (near) zero.
++    double max_len2 = 0.0;
++    for (int i = 0; i < 4; ++i) {
++        int    j  = (i + 1) % 4;
++        double dx = s.dst[j * 2] - s.dst[i * 2];
++        double dy = s.dst[j * 2 + 1] - s.dst[i * 2 + 1];
++        max_len2  = std::max(max_len2, dx * dx + dy * dy);
++    }
++    const double eps  = 1e-9 * std::max(1.0, max_len2);
++    int          sign = 0;
++    for (int i = 0; i < 4; ++i) {
++        int    j     = (i + 1) % 4;
++        int    k     = (i + 2) % 4;
++        double cross = slice_cross(s.dst[j * 2] - s.dst[i * 2],
++                                   s.dst[j * 2 + 1] - s.dst[i * 2 + 1],
++                                   s.dst[k * 2] - s.dst[j * 2],
++                                   s.dst[k * 2 + 1] - s.dst[j * 2 + 1]);
++        if (std::abs(cross) <= eps) {
++            error = "degenerate destination quad";
++            return false;
++        }
++        int this_sign = cross > 0 ? 1 : -1;
++        if (sign == 0)
++            sign = this_sign;
++        else if (sign != this_sign) {
++            error = "destination quad is not convex (bow-tie or concave)";
++            return false;
++        }
++    }
++    double area2 = 0.0;
++    for (int i = 0; i < 4; ++i) {
++        int j = (i + 1) % 4;
++        area2 += s.dst[i * 2] * s.dst[j * 2 + 1] - s.dst[j * 2] * s.dst[i * 2 + 1];
++    }
++    if (std::abs(area2) * 0.5 < 0.25) {
++        error = "destination quad area < 0.25 px";
++        return false;
++    }
++
++    s.opacity = std::clamp(s.opacity, 0.0f, 1.0f);
++    for (auto& f : s.feather)
++        f = std::max(f, 0.0f);
++    return true;
++}
++
++inline bool validate_slices(std::vector<slice>& slices, double raster_w, double raster_h, std::string& error)
++{
++    if (slices.size() > max_slices) {
++        error = "more than " + std::to_string(max_slices) + " slices";
++        return false;
++    }
++    for (std::size_t n = 0; n < slices.size(); ++n) {
++        std::string e;
++        if (!validate_slice(slices[n], raster_w, raster_h, e)) {
++            error = "slice " + std::to_string(n) + ": " + e;
++            return false;
++        }
++    }
++    return true;
++}
++
++inline bool slices_need_blend(const std::vector<slice>& slices)
++{
++    for (auto& s : slices) {
++        if (s.opacity < 1.0f)
++            return true;
++        for (float f : s.feather)
++            if (f > 0.0f)
++                return true;
++    }
++    return false;
++}
++
++// Per-corner q for a convex quad (ul ur lr ll), from the diagonal intersection — the same formula as
++// accelerator/ogl/util/transforms.cpp fill_texture_q_for_quad. Falls back to q = 1.
++inline void slice_corner_q(const double* p, double q[4])
++{
++    q[0] = q[1] = q[2] = q[3] = 1.0;
++
++    double s1_x  = p[4] - p[0]; // ul -> lr
++    double s1_y  = p[5] - p[1];
++    double s2_x  = p[6] - p[2]; // ur -> ll
++    double s2_y  = p[7] - p[3];
++    double denom = -s2_x * s1_y + s1_x * s2_y;
++    if (denom == 0.0)
++        return;
++
++    double s = (-s1_y * (p[0] - p[2]) + s1_x * (p[1] - p[3])) / denom;
++    double t = (s2_x * (p[1] - p[3]) - s2_y * (p[0] - p[2])) / denom;
++    if (!(s >= 0 && s <= 1 && t >= 0 && t <= 1))
++        return;
++
++    double ix = p[0] + t * s1_x;
++    double iy = p[1] + t * s1_y;
++
++    double d_ul = std::hypot(p[0] - ix, p[1] - iy);
++    double d_ur = std::hypot(p[2] - ix, p[3] - iy);
++    double d_lr = std::hypot(p[4] - ix, p[5] - iy);
++    double d_ll = std::hypot(p[6] - ix, p[7] - iy);
++    if (d_ul <= 0.0 || d_ur <= 0.0 || d_lr <= 0.0 || d_ll <= 0.0)
++        return;
++
++    q[0] = (d_ul + d_lr) / d_lr;
++    q[1] = (d_ur + d_ll) / d_ll;
++    q[2] = (d_lr + d_ul) / d_ul;
++    q[3] = (d_ll + d_ur) / d_ur;
++}
++
++// 6 vertices (two triangles: ul ur lr, ul lr ll) per slice, in slice order (= z order).
++inline std::vector<slice_vertex> build_slice_vertices(const std::vector<slice>& slices,
++                                                      double                    canvas_w,
++                                                      double                    canvas_h,
++                                                      double                    raster_w,
++                                                      double                    raster_h)
++{
++    std::vector<slice_vertex> out;
++    out.reserve(slices.size() * 6);
++
++    for (auto& s : slices) {
++        double q[4];
++        slice_corner_q(s.dst, q);
++
++        const double u0 = s.src[0] / raster_w;
++        const double v0 = s.src[1] / raster_h;
++        const double u1 = (s.src[0] + s.src[2]) / raster_w;
++        const double v1 = (s.src[1] + s.src[3]) / raster_h;
++
++        const double uv[4][2] = {{u0, v0}, {u1, v0}, {u1, v1}, {u0, v1}};
++        const double hu       = 0.5 / raster_w;
++        const double hv       = 0.5 / raster_h;
++        const float  clamp_uv[4] = {static_cast<float>(std::min(u0 + hu, (u0 + u1) * 0.5)),
++                                    static_cast<float>(std::min(v0 + hv, (v0 + v1) * 0.5)),
++                                    static_cast<float>(std::max(u1 - hu, (u0 + u1) * 0.5)),
++                                    static_cast<float>(std::max(v1 - hv, (v0 + v1) * 0.5))};
++        const double lc[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
++
++        auto len = [&](int a, int b) { return std::hypot(s.dst[b * 2] - s.dst[a * 2], s.dst[b * 2 + 1] - s.dst[a * 2 + 1]); };
++        const double w = std::max(1e-6, 0.5 * (len(0, 1) + len(3, 2)));
++        const double h = std::max(1e-6, 0.5 * (len(0, 3) + len(1, 2)));
++        const float  fl = static_cast<float>(s.feather[0] / w);
++        const float  ft = static_cast<float>(s.feather[1] / h);
++        const float  fr = static_cast<float>(s.feather[2] / w);
++        const float  fb = static_cast<float>(s.feather[3] / h);
++
++        slice_vertex corner[4];
++        for (int c = 0; c < 4; ++c) {
++            auto& v      = corner[c];
++            v.x          = static_cast<float>(s.dst[c * 2] / canvas_w * 2.0 - 1.0);
++            v.y          = static_cast<float>(1.0 - s.dst[c * 2 + 1] / canvas_h * 2.0);
++            v.u          = static_cast<float>(uv[c][0] * q[c]);
++            v.v          = static_cast<float>(uv[c][1] * q[c]);
++            v.r          = 0.0f;
++            v.q          = static_cast<float>(q[c]);
++            v.lu         = static_cast<float>(lc[c][0] * q[c]);
++            v.lv         = static_cast<float>(lc[c][1] * q[c]);
++            v.opacity    = s.opacity;
++            v.feather[0] = fl;
++            v.feather[1] = ft;
++            v.feather[2] = fr;
++            v.feather[3] = fb;
++            for (int k = 0; k < 4; ++k)
++                v.src_clamp[k] = clamp_uv[k];
++        }
++
++        for (int c : {0, 1, 2, 0, 2, 3})
++            out.push_back(corner[c]);
++    }
++    return out;
++}
++
++}} // namespace caspar::screen
+diff --git a/src/modules/screen/consumer_screen_fragment.h b/src/modules/screen/consumer_screen_fragment.h
+index 7af5a8a11..601416033 100644
+--- a/src/modules/screen/consumer_screen_fragment.h
++++ b/src/modules/screen/consumer_screen_fragment.h
+@@ -18,11 +18,16 @@ static const char* fragment_shader = R"shader(
+ uniform sampler2D background;
+ 
+ in vec4 TexCoord;
++in vec2 Local;
++flat in vec4 Feather;
++flat in float Opacity;
++flat in vec4 SrcClamp;
+ out vec4 fragColor;
+ 
+ uniform bool key_only;
+ uniform int colour_space;
+ uniform int window_width;
++uniform bool slice_mode;
+ 
+ // rgb=0~255, y=16~235, uv=16~240
+ mat3 rgb2yuv_709 = mat3(0.183f, -0.101f, 0.439f,  0.614f, -0.338f, -0.399f, 0.062f, 0.439f,-0.040f);
+@@ -33,8 +38,25 @@ vec4 dtv_color(vec4 color)
+     return color;
+ }
+ 
++// Slices: smooth ramp from an edge over the feather width (both in quad-local units).
++float feather_ramp(float d, float f)
++{
++    return f > 0.0f ? smoothstep(0.0f, f, d) : 1.0f;
++}
++
+ void main()
+ {
++    if (slice_mode) {
++        // Perspective-correct: texture and quad-local coordinates are pre-multiplied by q.
++        // Clamped to the source rect so bilinear filtering never pulls in pixels from outside it.
++        vec4 color = texture(background, clamp(TexCoord.xy / TexCoord.w, SrcClamp.xy, SrcClamp.zw));
++        vec2 l = Local / TexCoord.w;
++        float a = Opacity * feather_ramp(l.x, Feather.x) * feather_ramp(l.y, Feather.y) *
++                  feather_ramp(1.0f - l.x, Feather.z) * feather_ramp(1.0f - l.y, Feather.w);
++        fragColor = color * a; // premultiplied; blended with GL_ONE, GL_ONE_MINUS_SRC_ALPHA when a < 1
++        return;
++    }
++
+     vec4 color = texture(background, TexCoord.xy);
+     if (key_only)
+         color = vec4(color.aaa, 1);
+diff --git a/src/modules/screen/consumer_screen_vertex.h b/src/modules/screen/consumer_screen_vertex.h
+index 5ede38c17..70cde93f8 100644
+--- a/src/modules/screen/consumer_screen_vertex.h
++++ b/src/modules/screen/consumer_screen_vertex.h
+@@ -3,17 +3,29 @@
+ namespace caspar { namespace screen {
+ 
+ // Vertex shader for screen consumer
+-// Simple pass-through vertex shader with texture coordinates
++// Pass-through vertex shader with texture coordinates (+ slice attributes)
+ static const char* vertex_shader = R"shader(
+ #version 450
+ in vec4 TexCoordIn;
+ in vec2 Position;
++in vec2 LocalIn;    // slices: quad-local coordinates (x q)
++in vec4 FeatherIn;  // slices: feather l t r b in quad-local units
++in float OpacityIn; // slices: opacity
++in vec4 SrcClampIn; // slices: source rect in texture space, inset by half a texel
+ 
+ out vec4 TexCoord;
++out vec2 Local;
++flat out vec4 Feather;
++flat out float Opacity;
++flat out vec4 SrcClamp;
+ 
+ void main()
+ {
+     TexCoord = TexCoordIn;
++    Local = LocalIn;
++    Feather = FeatherIn;
++    Opacity = OpacityIn;
++    SrcClamp = SrcClampIn;
+     gl_Position = vec4(Position, 0, 1);
+ }
+ )shader";
+diff --git a/src/shell/casparcg.config b/src/shell/casparcg.config
+index c7171f139..a0cafec67 100644
+--- a/src/shell/casparcg.config
++++ b/src/shell/casparcg.config
+@@ -207,6 +207,20 @@
+                 <colour-space>RGB [RGB|datavideo-full|datavideo-limited] (RGB=standard, datavideo modes for DataVideo TC-100/TC-200 converters. Cannot combine datavideo with sbs-key or key-only)</colour-space>
+                 <force-linear-filter>false [true|false] (true=always use GL_LINEAR smooth filtering. false=GL_NEAREST for datavideo modes, GL_LINEAR for RGB. Override texture filtering)</force-linear-filter>
+                 <enable-mipmaps>false [true|false] (generate mipmap chain for better downscaling quality. Increases memory usage. Not needed for 1:1 or upscaling)</enable-mipmaps>
++                <slices>(optional; up to 64. Each slice maps a source rectangle of the channel onto a destination quad of the window canvas. The canvas is the configured window size (width/height); a resized window scales it. Slices replace the stretch/fill draw, uncovered canvas stays black, later slices draw on top. Not combinable with sbs-key, key-only or datavideo colour spaces.)
++                    <slice>
++                        <src>x y w h (channel pixels; clamped to the channel raster)</src>
++                        <dst>ulx uly urx ury lrx lry llx lly (canvas pixels: the corners the source upper-left, upper-right, lower-right and lower-left land on. Any convex quad, either winding (mirrored slices), perspective-correct)</dst>
++                        <opacity>1 [0..1]</opacity>
++                        <feather>0 0 0 0 (l t r b canvas pixels, soft edge ramp; edges named by the dst corners: l = ul-ll, t = ul-ur, r = ur-lr, b = ll-lr)</feather>
++                        <clip>0 0 0 0 (x y w h canvas pixels; the slice draws only inside this rectangle. w or h 0 = no clip)</clip>
++                    </slice>
++                </slices>
++                Live slice edit over AMCP (no window recreation); the consumer index is 600 + device - 1 (+10 for key-only):
++                     APPLY 1-600 SLICES SET [n] [21 numbers per slice: srcX srcY srcW srcH ulX ulY urX urY lrX lrY llX llY opacity featL featT featR featB clipX clipY clipW clipH]
++                     APPLY 1-600 SLICES CLEAR      (or SLICES SET 0: back to the stretch/fill draw)
++                     202 = applied from the next frame, 403 = rejected (bad count/number, bow-tie or degenerate quad, src outside the raster); the previous slices stay.
++                     INFO shows screen/slices (count) and screen/slice/[n]/src|dst|opacity|feather|clip.
+             </screen>
+             <ndi>
+                 <name>[custom name]</name>
+-- 
+2.53.0
+

@@ -9,6 +9,9 @@
 const { normalizeDeviceGraph } = require('../config/device-graph')
 const { releaseDecklinkOutputsForMappingNode } = require('./device-view-decklink-wiring')
 const { saveConfig } = require('./device-view-crud-save')
+const { reconcileNodeSettings } = require('../config/mapping-slices-model')
+const { planMappingNode } = require('../config/mapping-slices-plan')
+const { planConfigSignature } = require('../config/mapping-slices-windows')
 
 function handleAddMappingNode(j, ctx) {
 	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
@@ -27,7 +30,8 @@ function handleAddMappingNode(j, ctx) {
 				{ id: 'out_1', mode: '1080p5000', label: 'Output 1' },
 				{ id: 'out_2', mode: '1080p5000', label: 'Output 2' }
 			],
-			mappings: []
+			mappings: [],
+			slices: [], // WO-869
 		}
 	}
 	
@@ -87,4 +91,42 @@ function handleRemoveMappingNode(j, ctx) {
 	return { ok: true, graph, removedId: id, casparRestartNeeded: released.casparServerChanged }
 }
 
-module.exports = { handleAddMappingNode, handleRemoveMappingNode }
+/**
+ * WO-869: `{ updateMappingSlices: { nodeId, slices, outputPos? } }` — the slice editor's save. Persists the node's
+ * slices (+ the legacy `mappings[]` mirror for the web editor) and, when only slice geometry inside a slice window
+ * changed, applies them live (`APPLY … SLICES SET`, no restart). `casparRestartNeeded` is true only when the
+ * generated config changes: an output switching backend, a DeckLink placement / GPU head moving, the window raster.
+ * `outputPos` ({outId: {x, y}}) moves outputs on the node's window canvas.
+ * @param {object} j
+ * @param {object} ctx
+ */
+async function handleUpdateMappingSlices(j, ctx) {
+	const body = j.updateMappingSlices && typeof j.updateMappingSlices === 'object' ? j.updateMappingSlices : {}
+	const id = String(body.nodeId || '').trim()
+	if (!id) return { error: 'Missing nodeId' }
+	if (!Array.isArray(body.slices)) return { error: 'slices must be an array' }
+	const g0 = normalizeDeviceGraph(ctx.config?.deviceGraph)
+	const node = (g0.devices || []).find((d) => String(d?.id || '') === id && d.role === 'pixel_mapping')
+	if (!node) return { error: 'Not found', id }
+	const prevPlan = planMappingNode(node, { graph: g0 })
+	const pos = body.outputPos && typeof body.outputPos === 'object' ? body.outputPos : {}
+	const outputs = (Array.isArray(node.settings?.outputs) ? node.settings.outputs : []).map((o) => {
+		const p = pos[String(o?.id || '')]
+		if (!p || !Number.isFinite(Number(p.x)) || !Number.isFinite(Number(p.y))) return o
+		return { ...o, pos: { x: Math.round(Number(p.x)), y: Math.round(Number(p.y)) } }
+	})
+	const settings = reconcileNodeSettings({ ...(node.settings || {}), outputs, slices: body.slices }, node.settings).settings
+	const nextNode = { ...node, settings }
+	const graph = normalizeDeviceGraph({ ...g0, devices: g0.devices.map((d) => (d === node ? nextNode : d)) })
+	ctx.config.deviceGraph = graph
+	saveConfig(ctx, { deviceGraph: graph })
+	const plan = planMappingNode(nextNode, { graph })
+	const casparRestartNeeded = planConfigSignature(prevPlan) !== planConfigSignature(plan)
+	let live = { applied: false }
+	if (!casparRestartNeeded && plan.window) {
+		live = await require('../engine/mapping-slices-apply').applyMappingNodeSlices(ctx, id, ctx.config)
+	}
+	return { ok: true, graph, nodeId: id, slices: settings.slices, plan, casparRestartNeeded, live }
+}
+
+module.exports = { handleAddMappingNode, handleRemoveMappingNode, handleUpdateMappingSlices }

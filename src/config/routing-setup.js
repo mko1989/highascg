@@ -357,10 +357,16 @@ async function warmLookDeckThumbnails(self) {
 	)
 }
 
-async function setupMappingChannels(_self) {
+async function setupMappingChannels(self) {
 	// Pixel-map → DeckLink is expressed in generated Caspar XML as one program channel (custom width)
 	// plus a single decklink consumer with subregions and synced ports — no extra mapping channels or AMCP mirrors.
-	return
+	// WO-869: a mapping node's slice window (screen consumer 640+k on its feed's PGM channel) gets the node's
+	// current slices again — the XML <slices> is only the baseline the config was generated with.
+	try {
+		await require('../engine/mapping-slices-apply').reapplyAllMappingSlices(self)
+	} catch (e) {
+		self?.log?.('warn', `[mapping-slices] re-apply: ${e?.message || e}`)
+	}
 }
 
 /**

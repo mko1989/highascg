@@ -70,6 +70,24 @@ function resolveOutputDefForMapOutConnector(mapOutConn, outputs) {
 }
 
 /**
+ * WO-869: where each output's head sits on the node's canvas and how big it is, from the slice plan (replaces the
+ * legacy `mappings[].rect` read). A `direct` output (one 1:1 slice, or a refused one showing its first slice) is
+ * today's head: at the slice's src x/y, src-sized. A `screen-slices` output sits at its `pos`, output-sized — the
+ * node's slice window covers it. Outputs without slices are absent (callers keep their legacy fallbacks).
+ * @returns {Map<string, {x:number,y:number,w:number,h:number}>}
+ */
+function sliceHeadRects(node) {
+	const { planMappingNode } = require('../config/mapping-slices-plan')
+	const plan = planMappingNode(node, { sinks: new Map((node?.settings?.outputs || []).map((o) => [String(o?.id || ''), 'gpu'])) })
+	const out = new Map()
+	for (const r of plan.outputs) {
+		if (r.backend === 'screen-slices') out.set(r.outputId, { x: r.pos.x, y: r.pos.y, w: r.size.w, h: r.size.h })
+		else if (r.direct) out.set(r.outputId, { x: r.direct.src.x, y: r.direct.src.y, w: r.direct.src.w, h: r.direct.src.h })
+	}
+	return out
+}
+
+/**
  * Union bounding size of a pixel-mapping node's logical canvas from `outputs` + `mappings`
  * (same rules as Caspar merge / GPU path in `pixel-mapping-config.js`).
  *
@@ -78,8 +96,8 @@ function resolveOutputDefForMapOutConnector(mapOutConn, outputs) {
  */
 function computePixelMappingCanvasUnion(node) {
 	const outputs = Array.isArray(node?.settings?.outputs) ? node.settings.outputs : []
-	const mappings = Array.isArray(node?.settings?.mappings) ? node.settings.mappings : []
 	if (!outputs.length) return null
+	const heads = sliceHeadRects(node)
 	let maxR = 0
 	let maxB = 0
 	let fpsForCanvas = 50
@@ -91,27 +109,16 @@ function computePixelMappingCanvasUnion(node) {
 		const w = spec?.width ?? 1920
 		const h = spec?.height ?? 1080
 		const f = spec?.fps ?? 50
-		const slice = mappings.find((m) => String(m.outputId) === String(outDef?.id || ''))
+		const head = heads.get(String(outDef?.id || ''))
 		let px
 		let py
 		let pw
 		let ph
-		if (
-			slice &&
-			slice.rect &&
-			Number.isFinite(Number(slice.rect.w)) &&
-			Number(slice.rect.w) > 0 &&
-			Number.isFinite(Number(slice.rect.h)) &&
-			Number(slice.rect.h) > 0
-		) {
-			const rx = Number(slice.rect.x)
-			const ry = Number(slice.rect.y)
-			const rw = Number(slice.rect.w)
-			const rh = Number(slice.rect.h)
-			px = Number.isFinite(rx) ? rx : 0
-			py = Number.isFinite(ry) ? ry : 0
-			pw = rw
-			ph = rh
+		if (head) {
+			px = head.x
+			py = head.y
+			pw = head.w
+			ph = head.h
 		} else {
 			px = cumX
 			py = 0
@@ -146,6 +153,8 @@ function buildMappingGpuLayoutArtifacts(config) {
 	const byId = new Map(connectors.map((c) => [String(c?.id || ''), c]))
 	/** @type {Map<string, { width: number, height: number, fps: number } | null>} */
 	const unionCache = new Map()
+	/** @type {Map<string, Map<string, {x:number,y:number,w:number,h:number}>>} */
+	const headCache = new Map()
 
 	/** @type {MappingGpuLayoutEntry[]} */
 	const mappingGpuOutputs = []
@@ -172,7 +181,6 @@ function buildMappingGpuLayoutArtifacts(config) {
 		if (!sysId) continue
 
 		const outputs = Array.isArray(node.settings?.outputs) ? node.settings.outputs : []
-		const mappings = Array.isArray(node.settings?.mappings) ? node.settings.mappings : []
 		const { outDef } = resolveOutputDefForMapOutConnector(src, outputs)
 		if (!outDef) continue
 
@@ -180,15 +188,16 @@ function buildMappingGpuLayoutArtifacts(config) {
 		const { width: baseW, height: baseH, fps: baseFps } = resolveOutputPixelSize(outDef)
 
 		const oid = String(outDef.id || '').trim()
-		const slice = mappings.find((m) => String(m?.outputId || '') === oid)
-		const rx = Number(slice?.rect?.x)
-		const ry = Number(slice?.rect?.y)
-		const rw = Number(slice?.rect?.w)
-		const rh = Number(slice?.rect?.h)
-		const x = Number.isFinite(rx) ? rx : 0
-		const y = Number.isFinite(ry) ? ry : 0
-		const w = Number.isFinite(rw) && rw > 0 ? rw : baseW
-		const h = Number.isFinite(rh) && rh > 0 ? rh : baseH
+		let heads = headCache.get(nodeId)
+		if (!heads) {
+			heads = sliceHeadRects(node)
+			headCache.set(nodeId, heads)
+		}
+		const head = heads.get(oid)
+		const x = head ? head.x : 0
+		const y = head ? head.y : 0
+		const w = head ? head.w : baseW
+		const h = head ? head.h : baseH
 
 		const headMode = String(node.settings?.osXrandrHeadMode || 'slice').toLowerCase()
 		let union = unionCache.get(nodeId)
@@ -242,6 +251,7 @@ function buildMappingGpuLayoutArtifacts(config) {
 }
 
 module.exports = {
+	sliceHeadRects,
 	buildMappingGpuLayoutArtifacts,
 	resolveOutputDefForMapOutConnector,
 	computePixelMappingCanvasUnion,

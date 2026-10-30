@@ -50,7 +50,7 @@ async function main() {
 
 	// WO-807: 07_pixel_map needs the fixture engine (tracking plugin), a loopback-only copy of the MHP patch and a known
 	// picture on the sandbox's PGM 1 surface (tools/e2e/pixel-map-fixture.js)
-	const pixelMap = scenarios === 'all' || scenarios.split(',').some((s) => s === '07_pixel_map' || s === '11_wo843_sweep') // 11: WO-843's pixel-map click
+	const pixelMap = scenarios === 'all' || scenarios.split(',').some((s) => s === '07_pixel_map' || s === '11_wo843_sweep' || s === '16_wo869_mapping_slices') // 11: WO-843's pixel-map click; 16: WO-869's input picture
 	const pm = pixelMap ? require('./pixel-map-fixture') : null
 	// WO-857: 14_wo857_console_selection needs the fixture engine, 7 loopback heads and a free UDP port for the grandMA3 plugin
 	// listener (the scenario plays the plugin and sends its datagrams there)

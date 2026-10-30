@@ -14,11 +14,10 @@ extends MarginContainer
 ## the rear panel's "+" adds an output (output_port_controls.gd).
 ## Slice 7: a click on the rear panel's background (not a port, cable or "+") opens the Caspar server page
 ## (server_controls.gd — frame rate, CEF, network, hot backup), like the web's casparBand → selectDevice(CASPAR_HOST).
-## Slice 7c: the "Mapping nodes" column (mapping_panel.gd) between the destinations and the rear panel; a card (or a
-## mapping connector focused from a destination) opens the node page (mapping_controls.gd).
-## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd); Load opens from WO-608.
-## Slice 10: the header (devices_toolbar.gd) toggles the Matrix view (matrix_view.gd) in place of the panels, and
-## the Node view (node_panel.gd's cards in place of the rear panel, Bézier cables). The cables list is cables_list.gd.
+## Slice 7c: the "Mapping nodes" column (mapping_panel.gd); a card or a mapping connector opens the node page
+## (mapping_controls.gd), whose "Edit slices" (WO-869) shows slice_editor.gd in place of the body.
+## Slice 8: the header's download arrow saves a device snapshot (snapshot_dialogs.gd). Slice 10: the toolbar toggles
+## the Matrix view (matrix_view.gd) and the Node view (node_panel.gd, Bézier cables). Cables list: cables_list.gd.
 
 const Model := preload("res://features/devices/devices_model.gd")
 const PortIcon := preload("res://features/devices/port_icon.gd")
@@ -43,6 +42,7 @@ const NodePanel := preload("res://features/devices/node_panel.gd")
 const NV := preload("res://features/devices/node_view_model.gd")
 const CablesList := preload("res://features/devices/cables_list.gd")
 const InspectorPanel := preload("res://app/inspector_panel.gd")
+const SliceEditor := preload("res://features/devices/slice_editor.gd")
 
 var _dests: DestinationsPanel
 var _rear: RearPanel
@@ -64,6 +64,7 @@ var _outp: OutputControls
 var _server: ServerControls
 var _maps: MappingPanel
 var _mapc: MappingControls
+var _slices: SliceEditor
 var snapshots: SnapshotDialogs
 var live_inputs: LiveInputDialog
 var _payload := {}  # the merged device-view payload the page was built from
@@ -133,30 +134,23 @@ func _ready() -> void:
 			_gesture.selected_edge = ""
 			_sync())
 	_gpu = GpuControls.new()
-	add_child(_gpu)
-	_gpu.status.connect(_set_status)
-	_gpu.dirty.connect(func() -> void: _gesture.set_dirty(true))
-	_gpu.reload.connect(func(_dirty: bool) -> void: refresh())
 	_deck = DeckLinkControls.new()
-	add_child(_deck)
-	_deck.status.connect(_set_status)
-	_deck.dirty.connect(func() -> void: _gesture.set_dirty(true))
-	_deck.reload.connect(func(_dirty: bool) -> void: refresh())
 	_outp = OutputControls.new()
-	add_child(_outp)
-	_outp.status.connect(_set_status)
-	_outp.dirty.connect(func() -> void: _gesture.set_dirty(true))
-	_outp.reload.connect(func(_dirty: bool) -> void: refresh())
 	_server = ServerControls.new()
-	add_child(_server)
-	_server.status.connect(_set_status)
-	_server.dirty.connect(func() -> void: _gesture.set_dirty(true))
-	_server.reload.connect(func(_dirty: bool) -> void: refresh())
 	_mapc = MappingControls.new()
-	add_child(_mapc)
-	_mapc.status.connect(_set_status)
-	_mapc.dirty.connect(func() -> void: _gesture.set_dirty(true))
-	_mapc.reload.connect(func(_dirty: bool) -> void: refresh())
+	for page in [_gpu, _deck, _outp, _server, _mapc]:  # the Inspector page controllers
+		add_child(page)
+		page.status.connect(_set_status)
+		page.dirty.connect(func() -> void: _gesture.set_dirty(true))
+		page.reload.connect(func(_dirty: bool) -> void: refresh())
+	_slices = SliceEditor.new()  # WO-869: "Edit slices" — the node's canvases in place of the body
+	_slices.visible = false
+	v.add_child(_slices)
+	_slices.closed.connect(_close_slices)
+	_mapc.edit_slices.connect(func() -> void:
+		_slices.open(_mapc.slices)
+		_slices.set_meta("open", true)
+		_show_mode())
 	var mid := ScrollContainer.new()
 	mid.custom_minimum_size.x = 190
 	mid.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -227,9 +221,11 @@ func _ready() -> void:
 
 
 func _show_mode() -> void:
-	var matrix := _bar.mode() == "matrix"
-	_body.visible = not matrix
-	_cables.visible = not matrix
+	var editing := _slices.has_meta("open")
+	_slices.visible = editing
+	var matrix := _bar.mode() == "matrix" and not editing
+	_body.visible = not matrix and not editing
+	_cables.visible = not matrix and not editing
 	_matrix.visible = matrix
 	_cables.simple = _bar.mode() == "simple"
 	_rear.visible = not _cables.simple
@@ -268,8 +264,7 @@ func inspect_destination(id: String) -> void:
 	_dests.select(id)
 
 
-## Something outside the tab changed Caspar's plan (a DeckLink dropped on Sources).
-func mark_restart_dirty() -> void:
+func mark_restart_dirty() -> void:  # something outside the tab changed Caspar's plan (a DeckLink dropped on Sources)
 	_gesture.set_dirty(true)
 
 
@@ -373,6 +368,7 @@ func _close_port() -> void:
 			InspectorPanel.current.release(_server.page)
 	if _mapc.node_id != "":
 		_mapc.close()
+		_close_slices()
 		_maps.highlight("")
 		if InspectorPanel.current != null:
 			InspectorPanel.current.release(_mapc.page)
@@ -394,6 +390,11 @@ func _open_server() -> void:
 	_server.show_server(_payload, DevicesTarget.settings.settings)
 	if InspectorPanel.current != null:
 		InspectorPanel.current.present(_server.page)
+
+
+func _close_slices() -> void:
+	if _slices.has_meta("open"):
+		_slices.remove_meta("open"); _slices.close(); _show_mode()
 
 
 ## Gesture state → port tints, the overlay (selected / held / ghost), the toolbar and the cables list.
@@ -431,7 +432,7 @@ func _set_status(text: String, ok: bool) -> void:
 ## row label or socket opens its page, then a cable selects;
 ## anything else cancels an armed gesture (web: empty space restores) and lets the click through.
 func _input(event: InputEvent) -> void:
-	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or live_inputs.is_open() or _matrix.visible:
+	if not is_visible_in_tree() or _confirm.visible or snapshots.is_open() or live_inputs.is_open() or _matrix.visible or _slices.visible:
 		return
 	if event is InputEventMouseMotion:
 		var lp: Vector2 = _cables.get_global_transform().affine_inverse() * event.global_position

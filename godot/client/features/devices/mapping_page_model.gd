@@ -133,7 +133,9 @@ static func rect_fields(node: Dictionary, out: Dictionary) -> Dictionary:
 
 
 ## The node page. `ui` = per output index {mode, cw, ch, cf, x, y, w, h} as the operator left them (none = as opened).
-static func items(payload: Dictionary, id: String, ui := {}) -> Array:
+## `slices` (WO-869, the Godot page): no per-output Src fields — slice_page_model.gd's section replaces them. The
+## default keeps the web page's item list (the golden replay of the web inspector).
+static func items(payload: Dictionary, id: String, ui := {}, slices := false) -> Array:
 	var node := G.find_node(payload.get("graph"), id)
 	if node.is_empty():
 		return [{"t": "note", "text": NOT_FOUND}]
@@ -155,7 +157,7 @@ static func items(payload: Dictionary, id: String, ui := {}) -> Array:
 			{"t": "caption", "text": "Mode"}, {"t": "select", "key": k + "mode", "value": f.mode, "options": modes, "disabled": false}])
 		for c in ["cw", "ch", "cf"]:
 			out.append({"t": "input", "key": k + c, "value": f[c], "disabled": f.mode != "custom"})
-		for c in [["Src X", "x"], ["Src Y", "y"], ["Width", "w"], ["Height", "h"]]:
+		for c in ([] if slices else [["Src X", "x"], ["Src Y", "y"], ["Width", "w"], ["Height", "h"]]):
 			out.append({"t": "caption", "text": c[0]})
 			out.append({"t": "input", "key": k + c[1], "value": f[c[1]], "disabled": false})
 	out.append_array([{"t": "button", "text": "+ Add Output", "key": "+ Add Output"}, {"t": "heading", "text": "Actions"},

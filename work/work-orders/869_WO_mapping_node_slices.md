@@ -1,7 +1,7 @@
 # WO-869 — Mapping node slices: cut a screen destination's output into slices and place them freely on an output canvas (Resolume-style)
 
 **Area:** devices-config, amcp, godot-client
-**Status: OPEN (30.10) — investigation + design, not implemented**
+**Status: IN PROGRESS (30.10) — P1 model/planner/API, P2 Godot editor and P3 path (b) (fork APPLY + screen slices, generator, live APPLY) built and verified offline, in the GUI sandbox and on a scratch Caspar; waiting for the Caspar binary swap (§5 READY TO SWAP) and owner QA on real heads; path (a) route-slices not built (§6)**
 
 Owner 30.10: "need also a way inside mapping node to slice the output of a screen destination and position it freely on a set canvas output. similar to how resolume works with slices. i have a round around way of doing this with rendering the canvas then playing its sliced up routes on the output, but there must be an easier way to do this. doesnt caspar has something built in for these purposes? if not there needs to be a pull request that has something similar."
 
@@ -258,9 +258,82 @@ Why not (b) only: it cannot serve SDI and cannot take per-slice sources, and the
 
 ---
 
-## 4. Not done / what remains
+## 4. What was done (30.10)
 
-Nothing is implemented. No code, config or binary was changed; the Caspar tree and the live box were only read (AMCP and API untouched). Upstream material was fetched with `gh` into `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo869/` (outside the repo and outside `~/caspar-build`). INDEX.md and OPEN_ISSUES.md rows are added by the caller.
+Backend = path (b) for GPU heads (the planner's default case). SDI = placement only (Q2). Path (a) is planned but not built.
+
+**Model, migration, planner (pure, `src/config/`)**
+- `mapping-slices-model.js`: the `settings.slices[]` model from §2.0 and its normaliser. It migrates legacy `mappings[]` to one 1:1 slice per output (legacy `rotation` dropped and counted, Q10). It writes the legacy `mappings[]` mirror back, and `foldLegacyEdit` takes web-editor edits of that mirror back into slices, so the web editor keeps working (Q4).
+- `mapping-slices-geometry.js`: `dstQuad`, which returns the screen corners (rect, then rotate about the centre, then warp per corner, then the flip permutation) in SOURCE corner order. Also `isConvexQuad`, `isOneToOne` and the homography.
+- `mapping-slices-plan.js`: the backend for each output: direct, screen-slices, route-slices (planned only), refused or idle.
+  - Over the channel budget, route-slices is refused (Q3).
+  - Feather is stored as screen sides. `quadFeather` swaps it for flips, because the fork feathers along the quad edges.
+  - One window per node (Q8): when a node has a slice window, its other GPU heads that show a slice join it, so no PGM window has to cover the same heads.
+- `mapping-slices-windows.js`: `sliceWindowsFromConfig` gives device 41+k, which is consumer index 640+k. It also holds the 21-number `SLICES SET` contract (`slicesSetParams`, `sliceNumbers`), `slicesXml` and `planConfigSignature`, which decides restart vs live edit.
+- `pixel-mapping-config.js`: DeckLink tiles take `src`/`destX`/`destY` from the plan, so a single SDI slice can be placed anywhere (the hard-coded `destX: 0` is gone). `utils/mapping-gpu-os-layout.js` `sliceHeadRects`: a screen-slices head sits at its output `pos`.
+
+**API and engine**
+- `api/device-view-crud-mapping.js`: `updateMappingSlices` (and `outputPos`) answer `casparRestartNeeded` when the config signature changes; otherwise they apply live. `api/routes-device-view.js`: GET returns migrated slices plus `mappingSlicePlans`.
+- `engine/mapping-slices-apply.js`: `APPLY <pgm ch>-<640+k> SLICES SET …`. The set is sent whole, serialised per node. A refusal is reported, never thrown. `config/routing-setup.js` calls `reapplyAllMappingSlices(self)` on every (re)connect.
+
+**Generator (P3, new `config-generator-slice-windows.js` plus two one-line hooks)**
+- `applySliceWindowsToScreens` (called from `build-caspar-generator-config.js` after `reconcileDecklinkScreenConsumerFlags`) writes `screen_N_slice_windows`. It turns the PGM `<screen>` off when every GPU head that screen reaches is in a slice window.
+- `sliceWindowScreensXml` (hook in `config-generator-consumer-attach-screen.js`, PGM `<consumers>`) writes one `<screen>` per window on the feed's PGM channel:
+  - `<device>41+k</device>`;
+  - x/y = the window's bounding box of heads, which are the same numbers xrandr gets;
+  - window-sized, stretch none;
+  - vsync/gpu-texture policy;
+  - the `<slices>` baseline.
+- Legacy direct-only nodes generate byte-for-byte what they did before.
+
+**Godot editor (P2, `godot/client/features/devices/`)**
+- `slice_model.gd` (port of the JS model and geometry, pinned by goldens), `slice_page_model.gd`, `slice_flow.gd` (coalesced saves, restart vs live status), `slice_inspector.gd` (slice list and RULES.md number fields in the Inspector, Q1), `slice_canvas_math.gd`, `slice_canvas_src.gd` (live feed picture via `VideoSurfaces` `pgm<N>`, draw/move/resize, 8 px snap, Alt for no snap), `slice_canvas_dst.gd` (textured quads through the homography; move, scale, rotate knob with Shift for 15°, convex-clamped warp corners) and `slice_editor.gd` (both canvases in the Devices tab centre: output tabs, Transform/Warp, Flip H/V, Reset warp, Done).
+- Edited: `mapping_controls.gd` (slice section; Src X/Y/W/H fields removed from the Godot page), `mapping_page_model.gd`, `mapping_graph.gd` (remove/duplicate output carry slices) and `devices_tab.gd` (hosts the editor).
+
+**Caspar fork (`~/caspar-build/src-v2`, branch `wo742-shm-producer`, on top of `e8d457ec6`; `e4e1e7ef3`/`2747aaa47`/`e8d457ec6` kept, the 19 uncommitted WO-820/800 entries untouched)**
+- `ce7132e50`: cherry-pick of upstream #1638 (`APPLY`, `frame_consumer::call`).
+- `deac375bb`: screen consumer slices. These are N src rects onto perspective-correct dst quads, with opacity, feather along the quad edges, a per-slice clip and the `<slices>` XML. `APPLY … SLICES SET n <21 nums>` / `SLICES CLEAR` answer 202/403, the old binary answers 400, and `INFO` shows `screen/slices`.
+- Patch: `caspar/patches/wo869-screen-slices-apply.patch`. Build: `~/caspar-build/build-26/shell/casparcg`, md5 `ab668967e2ba73b8f67956a9356b92a7`. Not deployed: the live `bin/casparcg` is still `fb955e76` (WO-847).
+
+## 5. What was VERIFIED
+
+- **Node smokes** (all in `tools/ci/offline-test-files-3.js`): wo869 model 16/16, plan 17/17, api 5/5, slice-golden 1/1, slice-windows-generator 5/5 = **44/44**.
+  - The api smoke goes through the real `handlePost`/`handleGet` with JSON.stringify bodies.
+  - The generator smoke pins the exact `<screen>` block, PGM-window-off and -kept cases, no window without a feed, no stale keys, and the hook source text.
+- **Curated offline suite** `node tools/ci/run-offline-tests.js`: 4881 tests, 4876 pass, **0 fail**. `node tools/ci/check-max-file-lines.js`: 0 files over 500 lines.
+- **Godot suite** `run_tests.gd`: **23885 passed, 0 failed**, including `tests/test_devices_mapping_slices.gd`, which compares against the golden `tests/golden/devices_mapping_slices.json` written by the JS smoke.
+- **GUI e2e** `16_wo869_mapping_slices` (real drags in the sandbox, pixel-map fixture picture): **11/11**.
+  - Run 30.10 twice; the final run is after the P3 planner change.
+  - A combined run with 02_outputs, 10_cable_pull and 11_wo843_sweep: 30 passed, 0 failed.
+  - Screenshots: `/tmp/claude-1000/-home-casparcg/03d195b7-40ef-44d0-b117-27e2e6a3e0d1/scratchpad/wo869/e2e2/shots/01…11_*.png`, plus `…/wo869/e2e4/shots/` from the final run.
+- **Fork on a scratch Caspar** (Xvfb :169, AMCP 5264, killed by PID; evidence in `…/scratchpad/wo869/fork/`):
+  1. with no slices the picture is pixel-identical to before;
+  2. 5 config slices: the projective probe finds 0 bad points;
+  3. live APPLY answers 202 and the window is not recreated;
+  4. 17 invalid inputs answer 403;
+  5. CLEAR and SET 0 restore the full frame;
+  6. the opacity/feather ramp is exact;
+  7. per-window APPLY `1-601` works;
+  8. no measurable fps cost.
+- **HighAsCG generator → scratch Caspar end to end** (`…/scratchpad/wo869/gen/run.sh`, binary md5 `ab668967…`):
+  - The config is built by the real `buildCasparGeneratorFlatConfig` + `buildConfigXml` from a 2-output GPU node with 4 slices (scale, flipV, keystone, 90° rotation). The PGM channel carries only the device-41 slice window (PGM window off). For the probe, gpu-texture was switched to false and audio removed.
+  - Probe of the 3840×1080 window: covered ok=47193, **bad=0**; black ok=35636, bad=0.
+  - A live edit through the real `updateMappingSlices` handler gave `casparRestartNeeded:false` and one `APPLY 1-640 SLICES SET 4 …`. The scratch Caspar answered `202 APPLY OK`, and `INFO 1` shows 4 slices.
+  - Probe after the edit: covered ok=45192, **bad=0**. The old expectation against the new picture gives bad=4585, so the probe tells the two apart. There was one screen-consumer window before and after.
+  - Screenshots: `…/wo869/gen/g1-config.png`, `g2-apply.png`.
+- Not touched: the live device graph and project, Apply on the box, the highascg service, display :0.
+
+## 6. What remains
+
+- **Binary swap (owner):** the fork build above is READY TO SWAP. Until it is swapped, a generated slice window on the old binary ignores `<slices>` and shows the whole channel stretched into the window, and the live APPLY is refused (400, logged as a warning).
+- **Caps probe:** the planner assumes the running Caspar has screen slices (`caps.screenSlices` is never set). A connect-time probe (`APPLY <ch>-640 SLICES SET 0`, where 400 means none) that sets the caps and falls back to `refused`/direct is not built.
+- **Path (a) route-slices** (SDI scaling/rotation and per-slice sources): the planner models it and the budget refusal (Q3), but there is no generator or apply code. It also needs #1814 (crop leak) in the fork.
+- **Real GPU check:** the gpu-texture path (forced on in production) is not pixel-verified. On Xvfb its baseline is black even without slices, so the probes ran with `gpu-texture=false`. Check on the box after the swap: real heads, a slice window over the xrandr layout, and window stacking.
+- **Fork caveat:** an intermittent startup SEGV with two screen windows on one channel on Xvfb, seen with both the old and the new binary (not caused by this change). Watch for it on the box, where the PGM window plus a slice window means two windows when another GPU cable keeps the PGM window on.
+- **Not tested:** a channel format change while a window is live; re-apply after a real Caspar restart (the code path is smoke-tested only).
+- **Planner edge:** a node with a slice window plus an empty GPU output (no slice) keeps that output `direct`, so the PGM window stays on and may overlap the slice window.
+- **Owner QA:** one pass of the editor against a real two-head wall or LED processor.
+- INDEX.md / OPEN_ISSUES.md are not updated and `build-index` was not run, per instructions. The status line changed, so `node tools/wo/build-index.js` is due.
 
 ## Owner decisions (30.10)
 
