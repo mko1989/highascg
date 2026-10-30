@@ -80,7 +80,15 @@ module.exports = {
 			 * opened (measured 160 ms at every wrap). Consumed by `_sendClipTransport`. */
 			const seamlessPrev = opts?.seamless && prevAir === id ? this._prevKey : null
 			if (prevAir === id) {
-				this._prevKey = new Map()
+				/* WO-829: a layer with no clip at the new position keeps its cache entry, so `_syncAmcpLayers`
+				 * sends it the normal exit STOP — an empty map left a clip that ended at the timeline end on
+				 * air for the whole next loop pass (no STOP 1-211 at the wrap). */
+				const ended = new Map()
+				for (const [key, v] of this._prevKey) {
+					const layer = tl.layers[this._timelineLayerIndex(Number(key.split('-')[1]))]
+					if (v?.clipId && layer && !this._clipAt(layer, pos)) ended.set(key, v)
+				}
+				this._prevKey = ended
 				this._lastKfValues.clear()
 				this._lastKfSegment.clear()
 			}

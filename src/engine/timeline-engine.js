@@ -67,10 +67,12 @@ class TimelineEngine extends EventEmitter {
 	update(id, tl) {
 		if (!this.timelines.has(id)) return null
 		const updated = { ...tl, id }
+		/* WO-829: setSendTo diffs against the STORED routing — storing the new sendTo first made
+		 * routingChanged always false, so moving an on-air timeline off program never STOPped program. */
+		const reroute = updated.sendTo && typeof updated.sendTo === 'object' && this._airTimelineId === id ? updated.sendTo : null
+		if (reroute) updated.sendTo = this.timelines.get(id).sendTo
 		this.timelines.set(id, updated)
-		if (updated.sendTo && typeof updated.sendTo === 'object' && this._airTimelineId === id) {
-			this.setSendTo(updated.sendTo, id)
-		}
+		if (reroute) this.setSendTo(reroute, id)
 		this._emitChange()
 		// Clip edits (e.g. audioRoute) must refresh PLAY/LOAD+AF while this timeline is on air.
 		// Never force=true here — redundant PUTs (sync before resume, mouseup) must not CALL SEEK or STOP+PLAY.

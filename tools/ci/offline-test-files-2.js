@@ -51,4 +51,5 @@ module.exports = [
 	'tools/smoke/smoke-wo827-web-deck-import-repaint.test.js',
 	'tools/smoke/smoke-wo828-timeline-look-take-deviations.test.js',
 	'tools/smoke/smoke-wo828-d9-cut-timeline-hold.test.js',
+	'tools/smoke/smoke-wo829-timeline-wrap-and-reroute.test.js',
 ]

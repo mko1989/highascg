@@ -9,10 +9,12 @@ const {
 	TIMELINE_LAYER_BASE,
 	timelineCasparLayer,
 	normalizeTimelineSendTo,
+	TICK_MS,
 } = require('./timeline-playback-helpers')
 const { clipTransportMeta } = require('./timeline-playback-amcp-schedule')
 const { opacitySegmentAtLocalMs, buildDeferredSegmentMixerLines } = require('./timeline-keyframe-mixer')
 const { scrubSeek, cancelScrub } = require('./timeline-scrub-gate')
+const { resolveChannelFramerateForMixerTween } = require('./scene-transition')
 
 module.exports = {
 	_logDebug(msg) {
@@ -180,7 +182,7 @@ module.exports = {
 
 					if (meta.loopAlways) {
 						if (needsFullTransport || (force && !playing && !prev)) {
-							const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
+							const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true, localMs: ms - clip.startTime })
 							transportSent = true
 							if (result?.hasDeferredLines) {
 								mixerDirty.add(ch)
@@ -200,7 +202,7 @@ module.exports = {
 							transportSent = true
 						}
 					} else if (needsFullTransport) {
-						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true })
+						const result = this._sendClipTransport(ch, caspLayer, clip, meta, { playing, startTransport: true, localMs: ms - clip.startTime })
 						transportSent = true
 						if (result?.hasDeferredLines) {
 							mixerDirty.add(ch)
@@ -253,7 +255,8 @@ module.exports = {
 						this._applyClipMixer(ch, caspLayer, clip, ms - clip.startTime, {
 							force,
 							playing,
-							fps: Math.max(1, tl.fps || 25),
+							// WO-829: MIXER tween durations count CHANNEL frames (a 25p timeline on a 50p channel faded in half the time)
+							fps: Math.max(1, resolveChannelFramerateForMixerTween(self, ch, tl.fps)),
 							scheduleLeadTween: take,
 							takeFade,
 							collectLines: lines,
@@ -353,9 +356,15 @@ module.exports = {
 
 		// T173.2: check if there's an opacity segment tween at clip-local 0
 		// Determine if we'll use a tween or just init opacity
-		const fps = 25 // default; could be taken from timeline context if needed
+		const fps = Math.max(1, resolveChannelFramerateForMixerTween(self, ch, 25)) // WO-829: channel frames
 		const clipOpacityBase = clip.opacity != null ? clip.opacity : 1
-		const opacitySeg = opacitySegmentAtLocalMs(clip, 0, fps, this._interpProp.bind(this), clipOpacityBase)
+		/* WO-829: the lead tween is for a clip ENTERED at its start (a tick lands up to ~2 ticks late). A transport
+		 * started mid-clip (play/take from a position) must not fade the clip-local-0 segment in — that put a clip
+		 * keyframed to 0 at full; `_applyClipMixer(force)` right after sets the keyframed value at the real position. */
+		const enteredAtStart = !(Number(opts.localMs) > 2 * TICK_MS)
+		const opacitySeg = enteredAtStart
+			? opacitySegmentAtLocalMs(clip, 0, fps, this._interpProp.bind(this), clipOpacityBase)
+			: null
 		const hasOpacityTween = opacitySeg && opacitySeg.startVal !== opacitySeg.endVal
 
 		// Add opacity init if NO tween (else the tween start value will set it). Base is the clip's
@@ -365,7 +374,9 @@ module.exports = {
 			const opacityKfs = (clip.keyframes || [])
 				.filter((k) => k.property === 'opacity')
 				.sort((a, b) => a.time - b.time)
-			if (opacityKfs.length > 0) {
+			if (opacityKfs.length > 0 && !enteredAtStart) {
+				initialOpacity = this._interpProp(clip, 'opacity', Number(opts.localMs), clipOpacityBase)
+			} else if (opacityKfs.length > 0) {
 				const firstKf = opacityKfs[0]
 				if (firstKf.time <= 2) {
 					initialOpacity = Number.isFinite(firstKf.value) ? firstKf.value : 1
